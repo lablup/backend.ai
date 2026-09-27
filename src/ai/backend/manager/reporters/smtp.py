@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from email.mime.text import MIMEText
 from typing import Final, override
 
-from ai.backend.logging.utils import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.actions.types import OperationStatus
 from ai.backend.manager.reporters.base import (
     AbstractReporter,
@@ -14,7 +14,7 @@ from ai.backend.manager.reporters.base import (
 )
 from ai.backend.manager.types import SMTPTriggerPolicy
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 _UNDEFINED_VALUE: Final[str] = "(undefined)"
@@ -57,8 +57,8 @@ class SMTPSender:
                     from_addr=self._config.sender,
                     to_addrs=self._config.recipients,
                 )
-        except Exception as e:
-            log.error("Failed to send email: {}", e)
+        except Exception:
+            log.exception("email report send failed")
 
 
 class SMTPReporter(AbstractReporter):

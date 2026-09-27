@@ -37,7 +37,7 @@ from ai.backend.common.types import (
     VFolderMountPolicy,
     VFolderUsageMode,
 )
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.data.entity_share.types import EntityShareStatus
 from ai.backend.manager.data.permission.permission_defs import (
     VFolderPermission as VFolderRBACPermission,
@@ -105,7 +105,7 @@ from .gql_relay import AsyncNode, Connection, ConnectionResolverResult
 if TYPE_CHECKING:
     from .schema import GraphQueryContext
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 def _lent_to_users() -> sa.sql.ColumnElement[bool]:
@@ -619,11 +619,7 @@ class ModelCard(graphene.ObjectType):  # type: ignore[misc]
         try:
             return await cls.parse_row(graph_ctx, vfolder_row)
         except Exception as e:
-            log.exception(
-                "Failed to parse model card from vfolder (id: {}, error: {})",
-                vfolder_row.id,
-                repr(e),
-            )
+            log.exception("model card parse failed", vfolder_id=vfolder_row.id)
             if (
                 graph_ctx.user["role"] in (UserRole.SUPERADMIN, UserRole.ADMIN)
                 or vfolder_row.creator == graph_ctx.user["email"]

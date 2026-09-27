@@ -25,7 +25,7 @@ from ai.backend.common.dto.manager.v2.resource_group.request import (
 from ai.backend.common.dto.manager.v2.resource_group.response import (
     AdminSearchResourceGroupsPayload,
 )
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.api.rest.v2.path_params import (
     DomainNamePathParam,
     ProjectIdPathParam,
@@ -35,7 +35,7 @@ from ai.backend.manager.api.rest.v2.path_params import (
 if TYPE_CHECKING:
     from ai.backend.manager.api.adapters.resource_group.adapter import ResourceGroupAdapter
 
-log: Final = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log: Final = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 class V2ResourceGroupHandler:

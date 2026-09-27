@@ -13,14 +13,14 @@ from sqlalchemy.sql.selectable import Select
 
 from ai.backend.common.data.entity.resource_preset import ResourcePresetID
 from ai.backend.common.types import ResourceSlot
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.models.base import (
     GUID,
     Base,
     ResourceSlotColumn,
 )
 
-log = BraceStyleAdapter(logging.getLogger("ai.backend.manager.models"))
+log = StructuredLogger(logging.getLogger("ai.backend.manager.models"))
 
 __all__: Sequence[str] = ("resource_presets",)
 

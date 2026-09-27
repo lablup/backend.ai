@@ -10,7 +10,7 @@ from uuid import UUID
 from ai.backend.common.data.entity.deployment import DeploymentID
 from ai.backend.common.data.entity.replica_group import ReplicaGroupID
 from ai.backend.common.data.filter_specs import UUIDInMatchSpec
-from ai.backend.logging.utils import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.data.deployment.types import (
     DeploymentHandlerOptions,
     DeploymentInfo,
@@ -71,7 +71,7 @@ from ai.backend.manager.views.replica_group import (
     RevisionReplicaCount,
 )
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 class ReplicaGroupDBSource:

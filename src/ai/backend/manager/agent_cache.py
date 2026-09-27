@@ -17,13 +17,13 @@ from ai.backend.common import msgpack
 from ai.backend.common.auth import ManagerAuthHandler, PublicKey, SecretKey
 from ai.backend.common.clients.agent.peer import PeerInvoker
 from ai.backend.common.types import AgentId
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 
 from .exceptions import AgentError, RPCError
 from .models.agent import agents
 from .models.utils import ExtendedAsyncSAEngine, execute_with_retry
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 class AgentRPCCache:
@@ -99,10 +99,10 @@ class AgentRPCCache:
         else:
             auth_handler = None
         log.debug(
-            "rpc_context(): calling ag:{} via {}, with agent_public_key:{!r}",
-            agent_id,
-            agent_addr,
-            agent_public_key.decode() if agent_public_key else None,
+            "agent rpc calling",
+            agent_id=agent_id,
+            agent_addr=agent_addr,
+            agent_public_key=agent_public_key.decode() if agent_public_key else None,
         )
         peer = PeerInvoker(
             connect=ZeroMQAddress(agent_addr),

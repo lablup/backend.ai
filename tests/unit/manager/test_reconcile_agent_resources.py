@@ -317,7 +317,7 @@ class TestReconcileAgentResources:
         with caplog.at_level(logging.WARNING):
             await registry._reconcile_agent_resources()
 
-        assert "agent_resources drift detected" not in caplog.text
+        assert "agent resource drift detected" not in caplog.text
 
         used = await self._get_agent_resource_used(db, infra.agent_id)
         assert used["cpu"] == Decimal("2")
@@ -354,8 +354,10 @@ class TestReconcileAgentResources:
         with caplog.at_level(logging.WARNING):
             await registry._reconcile_agent_resources()
 
-        assert "agent_resources drift detected" in caplog.text
-        assert infra.agent_id in caplog.text
+        assert "agent resource drift detected" in caplog.text
+        assert any(
+            getattr(record, "log_tag_agent_id", None) == infra.agent_id for record in caplog.records
+        )
 
         used = await self._get_agent_resource_used(db, infra.agent_id)
         assert used["cpu"] == Decimal("2")
@@ -397,7 +399,7 @@ class TestReconcileAgentResources:
         with caplog.at_level(logging.WARNING):
             await registry._reconcile_agent_resources()
 
-        assert "agent_resources drift detected" in caplog.text
+        assert "agent resource drift detected" in caplog.text
 
         used = await self._get_agent_resource_used(db, infra.agent_id)
         assert used["cpu"] == Decimal("6")
@@ -425,7 +427,7 @@ class TestReconcileAgentResources:
         with caplog.at_level(logging.WARNING):
             await registry._reconcile_agent_resources()
 
-        assert "agent_resources drift detected" in caplog.text
+        assert "agent resource drift detected" in caplog.text
 
         used = await self._get_agent_resource_used(db, infra.agent_id)
         assert used["cpu"] == Decimal("0")

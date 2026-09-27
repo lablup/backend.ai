@@ -24,7 +24,7 @@ from ai.backend.common.dto.manager.error_log.response import (
     ListErrorLogsResponse,
     MarkClearedResponse,
 )
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.data.error_log.types import ErrorLogSeverity
 from ai.backend.manager.dto.context import UserContext
 from ai.backend.manager.models.error_log.creators import ErrorLogCreator
@@ -40,7 +40,7 @@ from ai.backend.manager.services.user.error_log.actions.global_search import (
 from ai.backend.manager.services.user.error_log.actions.search import SearchErrorLogsAction
 from ai.backend.manager.services.user.error_log.processors import ErrorLogProcessors
 
-log: Final = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log: Final = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 class ErrorLogHandler:

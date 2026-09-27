@@ -9,7 +9,7 @@ from ai.backend.common import validators as tx
 from ai.backend.common.clients.valkey_client.valkey_live.client import ValkeyLiveClient
 from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.types import AgentId, KernelId, SessionId
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.errors.agent import AgentNotAllocated
 from ai.backend.manager.errors.api import NotImplementedAPI
 from ai.backend.manager.registry import AgentRegistry
@@ -47,7 +47,7 @@ from ai.backend.manager.services.stream.actions.untrack_connection import (
     UntrackConnectionActionResult,
 )
 
-log: Final = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log: Final = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 class StreamService:
@@ -174,10 +174,10 @@ class StreamService:
             )
             remaining = await self._valkey_live.count_active_connections(session_id)
             log.debug(
-                "conn_tracker: gc {} removed/remaining = {}/{}",
-                session_id,
-                removed_count,
-                remaining,
+                "stale stream connections collected",
+                session_id=session_id,
+                removed_count=removed_count,
+                remaining_count=remaining,
             )
             if prev_remaining > 0 and remaining == 0:
                 await self._valkey_live.update_session_last_access(session_id)

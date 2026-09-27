@@ -24,7 +24,7 @@ from ai.backend.common.dto.manager.response import (
     ObjectStorageBucketsResponse,
     ObjectStorageListResponse,
 )
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.models.object_storage.searchers import ObjectStorageSearcher
 from ai.backend.manager.models.specs.pagination import NoPagination
 from ai.backend.manager.models.specs.searcher import GlobalSearcher, ScopedSearcher
@@ -48,7 +48,7 @@ if TYPE_CHECKING:
     from ai.backend.manager.services.object_storage.processors import ObjectStorageProcessors
     from ai.backend.manager.services.storage_namespace.processors import StorageNamespaceProcessors
 
-log: Final = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log: Final = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 class ObjectStorageHandler:

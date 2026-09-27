@@ -5,7 +5,7 @@ import uuid
 from typing import Any, Final
 
 from ai.backend.common.json import load_json
-from ai.backend.logging.utils import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.errors.resource import DBOperationFailed, SessionTemplateNotFound
 from ai.backend.manager.models.session_template.row import (
     TemplateType,
@@ -56,7 +56,7 @@ from .actions.update_task_template import (
     UpdateTaskTemplateActionResult,
 )
 
-log: Final = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log: Final = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 class TemplateService:

@@ -19,7 +19,7 @@ from graphql.execution import ExecutionResult
 from ai.backend.common.api_handlers import APIResponse, BodyParam
 from ai.backend.common.dto.manager.admin.request import GraphQLRequest
 from ai.backend.common.dto.manager.admin.response import GraphQLResponse
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.api.gql.data_loader.data_loaders import DataLoaders
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.api.gql_legacy.base import DataLoaderManager
@@ -39,7 +39,7 @@ from ai.backend.manager.errors.common import ServerFrozen
 if TYPE_CHECKING:
     from strawberry import Schema as StrawberrySchema
 
-log: Final = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log: Final = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 class GQLMutationUnfrozenRequiredMiddleware:
@@ -140,11 +140,14 @@ class AdminHandler:
         )
         if result.errors:
             # Severity-classified logging is done by GQLExceptionMiddleware;
-            # keep a debug trace here for errors that bypass resolvers
+            # keep a trace log here for errors that bypass resolvers
             # (e.g. query parse/validation errors).
             for e in result.errors:
-                log.debug("ADMIN.GQL Exception: {}", e.formatted)
-                log.debug("{}", "".join(traceback.format_exception(e)))
+                log.trace(
+                    "admin graphql error",
+                    error_message=str(e.formatted),
+                    error_traceback="".join(traceback.format_exception(e)),
+                )
         return result
 
     # ------------------------------------------------------------------

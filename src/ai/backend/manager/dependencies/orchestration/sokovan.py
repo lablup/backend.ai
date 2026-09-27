@@ -16,7 +16,7 @@ from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeySta
 from ai.backend.common.dependencies import NonMonitorableDependencyProvider
 from ai.backend.common.events.dispatcher import EventProducer
 from ai.backend.common.service_discovery.service_discovery import ServiceDiscovery
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.clients.agent import AgentClientPool
 from ai.backend.manager.clients.appproxy.client import AppProxyClientPool
 from ai.backend.manager.clients.prometheus.client import PrometheusClient
@@ -55,7 +55,7 @@ from ai.backend.manager.sokovan.sokovan import SokovanOrchestrator
 from ai.backend.manager.sokovan.stages.factory import build_reconciler_coordinator
 from ai.backend.manager.types import DistributedLockFactory
 
-log = BraceStyleAdapter(logging.getLogger(__name__))
+log = StructuredLogger(logging.getLogger(__name__))
 
 
 @dataclass
@@ -219,6 +219,6 @@ class SokovanOrchestratorDependency(
             reconciler_task_specs=reconciler_task_specs,
         )
 
-        log.info("Sokovan orchestrator initialized")
+        log.info("sokovan orchestrator initialized")
 
         yield orchestrator

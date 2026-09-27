@@ -26,7 +26,7 @@ from ai.backend.common.dto.manager.v2.session.request import (
     SessionIdPathParam as SessionIdPathParamDTO,
 )
 from ai.backend.common.types import AgentId, SessionId
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.api.rest.v2.path_params import (
     AgentIdPathParam,
     ProjectIdPathParam,
@@ -37,7 +37,7 @@ from ai.backend.manager.dto.context import UserContext
 if TYPE_CHECKING:
     from ai.backend.manager.api.adapters.session.adapter import SessionAdapter
 
-log: Final = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log: Final = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 class V2SessionHandler:

@@ -11,7 +11,7 @@ import trafaret as t
 from aiohttp import web
 
 from ai.backend.common.exception import InvalidAPIParameters
-from ai.backend.common.logging_utils import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.api.rest.middleware.auth import auth_required
 from ai.backend.manager.api.rest.types import CORSOptions, WebMiddleware
 from ai.backend.manager.api.utils import check_api_params
@@ -23,7 +23,7 @@ from .config import TOTPConfig
 from .exception import AuthorizationFailed, ExpiredToken, InvalidToken
 from .utils import InvalidTokenError, TokenExpired, TokenParser
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 @auth_required

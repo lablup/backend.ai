@@ -18,7 +18,7 @@ from ai.backend.common.data.entity.resource_policy import (
     UserResourcePolicyUUID,
 )
 from ai.backend.common.types import DefaultForUnspecified, ResourceSlot
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.models.keypair import keypairs
 from ai.backend.manager.models.resource_policy import (
     ProjectResourcePolicyRow,
@@ -50,7 +50,7 @@ if TYPE_CHECKING:
     from .schema import GraphQueryContext
 
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 __all__ = (
     "CreateKeyPairResourcePolicy",

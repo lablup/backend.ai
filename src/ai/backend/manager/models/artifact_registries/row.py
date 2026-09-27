@@ -8,7 +8,7 @@ import sqlalchemy as sa
 from sqlalchemy.orm import Mapped, foreign, mapped_column, relationship
 
 from ai.backend.common.data.entity.artifact_registry import ArtifactRegistryID
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.models.base import (
     GUID,
     Base,
@@ -18,7 +18,7 @@ if TYPE_CHECKING:
     from ai.backend.manager.models.huggingface_registry import HuggingFaceRegistryRow
     from ai.backend.manager.models.reservoir_registry import ReservoirRegistryRow
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 __all__ = ("ArtifactRegistryRow",)
 

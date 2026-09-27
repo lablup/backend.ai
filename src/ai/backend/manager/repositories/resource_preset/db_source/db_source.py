@@ -26,7 +26,7 @@ from ai.backend.common.types import (
     SlotQuantity,
     SlotTypes,
 )
-from ai.backend.logging.utils import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.data.agent.types import AgentStatus
 from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.data.permission.global_entity import global_entity_id
@@ -89,7 +89,7 @@ from .types import (
     ResourceUsageData,
 )
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 class ResourcePresetDBSource:

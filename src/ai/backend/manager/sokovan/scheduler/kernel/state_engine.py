@@ -13,10 +13,10 @@ from ai.backend.common.events.event_types.kernel.types import (
     KernelLifecycleEventReason,
 )
 from ai.backend.common.types import AgentId, KernelId, SessionId
-from ai.backend.logging.utils import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.repositories.scheduler import SchedulerRepository
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 class KernelStateEngine:
@@ -53,7 +53,7 @@ class KernelStateEngine:
         :param reason: The reason for the state change
         :return: True if the update was successful
         """
-        log.debug("Marking kernel {} as PULLING", kernel_id)
+        log.debug("marking kernel as pulling", kernel_id=kernel_id)
 
         # Use the repository to update kernel status
         return await self._repository.update_kernel_status_pulling(kernel_id, reason)
@@ -70,7 +70,7 @@ class KernelStateEngine:
         :param reason: The reason for the state change
         :return: True if the update was successful
         """
-        log.debug("Marking kernel {} as CREATING", kernel_id)
+        log.debug("marking kernel as creating", kernel_id=kernel_id)
 
         return await self._repository.update_kernel_status_creating(kernel_id, reason)
 
@@ -88,7 +88,7 @@ class KernelStateEngine:
         :param creation_info: What the agent reported about the started container
         :return: True if the update was successful
         """
-        log.debug("Marking kernel {} as RUNNING", kernel_id)
+        log.debug("marking kernel as running", kernel_id=kernel_id)
 
         return await self._repository.update_kernel_status_running(
             kernel_id,
@@ -106,7 +106,7 @@ class KernelStateEngine:
         :param kernel_id: The kernel ID
         :return: True if the update was successful
         """
-        log.debug("Marking kernel {} as PREPARING", kernel_id)
+        log.debug("marking kernel as preparing", kernel_id=kernel_id)
 
         return await self._repository.update_kernel_status_preparing(kernel_id)
 
@@ -125,7 +125,7 @@ class KernelStateEngine:
         :param reason: The reason for cancellation
         :return: True if the update was successful
         """
-        log.debug("Marking kernel {} as CANCELLED: {}", kernel_id, reason)
+        log.debug("marking kernel as cancelled", kernel_id=kernel_id, reason=reason)
 
         success = await self._repository.update_kernel_status_cancelled(kernel_id, reason)
 
@@ -149,7 +149,7 @@ class KernelStateEngine:
         :param exit_code: Optional exit code
         :return: True if the update was successful
         """
-        log.debug("Marking kernel {} as TERMINATED: {}", kernel_id, reason)
+        log.debug("marking kernel as terminated", kernel_id=kernel_id, reason=reason)
 
         return await self._repository.update_kernel_status_terminated(kernel_id, reason, exit_code)
 
@@ -169,10 +169,10 @@ class KernelStateEngine:
         :param image_id: Optional image UUID for precise matching
         """
         log.debug(
-            "Updating kernels to PULLING for agent:{} image:{} image_id:{}",
-            agent_id,
-            image,
-            image_id,
+            "updating kernels to pulling for image",
+            agent_id=agent_id,
+            image_name=image,
+            image_id=image_id,
         )
 
         await self._repository.update_kernels_to_pulling_for_image(
@@ -218,11 +218,11 @@ class KernelStateEngine:
         :param image_id: Optional image UUID for precise matching
         """
         log.warning(
-            "Cancelling kernels for failed image on agent:{} image:{} image_id:{}, msg:{}",
-            agent_id,
-            image,
-            image_id,
-            error_msg,
+            "cancelling kernels for failed image",
+            agent_id=agent_id,
+            image_name=image,
+            image_id=image_id,
+            error_message=error_msg,
         )
 
         await self._repository.cancel_kernels_for_failed_image(
@@ -247,7 +247,7 @@ class KernelStateEngine:
         if not session_ids:
             return 0
 
-        log.debug("Resetting kernels to PENDING for {} sessions: {}", len(session_ids), reason)
+        log.debug("resetting kernels to pending", session_count=len(session_ids), reason=reason)
 
         return await self._repository.reset_kernels_to_pending_for_sessions(session_ids, reason)
 
@@ -269,6 +269,6 @@ class KernelStateEngine:
         if not session_ids:
             return 0
 
-        log.debug("Updating kernels to CREATING for {} sessions: {}", len(session_ids), reason)
+        log.debug("updating kernels to creating", session_count=len(session_ids), reason=reason)
 
         return await self._repository.update_kernels_to_creating_for_sessions(session_ids, reason)

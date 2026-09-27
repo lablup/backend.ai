@@ -55,7 +55,7 @@ from ai.backend.common.types import (
     SessionTypes,
     SlotTypes,
 )
-from ai.backend.logging.utils import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.data.agent.types import AgentStatus
 from ai.backend.manager.data.dotfile.types import DotfileBundle, DotfileEntry, SSHKeypair
 from ai.backend.manager.data.image.types import ImageIdentifier
@@ -204,7 +204,7 @@ from ai.backend.manager.views.sokovan.workload import (
 
 from .types import KeypairConcurrencyData
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 def _create_resource_slot_from_policy(
@@ -2422,7 +2422,11 @@ class ScheduleDBSource:
                     await self._allocate_single_session(db_sess, allocation, now)
                     scheduled_session_ids.append(allocation.session_id)
         except AgentResourceCapacityExceeded as e:
-            log.warning("Allocation batch rolled back on capacity gate: {}", e)
+            log.warning(
+                "allocation batch rolled back on capacity gate",
+                allocation_count=len(allocations),
+                exc_info=e,
+            )
             return []
 
         return scheduled_session_ids
@@ -2445,7 +2449,11 @@ class ScheduleDBSource:
                     await self._reserve_single_session(db_sess, allocation, now)
                     reserved_session_ids.append(allocation.session_id)
         except AgentResourceCapacityExceeded as e:
-            log.warning("Reservation batch rolled back on capacity gate: {}", e)
+            log.warning(
+                "reservation batch rolled back on capacity gate",
+                allocation_count=len(allocations),
+                exc_info=e,
+            )
             return []
 
         return reserved_session_ids
@@ -2633,11 +2641,7 @@ class ScheduleDBSource:
         :param creation_info: What the agent reported about the started container
         :return: True if update was successful, False otherwise
         """
-        log.debug(
-            "[DBSource] update_kernel_status_running called: kernel_id={}, reason={}",
-            kernel_id,
-            reason,
-        )
+        log.debug("kernel running status updating", kernel_id=kernel_id, status_reason=reason)
         async with self._db.begin_session_read_committed() as db_sess:
             # Check current kernel status and fetch agent_id before update
             check_stmt = sa.select(KernelRow.status, KernelRow.starts_at, KernelRow.agent).where(
@@ -2647,13 +2651,13 @@ class ScheduleDBSource:
             current = check_result.first()
             if current:
                 log.debug(
-                    "[DBSource] Kernel {} current state: status={}, starts_at={}",
-                    kernel_id,
-                    current.status,
-                    current.starts_at,
+                    "kernel current state loaded",
+                    kernel_id=kernel_id,
+                    kernel_status=current.status,
+                    starts_at=current.starts_at,
                 )
             else:
-                log.debug("[DBSource] Kernel {} not found!", kernel_id)
+                log.debug("kernel not found", kernel_id=kernel_id)
 
             now = await self._get_db_now_in_session(db_sess)
             used_devices = creation_info.used_devices
@@ -2704,11 +2708,10 @@ class ScheduleDBSource:
             result = await db_sess.execute(stmt)
             rowcount = cast(CursorResult[Any], result).rowcount
             log.debug(
-                "[DBSource] update_kernel_status_running result: kernel_id={}, rowcount={}, "
-                "starts_at_to_set={}",
-                kernel_id,
-                rowcount,
-                now,
+                "kernel running status updated",
+                kernel_id=kernel_id,
+                updated_count=rowcount,
+                starts_at=now,
             )
             if rowcount == 0:
                 return False
@@ -2782,11 +2785,7 @@ class ScheduleDBSource:
                     used=ar.c.used + s.quantity,
                 )
             )
-        log.debug(
-            "[DBSource] Activated resources for kernel {} on agent {}",
-            kernel_id,
-            agent_id,
-        )
+        log.debug("kernel resources activated", kernel_id=kernel_id, agent_id=agent_id)
 
     async def _reserve_kernel_resources(
         self,
@@ -3604,8 +3603,8 @@ class ScheduleDBSource:
                 )
                 # Use the image UUID as key for reliable matching
                 image_configs[image_row.id] = image_config
-            except Exception as e:
-                log.error("Failed to process image {}: {}", image_row.name, e)
+            except Exception:
+                log.exception("image config resolution failed", image_name=image_row.name)
                 continue
 
         return image_configs
@@ -4587,7 +4586,7 @@ class ScheduleDBSource:
                 session_info = session_info_map[session_id]
                 user_info = user_map.get(session_info["user_uuid"])
                 if not user_info:
-                    log.warning("User info not found for session {}", session_id)
+                    log.warning("session user info not found", session_id=session_id)
                     continue
 
                 sessions_for_start.append(

@@ -11,18 +11,18 @@ from ai.backend.common.cli import LazyGroup
 from .context import CLIContext
 
 if TYPE_CHECKING:
-    from ai.backend.logging import BraceStyleAdapter
+    from ai.backend.logging.structured import StructuredLogger
 
 # LogLevel values for click.Choice - avoid importing ai.backend.logging at module level
 _LOG_LEVELS = ["CRITICAL", "ERROR", "WARNING", "INFO", "DEBUG", "TRACE", "NOTSET"]
 
 
-def _get_logger() -> BraceStyleAdapter:
+def _get_logger() -> StructuredLogger:
     import logging
 
-    from ai.backend.logging import BraceStyleAdapter
+    from ai.backend.logging.structured import StructuredLogger
 
-    return BraceStyleAdapter(logging.getLogger("ai.backend.manager.cli"))
+    return StructuredLogger(logging.getLogger("ai.backend.manager.cli"))
 
 
 @click.group(invoke_without_command=False, context_settings={"help_option_names": ["-h", "--help"]})
@@ -161,7 +161,7 @@ def dbshell(
         subprocess.run(cmd)
         return
     # Use the container to start the psql client command
-    _get_logger().info(f"using the db container {container_name} ...")
+    _get_logger().info("using the db container", container_name=container_name)
     cmd = [
         "docker",
         "exec",
@@ -186,7 +186,7 @@ def generate_api_keypair(_cli_ctx: CLIContext) -> None:
     """
     from ai.backend.manager.models.keypair import generate_keypair as _gen_keypair
 
-    _get_logger().info("Generating a manager API keypair...")
+    _get_logger().info("generating a manager API keypair")
     ak, sk = _gen_keypair()
     print(f"Access Key: {ak} ({len(ak)} bytes)")
     print(f"Secret Key: {sk} ({len(sk)} bytes)")
@@ -220,7 +220,7 @@ def generate_rpc_keypair(_cli_ctx: CLIContext, dst_dir: pathlib.Path, name: str)
 
     from ai.backend.manager.errors.resource import ConfigurationLoadFailed
 
-    _get_logger().info("Generating a RPC keypair...")
+    _get_logger().info("generating an RPC keypair")
     public_key_path, secret_key_path = create_certificates(dst_dir, name)
     public_key, secret_key = load_certificate(secret_key_path)
     if secret_key is None:
@@ -307,24 +307,24 @@ def clear_history(cli_ctx: CLIContext, retention: str, vacuum_full: bool) -> Non
                         deleted = await redis_conn_set.stat.delete(kernel_ids)
                         delete_count += deleted
                     log.info(
-                        "Cleaned up {:,} redis statistics records older than {:}.",
-                        delete_count,
-                        expiration_date,
+                        "cleaned up redis statistics records",
+                        deleted_count=delete_count,
+                        expiration_date=expiration_date,
                     )
 
                 # Sync and compact the persistent database of Redis
                 redis_config = await redis_conn_set.stat.config_get(["appendonly"])
                 if redis_config.get(b"appendonly") == b"yes":
                     await redis_conn_set.stat.execute_command(["BGREWRITEAOF"])
-                    log.info("Issued BGREWRITEAOF to the Redis database.")
+                    log.info("issued BGREWRITEAOF to the redis database")
                 else:
                     await redis_conn_set.stat.execute_command(["BGSAVE", "SCHEDULE"])
-                    log.info("Issued BGSAVE to the Redis database.")
+                    log.info("issued BGSAVE to the redis database")
         except Exception:
-            log.exception("Unexpected error while cleaning up redis history")
+            log.exception("unexpected error while cleaning up redis history")
 
     async def _force_retention_sweep() -> None:
-        log.info("Triggering an immediate DB record retention sweep...")
+        log.info("triggering an immediate db record retention sweep")
         # This standalone CLI process has not imported the full model tree, so
         # register every table before the sweep issues its first ORM query.
         ensure_all_tables_registered()
@@ -336,9 +336,9 @@ def clear_history(cli_ctx: CLIContext, retention: str, vacuum_full: bool) -> Non
             results = await repository.sweep()
         total_deleted = sum(result.deleted_count for result in results)
         log.info(
-            "Retention sweep deleted {:,} record(s) across {} categor(ies).",
-            total_deleted,
-            len(results),
+            "retention sweep finished",
+            deleted_count=total_deleted,
+            category_count=len(results),
         )
 
     asyncio.run(_clear_redis_history())

@@ -9,7 +9,7 @@ from typing import TYPE_CHECKING, override
 from ai.backend.common import redis_helper
 from ai.backend.common.defs import REDIS_STREAM_LOCK, RedisRole
 from ai.backend.common.lock import EtcdLock, FileLock, RedisLock
-from ai.backend.logging.utils import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.pglock import PgAdvisoryLock
 from ai.backend.manager.types import DistributedLockFactory
 
@@ -20,7 +20,7 @@ if TYPE_CHECKING:
     from ai.backend.manager.config.provider import ManagerConfigProvider
     from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 @dataclass
@@ -46,7 +46,7 @@ def create_lock_factory(
     ipc_base_path = config.manager.ipc_base_path
     manager_id = config.manager.id
     lock_backend = config.manager.distributed_lock
-    log.debug("using {} as the distributed lock backend", lock_backend)
+    log.debug("distributed lock backend selected", lock_backend_type=lock_backend)
     match lock_backend:
         case "filelock":
             return lambda lock_id, lifetime_hint: FileLock(  # noqa: ARG005

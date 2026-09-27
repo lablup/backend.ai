@@ -46,7 +46,7 @@ from ai.backend.common.types import (
     SlotName,
     VFolderMountPolicy,
 )
-from ai.backend.logging.utils import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
 from ai.backend.manager.data.agent.types import AgentStatus
 from ai.backend.manager.data.deployment.creator import DeploymentPolicyConfig
@@ -237,7 +237,7 @@ class _DeploymentUserResolution:
     access_key: AccessKey
 
 
-log = BraceStyleAdapter(logging.getLogger(__name__))
+log = StructuredLogger(logging.getLogger(__name__))
 
 # How many times a revision create re-picks its number after losing the race for it.
 _REVISION_NUMBER_ATTEMPTS = 3
@@ -2850,11 +2850,11 @@ class DeploymentDBSource:
             delete_result = await db_sess.execute(delete_query)
             deleted_count = len(delete_result.all())
             if deleted_count > 0:
-                log.info(
-                    "Pruned {} old revisions for deployment {} (limit={})",
-                    deleted_count,
-                    endpoint_id,
-                    revision_history_limit,
+                log.debug(
+                    "old deployment revisions pruned",
+                    deployment_id=endpoint_id,
+                    deleted_count=deleted_count,
+                    revision_history_limit=revision_history_limit,
                 )
             return deleted_count
 

@@ -17,7 +17,7 @@ from ai.backend.common.data.entity.artifact import ArtifactID
 from ai.backend.common.data.entity.artifact_revision import ArtifactRevisionID
 from ai.backend.common.dto.storage.request import GetVerificationResultReq
 from ai.backend.common.dto.storage.response import GetVerificationResultResponse
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.data.artifact.types import ArtifactRevisionResponseData
 from ai.backend.manager.dto.request import (
     ApproveArtifactRevisionReq,
@@ -73,7 +73,7 @@ if TYPE_CHECKING:
     from ai.backend.manager.services.artifact.processors import ArtifactProcessors
     from ai.backend.manager.services.artifact.revision.processors import ArtifactRevisionProcessors
 
-log: Final = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log: Final = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 class ArtifactHandler:

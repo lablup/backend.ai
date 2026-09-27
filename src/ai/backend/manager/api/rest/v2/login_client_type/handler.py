@@ -12,13 +12,13 @@ from ai.backend.common.dto.manager.v2.login_client_type.request import (
     SearchLoginClientTypesInput,
     UpdateLoginClientTypeInput,
 )
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.api.rest.v2.path_params import LoginClientTypeIdPathParam
 
 if TYPE_CHECKING:
     from ai.backend.manager.api.adapters.login_client_type.adapter import LoginClientTypeAdapter
 
-log: Final = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log: Final = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 class V2LoginClientTypeHandler:

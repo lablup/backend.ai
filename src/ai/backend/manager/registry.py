@@ -95,7 +95,7 @@ from ai.backend.common.types import (
     SessionTypes,
 )
 from ai.backend.common.utils import str_to_timedelta
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.clients.appproxy.types import CreateEndpointRequestBody
 from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
 from ai.backend.manager.config.provider import ManagerConfigProvider
@@ -188,7 +188,7 @@ from .types import UserScope
 type MSetType = Mapping[str | bytes, bytes | float | int | str]
 __all__ = ["AgentRegistry"]
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 SESSION_NAME_LEN_LIMIT = 10
 DEFAULT_WAIT_TIMEOUT_SECONDS = 60
@@ -469,7 +469,7 @@ class AgentRegistry:
         route_id: uuid.UUID | None = None,
         sudo_session_enabled: bool = False,
     ) -> Mapping[str, Any]:
-        log.debug("create_session():")
+        log.debug("session creating")
         resp: MutableMapping[str, Any] = {}
 
         current_task = asyncio.current_task()
@@ -601,7 +601,7 @@ class AgentRegistry:
                 starts_at = await self._scheduler_repository.get_db_now() + _td
 
         if cluster_size > 1:
-            log.debug(" -> cluster_mode:{} (replicate)", cluster_mode)
+            log.debug("session cluster mode replicating", cluster_mode=cluster_mode)
 
         if dependencies is None:
             dependencies = []
@@ -1408,24 +1408,22 @@ class AgentRegistry:
         result = await repo.reconcile_agent_resources()
         for r in result.reconciled_terminal_kernels:
             log.warning(
-                "reconciled terminal-session kernel drift: kernel={}, session={}, {} -> CANCELLED",
-                r.kernel_id,
-                r.session_id,
-                r.from_kernel_status,
+                "terminal session kernel drift reconciled to cancelled",
+                kernel_id=r.kernel_id,
+                session_id=r.session_id,
+                from_kernel_status=r.from_kernel_status,
             )
         for o in result.orphaned_allocations:
             log.warning(
-                "freed orphaned resource allocation: kernel={}, slot={}",
-                o.kernel_id,
-                o.slot_name,
+                "orphaned resource allocation freed", kernel_id=o.kernel_id, slot_name=o.slot_name
             )
         for d in result.agent_resource_drifts:
             log.warning(
-                "agent_resources drift detected for {}:{}: tracked={}, actual={}",
-                d.agent_id,
-                d.slot_name,
-                d.tracked,
-                d.actual,
+                "agent resource drift detected",
+                agent_id=d.agent_id,
+                slot_name=d.slot_name,
+                tracked_amount=d.tracked,
+                actual_amount=d.actual,
             )
 
     async def clean_session(
@@ -1462,8 +1460,8 @@ class AgentRegistry:
                     agent_id = session.main_kernel.agent
                     if agent_id is None:
                         log.warning(
-                            "Cannot destroy network {}: main kernel has no agent allocated",
-                            network_ref_name,
+                            "network destroy skipped, main kernel has no agent allocated",
+                            network_ref_name=network_ref_name,
                         )
                     else:
                         try:
@@ -1471,7 +1469,8 @@ class AgentRegistry:
                                 await client.destroy_local_network(network_ref_name)
                         except Exception:
                             log.exception(
-                                "Failed to destroy the agent-local network {}", network_ref_name
+                                "agent-local network destroy failed",
+                                network_ref_name=network_ref_name,
                             )
             elif ClusterMode(session.cluster_mode) == ClusterMode.MULTI_NODE:
                 if network_ref_name is None:
@@ -1485,7 +1484,9 @@ class AgentRegistry:
                 try:
                     await network_plugin.destroy_network(network_ref_name)
                 except Exception:
-                    log.exception("Failed to destroy the overlay network {}", network_ref_name)
+                    log.exception(
+                        "overlay network destroy failed", network_ref_name=network_ref_name
+                    )
             else:
                 pass
 

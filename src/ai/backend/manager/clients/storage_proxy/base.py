@@ -18,7 +18,7 @@ from ai.backend.common.exception import (
     PassthroughError,
 )
 from ai.backend.common.json import load_json
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.errors.storage import (
     QuotaScopeNotFoundError,
     StorageProxyConnectionError,
@@ -33,7 +33,7 @@ from ai.backend.manager.errors.storage import (
 AUTH_TOKEN_HDR: Final = "X-BackendAI-Storage-Auth-Token"
 DEFAULT_TIMEOUT: Final = ClientTimeout(total=300, sock_connect=30)
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 @dataclass
@@ -95,12 +95,11 @@ class StorageProxyHTTPClient:
         except (aiohttp.ContentTypeError, ValueError) as e:
             resp_text = await resp.text()
             log.warning(
-                "Failed to parse JSON from storage proxy error response: "
-                "status={}, content_type={}, error={}, response_text={}",
-                resp.status,
-                resp.content_type,
-                e,
-                resp_text if resp_text else "",
+                "storage proxy error response parse failed",
+                exc_info=e,
+                response_status=resp.status,
+                content_type=resp.content_type,
+                response_text=resp_text if resp_text else "",
             )
             raise PassthroughError(
                 status_code=resp.status,

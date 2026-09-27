@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, Final
 
 from ai.backend.common.data.entity.project import ProjectID
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.clients.container_registry.base import (
     AbstractContainerRegistryQuotaClient,
     ContainerRegistryAuthArgs,
@@ -93,7 +93,7 @@ from ai.backend.manager.services.container_registry.actions.update_registry_quot
 if TYPE_CHECKING:
     from ai.backend.manager.models.container_registry import ContainerRegistryRow
 
-log: Final = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log: Final = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 @dataclass(frozen=True)
@@ -246,11 +246,7 @@ class ContainerRegistryService:
                 scanner = HarborRegistry_v2(self._db, registry_row.registry_name, registry_row)
                 await scanner.scan_single_ref(f"{action.project}/{action.img_name}:{resource.tag}")
             else:
-                log.debug(
-                    'Ignore harbor webhook event: "{}". Recommended to modify the'
-                    " webhook config to not subscribe to this event type.",
-                    action.event_type,
-                )
+                log.debug("harbor webhook event ignored", webhook_event_type=action.event_type)
 
         return HandleHarborWebhookActionResult()
 

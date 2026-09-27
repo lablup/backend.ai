@@ -9,13 +9,13 @@ from ai.backend.common.events.event_types.vfolder.anycast import (
 from ai.backend.common.types import (
     AgentId,
 )
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.models.utils import (
     ExtendedAsyncSAEngine,
 )
 from ai.backend.manager.models.vfolder import VFolderOperationStatus, update_vfolder_status
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 class VFolderEventHandler:
@@ -38,7 +38,9 @@ class VFolderEventHandler:
         _source: AgentId,
         event: VFolderDeletionFailureEvent,
     ) -> None:
-        log.exception("Failed to delete vfolder (vfid:{}, msg:{})", event.vfid, event.message)
+        log.warning(
+            "vfolder deletion failed", vfolder_id=event.vfid.folder_id, reason=event.message
+        )
         await update_vfolder_status(
             self._db, [event.vfid.folder_id], VFolderOperationStatus.DELETE_ERROR, do_log=True
         )
@@ -62,11 +64,11 @@ class VFolderEventHandler:
         _source: AgentId,
         event: VFolderCloneFailureEvent,
     ) -> None:
-        log.exception(
-            "Failed to clone vfolder (vfid:{}, dst:{} msg:{})",
-            event.vfid,
-            event.dst_vfid,
-            event.message,
+        log.warning(
+            "vfolder clone failed",
+            vfolder_id=event.vfid.folder_id,
+            dst_vfolder_id=event.dst_vfid.folder_id,
+            reason=event.message,
         )
         await update_vfolder_status(
             self._db, [event.vfid.folder_id], VFolderOperationStatus.READY, do_log=True

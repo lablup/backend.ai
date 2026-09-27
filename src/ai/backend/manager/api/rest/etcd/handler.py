@@ -26,7 +26,7 @@ from ai.backend.common.dto.manager.etcd.response import (
     VfolderTypesResponse,
 )
 from ai.backend.common.dto.manager.resource.response import ContainerRegistriesResponse
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.dto.context import UserContext
 from ai.backend.manager.services.container_registry.actions.get_container_registries import (
     GetContainerRegistriesAction,
@@ -42,7 +42,7 @@ from ai.backend.manager.services.etcd_config import (
 )
 from ai.backend.manager.services.etcd_config.processors import EtcdConfigProcessors
 
-log: Final = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log: Final = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 class EtcdHandler:
@@ -96,10 +96,7 @@ class EtcdHandler:
     # ------------------------------------------------------------------
 
     async def get_docker_registries(self, ctx: UserContext) -> APIResponse:
-        log.warning(
-            "ETCD.GET_DOCKER_REGISTRIES has been deprecated because it no longer uses etcd."
-            " Use /resource/container-registries API instead."
-        )
+        log.trace("deprecated docker registries api called")
         result = await self._container_registry.get_container_registries.run(
             GetContainerRegistriesAction()
         )

@@ -20,7 +20,7 @@ from ai.backend.common.data.entity.replica import ReplicaID
 from ai.backend.common.data.entity.replica_group import ReplicaGroupID
 from ai.backend.common.data.entity.session import SessionID
 from ai.backend.common.data.entity.user import UserID
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.data.deployment.types import (
     RouteHealthStatus,
     RouteStatus,
@@ -43,7 +43,7 @@ if TYPE_CHECKING:
 __all__ = ("RouteStatus", "RoutingRow")
 
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 class RoutingRow(Base):

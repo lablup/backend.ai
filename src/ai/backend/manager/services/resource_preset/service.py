@@ -4,7 +4,7 @@ from typing import Any
 
 from ai.backend.common.exception import InvalidAPIParameters
 from ai.backend.common.types import LegacyResourceSlotState as ResourceSlotState
-from ai.backend.logging.utils import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.models.resource_preset.updaters import (
     ResourcePresetResourceGroupUpdater,
 )
@@ -34,7 +34,7 @@ from ai.backend.manager.services.resource_preset.actions.update_preset import (
     UpdateResourcePresetActionResult,
 )
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 class ResourcePresetService:

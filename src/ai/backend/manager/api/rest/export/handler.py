@@ -35,7 +35,7 @@ from ai.backend.common.dto.manager.v2.export import (
     SessionExportCSVInput,
     UserExportCSVInput,
 )
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.config.unified import ExportConfig
 from ai.backend.manager.dto.context import RequestCtx, UserContext
 from ai.backend.manager.dto.export import (
@@ -67,7 +67,7 @@ from ai.backend.manager.services.export.processors import ExportProcessors
 
 from .adapter import ExportAdapter
 
-log: Final = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log: Final = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 class _CSVExportResult(Protocol):
@@ -499,7 +499,7 @@ class ExportHandler:
                     await resp.write(chunk)
             await resp.write_eof()
         except Exception:
-            log.exception("Error during streaming response body iteration")
+            log.exception("export stream response body iteration failed")
             resp.force_close()
 
         return resp

@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING, Final
 
 from strawberry.types.execution import ExecutionResult, PreExecutionError
 
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.api.gql.data_loader.data_loaders import DataLoaders
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 
@@ -20,7 +20,7 @@ if TYPE_CHECKING:
 
     from ai.backend.manager.api.rest.types import GQLContextDeps
 
-log: Final = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log: Final = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 class SubscriptionExecutor:
@@ -107,8 +107,8 @@ class SubscriptionExecutor:
             # Client-initiated complete — do NOT echo complete back.
             send_complete = False
             return
-        except Exception as e:
-            log.exception("GQL WS: subscription {} error ({})", sub_id, repr(e))
+        except Exception:
+            log.exception("graphql-ws subscription failed", subscription_id=sub_id)
             if not sender.closed:
                 await sender.send_internal_error(sub_id)
         finally:

@@ -4,7 +4,7 @@ import logging
 
 from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.exception import InvalidAPIParameters
-from ai.backend.logging.utils import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.actions.v2.ops.result import CreatedEntityOpsResult
 from ai.backend.manager.data.domain.types import DomainData
 from ai.backend.manager.data.dotfile.types import DotfileEntries
@@ -37,7 +37,7 @@ from ai.backend.manager.services.domain.actions.update_domain_node import (
     UpdateDomainNodeActionResult,
 )
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 class DomainService:

@@ -14,7 +14,7 @@ from ai.backend.common.metrics.metric import CommonMetricRegistry
 from ai.backend.common.metrics.profiler import Profiler, PyroscopeArgs
 from ai.backend.common.types import AgentSelectionStrategy
 from ai.backend.common.web.reserved_response_headers import setup_reserved_response_headers
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager import __version__
 from ai.backend.manager.config.bootstrap import BootstrapConfig
 from ai.backend.manager.errors.common import (
@@ -29,7 +29,7 @@ from .routing import RouteRegistry
 if TYPE_CHECKING:
     from .types import CORSOptions, WebRequestHandler
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 VALID_VERSIONS: Final = frozenset([
     "v4.20181215",
@@ -121,7 +121,7 @@ def _mount_registry_tree(
 
     for prefix, app, _reg in root_registry.collect_apps():
         if pidx == 0:
-            log.info("Loading module: {}", prefix)
+            log.debug("api module loading", module_prefix=prefix)
         app["_registry_prefix"] = prefix
         app.on_startup.insert(0, _bridge_root_app)
         root_app.add_subapp("/" + prefix, app)

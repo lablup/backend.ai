@@ -7,7 +7,7 @@ from ai.backend.common.events.event_types.artifact_registry.anycast import (
 from ai.backend.common.types import (
     AgentId,
 )
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.artifact.types import (
@@ -26,7 +26,7 @@ from ai.backend.manager.repositories.vfs_storage.repository import VFSStorageRep
 from ai.backend.manager.services.artifact.actions.scan import ScanArtifactsAction
 from ai.backend.manager.services.artifact.service import ArtifactService
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 class ArtifactRegistryEventHandler:
@@ -81,12 +81,9 @@ class ArtifactRegistryEventHandler:
                         search=None,
                     )
                 )
-                log.info("Completed scanning reservoir registry: {}.", registry.registry_id)
+                log.debug("reservoir registry scanned", registry_id=registry.registry_id)
             except ReservoirConnectionError:
-                log.warning(
-                    "Failed to scan reservoir registry: {}.",
-                    registry.registry_id,
-                )
+                log.warning("reservoir registry scan failed", registry_id=registry.registry_id)
 
     async def _resolve_storage_data(self, storage_name: str) -> ObjectStorageData | VFSStorageData:
         try:

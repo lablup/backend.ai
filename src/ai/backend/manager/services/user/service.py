@@ -9,7 +9,7 @@ from ai.backend.common.dto.manager.config.types import MAXIMUM_DOTFILE_SIZE
 from ai.backend.common.events.event_types.kernel.types import KernelLifecycleEventReason
 from ai.backend.common.exception import InvalidAPIParameters
 from ai.backend.common.types import AccessKey
-from ai.backend.logging.utils import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
 from ai.backend.manager.data.dotfile.types import DotfileEntries, normalize_newlines
 from ai.backend.manager.data.user.types import (
@@ -104,7 +104,7 @@ from ai.backend.manager.services.user.actions.user_month_stats import (
 )
 from ai.backend.manager.sokovan.scheduling_controller import SchedulingController
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 @dataclass
@@ -272,7 +272,7 @@ class UserService:
                 await self._purge_single_user(user_uuid, action, user_info_ctx)
                 purged_user_ids.append(user_uuid)
             except Exception as e:
-                log.error("Failed to purge user {}: {}", user_uuid, e)
+                log.warning("user purge failed", target_user_id=user_uuid, exc_info=e)
                 failures.append(BulkPurgeError(user_id=user_uuid, exception=e))
 
         return BulkPurgeUserActionResult(

@@ -8,12 +8,12 @@ from typing import TYPE_CHECKING, Final
 
 from ai.backend.common.api_handlers import APIResponse, BodyParam
 from ai.backend.common.dto.manager.v2.audit_log.request import AdminSearchAuditLogsInput
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 
 if TYPE_CHECKING:
     from ai.backend.manager.api.adapters.audit_log.adapter import AuditLogAdapter
 
-log: Final = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log: Final = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 class V2AuditLogHandler:

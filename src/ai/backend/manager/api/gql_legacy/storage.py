@@ -8,7 +8,7 @@ import aiohttp
 import graphene
 
 from ai.backend.common.types import HardwareMetadata
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.clients.storage_proxy.session_manager import (
     AUTH_TOKEN_HDR,
     VolumeInfo,
@@ -25,7 +25,7 @@ __all__ = (
     "StorageVolumeList",
 )
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 class StorageVolume(graphene.ObjectType):  # type: ignore[misc]
@@ -100,9 +100,7 @@ class StorageVolume(graphene.ObjectType):  # type: ignore[misc]
     ) -> Sequence[StorageVolume]:
         # For consistency we add filter/order params here, but it's actually noop.
         if filter is not None or order is not None:
-            log.warning(
-                "Paginated list of storage volumes igonores custom filtering and/or ordering"
-            )
+            log.trace("storage volume pagination ignores filter and order")
         volumes = [*await ctx.storage_manager.get_all_volumes()]
         return [
             cls.from_info(proxy_name, volume_info)

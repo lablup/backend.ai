@@ -42,7 +42,7 @@ from ai.backend.common.types import (
     SlotName,
 )
 from ai.backend.common.utils import join_non_empty
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.data.image.types import (
     ImageAliasData,
     ImageData,
@@ -83,7 +83,7 @@ from ai.backend.manager.models.virtual_entity.queries import user_scope_membersh
 if TYPE_CHECKING:
     from ai.backend.manager.models.container_registry import ContainerRegistryRow
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 __all__ = (

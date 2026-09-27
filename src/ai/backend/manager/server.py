@@ -54,6 +54,7 @@ from ai.backend.logging.otel import (
     instrument_aiohttp_client,
     instrument_aiohttp_server,
 )
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.logging.structured_otel import StructuredOtelLogging
 
 from . import __version__
@@ -71,7 +72,7 @@ from .data.manager_status.types import ManagerStatus
 from .dependencies import DependencyInput, DependencyResources, ManagerDependencyComposer
 from .plugin.webapp import WebappPluginContext
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 EVENT_DISPATCHER_CONSUMER_GROUP: Final = "manager"
 
@@ -102,7 +103,7 @@ async def webapp_plugin_ctx(
     root_app["_auth_repository"] = r.domain.repositories.auth.repository
     for plugin_name, plugin_instance in plugin_ctx.plugins.items():
         if pidx == 0:
-            log.info("Loading webapp plugin: {0}", plugin_name)
+            log.info("loading webapp plugin", plugin_name=plugin_name)
         subapp, global_middlewares = await plugin_instance.create_app(cors_options)
         _init_subapp(plugin_name, root_app, subapp, global_middlewares)
     try:
@@ -124,9 +125,9 @@ async def manager_status_ctx(
                 ManagerStatus.RUNNING
             )
             mgr_status = ManagerStatus.RUNNING
-        log.info("Manager status: {}", mgr_status)
+        log.info("manager status loaded", manager_status=mgr_status)
         tz = config_provider.config.system.timezone
-        log.info("Configured timezone: {}", tz.tzname(datetime.now(UTC)))
+        log.info("timezone configured", timezone_name=tz.tzname(datetime.now(UTC)))
     yield
 
 
@@ -141,12 +142,12 @@ def handle_loop_error(
     msg = context.get("message", "(empty message)")
     if exception is not None:
         if sys.exc_info()[0] is not None:
-            log.exception("Error inside event loop: {0}", msg)
+            log.exception("error inside the event loop", loop_error_message=str(msg))
             if _error_monitor_ref is not None:
                 loop.create_task(_error_monitor_ref.capture_exception())
         else:
             exc_info = (type(exception), exception, exception.__traceback__)
-            log.error("Error inside event loop: {0}", msg, exc_info=exc_info)
+            log.error("error inside the event loop", loop_error_message=str(msg), exc_info=exc_info)
             if _error_monitor_ref is not None:
                 loop.create_task(_error_monitor_ref.capture_exception(exc_instance=exception))
 
@@ -318,10 +319,7 @@ async def server_main(
         )
         await site.start()
         await internal_site.start()
-        log.info(
-            "started handling API requests at {}",
-            service_addr,
-        )
+        log.info("started handling API requests", service_addr=str(service_addr))
 
         try:
             yield
@@ -382,7 +380,10 @@ async def server_main(
         trusted_proxies = dep_resources.bootstrap.config_provider.config.manager.trusted_proxies
         root_app[TRUSTED_PROXY_NETWORKS_KEY] = parse_trusted_proxy_networks(trusted_proxies)
         if trusted_proxies:
-            log.info("Trusting the forwarding headers set by proxies: {}", trusted_proxies)
+            log.info(
+                "trusting the forwarding headers set by proxies",
+                trusted_proxies=", ".join(map(str, trusted_proxies)),
+            )
 
         # Build and mount the API module tree.
         # Must happen before runner.setup() which freezes the application router.
@@ -433,18 +434,18 @@ async def server_main(
             ])
             os.setgid(gid)
             os.setuid(uid)
-            log.info("changed process uid and gid to {}:{}", uid, gid)
+            log.info("changed the process uid and gid", uid=uid, gid=gid)
 
-        log.info("Started the manager service.")
+        log.info("started the manager service")
     except Exception:
-        log.exception("Server initialization failure; triggering shutdown...")
+        log.exception("server initialization failed; triggering shutdown")
         loop.call_later(0.2, os.kill, 0, signal.SIGINT)
 
     try:
         yield
     finally:
         _error_monitor_ref = None
-        log.info("shutting down...")
+        log.info("shutting down")
         await manager_init_stack.__aexit__(None, None, None)
 
 
@@ -536,15 +537,15 @@ def main(
             with logger:
                 ns = bootstrap_cfg.etcd.namespace
                 setproctitle(f"backend.ai: manager {ns}")
-                log.info("Backend.AI Manager {0}", __version__)
-                log.info("runtime: {0}", env_info())
+                log.info("Backend.AI Manager starting", version=__version__)
+                log.info("runtime environment", runtime_info=env_info())
                 log_config = logging.getLogger("ai.backend.manager.config")
                 log_config.debug("debug mode enabled.")
                 runner: Callable[..., Any]
                 match bootstrap_cfg.manager.event_loop:
                     case EventLoopType.UVLOOP:
                         runner = uvloop.run
-                        log.info("Using uvloop as the event loop backend")
+                        log.info("using uvloop as the event loop backend")
                     case EventLoopType.ASYNCIO:
                         runner = asyncio.run
                 try:
@@ -557,7 +558,7 @@ def main(
                     )
                 finally:
                     cleanup_prometheus_multiprocess_dir()
-                    log.info("terminated.")
+                    log.info("terminated")
         finally:
             if bootstrap_cfg.manager.pid_file.is_file():
                 # check is_file() to prevent deleting /dev/null!

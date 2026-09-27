@@ -26,7 +26,7 @@ from ai.backend.common.types import (
     AgentId,
     HardwareMetadata,
 )
-from ai.backend.logging.utils import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.bgtask.tasks.rescan_gpu_alloc_maps import RescanGPUAllocMapsManifest
 from ai.backend.manager.bgtask.types import ManagerBgtaskName
 from ai.backend.manager.data.agent.types import AgentDetailData
@@ -78,7 +78,7 @@ from .kernel import ComputeContainer, KernelConnection, KernelNode
 if TYPE_CHECKING:
     from .schema import GraphQueryContext
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 __all__ = (
     "Agent",
@@ -962,7 +962,7 @@ class RescanGPUAllocMaps(graphene.Mutation):  # type: ignore[misc]
         info: graphene.ResolveInfo,
         agent_id: str,
     ) -> RescanGPUAllocMaps:
-        log.info("rescanning GPU alloc maps for agent {}", agent_id)
+        log.trace("gpu alloc map rescan requested", agent_id=agent_id)
         graph_ctx: GraphQueryContext = info.context
 
         manifest = RescanGPUAllocMapsManifest(agent_id=AgentId(agent_id))

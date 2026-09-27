@@ -4,10 +4,10 @@ from ai.backend.common.events.event_types.idle.anycast import DoIdleCheckEvent
 from ai.backend.common.types import (
     AgentId,
 )
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.idle import IdleCheckerHost
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 class IdleCheckEventHandler:

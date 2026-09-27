@@ -15,7 +15,7 @@ import attrs
 import yarl
 
 from ai.backend.common.defs import NOOP_STORAGE_VOLUME_NAME
-from ai.backend.logging.utils import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.clients.storage_proxy.base import (
     StorageProxyClientArgs,
     StorageProxyHTTPClient,
@@ -38,7 +38,7 @@ _ctx_volumes_cache: ContextVar[list[tuple[str, VolumeInfo]]] = ContextVar("_ctx_
 AUTH_TOKEN_HDR: Final = "X-BackendAI-Storage-Auth-Token"
 
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 class VolumeInfo(TypedDict):
@@ -89,7 +89,7 @@ class StorageSessionManager:
         manager_facing_clients = {}
         for proxy_name, proxy_config in storage_config.proxies.items():
             if proxy_name in manager_facing_clients:
-                log.error("Storage proxy {} is already registered.", proxy_name)
+                log.error("storage proxy already registered", storage_proxy_name=proxy_name)
                 continue
             connector = aiohttp.TCPConnector(ssl=proxy_config.ssl_verify)
             session = aiohttp.ClientSession(connector=connector)
@@ -113,7 +113,7 @@ class StorageSessionManager:
         client_facing_clients = {}
         for proxy_name, proxy_config in storage_config.proxies.items():
             if proxy_name in client_facing_clients:
-                log.error("Storage proxy {} is already registered.", proxy_name)
+                log.error("storage proxy already registered", storage_proxy_name=proxy_name)
                 continue
             client_facing_clients[proxy_name] = StorageProxyClientFacingInfo(
                 base_url=yarl.URL(proxy_config.client_api),

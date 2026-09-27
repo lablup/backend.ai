@@ -10,7 +10,7 @@ from sqlalchemy.orm import selectinload
 from ai.backend.common.data.entity.agent import AgentUUID
 from ai.backend.common.data.entity.resource_group import ResourceGroupID
 from ai.backend.common.types import AgentId, ImageID
-from ai.backend.logging.utils import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.data.agent.types import (
     AgentData,
     AgentHeartbeatUpsert,
@@ -31,7 +31,7 @@ from ai.backend.manager.models.resource_slot.upserters import AgentResourceUpser
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.ops.v2.share.provider import ShareOpsProvider
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession
@@ -99,7 +99,6 @@ class AgentDBSource:
                 sa.select(AgentRow).where(AgentRow.id == agent_id)
             )
             if agent_row is None:
-                log.error("Agent with id {} not found", agent_id)
                 raise AgentNotFound(f"Agent with id {agent_id} not found")
             return AgentSearchableFields.own.to_data(agent_row)
 

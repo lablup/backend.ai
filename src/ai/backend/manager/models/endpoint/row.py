@@ -45,7 +45,7 @@ from ai.backend.common.types import (
     ClusterMode,
     ResourceSlot,
 )
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.data.deployment.scale import (
     AutoScalingAction,
     AutoScalingCondition,
@@ -102,7 +102,7 @@ __all__ = (
 )
 
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 def _get_endpoint_tokens_join_condition() -> Any:

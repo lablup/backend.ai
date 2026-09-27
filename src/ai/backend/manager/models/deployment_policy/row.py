@@ -9,7 +9,7 @@ from sqlalchemy.orm import Mapped, mapped_column
 from ai.backend.common.data.entity.deployment import DeploymentID
 from ai.backend.common.data.entity.deployment_policy import DeploymentPolicyID
 from ai.backend.common.data.model_deployment.types import DeploymentStrategy
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.models.base import (
     GUID,
     Base,
@@ -19,7 +19,7 @@ from ai.backend.manager.models.mixins.timestamp import LifecycleTimestampsMixin
 
 __all__ = ("DeploymentPolicyRow",)
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 class DeploymentPolicyRow(LifecycleTimestampsMixin, Base):

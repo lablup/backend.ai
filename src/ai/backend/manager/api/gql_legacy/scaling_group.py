@@ -21,7 +21,7 @@ from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.resource_group import ResourceGroupID, ResourceGroupName
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.types import AccessKey, ResourceSlot
-from ai.backend.logging.utils import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.errors.resource import ResourceGroupNotFound
 from ai.backend.manager.models.agent import AgentStatus
 from ai.backend.manager.models.domain import DomainRow
@@ -110,7 +110,7 @@ __all__ = (
     "ScalingGroupNode",
 )
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 async def _resolve_resource_group_id(

@@ -6,7 +6,7 @@ from ruamel.yaml import YAML
 from ai.backend.common.config import ModelDefinition
 from ai.backend.common.data.entity.model_card import ModelCardID
 from ai.backend.common.types import VFolderID
-from ai.backend.logging.utils import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.actions.v2.bulk.result import (
     PartialBulkEntityResult,
     PartialBulkResult,
@@ -34,7 +34,7 @@ from ai.backend.manager.services.model_card.actions.update import (
     UpdateModelCardActionResult,
 )
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 def _is_unmanaged(path: str | None) -> bool:
@@ -167,7 +167,7 @@ class ModelCardService:
                 )
                 readme = readme_bytes.decode("utf-8")
             except Exception:
-                log.warning("Failed to fetch README from vfolder {}", vf.id)
+                log.warning("model card readme fetch failed", vfolder_id=vf.id, exc_info=True)
 
         min_resource: list[ResourceRequirementEntry] = []
         if metadata and metadata.min_resource:

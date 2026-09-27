@@ -13,13 +13,13 @@ from ai.backend.common.dto.manager.v2.object_storage.request import (
     DeleteObjectStorageInput,
     UpdateObjectStorageInput,
 )
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.api.rest.v2.path_params import StorageIdPathParam
 
 if TYPE_CHECKING:
     from ai.backend.manager.api.adapters.object_storage.adapter import ObjectStorageAdapter
 
-log: Final = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log: Final = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 class V2ObjectStorageHandler:

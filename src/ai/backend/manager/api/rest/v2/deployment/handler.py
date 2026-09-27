@@ -43,7 +43,7 @@ from ai.backend.common.dto.manager.v2.deployment.request import (
 from ai.backend.common.dto.manager.v2.resource_slot.request import (
     SearchAllocatedResourceSlotsInput,
 )
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.api.rest.v2.path_params import (
     DeploymentIdPathParam,
     ProjectIdPathParam,
@@ -64,7 +64,7 @@ from ai.backend.manager.dto.context import UserContext
 if TYPE_CHECKING:
     from ai.backend.manager.api.adapters.deployment.adapter import DeploymentAdapter
 
-log: Final = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log: Final = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 class V2DeploymentHandler:

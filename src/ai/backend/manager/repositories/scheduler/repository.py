@@ -44,7 +44,7 @@ from ai.backend.common.types import (
     VFolderMountOptions,
     VFolderMountRequest,
 )
-from ai.backend.logging.utils import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.dotfile.types import DotfileBundle
 from ai.backend.manager.data.kernel.types import KernelListResult, KernelStatus
@@ -93,7 +93,7 @@ from ai.backend.manager.views.sokovan.workload import SessionWorkload
 from .cache_source.cache_source import ScheduleCacheSource
 from .db_source.db_source import ScheduleDBSource
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 scheduler_repository_resilience = Resilience(
     policies=[
@@ -782,7 +782,7 @@ class SchedulerRepository:
             if cached_data is not None:
                 return cached_data
         except Exception as e:
-            log.warning("Failed to get total resource slots from cache: {}", e)
+            log.warning("total resource slots cache read failed", exc_info=e)
 
         # Cache miss - calculate from DB
         total_resource_data = await self._db_source.calculate_total_resource_slots()
@@ -791,7 +791,7 @@ class SchedulerRepository:
         try:
             await self._cache_source.set_total_resource_slots(total_resource_data)
         except Exception as e:
-            log.warning("Failed to update total resource slots cache: {}", e)
+            log.warning("total resource slots cache update failed", exc_info=e)
 
         return total_resource_data
 

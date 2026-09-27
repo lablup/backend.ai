@@ -22,7 +22,7 @@ from sqlalchemy.sql.expression import SQLColumnExpression
 from ai.backend.common import msgpack
 from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.types import ResourceSlot, VFolderHostPermissionMap
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.data.domain.types import DomainStatus
 from ai.backend.manager.data.permission.permission_defs import DomainPermission
 from ai.backend.manager.defs import RESERVED_DOTFILES
@@ -51,7 +51,7 @@ from ai.backend.manager.models.rbac.context import ClientContext
 if TYPE_CHECKING:
     from ai.backend.manager.models.resource_group import ResourceGroupForDomainRow
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 __all__: Sequence[str] = (
