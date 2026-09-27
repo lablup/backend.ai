@@ -29,7 +29,7 @@ from ai.backend.common.types import (
     KernelId,
     SessionId,
 )
-from ai.backend.logging.utils import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger, with_log_context
 from ai.backend.manager.clients.agent import AgentClientPool
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.dotfile.types import normalize_newlines
@@ -52,7 +52,7 @@ from ai.backend.manager.views.sokovan.lifecycle import (
     SessionDataForStart,
 )
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 @dataclass
@@ -201,8 +201,9 @@ class SessionLauncher:
         """
 
         async def start_with_timeout(session: SessionDataForStart) -> None:
-            async with async_timeout.timeout(delay=START_SESSION_TIMEOUT_SEC):
-                await self._start_single_session(session, image_configs)
+            with with_log_context(session_id=session.session_id):
+                async with async_timeout.timeout(delay=START_SESSION_TIMEOUT_SEC):
+                    await self._start_single_session(session, image_configs)
 
         results = await asyncio.gather(
             *[start_with_timeout(session) for session in sessions],
@@ -211,8 +212,8 @@ class SessionLauncher:
         for session, result in zip(sessions, results, strict=True):
             if isinstance(result, BaseException):
                 log.warning(
-                    "start-session(s:{}): failed with unhandled exception",
-                    session.session_id,
+                    "session start failed with unhandled exception",
+                    session_id=session.session_id,
                     exc_info=result,
                 )
 
@@ -227,15 +228,13 @@ class SessionLauncher:
         :param session: Session data to start
         :param image_configs: Image configurations indexed by image ID
         """
-        log_fmt = "start-session(s:{}, type:{}, name:{}, ak:{}, cluster_mode:{}): "
-        log_args = (
-            session.session_id,
-            session.session_type,
-            session.name,
-            session.access_key,
-            session.cluster_mode,
+        log.debug(
+            "session start attempted",
+            session_type=session.session_type,
+            session_name=session.name,
+            access_key=session.access_key,
+            cluster_mode=session.cluster_mode,
         )
-        log.debug(log_fmt + "try-starting", *log_args)
 
         try:
             # Ensure we have kernels to start
@@ -318,10 +317,9 @@ class SessionLauncher:
                     # Use resolved image config by image_id
                     if k.image_id is None or k.image_id not in image_configs_by_id:
                         log.error(
-                            "Image ID {} (canonical: {}) not found in resolved configs"
-                            " - this indicates precondition check failed",
-                            k.image_id,
-                            image_str,
+                            "image not found in resolved configs",
+                            image_id=k.image_id,
+                            image_name=image_str,
                         )
                         raise ValueError(
                             f"Image {image_str} (id={k.image_id}) not found in database"
@@ -434,27 +432,26 @@ class SessionLauncher:
                 ]
                 if failed_agent_ids:
                     log.warning(
-                        log_fmt + "recording failed agents: {}",
-                        *log_args,
-                        failed_agent_ids,
+                        "recording failed agents",
+                        failed_agent_ids=", ".join(str(aid) for aid in failed_agent_ids),
                     )
                     try:
                         await self._valkey_schedule.record_session_failed_agents(
                             session.session_id, failed_agent_ids
                         )
                     except Exception:
-                        log.warning(
-                            log_fmt + "failed to record failed agents in Valkey",
-                            *log_args,
-                            exc_info=True,
-                        )
+                        log.warning("failed agents not recorded in Valkey", exc_info=True)
 
-            log.info(log_fmt + "started", *log_args)
+            log.trace(
+                "session started",
+                session_type=session.session_type,
+                cluster_mode=session.cluster_mode,
+            )
 
         except Exception as e:
             # Convert exception to error status info
             error_info = convert_to_status_data(e, self._config_provider.config.debug.enabled)
-            log.warning(log_fmt + "failed-starting", *log_args, exc_info=True)
+            log.warning("session start failed", exc_info=True)
             # Update error info in status_data without changing status
             # Session will be handled by timeout detection in Coordinator
             await self._repository.update_session_error_info(session.session_id, error_info)
@@ -494,7 +491,7 @@ class SessionLauncher:
                     async with self._agent_client_pool.acquire(first_kernel.agent_id) as client:
                         await client.create_local_network(network_name)
                 except Exception:
-                    log.exception("Failed to create agent-local network {}", network_name)
+                    log.exception("agent-local network creation failed", network_name=network_name)
                     raise
                 network_config = {
                     "mode": "bridge",
@@ -510,9 +507,9 @@ class SessionLauncher:
                 if driver not in self._network_plugin_ctx.plugins:
                     available_plugins = list(self._network_plugin_ctx.plugins.keys())
                     log.error(
-                        "Network plugin '{}' not found. Available plugins: {}. For overlay networks, ensure Docker Swarm is initialized with 'docker swarm init'.",
-                        driver,
-                        available_plugins,
+                        "network plugin not found",
+                        driver_name=driver,
+                        available_plugins=", ".join(available_plugins),
                     )
                     raise KeyError(
                         f"Network plugin '{driver}' not found. Available plugins: {available_plugins}. "
@@ -527,9 +524,7 @@ class SessionLauncher:
                     network_config = dict(network_info.options)
                     network_name = network_info.network_id
                 except Exception:
-                    log.exception(
-                        "Failed to create the inter-container network (plugin: {})", driver
-                    )
+                    log.exception("inter-container network creation failed", driver_name=driver)
                     raise
         elif network_type == NetworkType.HOST:
             network_config = {"mode": "host"}
@@ -541,8 +536,8 @@ class SessionLauncher:
                 for kernel in session.kernels:
                     if not kernel.agent_id:
                         log.warning(
-                            "No agent assigned for kernel {}, skipping port mapping",
-                            kernel.kernel_id,
+                            "no agent assigned for kernel, port mapping skipped",
+                            kernel_id=kernel.kernel_id,
                         )
                         continue
                     async with self._agent_client_pool.acquire(kernel.agent_id) as client:
