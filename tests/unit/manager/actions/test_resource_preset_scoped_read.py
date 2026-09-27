@@ -17,7 +17,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from ai.backend.common.contexts.user import with_user
+from ai.backend.common.contexts.user import with_user_context
 from ai.backend.common.data.entity.domain import DomainEntityType, DomainID
 from ai.backend.common.data.entity.resource_group import ResourceGroupEntityType, ResourceGroupID
 from ai.backend.common.data.entity.resource_preset import ResourcePresetEntityType
@@ -285,7 +285,7 @@ async def test_a_member_reads_the_presets_of_a_linked_resource_group(
     processors: ResourcePresetProcessors,
     graph: _Graph,
 ) -> None:
-    with with_user(_member(graph)):
+    with with_user_context(_member(graph)):
         result = await processors.list_presets.run(_action(graph.linked))
 
     assert result.presets == []
@@ -295,5 +295,5 @@ async def test_a_member_is_refused_a_resource_group_their_domain_is_not_linked_t
     processors: ResourcePresetProcessors,
     graph: _Graph,
 ) -> None:
-    with with_user(_member(graph)), pytest.raises(NotEnoughPermission):
+    with with_user_context(_member(graph)), pytest.raises(NotEnoughPermission):
         await processors.list_presets.run(_action(graph.unlinked))

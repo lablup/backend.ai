@@ -19,7 +19,7 @@ from sqlalchemy.ext.asyncio import AsyncEngine as SAEngine
 from ai.backend.client.v2.exceptions import NotFoundError
 from ai.backend.client.v2.registry import BackendAIClientRegistry
 from ai.backend.common.config import ModelDefinitionDraft
-from ai.backend.common.contexts.user import with_user
+from ai.backend.common.contexts.user import with_user_context
 from ai.backend.common.data.endpoint.types import EndpointLifecycle
 from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.entity.image import ImageID
@@ -513,7 +513,7 @@ class TestDeploymentAdapterFilter:
         replicas_filter: ReplicaNestedFilter,
         expected_names: tuple[str, ...],
     ) -> None:
-        with with_user(
+        with with_user_context(
             self._admin_user_data(admin_user_fixture.user_uuid, domain_fixture.domain_name)
         ):
             payload = await deployment_adapter.my_search(
@@ -536,7 +536,7 @@ class TestDeploymentAdapterFilter:
         domain_fixture: DomainFixtureData,
         replica_filter_deployments: dict[str, uuid.UUID],
     ) -> None:
-        with with_user(
+        with with_user_context(
             self._admin_user_data(admin_user_fixture.user_uuid, domain_fixture.domain_name)
         ):
             payload = await deployment_adapter.my_search(
@@ -599,7 +599,7 @@ class TestDeploymentAdapterFilter:
                 DeploymentFilterV2(tags=StringFilter(i_contains="beta")),
             ],
         )
-        with with_user(
+        with with_user_context(
             self._admin_user_data(admin_user_fixture.user_uuid, domain_fixture.domain_name)
         ):
             payload = await deployment_adapter.my_search(
@@ -651,7 +651,7 @@ class TestDeploymentAdapterFilter:
                 DeploymentFilterV2(tags=StringFilter(i_contains="beta")),
             ],
         )
-        with with_user(
+        with with_user_context(
             self._admin_user_data(admin_user_fixture.user_uuid, domain_fixture.domain_name)
         ):
             payload = await deployment_adapter.my_search(
@@ -728,7 +728,7 @@ class TestDeploymentAdapterFilter:
                 ),
             ],
         )
-        with with_user(
+        with with_user_context(
             self._admin_user_data(admin_user_fixture.user_uuid, domain_fixture.domain_name)
         ):
             payload = await deployment_adapter.my_search(
@@ -772,7 +772,7 @@ class TestDeploymentAdapterFilter:
                 DeploymentFilterV2(tags=StringFilter(i_contains="beta")),
             ],
         )
-        with with_user(
+        with with_user_context(
             self._admin_user_data(admin_user_fixture.user_uuid, domain_fixture.domain_name)
         ):
             payload = await deployment_adapter.project_search(

@@ -13,7 +13,7 @@ from typing import Any, override
 
 import pytest
 
-from ai.backend.common.contexts.user import with_user
+from ai.backend.common.contexts.user import with_user_context
 from ai.backend.common.data.entity.deployment import DeploymentID
 from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.entity.image import ImageEntityType
@@ -194,7 +194,7 @@ async def test_a_missing_key_and_a_denied_key_raise_the_same_thing(
     missing = _processor(_missing, monitor, [_PassingValidator()])
     denied = _processor(_resolved, monitor, [_DenyingValidator()])
 
-    with with_user(authenticated_user):
+    with with_user_context(authenticated_user):
         with pytest.raises(GenericBadRequest) as missing_error:
             await missing.run(action)
         with pytest.raises(GenericBadRequest) as denied_error:
@@ -211,7 +211,7 @@ async def test_the_merged_answer_names_neither_the_key_nor_the_id(
     monitor = _RecordingMonitor()
     denied = _processor(_resolved, monitor, [_DenyingValidator()])
 
-    with with_user(authenticated_user):
+    with with_user_context(authenticated_user):
         with pytest.raises(GenericBadRequest) as error:
             await denied.run(action)
 
@@ -226,7 +226,7 @@ async def test_the_audit_record_keeps_the_two_causes_apart(
     missing_monitor = _RecordingMonitor()
     denied_monitor = _RecordingMonitor()
 
-    with with_user(authenticated_user):
+    with with_user_context(authenticated_user):
         with pytest.raises(GenericBadRequest):
             await _processor(_missing, missing_monitor, [_PassingValidator()]).run(action)
         with pytest.raises(GenericBadRequest):
@@ -248,7 +248,7 @@ async def test_an_ungated_lookup_still_reports_the_miss(
     hidden by merging."""
     monitor = _RecordingMonitor()
 
-    with with_user(authenticated_user):
+    with with_user_context(authenticated_user):
         with pytest.raises(EntityNotFoundError):
             await _processor(_missing, monitor, []).run(action)
 
@@ -258,7 +258,7 @@ async def test_an_ungated_lookup_still_reports_the_miss(
 async def test_a_superadmin_gets_the_miss_unmerged(action: _Action, superadmin: UserData) -> None:
     monitor = _RecordingMonitor()
 
-    with with_user(superadmin):
+    with with_user_context(superadmin):
         with pytest.raises(EntityNotFoundError):
             await _processor(_missing, monitor, [_PassingValidator()]).run(action)
 
@@ -276,7 +276,7 @@ async def test_a_failure_that_is_neither_is_raised_unchanged(
 
     monitor = _RecordingMonitor()
 
-    with with_user(authenticated_user):
+    with with_user_context(authenticated_user):
         with pytest.raises(_Unreachable):
             await _processor(run, monitor, [_PassingValidator()]).run(action)
 
@@ -351,7 +351,7 @@ async def test_a_key_owner_lookup_merges_both_failures(
     missing_processor = missing_group.key_owner_lookup_ops(type(action))
     denied_processor = denied_group.key_owner_lookup_ops(type(action))
 
-    with with_user(authenticated_user):
+    with with_user_context(authenticated_user):
         with pytest.raises(GenericBadRequest) as missing_error:
             await missing_processor.run(action)
         monkeypatch.setattr(OpsRepository, "field_owner_by_key", found)
@@ -400,7 +400,7 @@ async def test_a_key_field_lookup_merges_both_failures(
         action,
     ).key_field_lookup_ops(LookupKeypairByAccessKeyAction)
 
-    with with_user(authenticated_user):
+    with with_user_context(authenticated_user):
         monkeypatch.setattr(OpsRepository, "field_by_key", missing)
         with pytest.raises(GenericBadRequest) as missing_error:
             await missing_processor.run(action)

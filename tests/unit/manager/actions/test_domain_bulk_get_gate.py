@@ -15,7 +15,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from ai.backend.common.contexts.user import with_user
+from ai.backend.common.contexts.user import with_user_context
 from ai.backend.common.data.entity.domain import DomainEntityType, DomainID
 from ai.backend.common.data.entity.user import UserEntityType, UserID
 from ai.backend.common.data.permission.types import Permission
@@ -247,7 +247,7 @@ async def test_a_member_reads_their_own_domain(
     processors: DomainProcessors,
     domains: _Domains,
 ) -> None:
-    with with_user(_member(domains)):
+    with with_user_context(_member(domains)):
         result = await processors.bulk_get.run(
             BulkGetDomainsAction(ids=[domains.own, domains.other])
         )
@@ -260,7 +260,7 @@ async def test_a_member_is_denied_a_domain_they_hold_no_role_in(
     processors: DomainProcessors,
     domains: _Domains,
 ) -> None:
-    with with_user(_member(domains)):
+    with with_user_context(_member(domains)):
         result = await processors.bulk_get.run(
             BulkGetDomainsAction(ids=[domains.own, domains.other])
         )

@@ -10,7 +10,7 @@ import pytest
 from aioresponses import aioresponses
 
 from ai.backend.common.bgtask.bgtask import BackgroundTaskManager
-from ai.backend.common.contexts.user import with_user
+from ai.backend.common.contexts.user import with_user_context
 from ai.backend.common.data.endpoint.types import EndpointStatus
 from ai.backend.common.data.entity.deployment import DeploymentID
 from ai.backend.common.data.entity.domain import DomainID
@@ -48,7 +48,7 @@ class TestGenerateToken:
 
     @pytest.fixture(autouse=True)
     def set_user_context(self, user_data: UserData) -> Iterator[None]:
-        with with_user(user_data):
+        with with_user_context(user_data):
             yield
 
     @pytest.fixture

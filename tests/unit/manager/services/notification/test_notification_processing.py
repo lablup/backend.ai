@@ -15,7 +15,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from ai.backend.common.contexts.user import with_user
+from ai.backend.common.contexts.user import with_user_context
 from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.entity.notification import (
     NotificationChannelEntityType,
@@ -162,7 +162,7 @@ class TestNotificationProcessing:
                     status="RUNNING",
                 ),
             )
-            with with_user(superadmin):
+            with with_user_context(superadmin):
                 result = await notification_processors.process_notification.run(action)
 
         assert isinstance(result, ProcessNotificationActionResult)
@@ -248,7 +248,7 @@ class TestNotificationProcessing:
                     status="RUNNING",
                 ),
             )
-            with with_user(superadmin):
+            with with_user_context(superadmin):
                 result = await notification_processors.process_notification.run(action)
 
         assert isinstance(result, ProcessNotificationActionResult)

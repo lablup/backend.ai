@@ -23,7 +23,7 @@ import pytest
 from aiohttp import web
 
 from ai.backend.common.api_handlers import BodyParam, QueryParam
-from ai.backend.common.contexts.user import with_user
+from ai.backend.common.contexts.user import with_user_context
 from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.user.types import UserData
@@ -105,7 +105,7 @@ def acting_user(user_context: UserContext) -> Iterator[UserData]:
         domain_name=user_context.user_domain,
         domain_id=DomainID(uuid.uuid4()),
     )
-    with with_user(user):
+    with with_user_context(user):
         yield user
 
 
