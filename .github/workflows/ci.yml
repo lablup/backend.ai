@@ -28,9 +28,6 @@ jobs:
       - uses: lablup/auto-labeler@main
 
   detect-changes:
-    if: |
-      !contains(github.event.pull_request.labels.*.name, 'skip:ci')
-      && !contains(toJSON(github.event.head_commit.message), 'skip:ci')
     runs-on: ubuntu-latest
     outputs:
       code: ${{ steps.filter.outputs.code }}
@@ -77,8 +74,6 @@ jobs:
     needs: detect-changes
     if: |
       always()
-      && !contains(github.event.pull_request.labels.*.name, 'skip:ci')
-      && !contains(toJSON(github.event.head_commit.message), 'skip:ci')
       && (
         needs.detect-changes.result != 'success'
         || needs.detect-changes.outputs.code == 'true'
@@ -97,8 +92,6 @@ jobs:
     needs: detect-changes
     if: |
       always()
-      && !contains(github.event.pull_request.labels.*.name, 'skip:ci')
-      && !contains(toJSON(github.event.head_commit.message), 'skip:ci')
       && (
         needs.detect-changes.result != 'success'
         || needs.detect-changes.outputs.code == 'true'
@@ -160,8 +153,6 @@ jobs:
     needs: detect-changes
     if: |
       always()
-      && !contains(github.event.pull_request.labels.*.name, 'skip:ci')
-      && !contains(toJSON(github.event.head_commit.message), 'skip:ci')
       && (
         needs.detect-changes.result != 'success'
         || needs.detect-changes.outputs.code == 'true'
@@ -183,8 +174,6 @@ jobs:
     needs: detect-changes
     if: |
       always()
-      && !contains(github.event.pull_request.labels.*.name, 'skip:ci')
-      && !contains(toJSON(github.event.head_commit.message), 'skip:ci')
       && (
         needs.detect-changes.result != 'success'
         || needs.detect-changes.outputs.code == 'true'
@@ -205,8 +194,6 @@ jobs:
     needs: detect-changes
     if: |
       always()
-      && !contains(github.event.pull_request.labels.*.name, 'skip:ci')
-      && !contains(toJSON(github.event.head_commit.message), 'skip:ci')
       && (
         needs.detect-changes.result != 'success'
         || needs.detect-changes.outputs.code == 'true'
@@ -229,8 +216,6 @@ jobs:
     needs: detect-changes
     if: |
       always()
-      && !contains(github.event.pull_request.labels.*.name, 'skip:ci')
-      && !contains(toJSON(github.event.head_commit.message), 'skip:ci')
       && (
         needs.detect-changes.result != 'success'
         || needs.detect-changes.outputs.code == 'true'
