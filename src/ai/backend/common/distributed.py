@@ -7,13 +7,13 @@ from typing import Final
 
 from aiomonitor.task import preserve_termination_log
 
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger, with_log_context
 
 from .events.dispatcher import EventProducer
 from .events.types import AbstractAnycastEvent
 from .lock import AbstractDistributedLock
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 class GlobalTimer:
@@ -44,6 +44,10 @@ class GlobalTimer:
 
     @preserve_termination_log  # type: ignore[misc]
     async def generate_tick(self) -> None:
+        with with_log_context(task_name=self.task_name):
+            await self._generate_tick()
+
+    async def _generate_tick(self) -> None:
         try:
             await asyncio.sleep(self.initial_delay)
             if self._stopped:
@@ -60,7 +64,7 @@ class GlobalTimer:
                 except Exception:
                     if self._stopped:  # _stopped can change during await
                         return  # type: ignore[unreachable]
-                    log.debug("timeout raised while trying to acquire lock. retrying...")
+                    log.debug("global timer lock acquisition failed, retrying")
         except asyncio.CancelledError:
             pass
 
