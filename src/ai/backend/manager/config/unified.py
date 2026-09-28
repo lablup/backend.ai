@@ -651,24 +651,6 @@ class RBACConfig(BaseConfigSchema):
 
 
 class ManagerConfig(BaseConfigSchema):
-    shutdown_drain_period: Annotated[
-        float,
-        Field(
-            default=15.0,
-            ge=0,
-            allow_inf_nan=False,
-            validation_alias=AliasChoices("shutdown-drain-period", "shutdown_drain_period"),
-            serialization_alias="shutdown-drain-period",
-        ),
-        BackendAIConfigMeta(
-            description=(
-                "Seconds to keep serving requests after readiness reports draining. "
-                "Set longer than the webserver probe interval."
-            ),
-            added_version=NEXT_RELEASE_VERSION,
-            example=ConfigExample(local="15.0", prod="15.0"),
-        ),
-    ]
     shutdown_grace_period: Annotated[
         float,
         Field(
@@ -679,7 +661,7 @@ class ManagerConfig(BaseConfigSchema):
             serialization_alias="shutdown-grace-period",
         ),
         BackendAIConfigMeta(
-            description="Seconds to wait for in-flight HTTP requests after the drain period ends.",
+            description="Seconds to wait for in-flight HTTP requests during shutdown.",
             added_version=NEXT_RELEASE_VERSION,
             example=ConfigExample(local="30.0", prod="30.0"),
         ),

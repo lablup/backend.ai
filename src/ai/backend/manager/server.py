@@ -352,9 +352,8 @@ async def server_main(
                     drain_notifier.notify_draining()
                     log.info(
                         "draining API requests",
-                        drain_period=shutdown_config.shutdown_drain_period,
+                        grace_period=shutdown_config.shutdown_grace_period,
                     )
-                    await asyncio.sleep(shutdown_config.shutdown_drain_period)
             finally:
                 results = await asyncio.gather(
                     runner.cleanup(), internal_runner.cleanup(), return_exceptions=True
@@ -592,9 +591,7 @@ def main(
                         num_workers=bootstrap_cfg.manager.num_proc,
                         args=(bootstrap_cfg, discovered_cfg_path, log_endpoint, log_level),
                         wait_timeout=(
-                            bootstrap_cfg.manager.shutdown_drain_period
-                            + bootstrap_cfg.manager.shutdown_grace_period
-                            + SHUTDOWN_CLEANUP_MARGIN
+                            bootstrap_cfg.manager.shutdown_grace_period + SHUTDOWN_CLEANUP_MARGIN
                         ),
                         runner=runner,
                     )
