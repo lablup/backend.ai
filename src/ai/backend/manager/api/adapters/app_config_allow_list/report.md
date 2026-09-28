@@ -2,7 +2,16 @@
 
 [무엇을 보장하는가](/src/ai/backend/manager/api/adapters/app_config_allow_list/KNOWLEDGE.md) · [어댑터](/src/ai/backend/manager/api/adapters/app_config_allow_list/adapter.py)
 
-Not exercised by any scenario: batch_load_fields.
+시나리오: 완성
+
+- ops 로 구성 (5)
+  - admin_create — 대표 성공 ✓ · 대표 실패 ✓
+  - admin_get — 대표 성공 ✓ · 대표 실패 ✓
+  - admin_search — 대표 성공 ✓ · 대표 실패 ✓
+  - admin_update — 대표 성공 ✓ · 대표 실패 ✓
+  - batch_load_by_ids — 대표 성공 ✓ · 대표 실패 ✓
+- 직접 구현 (1)
+  - admin_purge — 성공 있음 2 · 실패 있음 2 (single_entity)
 
 ### creating
 

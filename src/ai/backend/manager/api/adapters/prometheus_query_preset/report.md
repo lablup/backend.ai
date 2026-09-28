@@ -2,7 +2,18 @@
 
 [무엇을 보장하는가](/src/ai/backend/manager/api/adapters/prometheus_query_preset/KNOWLEDGE.md) · [어댑터](/src/ai/backend/manager/api/adapters/prometheus_query_preset/adapter.py)
 
-Not exercised by any scenario: batch_load_fields.
+시나리오: 미완 1 / 8
+
+- ops 로 구성 (4)
+  - batch_load_by_ids — 대표 성공 ✓ · 대표 실패 ✗ — SCENARIO-GAP
+  - delete — 대표 성공 ✓ · 대표 실패 ✓
+  - get — 대표 성공 ✓ · 대표 실패 ✓
+  - search — 대표 성공 ✓ · 대표 실패 ✓
+- 직접 구현 (4)
+  - admin_preview — 성공 있음 2 · 실패 있음 2 (global_scope)
+  - create — 성공 있음 4 · 실패 있음 4 (global_scope)
+  - execute_preset — 성공 있음 3 · 실패 있음 4 (single_entity)
+  - update — 성공 있음 6 · 실패 있음 3 (single_entity)
 
 ### creating
 

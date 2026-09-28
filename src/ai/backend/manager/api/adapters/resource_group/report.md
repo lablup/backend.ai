@@ -2,7 +2,33 @@
 
 [무엇을 보장하는가](/src/ai/backend/manager/api/adapters/resource_group/KNOWLEDGE.md) · [어댑터](/src/ai/backend/manager/api/adapters/resource_group/adapter.py)
 
-Not exercised by any scenario: batch_load_fields.
+시나리오: 미완 2 / 22
+
+- ops 로 구성 (7)
+  - batch_load_by_ids — 대표 성공 ✓ · 대표 실패 ✗ — SCENARIO-GAP
+  - batch_load_by_names — 대표 성공 ✓ · 대표 실패 ✗ — SCENARIO-GAP
+  - get — 대표 성공 ✓ · 대표 실패 ✓
+  - get_allowed_resource_groups_for_domain — 대표 성공 ✓ · 대표 실패 ✓
+  - get_allowed_resource_groups_for_project — 대표 성공 ✓ · 대표 실패 ✓
+  - scoped_search — 대표 성공 ✓ · 대표 실패 ✓
+  - search — 대표 성공 ✓ · 대표 실패 ✓
+- ops + 직접 구현 (1)
+  - get_fair_share_spec — 성공 있음 2 · 실패 있음 2 (partial_bulk_get_ops, single_entity)
+- 직접 구현 (14)
+  - admin_replace_default_deployment_options — 성공 있음 2 · 실패 있음 2 (single_entity)
+  - admin_replace_default_session_options — 성공 있음 1 · 실패 있음 2 (single_entity)
+  - create — 성공 있음 2 · 실패 있음 3 (global_scope)
+  - get_allowed_domains_for_resource_group — 성공 있음 2 · 실패 있음 1 (single_entity)
+  - get_allowed_projects_for_resource_group — 성공 있음 1 · 실패 있음 1 (single_entity)
+  - get_resource_info — 성공 있음 2 · 실패 있음 2 (single_entity)
+  - purge — 성공 있음 2 · 실패 있음 2 (single_entity)
+  - update — 성공 있음 5 · 실패 있음 3 (single_entity)
+  - update_allowed_domains_for_resource_group — 성공 있음 1 · 실패 있음 3 (relation, single_entity)
+  - update_allowed_projects_for_resource_group — 성공 있음 1 · 실패 있음 1 (relation, single_entity)
+  - update_allowed_resource_groups_for_domain — 성공 있음 3 · 실패 있음 2 (global_scope, relation, single_entity)
+  - update_allowed_resource_groups_for_project — 성공 있음 1 · 실패 있음 1 (global_scope, relation, single_entity)
+  - update_config — 성공 있음 2 · 실패 있음 1 (single_entity)
+  - update_fair_share_spec — 성공 있음 2 · 실패 있음 2 (single_entity)
 
 ### allowing
 

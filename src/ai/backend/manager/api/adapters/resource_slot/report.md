@@ -2,7 +2,22 @@
 
 [무엇을 보장하는가](/src/ai/backend/manager/api/adapters/resource_slot/KNOWLEDGE.md) · [어댑터](/src/ai/backend/manager/api/adapters/resource_slot/adapter.py)
 
-Not exercised by any scenario: batch_load_fields.
+시나리오: 미완 2 / 12
+
+- ops 로 구성 (8)
+  - admin_create_slot_type — 대표 성공 ✓ · 대표 실패 ✓
+  - admin_purge_slot_type — 대표 성공 ✓ · 대표 실패 ✓
+  - admin_update_slot_type — 대표 성공 ✓ · 대표 실패 ✓
+  - get_slot_type — 대표 성공 ✓ · 대표 실패 ✓
+  - scoped_search_agent_resources — 대표 성공 ✓ · 대표 실패 ✓
+  - search_agent_resources — 대표 성공 ✓ · 대표 실패 ✓
+  - search_allocations — 대표 성공 ✓ · 대표 실패 ✓
+  - search_slot_types — 대표 성공 ✓ · 대표 실패 ✗ — SCENARIO-GAP
+- 직접 구현 (4)
+  - get_agent_resource — 성공 없음 · 실패 있음 6 (single_entity) — SCENARIO-GAP
+  - get_domain_resource_overview — 성공 있음 3 · 실패 있음 3 (scope)
+  - get_kernel_allocation — 성공 있음 3 · 실패 있음 4 (single_entity)
+  - get_project_resource_overview — 성공 있음 5 · 실패 있음 1 (scope)
 
 ### creating
 

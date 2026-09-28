@@ -2,7 +2,21 @@
 
 [무엇을 보장하는가](/src/ai/backend/manager/api/adapters/domain/KNOWLEDGE.md) · [어댑터](/src/ai/backend/manager/api/adapters/domain/adapter.py)
 
-Not exercised by any scenario: batch_load_by_ids, batch_load_by_names, batch_load_fields, scoped_search, search_rg_domains.
+시나리오: 미완 6 / 11
+
+- ops 로 구성 (8)
+  - admin_delete — 대표 성공 ✓ · 대표 실패 ✓
+  - admin_restore — 대표 성공 ✓ · 대표 실패 ✗ — SCENARIO-GAP
+  - admin_search — 대표 성공 ✓ · 대표 실패 ✓
+  - batch_load_by_ids — 대표 성공 ✗ · 대표 실패 ✗ — SCENARIO-GAP
+  - batch_load_by_names — 대표 성공 ✗ · 대표 실패 ✗ — SCENARIO-GAP
+  - get — 대표 성공 ✓ · 대표 실패 ✓
+  - scoped_search — 대표 성공 ✗ · 대표 실패 ✗ — SCENARIO-GAP
+  - search_rg_domains — 대표 성공 ✗ · 대표 실패 ✗ — SCENARIO-GAP
+- 직접 구현 (3)
+  - admin_create — 성공 있음 1 · 실패 있음 4 (global_scope)
+  - admin_purge — 성공 있음 1 · 실패 없음 (single_entity) — SCENARIO-GAP
+  - admin_update — 성공 있음 2 · 실패 있음 2 (single_entity)
 
 ### creating
 

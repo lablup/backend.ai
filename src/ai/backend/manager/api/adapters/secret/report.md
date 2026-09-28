@@ -2,7 +2,11 @@
 
 [무엇을 보장하는가](/src/ai/backend/manager/api/adapters/secret/KNOWLEDGE.md) · [어댑터](/src/ai/backend/manager/api/adapters/secret/adapter.py)
 
-Not exercised by any scenario: batch_load_fields.
+시나리오: 완성
+
+- 직접 구현 (2)
+  - admin_reencrypt_secrets — 성공 있음 4 · 실패 있음 2 (global_scope)
+  - admin_secret_status — 성공 있음 3 · 실패 있음 1 (global_scope)
 
 ### reencrypting
 

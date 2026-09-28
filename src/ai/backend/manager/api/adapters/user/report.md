@@ -2,7 +2,54 @@
 
 [무엇을 보장하는가](/src/ai/backend/manager/api/adapters/user/KNOWLEDGE.md) · [어댑터](/src/ai/backend/manager/api/adapters/user/adapter.py)
 
-Not exercised by any scenario: batch_load_fields, resolve_domain_id.
+시나리오: 미완 4 / 43
+
+- ops 로 구성 (18)
+  - LoginHistoryAdapter.admin_search — 대표 성공 ✓ · 대표 실패 ✓
+  - LoginHistoryAdapter.my_search — 대표 성공 ✓ · 대표 실패 ✓
+  - LoginSessionAdapter.admin_search — 대표 성공 ✓ · 대표 실패 ✓
+  - LoginSessionAdapter.my_search — 대표 성공 ✓ · 대표 실패 ✓
+  - UserAdapter.admin_search — 대표 성공 ✓ · 대표 실패 ✓
+  - UserAdapter.admin_search_keypairs — 대표 성공 ✓ · 대표 실패 ✓
+  - UserAdapter.batch_load_by_ids — 대표 성공 ✓ · 대표 실패 ✓
+  - UserAdapter.domain_search — 대표 성공 ✓ · 대표 실패 ✓
+  - UserAdapter.gql_admin_search — 대표 성공 ✓ · 대표 실패 ✓
+  - UserAdapter.gql_admin_search_keypairs — 대표 성공 ✓ · 대표 실패 ✓
+  - UserAdapter.gql_scoped_search — 대표 성공 ✓ · 대표 실패 ✓
+  - UserAdapter.gql_search_by_domain — 대표 성공 ✓ · 대표 실패 ✓
+  - UserAdapter.gql_search_by_project — 대표 성공 ✓ · 대표 실패 ✓
+  - UserAdapter.project_search — 대표 성공 ✓ · 대표 실패 ✓
+  - UserAdapter.resolve_domain_id — 대표 성공 ✗ · 대표 실패 ✗ — SCENARIO-GAP
+  - UserAdapter.role_search — 대표 성공 ✓ · 대표 실패 ✓
+  - UserAdapter.scoped_search — 대표 성공 ✓ · 대표 실패 ✓
+  - UserAdapter.search_my_keypairs — 대표 성공 ✓ · 대표 실패 ✓
+- ops + 직접 구현 (6)
+  - UserAdapter.bulk_create_users — 성공 없음 · 실패 있음 1 (atomic_bulk_get_ops, global_scope) — SCENARIO-GAP
+  - UserAdapter.bulk_create_users_with_keypair — 성공 없음 · 실패 있음 1 (atomic_bulk_get_ops, global_scope) — SCENARIO-GAP
+  - UserAdapter.bulk_modify_users — 성공 있음 2 · 실패 있음 1 (atomic_bulk_get_ops, global_scope, single_entity)
+  - UserAdapter.create_user — 성공 없음 · 실패 있음 2 (atomic_bulk_get_ops, scope) — SCENARIO-GAP
+  - UserAdapter.get — 성공 있음 1 · 실패 있음 1 (atomic_bulk_get_ops, single_entity)
+  - UserAdapter.update_user_by_id — 성공 있음 3 · 실패 있음 2 (atomic_bulk_get_ops, single_entity)
+- 직접 구현 (19)
+  - LoginSessionAdapter.admin_revoke — 성공 있음 1 · 실패 있음 2 (global_scope)
+  - LoginSessionAdapter.admin_unblock_user — 성공 있음 2 · 실패 있음 1 (global_scope)
+  - LoginSessionAdapter.my_revoke — 성공 있음 1 · 실패 있음 3 (single_field)
+  - UserAdapter.admin_create_keypair — 성공 있음 1 · 실패 있음 2 (single_entity)
+  - UserAdapter.admin_delete_keypair — 성공 있음 1 · 실패 있음 3 (single_field)
+  - UserAdapter.admin_delete_ssh_keypair — 성공 있음 1 · 실패 있음 2 (single_entity)
+  - UserAdapter.admin_get_keypair — 성공 있음 1 · 실패 있음 1 (single_field)
+  - UserAdapter.admin_get_ssh_keypair — 성공 있음 1 · 실패 있음 1 (single_entity)
+  - UserAdapter.admin_register_ssh_keypair — 성공 있음 1 · 실패 있음 2 (single_entity)
+  - UserAdapter.admin_update_keypair — 성공 있음 1 · 실패 있음 3 (single_field)
+  - UserAdapter.bulk_purge_users — 성공 있음 2 · 실패 있음 1 (global_scope)
+  - UserAdapter.delete_user_by_id — 성공 있음 1 · 실패 있음 1 (single_entity)
+  - UserAdapter.issue_my_keypair — 성공 있음 2 · 실패 있음 1 (single_entity)
+  - UserAdapter.purge_user_by_id — 성공 있음 1 · 실패 있음 2 (single_entity)
+  - UserAdapter.restore_user_by_id — 성공 있음 2 · 실패 있음 1 (single_entity)
+  - UserAdapter.revoke_my_keypair — 성공 있음 1 · 실패 있음 4 (single_field)
+  - UserAdapter.switch_default_access_key — 성공 있음 1 · 실패 있음 2 (single_entity)
+  - UserAdapter.update_my_keypair — 성공 있음 1 · 실패 있음 3 (single_field)
+  - UserAdapter.update_user — 성공 있음 1 · 실패 있음 1 (single_entity)
 
 ### creating
 

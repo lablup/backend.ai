@@ -2,7 +2,19 @@
 
 [무엇을 보장하는가](/src/ai/backend/manager/api/adapters/app_config_fragment/KNOWLEDGE.md) · [어댑터](/src/ai/backend/manager/api/adapters/app_config_fragment/adapter.py)
 
-Not exercised by any scenario: batch_load_fields.
+시나리오: 미완 1 / 10
+
+- ops 로 구성 (10)
+  - admin_search — 대표 성공 ✓ · 대표 실패 ✓
+  - batch_load_by_ids — 대표 성공 ✓ · 대표 실패 ✓
+  - bulk_purge — 대표 성공 ✓ · 대표 실패 ✗ — SCENARIO-GAP
+  - get — 대표 성공 ✓ · 대표 실패 ✓
+  - my_app_config_fragments_by_names — 대표 성공 ✓ · 대표 실패 ✓
+  - my_upsert_app_config_fragments — 대표 성공 ✓ · 대표 실패 ✓
+  - purge — 대표 성공 ✓ · 대표 실패 ✓
+  - scoped_app_config_fragments_by_names — 대표 성공 ✓ · 대표 실패 ✓
+  - scoped_search — 대표 성공 ✓ · 대표 실패 ✓
+  - scoped_upsert_app_config_fragments — 대표 성공 ✓ · 대표 실패 ✓
 
 ### purging
 

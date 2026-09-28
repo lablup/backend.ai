@@ -2,7 +2,35 @@
 
 [무엇을 보장하는가](/src/ai/backend/manager/api/adapters/vfolder/KNOWLEDGE.md) · [어댑터](/src/ai/backend/manager/api/adapters/vfolder/adapter.py)
 
-Not exercised by any scenario: admin_search, batch_load_fields, batch_load_permissions, bulk_delete, bulk_purge, clone, create_download_session, create_in_project, create_upload_session, delete, delete_files, deploy, get_folder_usage, list_files, list_mount_policies, mkdir, move_file, purge, restore, set_mount_policy, unset_mount_policy.
+시나리오: 미완 21 / 25
+
+- ops 로 구성 (4)
+  - admin_search — 대표 성공 ✗ · 대표 실패 ✗ — SCENARIO-GAP
+  - batch_load_by_ids — 대표 성공 ✓ · 대표 실패 ✓
+  - project_search — 대표 성공 ✓ · 대표 실패 ✓
+  - scoped_search — 대표 성공 ✓ · 대표 실패 ✗ — SCENARIO-GAP
+- 직접 구현 (21)
+  - batch_load_permissions — 성공 없음 · 실패 없음 (partial_bulk) — SCENARIO-GAP
+  - bulk_delete — 성공 없음 · 실패 없음 (single_entity) — SCENARIO-GAP
+  - bulk_purge — 성공 없음 · 실패 없음 (single_entity) — SCENARIO-GAP
+  - clone — 성공 없음 · 실패 없음 (single_entity) — SCENARIO-GAP
+  - create — 성공 있음 1 · 실패 있음 1 (scope)
+  - create_download_session — 성공 없음 · 실패 없음 (single_entity) — SCENARIO-GAP
+  - create_in_project — 성공 없음 · 실패 없음 (scope) — SCENARIO-GAP
+  - create_upload_session — 성공 없음 · 실패 없음 (single_entity) — SCENARIO-GAP
+  - delete — 성공 없음 · 실패 없음 (single_entity) — SCENARIO-GAP
+  - delete_files — 성공 없음 · 실패 없음 (single_entity) — SCENARIO-GAP
+  - deploy — 성공 없음 · 실패 없음 (scope, single_entity) — SCENARIO-GAP
+  - get — 성공 있음 2 · 실패 있음 2 (single_entity)
+  - get_folder_usage — 성공 없음 · 실패 없음 (single_entity) — SCENARIO-GAP
+  - list_files — 성공 없음 · 실패 없음 (single_entity) — SCENARIO-GAP
+  - list_mount_policies — 성공 없음 · 실패 없음 (single_entity) — SCENARIO-GAP
+  - mkdir — 성공 없음 · 실패 없음 (single_entity) — SCENARIO-GAP
+  - move_file — 성공 없음 · 실패 없음 (single_entity) — SCENARIO-GAP
+  - purge — 성공 없음 · 실패 없음 (single_entity) — SCENARIO-GAP
+  - restore — 성공 없음 · 실패 없음 (single_entity) — SCENARIO-GAP
+  - set_mount_policy — 성공 없음 · 실패 없음 (single_entity) — SCENARIO-GAP
+  - unset_mount_policy — 성공 없음 · 실패 없음 (single_entity) — SCENARIO-GAP
 
 ### batch_loading
 

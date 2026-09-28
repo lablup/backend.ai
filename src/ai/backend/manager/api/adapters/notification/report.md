@@ -2,7 +2,24 @@
 
 [무엇을 보장하는가](/src/ai/backend/manager/api/adapters/notification/KNOWLEDGE.md) · [어댑터](/src/ai/backend/manager/api/adapters/notification/adapter.py)
 
-Not exercised by any scenario: batch_load_fields.
+시나리오: 미완 2 / 14
+
+- ops 로 구성 (12)
+  - batch_load_channels_by_ids — 대표 성공 ✓ · 대표 실패 ✗ — SCENARIO-GAP
+  - batch_load_rules_by_ids — 대표 성공 ✓ · 대표 실패 ✗ — SCENARIO-GAP
+  - create_channel — 대표 성공 ✓ · 대표 실패 ✓
+  - create_rule — 대표 성공 ✓ · 대표 실패 ✓
+  - delete_channel — 대표 성공 ✓ · 대표 실패 ✓
+  - delete_rule — 대표 성공 ✓ · 대표 실패 ✓
+  - get_channel — 대표 성공 ✓ · 대표 실패 ✓
+  - get_rule — 대표 성공 ✓ · 대표 실패 ✓
+  - search_channels — 대표 성공 ✓ · 대표 실패 ✓
+  - search_rules — 대표 성공 ✓ · 대표 실패 ✓
+  - update_channel — 대표 성공 ✓ · 대표 실패 ✓
+  - update_rule — 대표 성공 ✓ · 대표 실패 ✓
+- 직접 구현 (2)
+  - validate_channel — 성공 있음 1 · 실패 있음 2 (single_entity)
+  - validate_rule — 성공 있음 1 · 실패 있음 3 (single_entity)
 
 ### creating_channels
 
