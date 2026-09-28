@@ -16,16 +16,22 @@ from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     gql_root_field,
 )
-from ai.backend.manager.api.gql.prometheus_query_preset.types import (
+from ai.backend.manager.api.gql.prometheus_query_preset.types.filters import (
+    QueryDefinitionFilter,
+    QueryDefinitionOrderBy,
+)
+from ai.backend.manager.api.gql.prometheus_query_preset.types.inputs import (
     ExecuteQueryDefinitionOptionsInput,
     PreviewQueryDefinitionInputGQL,
+    QueryTimeRangeInput,
+)
+from ai.backend.manager.api.gql.prometheus_query_preset.types.node import (
     QueryDefinitionConnection,
     QueryDefinitionEdge,
-    QueryDefinitionFilter,
     QueryDefinitionGQL,
-    QueryDefinitionOrderBy,
+)
+from ai.backend.manager.api.gql.prometheus_query_preset.types.payloads import (
     QueryDefinitionResultGQL,
-    QueryTimeRangeInput,
 )
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.api.gql.utils import check_admin_only

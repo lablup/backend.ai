@@ -21,7 +21,7 @@ from ai.backend.manager.models.alembic.versions.c092d242a027_drop_the_scope_from
     refuse_rows_disagreeing_with_their_role,
 )
 from ai.backend.manager.models.base import GUID
-from ai.backend.manager.models.rbac_models.role import RoleRow
+from ai.backend.manager.models.rbac_models.role.row import RoleRow
 from ai.backend.manager.models.rbac_models.role_preset.row import RolePresetRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.virtual_entity.virtual_entity import VirtualEntityRow

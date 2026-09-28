@@ -20,9 +20,9 @@ from ai.backend.common.resilience import (
     RetryPolicy,
 )
 from ai.backend.common.types import ValkeyTarget
-from ai.backend.logging.utils import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 # Resilience instance for valkey_rate_limit layer
 valkey_rate_limit_resilience = Resilience(
@@ -89,7 +89,7 @@ class ValkeyRateLimitClient:
         Close the ValkeyRateLimitClient connection.
         """
         if self._closed:
-            log.debug("ValkeyRateLimitClient is already closed.")
+            log.debug("valkey rate limit client already closed")
             return
         self._closed = True
         await self._client.disconnect()

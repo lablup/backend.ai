@@ -8,13 +8,16 @@ from typing import Any
 
 import sqlalchemy as sa
 
-from ai.backend.manager.models.association_container_registries_groups import (
+from ai.backend.manager.models.association_container_registries_groups.row import (
     AssociationContainerRegistriesGroupsRow,
 )
-from ai.backend.manager.models.container_registry import ContainerRegistryRow
-from ai.backend.manager.models.project import ProjectRow
-from ai.backend.manager.models.resource_group import ResourceGroupForProjectRow, ResourceGroupRow
-from ai.backend.manager.models.resource_policy import ProjectResourcePolicyRow
+from ai.backend.manager.models.container_registry.row import ContainerRegistryRow
+from ai.backend.manager.models.project.row import ProjectRow
+from ai.backend.manager.models.resource_group.row import (
+    ResourceGroupForProjectRow,
+    ResourceGroupRow,
+)
+from ai.backend.manager.models.resource_policy.row import ProjectResourcePolicyRow
 from ai.backend.manager.repositories.base.export import (
     ExportFieldDef,
     ExportFieldType,

@@ -14,6 +14,7 @@ from ai.backend.common.data.entity.deployment import DeploymentID
 from ai.backend.common.data.entity.deployment_revision import DeploymentRevisionID
 from ai.backend.common.data.entity.replica import ReplicaID
 from ai.backend.manager.data.deployment.types import (
+    RouteData,
     RouteHandlerCategory,
     RouteHealthStatus,
     RouteStatus,
@@ -22,8 +23,7 @@ from ai.backend.manager.data.deployment.types import (
     RouteTrafficStatus,
     RouteTransitionTarget,
 )
-from ai.backend.manager.repositories.deployment import DeploymentRepository
-from ai.backend.manager.repositories.deployment.types import RouteData
+from ai.backend.manager.repositories.deployment.repository import DeploymentRepository
 from ai.backend.manager.sokovan.deployment.route.coordinator import RouteCoordinator
 from ai.backend.manager.sokovan.deployment.route.handlers.base import RouteHandler
 from ai.backend.manager.sokovan.deployment.route.types import (

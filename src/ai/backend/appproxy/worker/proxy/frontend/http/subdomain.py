@@ -12,11 +12,11 @@ from ai.backend.appproxy.common.errors import GenericBadRequest, ServerMisconfig
 from ai.backend.appproxy.worker.config import WildcardDomainConfig
 from ai.backend.appproxy.worker.errors import InvalidFrontendTypeError
 from ai.backend.appproxy.worker.types import Circuit, SubdomainFrontendInfo
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger, with_log_context
 
 from .base import BaseHTTPFrontend
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 class SubdomainFrontend(BaseHTTPFrontend[str]):
@@ -74,7 +74,7 @@ class SubdomainFrontend(BaseHTTPFrontend[str]):
         )
         await site.start()
         self.site = site
-        log.info("accepting proxy requests at {}", service_addr)
+        log.info("accepting proxy requests", service_addr=str(service_addr))
 
     @override
     async def stop(self) -> None:
@@ -95,12 +95,13 @@ class SubdomainFrontend(BaseHTTPFrontend[str]):
         async def _exception_safe_handler(request: web.Request) -> web.StreamResponse:
             slot = self.parse_slot(request)
             circuit = self.circuits[slot]
-            self.ensure_allowed_ip(request, circuit)
-            self.ensure_credential(request, circuit)
-            backend = self.backends[slot]
-            request["circuit"] = circuit
-            request["backend"] = backend
-            return await handler(request)
+            with with_log_context(circuit_id=circuit.id):
+                self.ensure_allowed_ip(request, circuit)
+                self.ensure_credential(request, circuit)
+                backend = self.backends[slot]
+                request["circuit"] = circuit
+                request["backend"] = backend
+                return await handler(request)
 
         return await self.exception_safe_handler_wrapper(request, _exception_safe_handler)
 

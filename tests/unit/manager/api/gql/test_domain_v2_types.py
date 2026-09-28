@@ -12,7 +12,7 @@ from ai.backend.common.dto.manager.v2.domain.response import (
     DomainNode,
     DomainRegistryInfo,
 )
-from ai.backend.manager.api.gql.domain_v2.types import (
+from ai.backend.manager.api.gql.domain_v2.types.node import (
     DomainV2GQL,
 )
 

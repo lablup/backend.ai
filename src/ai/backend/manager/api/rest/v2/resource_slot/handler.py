@@ -16,13 +16,13 @@ from ai.backend.common.dto.manager.v2.resource_slot.request import (
     ScopedSearchAgentResourcesInput,
     UpdateResourceSlotTypeInput,
 )
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.api.rest.v2.path_params import SlotNamePathParam
 
 if TYPE_CHECKING:
     from ai.backend.manager.api.adapters.resource_slot.adapter import ResourceSlotAdapter
 
-log: Final = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log: Final = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 class V2ResourceSlotHandler:

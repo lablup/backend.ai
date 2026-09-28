@@ -5,7 +5,7 @@ from collections.abc import Sequence
 from uuid import UUID
 
 from ai.backend.common.dto.manager.v2.model_card.request import DeleteModelCardOptions
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.data.model_card.types import (
     BulkModelCardDeleteResultData,
     ModelCardData,
@@ -18,7 +18,7 @@ from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 
 from .db_source.db_source import ModelCardDBSource
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 class ModelCardRepository:

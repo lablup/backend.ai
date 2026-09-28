@@ -28,19 +28,19 @@ from ai.backend.common.events.hub.propagators.cache import WithCachePropagator
 from ai.backend.common.events.types import EventCacheDomain, EventDomain
 from ai.backend.common.exception import BgtaskCancelledError, BgtaskFailedError
 from ai.backend.common.types import AgentId, ImageRegistry, SessionId
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.bgtask.types import ManagerBgtaskName
 from ai.backend.manager.errors.kernel import SessionNotFound
 
 if TYPE_CHECKING:
     from ai.backend.common.events.fetcher import EventFetcher
     from ai.backend.common.events.hub.hub import EventHub
-    from ai.backend.manager.models.image import ImageRow
+    from ai.backend.manager.models.image.row import ImageRow
     from ai.backend.manager.registry import AgentRegistry
     from ai.backend.manager.repositories.image.repository import ImageRepository
     from ai.backend.manager.repositories.session.repository import SessionRepository
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 class CommitSessionResult(BaseBackgroundTaskResult):
@@ -114,153 +114,150 @@ class CommitSessionHandler(BaseBackgroundTaskHandler[CommitSessionManifest, Comm
 
     @override
     async def execute(self, manifest: CommitSessionManifest) -> CommitSessionResult:
-        try:
-            # Get session and validate
-            session = await self._session_repository.get_session_by_id(manifest.session_id)
-            if not session:
-                raise SessionNotFound(f"Session {manifest.session_id} not found")
+        # Get session and validate
+        session = await self._session_repository.get_session_by_id(manifest.session_id)
+        if not session:
+            raise SessionNotFound(f"Session {manifest.session_id} not found")
 
-            # Get registry configuration
-            if manifest.registry_id is not None:
-                registry_conf = await self._session_repository.get_container_registry_by_id(
-                    manifest.registry_id
-                )
-            else:
-                registry_conf = await self._session_repository.get_container_registry(
-                    manifest.registry_hostname, manifest.registry_project
-                )
+        # Get registry configuration
+        if manifest.registry_id is not None:
+            registry_conf = await self._session_repository.get_container_registry_by_id(
+                manifest.registry_id
+            )
+        else:
+            registry_conf = await self._session_repository.get_container_registry(
+                manifest.registry_hostname, manifest.registry_project
+            )
 
-            # Resolve base image
-            if not session.main_kernel.image or not session.main_kernel.architecture:
+        # Resolve base image
+        if not session.main_kernel.image or not session.main_kernel.architecture:
+            raise BgtaskFailedError(
+                extra_msg=f"Session {manifest.session_id} main kernel has no image or architecture"
+            )
+        # The base image may have been deleted while the session is still
+        # running, so include non-alive images when resolving it.
+        image_data = await self._session_repository.resolve_image_by_canonical(
+            session.main_kernel.image, session.main_kernel.architecture, alive_only=False
+        )
+        base_image_ref = image_data.image_ref
+
+        # Build new image canonical name
+        filtered_tag_set = [
+            x for x in base_image_ref.tag.split("-") if not x.startswith("customized_")
+        ]
+
+        if base_image_ref.name == "":
+            new_name = base_image_ref.project
+        else:
+            new_name = base_image_ref.name
+
+        project_prefix = f"{manifest.registry_project}/" if manifest.registry_project else ""
+        new_canonical = (
+            f"{manifest.registry_hostname}/{project_prefix}{new_name}:{'-'.join(filtered_tag_set)}"
+        )
+
+        # Check for existing customized image
+        existing_row = await self._session_repository.get_existing_customized_image(
+            new_canonical,
+            uuid.UUID(manifest.image_owner_id),
+            manifest.image_name,
+        )
+
+        customized_image_id: str
+        kern_features: list[str]
+        if existing_row is not None:
+            existing_image: ImageRow = existing_row
+            labels = existing_image.labels or {}
+            kern_features_str = labels.get(LabelName.FEATURES, DEFAULT_KERNEL_FEATURE)
+            kern_features = (
+                kern_features_str.split() if kern_features_str else [DEFAULT_KERNEL_FEATURE]
+            )
+            customized_image_id = labels.get(LabelName.CUSTOMIZED_ID, str(uuid.uuid4()))
+            log.debug(
+                "reusing existing customized image id", customized_image_id=customized_image_id
+            )
+        else:
+            kern_features = [DEFAULT_KERNEL_FEATURE]
+            customized_image_id = str(uuid.uuid4())
+            # Remove PRIVATE label for customized images
+            kern_features = [feat for feat in kern_features if feat != KernelFeatures.PRIVATE.value]
+
+        new_canonical += f"-customized_{customized_image_id.replace('-', '')}"
+
+        new_image_ref = ImageRef.from_image_str(
+            new_canonical,
+            None,
+            manifest.registry_hostname,
+            architecture=base_image_ref.architecture,
+            is_local=base_image_ref.is_local,
+        )
+
+        # Prepare image labels
+        image_labels: dict[str | LabelName, str] = {
+            LabelName.CUSTOMIZED_OWNER: f"{manifest.image_visibility.value}:{manifest.image_owner_id}",
+            LabelName.CUSTOMIZED_NAME: manifest.image_name,
+            LabelName.CUSTOMIZED_ID: customized_image_id,
+            LabelName.FEATURES: " ".join(kern_features),
+        }
+        match manifest.image_visibility:
+            case CustomizedImageVisibilityScope.USER:
+                image_labels[LabelName.CUSTOMIZED_USER_EMAIL] = manifest.user_email
+
+        # Commit session
+        log.debug("committing session", session_id=manifest.session_id)
+        resp = await self._agent_registry.commit_session(
+            session,
+            new_image_ref,
+            extra_labels=image_labels,
+        )
+        bgtask_id = cast(uuid.UUID, resp["bgtask_id"])
+
+        # Wait for commit to complete
+        await self._wait_for_agent_bgtask(bgtask_id, "Commit")
+
+        # Push image to registry if not local
+        if not new_image_ref.is_local:
+            log.debug("pushing image to registry")
+            image_registry = ImageRegistry(
+                name=manifest.registry_hostname,
+                url=str(registry_conf.url),
+                username=registry_conf.username,
+                password=registry_conf.password,
+            )
+            if not session.main_kernel.agent:
                 raise BgtaskFailedError(
-                    extra_msg=f"Session {manifest.session_id} main kernel has no image or architecture"
+                    extra_msg=f"Session {manifest.session_id} main kernel has no agent assigned"
                 )
-            # The base image may have been deleted while the session is still
-            # running, so include non-alive images when resolving it.
-            image_data = await self._session_repository.resolve_image_by_canonical(
-                session.main_kernel.image, session.main_kernel.architecture, alive_only=False
-            )
-            base_image_ref = image_data.image_ref
-
-            # Build new image canonical name
-            filtered_tag_set = [
-                x for x in base_image_ref.tag.split("-") if not x.startswith("customized_")
-            ]
-
-            if base_image_ref.name == "":
-                new_name = base_image_ref.project
-            else:
-                new_name = base_image_ref.name
-
-            project_prefix = f"{manifest.registry_project}/" if manifest.registry_project else ""
-            new_canonical = f"{manifest.registry_hostname}/{project_prefix}{new_name}:{'-'.join(filtered_tag_set)}"
-
-            # Check for existing customized image
-            existing_row = await self._session_repository.get_existing_customized_image(
-                new_canonical,
-                uuid.UUID(manifest.image_owner_id),
-                manifest.image_name,
-            )
-
-            customized_image_id: str
-            kern_features: list[str]
-            if existing_row is not None:
-                existing_image: ImageRow = existing_row
-                labels = existing_image.labels or {}
-                kern_features_str = labels.get(LabelName.FEATURES, DEFAULT_KERNEL_FEATURE)
-                kern_features = (
-                    kern_features_str.split() if kern_features_str else [DEFAULT_KERNEL_FEATURE]
-                )
-                customized_image_id = labels.get(LabelName.CUSTOMIZED_ID, str(uuid.uuid4()))
-                log.debug("reusing existing customized image ID {}", customized_image_id)
-            else:
-                kern_features = [DEFAULT_KERNEL_FEATURE]
-                customized_image_id = str(uuid.uuid4())
-                # Remove PRIVATE label for customized images
-                kern_features = [
-                    feat for feat in kern_features if feat != KernelFeatures.PRIVATE.value
-                ]
-
-            new_canonical += f"-customized_{customized_image_id.replace('-', '')}"
-
-            new_image_ref = ImageRef.from_image_str(
-                new_canonical,
-                None,
-                manifest.registry_hostname,
-                architecture=base_image_ref.architecture,
-                is_local=base_image_ref.is_local,
-            )
-
-            # Prepare image labels
-            image_labels: dict[str | LabelName, str] = {
-                LabelName.CUSTOMIZED_OWNER: f"{manifest.image_visibility.value}:{manifest.image_owner_id}",
-                LabelName.CUSTOMIZED_NAME: manifest.image_name,
-                LabelName.CUSTOMIZED_ID: customized_image_id,
-                LabelName.FEATURES: " ".join(kern_features),
-            }
-            match manifest.image_visibility:
-                case CustomizedImageVisibilityScope.USER:
-                    image_labels[LabelName.CUSTOMIZED_USER_EMAIL] = manifest.user_email
-
-            # Commit session
-            log.info("Committing session {}", manifest.session_id)
-            resp = await self._agent_registry.commit_session(
-                session,
+            resp = await self._agent_registry.push_image(
+                AgentId(session.main_kernel.agent),
                 new_image_ref,
-                extra_labels=image_labels,
+                image_registry,
             )
             bgtask_id = cast(uuid.UUID, resp["bgtask_id"])
+            await self._wait_for_agent_bgtask(bgtask_id, "Push")
 
-            # Wait for commit to complete
-            await self._wait_for_agent_bgtask(bgtask_id, "Commit")
+        # Rescan updated image
+        log.debug("rescanning image")
+        rescan_result = await self._image_repository.rescan_images(
+            new_image_ref.canonical,
+            manifest.registry_project,
+            reporter=None,
+        )
 
-            # Push image to registry if not local
-            if not new_image_ref.is_local:
-                log.info("Pushing image to registry")
-                image_registry = ImageRegistry(
-                    name=manifest.registry_hostname,
-                    url=str(registry_conf.url),
-                    username=registry_conf.username,
-                    password=registry_conf.password,
-                )
-                if not session.main_kernel.agent:
-                    raise BgtaskFailedError(
-                        extra_msg=f"Session {manifest.session_id} main kernel has no agent assigned"
-                    )
-                resp = await self._agent_registry.push_image(
-                    AgentId(session.main_kernel.agent),
-                    new_image_ref,
-                    image_registry,
-                )
-                bgtask_id = cast(uuid.UUID, resp["bgtask_id"])
-                await self._wait_for_agent_bgtask(bgtask_id, "Push")
-
-            # Rescan updated image
-            log.info("Rescanning image")
-            rescan_result = await self._image_repository.rescan_images(
-                new_image_ref.canonical,
-                manifest.registry_project,
-                reporter=None,
+        if len(rescan_result.images) == 0:
+            rescan_errors = ",".join(rescan_result.errors)
+            raise BgtaskFailedError(
+                extra_msg=f"Session commit succeeded, but no image was rescanned, Error: {rescan_errors}"
+            )
+        if len(rescan_result.images) > 1:
+            log.warning(
+                "more than one image rescanned after session commit",
+                image_count=len(rescan_result.images),
             )
 
-            if len(rescan_result.images) == 0:
-                rescan_errors = ",".join(rescan_result.errors)
-                raise BgtaskFailedError(
-                    extra_msg=f"Session commit succeeded, but no image was rescanned, Error: {rescan_errors}"
-                )
-            if len(rescan_result.images) > 1:
-                log.warning(
-                    "More than two images were rescanned unexpectedly. Rescanned Images: {}",
-                    rescan_result.images,
-                )
-
-            result_image_id = rescan_result.images[0].id
-            log.info("Session commit completed successfully. Image ID: {}", result_image_id)
-            return CommitSessionResult(image_id=result_image_id)
-
-        except Exception:
-            log.exception("Failed to commit session {}", manifest.session_id)
-            raise
+        result_image_id = rescan_result.images[0].id
+        log.trace("session commit completed", image_id=result_image_id)
+        return CommitSessionResult(image_id=result_image_id)
 
     async def _wait_for_agent_bgtask(self, bgtask_id: uuid.UUID, operation_name: str) -> None:
         """Wait for an agent background task to complete."""
@@ -272,22 +269,30 @@ class CommitSessionHandler(BaseBackgroundTaskHandler[CommitSessionManifest, Comm
             cache_id = EventCacheDomain.BGTASK.cache_id(str(bgtask_id))
             async for event in propagator.receive(cache_id):
                 if not isinstance(event, BaseBgtaskEvent):
-                    log.warning("unexpected event: {}", event)
+                    log.warning("unexpected event", event_type=type(event).__name__)
                     continue
                 match event.status():
                     case BgtaskStatus.DONE | BgtaskStatus.PARTIAL_SUCCESS:
-                        log.info("{} completed", operation_name)
+                        log.debug("agent background task completed", operation_name=operation_name)
                         return
                     case BgtaskStatus.FAILED:
                         error_msg = cast(BaseBgtaskDoneEvent, event).message
-                        log.error("{} failed: {}", operation_name, error_msg)
+                        log.trace(
+                            "agent background task failed",
+                            operation_name=operation_name,
+                            reason=error_msg,
+                        )
                         raise BgtaskFailedError(extra_msg=error_msg)
                     case BgtaskStatus.CANCELLED:
-                        log.warning("{} cancelled", operation_name)
+                        log.trace("agent background task cancelled", operation_name=operation_name)
                         raise BgtaskCancelledError(extra_msg="Operation cancelled")
                     case BgtaskStatus.UPDATED:
                         continue
                     case _:
-                        log.warning("unexpected bgtask done event: {}", event)
+                        log.warning(
+                            "unexpected bgtask done event",
+                            event_type=type(event).__name__,
+                            bgtask_status=event.status(),
+                        )
         finally:
             self._event_hub.unregister_event_propagator(propagator.id())

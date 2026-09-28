@@ -16,7 +16,7 @@ from ai.backend.manager.models.specs.pagination import (
     NoPagination,
     OffsetPagination,
 )
-from ai.backend.manager.repositories.base import (
+from ai.backend.manager.repositories.base.querier import (
     BatchQuerier,
     execute_batch_querier,
 )

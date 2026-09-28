@@ -40,13 +40,13 @@ from dataclasses import dataclass
 import aiohttp
 from aiotools import cancel_and_wait
 
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.web.errors import ManagerConnectionUnavailable
 
 from .strategy import EndpointSelectionStrategy
 from .types import AcquiredEndpoint, EndpointEntry, EndpointPoolSpec
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 # Caller-side exceptions that signal an unreachable / unhealthy endpoint as
 # opposed to a business error riding on a working connection. The acquire
@@ -191,11 +191,11 @@ class HealthyEndpointPool:
         if self._spec.is_failure_threshold_reached(cached.failure_count) and cached.is_healthy:
             cached.is_healthy = False
             cached.unhealthy_since = time.perf_counter()
-            log.info(
-                "Endpoint {} marked unhealthy ({}): failures={}",
-                cached.entry.endpoint,
-                reason,
-                cached.failure_count,
+            log.warning(
+                "endpoint marked unhealthy",
+                endpoint_url=cached.entry.endpoint,
+                reason=reason,
+                failure_count=cached.failure_count,
             )
 
     def _mark_success(self, cached: _CachedEntry) -> None:
@@ -204,7 +204,7 @@ class HealthyEndpointPool:
         cached.failure_count = 0
         cached.unhealthy_since = None
         if was_unhealthy:
-            log.info("Endpoint {} recovered", cached.entry.endpoint)
+            log.info("endpoint recovered", endpoint_url=cached.entry.endpoint)
 
     # --- Background probe loop -----------------------------------------
 

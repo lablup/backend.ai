@@ -5,7 +5,6 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, override
 
 from ai.backend.common.artifact_storage import AbstractStorage, AbstractStoragePool
-from ai.backend.common.contexts.request_id import current_request_id
 from ai.backend.common.data.storage.registries.types import ModelTarget
 from ai.backend.common.data.storage.types import (
     ArtifactStorageImportStep,
@@ -13,14 +12,14 @@ from ai.backend.common.data.storage.types import (
     VFolderStorageTarget,
 )
 from ai.backend.common.dto.storage.request import StorageMappingResolverData
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.storage.errors.common import InvalidStorageTargetError
 from ai.backend.storage.storages.vfolder_storage import VFolderStorage
 
 if TYPE_CHECKING:
     from ai.backend.storage.volumes.pool import VolumePool
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 class StorageTarget:
@@ -163,20 +162,16 @@ class StorageMappingResolver:
         if storage_step_mappings.storage_step_target_mappings:
             for step, target in storage_step_mappings.storage_step_target_mappings.items():
                 if isinstance(target, VFolderStorageTarget):
-                    adapter_name = f"volume_storage_{current_request_id()}"
                     volume = self._volume_pool.get_volume_by_name(target.volume_name)
                     adapter = VFolderStorage(
-                        name=adapter_name,
+                        name="vfolder_storage",
                         volume=volume,
                         vfolder_id=target.vfolder_id,
                     )
-
-                    log.info(
-                        "Created VFolderStorage: name={}, vfolder_id={}, volume_name={}, volume_type={}",
-                        adapter_name,
+                    log.debug(
+                        "created VFolderStorage for vfolder {} on volume {}",
                         target.vfolder_id,
                         target.volume_name,
-                        type(volume).__name__,
                     )
 
                     result[step] = StorageTarget.from_storage(adapter)

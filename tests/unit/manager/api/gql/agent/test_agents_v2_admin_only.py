@@ -12,11 +12,11 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 from aiohttp import web
 
-from ai.backend.common.contexts.user import with_user
+from ai.backend.common.contexts.user import with_user_context
 from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.user.types import UserData
 from ai.backend.manager.api.gql.agent.resolver import agents_v2
-from ai.backend.manager.models.user import UserRole
+from ai.backend.manager.models.user.row import UserRole
 
 
 class ExpectedResult(Enum):
@@ -62,9 +62,9 @@ class TestAgentsV2AdminOnly:
         )
         resolver_fn = agents_v2.base_resolver
         if case.expected == ExpectedResult.FORBIDDEN:
-            with with_user(user), pytest.raises(web.HTTPForbidden):
+            with with_user_context(user), pytest.raises(web.HTTPForbidden):
                 await resolver_fn(mock_info)
         else:
-            with with_user(user):
+            with with_user_context(user):
                 await resolver_fn(mock_info)
             mock_info.context.adapters.agent.admin_search.assert_awaited_once()

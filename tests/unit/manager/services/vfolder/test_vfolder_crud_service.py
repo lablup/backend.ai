@@ -38,8 +38,8 @@ from ai.backend.manager.errors.storage import (
     VFolderInvalidParameter,
     VFolderNotFound,
 )
-from ai.backend.manager.models.project import ProjectType
-from ai.backend.manager.models.user import UserRole
+from ai.backend.manager.models.project.row import ProjectType
+from ai.backend.manager.models.user.row import UserRole
 from ai.backend.manager.models.vfolder.creators import (
     PersonalVFolderCreator,
     ProjectVFolderCreator,

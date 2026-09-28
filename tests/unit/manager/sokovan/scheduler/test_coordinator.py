@@ -12,14 +12,17 @@ Test Scenarios:
 
 from __future__ import annotations
 
+import logging
+from contextlib import nullcontext
 from datetime import datetime, timedelta
 from typing import Any
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock, MagicMock, patch
 from uuid import uuid4
 
 import pytest
 from dateutil.tz import tzutc
 
+from ai.backend.common.data.entity.resource_group import ResourceGroupID
 from ai.backend.common.events.event_types.kernel.types import KernelLifecycleEventReason
 from ai.backend.common.types import AccessKey, KernelId, SessionId
 from ai.backend.manager.data.kernel.types import KernelStatus
@@ -37,14 +40,15 @@ from ai.backend.manager.sokovan.scheduler.coordinator import (
     HookExecutionResult,
     ScheduleCoordinator,
 )
-from ai.backend.manager.sokovan.scheduler.post_processors import PostProcessorContext
-from ai.backend.manager.sokovan.scheduler.recorder import SessionRecorderContext
+from ai.backend.manager.sokovan.scheduler.post_processors.base import PostProcessorContext
+from ai.backend.manager.sokovan.scheduler.recorder.context import SessionRecorderContext
 from ai.backend.manager.sokovan.scheduler.results import (
     KernelExecutionResult,
     KernelTransitionInfo,
     SessionExecutionResult,
     SessionTransitionInfo,
 )
+from ai.backend.manager.sokovan.scheduler.types import ScheduleType
 from ai.backend.manager.views.sokovan.lifecycle import LastPhase
 
 # =============================================================================
@@ -1375,3 +1379,101 @@ class TestScheduleCoordinatorPromotionRecordOrdering:
         (finalize,) = records[session_id].phases
         assert finalize.name == "finalize_start"
         assert [step.name for step in finalize.steps] == ["trigger_batch_execution"]
+
+
+# =============================================================================
+# TestScheduleCoordinatorFaultLogging
+# =============================================================================
+
+
+class TestScheduleCoordinatorFaultLogging:
+    """Server faults are logged once at error, with the scope fields and the traceback."""
+
+    @pytest.fixture
+    def resource_group_id(self) -> ResourceGroupID:
+        return ResourceGroupID(uuid4())
+
+    @pytest.fixture
+    def repository(self, resource_group_id: ResourceGroupID) -> AsyncMock:
+        repository = AsyncMock()
+        repository.get_all_resource_groups.return_value = [resource_group_id]
+        return repository
+
+    @pytest.fixture
+    def coordinator(self, repository: AsyncMock) -> ScheduleCoordinator:
+        coordinator = ScheduleCoordinator.__new__(ScheduleCoordinator)
+        coordinator._repository = repository
+        coordinator._operation_metrics = MagicMock()
+        coordinator._operation_metrics.measure_operation.return_value = nullcontext()
+        coordinator._post_processors = []
+        return coordinator
+
+    @pytest.fixture
+    def handler(self) -> MagicMock:
+        handler = MagicMock()
+        handler.name.return_value = _TEST_HANDLER_NAME
+        handler.lock_id = None
+        return handler
+
+    def _error_records(self, caplog: pytest.LogCaptureFixture) -> list[logging.LogRecord]:
+        return [r for r in caplog.records if r.levelno >= logging.ERROR]
+
+    async def test_resource_group_failure_logged_with_scope(
+        self,
+        coordinator: ScheduleCoordinator,
+        handler: MagicMock,
+        resource_group_id: ResourceGroupID,
+        caplog: pytest.LogCaptureFixture,
+    ) -> None:
+        error = RuntimeError("resource group processing broke")
+        with patch.object(coordinator, "_process_resource_group", AsyncMock(side_effect=error)):
+            await coordinator._process_lifecycle_handler_schedule(ScheduleType.SCHEDULE, handler)
+
+        (record,) = self._error_records(caplog)
+        assert record.__dict__["log_tag_resource_group_id"] == str(resource_group_id)
+        assert record.__dict__["log_tag_schedule_type"] == ScheduleType.SCHEDULE.value
+        assert record.__dict__["log_tag_handler_name"] == _TEST_HANDLER_NAME
+        assert record.exc_info is not None
+        assert record.exc_info[1] is error
+
+    async def test_post_processor_failure_logged_with_scope(
+        self,
+        coordinator: ScheduleCoordinator,
+        handler: MagicMock,
+        resource_group_id: ResourceGroupID,
+        caplog: pytest.LogCaptureFixture,
+    ) -> None:
+        error = RuntimeError("post-processor broke")
+        failing_post_processor = AsyncMock()
+        failing_post_processor.execute.side_effect = error
+        coordinator._post_processors = [failing_post_processor]
+
+        async def process_resource_group(*_: Any) -> None:
+            await coordinator._run_post_processors(
+                SessionExecutionResult(successes=[_create_session_transition_info()]),
+                {SessionStatus.SCHEDULED},
+            )
+
+        with patch.object(coordinator, "_process_resource_group", process_resource_group):
+            await coordinator._process_lifecycle_handler_schedule(ScheduleType.SCHEDULE, handler)
+
+        (record,) = self._error_records(caplog)
+        assert record.__dict__["log_tag_handler_name"] == _TEST_HANDLER_NAME
+        assert record.__dict__["log_tag_resource_group_id"] == str(resource_group_id)
+        assert record.exc_info is not None
+        assert record.exc_info[1] is error
+
+    async def test_schedule_failure_propagates_without_log(
+        self,
+        coordinator: ScheduleCoordinator,
+        handler: MagicMock,
+        repository: AsyncMock,
+        caplog: pytest.LogCaptureFixture,
+    ) -> None:
+        """The event dispatcher logs what propagates, so the coordinator does not."""
+        repository.get_all_resource_groups.side_effect = RuntimeError("db down")
+
+        with pytest.raises(RuntimeError):
+            await coordinator._process_lifecycle_handler_schedule(ScheduleType.SCHEDULE, handler)
+
+        assert self._error_records(caplog) == []

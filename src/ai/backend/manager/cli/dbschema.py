@@ -9,14 +9,14 @@ from typing import TYPE_CHECKING, TypedDict
 
 import click
 
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.errors.resource import ConfigurationLoadFailed
 from ai.backend.manager.models.uuid7 import UUID_GENERATE_V7_DDL
 
 if TYPE_CHECKING:
     from .context import CLIContext
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 class RevisionDump(TypedDict):
@@ -166,8 +166,8 @@ def apply_missing_revisions(
                 revision_history: RevisionHistory = load_json(fr.read())
         except FileNotFoundError:
             log.error(
-                "Could not find revision history dump as of Backend.AI version {}. Make sure you have upgraded this Backend.AI cluster to very latest version of prior major release before initiating this major upgrade.",
-                previous_version,
+                "could not find the revision history dump for the previous version; upgrade this cluster to the latest release of the prior major version first",
+                previous_version=previous_version,
             )
             sys.exit(1)
 
@@ -181,11 +181,11 @@ def apply_missing_revisions(
     for applied_revision in revision_history["revisions"]:
         del revisions_to_apply[applied_revision["revision"]]
 
-    log.info("Applying following revisions:")
     scripts = list(revisions_to_apply.values())[::-1]
+    log.info("applying revisions", revision_count=len(scripts))
 
     for script_to_apply in scripts:
-        log.info("    {}", str(script_to_apply))
+        log.info("applying revision", revision=str(script_to_apply))
 
     if not dry_run:
         with EnvironmentContext(
@@ -239,11 +239,11 @@ def oneshot(_cli_ctx: CLIContext, alembic_config: str) -> None:
         metadata.create_all(engine, checkfirst=False)
         for statement in SEED_GLOBAL_ENTITIES_SQL:
             connection.exec_driver_sql(statement)
-        log.info("Stamping alembic version to head...")
+        log.info("stamping the alembic version to head")
         script = ScriptDirectory.from_config(alembic_cfg)
         heads = script.get_heads()
         if not heads:
-            log.warning("No alembic migration heads found, skipping version stamping")
+            log.warning("no alembic migration heads found, skipping version stamping")
             return
         head_rev = heads[0]
         connection.exec_driver_sql("CREATE TABLE alembic_version (\nversion_num varchar(32)\n);")
@@ -258,20 +258,18 @@ def oneshot(_cli_ctx: CLIContext, alembic_config: str) -> None:
         if current_rev is None:
             # For a fresh clean database, create all from scratch.
             # (it will raise error if tables already exist.)
-            log.info("Detected a fresh new database.")
-            log.info("Creating tables...")
+            log.info("detected a fresh new database, creating tables")
             async with engine.begin() as connection:
                 await connection.run_sync(_create_all_sync, engine=engine.sync_engine)
             log.info(
-                "If you don't need old migrations, delete them and set "
-                '"down_revision" value in the earliest migration to "None".'
+                "if old migrations are not needed, delete them and set down_revision "
+                "of the earliest migration to None"
             )
         else:
             log.info(
-                "Detected an existing database (current revision: {}).",
-                current_rev,
+                "detected an existing database; use 'alembic upgrade head' to apply pending migrations",
+                current_revision=current_rev,
             )
-            log.info("Use 'alembic upgrade head' to apply pending migrations.")
 
     alembic_cfg = Config(alembic_config)
     sa_url = alembic_cfg.get_main_option("sqlalchemy.url")

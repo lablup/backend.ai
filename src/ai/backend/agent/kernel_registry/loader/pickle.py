@@ -12,14 +12,14 @@ from ai.backend.agent.kernel_registry.exception import (
     KernelRegistryNotFound,
 )
 from ai.backend.common.types import KernelId
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 
 from .abc import AbstractKernelRegistryLoader
 
 if TYPE_CHECKING:
     from ai.backend.agent.kernel import AbstractKernel
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 class PickleBasedKernelRegistryLoader(AbstractKernelRegistryLoader):
@@ -40,16 +40,16 @@ class PickleBasedKernelRegistryLoader(AbstractKernelRegistryLoader):
                 shutil.move(legacy_registry_file, final_file_path)
         except Exception as e:
             log.warning(
-                "Failed to move legacy kernel registry file {} to {} (err: {})",
-                str(legacy_registry_file),
-                str(final_file_path),
-                str(e),
+                "legacy kernel registry file move failed",
+                exc_info=e,
+                legacy_registry_path=legacy_registry_file,
+                registry_path=final_file_path,
             )
         try:
             with final_file_path.open("rb") as f:
                 return cast("MutableMapping[KernelId, AbstractKernel]", pickle.load(f))
         except EOFError as e:
-            log.warning("Failed to load the last kernel registry: {}", str(final_file_path))
+            log.warning("kernel registry load failed", registry_path=final_file_path)
             raise KernelRegistryLoadError from e
         except FileNotFoundError as e:
             raise KernelRegistryNotFound from e

@@ -19,16 +19,16 @@ from ai.backend.manager.errors.resource import (
 )
 from ai.backend.manager.errors.user import UserNotFound
 from ai.backend.manager.models.clauses import QueryCondition
-from ai.backend.manager.models.domain import DomainRow
-from ai.backend.manager.models.project import ProjectRow
-from ai.backend.manager.models.resource_group import ResourceGroupRow
-from ai.backend.manager.models.resource_usage_history import (
+from ai.backend.manager.models.domain.row import DomainRow
+from ai.backend.manager.models.project.row import ProjectRow
+from ai.backend.manager.models.resource_group.row import ResourceGroupRow
+from ai.backend.manager.models.resource_usage_history.row import (
     DomainUsageBucketRow,
     ProjectUsageBucketRow,
     UserUsageBucketRow,
 )
 from ai.backend.manager.models.scopes import ExistenceCheck, ScopeTarget
-from ai.backend.manager.models.user import UserRow
+from ai.backend.manager.models.user.row import UserRow
 
 
 class UsageBucketTarget(ScopeTarget, ABC):

@@ -7,7 +7,7 @@ from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.types import EntityIdentifier
 from ai.backend.common.types import AccessKey, SessionTypes
 from ai.backend.manager.actions.types import ActionOperationType
-from ai.backend.manager.models.user import UserRole
+from ai.backend.manager.models.user.row import UserRole
 from ai.backend.manager.services.session.base import (
     SessionScopeAction,
     SessionScopeActionResult,

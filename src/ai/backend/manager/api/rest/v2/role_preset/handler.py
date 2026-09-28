@@ -20,13 +20,13 @@ from ai.backend.common.dto.manager.v2.role_preset.request import (
     SearchRolePresetsInput,
     UpdateRolePresetBody,
 )
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.api.rest.v2.path_params import RolePresetIdPathParam
 
 if TYPE_CHECKING:
     from ai.backend.manager.api.adapters.role_preset.adapter import RolePresetAdapter
 
-log: Final = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log: Final = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 class V2RolePresetHandler:

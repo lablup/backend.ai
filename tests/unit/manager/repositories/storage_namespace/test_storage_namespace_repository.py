@@ -12,7 +12,7 @@ import pytest
 
 from ai.backend.manager.data.storage_namespace.types import StorageNamespaceData
 from ai.backend.manager.models.specs.pagination import OffsetPagination
-from ai.backend.manager.models.storage_namespace import StorageNamespaceRow
+from ai.backend.manager.models.storage_namespace.row import StorageNamespaceRow
 from ai.backend.manager.models.storage_namespace.searchers import StorageNamespaceSearcher
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.ops.repository import OpsRepository

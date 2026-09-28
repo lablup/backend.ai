@@ -5,11 +5,11 @@ from __future__ import annotations
 import pytest
 
 from ai.backend.manager.api.rest.export.adapter import ExportAdapter
-from ai.backend.manager.models.kernel import KernelRow
-from ai.backend.manager.models.project import ProjectRow
-from ai.backend.manager.models.resource_policy import ProjectResourcePolicyRow
-from ai.backend.manager.models.session import SessionRow
-from ai.backend.manager.models.user import UserRow
+from ai.backend.manager.models.kernel.row import KernelRow
+from ai.backend.manager.models.project.row import ProjectRow
+from ai.backend.manager.models.resource_policy.row import ProjectResourcePolicyRow
+from ai.backend.manager.models.session.row import SessionRow
+from ai.backend.manager.models.user.row import UserRow
 from ai.backend.manager.repositories.base.export import ExportFieldDef
 from ai.backend.manager.repositories.export.reports.session import (
     KERNEL_JOIN,

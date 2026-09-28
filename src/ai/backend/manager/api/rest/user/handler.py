@@ -33,7 +33,7 @@ from ai.backend.common.dto.manager.user import (
 )
 from ai.backend.common.dto.manager.user.response import UserDTO
 from ai.backend.common.types import AccessKey
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.data.user.types import UserData
 from ai.backend.manager.data.user.types import UserStatus as ManagerUserStatus
 from ai.backend.manager.dto.context import UserContext
@@ -61,7 +61,7 @@ if TYPE_CHECKING:
     from ai.backend.manager.services.domain.processors import DomainProcessors
     from ai.backend.manager.services.user.processors import UserProcessors
 
-log: Final = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log: Final = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 class UserHandler:

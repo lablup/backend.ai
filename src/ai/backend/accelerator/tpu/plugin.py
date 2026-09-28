@@ -26,12 +26,12 @@ from ai.backend.common.types import (
     SlotName,
     SlotTypes,
 )
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 
 from . import __version__
 from .tpu import libtpu
 
-log = BraceStyleAdapter(logging.getLogger("ai.backend.accelerator.tpu"))
+log = StructuredLogger(logging.getLogger("ai.backend.accelerator.tpu"))
 
 
 class TPUDevice(AbstractComputeDevice):
@@ -62,15 +62,13 @@ class TPUPlugin(AbstractComputePlugin):
             stdout, _ = await proc.communicate()
             lines = stdout.decode().splitlines()
         except FileNotFoundError:
-            log.warning("Gcloud SDK not found.")
-            log.info("TPU acceleration is disabled.")
+            log.warning("accelerator disabled: gcloud SDK not found", plugin_name=self.key)
             self.enabled = False
         m = rx_sdk_version.search(lines[0])
         if m:
             self.gcloud_sdk_version = tuple(map(int, m.group(1).split(".")))
         else:
-            log.error("could not detect gcloud version!")
-            log.info("TPU acceleration is disabled.")
+            log.error("accelerator disabled: gcloud version not detected", plugin_name=self.key)
             self.enabled = False
             return
 

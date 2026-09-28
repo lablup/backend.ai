@@ -18,12 +18,12 @@ from ai.backend.common.dto.manager.v2.image.request import (
     ScopedSearchImagesInput,
     UpdateImageInput,
 )
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 
 if TYPE_CHECKING:
     from ai.backend.manager.api.adapters.image.adapter import ImageAdapter
 
-log: Final = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log: Final = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 class V2ImageHandler:

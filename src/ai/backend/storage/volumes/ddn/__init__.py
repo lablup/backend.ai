@@ -8,9 +8,10 @@ from typing import Any, Final, override
 import aiofiles
 import aiofiles.os
 
+from ai.backend.common.asyncio import run_in_executor_with_context
 from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.types import QuotaScopeID
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.storage.errors import (
     DDNCommandFailedError,
     QuotaScopeAlreadyExists,
@@ -35,7 +36,7 @@ def _kilobyte_to_byte(kilobyte: int) -> int:
     return kilobyte * 1024
 
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 class EXAScalerQuotaModel(BaseQuotaModel):
@@ -53,14 +54,14 @@ class EXAScalerQuotaModel(BaseQuotaModel):
             except FileNotFoundError:
                 return None
 
-        return await asyncio.get_running_loop().run_in_executor(None, _read)
+        return await run_in_executor_with_context(None, _read)
 
     async def _write_project_id(self, pid: int, pid_file_path: str | Path) -> None:
         def _write() -> None:
             with Path(pid_file_path).open("w") as f:
                 f.write(str(pid))
 
-        await asyncio.get_running_loop().run_in_executor(None, _write)
+        await run_in_executor_with_context(None, _write)
 
     async def _read_main_project_id(self) -> int:
         raw_val = await self.etcd.get(PROJECT_MAIN_ID_KEY)
@@ -126,11 +127,10 @@ class EXAScalerQuotaModel(BaseQuotaModel):
                     limit_bytes = _kilobyte_to_byte(hard_limit)
                     if used_bytes < 0 or limit_bytes < 0:
                         log.warning(
-                            "Subprocess lfs quota returned negative values in used_bytes({}) or limit_bytes({}), pid: {} Line: {}",
-                            used_bytes,
-                            limit_bytes,
-                            pid,
-                            line,
+                            "negative quota usage reported",
+                            used_bytes=used_bytes,
+                            limit_bytes=limit_bytes,
+                            report_line=line,
                         )
                     return QuotaUsage(used_bytes=used_bytes, limit_bytes=limit_bytes)
                 if Path(words[0]) == qspath:

@@ -18,16 +18,14 @@ from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     gql_root_field,
 )
-from ai.backend.manager.api.gql.domain_v2.types import DomainV2GQL
-from ai.backend.manager.api.gql.project_v2.types import (
-    DomainProjectScope,
-    ProjectScopeGQL,
+from ai.backend.manager.api.gql.domain_v2.types.node import DomainV2GQL
+from ai.backend.manager.api.gql.project_v2.types.filters import ProjectV2Filter, ProjectV2OrderBy
+from ai.backend.manager.api.gql.project_v2.types.node import (
     ProjectV2Connection,
-    ProjectV2Filter,
+    ProjectV2Edge,
     ProjectV2GQL,
-    ProjectV2OrderBy,
 )
-from ai.backend.manager.api.gql.project_v2.types.node import ProjectV2Edge
+from ai.backend.manager.api.gql.project_v2.types.scopes import DomainProjectScope, ProjectScopeGQL
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.api.gql.utils import check_admin_only
 

@@ -9,7 +9,7 @@ from typing import TYPE_CHECKING, override
 from ai.backend.common.data.entity.resource_group import ResourceGroupID
 from ai.backend.common.events.event_types.kernel.types import KernelLifecycleEventReason
 from ai.backend.common.types import PreemptionMode
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.data.session.types import SessionStatus, StatusTransitions
 from ai.backend.manager.defs import LockID
@@ -20,9 +20,11 @@ from ai.backend.manager.sokovan.scheduler.types import ScheduleType
 from ai.backend.manager.views.sokovan.lifecycle import SessionWithKernels
 
 if TYPE_CHECKING:
-    from ai.backend.manager.sokovan.scheduling_controller import SchedulingController
+    from ai.backend.manager.sokovan.scheduling_controller.scheduling_controller import (
+        SchedulingController,
+    )
 
-log = BraceStyleAdapter(logging.getLogger(__name__))
+log = StructuredLogger(logging.getLogger(__name__))
 
 
 class PreemptSessionsLifecycleHandler(SessionLifecycleHandler):
@@ -102,12 +104,12 @@ class PreemptSessionsLifecycleHandler(SessionLifecycleHandler):
                 reason=KernelLifecycleEventReason.PREEMPTED_BY_SCHEDULER,
             )
             await self._scheduling_controller.mark_scheduling_needed([ScheduleType.RESCHEDULING])
-            log.info("Sent {} preemption victims to rescheduling", len(marked))
+            log.debug("preemption victims sent to rescheduling", session_count=len(marked))
         else:
             await self._scheduling_controller.mark_sessions_for_termination(
                 session_ids,
                 reason=KernelLifecycleEventReason.PREEMPTED_BY_SCHEDULER,
                 message="preempt_terminate success",
             )
-            log.info("Sent {} preemption victims to termination", len(session_ids))
+            log.debug("preemption victims sent to termination", session_count=len(session_ids))
         return result

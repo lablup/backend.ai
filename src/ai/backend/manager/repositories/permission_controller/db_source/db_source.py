@@ -8,7 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession as SASession
 from ai.backend.common.data.entity.project import ProjectEntityType
 from ai.backend.common.data.entity.role import RoleID
 from ai.backend.common.data.entity.user import UserID
-from ai.backend.logging.utils import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.permission.permission import (
     PermissionData,
@@ -37,15 +37,15 @@ from ai.backend.manager.models.rbac_models.permission.searchable_fields import (
     PermissionSearchableFields,
 )
 from ai.backend.manager.models.rbac_models.permission.updaters import RolePermissionUpdater
-from ai.backend.manager.models.rbac_models.role import RoleRow
-from ai.backend.manager.models.rbac_models.user_role import UserRoleRow
+from ai.backend.manager.models.rbac_models.role.row import RoleRow
+from ai.backend.manager.models.rbac_models.user_role.row import UserRoleRow
 from ai.backend.manager.models.rbac_models.user_role.searchers import RoleAssignmentSearcher
 from ai.backend.manager.models.scopes import OperationScope
 from ai.backend.manager.models.specs.permission import PermissionEntry
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.ops.v2.permission.provider import PermissionOpsProvider
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 class PermissionDBSource:
@@ -315,11 +315,11 @@ class PermissionDBSource:
                             )
                         )
                 except Exception as e:
-                    log.warning(
-                        "Failed to revoke role {} from user {}: {}",
-                        data.role_id,
-                        user_id,
-                        str(e),
+                    log.trace(
+                        "role revocation failed: {}",
+                        e,
+                        role_id=data.role_id,
+                        target_user_id=user_id,
                     )
                     failures.append(BulkRoleRevocationFailure(user_id=user_id, message=str(e)))
 

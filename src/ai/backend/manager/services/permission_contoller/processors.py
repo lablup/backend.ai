@@ -29,20 +29,30 @@ from ai.backend.manager.actions.v2.single_entity.processor import SingleEntityAc
 from ai.backend.manager.data.permission.permission import PermissionData
 from ai.backend.manager.data.permission.role import RoleData
 from ai.backend.manager.data.user.types import UserData
-
-from .actions import (
+from ai.backend.manager.services.permission_contoller.actions.add_role_permission import (
     AddRolePermissionAction,
+)
+from ai.backend.manager.services.permission_contoller.actions.bulk_remove_role_permissions import (
     BulkRemoveRolePermissionsAction,
-    CreateRoleAction,
-    DeleteRoleAction,
+)
+from ai.backend.manager.services.permission_contoller.actions.create_role import CreateRoleAction
+from ai.backend.manager.services.permission_contoller.actions.delete_role import DeleteRoleAction
+from ai.backend.manager.services.permission_contoller.actions.get_role_detail import (
     GetRoleDetailAction,
     GetRoleDetailActionResult,
-    GlobalSearchRolesAction,
+)
+from ai.backend.manager.services.permission_contoller.actions.replace_role_permissions import (
     ReplaceRolePermissionsAction,
     ReplaceRolePermissionsActionResult,
-    SearchRolesInScopeAction,
-    UpdateRoleAction,
 )
+from ai.backend.manager.services.permission_contoller.actions.search_roles import (
+    GlobalSearchRolesAction,
+)
+from ai.backend.manager.services.permission_contoller.actions.search_roles_in_scope import (
+    SearchRolesInScopeAction,
+)
+from ai.backend.manager.services.permission_contoller.actions.update_role import UpdateRoleAction
+
 from .actions.bulk_get_permissions import BulkGetPermissionsAction
 from .actions.bulk_get_roles import BulkGetRolesAction
 from .actions.bulk_lookup_role_assignment_ends import (

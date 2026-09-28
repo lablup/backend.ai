@@ -33,7 +33,7 @@ from ai.backend.common.dto.manager.v2.rbac.response import (
     ScopeEntityOperationCombinationInfo,
     SearchRoleAssignmentsPayload,
 )
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.api.rest.v2.path_params import ProjectIdPathParam, RoleIdPathParam
 from ai.backend.manager.models.rbac_models.role.scopes import (
     ScopedRoleTarget,
@@ -42,7 +42,7 @@ from ai.backend.manager.models.rbac_models.role.scopes import (
 if TYPE_CHECKING:
     from ai.backend.manager.api.adapters.rbac.adapter import RBACAdapter
 
-log: Final = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log: Final = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 class PermissionMatrixPayload(

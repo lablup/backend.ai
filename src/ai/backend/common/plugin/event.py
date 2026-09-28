@@ -6,11 +6,11 @@ from typing import Any, override
 
 from ai.backend.common.events.types import AbstractEvent
 from ai.backend.common.types import AgentId
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 
 from . import AbstractPlugin, BasePluginContext
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 class AbstractEventDispatcherPlugin(AbstractPlugin, metaclass=ABCMeta):

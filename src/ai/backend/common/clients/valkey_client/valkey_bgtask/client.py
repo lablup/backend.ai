@@ -44,9 +44,9 @@ from ai.backend.common.resilience import (
     RetryPolicy,
 )
 from ai.backend.common.types import ValkeyTarget
-from ai.backend.logging.utils import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 # Resilience instance for valkey_bgtask layer
 valkey_bgtask_resilience = Resilience(
@@ -162,10 +162,10 @@ class ValkeyBgtaskClient:
         batch.expire(task_meta_key, TASK_METADATA_TTL)
         # subkey set for tracking all subkeys of a task
         task_subkey_set_key = self._get_task_subkey_set_key(task_info.task_id)
-        log.info(
-            "Registering task (id: {}, subkeys: {})",
-            task_info.task_id,
-            len(task_total_info.task_key_list),
+        log.debug(
+            "bgtask registering",
+            bgtask_id=task_info.task_id,
+            subtask_count=len(task_total_info.task_key_list),
         )
         batch.sadd(task_subkey_set_key, task_total_info.subkeys())
         batch.expire(task_subkey_set_key, TASK_METADATA_TTL)
@@ -359,7 +359,7 @@ class ValkeyBgtaskClient:
         results: list[TaskTotalInfo] = []
         for fetch_result in fetch_results:
             if isinstance(fetch_result, BaseException):
-                log.warning("Failed to fetch unmanaged task: {}", fetch_result)
+                log.warning("unmanaged bgtask fetch failed", exc_info=fetch_result)
                 continue
             if fetch_result is not None:
                 results.append(fetch_result)
@@ -387,17 +387,17 @@ class ValkeyBgtaskClient:
 
         match result_type:
             case _ScriptResult.TTL_SUFFICIENT:
-                log.debug("Task TTL sufficient, skipping (id: {})", task_id)
+                log.debug("bgtask ttl sufficient, skipping", bgtask_id=task_id)
                 return False
             case _ScriptResult.KEY_NOT_EXIST | _ScriptResult.NO_EXPIRY:
                 log.warning(
-                    "Task key not exist or no expiry, skipping (id: {}, result: {})",
-                    task_id,
-                    result_type,
+                    "bgtask key missing or has no expiry, skipping",
+                    bgtask_id=task_id,
+                    script_result=result_type,
                 )
                 return False
             case _ScriptResult.TTL_INSUFFICIENT:
-                log.debug("Task TTL insufficient (id: {})", task_id)
+                log.debug("bgtask ttl insufficient", bgtask_id=task_id)
                 return True
 
     async def _fetch_total_info(self, task_id: TaskID) -> TaskTotalInfo | None:
@@ -410,7 +410,7 @@ class ValkeyBgtaskClient:
         async with self._client.client() as conn:
             raw_task_metadata_dict = await conn.hgetall(task_key)
             if not raw_task_metadata_dict:
-                log.warning("Task metadata not found (id: {})", task_id)
+                log.warning("bgtask metadata not found", bgtask_id=task_id)
                 return None
             task_info = TaskInfo.from_valkey_hash_fields(raw_task_metadata_dict)
             # Fetch subkeys
@@ -428,7 +428,7 @@ class ValkeyBgtaskClient:
 
                 subtask_results = await conn.exec(batch, raise_on_error=True)
                 if subtask_results is None:
-                    log.warning("Failed to fetch subtask metadata (id: {})", task_id)
+                    log.warning("bgtask subtask metadata fetch failed", bgtask_id=task_id)
                     return None
 
                 raw_subtask_results = cast(list[dict[bytes, bytes]], subtask_results)
@@ -439,13 +439,12 @@ class ValkeyBgtaskClient:
                         subtask_info = TaskSubKeyInfo.from_valkey_hash_fields(raw_subtask_dict)
                         task_key_set.append(subtask_info)
                     except InvalidTaskMetadataError:
-                        log.warning("Invalid subtask metadata (id: {})", task_id)
+                        log.warning("bgtask subtask metadata invalid", bgtask_id=task_id)
                         return None
-        log.info(
-            "Fetched task total info (id: {}, task_info: {}, subtasks: {})",
-            task_id,
-            task_info,
-            len(task_key_set),
+        log.debug(
+            "bgtask total info fetched",
+            bgtask_id=task_id,
+            subtask_count=len(task_key_set),
         )
         return TaskTotalInfo(task_info=task_info, task_key_list=task_key_set)
 
@@ -463,14 +462,11 @@ class ValkeyBgtaskClient:
         total_info = await self._fetch_total_info(task_id)
         if total_info is None:
             # Metadata is missing or corrupted, clean up the task references
-            log.warning(
-                "Failed to fetch task info, unregistering task (id: {})",
-                task_id,
-            )
+            log.warning("bgtask info fetch failed, unregistering", bgtask_id=task_id)
             try:
                 await self.unregister_task(task_id, task_set_key)
             except Exception:
-                log.exception("Failed to unregister corrupted task (id: {})", task_id)
+                log.exception("corrupted bgtask unregister failed", bgtask_id=task_id)
             return None
 
         return total_info

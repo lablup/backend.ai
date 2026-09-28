@@ -11,10 +11,10 @@ from weakref import WeakSet
 from ai.backend.common.asyncio import cancel_tasks
 from ai.backend.common.etcd import AbstractKVStore
 from ai.backend.common.exception import ConfigurationError
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.plugin.entrypoint import scan_entrypoints
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 __all__ = (
     "AbstractPlugin",
@@ -141,20 +141,20 @@ class BasePluginContext[P: AbstractPlugin]:
             plugin_cls = entrypoint.load()
             if not (isinstance(plugin_cls, type) and issubclass(plugin_cls, AbstractPlugin)):
                 log.warning(
-                    "skipping plugin (group:{}): {} (not a valid AbstractPlugin subclass, got {})",
-                    plugin_group,
-                    entrypoint.name,
-                    type(plugin_cls),
+                    "plugin skipped, not a valid AbstractPlugin subclass",
+                    plugin_group=plugin_group,
+                    plugin_name=entrypoint.name,
+                    plugin_type=str(type(plugin_cls)),
                 )
                 continue
             if not allowlist_enabled and plugin_cls.require_explicit_allow:
                 log.info(
-                    "skipping plugin (group:{}): {} (requires explicit allow)",
-                    plugin_group,
-                    entrypoint.name,
+                    "plugin skipped, requires explicit allow",
+                    plugin_group=plugin_group,
+                    plugin_name=entrypoint.name,
                 )
                 continue
-            log.info("loading plugin (group:{}): {}", plugin_group, entrypoint.name)
+            log.info("plugin loading", plugin_group=plugin_group, plugin_name=entrypoint.name)
             yield entrypoint.name, cast(type[P], plugin_cls)
 
     async def init(
@@ -181,7 +181,7 @@ class BasePluginContext[P: AbstractPlugin]:
                 plugin_instance = plugin_entry(plugin_config, self.local_config)
                 await plugin_instance.init(context=context)
             except Exception:
-                log.exception("error during initialization of plugin: {}", plugin_name)
+                log.exception("plugin initialization failed", plugin_name=plugin_name)
                 continue
             else:
                 self.plugins[plugin_name] = plugin_instance

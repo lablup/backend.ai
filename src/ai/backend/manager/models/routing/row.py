@@ -20,7 +20,7 @@ from ai.backend.common.data.entity.replica import ReplicaID
 from ai.backend.common.data.entity.replica_group import ReplicaGroupID
 from ai.backend.common.data.entity.session import SessionID
 from ai.backend.common.data.entity.user import UserID
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.data.deployment.types import (
     RouteHealthStatus,
     RouteStatus,
@@ -36,14 +36,14 @@ from ai.backend.manager.models.base import (
 )
 
 if TYPE_CHECKING:
-    from ai.backend.manager.models.endpoint import EndpointRow
-    from ai.backend.manager.models.session import SessionRow
+    from ai.backend.manager.models.endpoint.row import EndpointRow
+    from ai.backend.manager.models.session.row import SessionRow
 
 
 __all__ = ("RouteStatus", "RoutingRow")
 
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 class RoutingRow(Base):

@@ -10,7 +10,7 @@ from uuid import UUID
 from ai.backend.common.data.entity.deployment import DeploymentID
 from ai.backend.common.data.entity.replica_group import ReplicaGroupID
 from ai.backend.common.data.filter_specs import UUIDInMatchSpec
-from ai.backend.logging.utils import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.data.deployment.types import (
     DeploymentHandlerOptions,
     DeploymentInfo,
@@ -24,22 +24,22 @@ from ai.backend.manager.data.deployment.types import (
 )
 from ai.backend.manager.data.model_serving.types import RoutingData
 from ai.backend.manager.models.clauses import QueryCondition
-from ai.backend.manager.models.endpoint import EndpointRow
+from ai.backend.manager.models.endpoint.row import EndpointRow
 from ai.backend.manager.models.endpoint.updaters import EndpointReplicaGroupUpdater
-from ai.backend.manager.models.replica_group import ReplicaGroupRow
 from ai.backend.manager.models.replica_group.creators import ReplicaGroupCreator
+from ai.backend.manager.models.replica_group.row import ReplicaGroupRow
 from ai.backend.manager.models.replica_group.searchers import (
     ReplicaGroupDeploySchedulingViewSearcher,
     ReplicaGroupScalingSchedulingViewSearcher,
     ReplicaGroupSearcher,
 )
 from ai.backend.manager.models.replica_group.updaters import ReplicaGroupDeployUpdater
-from ai.backend.manager.models.replica_group_history import ReplicaGroupHistoryRow
+from ai.backend.manager.models.replica_group_history.row import ReplicaGroupHistoryRow
 from ai.backend.manager.models.replica_group_history.searchable_fields import (
     ReplicaGroupHistorySearchableFields,
 )
-from ai.backend.manager.models.routing import RoutingRow
 from ai.backend.manager.models.routing.creators import ReplicaCreator
+from ai.backend.manager.models.routing.row import RoutingRow
 from ai.backend.manager.models.routing.updaters import ReplicaBatchUpdater
 from ai.backend.manager.models.session_group.creators import SessionGroupCreator
 from ai.backend.manager.models.specs.creator import FieldToCreate
@@ -71,7 +71,7 @@ from ai.backend.manager.views.replica_group import (
     RevisionReplicaCount,
 )
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 class ReplicaGroupDBSource:

@@ -29,16 +29,16 @@ from ai.backend.agent.kernel import AbstractCodeRunner, AbstractKernel
 from ai.backend.agent.resources import KernelResourceSpec
 from ai.backend.agent.types import AgentEventData, KernelOwnershipData
 from ai.backend.agent.utils import closing_async, get_arch_name
-from ai.backend.common.asyncio import current_loop
+from ai.backend.common.asyncio import run_in_executor_with_context
 from ai.backend.common.docker import ImageRef
 from ai.backend.common.dto.agent.response import CodeCompletionResp
 from ai.backend.common.events.dispatcher import EventProducer
 from ai.backend.common.lock import FileLock
 from ai.backend.common.types import CommitStatus, KernelId, Sentinel, SessionId
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.plugin.entrypoint import scan_entrypoints
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 DEFAULT_CHUNK_SIZE: Final = 256 * 1024  # 256 KiB
 DEFAULT_INFLIGHT_CHUNKS: Final = 8
@@ -205,7 +205,6 @@ class DockerKernel(AbstractKernel):
         if self.runner is None:
             raise KernelRunnerNotInitializedError("Kernel runner is not initialized")
 
-        loop = asyncio.get_running_loop()
         path, lock_path = self._get_commit_path(kernel_id, subdir)
         container_id: str = str(self.data["container_id"])
         try:
@@ -227,7 +226,7 @@ class DockerKernel(AbstractKernel):
 
         try:
             async with FileLock(path=lock_path, timeout=0.1, remove_when_unlock=True):
-                log.info("Container (k: {}) is being committed", kernel_id)
+                log.debug("container commit started", kernel_id=kernel_id)
                 docker = Docker()
                 try:
                     # There is a known issue at certain versions of Docker Engine
@@ -252,7 +251,7 @@ class DockerKernel(AbstractKernel):
                             repo, tag = canonical.rsplit(":", maxsplit=1)
                         else:
                             repo, tag = canonical, "latest"
-                        log.debug("tagging image as {}:{}", repo, tag)
+                        log.debug("committed image tag resolved", image_repo=repo, image_tag=tag)
                     else:
                         repo, tag = None, None
                     # TODO:
@@ -277,7 +276,7 @@ class DockerKernel(AbstractKernel):
                             )
                             async with docker._query(f"images/{image_id}/get") as tb_resp:
                                 with gzip.open(filepath, "wb") as fileobj:
-                                    write_task = loop.run_in_executor(
+                                    write_task = run_in_executor_with_context(
                                         None,
                                         functools.partial(
                                             _write_chunks,
@@ -299,11 +298,10 @@ class DockerKernel(AbstractKernel):
                 finally:
                     await docker.close()
         except TimeoutError:
-            log.warning("Session is already being committed.")
+            log.trace("container commit already in progress", kernel_id=kernel_id)
 
     @override
     async def accept_file(self, container_path: os.PathLike[str] | str, filedata: bytes) -> None:
-        loop = current_loop()
         host_work_dir: Path = (
             self.agent_config["container"]["scratch-root"] / str(self.kernel_id) / "work"
         )
@@ -316,7 +314,7 @@ class DockerKernel(AbstractKernel):
             host_abspath.write_bytes(filedata)
 
         try:
-            await loop.run_in_executor(None, _write_to_disk)
+            await run_in_executor_with_context(None, _write_to_disk)
         except OSError as e:
             raise RuntimeError(
                 f"{self.kernel_id}: writing uploaded file failed: {container_path} -> {host_abspath} ({e!r})"
@@ -513,7 +511,7 @@ async def prepare_krunner_env_impl(distro: str, entrypoint_name: str) -> tuple[s
             if item["RepoTags"][0] == extractor_image:
                 break
         else:
-            log.info("preparing the Docker image for krunner extractor...")
+            log.info("krunner extractor image loading")
             extractor_archive = str(
                 files("ai.backend.runner").joinpath(f"krunner-extractor.img.{arch}.tar.xz")
             )
@@ -526,7 +524,7 @@ async def prepare_krunner_env_impl(distro: str, entrypoint_name: str) -> tuple[s
                 if proc.returncode != 0:
                     raise RuntimeError("loading krunner extractor image has failed!")
 
-        log.info("checking krunner-env for {}...", distro)
+        log.debug("krunner environment checking", distro=distro, arch=arch)
         do_create = False
         try:
             vol = DockerVolume(docker, volume_name)  # type: ignore[no-untyped-call]
@@ -548,9 +546,13 @@ async def prepare_krunner_env_impl(distro: str, entrypoint_name: str) -> tuple[s
                 )
             ).resolve()
             if not archive_path.exists():
-                log.warning("krunner environment for {} ({}) is not supported!", distro, arch)
+                log.warning("krunner environment unsupported", distro=distro, arch=arch)
             else:
-                log.info("populating {} volume version {}", volume_name, current_version)
+                log.info(
+                    "krunner volume populating",
+                    volume_name=volume_name,
+                    krunner_version=current_version,
+                )
                 await docker.volumes.create({  # type: ignore[no-untyped-call]
                     "Name": volume_name,
                     "Driver": "local",
@@ -580,7 +582,7 @@ async def prepare_krunner_env_impl(distro: str, entrypoint_name: str) -> tuple[s
                     raise RuntimeError("extracting krunner environment has failed!")
 
     except Exception:
-        log.exception("unexpected error")
+        log.exception("krunner environment preparation failed", distro=distro, arch=arch)
         return distro, None
     finally:
         await docker.close()
@@ -597,7 +599,7 @@ async def prepare_krunner_env(_local_config: Mapping[str, Any]) -> Mapping[str, 
     all_distros: list[tuple[str, str]] = []
     entry_prefix = "backendai_krunner_v10"
     for entrypoint in scan_entrypoints(entry_prefix):
-        log.debug("loading krunner pkg: {}", entrypoint.module)
+        log.debug("krunner package loading", module_name=entrypoint.module)
         plugin = entrypoint.load()
         await plugin.init({})  # currently does nothing
         provided_versions = (
@@ -669,7 +671,7 @@ async def prepare_kernel_metadata_uri_handling(local_config: AgentUnifiedConfig)
         await proxy_worker_container.ensure_running_latest()
 
         # Check if iptables rule is propagated on LinuxKit VM properly
-        log.info("Checking metadata URL iptables rule ...")
+        log.debug("metadata url iptables rule checking")
         proc = await asyncio.create_subprocess_exec(
             *(LinuxKit_CMD_EXEC_PREFIX + ["/sbin/iptables", "-n", "-t", "nat", "-L", "PREROUTING"]),
             stdout=asyncio.subprocess.PIPE,
@@ -704,6 +706,6 @@ async def prepare_kernel_metadata_uri_handling(local_config: AgentUnifiedConfig)
                 )
             )
             await proc.wait()
-            log.info("Inserted the iptables rules.")
+            log.info("metadata url iptables rule inserted")
         else:
-            log.info("The iptables rule already exists.")
+            log.debug("metadata url iptables rule already present")

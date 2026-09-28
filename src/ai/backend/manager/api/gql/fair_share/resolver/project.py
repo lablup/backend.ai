@@ -19,7 +19,7 @@ from ai.backend.manager.api.gql.decorators import (
     gql_mutation,
     gql_root_field,
 )
-from ai.backend.manager.api.gql.fair_share.types import (
+from ai.backend.manager.api.gql.fair_share.types.project import (
     BulkUpsertProjectFairShareWeightInput,
     BulkUpsertProjectFairShareWeightPayload,
     ProjectFairShareConnection,

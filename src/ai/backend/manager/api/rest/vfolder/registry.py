@@ -16,7 +16,7 @@ from ai.backend.manager.api.rest.middleware.auth import (
 )
 from ai.backend.manager.api.rest.routing import RouteRegistry
 from ai.backend.manager.api.rest.types import RouteMiddleware, WebRequestHandler
-from ai.backend.manager.models.vfolder import VFolderStatusSet
+from ai.backend.manager.models.vfolder.row import VFolderStatusSet
 from ai.backend.manager.services.vfolder.actions.base import LookupAccessibleVFolderAction
 from ai.backend.manager.services.vfolder.actions.get_row import GetVFolderLegacyRowAction
 

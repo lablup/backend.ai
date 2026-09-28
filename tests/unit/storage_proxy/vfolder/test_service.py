@@ -1,3 +1,4 @@
+import logging
 import uuid
 from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -6,7 +7,7 @@ import pytest
 from aiohttp import web
 
 from ai.backend.common.types import QuotaConfig, QuotaScopeID, QuotaScopeType, VFolderID, VolumeID
-from ai.backend.storage.errors import VFolderNotFoundError
+from ai.backend.storage.errors import ExternalStorageServiceError, VFolderNotFoundError
 from ai.backend.storage.services.service import VolumeService
 from ai.backend.storage.services.service import log as service_log
 from ai.backend.storage.volumes.pool import VolumePool
@@ -23,6 +24,7 @@ UUID2 = uuid.UUID("12345678-1234-5678-1234-567812345680")
 VOLUME_ID = VolumeID(UUID)
 VOLUME_ID1 = VolumeID(UUID1)
 VOLUME_ID2 = VolumeID(UUID2)
+SERVICE_LOGGER = "ai.backend.storage.services.service"
 
 
 @pytest.fixture
@@ -301,3 +303,49 @@ async def test_delete_vfolder(
 
     mock_log.assert_called_once_with(service_log, "delete_vfolder", vfolder_key)
     mock_volume.get_vfolder_mount.assert_called_once_with(vfolder_id, ".")
+
+
+async def test_external_error_logs_one_error_line_with_the_volume_scope(
+    mock_service: VolumeService, mock_volume_pool: MagicMock, caplog: pytest.LogCaptureFixture
+) -> None:
+    mock_volume = MagicMock()
+    mock_volume.quota_model.describe_quota_scope = AsyncMock(
+        side_effect=ExternalStorageServiceError("backend unreachable")
+    )
+    mock_volume_pool.get_volume.return_value = mock_volume
+    quota_scope_id = QuotaScopeID(scope_type=QuotaScopeType.USER, scope_id=UUID)
+    quota_scope_key = QuotaScopeKey(volume_id=VOLUME_ID, quota_scope_id=quota_scope_id)
+
+    with (
+        caplog.at_level(logging.ERROR, logger=SERVICE_LOGGER),
+        pytest.raises(web.HTTPInternalServerError),
+    ):
+        await mock_service.get_quota_scope(quota_scope_key)
+
+    errors = [r for r in caplog.records if r.levelno >= logging.ERROR]
+    assert len(errors) == 1
+    record = errors[0]
+    assert record.exc_info is not None
+    assert record.__dict__["log_tag_volume_id"] == str(VOLUME_ID)
+    assert record.__dict__["log_tag_quota_scope_id"] == str(quota_scope_id)
+
+
+async def test_missing_vfolder_logs_nothing_at_info_or_above(
+    mock_service: VolumeService, mock_volume_pool: MagicMock, caplog: pytest.LogCaptureFixture
+) -> None:
+    mock_volume = MagicMock()
+    mock_volume.get_vfolder_mount = AsyncMock(side_effect=VFolderNotFoundError)
+    mock_volume_pool.get_volume.return_value = mock_volume
+    vfolder_id = VFolderID(
+        quota_scope_id=QuotaScopeID(scope_type=QuotaScopeType.USER, scope_id=UUID),
+        folder_id=UUID1,
+    )
+    vfolder_key = VFolderKey(volume_id=VOLUME_ID, vfolder_id=vfolder_id)
+
+    with caplog.at_level(1), pytest.raises(web.HTTPGone):
+        await mock_service.get_vfolder_info(vfolder_key, ".")
+
+    assert [r for r in caplog.records if r.levelno >= logging.INFO] == []
+    entry_logs = [r for r in caplog.records if r.name == SERVICE_LOGGER]
+    assert entry_logs
+    assert all(r.__dict__["log_tag_vfolder_id"] == str(UUID1) for r in entry_logs)

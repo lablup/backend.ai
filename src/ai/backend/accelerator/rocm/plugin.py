@@ -49,7 +49,7 @@ from ai.backend.common.types import (
     SlotName,
     SlotTypes,
 )
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 
 __all__ = (
     "PREFIX",
@@ -59,7 +59,7 @@ __all__ = (
 
 PREFIX = "rocm"
 
-log = BraceStyleAdapter(logging.getLogger("ai.backend.accelerator.rocm"))
+log = StructuredLogger(logging.getLogger("ai.backend.accelerator.rocm"))
 
 
 class ROCmPlugin(AbstractComputePlugin):
@@ -89,18 +89,20 @@ class ROCmPlugin(AbstractComputePlugin):
             (major, minor, patch) = librocm_smi.get_version()
             if major < 6:
                 raise RuntimeError("Unsupported ROCm version {}.{}.{}", major, minor, patch)
-            log.info("Running on ROCm {}.{}.{}", major, minor, patch)
+            log.info("ROCm runtime detected", rocm_version=f"{major}.{minor}.{patch}")
             detected_devices = await self.list_devices()
-            log.info("detected devices:\n" + pformat(detected_devices))
+            log.debug("detected devices:\n{}", pformat(detected_devices))
             libhip.get_device_count()
-            log.info("ROCm acceleration is enabled.")
+            log.info(
+                "accelerator enabled", plugin_name=self.key, device_count=len(detected_devices)
+            )
         except (ImportError, NoRocmDeviceError, GenericRocmError):
-            log.warning("could not load the ROCm HIP library.")
-            log.info("ROCm acceleration is disabled.")
+            log.warning("accelerator disabled: ROCm HIP library not loaded", plugin_name=self.key)
             self.enabled = False
         except RuntimeError as e:
-            log.warning("ROCm init error: {}", e)
-            log.info("ROCm acceleration is disabled.")
+            log.warning(
+                "accelerator disabled: initialization failed", plugin_name=self.key, exc_info=e
+            )
             self.enabled = False
 
     async def list_devices(self) -> Collection[ROCmDevice]:
@@ -221,10 +223,12 @@ class ROCmPlugin(AbstractComputePlugin):
                         util_total += gpu_util
                         util_stats[device.device_id] = Measurement(Decimal(gpu_util), Decimal(100))
 
-            except (RocmUtilFetchError, RocmMemFetchError) as e:
+            except (RocmUtilFetchError, RocmMemFetchError):
                 # libhip is not installed.
                 # Return an empty result.
-                log.exception(e)
+                log.exception(
+                    "accelerator disabled: device stat query failed", plugin_name=self.key
+                )
                 self.enabled = False
         return [
             NodeMeasurement(
@@ -271,14 +275,16 @@ class ROCmPlugin(AbstractComputePlugin):
                             "mem_used": mem_used,
                             "mem_total": mem_total,
                         }
-            except (RocmUtilFetchError, RocmMemFetchError) as e:
+            except (RocmUtilFetchError, RocmMemFetchError):
                 # libhip is not installed.
                 # Return an empty result.
-                log.exception(e)
+                log.exception(
+                    "accelerator disabled: device stat query failed", plugin_name=self.key
+                )
                 self.enabled = False
                 return []
 
-            log.debug("device_stats_by_device_filename: {}", device_stats_by_device_filename)
+            log.debug("device stats by device filename: {}", device_stats_by_device_filename)
             async with aiodocker.Docker() as docker:
                 for cid in container_ids:
                     mem_stats[cid] = 0
@@ -287,7 +293,7 @@ class ROCmPlugin(AbstractComputePlugin):
                     number_of_devices_per_container[cid] = 0
                     container_info = await docker.containers.get(cid)
                     log.debug(
-                        "Container {}: Devices: {}", cid, container_info["HostConfig"]["Devices"]
+                        "container {} devices: {}", cid, container_info["HostConfig"]["Devices"]
                     )
                     for device in container_info["HostConfig"]["Devices"]:
                         if device["PathOnHost"] in device_stats_by_device_filename:

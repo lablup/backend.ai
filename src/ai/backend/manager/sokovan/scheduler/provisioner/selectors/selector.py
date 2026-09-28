@@ -24,7 +24,7 @@ from ai.backend.common.types import (
     PreemptionOrder,
     SessionId,
 )
-from ai.backend.logging.utils import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.data.session.options import AgentSelectionPolicy
 from ai.backend.manager.sokovan.recorder.context import RecorderContext
 from ai.backend.manager.sokovan.recorder.recorder import TransitionRecorder
@@ -50,7 +50,7 @@ from .tracker import AgentStateTracker
 from .types import PlacementFailure, ResourceRequirements
 from .victims.selector import VictimSelector
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 @dataclass

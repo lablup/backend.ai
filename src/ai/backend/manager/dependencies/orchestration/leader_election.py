@@ -19,14 +19,14 @@ from ai.backend.common.leader import ValkeyLeaderElection, ValkeyLeaderElectionC
 from ai.backend.common.leader.tasks import EventProducerTask, LeaderCron, PeriodicTask
 from ai.backend.common.leader.tasks.event_task import EventTaskSpec
 from ai.backend.common.types import ValkeyProfileTarget
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.leader.tasks.retention_sweep import RetentionSweepTask
 from ai.backend.manager.repositories.retention.repository import RetentionRepository
 from ai.backend.manager.sokovan.sokovan import SokovanOrchestrator
 from ai.backend.manager.tasks.agent_lost_checker import AgentLostCheckerTask
 
-log = BraceStyleAdapter(logging.getLogger(__name__))
+log = StructuredLogger(logging.getLogger(__name__))
 
 
 @dataclass
@@ -142,7 +142,7 @@ class LeaderElectionDependency(
 
         # Start leader election
         await leader_election.start()
-        log.info("Leader election started for server {}", server_id)
+        log.info("leader election started", server_id=server_id)
 
         try:
             yield leader_election

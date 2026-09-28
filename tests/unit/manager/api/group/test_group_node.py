@@ -24,7 +24,7 @@ from ai.backend.common.types import (
 from ai.backend.manager.actions.v2.ops.result import CreatedEntityOpsResult
 from ai.backend.manager.api.gql_legacy.group import CreateGroup, GroupNode
 from ai.backend.manager.data.project.types import ProjectData, ProjectType
-from ai.backend.manager.models.user import UserRole
+from ai.backend.manager.models.user.row import UserRole
 
 
 class TestCreateGroupMutation:

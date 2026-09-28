@@ -29,7 +29,7 @@ from ai.backend.manager.config.bootstrap import BootstrapConfig
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.error_log.types import ErrorLogData
 from ai.backend.manager.dependencies.infrastructure.redis import ValkeyClients
-from ai.backend.manager.models.agent import agents
+from ai.backend.manager.models.agent.row import agents
 from ai.backend.manager.models.error_log.row import ErrorLogRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.manager_admin.repository import ManagerAdminRepository

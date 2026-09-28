@@ -12,7 +12,7 @@ import pytest
 
 from ai.backend.manager.models.specs.pagination import OffsetPagination
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.models.vfs_storage import VFSStorageRow
+from ai.backend.manager.models.vfs_storage.row import VFSStorageRow
 from ai.backend.manager.models.vfs_storage.searchers import VFSStorageSearcher
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.repositories.vfs_storage.repository import VFSStorageRepository

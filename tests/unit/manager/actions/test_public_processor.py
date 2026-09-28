@@ -14,7 +14,7 @@ from typing import override
 
 import pytest
 
-from ai.backend.common.contexts.user import with_user
+from ai.backend.common.contexts.user import with_user_context
 from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.entity.resource_slot import ResourceSlotTypeEntityType
 from ai.backend.common.data.entity.types import EntityType
@@ -125,7 +125,7 @@ async def test_the_public_path_rejects_a_missing_user_context() -> None:
 async def test_the_public_path_rejects_an_unauthorized_user() -> None:
     processor = PublicActionProcessor[_SearchAction, _Result](_SearchAction, _run)
 
-    with with_user(_user(is_authorized=False)):
+    with with_user_context(_user(is_authorized=False)):
         with pytest.raises(GenericForbidden):
             await processor.run(_SearchAction())
 
@@ -133,7 +133,7 @@ async def test_the_public_path_rejects_an_unauthorized_user() -> None:
 async def test_the_public_path_passes_a_regular_authenticated_user() -> None:
     processor = PublicActionProcessor[_SearchAction, _Result](_SearchAction, _run)
 
-    with with_user(_user()):
+    with with_user_context(_user()):
         result = await processor.run(_SearchAction())
 
     assert isinstance(result, _Result)
@@ -145,7 +145,7 @@ async def test_a_public_denial_still_reaches_the_monitors() -> None:
         _SearchAction, _run, monitors=[monitor]
     )
 
-    with with_user(_user(is_authorized=False)):
+    with with_user_context(_user(is_authorized=False)):
         with pytest.raises(GenericForbidden):
             await processor.run(_SearchAction())
 

@@ -10,7 +10,7 @@ from ai.backend.common.data.entity.resource_group import ResourceGroupID
 from ai.backend.common.defs.session import SESSION_PRIORITY_MIN
 from ai.backend.common.events.event_types.kernel.types import KernelLifecycleEventReason
 from ai.backend.common.types import AccessKey
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.data.session.types import SessionStatus, StatusTransitions, TransitionStatus
 from ai.backend.manager.defs import LockID
@@ -22,7 +22,7 @@ from ai.backend.manager.sokovan.scheduler.results import (
 )
 from ai.backend.manager.views.sokovan.lifecycle import SessionWithKernels
 
-log = BraceStyleAdapter(logging.getLogger(__name__))
+log = StructuredLogger(logging.getLogger(__name__))
 
 # Amount to lower priority when deprioritizing
 DEPRIORITIZE_AMOUNT = 10
@@ -122,11 +122,10 @@ class DeprioritizeSessionsLifecycleHandler(SessionLifecycleHandler):
             session_ids, DEPRIORITIZE_AMOUNT, SESSION_PRIORITY_MIN
         )
 
-        log.info(
-            "Lowered priority by {} for {} sessions in resource group {}",
-            DEPRIORITIZE_AMOUNT,
-            len(sessions),
-            resource_group_id,
+        log.debug(
+            "session priority lowered",
+            priority_delta=DEPRIORITIZE_AMOUNT,
+            session_count=len(sessions),
         )
 
         # Mark all sessions as success for status transition to PENDING

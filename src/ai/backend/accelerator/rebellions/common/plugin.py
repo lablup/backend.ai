@@ -49,7 +49,7 @@ from ai.backend.common.types import (
     SlotName,
     SlotTypes,
 )
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 
 _atom_config_iv = t.Dict({
     "general": t.Dict({
@@ -59,7 +59,7 @@ _atom_config_iv = t.Dict({
     }).allow_extra("*"),
 }).allow_extra("*")
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 class AbstractATOMPlugin[TATOMDevice: AbstractATOMDevice](AbstractComputePlugin, metaclass=ABCMeta):
@@ -88,21 +88,22 @@ class AbstractATOMPlugin[TATOMDevice: AbstractATOMDevice](AbstractComputePlugin,
 
         raw_cfg, cfg_src_path = config.read_from_file(None, "atom")
         self.atom_config = _atom_config_iv.check(raw_cfg)
-        log.info("Read {} device configs from {}", self.key, cfg_src_path)
+        log.info("device config loaded", plugin_name=self.key, config_path=str(cfg_src_path))
         _rbln_stat_path = self.atom_config["general"]["rbln_stat_path"] or shutil.which("rbln-stat")
         if _rbln_stat_path is None:
-            log.error("Could not find path to rbln-stat executable.")
-            log.info("{} acceleration is disabled.")
+            log.error("accelerator disabled: rbln-stat executable not found", plugin_name=self.key)
             self.enabled = False
             return
         self._rbln_stat_path = _rbln_stat_path
         self._enable_rsd = self.atom_config["general"]["enable_rsd"]
         try:
             detected_devices = await self.list_devices()
-            log.info("detected devices:\n" + pformat(detected_devices))
-            log.info("{} acceleration is enabled.", self.key)
+            log.debug("detected devices:\n{}", pformat(detected_devices))
+            log.info(
+                "accelerator enabled", plugin_name=self.key, device_count=len(detected_devices)
+            )
         except ImportError:
-            log.warning("could not find {} devices with VID 1eff.", self.key)
+            log.warning("accelerator disabled: no devices found", plugin_name=self.key)
             self.enabled = False
 
     async def list_devices(self) -> list[TATOMDevice]:
@@ -118,7 +119,7 @@ class AbstractATOMPlugin[TATOMDevice: AbstractATOMDevice](AbstractComputePlugin,
 
     async def available_slots(self) -> Mapping[SlotName, Decimal]:
         devices = await self.list_devices()
-        log.debug("available devices: {}", Decimal(len(devices)))
+        log.debug("available devices: {}", len(devices))
         return {
             self.slot_types[0][0]: Decimal(len(devices)),
         }
@@ -303,11 +304,12 @@ class AbstractATOMPlugin[TATOMDevice: AbstractATOMDevice](AbstractComputePlugin,
         if self._enable_rsd:
             try:
                 group_idx = await self._group_npus(assigned_devices)
-                log.debug("Created NPU Group {} with members {}", group_idx, assigned_devices)
+                log.debug("created NPU group {} with members {}", group_idx, assigned_devices)
                 device_files.append((Path(f"/dev/rsd{group_idx}"), Path("/dev/rsd0")))
             except LibraryError as e:
                 log.warning(
-                    "Failed to create NPU Group: {!s}, starting kernel without NPU group", e
+                    "NPU group creation failed, starting kernel without NPU group",
+                    exc_info=e,
                 )
                 additional_device_files.append(Path("/dev/rsd0"))
         else:

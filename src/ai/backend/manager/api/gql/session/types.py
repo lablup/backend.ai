@@ -117,13 +117,13 @@ from ai.backend.manager.api.gql.decorators import (
 )
 from ai.backend.manager.api.gql.deployment.types.revision import EnvironmentVariablesGQL
 from ai.backend.manager.api.gql.domain_v2.types.node import DomainV2GQL
-from ai.backend.manager.api.gql.entity_label.types import (
-    EntityLabelConnection,
+from ai.backend.manager.api.gql.entity_label.types.field import resolve_entity_labels
+from ai.backend.manager.api.gql.entity_label.types.filters import (
     EntityLabelFilterGQL,
     EntityLabelNestedFilterGQL,
     EntityLabelOrderByGQL,
-    resolve_entity_labels,
 )
+from ai.backend.manager.api.gql.entity_label.types.node import EntityLabelConnection
 from ai.backend.manager.api.gql.image.types import ImageV2ConnectionGQL
 from ai.backend.manager.api.gql.kernel.types import (
     KernelV2ConnectionGQL,

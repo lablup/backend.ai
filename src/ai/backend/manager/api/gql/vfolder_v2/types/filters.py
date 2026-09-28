@@ -23,7 +23,7 @@ from ai.backend.manager.api.gql.decorators import (
     gql_field,
     gql_pydantic_input,
 )
-from ai.backend.manager.api.gql.entity_label.types import EntityLabelNestedFilterGQL
+from ai.backend.manager.api.gql.entity_label.types.filters import EntityLabelNestedFilterGQL
 from ai.backend.manager.api.gql.pydantic_compat import PydanticInputMixin
 
 from .enum import VFolderOperationStatusGQL, VFolderUsageModeGQL

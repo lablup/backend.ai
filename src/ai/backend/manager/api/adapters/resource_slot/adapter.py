@@ -83,7 +83,7 @@ from ai.backend.manager.models.resource_slot.types import NumberFormat
 from ai.backend.manager.models.resource_slot.updaters import ResourceSlotTypeUpdater
 from ai.backend.manager.models.specs.pagination import OffsetPagination
 from ai.backend.manager.models.specs.searcher import GlobalSearcher, ScopedSearcher
-from ai.backend.manager.repositories.base import BatchQuerier
+from ai.backend.manager.repositories.base.querier import BatchQuerier
 from ai.backend.manager.services.agent.actions.lookup import LookupAgentAction
 from ai.backend.manager.services.agent.actions.scoped_search_resources import (
     ScopedSearchAgentResourcesAction,

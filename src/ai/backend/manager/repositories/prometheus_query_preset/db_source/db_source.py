@@ -6,11 +6,11 @@ from typing import TYPE_CHECKING
 from uuid import UUID
 
 from ai.backend.common.exception import PrometheusQueryPresetNotFound
-from ai.backend.manager.data.prometheus_query_preset import (
+from ai.backend.manager.data.prometheus_query_preset.types import (
     PrometheusQueryPresetData,
     PrometheusQueryPresetListResult,
 )
-from ai.backend.manager.models.prometheus_query_preset import PrometheusQueryPresetRow
+from ai.backend.manager.models.prometheus_query_preset.row import PrometheusQueryPresetRow
 from ai.backend.manager.models.prometheus_query_preset.searchable_fields import (
     PrometheusQueryPresetSearchableFields,
 )

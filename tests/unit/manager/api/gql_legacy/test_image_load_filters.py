@@ -12,8 +12,8 @@ from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.docker import LabelName
 from ai.backend.manager.api.gql_legacy.image import Image
 from ai.backend.manager.data.image.types import KVPair
-from ai.backend.manager.models.image import ImageLoadFilter
-from ai.backend.manager.models.user import UserRole
+from ai.backend.manager.models.image.row import ImageLoadFilter
+from ai.backend.manager.models.user.row import UserRole
 
 ME = UserID(uuid.uuid4())
 SOMEBODY_ELSE = UserID(uuid.uuid4())

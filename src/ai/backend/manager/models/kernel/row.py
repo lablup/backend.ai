@@ -35,7 +35,7 @@ from ai.backend.common.types import (
     SessionTypes,
     VFolderMount,
 )
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.data.image.types import ImageIdentifier
 from ai.backend.manager.data.kernel.types import (
     ClusterConfig,
@@ -53,11 +53,11 @@ from ai.backend.manager.data.kernel.types import (
 )
 
 if TYPE_CHECKING:
-    from ai.backend.manager.models.agent import AgentRow
-    from ai.backend.manager.models.image import ImageRow
-    from ai.backend.manager.models.project import ProjectRow
-    from ai.backend.manager.models.session import SessionRow
-    from ai.backend.manager.models.user import UserRow
+    from ai.backend.manager.models.agent.row import AgentRow
+    from ai.backend.manager.models.image.row import ImageRow
+    from ai.backend.manager.models.project.row import ProjectRow
+    from ai.backend.manager.models.session.row import SessionRow
+    from ai.backend.manager.models.user.row import UserRow
 
 from ai.backend.manager.defs import DEFAULT_ROLE
 from ai.backend.manager.errors.kernel import SessionNotFound
@@ -86,7 +86,7 @@ __all__ = (
     "kernels",
 )
 
-log = BraceStyleAdapter(logging.getLogger("ai.backend.manager.models.kernel"))
+log = StructuredLogger(logging.getLogger("ai.backend.manager.models.kernel"))
 
 
 # statuses to consider when calculating current resource usage
@@ -133,7 +133,7 @@ def default_hostname(context: Any) -> str:
 
 # Defined for avoiding circular import
 def _get_user_row_join_condition() -> sa.sql.elements.ColumnElement[Any]:
-    from ai.backend.manager.models.user import UserRow
+    from ai.backend.manager.models.user.row import UserRow
 
     return UserRow.uuid == foreign(KernelRow.user_uuid)
 
@@ -463,7 +463,7 @@ class KernelRow(CreatedAtMixin, Base):
     async def get_kernel(
         db: ExtendedAsyncSAEngine, kern_id: uuid.UUID, allow_stale: bool = False
     ) -> KernelRow:
-        from ai.backend.manager.models.agent import AgentStatus
+        from ai.backend.manager.data.agent.types import AgentStatus
 
         async def _query() -> KernelRow:
             async with db.begin_readonly_session() as db_sess:

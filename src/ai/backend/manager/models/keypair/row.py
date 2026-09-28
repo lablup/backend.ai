@@ -30,9 +30,9 @@ from ai.backend.manager.secret.pool import KeyProviderPool
 from ai.backend.manager.secret.types import SecretValue
 
 if TYPE_CHECKING:
-    from ai.backend.manager.models.resource_group import ResourceGroupForKeypairsRow
-    from ai.backend.manager.models.resource_policy import KeyPairResourcePolicyRow
-    from ai.backend.manager.models.user import UserRow
+    from ai.backend.manager.models.resource_group.row import ResourceGroupForKeypairsRow
+    from ai.backend.manager.models.resource_policy.row import KeyPairResourcePolicyRow
+    from ai.backend.manager.models.user.row import UserRow
 
 __all__: Sequence[str] = (
     "KEYPAIR_SECRET_KEY_CONTEXT",

@@ -27,12 +27,12 @@ from ai.backend.manager.data.permission.global_entity import global_entity_id
 from ai.backend.manager.data.project.types import ProjectData
 from ai.backend.manager.data.user.types import UserData
 from ai.backend.manager.errors.resource import DomainNotFound
-from ai.backend.manager.models.domain import DomainRow
+from ai.backend.manager.models.domain.row import DomainRow
 from ai.backend.manager.models.keypair.creators import DefaultKeypairCreator
-from ai.backend.manager.models.project import ProjectRow, ProjectType
 from ai.backend.manager.models.project.creators import ProjectCreator
-from ai.backend.manager.models.user import UserRole, UserRow, UserStatus
+from ai.backend.manager.models.project.row import ProjectRow, ProjectType
 from ai.backend.manager.models.user.creators import UserCreator
+from ai.backend.manager.models.user.row import UserRole, UserRow, UserStatus
 from ai.backend.manager.models.virtual_entity.queries import user_scope_membership_query
 from ai.backend.manager.models.virtual_entity.virtual_entity import VirtualEntityRow
 from ai.backend.manager.repositories.ops.v2.resource_policy.write import (

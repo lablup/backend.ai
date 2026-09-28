@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import uuid
 from functools import partial
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock
@@ -7,10 +8,13 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 import yarl
 from aiohttp import web
+from aiohttp.test_utils import make_mocked_request
 from pytest_mock import MockerFixture
 
 from ai.backend.common.clients.http_client.client_pool import ClientPool, tcp_client_session_factory
-from ai.backend.web.auth import get_anonymous_session, get_api_session
+from ai.backend.common.contexts.request_id import current_request_id
+from ai.backend.common.middlewares.request_id import REQUEST_ID_HEADER, request_id_middleware
+from ai.backend.web.auth import build_forwarding_headers, get_anonymous_session, get_api_session
 from ai.backend.web.clients.endpoint_pool import AcquiredEndpoint
 
 from .conftest import DummyApiConfig, DummyConfig
@@ -163,3 +167,43 @@ async def test_get_anonymous_session_with_specific_api_endpoint(
     mock_get_session.assert_not_called()
     async with api_session:
         assert str(api_session.config.endpoint) == specific_api_endpoint
+
+
+def _create_forwarding_app() -> web.Application:
+    async def handler(request: web.Request) -> web.Response:
+        return web.json_response({
+            "forwarded": build_forwarding_headers(request).get(REQUEST_ID_HEADER),
+            "current": current_request_id(),
+        })
+
+    app = web.Application(middlewares=[request_id_middleware])
+    app.router.add_get("/", handler)
+    return app
+
+
+async def test_forwarding_headers_carry_incoming_request_id(aiohttp_client: Any) -> None:
+    client = await aiohttp_client(_create_forwarding_app())
+    request_id = str(uuid.uuid4())
+
+    resp = await client.get("/", headers={REQUEST_ID_HEADER: request_id})
+
+    body = await resp.json()
+    assert body["forwarded"] == request_id
+
+
+async def test_forwarding_headers_carry_generated_request_id(aiohttp_client: Any) -> None:
+    client = await aiohttp_client(_create_forwarding_app())
+
+    resp = await client.get("/")
+
+    body = await resp.json()
+    assert body["forwarded"] is not None
+    assert body["forwarded"] == body["current"]
+
+
+def test_forwarding_headers_omit_request_id_outside_request_scope() -> None:
+    request = make_mocked_request("GET", "/", headers={"X-Forwarded-For": "10.0.0.1"})
+
+    headers = build_forwarding_headers(request)
+
+    assert REQUEST_ID_HEADER not in headers

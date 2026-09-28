@@ -21,9 +21,9 @@ from ai.backend.common.resilience import (
     RetryPolicy,
 )
 from ai.backend.common.types import AgentId, ImageCanonical, ImageID, ValkeyTarget
-from ai.backend.logging.utils import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 # Resilience instance for valkey_image layer
 valkey_image_resilience = Resilience(
@@ -86,7 +86,7 @@ class ValkeyImageClient:
         Close the ValkeyImageClient connection.
         """
         if self._closed:
-            log.debug("ValkeyImageClient is already closed.")
+            log.debug("valkey image client already closed")
             return
         self._closed = True
         await self._client.disconnect()

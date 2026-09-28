@@ -8,7 +8,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from ai.backend.common.contexts.user import with_user
+from ai.backend.common.contexts.user import with_user_context
 from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.entity.global_entity import GlobalEntityID, GlobalEntityName
 from ai.backend.common.data.entity.secret import SecretFieldType
@@ -131,7 +131,7 @@ class TestGetSecretStatus:
         repository: MagicMock,
         non_superadmin: UserData,
     ) -> None:
-        with with_user(non_superadmin), pytest.raises(InsufficientPrivilege):
+        with with_user_context(non_superadmin), pytest.raises(InsufficientPrivilege):
             await processors.get_status.run(GetSecretStatusAction())
         repository.status.assert_not_awaited()
 
@@ -141,7 +141,7 @@ class TestGetSecretStatus:
         repository: MagicMock,
         monitor_user: UserData,
     ) -> None:
-        with with_user(monitor_user):
+        with with_user_context(monitor_user):
             result = await processors.get_status.run(GetSecretStatusAction())
         assert result.status == repository.status.return_value
 
@@ -153,7 +153,7 @@ class TestReencryptSecrets:
         repository: MagicMock,
         non_superadmin: UserData,
     ) -> None:
-        with with_user(non_superadmin), pytest.raises(InsufficientPrivilege):
+        with with_user_context(non_superadmin), pytest.raises(InsufficientPrivilege):
             await processors.reencrypt.run(ReencryptSecretsAction())
         repository.reencrypt.assert_not_awaited()
 
@@ -163,6 +163,6 @@ class TestReencryptSecrets:
         repository: MagicMock,
         monitor_user: UserData,
     ) -> None:
-        with with_user(monitor_user), pytest.raises(InsufficientPrivilege):
+        with with_user_context(monitor_user), pytest.raises(InsufficientPrivilege):
             await processors.reencrypt.run(ReencryptSecretsAction())
         repository.reencrypt.assert_not_awaited()

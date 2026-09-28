@@ -16,7 +16,7 @@ import sqlalchemy as sa
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
 from ai.backend.manager.models.domain.row import DomainRow
 from ai.backend.manager.models.project.row import ProjectRow
-from ai.backend.manager.models.user import UserRow
+from ai.backend.manager.models.user.row import UserRow
 
 __all__ = (
     "DeprecatedDomainConditions",

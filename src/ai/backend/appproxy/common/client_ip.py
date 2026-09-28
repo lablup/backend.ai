@@ -17,9 +17,9 @@ validator runs.
 import ipaddress
 import logging
 
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 type IPNetwork = ipaddress.IPv4Network | ipaddress.IPv6Network
 
@@ -52,7 +52,7 @@ class ClientIPValidator:
             try:
                 networks.append(ipaddress.ip_network(entry, strict=False))
             except ValueError:
-                log.exception("Skipping invalid entry in allowed_client_ips: {!r}", entry)
+                log.warning("skipping invalid client IP allowlist entry", allowlist_entry=entry)
         return networks
 
     @property

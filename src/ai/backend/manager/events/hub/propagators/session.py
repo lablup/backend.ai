@@ -32,17 +32,17 @@ from ai.backend.common.events.event_types.session.broadcast import (
 from ai.backend.common.events.hub import WILDCARD, EventPropagator
 from ai.backend.common.events.types import AbstractEvent
 from ai.backend.common.json import dump_json_str
-from ai.backend.logging import BraceStyleAdapter
-from ai.backend.manager.models.kernel import kernels
-from ai.backend.manager.models.session import SessionRow
-from ai.backend.manager.models.user import UserRole
+from ai.backend.logging.structured import StructuredLogger
+from ai.backend.manager.models.kernel.row import kernels
+from ai.backend.manager.models.session.row import SessionRow
+from ai.backend.manager.models.user.row import UserRole
 
 if TYPE_CHECKING:
     from aiohttp_sse import EventSourceResponse
 
     from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 class SessionEventPropagator(EventPropagator):
@@ -102,7 +102,7 @@ class SessionEventPropagator(EventPropagator):
         # Get event data based on event type
         data = await self._get_event_data(event)
         if data is None:
-            log.warning("Could not fetch the domain object for {!r}", event)
+            log.debug("event domain object not found", event_type=type(event).__name__)
             return
         event_name, event_data = data
 
@@ -130,7 +130,7 @@ class SessionEventPropagator(EventPropagator):
         try:
             await self._response.send(dump_json_str(response_data), event=event_name)
         except Exception as e:
-            log.warning("Failed to send SSE event: {}", e)
+            log.trace("sse event send failed", reason=repr(e))
             await self.close()
 
     async def _get_event_data(self, event: AbstractEvent) -> tuple[str, Mapping[str, Any]] | None:
@@ -158,7 +158,7 @@ class SessionEventPropagator(EventPropagator):
             ):
                 return await self._fetch_session_data(event)
             case _:
-                log.debug("Unknown event type: {}", type(event))
+                log.debug("unknown event type", event_type=type(event).__name__)
                 return None
 
     async def _fetch_kernel_data(
@@ -193,7 +193,7 @@ class SessionEventPropagator(EventPropagator):
                 data["exit_Code"] = getattr(event, "exit_code", None)
                 return event.event_name(), data
         except Exception as e:
-            log.warning("Failed to fetch kernel data for event {}: {}", event.kernel_id, e)
+            log.warning("kernel data fetch failed", kernel_id=event.kernel_id, exc_info=e)
             return None
 
     async def _fetch_session_data(
@@ -243,7 +243,7 @@ class SessionEventPropagator(EventPropagator):
                 data["exit_Code"] = getattr(event, "exit_code", None)
                 return event_name, data
         except Exception as e:
-            log.warning("Failed to fetch session data for event {}: {}", event.session_id, e)
+            log.warning("session data fetch failed", session_id=event.session_id, exc_info=e)
             return None
 
     async def _should_send_event(self, event_data: Mapping[str, Any]) -> bool:

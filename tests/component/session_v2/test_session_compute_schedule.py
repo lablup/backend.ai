@@ -29,8 +29,8 @@ from ai.backend.common.types import AgentId
 from ai.backend.manager.api.rest.routing import RouteRegistry
 from ai.backend.manager.api.rest.types import RouteDeps
 from ai.backend.manager.data.session.options import AgentSelectionPolicy, DefaultSessionOptions
-from ai.backend.manager.models.resource_group import resource_groups
-from ai.backend.manager.models.session import SessionRow
+from ai.backend.manager.models.resource_group.row import resource_groups
+from ai.backend.manager.models.session.row import SessionRow
 from ai.backend.manager.services.session.processors import SessionProcessors
 
 from .conftest import AgentFactoryFunc, build_session_registries

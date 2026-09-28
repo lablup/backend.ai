@@ -93,7 +93,7 @@ from ai.backend.manager.event_dispatcher.handlers.stream_cleanup import StreamCl
 from ai.backend.manager.idle import IdleCheckerHost
 from ai.backend.manager.models.keypair.ssh_key_validator import SSHKeyValidator
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.notification import NotificationCenter
+from ai.backend.manager.notification.notification_center import NotificationCenter
 from ai.backend.manager.registry import AgentRegistry
 from ai.backend.manager.reporters.base import AbstractReporter
 from ai.backend.manager.reporters.hub import ReporterHub, ReporterHubArgs
@@ -103,13 +103,15 @@ from ai.backend.manager.repositories.repositories import Repositories
 from ai.backend.manager.repositories.scheduler.repository import SchedulerRepository
 from ai.backend.manager.secret.pool import KeyProviderPool
 from ai.backend.manager.services.processors import Processors, ServiceArgs
-from ai.backend.manager.sokovan.deployment import DeploymentController
 from ai.backend.manager.sokovan.deployment.coordinator import DeploymentCoordinator
+from ai.backend.manager.sokovan.deployment.deployment_controller import DeploymentController
 from ai.backend.manager.sokovan.deployment.route.coordinator import RouteCoordinator
 from ai.backend.manager.sokovan.deployment.route.route_controller import RouteController
 from ai.backend.manager.sokovan.reconciler.coordinator import ReconcilerCoordinator
 from ai.backend.manager.sokovan.scheduler.coordinator import ScheduleCoordinator
-from ai.backend.manager.sokovan.scheduling_controller import SchedulingController
+from ai.backend.manager.sokovan.scheduling_controller.scheduling_controller import (
+    SchedulingController,
+)
 from ai.backend.manager.types import SMTPTriggerPolicy
 
 from .bgtask_registry import BgtaskRegistryDependency, BgtaskRegistryInput

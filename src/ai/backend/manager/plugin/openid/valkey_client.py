@@ -14,11 +14,11 @@ from ai.backend.common.clients.valkey_client.client import (
     create_valkey_client,
 )
 from ai.backend.common.types import ValkeyTarget
-from ai.backend.logging.utils import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 
 from .exceptions import InvalidSession
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 _SESSION_KEY_EXPIRATION: Final[int] = 3600  # 1 hour
@@ -70,7 +70,7 @@ class ValkeyOpenIDClient:
 
     async def close(self) -> None:
         if self._closed:
-            log.debug("ValkeyOpenIDClient is already closed.")
+            log.debug("openid valkey client already closed")
             return
         self._closed = True
         await self._client.disconnect()

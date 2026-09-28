@@ -10,13 +10,14 @@ Test Scenarios:
 
 from __future__ import annotations
 
+import logging
 from unittest.mock import AsyncMock, MagicMock
 from uuid import UUID
 
 import pytest
 
 from ai.backend.common.types import AutoPullBehavior
-from ai.backend.manager.sokovan.recorder import RecorderContext
+from ai.backend.manager.sokovan.recorder.context import RecorderContext
 from ai.backend.manager.sokovan.scheduler.launcher.launcher import SessionLauncher
 from ai.backend.manager.views.sokovan.image import ImageConfigData
 from ai.backend.manager.views.sokovan.lifecycle import (
@@ -291,6 +292,35 @@ class TestSessionLauncherKernelCreation:
         kernel_configs = mock_client.create_kernels.call_args[0][2]
         assert [c["auto_pull"] for c in kernel_configs] == [auto_pull]
         assert [c["image"]["auto_pull"] for c in kernel_configs] == [auto_pull]
+
+    async def test_agent_kernel_creation_failure_logged_at_error(
+        self,
+        launcher: SessionLauncher,
+        mock_agent_client_pool: MagicMock,
+        mock_valkey_schedule: AsyncMock,
+        session_for_start_single_kernel: SessionDataForStart,
+        image_config_default: dict[UUID, ImageConfigData],
+        caplog: pytest.LogCaptureFixture,
+    ) -> None:
+        """Kernel creation fails on one agent -> that exception is logged at error."""
+        error = RuntimeError("agent refused kernel creation")
+        mock_agent_client_pool._mock_client.create_kernels.side_effect = error
+
+        session_ids = [session_for_start_single_kernel.session_id]
+        with RecorderContext.scope("test", entity_ids=session_ids):
+            await launcher.start_sessions_for_handler(
+                [session_for_start_single_kernel],
+                image_config_default,
+            )
+
+        (record,) = [r for r in caplog.records if r.levelno >= logging.ERROR]
+        assert record.__dict__["log_tag_agent_id"] == "agent-1"
+        assert record.__dict__["log_tag_session_id"] == str(
+            session_for_start_single_kernel.session_id
+        )
+        assert record.exc_info is not None
+        assert record.exc_info[1] is error
+        mock_valkey_schedule.record_session_failed_agents.assert_awaited_once()
 
 
 # =============================================================================

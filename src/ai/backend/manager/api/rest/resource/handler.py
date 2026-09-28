@@ -33,7 +33,7 @@ from ai.backend.common.dto.manager.resource.response import (
 )
 from ai.backend.common.types import AccessKey, AgentId
 from ai.backend.common.types import LegacyResourceSlotState as ResourceSlotState
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.dto.context import RequestCtx, UserContext
 from ai.backend.manager.models.resource_preset.scopes import (
     PublicResourcePresetTarget,
@@ -73,7 +73,7 @@ if TYPE_CHECKING:
     from ai.backend.manager.services.resource_preset.processors import ResourcePresetProcessors
     from ai.backend.manager.services.user.processors import UserProcessors
 
-log: Final = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log: Final = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 class ResourceHandler:

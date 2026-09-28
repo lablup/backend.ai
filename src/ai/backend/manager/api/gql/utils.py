@@ -1,9 +1,8 @@
 from __future__ import annotations
 
-from aiohttp import web
-
 from ai.backend.common.contexts.user import current_user
 from ai.backend.common.utils import dedent_strip
+from ai.backend.manager.errors.auth import InsufficientPrivilege
 
 __all__ = (
     "check_admin_only",
@@ -18,8 +17,8 @@ def check_admin_only() -> None:
     This check is required for all admin_* prefixed APIs as defined in BEP-1041.
 
     Raises:
-        web.HTTPForbidden: If the current user is not a superadmin.
+        InsufficientPrivilege: If the current user is not a superadmin.
     """
     me = current_user()
     if me is None or not me.is_superadmin:
-        raise web.HTTPForbidden(reason="Admin exclusive access")
+        raise InsufficientPrivilege("Admin exclusive access")

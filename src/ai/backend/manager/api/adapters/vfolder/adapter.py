@@ -164,11 +164,9 @@ from ai.backend.manager.services.vfolder.actions.vfolder_v2 import (
     DeleteVFolderV2Action,
     PurgeVFolderV2Action,
 )
-from ai.backend.manager.services.vfolder.processors import (
-    VFolderFileProcessors,
-    VFolderMountPolicyProcessors,
-    VFolderProcessors,
-)
+from ai.backend.manager.services.vfolder.processors.file import VFolderFileProcessors
+from ai.backend.manager.services.vfolder.processors.mount_policy import VFolderMountPolicyProcessors
+from ai.backend.manager.services.vfolder.processors.vfolder import VFolderProcessors
 from ai.backend.manager.services.vfolder.processors.vfolder_admin import VFolderAdminProcessors
 
 # The ``vfolders.max_files`` column default; no path ever wrote another value.

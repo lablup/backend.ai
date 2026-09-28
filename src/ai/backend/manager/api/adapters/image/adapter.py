@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
-from decimal import Decimal
 from functools import lru_cache
 from typing import assert_never
 
@@ -66,10 +65,9 @@ from ai.backend.manager.api.adapter_options.pagination.pagination import (
     PaginationSpec,
 )
 from ai.backend.manager.api.adapters.base import BaseAdapter
-from ai.backend.manager.data.image.types import ImageAliasData, ImageData
+from ai.backend.manager.data.image.types import ImageAliasData, ImageData, ImageType
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
 from ai.backend.manager.models.condition_utils import combine_conditions_or, negate_conditions
-from ai.backend.manager.models.image import ImageType
 from ai.backend.manager.models.image.row import ImageAliasRow, ImageRow
 from ai.backend.manager.models.image.scopes import (
     ContainerRegistryImageTarget,
@@ -542,26 +540,14 @@ class ImageAdapter(BaseAdapter):
             case _:
                 assert_never(order.field)
 
-    @staticmethod
-    def _convert_max(value: Decimal | str | None) -> str | None:
-        if value is None:
-            return None
-        if isinstance(value, Decimal):
-            return None if value.is_infinite() else str(value)
-        return str(value)
-
     def _data_to_dto(self, data: ImageData) -> ImageNode:
         """Convert data layer type to Pydantic DTO."""
         status = ImageStatusType(data.status.value)
         labels = [ImageLabelInfo(key=k, value=v) for k, v in data.labels.label_data.items()]
         tags = [ImageTagInfo(key=e.key, value=e.value) for e in data.tags]
         resource_limits_flat = [
-            ImageResourceLimitInfo(
-                key=rl.key,
-                min=str(rl.min),
-                max=self._convert_max(rl.max),
-            )
-            for rl in data.resource_limits
+            ImageResourceLimitInfo.model_validate(resource_limit.to_dict())
+            for resource_limit in data.resource_limits
         ]
         accelerators = data.accelerators
         accelerator_list = (

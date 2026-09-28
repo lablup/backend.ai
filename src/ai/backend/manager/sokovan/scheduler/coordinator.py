@@ -31,7 +31,7 @@ from ai.backend.common.events.event_types.session.broadcast import (
 from ai.backend.common.events.types import AbstractBroadcastEvent
 from ai.backend.common.leader.tasks import EventTaskSpec
 from ai.backend.common.types import AccessKey, AgentId, SessionId
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger, with_log_context
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.data.session.types import (
@@ -56,9 +56,27 @@ from ai.backend.manager.repositories.scheduler.types.session import SessionHisto
 from ai.backend.manager.sokovan.recorder.pool import RecordPool
 from ai.backend.manager.sokovan.recorder.types import ExecutionRecord
 from ai.backend.manager.sokovan.recorder.utils import extract_sub_steps_for_entity
+from ai.backend.manager.sokovan.scheduler.handlers.base import SessionLifecycleHandler
+from ai.backend.manager.sokovan.scheduler.handlers.cleanup.base import CleanupHandler
+from ai.backend.manager.sokovan.scheduler.handlers.kernel.base import KernelLifecycleHandler
+from ai.backend.manager.sokovan.scheduler.handlers.observer.base import KernelObserver
+from ai.backend.manager.sokovan.scheduler.kernel.state_engine import KernelStateEngine
+from ai.backend.manager.sokovan.scheduler.post_processors.base import (
+    KernelPostProcessor,
+    KernelPostProcessorContext,
+    PostProcessor,
+    PostProcessorContext,
+)
+from ai.backend.manager.sokovan.scheduler.post_processors.factory import (
+    create_kernel_post_processors,
+    create_session_post_processors,
+)
+from ai.backend.manager.sokovan.scheduler.recorder.context import SessionRecorderContext
 from ai.backend.manager.sokovan.scheduler.scheduler import SchedulerComponents
 from ai.backend.manager.sokovan.scheduler.types import ScheduleType
-from ai.backend.manager.sokovan.scheduling_controller import SchedulingController
+from ai.backend.manager.sokovan.scheduling_controller.scheduling_controller import (
+    SchedulingController,
+)
 from ai.backend.manager.types import DistributedLockFactory
 from ai.backend.manager.views.sokovan.lifecycle import (
     LastPhase,
@@ -67,21 +85,7 @@ from ai.backend.manager.views.sokovan.lifecycle import (
 from ai.backend.manager.views.sokovan.result import PromotionSpec
 
 from .factory import CoordinatorHandlers
-from .handlers import SessionLifecycleHandler
-from .handlers.cleanup import CleanupHandler
-from .handlers.kernel import KernelLifecycleHandler
-from .handlers.observer import KernelObserver
 from .hooks.registry import HookRegistry
-from .kernel import KernelStateEngine
-from .post_processors import (
-    KernelPostProcessor,
-    KernelPostProcessorContext,
-    PostProcessor,
-    PostProcessorContext,
-    create_kernel_post_processors,
-    create_session_post_processors,
-)
-from .recorder import SessionRecorderContext
 from .results import (
     KernelExecutionResult,
     KernelStatusTransitions,
@@ -89,7 +93,7 @@ from .results import (
     SessionTransitionInfo,
 )
 
-log = BraceStyleAdapter(logging.getLogger(__name__))
+log = StructuredLogger(logging.getLogger(__name__))
 
 # Batch size for observer kernel processing
 _OBSERVER_BATCH_SIZE: Final[int] = 500
@@ -283,7 +287,7 @@ class ScheduleCoordinator:
         if cleanup_handler:
             return await self._process_cleanup_schedule(schedule_type, cleanup_handler)
 
-        log.warning("No handler for schedule type: {}", schedule_type.value)
+        log.warning("no handler for schedule type", schedule_type=schedule_type)
         return False
 
     async def _process_lifecycle_handler_schedule(
@@ -292,8 +296,8 @@ class ScheduleCoordinator:
         handler: SessionLifecycleHandler,
     ) -> bool:
         """Process a lifecycle handler schedule type."""
-        try:
-            log.debug("Processing lifecycle schedule type: {}", schedule_type.value)
+        with with_log_context(schedule_type=schedule_type, handler_name=handler.name()):
+            log.debug("lifecycle schedule processing")
 
             async with AsyncExitStack() as stack:
                 stack.enter_context(self._operation_metrics.measure_operation(handler.name()))
@@ -312,31 +316,17 @@ class ScheduleCoordinator:
 
                 results = await asyncio.gather(
                     *[
-                        self._process_resource_group(handler, schedule_type, resource_group_id)
+                        self._run_in_resource_group(
+                            resource_group_id,
+                            self._process_resource_group(handler, schedule_type, resource_group_id),
+                        )
                         for resource_group_id in resource_group_ids
                     ],
                     return_exceptions=True,
                 )
-
-                # Log any exceptions that occurred during parallel processing
-                for resource_group_id, result in zip(resource_group_ids, results, strict=True):
-                    if isinstance(result, BaseException):
-                        log.error(
-                            "Error processing resource group {} for {}: {}",
-                            resource_group_id,
-                            schedule_type.value,
-                            result,
-                        )
+                self._log_resource_group_failures(resource_group_ids, results)
 
             return True
-
-        except Exception as e:
-            log.exception(
-                "Error processing lifecycle schedule type {}: {}",
-                schedule_type.value,
-                e,
-            )
-            raise
 
     async def _process_promotion_schedule(
         self,
@@ -348,8 +338,8 @@ class ScheduleCoordinator:
         Promotion specs define query conditions and target status declaratively.
         The Coordinator processes sessions matching the spec directly.
         """
-        try:
-            log.debug("Processing promotion schedule type: {}", schedule_type.value)
+        with with_log_context(schedule_type=schedule_type, handler_name=spec.name):
+            log.debug("promotion schedule processing")
 
             with self._operation_metrics.measure_operation(spec.name):
                 # Promotions update session status based on kernel state and
@@ -358,33 +348,19 @@ class ScheduleCoordinator:
 
                 results = await asyncio.gather(
                     *[
-                        self._process_promotion_resource_group(
-                            spec, schedule_type, resource_group_id
+                        self._run_in_resource_group(
+                            resource_group_id,
+                            self._process_promotion_resource_group(
+                                spec, schedule_type, resource_group_id
+                            ),
                         )
                         for resource_group_id in resource_group_ids
                     ],
                     return_exceptions=True,
                 )
-
-                # Log any exceptions that occurred during parallel processing
-                for resource_group_id, result in zip(resource_group_ids, results, strict=True):
-                    if isinstance(result, BaseException):
-                        log.error(
-                            "Error processing resource group {} for {}: {}",
-                            resource_group_id,
-                            schedule_type.value,
-                            result,
-                        )
+                self._log_resource_group_failures(resource_group_ids, results)
 
             return True
-
-        except Exception as e:
-            log.exception(
-                "Error processing promotion schedule type {}: {}",
-                schedule_type.value,
-                e,
-            )
-            raise
 
     async def _process_kernel_schedule(
         self,
@@ -399,8 +375,8 @@ class ScheduleCoordinator:
         3. Execute handler logic
         4. Apply kernel status transitions based on result
         """
-        try:
-            log.debug("Processing kernel schedule type: {}", schedule_type.value)
+        with with_log_context(schedule_type=schedule_type, handler_name=handler.name()):
+            log.debug("kernel schedule processing")
 
             async with AsyncExitStack() as stack:
                 stack.enter_context(self._operation_metrics.measure_operation(handler.name()))
@@ -419,33 +395,19 @@ class ScheduleCoordinator:
 
                 results = await asyncio.gather(
                     *[
-                        self._process_kernel_resource_group(
-                            handler, schedule_type, resource_group_id
+                        self._run_in_resource_group(
+                            resource_group_id,
+                            self._process_kernel_resource_group(
+                                handler, schedule_type, resource_group_id
+                            ),
                         )
                         for resource_group_id in resource_group_ids
                     ],
                     return_exceptions=True,
                 )
-
-                # Log any exceptions that occurred during parallel processing
-                for resource_group_id, result in zip(resource_group_ids, results, strict=True):
-                    if isinstance(result, BaseException):
-                        log.error(
-                            "Error processing resource group {} for {}: {}",
-                            resource_group_id,
-                            schedule_type.value,
-                            result,
-                        )
+                self._log_resource_group_failures(resource_group_ids, results)
 
             return True
-
-        except Exception as e:
-            log.exception(
-                "Error processing kernel schedule type {}: {}",
-                schedule_type.value,
-                e,
-            )
-            raise
 
     async def _process_observer_schedule(
         self,
@@ -464,13 +426,7 @@ class ScheduleCoordinator:
         Returns:
             True if operation was performed, False otherwise
         """
-        try:
-            log.debug(
-                "[Coordinator] Processing observer schedule: type={}, observer={}",
-                schedule_type.value,
-                observer.name(),
-            )
-
+        with with_log_context(schedule_type=schedule_type, handler_name=observer.name()):
             async with AsyncExitStack() as stack:
                 stack.enter_context(self._operation_metrics.measure_operation(observer.name()))
 
@@ -478,39 +434,22 @@ class ScheduleCoordinator:
                 resource_group_ids = await self._repository.get_all_resource_groups()
 
                 log.debug(
-                    "[Coordinator] Found {} resource groups to observe: {}",
-                    len(resource_group_ids),
-                    resource_group_ids,
+                    "observer schedule processing", resource_group_count=len(resource_group_ids)
                 )
 
                 results = await asyncio.gather(
                     *[
-                        self._process_observer_resource_group(observer, resource_group_id)
+                        self._run_in_resource_group(
+                            resource_group_id,
+                            self._process_observer_resource_group(observer, resource_group_id),
+                        )
                         for resource_group_id in resource_group_ids
                     ],
                     return_exceptions=True,
                 )
+                self._log_resource_group_failures(resource_group_ids, results)
 
-                # Log any exceptions that occurred during parallel processing
-                for resource_group_id, result in zip(resource_group_ids, results, strict=True):
-                    if isinstance(result, BaseException):
-                        log.error(
-                            "Error observing resource group {} for {}: {}",
-                            resource_group_id,
-                            schedule_type.value,
-                            result,
-                        )
-
-            log.debug("[Coordinator] Observer schedule {} completed", schedule_type.value)
             return True
-
-        except Exception as e:
-            log.exception(
-                "Error processing observer schedule type {}: {}",
-                schedule_type.value,
-                e,
-            )
-            raise
 
     async def _process_cleanup_schedule(
         self,
@@ -526,8 +465,8 @@ class ScheduleCoordinator:
         The coordinator sets up RecorderContext so that downstream components
         (e.g., SessionTerminator) can use shared_phase/shared_step as usual.
         """
-        try:
-            log.debug("Processing cleanup schedule type: {}", schedule_type.value)
+        with with_log_context(schedule_type=schedule_type, handler_name=handler.name()):
+            log.debug("cleanup schedule processing")
 
             with self._operation_metrics.measure_operation(handler.name()):
                 session_ids = await handler.fetch_session_ids()
@@ -539,13 +478,27 @@ class ScheduleCoordinator:
                     await handler.execute(session_ids)
 
             return True
-        except Exception as e:
-            log.exception(
-                "Error processing cleanup schedule type {}: {}",
-                schedule_type.value,
-                e,
-            )
-            raise
+
+    async def _run_in_resource_group(
+        self,
+        resource_group_id: ResourceGroupID,
+        processing: Awaitable[None],
+    ) -> None:
+        with with_log_context(resource_group_id=resource_group_id):
+            await processing
+
+    def _log_resource_group_failures(
+        self,
+        resource_group_ids: Sequence[ResourceGroupID],
+        results: Sequence[BaseException | None],
+    ) -> None:
+        for resource_group_id, result in zip(resource_group_ids, results, strict=True):
+            if isinstance(result, BaseException):
+                log.error(
+                    "resource group processing failed",
+                    resource_group_id=resource_group_id,
+                    exc_info=result,
+                )
 
     async def _process_observer_resource_group(
         self,
@@ -564,11 +517,6 @@ class ScheduleCoordinator:
             observer: The kernel observer to execute
             resource_group_id: The id of the resource group to process
         """
-        log.debug(
-            "[Coordinator] Processing observer {} for resource_group={}",
-            observer.name(),
-            resource_group_id,
-        )
         condition = observer.get_query_condition(resource_group_id)
 
         # Process in batches with pagination for large result sets
@@ -584,15 +532,13 @@ class ScheduleCoordinator:
             kernel_result = await self._repository.search_kernels_for_handler(searcher)
 
             log.debug(
-                "[Coordinator] Observer {} batch: offset={}, items_count={}, has_next_page={}",
-                observer.name(),
-                offset,
-                len(kernel_result.items),
-                kernel_result.has_next_page,
+                "observer batch fetched",
+                offset=offset,
+                kernel_count=len(kernel_result.items),
+                has_next_page=kernel_result.has_next_page,
             )
 
             if not kernel_result.items:
-                log.debug("[Coordinator] Observer {} no items found, exiting loop", observer.name())
                 break
 
             # Execute observer logic (no status transitions)
@@ -605,11 +551,7 @@ class ScheduleCoordinator:
 
             offset += _OBSERVER_BATCH_SIZE
 
-        log.debug(
-            "[Coordinator] Observer {} completed: total_observed={}",
-            observer.name(),
-            total_observed,
-        )
+        log.debug("observer completed", observed_count=total_observed)
 
         # Emit metrics (total observed count across all batches)
         if total_observed > 0:
@@ -674,12 +616,8 @@ class ScheduleCoordinator:
             target_statuses = self._collect_kernel_target_statuses(transitions, result)
             try:
                 await self._run_kernel_post_processors(result, target_statuses)
-            except Exception as e:
-                log.error(
-                    "Error during kernel post-processing for resource group {}: {}",
-                    resource_group_id,
-                    e,
-                )
+            except Exception:
+                log.exception("kernel post-processing failed")
 
     async def _handle_kernel_result(
         self,
@@ -695,7 +633,6 @@ class ScheduleCoordinator:
             handler: The kernel handler that produced the result
             result: The execution result with successes and failures
         """
-        handler_name = handler.name()
         transitions = handler.status_transitions()
 
         # Handle failures - apply failure transition (typically to TERMINATED)
@@ -705,20 +642,12 @@ class ScheduleCoordinator:
                     failure.kernel_id,
                     failure.reason or KernelLifecycleEventReason.KERNEL_HANDLER_FAILURE,
                 )
-            log.debug(
-                "{}: Terminated {} kernels",
-                handler_name,
-                len(result.failures),
-            )
+            log.debug("kernels terminated", kernel_count=len(result.failures))
 
         # Handle successes - typically no status change (success means kernel is healthy)
         # Success transition is usually None, meaning no status change needed
         if result.successes:
-            log.debug(
-                "{}: {} kernels processed successfully (no status change)",
-                handler_name,
-                len(result.successes),
-            )
+            log.debug("kernels processed", kernel_count=len(result.successes))
 
     async def _process_resource_group(
         self,
@@ -786,21 +715,11 @@ class ScheduleCoordinator:
                 )
                 try:
                     await self._run_post_processors(result, target_statuses)
-                except Exception as e:
-                    log.error(
-                        "Error during common post-processing for resource group {}: {}",
-                        resource_group_id,
-                        e,
-                    )
+                except Exception:
+                    log.exception("post-processing failed")
 
-            # Log recorded steps for this resource group
             if all_records:
-                log.debug(
-                    "Recorded {} sessions with execution records for {} in resource group {}",
-                    len(all_records),
-                    schedule_type.value,
-                    resource_group_id,
-                )
+                log.debug("execution records collected", session_count=len(all_records))
 
     def _populate_phase_history(
         self,
@@ -918,22 +837,12 @@ class ScheduleCoordinator:
                 target_statuses = {spec.success_status}
                 try:
                     await self._run_post_processors(result, target_statuses)
-                except Exception as e:
-                    log.error(
-                        "Error during common post-processing for resource group {}: {}",
-                        resource_group_id,
-                        e,
-                    )
+                except Exception:
+                    log.exception("post-processing failed")
 
-            # Log recorded steps for this resource group
             all_records = pool.get_all_records()
             if all_records:
-                log.debug(
-                    "Recorded {} sessions with execution records for {} in resource group {}",
-                    len(all_records),
-                    schedule_type.value,
-                    resource_group_id,
-                )
+                log.debug("execution records collected", session_count=len(all_records))
 
     async def _handle_promotion_status_transitions(
         self,
@@ -1037,9 +946,9 @@ class ScheduleCoordinator:
 
         if not full_sessions:
             log.warning(
-                "No full session data found for {} sessions transitioning to {}",
-                len(session_ids),
-                target_status,
+                "no session data found for transition hooks",
+                session_count=len(session_ids),
+                target_status=target_status,
             )
             return HookExecutionResult(successful_sessions=[], full_session_data=[])
 
@@ -1064,10 +973,10 @@ class ScheduleCoordinator:
 
             if isinstance(hook_result, BaseException):
                 log.error(
-                    "Hook failed for session {} transitioning to {}: {}",
-                    session_id,
-                    target_status,
-                    hook_result,
+                    "transition hook failed",
+                    session_id=session_id,
+                    target_status=target_status,
+                    exc_info=hook_result,
                 )
                 # Hook failed - don't include in successful sessions
                 continue
@@ -1075,11 +984,11 @@ class ScheduleCoordinator:
             successful_sessions.append(original_info)
             successful_full_sessions.append(session)
 
-        log.info(
-            "Executed on_transition hooks for {} sessions transitioning to {} ({} succeeded)",
-            len(full_sessions),
-            target_status,
-            len(successful_sessions),
+        log.debug(
+            "transition hooks executed",
+            target_status=target_status,
+            session_count=len(full_sessions),
+            success_count=len(successful_sessions),
         )
 
         return HookExecutionResult(
@@ -1100,7 +1009,8 @@ class ScheduleCoordinator:
         """
         hook = self._hook_registry.get_hook(status)
         if hook:
-            await hook.execute(session)
+            with with_log_context(session_id=session.session_info.identity.id):
+                await hook.execute(session)
 
     async def _broadcast_transition_events(
         self,
@@ -1123,8 +1033,8 @@ class ScheduleCoordinator:
         for session_info in sessions:
             if session_info.creation_id is None:
                 log.warning(
-                    "Skipping event broadcast for session {} - missing creation_id",
-                    session_info.session_id,
+                    "event broadcast skipped, creation_id missing",
+                    session_id=session_info.session_id,
                 )
                 continue
 
@@ -1143,11 +1053,7 @@ class ScheduleCoordinator:
 
         if events:
             await self._event_producer.broadcast_events_batch(events)
-            log.debug(
-                "Broadcast {} transition events for status {}",
-                len(events),
-                to_status,
-            )
+            log.debug("transition events broadcast", event_count=len(events), to_status=to_status)
 
     async def _handle_result(
         self,
@@ -1348,7 +1254,7 @@ class ScheduleCoordinator:
         """Apply a single transition type to sessions (BEP-1030).
 
         Args:
-            handler_name: Name of the handler for logging and history
+            handler_name: Name of the handler for history
             session_infos: List of SessionTransitionInfo for the sessions to update
             transition: Target status transition to apply
             scheduling_result: Result type for history recording
@@ -1384,20 +1290,18 @@ class ScheduleCoordinator:
             ]
             updated = await self._repository.update_with_history(updater, histories)
             log.debug(
-                "{}: Updated {} sessions to {} ({})",
-                handler_name,
-                updated,
-                transition.session,
-                scheduling_result.value,
+                "session status updated",
+                session_count=updated,
+                to_status=transition.session,
+                scheduling_result=scheduling_result,
             )
 
         # Kernel status reset if transitioning to PENDING
         if transition.kernel == KernelStatus.PENDING:
-            await self._apply_kernel_pending_resets(handler_name, session_ids)
+            await self._apply_kernel_pending_resets(session_ids)
 
     async def _apply_kernel_pending_resets(
         self,
-        handler_name: str,
         session_ids: list[SessionId],
     ) -> None:
         """Reset kernels to PENDING for sessions going back to PENDING.
@@ -1408,7 +1312,6 @@ class ScheduleCoordinator:
         so the scheduler can deprioritize them on retry.
 
         Args:
-            handler_name: Name of the handler for logging
             session_ids: List of session IDs whose kernels should be reset
         """
         if not session_ids:
@@ -1430,10 +1333,9 @@ class ScheduleCoordinator:
             for session_id, result in zip(record_sessions, results, strict=True):
                 if isinstance(result, Exception):
                     log.warning(
-                        "{}: Failed to record failed agents for session {}: {}",
-                        handler_name,
-                        session_id,
-                        result,
+                        "failed agents not recorded in Valkey",
+                        session_id=session_id,
+                        exc_info=result,
                     )
 
         reset_count = await self._kernel_state_engine.reset_kernels_to_pending_for_sessions(
@@ -1441,10 +1343,7 @@ class ScheduleCoordinator:
             reason=KernelLifecycleEventReason.EXCEEDED_MAX_RETRIES,
         )
         log.debug(
-            "{}: Reset {} kernels to PENDING for {} sessions",
-            handler_name,
-            reset_count,
-            len(session_ids),
+            "kernels reset to pending", kernel_count=reset_count, session_count=len(session_ids)
         )
 
     async def _record_history_without_transition(
@@ -1491,10 +1390,9 @@ class ScheduleCoordinator:
         ]
         await self._repository.create_scheduling_history(histories)
         log.debug(
-            "{}: Recorded {} sessions in history as {} without status change",
-            handler_name,
-            len(session_infos),
-            scheduling_result.value,
+            "history recorded without status change",
+            session_count=len(session_infos),
+            scheduling_result=scheduling_result,
         )
 
     def _collect_target_statuses(
@@ -1548,10 +1446,10 @@ class ScheduleCoordinator:
         )
         for post_processor, res in zip(self._post_processors, results, strict=True):
             if isinstance(res, BaseException):
-                log.warning(
-                    "Post-processor {} failed: {}",
-                    post_processor.__class__.__name__,
-                    res,
+                log.error(
+                    "post-processor failed",
+                    post_processor_name=post_processor.__class__.__name__,
+                    exc_info=res,
                 )
 
     async def _run_kernel_post_processors(
@@ -1572,10 +1470,10 @@ class ScheduleCoordinator:
         )
         for post_processor, res in zip(self._kernel_post_processors, results, strict=True):
             if isinstance(res, BaseException):
-                log.warning(
-                    "Kernel post-processor {} failed: {}",
-                    post_processor.__class__.__name__,
-                    res,
+                log.error(
+                    "kernel post-processor failed",
+                    post_processor_name=post_processor.__class__.__name__,
+                    exc_info=res,
                 )
 
     def _collect_kernel_target_statuses(
@@ -1677,7 +1575,7 @@ class ScheduleCoordinator:
 
     async def handle_kernel_terminated(self, event: KernelTerminatedAnycastEvent) -> bool:
         """Handle kernel terminated event through the kernel state engine."""
-        log.info("Handling termination of kernel {}", event.kernel_id)
+        log.trace("kernel termination handling", kernel_id=event.kernel_id)
         result = await self._kernel_state_engine.mark_kernel_terminated(
             event.kernel_id, event.reason, event.exit_code
         )
@@ -1715,11 +1613,11 @@ class ScheduleCoordinator:
             agent_id, image, image_ref, image_id=image_id
         )
         if result > 0:
-            log.info(
-                "Updated {} kernels to PREPARED state for agent:{} image:{}",
-                result,
-                agent_id,
-                image,
+            log.debug(
+                "kernels updated to prepared",
+                kernel_count=result,
+                agent_id=agent_id,
+                image_name=image,
             )
             # Request scheduling to check if sessions can transition to RUNNING
             await self._scheduling_controller.mark_scheduling_needed([

@@ -26,7 +26,7 @@ from ai.backend.common.dto.manager.config.response import (
     ListDotfilesResponse,
     UpdateDotfileResponse,
 )
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.data.dotfile.types import DotfileEntries, DotfileEntry
 from ai.backend.manager.dto.context import UserContext
 from ai.backend.manager.services.domain.actions.create_domain_dotfile import (
@@ -42,7 +42,7 @@ from ai.backend.manager.services.domain.actions.update_domain_dotfile import (
 )
 from ai.backend.manager.services.domain.processors import DomainProcessors
 
-log: Final = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log: Final = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 class DomainConfigHandler:

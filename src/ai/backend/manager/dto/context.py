@@ -8,7 +8,7 @@ from aiohttp import web
 from pydantic import ConfigDict
 
 from ai.backend.common.api_handlers import MiddlewareParam
-from ai.backend.manager.models.user import UserRole
+from ai.backend.manager.models.user.row import UserRole
 
 
 class RequestCtx(MiddlewareParam):

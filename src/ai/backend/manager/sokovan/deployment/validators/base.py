@@ -23,13 +23,13 @@ from collections.abc import Collection, Iterable, Sequence
 from dataclasses import dataclass, field
 
 from ai.backend.common.types import SlotName
-from ai.backend.logging.utils import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.data.deployment.types import ModelRevisionSpec
 from ai.backend.manager.models.deployment_revision.creators import (
     DeploymentRevisionCreator,
 )
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 @dataclass(frozen=True)
@@ -79,7 +79,7 @@ class DeploymentRevisionValidator:
         context: DeploymentRevisionValidationContext,
     ) -> None:
         for rule in self._rules:
-            log.debug("Applying DeploymentRevisionCreator validation rule: {}", rule.name())
+            log.trace("deployment revision validation rule applying: {}", rule.name())
             rule.validate(spec, context)
 
     def validate_legacy_revision_spec(
@@ -88,5 +88,5 @@ class DeploymentRevisionValidator:
         context: DeploymentRevisionValidationContext,
     ) -> None:
         for rule in self._rules:
-            log.debug("Applying ModelRevisionSpec validation rule: {}", rule.name())
+            log.trace("model revision validation rule applying: {}", rule.name())
             rule.validate_legacy_revision_spec(spec, context)

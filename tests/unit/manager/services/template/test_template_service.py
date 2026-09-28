@@ -17,8 +17,8 @@ from ai.backend.common.data.entity.session_template import SessionTemplateID
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.manager.errors.resource import DBOperationFailed, SessionTemplateNotFound
 from ai.backend.manager.exceptions import InvalidArgument
-from ai.backend.manager.models.session_template import TemplateType
-from ai.backend.manager.models.user import UserRole
+from ai.backend.manager.models.session_template.row import TemplateType
+from ai.backend.manager.models.user.row import UserRole
 from ai.backend.manager.repositories.template.repository import TemplateRepository
 from ai.backend.manager.services.template.actions.create_cluster_template import (
     CreateClusterTemplateAction,

@@ -39,9 +39,9 @@ from ai.backend.manager.api.rest.v2.user.registry import register_v2_user_routes
 from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.secret.types import KeyProviderType
-from ai.backend.manager.models.keypair import keypairs
-from ai.backend.manager.models.project import association_groups_users
-from ai.backend.manager.models.user import users
+from ai.backend.manager.models.keypair.row import keypairs
+from ai.backend.manager.models.project.row import association_groups_users
+from ai.backend.manager.models.user.row import users
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.registry import AgentRegistry
 from ai.backend.manager.repositories.domain.repository import DomainRepository

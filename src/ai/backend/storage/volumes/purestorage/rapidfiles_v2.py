@@ -10,7 +10,7 @@ from subprocess import CalledProcessError
 from typing import override
 
 from ai.backend.common.json import load_json
-from ai.backend.logging.utils import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.storage.errors import (
     PureStorageCommandFailedError,
     SubprocessStdoutNotAvailableError,
@@ -21,7 +21,7 @@ from ai.backend.storage.utils import fstime2datetime
 
 from .rapidfiles import RapidFileToolsFSOpModel
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 class RapidFileToolsv2FSOpModel(RapidFileToolsFSOpModel):

@@ -27,7 +27,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from ai.backend.common.contexts.user import with_user
+from ai.backend.common.contexts.user import with_user_context
 from ai.backend.common.data.entity.domain import DomainID, DomainName
 from ai.backend.common.data.entity.image import ImageID
 from ai.backend.common.data.entity.project import ProjectID
@@ -80,7 +80,7 @@ from ai.backend.manager.data.session.options import (
 )
 from ai.backend.manager.data.session.spec import SessionSpec
 from ai.backend.manager.errors.common import RejectedByHook
-from ai.backend.manager.models.network import NetworkType
+from ai.backend.manager.models.network.row import NetworkType
 from ai.backend.manager.sokovan.scheduling_controller.scheduling_controller import (
     SchedulingController,
     SchedulingControllerArgs,
@@ -304,7 +304,7 @@ class TestEnqueueSessionFromDraft:
 
         user = _make_user()
 
-        with with_user(user):
+        with with_user_context(user):
             returned_id = await controller.enqueue_session_from_draft(draft)
 
         assert returned_id == expected_session_id
@@ -377,7 +377,7 @@ class TestEnqueueSessionFromDraft:
 
         controller, _, _ = _build_controller(repository)
 
-        with with_user(_make_user()):
+        with with_user_context(_make_user()):
             await controller.enqueue_session_from_draft(draft_jp)
 
         enqueued_spec = repository.enqueue_session_from_spec.await_args.args[0]
@@ -419,7 +419,7 @@ class TestEnqueueSessionFromDraft:
 
         controller, _, _ = _build_controller(repository)
 
-        with with_user(_make_user()):
+        with with_user_context(_make_user()):
             await controller.enqueue_session_from_draft(draft_strict)
 
         enqueued_spec = repository.enqueue_session_from_spec.await_args.args[0]
@@ -448,7 +448,7 @@ class TestEnqueueSessionFromDraft:
 
         controller, _, _ = _build_controller(repository)
 
-        with with_user(_make_user()):
+        with with_user_context(_make_user()):
             await controller.enqueue_session_from_draft(draft)
 
         enqueued_spec = repository.enqueue_session_from_spec.await_args.args[0]
@@ -475,7 +475,7 @@ class TestEnqueueSessionFromDraft:
 
         user = _make_user()
 
-        with with_user(user), pytest.raises(RejectedByHook):
+        with with_user_context(user), pytest.raises(RejectedByHook):
             await controller.enqueue_session_from_draft(draft)
 
         # Writer path must not be reached
@@ -496,7 +496,7 @@ class TestEnqueueSessionFromDraft:
         controller, _event_producer, _hook_plugin_ctx = _build_controller(repository)
 
         user = _make_user()
-        with with_user(user):
+        with with_user_context(user):
             await controller.enqueue_session_from_draft(draft)
 
         enqueued_spec = repository.enqueue_session_from_spec.await_args.args[0]
@@ -516,7 +516,7 @@ class TestResourceGroupAccessibility:
         controller, _event_producer, _hook_plugin_ctx = _build_controller(repository)
 
         user = _make_user()
-        with with_user(user), pytest.raises(InvalidAPIParameters):
+        with with_user_context(user), pytest.raises(InvalidAPIParameters):
             await controller.enqueue_session_from_draft(draft)
 
         repository.fetch_session_spec_context.assert_not_called()
@@ -537,7 +537,7 @@ class TestResourceGroupAccessibility:
         controller, _event_producer, _hook_plugin_ctx = _build_controller(repository)
 
         user = _make_user()
-        with with_user(user):
+        with with_user_context(user):
             await controller.enqueue_session_from_draft(draft)
 
         repository.query_accessible_resource_group_ids.assert_awaited_once()

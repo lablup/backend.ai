@@ -19,11 +19,11 @@ from ai.backend.common.types import (
     SlotName,
     SlotTypes,
 )
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 
 from .types import ATOMMaxChildDevice, ATOMMaxDevice
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 VALID_DEVICE_NAME = ("RBLN-CA25",)
 

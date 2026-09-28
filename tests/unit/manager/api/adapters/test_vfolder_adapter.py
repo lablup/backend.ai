@@ -28,7 +28,7 @@ from ai.backend.manager.data.vfolder.types import (
     VFolderUsageData,
 )
 from ai.backend.manager.errors.common import GenericForbidden
-from ai.backend.manager.models.user import UserRole
+from ai.backend.manager.models.user.row import UserRole
 from ai.backend.manager.services.vfolder.actions.get_usage import (
     GetVFolderUsageActionResult,
 )

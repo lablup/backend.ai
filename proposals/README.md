@@ -136,7 +136,7 @@ BEP numbers start from 1000.
 | [1063](BEP-1063-db-record-retention.md) | DB Record Retention Management | HyeokJin Kim | Implemented |
 | [1064](BEP-1064-session-group-placement.md) | SessionGroup Placement for Grouped Sessions | HyeokJin Kim | Draft |
 | [1065](BEP-1065-encrypted-secret-key-storage.md) | Encrypted Secret-Key Storage | HyeokJin Kim | Draft |
-| [1066](BEP-1066-structured-logging.md) | Structured Logging Across Components | HyeokJin Kim | Draft |
+| [1066](BEP-1066-structured-logging.md) | Structured Logging Across Components | HyeokJin Kim | Implemented |
 | [1067](BEP-1067-e2e-integration-test-framework.md) | Full-Stack E2E Integration Test Framework | HyeokJin Kim | Draft |
 | [1068](BEP-1068-login-session.md) | Login Session Improvements | HyeokJin Kim | Draft |
 | [1069](BEP-1069-entity-lifecycle-deletion.md) | Entity Lifecycle Deletion Management | HyeokJin Kim | Draft |

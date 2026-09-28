@@ -9,7 +9,7 @@ from typing import TYPE_CHECKING
 from ai.backend.common.data.notification import NotifiableMessage, NotificationRuleType
 
 if TYPE_CHECKING:
-    from ai.backend.manager.data.notification import NotificationChannelData
+    from ai.backend.manager.data.notification.types import NotificationChannelData
 
 __all__ = (
     "NotificationMessage",

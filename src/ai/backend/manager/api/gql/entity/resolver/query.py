@@ -9,7 +9,7 @@ from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     gql_root_field,
 )
-from ai.backend.manager.api.gql.entity.types import EntityTypeGQL
+from ai.backend.manager.api.gql.entity.types.node import EntityTypeGQL
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 
 

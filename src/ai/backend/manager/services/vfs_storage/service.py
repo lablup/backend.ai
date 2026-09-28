@@ -1,6 +1,6 @@
 import logging
 
-from ai.backend.logging.utils import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
 from ai.backend.manager.repositories.vfs_storage.repository import VFSStorageRepository
 from ai.backend.manager.services.vfs_storage.actions.get_quota_scope import (
@@ -21,7 +21,7 @@ from ai.backend.manager.services.vfs_storage.actions.unset_quota_scope import (
     UnsetQuotaScopeActionResult,
 )
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 class VFSStorageService:

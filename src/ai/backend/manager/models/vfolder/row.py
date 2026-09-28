@@ -42,7 +42,7 @@ from ai.backend.common.types import (
     VFolderMountPolicy,
     VFolderUsageMode,
 )
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.data.entity_share.types import EntityShareStatus
 from ai.backend.manager.data.permission.permission_defs import StorageHostPermission
 from ai.backend.manager.data.permission.permission_defs import (
@@ -70,7 +70,7 @@ from ai.backend.manager.models.base import (
 )
 from ai.backend.manager.models.entity_share.row import EntityShareRow
 from ai.backend.manager.models.mixins.timestamp import LifecycleTimestampsMixin
-from ai.backend.manager.models.project import ProjectRow
+from ai.backend.manager.models.project.row import ProjectRow
 from ai.backend.manager.models.rbac import (
     AbstractPermissionContext,
     AbstractPermissionContextBuilder,
@@ -84,12 +84,12 @@ from ai.backend.manager.models.rbac import (
     UserScope as UserRBACScope,
 )
 from ai.backend.manager.models.rbac.context import ClientContext
-from ai.backend.manager.models.session import DEAD_SESSION_STATUSES, SessionRow
+from ai.backend.manager.models.session.row import DEAD_SESSION_STATUSES, SessionRow
 from ai.backend.manager.models.storage import PermissionContext as StorageHostPermissionContext
 from ai.backend.manager.models.storage import (
     PermissionContextBuilder as StorageHostPermissionContextBuilder,
 )
-from ai.backend.manager.models.user import UserRole, UserRow
+from ai.backend.manager.models.user.row import UserRole, UserRow
 from ai.backend.manager.models.utils import (
     ExtendedAsyncSAEngine,
     execute_with_retry,
@@ -126,7 +126,7 @@ __all__: Sequence[str] = (
 )
 
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 def _get_user_row_join_condition() -> sa.sql.elements.ColumnElement[Any]:
@@ -521,8 +521,8 @@ async def get_allowed_vfolder_hosts_by_group(
     If `group_id` is not None, `allowed_vfolder_hosts` from the group is also merged.
     If the requester is a domain admin, gather all `allowed_vfolder_hosts` of the domain groups.
     """
-    from ai.backend.manager.models.domain import domains
-    from ai.backend.manager.models.project import groups
+    from ai.backend.manager.models.domain.row import domains
+    from ai.backend.manager.models.project.row import groups
 
     # Domain's allowed_vfolder_hosts.
     allowed_hosts = VFolderHostPermissionMap()
@@ -561,8 +561,8 @@ async def get_allowed_vfolder_hosts_by_user(
 
     All available `allowed_vfolder_hosts` of groups which requester associated will be merged.
     """
-    from ai.backend.manager.models.domain import domains
-    from ai.backend.manager.models.project import groups
+    from ai.backend.manager.models.domain.row import domains
+    from ai.backend.manager.models.project.row import groups
 
     # Domain's allowed_vfolder_hosts.
     allowed_hosts = VFolderHostPermissionMap()
@@ -573,7 +573,9 @@ async def get_allowed_vfolder_hosts_by_user(
         result_hosts: VFolderHostPermissionMap = allowed_hosts | values
         allowed_hosts = result_hosts
     # User's Groups' allowed_vfolder_hosts.
-    membership_cond = user_scope_membership_exists(ProjectEntityType(), groups.c.id, user_uuid)
+    membership_cond: sa.ColumnElement[bool] = user_scope_membership_exists(
+        ProjectEntityType(), groups.c.id, user_uuid
+    )
     if group_id is not None:
         membership_cond = sa.and_(membership_cond, groups.c.id == group_id)
     query = sa.select(groups.c.allowed_vfolder_hosts).where(
@@ -672,9 +674,9 @@ async def update_vfolder_status(
     await execute_with_retry(_update)
     if do_log:
         log.debug(
-            "Successfully updated status of VFolder(s) {} to {}",
-            [str(x) for x in vfolder_ids],
-            update_status.name,
+            "vfolder status updated",
+            vfolder_ids=", ".join(str(x) for x in vfolder_ids),
+            vfolder_status=update_status,
         )
 
 
@@ -996,7 +998,7 @@ class VFolderPermissionContextBuilder(
         self,
         ctx: ClientContext,
     ) -> VFolderPermissionContext:
-        from ai.backend.manager.models.domain import DomainRow
+        from ai.backend.manager.models.domain.row import DomainRow
 
         perm_ctx = VFolderPermissionContext()
         _domain_query_stmt = sa.select(DomainRow).options(load_only(DomainRow.name))

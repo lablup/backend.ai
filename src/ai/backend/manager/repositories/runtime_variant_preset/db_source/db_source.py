@@ -7,7 +7,7 @@ from uuid import UUID
 
 import sqlalchemy as sa
 
-from ai.backend.logging.utils import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.data.runtime_variant_preset.types import RuntimeVariantPresetData
 from ai.backend.manager.errors.resource import RuntimeVariantPresetNotFound
 from ai.backend.manager.models.runtime_variant_preset.row import RuntimeVariantPresetRow
@@ -16,7 +16,7 @@ from ai.backend.manager.models.runtime_variant_preset.searchable_fields import (
 )
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 class RuntimeVariantPresetDBSource:

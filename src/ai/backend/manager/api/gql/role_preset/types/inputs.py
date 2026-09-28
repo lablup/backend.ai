@@ -41,8 +41,8 @@ from ai.backend.manager.api.gql.decorators import (
     gql_pydantic_input,
 )
 from ai.backend.manager.api.gql.pydantic_compat import PydanticInputMixin
-from ai.backend.manager.api.gql.rbac.types import PermissionBitGQL
 from ai.backend.manager.api.gql.rbac.types.permission import OperationTypeGQL
+from ai.backend.manager.api.gql.rbac.types.scope import PermissionBitGQL
 
 
 @gql_pydantic_input(

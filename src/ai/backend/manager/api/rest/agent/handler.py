@@ -13,7 +13,7 @@ from ai.backend.common.dto.manager.agent.request import SearchAgentsRequest
 from ai.backend.common.dto.manager.agent.response import SearchAgentsResponse
 from ai.backend.common.dto.manager.pagination import PaginationInfo
 from ai.backend.common.types import AgentId
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.data.agent.types import AgentDetailData
 from ai.backend.manager.data.resource_slot.types import AgentResourceData
 from ai.backend.manager.dto.context import UserContext
@@ -29,7 +29,7 @@ from ai.backend.manager.services.agent.processors import AgentProcessors
 
 from .adapter import AgentAdapter
 
-log: Final = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log: Final = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 class AgentHandler:

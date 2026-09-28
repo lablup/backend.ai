@@ -24,7 +24,7 @@ from ai.backend.manager.api.rest.types import RouteDeps
 from ai.backend.manager.clients.container_registry.pool import (
     ContainerRegistryQuotaClientPool,
 )
-from ai.backend.manager.models.container_registry import ContainerRegistryRow
+from ai.backend.manager.models.container_registry.row import ContainerRegistryRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.container_registry.repository import (
     ContainerRegistryRepository,

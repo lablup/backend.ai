@@ -263,13 +263,11 @@ from ai.backend.manager.services.template.service import TemplateService
 from ai.backend.manager.services.user.processors import UserProcessors
 from ai.backend.manager.services.user.service import UserService
 from ai.backend.manager.services.user_resource_policy.processors import UserResourcePolicyProcessors
-from ai.backend.manager.services.vfolder.processors import (
-    VFolderFileProcessors,
-    VFolderInviteProcessors,
-    VFolderMountPolicyProcessors,
-    VFolderProcessors,
-    VFolderSharingProcessors,
-)
+from ai.backend.manager.services.vfolder.processors.file import VFolderFileProcessors
+from ai.backend.manager.services.vfolder.processors.invite import VFolderInviteProcessors
+from ai.backend.manager.services.vfolder.processors.mount_policy import VFolderMountPolicyProcessors
+from ai.backend.manager.services.vfolder.processors.sharing import VFolderSharingProcessors
+from ai.backend.manager.services.vfolder.processors.vfolder import VFolderProcessors
 from ai.backend.manager.services.vfolder.processors.vfolder_admin import VFolderAdminProcessors
 from ai.backend.manager.services.vfolder.services.file import VFolderFileService
 from ai.backend.manager.services.vfolder.services.invite import VFolderInviteService

@@ -30,12 +30,12 @@ from ai.backend.common.dto.appproxy_coordinator.v2.endpoint.types import (
     UpdatedRoutesItem,
     UpdateRoutesItem,
 )
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 
 if TYPE_CHECKING:
     from ai.backend.appproxy.coordinator.types import CircuitManager
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 class EndpointService:
@@ -92,7 +92,7 @@ class EndpointService:
         try:
             results = await self._repository.update_routes(items)
         except Exception as exc:
-            log.warning("Bulk routes update failed: {}", exc)
+            log.exception("failed to update routes in bulk")
             return [
                 UpdatedRoutesItem(
                     deployment_id=item.deployment_id,
@@ -117,7 +117,7 @@ class EndpointService:
                 # is already committed, so we mark every propagated
                 # entry as failed and let the manager retry on the
                 # next short cycle.
-                log.warning("Bulk worker propagation failed: {}", exc)
+                log.exception("failed to propagate updated routes to workers")
                 propagated_ids = {item.circuit.endpoint_id for item in update_items}
                 for result in results:
                     if (
@@ -154,7 +154,7 @@ class EndpointService:
         try:
             results = await self._repository.register_routes(items)
         except Exception as exc:
-            log.warning("Bulk routes register failed: {}", exc)
+            log.exception("failed to register routes in bulk")
             return [
                 RegisteredRoutesItem(
                     deployment_id=item.deployment_id,
@@ -179,7 +179,7 @@ class EndpointService:
                 # propagation either completes or aborts as a unit, so
                 # we mark every propagated entry as failed and let the
                 # manager retry on the next short cycle.
-                log.warning("Bulk worker propagation (register) failed: {}", exc)
+                log.exception("failed to propagate registered routes to workers")
                 propagated_ids = {item.circuit.endpoint_id for item in update_items}
                 for result in results:
                     if (
@@ -218,7 +218,7 @@ class EndpointService:
         try:
             results = await self._repository.unregister_routes(items)
         except Exception as exc:
-            log.warning("Bulk routes unregister failed: {}", exc)
+            log.exception("failed to unregister routes in bulk")
             return [
                 UnregisteredRoutesItem(
                     deployment_id=item.deployment_id,
@@ -239,7 +239,7 @@ class EndpointService:
             try:
                 await self._circuit_manager.update_circuit_routes_bulk(update_items)
             except Exception as exc:
-                log.warning("Bulk worker propagation (unregister) failed: {}", exc)
+                log.exception("failed to propagate unregistered routes to workers")
                 propagated_ids = {item.circuit.endpoint_id for item in update_items}
                 for result in results:
                     if (
@@ -279,7 +279,7 @@ class EndpointService:
         try:
             circuits = await self._repository.delete_endpoints(deployment_ids)
         except Exception as exc:
-            log.warning("Bulk endpoint delete failed: {}", exc)
+            log.exception("failed to delete endpoints in bulk")
             return [
                 DeletedEndpointItem(
                     deployment_id=deployment_id,

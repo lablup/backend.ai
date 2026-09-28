@@ -16,7 +16,7 @@ from ai.backend.common.exception import (
     ShowmountNotFound,
 )
 from ai.backend.common.utils import check_nfs_remote_server
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 
 from .exception import (
     AuthenticationError,
@@ -33,7 +33,7 @@ DOMAIN_FOR_HTTP_SESSION = "hammerspace"
 NFS_CHECK_RETRY_COUNT = 5
 NFS_CHECK_WAIT_SEC = 1
 
-log = BraceStyleAdapter(logging.getLogger(__name__))
+log = StructuredLogger(logging.getLogger(__name__))
 
 
 class HammerspaceAPIClient:
@@ -86,8 +86,8 @@ class HammerspaceAPIClient:
         host = self._connection_info.address.host
         if host is None:
             log.warning(
-                "Invalid host in the address: {}, skip NFS export check",
-                self._connection_info.address,
+                "invalid host in address, skipping NFS export check",
+                address=str(self._connection_info.address),
             )
             return
         count = NFS_CHECK_RETRY_COUNT
@@ -96,21 +96,24 @@ class HammerspaceAPIClient:
             try:
                 await check_nfs_remote_server(host, export_path)
             except ShowmountNotFound:
-                log.warning("showmount command not found. Install nfs-common package.")
+                log.warning("showmount command not found, install the nfs-common package")
                 return
             except ExportPathNotFound:
                 log.debug(
                     "NFS export path {} not found on the server {}. Retrying...", export_path, host
                 )
             except BaseNFSMountCheckFailed:
-                log.exception(
-                    "Check NFS export {} on the server {} failed. Retrying...", export_path, host
+                log.warning(
+                    "NFS export check failed, retrying",
+                    exc_info=True,
+                    export_path=export_path,
+                    host=host,
                 )
             else:
                 log.debug("Found NFS export {} on the server {}", export_path, host)
                 return
             await asyncio.sleep(NFS_CHECK_WAIT_SEC)
-        log.exception("Failed to verify NFS export {} on the server {}", export_path, host)
+        log.error("NFS export verification failed", export_path=export_path, host=host)
 
     async def create_share(
         self,
@@ -214,7 +217,7 @@ class HammerspaceAPIClient:
                     site = Site.model_validate(s)
                     sites.append(site)
                 except BackendAISchemaValidationFailed:
-                    log.warning("Failed to parse the site data: {}", s)
+                    log.warning("site data parse failed", exc_info=True, site_data=str(s))
                     continue
             return sites
 

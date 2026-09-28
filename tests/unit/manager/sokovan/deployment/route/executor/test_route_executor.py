@@ -15,6 +15,7 @@ Test Scenarios:
 from __future__ import annotations
 
 import dataclasses
+import logging
 from datetime import datetime
 from unittest.mock import AsyncMock, MagicMock
 from uuid import UUID, uuid4
@@ -35,6 +36,7 @@ from ai.backend.common.dto.appproxy_coordinator.v2.endpoint.response import (
 from ai.backend.common.dto.appproxy_coordinator.v2.endpoint.types import UpdatedRoutesItem
 from ai.backend.common.types import SessionId
 from ai.backend.manager.data.deployment.types import (
+    RouteData,
     RouteHealthStatus,
     RouteStatus,
     RouteSubStatus,
@@ -42,9 +44,15 @@ from ai.backend.manager.data.deployment.types import (
 )
 from ai.backend.manager.data.model_serving.types import AppProxyRouteEntry
 from ai.backend.manager.data.resource.types import ResourceGroupProxyTarget
-from ai.backend.manager.repositories.deployment.types import RouteData
 from ai.backend.manager.sokovan.deployment.route.executor import RouteExecutor
 from ai.backend.manager.sokovan.deployment.route.recorder.context import RouteRecorderContext
+
+_TRACE_LEVEL = 5
+
+
+def _provisioning_failure_records(caplog: pytest.LogCaptureFixture) -> list[logging.LogRecord]:
+    return [r for r in caplog.records if r.getMessage().startswith("route provisioning failed")]
+
 
 # =============================================================================
 # TestProvisionRoutes (RP-001 ~ RP-003)
@@ -155,6 +163,49 @@ class TestProvisionRoutes:
         # Assert
         assert len(result.successes) == 0
         assert len(result.errors) == 1
+
+    async def test_provisioning_rejection_logged_at_trace(
+        self,
+        route_executor: RouteExecutor,
+        mock_deployment_repo: AsyncMock,
+        provisioning_route: RouteData,
+        caplog: pytest.LogCaptureFixture,
+    ) -> None:
+        """A client-side rejection (missing deployment) is logged at trace without a traceback."""
+        caplog.set_level(_TRACE_LEVEL, logger="ai.backend.manager.sokovan")
+        mock_deployment_repo.get_deployments_by_ids.return_value = []
+
+        with RouteRecorderContext.scope("test", entity_ids=[provisioning_route.route_id]):
+            await route_executor.provision_routes([provisioning_route])
+
+        failures = _provisioning_failure_records(caplog)
+        assert len(failures) == 1
+        assert failures[0].levelno == _TRACE_LEVEL
+        assert failures[0].__dict__["log_tag_route_id"] == str(provisioning_route.route_id)
+
+    async def test_provisioning_server_fault_logged_as_error(
+        self,
+        route_executor: RouteExecutor,
+        mock_deployment_repo: AsyncMock,
+        provisioning_route: RouteData,
+        caplog: pytest.LogCaptureFixture,
+    ) -> None:
+        """A failure that is not a rejection is a server fault, logged with its traceback."""
+        caplog.set_level(_TRACE_LEVEL, logger="ai.backend.manager.sokovan")
+        deployment = MagicMock()
+        deployment.id = provisioning_route.deployment_id
+        mock_deployment_repo.get_deployments_by_ids.return_value = [deployment]
+        mock_deployment_repo.fetch_deployment_context.side_effect = RuntimeError("db bug")
+
+        with RouteRecorderContext.scope("test", entity_ids=[provisioning_route.route_id]):
+            result = await route_executor.provision_routes([provisioning_route])
+
+        assert len(result.errors) == 1
+        failures = _provisioning_failure_records(caplog)
+        assert len(failures) == 1
+        assert failures[0].levelno == logging.ERROR
+        assert failures[0].exc_info is not None
+        assert failures[0].__dict__["log_tag_route_id"] == str(provisioning_route.route_id)
 
     @pytest.mark.skip(
         reason=(

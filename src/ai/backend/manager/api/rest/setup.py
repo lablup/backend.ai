@@ -8,7 +8,7 @@ from .app import _mount_registry_tree
 from .routing import RouteRegistry
 
 if TYPE_CHECKING:
-    from ai.backend.manager.dependencies import DependencyResources
+    from ai.backend.manager.dependencies.composer import DependencyResources
 
 
 def setup_api(

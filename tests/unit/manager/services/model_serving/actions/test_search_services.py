@@ -9,7 +9,7 @@ import pytest
 from pydantic import HttpUrl
 
 from ai.backend.common.bgtask.bgtask import BackgroundTaskManager
-from ai.backend.common.contexts.user import with_user
+from ai.backend.common.contexts.user import with_user_context
 from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.user.types import UserData, UserRole
 from ai.backend.common.dto.manager.model_serving.request import ServiceFilterModel
@@ -33,7 +33,9 @@ from ai.backend.manager.services.model_serving.actions.search_services import (
 from ai.backend.manager.services.model_serving.adapter import ServiceSearchAdapter
 from ai.backend.manager.services.model_serving.services.model_serving import ModelServingService
 from ai.backend.manager.sokovan.deployment.deployment_controller import DeploymentController
-from ai.backend.manager.sokovan.scheduling_controller import SchedulingController
+from ai.backend.manager.sokovan.scheduling_controller.scheduling_controller import (
+    SchedulingController,
+)
 
 
 class TestSearchServices:
@@ -51,7 +53,7 @@ class TestSearchServices:
 
     @pytest.fixture(autouse=True)
     def set_user_context(self, user_data: UserData) -> Iterator[None]:
-        with with_user(user_data):
+        with with_user_context(user_data):
             yield
 
     @pytest.fixture

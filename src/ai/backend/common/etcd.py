@@ -57,7 +57,7 @@ from etcd_client import (
 )
 
 from ai.backend.common.data.config.types import EtcdConfigData
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 
 from .types import HostPortPair, QueueSentinel
 
@@ -69,7 +69,7 @@ __all__ = (
 
 Event = namedtuple("Event", "key event value")
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 class ConfigScopes(enum.Enum):
@@ -305,9 +305,9 @@ class AsyncEtcd(AbstractKVStore):
             # Make it plural.
             addrs = [addrs]
         log.debug(
-            'using etcd cluster at [{}] with namespace "{}"',
-            ", ".join(str(addr) for addr in addrs),
-            namespace,
+            "etcd cluster configured",
+            etcd_addrs=", ".join(str(addr) for addr in addrs),
+            namespace=namespace,
         )
         self.encoding = encoding
         self.watch_reconnect_intvl = watch_reconnect_intvl
@@ -811,8 +811,9 @@ class AsyncEtcd(AbstractKVStore):
                 ):
                     if retry_count > 0:
                         log.info(
-                            "watch(): successfully reconnected to Etcd server after %d retries",
-                            retry_count,
+                            "etcd watch reconnected",
+                            watch_type="key",
+                            retry_count=retry_count,
                         )
                         retry_count = 0
                     yield ev
@@ -824,13 +825,13 @@ class AsyncEtcd(AbstractKVStore):
                     retry_count += 1
                     delay = self._calc_watch_reconnect_delay(retry_count)
                     if retry_count == 1:
-                        log.warning("watch(): error while connecting to Etcd server, retrying...")
+                        log.warning("etcd watch connection failed, retrying", watch_type="key")
                     else:
                         log.debug(
-                            "watch(): still unable to connect to Etcd server (attempt %d),"
-                            " next retry in %.1fs",
-                            retry_count,
-                            delay,
+                            "etcd watch still unable to connect",
+                            watch_type="key",
+                            retry_count=retry_count,
+                            delay_sec=delay,
                         )
                     await asyncio.sleep(delay)
                     ended_without_error = False
@@ -869,8 +870,9 @@ class AsyncEtcd(AbstractKVStore):
                 ):
                     if retry_count > 0:
                         log.info(
-                            "watch_prefix(): successfully reconnected to Etcd server after %d retries",
-                            retry_count,
+                            "etcd watch reconnected",
+                            watch_type="prefix",
+                            retry_count=retry_count,
                         )
                         retry_count = 0
                     yield ev
@@ -882,15 +884,13 @@ class AsyncEtcd(AbstractKVStore):
                     retry_count += 1
                     delay = self._calc_watch_reconnect_delay(retry_count)
                     if retry_count == 1:
-                        log.warning(
-                            "watch_prefix(): error while connecting to Etcd server, retrying..."
-                        )
+                        log.warning("etcd watch connection failed, retrying", watch_type="prefix")
                     else:
                         log.debug(
-                            "watch_prefix(): still unable to connect to Etcd server (attempt %d),"
-                            " next retry in %.1fs",
-                            retry_count,
-                            delay,
+                            "etcd watch still unable to connect",
+                            watch_type="prefix",
+                            retry_count=retry_count,
+                            delay_sec=delay,
                         )
                     await asyncio.sleep(delay)
                     ended_without_error = False

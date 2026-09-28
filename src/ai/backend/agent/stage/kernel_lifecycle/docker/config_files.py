@@ -4,7 +4,6 @@ Config files stage for kernel lifecycle.
 This stage handles creation of environment and resource configuration files.
 """
 
-import asyncio
 import shutil
 from collections.abc import Mapping
 from dataclasses import dataclass
@@ -13,6 +12,7 @@ from pathlib import Path
 from typing import override
 
 from ai.backend.agent.resources import ComputerContext, KernelResourceSpec
+from ai.backend.common.asyncio import run_in_executor_with_context
 from ai.backend.common.stage.types import ArgsSpecGenerator, Provisioner, ProvisionStage
 from ai.backend.common.types import DeviceName
 
@@ -77,7 +77,6 @@ class ConfigFileProvisioner(Provisioner[ConfigFileSpec, ConfigFileResult]):
         return spec.config_dir / "resource_base.txt"
 
     async def _write_environ(self, spec: ConfigFileSpec) -> None:
-        loop = asyncio.get_running_loop()
         with StringIO() as buf:
             # Write basic environment variables
             for k, v in spec.environ.items():
@@ -87,14 +86,13 @@ class ConfigFileProvisioner(Provisioner[ConfigFileSpec, ConfigFileResult]):
             for k, v in spec.accelerator_envs.items():
                 buf.write(f"{k}={v}\n")
 
-            await loop.run_in_executor(
+            await run_in_executor_with_context(
                 None,
                 (self._environ_path(spec)).write_bytes,
                 buf.getvalue().encode("utf8"),
             )
 
     async def _write_resource_txt(self, spec: ConfigFileSpec) -> None:
-        loop = asyncio.get_running_loop()
         with StringIO() as buf:
             spec.resource_spec.write_to_file(buf)
 
@@ -106,7 +104,7 @@ class ConfigFileProvisioner(Provisioner[ConfigFileSpec, ConfigFileResult]):
                     for k, v in kvpairs.items():
                         buf.write(f"{k}={v}\n")
 
-            await loop.run_in_executor(
+            await run_in_executor_with_context(
                 None,
                 (self._resource_path(spec)).write_bytes,
                 buf.getvalue().encode("utf8"),
@@ -119,9 +117,8 @@ class ConfigFileProvisioner(Provisioner[ConfigFileSpec, ConfigFileResult]):
         resource_path = self._resource_path(spec)
         resource_base_path = self._resource_base_path(spec)
 
-        loop = asyncio.get_running_loop()
-        await loop.run_in_executor(None, shutil.copyfile, environ_path, environ_base_path)
-        await loop.run_in_executor(None, shutil.copyfile, resource_path, resource_base_path)
+        await run_in_executor_with_context(None, shutil.copyfile, environ_path, environ_base_path)
+        await run_in_executor_with_context(None, shutil.copyfile, resource_path, resource_base_path)
 
     @override
     async def teardown(self, resource: ConfigFileResult) -> None:

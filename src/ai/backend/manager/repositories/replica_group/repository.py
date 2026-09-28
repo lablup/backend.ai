@@ -12,17 +12,18 @@ from ai.backend.common.metrics.metric import DomainType, LayerType
 from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPolicy
 from ai.backend.common.resilience.policies.retry import BackoffStrategy, RetryArgs, RetryPolicy
 from ai.backend.common.resilience.resilience import Resilience
-from ai.backend.logging.utils import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.data.deployment.types import (
     DeploymentInfo,
     ReplicaGroupData,
     ReplicaGroupHandlerCategory,
 )
 from ai.backend.manager.models.clauses import QueryCondition
-from ai.backend.manager.models.endpoint import EndpointRow
-from ai.backend.manager.models.replica_group import ReplicaGroupRow
+from ai.backend.manager.models.endpoint.row import EndpointRow
+from ai.backend.manager.models.replica_group.row import ReplicaGroupRow
 from ai.backend.manager.models.specs.updater import GuardedDataUpdater
 from ai.backend.manager.repositories.ops.v2.replica_group.provider import ReplicaGroupOpsProvider
+from ai.backend.manager.repositories.replica_group.db_source.db_source import ReplicaGroupDBSource
 from ai.backend.manager.repositories.replica_group.types import (
     ApplyWritesResult,
     AutoscaleReconcileFetch,
@@ -37,9 +38,7 @@ from ai.backend.manager.views.replica_group import (
     ReplicaGroupScalingSchedulingView,
 )
 
-from .db_source import ReplicaGroupDBSource
-
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 replica_group_repository_resilience = Resilience(

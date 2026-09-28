@@ -32,7 +32,7 @@ from ai.backend.common.exception import (
     PermissionDeniedError,
 )
 from ai.backend.common.metrics.metric import GraphQLMetricObserver
-from ai.backend.logging.utils import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.plugin.network import NetworkPluginContext
 from ai.backend.manager.services.keypair_resource_policy.actions.lookup import (
@@ -80,7 +80,7 @@ set_input_object_type_default_value(Undefined)
 from ai.backend.common.types import QuotaScopeID, SessionId
 from ai.backend.manager.defs import DEFAULT_IMAGE_ARCH
 from ai.backend.manager.models.rbac import ContainerRegistryScope
-from ai.backend.manager.models.session import SessionRow
+from ai.backend.manager.models.session.row import SessionRow
 
 from .container_registry import (
     ContainerRegistry,
@@ -145,7 +145,7 @@ from ai.backend.manager.models.resource_group.row import (
     ResourceGroupRow,
     and_names,
 )
-from ai.backend.manager.models.vfolder import ensure_quota_scope_accessible_by_user
+from ai.backend.manager.models.vfolder.row import ensure_quota_scope_accessible_by_user
 from ai.backend.manager.models.virtual_entity.queries import user_scope_membership_exists
 from ai.backend.manager.repositories.ops.repository import OpsRepository
 from ai.backend.manager.secret.pool import KeyProviderPool
@@ -311,7 +311,7 @@ from .vfolder import (
 )
 from .viewer import Viewer
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 def _is_legacy_mutation(mutation_cls: Any) -> bool:
@@ -3410,9 +3410,9 @@ class GQLExceptionMiddleware:
 
     def _wrap_backend_error(self, e: BackendAIError) -> GraphQLError:
         if e.status_code // 100 == 4:
-            log.debug("GraphQL client error: {}", e)
+            log.trace("graphql client error", error_code=str(e.error_code()), error_message=str(e))
         elif e.status_code // 100 == 5:
-            log.exception("GraphQL Server error: {}", e)
+            log.exception("graphql server error", error_code=str(e.error_code()))
         return GraphQLError(
             message=str(e),
             extensions={
@@ -3421,7 +3421,7 @@ class GQLExceptionMiddleware:
         )
 
     def _wrap_unexpected_error(self, e: BaseException) -> GraphQLError:
-        log.exception("GraphQL unexpected error: {}", e)
+        log.exception("graphql unexpected error")
         return GraphQLError(
             message=str(e),
             extensions={

@@ -5,8 +5,9 @@ from collections.abc import Sequence
 from typing import override
 
 from ai.backend.common.events.dispatcher import EventProducer
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.data.deployment.types import (
+    RouteData,
     RouteHandlerCategory,
     RouteHealthStatus,
     RouteStatus,
@@ -16,13 +17,12 @@ from ai.backend.manager.data.deployment.types import (
     RouteTransitionTarget,
 )
 from ai.backend.manager.defs import LockID
-from ai.backend.manager.repositories.deployment.types import RouteData
 from ai.backend.manager.sokovan.deployment.route.executor import RouteExecutor
 from ai.backend.manager.sokovan.deployment.route.types import RouteExecutionResult
 
 from .base import RouteHandler
 
-log = BraceStyleAdapter(logging.getLogger(__name__))
+log = StructuredLogger(logging.getLogger(__name__))
 
 
 class RouteEvictionHandler(RouteHandler):
@@ -97,8 +97,6 @@ class RouteEvictionHandler(RouteHandler):
         Delegates to the executor, which combines the orphan-revision
         check with the scaling-group health policy in a single pass.
         """
-        log.debug("Checking {} routes for eviction", len(routes))
-
         # Use executor logic to filter routes by scaling group config
         return await self._route_executor.cleanup_routes_by_config(routes)
 
@@ -106,7 +104,4 @@ class RouteEvictionHandler(RouteHandler):
     async def post_process(self, result: RouteExecutionResult) -> None:
         """Handle post-processing after eviction check."""
         if result.successes:
-            log.info(
-                "Marked {} routes for eviction",
-                len(result.successes),
-            )
+            log.debug("routes marked for eviction", route_count=len(result.successes))

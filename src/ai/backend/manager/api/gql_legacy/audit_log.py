@@ -9,7 +9,7 @@ from dateutil.parser import parse as dtparse
 
 from ai.backend.common.data.entity.types import EntityType
 from ai.backend.manager.actions.types import OperationStatus
-from ai.backend.manager.models.audit_log import (
+from ai.backend.manager.models.audit_log.row import (
     AuditLogRow,
 )
 from ai.backend.manager.models.minilang import FieldSpecItem, OrderSpecItem

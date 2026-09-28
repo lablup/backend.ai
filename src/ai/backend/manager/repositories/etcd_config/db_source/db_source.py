@@ -9,8 +9,9 @@ from ai.backend.common.metrics.metric import DomainType, LayerType
 from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPolicy
 from ai.backend.common.resilience.policies.retry import BackoffStrategy, RetryArgs, RetryPolicy
 from ai.backend.common.resilience.resilience import Resilience
-from ai.backend.manager.models.agent import AgentRow, AgentStatus
-from ai.backend.manager.models.resource_slot import AgentResourceRow
+from ai.backend.manager.data.agent.types import AgentStatus
+from ai.backend.manager.models.agent.row import AgentRow
+from ai.backend.manager.models.resource_slot.row import AgentResourceRow
 
 if TYPE_CHECKING:
     from ai.backend.manager.models.utils import ExtendedAsyncSAEngine

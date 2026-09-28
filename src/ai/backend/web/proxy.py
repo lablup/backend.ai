@@ -17,9 +17,9 @@ from trafaret import DataError
 
 from ai.backend.client.exceptions import BackendAPIError, BackendClientError
 from ai.backend.client.request import Request, RequestContent, SessionMode
-from ai.backend.common.exception import InvalidAPIParameters
+from ai.backend.common.exception import InvalidAPIParameters, MalformedRequestBody
 from ai.backend.common.web.session import STORAGE_KEY, extra_config_headers, get_session
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.web.clients.endpoint_pool import AcquiredEndpoint, HealthyEndpointPool
 from ai.backend.web.config.unified import WebServerUnifiedConfig
 from ai.backend.web.errors import (
@@ -36,7 +36,7 @@ from .auth import (
 )
 from .stats import WebStats
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 HTTP_HEADERS_TO_FORWARD = [
     "Accept-Language",
@@ -91,8 +91,8 @@ class WebSocketProxy:
                 if msg.type in (aiohttp.WSMsgType.TEXT, aiohttp.WSMsgType.BINARY):
                     await self.send(msg.data, msg.type)
                 elif msg.type == aiohttp.WSMsgType.ERROR:
-                    log.error(
-                        "WebSocketProxy: connection closed with exception {}",
+                    log.debug(
+                        "websocket connection closed with exception: {}",
                         self.up_conn.exception(),
                     )
                     break
@@ -118,8 +118,8 @@ class WebSocketProxy:
             # here, server gracefully disconnected
         except asyncio.CancelledError:
             pass
-        except Exception as e:
-            log.error("WebSocketProxy: unexpected error: {}", e)
+        except Exception:
+            log.exception("websocket downstream relay failed")
         finally:
             await self.close_upstream()
 
@@ -311,14 +311,14 @@ async def _run_proxy_request(
             reason=e.reason,
         )
     except BackendClientError as e:
-        log.exception("{}: BackendClientError", log_prefix)
+        log.warning("upstream connection failed", exc_info=True, handler_name=log_prefix)
         raise ProxyTargetUnreachableError() from e
     except ClientConnectionError:
         log.warning(
-            "{}: ClientConnectionError - Client disconnected during proxying: method: {}, path: {}",
-            log_prefix,
-            frontend_rqst.method,
-            path,
+            "connection closed during proxying",
+            handler_name=log_prefix,
+            request_method=frontend_rqst.method,
+            request_path=path,
         )
         raise
     except web.HTTPException:
@@ -327,7 +327,7 @@ async def _run_proxy_request(
         # status code, not get rewritten to 500 by the generic catch below.
         raise
     except Exception as e:
-        log.exception("{}: unexpected error", log_prefix)
+        log.exception("unexpected proxy error", handler_name=log_prefix)
         raise UnexpectedProxyError() from e
 
 
@@ -401,7 +401,7 @@ async def web_handler_with_jwt(
     # Generate JWT token from session (needed for both HTTP and WebSocket)
     jwt_token = await generate_jwt_token_for_session(frontend_rqst)
     log.debug(
-        "web_handler_with_jwt: Generated JWT token (length: {}, path: {})",
+        "generated JWT token (length: {}, path: {})",
         len(jwt_token) if jwt_token else 0,
         frontend_rqst.path,
     )
@@ -509,13 +509,16 @@ async def web_handler_with_jwt(
             reason=e.reason,
         )
     except BackendClientError as e:
-        log.exception("web_handler_with_jwt: BackendClientError")
+        log.warning(
+            "upstream connection failed", exc_info=True, handler_name="web_handler_with_jwt"
+        )
         raise ProxyTargetUnreachableError() from e
     except ClientConnectionError:
         log.warning(
-            "web_handler_with_jwt: ClientConnectionError - Client disconnected during proxying: method: {}, path: {}",
-            frontend_rqst.method,
-            path,
+            "connection closed during proxying",
+            handler_name="web_handler_with_jwt",
+            request_method=frontend_rqst.method,
+            request_path=path,
         )
         raise
     except web.HTTPException:
@@ -524,7 +527,7 @@ async def web_handler_with_jwt(
         # status code, not get rewritten to 500 by the generic catch below.
         raise
     except Exception as e:
-        log.exception("web_handler_with_jwt: unexpected error")
+        log.exception("unexpected proxy error", handler_name="web_handler_with_jwt")
         raise UnexpectedProxyError() from e
 
 
@@ -590,7 +593,11 @@ async def web_plugin_handler(
                 if frontend_rqst.body_exists:
                     content = frontend_rqst.content
                     if path == "auth/signup":
-                        body = await frontend_rqst.json()
+                        try:
+                            body = await frontend_rqst.json()
+                        except json.JSONDecodeError as e:
+                            log.trace("signup request body is not valid JSON: {}", e)
+                            raise MalformedRequestBody() from e
                         body["domain"] = config.api.domain
                         content = json.dumps(body).encode("utf8")
                 request_api_version = frontend_rqst.headers.get("X-BackendAI-Version", None)
@@ -642,12 +649,12 @@ async def web_plugin_handler(
             reason=e.reason,
         )
     except BackendClientError as e:
-        log.exception("web_plugin_handler: BackendClientError")
+        log.warning("upstream connection failed", exc_info=True, handler_name="web_plugin_handler")
         raise ProxyTargetUnreachableError() from e
     except web.HTTPException:
         raise
     except Exception as e:
-        log.exception("web_plugin_handler: unexpected error")
+        log.exception("unexpected proxy error", handler_name="web_plugin_handler")
         raise UnexpectedProxyError() from e
 
 
@@ -765,10 +772,10 @@ async def websocket_handler(
             reason=e.reason,
         )
     except BackendClientError as e:
-        log.exception("websocket_handler: BackendClientError")
+        log.warning("upstream connection failed", exc_info=True, handler_name="websocket_handler")
         raise ProxyTargetUnreachableError() from e
     except web.HTTPException:
         raise
     except Exception as e:
-        log.exception("websocket_handler: unexpected error")
+        log.exception("unexpected proxy error", handler_name="websocket_handler")
         raise UnexpectedProxyError() from e

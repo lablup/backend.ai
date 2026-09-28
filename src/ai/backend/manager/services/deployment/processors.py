@@ -101,15 +101,19 @@ from ai.backend.manager.services.deployment.actions.create_legacy_deployment imp
     CreateLegacyDeploymentAction,
     CreateLegacyDeploymentActionResult,
 )
-from ai.backend.manager.services.deployment.actions.deployment_policy import (
-    GetDeploymentPolicyAction,
-    GetDeploymentPolicyActionResult,
-    SearchDeploymentPoliciesAction,
-    UpsertDeploymentPolicyAction,
-    UpsertDeploymentPolicyActionResult,
-)
 from ai.backend.manager.services.deployment.actions.deployment_policy.bulk_get_deployment_policies import (
     BulkGetDeploymentPoliciesAction,
+)
+from ai.backend.manager.services.deployment.actions.deployment_policy.get_deployment_policy import (
+    GetDeploymentPolicyAction,
+    GetDeploymentPolicyActionResult,
+)
+from ai.backend.manager.services.deployment.actions.deployment_policy.search_deployment_policies import (
+    SearchDeploymentPoliciesAction,
+)
+from ai.backend.manager.services.deployment.actions.deployment_policy.upsert_deployment_policy import (
+    UpsertDeploymentPolicyAction,
+    UpsertDeploymentPolicyActionResult,
 )
 from ai.backend.manager.services.deployment.actions.destroy_deployment import (
     DestroyDeploymentAction,
@@ -178,17 +182,17 @@ from ai.backend.manager.services.deployment.actions.replica.bulk_get_replicas im
 from ai.backend.manager.services.deployment.actions.replica_group.bulk_get_replica_groups import (
     BulkGetReplicaGroupsAction,
 )
-from ai.backend.manager.services.deployment.actions.revision_operations import (
+from ai.backend.manager.services.deployment.actions.revision_operations.activate_revision import (
     ActivateRevisionAction,
     ActivateRevisionActionResult,
 )
-from ai.backend.manager.services.deployment.actions.route import (
-    SearchRoutesAction,
-    UpdateRouteTrafficStatusAction,
-    UpdateRouteTrafficStatusActionResult,
-)
 from ai.backend.manager.services.deployment.actions.route.bulk_get_routes import (
     BulkGetRoutesAction,
+)
+from ai.backend.manager.services.deployment.actions.route.search_routes import SearchRoutesAction
+from ai.backend.manager.services.deployment.actions.route.update_route_traffic_status import (
+    UpdateRouteTrafficStatusAction,
+    UpdateRouteTrafficStatusActionResult,
 )
 from ai.backend.manager.services.deployment.actions.scoped_search import (
     ScopedSearchDeploymentsAction,

@@ -8,10 +8,10 @@ from typing import Any, override
 
 from ai.backend.common.dependencies import NonMonitorableDependencyProvider, ResourceT
 from ai.backend.common.etcd import AsyncEtcd
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.plugin.monitor import ManagerErrorPluginContext, ManagerStatsPluginContext
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 @dataclass
@@ -52,8 +52,8 @@ class ErrorMonitorDependency(MonitoringDependency[ManagerErrorPluginContext]):
             allowlist=setup_input.allowed_plugins,
         )
         log.info(
-            "ManagerErrorPluginContext initialized with plugins: {}",
-            list(ctx.plugins.keys()),
+            "error monitor plugins initialized",
+            plugin_names=", ".join(ctx.plugins.keys()),
         )
         try:
             yield ctx
@@ -82,8 +82,8 @@ class StatsMonitorDependency(MonitoringDependency[ManagerStatsPluginContext]):
             allowlist=setup_input.allowed_plugins,
         )
         log.info(
-            "ManagerStatsPluginContext initialized with plugins: {}",
-            list(ctx.plugins.keys()),
+            "stats monitor plugins initialized",
+            plugin_names=", ".join(ctx.plugins.keys()),
         )
         try:
             yield ctx

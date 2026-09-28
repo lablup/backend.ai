@@ -24,12 +24,13 @@ from ai.backend.common import validators as tx
 from ai.backend.common.etcd import AsyncEtcd, ConfigScopes
 from ai.backend.common.msgpack import DEFAULT_PACK_OPTS, DEFAULT_UNPACK_OPTS
 from ai.backend.common.utils import Fstab
-from ai.backend.logging import BraceStyleAdapter, Logger, LogLevel
+from ai.backend.logging import Logger, LogLevel
 from ai.backend.logging.config import LoggingConfig
+from ai.backend.logging.structured import StructuredLogger
 
 __version__ = (Path(__file__).parent.parent / "VERSION").read_text().strip()
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 shutdown_enabled = False
 
@@ -43,13 +44,13 @@ async def auth_middleware(
         try:
             return await handler(request)
         except FileNotFoundError as e:
-            log.info(repr(e))
+            log.trace("watcher target service not loaded", error_repr=repr(e))
             message = "Agent is not loaded with systemctl."
             return web.json_response({"message": message}, status=HTTPStatus.OK)
-        except Exception as e:
-            log.exception(repr(e))
+        except Exception:
+            log.exception("watcher request failed")
             raise
-    log.info("invalid requested token")
+    log.trace("watcher request rejected, invalid token")
     raise InvalidWatcherTokenError()
 
 
@@ -131,7 +132,7 @@ async def handle_agent_restart(request: web.Request) -> web.Response:
 
 
 async def handle_fstab_detail(request: web.Request) -> web.Response:
-    log.info("HANDLE_FSTAB_DETAIL")
+    log.trace("fstab detail requested")
     params = request.query
     fstab_path = params.get("fstab_path", "/etc/fstab")
     async with aiofiles.open(fstab_path) as fp:
@@ -140,7 +141,7 @@ async def handle_fstab_detail(request: web.Request) -> web.Response:
 
 
 async def handle_list_mounts(request: web.Request) -> web.Response:
-    log.info("HANDLE_LIST_MOUNT")
+    log.trace("mount list requested")
     config = request.app["config_server"]
     mount_prefix = await config.get("volumes/_mount")
     if mount_prefix is None:
@@ -153,7 +154,7 @@ async def handle_list_mounts(request: web.Request) -> web.Response:
 
 
 async def handle_mount(request: web.Request) -> web.Response:
-    log.info("HANDLE_MOUNT")
+    log.trace("mount requested")
     params = await request.json()
     config = request.app["config_server"]
     mount_prefix = await config.get("volumes/_mount")
@@ -182,9 +183,9 @@ async def handle_mount(request: web.Request) -> web.Response:
     err = raw_err.decode("utf8")
     await proc.wait()
     if err:
-        log.error("Mount error: " + err)
+        log.error("volume mount failed", mountpoint=mountpoint, stderr=err)
         return web.Response(text=err, status=HTTPStatus.INTERNAL_SERVER_ERROR)
-    log.info("Mounted " + params["name"] + " on " + mount_prefix)
+    log.info("volume mounted", volume_name=params["name"], mount_prefix=mount_prefix)
     if params["edit_fstab"]:
         fstab_path = params["fstab_path"] if params["fstab_path"] else "/etc/fstab"
         # FIXME: Remove ignore if https://github.com/python/typeshed/pull/4650 is released
@@ -197,7 +198,7 @@ async def handle_mount(request: web.Request) -> web.Response:
 
 
 async def handle_umount(request: web.Request) -> web.Response:
-    log.info("HANDLE_UMOUNT")
+    log.trace("unmount requested")
     params = await request.json()
     config = request.app["config_server"]
     mount_prefix = await config.get("volumes/_mount")
@@ -223,9 +224,9 @@ async def handle_umount(request: web.Request) -> web.Response:
     err = raw_err.decode("utf8")
     await proc.wait()
     if err:
-        log.error("Unmount error: " + err)
+        log.error("volume unmount failed", mountpoint=mountpoint, stderr=err)
         return web.Response(text=err, status=HTTPStatus.INTERNAL_SERVER_ERROR)
-    log.info("Unmounted " + params["name"] + " from " + mount_prefix)
+    log.info("volume unmounted", volume_name=params["name"], mount_prefix=mount_prefix)
     try:
         mountpoint.rmdir()  # delete directory if empty
     except OSError:
@@ -305,7 +306,7 @@ async def watcher_server(
             token = await etcd.get("config/watcher/token")
             if token is None:
                 token = "insecure"
-            log.debug("watcher authentication token: {}", token)
+            log.debug("watcher authentication token set", token=token)
             app["token"] = token
 
             app.middlewares.append(auth_middleware)
@@ -331,13 +332,13 @@ async def watcher_server(
                 ssl_context=ssl_ctx,
             )
             await site.start()
-            log.info("started at {}", watcher_addr)
+            log.info("watcher started", listen_addr=str(watcher_addr))
             try:
                 stop_sig = yield
             finally:
-                log.info("shutting down...")
+                log.info("watcher shutting down")
                 if stop_sig == signal.SIGALRM and shutdown_enabled:
-                    log.warning("shutting down the agent node!")
+                    log.warning("agent node shutting down")
                     await asyncio.to_thread(subprocess.run, ["shutdown", "-h", "now"])
                 await runner.cleanup()
 
@@ -443,8 +444,8 @@ def main(
 
     setproctitle(f"backend.ai: watcher {cfg['etcd']['namespace']}")
     with logger:
-        log.info("Backend.AI Agent Watcher {0}", __version__)
-        log.info("runtime: {0}", utils.env_info())
+        log.info("watcher starting", version=__version__)
+        log.info("runtime environment", runtime_info=utils.env_info())
 
         log_config = logging.getLogger("ai.backend.agent.config")
         log_config.debug("debug mode enabled.")
@@ -455,4 +456,4 @@ def main(
             args=(cfg, log_endpoint),
             stop_signals={signal.SIGINT, signal.SIGTERM, signal.SIGALRM},
         )
-        log.info("exit.")
+        log.info("watcher exited")

@@ -9,10 +9,10 @@ from ai.backend.common.artifact_storage import AbstractStorage
 from ai.backend.common.data.artifact.types import ArtifactRegistryType, VerificationStepResult
 from ai.backend.common.data.storage.registries.types import FileObjectData
 from ai.backend.common.data.storage.types import ArtifactStorageImportStep
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.storage.data.storage.types import ImportStepContext
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 @dataclass
@@ -108,9 +108,9 @@ class ImportStep[InputType](abc.ABC):
 
         try:
             await storage.delete_file(model_prefix)
-            log.info("[cleanup] Removed files: {}", model_prefix)
+            log.debug("[cleanup] Removed files: {}", model_prefix)
         except Exception as e:
-            log.warning("[cleanup] Failed to cleanup: {}: {!s}", model_prefix, e)
+            log.warning("import step files cleanup failed", exc_info=e, model_prefix=model_prefix)
 
 
 class ImportPipeline:
@@ -143,8 +143,7 @@ class ImportPipeline:
                     try:
                         await step.cleanup_stage(context)
                     except Exception:
-                        log.error("Failed to cleanup step {}", step.step_type)
-                        pass
+                        log.exception("import step cleanup failed", step_type=step.step_type)
 
         except Exception:
             # Cleanup completed steps in reverse order on failure
@@ -153,6 +152,5 @@ class ImportPipeline:
                     await step.cleanup_stage(context)
                 except Exception:
                     # Log cleanup failures but continue with other cleanups
-                    log.error("Failed to cleanup step {}", step.step_type)
-                    pass
+                    log.exception("import step cleanup failed", step_type=step.step_type)
             raise

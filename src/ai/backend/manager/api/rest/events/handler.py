@@ -29,12 +29,12 @@ from ai.backend.common.events.hub import WILDCARD
 from ai.backend.common.events.hub.propagators.cache import WithCachePropagator
 from ai.backend.common.events.types import EventCacheDomain, EventDomain
 from ai.backend.common.json import dump_json_str
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.dto.context import RequestCtx, UserContext
 from ai.backend.manager.errors.common import GenericForbidden
 from ai.backend.manager.errors.resource import NoCurrentTaskContext
 from ai.backend.manager.exceptions import InvalidArgument
-from ai.backend.manager.models.user import UserRole
+from ai.backend.manager.models.user.row import UserRole
 from ai.backend.manager.services.project.actions.lookup import LookupProjectAction
 from ai.backend.manager.services.session.actions.lookup import LookupSessionAction
 
@@ -45,7 +45,7 @@ if TYPE_CHECKING:
     from ai.backend.manager.services.project.processors import ProjectProcessors
     from ai.backend.manager.services.session.processors import SessionProcessors
 
-log: Final = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log: Final = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 @attrs.define(slots=True, auto_attribs=True)
@@ -221,8 +221,8 @@ class EventsHandler:
                     user_event = event.user_event()
                     if user_event is None:
                         log.warning(
-                            "Received unsupported user event: {}",
-                            event.event_name(),
+                            "unsupported user event received",
+                            event_name=event.event_name(),
                         )
                         continue
                     await resp.send(
@@ -231,9 +231,9 @@ class EventsHandler:
                         retry=user_event.retry_count(),
                     )
                     if user_event.is_close_event():
-                        log.debug(
-                            "Received close event: {}",
-                            user_event.event_name(),
+                        log.trace(
+                            "background task close event received",
+                            event_name=user_event.event_name(),
                         )
                         break
                 # Skip the trailing send if the client already disconnected

@@ -16,9 +16,9 @@ from ai.backend.manager.actions.registry.types import (
 )
 from ai.backend.manager.actions.types import ActionBacking, ActionGate, ActionKind
 from ai.backend.manager.actions.v2.relation.base import BaseRelationAction
-from ai.backend.manager.actions.v2.relation.monitor import RelationActionMonitor
+from ai.backend.manager.actions.v2.relation.monitor.base import RelationActionMonitor
 from ai.backend.manager.actions.v2.relation.processor import RelationActionProcessor
-from ai.backend.manager.actions.v2.relation.validator import RelationActionValidator
+from ai.backend.manager.actions.v2.relation.validator.base import RelationActionValidator
 
 __all__ = ("RelationGroup",)
 

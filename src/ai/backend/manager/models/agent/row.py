@@ -29,7 +29,7 @@ from ai.backend.manager.models.base import (
     CurvePublicKeyColumn,
     EnumType,
 )
-from ai.backend.manager.models.resource_slot import AgentResourceRow
+from ai.backend.manager.models.resource_slot.row import AgentResourceRow
 from ai.backend.manager.models.resource_slot.searchable_fields import (
     AgentResourceSearchableFields,
 )
