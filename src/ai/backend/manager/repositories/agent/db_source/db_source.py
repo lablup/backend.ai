@@ -9,10 +9,11 @@ from sqlalchemy.orm import selectinload
 
 from ai.backend.common.data.entity.agent import AgentUUID
 from ai.backend.common.data.entity.resource_group import ResourceGroupID
-from ai.backend.common.types import AgentId, ImageID
+from ai.backend.common.types import AgentId, ImageID, ResourceSlot
 from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.data.agent.types import (
     AgentData,
+    AgentDataForHeartbeatUpdate,
     AgentHeartbeatUpsert,
     UpsertResult,
 )
@@ -102,20 +103,45 @@ class AgentDBSource:
                 raise AgentNotFound(f"Agent with id {agent_id} not found")
             return AgentSearchableFields.own.to_data(agent_row)
 
+    async def _heartbeat_update_data(
+        self, session: AsyncSession, row: AgentRow
+    ) -> AgentDataForHeartbeatUpdate:
+        """The stored state a heartbeat is compared against.
+
+        ``available_slots`` is read from ``agent_resources`` in its own statement; the
+        remaining fields are columns of the agent row.
+        """
+        slot_rows = (
+            await session.execute(
+                sa.select(AgentResourceRow.slot_name, AgentResourceRow.capacity).where(
+                    AgentResourceRow.agent_id == row.id
+                )
+            )
+        ).all()
+        return AgentDataForHeartbeatUpdate(
+            status=row.status,
+            status_changed=row.status_changed,
+            available_slots=ResourceSlot({
+                slot_name: capacity for slot_name, capacity in slot_rows
+            }),
+            addr=row.addr,
+            public_host=row.public_host,
+            version=row.version,
+            architecture=row.architecture,
+            compute_plugins=row.compute_plugins,
+            public_key=row.public_key,
+            auto_terminate_abusing_kernel=row.auto_terminate_abusing_kernel,
+        )
+
     async def upsert_agent_with_state(self, upsert_data: AgentHeartbeatUpsert) -> UpsertResult:
         async with self._db.begin_session_read_committed() as session:
             query = (
-                sa.select(AgentRow)
-                .where(AgentRow.id == upsert_data.metadata.id)
-                .options(
-                    selectinload(AgentRow.agent_resource_rows).joinedload(
-                        AgentResourceRow.slot_type_row
-                    )
-                )
-                .with_for_update()
+                sa.select(AgentRow).where(AgentRow.id == upsert_data.metadata.id).with_for_update()
             )
             row: AgentRow | None = await session.scalar(query)
-            agent_data = row.to_heartbeat_update_data() if row is not None else None
+            agent_data = (
+                await self._heartbeat_update_data(session, row) if row is not None else None
+            )
             upsert_result = UpsertResult.from_state_comparison(agent_data, upsert_data)
 
             if row is not None:
