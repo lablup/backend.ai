@@ -1143,13 +1143,16 @@ class DataLoaders:
 
         async def load_fn(
             ids: list[RuntimeVariantPresetID],
-        ) -> list[RuntimeVariantPresetGQL | None]:
+        ) -> list[RuntimeVariantPresetGQL | Exception | None]:
             from ai.backend.manager.api.gql.runtime_variant_preset.types import (  # pants: no-infer-dep
                 RuntimeVariantPresetGQL as RVP,
             )
 
-            nodes = await adapter.batch_load_by_ids(ids)
-            return [RVP.from_pydantic(node) if node is not None else None for node in nodes]
+            dtos = await adapter.batch_load_by_ids(ids)
+            return [
+                dto if dto is None or isinstance(dto, Exception) else RVP.from_pydantic(dto)
+                for dto in dtos
+            ]
 
         return DataLoader(load_fn=load_fn)
 
@@ -1159,13 +1162,18 @@ class DataLoaders:
     ) -> DataLoader[PrometheusQueryPresetID, QueryDefinitionGQL | None]:
         adapter = self._adapters.prometheus_query_preset
 
-        async def load_fn(ids: list[PrometheusQueryPresetID]) -> list[QueryDefinitionGQL | None]:
+        async def load_fn(
+            ids: list[PrometheusQueryPresetID],
+        ) -> list[QueryDefinitionGQL | Exception | None]:
             from ai.backend.manager.api.gql.prometheus_query_preset.types.node import (  # pants: no-infer-dep
                 QueryDefinitionGQL as QD,
             )
 
             dtos = await adapter.batch_load_by_ids(ids)
-            return [QD.from_pydantic(dto) if dto is not None else None for dto in dtos]
+            return [
+                dto if dto is None or isinstance(dto, Exception) else QD.from_pydantic(dto)
+                for dto in dtos
+            ]
 
         return DataLoader(load_fn=load_fn)
 

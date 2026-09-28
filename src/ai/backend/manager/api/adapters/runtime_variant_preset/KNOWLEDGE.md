@@ -1,7 +1,7 @@
 ---
 name: runtime-variant-preset-adapter-scenarios
 type: reference
-description: what the runtime variant preset adapter guarantees, as scenarios; the rank the insert fills in, the value-type rule checked by the request on create and by the service on update, the batch read that is a search, the variant column with no foreign key in the ORM
+description: what the runtime variant preset adapter guarantees, as scenarios; the rank the insert fills in, the value-type rule checked by the request on create and by the service on update, the batch read that answers per id and refuses a missing id in place, the variant column with no foreign key in the ORM
 scope: src/ai/backend/manager/api/adapters/runtime_variant_preset
 keywords: [runtime variant preset, scenario, adapter, superadmin, rank, value type, flag, public read]
 generated:
@@ -68,8 +68,8 @@ status: draft
 이를 검증한다. 반면 생성 요청은 슈퍼관리자가 아니면 거부된다. 존재하지 않는 ID와 닿을 수 없는 ID는
 같은 이유로 거부된다.
 
-여러 ID를 한 번에 조회할 때는 ID 조건을 지정한 검색으로 실행한다. ID마다 개별 조회하는 방식이
-아니므로 존재하지 않는 ID가 있어도 요청 전체를 거부하지 않고 해당 위치에 빈 항목을 반환한다.
+여러 ID를 한 번에 조회할 때는 ID마다 응답하고 ID마다 권한을 검사한다. 존재하지 않는 ID가 있어도
+요청 전체를 거부하지 않고, 그 ID를 읽을 수 없다는 거부를 해당 위치에 담는다.
 
 인증되지 않은 호출은 시나리오로 두지 않는다. 시나리오는 언제나 미리 만들어 둔 사용자로 호출한다.
 

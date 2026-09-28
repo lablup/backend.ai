@@ -13,7 +13,7 @@ from ai.backend.manager.models.runtime_variant_preset.row import RuntimeVariantP
 from ai.backend.manager.models.runtime_variant_preset.searchable_fields import (
     RuntimeVariantPresetSearchableFields,
 )
-from ai.backend.manager.models.specs.querier import DataQuerier
+from ai.backend.manager.models.specs.querier import BulkEntityQuerier, DataQuerier
 
 
 @dataclass
@@ -32,6 +32,24 @@ class RuntimeVariantPresetQuerier(DataQuerier[RuntimeVariantPresetRow, RuntimeVa
     @override
     def entity_id_value(self) -> RuntimeVariantPresetID:
         return self.preset_id
+
+    @override
+    def to_data(self, row: RuntimeVariantPresetRow) -> RuntimeVariantPresetData:
+        return RuntimeVariantPresetSearchableFields.own.to_data(row)
+
+
+class BulkRuntimeVariantPresetQuerier(
+    BulkEntityQuerier[RuntimeVariantPresetRow, RuntimeVariantPresetData]
+):
+    """The runtime variant presets the caller named."""
+
+    @override
+    def row_class(self) -> type[RuntimeVariantPresetRow]:
+        return RuntimeVariantPresetRow
+
+    @override
+    def entity_id_column(self) -> InstrumentedAttribute[Any]:
+        return RuntimeVariantPresetRow.id
 
     @override
     def to_data(self, row: RuntimeVariantPresetRow) -> RuntimeVariantPresetData:

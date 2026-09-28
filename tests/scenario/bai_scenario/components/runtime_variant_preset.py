@@ -28,6 +28,7 @@ from ai.backend.manager.data.runtime_variant.types import RuntimeVariantData
 from ai.backend.manager.data.runtime_variant_preset.types import RuntimeVariantPresetData
 from ai.backend.manager.data.user.types import UserData
 from ai.backend.manager.errors.base.entity import EntityNotFoundError
+from ai.backend.manager.errors.permission import NotEnoughPermission
 from ai.backend.testutils.scenario_steps import (
     Answered,
     Given,
@@ -479,20 +480,22 @@ class TheFirstPageOfPresets(Then[ManyPresetsAndACaller, SearchRuntimeVariantPres
 
 
 @dataclass(frozen=True)
-class ThePresetsInTheOrderAsked(Then[ManyPresetsAndACaller, list[RuntimeVariantPresetNode | None]]):
-    """요청한 순서대로 반환한다. 존재하지 않는 ID의 위치에는 빈 항목을 반환한다."""
+class ThePresetsInTheOrderAsked(
+    Then[ManyPresetsAndACaller, list[RuntimeVariantPresetNode | Exception | None]]
+):
+    """요청한 순서대로 반환한다. 존재하지 않는 ID의 위치에는 거부를 담는다."""
 
     started: datetime
 
     @override
     def says(self) -> str:
-        return "요청한 순서대로 반환되며, 존재하지 않는 ID의 위치에는 빈 항목이 반환된다"
+        return "요청한 순서대로 반환되며, 존재하지 않는 ID의 위치에는 거부가 담긴다"
 
     @override
     def look(
         self,
         laid: ManyPresetsAndACaller,
-        answered: Answered[list[RuntimeVariantPresetNode | None]],
+        answered: Answered[list[RuntimeVariantPresetNode | Exception | None]],
     ) -> list[Verdict]:
         items = answered.response
         if items is None:
@@ -502,12 +505,12 @@ class ThePresetsInTheOrderAsked(Then[ManyPresetsAndACaller, list[RuntimeVariantP
         seen: list[Verdict] = [Same("len(items)", len(items), asked)]
         for i, expected in enumerate(laid.laid):
             got = items[i] if i < len(items) else None
-            if got is None:
+            if not isinstance(got, RuntimeVariantPresetNode):
                 seen.append(Same(f"items[{i}]", got, "노드"))
                 continue
             seen.extend(laid_preset_verdicts(f"items[{i}].", got, expected, written))
-        last = items[asked - 1] if len(items) >= asked else "없음"
-        seen.append(Same(f"items[{asked - 1}]", last, None))
+        last = items[asked - 1] if len(items) >= asked else None
+        seen.append(Refused(NotEnoughPermission, last if isinstance(last, BaseException) else None))
         return seen
 
 
