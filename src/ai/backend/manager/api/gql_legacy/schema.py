@@ -2297,7 +2297,7 @@ class Query(graphene.ObjectType):  # type: ignore[misc]
         return await ScalingGroup.load_all(info.context, is_active=is_active)
 
     @staticmethod
-    @scoped_query(autofill_user=False, user_key="access_key")
+    @scoped_query(autofill_user=True, user_key="access_key")
     async def resolve_accessible_scaling_groups(
         root: Any,
         info: graphene.ResolveInfo,
