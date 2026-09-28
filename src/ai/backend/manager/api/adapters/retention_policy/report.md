@@ -2,7 +2,15 @@
 
 [무엇을 보장하는가](/src/ai/backend/manager/api/adapters/retention_policy/KNOWLEDGE.md) · [어댑터](/src/ai/backend/manager/api/adapters/retention_policy/adapter.py)
 
-Not exercised by any scenario: batch_load_fields.
+시나리오: 완성
+
+- ops 로 구성 (6)
+  - create — 대표 성공 ✓ · 대표 실패 ✓
+  - delete — 대표 성공 ✓ · 대표 실패 ✓
+  - get — 대표 성공 ✓ · 대표 실패 ✓
+  - purge — 대표 성공 ✓ · 대표 실패 ✓
+  - search — 대표 성공 ✓ · 대표 실패 ✓
+  - update — 대표 성공 ✓ · 대표 실패 ✓
 
 ### creating
 

@@ -2,7 +2,10 @@
 
 [무엇을 보장하는가](/src/ai/backend/manager/api/adapters/service_catalog/KNOWLEDGE.md) · [어댑터](/src/ai/backend/manager/api/adapters/service_catalog/adapter.py)
 
-Not exercised by any scenario: batch_load_fields.
+시나리오: 완성
+
+- ops 로 구성 (1)
+  - admin_search — 대표 성공 ✓ · 대표 실패 ✓
 
 ### searching
 

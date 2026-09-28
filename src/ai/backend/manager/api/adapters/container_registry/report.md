@@ -2,7 +2,17 @@
 
 [무엇을 보장하는가](/src/ai/backend/manager/api/adapters/container_registry/KNOWLEDGE.md) · [어댑터](/src/ai/backend/manager/api/adapters/container_registry/adapter.py)
 
-Not exercised by any scenario: apply_global, batch_load_fields.
+시나리오: 미완 1 / 7
+
+- ops 로 구성 (2)
+  - admin_search — 대표 성공 ✓ · 대표 실패 ✓
+  - batch_load_by_ids — 대표 성공 ✓ · 대표 실패 ✓
+- 직접 구현 (5)
+  - admin_create — 성공 있음 2 · 실패 있음 2 (global_scope, relation)
+  - admin_delete — 성공 있음 2 · 실패 있음 2 (global_scope)
+  - admin_update — 성공 있음 3 · 실패 있음 4 (global_scope, membership, relation)
+  - apply_allowed_groups — 성공 있음 6 · 실패 있음 6 (relation)
+  - apply_global — 성공 없음 · 실패 없음 (membership) — SCENARIO-GAP
 
 ### allowing_projects
 

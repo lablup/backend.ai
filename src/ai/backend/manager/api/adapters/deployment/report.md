@@ -2,7 +2,54 @@
 
 [무엇을 보장하는가](/src/ai/backend/manager/api/adapters/deployment/KNOWLEDGE.md) · [어댑터](/src/ai/backend/manager/api/adapters/deployment/adapter.py)
 
-Not exercised by any scenario: activate_revision, admin_refresh_deployment_revisions, admin_search_replicas, batch_load_access_tokens_by_ids, batch_load_auto_scaling_rules_by_ids, batch_load_by_ids, batch_load_fields, batch_load_policies_by_endpoint_ids, batch_load_replicas_by_ids, batch_load_routes_by_ids, bulk_delete_access_tokens, bulk_delete_rules, create_access_token, create_rule, delete_access_token, delete_rule, get_access_token, get_policy, get_replica, get_rule, search_access_tokens, search_policies, search_replicas, search_routes, search_rules, update_route_traffic, update_rule, upsert_policy.
+시나리오: 미완 29 / 43
+
+- ops 로 구성 (21)
+  - admin_search — 대표 성공 ✓ · 대표 실패 ✓
+  - admin_search_replicas — 대표 성공 ✗ · 대표 실패 ✗ — SCENARIO-GAP
+  - admin_search_revisions — 대표 성공 ✓ · 대표 실패 ✓
+  - batch_load_access_tokens_by_ids — 대표 성공 ✗ · 대표 실패 ✗ — SCENARIO-GAP
+  - batch_load_auto_scaling_rules_by_ids — 대표 성공 ✗ · 대표 실패 ✗ — SCENARIO-GAP
+  - batch_load_by_ids — 대표 성공 ✗ · 대표 실패 ✗ — SCENARIO-GAP
+  - batch_load_policies_by_endpoint_ids — 대표 성공 ✗ · 대표 실패 ✗ — SCENARIO-GAP
+  - batch_load_replicas_by_ids — 대표 성공 ✗ · 대표 실패 ✗ — SCENARIO-GAP
+  - batch_load_revisions_by_ids — 대표 성공 ✓ · 대표 실패 ✗ — SCENARIO-GAP
+  - batch_load_routes_by_ids — 대표 성공 ✗ · 대표 실패 ✗ — SCENARIO-GAP
+  - get_access_token — 대표 성공 ✗ · 대표 실패 ✗ — SCENARIO-GAP
+  - get_replica — 대표 성공 ✗ · 대표 실패 ✗ — SCENARIO-GAP
+  - get_revision — 대표 성공 ✓ · 대표 실패 ✓
+  - project_search — 대표 성공 ✓ · 대표 실패 ✓
+  - scoped_search — 대표 성공 ✓ · 대표 실패 ✓
+  - search_access_tokens — 대표 성공 ✗ · 대표 실패 ✗ — SCENARIO-GAP
+  - search_policies — 대표 성공 ✗ · 대표 실패 ✗ — SCENARIO-GAP
+  - search_replicas — 대표 성공 ✗ · 대표 실패 ✗ — SCENARIO-GAP
+  - search_revisions — 대표 성공 ✓ · 대표 실패 ✓
+  - search_routes — 대표 성공 ✗ · 대표 실패 ✗ — SCENARIO-GAP
+  - search_rules — 대표 성공 ✗ · 대표 실패 ✗ — SCENARIO-GAP
+- ops + 직접 구현 (1)
+  - get_current_revision — 성공 없음 · 실패 있음 1 (get_ops, single_entity) — SCENARIO-GAP
+- 직접 구현 (21)
+  - activate_revision — 성공 없음 · 실패 없음 (single_entity) — SCENARIO-GAP
+  - add_revision — 성공 있음 4 · 실패 있음 7 (single_entity)
+  - admin_refresh_deployment_revisions — 성공 없음 · 실패 없음 (global_scope) — SCENARIO-GAP
+  - bulk_delete_access_tokens — 성공 없음 · 실패 없음 (partial_bulk_field) — SCENARIO-GAP
+  - bulk_delete_rules — 성공 없음 · 실패 없음 (partial_bulk) — SCENARIO-GAP
+  - create — 성공 있음 3 · 실패 있음 2 (scope)
+  - create_access_token — 성공 없음 · 실패 없음 (single_entity) — SCENARIO-GAP
+  - create_rule — 성공 없음 · 실패 없음 (single_entity) — SCENARIO-GAP
+  - delete — 성공 있음 2 · 실패 있음 2 (single_entity)
+  - delete_access_token — 성공 없음 · 실패 없음 (single_field) — SCENARIO-GAP
+  - delete_rule — 성공 없음 · 실패 없음 (single_entity) — SCENARIO-GAP
+  - get — 성공 있음 2 · 실패 있음 3 (single_entity)
+  - get_policy — 성공 없음 · 실패 없음 (single_entity) — SCENARIO-GAP
+  - get_rule — 성공 없음 · 실패 없음 (single_entity) — SCENARIO-GAP
+  - replace_options — 성공 있음 2 · 실패 있음 3 (single_entity)
+  - search_revision_resource_slots — 성공 있음 1 · 실패 있음 1 (single_field)
+  - sync_replicas — 성공 있음 1 · 실패 있음 1 (single_entity)
+  - update — 성공 있음 5 · 실패 있음 2 (single_entity)
+  - update_route_traffic — 성공 없음 · 실패 없음 (single_field) — SCENARIO-GAP
+  - update_rule — 성공 없음 · 실패 없음 (single_entity) — SCENARIO-GAP
+  - upsert_policy — 성공 없음 · 실패 없음 (single_entity) — SCENARIO-GAP
 
 ### adding_revisions
 

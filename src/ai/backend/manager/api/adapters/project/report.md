@@ -2,7 +2,24 @@
 
 [무엇을 보장하는가](/src/ai/backend/manager/api/adapters/project/KNOWLEDGE.md) · [어댑터](/src/ai/backend/manager/api/adapters/project/adapter.py)
 
-Not exercised by any scenario: admin_delete, admin_purge, admin_restore, admin_search, admin_update, batch_load_by_ids, batch_load_fields, get, scoped_search, search_by_domain_name, search_by_user, unassign_users.
+시나리오: 미완 12 / 13
+
+- ops 로 구성 (8)
+  - admin_delete — 대표 성공 ✗ · 대표 실패 ✗ — SCENARIO-GAP
+  - admin_restore — 대표 성공 ✗ · 대표 실패 ✗ — SCENARIO-GAP
+  - admin_search — 대표 성공 ✗ · 대표 실패 ✗ — SCENARIO-GAP
+  - batch_load_by_ids — 대표 성공 ✗ · 대표 실패 ✗ — SCENARIO-GAP
+  - get — 대표 성공 ✗ · 대표 실패 ✗ — SCENARIO-GAP
+  - scoped_search — 대표 성공 ✗ · 대표 실패 ✗ — SCENARIO-GAP
+  - search_by_domain_name — 대표 성공 ✗ · 대표 실패 ✗ — SCENARIO-GAP
+  - search_by_user — 대표 성공 ✗ · 대표 실패 ✗ — SCENARIO-GAP
+- ops + 직접 구현 (2)
+  - assign_users — 성공 있음 1 · 실패 없음 (atomic_bulk_get_ops, scope) — SCENARIO-GAP
+  - unassign_users — 성공 없음 · 실패 없음 (atomic_bulk_get_ops, scope) — SCENARIO-GAP
+- 직접 구현 (3)
+  - admin_create — 성공 있음 1 · 실패 있음 1 (scope)
+  - admin_purge — 성공 없음 · 실패 없음 (single_entity) — SCENARIO-GAP
+  - admin_update — 성공 없음 · 실패 없음 (single_entity) — SCENARIO-GAP
 
 ### project
 

@@ -2,7 +2,27 @@
 
 [무엇을 보장하는가](/src/ai/backend/manager/api/adapters/resource_policy/KNOWLEDGE.md) · [어댑터](/src/ai/backend/manager/api/adapters/resource_policy/adapter.py)
 
-Not exercised by any scenario: batch_load_fields, get_project_resource_policy.
+시나리오: 미완 1 / 18
+
+- ops 로 구성 (18)
+  - admin_create_keypair_resource_policy — 대표 성공 ✓ · 대표 실패 ✓
+  - admin_create_project_resource_policy — 대표 성공 ✓ · 대표 실패 ✓
+  - admin_create_user_resource_policy — 대표 성공 ✓ · 대표 실패 ✓
+  - admin_delete_keypair_resource_policy — 대표 성공 ✓ · 대표 실패 ✓
+  - admin_delete_project_resource_policy — 대표 성공 ✓ · 대표 실패 ✓
+  - admin_delete_user_resource_policy — 대표 성공 ✓ · 대표 실패 ✓
+  - admin_get_keypair_resource_policy — 대표 성공 ✓ · 대표 실패 ✓
+  - admin_get_project_resource_policy — 대표 성공 ✓ · 대표 실패 ✓
+  - admin_get_user_resource_policy — 대표 성공 ✓ · 대표 실패 ✓
+  - admin_search_keypair_resource_policies — 대표 성공 ✓ · 대표 실패 ✓
+  - admin_search_project_resource_policies — 대표 성공 ✓ · 대표 실패 ✓
+  - admin_search_user_resource_policies — 대표 성공 ✓ · 대표 실패 ✓
+  - admin_update_keypair_resource_policy — 대표 성공 ✓ · 대표 실패 ✓
+  - admin_update_project_resource_policy — 대표 성공 ✓ · 대표 실패 ✓
+  - admin_update_user_resource_policy — 대표 성공 ✓ · 대표 실패 ✓
+  - get_my_keypair_resource_policy — 대표 성공 ✓ · 대표 실패 ✓
+  - get_my_user_resource_policy — 대표 성공 ✓ · 대표 실패 ✓
+  - get_project_resource_policy — 대표 성공 ✗ · 대표 실패 ✗ — SCENARIO-GAP
 
 ### creating
 

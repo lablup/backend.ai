@@ -2,7 +2,15 @@
 
 [무엇을 보장하는가](/src/ai/backend/manager/api/adapters/user/KNOWLEDGE.md) · [어댑터](/src/ai/backend/manager/api/adapters/user/adapter.py)
 
-Not exercised by any scenario: batch_load_fields, resolve_domain_id.
+시나리오: 완성
+
+- ops 로 구성 (2)
+  - admin_search — 대표 성공 ✓ · 대표 실패 ✓
+  - my_search — 대표 성공 ✓ · 대표 실패 ✓
+- 직접 구현 (3)
+  - admin_revoke — 성공 있음 1 · 실패 있음 2 (global_scope)
+  - admin_unblock_user — 성공 있음 2 · 실패 있음 1 (global_scope)
+  - my_revoke — 성공 있음 1 · 실패 있음 3 (single_field)
 
 ### creating
 

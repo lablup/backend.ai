@@ -2,7 +2,23 @@
 
 [무엇을 보장하는가](/src/ai/backend/manager/api/adapters/image/KNOWLEDGE.md) · [어댑터](/src/ai/backend/manager/api/adapters/image/adapter.py)
 
-Not exercised by any scenario: batch_load_fields.
+시나리오: 완성
+
+- ops 로 구성 (6)
+  - admin_search — 대표 성공 ✓ · 대표 실패 ✓
+  - admin_search_images_gql — 대표 성공 ✓ · 대표 실패 ✓
+  - batch_load_aliases_by_ids — 대표 성공 ✓ · 대표 실패 ✓
+  - batch_load_by_ids — 대표 성공 ✓ · 대표 실패 ✓
+  - scoped_search — 대표 성공 ✓ · 대표 실패 ✓
+  - scoped_search_aliases — 대표 성공 ✓ · 대표 실패 ✓
+- 직접 구현 (7)
+  - admin_alias — 성공 있음 1 · 실패 있음 3 (global_scope)
+  - admin_dealias — 성공 있음 1 · 실패 있음 2 (global_scope)
+  - admin_forget — 성공 있음 2 · 실패 있음 5 (single_entity)
+  - admin_purge — 성공 있음 3 · 실패 있음 3 (single_entity)
+  - admin_restore — 성공 있음 2 · 실패 있음 2 (single_entity)
+  - admin_search_image_aliases — 성공 있음 3 · 실패 있음 1 (global_scope)
+  - admin_update — 성공 있음 6 · 실패 있음 2 (global_scope)
 
 ### aliasing
 

@@ -2,7 +2,12 @@
 
 [무엇을 보장하는가](/src/ai/backend/manager/api/adapters/client_ip_masking/KNOWLEDGE.md) · [어댑터](/src/ai/backend/manager/api/adapters/client_ip_masking/adapter.py)
 
-Not exercised by any scenario: batch_load_fields.
+시나리오: 완성
+
+- ops 로 구성 (3)
+  - admin_purge — 대표 성공 ✓ · 대표 실패 ✓
+  - admin_search — 대표 성공 ✓ · 대표 실패 ✓
+  - admin_upsert — 대표 성공 ✓ · 대표 실패 ✓
 
 ### retiring
 

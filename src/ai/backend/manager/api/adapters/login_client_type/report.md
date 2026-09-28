@@ -2,7 +2,14 @@
 
 [무엇을 보장하는가](/src/ai/backend/manager/api/adapters/login_client_type/KNOWLEDGE.md) · [어댑터](/src/ai/backend/manager/api/adapters/login_client_type/adapter.py)
 
-Not exercised by any scenario: batch_load_fields.
+시나리오: 미완 1 / 5
+
+- ops 로 구성 (5)
+  - admin_create — 대표 성공 ✓ · 대표 실패 ✓
+  - admin_delete — 대표 성공 ✓ · 대표 실패 ✓
+  - admin_update — 대표 성공 ✓ · 대표 실패 ✓
+  - get — 대표 성공 ✓ · 대표 실패 ✓
+  - search — 대표 성공 ✓ · 대표 실패 ✗ — SCENARIO-GAP
 
 ### creating
 

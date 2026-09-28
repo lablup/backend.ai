@@ -2,7 +2,11 @@
 
 [무엇을 보장하는가](/src/ai/backend/manager/api/adapters/app_config/KNOWLEDGE.md) · [어댑터](/src/ai/backend/manager/api/adapters/app_config/adapter.py)
 
-Not exercised by any scenario: batch_load_fields.
+시나리오: 미완 1 / 2
+
+- 직접 구현 (2)
+  - my_app_configs — 성공 있음 11 · 실패 있음 1 (scope)
+  - public_app_configs — 성공 있음 5 · 실패 없음 (anonymous_scope) — SCENARIO-GAP
 
 ### reading_mine
 

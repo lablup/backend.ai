@@ -2,7 +2,32 @@
 
 [무엇을 보장하는가](/src/ai/backend/manager/api/adapters/session/KNOWLEDGE.md) · [어댑터](/src/ai/backend/manager/api/adapters/session/adapter.py)
 
-Not exercised by any scenario: admin_search_kernels, batch_load_by_ids, batch_load_fields, batch_load_kernels_by_ids, batch_resource_allocation_by_kernel, batch_resource_allocation_by_session, compute_schedule, enqueue, exclude_idle_checks, get, get_logs, gql_search_by_project, include_idle_checks, project_search, scoped_search, search_kernels_by_agent, search_kernels_by_session, search_sessions_by_agent, shutdown_service, start_service, terminate, update.
+시나리오: 미완 21 / 22
+
+- ops + 직접 구현 (10)
+  - admin_search — 성공 있음 1 · 실패 있음 1 (global_searcher_ops, partial_bulk)
+  - admin_search_kernels — 성공 없음 · 실패 없음 (atomic_bulk_field, global_searcher_ops) — SCENARIO-GAP
+  - batch_load_by_ids — 성공 없음 · 실패 없음 (partial_bulk, partial_bulk_get_ops) — SCENARIO-GAP
+  - batch_load_kernels_by_ids — 성공 없음 · 실패 없음 (atomic_bulk_field, partial_bulk_get_ops) — SCENARIO-GAP
+  - gql_search_by_project — 성공 없음 · 실패 없음 (partial_bulk, scoped_search_ops) — SCENARIO-GAP
+  - project_search — 성공 없음 · 실패 없음 (partial_bulk, scoped_search_ops) — SCENARIO-GAP
+  - scoped_search — 성공 없음 · 실패 없음 (partial_bulk, scoped_search_ops) — SCENARIO-GAP
+  - search_kernels_by_agent — 성공 없음 · 실패 없음 (atomic_bulk_field, global_searcher_ops) — SCENARIO-GAP
+  - search_kernels_by_session — 성공 없음 · 실패 없음 (atomic_bulk_field, atomic_bulk_scoped_search_ops) — SCENARIO-GAP
+  - search_sessions_by_agent — 성공 없음 · 실패 없음 (global_searcher_ops, partial_bulk) — SCENARIO-GAP
+- 직접 구현 (12)
+  - batch_resource_allocation_by_kernel — 성공 없음 · 실패 없음 (atomic_bulk_field) — SCENARIO-GAP
+  - batch_resource_allocation_by_session — 성공 없음 · 실패 없음 (partial_bulk) — SCENARIO-GAP
+  - compute_schedule — 성공 없음 · 실패 없음 (single_entity) — SCENARIO-GAP
+  - enqueue — 성공 없음 · 실패 없음 (partial_bulk, scope) — SCENARIO-GAP
+  - exclude_idle_checks — 성공 없음 · 실패 없음 (legacy_partial_bulk) — SCENARIO-GAP
+  - get — 성공 없음 · 실패 없음 (partial_bulk, single_entity) — SCENARIO-GAP
+  - get_logs — 성공 없음 · 실패 없음 (single_entity) — SCENARIO-GAP
+  - include_idle_checks — 성공 없음 · 실패 없음 (legacy_partial_bulk) — SCENARIO-GAP
+  - shutdown_service — 성공 없음 · 실패 없음 (single_entity) — SCENARIO-GAP
+  - start_service — 성공 없음 · 실패 없음 (single_entity) — SCENARIO-GAP
+  - terminate — 성공 없음 · 실패 없음 (partial_bulk) — SCENARIO-GAP
+  - update — 성공 없음 · 실패 없음 (partial_bulk, single_entity) — SCENARIO-GAP
 
 ### session
 

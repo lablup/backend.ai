@@ -2,7 +2,18 @@
 
 [무엇을 보장하는가](/src/ai/backend/manager/api/adapters/runtime_variant/KNOWLEDGE.md) · [어댑터](/src/ai/backend/manager/api/adapters/runtime_variant/adapter.py)
 
-Not exercised by any scenario: batch_load_fields.
+시나리오: 미완 2 / 8
+
+- ops 로 구성 (6)
+  - batch_load_by_ids — 대표 성공 ✓ · 대표 실패 ✓
+  - create — 대표 성공 ✓ · 대표 실패 ✓
+  - get — 대표 성공 ✓ · 대표 실패 ✓
+  - resolve_by_name — 대표 성공 ✓ · 대표 실패 ✓
+  - search — 대표 성공 ✓ · 대표 실패 ✗ — SCENARIO-GAP
+  - update — 대표 성공 ✓ · 대표 실패 ✓
+- 직접 구현 (2)
+  - bulk_delete — 성공 있음 3 · 실패 없음 (partial_bulk) — SCENARIO-GAP
+  - delete — 성공 있음 2 · 실패 있음 2 (single_entity)
 
 ### creating
 
