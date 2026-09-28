@@ -62,6 +62,7 @@ from ai.backend.common.dto.manager.auth.types import (
     RequireTwoFactorAuthResponse,
     RequireTwoFactorRegistrationResponse,
 )
+from ai.backend.common.endpoint_pool.exceptions import NoHealthyEndpointError
 from ai.backend.common.endpoint_pool.pool import HealthyEndpointPool
 from ai.backend.common.endpoint_pool.strategy import build_endpoint_selection_strategy
 from ai.backend.common.endpoint_pool.types import AcquiredEndpoint, EndpointPoolSpec
@@ -280,6 +281,8 @@ async def update_password_no_auth(request: web.Request) -> web.Response:
             creds["username"],
             client_ip,
         )
+    except NoHealthyEndpointError as e:
+        raise ManagerConnectionUnavailable(extra_msg=e.extra_msg) from e
     except BackendClientError as e:
         # This is error, not failed login, so we should not update login history.
         raise ProxyTargetUnreachableError(str(e)) from e
@@ -528,6 +531,8 @@ async def login_handler(request: web.Request) -> web.Response:
                 raise UnexpectedAuthResponseError(
                     f"Unexpected auth result type: {type(auth_result)}"
                 )
+    except NoHealthyEndpointError as e:
+        raise ManagerConnectionUnavailable(extra_msg=e.extra_msg) from e
     except BackendClientError as e:
         # This is error, not failed login, so we should not update login history.
         raise ProxyTargetUnreachableError(str(e)) from e
@@ -746,6 +751,8 @@ async def token_login_handler(request: web.Request) -> web.Response:
         session["token"] = stored_token  # store full token
         result["authenticated"] = True
         result["data"] = public_return  # store public info from token
+    except NoHealthyEndpointError as e:
+        raise ManagerConnectionUnavailable(extra_msg=e.extra_msg) from e
     except BackendClientError as e:
         raise ProxyTargetUnreachableError(str(e)) from e
     except BackendAPIError as e:
@@ -883,7 +890,6 @@ async def manager_pool_ctx(
         )
 
     pool = HealthyEndpointPool(
-        unavailable_error_factory=ManagerConnectionUnavailable,
         endpoints=[str(endpoint) for endpoint in config.api.endpoint],
         spec=EndpointPoolSpec(
             probe_path=config.api.health_check_probe_path,
@@ -927,7 +933,6 @@ async def apollo_router_pool_ctx(
         )
 
     pool = HealthyEndpointPool(
-        unavailable_error_factory=ManagerConnectionUnavailable,
         endpoints=list(config.apollo_router.endpoints),
         spec=EndpointPoolSpec(
             probe_path=config.apollo_router.health_check_probe_path,

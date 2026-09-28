@@ -30,7 +30,6 @@ from ai.backend.manager.clients.storage_proxy.manager_facing_client import (
 from ai.backend.manager.config.unified import VolumesConfig
 from ai.backend.manager.defs import is_noop_host
 from ai.backend.manager.errors.storage import (
-    StorageProxyConnectionError,
     StorageProxyNotFound,
 )
 
@@ -87,7 +86,6 @@ class StorageSessionManager:
                     probe_session_factory=partial(
                         self._create_probe_session, ssl_verify=proxy_config.ssl_verify
                     ),
-                    unavailable_error_factory=partial(self._unavailable_error, proxy_name),
                 ),
                 sftp_resource_groups=proxy_config.sftp_resource_groups or [],
             )
@@ -100,10 +98,6 @@ class StorageSessionManager:
             base_url=yarl.URL(endpoint).origin(),
             connector=aiohttp.TCPConnector(ssl=ssl_verify),
         )
-
-    @staticmethod
-    def _unavailable_error(proxy_name: str, reason: str) -> StorageProxyConnectionError:
-        return StorageProxyConnectionError(extra_msg=f"Storage proxy {proxy_name!r}: {reason}")
 
     def _setup_manager_facing_clients(
         self,
@@ -120,6 +114,7 @@ class StorageSessionManager:
                     StorageProxyClientArgs(
                         endpoint_pool=self._proxies[proxy_name].endpoint_pool,
                         secret=proxy_config.secret,
+                        proxy_name=proxy_name,
                     ),
                 ),
                 timeout_config=proxy_config.timeouts,

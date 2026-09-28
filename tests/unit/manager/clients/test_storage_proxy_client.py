@@ -26,7 +26,6 @@ from ai.backend.manager.clients.storage_proxy.manager_facing_client import (
 )
 from ai.backend.manager.config.unified import StorageProxyClientTimeoutConfig
 from ai.backend.manager.errors.storage import (
-    StorageProxyConnectionError,
     StorageProxyTimeoutError,
     VFolderNotFound,
     VFolderOperationFailed,
@@ -59,7 +58,6 @@ async def storage_proxy_client_factory(
             spec=EndpointPoolSpec("/readyz", 3600, 1, 60, 2),
             strategy=RoundRobinStrategy(),
             probe_session_factory=lambda endpoint: ClientSession(base_url=endpoint),
-            unavailable_error_factory=StorageProxyConnectionError,
         )
         pools.append(pool)
         return StorageProxyHTTPClient(
@@ -67,6 +65,7 @@ async def storage_proxy_client_factory(
             args=StorageProxyClientArgs(
                 endpoint_pool=pool,
                 secret="test-secret",
+                proxy_name="test",
             ),
         )
 

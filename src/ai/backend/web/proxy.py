@@ -17,6 +17,7 @@ from trafaret import DataError
 
 from ai.backend.client.exceptions import BackendAPIError, BackendClientError
 from ai.backend.client.request import Request, RequestContent, SessionMode
+from ai.backend.common.endpoint_pool.exceptions import NoHealthyEndpointError
 from ai.backend.common.endpoint_pool.pool import HealthyEndpointPool
 from ai.backend.common.endpoint_pool.types import AcquiredEndpoint
 from ai.backend.common.exception import InvalidAPIParameters, MalformedRequestBody
@@ -25,6 +26,7 @@ from ai.backend.logging.structured import StructuredLogger
 from ai.backend.web.config.unified import WebServerUnifiedConfig
 from ai.backend.web.errors import (
     InvalidAPIConfigurationError,
+    ManagerConnectionUnavailable,
     ProxyTargetUnreachableError,
     UnexpectedProxyError,
 )
@@ -322,6 +324,8 @@ async def _run_proxy_request(
             request_path=path,
         )
         raise
+    except NoHealthyEndpointError as e:
+        raise ManagerConnectionUnavailable(extra_msg=e.extra_msg) from e
     except web.HTTPException:
         # BackendAIError instances that double-inherit aiohttp.web.HTTPException
         # (e.g. ManagerConnectionUnavailable -> 503) must surface as their own
@@ -522,6 +526,8 @@ async def web_handler_with_jwt(
             request_path=path,
         )
         raise
+    except NoHealthyEndpointError as e:
+        raise ManagerConnectionUnavailable(extra_msg=e.extra_msg) from e
     except web.HTTPException:
         # BackendAIError instances that double-inherit aiohttp.web.HTTPException
         # (e.g. ManagerConnectionUnavailable -> 503) must surface as their own
@@ -652,6 +658,8 @@ async def web_plugin_handler(
     except BackendClientError as e:
         log.warning("upstream connection failed", exc_info=True, handler_name="web_plugin_handler")
         raise ProxyTargetUnreachableError() from e
+    except NoHealthyEndpointError as e:
+        raise ManagerConnectionUnavailable(extra_msg=e.extra_msg) from e
     except web.HTTPException:
         raise
     except Exception as e:
@@ -775,6 +783,8 @@ async def websocket_handler(
     except BackendClientError as e:
         log.warning("upstream connection failed", exc_info=True, handler_name="websocket_handler")
         raise ProxyTargetUnreachableError() from e
+    except NoHealthyEndpointError as e:
+        raise ManagerConnectionUnavailable(extra_msg=e.extra_msg) from e
     except web.HTTPException:
         raise
     except Exception as e:

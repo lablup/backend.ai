@@ -17,7 +17,6 @@ from ai.backend.web.clients.manager_pool import (
     ManagerEndpointsHealthChecker,
     ManagerPoolGateHealthChecker,
 )
-from ai.backend.web.errors import ManagerConnectionUnavailable
 
 
 def _make_spec() -> EndpointPoolSpec:
@@ -65,7 +64,6 @@ async def _drive_unhealthy(pool: HealthyEndpointPool, endpoint: str) -> None:
 class TestManagerPoolGateHealthChecker:
     async def test_targets_manager_service_group(self) -> None:
         pool = HealthyEndpointPool(
-            unavailable_error_factory=ManagerConnectionUnavailable,
             endpoints=["http://m1"],
             spec=_make_spec(),
             strategy=RoundRobinStrategy(),
@@ -77,7 +75,6 @@ class TestManagerPoolGateHealthChecker:
 
     async def test_healthy_when_any_endpoint_is_up(self) -> None:
         pool = HealthyEndpointPool(
-            unavailable_error_factory=ManagerConnectionUnavailable,
             endpoints=["http://m1", "http://m2"],
             spec=_make_spec(),
             strategy=RoundRobinStrategy(),
@@ -94,7 +91,6 @@ class TestManagerPoolGateHealthChecker:
 
     async def test_unhealthy_when_no_endpoint_is_up(self) -> None:
         pool = HealthyEndpointPool(
-            unavailable_error_factory=ManagerConnectionUnavailable,
             endpoints=["http://m1", "http://m2"],
             spec=_make_spec(),
             strategy=RoundRobinStrategy(),
@@ -114,7 +110,6 @@ class TestManagerPoolGateHealthChecker:
 class TestManagerEndpointsHealthChecker:
     async def test_targets_manager_endpoints_service_group(self) -> None:
         pool = HealthyEndpointPool(
-            unavailable_error_factory=ManagerConnectionUnavailable,
             endpoints=["http://m1"],
             spec=_make_spec(),
             strategy=RoundRobinStrategy(),
@@ -126,7 +121,6 @@ class TestManagerEndpointsHealthChecker:
 
     async def test_emits_one_component_per_endpoint(self) -> None:
         pool = HealthyEndpointPool(
-            unavailable_error_factory=ManagerConnectionUnavailable,
             endpoints=["http://m1", "http://m2", "http://m3"],
             spec=_make_spec(),
             strategy=RoundRobinStrategy(),
@@ -145,7 +139,6 @@ class TestManagerEndpointsHealthChecker:
 
     async def test_reports_individual_unhealthy_endpoint(self) -> None:
         pool = HealthyEndpointPool(
-            unavailable_error_factory=ManagerConnectionUnavailable,
             endpoints=["http://m1", "http://m2"],
             spec=_make_spec(),
             strategy=RoundRobinStrategy(),

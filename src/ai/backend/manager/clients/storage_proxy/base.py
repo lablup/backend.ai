@@ -10,6 +10,7 @@ import yarl
 from aiohttp import ClientTimeout
 
 from ai.backend.common.contexts.request_id import current_request_id
+from ai.backend.common.endpoint_pool.exceptions import NoHealthyEndpointError
 from ai.backend.common.endpoint_pool.pool import HealthyEndpointPool
 from ai.backend.common.exception import (
     ErrorCode,
@@ -41,16 +42,19 @@ log = StructuredLogger(logging.getLogger(__spec__.name))
 
 @dataclass
 class StorageProxyClientArgs:
+    proxy_name: str
     endpoint_pool: HealthyEndpointPool
     secret: str
 
 
 class StorageProxyHTTPClient:
+    _proxy_name: str
     _client_session: aiohttp.ClientSession
     _endpoint_pool: HealthyEndpointPool
     _secret: str
 
     def __init__(self, client_session: aiohttp.ClientSession, args: StorageProxyClientArgs) -> None:
+        self._proxy_name = args.proxy_name
         self._client_session = client_session
         self._endpoint_pool = args.endpoint_pool
         self._secret = args.secret
@@ -185,6 +189,10 @@ class StorageProxyHTTPClient:
                         yield client_resp
                         return
                     await self._handle_exceptional_response(client_resp)
+        except NoHealthyEndpointError as e:
+            raise StorageProxyConnectionError(
+                extra_msg=f"Storage proxy {self._proxy_name!r}: {e.extra_msg}",
+            ) from e
         except TimeoutError as e:
             raise StorageProxyTimeoutError(
                 extra_msg="Request to storage proxy timed out",
