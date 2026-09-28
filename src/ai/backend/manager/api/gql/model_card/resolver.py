@@ -7,6 +7,7 @@ import strawberry
 from strawberry import Info
 from strawberry.relay import PageInfo
 
+from ai.backend.common.contexts.user import current_user
 from ai.backend.common.dto.manager.v2.common import OrderDirection
 from ai.backend.common.dto.manager.v2.deployment_revision_preset.request import (
     DeploymentRevisionPresetFilter,
@@ -24,7 +25,9 @@ from ai.backend.common.dto.manager.v2.model_card.request import (
     SearchModelCardsInput,
 )
 from ai.backend.common.dto.manager.v2.model_card.response import SearchModelCardsPayload
-from ai.backend.common.dto.manager.v2.model_card.types import ModelCardOrderField
+from ai.backend.common.dto.manager.v2.model_card.types import ModelCardOrderField, ModelCardScope
+from ai.backend.common.dto.manager.v2.rbac.types import UUIDScope
+from ai.backend.common.exception import UnreachableError
 from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import encode_cursor
 from ai.backend.manager.api.gql.decorators import BackendAIGQLMeta, gql_mutation, gql_root_field
@@ -130,6 +133,52 @@ async def scoped_model_cards_v2(
     payload = await info.context.adapters.model_card.scoped_search(
         ScopedSearchModelCardsInput(
             scope=scope.to_pydantic(),
+            usage=usage.to_pydantic() if usage else None,
+            filter=filter.to_pydantic() if filter else None,
+            order=[o.to_pydantic() for o in order_by] if order_by else None,
+            first=first,
+            after=after,
+            last=last,
+            before=before,
+            limit=limit,
+            offset=offset,
+        )
+    )
+    return _build_connection(payload)
+
+
+@gql_root_field(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Page through the model cards the current user holds through membership.",
+    )
+)  # type: ignore[misc]
+async def my_model_cards_v2(
+    info: Info[StrawberryGQLContext],
+    usage: Annotated[
+        ModelCardUsageGQL | None,
+        strawberry.argument(
+            description=(
+                "Uses narrowing the result. Each listed entity must be readable by the "
+                "caller; model cards the caller cannot read are left out."
+            )
+        ),
+    ] = None,
+    filter: ModelCardFilterGQL | None = None,
+    order_by: list[ModelCardOrderByGQL] | None = None,
+    before: str | None = None,
+    after: str | None = None,
+    first: int | None = None,
+    last: int | None = None,
+    limit: int | None = None,
+    offset: int | None = None,
+) -> ModelCardV2Connection | None:
+    me = current_user()
+    if me is None:
+        raise UnreachableError("User context is not available")
+    payload = await info.context.adapters.model_card.scoped_search(
+        ScopedSearchModelCardsInput(
+            scope=ModelCardScope(user=[UUIDScope(value=me.user_id)]),
             usage=usage.to_pydantic() if usage else None,
             filter=filter.to_pydantic() if filter else None,
             order=[o.to_pydantic() for o in order_by] if order_by else None,

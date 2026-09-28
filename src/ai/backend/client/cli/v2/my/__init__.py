@@ -70,6 +70,25 @@ def session() -> None:
     """My session commands."""
 
 
+@my.group(
+    cls=LazyGroup,
+    import_name="ai.backend.client.cli.v2.my.model_card:model_card",
+    name="model-card",
+)
+def model_card() -> None:
+    """My model card commands."""
+
+
+@my.group(cls=LazyGroup, import_name="ai.backend.client.cli.v2.my.image:image")
+def image() -> None:
+    """My image commands."""
+
+
+@my.group(cls=LazyGroup, import_name="ai.backend.client.cli.v2.my.project:project")
+def project() -> None:
+    """My project commands."""
+
+
 @my.group(cls=LazyGroup, import_name="ai.backend.client.cli.v2.my.deployment:deployment")
 def deployment() -> None:
     """My deployment commands."""
