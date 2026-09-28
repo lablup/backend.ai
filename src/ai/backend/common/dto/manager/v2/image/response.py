@@ -61,7 +61,12 @@ class ImageNode(BaseResponseModel):
     tag: str | None = Field(default=None, description="Image tag")
     architecture: str = Field(description="Target CPU architecture")
     size_bytes: int = Field(description="Image size in bytes")
-    type: ImageTypeEnum = Field(description="Image type category")
+    type: ImageTypeEnum = Field(
+        description=(
+            "Image type category. `service` is deprecated since 26.9.0: the scan never"
+            " writes it, and it is removed in the next release."
+        )
+    )
     status: ImageStatusType = Field(description="Image status")
     labels: list[ImageLabelInfo] = Field(default_factory=list, description="Image labels")
     tags: list[ImageTagInfo] = Field(default_factory=list, description="Image tags")

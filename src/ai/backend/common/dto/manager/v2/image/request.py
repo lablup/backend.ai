@@ -77,7 +77,11 @@ class ImageStatusFilterInputDTO(EnumFilter[ImageStatusType]):
 
 
 class ImageTypeFilterInputDTO(EnumFilter[ImageTypeEnum]):
-    """Filter for the image type category."""
+    """Filter for the image type category.
+
+    ``SERVICE`` is deprecated since 26.9.0: the scan never writes it, so nothing
+    matches. It is removed in the next release.
+    """
 
 
 class ImageAliasNestedFilterInputDTO(BaseRequestModel):
@@ -113,7 +117,12 @@ class ImageFilterInputDTO(BaseRequestModel):
     size_bytes: IntFilter | None = Field(default=None, description="Filter by image size in bytes.")
     is_local: bool | None = Field(default=None, description="Filter by local-only status.")
     type: ImageTypeFilterInputDTO | None = Field(
-        default=None, description="Filter by image type category."
+        default=None,
+        description=(
+            "Filter by image type category. `service` is deprecated since 26.9.0: the"
+            " scan never writes it, so nothing matches, and it is removed in the next"
+            " release."
+        ),
     )
     created_at: DateTimeFilter | None = Field(
         default=None, description="Filter by creation datetime (before/after)."
@@ -343,7 +352,11 @@ class UpdateImageInput(BaseRequestModel):
     )
     type: str | None | Unset = Field(
         default=UNSET,
-        description="Updated image type (compute, system, service). Omit to leave unchanged.",
+        description=(
+            "Updated image type. `service` is deprecated since 26.9.0: the scan never"
+            " writes it, and it is removed in the next release."
+            " Omit to leave unchanged."
+        ),
     )
     config_digest: str | None | Unset = Field(
         default=UNSET, description="Updated config digest. Omit to leave unchanged."

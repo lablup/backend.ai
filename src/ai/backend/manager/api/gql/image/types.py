@@ -566,12 +566,19 @@ class ImageV2StatusFilterGQL(PydanticInputMixin[ImageStatusFilterInputDTO]):
     )
 
 
+_IMAGE_SERVICE_TYPE_DEPRECATION = (
+    f"Deprecated since {NEXT_RELEASE_VERSION}. The scan never writes this type, so no"
+    " image is ever one. It is removed in the next release."
+)
+
+
 @gql_enum(
     BackendAIGQLMeta(
         added_version=NEXT_RELEASE_VERSION,
         description="Type category of an image.",
     ),
     name="ImageV2Type",
+    deprecated_values={"SERVICE": _IMAGE_SERVICE_TYPE_DEPRECATION},
 )
 class ImageV2TypeGQL(enum.Enum):
     COMPUTE = "compute"

@@ -43,6 +43,14 @@ class ImageOrderField(enum.StrEnum):
 
 
 class ImageType(CIStrEnum):
+    """What an image is used for, which the scan reads off its role and feature labels.
+
+    The role label's INFERENCE is absorbed into COMPUTE: nothing reads the distinction.
+
+    ``SERVICE`` is deprecated since 26.9.0: nothing writes it and nothing reads it, so
+    an image is never this type. It is removed in the next release.
+    """
+
     COMPUTE = "compute"
     SYSTEM = "system"
     SERVICE = "service"
