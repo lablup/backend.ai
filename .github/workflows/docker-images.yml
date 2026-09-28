@@ -60,7 +60,7 @@ jobs:
       matrix: ${{ steps.set-matrix.outputs.matrix }}
       python-version: ${{ steps.pyver.outputs.version }}
       pkgver: ${{ steps.pkgver.outputs.version }}
-      is-prerelease: ${{ steps.release-type.outputs.is-prerelease }}
+      is-prerelease: ${{ steps.release-type.outputs.IS_PRERELEASE }}
     steps:
     - name: Checkout the revision
       uses: actions/checkout@v6
@@ -113,9 +113,7 @@ jobs:
       id: release-type
       env:
         PKGVER: ${{ steps.pkgver.outputs.version }}
-      run: |
-        IS_PRERELEASE=$(python3 scripts/determine-release-type.py "$PKGVER")
-        echo "is-prerelease=$IS_PRERELEASE" >> "$GITHUB_OUTPUT"
+      run: python3 scripts/determine-release-type.py "$PKGVER" >> "$GITHUB_OUTPUT"
 
   build-push:
     name: Build and push ${{ matrix.name }}
