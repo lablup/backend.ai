@@ -120,7 +120,7 @@ The client must be free to choose cursor or offset. For per-mode behavior, see `
 **search — three variants:**
 - `adminFoosV2`: superadmin only, no scope — the entire system.
 - `scopedFoosV2` (e.g. `scopedSessionsV2`): non-admin, scope required — within that scope.
-- `myFoosV2`: self-service, the adapter resolves the current user as the scope internally.
+- `myFoosV2`: self-service — fills the current user in as the user scope and calls the same adapter `scoped_search` as `scopedFoosV2`.
 - There is no "unscoped system-wide query" for non-admins.
 
 **scoped search convention:**
@@ -140,8 +140,8 @@ The client must be free to choose cursor or offset. For per-mode behavior, see `
 - Legacy `{scope}FoosV2` (e.g. `projectSessionsV2`) predates this convention — do not create new ones.
 
 **`myFoosV2` resolver:**
-- The resolver does NOT call `current_user()` or build a scope — it passes only the search input DTO to the adapter.
-- The adapter builds the scope internally via `current_user()`.
+- The resolver builds the user scope from `current_user()`, puts it in `ScopedSearchFoosInput`, and calls the adapter's `scoped_search`.
+- Do not add `my_search` to the adapter.
 
 **create / update / get / delete / purge — criteria for splitting out `admin_`:**
 - admin-only entities: a single `admin_` mutation/query.

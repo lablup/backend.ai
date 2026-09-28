@@ -8,10 +8,14 @@ from uuid import UUID
 import strawberry
 from strawberry import Info
 
+from ai.backend.common.contexts.user import current_user
+from ai.backend.common.dto.manager.v2.rbac.types import UUIDScope
 from ai.backend.common.dto.manager.v2.vfolder.request import (
     ScopedSearchVFoldersInput,
     SearchVFoldersInput,
 )
+from ai.backend.common.dto.manager.v2.vfolder.types import VFolderScope
+from ai.backend.common.exception import UnreachableError
 from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import encode_cursor
 from ai.backend.manager.api.gql.decorators import (
@@ -247,8 +251,12 @@ async def my_vfolders(
     offset: int | None = None,
 ) -> VFolderConnection | None:
     """Search virtual folders accessible to the current user."""
-    result = await info.context.adapters.vfolder.my_search(
-        SearchVFoldersInput(
+    me = current_user()
+    if me is None:
+        raise UnreachableError("User context is not available")
+    result = await info.context.adapters.vfolder.scoped_search(
+        ScopedSearchVFoldersInput(
+            scope=VFolderScope(user=[UUIDScope(value=me.user_id)]),
             usage=usage.to_pydantic() if usage else None,
             filter=filter.to_pydantic() if filter else None,
             order=[o.to_pydantic() for o in order_by] if order_by else None,

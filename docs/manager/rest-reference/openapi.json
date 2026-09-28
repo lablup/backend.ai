@@ -50081,6 +50081,35 @@
         "description": "Search images with admin scope.\n\n**Preconditions:**\n* Superadmin privilege required.\n"
       }
     },
+    "/v2/images/my/search": {
+      "post": {
+        "operationId": "v2/images.my_search_images",
+        "tags": [
+          "v2/images"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AdminSearchImagesInput"
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "description": "Search the images the current user can reach.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
     "/v2/images/scoped/search": {
       "post": {
         "operationId": "v2/images.scoped_search_images",
@@ -51761,6 +51790,35 @@
         },
         "parameters": [],
         "description": "Search projects with filters, orders, and pagination (superadmin only).\n\n**Preconditions:**\n* Superadmin privilege required.\n"
+      }
+    },
+    "/v2/projects/my/search": {
+      "post": {
+        "operationId": "v2/projects.my_search",
+        "tags": [
+          "v2/projects"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AdminSearchProjectsInput"
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "description": "Search the projects the current user is a member of.\n\n**Preconditions:**\n* User privilege required.\n"
       }
     },
     "/v2/projects/scoped/search": {
@@ -55916,6 +55974,35 @@
         },
         "parameters": [],
         "description": "\n**Preconditions:**\n* Superadmin privilege required.\n"
+      }
+    },
+    "/v2/model-cards/my/search": {
+      "post": {
+        "operationId": "v2/model-cards.my_search",
+        "tags": [
+          "v2/model-cards"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SearchModelCardsInput"
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "description": "Search the model cards the current user holds through membership.\n\n**Preconditions:**\n* User privilege required.\n"
       }
     },
     "/v2/model-cards/scoped/search": {
@@ -61430,7 +61517,7 @@
           }
         },
         "parameters": [],
-        "description": "Readiness probe — 200 / 503 based on readiness-tier health, empty body."
+        "description": "Readiness probe; draining returns a 503 problem response."
       }
     },
     "/container-registries/": {
