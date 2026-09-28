@@ -17629,6 +17629,22 @@ type Query
     offset: Int = null
   ): ImageV2Connection @join__field(graph: STRAWBERRY)
 
+  """Added in 26.9.0. Page through the images the current user can reach."""
+  myImagesV2(
+    """
+    Uses narrowing the result. Each listed entity must be readable by the caller; images the caller cannot read are left out.
+    """
+    usage: ImageUsage = null
+    filter: ImageV2Filter = null
+    orderBy: [ImageV2OrderBy!] = null
+    before: String = null
+    after: String = null
+    first: Int = null
+    last: Int = null
+    limit: Int = null
+    offset: Int = null
+  ): ImageV2Connection @join__field(graph: STRAWBERRY)
+
   """
   Added in 26.2.0. Query kernels with pagination and filtering. (admin only)
   """
@@ -17715,6 +17731,22 @@ type Query
 
     """
     Added in 26.9.0. Uses narrowing the result. Each listed entity must be readable by the caller; sessions the caller cannot read are left out.
+    """
+    usage: SessionUsage = null
+    filter: SessionV2Filter = null
+    orderBy: [SessionV2OrderBy!] = null
+    before: String = null
+    after: String = null
+    first: Int = null
+    last: Int = null
+    limit: Int = null
+    offset: Int = null
+  ): SessionV2Connection @join__field(graph: STRAWBERRY)
+
+  """Added in 26.9.0. Page through the sessions the current user owns."""
+  mySessionsV2(
+    """
+    Uses narrowing the result. Each listed entity must be readable by the caller; sessions the caller cannot read are left out.
     """
     usage: SessionUsage = null
     filter: SessionV2Filter = null
@@ -18199,6 +18231,11 @@ type Query
   scopedProjectsV2(scope: ProjectScope!, filter: ProjectV2Filter = null, orderBy: [ProjectV2OrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ProjectV2Connection @join__field(graph: STRAWBERRY)
 
   """
+  Added in 26.9.0. Page through the projects the current user is a member of.
+  """
+  myProjectsV2(filter: ProjectV2Filter = null, orderBy: [ProjectV2OrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ProjectV2Connection @join__field(graph: STRAWBERRY)
+
+  """
   Added in 26.2.0. Get the domain that a project belongs to. Returns an error if project or domain is not found.
   """
   projectDomainV2(projectId: UUID!): DomainV2 @join__field(graph: STRAWBERRY)
@@ -18387,6 +18424,24 @@ type Query
 
     """
     Added in 26.9.0. Uses narrowing the result. Each listed entity must be readable by the caller; model cards the caller cannot read are left out.
+    """
+    usage: ModelCardUsage = null
+    filter: ModelCardV2Filter = null
+    orderBy: [ModelCardV2OrderBy!] = null
+    before: String = null
+    after: String = null
+    first: Int = null
+    last: Int = null
+    limit: Int = null
+    offset: Int = null
+  ): ModelCardV2Connection @join__field(graph: STRAWBERRY)
+
+  """
+  Added in 26.9.0. Page through the model cards the current user holds through membership.
+  """
+  myModelCardsV2(
+    """
+    Uses narrowing the result. Each listed entity must be readable by the caller; model cards the caller cannot read are left out.
     """
     usage: ModelCardUsage = null
     filter: ModelCardV2Filter = null

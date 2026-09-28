@@ -9,6 +9,7 @@ from typing import TYPE_CHECKING, Final
 from ai.backend.common.api_handlers import APIResponse, BodyParam, PathParam, QueryParam
 from ai.backend.common.data.entity.session import SessionID
 from ai.backend.common.dto.manager.v2.kernel.request import AdminSearchKernelsInput
+from ai.backend.common.dto.manager.v2.rbac.types import UUIDScope
 from ai.backend.common.dto.manager.v2.scheduler.request import ComputeScheduleInput
 from ai.backend.common.dto.manager.v2.session.request import (
     AdminSearchSessionsInput,
@@ -25,6 +26,7 @@ from ai.backend.common.dto.manager.v2.session.request import (
 from ai.backend.common.dto.manager.v2.session.request import (
     SessionIdPathParam as SessionIdPathParamDTO,
 )
+from ai.backend.common.dto.manager.v2.session.types import SessionScope
 from ai.backend.common.types import AgentId, SessionId
 from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.api.rest.v2.path_params import (
@@ -129,10 +131,24 @@ class V2SessionHandler:
 
     async def my_search(
         self,
+        user_ctx: UserContext,
         body: BodyParam[AdminSearchSessionsInput],
     ) -> APIResponse:
         """Search sessions owned by the current user."""
-        result = await self._adapter.my_search(body.parsed)
+        result = await self._adapter.scoped_search(
+            ScopedSearchSessionsInput(
+                scope=SessionScope(user=[UUIDScope(value=user_ctx.user_uuid)]),
+                usage=body.parsed.usage,
+                filter=body.parsed.filter,
+                order=body.parsed.order,
+                first=body.parsed.first,
+                after=body.parsed.after,
+                last=body.parsed.last,
+                before=body.parsed.before,
+                limit=body.parsed.limit,
+                offset=body.parsed.offset,
+            )
+        )
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
 
     async def scoped_search(
