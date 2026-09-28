@@ -2,7 +2,9 @@ import logging
 import uuid
 
 import sqlalchemy as sa
+import yarl
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
+from sqlalchemy.orm import load_only
 
 from ai.backend.common.container_registry import ContainerRegistryType
 from ai.backend.common.data.entity.container_registry import ContainerRegistryID
@@ -23,17 +25,17 @@ from ai.backend.manager.data.permission.global_entity import global_entity_id
 from ai.backend.manager.errors.image import ContainerRegistryNotFound
 from ai.backend.manager.models.container_registry.creators import ContainerRegistryCreator
 from ai.backend.manager.models.container_registry.purgers import ContainerRegistryPurger
-from ai.backend.manager.models.container_registry.row import (
-    ContainerRegistryRow,
-    ContainerRegistryValidator,
-    ContainerRegistryValidatorArgs,
-)
+from ai.backend.manager.models.container_registry.row import ContainerRegistryRow
 from ai.backend.manager.models.container_registry.searchable_fields import (
     ContainerRegistrySearchableFields,
 )
 from ai.backend.manager.models.container_registry.updaters import (
     ContainerRegistryGlobalUpdater,
     ContainerRegistryUpdater,
+)
+from ai.backend.manager.models.container_registry.validator import (
+    ContainerRegistryValidator,
+    ContainerRegistryValidatorArgs,
 )
 from ai.backend.manager.models.image.row import ImageRow
 from ai.backend.manager.models.rbac import ProjectScope
@@ -226,17 +228,20 @@ class ContainerRegistryRepository:
     @container_registry_repository_resilience.apply()
     async def get_known_registries(self) -> dict[str, str]:
         async with self._db.begin_readonly_session_read_committed() as session:
-            known_registries_map = await ContainerRegistryRow.get_known_container_registries(
-                session
+            stmt = sa.select(ContainerRegistryRow).options(
+                load_only(
+                    ContainerRegistryRow.project,
+                    ContainerRegistryRow.registry_name,
+                    ContainerRegistryRow.url,
+                )
             )
-
-            known_registries = {}
-            for project, registries in known_registries_map.items():
-                for registry_name, url in registries.items():
-                    if project not in known_registries:
-                        known_registries[f"{project}/{registry_name}"] = url.human_repr()
-
-            return known_registries
+            result = await session.execute(stmt)
+            rows = list(result.scalars().all())
+            return {
+                f"{row.project}/{row.registry_name}": yarl.URL(row.url).human_repr()
+                for row in rows
+                if row.project is not None
+            }
 
     @container_registry_repository_resilience.apply()
     async def get_registry_by_url_and_project(
