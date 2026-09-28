@@ -2,14 +2,15 @@
 
 [무엇을 보장하는가](/src/ai/backend/manager/api/adapters/resource_group/KNOWLEDGE.md) · [어댑터](/src/ai/backend/manager/api/adapters/resource_group/adapter.py)
 
-시나리오: 미완 2 / 22
+시나리오: 미완 2 / 23
 
-- ops 로 구성 (7)
+- ops 로 구성 (8)
   - batch_load_by_ids — 대표 성공 ✓ · 대표 실패 ✗ — SCENARIO-GAP
   - batch_load_by_names — 대표 성공 ✓ · 대표 실패 ✗ — SCENARIO-GAP
   - get — 대표 성공 ✓ · 대표 실패 ✓
   - get_allowed_resource_groups_for_domain — 대표 성공 ✓ · 대표 실패 ✓
   - get_allowed_resource_groups_for_project — 대표 성공 ✓ · 대표 실패 ✓
+  - lookup_name — 대표 성공 ✓ · 대표 실패 ✓
   - scoped_search — 대표 성공 ✓ · 대표 실패 ✓
   - search — 대표 성공 ✓ · 대표 실패 ✓
 - ops + 직접 구현 (1)
@@ -1433,6 +1434,80 @@ Then
   - decay_unit_days = 1
   - default_weight = '1.0'
   - resource_weights = []
+
+### looking_up
+
+#### [a-user-granted-nothing-still-looks-up-a-resource-group-by-name](/tests/scenario/bai_scenario/manager/resource_group/test_looking_up.py) — pass
+
+아무 권한도 받지 않은 사용자도 리소스 그룹 이름으로 id를 찾을 수 있다. 이 호출은 인증만 보고, 권한은 그 id를 받는 호출이 본다
+
+Given
+
+- 리소스 그룹 하나와, 일반 사용자 한 명
+  - 도메인 home-1
+  - 리소스 그룹 resource-group-1: fifo 스케줄러를 쓴다
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+
+When
+
+- ResourceGroupAdapter.lookup_name — user-1이 resource-group-1의 id를 찾음
+
+Then
+
+- 그 리소스 그룹의 id가 온다
+  - id: 미리 만든 리소스 그룹의 id와 같다
+
+#### [looking-up-a-resource-group-name-nothing-answers-to-is-not-found](/tests/scenario/bai_scenario/manager/resource_group/test_looking_up.py) — pass
+
+아무 리소스 그룹도 갖지 않은 이름으로 id를 찾으면 대상이 없다는 것으로 거부된다
+
+Given
+
+- 리소스 그룹 하나와, 슈퍼관리자 한 명
+  - 도메인 home-1
+  - 리소스 그룹 resource-group-1: fifo 스케줄러를 쓴다
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+
+When
+
+- ResourceGroupAdapter.lookup_name — user-1이 no-such-group의 id를 찾음
+
+Then
+
+- 거부된다
+  - 거부: EntityNotFoundError
+
+#### [the-superadmin-looks-up-a-resource-group-by-name](/tests/scenario/bai_scenario/manager/resource_group/test_looking_up.py) — pass
+
+슈퍼관리자가 리소스 그룹 이름으로 id를 찾으면, 그 리소스 그룹의 id가 온다
+
+Given
+
+- 리소스 그룹 하나와, 슈퍼관리자 한 명
+  - 도메인 home-1
+  - 리소스 그룹 resource-group-1: fifo 스케줄러를 쓴다
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+
+When
+
+- ResourceGroupAdapter.lookup_name — user-1이 resource-group-1의 id를 찾음
+
+Then
+
+- 그 리소스 그룹의 id가 온다
+  - id: 미리 만든 리소스 그룹의 id와 같다
 
 ### options
 

@@ -33,7 +33,7 @@ type DomainStep = Scenario[SeedingSession, ADomainAndACaller, DomainAdapter, Dom
 
 @dataclass(frozen=True)
 class Editing(When[ADomainAndACaller, DomainAdapter, DomainNode]):
-    """심은 도메인을 고친다. 답이 실은 노드를 벗겨서 준다."""
+    """미리 만든 도메인을 고친다. 답이 실은 노드를 벗겨서 준다."""
 
     asked: UpdateDomainInput
     named: str | None = None
@@ -41,7 +41,7 @@ class Editing(When[ADomainAndACaller, DomainAdapter, DomainNode]):
 
     @override
     def operation(self) -> str:
-        return "admin_update"
+        return "update"
 
     @override
     def describe(self, laid: ADomainAndACaller) -> str:
@@ -50,8 +50,8 @@ class Editing(When[ADomainAndACaller, DomainAdapter, DomainNode]):
 
     @override
     async def call(self, adapter: DomainAdapter, laid: ADomainAndACaller) -> DomainNode:
-        with ActingAs(laid.caller) as who:
-            payload = await adapter.admin_update(self.named or laid.domain.name, self.asked, who)
+        with ActingAs(laid.caller):
+            payload = await adapter.update(self.named or laid.domain.name, self.asked)
         return payload.domain
 
 
@@ -83,22 +83,22 @@ class TheDescriptionChangesAndTheNameStays(
 
 
 @dataclass(frozen=True)
-class ClearingTheActiveFlagRetires(
+class ClearingTheActiveFlagDeactivates(
     Scenario[SeedingSession, ADomainAndACaller, DomainAdapter, DomainNode]
 ):
     started: datetime
 
     @override
     def summary(self) -> str:
-        return "clearing-the-active-flag-is-how-a-domain-retires"
+        return "clearing-the-active-flag-deactivates-a-domain"
 
     @override
     def describe(self) -> str:
-        return "활성 플래그를 내리는 수정으로 도메인을 물릴 수 있고, 답이 그 상태를 실어 온다"
+        return "활성 플래그를 내리는 수정은 도메인을 비활성으로 만들고, 답이 그 상태를 실어 온다"
 
     @override
     def given(self) -> Given[SeedingSession, ADomainAndACaller]:
-        return ADomainAndSomeone(role=UserRole.SUPERADMIN, name_hint="to-retire")
+        return ADomainAndSomeone(role=UserRole.SUPERADMIN, name_hint="to-deactivate")
 
     @override
     def when(self) -> When[ADomainAndACaller, DomainAdapter, DomainNode]:
@@ -161,7 +161,7 @@ class ANameNothingAnswersToIsNotFound(
 
 SCENARIOS: list[DomainStep] = [
     TheDescriptionChangesAndTheNameStays(started=datetime.now(UTC)),
-    ClearingTheActiveFlagRetires(started=datetime.now(UTC)),
+    ClearingTheActiveFlagDeactivates(started=datetime.now(UTC)),
     AUserGrantedNothingMayNotEdit(),
     ANameNothingAnswersToIsNotFound(),
 ]

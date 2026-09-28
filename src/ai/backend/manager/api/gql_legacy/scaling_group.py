@@ -942,7 +942,7 @@ class AssociateScalingGroupWithDomain(graphene.Mutation):  # type: ignore[misc]
     ) -> AssociateScalingGroupWithDomain:
         graph_ctx: GraphQueryContext = info.context
         domain_id = (
-            await graph_ctx.processors.domain.lookup.run(
+            await graph_ctx.processors.domain.lookup_name.run(
                 LookupDomainAction(name=DomainName(domain))
             )
         ).entity_id()
@@ -973,7 +973,7 @@ class AssociateScalingGroupsWithDomain(graphene.Mutation):  # type: ignore[misc]
     ) -> AssociateScalingGroupsWithDomain:
         graph_ctx: GraphQueryContext = info.context
         domain_id = (
-            await graph_ctx.processors.domain.lookup.run(
+            await graph_ctx.processors.domain.lookup_name.run(
                 LookupDomainAction(name=DomainName(domain))
             )
         ).entity_id()
@@ -1003,7 +1003,7 @@ class DisassociateScalingGroupWithDomain(graphene.Mutation):  # type: ignore[mis
     ) -> DisassociateScalingGroupWithDomain:
         graph_ctx: GraphQueryContext = info.context
         domain_id = (
-            await graph_ctx.processors.domain.lookup.run(
+            await graph_ctx.processors.domain.lookup_name.run(
                 LookupDomainAction(name=DomainName(domain))
             )
         ).entity_id()
@@ -1034,7 +1034,7 @@ class DisassociateScalingGroupsWithDomain(graphene.Mutation):  # type: ignore[mi
     ) -> DisassociateScalingGroupsWithDomain:
         graph_ctx: GraphQueryContext = info.context
         domain_id = (
-            await graph_ctx.processors.domain.lookup.run(
+            await graph_ctx.processors.domain.lookup_name.run(
                 LookupDomainAction(name=DomainName(domain))
             )
         ).entity_id()
@@ -1062,7 +1062,7 @@ class DisassociateAllScalingGroupsWithDomain(graphene.Mutation):  # type: ignore
     ) -> DisassociateAllScalingGroupsWithDomain:
         graph_ctx: GraphQueryContext = info.context
         domain_id = (
-            await graph_ctx.processors.domain.lookup.run(
+            await graph_ctx.processors.domain.lookup_name.run(
                 LookupDomainAction(name=DomainName(domain))
             )
         ).entity_id()

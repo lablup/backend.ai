@@ -9,6 +9,7 @@ from typing import override
 import pytest
 
 from ai.backend.common.data.user.types import UserRole
+from ai.backend.common.dto.manager.v2.domain.request import DeleteDomainInput
 from ai.backend.common.dto.manager.v2.domain.response import DomainNode
 from ai.backend.manager.api.adapters.domain.adapter import DomainAdapter
 from ai.backend.manager.errors.base.entity import EntityNotFoundError
@@ -18,6 +19,7 @@ from ai.backend.testutils.scenario_steps import Given, Scenario, Then, When
 from bai_scenario.components.domain import (
     ADomainAndACaller,
     ADomainAndSomeone,
+    ATargetAndSomeone,
     TheCallIsRefused,
     TheDomainNode,
 )
@@ -30,7 +32,7 @@ type DomainStep = Scenario[SeedingSession, ADomainAndACaller, DomainAdapter, Dom
 
 @dataclass(frozen=True)
 class ReadingByName(When[ADomainAndACaller, DomainAdapter, DomainNode]):
-    """이름으로 읽는다. 이름을 대지 않으면 심은 도메인의 이름을 쓴다."""
+    """이름으로 읽는다. 이름을 대지 않으면 미리 만든 도메인의 이름을 쓴다."""
 
     named: str | None = None
 
@@ -46,6 +48,25 @@ class ReadingByName(When[ADomainAndACaller, DomainAdapter, DomainNode]):
     async def call(self, adapter: DomainAdapter, laid: ADomainAndACaller) -> DomainNode:
         with ActingAs(laid.caller):
             return await adapter.get(self.named or laid.domain.name)
+
+
+@dataclass(frozen=True)
+class SoftDeletingThenReading(When[ADomainAndACaller, DomainAdapter, DomainNode]):
+    """미리 만든 도메인을 soft delete 한 뒤 이름으로 읽는다."""
+
+    @override
+    def operation(self) -> str:
+        return "get"
+
+    @override
+    def describe(self, laid: ADomainAndACaller) -> str:
+        return f"{laid.caller.username}이 {laid.domain.name}을 soft delete 한 뒤 이름으로 조회"
+
+    @override
+    async def call(self, adapter: DomainAdapter, laid: ADomainAndACaller) -> DomainNode:
+        with ActingAs(laid.caller):
+            await adapter.delete(DeleteDomainInput(name=laid.domain.name))
+            return await adapter.get(laid.domain.name)
 
 
 @dataclass(frozen=True)
@@ -131,10 +152,38 @@ class ANameNothingAnswersToIsNotFound(
         return TheCallIsRefused(EntityNotFoundError)
 
 
+@dataclass(frozen=True)
+class ASoftDeletedDomainIsStillRead(
+    Scenario[SeedingSession, ADomainAndACaller, DomainAdapter, DomainNode]
+):
+    started: datetime
+
+    @override
+    def summary(self) -> str:
+        return "the-superadmin-reads-a-soft-deleted-domain-by-name"
+
+    @override
+    def describe(self) -> str:
+        return "슈퍼관리자가 도메인을 soft delete 한 뒤 이름으로 조회하면, 비활성 상태를 실은 그 도메인이 온다"
+
+    @override
+    def given(self) -> Given[SeedingSession, ADomainAndACaller]:
+        return ATargetAndSomeone(role=UserRole.SUPERADMIN, name_hint="soft-deleted")
+
+    @override
+    def when(self) -> When[ADomainAndACaller, DomainAdapter, DomainNode]:
+        return SoftDeletingThenReading()
+
+    @override
+    def then(self) -> Then[ADomainAndACaller, DomainNode]:
+        return TheDomainNode(started=self.started, active=False)
+
+
 SCENARIOS: list[DomainStep] = [
     TheSuperadminReadsADomainByName(started=datetime.now(UTC)),
     AUserGrantedNothingMayNotRead(),
     ANameNothingAnswersToIsNotFound(),
+    ASoftDeletedDomainIsStillRead(started=datetime.now(UTC)),
 ]
 
 
