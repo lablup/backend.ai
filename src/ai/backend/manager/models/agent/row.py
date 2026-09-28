@@ -16,11 +16,8 @@ from sqlalchemy.sql.expression import false, true
 from ai.backend.common.auth import PublicKey
 from ai.backend.common.data.entity.agent import AgentUUID
 from ai.backend.common.data.entity.resource_group import ResourceGroupID
-from ai.backend.common.types import AgentId, ResourceSlot
-from ai.backend.manager.data.agent.types import (
-    AgentDataForHeartbeatUpdate,
-    AgentStatus,
-)
+from ai.backend.common.types import AgentId
+from ai.backend.manager.data.agent.types import AgentStatus
 from ai.backend.manager.data.resource_slot.types import AgentResourceData
 from ai.backend.manager.models.base import (
     GUID,
@@ -111,26 +108,6 @@ class AgentRow(Base):
             AgentResourceSearchableFields.own.to_data(resource_row)
             for resource_row in self._resource_rows_by_rank()
         ]
-
-    def actual_available_slots(self) -> ResourceSlot:
-        available = ResourceSlot()
-        for resource_row in self._resource_rows_by_rank():
-            available[resource_row.slot_name] = resource_row.capacity
-        return available
-
-    def to_heartbeat_update_data(self) -> AgentDataForHeartbeatUpdate:
-        return AgentDataForHeartbeatUpdate(
-            status=self.status,
-            status_changed=self.status_changed,
-            available_slots=self.actual_available_slots(),
-            addr=self.addr,
-            public_host=self.public_host,
-            version=self.version,
-            architecture=self.architecture,
-            compute_plugins=self.compute_plugins,
-            public_key=self.public_key,
-            auto_terminate_abusing_kernel=self.auto_terminate_abusing_kernel,
-        )
 
 
 # For compatibility
