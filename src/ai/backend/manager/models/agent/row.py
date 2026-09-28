@@ -98,6 +98,9 @@ class AgentRow(Base):
         default=False,
     )
 
+    # The relationship and the two readers below are used only by gql_legacy
+    # (api/gql_legacy/agent.py and the list_data it calls). v2 reads AgentResourceRow
+    # on its own. Delete them together with gql_legacy.
     agent_resource_rows: Mapped[list[AgentResourceRow]] = relationship("AgentResourceRow")
 
     def _resource_rows_by_rank(self) -> list[AgentResourceRow]:
