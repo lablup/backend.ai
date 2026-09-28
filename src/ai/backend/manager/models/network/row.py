@@ -30,6 +30,7 @@ __all__: Final[tuple[str, ...]] = (
 )
 
 
+# Join conditions for the two relationships below; they go together with them.
 def _get_project_join_condition() -> sa.ColumnElement[bool]:
     from ai.backend.manager.models.project.row import ProjectRow
 
@@ -70,6 +71,9 @@ class NetworkRow(LifecycleTimestampsMixin, Base):
         nullable=False,
     )
 
+    # Used only by api/gql_legacy/network.py. Delete them together with gql_legacy.
+    # project_row.domain_name is the project's domain, so NetworkRow.domain_name
+    # cannot replace it.
     project_row: Mapped[ProjectRow] = relationship(
         "ProjectRow",
         primaryjoin=_get_project_join_condition,
@@ -110,6 +114,9 @@ class NetworkRow(LifecycleTimestampsMixin, Base):
             updated_at=self.updated_at,
         )
 
+    # Used only by api/gql_legacy/network.py and the v1 session paths
+    # (registry.py, SessionRow.get_network_ref). When gql_legacy goes, replace it
+    # together with its callers by get_attached_network in repositories/scheduler.
     @classmethod
     async def get(
         cls,
