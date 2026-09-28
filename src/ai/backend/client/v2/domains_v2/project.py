@@ -42,6 +42,18 @@ class V2ProjectClient(BaseDomainClient):
             response_model=AdminSearchGroupsPayload,
         )
 
+    async def my_search(
+        self,
+        request: AdminSearchProjectsInput,
+    ) -> AdminSearchGroupsPayload:
+        """Search the projects the current user is a member of."""
+        return await self._client.typed_request(
+            "POST",
+            f"{_PATH}/my/search",
+            request=request,
+            response_model=AdminSearchGroupsPayload,
+        )
+
     async def get(self, project_id: UUID) -> ProjectNode:
         """Retrieve a single project by UUID."""
         return await self._client.typed_request(
