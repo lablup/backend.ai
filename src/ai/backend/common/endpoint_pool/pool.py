@@ -41,11 +41,10 @@ from http import HTTPStatus
 import aiohttp
 from aiotools import cancel_and_wait
 
+from ai.backend.common.endpoint_pool.exceptions import NoHealthyEndpointError
+from ai.backend.common.endpoint_pool.strategy import EndpointSelectionStrategy
+from ai.backend.common.endpoint_pool.types import AcquiredEndpoint, EndpointEntry, EndpointPoolSpec
 from ai.backend.logging.structured import StructuredLogger
-from ai.backend.web.errors import ManagerConnectionUnavailable
-
-from .strategy import EndpointSelectionStrategy
-from .types import AcquiredEndpoint, EndpointEntry, EndpointPoolSpec
 
 log = StructuredLogger(logging.getLogger(__spec__.name))
 
@@ -125,7 +124,7 @@ class HealthyEndpointPool:
         resets the failure counter while the endpoint is healthy. Only a
         successful probe restores an unhealthy endpoint.
 
-        Raises :class:`ManagerConnectionUnavailable` when no endpoint is
+        Raises NoHealthyEndpointError when no endpoint is
         currently healthy.
         """
         async with self._lock:
@@ -133,7 +132,7 @@ class HealthyEndpointPool:
                 cached.entry for cached in self._entries.values() if cached.is_healthy
             ]
         if not healthy_entries:
-            raise ManagerConnectionUnavailable(
+            raise NoHealthyEndpointError(
                 "no healthy endpoint is available",
             )
         async with self._strategy.acquire(healthy_entries) as chosen_entry:
@@ -152,7 +151,7 @@ class HealthyEndpointPool:
         """
         cached = self._entries.get(endpoint)
         if cached is None or not cached.is_healthy:
-            raise ManagerConnectionUnavailable(
+            raise NoHealthyEndpointError(
                 f"endpoint {endpoint!r} is not healthy",
             )
         async with self._strategy.acquire([cached.entry]) as chosen_entry:

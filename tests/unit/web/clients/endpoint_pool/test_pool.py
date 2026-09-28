@@ -9,15 +9,15 @@ from unittest.mock import AsyncMock, MagicMock
 import aiohttp
 import pytest
 
-from ai.backend.web.clients.endpoint_pool import (
-    EndpointPoolSpec,
+from ai.backend.common.endpoint_pool.exceptions import NoHealthyEndpointError
+from ai.backend.common.endpoint_pool.pool import HealthyEndpointPool
+from ai.backend.common.endpoint_pool.strategy import (
     EndpointSelectionPolicy,
-    HealthyEndpointPool,
     LeastConnectionsStrategy,
     RoundRobinStrategy,
     build_endpoint_selection_strategy,
 )
-from ai.backend.web.errors import ManagerConnectionUnavailable
+from ai.backend.common.endpoint_pool.types import EndpointPoolSpec
 
 
 def _make_spec(
@@ -130,7 +130,7 @@ class TestAcquire:
         )
         async with _running_pool(pool):
             await _drive_to_unhealthy(pool, "http://m1", attempts=1)
-            with pytest.raises(ManagerConnectionUnavailable):
+            with pytest.raises(NoHealthyEndpointError):
                 async with pool.acquire():
                     pytest.fail("acquire should have raised before yielding")
 
@@ -170,7 +170,7 @@ class TestAcquireSticky:
             probe_session_factory=_make_session_factory(),
         )
         async with _running_pool(pool):
-            with pytest.raises(ManagerConnectionUnavailable):
+            with pytest.raises(NoHealthyEndpointError):
                 async with pool.acquire_sticky("http://other"):
                     pytest.fail("acquire_sticky should have raised")
 
@@ -280,9 +280,9 @@ class TestHealthState:
             probe_session_factory=_make_session_factory(),
         )
         async with _running_pool(pool):
-            with pytest.raises(ManagerConnectionUnavailable):
+            with pytest.raises(NoHealthyEndpointError):
                 async with pool.acquire_sticky("http://other"):
-                    pytest.fail("expected ManagerConnectionUnavailable")
+                    pytest.fail("expected NoHealthyEndpointError")
 
     async def test_all_endpoints_lists_configured_endpoints(self) -> None:
         pool = HealthyEndpointPool(
@@ -415,7 +415,7 @@ class TestReadiness:
             assert not pool.is_healthy("http://m1")
             async with pool.acquire() as acquired:
                 assert acquired.endpoint == "http://m2"
-            with pytest.raises(ManagerConnectionUnavailable):
+            with pytest.raises(NoHealthyEndpointError):
                 async with pool.acquire_sticky("http://m1"):
                     pytest.fail("unready endpoint must not be acquired")
 
