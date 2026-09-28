@@ -17,7 +17,7 @@ from ai.backend.common.events.event_types.schedule.anycast import (
 )
 from ai.backend.common.leader.tasks import EventTaskSpec
 from ai.backend.common.service_discovery import ServiceDiscovery
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger, with_log_context
 from ai.backend.manager.clients.appproxy.client import AppProxyClientPool
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.deployment.types import (
@@ -33,28 +33,36 @@ from ai.backend.manager.models.routing.searchers import RouteDataSearcher
 from ai.backend.manager.models.routing.updaters import ReplicaBatchUpdater
 from ai.backend.manager.models.scheduling_history.creators import RouteHistoryCreator
 from ai.backend.manager.models.specs.pagination import NoPagination
-from ai.backend.manager.repositories.deployment import DeploymentRepository
-from ai.backend.manager.repositories.deployment.types import RouteHistoryToCreate
+from ai.backend.manager.repositories.deployment.repository import DeploymentRepository
+from ai.backend.manager.repositories.deployment.types.endpoint import RouteHistoryToCreate
 from ai.backend.manager.sokovan.deployment.route.executor import RouteExecutor
-from ai.backend.manager.sokovan.deployment.route.handlers import (
+from ai.backend.manager.sokovan.deployment.route.handlers.appproxy_sync import (
     AppProxySyncRouteHandler,
-    DrainingRouteHandler,
+)
+from ai.backend.manager.sokovan.deployment.route.handlers.base import RouteHandler
+from ai.backend.manager.sokovan.deployment.route.handlers.draining import DrainingRouteHandler
+from ai.backend.manager.sokovan.deployment.route.handlers.health_check import (
     HealthCheckRouteHandler,
-    ProvisioningRouteHandler,
-    ReplicaProbeTargetSyncHandler,
-    RouteEvictionHandler,
-    RouteHandler,
-    RunningRouteHandler,
-    ServiceDiscoverySyncHandler,
-    StartingRouteHandler,
-    TerminatingRouteHandler,
-    WarmingUpRouteHandler,
 )
-from ai.backend.manager.sokovan.deployment.route.handlers.observer import (
+from ai.backend.manager.sokovan.deployment.route.handlers.observer.base import RouteObserver
+from ai.backend.manager.sokovan.deployment.route.handlers.observer.health_check import (
     RouteHealthObserver,
-    RouteObserver,
 )
-from ai.backend.manager.sokovan.deployment.route.recorder import RouteRecorderContext
+from ai.backend.manager.sokovan.deployment.route.handlers.probe_target_sync import (
+    ReplicaProbeTargetSyncHandler,
+)
+from ai.backend.manager.sokovan.deployment.route.handlers.provisioning import (
+    ProvisioningRouteHandler,
+)
+from ai.backend.manager.sokovan.deployment.route.handlers.route_eviction import RouteEvictionHandler
+from ai.backend.manager.sokovan.deployment.route.handlers.running import RunningRouteHandler
+from ai.backend.manager.sokovan.deployment.route.handlers.service_discovery_sync import (
+    ServiceDiscoverySyncHandler,
+)
+from ai.backend.manager.sokovan.deployment.route.handlers.starting import StartingRouteHandler
+from ai.backend.manager.sokovan.deployment.route.handlers.terminating import TerminatingRouteHandler
+from ai.backend.manager.sokovan.deployment.route.handlers.warming_up import WarmingUpRouteHandler
+from ai.backend.manager.sokovan.deployment.route.recorder.context import RouteRecorderContext
 from ai.backend.manager.sokovan.deployment.route.types import (
     RouteExecutionResult,
     RouteLifecycleType,
@@ -66,7 +74,7 @@ from ai.backend.manager.sokovan.scheduling_controller.scheduling_controller impo
 )
 from ai.backend.manager.types import DistributedLockFactory, OptionalState, TriState
 
-log = BraceStyleAdapter(logging.getLogger(__name__))
+log = StructuredLogger(logging.getLogger(__name__))
 
 
 @dataclass
@@ -209,14 +217,19 @@ class RouteCoordinator:
         # Check for observer first (no state transitions)
         observer = self._route_observers.get(lifecycle_type)
         if observer:
-            await self._process_observer(observer)
+            with with_log_context(lifecycle_type=lifecycle_type, handler_name=observer.name()):
+                await self._process_observer(observer)
             return
 
         handler = self._route_handlers.get(lifecycle_type)
         if not handler:
-            log.warning("No handler for route lifecycle type: {}", lifecycle_type.value)
+            log.warning("no handler for route lifecycle", lifecycle_type=lifecycle_type)
             return
 
+        with with_log_context(lifecycle_type=lifecycle_type, handler_name=handler.name()):
+            await self._run_handler(lifecycle_type, handler)
+
+    async def _run_handler(self, lifecycle_type: RouteLifecycleType, handler: RouteHandler) -> None:
         async with AsyncExitStack() as stack:
             if handler.lock_id is not None:
                 lock_lifetime = self._config_provider.config.manager.session_schedule_lock_lifetime
@@ -239,10 +252,10 @@ class RouteCoordinator:
                 category=handler.category(),
             )
             if not routes:
-                log.trace("No routes to process for handler: {}", handler.name())
+                log.trace("no routes to process")
                 return
 
-            log.trace("handler: {}, routes: {}", handler.name(), routes)
+            log.debug("route handler processing", route_count=len(routes))
 
             # Execute handler with recorder context
             route_ids = [r.route_id for r in routes]
@@ -255,8 +268,8 @@ class RouteCoordinator:
 
             try:
                 await handler.post_process(result)
-            except Exception as e:
-                log.error("Error during post-processing: {}", e)
+            except Exception:
+                log.exception("route handler post-processing failed")
 
     async def _process_observer(self, observer: RouteObserver) -> None:
         """Process a route observer (no state transitions).
@@ -294,13 +307,9 @@ class RouteCoordinator:
                 return
 
             result = await observer.observe(routes)
-            log.debug(
-                "Observer {}: observed {} routes",
-                observer.name(),
-                result.observed_count,
-            )
+            log.debug("route observer completed", observed_count=result.observed_count)
         except Exception:
-            log.exception("Error in route observer {}", observer.name())
+            log.exception("route observer failed")
 
     async def _handle_status_transitions(
         self,

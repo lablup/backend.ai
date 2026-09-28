@@ -25,18 +25,18 @@ from ai.backend.manager.data.image.types import ImageStatus, ImageType
 from ai.backend.manager.models.alembic.versions.a3f57c4d90e2_mark_customized_images_and_their_creator import (
     backfill,
 )
-from ai.backend.manager.models.container_registry import ContainerRegistryRow
-from ai.backend.manager.models.domain import DomainRow
+from ai.backend.manager.models.container_registry.row import ContainerRegistryRow
+from ai.backend.manager.models.domain.row import DomainRow
 from ai.backend.manager.models.hasher.types import PasswordInfo
-from ai.backend.manager.models.image import ImageRow
-from ai.backend.manager.models.keypair import KeyPairRow
-from ai.backend.manager.models.project import ProjectRow
-from ai.backend.manager.models.resource_policy import (
+from ai.backend.manager.models.image.row import ImageRow
+from ai.backend.manager.models.keypair.row import KeyPairRow
+from ai.backend.manager.models.project.row import ProjectRow
+from ai.backend.manager.models.resource_policy.row import (
     KeyPairResourcePolicyRow,
     ProjectResourcePolicyRow,
     UserResourcePolicyRow,
 )
-from ai.backend.manager.models.user import UserRole, UserRow, UserStatus
+from ai.backend.manager.models.user.row import UserRole, UserRow, UserStatus
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.testutils.db import HasTable, with_tables
 

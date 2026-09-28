@@ -56,11 +56,11 @@ from ai.backend.manager.models.rbac import (
 )
 from ai.backend.manager.models.rbac.context import ClientContext
 from ai.backend.manager.models.types import QueryCondition
-from ai.backend.manager.models.user import UserRole
+from ai.backend.manager.models.user.row import UserRole
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 
 if TYPE_CHECKING:
-    from ai.backend.manager.models.agent import AgentRow
+    from ai.backend.manager.models.agent.row import AgentRow
 
 __all__: Sequence[str] = (
     # table defs
@@ -492,7 +492,7 @@ class ResourceGroupPermissionContextBuilder(
         self,
         ctx: ClientContext,
     ) -> ResourceGroupPermissionContext:
-        from ai.backend.manager.models.domain import DomainRow
+        from ai.backend.manager.models.domain.row import DomainRow
 
         perm_ctx = ResourceGroupPermissionContext()
         _domain_query_stmt = sa.select(DomainRow).options(load_only(DomainRow.name))
@@ -507,7 +507,7 @@ class ResourceGroupPermissionContextBuilder(
         ctx: ClientContext,
         scope: DomainScope,
     ) -> ResourceGroupPermissionContext:
-        from ai.backend.manager.models.domain import DomainRow
+        from ai.backend.manager.models.domain.row import DomainRow
 
         permissions = await self.calculate_permission(ctx, scope)
         if not permissions:
@@ -539,7 +539,7 @@ class ResourceGroupPermissionContextBuilder(
         ctx: ClientContext,
         scope: ProjectScope,
     ) -> ResourceGroupPermissionContext:
-        from ai.backend.manager.models.project import ProjectRow
+        from ai.backend.manager.models.project.row import ProjectRow
 
         project_permissions = await self.calculate_permission(ctx, scope)
         if not project_permissions:
@@ -571,8 +571,8 @@ class ResourceGroupPermissionContextBuilder(
         ctx: ClientContext,
         scope: UserScope,
     ) -> ResourceGroupPermissionContext:
-        from ai.backend.manager.models.keypair import KeyPairRow
-        from ai.backend.manager.models.user import UserRow
+        from ai.backend.manager.models.keypair.row import KeyPairRow
+        from ai.backend.manager.models.user.row import UserRow
 
         user_permissions = await self.calculate_permission(ctx, scope)
         if not user_permissions:

@@ -21,7 +21,7 @@ from ai.backend.common.types import (
     LegacyResourceSlotState as ResourceSlotState,
 )
 from ai.backend.manager.data.resource_preset.types import ResourcePresetData
-from ai.backend.manager.models.kernel import KernelRow
+from ai.backend.manager.models.kernel.row import KernelRow
 from ai.backend.manager.repositories.resource_slot.types import (
     quantities_from_json,
     quantities_to_json,

@@ -20,8 +20,8 @@ from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
 from ai.backend.manager.models.condition_utils import combine_conditions_or, negate_conditions
 from ai.backend.manager.models.entity_label.searchable_fields import EntityLabelSearchableFields
 from ai.backend.manager.models.specs.searcher import Searcher
-from ai.backend.manager.repositories.base import BatchQuerier
 from ai.backend.manager.repositories.base.filter_adapter import BaseFilterAdapter
+from ai.backend.manager.repositories.base.querier import BatchQuerier
 
 if TYPE_CHECKING:
     from ai.backend.common.dto.manager.v2.entity_label.request import (

@@ -30,7 +30,7 @@ from ai.backend.manager.errors.storage import (
 )
 from ai.backend.manager.models.base import StrEnumType
 from ai.backend.manager.models.project.row import ProjectRow, ProjectType
-from ai.backend.manager.models.resource_policy import (
+from ai.backend.manager.models.resource_policy.row import (
     ProjectResourcePolicyRow,
     UserResourcePolicyRow,
 )
@@ -38,7 +38,7 @@ from ai.backend.manager.models.specs.creator import (
     GuardedEntityCreator,
 )
 from ai.backend.manager.models.specs.types import IntegrityErrorCheck, PreconditionCheck
-from ai.backend.manager.models.user import UserRow
+from ai.backend.manager.models.user.row import UserRow
 from ai.backend.manager.models.vfolder.row import (
     HARD_DELETED_VFOLDER_STATUSES,
     VFOLDER_NAME_IN_PROJECT_INDEX,

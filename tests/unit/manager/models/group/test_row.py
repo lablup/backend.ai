@@ -14,16 +14,15 @@ from ai.backend.common.types import ResourceSlot, VFolderHostPermissionMap
 # test registers a domain-cluster row) resolves string relationships against the
 # registry. These rows are reachable via relationships but are not otherwise
 # imported/registered by this test; _ORM_CLUSTER keeps them live.
-from ai.backend.manager.models.agent import AgentRow
-from ai.backend.manager.models.domain import DomainRow
-from ai.backend.manager.models.project import ProjectRow
-from ai.backend.manager.models.project.row import resolve_group_name_or_id
-from ai.backend.manager.models.resource_group import ResourceGroupForDomainRow
-from ai.backend.manager.models.resource_policy import (
+from ai.backend.manager.models.agent.row import AgentRow
+from ai.backend.manager.models.domain.row import DomainRow
+from ai.backend.manager.models.project.row import ProjectRow, resolve_group_name_or_id
+from ai.backend.manager.models.resource_group.row import ResourceGroupForDomainRow
+from ai.backend.manager.models.resource_policy.row import (
     ProjectResourcePolicyRow,
     UserResourcePolicyRow,
 )
-from ai.backend.manager.models.user import UserRow
+from ai.backend.manager.models.user.row import UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.testutils.db import with_tables
 from ai.backend.testutils.fixtures import DomainFixtureData

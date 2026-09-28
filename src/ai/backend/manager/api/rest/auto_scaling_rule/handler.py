@@ -27,7 +27,7 @@ from ai.backend.common.dto.manager.auto_scaling_rule import (
     UpdateAutoScalingRuleRequest,
     UpdateAutoScalingRuleResponse,
 )
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.data.deployment.scale import ModelDeploymentAutoScalingRuleCreator
 from ai.backend.manager.dto.auto_scaling_rule_request import (
     GetAutoScalingRulePathParam,
@@ -61,7 +61,7 @@ from ai.backend.manager.services.deployment.processors import DeploymentProcesso
 
 from .adapter import AutoScalingRuleAdapter
 
-log: Final = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log: Final = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 class AutoScalingRuleHandler:

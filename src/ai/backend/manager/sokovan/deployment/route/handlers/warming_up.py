@@ -5,8 +5,9 @@ from collections.abc import Sequence
 from typing import override
 
 from ai.backend.common.events.dispatcher import EventProducer
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.data.deployment.types import (
+    RouteData,
     RouteHandlerCategory,
     RouteStatus,
     RouteStatusTransitions,
@@ -15,13 +16,12 @@ from ai.backend.manager.data.deployment.types import (
     RouteTrafficStatus,
     RouteTransitionTarget,
 )
-from ai.backend.manager.repositories.deployment.types import RouteData
 from ai.backend.manager.sokovan.deployment.route.executor import RouteExecutor
 from ai.backend.manager.sokovan.deployment.route.types import RouteExecutionResult
 
 from .base import RouteHandler
 
-log = BraceStyleAdapter(logging.getLogger(__name__))
+log = StructuredLogger(logging.getLogger(__name__))
 
 
 class WarmingUpRouteHandler(RouteHandler):
@@ -82,13 +82,12 @@ class WarmingUpRouteHandler(RouteHandler):
 
     @override
     async def execute(self, routes: Sequence[RouteData]) -> RouteExecutionResult:
-        log.debug("Checking {} warming-up routes for initial health", len(routes))
         return await self._route_executor.check_warming_up_health(routes)
 
     @override
     async def post_process(self, result: RouteExecutionResult) -> None:
-        log.info(
-            "Warming-up check: {} routes activated (→ running), {} still probing",
-            len(result.successes),
-            len(result.errors) + len(result.stale),
+        log.debug(
+            "warming-up routes checked",
+            activated_count=len(result.successes),
+            probing_count=len(result.errors) + len(result.stale),
         )

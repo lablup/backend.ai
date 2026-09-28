@@ -10,9 +10,9 @@ from typing import Final
 
 from ai.backend.common.events.types import AbstractEvent, EventDomain
 from ai.backend.common.metrics.metric import EventPropagatorMetricObserver
-from ai.backend.logging.utils import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 WILDCARD: Final = "*"
 

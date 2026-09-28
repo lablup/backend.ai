@@ -5,19 +5,20 @@ from __future__ import annotations
 import uuid
 from datetime import UTC, datetime
 from types import SimpleNamespace
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 from uuid import uuid4
 
 import pytest
 
-from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.vfolder import VFolderUUID
-from ai.backend.common.data.user.types import UserData
+from ai.backend.common.dto.manager.v2.rbac.types import UUIDScope
 from ai.backend.common.dto.manager.v2.vfolder.request import (
+    ScopedSearchVFoldersInput,
     SearchVFoldersInput,
     VFolderFilter,
 )
+from ai.backend.common.dto.manager.v2.vfolder.types import VFolderScope
 from ai.backend.common.types import QuotaScopeID, VFolderMountPolicy, VFolderUsageMode
 from ai.backend.manager.actions.v2.bulk.result import PartialBulkEntityResult, PartialBulkResult
 from ai.backend.manager.api.adapters.vfolder.adapter import VFolderAdapter
@@ -28,7 +29,6 @@ from ai.backend.manager.data.vfolder.types import (
     VFolderUsageData,
 )
 from ai.backend.manager.errors.common import GenericForbidden
-from ai.backend.manager.models.user import UserRole
 from ai.backend.manager.services.vfolder.actions.get_usage import (
     GetVFolderUsageActionResult,
 )
@@ -44,20 +44,12 @@ def _scoped_result(items: list[VFolderData]) -> SimpleNamespace:
     )
 
 
-class TestVFolderAdapterMySearch:
-    """Tests for VFolderAdapter.my_search()."""
+class TestVFolderAdapterUserScopedSearch:
+    """Tests for VFolderAdapter.scoped_search() with a user scope."""
 
     @pytest.fixture
-    def user_data(self) -> UserData:
-        return UserData(
-            user_id=uuid4(),
-            is_authorized=True,
-            is_admin=False,
-            is_superadmin=False,
-            role=UserRole.USER,
-            domain_name="default",
-            domain_id=DomainID(uuid4()),
-        )
+    def user_id(self) -> uuid.UUID:
+        return uuid4()
 
     @pytest.fixture
     def vfolder_data(self) -> VFolderData:
@@ -100,39 +92,32 @@ class TestVFolderAdapterMySearch:
             mock_processors.vfolder_mount_policy,
         )
 
-    async def test_my_search_calls_processor_with_user_scope(
+    async def test_user_scope_is_the_one_scope_read(
         self,
         adapter: VFolderAdapter,
         mock_processors: MagicMock,
-        user_data: UserData,
+        user_id: uuid.UUID,
     ) -> None:
-        """my_search names the acting user as the one scope it reads within."""
-        input_dto = SearchVFoldersInput(limit=10, offset=0)
-
-        with patch(
-            "ai.backend.manager.api.adapters.vfolder.adapter.current_user",
-            return_value=user_data,
-        ):
-            await adapter.my_search(input_dto)
+        await adapter.scoped_search(
+            ScopedSearchVFoldersInput(
+                scope=VFolderScope(user=[UUIDScope(value=user_id)]), limit=10, offset=0
+            )
+        )
 
         mock_processors.vfolder.scoped_search.run.assert_called_once()
         action = mock_processors.vfolder.scoped_search.run.call_args[0][0]
-        assert [item.scope_id() for item in action.searcher.scopes] == [user_data.user_id]
+        assert [item.scope_id() for item in action.searcher.scopes] == [user_id]
 
-    async def test_my_search_returns_payload(
+    async def test_user_scope_returns_payload(
         self,
         adapter: VFolderAdapter,
-        mock_processors: MagicMock,
-        user_data: UserData,
+        user_id: uuid.UUID,
     ) -> None:
-        """my_search should return SearchVFoldersPayload with items from action result."""
-        input_dto = SearchVFoldersInput(limit=10, offset=0)
-
-        with patch(
-            "ai.backend.manager.api.adapters.vfolder.adapter.current_user",
-            return_value=user_data,
-        ):
-            result = await adapter.my_search(input_dto)
+        result = await adapter.scoped_search(
+            ScopedSearchVFoldersInput(
+                scope=VFolderScope(user=[UUIDScope(value=user_id)]), limit=10, offset=0
+            )
+        )
 
         assert result.total_count == 1
         assert len(result.items) == 1

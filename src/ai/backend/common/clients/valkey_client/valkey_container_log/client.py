@@ -23,9 +23,9 @@ from ai.backend.common.resilience import (
     RetryPolicy,
 )
 from ai.backend.common.types import ValkeyTarget
-from ai.backend.logging.utils import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 # Resilience instance for valkey_container_log layer
 valkey_container_log_resilience = Resilience(
@@ -92,7 +92,7 @@ class ValkeyContainerLogClient:
         Close the ValkeyContainerLogClient connection.
         """
         if self._closed:
-            log.debug("ValkeyContainerLogClient is already closed.")
+            log.debug("valkey container log client already closed")
             return
         self._closed = True
         await self._client.disconnect()

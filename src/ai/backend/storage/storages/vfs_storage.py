@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import asyncio
 import logging
 import mimetypes
 import shutil
@@ -14,6 +13,7 @@ import aiofiles
 import aiofiles.os
 
 from ai.backend.common.artifact_storage import AbstractStorage
+from ai.backend.common.asyncio import run_in_executor_with_context
 from ai.backend.common.dto.storage.response import (
     PresignedDownloadObjectResponse,
     PresignedUploadObjectResponse,
@@ -22,7 +22,7 @@ from ai.backend.common.dto.storage.response import (
     VFSListFilesResponse,
 )
 from ai.backend.common.types import StreamReader
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.storage.config.unified import VFSStorageConfig
 from ai.backend.storage.errors import (
     FileStreamDownloadError,
@@ -34,7 +34,7 @@ from ai.backend.storage.errors import (
 )
 from ai.backend.storage.utils import normalize_filepath
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 class VFSFileDownloadServerStreamReader(StreamReader):
@@ -79,14 +79,13 @@ class VFSDirectoryDownloadServerStreamReader(StreamReader):
     @override
     async def read(self) -> AsyncIterator[bytes]:
         """Create a tar archive of the directory and stream it."""
-        loop = asyncio.get_running_loop()
 
         # Create temporary file for the tar archive
         with tempfile.NamedTemporaryFile(delete=False, suffix=".tar") as temp_file:
             self._temp_file = Path(temp_file.name)
 
             # Create tar archive in executor to avoid blocking
-            await loop.run_in_executor(
+            await run_in_executor_with_context(
                 None, self._create_tar_archive, str(self._directory_path), str(self._temp_file)
             )
 
@@ -112,14 +111,10 @@ class VFSDirectoryDownloadServerStreamReader(StreamReader):
 
     def _create_tar_archive(self, source_dir: str, tar_path: str) -> None:
         """Create tar archive of directory contents."""
-        try:
-            log.debug("Creating tar archive: {} -> {}", source_dir, tar_path)
-            with tarfile.open(tar_path, "w") as tar:
-                tar.add(source_dir, arcname=".", recursive=True)
-            log.debug("Tar archive created successfully: {}", tar_path)
-        except Exception as e:
-            log.error("Failed to create tar archive: {}", e)
-            raise
+        log.debug("Creating tar archive: {} -> {}", source_dir, tar_path)
+        with tarfile.open(tar_path, "w") as tar:
+            tar.add(source_dir, arcname=".", recursive=True)
+        log.debug("Tar archive created successfully: {}", tar_path)
 
 
 class VFSStorage(AbstractStorage):
@@ -160,7 +155,7 @@ class VFSStorage(AbstractStorage):
         if not self._base_path.exists():
             return
 
-        log.info("Cleaning up temporary storage: {}", self._base_path)
+        log.debug("cleaning up temporary storage {}", self._base_path)
         try:
             # Remove all contents but keep the directory itself
             for item in self._base_path.iterdir():
@@ -168,9 +163,9 @@ class VFSStorage(AbstractStorage):
                     shutil.rmtree(item)
                 else:
                     item.unlink()
-            log.info("Temporary storage cleaned: {}", self._base_path)
-        except Exception as e:
-            log.warning("Failed to clean temporary storage {}: {}", self._base_path, e)
+            log.info("temporary storage cleaned", base_path=self._base_path)
+        except Exception:
+            log.exception("temporary storage cleanup failed", base_path=self._base_path)
 
     @property
     @override
@@ -341,8 +336,7 @@ class VFSStorage(AbstractStorage):
                 await aiofiles.os.remove(target_path)
             elif target_path.is_dir():
                 # Remove directory recursively
-                loop = asyncio.get_running_loop()
-                await loop.run_in_executor(None, shutil.rmtree, target_path)
+                await run_in_executor_with_context(None, shutil.rmtree, target_path)
             else:
                 raise FileStreamUploadError(f"Cannot delete: {filepath}")
 

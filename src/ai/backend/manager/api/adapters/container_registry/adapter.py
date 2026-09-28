@@ -49,7 +49,7 @@ from ai.backend.manager.models.container_registry.searchable_fields import (
 from ai.backend.manager.models.container_registry.searchers import ContainerRegistrySearcher
 from ai.backend.manager.models.container_registry.updaters import ContainerRegistryUpdater
 from ai.backend.manager.models.specs.searcher import GlobalSearcher
-from ai.backend.manager.repositories.base import BatchQuerier
+from ai.backend.manager.repositories.base.querier import BatchQuerier
 from ai.backend.manager.services.container_registry.actions.bulk_get import (
     BulkGetContainerRegistriesAction,
 )

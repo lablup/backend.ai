@@ -7,7 +7,7 @@ This document explains how to add new fonts under `resources/fonts/`.
 The application parses the `fontFamily` value from `theme.json` and **automatically loads** the corresponding CSS file for each font name.
 
 ```
-theme.json fontFamily: "MyFont, 'Ubuntu', Roboto, sans-serif"
+theme.json fontFamily: "MyFont, 'Ubuntu', Roboto, Pretendard, sans-serif"
                           │         │        │
                           ▼         ▼        ▼
         resources/fonts/myfont/myfont.css
@@ -60,6 +60,22 @@ This applies to fonts that already include a CSS file (e.g. Google Fonts downloa
    /* Use relative paths */
    src: url(./woff2/MyCustomFont-Regular.woff2) format('woff2');
    ```
+
+### Example: Pretendard (upstream web package, copied as-is)
+
+The Hangul face is the upstream `dist/web/static` folder of
+[Pretendard](https://github.com/orioncactus/pretendard) copied without changes — its entry
+CSS is already named `pretendard.css`, so the auto-loader resolves it once `Pretendard` is
+listed in `fontFamily`. Keep `'Ubuntu', Roboto` **before** it: Latin then stays in Ubuntu and
+only the code points Ubuntu/Roboto lack (Hangul) fall through to Pretendard.
+
+```
+resources/fonts/pretendard/
+├── pretendard.css            ← entry CSS (loads woff2/ + woff/)
+├── pretendard-subset.css     ← same faces, Korean-subset files (not loaded by default)
+├── woff2/ · woff/            ← 9 weights each
+└── woff2-subset/ · woff-subset/
+```
 
 ### Example: Roboto (distributed with woff2/woff)
 
@@ -230,3 +246,4 @@ After placing font files and CSS, add the font name to `fontFamily` in `resource
 |-----------------|----------------------|--------------------------------|
 | `roboto/`       | `roboto.css`         | woff2/woff, CSS included       |
 | `ubuntu/`       | `ubuntu.css`         | woff2/woff, CSS included       |
+| `pretendard/`   | `pretendard.css`     | upstream `dist/web/static` as-is (woff2/woff + `-subset` variants); Hangul face after Ubuntu/Roboto |

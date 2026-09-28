@@ -2,14 +2,14 @@ import logging
 from collections.abc import Sequence
 
 from ai.backend.common.leader.tasks import EventTaskSpec
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.sokovan.deployment.coordinator import DeploymentCoordinator
 from ai.backend.manager.sokovan.deployment.route.coordinator import RouteCoordinator
 from ai.backend.manager.sokovan.reconciler.base import ReconcilerTaskSpec
 from ai.backend.manager.sokovan.reconciler.coordinator import ReconcilerCoordinator
 from ai.backend.manager.sokovan.scheduler.coordinator import ScheduleCoordinator
 
-log = BraceStyleAdapter(logging.getLogger(__name__))
+log = StructuredLogger(logging.getLogger(__name__))
 
 
 class SokovanOrchestrator:

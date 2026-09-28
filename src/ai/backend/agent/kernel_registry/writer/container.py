@@ -10,7 +10,7 @@ from ai.backend.agent.kernel_registry.types import KernelRecoveryData
 from ai.backend.agent.scratch.types import KernelRecoveryScratchData
 from ai.backend.agent.scratch.utils import ScratchConfig, ScratchUtils
 from ai.backend.common.types import KernelId
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 
 from .abc import AbstractKernelRegistryWriter
 from .types import KernelRegistrySaveMetadata
@@ -18,7 +18,7 @@ from .types import KernelRegistrySaveMetadata
 if TYPE_CHECKING:
     from ai.backend.agent.kernel import AbstractKernel
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 class ContainerBasedKernelRegistryWriter(AbstractKernelRegistryWriter):
@@ -54,7 +54,9 @@ class ContainerBasedKernelRegistryWriter(AbstractKernelRegistryWriter):
                 original_recovery_data = self._parse_recovery_data_from_kernel(kernel)
             except KernelRecoveryDataParseError as e:
                 log.exception(
-                    "Failed to parse recovery data from kernel {}: {}", kernel.kernel_id, str(e)
+                    "kernel recovery data parse failed",
+                    kernel_id=kernel.kernel_id,
+                    error_repr=repr(e),
                 )
                 continue
             if original_recovery_data is None:
@@ -64,4 +66,4 @@ class ContainerBasedKernelRegistryWriter(AbstractKernelRegistryWriter):
             )
             await config_mgr.save_json_recovery_data(recovery_data)
             # resource spec and environ are not saved here, as they are saved when the kernel is created.
-        log.debug("Saved kernel registry to scratch root {}", str(self._scratch_root))
+        log.debug("kernel registry saved to scratch", scratch_root=self._scratch_root)

@@ -11,7 +11,7 @@ from uuid import uuid4
 import pytest
 
 from ai.backend.common.config import ModelConfig, ModelDefinition, ModelServiceConfig
-from ai.backend.common.contexts.user import with_user
+from ai.backend.common.contexts.user import with_user_context
 from ai.backend.common.data.entity.auto_scaling_rule import AutoScalingRuleID
 from ai.backend.common.data.entity.deployment import DeploymentEntityType, DeploymentID
 from ai.backend.common.data.entity.deployment_revision import DeploymentRevisionID
@@ -24,7 +24,12 @@ from ai.backend.common.data.entity.types import EntityIdentifier
 from ai.backend.common.data.entity.vfolder import VFolderUUID
 from ai.backend.common.data.model_deployment.types import DeploymentStrategy, ModelDeploymentStatus
 from ai.backend.common.data.user.types import UserData, UserRole
-from ai.backend.common.dto.manager.v2.deployment.request import AdminSearchDeploymentsInput
+from ai.backend.common.dto.manager.v2.deployment.request import (
+    AdminSearchDeploymentsInput,
+    ScopedSearchDeploymentsInput,
+)
+from ai.backend.common.dto.manager.v2.deployment.types import DeploymentScope
+from ai.backend.common.dto.manager.v2.rbac.types import UUIDScope
 from ai.backend.common.schema.deployment import RollingUpdateSpec
 from ai.backend.common.types import (
     AutoScalingMetricSource,
@@ -198,14 +203,20 @@ class TestDeploymentSearchGates:
         )
         return DeploymentAdapter(processors.deployment, MagicMock())
 
-    async def test_my_search_is_answered_for_the_user_scope(
+    async def test_scoped_search_is_answered_for_the_user_scope(
         self,
         adapter: DeploymentAdapter,
         scope_gate: _RecordingScopeValidator,
         regular_user: UserData,
     ) -> None:
-        with with_user(regular_user):
-            payload = await adapter.my_search(AdminSearchDeploymentsInput(limit=10, offset=0))
+        with with_user_context(regular_user):
+            payload = await adapter.scoped_search(
+                ScopedSearchDeploymentsInput(
+                    scope=DeploymentScope(user=[UUIDScope(value=regular_user.user_id)]),
+                    limit=10,
+                    offset=0,
+                )
+            )
 
         assert payload.total_count == 0
         assert scope_gate.seen == [[regular_user.user_id]]
@@ -217,7 +228,7 @@ class TestDeploymentSearchGates:
         regular_user: UserData,
     ) -> None:
         project_id = uuid4()
-        with with_user(regular_user):
+        with with_user_context(regular_user):
             payload = await adapter.project_search(
                 project_id, AdminSearchDeploymentsInput(limit=10, offset=0)
             )
@@ -230,7 +241,7 @@ class TestDeploymentSearchGates:
         adapter: DeploymentAdapter,
         regular_user: UserData,
     ) -> None:
-        with with_user(regular_user), pytest.raises(InsufficientPrivilege):
+        with with_user_context(regular_user), pytest.raises(InsufficientPrivilege):
             await adapter.admin_search(AdminSearchDeploymentsInput(limit=10, offset=0))
 
 

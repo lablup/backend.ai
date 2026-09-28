@@ -23,21 +23,21 @@ from uuid import UUID
 from ai.backend.common.data.entity.kernel import KernelID
 from ai.backend.common.data.entity.resource_group import ResourceGroupID
 from ai.backend.common.types import KernelId, ResourceSlot
-from ai.backend.logging.utils import BraceStyleAdapter
-from ai.backend.manager.data.fair_share import (
+from ai.backend.logging.structured import StructuredLogger
+from ai.backend.manager.data.fair_share.types import (
     DomainUsageBucketKey,
     ProjectUsageBucketKey,
     UsageBucketAggregationResult,
     UserUsageBucketKey,
 )
 from ai.backend.manager.data.resource_usage_history.types import KernelUsageRecordData
-from ai.backend.manager.models.resource_usage_history import KernelUsageRecordRow
 from ai.backend.manager.models.resource_usage_history.creators import (
     KernelUsageRecordCreator,
 )
+from ai.backend.manager.models.resource_usage_history.row import KernelUsageRecordRow
 from ai.backend.manager.models.specs.creator import NestedFieldToCreate
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 # Observation slice duration (5 minutes)
 SLICE_DURATION_SECONDS = 300
@@ -342,23 +342,19 @@ class FairShareAggregator:
             end_time = self._floor_to_boundary(now)
 
         log.debug(
-            "[Aggregator] Kernel {}: is_first={}, is_terminated={}, "
-            "start_time={}, end_time={}, now={}",
-            kernel.id,
-            is_first_observation,
-            is_terminated,
-            start_time,
-            end_time,
-            now,
+            "fair share slice range computed",
+            kernel_id=kernel.id,
+            is_first_observation=is_first_observation,
+            is_terminated=is_terminated,
+            start_time=start_time,
+            end_time=end_time,
+            current_time=now,
         )
 
         # Validate time range
         if end_time <= start_time:
             # Not enough time has passed to generate any slices
-            log.debug(
-                "[Aggregator] Kernel {}: skipped (end_time <= start_time)",
-                kernel.id,
-            )
+            log.debug("fair share slice skipped, end before start", kernel_id=kernel.id)
             return [], start_time
 
         # Generate 5-minute slices
@@ -371,11 +367,7 @@ class FairShareAggregator:
             end_time=end_time,
         )
 
-        log.debug(
-            "[Aggregator] Kernel {}: generated {} specs",
-            kernel.id,
-            len(specs),
-        )
+        log.debug("fair share slice specs generated", kernel_id=kernel.id, spec_count=len(specs))
 
         # Return end_time as the new last_observed_at
         # For RUNNING: this is floored to boundary

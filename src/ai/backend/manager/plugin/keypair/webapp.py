@@ -9,8 +9,8 @@ import yarl
 from aiohttp import web
 from pydantic import ValidationError
 
-from ai.backend.common.logging_utils import BraceStyleAdapter
 from ai.backend.common.types import BackendAISchema
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.api.rest.types import CORSOptions, WebMiddleware
 from ai.backend.manager.errors.auth import AuthorizationFailed, InvalidAuthParameters
 from ai.backend.manager.plugin.webapp import WebappPlugin
@@ -22,7 +22,7 @@ from .utils import (
     serialize_stoken,
 )
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 class LoginRequestData(BackendAISchema):
@@ -40,10 +40,7 @@ async def login(request: web.Request) -> web.Response:
         raw_data = await request.json()
         json_data = LoginRequestData(**raw_data)
     except (json.decoder.JSONDecodeError, ValidationError, TypeError) as e:
-        log.warning(
-            "Invalid login request data: {}",
-            repr(e),
-        )
+        log.trace("login request data invalid", error_detail=repr(e))
         raise InvalidAuthParameters("Invalid JSON data in request body.") from None
 
     auth_repository = cast(AuthRepository, root_app["_auth_repository"])
@@ -51,7 +48,7 @@ async def login(request: web.Request) -> web.Response:
         json_data.access_key, json_data.secret_key
     )
     if not authenticated:
-        log.warning("login failed for access_key {}", json_data.access_key)
+        log.trace("login failed", access_key=json_data.access_key)
         raise AuthorizationFailed("Invalid credentials.")
 
     token_secret = plugin_config["secret"]

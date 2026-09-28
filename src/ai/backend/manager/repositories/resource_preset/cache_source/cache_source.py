@@ -8,10 +8,10 @@ from uuid import UUID
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
 from ai.backend.common.json import dump_json, load_json
 from ai.backend.common.types import AccessKey
-from ai.backend.logging.utils import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.data.resource_preset.types import ResourcePresetData
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 # Cache TTL in seconds
 CACHE_TTL = 60  # 1 minute

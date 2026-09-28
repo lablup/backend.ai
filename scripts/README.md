@@ -41,6 +41,7 @@ current, see `AGENTS.md` in this directory.
 | `pre-commit.sh` | `pants fmt` + `pants lint` over the changed files | auto — `pre-commit` |
 | `pre-push` | Hook stub copied into `.git/hooks/` — calls `pre-push.sh` | auto — git, installed by `install-dev.sh` |
 | `pre-push.sh` | `pants lint/check/test` against the PR's base branch | auto — `pre-push` |
+| `plan-push-targets.sh` | Writes the changed targets and their direct dependents to a file and prints its path, cached by a hash of the base commit, HEAD's tree and the uncommitted changes | auto — `pre-push.sh` |
 | `hooks/auto-format.sh` | Runs `pants fmt` on the files an AI agent touched | auto — Claude Code hook (per-user settings) |
 | `hooks/auto-fix.sh` | Runs `pants fix` on the files an AI agent touched | auto — Claude Code hook (per-user settings) |
 
@@ -51,11 +52,16 @@ current, see `AGENTS.md` in this directory.
 | `assign-pr-number.py` | Renames news fragments to the assigned PR number | auto — `assign-pr-number.yml` (via `timeline-check.yml`) |
 | `check-multiple-alembic-heads.py` | Fails the build when the migration graph has more than one head | auto — `ci.yml` |
 | `check-alembic-revision.py` | Rejects a migration whose `upgrade()` / `downgrade()` is empty | auto — `ci.yml` |
+| `check-init-imports.py` | Fails when an `__init__.py` under the given directories imports anything, apart from the files it allows | auto — `ci.yml` (`check-build-and-lint`) |
 | `knowledge/check.py` | Validates `KNOWLEDGE.md` frontmatter, paths, and body links | auto — `knowledge-check.yml`; person |
 | `get-platform-suffix.py` | Prints the `<os>-<arch>` suffix used in artifact names | auto — `ci.yml`, `build-test.yml` |
 | `.github/scripts/decide-backport-targets.sh` | Reads `.github/maintained-versions.yml` and the `Backport:` trailer to decide the target branches | auto — `backport.yml` |
 | `.github/scripts/check-backport-migration.sh` | Warns when a pull request both carries a `Backport:` trailer and changes the database schema, since both migrations then have to be idempotent | auto — `backport-migration-check.yml` |
 | `.github/scripts/check-migration-edits.sh` | Reports the already-merged alembic migrations a pull request rewrites, deletes or renames; `allow:migration-edit` records an intended one | auto — `migration-edit-check.yml` |
+| `.github/scripts/plan-ci-targets.py` | Writes the targets for typecheck and each test suite as spec files, and prints the `--shard` values that hold a target | auto — `ci.yml` |
+| `.github/scripts/decide-cache-save.sh` | Prints whether a push saves the CI caches: the tip of `main` or of a maintained version branch | auto — `ci-lint.yml`, `ci-typecheck.yml`, `ci-test.yml`, `ci-test-scenario.yml` |
+| `.github/scripts/prune-ref-caches.sh` | Deletes the cache entries under a ref that a newer save of the same key prefix superseded | auto — `.github/actions/pants-caches` |
+| `.github/scripts/delete-ref-caches.sh` | Deletes every cache entry under a ref, such as a closed pull request's | auto — `cleanup-pr-caches.yml` |
 | `update-default-seccomp.sh` | Refreshes `default-seccomp.json` from the upstream moby profile | auto — `update-seccomp-profile.yml` (monthly); person |
 | `check-docs-label.sh` | Skips a Read the Docs PR preview build unless the PR carries `area:docs`. **Currently unreferenced** — `.readthedocs.yaml` does the same check inline | — |
 

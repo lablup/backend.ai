@@ -6,7 +6,7 @@ from typing import Any, TypedDict, override
 import aiohttp
 import yarl
 
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.clients.container_registry.base import (
     AbstractContainerRegistryQuotaClient,
     ContainerRegistryAuthArgs,
@@ -18,7 +18,7 @@ from ai.backend.manager.errors.common import (
 )
 from ai.backend.manager.errors.container_registry import ContainerRegistryQuotaAlreadyExists
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 class HarborProjectQuotaInfo(TypedDict):
@@ -111,7 +111,6 @@ class HarborQuotaClient(AbstractContainerRegistryQuotaClient):
                 put_quota_api, json=payload, allow_redirects=False, **rqst_args
             ) as resp:
                 if resp.status != 200:
-                    log.error("Failed to create quota! response: {}", resp)
                     raise InternalServerError(f"Failed to create quota! response: {resp}")
 
     @override
@@ -137,7 +136,6 @@ class HarborQuotaClient(AbstractContainerRegistryQuotaClient):
                 put_quota_api, json=payload, allow_redirects=False, **rqst_args
             ) as resp:
                 if resp.status != 200:
-                    log.error("Failed to update quota! response: {}", resp)
                     raise InternalServerError(f"Failed to update quota! response: {resp}")
 
     @override
@@ -160,5 +158,4 @@ class HarborQuotaClient(AbstractContainerRegistryQuotaClient):
                 put_quota_api, json=payload, allow_redirects=False, **rqst_args
             ) as resp:
                 if resp.status != 200:
-                    log.error("Failed to delete quota! response: {}", resp)
                     raise InternalServerError(f"Failed to delete quota! response: {resp}")

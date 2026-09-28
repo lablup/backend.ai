@@ -10,7 +10,7 @@ from ai.backend.common.exception import (
 from ai.backend.manager.data.storage_namespace.types import (
     StorageNamespaceData,
 )
-from ai.backend.manager.models.storage_namespace import StorageNamespaceRow
+from ai.backend.manager.models.storage_namespace.row import StorageNamespaceRow
 from ai.backend.manager.models.storage_namespace.searchable_fields import (
     StorageNamespaceSearchableFields,
 )

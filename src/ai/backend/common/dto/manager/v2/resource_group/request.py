@@ -14,6 +14,7 @@ from ai.backend.common.api_handlers import BaseRequestModel
 from ai.backend.common.data.entity.resource_group import ResourceGroupName
 from ai.backend.common.dto.manager.query import StringFilter
 from ai.backend.common.dto.manager.v2.deployment_options import DeploymentOptionsInput
+from ai.backend.common.dto.manager.v2.entity_label.request import EntityLabelNestedFilter
 from ai.backend.common.dto.manager.v2.resource_group.types import (
     ResourceGroupOrderDirection,
     ResourceGroupOrderField,
@@ -157,6 +158,9 @@ class ResourceGroupFilter(BaseRequestModel):
     is_public: bool | None = Field(default=None, description="Filter by public status.")
     is_default: bool | None = Field(
         default=None, description="Filter by whether the resource group is the default one."
+    )
+    labels: EntityLabelNestedFilter | None = Field(
+        default=None, description="Filter by the labels on the entity"
     )
     AND: list[ResourceGroupFilter] | None = Field(default=None, description="AND conjunction.")
     OR: list[ResourceGroupFilter] | None = Field(default=None, description="OR conjunction.")

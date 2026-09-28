@@ -41,6 +41,7 @@ from ai.backend.manager.data.model_serving.modifier import (
 from ai.backend.manager.data.model_serving.types import (
     EndpointAutoScalingRuleData,
     EndpointData,
+    EndpointLifecycle,
 )
 from ai.backend.manager.errors.common import GenericForbidden
 from ai.backend.manager.errors.service import (
@@ -49,10 +50,9 @@ from ai.backend.manager.errors.service import (
     EndpointTokenNotFound,
 )
 from ai.backend.manager.errors.storage import VFolderNotFound
-from ai.backend.manager.models.deployment_revision import DeploymentRevisionRow
-from ai.backend.manager.models.endpoint import (
+from ai.backend.manager.models.deployment_revision.row import DeploymentRevisionRow
+from ai.backend.manager.models.endpoint.row import (
     EndpointAutoScalingRuleRow,
-    EndpointLifecycle,
     EndpointRow,
     EndpointTokenRow,
 )
@@ -60,13 +60,13 @@ from ai.backend.manager.models.endpoint.updaters import (
     AutoScalingRuleUpdater,
     LegacyEndpointUpdater,
 )
-from ai.backend.manager.models.image import ImageRow
+from ai.backend.manager.models.image.row import ImageRow
 from ai.backend.manager.models.minilang import FieldSpecItem, OrderSpecItem
 from ai.backend.manager.models.minilang.ordering import QueryOrderParser
 from ai.backend.manager.models.minilang.queryfilter import QueryFilterParser
 from ai.backend.manager.models.runtime_variant.row import RuntimeVariantRow
-from ai.backend.manager.models.user import UserRole, UserRow
-from ai.backend.manager.models.vfolder import VFolderRow
+from ai.backend.manager.models.user.row import UserRole, UserRow
+from ai.backend.manager.models.vfolder.row import VFolderRow
 from ai.backend.manager.services.deployment.actions.lookup_owner import (
     LookupAutoScalingRuleDeploymentAction,
 )

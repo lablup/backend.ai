@@ -15,13 +15,13 @@ from ai.backend.manager.errors.deployment import (
     NoActiveKeypairForDeployment,
     UserNotFoundInDeployment,
 )
-from ai.backend.manager.models.domain import DomainRow
-from ai.backend.manager.models.keypair import KeyPairRow
-from ai.backend.manager.models.resource_policy import (
+from ai.backend.manager.models.domain.row import DomainRow
+from ai.backend.manager.models.keypair.row import KeyPairRow
+from ai.backend.manager.models.resource_policy.row import (
     KeyPairResourcePolicyRow,
     UserResourcePolicyRow,
 )
-from ai.backend.manager.models.user import UserRole, UserRow
+from ai.backend.manager.models.user.row import UserRole, UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.deployment.db_source.db_source import DeploymentDBSource
 from ai.backend.manager.repositories.ops.v2.reconciler.provider import ReconcileOpsProvider

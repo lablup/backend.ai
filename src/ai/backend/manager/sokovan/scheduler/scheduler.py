@@ -2,10 +2,10 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from ai.backend.manager.clients.agent import AgentClientPool
+from ai.backend.manager.clients.agent.pool import AgentClientPool
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.plugin.network import NetworkPluginContext
-from ai.backend.manager.repositories.scheduler import SchedulerRepository
+from ai.backend.manager.repositories.scheduler.repository import SchedulerRepository
 
 from .hooks.registry import HookRegistry, HookRegistryArgs
 from .launcher.launcher import SessionLauncher

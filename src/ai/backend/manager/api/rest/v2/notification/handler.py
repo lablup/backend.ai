@@ -19,14 +19,14 @@ from ai.backend.common.dto.manager.v2.notification.request import (
     ValidateNotificationChannelInput,
     ValidateNotificationRuleInput,
 )
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.api.rest.v2.path_params import ChannelIdPathParam, RuleIdPathParam
 from ai.backend.manager.dto.context import UserContext
 
 if TYPE_CHECKING:
     from ai.backend.manager.api.adapters.notification.adapter import NotificationAdapter
 
-log: Final = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log: Final = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 class V2NotificationHandler:

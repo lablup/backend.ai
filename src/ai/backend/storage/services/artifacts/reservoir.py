@@ -6,6 +6,7 @@ import tempfile
 import uuid
 from collections.abc import AsyncIterator, Callable
 from dataclasses import dataclass
+from http import HTTPStatus
 from pathlib import Path
 from typing import Any, Final, cast, override
 
@@ -13,6 +14,7 @@ import aiofiles
 import aiohttp
 
 from ai.backend.common.artifact_storage import AbstractStorage, AbstractStoragePool
+from ai.backend.common.asyncio import run_in_executor_with_context
 from ai.backend.common.bgtask.bgtask import BackgroundTaskManager
 from ai.backend.common.bgtask.reporter import ProgressReporter
 from ai.backend.common.clients.valkey_client.valkey_artifact.client import (
@@ -29,7 +31,7 @@ from ai.backend.common.data.storage.types import (
 from ai.backend.common.events.dispatcher import EventProducer
 from ai.backend.common.events.event_types.artifact.anycast import ModelImportDoneEvent
 from ai.backend.common.types import DispatchResult, StreamReader
-from ai.backend.logging.utils import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.storage.client.manager import ManagerHTTPClient, ManagerHTTPClientPool
 from ai.backend.storage.client.s3 import S3Client
 from ai.backend.storage.config.unified import (
@@ -57,7 +59,7 @@ from ai.backend.storage.storages.storage_pool import StoragePool
 from ai.backend.storage.storages.vfs_storage import VFSStorage
 from ai.backend.storage.types import BucketCopyOptions
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 _DOWNLOAD_PROGRESS_UPDATE_INTERVAL: Final[int] = 30
 
@@ -150,10 +152,7 @@ class ReservoirVFSFileDownloader:
                 break
             except Exception as e:
                 # Log error but don't fail the download
-                log.warning(
-                    "Failed to update download progress in Redis: {}",
-                    str(e),
-                )
+                log.warning("download progress update failed", exc_info=e)
 
     async def download_file(self, remote_path: str, local_path: Path, total_bytes: int) -> int:
         """
@@ -189,20 +188,9 @@ class ReservoirVFSFileDownloader:
             )
 
             async with aiofiles.open(local_path, "wb") as f:
-                try:
-                    async for chunk in stream_reader.read():
-                        await f.write(chunk)
-                        self._bytes_downloaded += len(chunk)
-                except aiohttp.ClientError as e:
-                    log.error(
-                        "Network error during download: {}, Downloaded {} bytes before failure",
-                        e,
-                        self._bytes_downloaded,
-                    )
-                    raise
-                except TimeoutError:
-                    log.error("Timeout after downloading {} bytes", self._bytes_downloaded)
-                    raise
+                async for chunk in stream_reader.read():
+                    await f.write(chunk)
+                    self._bytes_downloaded += len(chunk)
         except Exception as e:
             # Update Redis with error status for any unexpected errors
             try:
@@ -216,7 +204,7 @@ class ReservoirVFSFileDownloader:
                     error_message=str(e),
                 )
             except Exception as redis_err:
-                log.warning("Failed to update error status in Redis: {}", redis_err)
+                log.warning("download error status update failed", exc_info=redis_err)
             raise
         finally:
             self._download_complete = True
@@ -240,7 +228,7 @@ class ReservoirVFSFileDownloader:
                     success=(self._bytes_downloaded >= total_bytes),
                 )
             except Exception as redis_err:
-                log.warning("Failed to update final status in Redis: {}", redis_err)
+                log.warning("download final status update failed", exc_info=redis_err)
 
         log.debug(
             "Downloaded file: {} -> {} ({} bytes)", remote_path, local_path, self._bytes_downloaded
@@ -314,10 +302,7 @@ class ReservoirS3FileDownloadStreamReader(StreamReader):
                 break
             except Exception as e:
                 # Log error but don't fail the download
-                log.warning(
-                    "Failed to update download progress in Redis: {}",
-                    str(e),
-                )
+                log.warning("download progress update failed", exc_info=e)
 
     @override
     async def read(self) -> AsyncIterator[bytes]:
@@ -364,7 +349,7 @@ class ReservoirS3FileDownloadStreamReader(StreamReader):
                     error_message=str(e),
                 )
             except Exception as redis_err:
-                log.warning("Failed to update error status in Redis: {}", redis_err)
+                log.warning("download error status update failed", exc_info=redis_err)
             raise
         finally:
             self._download_complete = True
@@ -388,7 +373,7 @@ class ReservoirS3FileDownloadStreamReader(StreamReader):
                     success=(sent >= self._size),
                 )
             except Exception as redis_err:
-                log.warning("Failed to update final status in Redis: {}", redis_err)
+                log.warning("download final status update failed", exc_info=redis_err)
 
     @override
     def content_type(self) -> str | None:
@@ -452,17 +437,16 @@ class ReservoirService:
             )
             resp = await manager_client.get_verification_result(artifact_revision_id)
             if resp.verification_result:
-                log.info(
-                    "Fetched verification result from remote reservoir: artifact_revision_id={}",
+                log.debug(
+                    "Fetched verification result from remote reservoir for artifact revision {}",
                     artifact_revision_id,
                 )
             return resp.verification_result
         except Exception as e:
             log.warning(
-                "Failed to fetch verification result from remote reservoir: "
-                "artifact_revision_id={}, error={}",
-                artifact_revision_id,
-                str(e),
+                "remote verification result fetch failed",
+                exc_info=e,
+                artifact_revision_id=artifact_revision_id,
             )
             return None
 
@@ -508,7 +492,7 @@ class ReservoirService:
 
             # Execute import pipeline
             await pipeline.execute(context)
-            log.info("Model import completed: {}", model)
+            log.debug("Model import completed: {}", model)
             success = True
 
             # Fetch verification result from remote reservoir
@@ -541,12 +525,12 @@ class ReservoirService:
         async def _import_models_batch(reporter: ProgressReporter) -> DispatchResult[Any]:
             model_count = len(models)
             if not model_count:
-                log.warning("No models to import")
+                log.trace("No models to import")
                 return DispatchResult.error("No models provided for batch import")
 
             reporter.total_progress = model_count
 
-            log.info("Starting batch model import: model_count={}", model_count)
+            log.debug("Starting batch model import: model_count={}", model_count)
 
             try:
                 successful_models = 0
@@ -561,7 +545,7 @@ class ReservoirService:
                 ):
                     model_id = model.model_id
                     try:
-                        log.info(
+                        log.debug(
                             "Processing model in batch: model_id={}, progress={}/{}",
                             model_id,
                             idx,
@@ -580,21 +564,22 @@ class ReservoirService:
                         )
 
                         successful_models += 1
-                        log.info(
+                        log.debug(
                             "Successfully imported model in batch: model_id={}, progress={}/{}",
                             model_id,
                             idx,
                             model_count,
                         )
+                    except aiohttp.ClientResponseError as e:
+                        failed_models += 1
+                        if e.status == HTTPStatus.NOT_FOUND:
+                            log.trace("model not found on the remote reservoir", model_id=model_id)
+                        else:
+                            log.exception("model import in batch failed", model_id=model_id)
+                        errors.append(str(e))
                     except Exception as e:
                         failed_models += 1
-                        log.error(
-                            "Failed to import model in batch: {!s}, model_id={}, progress={}/{}",
-                            e,
-                            model_id,
-                            idx,
-                            model_count,
-                        )
+                        log.exception("model import in batch failed", model_id=model_id)
                         errors.append(str(e))
                     finally:
                         await reporter.update(
@@ -602,7 +587,7 @@ class ReservoirService:
                             message=f"Processed model: {model_id} (progress: {idx}/{model_count})",
                         )
 
-                log.info(
+                log.trace(
                     "Batch model import completed: total_models={}, successful_models={}, failed_models={}",
                     model_count,
                     successful_models,
@@ -610,12 +595,12 @@ class ReservoirService:
                 )
 
                 if failed_models > 0:
-                    log.warning(
+                    log.trace(
                         "Some models failed to import in batch: failed_count={}", failed_models
                     )
                     return DispatchResult.partial_success(None, errors=errors)
             except Exception as e:
-                log.error("Batch model import failed: {!s}", e)
+                log.exception("batch model import failed")
                 return DispatchResult.error(f"Batch import failed: {e!s}")
 
             return DispatchResult.success(None)
@@ -723,7 +708,7 @@ class ReservoirDownloadStep(ImportStep[None]):
                 f"Unsupported storage type: {storage_type} (storage class: {type(self._download_storage)})"
             )
 
-        log.info("Reservoir copy completed: {}, bytes_copied={}", context.model, bytes_copied)
+        log.debug("Reservoir copy completed: {}, bytes_copied={}", context.model, bytes_copied)
 
         return DownloadStepResult(
             downloaded_files=downloaded_files,
@@ -747,79 +732,74 @@ class ReservoirDownloadStep(ImportStep[None]):
                 f"Download storage is not a VFS storage type: {type(storage)}"
             )
 
-        try:
-            manager_client = self._manager_client_pool.get_or_create(context.registry_name)
+        manager_client = self._manager_client_pool.get_or_create(context.registry_name)
 
-            if not registry_config.storage_name:
-                raise ReservoirStorageConfigInvalidError(
-                    f"Reservoir registry storage name not configured: {context.registry_name}"
-                )
-
-            # Get list of all files in the model directory
-            log.debug("Listing files for model: {}", model_prefix)
-            file_list_response = await manager_client.list_vfs_files(
-                storage_name=registry_config.storage_name, directory=model_prefix
+        if not registry_config.storage_name:
+            raise ReservoirStorageConfigInvalidError(
+                f"Reservoir registry storage name not configured: {context.registry_name}"
             )
 
-            files = file_list_response.files
-            if not files:
-                log.warning("No files found for model: {}", model_prefix)
-                return 0
+        # Get list of all files in the model directory
+        log.debug("Listing files for model: {}", model_prefix)
+        file_list_response = await manager_client.list_vfs_files(
+            storage_name=registry_config.storage_name, directory=model_prefix
+        )
 
-            log.info("Found {} files to download for model: {}", len(files), model_prefix)
+        files = file_list_response.files
+        if not files:
+            log.trace("No files found for model: {}", model_prefix)
+            return 0
 
-            # Initialize artifact download tracking in Redis with all file information
-            revision = context.model.resolve_revision(ArtifactRegistryType.RESERVOIR)
-            file_info_list = [
-                (file_info.path, file_info.size or 0)
-                for file_info in files
-                if file_info.type != "directory"
-            ]
-            await self._redis_client.init_artifact_download(
-                model_id=context.model.model_id,
-                revision=revision,
-                file_info_list=file_info_list,
+        log.debug("Found {} files to download for model: {}", len(files), model_prefix)
+
+        # Initialize artifact download tracking in Redis with all file information
+        revision = context.model.resolve_revision(ArtifactRegistryType.RESERVOIR)
+        file_info_list = [
+            (file_info.path, file_info.size or 0)
+            for file_info in files
+            if file_info.type != "directory"
+        ]
+        await self._redis_client.init_artifact_download(
+            model_id=context.model.model_id,
+            revision=revision,
+            file_info_list=file_info_list,
+        )
+
+        # Create file downloader
+        downloader = ReservoirVFSFileDownloader(
+            client=manager_client,
+            storage_name=registry_config.storage_name,
+            redis_client=self._redis_client,
+            model_id=context.model.model_id,
+            revision=revision,
+        )
+
+        # Download each file individually
+        total_bytes = 0
+        for file_info in files:
+            # Skip directories (they will be created automatically when files are downloaded)
+            if file_info.type == "directory":
+                continue
+
+            remote_file_path = file_info.path
+            # Convert remote path to local path relative to dest_path
+            # Remove model_prefix from the beginning to get relative path within model
+            if remote_file_path.startswith(model_prefix):
+                relative_path = remote_file_path[len(model_prefix) :].lstrip("/")
+            else:
+                relative_path = remote_file_path
+
+            local_file_path = dest_path / relative_path
+            bytes_downloaded = await downloader.download_file(
+                remote_file_path, local_file_path, file_info.size or 0
             )
+            total_bytes += bytes_downloaded
+            log.debug("Downloaded: {} ({} bytes)", remote_file_path, bytes_downloaded)
 
-            # Create file downloader
-            downloader = ReservoirVFSFileDownloader(
-                client=manager_client,
-                storage_name=registry_config.storage_name,
-                redis_client=self._redis_client,
-                model_id=context.model.model_id,
-                revision=revision,
-            )
-
-            # Download each file individually
-            total_bytes = 0
-            for file_info in files:
-                # Skip directories (they will be created automatically when files are downloaded)
-                if file_info.type == "directory":
-                    continue
-
-                remote_file_path = file_info.path
-                # Convert remote path to local path relative to dest_path
-                # Remove model_prefix from the beginning to get relative path within model
-                if remote_file_path.startswith(model_prefix):
-                    relative_path = remote_file_path[len(model_prefix) :].lstrip("/")
-                else:
-                    relative_path = remote_file_path
-
-                local_file_path = dest_path / relative_path
-                bytes_downloaded = await downloader.download_file(
-                    remote_file_path, local_file_path, file_info.size or 0
-                )
-                total_bytes += bytes_downloaded
-                log.debug("Downloaded: {} ({} bytes)", remote_file_path, bytes_downloaded)
-
-            log.info(
-                "VFS download completed: {} -> {} ({} bytes)", model_prefix, dest_path, total_bytes
-            )
-            return total_bytes
-
-        except Exception as e:
-            log.error("VFS download failed for {}: {!s}", model_prefix, e)
-            raise
+        log.debug(
+            "VFS download completed: {} -> {} ({} bytes)", model_prefix, dest_path, total_bytes
+        )
+        return total_bytes
 
     async def _handle_object_storage_download(
         self,
@@ -1161,10 +1141,9 @@ class TarExtractor:
             target_dir.mkdir(parents=True, exist_ok=True)
 
             # Extract tar file in executor to avoid blocking
-            loop = asyncio.get_running_loop()
-            await loop.run_in_executor(None, self._extract_tar, temp_file, target_dir)
+            await run_in_executor_with_context(None, self._extract_tar, temp_file, target_dir)
 
-            log.info("Successfully extracted artifact tar to: {}", target_dir)
+            log.debug("Successfully extracted artifact tar to: {}", target_dir)
             return bytes_downloaded
 
         finally:
@@ -1174,7 +1153,7 @@ class TarExtractor:
                     temp_file.unlink()
                     log.debug("Cleaned up temp file: {}", temp_file)
                 except Exception as e:
-                    log.warning("Failed to remove temp file {}: {}", temp_file, e)
+                    log.warning("temp file removal failed", exc_info=e, file_path=temp_file)
 
     def _extract_tar(self, tar_path: Path, target_dir: Path) -> None:
         """Extract tar archive to target directory safely."""

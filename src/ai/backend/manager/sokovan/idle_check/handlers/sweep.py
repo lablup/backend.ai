@@ -10,7 +10,9 @@ from ai.backend.manager.sokovan.idle_check.sweep.types import (
     IdleCheckSweepResult,
 )
 from ai.backend.manager.sokovan.reconciler.base import ReconcilerHandler
-from ai.backend.manager.sokovan.scheduling_controller import SchedulingController
+from ai.backend.manager.sokovan.scheduling_controller.scheduling_controller import (
+    SchedulingController,
+)
 
 
 class IdleCheckSweepHandler(ReconcilerHandler[IdleCheckSweepReconcileInfo, IdleCheckSweepResult]):

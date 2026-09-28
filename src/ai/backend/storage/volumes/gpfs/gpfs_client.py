@@ -17,7 +17,7 @@ from tenacity import (
     wait_fixed,
 )
 
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.storage.errors import ExternalStorageServiceError
 
 from .exceptions import (
@@ -41,7 +41,7 @@ from .types import (
     GPFSSystemHealthState,
 )
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 async def base_response_handler(response: aiohttp.ClientResponse) -> aiohttp.ClientResponse:
@@ -161,7 +161,6 @@ class GPFSAPIClient:
                         case GPFSJobStatus.COMPLETED:
                             return
                         case GPFSJobStatus.FAILED:
-                            log.error("Failed to run GPFS job. (e:{!s})", jobs)
                             raise GPFSJobFailedError(
                                 job.result.to_json() if job.result is not None else ""
                             )
@@ -306,7 +305,7 @@ class GPFSAPIClient:
                     body,
                 )
             except GPFSConflictError:
-                log.warning("GPFS fileset already exists. Skip create. (name: {})", fileset_name)
+                log.debug("GPFS fileset {} already exists, skipping creation", fileset_name)
                 return
             if response.status not in (200, 201, 202):
                 raise ExternalStorageServiceError(

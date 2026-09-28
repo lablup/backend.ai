@@ -7,7 +7,6 @@ import time
 import uuid
 from abc import ABC, abstractmethod
 from collections.abc import Awaitable, Callable, Iterable, Mapping, MutableMapping, Sequence
-from contextlib import suppress
 from dataclasses import dataclass
 from typing import (
     Any,
@@ -57,7 +56,7 @@ from ai.backend.common.exception import (
     ErrorOperation,
 )
 from ai.backend.common.types import DispatchResult, Sentinel
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger, with_log_context
 
 from .hooks import (
     BackgroundTaskObserver,
@@ -74,7 +73,7 @@ from .task.registry import BackgroundTaskHandlerRegistry
 from .task_result import TaskCancelledResult, TaskFailedResult, TaskResult, TaskSuccessResult
 
 sentinel: Final = Sentinel.TOKEN
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 P = ParamSpec("P")
 
@@ -255,16 +254,16 @@ def _exception_to_task_result[**P](
             result = await func(*args, **kwargs)
             return TaskSuccessResult(result)
         except asyncio.CancelledError:
-            log.warning("Task cancelled")
+            log.warning("background task cancelled")
             return TaskCancelledResult()
         except BackendAIError as e:
             if e.status_code // 100 == 4:
-                log.warning("BackendAIError in task: {}", repr(e))
+                log.trace("background task failed", error_code=str(e.error_code()))
             else:
-                log.exception("BackendAIError in task: {}", e)
+                log.exception("background task failed")
             return TaskFailedResult(e)
         except Exception as e:
-            log.exception("Unhandled error in task: {}", e)
+            log.exception("background task failed")
             return TaskFailedResult(e)
 
     return wrapper
@@ -339,7 +338,7 @@ class BackgroundTaskManager:
         return task_id
 
     async def shutdown(self) -> None:
-        log.info("Cancelling remaining background tasks...")
+        log.info("cancelling remaining background tasks")
         for task in self._ongoing_tasks.values():
             async_tasks = task.async_tasks()
             for async_task in async_tasks:
@@ -400,16 +399,16 @@ class BackgroundTaskManager:
                 operation=ErrorOperation.EXECUTE,
                 error_detail=ErrorDetail.CANCELED,
             )
-            log.warning("Task {} ({}): cancelled", task_id, task_name)
+            log.warning("background task cancelled")
             msg = "Task cancelled"
             return BgtaskCancelledEvent(task_id=task_id, message=msg)
         except BackendAIError as e:
             status = BgtaskStatus.FAILED
             error_code = e.error_code()
             if e.status_code // 100 == 4:
-                log.warning("Task {} ({}): BackendAIError: {}", task_id, task_name, repr(e))
+                log.trace("background task failed", error_code=str(error_code))
             else:
-                log.exception("Task {} ({}): BackendAIError: {}", task_id, task_name, e)
+                log.exception("background task failed")
             msg = repr(e)
             return BgtaskFailedEvent(task_id=task_id, message=msg)
         except Exception as e:
@@ -419,7 +418,7 @@ class BackgroundTaskManager:
                 operation=ErrorOperation.EXECUTE,
                 error_detail=ErrorDetail.INTERNAL_ERROR,
             )
-            log.exception("Task {} ({}): unhandled error: {}", task_id, task_name, e)
+            log.exception("background task failed")
             msg = repr(e)
             return BgtaskFailedEvent(task_id=task_id, message=msg)
         finally:
@@ -441,15 +440,14 @@ class BackgroundTaskManager:
         **kwargs: Any,
     ) -> None:
         try:
-            bgtask_result_event = await self._observe_bgtask(func, task_id, task_name, **kwargs)
-            cache_id = EventCacheDomain.BGTASK.cache_id(str(task_id))
-            await self._event_producer.broadcast_event_with_cache(cache_id, bgtask_result_event)
-            log.info(
-                "Task {} ({}): {}",
-                task_id,
-                task_name or func.__name__,
-                bgtask_result_event.__class__.__name__,
-            )
+            with with_log_context(task_name=task_name or func.__name__, bgtask_id=task_id):
+                bgtask_result_event = await self._observe_bgtask(func, task_id, task_name, **kwargs)
+                cache_id = EventCacheDomain.BGTASK.cache_id(str(task_id))
+                await self._event_producer.broadcast_event_with_cache(cache_id, bgtask_result_event)
+                log.trace(
+                    "background task finished",
+                    bgtask_status=bgtask_result_event.status(),
+                )
         finally:
             self._ongoing_tasks.pop(TaskID(task_id), None)
 
@@ -510,6 +508,16 @@ class BackgroundTaskManager:
         subkey: BgTaskKey,
         manifest: BaseBackgroundTaskManifest,
     ) -> None:
+        with with_log_context(task_name=task_name.value, bgtask_id=task_id):
+            await self._execute_new_task_in_scope(task_name, task_id, subkey, manifest)
+
+    async def _execute_new_task_in_scope(
+        self,
+        task_name: BgtaskNameBase,
+        task_id: TaskID,
+        subkey: BgTaskKey,
+        manifest: BaseBackgroundTaskManifest,
+    ) -> None:
         async with self._hook.apply(
             TaskContext(
                 task_name=task_name,
@@ -528,15 +536,15 @@ class BackgroundTaskManager:
                 last_message = f"Task failed with exception: {e}"
                 raise e
             finally:
-                with suppress(Exception):
-                    await self._valkey_client.finish_subtask(
-                        task_id=task_id,
-                        subkey=subkey,
-                        status=task_status,
-                        last_message=last_message,
-                    )
+                await self._finish_subtask(task_id, subkey, task_status, last_message)
 
     async def _revive_task(
+        self, task_name: BgtaskNameBase, task_info: TaskInfo, task_key: BgTaskKey
+    ) -> None:
+        with with_log_context(task_name=task_name.value, bgtask_id=task_info.task_id):
+            await self._revive_task_in_scope(task_name, task_info, task_key)
+
+    async def _revive_task_in_scope(
         self, task_name: BgtaskNameBase, task_info: TaskInfo, task_key: BgTaskKey
     ) -> None:
         async with self._hook.apply(
@@ -557,13 +565,25 @@ class BackgroundTaskManager:
                 last_message = f"Task failed with exception: {e}"
                 raise e
             finally:
-                with suppress(Exception):
-                    await self._valkey_client.finish_subtask(
-                        task_id=task_info.task_id,
-                        subkey=task_key,
-                        status=task_status,
-                        last_message=last_message,
-                    )
+                await self._finish_subtask(task_info.task_id, task_key, task_status, last_message)
+
+    async def _finish_subtask(
+        self, task_id: TaskID, subkey: BgTaskKey, status: TaskStatus, last_message: str
+    ) -> None:
+        try:
+            await self._valkey_client.finish_subtask(
+                task_id=task_id,
+                subkey=subkey,
+                status=status,
+                last_message=last_message,
+            )
+        except Exception as e:
+            log.warning(
+                "background subtask status record failed",
+                exc_info=e,
+                bgtask_id=task_id,
+                subkey=subkey,
+            )
 
     async def do_heartbeat(self) -> None:
         """Publish a heartbeat for ongoing background tasks. One iteration."""
@@ -585,9 +605,14 @@ class BackgroundTaskManager:
             self._retry_bgtask(total_info) for total_info in unmanaged_task_total_info_list
         ]
         results = await asyncio.gather(*async_tasks, return_exceptions=True)
-        for result in results:
+        for total_info, result in zip(unmanaged_task_total_info_list, results, strict=True):
             if isinstance(result, BaseException):
-                log.exception("Exception in retry loop: {}", result)
+                log.error(
+                    "background task revive failed",
+                    exc_info=result,
+                    task_name=total_info.task_info.task_name,
+                    bgtask_id=total_info.task_info.task_id,
+                )
 
     async def _retry_bgtask(self, total_info: TaskTotalInfo) -> None:
         """Retry a background task"""
@@ -600,18 +625,20 @@ class BackgroundTaskManager:
             task_name = self._task_registry.get_task_name(task_name_str)
         except Exception as e:
             log.warning(
-                "Cannot revive task {}: {}. Marking all subtasks as failed.", task_info.task_id, e
+                "background task handler not registered, marking subtasks failed",
+                exc_info=e,
+                task_name=task_name_str,
+                bgtask_id=task_info.task_id,
             )
             # Mark all ongoing subtasks as failed to prevent infinite retry
             for subkey_info in total_info.task_key_list:
                 if subkey_info.status == TaskStatus.ONGOING:
-                    with suppress(Exception):
-                        await self._valkey_client.finish_subtask(
-                            task_id=task_info.task_id,
-                            subkey=subkey_info.key,
-                            status=TaskStatus.FAILURE,
-                            last_message=f"Task handler not registered: {task_name_str}",
-                        )
+                    await self._finish_subtask(
+                        task_info.task_id,
+                        subkey_info.key,
+                        TaskStatus.FAILURE,
+                        f"Task handler not registered: {task_name_str}",
+                    )
             return
 
         async_tasks: list[asyncio.Task[Any]] = []
@@ -624,10 +651,6 @@ class BackgroundTaskManager:
         match task_info.task_type:
             case TaskType.SINGLE:
                 if len(async_tasks) != 1:
-                    log.error(
-                        "Inconsistent task type and subtask count for SINGLE task: {}",
-                        task_info.task_id,
-                    )
                     raise InvalidTaskMetadataError(
                         f"SINGLE task must have exactly one ongoing subtask: {task_info.task_id}"
                     )
@@ -637,10 +660,6 @@ class BackgroundTaskManager:
                 )
             case TaskType.PARALLEL:
                 if len(async_tasks) < 1:
-                    log.error(
-                        "Inconsistent task type and subtask count for PARALLEL task: {}",
-                        task_info.task_id,
-                    )
                     raise InvalidTaskMetadataError(
                         f"PARALLEL task must have at least one ongoing subtask: {task_info.task_id}"
                     )
@@ -649,8 +668,13 @@ class BackgroundTaskManager:
                     total_info=total_info,
                 )
             case _:
-                log.error("Unsuuported task type: {}", task_info.task_type)
                 raise InvalidTaskMetadataError(f"Unsupported task type: {task_info.task_type}")
         if task is not None:
             self._ongoing_tasks[task_info.task_id] = task
         await self._valkey_client.claim_task(task_info.task_id, self._task_set_key)
+        log.info(
+            "background task revived",
+            task_name=task_name_str,
+            bgtask_id=task_info.task_id,
+            subtask_count=len(async_tasks),
+        )

@@ -26,13 +26,15 @@ from ai.backend.manager.errors.artifact import (
     ArtifactRevisionNotVerified,
     ArtifactRevisionUpdateError,
 )
-from ai.backend.manager.models.artifact import ArtifactRow
+from ai.backend.manager.models.artifact.row import ArtifactRow
 from ai.backend.manager.models.artifact.searchable_fields import ArtifactSearchableFields
-from ai.backend.manager.models.artifact_revision import ArtifactRevisionRow
+from ai.backend.manager.models.artifact_revision.row import ArtifactRevisionRow
 from ai.backend.manager.models.artifact_revision.searchable_fields import (
     ArtifactRevisionSearchableFields,
 )
-from ai.backend.manager.models.association_artifacts_storages import AssociationArtifactsStorageRow
+from ai.backend.manager.models.association_artifacts_storages.row import (
+    AssociationArtifactsStorageRow,
+)
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 
 

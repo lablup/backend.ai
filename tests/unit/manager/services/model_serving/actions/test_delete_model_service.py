@@ -8,7 +8,7 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 
 from ai.backend.common.bgtask.bgtask import BackgroundTaskManager
-from ai.backend.common.contexts.user import with_user
+from ai.backend.common.contexts.user import with_user_context
 from ai.backend.common.data.entity.deployment import DeploymentID
 from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.user.types import UserData, UserRole
@@ -26,7 +26,9 @@ from ai.backend.manager.services.model_serving.actions.delete_model_service impo
 )
 from ai.backend.manager.services.model_serving.services.model_serving import ModelServingService
 from ai.backend.manager.sokovan.deployment.deployment_controller import DeploymentController
-from ai.backend.manager.sokovan.scheduling_controller import SchedulingController
+from ai.backend.manager.sokovan.scheduling_controller.scheduling_controller import (
+    SchedulingController,
+)
 from ai.backend.testutils.scenario import ScenarioBase
 
 
@@ -45,7 +47,7 @@ class TestDeleteModelService:
 
     @pytest.fixture(autouse=True)
     def set_user_context(self, user_data: UserData) -> Iterator[None]:
-        with with_user(user_data):
+        with with_user_context(user_data):
             yield
 
     @pytest.fixture

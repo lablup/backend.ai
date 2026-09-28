@@ -6,7 +6,7 @@ rule, is marked deprecated in the schema, and is removed in the next release. No
 new goes here; the declarations are in `searchable_fields.py`.
 
 Both reads use these. The read rooted at the fair share table reaches the other entity
-through an outer join; the read rooted at the domain, project or membership row keeps
+through an outer join; the read rooted at the domain, project or project member keeps
 every entity of the resource group and leaves the fair share columns NULL where no row
 exists, so there the name, the id and the status are read off the base table.
 """
@@ -15,7 +15,7 @@ from __future__ import annotations
 
 from ai.backend.manager.data.user.types import UserStatus
 from ai.backend.manager.models.domain.row import DomainRow
-from ai.backend.manager.models.project.row import AssocGroupUserRow, ProjectRow
+from ai.backend.manager.models.project.row import ProjectRow
 from ai.backend.manager.models.specs.conditions.boolean import BoolConditions
 from ai.backend.manager.models.specs.conditions.enum import EnumConditions
 from ai.backend.manager.models.specs.conditions.string import StringConditions
@@ -80,12 +80,8 @@ class DeprecatedUserFairShareFields:
         DomainRow.name, StringConditions(DomainRow.name), ColumnOrder(DomainRow.name)
     )
     membership_user_id = SearchableField(
-        AssocGroupUserRow.user_id,
-        UUIDConditions(AssocGroupUserRow.user_id),
-        ColumnOrder(AssocGroupUserRow.user_id),
+        UserRow.uuid, UUIDConditions(UserRow.uuid), ColumnOrder(UserRow.uuid)
     )
     membership_project_id = SearchableField(
-        AssocGroupUserRow.group_id,
-        UUIDConditions(AssocGroupUserRow.group_id),
-        ColumnOrder(AssocGroupUserRow.group_id),
+        ProjectRow.id, UUIDConditions(ProjectRow.id), ColumnOrder(ProjectRow.id)
     )

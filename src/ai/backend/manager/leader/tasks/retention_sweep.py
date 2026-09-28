@@ -12,10 +12,10 @@ import logging
 from typing import Final, override
 
 from ai.backend.common.cron.base import PeriodicTask
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.repositories.retention.repository import RetentionRepository
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 class RetentionSweepTask(PeriodicTask):

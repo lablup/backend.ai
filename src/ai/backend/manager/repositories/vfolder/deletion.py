@@ -11,7 +11,7 @@ from collections.abc import Sequence
 
 import aiotools
 
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
 from ai.backend.manager.data.vfolder.types import VFolderOperationStatus
 from ai.backend.manager.errors.api import InvalidAPIParameters
@@ -23,7 +23,7 @@ from ai.backend.manager.models.vfolder.row import (
     update_vfolder_status,
 )
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 async def initiate_vfolder_deletion(
@@ -73,8 +73,8 @@ async def initiate_vfolder_deletion(
         await update_vfolder_status(
             db_engine, vfolder_ids, VFolderOperationStatus.DELETE_COMPLETE, do_log=False
         )
-        log.info("vfolders already deleted {}", [str(x) for x in vfolder_ids])
+        log.trace("vfolders already deleted", vfolder_ids=", ".join(str(x) for x in vfolder_ids))
 
-    log.info("Started purging vfolders {}", [str(x) for x in vfolder_ids])
+    log.trace("vfolder purge started", vfolder_ids=", ".join(str(x) for x in vfolder_ids))
 
     return vfolder_info_len

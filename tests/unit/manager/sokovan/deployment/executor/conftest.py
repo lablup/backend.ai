@@ -24,12 +24,12 @@ from ai.backend.manager.data.deployment.types import (
     DeploymentState,
     ModelRevisionData,
     ReplicaData,
+    RouteData,
     RouteHealthStatus,
     RouteStatus,
     RouteTrafficStatus,
 )
 from ai.backend.manager.data.resource.types import ResourceGroupProxyTarget
-from ai.backend.manager.repositories.deployment.types import RouteData
 from ai.backend.manager.sokovan.deployment.executor import DeploymentExecutor
 from ai.backend.manager.sokovan.deployment.types import DeploymentWithHistory
 

@@ -46,7 +46,7 @@ from ai.backend.common.types import (
     SlotName,
     SlotTypes,
 )
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 
 __all__ = (
     "PREFIX",
@@ -60,7 +60,7 @@ _config_iv = t.Dict({
 }).allow_extra("*")
 
 
-log = BraceStyleAdapter(logging.getLogger("ai.backend.accelerator.habana.gaudi2"))
+log = StructuredLogger(logging.getLogger("ai.backend.accelerator.habana.gaudi2"))
 
 
 class AbstractGaudiPlugin[TDevice: AbstractGaudiDevice](AbstractComputePlugin, metaclass=ABCMeta):
@@ -94,19 +94,22 @@ class AbstractGaudiPlugin[TDevice: AbstractGaudiDevice](AbstractComputePlugin, m
 
         raw_cfg, cfg_src_path = config.read_from_file(None, "gaudi2")
         self.gaudi_config = _config_iv.check(raw_cfg)
-        log.info("Read Gaudi device configs from {}", cfg_src_path)
+        log.info("device config loaded", plugin_name=self.key, config_path=str(cfg_src_path))
 
         try:
             pyhlml.hlmlInit()
             self._driver_version = pyhlml.hlmlGetDriverVersion().decode()
-            log.info("Running on Habana Driver {}", self._driver_version)
+            log.info("habana driver detected", driver_version=self._driver_version)
             detected_devices = await self.list_devices()
-            log.info("detected devices:\n" + pformat(detected_devices))
+            log.debug("detected devices:\n{}", pformat(detected_devices))
             await self.prepare_networks()
-            log.info("Gaudi acceleration is enabled.")
+            log.info(
+                "accelerator enabled", plugin_name=self.key, device_count=len(detected_devices)
+            )
         except RuntimeError as e:
-            log.warning("Gaudi init error: {}", e)
-            log.info("Gaudi acceleration is disabled.")
+            log.warning(
+                "accelerator disabled: initialization failed", plugin_name=self.key, exc_info=e
+            )
             self.enabled = False
 
     @abstractmethod
@@ -173,10 +176,12 @@ class AbstractGaudiPlugin[TDevice: AbstractGaudiDevice](AbstractComputePlugin, m
                     mem_stats[device.device_id] = Measurement(Decimal(mem_used), Decimal(mem_total))
                     util_total += gpu_util
                     util_stats[device.device_id] = Measurement(Decimal(gpu_util), Decimal(100))
-            except RuntimeError as e:
+            except RuntimeError:
                 # libhip is not installed.
                 # Return an empty result.
-                log.exception(e)
+                log.exception(
+                    "accelerator disabled: device stat query failed", plugin_name=self.key
+                )
                 self.enabled = False
         return [
             NodeMeasurement(
@@ -223,10 +228,12 @@ class AbstractGaudiPlugin[TDevice: AbstractGaudiDevice](AbstractComputePlugin, m
                         "mem_used": mem_info.used,
                         "mem_total": mem_info.total,
                     }
-            except RuntimeError as e:
+            except RuntimeError:
                 # libhip is not installed.
                 # Return an empty result.
-                log.exception(e)
+                log.exception(
+                    "accelerator disabled: device stat query failed", plugin_name=self.key
+                )
                 self.enabled = False
                 return []
 

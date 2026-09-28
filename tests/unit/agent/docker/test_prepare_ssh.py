@@ -36,14 +36,13 @@ class PrepareSSHFixture:
             return_value="x86_64",
         )
 
-        mock_current_loop = mocker.patch("ai.backend.agent.docker.agent.current_loop")
-        mock_event_loop = MagicMock()
-
         async def run_in_executor_sync(executor: Any, fn: Any, *args: Any) -> Any:
             return fn(*args)
 
-        mock_event_loop.run_in_executor = run_in_executor_sync
-        mock_current_loop.return_value = mock_event_loop
+        mocker.patch(
+            "ai.backend.agent.docker.agent.run_in_executor_with_context",
+            side_effect=run_in_executor_sync,
+        )
 
     def _build_mock_ctx(self) -> MagicMock:
         ctx = MagicMock(spec=DockerKernelCreationContext)

@@ -4,9 +4,9 @@ import logging
 from aiohttp import web
 from aiohttp.typedefs import Handler
 
-from ai.backend.logging.utils import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 @web.middleware
@@ -15,28 +15,42 @@ async def general_exception_middleware(
 ) -> web.StreamResponse:
     method = request.method
     endpoint = getattr(request.match_info.route.resource, "canonical", request.path)
-    log.trace("Handling request: ({}) {}", method, endpoint)
+    log.trace("handling request", http_method=method, endpoint=endpoint)
     try:
         resp = await handler(request)
     except web.HTTPException as ex:
         if ex.status_code // 100 == 4:
-            log.warning("client error raised inside handlers: ({} {}): {}", method, endpoint, ex)
+            log.trace(
+                "client error raised inside handlers",
+                http_method=method,
+                endpoint=endpoint,
+                response_status=ex.status_code,
+                error=str(ex),
+            )
         elif ex.status_code // 100 == 5:
             log.exception(
-                "Internal server error raised inside handlers: ({} {}): {}", method, endpoint, ex
+                "internal server error raised inside handlers",
+                http_method=method,
+                endpoint=endpoint,
+                response_status=ex.status_code,
             )
         raise
     except ConnectionError as e:
-        log.warning("Connection error inside handlers ({} {}): {}", method, endpoint, e)
+        log.warning(
+            "connection error inside handlers",
+            exc_info=e,
+            http_method=method,
+            endpoint=endpoint,
+        )
         raise
     except asyncio.CancelledError:
         # The server is closing or the client has disconnected in the middle of
         # request.  Atomic requests are still executed to their ends.
-        log.debug("Request cancelled ({0} {1})", request.method, request.rel_url)
+        log.debug("request cancelled", http_method=method, request_url=str(request.rel_url))
         raise
-    except Exception as e:
+    except Exception:
         log.exception(
-            "Uncaught exception in HTTP request handlers ({} {}): {}", method, endpoint, e
+            "uncaught exception in http request handlers", http_method=method, endpoint=endpoint
         )
         raise
     else:

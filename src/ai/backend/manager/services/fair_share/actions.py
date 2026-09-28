@@ -21,7 +21,7 @@ from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.actions.v2.global_scope.base import BaseGlobalAction
 from ai.backend.manager.actions.v2.scope.base import BaseScopeAction
 from ai.backend.manager.actions.v2.scope.result import BaseScopeActionResult
-from ai.backend.manager.data.fair_share import (
+from ai.backend.manager.data.fair_share.types import (
     DomainFairShareData,
     ProjectFairShareData,
     UserFairShareData,
@@ -33,7 +33,7 @@ from ai.backend.manager.models.fair_share.scopes import (
     UserFairShareTarget,
 )
 from ai.backend.manager.models.specs.pagination import QueryPagination
-from ai.backend.manager.repositories.base import BatchQuerier
+from ai.backend.manager.repositories.base.querier import BatchQuerier
 
 
 @dataclass(frozen=True)

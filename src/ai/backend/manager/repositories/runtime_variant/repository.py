@@ -5,7 +5,7 @@ from collections.abc import Sequence
 from uuid import UUID
 
 from ai.backend.common.data.entity.types import EntityIdentifier
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.runtime_variant.types import RuntimeVariantData
 from ai.backend.manager.errors.resource import RuntimeVariantNotFound
@@ -20,7 +20,7 @@ from ai.backend.manager.repositories.ops.v2.write import V2WriteOps
 
 from .db_source.db_source import RuntimeVariantDBSource
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 class RuntimeVariantRepository:

@@ -148,7 +148,7 @@ class TestMonitoringValkeyClient:
             record
             for record in error_logs
             if "CancelledError" in str(record.message)
-            or "Error in Valkey connection monitor" in str(record.message)
+            or "valkey connection monitor failed" in str(record.message)
         ]
         assert len(cancelled_error_logs) == 0, (
             f"Unexpected error logs during cancellation: {[r.message for r in cancelled_error_logs]}"
@@ -199,7 +199,7 @@ class TestMonitoringValkeyClient:
             record
             for record in error_logs
             if "CancelledError" in str(record.message)
-            or "Error in Valkey connection monitor" in str(record.message)
+            or "valkey connection monitor failed" in str(record.message)
         ]
         assert len(cancelled_error_logs) == 0, (
             f"Unexpected error logs during external cancellation: {[r.message for r in cancelled_error_logs]}"

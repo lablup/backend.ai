@@ -12,7 +12,9 @@ from .schedule_marking import ScheduleMarkingPostProcessor
 
 if TYPE_CHECKING:
     from ai.backend.manager.repositories.scheduler.repository import SchedulerRepository
-    from ai.backend.manager.sokovan.scheduling_controller import SchedulingController
+    from ai.backend.manager.sokovan.scheduling_controller.scheduling_controller import (
+        SchedulingController,
+    )
 
 
 def create_session_post_processors(

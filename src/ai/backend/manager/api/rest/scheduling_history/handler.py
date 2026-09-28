@@ -16,7 +16,7 @@ from ai.backend.common.dto.manager.scheduling_history import (
     SearchRouteHistoryRequest,
     SearchSessionHistoryRequest,
 )
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.dto.context import UserContext
 from ai.backend.manager.models.scheduling_history.searchers import (
     DeploymentHistorySearcher,
@@ -24,16 +24,20 @@ from ai.backend.manager.models.scheduling_history.searchers import (
     SessionSchedulingHistorySearcher,
 )
 from ai.backend.manager.models.specs.searcher import GlobalSearcher
-from ai.backend.manager.services.scheduling_history.actions import (
+from ai.backend.manager.services.scheduling_history.actions.search_deployment_history import (
     SearchDeploymentHistoryAction,
+)
+from ai.backend.manager.services.scheduling_history.actions.search_route_history import (
     SearchRouteHistoryAction,
+)
+from ai.backend.manager.services.scheduling_history.actions.search_session_history import (
     SearchSessionHistoryAction,
 )
 from ai.backend.manager.services.scheduling_history.processors import SchedulingHistoryProcessors
 
 from .adapter import SchedulingHistoryAdapter
 
-log: Final = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log: Final = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 class SchedulingHistoryHandler:

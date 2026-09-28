@@ -43,40 +43,42 @@ from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.model_deployment.types import DeploymentStrategy
 from ai.backend.common.events.types import EventDomain
 from ai.backend.common.schema.deployment import IntOrPercent, ReplicaGroupRolloutSpec
-from ai.backend.common.types import ResourceSlot
+from ai.backend.common.types import ResourceSlot, SessionTypes
 from ai.backend.manager.actions.types import OperationStatus
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.deployment.types import ReplicaGroupLifecycle
 from ai.backend.manager.data.error_log.types import ErrorLogSeverity
 from ai.backend.manager.data.kernel.types import KernelStatus
+from ai.backend.manager.data.model_serving.types import EndpointLifecycle
 from ai.backend.manager.data.permission.status import RoleStatus
 from ai.backend.manager.data.retention.types import RetentionCategory, RetentionPurgeResult
+from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.data.session_group.types import (
     SessionGroupPlacementDirection,
     SessionGroupPlacementEnforcement,
 )
-from ai.backend.manager.models.agent import AgentRow
+from ai.backend.manager.models.agent.row import AgentRow
 from ai.backend.manager.models.audit_log.row import AuditLogRow
 from ai.backend.manager.models.base import Base
-from ai.backend.manager.models.container_registry import ContainerRegistryRow
+from ai.backend.manager.models.container_registry.row import ContainerRegistryRow
 from ai.backend.manager.models.deployment_policy.row import DeploymentPolicyRow
 from ai.backend.manager.models.deployment_revision.row import DeploymentRevisionRow
-from ai.backend.manager.models.domain import DomainRow
-from ai.backend.manager.models.endpoint import EndpointLifecycle, EndpointRow, EndpointTokenRow
+from ai.backend.manager.models.domain.row import DomainRow
+from ai.backend.manager.models.endpoint.row import EndpointRow, EndpointTokenRow
 from ai.backend.manager.models.entity_label.row import EntityLabelRow
 from ai.backend.manager.models.entity_share.row import EntityShareRow
 from ai.backend.manager.models.error_log.row import ErrorLogRow
 from ai.backend.manager.models.event_log.row import EventLogRow
 from ai.backend.manager.models.hasher.types import PasswordInfo
-from ai.backend.manager.models.image import ImageRow
+from ai.backend.manager.models.image.row import ImageRow
 from ai.backend.manager.models.kernel.row import KernelRow
-from ai.backend.manager.models.keypair import KeyPairRow
-from ai.backend.manager.models.project import ProjectRow, ProjectType
-from ai.backend.manager.models.rbac_models.role import RoleRow
-from ai.backend.manager.models.replica_group import ReplicaGroupRow
+from ai.backend.manager.models.keypair.row import KeyPairRow
+from ai.backend.manager.models.project.row import ProjectRow, ProjectType
+from ai.backend.manager.models.rbac_models.role.row import RoleRow
+from ai.backend.manager.models.replica_group.row import ReplicaGroupRow
 from ai.backend.manager.models.replica_group_history.row import ReplicaGroupHistoryRow
-from ai.backend.manager.models.resource_group import ResourceGroupOpts, ResourceGroupRow
-from ai.backend.manager.models.resource_policy import (
+from ai.backend.manager.models.resource_group.row import ResourceGroupOpts, ResourceGroupRow
+from ai.backend.manager.models.resource_policy.row import (
     KeyPairResourcePolicyRow,
     ProjectResourcePolicyRow,
     UserResourcePolicyRow,
@@ -96,14 +98,9 @@ from ai.backend.manager.models.scheduling_history.row import (
     RouteHistoryRow,
     SessionSchedulingHistoryRow,
 )
-from ai.backend.manager.models.session import (
-    SessionDependencyRow,
-    SessionRow,
-    SessionStatus,
-    SessionTypes,
-)
+from ai.backend.manager.models.session.row import SessionDependencyRow, SessionRow
 from ai.backend.manager.models.session_group.row import SessionGroupRow
-from ai.backend.manager.models.user import UserRole, UserRow, UserStatus
+from ai.backend.manager.models.user.row import UserRole, UserRow, UserStatus
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.vfolder.row import VFolderRow
 from ai.backend.manager.models.virtual_entity.entity_membership import EntityMembershipRow

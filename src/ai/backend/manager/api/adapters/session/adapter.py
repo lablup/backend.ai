@@ -138,7 +138,7 @@ from ai.backend.manager.models.session.searchable_fields import SessionSearchabl
 from ai.backend.manager.models.session.searchers import SessionSearcher
 from ai.backend.manager.models.specs.search.usage import UsedBy
 from ai.backend.manager.models.specs.searcher import GlobalSearcher, ScopedSearcher
-from ai.backend.manager.models.user import UserRole
+from ai.backend.manager.models.user.row import UserRole
 from ai.backend.manager.repositories.idle_checker.types import SessionIdleCheckPair
 from ai.backend.manager.services.idle_checker.actions.exclude_sessions import (
     ExcludeSessionIdleChecksAction,
@@ -706,22 +706,6 @@ class SessionAdapter(BaseAdapter):
             )
         )
 
-        return AdminSearchSessionsPayload(
-            items=await self._session_data_to_nodes([
-                item.to_session_data() for item in action_result.items
-            ]),
-            total_count=action_result.total_count,
-            has_next_page=action_result.has_next_page,
-            has_previous_page=action_result.has_previous_page,
-        )
-
-    async def my_search(self, input: AdminSearchSessionsInput) -> AdminSearchSessionsPayload:
-        """Search sessions owned by the current user."""
-        action_result = await self._session.scoped_search.run(
-            self._scoped_search_action(
-                [UserSessionTarget(user_id=UserID(self._require_user_id()))], input
-            )
-        )
         return AdminSearchSessionsPayload(
             items=await self._session_data_to_nodes([
                 item.to_session_data() for item in action_result.items

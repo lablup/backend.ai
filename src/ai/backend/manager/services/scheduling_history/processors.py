@@ -37,6 +37,9 @@ from ai.backend.manager.services.scheduling_history.actions.bulk_get_route_histo
 from ai.backend.manager.services.scheduling_history.actions.bulk_get_session_histories import (
     BulkGetSessionHistoriesAction,
 )
+from ai.backend.manager.services.scheduling_history.actions.global_search_replica_group_history import (
+    GlobalSearchReplicaGroupHistoryAction,
+)
 from ai.backend.manager.services.scheduling_history.actions.lookup_owner import (
     LookupBulkDeploymentHistoryOwnerAction,
     LookupBulkKernelSchedulingHistoryOwnerAction,
@@ -52,24 +55,39 @@ from ai.backend.manager.services.scheduling_history.actions.lookup_owner import 
 from ai.backend.manager.services.scheduling_history.actions.lookup_replica_deployment import (
     LookupReplicaDeploymentAction,
 )
-
-from .actions import (
-    GlobalSearchReplicaGroupHistoryAction,
+from ai.backend.manager.services.scheduling_history.actions.scoped_search_replica_group_history import (
     ScopedSearchReplicaGroupHistoryAction,
     ScopedSearchReplicaGroupHistoryActionResult,
+)
+from ai.backend.manager.services.scheduling_history.actions.search_deployment_history import (
     SearchDeploymentHistoryAction,
+)
+from ai.backend.manager.services.scheduling_history.actions.search_deployment_scoped_history import (
     SearchDeploymentScopedHistoryAction,
     SearchDeploymentScopedHistoryActionResult,
+)
+from ai.backend.manager.services.scheduling_history.actions.search_kernel_history import (
     SearchKernelHistoryAction,
+)
+from ai.backend.manager.services.scheduling_history.actions.search_kernel_scoped_history import (
     SearchKernelScopedHistoryAction,
     SearchKernelScopedHistoryActionResult,
+)
+from ai.backend.manager.services.scheduling_history.actions.search_route_history import (
     SearchRouteHistoryAction,
+)
+from ai.backend.manager.services.scheduling_history.actions.search_route_scoped_history import (
     SearchRouteScopedHistoryAction,
     SearchRouteScopedHistoryActionResult,
+)
+from ai.backend.manager.services.scheduling_history.actions.search_session_history import (
     SearchSessionHistoryAction,
+)
+from ai.backend.manager.services.scheduling_history.actions.search_session_scoped_history import (
     SearchSessionScopedHistoryAction,
     SearchSessionScopedHistoryActionResult,
 )
+
 from .service import SchedulingHistoryService
 
 

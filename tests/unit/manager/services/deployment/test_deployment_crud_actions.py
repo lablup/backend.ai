@@ -39,8 +39,8 @@ from ai.backend.manager.data.deployment.types import (
     ResourceConfigData,
 )
 from ai.backend.manager.models.specs.pagination import OffsetPagination
-from ai.backend.manager.repositories.base import BatchQuerier
-from ai.backend.manager.repositories.deployment import DeploymentRepository
+from ai.backend.manager.repositories.base.querier import BatchQuerier
+from ai.backend.manager.repositories.deployment.repository import DeploymentRepository
 from ai.backend.manager.services.deployment.actions.create_legacy_deployment import (
     CreateLegacyDeploymentAction,
 )
@@ -51,7 +51,7 @@ from ai.backend.manager.services.deployment.actions.sync_replicas import (
     SyncReplicaAction,
 )
 from ai.backend.manager.services.deployment.service import DeploymentService
-from ai.backend.manager.sokovan.deployment import DeploymentController
+from ai.backend.manager.sokovan.deployment.deployment_controller import DeploymentController
 from ai.backend.manager.sokovan.deployment.types import DeploymentLifecycleType
 
 

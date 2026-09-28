@@ -26,10 +26,10 @@ from ai.backend.manager.api.gql.decorators import (
     gql_field,
     gql_pydantic_input,
 )
-from ai.backend.manager.api.gql.fair_share.types import DomainFairShareGQL
+from ai.backend.manager.api.gql.fair_share.types.domain import DomainFairShareGQL
 from ai.backend.manager.api.gql.pydantic_compat import PydanticInputMixin, PydanticNodeMixin
 from ai.backend.manager.api.gql.resource_slot.overview_types import ActiveResourceOverviewGQL
-from ai.backend.manager.api.gql.resource_usage.types import (
+from ai.backend.manager.api.gql.resource_usage.types.domain_usage import (
     DomainUsageBucketConnection,
     DomainUsageBucketFilter,
     DomainUsageBucketOrderBy,
@@ -163,7 +163,7 @@ class DomainV2GQL(PydanticNodeMixin[DomainNode]):
         from strawberry.relay import PageInfo
 
         from ai.backend.manager.api.gql.base import encode_cursor
-        from ai.backend.manager.api.gql.resource_usage.types import (
+        from ai.backend.manager.api.gql.resource_usage.types.domain_usage import (
             DomainUsageBucketEdge,
             DomainUsageBucketGQL,
         )

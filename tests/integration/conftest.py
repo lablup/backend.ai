@@ -36,7 +36,8 @@ from ai.backend.logging import LocalLogger, LogLevel
 from ai.backend.logging.config import ConsoleConfig, LogDriver, LoggingConfig
 from ai.backend.logging.types import LogFormat
 from ai.backend.manager.api.rest.app import build_root_app
-from ai.backend.manager.api.rest.middleware import build_auth_middleware, build_exception_middleware
+from ai.backend.manager.api.rest.middleware.auth import build_auth_middleware
+from ai.backend.manager.api.rest.middleware.exception import build_exception_middleware
 from ai.backend.manager.api.rest.setup import setup_api
 from ai.backend.manager.cli.context import CLIContext
 from ai.backend.manager.cli.dbschema import oneshot as cli_schema_oneshot
@@ -52,23 +53,26 @@ from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.user.types import UserStatus
 from ai.backend.manager.dependencies.composer import DependencyInput, ManagerDependencyComposer
 from ai.backend.manager.models.base import pgsql_connect_opts
-from ai.backend.manager.models.domain import DomainRow, domains
+from ai.backend.manager.models.domain.row import DomainRow, domains
 from ai.backend.manager.models.hasher.types import PasswordInfo
-from ai.backend.manager.models.image import ImageAliasRow, ImageRow
-from ai.backend.manager.models.kernel import kernels
-from ai.backend.manager.models.keypair import keypairs
-from ai.backend.manager.models.project import ProjectRow, association_groups_users
-from ai.backend.manager.models.resource_group import resource_groups, sgroups_for_domains
-from ai.backend.manager.models.resource_group.row import ResourceGroupOpts
-from ai.backend.manager.models.resource_policy import (
+from ai.backend.manager.models.image.row import ImageAliasRow, ImageRow
+from ai.backend.manager.models.kernel.row import kernels
+from ai.backend.manager.models.keypair.row import keypairs
+from ai.backend.manager.models.project.row import ProjectRow, association_groups_users
+from ai.backend.manager.models.resource_group.row import (
+    ResourceGroupOpts,
+    resource_groups,
+    sgroups_for_domains,
+)
+from ai.backend.manager.models.resource_policy.row import (
     ProjectResourcePolicyRow,
     UserResourcePolicyRow,
     keypair_resource_policies,
 )
-from ai.backend.manager.models.session import SessionRow
-from ai.backend.manager.models.session_template import SessionTemplateRow
-from ai.backend.manager.models.user import users
-from ai.backend.manager.models.vfolder import vfolders
+from ai.backend.manager.models.session.row import SessionRow
+from ai.backend.manager.models.session_template.row import SessionTemplateRow
+from ai.backend.manager.models.user.row import users
+from ai.backend.manager.models.vfolder.row import vfolders
 from ai.backend.manager.secret.types import SecretValue
 from ai.backend.manager.server import webapp_plugin_ctx
 from ai.backend.testutils.bootstrap import POSTGRES_MAINTENANCE_DB, POSTGRES_PASSWORD, POSTGRES_USER

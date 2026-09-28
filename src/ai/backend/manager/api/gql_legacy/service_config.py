@@ -6,9 +6,9 @@ import graphene
 
 from ai.backend.common.lock import EtcdLock
 from ai.backend.common.utils import deep_merge
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.config.unified import ManagerUnifiedConfig
-from ai.backend.manager.models.user import UserRole
+from ai.backend.manager.models.user.row import UserRole
 
 from .gql_relay import AsyncNode, Connection, ConnectionResolverResult
 
@@ -18,7 +18,7 @@ if TYPE_CHECKING:
 _PREFIX: Final[str] = "ai/backend/config"
 
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 class AvailableServiceNode(graphene.ObjectType):  # type: ignore[misc]
@@ -37,8 +37,19 @@ class AvailableServiceNode(graphene.ObjectType):  # type: ignore[misc]
         description='Possible values of "Config.service". Added in 25.8.0.',
     )
 
-    async def resolve_component_variants(self, info: graphene.ResolveInfo) -> list[str]:
+    async def resolve_service_variants(self, info: graphene.ResolveInfo) -> list[str]:
         return ["manager", "common"]
+
+    @classmethod
+    def get_connection(cls) -> ConnectionResolverResult[Self]:
+        # The connection encodes each node's id into its edge cursor, so the node needs one.
+        return ConnectionResolverResult(
+            node_list=[cls(id="available_services")],
+            cursor=None,
+            pagination_order=None,
+            requested_page_size=None,
+            total_count=1,
+        )
 
 
 class AvailableServiceConnection(Connection):
@@ -114,8 +125,8 @@ class ServiceConfigNode(graphene.ObjectType):  # type: ignore[misc]
             try:
                 node = await task
                 result.append(node)
-            except Exception as exc:
-                log.error("Failed to load service config node: {}", exc)
+            except Exception:
+                log.exception("service config node load failed")
 
         return ConnectionResolverResult(
             node_list=result,

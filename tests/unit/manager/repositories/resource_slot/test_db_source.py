@@ -15,25 +15,25 @@ from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.entity.resource_group import ResourceGroupID
 from ai.backend.manager.data.agent.types import AgentStatus
 from ai.backend.manager.data.kernel.types import KernelStatus
-from ai.backend.manager.models.agent import AgentRow
-from ai.backend.manager.models.container_registry import ContainerRegistryRow
-from ai.backend.manager.models.domain import DomainRow
-from ai.backend.manager.models.image import ImageRow
-from ai.backend.manager.models.kernel import KernelRow
-from ai.backend.manager.models.project import ProjectRow
-from ai.backend.manager.models.resource_group import ResourceGroupOpts, ResourceGroupRow
-from ai.backend.manager.models.resource_policy import (
+from ai.backend.manager.models.agent.row import AgentRow
+from ai.backend.manager.models.container_registry.row import ContainerRegistryRow
+from ai.backend.manager.models.domain.row import DomainRow
+from ai.backend.manager.models.image.row import ImageRow
+from ai.backend.manager.models.kernel.row import KernelRow
+from ai.backend.manager.models.project.row import ProjectRow
+from ai.backend.manager.models.resource_group.row import ResourceGroupOpts, ResourceGroupRow
+from ai.backend.manager.models.resource_policy.row import (
     ProjectResourcePolicyRow,
     UserResourcePolicyRow,
 )
-from ai.backend.manager.models.resource_slot import (
+from ai.backend.manager.models.resource_slot.row import (
     ResourceAllocationRow,
     ResourceSlotTypeRow,
 )
-from ai.backend.manager.models.session import SessionRow
-from ai.backend.manager.models.user import UserRow
+from ai.backend.manager.models.session.row import SessionRow
+from ai.backend.manager.models.user.row import UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.repositories.resource_slot.db_source import ResourceSlotDBSource
+from ai.backend.manager.repositories.resource_slot.db_source.db_source import ResourceSlotDBSource
 from ai.backend.testutils.db import with_tables
 
 

@@ -18,6 +18,7 @@ from ai.backend.common.dto.manager.query import (
     StringFilter,
     UUIDFilter,
 )
+from ai.backend.common.dto.manager.v2.entity_label.request import EntityLabelNestedFilter
 from ai.backend.common.tristate.unset import UNSET, Unset
 
 from .types import (
@@ -122,6 +123,9 @@ class ImageFilterInputDTO(BaseRequestModel):
     )
     last_used: DateTimeFilter | None = Field(
         default=None, description="Filter by last used datetime (before/after)."
+    )
+    labels: EntityLabelNestedFilter | None = Field(
+        default=None, description="Filter by the labels on the entity"
     )
     AND: list[ImageFilterInputDTO] | None = Field(
         default=None, description="Combine with AND logic."

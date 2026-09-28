@@ -21,7 +21,7 @@ from ai.backend.manager.api.rest.user.handler import UserHandler
 from ai.backend.manager.api.rest.user.registry import register_user_routes
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.secret.types import KeyProviderType
-from ai.backend.manager.models.keypair import KeyPairRow, keypairs
+from ai.backend.manager.models.keypair.row import KeyPairRow, keypairs
 from ai.backend.manager.secret.pool import KeyProviderPool
 from ai.backend.manager.services.domain.processors import DomainProcessors
 from ai.backend.manager.services.user.processors import UserProcessors

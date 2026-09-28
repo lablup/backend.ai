@@ -10,7 +10,7 @@ import pytest
 from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.user.types import UserData, UserRole
 from ai.backend.manager.api.gql.rbac.resolver import role as role_resolver
-from ai.backend.manager.api.gql.rbac.types import RoleAssignmentConnection
+from ai.backend.manager.api.gql.rbac.types.role import RoleAssignmentConnection
 from ai.backend.manager.data.common.types import SearchResult
 from ai.backend.manager.errors.auth import InsufficientPrivilege
 

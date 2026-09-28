@@ -10,7 +10,7 @@ from typing import override
 from ai.backend.common.clients.valkey_client.valkey_live.client import ValkeyLiveClient
 from ai.backend.common.data.entity.idle_checker import IdleCheckerID
 from ai.backend.common.types import SessionId
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.data.idle_checker.types import IdleCheckSession
 from ai.backend.manager.sokovan.idle_check.checkers.base import (
     CheckerAssignment,
@@ -19,7 +19,7 @@ from ai.backend.manager.sokovan.idle_check.checkers.base import (
     IdleCheckerContext,
 )
 
-log = BraceStyleAdapter(logging.getLogger(__name__))
+log = StructuredLogger(logging.getLogger(__name__))
 
 _ONGOING_ACTIVITY_SENTINEL = 0.0
 
@@ -57,9 +57,9 @@ class NetworkTimeoutChecker(IdleChecker):
             network_spec = assignment.definition.spec.network
             if network_spec is None:
                 log.error(
-                    "Network timeout checker has mismatched spec type - check id: {}, spec type: {}",
-                    assignment.definition.checker_id,
-                    assignment.definition.spec.type,
+                    "network timeout checker has mismatched spec type",
+                    idle_checker_id=assignment.definition.checker_id,
+                    spec_type=assignment.definition.spec.type,
                 )
                 continue
             max_inactivity_seconds = network_spec.max_network_inactivity_seconds

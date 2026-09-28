@@ -19,13 +19,13 @@ from ai.backend.common.dto.manager.v2.vfs_storage.request import (
     UpdateVFSStorageInput,
 )
 from ai.backend.common.dto.manager.v2.vfs_storage.response import VFSStorageNode
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.api.rest.v2.path_params import StorageIdPathParam
 
 if TYPE_CHECKING:
     from ai.backend.manager.api.adapters.vfs_storage.adapter import VFSStorageAdapter
 
-log: Final = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log: Final = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 class ListVFSStoragesPayload(BaseRootResponseModel[list[VFSStorageNode]]):

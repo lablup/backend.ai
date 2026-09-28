@@ -21,7 +21,7 @@ from ai.backend.common.dto.manager.operations.types import (
     ManagerStatus,
     SchedulerOps,
 )
-from ai.backend.manager.models.agent import agents
+from ai.backend.manager.models.agent.row import agents
 
 
 class TestAppendErrorLog:

@@ -98,7 +98,7 @@ BEP numbers start from 1000.
 | [1025](BEP-1025-server-side-csv-export.md) | Server-Side CSV Export API | HyeokJin Kim | Implemented |
 | [1026](BEP-1026-fair-share-scheduler.md) | Fair Share Scheduler | HyeokJin Kim | Implemented |
 | 1027 | Docker Relay in Compute Sessions | Joongi Kim | Draft |
-| [1028](BEP-1028-kubernetes-bridge.md) | Kubernetes Bridge | Daemyung Kang, Hyunhoi Koo | Draft |
+| [1028](BEP-1028-kubernetes-bridge.md) | Kubernetes Bridge | Daemyung Kang, Hyunhoi Koo | Rejected |
 | [1029](BEP-1029-sokovan-observer-handler.md) | Sokovan ObserverHandler Pattern | HyeokJin Kim | Implemented |
 | [1030](BEP-1030-sokovan-scheduler-status-transition.md) | Sokovan Scheduler Status Transition Design | HyeokJin Kim | Implemented |
 | [1031](BEP-1031-graphql-field-metadata.md) | GraphQL API Field Metadata Extension | HyeokJin Kim | Draft |
@@ -136,7 +136,7 @@ BEP numbers start from 1000.
 | [1063](BEP-1063-db-record-retention.md) | DB Record Retention Management | HyeokJin Kim | Implemented |
 | [1064](BEP-1064-session-group-placement.md) | SessionGroup Placement for Grouped Sessions | HyeokJin Kim | Draft |
 | [1065](BEP-1065-encrypted-secret-key-storage.md) | Encrypted Secret-Key Storage | HyeokJin Kim | Draft |
-| [1066](BEP-1066-structured-logging.md) | Structured Logging Across Components | HyeokJin Kim | Draft |
+| [1066](BEP-1066-structured-logging.md) | Structured Logging Across Components | HyeokJin Kim | Implemented |
 | [1067](BEP-1067-e2e-integration-test-framework.md) | Full-Stack E2E Integration Test Framework | HyeokJin Kim | Draft |
 | [1068](BEP-1068-login-session.md) | Login Session Improvements | HyeokJin Kim | Draft |
 | [1069](BEP-1069-entity-lifecycle-deletion.md) | Entity Lifecycle Deletion Management | HyeokJin Kim | Draft |

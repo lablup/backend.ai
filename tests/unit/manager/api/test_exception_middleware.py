@@ -9,10 +9,11 @@ from aiohttp import web
 
 from ai.backend.common.metrics.http import build_api_metric_middleware
 from ai.backend.manager.api.rest.app import api_middleware
-from ai.backend.manager.api.rest.middleware import build_exception_middleware
+from ai.backend.manager.api.rest.middleware.exception import build_exception_middleware
 from ai.backend.manager.errors.common import GenericForbidden, InternalServerError
 
 _EXCEPTION_MIDDLEWARE_LOGGER = "ai.backend.manager.api.rest.middleware.exception"
+_TRACE = 5
 
 
 class _RecordingMetric:
@@ -49,17 +50,17 @@ def _build_app(metric: _RecordingMetric) -> web.Application:
     return app
 
 
-async def test_unmatched_route_is_logged_at_debug_and_counted(
+async def test_unmatched_route_is_logged_at_trace_and_counted(
     aiohttp_client: Any, caplog: pytest.LogCaptureFixture
 ) -> None:
     metric = _RecordingMetric()
     client = await aiohttp_client(_build_app(metric))
 
-    with caplog.at_level(logging.DEBUG, logger=_EXCEPTION_MIDDLEWARE_LOGGER):
+    with caplog.at_level(_TRACE, logger=_EXCEPTION_MIDDLEWARE_LOGGER):
         resp = await client.get("/license")
 
     assert resp.status == 404
-    assert [r.levelno for r in caplog.records] == [logging.DEBUG]
+    assert [r.levelno for r in caplog.records] == [_TRACE]
     assert metric.observations == [
         {
             "method": "GET",
@@ -71,17 +72,17 @@ async def test_unmatched_route_is_logged_at_debug_and_counted(
     ]
 
 
-async def test_registered_handler_4xx_keeps_warning(
+async def test_registered_handler_4xx_is_logged_at_trace(
     aiohttp_client: Any, caplog: pytest.LogCaptureFixture
 ) -> None:
     metric = _RecordingMetric()
     client = await aiohttp_client(_build_app(metric))
 
-    with caplog.at_level(logging.DEBUG, logger=_EXCEPTION_MIDDLEWARE_LOGGER):
+    with caplog.at_level(_TRACE, logger=_EXCEPTION_MIDDLEWARE_LOGGER):
         resp = await client.get("/forbidden")
 
     assert resp.status == 403
-    assert [r.levelno for r in caplog.records] == [logging.WARNING]
+    assert [r.levelno for r in caplog.records] == [_TRACE]
     assert metric.observations[0]["status_code"] == 403
 
 
@@ -91,7 +92,7 @@ async def test_registered_handler_5xx_keeps_traceback(
     metric = _RecordingMetric()
     client = await aiohttp_client(_build_app(metric))
 
-    with caplog.at_level(logging.DEBUG, logger=_EXCEPTION_MIDDLEWARE_LOGGER):
+    with caplog.at_level(_TRACE, logger=_EXCEPTION_MIDDLEWARE_LOGGER):
         resp = await client.get("/broken")
 
     assert resp.status == 500

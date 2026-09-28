@@ -45,7 +45,7 @@ from ai.backend.common.types import (
     ClusterMode,
     ResourceSlot,
 )
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.data.deployment.scale import (
     AutoScalingAction,
     AutoScalingCondition,
@@ -88,11 +88,11 @@ from ai.backend.manager.models.deployment_policy.searchable_fields import (
 from ai.backend.manager.models.image.searchable_fields import ImageSearchableFields
 
 if TYPE_CHECKING:
-    from ai.backend.manager.models.deployment_policy import DeploymentPolicyRow
+    from ai.backend.manager.models.deployment_policy.row import DeploymentPolicyRow
     from ai.backend.manager.models.deployment_revision.row import DeploymentRevisionRow
-    from ai.backend.manager.models.replica_group import ReplicaGroupRow
-    from ai.backend.manager.models.routing import RoutingRow
-    from ai.backend.manager.models.user import UserRow
+    from ai.backend.manager.models.replica_group.row import ReplicaGroupRow
+    from ai.backend.manager.models.routing.row import RoutingRow
+    from ai.backend.manager.models.user.row import UserRow
 
 __all__ = (
     "EndpointAutoScalingRuleRow",
@@ -102,54 +102,54 @@ __all__ = (
 )
 
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 def _get_endpoint_tokens_join_condition() -> Any:
-    from ai.backend.manager.models.endpoint import EndpointTokenRow
+    from ai.backend.manager.models.endpoint.row import EndpointTokenRow
 
     return foreign(EndpointTokenRow.endpoint) == EndpointRow.id
 
 
 def _get_primary_replica_group_join_condition() -> sa.ColumnElement[bool]:
-    from ai.backend.manager.models.replica_group import ReplicaGroupRow
+    from ai.backend.manager.models.replica_group.row import ReplicaGroupRow
 
     return foreign(EndpointRow.primary_replica_group_id) == ReplicaGroupRow.id
 
 
 def _get_target_replica_group_join_condition() -> sa.ColumnElement[bool]:
-    from ai.backend.manager.models.replica_group import ReplicaGroupRow
+    from ai.backend.manager.models.replica_group.row import ReplicaGroupRow
 
     return foreign(EndpointRow.target_replica_group_id) == ReplicaGroupRow.id
 
 
 def _get_current_revision_secondaryjoin() -> sa.ColumnElement[bool]:
-    from ai.backend.manager.models.deployment_revision import DeploymentRevisionRow
-    from ai.backend.manager.models.replica_group import ReplicaGroupRow
+    from ai.backend.manager.models.deployment_revision.row import DeploymentRevisionRow
+    from ai.backend.manager.models.replica_group.row import ReplicaGroupRow
 
     return foreign(ReplicaGroupRow.current_revision_id) == DeploymentRevisionRow.id
 
 
 def _get_deploying_revision_join_condition() -> sa.ColumnElement[bool]:
-    from ai.backend.manager.models.deployment_revision import DeploymentRevisionRow
+    from ai.backend.manager.models.deployment_revision.row import DeploymentRevisionRow
 
     return foreign(EndpointRow.deploying_revision_id) == DeploymentRevisionRow.id
 
 
 def _get_deployment_policy_join_condition() -> Any:
-    from ai.backend.manager.models.deployment_policy import DeploymentPolicyRow
+    from ai.backend.manager.models.deployment_policy.row import DeploymentPolicyRow
 
     return EndpointRow.id == foreign(DeploymentPolicyRow.endpoint)
 
 
 def _get_created_user_row_join_condition() -> Any:
-    from ai.backend.manager.models.user import UserRow
+    from ai.backend.manager.models.user.row import UserRow
 
     return foreign(EndpointRow.created_user) == UserRow.uuid
 
 
 def _get_session_owner_row_join_condition() -> Any:
-    from ai.backend.manager.models.user import UserRow
+    from ai.backend.manager.models.user.row import UserRow
 
     return foreign(EndpointRow.session_owner) == UserRow.uuid
 
@@ -357,7 +357,7 @@ class EndpointRow(Base):
         """
         :raises: sqlalchemy.orm.exc.NoResultFound
         """
-        from ai.backend.manager.models.deployment_revision import DeploymentRevisionRow
+        from ai.backend.manager.models.deployment_revision.row import DeploymentRevisionRow
 
         query = sa.select(EndpointRow).filter(EndpointRow.id == endpoint_id)
         if load_routes:
@@ -407,7 +407,7 @@ class EndpointRow(Base):
         load_revisions: bool = False,
         status_filter: Iterable[EndpointLifecycle] = frozenset([EndpointLifecycle.CREATED]),
     ) -> list[EndpointRow]:
-        from ai.backend.manager.models.deployment_revision import DeploymentRevisionRow
+        from ai.backend.manager.models.deployment_revision.row import DeploymentRevisionRow
 
         query = (
             sa.select(EndpointRow)
@@ -459,7 +459,7 @@ class EndpointRow(Base):
         load_revisions: bool = False,
         status_filter: Iterable[EndpointLifecycle] = frozenset([EndpointLifecycle.CREATED]),
     ) -> Sequence[EndpointRow]:
-        from ai.backend.manager.models.deployment_revision import DeploymentRevisionRow
+        from ai.backend.manager.models.deployment_revision.row import DeploymentRevisionRow
 
         query = (
             sa.select(EndpointRow)
@@ -533,7 +533,7 @@ class EndpointRow(Base):
         target_access_key: AccessKey,
     ) -> None:
         from ai.backend.manager.models.replica_group.row import ReplicaGroupRow
-        from ai.backend.manager.models.session import KernelLoadingStrategy, SessionRow
+        from ai.backend.manager.models.session.row import KernelLoadingStrategy, SessionRow
         from ai.backend.manager.models.session_group.row import SessionGroupRow
 
         endpoint_rows = await EndpointRow.list_endpoint(

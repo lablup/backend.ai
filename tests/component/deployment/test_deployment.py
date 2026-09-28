@@ -19,7 +19,7 @@ from sqlalchemy.ext.asyncio import AsyncEngine as SAEngine
 from ai.backend.client.v2.exceptions import NotFoundError
 from ai.backend.client.v2.registry import BackendAIClientRegistry
 from ai.backend.common.config import ModelDefinitionDraft
-from ai.backend.common.contexts.user import with_user
+from ai.backend.common.contexts.user import with_user_context
 from ai.backend.common.data.endpoint.types import EndpointLifecycle
 from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.entity.image import ImageID
@@ -56,10 +56,13 @@ from ai.backend.common.dto.manager.v2.deployment.request import (
     ReplicaFilter,
     ReplicaHealthStatusFilter,
     ReplicaNestedFilter,
+    ScopedSearchDeploymentsInput,
 )
 from ai.backend.common.dto.manager.v2.deployment.request import (
     DeploymentFilter as DeploymentFilterV2,
 )
+from ai.backend.common.dto.manager.v2.deployment.types import DeploymentScope
+from ai.backend.common.dto.manager.v2.rbac.types import UUIDScope
 from ai.backend.common.types import ClusterMode
 from ai.backend.manager.api.adapters.deployment.adapter import DeploymentAdapter
 from ai.backend.manager.data.deployment.types import (
@@ -67,7 +70,7 @@ from ai.backend.manager.data.deployment.types import (
     RouteStatus,
     RouteTrafficStatus,
 )
-from ai.backend.manager.models.routing import RoutingRow
+from ai.backend.manager.models.routing.row import RoutingRow
 from ai.backend.manager.services.deployment.processors import DeploymentProcessors
 from ai.backend.manager.services.processors import Processors
 from ai.backend.testutils.fixtures import DomainFixtureData
@@ -347,7 +350,7 @@ class TestDeactivateRevision:
 class TestDeploymentAdapterFilter:
     """Verify the GQL adapter honors AND/OR/NOT in DeploymentFilter.
 
-    The adapter's ``my_search`` and ``project_search`` previously inlined
+    The adapter's ``scoped_search`` and ``project_search`` previously inlined
     the filter conversion and silently dropped nested ``AND``/``OR``/``NOT``
     clauses, so multi-condition filters degenerated into "no filter at all".
     These tests pin the corrected behavior.
@@ -513,11 +516,12 @@ class TestDeploymentAdapterFilter:
         replicas_filter: ReplicaNestedFilter,
         expected_names: tuple[str, ...],
     ) -> None:
-        with with_user(
+        with with_user_context(
             self._admin_user_data(admin_user_fixture.user_uuid, domain_fixture.domain_name)
         ):
-            payload = await deployment_adapter.my_search(
-                AdminSearchDeploymentsInput(
+            payload = await deployment_adapter.scoped_search(
+                ScopedSearchDeploymentsInput(
+                    scope=DeploymentScope(user=[UUIDScope(value=admin_user_fixture.user_uuid)]),
                     filter=DeploymentFilterV2(
                         replicas=replicas_filter,
                     ),
@@ -536,11 +540,12 @@ class TestDeploymentAdapterFilter:
         domain_fixture: DomainFixtureData,
         replica_filter_deployments: dict[str, uuid.UUID],
     ) -> None:
-        with with_user(
+        with with_user_context(
             self._admin_user_data(admin_user_fixture.user_uuid, domain_fixture.domain_name)
         ):
-            payload = await deployment_adapter.my_search(
-                AdminSearchDeploymentsInput(
+            payload = await deployment_adapter.scoped_search(
+                ScopedSearchDeploymentsInput(
+                    scope=DeploymentScope(user=[UUIDScope(value=admin_user_fixture.user_uuid)]),
                     filter=DeploymentFilterV2(
                         replicas=ReplicaNestedFilter(
                             exists=True,
@@ -557,7 +562,7 @@ class TestDeploymentAdapterFilter:
 
         assert {item.id for item in payload.items} == {replica_filter_deployments["healthy"]}
 
-    async def test_my_search_and_filter_returns_intersection(
+    async def test_user_scoped_search_and_filter_returns_intersection(
         self,
         admin_registry: BackendAIClientRegistry,
         admin_user_fixture: UserFixtureData,
@@ -599,17 +604,21 @@ class TestDeploymentAdapterFilter:
                 DeploymentFilterV2(tags=StringFilter(i_contains="beta")),
             ],
         )
-        with with_user(
+        with with_user_context(
             self._admin_user_data(admin_user_fixture.user_uuid, domain_fixture.domain_name)
         ):
-            payload = await deployment_adapter.my_search(
-                AdminSearchDeploymentsInput(filter=filter_input, limit=50),
+            payload = await deployment_adapter.scoped_search(
+                ScopedSearchDeploymentsInput(
+                    scope=DeploymentScope(user=[UUIDScope(value=admin_user_fixture.user_uuid)]),
+                    filter=filter_input,
+                    limit=50,
+                ),
             )
 
         assert payload.total_count == 1
         assert [item.id for item in payload.items] == [target_id]
 
-    async def test_my_search_or_filter_returns_union(
+    async def test_user_scoped_search_or_filter_returns_union(
         self,
         admin_registry: BackendAIClientRegistry,
         admin_user_fixture: UserFixtureData,
@@ -651,17 +660,21 @@ class TestDeploymentAdapterFilter:
                 DeploymentFilterV2(tags=StringFilter(i_contains="beta")),
             ],
         )
-        with with_user(
+        with with_user_context(
             self._admin_user_data(admin_user_fixture.user_uuid, domain_fixture.domain_name)
         ):
-            payload = await deployment_adapter.my_search(
-                AdminSearchDeploymentsInput(filter=filter_input, limit=50),
+            payload = await deployment_adapter.scoped_search(
+                ScopedSearchDeploymentsInput(
+                    scope=DeploymentScope(user=[UUIDScope(value=admin_user_fixture.user_uuid)]),
+                    filter=filter_input,
+                    limit=50,
+                ),
             )
 
         assert payload.total_count == 2
         assert {item.id for item in payload.items} == {alpha_id, beta_id}
 
-    async def test_my_search_or_filter_groups_multi_field_subfilters(
+    async def test_user_scoped_search_or_filter_groups_multi_field_subfilters(
         self,
         admin_registry: BackendAIClientRegistry,
         admin_user_fixture: UserFixtureData,
@@ -728,11 +741,15 @@ class TestDeploymentAdapterFilter:
                 ),
             ],
         )
-        with with_user(
+        with with_user_context(
             self._admin_user_data(admin_user_fixture.user_uuid, domain_fixture.domain_name)
         ):
-            payload = await deployment_adapter.my_search(
-                AdminSearchDeploymentsInput(filter=filter_input, limit=50),
+            payload = await deployment_adapter.scoped_search(
+                ScopedSearchDeploymentsInput(
+                    scope=DeploymentScope(user=[UUIDScope(value=admin_user_fixture.user_uuid)]),
+                    filter=filter_input,
+                    limit=50,
+                ),
             )
 
         assert payload.total_count == 2
@@ -772,7 +789,7 @@ class TestDeploymentAdapterFilter:
                 DeploymentFilterV2(tags=StringFilter(i_contains="beta")),
             ],
         )
-        with with_user(
+        with with_user_context(
             self._admin_user_data(admin_user_fixture.user_uuid, domain_fixture.domain_name)
         ):
             payload = await deployment_adapter.project_search(

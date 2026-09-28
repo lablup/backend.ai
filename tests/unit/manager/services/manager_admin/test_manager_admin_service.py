@@ -11,7 +11,7 @@ from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.errors.api import InvalidAPIParameters
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.repositories.manager_admin import ManagerAdminRepository
+from ai.backend.manager.repositories.manager_admin.repository import ManagerAdminRepository
 from ai.backend.manager.services.manager_admin.actions.get_announcement import GetAnnouncementAction
 from ai.backend.manager.services.manager_admin.actions.update_announcement import (
     UpdateAnnouncementAction,

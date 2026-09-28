@@ -7,7 +7,10 @@ import asyncio
 import click
 
 from ai.backend.client.cli.v2.helpers import (
+    EntityLabelTerm,
     create_v2_registry,
+    entity_label_filter_options,
+    entity_label_relations,
     load_v2_config,
     nullable_option,
     parse_order_options,
@@ -39,6 +42,7 @@ def resource_group() -> None:
     default=None,
     help="Filter by whether the resource group is the default one.",
 )
+@entity_label_filter_options
 @click.option(
     "--order-by",
     multiple=True,
@@ -51,6 +55,7 @@ def search(
     is_active: bool | None,
     is_default: bool | None,
     order_by: tuple[str, ...],
+    label: tuple[EntityLabelTerm, ...],
 ) -> None:
     """Search resource groups (superadmin only)."""
     from ai.backend.common.dto.manager.v2.resource_group.request import (
@@ -60,14 +65,16 @@ def search(
     )
     from ai.backend.common.dto.manager.v2.resource_group.types import ResourceGroupOrderField
 
+    relations = entity_label_relations(label)
     filter_dto: ResourceGroupFilter | None = None
-    if name_contains is not None or is_active is not None or is_default is not None:
+    if relations or any(opt is not None for opt in (name_contains, is_active, is_default)):
         from ai.backend.common.dto.manager.query import StringFilter
 
         filter_dto = ResourceGroupFilter(
             name=StringFilter(contains=name_contains) if name_contains is not None else None,
             is_active=is_active,
             is_default=is_default,
+            AND=[ResourceGroupFilter(labels=rel) for rel in relations] or None,
         )
 
     orders = (

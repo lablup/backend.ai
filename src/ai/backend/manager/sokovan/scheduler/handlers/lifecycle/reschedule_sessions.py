@@ -9,7 +9,7 @@ from typing import TYPE_CHECKING, override
 from ai.backend.common.data.entity.resource_group import ResourceGroupID
 from ai.backend.common.events.event_types.kernel.types import KernelLifecycleEventReason
 from ai.backend.common.types import SessionId
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.data.session.types import SessionStatus, StatusTransitions
 from ai.backend.manager.defs import LockID
@@ -21,9 +21,11 @@ from ai.backend.manager.views.sokovan.lifecycle import SessionWithKernels
 
 if TYPE_CHECKING:
     from ai.backend.manager.sokovan.scheduler.terminator.terminator import SessionTerminator
-    from ai.backend.manager.sokovan.scheduling_controller import SchedulingController
+    from ai.backend.manager.sokovan.scheduling_controller.scheduling_controller import (
+        SchedulingController,
+    )
 
-log = BraceStyleAdapter(logging.getLogger(__name__))
+log = StructuredLogger(logging.getLogger(__name__))
 
 
 class RescheduleSessionsLifecycleHandler(SessionLifecycleHandler):
@@ -124,7 +126,7 @@ class RescheduleSessionsLifecycleHandler(SessionLifecycleHandler):
         terminating_sessions = await self._repository.get_terminating_sessions_by_ids(session_ids)
         if terminating_sessions:
             await self._terminator.terminate_sessions_for_handler(terminating_sessions)
-        log.info("Tearing down kernels of {} rescheduling sessions", len(session_ids))
+        log.debug("rescheduling session kernels tearing down", session_count=len(session_ids))
 
     async def _requeue(self, session_ids: list[SessionId]) -> None:
         """Put the sessions back in the queue now that their kernels are gone:
@@ -139,4 +141,4 @@ class RescheduleSessionsLifecycleHandler(SessionLifecycleHandler):
             reason=KernelLifecycleEventReason.RESCHEDULED,
         )
         await self._scheduling_controller.mark_scheduling_needed([ScheduleType.SCHEDULE])
-        log.info("Requeued {} rescheduling sessions to PENDING", len(requeued))
+        log.debug("rescheduling sessions requeued", session_count=len(requeued))

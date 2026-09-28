@@ -34,9 +34,9 @@ from ai.backend.common.resilience import (
 )
 from ai.backend.common.resource.types import TotalResourceData
 from ai.backend.common.types import AccessKey, ValkeyTarget
-from ai.backend.logging.utils import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 # Resilience instance for valkey_stat layer
 valkey_stat_resilience = Resilience(
@@ -115,7 +115,7 @@ class ValkeyStatClient:
         Close the ValkeyStatClient connection.
         """
         if self._closed:
-            log.debug("ValkeyStatClient is already closed.")
+            log.debug("valkey stat client already closed")
             return
         self._closed = True
         await self._client.disconnect()
@@ -175,9 +175,9 @@ class ValkeyStatClient:
             return {k: Decimal(v) for k, v in raw.items()}
         except (json.JSONDecodeError, UnicodeDecodeError):
             log.warning(
-                "Failed to decode GPU allocation map for agent {}: {}",
-                agent_id,
-                result.decode("utf-8"),
+                "gpu allocation map decode failed",
+                agent_id=agent_id,
+                raw_value=result.decode("utf-8", errors="replace"),
             )
             return None
 
@@ -211,9 +211,9 @@ class ValkeyStatClient:
             return cast(dict[str, Any], msgpack.unpackb(result, raw=False))
         except (ExtraData, UnpackException, ValueError):
             log.warning(
-                "Failed to unpack kernel statistics for ID {}: {}",
-                kernel_id,
-                result.decode("utf-8"),
+                "kernel statistics unpack failed",
+                kernel_id=kernel_id,
+                raw_value=result.decode("utf-8", errors="replace"),
             )
             return None
 
@@ -308,9 +308,9 @@ class ValkeyStatClient:
                 ValueError,
             ):
                 log.warning(
-                    "Failed to unpack session statistics for ID {}: {}",
-                    session_ids[i],
-                    result.decode("utf-8"),
+                    "session statistics unpack failed",
+                    session_id=session_ids[i],
+                    raw_value=result.decode("utf-8", errors="replace"),
                 )
                 stats.append(None)
         return stats
@@ -347,9 +347,9 @@ class ValkeyStatClient:
                 ValueError,
             ):
                 log.warning(
-                    "Failed to unpack agent statistics for ID {}: {}",
-                    agent_ids[i],
-                    result.decode("utf-8"),
+                    "agent statistics unpack failed",
+                    agent_id=agent_ids[i],
+                    raw_value=result.decode("utf-8", errors="replace"),
                 )
                 stats.append(None)
         return stats
@@ -377,9 +377,9 @@ class ValkeyStatClient:
                 counts.append(int(result.decode("utf-8")))
             except (ValueError, UnicodeDecodeError):
                 log.warning(
-                    "Failed to decode container count for key {}: {}",
-                    keys[i],
-                    result.decode("utf-8"),
+                    "container count decode failed",
+                    agent_id=agent_ids[i],
+                    raw_value=result.decode("utf-8", errors="replace"),
                 )
                 counts.append(0)
         return counts
@@ -452,9 +452,9 @@ class ValkeyStatClient:
                 ValueError,
             ):
                 log.warning(
-                    "Failed to unpack inference app statistics for key {}: {}",
-                    keys[i],
-                    result.decode("utf-8"),
+                    "inference app statistics unpack failed",
+                    endpoint_id=endpoint_ids[i],
+                    raw_value=result.decode("utf-8", errors="replace"),
                 )
                 stats.append(None)
         return stats
@@ -1115,7 +1115,7 @@ class ValkeyStatClient:
             data = load_json(result.decode("utf-8"))
             return TotalResourceData.from_json(data)
         except (json.JSONDecodeError, ValueError, KeyError, UnicodeDecodeError) as e:
-            log.warning("Failed to deserialize TotalResourceData from cache: {}", e)
+            log.warning("total resource data cache deserialize failed", exc_info=e)
             return None
 
     async def set_total_resource_slots(
@@ -1127,18 +1127,14 @@ class ValkeyStatClient:
         :param total_slots: The TotalResourceData to cache
         :param ttl_seconds: TTL in seconds (default: 300 = 5 minutes)
         """
-        try:
-            total_slots_obj = total_slots.to_json()
-            serialized = dump_json_str(total_slots_obj)
-            async with self._client.client() as conn:
-                await conn.set(
-                    _TOTAL_RESOURCE_SLOTS_KEY,
-                    serialized,
-                    expiry=ExpirySet(ExpiryType.SEC, ttl_seconds),
-                )
-        except Exception as e:
-            log.warning("Failed to serialize TotalResourceData to cache: {}", e)
-            raise
+        total_slots_obj = total_slots.to_json()
+        serialized = dump_json_str(total_slots_obj)
+        async with self._client.client() as conn:
+            await conn.set(
+                _TOTAL_RESOURCE_SLOTS_KEY,
+                serialized,
+                expiry=ExpirySet(ExpiryType.SEC, ttl_seconds),
+            )
 
     def _invalidate_total_resource_slots(self, batch: Batch) -> Batch:
         """

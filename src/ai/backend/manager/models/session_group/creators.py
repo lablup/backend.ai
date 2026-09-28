@@ -17,7 +17,7 @@ from ai.backend.manager.data.session_group.types import (
     SessionGroupPlacementDirection,
     SessionGroupPlacementEnforcement,
 )
-from ai.backend.manager.models.domain import DomainRow
+from ai.backend.manager.models.domain.row import DomainRow
 from ai.backend.manager.models.session_group.row import SessionGroupRow
 from ai.backend.manager.models.specs.creator import EntityCreator
 from ai.backend.manager.models.specs.types import IntegrityErrorCheck

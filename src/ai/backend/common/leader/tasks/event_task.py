@@ -10,9 +10,9 @@ from typing import Final, override
 from ai.backend.common.cron.base import PeriodicTask
 from ai.backend.common.events.dispatcher import EventProducer
 from ai.backend.common.events.types import AbstractAnycastEvent
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 @dataclass(frozen=True)
@@ -52,9 +52,9 @@ class EventProducerTask(PeriodicTask):
         try:
             event = self._spec.event_factory()
             await self._event_producer.anycast_event(event)
-            log.debug("Event task {} produced event", self._spec.name)
+            log.debug("leader event produced")
         except Exception:
-            log.exception("Failed to produce event for task {}", self._spec.name)
+            log.exception("leader event production failed")
 
     @property
     @override

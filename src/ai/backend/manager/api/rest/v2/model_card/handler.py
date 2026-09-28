@@ -24,8 +24,11 @@ from ai.backend.common.dto.manager.v2.model_card.request import (
     SearchModelCardsInput,
     UpdateModelCardInput,
 )
+from ai.backend.common.dto.manager.v2.model_card.types import ModelCardScope
+from ai.backend.common.dto.manager.v2.rbac.types import UUIDScope
 from ai.backend.manager.api.adapters.model_card.adapter import ModelCardAdapter
 from ai.backend.manager.api.rest.v2.path_params import ProjectIdPathParam
+from ai.backend.manager.dto.context import UserContext
 
 
 class CardIdPathParam(BaseRequestModel):
@@ -41,6 +44,28 @@ class V2ModelCardHandler:
         body: BodyParam[SearchModelCardsInput],
     ) -> APIResponse:
         result = await self._adapter.admin_search(body.parsed)
+        return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
+
+    async def my_search(
+        self,
+        user_ctx: UserContext,
+        body: BodyParam[SearchModelCardsInput],
+    ) -> APIResponse:
+        """Search the model cards the current user holds through membership."""
+        result = await self._adapter.scoped_search(
+            ScopedSearchModelCardsInput(
+                scope=ModelCardScope(user=[UUIDScope(value=user_ctx.user_uuid)]),
+                usage=body.parsed.usage,
+                filter=body.parsed.filter,
+                order=body.parsed.order,
+                first=body.parsed.first,
+                after=body.parsed.after,
+                last=body.parsed.last,
+                before=body.parsed.before,
+                limit=body.parsed.limit,
+                offset=body.parsed.offset,
+            )
+        )
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
 
     async def scoped_search(

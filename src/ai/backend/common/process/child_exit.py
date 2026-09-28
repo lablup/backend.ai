@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import contextvars
 import logging
 import multiprocessing as mp
 import os
@@ -14,9 +15,9 @@ from multiprocessing.sharedctypes import Synchronized
 from multiprocessing.synchronize import Event as MPEvent
 from typing import Final
 
-from ai.backend.logging.utils import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 
-log: Final = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log: Final = StructuredLogger(logging.getLogger(__spec__.name))
 
 _POLL_INTERVAL: Final[float] = 0.05
 _UNPUBLISHED_PID: Final[int] = 0
@@ -87,7 +88,10 @@ class ChildExitMonitor:
             return
         self._armed.set()
         self._thread = threading.Thread(
-            target=self._observe, name="child-exit-monitor", daemon=True
+            target=contextvars.copy_context().run,
+            args=(self._observe,),
+            name="child-exit-monitor",
+            daemon=True,
         )
         self._thread.start()
 
@@ -128,7 +132,7 @@ class ChildExitMonitor:
         except ChildProcessError:
             return ChildCheck(ended=True)
         except OSError as e:
-            log.warning("stopped watching the child process {}: {}", pid, e)
+            log.warning("child process watch stopped", exc_info=e, child_pid=pid)
             return ChildCheck(ended=False)
         if info is None:
             return ChildCheck(ended=False)
@@ -139,10 +143,9 @@ class ChildExitMonitor:
 
     def _request_shutdown(self, pid: int, child_exit: ChildExit | None) -> None:
         log.error(
-            "The child process {} {} without being asked to stop. Shutting down the "
-            "supervisor so that the service manager can restart it.",
-            pid,
-            child_exit.describe() if child_exit is not None else "terminated",
+            "child process ended without being asked to stop, shutting down the supervisor",
+            child_pid=pid,
+            child_exit=child_exit.describe() if child_exit is not None else "terminated",
         )
         # Go through the stop signal the supervisor already handles, so that the
         # remaining shutdown routines still run.

@@ -37,15 +37,15 @@ from ai.backend.manager.errors.entity_share import (
     ShareToTheOwningScope,
 )
 from ai.backend.manager.models.base import ensure_all_tables_registered
-from ai.backend.manager.models.domain import DomainRow
+from ai.backend.manager.models.domain.row import DomainRow
 from ai.backend.manager.models.entity_label.row import EntityLabelRow
 from ai.backend.manager.models.entity_share.creators import EntityShareCreator
 from ai.backend.manager.models.entity_share.row import EntityShareRow
 from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.project.row import ProjectRow
 from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
-from ai.backend.manager.models.rbac_models.role import RoleRow
-from ai.backend.manager.models.resource_policy import (
+from ai.backend.manager.models.rbac_models.role.row import RoleRow
+from ai.backend.manager.models.resource_policy.row import (
     ProjectResourcePolicyRow,
     UserResourcePolicyRow,
 )

@@ -25,15 +25,15 @@ from ai.backend.manager.data.entity_share.types import EntityShareStatus
 from ai.backend.manager.data.vfolder.types import (
     VFolderOwnershipType,
 )
-from ai.backend.manager.models.domain import DomainRow
+from ai.backend.manager.models.domain.row import DomainRow
 from ai.backend.manager.models.entity_share.row import EntityShareRow
 from ai.backend.manager.models.hasher.types import PasswordInfo
-from ai.backend.manager.models.keypair import KeyPairRow
-from ai.backend.manager.models.resource_policy import (
+from ai.backend.manager.models.keypair.row import KeyPairRow
+from ai.backend.manager.models.resource_policy.row import (
     KeyPairResourcePolicyRow,
     UserResourcePolicyRow,
 )
-from ai.backend.manager.models.user import UserRole, UserRow, UserStatus
+from ai.backend.manager.models.user.row import UserRole, UserRow, UserStatus
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.vfolder.row import VFolderRow, VFolderUserMountPolicyRow
 from ai.backend.manager.models.virtual_entity.virtual_entity import VirtualEntityRow

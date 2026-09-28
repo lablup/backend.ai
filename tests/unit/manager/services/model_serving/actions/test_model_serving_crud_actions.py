@@ -13,7 +13,7 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 
 from ai.backend.common.bgtask.bgtask import BackgroundTaskManager
-from ai.backend.common.contexts.user import with_user
+from ai.backend.common.contexts.user import with_user_context
 from ai.backend.common.data.entity.deployment import DeploymentID
 from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.user.types import UserData, UserRole
@@ -22,6 +22,7 @@ from ai.backend.common.events.event_types.kernel.types import KernelLifecycleEve
 from ai.backend.common.events.hub import EventHub
 from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
 from ai.backend.manager.config.provider import ManagerConfigProvider
+from ai.backend.manager.data.deployment.types import RouteStatus
 from ai.backend.manager.data.model_serving.types import MutationResult
 from ai.backend.manager.errors.api import InvalidAPIParameters
 from ai.backend.manager.errors.service import (
@@ -30,7 +31,6 @@ from ai.backend.manager.errors.service import (
     RouteNotFound,
 )
 from ai.backend.manager.models.endpoint.updaters import LegacyEndpointUpdater
-from ai.backend.manager.models.routing import RouteStatus
 from ai.backend.manager.repositories.model_serving.repositories import ModelServingRepositories
 from ai.backend.manager.repositories.model_serving.repository import ModelServingRepository
 from ai.backend.manager.repositories.runtime_variant.repository import RuntimeVariantRepository
@@ -46,7 +46,9 @@ from ai.backend.manager.services.model_serving.actions.update_endpoint import (
 from ai.backend.manager.services.model_serving.services.model_serving import ModelServingService
 from ai.backend.manager.sokovan.deployment.deployment_controller import DeploymentController
 from ai.backend.manager.sokovan.deployment.types import DeploymentLifecycleType
-from ai.backend.manager.sokovan.scheduling_controller import SchedulingController
+from ai.backend.manager.sokovan.scheduling_controller.scheduling_controller import (
+    SchedulingController,
+)
 from ai.backend.manager.types import OptionalState, TriState
 
 
@@ -67,7 +69,7 @@ class ModelServingCRUDBaseFixtures:
 
     @pytest.fixture(autouse=True)
     def set_user_context(self, user_data: UserData) -> Iterator[None]:
-        with with_user(user_data):
+        with with_user_context(user_data):
             yield
 
     @pytest.fixture

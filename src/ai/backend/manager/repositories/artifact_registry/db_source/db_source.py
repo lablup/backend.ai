@@ -7,7 +7,7 @@ import sqlalchemy as sa
 from ai.backend.common.data.artifact.types import ArtifactRegistryType
 from ai.backend.manager.data.artifact_registries.types import ArtifactRegistryData
 from ai.backend.manager.errors.artifact_registry import ArtifactRegistryNotFoundError
-from ai.backend.manager.models.artifact_registries import ArtifactRegistryRow
+from ai.backend.manager.models.artifact_registries.row import ArtifactRegistryRow
 from ai.backend.manager.models.artifact_registries.searchable_fields import (
     ArtifactRegistrySearchableFields,
 )

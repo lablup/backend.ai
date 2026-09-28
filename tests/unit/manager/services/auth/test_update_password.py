@@ -8,7 +8,7 @@ from ai.backend.common.plugin.hook import HookResult, HookResults
 from ai.backend.manager.data.secret.types import KeyProviderType
 from ai.backend.manager.errors.auth import AuthorizationFailed
 from ai.backend.manager.errors.common import RejectedByHook
-from ai.backend.manager.models.user import UserRole, UserStatus
+from ai.backend.manager.models.user.row import UserRole, UserStatus
 from ai.backend.manager.repositories.auth.repository import AuthRepository
 from ai.backend.manager.repositories.user_resource_policy.repository import (
     UserResourcePolicyRepository,

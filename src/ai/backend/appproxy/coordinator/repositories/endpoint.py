@@ -50,9 +50,9 @@ from ai.backend.common.dto.appproxy_coordinator.v2.endpoint.types import (
     UnregisterRoutesItem,
     UpdateRoutesItem,
 )
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 @dataclass(slots=True)

@@ -26,7 +26,7 @@ from ai.backend.manager.api.rest.v2.image.registry import register_v2_image_rout
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.image.types import ImageAliasData, ImageStatus, ImageType
 from ai.backend.manager.dependencies.infrastructure.redis import ValkeyClients
-from ai.backend.manager.models.container_registry import ContainerRegistryRow
+from ai.backend.manager.models.container_registry.row import ContainerRegistryRow
 from ai.backend.manager.models.image.row import ImageAliasRow, ImageRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.registry import AgentRegistry

@@ -42,7 +42,7 @@ if TYPE_CHECKING:
     from ai.backend.manager.idle import IdleCheckerHost
     from ai.backend.manager.models.keypair.ssh_key_validator import SSHKeyValidator
     from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-    from ai.backend.manager.notification import NotificationCenter
+    from ai.backend.manager.notification.notification_center import NotificationCenter
     from ai.backend.manager.registry import AgentRegistry
     from ai.backend.manager.repositories.repositories import Repositories
     from ai.backend.manager.services.agent.processors import AgentProcessors
@@ -280,13 +280,13 @@ if TYPE_CHECKING:
     from ai.backend.manager.services.user_resource_policy.processors import (
         UserResourcePolicyProcessors,
     )
-    from ai.backend.manager.services.vfolder.processors import (
-        VFolderFileProcessors,
-        VFolderInviteProcessors,
+    from ai.backend.manager.services.vfolder.processors.file import VFolderFileProcessors
+    from ai.backend.manager.services.vfolder.processors.invite import VFolderInviteProcessors
+    from ai.backend.manager.services.vfolder.processors.mount_policy import (
         VFolderMountPolicyProcessors,
-        VFolderProcessors,
-        VFolderSharingProcessors,
     )
+    from ai.backend.manager.services.vfolder.processors.sharing import VFolderSharingProcessors
+    from ai.backend.manager.services.vfolder.processors.vfolder import VFolderProcessors
     from ai.backend.manager.services.vfolder.processors.vfolder_admin import (
         VFolderAdminProcessors,
     )
@@ -311,11 +311,11 @@ if TYPE_CHECKING:
     from ai.backend.manager.services.vfs_storage.service import (
         VFSStorageService,
     )
-    from ai.backend.manager.sokovan.deployment import DeploymentController
+    from ai.backend.manager.sokovan.deployment.deployment_controller import DeploymentController
     from ai.backend.manager.sokovan.deployment.route.route_controller import (
         RouteController,
     )
-    from ai.backend.manager.sokovan.scheduling_controller import (
+    from ai.backend.manager.sokovan.scheduling_controller.scheduling_controller import (
         SchedulingController,
     )
 # fmt: on

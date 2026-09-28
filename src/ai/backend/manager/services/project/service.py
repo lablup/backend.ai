@@ -12,7 +12,7 @@ from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.exception import (
     InvalidAPIParameters,
 )
-from ai.backend.logging.utils import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.actions.v2.ops.result import CreatedEntityOpsResult
 from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
 from ai.backend.manager.config.provider import ManagerConfigProvider
@@ -57,7 +57,7 @@ from ai.backend.manager.services.project.actions.usage_per_period import (
     UsagePerPeriodActionResult,
 )
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 class ProjectService:
@@ -124,7 +124,7 @@ class ProjectService:
         result = await self._group_repository.get_container_stats_for_period(
             start_date, end_date, action.group_ids
         )
-        log.debug("container list are retrieved for month {0}", month)
+        log.debug("project usage retrieved for month", usage_month=month)
         return UsagePerMonthActionResult(result=result)
 
     # group (or all the groups)
@@ -142,15 +142,18 @@ class ProjectService:
             raise InvalidAPIParameters(extra_msg="Invalid date values") from e
         if end_date <= start_date:
             raise InvalidAPIParameters(extra_msg="end_date must be later than start_date.")
-        log.info(
-            "USAGE_PER_MONTH (p:{}, start_date:{}, end_date:{})", project_id, start_date, end_date
+        log.trace(
+            "project usage per period requested",
+            project_id=project_id,
+            start_date=start_date,
+            end_date=end_date,
         )
         project_ids = [project_id] if project_id is not None else None
         usage_map = await self._get_project_stats_for_period(
             start_date, end_date, project_ids=project_ids
         )
         result = [p_usage.to_json(child=True) for p_usage in usage_map.values()]
-        log.debug("container list are retrieved from {0} to {1}", start_date, end_date)
+        log.debug("project usage retrieved for period", start_date=start_date, end_date=end_date)
         return UsagePerPeriodActionResult(result=result)
 
     async def create_dotfile(

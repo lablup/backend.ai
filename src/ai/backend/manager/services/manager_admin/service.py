@@ -24,7 +24,7 @@ if TYPE_CHECKING:
     from ai.backend.common.etcd import AsyncEtcd
     from ai.backend.manager.config.provider import ManagerConfigProvider
     from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-    from ai.backend.manager.repositories.manager_admin import ManagerAdminRepository
+    from ai.backend.manager.repositories.manager_admin.repository import ManagerAdminRepository
 
 __all__ = ("ManagerAdminService",)
 

@@ -157,7 +157,7 @@ async def test_csp_policy_drops_nonce_when_unsafe_inline_present(
         ],
     )
     request = make_mocked_request("GET", "/", headers={"Host": "localhost"}, app=test_app)
-    with caplog.at_level("WARNING"):
+    with caplog.at_level("DEBUG"):
         response = await security_policy_middleware(request, async_handler)
 
     csp = response.headers["Content-Security-Policy"]

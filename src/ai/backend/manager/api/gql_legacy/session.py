@@ -33,6 +33,7 @@ from ai.backend.common.types import (
     ResourceSlot,
     SessionId,
     SessionResult,
+    SessionTypes,
     VFolderID,
     VFolderMount,
 )
@@ -48,7 +49,7 @@ from ai.backend.manager.defs import DEFAULT_ROLE
 from ai.backend.manager.errors.api import NotImplementedAPI
 from ai.backend.manager.errors.resource import DataTransformationFailed
 from ai.backend.manager.idle import ReportInfo
-from ai.backend.manager.models.kernel import KernelRow
+from ai.backend.manager.models.kernel.row import KernelRow
 from ai.backend.manager.models.minilang import ArrayFieldItem, JSONFieldItem, ORMFieldItem
 from ai.backend.manager.models.minilang.ordering import ColumnMapType, QueryOrderParser
 from ai.backend.manager.models.minilang.queryfilter import FieldSpecType, QueryFilterParser
@@ -58,11 +59,10 @@ from ai.backend.manager.models.rbac.context import ClientContext
 from ai.backend.manager.models.resource_slot.aggregates import (
     batch_load_session_allocations,
 )
-from ai.backend.manager.models.session import (
+from ai.backend.manager.models.session.row import (
     DEFAULT_SESSION_ORDERING,
     SessionDependencyRow,
     SessionRow,
-    SessionTypes,
     by_domain_name,
     by_raw_filter,
     by_resource_group_name,
@@ -76,10 +76,10 @@ from ai.backend.manager.models.types import (
     join_by_related_field,
     load_related_field,
 )
-from ai.backend.manager.models.user import UserRole, UserRow
+from ai.backend.manager.models.user.row import UserRole, UserRow
 from ai.backend.manager.models.utils import agg_to_array
-from ai.backend.manager.models.vfolder import VFolderRow
-from ai.backend.manager.models.vfolder import get_permission_ctx as get_vfolder_permission_ctx
+from ai.backend.manager.models.vfolder.row import VFolderRow
+from ai.backend.manager.models.vfolder.row import get_permission_ctx as get_vfolder_permission_ctx
 from ai.backend.manager.services.session.actions.update_session import UpdateSessionAction
 from ai.backend.manager.types import OptionalState
 
@@ -595,7 +595,7 @@ class ComputeSessionNode(graphene.ObjectType):  # type: ignore[misc]
         self,
         info: graphene.ResolveInfo,
     ) -> ConnectionResolverResult[Self]:
-        from ai.backend.manager.models.session import SessionDependencyRow, SessionRow
+        from ai.backend.manager.models.session.row import SessionDependencyRow, SessionRow
 
         ctx: GraphQueryContext = info.context
 
@@ -651,7 +651,7 @@ class ComputeSessionNode(graphene.ObjectType):  # type: ignore[misc]
         Used by resolve_dependents(): given dependee IDs (sessions being depended on),
         return the dependent sessions (sessions that depend on them).
         """
-        from ai.backend.manager.models.session import SessionDependencyRow, SessionRow
+        from ai.backend.manager.models.session.row import SessionDependencyRow, SessionRow
 
         async with ctx.db.begin_readonly_session() as db_sess:
             # Step 1: Find dependency rows where depends_on matches the input IDs
@@ -695,7 +695,7 @@ class ComputeSessionNode(graphene.ObjectType):  # type: ignore[misc]
         Used by resolve_dependees(): given dependent IDs (sessions that depend on others),
         return the dependee sessions (sessions they depend on).
         """
-        from ai.backend.manager.models.session import SessionDependencyRow, SessionRow
+        from ai.backend.manager.models.session.row import SessionDependencyRow, SessionRow
 
         async with ctx.db.begin_readonly_session() as db_sess:
             # Step 1: Find dependency rows where session_id matches the input IDs

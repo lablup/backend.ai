@@ -23,7 +23,7 @@ from ai.backend.manager.api.rest.types import RouteDeps
 from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.artifact.types import ArtifactRevisionData
-from ai.backend.manager.models.object_storage import ObjectStorageRow
+from ai.backend.manager.models.object_storage.row import ObjectStorageRow
 from ai.backend.manager.models.storage_namespace.row import StorageNamespaceRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.artifact.repository import ArtifactRepository

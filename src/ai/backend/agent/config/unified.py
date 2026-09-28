@@ -59,11 +59,11 @@ from ai.backend.common.types import (
     SlotName,
     SlotNameField,
 )
-from ai.backend.logging import BraceStyleAdapter
 from ai.backend.logging.config import LoggingConfig
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.logging.validation_context import BaseConfigValidationContext
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 # Default of the removed `scaling-group` key, kept for the legacy `sgroup/<name>` etcd scope.
 LEGACY_SGROUP_NAME_FALLBACK: Final = "default"

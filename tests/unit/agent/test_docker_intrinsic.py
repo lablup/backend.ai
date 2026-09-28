@@ -191,8 +191,8 @@ class TestMemoryPluginDockerClientLifecycle(BaseDockerIntrinsicTest):
                 return_value=ContainerNetStat(rx_bytes=0, tx_bytes=0),
             ),
             patch(
-                "ai.backend.agent.docker.intrinsic.current_loop",
-            ) as mock_loop,
+                "ai.backend.agent.docker.intrinsic.run_in_executor_with_context",
+            ) as mock_run_in_executor,
         ):
             mock_container_instance = AsyncMock()
             mock_container_instance.show.return_value = mock_container_data
@@ -201,9 +201,7 @@ class TestMemoryPluginDockerClientLifecycle(BaseDockerIntrinsicTest):
             async def default_run_in_executor(executor: Any, fn: Any, *args: Any) -> Any:
                 return fn(*args)
 
-            mock_loop.return_value.run_in_executor = AsyncMock(
-                side_effect=default_run_in_executor,
-            )
+            mock_run_in_executor.side_effect = default_run_in_executor
             yield ctx
 
     async def test_init_creates_docker_client(self, memory_plugin: MemoryPlugin) -> None:
@@ -302,8 +300,8 @@ class TestMemoryPluginContainerPidValidation(BaseDockerIntrinsicTest):
                 "ai.backend.agent.docker.intrinsic.read_proc_net_dev",
             ) as mock_read_proc_net_dev,
             patch(
-                "ai.backend.agent.docker.intrinsic.current_loop",
-            ) as mock_loop,
+                "ai.backend.agent.docker.intrinsic.run_in_executor_with_context",
+            ) as mock_run_in_executor,
         ):
             mock_read_proc_net_dev.return_value = ContainerNetStat(rx_bytes=4096, tx_bytes=8192)
 
@@ -313,9 +311,7 @@ class TestMemoryPluginContainerPidValidation(BaseDockerIntrinsicTest):
             mock_container_instance = AsyncMock()
             mock_container_instance.show.return_value = mock_container_data
             mock_container_cls.return_value = mock_container_instance
-            mock_loop.return_value.run_in_executor = AsyncMock(
-                side_effect=run_in_executor_impl,
-            )
+            mock_run_in_executor.side_effect = run_in_executor_impl
             yield ctx, mock_read_proc_net_dev
 
     async def test_pid_zero_returns_zero_net_stats(
@@ -381,7 +377,7 @@ class _SysfsMocks:
     ctx: MagicMock
     container: AsyncMock
     read_proc_net_dev: MagicMock
-    loop: MagicMock
+    run_in_executor: MagicMock
     container_data: dict[str, Any]
 
 
@@ -431,7 +427,9 @@ class TestMemoryPluginSysfsTimeoutAndErrorIsolation(BaseDockerIntrinsicTest):
                 "ai.backend.agent.docker.intrinsic.read_proc_net_dev",
                 return_value=ContainerNetStat(rx_bytes=0, tx_bytes=0),
             ) as mock_read_proc_net_dev,
-            patch("ai.backend.agent.docker.intrinsic.current_loop") as mock_loop,
+            patch(
+                "ai.backend.agent.docker.intrinsic.run_in_executor_with_context"
+            ) as mock_run_in_executor,
         ):
             mock_container = AsyncMock()
             mock_container.show.return_value = container_data
@@ -440,15 +438,13 @@ class TestMemoryPluginSysfsTimeoutAndErrorIsolation(BaseDockerIntrinsicTest):
             async def default_run_in_executor(executor: Any, fn: Any, *args: Any) -> Any:
                 return fn(*args)
 
-            mock_loop.return_value.run_in_executor = AsyncMock(
-                side_effect=default_run_in_executor,
-            )
+            mock_run_in_executor.side_effect = default_run_in_executor
 
             yield _SysfsMocks(
                 ctx=ctx,
                 container=mock_container,
                 read_proc_net_dev=mock_read_proc_net_dev,
-                loop=mock_loop,
+                run_in_executor=mock_run_in_executor,
                 container_data=container_data,
             )
 
@@ -522,7 +518,7 @@ class TestMemoryPluginSysfsTimeoutAndErrorIsolation(BaseDockerIntrinsicTest):
                 raise RuntimeError("unexpected executor failure")
             return fn(*args)
 
-        sysfs_mocks.loop.return_value.run_in_executor = selective_run_in_executor
+        sysfs_mocks.run_in_executor.side_effect = selective_run_in_executor
 
         results = await memory_plugin.gather_container_measures(
             sysfs_mocks.ctx, ["broken_container", "healthy_container"]
@@ -545,7 +541,7 @@ class TestMemoryPluginSysfsTimeoutAndErrorIsolation(BaseDockerIntrinsicTest):
                 raise asyncio.CancelledError()
             return fn(*args)
 
-        sysfs_mocks.loop.return_value.run_in_executor = cancel_on_first
+        sysfs_mocks.run_in_executor.side_effect = cancel_on_first
 
         with pytest.raises(asyncio.CancelledError):
             await memory_plugin.gather_container_measures(

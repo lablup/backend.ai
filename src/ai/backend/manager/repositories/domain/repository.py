@@ -21,7 +21,7 @@ from ai.backend.manager.models.resource_group.purgers import (
     ResourceGroupForDomainRelationPurger,
 )
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.repositories.domain.db_source import DomainDBSource
+from ai.backend.manager.repositories.domain.db_source.db_source import DomainDBSource
 from ai.backend.manager.repositories.ops.v2.domain.provider import DomainOpsProvider
 
 domain_repository_resilience = Resilience(

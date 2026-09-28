@@ -23,7 +23,7 @@ import more_itertools
 
 from ai.backend.common.exception import ConfigurationError
 from ai.backend.common.types import DeviceId, DeviceName, SlotName, SlotTypes
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 
 from .affinity_map import AffinityHint, AffinityPolicy
 from .errors import (
@@ -39,7 +39,7 @@ from .errors import (
 if TYPE_CHECKING:
     from .resources import AbstractComputeDevice
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 log_alloc_map: bool = False
 T = TypeVar("T")
 
@@ -350,9 +350,16 @@ class DiscretePropertyAllocMap(AbstractAllocMap):
             sorted_dev_allocs = self.get_current_allocations(affinity_hint, slot_name)
             if log_alloc_map:
                 log.debug(
-                    "DiscretePropertyAllocMap(FILL): allocating {} {}", slot_name, requested_alloc
+                    "discrete alloc map allocating",
+                    allocation_strategy="fill",
+                    slot_name=str(slot_name),
+                    requested_alloc=requested_alloc,
                 )
-                log.debug("DiscretePropertyAllocMap(FILL): current-alloc: {!r}", sorted_dev_allocs)
+                log.debug(
+                    "discrete alloc map current allocation",
+                    allocation_strategy="fill",
+                    current_alloc=str(sorted_dev_allocs),
+                )
 
             total_allocatable = 0
             remaining_alloc = Decimal(requested_alloc).normalize()
@@ -404,7 +411,10 @@ class DiscretePropertyAllocMap(AbstractAllocMap):
             remaining_alloc = int(Decimal(requested_alloc))
             if log_alloc_map:
                 log.debug(
-                    "DiscretePropertyAllocMap(EVENLY): allocating {} {}", slot_name, requested_alloc
+                    "discrete alloc map allocating",
+                    allocation_strategy="evenly",
+                    slot_name=str(slot_name),
+                    requested_alloc=requested_alloc,
                 )
 
             repeats = 0
@@ -417,7 +427,9 @@ class DiscretePropertyAllocMap(AbstractAllocMap):
                 sorted_dev_allocs = self.get_current_allocations(affinity_hint, slot_name)
                 if log_alloc_map and repeats == 0:
                     log.debug(
-                        "DiscretePropertyAllocMap(EVENLY): current-alloc: {!r}", sorted_dev_allocs
+                        "discrete alloc map current allocation",
+                        allocation_strategy="evenly",
+                        current_alloc=str(sorted_dev_allocs),
                     )
 
                 # calculate remaining slots per device
@@ -477,7 +489,11 @@ class DiscretePropertyAllocMap(AbstractAllocMap):
             allocation[slot_name] = {k: v for k, v in new_alloc.items() if v > 0}
             self.update_affinity_hint(new_alloc, affinity_hint)
             if log_alloc_map:
-                log.debug("DiscretePropertyAllocMap(EVENLY): new-alloc: {!r}", new_alloc)
+                log.debug(
+                    "discrete alloc map allocated",
+                    allocation_strategy="evenly",
+                    new_alloc=str(dict(new_alloc)),
+                )
 
         return allocation
 
@@ -654,8 +670,17 @@ class FractionAllocMap(AbstractAllocMap):
                 )
 
             if log_alloc_map:
-                log.debug("FractionAllocMap(FILL): allocating {} {}", slot_name, alloc)
-                log.debug("FractionAllocMap(FILL): current-alloc: {!r}", sorted_dev_allocs)
+                log.debug(
+                    "fraction alloc map allocating",
+                    allocation_strategy="fill",
+                    slot_name=str(slot_name),
+                    requested_alloc=alloc,
+                )
+                log.debug(
+                    "fraction alloc map current allocation",
+                    allocation_strategy="fill",
+                    current_alloc=str(sorted_dev_allocs),
+                )
 
             slot_type = self.slot_types.get(slot_name, SlotTypes.COUNT)
             if slot_type in (SlotTypes.COUNT, SlotTypes.BYTES):
@@ -805,8 +830,17 @@ class FractionAllocMap(AbstractAllocMap):
             )
 
             if log_alloc_map:
-                log.debug("FractionAllocMap(EVENLY): allocating {} {}", slot_name, alloc)
-                log.debug("FractionAllocMap(EVENLY): current-alloc: {!r}", sorted_dev_allocs)
+                log.debug(
+                    "fraction alloc map allocating",
+                    allocation_strategy="evenly",
+                    slot_name=str(slot_name),
+                    requested_alloc=alloc,
+                )
+                log.debug(
+                    "fraction alloc map current allocation",
+                    allocation_strategy="evenly",
+                    current_alloc=str(sorted_dev_allocs),
+                )
 
             # check if there is enough resource for allocation
             total_allocatable = Decimal(0)

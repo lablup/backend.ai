@@ -25,7 +25,7 @@ from ai.backend.common.events.event_types.schedule.anycast import (
     DoDeploymentLifecycleIfNeededEvent,
 )
 from ai.backend.common.leader.tasks.event_task import EventTaskSpec
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger, with_log_context
 from ai.backend.manager.clients.prometheus.client import PrometheusClient
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.deployment.types import (
@@ -43,14 +43,38 @@ from ai.backend.manager.models.endpoint.searchers import DeploymentInfoSearcher
 from ai.backend.manager.models.endpoint.updaters import EndpointLifecycleBatchUpdater
 from ai.backend.manager.models.scheduling_history.creators import DeploymentHistoryCreator
 from ai.backend.manager.models.specs.pagination import NoPagination
-from ai.backend.manager.repositories.deployment import DeploymentRepository
-from ai.backend.manager.repositories.deployment.types import DeploymentHistoryToCreate
+from ai.backend.manager.repositories.deployment.repository import DeploymentRepository
+from ai.backend.manager.repositories.deployment.types.endpoint import DeploymentHistoryToCreate
 from ai.backend.manager.repositories.prometheus_query_preset.repository import (
     PrometheusQueryPresetRepository,
 )
 from ai.backend.manager.repositories.replica_group.repository import ReplicaGroupRepository
 from ai.backend.manager.repositories.runtime_variant.repository import RuntimeVariantRepository
-from ai.backend.manager.sokovan.deployment.recorder import DeploymentRecorderContext
+from ai.backend.manager.sokovan.deployment.handlers.base import DeploymentHandler
+from ai.backend.manager.sokovan.deployment.handlers.deploying_draining import (
+    DeployingDrainingHandler,
+)
+from ai.backend.manager.sokovan.deployment.handlers.deploying_finalizing import (
+    DeployingFinalizingHandler,
+)
+from ai.backend.manager.sokovan.deployment.handlers.deploying_initializing import (
+    DeployingInitializingHandler,
+)
+from ai.backend.manager.sokovan.deployment.handlers.deploying_promoting import (
+    DeployingPromotingHandler,
+)
+from ai.backend.manager.sokovan.deployment.handlers.deploying_provisioned import (
+    DeployingProvisionedHandler,
+)
+from ai.backend.manager.sokovan.deployment.handlers.deploying_provisioning import (
+    DeployingProvisioningHandler,
+)
+from ai.backend.manager.sokovan.deployment.handlers.deploying_rolling_back import (
+    DeployingRollingBackHandler,
+)
+from ai.backend.manager.sokovan.deployment.handlers.destroying import DestroyingDeploymentHandler
+from ai.backend.manager.sokovan.deployment.handlers.replica import CheckReplicaDeploymentHandler
+from ai.backend.manager.sokovan.deployment.recorder.context import DeploymentRecorderContext
 from ai.backend.manager.sokovan.deployment.route.route_controller import RouteController
 from ai.backend.manager.sokovan.recorder.types import ExecutionRecord
 from ai.backend.manager.sokovan.recorder.utils import extract_sub_steps_for_entity
@@ -61,18 +85,6 @@ from ai.backend.manager.types import DistributedLockFactory
 
 from .deployment_controller import DeploymentController
 from .executor import DeploymentExecutor
-from .handlers import (
-    CheckReplicaDeploymentHandler,
-    DeployingDrainingHandler,
-    DeployingFinalizingHandler,
-    DeployingInitializingHandler,
-    DeployingPromotingHandler,
-    DeployingProvisionedHandler,
-    DeployingProvisioningHandler,
-    DeployingRollingBackHandler,
-    DeploymentHandler,
-    DestroyingDeploymentHandler,
-)
 from .types import (
     DeploymentExecutionError,
     DeploymentExecutionResult,
@@ -80,7 +92,7 @@ from .types import (
     DeploymentWithHistory,
 )
 
-log = BraceStyleAdapter(logging.getLogger(__name__))
+log = StructuredLogger(logging.getLogger(__name__))
 
 # Handler registry key: (lifecycle_type, sub_step).
 # sub_step is None for handlers that don't filter by sub-step.
@@ -400,18 +412,21 @@ class DeploymentCoordinator:
         handler = self._registry.handlers.get((lifecycle_type, sub_step))
         if handler is None:
             log.warning(
-                "No handler for deployment lifecycle ({}, {})",
-                lifecycle_type.value,
-                sub_step,
+                "no handler for deployment lifecycle",
+                lifecycle_type=lifecycle_type,
+                sub_step=sub_step,
             )
             return
 
         lock_id = handler.lock_id
-        async with AsyncExitStack() as stack:
-            if lock_id is not None:
-                lock_lifetime = self._config_provider.config.manager.session_schedule_lock_lifetime
-                await stack.enter_async_context(self._lock_factory(lock_id, lock_lifetime))
-            await self._run_handler(handler)
+        with with_log_context(lifecycle_type=lifecycle_type, handler_name=handler.name()):
+            async with AsyncExitStack() as stack:
+                if lock_id is not None:
+                    lock_lifetime = (
+                        self._config_provider.config.manager.session_schedule_lock_lifetime
+                    )
+                    await stack.enter_async_context(self._lock_factory(lock_id, lock_lifetime))
+                await self._run_handler(handler)
 
     @staticmethod
     def _build_deployment_searcher(target: DeploymentTargetStatuses) -> DeploymentInfoSearcher:
@@ -445,10 +460,10 @@ class DeploymentCoordinator:
             category=handler.category(),
         )
         if not deployments:
-            log.trace("No deployments to process for handler: {}", handler_name)
+            log.trace("no deployments to process")
             return
 
-        log.info("handler: {} - processing {} deployments", handler_name, len(deployments))
+        log.debug("deployment handler processing", deployment_count=len(deployments))
 
         deployment_ids = [deployment.deployment_info.id for deployment in deployments]
 
@@ -456,7 +471,7 @@ class DeploymentCoordinator:
             try:
                 result = await handler.execute(deployments)
             except Exception:
-                log.exception("handler {}: execute() raised an unexpected error", handler_name)
+                log.exception("deployment handler execute failed")
                 result = DeploymentExecutionResult(
                     failures=[
                         DeploymentExecutionError(
@@ -472,8 +487,8 @@ class DeploymentCoordinator:
 
         try:
             await handler.post_process(result)
-        except Exception as e:
-            log.error("Error during post-processing for {}: {}", handler.name(), e)
+        except Exception:
+            log.exception("deployment handler post-processing failed")
 
     async def _handle_status_transitions(
         self,
@@ -535,10 +550,9 @@ class DeploymentCoordinator:
                 if policy.is_timed_out(started_at, current_dbtime):
                     timed_out.append(deployment)
             if timed_out:
-                log.warning(
-                    "handler {}: {} skipped deployments timed out — transitioning to expired",
-                    handler_name,
-                    len(timed_out),
+                log.trace(
+                    "skipped deployments timed out, transitioning to expired",
+                    deployment_count=len(timed_out),
                 )
                 transition = self._build_success_transition(
                     handler_name=handler_name,
@@ -605,8 +619,8 @@ class DeploymentCoordinator:
         for event in notification_events:
             try:
                 await self._event_producer.anycast_event(event)
-            except Exception as e:
-                log.warning("Failed to send lifecycle notification: {}", e)
+            except Exception:
+                log.exception("lifecycle notification failed")
 
     def _build_lifecycle_updater(
         self,

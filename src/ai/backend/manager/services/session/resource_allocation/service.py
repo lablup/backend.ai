@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import logging
 
-from ai.backend.logging.utils import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.data.resource_allocation.types import PresetAvailabilityData
 from ai.backend.manager.repositories.resource_allocation.repository import (
     ResourceAllocationRepository,
@@ -43,7 +43,7 @@ from ai.backend.manager.services.session.resource_allocation.actions.resolve_key
     ResolveKeypairContextActionResult,
 )
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 class ResourceAllocationService:

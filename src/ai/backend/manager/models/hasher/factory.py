@@ -6,7 +6,7 @@ from __future__ import annotations
 
 import logging
 
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 
 from .base import PasswordHasher
@@ -14,7 +14,7 @@ from .bcrypt import BcryptHasher
 from .pbkdf2 import PBKDF2_SHA3_256Hasher, PBKDF2_SHA256Hasher
 from .sha import SHA3_256Hasher, SHA256Hasher
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 class PasswordHasherFactory:

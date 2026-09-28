@@ -8,6 +8,7 @@ from typing import override
 import sqlalchemy as sa
 
 from ai.backend.common.data.entity.deployment import DeploymentID
+from ai.backend.common.data.entity.image import ImageEntityType
 from ai.backend.common.data.entity.image_alias import ImageAliasID
 from ai.backend.common.data.entity.session import SessionID
 from ai.backend.common.types import ImageCanonical
@@ -23,6 +24,10 @@ from ai.backend.manager.data.image.types import (
     ResourceLimit,
 )
 from ai.backend.manager.models.deployment_revision.row import DeploymentRevisionRow
+from ai.backend.manager.models.entity_label.searchable_fields import (
+    EntityLabelCorrelation,
+    EntityLabelSearchableFields,
+)
 from ai.backend.manager.models.image.row import ImageAliasRow, ImageRow
 from ai.backend.manager.models.kernel.row import KernelRow
 from ai.backend.manager.models.replica_group.row import ReplicaGroupRow
@@ -177,8 +182,12 @@ class ImageAliasSearchableFields:
 
 
 class _ImageNestedFields:
-    """Rows of other tables the image owns: its aliases."""
+    """Rows of other tables the image owns: its labels and its aliases."""
 
+    labels = NestedSearchableField(
+        EntityLabelSearchableFields.own,
+        EntityLabelCorrelation(ImageRow, ImageEntityType(), ImageRow.id),
+    )
     aliases = NestedSearchableField(
         ImageAliasSearchableFields.own,
         ToManyCorrelation(ImageAliasRow, ImageRow, ImageAliasRow.image_id == ImageRow.id),

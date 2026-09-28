@@ -11,7 +11,7 @@ from aiohttp.typedefs import Middleware
 from ai.backend.common.exception import BackendAIError, ErrorCode
 from ai.backend.common.json import dump_json_str
 from ai.backend.common.plugin.monitor import INCREMENT
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.errors.api import InvalidAPIParameters
 from ai.backend.manager.errors.common import (
     GenericBadRequest,
@@ -26,7 +26,7 @@ if TYPE_CHECKING:
     from ai.backend.manager.api.rest.types import WebRequestHandler
     from ai.backend.manager.config.provider import ManagerConfigProvider
 
-log: Final = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log: Final = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 def _debug_error_response(
@@ -83,18 +83,20 @@ def build_exception_middleware(
             raise InvalidAPIParameters() from ex
         except BackendAIError as ex:
             if ex.status_code // 100 == 4:
-                log.warning(
-                    "client error raised inside handlers: ({} {}): {}",
-                    method,
-                    endpoint,
-                    repr(ex),
+                log.trace(
+                    "request failed with client error",
+                    http_method=method,
+                    route_path=endpoint,
+                    http_status=ex.status_code,
+                    error_code=str(ex.error_code()),
                 )
             elif ex.status_code // 100 == 5:
                 log.exception(
-                    "Internal server error raised inside handlers: ({} {}): {}",
-                    method,
-                    endpoint,
-                    repr(ex),
+                    "request failed with server error",
+                    http_method=method,
+                    route_path=endpoint,
+                    http_status=ex.status_code,
+                    error_code=str(ex.error_code()),
                 )
             await error_monitor.capture_exception()
             await stats_monitor.report_metric(INCREMENT, "ai.backend.manager.api.failures")
@@ -111,17 +113,20 @@ def build_exception_middleware(
             )
             if request.match_info.http_exception is not None and ex.status_code == 404:
                 # No route matched; the client probed a path this server does not serve.
-                log.debug("no route matched: ({} {}): {}", method, endpoint, ex)
+                log.trace("no route matched", http_method=method, route_path=endpoint)
             elif ex.status_code // 100 == 4:
-                log.warning(
-                    "client error raised inside handlers: ({} {}): {}", method, endpoint, ex
+                log.trace(
+                    "request failed with client error",
+                    http_method=method,
+                    route_path=endpoint,
+                    http_status=ex.status_code,
                 )
             elif ex.status_code // 100 == 5:
                 log.exception(
-                    "Internal server error raised inside handlers: ({} {}): {}",
-                    method,
-                    endpoint,
-                    ex,
+                    "request failed with server error",
+                    http_method=method,
+                    route_path=endpoint,
+                    http_status=ex.status_code,
                 )
             if ex.status_code == 404:
                 raise URLNotFound(extra_data=request.path) from ex
@@ -132,12 +137,14 @@ def build_exception_middleware(
                 ) from ex
             raise GenericBadRequest from ex
         except asyncio.CancelledError as e:
-            log.debug("Request cancelled ({0} {1})", request.method, request.rel_url)
+            log.trace("request cancelled", http_method=method, route_path=endpoint)
             raise e
         except Exception as e:
             await error_monitor.capture_exception()
             log.exception(
-                "Uncaught exception in HTTP request handlers ({} {}): {}", method, endpoint, e
+                "request handler raised an unexpected error",
+                http_method=method,
+                route_path=endpoint,
             )
             if config_provider.config.debug.enabled:
                 return _debug_error_response(e)

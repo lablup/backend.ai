@@ -18,13 +18,14 @@ from ai.backend.common.data.filter_specs import UUIDInMatchSpec
 from ai.backend.common.docker import ImageRef
 from ai.backend.common.types import ImageID
 from ai.backend.common.utils import join_non_empty
-from ai.backend.logging.utils import BraceStyleAdapter
-from ai.backend.manager.container_registry import get_container_registry_cls
+from ai.backend.logging.structured import StructuredLogger
+from ai.backend.manager.container_registry.factory import get_container_registry_cls
 from ai.backend.manager.data.image.types import (
     ImageAliasData,
     ImageAliasListResult,
     ImageData,
     ImageDataWithDetails,
+    ImageIdentifier,
     ImageStatus,
     RescanImagesResult,
     ResourceLimitInput,
@@ -38,16 +39,12 @@ from ai.backend.manager.errors.image import (
     RegistryNotFoundForImage,
     UpdateImageActionValueError,
 )
-from ai.backend.manager.models.container_registry import ContainerRegistryRow
-from ai.backend.manager.models.image import (
-    ImageAliasRow,
-    ImageIdentifier,
-    ImageRow,
-)
+from ai.backend.manager.models.container_registry.row import ContainerRegistryRow
 from ai.backend.manager.models.image.creators import ImageAliasCreator
 from ai.backend.manager.models.image.lookups import ImageAliasOwnerLookup
 from ai.backend.manager.models.image.purgers import ImagePurger
 from ai.backend.manager.models.image.queriers import ImageQuerier
+from ai.backend.manager.models.image.row import ImageAliasRow, ImageRow
 from ai.backend.manager.models.image.scopes import ImageTarget
 from ai.backend.manager.models.image.searchable_fields import (
     ImageAliasSearchableFields,
@@ -63,10 +60,10 @@ from ai.backend.manager.models.image.updaters import ImageUpdater
 from ai.backend.manager.models.specs.pagination import NoPagination
 from ai.backend.manager.models.specs.searcher import SearcherResult
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.repositories.base import BatchQuerier, execute_batch_querier
+from ai.backend.manager.repositories.base.querier import BatchQuerier, execute_batch_querier
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 class ImageDBSource:
@@ -472,7 +469,7 @@ class ImageDBSource:
         if not matching_registries:
             raise RuntimeError("It is an unknown registry.", registry_or_image)
 
-        log.debug("running a per-registry metadata scan")
+        log.debug("per-registry image metadata scan started")
         return await self._scan_registries(matching_registries, reporter=reporter)
         # TODO: delete images removed from registry?
 
@@ -486,7 +483,9 @@ class ImageDBSource:
         registry_name = ImageRef.parse_image_str(registry_key, "*").registry
         image_name = image_canonical.removeprefix(registry_name + "/")
 
-        log.debug("running a per-image metadata scan: {}, {}", registry_name, image_name)
+        log.debug(
+            "per-image metadata scan started", registry_name=registry_name, image_name=image_name
+        )
 
         scanner_cls = get_container_registry_cls(registry_row)
         scanner = scanner_cls(self._db, registry_name, registry_row)
@@ -525,7 +524,7 @@ class ImageDBSource:
 
         for registry_key, registry_row in registries.items():
             registry_name = ImageRef.parse_image_str(registry_key, "*").registry
-            log.info('Scanning kernel images from the registry "{0}"', registry_name)
+            log.debug("registry image scan started", registry_name=registry_name)
 
             scanner_cls = get_container_registry_cls(registry_row)
             scanner = scanner_cls(self._db, registry_name, registry_row)

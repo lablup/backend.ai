@@ -6,7 +6,7 @@ from typing import override
 
 from ai.backend.common.data.entity.replica_group import ReplicaGroupID
 from ai.backend.common.data.filter_specs import UUIDInMatchSpec
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.data.deployment.types import (
     DeploymentHandlerCategory,
     DeploymentLifecycleStatus,
@@ -32,7 +32,7 @@ from ai.backend.manager.views.replica_group import ReplicaGroupDeploySchedulingV
 
 from .base import DeploymentHandler
 
-log = BraceStyleAdapter(logging.getLogger(__name__))
+log = StructuredLogger(logging.getLogger(__name__))
 
 
 class DeployingProvisionedHandler(DeploymentHandler):

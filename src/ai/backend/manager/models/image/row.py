@@ -42,7 +42,7 @@ from ai.backend.common.types import (
     SlotName,
 )
 from ai.backend.common.utils import join_non_empty
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.data.image.types import (
     ImageAliasData,
     ImageData,
@@ -63,9 +63,9 @@ from ai.backend.manager.models.base import (
     StrEnumType,
     StructuredJSONColumn,
 )
-from ai.backend.manager.models.container_registry import ContainerRegistryRow
+from ai.backend.manager.models.container_registry.row import ContainerRegistryRow
 from ai.backend.manager.models.mixins.timestamp import CreatedAtMixin
-from ai.backend.manager.models.project import ProjectRow
+from ai.backend.manager.models.project.row import ProjectRow
 from ai.backend.manager.models.rbac import (
     AbstractPermissionContext,
     AbstractPermissionContextBuilder,
@@ -77,13 +77,13 @@ from ai.backend.manager.models.rbac import (
 )
 from ai.backend.manager.models.rbac.context import ClientContext
 from ai.backend.manager.models.rbac.exceptions import InvalidScope
-from ai.backend.manager.models.user import UserRole, UserRow
+from ai.backend.manager.models.user.row import UserRole, UserRow
 from ai.backend.manager.models.virtual_entity.queries import user_scope_membership_exists
 
 if TYPE_CHECKING:
-    from ai.backend.manager.models.container_registry import ContainerRegistryRow
+    from ai.backend.manager.models.container_registry.row import ContainerRegistryRow
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 __all__ = (
@@ -120,7 +120,7 @@ class ImageLoadFilter(enum.StrEnum):
 
 
 def _get_container_registry_join_condition() -> sa.sql.elements.ColumnElement[Any]:
-    from ai.backend.manager.models.container_registry import ContainerRegistryRow
+    from ai.backend.manager.models.container_registry.row import ContainerRegistryRow
 
     return ContainerRegistryRow.id == foreign(ImageRow.registry_id)
 
@@ -305,6 +305,10 @@ class ImageRow(CreatedAtMixin, Base):
 
     @classmethod
     def from_dataclass_with_details(cls, image_data: ImageDataWithDetails) -> Self:
+        resources: dict[str, dict[str, str | None]] = {}
+        for resource_limit in image_data.resource_limits:
+            limit = resource_limit.to_dict()
+            resources[resource_limit.key] = {"min": limit["min"], "max": limit["max"]}
         image_row = cls(
             name=image_data.name,
             project=image_data.project,
@@ -319,7 +323,7 @@ class ImageRow(CreatedAtMixin, Base):
             type=image_data.type,
             accelerators=",".join(image_data.supported_accelerators),
             labels={kv.key: kv.value for kv in image_data.labels},
-            resources={rl.key: {rl.min, rl.max} for rl in image_data.resource_limits},
+            resources=resources,
             status=image_data.status,
         )
         image_row.id = image_data.id
@@ -800,8 +804,8 @@ class ImagePermissionContextBuilder(
         ctx: ClientContext,
         scope: DomainScope,
     ) -> ImagePermissionContext:
-        from ai.backend.manager.models.container_registry import ContainerRegistryRow
-        from ai.backend.manager.models.domain import DomainRow
+        from ai.backend.manager.models.container_registry.row import ContainerRegistryRow
+        from ai.backend.manager.models.domain.row import DomainRow
 
         permissions = await self.calculate_permission(ctx, scope)
         image_id_permission_map: dict[UUID, frozenset[ImagePermission]] = {}
@@ -855,7 +859,7 @@ class ImagePermissionContextBuilder(
         _ctx: ClientContext,
         scope: DomainScope,
     ) -> list[ProjectScope]:
-        from ai.backend.manager.models.project import ProjectRow
+        from ai.backend.manager.models.project.row import ProjectRow
 
         stmt = sa.select(ProjectRow.id).where(ProjectRow.domain_name == scope.domain_name)
         project_ids = await self.db_session.scalars(stmt)
@@ -864,7 +868,7 @@ class ImagePermissionContextBuilder(
     async def _verify_project_scope_and_calculate_permission(
         self, ctx: ClientContext, scope: ProjectScope
     ) -> frozenset[ImagePermission]:
-        from ai.backend.manager.models.project import ProjectRow
+        from ai.backend.manager.models.project.row import ProjectRow
 
         group_query_stmt = sa.select(ProjectRow).where(ProjectRow.id == scope.project_id)
         group_row = cast(ProjectRow | None, await self.db_session.scalar(group_query_stmt))
@@ -880,7 +884,7 @@ class ImagePermissionContextBuilder(
         registry_condition_factory: Callable[[list[Any]], Any],
         filter_global_registry: bool = False,
     ) -> ImagePermissionContext:
-        from ai.backend.manager.models.container_registry import ContainerRegistryRow
+        from ai.backend.manager.models.container_registry.row import ContainerRegistryRow
 
         project_ids = [scope.project_id for scope in scopes]
         project_id_to_permission_map: dict[str, frozenset[ImagePermission]] = {}
@@ -938,7 +942,7 @@ class ImagePermissionContextBuilder(
         ctx: ClientContext,
         scopes: list[ProjectScope],
     ) -> ImagePermissionContext:
-        from ai.backend.manager.models.container_registry import ContainerRegistryRow
+        from ai.backend.manager.models.container_registry.row import ContainerRegistryRow
 
         def global_registry_condition(
             _project_ids: list[Any],
@@ -954,10 +958,10 @@ class ImagePermissionContextBuilder(
         ctx: ClientContext,
         scopes: list[ProjectScope],
     ) -> ImagePermissionContext:
-        from ai.backend.manager.models.association_container_registries_groups import (
+        from ai.backend.manager.models.association_container_registries_groups.row import (
             AssociationContainerRegistriesGroupsRow,
         )
-        from ai.backend.manager.models.container_registry import ContainerRegistryRow
+        from ai.backend.manager.models.container_registry.row import ContainerRegistryRow
 
         def non_global_registry_condition(
             project_ids: list[Any],

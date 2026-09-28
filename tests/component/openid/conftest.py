@@ -34,6 +34,7 @@ from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.entity.project import ProjectEntityType
 from ai.backend.common.typed_validators import HostPortPair as HostPortPairModel
 from ai.backend.common.types import (
+    DefaultForUnspecified,
     ResourceSlot,
     ValkeyProfileTarget,
     ValkeyTarget,
@@ -47,21 +48,18 @@ from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.permission.global_entity import GlobalEntityIDCache
 from ai.backend.manager.data.secret.types import KeyProviderType
 from ai.backend.manager.models.base import pgsql_connect_opts
-from ai.backend.manager.models.domain import domains
-from ai.backend.manager.models.domain.row import DomainRow
+from ai.backend.manager.models.domain.row import DomainRow, domains
 from ai.backend.manager.models.hasher.types import PasswordInfo
-from ai.backend.manager.models.keypair import keypairs
-from ai.backend.manager.models.project import association_groups_users, groups
-from ai.backend.manager.models.project.row import ProjectRow
-from ai.backend.manager.models.resource_policy import (
-    DefaultForUnspecified,
+from ai.backend.manager.models.keypair.row import keypairs
+from ai.backend.manager.models.project.row import ProjectRow, association_groups_users, groups
+from ai.backend.manager.models.resource_policy.row import (
     ProjectResourcePolicyRow,
     UserResourcePolicyRow,
     keypair_resource_policies,
     project_resource_policies,
     user_resource_policies,
 )
-from ai.backend.manager.models.user import UserRole, UserStatus, users
+from ai.backend.manager.models.user.row import UserRole, UserStatus, users
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.virtual_entity.entity_membership import EntityMembershipRow
 from ai.backend.manager.models.virtual_entity.scope_binding import ScopeBindingRow

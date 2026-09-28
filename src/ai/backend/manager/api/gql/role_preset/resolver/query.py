@@ -21,13 +21,15 @@ from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     gql_root_field,
 )
-from ai.backend.manager.api.gql.role_preset.types import (
+from ai.backend.manager.api.gql.role_preset.types.filters import (
+    RolePresetFilterGQL,
+    RolePresetOrderByGQL,
+)
+from ai.backend.manager.api.gql.role_preset.types.inputs import RolePresetUsageGQL
+from ai.backend.manager.api.gql.role_preset.types.node import (
     RolePresetConnection,
     RolePresetEdge,
-    RolePresetFilterGQL,
     RolePresetGQL,
-    RolePresetOrderByGQL,
-    RolePresetUsageGQL,
 )
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.api.gql.utils import check_admin_only

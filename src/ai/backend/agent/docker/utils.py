@@ -13,9 +13,9 @@ from aiodocker.exceptions import DockerError
 
 from ai.backend.agent.errors import InitializationError, SubprocessStreamError
 from ai.backend.agent.utils import closing_async, get_arch_name, update_nested_dict
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 IMAGE_CHUNK_SIZE: Final[int] = 1 * 1024 * 1024 * 1024  # 1MiB
@@ -86,22 +86,22 @@ class PersistentServiceContainer:
     async def ensure_running_latest(self) -> None:
         image_version = await self.get_image_version()
         if image_version == 0:
-            log.info("PersistentServiceContainer({}): installing...", self.image_ref)
+            log.info("persistent service container installing", image_name=self.image_ref)
             await self.install_latest()
         elif image_version < self.img_version:
             log.info(
-                "PersistentServiceContainer({}): upgrading (v{} -> v{})",
-                self.image_ref,
-                image_version,
-                self.img_version,
+                "persistent service container upgrading",
+                image_name=self.image_ref,
+                current_version=image_version,
+                target_version=self.img_version,
             )
             await self.install_latest()
         container_version, is_running = await self.get_container_version_and_status()
         if container_version == 0 or image_version != container_version or not is_running:
-            log.info("PersistentServiceContainer({}): recreating...", self.image_ref)
+            log.info("persistent service container recreating", image_name=self.image_ref)
             await self.recreate()
         if not is_running:
-            log.info("PersistentServiceContainer({}): starting...", self.image_ref)
+            log.info("persistent service container starting", image_name=self.image_ref)
             await self.start()
 
     async def install_latest(self) -> None:

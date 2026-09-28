@@ -11,13 +11,13 @@ from ai.backend.common.bgtask.task.base import (
     BaseBackgroundTaskManifest,
 )
 from ai.backend.common.type_adapters import VFolderIDField
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.storage.bgtask.types import StorageBgtaskName
 
 if TYPE_CHECKING:
     from ai.backend.storage.volumes.pool import VolumePool
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 class FileDeleteManifest(BaseBackgroundTaskManifest):

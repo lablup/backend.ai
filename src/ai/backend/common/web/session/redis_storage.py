@@ -9,11 +9,11 @@ from typing import Any, override
 from aiohttp import web
 
 from ai.backend.common.clients.valkey_client.valkey_session.client import ValkeySessionClient
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 
 from . import AbstractStorage, Session, extra_config_headers, get_time
 
-log = BraceStyleAdapter(logging.getLogger("ai.backend.web.server"))
+log = StructuredLogger(logging.getLogger("ai.backend.web.server"))
 
 
 class RedisStorage(AbstractStorage):

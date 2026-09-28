@@ -6,7 +6,7 @@ from ai.backend.common.events.reporter import (
     PrepareEventReportArgs,
 )
 from ai.backend.common.events.types import AbstractEvent
-from ai.backend.manager.models.event_log import EventLogRow
+from ai.backend.manager.models.event_log.row import EventLogRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 
 

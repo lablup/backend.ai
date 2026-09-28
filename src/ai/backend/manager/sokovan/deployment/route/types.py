@@ -3,7 +3,7 @@
 from dataclasses import dataclass, field
 from enum import StrEnum
 
-from ai.backend.manager.repositories.deployment.types import RouteData
+from ai.backend.manager.data.deployment.types import RouteData
 
 
 class RouteLifecycleType(StrEnum):

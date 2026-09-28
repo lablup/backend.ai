@@ -35,7 +35,7 @@ from ai.backend.manager.actions.v2.ops.result import LookupOpsResult
 from ai.backend.manager.api.rest.resource.handler import ResourceHandler
 from ai.backend.manager.data.manager_status.types import ManagerStatus
 from ai.backend.manager.dto.context import RequestCtx, UserContext
-from ai.backend.manager.models.user import UserRole
+from ai.backend.manager.models.user.row import UserRole
 
 # ---------------------------------------------------------------------------
 # Fixtures

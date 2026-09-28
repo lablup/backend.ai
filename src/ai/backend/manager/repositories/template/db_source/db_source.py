@@ -13,12 +13,12 @@ from ai.backend.common.data.entity.types import EntityIdentifier
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.manager.errors.api import InvalidAPIParameters
 from ai.backend.manager.errors.common import GenericForbidden
-from ai.backend.manager.models.domain import domains
-from ai.backend.manager.models.keypair import keypairs
-from ai.backend.manager.models.project import groups
+from ai.backend.manager.models.domain.row import domains
+from ai.backend.manager.models.keypair.row import keypairs
+from ai.backend.manager.models.project.row import groups
 from ai.backend.manager.models.session_template.creators import SessionTemplateCreator
 from ai.backend.manager.models.session_template.row import SessionTemplateRow, TemplateType
-from ai.backend.manager.models.user import UserRole, users
+from ai.backend.manager.models.user.row import UserRole, users
 from ai.backend.manager.models.virtual_entity.queries import (
     user_scope_membership_exists,
     user_scope_membership_query,

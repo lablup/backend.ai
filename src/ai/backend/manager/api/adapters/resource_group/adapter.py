@@ -91,7 +91,6 @@ from ai.backend.manager.data.resource_group.types import (
 from ai.backend.manager.errors.resource import ResourceGroupNotFound
 from ai.backend.manager.models.clauses import QueryCondition
 from ai.backend.manager.models.condition_utils import combine_conditions_or, negate_conditions
-from ai.backend.manager.models.resource_group import ResourceGroupRow
 from ai.backend.manager.models.resource_group.creators import (
     ResourceGroupCreator,
     ResourceGroupForDomainRelationCreator,
@@ -101,6 +100,7 @@ from ai.backend.manager.models.resource_group.purgers import (
     ResourceGroupForDomainRelationPurger,
     ResourceGroupForProjectRelationPurger,
 )
+from ai.backend.manager.models.resource_group.row import ResourceGroupRow
 from ai.backend.manager.models.resource_group.scopes import (
     DomainResourceGroupTarget,
     ProjectResourceGroupTarget,
@@ -418,6 +418,11 @@ class ResourceGroupAdapter(BaseAdapter):
             *self.apply_bool_filter(filter_.is_active, fields.is_active.filter),
             *self.apply_bool_filter(filter_.is_public, fields.is_public.filter),
             *self.apply_bool_filter(filter_.is_default, fields.is_default.filter),
+            *self.apply_to_many_filter(
+                filter_.labels,
+                ResourceGroupSearchableFields.nested.labels.correlation,
+                self._convert_entity_label_filter,
+            ),
         ]
         if filter_.AND:
             for sub in filter_.AND:

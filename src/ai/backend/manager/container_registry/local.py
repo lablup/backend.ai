@@ -11,9 +11,9 @@ import yarl
 
 from ai.backend.common.docker import arch_name_aliases, get_docker_connector
 from ai.backend.common.json import pretty_json_str
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.data.image.types import ImageStatus
-from ai.backend.manager.models.image import ImageRow
+from ai.backend.manager.models.image.row import ImageRow
 
 from .base import (
     BaseContainerRegistry,
@@ -21,7 +21,7 @@ from .base import (
     progress_reporter,
 )
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 class LocalRegistry(BaseContainerRegistry):
@@ -80,7 +80,12 @@ class LocalRegistry(BaseContainerRegistry):
                 "ContainerConfig.Image": data.get("ContainerConfig", {}).get("Image", None),
                 "Architecture": architecture,
             }
-            log.debug("scanned image info: {}:{}\n{}", image, tag, pretty_json_str(summary))
+            log.debug(
+                "image info scanned",
+                image_name=image,
+                image_tag=tag,
+                image_summary=pretty_json_str(summary),
+            )
             config_digest = data["Id"]
             async with self.db.begin_readonly_session() as db_session:
                 already_exists = await db_session.scalar(
@@ -97,10 +102,10 @@ class LocalRegistry(BaseContainerRegistry):
             labels = data["Config"]["Labels"]
             if labels is None:
                 log.debug(
-                    "The image {}:{}/{} has no metadata labels -> treating as vanilla image",
-                    image,
-                    tag,
-                    architecture,
+                    "image has no metadata labels, treating as vanilla image",
+                    image_name=image,
+                    image_tag=tag,
+                    architecture=architecture,
                 )
                 labels = {}
             return {

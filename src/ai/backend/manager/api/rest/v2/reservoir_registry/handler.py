@@ -13,13 +13,13 @@ from ai.backend.common.dto.manager.v2.reservoir_registry.request import (
     DeleteReservoirRegistryInput,
     UpdateReservoirRegistryInput,
 )
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.api.rest.v2.path_params import RegistryIdPathParam
 
 if TYPE_CHECKING:
     from ai.backend.manager.api.adapters.reservoir_registry.adapter import ReservoirRegistryAdapter
 
-log: Final = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log: Final = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 class V2ReservoirRegistryHandler:

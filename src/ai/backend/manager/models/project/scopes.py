@@ -16,7 +16,7 @@ from ai.backend.common.data.entity.types import EntityIdentifier
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.manager.errors.resource import DomainNotFound
 from ai.backend.manager.models.clauses import QueryCondition
-from ai.backend.manager.models.domain import DomainRow
+from ai.backend.manager.models.domain.row import DomainRow
 from ai.backend.manager.models.project.row import ProjectRow
 from ai.backend.manager.models.resource_group.row import ResourceGroupForProjectRow
 from ai.backend.manager.models.scopes import ExistenceCheck, ScopeTarget

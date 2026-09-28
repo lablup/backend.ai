@@ -28,7 +28,7 @@ from ai.backend.manager.data.user.types import (
     UserData,
 )
 from ai.backend.manager.models.hasher.types import PasswordInfo
-from ai.backend.manager.models.keypair import KeyPairRow
+from ai.backend.manager.models.keypair.row import KeyPairRow
 from ai.backend.manager.models.minilang import (
     ExternalTableFilterSpec,
     FieldSpecItem,
@@ -37,8 +37,9 @@ from ai.backend.manager.models.minilang import (
 )
 from ai.backend.manager.models.minilang.ordering import QueryOrderParser
 from ai.backend.manager.models.minilang.queryfilter import QueryFilterParser
-from ai.backend.manager.models.project import ProjectRow, groups
-from ai.backend.manager.models.user import (
+from ai.backend.manager.models.project.row import ProjectRow, groups
+from ai.backend.manager.models.user.creators import UserCreator
+from ai.backend.manager.models.user.row import (
     ACTIVE_USER_STATUSES,
     INACTIVE_USER_STATUSES,
     UserRole,
@@ -46,7 +47,6 @@ from ai.backend.manager.models.user import (
     UserStatus,
     users,
 )
-from ai.backend.manager.models.user.creators import UserCreator
 from ai.backend.manager.models.user.updaters import UserUpdater
 from ai.backend.manager.models.virtual_entity.queries import (
     user_scope_membership_exists,
@@ -448,7 +448,7 @@ class UserNode(graphene.ObjectType):  # type: ignore[misc]
         before: str | None = None,
         last: int | None = None,
     ) -> ConnectionResolverResult[GroupNode]:
-        from ai.backend.manager.models.project import ProjectRow
+        from ai.backend.manager.models.project.row import ProjectRow
 
         from .group import GroupNode
 

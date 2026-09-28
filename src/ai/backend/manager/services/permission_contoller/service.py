@@ -5,7 +5,7 @@ from typing import Any
 
 from ai.backend.common.data.entity.types import EntityType
 from ai.backend.common.data.permission.types import role_scope_types
-from ai.backend.logging.utils import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.actions.action.rbac import build_operation_description
 from ai.backend.manager.actions.registry.registry import ProcessorRegistry
 from ai.backend.manager.data.permission.types import GrantableOperation
@@ -48,7 +48,7 @@ from ai.backend.manager.services.permission_contoller.actions.search_users_assig
     GlobalSearchRoleAssignmentsActionResult,
 )
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 class PermissionControllerService:

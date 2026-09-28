@@ -41,9 +41,9 @@ from ai.backend.manager.models.association_container_registries_groups.row impor
 )
 from ai.backend.manager.models.base import metadata
 from ai.backend.manager.models.client_ip_masking.row import ClientIPMaskingPolicyRow
-from ai.backend.manager.models.container_registry import ContainerRegistryRow
+from ai.backend.manager.models.container_registry.row import ContainerRegistryRow
 from ai.backend.manager.models.deployment_revision_preset.row import DeploymentRevisionPresetRow
-from ai.backend.manager.models.domain import DomainRow
+from ai.backend.manager.models.domain.row import DomainRow
 from ai.backend.manager.models.endpoint.row import EndpointRow
 from ai.backend.manager.models.entity_share.row import EntityShareRow
 from ai.backend.manager.models.huggingface_registry.row import HuggingFaceRegistryRow
@@ -59,14 +59,13 @@ from ai.backend.manager.models.model_card.row import ModelCardRow
 from ai.backend.manager.models.network.row import NetworkRow
 from ai.backend.manager.models.notification.row import NotificationChannelRow, NotificationRuleRow
 from ai.backend.manager.models.object_storage.row import ObjectStorageRow
-from ai.backend.manager.models.project import ProjectRow
-from ai.backend.manager.models.project.row import AssocGroupUserRow
+from ai.backend.manager.models.project.row import AssocGroupUserRow, ProjectRow
 from ai.backend.manager.models.prometheus_query_preset.row import PrometheusQueryPresetRow
 from ai.backend.manager.models.prometheus_query_preset_category.row import (
     PrometheusQueryPresetCategoryRow,
 )
 from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
-from ai.backend.manager.models.rbac_models.role import RoleRow
+from ai.backend.manager.models.rbac_models.role.row import RoleRow
 from ai.backend.manager.models.rbac_models.role_permission_preset.row import (
     RolePermissionPresetRow,
 )
@@ -79,11 +78,11 @@ from ai.backend.manager.models.resource_group.row import (
     ResourceGroupForProjectRow,
     ResourceGroupRow,
 )
-from ai.backend.manager.models.resource_policy import (
+from ai.backend.manager.models.resource_policy.row import (
+    KeyPairResourcePolicyRow,
     ProjectResourcePolicyRow,
     UserResourcePolicyRow,
 )
-from ai.backend.manager.models.resource_policy.row import KeyPairResourcePolicyRow
 from ai.backend.manager.models.resource_preset.row import ResourcePresetRow
 from ai.backend.manager.models.resource_slot.row import ResourceSlotTypeRow
 from ai.backend.manager.models.retention.row import RetentionPolicyRow
@@ -94,7 +93,7 @@ from ai.backend.manager.models.session.row import SessionRow
 from ai.backend.manager.models.session_group.row import SessionGroupRow
 from ai.backend.manager.models.session_template.row import SessionTemplateRow
 from ai.backend.manager.models.storage_namespace.row import StorageNamespaceRow
-from ai.backend.manager.models.user import UserRow
+from ai.backend.manager.models.user.row import UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.vfolder.row import VFolderRow
 from ai.backend.manager.models.vfs_storage.row import VFSStorageRow

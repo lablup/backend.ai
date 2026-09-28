@@ -13,7 +13,7 @@ from ai.backend.manager.services.vfolder.actions.search_storage_host_permissions
     SearchStorageHostPermissionsAction,
     StorageHostPermissionEntry,
 )
-from ai.backend.manager.services.vfolder.processors import VFolderProcessors
+from ai.backend.manager.services.vfolder.processors.vfolder import VFolderProcessors
 
 
 class StorageHostAdapter(BaseAdapter):

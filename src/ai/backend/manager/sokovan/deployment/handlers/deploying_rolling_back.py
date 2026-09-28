@@ -4,7 +4,7 @@ import logging
 from collections.abc import Sequence
 from typing import override
 
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.data.deployment.types import (
     DeploymentHandlerCategory,
     DeploymentInfo,
@@ -18,9 +18,9 @@ from ai.backend.manager.data.deployment.types import (
 )
 from ai.backend.manager.data.model_serving.types import EndpointLifecycle
 from ai.backend.manager.defs import LockID
-from ai.backend.manager.models.endpoint import EndpointRow
+from ai.backend.manager.models.endpoint.row import EndpointRow
 from ai.backend.manager.models.endpoint.updaters import EndpointReplicaGroupUpdater
-from ai.backend.manager.models.replica_group import ReplicaGroupRow
+from ai.backend.manager.models.replica_group.row import ReplicaGroupRow
 from ai.backend.manager.models.replica_group.updaters import (
     ReplicaGroupDeployUpdater,
     ReplicaGroupLifecycleUpdater,
@@ -39,7 +39,7 @@ from ai.backend.manager.types import OptionalState, TriState
 
 from .base import DeploymentHandler
 
-log = BraceStyleAdapter(logging.getLogger(__name__))
+log = StructuredLogger(logging.getLogger(__name__))
 
 
 class DeployingRollingBackHandler(DeploymentHandler):

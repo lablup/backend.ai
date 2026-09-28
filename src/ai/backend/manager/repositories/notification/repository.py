@@ -13,13 +13,12 @@ from ai.backend.common.resilience import (
     RetryPolicy,
 )
 from ai.backend.common.resilience.policies.retry import BackoffStrategy
-from ai.backend.manager.data.notification import (
+from ai.backend.manager.data.notification.types import (
+    MatchingNotificationRuleData,
     NotificationChannelData,
     NotificationRuleData,
 )
-from ai.backend.manager.data.notification.types import MatchingNotificationRuleData
-
-from .db_source import NotificationDBSource
+from ai.backend.manager.repositories.notification.db_source.db_source import NotificationDBSource
 
 if TYPE_CHECKING:
     from ai.backend.manager.models.utils import ExtendedAsyncSAEngine

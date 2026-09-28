@@ -32,6 +32,7 @@ from aiohttp import web
 from aiotools import apartial
 
 from ai.backend.common.api_handlers import PathParam, QueryParam
+from ai.backend.common.asyncio import IgnoreTaskExceptionHandler
 from ai.backend.common.contexts.user import current_user
 from ai.backend.common.data.entity.session import SessionID
 from ai.backend.common.dto.manager.stream.request import SessionNamePath, StreamProxyRequest
@@ -39,7 +40,7 @@ from ai.backend.common.dto.manager.stream.response import StreamAppItem
 from ai.backend.common.exception import BackendAIError, UnreachableError
 from ai.backend.common.json import dump_json, load_json
 from ai.backend.common.types import KernelId, SessionId
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.api.utils import call_non_bursty
 from ai.backend.manager.api.wsproxy import TCPProxy
 from ai.backend.manager.dto.context import RequestCtx
@@ -47,7 +48,7 @@ from ai.backend.manager.errors.api import InvalidAPIParameters
 from ai.backend.manager.errors.kernel import InvalidStreamMode
 from ai.backend.manager.errors.resource import AppNotFound, NoCurrentTaskContext
 from ai.backend.manager.errors.service import AppServiceStartFailed
-from ai.backend.manager.models.kernel import KernelRow
+from ai.backend.manager.models.kernel.row import KernelRow
 from ai.backend.manager.services.session.actions.lookup import LookupSessionAction
 from ai.backend.manager.services.session.actions.resolve_session_name import (
     ResolveSessionNameAction,
@@ -76,7 +77,7 @@ if TYPE_CHECKING:
     from ai.backend.manager.services.session.processors import SessionProcessors
     from ai.backend.manager.services.stream.processors import StreamProcessors
 
-log: Final = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log: Final = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 def _require_current_user_id() -> uuid.UUID:
@@ -193,12 +194,16 @@ class StreamHandler:
             _repl_out_port: int,
         ) -> tuple[zmq.asyncio.Socket, zmq.asyncio.Socket]:
             stdin_addr = f"tcp://{_kernel_host}:{_repl_in_port}"
-            log.debug("stream_pty({0}): stdin: {1}", stream_key, stdin_addr)
+            log.debug(
+                "pty stdin socket connecting", kernel_id=stream_key, socket_address=stdin_addr
+            )
             stdin_sock = app_ctx.zctx.socket(zmq.PUB)
             stdin_sock.connect(stdin_addr)
             stdin_sock.setsockopt(zmq.LINGER, 100)
             stdout_addr = f"tcp://{_kernel_host}:{_repl_out_port}"
-            log.debug("stream_pty({0}): stdout: {1}", stream_key, stdout_addr)
+            log.debug(
+                "pty stdout socket connecting", kernel_id=stream_key, socket_address=stdout_addr
+            )
             stdout_sock = app_ctx.zctx.socket(zmq.SUB)
             stdout_sock.connect(stdout_addr)
             stdout_sock.setsockopt(zmq.LINGER, 100)
@@ -229,7 +234,7 @@ class StreamHandler:
                                 socks[1] = stdout_sock
                                 app_ctx.stream_stdin_socks[stream_key].add(socks[0])
                                 await socks[0].send_multipart([raw_data])
-                                log.debug("stream_stdin({0}): zmq stream reset", stream_key)
+                                log.debug("pty stdin zmq stream reset", kernel_id=stream_key)
                                 stream_sync.set()
                                 continue
                         else:
@@ -260,7 +265,7 @@ class StreamHandler:
                                     ),
                                 )
                             elif data["type"] == "restart":
-                                log.debug("stream_stdin: restart requested")
+                                log.trace("pty kernel restart requested", kernel_id=stream_key)
                                 if not socks[0].closed:
                                     await self._stream.restart_in_stream.run(
                                         RestartInStreamAction(
@@ -269,31 +274,29 @@ class StreamHandler:
                                     )
                                     socks[0].close()
                                 else:
-                                    log.warning(
-                                        "stream_stdin({0}): "
-                                        "duplicate kernel restart request; "
-                                        "ignoring it.",
-                                        stream_key,
+                                    log.trace(
+                                        "duplicate pty kernel restart request ignored",
+                                        kernel_id=stream_key,
                                     )
                     elif msg.type == aiohttp.WSMsgType.ERROR:
-                        log.warning(
-                            "stream_stdin({0}): connection closed ({1})",
-                            stream_key,
-                            ws.exception(),
+                        log.trace(
+                            "pty stdin websocket closed with error",
+                            kernel_id=stream_key,
+                            error_message=str(ws.exception()),
                         )
             except asyncio.CancelledError:
                 raise
             except Exception:
                 await self.error_monitor.capture_exception(context={"user": user_id})
-                log.exception("stream_stdin({0}): unexpected error", stream_key)
+                log.exception("pty stdin stream failed", kernel_id=stream_key)
             finally:
-                log.debug("stream_stdin({0}): terminated", stream_key)
+                log.debug("pty stdin stream terminated", kernel_id=stream_key)
                 if not socks[0].closed:
                     socks[0].close()
 
         async def stream_stdout() -> None:
             nonlocal socks
-            log.debug("stream_stdout({0}): started", stream_key)
+            log.debug("pty stdout stream started", kernel_id=stream_key)
             data: list[bytes] = []
             try:
                 while True:
@@ -304,7 +307,7 @@ class StreamHandler:
                             return
                         await stream_sync.wait()
                         stream_sync.clear()
-                        log.debug("stream_stdout({0}): zmq stream reset", stream_key)
+                        log.debug("pty stdout zmq stream reset", kernel_id=stream_key)
                         continue
                     if ws.closed:
                         break
@@ -318,9 +321,9 @@ class StreamHandler:
                 pass
             except Exception:
                 await self.error_monitor.capture_exception(context={"user": user_id})
-                log.exception("stream_stdout({0}): unexpected error", stream_key)
+                log.exception("pty stdout stream failed", kernel_id=stream_key)
             finally:
-                log.debug("stream_stdout({0}): terminated", stream_key)
+                log.debug("pty stdout stream terminated", kernel_id=stream_key)
                 socks[1].close()
 
         stdout_task = asyncio.create_task(stream_stdout())
@@ -328,7 +331,7 @@ class StreamHandler:
             await stream_stdin()
         except Exception:
             await self.error_monitor.capture_exception(context={"user": user_id})
-            log.exception("stream_pty({0}): unexpected error", stream_key)
+            log.exception("pty stream failed", kernel_id=stream_key)
         finally:
             app_ctx.stream_pty_handlers[stream_key].discard(myself)
             app_ctx.stream_stdin_socks[stream_key].discard(socks[0])
@@ -372,7 +375,7 @@ class StreamHandler:
 
         try:
             if ws.closed:
-                log.debug("STREAM_EXECUTE: client disconnected (cancelled)")
+                log.trace("execute stream client disconnected while cancelled")
                 return ws
             params = await ws.receive_json()
             if not params.get("mode"):
@@ -397,7 +400,7 @@ class StreamHandler:
                 )
                 raw_result = exec_result.result
                 if ws.closed:
-                    log.debug("STREAM_EXECUTE: client disconnected (interrupted)")  # type: ignore[unreachable]
+                    log.trace("execute stream client disconnected while interrupted")  # type: ignore[unreachable]
                     await self._stream.interrupt_in_stream.run(
                         InterruptInStreamAction(
                             session_id=session_id,
@@ -421,7 +424,7 @@ class StreamHandler:
                     code = ""
                     opts.clear()
         except (json.decoder.JSONDecodeError, AssertionError) as e:
-            log.warning("STREAM_EXECUTE: invalid/missing parameters: {0!r}", e)
+            log.trace("execute stream parameters invalid", error_message=repr(e))
             if not ws.closed:
                 await ws.send_json({
                     "status": "error",
@@ -605,7 +608,7 @@ class StreamHandler:
             )
             return await proxy.proxy()
         except asyncio.CancelledError:
-            log.debug("stream_proxy({}, {}) cancelled", stream_key, service)
+            log.debug("stream proxy cancelled", kernel_id=stream_key, service_name=service)
             raise
         finally:
             app_ctx.stream_proxy_handlers[stream_key].discard(myself)
@@ -686,7 +689,7 @@ async def stream_conn_tracker_gc(
                         GCStaleConnectionsAction(active_session_ids=active_session_ids),
                     )
                 except Exception:
-                    log.warning("stream_conn_tracker_gc(): error during GC, retrying...")
+                    log.warning("stream connection gc failed, retrying", exc_info=True)
             await asyncio.sleep(10)
     except asyncio.CancelledError:
         pass
@@ -703,7 +706,9 @@ async def stream_app_ctx(
     app_ctx = priv_ctx
 
     app_ctx.database_ptask_group = aiotools.PersistentTaskGroup()
-    app_ctx.rpc_ptask_group = aiotools.PersistentTaskGroup()
+    app_ctx.rpc_ptask_group = aiotools.PersistentTaskGroup(
+        exception_handler=IgnoreTaskExceptionHandler()
+    )
     app_ctx.stream_pty_handlers = defaultdict(weakref.WeakSet)
     app_ctx.stream_execute_handlers = defaultdict(weakref.WeakSet)
     app_ctx.stream_proxy_handlers = defaultdict(weakref.WeakSet)

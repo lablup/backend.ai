@@ -1,15 +1,15 @@
 import logging
-import uuid
 from abc import ABC, abstractmethod
 from collections.abc import Awaitable, Callable, Sequence
 from datetime import UTC, datetime
 from typing import override
 
-from ai.backend.logging.utils import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.actions.run_status import ActionRunStatus
 from ai.backend.manager.actions.types import OperationStatus
 from ai.backend.manager.actions.v2.bulk.base import BaseBulkAction
-from ai.backend.manager.actions.v2.bulk.monitor import BulkActionMonitor
+from ai.backend.manager.actions.v2.bulk.log_context import with_bulk_action_context
+from ai.backend.manager.actions.v2.bulk.monitor.base import BulkActionMonitor
 from ai.backend.manager.actions.v2.bulk.result import (
     BasePartialBulkActionResult,
     BulkActionProcessResult,
@@ -17,11 +17,11 @@ from ai.backend.manager.actions.v2.bulk.result import (
     BulkEntityResult,
 )
 from ai.backend.manager.actions.v2.bulk.trigger import BulkActionTriggerMeta
-from ai.backend.manager.actions.v2.bulk.validator import AtomicBulkActionValidator
+from ai.backend.manager.actions.v2.bulk.validator.base import AtomicBulkActionValidator
 
 __all__ = ("BulkActionProcessor",)
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 class EntityResultJudge[TResult](ABC):
@@ -98,7 +98,7 @@ class BulkActionProcessor[TAction: BaseBulkAction, TResult]:
             try:
                 await monitor.prepare(trigger_meta)
             except Exception as e:
-                log.warning("Error in monitor prepare method: {}", e)
+                log.warning("action monitor prepare failed", exc_info=e)
 
     async def _finalize_monitors(
         self, trigger_meta: BulkActionTriggerMeta, meta: BulkActionResultMeta
@@ -108,51 +108,51 @@ class BulkActionProcessor[TAction: BaseBulkAction, TResult]:
             try:
                 await monitor.done(trigger_meta, process_result)
             except Exception as e:
-                log.warning("Error in monitor done method: {}", e)
+                log.warning("action monitor done failed", exc_info=e)
 
     async def run(self, action: TAction) -> TResult:
-        started_at = datetime.now(UTC)
-        action_id = uuid.uuid4()
-        trigger_meta = BulkActionTriggerMeta(
-            action_id=action_id,
-            started_at=started_at,
-            entity_ids=action.entity_ids(),
-            operation_type=action.operation_type(),
-            action_name=action.action_name(),
-        )
-
-        entity_results: Sequence[BulkEntityResult] = []
-
-        # Validation runs inside the monitor lifecycle so a rejected action is
-        # recorded too; monitors that only wrapped execution missed every denial.
-        await self._prepare_monitors(trigger_meta)
-        try:
-            try:
-                for validator in self._validators:
-                    await validator.validate(trigger_meta)
-            except BaseException as e:
-                run_status = ActionRunStatus.of_failure(e, during_validation=True)
-                entity_results = self._same_result_for_every_entity(trigger_meta, run_status)
-                raise
-            try:
-                result = await self._func(action)
-            except BaseException as e:
-                run_status = ActionRunStatus.of_failure(e, during_validation=False)
-                entity_results = self._same_result_for_every_entity(trigger_meta, run_status)
-                raise
-            else:
-                entity_results = self._judge.judge(trigger_meta, result)
-                return result
-        finally:
-            ended_at = datetime.now(UTC)
-            meta = BulkActionResultMeta(
+        with with_bulk_action_context(action) as action_id:
+            started_at = datetime.now(UTC)
+            trigger_meta = BulkActionTriggerMeta(
                 action_id=action_id,
-                entity_results=entity_results,
                 started_at=started_at,
-                ended_at=ended_at,
-                duration=ended_at - started_at,
+                entity_ids=action.entity_ids(),
+                operation_type=action.operation_type(),
+                action_name=action.action_name(),
             )
-            await self._finalize_monitors(trigger_meta, meta)
+
+            entity_results: Sequence[BulkEntityResult] = []
+
+            # Validation runs inside the monitor lifecycle so a rejected action is
+            # recorded too; monitors that only wrapped execution missed every denial.
+            await self._prepare_monitors(trigger_meta)
+            try:
+                try:
+                    for validator in self._validators:
+                        await validator.validate(trigger_meta)
+                except BaseException as e:
+                    run_status = ActionRunStatus.of_failure(e, during_validation=True)
+                    entity_results = self._same_result_for_every_entity(trigger_meta, run_status)
+                    raise
+                try:
+                    result = await self._func(action)
+                except BaseException as e:
+                    run_status = ActionRunStatus.of_failure(e, during_validation=False)
+                    entity_results = self._same_result_for_every_entity(trigger_meta, run_status)
+                    raise
+                else:
+                    entity_results = self._judge.judge(trigger_meta, result)
+                    return result
+            finally:
+                ended_at = datetime.now(UTC)
+                meta = BulkActionResultMeta(
+                    action_id=action_id,
+                    entity_results=entity_results,
+                    started_at=started_at,
+                    ended_at=ended_at,
+                    duration=ended_at - started_at,
+                )
+                await self._finalize_monitors(trigger_meta, meta)
 
     def _same_result_for_every_entity(
         self, trigger_meta: BulkActionTriggerMeta, run_status: ActionRunStatus

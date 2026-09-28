@@ -22,7 +22,7 @@ from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.user import UserEntityType, UserID
 from ai.backend.common.data.entity.vfolder import VFolderEntityType, VFolderUUID
 from ai.backend.common.types import AccessKey, VFolderID
-from ai.backend.logging.utils import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
 from ai.backend.manager.data.common.bulk import BulkCreateFailure, BulkUpdateFailure
 from ai.backend.manager.data.entity_share.types import EntityShareStatus
@@ -30,6 +30,7 @@ from ai.backend.manager.data.keypair.types import (
     KeyPairCreator,
     KeyPairData,
 )
+from ai.backend.manager.data.model_serving.types import EndpointLifecycle
 from ai.backend.manager.data.user.types import (
     BulkUserCreateResultData,
     BulkUserUpdateResultData,
@@ -48,13 +49,13 @@ from ai.backend.manager.errors.user import (
     UserNotFound,
     UserPurgeInProgress,
 )
-from ai.backend.manager.models.domain import DomainRow
-from ai.backend.manager.models.endpoint import EndpointLifecycle, EndpointRow
+from ai.backend.manager.models.domain.row import DomainRow
 from ai.backend.manager.models.endpoint.purgers import UserEndpointPurger
+from ai.backend.manager.models.endpoint.row import EndpointRow
 from ai.backend.manager.models.entity_share.purgers import EntitySharePendingOfferBatchPurger
 from ai.backend.manager.models.entity_share.row import EntityShareRow
 from ai.backend.manager.models.entity_share.updaters import EntityShareRevokeUpdater
-from ai.backend.manager.models.kernel import (
+from ai.backend.manager.models.kernel.row import (
     AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES,
     RESOURCE_USAGE_KERNEL_STATUSES,
     kernels,
@@ -66,19 +67,18 @@ from ai.backend.manager.models.keypair.row import (
 )
 from ai.backend.manager.models.keypair.searchable_fields import KeyPairSearchableFields
 from ai.backend.manager.models.project.lookups import PersonalProjectOfUserLookup
-from ai.backend.manager.models.resource_policy import UserResourcePolicyRow
-from ai.backend.manager.models.resource_policy.row import KeyPairResourcePolicyRow
+from ai.backend.manager.models.resource_policy.row import (
+    KeyPairResourcePolicyRow,
+    UserResourcePolicyRow,
+)
 from ai.backend.manager.models.resource_slot.aggregates import kernel_allocated_slots_expr
-from ai.backend.manager.models.session import (
+from ai.backend.manager.models.session.row import (
     AGENT_RESOURCE_OCCUPYING_SESSION_STATUSES,
-    QueryCondition,
-    QueryOption,
     SessionRow,
     by_status,
     by_user_id,
 )
-from ai.backend.manager.models.types import join_by_related_field
-from ai.backend.manager.models.user import UserRole, UserRow, UserStatus, users
+from ai.backend.manager.models.types import QueryCondition, QueryOption, join_by_related_field
 from ai.backend.manager.models.user.creators import UserCreator
 from ai.backend.manager.models.user.purgers import (
     UserErrorLogPurger,
@@ -87,11 +87,12 @@ from ai.backend.manager.models.user.purgers import (
     UserPurger,
     UserSessionGroupPurger,
 )
+from ai.backend.manager.models.user.row import UserRole, UserRow, UserStatus, users
 from ai.backend.manager.models.user.searchable_fields import UserSearchableFields
 from ai.backend.manager.models.user.searchers import UserSearcher
 from ai.backend.manager.models.user.updaters import UserUpdater
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.models.vfolder import (
+from ai.backend.manager.models.vfolder.row import (
     VFolderDeletionInfo,
     VFolderRow,
     VFolderStatusSet,
@@ -112,7 +113,7 @@ from ai.backend.manager.repositories.user.creators import UserCreateSpec
 from ai.backend.manager.repositories.vfolder.deletion import initiate_vfolder_deletion
 from ai.backend.manager.secret.pool import KeyProviderPool
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 class UserDBSource:
@@ -241,7 +242,7 @@ class UserDBSource:
                             )
                         )
                 except Exception as e:
-                    log.warning("Failed to create user {}: {}", item.creator.email, str(e))
+                    log.trace("user creation failed: {}", e, user_email=item.creator.email)
                     failures.append(BulkCreateFailure(index=idx, exception=e))
 
         return BulkUserCreateResultData(successes=successes, failures=failures)
@@ -270,7 +271,7 @@ class UserDBSource:
                         updated_user = await self._update_single_user_validated(session, item)
                         successes.append(updated_user)
                 except Exception as e:
-                    log.warning("Failed to update user {}: {}", item.user_id, str(e))
+                    log.trace("user update failed: {}", e, target_user_id=item.user_id)
                     failures.append(BulkUpdateFailure(index=idx, exception=e))
 
         return BulkUserUpdateResultData(successes=successes, failures=failures)

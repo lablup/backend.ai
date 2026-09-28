@@ -33,7 +33,7 @@ from ai.backend.manager.data.deployment_revision_preset.types import (
 from ai.backend.manager.data.runtime_variant.types import RuntimeVariantData
 
 if TYPE_CHECKING:
-    from ai.backend.manager.repositories.deployment import DeploymentRepository
+    from ai.backend.manager.repositories.deployment.repository import DeploymentRepository
 
 __all__ = ("RevisionDraftReader",)
 

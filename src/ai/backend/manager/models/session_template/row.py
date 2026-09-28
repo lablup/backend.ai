@@ -18,7 +18,7 @@ from ai.backend.common.types import SessionTypes
 from ai.backend.manager.defs import DEFAULT_ROLE
 from ai.backend.manager.exceptions import InvalidArgument
 from ai.backend.manager.models.base import GUID, Base, EnumType
-from ai.backend.manager.models.vfolder import verify_vfolder_name
+from ai.backend.manager.models.vfolder.row import verify_vfolder_name
 
 __all__: Sequence[str] = (
     "TemplateType",

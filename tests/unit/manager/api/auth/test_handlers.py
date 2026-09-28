@@ -23,7 +23,7 @@ import pytest
 from aiohttp import web
 
 from ai.backend.common.api_handlers import BodyParam, QueryParam
-from ai.backend.common.contexts.user import with_user
+from ai.backend.common.contexts.user import with_user_context
 from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.user.types import UserData
@@ -46,7 +46,7 @@ from ai.backend.manager.api.rest.middleware.auth import (
 )
 from ai.backend.manager.data.auth.types import AuthorizationResult, SSHKeypair
 from ai.backend.manager.dto.context import RequestCtx, UserContext
-from ai.backend.manager.models.user import UserRole, UserStatus
+from ai.backend.manager.models.user.row import UserRole, UserStatus
 from ai.backend.manager.services.auth.actions.authorize import AuthorizeActionResult
 from ai.backend.manager.services.auth.actions.generate_ssh_keypair import (
     GenerateSSHKeypairActionResult,
@@ -105,7 +105,7 @@ def acting_user(user_context: UserContext) -> Iterator[UserData]:
         domain_name=user_context.user_domain,
         domain_id=DomainID(uuid.uuid4()),
     )
-    with with_user(user):
+    with with_user_context(user):
         yield user
 
 

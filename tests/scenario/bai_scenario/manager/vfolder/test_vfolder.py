@@ -9,14 +9,16 @@ from uuid import UUID
 
 import pytest
 
+from ai.backend.common.dto.manager.v2.rbac.types import UUIDScope
 from ai.backend.common.dto.manager.v2.vfolder.request import (
     CreateVFolderInput,
-    SearchVFoldersInput,
+    ScopedSearchVFoldersInput,
 )
 from ai.backend.common.dto.manager.v2.vfolder.response import (
     SearchVFoldersPayload,
     VFolderNode,
 )
+from ai.backend.common.dto.manager.v2.vfolder.types import VFolderScope
 from ai.backend.manager.api.adapters.vfolder.adapter import VFolderAdapter
 from ai.backend.manager.errors.permission import NotEnoughPermission
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
@@ -78,7 +80,7 @@ class ListingMyFolders(When[AFolderMakerAndTheirDomain, VFolderAdapter, Answer])
 
     @override
     def operation(self) -> str:
-        return "my_search"
+        return "scoped_search"
 
     @override
     def describe(self, laid: AFolderMakerAndTheirDomain) -> str:
@@ -87,7 +89,11 @@ class ListingMyFolders(When[AFolderMakerAndTheirDomain, VFolderAdapter, Answer])
     @override
     async def call(self, adapter: VFolderAdapter, laid: AFolderMakerAndTheirDomain) -> Answer:
         with ActingAs(laid.caller):
-            return await adapter.my_search(SearchVFoldersInput())
+            return await adapter.scoped_search(
+                ScopedSearchVFoldersInput(
+                    scope=VFolderScope(user=[UUIDScope(value=laid.caller.id)])
+                )
+            )
 
 
 @dataclass(frozen=True)

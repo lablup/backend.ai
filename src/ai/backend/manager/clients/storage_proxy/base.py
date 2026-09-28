@@ -9,6 +9,7 @@ import aiohttp
 import yarl
 from aiohttp import ClientTimeout
 
+from ai.backend.common.contexts.request_id import current_request_id
 from ai.backend.common.exception import (
     ErrorCode,
     ErrorDetail,
@@ -18,7 +19,8 @@ from ai.backend.common.exception import (
     PassthroughError,
 )
 from ai.backend.common.json import load_json
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.common.middlewares.request_id import REQUEST_ID_HEADER
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.errors.storage import (
     QuotaScopeNotFoundError,
     StorageProxyConnectionError,
@@ -33,7 +35,7 @@ from ai.backend.manager.errors.storage import (
 AUTH_TOKEN_HDR: Final = "X-BackendAI-Storage-Auth-Token"
 DEFAULT_TIMEOUT: Final = ClientTimeout(total=300, sock_connect=30)
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 @dataclass
@@ -88,6 +90,24 @@ class StorageProxyHTTPClient:
                     extra_msg=f"Unexpected error {status_code} from storage proxy",
                 )
 
+    def _log_error_response(self, status: int, data: Mapping[str, Any]) -> None:
+        error_code = str(data.get("error_code", ""))
+        error_title = str(data.get("title", ""))
+        if 400 <= status < 500:
+            log.trace(
+                "storage proxy error response",
+                response_status=status,
+                error_code=error_code,
+                error_title=error_title,
+            )
+        else:
+            log.warning(
+                "storage proxy error response",
+                response_status=status,
+                error_code=error_code,
+                error_title=error_title,
+            )
+
     async def _handle_exceptional_response(self, resp: aiohttp.ClientResponse) -> None:
         data = None
         try:
@@ -95,12 +115,11 @@ class StorageProxyHTTPClient:
         except (aiohttp.ContentTypeError, ValueError) as e:
             resp_text = await resp.text()
             log.warning(
-                "Failed to parse JSON from storage proxy error response: "
-                "status={}, content_type={}, error={}, response_text={}",
-                resp.status,
-                resp.content_type,
-                e,
-                resp_text if resp_text else "",
+                "storage proxy error response parse failed",
+                exc_info=e,
+                response_status=resp.status,
+                content_type=resp.content_type,
+                response_text=resp_text if resp_text else "",
             )
             raise PassthroughError(
                 status_code=resp.status,
@@ -111,6 +130,7 @@ class StorageProxyHTTPClient:
                 ),
                 error_message=f"Failed to parse error response from storage proxy. Original response: {resp_text if resp_text else ''}",
             ) from e
+        self._log_error_response(resp.status, data)
         try:
             err_code = ErrorCode.from_str(data.get("error_code", ""))
             err_domain = err_code.domain
@@ -148,6 +168,8 @@ class StorageProxyHTTPClient:
         headers = {
             AUTH_TOKEN_HDR: self._secret,
         }
+        if (request_id := current_request_id()) is not None:
+            headers[REQUEST_ID_HEADER] = request_id
         try:
             async with self._client_session.request(
                 method,

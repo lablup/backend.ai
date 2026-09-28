@@ -1,7 +1,7 @@
 body {
   margin: 0;
   --token-fontFamily:
-    "Ubuntu", Roboto, -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica,
+    "Ubuntu", Roboto, Pretendard, -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica,
     Arial, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol",
     AppleSDGothic, "Apple SD Gothic Neo", NanumGothic, "NanumGothicOTF",
     "Nanum Gothic", "Malgun Gothic", sans-serif;
@@ -42,6 +42,7 @@ body {
   font-family:
     "Ubuntu",
     "Roboto",
+    "Pretendard",
     "Noto Sans KR",
     -apple-system,
     BlinkMacSystemFont,

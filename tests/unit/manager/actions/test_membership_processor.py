@@ -11,7 +11,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from ai.backend.common.contexts.user import with_user
+from ai.backend.common.contexts.user import with_user_context
 from ai.backend.common.data.entity.container_registry import ContainerRegistryID
 from ai.backend.common.data.entity.global_entity import GlobalEntityID
 from ai.backend.common.data.entity.types import EntityIdentifier
@@ -153,28 +153,28 @@ class TestEntityAndEveryScopeMustPermit:
             _REGISTRY_ID: Permission.UPDATE,
             _PUBLIC_ID: Permission.UPDATE,
         })
-        with with_user(self._user()):
+        with with_user_context(self._user()):
             await validator.validate(self._meta())
 
     async def test_update_on_the_entity_alone_is_not_enough(self) -> None:
         validator = self._validator({_REGISTRY_ID: Permission.UPDATE})
-        with with_user(self._user()):
+        with with_user_context(self._user()):
             with pytest.raises(NotEnoughPermission):
                 await validator.validate(self._meta())
 
     async def test_update_on_the_scope_alone_is_not_enough(self) -> None:
         validator = self._validator({_PUBLIC_ID: Permission.UPDATE})
-        with with_user(self._user()):
+        with with_user_context(self._user()):
             with pytest.raises(NotEnoughPermission):
                 await validator.validate(self._meta())
 
     async def test_read_on_both_is_not_enough(self) -> None:
         validator = self._validator({_REGISTRY_ID: Permission.READ, _PUBLIC_ID: Permission.READ})
-        with with_user(self._user()):
+        with with_user_context(self._user()):
             with pytest.raises(NotEnoughPermission):
                 await validator.validate(self._meta())
 
     async def test_a_superadmin_bypasses_the_check(self) -> None:
         validator = self._validator({})
-        with with_user(self._user(superadmin=True)):
+        with with_user_context(self._user(superadmin=True)):
             await validator.validate(self._meta())

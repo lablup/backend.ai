@@ -26,11 +26,11 @@ from ai.backend.common.dto.manager.user import (
     UserStatus,
 )
 from ai.backend.manager.data.permission.status import RoleStatus
-from ai.backend.manager.models.keypair import KeyPairRow, keypairs
-from ai.backend.manager.models.project import ProjectRow, ProjectType
-from ai.backend.manager.models.rbac_models.role import RoleRow
-from ai.backend.manager.models.rbac_models.user_role import UserRoleRow
-from ai.backend.manager.models.user import users
+from ai.backend.manager.models.keypair.row import KeyPairRow, keypairs
+from ai.backend.manager.models.project.row import ProjectRow, ProjectType
+from ai.backend.manager.models.rbac_models.role.row import RoleRow
+from ai.backend.manager.models.rbac_models.user_role.row import UserRoleRow
+from ai.backend.manager.models.user.row import users
 from ai.backend.manager.models.virtual_entity.entity_membership import EntityMembershipRow
 from ai.backend.manager.models.virtual_entity.scope_binding import ScopeBindingRow
 from ai.backend.manager.models.virtual_entity.virtual_entity import VirtualEntityRow

@@ -20,8 +20,10 @@ from ai.backend.manager.errors.api import InvalidAPIParameters
 from ai.backend.manager.models.deployment_revision.creators import (
     DeploymentRevisionCreator,
 )
-from ai.backend.manager.sokovan.deployment.validators import (
+from ai.backend.manager.sokovan.deployment.validators.base import (
     DeploymentRevisionValidationContext,
+)
+from ai.backend.manager.sokovan.deployment.validators.required_resource_slot_rule import (
     RequiredResourceSlotRule,
 )
 

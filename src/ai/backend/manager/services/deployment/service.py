@@ -18,7 +18,8 @@ from ai.backend.common.data.model_deployment.types import (
 from ai.backend.common.dto.appproxy_coordinator.v2.endpoint.request import (
     MintEndpointTokenRequest,
 )
-from ai.backend.logging.utils import BraceStyleAdapter
+from ai.backend.common.exception import BackendAIError
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.actions.v2.bulk.result import PartialBulkEntityResult, PartialBulkResult
 from ai.backend.manager.actions.v2.ops.result import BulkFieldOpsResult
 from ai.backend.manager.clients.appproxy.client import AppProxyClientPool
@@ -46,7 +47,7 @@ from ai.backend.manager.models.endpoint.creators import EndpointTokenCreator
 from ai.backend.manager.models.endpoint.searchable_fields import DeploymentSearchableFields
 from ai.backend.manager.models.endpoint.searchers import DeploymentIDSearcher
 from ai.backend.manager.models.specs.pagination import NoPagination
-from ai.backend.manager.repositories.deployment import DeploymentRepository
+from ai.backend.manager.repositories.deployment.repository import DeploymentRepository
 from ai.backend.manager.repositories.deployment_revision_preset.repository import (
     DeploymentPresetRepository,
 )
@@ -91,9 +92,11 @@ from ai.backend.manager.services.deployment.actions.create_legacy_deployment imp
     CreateLegacyDeploymentAction,
     CreateLegacyDeploymentActionResult,
 )
-from ai.backend.manager.services.deployment.actions.deployment_policy import (
+from ai.backend.manager.services.deployment.actions.deployment_policy.get_deployment_policy import (
     GetDeploymentPolicyAction,
     GetDeploymentPolicyActionResult,
+)
+from ai.backend.manager.services.deployment.actions.deployment_policy.upsert_deployment_policy import (
     UpsertDeploymentPolicyAction,
     UpsertDeploymentPolicyActionResult,
 )
@@ -125,11 +128,11 @@ from ai.backend.manager.services.deployment.actions.replace_deployment_options i
     ReplaceDeploymentOptionsAction,
     ReplaceDeploymentOptionsActionResult,
 )
-from ai.backend.manager.services.deployment.actions.revision_operations import (
+from ai.backend.manager.services.deployment.actions.revision_operations.activate_revision import (
     ActivateRevisionAction,
     ActivateRevisionActionResult,
 )
-from ai.backend.manager.services.deployment.actions.route import (
+from ai.backend.manager.services.deployment.actions.route.update_route_traffic_status import (
     UpdateRouteTrafficStatusAction,
     UpdateRouteTrafficStatusActionResult,
 )
@@ -145,10 +148,10 @@ from ai.backend.manager.services.deployment.actions.update_deployment import (
     UpdateDeploymentAction,
     UpdateDeploymentActionResult,
 )
-from ai.backend.manager.sokovan.deployment import DeploymentController
+from ai.backend.manager.sokovan.deployment.deployment_controller import DeploymentController
 from ai.backend.manager.sokovan.deployment.types import DeploymentLifecycleType
 
-log = BraceStyleAdapter(logging.getLogger(__name__))
+log = StructuredLogger(logging.getLogger(__name__))
 
 
 def _deployment_desired_replica_count(info: DeploymentInfo) -> int:
@@ -321,7 +324,7 @@ class DeploymentService:
         Returns:
             CreateDeploymentActionResult: Result containing the created deployment data
         """
-        log.info("Creating deployment with name: {}", action.creator.metadata.name)
+        log.trace("deployment creation requested", deployment_name=action.creator.metadata.name)
         deployment_info = await self._deployment_controller.create_deployment(action.creator)
         if action.creator.model_revision is not None:
             await self._deployment_controller.add_deployment_revision(
@@ -348,7 +351,7 @@ class DeploymentService:
         Returns:
             CreateLegacyDeploymentActionResult: Result containing the created deployment info
         """
-        log.info("Creating deployment with name: {}", action.draft.name)
+        log.trace("deployment creation requested", deployment_name=action.draft.name)
         creator, revision = await self._deployment_controller.build_creator_from_legacy_draft(
             action.draft
         )
@@ -380,7 +383,7 @@ class DeploymentService:
         Returns:
             UpdateDeploymentActionResult: Result containing the updated deployment data
         """
-        log.info("Updating deployment with ID: {}", action.updater.deployment_id)
+        log.trace("deployment update requested", deployment_id=action.updater.deployment_id)
         deployment_info = await self._deployment_controller.update_deployment(
             action.updater.deployment_id, action.updater
         )
@@ -395,7 +398,7 @@ class DeploymentService:
         via ``UPDATE ... RETURNING`` so this path does a single round-trip
         and does not re-materialise the surrounding deployment node.
         """
-        log.info("Replacing deployment options for ID: {}", action.deployment_id)
+        log.trace("deployment options replace requested", deployment_id=action.deployment_id)
         options = await self._deployment_repository.replace_deployment_options(
             action.deployment_id, action.options
         )
@@ -415,7 +418,7 @@ class DeploymentService:
         Raises:
             EndpointNotFound: If the endpoint does not exist
         """
-        log.info("Destroying deployment with ID: {}", action.deployment_id)
+        log.trace("deployment destroy requested", deployment_id=action.deployment_id)
         # Validate endpoint exists before attempting destruction
         await self._deployment_repository.get_endpoint_info(action.deployment_id)
         success = await self._deployment_controller.destroy_deployment(action.deployment_id)
@@ -585,12 +588,12 @@ class DeploymentService:
                 )
                 succeeded += 1
             except Exception as exc:
-                log.warning(
-                    "global_refresh_revisions failed for deployment {}: {}: {}",
-                    deployment_id,
-                    type(exc).__name__,
-                    exc,
-                )
+                if isinstance(exc, BackendAIError) and exc.is_client_error():
+                    log.trace(
+                        "deployment revision refresh rejected: {}", exc, deployment_id=deployment_id
+                    )
+                else:
+                    log.exception("deployment revision refresh failed", deployment_id=deployment_id)
                 results.append(
                     RevisionRefreshResult(
                         deployment_id=deployment_id,
@@ -600,11 +603,11 @@ class DeploymentService:
                     )
                 )
                 failed += 1
-        log.info(
-            "global_refresh_revisions summary: total={} succeeded={} failed={}",
-            len(deployment_ids),
-            succeeded,
-            failed,
+        log.trace(
+            "deployment revisions refreshed",
+            deployment_count=len(deployment_ids),
+            succeeded_count=succeeded,
+            failed_count=failed,
         )
         return GlobalRefreshDeploymentRevisionsActionResult(results=results)
 
@@ -627,7 +630,7 @@ class DeploymentService:
             DeploymentLifecycleType.CHECK_REPLICA
         )
 
-        log.info("Triggered replica sync for deployment {}", action.deployment_id)
+        log.trace("replica sync triggered", deployment_id=action.deployment_id)
 
         return SyncReplicaActionResult(success=True)
 

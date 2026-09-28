@@ -11,7 +11,7 @@ from ai.backend.common.data.entity.deployment_revision import DeploymentRevision
 from ai.backend.common.data.entity.replica_group import ReplicaGroupID
 from ai.backend.common.schema.deployment import TargetGroupSpec
 from ai.backend.manager.data.deployment.types import ReplicaGroupData
-from ai.backend.manager.models.replica_group import ReplicaGroupRow
+from ai.backend.manager.models.replica_group.row import ReplicaGroupRow
 from ai.backend.manager.models.replica_group_history.creators import (
     ReplicaGroupHistoryCreator,
 )

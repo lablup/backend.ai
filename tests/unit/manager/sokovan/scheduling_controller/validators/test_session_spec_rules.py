@@ -54,7 +54,7 @@ from ai.backend.manager.data.session.spec import (
 from ai.backend.manager.errors.api import InvalidAPIParameters
 from ai.backend.manager.errors.kernel import QuotaExceeded
 from ai.backend.manager.errors.storage import DotfileVFolderPathConflict
-from ai.backend.manager.models.network import NetworkType
+from ai.backend.manager.models.network.row import NetworkType
 from ai.backend.manager.sokovan.scheduling_controller.validators.container_limit_rule import (
     ContainerLimitRule,
 )

@@ -28,7 +28,7 @@ from ai.backend.manager.data.session_group.types import (
     SessionGroupPlacementDirection,
     SessionGroupPlacementEnforcement,
 )
-from ai.backend.manager.models.agent import AgentRow
+from ai.backend.manager.models.agent.row import AgentRow
 from ai.backend.manager.models.session_group.row import SessionGroupRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.ops.v2.reconciler.provider import ReconcileOpsProvider

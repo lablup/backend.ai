@@ -32,8 +32,8 @@ from ai.backend.manager.data.permission.permission_defs import (
     DomainPermission,
     ResourceGroupPermission,
 )
-from ai.backend.manager.models.domain import DomainRow, domains, get_permission_ctx
 from ai.backend.manager.models.domain.creators import DomainCreator
+from ai.backend.manager.models.domain.row import DomainRow, domains, get_permission_ctx
 from ai.backend.manager.models.domain.updaters import DomainSoftDeleteUpdater, DomainUpdater
 from ai.backend.manager.models.minilang import FieldSpecItem, OrderSpecItem
 from ai.backend.manager.models.minilang.ordering import QueryOrderParser
@@ -43,8 +43,8 @@ from ai.backend.manager.models.rbac import (
     SystemScope,
 )
 from ai.backend.manager.models.rbac.context import ClientContext
-from ai.backend.manager.models.resource_group import get_resource_groups
-from ai.backend.manager.models.user import UserRole
+from ai.backend.manager.models.resource_group.row import get_resource_groups
+from ai.backend.manager.models.user.row import UserRole
 from ai.backend.manager.services.domain.actions.create_domain import CreateDomainAction
 from ai.backend.manager.services.domain.actions.create_domain_node import (
     CreateDomainNodeAction,
@@ -79,7 +79,7 @@ from .gql_relay import (
 from .scaling_group import ScalingGroup, ScalingGroupConnection
 
 if TYPE_CHECKING:
-    from ai.backend.manager.models.domain import DomainModel
+    from ai.backend.manager.models.domain.row import DomainModel
 
     from .scaling_group import ScalingGroupNode
     from .schema import GraphQueryContext
@@ -242,10 +242,19 @@ class DomainNode(graphene.ObjectType):  # type: ignore[misc]
         id: str,
         permission: DomainPermission = DomainPermission.READ_ATTRIBUTE,
     ) -> Self | None:
-        from ai.backend.manager.models.domain import DomainModel
+        _, domain_name = AsyncNode.resolve_global_id(info, id)
+        return await cls.get_node_by_name(info, domain_name, permission)
+
+    @classmethod
+    async def get_node_by_name(
+        cls,
+        info: graphene.ResolveInfo,
+        domain_name: str,
+        permission: DomainPermission = DomainPermission.READ_ATTRIBUTE,
+    ) -> Self | None:
+        from ai.backend.manager.models.domain.row import DomainModel
 
         graph_ctx: GraphQueryContext = info.context
-        _, domain_name = AsyncNode.resolve_global_id(info, id)
         user = graph_ctx.user
         client_ctx = ClientContext(graph_ctx.db, user["domain_name"], user["uuid"], user["role"])
         async with graph_ctx.db.begin_readonly_session() as db_session:
@@ -276,7 +285,7 @@ class DomainNode(graphene.ObjectType):  # type: ignore[misc]
         before: str | None = None,
         last: int | None = None,
     ) -> ConnectionResolverResult[Self]:
-        from ai.backend.manager.models.domain import DomainModel
+        from ai.backend.manager.models.domain.row import DomainModel
 
         graph_ctx: GraphQueryContext = info.context
         _filter_arg = (

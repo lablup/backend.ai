@@ -6,7 +6,7 @@ from typing import override
 
 from ai.backend.manager.data.session.spec import SessionSpec
 from ai.backend.manager.errors.api import InvalidAPIParameters
-from ai.backend.manager.models.vfolder import verify_vfolder_name
+from ai.backend.manager.models.vfolder.row import verify_vfolder_name
 from ai.backend.manager.sokovan.scheduling_controller.validators.session_spec_base import (
     SessionSpecValidatorRule,
 )

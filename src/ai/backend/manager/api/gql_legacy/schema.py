@@ -32,7 +32,7 @@ from ai.backend.common.exception import (
     PermissionDeniedError,
 )
 from ai.backend.common.metrics.metric import GraphQLMetricObserver
-from ai.backend.logging.utils import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.plugin.network import NetworkPluginContext
 from ai.backend.manager.services.keypair_resource_policy.actions.lookup import (
@@ -80,7 +80,7 @@ set_input_object_type_default_value(Undefined)
 from ai.backend.common.types import QuotaScopeID, SessionId
 from ai.backend.manager.defs import DEFAULT_IMAGE_ARCH
 from ai.backend.manager.models.rbac import ContainerRegistryScope
-from ai.backend.manager.models.session import SessionRow
+from ai.backend.manager.models.session.row import SessionRow
 
 from .container_registry import (
     ContainerRegistry,
@@ -145,7 +145,7 @@ from ai.backend.manager.models.resource_group.row import (
     ResourceGroupRow,
     and_names,
 )
-from ai.backend.manager.models.vfolder import ensure_quota_scope_accessible_by_user
+from ai.backend.manager.models.vfolder.row import ensure_quota_scope_accessible_by_user
 from ai.backend.manager.models.virtual_entity.queries import user_scope_membership_exists
 from ai.backend.manager.repositories.ops.repository import OpsRepository
 from ai.backend.manager.secret.pool import KeyProviderPool
@@ -311,7 +311,7 @@ from .vfolder import (
 )
 from .viewer import Viewer
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 def _is_legacy_mutation(mutation_cls: Any) -> bool:
@@ -1265,6 +1265,7 @@ class Query(graphene.ObjectType):  # type: ignore[misc]
     available_services = PaginatedConnectionField(
         AvailableServiceConnection,
         description="Added in 25.8.0.",
+        deprecation_reason="Deprecated since 26.9.0.",
     )
     service_config = graphene.Field(
         ServiceConfigNode,
@@ -1413,10 +1414,11 @@ class Query(graphene.ObjectType):  # type: ignore[misc]
         root: Any,
         info: graphene.ResolveInfo,
         *,
-        id: str,
+        id: ResolvedGlobalID,
         permission: DomainPermission,
     ) -> DomainNode | None:
-        return await DomainNode.get_node(info, id, permission)
+        _, domain_name = id
+        return await DomainNode.get_node_by_name(info, domain_name, permission)
 
     @staticmethod
     async def resolve_domain_nodes(
@@ -3190,6 +3192,22 @@ class Query(graphene.ObjectType):  # type: ignore[misc]
 
     @staticmethod
     @privileged_query(UserRole.SUPERADMIN)
+    async def resolve_available_services(
+        root: Any,
+        info: graphene.ResolveInfo,
+        *,
+        filter: str | None = None,
+        order: str | None = None,
+        offset: int | None = None,
+        after: str | None = None,
+        first: int | None = None,
+        before: str | None = None,
+        last: int | None = None,
+    ) -> ConnectionResolverResult[AvailableServiceNode]:
+        return AvailableServiceNode.get_connection()
+
+    @staticmethod
+    @privileged_query(UserRole.SUPERADMIN)
     async def resolve_service_config(
         root: Any,
         info: graphene.ResolveInfo,
@@ -3392,9 +3410,9 @@ class GQLExceptionMiddleware:
 
     def _wrap_backend_error(self, e: BackendAIError) -> GraphQLError:
         if e.status_code // 100 == 4:
-            log.debug("GraphQL client error: {}", e)
+            log.trace("graphql client error", error_code=str(e.error_code()), error_message=str(e))
         elif e.status_code // 100 == 5:
-            log.exception("GraphQL Server error: {}", e)
+            log.exception("graphql server error", error_code=str(e.error_code()))
         return GraphQLError(
             message=str(e),
             extensions={
@@ -3403,7 +3421,7 @@ class GQLExceptionMiddleware:
         )
 
     def _wrap_unexpected_error(self, e: BaseException) -> GraphQLError:
-        log.exception("GraphQL unexpected error: {}", e)
+        log.exception("graphql unexpected error")
         return GraphQLError(
             message=str(e),
             extensions={

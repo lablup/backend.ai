@@ -14,7 +14,7 @@ from ai.backend.common.types import AccessKey, ClusterMode, MountInfoEntry, Sess
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.session.options import AgentSelectionPolicy
 from ai.backend.manager.data.session.types import SessionData
-from ai.backend.manager.models.user import UserRole
+from ai.backend.manager.models.user.row import UserRole
 from ai.backend.manager.services.session.base import (
     SessionScopeAction,
     SessionScopeActionResult,

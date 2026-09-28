@@ -164,11 +164,9 @@ from ai.backend.manager.services.vfolder.actions.vfolder_v2 import (
     DeleteVFolderV2Action,
     PurgeVFolderV2Action,
 )
-from ai.backend.manager.services.vfolder.processors import (
-    VFolderFileProcessors,
-    VFolderMountPolicyProcessors,
-    VFolderProcessors,
-)
+from ai.backend.manager.services.vfolder.processors.file import VFolderFileProcessors
+from ai.backend.manager.services.vfolder.processors.mount_policy import VFolderMountPolicyProcessors
+from ai.backend.manager.services.vfolder.processors.vfolder import VFolderProcessors
 from ai.backend.manager.services.vfolder.processors.vfolder_admin import VFolderAdminProcessors
 
 # The ``vfolders.max_files`` column default; no path ever wrote another value.
@@ -331,27 +329,6 @@ class VFolderAdapter(BaseAdapter):
                     searcher=self._build_vfolder_searcher(input),
                 )
             )
-        )
-        return SearchVFoldersPayload(
-            items=[self._vfolder_data_to_node(item) for item in action_result.items],
-            total_count=action_result.total_count,
-            has_next_page=action_result.has_next_page,
-            has_previous_page=action_result.has_previous_page,
-        )
-
-    async def my_search(
-        self,
-        input: SearchVFoldersInput,
-    ) -> SearchVFoldersPayload:
-        """Search vfolders accessible to the current user.
-
-        Calls current_user() internally -- the caller does not need to pass scope.
-        """
-        me = current_user()
-        if me is None:
-            raise UnreachableError("User context is not available")
-        action_result = await self._vfolder.scoped_search.run(
-            self._scoped_search_action([UserVFolderTarget(user_id=UserID(me.user_id))], input)
         )
         return SearchVFoldersPayload(
             items=[self._vfolder_data_to_node(item) for item in action_result.items],

@@ -25,7 +25,7 @@ from ai.backend.common.dto.manager.image import (
     SearchImagesResponse,
 )
 from ai.backend.common.types import ImageID
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.data.image.types import ImageStatus
 from ai.backend.manager.dto.context import UserContext
 from ai.backend.manager.dto.image_request import GetImagePathParam
@@ -48,7 +48,7 @@ from ai.backend.manager.services.image.processors import ImageProcessors
 
 from .adapter import ImageAdapter
 
-log: Final = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log: Final = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 class ImageHandler:

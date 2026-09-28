@@ -6737,6 +6737,9 @@ type ImageV2 implements Node {
 
   """Added in 26.2.0. Aliases for this image."""
   aliases(filter: ImageV2AliasFilter = null, orderBy: [ImageV2AliasOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null): ImageV2AliasConnection
+
+  """Added in 26.9.0. The labels on this image."""
+  entityLabels(filter: EntityLabelFilter = null, orderBy: [EntityLabelOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): EntityLabelConnection
 }
 
 """
@@ -6878,6 +6881,9 @@ input ImageV2Filter {
 
   """Added in 26.3.0. Filter by last used datetime (before/after)."""
   lastUsed: DateTimeFilter = null
+
+  """Added in 26.9.0. Select entities by the labels on them."""
+  labels: EntityLabelNestedFilter = null
   AND: [ImageV2Filter!] = null
   OR: [ImageV2Filter!] = null
   NOT: [ImageV2Filter!] = null
@@ -12368,6 +12374,22 @@ type Query {
     offset: Int = null
   ): ImageV2Connection
 
+  """Added in 26.9.0. Page through the images the current user can reach."""
+  myImagesV2(
+    """
+    Uses narrowing the result. Each listed entity must be readable by the caller; images the caller cannot read are left out.
+    """
+    usage: ImageUsage = null
+    filter: ImageV2Filter = null
+    orderBy: [ImageV2OrderBy!] = null
+    before: String = null
+    after: String = null
+    first: Int = null
+    last: Int = null
+    limit: Int = null
+    offset: Int = null
+  ): ImageV2Connection
+
   """
   Added in 26.2.0. Query kernels with pagination and filtering. (admin only)
   """
@@ -12454,6 +12476,22 @@ type Query {
 
     """
     Added in 26.9.0. Uses narrowing the result. Each listed entity must be readable by the caller; sessions the caller cannot read are left out.
+    """
+    usage: SessionUsage = null
+    filter: SessionV2Filter = null
+    orderBy: [SessionV2OrderBy!] = null
+    before: String = null
+    after: String = null
+    first: Int = null
+    last: Int = null
+    limit: Int = null
+    offset: Int = null
+  ): SessionV2Connection
+
+  """Added in 26.9.0. Page through the sessions the current user owns."""
+  mySessionsV2(
+    """
+    Uses narrowing the result. Each listed entity must be readable by the caller; sessions the caller cannot read are left out.
     """
     usage: SessionUsage = null
     filter: SessionV2Filter = null
@@ -12938,6 +12976,11 @@ type Query {
   scopedProjectsV2(scope: ProjectScope!, filter: ProjectV2Filter = null, orderBy: [ProjectV2OrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ProjectV2Connection
 
   """
+  Added in 26.9.0. Page through the projects the current user is a member of.
+  """
+  myProjectsV2(filter: ProjectV2Filter = null, orderBy: [ProjectV2OrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ProjectV2Connection
+
+  """
   Added in 26.2.0. Get the domain that a project belongs to. Returns an error if project or domain is not found.
   """
   projectDomainV2(projectId: UUID!): DomainV2
@@ -13126,6 +13169,24 @@ type Query {
 
     """
     Added in 26.9.0. Uses narrowing the result. Each listed entity must be readable by the caller; model cards the caller cannot read are left out.
+    """
+    usage: ModelCardUsage = null
+    filter: ModelCardV2Filter = null
+    orderBy: [ModelCardV2OrderBy!] = null
+    before: String = null
+    after: String = null
+    first: Int = null
+    last: Int = null
+    limit: Int = null
+    offset: Int = null
+  ): ModelCardV2Connection
+
+  """
+  Added in 26.9.0. Page through the model cards the current user holds through membership.
+  """
+  myModelCardsV2(
+    """
+    Uses narrowing the result. Each listed entity must be readable by the caller; model cards the caller cannot read are left out.
     """
     usage: ModelCardUsage = null
     filter: ModelCardV2Filter = null
@@ -14088,6 +14149,9 @@ type ResourceGroup implements Node {
 
   """Added in 26.9.0. Projects this resource group serves."""
   projects(filter: ProjectV2Filter = null, orderBy: [ProjectV2OrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ProjectV2Connection
+
+  """Added in 26.9.0. The labels on this resource group."""
+  entityLabels(filter: EntityLabelFilter = null, orderBy: [EntityLabelOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): EntityLabelConnection
 }
 
 """Added in 26.2.0. Resource group connection"""
@@ -14122,6 +14186,9 @@ input ResourceGroupFilter {
   isActive: Boolean = null
   isPublic: Boolean = null
   isDefault: Boolean = null
+
+  """Added in 26.9.0. Select entities by the labels on them."""
+  labels: EntityLabelNestedFilter = null
   AND: [ResourceGroupFilter!] = null
   OR: [ResourceGroupFilter!] = null
   NOT: [ResourceGroupFilter!] = null

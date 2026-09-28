@@ -17,7 +17,7 @@ from ai.backend.common.dto.manager.v2.domain.request import (
     ScopedSearchDomainsInput,
     UpdateDomainInput,
 )
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.api.rest.v2.path_params import DomainNamePathParam
 from ai.backend.manager.data.domain.types import UserInfo
 from ai.backend.manager.dto.context import UserContext
@@ -25,7 +25,7 @@ from ai.backend.manager.dto.context import UserContext
 if TYPE_CHECKING:
     from ai.backend.manager.api.adapters.domain.adapter import DomainAdapter
 
-log: Final = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log: Final = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 class V2DomainHandler:

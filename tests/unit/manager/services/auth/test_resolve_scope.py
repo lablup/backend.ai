@@ -4,14 +4,14 @@ from unittest.mock import AsyncMock
 
 import pytest
 
-from ai.backend.common.contexts.user import with_user
+from ai.backend.common.contexts.user import with_user_context
 from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.user.types import UserData
 from ai.backend.common.exception import InvalidAPIParameters
 from ai.backend.common.types import AccessKey
 from ai.backend.manager.data.secret.types import KeyProviderType
 from ai.backend.manager.errors.common import GenericForbidden
-from ai.backend.manager.models.user import UserRole
+from ai.backend.manager.models.user.row import UserRole
 from ai.backend.manager.repositories.auth.repository import AuthRepository
 from ai.backend.manager.repositories.user_resource_policy.repository import (
     UserResourcePolicyRepository,
@@ -81,7 +81,7 @@ class TestResolveAccessKeyScope:
         default_keypair: None,
     ) -> None:
         action = PublicResolveAccessKeyScopeAction(owner_access_key=None)
-        with with_user(acting_user(UserRole.USER)):
+        with with_user_context(acting_user(UserRole.USER)):
             result = await auth_service.resolve_access_key_scope(action)
         assert result.requester_access_key == AccessKey(REQUESTER_AK)
         assert result.owner_access_key == AccessKey(REQUESTER_AK)
@@ -92,7 +92,7 @@ class TestResolveAccessKeyScope:
         default_keypair: None,
     ) -> None:
         action = PublicResolveAccessKeyScopeAction(owner_access_key=REQUESTER_AK)
-        with with_user(acting_user(UserRole.ADMIN)):
+        with with_user_context(acting_user(UserRole.ADMIN)):
             result = await auth_service.resolve_access_key_scope(action)
         assert result.owner_access_key == AccessKey(REQUESTER_AK)
 
@@ -107,7 +107,7 @@ class TestResolveAccessKeyScope:
             UserRole.ADMIN,
         )
         action = PublicResolveAccessKeyScopeAction(owner_access_key=OWNER_AK)
-        with with_user(acting_user(UserRole.USER)):
+        with with_user_context(acting_user(UserRole.USER)):
             with pytest.raises(GenericForbidden):
                 await auth_service.resolve_access_key_scope(action)
 
@@ -121,7 +121,7 @@ class TestResolveAccessKeyScope:
             "Unknown owner access key"
         )
         action = PublicResolveAccessKeyScopeAction(owner_access_key="NONEXISTENT_KEY")
-        with with_user(acting_user(UserRole.SUPERADMIN)):
+        with with_user_context(acting_user(UserRole.SUPERADMIN)):
             with pytest.raises(InvalidAPIParameters):
                 await auth_service.resolve_access_key_scope(action)
 
@@ -136,7 +136,7 @@ class TestResolveAccessKeyScope:
             UserRole.USER,
         )
         action = PublicResolveAccessKeyScopeAction(owner_access_key=OWNER_AK)
-        with with_user(acting_user(UserRole.ADMIN)):
+        with with_user_context(acting_user(UserRole.ADMIN)):
             with pytest.raises(GenericForbidden):
                 await auth_service.resolve_access_key_scope(action)
 
@@ -152,6 +152,6 @@ class TestResolveAccessKeyScope:
             UserRole.USER,
         )
         action = PublicResolveAccessKeyScopeAction(owner_access_key=OWNER_AK)
-        with with_user(acting_user(UserRole.USER)):
+        with with_user_context(acting_user(UserRole.USER)):
             with pytest.raises(GenericForbidden):
                 await auth_service.resolve_access_key_scope(action)
