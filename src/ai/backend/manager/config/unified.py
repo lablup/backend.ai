@@ -651,6 +651,21 @@ class RBACConfig(BaseConfigSchema):
 
 
 class ManagerConfig(BaseConfigSchema):
+    shutdown_grace_period: Annotated[
+        float,
+        Field(
+            default=30.0,
+            gt=0,
+            allow_inf_nan=False,
+            validation_alias=AliasChoices("shutdown-grace-period", "shutdown_grace_period"),
+            serialization_alias="shutdown-grace-period",
+        ),
+        BackendAIConfigMeta(
+            description="Seconds to wait for in-flight HTTP requests during shutdown.",
+            added_version=NEXT_RELEASE_VERSION,
+            example=ConfigExample(local="30.0", prod="30.0"),
+        ),
+    ]
     ipc_base_path: Annotated[
         AutoDirectoryPath,
         Field(

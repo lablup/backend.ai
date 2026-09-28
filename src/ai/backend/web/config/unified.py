@@ -1610,7 +1610,7 @@ class APIConfig(BaseConfigSchema):
         BackendAIConfigMeta(
             description=(
                 "Consecutive probe (or caller-reported) failures required before an "
-                "endpoint flips from healthy to unhealthy."
+                "endpoint flips from healthy to unhealthy. A 503 probe excludes it immediately."
             ),
             added_version="26.4.4",
             example=ConfigExample(local="3", prod="3"),
@@ -2102,7 +2102,8 @@ class ApolloRouterConfig(BaseConfigSchema):
         BackendAIConfigMeta(
             description=(
                 "Consecutive probe (or caller-reported) failures required before an "
-                "Apollo Router endpoint flips from healthy to unhealthy."
+                "Apollo Router endpoint flips from healthy to unhealthy. "
+                "A 503 probe excludes it immediately."
             ),
             added_version="26.4.4",
             example=ConfigExample(local="3", prod="3"),
