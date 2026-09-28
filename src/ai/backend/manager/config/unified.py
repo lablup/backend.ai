@@ -665,7 +665,7 @@ class ManagerConfig(BaseConfigSchema):
                 "Seconds to keep serving requests after readiness reports draining. "
                 "Set longer than the webserver probe interval."
             ),
-            added_version="26.9.0",
+            added_version=NEXT_RELEASE_VERSION,
             example=ConfigExample(local="15.0", prod="15.0"),
         ),
     ]
@@ -680,7 +680,7 @@ class ManagerConfig(BaseConfigSchema):
         ),
         BackendAIConfigMeta(
             description="Seconds to wait for in-flight HTTP requests after the drain period ends.",
-            added_version="26.9.0",
+            added_version=NEXT_RELEASE_VERSION,
             example=ConfigExample(local="30.0", prod="30.0"),
         ),
     ]
