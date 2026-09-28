@@ -9,7 +9,7 @@ The column becomes a VARCHAR holding the enum's values, so what it stores is low
 from here on, where the dropped Postgres enum stored the member names.
 
 Revision ID: b9f2c41ad07e
-Revises: a91c4e7d0b35
+Revises: d17b4e9c25a8
 Create Date: 2026-09-25
 
 """
@@ -24,7 +24,7 @@ from sqlalchemy.engine import Connection
 
 # revision identifiers, used by Alembic.
 revision = "b9f2c41ad07e"  # Part of: NEXT_RELEASE_VERSION
-down_revision = "a91c4e7d0b35"
+down_revision = "d17b4e9c25a8"
 branch_labels = None
 depends_on = None
 
