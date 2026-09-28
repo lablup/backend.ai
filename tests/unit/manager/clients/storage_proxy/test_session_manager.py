@@ -1,9 +1,9 @@
 from __future__ import annotations
 
-from collections.abc import AsyncIterator
+from collections.abc import AsyncGenerator, AsyncIterator
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, cast
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import aiohttp
@@ -14,6 +14,7 @@ from ai.backend.manager.clients.storage_proxy.session_manager import StorageSess
 from ai.backend.manager.config.unified import VolumesConfig
 from ai.backend.manager.errors.storage import (
     StorageProxyConnectionError,
+    StorageProxyTimeoutError,
 )
 
 
@@ -21,6 +22,7 @@ from ai.backend.manager.errors.storage import (
 class StorageScenario:
     manager: StorageSessionManager
     session: MagicMock
+    response: MagicMock
     probes: dict[str, MagicMock]
     failures: dict[str, Exception]
 
@@ -78,7 +80,7 @@ async def storage_scenario(request: pytest.FixtureRequest) -> AsyncIterator[Stor
     ):
         manager = StorageSessionManager(config)
         try:
-            yield StorageScenario(manager, session, probes, failures)
+            yield StorageScenario(manager, session, response, probes, failures)
         finally:
             await manager.aclose()
 
@@ -120,7 +122,7 @@ class TestStorageSessionManager:
     async def test_probe_failure_and_recovery(self, storage_scenario: StorageScenario) -> None:
         pool = storage_scenario.manager._proxies["shared"].endpoint_pool
         probe = storage_scenario.probes["http://a:6022"]
-        probe.get.return_value.__aenter__.return_value.status = 503
+        probe.get.return_value.__aenter__.return_value.status = 500
         for _ in range(2):
             await pool._check_all_health()
             assert pool.is_healthy("http://a:6022")
@@ -153,3 +155,43 @@ class TestStorageSessionManager:
         for probe in storage_scenario.probes.values():
             probe.close.assert_awaited_once()
         assert storage_scenario.manager._proxies["shared"].endpoint_pool._health_check_task.done()
+
+    @pytest.mark.parametrize(
+        ("transport_error", "expected_error"),
+        [
+            (aiohttp.ClientConnectionError, StorageProxyConnectionError),
+            (TimeoutError, StorageProxyTimeoutError),
+        ],
+    )
+    @pytest.mark.parametrize(
+        "storage_scenario", [{"health_check_failure_threshold": 1}], indirect=True
+    )
+    async def test_stream_failure_updates_pool_without_retry(
+        self,
+        storage_scenario: StorageScenario,
+        transport_error: type[Exception],
+        expected_error: type[Exception],
+    ) -> None:
+        async def chunks(_size: int) -> AsyncIterator[bytes]:
+            yield b"first chunk"
+            raise transport_error("stream interrupted")
+
+        storage_scenario.response.content.iter_chunked.side_effect = chunks
+        client = storage_scenario.manager.get_manager_facing_client("shared")
+        pool = storage_scenario.manager._proxies["shared"].endpoint_pool
+        stream = cast(
+            AsyncGenerator[bytes, None],
+            client.fetch_file_content_streaming("volume", "folder", "file"),
+        )
+        try:
+            assert await anext(stream) == b"first chunk"
+            assert pool.is_healthy("http://a:6022")
+            with pytest.raises(expected_error) as exc_info:
+                await anext(stream)
+            assert isinstance(exc_info.value.__cause__, transport_error)
+            assert not pool.is_healthy("http://a:6022")
+            assert storage_scenario.session.request.call_count == 1
+        finally:
+            await stream.aclose()
+        await client.get_volumes()
+        assert storage_scenario.session.request.call_args.args[1].host == "b"

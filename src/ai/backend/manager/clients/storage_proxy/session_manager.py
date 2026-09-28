@@ -112,12 +112,12 @@ class StorageSessionManager:
                 StorageProxyHTTPClient(
                     self._proxies[proxy_name].session,
                     StorageProxyClientArgs(
-                        endpoint_pool=self._proxies[proxy_name].endpoint_pool,
                         secret=proxy_config.secret,
-                        proxy_name=proxy_name,
                     ),
                 ),
                 timeout_config=proxy_config.timeouts,
+                endpoint_pool=self._proxies[proxy_name].endpoint_pool,
+                proxy_name=proxy_name,
             )
         return manager_facing_clients
 

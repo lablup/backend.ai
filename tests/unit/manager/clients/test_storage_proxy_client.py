@@ -33,7 +33,7 @@ from ai.backend.manager.errors.storage import (
 
 type HandlerType = Callable[[web.Request], Coroutine[Any, Any, web.Response]]
 type StorageProxyClientFactory = Callable[
-    [str, HandlerType], Coroutine[Any, Any, StorageProxyHTTPClient]
+    [str, HandlerType], Coroutine[Any, Any, tuple[StorageProxyHTTPClient, HealthyEndpointPool]]
 ]
 
 
@@ -48,7 +48,7 @@ async def storage_proxy_client_factory(
     async def _factory(
         endpoint_path: str,
         handler: HandlerType,
-    ) -> StorageProxyHTTPClient:
+    ) -> tuple[StorageProxyHTTPClient, HealthyEndpointPool]:
         app = web.Application()
         app.router.add_get(f"/{endpoint_path}", handler)
         client: TestClient[Any] = await aiohttp_client(app)  # type: ignore[type-arg]
@@ -63,11 +63,9 @@ async def storage_proxy_client_factory(
         return StorageProxyHTTPClient(
             client_session=client.session,
             args=StorageProxyClientArgs(
-                endpoint_pool=pool,
                 secret="test-secret",
-                proxy_name="test",
             ),
-        )
+        ), pool
 
     try:
         yield _factory
@@ -87,12 +85,22 @@ class TestStorageProxyClient:
             received.append(request.headers.get(REQUEST_ID_HEADER))
             return web.Response(status=204)
 
-        client = await storage_proxy_client_factory("echo", handler)
+        client, pool = await storage_proxy_client_factory("echo", handler)
         if request_id is None:
-            await client.request(method="GET", url="echo", request_timeout=DEFAULT_TIMEOUT)
+            await client.request(
+                endpoint=pool.all_endpoints()[0],
+                method="GET",
+                url="echo",
+                request_timeout=DEFAULT_TIMEOUT,
+            )
         else:
             with with_request_context(request_id):
-                await client.request(method="GET", url="echo", request_timeout=DEFAULT_TIMEOUT)
+                await client.request(
+                    endpoint=pool.all_endpoints()[0],
+                    method="GET",
+                    url="echo",
+                    request_timeout=DEFAULT_TIMEOUT,
+                )
 
         assert received == [request_id]
 
@@ -110,14 +118,17 @@ class TestStorageProxyClient:
                 content_type="text/plain",
             )
 
-        storage_proxy_client = await storage_proxy_client_factory(
+        storage_proxy_client, pool = await storage_proxy_client_factory(
             test_endpoint, invalid_endpoint_handler
         )
 
         # Verify that non-JSON response raises PassthroughError with correct error code
         with pytest.raises(PassthroughError) as exc_info:
             await storage_proxy_client.request(
-                method="GET", url=test_endpoint, request_timeout=DEFAULT_TIMEOUT
+                endpoint=pool.all_endpoints()[0],
+                method="GET",
+                url=test_endpoint,
+                request_timeout=DEFAULT_TIMEOUT,
             )
 
         assert exc_info.value.status_code == test_status_code
@@ -154,12 +165,17 @@ class TestStorageProxyClient:
                 status=status,
             )
 
-        client = await storage_proxy_client_factory("failing", handler)
+        client, pool = await storage_proxy_client_factory("failing", handler)
         with (
             caplog.at_level(5, logger="ai.backend.manager.clients.storage_proxy.base"),
             pytest.raises(error_type) as exc_info,
         ):
-            await client.request(method="GET", url="failing", request_timeout=DEFAULT_TIMEOUT)
+            await client.request(
+                endpoint=pool.all_endpoints()[0],
+                method="GET",
+                url="failing",
+                request_timeout=DEFAULT_TIMEOUT,
+            )
 
         assert getattr(exc_info.value, "extra_msg", None) == extra_msg
         records = [r for r in caplog.records if r.getMessage() == "storage proxy error response"]
@@ -180,20 +196,19 @@ class TestStorageProxyClient:
             await asyncio.sleep(2.0)
             return web.json_response({"status": "success"})
 
-        storage_proxy_client = await storage_proxy_client_factory(
+        storage_proxy_client, pool = await storage_proxy_client_factory(
             test_endpoint, slow_endpoint_handler
         )
 
         # Make request with very short timeout
         timeout = ClientTimeout(total=0.1)
-        with pytest.raises(StorageProxyTimeoutError) as exc_info:
+        with pytest.raises(TimeoutError):
             await storage_proxy_client.request(
+                endpoint=pool.all_endpoints()[0],
                 method="GET",
                 url=test_endpoint,
                 request_timeout=timeout,
             )
-
-        assert "Request to storage proxy timed out" in str(exc_info.value)
 
     async def test_configured_client_timeout_causes_timeout_error(
         self, storage_proxy_client_factory: StorageProxyClientFactory
@@ -208,13 +223,15 @@ class TestStorageProxyClient:
             await asyncio.sleep(0.5)
             return web.json_response({"volumes": []})
 
-        http_client = await storage_proxy_client_factory("volumes", volumes_handler)
+        http_client, pool = await storage_proxy_client_factory("volumes", volumes_handler)
 
         # Create manager client with custom very short timeout for get_volumes
         custom_timeout = HttpTimeoutConfig(total=0.1, sock_connect=0.05)  # type: ignore[call-arg]
         timeout_config = StorageProxyClientTimeoutConfig(get_volumes=custom_timeout)  # type: ignore[call-arg]
         manager_client = StorageProxyManagerFacingClient(
             client=http_client,
+            endpoint_pool=pool,
+            proxy_name="test",
             timeout_config=timeout_config,
         )
 
@@ -235,13 +252,15 @@ class TestStorageProxyClient:
             await asyncio.sleep(0.1)
             return web.json_response({"volumes": ["volume1", "volume2"]})
 
-        http_client = await storage_proxy_client_factory("volumes", volumes_handler)
+        http_client, pool = await storage_proxy_client_factory("volumes", volumes_handler)
 
         # Create manager client with sufficient timeout for get_volumes
         custom_timeout = HttpTimeoutConfig(total=5.0, sock_connect=1.0)  # type: ignore[call-arg]
         timeout_config = StorageProxyClientTimeoutConfig(get_volumes=custom_timeout)  # type: ignore[call-arg]
         manager_client = StorageProxyManagerFacingClient(
             client=http_client,
+            endpoint_pool=pool,
+            proxy_name="test",
             timeout_config=timeout_config,
         )
 
