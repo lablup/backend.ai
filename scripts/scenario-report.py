@@ -17,6 +17,7 @@ uses to write the records. This file only reads the arguments and the files.
 from __future__ import annotations
 
 import argparse
+import difflib
 import pathlib
 import sys
 
@@ -87,8 +88,16 @@ def main() -> int:
             if not written.exists():
                 print(f"{written}: not written yet", file=sys.stderr)
                 drifted += 1
-            elif written.read_text(encoding="utf8") != wanted:
+            elif (had := written.read_text(encoding="utf8")) != wanted:
                 print(f"{written}: no longer matches the run", file=sys.stderr)
+                sys.stderr.writelines(
+                    difflib.unified_diff(
+                        had.splitlines(keepends=True),
+                        wanted.splitlines(keepends=True),
+                        fromfile=f"{written} (committed)",
+                        tofile=f"{written} (this run)",
+                    )
+                )
                 drifted += 1
         if drifted:
             print(

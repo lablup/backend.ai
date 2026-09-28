@@ -69,6 +69,15 @@ class WidgetAdapter(BaseAdapter):
         return await self._widget.get.run(GetWidgetAction(widget_id))
 """
 
+_SESSION_ADAPTER = """
+class WidgetSessionAdapter(BaseAdapter):
+    def __init__(self, widget: WidgetProcessors) -> None:
+        self._widget = widget
+
+    async def get(self, widget_id):
+        return await self._widget.rename.run(RenameWidgetAction(widget_id, None))
+"""
+
 _OFFERS = (
     "approve",
     "batch_load",
@@ -87,10 +96,20 @@ def manager(tmp_path: pathlib.Path) -> pathlib.Path:
     (tmp_path / "services" / "widget" / "processors.py").write_text(textwrap.dedent(_PROCESSORS))
     (tmp_path / "api" / "adapters" / "widget").mkdir(parents=True)
     (tmp_path / "api" / "adapters" / "widget" / "adapter.py").write_text(textwrap.dedent(_ADAPTER))
+    (tmp_path / "api" / "adapters" / "widget_session").mkdir(parents=True)
+    (tmp_path / "api" / "adapters" / "widget_session" / "adapter.py").write_text(
+        textwrap.dedent(_SESSION_ADAPTER)
+    )
     return tmp_path
 
 
-def _record(operation: str, *, refused: bool = False, summary: str = "") -> ScenarioRecord:
+def _record(
+    operation: str,
+    *,
+    refused: bool = False,
+    summary: str = "",
+    adapter: str = "WidgetAdapter",
+) -> ScenarioRecord:
     seen = (Line(says=f"{Refused.PREFIX}NotEnoughPermission"),) if refused else (Line("id = 1"),)
     return ScenarioRecord(
         summary=summary or f"{operation}-{'refused' if refused else 'answered'}",
@@ -102,7 +121,7 @@ def _record(operation: str, *, refused: bool = False, summary: str = "") -> Scen
         then="",
         module="bai_scenario.manager.widget.test_widget",
         outcome="passed",
-        adapter="WidgetAdapter",
+        adapter=adapter,
         seen=seen,
         offers=_OFFERS,
     )
@@ -213,3 +232,33 @@ class TestMarkdownOperations:
 
         assert "시나리오: 완성" in rendered
         assert "SCENARIO-GAP" not in rendered
+
+
+class TestSeveralAdapters:
+    @pytest.fixture
+    def records(self) -> list[ScenarioRecord]:
+        return [
+            _record("get", adapter="WidgetSessionAdapter", summary="session-get"),
+            _record("get"),
+            _record("get", refused=True),
+        ]
+
+    def test_each_adapter_is_named_beside_its_operations(
+        self, manager: pathlib.Path, records: list[ScenarioRecord]
+    ) -> None:
+        operations = {
+            one.operation: one
+            for one in Report.of(records, AdapterWiring(manager)).components[0].operations
+        }
+
+        assert operations["WidgetAdapter.get"].refused == 1
+        assert operations["WidgetSessionAdapter.get"].succeeding == 1
+        assert operations["WidgetSessionAdapter.get"].refused == 0
+
+    def test_the_report_does_not_depend_on_the_order_records_arrive_in(
+        self, manager: pathlib.Path, records: list[ScenarioRecord]
+    ) -> None:
+        forward = Report.of(records, AdapterWiring(manager))
+        backward = Report.of(list(reversed(records)), AdapterWiring(manager))
+
+        assert MarkdownFormat().render(forward) == MarkdownFormat().render(backward)

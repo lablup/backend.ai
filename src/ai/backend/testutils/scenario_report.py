@@ -213,12 +213,11 @@ class Report:
             grouped.setdefault(record.component, {}).setdefault(record.behaviour, []).append(record)
         components = []
         for component, behaviours in sorted(grouped.items()):
-            adapter = _adapter_of(behaviours)
             rows = [row for rows in behaviours.values() for row in rows]
             components.append(
                 ComponentReport(
                     component=component,
-                    adapter=adapter,
+                    adapter=_adapter_of(rows),
                     behaviours=tuple(
                         BehaviourReport(
                             behaviour,
@@ -226,40 +225,48 @@ class Report:
                         )
                         for behaviour in sorted(behaviours)
                     ),
-                    operations=_operations(rows, wiring.of(component, adapter)),
+                    operations=_operations(component, rows, wiring),
                 )
             )
         return cls(tuple(components))
 
 
-def _adapter_of(behaviours: dict[str, list[ScenarioRecord]]) -> str:
-    for rows in behaviours.values():
-        for row in rows:
-            if row.adapter:
-                return row.adapter
-    return ""
+def _adapter_of(rows: Sequence[ScenarioRecord]) -> str:
+    """The adapter most rows call, so the answer does not hang on the order records arrive in."""
+    counts: dict[str, int] = {}
+    for row in rows:
+        if row.adapter:
+            counts[row.adapter] = counts.get(row.adapter, 0) + 1
+    return min(counts, key=lambda adapter: (-counts[adapter], adapter), default="")
 
 
 def _operations(
-    records: Sequence[ScenarioRecord], built: Mapping[str, OperationWiring]
+    component: str, records: Sequence[ScenarioRecord], wiring: AdapterWiring
 ) -> tuple[OperationReport, ...]:
-    """Every operation the adapter class defines, with the rows that called it.
+    """Every operation each adapter the rows call defines, with the rows that called it.
 
     A ``BaseAdapter`` method is final to every adapter, so it is no adapter's operation.
+    A component calling several adapters names each operation with its adapter.
     """
+    adapters = sorted({record.adapter for record in records if record.adapter})
     out = []
-    for operation, wiring in sorted(built.items()):
-        calls = [record for record in records if record.operation == operation]
-        refused = sum(1 for record in calls if record.expects_refusal())
-        out.append(
-            OperationReport(
-                operation=operation,
-                composition=wiring.composition,
-                group_methods=wiring.group_methods,
-                succeeding=len(calls) - refused,
-                refused=refused,
+    for adapter in adapters:
+        for operation, built in sorted(wiring.of(component, adapter).items()):
+            calls = [
+                record
+                for record in records
+                if record.adapter == adapter and record.operation == operation
+            ]
+            refused = sum(1 for record in calls if record.expects_refusal())
+            out.append(
+                OperationReport(
+                    operation=operation if len(adapters) == 1 else f"{adapter}.{operation}",
+                    composition=built.composition,
+                    group_methods=built.group_methods,
+                    succeeding=len(calls) - refused,
+                    refused=refused,
+                )
             )
-        )
     return tuple(out)
 
 
