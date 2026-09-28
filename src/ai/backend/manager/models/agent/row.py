@@ -6,7 +6,6 @@ from typing import Any
 
 import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql as pgsql
-from sqlalchemy.ext.asyncio import AsyncSession as SASession
 from sqlalchemy.orm import (
     Mapped,
     mapped_column,
@@ -37,7 +36,6 @@ from ai.backend.manager.models.resource_slot.searchable_fields import (
 __all__: Sequence[str] = (
     "AgentRow",
     "agents",
-    "list_schedulable_agents_by_sgroup",
 )
 
 
@@ -137,17 +135,3 @@ class AgentRow(Base):
 
 # For compatibility
 agents = AgentRow.__table__
-
-
-async def list_schedulable_agents_by_sgroup(
-    db_sess: SASession,
-    sgroup_name: str,
-) -> Sequence[AgentRow]:
-    query = sa.select(AgentRow).where(
-        (AgentRow.status == AgentStatus.ALIVE)
-        & (AgentRow.scaling_group == sgroup_name)
-        & (AgentRow.schedulable == true()),
-    )
-
-    result = await db_sess.execute(query)
-    return result.scalars().all()
