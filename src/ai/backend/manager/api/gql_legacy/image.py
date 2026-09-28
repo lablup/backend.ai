@@ -24,6 +24,7 @@ from ai.backend.common.bgtask.reporter import ProgressReporter
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.filter_specs import StringInMatchSpec, UUIDEqualMatchSpec
 from ai.backend.common.docker import ImageRef, KernelFeatures, LabelName
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.common.types import (
     AgentId,
     DispatchResult,
@@ -202,8 +203,8 @@ ImageTypeEnum = graphene.Enum.from_enum(
     ImageType,
     description=(
         "Added in 25.12.0."
-        " `SERVICE` is deprecated since 26.9.0: the scan never writes it, and it is"
-        " removed in the next release."
+        f" `SERVICE` is deprecated since {NEXT_RELEASE_VERSION}: the scan never writes"
+        " it, and it is removed in the next release."
     ),
 )
 

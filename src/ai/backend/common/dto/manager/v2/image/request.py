@@ -19,6 +19,7 @@ from ai.backend.common.dto.manager.query import (
     UUIDFilter,
 )
 from ai.backend.common.dto.manager.v2.entity_label.request import EntityLabelNestedFilter
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.common.tristate.unset import UNSET, Unset
 
 from .types import (
@@ -79,8 +80,8 @@ class ImageStatusFilterInputDTO(EnumFilter[ImageStatusType]):
 class ImageTypeFilterInputDTO(EnumFilter[ImageTypeEnum]):
     """Filter for the image type category.
 
-    ``SERVICE`` is deprecated since 26.9.0: the scan never writes it, so nothing
-    matches. It is removed in the next release.
+    ``SERVICE`` is deprecated: the scan never writes it, so nothing matches. It is
+    removed in the next release.
     """
 
 
@@ -119,9 +120,9 @@ class ImageFilterInputDTO(BaseRequestModel):
     type: ImageTypeFilterInputDTO | None = Field(
         default=None,
         description=(
-            "Filter by image type category. `service` is deprecated since 26.9.0: the"
-            " scan never writes it, so nothing matches, and it is removed in the next"
-            " release."
+            "Filter by image type category. `service` is deprecated since"
+            f" {NEXT_RELEASE_VERSION}: the scan never writes it, so nothing matches,"
+            " and it is removed in the next release."
         ),
     )
     created_at: DateTimeFilter | None = Field(
@@ -353,9 +354,9 @@ class UpdateImageInput(BaseRequestModel):
     type: str | None | Unset = Field(
         default=UNSET,
         description=(
-            "Updated image type. `service` is deprecated since 26.9.0: the scan never"
-            " writes it, and it is removed in the next release."
-            " Omit to leave unchanged."
+            "Updated image type. `service` is deprecated since"
+            f" {NEXT_RELEASE_VERSION}: the scan never writes it, and it is removed in"
+            " the next release. Omit to leave unchanged."
         ),
     )
     config_digest: str | None | Unset = Field(

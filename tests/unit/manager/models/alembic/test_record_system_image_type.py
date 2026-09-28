@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import uuid
 from collections.abc import AsyncGenerator
-from typing import Any
+from typing import Any, cast
 
 import pytest
 import sqlalchemy as sa
@@ -20,17 +20,17 @@ from ai.backend.manager.data.image.types import ImageStatus, ImageType
 from ai.backend.manager.models.alembic.versions.b9f2c41ad07e_record_system_image_type_from_labels import (
     backfill,
 )
-from ai.backend.manager.models.container_registry import ContainerRegistryRow
-from ai.backend.manager.models.domain import DomainRow
-from ai.backend.manager.models.image import ImageRow
-from ai.backend.manager.models.keypair import KeyPairRow
-from ai.backend.manager.models.project import ProjectRow
-from ai.backend.manager.models.resource_policy import (
+from ai.backend.manager.models.container_registry.row import ContainerRegistryRow
+from ai.backend.manager.models.domain.row import DomainRow
+from ai.backend.manager.models.image.row import ImageRow
+from ai.backend.manager.models.keypair.row import KeyPairRow
+from ai.backend.manager.models.project.row import ProjectRow
+from ai.backend.manager.models.resource_policy.row import (
     KeyPairResourcePolicyRow,
     ProjectResourcePolicyRow,
     UserResourcePolicyRow,
 )
-from ai.backend.manager.models.user import UserRow
+from ai.backend.manager.models.user.row import UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.testutils.db import HasTable, with_tables
 
@@ -105,7 +105,7 @@ async def _add_image(
         )
         session.add(row)
         await session.flush()
-        image_id = row.id
+        image_id = cast(uuid.UUID, row.id)
         await session.commit()
     return image_id
 
@@ -117,9 +117,8 @@ async def _run_backfill(db: ExtendedAsyncSAEngine) -> None:
 
 async def _type_of(db: ExtendedAsyncSAEngine, image_id: uuid.UUID) -> ImageType:
     async with db.begin_readonly_session() as session:
-        return (
-            await session.execute(sa.select(ImageRow.type).where(ImageRow.id == image_id))
-        ).scalar_one()
+        result = await session.execute(sa.select(ImageRow.type).where(ImageRow.id == image_id))
+        return result.scalar_one()
 
 
 class TestRecordSystemImageType:

@@ -63,8 +63,9 @@ class ImageNode(BaseResponseModel):
     size_bytes: int = Field(description="Image size in bytes")
     type: ImageTypeEnum = Field(
         description=(
-            "Image type category. `service` is deprecated since 26.9.0: the scan never"
-            " writes it, and it is removed in the next release."
+            "Image type category. `service` is deprecated since"
+            f" {NEXT_RELEASE_VERSION}: the scan never writes it, and it is removed in"
+            " the next release."
         )
     )
     status: ImageStatusType = Field(description="Image status")

@@ -47,8 +47,8 @@ class ImageType(CIStrEnum):
 
     The role label's INFERENCE is absorbed into COMPUTE: nothing reads the distinction.
 
-    ``SERVICE`` is deprecated since 26.9.0: nothing writes it and nothing reads it, so
-    an image is never this type. It is removed in the next release.
+    ``SERVICE`` is deprecated: nothing writes it and nothing reads it, so an image is
+    never this type. It is removed in the next release.
     """
 
     COMPUTE = "compute"
