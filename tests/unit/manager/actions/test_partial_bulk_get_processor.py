@@ -258,3 +258,42 @@ async def test_a_denial_is_marked_apart_from_a_failure(action: _Action) -> None:
         _eid("denied"): True,
         _eid("gone"): False,
     }
+
+
+async def test_a_repeated_id_is_answered_the_same_at_every_place() -> None:
+    ids = [_eid("readable"), _eid("other"), _eid("readable")]
+    reader = _Reader(present=[_eid("readable"), _eid("other")])
+    processor = PartialBulkActionProcessor[_Action, str](reader.run)
+
+    result = await processor.run(_Action(ids=ids))
+
+    assert [item.entity_id for item in result.items] == ids
+    assert result.items[0] == result.items[2]
+    assert result.items[0].value == f"data:{_eid('readable')}"
+
+
+async def test_a_repeated_denied_id_is_denied_at_every_place() -> None:
+    ids = [_eid("denied"), _eid("readable"), _eid("denied")]
+    reader = _Reader(present=list(ids))
+    processor = PartialBulkActionProcessor[_Action, str](
+        reader.run,
+        partial_validators=[_DenyingValidator(denied=[_eid("denied")])],
+    )
+
+    result = await processor.run(_Action(ids=ids))
+
+    assert reader.asked_for == [_eid("readable")]
+    assert [item.is_denied for item in result.items] == [True, False, True]
+
+
+async def test_no_ids_read_nothing_and_answer_nothing() -> None:
+    reader = _Reader(present=[_eid("readable")])
+    processor = PartialBulkActionProcessor[_Action, str](
+        reader.run,
+        partial_validators=[_DenyingValidator(denied=[_eid("readable")])],
+    )
+
+    result = await processor.run(_Action(ids=[]))
+
+    assert reader.asked_for == []
+    assert result.items == []
