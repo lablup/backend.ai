@@ -12,8 +12,13 @@ from typing import override
 import pytest
 
 from ai.backend.common.data.user.types import UserRole
-from ai.backend.common.dto.manager.v2.deployment.request import AdminSearchDeploymentsInput
+from ai.backend.common.dto.manager.v2.deployment.request import (
+    AdminSearchDeploymentsInput,
+    ScopedSearchDeploymentsInput,
+)
 from ai.backend.common.dto.manager.v2.deployment.response import AdminSearchDeploymentsPayload
+from ai.backend.common.dto.manager.v2.deployment.types import DeploymentScope
+from ai.backend.common.dto.manager.v2.rbac.types import UUIDScope
 from ai.backend.manager.api.adapters.deployment.adapter import DeploymentAdapter
 from ai.backend.manager.data.permission.types import Permission
 from ai.backend.manager.errors.auth import InsufficientPrivilege
@@ -90,7 +95,7 @@ class SearchingMine(When[ManyDeploymentsAndACaller, DeploymentAdapter, Searched]
 
     @override
     def operation(self) -> str:
-        return "my_search"
+        return "scoped_search"
 
     @override
     def describe(self, laid: ManyDeploymentsAndACaller) -> str:
@@ -99,7 +104,11 @@ class SearchingMine(When[ManyDeploymentsAndACaller, DeploymentAdapter, Searched]
     @override
     async def call(self, adapter: DeploymentAdapter, laid: ManyDeploymentsAndACaller) -> Searched:
         with ActingAs(laid.caller):
-            return await adapter.my_search(AdminSearchDeploymentsInput())
+            return await adapter.scoped_search(
+                ScopedSearchDeploymentsInput(
+                    scope=DeploymentScope(user=[UUIDScope(value=laid.caller.id)])
+                )
+            )
 
 
 @dataclass(frozen=True)

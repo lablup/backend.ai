@@ -39,6 +39,14 @@ class V2ModelCardClient(BaseDomainClient):
             response_model=SearchModelCardsPayload,
         )
 
+    async def my_search(self, request: SearchModelCardsInput) -> SearchModelCardsPayload:
+        return await self._client.typed_request(
+            "POST",
+            f"{_PATH}/my/search",
+            request=request,
+            response_model=SearchModelCardsPayload,
+        )
+
     async def project_search(
         self, project_id: UUID, request: SearchModelCardsInput
     ) -> SearchModelCardsPayload:
