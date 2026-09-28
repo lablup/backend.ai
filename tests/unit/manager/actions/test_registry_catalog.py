@@ -331,6 +331,9 @@ from ai.backend.manager.services.scheduling_history.processors import (
 )
 from ai.backend.manager.services.secret.processors import SecretProcessors
 from ai.backend.manager.services.service_catalog.processors import ServiceCatalogProcessors
+from ai.backend.manager.services.session.actions.batch_get_kernel_resource_allocation import (
+    BatchGetKernelResourceAllocationAction,
+)
 from ai.backend.manager.services.session.actions.bulk_get import BulkGetSessionsAction
 from ai.backend.manager.services.session.actions.bulk_get_kernels import BulkGetKernelsAction
 from ai.backend.manager.services.session.actions.compute_schedule import (
@@ -970,7 +973,7 @@ def test_field_data_loader_reads_are_partial_permission_reads() -> None:
 
 
 def test_session_and_kernel_data_loader_reads_are_checked_per_session() -> None:
-    """The session DataLoader reads per named session, the kernel one per owning session."""
+    """The session DataLoader reads per named session, the kernel ones per owning session."""
     registry = _ops_registry()
     SessionProcessors(
         registry.group(GroupMeta(SessionEntityType())),
@@ -988,6 +991,7 @@ def test_session_and_kernel_data_loader_reads_are_checked_per_session() -> None:
     partial = (SessionEntityType(), ActionKind.BULK, ActionGate.PERMISSION)
     assert recorded[BulkGetSessionsAction] == partial
     assert recorded[BulkGetKernelsAction] == partial
+    assert recorded[BatchGetKernelResourceAllocationAction] == partial
 
     lookup_gates = {
         (record.action_cls, record.gate)

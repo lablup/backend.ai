@@ -63,8 +63,7 @@ This domain reads the time series Prometheus answers, not a table. The storage l
   under `Concern.METRIC`.
 - The cross-user series and the metric names share the preset domain's group, behind the
   global gate and the public gate respectively.
-- Live stats are wired through `ProcessorGroup.bulk_field`. The same shape is used by
-  `BatchGetKernelResourceAllocationAction`.
+- Live stats are wired through `ProcessorGroup.atomic_bulk_field`.
 - The processor fields are `search_user_container_metrics` (own metrics), `global_search`
   (cross-user), `metadata_public_search` (metric names) and `batch_get_kernel_live_stats`
   (live stats).

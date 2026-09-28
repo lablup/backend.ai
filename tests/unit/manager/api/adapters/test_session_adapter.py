@@ -483,7 +483,10 @@ class TestBatchLoadKernels:
             )
         )
         processors.batch_get_kernel_resource_allocation.run = AsyncMock(
-            return_value=MagicMock(data={})
+            return_value=BulkFieldOpsResult(
+                successes={KernelID(readable.id): ResourceAllocationAggregate.empty()},
+                errors={},
+            )
         )
         return processors
 
@@ -524,6 +527,91 @@ class TestBatchLoadKernels:
     ) -> None:
         assert await adapter.batch_load_kernels_by_ids([]) == []
         processors.bulk_get_kernels.run.assert_not_awaited()
+
+
+class TestBatchResourceAllocationByKernel:
+    """The kernel allocation DataLoader path: each kernel is answered for by its session."""
+
+    @pytest.fixture
+    def readable_id(self) -> KernelID:
+        return KernelID(uuid4())
+
+    @pytest.fixture
+    def denied_id(self) -> KernelID:
+        return KernelID(uuid4())
+
+    @pytest.fixture
+    def empty_id(self) -> KernelID:
+        return KernelID(uuid4())
+
+    @pytest.fixture
+    def denial(self) -> GenericForbidden:
+        return GenericForbidden("no read on the session this kernel runs under")
+
+    @pytest.fixture
+    def processors(
+        self,
+        readable_id: KernelID,
+        denied_id: KernelID,
+        empty_id: KernelID,
+        denial: GenericForbidden,
+    ) -> MagicMock:
+        processors = MagicMock()
+        processors.batch_get_kernel_resource_allocation.run = AsyncMock(
+            return_value=BulkFieldOpsResult(
+                successes={
+                    readable_id: ResourceAllocationAggregate(
+                        requested=ResourceSlot({"cpu": Decimal("2")}),
+                        used=ResourceSlot({"cpu": Decimal("1")}),
+                        allocated=ResourceSlot({"cpu": Decimal("1")}),
+                    ),
+                    empty_id: ResourceAllocationAggregate.empty(),
+                },
+                errors={denied_id: denial},
+            )
+        )
+        return processors
+
+    @pytest.fixture
+    def adapter(self, processors: MagicMock) -> SessionAdapter:
+        return SessionAdapter(processors, MagicMock())
+
+    async def test_answers_per_id(
+        self,
+        adapter: SessionAdapter,
+        readable_id: KernelID,
+        denied_id: KernelID,
+        empty_id: KernelID,
+        denial: GenericForbidden,
+    ) -> None:
+        allocated, refused, empty = await adapter.batch_resource_allocation_by_kernel([
+            readable_id,
+            denied_id,
+            empty_id,
+        ])
+
+        assert allocated == _create_allocation(
+            requested={"cpu": Decimal("2")}, used={"cpu": Decimal("1")}
+        )
+        assert refused is denial
+        assert empty == _create_allocation()
+
+    async def test_no_kernel_found_is_every_id_empty(
+        self, adapter: SessionAdapter, processors: MagicMock, empty_id: KernelID
+    ) -> None:
+        processors.batch_get_kernel_resource_allocation.run.side_effect = FieldNotFoundError(
+            field_type=KernelFieldType(), operation=ActionOperationType.SEARCH
+        )
+
+        assert await adapter.batch_resource_allocation_by_kernel([empty_id]) == [
+            _create_allocation()
+        ]
+
+    async def test_no_ids_read_nothing(
+        self, adapter: SessionAdapter, processors: MagicMock
+    ) -> None:
+        assert await adapter.batch_resource_allocation_by_kernel([]) == []
+        processors.batch_get_kernel_resource_allocation.run.assert_not_awaited()
 
 
 class TestEnqueueActionBuilding:
