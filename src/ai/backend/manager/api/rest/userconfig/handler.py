@@ -31,7 +31,7 @@ from ai.backend.common.dto.manager.config.response import (
     UpdateDotfileResponse,
 )
 from ai.backend.common.types import AccessKey
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.data.dotfile.types import DotfileEntries, DotfileEntry
 from ai.backend.manager.dto.context import UserContext
 from ai.backend.manager.services.auth.actions.resolve_access_key_scope import (
@@ -60,7 +60,7 @@ from ai.backend.manager.services.user.actions.update_keypair_dotfile import (
 )
 from ai.backend.manager.services.user.processors import UserProcessors
 
-log: Final = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log: Final = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 class UserConfigHandler:

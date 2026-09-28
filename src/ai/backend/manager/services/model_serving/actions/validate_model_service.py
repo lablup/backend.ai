@@ -9,7 +9,7 @@ from ai.backend.common.data.entity.vfolder import VFolderUUID
 from ai.backend.common.types import AccessKey, RuntimeVariant, VFolderMount
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.model_serving.types import ServiceConfig
-from ai.backend.manager.models.user import UserRole
+from ai.backend.manager.models.user.row import UserRole
 from ai.backend.manager.services.model_serving.actions.base import (
     ModelServiceScopeAction,
     ModelServiceScopeActionResult,

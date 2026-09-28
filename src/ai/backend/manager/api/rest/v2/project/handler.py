@@ -18,13 +18,13 @@ from ai.backend.common.dto.manager.v2.group.request import (
     UnassignUsersFromProjectInput,
     UpdateProjectInput,
 )
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.api.rest.v2.path_params import ProjectIdPathParam
 
 if TYPE_CHECKING:
     from ai.backend.manager.api.adapters.project.adapter import ProjectAdapter
 
-log: Final = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log: Final = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 class V2ProjectHandler:

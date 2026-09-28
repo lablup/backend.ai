@@ -11,7 +11,7 @@ from sqlalchemy.orm import Mapped, mapped_column
 from ai.backend.common.data.entity.artifact import ArtifactID
 from ai.backend.common.data.entity.artifact_revision import ArtifactRevisionID
 from ai.backend.common.data.storage.registries.types import ModelData
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.data.artifact.types import (
     ArtifactStatus,
 )
@@ -20,7 +20,7 @@ from ai.backend.manager.models.base import (
     Base,
 )
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 __all__ = ("ArtifactRevisionRow",)
 

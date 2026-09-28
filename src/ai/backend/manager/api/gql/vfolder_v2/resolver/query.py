@@ -20,14 +20,13 @@ from ai.backend.manager.api.gql.decorators import (
 )
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.api.gql.utils import check_admin_only
-from ai.backend.manager.api.gql.vfolder_v2.types import (
-    VFolderConnection,
-    VFolderFilterGQL,
-    VFolderGQL,
-    VFolderOrderByGQL,
-)
+from ai.backend.manager.api.gql.vfolder_v2.types.filters import VFolderFilterGQL, VFolderOrderByGQL
 from ai.backend.manager.api.gql.vfolder_v2.types.mount_policy import VFolderMountPoliciesPayloadGQL
-from ai.backend.manager.api.gql.vfolder_v2.types.node import VFolderEdge
+from ai.backend.manager.api.gql.vfolder_v2.types.node import (
+    VFolderConnection,
+    VFolderEdge,
+    VFolderGQL,
+)
 from ai.backend.manager.api.gql.vfolder_v2.types.scopes import VFolderScopeGQL, VFolderUsageGQL
 
 

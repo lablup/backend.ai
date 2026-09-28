@@ -20,7 +20,7 @@ from ai.backend.manager.api.gql.kernel.types import (
     KernelV2GQL,
     KernelV2OrderByGQL,
 )
-from ai.backend.manager.api.gql.scheduling_history import SessionScope
+from ai.backend.manager.api.gql.scheduling_history.types import SessionScope
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.api.gql.utils import check_admin_only
 

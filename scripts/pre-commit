@@ -1,3 +1,2 @@
 # backend.ai monorepo standard pre-commit hook
-BASE_PATH=$(cd "$(dirname "$0")"/../.. && pwd)
-${BASE_PATH}/scripts/pre-commit.sh "$@"
+"$(git rev-parse --show-toplevel)/scripts/pre-commit.sh" "$@"

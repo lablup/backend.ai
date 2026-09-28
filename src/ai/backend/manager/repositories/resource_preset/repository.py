@@ -16,7 +16,7 @@ from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPoli
 from ai.backend.common.resilience.policies.retry import BackoffStrategy, RetryArgs, RetryPolicy
 from ai.backend.common.resilience.resilience import Resilience
 from ai.backend.common.types import AccessKey, SlotName, SlotQuantity, SlotTypes
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.resource_preset.types import (
     ResourcePresetData,
@@ -34,7 +34,7 @@ from .db_source.db_source import ResourcePresetDBSource
 from .types import CheckPresetsResult
 from .utils import suppress_with_log
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 resource_preset_repository_resilience = Resilience(
@@ -224,15 +224,18 @@ class ResourcePresetRepository:
                 access_key, group_name, domain_name, resource_group
             )
             if cached_data:
-                log.info(
-                    "Cache hit for check_presets: {}, {}, {}", access_key, group_name, domain_name
+                log.trace(
+                    "check presets cache hit",
+                    access_key=access_key,
+                    project_name=group_name,
+                    domain_name=domain_name,
                 )
                 return CheckPresetsResult.from_cache(cached_data)
-        log.info(
-            "Cache miss for check_presets, fetching from DB, {}, {}, {}",
-            access_key,
-            group_name,
-            domain_name,
+        log.trace(
+            "check presets cache miss",
+            access_key=access_key,
+            project_name=group_name,
+            domain_name=domain_name,
         )
 
         known_slot_types = await self._db_source.known_slot_types()

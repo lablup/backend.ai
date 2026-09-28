@@ -12,7 +12,7 @@ from ai.backend.common.types import (
     SlotName,
     SlotTypes,
 )
-from ai.backend.logging.utils import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.resource_allocation.types import (
     EffectiveAllocationData,
@@ -24,7 +24,7 @@ from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 
 from .db_source.db_source import ResourceAllocationDBSource
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 class ResourceAllocationRepository:

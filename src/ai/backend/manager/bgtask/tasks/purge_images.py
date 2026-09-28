@@ -11,7 +11,7 @@ from ai.backend.common.bgtask.task.base import (
     BaseBackgroundTaskResult,
 )
 from ai.backend.common.types import AgentId, BackendAISchema
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.bgtask.types import ManagerBgtaskName
 from ai.backend.manager.services.image.actions.purge_images import PurgeImageAction
 from ai.backend.manager.services.image.types import ImageRefData
@@ -19,7 +19,7 @@ from ai.backend.manager.services.image.types import ImageRefData
 if TYPE_CHECKING:
     from ai.backend.manager.services.image.service import ImageService
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 class PurgedImageData(BackendAISchema):
@@ -118,7 +118,7 @@ class PurgeImagesHandler(BaseBackgroundTaskHandler[PurgeImagesManifest, PurgeIma
                 )
 
                 if result.error is not None:
-                    log.error(result.error)
+                    log.trace("image purge failed", agent_id=key.agent_id, reason=result.error)
                     errors.append(result.error)
 
         return PurgeImagesTaskResult(

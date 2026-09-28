@@ -6,14 +6,14 @@ from typing import (
     override,
 )
 
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.storage.types import CapacityUsage
 from ai.backend.storage.volumes.abc import (
     CAP_VFOLDER,
 )
 from ai.backend.storage.volumes.vfs import BaseVolume
 
-log = BraceStyleAdapter(logging.getLogger(__name__))
+log = StructuredLogger(logging.getLogger(__name__))
 
 
 class BaseHammerspaceVolume(BaseVolume):

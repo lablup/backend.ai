@@ -25,7 +25,7 @@ from ai.backend.manager.data.session.draft import (
     SessionResourceSpecDraft,
 )
 from ai.backend.manager.data.session.options import DefaultSessionOptions
-from ai.backend.manager.models.network import NetworkType
+from ai.backend.manager.models.network.row import NetworkType
 from ai.backend.manager.sokovan.scheduling_controller.preparers.specs.assign_network_config_rule import (
     AssignNetworkConfigRule,
 )

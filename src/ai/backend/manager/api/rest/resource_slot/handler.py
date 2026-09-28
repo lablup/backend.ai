@@ -16,7 +16,7 @@ from ai.backend.common.dto.manager.resource_slot.response import (
     PaginationInfo,
     SearchResourceSlotTypesResponse,
 )
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.models.resource_slot.scopes import PublicResourceSlotTypeTarget
 from ai.backend.manager.models.specs.searcher import ScopedSearcher
 from ai.backend.manager.services.resource_slot.actions.get import GetResourceSlotTypeAction
@@ -32,7 +32,7 @@ from .adapter import ResourceSlotAdapter
 if TYPE_CHECKING:
     from ai.backend.manager.services.resource_slot.processors import ResourceSlotProcessors
 
-log: Final = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log: Final = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 class ResourceSlotHandler:

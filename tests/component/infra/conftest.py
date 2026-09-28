@@ -38,7 +38,7 @@ from ai.backend.manager.clients.container_registry.pool import (
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.secret.types import KeyProviderType
 from ai.backend.manager.dependencies.infrastructure.redis import ValkeyClients
-from ai.backend.manager.models.project import ProjectRow
+from ai.backend.manager.models.project.row import ProjectRow
 from ai.backend.manager.models.resource_preset.row import ResourcePresetRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.agent.repository import AgentRepository

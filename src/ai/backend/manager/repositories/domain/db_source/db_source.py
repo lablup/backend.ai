@@ -5,14 +5,14 @@ import logging
 import sqlalchemy as sa
 
 from ai.backend.common.data.entity.domain import DomainID, DomainName
-from ai.backend.logging.utils import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.data.domain.types import DomainData
 from ai.backend.manager.errors.resource import DomainNotFound
 from ai.backend.manager.models.domain.row import DomainRow
 from ai.backend.manager.models.domain.searchable_fields import DomainSearchableFields
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 class DomainDBSource:

@@ -65,14 +65,14 @@ from ai.backend.manager.data.secret.types import KeyProviderType
 from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.dependencies.infrastructure.redis import ValkeyClients
 from ai.backend.manager.models.agent.row import AgentRow
-from ai.backend.manager.models.container_registry import ContainerRegistryRow
+from ai.backend.manager.models.container_registry.row import ContainerRegistryRow
 from ai.backend.manager.models.image.row import ImageRow
-from ai.backend.manager.models.kernel import kernels
+from ai.backend.manager.models.kernel.row import kernels
 from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
-from ai.backend.manager.models.rbac_models.role import RoleRow
-from ai.backend.manager.models.rbac_models.user_role import UserRoleRow
+from ai.backend.manager.models.rbac_models.role.row import RoleRow
+from ai.backend.manager.models.rbac_models.user_role.row import UserRoleRow
 from ai.backend.manager.models.resource_slot.row import AgentResourceRow
-from ai.backend.manager.models.session import SessionRow
+from ai.backend.manager.models.session.row import SessionRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.plugin.network import NetworkPluginContext
 from ai.backend.manager.repositories.container_registry.db_source import ContainerRegistryDBSource
@@ -89,7 +89,7 @@ from ai.backend.manager.repositories.permission_controller.repository import (
 from ai.backend.manager.repositories.rbac.permission_check_repository import (
     RbacPermissionCheckRepository,
 )
-from ai.backend.manager.repositories.scheduler import SchedulerRepository
+from ai.backend.manager.repositories.scheduler.repository import SchedulerRepository
 from ai.backend.manager.repositories.session.repository import SessionRepository
 from ai.backend.manager.repositories.user.repository import UserRepository
 from ai.backend.manager.secret.pool import KeyProviderPool
@@ -108,7 +108,7 @@ from ai.backend.manager.services.session.service import SessionService, SessionS
 from ai.backend.manager.sokovan.scheduler.provisioner.selectors.pool import (
     create_agent_selector,
 )
-from ai.backend.manager.sokovan.scheduling_controller import (
+from ai.backend.manager.sokovan.scheduling_controller.scheduling_controller import (
     SchedulingController,
     SchedulingControllerArgs,
 )

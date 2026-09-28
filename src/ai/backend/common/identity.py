@@ -21,7 +21,7 @@ import aiohttp
 import ifaddr
 import psutil
 
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 
 from .exception import CloudDetectionError
 from .networking import curl
@@ -37,7 +37,7 @@ __all__ = (
     "get_wsl_version",
 )
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 class CloudProvider(enum.StrEnum):
@@ -145,7 +145,7 @@ async def detect_cloud() -> CloudProvider | None:
             return result
         for exc in exceptions:
             if exc is not None:
-                log.debug("Cloud detection failed: {}", exc)
+                log.debug("cloud detection failed", error=str(exc))
     return None
 
 
@@ -204,15 +204,16 @@ try:
         # No running loop, safe to use asyncio.run()
         current_provider = asyncio.run(detect_cloud())
 except Exception as e:
-    log.warning("Failed to detect cloud provider: {}", e)
+    log.warning("cloud provider detection failed", exc_info=e)
     current_provider = None
 
 if current_provider is None:
-    log.info("Detected environment: on-premise setup")
-    log.info("The agent node ID is set using the hostname.")
+    log.info("environment detected, node id follows the hostname")
 else:
-    log.info("Detected environment: {} cloud", current_provider)
-    log.info("The agent node ID will follow the instance ID.")
+    log.info(
+        "environment detected, node id follows the instance id",
+        cloud_provider=current_provider,
+    )
 
 _defined: bool = False
 get_instance_id: Callable[[], Awaitable[str]]

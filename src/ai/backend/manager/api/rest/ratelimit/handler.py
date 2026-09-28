@@ -21,14 +21,14 @@ from ai.backend.common.clients.valkey_client.valkey_rate_limit.client import (
 from ai.backend.common.contexts.client_ip import current_client_ip
 from ai.backend.common.exception import UnreachableError
 from ai.backend.common.web.reserved_response_headers import reserve_response_headers
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.api.rest.types import WebRequestHandler
 
 if TYPE_CHECKING:
     from aiohttp.typedefs import Middleware
 from ai.backend.manager.errors.api import RateLimitExceeded
 
-log: Final = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log: Final = StructuredLogger(logging.getLogger(__spec__.name))
 
 _RATELIMIT_WINDOW_SECONDS: Final = 60 * 15
 _ANONYMOUS_RATELIMIT: Final = 1000

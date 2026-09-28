@@ -27,9 +27,9 @@ from ai.backend.common.exception import (
 )
 from ai.backend.common.types import ValkeyTarget
 from ai.backend.common.utils import addr_to_hostport_pair
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 _DEFAULT_REQUEST_TIMEOUT: Final[int] = 1_000  # Default request timeout in milliseconds
@@ -239,10 +239,10 @@ class ValkeyStandaloneClient(AbstractValkeyClient):
         self._valkey_client = glide_client
 
         log.debug(
-            "Created ValkeyClient for standalone at {}:{} for database {}",
-            target_host,
-            target_port,
-            self._human_readable_name,
+            "valkey standalone client created",
+            host=target_host,
+            port=target_port,
+            database_name=self._human_readable_name,
         )
 
     @override
@@ -379,18 +379,20 @@ class ValkeySentinelClient(AbstractValkeyClient):
         self._valkey_client = glide_client
 
         log.info(
-            "Created ValkeyClient for master at {}:{} for database {}",
-            master_address[0],
-            master_address[1],
-            self._human_readable_name,
+            "valkey master client created",
+            host=master_address[0],
+            port=master_address[1],
+            database_name=self._human_readable_name,
         )
 
     async def _get_master_address(self) -> tuple[str, int] | None:
         try:
             return await self._sentinel.discover_master(self._target.service_name)
         except Exception as e:
-            log.error(
-                "Failed to discover master for service '{}': {}", self._target.service_name, e
+            log.warning(
+                "valkey master discovery failed",
+                exc_info=e,
+                service_name=self._target.service_name,
             )
             return None
 
@@ -633,14 +635,14 @@ class MonitoringValkeyClient(AbstractValkeyClient):
         except _VALKEY_CONNECTION_ERRORS:
             self._operation_failure_count += 1
             log.warning(
-                "Operation connection error (consecutive failures: {}/{})",
-                self._operation_failure_count,
-                self._operation_failure_threshold,
+                "valkey operation connection failed",
+                failure_count=self._operation_failure_count,
+                failure_threshold=self._operation_failure_threshold,
             )
             if self._operation_failure_count >= self._operation_failure_threshold:
                 log.warning(
-                    "Operation failure threshold reached ({}), requesting reconnection...",
-                    self._operation_failure_threshold,
+                    "valkey operation failure threshold reached, requesting reconnect",
+                    failure_threshold=self._operation_failure_threshold,
                 )
                 self._operation_failure_count = 0
                 self._reconnect_event.set()
@@ -666,21 +668,21 @@ class MonitoringValkeyClient(AbstractValkeyClient):
             self._monitor_consecutive_failure_count = 0
             return False
         except reconnectable_exceptions as e:
-            log.warning("Health check signaled reconnect: {}, reconnecting immediately...", e)
+            log.warning("valkey health check requested reconnect", exc_info=e)
             self._monitor_consecutive_failure_count = 0
             return True
         except Exception as e:
             self._monitor_consecutive_failure_count += 1
             log.warning(
-                "Error in connection monitoring (consecutive failures: {}/{}): {}",
-                self._monitor_consecutive_failure_count,
-                self._monitor_failure_threshold,
-                e,
+                "valkey connection monitoring failed",
+                exc_info=e,
+                failure_count=self._monitor_consecutive_failure_count,
+                failure_threshold=self._monitor_failure_threshold,
             )
             if self._monitor_consecutive_failure_count >= self._monitor_failure_threshold:
                 log.warning(
-                    "Monitor failure threshold reached ({}), reconnecting...",
-                    self._monitor_failure_threshold,
+                    "valkey monitor failure threshold reached, reconnecting",
+                    failure_threshold=self._monitor_failure_threshold,
                 )
                 self._monitor_consecutive_failure_count = 0
                 return True
@@ -696,7 +698,7 @@ class MonitoringValkeyClient(AbstractValkeyClient):
         return await self._check_health()
 
     async def _monitor_connection(self) -> None:
-        log.info("Starting Valkey connection monitor task...")
+        log.debug("valkey connection monitor started")
         try:
             while True:
                 try:
@@ -711,30 +713,30 @@ class MonitoringValkeyClient(AbstractValkeyClient):
                     reconnect_requested = self._reconnect_event.is_set()
                     self._reconnect_event.clear()
                     if reconnect_requested or await self._check_connection():
-                        log.info("Reconnecting Valkey clients...")
+                        log.info("valkey clients reconnecting")
                         await self._reconnect()
                 except asyncio.CancelledError:
                     # Normal shutdown - don't log as error
                     raise
-                except Exception as e:
+                except Exception:
                     if not self._closed:
-                        log.exception("Error in Valkey connection monitor: {}", e)
+                        log.exception("valkey connection monitor failed")
                         continue
                     raise
         finally:
-            log.info("Valkey connection monitor task stopped. Client closed: {}", self._closed)
+            log.debug("valkey connection monitor stopped", closed=self._closed)
 
     async def _reconnect(self) -> None:
         # Disconnect both clients
         try:
             await self._monitor_client.disconnect()
         except Exception as e:
-            log.warning("Error disconnecting monitor client: {}", e)
+            log.warning("valkey monitor client disconnect failed", exc_info=e)
 
         try:
             await self._operation_client.disconnect()
         except Exception as e:
-            log.warning("Error disconnecting operation client: {}", e)
+            log.warning("valkey operation client disconnect failed", exc_info=e)
 
         # Reconnect both clients
         await self._operation_client.connect()

@@ -32,7 +32,7 @@ from ai.backend.common.dto.manager.notification import (
     WebhookSpecResponse,
 )
 from ai.backend.common.dto.manager.notification.response import EmailSpecResponse
-from ai.backend.manager.data.notification import (
+from ai.backend.manager.data.notification.types import (
     NotificationChannelData,
     NotificationRuleData,
 )

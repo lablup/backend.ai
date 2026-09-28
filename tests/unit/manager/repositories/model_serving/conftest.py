@@ -20,19 +20,16 @@ from ai.backend.common.types import (
     VFolderUsageMode,
 )
 from ai.backend.manager.data.image.types import ImageStatus, ImageType
-from ai.backend.manager.data.model_serving.types import EndpointData
+from ai.backend.manager.data.model_serving.types import EndpointData, EndpointLifecycle
 from ai.backend.manager.data.vfolder.types import (
     VFolderOperationStatus,
     VFolderOwnershipType,
 )
-from ai.backend.manager.models.endpoint import (
-    EndpointLifecycle,
-    EndpointRow,
-)
-from ai.backend.manager.models.image import ImageRow
-from ai.backend.manager.models.user import UserRole, UserRow, UserStatus
+from ai.backend.manager.models.endpoint.row import EndpointRow
+from ai.backend.manager.models.image.row import ImageRow
+from ai.backend.manager.models.user.row import UserRole, UserRow, UserStatus
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.models.vfolder import VFolderRow
+from ai.backend.manager.models.vfolder.row import VFolderRow
 from ai.backend.manager.repositories.model_serving.repository import ModelServingRepository
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 
@@ -228,27 +225,29 @@ def setup_writable_session(mock_db_engine: MagicMock, mock_session: AsyncMock) -
 def patch_endpoint_get(mocker: MockerFixture) -> AsyncMock:
     """Patch EndpointRow.get method using mocker."""
     return mocker.patch(
-        "ai.backend.manager.models.endpoint.EndpointRow.get", new_callable=AsyncMock
+        "ai.backend.manager.models.endpoint.row.EndpointRow.get", new_callable=AsyncMock
     )
 
 
 @pytest.fixture
 def patch_routing_get(mocker: MockerFixture) -> AsyncMock:
     """Patch RoutingRow.get method using mocker."""
-    return mocker.patch("ai.backend.manager.models.routing.RoutingRow.get", new_callable=AsyncMock)
+    return mocker.patch(
+        "ai.backend.manager.models.routing.row.RoutingRow.get", new_callable=AsyncMock
+    )
 
 
 @pytest.fixture
 def patch_user_get(mocker: MockerFixture) -> AsyncMock:
     """Patch UserRow.get method using mocker."""
-    return mocker.patch("ai.backend.manager.models.user.UserRow.get", new_callable=AsyncMock)
+    return mocker.patch("ai.backend.manager.models.user.row.UserRow.get", new_callable=AsyncMock)
 
 
 @pytest.fixture
 def patch_session_get(mocker: MockerFixture) -> AsyncMock:
     """Patch SessionRow.get_session method using mocker."""
     return mocker.patch(
-        "ai.backend.manager.models.session.SessionRow.get_session", new_callable=AsyncMock
+        "ai.backend.manager.models.session.row.SessionRow.get_session", new_callable=AsyncMock
     )
 
 
@@ -256,7 +255,8 @@ def patch_session_get(mocker: MockerFixture) -> AsyncMock:
 def patch_auto_scaling_rule_get(mocker: MockerFixture) -> AsyncMock:
     """Patch EndpointAutoScalingRuleRow.get method using mocker."""
     return mocker.patch(
-        "ai.backend.manager.models.endpoint.EndpointAutoScalingRuleRow.get", new_callable=AsyncMock
+        "ai.backend.manager.models.endpoint.row.EndpointAutoScalingRuleRow.get",
+        new_callable=AsyncMock,
     )
 
 

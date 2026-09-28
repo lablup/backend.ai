@@ -8,49 +8,63 @@ from typing import TYPE_CHECKING
 
 from ai.backend.common.clients.valkey_client.valkey_schedule import ValkeyScheduleClient
 from ai.backend.common.events.event_types.kernel.types import KernelLifecycleEventReason
-from ai.backend.manager.clients.agent import AgentClientPool
+from ai.backend.manager.clients.agent.pool import AgentClientPool
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.plugin.network import NetworkPluginContext
-from ai.backend.manager.repositories.fair_share import FairShareRepository
-from ai.backend.manager.repositories.resource_usage_history import (
+from ai.backend.manager.repositories.fair_share.repository import FairShareRepository
+from ai.backend.manager.repositories.resource_usage_history.repository import (
     ResourceUsageHistoryRepository,
 )
-from ai.backend.manager.repositories.scheduler import SchedulerRepository
+from ai.backend.manager.repositories.scheduler.repository import SchedulerRepository
 from ai.backend.manager.sokovan.scheduler.types import ScheduleType
 
 if TYPE_CHECKING:
-    from ai.backend.manager.sokovan.scheduling_controller import SchedulingController
+    from ai.backend.manager.sokovan.scheduling_controller.scheduling_controller import (
+        SchedulingController,
+    )
 
 from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.data.session.types import KernelMatchType, SessionStatus
-from ai.backend.manager.sokovan.scheduler.fair_share import (
-    FairShareAggregator,
-    FairShareFactorCalculator,
-)
-from ai.backend.manager.sokovan.scheduler.handlers import (
-    CheckPreconditionLifecycleHandler,
-    DeprioritizeSessionsLifecycleHandler,
-    PreemptSessionsLifecycleHandler,
-    ReleaseReservedSessionsLifecycleHandler,
-    RescheduleSessionsLifecycleHandler,
-    ScheduleSessionsLifecycleHandler,
-    SessionLifecycleHandler,
-    StartSessionsLifecycleHandler,
-    SweepSessionsLifecycleHandler,
-    TerminateSessionsLifecycleHandler,
-)
-from ai.backend.manager.sokovan.scheduler.handlers.cleanup import (
+from ai.backend.manager.sokovan.scheduler.fair_share.aggregator import FairShareAggregator
+from ai.backend.manager.sokovan.scheduler.fair_share.calculator import FairShareFactorCalculator
+from ai.backend.manager.sokovan.scheduler.handlers.base import SessionLifecycleHandler
+from ai.backend.manager.sokovan.scheduler.handlers.cleanup.base import CleanupHandler
+from ai.backend.manager.sokovan.scheduler.handlers.cleanup.force_terminated import (
     CleanupForceTerminatedHandler,
-    CleanupHandler,
 )
-from ai.backend.manager.sokovan.scheduler.handlers.kernel import (
-    KernelLifecycleHandler,
+from ai.backend.manager.sokovan.scheduler.handlers.kernel.base import KernelLifecycleHandler
+from ai.backend.manager.sokovan.scheduler.handlers.kernel.sweep_stale_kernels import (
     SweepStaleKernelsKernelHandler,
 )
-from ai.backend.manager.sokovan.scheduler.handlers.observer import (
-    FairShareObserver,
-    KernelObserver,
+from ai.backend.manager.sokovan.scheduler.handlers.lifecycle.check_precondition import (
+    CheckPreconditionLifecycleHandler,
 )
+from ai.backend.manager.sokovan.scheduler.handlers.lifecycle.deprioritize_sessions import (
+    DeprioritizeSessionsLifecycleHandler,
+)
+from ai.backend.manager.sokovan.scheduler.handlers.lifecycle.preempt_sessions import (
+    PreemptSessionsLifecycleHandler,
+)
+from ai.backend.manager.sokovan.scheduler.handlers.lifecycle.release_reserved_sessions import (
+    ReleaseReservedSessionsLifecycleHandler,
+)
+from ai.backend.manager.sokovan.scheduler.handlers.lifecycle.reschedule_sessions import (
+    RescheduleSessionsLifecycleHandler,
+)
+from ai.backend.manager.sokovan.scheduler.handlers.lifecycle.schedule_sessions import (
+    ScheduleSessionsLifecycleHandler,
+)
+from ai.backend.manager.sokovan.scheduler.handlers.lifecycle.start_sessions import (
+    StartSessionsLifecycleHandler,
+)
+from ai.backend.manager.sokovan.scheduler.handlers.lifecycle.terminate_sessions import (
+    TerminateSessionsLifecycleHandler,
+)
+from ai.backend.manager.sokovan.scheduler.handlers.maintenance.sweep_sessions import (
+    SweepSessionsLifecycleHandler,
+)
+from ai.backend.manager.sokovan.scheduler.handlers.observer.base import KernelObserver
+from ai.backend.manager.sokovan.scheduler.handlers.observer.fair_share import FairShareObserver
 from ai.backend.manager.sokovan.scheduler.launcher.launcher import (
     SessionLauncher,
     SessionLauncherArgs,

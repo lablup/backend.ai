@@ -11,8 +11,8 @@ from alembic import op
 from sqlalchemy.dialects import postgresql
 from sqlalchemy.sql import text
 
+from ai.backend.manager.data.image.types import ImageType
 from ai.backend.manager.models.base import ForeignKeyIDColumn, IDColumn, convention
-from ai.backend.manager.models.image import ImageType
 
 # revision identifiers, used by Alembic.
 revision = "015d84d5a5ef"

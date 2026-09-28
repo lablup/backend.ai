@@ -2,6 +2,7 @@ import logging
 import uuid
 from collections.abc import Iterable
 from dataclasses import dataclass
+from typing import ClassVar
 
 from opentelemetry import trace
 from opentelemetry.exporter.otlp.proto.grpc._log_exporter import OTLPLogExporter
@@ -15,6 +16,9 @@ from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import BatchSpanProcessor
 
 from ai.backend.logging.formatter import CustomJsonFormatter
+from ai.backend.logging.structured import StructuredLogger, StructuredMessage
+
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 @dataclass
@@ -47,6 +51,7 @@ def apply_otel_loggers(loggers: Iterable[logging.Logger], spec: OpenTelemetrySpe
     log_provider.add_log_record_processor(log_processor)
     log_level = logging.getLevelNamesMapping().get(spec.log_level.upper(), logging.INFO)
     handler = LoggingHandler(level=log_level, logger_provider=log_provider)
+    handler.addFilter(lambda record: not isinstance(record.msg, StructuredMessage))
 
     # Apply JSON formatter to handler for OTEL
     json_formatter = CustomJsonFormatter()
@@ -58,7 +63,24 @@ def apply_otel_loggers(loggers: Iterable[logging.Logger], spec: OpenTelemetrySpe
         # Apply JSON formatter to existing handlers for extra fields
         for existing_handler in logger.handlers:
             existing_handler.setFormatter(json_formatter)
-    logging.info("open telemetry logging initialized successfully.")
+    log.info("opentelemetry logging initialized")
+
+
+class LegacyOtelLogging:
+    """Sends records of loggers wrapped by the deprecated `BraceStyleAdapter` to OTel."""
+
+    _loggers: ClassVar[set[logging.Logger]] = set()
+    _spec: OpenTelemetrySpec
+
+    def __init__(self, spec: OpenTelemetrySpec) -> None:
+        self._spec = spec
+
+    @classmethod
+    def register(cls, logger: logging.Logger) -> None:
+        cls._loggers.add(logger)
+
+    def attach(self) -> None:
+        apply_otel_loggers(self._loggers, self._spec)
 
 
 def apply_otel_tracer(spec: OpenTelemetrySpec) -> None:
@@ -71,14 +93,14 @@ def apply_otel_tracer(spec: OpenTelemetrySpec) -> None:
     )
     tracer_provider.add_span_processor(span_processor)
     trace.set_tracer_provider(tracer_provider)
-    logging.info("OpenTelemetry tracing initialized successfully.")
+    log.info("opentelemetry tracing initialized")
 
 
 def instrument_aiohttp_server() -> None:
     AioHttpServerInstrumentor().instrument()
-    logging.info("OpenTelemetry tracing for aiohttp server initialized successfully.")
+    log.info("opentelemetry aiohttp server instrumentation initialized")
 
 
 def instrument_aiohttp_client() -> None:
     AioHttpClientInstrumentor().instrument()
-    logging.info("OpenTelemetry tracing for aiohttp client initialized successfully.")
+    log.info("opentelemetry aiohttp client instrumentation initialized")

@@ -15,8 +15,8 @@ from sqlalchemy.ext.asyncio import AsyncSession as SASession
 
 from ai.backend.common.types import AccessKey, SessionId
 from ai.backend.manager.errors.kernel import InvalidSessionData
-from ai.backend.manager.models.kernel import kernels
-from ai.backend.manager.models.session import SessionDependencyRow, SessionRow
+from ai.backend.manager.models.kernel.row import kernels
+from ai.backend.manager.models.session.row import SessionDependencyRow, SessionRow
 
 
 @aiotools.lru_cache(maxsize=100)

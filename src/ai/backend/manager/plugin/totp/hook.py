@@ -11,17 +11,17 @@ from ai.backend.common.dto.manager.auth.types import (
     RequireTwoFactorRegistrationResponse,
     TwoFactorType,
 )
-from ai.backend.common.logging_utils import BraceStyleAdapter
 from ai.backend.common.plugin.hook import (
     HookHandler,
     HookPlugin,
     Reject,
 )
+from ai.backend.logging.structured import StructuredLogger
 
 from .config import TOTPConfig
 from .utils import TokenParser
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 class TOTPHook(HookPlugin):
@@ -76,7 +76,7 @@ class TOTPHook(HookPlugin):
                         "data": auth_data.to_dict(),
                     },
                 )
-            log.info("TOTP.VALIDATE_OTP(TOTP not forced, user TOTP not activated)")
+            log.trace("totp validation skipped, not forced and not activated")
             return None
         if not user.totp_key:
             raise Reject("User activated TOTP but TOTP key does not exist")
@@ -96,5 +96,5 @@ class TOTPHook(HookPlugin):
         totp = pyotp.TOTP(user.totp_key)
         if not totp.verify(otp):
             raise Reject("Invalid TOTP code provided")
-        log.info("TOTP.VALIDATE_OTP(TOTP validated successfully)")
+        log.trace("totp validated")
         return None

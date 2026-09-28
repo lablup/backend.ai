@@ -19,12 +19,16 @@ from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     gql_mutation,
 )
-from ai.backend.manager.api.gql.prometheus_query_preset.types import (
+from ai.backend.manager.api.gql.prometheus_query_preset.types.inputs import (
     CreateQueryDefinitionInput,
-    CreateQueryDefinitionPayload,
-    DeleteQueryDefinitionPayload,
     ModifyQueryDefinitionInput,
+)
+from ai.backend.manager.api.gql.prometheus_query_preset.types.node import (
+    CreateQueryDefinitionPayload,
     ModifyQueryDefinitionPayload,
+)
+from ai.backend.manager.api.gql.prometheus_query_preset.types.payloads import (
+    DeleteQueryDefinitionPayload,
 )
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.api.gql.utils import check_admin_only

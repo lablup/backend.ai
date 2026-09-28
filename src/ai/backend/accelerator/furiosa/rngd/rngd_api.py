@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import asyncio
 import ctypes
 import enum
 import glob
@@ -10,9 +9,10 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import ClassVar
 
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.common.asyncio import run_in_executor_with_context
+from ai.backend.logging.structured import StructuredLogger
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 # ---------------------------------------------------------------------------
 # Constants (from furiosa_smi.h)
@@ -351,8 +351,7 @@ _SYSFS_PCI_DEVICES = Path("/sys/bus/pci/devices")
 
 
 async def _read_sysfs(path: Path) -> str:
-    loop = asyncio.get_running_loop()
-    return (await loop.run_in_executor(None, path.read_text)).strip()
+    return (await run_in_executor_with_context(None, path.read_text)).strip()
 
 
 async def _read_sysfs_int(path: Path, base: int = 10) -> int:
@@ -471,12 +470,11 @@ class RngdAPI:
 
     @classmethod
     async def get_driver_info(cls) -> RngdDriverInfo:
-        loop = asyncio.get_running_loop()
         if cls._is_ffi_available():
-            ver = await loop.run_in_executor(None, _LibFuriosaSmi.get_driver_info)
+            ver = await run_in_executor_with_context(None, _LibFuriosaSmi.get_driver_info)
             return RngdDriverInfo(version=_version_str(ver))
         # sysfs fallback: read version from first device
-        candidates = await loop.run_in_executor(None, glob.glob, "/dev/rngd/npu?mgmt")
+        candidates = await run_in_executor_with_context(None, glob.glob, "/dev/rngd/npu?mgmt")
         if not candidates:
             return RngdDriverInfo(version="unknown")
         version_text = await _read_sysfs(_mgmt_path(0) / "version")
@@ -486,21 +484,20 @@ class RngdAPI:
 
     @classmethod
     async def list_devices(cls) -> list[RngdDeviceInfo]:
-        loop = asyncio.get_running_loop()
         if cls._is_ffi_available():
-            return await cls._list_devices_ffi(loop)
-        return await cls._list_devices_sysfs(loop)
+            return await cls._list_devices_ffi()
+        return await cls._list_devices_sysfs()
 
     @classmethod
-    async def _list_devices_ffi(cls, loop: asyncio.AbstractEventLoop) -> list[RngdDeviceInfo]:
-        handles = await loop.run_in_executor(None, _LibFuriosaSmi.get_device_handles)
+    async def _list_devices_ffi(cls) -> list[RngdDeviceInfo]:
+        handles = await run_in_executor_with_context(None, _LibFuriosaSmi.get_device_handles)
         devices: list[RngdDeviceInfo] = []
         for i in range(handles.count):
             handle = handles.device_handles[i]
-            info = await loop.run_in_executor(None, _LibFuriosaSmi.get_device_info, handle)
+            info = await run_in_executor_with_context(None, _LibFuriosaSmi.get_device_info, handle)
             # Get memory size via memory utilization
             try:
-                mem_util = await loop.run_in_executor(
+                mem_util = await run_in_executor_with_context(
                     None, _LibFuriosaSmi.get_memory_utilization, handle
                 )
                 memory_total, _ = _compute_memory_totals(mem_util)
@@ -522,8 +519,8 @@ class RngdAPI:
         return devices
 
     @classmethod
-    async def _list_devices_sysfs(cls, loop: asyncio.AbstractEventLoop) -> list[RngdDeviceInfo]:
-        candidates = await loop.run_in_executor(None, glob.glob, "/dev/rngd/npu?mgmt")
+    async def _list_devices_sysfs(cls) -> list[RngdDeviceInfo]:
+        candidates = await run_in_executor_with_context(None, glob.glob, "/dev/rngd/npu?mgmt")
         devices: list[RngdDeviceInfo] = []
         for idx in range(len(candidates)):
             mgmt = _mgmt_path(idx)
@@ -542,7 +539,7 @@ class RngdAPI:
             fw_version = await _read_sysfs(mgmt / "fw_version")
 
             # Count PEs by scanning sysfs entries
-            pe_entries = await loop.run_in_executor(
+            pe_entries = await run_in_executor_with_context(
                 None,
                 lambda i=idx: list(_SYSFS_RNGD_MGMT.glob(f"rngd!npu{i}pe[0-9]")),
             )
@@ -587,38 +584,39 @@ class RngdAPI:
 
     @classmethod
     async def get_device_metrics(cls, device_index: int) -> RngdDeviceMetrics:
-        loop = asyncio.get_running_loop()
         if cls._is_ffi_available():
-            return await cls._get_device_metrics_ffi(device_index, loop)
-        return await cls._get_device_metrics_sysfs(device_index, loop)
+            return await cls._get_device_metrics_ffi(device_index)
+        return await cls._get_device_metrics_sysfs(device_index)
 
     @classmethod
-    async def _get_device_metrics_ffi(
-        cls, device_index: int, loop: asyncio.AbstractEventLoop
-    ) -> RngdDeviceMetrics:
-        handles = await loop.run_in_executor(None, _LibFuriosaSmi.get_device_handles)
+    async def _get_device_metrics_ffi(cls, device_index: int) -> RngdDeviceMetrics:
+        handles = await run_in_executor_with_context(None, _LibFuriosaSmi.get_device_handles)
         handle = handles.device_handles[device_index]
 
         # Memory
-        mem_util = await loop.run_in_executor(None, _LibFuriosaSmi.get_memory_utilization, handle)
+        mem_util = await run_in_executor_with_context(
+            None, _LibFuriosaSmi.get_memory_utilization, handle
+        )
         mem_total, mem_used = _compute_memory_totals(mem_util)
 
         # Utilization
-        perf = await loop.run_in_executor(
+        perf = await run_in_executor_with_context(
             None, _LibFuriosaSmi.get_device_performance_counter, handle
         )
         core_utils = _compute_core_utilizations(perf)
 
         # Temperature
         try:
-            temp = await loop.run_in_executor(None, _LibFuriosaSmi.get_device_temperature, handle)
+            temp = await run_in_executor_with_context(
+                None, _LibFuriosaSmi.get_device_temperature, handle
+            )
             temperature = temp.soc_peak
         except LibraryError:
             temperature = 0.0
 
         # Power
         try:
-            power = await loop.run_in_executor(
+            power = await run_in_executor_with_context(
                 None, _LibFuriosaSmi.get_device_power_consumption, handle
             )
             power_watts = power.rms_total
@@ -635,15 +633,13 @@ class RngdAPI:
         )
 
     @classmethod
-    async def _get_device_metrics_sysfs(
-        cls, device_index: int, loop: asyncio.AbstractEventLoop
-    ) -> RngdDeviceMetrics:
+    async def _get_device_metrics_sysfs(cls, device_index: int) -> RngdDeviceMetrics:
         mgmt = _mgmt_path(device_index)
         if not mgmt.exists():
             raise ValueError(f"RNGD device {device_index} not found in sysfs")
 
         # Count PEs
-        pe_entries = await loop.run_in_executor(
+        pe_entries = await run_in_executor_with_context(
             None,
             lambda: sorted(_SYSFS_RNGD_MGMT.glob(f"rngd!npu{device_index}pe[0-9]")),
         )

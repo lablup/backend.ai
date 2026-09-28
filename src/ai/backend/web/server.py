@@ -62,10 +62,12 @@ from ai.backend.common.dto.manager.auth.types import (
     RequireTwoFactorAuthResponse,
     RequireTwoFactorRegistrationResponse,
 )
+from ai.backend.common.exception import MalformedRequestBody
 from ai.backend.common.health_checker.checkers.valkey import ValkeyHealthChecker
 from ai.backend.common.health_checker.probe import HealthProbe, HealthProbeOptions
 from ai.backend.common.health_checker.types import ComponentId
 from ai.backend.common.middlewares.exception import general_exception_middleware
+from ai.backend.common.middlewares.request_id import request_id_middleware
 from ai.backend.common.msgpack import DEFAULT_PACK_OPTS, DEFAULT_UNPACK_OPTS
 from ai.backend.common.networking import force_threaded_dns_resolver
 from ai.backend.common.web.session import (
@@ -76,8 +78,10 @@ from ai.backend.common.web.session import (
 )
 from ai.backend.common.web.session import setup as setup_session
 from ai.backend.common.web.session.redis_storage import RedisStorage
-from ai.backend.logging import BraceStyleAdapter, Logger, LogLevel
-from ai.backend.logging.otel import OpenTelemetrySpec
+from ai.backend.logging import Logger, LogLevel
+from ai.backend.logging.otel import LegacyOtelLogging, OpenTelemetrySpec, apply_otel_tracer
+from ai.backend.logging.structured import StructuredLogger
+from ai.backend.logging.structured_otel import StructuredOtelLogging
 from ai.backend.web.clients.apollo_router_pool import (
     ApolloRouterEndpointsHealthChecker,
     ApolloRouterPoolGateHealthChecker,
@@ -120,7 +124,7 @@ from .proxy import (
 from .stats import WebStats, track_active_handlers, view_stats
 from .template import toml_scalar
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 PROXIED_HTTP_METHODS: Final = ("HEAD", "GET", "PUT", "POST", "PATCH", "DELETE")
 
@@ -243,7 +247,7 @@ async def update_password_no_auth(request: web.Request) -> web.Response:
         text = await request.text()
         creds = json.loads(text)
     except json.JSONDecodeError as e:
-        log.error("Login: JSON decoding error: {}", e)
+        log.trace("login request body is not valid JSON: {}", e)
         creds = {}
 
     for param in ("username", "current_password", "new_password"):
@@ -273,8 +277,8 @@ async def update_password_no_auth(request: web.Request) -> web.Response:
                 extra_headers=build_forwarding_headers(request),
             )
         result["password_changed_at"] = resp.password_changed_at
-        log.info(
-            "UPDATE_PASSWORD_NO_AUTH: Authorization succeeded for (email:{}, ip:{})",
+        log.trace(
+            "password update succeeded (email: {}, ip: {})",
             creds["username"],
             client_ip,
         )
@@ -282,8 +286,8 @@ async def update_password_no_auth(request: web.Request) -> web.Response:
         # This is error, not failed login, so we should not update login history.
         raise ProxyTargetUnreachableError(str(e)) from e
     except BackendAPIError as e:
-        log.info(
-            "LOGIN_HANDLER: Authorization failed (email:{}, ip:{}) - {}",
+        log.trace(
+            "password update failed (email: {}, ip: {}): {}",
             creds["username"],
             client_ip,
             e,
@@ -385,7 +389,7 @@ async def login_handler(request: web.Request) -> web.Response:
     try:
         creds = json.loads(request["payload"])
     except json.JSONDecodeError as e:
-        log.error("Login: JSON decoding error: {}", e)
+        log.trace("login request body is not valid JSON: {}", e)
         creds = {}
     if "username" not in creds or not creds["username"]:
         raise web.HTTPBadRequest(
@@ -447,8 +451,8 @@ async def login_handler(request: web.Request) -> web.Response:
         login_fail_count = 0
     last_login_attempt = login_time
     if login_fail_count >= ALLOWED_FAIL_COUNT:
-        log.info(
-            "LOGIN_HANDLER: Too many consecutive login fails (email:{}, count:{}, ip:{})",
+        log.trace(
+            "login blocked after consecutive failures (email: {}, count: {}, ip: {})",
             creds["username"],
             login_fail_count,
             client_ip,
@@ -500,8 +504,8 @@ async def login_handler(request: web.Request) -> web.Response:
                 result["data"] = public_return  # store public info from token
                 login_fail_count = 0
                 await _set_login_history(last_login_attempt, login_fail_count)
-                log.info(
-                    "LOGIN_HANDLER: Authorization succeeded for (email:{}, ip:{})",
+                log.trace(
+                    "login succeeded (email: {}, ip: {})",
                     creds["username"],
                     client_ip,
                 )
@@ -530,8 +534,8 @@ async def login_handler(request: web.Request) -> web.Response:
         # This is error, not failed login, so we should not update login history.
         raise ProxyTargetUnreachableError(str(e)) from e
     except BackendAPIError as e:
-        log.info(
-            "LOGIN_HANDLER: Authorization failed (email:{}, ip:{}) - {}",
+        log.trace(
+            "login failed (email: {}, ip: {}): {}",
             creds["username"],
             client_ip,
             e,
@@ -567,12 +571,11 @@ async def logout_handler(request: web.Request) -> web.Response:
                     await http_session.post(
                         f"{acquired.endpoint}/auth/logout",
                         json={"session_token": session_token},
+                        headers=build_forwarding_headers(request),
                         ssl=config.api.ssl_verify,
                     )
         except Exception:
-            log.exception(
-                "Failed to invalidate login session in Manager DB (token={})", session_token
-            )
+            log.warning("failed to invalidate the login session on the manager", exc_info=True)
 
     return web.Response()
 
@@ -663,7 +666,11 @@ async def token_login_handler(request: web.Request) -> web.Response:
         raise AlreadyLoggedInError()
 
     # Check if auth token is delivered via request body or cookie.
-    rqst_data: dict[str, Any] = await request.json()
+    try:
+        rqst_data: dict[str, Any] = await request.json()
+    except json.JSONDecodeError as e:
+        log.trace("token login request body is not valid JSON: {}", e)
+        raise MalformedRequestBody() from e
     auth_token_name = config.api.auth_token_name
     auth_token = rqst_data.get(auth_token_name)
     if not auth_token:
@@ -744,7 +751,7 @@ async def token_login_handler(request: web.Request) -> web.Response:
     except BackendClientError as e:
         raise ProxyTargetUnreachableError(str(e)) from e
     except BackendAPIError as e:
-        log.info("Authorization failed for token {}: {}", auth_token, e)
+        log.trace("token login failed: {}", e)
         result["authenticated"] = False
         result["data"] = {
             "type": e.data.get("type"),
@@ -818,7 +825,7 @@ async def redis_ctx(
 
     if pidx == 0 and config.session.flush_on_startup:
         await valkey_session_client.flush_all_sessions()
-        log.info("flushed session storage.")
+        log.info("session storage flushed")
 
     if config.session.login_session_extension_sec is None:
         config.session.login_session_extension_sec = config.session.max_age
@@ -1152,7 +1159,9 @@ async def service_discovery_ctx(config: WebServerUnifiedConfig) -> AsyncGenerato
             max_queue_size=config.otel.max_queue_size,
             max_export_batch_size=config.otel.max_export_batch_size,
         )
-        BraceStyleAdapter.apply_otel(otel_spec)
+        LegacyOtelLogging(otel_spec).attach()
+        apply_otel_tracer(otel_spec)
+        StructuredOtelLogging(otel_spec).attach(config.logging.pkg_ns.keys())
     yield
 
 
@@ -1168,6 +1177,7 @@ async def server_main(
     try:
         app = web.Application(
             middlewares=[
+                request_id_middleware,
                 decrypt_payload,
                 track_active_handlers,
                 security_policy_middleware,
@@ -1223,14 +1233,14 @@ async def server_main(
 
         await web_init_stack.enter_async_context(webapp_ctx(config, app))
         await web_init_stack.enter_async_context(service_discovery_ctx(config))
-        log.info("Started the web gateway service.")
+        log.info("started the web gateway service")
     except Exception:
-        log.exception("Server initialization failure; triggering shutdown...")
+        log.exception("server initialization failed; triggering shutdown")
         loop.call_later(0.2, os.kill, 0, signal.SIGINT)
     try:
         yield
     finally:
-        log.info("shutting down...")
+        log.info("shutting down")
         await web_init_stack.__aexit__(None, None, None)
 
 
@@ -1298,20 +1308,23 @@ def main(
                 setproctitle(
                     f"backend.ai: webserver {server_config.service.ip}:{server_config.service.port}"
                 )
-                log.info("Backend.AI Web Server {0}", __version__)
-                log.info("runtime: {0}", sys.prefix)
+                log.info("Backend.AI Web Server starting", version=__version__)
+                log.info("runtime environment", runtime_path=sys.prefix)
 
                 log_config = logging.getLogger("ai.backend.web.config")
                 if log_level == LogLevel.DEBUG:
                     log_config.debug("debug mode enabled.")
                     print("== Web Server configuration ==")
                     pprint(server_config.model_dump())
-                log.info("serving at {0}:{1}", server_config.service.ip, server_config.service.port)
+                log.info(
+                    "serving",
+                    service_addr=f"{server_config.service.ip}:{server_config.service.port}",
+                )
                 runner: Callable[..., Any]
                 match server_config.webserver.event_loop:
                     case EventLoopType.UVLOOP:
                         runner = uvloop.run
-                        log.info("Using uvloop as the event loop backend")
+                        log.info("using uvloop as the event loop backend")
                     case EventLoopType.ASYNCIO:
                         runner = asyncio.run
                 try:
@@ -1322,7 +1335,7 @@ def main(
                         runner=runner,
                     )
                 finally:
-                    log.info("terminated.")
+                    log.info("terminated")
         finally:
             if server_config.webserver.pid_file.is_file():
                 # check is_file() to prevent deleting /dev/null!

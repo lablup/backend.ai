@@ -15,9 +15,9 @@ from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.resource_group import ResourceGroupID
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.types import ResourceSlot
-from ai.backend.manager.models.agent import AgentRow
-from ai.backend.manager.models.domain import DomainRow
-from ai.backend.manager.models.fair_share import (
+from ai.backend.manager.models.agent.row import AgentRow
+from ai.backend.manager.models.domain.row import DomainRow
+from ai.backend.manager.models.fair_share.row import (
     DomainFairShareRow,
     ProjectFairShareRow,
     UserFairShareRow,
@@ -27,25 +27,21 @@ from ai.backend.manager.models.fair_share.upserters import (
     ProjectFairShareUpserter,
     UserFairShareUpserter,
 )
-from ai.backend.manager.models.keypair import KeyPairRow
-from ai.backend.manager.models.project import ProjectRow
-from ai.backend.manager.models.rbac_models import RoleRow, UserRoleRow
-from ai.backend.manager.models.resource_group import ResourceGroupOpts, ResourceGroupRow
-from ai.backend.manager.models.resource_policy import (
+from ai.backend.manager.models.hasher.types import PasswordInfo
+from ai.backend.manager.models.keypair.row import KeyPairRow
+from ai.backend.manager.models.project.row import ProjectRow
+from ai.backend.manager.models.rbac_models.role.row import RoleRow
+from ai.backend.manager.models.rbac_models.user_role.row import UserRoleRow
+from ai.backend.manager.models.resource_group.row import ResourceGroupOpts, ResourceGroupRow
+from ai.backend.manager.models.resource_policy.row import (
     KeyPairResourcePolicyRow,
     ProjectResourcePolicyRow,
     UserResourcePolicyRow,
 )
-from ai.backend.manager.models.resource_slot import AgentResourceRow, ResourceSlotTypeRow
-from ai.backend.manager.models.user import (
-    PasswordHashAlgorithm,
-    PasswordInfo,
-    UserRole,
-    UserRow,
-    UserStatus,
-)
+from ai.backend.manager.models.resource_slot.row import AgentResourceRow, ResourceSlotTypeRow
+from ai.backend.manager.models.user.row import PasswordHashAlgorithm, UserRole, UserRow, UserStatus
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.repositories.fair_share import FairShareRepository
+from ai.backend.manager.repositories.fair_share.repository import FairShareRepository
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.types import TriState
 from ai.backend.testutils.db import with_tables

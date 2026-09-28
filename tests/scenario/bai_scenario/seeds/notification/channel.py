@@ -12,7 +12,7 @@ from ai.backend.common.data.notification.types import (
     SMTPAuth,
     SMTPConnection,
 )
-from ai.backend.manager.data.notification import NotificationChannelData
+from ai.backend.manager.data.notification.types import NotificationChannelData
 from ai.backend.manager.data.user.types import UserData
 from ai.backend.manager.models.notification.creators import NotificationChannelCreator
 from bai_scenario.seeds.seeder import Naming, SeedRowFrom

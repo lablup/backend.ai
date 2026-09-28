@@ -52,7 +52,7 @@ from ai.backend.common.types import (
     VFolderHostPermission,
     VFolderHostPermissionMap,
 )
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.errors.api import InvalidAPIParameters
 from ai.backend.manager.errors.resource import DataTransformationFailed
@@ -63,7 +63,7 @@ from ai.backend.manager.secret.types import SecretValue
 if TYPE_CHECKING:
     from sqlalchemy.engine.interfaces import Dialect
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 # The common shared metadata instance
 convention = {
@@ -101,17 +101,15 @@ def ensure_all_tables_registered() -> None:
 
     import ai.backend.manager.models
 
+    prefix = "ai.backend.manager.models."
     for module_info in pkgutil.iter_modules(ai.backend.manager.models.__path__):
         if module_info.name in _SKIP_SUBPACKAGES:
             continue
-        importlib.import_module(f"ai.backend.manager.models.{module_info.name}")
-        # A domain package may keep its __init__ empty (no Row re-export) and
-        # declare its table only in ``row.py``; import it so create_all sees it.
+        package = importlib.import_module(prefix + module_info.name)
+        # A domain package declares its tables in submodules, not in its __init__.
         if module_info.ispkg:
-            try:
-                importlib.import_module(f"ai.backend.manager.models.{module_info.name}.row")
-            except ModuleNotFoundError:
-                pass
+            for sub_info in pkgutil.walk_packages(package.__path__, f"{package.__name__}."):
+                importlib.import_module(sub_info.name)
 
 
 pgsql_connect_opts = {
@@ -1145,7 +1143,7 @@ async def populate_fixture(
             raise DataTransformationFailed(f"Table {table_name} not found in metadata")
         if not rows:
             continue
-        log.debug("Loading the fixture table {0} (mode:{1})", table_name, op_mode.name)
+        log.debug("fixture table loading", table_name=table_name, op_mode=op_mode.name)
         from .hasher.types import PasswordColumn
 
         async with engine.begin() as conn:

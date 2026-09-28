@@ -37,6 +37,7 @@ from ai.backend.common.api_handlers import (
     QueryParam,
     stream_api_handler,
 )
+from ai.backend.common.asyncio import run_in_executor_with_context
 from ai.backend.common.dto.storage.request import (
     ArchiveDownloadQueryParams,
     ArchiveDownloadTokenData,
@@ -44,9 +45,10 @@ from ai.backend.common.dto.storage.request import (
 from ai.backend.common.json import dump_json_str
 from ai.backend.common.metrics.http import build_api_metric_middleware
 from ai.backend.common.middlewares.exception import general_exception_middleware
+from ai.backend.common.middlewares.request_id import request_id_middleware
 from ai.backend.common.typed_validators import PydanticJWTValidator
 from ai.backend.common.types import BinarySize, VFolderID
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.storage import __version__
 from ai.backend.storage.dto.context import StorageRootCtx
 from ai.backend.storage.errors import (
@@ -74,7 +76,7 @@ from ai.backend.common.clients.valkey_client.valkey_tus import (
     TusSessionNotFoundError,
 )
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 DEFAULT_CHUNK_SIZE: Final = 256 * 1024  # 256 KiB
 DEFAULT_INFLIGHT_CHUNKS: Final = 8
@@ -108,7 +110,7 @@ async def _drain_into_upload_file(
                 await f.write(chunk)
                 bytes_written += len(chunk)
             await f.flush()
-            await asyncio.get_running_loop().run_in_executor(None, os.fsync, f.fileno())
+            await run_in_executor_with_context(None, os.fsync, f.fileno())
     except FileNotFoundError as e:
         raise TusSessionNotFoundError(
             f"Upload session {session_id} staging file is missing at offset {start_offset}"
@@ -302,7 +304,7 @@ async def download_directory_as_archive(
             loop = asyncio.get_running_loop()
             q: janus.Queue[Any] = janus.Queue(maxsize=DEFAULT_INFLIGHT_CHUNKS)
             try:
-                fut = loop.run_in_executor(None, lambda: _consume(loop, iter, q.sync_q))
+                fut = run_in_executor_with_context(None, lambda: _consume(loop, iter, q.sync_q))
                 while True:
                     item = await q.async_q.get()
                     if item is SENTINEL:
@@ -573,6 +575,7 @@ class DownloadHandler:
 async def init_client_app(ctx: RootContext) -> web.Application:
     app = web.Application(
         middlewares=[
+            request_id_middleware,
             general_exception_middleware,
             build_api_metric_middleware(ctx.metric_registry.api),
         ]

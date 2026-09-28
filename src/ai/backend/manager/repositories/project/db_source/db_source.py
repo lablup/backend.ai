@@ -19,9 +19,10 @@ from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeySta
 from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.types import ResourceSlot, SessionId, SlotName, VFolderID
 from ai.backend.common.utils import nmget
-from ai.backend.logging.utils import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
 from ai.backend.manager.config.provider import ManagerConfigProvider
+from ai.backend.manager.data.model_serving.types import EndpointLifecycle
 from ai.backend.manager.data.project.types import ProjectData, ProjectType
 from ai.backend.manager.errors.resource import (
     PersonalProjectDeletionError,
@@ -29,15 +30,14 @@ from ai.backend.manager.errors.resource import (
     ProjectHasVFoldersMountedError,
     ProjectNotFound,
 )
-from ai.backend.manager.models.endpoint import EndpointLifecycle, EndpointRow
-from ai.backend.manager.models.kernel import (
+from ai.backend.manager.models.endpoint.row import EndpointRow
+from ai.backend.manager.models.kernel.row import (
     AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES,
     LIVE_STATUS,
     RESOURCE_USAGE_KERNEL_STATUSES,
     KernelRow,
     kernels,
 )
-from ai.backend.manager.models.project import groups
 from ai.backend.manager.models.project.purgers import (
     ProjectEndpointPurger,
     ProjectKernelPurger,
@@ -47,6 +47,7 @@ from ai.backend.manager.models.project.purgers import (
 )
 from ai.backend.manager.models.project.row import (
     ProjectRow,
+    groups,
 )
 from ai.backend.manager.models.project.scopes import (
     DomainProjectTarget,
@@ -56,10 +57,10 @@ from ai.backend.manager.models.project.searchable_fields import ProjectSearchabl
 from ai.backend.manager.models.project.searchers import ProjectSearcher
 from ai.backend.manager.models.resource_slot.aggregates import kernel_allocated_slots_expr
 from ai.backend.manager.models.resource_usage import fetch_resource_usage
-from ai.backend.manager.models.routing import RoutingRow
-from ai.backend.manager.models.user import users
+from ai.backend.manager.models.routing.row import RoutingRow
+from ai.backend.manager.models.user.row import users
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.models.vfolder import (
+from ai.backend.manager.models.vfolder.row import (
     VFolderDeletionInfo,
     VFolderRow,
     VFolderStatusSet,
@@ -69,7 +70,7 @@ from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.repositories.project.types import ProjectSearchResult
 from ai.backend.manager.repositories.vfolder.deletion import initiate_vfolder_deletion
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 class ProjectDBSource:
@@ -166,7 +167,7 @@ class ProjectDBSource:
             last_stat = row.last_stat
             if not last_stat:
                 if raw_stat is None:
-                    log.warning("stat object for {} not found on redis, skipping", str(row.id))
+                    log.debug("kernel stat not found, kernel skipped", kernel_id=row.id)
                     continue
                 last_stat = msgpack.unpackb(raw_stat)
             nfs = None
@@ -347,7 +348,12 @@ class ProjectDBSource:
                     if uuid.UUID(_mount[2]) in group_vfolder_ids:
                         return True
                 except Exception:
-                    log.warning("Malformed mount entry in group {}, skipping: {}", group_id, _mount)
+                    log.warning(
+                        "malformed kernel mount entry skipped",
+                        project_id=group_id,
+                        mount_entry=str(_mount),
+                        exc_info=True,
+                    )
         return False
 
     async def _routed_session_ids(self, sess: SASession, group_id: uuid.UUID) -> list[SessionId]:

@@ -14,7 +14,7 @@ from ai.backend.common.data.entity.storage_namespace import (
 from ai.backend.common.data.entity.types import EntityType
 from ai.backend.manager.models.clauses import QueryCondition
 from ai.backend.manager.models.specs.lookup import DataLookup
-from ai.backend.manager.models.storage_namespace import StorageNamespaceRow
+from ai.backend.manager.models.storage_namespace.row import StorageNamespaceRow
 
 
 @dataclass

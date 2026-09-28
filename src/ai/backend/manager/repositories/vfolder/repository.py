@@ -43,6 +43,8 @@ from ai.backend.manager.data.vfolder.types import (
     VFolderData,
     VFolderInvitationData,
     VFolderMountPolicyData,
+    VFolderOperationStatus,
+    VFolderOwnershipType,
 )
 from ai.backend.manager.errors.api import InvalidAPIParameters
 from ai.backend.manager.errors.auth import AuthorizationFailed
@@ -63,7 +65,7 @@ from ai.backend.manager.errors.storage import (
     VFolderOperationFailed,
 )
 from ai.backend.manager.errors.user import KeyPairNotFound, UserNotFound
-from ai.backend.manager.models.agent import agents
+from ai.backend.manager.models.agent.row import agents
 from ai.backend.manager.models.entity_share.creators import EntityShareCreator
 from ai.backend.manager.models.entity_share.lookups import HeldShareLookup
 from ai.backend.manager.models.entity_share.purgers import EntitySharePendingOfferBatchPurger
@@ -76,44 +78,26 @@ from ai.backend.manager.models.entity_share.updaters import (
     EntityShareRejectUpdater,
     EntityShareRevokeUpdater,
 )
-from ai.backend.manager.models.kernel import kernels
-from ai.backend.manager.models.keypair import KeyPairRow, keypairs
+from ai.backend.manager.models.kernel.row import kernels
+from ai.backend.manager.models.keypair.row import KeyPairRow, keypairs
 from ai.backend.manager.models.model_card.purgers import ModelCardPurger
 from ai.backend.manager.models.model_card.row import ModelCardRow
-from ai.backend.manager.models.project import ProjectRow, ProjectType
 from ai.backend.manager.models.project.lookups import PersonalProjectOfUserLookup
-from ai.backend.manager.models.resource_policy import keypair_resource_policies
+from ai.backend.manager.models.project.row import ProjectRow, ProjectType
+from ai.backend.manager.models.resource_policy.row import keypair_resource_policies
 from ai.backend.manager.models.scopes import OperationScope
 from ai.backend.manager.models.specs.pagination import NoPagination
 from ai.backend.manager.models.specs.types import ConflictCheck, IntegrityErrorCheck
-from ai.backend.manager.models.user import (
+from ai.backend.manager.models.user.lookups import UserEmailLookup
+from ai.backend.manager.models.user.queries import joined_project_ids_query
+from ai.backend.manager.models.user.row import (
     ACTIVE_USER_STATUSES,
     UserRole,
     UserRow,
     UserStatus,
     users,
 )
-from ai.backend.manager.models.user.lookups import UserEmailLookup
-from ai.backend.manager.models.user.queries import joined_project_ids_query
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine, execute_with_retry
-from ai.backend.manager.models.vfolder import (
-    HARD_DELETED_VFOLDER_STATUSES,
-    VFolderCloneInfo,
-    VFolderDeletionInfo,
-    VFolderOperationStatus,
-    VFolderOwnershipType,
-    VFolderRow,
-    VFolderStatusSet,
-    VFolderUserMountPolicyRow,
-    ensure_host_permission_allowed,
-    ensure_quota_scope_accessible_by_user,
-    get_allowed_vfolder_hosts_by_group,
-    get_allowed_vfolder_hosts_by_user,
-    get_sessions_by_mounted_folder,
-    is_unmanaged,
-    vfolder_status_map,
-    vfolders,
-)
 from ai.backend.manager.models.vfolder.creators import (
     PersonalVFolderCreator,
     ProjectVFolderCreator,
@@ -129,6 +113,22 @@ from ai.backend.manager.models.vfolder.purgers import (
 from ai.backend.manager.models.vfolder.queriers import (
     VFolderQuerier,
     VFolderUserMountPolicyQuerier,
+)
+from ai.backend.manager.models.vfolder.row import (
+    HARD_DELETED_VFOLDER_STATUSES,
+    VFolderCloneInfo,
+    VFolderDeletionInfo,
+    VFolderRow,
+    VFolderStatusSet,
+    VFolderUserMountPolicyRow,
+    ensure_host_permission_allowed,
+    ensure_quota_scope_accessible_by_user,
+    get_allowed_vfolder_hosts_by_group,
+    get_allowed_vfolder_hosts_by_user,
+    get_sessions_by_mounted_folder,
+    is_unmanaged,
+    vfolder_status_map,
+    vfolders,
 )
 from ai.backend.manager.models.vfolder.scopes import UserVFolderTarget
 from ai.backend.manager.models.vfolder.searchable_fields import VFolderSearchableFields

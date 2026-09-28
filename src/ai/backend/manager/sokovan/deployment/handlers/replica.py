@@ -4,7 +4,7 @@ import logging
 from collections.abc import Sequence
 from typing import override
 
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.data.deployment.types import (
     DeploymentHandlerCategory,
     DeploymentStatusTransitions,
@@ -21,7 +21,7 @@ from ai.backend.manager.sokovan.deployment.types import (
 
 from .base import DeploymentHandler
 
-log = BraceStyleAdapter(logging.getLogger(__name__))
+log = StructuredLogger(logging.getLogger(__name__))
 
 
 class CheckReplicaDeploymentHandler(DeploymentHandler):
@@ -88,15 +88,10 @@ class CheckReplicaDeploymentHandler(DeploymentHandler):
 
         Skips deployments without a ``current_revision`` — scaling is only meaningful once an
         initial revision has been deployed; those are still in the DEPLOYING rollout."""
-        log.debug("Checking deployment replicas")
-
         scalable = [d for d in deployments if d.deployment_info.current_revision is not None]
         if len(scalable) != len(deployments):
             skipped = len(deployments) - len(scalable)
-            log.debug(
-                "Skipping {} deployments without a current_revision for replica check",
-                skipped,
-            )
+            log.debug("deployments without current revision skipped", deployment_count=skipped)
         if not scalable:
             return DeploymentExecutionResult()
 

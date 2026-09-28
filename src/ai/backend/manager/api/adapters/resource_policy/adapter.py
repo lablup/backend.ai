@@ -79,11 +79,6 @@ from ai.backend.manager.errors.user import UserResourcePolicyNotFound
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
 from ai.backend.manager.models.condition_utils import combine_conditions_or, negate_conditions
 from ai.backend.manager.models.keypair.searchable_fields import KeyPairSearchableFields
-from ai.backend.manager.models.resource_policy import (
-    KeyPairResourcePolicyRow,
-    ProjectResourcePolicyRow,
-    UserResourcePolicyRow,
-)
 from ai.backend.manager.models.resource_policy.creators import (
     KeyPairResourcePolicyCreator,
     ProjectResourcePolicyCreator,
@@ -91,6 +86,11 @@ from ai.backend.manager.models.resource_policy.creators import (
 )
 from ai.backend.manager.models.resource_policy.deprecated_search import (
     DeprecatedKeyPairResourcePolicyConditions,
+)
+from ai.backend.manager.models.resource_policy.row import (
+    KeyPairResourcePolicyRow,
+    ProjectResourcePolicyRow,
+    UserResourcePolicyRow,
 )
 from ai.backend.manager.models.resource_policy.scopes import (
     ProjectResourcePolicyTarget,

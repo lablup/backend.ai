@@ -10,7 +10,7 @@ from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.types import SlotName
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.errors.api import InvalidAPIParameters
-from ai.backend.manager.repositories.etcd_config import EtcdConfigRepository
+from ai.backend.manager.repositories.etcd_config.repository import EtcdConfigRepository
 from ai.backend.manager.services.etcd_config.actions.delete_config import DeleteConfigAction
 from ai.backend.manager.services.etcd_config.actions.get_config import GetConfigAction
 from ai.backend.manager.services.etcd_config.actions.get_resource_metadata import (

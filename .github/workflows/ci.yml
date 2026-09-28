@@ -27,19 +27,25 @@ jobs:
     steps:
       - uses: lablup/auto-labeler@main
 
-
   detect-changes:
-    if: |
-      !contains(github.event.pull_request.labels.*.name, 'skip:ci')
-      && !contains(toJSON(github.event.head_commit.message), 'skip:ci')
     runs-on: ubuntu-latest
     outputs:
       code: ${{ steps.filter.outputs.code }}
+      models: ${{ steps.filter.outputs.models }}
       release: ${{ steps.release.outputs.release }}
+      base-ref: ${{ steps.base.outputs.ref }}
     steps:
     - uses: actions/checkout@v6
       with:
+        fetch-depth: 2
         lfs: false
+    - name: Find the revision a changed-only run compares against
+      id: base
+      # A PR checks out the synthetic refs/pull/N/merge commit, a merge of the PR
+      # head into the current base tip, so its first parent is the base the merge was
+      # built on -- whatever the PR's commit count, rebases, or merges of main back
+      # into the topic branch. A push's first parent is the previous commit.
+      run: echo "ref=$(git rev-parse HEAD^1)" >> "$GITHUB_OUTPUT"
     - name: Detect release PR
       id: release
       uses: ./.github/actions/detect-release-pr
@@ -55,124 +61,41 @@ jobs:
             - 'pants.ci.toml'
             - 'python*.lock'
             - 'tools/*.lock'
-            - '.github/workflows/ci.yml'
+            - '.github/workflows/ci*.yml'
+            - '.github/actions/pants-caches/**'
+            - '.github/scripts/plan-ci-targets.py'
+          models:
+            - 'src/ai/backend/manager/models/**'
 
-
+  # A tag and a release PR check every target; anything else only what changed
+  # since `base-ref`. A fork PR gets no problem-matcher annotations. Only a push to
+  # a branch passes `cache-branch`, and the caches are saved only when
+  # `decide-cache-save.sh` finds it at the tip of main or of a maintained version.
   check-build-and-lint:
     needs: detect-changes
     if: |
       always()
-      && !contains(github.event.pull_request.labels.*.name, 'skip:ci')
-      && !contains(toJSON(github.event.head_commit.message), 'skip:ci')
       && (
         needs.detect-changes.result != 'success'
         || needs.detect-changes.outputs.code == 'true'
         || startsWith(github.ref, 'refs/tags/')
         || needs.detect-changes.outputs.release == 'true'
       )
-    runs-on: ubuntu-latest
-    steps:
-    - name: Verify detect-changes
-      if: needs.detect-changes.result != 'success'
-      run: |
-        echo "detect-changes did not succeed: ${{ needs.detect-changes.result }}"
-        exit 1
-    - name: Detect fork PR
-      run: |
-        if [ "$GITHUB_EVENT_NAME" == "pull_request" ] \
-          && [ "${{ github.event.pull_request.head.repo.full_name }}" != "${{ github.event.pull_request.base.repo.full_name }}" ]; then
-          echo "IS_FORK_PR=true" >> "${GITHUB_ENV}"
-        else
-          echo "IS_FORK_PR=false" >> "${GITHUB_ENV}"
-        fi
-    - name: Check out the revision with minimal required history
-      uses: actions/checkout@v6
-      with:
-        # PR events check out the synthetic refs/pull/N/merge commit, so depth 2
-        # covers HEAD plus both parents (base = HEAD^1, PR head = HEAD^2); push
-        # events need HEAD plus HEAD~1. See "Calculate base ref" for usage.
-        fetch-depth: 2
-        lfs: false
-    - name: Extract Python version from pants.toml
-      run: |
-        PYTHON_VERSION=$(grep -m 1 -oP '(?<=CPython==)([^"]+)' pants.toml)
-        echo "PANTS_CONFIG_FILES=pants.ci.toml" >> $GITHUB_ENV
-        echo "PROJECT_PYTHON_VERSION=$PYTHON_VERSION" >> $GITHUB_ENV
-    - name: Set up Python as Runtime
-      uses: actions/setup-python@v6
-      with:
-        python-version: ${{ env.PROJECT_PYTHON_VERSION }}
-    - name: Test the release-grade classifier
-      run: python ./scripts/test_determine_release_type.py
-    - name: Set up remote cache backend (if applicable)
-      run: |
-        echo "PANTS_REMOTE_STORE_ADDRESS=${REMOTE_CACHE_BACKEND_ENDPOINT}" >> $GITHUB_ENV
-        echo "PANTS_REMOTE_CACHE_READ=true" >> $GITHUB_ENV
-        echo "PANTS_REMOTE_CACHE_WRITE=true" >> $GITHUB_ENV
-        echo "PANTS_REMOTE_INSTANCE_NAME=main" >> $GITHUB_ENV
-      env:
-        REMOTE_CACHE_BACKEND_ENDPOINT: ${{ secrets.PANTS_REMOTE_CACHE_ENDPOINT_ARC }}
-      if: ${{ env.REMOTE_CACHE_BACKEND_ENDPOINT != '' }}
-    - name: Bootstrap Pants
-      uses: pantsbuild/actions/init-pants@v11
-      # See: github.com/pantsbuild/actions/tree/main/init-pants/
-      # ref) https://github.com/pantsbuild/example-python/blob/main/.github/workflows/pants.yaml#L30-L49
-      with:
-        gha-cache-key: v1
-        named-caches-hash: ${{ hashFiles('python*.lock', 'tools/*.lock') }}
-        cache-lmdb-store: 'true'
-    - name: Calculate base ref
-      run: |
-        if [ "$GITHUB_EVENT_NAME" == "pull_request" ]; then
-          # actions/checkout checks out refs/pull/N/merge for PR events, a
-          # synthetic merge of the PR head into the current base tip. HEAD^1
-          # is therefore the base used to construct that merge — always
-          # present in the shallow tree at depth 2, regardless of how many
-          # commits the PR has, whether it has been rebased, or whether main
-          # has been merged back into the topic branch (which would inflate
-          # pull_request.commits with non-PR commits).
-          BASE_REF=$(git rev-parse HEAD^1)
-        else
-          BASE_REF="HEAD~1"
-        fi
-        echo "BASE_REF=$BASE_REF" >> $GITHUB_ENV
-    - name: Check BUILD files
-      env:
-        IS_RELEASE_PR: ${{ needs.detect-changes.outputs.release }}
-      run: |
-        if [[ "$GITHUB_REF" == refs/tags/* || "$IS_RELEASE_PR" == "true" ]]; then
-          pants tailor --check update-build-files --check '::'
-        else
-          pants tailor --check update-build-files --check --changed-since=$BASE_REF
-        fi
-    - name: Lint
-      run: |
-        if [ "$IS_FORK_PR" == "true" ]; then
-          echo "(skipping matchers for fork pull request)"
-        else
-          echo "::add-matcher::.github/workflows/flake8-matcher.json"
-        fi
-        pants lint --changed-since=$BASE_REF
-    - name: Check the seed role declaration
-      # Always, not only when the declaration changed: the entity types it answers
-      # for are read at run time, so adding one changes the answer without touching
-      # any file `--changed-since` would select.
-      run: |
-        pants test tests/unit/manager/data/permission/seed::
-    - name: Upload pants log
-      uses: actions/upload-artifact@v5
-      with:
-        name: pants.check-build-and-lint.log
-        path: .pants.d/workdir/pants.log
-      if: always()  # We want the log even on failures.
+    uses: ./.github/workflows/ci-lint.yml
+    with:
+      detect-changes-result: ${{ needs.detect-changes.result }}
+      base-ref: ${{ needs.detect-changes.outputs.base-ref }}
+      annotate: ${{ github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.event.pull_request.base.repo.full_name }}
+      full-run: ${{ startsWith(github.ref, 'refs/tags/') || needs.detect-changes.outputs.release == 'true' }}
+      cache-branch: ${{ github.event_name == 'push' && startsWith(github.ref, 'refs/heads/') && github.ref_name || '' }}
 
-
-  typecheck:
+  # Builds the dependents map once and hands every typecheck and test job its
+  # targets in the `ci-targets` artifact, with the shards that hold a target. A
+  # job with no targets is not started, so each gate below also checks this job.
+  plan-targets:
     needs: detect-changes
     if: |
       always()
-      && !contains(github.event.pull_request.labels.*.name, 'skip:ci')
-      && !contains(toJSON(github.event.head_commit.message), 'skip:ci')
       && (
         needs.detect-changes.result != 'success'
         || needs.detect-changes.outputs.code == 'true'
@@ -180,88 +103,91 @@ jobs:
         || needs.detect-changes.outputs.release == 'true'
       )
     runs-on: ubuntu-latest
+    outputs:
+      typecheck: ${{ steps.plan.outputs.typecheck }}
+      unit-shards: ${{ steps.plan.outputs.unit-shards }}
+      component-shards: ${{ steps.plan.outputs.component-shards }}
+      integration-shards: ${{ steps.plan.outputs.integration-shards }}
+      scenario-shards: ${{ steps.plan.outputs.scenario-shards }}
     steps:
     - name: Verify detect-changes
       if: needs.detect-changes.result != 'success'
+      env:
+        RESULT: ${{ needs.detect-changes.result }}
       run: |
-        echo "detect-changes did not succeed: ${{ needs.detect-changes.result }}"
+        echo "detect-changes did not succeed: $RESULT"
         exit 1
-    - name: Detect fork PR
-      run: |
-        if [ "$GITHUB_EVENT_NAME" == "pull_request" ] \
-          && [ "${{ github.event.pull_request.head.repo.full_name }}" != "${{ github.event.pull_request.base.repo.full_name }}" ]; then
-          echo "IS_FORK_PR=true" >> "${GITHUB_ENV}"
-        else
-          echo "IS_FORK_PR=false" >> "${GITHUB_ENV}"
-        fi
     - name: Check out the revision with minimal required history
       uses: actions/checkout@v6
       with:
-        # PR events check out the synthetic refs/pull/N/merge commit, so depth 2
-        # covers HEAD plus both parents (base = HEAD^1, PR head = HEAD^2); push
-        # events need HEAD plus HEAD~1. See "Calculate base ref" for usage.
+        # Depth 2 holds `base-ref`.
         fetch-depth: 2
         lfs: false
     - name: Extract Python version from pants.toml
       run: |
         PYTHON_VERSION=$(grep -m 1 -oP '(?<=CPython==)([^"]+)' pants.toml)
-        echo "PANTS_CONFIG_FILES=pants.ci.toml" >> $GITHUB_ENV
-        echo "PROJECT_PYTHON_VERSION=$PYTHON_VERSION" >> $GITHUB_ENV
+        echo "PANTS_CONFIG_FILES=pants.ci.toml" >> "$GITHUB_ENV"
+        echo "PROJECT_PYTHON_VERSION=$PYTHON_VERSION" >> "$GITHUB_ENV"
     - name: Set up Python as Runtime
       uses: actions/setup-python@v6
       with:
         python-version: ${{ env.PROJECT_PYTHON_VERSION }}
-    - name: Set up remote cache backend (if applicable)
-      run: |
-        echo "PANTS_REMOTE_STORE_ADDRESS=${REMOTE_CACHE_BACKEND_ENDPOINT}" >> $GITHUB_ENV
-        echo "PANTS_REMOTE_CACHE_READ=true" >> $GITHUB_ENV
-        echo "PANTS_REMOTE_CACHE_WRITE=true" >> $GITHUB_ENV
-        echo "PANTS_REMOTE_INSTANCE_NAME=main" >> $GITHUB_ENV
-      env:
-        REMOTE_CACHE_BACKEND_ENDPOINT: ${{ secrets.PANTS_REMOTE_CACHE_ENDPOINT_ARC }}
-      if: ${{ env.REMOTE_CACHE_BACKEND_ENDPOINT != '' }}
+    - name: Restore the Pants caches
+      uses: ./.github/actions/pants-caches
+      with:
+        mode: restore
     - name: Bootstrap Pants
       uses: pantsbuild/actions/init-pants@v11
       with:
-        gha-cache-key: v1
-        named-caches-hash: ${{ hashFiles('python*.lock', 'tools/*.lock') }}
-        cache-lmdb-store: 'true'
-    - name: Calculate base ref
+        named-caches-hash: disable
+        cache-lmdb-store: 'false'
+    - name: Plan the targets and shards
+      id: plan
+      env:
+        # The dependents map holds about 6.5GiB; above the limit pantsd drops it and
+        # the next run of the planner builds it again.
+        PANTS_PANTSD_MAX_MEMORY_USAGE: 10GiB
+        BASE_REF: ${{ needs.detect-changes.outputs.base-ref }}
+        FULL_RUN: ${{ startsWith(github.ref, 'refs/tags/') || needs.detect-changes.outputs.release == 'true' }}
       run: |
-        if [ "$GITHUB_EVENT_NAME" == "pull_request" ]; then
-          # See `check-build-and-lint` job above for rationale.
-          BASE_REF=$(git rev-parse HEAD^1)
-        else
-          BASE_REF="HEAD~1"
-        fi
-        echo "BASE_REF=$BASE_REF" >> $GITHUB_ENV
-    - name: Typecheck
-      run: |
-        if [ "$IS_FORK_PR" == "true" ]; then
-          echo "(skipping matchers for fork pull request)"
-        else
-          echo "::add-matcher::.github/workflows/mypy-matcher.json"
-        fi
-        pants check --changed-since=$BASE_REF --changed-dependents=transitive
+        flags=()
+        if [ "$FULL_RUN" == "true" ]; then flags=(--full-run); fi
+        .github/scripts/plan-ci-targets.py --base-ref "$BASE_REF" "${flags[@]}" \
+          --out dist/ci-targets | tee -a "$GITHUB_OUTPUT"
+    - name: Upload the targets
+      uses: actions/upload-artifact@v5
+      with:
+        name: ci-targets
+        path: dist/ci-targets
     - name: Upload pants log
       uses: actions/upload-artifact@v5
       with:
-        name: pants.typecheck.log
+        name: pants.plan-targets.log
         path: .pants.d/workdir/pants.log
       if: always()  # We want the log even on failures.
 
+  typecheck:
+    needs: plan-targets
+    if: needs.plan-targets.result == 'success' && needs.plan-targets.outputs.typecheck == 'true'
+    uses: ./.github/workflows/ci-typecheck.yml
+    with:
+      targets-artifact: ci-targets
+      annotate: ${{ github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.event.pull_request.base.repo.full_name }}
+      cache-branch: ${{ github.event_name == 'push' && startsWith(github.ref, 'refs/heads/') && github.ref_name || '' }}
 
   lint-and-typecheck:
-    needs: [check-build-and-lint, typecheck]
+    needs: [check-build-and-lint, plan-targets, typecheck]
     if: always()
     runs-on: ubuntu-latest
     steps:
     - run: |
         lint_result="${{ needs.check-build-and-lint.result }}"
+        plan_result="${{ needs.plan-targets.result }}"
         typecheck_result="${{ needs.typecheck.result }}"
         echo "check-build-and-lint: $lint_result"
+        echo "plan-targets: $plan_result"
         echo "typecheck: $typecheck_result"
-        for r in "$lint_result" "$typecheck_result"; do
+        for r in "$lint_result" "$plan_result" "$typecheck_result"; do
           if [ "$r" != "success" ] && [ "$r" != "skipped" ]; then
             echo "FAIL: unexpected result $r"
             exit 1
@@ -269,498 +195,25 @@ jobs:
         done
         echo "OK"
 
+  alembic:
+    needs: detect-changes
+    if: |
+      needs.detect-changes.result == 'success'
+      && (
+        (github.event_name == 'pull_request'
+          && (needs.detect-changes.outputs.models == 'true' || needs.detect-changes.outputs.release == 'true'))
+        || (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/'))
+      )
+    uses: ./.github/workflows/ci-alembic.yml
 
   check-alembic-migrations:
-    if: |
-      github.event_name == 'pull_request'
-      || (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/'))
-    runs-on: ubuntu-latest
-    steps:
-    - name: Check out the revision
-      uses: actions/checkout@v6
-      with:
-        lfs: false
-    - uses: dorny/paths-filter@v3
-      id: filter
-      with:
-        filters: |
-          models:
-            - 'src/ai/backend/manager/models/**'
-    - name: Detect release PR
-      uses: ./.github/actions/detect-release-pr
-    - name: Decide whether to run the migration check
-      env:
-        MODELS_CHANGED: ${{ steps.filter.outputs.models }}
-      run: |
-        if [[ "$MODELS_CHANGED" == "true" || "$GITHUB_REF" == refs/tags/* || "$IS_RELEASE_PR" == "true" ]]; then
-          echo "RUN_ALEMBIC_CHECK=true" >> "$GITHUB_ENV"
-        else
-          echo "RUN_ALEMBIC_CHECK=false" >> "$GITHUB_ENV"
-        fi
-    - name: Skip if no model changes
-      if: env.RUN_ALEMBIC_CHECK != 'true'
-      run: |
-        echo "No alembic-related changes detected, skipping."
-        exit 0
-    - name: Parse versions from config
-      if: env.RUN_ALEMBIC_CHECK == 'true'
-      run: |
-        PYTHON_VERSION=$(grep -m 1 -oP '(?<=CPython==)([^"]+)' pants.toml)
-        echo "PANTS_CONFIG_FILES=pants.ci.toml" >> $GITHUB_ENV
-        echo "PROJECT_PYTHON_VERSION=$PYTHON_VERSION" >> $GITHUB_ENV
-    - name: Set up Python as Runtime
-      if: env.RUN_ALEMBIC_CHECK == 'true'
-      uses: actions/setup-python@v6
-      with:
-        python-version: ${{ env.PROJECT_PYTHON_VERSION }}
-    - name: Check for multiple heads
-      if: env.RUN_ALEMBIC_CHECK == 'true'
-      run: python scripts/check-multiple-alembic-heads.py
-    - name: Set up remote cache backend (if applicable)
-      if: env.RUN_ALEMBIC_CHECK == 'true' && env.REMOTE_CACHE_BACKEND_ENDPOINT != ''
-      run: |
-        echo "PANTS_REMOTE_STORE_ADDRESS=${REMOTE_CACHE_BACKEND_ENDPOINT}" >> $GITHUB_ENV
-        echo "PANTS_REMOTE_CACHE_READ=true" >> $GITHUB_ENV
-        echo "PANTS_REMOTE_CACHE_WRITE=true" >> $GITHUB_ENV
-        echo "PANTS_REMOTE_INSTANCE_NAME=main" >> $GITHUB_ENV
-      env:
-        REMOTE_CACHE_BACKEND_ENDPOINT: ${{ secrets.PANTS_REMOTE_CACHE_ENDPOINT_ARC }}
-    - name: Bootstrap Pants
-      if: env.RUN_ALEMBIC_CHECK == 'true'
-      uses: pantsbuild/actions/init-pants@v11
-      with:
-        gha-cache-key: v1
-        named-caches-hash: ${{ hashFiles('python*.lock', 'tools/*.lock') }}
-        # ``pants export`` builds a venv into the named caches; caching the
-        # lmdb_store (process cache) here desyncs from the named-caches cache
-        # (lmdb hit + named-caches miss -> dangling venv python). The other
-        # export jobs (build-scies/wheels/supergraph) already disable it.
-        cache-lmdb-store: 'false'
-    - name: Prepare DB
-      if: env.RUN_ALEMBIC_CHECK == 'true'
-      run: docker compose -f docker-compose.halfstack-main.yml up -d backendai-half-db --wait
-    - name: Pants export
-      if: env.RUN_ALEMBIC_CHECK == 'true'
-      run: pants export --resolve=python-default
-    - name: Prepare the alembic configuration file
-      if: env.RUN_ALEMBIC_CHECK == 'true'
-      run: cp configs/manager/halfstack.alembic.ini alembic.ini
-    - name: Prepare database schema
-      if: env.RUN_ALEMBIC_CHECK == 'true'
-      run: ./backend.ai mgr schema oneshot
-    - name: Try creating alembic migration
-      if: env.RUN_ALEMBIC_CHECK == 'true'
-      id: create-revision
-      run: |
-        output=$(./py -m alembic revision --autogenerate)
-        revision_file=$(echo "$output" | grep -oP '(?<=Generating ).*\.py')
-        echo "REVISION_FILE=$revision_file" >> $GITHUB_OUTPUT
-    - name: Verify that revision is empty
-      if: env.RUN_ALEMBIC_CHECK == 'true'
-      run: python scripts/check-alembic-revision.py ${{ steps.create-revision.outputs.REVISION_FILE }}
-
-
-  test-unit:
-    needs: detect-changes
-    if: |
-      always()
-      && !contains(github.event.pull_request.labels.*.name, 'skip:ci')
-      && !contains(toJSON(github.event.head_commit.message), 'skip:ci')
-      && (
-        needs.detect-changes.result != 'success'
-        || needs.detect-changes.outputs.code == 'true'
-        || startsWith(github.ref, 'refs/tags/')
-        || needs.detect-changes.outputs.release == 'true'
-      )
-    runs-on: ${{ ((github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')) || needs.detect-changes.outputs.release == 'true') && 'ubuntu-latest-8-cores' || 'ubuntu-latest' }}
-    strategy:
-      fail-fast: false
-      matrix:
-        shard: ${{ fromJSON('["0/6","1/6","2/6","3/6","4/6","5/6"]') }}
-    steps:
-    - name: Verify detect-changes
-      if: needs.detect-changes.result != 'success'
-      run: |
-        echo "detect-changes did not succeed: ${{ needs.detect-changes.result }}"
-        exit 1
-    - name: Check out the revision with minimal required history
-      uses: actions/checkout@v6
-      with:
-        # PR events check out the synthetic refs/pull/N/merge commit, so depth 2
-        # covers HEAD plus both parents (base = HEAD^1, PR head = HEAD^2); push
-        # events need HEAD plus HEAD~1. See "Calculate base ref" for usage.
-        fetch-depth: 2
-        lfs: false
-    - name: Extract Python version from pants.toml
-      run: |
-        PYTHON_VERSION=$(grep -m 1 -oP '(?<=CPython==)([^"]+)' pants.toml)
-        echo "PANTS_CONFIG_FILES=pants.ci.toml" >> $GITHUB_ENV
-        echo "PROJECT_PYTHON_VERSION=$PYTHON_VERSION" >> $GITHUB_ENV
-    - name: Set up Python as Runtime
-      uses: actions/setup-python@v6
-      with:
-        python-version: ${{ env.PROJECT_PYTHON_VERSION }}
-    - name: Set up remote cache backend (if applicable)
-      run: |
-        echo "PANTS_REMOTE_STORE_ADDRESS=${REMOTE_CACHE_BACKEND_ENDPOINT}" >> $GITHUB_ENV
-        echo "PANTS_REMOTE_CACHE_READ=true" >> $GITHUB_ENV
-        echo "PANTS_REMOTE_CACHE_WRITE=true" >> $GITHUB_ENV
-        echo "PANTS_REMOTE_INSTANCE_NAME=main" >> $GITHUB_ENV
-      env:
-        REMOTE_CACHE_BACKEND_ENDPOINT: ${{ secrets.PANTS_REMOTE_CACHE_ENDPOINT }}
-      if: ${{ env.REMOTE_CACHE_BACKEND_ENDPOINT != '' }}
-    - name: Bootstrap Pants
-      uses: pantsbuild/actions/init-pants@v11
-      with:
-        gha-cache-key: v1
-        named-caches-hash: ${{ hashFiles('python*.lock', 'tools/*.lock') }}
-        cache-lmdb-store: 'true'
-    - name: Test
-      timeout-minutes: 60
-      env:
-        IS_RELEASE_PR: ${{ needs.detect-changes.outputs.release }}
-      run: |
-        if [[ "$GITHUB_REF" == refs/tags/* || "$IS_RELEASE_PR" == "true" ]]; then
-          pants test --shard='${{ matrix.shard }}' \
-            tests/unit/:: -- -v
-        else
-          if [ "$GITHUB_EVENT_NAME" == "pull_request" ]; then
-            # See `check-build-and-lint` job for rationale on HEAD^1.
-            BASE_REF=$(git rev-parse HEAD^1)
-          else
-            BASE_REF="HEAD~1"
-          fi
-          pants test --changed-since=$BASE_REF --changed-dependents=direct \
-            --shard='${{ matrix.shard }}' \
-            --filter-address-regex='tests/unit/' -- -v
-        fi
-    - name: Upload pants log
-      uses: actions/upload-artifact@v5
-      with:
-        name: pants.test-unit.${{ strategy.job-index }}.log
-        path: .pants.d/workdir/pants.log
-      if: always()  # We want the log even on failures.
-
-
-  test-scenario:
-    needs: detect-changes
-    if: |
-      always()
-      && !contains(github.event.pull_request.labels.*.name, 'skip:ci')
-      && !contains(toJSON(github.event.head_commit.message), 'skip:ci')
-      && (
-        needs.detect-changes.result != 'success'
-        || needs.detect-changes.outputs.code == 'true'
-        || startsWith(github.ref, 'refs/tags/')
-        || needs.detect-changes.outputs.release == 'true'
-      )
-    runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        shard: ${{ fromJSON('["0/3","1/3","2/3"]') }}
-    steps:
-    - name: Verify detect-changes
-      if: needs.detect-changes.result != 'success'
-      run: |
-        echo "detect-changes did not succeed: ${{ needs.detect-changes.result }}"
-        exit 1
-    - name: Check out the revision with minimal required history
-      uses: actions/checkout@v6
-      with:
-        # See "Calculate base ref" in the unit job for why depth 2 is enough.
-        fetch-depth: 2
-        lfs: false
-    - name: Extract Python version from pants.toml
-      run: |
-        PYTHON_VERSION=$(grep -m 1 -oP '(?<=CPython==)([^"]+)' pants.toml)
-        echo "PANTS_CONFIG_FILES=pants.ci.toml" >> $GITHUB_ENV
-        echo "PROJECT_PYTHON_VERSION=$PYTHON_VERSION" >> $GITHUB_ENV
-    - name: Set up Python as Runtime
-      uses: actions/setup-python@v6
-      with:
-        python-version: ${{ env.PROJECT_PYTHON_VERSION }}
-    - name: Set up remote cache backend (if applicable)
-      run: |
-        echo "PANTS_REMOTE_STORE_ADDRESS=${REMOTE_CACHE_BACKEND_ENDPOINT}" >> $GITHUB_ENV
-        echo "PANTS_REMOTE_CACHE_READ=true" >> $GITHUB_ENV
-        echo "PANTS_REMOTE_CACHE_WRITE=true" >> $GITHUB_ENV
-        echo "PANTS_REMOTE_INSTANCE_NAME=main" >> $GITHUB_ENV
-      env:
-        REMOTE_CACHE_BACKEND_ENDPOINT: ${{ secrets.PANTS_REMOTE_CACHE_ENDPOINT }}
-      if: ${{ env.REMOTE_CACHE_BACKEND_ENDPOINT != '' }}
-    - name: Bootstrap Pants
-      uses: pantsbuild/actions/init-pants@v11
-      with:
-        gha-cache-key: v1
-        named-caches-hash: ${{ hashFiles('python*.lock', 'tools/*.lock') }}
-        cache-lmdb-store: 'true'
-    - name: Pick which components to run
-      id: pick
-      env:
-        IS_RELEASE_PR: ${{ needs.detect-changes.outputs.release }}
-      run: |
-        # A component runs whole or not at all: its report.md covers every scenario it
-        # holds, so a half-run component would look as though rows had disappeared.
-        # Selection is transitive, because a scenario reaches src through its seeds and
-        # a direct-dependents run would skip almost every row.
-        if [[ "$GITHUB_REF" == refs/tags/* || "$IS_RELEASE_PR" == "true" ]]; then
-          echo "targets=tests/scenario::" >> $GITHUB_OUTPUT
-          exit 0
-        fi
-        if [ "$GITHUB_EVENT_NAME" == "pull_request" ]; then
-          BASE_REF=$(git rev-parse HEAD^1)
-        else
-          BASE_REF="HEAD~1"
-        fi
-        touched=$(pants list --changed-since="$BASE_REF" --changed-dependents=transitive \
-          2>/dev/null | grep '^tests/scenario/' || true)
-        if [ -z "$touched" ]; then
-          echo "targets=" >> $GITHUB_OUTPUT
-          exit 0
-        fi
-        components=$(echo "$touched" \
-          | sed -n 's|^tests/scenario/bai_scenario/manager/\([^/]*\)/.*|\1|p' | sort -u)
-        picked="tests/scenario/bai_scenario/setup::"
-        for one in $components; do
-          picked="$picked tests/scenario/bai_scenario/manager/$one::"
-        done
-        echo "targets=$picked" >> $GITHUB_OUTPUT
-    - name: Run the scenarios and keep what each one did
-      if: steps.pick.outputs.targets != ''
-      timeout-minutes: 60
-      run: |
-        mkdir -p dist
-        BACKEND_SCENARIO_LOG=$PWD/dist/scenarios.jsonl pants test \
-          --test-extra-env-vars="+['BACKEND_SCENARIO_LOG']" \
-          --shard='${{ matrix.shard }}' \
-          ${{ steps.pick.outputs.targets }} -- -v
-    - name: Upload the report the run produced
-      uses: actions/upload-artifact@v5
-      with:
-        name: scenario-report.${{ strategy.job-index }}
-        path: dist/scenarios.jsonl
-      if: always()
-    - name: Upload pants log
-      uses: actions/upload-artifact@v5
-      with:
-        name: pants.test-scenario.${{ strategy.job-index }}.log
-        path: .pants.d/workdir/pants.log
-      if: always()
-
-  verify-scenario-report:
-    needs: test-scenario
-    if: always() && needs.test-scenario.result == 'success'
-    runs-on: ubuntu-latest
-    steps:
-    - name: Check out the revision with minimal required history
-      uses: actions/checkout@v6
-      with:
-        fetch-depth: 1
-        lfs: false
-    - name: Collect what every shard recorded
-      uses: actions/download-artifact@v5
-      with:
-        pattern: scenario-report.*
-        path: dist
-        merge-multiple: false
-    - name: Check each entity's report against the run
-      run: |
-        # A shard holds only part of a component, so the check needs every shard's
-        # record together. A component that did not run at all is not checked here;
-        # it is checked by the run that does hold it.
-        # download-artifact leaves no dist/ when the run matched no artifact, and
-        # this step runs under `set -e`, so an unguarded find would abort before the
-        # nothing-ran check below.
-        found=$(find dist -name scenarios.jsonl 2>/dev/null || true)
-        if [ -z "$found" ]; then
-          echo "no scenario ran; nothing to check"
-          exit 0
-        fi
-        python scripts/scenario-report.py $found \
-          --verify src/ai/backend/manager/api/adapters
-
-  test-component:
-    needs: detect-changes
-    if: |
-      always()
-      && !contains(github.event.pull_request.labels.*.name, 'skip:ci')
-      && !contains(toJSON(github.event.head_commit.message), 'skip:ci')
-      && (
-        needs.detect-changes.result != 'success'
-        || needs.detect-changes.outputs.code == 'true'
-        || startsWith(github.ref, 'refs/tags/')
-        || needs.detect-changes.outputs.release == 'true'
-      )
-    runs-on: ${{ ((github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')) || needs.detect-changes.outputs.release == 'true') && 'ubuntu-latest-8-cores' || 'ubuntu-latest' }}
-    strategy:
-      fail-fast: false
-      matrix:
-        shard: ${{ fromJSON('["0/6","1/6","2/6","3/6","4/6","5/6"]') }}
-    steps:
-    - name: Verify detect-changes
-      if: needs.detect-changes.result != 'success'
-      run: |
-        echo "detect-changes did not succeed: ${{ needs.detect-changes.result }}"
-        exit 1
-    - name: Check out the revision with minimal required history
-      uses: actions/checkout@v6
-      with:
-        # PR events check out the synthetic refs/pull/N/merge commit, so depth 2
-        # covers HEAD plus both parents (base = HEAD^1, PR head = HEAD^2); push
-        # events need HEAD plus HEAD~1. See "Calculate base ref" for usage.
-        fetch-depth: 2
-        lfs: false
-    - name: Extract Python version from pants.toml
-      run: |
-        PYTHON_VERSION=$(grep -m 1 -oP '(?<=CPython==)([^"]+)' pants.toml)
-        echo "PANTS_CONFIG_FILES=pants.ci.toml" >> $GITHUB_ENV
-        echo "PROJECT_PYTHON_VERSION=$PYTHON_VERSION" >> $GITHUB_ENV
-    - name: Set up Python as Runtime
-      uses: actions/setup-python@v6
-      with:
-        python-version: ${{ env.PROJECT_PYTHON_VERSION }}
-    - name: Set up remote cache backend (if applicable)
-      run: |
-        echo "PANTS_REMOTE_STORE_ADDRESS=${REMOTE_CACHE_BACKEND_ENDPOINT}" >> $GITHUB_ENV
-        echo "PANTS_REMOTE_CACHE_READ=true" >> $GITHUB_ENV
-        echo "PANTS_REMOTE_CACHE_WRITE=true" >> $GITHUB_ENV
-        echo "PANTS_REMOTE_INSTANCE_NAME=main" >> $GITHUB_ENV
-      env:
-        REMOTE_CACHE_BACKEND_ENDPOINT: ${{ secrets.PANTS_REMOTE_CACHE_ENDPOINT }}
-      if: ${{ env.REMOTE_CACHE_BACKEND_ENDPOINT != '' }}
-    - name: Bootstrap Pants
-      uses: pantsbuild/actions/init-pants@v11
-      with:
-        gha-cache-key: v1
-        named-caches-hash: ${{ hashFiles('python*.lock', 'tools/*.lock') }}
-        cache-lmdb-store: 'true'
-    - name: Test
-      timeout-minutes: 60
-      env:
-        IS_RELEASE_PR: ${{ needs.detect-changes.outputs.release }}
-      run: |
-        # configure redis sentinel cluster hostnames for testing
-        grep -q "127.0.0.1 node01" /etc/hosts || echo "127.0.0.1 node01" | sudo tee -a /etc/hosts
-        grep -q "127.0.0.1 node02" /etc/hosts || echo "127.0.0.1 node02" | sudo tee -a /etc/hosts
-        grep -q "127.0.0.1 node03" /etc/hosts || echo "127.0.0.1 node03" | sudo tee -a /etc/hosts
-        if [[ "$GITHUB_REF" == refs/tags/* || "$IS_RELEASE_PR" == "true" ]]; then
-          pants test --shard='${{ matrix.shard }}' \
-            tests/component/:: -- -v
-        else
-          if [ "$GITHUB_EVENT_NAME" == "pull_request" ]; then
-            # See `check-build-and-lint` job for rationale on HEAD^1.
-            BASE_REF=$(git rev-parse HEAD^1)
-          else
-            BASE_REF="HEAD~1"
-          fi
-          pants test --changed-since=$BASE_REF --changed-dependents=direct \
-            --shard='${{ matrix.shard }}' \
-            --filter-address-regex='tests/component/' -- -v
-        fi
-    - name: Upload pants log
-      uses: actions/upload-artifact@v5
-      with:
-        name: pants.test-component.${{ strategy.job-index }}.log
-        path: .pants.d/workdir/pants.log
-      if: always()  # We want the log even on failures.
-
-
-  test-integration:
-    needs: detect-changes
-    if: |
-      always()
-      && !contains(github.event.pull_request.labels.*.name, 'skip:ci')
-      && !contains(toJSON(github.event.head_commit.message), 'skip:ci')
-      && (
-        needs.detect-changes.result != 'success'
-        || needs.detect-changes.outputs.code == 'true'
-        || startsWith(github.ref, 'refs/tags/')
-        || needs.detect-changes.outputs.release == 'true'
-      )
-    runs-on: ${{ ((github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')) || needs.detect-changes.outputs.release == 'true') && 'ubuntu-latest-8-cores' || 'ubuntu-latest' }}
-    strategy:
-      fail-fast: false
-      matrix:
-        shard: ${{ fromJSON('["0/2","1/2"]') }}
-    steps:
-    - name: Verify detect-changes
-      if: needs.detect-changes.result != 'success'
-      run: |
-        echo "detect-changes did not succeed: ${{ needs.detect-changes.result }}"
-        exit 1
-    - name: Check out the revision with minimal required history
-      uses: actions/checkout@v6
-      with:
-        # PR events check out the synthetic refs/pull/N/merge commit, so depth 2
-        # covers HEAD plus both parents (base = HEAD^1, PR head = HEAD^2); push
-        # events need HEAD plus HEAD~1. See "Calculate base ref" for usage.
-        fetch-depth: 2
-        lfs: false
-    - name: Extract Python version from pants.toml
-      run: |
-        PYTHON_VERSION=$(grep -m 1 -oP '(?<=CPython==)([^"]+)' pants.toml)
-        echo "PANTS_CONFIG_FILES=pants.ci.toml" >> $GITHUB_ENV
-        echo "PROJECT_PYTHON_VERSION=$PYTHON_VERSION" >> $GITHUB_ENV
-    - name: Set up Python as Runtime
-      uses: actions/setup-python@v6
-      with:
-        python-version: ${{ env.PROJECT_PYTHON_VERSION }}
-    - name: Set up remote cache backend (if applicable)
-      run: |
-        echo "PANTS_REMOTE_STORE_ADDRESS=${REMOTE_CACHE_BACKEND_ENDPOINT}" >> $GITHUB_ENV
-        echo "PANTS_REMOTE_CACHE_READ=true" >> $GITHUB_ENV
-        echo "PANTS_REMOTE_CACHE_WRITE=true" >> $GITHUB_ENV
-        echo "PANTS_REMOTE_INSTANCE_NAME=main" >> $GITHUB_ENV
-      env:
-        REMOTE_CACHE_BACKEND_ENDPOINT: ${{ secrets.PANTS_REMOTE_CACHE_ENDPOINT }}
-      if: ${{ env.REMOTE_CACHE_BACKEND_ENDPOINT != '' }}
-    - name: Bootstrap Pants
-      uses: pantsbuild/actions/init-pants@v11
-      with:
-        gha-cache-key: v1
-        named-caches-hash: ${{ hashFiles('python*.lock', 'tools/*.lock') }}
-        cache-lmdb-store: 'true'
-    - name: Test
-      timeout-minutes: 60
-      env:
-        IS_RELEASE_PR: ${{ needs.detect-changes.outputs.release }}
-      run: |
-        # configure redis sentinel cluster hostnames for testing
-        grep -q "127.0.0.1 node01" /etc/hosts || echo "127.0.0.1 node01" | sudo tee -a /etc/hosts
-        grep -q "127.0.0.1 node02" /etc/hosts || echo "127.0.0.1 node02" | sudo tee -a /etc/hosts
-        grep -q "127.0.0.1 node03" /etc/hosts || echo "127.0.0.1 node03" | sudo tee -a /etc/hosts
-        # Release: run full integration suite; PR/push: only directly changed integration tests
-        if [[ "$GITHUB_REF" == refs/tags/* || "$IS_RELEASE_PR" == "true" ]]; then
-          pants test --shard='${{ matrix.shard }}' \
-            tests/integration/:: -- -v
-        else
-          if [ "$GITHUB_EVENT_NAME" == "pull_request" ]; then
-            # See `check-build-and-lint` job for rationale on HEAD^1.
-            BASE_REF=$(git rev-parse HEAD^1)
-          else
-            BASE_REF="HEAD~1"
-          fi
-          pants test --changed-since=$BASE_REF \
-            --shard='${{ matrix.shard }}' \
-            --filter-address-regex='tests/integration/' -- -v
-        fi
-    - name: Upload pants log
-      uses: actions/upload-artifact@v5
-      with:
-        name: pants.test-integration.${{ strategy.job-index }}.log
-        path: .pants.d/workdir/pants.log
-      if: always()  # We want the log even on failures.
-
-
-  test-unit-gate:
-    needs: [test-unit]
+    needs: [alembic]
     if: always()
     runs-on: ubuntu-latest
     steps:
     - run: |
-        r="${{ needs.test-unit.result }}"
-        echo "test-unit: $r"
+        r="${{ needs.alembic.result }}"
+        echo "alembic: $r"
         if [ "$r" = "success" ] || [ "$r" = "skipped" ]; then
           echo "OK"
         else
@@ -768,19 +221,83 @@ jobs:
           exit 1
         fi
 
-  test-component-gate:
-    needs: [test-component, test-scenario, verify-scenario-report]
+  test-unit:
+    needs: [detect-changes, plan-targets]
+    if: needs.plan-targets.result == 'success' && needs.plan-targets.outputs.unit-shards != '[]'
+    uses: ./.github/workflows/ci-test.yml
+    with:
+      suite: unit
+      shards: ${{ needs.plan-targets.outputs.unit-shards }}
+      runner: ${{ ((github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')) || needs.detect-changes.outputs.release == 'true') && 'ubuntu-latest-8-cores' || 'ubuntu-latest' }}
+      targets-artifact: ci-targets
+      cache-branch: ${{ github.event_name == 'push' && startsWith(github.ref, 'refs/heads/') && github.ref_name || '' }}
+
+  test-scenario:
+    needs: plan-targets
+    if: needs.plan-targets.result == 'success' && needs.plan-targets.outputs.scenario-shards != '[]'
+    uses: ./.github/workflows/ci-test-scenario.yml
+    with:
+      shards: ${{ needs.plan-targets.outputs.scenario-shards }}
+      runner: ubuntu-latest
+      targets-artifact: ci-targets
+      cache-branch: ${{ github.event_name == 'push' && startsWith(github.ref, 'refs/heads/') && github.ref_name || '' }}
+
+  test-component:
+    needs: [detect-changes, plan-targets]
+    if: needs.plan-targets.result == 'success' && needs.plan-targets.outputs.component-shards != '[]'
+    uses: ./.github/workflows/ci-test.yml
+    with:
+      suite: component
+      shards: ${{ needs.plan-targets.outputs.component-shards }}
+      runner: ${{ ((github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')) || needs.detect-changes.outputs.release == 'true') && 'ubuntu-latest-8-cores' || 'ubuntu-latest' }}
+      sentinel-hosts: true
+      targets-artifact: ci-targets
+      cache-branch: ${{ github.event_name == 'push' && startsWith(github.ref, 'refs/heads/') && github.ref_name || '' }}
+
+  test-integration:
+    needs: [detect-changes, plan-targets]
+    if: needs.plan-targets.result == 'success' && needs.plan-targets.outputs.integration-shards != '[]'
+    uses: ./.github/workflows/ci-test.yml
+    with:
+      suite: integration
+      shards: ${{ needs.plan-targets.outputs.integration-shards }}
+      runner: ${{ ((github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')) || needs.detect-changes.outputs.release == 'true') && 'ubuntu-latest-8-cores' || 'ubuntu-latest' }}
+      sentinel-hosts: true
+      targets-artifact: ci-targets
+      cache-branch: ${{ github.event_name == 'push' && startsWith(github.ref, 'refs/heads/') && github.ref_name || '' }}
+
+  test-unit-gate:
+    needs: [plan-targets, test-unit]
     if: always()
     runs-on: ubuntu-latest
     steps:
     - run: |
-        for name in component scenario report; do
+        for name in plan-targets test-unit; do
           case "$name" in
-            component) r="${{ needs.test-component.result }}" ;;
-            scenario) r="${{ needs.test-scenario.result }}" ;;
-            report) r="${{ needs.verify-scenario-report.result }}" ;;
+            plan-targets) r="${{ needs.plan-targets.result }}" ;;
+            test-unit) r="${{ needs.test-unit.result }}" ;;
           esac
-          echo "test-$name: $r"
+          echo "$name: $r"
+          if [ "$r" != "success" ] && [ "$r" != "skipped" ]; then
+            echo "FAIL"
+            exit 1
+          fi
+        done
+        echo "OK"
+
+  test-component-gate:
+    needs: [plan-targets, test-component, test-scenario]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+    - run: |
+        for name in plan-targets test-component test-scenario; do
+          case "$name" in
+            plan-targets) r="${{ needs.plan-targets.result }}" ;;
+            test-component) r="${{ needs.test-component.result }}" ;;
+            test-scenario) r="${{ needs.test-scenario.result }}" ;;
+          esac
+          echo "$name: $r"
           if [ "$r" != "success" ] && [ "$r" != "skipped" ]; then
             echo "FAIL"
             exit 1
@@ -789,19 +306,23 @@ jobs:
         echo "OK"
 
   test-integration-gate:
-    needs: [test-integration]
+    needs: [plan-targets, test-integration]
     if: always()
     runs-on: ubuntu-latest
     steps:
     - run: |
-        r="${{ needs.test-integration.result }}"
-        echo "test-integration: $r"
-        if [ "$r" = "success" ] || [ "$r" = "skipped" ]; then
-          echo "OK"
-        else
-          echo "FAIL"
-          exit 1
-        fi
+        for name in plan-targets test-integration; do
+          case "$name" in
+            plan-targets) r="${{ needs.plan-targets.result }}" ;;
+            test-integration) r="${{ needs.test-integration.result }}" ;;
+          esac
+          echo "$name: $r"
+          if [ "$r" != "success" ] && [ "$r" != "skipped" ]; then
+            echo "FAIL"
+            exit 1
+          fi
+        done
+        echo "OK"
 
   determine-release-grade:
     if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
@@ -818,374 +339,27 @@ jobs:
       id: grade
       run: python3 ./scripts/determine-release-type.py "$(cat VERSION)" >> "$GITHUB_OUTPUT"
 
-  build-scies:
+  release:
     needs: [determine-release-grade, lint-and-typecheck, test-unit-gate, test-component-gate, test-integration-gate, check-alembic-migrations]
     if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
-      && needs.determine-release-grade.outputs.RELEASE_AUDIENCE != 'internal'
-    strategy:
-      fail-fast: false
-      matrix:
-        # ubuntu-22.04: x86-64
-        # ubuntu-22.04-arm: aarch64
-        # macos-15: apple silicon
-        os: [ubuntu-22.04, ubuntu-22.04-arm, macos-15]
-    runs-on: ${{ matrix.os }}
-    env:
-      SCIENCE_AUTH_API_GITHUB_COM_BEARER: ${{ secrets.GITHUB_TOKEN }}
-    steps:
-    - name: Check out the revision
-      uses: actions/checkout@v6
-    - name: Fetch remote tags
-      run: git fetch origin 'refs/tags/*:refs/tags/*' -f
-    - name: Git LFS Pull
-      run: git lfs pull
-    - name: Extract Python version from pants.toml
-      run: |
-        PYTHON_VERSION=$(awk -F'["]' '/CPython==/ {print $2; exit}' pants.toml | sed 's/CPython==//')
-        echo "PANTS_CONFIG_FILES=pants.ci.toml" >> $GITHUB_ENV
-        echo "PROJECT_PYTHON_VERSION=$PYTHON_VERSION" >> $GITHUB_ENV
-    - name: Install coreutils for macOS
-      if: ${{ startsWith(matrix.os, 'macos') }}
-      run: brew install coreutils
-    - name: Set up Python as Runtime
-      uses: actions/setup-python@v6
-      with:
-        python-version: ${{ env.PROJECT_PYTHON_VERSION }}
-        cache: "pip"
-    - name: Bootstrap Pants
-      uses: pantsbuild/actions/init-pants@v11
-      with:
-        gha-cache-key: v1-${{ runner.arch }}
-        named-caches-hash: ${{ hashFiles('python*.lock', 'tools/*.lock') }}
-        cache-lmdb-store: 'false'
-    - name: Build both lazy and fat packages
-      run: |
-        pants --tag="scie" package '::'
-        # Rename artifacts to have the platform suffix
-        platform_suffix="$(python scripts/get-platform-suffix.py)"
-        for artifact in dist/backendai-*; do
-          mv "${artifact}" "${artifact}-${platform_suffix}"
-        done
-        # Generate checksums. NOTE: 'pants run' does not support parallelization
-        pants list --filter-tag-regex='checksum' '::' | xargs -n 1 pants run
-        # Merge checksums into a single file
-        cat dist/*.sha256 > dist/checksum.txt
-        mv dist/checksum.txt dist/checksum-${platform_suffix}.txt
-        rm dist/*.sha256
-    - name: Upload scies
-      uses: actions/upload-artifact@v5
-      with:
-        name: scies-${{ matrix.os }}
-        path: dist/*
-    - name: Upload pants log
-      uses: actions/upload-artifact@v5
-      with:
-        name: pants-${{ matrix.os }}.build-scies.log
-        path: .pants.d/workdir/pants.log
-      if: always()  # We want the log even on failures.
+    uses: ./.github/workflows/ci-release.yml
+    with:
+      tag: ${{ github.ref_name }}
+      release-audience: ${{ needs.determine-release-grade.outputs.RELEASE_AUDIENCE }}
+      is-prerelease: ${{ needs.determine-release-grade.outputs.IS_PRERELEASE }}
+    secrets: inherit
 
-
-  build-wheels:
-    needs: [lint-and-typecheck, test-unit-gate, test-component-gate, test-integration-gate, check-alembic-migrations]
+  post-release:
+    needs: [determine-release-grade, release]
     if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
-    runs-on: ubuntu-22.04
-    steps:
-    - name: Check out the revision
-      uses: actions/checkout@v6
-    - name: Fetch remote tags
-      run: git fetch origin 'refs/tags/*:refs/tags/*' -f
-    - name: Git LFS Pull
-      run: git lfs pull
-    - name: Extract Python version from pants.toml
-      run: |
-        PYTHON_VERSION=$(awk -F'["]' '/CPython==/ {print $2; exit}' pants.toml | sed 's/CPython==//')
-        echo "PANTS_CONFIG_FILES=pants.ci.toml" >> $GITHUB_ENV
-        echo "PROJECT_PYTHON_VERSION=$PYTHON_VERSION" >> $GITHUB_ENV
-    - name: Set up Python as Runtime
-      uses: actions/setup-python@v6
-      with:
-        python-version: ${{ env.PROJECT_PYTHON_VERSION }}
-        cache: "pip"
-    - name: Install local dependencies for packaging
-      run: |
-        pip install -U 'packaging>=21.3'
-    - name: Bootstrap Pants
-      uses: pantsbuild/actions/init-pants@v11
-      with:
-        gha-cache-key: v1
-        named-caches-hash: ${{ hashFiles('python*.lock', 'tools/*.lock') }}
-        cache-lmdb-store: 'false'
-    - name: Build wheel packages
-      run: |
-        ./scripts/build-wheels.sh
-    - name: Upload wheels
-      uses: actions/upload-artifact@v5
-      with:
-        name: wheels
-        path: |
-          dist/*
-          !dist/export/
-    - name: Upload pants log
-      uses: actions/upload-artifact@v5
-      with:
-        name: pants.build-wheels.log
-        path: .pants.d/workdir/pants.log
-      if: always()  # We want the log even on failures.
-
-
-  build-sbom:
-    needs: [determine-release-grade, lint-and-typecheck, test-unit-gate, test-component-gate, test-integration-gate, check-alembic-migrations]
-    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
-      && needs.determine-release-grade.outputs.RELEASE_AUDIENCE != 'internal'
-    uses: ./.github/workflows/sbom.yml
-
-  build-supergraph:
-    needs: [determine-release-grade, lint-and-typecheck, test-unit-gate, test-component-gate, test-integration-gate, check-alembic-migrations]
-    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
-      && needs.determine-release-grade.outputs.RELEASE_AUDIENCE != 'internal'
-    runs-on: ubuntu-latest
-    steps:
-    - name: Check out the revision
-      uses: actions/checkout@v6
-    - name: Fetch remote tags
-      run: git fetch origin 'refs/tags/*:refs/tags/*' -f
-    - name: Extract Python version from pants.toml
-      run: |
-        PYTHON_VERSION=$(grep -m 1 -oP '(?<=CPython==)([^"]+)' pants.toml)
-        echo "PANTS_CONFIG_FILES=pants.ci.toml" >> $GITHUB_ENV
-        echo "PROJECT_PYTHON_VERSION=$PYTHON_VERSION" >> $GITHUB_ENV
-    - name: Set up Python as Runtime
-      uses: actions/setup-python@v6
-      with:
-        python-version: ${{ env.PROJECT_PYTHON_VERSION }}
-    - name: Bootstrap Pants
-      uses: pantsbuild/actions/init-pants@v11
-      with:
-        gha-cache-key: v1
-        named-caches-hash: ${{ hashFiles('python*.lock', 'tools/*.lock') }}
-        cache-lmdb-store: 'false'
-    - name: Pants export
-      run: pants export --resolve=python-default
-    - name: Install Rover CLI for generating supergraph
-      run: |
-        curl -sSL https://rover.apollo.dev/nix/latest | sh
-        echo "$HOME/.rover/bin" >> $GITHUB_PATH
-    - name: Generate GraphQL schemas and supergraph
-      env:
-        APOLLO_ELV2_LICENSE: accept
-      run: |
-        ./backend.ai mgr api dump-gql-schema --output schema.graphql
-        ./backend.ai mgr api dump-gql-schema --v2 --output v2-schema.graphql
-        ./backend.ai mgr api generate-supergraph --config configs/graphql/supergraph.yaml -o .
-    - name: Upload supergraph schema
-      uses: actions/upload-artifact@v5
-      with:
-        name: supergraph
-        path: supergraph.graphql
-    - name: Upload pants log
-      uses: actions/upload-artifact@v5
-      with:
-        name: pants.build-supergraph.log
-        path: .pants.d/workdir/pants.log
-      if: always()  # We want the log even on failures.
-
-  build-isla-sorna-image:
-    needs: [build-wheels]
-    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Trigger Isla Sorna repo image build
-        run: |
-          gh api /repos/lablup/isla-sorna/dispatches \
-              --method POST \
-              -f 'event_type=build-images' \
-              -F "client_payload[version]=${{ github.ref_name }}"
-        env:
-          GITHUB_TOKEN: ${{ secrets.WORKFLOW_PAT }}
-
-  make-final-release:
-    needs: [determine-release-grade, build-scies, build-wheels, build-supergraph]
-    # `build-scies` and `build-supergraph` are skipped for an internal release, so
-    # only `build-wheels` is required to have succeeded.
-    if: |
-      !cancelled()
-      && github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
-      && needs.determine-release-grade.result == 'success'
-      && needs.build-wheels.result == 'success'
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write
-    env:
-      RELEASE_AUDIENCE: ${{ needs.determine-release-grade.outputs.RELEASE_AUDIENCE }}
-      IS_PRERELEASE: ${{ needs.determine-release-grade.outputs.IS_PRERELEASE }}
-    steps:
-    - uses: actions/checkout@v6
-    - name: Fetch remote tags
-      run: git fetch origin 'refs/tags/*:refs/tags/*' -f
-    - name: Extract Python version from pants.toml
-      run: |
-        PYTHON_VERSION=$(grep -m 1 -oP '(?<=CPython==)([^"]+)' pants.toml)
-        echo "PROJECT_PYTHON_VERSION=$PYTHON_VERSION" >> $GITHUB_ENV
-    - name: Set up Python as Runtime
-      uses: actions/setup-python@v6
-      with:
-        python-version: ${{ env.PROJECT_PYTHON_VERSION }}
-    - name: Extract the release changelog
-      env:
-        VERSION: ${{ github.ref_name }}
-        REPOSITORY: ${{ github.repository }}
-      run: python ./scripts/extract-release-changelog.py "$VERSION" --repository "$REPOSITORY"
-    - name: Download wheels
-      uses: actions/download-artifact@v6
-      with:
-        name: wheels
-        path: dist
-    - name: Download scies
-      if: env.RELEASE_AUDIENCE != 'internal'
-      uses: actions/download-artifact@v6
-      with:
-        pattern: scies-*
-        path: dist
-        merge-multiple: true
-    - name: Merge checksum files into one
-      if: env.RELEASE_AUDIENCE != 'internal'
-      run: |
-        cat dist/checksum-*.txt > dist/checksum.txt
-        sort -u -k2 dist/checksum.txt -o dist/checksum.txt
-    - name: Download SBOM report
-      continue-on-error: true
-      uses: actions/download-artifact@v6
-      with:
-        name: SBOM report
-        path: dist
-    - name: Download supergraph schema
-      if: env.RELEASE_AUDIENCE != 'internal'
-      uses: actions/download-artifact@v6
-      with:
-        name: supergraph
-        path: dist
-    - name: Create GitHub Release
-      run: |
-        if gh release view "${{ github.ref_name }}" > /dev/null 2>&1; then
-          echo "Release already exists, updating..."
-          gh release edit "${{ github.ref_name }}" \
-            --title "${{ github.ref_name }}" \
-            --notes-file "CHANGELOG_RELEASE.md"
-        elif [ "${{ env.IS_PRERELEASE }}" = "true" ]; then
-          gh release create "${{ github.ref_name }}" \
-            --title "${{ github.ref_name }}" \
-            --notes-file "CHANGELOG_RELEASE.md" \
-            --prerelease
-        else
-          gh release create "${{ github.ref_name }}" \
-            --title "${{ github.ref_name }}" \
-            --notes-file "CHANGELOG_RELEASE.md"
-        fi
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-    - name: Upload release assets
-      run: |
-        for file in dist/*; do
-          if [ -d "$file" ]; then
-            echo "Skipping directory $file"
-            continue
-          fi
-          echo "Uploading $file..."
-          for attempt in 1 2 3; do
-            if gh release upload "${{ github.ref_name }}" "$file" --clobber; then
-              echo "Successfully uploaded $file"
-              break
-            fi
-            if [ $attempt -lt 3 ]; then
-              echo "Retry attempt $attempt failed for $file, waiting 10s..."
-              sleep 10
-            else
-              echo "Failed to upload $file after 3 attempts"
-              exit 1
-            fi
-          done
-        done
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-    - name: Resolve the installer channels
-      id: channels
-      run: |
-        # `main` is the authority on which versions are alive: the checked-out
-        # tag may sit on a release branch that predates the registry.
-        git fetch --depth=1 origin main
-        registry=$(git show FETCH_HEAD:.github/maintained-versions.yml)
-        series=$(awk -F'.' '{print $1"."$2}' <<< "${{ github.ref_name }}")
-        edge=$(yq -e '.versions[].version' <<< "$registry" | sort -V | tail -n 1)
-        stable=$(yq -e '.versions[] | select(.lts == true) | .version' <<< "$registry" | sort -V | tail -n 1)
-        # An LTS line is supported for a year, so neither should ever come back
-        # empty. Warn instead of failing: leaving an installer URL on the
-        # previous release beats failing a release that is otherwise complete.
-        [ -n "$edge" ] || echo "::warning::No maintained version in the registry; leaving the edge installer URL as is."
-        [ -n "$stable" ] || echo "::warning::No LTS version in the registry; leaving the stable installer URL as is."
-        {
-          echo "SERIES=$series"
-          echo "EDGE=$edge"
-          echo "STABLE=$stable"
-        } >> $GITHUB_OUTPUT
-    - name: Update stable installer shorten URL
-      if: ${{ env.IS_PRERELEASE == 'false' && steps.channels.outputs.STABLE != '' && steps.channels.outputs.STABLE == steps.channels.outputs.SERIES }}
-      run: |
-        curl -X 'PATCH' \
-          'https://bnd.ai/rest/v3/short-urls/installer-stable-macos-aarch64' \
-          -H 'accept: application/json' \
-          -H 'X-Api-Key: ${{ secrets.SHLINK_TOKEN }}' \
-          -H 'Content-Type: application/json' \
-          -d '{
-          "longUrl": "https://github.com/lablup/backend.ai/releases/download/${{ github.ref_name }}/backendai-install-macos-aarch64"
-        }'
-        curl -X 'PATCH' \
-          'https://bnd.ai/rest/v3/short-urls/installer-stable-linux-aarch64' \
-          -H 'accept: application/json' \
-          -H 'X-Api-Key: ${{ secrets.SHLINK_TOKEN }}' \
-          -H 'Content-Type: application/json' \
-          -d '{
-          "longUrl": "https://github.com/lablup/backend.ai/releases/download/${{ github.ref_name }}/backendai-install-linux-aarch64"
-        }'
-        curl -X 'PATCH' \
-          'https://bnd.ai/rest/v3/short-urls/installer-stable-linux-x86_64' \
-          -H 'accept: application/json' \
-          -H 'X-Api-Key: ${{ secrets.SHLINK_TOKEN }}' \
-          -H 'Content-Type: application/json' \
-          -d '{
-          "longUrl": "https://github.com/lablup/backend.ai/releases/download/${{ github.ref_name }}/backendai-install-linux-x86_64"
-        }'
-    - name: Update edge installer shorten URL
-      if: ${{ steps.channels.outputs.EDGE != '' && startsWith(github.ref_name, steps.channels.outputs.EDGE) }}
-      run: |
-        curl -X 'PATCH' \
-          'https://bnd.ai/rest/v3/short-urls/installer-edge-macos-aarch64' \
-          -H 'accept: application/json' \
-          -H 'X-Api-Key: ${{ secrets.SHLINK_TOKEN }}' \
-          -H 'Content-Type: application/json' \
-          -d '{
-          "longUrl": "https://github.com/lablup/backend.ai/releases/download/${{ github.ref_name }}/backendai-install-macos-aarch64"
-        }'
-        curl -X 'PATCH' \
-          'https://bnd.ai/rest/v3/short-urls/installer-edge-linux-aarch64' \
-          -H 'accept: application/json' \
-          -H 'X-Api-Key: ${{ secrets.SHLINK_TOKEN }}' \
-          -H 'Content-Type: application/json' \
-          -d '{
-          "longUrl": "https://github.com/lablup/backend.ai/releases/download/${{ github.ref_name }}/backendai-install-linux-aarch64"
-        }'
-        curl -X 'PATCH' \
-          'https://bnd.ai/rest/v3/short-urls/installer-edge-linux-x86_64' \
-          -H 'accept: application/json' \
-          -H 'X-Api-Key: ${{ secrets.SHLINK_TOKEN }}' \
-          -H 'Content-Type: application/json' \
-          -d '{
-          "longUrl": "https://github.com/lablup/backend.ai/releases/download/${{ github.ref_name }}/backendai-install-linux-x86_64"
-        }'
-
+    uses: ./.github/workflows/ci-post-release.yml
+    with:
+      tag: ${{ github.ref_name }}
+      release-audience: ${{ needs.determine-release-grade.outputs.RELEASE_AUDIENCE }}
+    secrets: inherit
 
   publish-to-pypi:
-    needs: [determine-release-grade, build-wheels]
+    needs: [determine-release-grade, release]
     if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
       && needs.determine-release-grade.outputs.RELEASE_AUDIENCE == 'public'
     runs-on: ubuntu-latest
@@ -1197,7 +371,7 @@ jobs:
     - name: Extract Python version from pants.toml
       run: |
         PYTHON_VERSION=$(grep -m 1 -oP '(?<=CPython==)([^"]+)' pants.toml)
-        echo "PROJECT_PYTHON_VERSION=$PYTHON_VERSION" >> $GITHUB_ENV
+        echo "PROJECT_PYTHON_VERSION=$PYTHON_VERSION" >> "$GITHUB_ENV"
     - name: Set up Python as Runtime
       uses: actions/setup-python@v6
       with:
@@ -1235,59 +409,3 @@ jobs:
       # wheels after building them to add arch-specific tags.
       run: |
         twine upload --skip-existing dist/*.whl dist/*.tar.gz
-
-
-  build-conda-pack-for-windows:
-    needs: [determine-release-grade, make-final-release]
-    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
-      && needs.determine-release-grade.outputs.RELEASE_AUDIENCE != 'internal'
-    runs-on: windows-latest
-    permissions:
-      contents: write
-
-    steps:
-    - name: Check out the revision
-      uses: actions/checkout@v6
-    - name: Git LFS Pull
-      run: git lfs pull
-    - name: Extract Python version from pants.toml
-      shell: bash
-      run: |
-        export LANG=C.UTF-8
-        PYTHON_VERSION=$(grep -m 1 -oP '(?<=CPython==)([^"]+)' pants.toml)
-        echo "PROJECT_PYTHON_VERSION=$PYTHON_VERSION" >> $GITHUB_ENV
-    - name: Set up Python
-      uses: actions/setup-python@v6
-      with:
-        python-version: ${{ env.PROJECT_PYTHON_VERSION }}
-        cache: pip
-    - name: Install local dependencies for packaging
-      run: |
-        pip install -U 'packaging>=21.3'
-    - name: Normalize the package version
-      shell: bash
-      run: |
-        PKGVER=$(python -c "import packaging.version,pathlib; print(str(packaging.version.Version(pathlib.Path('VERSION').read_text())))")
-        echo "PKGVER=$PKGVER" >> $GITHUB_ENV
-    - name: Install conda-pack
-      uses: s-weigand/setup-conda@v1
-      with:
-        activate-conda: false
-    - name: Download wheels
-      uses: actions/download-artifact@v6
-      with:
-        name: wheels
-        path: dist
-    - name: Create conda environment
-      # FIXME: Let's think about resolving dependency of backend.ai-client package programmatically, instead of hardcoding it.
-      run: |
-        pip install conda-pack
-        conda create -n backend.ai-client python=${{ env.PROJECT_PYTHON_VERSION }}
-        conda activate backend.ai-client
-        pip install dist/backend_ai_client-${{ env.PKGVER }}-py3-none-any.whl dist/backend_ai_cli-${{ env.PKGVER }}-py3-none-any.whl dist/backend_ai_common-${{ env.PKGVER }}-py3-none-any.whl dist/backend_ai_plugin-${{ env.PKGVER }}-py3-none-any.whl
-        conda-pack -o backend.ai-client-${{ github.ref_name }}-windows-conda.zip
-    - name: Upload conda-pack to GitHub release
-      run: |
-        gh release upload ${{ github.ref_name }} backend.ai-client-${{ github.ref_name }}-windows-conda.zip
-      env:
-        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

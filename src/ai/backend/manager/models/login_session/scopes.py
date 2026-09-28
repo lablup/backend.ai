@@ -15,7 +15,7 @@ from ai.backend.common.exception import UserNotFound
 from ai.backend.manager.models.clauses import QueryCondition
 from ai.backend.manager.models.login_session.row import LoginHistoryRow, LoginSessionRow
 from ai.backend.manager.models.scopes import ExistenceCheck, ScopeTarget
-from ai.backend.manager.models.user import UserRow
+from ai.backend.manager.models.user.row import UserRow
 
 
 @dataclass(frozen=True)

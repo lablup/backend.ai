@@ -18,9 +18,9 @@ from ai.backend.common.resilience import (
     RetryPolicy,
 )
 from ai.backend.common.types import ValkeyTarget
-from ai.backend.logging.utils import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 # Resilience instance for valkey_session layer
 valkey_session_resilience = Resilience(
@@ -88,7 +88,7 @@ class ValkeySessionClient:
         Close the ValkeySessionClient connection.
         """
         if self._closed:
-            log.debug("ValkeySessionClient is already closed.")
+            log.debug("valkey session client already closed")
             return
         self._closed = True
         await self._client.disconnect()

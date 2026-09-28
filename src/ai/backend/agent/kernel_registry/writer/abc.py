@@ -6,14 +6,14 @@ from collections.abc import MutableMapping
 from typing import TYPE_CHECKING
 
 from ai.backend.common.types import KernelId
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 
 from .types import KernelRegistrySaveMetadata
 
 if TYPE_CHECKING:
     from ai.backend.agent.kernel import AbstractKernel
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 class AbstractKernelRegistryWriter(ABC):

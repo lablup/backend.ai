@@ -15,7 +15,7 @@ from ai.backend.common.defs import DEFAULT_VFOLDER_PERMISSION_MODE
 from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.events.dispatcher import EventDispatcher, EventProducer
 from ai.backend.common.types import BinarySize, HardwareMetadata, QuotaScopeID
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.storage.errors import InvalidSubpathError, VFolderNotFoundError
 from ai.backend.storage.types import (
     CapacityUsage,
@@ -42,7 +42,7 @@ CAP_FAST_SIZE: Final = "fast-size"
 
 _CURRENT_DIR: Final = PurePosixPath(".")
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 class AbstractQuotaModel(metaclass=ABCMeta):

@@ -18,6 +18,7 @@ import yarl
 from aiohttp.multipart import BodyPartReader
 from dateutil.tz import tzutc
 
+from ai.backend.common.asyncio import IgnoreTaskExceptionHandler
 from ai.backend.common.bgtask.bgtask import BackgroundTaskManager
 from ai.backend.common.data.entity.domain import DomainName
 from ai.backend.common.data.entity.image import ImageID
@@ -49,7 +50,7 @@ from ai.backend.common.types import (
     SessionId,
     SessionTypes,
 )
-from ai.backend.logging.utils import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.actions.v2.bulk.result import (
     PartialBulkEntityResult,
     PartialBulkResult,
@@ -100,7 +101,7 @@ from ai.backend.manager.errors.resource import (
 )
 from ai.backend.manager.errors.storage import VFolderBadRequest
 from ai.backend.manager.idle import IdleCheckerHost
-from ai.backend.manager.models.session import (
+from ai.backend.manager.models.session.row import (
     DEAD_SESSION_STATUSES,
     PRIVATE_SESSION_TYPES,
     KernelLoadingStrategy,
@@ -241,10 +242,12 @@ from ai.backend.manager.services.session.types import (
     overwritten_param_check,
 )
 from ai.backend.manager.services.session.utils import drop_undefined
-from ai.backend.manager.sokovan.scheduling_controller import SchedulingController
+from ai.backend.manager.sokovan.scheduling_controller.scheduling_controller import (
+    SchedulingController,
+)
 from ai.backend.manager.types import UserScope
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 @dataclass
@@ -293,7 +296,9 @@ class SessionService:
         self._scheduling_controller = args.scheduling_controller
         self._appproxy_client_pool = args.appproxy_client_pool
         self._database_ptask_group = aiotools.PersistentTaskGroup()
-        self._rpc_ptask_group = aiotools.PersistentTaskGroup()
+        self._rpc_ptask_group = aiotools.PersistentTaskGroup(
+            exception_handler=IgnoreTaskExceptionHandler()
+        )
         self._webhook_ptask_group = aiotools.PersistentTaskGroup()
 
     async def compute_schedule(self, action: ComputeScheduleAction) -> ComputeScheduleActionResult:
@@ -507,7 +512,6 @@ class SessionService:
             raise UnknownImageReferenceError("Unknown image reference!") from e
         except Exception as e:
             await self._error_monitor.capture_exception()
-            log.exception("GET_OR_CREATE: unexpected error!", e)
             raise InternalServerError from e
 
     async def create_from_params(
@@ -599,7 +603,6 @@ class SessionService:
             raise
         except Exception as e:
             await self._error_monitor.capture_exception(context={"user": user_info.owner_uuid})
-            log.exception("GET_OR_CREATE: unexpected error!", e)
             raise InternalServerError from e
 
     async def create_from_template(
@@ -626,7 +629,7 @@ class SessionService:
         if isinstance(template, str):
             template = load_json(template)
 
-        log.debug("Template: {0}", template)
+        log.debug("session template: {}", template)
 
         param_from_template = {
             "image": template["spec"]["kernel"]["image"],
@@ -670,11 +673,11 @@ class SessionService:
         override_config = drop_undefined(dict(action.params.config))
         override_params = drop_undefined(dict(asdict(action.params)))
 
-        log.debug("Default config: {0}", config_from_template)
-        log.debug("Default params: {0}", param_from_template)
+        log.debug("default config: {}", config_from_template)
+        log.debug("default params: {}", param_from_template)
 
-        log.debug("Override config: {0}", override_config)
-        log.debug("Override params: {0}", override_params)
+        log.debug("override config: {}", override_config)
+        log.debug("override params: {}", override_params)
 
         if override_config:
             config_from_template.update(override_config)
@@ -684,14 +687,12 @@ class SessionService:
         try:
             params = overwritten_param_check.check(param_from_template)
         except RuntimeError as e1:
-            log.exception(e1)
             raise InvalidAPIParameters("Error while validating template") from e1
         except t.DataError as e2:
-            log.debug("Error: {0}", str(e2))
             raise InvalidAPIParameters("Error while validating template") from e2
         params["config"] = config_from_template
 
-        log.debug("Updated param: {0}", params)
+        log.debug("updated params: {}", params)
 
         if git := template["spec"]["kernel"]["git"]:
             if _dest := git.get("dest_dir"):
@@ -794,7 +795,6 @@ class SessionService:
             raise
         except Exception as e:
             await self._error_monitor.capture_exception(context={"user": user_info.owner_uuid})
-            log.exception("GET_OR_CREATE: unexpected error!", e)
             raise InternalServerError from e
 
     async def destroy_session(self, action: DestroySessionAction) -> DestroySessionActionResult:
@@ -884,7 +884,6 @@ class SessionService:
             raise
         except Exception as e:
             await self._error_monitor.capture_exception(context={"user": user_id})
-            log.exception("DOWNLOAD_SINGLE: unexpected error!", e)
             raise InternalServerError from e
 
         return DownloadFileActionResult(bytes=result, session_data=session.to_dataclass())
@@ -915,7 +914,6 @@ class SessionService:
             raise InvalidAPIParameters("The file is not found.") from e
         except Exception as e:
             await self._error_monitor.capture_exception(context={"user": user_id})
-            log.exception("DOWNLOAD_FILE: unexpected error!", e)
             raise InternalServerError from e
 
         with aiohttp.MultipartWriter("mixed") as mpwriter:
@@ -997,7 +995,6 @@ class SessionService:
                     result["console"] = raw_result.get("console")
                 resp["result"] = result
         except AssertionError as e:
-            log.warning("EXECUTE: invalid/missing parameters: {0!r}", e)
             raise InvalidAPIParameters(extra_msg=e.args[0]) from e
         except BackendAIError:
             raise
@@ -1218,14 +1215,13 @@ class SessionService:
         try:
             result = await self._agent_registry.list_files(session, path)
             resp.update(result)
-            log.debug("container file list for {0} retrieved", path)
+            log.debug("container file list retrieved", container_path=path)
         except asyncio.CancelledError:
             raise
         except BackendAIError:
             raise
         except Exception as e:
             await self._error_monitor.capture_exception(context={"user": user_id})
-            log.exception("LIST_FILES: unexpected error!", e)
             raise InternalServerError from e
 
         return ListFilesActionResult(result=result, session_data=session.to_dataclass())
@@ -1415,7 +1411,7 @@ class SessionService:
                     chunks.append(chunk)
                     recv_size += chunk_size
                 data = file.decode(b"".join(chunks))
-                log.debug("received file: {0} ({1:,} bytes)", file_name, recv_size)
+                log.debug("file received", file_name=file_name, received_bytes=recv_size)
                 ts.create_task(self._agent_registry.upload_file(session, file_name, data))
 
         return UploadFilesActionResult(result=None, session_data=session.to_dataclass())

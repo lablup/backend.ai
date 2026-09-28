@@ -10,11 +10,11 @@ from ai.backend.common.message_queue.payload import (
     CachedBroadcastMessagePayload,
 )
 from ai.backend.common.types import RedisTarget
-from ai.backend.logging.utils import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 
 from .exceptions import MessageQueueClosedError
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 class RedisBroadcaster(AbstractBroadcaster):
@@ -79,7 +79,7 @@ class RedisBroadcaster(AbstractBroadcaster):
             raise MessageQueueClosedError("Broadcaster is closed")
 
         await self._client.broadcast(self._channel, payload)
-        log.debug("Message broadcasted to channel {}", self._channel)
+        log.trace("message broadcasted", channel_name=self._channel)
 
     @override
     async def broadcast_with_cache(self, cache_id: str, payload: BroadcastMessagePayload) -> None:
@@ -100,9 +100,7 @@ class RedisBroadcaster(AbstractBroadcaster):
             raise MessageQueueClosedError("Broadcaster is closed")
 
         await self._client.broadcast_with_cache(self._channel, cache_id, payload)
-        log.debug(
-            "Cached message broadcasted to channel {} with cache_id {}", self._channel, cache_id
-        )
+        log.trace("cached message broadcasted", channel_name=self._channel, cache_id=cache_id)
 
     @override
     async def fetch_cached_broadcast_message(self, cache_id: str) -> BroadcastMessagePayload | None:
@@ -126,11 +124,7 @@ class RedisBroadcaster(AbstractBroadcaster):
             raise MessageQueueClosedError("Broadcaster is closed")
 
         payload = await self._client.fetch_cached_broadcast_message(cache_id)
-        log.debug(
-            "Fetched cached message for cache_id {}: {}",
-            cache_id,
-            "found" if payload else "not found",
-        )
+        log.trace("cached message fetched", cache_id=cache_id, found=payload is not None)
         return payload
 
     @override
@@ -151,7 +145,9 @@ class RedisBroadcaster(AbstractBroadcaster):
             raise MessageQueueClosedError("Broadcaster is closed")
 
         await self._client.broadcast_batch(self._channel, events)
-        log.debug("Batch of {} messages broadcasted to channel {}", len(events), self._channel)
+        log.trace(
+            "message batch broadcasted", channel_name=self._channel, message_count=len(events)
+        )
 
     @override
     async def close(self) -> None:
@@ -165,4 +161,4 @@ class RedisBroadcaster(AbstractBroadcaster):
 
         self._closed = True
         await self._client.close()
-        log.debug("RedisBroadcaster closed")
+        log.debug("redis broadcaster closed")

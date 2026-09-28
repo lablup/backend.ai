@@ -44,7 +44,10 @@ from ai.backend.common.types import (
     ServicePort,
     ServicePortProtocols,
     SessionId,
+    SessionResult,
+    SessionTypes,
 )
+from ai.backend.manager.data.agent.types import AgentStatus
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.deployment.types import (
     DeploymentLifecycleSubStep,
@@ -57,66 +60,64 @@ from ai.backend.manager.data.deployment.types import (
     RouteTrafficStatus,
 )
 from ai.backend.manager.data.image.types import ImageType
+from ai.backend.manager.data.kernel.types import KernelStatus
+from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.data.session_group.types import (
     SessionGroupPlacementDirection,
     SessionGroupPlacementEnforcement,
 )
 from ai.backend.manager.errors.deployment import DeploymentRevisionNotFound
 from ai.backend.manager.errors.service import DeploymentPolicyNotFound
-from ai.backend.manager.models.agent import AgentRow, AgentStatus
-from ai.backend.manager.models.container_registry import ContainerRegistryRow
-from ai.backend.manager.models.deployment_policy import DeploymentPolicyRow
+from ai.backend.manager.models.agent.row import AgentRow
+from ai.backend.manager.models.container_registry.row import ContainerRegistryRow
 from ai.backend.manager.models.deployment_policy.purgers import DeploymentPolicyPurger
+from ai.backend.manager.models.deployment_policy.row import DeploymentPolicyRow
 from ai.backend.manager.models.deployment_policy.upserters import DeploymentPolicyUpserter
-from ai.backend.manager.models.deployment_revision import DeploymentRevisionRow
 from ai.backend.manager.models.deployment_revision.creators import DeploymentRevisionCreator
+from ai.backend.manager.models.deployment_revision.row import DeploymentRevisionRow
 from ai.backend.manager.models.deployment_revision.searchers import ModelRevisionSearcher
-from ai.backend.manager.models.deployment_revision_preset import DeploymentRevisionPresetRow
-from ai.backend.manager.models.domain import DomainRow
-from ai.backend.manager.models.endpoint import EndpointRow, EndpointTokenRow
+from ai.backend.manager.models.deployment_revision_preset.row import DeploymentRevisionPresetRow
+from ai.backend.manager.models.domain.row import DomainRow
 from ai.backend.manager.models.endpoint.creators import (
     DeploymentCreator,
     DeploymentMetadataFields,
     DeploymentNetworkFields,
     DeploymentReplicaFields,
 )
+from ai.backend.manager.models.endpoint.row import EndpointRow, EndpointTokenRow
 from ai.backend.manager.models.endpoint.updaters import DeploymentUpdater
 from ai.backend.manager.models.entity_label.row import EntityLabelRow
 from ai.backend.manager.models.hasher.types import PasswordInfo
-from ai.backend.manager.models.image import ImageRow
-from ai.backend.manager.models.kernel import KernelRow, KernelStatus
-from ai.backend.manager.models.keypair import KeyPairRow
-from ai.backend.manager.models.project import ProjectRow
-from ai.backend.manager.models.rbac_models import RoleRow, UserRoleRow
+from ai.backend.manager.models.image.row import ImageRow
+from ai.backend.manager.models.kernel.row import KernelRow
+from ai.backend.manager.models.keypair.row import KeyPairRow
+from ai.backend.manager.models.project.row import ProjectRow
 from ai.backend.manager.models.rbac_models.entity_field import EntityFieldRow
 from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
-from ai.backend.manager.models.replica_group import ReplicaGroupRow
-from ai.backend.manager.models.resource_group import ResourceGroupOpts, ResourceGroupRow
-from ai.backend.manager.models.resource_policy import (
+from ai.backend.manager.models.rbac_models.role.row import RoleRow
+from ai.backend.manager.models.rbac_models.user_role.row import UserRoleRow
+from ai.backend.manager.models.replica_group.row import ReplicaGroupRow
+from ai.backend.manager.models.resource_group.row import ResourceGroupOpts, ResourceGroupRow
+from ai.backend.manager.models.resource_policy.row import (
     KeyPairResourcePolicyRow,
     ProjectResourcePolicyRow,
     UserResourcePolicyRow,
 )
-from ai.backend.manager.models.resource_preset import ResourcePresetRow
+from ai.backend.manager.models.resource_preset.row import ResourcePresetRow
 from ai.backend.manager.models.resource_slot.row import (
     DeploymentRevisionResourceSlotRow,
     ResourceSlotTypeRow,
 )
-from ai.backend.manager.models.routing import RoutingRow
 from ai.backend.manager.models.routing.creators import ReplicaCreator
+from ai.backend.manager.models.routing.row import RoutingRow
 from ai.backend.manager.models.routing.updaters import ReplicaUpdater
-from ai.backend.manager.models.runtime_variant import RuntimeVariantRow
-from ai.backend.manager.models.session import (
-    SessionResult,
-    SessionRow,
-    SessionStatus,
-    SessionTypes,
-)
+from ai.backend.manager.models.runtime_variant.row import RuntimeVariantRow
+from ai.backend.manager.models.session.row import SessionRow
 from ai.backend.manager.models.session_group.row import SessionGroupRow
 from ai.backend.manager.models.specs.pagination import OffsetPagination
-from ai.backend.manager.models.user import UserRole, UserRow, UserStatus
+from ai.backend.manager.models.user.row import UserRole, UserRow, UserStatus
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.models.vfolder import VFolderRow
+from ai.backend.manager.models.vfolder.row import VFolderRow
 from ai.backend.manager.models.virtual_entity.entity_membership import EntityMembershipRow
 from ai.backend.manager.models.virtual_entity.entity_membership_cap import (
     EntityMembershipCapRow,
@@ -126,7 +127,7 @@ from ai.backend.manager.models.virtual_entity.entity_membership_field import (
 )
 from ai.backend.manager.models.virtual_entity.scope_binding import ScopeBindingRow
 from ai.backend.manager.models.virtual_entity.virtual_entity import VirtualEntityRow
-from ai.backend.manager.repositories.deployment import DeploymentRepository
+from ai.backend.manager.repositories.deployment.repository import DeploymentRepository
 from ai.backend.manager.repositories.ops.v2.reconciler.provider import ReconcileOpsProvider
 from ai.backend.manager.secret.types import SecretValue
 from ai.backend.manager.types import OptionalState

@@ -26,12 +26,12 @@ from tenacity import (
     wait_random,
 )
 
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 
 from .etcd import AsyncEtcd
 from .types import RedisConnectionInfo
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 class AbstractDistributedLock(metaclass=abc.ABCMeta):
@@ -83,7 +83,7 @@ class FileLock(AbstractDistributedLock):
         if self._file is not None:
             self._debug = False
             self.release()
-            log.debug("file lock implicitly released: {}", self._path)
+            log.debug("file lock implicitly released", lock_path=self._path)
 
     async def acquire(self) -> None:
         if self._file is not None:
@@ -108,7 +108,7 @@ class FileLock(AbstractDistributedLock):
                             self._watchdog_timer(ttl=self._lifetime),
                         )
                     if self._debug:
-                        log.debug("file lock acquired: {}", self._path)
+                        log.debug("file lock acquired", lock_path=self._path)
         except RetryError as e:
             raise TimeoutError(f"failed to lock file: {self._path}") from e
 
@@ -122,7 +122,7 @@ class FileLock(AbstractDistributedLock):
             fcntl.flock(self._file.fileno(), fcntl.LOCK_UN)
             self._locked = False
             if self._debug:
-                log.debug("file lock explicitly released: {}", self._path)
+                log.debug("file lock explicitly released", lock_path=self._path)
         self._file.close()
         if self._remove_when_unlock:
             try:
@@ -149,7 +149,7 @@ class FileLock(AbstractDistributedLock):
             fcntl.flock(self._file.fileno(), fcntl.LOCK_UN)
             self._locked = False
             if self._debug:
-                log.debug("file lock implicitly released by watchdog: {}", self._path)
+                log.debug("file lock implicitly released by watchdog", lock_path=self._path)
 
     @property
     def is_locked(self) -> bool:
@@ -264,7 +264,7 @@ class RedisLock(AbstractDistributedLock):
         except LockError as e:
             raise TimeoutError(str(e)) from e
         if self._debug:
-            log.debug("RedisLock.__aenter__(): lock acquired")
+            log.debug("redis lock acquired")
 
     @override
     async def __aexit__(self, *exc_info: Any) -> bool | None:
@@ -273,12 +273,12 @@ class RedisLock(AbstractDistributedLock):
         try:
             val = await self._lock.__aexit__(*exc_info)  # type: ignore[func-returns-value]
         except LockNotOwnedError:
-            log.exception("Lock no longer owned. Skip.")
+            log.exception("redis lock no longer owned, skipped release")
             return True
         except LockError:
-            log.exception("Already unlocked. Skip.")
+            log.exception("redis lock already unlocked, skipped release")
             return True
         if self._debug:
-            log.debug("RedisLock.__aexit__(): lock released")
+            log.debug("redis lock released")
 
         return val

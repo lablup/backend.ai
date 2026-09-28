@@ -27,7 +27,7 @@ from ai.backend.agent.resources import (
     DeviceSlotInfo,
     DiscretePropertyAllocMap,
 )
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 
 try:
     from ai.backend.agent.resources import get_resource_spec_from_container  # type: ignore
@@ -65,7 +65,7 @@ __all__ = (
 
 PREFIX = "cuda"
 
-log = BraceStyleAdapter(logging.getLogger("ai.backend.accelerator.cuda"))
+log = StructuredLogger(logging.getLogger("ai.backend.accelerator.cuda"))
 
 rx_triple_version = re.compile(r"(\d+\.\d+\.\d+)")
 
@@ -292,33 +292,41 @@ class CUDAPlugin(AbstractComputePlugin):
             async with closing_async(aiodocker.Docker()) as docker:
                 docker_info = await docker.system.info()
                 version_info = EngineVersion.model_validate(await docker.version())
-        except DockerError:
-            log.info("CUDA acceleration is disabled.")
+        except DockerError as e:
+            log.warning(
+                "accelerator disabled: docker engine query failed",
+                plugin_name=self.key,
+                exc_info=e,
+            )
             self.enabled = False
             return
 
         device_injector = self._detect_device_injector(docker_info, version_info)
         if device_injector is None:
-            log.info("CUDA acceleration is disabled.")
+            log.warning("accelerator disabled: no device injector", plugin_name=self.key)
             self.enabled = False
             return
         self._device_injector = device_injector
-        log.info("attaching GPUs via the {} mechanism.", device_injector.name)
+        log.info("device injector selected", device_injector_name=device_injector.name)
 
         raw_device_mask = self.plugin_config.get("device_mask")
         if raw_device_mask is not None:
             self.device_mask = [*raw_device_mask.split(",")]
         try:
             detected_devices = await self.list_devices()
-            log.info("detected devices:\n" + pformat(detected_devices))
-            log.info("CUDA acceleration is enabled.")
+            log.debug("detected devices:\n{}", pformat(detected_devices))
+            log.info(
+                "accelerator enabled", plugin_name=self.key, device_count=len(detected_devices)
+            )
         except ImportError:
-            log.warning("could not load the CUDA runtime library.")
-            log.info("CUDA acceleration is disabled.")
+            log.warning(
+                "accelerator disabled: CUDA runtime library not loaded", plugin_name=self.key
+            )
             self.enabled = False
         except RuntimeError as e:
-            log.warning("CUDA init error: {}", e)
-            log.info("CUDA acceleration is disabled.")
+            log.warning(
+                "accelerator disabled: initialization failed", plugin_name=self.key, exc_info=e
+            )
             self.enabled = False
 
     def _detect_device_injector(
@@ -330,28 +338,28 @@ class CUDAPlugin(AbstractComputePlugin):
         if cdi_only_engine is not None:
             engine_version = self._parse_version(cdi_only_engine.version)
             if engine_version is None:
-                log.error("could not detect the {} version!", cdi_only_engine.name)
+                log.error("container engine version not detected", engine_name=cdi_only_engine.name)
                 return None
             min_version = CDI_ONLY_ENGINE_COMPONENTS[cdi_only_engine.name]
             if engine_version < min_version:
                 log.error(
-                    "{} {} ignores CDI device requests; {} or later is required.",
-                    cdi_only_engine.name,
-                    self._format_version(engine_version),
-                    self._format_version(min_version),
+                    "container engine too old for CDI device requests",
+                    engine_name=cdi_only_engine.name,
+                    engine_version=self._format_version(engine_version),
+                    min_engine_version=self._format_version(min_version),
                 )
                 return None
             if not self._has_cdi_spec():
-                log.error("could not find a CDI spec for {}!", CDI_KIND)
+                log.error("CDI spec not found", cdi_kind=CDI_KIND)
                 return None
             return CDIInjector()
 
         if "nvidia" not in docker_info["Runtimes"]:
-            log.error("could not detect valid NVIDIA Container Runtime!")
+            log.error("NVIDIA container runtime not detected")
             return None
         docker_version = self._parse_version(docker_info["ServerVersion"])
         if docker_version is None:
-            log.error("could not detect docker version!")
+            log.error("docker version not detected")
             return None
         if docker_version >= MIN_DOCKER_DEVICE_REQUEST_VERSION:
             return NvidiaDriverInjector()
@@ -442,9 +450,9 @@ class CUDAPlugin(AbstractComputePlugin):
                     "cuda_version": "{0[0]}.{0[1]}".format(libcudart.get_version()),
                 }
             except ImportError:
-                log.warning("extra_info(): NVML/CUDA runtime library is not found")
+                log.warning("CUDA extra info unavailable: NVML/CUDA runtime library not found")
             except LibraryError as e:
-                log.warning("extra_info(): {!r}", e)
+                log.warning("CUDA extra info unavailable", exc_info=e)
         return {
             "cuda_support": False,
         }
@@ -474,9 +482,9 @@ class CUDAPlugin(AbstractComputePlugin):
                     util_total += dev_stat.gpu_util
                     util_stats[dev_id] = Measurement(Decimal(dev_stat.gpu_util), Decimal(100))
             except ImportError:
-                log.warning("gather_node_measures(): NVML library is not found")
+                log.warning("CUDA node measure skipped: NVML library not found")
             except LibraryError as e:
-                log.warning("gather_node_measures(): {!r}", e)
+                log.warning("CUDA node measure failed", exc_info=e)
         return [
             NodeMeasurement(
                 MetricKey("cuda_mem"),
@@ -529,9 +537,9 @@ class CUDAPlugin(AbstractComputePlugin):
                             container_info = await container.show()
                         except DockerError as e:
                             log.warning(
-                                "gather_container_measures(): container {} skipped: {!r}",
-                                cid,
-                                e,
+                                "CUDA container measure skipped",
+                                container_id=cid,
+                                exc_info=e,
                             )
                             continue
                         nvidia_device_reqs = [
@@ -556,9 +564,9 @@ class CUDAPlugin(AbstractComputePlugin):
                             util_stats[cid] += Decimal(util_stat.value)
                             number_of_devices_per_container[cid] += 1
             except ImportError:
-                log.warning("gather_container_measures(): NVML library is not found")
+                log.warning("CUDA container measure skipped: NVML library not found")
             except LibraryError as e:
-                log.warning("gather_container_measures(): {!r}", e)
+                log.warning("CUDA container measure failed", exc_info=e)
 
         return [
             ContainerMeasurement(

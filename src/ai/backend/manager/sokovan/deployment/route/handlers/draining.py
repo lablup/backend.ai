@@ -5,8 +5,9 @@ from collections.abc import Sequence
 from typing import override
 
 from ai.backend.common.events.dispatcher import EventProducer
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.data.deployment.types import (
+    RouteData,
     RouteHandlerCategory,
     RouteStatus,
     RouteStatusTransitions,
@@ -15,13 +16,12 @@ from ai.backend.manager.data.deployment.types import (
     RouteTransitionTarget,
 )
 from ai.backend.manager.defs import LockID
-from ai.backend.manager.repositories.deployment.types import RouteData
 from ai.backend.manager.sokovan.deployment.route.executor import RouteExecutor
 from ai.backend.manager.sokovan.deployment.route.types import RouteExecutionResult
 
 from .base import RouteHandler
 
-log = BraceStyleAdapter(logging.getLogger(__name__))
+log = StructuredLogger(logging.getLogger(__name__))
 
 
 class DrainingRouteHandler(RouteHandler):
@@ -87,13 +87,9 @@ class DrainingRouteHandler(RouteHandler):
         unregister; failures are logged but do not hold the route in
         DRAINING (the AppProxy sync handler converges leftovers).
         """
-        log.debug("Draining {} routes", len(routes))
         return await self._route_executor.drain_routes(routes)
 
     @override
     async def post_process(self, result: RouteExecutionResult) -> None:
         """Handle post-processing after draining routes."""
-        log.info(
-            "Drained {} routes (→ cooling down)",
-            len(result.successes),
-        )
+        log.debug("routes drained", route_count=len(result.successes))

@@ -1,4 +1,3 @@
-import asyncio
 import logging
 import os
 from collections.abc import Mapping
@@ -9,12 +8,13 @@ from typing import Any, override
 import aiofiles
 import aiofiles.os
 
+from ai.backend.common.asyncio import run_in_executor_with_context
 from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.events.dispatcher import EventDispatcher, EventProducer
 from ai.backend.common.exception import InvalidConfigError
 from ai.backend.common.lock import FileLock
 from ai.backend.common.types import QuotaScopeID
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.storage.errors import (
     InvalidQuotaFormatError,
     InvalidQuotaScopeError,
@@ -30,7 +30,7 @@ from ai.backend.storage.volumes.abc import CAP_QUOTA, CAP_VFOLDER, AbstractQuota
 from ai.backend.storage.volumes.vfs import BaseQuotaModel, BaseVolume
 from ai.backend.storage.watcher import WatcherClient
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 DEFAULT_LOCK_FILE = Path("/tmp/backendai-xfs-file-lock")
 
@@ -54,8 +54,7 @@ class XfsProjectRegistry:
         if self.file_projid.is_file():
             project_id_pool = []
             self.name_id_map = {}
-            loop = asyncio.get_running_loop()
-            raw_projid = await loop.run_in_executor(None, _read_projid_file)
+            raw_projid = await run_in_executor_with_context(None, _read_projid_file)
             for line in raw_projid.splitlines():
                 proj_name, proj_id = line.split(":")[:2]
                 project_id_pool.append(int(proj_id))
@@ -113,13 +112,12 @@ class XfsProjectRegistry:
             except FileNotFoundError:
                 pass
 
-        loop = asyncio.get_running_loop()
         try:
-            await loop.run_in_executor(None, _create_temp_files)
+            await run_in_executor_with_context(None, _create_temp_files)
             await run(["sudo", "cp", "-rp", temp_name_projects, self.file_projects])
             await run(["sudo", "cp", "-rp", temp_name_projid, self.file_projid])
         finally:
-            await loop.run_in_executor(None, _delete_temp_files)
+            await run_in_executor_with_context(None, _delete_temp_files)
 
     async def remove_project_entry(self, quota_scope_id: QuotaScopeID) -> None:
         await run(["sudo", "sed", "-i.bak", f"/{quota_scope_id.pathname}/d", self.file_projects])
@@ -166,27 +164,20 @@ class XFSProjectQuotaModel(BaseQuotaModel):
         extra_args: dict[str, Any] | None = None,
     ) -> None:
         qspath = self.mangle_qspath(quota_scope_id)
-        try:
-            if options is None:
-                # Set the limit as the filesystem size
-                vfs_stat = os.statvfs(self.mount_path)
-                options = QuotaConfig(vfs_stat.f_blocks * self.block_size)
-            async with FileLock(self._lock_path):
-                log.info(
-                    "creating project quota (qs:{}, q:{})",
-                    quota_scope_id,
-                    options.limit_bytes,
-                )
-                await aiofiles.os.makedirs(qspath)
-                await self.project_registry.read_project_info()
-                await self.project_registry.add_project_entry(quota_scope_id, qspath)
-                await self.project_registry.read_project_info()
-        except (TimeoutError, asyncio.CancelledError):
-            log.exception("quota-scope creation timeout")
-            raise
-        except Exception:
-            log.exception("quota-scope creation error")
-            raise
+        if options is None:
+            # Set the limit as the filesystem size
+            vfs_stat = os.statvfs(self.mount_path)
+            options = QuotaConfig(vfs_stat.f_blocks * self.block_size)
+        async with FileLock(self._lock_path):
+            log.debug(
+                "creating project quota (qs:{}, q:{})",
+                quota_scope_id,
+                options.limit_bytes,
+            )
+            await aiofiles.os.makedirs(qspath)
+            await self.project_registry.read_project_info()
+            await self.project_registry.add_project_entry(quota_scope_id, qspath)
+            await self.project_registry.read_project_info()
         if options is not None:
             await self.update_quota_scope(quota_scope_id, options)
 
@@ -218,11 +209,10 @@ class XFSProjectQuotaModel(BaseQuotaModel):
         hard_limit_bytes = int(hard_limit_kbs) * 1024
         if used_bytes < 0 or hard_limit_bytes < 0:
             log.warning(
-                "Negative values in used_bytes({}) or limit_bytes({}) for quota scope {} in XFS: report line = {}",
-                used_bytes,
-                hard_limit_bytes,
-                quota_scope_id,
-                report,
+                "negative quota usage reported",
+                used_bytes=used_bytes,
+                limit_bytes=hard_limit_bytes,
+                report_line=report,
             )
         return QuotaUsage(used_bytes, hard_limit_bytes)
 
@@ -321,11 +311,6 @@ class XfsVolume(BaseVolume):
         try:
             self._lock_path.touch()
         except OSError as e:
-            log.exception(
-                "Failed to create XFS backend lock file at {}: (Error: {})",
-                self._lock_path,
-                e,
-            )
             raise InvalidConfigError(
                 f"Cannot create XFS backend lock file at {self._lock_path}"
             ) from e

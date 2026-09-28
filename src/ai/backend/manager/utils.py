@@ -7,16 +7,16 @@ from sqlalchemy.ext.asyncio import AsyncSession as SASession
 
 from ai.backend.common.data.entity.project import ProjectEntityType
 from ai.backend.common.types import AccessKey
+from ai.backend.manager.models.domain.row import domains
+from ai.backend.manager.models.keypair.row import keypairs
+from ai.backend.manager.models.project.row import groups
+from ai.backend.manager.models.resource_policy.row import keypair_resource_policies
+from ai.backend.manager.models.user.row import UserRole, users
 
 from .data.user.types import SessionOwnerContext
 from .errors.api import InvalidAPIParameters
 from .errors.auth import AccessKeyNotFound, UserNotFound
 from .errors.common import InternalServerError
-from .models.domain import domains
-from .models.keypair import keypairs
-from .models.project import groups
-from .models.resource_policy import keypair_resource_policies
-from .models.user import UserRole, users
 from .models.virtual_entity.queries import user_scope_membership_exists
 
 

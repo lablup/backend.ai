@@ -21,7 +21,7 @@ from ai.backend.manager.models.alembic.versions.b3e7a1f09c42_remove_the_auth_ent
     remove_retired_permissions,
 )
 from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
-from ai.backend.manager.models.rbac_models.role import RoleRow
+from ai.backend.manager.models.rbac_models.role.row import RoleRow
 from ai.backend.manager.models.rbac_models.role_permission_preset.row import (
     RolePermissionPresetRow,
 )

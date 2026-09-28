@@ -7,7 +7,7 @@ from collections.abc import Sequence
 from typing import override
 
 from ai.backend.common.data.entity.resource_group import ResourceGroupID
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.data.session.types import (
     SessionStatus,
@@ -22,7 +22,7 @@ from ai.backend.manager.sokovan.scheduler.results import (
 )
 from ai.backend.manager.views.sokovan.lifecycle import SessionWithKernels
 
-log = BraceStyleAdapter(logging.getLogger(__name__))
+log = StructuredLogger(logging.getLogger(__name__))
 
 _RELEASE_REASON = "RESERVATION_RELEASED"
 
@@ -108,6 +108,6 @@ class ReleaseReservedSessionsLifecycleHandler(SessionLifecycleHandler):
         session_ids = [session.session_info.identity.id for session in sessions]
         admitted = await self._repository.admit_prereserved_kernels(session_ids)
         if admitted:
-            log.info("Admitted {} prereserved kernels", len(admitted))
+            log.debug("prereserved kernels admitted", kernel_count=len(admitted))
 
         return result

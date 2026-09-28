@@ -151,7 +151,7 @@ def domain_factory() -> DomainFactory:
     exposes both ``domain_name`` and ``domain_id`` so call sites are ready for
     the upcoming domain PK migration to UUID.
     """
-    from ai.backend.manager.models.domain import (
+    from ai.backend.manager.models.domain.row import (
         domains,
     )  # lazy: avoid registering DomainRow globally
     from ai.backend.manager.models.virtual_entity.virtual_entity import VirtualEntityRow

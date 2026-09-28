@@ -21,7 +21,7 @@ from ai.backend.manager.api.gql.decorators import (
     gql_mutation,
     gql_root_field,
 )
-from ai.backend.manager.api.gql.rbac.types import (
+from ai.backend.manager.api.gql.rbac.types.role import (
     AssignRoleInput,
     BulkAssignRoleInputGQL,
     BulkAssignRolePayloadGQL,
@@ -34,17 +34,18 @@ from ai.backend.manager.api.gql.rbac.types import (
     PurgeRolePayload,
     RevokeRoleInput,
     RoleAssignmentConnection,
+    RoleAssignmentEdge,
     RoleAssignmentFilter,
     RoleAssignmentGQL,
     RoleAssignmentOrderBy,
     RoleConnection,
+    RoleEdge,
     RoleFilter,
     RoleGQL,
     RoleOrderBy,
     RoleUsageGQL,
     UpdateRoleInput,
 )
-from ai.backend.manager.api.gql.rbac.types.role import RoleAssignmentEdge, RoleEdge
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.api.gql.utils import check_admin_only
 from ai.backend.manager.models.rbac_models.role.scopes import (

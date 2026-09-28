@@ -27,7 +27,7 @@ from ai.backend.common.data.entity.role import RoleID
 from ai.backend.common.data.entity.role_preset import RolePresetID
 from ai.backend.common.data.entity.types import EntityIdentifier, EntityType
 from ai.backend.common.data.entity.user import UserID
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.permission.global_entity import global_entity_id
 from ai.backend.manager.data.permission.scope_template import ScopeTemplateValue
@@ -40,12 +40,12 @@ from ai.backend.manager.errors.base.entity import EntityNotFoundError
 from ai.backend.manager.errors.role_preset import InvalidRoleNameTemplate
 from ai.backend.manager.models.base import Base
 from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
-from ai.backend.manager.models.rbac_models.role import RoleRow
+from ai.backend.manager.models.rbac_models.role.row import RoleRow
 from ai.backend.manager.models.rbac_models.role_permission_preset.row import (
     RolePermissionPresetRow,
 )
 from ai.backend.manager.models.rbac_models.role_preset.row import RolePresetRow
-from ai.backend.manager.models.rbac_models.user_role import UserRoleRow
+from ai.backend.manager.models.rbac_models.user_role.row import UserRoleRow
 from ai.backend.manager.models.specs.creator import (
     EntityCreator,
     GuardedEntityCreator,
@@ -60,7 +60,7 @@ from ai.backend.manager.repositories.ops.v2.graph_write import V2GraphWriteOpsBa
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession as SASession
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 @dataclass(frozen=True)
@@ -437,11 +437,11 @@ class V2EntityWriteOps(V2GraphWriteOpsBase):
         except InvalidRoleNameTemplate as e:
             fallback = self._fallback_preset_role_name(entity)
             log.warning(
-                "Failed to render role name template of preset {} ({}): {}; falling back to {}",
-                preset.id,
-                preset.role_name_template,
-                e,
-                fallback,
+                "role name template not rendered, fallback name used",
+                role_preset_id=preset.id,
+                role_name_template=preset.role_name_template,
+                role_name=fallback,
+                exc_info=e,
             )
             return fallback
 

@@ -21,9 +21,9 @@ from ai.backend.manager.data.vfolder.types import (
     VFolderOperationStatus,
     VFolderOwnershipType,
 )
-from ai.backend.manager.models.domain import domains
-from ai.backend.manager.models.resource_policy import keypair_resource_policies
-from ai.backend.manager.models.vfolder import vfolders
+from ai.backend.manager.models.domain.row import domains
+from ai.backend.manager.models.resource_policy.row import keypair_resource_policies
+from ai.backend.manager.models.vfolder.row import vfolders
 
 VFolderFixtureData = dict[str, Any]
 VFolderFactory = Callable[..., Coroutine[Any, Any, VFolderFixtureData]]

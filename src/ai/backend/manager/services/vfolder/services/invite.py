@@ -4,6 +4,10 @@ from ai.backend.common.contexts.user import current_user
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.exception import UnreachableError
 from ai.backend.manager.config.provider import ManagerConfigProvider
+from ai.backend.manager.data.vfolder.types import (
+    VFolderInvitationState,
+    VFolderOwnershipType,
+)
 from ai.backend.manager.errors.auth import InsufficientPrivilege
 from ai.backend.manager.errors.common import Forbidden, InternalServerError
 from ai.backend.manager.errors.storage import (
@@ -14,11 +18,7 @@ from ai.backend.manager.errors.storage import (
     VFolderNotFound,
 )
 from ai.backend.manager.errors.user import UserNotFound
-from ai.backend.manager.models.user import UserRole
-from ai.backend.manager.models.vfolder import (
-    VFolderInvitationState,
-    VFolderOwnershipType,
-)
+from ai.backend.manager.models.user.row import UserRole
 from ai.backend.manager.repositories.user.repository import UserRepository
 from ai.backend.manager.repositories.vfolder.repository import VfolderRepository
 from ai.backend.manager.services.vfolder.actions.invite import (

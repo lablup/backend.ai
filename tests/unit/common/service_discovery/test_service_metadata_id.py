@@ -8,17 +8,20 @@ from ai.backend.common.service_discovery.service_discovery import (
 )
 
 
-def _manager_worker() -> ServiceMetadata:
+def _manager_worker(
+    *, announced: str = "10.0.0.1:8081", scraped: str = "10.0.0.1:18080"
+) -> ServiceMetadata:
     """What one worker registers. Its siblings share the listening socket."""
+    host, port = announced.rsplit(":", 1)
     return ServiceMetadata.for_endpoint(
         display_name="manager-i-core1",
         service_group="manager",
         version="26.9.0a4",
         endpoint=ServiceEndpoint(
-            address="10.0.0.1",
-            port=8081,
+            address=host,
+            port=int(port),
             protocol="http",
-            prometheus_address="10.0.0.1:18080",
+            prometheus_address=scraped,
         ),
     )
 
@@ -108,3 +111,16 @@ def test_a_caller_that_owns_its_identity_still_passes_one() -> None:
     )
 
     assert meta.id == route_id
+
+
+def test_hosts_sharing_an_announced_address_stay_apart() -> None:
+    """`announce-addr` has a host-independent default, and a deployment may leave it.
+
+    Keying identity on it collapsed three managers into one registry entry, so two of
+    the three stopped being scraped. The scrape address is what the entry is for and
+    what differs per host, so that is what names it.
+    """
+    left = _manager_worker(announced="127.0.0.1:5432", scraped="10.0.0.1:18080")
+    right = _manager_worker(announced="127.0.0.1:5432", scraped="10.0.0.2:18080")
+
+    assert left.id != right.id

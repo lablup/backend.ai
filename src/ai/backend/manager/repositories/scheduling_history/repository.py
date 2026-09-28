@@ -38,8 +38,9 @@ from ai.backend.manager.models.scheduling_history.searchers import (
 )
 from ai.backend.manager.models.scopes import OperationScope
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
-
-from .db_source import SchedulingHistoryDBSource
+from ai.backend.manager.repositories.scheduling_history.db_source.db_source import (
+    SchedulingHistoryDBSource,
+)
 
 if TYPE_CHECKING:
     from ai.backend.manager.models.utils import ExtendedAsyncSAEngine

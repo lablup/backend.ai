@@ -21,30 +21,9 @@ if not logging_active.get():
     assert config.config_file_name is not None
     fileConfig(config.config_file_name)
 
-# Import all model modules to register tables with metadata.
-# Using pkgutil for automatic discovery to ensure all tables are included.
-# This handles both top-level modules (models/*.py) and subpackages (models/{domain}/),
-# including subpackages that keep their __init__ empty and declare the table in row.py.
-import importlib
-import pkgutil
+from ai.backend.manager.models.base import ensure_all_tables_registered, metadata
 
-import ai.backend.manager.models
-
-# Subpackages to skip (not containing Row definitions)
-_SKIP_SUBPACKAGES = {"alembic", "hasher", "minilang", "rbac"}
-
-for module_info in pkgutil.iter_modules(ai.backend.manager.models.__path__):
-    if module_info.ispkg:
-        if module_info.name not in _SKIP_SUBPACKAGES:
-            importlib.import_module(f"ai.backend.manager.models.{module_info.name}")
-            try:
-                importlib.import_module(f"ai.backend.manager.models.{module_info.name}.row")
-            except ModuleNotFoundError:
-                pass
-    else:
-        importlib.import_module(f"ai.backend.manager.models.{module_info.name}")
-
-from ai.backend.manager.models.base import metadata
+ensure_all_tables_registered()
 
 target_metadata = metadata
 

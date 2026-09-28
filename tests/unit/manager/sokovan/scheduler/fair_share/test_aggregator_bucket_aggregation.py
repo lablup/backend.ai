@@ -17,7 +17,7 @@ import pytest
 
 from ai.backend.common.data.entity.resource_group import ResourceGroupID
 from ai.backend.common.types import ResourceSlot
-from ai.backend.manager.data.fair_share import (
+from ai.backend.manager.data.fair_share.types import (
     DomainUsageBucketKey,
     ProjectUsageBucketKey,
     UserUsageBucketKey,

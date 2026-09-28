@@ -9,6 +9,7 @@ from pathlib import Path
 import aiofiles
 
 from ai.backend.agent.resources import KernelResourceSpec
+from ai.backend.common.asyncio import run_in_executor_with_context
 from ai.backend.common.json import load_json
 from ai.backend.common.types import KernelId
 
@@ -28,11 +29,10 @@ def create_sparse_file(name: str, size: int) -> None:
 async def create_loop_filesystem(
     scratch_root: Path, scratch_size: int, kernel_id: KernelId
 ) -> None:
-    loop = asyncio.get_running_loop()
     scratch_dir = (scratch_root / f"{kernel_id}").resolve()
     scratch_file = (scratch_root / f"{kernel_id}.img").resolve()
-    await loop.run_in_executor(None, partial(os.makedirs, str(scratch_dir), exist_ok=True))
-    await loop.run_in_executor(None, create_sparse_file, str(scratch_file), scratch_size)
+    await run_in_executor_with_context(None, partial(os.makedirs, str(scratch_dir), exist_ok=True))
+    await run_in_executor_with_context(None, create_sparse_file, str(scratch_file), scratch_size)
     mkfs = await asyncio.create_subprocess_exec(
         "/sbin/mkfs.ext4", str(scratch_file), stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
     )
@@ -46,15 +46,14 @@ async def create_loop_filesystem(
 
 
 async def destroy_loop_filesystem(scratch_root: Path, kernel_id: KernelId) -> None:
-    loop = asyncio.get_running_loop()
     scratch_dir = (scratch_root / f"{kernel_id}").resolve()
     scratch_file = (scratch_root / f"{kernel_id}.img").resolve()
     umount = await asyncio.create_subprocess_exec("umount", str(scratch_dir))
     exit_code = await umount.wait()
     if exit_code != 0:
         raise RuntimeError("umount failed")
-    await loop.run_in_executor(None, scratch_file.unlink)
-    await loop.run_in_executor(None, shutil.rmtree, str(scratch_dir))
+    await run_in_executor_with_context(None, scratch_file.unlink)
+    await run_in_executor_with_context(None, shutil.rmtree, str(scratch_dir))
 
 
 class ScratchUtils:

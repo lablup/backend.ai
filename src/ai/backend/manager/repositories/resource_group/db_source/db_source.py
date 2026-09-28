@@ -23,9 +23,9 @@ from ai.backend.manager.data.resource_group.types import (
 )
 from ai.backend.manager.data.session.options import DefaultSessionOptions
 from ai.backend.manager.errors.resource import ResourceGroupNotFound
-from ai.backend.manager.models.agent import AgentRow
+from ai.backend.manager.models.agent.row import AgentRow
 from ai.backend.manager.models.domain.row import DomainRow
-from ai.backend.manager.models.resource_group import (
+from ai.backend.manager.models.resource_group.row import (
     ResourceGroupForDomainRow,
     ResourceGroupForKeypairsRow,
     ResourceGroupForProjectRow,
@@ -34,7 +34,7 @@ from ai.backend.manager.models.resource_group import (
 from ai.backend.manager.models.resource_group.searchable_fields import (
     ResourceGroupSearchableFields,
 )
-from ai.backend.manager.models.resource_slot import AgentResourceRow, ResourceSlotTypeRow
+from ai.backend.manager.models.resource_slot.row import AgentResourceRow, ResourceSlotTypeRow
 from ai.backend.manager.repositories.resource_slot.types import subtract_quantities
 
 if TYPE_CHECKING:

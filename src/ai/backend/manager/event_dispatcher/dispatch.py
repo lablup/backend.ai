@@ -130,7 +130,9 @@ from ai.backend.manager.sokovan.deployment.coordinator import DeploymentCoordina
 from ai.backend.manager.sokovan.deployment.route.coordinator import RouteCoordinator
 from ai.backend.manager.sokovan.reconciler.coordinator import ReconcilerCoordinator
 from ai.backend.manager.sokovan.scheduler.coordinator import ScheduleCoordinator
-from ai.backend.manager.sokovan.scheduling_controller import SchedulingController
+from ai.backend.manager.sokovan.scheduling_controller.scheduling_controller import (
+    SchedulingController,
+)
 
 from .handlers.agent import AgentEventHandler
 from .handlers.idle_check import IdleCheckEventHandler

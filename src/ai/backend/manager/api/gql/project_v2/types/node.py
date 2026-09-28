@@ -25,10 +25,10 @@ from ai.backend.manager.api.gql.decorators import (
     gql_field,
     gql_pydantic_input,
 )
-from ai.backend.manager.api.gql.fair_share.types import ProjectFairShareGQL
+from ai.backend.manager.api.gql.fair_share.types.project import ProjectFairShareGQL
 from ai.backend.manager.api.gql.pydantic_compat import PydanticInputMixin, PydanticNodeMixin
 from ai.backend.manager.api.gql.resource_slot.overview_types import ActiveResourceOverviewGQL
-from ai.backend.manager.api.gql.resource_usage.types import (
+from ai.backend.manager.api.gql.resource_usage.types.project_usage import (
     ProjectUsageBucketConnection,
     ProjectUsageBucketFilter,
     ProjectUsageBucketOrderBy,
@@ -173,7 +173,7 @@ class ProjectV2GQL(PydanticNodeMixin[ProjectNode]):
         from strawberry.relay import PageInfo
 
         from ai.backend.manager.api.gql.base import encode_cursor
-        from ai.backend.manager.api.gql.resource_usage.types import (
+        from ai.backend.manager.api.gql.resource_usage.types.project_usage import (
             ProjectUsageBucketEdge,
             ProjectUsageBucketGQL,
         )

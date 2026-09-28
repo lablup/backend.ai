@@ -15,12 +15,12 @@ from ai.backend.common.data.entity.resource_preset import ResourcePresetID
 from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.exception import InvalidAPIParameters
 from ai.backend.common.types import BinarySize, ResourceSlot
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.data.resource_preset.types import ResourcePresetData
 from ai.backend.manager.models.minilang.ordering import ColumnMapType, QueryOrderParser
 from ai.backend.manager.models.minilang.queryfilter import FieldSpecType, QueryFilterParser
-from ai.backend.manager.models.resource_preset import ResourcePresetRow, resource_presets
 from ai.backend.manager.models.resource_preset.creators import ResourcePresetCreator
+from ai.backend.manager.models.resource_preset.row import ResourcePresetRow, resource_presets
 from ai.backend.manager.models.resource_preset.updaters import ResourcePresetUpdater
 from ai.backend.manager.services.resource_group.actions.lookup import LookupResourceGroupAction
 from ai.backend.manager.services.resource_preset.actions.lookup import (
@@ -37,7 +37,7 @@ from .base import (
 if TYPE_CHECKING:
     from .schema import GraphQueryContext
 
-log = BraceStyleAdapter(logging.getLogger("ai.backend.manager.models"))
+log = StructuredLogger(logging.getLogger("ai.backend.manager.models"))
 
 __all__: Sequence[str] = (
     "CreateResourcePreset",

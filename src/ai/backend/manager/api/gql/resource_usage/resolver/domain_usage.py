@@ -12,7 +12,7 @@ from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     gql_root_field,
 )
-from ai.backend.manager.api.gql.resource_usage.types import (
+from ai.backend.manager.api.gql.resource_usage.types.domain_usage import (
     DomainUsageBucketConnection,
     DomainUsageBucketEdge,
     DomainUsageBucketFilter,

@@ -43,7 +43,7 @@ from sqlalchemy.ext.asyncio import AsyncSession as SASession
 from sqlalchemy.orm import DeclarativeMeta
 from sqlalchemy.orm.attributes import InstrumentedAttribute
 
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.errors.api import InvalidAPIParameters
 from ai.backend.manager.errors.common import GenericForbidden, ObjectNotFound
 from ai.backend.manager.models.minilang.ordering import (
@@ -53,7 +53,7 @@ from ai.backend.manager.models.minilang.ordering import (
     QueryOrderParser,
 )
 from ai.backend.manager.models.minilang.queryfilter import QueryFilterParser, WhereClauseType
-from ai.backend.manager.models.user import UserRole
+from ai.backend.manager.models.user.row import UserRole
 from ai.backend.manager.models.utils import execute_with_retry
 
 from .gql_relay import (
@@ -68,7 +68,7 @@ if TYPE_CHECKING:
 
     from .schema import GraphQueryContext
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 SAFE_MIN_INT = -9007199254740991
 SAFE_MAX_INT = 9007199254740991
@@ -533,7 +533,7 @@ def privileged_query(required_role: UserRole) -> Callable[..., Any]:
             *args: Any,
             **kwargs: Any,
         ) -> Any:
-            from ai.backend.manager.models.user import UserRole
+            from ai.backend.manager.models.user.row import UserRole
 
             ctx: GraphQueryContext = info.context
             if ctx.user["role"] != UserRole.SUPERADMIN:
@@ -569,7 +569,7 @@ def scoped_query(
             *args: Any,
             **kwargs: Any,
         ) -> Any:
-            from ai.backend.manager.models.user import UserRole
+            from ai.backend.manager.models.user.row import UserRole
 
             ctx: GraphQueryContext = info.context
             client_role = ctx.user["role"]
@@ -629,8 +629,8 @@ def privileged_mutation(
         async def wrapped(
             cls: type, root: Any, info: graphene.ResolveInfo, *args: Any, **kwargs: Any
         ) -> Any:
-            from ai.backend.manager.models.project import groups  # , association_groups_users
-            from ai.backend.manager.models.user import UserRole
+            from ai.backend.manager.models.project.row import groups  # , association_groups_users
+            from ai.backend.manager.models.user.row import UserRole
 
             ctx: GraphQueryContext = info.context
             permitted = False
@@ -700,18 +700,20 @@ async def gql_mutation_wrapper(
     try:
         return await execute_with_retry(_do_mutate)
     except sa.exc.IntegrityError as e:
-        log.warning("gql_mutation_wrapper(): integrity error ({})", repr(e))
+        log.trace("gql mutation integrity error", error_message=str(e))
         return cast(ResultType, result_cls(False, f"integrity error: {e}"))
     except sa.exc.StatementError as e:
         log.warning(
-            "gql_mutation_wrapper(): statement error ({})\n{}", repr(e), e.statement or "(unknown)"
+            "gql mutation statement failed",
+            sql_statement=e.statement or "(unknown)",
+            exc_info=e,
         )
         orig_exc = e.orig
         return cast(ResultType, result_cls(False, str(orig_exc), None))
     except (TimeoutError, asyncio.CancelledError):
         raise
     except Exception as e:
-        log.exception("gql_mutation_wrapper(): other error")
+        log.exception("gql mutation failed")
         return cast(ResultType, result_cls(False, f"unexpected error: {e}"))
 
 

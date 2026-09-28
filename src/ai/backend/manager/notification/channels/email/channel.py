@@ -2,20 +2,20 @@
 
 from __future__ import annotations
 
-import asyncio
 import logging
 import smtplib
 from email.mime.text import MIMEText
 from functools import partial
 from typing import override
 
+from ai.backend.common.asyncio import run_in_executor_with_context
 from ai.backend.common.data.notification.types import EmailSpec
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.errors.notification import NotificationProcessingFailure
 from ai.backend.manager.notification.channels.base import AbstractNotificationChannel
 from ai.backend.manager.notification.types import NotificationMessage, SendResult
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 _DEFAULT_NOTIFICATION_SUBJECT = "Notification from Backend.AI"
 
@@ -51,16 +51,12 @@ class EmailChannel(AbstractNotificationChannel):
             lines = message.message.split("\n", 1)
             subject = lines[0] if lines else _DEFAULT_NOTIFICATION_SUBJECT
 
-        loop = asyncio.get_running_loop()
-        await loop.run_in_executor(
+        await run_in_executor_with_context(
             None,
             partial(self._send_email, subject, message.message),
         )
 
-        log.info(
-            "Email notification sent successfully to {} recipients",
-            len(self._spec.message.to_emails),
-        )
+        log.trace("email notification sent", recipient_count=len(self._spec.message.to_emails))
 
         return SendResult(
             message=f"Email sent successfully to {len(self._spec.message.to_emails)} recipients"
@@ -93,23 +89,10 @@ class EmailChannel(AbstractNotificationChannel):
                     to_addrs=msg.to_emails,
                 )
         except smtplib.SMTPConnectError as e:
-            log.error(
-                "Failed to connect to SMTP server {}:{}: {}",
-                smtp.host,
-                smtp.port,
-                str(e),
-            )
             raise NotificationProcessingFailure(f"SMTP connection failed: {e!s}") from e
         except smtplib.SMTPAuthenticationError as e:
-            log.error(
-                "SMTP authentication failed for user {}: {}",
-                auth.username if auth else "unknown",
-                str(e),
-            )
             raise NotificationProcessingFailure(f"SMTP authentication failed: {e!s}") from e
         except smtplib.SMTPException as e:
-            log.error("SMTP error while sending email: {}", str(e))
             raise NotificationProcessingFailure(f"Email delivery failed: {e!s}") from e
         except Exception as e:
-            log.error("Unexpected error sending email: {}", str(e))
             raise NotificationProcessingFailure(f"Email delivery failed: {e!s}") from e

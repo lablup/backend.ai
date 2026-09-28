@@ -27,12 +27,12 @@ from ai.backend.appproxy.common.utils import ensure_json_serializable
 from ai.backend.appproxy.coordinator.errors import InvalidEnumTypeError
 from ai.backend.common.exception import InvalidIpAddressValue
 from ai.backend.common.types import BackendAISchema, ReadableCIDR
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 
 SAFE_MIN_INT = -9007199254740991
 SAFE_MAX_INT = 9007199254740991
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 # The common shared metadata instance
 convention = {

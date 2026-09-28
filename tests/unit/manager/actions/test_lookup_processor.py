@@ -12,7 +12,7 @@ from typing import Any, override
 
 import pytest
 
-from ai.backend.common.contexts.user import with_user
+from ai.backend.common.contexts.user import with_user_context
 from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.entity.image import ImageEntityType
 from ai.backend.common.data.entity.types import EntityIdentifier, EntityType
@@ -139,7 +139,7 @@ async def test_a_failed_lookup_reaches_the_monitors(
     monitor = _RecordingMonitor()
     processor = LookupActionProcessor[_Action, _Result](func=run, monitors=[monitor])
 
-    with with_user(authenticated_user):
+    with with_user_context(authenticated_user):
         with pytest.raises(ImageNotFound):
             await processor.run(action)
 
@@ -155,7 +155,7 @@ async def test_a_resolved_lookup_returns_the_id(
     monitor = _RecordingMonitor()
     processor = LookupActionProcessor[_Action, _Result](func=run, monitors=[monitor])
 
-    with with_user(authenticated_user):
+    with with_user_context(authenticated_user):
         result = await processor.run(action)
 
     assert result.entity_id() == _RESOLVED

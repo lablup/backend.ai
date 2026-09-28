@@ -23,7 +23,7 @@ import pytest
 import sqlalchemy as sa
 from sqlalchemy.orm import InstrumentedAttribute
 
-from ai.backend.common.contexts.user import with_user
+from ai.backend.common.contexts.user import with_user_context
 from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.role_preset import RolePresetEntityType, RolePresetID
@@ -1500,7 +1500,7 @@ async def test_lookup_runs_under_the_lookup_processor(
         LookupActionProcessor(service.execute)
     )
 
-    with with_user(authenticated_user):
+    with with_user_context(authenticated_user):
         result = await processor.run(_LookupAction(lookup=_PresetByName(name="default")))
 
     # The id the key resolved to is what reaches the audit trail.

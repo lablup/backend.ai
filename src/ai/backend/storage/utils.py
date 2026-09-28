@@ -13,7 +13,7 @@ import trafaret as t
 from aiohttp import hdrs, web
 
 from ai.backend.common.json import dump_json_str
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 
 from .errors import (
     InvalidConfigurationSourceError,
@@ -21,7 +21,7 @@ from .errors import (
 )
 from .volumes.types import LoggingInternalMeta
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 class CheckParamSource(enum.Enum):
@@ -66,7 +66,7 @@ async def check_params(
         else:
             yield checker.check(raw_params)
     except t.DataError as e:
-        log.debug("check_params IV error", exc_info=e)
+        log.trace("invalid API parameters: {}", e)
         raise web.HTTPBadRequest(
             text=dump_json_str(
                 {
@@ -90,13 +90,13 @@ async def check_params(
 
 
 async def log_manager_api_entry(
-    log: logging.Logger | BraceStyleAdapter,
+    log: StructuredLogger,
     name: str,
     params: Any,
 ) -> None:
     if params is not None:
         if "src_vfid" in params and "dst_vfid" in params:
-            log.info(
+            log.debug(
                 "ManagerAPI::{}(v:{}, f:{} -> dst_v: {}, dst_f:{})",
                 name.upper(),
                 params["src_volume"],
@@ -107,7 +107,7 @@ async def log_manager_api_entry(
         elif "relpaths" in params:
             relpaths = params["relpaths"]
             paths_summary = str(relpaths[0]) + "..." if relpaths else "(empty)"
-            log.info(
+            log.debug(
                 "ManagerAPI::{}(v:{}, f:{}, p*:{})",
                 name.upper(),
                 params["volume"],
@@ -115,7 +115,7 @@ async def log_manager_api_entry(
                 paths_summary,
             )
         elif "relpath" in params:
-            log.info(
+            log.debug(
                 "ManagerAPI::{}(v:{}, f:{}, p:{})",
                 name.upper(),
                 params["volume"],
@@ -123,43 +123,43 @@ async def log_manager_api_entry(
                 params["relpath"],
             )
         elif "vfid" in params:
-            log.info(
+            log.debug(
                 "ManagerAPI::{}(v:{}, f:{})",
                 name.upper(),
                 params["volume"],
                 params["vfid"],
             )
         elif "volume" in params:
-            log.info(
+            log.debug(
                 "ManagerAPI::{}(v:{})",
                 name.upper(),
                 params["volume"],
             )
         return
-    log.info(
+    log.debug(
         "ManagerAPI::{}()",
         name.upper(),
     )
 
 
 async def log_manager_api_entry_new(
-    log: logging.Logger | BraceStyleAdapter,
+    log: StructuredLogger,
     name: str,
     params: Any,
 ) -> None:
     if params is None:
-        log.info(
+        log.debug(
             "ManagerAPI::{}()",
             name.upper(),
         )
     elif isinstance(params, LoggingInternalMeta):
-        log.info(
+        log.debug(
             "ManagerAPI::{}({})",
             name.upper(),
             params.to_logging_str(),
         )
     else:
-        log.info(
+        log.debug(
             "ManagerAPI::{}({})",
             name.upper(),
             str(params),
@@ -167,23 +167,23 @@ async def log_manager_api_entry_new(
 
 
 async def log_client_api_entry(
-    log: logging.Logger | BraceStyleAdapter,
+    log: StructuredLogger,
     name: str,
     params: Any,
 ) -> None:
     if params is None:
-        log.info(
+        log.debug(
             "ClientFacingAPI::{}()",
             name.upper(),
         )
     elif isinstance(params, LoggingInternalMeta):
-        log.info(
+        log.debug(
             "ClientFacingAPI::{}({})",
             name.upper(),
             params.to_logging_str(),
         )
     else:
-        log.info(
+        log.debug(
             "ClientFacingAPI::{}({})",
             name.upper(),
             str(params),

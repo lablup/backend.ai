@@ -17,13 +17,13 @@ from ai.backend.common.dto.manager.v2.resource_preset.response import (
     AdminSearchResourcePresetsPayload,
 )
 from ai.backend.common.types import ResourceSlot
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.api.rest.v2.path_params import PresetIdPathParam
 
 if TYPE_CHECKING:
     from ai.backend.manager.api.adapters.resource_preset.adapter import ResourcePresetAdapter
 
-log: Final = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log: Final = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 class V2ResourcePresetHandler:

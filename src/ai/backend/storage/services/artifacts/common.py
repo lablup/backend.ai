@@ -16,7 +16,7 @@ from ai.backend.common.events.dispatcher import EventProducer
 from ai.backend.common.events.event_types.artifact.anycast import (
     ModelVerifyingEvent,
 )
-from ai.backend.logging.utils import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.storage.context_types import ArtifactVerifierContext
 from ai.backend.storage.data.storage.types import ImportStepContext, StorageTarget
 from ai.backend.storage.errors import (
@@ -34,7 +34,7 @@ from ai.backend.storage.services.artifacts.types import (
 from ai.backend.storage.storages.vfolder_storage import VFolderStorage
 from ai.backend.storage.storages.vfs_storage import VFSStorage
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 class ModelVerifyStep(ImportStep[DownloadStepResult], ABC):
@@ -128,7 +128,7 @@ class ModelVerifyStep(ImportStep[DownloadStepResult], ABC):
         for verifier_name, verifier in self._artifact_verifier_ctx._verifiers.items():
             dst_path = dst_storage.resolve_path(model_prefix)
             verifier_start_time = datetime.now(UTC)
-            log.info(
+            log.debug(
                 "Starting artifact verification using '{}', dst_path: {}", verifier_name, dst_path
             )
             try:
@@ -148,13 +148,13 @@ class ModelVerifyStep(ImportStep[DownloadStepResult], ABC):
 
                 if result.infected_count > 0:
                     verification_success = False
-                    log.warning(
+                    log.trace(
                         "Artifact verification using '{}' found {} infected files",
                         verifier_name,
                         result.infected_count,
                     )
                 else:
-                    log.info(
+                    log.debug(
                         "Artifact verification using '{}' completed successfully", verifier_name
                     )
 
@@ -171,7 +171,7 @@ class ModelVerifyStep(ImportStep[DownloadStepResult], ABC):
                     metadata={},
                     error=str(e),
                 )
-                log.error("Artifact verification using '{}' failed: {}", verifier_name, e)
+                log.exception("artifact verification failed", verifier_name=verifier_name)
 
         # Create complete verification result
         verification_result = VerificationStepResult(
@@ -243,13 +243,15 @@ class ModelArchiveStep(ImportStep[VerifyStepResult], ABC):
 
         # No need to move if download and archive storage are the same
         if download_storage_name == archive_storage_name:
-            log.info(
+            log.debug(
                 "Archive step skipped - download and archive storage are the same: {}",
                 archive_storage_name,
             )
             return
 
-        log.info("Starting archive transfer: {} -> {}", download_storage_name, archive_storage_name)
+        log.debug(
+            "Starting archive transfer: {} -> {}", download_storage_name, archive_storage_name
+        )
 
         # Transfer entire model directory at once
         revision = context.model.resolve_revision(self.registry_type)
@@ -269,7 +271,7 @@ class ModelArchiveStep(ImportStep[VerifyStepResult], ABC):
             dest_prefix=model_prefix,
         )
 
-        log.info(
+        log.debug(
             "Archive transfer completed: {} -> {}, files={}",
             download_storage_name,
             archive_storage_name,

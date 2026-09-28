@@ -30,7 +30,7 @@ from redis.backoff import ExponentialBackoff
 from redis.retry import Retry
 
 from ai.backend.common.utils import addr_to_hostport_pair
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 
 from .types import RedisConnectionInfo, RedisHelperConfig, RedisTarget, ValkeyTarget
 from .validators import DelimiterSeperatedList, HostPortPair
@@ -72,7 +72,7 @@ _default_conn_pool_opts: Mapping[str, Any] = {
     "max_connections": 16,
 }
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 # TODO: Remove this after migrating redis_lock client to valkey glide
@@ -108,11 +108,10 @@ async def execute(
         now = time.perf_counter()
         if (warn_on_first_attempt and retry_log_count == 0) or now - last_log_time >= 10.0:
             log.warning(
-                "Retrying due to interruption of Redis connection "
-                "({}, conn-pool: {}, retrying-for: {:.3f}s)",
-                repr(e),
-                redis_obj.name,
-                now - first_trial,
+                "redis connection interrupted, retrying",
+                error=repr(e),
+                conn_pool_name=redis_obj.name,
+                retrying_sec=now - first_trial,
             )
             retry_log_count += 1
             last_log_time = now

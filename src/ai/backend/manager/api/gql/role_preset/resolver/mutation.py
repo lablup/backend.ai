@@ -11,21 +11,25 @@ from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     gql_mutation,
 )
-from ai.backend.manager.api.gql.role_preset.types import (
+from ai.backend.manager.api.gql.role_preset.types.inputs import (
     BulkAddRolePermissionPresetsInputGQL,
-    BulkAddRolePermissionPresetsPayloadGQL,
     BulkDeleteRolePresetsInputGQL,
-    BulkDeleteRolePresetsPayloadGQL,
     BulkPurgeRolePresetsInputGQL,
-    BulkPurgeRolePresetsPayloadGQL,
     BulkRemoveRolePermissionPresetsInputGQL,
-    BulkRemoveRolePermissionPresetsPayloadGQL,
     BulkRestoreRolePresetsInputGQL,
-    BulkRestoreRolePresetsPayloadGQL,
     CreateRolePresetInputGQL,
-    CreateRolePresetPayloadGQL,
     UpdateRolePresetInputGQL,
+)
+from ai.backend.manager.api.gql.role_preset.types.payloads import (
+    BulkDeleteRolePresetsPayloadGQL,
+    BulkPurgeRolePresetsPayloadGQL,
+    BulkRestoreRolePresetsPayloadGQL,
+    CreateRolePresetPayloadGQL,
     UpdateRolePresetPayloadGQL,
+)
+from ai.backend.manager.api.gql.role_preset.types.permission import (
+    BulkAddRolePermissionPresetsPayloadGQL,
+    BulkRemoveRolePermissionPresetsPayloadGQL,
 )
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.api.gql.utils import check_admin_only

@@ -31,12 +31,12 @@ from ai.backend.appproxy.coordinator.models import Circuit, Token, Worker, add_c
 from ai.backend.appproxy.coordinator.models.utils import execute_with_txn_retry
 from ai.backend.appproxy.coordinator.types import RootContext
 from ai.backend.common.types import BackendAISchema
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession as SASession
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 class AddRequestModel(BackendAISchema):
@@ -116,10 +116,10 @@ async def proxy(
         token = await Token.get(sess, UUID(token_id))
 
     if token.session_id != session_id:
-        log.warning(
-            "User requested to create app of session {} but token authorizes session {}",
-            session_id,
-            token.session_id,
+        log.trace(
+            "requested session does not match the token",
+            session_id=session_id,
+            token_session_id=token.session_id,
         )
         raise InvalidCredentials("E20007: Session ID mismatch")
 

@@ -24,7 +24,7 @@ from ai.backend.manager.clients.container_registry.base import (
 from ai.backend.manager.clients.container_registry.pool import (
     ContainerRegistryQuotaClientPool,
 )
-from ai.backend.manager.container_registry import get_container_registry_cls
+from ai.backend.manager.container_registry.factory import get_container_registry_cls
 from ai.backend.manager.data.container_registry.types import (
     ContainerRegistryData,
 )
@@ -41,14 +41,14 @@ from ai.backend.manager.errors.image import (
     ContainerRegistryWebhookAuthorizationFailed,
     HarborWebhookContainerRegistryRowNotFound,
 )
-from ai.backend.manager.models.agent import AgentRow
-from ai.backend.manager.models.container_registry import ContainerRegistryRow
+from ai.backend.manager.models.agent.row import AgentRow
+from ai.backend.manager.models.container_registry.row import ContainerRegistryRow
 from ai.backend.manager.models.container_registry.searchable_fields import (
     ContainerRegistrySearchableFields,
 )
 from ai.backend.manager.models.rbac import ProjectScope
-from ai.backend.manager.models.resource_group import ResourceGroupForProjectRow
-from ai.backend.manager.models.session import SessionRow
+from ai.backend.manager.models.resource_group.row import ResourceGroupForProjectRow
+from ai.backend.manager.models.session.row import SessionRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.container_registry.repository import (
     ContainerRegistryRepository,

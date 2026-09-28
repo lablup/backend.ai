@@ -4,7 +4,7 @@ from typing import override
 from ai.backend.common.data.entity.types import EntityIdentifier
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.actions.v2.single_entity.base import BaseSingleEntityAction
-from ai.backend.manager.data.prometheus_query_preset import PrometheusQueryPresetData
+from ai.backend.manager.data.prometheus_query_preset.types import PrometheusQueryPresetData
 from ai.backend.manager.models.prometheus_query_preset.updaters import (
     PrometheusQueryPresetUpdater,
 )

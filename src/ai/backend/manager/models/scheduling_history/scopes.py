@@ -17,12 +17,12 @@ from ai.backend.manager.errors.deployment import EndpointNotFound
 from ai.backend.manager.errors.kernel import KernelNotFound, SessionNotFound
 from ai.backend.manager.errors.service import RouteNotFound
 from ai.backend.manager.models.clauses import QueryCondition
-from ai.backend.manager.models.endpoint import EndpointRow
+from ai.backend.manager.models.endpoint.row import EndpointRow
 from ai.backend.manager.models.kernel.row import KernelRow
 from ai.backend.manager.models.replica_group_history.searchable_fields import (
     ReplicaGroupHistorySearchableFields,
 )
-from ai.backend.manager.models.routing import RoutingRow
+from ai.backend.manager.models.routing.row import RoutingRow
 from ai.backend.manager.models.scheduling_history.searchable_fields import (
     DeploymentHistorySearchableFields,
     KernelSchedulingHistorySearchableFields,
@@ -30,7 +30,7 @@ from ai.backend.manager.models.scheduling_history.searchable_fields import (
     SessionSchedulingHistorySearchableFields,
 )
 from ai.backend.manager.models.scopes import ExistenceCheck, ScopeTarget
-from ai.backend.manager.models.session import SessionRow
+from ai.backend.manager.models.session.row import SessionRow
 
 __all__ = (
     "DeploymentHistoryTarget",

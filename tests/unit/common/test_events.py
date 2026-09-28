@@ -1,10 +1,11 @@
 from __future__ import annotations
 
 import asyncio
-from types import TracebackType
+import logging
 from typing import override
 
 import aiotools
+import pytest
 
 from ai.backend.common.events.dispatcher import (
     CoalescingOptions,
@@ -89,22 +90,11 @@ async def test_dispatch(test_valkey_stream_mq: RedisQueue, test_node_id: str) ->
     await dispatcher.close()
 
 
-async def test_error_on_dispatch(test_valkey_stream_mq: RedisQueue, test_node_id: str) -> None:
+async def test_error_on_dispatch(
+    test_valkey_stream_mq: RedisQueue, test_node_id: str, caplog: pytest.LogCaptureFixture
+) -> None:
     app = object()
-    exception_log: list[str] = []
-
-    async def handle_exception(
-        et: type[Exception],
-        exc: Exception,
-        tb: TracebackType,
-    ) -> None:
-        exception_log.append(type(exc).__name__)
-
-    dispatcher = EventDispatcher(
-        test_valkey_stream_mq,
-        consumer_exception_handler=handle_exception,  # type: ignore
-        subscriber_exception_handler=handle_exception,  # type: ignore
-    )
+    dispatcher = EventDispatcher(test_valkey_stream_mq)
     producer = EventProducer(test_valkey_stream_mq, source=AgentId(test_node_id))
 
     async def acb(context: object, source: AgentId, event: DummyBroadcastEvent) -> None:
@@ -124,11 +114,14 @@ async def test_error_on_dispatch(test_valkey_stream_mq: RedisQueue, test_node_id
     await dispatcher.start()
     await asyncio.sleep(0.1)
 
-    await producer.broadcast_event(DummyBroadcastEvent(value=0), source_override=AgentId("i-test"))
-    await asyncio.sleep(0.5)
-    assert len(exception_log) == 2
-    assert "ZeroDivisionError" in exception_log
-    assert "OverflowError" in exception_log
+    with caplog.at_level(logging.ERROR, logger="ai.backend.common.events.dispatcher"):
+        await producer.broadcast_event(
+            DummyBroadcastEvent(value=0), source_override=AgentId("i-test")
+        )
+        await asyncio.sleep(0.5)
+    failures = [r for r in caplog.records if r.getMessage() == "event handler failed"]
+    assert len(failures) == 2
+    assert {r.exc_info[0] for r in failures if r.exc_info} == {ZeroDivisionError, OverflowError}
 
     await producer.close()
     await dispatcher.close()

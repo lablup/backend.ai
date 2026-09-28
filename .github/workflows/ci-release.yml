@@ -1,0 +1,379 @@
+name: ci-release
+
+# Builds the release artifacts and publishes the GitHub release, called by
+# `ci.yml` for a tag once every check has passed. PyPI publishing waits for it in
+# `ci.yml`, since PyPI trusts only the workflow it was registered with.
+
+on:
+  workflow_call:
+    inputs:
+      tag:
+        description: The tag being released, e.g. 26.9.0
+        type: string
+        required: true
+      release-audience:
+        description: RELEASE_AUDIENCE from `scripts/determine-release-type.py`; `internal` builds wheels only
+        type: string
+        required: true
+      is-prerelease:
+        description: IS_PRERELEASE from `scripts/determine-release-type.py`
+        type: string
+        required: true
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+
+  build-scies:
+    if: inputs.release-audience != 'internal'
+    strategy:
+      fail-fast: false
+      matrix:
+        # ubuntu-22.04: x86-64
+        # ubuntu-22.04-arm: aarch64
+        # macos-15: apple silicon
+        os: [ubuntu-22.04, ubuntu-22.04-arm, macos-15]
+    runs-on: ${{ matrix.os }}
+    env:
+      SCIENCE_AUTH_API_GITHUB_COM_BEARER: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+    - name: Check out the revision
+      uses: actions/checkout@v6
+    - name: Fetch remote tags
+      run: git fetch origin 'refs/tags/*:refs/tags/*' -f
+    - name: Git LFS Pull
+      run: git lfs pull
+    - name: Extract Python version from pants.toml
+      run: |
+        PYTHON_VERSION=$(awk -F'["]' '/CPython==/ {print $2; exit}' pants.toml | sed 's/CPython==//')
+        echo "PANTS_CONFIG_FILES=pants.ci.toml" >> $GITHUB_ENV
+        echo "PROJECT_PYTHON_VERSION=$PYTHON_VERSION" >> $GITHUB_ENV
+    - name: Install coreutils for macOS
+      if: ${{ startsWith(matrix.os, 'macos') }}
+      run: brew install coreutils
+    - name: Set up Python as Runtime
+      uses: actions/setup-python@v6
+      with:
+        python-version: ${{ env.PROJECT_PYTHON_VERSION }}
+        cache: "pip"
+    - name: Restore the Pants caches
+      uses: ./.github/actions/pants-caches
+      with:
+        mode: restore
+    - name: Bootstrap Pants
+      uses: pantsbuild/actions/init-pants@v11
+      with:
+        named-caches-hash: disable
+        cache-lmdb-store: 'false'
+    - name: Build both lazy and fat packages
+      run: |
+        pants --tag="scie" package '::'
+        # Rename artifacts to have the platform suffix
+        platform_suffix="$(python scripts/get-platform-suffix.py)"
+        for artifact in dist/backendai-*; do
+          mv "${artifact}" "${artifact}-${platform_suffix}"
+        done
+        # Generate checksums. NOTE: 'pants run' does not support parallelization
+        pants list --filter-tag-regex='checksum' '::' | xargs -n 1 pants run
+        # Merge checksums into a single file
+        cat dist/*.sha256 > dist/checksum.txt
+        mv dist/checksum.txt dist/checksum-${platform_suffix}.txt
+        rm dist/*.sha256
+    - name: Upload scies
+      uses: actions/upload-artifact@v5
+      with:
+        name: scies-${{ matrix.os }}
+        path: dist/*
+    - name: Upload pants log
+      uses: actions/upload-artifact@v5
+      with:
+        name: pants-${{ matrix.os }}.build-scies.log
+        path: .pants.d/workdir/pants.log
+      if: always()  # We want the log even on failures.
+
+  build-wheels:
+    runs-on: ubuntu-22.04
+    steps:
+    - name: Check out the revision
+      uses: actions/checkout@v6
+    - name: Fetch remote tags
+      run: git fetch origin 'refs/tags/*:refs/tags/*' -f
+    - name: Git LFS Pull
+      run: git lfs pull
+    - name: Extract Python version from pants.toml
+      run: |
+        PYTHON_VERSION=$(awk -F'["]' '/CPython==/ {print $2; exit}' pants.toml | sed 's/CPython==//')
+        echo "PANTS_CONFIG_FILES=pants.ci.toml" >> $GITHUB_ENV
+        echo "PROJECT_PYTHON_VERSION=$PYTHON_VERSION" >> $GITHUB_ENV
+    - name: Set up Python as Runtime
+      uses: actions/setup-python@v6
+      with:
+        python-version: ${{ env.PROJECT_PYTHON_VERSION }}
+        cache: "pip"
+    - name: Install local dependencies for packaging
+      run: |
+        pip install -U 'packaging>=21.3'
+    - name: Restore the Pants caches
+      uses: ./.github/actions/pants-caches
+      with:
+        mode: restore
+    - name: Bootstrap Pants
+      uses: pantsbuild/actions/init-pants@v11
+      with:
+        named-caches-hash: disable
+        cache-lmdb-store: 'false'
+    - name: Build wheel packages
+      run: |
+        ./scripts/build-wheels.sh
+    - name: Upload wheels
+      uses: actions/upload-artifact@v5
+      with:
+        name: wheels
+        path: |
+          dist/*
+          !dist/export/
+    - name: Upload pants log
+      uses: actions/upload-artifact@v5
+      with:
+        name: pants.build-wheels.log
+        path: .pants.d/workdir/pants.log
+      if: always()  # We want the log even on failures.
+
+  build-sbom:
+    if: inputs.release-audience != 'internal'
+    permissions:
+      contents: read
+      # `sbom.yml`'s sbom-containers job requests both.
+      id-token: write
+      attestations: write
+    uses: ./.github/workflows/sbom.yml
+
+  build-supergraph:
+    if: inputs.release-audience != 'internal'
+    runs-on: ubuntu-latest
+    steps:
+    - name: Check out the revision
+      uses: actions/checkout@v6
+    - name: Fetch remote tags
+      run: git fetch origin 'refs/tags/*:refs/tags/*' -f
+    - name: Extract Python version from pants.toml
+      run: |
+        PYTHON_VERSION=$(grep -m 1 -oP '(?<=CPython==)([^"]+)' pants.toml)
+        echo "PANTS_CONFIG_FILES=pants.ci.toml" >> $GITHUB_ENV
+        echo "PROJECT_PYTHON_VERSION=$PYTHON_VERSION" >> $GITHUB_ENV
+    - name: Set up Python as Runtime
+      uses: actions/setup-python@v6
+      with:
+        python-version: ${{ env.PROJECT_PYTHON_VERSION }}
+    - name: Restore the Pants caches
+      uses: ./.github/actions/pants-caches
+      with:
+        mode: restore
+    - name: Bootstrap Pants
+      uses: pantsbuild/actions/init-pants@v11
+      with:
+        named-caches-hash: disable
+        cache-lmdb-store: 'false'
+    - name: Pants export
+      run: pants export --resolve=python-default
+    - name: Install Rover CLI for generating supergraph
+      run: |
+        curl -sSL https://rover.apollo.dev/nix/latest | sh
+        echo "$HOME/.rover/bin" >> $GITHUB_PATH
+    - name: Generate GraphQL schemas and supergraph
+      env:
+        APOLLO_ELV2_LICENSE: accept
+      run: |
+        ./backend.ai mgr api dump-gql-schema --output schema.graphql
+        ./backend.ai mgr api dump-gql-schema --v2 --output v2-schema.graphql
+        ./backend.ai mgr api generate-supergraph --config configs/graphql/supergraph.yaml -o .
+    - name: Upload supergraph schema
+      uses: actions/upload-artifact@v5
+      with:
+        name: supergraph
+        path: supergraph.graphql
+    - name: Upload pants log
+      uses: actions/upload-artifact@v5
+      with:
+        name: pants.build-supergraph.log
+        path: .pants.d/workdir/pants.log
+      if: always()  # We want the log even on failures.
+
+  make-final-release:
+    needs: [build-scies, build-wheels, build-supergraph]
+    # `build-scies` and `build-supergraph` are skipped for an internal release, so
+    # only `build-wheels` is required to have succeeded.
+    if: |
+      !cancelled()
+      && needs.build-wheels.result == 'success'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    env:
+      RELEASE_AUDIENCE: ${{ inputs.release-audience }}
+      IS_PRERELEASE: ${{ inputs.is-prerelease }}
+    steps:
+    - uses: actions/checkout@v6
+    - name: Fetch remote tags
+      run: git fetch origin 'refs/tags/*:refs/tags/*' -f
+    - name: Extract Python version from pants.toml
+      run: |
+        PYTHON_VERSION=$(grep -m 1 -oP '(?<=CPython==)([^"]+)' pants.toml)
+        echo "PROJECT_PYTHON_VERSION=$PYTHON_VERSION" >> $GITHUB_ENV
+    - name: Set up Python as Runtime
+      uses: actions/setup-python@v6
+      with:
+        python-version: ${{ env.PROJECT_PYTHON_VERSION }}
+    - name: Extract the release changelog
+      env:
+        VERSION: ${{ inputs.tag }}
+        REPOSITORY: ${{ github.repository }}
+      run: python ./scripts/extract-release-changelog.py "$VERSION" --repository "$REPOSITORY"
+    - name: Download wheels
+      uses: actions/download-artifact@v6
+      with:
+        name: wheels
+        path: dist
+    - name: Download scies
+      if: inputs.release-audience != 'internal'
+      uses: actions/download-artifact@v6
+      with:
+        pattern: scies-*
+        path: dist
+        merge-multiple: true
+    - name: Merge checksum files into one
+      if: inputs.release-audience != 'internal'
+      run: |
+        cat dist/checksum-*.txt > dist/checksum.txt
+        sort -u -k2 dist/checksum.txt -o dist/checksum.txt
+    - name: Download SBOM report
+      continue-on-error: true
+      uses: actions/download-artifact@v6
+      with:
+        name: SBOM report
+        path: dist
+    - name: Download supergraph schema
+      if: inputs.release-audience != 'internal'
+      uses: actions/download-artifact@v6
+      with:
+        name: supergraph
+        path: dist
+    - name: Create GitHub Release
+      run: |
+        if gh release view "${{ inputs.tag }}" > /dev/null 2>&1; then
+          echo "Release already exists, updating..."
+          gh release edit "${{ inputs.tag }}" \
+            --title "${{ inputs.tag }}" \
+            --notes-file "CHANGELOG_RELEASE.md"
+        elif [ "${{ env.IS_PRERELEASE }}" = "true" ]; then
+          gh release create "${{ inputs.tag }}" \
+            --title "${{ inputs.tag }}" \
+            --notes-file "CHANGELOG_RELEASE.md" \
+            --prerelease
+        else
+          gh release create "${{ inputs.tag }}" \
+            --title "${{ inputs.tag }}" \
+            --notes-file "CHANGELOG_RELEASE.md"
+        fi
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    - name: Upload release assets
+      run: |
+        for file in dist/*; do
+          if [ -d "$file" ]; then
+            echo "Skipping directory $file"
+            continue
+          fi
+          echo "Uploading $file..."
+          for attempt in 1 2 3; do
+            if gh release upload "${{ inputs.tag }}" "$file" --clobber; then
+              echo "Successfully uploaded $file"
+              break
+            fi
+            if [ $attempt -lt 3 ]; then
+              echo "Retry attempt $attempt failed for $file, waiting 10s..."
+              sleep 10
+            else
+              echo "Failed to upload $file after 3 attempts"
+              exit 1
+            fi
+          done
+        done
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    - name: Resolve the installer channels
+      id: channels
+      run: |
+        # `main` is the authority on which versions are alive: the checked-out
+        # tag may sit on a release branch that predates the registry.
+        git fetch --depth=1 origin main
+        registry=$(git show FETCH_HEAD:.github/maintained-versions.yml)
+        series=$(awk -F'.' '{print $1"."$2}' <<< "${{ inputs.tag }}")
+        edge=$(yq -e '.versions[].version' <<< "$registry" | sort -V | tail -n 1)
+        stable=$(yq -e '.versions[] | select(.lts == true) | .version' <<< "$registry" | sort -V | tail -n 1)
+        # An LTS line is supported for a year, so neither should ever come back
+        # empty. Warn instead of failing: leaving an installer URL on the
+        # previous release beats failing a release that is otherwise complete.
+        [ -n "$edge" ] || echo "::warning::No maintained version in the registry; leaving the edge installer URL as is."
+        [ -n "$stable" ] || echo "::warning::No LTS version in the registry; leaving the stable installer URL as is."
+        {
+          echo "SERIES=$series"
+          echo "EDGE=$edge"
+          echo "STABLE=$stable"
+        } >> $GITHUB_OUTPUT
+    - name: Update stable installer shorten URL
+      if: ${{ inputs.is-prerelease == 'false' && steps.channels.outputs.STABLE != '' && steps.channels.outputs.STABLE == steps.channels.outputs.SERIES }}
+      run: |
+        curl -X 'PATCH' \
+          'https://bnd.ai/rest/v3/short-urls/installer-stable-macos-aarch64' \
+          -H 'accept: application/json' \
+          -H 'X-Api-Key: ${{ secrets.SHLINK_TOKEN }}' \
+          -H 'Content-Type: application/json' \
+          -d '{
+          "longUrl": "https://github.com/lablup/backend.ai/releases/download/${{ inputs.tag }}/backendai-install-macos-aarch64"
+        }'
+        curl -X 'PATCH' \
+          'https://bnd.ai/rest/v3/short-urls/installer-stable-linux-aarch64' \
+          -H 'accept: application/json' \
+          -H 'X-Api-Key: ${{ secrets.SHLINK_TOKEN }}' \
+          -H 'Content-Type: application/json' \
+          -d '{
+          "longUrl": "https://github.com/lablup/backend.ai/releases/download/${{ inputs.tag }}/backendai-install-linux-aarch64"
+        }'
+        curl -X 'PATCH' \
+          'https://bnd.ai/rest/v3/short-urls/installer-stable-linux-x86_64' \
+          -H 'accept: application/json' \
+          -H 'X-Api-Key: ${{ secrets.SHLINK_TOKEN }}' \
+          -H 'Content-Type: application/json' \
+          -d '{
+          "longUrl": "https://github.com/lablup/backend.ai/releases/download/${{ inputs.tag }}/backendai-install-linux-x86_64"
+        }'
+    - name: Update edge installer shorten URL
+      if: ${{ steps.channels.outputs.EDGE != '' && startsWith(inputs.tag, steps.channels.outputs.EDGE) }}
+      run: |
+        curl -X 'PATCH' \
+          'https://bnd.ai/rest/v3/short-urls/installer-edge-macos-aarch64' \
+          -H 'accept: application/json' \
+          -H 'X-Api-Key: ${{ secrets.SHLINK_TOKEN }}' \
+          -H 'Content-Type: application/json' \
+          -d '{
+          "longUrl": "https://github.com/lablup/backend.ai/releases/download/${{ inputs.tag }}/backendai-install-macos-aarch64"
+        }'
+        curl -X 'PATCH' \
+          'https://bnd.ai/rest/v3/short-urls/installer-edge-linux-aarch64' \
+          -H 'accept: application/json' \
+          -H 'X-Api-Key: ${{ secrets.SHLINK_TOKEN }}' \
+          -H 'Content-Type: application/json' \
+          -d '{
+          "longUrl": "https://github.com/lablup/backend.ai/releases/download/${{ inputs.tag }}/backendai-install-linux-aarch64"
+        }'
+        curl -X 'PATCH' \
+          'https://bnd.ai/rest/v3/short-urls/installer-edge-linux-x86_64' \
+          -H 'accept: application/json' \
+          -H 'X-Api-Key: ${{ secrets.SHLINK_TOKEN }}' \
+          -H 'Content-Type: application/json' \
+          -d '{
+          "longUrl": "https://github.com/lablup/backend.ai/releases/download/${{ inputs.tag }}/backendai-install-linux-x86_64"
+        }'

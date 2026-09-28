@@ -30,7 +30,8 @@ from ai.backend.common.health_checker.probe import HealthProbe, HealthProbeOptio
 from ai.backend.common.message_queue.redis_queue import RedisMQArgs, RedisQueue
 from ai.backend.common.metrics.metric import CommonMetricRegistry
 from ai.backend.common.types import AGENTID_STORAGE
-from ai.backend.logging import BraceStyleAdapter, LocalLogger, LogLevel
+from ai.backend.logging import LocalLogger, LogLevel
+from ai.backend.logging.structured import StructuredLogger
 
 from .client.manager import ManagerHTTPClientPool
 from .config.loaders import load_local_config, make_etcd
@@ -42,7 +43,7 @@ from .volumes.abc import CAP_FAST_SIZE, AbstractVolume
 from .volumes.backends import DEFAULT_BACKENDS
 from .volumes.pool import VolumePool
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 @dataclass
@@ -81,9 +82,9 @@ async def check_latest(ctx: RootContext) -> list[VolumeUpgradeInfo]:
         match version:
             case 2:
                 log.warning(
-                    "{}: Detected an old vfolder structure (v{})",
-                    volume.mount_path,
-                    version,
+                    "old vfolder structure detected",
+                    mount_path=volume.mount_path,
+                    vfolder_structure_version=version,
                 )
                 volumes_to_upgrade.append(VolumeUpgradeInfo(2, 3, volume))
             case 3:
@@ -114,7 +115,7 @@ async def upgrade_2_to_3(
 ) -> None:
     rx_two_digits_hex = re.compile(r"^[a-f0-9]{2}$")
     rx_rest_digits_hex = re.compile(r"^[a-f0-9]{28}$")
-    log.info("upgrading {} ...", volume.mount_path)
+    log.info("volume upgrade started", mount_path=volume.mount_path)
     volume_id = os.fsdecode(volume.mount_path)
     scan_folder_size = force_scan_folder_size or (CAP_FAST_SIZE in await volume.get_capabilities())
 
@@ -152,7 +153,7 @@ async def upgrade_2_to_3(
                     )
                     quota_scope_map[row["id"]] = row["quota_scope_id"]
 
-                log.info("checking {} ...".format(", ".join(map(str, folder_ids))))
+                log.debug("checking vfolders {}", ", ".join(map(str, folder_ids)))
 
             for folder_id in folder_ids:
                 try:
@@ -183,7 +184,7 @@ async def upgrade_2_to_3(
                         "old_quota": old_quota_map[folder_id],
                     })
                 except Exception:
-                    log.exception("error during migration of vfolder {}", folder_id)
+                    log.exception("vfolder migration failed", vfolder_id=folder_id)
                 finally:
                     progbar.update(1)
 

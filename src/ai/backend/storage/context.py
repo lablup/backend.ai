@@ -23,7 +23,7 @@ from ai.backend.common.events.dispatcher import (
 )
 from ai.backend.common.health_checker.probe import HealthProbe
 from ai.backend.common.metrics.metric import CommonMetricRegistry
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 
 from .client.manager import ManagerHTTPClientPool
 from .config.unified import StorageProxyUnifiedConfig
@@ -39,7 +39,7 @@ from .volumes.pool import VolumePool
 from .volumes.stats import VolumeState, VolumeStatsObserver
 from .watcher import WatcherClient
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 EVENT_DISPATCHER_CONSUMER_GROUP: Final = "storage-proxy"
 
@@ -88,7 +88,7 @@ class RootContext:
         await plugin_ctx.init()
         plugins = {}
         for plugin_name, plugin_instance in plugin_ctx.plugins.items():
-            log.info("Loading artifact verifier storage plugin: {0}", plugin_name)
+            log.info("artifact verifier plugin loaded", plugin_name=plugin_name)
             plugins[plugin_name] = plugin_instance
         self.artifact_verifier_ctx.load_verifiers(plugins)
 

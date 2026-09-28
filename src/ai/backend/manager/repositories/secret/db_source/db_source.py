@@ -13,7 +13,7 @@ from collections import Counter
 from collections.abc import Sequence
 from typing import Any, Final
 
-from ai.backend.logging.utils import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.data.secret.types import (
     KeyProviderType,
     SecretKeyCount,
@@ -26,7 +26,7 @@ from ai.backend.manager.repositories.ops.v2.secret.provider import SecretOpsProv
 from ai.backend.manager.repositories.ops.v2.secret.read import SecretTarget
 from ai.backend.manager.secret.pool import KeyProviderPool
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 # Rows one chunk reads and writes back in a single transaction, so a large table never
 # becomes one long-held transaction.
@@ -63,7 +63,9 @@ class SecretDBSource:
             column_scanned, column_reencrypted = await self._reencrypt_column(target)
             scanned += column_scanned
             reencrypted += column_reencrypted
-        log.info("secret re-encryption read {} secret(s) and wrote {}", scanned, reencrypted)
+        log.trace(
+            "secret re-encryption finished", scanned_count=scanned, reencrypted_count=reencrypted
+        )
         return SecretReencryptProgress(
             scanned=scanned,
             reencrypted=reencrypted,

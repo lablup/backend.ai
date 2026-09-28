@@ -17,7 +17,7 @@ from ai.backend.manager.models.model_card.row import ModelCardRow
 from ai.backend.manager.models.model_card.searchable_fields import (
     ModelCardSearchableFields,
 )
-from ai.backend.manager.models.resource_slot import ModelCardResourceRequirementRow
+from ai.backend.manager.models.resource_slot.row import ModelCardResourceRequirementRow
 from ai.backend.manager.models.specs.purger import (
     EntityBatchPurger,
     EntityPurger,

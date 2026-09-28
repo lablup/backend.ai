@@ -22,11 +22,11 @@ from ai.backend.manager.data.deployment.types import (
     DeploymentOptions,
     DeploymentState,
     ReplicaData,
+    RouteData,
     RouteHealthStatus,
     RouteStatus,
     RouteTrafficStatus,
 )
-from ai.backend.manager.repositories.deployment.types import RouteData
 from ai.backend.manager.sokovan.deployment.route.executor import RouteExecutor
 
 # =============================================================================

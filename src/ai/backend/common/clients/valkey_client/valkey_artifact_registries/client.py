@@ -23,9 +23,9 @@ from ai.backend.common.resilience import (
     RetryPolicy,
 )
 from ai.backend.common.types import ValkeyTarget
-from ai.backend.logging.utils import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 # Resilience instance for valkey_artifact_registries layer
 valkey_artifact_registries_resilience = Resilience(
@@ -94,7 +94,7 @@ class ValkeyArtifactRegistryClient:
         Close the ValkeyArtifactRegistryClient connection.
         """
         if self._closed:
-            log.debug("ValkeyArtifactRegistryClient is already closed.")
+            log.debug("valkey artifact registry client already closed")
             return
         self._closed = True
         await self._client.disconnect()

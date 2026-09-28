@@ -20,7 +20,6 @@ from typing import (
 from uuid import UUID
 
 import humps
-import redis
 import yaml
 from aiohttp import web, web_response
 from aiohttp.typedefs import Handler
@@ -31,14 +30,14 @@ from ai.backend.appproxy.common.types import PydanticResponse
 from ai.backend.common import redis_helper
 from ai.backend.common.exception import BackendAISchemaValidationFailed
 from ai.backend.common.types import RedisConnectionInfo
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 
 from .config import HostPortPair, PermitHashConfig
 from .errors import InvalidAPIParameters
 
 # FIXME: merge majority of common definitions to ai.backend.common when ready
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 _danger_words = ["password", "passwd", "secret"]
 
 
@@ -312,46 +311,26 @@ def mime_match(base_array: str, compare: str, strict: bool = False) -> bool:
 
 
 class BackendAIAccessLogger(AccessLogger):
+    _structured_logger: StructuredLogger
+
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
+        self._structured_logger = StructuredLogger(self.logger)
 
     @override
     def log(self, request: web.BaseRequest, response: web.StreamResponse, time: float) -> None:
         if request.get("do_not_print_access_log"):
             return
-
-        if "request_id" not in request:
-            self.logger.warn("Request ID not set at request object!")
-            prepend_to_log = ""
-        else:
-            prepend_to_log = f"#{request['request_id']} "
-        if not self.logger.isEnabledFor(logging.INFO):
+        if not self.logger.isEnabledFor(logging.DEBUG):
             # Avoid formatting the log line if it will not be emitted.
             return
         try:
             fmt_info = self._format_line(request, response, time)
-
-            values = list()
-            extra: dict[str, Any] = {}
-            for key, value in fmt_info:
-                values.append(value)
-
-                if isinstance(key, str):
-                    extra[key] = value
-                else:
-                    k1, k2 = key
-                    dct = extra.get(k1, {})
-                    dct[k2] = value
-                    extra[k1] = dct
-
-            self.logger.info((prepend_to_log + self._log_format) % tuple(values), extra=extra)
+            line = self._log_format % tuple(value for _, value in fmt_info)
+            self._structured_logger.debug("{}", line, request_id=request.get("request_id"))
         except Exception:
-            self.logger.exception("Error in logging")
+            self._structured_logger.exception("failed to write the access log")
 
 
 async def ping_redis_connection(connection: RedisConnectionInfo) -> bool:
-    try:
-        return cast(bool, await redis_helper.execute(connection, lambda r: r.ping()))
-    except (redis.exceptions.ConnectionError, redis.exceptions.TimeoutError) as e:
-        log.exception("ping_redis_connection(): Connecting to redis failed: {}", e)
-        raise
+    return cast(bool, await redis_helper.execute(connection, lambda r: r.ping()))

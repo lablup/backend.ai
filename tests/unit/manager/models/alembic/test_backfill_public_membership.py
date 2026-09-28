@@ -37,19 +37,19 @@ from ai.backend.manager.data.permission.global_entity import global_entity_id
 from ai.backend.manager.models.alembic.versions import (
     f1c47b92e3a6_backfill_public_membership as revision,
 )
-from ai.backend.manager.models.container_registry import ContainerRegistryRow
+from ai.backend.manager.models.container_registry.row import ContainerRegistryRow
 from ai.backend.manager.models.deployment_revision_preset.row import (
     DeploymentRevisionPresetRow,
 )
-from ai.backend.manager.models.domain import DomainRow
-from ai.backend.manager.models.image import ImageRow
+from ai.backend.manager.models.domain.row import DomainRow
+from ai.backend.manager.models.image.row import ImageRow
 from ai.backend.manager.models.login_client_type.row import LoginClientTypeRow
-from ai.backend.manager.models.project import ProjectRow
+from ai.backend.manager.models.project.row import ProjectRow
 from ai.backend.manager.models.prometheus_query_preset.row import PrometheusQueryPresetRow
 from ai.backend.manager.models.prometheus_query_preset_category.row import (
     PrometheusQueryPresetCategoryRow,
 )
-from ai.backend.manager.models.resource_policy import (
+from ai.backend.manager.models.resource_policy.row import (
     KeyPairResourcePolicyRow,
     ProjectResourcePolicyRow,
     UserResourcePolicyRow,
@@ -58,7 +58,7 @@ from ai.backend.manager.models.resource_preset.row import ResourcePresetRow
 from ai.backend.manager.models.resource_slot.row import ResourceSlotTypeRow
 from ai.backend.manager.models.runtime_variant.row import RuntimeVariantRow
 from ai.backend.manager.models.runtime_variant_preset.row import RuntimeVariantPresetRow
-from ai.backend.manager.models.user import UserRow
+from ai.backend.manager.models.user.row import UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.virtual_entity.entity_membership import EntityMembershipRow
 from ai.backend.manager.models.virtual_entity.scope_binding import ScopeBindingRow

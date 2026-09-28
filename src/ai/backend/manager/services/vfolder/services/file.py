@@ -8,7 +8,7 @@ from ai.backend.common.types import (
 from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.errors.storage import VFolderInvalidParameter
-from ai.backend.manager.models.vfolder import (
+from ai.backend.manager.models.vfolder.row import (
     is_unmanaged,
 )
 from ai.backend.manager.repositories.user.repository import UserRepository

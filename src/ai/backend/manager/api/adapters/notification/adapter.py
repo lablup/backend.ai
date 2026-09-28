@@ -68,15 +68,15 @@ from ai.backend.common.dto.manager.v2.notification.types import (
 )
 from ai.backend.manager.api.adapter_options.pagination.pagination import PaginationSpec
 from ai.backend.manager.api.adapters.base import BaseAdapter
-from ai.backend.manager.data.notification import NotificationChannelData, NotificationRuleData
+from ai.backend.manager.data.notification.types import NotificationChannelData, NotificationRuleData
 from ai.backend.manager.errors.notification import InvalidNotificationSpec
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
 from ai.backend.manager.models.condition_utils import combine_conditions_or, negate_conditions
-from ai.backend.manager.models.notification import NotificationChannelRow, NotificationRuleRow
 from ai.backend.manager.models.notification.creators import (
     NotificationChannelCreator,
     NotificationRuleCreator,
 )
+from ai.backend.manager.models.notification.row import NotificationChannelRow, NotificationRuleRow
 from ai.backend.manager.models.notification.searchable_fields import (
     NotificationChannelSearchableFields,
     NotificationRuleSearchableFields,
@@ -90,24 +90,22 @@ from ai.backend.manager.models.notification.updaters import (
     NotificationRuleUpdater,
 )
 from ai.backend.manager.models.specs.searcher import GlobalSearcher
-from ai.backend.manager.services.notification.actions import (
-    CreateChannelAction,
-    CreateRuleAction,
-    GetChannelAction,
-    GetRuleAction,
-    PurgeChannelAction,
-    PurgeRuleAction,
-    SearchChannelsAction,
-    SearchRulesAction,
-    UpdateChannelAction,
-    UpdateRuleAction,
-    ValidateChannelAction,
-    ValidateRuleAction,
-)
 from ai.backend.manager.services.notification.actions.bulk_get_channels import (
     BulkGetChannelsAction,
 )
 from ai.backend.manager.services.notification.actions.bulk_get_rules import BulkGetRulesAction
+from ai.backend.manager.services.notification.actions.create_channel import CreateChannelAction
+from ai.backend.manager.services.notification.actions.create_rule import CreateRuleAction
+from ai.backend.manager.services.notification.actions.get_channel import GetChannelAction
+from ai.backend.manager.services.notification.actions.get_rule import GetRuleAction
+from ai.backend.manager.services.notification.actions.list_channels import SearchChannelsAction
+from ai.backend.manager.services.notification.actions.list_rules import SearchRulesAction
+from ai.backend.manager.services.notification.actions.purge_channel import PurgeChannelAction
+from ai.backend.manager.services.notification.actions.purge_rule import PurgeRuleAction
+from ai.backend.manager.services.notification.actions.update_channel import UpdateChannelAction
+from ai.backend.manager.services.notification.actions.update_rule import UpdateRuleAction
+from ai.backend.manager.services.notification.actions.validate_channel import ValidateChannelAction
+from ai.backend.manager.services.notification.actions.validate_rule import ValidateRuleAction
 from ai.backend.manager.services.notification.processors import NotificationProcessors
 from ai.backend.manager.types import OptionalState, TriState
 

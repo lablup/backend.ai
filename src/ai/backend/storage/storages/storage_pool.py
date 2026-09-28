@@ -4,14 +4,14 @@ from typing import Self, override
 from ai.backend.common.artifact_storage import AbstractStorage, AbstractStoragePool
 from ai.backend.common.data.storage.types import ArtifactStorageType
 from ai.backend.common.exception import GenericNotImplementedError, InvalidConfigError
-from ai.backend.logging.utils import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.storage.config.unified import (
     StorageProxyUnifiedConfig,
 )
 from ai.backend.storage.storages.object_storage import ObjectStorage
 from ai.backend.storage.storages.vfs_storage import VFSStorage
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 class StoragePool(AbstractStoragePool):
@@ -41,7 +41,9 @@ class StoragePool(AbstractStoragePool):
         # Add Legacy Object Storage instances
         for legacy_storage_config in config.storages:
             log.debug(
-                f"Adding object storage: {legacy_storage_config.name} ({legacy_storage_config.endpoint})"
+                "adding object storage {} ({})",
+                legacy_storage_config.name,
+                legacy_storage_config.endpoint,
             )
             storages[legacy_storage_config.name] = ObjectStorage(
                 legacy_storage_config.name, legacy_storage_config
@@ -56,7 +58,9 @@ class StoragePool(AbstractStoragePool):
                             "vfs_storage config is required when storage_type is 'vfs_storage'"
                         )
                     log.info(
-                        f"Adding VFS storage: {storage_name} ({artifact_storage_config.vfs_storage.base_path})"
+                        "VFS storage added",
+                        storage_name=storage_name,
+                        base_path=artifact_storage_config.vfs_storage.base_path,
                     )
                     storages[storage_name] = VFSStorage(
                         storage_name, artifact_storage_config.vfs_storage
@@ -68,7 +72,9 @@ class StoragePool(AbstractStoragePool):
                             "object_storage config is required when storage_type is 'object_storage'"
                         )
                     log.debug(
-                        f"Adding object storage: {storage_name} ({artifact_storage_config.object_storage.endpoint})"
+                        "adding object storage {} ({})",
+                        storage_name,
+                        artifact_storage_config.object_storage.endpoint,
                     )
                     storages[storage_name] = ObjectStorage(
                         storage_name, artifact_storage_config.object_storage

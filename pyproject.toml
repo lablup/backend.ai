@@ -199,6 +199,11 @@ ignore = [
 "strawberry.experimental.pydantic.type" = {msg = "Use gql_pydantic_type from decorators.py."}
 "strawberry.experimental.pydantic.input" = {msg = "Use gql_pydantic_input from decorators.py."}
 "strawberry.experimental.pydantic.interface" = {msg = "Use gql_pydantic_interface from decorators.py."}
+"ai.backend.logging.BraceStyleAdapter" = {msg = "Deprecated; use ai.backend.logging.structured.StructuredLogger."}
+"ai.backend.logging.utils.BraceStyleAdapter" = {msg = "Deprecated; use ai.backend.logging.structured.StructuredLogger."}
+"ai.backend.common.logging.BraceStyleAdapter" = {msg = "Deprecated; use ai.backend.logging.structured.StructuredLogger."}
+"ai.backend.common.logging_utils.BraceStyleAdapter" = {msg = "Deprecated; use ai.backend.logging.structured.StructuredLogger."}
+"ai.backend.logging.utils.with_log_context_fields" = {msg = "Deprecated; use ai.backend.logging.structured.with_log_context."}
 
 [tool.ruff.lint.isort]
 known-first-party = ["ai.backend", "bai_scenario"]
@@ -215,6 +220,12 @@ split-on-trailing-comma = true
 "tests/unit/manager/api/gql/test_pydantic_compat.py" = ["TID251"]
 # dataloader conftest defines a test-only probe GQL schema with raw strawberry decorators
 "tests/component/dataloader/conftest.py" = ["TID251"]
+# BraceStyleAdapter is kept for external plugins: its re-exports, its own tests, and the unmaintained account manager
+"src/ai/backend/logging/__init__.py" = ["TID251"]
+"src/ai/backend/common/logging.py" = ["TID251"]
+"src/ai/backend/common/logging_utils.py" = ["TID251"]
+"tests/unit/logging/test_adapter.py" = ["TID251"]
+"src/ai/backend/account_manager/**/*.py" = ["TID251"]
 "src/ai/backend/manager/config.py" = ["E402"]
 "src/ai/backend/manager/models/alembic/env.py" = ["E402"]
 "src/ai/backend/logging/otel.py" = ["LOG015"]  # root logger usage is intentional for OTEL initialization

@@ -51,7 +51,7 @@ from ai.backend.agent.resources import (
     known_slot_types,
 )
 from ai.backend.agent.types import Container, KernelOwnershipData, MountInfo, Port
-from ai.backend.common.asyncio import current_loop
+from ai.backend.common.asyncio import run_in_executor_with_context
 from ai.backend.common.cgroup import CgroupController
 from ai.backend.common.docker import ImageRef, KernelFeatures
 from ai.backend.common.dto.agent.response import PurgeImagesResp
@@ -78,7 +78,7 @@ from ai.backend.common.types import (
     VFolderMount,
     current_resource_slots,
 )
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 
 from .kernel import KubernetesKernel
 from .kube_object import (
@@ -97,7 +97,7 @@ from .kube_object import (
 if TYPE_CHECKING:
     from ai.backend.common.auth import PublicKey
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 class KubernetesKernelCreationContext(AbstractKernelCreationContext[KubernetesKernel]):
@@ -171,7 +171,6 @@ class KubernetesKernelCreationContext(AbstractKernelCreationContext[KubernetesKe
 
     @override
     async def prepare_resource_spec(self) -> tuple[KernelResourceSpec, Mapping[str, Any] | None]:
-        loop = current_loop()
         if self.restarting:
             await kube_config.load_kube_config()
 
@@ -180,7 +179,7 @@ class KubernetesKernelCreationContext(AbstractKernelCreationContext[KubernetesKe
                 with resource_file.open() as f:
                     return KernelResourceSpec.read_from_file(f)
 
-            resource_spec = await loop.run_in_executor(None, _kernel_resource_spec_read)
+            resource_spec = await run_in_executor_with_context(None, _kernel_resource_spec_read)
             resource_opts = None
         else:
             slots = ResourceSlot.from_json(self.kernel_config["resource_slots"])
@@ -208,7 +207,6 @@ class KubernetesKernelCreationContext(AbstractKernelCreationContext[KubernetesKe
 
     @override
     async def prepare_scratch(self) -> None:
-        loop = current_loop()
         await kube_config.load_kube_config()
         core_api = kube_client.CoreV1Api()
 
@@ -232,7 +230,7 @@ class KubernetesKernelCreationContext(AbstractKernelCreationContext[KubernetesKe
 
         # Mount scratch directory as PV
         # Config files can be mounted via ConfigMap
-        await loop.run_in_executor(None, _create_scratch_dirs)
+        await run_in_executor_with_context(None, _create_scratch_dirs)
 
         if not self.restarting:
             # Since these files are bind-mounted inside a bind-mounted directory,
@@ -277,7 +275,7 @@ class KubernetesKernelCreationContext(AbstractKernelCreationContext[KubernetesKe
                         os.chown(self.work_dir / ".vimrc", uid, gid)
                         os.chown(self.work_dir / ".tmux.conf", uid, gid)
 
-            await loop.run_in_executor(None, _clone_dotfiles)
+            await run_in_executor_with_context(None, _clone_dotfiles)
 
     @override
     async def get_intrinsic_mounts(self) -> Sequence[Mount]:
@@ -415,10 +413,10 @@ class KubernetesKernelCreationContext(AbstractKernelCreationContext[KubernetesKe
                 )
             else:
                 log.warning(
-                    "Mount {}:{} -> Mount type {} it not supported on K8s Agent. Skipping mount",
-                    mount.source,
-                    mount.target,
-                    mount.type,
+                    "unsupported mount type skipped",
+                    mount_source=str(mount.source),
+                    mount_target=str(mount.target),
+                    mount_type=mount.type,
                 )
 
     @override
@@ -554,7 +552,6 @@ class KubernetesKernelCreationContext(AbstractKernelCreationContext[KubernetesKe
         service_ports: Any,
         cluster_info: ClusterInfo,
     ) -> KubernetesKernel:
-        loop = current_loop()
         if self.restarting:
             pass
         else:
@@ -568,7 +565,7 @@ class KubernetesKernelCreationContext(AbstractKernelCreationContext[KubernetesKe
                         if os.geteuid() == 0:
                             os.chown(self.work_dir / "bootstrap.sh", uid, gid)
 
-                await loop.run_in_executor(None, _write_user_bootstrap_script)
+                await run_in_executor_with_context(None, _write_user_bootstrap_script)
 
             def _write_config(file_name: str, content: str) -> None:
                 file_path = self.config_dir / file_name
@@ -585,7 +582,7 @@ class KubernetesKernelCreationContext(AbstractKernelCreationContext[KubernetesKe
                 # accel_envs = self.computer_docker_args.get('Env', [])
                 # for env in accel_envs:
                 #     buf.write(f'{env}\n')
-                await loop.run_in_executor(
+                await run_in_executor_with_context(
                     None,
                     functools.partial(_write_config, "environ.txt", buf.getvalue()),
                 )
@@ -597,14 +594,14 @@ class KubernetesKernelCreationContext(AbstractKernelCreationContext[KubernetesKe
                     kvpairs = await computer_self.instance.generate_resource_data(device_alloc)
                     for k, v in kvpairs.items():
                         buf.write(f"{k}={v}\n")
-                await loop.run_in_executor(
+                await run_in_executor_with_context(
                     None,
                     functools.partial(_write_config, "resource.txt", buf.getvalue()),
                 )
 
             docker_creds = self.internal_data.get("docker_credentials")
             if docker_creds:
-                await loop.run_in_executor(
+                await run_in_executor_with_context(
                     None,
                     functools.partial(_write_config, "docker-creds.json", docker_creds),
                 )
@@ -658,7 +655,7 @@ class KubernetesKernelCreationContext(AbstractKernelCreationContext[KubernetesKe
             else:
                 file_path = self.work_dir / dotfile["path"]
             file_path.parent.mkdir(parents=True, exist_ok=True)
-            await loop.run_in_executor(None, file_path.write_text, dotfile["data"])
+            await run_in_executor_with_context(None, file_path.write_text, dotfile["data"])
 
             tmp = Path(file_path)
             while tmp != self.work_dir:
@@ -722,7 +719,7 @@ class KubernetesKernelCreationContext(AbstractKernelCreationContext[KubernetesKe
         )
 
         if self.local_config.debug.log_kernel_config:
-            log.debug("Initial container config: {0}", deployment)
+            log.debug("initial container config built", container_config=str(deployment))
 
         expose_service = Service(
             str(self.kernel_id),
@@ -748,11 +745,10 @@ class KubernetesKernelCreationContext(AbstractKernelCreationContext[KubernetesKe
                     if rollup_function:
                         await rollup_function()
                     rollback_functions.append(future_rollback_function)
-                except Exception as e:
+                except Exception:
                     for rollback_function in rollback_functions[::-1]:
                         if rollback_function:
                             await rollback_function()
-                    log.exception("Error while rollup: {}", e)
                     raise
 
         arguments: list[
@@ -762,13 +758,9 @@ class KubernetesKernelCreationContext(AbstractKernelCreationContext[KubernetesKe
             ]
         ] = []
 
-        try:
-            expose_service_api_response: V1Service = await core_api.create_namespaced_service(
-                "backend-ai", body=expose_service.to_dict()
-            )
-        except Exception as e:
-            log.exception("Error while rollup: {}", e)
-            raise
+        expose_service_api_response: V1Service = await core_api.create_namespaced_service(
+            "backend-ai", body=expose_service.to_dict()
+        )
 
         if expose_service_api_response.spec is None:
             raise K8sError("expose_service_api_response.spec is None")
@@ -980,8 +972,8 @@ class KubernetesAgent(
                     "backend-ai",
                     body=new_pvc.to_dict(),
                 )
-            except Exception as e:
-                log.exception("Error: {}", e)
+            except Exception:
+                log.exception("scratch volume claim creation failed")
                 raise
 
     async def fetch_workers(self) -> None:
@@ -1069,9 +1061,9 @@ class KubernetesAgent(
                     pass
                 except Exception:
                     log.exception(
-                        "error while fetching container information (cid:{}, k:{})",
-                        pod["metadata"]["uid"],
-                        kernel_id,
+                        "container information fetch failed",
+                        pod_id=pod["metadata"]["uid"],
+                        kernel_id=kernel_id,
                     )
 
             fetch_tasks.append(_fetch_container_info(deployment))
@@ -1167,7 +1159,7 @@ class KubernetesAgent(
         try:
             kernel = self.kernel_registry[kernel_id]
         except Exception:
-            log.warning("_destroy_kernel({0}) kernel missing (already dead?)", kernel_id)
+            log.debug("kernel to destroy missing from registry", kernel_id=kernel_id)
             await asyncio.shield(self.k8s_ptask_group.create_task(force_cleanup()))
             return
         deployment_name = kernel["deployment_name"]
@@ -1176,7 +1168,7 @@ class KubernetesAgent(
             await core_api.delete_namespaced_service(f"{deployment_name}-nodeport", "backend-ai")
             await apps_api.delete_namespaced_deployment(f"{deployment_name}", "backend-ai")
         except Exception:
-            log.warning("_destroy({0}) kernel missing (already dead?)", kernel_id)
+            log.debug("kernel resources to destroy already gone", kernel_id=kernel_id)
 
     @override
     async def clean_kernel(
@@ -1185,10 +1177,9 @@ class KubernetesAgent(
         container_id: ContainerId | None,
         restarting: bool,
     ) -> None:
-        loop = current_loop()
         if not restarting:
             scratch_dir = self.local_config.container.scratch_root / str(kernel_id)
-            await loop.run_in_executor(None, shutil.rmtree, str(scratch_dir))
+            await run_in_executor_with_context(None, shutil.rmtree, str(scratch_dir))
 
     @override
     async def create_local_network(self, network_name: str) -> None:
@@ -1204,10 +1195,9 @@ class KubernetesAgent(
         kernel_id: KernelId,
         name: str,
     ) -> bytes:
-        loop = current_loop()
         scratch_dir = (self.local_config.container.scratch_root / str(kernel_id)).resolve()
         config_dir = scratch_dir / "config"
-        return await loop.run_in_executor(
+        return await run_in_executor_with_context(
             None,
             (config_dir / name).read_bytes,
         )
@@ -1219,14 +1209,13 @@ class KubernetesAgent(
         name: str,
         data: bytes,
     ) -> None:
-        loop = current_loop()
         scratch_dir = (self.local_config.container.scratch_root / str(kernel_id)).resolve()
         config_dir = scratch_dir / "config"
 
         def _write_bytes(data: bytes) -> None:
             (config_dir / name).write_bytes(data)
 
-        return await loop.run_in_executor(
+        return await run_in_executor_with_context(
             None,
             _write_bytes,
             data,

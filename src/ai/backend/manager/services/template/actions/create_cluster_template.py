@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from typing import Any, override
 
 from ai.backend.manager.actions.types import ActionOperationType
-from ai.backend.manager.models.user import UserRole
+from ai.backend.manager.models.user.row import UserRole
 
 from .base import TemplateProjectScopeAction, TemplateScopeActionResult
 

@@ -9,7 +9,6 @@
 # For cgroup v2, see
 # https://docs.kernel.org/admin-guide/cgroup-v2.html
 
-import asyncio
 import enum
 import logging
 import re
@@ -21,8 +20,9 @@ from typing import Final, Literal, override
 import aiohttp
 from aiohttp import web
 
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 
+from .asyncio import run_in_executor_with_context
 from .docker import get_docker_connector
 from .exception import (
     BackendAIError,
@@ -33,7 +33,7 @@ from .exception import (
 )
 from .types import PID, ContainerId
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 # Leaf cgroups that container runtimes may interpose between the container scope and
 # its processes. They carry no container identity of their own.
@@ -166,10 +166,14 @@ async def get_container_cgroup_path(
 
 async def get_container_pids(cid: ContainerId) -> list[int]:
     cgroup_version = await get_docker_cgroup_version()
-    log.debug("Cgroup version: {}, {}", cgroup_version.version, cgroup_version.driver)
+    log.debug(
+        "cgroup version detected",
+        cgroup_version=cgroup_version.version,
+        cgroup_driver=cgroup_version.driver,
+    )
     cgroup_path = await get_container_cgroup_path(
         cgroup_version.version, CgroupController.PIDS, cid
     )
     tasks_path = cgroup_path / ("cgroup.procs" if cgroup_version.version == "2" else "tasks")
-    tasks = await asyncio.get_running_loop().run_in_executor(None, tasks_path.read_text)
+    tasks = await run_in_executor_with_context(None, tasks_path.read_text)
     return [*map(int, tasks.splitlines())]

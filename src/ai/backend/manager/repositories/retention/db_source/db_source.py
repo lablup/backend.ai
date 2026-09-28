@@ -21,7 +21,7 @@ from ai.backend.common.data.entity.entity_share import EntityShareEntityType
 from ai.backend.common.data.entity.role import RoleEntityType
 from ai.backend.common.data.entity.session import SessionEntityType
 from ai.backend.common.data.entity.session_group import SessionGroupEntityType
-from ai.backend.logging.utils import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.auth.login_session_types import LoginSessionStatus
 from ai.backend.manager.data.deployment.types import ReplicaGroupLifecycle, RouteStatus
@@ -43,7 +43,7 @@ from ai.backend.manager.models.error_log.row import ErrorLogRow
 from ai.backend.manager.models.event_log.row import EventLogRow
 from ai.backend.manager.models.kernel.row import KernelRow
 from ai.backend.manager.models.login_session.row import LoginHistoryRow, LoginSessionRow
-from ai.backend.manager.models.rbac_models.role import RoleRow
+from ai.backend.manager.models.rbac_models.role.row import RoleRow
 from ai.backend.manager.models.replica_group.row import ReplicaGroupRow
 from ai.backend.manager.models.replica_group_history.row import ReplicaGroupHistoryRow
 from ai.backend.manager.models.resource_usage_history.row import (
@@ -72,7 +72,7 @@ from ai.backend.manager.repositories.ops.v2.retention.write import (
     RetentionWriteOps,
 )
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 # usage_bucket_entries.bucket_type discriminators: the three bucket kinds share
 # one FK-less entries table, so each parent purge matches its own entries.
@@ -342,17 +342,15 @@ class RetentionDBSource:
 
             for policy in policies:
                 if budget_remaining is not None and budget_remaining <= 0:
-                    log.debug(
-                        "retention sweep per-tick budget exhausted; deferring remaining categories"
-                    )
+                    log.debug("retention sweep per-tick budget exhausted, remaining deferred")
                     break
                 threshold = now - policy.retention_period
                 try:
                     specs = self._purger_specs(policy.category, threshold)
                 except RetentionCategoryNotSupportedError:
                     log.debug(
-                        "retention category {} has no cleanup wired yet; skipping",
-                        policy.category.value,
+                        "retention category has no cleanup, skipped",
+                        retention_category=policy.category,
                     )
                     continue
                 try:
@@ -363,8 +361,8 @@ class RetentionDBSource:
                         )
                 except Exception:
                     log.exception(
-                        "retention sweep failed for category {}; isolated and skipped",
-                        policy.category.value,
+                        "retention sweep failed for category, skipped",
+                        retention_category=policy.category,
                     )
                     continue
                 results.append(
@@ -376,9 +374,9 @@ class RetentionDBSource:
         total_deleted = sum(r.deleted_count for r in results)
         if total_deleted:
             log.info(
-                "retention sweep deleted {} record(s) across {} categor(ies)",
-                total_deleted,
-                len(results),
+                "retention sweep deleted records",
+                deleted_count=total_deleted,
+                category_count=len(results),
             )
         return results
 

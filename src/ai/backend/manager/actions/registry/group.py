@@ -35,7 +35,7 @@ from ai.backend.manager.actions.types import (
     ActionOperationType,
 )
 from ai.backend.manager.actions.v2.bulk.base import BaseBulkAction, BasePartialBulkAction
-from ai.backend.manager.actions.v2.bulk.monitor import BulkActionMonitor
+from ai.backend.manager.actions.v2.bulk.monitor.base import BulkActionMonitor
 from ai.backend.manager.actions.v2.bulk.partial_processor import (
     PartialBulkActionProcessor,
     PublicPartialBulkActionProcessor,
@@ -48,7 +48,7 @@ from ai.backend.manager.actions.v2.bulk.result import (
     BasePartialBulkActionResult,
     PartialBulkResult,
 )
-from ai.backend.manager.actions.v2.bulk.validator import (
+from ai.backend.manager.actions.v2.bulk.validator.base import (
     AtomicBulkActionValidator,
     PartialBulkActionValidator,
 )
@@ -68,21 +68,21 @@ from ai.backend.manager.actions.v2.field.processor import (
     OwnerLookupProcessor,
 )
 from ai.backend.manager.actions.v2.global_scope.base import BaseGlobalAction
-from ai.backend.manager.actions.v2.global_scope.monitor import GlobalActionMonitor
+from ai.backend.manager.actions.v2.global_scope.monitor.base import GlobalActionMonitor
 from ai.backend.manager.actions.v2.global_scope.processor import (
     AnonymousGlobalActionProcessor,
     GlobalActionProcessor,
     PublicActionProcessor,
 )
-from ai.backend.manager.actions.v2.global_scope.validator import GlobalActionValidator
+from ai.backend.manager.actions.v2.global_scope.validator.base import GlobalActionValidator
 from ai.backend.manager.actions.v2.lookup.base import BaseLookupAction, BaseLookupActionResult
-from ai.backend.manager.actions.v2.lookup.bulk_monitor import BulkLookupActionMonitor
+from ai.backend.manager.actions.v2.lookup.bulk_monitor.base import BulkLookupActionMonitor
 from ai.backend.manager.actions.v2.lookup.bulk_processor import BulkLookupActionProcessor
-from ai.backend.manager.actions.v2.lookup.monitor import LookupActionMonitor
+from ai.backend.manager.actions.v2.lookup.monitor.base import LookupActionMonitor
 from ai.backend.manager.actions.v2.lookup.processor import (
     LookupActionProcessor,
 )
-from ai.backend.manager.actions.v2.lookup.validator import LookupActionValidator
+from ai.backend.manager.actions.v2.lookup.validator.base import LookupActionValidator
 from ai.backend.manager.actions.v2.membership.base import BaseMembershipAction
 from ai.backend.manager.actions.v2.membership.monitor.base import MembershipActionMonitor
 from ai.backend.manager.actions.v2.membership.processor import MembershipActionProcessor
@@ -138,17 +138,17 @@ from ai.backend.manager.actions.v2.ops.result import (
     ScopedBatchOpsResult,
 )
 from ai.backend.manager.actions.v2.scope.base import BaseScopeAction
-from ai.backend.manager.actions.v2.scope.monitor import ScopeActionMonitor
+from ai.backend.manager.actions.v2.scope.monitor.base import ScopeActionMonitor
 from ai.backend.manager.actions.v2.scope.processor import ScopeActionProcessor
 from ai.backend.manager.actions.v2.scope.result import BaseScopeActionResult
-from ai.backend.manager.actions.v2.scope.validator import ScopeActionValidator
+from ai.backend.manager.actions.v2.scope.validator.base import ScopeActionValidator
 from ai.backend.manager.actions.v2.single_entity.base import BaseSingleEntityAction
-from ai.backend.manager.actions.v2.single_entity.monitor import SingleEntityActionMonitor
+from ai.backend.manager.actions.v2.single_entity.monitor.base import SingleEntityActionMonitor
 from ai.backend.manager.actions.v2.single_entity.processor import (
     PublicSingleEntityActionProcessor,
     SingleEntityActionProcessor,
 )
-from ai.backend.manager.actions.v2.single_entity.validator import SingleEntityActionValidator
+from ai.backend.manager.actions.v2.single_entity.validator.base import SingleEntityActionValidator
 from ai.backend.manager.errors.common import ServerMisconfiguredError
 from ai.backend.manager.services.ops.service import (
     BatchPurgeService,

@@ -15,12 +15,12 @@ from ai.backend.common.dto.manager.v2.entity_label.request import (
     SearchEntityLabelsInput,
     UpsertEntityLabelInput,
 )
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 
 if TYPE_CHECKING:
     from ai.backend.manager.api.adapters.entity_label.adapter import EntityLabelAdapter
 
-log: Final = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log: Final = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 class EntityLabelIdPathParam(BaseRequestModel):
