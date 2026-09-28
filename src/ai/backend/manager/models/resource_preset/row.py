@@ -1,44 +1,19 @@
 from __future__ import annotations
 
-import logging
-from collections.abc import Callable, Mapping, Sequence
-from typing import Any, Self
-from uuid import UUID
+from collections.abc import Sequence
 
 import sqlalchemy as sa
-from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import Mapped, mapped_column
-from sqlalchemy.sql.dml import Delete, Update
-from sqlalchemy.sql.selectable import Select
 
 from ai.backend.common.data.entity.resource_preset import ResourcePresetID
 from ai.backend.common.types import ResourceSlot
-from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.models.base import (
     GUID,
     Base,
     ResourceSlotColumn,
 )
 
-log = StructuredLogger(logging.getLogger("ai.backend.manager.models"))
-
 __all__: Sequence[str] = ("resource_presets",)
-
-
-# Type alias for statements that support .where() method
-type WhereableStatement[T] = Select[T] | Update | Delete
-
-
-def filter_by_name(name: str) -> Callable[[WhereableStatement[Any]], WhereableStatement[Any]]:
-    return lambda query_stmt: query_stmt.where(ResourcePresetRow.name == name)
-
-
-def filter_by_id(id: UUID) -> Callable[[WhereableStatement[Any]], WhereableStatement[Any]]:
-    return lambda query_stmt: query_stmt.where(ResourcePresetRow.id == id)
-
-
-# QueryOption is a function that takes a statement and returns a filtered statement
-type QueryOption = Callable[[WhereableStatement[Any]], WhereableStatement[Any]]
 
 
 class ResourcePresetRow(Base):
@@ -74,27 +49,6 @@ class ResourcePresetRow(Base):
         ),
     )
 
-    @classmethod
-    async def update(
-        cls,
-        query_option: QueryOption,
-        data: Mapping[str, Any],
-        *,
-        db_session: AsyncSession,
-    ) -> Self | None:
-        base_update_stmt = sa.update(ResourcePresetRow).values(data).returning(ResourcePresetRow)
-        filtered_stmt = query_option(base_update_stmt)
-        stmt = (
-            sa.select(ResourcePresetRow)
-            .from_statement(filtered_stmt)
-            .execution_options(populate_existing=True)
-        )
-        try:
-            result: Self | None = await db_session.scalar(stmt)
-            return result
-        except sa.exc.IntegrityError:
-            return None
 
-
-# For compatibility
+# Used only by batch_load_by_name in gql_legacy.
 resource_presets = ResourcePresetRow.__table__

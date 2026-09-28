@@ -4,29 +4,14 @@ on:
   pull_request:
     types: [labeled, unlabeled, opened, synchronize, reopened]
 permissions:
-  contents: write
+  contents: read
 
 jobs:
-  assign-pr-number:
-    if: |
-      github.event.pull_request.head.repo.full_name == github.repository
-      && !contains(github.event.pull_request.labels.*.name, 'skip:changelog')
-      && !contains(fromJSON('["flow:merge-queue", "flow:hotfix"]'), github.event.label.name)
-      && github.event.pull_request.number != null
-      && github.event.pull_request.merged == false
-      && github.event.pull_request.draft == false
-    uses: ./.github/workflows/assign-pr-number.yml
-    secrets:
-      WORKFLOW_PAT: ${{ secrets.OCTODOG }}
-
   towncrier:
     if: |
-      always()
-      && !contains(github.event.pull_request.labels.*.name, 'skip:changelog')
+      !contains(github.event.pull_request.labels.*.name, 'skip:changelog')
       && !contains(fromJSON('["flow:merge-queue", "flow:hotfix"]'), github.event.label.name)
       && !startsWith(github.event.pull_request.title, 'release:')
-      && needs.assign-pr-number.result != 'failure'
-    needs: [assign-pr-number]
     runs-on: ubuntu-latest
     steps:
     - name: Get PR's fetch depth
