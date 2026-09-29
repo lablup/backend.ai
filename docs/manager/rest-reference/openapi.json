@@ -13013,7 +13013,7 @@
         "type": "string"
       },
       "ImageTypeEnum": {
-        "description": "Type category of an image.\n\n``SERVICE`` is deprecated since 26.9.0: nothing writes it and nothing reads it, so\nan image is never this type. It is removed in the next release.",
+        "description": "Type category of an image.\n\n``SERVICE`` is deprecated: nothing writes it and nothing reads it, so an image is\nnever this type. It is removed in the next release.",
         "enum": [
           "compute",
           "system",
@@ -13023,7 +13023,7 @@
         "type": "string"
       },
       "ImageTypeFilterInputDTO": {
-        "description": "Filter for the image type category.\n\n``SERVICE`` is deprecated since 26.9.0: the scan never writes it, so nothing\nmatches. It is removed in the next release.",
+        "description": "Filter for the image type category.\n\n``SERVICE`` is deprecated: the scan never writes it, so nothing matches. It is\nremoved in the next release.",
         "properties": {
           "equals": {
             "anyOf": [
