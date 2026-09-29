@@ -311,6 +311,7 @@ async def update_password_no_auth(request: web.Request) -> web.Response:
             "title": e.data.get("title"),
             "details": e.data.get("msg"),
         }
+        return web.json_response(result, status=e.status)
     return web.json_response(result)
 
 
