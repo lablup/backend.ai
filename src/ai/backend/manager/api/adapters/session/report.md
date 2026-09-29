@@ -29,7 +29,16 @@
   - terminate — 성공 없음 · 실패 없음 (partial_bulk) — SCENARIO-GAP
   - update — 성공 없음 · 실패 없음 (partial_bulk, single_entity) — SCENARIO-GAP
 
-### session
+**admin_search**
+
+| 시나리오 | 판정 |
+|---|---|
+| [세션을 하나도 심지 않은 상태에서 슈퍼관리자가 조회하면, 답은 비어 있다](#session-a-scenario-that-laid-no-session-finds-none) | 성공 |
+| [필터 없는 전체 조회는 슈퍼관리자 역할로만 열리므로, 아무 권한도 받지 않은 사용자는 역할 부족으로 거부된다](#session-a-user-granted-nothing-may-not-search-sessions) | 거부 |
+
+### admin_search
+
+<a id="session-a-scenario-that-laid-no-session-finds-none"></a>
 
 #### [a-scenario-that-laid-no-session-finds-none](/tests/scenario/bai_scenario/manager/session/test_session.py) — pass
 
@@ -56,6 +65,8 @@ Then
   - total_count = 0
   - has_next_page = False
   - has_previous_page = False
+
+<a id="session-a-user-granted-nothing-may-not-search-sessions"></a>
 
 #### [a-user-granted-nothing-may-not-search-sessions](/tests/scenario/bai_scenario/manager/session/test_session.py) — pass
 

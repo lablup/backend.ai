@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import pathlib
 import textwrap
+from dataclasses import replace
 
 import pytest
 
@@ -113,7 +114,7 @@ def _record(
     seen = (Line(says=f"{Refused.PREFIX}NotEnoughPermission"),) if refused else (Line("id = 1"),)
     return ScenarioRecord(
         summary=summary or f"{operation}-{'refused' if refused else 'answered'}",
-        description="",
+        description=f"{summary or operation} {'is refused' if refused else 'answers'}",
         actor="",
         caller="",
         operation=operation,
@@ -234,6 +235,110 @@ class TestMarkdownOperations:
         assert "SCENARIO-GAP" not in rendered
 
 
+class TestMarkdownOperationTables:
+    def test_each_operation_called_has_a_table_under_the_list(self, report: Report) -> None:
+        rendered = MarkdownFormat().render_one(report.components[0])
+
+        assert (
+            "\n".join([
+                "  - describe — 성공 없음 · 실패 없음 — SCENARIO-GAP",
+                "",
+                "**get**",
+                "",
+                "| 시나리오 | 판정 |",
+                "|---|---|",
+                "| [get answers](#widget-get-answered) | 성공 |",
+                "| [get is refused](#widget-get-refused) | 거부 |",
+                "",
+                "**refresh**",
+                "",
+                "| 시나리오 | 판정 |",
+                "|---|---|",
+                "| [refresh-1 answers](#widget-refresh-1) | 성공 |",
+                "| [refresh-2 answers](#widget-refresh-2) | 성공 |",
+                "",
+                "**rename**",
+                "",
+                "| 시나리오 | 판정 |",
+                "|---|---|",
+                "| [rename is refused](#widget-rename-refused) | 거부 |",
+                "",
+                "### get",
+            ])
+            in rendered
+        )
+
+    def test_successes_come_before_refusals_each_in_summary_order(
+        self, manager: pathlib.Path
+    ) -> None:
+        report = Report.of(
+            [
+                _record("get", refused=True, summary="b"),
+                _record("get", summary="d"),
+                _record("get", refused=True, summary="a"),
+                _record("get", summary="c"),
+            ],
+            AdapterWiring(manager),
+        )
+
+        rendered = MarkdownFormat().render_one(report.components[0])
+
+        assert (
+            "\n".join([
+                "| [c answers](#widget-c) | 성공 |",
+                "| [d answers](#widget-d) | 성공 |",
+                "| [a is refused](#widget-a) | 거부 |",
+                "| [b is refused](#widget-b) | 거부 |",
+            ])
+            in rendered
+        )
+
+    def test_an_operation_the_list_does_not_name_comes_last(self, manager: pathlib.Path) -> None:
+        report = Report.of([_record("batch_load_fields"), _record("get")], AdapterWiring(manager))
+
+        rendered = MarkdownFormat().render_one(report.components[0])
+
+        assert rendered.index("**get**") < rendered.index("**batch_load_fields**")
+
+    def test_each_link_lands_on_the_details_of_its_row(self, report: Report) -> None:
+        rendered = MarkdownFormat().render_one(report.components[0])
+
+        assert (
+            "\n".join([
+                '<a id="widget-get-refused"></a>',
+                "",
+                "#### [get-refused](/tests/scenario/bai_scenario/manager/widget/test_widget.py)"
+                " — pass",
+            ])
+            in rendered
+        )
+
+    def test_the_details_follow_the_tables_by_operation(self, report: Report) -> None:
+        rendered = MarkdownFormat().render_one(report.components[0])
+        details = rendered[rendered.index("### get") :]
+
+        order = [
+            "### get",
+            "#### [get-answered]",
+            "#### [get-refused]",
+            "### refresh",
+            "#### [refresh-1]",
+            "#### [refresh-2]",
+            "### rename",
+            "#### [rename-refused]",
+        ]
+        assert [details.index(one) for one in order] == sorted(details.index(one) for one in order)
+
+    def test_a_bar_in_a_description_does_not_split_the_cell(self, manager: pathlib.Path) -> None:
+        record = replace(_record("get"), description="a | b")
+
+        rendered = MarkdownFormat().render_one(
+            Report.of([record], AdapterWiring(manager)).components[0]
+        )
+
+        assert "| [a \\| b](#widget-get-answered) | 성공 |" in rendered
+
+
 class TestSeveralAdapters:
     @pytest.fixture
     def records(self) -> list[ScenarioRecord]:
@@ -254,6 +359,14 @@ class TestSeveralAdapters:
         assert operations["WidgetAdapter.get"].refused == 1
         assert operations["WidgetSessionAdapter.get"].succeeding == 1
         assert operations["WidgetSessionAdapter.get"].refused == 0
+
+    def test_each_table_names_its_operation_with_its_adapter(
+        self, manager: pathlib.Path, records: list[ScenarioRecord]
+    ) -> None:
+        rendered = MarkdownFormat().render(Report.of(records, AdapterWiring(manager)))
+
+        assert "**WidgetAdapter.get**" in rendered
+        assert "**WidgetSessionAdapter.get**" in rendered
 
     def test_the_report_does_not_depend_on_the_order_records_arrive_in(
         self, manager: pathlib.Path, records: list[ScenarioRecord]
