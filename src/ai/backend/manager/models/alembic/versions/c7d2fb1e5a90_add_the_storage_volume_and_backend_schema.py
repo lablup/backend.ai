@@ -1,7 +1,7 @@
 """add the storage volume and backend schema
 
 Revision ID: c7d2fb1e5a90
-Revises: a91c4e7d0b35
+Revises: d17b4e9c25a8
 Create Date: 2026-09-04
 
 """
@@ -18,7 +18,7 @@ from ai.backend.manager.models.base import GUID
 
 # revision identifiers, used by Alembic.
 revision = "c7d2fb1e5a90"
-down_revision = "a91c4e7d0b35"
+down_revision = "d17b4e9c25a8"
 branch_labels = None
 depends_on = None
 
