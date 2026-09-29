@@ -22,7 +22,16 @@
 - Action 없음 (1)
   - available_presets — 성공 없음 · 실패 없음 — SCENARIO-GAP
 
-### model_card
+**admin_search**
+
+| 시나리오 | 판정 |
+|---|---|
+| [모델 카드를 하나도 심지 않은 상태에서 슈퍼관리자가 전체 조회를 하면, 답은 비어 있다](#model_card-a-scenario-that-laid-no-model-card-finds-none) | 성공 |
+| [슈퍼관리자가 아닌 사용자가 전체 모델 카드 조회를 요청하면 역할로 막힌다](#model_card-a-user-who-is-not-the-superadmin-may-not-search-every-model-card) | 거부 |
+
+### admin_search
+
+<a id="model_card-a-scenario-that-laid-no-model-card-finds-none"></a>
 
 #### [a-scenario-that-laid-no-model-card-finds-none](/tests/scenario/bai_scenario/manager/model_card/test_model_card.py) — pass
 
@@ -49,6 +58,8 @@ Then
   - total_count = 0
   - has_next_page = False
   - has_previous_page = False
+
+<a id="model_card-a-user-who-is-not-the-superadmin-may-not-search-every-model-card"></a>
 
 #### [a-user-who-is-not-the-superadmin-may-not-search-every-model-card](/tests/scenario/bai_scenario/manager/model_card/test_model_card.py) — pass
 
