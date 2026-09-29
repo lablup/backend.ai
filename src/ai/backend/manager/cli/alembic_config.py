@@ -114,12 +114,21 @@ async def resolve_alembic_config(
             raise ConfigurationLoadFailed(
                 "sqlalchemy.url in the alembic config is not a valid database URL"
             ) from e
+        db_url_source = "alembic config file"
     else:
         db_url = build_db_url(await load_db_config())
-        log.debug(
-            "built the database URL from the manager config",
-            url=db_url.render_as_string(hide_password=True),
-        )
+        db_url_source = "manager.toml"
+    # A leftover ./alembic.ini silently overrides manager.toml, so make the
+    # resolved source explicit; the URL is always the password-hidden rendering.
+    config_source = (
+        str(config.config_file_name) if config.config_file_name else "packaged migrations"
+    )
+    log.info(
+        "resolved the alembic config",
+        config_source=config_source,
+        db_url_source=db_url_source,
+        db_url=db_url.render_as_string(hide_password=True),
+    )
     # ConfigParser interpolates '%', which the escaped credentials may contain.
     config.set_main_option(
         "sqlalchemy.url",
