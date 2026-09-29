@@ -73,12 +73,12 @@ def ping(cli_ctx: CLIContext, agent_id: str, alembic_config: Path | None, timeou
             raise ConfigurationLoadFailed("Manager secret key is not available in the keypair")
         resolved = await resolve_alembic_config(alembic_config, db_config_loader(cli_ctx))
         db = create_async_engine(resolved.db_url)
-        agent_cache = AgentRPCCache(
-            db,
-            manager_public_key=PublicKey(manager_public_key),
-            manager_secret_key=SecretKey(manager_secret_key),
-        )
         try:
+            agent_cache = AgentRPCCache(
+                db,
+                manager_public_key=PublicKey(manager_public_key),
+                manager_secret_key=SecretKey(manager_secret_key),
+            )
             log.info("contacting the agent", agent_id=agent_id)
             enforce_debug_logging(["callosum", "ai.backend.manager.agent_cache"])
             async with agent_cache.rpc_context(
