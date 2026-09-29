@@ -2444,6 +2444,10 @@ class DockerContext(Context):
     # fails fast when the share is not mounted). Covered by the
     # SYSTEM_STATE_PATH mount of the agent.
     KRUNNER_SHARED_PATH = Path("/var/lib/backend.ai/krunner")
+    # In-container target of the <base_path>/alembic.ini mount on manager and
+    # manager-cli; /app is the image WORKDIR, so `mgr schema` finds it with
+    # the default `-f alembic.ini` inside the manager container.
+    ALEMBIC_INI_MOUNT = "/app/alembic.ini"
     # Compose service DNS names of the halfstack members (same project via
     # the include: in the services compose file); bridge services address
     # them with the CONTAINER-side ports, not the host-published ones.
@@ -2821,8 +2825,9 @@ class DockerContext(Context):
 
         # Manager schema must exist before fixtures and the app-proxy DB step
         # update scaling_groups (mirrors the PackageContext.configure() order).
+        # Use the compose mount explicitly rather than manager-cli's working_dir.
         self.log_header("Initializing manager database schema...")
-        await self.run_manager_cli(["mgr", "schema", "oneshot"])
+        await self.run_manager_cli(["mgr", "schema", "oneshot", "-f", self.ALEMBIC_INI_MOUNT])
 
         self.log_header("Configuring agent...")
         await self.configure_agent()
