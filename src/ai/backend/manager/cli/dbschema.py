@@ -10,7 +10,12 @@ from typing import TYPE_CHECKING, TypedDict
 import click
 
 from ai.backend.logging.structured import StructuredLogger
-from ai.backend.manager.errors.resource import ConfigurationLoadFailed
+from ai.backend.manager.cli.alembic_config import (
+    ALEMBIC_CONFIG_HELP,
+    db_config_loader,
+    load_alembic_config,
+    resolve_alembic_config,
+)
 from ai.backend.manager.models.uuid7 import UUID_GENERATE_V7_DDL
 
 if TYPE_CHECKING:
@@ -33,23 +38,26 @@ class RevisionHistory(TypedDict):
     revisions: list[RevisionDump]
 
 
+_alembic_config_option = click.option(
+    "-f",
+    "--alembic-config",
+    default=None,
+    type=click.Path(exists=True, dir_okay=False, path_type=Path),
+    metavar="PATH",
+    help=ALEMBIC_CONFIG_HELP,
+)
+
+
 @click.group()
 def cli() -> None:
     pass
 
 
 @cli.command()
-@click.option(
-    "-f",
-    "--alembic-config",
-    default="alembic.ini",
-    metavar="PATH",
-    help="The path to Alembic config file. [default: alembic.ini]",
-)
+@_alembic_config_option
 @click.pass_obj
-def show(_cli_ctx: CLIContext, alembic_config: str) -> None:
+def show(cli_ctx: CLIContext, alembic_config: Path | None) -> None:
     """Show the current schema information."""
-    from alembic.config import Config
     from alembic.runtime.migration import MigrationContext
     from alembic.script import ScriptDirectory
     from sqlalchemy.engine import Connection
@@ -60,33 +68,25 @@ def show(_cli_ctx: CLIContext, alembic_config: str) -> None:
         context = MigrationContext.configure(connection)
         return context.get_current_revision()
 
-    async def _show(sa_url: str) -> None:
-        engine = create_async_engine(sa_url)
-        async with engine.begin() as connection:
-            current_rev = await connection.run_sync(_get_current_rev_sync)
-        script = ScriptDirectory.from_config(alembic_cfg)
+    async def _show() -> None:
+        resolved = await resolve_alembic_config(alembic_config, db_config_loader(cli_ctx))
+        engine = create_async_engine(resolved.db_url)
+        try:
+            async with engine.begin() as connection:
+                current_rev = await connection.run_sync(_get_current_rev_sync)
+        finally:
+            await engine.dispose()
+        script = ScriptDirectory.from_config(resolved.config)
         heads = script.get_heads()
         head_rev = heads[0] if len(heads) > 0 else None
         print(f"Current database revision: {current_rev}")
         print(f"The head revision of available migrations: {head_rev}")
 
-    alembic_cfg = Config(alembic_config)
-    sa_url = alembic_cfg.get_main_option("sqlalchemy.url")
-    if sa_url is None:
-        raise ConfigurationLoadFailed("sqlalchemy.url is not configured in alembic config")
-    sa_url = sa_url.replace("postgresql://", "postgresql+asyncpg://")
-    asyncio.run(_show(sa_url))
+    asyncio.run(_show())
 
 
 @cli.command()
-@click.option(
-    "-f",
-    "--alembic-config",
-    default="alembic.ini",
-    type=click.Path(exists=True, dir_okay=False),
-    metavar="PATH",
-    help="The path to Alembic config file. [default: alembic.ini]",
-)
+@_alembic_config_option
 @click.option(
     "--output",
     "-o",
@@ -95,15 +95,14 @@ def show(_cli_ctx: CLIContext, alembic_config: str) -> None:
     help="Output file path (default: stdout)",
 )
 @click.pass_obj
-def dump_history(_cli_ctx: CLIContext, alembic_config: str, output: str) -> None:
+def dump_history(_cli_ctx: CLIContext, alembic_config: Path | None, output: str) -> None:
     """Dump current alembic history in a serialiazable format."""
-    from alembic.config import Config
     from alembic.script import ScriptDirectory
 
     from ai.backend.common.json import pretty_json_str
     from ai.backend.manager import __version__
 
-    alembic_cfg = Config(alembic_config)
+    alembic_cfg = load_alembic_config(alembic_config)
     script = ScriptDirectory.from_config(alembic_cfg)
     serialized_revisions = []
 
@@ -129,14 +128,7 @@ def dump_history(_cli_ctx: CLIContext, alembic_config: str, output: str) -> None
 
 @cli.command()
 @click.argument("previous_version", type=str, metavar="VERSION")
-@click.option(
-    "-f",
-    "--alembic-config",
-    default="alembic.ini",
-    type=click.Path(exists=True, dir_okay=False),
-    metavar="PATH",
-    help="The path to Alembic config file. [default: alembic.ini]",
-)
+@_alembic_config_option
 @click.option(
     "--dry-run",
     default=False,
@@ -145,13 +137,12 @@ def dump_history(_cli_ctx: CLIContext, alembic_config: str, output: str) -> None
 )
 @click.pass_obj
 def apply_missing_revisions(
-    _cli_ctx: CLIContext, previous_version: str, alembic_config: str, dry_run: bool
+    cli_ctx: CLIContext, previous_version: str, alembic_config: Path | None, dry_run: bool
 ) -> None:
     """
     Compare current alembic revision paths with the given serialized
     alembic revision history and try to execute every missing revisions.
     """
-    from alembic.config import Config
     from alembic.runtime.environment import EnvironmentContext
     from alembic.runtime.migration import MigrationStep
     from alembic.script import Script, ScriptDirectory
@@ -171,7 +162,13 @@ def apply_missing_revisions(
             )
             sys.exit(1)
 
-    alembic_cfg = Config(alembic_config)
+    if dry_run:
+        alembic_cfg = load_alembic_config(alembic_config)
+    else:
+        # env.py connects on its own from the config's sqlalchemy.url.
+        alembic_cfg = asyncio.run(
+            resolve_alembic_config(alembic_config, db_config_loader(cli_ctx))
+        ).config
     script_directory = ScriptDirectory.from_config(alembic_cfg)
     revisions_to_apply: dict[str, Script] = {}
 
@@ -201,20 +198,48 @@ def apply_missing_revisions(
 
 
 @cli.command()
-@click.option(
-    "-f",
-    "--alembic-config",
-    default="alembic.ini",
-    type=click.Path(exists=True, dir_okay=False),
-    metavar="PATH",
-    help="The path to Alembic config file. [default: alembic.ini]",
-)
+@click.argument("revision", default="head", metavar="[REVISION]")
+@_alembic_config_option
 @click.pass_obj
-def oneshot(_cli_ctx: CLIContext, alembic_config: str) -> None:
+def upgrade(cli_ctx: CLIContext, revision: str, alembic_config: Path | None) -> None:
+    """
+    Upgrade the database schema to REVISION (default: head) by applying
+    the pending migrations packaged with this manager.
+    """
+    from alembic import command
+    from sqlalchemy.engine import Connection
+
+    from ai.backend.manager.repositories.db.engine import create_async_engine
+
+    async def _upgrade() -> None:
+        resolved = await resolve_alembic_config(alembic_config, db_config_loader(cli_ctx))
+        alembic_cfg = resolved.config
+
+        def _upgrade_sync(connection: Connection) -> None:
+            # env.py runs the migrations on this connection instead of opening its own.
+            alembic_cfg.attributes["connection"] = connection
+            command.upgrade(alembic_cfg, revision)
+
+        engine = create_async_engine(resolved.db_url)
+        try:
+            async with engine.begin() as connection:
+                await connection.run_sync(_upgrade_sync)
+        finally:
+            await engine.dispose()
+        log.info("upgraded the database schema", revision=revision)
+
+    asyncio.run(_upgrade())
+
+
+@cli.command()
+@_alembic_config_option
+@click.pass_obj
+def oneshot(cli_ctx: CLIContext, alembic_config: Path | None) -> None:
     """
     Set up your database with one-shot schema migration instead of
     iterating over multiple revisions if there is no existing database.
-    It uses alembic.ini to configure database connection.
+    The database connection comes from the alembic config's sqlalchemy.url,
+    or from the [db] section of manager.toml when it has none.
 
     Reference: http://alembic.sqlalchemy.org/en/latest/cookbook.html
                #building-an-up-to-date-database-from-scratch
@@ -234,7 +259,7 @@ def oneshot(_cli_ctx: CLIContext, alembic_config: str) -> None:
         context = MigrationContext.configure(connection)
         return context.get_current_revision()
 
-    def _create_all_sync(connection: Connection, engine: Engine) -> None:
+    def _create_all_sync(connection: Connection, engine: Engine, alembic_cfg: Config) -> None:
         alembic_cfg.attributes["connection"] = connection
         metadata.create_all(engine, checkfirst=False)
         for statement in SEED_GLOBAL_ENTITIES_SQL:
@@ -249,31 +274,34 @@ def oneshot(_cli_ctx: CLIContext, alembic_config: str) -> None:
         connection.exec_driver_sql("CREATE TABLE alembic_version (\nversion_num varchar(32)\n);")
         connection.exec_driver_sql(f"INSERT INTO alembic_version VALUES('{head_rev}')")
 
-    async def _oneshot(sa_url: str) -> None:
-        engine = create_async_engine(sa_url)
-        async with engine.begin() as connection:
-            await connection.exec_driver_sql('CREATE EXTENSION IF NOT EXISTS "uuid-ossp";')
-            await connection.exec_driver_sql(UUID_GENERATE_V7_DDL)
-            current_rev = await connection.run_sync(_get_current_rev_sync)
-        if current_rev is None:
-            # For a fresh clean database, create all from scratch.
-            # (it will raise error if tables already exist.)
-            log.info("detected a fresh new database, creating tables")
+    async def _oneshot() -> None:
+        resolved = await resolve_alembic_config(alembic_config, db_config_loader(cli_ctx))
+        engine = create_async_engine(resolved.db_url)
+        try:
             async with engine.begin() as connection:
-                await connection.run_sync(_create_all_sync, engine=engine.sync_engine)
-            log.info(
-                "if old migrations are not needed, delete them and set down_revision "
-                "of the earliest migration to None"
-            )
-        else:
-            log.info(
-                "detected an existing database; use 'alembic upgrade head' to apply pending migrations",
-                current_revision=current_rev,
-            )
+                await connection.exec_driver_sql('CREATE EXTENSION IF NOT EXISTS "uuid-ossp";')
+                await connection.exec_driver_sql(UUID_GENERATE_V7_DDL)
+                current_rev = await connection.run_sync(_get_current_rev_sync)
+            if current_rev is None:
+                # For a fresh clean database, create all from scratch.
+                # (it will raise error if tables already exist.)
+                log.info("detected a fresh new database, creating tables")
+                async with engine.begin() as connection:
+                    await connection.run_sync(
+                        _create_all_sync,
+                        engine=engine.sync_engine,
+                        alembic_cfg=resolved.config,
+                    )
+                log.info(
+                    "if old migrations are not needed, delete them and set down_revision "
+                    "of the earliest migration to None"
+                )
+            else:
+                log.info(
+                    "detected an existing database; use 'backend.ai mgr schema upgrade' to apply pending migrations",
+                    current_revision=current_rev,
+                )
+        finally:
+            await engine.dispose()
 
-    alembic_cfg = Config(alembic_config)
-    sa_url = alembic_cfg.get_main_option("sqlalchemy.url")
-    if sa_url is None:
-        raise ConfigurationLoadFailed("sqlalchemy.url is not configured in alembic config")
-    sa_url = sa_url.replace("postgresql://", "postgresql+asyncpg://")
-    asyncio.run(_oneshot(sa_url))
+    asyncio.run(_oneshot())

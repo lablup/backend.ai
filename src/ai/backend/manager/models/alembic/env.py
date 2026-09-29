@@ -16,9 +16,10 @@ config = context.config
 
 # Interpret the config file for Python logging.
 # This line sets up loggers basically.
+# A config built in memory (``backend.ai mgr schema`` without an alembic.ini)
+# has no file; the manager CLI has already set up logging in that case.
 
-if not logging_active.get():
-    assert config.config_file_name is not None
+if not logging_active.get() and config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
 from ai.backend.manager.models.base import ensure_all_tables_registered, metadata

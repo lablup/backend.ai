@@ -101,6 +101,21 @@ Shared prerequisites:
 | RPC auth key distribution | manager, agent | the agent needs the manager's RPC **public** key to authenticate RPC calls — e.g. share the parity-mounted fixtures directory across nodes, or mount a common key directory at `/etc/backend.ai/keys:ro` |
 | `wheelhouse/` mount at `/app/wheelhouse` | manager, agent | staging dir for extra plugin wheels (e.g. accelerator plugins) — the DOCKER install mode creates and mounts `<install-dir>/wheelhouse` read-write (installing from it unpacks the wheels in place); nothing in the images consumes it automatically, so install with `docker exec <container> pip install /app/wheelhouse/*.whl` or build a derived image |
 
+### Database schema
+
+Run the schema commands as a one-off container of the manager image, before
+starting the manager. No `alembic.ini` is needed: the commands use the
+migrations packaged in the image and the `[db]` section of `manager.toml`.
+
+| Database | Command |
+|---|---|
+| fresh (empty) | `docker run --rm -v <manager.toml>:/etc/backend.ai/manager.toml:ro lablup/backend.ai-manager:<version> backend.ai mgr schema oneshot` |
+| existing (after an upgrade) | `docker run --rm -v <manager.toml>:/etc/backend.ai/manager.toml:ro lablup/backend.ai-manager:<version> backend.ai mgr schema upgrade` |
+
+The container must reach the DB address in `manager.toml` (add
+`--network host` or the compose network as needed). `-f <alembic.ini>` is
+still accepted; a `sqlalchemy.url` in that file overrides `manager.toml`.
+
 ## Container privileges
 
 Most services run fine with compose defaults (bridge network, config file
