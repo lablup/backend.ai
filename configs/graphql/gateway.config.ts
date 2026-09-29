@@ -16,6 +16,9 @@ const useConnectionParamsToHeadersPlugin = (): GatewayPlugin => {
         if (reqHeaders["x-backendai-token"]) {
           new_headers["x-backendai-token"] = reqHeaders["x-backendai-token"];
         }
+        if (reqHeaders["x-backendai-act-as"]) {
+          new_headers["x-backendai-act-as"] = reqHeaders["x-backendai-act-as"];
+        }
         // Forward X-Forwarded-For so the manager can resolve the real client IP
         // (e.g. for the my_client_ip GQL query). Without this, extract_client_ip()
         // falls back to the hive-gateway/HAProxy IP.
