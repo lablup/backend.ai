@@ -207,8 +207,11 @@ issuing SQL statement directly inside the PostgreSQL container:
 Populate the database with initial fixtures
 -------------------------------------------
 
-You need to prepare ``alembic.ini`` file under ``${HOME}/manager`` to manage
-the database schema. Copy the sample
+An ``alembic.ini`` file under ``${HOME}/manager`` is optional: when it is
+absent, ``backend.ai mgr schema`` commands build the database connection from
+the ``[db]`` section of ``manager.toml`` instead. To use an explicit
+``alembic.ini`` (for example, to point at a database different from the one
+configured in ``manager.toml``), copy the sample
 `halfstack.alembic.ini <https://github.com/lablup/backend.ai/blob/main/configs/manager/halfstack.alembic.ini>`_
 and save it as ``${HOME}/manager/alembic.ini``. Adjust the ``sqlalchemy.url``
 field if database connection information is different from the default one. You
