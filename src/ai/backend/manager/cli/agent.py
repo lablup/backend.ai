@@ -2,14 +2,19 @@ from __future__ import annotations
 
 import asyncio
 import logging
+from pathlib import Path
 from typing import TYPE_CHECKING
 
 import click
-from alembic.config import Config
 
 from ai.backend.common.types import AgentId
 from ai.backend.logging.structured import StructuredLogger
 from ai.backend.logging.utils import enforce_debug_logging
+from ai.backend.manager.cli.alembic_config import (
+    ALEMBIC_CONFIG_HELP,
+    db_config_loader,
+    resolve_alembic_config,
+)
 from ai.backend.manager.errors.resource import ConfigurationLoadFailed
 
 if TYPE_CHECKING:
@@ -28,10 +33,10 @@ def cli() -> None:
 @click.option(
     "-f",
     "--alembic-config",
-    default="alembic.ini",
+    default=None,
     metavar="PATH",
-    type=click.Path(exists=True, dir_okay=False),
-    help="The path to Alembic config file. [default: alembic.ini]",
+    type=click.Path(exists=True, dir_okay=False, path_type=Path),
+    help=ALEMBIC_CONFIG_HELP,
 )
 @click.option(
     "-t",
@@ -41,7 +46,7 @@ def cli() -> None:
     help="The timeout to wait until declaring failure. [default: 10.0]",
 )
 @click.pass_obj
-def ping(cli_ctx: CLIContext, agent_id: str, alembic_config: str, timeout: float) -> None:
+def ping(cli_ctx: CLIContext, agent_id: str, alembic_config: Path | None, timeout: float) -> None:
     """
     Ping the agent with AGENT_ID to check whether it responds to an RPC call.
 
@@ -66,9 +71,8 @@ def ping(cli_ctx: CLIContext, agent_id: str, alembic_config: str, timeout: float
         )
         if manager_secret_key is None:
             raise ConfigurationLoadFailed("Manager secret key is not available in the keypair")
-        alembic_cfg = Config(alembic_config)
-        sa_url = alembic_cfg.get_main_option("sqlalchemy.url")
-        db = create_async_engine(sa_url)
+        resolved = await resolve_alembic_config(alembic_config, db_config_loader(cli_ctx))
+        db = create_async_engine(resolved.db_url)
         agent_cache = AgentRPCCache(
             db,
             manager_public_key=PublicKey(manager_public_key),
