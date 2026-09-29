@@ -2,24 +2,28 @@
 
 from __future__ import annotations
 
+import importlib.resources
 from collections.abc import AsyncIterator, Callable
 from contextlib import asynccontextmanager
 from pathlib import Path
 from types import SimpleNamespace
-from typing import Any
+from typing import Any, override
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from click.testing import CliRunner
 from sqlalchemy.engine import make_url
 
+from ai.backend.common.json import load_json
 from ai.backend.common.typed_validators import HostPortPair
+from ai.backend.manager.cli.agent import cli as agent_cli
 from ai.backend.manager.cli.alembic_config import (
     MANAGER_SCRIPT_LOCATION,
     build_db_url,
     load_alembic_config,
     resolve_alembic_config,
 )
+from ai.backend.manager.cli.dbschema import RevisionHistory
 from ai.backend.manager.cli.dbschema import cli as schema_cli
 from ai.backend.manager.config.unified import DatabaseConfig
 from ai.backend.manager.errors.resource import ConfigurationLoadFailed
@@ -70,6 +74,19 @@ def ini_without_url(workdir: Path) -> Path:
 @pytest.fixture
 def cwd_default_ini(workdir: Path) -> Path:
     return _write_ini(workdir / "alembic.ini", sqlalchemy_url=FILE_URL)
+
+
+@pytest.fixture
+def cli_obj(db_config: DatabaseConfig) -> MagicMock:
+    """A ``CLIContext``-like object shared by the command-level tests below."""
+    obj = MagicMock()
+    obj.get_bootstrap_config = AsyncMock(
+        return_value=SimpleNamespace(
+            db=db_config,
+            manager=SimpleNamespace(rpc_auth_manager_keypair="dummy-keypair-path"),
+        )
+    )
+    return obj
 
 
 class TestBuildDbUrl:
@@ -153,6 +170,39 @@ class TestResolveAlembicConfig:
         with pytest.raises(ConfigurationLoadFailed):
             await resolve_alembic_config(ini, db_config_loader)
 
+    async def test_explicit_file_wins_over_cwd_default_ini(
+        self, workdir: Path, db_config_loader: AsyncMock
+    ) -> None:
+        # Both an explicitly-given file and a ./alembic.ini exist; -f must win.
+        explicit = _write_ini(workdir / "explicit.ini", sqlalchemy_url=FILE_URL)
+        _write_ini(
+            workdir / "alembic.ini",
+            sqlalchemy_url="postgresql+asyncpg://other:other@otherhost:1111/otherdb",
+        )
+
+        resolved = await resolve_alembic_config(explicit, db_config_loader)
+
+        assert resolved.db_url == make_url(FILE_URL)
+        assert resolved.config.config_file_name == str(explicit)
+        db_config_loader.assert_not_awaited()
+
+    async def test_file_url_with_percent_encoded_password_round_trips(
+        self, workdir: Path, db_config_loader: AsyncMock
+    ) -> None:
+        # ConfigParser interpolates '%', so a literal '%' in the file must be
+        # doubled; the resulting option must stay a valid, parseable URL.
+        ini = _write_ini(
+            workdir / "percent.ini",
+            sqlalchemy_url="postgresql+asyncpg://user:p%%40ss%%25x@host:5432/db",
+        )
+
+        resolved = await resolve_alembic_config(ini, db_config_loader)
+
+        assert resolved.db_url.password == "p@ss%x"
+        raw_url = resolved.config.get_main_option("sqlalchemy.url")
+        assert raw_url is not None
+        assert make_url(raw_url).password == "p@ss%x"
+
 
 class TestLoadAlembicConfig:
     def test_no_file_points_at_packaged_scripts(self, workdir: Path) -> None:
@@ -186,12 +236,6 @@ class _FakeEngine:
 
 
 class TestSchemaUpgradeCommand:
-    @pytest.fixture
-    def cli_obj(self, db_config: DatabaseConfig) -> MagicMock:
-        obj = MagicMock()
-        obj.get_bootstrap_config = AsyncMock(return_value=SimpleNamespace(db=db_config))
-        return obj
-
     def test_help_lists_the_revision_argument(self) -> None:
         result = CliRunner().invoke(schema_cli, ["upgrade", "--help"])
 
@@ -228,4 +272,219 @@ class TestSchemaUpgradeCommand:
         assert revision == expected_revision
         assert alembic_cfg.attributes["connection"] is engine.connection.sync_connection
         assert alembic_cfg.get_main_option("script_location") == MANAGER_SCRIPT_LOCATION
+        engine.dispose.assert_awaited_once()
+
+
+class TestSchemaShowCommand:
+    def test_show_resolves_config_from_the_resolver(
+        self, workdir: Path, cli_obj: MagicMock, db_config: DatabaseConfig
+    ) -> None:
+        engine = _FakeEngine()
+        migration_context = MagicMock()
+        migration_context.get_current_revision.return_value = "abc123"
+        script = MagicMock()
+        script.get_heads.return_value = ["headrev"]
+        with (
+            patch(
+                "ai.backend.manager.repositories.db.engine.create_async_engine",
+                return_value=engine,
+            ) as create_engine,
+            patch(
+                "alembic.runtime.migration.MigrationContext.configure",
+                return_value=migration_context,
+            ),
+            patch("alembic.script.ScriptDirectory.from_config", return_value=script),
+        ):
+            result = CliRunner().invoke(schema_cli, ["show"], obj=cli_obj)
+
+        assert result.exit_code == 0, result.output
+        create_engine.assert_called_once_with(build_db_url(db_config))
+        assert "Current database revision: abc123" in result.output
+        assert "The head revision of available migrations: headrev" in result.output
+        engine.dispose.assert_awaited_once()
+
+
+class _FakeSyncConnection:
+    def __init__(self) -> None:
+        self.exec_driver_sql = MagicMock()
+
+
+class _FakeOneshotConnection:
+    sync_connection: _FakeSyncConnection
+    exec_driver_sql: AsyncMock
+
+    def __init__(self) -> None:
+        self.exec_driver_sql = AsyncMock()
+        self.sync_connection = _FakeSyncConnection()
+
+    async def run_sync(self, fn: Callable[..., Any], *args: Any, **kwargs: Any) -> Any:
+        return fn(self.sync_connection, *args, **kwargs)
+
+
+class _FakeOneshotEngine:
+    connection: _FakeOneshotConnection
+    sync_engine: MagicMock
+    dispose: AsyncMock
+
+    def __init__(self) -> None:
+        self.connection = _FakeOneshotConnection()
+        self.sync_engine = MagicMock()
+        self.dispose = AsyncMock()
+
+    @asynccontextmanager
+    async def begin(self) -> AsyncIterator[_FakeOneshotConnection]:
+        yield self.connection
+
+
+class TestSchemaOneshotCommand:
+    def test_oneshot_creates_tables_on_a_fresh_database(
+        self, workdir: Path, cli_obj: MagicMock, db_config: DatabaseConfig
+    ) -> None:
+        engine = _FakeOneshotEngine()
+        migration_context = MagicMock()
+        migration_context.get_current_revision.return_value = None
+        script = MagicMock()
+        script.get_heads.return_value = ["headrev"]
+        with (
+            patch(
+                "ai.backend.manager.repositories.db.engine.create_async_engine",
+                return_value=engine,
+            ) as create_engine,
+            patch(
+                "alembic.runtime.migration.MigrationContext.configure",
+                return_value=migration_context,
+            ),
+            patch("alembic.script.ScriptDirectory.from_config", return_value=script),
+            patch("ai.backend.manager.models.base.metadata.create_all") as create_all,
+        ):
+            result = CliRunner().invoke(schema_cli, ["oneshot"], obj=cli_obj)
+
+        assert result.exit_code == 0, result.output
+        create_engine.assert_called_once_with(build_db_url(db_config))
+        create_all.assert_called_once_with(engine.sync_engine, checkfirst=False)
+        engine.connection.sync_connection.exec_driver_sql.assert_any_call(
+            "INSERT INTO alembic_version VALUES('headrev')"
+        )
+        engine.dispose.assert_awaited_once()
+
+    def test_oneshot_defers_to_upgrade_on_an_existing_database(
+        self, workdir: Path, cli_obj: MagicMock, db_config: DatabaseConfig
+    ) -> None:
+        engine = _FakeOneshotEngine()
+        migration_context = MagicMock()
+        migration_context.get_current_revision.return_value = "abc123"
+        with (
+            patch(
+                "ai.backend.manager.repositories.db.engine.create_async_engine",
+                return_value=engine,
+            ) as create_engine,
+            patch(
+                "alembic.runtime.migration.MigrationContext.configure",
+                return_value=migration_context,
+            ),
+            patch("ai.backend.manager.models.base.metadata.create_all") as create_all,
+        ):
+            result = CliRunner().invoke(schema_cli, ["oneshot"], obj=cli_obj)
+
+        assert result.exit_code == 0, result.output
+        create_engine.assert_called_once_with(build_db_url(db_config))
+        create_all.assert_not_called()
+        engine.dispose.assert_awaited_once()
+
+
+_PREVIOUS_VERSION = "24.09.8"
+
+
+class _FakeRevisionScript:
+    def __init__(self, revision: str) -> None:
+        self.revision = revision
+
+    @override
+    def __str__(self) -> str:
+        return self.revision
+
+
+def _load_revision_history(version: str) -> RevisionHistory:
+    with importlib.resources.as_file(
+        importlib.resources.files("ai.backend.manager.models.alembic.revision_history")
+    ) as f:
+        with (f / f"{version}.json").open() as fr:
+            history: RevisionHistory = load_json(fr.read())
+            return history
+
+
+class TestSchemaApplyMissingRevisionsCommand:
+    @pytest.fixture
+    def fake_script_directory(self) -> MagicMock:
+        """A ScriptDirectory whose revisions are the previous version's applied history
+        plus one pending revision, so the command does not depend on walking the real
+        packaged migration scripts."""
+        history = _load_revision_history(_PREVIOUS_VERSION)
+        applied = [r["revision"] for r in history["revisions"]]
+        scripts = [_FakeRevisionScript(r) for r in [*applied, "pending-revision"]]
+        script_directory = MagicMock()
+        script_directory.walk_revisions.return_value = scripts
+        return script_directory
+
+    def test_dry_run_does_not_load_manager_toml(
+        self, workdir: Path, cli_obj: MagicMock, fake_script_directory: MagicMock
+    ) -> None:
+        with patch(
+            "alembic.script.ScriptDirectory.from_config", return_value=fake_script_directory
+        ):
+            result = CliRunner().invoke(
+                schema_cli,
+                ["apply-missing-revisions", _PREVIOUS_VERSION, "--dry-run"],
+                obj=cli_obj,
+            )
+
+        assert result.exit_code == 0, result.output
+        cli_obj.get_bootstrap_config.assert_not_awaited()
+        fake_script_directory.run_env.assert_not_called()
+
+    def test_real_run_resolves_config_from_the_resolver(
+        self, workdir: Path, cli_obj: MagicMock, fake_script_directory: MagicMock
+    ) -> None:
+        with patch(
+            "alembic.script.ScriptDirectory.from_config", return_value=fake_script_directory
+        ):
+            result = CliRunner().invoke(
+                schema_cli, ["apply-missing-revisions", _PREVIOUS_VERSION], obj=cli_obj
+            )
+
+        assert result.exit_code == 0, result.output
+        cli_obj.get_bootstrap_config.assert_awaited()
+        fake_script_directory.run_env.assert_called_once()
+
+
+class TestAgentPingCommand:
+    def test_ping_resolves_config_from_the_resolver(
+        self, workdir: Path, cli_obj: MagicMock, db_config: DatabaseConfig
+    ) -> None:
+        engine = _FakeEngine()
+        fake_rpc = MagicMock()
+        fake_rpc.call.ping = AsyncMock(return_value="pong")
+
+        @asynccontextmanager
+        async def _fake_rpc_context(*_args: Any, **_kwargs: Any) -> AsyncIterator[MagicMock]:
+            yield fake_rpc
+
+        agent_cache_instance = MagicMock()
+        agent_cache_instance.rpc_context = _fake_rpc_context
+        with (
+            patch("zmq.auth.certs.load_certificate", return_value=(b"pub", b"sec")),
+            patch(
+                "ai.backend.manager.repositories.db.engine.create_async_engine",
+                return_value=engine,
+            ) as create_engine,
+            patch(
+                "ai.backend.manager.agent_cache.AgentRPCCache",
+                return_value=agent_cache_instance,
+            ) as agent_rpc_cache_cls,
+        ):
+            result = CliRunner().invoke(agent_cli, ["ping", "agent-id-1"], obj=cli_obj)
+
+        assert result.exit_code == 0, result.output
+        create_engine.assert_called_once_with(build_db_url(db_config))
+        agent_rpc_cache_cls.assert_called_once()
         engine.dispose.assert_awaited_once()
