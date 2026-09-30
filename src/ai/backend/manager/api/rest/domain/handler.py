@@ -83,7 +83,7 @@ class DomainHandler:
             allowed_docker_registries=body.parsed.allowed_docker_registries,
             integration_name=body.parsed.integration_id,  # v1 DTO uses integration_id
         )
-        action_result = await self._domain.create_domain.run(CreateDomainAction(creator=creator))
+        action_result = await self._domain.create.run(CreateDomainAction(creator=creator))
         domain_data = action_result.data
 
         resp = CreateDomainResponse(domain=self._adapter.convert_to_dto(domain_data))
@@ -98,7 +98,7 @@ class DomainHandler:
         path: PathParam[GetDomainPathParam],
         ctx: UserContext,
     ) -> APIResponse:
-        resolved = await self._domain.lookup.run(
+        resolved = await self._domain.lookup_name.run(
             LookupDomainAction(name=DomainName(path.parsed.domain_name))
         )
         action_result = await self._domain.get.run(GetDomainAction(domain_id=resolved.entity_id()))
@@ -142,10 +142,12 @@ class DomainHandler:
         ctx: UserContext,
     ) -> APIResponse:
         domain_name = path.parsed.domain_name
-        target = await self._domain.lookup.run(LookupDomainAction(name=DomainName(domain_name)))
+        target = await self._domain.lookup_name.run(
+            LookupDomainAction(name=DomainName(domain_name))
+        )
         updater = self._adapter.build_updater(body.parsed, target.entity_id())
 
-        action_result = await self._domain.update_domain.run(UpdateDomainAction(updater=updater))
+        action_result = await self._domain.update.run(UpdateDomainAction(updater=updater))
 
         resp = UpdateDomainResponse(domain=self._adapter.convert_to_dto(action_result.data))
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=resp)
@@ -159,10 +161,10 @@ class DomainHandler:
         body: BodyParam[DeleteDomainRequest],
         ctx: UserContext,
     ) -> APIResponse:
-        target = await self._domain.lookup.run(
+        target = await self._domain.lookup_name.run(
             LookupDomainAction(name=DomainName(body.parsed.name))
         )
-        await self._domain.delete_domain.run(
+        await self._domain.delete.run(
             DeleteDomainAction(
                 updater=DomainSoftDeleteUpdater(domain_id=target.entity_id()),
             )
@@ -180,10 +182,10 @@ class DomainHandler:
         body: BodyParam[PurgeDomainRequest],
         ctx: UserContext,
     ) -> APIResponse:
-        target = await self._domain.lookup.run(
+        target = await self._domain.lookup_name.run(
             LookupDomainAction(name=DomainName(body.parsed.name))
         )
-        await self._domain.purge_domain.run(
+        await self._domain.purge.run(
             PurgeDomainAction(domain_id=target.entity_id(), name=body.parsed.name)
         )
 

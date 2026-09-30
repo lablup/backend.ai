@@ -81,7 +81,7 @@ class ResourceGroupHandler:
         ctx: UserContext,
     ) -> APIResponse:
         params = query.parsed
-        domain_lookup = await self._domain.lookup.run(
+        domain_lookup = await self._domain.lookup_name.run(
             LookupDomainAction(name=DomainName(ctx.user_domain))
         )
         targets: list[ResourceGroupTarget] = [
@@ -121,7 +121,7 @@ class ResourceGroupHandler:
     ) -> APIResponse:
         path_params = path.parsed
         query_params = query.parsed
-        domain_lookup = await self._domain.lookup.run(
+        domain_lookup = await self._domain.lookup_name.run(
             LookupDomainAction(name=DomainName(ctx.user_domain))
         )
         targets: list[ResourceGroupTarget] = [

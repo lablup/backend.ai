@@ -2,9 +2,251 @@
 
 [무엇을 보장하는가](/src/ai/backend/manager/api/adapters/vfolder/KNOWLEDGE.md) · [어댑터](/src/ai/backend/manager/api/adapters/vfolder/adapter.py)
 
-Not exercised by any scenario: admin_search, batch_load_fields, batch_load_permissions, bulk_delete, bulk_purge, clone, create_download_session, create_in_project, create_upload_session, delete, delete_files, deploy, get_folder_usage, list_files, list_mount_policies, mkdir, move_file, purge, restore, scoped_search, set_mount_policy, unset_mount_policy.
+시나리오: 미완 21 / 25
 
-### batch_loading
+- ops 로 구성 (4)
+  - admin_search — 대표 성공 ✗ · 대표 실패 ✗ — SCENARIO-GAP
+  - batch_load_by_ids — 대표 성공 ✓ · 대표 실패 ✓
+  - project_search — 대표 성공 ✓ · 대표 실패 ✓
+  - scoped_search — 대표 성공 ✓ · 대표 실패 ✗ — SCENARIO-GAP
+- 직접 구현 (21)
+  - batch_load_permissions — 성공 없음 · 실패 없음 (partial_bulk) — SCENARIO-GAP
+  - bulk_delete — 성공 없음 · 실패 없음 (single_entity) — SCENARIO-GAP
+  - bulk_purge — 성공 없음 · 실패 없음 (single_entity) — SCENARIO-GAP
+  - clone — 성공 없음 · 실패 없음 (single_entity) — SCENARIO-GAP
+  - create — 성공 있음 1 · 실패 있음 1 (scope)
+  - create_download_session — 성공 없음 · 실패 없음 (single_entity) — SCENARIO-GAP
+  - create_in_project — 성공 없음 · 실패 없음 (scope) — SCENARIO-GAP
+  - create_upload_session — 성공 없음 · 실패 없음 (single_entity) — SCENARIO-GAP
+  - delete — 성공 없음 · 실패 없음 (single_entity) — SCENARIO-GAP
+  - delete_files — 성공 없음 · 실패 없음 (single_entity) — SCENARIO-GAP
+  - deploy — 성공 없음 · 실패 없음 (scope, single_entity) — SCENARIO-GAP
+  - get — 성공 있음 2 · 실패 있음 2 (single_entity)
+  - get_folder_usage — 성공 없음 · 실패 없음 (single_entity) — SCENARIO-GAP
+  - list_files — 성공 없음 · 실패 없음 (single_entity) — SCENARIO-GAP
+  - list_mount_policies — 성공 없음 · 실패 없음 (single_entity) — SCENARIO-GAP
+  - mkdir — 성공 없음 · 실패 없음 (single_entity) — SCENARIO-GAP
+  - move_file — 성공 없음 · 실패 없음 (single_entity) — SCENARIO-GAP
+  - purge — 성공 없음 · 실패 없음 (single_entity) — SCENARIO-GAP
+  - restore — 성공 없음 · 실패 없음 (single_entity) — SCENARIO-GAP
+  - set_mount_policy — 성공 없음 · 실패 없음 (single_entity) — SCENARIO-GAP
+  - unset_mount_policy — 성공 없음 · 실패 없음 (single_entity) — SCENARIO-GAP
+
+**batch_load_by_ids**
+
+| 시나리오 | 판정 |
+|---|---|
+| [아무 권한도 받지 않은 사용자가 빈 id 목록을 주면, 권한 검사 없이 빈 목록이 온다](#batch_loading-a-batch-load-of-no-ids-answers-an-empty-list) | 성공 |
+| [자기 개인 프로젝트에서 폴더 읽기 권한을 받은 사용자가 자기 폴더 id로 일괄 읽기를 하면, 그 폴더가 온다](#batch_loading-a-user-granted-folder-read-loads-their-own-folder-by-id) | 성공 |
+| [남의 폴더를 읽기로 공유받아 받아들인 사용자가 그 폴더 id로 일괄 읽기를 하면, 그 폴더가 온다](#batch_loading-an-accepted-share-loads-someone-elses-folder-by-id) | 성공 |
+| [슈퍼관리자가 남의 폴더와 없는 id를 함께 요청하면, 그 폴더는 노드로, 없는 id 자리는 빈 값으로 온다](#batch_loading-the-superadmin-batch-load-leaves-a-missing-id-empty) | 성공 |
+| [자기 폴더만 읽을 수 있는 사용자가 자기 폴더, 공유받지 않은 남의 폴더, 없는 id를 한 번에 요청하면, 입력 순서대로 그 폴더, 거부, 거부가 온다](#batch_loading-a-batch-load-answers-a-node-or-a-refusal-for-each-id-in-order) | 거부 |
+| [아무 권한도 받지 않은 사용자가 자기 폴더 id로 일괄 읽기를 하면, 호출은 성공하되 그 자리는 권한 부족으로 거부된다](#batch_loading-a-user-granted-nothing-gets-a-refusal-in-place-of-their-own-folder) | 거부 |
+| [남의 폴더를 공유 제안만 받고 받아들이지 않은 사용자가 그 폴더 id로 일괄 읽기를 하면, 호출은 성공하되 그 자리는 권한 부족으로 거부된다](#batch_loading-an-unanswered-offer-gets-a-refusal-in-place-of-someone-elses-folder) | 거부 |
+
+**project_search**
+
+| 시나리오 | 판정 |
+|---|---|
+| [프로젝트에서 폴더 읽기 권한을 받은 사용자가 그 프로젝트의 폴더를 조회하면, 그 프로젝트의 폴더가 온다](#reaching-a-user-granted-folder-read-in-a-project-lists-its-folder) | 성공 |
+| [아무 권한도 받지 않은 사용자가 프로젝트의 폴더를 조회하려 하면 권한 부족으로 거부된다](#reaching-a-user-granted-nothing-may-not-list-a-projects-folders) | 거부 |
+
+**scoped_search**
+
+| 시나리오 | 판정 |
+|---|---|
+| [폴더를 하나도 만들지 않은 사용자가 자기 폴더를 조회하면, 답은 비어 있다](#vfolder-a-user-who-has-made-no-folder-lists-none) | 성공 |
+
+**create**
+
+| 시나리오 | 판정 |
+|---|---|
+| [자기 스코프에서 폴더 생성 권한을 받은 사용자가 폴더를 만들면, 그 폴더의 소유는 그 사용자에게 있다](#vfolder-a-user-granted-folder-create-makes-one-of-their-own) | 성공 |
+| [아무 권한도 받지 않은 사용자가 폴더를 만들려 하면 권한 부족으로 거부된다](#vfolder-a-user-granted-nothing-may-not-make-a-folder) | 거부 |
+
+**get**
+
+| 시나리오 | 판정 |
+|---|---|
+| [자기 개인 프로젝트에서 폴더 읽기 권한을 받은 사용자가 자기 폴더를 읽으면, 그 폴더가 온다](#reaching-a-user-granted-folder-read-reads-their-own-folder) | 성공 |
+| [남의 폴더를 읽기로 공유받아 받아들인 사용자가 그 폴더를 읽으면, 그 폴더가 온다](#reaching-an-accepted-share-reads-someone-elses-folder) | 성공 |
+| [아무 권한도 받지 않은 사용자가 자기 폴더를 읽으려 하면 권한 부족으로 거부된다](#reaching-a-user-granted-nothing-may-not-read-their-own-folder) | 거부 |
+| [남의 폴더를 공유 제안만 받고 받아들이지 않은 사용자가 그 폴더를 읽으려 하면 권한 부족으로 거부된다](#reaching-an-unanswered-offer-may-not-read-someone-elses-folder) | 거부 |
+
+### batch_load_by_ids
+
+<a id="batch_loading-a-batch-load-of-no-ids-answers-an-empty-list"></a>
+
+#### [a-batch-load-of-no-ids-answers-an-empty-list](/tests/scenario/bai_scenario/manager/vfolder/test_batch_loading.py) — pass
+
+아무 권한도 받지 않은 사용자가 빈 id 목록을 주면, 권한 검사 없이 빈 목록이 온다
+
+Given
+
+- 폴더를 놓을 수 있는 도메인과, 아무 권한도 받지 않은 사용자 한 명
+  - 도메인 home-1: 이 도메인의 폴더는 local:volume1에 놓을 수 있다
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지, 폴더는 local:volume1에 놓을 수 있다
+    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+
+When
+
+- VFolderAdapter.batch_load_by_ids — user-1이 빈 목록으로 일괄 읽음
+
+Then
+
+- 빈 목록이 온다
+  - loaded = []
+
+<a id="batch_loading-a-user-granted-folder-read-loads-their-own-folder-by-id"></a>
+
+#### [a-user-granted-folder-read-loads-their-own-folder-by-id](/tests/scenario/bai_scenario/manager/vfolder/test_batch_loading.py) — pass
+
+자기 개인 프로젝트에서 폴더 읽기 권한을 받은 사용자가 자기 폴더 id로 일괄 읽기를 하면, 그 폴더가 온다
+
+Given
+
+- 자기 개인 폴더 하나를 가진, 자기 개인 프로젝트에서 폴더를 읽을 수 있는 사용자 한 명
+  - 도메인 home-1: 이 도메인의 폴더는 local:volume1에 놓을 수 있다
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지, 폴더는 local:volume1에 놓을 수 있다
+    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+  - 개인 폴더 folder-1: 그 사람의 개인 프로젝트에 놓이고, 쓸 수 있는 상태다
+  - 폴더 읽기 권한 부여
+    - 역할 folder-reader-1: 이 역할이 앉은 스코프 안에서만 통한다
+    - 역할 folder-reader-1: vfolder 전체에 READ 허용
+    - 일반 사용자 user-1: 역할 folder-reader-1 보유
+
+When
+
+- VFolderAdapter.batch_load_by_ids — user-1이 folder-1 폴더 id로 일괄 읽음
+
+Then
+
+- 심은 폴더 하나가 통째로 온다
+  - length = 1
+  - [0].id: 심은 폴더와 같다
+  - [0].host = 'local:volume1'
+  - [0].status = 'ready'
+  - [0].metadata.name = 'folder-1'
+  - [0].metadata.cloneable = False
+  - [0].metadata.last_used = None
+  - [0].access_control.ownership_type = 'user'
+  - [0].ownership.user_id: 폴더 주인와 같다
+  - [0].ownership.project_id: 폴더가 놓인 프로젝트와 같다
+  - [0].ownership.creator_id: 만든 사람와 같다
+  - [0].ownership.creator_email = 'user-1@scenario.local'
+  - [0].unmanaged_path = None
+  - [0].metadata.usage_mode: 무시함 — 타입이 이미 값을 못박는다
+  - [0].metadata.quota_scope_id: 무시함 — 주인의 id로 만들어져 실행마다 다르다
+  - [0].access_control.permission: 무시함 — 마운트 권한이라 이 표가 묻는 것이 아니다
+  - [0].quota: 무시함 — 저장소가 답하는 값이라 여기서 말할 수 없다
+  - [0].metadata.created_at: 이 실행이 쓴 시각
+
+<a id="batch_loading-an-accepted-share-loads-someone-elses-folder-by-id"></a>
+
+#### [an-accepted-share-loads-someone-elses-folder-by-id](/tests/scenario/bai_scenario/manager/vfolder/test_batch_loading.py) — pass
+
+남의 폴더를 읽기로 공유받아 받아들인 사용자가 그 폴더 id로 일괄 읽기를 하면, 그 폴더가 온다
+
+Given
+
+- 남의 개인 폴더를 읽기로 공유 제안받아 받아들인, 자기 개인 프로젝트에서 폴더를 읽을 수 있는 사용자 한 명
+  - 도메인 home-1: 이 도메인의 폴더는 local:volume1에 놓을 수 있다
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지, 폴더는 local:volume1에 놓을 수 있다
+    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+    - 사용자 정책 user-policy-2: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-2: 동시 세션 5개까지, 폴더는 local:volume1에 놓을 수 있다
+    - 일반 사용자 user-2: 자기 키와 개인 프로젝트를 갖는다
+  - 개인 폴더 folder-1: 그 사람의 개인 프로젝트에 놓이고, 쓸 수 있는 상태다
+  - 폴더 공유 제안 share-1: READ 권한으로 제안되고, 아직 답하지 않았다
+  - 폴더 공유 제안 share-1: 받는 사람이 받아들임
+  - 폴더 읽기 권한 부여
+    - 역할 folder-reader-1: 이 역할이 앉은 스코프 안에서만 통한다
+    - 역할 folder-reader-1: vfolder 전체에 READ 허용
+    - 일반 사용자 user-2: 역할 folder-reader-1 보유
+
+When
+
+- VFolderAdapter.batch_load_by_ids — user-2이 folder-1 폴더 id로 일괄 읽음
+
+Then
+
+- 심은 폴더 하나가 통째로 온다
+  - length = 1
+  - [0].id: 심은 폴더와 같다
+  - [0].host = 'local:volume1'
+  - [0].status = 'ready'
+  - [0].metadata.name = 'folder-1'
+  - [0].metadata.cloneable = False
+  - [0].metadata.last_used = None
+  - [0].access_control.ownership_type = 'user'
+  - [0].ownership.user_id: 폴더 주인와 같다
+  - [0].ownership.project_id: 폴더가 놓인 프로젝트와 같다
+  - [0].ownership.creator_id: 만든 사람와 같다
+  - [0].ownership.creator_email = 'user-1@scenario.local'
+  - [0].unmanaged_path = None
+  - [0].metadata.usage_mode: 무시함 — 타입이 이미 값을 못박는다
+  - [0].metadata.quota_scope_id: 무시함 — 주인의 id로 만들어져 실행마다 다르다
+  - [0].access_control.permission: 무시함 — 마운트 권한이라 이 표가 묻는 것이 아니다
+  - [0].quota: 무시함 — 저장소가 답하는 값이라 여기서 말할 수 없다
+  - [0].metadata.created_at: 이 실행이 쓴 시각
+
+<a id="batch_loading-the-superadmin-batch-load-leaves-a-missing-id-empty"></a>
+
+#### [the-superadmin-batch-load-leaves-a-missing-id-empty](/tests/scenario/bai_scenario/manager/vfolder/test_batch_loading.py) — pass
+
+슈퍼관리자가 남의 폴더와 없는 id를 함께 요청하면, 그 폴더는 노드로, 없는 id 자리는 빈 값으로 온다
+
+Given
+
+- 남의 개인 폴더 하나와, 아무 역할도 받지 않은 슈퍼관리자 한 명
+  - 도메인 home-1: 이 도메인의 폴더는 local:volume1에 놓을 수 있다
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지, 폴더는 local:volume1에 놓을 수 있다
+    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+    - 사용자 정책 user-policy-2: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
+    - 슈퍼관리자 user-2: 자기 키와 개인 프로젝트를 갖는다
+  - 개인 폴더 folder-1: 그 사람의 개인 프로젝트에 놓이고, 쓸 수 있는 상태다
+
+When
+
+- VFolderAdapter.batch_load_by_ids — user-2이 folder-1 폴더와 없는 id를 일괄 읽음
+
+Then
+
+- 있는 폴더는 노드로, 없는 id 자리는 빈 값으로 온다
+  - length = 2
+  - [0].id: 심은 폴더와 같다
+  - [0].host = 'local:volume1'
+  - [0].status = 'ready'
+  - [0].metadata.name = 'folder-1'
+  - [0].metadata.cloneable = False
+  - [0].metadata.last_used = None
+  - [0].access_control.ownership_type = 'user'
+  - [0].ownership.user_id: 폴더 주인와 같다
+  - [0].ownership.project_id: 폴더가 놓인 프로젝트와 같다
+  - [0].ownership.creator_id: 만든 사람와 같다
+  - [0].ownership.creator_email = 'user-1@scenario.local'
+  - [0].unmanaged_path = None
+  - [0].metadata.usage_mode: 무시함 — 타입이 이미 값을 못박는다
+  - [0].metadata.quota_scope_id: 무시함 — 주인의 id로 만들어져 실행마다 다르다
+  - [0].access_control.permission: 무시함 — 마운트 권한이라 이 표가 묻는 것이 아니다
+  - [0].quota: 무시함 — 저장소가 답하는 값이라 여기서 말할 수 없다
+  - [0].metadata.created_at: 이 실행이 쓴 시각
+  - [1] = None
+
+<a id="batch_loading-a-batch-load-answers-a-node-or-a-refusal-for-each-id-in-order"></a>
 
 #### [a-batch-load-answers-a-node-or-a-refusal-for-each-id-in-order](/tests/scenario/bai_scenario/manager/vfolder/test_batch_loading.py) — pass
 
@@ -57,73 +299,7 @@ Then
   - 거부: NotEnoughPermission
   - 거부: NotEnoughPermission
 
-#### [a-batch-load-of-no-ids-answers-an-empty-list](/tests/scenario/bai_scenario/manager/vfolder/test_batch_loading.py) — pass
-
-아무 권한도 받지 않은 사용자가 빈 id 목록을 주면, 권한 검사 없이 빈 목록이 온다
-
-Given
-
-- 폴더를 놓을 수 있는 도메인과, 아무 권한도 받지 않은 사용자 한 명
-  - 도메인 home-1: 이 도메인의 폴더는 local:volume1에 놓을 수 있다
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지, 폴더는 local:volume1에 놓을 수 있다
-    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-
-When
-
-- VFolderAdapter.batch_load_by_ids — user-1이 빈 목록으로 일괄 읽음
-
-Then
-
-- 빈 목록이 온다
-  - loaded = []
-
-#### [a-user-granted-folder-read-loads-their-own-folder-by-id](/tests/scenario/bai_scenario/manager/vfolder/test_batch_loading.py) — pass
-
-자기 개인 프로젝트에서 폴더 읽기 권한을 받은 사용자가 자기 폴더 id로 일괄 읽기를 하면, 그 폴더가 온다
-
-Given
-
-- 자기 개인 폴더 하나를 가진, 자기 개인 프로젝트에서 폴더를 읽을 수 있는 사용자 한 명
-  - 도메인 home-1: 이 도메인의 폴더는 local:volume1에 놓을 수 있다
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지, 폴더는 local:volume1에 놓을 수 있다
-    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-  - 개인 폴더 folder-1: 그 사람의 개인 프로젝트에 놓이고, 쓸 수 있는 상태다
-  - 폴더 읽기 권한 부여
-    - 역할 folder-reader-1: 이 역할이 앉은 스코프 안에서만 통한다
-    - 역할 folder-reader-1: vfolder 전체에 READ 허용
-    - 일반 사용자 user-1: 역할 folder-reader-1 보유
-
-When
-
-- VFolderAdapter.batch_load_by_ids — user-1이 folder-1 폴더 id로 일괄 읽음
-
-Then
-
-- 심은 폴더 하나가 통째로 온다
-  - length = 1
-  - [0].id: 심은 폴더와 같다
-  - [0].host = 'local:volume1'
-  - [0].status = 'ready'
-  - [0].metadata.name = 'folder-1'
-  - [0].metadata.cloneable = False
-  - [0].metadata.last_used = None
-  - [0].access_control.ownership_type = 'user'
-  - [0].ownership.user_id: 폴더 주인와 같다
-  - [0].ownership.project_id: 폴더가 놓인 프로젝트와 같다
-  - [0].ownership.creator_id: 만든 사람와 같다
-  - [0].ownership.creator_email = 'user-1@scenario.local'
-  - [0].unmanaged_path = None
-  - [0].metadata.usage_mode: 무시함 — 타입이 이미 값을 못박는다
-  - [0].metadata.quota_scope_id: 무시함 — 주인의 id로 만들어져 실행마다 다르다
-  - [0].access_control.permission: 무시함 — 마운트 권한이라 이 표가 묻는 것이 아니다
-  - [0].quota: 무시함 — 저장소가 답하는 값이라 여기서 말할 수 없다
-  - [0].metadata.created_at: 이 실행이 쓴 시각
+<a id="batch_loading-a-user-granted-nothing-gets-a-refusal-in-place-of-their-own-folder"></a>
 
 #### [a-user-granted-nothing-gets-a-refusal-in-place-of-their-own-folder](/tests/scenario/bai_scenario/manager/vfolder/test_batch_loading.py) — pass
 
@@ -150,55 +326,7 @@ Then
   - length = 1
   - 거부: NotEnoughPermission
 
-#### [an-accepted-share-loads-someone-elses-folder-by-id](/tests/scenario/bai_scenario/manager/vfolder/test_batch_loading.py) — pass
-
-남의 폴더를 읽기로 공유받아 받아들인 사용자가 그 폴더 id로 일괄 읽기를 하면, 그 폴더가 온다
-
-Given
-
-- 남의 개인 폴더를 읽기로 공유 제안받아 받아들인, 자기 개인 프로젝트에서 폴더를 읽을 수 있는 사용자 한 명
-  - 도메인 home-1: 이 도메인의 폴더는 local:volume1에 놓을 수 있다
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지, 폴더는 local:volume1에 놓을 수 있다
-    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-    - 사용자 정책 user-policy-2: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-2: 동시 세션 5개까지, 폴더는 local:volume1에 놓을 수 있다
-    - 일반 사용자 user-2: 자기 키와 개인 프로젝트를 갖는다
-  - 개인 폴더 folder-1: 그 사람의 개인 프로젝트에 놓이고, 쓸 수 있는 상태다
-  - 폴더 공유 제안 share-1: READ 권한으로 제안되고, 아직 답하지 않았다
-  - 폴더 공유 제안 share-1: 받는 사람이 받아들임
-  - 폴더 읽기 권한 부여
-    - 역할 folder-reader-1: 이 역할이 앉은 스코프 안에서만 통한다
-    - 역할 folder-reader-1: vfolder 전체에 READ 허용
-    - 일반 사용자 user-2: 역할 folder-reader-1 보유
-
-When
-
-- VFolderAdapter.batch_load_by_ids — user-2이 folder-1 폴더 id로 일괄 읽음
-
-Then
-
-- 심은 폴더 하나가 통째로 온다
-  - length = 1
-  - [0].id: 심은 폴더와 같다
-  - [0].host = 'local:volume1'
-  - [0].status = 'ready'
-  - [0].metadata.name = 'folder-1'
-  - [0].metadata.cloneable = False
-  - [0].metadata.last_used = None
-  - [0].access_control.ownership_type = 'user'
-  - [0].ownership.user_id: 폴더 주인와 같다
-  - [0].ownership.project_id: 폴더가 놓인 프로젝트와 같다
-  - [0].ownership.creator_id: 만든 사람와 같다
-  - [0].ownership.creator_email = 'user-1@scenario.local'
-  - [0].unmanaged_path = None
-  - [0].metadata.usage_mode: 무시함 — 타입이 이미 값을 못박는다
-  - [0].metadata.quota_scope_id: 무시함 — 주인의 id로 만들어져 실행마다 다르다
-  - [0].access_control.permission: 무시함 — 마운트 권한이라 이 표가 묻는 것이 아니다
-  - [0].quota: 무시함 — 저장소가 답하는 값이라 여기서 말할 수 없다
-  - [0].metadata.created_at: 이 실행이 쓴 시각
+<a id="batch_loading-an-unanswered-offer-gets-a-refusal-in-place-of-someone-elses-folder"></a>
 
 #### [an-unanswered-offer-gets-a-refusal-in-place-of-someone-elses-folder](/tests/scenario/bai_scenario/manager/vfolder/test_batch_loading.py) — pass
 
@@ -233,52 +361,9 @@ Then
   - length = 1
   - 거부: NotEnoughPermission
 
-#### [the-superadmin-batch-load-leaves-a-missing-id-empty](/tests/scenario/bai_scenario/manager/vfolder/test_batch_loading.py) — pass
+### project_search
 
-슈퍼관리자가 남의 폴더와 없는 id를 함께 요청하면, 그 폴더는 노드로, 없는 id 자리는 빈 값으로 온다
-
-Given
-
-- 남의 개인 폴더 하나와, 아무 역할도 받지 않은 슈퍼관리자 한 명
-  - 도메인 home-1: 이 도메인의 폴더는 local:volume1에 놓을 수 있다
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지, 폴더는 local:volume1에 놓을 수 있다
-    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-    - 사용자 정책 user-policy-2: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
-    - 슈퍼관리자 user-2: 자기 키와 개인 프로젝트를 갖는다
-  - 개인 폴더 folder-1: 그 사람의 개인 프로젝트에 놓이고, 쓸 수 있는 상태다
-
-When
-
-- VFolderAdapter.batch_load_by_ids — user-2이 folder-1 폴더와 없는 id를 일괄 읽음
-
-Then
-
-- 있는 폴더는 노드로, 없는 id 자리는 빈 값으로 온다
-  - length = 2
-  - [0].id: 심은 폴더와 같다
-  - [0].host = 'local:volume1'
-  - [0].status = 'ready'
-  - [0].metadata.name = 'folder-1'
-  - [0].metadata.cloneable = False
-  - [0].metadata.last_used = None
-  - [0].access_control.ownership_type = 'user'
-  - [0].ownership.user_id: 폴더 주인와 같다
-  - [0].ownership.project_id: 폴더가 놓인 프로젝트와 같다
-  - [0].ownership.creator_id: 만든 사람와 같다
-  - [0].ownership.creator_email = 'user-1@scenario.local'
-  - [0].unmanaged_path = None
-  - [0].metadata.usage_mode: 무시함 — 타입이 이미 값을 못박는다
-  - [0].metadata.quota_scope_id: 무시함 — 주인의 id로 만들어져 실행마다 다르다
-  - [0].access_control.permission: 무시함 — 마운트 권한이라 이 표가 묻는 것이 아니다
-  - [0].quota: 무시함 — 저장소가 답하는 값이라 여기서 말할 수 없다
-  - [0].metadata.created_at: 이 실행이 쓴 시각
-  - [1] = None
-
-### reaching
+<a id="reaching-a-user-granted-folder-read-in-a-project-lists-its-folder"></a>
 
 #### [a-user-granted-folder-read-in-a-project-lists-its-folder](/tests/scenario/bai_scenario/manager/vfolder/test_reaching.py) — pass
 
@@ -329,6 +414,145 @@ Then
   - items[0].quota: 무시함 — 저장소가 답하는 값이라 여기서 말할 수 없다
   - items[0].metadata.created_at: 이 실행이 쓴 시각
 
+<a id="reaching-a-user-granted-nothing-may-not-list-a-projects-folders"></a>
+
+#### [a-user-granted-nothing-may-not-list-a-projects-folders](/tests/scenario/bai_scenario/manager/vfolder/test_reaching.py) — pass
+
+아무 권한도 받지 않은 사용자가 프로젝트의 폴더를 조회하려 하면 권한 부족으로 거부된다
+
+Given
+
+- 폴더 하나를 가진 프로젝트와, 아무 권한도 받지 않은 사용자 한 명
+  - 도메인 home-1: 이 도메인의 폴더는 local:volume1에 놓을 수 있다
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지, 폴더는 local:volume1에 놓을 수 있다
+    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+  - 프로젝트 project-1
+  - 프로젝트 폴더 folder-1: 프로젝트에 놓이고, 쓸 수 있는 상태다
+
+When
+
+- VFolderAdapter.project_search — user-1이 folder-1 폴더가 놓인 프로젝트의 폴더를 조회
+
+Then
+
+- 거부된다
+  - 거부: NotEnoughPermission
+
+### scoped_search
+
+<a id="vfolder-a-user-who-has-made-no-folder-lists-none"></a>
+
+#### [a-user-who-has-made-no-folder-lists-none](/tests/scenario/bai_scenario/manager/vfolder/test_vfolder.py) — pass
+
+폴더를 하나도 만들지 않은 사용자가 자기 폴더를 조회하면, 답은 비어 있다
+
+Given
+
+- 폴더를 놓을 수 있는 도메인과, 거기서 폴더를 만들 수 있는 사용자 한 명
+  - 도메인 home-1: 이 도메인의 폴더는 local:volume1에 놓을 수 있다
+  - 폴더를 만들 수 있는 사용자 준비
+    - 도메인에 속한 사용자 한 명 준비
+      - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지, 폴더는 local:volume1에 놓을 수 있다
+      - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+    - 역할 folder-owner-1: 이 역할이 앉은 스코프 안에서만 통한다
+    - 역할 folder-owner-1: vfolder 전체에 CREATE 허용
+    - 역할 folder-owner-1: vfolder 전체에 READ 허용
+    - 일반 사용자 user-1: 역할 folder-owner-1 보유
+
+When
+
+- VFolderAdapter.scoped_search — user-1이 자기 폴더를 조회
+
+Then
+
+- 답이 비어 있다
+  - items = []
+  - total_count = 0
+  - has_next_page = False
+  - has_previous_page = False
+
+### create
+
+<a id="vfolder-a-user-granted-folder-create-makes-one-of-their-own"></a>
+
+#### [a-user-granted-folder-create-makes-one-of-their-own](/tests/scenario/bai_scenario/manager/vfolder/test_vfolder.py) — pass
+
+자기 스코프에서 폴더 생성 권한을 받은 사용자가 폴더를 만들면, 그 폴더의 소유는 그 사용자에게 있다
+
+Given
+
+- 폴더를 놓을 수 있는 도메인과, 거기서 폴더를 만들 수 있는 사용자 한 명
+  - 도메인 home-1: 이 도메인의 폴더는 local:volume1에 놓을 수 있다
+  - 폴더를 만들 수 있는 사용자 준비
+    - 도메인에 속한 사용자 한 명 준비
+      - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지, 폴더는 local:volume1에 놓을 수 있다
+      - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+    - 역할 folder-owner-1: 이 역할이 앉은 스코프 안에서만 통한다
+    - 역할 folder-owner-1: vfolder 전체에 CREATE 허용
+    - 역할 folder-owner-1: vfolder 전체에 READ 허용
+    - 일반 사용자 user-1: 역할 folder-owner-1 보유
+
+When
+
+- VFolderAdapter.create — user-1이 work이라는 폴더를 만듦
+
+Then
+
+- 만든 폴더 전체가 오고, 소유는 만든 사람에게 있다
+  - host = 'local:volume1'
+  - metadata.name = 'work'
+  - metadata.cloneable = False
+  - metadata.last_used = None
+  - access_control.ownership_type = 'user'
+  - ownership.user_id: 만든 사람와 같다
+  - ownership.project_id: 무시함 — 개인 폴더는 그 사람의 개인 프로젝트에 붙는다. 그 id는 사용자를 만들 때 생긴다
+  - ownership.creator_id: 만든 사람와 같다
+  - ownership.creator_email = 'user-1@scenario.local'
+  - unmanaged_path = None
+  - id: 무시함 — 데이터베이스가 만든다
+  - status: 무시함 — 폴더가 만들어지는 동안 오가는 값이다
+  - metadata.usage_mode: 무시함 — 타입이 이미 값을 못박는다
+  - metadata.quota_scope_id: 무시함 — 저장소가 정한다
+  - access_control.permission: 무시함 — 만든 사람에게는 물어볼 것이 없다
+  - quota: 무시함 — 저장소가 답하는 값이라 여기서 말할 수 없다
+  - metadata.created_at: 이 실행이 쓴 시각
+
+<a id="vfolder-a-user-granted-nothing-may-not-make-a-folder"></a>
+
+#### [a-user-granted-nothing-may-not-make-a-folder](/tests/scenario/bai_scenario/manager/vfolder/test_vfolder.py) — pass
+
+아무 권한도 받지 않은 사용자가 폴더를 만들려 하면 권한 부족으로 거부된다
+
+Given
+
+- 폴더를 놓을 수 있는 도메인과, 아무 권한도 받지 않은 사용자 한 명
+  - 도메인 home-1: 이 도메인의 폴더는 local:volume1에 놓을 수 있다
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지, 폴더는 local:volume1에 놓을 수 있다
+    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+
+When
+
+- VFolderAdapter.create — user-1이 denied이라는 폴더를 만듦
+
+Then
+
+- 거부된다
+  - 거부: NotEnoughPermission
+
+### get
+
+<a id="reaching-a-user-granted-folder-read-reads-their-own-folder"></a>
+
 #### [a-user-granted-folder-read-reads-their-own-folder](/tests/scenario/bai_scenario/manager/vfolder/test_reaching.py) — pass
 
 자기 개인 프로젝트에서 폴더 읽기 권한을 받은 사용자가 자기 폴더를 읽으면, 그 폴더가 온다
@@ -373,54 +597,7 @@ Then
   - quota: 무시함 — 저장소가 답하는 값이라 여기서 말할 수 없다
   - metadata.created_at: 이 실행이 쓴 시각
 
-#### [a-user-granted-nothing-may-not-list-a-projects-folders](/tests/scenario/bai_scenario/manager/vfolder/test_reaching.py) — pass
-
-아무 권한도 받지 않은 사용자가 프로젝트의 폴더를 조회하려 하면 권한 부족으로 거부된다
-
-Given
-
-- 폴더 하나를 가진 프로젝트와, 아무 권한도 받지 않은 사용자 한 명
-  - 도메인 home-1: 이 도메인의 폴더는 local:volume1에 놓을 수 있다
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지, 폴더는 local:volume1에 놓을 수 있다
-    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-  - 프로젝트 project-1
-  - 프로젝트 폴더 folder-1: 프로젝트에 놓이고, 쓸 수 있는 상태다
-
-When
-
-- VFolderAdapter.project_search — user-1이 folder-1 폴더가 놓인 프로젝트의 폴더를 조회
-
-Then
-
-- 거부된다
-  - 거부: NotEnoughPermission
-
-#### [a-user-granted-nothing-may-not-read-their-own-folder](/tests/scenario/bai_scenario/manager/vfolder/test_reaching.py) — pass
-
-아무 권한도 받지 않은 사용자가 자기 폴더를 읽으려 하면 권한 부족으로 거부된다
-
-Given
-
-- 자기 개인 폴더 하나를 가진, 아무 권한도 받지 않은 사용자 한 명
-  - 도메인 home-1: 이 도메인의 폴더는 local:volume1에 놓을 수 있다
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지, 폴더는 local:volume1에 놓을 수 있다
-    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-  - 개인 폴더 folder-1: 그 사람의 개인 프로젝트에 놓이고, 쓸 수 있는 상태다
-
-When
-
-- VFolderAdapter.get — user-1이 folder-1 폴더를 읽음
-
-Then
-
-- 거부된다
-  - 거부: NotEnoughPermission
+<a id="reaching-an-accepted-share-reads-someone-elses-folder"></a>
 
 #### [an-accepted-share-reads-someone-elses-folder](/tests/scenario/bai_scenario/manager/vfolder/test_reaching.py) — pass
 
@@ -471,6 +648,34 @@ Then
   - quota: 무시함 — 저장소가 답하는 값이라 여기서 말할 수 없다
   - metadata.created_at: 이 실행이 쓴 시각
 
+<a id="reaching-a-user-granted-nothing-may-not-read-their-own-folder"></a>
+
+#### [a-user-granted-nothing-may-not-read-their-own-folder](/tests/scenario/bai_scenario/manager/vfolder/test_reaching.py) — pass
+
+아무 권한도 받지 않은 사용자가 자기 폴더를 읽으려 하면 권한 부족으로 거부된다
+
+Given
+
+- 자기 개인 폴더 하나를 가진, 아무 권한도 받지 않은 사용자 한 명
+  - 도메인 home-1: 이 도메인의 폴더는 local:volume1에 놓을 수 있다
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지, 폴더는 local:volume1에 놓을 수 있다
+    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+  - 개인 폴더 folder-1: 그 사람의 개인 프로젝트에 놓이고, 쓸 수 있는 상태다
+
+When
+
+- VFolderAdapter.get — user-1이 folder-1 폴더를 읽음
+
+Then
+
+- 거부된다
+  - 거부: NotEnoughPermission
+
+<a id="reaching-an-unanswered-offer-may-not-read-someone-elses-folder"></a>
+
 #### [an-unanswered-offer-may-not-read-someone-elses-folder](/tests/scenario/bai_scenario/manager/vfolder/test_reaching.py) — pass
 
 남의 폴더를 공유 제안만 받고 받아들이지 않은 사용자가 그 폴더를 읽으려 하면 권한 부족으로 거부된다
@@ -502,104 +707,4 @@ Then
 
 - 거부된다
   - 거부: NotEnoughPermission
-
-### vfolder
-
-#### [a-user-granted-folder-create-makes-one-of-their-own](/tests/scenario/bai_scenario/manager/vfolder/test_vfolder.py) — pass
-
-자기 스코프에서 폴더 생성 권한을 받은 사용자가 폴더를 만들면, 그 폴더의 소유는 그 사용자에게 있다
-
-Given
-
-- 폴더를 놓을 수 있는 도메인과, 거기서 폴더를 만들 수 있는 사용자 한 명
-  - 도메인 home-1: 이 도메인의 폴더는 local:volume1에 놓을 수 있다
-  - 폴더를 만들 수 있는 사용자 준비
-    - 도메인에 속한 사용자 한 명 준비
-      - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지, 폴더는 local:volume1에 놓을 수 있다
-      - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-    - 역할 folder-owner-1: 이 역할이 앉은 스코프 안에서만 통한다
-    - 역할 folder-owner-1: vfolder 전체에 CREATE 허용
-    - 역할 folder-owner-1: vfolder 전체에 READ 허용
-    - 일반 사용자 user-1: 역할 folder-owner-1 보유
-
-When
-
-- VFolderAdapter.create — user-1이 work이라는 폴더를 만듦
-
-Then
-
-- 만든 폴더 전체가 오고, 소유는 만든 사람에게 있다
-  - host = 'local:volume1'
-  - metadata.name = 'work'
-  - metadata.cloneable = False
-  - metadata.last_used = None
-  - access_control.ownership_type = 'user'
-  - ownership.user_id: 만든 사람와 같다
-  - ownership.project_id: 무시함 — 개인 폴더는 그 사람의 개인 프로젝트에 붙는다. 그 id는 사용자를 만들 때 생긴다
-  - ownership.creator_id: 만든 사람와 같다
-  - ownership.creator_email = 'user-1@scenario.local'
-  - unmanaged_path = None
-  - id: 무시함 — 데이터베이스가 만든다
-  - status: 무시함 — 폴더가 만들어지는 동안 오가는 값이다
-  - metadata.usage_mode: 무시함 — 타입이 이미 값을 못박는다
-  - metadata.quota_scope_id: 무시함 — 저장소가 정한다
-  - access_control.permission: 무시함 — 만든 사람에게는 물어볼 것이 없다
-  - quota: 무시함 — 저장소가 답하는 값이라 여기서 말할 수 없다
-  - metadata.created_at: 이 실행이 쓴 시각
-
-#### [a-user-granted-nothing-may-not-make-a-folder](/tests/scenario/bai_scenario/manager/vfolder/test_vfolder.py) — pass
-
-아무 권한도 받지 않은 사용자가 폴더를 만들려 하면 권한 부족으로 거부된다
-
-Given
-
-- 폴더를 놓을 수 있는 도메인과, 아무 권한도 받지 않은 사용자 한 명
-  - 도메인 home-1: 이 도메인의 폴더는 local:volume1에 놓을 수 있다
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지, 폴더는 local:volume1에 놓을 수 있다
-    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-
-When
-
-- VFolderAdapter.create — user-1이 denied이라는 폴더를 만듦
-
-Then
-
-- 거부된다
-  - 거부: NotEnoughPermission
-
-#### [a-user-who-has-made-no-folder-lists-none](/tests/scenario/bai_scenario/manager/vfolder/test_vfolder.py) — pass
-
-폴더를 하나도 만들지 않은 사용자가 자기 폴더를 조회하면, 답은 비어 있다
-
-Given
-
-- 폴더를 놓을 수 있는 도메인과, 거기서 폴더를 만들 수 있는 사용자 한 명
-  - 도메인 home-1: 이 도메인의 폴더는 local:volume1에 놓을 수 있다
-  - 폴더를 만들 수 있는 사용자 준비
-    - 도메인에 속한 사용자 한 명 준비
-      - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지, 폴더는 local:volume1에 놓을 수 있다
-      - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-    - 역할 folder-owner-1: 이 역할이 앉은 스코프 안에서만 통한다
-    - 역할 folder-owner-1: vfolder 전체에 CREATE 허용
-    - 역할 folder-owner-1: vfolder 전체에 READ 허용
-    - 일반 사용자 user-1: 역할 folder-owner-1 보유
-
-When
-
-- VFolderAdapter.my_search — user-1이 자기 폴더를 조회
-
-Then
-
-- 답이 비어 있다
-  - items = []
-  - total_count = 0
-  - has_next_page = False
-  - has_previous_page = False
 

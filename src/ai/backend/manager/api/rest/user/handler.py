@@ -109,7 +109,7 @@ class UserHandler:
         )
 
         domain_id = (
-            await self._domain.lookup.run(
+            await self._domain.lookup_name.run(
                 LookupDomainAction(name=DomainName(body.parsed.domain_name))
             )
         ).entity_id()

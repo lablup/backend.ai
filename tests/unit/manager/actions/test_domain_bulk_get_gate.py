@@ -248,7 +248,7 @@ async def test_a_member_reads_their_own_domain(
     domains: _Domains,
 ) -> None:
     with with_user_context(_member(domains)):
-        result = await processors.bulk_get.run(
+        result = await processors.bulk_get_ids.run(
             BulkGetDomainsAction(ids=[domains.own, domains.other])
         )
 
@@ -261,7 +261,7 @@ async def test_a_member_is_denied_a_domain_they_hold_no_role_in(
     domains: _Domains,
 ) -> None:
     with with_user_context(_member(domains)):
-        result = await processors.bulk_get.run(
+        result = await processors.bulk_get_ids.run(
             BulkGetDomainsAction(ids=[domains.own, domains.other])
         )
 

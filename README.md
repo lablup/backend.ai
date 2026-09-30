@@ -36,6 +36,20 @@ Requirements
 | Docker | 20.10+ | The nvidia runtime registered with the daemon (`nvidia-ctk runtime configure --runtime=docker`) |
 | Podman | 5.4.0+ | A CDI spec for the accelerator under `/etc/cdi` or `/var/run/cdi` (`nvidia-ctk cdi generate` for NVIDIA GPUs) |
 
+**Distributions packaging Podman 5.4.0+**:
+
+| OS | Minimum version | Packaged Podman |
+|---|---|---|
+| RHEL | 9.x | 5.4.0+ (older minors, e.g. under EUS, may ship older Podman; check the version the OS repo offers) |
+| Rocky Linux | 9.6 | 5.4.0 |
+| AlmaLinux | 9.6 | 5.4.0 |
+| Oracle Linux | 9.6 | 5.4.0 |
+| CentOS Stream | 9 | 5.8.5 |
+| Ubuntu | 26.04 LTS | 5.7.0 |
+| Debian | 13 | 5.4.2 |
+
+- Ubuntu 24.04 LTS packages Podman 4.9.3 and Debian 12 packages 4.3.1, both below the floor; use Docker there.
+
 **Required**:
 - Docker Compose v2
 - PostgreSQL 16+ (tested with 16.3)

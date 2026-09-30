@@ -57,7 +57,9 @@ class DomainConfigHandler:
         ctx: UserContext,
     ) -> APIResponse:
         params = body.parsed
-        target = await self._domain.lookup.run(LookupDomainAction(name=DomainName(params.domain)))
+        target = await self._domain.lookup_name.run(
+            LookupDomainAction(name=DomainName(params.domain))
+        )
         await self._domain.create_dotfile.run(
             CreateDomainDotfileAction(
                 domain_id=target.entity_id(),
@@ -73,7 +75,9 @@ class DomainConfigHandler:
         ctx: UserContext,
     ) -> APIResponse:
         params = query.parsed
-        resolved = await self._domain.lookup.run(LookupDomainAction(name=DomainName(params.domain)))
+        resolved = await self._domain.lookup_name.run(
+            LookupDomainAction(name=DomainName(params.domain))
+        )
         target = await self._domain.get.run(GetDomainAction(domain_id=resolved.entity_id()))
         entries = DotfileEntries.unpack(target.data.dotfiles)
         if params.path:
@@ -93,7 +97,9 @@ class DomainConfigHandler:
         ctx: UserContext,
     ) -> APIResponse:
         params = body.parsed
-        target = await self._domain.lookup.run(LookupDomainAction(name=DomainName(params.domain)))
+        target = await self._domain.lookup_name.run(
+            LookupDomainAction(name=DomainName(params.domain))
+        )
         await self._domain.update_dotfile.run(
             UpdateDomainDotfileAction(
                 domain_id=target.entity_id(),
@@ -109,7 +115,9 @@ class DomainConfigHandler:
         ctx: UserContext,
     ) -> APIResponse:
         params = query.parsed
-        target = await self._domain.lookup.run(LookupDomainAction(name=DomainName(params.domain)))
+        target = await self._domain.lookup_name.run(
+            LookupDomainAction(name=DomainName(params.domain))
+        )
         await self._domain.delete_dotfile.run(
             DeleteDomainDotfileAction(
                 domain_id=target.entity_id(), name=params.domain, path=params.path

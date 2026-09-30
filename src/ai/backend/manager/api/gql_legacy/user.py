@@ -1105,7 +1105,7 @@ class CreateUser(graphene.Mutation):  # type: ignore[misc]
 
         graph_ctx: GraphQueryContext = info.context
         domain_id = (
-            await graph_ctx.processors.domain.lookup.run(
+            await graph_ctx.processors.domain.lookup_name.run(
                 LookupDomainAction(name=DomainName(str(props.domain_name)))
             )
         ).entity_id()

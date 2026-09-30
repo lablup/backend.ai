@@ -18,8 +18,11 @@ from ai.backend.common.dto.manager.v2.group.request import (
     UnassignUsersFromProjectInput,
     UpdateProjectInput,
 )
+from ai.backend.common.dto.manager.v2.group.types import ProjectScope
+from ai.backend.common.dto.manager.v2.rbac.types import UUIDScope
 from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.api.rest.v2.path_params import ProjectIdPathParam
+from ai.backend.manager.dto.context import UserContext
 
 if TYPE_CHECKING:
     from ai.backend.manager.api.adapters.project.adapter import ProjectAdapter
@@ -47,6 +50,27 @@ class V2ProjectHandler:
     ) -> APIResponse:
         """Search projects with filters, orders, and pagination (superadmin only)."""
         result = await self._adapter.admin_search(body.parsed)
+        return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
+
+    async def my_search(
+        self,
+        user_ctx: UserContext,
+        body: BodyParam[AdminSearchProjectsInput],
+    ) -> APIResponse:
+        """Search the projects the current user is a member of."""
+        result = await self._adapter.scoped_search(
+            ScopedSearchProjectsInput(
+                scope=ProjectScope(user=[UUIDScope(value=user_ctx.user_uuid)]),
+                filter=body.parsed.filter,
+                order=body.parsed.order,
+                first=body.parsed.first,
+                after=body.parsed.after,
+                last=body.parsed.last,
+                before=body.parsed.before,
+                limit=body.parsed.limit,
+                offset=body.parsed.offset,
+            )
+        )
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
 
     async def scoped_search(

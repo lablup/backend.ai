@@ -20,7 +20,6 @@ from ai.backend.common.config import (
     ModelDefinition,
     ModelServiceConfig,
 )
-from ai.backend.common.contexts.user import current_user
 from ai.backend.common.data.endpoint.types import EndpointLifecycle
 from ai.backend.common.data.entity.auto_scaling_rule import AutoScalingRuleID
 from ai.backend.common.data.entity.deployment import DeploymentID
@@ -796,30 +795,6 @@ class DeploymentAdapter(BaseAdapter):
                     scopes=self._scope_targets(input.scope),
                     used_by=self._usage(input.usage),
                     searcher=self._build_scoped_deployment_searcher(input),
-                )
-            )
-        )
-        return AdminSearchDeploymentsPayload(
-            items=[self._deployment_data_to_dto(item) for item in action_result.items],
-            total_count=action_result.total_count,
-            has_next_page=action_result.has_next_page,
-            has_previous_page=action_result.has_previous_page,
-        )
-
-    async def my_search(
-        self,
-        input: AdminSearchDeploymentsInput,
-    ) -> AdminSearchDeploymentsPayload:
-        """Search deployments created by the current user."""
-        user = current_user()
-        if user is None:
-            raise RuntimeError("No authenticated user in context")
-        action_result = await self._deployment.scoped_search.run(
-            ScopedSearchDeploymentsAction(
-                searcher=ScopedSearcher(
-                    scopes=[UserDeploymentTarget(user_id=UserID(user.user_id))],
-                    used_by=self._usage(input.usage),
-                    searcher=self._build_deployment_searcher(input),
                 )
             )
         )

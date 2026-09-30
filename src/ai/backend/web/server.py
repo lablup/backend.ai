@@ -62,6 +62,10 @@ from ai.backend.common.dto.manager.auth.types import (
     RequireTwoFactorAuthResponse,
     RequireTwoFactorRegistrationResponse,
 )
+from ai.backend.common.endpoint_pool.exceptions import NoHealthyEndpointError
+from ai.backend.common.endpoint_pool.pool import HealthyEndpointPool
+from ai.backend.common.endpoint_pool.strategy import build_endpoint_selection_strategy
+from ai.backend.common.endpoint_pool.types import AcquiredEndpoint, EndpointPoolSpec
 from ai.backend.common.exception import MalformedRequestBody
 from ai.backend.common.health_checker.checkers.valkey import ValkeyHealthChecker
 from ai.backend.common.health_checker.probe import HealthProbe, HealthProbeOptions
@@ -86,17 +90,12 @@ from ai.backend.web.clients.apollo_router_pool import (
     ApolloRouterEndpointsHealthChecker,
     ApolloRouterPoolGateHealthChecker,
 )
-from ai.backend.web.clients.endpoint_pool import (
-    AcquiredEndpoint,
-    EndpointPoolSpec,
-    HealthyEndpointPool,
-    build_endpoint_selection_strategy,
-)
 from ai.backend.web.clients.manager_pool import (
     ManagerEndpointsHealthChecker,
     ManagerPoolGateHealthChecker,
 )
 from ai.backend.web.config.unified import EventLoopType, ServiceMode, WebServerUnifiedConfig
+from ai.backend.web.errors import ManagerConnectionUnavailable
 from ai.backend.web.ratelimit import manager_proxy_rate_limited
 from ai.backend.web.security import SecurityPolicy, csp_nonce_var, security_policy_middleware
 
@@ -282,6 +281,8 @@ async def update_password_no_auth(request: web.Request) -> web.Response:
             creds["username"],
             client_ip,
         )
+    except NoHealthyEndpointError as e:
+        raise ManagerConnectionUnavailable(extra_msg=e.extra_msg) from e
     except BackendClientError as e:
         # This is error, not failed login, so we should not update login history.
         raise ProxyTargetUnreachableError(str(e)) from e
@@ -297,6 +298,7 @@ async def update_password_no_auth(request: web.Request) -> web.Response:
             "title": e.data.get("title"),
             "details": e.data.get("msg"),
         }
+        return web.json_response(result, status=e.status)
     return web.json_response(result)
 
 
@@ -530,6 +532,8 @@ async def login_handler(request: web.Request) -> web.Response:
                 raise UnexpectedAuthResponseError(
                     f"Unexpected auth result type: {type(auth_result)}"
                 )
+    except NoHealthyEndpointError as e:
+        raise ManagerConnectionUnavailable(extra_msg=e.extra_msg) from e
     except BackendClientError as e:
         # This is error, not failed login, so we should not update login history.
         raise ProxyTargetUnreachableError(str(e)) from e
@@ -748,6 +752,8 @@ async def token_login_handler(request: web.Request) -> web.Response:
         session["token"] = stored_token  # store full token
         result["authenticated"] = True
         result["data"] = public_return  # store public info from token
+    except NoHealthyEndpointError as e:
+        raise ManagerConnectionUnavailable(extra_msg=e.extra_msg) from e
     except BackendClientError as e:
         raise ProxyTargetUnreachableError(str(e)) from e
     except BackendAPIError as e:

@@ -134,7 +134,9 @@ class ProjectAdapter(BaseAdapter):
         self._user = user
 
     async def _resolve_domain_id(self, domain_name: str) -> DomainID:
-        result = await self._domain.lookup.run(LookupDomainAction(name=DomainName(domain_name)))
+        result = await self._domain.lookup_name.run(
+            LookupDomainAction(name=DomainName(domain_name))
+        )
         return result.entity_id()
 
     # ------------------------------------------------------------------ batch load (DataLoader)
