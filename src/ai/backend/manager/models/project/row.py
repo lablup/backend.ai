@@ -209,11 +209,20 @@ class ProjectRow(LifecycleTimestampsMixin, Base):
     )
 
     # Relationships (defined with deferred join conditions to avoid circular imports)
+    # Only ResourceGroupPermissionContextBuilder in resource_group/row.py (legacy RBAC)
+    # reads this. Delete it together with the legacy RBAC cleanup.
     sgroup_for_groups_rows: Mapped[list[ResourceGroupForProjectRow]] = relationship(
         "ResourceGroupForProjectRow"
     )
+    # Only the role lookup functions in models/rbac/__init__.py read this, and their
+    # callers are the legacy RBAC builders. Delete it with the legacy RBAC cleanup.
     users: Mapped[list[AssocGroupUserRow]] = relationship("AssocGroupUserRow")
+    # Read by gql_legacy (network.py, resource_policy.py, vfolder.py) and ProjectRow.get.
+    # v2 (the vfolder repository) joins ProjectResourcePolicyRow directly from F-1 on.
+    # Delete it with the gql_legacy cleanup.
     resource_policy_row: Mapped[ProjectResourcePolicyRow] = relationship("ProjectResourcePolicyRow")
+    # Only ProjectPermissionContext in this file (legacy RBAC) reads this. Delete it
+    # together with the legacy RBAC cleanup.
     association_container_registries_groups_rows: Mapped[
         list[AssociationContainerRegistriesGroupsRow]
     ] = relationship(
@@ -229,6 +238,8 @@ class ProjectRow(LifecycleTimestampsMixin, Base):
     def scope_name_expr(cls) -> SQLColumnExpression[str]:
         return cls.name
 
+    # Only CreateNetwork in gql_legacy's network.py calls this. Delete it together
+    # with the gql_legacy cleanup.
     @classmethod
     async def get(
         cls,
