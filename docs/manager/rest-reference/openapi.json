@@ -19024,6 +19024,18 @@
       "RolePresetFilter": {
         "description": "Filter criteria for searching role presets.",
         "properties": {
+          "id": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/UUIDFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter by role preset ID."
+          },
           "name": {
             "anyOf": [
               {

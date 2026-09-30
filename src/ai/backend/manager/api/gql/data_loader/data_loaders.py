@@ -56,6 +56,7 @@ from ai.backend.common.data.entity.prometheus_query_preset_category import (
 from ai.backend.common.data.entity.replica import ReplicaID
 from ai.backend.common.data.entity.resource_group import ResourceGroupEntityType, ResourceGroupID
 from ai.backend.common.data.entity.role import RoleEntityType, RoleID
+from ai.backend.common.data.entity.role_preset import RolePresetID
 from ai.backend.common.data.entity.route_history import RouteHistoryID
 from ai.backend.common.data.entity.runtime_variant import RuntimeVariantEntityType, RuntimeVariantID
 from ai.backend.common.data.entity.runtime_variant_preset import (
@@ -161,6 +162,9 @@ if TYPE_CHECKING:
     )
     from ai.backend.manager.api.gql.resource_group.types import (  # pants: no-infer-dep
         ResourceGroupGQL,
+    )
+    from ai.backend.manager.api.gql.role_preset.types.node import (  # pants: no-infer-dep
+        RolePresetGQL,
     )
     from ai.backend.manager.api.gql.runtime_variant.types import (  # pants: no-infer-dep
         RuntimeVariantGQL,
@@ -1055,6 +1059,27 @@ class DataLoaders:
 
             dtos = await adapter.batch_load_roles_by_ids(ids)
             return [RG.from_pydantic(dto) if dto is not None else None for dto in dtos]
+
+        return DataLoader(load_fn=load_fn)
+
+    @cached_property
+    def role_preset_loader(
+        self,
+    ) -> DataLoader[RolePresetID, RolePresetGQL | None]:
+        adapter = self._adapters.role_preset
+
+        async def load_fn(
+            ids: list[RolePresetID],
+        ) -> list[RolePresetGQL | Exception | None]:
+            from ai.backend.manager.api.gql.role_preset.types.node import (  # pants: no-infer-dep
+                RolePresetGQL as RP,
+            )
+
+            dtos = await adapter.batch_load_by_ids(ids)
+            return [
+                dto if dto is None or isinstance(dto, Exception) else RP.from_pydantic(dto)
+                for dto in dtos
+            ]
 
         return DataLoader(load_fn=load_fn)
 
