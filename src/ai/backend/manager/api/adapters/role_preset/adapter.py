@@ -6,6 +6,8 @@ into Processor actions and converts the action results back into v2 DTOs.
 
 from __future__ import annotations
 
+from collections.abc import Sequence
+
 from ai.backend.common.data.entity.role import RoleID
 from ai.backend.common.data.entity.role_permission_preset import RolePermissionPresetID
 from ai.backend.common.data.entity.role_preset import RolePresetID
@@ -82,6 +84,7 @@ from ai.backend.manager.models.specs.searcher import GlobalSearcher
 from ai.backend.manager.services.role_preset.actions.bulk_add_permissions import (
     BulkAddRolePermissionPresetsAction,
 )
+from ai.backend.manager.services.role_preset.actions.bulk_get import BulkGetRolePresetsAction
 from ai.backend.manager.services.role_preset.actions.bulk_purge import (
     BulkPurgeRolePresetsAction,
 )
@@ -149,6 +152,24 @@ class RolePresetAdapter(BaseAdapter):
         """Get a single role preset by ID."""
         result = await self._role_preset.get.run(GetRolePresetAction(preset_id=role_preset_id))
         return self._data_to_node(result.data)
+
+    async def batch_load_by_ids(
+        self, ids: Sequence[RolePresetID]
+    ) -> list[RolePresetNode | Exception | None]:
+        """Batch load role presets by id for DataLoader use.
+
+        One answer per id in the given order: the node, ``None`` for an id matching no
+        row, and the denial for one the caller may not read.
+        """
+        if not ids:
+            return []
+        result = await self._role_preset.bulk_get.run(BulkGetRolePresetsAction(ids=ids))
+        return [
+            self._data_to_node(item.value)
+            if item.value is not None
+            else self.batch_load_failure(item.error)
+            for item in result.items
+        ]
 
     def _usage(self, usage: RolePresetUsage | None) -> list[UsedBy]:
         """The uses the request named, each of which the caller must be able to read."""
@@ -355,6 +376,7 @@ class RolePresetAdapter(BaseAdapter):
     def _convert_filter(self, filter_: RolePresetFilter) -> list[QueryCondition]:
         fields = RolePresetSearchableFields.own
         conditions = [
+            *self.apply_uuid_filter(filter_.id, fields.id.filter),
             *self.apply_string_filter(filter_.name, fields.name.filter),
             *self.apply_string_filter(filter_.scope_type, fields.scope_type.filter),
             *self.apply_bool_filter(filter_.auto_assign, fields.auto_assign.filter),
