@@ -22,13 +22,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import (
     Mapped,
     foreign,
-    joinedload,
     load_only,
     mapped_column,
     relationship,
     selectinload,
 )
-from sqlalchemy.orm.strategy_options import _AbstractLoad
 from sqlalchemy.sql.expression import SQLColumnExpression
 
 from ai.backend.common import msgpack
@@ -39,7 +37,6 @@ from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.data.permission.permission_defs import ProjectPermission
 from ai.backend.manager.data.project.types import ProjectStatus, ProjectType
 from ai.backend.manager.defs import RESERVED_DOTFILES
-from ai.backend.manager.errors.resource import ProjectNotFound
 from ai.backend.manager.models.association_container_registries_groups.row import (
     AssociationContainerRegistriesGroupsRow,
 )
@@ -65,12 +62,6 @@ from ai.backend.manager.models.rbac import (
     required_permission,
 )
 from ai.backend.manager.models.rbac.context import ClientContext
-from ai.backend.manager.models.types import (
-    QueryCondition,
-    QueryOption,
-    load_related_field,
-)
-from ai.backend.manager.models.utils import ExtendedAsyncSAEngine, execute_with_txn_retry
 
 if TYPE_CHECKING:
     from ai.backend.manager.models.rbac import ContainerRegistryScope
@@ -261,84 +252,10 @@ class ProjectRow(LifecycleTimestampsMixin, Base):
 
         return row
 
-    @classmethod
-    def load_resource_policy(cls) -> _AbstractLoad:
-        return joinedload(ProjectRow.resource_policy_row)
-
-    @classmethod
-    async def query_by_condition(
-        cls,
-        conditions: Sequence[QueryCondition],
-        options: Sequence[QueryOption] = tuple(),
-        *,
-        db: ExtendedAsyncSAEngine,
-    ) -> Sequence[ProjectRow]:
-        """
-        Args:
-            condition: QueryCondition.
-            options: A sequence of query options.
-            db: Database engine.
-        Returns:
-            A list of ProjectRow instances that match the condition.
-        Raises:
-            EmptySQLCondition: If the condition is empty.
-        """
-        query_stmt = sa.select(ProjectRow)
-        for cond in conditions:
-            query_stmt = cond(query_stmt)
-
-        for option in options:
-            query_stmt = option(query_stmt)
-
-        async def fetch(db_session: AsyncSession) -> Sequence[ProjectRow]:
-            return (await db_session.scalars(query_stmt)).all()
-
-        async with db.connect() as db_conn:
-            return await execute_with_txn_retry(
-                fetch,
-                db.begin_readonly_session,
-                db_conn,
-            )
-
-    @classmethod
-    async def get_by_id_with_policies(
-        cls,
-        project_id: uuid.UUID,
-        *,
-        db: ExtendedAsyncSAEngine,
-    ) -> ProjectRow:
-        """
-        Query a project by its ID with related resource policies.
-        Args:
-            project_id: The ID of the project.
-            db: Database engine.
-        Returns:
-            The ProjectRow instance that matches the project ID.
-        Raises:
-            ProjectNotFound: If the project not found.
-        """
-        rows = await cls.query_by_condition(
-            [by_id(project_id)],
-            [load_related_field(cls.load_resource_policy())],
-            db=db,
-        )
-        if not rows:
-            raise ProjectNotFound(f"Project with id {project_id} not found")
-        return rows[0]
-
 
 # NOTE: Deprecated legacy table reference for backward compatibility.
 # Use ProjectRow class directly for new code.
 groups = ProjectRow.__table__
-
-
-def by_id(project_id: uuid.UUID) -> QueryCondition:
-    def _by_id(
-        query_stmt: sa.sql.Select[Any],
-    ) -> sa.sql.Select[Any]:
-        return query_stmt.where(ProjectRow.id == project_id)
-
-    return _by_id
 
 
 @dataclass
