@@ -6,13 +6,11 @@ import uuid
 from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime
-from pathlib import PurePosixPath
 from typing import (
     Any,
     Final,
     NamedTuple,
     cast,
-    overload,
     override,
 )
 
@@ -34,7 +32,6 @@ from ai.backend.common.types import (
     VFolderHostPermission,
     VFolderHostPermissionMap,
     VFolderID,
-    VFolderMount,
     VFolderMountPolicy,
     VFolderUsageMode,
 )
@@ -572,29 +569,6 @@ async def get_allowed_vfolder_hosts_by_user(
         "allowed_vfolder_hosts", VFolderHostPermissionMap()
     )
     return final_result
-
-
-@overload
-def check_overlapping_mounts(mounts: Iterable[str]) -> None:
-    pass
-
-
-@overload
-def check_overlapping_mounts(mounts: Iterable[PurePosixPath]) -> None:
-    pass
-
-
-def check_overlapping_mounts(mounts: Iterable[str] | Iterable[PurePosixPath]) -> None:
-    for p1 in mounts:
-        for p2 in mounts:
-            _p1 = PurePosixPath(p1)
-            _p2 = PurePosixPath(p2)
-            if _p1 == _p2:
-                continue
-            if _p1.is_relative_to(_p2):
-                raise InvalidAPIParameters(
-                    f"VFolder path '{_p1}' overlaps with '{_p2}'",
-                )
 
 
 async def update_vfolder_status(
@@ -1258,14 +1232,3 @@ async def get_permission_ctx(
         #     ctx, target_scope, host_permission
         # )
         # permission_ctx.apply_host_permission_ctx(host_permission_ctx)
-
-
-def is_mount_duplicate(
-    folder_id: VFolderID, subpath: PurePosixPath, mounts: Iterable[VFolderMount]
-) -> bool:
-    for mount in mounts:
-        if mount.vfid != folder_id:
-            continue
-        if subpath.is_relative_to(mount.vfsubpath) or mount.vfsubpath.is_relative_to(subpath):
-            return True
-    return False
