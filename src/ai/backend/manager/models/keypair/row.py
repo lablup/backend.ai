@@ -17,9 +17,9 @@ from sqlalchemy.sql.expression import false
 from ai.backend.common import msgpack
 from ai.backend.common.data.entity.keypair import KeyPairID
 from ai.backend.common.data.entity.user import UserID
+from ai.backend.common.defs import RESERVED_DOTFILES
 from ai.backend.common.types import AccessKey, SecretKey
 from ai.backend.manager.data.keypair.types import KeyPairSecrets
-from ai.backend.manager.defs import RESERVED_DOTFILES
 from ai.backend.manager.models.base import (
     GUID,
     Base,

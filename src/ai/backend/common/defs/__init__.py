@@ -28,6 +28,13 @@ class RedisRole(StrEnum):
 
 DEFAULT_FILE_IO_TIMEOUT: Final = 10
 
+RESERVED_DOTFILES = [".terminfo", ".jupyter", ".ssh", ".ssh/authorized_keys", ".local", ".config"]
+
+
+def verify_dotfile_name(dotfile: str) -> bool:
+    return dotfile not in RESERVED_DOTFILES
+
+
 _RESERVED_VFOLDER_PATTERNS = [r"^\.[a-z0-9]+rc$", r"^\.[a-z0-9]+_profile$"]
 RESERVED_VFOLDERS = [
     ".terminfo",
