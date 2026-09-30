@@ -599,7 +599,9 @@ class ResourceSlotAdapter(BaseAdapter):
 
     async def get_domain_resource_overview(self, domain_name: str) -> ActiveResourceOverviewInfoDTO:
         """Retrieve active resource occupancy overview for a domain."""
-        domain = await self._domain.lookup.run(LookupDomainAction(name=DomainName(domain_name)))
+        domain = await self._domain.lookup_name.run(
+            LookupDomainAction(name=DomainName(domain_name))
+        )
         action_result = await self._resource_slot.get_domain_resource_overview.run(
             GetDomainResourceOverviewAction(domain_id=domain.entity_id(), domain_name=domain_name)
         )

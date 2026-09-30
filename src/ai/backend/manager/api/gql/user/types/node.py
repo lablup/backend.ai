@@ -214,8 +214,13 @@ class UserV2GQL(PydanticNodeMixin[UserNode]):
     ):
         if self.organization.domain_name is None:
             return None
-        domain: DomainV2GQL | None = await info.context.data_loaders.domain_loader.load(
+        domain_id = await info.context.data_loaders.domain_id_by_name_loader.load(
             self.organization.domain_name
+        )
+        if domain_id is None:
+            return None
+        domain: DomainV2GQL | None = await info.context.data_loaders.domain_by_id_loader.load(
+            domain_id
         )
         return domain
 

@@ -29,6 +29,30 @@ scope permission check runs on the same path as the scoped search. This keeps ea
 A `my_` operation with no matching scoped search still takes the user context from `current_user()` inside the adapter
 and builds the `OperationScope` there.
 
+## 연산 이름을 하나로 맞추는 이유
+
+같은 동작이 adapter, processor, service에서 다른 이름이면 호출 경로를 따라갈 때마다 대응표가
+필요하다. 이름이 같으면 한 번의 검색으로 세 층이 모두 나온다.
+
+`admin_`은 게이트를 이름에 적은 것이다. 게이트는 Action의 모양(전역, 스코프, 단일 엔티티)이
+이미 말하므로 이름에 다시 적으면 둘이 어긋날 수 있다. `node`는 GQL 타입 이름이 아래 층으로
+스며든 것이다.
+
+REST 경로와 핸들러 이름, GQL 필드 이름은 공개 계약이라 이 규칙과 무관하게 그대로 둔다. REST
+핸들러 이름은 OpenAPI의 operationId가 된다.
+
+## 다른 엔티티의 processor를 받지 않는 이유
+
+도메인 adapter가 리소스 그룹 processor로 리소스 그룹 이름을 풀던 때, 두 엔티티의 adapter가
+서로의 processor를 들고 있었다. GQL resolver가 리소스 그룹 adapter의 `lookup_name`을 먼저 부르고 id를
+넘기면 도메인 adapter는 자기 processor 하나만 받는다. 이름 해석의 권한 판단도 한 곳에 남는다.
+`lookup_name`은 인증만 보고, 권한은 id를 받은 연산이 본다.
+
+REST handler와 GQL resolver가 만들어 adapter에 넘기던 `UserInfo`는 Action이 쓰지 않았다.
+validator가 요청 문맥의 `current_user()`로 권한을 판단하므로 같은 정보가 두 곳에 있었다.
+
+도메인이 이 규칙을 처음 따랐다. 다른 엔티티는 같은 에픽의 후속 작업이 옮긴다.
+
 ## Why `entity_id` / `field_id` sit beside `id`
 
 The GQL `id` is a Relay global id: the type name and the row key base64-encoded into one

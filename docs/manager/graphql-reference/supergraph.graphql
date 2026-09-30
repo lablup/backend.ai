@@ -4395,7 +4395,9 @@ input CreateDomainInput
   integrationName: String = null
 }
 
-"""Added in 24.12.0."""
+"""
+Added in 24.12.0. Creates the domain, then links the given scaling groups in a separate step. If linking fails, the domain remains without them.
+"""
 type CreateDomainNode
   @join__type(graph: GRAPHENE)
 {
@@ -12872,7 +12874,9 @@ input ModifyDomainInput
   integration_id: String
 }
 
-"""Added in 24.12.0."""
+"""
+Added in 24.12.0. Updates the domain, then adds and removes the given scaling groups in separate steps. If linking fails, the domain update remains.
+"""
 type ModifyDomainNode
   @join__type(graph: GRAPHENE)
 {

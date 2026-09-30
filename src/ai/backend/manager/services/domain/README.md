@@ -2,7 +2,7 @@
 
 ## Service Overview
 
-The Domain Service manages domain resources in Backend.AI. It provides comprehensive functionality to create, modify, delete, and purge domains, as well as manage domain nodes with permissions and scaling group associations. Domains represent organizational units that group users, projects, and resources together.
+The Domain Service manages domain resources in Backend.AI. It provides comprehensive functionality to create, modify, delete, and purge domains, Domains represent organizational units that group users, projects, and resources together.
 
 ## Key Features and Capabilities
 
@@ -10,7 +10,6 @@ The Domain Service manages domain resources in Backend.AI. It provides comprehen
 - **Modify Domain**: Update existing domain configurations and resource allocations
 - **Delete Domain**: Soft-delete domains while preserving data relationships
 - **Purge Domain**: Permanently remove domains and all associated data
-- **Domain Node Management**: Create and modify domain nodes with scaling group permissions
 - **Role-Based Access Control**: Differentiate between superadmin and regular user operations
 - **Resource Management**: Control various domain aspects including:
   - Total resource slots (CPU, memory, GPU)
@@ -57,14 +56,6 @@ The purge process:
 4. Cleans up related resources and relationships
 5. Returns success/failure status
 
-### Domain Node Operations
-
-Domain nodes provide extended functionality:
-- **Create Domain Node**: Creates domain with permissions and scaling group associations
-- **Modify Domain Node**: Updates domain node configurations and scaling group memberships
-- Supports adding/removing scaling groups
-- Validates scaling group permission conflicts
-
 ## API Usage Examples
 
 ### Creating a Domain
@@ -86,7 +77,7 @@ action = CreateDomainAction(
     ),
 )
 
-result = await processors.domain.create_domain.run(action)
+result = await processors.domain.create.run(action)
 ```
 
 The action writes the domain row, its preset roles, and the model-store project the
@@ -137,44 +128,6 @@ action = PurgeDomainAction(
 result = await domain_service.purge_domain(action)
 ```
 
-### Creating a Domain Node
-
-```python
-from ai.backend.manager.services.domain.actions.create_domain_node import CreateDomainNodeAction
-
-action = CreateDomainNodeAction(
-    creator=DomainCreator(
-        name="compute-cluster",
-        description="High-performance compute cluster",
-        total_resource_slots=ResourceSlot({"cpu": 500, "mem": "1000g", "cuda.device": 16})
-    ),
-    user_info=user_info,
-    scaling_groups={"gpu-cluster", "cpu-cluster"}
-)
-
-result = await domain_service.create_domain_node(action)
-```
-
-### Modifying Domain Node
-
-```python
-from ai.backend.manager.services.domain.actions.modify_domain_node import ModifyDomainNodeAction
-from ai.backend.manager.services.domain.types import DomainNodeModifier
-
-action = ModifyDomainNodeAction(
-    name="compute-cluster",
-    modifier=DomainNodeModifier(
-        description=TriState.update("Updated compute cluster configuration"),
-        total_resource_slots=TriState.update(ResourceSlot({"cpu": 750, "mem": "1500g"}))
-    ),
-    user_info=user_info,
-    sgroups_to_add={"new-gpu-cluster"},
-    sgroups_to_remove={"old-cpu-cluster"}
-)
-
-result = await domain_service.modify_domain_node(action)
-```
-
 ## Integration Points
 
 ### Repository Layer
@@ -220,15 +173,6 @@ The service follows the action-based pattern with comprehensive operations:
    - Permanently removes domain data
    - Returns `PurgeDomainActionResult` with purge status
 
-5. **CreateDomainNodeAction** (src/ai/backend/manager/services/domain/actions/create_domain_node.py)
-   - Creates domain with scaling group associations
-   - Returns `CreateDomainNodeActionResult` with node data
-
-6. **ModifyDomainNodeAction** (src/ai/backend/manager/services/domain/actions/modify_domain_node.py)
-   - Updates domain node configurations
-   - Manages scaling group memberships
-   - Returns `ModifyDomainNodeActionResult` with updated data
-
 ## Error Handling
 
 The service implements comprehensive error handling:
@@ -237,18 +181,12 @@ The service implements comprehensive error handling:
 - **Exception Handling**: All operations wrapped in try-catch blocks
 - **Success/Failure Results**: Each action returns success status with description
 - **Permission Validation**: Role-based access control enforcement
-- **Input Validation**: Scaling group conflict detection
 
 ### Repository Layer
 - **IntegrityError**: Raised for database constraint violations
 - **ValidationError**: Raised for permission or data validation failures
 - **NotFoundError**: Raised when domain lookup fails
 - **Transaction Failures**: Proper rollback on errors
-
-### Domain Node Specific
-- **Scaling Group Conflicts**: Validation prevents adding and removing same groups
-- **Permission Conflicts**: Ensures consistent scaling group permissions
-- **Resource Validation**: Validates resource slot allocations
 
 ## Best Practices
 
@@ -301,6 +239,5 @@ The service implements comprehensive error handling:
 - Domain creation with various configurations
 - Partial updates using modifiers
 - Soft deletion and purge operations
-- Domain node creation with scaling groups
 - Permission validation across user roles
 - Error handling and rollback scenarios

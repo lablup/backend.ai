@@ -1,10 +1,9 @@
 """The wiring-time spec catalog vs the v2 actions defined in the import closure.
 
-Constructing a v2-wired package accumulates every wired spec on its registry, and
-recursing ``__subclasses__()`` from the five v2 action bases finds every concrete
-v2 action class defined. The two sets matching is what catches an action that was
-defined but never wired. A new v2 wiring extends this guard by being imported and
-constructed here.
+The production assembly (``create_processors``) accumulates every wired spec on its
+registry, and recursing ``__subclasses__()`` from the five v2 action bases finds every
+concrete v2 action class defined. The two sets matching is what catches an action that
+was defined but never wired.
 
 The same sweep also holds every action to the audit identity contract: the
 ``(entity_type, operation, action_name)`` triple must be unique and the name must
@@ -20,10 +19,6 @@ from typing import Any
 from unittest.mock import MagicMock
 
 from ai.backend.common.data.entity.agent import AgentEntityType
-from ai.backend.common.data.entity.app_config import AppConfigEntityType
-from ai.backend.common.data.entity.app_config_allow_list import AppConfigAllowListEntityType
-from ai.backend.common.data.entity.app_config_definition import AppConfigDefinitionEntityType
-from ai.backend.common.data.entity.app_config_fragment import AppConfigFragmentEntityType
 from ai.backend.common.data.entity.artifact import ArtifactEntityType
 from ai.backend.common.data.entity.artifact_registry import ArtifactRegistryEntityType
 from ai.backend.common.data.entity.artifact_revision import ArtifactRevisionFieldType
@@ -33,48 +28,18 @@ from ai.backend.common.data.entity.deployment import DeploymentEntityType
 from ai.backend.common.data.entity.deployment_preset import DeploymentPresetEntityType
 from ai.backend.common.data.entity.domain import DomainEntityType
 from ai.backend.common.data.entity.entity_label import EntityLabelFieldType
-from ai.backend.common.data.entity.entity_share import EntityShareEntityType
-from ai.backend.common.data.entity.fair_share import (
-    DomainFairShareFieldType,
-    ProjectFairShareFieldType,
-    UserFairShareFieldType,
-)
 from ai.backend.common.data.entity.idle_checker import IdleCheckerEntityType
 from ai.backend.common.data.entity.image import ImageEntityType
 from ai.backend.common.data.entity.image_alias import ImageAliasFieldType
 from ai.backend.common.data.entity.kernel import KernelFieldType
-from ai.backend.common.data.entity.login_client_type import LoginClientTypeEntityType
-from ai.backend.common.data.entity.model_card import ModelCardEntityType
 from ai.backend.common.data.entity.notification import (
     NotificationChannelEntityType,
     NotificationRuleEntityType,
 )
-from ai.backend.common.data.entity.object_storage import ObjectStorageEntityType
 from ai.backend.common.data.entity.project import ProjectEntityType
-from ai.backend.common.data.entity.prometheus_query_preset import (
-    PrometheusQueryPresetEntityType,
-)
-from ai.backend.common.data.entity.prometheus_query_preset_category import (
-    PrometheusQueryPresetCategoryEntityType,
-)
 from ai.backend.common.data.entity.resource_group import ResourceGroupEntityType
-from ai.backend.common.data.entity.resource_policy import (
-    KeyPairResourcePolicyEntityType,
-    ProjectResourcePolicyEntityType,
-    UserResourcePolicyEntityType,
-)
 from ai.backend.common.data.entity.resource_preset import ResourcePresetEntityType
-from ai.backend.common.data.entity.resource_slot import ResourceSlotTypeEntityType
-from ai.backend.common.data.entity.retention_policy import RetentionPolicyEntityType
-from ai.backend.common.data.entity.role import RoleEntityType
-from ai.backend.common.data.entity.role_preset import RolePresetEntityType
-from ai.backend.common.data.entity.runtime_variant import RuntimeVariantEntityType
-from ai.backend.common.data.entity.runtime_variant_preset import RuntimeVariantPresetEntityType
-from ai.backend.common.data.entity.secret import SecretFieldType
-from ai.backend.common.data.entity.service_catalog import ServiceCatalogEntityType
 from ai.backend.common.data.entity.session import SessionEntityType
-from ai.backend.common.data.entity.session_template import SessionTemplateEntityType
-from ai.backend.common.data.entity.storage_namespace import StorageNamespaceEntityType
 from ai.backend.common.data.entity.types import GlobalEntityType
 from ai.backend.common.data.entity.user import UserEntityType
 from ai.backend.common.data.entity.vfolder import VFolderEntityType
@@ -89,7 +54,7 @@ from ai.backend.manager.actions.registry.types import (
     GroupMeta,
     ProcessorDependencies,
 )
-from ai.backend.manager.actions.types import ActionGate, ActionKind
+from ai.backend.manager.actions.types import ActionBacking, ActionGate, ActionKind
 from ai.backend.manager.actions.v2.bulk.base import BaseBulkAction
 from ai.backend.manager.actions.v2.field.base import (
     BaseRuntimeSingleFieldAction,
@@ -103,6 +68,7 @@ from ai.backend.manager.actions.v2.global_scope.validator.refusing import (
 from ai.backend.manager.actions.v2.lookup.base import BaseLookupAction
 from ai.backend.manager.actions.v2.lookup.bulk_base import BaseBulkLookupAction
 from ai.backend.manager.actions.v2.membership.base import BaseMembershipAction
+from ai.backend.manager.actions.v2.ops.backend import OpsBackendAction
 from ai.backend.manager.actions.v2.relation.base import BaseRelationAction
 from ai.backend.manager.actions.v2.scope.base import BaseScopeAction
 from ai.backend.manager.actions.v2.single_entity.base import BaseSingleEntityAction
@@ -110,14 +76,8 @@ from ai.backend.manager.actions.v2.validators import ActionValidators
 from ai.backend.manager.data.artifact.types import ArtifactRevisionData
 from ai.backend.manager.data.audit_log.types import AuditLogData
 from ai.backend.manager.data.entity_label.types import EntityLabelData
-from ai.backend.manager.data.fair_share.types import (
-    DomainFairShareData,
-    ProjectFairShareData,
-    UserFairShareData,
-)
 from ai.backend.manager.data.image.types import ImageAliasData
 from ai.backend.manager.data.kernel.types import KernelInfo
-from ai.backend.manager.data.secret.types import SecretFieldData
 from ai.backend.manager.repositories.ops.repository import OpsRepository
 from ai.backend.manager.services.agent.actions.bulk_get import BulkGetAgentsAction
 from ai.backend.manager.services.agent.actions.bulk_load_container_counts import (
@@ -143,7 +103,16 @@ from ai.backend.manager.services.agent.actions.scoped_search_resources import (
 )
 from ai.backend.manager.services.agent.actions.search_agents import SearchAgentsAction
 from ai.backend.manager.services.agent.processors import AgentProcessors
-from ai.backend.manager.services.app_config.processors import AppConfigProcessors
+from ai.backend.manager.services.app_config.actions.allow_list.purge import (
+    PurgeAppConfigAllowListAction,
+)
+from ai.backend.manager.services.app_config.actions.definition.purge import (
+    PurgeAppConfigDefinitionAction,
+)
+from ai.backend.manager.services.app_config.actions.search import (
+    AnonymousSearchAppConfigsAction,
+    SearchAppConfigsAction,
+)
 from ai.backend.manager.services.artifact.actions.bulk_get import BulkGetArtifactsAction
 from ai.backend.manager.services.artifact.processors import ArtifactProcessors
 from ai.backend.manager.services.artifact.revision.actions.bulk_get import (
@@ -170,7 +139,7 @@ from ai.backend.manager.services.audit_log.actions.lookup_owner import (
     LookupBulkAuditLogOwnerAction,
 )
 from ai.backend.manager.services.audit_log.processors import AuditLogProcessors
-from ai.backend.manager.services.auth.processors import AuthProcessors
+from ai.backend.manager.services.catalog import load_wiring_catalog
 from ai.backend.manager.services.container_registry.actions.bulk_get import (
     BulkGetContainerRegistriesAction,
 )
@@ -216,11 +185,15 @@ from ai.backend.manager.services.deployment.processors import DeploymentProcesso
 from ai.backend.manager.services.deployment_revision_preset.actions.bulk_get import (
     BulkGetDeploymentPresetsAction,
 )
+from ai.backend.manager.services.deployment_revision_preset.actions.update import (
+    UpdateDeploymentPresetAction,
+)
 from ai.backend.manager.services.deployment_revision_preset.processors import (
     DeploymentPresetProcessors,
 )
 from ai.backend.manager.services.domain.actions.bulk_get import BulkGetDomainsAction
 from ai.backend.manager.services.domain.actions.bulk_lookup import BulkLookupDomainsAction
+from ai.backend.manager.services.domain.actions.create_domain import CreateDomainAction
 from ai.backend.manager.services.domain.actions.get import GetDomainAction
 from ai.backend.manager.services.domain.actions.scoped_search import ScopedSearchDomainsAction
 from ai.backend.manager.services.domain.processors import DomainProcessors
@@ -229,18 +202,13 @@ from ai.backend.manager.services.entity_label.actions.lookup_owner import (
     LookupEntityLabelOwnerAction,
 )
 from ai.backend.manager.services.entity_label.processors import EntityLabelProcessors
-from ai.backend.manager.services.entity_share.processors import (
-    EntityShareProcessors,
-)
 from ai.backend.manager.services.export.actions.get_report import GetReportAction
 from ai.backend.manager.services.export.actions.public_get_report import PublicGetReportAction
 from ai.backend.manager.services.export.processors import ExportProcessors
-from ai.backend.manager.services.fair_share.processors import FairShareProcessors
 from ai.backend.manager.services.idle_checker.actions.bulk_get import BulkGetIdleCheckersAction
+from ai.backend.manager.services.idle_checker.actions.create import CreateIdleCheckerAction
+from ai.backend.manager.services.idle_checker.actions.update import UpdateIdleCheckerAction
 from ai.backend.manager.services.idle_checker.processors import IdleCheckerProcessors
-from ai.backend.manager.services.idle_checker_assignment.processors import (
-    IdleCheckerAssignmentProcessors,
-)
 from ai.backend.manager.services.image.actions.bulk_get import BulkGetImagesAction
 from ai.backend.manager.services.image.actions.bulk_get_aliases import BulkGetImageAliasesAction
 from ai.backend.manager.services.image.actions.lookup_alias_owner import (
@@ -251,41 +219,15 @@ from ai.backend.manager.services.image.actions.search_image_aliases import (
     SearchImageAliasesAction,
 )
 from ai.backend.manager.services.image.processors import ImageProcessors
-from ai.backend.manager.services.keypair_resource_policy.processors import (
-    KeypairResourcePolicyProcessors,
-)
-from ai.backend.manager.services.login_client_type.processors import (
-    LoginClientTypeProcessors,
-)
-from ai.backend.manager.services.metric.processors import MetricProcessors
-from ai.backend.manager.services.model_card.processors import ModelCardProcessors
-from ai.backend.manager.services.model_serving.processors.auto_scaling import (
-    ModelServingAutoScalingProcessors,
-)
-from ai.backend.manager.services.model_serving.processors.model_serving import (
-    ModelServingProcessors,
-)
 from ai.backend.manager.services.notification.actions.bulk_get_channels import (
     BulkGetChannelsAction,
 )
 from ai.backend.manager.services.notification.actions.bulk_get_rules import BulkGetRulesAction
 from ai.backend.manager.services.notification.processors import NotificationProcessors
-from ai.backend.manager.services.object_storage.processors import ObjectStorageProcessors
-from ai.backend.manager.services.permission_contoller.processors import (
-    PermissionControllerProcessors,
-)
 from ai.backend.manager.services.project.actions.bulk_get import BulkGetProjectsAction
+from ai.backend.manager.services.project.actions.create_project import CreateProjectAction
 from ai.backend.manager.services.project.processors import ProjectProcessors
-from ai.backend.manager.services.project_resource_policy.processors import (
-    ProjectResourcePolicyProcessors,
-)
-from ai.backend.manager.services.prometheus_query_preset.processors import (
-    PrometheusQueryPresetProcessors,
-)
-from ai.backend.manager.services.prometheus_query_preset_category.processors import (
-    PrometheusQueryPresetCategoryProcessors,
-)
-from ai.backend.manager.services.rbac.processors import RbacProcessors
+from ai.backend.manager.services.prometheus_query_preset.actions.create import CreatePresetAction
 from ai.backend.manager.services.resource_group.actions.bulk_get import (
     BulkGetResourceGroupsAction,
 )
@@ -303,13 +245,15 @@ from ai.backend.manager.services.resource_preset.actions.list_presets import (
     ListResourcePresetsAction,
 )
 from ai.backend.manager.services.resource_preset.processors import ResourcePresetProcessors
-from ai.backend.manager.services.resource_slot.processors import ResourceSlotProcessors
-from ai.backend.manager.services.retention_policy.processors import RetentionPolicyProcessors
-from ai.backend.manager.services.role_preset.processors import RolePresetProcessors
-from ai.backend.manager.services.runtime_variant.processors import RuntimeVariantProcessors
-from ai.backend.manager.services.runtime_variant_preset.processors import (
-    RuntimeVariantPresetProcessors,
+from ai.backend.manager.services.role_preset.actions.bulk_add_permissions import (
+    BulkAddRolePermissionPresetsAction,
 )
+from ai.backend.manager.services.role_preset.actions.bulk_remove_permissions import (
+    BulkRemoveRolePermissionPresetsAction,
+)
+from ai.backend.manager.services.role_preset.actions.create import CreateRolePresetAction
+from ai.backend.manager.services.role_preset.actions.update import UpdateRolePresetAction
+from ai.backend.manager.services.runtime_variant.actions.purge import PurgeRuntimeVariantAction
 from ai.backend.manager.services.scheduling_history.actions.bulk_get_deployment_histories import (
     BulkGetDeploymentHistoriesAction,
 )
@@ -329,8 +273,6 @@ from ai.backend.manager.services.scheduling_history.actions.lookup_owner import 
 from ai.backend.manager.services.scheduling_history.processors import (
     SchedulingHistoryProcessors,
 )
-from ai.backend.manager.services.secret.processors import SecretProcessors
-from ai.backend.manager.services.service_catalog.processors import ServiceCatalogProcessors
 from ai.backend.manager.services.session.actions.bulk_get import BulkGetSessionsAction
 from ai.backend.manager.services.session.actions.bulk_get_kernels import BulkGetKernelsAction
 from ai.backend.manager.services.session.actions.compute_schedule import (
@@ -346,25 +288,11 @@ from ai.backend.manager.services.session.processors import SessionProcessors
 from ai.backend.manager.services.session.resource_allocation.processors import (
     ResourceAllocationProcessors,
 )
-from ai.backend.manager.services.storage_namespace.processors import (
-    StorageNamespaceProcessors,
-)
-from ai.backend.manager.services.template.processors import TemplateProcessors
 from ai.backend.manager.services.user.actions.bulk_get import BulkGetUsersAction
 from ai.backend.manager.services.user.processors import UserProcessors
-from ai.backend.manager.services.user_resource_policy.processors import (
-    UserResourcePolicyProcessors,
-)
 from ai.backend.manager.services.vfolder.actions.bulk_get import BulkGetVFoldersAction
 from ai.backend.manager.services.vfolder.actions.storage_ops import PublicListAllowedTypesAction
-from ai.backend.manager.services.vfolder.processors.file import VFolderFileProcessors
-from ai.backend.manager.services.vfolder.processors.invite import VFolderInviteProcessors
-from ai.backend.manager.services.vfolder.processors.mount_policy import (
-    VFolderMountPolicyProcessors,
-)
-from ai.backend.manager.services.vfolder.processors.sharing import VFolderSharingProcessors
 from ai.backend.manager.services.vfolder.processors.vfolder import VFolderProcessors
-from ai.backend.manager.services.vfolder.processors.vfolder_admin import VFolderAdminProcessors
 from ai.backend.manager.services.vfs_storage.actions.bulk_get import BulkGetVFSStoragesAction
 from ai.backend.manager.services.vfs_storage.processors import VFSStorageProcessors
 
@@ -423,216 +351,12 @@ def _kernels(registry: ProcessorRegistry[Any]) -> LookupFieldGroup[KernelInfo]:
     )
 
 
-def test_every_defined_v2_action_is_wired() -> None:
-    # One shared registry, as in the production wiring: every v2 package registers
-    # through it, so its wired_actions() is the complete catalog of registered actions.
-    registry = _ops_registry()
-    fair_share_groups = registry.concern(ConcernMeta(Concern.RESOURCE_GROUP))
-    artifact_revisions = registry.group(GroupMeta(ArtifactEntityType())).field_group(
-        FieldGroupMeta(ArtifactRevisionFieldType()),
-        ArtifactRevisionData,
-        LookupArtifactRevisionOwnerAction,
-        LookupBulkArtifactRevisionOwnerAction,
-    )
-    resource_slot_groups = registry.concern(ConcernMeta(Concern.SYSTEM))
-    scheduling_history_groups = registry.concern(ConcernMeta(Concern.SESSION))
-    resource_allocation_groups = registry.concern(ConcernMeta(Concern.RESOURCE_GROUP))
-    agent_groups = registry.concern(ConcernMeta(Concern.RESOURCE_GROUP))
-    AgentProcessors(agent_groups.group(GroupMeta(AgentEntityType())), MagicMock())
-    AppConfigProcessors(
-        registry.group(GroupMeta(AppConfigEntityType())),
-        registry.group(GroupMeta(AppConfigDefinitionEntityType())),
-        registry.group(GroupMeta(AppConfigAllowListEntityType())),
-        registry.group(GroupMeta(AppConfigFragmentEntityType())),
-        MagicMock(),
-    )
-    ResourceSlotProcessors(
-        resource_slot_groups.group(GroupMeta(ResourceSlotTypeEntityType())),
-        resource_slot_groups.group(GroupMeta(SessionEntityType())),
-        resource_slot_groups.group(GroupMeta(AgentEntityType())),
-        MagicMock(),
-    )
-    IdleCheckerProcessors(
-        registry.group(GroupMeta(IdleCheckerEntityType())),
-        registry.group(GroupMeta(SessionEntityType())),
-        MagicMock(),
-    )
-    IdleCheckerAssignmentProcessors(
-        scheduling_history_groups.group(GroupMeta(IdleCheckerEntityType())),
-        MagicMock(),
-    )
-    RetentionPolicyProcessors(registry.group(GroupMeta(RetentionPolicyEntityType())))
-    LoginClientTypeProcessors(registry.group(GroupMeta(LoginClientTypeEntityType())))
-    ServiceCatalogProcessors(registry.group(GroupMeta(ServiceCatalogEntityType())))
-    ProjectResourcePolicyProcessors(registry.group(GroupMeta(ProjectResourcePolicyEntityType())))
-    UserResourcePolicyProcessors(registry.group(GroupMeta(UserResourcePolicyEntityType())))
-    KeypairResourcePolicyProcessors(registry.group(GroupMeta(KeyPairResourcePolicyEntityType())))
-    RolePresetProcessors(registry.group(GroupMeta(RolePresetEntityType())), MagicMock())
-    EntityShareProcessors(registry.group(GroupMeta(EntityShareEntityType())), MagicMock())
-    rbac_groups = registry.concern(ConcernMeta(Concern.RBAC))
-    RbacProcessors(
-        rbac_groups.relation_group(),
-        rbac_groups.group(GroupMeta(UserEntityType())),
-        MagicMock(),
-        MagicMock(),
-        MagicMock(),
-    )
-    RuntimeVariantProcessors(registry.group(GroupMeta(RuntimeVariantEntityType())), MagicMock())
-    ObjectStorageProcessors(
-        registry.group(GroupMeta(ObjectStorageEntityType())),
-        artifact_revisions,
-        MagicMock(),
-    )
-    VFSStorageProcessors(registry.group(GroupMeta(VFSStorageEntityType())), MagicMock())
-    NotificationProcessors(
-        registry.group(GroupMeta(NotificationChannelEntityType())),
-        registry.group(GroupMeta(NotificationRuleEntityType())),
-        MagicMock(),
-    )
-    PrometheusQueryPresetCategoryProcessors(
-        registry.group(GroupMeta(PrometheusQueryPresetCategoryEntityType()))
-    )
-    MetricProcessors(
-        registry.group(GroupMeta(PrometheusQueryPresetEntityType())),
-        registry.group(GroupMeta(UserEntityType())),
-        registry.group(GroupMeta(SessionEntityType())),
-        MagicMock(),
-    )
-    RuntimeVariantPresetProcessors(
-        registry.group(GroupMeta(RuntimeVariantPresetEntityType())), MagicMock()
-    )
-    AuditLogProcessors(
-        registry.dangling_lookup_field_group(
-            FieldGroupMeta(AuditLogFieldType()),
-            AuditLogData,
-            LookupAuditLogOwnerAction,
-            LookupBulkAuditLogOwnerAction,
-        )
-    )
-    SecretProcessors(
-        registry.concern(ConcernMeta(Concern.SYSTEM)).dangling_field_group(
-            FieldGroupMeta(SecretFieldType()), SecretFieldData
-        ),
-        MagicMock(),
-    )
-    EntityLabelProcessors(
-        registry.dangling_lookup_field_group(
-            FieldGroupMeta(EntityLabelFieldType()),
-            EntityLabelData,
-            LookupEntityLabelOwnerAction,
-            LookupBulkEntityLabelOwnerAction,
-        )
-    )
-    PrometheusQueryPresetProcessors(
-        registry.group(GroupMeta(PrometheusQueryPresetEntityType())), MagicMock()
-    )
-    StorageNamespaceProcessors(registry.group(GroupMeta(StorageNamespaceEntityType())))
-    DeploymentPresetProcessors(registry.group(GroupMeta(DeploymentPresetEntityType())), MagicMock())
-    DomainProcessors(registry.group(GroupMeta(DomainEntityType())), MagicMock())
-    PermissionControllerProcessors(
-        registry.group(GroupMeta(RoleEntityType())),
-        registry.group(GroupMeta(UserEntityType())),
-        MagicMock(),
-    )
-    ProjectProcessors(registry.group(GroupMeta(ProjectEntityType())), MagicMock())
-    UserProcessors(
-        registry.group(GroupMeta(UserEntityType())),
-        MagicMock(),
-    )
-    AuthProcessors(
-        registry.group(GroupMeta(GlobalEntityType())),
-        registry.group(GroupMeta(UserEntityType())),
-        MagicMock(),
-    )
-    FairShareProcessors(
-        fair_share_groups.dangling_field_group(
-            FieldGroupMeta(DomainFairShareFieldType()), DomainFairShareData
-        ),
-        fair_share_groups.dangling_field_group(
-            FieldGroupMeta(ProjectFairShareFieldType()), ProjectFairShareData
-        ),
-        fair_share_groups.dangling_field_group(
-            FieldGroupMeta(UserFairShareFieldType()), UserFairShareData
-        ),
-        MagicMock(),
-    )
-    ResourcePresetProcessors(registry.group(GroupMeta(ResourcePresetEntityType())), MagicMock())
-    ResourceGroupProcessors(registry.group(GroupMeta(ResourceGroupEntityType())), MagicMock())
-    ArtifactProcessors(
-        registry.group(GroupMeta(ArtifactEntityType())),
-        artifact_revisions,
-        ArtifactRevisionProcessors(
-            registry.group(GroupMeta(ArtifactEntityType())),
-            artifact_revisions,
-            MagicMock(),
-        ),
-        MagicMock(),
-    )
-    ArtifactRegistryProcessors(
-        registry.group(GroupMeta(ArtifactRegistryEntityType())),
-        registry.group(GroupMeta(ArtifactRegistryEntityType())),
-        registry.group(GroupMeta(ArtifactRegistryEntityType())),
-        MagicMock(),
-    )
-    ModelCardProcessors(registry.group(GroupMeta(ModelCardEntityType())), MagicMock())
-    ContainerRegistryProcessors(
-        registry.group(GroupMeta(ContainerRegistryEntityType())), MagicMock()
-    )
-    ImageProcessors(
-        registry.group(GroupMeta(ImageEntityType())),
-        registry.group(GroupMeta(ImageEntityType())).field_group(
-            FieldGroupMeta(ImageAliasFieldType()),
-            ImageAliasData,
-            LookupImageAliasOwnerAction,
-            LookupBulkImageAliasOwnerAction,
-        ),
-        MagicMock(),
-    )
-    ExportProcessors(
-        registry.group(GroupMeta(UserEntityType())),
-        registry.group(GroupMeta(SessionEntityType())),
-        registry.group(GroupMeta(ProjectEntityType())),
-        registry.group(GroupMeta(GlobalEntityType())),
-        registry.dangling_field_group(FieldGroupMeta(AuditLogFieldType()), AuditLogData),
-        MagicMock(),
-    )
-    TemplateProcessors(registry.group(GroupMeta(SessionTemplateEntityType())), MagicMock())
-    SchedulingHistoryProcessors(
-        scheduling_history_groups.group(GroupMeta(SessionEntityType())),
-        scheduling_history_groups.group(GroupMeta(DeploymentEntityType())),
-        scheduling_history_groups.group(GroupMeta(DeploymentEntityType())),
-        MagicMock(),
-    )
-    SessionProcessors(
-        registry.group(GroupMeta(SessionEntityType())),
-        resource_allocation_groups.group(GroupMeta(ResourceGroupEntityType())),
-        _kernels(registry),
-        ResourceAllocationProcessors(
-            resource_allocation_groups.group(GroupMeta(UserEntityType())),
-            resource_allocation_groups.group(GroupMeta(ProjectEntityType())),
-            resource_allocation_groups.group(GroupMeta(DomainEntityType())),
-            resource_allocation_groups.group(GroupMeta(ResourceGroupEntityType())),
-            resource_allocation_groups.group(GroupMeta(SessionEntityType())),
-            resource_allocation_groups.group(GroupMeta(ResourcePresetEntityType())),
-            MagicMock(),
-        ),
-        MagicMock(),
-    )
-    DeploymentProcessors(registry.group(GroupMeta(DeploymentEntityType())), MagicMock())
-    VFolderProcessors(registry.group(GroupMeta(VFolderEntityType())), MagicMock())
-    VFolderAdminProcessors(registry.group(GroupMeta(VFolderEntityType())))
-    VFolderFileProcessors(registry.group(GroupMeta(VFolderEntityType())), MagicMock())
-    VFolderInviteProcessors(registry.group(GroupMeta(VFolderEntityType())), MagicMock())
-    VFolderSharingProcessors(registry.group(GroupMeta(VFolderEntityType())), MagicMock())
-    VFolderMountPolicyProcessors(registry.group(GroupMeta(VFolderEntityType())), MagicMock())
-    ModelServingProcessors(registry.group(GroupMeta(DeploymentEntityType())), MagicMock())
-    ModelServingAutoScalingProcessors(
-        registry.group(GroupMeta(DeploymentEntityType())), MagicMock()
-    )
+async def test_every_defined_v2_action_is_wired() -> None:
+    catalog = await load_wiring_catalog()
 
     # One action class may be wired more than once -- an owner lookup is built by every
     # field operation that runs it first -- and the catalog is which classes are wired.
-    wired = sorted({cls.action_name() for cls in registry.wired_actions()})
+    wired = sorted({record.action_cls.action_name() for record in catalog})
     defined = sorted(cls.action_name() for cls in _concrete_v2_action_classes())
 
     assert wired == defined
@@ -1263,3 +987,37 @@ def test_dangling_lookup_field_group_records_its_owner_lookups_under_its_concern
     assert recorded[LookupBulkEntityLabelOwnerAction] == {
         (EntityLabelFieldType(), ActionKind.LOOKUP, ActionGate.PERMISSION)
     }
+
+
+# An ops-family action wired through a service function, and why the generic service
+# cannot run it.
+_OPS_ACTIONS_WIRED_TO_A_SERVICE: dict[type[Any], str] = {
+    CreateDomainAction: "also creates the domain's model-store project in the same transaction",
+    CreateProjectAction: "lends the project its resource policy in the same transaction",
+    CreateIdleCheckerAction: "validates utilization labels against the referenced preset",
+    UpdateIdleCheckerAction: "validates utilization labels against the referenced preset",
+    PurgeRuntimeVariantAction: "purges the variant's presets first",
+    SearchAppConfigsAction: "merges rank-ordered fragments into one config per name",
+    AnonymousSearchAppConfigsAction: "merges fragments on the anonymous path, which has no ops shape",
+    PurgeAppConfigDefinitionAction: "purges the definition's allow-list entries and fragments first",
+    PurgeAppConfigAllowListAction: "purges the fragments the entry admits first",
+    UpdateDeploymentPresetAction: "replaces the preset's resource slots in the same transaction",
+    CreatePresetAction: "validates the query template before insert",
+    CreateRolePresetAction: "validates that the role name template renders",
+    UpdateRolePresetAction: "validates the template and re-syncs the derived roles",
+    BulkAddRolePermissionPresetsAction: "re-syncs the derived roles in the same transaction",
+    BulkRemoveRolePermissionPresetsAction: "re-syncs the derived roles in the same transaction",
+}
+
+
+async def test_ops_actions_are_wired_through_an_ops_shape() -> None:
+    catalog = await load_wiring_catalog()
+
+    wired_to_a_service = {
+        record.action_cls
+        for record in catalog
+        if record.backing is ActionBacking.CUSTOM
+        and issubclass(record.action_cls, OpsBackendAction)
+    }
+
+    assert wired_to_a_service == set(_OPS_ACTIONS_WIRED_TO_A_SERVICE)

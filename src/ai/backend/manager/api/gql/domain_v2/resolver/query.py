@@ -10,6 +10,8 @@ from ai.backend.common.dto.manager.v2.domain.request import (
     AdminSearchDomainsInput,
     ScopedSearchDomainsInput,
 )
+from ai.backend.common.dto.manager.v2.domain.types import DomainScope
+from ai.backend.common.dto.manager.v2.rbac.types import UUIDScope
 from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import encode_cursor
 from ai.backend.manager.api.gql.decorators import (
@@ -55,7 +57,7 @@ async def admin_domains_v2(
     offset: int | None = None,
 ) -> DomainV2Connection | None:
     check_admin_only()
-    payload = await info.context.adapters.domain.admin_search(
+    payload = await info.context.adapters.domain.global_search(
         AdminSearchDomainsInput(
             filter=filter.to_pydantic() if filter else None,
             order=[o.to_pydantic() for o in order_by] if order_by else None,
@@ -146,9 +148,12 @@ async def rg_domains_v2(
     limit: int | None = None,
     offset: int | None = None,
 ) -> DomainV2Connection | None:
-    payload = await info.context.adapters.domain.search_rg_domains(
-        resource_group_name=scope.resource_group_name,
-        input=AdminSearchDomainsInput(
+    resource_group_id = await info.context.adapters.resource_group.lookup_name(
+        scope.resource_group_name
+    )
+    payload = await info.context.adapters.domain.scoped_search(
+        ScopedSearchDomainsInput(
+            scope=DomainScope(resource_group=[UUIDScope(value=resource_group_id)]),
             filter=filter.to_pydantic() if filter else None,
             order=[o.to_pydantic() for o in order_by] if order_by else None,
             first=first,
@@ -157,7 +162,7 @@ async def rg_domains_v2(
             before=before,
             limit=limit,
             offset=offset,
-        ),
+        )
     )
     nodes = [DomainV2GQL.from_pydantic(node) for node in payload.items]
     edges = [strawberry.relay.Edge(node=node, cursor=encode_cursor(str(node.id))) for node in nodes]
