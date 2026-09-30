@@ -26,7 +26,6 @@ from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.resource_group import ResourceGroupID
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.types import (
-    AccessKey,
     ClusterMode,
     KernelId,
     SessionId,
@@ -430,10 +429,6 @@ class KernelRow(CreatedAtMixin, Base):
                 return cand[0]
 
         return await execute_with_retry(_query)
-
-    def delegate_ownership(self, user_uuid: UserID, access_key: AccessKey) -> None:
-        self.user_uuid = user_uuid
-        self.access_key = access_key
 
     def to_kernel_info(self) -> KernelInfo:
         return KernelInfo(

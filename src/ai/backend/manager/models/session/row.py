@@ -894,7 +894,8 @@ class SessionRow(CreatedAtMixin, Base):
         self.user_uuid = user_uuid
         self.access_key = access_key
         for kernel_row in self.kernels:
-            kernel_row.delegate_ownership(user_uuid, access_key)
+            kernel_row.user_uuid = user_uuid
+            kernel_row.access_key = access_key
 
     @classmethod
     async def set_session_result(
