@@ -11,6 +11,7 @@ from uuid import UUID
 from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseResponseModel
+from ai.backend.common.data.entity.role_preset import RolePresetID
 from ai.backend.common.data.entity.types import EntityType
 from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 
@@ -77,6 +78,14 @@ class RoleNode(BaseResponseModel):
     deleted_at: datetime | None = Field(default=None, description="Deletion timestamp")
     scope_type: EntityType = Field(description="Type of the scope the role belongs to")
     scope_id: UUID = Field(description="ID of the scope the role belongs to")
+    role_preset_id: RolePresetID | None = Field(
+        default=None,
+        description=(
+            "ID of the role preset the role was instantiated from. Null when the role "
+            "was not created from a preset or the preset has been purged. "
+            f"Added in {NEXT_RELEASE_VERSION}."
+        ),
+    )
 
 
 class CreateRolePayload(BaseResponseModel):
