@@ -165,7 +165,7 @@ from ai.backend.manager.models.endpoint.updaters import (
     EndpointLifecycleBatchUpdater,
     EndpointReplicaGroupUpdater,
 )
-from ai.backend.manager.models.image import ImageRow
+from ai.backend.manager.models.image.row import ImageRow
 from ai.backend.manager.models.image.searchers import ReferenceImageSearcher
 from ai.backend.manager.models.kernel.row import KernelRow
 from ai.backend.manager.models.keypair.row import keypairs
