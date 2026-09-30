@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import logging
 from datetime import datetime
 from typing import TYPE_CHECKING, Any
 
@@ -16,14 +15,12 @@ from ai.backend.common.data.entity.replica import ReplicaID
 from ai.backend.common.data.entity.replica_group import ReplicaGroupID
 from ai.backend.common.data.entity.session import SessionID
 from ai.backend.common.data.entity.user import UserID
-from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.data.deployment.types import (
     RouteHealthStatus,
     RouteStatus,
     RouteSubStatus,
     RouteTrafficStatus,
 )
-from ai.backend.manager.data.model_serving.types import RoutingData
 from ai.backend.manager.models.base import (
     GUID,
     Base,
@@ -35,10 +32,7 @@ if TYPE_CHECKING:
     from ai.backend.manager.models.endpoint.row import EndpointRow
 
 
-__all__ = ("RouteStatus", "RoutingRow")
-
-
-log = StructuredLogger(logging.getLogger(__spec__.name))
+__all__ = ("RoutingRow",)
 
 
 class RoutingRow(Base):
@@ -160,18 +154,3 @@ class RoutingRow(Base):
     )
 
     endpoint_row: Mapped[EndpointRow] = relationship("EndpointRow", back_populates="routings")
-
-    def delegate_ownership(self, user_uuid: UserID) -> None:
-        self.session_owner = user_uuid
-
-    def to_data(self) -> RoutingData:
-        return RoutingData(
-            id=self.id,
-            endpoint=self.endpoint,
-            session=self.session,
-            status=self.status,
-            health_status=self.health_status,
-            traffic_ratio=self.traffic_ratio,
-            created_at=self.created_at,
-            error_data=self.error_data or {},
-        )

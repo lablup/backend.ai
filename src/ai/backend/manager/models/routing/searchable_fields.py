@@ -19,6 +19,7 @@ from ai.backend.manager.data.deployment.types import (
     RouteSubStatus,
     RouteTrafficStatus,
 )
+from ai.backend.manager.data.model_serving.types import RoutingData
 from ai.backend.manager.models.deployment_revision.row import DeploymentRevisionRow
 from ai.backend.manager.models.deployment_revision.searchable_fields import (
     ModelRevisionSearchableFields,
@@ -169,6 +170,19 @@ class _ReplicaOwnFields(RowDataConverter[RoutingRow, ModelReplicaData]):
             traffic_status=self.traffic_status.read(row),
             health_check=self.health_check.read(row),
             replica_group_id=self.replica_group_id.read(row),
+            error_data=self.error_data.read(row) or {},
+        )
+
+    def to_routing_data(self, row: RoutingRow) -> RoutingData:
+        """The same row read as the legacy REST v1 route projection."""
+        return RoutingData(
+            id=self.field_id.read(row),
+            endpoint=self.deployment_id.read(row),
+            session=self.session.read(row),
+            status=self.status.read(row),
+            health_status=self.health_status.read(row),
+            traffic_ratio=self.traffic_ratio.read(row),
+            created_at=self.created_at.read(row),
             error_data=self.error_data.read(row) or {},
         )
 
