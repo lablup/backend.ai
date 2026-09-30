@@ -5,7 +5,6 @@ from collections.abc import Callable, Container, Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from typing import (
-    TYPE_CHECKING,
     Any,
     Self,
     cast,
@@ -58,9 +57,6 @@ from ai.backend.manager.models.rbac.context import ClientContext
 from ai.backend.manager.models.types import QueryCondition
 from ai.backend.manager.models.user.row import UserRole
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-
-if TYPE_CHECKING:
-    from ai.backend.manager.models.agent.row import AgentRow
 
 __all__: Sequence[str] = (
     # table defs
@@ -294,11 +290,6 @@ class ResourceGroupRow(CreatedAtMixin, Base):
         PydanticColumn(DefaultSessionOptions),
         nullable=False,
         default=DefaultSessionOptions,
-    )
-
-    agents: Mapped[list[AgentRow]] = relationship(
-        "AgentRow",
-        foreign_keys="[AgentRow.scaling_group]",
     )
 
     @classmethod
