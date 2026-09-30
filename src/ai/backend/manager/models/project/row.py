@@ -10,7 +10,6 @@ from typing import (
     Any,
     Self,
     TypedDict,
-    overload,
     override,
 )
 
@@ -83,7 +82,6 @@ __all__: Sequence[str] = (
     "ProjectType",
     "association_groups_users",
     "groups",
-    "query_group_domain",
     "query_group_dotfiles",
     "verify_dotfile_name",
 )
@@ -333,54 +331,6 @@ class ProjectModel(RBACModel[ProjectPermission]):
         )
 
 
-def _build_group_query(
-    cond: sa.sql.expression.ColumnElement[bool], domain_name: str
-) -> sa.sql.Select[Any]:
-    return (
-        sa.select(groups.c.id)
-        .select_from(groups)
-        .where(
-            cond & (groups.c.domain_name == domain_name),
-        )
-    )
-
-
-@overload
-async def resolve_groups(
-    db_conn: SAConnection,
-    domain_name: str,
-    values: Iterable[uuid.UUID],
-) -> Sequence[uuid.UUID]: ...
-
-
-@overload
-async def resolve_groups(
-    db_conn: SAConnection,
-    domain_name: str,
-    values: Iterable[str],
-) -> Sequence[uuid.UUID]: ...
-
-
-async def resolve_groups(
-    db_conn: SAConnection,
-    domain_name: str,
-    values: Iterable[uuid.UUID] | Iterable[str],
-) -> Sequence[uuid.UUID]:
-    listed_val = [*values]
-    match listed_val:
-        case [uuid.UUID(), *_]:
-            query = _build_group_query((groups.c.id.in_(listed_val)), domain_name)
-        case [str(), *_]:
-            query = _build_group_query((groups.c.name.in_(listed_val)), domain_name)
-        case []:
-            return []
-        case _:
-            raise TypeError("unexpected type for group_name_or_id")
-
-    rows = (await db_conn.execute(query)).fetchall()
-    return [row.id for row in rows]
-
-
 class ProjectDotfile(TypedDict):
     data: str
     path: str
@@ -397,14 +347,6 @@ async def query_group_dotfiles(
         return [], MAXIMUM_DOTFILE_SIZE
     rows = msgpack.unpackb(packed_dotfile)
     return rows, MAXIMUM_DOTFILE_SIZE - len(packed_dotfile)
-
-
-async def query_group_domain(
-    db_conn: SAConnection,
-    group_id: GUID[uuid.UUID] | uuid.UUID,
-) -> str | None:
-    query = sa.select(groups.c.domain_name).select_from(groups).where(groups.c.id == group_id)
-    return await db_conn.scalar(query)
 
 
 def verify_dotfile_name(dotfile: str) -> bool:
