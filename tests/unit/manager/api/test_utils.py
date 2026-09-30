@@ -4,9 +4,9 @@ import asyncio
 
 import pytest
 
+from ai.backend.common.defs import verify_vfolder_name
 from ai.backend.manager.api.utils import call_non_bursty, mask_sensitive_keys
 from ai.backend.manager.models.domain.row import verify_dotfile_name
-from ai.backend.manager.models.vfolder.row import verify_vfolder_name
 
 
 async def test_call_non_bursty() -> None:

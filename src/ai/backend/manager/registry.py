@@ -51,6 +51,7 @@ from ai.backend.common.data.entity.resource_slot import ResourceSlotName
 from ai.backend.common.data.entity.session import SessionID
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.entity.vfolder import VFolderUUID
+from ai.backend.common.defs import verify_vfolder_name
 from ai.backend.common.defs.session import JOB_PRIORITY_DEFAULT, SESSION_PRIORITY_DEFAULT
 from ai.backend.common.docker import ImageRef, LabelName
 from ai.backend.common.dto.agent.response import (
@@ -149,9 +150,6 @@ from ai.backend.manager.models.session.row import (
     handle_session_exception,
 )
 from ai.backend.manager.models.user.row import UserRow
-from ai.backend.manager.models.vfolder.row import (
-    verify_vfolder_name,
-)
 from ai.backend.manager.plugin.network import NetworkPluginContext
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.repositories.resource_slot.repository import ResourceSlotRepository

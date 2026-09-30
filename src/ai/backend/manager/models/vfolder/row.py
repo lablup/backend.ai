@@ -27,11 +27,7 @@ from ai.backend.common.data.entity.project import ProjectEntityType, ProjectID
 from ai.backend.common.data.entity.user import UserEntityType, UserID
 from ai.backend.common.data.entity.vfolder import VFolderEntityType, VFolderUUID
 from ai.backend.common.data.entity.vfolder_mount_policy import VFolderMountPolicyID
-from ai.backend.common.defs import (
-    MODEL_VFOLDER_LENGTH_LIMIT,
-    RESERVED_VFOLDER_PATTERNS,
-    RESERVED_VFOLDERS,
-)
+from ai.backend.common.defs import MODEL_VFOLDER_LENGTH_LIMIT
 from ai.backend.common.types import (
     QuotaScopeID,
     SessionId,
@@ -120,7 +116,6 @@ __all__: Sequence[str] = (
     "get_allowed_vfolder_hosts_by_group",
     "get_allowed_vfolder_hosts_by_user",
     "update_vfolder_status",
-    "verify_vfolder_name",
     "vfolder_status_map",
     "vfolders",
 )
@@ -498,15 +493,6 @@ class VFolderUserMountPolicyRow(LifecycleTimestampsMixin, Base):
 
 def is_unmanaged(unmanaged_path: str | None) -> bool:
     return (unmanaged_path is not None) and unmanaged_path != ""
-
-
-def verify_vfolder_name(folder: str) -> bool:
-    if folder in RESERVED_VFOLDERS:
-        return False
-    for pattern in RESERVED_VFOLDER_PATTERNS:
-        if pattern.match(folder):
-            return False
-    return True
 
 
 async def get_allowed_vfolder_hosts_by_group(

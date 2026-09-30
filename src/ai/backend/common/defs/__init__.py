@@ -59,6 +59,17 @@ RESERVED_VFOLDERS = [
     "/home",
 ]
 RESERVED_VFOLDER_PATTERNS = [re.compile(x) for x in _RESERVED_VFOLDER_PATTERNS]
+
+
+def verify_vfolder_name(folder: str) -> bool:
+    if folder in RESERVED_VFOLDERS:
+        return False
+    for pattern in RESERVED_VFOLDER_PATTERNS:
+        if pattern.match(folder):
+            return False
+    return True
+
+
 API_VFOLDER_LENGTH_LIMIT: Final[int] = 64
 MODEL_VFOLDER_LENGTH_LIMIT: Final[int] = 128
 
