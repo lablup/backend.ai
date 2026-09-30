@@ -20417,6 +20417,11 @@ type Role implements Node
   """Added in 26.9.0. The scope the role belongs to."""
   scope: EntityNode
 
+  """
+  Added in 26.9.0. The role preset the role was instantiated from. Null when the role was not created from a preset.
+  """
+  rolePreset: RolePreset
+
   """Added in 26.3.0. Permissions associated with this role."""
   permissions(filter: PermissionFilter = null, orderBy: [PermissionOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): PermissionConnection
 
