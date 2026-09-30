@@ -22,13 +22,9 @@ def install(pkgname: str, force_install: bool = False) -> None:
         user_path = Path(site.USER_SITE).resolve()
         installed_pkgs = []
         for dist in importlib.metadata.distributions():
-            # A leftover dist-info without METADATA has no name
-            name = dist.metadata.get("Name")
-            if name is None:
-                continue
             pkg_path = Path(str(dist.locate_file(""))).resolve()
             is_user = user_path in pkg_path.parents
-            installed_pkgs.append(Package(name, dist.version, is_user))
+            installed_pkgs.append(Package(dist.metadata["Name"], dist.version, is_user))
 
         for installed_pkg in installed_pkgs:
             if pkgname.lower() == installed_pkg.name.lower():
