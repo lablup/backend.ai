@@ -14,6 +14,7 @@ from ai.backend.manager.data.kernel.types import KernelInfo, KernelStatus
 from ai.backend.manager.data.session.creation import ImageInfo
 from ai.backend.manager.data.session.spec import KernelSpec, SessionSpec
 from ai.backend.manager.models.kernel.row import KernelRow
+from ai.backend.manager.models.kernel.searchable_fields import KernelSearchableFields
 from ai.backend.manager.models.specs.creator import FieldCreator
 from ai.backend.manager.models.specs.types import IntegrityErrorCheck
 
@@ -106,4 +107,4 @@ class KernelCreator(FieldCreator[SessionID, KernelRow, KernelInfo]):
 
     @override
     def to_data(self, row: KernelRow) -> KernelInfo:
-        return row.to_kernel_info()
+        return KernelSearchableFields.own.to_data(row)

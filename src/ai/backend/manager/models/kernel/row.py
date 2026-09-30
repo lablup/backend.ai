@@ -33,21 +33,7 @@ from ai.backend.common.types import (
     SessionTypes,
     VFolderMount,
 )
-from ai.backend.manager.data.image.types import ImageIdentifier
-from ai.backend.manager.data.kernel.types import (
-    ClusterConfig,
-    ImageInfo,
-    KernelInfo,
-    KernelStatus,
-    LifecycleStatus,
-    Metadata,
-    Metrics,
-    NetworkConfig,
-    RelatedSessionInfo,
-    ResourceInfo,
-    RuntimeConfig,
-    UserPermission,
-)
+from ai.backend.manager.data.kernel.types import KernelStatus
 
 if TYPE_CHECKING:
     from ai.backend.manager.models.agent.row import AgentRow
@@ -429,98 +415,6 @@ class KernelRow(CreatedAtMixin, Base):
                 return cand[0]
 
         return await execute_with_retry(_query)
-
-    def to_kernel_info(self) -> KernelInfo:
-        return KernelInfo(
-            id=self.id,
-            session=RelatedSessionInfo(
-                session_id=str(self.session_id),
-                creation_id=self.session_creation_id,
-                name=self.session_name,
-                session_type=self.session_type,
-            ),
-            user_permission=UserPermission(
-                user_uuid=self.user_uuid,
-                access_key=self.access_key or "",
-                domain_name=self.domain_name,
-                group_id=self.group_id,
-                uid=self.uid,
-                main_gid=self.main_gid,
-                gids=self.gids,
-            ),
-            image=ImageInfo(
-                image_id=self.image_id,
-                identifier=ImageIdentifier(
-                    canonical=self.image,
-                    architecture=self.architecture or "",
-                )
-                if self.image
-                else None,
-                registry=self.registry,
-                tag=self.tag,
-                architecture=self.architecture,
-            ),
-            network=NetworkConfig(
-                kernel_host=self.kernel_host,
-                repl_in_port=self.repl_in_port,
-                repl_out_port=self.repl_out_port,
-                stdin_port=self.stdin_port,
-                stdout_port=self.stdout_port,
-                service_ports=self.service_ports,
-                preopen_ports=self.preopen_ports,
-                use_host_network=self.use_host_network,
-            ),
-            cluster=ClusterConfig(
-                cluster_mode=self.cluster_mode,
-                cluster_size=self.cluster_size,
-                cluster_role=self.cluster_role,
-                cluster_idx=self.cluster_idx,
-                local_rank=self.local_rank,
-                cluster_hostname=self.cluster_hostname,
-            ),
-            resource=ResourceInfo(
-                resource_group=self.scaling_group,
-                resource_group_id=self.resource_group_id,
-                agent=self.agent,
-                agent_addr=self.agent_addr,
-                container_id=self.container_id,
-                occupied_shares=self.occupied_shares,
-                attached_devices=self.attached_devices or {},
-                resource_opts=self.resource_opts or {},
-            ),
-            runtime=RuntimeConfig(
-                environ=self.environ,
-                mounts=self.mounts,
-                mount_map=self.mount_map,
-                vfolder_mounts=[m.to_json() for m in self.vfolder_mounts]
-                if self.vfolder_mounts
-                else None,
-                bootstrap_script=self.bootstrap_script,
-                startup_command=self.startup_command,
-            ),
-            lifecycle=LifecycleStatus(
-                status=self.status,
-                result=self.result,
-                created_at=self.created_at,
-                terminated_at=self.terminated_at,
-                starts_at=self.starts_at,
-                status_changed=self.status_changed,
-                status_info=self.status_info,
-                status_data=self.status_data,
-                status_history=self.status_history,
-                last_seen=self.last_seen,
-                last_observed_at=self.last_observed_at,
-            ),
-            metrics=Metrics(
-                num_queries=self.num_queries or 0,
-                last_stat=self.last_stat,
-                container_log=self.container_log,
-            ),
-            metadata=Metadata(
-                callback_url=str(self.callback_url) if self.callback_url else None,
-                internal_data=self.internal_data,
-            ),
-        )
 
 
 # For compatibility
