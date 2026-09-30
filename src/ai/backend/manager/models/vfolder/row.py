@@ -491,10 +491,6 @@ class VFolderUserMountPolicyRow(LifecycleTimestampsMixin, Base):
     )
 
 
-def is_unmanaged(unmanaged_path: str | None) -> bool:
-    return (unmanaged_path is not None) and unmanaged_path != ""
-
-
 async def get_allowed_vfolder_hosts_by_group(
     conn: SAConnection,
     resource_policy: Mapping[str, Any],

@@ -46,6 +46,7 @@ from ai.backend.manager.data.vfolder.types import (
     VFolderOperationStatus,
     VFolderOwnershipType,
 )
+from ai.backend.manager.defs import is_unmanaged
 from ai.backend.manager.errors.api import InvalidAPIParameters
 from ai.backend.manager.errors.auth import AuthorizationFailed
 from ai.backend.manager.errors.entity_share import EntityShareNotFound
@@ -126,7 +127,6 @@ from ai.backend.manager.models.vfolder.row import (
     get_allowed_vfolder_hosts_by_group,
     get_allowed_vfolder_hosts_by_user,
     get_sessions_by_mounted_folder,
-    is_unmanaged,
     vfolder_status_map,
     vfolders,
 )

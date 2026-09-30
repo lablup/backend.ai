@@ -17,6 +17,10 @@ def is_noop_host(vfolder_host: str) -> bool:
     return volume_name == NOOP_STORAGE_VOLUME_NAME
 
 
+def is_unmanaged(unmanaged_path: str | None) -> bool:
+    return (unmanaged_path is not None) and unmanaged_path != ""
+
+
 INTRINSIC_SLOTS: Final = {
     SlotName("cpu"): SlotTypes("count"),
     SlotName("mem"): SlotTypes("bytes"),

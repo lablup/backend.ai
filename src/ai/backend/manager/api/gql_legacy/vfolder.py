@@ -43,6 +43,7 @@ from ai.backend.manager.data.permission.permission_defs import (
     VFolderPermission as VFolderRBACPermission,
 )
 from ai.backend.manager.data.vfolder.types import VFolderOperationStatus, VFolderOwnershipType
+from ai.backend.manager.defs import is_unmanaged
 from ai.backend.manager.errors.storage import (
     ModelCardParseError,
     QuotaScopeNotFoundError,
@@ -66,7 +67,6 @@ from ai.backend.manager.models.vfolder.row import (
     VFolderUserMountPolicyRow,
     ensure_quota_scope_accessible_by_user,
     get_permission_ctx,
-    is_unmanaged,
     vfolders,
 )
 from ai.backend.manager.models.virtual_entity.queries import user_scope_membership_query
