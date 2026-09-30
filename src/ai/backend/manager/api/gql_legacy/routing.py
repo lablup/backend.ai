@@ -12,6 +12,7 @@ from sqlalchemy.exc import NoResultFound
 from ai.backend.common.exception import DeprecatedAPI
 from ai.backend.manager.data.deployment.types import RouteStatus
 from ai.backend.manager.errors.service import RoutingNotFound
+from ai.backend.manager.models.routing.legacy import get_routing, list_routings
 from ai.backend.manager.models.routing.row import RoutingRow
 
 from .base import InferenceSessionError, Item, PaginatedList
@@ -153,7 +154,7 @@ class Routing(graphene.ObjectType):  # type: ignore[misc]
         user_uuid: uuid.UUID | None = None,
     ) -> Sequence[Routing]:
         async with ctx.db.begin_readonly_session() as session:
-            rows = await RoutingRow.list(
+            rows = await list_routings(
                 session,
                 endpoint_id,
                 project=project,
@@ -174,7 +175,7 @@ class Routing(graphene.ObjectType):  # type: ignore[misc]
     ) -> Routing:
         try:
             async with ctx.db.begin_readonly_session() as session:
-                row = await RoutingRow.get(
+                row = await get_routing(
                     session, routing_id, project=project, domain=domain_name, user_uuid=user_uuid
                 )
         except NoResultFound as e:
