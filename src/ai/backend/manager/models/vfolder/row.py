@@ -389,10 +389,14 @@ class VFolderRow(LifecycleTimestampsMixin, Base):
     )
 
     # Relationships
+    # Read only by VFolderRow.get and gql_legacy (endpoint.py, vfolder.py).
+    # Delete it together with the gql_legacy cleanup.
     user_row: Mapped[UserRow | None] = relationship(
         "UserRow",
         primaryjoin=_get_user_row_join_condition,
     )
+    # Read only by VFolderRow.get and gql_legacy (endpoint.py, vfolder.py).
+    # Delete it together with the gql_legacy cleanup.
     group_row: Mapped[ProjectRow | None] = relationship(
         "ProjectRow",
         primaryjoin=_get_group_row_join_condition,
