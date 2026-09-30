@@ -106,7 +106,7 @@ yarl~=1.19.0
 zipstream-new~=1.1.8
 
 # required by ai.backend.test (integration test suite)
-pytest>=8.4.0
+pytest>=8.4.0,<9.1
 pytest-aiohttp~=1.1.0
 pytest-dependency>=0.6.0
 pytest-mock>=3.14.0
