@@ -208,7 +208,7 @@ class RoleGQL(PydanticNodeMixin[RoleNode]):
     )
     role_preset_id: UUID | None = gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.9.0",
             description=(
                 "ID of the role preset the role was instantiated from. Null when the role "
                 "was not created from a preset or the preset has been purged."
@@ -239,7 +239,7 @@ class RoleGQL(PydanticNodeMixin[RoleNode]):
 
     @gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.9.0",
             description=(
                 "The role preset the role was instantiated from. Null when the role "
                 "was not created from a preset or the preset has been purged."

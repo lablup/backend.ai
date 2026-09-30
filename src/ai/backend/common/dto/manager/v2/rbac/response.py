@@ -83,7 +83,7 @@ class RoleNode(BaseResponseModel):
         description=(
             "ID of the role preset the role was instantiated from. Null when the role "
             "was not created from a preset or the preset has been purged. "
-            f"Added in {NEXT_RELEASE_VERSION}."
+            "Added in 26.9.0."
         ),
     )
 

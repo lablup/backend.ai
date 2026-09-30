@@ -70,7 +70,7 @@ class RolePresetPermissionNestedFilterGQL(PydanticInputMixin[RolePresetPermissio
 class RolePresetFilterGQL(PydanticInputMixin[RolePresetFilterDTO]):
     id: UUIDFilter | None = gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.9.0",
             description="Filter by role preset ID.",
         ),
         default=None,
