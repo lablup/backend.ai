@@ -384,27 +384,3 @@ async def get_permission_ctx(
 ) -> DomainPermissionContext:
     builder = DomainPermissionContextBuilder(db_session)
     return await builder.build(ctx, target_scope, requested_permission)
-
-
-async def get_domains(
-    target_scope: ScopeType,
-    requested_permission: DomainPermission,
-    domain_names: Iterable[str] | None = None,
-    *,
-    ctx: ClientContext,
-    db_session: SASession,
-) -> list[DomainModel]:
-    ret: list[DomainModel] = []
-    permission_ctx = await get_permission_ctx(
-        target_scope, requested_permission, ctx=ctx, db_session=db_session
-    )
-    cond = permission_ctx.query_condition
-    if cond is None:
-        return ret
-    query_stmt = sa.select(DomainRow).where(cond)
-    if domain_names is not None:
-        query_stmt = query_stmt.where(DomainRow.name.in_(domain_names))
-    async for row in await db_session.stream_scalars(query_stmt):
-        permissions = await permission_ctx.calculate_final_permission(row)
-        ret.append(DomainModel.from_row(row, permissions))
-    return ret
