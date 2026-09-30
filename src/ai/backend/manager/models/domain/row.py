@@ -114,6 +114,9 @@ class DomainRow(LifecycleTimestampsMixin, Base):
         "dotfiles", sa.LargeBinary(length=MAXIMUM_DOTFILE_SIZE), nullable=False, default=b"\x90"
     )
 
+    # Read only by build_ctx_in_domain_scope (the legacy RBAC) in
+    # models/resource_group/row.py, whose entry point _ensure_sgroup_permission in
+    # api/gql_legacy/domain.py nothing calls. Delete it with the legacy RBAC.
     sgroup_for_domains_rows: Mapped[list[ResourceGroupForDomainRow]] = relationship(
         "ResourceGroupForDomainRow",
     )
@@ -132,6 +135,9 @@ class DomainRow(LifecycleTimestampsMixin, Base):
 domains = DomainRow.__table__
 
 
+# Everything below serves the legacy RBAC path alone: api/gql_legacy/domain.py imports
+# get_permission_ctx and DomainModel, and nothing else reads these names. Delete the
+# whole block together with gql_legacy.
 @dataclass
 class DomainModel(RBACModel[DomainPermission]):
     id: DomainID
@@ -214,6 +220,8 @@ MEMBER_PERMISSIONS: frozenset[DomainPermission] = frozenset([DomainPermission.RE
 type WhereClauseType = sa.sql.expression.BinaryExpression[Any] | sa.sql.expression.BooleanClauseList
 
 
+# Built by DomainPermissionContextBuilder below and read by
+# api/gql_legacy/domain.py:256, :319; the v2 path judges through models/scopes.py instead.
 @dataclass
 class DomainPermissionContext(AbstractPermissionContext[DomainPermission, DomainRow, str]):
     @property
@@ -258,6 +266,7 @@ class DomainPermissionContext(AbstractPermissionContext[DomainPermission, Domain
         return permissions
 
 
+# Reached only through get_permission_ctx below; no other name refers to it.
 class DomainPermissionContextBuilder(
     AbstractPermissionContextBuilder[DomainPermission, DomainPermissionContext]
 ):
@@ -346,6 +355,7 @@ class DomainPermissionContextBuilder(
         return MEMBER_PERMISSIONS
 
 
+# Called only by api/gql_legacy/domain.py:256, :319 — the way into everything above.
 async def get_permission_ctx(
     target_scope: ScopeType,
     requested_permission: DomainPermission,
