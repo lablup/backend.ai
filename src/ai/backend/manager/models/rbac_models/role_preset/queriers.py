@@ -13,7 +13,7 @@ from ai.backend.manager.models.rbac_models.role_preset.row import RolePresetRow
 from ai.backend.manager.models.rbac_models.role_preset.searchable_fields import (
     RolePresetSearchableFields,
 )
-from ai.backend.manager.models.specs.querier import DataQuerier
+from ai.backend.manager.models.specs.querier import BulkEntityQuerier, DataQuerier
 
 
 @dataclass
@@ -32,6 +32,22 @@ class RolePresetQuerier(DataQuerier[RolePresetRow, RolePresetData]):
     @override
     def entity_id_value(self) -> RolePresetID:
         return self.preset_id
+
+    @override
+    def to_data(self, row: RolePresetRow) -> RolePresetData:
+        return RolePresetSearchableFields.own.to_data(row)
+
+
+class BulkRolePresetQuerier(BulkEntityQuerier[RolePresetRow, RolePresetData]):
+    """The role presets the caller named."""
+
+    @override
+    def row_class(self) -> type[RolePresetRow]:
+        return RolePresetRow
+
+    @override
+    def entity_id_column(self) -> InstrumentedAttribute[Any]:
+        return RolePresetRow.id
 
     @override
     def to_data(self, row: RolePresetRow) -> RolePresetData:

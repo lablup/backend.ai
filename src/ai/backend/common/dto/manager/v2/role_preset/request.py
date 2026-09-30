@@ -7,7 +7,7 @@ from pydantic import Field
 from ai.backend.common.api_handlers import BaseRequestModel
 from ai.backend.common.data.entity.role_preset import RolePresetID
 from ai.backend.common.data.entity.types import DeclaredEntityType
-from ai.backend.common.dto.manager.query import StringFilter, ToManyFilter
+from ai.backend.common.dto.manager.query import StringFilter, ToManyFilter, UUIDFilter
 from ai.backend.common.dto.manager.v2.common import OrderDirection
 from ai.backend.common.dto.manager.v2.role_permission_preset.request import (
     RolePermissionPresetFilter,
@@ -114,6 +114,7 @@ class RolePresetPermissionNestedFilter(ToManyFilter[RolePermissionPresetFilter])
 class RolePresetFilter(BaseRequestModel):
     """Filter criteria for searching role presets."""
 
+    id: UUIDFilter | None = Field(default=None, description="Filter by role preset ID.")
     name: StringFilter | None = Field(default=None, description="Filter by name.")
     scope_type: StringFilter | None = Field(default=None, description="Filter by scope type.")
     auto_assign: bool | None = Field(default=None, description="Filter by auto-assign flag.")
