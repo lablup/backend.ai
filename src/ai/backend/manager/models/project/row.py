@@ -9,7 +9,6 @@ from typing import (
     TYPE_CHECKING,
     Any,
     Self,
-    TypedDict,
     override,
 )
 
@@ -28,7 +27,6 @@ from sqlalchemy.orm import (
 )
 from sqlalchemy.sql.expression import SQLColumnExpression
 
-from ai.backend.common import msgpack
 from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.types import ResourceSlot, VFolderHostPermissionMap
@@ -77,12 +75,10 @@ def _get_association_container_registries_groups_join_condition() -> sa.ColumnEl
 __all__: Sequence[str] = (
     "MAXIMUM_DOTFILE_SIZE",
     "AssocGroupUserRow",
-    "ProjectDotfile",
     "ProjectRow",
     "ProjectType",
     "association_groups_users",
     "groups",
-    "query_group_dotfiles",
     "verify_dotfile_name",
 )
 
@@ -329,24 +325,6 @@ class ProjectModel(RBACModel[ProjectPermission]):
             _container_registry=row.container_registry,
             _permissions=frozenset(permissions),
         )
-
-
-class ProjectDotfile(TypedDict):
-    data: str
-    path: str
-    perm: str
-
-
-async def query_group_dotfiles(
-    db_conn: SAConnection,
-    group_id: GUID[uuid.UUID] | uuid.UUID,
-) -> tuple[list[ProjectDotfile], int]:
-    query = sa.select(groups.c.dotfiles).select_from(groups).where(groups.c.id == group_id)
-    packed_dotfile = await db_conn.scalar(query)
-    if packed_dotfile is None:
-        return [], MAXIMUM_DOTFILE_SIZE
-    rows = msgpack.unpackb(packed_dotfile)
-    return rows, MAXIMUM_DOTFILE_SIZE - len(packed_dotfile)
 
 
 def verify_dotfile_name(dotfile: str) -> bool:
