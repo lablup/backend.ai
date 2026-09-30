@@ -14839,7 +14839,7 @@ type Role implements Node {
   scopeId: UUID!
 
   """
-  Added in 26.9.0. ID of the role preset the role was instantiated from. Null when the role was not created from a preset.
+  Added in 26.9.0. ID of the role preset the role was instantiated from. Null when the role was not created from a preset or the preset has been purged.
   """
   rolePresetId: UUID
 
@@ -14847,7 +14847,7 @@ type Role implements Node {
   scope: EntityNode
 
   """
-  Added in 26.9.0. The role preset the role was instantiated from. Null when the role was not created from a preset.
+  Added in 26.9.0. The role preset the role was instantiated from. Null when the role was not created from a preset or the preset has been purged.
   """
   rolePreset: RolePreset
 

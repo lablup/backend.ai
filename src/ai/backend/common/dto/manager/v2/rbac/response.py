@@ -82,7 +82,8 @@ class RoleNode(BaseResponseModel):
         default=None,
         description=(
             "ID of the role preset the role was instantiated from. Null when the role "
-            f"was not created from a preset. Added in {NEXT_RELEASE_VERSION}."
+            "was not created from a preset or the preset has been purged. "
+            f"Added in {NEXT_RELEASE_VERSION}."
         ),
     )
 

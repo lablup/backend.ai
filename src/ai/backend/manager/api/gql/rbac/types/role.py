@@ -210,8 +210,8 @@ class RoleGQL(PydanticNodeMixin[RoleNode]):
         BackendAIGQLMeta(
             added_version=NEXT_RELEASE_VERSION,
             description=(
-                "ID of the role preset the role was instantiated from. "
-                "Null when the role was not created from a preset."
+                "ID of the role preset the role was instantiated from. Null when the role "
+                "was not created from a preset or the preset has been purged."
             ),
         ),
         default=None,
@@ -241,8 +241,8 @@ class RoleGQL(PydanticNodeMixin[RoleNode]):
         BackendAIGQLMeta(
             added_version=NEXT_RELEASE_VERSION,
             description=(
-                "The role preset the role was instantiated from. "
-                "Null when the role was not created from a preset."
+                "The role preset the role was instantiated from. Null when the role "
+                "was not created from a preset or the preset has been purged."
             ),
         )
     )  # type: ignore[misc]
