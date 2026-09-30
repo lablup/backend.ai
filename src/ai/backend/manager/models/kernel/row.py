@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import uuid
 from collections.abc import Sequence
-from datetime import datetime, tzinfo
+from datetime import datetime
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -387,21 +387,6 @@ class KernelRow(CreatedAtMixin, Base):
         primaryjoin=_get_user_row_join_condition,
         foreign_keys="KernelRow.user_uuid",
     )
-
-    @property
-    def used_time(self) -> str | None:
-        if self.terminated_at is not None and self.created_at is not None:
-            return str(self.terminated_at - self.created_at)
-        return None
-
-    def get_used_days(self, local_tz: tzinfo) -> int | None:
-        if self.terminated_at is not None and self.created_at is not None:
-            return (
-                self.terminated_at.astimezone(local_tz).toordinal()
-                - self.created_at.astimezone(local_tz).toordinal()
-                + 1
-            )
-        return None
 
     @staticmethod
     async def batch_load_main_kernels_by_session_id(

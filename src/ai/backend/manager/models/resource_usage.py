@@ -499,6 +499,22 @@ def parse_resource_usage(
     )
 
 
+def _used_time(kernel: KernelRow) -> str | None:
+    if kernel.terminated_at is not None and kernel.created_at is not None:
+        return str(kernel.terminated_at - kernel.created_at)
+    return None
+
+
+def _used_days(kernel: KernelRow, local_tz: tzinfo) -> int | None:
+    if kernel.terminated_at is not None and kernel.created_at is not None:
+        return (
+            kernel.terminated_at.astimezone(local_tz).toordinal()
+            - kernel.created_at.astimezone(local_tz).toordinal()
+            + 1
+        )
+    return None
+
+
 async def parse_resource_usage_groups(
     kernels: list[KernelRow],
     allocated_slots: Mapping[UUID, ResourceSlot],
@@ -527,8 +543,8 @@ async def parse_resource_usage_groups(
                 if kern.status_history
                 else None
             ),
-            used_time=kern.used_time,
-            used_days=kern.get_used_days(local_tz),
+            used_time=_used_time(kern),
+            used_days=_used_days(kern, local_tz),
             last_stat=stat_map.get(kern.id),
             user_id=kern.session.user_uuid,
             user_email=kern.session.user.email if kern.session.user is not None else None,
