@@ -8,18 +8,15 @@ from typing import (
     TYPE_CHECKING,
     Any,
     Self,
-    TypedDict,
     override,
 )
 
 import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql as pgsql
-from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
 from sqlalchemy.orm import Mapped, load_only, mapped_column, relationship
 from sqlalchemy.sql.expression import SQLColumnExpression
 
-from ai.backend.common import msgpack
 from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.types import ResourceSlot, VFolderHostPermissionMap
 from ai.backend.logging.structured import StructuredLogger
@@ -56,10 +53,8 @@ log = StructuredLogger(logging.getLogger(__spec__.name))
 
 __all__: Sequence[str] = (
     "MAXIMUM_DOTFILE_SIZE",
-    "DomainDotfile",
     "DomainRow",
     "domains",
-    "query_domain_dotfiles",
     "verify_dotfile_name",
 )
 
@@ -204,24 +199,6 @@ class DomainModel(RBACModel[DomainPermission]):
             _permissions=frozenset(permissions),
             orm_obj=row,
         )
-
-
-class DomainDotfile(TypedDict):
-    data: str
-    path: str
-    perm: str
-
-
-async def query_domain_dotfiles(
-    conn: SAConnection,
-    name: str,
-) -> tuple[list[DomainDotfile], int]:
-    query = sa.select(DomainRow.dotfiles).where(DomainRow.name == name)
-    packed_dotfile = await conn.scalar(query)
-    if packed_dotfile is None:
-        return [], MAXIMUM_DOTFILE_SIZE
-    rows = msgpack.unpackb(packed_dotfile)
-    return rows, MAXIMUM_DOTFILE_SIZE - len(packed_dotfile)
 
 
 def verify_dotfile_name(dotfile: str) -> bool:
