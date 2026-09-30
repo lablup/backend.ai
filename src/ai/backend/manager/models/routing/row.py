@@ -37,7 +37,6 @@ from ai.backend.manager.models.base import (
 
 if TYPE_CHECKING:
     from ai.backend.manager.models.endpoint.row import EndpointRow
-    from ai.backend.manager.models.session.row import SessionRow
 
 
 __all__ = ("RouteStatus", "RoutingRow")
@@ -165,9 +164,6 @@ class RoutingRow(Base):
     )
 
     endpoint_row: Mapped[EndpointRow] = relationship("EndpointRow", back_populates="routings")
-    session_row: Mapped[SessionRow | None] = relationship(
-        "SessionRow", foreign_keys="RoutingRow.session"
-    )
 
     @classmethod
     async def list(
@@ -175,7 +171,6 @@ class RoutingRow(Base):
         db_sess: AsyncSession,
         endpoint_id: uuid.UUID,
         load_endpoint: bool = False,
-        load_session: bool = False,
         status_filter: list[RouteStatus] | None = None,
         project: uuid.UUID | None = None,
         domain: str | None = None,
@@ -194,8 +189,6 @@ class RoutingRow(Base):
         )
         if load_endpoint:
             query = query.options(selectinload(RoutingRow.endpoint_row))
-        if load_session:
-            query = query.options(selectinload(RoutingRow.session_row))
         if project:
             query = query.filter(RoutingRow.project == project)
         if domain:
@@ -210,7 +203,6 @@ class RoutingRow(Base):
         cls,
         db_sess: AsyncSession,
         route_id: uuid.UUID,
-        load_session: bool = False,
         load_endpoint: bool = False,
         project: uuid.UUID | None = None,
         domain: str | None = None,
@@ -220,8 +212,6 @@ class RoutingRow(Base):
         :raises: sqlalchemy.orm.exc.NoResultFound
         """
         query = sa.select(RoutingRow).where(RoutingRow.id == route_id)
-        if load_session:
-            query = query.options(selectinload(RoutingRow.session_row))
         if load_endpoint:
             query = query.options(selectinload(RoutingRow.endpoint_row))
         if project:

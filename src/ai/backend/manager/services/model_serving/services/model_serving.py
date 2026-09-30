@@ -44,6 +44,7 @@ from ai.backend.common.types import (
     MountInfoEntry,
     MountPermission,
     ResourceSlotEntry,
+    SessionId,
     SessionTypes,
 )
 from ai.backend.logging.structured import StructuredLogger
@@ -729,14 +730,9 @@ class ModelServingService:
         if route_data.status == RouteStatus.PROVISIONING:
             raise InvalidAPIParameters("Cannot remove route in PROVISIONING status")
 
-        # Get session for destruction
-        route_row = await self._repository.get_route_with_session(action.route_id)
-        if not route_row:
-            raise RouteNotFound
-
-        if route_row.session_row:
+        if route_data.session is not None:
             await self._scheduling_controller.mark_sessions_for_termination(
-                [route_row.session_row.id],
+                [SessionId(route_data.session)],
                 reason=KernelLifecycleEventReason.SERVICE_SCALED_DOWN,
                 forced=False,
             )

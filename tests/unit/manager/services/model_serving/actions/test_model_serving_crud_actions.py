@@ -20,6 +20,7 @@ from ai.backend.common.data.user.types import UserData, UserRole
 from ai.backend.common.events.dispatcher import EventDispatcher
 from ai.backend.common.events.event_types.kernel.types import KernelLifecycleEventReason
 from ai.backend.common.events.hub import EventHub
+from ai.backend.common.types import SessionId
 from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.deployment.types import RouteStatus
@@ -469,28 +470,6 @@ class TestDeleteRoute(ModelServingCRUDBaseFixtures):
         )
 
     @pytest.fixture
-    def mock_get_route_with_session(self, mocker: Any, mock_repositories: Any) -> AsyncMock:
-        return cast(
-            AsyncMock,
-            mocker.patch.object(
-                mock_repositories.repository,
-                "get_route_with_session",
-                new_callable=AsyncMock,
-            ),
-        )
-
-    @pytest.fixture
-    def mock_destroy_session(self, mocker: Any, mock_agent_registry: Any) -> AsyncMock:
-        return cast(
-            AsyncMock,
-            mocker.patch.object(
-                mock_agent_registry,
-                "destroy_session",
-                new_callable=AsyncMock,
-            ),
-        )
-
-    @pytest.fixture
     def mock_decrease_endpoint_replicas(self, mocker: Any, mock_repositories: Any) -> AsyncMock:
         return cast(
             AsyncMock,
@@ -508,46 +487,35 @@ class TestDeleteRoute(ModelServingCRUDBaseFixtures):
             domain=user_data.domain_name,
         )
 
-    @pytest.mark.skip(
-        reason=(
-            "Rewrite pending: the refactor routes route-deletion through"
-            " SchedulingController.mark_sessions_for_termination rather than"
-            " agent_registry.destroy_session; the mock expectation on"
-            " destroy_session no longer holds."
-        ),
-    )
     async def test_healthy_route_deletion_success(
         self,
         model_serving_service: ModelServingService,
         mock_check_user_access: AsyncMock,
         mock_get_endpoint_access_validation_data: AsyncMock,
         mock_get_route_by_id: AsyncMock,
-        mock_get_route_with_session: AsyncMock,
-        mock_destroy_session: AsyncMock,
+        mock_scheduling_controller: MagicMock,
         mock_decrease_endpoint_replicas: AsyncMock,
         user_data: UserData,
         service_id: uuid.UUID,
         route_id: uuid.UUID,
     ) -> None:
-        """HEALTHY route deletion returns success=true with destroy_session + decrease_replicas."""
+        """RUNNING route deletion marks the route's session for termination and decreases replicas."""
         mock_get_endpoint_access_validation_data.return_value = self._make_validation_data(
             user_data
         )
-        mock_route_data = MagicMock(status=RouteStatus.RUNNING)
-        mock_get_route_by_id.return_value = mock_route_data
-
-        mock_session_row = MagicMock()
-        mock_route_row = MagicMock(session_row=mock_session_row)
-        mock_get_route_with_session.return_value = mock_route_row
+        session_id = uuid.uuid4()
+        mock_get_route_by_id.return_value = MagicMock(
+            status=RouteStatus.RUNNING, session=session_id
+        )
 
         action = DeleteRouteAction(deployment_id=DeploymentID(service_id), route_id=route_id)
         result = await model_serving_service.delete_route(action)
 
         assert result.route_id == route_id
-        mock_destroy_session.assert_called_once_with(
-            mock_session_row,
-            forced=False,
+        mock_scheduling_controller.mark_sessions_for_termination.assert_called_once_with(
+            [SessionId(session_id)],
             reason=KernelLifecycleEventReason.SERVICE_SCALED_DOWN,
+            forced=False,
         )
         mock_decrease_endpoint_replicas.assert_called_once_with(service_id)
 
@@ -577,25 +545,23 @@ class TestDeleteRoute(ModelServingCRUDBaseFixtures):
         mock_check_user_access: AsyncMock,
         mock_get_endpoint_access_validation_data: AsyncMock,
         mock_get_route_by_id: AsyncMock,
-        mock_get_route_with_session: AsyncMock,
-        mock_destroy_session: AsyncMock,
+        mock_scheduling_controller: MagicMock,
         mock_decrease_endpoint_replicas: AsyncMock,
         user_data: UserData,
         service_id: uuid.UUID,
         route_id: uuid.UUID,
     ) -> None:
-        """Sessionless route deletes without session destruction call."""
+        """Sessionless route deletes without marking any session for termination."""
         mock_get_endpoint_access_validation_data.return_value = self._make_validation_data(
             user_data
         )
-        mock_get_route_by_id.return_value = MagicMock(status=RouteStatus.RUNNING)
-        mock_get_route_with_session.return_value = MagicMock(session_row=None)
+        mock_get_route_by_id.return_value = MagicMock(status=RouteStatus.RUNNING, session=None)
 
         action = DeleteRouteAction(deployment_id=DeploymentID(service_id), route_id=route_id)
         result = await model_serving_service.delete_route(action)
 
         assert result.route_id == route_id
-        mock_destroy_session.assert_not_called()
+        mock_scheduling_controller.mark_sessions_for_termination.assert_not_called()
         mock_decrease_endpoint_replicas.assert_called_once_with(service_id)
 
     async def test_non_existent_route_raises(

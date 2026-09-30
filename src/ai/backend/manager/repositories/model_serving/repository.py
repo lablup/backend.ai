@@ -462,15 +462,12 @@ class ModelServingRepository:
         session: SASession,
         route_id: uuid.UUID,
         load_endpoint: bool = False,
-        load_session: bool = False,
     ) -> RoutingRow | None:
         """
         Private method to get route by ID using an existing session.
         """
         try:
-            return await RoutingRow.get(
-                session, route_id, load_endpoint=load_endpoint, load_session=load_session
-            )
+            return await RoutingRow.get(session, route_id, load_endpoint=load_endpoint)
         except NoResultFound:
             return None
 
@@ -553,16 +550,6 @@ class ModelServingRepository:
         """
         async with self._db.begin_readonly_session_read_committed() as session:
             return await self._get_endpoint_by_id(session, service_id, load_routes=True)
-
-    @model_serving_repository_resilience.apply()
-    async def get_route_with_session(self, route_id: uuid.UUID) -> RoutingRow | None:
-        """
-        Get route with endpoint and session data loaded.
-        """
-        async with self._db.begin_readonly_session_read_committed() as session:
-            return await self._get_route_by_id(
-                session, route_id, load_endpoint=True, load_session=True
-            )
 
     @model_serving_repository_resilience.apply()
     async def update_endpoint_replicas(
