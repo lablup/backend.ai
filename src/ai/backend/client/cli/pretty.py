@@ -293,7 +293,7 @@ class ProgressBarWithSpinner(tqdm):  # type: ignore[type-arg]
         return self._total
 
     @total.setter
-    def total(self, value: int | float) -> None:
+    def total(self, value: int | float | None) -> None:
         self._total = value
         # Reactivate the progress bar display when total is first set
         self.format_meter = self._orig_format_meter
