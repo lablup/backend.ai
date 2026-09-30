@@ -1,5 +1,7 @@
 import logging
+import re
 import uuid
+from urllib.parse import urlparse
 
 import sqlalchemy as sa
 import yarl
@@ -22,6 +24,10 @@ from ai.backend.manager.data.container_registry.types import (
 )
 from ai.backend.manager.data.image.types import ImageStatus
 from ai.backend.manager.data.permission.global_entity import global_entity_id
+from ai.backend.manager.errors.container_registry import (
+    InvalidContainerRegistryProject,
+    InvalidContainerRegistryURL,
+)
 from ai.backend.manager.errors.image import ContainerRegistryNotFound
 from ai.backend.manager.models.container_registry.creators import ContainerRegistryCreator
 from ai.backend.manager.models.container_registry.purgers import ContainerRegistryPurger
@@ -32,10 +38,6 @@ from ai.backend.manager.models.container_registry.searchable_fields import (
 from ai.backend.manager.models.container_registry.updaters import (
     ContainerRegistryGlobalUpdater,
     ContainerRegistryUpdater,
-)
-from ai.backend.manager.models.container_registry.validator import (
-    ContainerRegistryValidator,
-    ContainerRegistryValidatorArgs,
 )
 from ai.backend.manager.models.image.row import ImageRow
 from ai.backend.manager.models.rbac import ProjectScope
@@ -63,6 +65,9 @@ container_registry_repository_resilience = Resilience(
         ),
     ]
 )
+
+
+_HARBOR_PROJECT_NAME = re.compile(r"^[a-z0-9]+(?:[._-][a-z0-9]+)*$")
 
 
 class ContainerRegistryRepository:
@@ -94,14 +99,37 @@ class ContainerRegistryRepository:
             if data is None:
                 raise ContainerRegistryNotFound(f"Container registry not found (id:{registry_id})")
             if updater.build_values():
-                ContainerRegistryValidator(
-                    ContainerRegistryValidatorArgs(
-                        type=data.type,
-                        project=data.project,
-                        url=data.url,
-                    )
-                ).validate()
+                self._validate_config(data)
             return data
+
+    @staticmethod
+    def _validate_config(data: ContainerRegistryData) -> None:
+        """Refuse the registry when its URL or its Harbor project name is malformed.
+
+        api/gql_legacy runs the same rules through
+        models/container_registry/validator.py; change both together.
+        """
+        url = data.url.strip()
+        if not url.startswith(("http://", "https://")):
+            url = "http://" + url
+        try:
+            parsed = urlparse(url)
+            valid_url = bool(parsed.scheme and parsed.netloc)
+        except Exception:
+            valid_url = False
+        if not valid_url:
+            raise InvalidContainerRegistryURL(f"Invalid URL format: {data.url}")
+        match data.type:
+            case ContainerRegistryType.HARBOR | ContainerRegistryType.HARBOR2:
+                project = data.project
+                if project is None:
+                    raise InvalidContainerRegistryProject("Project name is required for Harbor.")
+                if not (1 <= len(project) <= 255):
+                    raise InvalidContainerRegistryProject("Invalid project name length.")
+                if not _HARBOR_PROJECT_NAME.match(project):
+                    raise InvalidContainerRegistryProject("Invalid project name format.")
+            case _:
+                pass
 
     async def set_global(self, updater: ContainerRegistryGlobalUpdater) -> ContainerRegistryData:
         """Write `is_global` and put the registry and its images into the `public`
