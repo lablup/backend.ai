@@ -73,7 +73,7 @@ python-dateutil>=2.9
 python-dotenv~=1.2.2
 python-json-logger~=3.2.0
 pyzmq~=26.4
-PyJWT~=2.13.0
+PyJWT~=2.15.1
 PyYAML~=6.0
 pydantic[email]~=2.11.3
 packaging>=24.1
@@ -84,7 +84,7 @@ rich~=13.6
 ruamel.yaml~=0.18.10
 SQLAlchemy[postgresql_asyncpg]~=2.0.45
 setproctitle~=1.3.5
-setuptools~=80.0.0
+setuptools~=84.0.0
 strawberry-graphql~=0.315.7
 tabulate~=0.8.9
 temporenc~=0.1.0
@@ -106,7 +106,7 @@ yarl~=1.19.0
 zipstream-new~=1.1.8
 
 # required by ai.backend.test (integration test suite)
-pytest>=8.4.0
+pytest>=8.4.0,<9.1
 pytest-aiohttp~=1.1.0
 pytest-dependency>=0.6.0
 pytest-mock>=3.14.0
