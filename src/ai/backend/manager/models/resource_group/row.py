@@ -144,6 +144,8 @@ class ResourceGroupForDomainRow(Base):
         # constraint
         sa.UniqueConstraint("resource_group_id", "domain_id", name="uq_sgroup_domain"),
     )
+    # Read only by ResourceGroupPermissionContextBuilder (the legacy RBAC) below.
+    # Delete it with the legacy RBAC.
     sgroup_row: Mapped[ResourceGroupRow] = relationship(
         "ResourceGroupRow",
     )
@@ -175,6 +177,8 @@ class ResourceGroupForProjectRow(Base):
         # constraint
         sa.UniqueConstraint("resource_group_id", "group", name="uq_sgroup_ugroup"),
     )
+    # Read only by ResourceGroupPermissionContextBuilder (the legacy RBAC) below.
+    # Delete it with the legacy RBAC.
     sgroup_row: Mapped[ResourceGroupRow] = relationship(
         "ResourceGroupRow",
     )
@@ -205,6 +209,8 @@ class ResourceGroupForKeypairsRow(Base):
         # constraint
         sa.UniqueConstraint("resource_group_id", "access_key", name="uq_sgroup_akey"),
     )
+    # Read only by ResourceGroupPermissionContextBuilder (the legacy RBAC) below.
+    # Delete it with the legacy RBAC.
     sgroup_row: Mapped[ResourceGroupRow] = relationship(
         "ResourceGroupRow",
     )
@@ -300,6 +306,8 @@ class ResourceGroupRow(CreatedAtMixin, Base):
     def scope_name_expr(cls) -> SQLColumnExpression[str]:
         return cls.name
 
+    # Called only by resolve_scaling_groups_for_user_group in api/gql_legacy/schema.py.
+    # Delete it with gql_legacy.
     @classmethod
     async def list_by_condition(
         cls,
@@ -314,6 +322,8 @@ class ResourceGroupRow(CreatedAtMixin, Base):
             return list((await db_session.scalars(stmt)).all())
 
 
+# Builds the condition list_by_condition takes; api/gql_legacy/schema.py:146, :2321 is
+# the only caller. Delete it with gql_legacy.
 def and_names(names: Iterable[str]) -> Callable[..., sa.sql.Select[Any]]:
     return lambda query_stmt: query_stmt.where(ResourceGroupRow.name.in_(names))
 
