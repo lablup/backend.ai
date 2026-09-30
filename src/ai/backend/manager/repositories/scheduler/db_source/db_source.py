@@ -93,12 +93,10 @@ from ai.backend.manager.models.container_registry.row import ContainerRegistryRo
 from ai.backend.manager.models.domain.row import DomainRow, domains
 from ai.backend.manager.models.image.row import ImageRow
 from ai.backend.manager.models.kernel.creators import KernelCreator
-from ai.backend.manager.models.kernel.row import (
-    USER_RESOURCE_OCCUPYING_KERNEL_STATUSES,
-    KernelRow,
-)
+from ai.backend.manager.models.kernel.row import KernelRow
 from ai.backend.manager.models.kernel.searchable_fields import KernelSearchableFields
 from ai.backend.manager.models.kernel.searchers import KernelSearcher
+from ai.backend.manager.models.kernel.statuses import USER_RESOURCE_OCCUPYING_KERNEL_STATUSES
 from ai.backend.manager.models.keypair.row import KeyPairRow, keypairs
 from ai.backend.manager.models.network.row import NetworkRow
 from ai.backend.manager.models.project.row import ProjectRow

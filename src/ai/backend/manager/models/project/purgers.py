@@ -17,10 +17,8 @@ from ai.backend.common.types import KernelId, SessionId
 from ai.backend.manager.data.project.types import ProjectData
 from ai.backend.manager.errors.resource import ProjectHasActiveKernelsError
 from ai.backend.manager.models.endpoint.row import EndpointRow
-from ai.backend.manager.models.kernel.row import (
-    AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES,
-    KernelRow,
-)
+from ai.backend.manager.models.kernel.row import KernelRow
+from ai.backend.manager.models.kernel.statuses import AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES
 from ai.backend.manager.models.project.row import ProjectRow
 from ai.backend.manager.models.project.searchable_fields import ProjectSearchableFields
 from ai.backend.manager.models.session.row import SessionRow
