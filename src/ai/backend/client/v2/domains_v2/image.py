@@ -18,6 +18,7 @@ from ai.backend.common.dto.manager.v2.image.response import (
     AliasImagePayload,
     ForgetImagePayload,
     PurgeImagePayload,
+    ScopedSearchImagesPayload,
     UpdateImagePayload,
 )
 
@@ -37,6 +38,18 @@ class V2ImageClient(BaseDomainClient):
             f"{_PATH}/search",
             request=request,
             response_model=AdminSearchImagesPayload,
+        )
+
+    async def my_search(
+        self,
+        request: AdminSearchImagesInput,
+    ) -> ScopedSearchImagesPayload:
+        """Search the images the current user can reach."""
+        return await self._client.typed_request(
+            "POST",
+            f"{_PATH}/my/search",
+            request=request,
+            response_model=ScopedSearchImagesPayload,
         )
 
     async def admin_search_image_aliases(

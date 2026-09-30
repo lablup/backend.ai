@@ -215,6 +215,7 @@ from ai.backend.manager.api.gql.image.resolver import (
     image_alias,
     image_scoped_aliases,
     image_v2,
+    my_images_v2,
     scoped_images_v2,
 )
 from ai.backend.manager.api.gql.kernel.resolver.kernel import (
@@ -266,6 +267,7 @@ from ai.backend.manager.api.gql.model_card.resolver import (
     deploy_model_card_v2,
     model_card_available_presets,
     model_card_v2,
+    my_model_cards_v2,
     project_model_cards_v2,
     scan_project_model_cards_v2,
     scoped_model_cards_v2,
@@ -309,6 +311,7 @@ from ai.backend.manager.api.gql.project_v2.resolver.mutation import (
 from ai.backend.manager.api.gql.project_v2.resolver.query import (
     admin_projects_v2,
     domain_projects_v2,
+    my_projects_v2,
     project_domain_v2,
     project_v2,
     scoped_projects_v2,
@@ -492,6 +495,7 @@ from ai.backend.manager.api.gql.session.resolver.session import (
     enqueue_session,
     exclude_session_idle_checks,
     include_session_idle_checks,
+    my_sessions_v2,
     project_sessions_v2,
     scoped_sessions_v2,
     session_v2,
@@ -699,6 +703,7 @@ class Query:
     admin_user_usage_buckets = admin_user_usage_buckets
     admin_images_v2 = admin_images_v2
     scoped_images_v2 = scoped_images_v2
+    my_images_v2 = my_images_v2
     admin_kernels_v2 = admin_kernels_v2
     admin_audit_logs_v2 = admin_audit_logs_v2
     scoped_audit_logs_v2 = scoped_audit_logs_v2
@@ -712,6 +717,7 @@ class Query:
     admin_sessions_v2 = admin_sessions_v2
     project_sessions_v2 = project_sessions_v2
     scoped_sessions_v2 = scoped_sessions_v2
+    my_sessions_v2 = my_sessions_v2
     session_v2 = session_v2
     project_deployments = project_deployments
     scoped_deployments = scoped_deployments
@@ -820,6 +826,7 @@ class Query:
     admin_projects_v2 = admin_projects_v2
     domain_projects_v2 = domain_projects_v2
     scoped_projects_v2 = scoped_projects_v2
+    my_projects_v2 = my_projects_v2
     project_domain_v2 = project_domain_v2
     # Resource Policy V2 APIs
     admin_keypair_resource_policy_v2 = admin_keypair_resource_policy_v2
@@ -862,6 +869,7 @@ class Query:
     admin_model_cards_v2 = admin_model_cards_v2
     project_model_cards_v2 = project_model_cards_v2
     scoped_model_cards_v2 = scoped_model_cards_v2
+    my_model_cards_v2 = my_model_cards_v2
     model_card_v2 = model_card_v2
     model_card_available_presets = model_card_available_presets
     # Resource Allocation V2 APIs

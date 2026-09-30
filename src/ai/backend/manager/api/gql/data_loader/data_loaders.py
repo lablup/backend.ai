@@ -820,21 +820,13 @@ class DataLoaders:
         return DataLoader(load_fn=load_fn)
 
     @cached_property
-    def domain_loader(
+    def domain_id_by_name_loader(
         self,
-    ) -> DataLoader[str, DomainV2GQL | None]:
+    ) -> DataLoader[str, DomainID | None]:
         adapter = self._adapters.domain
 
-        async def load_fn(names: list[str]) -> list[DomainV2GQL | Exception | None]:
-            from ai.backend.manager.api.gql.domain_v2.types.node import (  # pants: no-infer-dep
-                DomainV2GQL as D,
-            )
-
-            dtos = await adapter.batch_load_by_names(names)
-            return [
-                dto if dto is None or isinstance(dto, Exception) else D.from_pydantic(dto)
-                for dto in dtos
-            ]
+        async def load_fn(names: list[str]) -> list[DomainID | None]:
+            return await adapter.bulk_lookup_names(names)
 
         return DataLoader(load_fn=load_fn)
 
@@ -849,7 +841,7 @@ class DataLoaders:
                 DomainV2GQL as D,
             )
 
-            dtos = await adapter.batch_load_by_ids(ids)
+            dtos = await adapter.bulk_get_ids(ids)
             return [
                 dto if dto is None or isinstance(dto, Exception) else D.from_pydantic(dto)
                 for dto in dtos

@@ -39,6 +39,7 @@ from ai.backend.manager.api.rest.app import build_root_app
 from ai.backend.manager.api.rest.middleware.auth import build_auth_middleware
 from ai.backend.manager.api.rest.middleware.exception import build_exception_middleware
 from ai.backend.manager.api.rest.setup import setup_api
+from ai.backend.manager.api.rest.shutdown import ServerDrainNotifier
 from ai.backend.manager.cli.context import CLIContext
 from ai.backend.manager.cli.dbschema import oneshot as cli_schema_oneshot
 from ai.backend.manager.cli.etcd import delete as cli_etcd_delete
@@ -834,7 +835,7 @@ async def server_factory(
         )
 
         # Build and mount the API module tree
-        setup_api(root_app, r, 0)
+        setup_api(root_app, r, 0, drain_notifier=ServerDrainNotifier())
 
         # Plugin webapps
         await init_stack.enter_async_context(webapp_plugin_ctx(root_app, dep_resources=r, pidx=0))

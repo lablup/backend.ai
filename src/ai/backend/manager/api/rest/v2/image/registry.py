@@ -28,6 +28,12 @@ def register_v2_image_routes(
     )
     registry.add(
         "POST",
+        "/my/search",
+        handler.my_search_images,
+        middlewares=[auth_required],
+    )
+    registry.add(
+        "POST",
         "/scoped/search",
         handler.scoped_search_images,
         middlewares=[auth_required],

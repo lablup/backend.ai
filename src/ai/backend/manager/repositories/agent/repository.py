@@ -240,6 +240,8 @@ class AgentRepository:
         ):
             await self._cache_source.remove_agent_from_images(agent_id, list(images.keys()))
 
+    # Every caller is in api/gql_legacy/agent.py. Delete it together with gql_legacy;
+    # it is the only v1 reader of AgentRow.agent_resource_rows and resources_by_rank.
     @agent_repository_resilience.apply()
     async def list_data(
         self,

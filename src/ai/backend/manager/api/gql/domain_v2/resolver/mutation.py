@@ -4,13 +4,11 @@ from __future__ import annotations
 
 from strawberry import Info
 
-from ai.backend.common.contexts.user import current_user
 from ai.backend.common.dto.manager.v2.domain.request import (
     DeleteDomainInput,
     PurgeDomainInput,
     RestoreDomainInput,
 )
-from ai.backend.common.exception import UnreachableError
 from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
@@ -26,18 +24,6 @@ from ai.backend.manager.api.gql.domain_v2.types.mutations import (
 )
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.api.gql.utils import check_admin_only
-from ai.backend.manager.data.domain.types import UserInfo
-
-
-def _get_user_info() -> UserInfo:
-    me = current_user()
-    if me is None:
-        raise UnreachableError("User context is not available after check_admin_only()")
-    return UserInfo(
-        id=me.user_id,
-        role=me.role,
-        domain_name=me.domain_name,
-    )
 
 
 @gql_mutation(
@@ -53,7 +39,7 @@ async def admin_create_domain_v2(
     """Create a new domain."""
     check_admin_only()
     ctx = info.context
-    payload = await ctx.adapters.domain.admin_create(input.to_pydantic(), _get_user_info())
+    payload = await ctx.adapters.domain.create(input.to_pydantic())
     return DomainPayloadGQL.from_pydantic(payload)
 
 
@@ -71,9 +57,7 @@ async def admin_update_domain_v2(
     """Update a domain."""
     check_admin_only()
     ctx = info.context
-    payload = await ctx.adapters.domain.admin_update(
-        domain_name, input.to_pydantic(), _get_user_info()
-    )
+    payload = await ctx.adapters.domain.update(domain_name, input.to_pydantic())
     return DomainPayloadGQL.from_pydantic(payload)
 
 
@@ -90,7 +74,7 @@ async def admin_delete_domain_v2(
     """Soft-delete a domain."""
     check_admin_only()
     ctx = info.context
-    payload = await ctx.adapters.domain.admin_delete(DeleteDomainInput(name=domain_name))
+    payload = await ctx.adapters.domain.delete(DeleteDomainInput(name=domain_name))
     return DeleteDomainPayloadGQL.from_pydantic(payload)
 
 
@@ -107,7 +91,7 @@ async def admin_restore_domain_v2(
     """Restore a soft-deleted domain."""
     check_admin_only()
     ctx = info.context
-    payload = await ctx.adapters.domain.admin_restore(RestoreDomainInput(name=domain_name))
+    payload = await ctx.adapters.domain.restore(RestoreDomainInput(name=domain_name))
     return RestoreDomainPayloadGQL.from_pydantic(payload)
 
 
@@ -124,5 +108,5 @@ async def admin_purge_domain_v2(
     """Permanently purge a domain."""
     check_admin_only()
     ctx = info.context
-    payload = await ctx.adapters.domain.admin_purge(PurgeDomainInput(name=domain_name))
+    payload = await ctx.adapters.domain.purge(PurgeDomainInput(name=domain_name))
     return PurgeDomainPayloadGQL.from_pydantic(payload)

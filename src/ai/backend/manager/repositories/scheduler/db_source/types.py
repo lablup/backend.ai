@@ -1,13 +1,18 @@
 """Types for database source operations."""
 
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 
 import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
 
-from ai.backend.common.types import SessionId
+from ai.backend.common.types import AgentId, SessionId
 from ai.backend.manager.errors.kernel import SessionNotFound
+from ai.backend.manager.models.resource_slot.row import AgentResourceRow
 from ai.backend.manager.models.session.row import SessionRow
+
+type AgentResourcesByAgent = Mapping[AgentId, Sequence[AgentResourceRow]]
+"""The ``agent_resources`` rows an agent holds, keyed by the agent's name column."""
 
 
 @dataclass

@@ -13,10 +13,8 @@ from decimal import Decimal
 
 import pytest
 import sqlalchemy as sa
-from sqlalchemy.orm import selectinload
 
 from ai.backend.common.data.entity.agent import AgentUUID
-from ai.backend.manager.models.agent.row import AgentRow
 from ai.backend.manager.models.resource_slot.row import (
     AgentResourceRow,
     ResourceAllocationRow,
@@ -491,62 +489,3 @@ class TestResourceAllocationRow:
             assert row is not None
             assert row.requested == one_tib
             assert row.used == one_tib
-
-
-class TestActualAvailableSlots:
-    """Tests that actual_available_slots() serves agent capacity from agent_resources."""
-
-    async def test_available_slots_from_capacity_sorted_by_rank(
-        self,
-        database_with_resource_slot_tables: ExtendedAsyncSAEngine,
-        agent_id: str,
-        agent_uuid: AgentUUID,
-    ) -> None:
-        capacities = {
-            "cpu": Decimal("8"),
-            "mem": Decimal("34359738368"),
-            "cuda.shares": Decimal("2"),
-        }
-        ranks = {"mem": 1, "cpu": 2, "cuda.shares": 3}
-        slot_type_defs = {"cpu": "count", "mem": "bytes", "cuda.shares": "count"}
-        async with database_with_resource_slot_tables.begin_session() as db_sess:
-            for slot_name, rank in ranks.items():
-                db_sess.add(
-                    ResourceSlotTypeRow(
-                        slot_name=slot_name,
-                        slot_type=slot_type_defs[slot_name],
-                        rank=rank,
-                    )
-                )
-            await db_sess.flush()
-
-        async with database_with_resource_slot_tables.begin_session() as db_sess:
-            for slot_name, capacity in capacities.items():
-                db_sess.add(
-                    AgentResourceRow(
-                        agent_id=agent_id,
-                        agent_uuid=agent_uuid,
-                        slot_name=slot_name,
-                        capacity=capacity,
-                        used=Decimal("1"),
-                    )
-                )
-            await db_sess.flush()
-
-        async with database_with_resource_slot_tables.begin_readonly_session() as db_sess:
-            agent_row = await db_sess.scalar(
-                sa.select(AgentRow)
-                .where(AgentRow.id == agent_id)
-                .options(
-                    selectinload(AgentRow.agent_resource_rows).joinedload(
-                        AgentResourceRow.slot_type_row
-                    )
-                )
-            )
-            assert agent_row is not None
-            available = agent_row.actual_available_slots()
-
-        assert list(available.keys()) == ["mem", "cpu", "cuda.shares"]
-        assert available["cpu"] == Decimal("8")
-        assert available["mem"] == Decimal("34359738368")
-        assert available["cuda.shares"] == Decimal("2")

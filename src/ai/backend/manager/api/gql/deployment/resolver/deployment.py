@@ -17,6 +17,9 @@ from ai.backend.common.dto.manager.v2.deployment.request import (
     ReplaceDeploymentOptionsInput,
     ScopedSearchDeploymentsInput,
 )
+from ai.backend.common.dto.manager.v2.deployment.types import DeploymentScope
+from ai.backend.common.dto.manager.v2.rbac.types import UUIDScope
+from ai.backend.common.exception import UnreachableError
 from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import encode_cursor, resolve_global_id
 from ai.backend.manager.api.gql.decorators import (
@@ -264,8 +267,12 @@ async def my_deployments(
     """List deployments owned by the current user."""
     pydantic_filter = filter.to_pydantic() if filter else None
     pydantic_order = [o.to_pydantic() for o in order_by] if order_by else None
-    payload = await info.context.adapters.deployment.my_search(
-        AdminSearchDeploymentsInput(
+    me = current_user()
+    if me is None:
+        raise UnreachableError("User context is not available")
+    payload = await info.context.adapters.deployment.scoped_search(
+        ScopedSearchDeploymentsInput(
+            scope=DeploymentScope(user=[UUIDScope(value=me.user_id)]),
             usage=usage.to_pydantic() if usage else None,
             filter=pydantic_filter,
             order=pydantic_order,

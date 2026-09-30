@@ -6,6 +6,7 @@ from http import HTTPStatus
 from typing import TYPE_CHECKING
 
 from ai.backend.common.api_handlers import APIResponse, BodyParam, PathParam
+from ai.backend.common.dto.manager.v2.rbac.types import UUIDScope
 from ai.backend.common.dto.manager.v2.vfolder.request import (
     BulkDeleteVFoldersInput,
     BulkPurgeVFoldersInput,
@@ -25,11 +26,13 @@ from ai.backend.common.dto.manager.v2.vfolder.request import (
     SetVFolderMountPolicyInput,
     UnsetVFolderMountPolicyInput,
 )
+from ai.backend.common.dto.manager.v2.vfolder.types import VFolderScope
 from ai.backend.manager.api.rest.v2.path_params import (
     ProjectIdPathParam,
     VFolderIdPathParam,
     VFolderUserPathParam,
 )
+from ai.backend.manager.dto.context import UserContext
 
 if TYPE_CHECKING:
     from ai.backend.manager.api.adapters.vfolder.adapter import VFolderAdapter
@@ -43,10 +46,24 @@ class V2VFolderHandler:
 
     async def my_search(
         self,
+        user_ctx: UserContext,
         body: BodyParam[SearchVFoldersInput],
     ) -> APIResponse:
         """Search vfolders owned by the current user."""
-        result = await self._adapter.my_search(body.parsed)
+        result = await self._adapter.scoped_search(
+            ScopedSearchVFoldersInput(
+                scope=VFolderScope(user=[UUIDScope(value=user_ctx.user_uuid)]),
+                usage=body.parsed.usage,
+                filter=body.parsed.filter,
+                order=body.parsed.order,
+                first=body.parsed.first,
+                after=body.parsed.after,
+                last=body.parsed.last,
+                before=body.parsed.before,
+                limit=body.parsed.limit,
+                offset=body.parsed.offset,
+            )
+        )
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
 
     async def scoped_search(

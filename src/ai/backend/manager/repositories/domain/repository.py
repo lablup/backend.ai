@@ -1,9 +1,6 @@
 from __future__ import annotations
 
-from collections.abc import Collection
-
 from ai.backend.common.data.entity.domain import DomainID, DomainName
-from ai.backend.common.data.entity.resource_group import ResourceGroupID
 from ai.backend.common.exception import BackendAIError, DomainNotFound
 from ai.backend.common.metrics.metric import DomainType, LayerType
 from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPolicy
@@ -13,13 +10,7 @@ from ai.backend.manager.data.domain.types import DomainData
 from ai.backend.manager.errors.resource import DomainDeletionFailed
 from ai.backend.manager.models.domain.creators import DomainCreator
 from ai.backend.manager.models.domain.purgers import DomainKernelPurger, DomainPurger
-from ai.backend.manager.models.domain.updaters import DomainDotfilesUpdater, DomainUpdater
-from ai.backend.manager.models.resource_group.creators import (
-    ResourceGroupForDomainRelationCreator,
-)
-from ai.backend.manager.models.resource_group.purgers import (
-    ResourceGroupForDomainRelationPurger,
-)
+from ai.backend.manager.models.domain.updaters import DomainDotfilesUpdater
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.domain.db_source.db_source import DomainDBSource
 from ai.backend.manager.repositories.ops.v2.domain.provider import DomainOpsProvider
@@ -64,40 +55,6 @@ class DomainRepository:
         """Register a domain with the model-store project it is registered with."""
         async with self._v2_ops.write_ops() as w:
             return (await w.create_domain(creator)).domain
-
-    @domain_repository_resilience.apply()
-    async def create_domain_node(
-        self, creator: DomainCreator, resource_group_ids: list[ResourceGroupID] | None = None
-    ) -> DomainData:
-        """Register a domain, the model-store project it is registered with, and the
-        resource groups it may schedule on."""
-        async with self._v2_ops.write_ops() as w:
-            return (await w.create_domain(creator, resource_group_ids)).domain
-
-    @domain_repository_resilience.apply()
-    async def update_domain_node(
-        self,
-        domain_id: DomainID,
-        updater: DomainUpdater,
-        sgroup_ids_to_add: Collection[ResourceGroupID] | None = None,
-        sgroup_ids_to_remove: Collection[ResourceGroupID] | None = None,
-    ) -> DomainData:
-        """Edit a domain and the resource groups it may schedule on."""
-        async with self._v2_ops.write_ops() as w:
-            if sgroup_ids_to_add:
-                await w.create_relations(
-                    ResourceGroupForDomainRelationCreator(),
-                    [(domain_id, sgroup_id) for sgroup_id in sgroup_ids_to_add],
-                )
-            if sgroup_ids_to_remove:
-                await w.purge_relations(
-                    ResourceGroupForDomainRelationPurger(),
-                    [(domain_id, sgroup_id) for sgroup_id in sgroup_ids_to_remove],
-                )
-            data = await w.update_data(updater)
-            if data is None:
-                raise DomainNotFound(f"Domain not found: {updater.target_id_value()}")
-            return data
 
     @domain_repository_resilience.apply()
     async def update_dotfiles(self, updater: DomainDotfilesUpdater) -> DomainData:

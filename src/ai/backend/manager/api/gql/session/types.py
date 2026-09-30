@@ -661,7 +661,10 @@ class SessionV2GQL(PydanticNodeMixin[SessionNode]):
         BackendAIGQLMeta(added_version="26.3.0", description="The domain this session belongs to.")
     )  # type: ignore[misc]
     async def domain(self, info: Info[StrawberryGQLContext]) -> DomainV2GQL | None:
-        return await info.context.data_loaders.domain_loader.load(self.domain_name)
+        domain_id = await info.context.data_loaders.domain_id_by_name_loader.load(self.domain_name)
+        if domain_id is None:
+            return None
+        return await info.context.data_loaders.domain_by_id_loader.load(domain_id)
 
     @gql_added_field(
         BackendAIGQLMeta(added_version="26.3.0", description="The user who owns this session.")
