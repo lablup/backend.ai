@@ -32,8 +32,8 @@ from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.data.resource_slot.types import ResourceAllocationAggregate
 from ai.backend.manager.defs import DEFAULT_ROLE
 from ai.backend.manager.models.image.row import ImageRow
-from ai.backend.manager.models.kernel.legacy import DEFAULT_KERNEL_ORDERING
 from ai.backend.manager.models.kernel.row import (
+    DEFAULT_KERNEL_ORDERING,
     KernelRow,
     kernels,
 )
