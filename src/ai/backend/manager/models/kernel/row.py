@@ -68,6 +68,7 @@ from ai.backend.manager.models.base import (
     StructuredJSONObjectListColumn,
     URLColumn,
 )
+from ai.backend.manager.models.kernel.statuses import DEAD_KERNEL_STATUSES
 from ai.backend.manager.models.mixins.timestamp import CreatedAtMixin
 from ai.backend.manager.models.utils import (
     ExtendedAsyncSAEngine,
@@ -75,50 +76,9 @@ from ai.backend.manager.models.utils import (
 )
 
 __all__ = (
-    "AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES",
-    "DEAD_KERNEL_STATUSES",
-    "LIVE_STATUS",
-    "RESOURCE_USAGE_KERNEL_STATUSES",
-    "USER_RESOURCE_OCCUPYING_KERNEL_STATUSES",
     "KernelRow",
     "kernels",
 )
-
-# statuses to consider when calculating current resource usage
-AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES = tuple(
-    e
-    for e in KernelStatus
-    if e
-    not in (
-        KernelStatus.TERMINATED,
-        KernelStatus.PENDING,
-        KernelStatus.CANCELLED,
-    )
-)
-
-USER_RESOURCE_OCCUPYING_KERNEL_STATUSES = tuple(
-    e
-    for e in KernelStatus
-    if e
-    not in (
-        KernelStatus.TERMINATED,
-        KernelStatus.PENDING,
-        KernelStatus.CANCELLED,
-    )
-)
-
-# statuses to consider when calculating historical resource usage
-RESOURCE_USAGE_KERNEL_STATUSES = (
-    KernelStatus.TERMINATED,
-    KernelStatus.RUNNING,
-)
-
-DEAD_KERNEL_STATUSES = (
-    KernelStatus.CANCELLED,
-    KernelStatus.TERMINATED,
-)
-
-LIVE_STATUS = (KernelStatus.RUNNING,)
 
 
 def default_hostname(context: Any) -> str:

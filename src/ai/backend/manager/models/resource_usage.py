@@ -20,10 +20,10 @@ from ai.backend.manager.data.kernel.types import KernelStatus
 if TYPE_CHECKING:
     from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
 
-from ai.backend.manager.models.kernel.row import (
+from ai.backend.manager.models.kernel.row import KernelRow
+from ai.backend.manager.models.kernel.statuses import (
     LIVE_STATUS,
     RESOURCE_USAGE_KERNEL_STATUSES,
-    KernelRow,
 )
 from ai.backend.manager.models.project.row import ProjectRow
 from ai.backend.manager.models.session.row import SessionRow
