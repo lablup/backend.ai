@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import uuid
-from collections.abc import Sequence
 from datetime import datetime
 from typing import (
     TYPE_CHECKING,
@@ -11,7 +10,6 @@ from typing import (
 import sqlalchemy as sa
 import yarl
 from sqlalchemy.dialects import postgresql as pgsql
-from sqlalchemy.ext.asyncio import AsyncSession as SASession
 from sqlalchemy.orm import (
     Mapped,
     foreign,
@@ -372,17 +370,6 @@ class KernelRow(CreatedAtMixin, Base):
         primaryjoin=_get_user_row_join_condition,
         foreign_keys="KernelRow.user_uuid",
     )
-
-    @staticmethod
-    async def batch_load_main_kernels_by_session_id(
-        session: SASession, session_ids: list[uuid.UUID]
-    ) -> Sequence[KernelRow]:
-        query = (
-            sa.select(KernelRow)
-            .where(KernelRow.session_id.in_(session_ids))
-            .where(KernelRow.cluster_role == DEFAULT_ROLE)
-        )
-        return (await session.execute(query)).scalars().all()
 
     @staticmethod
     async def get_kernel(
