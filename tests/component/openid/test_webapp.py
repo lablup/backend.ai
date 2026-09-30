@@ -9,10 +9,12 @@ import uuid
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
+import httpx
 import jwt as pyjwt
 import pytest
 import sqlalchemy as sa
-from aiohttp import web
+import yarl
+from authlib.integrations.base_client.errors import OAuthError  # pants: no-infer-dep
 from cryptography import x509
 from cryptography.hazmat.primitives.asymmetric import rsa
 
@@ -20,11 +22,10 @@ from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.keypair.row import keypairs
 from ai.backend.manager.models.user.row import UserRole, UserRow, UserStatus
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.plugin.openid.exceptions import InvalidSession
+from ai.backend.manager.plugin.openid.exceptions import InvalidSession, OpenIDGroupNotAllowed
 from ai.backend.manager.plugin.openid.valkey_client import ValkeyOpenIDClient
 from ai.backend.manager.plugin.openid.webapp import (
     OIDCWebAppPlugin,
-    OpenIDError,
     create_user_if_not_exists,
     generate_user_data,
 )
@@ -86,7 +87,7 @@ class TestGenerateUserData:
         self, oidc_token: Any, multi_group_mapping: dict[str, Any]
     ) -> None:
         token = oidc_token(["unknown-group"])
-        with pytest.raises(OpenIDError, match="does not belong to group"):
+        with pytest.raises(OpenIDGroupNotAllowed):
             generate_user_data(token, multi_group_mapping, ["backend-ai-users"])
 
     def test_group_order_priority(
@@ -298,20 +299,121 @@ class TestWebAppRedirect:
             assert user is not None
             assert user.full_name == "Alice Example"
 
-    async def test_redirect_invalid_token_returns_unauthorized(
+    async def _redirect(
+        self, plugin: OIDCWebAppPlugin, request: MagicMock, client: MagicMock
+    ) -> yarl.URL:
+        with patch(
+            "ai.backend.manager.plugin.openid.webapp.AsyncOAuth2Client",
+            return_value=client,
+        ):
+            response = await plugin.redirect(request)
+        assert response.status == 302
+        return yarl.URL(response.headers["Location"])
+
+    @pytest.mark.parametrize(
+        ("provider_error", "bai_error"),
+        [
+            ("access_denied", "openid-access-denied"),
+            ("consent_required", "openid-access-denied"),
+            ("temporarily_unavailable", "openid-provider-unavailable"),
+            ("invalid_scope", "openid-provider-misconfigured"),
+            ("unknown_error", "openid-not-authenticated"),
+        ],
+    )
+    async def test_redirect_callback_error_returns_with_error(
         self,
         webapp_plugin: OIDCWebAppPlugin,
         redirect_request: MagicMock,
-        failing_oauth2_client: MagicMock,
+        mock_oauth2_client: MagicMock,
+        provider_error: str,
+        bai_error: str,
     ) -> None:
-        with patch(
-            "ai.backend.manager.plugin.openid.webapp.AsyncOAuth2Client",
-            return_value=failing_oauth2_client,
-        ):
-            with pytest.raises(web.HTTPUnauthorized) as exc_info:
-                await webapp_plugin.redirect(redirect_request)
+        redirect_request.query = {
+            "state": redirect_request.query["state"],
+            "error": provider_error,
+            "error_description": "AADSTS00000: provider detail",
+        }
 
-        assert exc_info.value.status == 401
+        location = await self._redirect(webapp_plugin, redirect_request, mock_oauth2_client)
+
+        assert location.host == "app.example.com"
+        assert location.query["bai_error"] == bai_error
+        assert "sToken" not in location.query
+        assert "provider detail" not in str(location)
+        mock_oauth2_client.fetch_token.assert_not_called()
+
+    @pytest.mark.parametrize(
+        ("token_error", "bai_error"),
+        [
+            (OAuthError(error="invalid_client"), "openid-provider-misconfigured"),
+            (OAuthError(error="invalid_grant"), "invalid-openid-session"),
+            (OAuthError(error="server_error"), "openid-provider-unavailable"),
+            (httpx.ConnectError("connection refused"), "openid-provider-unavailable"),
+            (RuntimeError("unexpected"), "internal-server-error"),
+        ],
+    )
+    async def test_redirect_token_exchange_error_returns_with_error(
+        self,
+        webapp_plugin: OIDCWebAppPlugin,
+        redirect_request: MagicMock,
+        mock_oauth2_client: MagicMock,
+        token_error: Exception,
+        bai_error: str,
+    ) -> None:
+        mock_oauth2_client.fetch_token = AsyncMock(side_effect=token_error)
+
+        location = await self._redirect(webapp_plugin, redirect_request, mock_oauth2_client)
+
+        assert location.query["bai_error"] == bai_error
+        assert "sToken" not in location.query
+
+    async def test_redirect_group_not_allowed_returns_with_error(
+        self,
+        plugin_config: dict[str, Any],
+        redirect_request: MagicMock,
+        mock_oauth2_client: MagicMock,
+    ) -> None:
+        openid = {**plugin_config["openid"], "group_order": "other-group"}
+        openid["group_mapping"] = {"other-group": {"domain": "default"}}
+        plugin = OIDCWebAppPlugin({**plugin_config, "openid": openid}, local_config={})
+
+        location = await self._redirect(plugin, redirect_request, mock_oauth2_client)
+
+        assert location.query["bai_error"] == "openid-group-not-allowed"
+        assert "sToken" not in location.query
+
+    async def test_redirect_expired_session_returns_with_error(
+        self,
+        webapp_plugin: OIDCWebAppPlugin,
+        redirect_request: MagicMock,
+        mock_oauth2_client: MagicMock,
+    ) -> None:
+        redirect_request.query = {
+            "state": urllib.parse.urlencode({
+                "redirect": "https://app.example.com/dashboard",
+                "session": str(uuid.uuid4()),
+            }),
+            "code": "auth-code-123",
+        }
+
+        location = await self._redirect(webapp_plugin, redirect_request, mock_oauth2_client)
+
+        assert location.query["bai_error"] == "invalid-openid-session"
+        mock_oauth2_client.fetch_token.assert_not_called()
+
+    async def test_redirect_without_state_returns_to_login_uri(
+        self,
+        webapp_plugin: OIDCWebAppPlugin,
+        redirect_request: MagicMock,
+        mock_oauth2_client: MagicMock,
+    ) -> None:
+        redirect_request.query = {"code": "auth-code-123"}
+
+        location = await self._redirect(webapp_plugin, redirect_request, mock_oauth2_client)
+
+        assert str(location.with_query(None)) == "https://app.example.com/login"
+        assert location.query["bai_error"] == "invalid-openid-session"
+        mock_oauth2_client.fetch_token.assert_not_called()
 
 
 # ===========================================================================

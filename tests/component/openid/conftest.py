@@ -785,11 +785,3 @@ def group_mapping() -> dict[str, Any]:
 # ===========================================================================
 # Webapp handler test fixtures
 # ===========================================================================
-
-
-@pytest.fixture
-def failing_oauth2_client() -> MagicMock:
-    """Mock OAuth2Client whose fetch_token raises an Exception."""
-    client = MagicMock()
-    client.fetch_token = AsyncMock(side_effect=Exception("token exchange failed"))
-    return client
