@@ -42,7 +42,7 @@
 
 | etcd key | 용도 | 판정 | 처방 |
 |---|---|---|---|
-| `device_mask` | 이 노드에서 숨길 device id 목록 (`list_devices`와 통계 수집에서 제외) | `WRONG AXIS` — 이 노드의 물리 하드웨어가 클러스터 전역 키에 | 노드 TOML로 이동 |
+| `device_mask` | 열거 단계(`list_devices()`)에서 제외. 해당 디바이스는 용량·할당·지표·인벤토리 전부에서 사라진다 (아래 참조) | `WRONG AXIS` — 이 노드의 물리 하드웨어가 클러스터 전역 키에 있고, 구현이 플러그인마다 다섯 갈래 | **DB로 일반화.** 마스킹을 플러그인에서 걷어내 에이전트 계층으로 올리고, `devices` 인벤토리(BA-7176)의 제외 상태로 관리 |
 | `allocation_mode` | 보고할 슬롯 이름을 결정: `cuda.device`(discrete) vs `cuda.shares`(fractional) | `WRONG AXIS` — 런타임 설정이 아닌 배포 파라미터. 바꾸면 보고 슬롯 이름이 바뀌므로 무중단 적용 불가 | 설정으로 유지하되 재시작 필요를 명시. 리소스 그룹 스코프가 맞는지 재검토 |
 | `unit_mem`, `unit_proc` | fGPU 환산 기준 (`_get_share_raw`, `_share_to_spec`) | `WRONG AXIS` — 클러스터 할당 정책이 에이전트별 플러그인 키에 | 매니저 DB의 리소스 그룹 정책으로 이동 |
 | `quantum_size` | fractional 할당 단위. `get_metadata()`의 표시 `round_length`와 `ScalingGroup.accelerator_quantum_size`(`api/gql_legacy/scaling_group.py:569`)의 근거 | `WRONG AXIS` — 리소스 그룹별 GraphQL 필드로 노출되면서 실제로는 전역 단일 값 | BA-5692 — 리소스 그룹 정책으로 이동 |
@@ -52,6 +52,43 @@
 
 - **핫 리로드가 전무하다.** enterprise CUDA 플러그인은 `config_watch_enabled = False`이고, 나머지 모든 가속기 플러그인은 `update_plugin_config()`를 `pass`로 구현한다. 위 키는 전부 기동 시 1회만 읽히며, 이후 etcd 변경은 agent 재시작 없이는 반영되지 않는다.
 - 읽는 키가 더 좁은 플러그인: `cuda_unified`는 `skip_hook`만, `mock`은 CUDA와 동일 집합, `cuda_open`·`atom`/`atom-plus`/`atom-max`·`warboy`·`rngd`·`ipu`·`lpu`·`n300`·`rebellions`는 `device_mask`만.
+
+### `device_mask` — 유일하게 일반화가 필요한 키
+
+마스킹은 `list_devices()`에서 `continue`로 걸러내므로 그 디바이스는 `CUDADevice` 객체 자체가 생성되지 않는다.
+"컨테이너 생성에 쓰지 않는다"가 아니라 시스템에서 사라진다.
+
+| 경로 | 결과 |
+|---|---|
+| `available_slots()` (`plugin.py:731-732`) | 매니저가 보고받는 용량에서 빠짐. 스케줄러가 존재를 모름 |
+| alloc map `device_slots` | 항목 없음 → 할당 대상 아님 |
+| `activate_devices()` → `_active_accelerators` | 라이선스 활성화 대상도 아님 |
+| 노드·컨테이너 통계 (`:797`, `:907`) | 비활성이므로 `_check_active_by_device_id`에서 걸러짐 |
+| `get_attached_devices()` | 커널 디바이스 리포트와 `kernels.attached_devices`에 안 나옴 |
+
+호스트에서 떼는 것은 아니다. `nvidia-smi`로는 보이고, 디바이스 주입이 할당 기반이라 컨테이너에도 들어가지 않는다 — BAI가 모르는 GPU가 된다.
+
+구현은 플러그인마다 갈라져 있다.
+
+| 플러그인 | 설정 출처 | 키 공간 | 상태 |
+|---|---|---|---|
+| `cuda` (enterprise) | etcd `plugin_config` | 열거=NVML 서수 (`"0"`, MIG는 `"0:1"`), 통계=UUID | 내부 불일치 |
+| `cuda_open` | etcd `plugin_config` | UUID | 정상 |
+| `mock` | etcd `plugin_config` | UUID | 정상 |
+| `atom`/`atom-plus`/`atom-max` | etcd `plugin_config` | — | 파싱 후 미사용 |
+| `rocm`, `habana` | 로컬 TOML `local_config["device_mask"]` | UUID | 네임스페이스 없는 최상위 키 — 한 노드의 여러 플러그인이 공유 |
+
+enterprise CUDA에 UUID를 적으면 열거에서 걸리지 않아 **할당은 그대로 되고 지표에서만 사라진다.** 경고도 없다.
+서수는 재부팅·PCI 재열거 시 이동할 수 있어 고장 디바이스 격리라는 실제 용도에 맞지 않는다.
+
+일반화 시 필요한 것:
+
+- 플러그인은 열거 결과를 전부 보고하고 마스킹 코드를 제거한다. 에이전트 계층이 일괄 적용한다.
+- 키 공간을 `AbstractComputeDevice.device_id` 하나로 고정한다 — BA-7176의 `devices.device_id`와 같은 값이다.
+- BA-7176의 `devices` 인벤토리를 커널 RUNNING 전이가 아니라 **에이전트 열거로** 채워야 한다. 아니면 커널이 한 번도 뜨지 않은 디바이스는 가릴 수 없다.
+- 제외 사유와 시각 컬럼이 있어야 "하드웨어 고장 격리"와 "운영자가 의도적으로 제외"를 구분할 수 있다.
+
+나머지 가속기 설정은 전부 해당 가속기에 특화된 스키마라 DB로 옮길 수 없다. 로컬 TOML에 남긴다.
 
 ## SGROUP 스코프 해석
 
