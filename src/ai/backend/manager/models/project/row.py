@@ -85,7 +85,6 @@ __all__: Sequence[str] = (
     "groups",
     "query_group_domain",
     "query_group_dotfiles",
-    "resolve_group_name_or_id",
     "verify_dotfile_name",
 )
 
@@ -344,29 +343,6 @@ def _build_group_query(
             cond & (groups.c.domain_name == domain_name),
         )
     )
-
-
-async def resolve_group_name_or_id(
-    db_conn: SAConnection,
-    domain_name: str,
-    value: str | uuid.UUID,
-) -> uuid.UUID | None:
-    match value:
-        case uuid.UUID():
-            cond = groups.c.id == value
-        case str():
-            # Try to parse as UUID first
-            # If successful, query by ID; otherwise treat as group name
-            try:
-                parsed_uuid = uuid.UUID(value)
-                cond = groups.c.id == parsed_uuid
-            except ValueError:
-                cond = groups.c.name == value
-        case _:
-            raise TypeError("unexpected type for group_name_or_id")
-    query = _build_group_query(cond, domain_name)
-    result: uuid.UUID | None = await db_conn.scalar(query)
-    return result
 
 
 @overload

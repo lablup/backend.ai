@@ -260,14 +260,6 @@ def patch_auto_scaling_rule_get(mocker: MockerFixture) -> AsyncMock:
     )
 
 
-@pytest.fixture
-def patch_resolve_group_name_or_id(mocker: MockerFixture) -> MagicMock:
-    """Patch resolve_group_name_or_id function using mocker."""
-    return mocker.patch(
-        "ai.backend.manager.repositories.model_serving.repository.resolve_group_name_or_id"
-    )
-
-
 def setup_db_session_mock(mock_db_engine: MagicMock, mock_session: AsyncMock) -> AsyncMock:
     """Helper function to set up database session mocking consistently."""
     mock_db_engine.begin_readonly_session.return_value.__aenter__.return_value = mock_session

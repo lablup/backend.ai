@@ -62,7 +62,7 @@ from ai.backend.manager.data.vfolder.types import VFolderOwnershipType
 from ai.backend.manager.errors.api import InvalidAPIParameters
 from ai.backend.manager.errors.common import GenericForbidden, ServiceUnavailable
 from ai.backend.manager.errors.image import ImageNotFound
-from ai.backend.manager.errors.resource import DatabaseConnectionUnavailable, DomainNotFound
+from ai.backend.manager.errors.resource import DomainNotFound
 from ai.backend.manager.errors.service import AutoScalingRuleNotFound, EndpointNotFound
 from ai.backend.manager.models.deployment_revision.row import DeploymentRevisionRow
 from ai.backend.manager.models.domain.lookups import DomainNameLookup
@@ -77,7 +77,6 @@ from ai.backend.manager.models.endpoint.updaters import (
 from ai.backend.manager.models.image.row import ImageRow
 from ai.backend.manager.models.image.searchable_fields import ImageSearchableFields
 from ai.backend.manager.models.keypair.row import KeyPairRow
-from ai.backend.manager.models.project.row import resolve_group_name_or_id
 from ai.backend.manager.models.resource_group.row import resource_groups
 from ai.backend.manager.models.resource_group.searchers import AllowedResourceGroupsSearch
 from ai.backend.manager.models.resource_policy.row import keypair_resource_policies
@@ -690,19 +689,6 @@ class ModelServingRepository:
                 return True
             except AutoScalingRuleNotFound:
                 return False
-
-    @model_serving_repository_resilience.apply()
-    async def resolve_group_id(
-        self, domain_name: str, group_name_or_id: str | uuid.UUID
-    ) -> uuid.UUID | None:
-        """
-        Resolve group name or ID to group ID.
-        """
-        async with self._db.begin_readonly_session_read_committed() as session:
-            conn = await session.connection()
-            if conn is None:
-                raise DatabaseConnectionUnavailable("Database connection is not available")
-            return await resolve_group_name_or_id(conn, domain_name, group_name_or_id)
 
     @model_serving_repository_resilience.apply()
     async def get_session_by_id(
