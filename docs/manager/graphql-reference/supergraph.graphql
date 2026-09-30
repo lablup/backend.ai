@@ -20409,6 +20409,11 @@ type Role implements Node
   """Added in 26.9.0. ID of the scope the role belongs to."""
   scopeId: UUID!
 
+  """
+  Added in 26.9.0. ID of the role preset the role was instantiated from. Null when the role was not created from a preset.
+  """
+  rolePresetId: UUID
+
   """Added in 26.9.0. The scope the role belongs to."""
   scope: EntityNode
 
@@ -20976,6 +20981,9 @@ type RolePresetEdge
 input RolePresetFilter
   @join__type(graph: STRAWBERRY)
 {
+  """Added in 26.9.0. Filter by role preset ID."""
+  id: UUIDFilter = null
+
   """Filter by name."""
   name: StringFilter = null
 

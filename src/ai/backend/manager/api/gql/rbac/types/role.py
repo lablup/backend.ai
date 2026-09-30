@@ -204,6 +204,16 @@ class RoleGQL(PydanticNodeMixin[RoleNode]):
             description="ID of the scope the role belongs to.",
         )
     )
+    role_preset_id: UUID | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description=(
+                "ID of the role preset the role was instantiated from. "
+                "Null when the role was not created from a preset."
+            ),
+        ),
+        default=None,
+    )
 
     @gql_added_field(
         BackendAIGQLMeta(

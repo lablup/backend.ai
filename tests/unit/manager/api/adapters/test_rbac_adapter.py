@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import uuid
 from collections.abc import Iterator
+from datetime import UTC, datetime
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -12,7 +13,10 @@ from pydantic import ValidationError
 from ai.backend.common.contexts.user import with_user_context
 from ai.backend.common.data.entity.domain import DomainEntityType, DomainID
 from ai.backend.common.data.entity.project import ProjectEntityType, ProjectID
+from ai.backend.common.data.entity.role import RoleID
+from ai.backend.common.data.entity.role_preset import RolePresetID
 from ai.backend.common.data.entity.scope_admin import ScopeAdminEntityType
+from ai.backend.common.data.entity.types import EntityType
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.permission.types import Permission
 from ai.backend.common.data.user.types import UserData, UserRole
@@ -32,6 +36,9 @@ from ai.backend.common.dto.manager.v2.rbac.request import (
 )
 from ai.backend.common.dto.manager.v2.rbac.types import PermissionBitDTO, PermissionBitFilter
 from ai.backend.manager.api.adapters.rbac.adapter import RBACAdapter
+from ai.backend.manager.data.permission.role import RoleData
+from ai.backend.manager.data.permission.status import RoleStatus
+from ai.backend.manager.data.permission.types import RoleSource
 from ai.backend.manager.data.permission.virtual_entity import GovernCheckKey
 from ai.backend.manager.models.clauses import QueryCondition
 from ai.backend.manager.services.permission_contoller.actions.get_held_permissions import (
@@ -249,3 +256,37 @@ class TestRoleListingFilters:
         assert "roles.id = user_roles.role_id" in compiled
         assert "roles.name" in compiled
         assert "permissions.role_id = user_roles.role_id" in compiled
+
+
+_PRESET_ID = RolePresetID(uuid.uuid4())
+
+
+@pytest.fixture
+def role_data(role_preset_id: RolePresetID | None) -> RoleData:
+    now = datetime.now(UTC)
+    return RoleData(
+        id=RoleID(uuid.uuid4()),
+        name="project-admin",
+        source=RoleSource.SYSTEM,
+        status=RoleStatus.ACTIVE,
+        created_at=now,
+        updated_at=now,
+        deleted_at=None,
+        scope_type=EntityType(ProjectEntityType.name()),
+        scope_id=uuid.uuid4(),
+        role_preset_id=role_preset_id,
+    )
+
+
+class TestRoleNodeRolePreset:
+    @pytest.mark.parametrize(
+        "role_preset_id",
+        [_PRESET_ID, None],
+        ids=lambda role_preset_id: "from_preset" if role_preset_id else "without_preset",
+    )
+    def test_a_role_node_carries_the_preset_it_was_instantiated_from(
+        self, role_data: RoleData, role_preset_id: RolePresetID | None
+    ) -> None:
+        node = RBACAdapter._role_data_to_node(role_data)
+
+        assert node.role_preset_id == role_preset_id

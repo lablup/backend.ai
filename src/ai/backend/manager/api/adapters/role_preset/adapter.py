@@ -355,6 +355,7 @@ class RolePresetAdapter(BaseAdapter):
     def _convert_filter(self, filter_: RolePresetFilter) -> list[QueryCondition]:
         fields = RolePresetSearchableFields.own
         conditions = [
+            *self.apply_uuid_filter(filter_.id, fields.id.filter),
             *self.apply_string_filter(filter_.name, fields.name.filter),
             *self.apply_string_filter(filter_.scope_type, fields.scope_type.filter),
             *self.apply_bool_filter(filter_.auto_assign, fields.auto_assign.filter),
