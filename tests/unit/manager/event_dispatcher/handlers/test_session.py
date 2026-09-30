@@ -88,6 +88,7 @@ def _make_handler(mock_db: MagicMock) -> tuple[SessionEventHandler, MagicMock, A
         event_dispatcher_plugin_ctx=mock_event_dispatcher_plugin_ctx,
         scheduling_controller=mock_scheduling_controller,
         valkey_live=mock_valkey_live,
+        deployment_repository=AsyncMock(),
     )
     return handler, mock_registry, mock_valkey_live
 

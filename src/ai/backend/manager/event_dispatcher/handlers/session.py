@@ -5,9 +5,7 @@ from datetime import UTC, datetime
 from typing import Any
 
 import aiohttp
-import sqlalchemy as sa
 import yarl
-from sqlalchemy.exc import NoResultFound
 
 from ai.backend.common.clients.valkey_client.valkey_live.client import ValkeyLiveClient
 from ai.backend.common.events.event_types.session.anycast import (
@@ -34,16 +32,11 @@ from ai.backend.common.types import (
     SessionTypes,
 )
 from ai.backend.logging.structured import StructuredLogger
-from ai.backend.manager.data.deployment.types import RouteHealthStatus, RouteStatus
 from ai.backend.manager.errors.kernel import SessionNotFound
-from ai.backend.manager.models.endpoint.row import EndpointRow
-from ai.backend.manager.models.routing.row import RoutingRow
 from ai.backend.manager.models.session.row import KernelLoadingStrategy, SessionRow
-from ai.backend.manager.models.utils import (
-    ExtendedAsyncSAEngine,
-    execute_with_retry,
-)
+from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.registry import AgentRegistry
+from ai.backend.manager.repositories.deployment.repository import DeploymentRepository
 from ai.backend.manager.sokovan.scheduling_controller.scheduling_controller import (
     SchedulingController,
 )
@@ -57,6 +50,7 @@ class SessionEventHandler:
     _event_dispatcher_plugin_ctx: EventDispatcherPluginContext
     _scheduling_controller: SchedulingController
     _valkey_live: ValkeyLiveClient
+    _deployment_repository: DeploymentRepository
 
     def __init__(
         self,
@@ -65,12 +59,14 @@ class SessionEventHandler:
         event_dispatcher_plugin_ctx: EventDispatcherPluginContext,
         scheduling_controller: SchedulingController,
         valkey_live: ValkeyLiveClient,
+        deployment_repository: DeploymentRepository,
     ) -> None:
         self._registry = registry
         self._db = db
         self._event_dispatcher_plugin_ctx = event_dispatcher_plugin_ctx
         self._scheduling_controller = scheduling_controller
         self._valkey_live = valkey_live
+        self._deployment_repository = deployment_repository
 
     async def _handle_started_or_cancelled(
         self,
@@ -229,74 +225,23 @@ class SessionEventHandler:
             # Update routing status
             # TODO: Check session health
             if session.session_type == SessionTypes.INFERENCE:
-
-                async def _update() -> None:
-                    async with self._db.begin_session() as db_sess:
-                        route = await RoutingRow.get_by_session(
-                            db_sess, session.id, load_endpoint=True
-                        )
-                        endpoint = await EndpointRow.get(db_sess, route.endpoint, load_routes=True)
-                        match event:
-                            case SessionCancelledAnycastEvent():
-                                update_data: dict[str, Any] = {
-                                    "status": RouteStatus.FAILED_TO_START
-                                }
-                                status_data = session.status_data
-                                if status_data and "error" in status_data:
-                                    if status_data["error"]["name"] == "MultiAgentError":
-                                        errors = status_data["error"]["collection"]
-                                    else:
-                                        errors = [status_data["error"]]
-                                    update_data["error_data"] = {
-                                        "type": "session_cancelled",
-                                        "errors": errors,
-                                        "session_id": session.id,
-                                    }
-                                query = (
-                                    sa.update(RoutingRow)
-                                    .values(update_data)
-                                    .where(RoutingRow.id == route.id)
-                                )
-                                await db_sess.execute(query)
-                                query = (
-                                    sa.update(EndpointRow)
-                                    .values({"retries": endpoint.retries + 1})
-                                    .where(EndpointRow.id == endpoint.id)
-                                )
-                                await db_sess.execute(query)
-                        await db_sess.commit()
-
-                await execute_with_retry(_update)
-
-                async def _clear_error() -> None:
-                    async with self._db.begin_session() as db_sess:
-                        route = await RoutingRow.get_by_session(
-                            db_sess, session.id, load_endpoint=True
-                        )
-                        endpoint = await EndpointRow.get(db_sess, route.endpoint, load_routes=True)
-
-                        query = sa.select(sa.func.count("*")).where(
-                            (RoutingRow.endpoint == endpoint.id)
-                            & (RoutingRow.status == RouteStatus.RUNNING)
-                            & (RoutingRow.health_status == RouteHealthStatus.HEALTHY)
-                        )
-                        healthy_routes = await db_sess.scalar(query)
-                        if endpoint.replicas == healthy_routes:
-                            update_query = (
-                                sa.update(EndpointRow)
-                                .where(EndpointRow.id == endpoint.id)
-                                .values({"retries": 0})
-                            )
-                            await db_sess.execute(update_query)
-                            delete_query = sa.delete(RoutingRow).where(
-                                (RoutingRow.endpoint == endpoint.id)
-                                & (RoutingRow.status == RouteStatus.FAILED_TO_START)
-                            )
-                            await db_sess.execute(delete_query)
-
-                await execute_with_retry(_clear_error)
-        except NoResultFound:
-            pass  # Cases when we try to create a inference session for validation (/services/_/try API)
+                if isinstance(event, SessionCancelledAnycastEvent):
+                    error_data: dict[str, Any] | None = None
+                    status_data = session.status_data
+                    if status_data and "error" in status_data:
+                        if status_data["error"]["name"] == "MultiAgentError":
+                            errors = status_data["error"]["collection"]
+                        else:
+                            errors = [status_data["error"]]
+                        error_data = {
+                            "type": "session_cancelled",
+                            "errors": errors,
+                            "session_id": session.id,
+                        }
+                    await self._deployment_repository.mark_route_failed_by_session(
+                        session.id, error_data
+                    )
+                await self._deployment_repository.clear_endpoint_errors_by_session(session.id)
         except Exception:
             log.exception("route status update failed")
 

@@ -170,34 +170,6 @@ class RoutingRow(Base):
     )
 
     @classmethod
-    async def get_by_session(
-        cls,
-        db_sess: AsyncSession,
-        session_id: uuid.UUID,
-        load_endpoint: bool = False,
-        project: uuid.UUID | None = None,
-        domain: str | None = None,
-        user_uuid: uuid.UUID | None = None,
-    ) -> RoutingRow:
-        """
-        :raises: sqlalchemy.orm.exc.NoResultFound
-        """
-        query = sa.select(RoutingRow).where(RoutingRow.session == session_id)
-        if load_endpoint:
-            query = query.options(selectinload(RoutingRow.endpoint_row))
-        if project:
-            query = query.filter(RoutingRow.project == project)
-        if domain:
-            query = query.filter(RoutingRow.domain == domain)
-        if user_uuid:
-            query = query.filter(RoutingRow.session_owner == user_uuid)
-        result = await db_sess.execute(query)
-        row = result.scalar()
-        if row is None:
-            raise NoResultFound
-        return row
-
-    @classmethod
     async def list(
         cls,
         db_sess: AsyncSession,

@@ -229,6 +229,7 @@ class Dispatchers:
             args.event_dispatcher_plugin_ctx,
             args.scheduling_controller,
             args.valkey_live,
+            args.repositories.deployment.repository,
         )
         self._vfolder_event_handler = VFolderEventHandler(args.db)
         self._idle_check_event_handler = IdleCheckEventHandler(args.idle_checker_host)

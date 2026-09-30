@@ -1247,6 +1247,21 @@ class DeploymentRepository:
         return await self._db_source.get_endpoint_id_by_session(session_id)
 
     @deployment_repository_resilience.apply()
+    async def mark_route_failed_by_session(
+        self,
+        session_id: SessionId,
+        error_data: dict[str, Any] | None,
+    ) -> None:
+        await self._db_source.mark_route_failed_by_session(session_id, error_data)
+
+    @deployment_repository_resilience.apply()
+    async def clear_endpoint_errors_by_session(
+        self,
+        session_id: SessionId,
+    ) -> None:
+        await self._db_source.clear_endpoint_errors_by_session(session_id)
+
+    @deployment_repository_resilience.apply()
     async def fetch_route_service_discovery_info(
         self,
         route_ids: set[ReplicaID],

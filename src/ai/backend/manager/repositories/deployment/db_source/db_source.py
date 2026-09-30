@@ -205,7 +205,7 @@ from ai.backend.manager.models.session_group.creators import SessionGroupCreator
 from ai.backend.manager.models.specs.creator import FieldToCreate
 from ai.backend.manager.models.specs.pagination import NoPagination
 from ai.backend.manager.models.user.row import UserRow
-from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.models.utils import ExtendedAsyncSAEngine, execute_with_retry
 from ai.backend.manager.models.vfolder.row import VFolderRow, VFolderUserMountPolicyRow
 from ai.backend.manager.repositories.deployment.types.endpoint import (
     DeploymentHistoryToCreate,
@@ -1190,6 +1190,91 @@ class DeploymentDBSource:
             query = sa.select(RoutingRow.endpoint).where(RoutingRow.session == session_id)
             result = await db_sess.execute(query)
             return result.scalar_one_or_none()
+
+    async def mark_route_failed_by_session(
+        self,
+        session_id: SessionId,
+        error_data: dict[str, Any] | None,
+    ) -> None:
+        """Mark the session's route FAILED_TO_START and bump its endpoint's retries.
+
+        Does nothing when the session has no route or the route's endpoint is gone.
+        """
+
+        async def _update() -> None:
+            async with self._db.begin_session() as db_sess:
+                route = (
+                    await db_sess.execute(
+                        sa.select(RoutingRow.id, RoutingRow.endpoint).where(
+                            RoutingRow.session == session_id
+                        )
+                    )
+                ).one_or_none()
+                if route is None:
+                    return
+                try:
+                    endpoint = await EndpointRow.get(db_sess, route.endpoint, load_routes=True)
+                except NoResultFound:
+                    return
+                update_data: dict[str, Any] = {"status": RouteStatus.FAILED_TO_START}
+                if error_data is not None:
+                    update_data["error_data"] = error_data
+                await db_sess.execute(
+                    sa.update(RoutingRow).values(update_data).where(RoutingRow.id == route.id)
+                )
+                await db_sess.execute(
+                    sa.update(EndpointRow)
+                    .values({"retries": endpoint.retries + 1})
+                    .where(EndpointRow.id == endpoint.id)
+                )
+
+        await execute_with_retry(_update)
+
+    async def clear_endpoint_errors_by_session(
+        self,
+        session_id: SessionId,
+    ) -> None:
+        """Reset retries and delete FAILED_TO_START routes once every replica is healthy.
+
+        Does nothing when the session has no route or the route's endpoint is gone.
+        """
+
+        async def _clear_error() -> None:
+            async with self._db.begin_session() as db_sess:
+                route = (
+                    await db_sess.execute(
+                        sa.select(RoutingRow.id, RoutingRow.endpoint).where(
+                            RoutingRow.session == session_id
+                        )
+                    )
+                ).one_or_none()
+                if route is None:
+                    return
+                try:
+                    endpoint = await EndpointRow.get(db_sess, route.endpoint, load_routes=True)
+                except NoResultFound:
+                    return
+                healthy_routes = await db_sess.scalar(
+                    sa.select(sa.func.count("*")).where(
+                        (RoutingRow.endpoint == endpoint.id)
+                        & (RoutingRow.status == RouteStatus.RUNNING)
+                        & (RoutingRow.health_status == RouteHealthStatus.HEALTHY)
+                    )
+                )
+                if endpoint.replicas == healthy_routes:
+                    await db_sess.execute(
+                        sa.update(EndpointRow)
+                        .where(EndpointRow.id == endpoint.id)
+                        .values({"retries": 0})
+                    )
+                    await db_sess.execute(
+                        sa.delete(RoutingRow).where(
+                            (RoutingRow.endpoint == endpoint.id)
+                            & (RoutingRow.status == RouteStatus.FAILED_TO_START)
+                        )
+                    )
+
+        await execute_with_retry(_clear_error)
 
     async def fetch_route_service_discovery_info(
         self,
