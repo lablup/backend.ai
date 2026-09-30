@@ -55,10 +55,10 @@ from ai.backend.manager.models.endpoint.row import EndpointRow
 from ai.backend.manager.models.entity_share.purgers import EntitySharePendingOfferBatchPurger
 from ai.backend.manager.models.entity_share.row import EntityShareRow
 from ai.backend.manager.models.entity_share.updaters import EntityShareRevokeUpdater
-from ai.backend.manager.models.kernel.row import (
+from ai.backend.manager.models.kernel.row import kernels
+from ai.backend.manager.models.kernel.statuses import (
     AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES,
     RESOURCE_USAGE_KERNEL_STATUSES,
-    kernels,
 )
 from ai.backend.manager.models.keypair.row import (
     KeyPairRow,

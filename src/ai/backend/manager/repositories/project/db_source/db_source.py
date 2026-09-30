@@ -32,11 +32,13 @@ from ai.backend.manager.errors.resource import (
 )
 from ai.backend.manager.models.endpoint.row import EndpointRow
 from ai.backend.manager.models.kernel.row import (
+    KernelRow,
+    kernels,
+)
+from ai.backend.manager.models.kernel.statuses import (
     AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES,
     LIVE_STATUS,
     RESOURCE_USAGE_KERNEL_STATUSES,
-    KernelRow,
-    kernels,
 )
 from ai.backend.manager.models.project.purgers import (
     ProjectEndpointPurger,

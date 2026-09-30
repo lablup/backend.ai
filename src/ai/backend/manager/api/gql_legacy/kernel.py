@@ -33,11 +33,13 @@ from ai.backend.manager.data.resource_slot.types import ResourceAllocationAggreg
 from ai.backend.manager.defs import DEFAULT_ROLE
 from ai.backend.manager.models.image.row import ImageRow
 from ai.backend.manager.models.kernel.row import (
-    AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES,
     DEFAULT_KERNEL_ORDERING,
-    LIVE_STATUS,
     KernelRow,
     kernels,
+)
+from ai.backend.manager.models.kernel.statuses import (
+    AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES,
+    LIVE_STATUS,
 )
 from ai.backend.manager.models.minilang import JSONFieldItem
 from ai.backend.manager.models.minilang.ordering import ColumnMapType, QueryOrderParser

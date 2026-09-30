@@ -133,10 +133,12 @@ from ai.backend.manager.models.image.searchers import (
     ReferenceImageSearcher,
 )
 from ai.backend.manager.models.kernel.row import (
-    AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES,
-    USER_RESOURCE_OCCUPYING_KERNEL_STATUSES,
     KernelRow,
     kernels,
+)
+from ai.backend.manager.models.kernel.statuses import (
+    AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES,
+    USER_RESOURCE_OCCUPYING_KERNEL_STATUSES,
 )
 from ai.backend.manager.models.keypair.row import query_bootstrap_script
 from ai.backend.manager.models.network.row import NetworkRow, NetworkType

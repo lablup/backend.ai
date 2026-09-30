@@ -44,7 +44,8 @@ from ai.backend.common.types import VFolderID
 from ai.backend.manager.errors.storage import VFolderDeletionNotAllowed
 from ai.backend.manager.models.deployment_revision.row import DeploymentRevisionRow
 from ai.backend.manager.models.endpoint.row import EndpointRow
-from ai.backend.manager.models.kernel.row import DEAD_KERNEL_STATUSES, KernelRow
+from ai.backend.manager.models.kernel.row import KernelRow
+from ai.backend.manager.models.kernel.statuses import DEAD_KERNEL_STATUSES
 from ai.backend.manager.models.session.row import DEAD_SESSION_STATUSES, SessionRow
 from ai.backend.manager.models.specs.types import ConflictCheck
 from ai.backend.manager.models.vfolder.row import VFolderRow

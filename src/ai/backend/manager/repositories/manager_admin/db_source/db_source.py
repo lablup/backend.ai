@@ -12,7 +12,8 @@ from ai.backend.common.resilience.policies.retry import BackoffStrategy, RetryAr
 from ai.backend.common.resilience.resilience import Resilience
 from ai.backend.manager.defs import DEFAULT_ROLE
 from ai.backend.manager.models.agent.row import agents
-from ai.backend.manager.models.kernel.row import AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES, kernels
+from ai.backend.manager.models.kernel.row import kernels
+from ai.backend.manager.models.kernel.statuses import AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES
 
 if TYPE_CHECKING:
     from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
