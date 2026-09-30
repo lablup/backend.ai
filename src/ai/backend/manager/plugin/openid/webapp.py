@@ -1,7 +1,9 @@
+import base64
 import json
 import logging
 import random
 import string
+import time
 import urllib.parse
 import uuid
 from collections.abc import Mapping, Sequence
@@ -22,7 +24,10 @@ from aiohttp import web
 from authlib.common.security import generate_token  # pants: no-infer-dep
 from authlib.integrations.httpx_client import AsyncOAuth2Client  # pants: no-infer-dep
 from authlib.jose import jwt as joseJWT  # pants: no-infer-dep
+from authlib.oauth2.rfc7523 import PrivateKeyJWT  # pants: no-infer-dep
 from authlib.oidc.core import CodeIDToken  # pants: no-infer-dep
+from cryptography import x509
+from cryptography.hazmat.primitives import hashes
 
 from ai.backend.common.cron import LocalCron, PeriodicTask
 from ai.backend.common.data.entity.domain import DomainName
@@ -166,6 +171,7 @@ async def create_user_if_not_exists(
 
 
 _JWKS_REFRESH_INTERVAL: Final[float] = 86400.0
+_CLIENT_ASSERTION_LIFETIME: Final[int] = 300
 
 
 class JwksRefreshTask(PeriodicTask):
@@ -254,22 +260,46 @@ class OIDCWebAppPlugin(WebappPlugin):
         valkey_client: ValkeyOpenIDClient = app["valkey_client"]
         await valkey_client.close()
 
-    async def login(self, request: web.Request) -> web.Response:
-        post_data = await request.post()
-        redirect_to = post_data.get("redirect_to", None)
-        force = post_data.get("force", "false")
+    def _create_oauth2_client(self, token_endpoint: str) -> AsyncOAuth2Client:
         openid_config = self._config.openid
-        authorization_endpoint = request.app["openid.authorization_endpoint"]
-
-        redirect_uri = yarl.URL(self._config.login_uri)
-
+        if openid_config.private_key is None or openid_config.certificate is None:
+            return AsyncOAuth2Client(
+                openid_config.client_id,
+                openid_config.client_secret,
+                scope=scope,
+                proxies={},
+                code_challenge_method="S256",
+            )
+        certificate = x509.load_pem_x509_certificate(openid_config.certificate.encode())
+        thumbprint = base64.urlsafe_b64encode(certificate.fingerprint(hashes.SHA256()))
+        now = int(time.time())
         client = AsyncOAuth2Client(
             openid_config.client_id,
-            openid_config.client_secret,
+            openid_config.private_key,
+            token_endpoint_auth_method=PrivateKeyJWT.name,
             scope=scope,
             proxies={},
             code_challenge_method="S256",
         )
+        client.register_client_auth_method(
+            PrivateKeyJWT(
+                token_endpoint,
+                claims={"nbf": now, "exp": now + _CLIENT_ASSERTION_LIFETIME},
+                headers={"typ": "JWT", "x5t#S256": thumbprint.rstrip(b"=").decode()},
+                alg=openid_config.client_assertion_alg,
+            )
+        )
+        return client
+
+    async def login(self, request: web.Request) -> web.Response:
+        post_data = await request.post()
+        redirect_to = post_data.get("redirect_to", None)
+        force = post_data.get("force", "false")
+        authorization_endpoint = request.app["openid.authorization_endpoint"]
+
+        redirect_uri = yarl.URL(self._config.login_uri)
+
+        client = self._create_oauth2_client(request.app["openid.token_endpoint"])
         session_key = str(uuid.uuid4())
         code_verifier = generate_token(48)
         valkey_client: ValkeyOpenIDClient = request.app["valkey_client"]
@@ -308,13 +338,7 @@ class OIDCWebAppPlugin(WebappPlugin):
         valkey_client: ValkeyOpenIDClient = request.app["valkey_client"]
         code_verifier = await valkey_client.get_openid_key(state["session"][0])
 
-        client = AsyncOAuth2Client(
-            openid_config.client_id,
-            openid_config.client_secret,
-            scope=scope,
-            proxies={},
-            code_challenge_method="S256",
-        )
+        client = self._create_oauth2_client(token_endpoint)
 
         try:
             token = await client.fetch_token(

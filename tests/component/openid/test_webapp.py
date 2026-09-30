@@ -2,14 +2,19 @@
 
 from __future__ import annotations
 
+import base64
+import hashlib
 import urllib.parse
 import uuid
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
+import jwt as pyjwt
 import pytest
 import sqlalchemy as sa
 from aiohttp import web
+from cryptography import x509
+from cryptography.hazmat.primitives.asymmetric import rsa
 
 from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.keypair.row import keypairs
@@ -24,6 +29,8 @@ from ai.backend.manager.plugin.openid.webapp import (
     generate_user_data,
 )
 from ai.backend.manager.repositories.auth.repository import AuthRepository
+
+from .conftest import ClientCertificate
 
 # ===========================================================================
 # TestGenerateUserData — pure function, no DB needed
@@ -203,6 +210,7 @@ class TestWebAppLogin:
         request.post = AsyncMock(return_value=post_data)
         request.app = {
             "openid.authorization_endpoint": "https://idp.example.com/authorize",
+            "openid.token_endpoint": "https://idp.example.com/token",
             "valkey_client": valkey_client,
         }
         return request
@@ -304,3 +312,56 @@ class TestWebAppRedirect:
                 await webapp_plugin.redirect(redirect_request)
 
         assert exc_info.value.status == 401
+
+
+# ===========================================================================
+# TestOAuth2ClientAuthentication — token request client authentication
+# ===========================================================================
+
+
+class TestOAuth2ClientAuthentication:
+    TOKEN_ENDPOINT = "https://idp.example.com/token"
+
+    def _prepare_token_request(self, plugin: OIDCWebAppPlugin) -> dict[str, str]:
+        client = plugin._create_oauth2_client(self.TOKEN_ENDPOINT)
+        auth = client.client_auth(client.token_endpoint_auth_method)
+        _, _, body = auth.prepare("POST", self.TOKEN_ENDPOINT, {}, "grant_type=authorization_code")
+        return dict(urllib.parse.parse_qsl(body))
+
+    def test_private_key_signs_client_assertion(
+        self,
+        private_key_plugin_config: dict[str, Any],
+        client_certificate: ClientCertificate,
+    ) -> None:
+        plugin = OIDCWebAppPlugin(private_key_plugin_config, local_config={})
+
+        form = self._prepare_token_request(plugin)
+
+        assert form["client_assertion_type"] == (
+            "urn:ietf:params:oauth:client-assertion-type:jwt-bearer"
+        )
+        assertion = form["client_assertion"]
+        header = pyjwt.get_unverified_header(assertion)
+        thumbprint = hashlib.sha256(client_certificate.certificate_der).digest()
+        assert header["alg"] == "PS256"
+        assert header["typ"] == "JWT"
+        assert header["x5t#S256"] == base64.urlsafe_b64encode(thumbprint).rstrip(b"=").decode()
+        public_key = x509.load_pem_x509_certificate(
+            client_certificate.certificate.encode()
+        ).public_key()
+        assert isinstance(public_key, rsa.RSAPublicKey)
+        claims = pyjwt.decode(
+            assertion, public_key, algorithms=["PS256"], audience=self.TOKEN_ENDPOINT
+        )
+        assert claims["iss"] == "test-client-id"
+        assert claims["sub"] == "test-client-id"
+        assert claims["jti"]
+        assert claims["nbf"] <= claims["exp"] <= claims["nbf"] + 300
+
+    def test_client_secret_keeps_basic_authentication(
+        self, webapp_plugin: OIDCWebAppPlugin
+    ) -> None:
+        client = webapp_plugin._create_oauth2_client(self.TOKEN_ENDPOINT)
+
+        assert client.token_endpoint_auth_method == "client_secret_basic"
+        assert client.client_secret == "test-client-secret"
