@@ -38,7 +38,7 @@ jobs:
         --lockfile=uv.lock:tools/pytest.lock
         --lockfile=uv.lock:tools/setuptools.lock
         --lockfile=uv.lock:tools/towncrier.lock
-        --lockfile=requirements.txt:src/ai/backend/kernel/requirements.txt
+        --lockfile=uv.lock:python-kernel.lock
 
   prepare-container-matrix:
     name: Discover Dockerfiles
