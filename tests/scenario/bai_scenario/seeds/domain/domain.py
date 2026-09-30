@@ -31,7 +31,7 @@ class SeedDomain(SeedRow[DomainData]):
 
     @override
     def detail(self) -> str:
-        allows = [] if self.is_active else ["폐기된 상태"]
+        allows = [] if self.is_active else ["비활성 상태"]
         if self.vfolder_hosts:
             allows.append(f"이 도메인의 폴더는 {', '.join(self.vfolder_hosts)}에 놓을 수 있다")
         return ", ".join(allows)

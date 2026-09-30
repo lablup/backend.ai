@@ -7,7 +7,6 @@ from http import HTTPStatus
 from typing import TYPE_CHECKING, Final
 
 from ai.backend.common.api_handlers import APIResponse, BodyParam, PathParam
-from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.dto.manager.v2.domain.request import (
     AdminSearchDomainsInput,
     CreateDomainInput,
@@ -19,7 +18,6 @@ from ai.backend.common.dto.manager.v2.domain.request import (
 )
 from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.api.rest.v2.path_params import DomainNamePathParam
-from ai.backend.manager.data.domain.types import UserInfo
 from ai.backend.manager.dto.context import UserContext
 
 if TYPE_CHECKING:
@@ -34,14 +32,6 @@ class V2DomainHandler:
     def __init__(self, *, adapter: DomainAdapter) -> None:
         self._adapter = adapter
 
-    @staticmethod
-    def _build_user_info(ctx: UserContext) -> UserInfo:
-        return UserInfo(
-            id=ctx.user_uuid,
-            role=UserRole(ctx.user_role),
-            domain_name=ctx.user_domain,
-        )
-
     async def get(
         self,
         path: PathParam[DomainNamePathParam],
@@ -55,7 +45,7 @@ class V2DomainHandler:
         body: BodyParam[AdminSearchDomainsInput],
     ) -> APIResponse:
         """Search domains with filters, orders, and pagination (superadmin only)."""
-        result = await self._adapter.admin_search(body.parsed)
+        result = await self._adapter.global_search(body.parsed)
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
 
     async def scoped_search(
@@ -72,7 +62,7 @@ class V2DomainHandler:
         ctx: UserContext,
     ) -> APIResponse:
         """Create a new domain (superadmin only)."""
-        result = await self._adapter.admin_create(body.parsed, self._build_user_info(ctx))
+        result = await self._adapter.create(body.parsed)
         return APIResponse.build(status_code=HTTPStatus.CREATED, response_model=result)
 
     async def admin_update(
@@ -82,9 +72,7 @@ class V2DomainHandler:
         ctx: UserContext,
     ) -> APIResponse:
         """Update a domain (superadmin only)."""
-        result = await self._adapter.admin_update(
-            path.parsed.domain_name, body.parsed, self._build_user_info(ctx)
-        )
+        result = await self._adapter.update(path.parsed.domain_name, body.parsed)
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
 
     async def admin_delete(
@@ -93,7 +81,7 @@ class V2DomainHandler:
         ctx: UserContext,
     ) -> APIResponse:
         """Soft-delete a domain (superadmin only)."""
-        result = await self._adapter.admin_delete(body.parsed)
+        result = await self._adapter.delete(body.parsed)
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
 
     async def admin_restore(
@@ -102,7 +90,7 @@ class V2DomainHandler:
         ctx: UserContext,
     ) -> APIResponse:
         """Restore a soft-deleted domain (superadmin only)."""
-        result = await self._adapter.admin_restore(body.parsed)
+        result = await self._adapter.restore(body.parsed)
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
 
     async def admin_purge(
@@ -111,5 +99,5 @@ class V2DomainHandler:
         ctx: UserContext,
     ) -> APIResponse:
         """Permanently purge a domain (superadmin only)."""
-        result = await self._adapter.admin_purge(body.parsed)
+        result = await self._adapter.purge(body.parsed)
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)

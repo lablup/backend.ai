@@ -513,7 +513,7 @@ class ResourceGroupAdapter(BaseAdapter):
             Pydantic payload containing the updated resource group node.
         """
         updater = ResourceGroupUpdater(
-            resource_group_id=await self._resolve_resource_group_id(name),
+            resource_group_id=await self.lookup_name(name),
             is_active=OptionalState.from_unset(input.is_active),
             is_default=OptionalState.from_unset(input.is_default),
             description=TriState.from_unset(input.description),
@@ -538,7 +538,7 @@ class ResourceGroupAdapter(BaseAdapter):
         """
         action_result = await self._resource_group.get_resource_info.run(
             GetResourceInfoAction(
-                resource_group_id=await self._resolve_resource_group_id(resource_group),
+                resource_group_id=await self.lookup_name(resource_group),
                 resource_group=resource_group,
             )
         )
@@ -563,7 +563,7 @@ class ResourceGroupAdapter(BaseAdapter):
             FairShareResourceGroupSpecInfo DTO with merged resource weights and
             uses_default indicators per resource type.
         """
-        resource_group_id = await self._resolve_resource_group_id(resource_group)
+        resource_group_id = await self.lookup_name(resource_group)
         got = await self._resource_group.bulk_get.run(
             BulkGetResourceGroupsAction(ids=[resource_group_id])
         )
@@ -627,7 +627,7 @@ class ResourceGroupAdapter(BaseAdapter):
         )
         action_result = await self._resource_group.update_fair_share_spec.run(
             UpdateFairShareSpecAction(
-                resource_group_id=await self._resolve_resource_group_id(input.resource_group_name),
+                resource_group_id=await self.lookup_name(input.resource_group_name),
                 resource_group=input.resource_group_name,
                 half_life_days=OptionalState.from_unset(input.half_life_days).optional_value(),
                 lookback_days=OptionalState.from_unset(input.lookback_days).optional_value(),
@@ -670,7 +670,7 @@ class ResourceGroupAdapter(BaseAdapter):
                 )
             )
         updater = ResourceGroupUpdater(
-            resource_group_id=await self._resolve_resource_group_id(input.resource_group_name),
+            resource_group_id=await self.lookup_name(input.resource_group_name),
             is_active=OptionalState.from_unset(input.is_active),
             is_public=OptionalState.from_unset(input.is_public),
             is_default=OptionalState.from_unset(input.is_default),
@@ -705,7 +705,7 @@ class ResourceGroupAdapter(BaseAdapter):
             Pydantic node representing the purged resource group.
         """
         action_result = await self._resource_group.purge_resource_group.run(
-            PurgeResourceGroupAction(resource_group_id=await self._resolve_resource_group_id(name))
+            PurgeResourceGroupAction(resource_group_id=await self.lookup_name(name))
         )
 
         return self._data_to_detail_node(action_result.data)
@@ -714,11 +714,14 @@ class ResourceGroupAdapter(BaseAdapter):
 
     async def _resolve_domain_id(self, domain_name: str) -> DomainID:
         """Resolve a domain name to its row id at the API boundary."""
-        result = await self._domain.lookup.run(LookupDomainAction(name=DomainName(domain_name)))
+        result = await self._domain.lookup_name.run(
+            LookupDomainAction(name=DomainName(domain_name))
+        )
         return result.entity_id()
 
-    async def _resolve_resource_group_id(self, name: str) -> ResourceGroupID:
-        """Resolve a resource group name to its row ID at the API boundary."""
+    async def lookup_name(self, name: str) -> ResourceGroupID:
+        """The id of the resource group the name names. Checks the login only: the
+        operation the id is passed to checks the permission."""
         result = await self._resource_group.lookup.run(
             LookupResourceGroupAction(name=ResourceGroupName(name))
         )
@@ -930,7 +933,7 @@ class ResourceGroupAdapter(BaseAdapter):
         input: UpdateAllowedDomainsForResourceGroupInput,
     ) -> AllowedDomainsPayload:
         """Add and remove the domains a resource group may be scheduled on from."""
-        resource_group_id = await self._resolve_resource_group_id(input.resource_group_name)
+        resource_group_id = await self.lookup_name(input.resource_group_name)
         add_ids, remove_ids = await self._resolve_allowed_domain_ids(
             input.add or [], input.remove or []
         )
@@ -946,7 +949,7 @@ class ResourceGroupAdapter(BaseAdapter):
         input: UpdateAllowedProjectsForResourceGroupInput,
     ) -> AllowedProjectsPayload:
         """Add and remove the projects a resource group may be scheduled on from."""
-        resource_group_id = await self._resolve_resource_group_id(input.resource_group_name)
+        resource_group_id = await self.lookup_name(input.resource_group_name)
         await self._unlink_projects_from_resource_group(
             resource_group_id, [ProjectID(raw) for raw in input.remove or []]
         )
@@ -1011,7 +1014,7 @@ class ResourceGroupAdapter(BaseAdapter):
         resource_group_name: str,
     ) -> AllowedDomainsPayload:
         """Get allowed domains for a resource group."""
-        resource_group_id = await self._resolve_resource_group_id(resource_group_name)
+        resource_group_id = await self.lookup_name(resource_group_name)
         result = await self._resource_group.get_allowed_domains_for_rg.run(
             GetAllowedDomainsForResourceGroupAction(resource_group_id=resource_group_id)
         )
@@ -1022,7 +1025,7 @@ class ResourceGroupAdapter(BaseAdapter):
         resource_group_name: str,
     ) -> AllowedProjectsPayload:
         """Get allowed projects for a resource group."""
-        resource_group_id = await self._resolve_resource_group_id(resource_group_name)
+        resource_group_id = await self.lookup_name(resource_group_name)
         result = await self._resource_group.get_allowed_projects_for_rg.run(
             GetAllowedProjectsForResourceGroupAction(resource_group_id=resource_group_id)
         )
@@ -1086,7 +1089,7 @@ class ResourceGroupAdapter(BaseAdapter):
         )
         action_result = await self._resource_group.replace_default_deployment_options.run(
             ReplaceDefaultDeploymentOptionsAction(
-                resource_group_id=await self._resolve_resource_group_id(name),
+                resource_group_id=await self.lookup_name(name),
                 resource_group=name,
                 options=options,
             )
@@ -1119,7 +1122,7 @@ class ResourceGroupAdapter(BaseAdapter):
         )
         action_result = await self._resource_group.replace_default_session_options.run(
             ReplaceDefaultSessionOptionsAction(
-                resource_group_id=await self._resolve_resource_group_id(name),
+                resource_group_id=await self.lookup_name(name),
                 resource_group=name,
                 options=options,
             )

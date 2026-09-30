@@ -2660,7 +2660,9 @@ type PurgeDomain {
   msg: String
 }
 
-"""Added in 24.12.0."""
+"""
+Added in 24.12.0. Creates the domain, then links the given scaling groups in a separate step. If linking fails, the domain remains without them.
+"""
 type CreateDomainNode {
   ok: Boolean
   msg: String
@@ -2680,7 +2682,9 @@ input CreateDomainNodeInput {
   scaling_groups: [String]
 }
 
-"""Added in 24.12.0."""
+"""
+Added in 24.12.0. Updates the domain, then adds and removes the given scaling groups in separate steps. If linking fails, the domain update remains.
+"""
 type ModifyDomainNode {
   item: DomainNode
   client_mutation_id: String

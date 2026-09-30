@@ -24,6 +24,9 @@ Applies to every generated artifact — docs, code comments, BEPs, PR descriptio
 - Leave out how an individual value is composed and why a choice reads as natural.
 - Do not coin a term to group things. Name what is there and say how many. A term
   invented for one document spreads before anyone agrees it is the right one.
+- 계층이나 값을 가리킬 때는 코드에 있는 이름을 그대로 쓴다. REST handler, GQL resolver,
+  GQL DataLoader, adapter, processor, service, Action, repository, validator, `current_user()`,
+  user id 등. "표면", "행위자" 같은 서술어로 대신하지 않는다.
 - A comment or docstring stops at three lines. Anything longer is background: put it
   in `KNOWLEDGE.md` and point at it.
 

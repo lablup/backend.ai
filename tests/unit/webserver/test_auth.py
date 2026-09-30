@@ -13,9 +13,9 @@ from pytest_mock import MockerFixture
 
 from ai.backend.common.clients.http_client.client_pool import ClientPool, tcp_client_session_factory
 from ai.backend.common.contexts.request_id import current_request_id
+from ai.backend.common.endpoint_pool.types import AcquiredEndpoint
 from ai.backend.common.middlewares.request_id import REQUEST_ID_HEADER, request_id_middleware
 from ai.backend.web.auth import build_forwarding_headers, get_anonymous_session, get_api_session
-from ai.backend.web.clients.endpoint_pool import AcquiredEndpoint
 
 from .conftest import DummyApiConfig, DummyConfig
 

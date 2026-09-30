@@ -2,9 +2,36 @@
 
 [무엇을 보장하는가](/src/ai/backend/manager/api/adapters/model_card/KNOWLEDGE.md) · [어댑터](/src/ai/backend/manager/api/adapters/model_card/adapter.py)
 
-Not exercised by any scenario: admin_bulk_delete, available_presets, batch_load_fields, create, delete, deploy, get, min_resources, ownership_search, project_search, scan_project, scoped_search, update.
+시나리오: 미완 12 / 13
 
-### model_card
+- ops 로 구성 (7)
+  - admin_search — 대표 성공 ✓ · 대표 실패 ✓
+  - create — 대표 성공 ✗ · 대표 실패 ✗ — SCENARIO-GAP
+  - get — 대표 성공 ✗ · 대표 실패 ✗ — SCENARIO-GAP
+  - min_resources — 대표 성공 ✗ · 대표 실패 ✗ — SCENARIO-GAP
+  - ownership_search — 대표 성공 ✗ · 대표 실패 ✗ — SCENARIO-GAP
+  - project_search — 대표 성공 ✗ · 대표 실패 ✗ — SCENARIO-GAP
+  - scoped_search — 대표 성공 ✗ · 대표 실패 ✗ — SCENARIO-GAP
+- ops + 직접 구현 (2)
+  - deploy — 성공 없음 · 실패 없음 (scope, single_get_ops) — SCENARIO-GAP
+  - update — 성공 없음 · 실패 없음 (atomic_bulk_scoped_search_ops, single_entity) — SCENARIO-GAP
+- 직접 구현 (3)
+  - admin_bulk_delete — 성공 없음 · 실패 없음 (partial_bulk) — SCENARIO-GAP
+  - delete — 성공 없음 · 실패 없음 (single_entity) — SCENARIO-GAP
+  - scan_project — 성공 없음 · 실패 없음 (global_scope) — SCENARIO-GAP
+- Action 없음 (1)
+  - available_presets — 성공 없음 · 실패 없음 — SCENARIO-GAP
+
+**admin_search**
+
+| 시나리오 | 판정 |
+|---|---|
+| [모델 카드를 하나도 심지 않은 상태에서 슈퍼관리자가 전체 조회를 하면, 답은 비어 있다](#model_card-a-scenario-that-laid-no-model-card-finds-none) | 성공 |
+| [슈퍼관리자가 아닌 사용자가 전체 모델 카드 조회를 요청하면 역할로 막힌다](#model_card-a-user-who-is-not-the-superadmin-may-not-search-every-model-card) | 거부 |
+
+### admin_search
+
+<a id="model_card-a-scenario-that-laid-no-model-card-finds-none"></a>
 
 #### [a-scenario-that-laid-no-model-card-finds-none](/tests/scenario/bai_scenario/manager/model_card/test_model_card.py) — pass
 
@@ -31,6 +58,8 @@ Then
   - total_count = 0
   - has_next_page = False
   - has_previous_page = False
+
+<a id="model_card-a-user-who-is-not-the-superadmin-may-not-search-every-model-card"></a>
 
 #### [a-user-who-is-not-the-superadmin-may-not-search-every-model-card](/tests/scenario/bai_scenario/manager/model_card/test_model_card.py) — pass
 
