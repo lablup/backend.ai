@@ -365,3 +365,13 @@ class KernelRow(CreatedAtMixin, Base):
 
 # For compatibility
 kernels = KernelRow.__table__
+
+DEFAULT_KERNEL_ORDERING = [
+    sa.desc(
+        sa.func.greatest(
+            KernelRow.created_at,
+            KernelRow.terminated_at,
+            KernelRow.status_changed,
+        )
+    ),
+]
