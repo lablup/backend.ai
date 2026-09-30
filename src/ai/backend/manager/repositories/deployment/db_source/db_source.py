@@ -16,7 +16,7 @@ from sqlalchemy.exc import NoResultFound
 from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
 from sqlalchemy.ext.asyncio import async_sessionmaker
-from sqlalchemy.orm import aliased, selectinload
+from sqlalchemy.orm import aliased, contains_eager, selectinload
 
 from ai.backend.common.config import ModelHealthCheck
 from ai.backend.common.data.endpoint.types import EndpointLifecycle
@@ -175,6 +175,7 @@ from ai.backend.manager.models.replica_group.row import ReplicaGroupRow
 from ai.backend.manager.models.replica_group.updaters import ReplicaGroupRevisionSwapUpdater
 from ai.backend.manager.models.resource_group.row import ResourceGroupRow, resource_groups
 from ai.backend.manager.models.resource_slot.row import (
+    DeploymentRevisionResourceSlotRow,
     PresetResourceSlotRow,
     ResourceSlotTypeRow,
 )
@@ -2468,15 +2469,28 @@ class DeploymentDBSource:
     async def _fetch_latest_revision_row(
         session: SASession, endpoint_id: DeploymentID
     ) -> DeploymentRevisionRow:
+        latest_revision_id = (
+            sa.select(DeploymentRevisionRow.id)
+            .where(DeploymentRevisionRow.endpoint == endpoint_id)
+            .order_by(DeploymentRevisionRow.revision_number.desc())
+            .limit(1)
+            .scalar_subquery()
+        )
         row = (
-            await session.execute(
-                sa.select(DeploymentRevisionRow)
-                .where(DeploymentRevisionRow.endpoint == endpoint_id)
-                .order_by(DeploymentRevisionRow.revision_number.desc())
-                .limit(1)
-                .options(selectinload(DeploymentRevisionRow.resource_slot_rows))
+            (
+                await session.execute(
+                    sa.select(DeploymentRevisionRow)
+                    .where(DeploymentRevisionRow.id == latest_revision_id)
+                    .outerjoin(
+                        DeploymentRevisionResourceSlotRow,
+                        DeploymentRevisionResourceSlotRow.revision_id == DeploymentRevisionRow.id,
+                    )
+                    .options(contains_eager(DeploymentRevisionRow.resource_slot_rows))
+                )
             )
-        ).scalar_one_or_none()
+            .unique()
+            .scalar_one_or_none()
+        )
         if row is None:
             raise DeploymentRevisionNotFound(f"No revisions exist for endpoint {endpoint_id}")
         return row
