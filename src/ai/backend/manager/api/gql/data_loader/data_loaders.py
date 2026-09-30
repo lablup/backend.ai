@@ -56,6 +56,7 @@ from ai.backend.common.data.entity.prometheus_query_preset_category import (
 from ai.backend.common.data.entity.replica import ReplicaID
 from ai.backend.common.data.entity.resource_group import ResourceGroupEntityType, ResourceGroupID
 from ai.backend.common.data.entity.role import RoleEntityType, RoleID
+from ai.backend.common.data.entity.role_preset import RolePresetID
 from ai.backend.common.data.entity.route_history import RouteHistoryID
 from ai.backend.common.data.entity.runtime_variant import RuntimeVariantEntityType, RuntimeVariantID
 from ai.backend.common.data.entity.runtime_variant_preset import (
@@ -161,6 +162,9 @@ if TYPE_CHECKING:
     )
     from ai.backend.manager.api.gql.resource_group.types import (  # pants: no-infer-dep
         ResourceGroupGQL,
+    )
+    from ai.backend.manager.api.gql.role_preset.types.node import (  # pants: no-infer-dep
+        RolePresetGQL,
     )
     from ai.backend.manager.api.gql.runtime_variant.types import (  # pants: no-infer-dep
         RuntimeVariantGQL,
@@ -820,21 +824,13 @@ class DataLoaders:
         return DataLoader(load_fn=load_fn)
 
     @cached_property
-    def domain_loader(
+    def domain_id_by_name_loader(
         self,
-    ) -> DataLoader[str, DomainV2GQL | None]:
+    ) -> DataLoader[str, DomainID | None]:
         adapter = self._adapters.domain
 
-        async def load_fn(names: list[str]) -> list[DomainV2GQL | Exception | None]:
-            from ai.backend.manager.api.gql.domain_v2.types.node import (  # pants: no-infer-dep
-                DomainV2GQL as D,
-            )
-
-            dtos = await adapter.batch_load_by_names(names)
-            return [
-                dto if dto is None or isinstance(dto, Exception) else D.from_pydantic(dto)
-                for dto in dtos
-            ]
+        async def load_fn(names: list[str]) -> list[DomainID | None]:
+            return await adapter.bulk_lookup_names(names)
 
         return DataLoader(load_fn=load_fn)
 
@@ -849,7 +845,7 @@ class DataLoaders:
                 DomainV2GQL as D,
             )
 
-            dtos = await adapter.batch_load_by_ids(ids)
+            dtos = await adapter.bulk_get_ids(ids)
             return [
                 dto if dto is None or isinstance(dto, Exception) else D.from_pydantic(dto)
                 for dto in dtos
@@ -1063,6 +1059,27 @@ class DataLoaders:
 
             dtos = await adapter.batch_load_roles_by_ids(ids)
             return [RG.from_pydantic(dto) if dto is not None else None for dto in dtos]
+
+        return DataLoader(load_fn=load_fn)
+
+    @cached_property
+    def role_preset_loader(
+        self,
+    ) -> DataLoader[RolePresetID, RolePresetGQL | None]:
+        adapter = self._adapters.role_preset
+
+        async def load_fn(
+            ids: list[RolePresetID],
+        ) -> list[RolePresetGQL | Exception | None]:
+            from ai.backend.manager.api.gql.role_preset.types.node import (  # pants: no-infer-dep
+                RolePresetGQL as RP,
+            )
+
+            dtos = await adapter.batch_load_by_ids(ids)
+            return [
+                dto if dto is None or isinstance(dto, Exception) else RP.from_pydantic(dto)
+                for dto in dtos
+            ]
 
         return DataLoader(load_fn=load_fn)
 

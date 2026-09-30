@@ -260,7 +260,7 @@ async def fetch_admin_search_domains(
     order_dto = [o.to_pydantic() for o in order_by] if order_by else None
 
     # 2. Call shared adapter (same adapter used by REST v2)
-    payload_dto = await info.context.adapters.domain.admin_search(
+    payload_dto = await info.context.adapters.domain.global_search(
         AdminSearchDomainsInput(
             filter=filter_dto, order_by=order_dto, limit=limit, offset=offset
         )

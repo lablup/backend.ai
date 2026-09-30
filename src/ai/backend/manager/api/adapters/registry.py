@@ -240,7 +240,7 @@ class Adapters:
                 processors.container_registry, processors.rbac
             ),
             deployment=DeploymentAdapter(processors.deployment, deployment_coordinator),
-            domain=DomainAdapter(processors.domain, processors.resource_group),
+            domain=DomainAdapter(processors.domain),
             fair_share=FairShareAdapter(processors.fair_share, processors.resource_group),
             huggingface_registry=HuggingFaceRegistryAdapter(processors.artifact_registry),
             idle_checker=IdleCheckerAdapter(processors.idle_checker),

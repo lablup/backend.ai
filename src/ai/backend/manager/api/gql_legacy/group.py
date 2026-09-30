@@ -714,7 +714,7 @@ class CreateGroup(graphene.Mutation):  # type: ignore[misc]
             )
 
         domain_id = (
-            await graph_ctx.processors.domain.lookup.run(
+            await graph_ctx.processors.domain.lookup_name.run(
                 LookupDomainAction(name=DomainName(props.domain_name))
             )
         ).entity_id()

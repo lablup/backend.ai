@@ -115,7 +115,10 @@ class LoginHistoryV2GQL(PydanticNodeMixin[LoginHistoryNode]):
         ]
         | None
     ):
-        return await info.context.data_loaders.domain_loader.load(self.domain_name)
+        domain_id = await info.context.data_loaders.domain_id_by_name_loader.load(self.domain_name)
+        if domain_id is None:
+            return None
+        return await info.context.data_loaders.domain_by_id_loader.load(domain_id)
 
 
 LoginHistoryV2EdgeGQL = Edge[LoginHistoryV2GQL]

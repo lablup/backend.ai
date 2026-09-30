@@ -76,7 +76,7 @@ class TestCreateGroupMutation:
         )
         domain_data = MagicMock()
         domain_data.id = uuid4()
-        ctx.processors.domain.lookup.run = AsyncMock(return_value=MagicMock(data=domain_data))
+        ctx.processors.domain.lookup_name.run = AsyncMock(return_value=MagicMock(data=domain_data))
         # Required for privileged_mutation decorator
         ctx.user = {
             "role": UserRole.SUPERADMIN,

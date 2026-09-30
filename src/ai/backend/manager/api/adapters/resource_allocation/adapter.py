@@ -225,7 +225,9 @@ class ResourceAllocationAdapter(BaseAdapter):
         domain_name: str,
     ) -> DomainResourceAllocationPayload:
         """Get domain resource usage (admin only)."""
-        domain = await self._domain.lookup.run(LookupDomainAction(name=DomainName(domain_name)))
+        domain = await self._domain.lookup_name.run(
+            LookupDomainAction(name=DomainName(domain_name))
+        )
         result = await self._session.resource_allocation.get_domain_usage.run(
             GetDomainUsageAction(domain_id=domain.entity_id(), domain_name=domain_name)
         )

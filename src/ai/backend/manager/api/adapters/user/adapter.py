@@ -210,7 +210,9 @@ class UserAdapter(BaseAdapter):
 
     async def resolve_domain_id(self, domain_name: str) -> DomainID:
         """The domain's id, for callers that only hold its name."""
-        result = await self._domain.lookup.run(LookupDomainAction(name=DomainName(domain_name)))
+        result = await self._domain.lookup_name.run(
+            LookupDomainAction(name=DomainName(domain_name))
+        )
         return result.entity_id()
 
     # ------------------------------------------------------------------ batch load (DataLoader)

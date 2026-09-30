@@ -28,6 +28,7 @@ from ai.backend.manager.data.role_preset.types import (
 from ai.backend.manager.services.role_preset.actions.bulk_add_permissions import (
     BulkAddRolePermissionPresetsAction,
 )
+from ai.backend.manager.services.role_preset.actions.bulk_get import BulkGetRolePresetsAction
 from ai.backend.manager.services.role_preset.actions.bulk_purge import (
     BulkPurgeRolePresetsAction,
 )
@@ -68,6 +69,7 @@ class RolePresetProcessors:
         CreatedEntityWithFieldsOpsResult[RolePresetData, RolePermissionPresetData],
     ]
     get: SingleEntityActionProcessor[GetRolePresetAction, EntityOpsResult[RolePresetData]]
+    bulk_get: PartialBulkActionProcessor[BulkGetRolePresetsAction, RolePresetData]
     search: GlobalActionProcessor[SearchRolePresetsAction, BatchOpsResult[RolePresetData]]
     update: SingleEntityActionProcessor[UpdateRolePresetAction, EntityOpsResult[RolePresetData]]
     bulk_delete: PartialBulkActionProcessor[BulkDeleteRolePresetsAction, RolePresetData]
@@ -93,6 +95,7 @@ class RolePresetProcessors:
     ) -> None:
         self.create = preset_group.scope(CreateRolePresetAction, service.create)
         self.get = preset_group.single_get_ops(GetRolePresetAction)
+        self.bulk_get = preset_group.partial_bulk_get_ops(BulkGetRolePresetsAction)
         self.search = preset_group.global_searcher_ops(SearchRolePresetsAction)
         self.update = preset_group.single_entity(UpdateRolePresetAction, service.update)
         self.bulk_delete = preset_group.partial_bulk_delete_ops(BulkDeleteRolePresetsAction)

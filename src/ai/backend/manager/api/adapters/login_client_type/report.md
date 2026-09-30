@@ -2,9 +2,63 @@
 
 [무엇을 보장하는가](/src/ai/backend/manager/api/adapters/login_client_type/KNOWLEDGE.md) · [어댑터](/src/ai/backend/manager/api/adapters/login_client_type/adapter.py)
 
-Not exercised by any scenario: batch_load_fields.
+시나리오: 미완 1 / 5
 
-### creating
+- ops 로 구성 (5)
+  - admin_create — 대표 성공 ✓ · 대표 실패 ✓
+  - admin_delete — 대표 성공 ✓ · 대표 실패 ✓
+  - admin_update — 대표 성공 ✓ · 대표 실패 ✓
+  - get — 대표 성공 ✓ · 대표 실패 ✓
+  - search — 대표 성공 ✓ · 대표 실패 ✗ — SCENARIO-GAP
+
+**admin_create**
+
+| 시나리오 | 판정 |
+|---|---|
+| [슈퍼관리자가 이름과 설명을 함께 지정해 생성하면 지정한 값이 그대로 담긴 노드가 반환된다](#creating-a-login-client-type-made-with-a-description-carries-it-back) | 성공 |
+| [슈퍼관리자가 이름만 지정해 생성하면 설명이 비어 있는 노드가 반환된다](#creating-the-superadmin-makes-a-login-client-type-with-a-name-alone) | 성공 |
+| [같은 이름의 종류가 이미 있을 때 그 이름으로 다시 생성하면, 이름 중복으로 거부된다](#creating-a-login-client-type-name-already-taken-is-refused) | 거부 |
+| [슈퍼관리자가 아닌 사용자가 종류를 생성하면 역할 부족으로 거부된다](#creating-a-user-who-is-not-the-superadmin-may-not-create-a-login-client-type) | 거부 |
+| [권한 검사를 꺼도 슈퍼관리자가 아니면 종류를 생성하지 못한다](#creating-turning-enforcement-off-does-not-let-a-user-create-a-login-client-type) | 거부 |
+
+**admin_delete**
+
+| 시나리오 | 판정 |
+|---|---|
+| [슈퍼관리자가 종류를 삭제하면 삭제한 종류의 id를 담은 응답이 반환된다](#retiring-the-superadmin-deletes-a-login-client-type) | 성공 |
+| [권한 검사를 끄면 아무 권한도 없는 사용자도 종류를 삭제할 수 있다](#retiring-turning-enforcement-off-lets-a-user-delete-a-login-client-type) | 성공 |
+| [아무 권한도 없는 사용자가 종류를 삭제하면 권한 부족으로 거부된다](#retiring-a-user-granted-nothing-may-not-delete-a-login-client-type) | 거부 |
+| [슈퍼관리자가 존재하지 않는 id를 삭제하면 대상을 찾을 수 없다는 이유로 거부된다](#retiring-deleting-a-login-client-type-id-nothing-answers-to-is-not-found) | 거부 |
+
+**admin_update**
+
+| 시나리오 | 판정 |
+|---|---|
+| [값을 하나도 지정하지 않고 수정하면 아무것도 바뀌지 않은 노드가 반환된다](#editing-a-login-client-type-edit-giving-no-value-changes-nothing) | 성공 |
+| [설명이 있는 종류에 설명을 비우는 수정을 하면, 설명이 없어진다](#editing-clearing-a-login-client-type-description-leaves-it-empty) | 성공 |
+| [슈퍼관리자가 종류의 이름만 바꾸면, 이름은 새 값이 되고 설명은 그대로 유지된다](#editing-renaming-a-login-client-type-leaves-its-description-alone) | 성공 |
+| [권한 검사를 끄면 아무 권한도 없는 사용자도 종류를 수정할 수 있다](#editing-turning-enforcement-off-lets-a-user-edit-a-login-client-type) | 성공 |
+| [아무 권한도 없는 사용자가 존재하지 않는 id를 수정하면 대상 없음이 아니라 권한 부족으로 거부된다. 권한 검사가 먼저 실행되고 없는 행에는 부여된 권한도 없기 때문이다](#editing-a-user-granted-nothing-editing-an-unknown-login-client-type-id-is-refused-for-permission) | 거부 |
+| [아무 권한도 없는 사용자가 종류를 수정하면 권한 부족으로 거부된다. 종류는 어느 스코프에도 속하지 않아 그 권한을 받을 방법이 없다](#editing-a-user-granted-nothing-may-not-edit-a-login-client-type) | 거부 |
+| [종류 둘 중 한쪽의 이름을 다른 쪽 이름으로 바꾸면, 이름 중복으로 거부된다. 생성할 때와 달리 저장소의 제약 위반이 그대로 전파된다](#editing-renaming-a-login-client-type-to-a-name-already-taken-is-refused) | 거부 |
+| [슈퍼관리자가 존재하지 않는 id를 수정하면 대상을 찾을 수 없다는 이유로 거부된다](#editing-the-superadmin-editing-a-login-client-type-id-nothing-answers-to-is-not-found) | 거부 |
+
+**get**
+
+| 시나리오 | 판정 |
+|---|---|
+| [아무 권한도 없는 사용자가 id로 조회하면 그 종류 전체가 반환된다. 이 조회는 인증만 확인한다](#reading-a-user-granted-nothing-reads-a-login-client-type-by-id) | 성공 |
+| [존재하지 않는 id로 조회하면 대상을 찾을 수 없다는 이유로 거부된다](#reading-reading-a-login-client-type-id-nothing-answers-to-is-refused) | 거부 |
+
+**search**
+
+| 시나리오 | 판정 |
+|---|---|
+| [종류 둘이 있을 때 아무 권한도 없는 사용자가 필터 없이 조회하면 둘 다 집계된다](#searching-a-user-granted-nothing-counts-every-login-client-type-laid) | 성공 |
+
+### admin_create
+
+<a id="creating-a-login-client-type-made-with-a-description-carries-it-back"></a>
 
 #### [a-login-client-type-made-with-a-description-carries-it-back](/tests/scenario/bai_scenario/manager/login_client_type/test_creating.py) — pass
 
@@ -32,6 +86,37 @@ Then
   - description = '새로 지정한 설명'
   - created_at: 이 실행이 쓴 시각
   - modified_at: 이 실행이 쓴 시각
+
+<a id="creating-the-superadmin-makes-a-login-client-type-with-a-name-alone"></a>
+
+#### [the-superadmin-makes-a-login-client-type-with-a-name-alone](/tests/scenario/bai_scenario/manager/login_client_type/test_creating.py) — pass
+
+슈퍼관리자가 이름만 지정해 생성하면 설명이 비어 있는 노드가 반환된다
+
+Given
+
+- 슈퍼관리자 한 명
+  - 도메인 home-1
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+
+When
+
+- LoginClientTypeAdapter.admin_create — user-1이 webui 종류를 생성
+
+Then
+
+- 생성한 종류 전체가 반환된다
+  - id: 무시함 — 데이터베이스가 만든다
+  - name = 'webui'
+  - description = None
+  - created_at: 이 실행이 쓴 시각
+  - modified_at: 이 실행이 쓴 시각
+
+<a id="creating-a-login-client-type-name-already-taken-is-refused"></a>
 
 #### [a-login-client-type-name-already-taken-is-refused](/tests/scenario/bai_scenario/manager/login_client_type/test_creating.py) — pass
 
@@ -61,6 +146,8 @@ Then
 - 거부된다
   - 거부: LoginClientTypeConflict
 
+<a id="creating-a-user-who-is-not-the-superadmin-may-not-create-a-login-client-type"></a>
+
 #### [a-user-who-is-not-the-superadmin-may-not-create-a-login-client-type](/tests/scenario/bai_scenario/manager/login_client_type/test_creating.py) — pass
 
 슈퍼관리자가 아닌 사용자가 종류를 생성하면 역할 부족으로 거부된다
@@ -84,32 +171,7 @@ Then
 - 거부된다
   - 거부: InsufficientPrivilege
 
-#### [the-superadmin-makes-a-login-client-type-with-a-name-alone](/tests/scenario/bai_scenario/manager/login_client_type/test_creating.py) — pass
-
-슈퍼관리자가 이름만 지정해 생성하면 설명이 비어 있는 노드가 반환된다
-
-Given
-
-- 슈퍼관리자 한 명
-  - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
-
-When
-
-- LoginClientTypeAdapter.admin_create — user-1이 webui 종류를 생성
-
-Then
-
-- 생성한 종류 전체가 반환된다
-  - id: 무시함 — 데이터베이스가 만든다
-  - name = 'webui'
-  - description = None
-  - created_at: 이 실행이 쓴 시각
-  - modified_at: 이 실행이 쓴 시각
+<a id="creating-turning-enforcement-off-does-not-let-a-user-create-a-login-client-type"></a>
 
 #### [turning-enforcement-off-does-not-let-a-user-create-a-login-client-type](/tests/scenario/bai_scenario/manager/login_client_type/test_creating.py) — pass
 
@@ -134,7 +196,131 @@ Then
 - 거부된다
   - 거부: InsufficientPrivilege
 
-### editing
+### admin_delete
+
+<a id="retiring-the-superadmin-deletes-a-login-client-type"></a>
+
+#### [the-superadmin-deletes-a-login-client-type](/tests/scenario/bai_scenario/manager/login_client_type/test_retiring.py) — pass
+
+슈퍼관리자가 종류를 삭제하면 삭제한 종류의 id를 담은 응답이 반환된다
+
+Given
+
+- 로그인 클라이언트 종류 하나와, 슈퍼관리자 한 명
+  - 로그인 클라이언트 종류 client-1
+  - 도메인 home-1
+  - public 에서 login_client_type 조회 권한을 받은 사용자 준비
+    - 도메인에 속한 사용자 한 명 준비
+      - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+      - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+    - 역할 public-reader-1: 이 역할이 앉은 스코프 안에서만 통한다
+    - 역할 public-reader-1: login_client_type 전체에 READ 허용
+    - 슈퍼관리자 user-1: 역할 public-reader-1 보유
+
+When
+
+- LoginClientTypeAdapter.admin_delete — user-1이 client-1 삭제
+
+Then
+
+- 삭제한 종류의 id가 반환된다
+  - id: 미리 만들어 둔 종류와 같다
+
+<a id="retiring-turning-enforcement-off-lets-a-user-delete-a-login-client-type"></a>
+
+#### [turning-enforcement-off-lets-a-user-delete-a-login-client-type](/tests/scenario/bai_scenario/manager/login_client_type/test_retiring.py) — pass
+
+권한 검사를 끄면 아무 권한도 없는 사용자도 종류를 삭제할 수 있다
+
+Given
+
+- 로그인 클라이언트 종류 하나와, 일반 사용자 한 명
+  - 로그인 클라이언트 종류 client-1
+  - 도메인 home-1
+  - public 에서 login_client_type 조회 권한을 받은 사용자 준비
+    - 도메인에 속한 사용자 한 명 준비
+      - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+      - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+    - 역할 public-reader-1: 이 역할이 앉은 스코프 안에서만 통한다
+    - 역할 public-reader-1: login_client_type 전체에 READ 허용
+    - 일반 사용자 user-1: 역할 public-reader-1 보유
+
+When
+
+- LoginClientTypeAdapter.admin_delete — user-1이 client-1 삭제
+
+Then
+
+- 삭제한 종류의 id가 반환된다
+  - id: 미리 만들어 둔 종류와 같다
+
+<a id="retiring-a-user-granted-nothing-may-not-delete-a-login-client-type"></a>
+
+#### [a-user-granted-nothing-may-not-delete-a-login-client-type](/tests/scenario/bai_scenario/manager/login_client_type/test_retiring.py) — pass
+
+아무 권한도 없는 사용자가 종류를 삭제하면 권한 부족으로 거부된다
+
+Given
+
+- 로그인 클라이언트 종류 하나와, 일반 사용자 한 명
+  - 로그인 클라이언트 종류 client-1
+  - 도메인 home-1
+  - public 에서 login_client_type 조회 권한을 받은 사용자 준비
+    - 도메인에 속한 사용자 한 명 준비
+      - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+      - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+    - 역할 public-reader-1: 이 역할이 앉은 스코프 안에서만 통한다
+    - 역할 public-reader-1: login_client_type 전체에 READ 허용
+    - 일반 사용자 user-1: 역할 public-reader-1 보유
+
+When
+
+- LoginClientTypeAdapter.admin_delete — user-1이 client-1 삭제
+
+Then
+
+- 거부된다
+  - 거부: NotEnoughPermission
+
+<a id="retiring-deleting-a-login-client-type-id-nothing-answers-to-is-not-found"></a>
+
+#### [deleting-a-login-client-type-id-nothing-answers-to-is-not-found](/tests/scenario/bai_scenario/manager/login_client_type/test_retiring.py) — pass
+
+슈퍼관리자가 존재하지 않는 id를 삭제하면 대상을 찾을 수 없다는 이유로 거부된다
+
+Given
+
+- 로그인 클라이언트 종류 하나와, 슈퍼관리자 한 명
+  - 로그인 클라이언트 종류 client-1
+  - 도메인 home-1
+  - public 에서 login_client_type 조회 권한을 받은 사용자 준비
+    - 도메인에 속한 사용자 한 명 준비
+      - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+      - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+    - 역할 public-reader-1: 이 역할이 앉은 스코프 안에서만 통한다
+    - 역할 public-reader-1: login_client_type 전체에 READ 허용
+    - 슈퍼관리자 user-1: 역할 public-reader-1 보유
+
+When
+
+- LoginClientTypeAdapter.admin_delete — user-1이 존재하지 않는 id 삭제
+
+Then
+
+- 거부된다
+  - 거부: EntityNotFoundError
+
+### admin_update
+
+<a id="editing-a-login-client-type-edit-giving-no-value-changes-nothing"></a>
 
 #### [a-login-client-type-edit-giving-no-value-changes-nothing](/tests/scenario/bai_scenario/manager/login_client_type/test_editing.py) — pass
 
@@ -168,61 +354,7 @@ Then
   - created_at: 이 실행이 쓴 시각
   - modified_at: 이 실행이 쓴 시각
 
-#### [a-user-granted-nothing-editing-an-unknown-login-client-type-id-is-refused-for-permission](/tests/scenario/bai_scenario/manager/login_client_type/test_editing.py) — pass
-
-아무 권한도 없는 사용자가 존재하지 않는 id를 수정하면 대상 없음이 아니라 권한 부족으로 거부된다. 권한 검사가 먼저 실행되고 없는 행에는 부여된 권한도 없기 때문이다
-
-Given
-
-- 로그인 클라이언트 종류 하나와, 일반 사용자 한 명
-  - 로그인 클라이언트 종류 client-1
-  - 도메인 home-1
-  - public 에서 login_client_type 조회 권한을 받은 사용자 준비
-    - 도메인에 속한 사용자 한 명 준비
-      - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-      - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-    - 역할 public-reader-1: 이 역할이 앉은 스코프 안에서만 통한다
-    - 역할 public-reader-1: login_client_type 전체에 READ 허용
-    - 일반 사용자 user-1: 역할 public-reader-1 보유
-
-When
-
-- LoginClientTypeAdapter.admin_update — user-1이 존재하지 않는 id의 이름 수정
-
-Then
-
-- 거부된다
-  - 거부: NotEnoughPermission
-
-#### [a-user-granted-nothing-may-not-edit-a-login-client-type](/tests/scenario/bai_scenario/manager/login_client_type/test_editing.py) — pass
-
-아무 권한도 없는 사용자가 종류를 수정하면 권한 부족으로 거부된다. 종류는 어느 스코프에도 속하지 않아 그 권한을 받을 방법이 없다
-
-Given
-
-- 로그인 클라이언트 종류 하나와, 일반 사용자 한 명
-  - 로그인 클라이언트 종류 client-1
-  - 도메인 home-1
-  - public 에서 login_client_type 조회 권한을 받은 사용자 준비
-    - 도메인에 속한 사용자 한 명 준비
-      - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-      - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-    - 역할 public-reader-1: 이 역할이 앉은 스코프 안에서만 통한다
-    - 역할 public-reader-1: login_client_type 전체에 READ 허용
-    - 일반 사용자 user-1: 역할 public-reader-1 보유
-
-When
-
-- LoginClientTypeAdapter.admin_update — user-1이 client-1의 이름 수정
-
-Then
-
-- 거부된다
-  - 거부: NotEnoughPermission
+<a id="editing-clearing-a-login-client-type-description-leaves-it-empty"></a>
 
 #### [clearing-a-login-client-type-description-leaves-it-empty](/tests/scenario/bai_scenario/manager/login_client_type/test_editing.py) — pass
 
@@ -256,6 +388,8 @@ Then
   - created_at: 이 실행이 쓴 시각
   - modified_at: 이 실행이 쓴 시각
 
+<a id="editing-renaming-a-login-client-type-leaves-its-description-alone"></a>
+
 #### [renaming-a-login-client-type-leaves-its-description-alone](/tests/scenario/bai_scenario/manager/login_client_type/test_editing.py) — pass
 
 슈퍼관리자가 종류의 이름만 바꾸면, 이름은 새 값이 되고 설명은 그대로 유지된다
@@ -288,62 +422,7 @@ Then
   - created_at: 이 실행이 쓴 시각
   - modified_at: 이 실행이 쓴 시각
 
-#### [renaming-a-login-client-type-to-a-name-already-taken-is-refused](/tests/scenario/bai_scenario/manager/login_client_type/test_editing.py) — pass
-
-종류 둘 중 한쪽의 이름을 다른 쪽 이름으로 바꾸면, 이름 중복으로 거부된다. 생성할 때와 달리 저장소의 제약 위반이 그대로 전파된다
-
-Given
-
-- 로그인 클라이언트 종류 2개와, 슈퍼관리자 한 명
-  - 로그인 클라이언트 종류 wanted-1
-  - 로그인 클라이언트 종류 other-1
-  - 도메인 home-1
-  - public 에서 login_client_type 조회 권한을 받은 사용자 준비
-    - 도메인에 속한 사용자 한 명 준비
-      - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-      - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
-    - 역할 public-reader-1: 이 역할이 앉은 스코프 안에서만 통한다
-    - 역할 public-reader-1: login_client_type 전체에 READ 허용
-    - 슈퍼관리자 user-1: 역할 public-reader-1 보유
-
-When
-
-- LoginClientTypeAdapter.admin_update — user-1이 wanted-1의 이름을 other-1(으)로 수정
-
-Then
-
-- 거부된다
-  - 거부: UniqueConstraintViolationError
-
-#### [the-superadmin-editing-a-login-client-type-id-nothing-answers-to-is-not-found](/tests/scenario/bai_scenario/manager/login_client_type/test_editing.py) — pass
-
-슈퍼관리자가 존재하지 않는 id를 수정하면 대상을 찾을 수 없다는 이유로 거부된다
-
-Given
-
-- 로그인 클라이언트 종류 하나와, 슈퍼관리자 한 명
-  - 로그인 클라이언트 종류 client-1
-  - 도메인 home-1
-  - public 에서 login_client_type 조회 권한을 받은 사용자 준비
-    - 도메인에 속한 사용자 한 명 준비
-      - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-      - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
-    - 역할 public-reader-1: 이 역할이 앉은 스코프 안에서만 통한다
-    - 역할 public-reader-1: login_client_type 전체에 READ 허용
-    - 슈퍼관리자 user-1: 역할 public-reader-1 보유
-
-When
-
-- LoginClientTypeAdapter.admin_update — user-1이 존재하지 않는 id의 이름 수정
-
-Then
-
-- 거부된다
-  - 거부: EntityNotFoundError
+<a id="editing-turning-enforcement-off-lets-a-user-edit-a-login-client-type"></a>
 
 #### [turning-enforcement-off-lets-a-user-edit-a-login-client-type](/tests/scenario/bai_scenario/manager/login_client_type/test_editing.py) — pass
 
@@ -377,7 +456,130 @@ Then
   - created_at: 이 실행이 쓴 시각
   - modified_at: 이 실행이 쓴 시각
 
-### reading
+<a id="editing-a-user-granted-nothing-editing-an-unknown-login-client-type-id-is-refused-for-permission"></a>
+
+#### [a-user-granted-nothing-editing-an-unknown-login-client-type-id-is-refused-for-permission](/tests/scenario/bai_scenario/manager/login_client_type/test_editing.py) — pass
+
+아무 권한도 없는 사용자가 존재하지 않는 id를 수정하면 대상 없음이 아니라 권한 부족으로 거부된다. 권한 검사가 먼저 실행되고 없는 행에는 부여된 권한도 없기 때문이다
+
+Given
+
+- 로그인 클라이언트 종류 하나와, 일반 사용자 한 명
+  - 로그인 클라이언트 종류 client-1
+  - 도메인 home-1
+  - public 에서 login_client_type 조회 권한을 받은 사용자 준비
+    - 도메인에 속한 사용자 한 명 준비
+      - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+      - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+    - 역할 public-reader-1: 이 역할이 앉은 스코프 안에서만 통한다
+    - 역할 public-reader-1: login_client_type 전체에 READ 허용
+    - 일반 사용자 user-1: 역할 public-reader-1 보유
+
+When
+
+- LoginClientTypeAdapter.admin_update — user-1이 존재하지 않는 id의 이름 수정
+
+Then
+
+- 거부된다
+  - 거부: NotEnoughPermission
+
+<a id="editing-a-user-granted-nothing-may-not-edit-a-login-client-type"></a>
+
+#### [a-user-granted-nothing-may-not-edit-a-login-client-type](/tests/scenario/bai_scenario/manager/login_client_type/test_editing.py) — pass
+
+아무 권한도 없는 사용자가 종류를 수정하면 권한 부족으로 거부된다. 종류는 어느 스코프에도 속하지 않아 그 권한을 받을 방법이 없다
+
+Given
+
+- 로그인 클라이언트 종류 하나와, 일반 사용자 한 명
+  - 로그인 클라이언트 종류 client-1
+  - 도메인 home-1
+  - public 에서 login_client_type 조회 권한을 받은 사용자 준비
+    - 도메인에 속한 사용자 한 명 준비
+      - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+      - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+    - 역할 public-reader-1: 이 역할이 앉은 스코프 안에서만 통한다
+    - 역할 public-reader-1: login_client_type 전체에 READ 허용
+    - 일반 사용자 user-1: 역할 public-reader-1 보유
+
+When
+
+- LoginClientTypeAdapter.admin_update — user-1이 client-1의 이름 수정
+
+Then
+
+- 거부된다
+  - 거부: NotEnoughPermission
+
+<a id="editing-renaming-a-login-client-type-to-a-name-already-taken-is-refused"></a>
+
+#### [renaming-a-login-client-type-to-a-name-already-taken-is-refused](/tests/scenario/bai_scenario/manager/login_client_type/test_editing.py) — pass
+
+종류 둘 중 한쪽의 이름을 다른 쪽 이름으로 바꾸면, 이름 중복으로 거부된다. 생성할 때와 달리 저장소의 제약 위반이 그대로 전파된다
+
+Given
+
+- 로그인 클라이언트 종류 2개와, 슈퍼관리자 한 명
+  - 로그인 클라이언트 종류 wanted-1
+  - 로그인 클라이언트 종류 other-1
+  - 도메인 home-1
+  - public 에서 login_client_type 조회 권한을 받은 사용자 준비
+    - 도메인에 속한 사용자 한 명 준비
+      - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+      - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+    - 역할 public-reader-1: 이 역할이 앉은 스코프 안에서만 통한다
+    - 역할 public-reader-1: login_client_type 전체에 READ 허용
+    - 슈퍼관리자 user-1: 역할 public-reader-1 보유
+
+When
+
+- LoginClientTypeAdapter.admin_update — user-1이 wanted-1의 이름을 other-1(으)로 수정
+
+Then
+
+- 거부된다
+  - 거부: UniqueConstraintViolationError
+
+<a id="editing-the-superadmin-editing-a-login-client-type-id-nothing-answers-to-is-not-found"></a>
+
+#### [the-superadmin-editing-a-login-client-type-id-nothing-answers-to-is-not-found](/tests/scenario/bai_scenario/manager/login_client_type/test_editing.py) — pass
+
+슈퍼관리자가 존재하지 않는 id를 수정하면 대상을 찾을 수 없다는 이유로 거부된다
+
+Given
+
+- 로그인 클라이언트 종류 하나와, 슈퍼관리자 한 명
+  - 로그인 클라이언트 종류 client-1
+  - 도메인 home-1
+  - public 에서 login_client_type 조회 권한을 받은 사용자 준비
+    - 도메인에 속한 사용자 한 명 준비
+      - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+      - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+    - 역할 public-reader-1: 이 역할이 앉은 스코프 안에서만 통한다
+    - 역할 public-reader-1: login_client_type 전체에 READ 허용
+    - 슈퍼관리자 user-1: 역할 public-reader-1 보유
+
+When
+
+- LoginClientTypeAdapter.admin_update — user-1이 존재하지 않는 id의 이름 수정
+
+Then
+
+- 거부된다
+  - 거부: EntityNotFoundError
+
+### get
+
+<a id="reading-a-user-granted-nothing-reads-a-login-client-type-by-id"></a>
 
 #### [a-user-granted-nothing-reads-a-login-client-type-by-id](/tests/scenario/bai_scenario/manager/login_client_type/test_reading.py) — pass
 
@@ -411,6 +613,8 @@ Then
   - created_at: 이 실행이 쓴 시각
   - modified_at: 이 실행이 쓴 시각
 
+<a id="reading-reading-a-login-client-type-id-nothing-answers-to-is-refused"></a>
+
 #### [reading-a-login-client-type-id-nothing-answers-to-is-refused](/tests/scenario/bai_scenario/manager/login_client_type/test_reading.py) — pass
 
 존재하지 않는 id로 조회하면 대상을 찾을 수 없다는 이유로 거부된다
@@ -439,121 +643,9 @@ Then
 - 거부된다
   - 거부: NotEnoughPermission
 
-### retiring
+### search
 
-#### [a-user-granted-nothing-may-not-delete-a-login-client-type](/tests/scenario/bai_scenario/manager/login_client_type/test_retiring.py) — pass
-
-아무 권한도 없는 사용자가 종류를 삭제하면 권한 부족으로 거부된다
-
-Given
-
-- 로그인 클라이언트 종류 하나와, 일반 사용자 한 명
-  - 로그인 클라이언트 종류 client-1
-  - 도메인 home-1
-  - public 에서 login_client_type 조회 권한을 받은 사용자 준비
-    - 도메인에 속한 사용자 한 명 준비
-      - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-      - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-    - 역할 public-reader-1: 이 역할이 앉은 스코프 안에서만 통한다
-    - 역할 public-reader-1: login_client_type 전체에 READ 허용
-    - 일반 사용자 user-1: 역할 public-reader-1 보유
-
-When
-
-- LoginClientTypeAdapter.admin_delete — user-1이 client-1 삭제
-
-Then
-
-- 거부된다
-  - 거부: NotEnoughPermission
-
-#### [deleting-a-login-client-type-id-nothing-answers-to-is-not-found](/tests/scenario/bai_scenario/manager/login_client_type/test_retiring.py) — pass
-
-슈퍼관리자가 존재하지 않는 id를 삭제하면 대상을 찾을 수 없다는 이유로 거부된다
-
-Given
-
-- 로그인 클라이언트 종류 하나와, 슈퍼관리자 한 명
-  - 로그인 클라이언트 종류 client-1
-  - 도메인 home-1
-  - public 에서 login_client_type 조회 권한을 받은 사용자 준비
-    - 도메인에 속한 사용자 한 명 준비
-      - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-      - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
-    - 역할 public-reader-1: 이 역할이 앉은 스코프 안에서만 통한다
-    - 역할 public-reader-1: login_client_type 전체에 READ 허용
-    - 슈퍼관리자 user-1: 역할 public-reader-1 보유
-
-When
-
-- LoginClientTypeAdapter.admin_delete — user-1이 존재하지 않는 id 삭제
-
-Then
-
-- 거부된다
-  - 거부: EntityNotFoundError
-
-#### [the-superadmin-deletes-a-login-client-type](/tests/scenario/bai_scenario/manager/login_client_type/test_retiring.py) — pass
-
-슈퍼관리자가 종류를 삭제하면 삭제한 종류의 id를 담은 응답이 반환된다
-
-Given
-
-- 로그인 클라이언트 종류 하나와, 슈퍼관리자 한 명
-  - 로그인 클라이언트 종류 client-1
-  - 도메인 home-1
-  - public 에서 login_client_type 조회 권한을 받은 사용자 준비
-    - 도메인에 속한 사용자 한 명 준비
-      - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-      - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
-    - 역할 public-reader-1: 이 역할이 앉은 스코프 안에서만 통한다
-    - 역할 public-reader-1: login_client_type 전체에 READ 허용
-    - 슈퍼관리자 user-1: 역할 public-reader-1 보유
-
-When
-
-- LoginClientTypeAdapter.admin_delete — user-1이 client-1 삭제
-
-Then
-
-- 삭제한 종류의 id가 반환된다
-  - id: 미리 만들어 둔 종류와 같다
-
-#### [turning-enforcement-off-lets-a-user-delete-a-login-client-type](/tests/scenario/bai_scenario/manager/login_client_type/test_retiring.py) — pass
-
-권한 검사를 끄면 아무 권한도 없는 사용자도 종류를 삭제할 수 있다
-
-Given
-
-- 로그인 클라이언트 종류 하나와, 일반 사용자 한 명
-  - 로그인 클라이언트 종류 client-1
-  - 도메인 home-1
-  - public 에서 login_client_type 조회 권한을 받은 사용자 준비
-    - 도메인에 속한 사용자 한 명 준비
-      - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-      - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-    - 역할 public-reader-1: 이 역할이 앉은 스코프 안에서만 통한다
-    - 역할 public-reader-1: login_client_type 전체에 READ 허용
-    - 일반 사용자 user-1: 역할 public-reader-1 보유
-
-When
-
-- LoginClientTypeAdapter.admin_delete — user-1이 client-1 삭제
-
-Then
-
-- 삭제한 종류의 id가 반환된다
-  - id: 미리 만들어 둔 종류와 같다
-
-### searching
+<a id="searching-a-user-granted-nothing-counts-every-login-client-type-laid"></a>
 
 #### [a-user-granted-nothing-counts-every-login-client-type-laid](/tests/scenario/bai_scenario/manager/login_client_type/test_searching.py) — pass
 

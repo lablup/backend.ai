@@ -7,17 +7,21 @@ against, and the situations worth naming more than once.
 
 from __future__ import annotations
 
+import enum
 from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from typing import Any, override
+from uuid import UUID
 
 from ai.backend.common.data.entity.domain import DomainEntityType
+from ai.backend.common.data.entity.resource_group import ResourceGroupID
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.dto.manager.v2.domain.response import DomainNode
 from ai.backend.manager.data.domain.types import DomainData
 from ai.backend.manager.data.permission.types import Permission
+from ai.backend.manager.data.resource_group.types import ResourceGroupData
 from ai.backend.manager.data.user.types import UserData
 from ai.backend.manager.errors.base.entity import EntityNotFoundError
 from ai.backend.testutils.scenario_steps import (
@@ -27,12 +31,15 @@ from ai.backend.testutils.scenario_steps import (
     Held,
     Refused,
     Same,
+    SameAs,
     Skipped,
     Then,
     Verdict,
 )
 from bai_scenario.seeds.domain.domain import SeedDomain
+from bai_scenario.seeds.project.project import SeedProject
 from bai_scenario.seeds.rbac.role import SeedPermission, SeedRole
+from bai_scenario.seeds.resource_group.resource_group import LinkToDomain, SeedResourceGroup
 from bai_scenario.seeds.resource_policy.keypair import SeedKeypairPolicy
 from bai_scenario.seeds.resource_policy.project import SeedProjectPolicy
 from bai_scenario.seeds.resource_policy.user import SeedUserPolicy
@@ -40,7 +47,7 @@ from bai_scenario.seeds.seeder import Laid, Seeder, SeedNest
 from bai_scenario.seeds.user.user import SeedUserOf
 
 WAS_HERE = "이미 있던 도메인"
-"""시드가 심는 도메인의 설명. 시나리오가 기대값으로 다시 쓰므로 한 자리에 둔다."""
+"""시드가 미리 만드는 도메인의 설명. 시나리오가 기대값으로 다시 쓰므로 한 자리에 둔다."""
 
 SKEW = timedelta(seconds=30)
 """두 시계가 어긋나 있어도 봐주는 폭."""
@@ -72,31 +79,50 @@ class ADomainAndSomeone(Given[Any, ADomainAndACaller]):
         return ADomainAndACaller(seeding.made(domain), seeding.made(caller))
 
 
+class TargetHolds(enum.Enum):
+    """건드릴 도메인에 딸린 것."""
+
+    PROJECT = "프로젝트"
+    USER = "사용자"
+
+
 @dataclass(frozen=True)
 class ATargetAndSomeone(Given[Any, ADomainAndACaller]):
     """건드릴 도메인 하나와, 다른 도메인에 사는 사람 한 명.
 
-    건드리는 대상이 부르는 사람의 집이면 안 되는 자리에 쓴다. 완전히 지우는 요청이 그렇다.
+    건드리는 대상이 부르는 사람의 집이면 안 되는 자리에 쓴다. purge 요청이 그렇다.
     """
 
     role: UserRole = UserRole.USER
     name_hint: str = "target"
+    holds: TargetHolds | None = None
 
     @override
     def describe(self) -> str:
-        return f"건드릴 도메인 하나와, 다른 도메인에 사는 {self.role.value} 한 명"
+        target = "건드릴 도메인"
+        if self.holds is not None:
+            target = f"{self.holds.value}이 딸린 {target}"
+        return f"{target} 하나와, 다른 도메인에 사는 {self.role.value} 한 명"
 
     @override
     async def lay(self, seeding: Any) -> ADomainAndACaller:
         home = await seeding.creating(SeedDomain(name_hint="home", description=WAS_HERE))
         target = await seeding.creating(SeedDomain(name_hint=self.name_hint, description=WAS_HERE))
+        match self.holds:
+            case TargetHolds.PROJECT:
+                policy = await seeding.once(SeedProjectPolicy())
+                await seeding.creating_from_two(SeedProject(name_hint="team"), target, policy)
+            case TargetHolds.USER:
+                await seeding.within(SomeoneOf(target))
+            case None:
+                pass
         caller = await seeding.within(SomeoneOf(home, role=self.role))
         return ADomainAndACaller(seeding.made(target), seeding.made(caller))
 
 
 @dataclass(frozen=True)
 class ManyDomainsAndACaller:
-    """훑을 도메인 여럿과, 훑을 사람. `named`는 그중 골라낼 하나다."""
+    """search 할 도메인 여럿과, search 할 사람. `named`는 그중 골라낼 하나다."""
 
     laid: tuple[DomainData, ...]
     named: DomainData
@@ -148,11 +174,36 @@ class WrittenByThisRun(Condition[datetime | None]):
 
 
 @dataclass(frozen=True)
+class DomainLook:
+    """미리 만든 도메인의 노드가 어떤 값으로 와야 하는지. 이름은 미리 만든 것에서 읽는다."""
+
+    started: datetime
+    described: str | None = WAS_HERE
+    active: bool = True
+
+    def verdicts(self, prefix: str, node: DomainNode, laid: DomainData) -> list[Verdict]:
+        written = WrittenByThisRun(self.started)
+        return [
+            Same(f"{prefix}name", node.basic_info.name, laid.name),
+            Same(f"{prefix}description", node.basic_info.description, self.described),
+            Same(f"{prefix}integration_name", node.basic_info.integration_name, None),
+            Same(f"{prefix}allowed_docker_registries", node.registry.allowed_docker_registries, []),
+            Same(f"{prefix}is_active", node.lifecycle.is_active, self.active),
+            Same(f"{prefix}is_default", node.lifecycle.is_default, False),
+            Skipped(f"{prefix}id", "데이터베이스가 만든다"),
+            Held[UUID](
+                f"{prefix}entity_id", node.entity_id, SameAs(laid.id, "미리 만든 도메인의 id")
+            ),
+            Held(f"{prefix}created_at", node.lifecycle.created_at, written),
+            Held(f"{prefix}modified_at", node.lifecycle.modified_at, written),
+        ]
+
+
+@dataclass(frozen=True)
 class TheDomainNode(Then[ADomainAndACaller, DomainNode]):
     """도메인 노드 하나가 통째로 온다.
 
-    이름은 심은 것에서 읽는다. 시나리오가 정한 값만 여기로 받는다. 답이 노드를 감싸고
-    있으면 `when`이 벗겨서 준다.
+    시나리오가 정한 값만 여기로 받는다. 답이 노드를 감싸고 있으면 `when`이 벗겨서 준다.
     """
 
     started: datetime
@@ -161,25 +212,15 @@ class TheDomainNode(Then[ADomainAndACaller, DomainNode]):
 
     @override
     def says(self) -> str:
-        return "심은 도메인 전체가 온다"
+        return "미리 만든 도메인 전체가 온다"
 
     @override
     def look(self, laid: ADomainAndACaller, answered: Answered[DomainNode]) -> list[Verdict]:
         node = answered.response
         if node is None:
             return [Refused(EntityNotFoundError, answered.raised)]
-        written = WrittenByThisRun(self.started)
-        return [
-            Same("name", node.basic_info.name, laid.domain.name),
-            Same("description", node.basic_info.description, self.described),
-            Same("integration_name", node.basic_info.integration_name, None),
-            Same("allowed_docker_registries", node.registry.allowed_docker_registries, []),
-            Same("is_active", node.lifecycle.is_active, self.active),
-            Same("is_default", node.lifecycle.is_default, False),
-            Skipped("id", "데이터베이스가 만든다"),
-            Held("created_at", node.lifecycle.created_at, written),
-            Held("modified_at", node.lifecycle.modified_at, written),
-        ]
+        look = DomainLook(self.started, self.described, self.active)
+        return look.verdicts("", node, laid.domain)
 
 
 @dataclass(frozen=True)
@@ -284,3 +325,75 @@ class SomeoneReadingDomains(SeedNest[GrantedUser]):
         )
         grant = seed.granting(role, someone, role_id=lambda r: r.id, user_id=lambda u: UserID(u.id))
         return GrantedUser(someone, grant)
+
+
+@dataclass(frozen=True)
+class SomeoneReadingDomainsOfTheGroup(SeedNest[Laid[None]]):
+    """그 리소스 그룹 범위에서 도메인을 읽을 수 있는 사용자."""
+
+    group: Laid[ResourceGroupData]
+    user: Laid[UserData]
+
+    @override
+    def kind(self) -> str:
+        return "리소스 그룹 범위의 도메인 읽기 역할을 받은 사용자 준비"
+
+    @override
+    def lay(self, seed: Seeder) -> Laid[None]:
+        role = seed.creating_from(
+            SeedRole(lambda g: ResourceGroupID(g.id), name_hint="domain-reader"), self.group
+        )
+        seed.adding(
+            SeedPermission(entity_type=DomainEntityType(), permission=Permission.READ), role
+        )
+        return seed.granting(
+            role, self.user, role_id=lambda r: r.id, user_id=lambda u: UserID(u.id)
+        )
+
+
+@dataclass(frozen=True)
+class DomainsOfAGroupAndACaller:
+    """리소스 그룹 하나, 그 그룹을 쓸 수 있는 도메인들, 그리고 부를 사람."""
+
+    group: ResourceGroupData
+    linked: tuple[DomainData, ...]
+    caller: UserData
+
+
+@dataclass(frozen=True)
+class DomainsOfAGroupAndSomeone(Given[Any, DomainsOfAGroupAndACaller]):
+    """리소스 그룹 하나와 도메인 셋. 그중 둘만 그 그룹을 쓸 수 있다.
+
+    ``reading``이면 부르는 사람이 그 그룹 범위에서 도메인 읽기 역할을 받는다.
+    """
+
+    role: UserRole = UserRole.USER
+    reading: bool = False
+
+    @override
+    def describe(self) -> str:
+        who = (
+            f"그 그룹 범위의 도메인 읽기 역할을 받은 {self.role.value}"
+            if self.reading
+            else (self.role.value)
+        )
+        return f"리소스 그룹 하나, 그 그룹을 쓸 수 있는 도메인 둘과 쓸 수 없는 하나, 그리고 {who} 한 명"
+
+    @override
+    async def lay(self, seeding: Any) -> DomainsOfAGroupAndACaller:
+        home = await seeding.creating(SeedDomain(name_hint="home", description=WAS_HERE))
+        group = await seeding.creating(SeedResourceGroup())
+        linked = [
+            await seeding.creating(SeedDomain(name_hint="linked", description=WAS_HERE))
+            for _ in range(2)
+        ]
+        for one in linked:
+            await seeding.linking(LinkToDomain(), one, group)
+        caller = await seeding.within(SomeoneOf(home, role=self.role))
+        if self.reading:
+            await seeding.within(SomeoneReadingDomainsOfTheGroup(group, caller))
+        return DomainsOfAGroupAndACaller(
+            group=seeding.made(group),
+            linked=tuple(seeding.made(one) for one in linked),
+            caller=seeding.made(caller),
+        )
