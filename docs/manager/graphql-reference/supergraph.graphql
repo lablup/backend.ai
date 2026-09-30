@@ -20409,8 +20409,18 @@ type Role implements Node
   """Added in 26.9.0. ID of the scope the role belongs to."""
   scopeId: UUID!
 
+  """
+  Added in 26.9.0. ID of the role preset the role was instantiated from. Null when the role was not created from a preset or the preset has been purged.
+  """
+  rolePresetId: UUID
+
   """Added in 26.9.0. The scope the role belongs to."""
   scope: EntityNode
+
+  """
+  Added in 26.9.0. The role preset the role was instantiated from. Null when the role was not created from a preset or the preset has been purged.
+  """
+  rolePreset: RolePreset
 
   """Added in 26.3.0. Permissions associated with this role."""
   permissions(filter: PermissionFilter = null, orderBy: [PermissionOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): PermissionConnection
@@ -20976,6 +20986,9 @@ type RolePresetEdge
 input RolePresetFilter
   @join__type(graph: STRAWBERRY)
 {
+  """Added in 26.9.0. Filter by role preset ID."""
+  id: UUIDFilter = null
+
   """Filter by name."""
   name: StringFilter = null
 
