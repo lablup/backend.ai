@@ -14,6 +14,7 @@ from strawberry import UNSET, Info
 from strawberry.relay import Connection, Edge, NodeID
 
 from ai.backend.common.data.entity.role import RoleID
+from ai.backend.common.data.entity.role_preset import RolePresetID
 from ai.backend.common.data.entity.types import EntityType, RuntimeEntityID
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.dto.manager.v2.rbac.request import (
@@ -139,6 +140,7 @@ if TYPE_CHECKING:
         PermissionOrderBy,
         RolePermissionNestedFilterGQL,
     )
+    from ai.backend.manager.api.gql.role_preset.types.node import RolePresetGQL
     from ai.backend.manager.api.gql.user.types.filters import UserFilterGQL, UserOrderByGQL
     from ai.backend.manager.api.gql.user.types.node import UserV2Connection, UserV2GQL
 
@@ -204,6 +206,16 @@ class RoleGQL(PydanticNodeMixin[RoleNode]):
             description="ID of the scope the role belongs to.",
         )
     )
+    role_preset_id: UUID | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version="26.9.0",
+            description=(
+                "ID of the role preset the role was instantiated from. Null when the role "
+                "was not created from a preset or the preset has been purged."
+            ),
+        ),
+        default=None,
+    )
 
     @gql_added_field(
         BackendAIGQLMeta(
@@ -223,6 +235,31 @@ class RoleGQL(PydanticNodeMixin[RoleNode]):
     ):
         return await info.context.data_loaders.entity_node_loader.load(
             RuntimeEntityID(EntityType.from_name(self.scope_type), self.scope_id)
+        )
+
+    @gql_added_field(
+        BackendAIGQLMeta(
+            added_version="26.9.0",
+            description=(
+                "The role preset the role was instantiated from. Null when the role "
+                "was not created from a preset or the preset has been purged."
+            ),
+        )
+    )  # type: ignore[misc]
+    async def role_preset(
+        self,
+        info: Info[StrawberryGQLContext],
+    ) -> (
+        Annotated[
+            RolePresetGQL,
+            strawberry.lazy("ai.backend.manager.api.gql.role_preset.types.node"),
+        ]
+        | None
+    ):
+        if self.role_preset_id is None:
+            return None
+        return await info.context.data_loaders.role_preset_loader.load(
+            RolePresetID(self.role_preset_id)
         )
 
     @classmethod

@@ -1421,6 +1421,7 @@ class RBACAdapter(BaseAdapter):
             deleted_at=data.deleted_at,
             scope_type=data.scope_type,
             scope_id=data.scope_id,
+            role_preset_id=data.role_preset_id,
         )
 
     @staticmethod
@@ -1438,6 +1439,7 @@ class RBACAdapter(BaseAdapter):
             deleted_at=data.deleted_at,
             scope_type=data.scope_type,
             scope_id=data.scope_id,
+            role_preset_id=data.role_preset_id,
         )
 
     @staticmethod

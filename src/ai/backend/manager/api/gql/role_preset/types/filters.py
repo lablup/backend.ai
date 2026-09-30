@@ -15,7 +15,7 @@ from ai.backend.common.dto.manager.v2.role_preset.request import (
     RolePresetPermissionNestedFilter as RolePresetPermissionNestedFilterDTO,
 )
 from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
-from ai.backend.manager.api.gql.base import OrderDirection, StringFilter
+from ai.backend.manager.api.gql.base import OrderDirection, StringFilter, UUIDFilter
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     gql_added_field,
@@ -68,6 +68,13 @@ class RolePresetPermissionNestedFilterGQL(PydanticInputMixin[RolePresetPermissio
     name="RolePresetFilter",
 )
 class RolePresetFilterGQL(PydanticInputMixin[RolePresetFilterDTO]):
+    id: UUIDFilter | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version="26.9.0",
+            description="Filter by role preset ID.",
+        ),
+        default=None,
+    )
     name: StringFilter | None = gql_field(description="Filter by name.", default=None)
     scope_type: StringFilter | None = gql_field(description="Filter by scope type.", default=None)
     auto_assign: bool | None = gql_field(description="Filter by auto-assign flag.", default=None)
