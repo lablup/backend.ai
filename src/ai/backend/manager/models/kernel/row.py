@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import uuid
 from datetime import datetime
 from typing import (
     TYPE_CHECKING,
@@ -14,9 +13,7 @@ from sqlalchemy.orm import (
     Mapped,
     foreign,
     mapped_column,
-    noload,
     relationship,
-    selectinload,
 )
 
 from ai.backend.common.data.entity.image import ImageID
@@ -41,7 +38,6 @@ if TYPE_CHECKING:
     from ai.backend.manager.models.user.row import UserRow
 
 from ai.backend.manager.defs import DEFAULT_ROLE
-from ai.backend.manager.errors.kernel import SessionNotFound
 from ai.backend.manager.models.base import (
     GUID,
     Base,
@@ -51,12 +47,7 @@ from ai.backend.manager.models.base import (
     StructuredJSONObjectListColumn,
     URLColumn,
 )
-from ai.backend.manager.models.kernel.statuses import DEAD_KERNEL_STATUSES
 from ai.backend.manager.models.mixins.timestamp import CreatedAtMixin
-from ai.backend.manager.models.utils import (
-    ExtendedAsyncSAEngine,
-    execute_with_retry,
-)
 
 __all__ = (
     "KernelRow",
@@ -371,48 +362,6 @@ class KernelRow(CreatedAtMixin, Base):
         foreign_keys="KernelRow.user_uuid",
     )
 
-    @staticmethod
-    async def get_kernel(
-        db: ExtendedAsyncSAEngine, kern_id: uuid.UUID, allow_stale: bool = False
-    ) -> KernelRow:
-        from ai.backend.manager.data.agent.types import AgentStatus
-
-        async def _query() -> KernelRow:
-            async with db.begin_readonly_session() as db_sess:
-                query = (
-                    sa.select(KernelRow)
-                    .where(KernelRow.id == kern_id)
-                    .options(
-                        noload("*"),
-                        selectinload(KernelRow.agent_row).options(noload("*")),
-                    )
-                )
-                result = (await db_sess.execute(query)).scalars().all()
-
-                cand = result
-                if not allow_stale:
-                    cand = [
-                        k
-                        for k in result
-                        if (k.status not in DEAD_KERNEL_STATUSES)
-                        and (k.agent_row is not None and k.agent_row.status == AgentStatus.ALIVE)
-                    ]
-                if not cand:
-                    raise SessionNotFound
-                return cand[0]
-
-        return await execute_with_retry(_query)
-
 
 # For compatibility
 kernels = KernelRow.__table__
-
-DEFAULT_KERNEL_ORDERING = [
-    sa.desc(
-        sa.func.greatest(
-            KernelRow.created_at,
-            KernelRow.terminated_at,
-            KernelRow.status_changed,
-        )
-    ),
-]
