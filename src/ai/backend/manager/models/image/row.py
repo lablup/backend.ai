@@ -36,7 +36,6 @@ from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.docker import ImageRef
 from ai.backend.common.types import (
     BinarySize,
-    ImageCanonical,
     ImageID,
     SlotName,
 )
@@ -49,8 +48,6 @@ from ai.backend.manager.data.image.types import (
     ImageIdentifier,
     ImageStatus,
     ImageType,
-    KVPair,
-    ResourceLimit,
     Resources,
 )
 from ai.backend.manager.data.permission.permission_defs import ImagePermission
@@ -213,6 +210,8 @@ class ImageRow(CreatedAtMixin, Base):
         server_default=sa.func.now(),
     )
 
+    # Read only by gql_legacy (image.py, kernel.py); v2 reads aliases with ImageAliasSearcher.
+    # Delete it together with the gql_legacy cleanup.
     aliases = relationship("ImageAliasRow")
     # sessions = relationship("SessionRow", back_populates="image_row")
     registry_row = relationship(
@@ -411,41 +410,6 @@ class ImageRow(CreatedAtMixin, Base):
             resources[slot_type]["max"] = str(value_range[1])
 
         self._resources = resources
-
-    def to_detailed_dataclass(self) -> ImageDataWithDetails:
-        version, ptag_set = self.image_ref.tag_set
-        return ImageDataWithDetails(
-            id=self.id,
-            name=ImageCanonical(self.image),
-            namespace=self.image,
-            base_image_name=self.image_ref.name,
-            project=self.project or "",
-            humanized_name=self.image,
-            tag=self.tag,
-            tags=[KVPair(key=k, value=v) for k, v in ptag_set.items()],
-            version=version,
-            registry=self.registry,
-            registry_id=self.registry_id,
-            type=self.type,
-            architecture=self.architecture,
-            is_local=self.is_local,
-            digest=self.trimmed_digest or None,
-            labels=[KVPair(key=k, value=v) for k, v in self.labels.items() if v is not None],
-            aliases=[alias_row.alias for alias_row in self.aliases if alias_row.alias is not None],
-            size_bytes=self.size_bytes,
-            status=self.status,
-            resource_limits=[
-                ResourceLimit(key=str(k), min=v.get("min", Decimal(0)), max=Decimal("Infinity"))
-                for k, v in self.resources.items()
-            ],
-            supported_accelerators=self.accelerators.split(",") if self.accelerators else ["*"],
-            customized=self.customized,
-            creator_id=self.creator_id,
-            created_at=self.created_at,
-            last_used_at=self.last_used_at,
-            # legacy
-            hash=self.trimmed_digest or None,
-        )
 
 
 class ImageAliasRow(Base):

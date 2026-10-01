@@ -5,7 +5,6 @@ from collections.abc import Collection, Mapping, Sequence
 from typing import TYPE_CHECKING, Any
 
 import sqlalchemy as sa
-from sqlalchemy.orm import selectinload
 
 from ai.backend.common.data.entity.agent import AgentUUID
 from ai.backend.common.data.entity.resource_group import ResourceGroupID
@@ -25,11 +24,13 @@ from ai.backend.manager.models.agent.row import AgentRow, agents
 from ai.backend.manager.models.agent.searchable_fields import AgentSearchableFields
 from ai.backend.manager.models.agent.upserters import AgentHeartbeatUpserter
 from ai.backend.manager.models.image.row import ImageRow
+from ai.backend.manager.models.image.searchable_fields import ImageSearchableFields
 from ai.backend.manager.models.kernel.row import KernelRow
 from ai.backend.manager.models.resource_group.row import ResourceGroupRow
 from ai.backend.manager.models.resource_slot.row import AgentResourceRow
 from ai.backend.manager.models.resource_slot.upserters import AgentResourceUpserter
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.repositories.image.db_source.db_source import aliases_by_image
 from ai.backend.manager.repositories.ops.v2.share.provider import ShareOpsProvider
 
 log = StructuredLogger(logging.getLogger(__spec__.name))
@@ -51,34 +52,29 @@ class AgentDBSource:
     async def get_images_by_image_identifiers(
         self, image_identifiers: list[ImageIdentifier]
     ) -> dict[ImageID, ImageDataWithDetails]:
-        async with self._db.begin_readonly_session_read_committed() as db_session:
-            identifier_tuples = [
-                (identifier.canonical, identifier.architecture) for identifier in image_identifiers
-            ]
-
-            query = (
-                sa.select(ImageRow)
-                .where(sa.tuple_(ImageRow.name, ImageRow.architecture).in_(identifier_tuples))
-                .options(selectinload(ImageRow.aliases))
-            )
-            image_rows = list((await db_session.scalars(query)).all())
-            images_data: dict[ImageID, ImageDataWithDetails] = {}
-            for image_row in image_rows:
-                images_data[ImageID(image_row.id)] = image_row.to_detailed_dataclass()
-            return images_data
+        identifier_tuples = [
+            (identifier.canonical, identifier.architecture) for identifier in image_identifiers
+        ]
+        query = sa.select(ImageRow).where(
+            sa.tuple_(ImageRow.name, ImageRow.architecture).in_(identifier_tuples)
+        )
+        return await self._images_with_details(query)
 
     async def get_images_by_digest(self, digests: list[str]) -> dict[ImageID, ImageDataWithDetails]:
+        query = sa.select(ImageRow).where(ImageRow.config_digest.in_(digests))
+        return await self._images_with_details(query)
+
+    async def _images_with_details(
+        self, query: sa.Select[tuple[ImageRow]]
+    ) -> dict[ImageID, ImageDataWithDetails]:
         async with self._db.begin_readonly_session_read_committed() as db_session:
-            query = (
-                sa.select(ImageRow)
-                .where(ImageRow.config_digest.in_(digests))
-                .options(selectinload(ImageRow.aliases))
-            )
-            results = list((await db_session.scalars(query)).all())
-            images_data: dict[ImageID, ImageDataWithDetails] = {}
-            for image_row in results:
-                images_data[ImageID(image_row.id)] = image_row.to_detailed_dataclass()
-            return images_data
+            images = [
+                ImageSearchableFields.own.to_data(row)
+                for row in (await db_session.scalars(query)).all()
+            ]
+        async with self._v2_ops.read_ops() as r:
+            aliases = await aliases_by_image(r, [image.id for image in images])
+        return {image.id: image.to_detailed(aliases.get(image.id, [])) for image in images}
 
     async def agent_names_by_uuid(
         self, agent_uuids: Sequence[AgentUUID]

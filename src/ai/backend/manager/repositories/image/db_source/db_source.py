@@ -9,7 +9,6 @@ from typing import cast
 import sqlalchemy as sa
 from sqlalchemy.exc import DBAPIError
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
-from sqlalchemy.orm import selectinload
 
 from ai.backend.common.bgtask.reporter import ProgressReporter
 from ai.backend.common.data.entity.image_alias import ImageAliasID
@@ -63,8 +62,35 @@ from ai.backend.manager.models.specs.searcher import SearcherResult
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.base.querier import BatchQuerier, execute_batch_querier
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
+from ai.backend.manager.repositories.ops.v2.read import V2ReadOps
 
 log = StructuredLogger(logging.getLogger(__spec__.name))
+
+
+async def aliases_by_image(
+    read_ops: V2ReadOps, image_ids: Collection[ImageID]
+) -> Mapping[ImageID, list[str]]:
+    """The aliases of each image, keyed by image id; an image without an alias is absent."""
+    if not image_ids:
+        return {}
+    result = await read_ops.search_in_global(
+        ImageAliasSearcher(
+            pagination=NoPagination(),
+            conditions=[
+                ImageAliasSearchableFields.own.image_id.filter.in_(
+                    UUIDInMatchSpec(values=list(image_ids), negated=False)
+                )
+            ],
+        )
+    )
+    owners = await read_ops.lookup_field_owners(
+        ImageAliasOwnerLookup(), [alias.id for alias in result.items]
+    )
+    aliases: defaultdict[ImageID, list[str]] = defaultdict(list)
+    for alias in result.items:
+        if alias.alias:
+            aliases[ImageID(owners[alias.id])].append(alias.alias)
+    return aliases
 
 
 class ImageDBSource:
@@ -135,31 +161,6 @@ class ImageDBSource:
             raise ImageNotFound()
         return row
 
-    async def _aliases_by_image(
-        self, image_ids: Collection[ImageID]
-    ) -> Mapping[ImageID, list[str]]:
-        if not image_ids:
-            return {}
-        async with self._ops_provider.read_ops() as r:
-            result = await r.search_in_global(
-                ImageAliasSearcher(
-                    pagination=NoPagination(),
-                    conditions=[
-                        ImageAliasSearchableFields.own.image_id.filter.in_(
-                            UUIDInMatchSpec(values=list(image_ids), negated=False)
-                        )
-                    ],
-                )
-            )
-            owners = await r.lookup_field_owners(
-                ImageAliasOwnerLookup(), [alias.id for alias in result.items]
-            )
-        aliases: defaultdict[ImageID, list[str]] = defaultdict(list)
-        for alias in result.items:
-            if alias.alias:
-                aliases[ImageID(owners[alias.id])].append(alias.alias)
-        return aliases
-
     @staticmethod
     def _reject_while_purging(image_row: ImageRow) -> None:
         """Refuse a status write while a purge is working through this image."""
@@ -190,7 +191,7 @@ class ImageDBSource:
                 if scopes
                 else await r.search_in_global(searcher)
             )
-        aliases = await self._aliases_by_image([image.id for image in result.items])
+            aliases = await aliases_by_image(r, [image.id for image in result.items])
         return [image.to_detailed(aliases.get(image.id, [])) for image in result.items]
 
     async def mark_image_deleted(self, reference: str, architecture: str) -> ImageData:
@@ -363,18 +364,16 @@ class ImageDBSource:
         if not image_ids:
             return {}
 
-        query = (
-            sa.select(ImageRow)
-            .where(ImageRow.id.in_(image_ids))
-            .options(selectinload(ImageRow.aliases))
-        )
+        query = sa.select(ImageRow).where(ImageRow.id.in_(image_ids))
         if status_filter:
             query = query.where(ImageRow.status.in_(status_filter))
 
         async with self._db.begin_readonly_session_read_committed() as session:
             result = await session.execute(query)
-            image_rows = list(result.scalars().all())
-            return {ImageID(row.id): row.to_detailed_dataclass() for row in image_rows}
+            images = [ImageSearchableFields.own.to_data(row) for row in result.scalars().all()]
+        async with self._ops_provider.read_ops() as r:
+            aliases = await aliases_by_image(r, [image.id for image in images])
+        return {image.id: image.to_detailed(aliases.get(image.id, [])) for image in images}
 
     async def clear_image_resource_limits_by_id(self, image_id: ImageID) -> ImageData:
         """
