@@ -153,6 +153,18 @@ async def handle_list_mounts(request: web.Request) -> web.Response:
     return web.json_response(sorted(mounts))
 
 
+def _mountpoint_under_prefix(mount_prefix: str, name: str) -> Path | None:
+    prefix = os.path.normpath(mount_prefix)
+    mountpoint = os.path.normpath(Path(prefix) / name)
+    if not mountpoint.startswith(prefix.rstrip(os.sep) + os.sep):
+        return None
+    # A symlink under the prefix can still point outside it
+    real_prefix = os.path.realpath(prefix)
+    if not os.path.realpath(mountpoint).startswith(real_prefix.rstrip(os.sep) + os.sep):
+        return None
+    return Path(mountpoint)
+
+
 async def handle_mount(request: web.Request) -> web.Response:
     log.trace("mount requested")
     params = await request.json()
@@ -160,8 +172,8 @@ async def handle_mount(request: web.Request) -> web.Response:
     mount_prefix = await config.get("volumes/_mount")
     if mount_prefix is None:
         mount_prefix = "/mnt"
-    mountpoint = Path(mount_prefix) / params["name"]
-    if Path(mount_prefix).resolve() not in mountpoint.resolve().parents:
+    mountpoint = _mountpoint_under_prefix(mount_prefix, params["name"])
+    if mountpoint is None:
         return web.Response(
             text="The volume name must point to a directory under the mount prefix.",
             status=HTTPStatus.BAD_REQUEST,
@@ -209,8 +221,8 @@ async def handle_umount(request: web.Request) -> web.Response:
     mount_prefix = await config.get("volumes/_mount")
     if mount_prefix is None:
         mount_prefix = "/mnt"
-    mountpoint = Path(mount_prefix) / params["name"]
-    if Path(mount_prefix).resolve() not in mountpoint.resolve().parents:
+    mountpoint = _mountpoint_under_prefix(mount_prefix, params["name"])
+    if mountpoint is None:
         return web.Response(
             text="The volume name must point to a directory under the mount prefix.",
             status=HTTPStatus.BAD_REQUEST,
