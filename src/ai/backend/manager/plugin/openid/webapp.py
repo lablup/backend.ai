@@ -345,18 +345,18 @@ class OIDCWebAppPlugin(WebappPlugin):
             self._log_authorization_failure(e)
             return self._redirect_to(redirect_uri, {"bai_error": e.error_slug()})
         except Exception:
-            log.exception("openid authorization failed")
+            log.exception("OPENID.WEBAPP: authorization failed")
             return self._redirect_to(redirect_uri, {"bai_error": "internal-server-error"})
         return self._redirect_to(redirect_uri, {"sToken": stoken})
 
     def _log_authorization_failure(self, error: OpenIDRedirectError) -> None:
         detail = str(error.__cause__) if error.__cause__ is not None else str(error)
-        if error.is_client_error():
-            log.trace("openid authorization rejected", error_type=error.error_slug(), error=detail)
+        if 400 <= error.status_code < 500:
+            log.trace("OPENID.WEBAPP: authorization rejected ({}): {}", error.error_slug(), detail)
         elif isinstance(error, OpenIDProviderUnavailable):
-            log.warning("openid provider unavailable", error_type=error.error_slug(), error=detail)
+            log.warning("OPENID.WEBAPP: provider unavailable ({}): {}", error.error_slug(), detail)
         else:
-            log.error("openid authorization failed", error_type=error.error_slug(), error=detail)
+            log.error("OPENID.WEBAPP: authorization failed ({}): {}", error.error_slug(), detail)
 
     def _provider_error(self, error: OAuthError) -> OpenIDRedirectError:
         match error.error:
@@ -437,11 +437,6 @@ class OIDCWebAppPlugin(WebappPlugin):
             )
             claims.validate()
         except Exception as e:
-<<<<<<< HEAD
-            log.exception("Failed to handle token: %s", e)
-            log.info("OPENID.WEBAPP: request not authenticated")
-=======
->>>>>>> 33a0f0cc (feat(BA-8222): support certificate client authentication in the openid plugin (#15153))
             raise OpenIDAuthenticationFailed from e
 
         log.info("OPENID.WEBAPP: authorized ({})", json.dumps(claims))
