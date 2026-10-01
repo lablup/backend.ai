@@ -2,7 +2,7 @@ name: SBOM report
 
 on: [workflow_dispatch, workflow_call]
 
-# contents read: check out the repository
+# contents read: actions/checkout only fetches the source; nothing here pushes, tags or releases
 permissions:
   contents: read
 
