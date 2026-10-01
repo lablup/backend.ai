@@ -80,6 +80,7 @@ jobs:
   check-build-and-lint:
     permissions:
       contents: read
+      # gh cache delete in .github/scripts/prune-ref-caches.sh, run by the pants-caches action
       actions: write
     needs: detect-changes
     if: |
@@ -178,6 +179,7 @@ jobs:
   typecheck:
     permissions:
       contents: read
+      # gh cache delete in .github/scripts/prune-ref-caches.sh, run by the pants-caches action
       actions: write
     needs: plan-targets
     if: needs.plan-targets.result == 'success' && needs.plan-targets.outputs.typecheck == 'true'
@@ -239,6 +241,7 @@ jobs:
   test-unit:
     permissions:
       contents: read
+      # gh cache delete in .github/scripts/prune-ref-caches.sh, run by the pants-caches action
       actions: write
     needs: [detect-changes, plan-targets]
     if: needs.plan-targets.result == 'success' && needs.plan-targets.outputs.unit-shards != '[]'
@@ -253,6 +256,7 @@ jobs:
   test-scenario:
     permissions:
       contents: read
+      # gh cache delete in .github/scripts/prune-ref-caches.sh, run by the pants-caches action
       actions: write
     needs: plan-targets
     if: needs.plan-targets.result == 'success' && needs.plan-targets.outputs.scenario-shards != '[]'
@@ -266,6 +270,7 @@ jobs:
   test-component:
     permissions:
       contents: read
+      # gh cache delete in .github/scripts/prune-ref-caches.sh, run by the pants-caches action
       actions: write
     needs: [detect-changes, plan-targets]
     if: needs.plan-targets.result == 'success' && needs.plan-targets.outputs.component-shards != '[]'
@@ -281,6 +286,7 @@ jobs:
   test-integration:
     permissions:
       contents: read
+      # gh cache delete in .github/scripts/prune-ref-caches.sh, run by the pants-caches action
       actions: write
     needs: [detect-changes, plan-targets]
     if: needs.plan-targets.result == 'success' && needs.plan-targets.outputs.integration-shards != '[]'
@@ -368,8 +374,10 @@ jobs:
 
   release:
     permissions:
+      # gh release create/upload in the make-final-release job of ci-release.yml
       contents: write
       actions: read
+      # actions/attest-sbom in sbom.yml, called by the build-sbom job of ci-release.yml
       id-token: write
       attestations: write
     needs: [determine-release-grade, lint-and-typecheck, test-unit-gate, test-component-gate, test-integration-gate, check-alembic-migrations]
@@ -383,6 +391,7 @@ jobs:
 
   post-release:
     permissions:
+      # gh release upload in the build-conda-pack-for-windows job of ci-post-release.yml
       contents: write
       actions: read
     needs: [determine-release-grade, release]
