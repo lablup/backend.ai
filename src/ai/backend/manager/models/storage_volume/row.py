@@ -101,8 +101,9 @@ class StorageVolumeServiceHoldingRow(LifecycleTimestampsMixin, Base):
         "status", StrEnumType(ServiceStorageStatus), nullable=False
     )
     # When the service measured ``status``, not when its heartbeat delivered it.
-    status_checked_at: Mapped[datetime] = mapped_column(
-        "status_checked_at", sa.DateTime(timezone=True), nullable=False
+    # Null exactly while ``status`` is not_checked.
+    status_checked_at: Mapped[datetime | None] = mapped_column(
+        "status_checked_at", sa.DateTime(timezone=True), nullable=True
     )
 
 

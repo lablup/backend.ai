@@ -46,7 +46,7 @@ class ArtifactStorageImportStep(enum.StrEnum):
     ARCHIVE = "archive"
 
 
-# How long a backend or volume may go without a fresh check before it counts as stale.
+# How long a volume may go without a fresh check before it counts as stale.
 # The per-row ``status_stale_after`` column overrides it; this is only its default.
 DEFAULT_STATUS_STALE_AFTER: Final[timedelta] = timedelta(hours=1)
 
@@ -75,13 +75,13 @@ class StorageBackendCapabilities(BackendAISchema):
 class ServiceStorageStatus(enum.StrEnum):
     """How a service currently sees a storage backend or volume it relates to.
 
+    not_checked: declared, but no check has run yet.
     healthy: the last check found no problem.
     unhealthy: the check found a problem.
-    stale: no check has landed for a while.
-    detached: the relationship was removed outright.
+    lost: the service no longer declares it.
     """
 
+    NOT_CHECKED = "not_checked"
     HEALTHY = "healthy"
     UNHEALTHY = "unhealthy"
-    STALE = "stale"
-    DETACHED = "detached"
+    LOST = "lost"
