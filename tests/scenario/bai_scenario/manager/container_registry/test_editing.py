@@ -6,6 +6,7 @@ from dataclasses import dataclass, field
 from typing import override
 
 import pytest
+from pydantic import ValidationError
 
 from ai.backend.common.container_registry import ContainerRegistryType
 from ai.backend.common.data.user.types import UserRole
@@ -16,10 +17,7 @@ from ai.backend.common.dto.manager.v2.container_registry.request import (
 from ai.backend.common.dto.manager.v2.container_registry.response import ContainerRegistryNode
 from ai.backend.manager.api.adapters.container_registry.adapter import ContainerRegistryAdapter
 from ai.backend.manager.errors.auth import InsufficientPrivilege
-from ai.backend.manager.errors.container_registry import (
-    InvalidContainerRegistryProject,
-    InvalidContainerRegistryURL,
-)
+from ai.backend.manager.errors.container_registry import InvalidContainerRegistryProject
 from ai.backend.manager.errors.image import ContainerRegistryNotFound
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.testutils.scenario_steps import Given, Scenario, Then, When
@@ -178,7 +176,7 @@ class AnAddressWithoutAHostIsRefused(
     def describe(self) -> str:
         return (
             "슈퍼관리자가 호스트가 없는 주소로 수정하려 하면, "
-            "수정 후의 행을 검사하는 단계에서 주소 형식 오류로 거부된다"
+            "요청을 읽는 단계에서 주소 형식 오류로 거부된다"
         )
 
     @override
@@ -191,7 +189,7 @@ class AnAddressWithoutAHostIsRefused(
 
     @override
     def then(self) -> Then[ARegistryAndACaller, ContainerRegistryNode]:
-        return TheCallIsRefused(InvalidContainerRegistryURL)
+        return TheCallIsRefused(ValidationError)
 
 
 @dataclass(frozen=True)

@@ -57,7 +57,7 @@
 | [슈퍼관리자가 주소만 수정하면 주소만 새 값이 되고 나머지 필드는 그대로다](#editing-changing-only-the-address-leaves-every-other-field-alone) | 성공 |
 | [슈퍼관리자가 레지스트리를 수정하며 프로젝트를 허용하면 그 관계가 생성된다](#editing-editing-a-registry-can-add-an-allowed-project) | 성공 |
 | [슈퍼관리자가 아닌 사용자가 레지스트리를 수정하려 하면 권한 부족으로 거부된다. 이 호출은 호출자가 슈퍼관리자인지만 검사하고, 부여된 권한은 보지 않는다](#editing-a-user-who-is-not-the-superadmin-may-not-edit-a-registry) | 거부 |
-| [슈퍼관리자가 호스트가 없는 주소로 수정하려 하면, 수정 후의 행을 검사하는 단계에서 주소 형식 오류로 거부된다](#editing-an-address-whose-host-is-empty-is-refused-on-update) | 거부 |
+| [슈퍼관리자가 호스트가 없는 주소로 수정하려 하면, 요청을 읽는 단계에서 주소 형식 오류로 거부된다](#editing-an-address-whose-host-is-empty-is-refused-on-update) | 거부 |
 | [존재하지 않는 id를 수정하려 하면 대상을 찾을 수 없어 거부된다](#editing-editing-an-id-that-holds-no-registry-is-refused) | 거부 |
 | [프로젝트가 비어 있는 레지스트리를 harbor 종류로 수정하려 하면, harbor는 프로젝트를 요구하므로 거부된다](#editing-turning-a-registry-into-harbor-without-a-project-is-refused) | 거부 |
 
@@ -651,7 +651,7 @@ Then
 
 #### [an-address-whose-host-is-empty-is-refused-on-update](/tests/scenario/bai_scenario/manager/container_registry/test_editing.py) — pass
 
-슈퍼관리자가 호스트가 없는 주소로 수정하려 하면, 수정 후의 행을 검사하는 단계에서 주소 형식 오류로 거부된다
+슈퍼관리자가 호스트가 없는 주소로 수정하려 하면, 요청을 읽는 단계에서 주소 형식 오류로 거부된다
 
 Given
 
@@ -671,7 +671,7 @@ When
 Then
 
 - 거부된다
-  - 거부: InvalidContainerRegistryURL
+  - 거부: ValidationError
 
 <a id="editing-editing-an-id-that-holds-no-registry-is-refused"></a>
 
