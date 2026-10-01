@@ -1151,24 +1151,6 @@ def by_status(statuses: Iterable[SessionStatus]) -> QueryCondition:
     return _by_status
 
 
-def by_user_id(user_id: UUID) -> QueryCondition:
-    def _by_user_id(
-        query_stmt: sa.sql.Select[Any],
-    ) -> sa.sql.Select[Any]:
-        return query_stmt.where(SessionRow.user_uuid == user_id)
-
-    return _by_user_id
-
-
-def by_project_id(project_id: UUID) -> QueryCondition:
-    def _by_project_id(
-        query_stmt: sa.sql.Select[Any],
-    ) -> sa.sql.Select[Any]:
-        return query_stmt.where(SessionRow.group_id == project_id)
-
-    return _by_project_id
-
-
 def by_domain_name(domain_name: str) -> QueryCondition:
     def _by_domain_name(
         query_stmt: sa.sql.Select[Any],
