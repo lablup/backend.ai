@@ -68,12 +68,16 @@ def _make_mock_session_row(
     return row
 
 
-def _make_handler(mock_db: MagicMock) -> tuple[SessionEventHandler, MagicMock, AsyncMock]:
+def _make_handler(
+    mock_db: MagicMock, mock_session_row: MagicMock | None = None
+) -> tuple[SessionEventHandler, MagicMock, AsyncMock]:
     """Create a SessionEventHandler with mocked dependencies.
 
     Returns the handler with the mock registry and mock valkey-live client so
     callers can inspect create_task and last-access marker calls.
     """
+    mock_session_repository = MagicMock()
+    mock_session_repository.get_session_validated = AsyncMock(return_value=mock_session_row)
     mock_registry = MagicMock()
     mock_registry.webhook_ptask_group = MagicMock()
     mock_registry.clean_session = AsyncMock()
@@ -85,6 +89,7 @@ def _make_handler(mock_db: MagicMock) -> tuple[SessionEventHandler, MagicMock, A
     handler = SessionEventHandler(
         registry=mock_registry,
         db=mock_db,
+        session_repository=mock_session_repository,
         event_dispatcher_plugin_ctx=mock_event_dispatcher_plugin_ctx,
         scheduling_controller=mock_scheduling_controller,
         valkey_live=mock_valkey_live,
@@ -99,7 +104,7 @@ async def _invoke_and_capture(
     """Run invoke_session_callback and return the captured webhook payload data."""
     mock_db_session = AsyncMock()
     mock_db = _make_mock_db(mock_db_session)
-    handler, mock_registry, _mock_valkey_live = _make_handler(mock_db)
+    handler, mock_registry, _mock_valkey_live = _make_handler(mock_db, mock_row)
 
     captured_data: dict[str, Any] = {}
 
@@ -107,16 +112,9 @@ async def _invoke_and_capture(
         captured_data.update(data)
         return MagicMock()
 
-    with (
-        patch(
-            "ai.backend.manager.event_dispatcher.handlers.session.SessionRow.get_session",
-            new_callable=AsyncMock,
-            return_value=mock_row,
-        ),
-        patch(
-            "ai.backend.manager.event_dispatcher.handlers.session._make_session_callback",
-            new=_capture,
-        ),
+    with patch(
+        "ai.backend.manager.event_dispatcher.handlers.session._make_session_callback",
+        new=_capture,
     ):
         await handler.invoke_session_callback(None, AgentId("i-test"), event)
 
@@ -227,18 +225,11 @@ class TestInvokeSessionCallbackPayload:
 
         mock_db_session = AsyncMock()
         mock_db = _make_mock_db(mock_db_session)
-        handler, mock_registry, _mock_valkey_live = _make_handler(mock_db)
+        handler, mock_registry, _mock_valkey_live = _make_handler(mock_db, mock_row)
 
-        with (
-            patch(
-                "ai.backend.manager.event_dispatcher.handlers.session.SessionRow.get_session",
-                new_callable=AsyncMock,
-                return_value=mock_row,
-            ),
-            patch(
-                "ai.backend.manager.event_dispatcher.handlers.session._make_session_callback",
-            ) as mock_callback,
-        ):
+        with patch(
+            "ai.backend.manager.event_dispatcher.handlers.session._make_session_callback",
+        ) as mock_callback:
             await handler.invoke_session_callback(None, AgentId("i-test"), event)
 
         mock_callback.assert_not_called()

@@ -7,7 +7,7 @@ from typing import Any, cast
 
 import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import joinedload, noload, selectinload
+from sqlalchemy.orm import noload, selectinload
 from sqlalchemy.orm.strategy_options import _AbstractLoad
 
 from ai.backend.common.data.entity.session import SessionID
@@ -18,6 +18,7 @@ from ai.backend.common.types import (
     KernelId,
     ResourceSlot,
     SessionId,
+    SessionResult,
 )
 from ai.backend.manager.data.image.types import ImageData, ImageStatus
 from ai.backend.manager.data.resource_slot.types import ResourceAllocationAggregate
@@ -65,7 +66,7 @@ from ai.backend.manager.models.session_template.row import SessionTemplateRow
 from ai.backend.manager.models.specs.pagination import NoPagination
 from ai.backend.manager.models.user.row import UserRole, UserRow
 from ai.backend.manager.models.user.searchable_fields import UserSearchableFields
-from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.models.utils import ExtendedAsyncSAEngine, execute_with_retry
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.repositories.ops.v2.write import V2WriteOps
 from ai.backend.manager.repositories.session.dependency_graph import find_dependency_sessions
@@ -195,7 +196,6 @@ class SessionDBSource:
                     selectinload(KernelRow.agent_row).noload("*"),
                 ),
             ])
-        options.append(joinedload(SessionRow.user))
         cond = SessionRow.id == session_id
         if not allow_stale:
             cond = cond & ~SessionRow.status.in_(DEAD_SESSION_STATUSES)
@@ -216,11 +216,54 @@ class SessionDBSource:
         owner_access_key: AccessKey,
     ) -> list[SessionRow]:
         async with self._db.begin_readonly_session_read_committed() as db_sess:
-            return await SessionRow.match_sessions(
-                db_sess,
-                id_or_name_prefix,
-                owner_access_key,
+            return await self._match_sessions(
+                db_sess, id_or_name_prefix, owner_access_key, allow_stale=True
             )
+
+    @staticmethod
+    async def _match_sessions(
+        db_sess: AsyncSession,
+        id_or_name: str,
+        access_key: AccessKey,
+        *,
+        allow_stale: bool,
+    ) -> list[SessionRow]:
+        """The sessions of ``access_key`` whose id or name equals ``id_or_name``.
+
+        An id match shuts out the name matches; up to 10 name matches come newest first.
+        """
+        id_match: sa.ColumnElement[bool]
+        try:
+            id_match = SessionRow.id == uuid.UUID(id_or_name)
+        except ValueError:
+            id_match = sa.false()
+        rank = sa.case((id_match, 0), else_=1).label("rank")
+        cond = (id_match | (SessionRow.name == id_or_name)) & (SessionRow.access_key == access_key)
+        if not allow_stale:
+            cond = cond & ~SessionRow.status.in_(DEAD_SESSION_STATUSES)
+        query = (
+            sa.select(SessionRow, rank)
+            .where(cond)
+            .order_by(rank, sa.desc(SessionRow.created_at))
+            .limit(10)
+            .execution_options(populate_existing=True)
+        )
+        rows = (await db_sess.execute(query)).all()
+        if not rows:
+            return []
+        best_rank = rows[0].rank
+        return [row.SessionRow for row in rows if row.rank == best_rank]
+
+    async def set_session_result(self, session_id: SessionId, success: bool) -> None:
+        async def _update() -> None:
+            async with self._db.begin_session() as db_sess:
+                await db_sess.execute(
+                    sa.update(SessionRow)
+                    .values(result=SessionResult.SUCCESS if success else SessionResult.FAILURE)
+                    .where(SessionRow.id == session_id)
+                )
+
+        await execute_with_retry(_update)
 
     async def get_template_by_id(
         self,
@@ -399,17 +442,29 @@ class SessionDBSource:
 
             if session_name and session_row.access_key is not None:
                 # Check the owner of the target session has any session with the same name
-                try:
-                    sess = await SessionRow.get_session(
-                        db_session,
-                        session_name,
-                        AccessKey(session_row.access_key),
+                matches = await self._match_sessions(
+                    db_session,
+                    session_name,
+                    AccessKey(session_row.access_key),
+                    allow_stale=False,
+                )
+                if len(matches) > 1:
+                    raise TooManySessionsMatched(
+                        extra_data={
+                            "matches": [
+                                {
+                                    "session_id": sess.id,
+                                    "session_name": sess.name,
+                                    "status": sess.status,
+                                    "created_at": sess.created_at,
+                                }
+                                for sess in matches
+                            ]
+                        }
                     )
-                except SessionNotFound:
-                    pass
-                else:
+                if matches:
                     raise SessionAlreadyExists(
-                        f"Duplicate session name. Session(id:{sess.id}) already has the name"
+                        f"Duplicate session name. Session(id:{matches[0].id}) already has the name"
                     )
 
             updated = await V2WriteOps(db_session).update_data(updater)
@@ -545,14 +600,12 @@ class SessionDBSource:
         kernel_loading_strategy: KernelLoadingStrategy = KernelLoadingStrategy.MAIN_KERNEL_ONLY,
         allow_stale: bool = False,
     ) -> SessionRow:
-        """Get session with group information eagerly loaded"""
         async with self._db.begin_readonly_session_read_committed() as db_sess:
             return await self._session_by_id(
                 db_sess,
                 session_id,
                 kernel_loading_strategy=kernel_loading_strategy,
                 allow_stale=allow_stale,
-                eager_loading_op=[selectinload(SessionRow.group)],
             )
 
     async def get_session_with_routing_minimal(

@@ -112,7 +112,6 @@ from ai.backend.manager.models.types import (
 )
 from ai.backend.manager.models.utils import (
     ExtendedAsyncSAEngine,
-    execute_with_retry,
     execute_with_txn_retry,
 )
 
@@ -894,25 +893,6 @@ class SessionRow(CreatedAtMixin, Base):
         self.access_key = access_key
         for kernel_row in self.kernels:
             kernel_row.delegate_ownership(user_uuid, access_key)
-
-    @classmethod
-    async def set_session_result(
-        cls,
-        db: ExtendedAsyncSAEngine,
-        session_id: SessionId,
-        success: bool,
-    ) -> None:
-        # TODO: store exit code?
-        data = {
-            "result": SessionResult.SUCCESS if success else SessionResult.FAILURE,
-        }
-
-        async def _update() -> None:
-            async with db.begin_session() as db_sess:
-                query = sa.update(SessionRow).values(**data).where(SessionRow.id == session_id)
-                await db_sess.execute(query)
-
-        await execute_with_retry(_update)
 
     @classmethod
     async def match_sessions(

@@ -112,6 +112,10 @@ class SessionRepository:
         return await self._db_source.match_sessions(id_or_name_prefix, owner_access_key)
 
     @session_repository_resilience.apply()
+    async def set_session_result(self, session_id: SessionId, success: bool) -> None:
+        await self._db_source.set_session_result(session_id, success)
+
+    @session_repository_resilience.apply()
     async def get_template_by_id(
         self,
         template_id: uuid.UUID,
@@ -266,7 +270,6 @@ class SessionRepository:
         kernel_loading_strategy: KernelLoadingStrategy = KernelLoadingStrategy.MAIN_KERNEL_ONLY,
         allow_stale: bool = False,
     ) -> SessionRow:
-        """Get session with group information eagerly loaded"""
         return await self._db_source.get_session_with_group(
             session_id, kernel_loading_strategy, allow_stale
         )
