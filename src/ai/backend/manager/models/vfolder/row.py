@@ -386,6 +386,8 @@ class VFolderRow(LifecycleTimestampsMixin, Base):
         primaryjoin=_get_group_row_join_condition,
     )
 
+    # Called only by gql_legacy (endpoint.py, vfolder.py).
+    # Delete it together with the gql_legacy cleanup.
     @classmethod
     async def get(
         cls,
@@ -476,6 +478,8 @@ class VFolderUserMountPolicyRow(LifecycleTimestampsMixin, Base):
     )
 
 
+# Called by gql_legacy (schema.py, vfolder.py) and VfolderRepository.validate_quota_scope_access.
+# Move it into the repository together with the gql_legacy cleanup.
 async def ensure_quota_scope_accessible_by_user(
     conn: SASession,
     quota_scope: QuotaScopeID,
