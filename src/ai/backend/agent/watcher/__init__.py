@@ -162,13 +162,13 @@ async def handle_list_mounts(request: web.Request) -> web.Response:
 
 
 def _mountpoint_under_prefix(mount_prefix: str, name: str) -> Path | None:
-    prefix = os.path.normpath(mount_prefix)
-    mountpoint = os.path.normpath(Path(prefix) / name)
-    if not mountpoint.startswith(prefix.rstrip(os.sep) + os.sep):
+    prefix_dir = os.path.normpath(mount_prefix).rstrip(os.sep) + os.sep
+    real_prefix_dir = os.path.realpath(mount_prefix).rstrip(os.sep) + os.sep
+    mountpoint = os.path.normpath(Path(mount_prefix) / name)
+    if not mountpoint.startswith(prefix_dir):
         return None
     # A symlink under the prefix can still point outside it
-    real_prefix = os.path.realpath(prefix)
-    if not os.path.realpath(mountpoint).startswith(real_prefix.rstrip(os.sep) + os.sep):
+    if not os.path.realpath(mountpoint).startswith(real_prefix_dir):
         return None
     return Path(mountpoint)
 
