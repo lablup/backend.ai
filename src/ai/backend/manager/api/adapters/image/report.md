@@ -16,8 +16,8 @@
   - admin_dealias — 성공 있음 1 · 실패 있음 2 (global_scope)
   - admin_forget — 성공 있음 2 · 실패 있음 5 (single_entity)
   - admin_purge — 성공 있음 3 · 실패 있음 3 (single_entity)
-  - admin_rescan_image — 성공 있음 1 · 실패 있음 3 (global_scope)
   - admin_restore — 성공 있음 2 · 실패 있음 2 (single_entity)
+  - admin_scan_image — 성공 있음 1 · 실패 있음 3 (global_scope)
   - admin_search_image_aliases — 성공 있음 3 · 실패 있음 1 (global_scope)
   - admin_update — 성공 있음 6 · 실패 있음 2 (global_scope)
 
@@ -113,15 +113,6 @@
 | [아무 권한도 받지 않은 사용자가 이미지를 완전 삭제하려 하면 권한 부족으로 거부된다](#retiring-a-user-granted-nothing-may-not-purge-an-image) | 거부 |
 | [어느 이미지도 가리키지 않는 ID를 완전 삭제하려 하면 대상을 찾을 수 없어 거부된다](#retiring-purging-an-id-that-holds-no-image-is-refused) | 거부 |
 
-**admin_rescan_image**
-
-| 시나리오 | 판정 |
-|---|---|
-| [슈퍼관리자가 미등록된 이미지를 scan하면 요청한 아키텍처의 이미지 하나가 반환된다. scan은 슈퍼관리자 역할이 있어야만 실행된다](#rescanning-scanning-an-unregistered-image-registers-the-requested-architecture) | 성공 |
-| [이미지에 맞는 registry가 없으면 scan하지 않고 거부한다. 레지스트리 이름만 주어도 레지스트리 전체를 스캔하지 않는다](#rescanning-a-name-no-registry-holds-as-an-image-is-refused-without-a-scan) | 거부 |
-| [레지스트리에 없는 태그를 scan하면 이미지를 찾을 수 없어 거부된다](#rescanning-a-tag-the-registry-does-not-hold-is-refused) | 거부 |
-| [일반 사용자는 scan을 실행할 수 없어 슈퍼관리자 권한 부족으로 거부된다](#rescanning-a-user-who-is-not-the-superadmin-may-not-scan) | 거부 |
-
 **admin_restore**
 
 | 시나리오 | 판정 |
@@ -130,6 +121,15 @@
 | [살아 있는 이미지를 복원해도 살아 있는 상태 그대로다](#forgetting-restoring-an-image-that-was-never-forgotten-leaves-it-alive) | 성공 |
 | [아무 권한도 받지 않은 사용자가 이미지를 복원하려 하면 권한 부족으로 거부된다](#forgetting-a-user-granted-nothing-may-not-restore-an-image) | 거부 |
 | [어느 이미지도 가리키지 않는 ID를 복원하려 하면 대상을 찾을 수 없어 거부된다](#forgetting-restoring-an-id-that-holds-no-image-is-refused) | 거부 |
+
+**admin_scan_image**
+
+| 시나리오 | 판정 |
+|---|---|
+| [슈퍼관리자가 미등록된 이미지를 scan하면 요청한 아키텍처의 이미지 하나가 반환된다. scan은 슈퍼관리자 역할이 있어야만 실행된다](#scanning-scanning-an-unregistered-image-registers-the-requested-architecture) | 성공 |
+| [이미지에 맞는 registry가 없으면 scan하지 않고 거부한다. 레지스트리 이름만 주어도 레지스트리 전체를 스캔하지 않는다](#scanning-a-name-no-registry-holds-as-an-image-is-refused-without-a-scan) | 거부 |
+| [레지스트리에 없는 태그를 scan하면 이미지를 찾을 수 없어 거부된다](#scanning-a-tag-the-registry-does-not-hold-is-refused) | 거부 |
+| [일반 사용자는 scan을 실행할 수 없어 슈퍼관리자 권한 부족으로 거부된다](#scanning-a-user-who-is-not-the-superadmin-may-not-scan) | 거부 |
 
 **admin_search_image_aliases**
 
@@ -1626,142 +1626,6 @@ Then
 - 거부된다
   - 거부: ImageNotFound
 
-### admin_rescan_image
-
-<a id="rescanning-scanning-an-unregistered-image-registers-the-requested-architecture"></a>
-
-#### [scanning-an-unregistered-image-registers-the-requested-architecture](/tests/scenario/bai_scenario/manager/image/test_rescanning.py) — pass
-
-슈퍼관리자가 미등록된 이미지를 scan하면 요청한 아키텍처의 이미지 하나가 반환된다. scan은 슈퍼관리자 역할이 있어야만 실행된다
-
-Given
-
-- stable/python:latest 태그를 amd64, arm64로 내놓는 레지스트리 1개, superadmin 1명
-  - 도메인 home-1
-  - 컨테이너 레지스트리 host-1: 이미지를 가져오는 곳, 프로젝트는 stable
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
-
-When
-
-- ImageAdapter.admin_rescan_image — user-1이 stable/python:latest 태그를 x86_64 아키텍처로 스캔
-
-Then
-
-- 요청한 아키텍처로 등록된 이미지 노드가 반환된다
-  - id: 무시함 — 스캔이 새로 만든 행이라 데이터베이스가 정한다
-  - name = 'host-1/stable/python:latest'
-  - image = 'stable/python'
-  - registry = 'host-1'
-  - registry_id: 미리 만들어 둔 레지스트리의 ID와 같다
-  - project = 'stable'
-  - tag = 'latest'
-  - architecture = 'x86_64'
-  - size_bytes = 10
-  - type = <ImageType.COMPUTE: 'compute'>
-  - status = <ImageStatus.ALIVE: 'ALIVE'>
-  - labels = []
-  - tags = []
-  - resource_limits = [ImageResourceLimitInfo(key='cpu', min='1', max=None), ImageResourceLimitInfo(key='mem', min='1073741824', max=None)]
-  - accelerators = '*'
-  - config_digest = 'sha256:config-amd64'
-  - is_local = False
-  - created_at: 이 실행이 쓴 시각
-  - last_used_at: 무시함 — 세션이 기록하는 값이라 이 실행에서는 알 수 없다
-  - identity.canonical_name = 'host-1/stable/python:latest'
-  - identity.namespace = 'stable/python'
-  - identity.architecture = 'x86_64'
-  - metadata.digest = 'sha256:config-amd64'
-  - metadata.size_bytes = 10
-  - metadata.created_at: 이 실행이 쓴 시각
-  - metadata.last_used_at: 노드의 last_used_at 필드와 같다
-  - metadata.tags = []
-  - metadata.labels = []
-  - metadata.status = <ImageStatus.ALIVE: 'ALIVE'>
-  - requirements.supported_accelerators = ['*']
-  - requirements.resource_limits = [ImageResourceLimitGQLInfo(key='cpu', min='1', max='Infinity'), ImageResourceLimitGQLInfo(key='mem', min='1073741824', max='Infinity')]
-
-<a id="rescanning-a-name-no-registry-holds-as-an-image-is-refused-without-a-scan"></a>
-
-#### [a-name-no-registry-holds-as-an-image-is-refused-without-a-scan](/tests/scenario/bai_scenario/manager/image/test_rescanning.py) — pass
-
-이미지에 맞는 registry가 없으면 scan하지 않고 거부한다. 레지스트리 이름만 주어도 레지스트리 전체를 스캔하지 않는다
-
-Given
-
-- stable/python:latest 태그를 amd64, arm64로 내놓는 레지스트리 1개, superadmin 1명
-  - 도메인 home-1
-  - 컨테이너 레지스트리 host-1: 이미지를 가져오는 곳, 프로젝트는 stable
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
-
-When
-
-- ImageAdapter.admin_rescan_image — user-1이 이미지 없이 레지스트리 이름만 x86_64 아키텍처로 스캔
-
-Then
-
-- 거부된다
-  - 거부: RegistryNotFoundForImage
-
-<a id="rescanning-a-tag-the-registry-does-not-hold-is-refused"></a>
-
-#### [a-tag-the-registry-does-not-hold-is-refused](/tests/scenario/bai_scenario/manager/image/test_rescanning.py) — pass
-
-레지스트리에 없는 태그를 scan하면 이미지를 찾을 수 없어 거부된다
-
-Given
-
-- stable/python:latest 태그를 amd64, arm64로 내놓는 레지스트리 1개, superadmin 1명
-  - 도메인 home-1
-  - 컨테이너 레지스트리 host-1: 이미지를 가져오는 곳, 프로젝트는 stable
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
-
-When
-
-- ImageAdapter.admin_rescan_image — user-1이 stable/python:removed 태그를 x86_64 아키텍처로 스캔
-
-Then
-
-- 거부된다
-  - 거부: ImageNotFound
-
-<a id="rescanning-a-user-who-is-not-the-superadmin-may-not-scan"></a>
-
-#### [a-user-who-is-not-the-superadmin-may-not-scan](/tests/scenario/bai_scenario/manager/image/test_rescanning.py) — pass
-
-일반 사용자는 scan을 실행할 수 없어 슈퍼관리자 권한 부족으로 거부된다
-
-Given
-
-- stable/python:latest 태그를 amd64, arm64로 내놓는 레지스트리 1개, user 1명
-  - 도메인 home-1
-  - 컨테이너 레지스트리 host-1: 이미지를 가져오는 곳, 프로젝트는 stable
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-
-When
-
-- ImageAdapter.admin_rescan_image — user-1이 stable/python:latest 태그를 x86_64 아키텍처로 스캔
-
-Then
-
-- 거부된다
-  - 거부: InsufficientPrivilege
-
 ### admin_restore
 
 <a id="forgetting-restoring-a-forgotten-image-brings-it-back-alive"></a>
@@ -1931,6 +1795,142 @@ Then
 
 - 거부된다
   - 거부: ImageNotFound
+
+### admin_scan_image
+
+<a id="scanning-scanning-an-unregistered-image-registers-the-requested-architecture"></a>
+
+#### [scanning-an-unregistered-image-registers-the-requested-architecture](/tests/scenario/bai_scenario/manager/image/test_scanning.py) — pass
+
+슈퍼관리자가 미등록된 이미지를 scan하면 요청한 아키텍처의 이미지 하나가 반환된다. scan은 슈퍼관리자 역할이 있어야만 실행된다
+
+Given
+
+- stable/python:latest 태그를 amd64, arm64로 내놓는 레지스트리 1개, superadmin 1명
+  - 도메인 home-1
+  - 컨테이너 레지스트리 host-1: 이미지를 가져오는 곳, 프로젝트는 stable
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+
+When
+
+- ImageAdapter.admin_scan_image — user-1이 stable/python:latest 태그를 x86_64 아키텍처로 스캔
+
+Then
+
+- 요청한 아키텍처로 등록된 이미지 노드가 반환된다
+  - id: 무시함 — 스캔이 새로 만든 행이라 데이터베이스가 정한다
+  - name = 'host-1/stable/python:latest'
+  - image = 'stable/python'
+  - registry = 'host-1'
+  - registry_id: 미리 만들어 둔 레지스트리의 ID와 같다
+  - project = 'stable'
+  - tag = 'latest'
+  - architecture = 'x86_64'
+  - size_bytes = 10
+  - type = <ImageType.COMPUTE: 'compute'>
+  - status = <ImageStatus.ALIVE: 'ALIVE'>
+  - labels = []
+  - tags = []
+  - resource_limits = [ImageResourceLimitInfo(key='cpu', min='1', max=None), ImageResourceLimitInfo(key='mem', min='1073741824', max=None)]
+  - accelerators = '*'
+  - config_digest = 'sha256:config-amd64'
+  - is_local = False
+  - created_at: 이 실행이 쓴 시각
+  - last_used_at: 무시함 — 세션이 기록하는 값이라 이 실행에서는 알 수 없다
+  - identity.canonical_name = 'host-1/stable/python:latest'
+  - identity.namespace = 'stable/python'
+  - identity.architecture = 'x86_64'
+  - metadata.digest = 'sha256:config-amd64'
+  - metadata.size_bytes = 10
+  - metadata.created_at: 이 실행이 쓴 시각
+  - metadata.last_used_at: 노드의 last_used_at 필드와 같다
+  - metadata.tags = []
+  - metadata.labels = []
+  - metadata.status = <ImageStatus.ALIVE: 'ALIVE'>
+  - requirements.supported_accelerators = ['*']
+  - requirements.resource_limits = [ImageResourceLimitGQLInfo(key='cpu', min='1', max='Infinity'), ImageResourceLimitGQLInfo(key='mem', min='1073741824', max='Infinity')]
+
+<a id="scanning-a-name-no-registry-holds-as-an-image-is-refused-without-a-scan"></a>
+
+#### [a-name-no-registry-holds-as-an-image-is-refused-without-a-scan](/tests/scenario/bai_scenario/manager/image/test_scanning.py) — pass
+
+이미지에 맞는 registry가 없으면 scan하지 않고 거부한다. 레지스트리 이름만 주어도 레지스트리 전체를 스캔하지 않는다
+
+Given
+
+- stable/python:latest 태그를 amd64, arm64로 내놓는 레지스트리 1개, superadmin 1명
+  - 도메인 home-1
+  - 컨테이너 레지스트리 host-1: 이미지를 가져오는 곳, 프로젝트는 stable
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+
+When
+
+- ImageAdapter.admin_scan_image — user-1이 이미지 없이 레지스트리 이름만 x86_64 아키텍처로 스캔
+
+Then
+
+- 거부된다
+  - 거부: RegistryNotFoundForImage
+
+<a id="scanning-a-tag-the-registry-does-not-hold-is-refused"></a>
+
+#### [a-tag-the-registry-does-not-hold-is-refused](/tests/scenario/bai_scenario/manager/image/test_scanning.py) — pass
+
+레지스트리에 없는 태그를 scan하면 이미지를 찾을 수 없어 거부된다
+
+Given
+
+- stable/python:latest 태그를 amd64, arm64로 내놓는 레지스트리 1개, superadmin 1명
+  - 도메인 home-1
+  - 컨테이너 레지스트리 host-1: 이미지를 가져오는 곳, 프로젝트는 stable
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+
+When
+
+- ImageAdapter.admin_scan_image — user-1이 stable/python:removed 태그를 x86_64 아키텍처로 스캔
+
+Then
+
+- 거부된다
+  - 거부: ImageNotFound
+
+<a id="scanning-a-user-who-is-not-the-superadmin-may-not-scan"></a>
+
+#### [a-user-who-is-not-the-superadmin-may-not-scan](/tests/scenario/bai_scenario/manager/image/test_scanning.py) — pass
+
+일반 사용자는 scan을 실행할 수 없어 슈퍼관리자 권한 부족으로 거부된다
+
+Given
+
+- stable/python:latest 태그를 amd64, arm64로 내놓는 레지스트리 1개, user 1명
+  - 도메인 home-1
+  - 컨테이너 레지스트리 host-1: 이미지를 가져오는 곳, 프로젝트는 stable
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+
+When
+
+- ImageAdapter.admin_scan_image — user-1이 stable/python:latest 태그를 x86_64 아키텍처로 스캔
+
+Then
+
+- 거부된다
+  - 거부: InsufficientPrivilege
 
 ### admin_search_image_aliases
 

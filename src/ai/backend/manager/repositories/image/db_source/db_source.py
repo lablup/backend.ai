@@ -435,7 +435,7 @@ class ImageDBSource:
                 has_previous_page=result.has_previous_page,
             )
 
-    async def rescan_image(self, canonical: str, architecture: str) -> ImageData:
+    async def scan_image(self, canonical: str, architecture: str) -> ImageData:
         registries = await self._load_configured_registries(None)
         # Select registered registries whose registry/project prefix matches the image canonical.
         matching = self._filter_by_img_canonical(registries, canonical)

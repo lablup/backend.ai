@@ -1,4 +1,4 @@
-"""Stand-in for the registry a rescan reads a tag from.
+"""Stand-in for the registry a scan reads a tag from.
 
 The scanner picks its client from the registry row and reaches the registry over HTTP,
 so nothing can be handed in. This answers those requests with the tag it was built from.
