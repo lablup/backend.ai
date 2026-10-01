@@ -1,0 +1,5 @@
+name: CodeQL config
+
+paths-ignore:
+  - tests/**
+  - src/ai/backend/test/**
