@@ -41,6 +41,7 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 HTTP_HEADERS_TO_FORWARD = [
     "Accept-Language",
     "Authorization",
+    "X-BackendAI-Act-As",
 ]
 
 CHUNK_SIZE: Final[int] = 64 * 1024
