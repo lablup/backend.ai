@@ -167,14 +167,15 @@ def _mountpoint_under_prefix(mount_prefix: str, name: str) -> Path:
     real_prefix_dir = real_prefix.rstrip(os.sep) + os.sep
     mountpoint = os.path.normpath(Path(mount_prefix) / name)
     if not mountpoint.startswith(prefix_dir):
-        raise InvalidMountNameError()
-    # A symlink under the prefix can still point outside it
+        raise InvalidMountNameError(f"{name!r} resolves to {mountpoint}, outside {mount_prefix}")
     real_mountpoint = os.path.realpath(mountpoint)
     if not real_mountpoint.startswith(real_prefix_dir):
-        raise InvalidMountNameError()
+        raise InvalidMountNameError(
+            f"{name!r} follows a symlink to {real_mountpoint}, outside {mount_prefix}"
+        )
     # With `/` as the prefix, the prefix itself also passes the checks above
     if real_mountpoint == real_prefix:
-        raise InvalidMountNameError()
+        raise InvalidMountNameError(f"{name!r} resolves to the mount prefix {mount_prefix} itself")
     return Path(mountpoint)
 
 
