@@ -63,7 +63,7 @@ one place per domain.
 | `InvalidFieldPermission` | validates a requested field scope for both permission entries and entity shares, so it names no one row kind |
 | `VirtualEntityNotFound` | `data/entity/virtual_entity.py` declares an id alone, no `EntityType` |
 | `NotEnoughPermission`, `InsufficientPrivilege`, `ContainerRegistryWebhookAuthorizationFailed`, `ImageAccessForbiddenError` | an authorization denial about the caller, not about a row |
-| `InvalidCredentials`, `InvalidAuthParameters`, `AuthorizationFailed`, `OpenIDAuthenticationFailed` | the credentials are judged before a subject is settled, so no row is named |
+| `InvalidCredentials`, `InvalidAuthParameters`, `AuthorizationFailed` | the credentials are judged before a subject is settled, so no row is named |
 | `InvalidClientIPConfig` | the manager's own client-address configuration, not a row |
 | `PasswordExpired`, `LoginSessionExpiredError`, `LoginBlockedError`, `TooManyConcurrentLoginSessions` | a row is named, but what failed is the authentication — `ErrorOperation.AUTH`, which no `ActionOperationType` maps to |
 | `DeploymentDefinitionFileReadError` | a file inside a vfolder, which no row type declares |
