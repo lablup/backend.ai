@@ -1,11 +1,6 @@
-import json
-from collections.abc import Callable
-from http import HTTPStatus
 from typing import Any
 from unittest import mock
 from unittest.mock import AsyncMock, Mock
-
-from aioresponses import CallbackResult
 
 
 def mock_corofunc(return_value: Any) -> Mock:
@@ -169,81 +164,3 @@ class AsyncContextCoroutineMock(AsyncMock):
         self, exc_type: type[BaseException] | None, exc_val: BaseException | None, exc_tb: Any
     ) -> None:
         pass
-
-
-def mock_aioresponses_sequential_payloads(
-    mock_responses: list[Any],
-) -> Callable[..., CallbackResult]:
-    """
-    Creates a callback function for aioresponses that sequentially returns mock responses.
-    On each invocation, the callback function returns the next mock response from the 'mock_value' list.
-    If the number of calls exceeds the length of 'mock_value', it raises an Exception to indicate that no more responses are available.
-    """
-    cb_call_counter = 0
-
-    def _callback(*_args: Any, **_kwargs: Any) -> CallbackResult:
-        nonlocal cb_call_counter
-
-        if cb_call_counter >= len(mock_responses):
-            raise Exception("No more mock responses left")
-
-        data = mock_responses[cb_call_counter]
-        cb_call_counter += 1
-        return CallbackResult(status=HTTPStatus.OK, payload=data)
-
-    return _callback
-
-
-def setup_dockerhub_mocking(
-    aiohttp_request_mock: Any, registry_url: str, dockerhub_responses_mock: dict[str, Any]
-) -> None:
-    # /v2/ endpoint
-    aiohttp_request_mock.get(
-        f"{registry_url}/v2/",
-        status=HTTPStatus.OK,
-        payload=dockerhub_responses_mock["get_token"],
-        repeat=True,
-    )
-
-    # catalog
-    aiohttp_request_mock.get(
-        f"{registry_url}/v2/_catalog?n=30",
-        status=HTTPStatus.OK,
-        payload=dockerhub_responses_mock["get_catalog"],
-        repeat=True,
-    )
-
-    repositories = dockerhub_responses_mock["get_catalog"]["repositories"]
-
-    for repo in repositories:
-        # tags
-        mock_value = dockerhub_responses_mock["get_tags"]
-        params = {
-            "status": HTTPStatus.OK,
-            "callback" if callable(mock_value) else "payload": mock_value,
-        }
-
-        aiohttp_request_mock.get(f"{registry_url}/v2/{repo}/tags/list?n=10", **params)
-
-        # manifest
-        aiohttp_request_mock.get(
-            f"{registry_url}/v2/{repo}/manifests/latest",
-            status=HTTPStatus.OK,
-            payload=dockerhub_responses_mock["get_manifest"],
-            headers={
-                "Content-Type": "application/vnd.docker.distribution.manifest.v2+json",
-            },
-            repeat=True,
-        )
-
-        config_data = dockerhub_responses_mock["get_manifest"]["config"]
-        image_digest = config_data["digest"]
-
-        # config blob (JSON)
-        aiohttp_request_mock.get(
-            f"{registry_url}/v2/{repo}/blobs/{image_digest}",
-            status=HTTPStatus.OK,
-            body=json.dumps(dockerhub_responses_mock["get_config"]).encode("utf-8"),
-            payload=dockerhub_responses_mock["get_config"],
-            repeat=True,
-        )

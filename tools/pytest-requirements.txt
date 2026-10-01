@@ -6,7 +6,5 @@ pytest-custom_exit_code>=0.3.0
 pytest-dependency>=0.6.0
 pytest-mock>=3.14.0
 pytest-timeout>=2.3.1
-# Hold aiohttp below 3.14: its ClientResponse requires a `stream_writer` kwarg that
-# aioresponses (<=0.7.9, latest) does not pass, breaking mocks.
-aiohttp~=3.13.3
-aioresponses>=0.7.6
+# Match the production resolve (requirements.txt).
+aiohttp~=3.14.3
