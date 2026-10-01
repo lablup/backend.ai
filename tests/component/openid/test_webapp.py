@@ -235,6 +235,70 @@ class TestWebAppLogin:
 
         mock_oauth2_client.create_authorization_url.assert_called_once()
 
+    async def _login_state(
+        self, plugin: OIDCWebAppPlugin, request: MagicMock, client: MagicMock
+    ) -> dict[str, str]:
+        with patch(
+            "ai.backend.manager.plugin.openid.webapp.AsyncOAuth2Client",
+            return_value=client,
+        ):
+            await plugin.login(request)
+        kwargs = client.create_authorization_url.call_args.kwargs
+        assert kwargs["redirect_uri"] == "https://app.example.com/func/openid/redirect"
+        return dict(urllib.parse.parse_qsl(kwargs["state"]))
+
+    async def test_login_keeps_allowed_redirect_host(
+        self,
+        plugin_config: dict[str, Any],
+        login_request: MagicMock,
+        mock_oauth2_client: MagicMock,
+    ) -> None:
+        plugin = OIDCWebAppPlugin(
+            {**plugin_config, "allowed_redirect_hosts": ["guest.example.com"]}, local_config={}
+        )
+        login_request.post = AsyncMock(
+            return_value={"redirect_to": "https://guest.example.com/dashboard"}
+        )
+
+        state = await self._login_state(plugin, login_request, mock_oauth2_client)
+
+        assert state["redirect"] == "https://guest.example.com/dashboard"
+
+    async def test_login_without_allowed_hosts_keeps_any_redirect(
+        self,
+        webapp_plugin: OIDCWebAppPlugin,
+        login_request: MagicMock,
+        mock_oauth2_client: MagicMock,
+    ) -> None:
+        login_request.post = AsyncMock(
+            return_value={"redirect_to": "https://coredev.example.com/dashboard"}
+        )
+
+        state = await self._login_state(webapp_plugin, login_request, mock_oauth2_client)
+
+        assert state["redirect"] == "https://coredev.example.com/dashboard"
+
+    @pytest.mark.parametrize(
+        "redirect_to",
+        ["https://evil.example.com/dashboard", "/dashboard", "javascript:alert(1)", None],
+    )
+    async def test_login_replaces_disallowed_redirect_with_login_uri(
+        self,
+        plugin_config: dict[str, Any],
+        login_request: MagicMock,
+        mock_oauth2_client: MagicMock,
+        redirect_to: str | None,
+    ) -> None:
+        plugin = OIDCWebAppPlugin(
+            {**plugin_config, "allowed_redirect_hosts": ["guest.example.com"]}, local_config={}
+        )
+        post_data = {} if redirect_to is None else {"redirect_to": redirect_to}
+        login_request.post = AsyncMock(return_value=post_data)
+
+        state = await self._login_state(plugin, login_request, mock_oauth2_client)
+
+        assert state["redirect"] == "https://app.example.com/login"
+
 
 # ===========================================================================
 # TestWebAppRedirect — real DB + Valkey, mock OAuth2Client
@@ -298,6 +362,81 @@ class TestWebAppRedirect:
             user = result.scalars().one_or_none()
             assert user is not None
             assert user.full_name == "Alice Example"
+
+    def _set_return_uri(self, request: MagicMock, return_uri: str) -> None:
+        state = urllib.parse.parse_qs(request.query["state"])
+        request.query = {
+            **request.query,
+            "state": urllib.parse.urlencode({
+                "redirect": return_uri,
+                "session": state["session"][0],
+            }),
+        }
+
+    async def test_redirect_returns_to_allowed_host_through_login_uri_callback(
+        self,
+        plugin_config: dict[str, Any],
+        redirect_request: MagicMock,
+        mock_oauth2_client: MagicMock,
+    ) -> None:
+        plugin = OIDCWebAppPlugin(
+            {**plugin_config, "allowed_redirect_hosts": ["guest.example.com"]}, local_config={}
+        )
+        self._set_return_uri(redirect_request, "https://guest.example.com/dashboard")
+
+        location = await self._redirect(plugin, redirect_request, mock_oauth2_client)
+
+        assert str(location.with_query(None)) == "https://guest.example.com/dashboard"
+        assert "sToken" in location.query
+        fetch_kwargs = mock_oauth2_client.fetch_token.call_args.kwargs
+        assert fetch_kwargs["redirect_uri"] == "https://app.example.com/func/openid/redirect"
+
+    async def test_redirect_without_allowed_hosts_returns_to_any_host(
+        self,
+        webapp_plugin: OIDCWebAppPlugin,
+        redirect_request: MagicMock,
+        mock_oauth2_client: MagicMock,
+    ) -> None:
+        self._set_return_uri(redirect_request, "https://coredev.example.com/dashboard")
+
+        location = await self._redirect(webapp_plugin, redirect_request, mock_oauth2_client)
+
+        assert str(location.with_query(None)) == "https://coredev.example.com/dashboard"
+        assert "sToken" in location.query
+
+    async def test_redirect_disallowed_host_returns_to_login_uri(
+        self,
+        plugin_config: dict[str, Any],
+        redirect_request: MagicMock,
+        mock_oauth2_client: MagicMock,
+    ) -> None:
+        plugin = OIDCWebAppPlugin(
+            {**plugin_config, "allowed_redirect_hosts": ["guest.example.com"]}, local_config={}
+        )
+        self._set_return_uri(redirect_request, "https://evil.example.com/dashboard")
+
+        location = await self._redirect(plugin, redirect_request, mock_oauth2_client)
+
+        assert str(location.with_query(None)) == "https://app.example.com/login"
+        assert "sToken" in location.query
+
+    async def test_redirect_replaces_previous_result_query(
+        self,
+        webapp_plugin: OIDCWebAppPlugin,
+        redirect_request: MagicMock,
+        mock_oauth2_client: MagicMock,
+    ) -> None:
+        self._set_return_uri(
+            redirect_request,
+            "https://app.example.com/dashboard?tab=1&bai_error=openid-access-denied&sToken=old",
+        )
+
+        location = await self._redirect(webapp_plugin, redirect_request, mock_oauth2_client)
+
+        assert location.query["tab"] == "1"
+        assert "bai_error" not in location.query
+        assert location.query.getall("sToken") != ["old"]
+        assert len(location.query.getall("sToken")) == 1
 
     async def _redirect(
         self, plugin: OIDCWebAppPlugin, request: MagicMock, client: MagicMock

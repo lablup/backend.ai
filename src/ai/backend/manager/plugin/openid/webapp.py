@@ -62,6 +62,8 @@ from .valkey_client import ValkeyOpenIDClient
 log = BraceStyleAdapter(logging.getLogger(__name__))
 
 scope = "openid profile email"
+_CALLBACK_PATH: Final[str] = "/func/openid/redirect"
+_RESULT_QUERY_KEYS: Final[tuple[str, ...]] = ("bai_error", "sToken")
 
 
 async def ping(_request: web.Request) -> web.Response:
@@ -307,8 +309,6 @@ class OIDCWebAppPlugin(WebappPlugin):
         force = post_data.get("force", "false")
         authorization_endpoint = request.app["openid.authorization_endpoint"]
 
-        redirect_uri = yarl.URL(self._config.login_uri)
-
         client = self._create_oauth2_client(request.app["openid.token_endpoint"])
         session_key = str(uuid.uuid4())
         code_verifier = generate_token(48)
@@ -318,12 +318,12 @@ class OIDCWebAppPlugin(WebappPlugin):
         uri, _ = client.create_authorization_url(
             authorization_endpoint,
             state=urllib.parse.urlencode({
-                "redirect": redirect_to or "",
+                "redirect": str(self._return_uri(redirect_to)),
                 "session": session_key,
                 "force": force,
             }),
             code_verifier=code_verifier,
-            redirect_uri=str(redirect_uri.with_path("/func/openid/redirect")),
+            redirect_uri=self._callback_uri(),
         )
 
         return web.Response(
@@ -335,12 +335,9 @@ class OIDCWebAppPlugin(WebappPlugin):
 
     async def redirect(self, request: web.Request) -> web.Response:
         state = urllib.parse.parse_qs(request.query.get("state", ""))
-        if "redirect" in state:
-            redirect_uri = yarl.URL(state["redirect"][0])
-        else:
-            redirect_uri = yarl.URL(self._config.login_uri)
+        redirect_uri = self._return_uri(state.get("redirect", [None])[0])
         try:
-            stoken = await self._authorize(request, state, redirect_uri)
+            stoken = await self._authorize(request, state)
         except OpenIDRedirectError as e:
             self._log_authorization_failure(e)
             return self._redirect_to(redirect_uri, {"bai_error": e.error_slug()})
@@ -348,6 +345,22 @@ class OIDCWebAppPlugin(WebappPlugin):
             log.exception("OPENID.WEBAPP: authorization failed")
             return self._redirect_to(redirect_uri, {"bai_error": "internal-server-error"})
         return self._redirect_to(redirect_uri, {"sToken": stoken})
+
+    def _callback_uri(self) -> str:
+        return str(yarl.URL(self._config.login_uri).with_path(_CALLBACK_PATH))
+
+    def _return_uri(self, candidate: object) -> yarl.URL:
+        """Return ``candidate`` unless ``allowed_redirect_hosts`` rejects its host."""
+        login_uri = yarl.URL(self._config.login_uri)
+        if not isinstance(candidate, str) or not candidate:
+            return login_uri
+        uri = yarl.URL(candidate)
+        if self._config.allowed_redirect_hosts is None:
+            return uri
+        allowed_hosts = {login_uri.host, *(h.lower() for h in self._config.allowed_redirect_hosts)}
+        if uri.scheme not in ("http", "https") or uri.host not in allowed_hosts:
+            return login_uri
+        return uri
 
     def _log_authorization_failure(self, error: OpenIDRedirectError) -> None:
         detail = str(error.__cause__) if error.__cause__ is not None else str(error)
@@ -392,14 +405,16 @@ class OIDCWebAppPlugin(WebappPlugin):
     def _redirect_to(self, redirect_uri: yarl.URL, query: Mapping[str, str]) -> web.Response:
         return web.Response(
             status=HTTPStatus.FOUND,
-            headers={"Location": str(redirect_uri.update_query(query))},
+            headers={
+                "Location": str(
+                    redirect_uri.without_query_params(*_RESULT_QUERY_KEYS).update_query(query)
+                )
+            },
             # Legacy body that aiohttp's HTTP*Redirect filled in.
             text=f"{HTTPStatus.FOUND.value}: {HTTPStatus.FOUND.phrase}",
         )
 
-    async def _authorize(
-        self, request: web.Request, state: Mapping[str, list[str]], redirect_uri: yarl.URL
-    ) -> str:
+    async def _authorize(self, request: web.Request, state: Mapping[str, list[str]]) -> str:
         if "error" in request.query:
             callback_error = OAuthError(
                 error=request.query["error"],
@@ -425,7 +440,7 @@ class OIDCWebAppPlugin(WebappPlugin):
                 token_endpoint,
                 authorization_response=str(request.url),
                 code_verifier=code_verifier,
-                redirect_uri=str(redirect_uri.with_path("/func/openid/redirect")),
+                redirect_uri=self._callback_uri(),
             )
         except OAuthError as e:
             raise self._provider_error(e) from e
