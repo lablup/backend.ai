@@ -68,7 +68,6 @@ from ai.backend.manager.models.resource_policy.searchable_fields import (
     UserResourcePolicySearchableFields,
 )
 from ai.backend.manager.models.user import UserRow, UserStatus
-from ai.backend.manager.models.utils import execute_with_retry
 from ai.backend.manager.secret.pool import KeyProviderPool
 
 if TYPE_CHECKING:
@@ -638,12 +637,12 @@ class _AuthContext:
     keypair: AuthenticatedKeypair
 
 
-async def _query_auth_context_by_access_key(
+async def _query_auth_context(
     db: ExtendedAsyncSAEngine,
     key_provider_pool: KeyProviderPool,
-    access_key: str,
+    keypair_condition: sa.ColumnElement[bool],
 ) -> _AuthContext | None:
-    """Resolve an access key into the context an authenticated request carries.
+    """Resolve the keypair matching ``keypair_condition`` into the context a request carries.
 
     Only the columns that context carries are loaded, and the rows stay inside this session.
     """
@@ -688,9 +687,7 @@ async def _query_auth_context_by_access_key(
                     UserRow.allowed_client_ip,
                 ),
             )
-            .where(
-                (KeyPairRow.access_key == access_key) & (KeyPairRow.is_active.is_(True)),
-            )
+            .where(keypair_condition)
         )
         row = result.one_or_none()
         if row is None:
@@ -724,6 +721,31 @@ async def _query_auth_context_by_access_key(
                 ),
             ),
         )
+
+
+async def _query_auth_context_by_access_key(
+    db: ExtendedAsyncSAEngine,
+    key_provider_pool: KeyProviderPool,
+    access_key: str,
+) -> _AuthContext | None:
+    return await _query_auth_context(
+        db,
+        key_provider_pool,
+        (KeyPairRow.access_key == access_key) & (KeyPairRow.is_active.is_(True)),
+    )
+
+
+async def _query_auth_context_by_user_id(
+    db: ExtendedAsyncSAEngine,
+    key_provider_pool: KeyProviderPool,
+    user_id: UserID,
+) -> _AuthContext | None:
+    """Resolve a user into the context of their default keypair."""
+    return await _query_auth_context(
+        db,
+        key_provider_pool,
+        (KeyPairRow.user == user_id) & KeyPairRow.is_default,
+    )
 
 
 async def _authenticate_via_jwt(
@@ -818,50 +840,41 @@ async def _authenticate_via_hook(
     return context
 
 
-async def _load_user_data(db: ExtendedAsyncSAEngine, user_id: UserID) -> UserData:
-    """Load a user's ``UserData`` by UUID (impersonation target). Raises if not found."""
+async def _resolve_effective_context(
+    request: web.Request,
+    db: ExtendedAsyncSAEngine,
+    key_provider_pool: KeyProviderPool,
+    authenticated: _AuthContext,
+) -> _AuthContext:
+    """The context the request runs as: the caller's, or the X-BackendAI-Act-As target's.
 
-    async def _query() -> UserRow | None:
-        async with db.begin_readonly_session_read_committed() as session:
-            row: UserRow | None = await session.scalar(
-                sa.select(UserRow).where(UserRow.uuid == user_id)
-            )
-            return row
-
-    row = await execute_with_retry(_query)
-    if row is None:
-        raise UserNotFound("Impersonation target user not found")
-    if row.status in _AUTH_DENIED_USER_STATUSES:
-        raise AuthorizationFailed(f"Impersonation target user account is {row.status}")
-    return UserData(
-        user_id=row.uuid,
-        is_authorized=True,
-        is_admin=row.role in (UserRole.ADMIN, UserRole.SUPERADMIN),
-        is_superadmin=row.role == UserRole.SUPERADMIN,
-        role=row.role,
-        domain_name=row.domain_name,
-        domain_id=row.domain_id,
-    )
-
-
-async def _resolve_effective_user(
-    request: web.Request, db: ExtendedAsyncSAEngine, authenticated_user: UserData
-) -> UserData:
-    """The user the request runs as: the caller, or the X-BackendAI-Act-As target.
-
-    Without the header the caller is the effective user. With it, the caller must
-    be a super admin and the request runs as the target (fail-closed).
+    With the header, the caller must be a super admin and the target's default keypair is used.
     """
     raw_target = request.headers.get("X-BackendAI-Act-As")
     if not raw_target:
-        return authenticated_user
-    if not authenticated_user.is_superadmin:
+        return authenticated
+    if authenticated.user.role != UserRole.SUPERADMIN:
         raise InsufficientPrivilege("Only superadmin may use X-BackendAI-Act-As")
     try:
         target_user_id = UserID(uuid.UUID(raw_target))
     except ValueError as e:
         raise InvalidAuthParameters("X-BackendAI-Act-As must be a valid user UUID") from e
-    return await _load_user_data(db, target_user_id)
+    context = await _query_auth_context_by_user_id(db, key_provider_pool, target_user_id)
+    if context is None:
+        raise UserNotFound("Impersonation target user or its default keypair not found")
+    return context
+
+
+def _to_user_data(context: _AuthContext) -> UserData:
+    return UserData(
+        user_id=context.user.uuid,
+        is_authorized=True,
+        is_admin=context.keypair.is_admin,
+        is_superadmin=context.user.role == UserRole.SUPERADMIN,
+        role=context.user.role,
+        domain_name=context.user.domain_name,
+        domain_id=context.user.domain_id,
+    )
 
 
 def _setup_user_context(
@@ -1014,35 +1027,21 @@ def build_auth_middleware(
                 request, db, key_provider_pool, valkey_stat, hook_plugin_ctx
             )
 
-        authenticated_user: UserData | None = None
-        if context is not None:
-            validate_ip(request, context.user.allowed_client_ip)
-            is_superadmin = context.user.role == UserRole.SUPERADMIN
-            request.update({
-                "is_authorized": True,
-                "is_admin": context.keypair.is_admin,
-                "is_superadmin": is_superadmin,
-                # Handlers still read these two as mappings.
-                "user": dataclasses.asdict(context.user),
-                "keypair": dataclasses.asdict(context.keypair),
-            })
-            authenticated_user = UserData(
-                user_id=context.user.uuid,
-                is_authorized=True,
-                is_admin=context.keypair.is_admin,
-                is_superadmin=is_superadmin,
-                role=context.user.role,
-                domain_name=context.user.domain_name,
-                domain_id=context.user.domain_id,
-            )
+        if context is None:
+            return await handler(request)
 
-        # The effective user may differ from the caller (impersonation); the DB is touched here.
-        effective_user = (
-            await _resolve_effective_user(request, db, authenticated_user)
-            if authenticated_user is not None
-            else None
-        )
-        with _setup_user_context(effective_user, authenticated_user):
+        validate_ip(request, context.user.allowed_client_ip)
+        effective = await _resolve_effective_context(request, db, key_provider_pool, context)
+        effective_user = _to_user_data(effective)
+        request.update({
+            "is_authorized": True,
+            "is_admin": effective_user.is_admin,
+            "is_superadmin": effective_user.is_superadmin,
+            # Handlers still read these two as mappings.
+            "user": dataclasses.asdict(effective.user),
+            "keypair": dataclasses.asdict(effective.keypair),
+        })
+        with _setup_user_context(effective_user, _to_user_data(context)):
             return await handler(request)
 
     return _middleware
