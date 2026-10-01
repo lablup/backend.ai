@@ -51,7 +51,7 @@ __all__ = (
     "ImageTypeFilterInputDTO",
     "ImageUsage",
     "PurgeImageInput",
-    "RescanImagesInput",
+    "ScanImageInput",
     "ScopedSearchImagesInput",
     "SearchImageAliasesInput",
     "SearchImagesInput",
@@ -194,12 +194,12 @@ class SearchImagesInput(BaseRequestModel):
     offset: int = Field(default=0, ge=0, description="Number of items to skip")
 
 
-class RescanImagesInput(BaseRequestModel):
-    """Input for rescanning an image tag and selecting its architecture."""
+class ScanImageInput(BaseRequestModel):
+    """Input for scanning an image tag and selecting its architecture."""
 
     canonical: str = Field(
         min_length=1,
-        description="Image canonical name to rescan. Defaults to latest when the tag is omitted.",
+        description="Image canonical name to scan. Defaults to latest when the tag is omitted.",
     )
 
     architecture: str = Field(min_length=1, description="Image architecture to return")

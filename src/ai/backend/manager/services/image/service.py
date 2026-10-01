@@ -59,15 +59,13 @@ from ai.backend.manager.services.image.actions.purge_images import (
     PurgeImagesAction,
     PurgeImagesActionResult,
 )
-from ai.backend.manager.services.image.actions.rescan_image import (
-    GlobalRescanImageAction,
-    GlobalRescanImageActionResult,
-)
 from ai.backend.manager.services.image.actions.restore_image import (
     RestoreImageByIdAction,
     RestoreImageByIdActionResult,
 )
 from ai.backend.manager.services.image.actions.scan_image import (
+    GlobalScanImageAction,
+    GlobalScanImageActionResult,
     ScanImageAction,
     ScanImageActionResult,
 )
@@ -351,9 +349,9 @@ class ImageService:
             total_reserved_bytes=total_reserved_bytes,
         )
 
-    async def rescan_image(self, action: GlobalRescanImageAction) -> GlobalRescanImageActionResult:
-        image = await self._image_repository.rescan_image(action.canonical, action.architecture)
-        return GlobalRescanImageActionResult(image=image)
+    async def global_scan_image(self, action: GlobalScanImageAction) -> GlobalScanImageActionResult:
+        image = await self._image_repository.scan_image(action.canonical, action.architecture)
+        return GlobalScanImageActionResult(image=image)
 
     async def scan_image(self, action: ScanImageAction) -> ScanImageActionResult:
         image_canonical = action.canonical

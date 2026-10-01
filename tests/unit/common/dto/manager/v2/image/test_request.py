@@ -15,7 +15,7 @@ from ai.backend.common.dto.manager.v2.image.request import (
     ImageFilter,
     ImageOrder,
     PurgeImageInput,
-    RescanImagesInput,
+    ScanImageInput,
     SearchImagesInput,
     UpdateImageInput,
 )
@@ -118,10 +118,10 @@ class TestImageOrder:
             assert order.field == field
 
 
-class TestRescanImagesInput:
+class TestScanImageInput:
     def test_empty_canonical_raises_error(self) -> None:
         with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
-            RescanImagesInput(canonical="", architecture="x86_64")
+            ScanImageInput(canonical="", architecture="x86_64")
 
 
 class TestAliasImageInput:

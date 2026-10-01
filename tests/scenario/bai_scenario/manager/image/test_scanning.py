@@ -10,7 +10,7 @@ from uuid import UUID
 import pytest
 
 from ai.backend.common.data.user.types import UserRole
-from ai.backend.common.dto.manager.v2.image.request import RescanImagesInput
+from ai.backend.common.dto.manager.v2.image.request import ScanImageInput
 from ai.backend.common.dto.manager.v2.image.response import ImageNode
 from ai.backend.manager.api.adapters.image.adapter import ImageAdapter
 from ai.backend.manager.data.container_registry.types import ContainerRegistryData
@@ -101,7 +101,7 @@ THE_REGISTRY_ALONE = Canonical(None)
 
 
 @dataclass(frozen=True)
-class Rescanning(When[ARegistryAndACaller, ImageAdapter, ImageNode]):
+class Scanning(When[ARegistryAndACaller, ImageAdapter, ImageNode]):
     """태그 하나를 아키텍처를 지정해 스캔한다."""
 
     canonical: Canonical = THE_SERVED_TAG
@@ -109,7 +109,7 @@ class Rescanning(When[ARegistryAndACaller, ImageAdapter, ImageNode]):
 
     @override
     def operation(self) -> str:
-        return "admin_rescan_image"
+        return "admin_scan_image"
 
     @override
     def describe(self, laid: ARegistryAndACaller) -> str:
@@ -119,11 +119,11 @@ class Rescanning(When[ARegistryAndACaller, ImageAdapter, ImageNode]):
 
     @override
     async def call(self, adapter: ImageAdapter, laid: ARegistryAndACaller) -> ImageNode:
-        asked = RescanImagesInput(
+        asked = ScanImageInput(
             canonical=self.canonical.of(laid.registry), architecture=self.architecture
         )
         with serving(laid.registry, SERVED), ActingAs(laid.caller):
-            payload = await adapter.admin_rescan_image(asked)
+            payload = await adapter.admin_scan_image(asked)
         return payload.item
 
 
@@ -226,7 +226,7 @@ class ScanningAnUnregisteredImage(
 
     @override
     def when(self) -> When[ARegistryAndACaller, ImageAdapter, ImageNode]:
-        return Rescanning()
+        return Scanning()
 
     @override
     def then(self) -> Then[ARegistryAndACaller, ImageNode]:
@@ -249,7 +249,7 @@ class APlainUserMayNotScan(Scenario[SeedingSession, ARegistryAndACaller, ImageAd
 
     @override
     def when(self) -> When[ARegistryAndACaller, ImageAdapter, ImageNode]:
-        return Rescanning()
+        return Scanning()
 
     @override
     def then(self) -> Then[ARegistryAndACaller, ImageNode]:
@@ -277,7 +277,7 @@ class NoRegistryMatchesTheImage(
 
     @override
     def when(self) -> When[ARegistryAndACaller, ImageAdapter, ImageNode]:
-        return Rescanning(canonical=THE_REGISTRY_ALONE)
+        return Scanning(canonical=THE_REGISTRY_ALONE)
 
     @override
     def then(self) -> Then[ARegistryAndACaller, ImageNode]:
@@ -302,7 +302,7 @@ class AMissingTagIsNotASuccess(
 
     @override
     def when(self) -> When[ARegistryAndACaller, ImageAdapter, ImageNode]:
-        return Rescanning(canonical=A_MISSING_TAG)
+        return Scanning(canonical=A_MISSING_TAG)
 
     @override
     def then(self) -> Then[ARegistryAndACaller, ImageNode]:
@@ -318,7 +318,7 @@ SCENARIOS: list[Any] = [
 
 
 @pytest.mark.parametrize("scenario", SCENARIOS, ids=lambda s: s.summary())
-async def test_rescanning(
+async def test_scanning(
     scenario: Any, adapter: ImageAdapter, engine: ExtendedAsyncSAEngine
 ) -> None:
     await run_scenario(scenario, adapter, engine)

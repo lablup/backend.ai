@@ -3,7 +3,7 @@
 Covers what the scan writes — the creator column, and the registry membership a
 customized image shares with every other image — and the two readers that used to parse
 the owner label: the per-user image quota and the availability check a session start
-makes. Also covers rescanning a single image in its registry.
+makes. Also covers scanning a single image in its registry.
 """
 
 from __future__ import annotations
@@ -576,7 +576,7 @@ class TestImageOwnershipGraph:
         assert await self._kind_and_creator(db_with_cleanup, image_id) == (True, None)
 
 
-class TestRescanImage:
+class TestScanImage:
     @pytest.fixture
     def source(self, db_with_cleanup: ExtendedAsyncSAEngine) -> ImageDBSource:
         return ImageDBSource(db_with_cleanup, V2DBOpsProvider(db_with_cleanup))
@@ -619,7 +619,7 @@ class TestRescanImage:
         "architecture, expected_architecture",
         [("x86_64", "x86_64"), ("aarch64", "aarch64"), ("arm64", "aarch64")],
     )
-    async def test_rescan_registers_new_image_and_returns_requested_architecture(
+    async def test_scan_registers_new_image_and_returns_requested_architecture(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         registry_id: ContainerRegistryID,
@@ -630,7 +630,7 @@ class TestRescanImage:
     ) -> None:
         canonical = f"{REGISTRY_NAME}/{REGISTRY_PROJECT}/python"
 
-        image = await source.rescan_image(canonical, architecture)
+        image = await source.scan_image(canonical, architecture)
 
         assert image.architecture == expected_architecture
         assert str(image.name) == canonical + ":latest"
@@ -641,7 +641,7 @@ class TestRescanImage:
                 row.id == image.id and row.architecture == expected_architecture for row in rows
             )
 
-    async def test_rescan_existing_image_preserves_id_without_duplicates(
+    async def test_scan_existing_image_preserves_id_without_duplicates(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         registry_id: ContainerRegistryID,
@@ -649,9 +649,9 @@ class TestRescanImage:
         registry_manifests: aioresponses,
     ) -> None:
         canonical = f"{REGISTRY_NAME}/{REGISTRY_PROJECT}/python:latest"
-        first = await source.rescan_image(canonical, "x86_64")
+        first = await source.scan_image(canonical, "x86_64")
 
-        second = await source.rescan_image(canonical, "x86_64")
+        second = await source.scan_image(canonical, "x86_64")
 
         assert second.id == first.id
         assert second.architecture == "x86_64"
@@ -659,7 +659,7 @@ class TestRescanImage:
             assert await session.scalar(sa.select(sa.func.count()).select_from(ImageRow)) == 2
 
     @pytest.mark.parametrize("canonical", ["unknown.example/stable/python:latest", REGISTRY_NAME])
-    async def test_canonical_rescan_never_falls_back_to_registry_scan(
+    async def test_canonical_scan_never_falls_back_to_registry_scan(
         self,
         registry_id: ContainerRegistryID,
         source: ImageDBSource,
@@ -667,10 +667,10 @@ class TestRescanImage:
     ) -> None:
         with aioresponses() as requests:
             with pytest.raises(RegistryNotFoundForImage):
-                await source.rescan_image(canonical, "x86_64")
+                await source.scan_image(canonical, "x86_64")
             assert not requests.requests
 
-    async def test_canonical_rescan_rejects_duplicate_registry_rows(
+    async def test_canonical_scan_rejects_duplicate_registry_rows(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         registry_id: ContainerRegistryID,
@@ -688,10 +688,10 @@ class TestRescanImage:
                 )
             )
         with pytest.raises(InternalServerError):
-            await source.rescan_image(f"{REGISTRY_NAME}/{REGISTRY_PROJECT}/python:latest", "x86_64")
+            await source.scan_image(f"{REGISTRY_NAME}/{REGISTRY_PROJECT}/python:latest", "x86_64")
 
     @pytest.mark.parametrize("tag, architecture", [("latest", "s390x"), ("removed", "x86_64")])
-    async def test_rescan_missing_image_raises_image_not_found(
+    async def test_scan_missing_image_raises_image_not_found(
         self,
         registry_id: ContainerRegistryID,
         source: ImageDBSource,
@@ -703,6 +703,6 @@ class TestRescanImage:
             f"https://{REGISTRY_NAME}/v2/stable/python/manifests/removed", status=404
         )
         with pytest.raises(ImageNotFound):
-            await source.rescan_image(
+            await source.scan_image(
                 f"{REGISTRY_NAME}/{REGISTRY_PROJECT}/python:{tag}", architecture
             )
