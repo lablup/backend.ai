@@ -124,6 +124,7 @@ from ai.backend.manager.data.session.options import (
     ResourceOpts,
 )
 from ai.backend.manager.data.session.types import SessionStatus
+from ai.backend.manager.errors.kernel import handle_session_exception
 from ai.backend.manager.models.agent.row import AgentRow, agents
 from ai.backend.manager.models.domain.row import domains
 from ai.backend.manager.models.endpoint.row import EndpointRow
@@ -146,7 +147,6 @@ from ai.backend.manager.models.session.row import (
     PRIVATE_SESSION_TYPES,
     KernelLoadingStrategy,
     SessionRow,
-    handle_session_exception,
 )
 from ai.backend.manager.models.user.row import UserRow
 from ai.backend.manager.models.vfolder.row import (

@@ -4,7 +4,9 @@ Kernel and session-related exceptions.
 
 from __future__ import annotations
 
-from collections.abc import Mapping
+import asyncio
+from collections.abc import AsyncIterator, Callable, Mapping
+from contextlib import asynccontextmanager
 from typing import Any, override
 
 from aiohttp import web
@@ -293,3 +295,54 @@ class IdlePolicyNotFound(ObjectNotFound):
             operation=ErrorOperation.READ,
             error_detail=ErrorDetail.NOT_FOUND,
         )
+
+
+OP_EXC = {
+    "execute": KernelExecutionFailed,
+    "shutdown_service": KernelExecutionFailed,
+    "upload_file": KernelExecutionFailed,
+    "download_file": KernelExecutionFailed,
+    "download_single": KernelExecutionFailed,
+    "list_files": KernelExecutionFailed,
+    "get_logs_from_agent": KernelExecutionFailed,
+    "commit_session": KernelExecutionFailed,
+    "commit_session_to_file": KernelExecutionFailed,
+    "trigger_batch_execution": KernelExecutionFailed,
+}
+
+
+# Used only by the v1 session paths in registry.py. Delete it together with them.
+@asynccontextmanager
+async def handle_session_exception(
+    op: str,
+    error_callback: Callable[[], Any] | None = None,
+    cancellation_callback: Callable[[], Any] | None = None,
+) -> AsyncIterator[None]:
+    """Translate per-op exceptions to the corresponding OP_EXC subclass.
+
+    Session status is not touched — sokovan's coordinator reconciles
+    session state from kernel events; error marking is not a manager
+    responsibility.
+    """
+    exc_class = OP_EXC[op]
+    try:
+        yield
+    except TimeoutError:
+        if error_callback:
+            await error_callback()
+        raise exc_class("TIMEOUT") from None
+    except asyncio.CancelledError:
+        if cancellation_callback:
+            await cancellation_callback()
+        raise
+    except AgentError as e:
+        if error_callback:
+            await error_callback()
+        raise exc_class("FAILURE", e) from None
+    except BackendAIError:
+        # silently re-raise to make them handled by gateway http handlers
+        raise
+    except Exception:
+        if error_callback:
+            await error_callback()
+        raise
