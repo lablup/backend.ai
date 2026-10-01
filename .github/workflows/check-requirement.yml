@@ -3,6 +3,9 @@ name: Check if a precompiled binary file exists in dependencies
 on:
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 jobs:
   check-requirement:
     runs-on: ubuntu-latest

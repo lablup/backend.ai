@@ -6,6 +6,9 @@ on:
   workflow_dispatch:
 
 
+permissions:
+  contents: read
+
 jobs:
   integration:
     runs-on: ubuntu-latest

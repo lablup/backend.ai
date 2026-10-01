@@ -16,6 +16,9 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
   cancel-in-progress: true
 
+permissions:
+  contents: read
+
 jobs:
 
   labeler:
@@ -28,6 +31,9 @@ jobs:
       - uses: lablup/auto-labeler@main
 
   detect-changes:
+    permissions:
+      contents: read
+      pull-requests: read
     runs-on: ubuntu-latest
     outputs:
       code: ${{ steps.filter.outputs.code }}
@@ -72,6 +78,9 @@ jobs:
   # a branch passes `cache-branch`, and the caches are saved only when
   # `decide-cache-save.sh` finds it at the tip of main or of a maintained version.
   check-build-and-lint:
+    permissions:
+      contents: read
+      actions: write
     needs: detect-changes
     if: |
       always()
@@ -167,6 +176,9 @@ jobs:
       if: always()  # We want the log even on failures.
 
   typecheck:
+    permissions:
+      contents: read
+      actions: write
     needs: plan-targets
     if: needs.plan-targets.result == 'success' && needs.plan-targets.outputs.typecheck == 'true'
     uses: ./.github/workflows/ci-typecheck.yml
@@ -196,6 +208,9 @@ jobs:
         echo "OK"
 
   alembic:
+    permissions:
+      contents: read
+      actions: read
     needs: detect-changes
     if: |
       needs.detect-changes.result == 'success'
@@ -222,6 +237,9 @@ jobs:
         fi
 
   test-unit:
+    permissions:
+      contents: read
+      actions: write
     needs: [detect-changes, plan-targets]
     if: needs.plan-targets.result == 'success' && needs.plan-targets.outputs.unit-shards != '[]'
     uses: ./.github/workflows/ci-test.yml
@@ -233,6 +251,9 @@ jobs:
       cache-branch: ${{ github.event_name == 'push' && startsWith(github.ref, 'refs/heads/') && github.ref_name || '' }}
 
   test-scenario:
+    permissions:
+      contents: read
+      actions: write
     needs: plan-targets
     if: needs.plan-targets.result == 'success' && needs.plan-targets.outputs.scenario-shards != '[]'
     uses: ./.github/workflows/ci-test-scenario.yml
@@ -243,6 +264,9 @@ jobs:
       cache-branch: ${{ github.event_name == 'push' && startsWith(github.ref, 'refs/heads/') && github.ref_name || '' }}
 
   test-component:
+    permissions:
+      contents: read
+      actions: write
     needs: [detect-changes, plan-targets]
     if: needs.plan-targets.result == 'success' && needs.plan-targets.outputs.component-shards != '[]'
     uses: ./.github/workflows/ci-test.yml
@@ -255,6 +279,9 @@ jobs:
       cache-branch: ${{ github.event_name == 'push' && startsWith(github.ref, 'refs/heads/') && github.ref_name || '' }}
 
   test-integration:
+    permissions:
+      contents: read
+      actions: write
     needs: [detect-changes, plan-targets]
     if: needs.plan-targets.result == 'success' && needs.plan-targets.outputs.integration-shards != '[]'
     uses: ./.github/workflows/ci-test.yml
@@ -340,6 +367,11 @@ jobs:
       run: python3 ./scripts/determine-release-type.py "$(cat VERSION)" >> "$GITHUB_OUTPUT"
 
   release:
+    permissions:
+      contents: write
+      actions: read
+      id-token: write
+      attestations: write
     needs: [determine-release-grade, lint-and-typecheck, test-unit-gate, test-component-gate, test-integration-gate, check-alembic-migrations]
     if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
     uses: ./.github/workflows/ci-release.yml
@@ -350,6 +382,9 @@ jobs:
     secrets: inherit
 
   post-release:
+    permissions:
+      contents: write
+      actions: read
     needs: [determine-release-grade, release]
     if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
     uses: ./.github/workflows/ci-post-release.yml
