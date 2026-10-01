@@ -289,18 +289,18 @@ class DatabaseConfig(BaseConfigSchema):
             example=ConfigExample(local="127.0.0.1:5432", prod="db.example.com:5432"),
         ),
     ]
-    extra_primary_addrs: Annotated[
+    cluster_addrs: Annotated[
         list[HostPortPair],
         Field(
             default_factory=list,
-            validation_alias=AliasChoices("extra-primary-addrs", "extra_primary_addrs"),
-            serialization_alias="extra-primary-addrs",
+            validation_alias=AliasChoices("cluster-addrs", "cluster_addrs"),
+            serialization_alias="cluster-addrs",
         ),
         BackendAIConfigMeta(
             description=(
-                "Other nodes of the cluster that can become the primary, tried in order "
-                "after addr. They share the [db] connection pool, and the manager connects "
-                "only to the node that accepts writes, so a failover needs no config change."
+                "The other members of the PostgreSQL cluster, tried in order after addr. "
+                "The manager connects only to the member that accepts writes, so which one "
+                "is the primary may change without a config change."
             ),
             added_version=NEXT_RELEASE_VERSION,
             example=ConfigExample(local="", prod="db-2.example.com:5432"),
@@ -443,8 +443,8 @@ class DatabaseConfig(BaseConfigSchema):
     ]
 
     @property
-    def primary_addrs(self) -> list[HostPortPair]:
-        return [self.addr, *self.extra_primary_addrs]
+    def all_addrs(self) -> list[HostPortPair]:
+        return [self.addr, *self.cluster_addrs]
 
 
 class EventLoopType(enum.StrEnum):

@@ -50,22 +50,22 @@ class TestUnknownFieldWarning:
         assert config.num_proc == 2
 
 
-class TestDatabaseConfigPrimaryAddrs:
+class TestDatabaseConfigAllAddrs:
     def test_addr_alone(self) -> None:
         config = DatabaseConfig.model_validate({"addr": "10.0.0.1:5432"}, by_name=True)
 
-        assert config.primary_addrs == [HostPortPair(host="10.0.0.1", port=5432)]
+        assert config.all_addrs == [HostPortPair(host="10.0.0.1", port=5432)]
 
-    def test_extra_primary_addrs_follow_addr_in_order(self) -> None:
+    def test_cluster_addrs_follow_addr_in_order(self) -> None:
         config = DatabaseConfig.model_validate(
             {
                 "addr": "pg1:5432",
-                "extra-primary-addrs": ["pg2:5432", {"host": "pg3", "port": 5433}],
+                "cluster-addrs": ["pg2:5432", {"host": "pg3", "port": 5433}],
             },
             by_name=True,
         )
 
-        assert config.primary_addrs == [
+        assert config.all_addrs == [
             HostPortPair(host="pg1", port=5432),
             HostPortPair(host="pg2", port=5432),
             HostPortPair(host="pg3", port=5433),

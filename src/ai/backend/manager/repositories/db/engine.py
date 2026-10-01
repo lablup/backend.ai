@@ -43,7 +43,7 @@ def create_async_engine(
 
 def build_db_url(db_config: DatabaseConfig) -> URL:
     """
-    URL for create_async_engine(). Lists every primary candidate so asyncpg picks the
+    URL for create_async_engine(). Lists every cluster member so asyncpg picks the
     one that accepts writes.
     """
     return URL.create(
@@ -52,7 +52,7 @@ def build_db_url(db_config: DatabaseConfig) -> URL:
         password=db_config.password,
         database=db_config.name,
         query={
-            "host": [f"{addr.host}:{addr.port}" for addr in db_config.primary_addrs],
+            "host": [f"{addr.host}:{addr.port}" for addr in db_config.all_addrs],
             "target_session_attrs": TARGET_SESSION_ATTRS_READ_WRITE,
         },
     )
@@ -63,7 +63,7 @@ def build_libpq_uri(db_config: DatabaseConfig) -> str:
     Connection string for psql (dbshell). Same addresses as build_db_url() in libpq's
     comma-separated form.
     """
-    hosts = ",".join(f"{addr.host}:{addr.port}" for addr in db_config.primary_addrs)
+    hosts = ",".join(f"{addr.host}:{addr.port}" for addr in db_config.all_addrs)
     auth = db_config.user
     if db_config.password is not None:
         auth = f"{auth}:{db_config.password}"

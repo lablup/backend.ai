@@ -24,11 +24,11 @@
   # your database server or cluster endpoint.
   # Added in 25.8.0
   addr = { host = "db.example.com", port = 5432 }
-  # Other nodes of the cluster that can become the primary, tried in order after
-  # addr. They share the [db] connection pool, and the manager connects only to
-  # the node that accepts writes, so a failover needs no config change.
+  # The other members of the PostgreSQL cluster, tried in order after addr. The
+  # manager connects only to the member that accepts writes, so which one is the
+  # primary may change without a config change.
   # Added in 26.9.0
-  ## extra-primary-addrs = [{ host = "db-2.example.com", port = 5432 }]
+  ## cluster-addrs = [{ host = "db-2.example.com", port = 5432 }]
   # Name of the PostgreSQL database to use for Backend.AI. This database must
   # exist and be accessible by the configured user. The database should be
   # created before starting the manager. Length must be between 2 and 64
