@@ -163,12 +163,17 @@ async def handle_list_mounts(request: web.Request) -> web.Response:
 
 def _mountpoint_under_prefix(mount_prefix: str, name: str) -> Path:
     prefix_dir = os.path.normpath(mount_prefix).rstrip(os.sep) + os.sep
-    real_prefix_dir = os.path.realpath(mount_prefix).rstrip(os.sep) + os.sep
+    real_prefix = os.path.realpath(mount_prefix)
+    real_prefix_dir = real_prefix.rstrip(os.sep) + os.sep
     mountpoint = os.path.normpath(Path(mount_prefix) / name)
     if not mountpoint.startswith(prefix_dir):
         raise InvalidMountNameError()
     # A symlink under the prefix can still point outside it
-    if not os.path.realpath(mountpoint).startswith(real_prefix_dir):
+    real_mountpoint = os.path.realpath(mountpoint)
+    if not real_mountpoint.startswith(real_prefix_dir):
+        raise InvalidMountNameError()
+    # With `/` as the prefix, the prefix itself also passes the checks above
+    if real_mountpoint == real_prefix:
         raise InvalidMountNameError()
     return Path(mountpoint)
 
