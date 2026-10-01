@@ -28,7 +28,7 @@ from cryptography.hazmat.primitives.asymmetric import rsa
 from dateutil.parser import isoparse
 from dateutil.tz import tzutc
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import noload, selectinload
+from sqlalchemy.orm import noload
 from typeguard import check_type
 from yarl import URL
 
@@ -169,8 +169,10 @@ from .errors.api import InvalidAPIParameters
 from .errors.image import ImageNotFound
 from .errors.kernel import (
     InvalidKernelConfig,
+    MainKernelNotFound,
     SessionAlreadyExists,
     SessionNotFound,
+    TooManyKernelsFound,
     TooManySessionsMatched,
 )
 from .errors.resource import (
@@ -1439,24 +1441,26 @@ class AgentRegistry:
         self,
         session_id: SessionId,
     ) -> None:
-        async def _fetch_session() -> tuple[SessionRow, str | None]:
+        async def _fetch_session() -> tuple[SessionRow, str | None, list[str | None]]:
             async with self.db.begin_readonly_session() as db_sess:
                 sess = await SessionRow.get_session_by_id(
                     db_sess,
                     session_id,
-                    eager_loading_op=(
-                        noload("*"),
-                        selectinload(SessionRow.kernels).options(
-                            noload("*"),
-                            selectinload(KernelRow.agent_row).noload("*"),
-                        ),
-                    ),
+                    eager_loading_op=(noload("*"),),
                 )
                 network_ref_name = await sess.get_network_ref(db_sess)
-                return sess, network_ref_name
+                main_kernel_agents = list(
+                    await db_sess.scalars(
+                        sa.select(KernelRow.agent).where(
+                            (KernelRow.session_id == session_id)
+                            & (KernelRow.cluster_role == DEFAULT_ROLE)
+                        )
+                    )
+                )
+                return sess, network_ref_name, main_kernel_agents
 
         try:
-            session, network_ref_name = await execute_with_retry(_fetch_session)
+            session, network_ref_name, main_kernel_agents = await execute_with_retry(_fetch_session)
         except SessionNotFound:
             return
 
@@ -1466,7 +1470,13 @@ class AgentRegistry:
         if session.network_type == NetworkType.VOLATILE:
             if ClusterMode(session.cluster_mode) == ClusterMode.SINGLE_NODE:
                 if network_ref_name is not None:
-                    agent_id = session.main_kernel.agent
+                    if len(main_kernel_agents) > 1:
+                        raise TooManyKernelsFound(
+                            f"Session (id: {session.id}) has more than 1 main kernel.",
+                        )
+                    if not main_kernel_agents:
+                        raise MainKernelNotFound(f"Session (id: {session.id}) has no main kernel.")
+                    agent_id = main_kernel_agents[0]
                     if agent_id is None:
                         log.warning(
                             "network destroy skipped, main kernel has no agent allocated",
