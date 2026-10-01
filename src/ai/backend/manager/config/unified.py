@@ -304,6 +304,23 @@ class DatabaseConfig(BaseConfigSchema):
             example=ConfigExample(local="127.0.0.1:5432", prod="db1.example.com:5432"),
         ),
     ]
+    connect_timeout: Annotated[
+        float,
+        Field(
+            default=10.0,
+            gt=0,
+            validation_alias=AliasChoices("connect-timeout", "connect_timeout"),
+            serialization_alias="connect-timeout",
+        ),
+        BackendAIConfigMeta(
+            description=(
+                "Timeout in seconds for connecting to one member of addrs. "
+                "When it expires, the next member is tried."
+            ),
+            added_version=NEXT_RELEASE_VERSION,
+            example=ConfigExample(local="10", prod="5"),
+        ),
+    ]
     name: Annotated[
         str,
         Field(default="DB_NAME", min_length=2, max_length=64),
