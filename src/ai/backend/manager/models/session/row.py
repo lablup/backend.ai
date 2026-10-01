@@ -205,6 +205,7 @@ OP_EXC = {
 }
 
 
+# Used only by the v1 session paths in registry.py. Delete it together with them.
 @actxmgr
 async def handle_session_exception(
     op: str,
@@ -348,7 +349,8 @@ ALLOWED_IMAGE_ROLES_FOR_SESSION_TYPE: Mapping[SessionTypes, tuple[str, ...]] = {
 }
 
 
-# Defined for avoiding circular import
+# Defined for avoiding circular import.
+# The primaryjoin of SessionRow.user. Delete it together with that relationship.
 def _get_user_row_join_condition() -> sa.sql.elements.ColumnElement[Any]:
     from ai.backend.manager.models.user.row import UserRow
 
@@ -441,6 +443,9 @@ class SessionRow(CreatedAtMixin, Base):
         nullable=True,
         default=None,
     )
+    # Loaded by gql_legacy, registry.py and the v2 db_sources, and read by main_kernel,
+    # resource_opts and get_kernel_by_id. Delete it together with KernelRow.session
+    # once the v2 services stop reading main_kernel off a SessionRow.
     kernels: Mapped[list[KernelRow]] = relationship("KernelRow", back_populates="session")
 
     # Resource ownership
@@ -474,6 +479,8 @@ class SessionRow(CreatedAtMixin, Base):
     group_id: Mapped[ProjectID] = mapped_column(
         "group_id", GUID(ProjectID), sa.ForeignKey("groups.id"), nullable=False
     )
+    # Loaded only by gql_legacy (session.py). v2 joins on group_id.
+    # Delete it together with the gql_legacy cleanup.
     group: Mapped[ProjectRow] = relationship("ProjectRow")
     user_uuid: Mapped[UserID | None] = mapped_column(
         "user_uuid",
@@ -481,6 +488,8 @@ class SessionRow(CreatedAtMixin, Base):
         sa.ForeignKey("users.uuid", ondelete="SET NULL"),
         nullable=True,
     )
+    # Loaded only by gql_legacy (session.py, schema.py) and get_session (v1). v2 joins on
+    # user_uuid. Delete it together with the gql_legacy cleanup.
     user: Mapped[UserRow | None] = relationship(
         "UserRow",
         primaryjoin=_get_user_row_join_condition,
@@ -651,6 +660,8 @@ class SessionRow(CreatedAtMixin, Base):
         ),
     )
 
+    # The three load options below are used only by gql_legacy (session.py).
+    # Delete them together with the gql_legacy cleanup.
     @classmethod
     def kernel_load_option(cls, already_joined: bool = False) -> _AbstractLoad:
         return selectinload(cls.kernels) if not already_joined else contains_eager(cls.kernels)
@@ -833,6 +844,8 @@ class SessionRow(CreatedAtMixin, Base):
             handler_options=self.options.handler_options,
         )
 
+    # Read only by gql_legacy (session.py).
+    # Delete it together with the gql_legacy cleanup.
     @property
     def vfolders_sorted_by_id(self) -> list[VFolderMount]:
         # TODO: Remove this after ComputeSessionNode and ComputeSession deprecates vfolder_mounts field
@@ -878,6 +891,8 @@ class SessionRow(CreatedAtMixin, Base):
             raise KernelNotFound(f"Session has no such kernel (sid:{self.id}, kid:{kernel_id}))")
         return kerns[0]
 
+    # Used only by gql_legacy (session.py TotalResourceSlot.get_data).
+    # Delete it together with the gql_legacy cleanup.
     @classmethod
     async def list_session_by_condition(
         cls,
@@ -904,6 +919,8 @@ class SessionRow(CreatedAtMixin, Base):
         for kernel_row in self.kernels:
             kernel_row.delegate_ownership(user_uuid, access_key)
 
+    # Used only by get_session and list_sessions. v2 matches in SessionDBSource.
+    # Delete it together with _build_session_fetch_query and _match_sessions_by_*.
     @classmethod
     async def match_sessions(
         cls,
@@ -975,6 +992,8 @@ class SessionRow(CreatedAtMixin, Base):
             return list(rows)
         return []
 
+    # Used only by the v1 session paths in registry.py. v2 uses SessionDBSource.
+    # Delete it together with them.
     @classmethod
     async def get_session(
         cls,
@@ -1094,6 +1113,7 @@ class SessionRow(CreatedAtMixin, Base):
         except IndexError as e:
             raise SessionNotFound(f"Session (ids={session_ids}) does not exist.") from e
 
+    # Used only by the v1 session paths in registry.py. Delete it together with them.
     @classmethod
     async def get_session_by_id(
         cls,
@@ -1121,6 +1141,7 @@ class SessionRow(CreatedAtMixin, Base):
         except IndexError as e:
             raise SessionNotFound(f"Session (id={session_id}) does not exist.") from e
 
+    # Used only by the v1 session paths in registry.py. Delete it together with them.
     async def get_network_ref(self, db_sess: SASession) -> str | None:
         if not self.network_id or not self.network_type:
             return None
@@ -1132,6 +1153,8 @@ class SessionRow(CreatedAtMixin, Base):
                 return network_row.ref_name
 
 
+# The four conditions below are used only by gql_legacy (session.py TotalResourceSlot.get_data).
+# v2 uses SessionSearchableFields. Delete them together with the gql_legacy cleanup.
 def by_status(statuses: Iterable[SessionStatus]) -> QueryCondition:
     def _by_status(
         query_stmt: sa.sql.Select[Any],
@@ -1225,6 +1248,8 @@ MEMBER_PERMISSIONS: frozenset[ComputeSessionPermission] = frozenset()
 type WhereClauseType = sa.sql.expression.BinaryExpression[Any] | sa.sql.expression.BooleanClauseList
 
 
+# Legacy RBAC, reached only through get_permission_ctx from gql_legacy (session.py).
+# Delete it together with the legacy RBAC cleanup.
 class ComputeSessionPermissionContext(
     AbstractPermissionContext[ComputeSessionPermission, SessionRow, SessionId]
 ):
@@ -1288,6 +1313,8 @@ class ComputeSessionPermissionContext(
         return permissions
 
 
+# Legacy RBAC, reached only through get_permission_ctx from gql_legacy (session.py).
+# Delete it together with the legacy RBAC cleanup.
 class ComputeSessionPermissionContextBuilder(
     AbstractPermissionContextBuilder[ComputeSessionPermission, ComputeSessionPermissionContext]
 ):
@@ -1478,6 +1505,8 @@ class ComputeSessionPermissionContextBuilder(
         return MEMBER_PERMISSIONS
 
 
+# Legacy RBAC, used only by gql_legacy (session.py).
+# Delete it together with the legacy RBAC cleanup.
 async def get_permission_ctx(
     db_conn: SAConnection,
     ctx: ClientContext,
