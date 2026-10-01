@@ -2,6 +2,7 @@ name: SBOM report
 
 on: [workflow_dispatch, workflow_call]
 
+# contents read: check out the repository
 permissions:
   contents: read
 

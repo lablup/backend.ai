@@ -9,6 +9,7 @@ on:
     - cron: '0 15 * * 1-5'
   workflow_dispatch:
 
+# contents read: check out the repository
 permissions:
   contents: read
 

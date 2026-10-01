@@ -16,6 +16,7 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
   cancel-in-progress: true
 
+# contents read: check out the repository
 permissions:
   contents: read
 
@@ -31,6 +32,8 @@ jobs:
       - uses: lablup/auto-labeler@main
 
   detect-changes:
+    # contents read: check out the repository
+    # pull-requests read: list the PR's changed files (dorny/paths-filter)
     permissions:
       contents: read
       pull-requests: read
@@ -78,9 +81,10 @@ jobs:
   # a branch passes `cache-branch`, and the caches are saved only when
   # `decide-cache-save.sh` finds it at the tip of main or of a maintained version.
   check-build-and-lint:
+    # contents read: check out the repository
+    # actions write: delete the Pants caches a newer save superseded (pants-caches action)
     permissions:
       contents: read
-      # Deleting the Pants caches a newer save superseded needs write (pants-caches action)
       actions: write
     needs: detect-changes
     if: |
@@ -177,9 +181,10 @@ jobs:
       if: always()  # We want the log even on failures.
 
   typecheck:
+    # contents read: check out the repository
+    # actions write: delete the Pants caches a newer save superseded (pants-caches action)
     permissions:
       contents: read
-      # Deleting the Pants caches a newer save superseded needs write (pants-caches action)
       actions: write
     needs: plan-targets
     if: needs.plan-targets.result == 'success' && needs.plan-targets.outputs.typecheck == 'true'
@@ -210,6 +215,8 @@ jobs:
         echo "OK"
 
   alembic:
+    # contents read: check out the repository
+    # actions read: ci-alembic.yml declares it, and a called workflow gets no more than this job grants
     permissions:
       contents: read
       actions: read
@@ -239,9 +246,10 @@ jobs:
         fi
 
   test-unit:
+    # contents read: check out the repository
+    # actions write: delete the Pants caches a newer save superseded (pants-caches action)
     permissions:
       contents: read
-      # Deleting the Pants caches a newer save superseded needs write (pants-caches action)
       actions: write
     needs: [detect-changes, plan-targets]
     if: needs.plan-targets.result == 'success' && needs.plan-targets.outputs.unit-shards != '[]'
@@ -254,9 +262,10 @@ jobs:
       cache-branch: ${{ github.event_name == 'push' && startsWith(github.ref, 'refs/heads/') && github.ref_name || '' }}
 
   test-scenario:
+    # contents read: check out the repository
+    # actions write: delete the Pants caches a newer save superseded (pants-caches action)
     permissions:
       contents: read
-      # Deleting the Pants caches a newer save superseded needs write (pants-caches action)
       actions: write
     needs: plan-targets
     if: needs.plan-targets.result == 'success' && needs.plan-targets.outputs.scenario-shards != '[]'
@@ -268,9 +277,10 @@ jobs:
       cache-branch: ${{ github.event_name == 'push' && startsWith(github.ref, 'refs/heads/') && github.ref_name || '' }}
 
   test-component:
+    # contents read: check out the repository
+    # actions write: delete the Pants caches a newer save superseded (pants-caches action)
     permissions:
       contents: read
-      # Deleting the Pants caches a newer save superseded needs write (pants-caches action)
       actions: write
     needs: [detect-changes, plan-targets]
     if: needs.plan-targets.result == 'success' && needs.plan-targets.outputs.component-shards != '[]'
@@ -284,9 +294,10 @@ jobs:
       cache-branch: ${{ github.event_name == 'push' && startsWith(github.ref, 'refs/heads/') && github.ref_name || '' }}
 
   test-integration:
+    # contents read: check out the repository
+    # actions write: delete the Pants caches a newer save superseded (pants-caches action)
     permissions:
       contents: read
-      # Deleting the Pants caches a newer save superseded needs write (pants-caches action)
       actions: write
     needs: [detect-changes, plan-targets]
     if: needs.plan-targets.result == 'success' && needs.plan-targets.outputs.integration-shards != '[]'
@@ -373,11 +384,12 @@ jobs:
       run: python3 ./scripts/determine-release-type.py "$(cat VERSION)" >> "$GITHUB_OUTPUT"
 
   release:
+    # contents write: create the GitHub release and upload its assets (ci-release.yml)
+    # actions read: ci-release.yml declares it, and a called workflow gets no more than this job grants
+    # id-token write, attestations write: sign and register the container SBOM attestations (sbom.yml)
     permissions:
-      # Creating the GitHub release and uploading its assets needs write (ci-release.yml)
       contents: write
       actions: read
-      # Signing the container SBOM attestations needs an OIDC token and attestation write (sbom.yml)
       id-token: write
       attestations: write
     needs: [determine-release-grade, lint-and-typecheck, test-unit-gate, test-component-gate, test-integration-gate, check-alembic-migrations]
@@ -390,8 +402,9 @@ jobs:
     secrets: inherit
 
   post-release:
+    # contents write: upload the Windows conda pack to the GitHub release (ci-post-release.yml)
+    # actions read: ci-post-release.yml declares it, and a called workflow gets no more than this job grants
     permissions:
-      # Uploading the Windows conda pack to the GitHub release needs write (ci-post-release.yml)
       contents: write
       actions: read
     needs: [determine-release-grade, release]
