@@ -161,6 +161,11 @@ async def handle_mount(request: web.Request) -> web.Response:
     if mount_prefix is None:
         mount_prefix = "/mnt"
     mountpoint = Path(mount_prefix) / params["name"]
+    if Path(mount_prefix).resolve() not in mountpoint.resolve().parents:
+        return web.Response(
+            text="The volume name must point to a directory under the mount prefix.",
+            status=HTTPStatus.BAD_REQUEST,
+        )
     mountpoint.mkdir(exist_ok=True)
     if params.get("options", None):
         cmd = [
@@ -205,9 +210,9 @@ async def handle_umount(request: web.Request) -> web.Response:
     if mount_prefix is None:
         mount_prefix = "/mnt"
     mountpoint = Path(mount_prefix) / params["name"]
-    if Path(mount_prefix) == mountpoint:
+    if Path(mount_prefix).resolve() not in mountpoint.resolve().parents:
         return web.Response(
-            text="Cannot unmount the mount prefix directory itself.",
+            text="The volume name must point to a directory under the mount prefix.",
             status=HTTPStatus.BAD_REQUEST,
         )
     proc = await asyncio.create_subprocess_exec(
