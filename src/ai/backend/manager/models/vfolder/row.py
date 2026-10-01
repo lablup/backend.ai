@@ -28,7 +28,6 @@ from ai.backend.common.data.entity.vfolder_mount_policy import VFolderMountPolic
 from ai.backend.common.defs import MODEL_VFOLDER_LENGTH_LIMIT
 from ai.backend.common.types import (
     QuotaScopeID,
-    SessionId,
     VFolderID,
     VFolderMountPolicy,
     VFolderUsageMode,
@@ -73,7 +72,6 @@ from ai.backend.manager.models.rbac import (
     UserScope as UserRBACScope,
 )
 from ai.backend.manager.models.rbac.context import ClientContext
-from ai.backend.manager.models.session.row import DEAD_SESSION_STATUSES, SessionRow
 from ai.backend.manager.models.storage import PermissionContext as StorageHostPermissionContext
 from ai.backend.manager.models.storage import (
     PermissionContextBuilder as StorageHostPermissionContextBuilder,
@@ -518,26 +516,6 @@ async def ensure_quota_scope_accessible_by_user(
                     return
 
     raise InvalidAPIParameters
-
-
-async def get_sessions_by_mounted_folder(
-    db_session: SASession, vfolder_id: VFolderID
-) -> tuple[SessionId, ...]:
-    """
-    Return a tuple of sessions.id that the give folder is mounted on.
-    """
-
-    select_stmt = (
-        sa.select(SessionRow)
-        .where(
-            (SessionRow.status.not_in(DEAD_SESSION_STATUSES))
-            & SessionRow.vfolder_mounts.contains([{"vfid": str(vfolder_id)}])
-        )
-        .options(load_only(SessionRow.id))
-    )
-
-    session_rows = (await db_session.scalars(select_stmt)).all()
-    return tuple([session.id for session in session_rows])
 
 
 # Note: GraphQL classes (VirtualFolder, VirtualFolderList, VirtualFolderPermission,

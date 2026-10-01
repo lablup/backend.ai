@@ -29,9 +29,9 @@ from ai.backend.manager.models.utils import (
 from ai.backend.manager.models.vfolder.row import (
     VFolderDeletionInfo,
     VFolderRow,
-    get_sessions_by_mounted_folder,
     vfolders,
 )
+from ai.backend.manager.repositories.vfolder.purge_guards import get_sessions_by_mounted_folder
 
 log = StructuredLogger(logging.getLogger(__spec__.name))
 

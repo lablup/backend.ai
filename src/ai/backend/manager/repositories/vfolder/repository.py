@@ -123,7 +123,6 @@ from ai.backend.manager.models.vfolder.row import (
     VFolderStatusSet,
     VFolderUserMountPolicyRow,
     ensure_quota_scope_accessible_by_user,
-    get_sessions_by_mounted_folder,
     vfolder_status_map,
     vfolders,
 )
@@ -150,6 +149,7 @@ from ai.backend.manager.repositories.vfolder.host_permission import (
 )
 from ai.backend.manager.repositories.vfolder.purge_guards import (
     find_active_vfolder_references,
+    get_sessions_by_mounted_folder,
     vfolder_reference_conflict_checks,
 )
 from ai.backend.manager.repositories.vfolder.types import (
