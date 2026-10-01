@@ -1,5 +1,6 @@
 import asyncio
 import base64
+import dataclasses
 import functools
 import logging
 import secrets
@@ -360,7 +361,7 @@ class SessionService:
         )
 
         return CommitSessionActionResult(
-            session_data=session.to_dataclass(),
+            session_data=session.to_dataclass(session.main_kernel),
             commit_result=resp,
         )
 
@@ -377,7 +378,7 @@ class SessionService:
         except AssertionError as e:
             raise InvalidAPIParameters from e
         return CompleteActionResult(
-            session_data=session.to_dataclass(),
+            session_data=session.to_dataclass(session.main_kernel),
             result=resp,
         )
 
@@ -412,24 +413,26 @@ class SessionService:
                 },
             )
 
-        session = await self._session_repository.get_session_with_group(
-            SessionId(action.session_id),
-            kernel_loading_strategy=KernelLoadingStrategy.MAIN_KERNEL_ONLY,
+        session = await self._session_repository.get_session_with_kernels(
+            SessionId(action.session_id)
         )
 
-        registry_conf = await self._session_repository.get_image_commit_registry(session.group_id)
+        registry_conf = await self._session_repository.get_image_commit_registry(
+            ProjectID(session.session.group_id)
+        )
         registry_hostname = registry_conf.registry_name
         registry_project = registry_conf.project
 
         # Validate image exists
-        if session.main_kernel.image and session.main_kernel.architecture:
+        main_image = session.main_kernel.image
+        if main_image.identifier is not None and main_image.architecture:
             await self._session_repository.resolve_image_by_canonical(
-                session.main_kernel.image, session.main_kernel.architecture, alive_only=False
+                main_image.identifier.canonical, main_image.architecture, alive_only=False
             )
 
         # Create manifest for background task
         manifest = CommitSessionManifest(
-            session_id=session.id,
+            session_id=SessionId(session.session.id),
             registry_id=registry_conf.id,
             registry_hostname=registry_hostname,
             registry_project=registry_project,
@@ -444,9 +447,7 @@ class SessionService:
             manifest,
         )
 
-        return ConvertSessionToImageActionResult(
-            task_id=task_id, session_data=session.to_dataclass()
-        )
+        return ConvertSessionToImageActionResult(task_id=task_id, session_data=session.session)
 
     async def create_cluster(self, action: CreateClusterAction) -> CreateClusterActionResult:
         template_id = action.template_id
@@ -886,7 +887,9 @@ class SessionService:
             await self._error_monitor.capture_exception(context={"user": user_id})
             raise InternalServerError from e
 
-        return DownloadFileActionResult(bytes=result, session_data=session.to_dataclass())
+        return DownloadFileActionResult(
+            bytes=result, session_data=session.to_dataclass(session.main_kernel)
+        )
 
     async def download_files(self, action: DownloadFilesAction) -> DownloadFilesActionResult:
         user_id = action.user_id
@@ -922,7 +925,7 @@ class SessionService:
                 mpwriter.append(tarbytes, headers)
 
             return DownloadFilesActionResult(
-                session_data=session.to_dataclass(),
+                session_data=session.to_dataclass(session.main_kernel),
                 result=mpwriter,
             )
 
@@ -999,34 +1002,29 @@ class SessionService:
         except BackendAIError:
             raise
 
-        return ExecuteSessionActionResult(result=resp, session_data=session.to_dataclass())
+        return ExecuteSessionActionResult(
+            result=resp, session_data=session.to_dataclass(session.main_kernel)
+        )
 
     async def get_abusing_report(
         self, action: GetAbusingReportAction
     ) -> GetAbusingReportActionResult:
-        session = await self._session_repository.get_session_validated(
-            SessionId(action.session_id),
-            kernel_loading_strategy=KernelLoadingStrategy.MAIN_KERNEL_ONLY,
+        session = await self._session_repository.get_session_with_kernels(
+            SessionId(action.session_id)
         )
-        kernel = session.main_kernel
-        report = await self._agent_registry.get_abusing_report(kernel.id)
-        return GetAbusingReportActionResult(
-            abuse_report=report, session_data=session.to_dataclass()
-        )
+        report = await self._agent_registry.get_abusing_report(session.main_kernel.id)
+        return GetAbusingReportActionResult(abuse_report=report, session_data=session.session)
 
     async def get_commit_status(self, action: GetCommitStatusAction) -> GetCommitStatusActionResult:
-        session = await self._session_repository.get_session_validated(
-            SessionId(action.session_id),
-            kernel_loading_strategy=KernelLoadingStrategy.MAIN_KERNEL_ONLY,
+        session = await self._session_repository.get_session_with_kernels(
+            SessionId(action.session_id)
         )
         statuses = await self._agent_registry.get_commit_status([session.main_kernel.id])
 
         commit_info = CommitStatusInfo(
             status=statuses[session.main_kernel.id], kernel=str(session.main_kernel.id)
         )
-        return GetCommitStatusActionResult(
-            commit_info=commit_info, session_data=session.to_dataclass()
-        )
+        return GetCommitStatusActionResult(commit_info=commit_info, session_data=session.session)
 
     async def get_container_logs(
         self, action: GetContainerLogsAction
@@ -1058,7 +1056,8 @@ class SessionService:
                 log.debug("returning log from database record")
                 resp["result"]["logs"] = kernel_log.decode("utf-8")
                 return GetContainerLogsActionResult(
-                    result=resp, session_data=compute_session.to_dataclass()
+                    result=resp,
+                    session_data=compute_session.to_dataclass(compute_session.main_kernel),
                 )
 
         registry = self._agent_registry
@@ -1068,7 +1067,7 @@ class SessionService:
         log.debug("returning log from agent")
 
         return GetContainerLogsActionResult(
-            result=resp, session_data=compute_session.to_dataclass()
+            result=resp, session_data=compute_session.to_dataclass(compute_session.main_kernel)
         )
 
     async def get_dependency_graph(
@@ -1084,36 +1083,33 @@ class SessionService:
         if session_id:
             if isinstance(session_id, list) and session_id:
                 session_id = session_id[0]
-            session = await self._session_repository.get_session_by_id(str(session_id))
         else:
-            session = None
-
-        if session is None:
             raise SessionNotFound
-        return GetDependencyGraphActionResult(
-            result=dependency_graph, session_data=session.to_dataclass()
+        session_data = await self._session_repository.get_session_data_by_id(
+            SessionId(uuid.UUID(str(session_id)))
         )
+        return GetDependencyGraphActionResult(result=dependency_graph, session_data=session_data)
 
     async def get_direct_access_info(
         self, action: GetDirectAccessInfoAction
     ) -> GetDirectAccessInfoActionResult:
-        sess = await self._session_repository.get_session_validated(
-            SessionId(action.session_id),
-            kernel_loading_strategy=KernelLoadingStrategy.MAIN_KERNEL_ONLY,
-        )
+        sess = await self._session_repository.get_session_with_kernels(SessionId(action.session_id))
+        main_kernel = sess.main_kernel
         resp = {}
-        sess_type = sess.session_type
+        sess_type = sess.session.session_type
         if sess_type in PRIVATE_SESSION_TYPES:
-            if sess.main_kernel.agent_row is None:
+            if main_kernel.resource.agent is None:
                 raise KernelNotReady(
-                    f"Kernel of the session has no agent info yet (kernel: {sess.main_kernel.id}, kernel status: {sess.main_kernel.status.name})"
+                    f"Kernel of the session has no agent info yet (kernel: {main_kernel.id}, kernel status: {main_kernel.lifecycle.status.name})"
                 )
-            public_host = sess.main_kernel.agent_row.public_host
+            public_host = await self._session_repository.get_agent_public_host(
+                AgentId(main_kernel.resource.agent)
+            )
             found_ports: dict[str, list[str]] = {}
-            service_ports = sess.main_kernel.service_ports
+            service_ports = main_kernel.network.service_ports
             if service_ports is None:
                 raise KernelNotReady(
-                    f"Kernel of the session has no service ports yet (kernel: {sess.main_kernel.id}, kernel status: {sess.main_kernel.status.name})"
+                    f"Kernel of the session has no service ports yet (kernel: {main_kernel.id}, kernel status: {main_kernel.lifecycle.status.name})"
                 )
             for sport in service_ports:
                 if sport["name"] == "sshd":
@@ -1127,16 +1123,17 @@ class SessionService:
                 "sshd_ports": found_ports.get("sftpd") or found_ports["sshd"],
             }
 
-        return GetDirectAccessInfoActionResult(result=resp, session_data=sess.to_dataclass())
+        return GetDirectAccessInfoActionResult(result=resp, session_data=sess.session)
 
     async def get_session_info(self, action: GetSessionInfoAction) -> GetSessionInfoActionResult:
-        sess = await self._session_repository.get_session_validated(
-            SessionId(action.session_id),
-            kernel_loading_strategy=KernelLoadingStrategy.MAIN_KERNEL_ONLY,
+        session_with_kernels = await self._session_repository.get_session_with_kernels(
+            SessionId(action.session_id)
         )
+        sess = session_with_kernels.session
+        main_kernel = session_with_kernels.main_kernel
 
         session_id = SessionId(sess.id)
-        main_kernel_id = KernelId(sess.main_kernel.id)
+        main_kernel_id = KernelId(main_kernel.id)
         session_allocation = (
             await self._session_repository.batch_get_resource_allocation_by_session([session_id])
         ).get(session_id)
@@ -1145,26 +1142,32 @@ class SessionService:
         ).get(main_kernel_id)
 
         age = datetime.now(tzutc()) - sess.created_at
+        main_image_canonical = (
+            main_kernel.image.identifier.canonical if main_kernel.image.identifier else ""
+        )
         session_info = LegacySessionInfo(
             domain_name=sess.domain_name,
             group_id=sess.group_id,
             user_id=sess.user_uuid,
-            lang=sess.main_kernel.image or "",  # legacy
-            image=sess.main_kernel.image or "",
-            architecture=sess.main_kernel.architecture or "",
-            registry=sess.main_kernel.registry,
+            lang=main_image_canonical,  # legacy
+            image=main_image_canonical,
+            architecture=main_kernel.image.architecture or "",
+            registry=main_kernel.image.registry,
             tag=sess.tag,
-            container_id=ContainerId(sess.main_kernel.container_id)
-            if sess.main_kernel.container_id
+            container_id=ContainerId(main_kernel.resource.container_id)
+            if main_kernel.resource.container_id
             else None,
             occupied_slots=str(kernel_allocation.used if kernel_allocation else ResourceSlot()),
             occupying_slots=str(session_allocation.used if session_allocation else ResourceSlot()),
             requested_slots=str(
                 session_allocation.requested if session_allocation else ResourceSlot()
             ),
-            occupied_shares=str(sess.main_kernel.occupied_shares),  # legacy
+            occupied_shares=str(main_kernel.resource.occupied_shares),  # legacy
             environ=str(sess.environ),
-            resource_opts=str(sess.resource_opts),
+            resource_opts=str({
+                kern.cluster.cluster_hostname: kern.resource.resource_opts
+                for kern in session_with_kernels.kernels
+            }),
             status=sess.status,
             status_info=str(sess.status_info) if sess.status_info else None,
             status_data=sess.status_data,
@@ -1173,14 +1176,12 @@ class SessionService:
             termination_time=sess.terminated_at,
             num_queries_executed=sess.num_queries or 0,
             last_stat=sess.last_stat,
-            idle_checks=await self._idle_checker_host.get_idle_check_report(sess.id),
+            idle_checks=await self._idle_checker_host.get_idle_check_report(session_id),
         )
 
         # Resource limits collected from agent heartbeats were erased, as they were deprecated
         # TODO: factor out policy/image info as a common repository
-        return GetSessionInfoActionResult(
-            session_info=session_info, session_data=sess.to_dataclass()
-        )
+        return GetSessionInfoActionResult(session_info=session_info, session_data=sess)
 
     async def get_status_history(
         self, action: GetStatusHistoryAction
@@ -1200,7 +1201,9 @@ class SessionService:
         )
         await self._agent_registry.interrupt_session(session)
 
-        return InterruptSessionActionResult(result=None, session_data=session.to_dataclass())
+        return InterruptSessionActionResult(
+            result=None, session_data=session.to_dataclass(session.main_kernel)
+        )
 
     async def list_files(self, action: ListFilesAction) -> ListFilesActionResult:
         user_id = action.user_id
@@ -1224,7 +1227,9 @@ class SessionService:
             await self._error_monitor.capture_exception(context={"user": user_id})
             raise InternalServerError from e
 
-        return ListFilesActionResult(result=result, session_data=session.to_dataclass())
+        return ListFilesActionResult(
+            result=result, session_data=session.to_dataclass(session.main_kernel)
+        )
 
     async def match_sessions(self, action: MatchSessionsAction) -> MatchSessionsActionResult:
         id_or_name_prefix = action.id_or_name_prefix
@@ -1250,7 +1255,7 @@ class SessionService:
         new_name = action.new_name
 
         try:
-            compute_session = await self._session_repository.update_session_name(
+            session_data = await self._session_repository.update_session_name(
                 SessionId(action.session_id), new_name
             )
         except ValueError as e:
@@ -1258,7 +1263,7 @@ class SessionService:
                 raise InvalidAPIParameters(str(e)) from e
             raise
 
-        return RenameSessionActionResult(session_data=compute_session.to_dataclass())
+        return RenameSessionActionResult(session_data=session_data)
 
     async def shutdown_service(self, action: ShutdownServiceAction) -> ShutdownServiceActionResult:
         service_name = action.service_name
@@ -1268,7 +1273,9 @@ class SessionService:
             kernel_loading_strategy=KernelLoadingStrategy.MAIN_KERNEL_ONLY,
         )
         await self._agent_registry.shutdown_service(session, service_name)
-        return ShutdownServiceActionResult(result=None, session_data=session.to_dataclass())
+        return ShutdownServiceActionResult(
+            result=None, session_data=session.to_dataclass(session.main_kernel)
+        )
 
     async def start_service(self, action: StartServiceAction) -> StartServiceActionResult:
         session_id = action.session_id
@@ -1414,7 +1421,9 @@ class SessionService:
                 log.debug("file received", file_name=file_name, received_bytes=recv_size)
                 ts.create_task(self._agent_registry.upload_file(session, file_name, data))
 
-        return UploadFilesActionResult(result=None, session_data=session.to_dataclass())
+        return UploadFilesActionResult(
+            result=None, session_data=session.to_dataclass(session.main_kernel)
+        )
 
     async def get_session(self, action: GetSessionAction) -> GetSessionActionResult:
         """Get a single session by ID with RBAC validation."""
@@ -1427,13 +1436,13 @@ class SessionService:
         session_id = action.session_id
         session_name = action.updater.name.optional_value()
 
-        session_row = await self._session_repository.update_session(action.updater, session_name)
-        if session_row is None:
+        session_data = await self._session_repository.update_session(action.updater, session_name)
+        if session_data is None:
             raise ValueError(f"Session not found (id:{session_id})")
         session_owner_data = await self._session_repository.get_session_owner(str(session_id))
 
         return UpdateSessionActionResult(
-            session_data=session_row.to_dataclass(owner=session_owner_data)
+            session_data=dataclasses.replace(session_data, owner=session_owner_data)
         )
 
     async def batch_get_session_resource_allocation(
