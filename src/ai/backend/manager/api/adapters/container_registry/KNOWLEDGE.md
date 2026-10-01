@@ -1,7 +1,7 @@
 ---
 name: container-registry-adapter-scenarios
 type: reference
-description: container registry adapter scenario guarantees; superadmin-gated management calls, per-id batch load, missing scoped search, RBAC project relations, legacy is_global image visibility, update-only URL validation
+description: container registry adapter scenario guarantees; superadmin-gated management calls, per-id batch load, missing scoped search, RBAC project relations, legacy is_global image visibility, URL validated by the request DTO and the Harbor project rule by a column constraint
 scope: src/ai/backend/manager/api/adapters/container_registry
 keywords: [container registry, scenario, adapter, superadmin, scoped_search, operation scope, RBAC, allowed groups, is_global, image visibility]
 sources:
@@ -108,7 +108,7 @@ status: draft
   노드가 없는 ID는 빈 값이 아니라 권한 부족으로 거부된다. 단건 조회의 권한 검사는 슈퍼관리자를
   먼저 통과시키므로 두 검사의 결과가 다르며, 어느 쪽으로 맞출지는 아직 결정되지 않았다.
 
-## 수정 후 레지스트리의 `url` 값과 `type` 값을 검증한다
+## `url` 값은 요청을 읽을 때, `project` 값은 데이터베이스가 검증한다
 
 | 시나리오 | 상황 | 요청 | 결과 |
 |---|---|---|---|
@@ -124,8 +124,12 @@ status: draft
 - `http` 또는 `https`로 시작하지 않는 `url` 값에는 `http://`를 붙인 뒤 파싱한다. 따라서
   `ftp://reg.example`이나 공백이 포함된 문자열도 통과하며, 호스트가 비어 있는 `url` 값만 거부된다.
 - 이 검증 범위를 강화할지는 아직 결정되지 않았다.
-- 검증은 수정 후의 최종 값을 대상으로 한다. 요청에서 `url` 값이나 `project` 값을 생략하더라도
-  저장된 값이 규칙을 위반하면 수정 요청을 거부한다.
+- `project` 값은 `container_registries` 테이블의 `CHECK` 제약이 검증한다. Harbor 종류인 행은
+  Harbor가 받는 형식의 `project` 값을 가져야 하며, 다른 종류는 이 값을 보지 않는다.
+- 제약은 쓰기가 끝난 행을 본다. 요청에서 `type` 값이나 `project` 값 한쪽만 바꿔도 저장될 행이
+  규칙을 위반하면 거부되며, 거부의 주체는 요청을 읽는 단계가 아니라 데이터베이스다.
+- v1 GraphQL은 아직 요청 DTO를 거치지 않으므로 같은 검증을 파이썬 쪽 validator가 맡는다
+  (`services/container_registry/validator.py`).
 
 ## 허용 프로젝트 변경은 레지스트리와 프로젝트 양쪽 스코프의 권한을 검사한다
 
