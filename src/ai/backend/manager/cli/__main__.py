@@ -159,7 +159,7 @@ def dbshell(
             "psql",
             (
                 f"postgres://{db_config.user}:{db_config.password}@/{db_config.name}"
-                f"?host={hosts}&port={ports}"
+                f"?host={hosts}&port={ports}&target_session_attrs=primary"
             ),
             *_psql_args,
         ]

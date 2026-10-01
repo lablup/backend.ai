@@ -115,3 +115,4 @@ class TestDatabaseConfigAddrs:
         assert connect_args["host"] == expected_host
         assert connect_args["port"] == expected_port
         assert connect_args["password"] == "p@ss:/w"
+        assert connect_args["target_session_attrs"] == "primary"

@@ -460,6 +460,7 @@ class DatabaseConfig(BaseConfigSchema):
             query={
                 "host": ",".join(addr.host for addr in self.addrs),
                 "port": ",".join(str(addr.port) for addr in self.addrs),
+                "target_session_attrs": "primary",
             },
         )
 
