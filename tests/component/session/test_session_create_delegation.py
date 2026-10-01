@@ -12,6 +12,7 @@ import sqlalchemy as sa
 from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
 
 from ai.backend.client.v2.registry import BackendAIClientRegistry
+from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.dto.manager.session.request import CreateFromParamsRequest
 from ai.backend.common.types import SessionTypes
 from ai.backend.manager.models.project import ProjectRow
@@ -144,4 +145,40 @@ class TestDelegatedSessionCreation:
             "UserScope.user_uuid must be the owner's UUID, not the requester admin's"
         )
         assert passed_user_scope.user_uuid != admin_user_fixture.user_uuid
+        assert passed_owner_access_key == regular_user_fixture.keypair.access_key
+
+    async def test_admin_create_acting_as_user_routes_target_into_user_scope(
+        self,
+        admin_registry: BackendAIClientRegistry,
+        domain_fixture: DomainFixtureData,
+        group_name_for_fixture: str,
+        regular_user_fixture: UserFixtureData,
+        session_repository_with_stub_image: SessionRepository,
+        mock_create_session: AsyncMock,
+    ) -> None:
+        """POST /session signed by the admin keypair with ``X-BackendAI-Act-As`` records the target."""
+        request = CreateFromParamsRequest(
+            session_name="act-as-session-component",
+            image="python:latest",
+            architecture="x86_64",
+            session_type=SessionTypes.INTERACTIVE,
+            domain=domain_fixture.domain_name,
+            group=group_name_for_fixture,
+            reuse=False,
+            enqueue_only=True,
+        )
+
+        await admin_registry._client._request(
+            "POST",
+            "/session",
+            json=request.model_dump(mode="json", exclude_none=True),
+            extra_headers={"X-BackendAI-Act-As": str(regular_user_fixture.user_uuid)},
+        )
+
+        mock_create_session.assert_awaited_once()
+        passed_user_scope: Any = mock_create_session.call_args.args[2]
+        passed_owner_access_key: Any = mock_create_session.call_args.args[3]
+        assert isinstance(passed_user_scope, UserScope)
+        assert passed_user_scope.user_uuid == regular_user_fixture.user_uuid
+        assert passed_user_scope.user_role == UserRole.USER
         assert passed_owner_access_key == regular_user_fixture.keypair.access_key
