@@ -122,10 +122,7 @@ from ai.backend.manager.models.vfolder.row import (
     VFolderRow,
     VFolderStatusSet,
     VFolderUserMountPolicyRow,
-    ensure_host_permission_allowed,
     ensure_quota_scope_accessible_by_user,
-    get_allowed_vfolder_hosts_by_group,
-    get_allowed_vfolder_hosts_by_user,
     get_sessions_by_mounted_folder,
     vfolder_status_map,
     vfolders,
@@ -146,6 +143,11 @@ from ai.backend.manager.models.virtual_entity.queries import (
 from ai.backend.manager.repositories.base.integrity import match_integrity_error
 from ai.backend.manager.repositories.ops.v2.share.provider import ShareOpsProvider
 from ai.backend.manager.repositories.ops.v2.share.write import V2ShareWriteOps
+from ai.backend.manager.repositories.vfolder.host_permission import (
+    ensure_host_permission_allowed,
+    get_allowed_vfolder_hosts_by_group,
+    get_allowed_vfolder_hosts_by_user,
+)
 from ai.backend.manager.repositories.vfolder.purge_guards import (
     find_active_vfolder_references,
     vfolder_reference_conflict_checks,

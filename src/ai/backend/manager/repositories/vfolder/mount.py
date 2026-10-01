@@ -45,7 +45,6 @@ from ai.backend.manager.models.vfolder.row import (
     DEAD_VFOLDER_STATUSES,
     VFolderRow,
     VFolderUserMountPolicyRow,
-    ensure_host_permission_allowed,
     vfolders,
 )
 from ai.backend.manager.models.vfolder.scopes import (
@@ -53,6 +52,7 @@ from ai.backend.manager.models.vfolder.scopes import (
     UserVFolderTarget,
 )
 from ai.backend.manager.models.vfolder.searchable_fields import VFolderSearchableFields
+from ai.backend.manager.repositories.vfolder.host_permission import ensure_host_permission_allowed
 from ai.backend.manager.repositories.vfolder.mount_policy import resolve_mount_policy
 from ai.backend.manager.types import UserScope
 
