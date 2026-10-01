@@ -27,7 +27,6 @@ from sqlalchemy.orm import (
     load_only,
     mapped_column,
     relationship,
-    selectinload,
 )
 from sqlalchemy.sql.expression import true
 
@@ -214,7 +213,7 @@ class ImageRow(CreatedAtMixin, Base):
         server_default=sa.func.now(),
     )
 
-    aliases = relationship("ImageAliasRow", back_populates="image")
+    aliases = relationship("ImageAliasRow")
     # sessions = relationship("SessionRow", back_populates="image_row")
     registry_row = relationship(
         "ContainerRegistryRow",
@@ -458,30 +457,6 @@ class ImageAliasRow(Base):
     image_id: Mapped[ImageID] = mapped_column(
         "image", GUID(ImageID), sa.ForeignKey("images.id", ondelete="CASCADE"), nullable=False
     )
-    image: Mapped[ImageRow] = relationship("ImageRow", back_populates="aliases")
-
-    @classmethod
-    async def create(
-        cls,
-        session: AsyncSession,
-        alias: str,
-        target: ImageRow,
-    ) -> ImageAliasRow:
-        existing_alias: ImageRow | None = await session.scalar(
-            sa.select(ImageAliasRow)
-            .where(ImageAliasRow.alias == alias)
-            .options(selectinload(ImageAliasRow.image)),
-        )
-        if existing_alias is not None:
-            raise ValueError(
-                f"alias already created with ({existing_alias.image})",
-            )
-        new_alias = ImageAliasRow(
-            alias=alias,
-            image_id=target.id,
-        )
-        session.add_all([new_alias])
-        return new_alias
 
     @classmethod
     def from_dataclass(cls, alias_data: ImageAliasData, image_id: uuid.UUID) -> Self:

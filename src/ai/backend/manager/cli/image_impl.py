@@ -17,8 +17,9 @@ from ai.backend.common.exception import UnknownImageReference
 from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.container_registry.harbor import HarborRegistry_v2
 from ai.backend.manager.data.image.types import ImageData, ImageStatus
-from ai.backend.manager.errors.image import ImageNotFound
+from ai.backend.manager.errors.image import AliasImageActionDBError, ImageNotFound
 from ai.backend.manager.models.container_registry.row import ContainerRegistryRow
+from ai.backend.manager.models.image.creators import ImageAliasCreator
 from ai.backend.manager.models.image.purgers import ImagePurger
 from ai.backend.manager.models.image.row import ImageAliasRow, ImageRow
 from ai.backend.manager.models.image.searchable_fields import ImageSearchableFields
@@ -244,11 +245,13 @@ async def alias(cli_ctx: CLIContext, alias: str, target: str, architecture: str)
     async with connect_database(bootstrap_config.db) as db:
         try:
             image = await _first_image(db, _canonical_searcher(target, architecture), target)
-            async with db.begin_session() as session:
-                image_row = await session.get_one(ImageRow, image.id)
-                await ImageAliasRow.create(session, alias, image_row)
+            await ImageDBSource(db, V2DBOpsProvider(db)).insert_image_alias_by_id(
+                image.id, ImageAliasCreator(alias=alias)
+            )
         except UnknownImageReference:
             log.error("image not found", image_ref=target)
+        except AliasImageActionDBError:
+            log.exception("image alias creation failed", image_alias=alias)
         except Exception:
             log.exception("image command failed")
 
