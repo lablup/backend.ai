@@ -67,12 +67,7 @@ from ai.backend.manager.models.resource_policy.searchable_fields import (
     KeyPairResourcePolicySearchableFields,
     UserResourcePolicySearchableFields,
 )
-<<<<<<< HEAD
 from ai.backend.manager.models.user import UserRow, UserStatus
-from ai.backend.manager.models.utils import execute_with_retry
-=======
-from ai.backend.manager.models.user.row import UserRow, UserStatus
->>>>>>> 770abc59 (fix(BA-8219): run X-BackendAI-Act-As requests as the target user and its default keypair (#15170))
 from ai.backend.manager.secret.pool import KeyProviderPool
 
 if TYPE_CHECKING:
