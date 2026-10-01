@@ -161,15 +161,15 @@ async def handle_list_mounts(request: web.Request) -> web.Response:
     return web.json_response(sorted(mounts))
 
 
-def _mountpoint_under_prefix(mount_prefix: str, name: str) -> Path | None:
+def _mountpoint_under_prefix(mount_prefix: str, name: str) -> Path:
     prefix_dir = os.path.normpath(mount_prefix).rstrip(os.sep) + os.sep
     real_prefix_dir = os.path.realpath(mount_prefix).rstrip(os.sep) + os.sep
     mountpoint = os.path.normpath(Path(mount_prefix) / name)
     if not mountpoint.startswith(prefix_dir):
-        return None
+        raise InvalidMountNameError()
     # A symlink under the prefix can still point outside it
     if not os.path.realpath(mountpoint).startswith(real_prefix_dir):
-        return None
+        raise InvalidMountNameError()
     return Path(mountpoint)
 
 
@@ -181,8 +181,6 @@ async def handle_mount(request: web.Request) -> web.Response:
     if mount_prefix is None:
         mount_prefix = "/mnt"
     mountpoint = _mountpoint_under_prefix(mount_prefix, params["name"])
-    if mountpoint is None:
-        raise InvalidMountNameError()
     mountpoint.mkdir(exist_ok=True)
     if params.get("options", None):
         cmd = [
@@ -227,8 +225,6 @@ async def handle_umount(request: web.Request) -> web.Response:
     if mount_prefix is None:
         mount_prefix = "/mnt"
     mountpoint = _mountpoint_under_prefix(mount_prefix, params["name"])
-    if mountpoint is None:
-        raise InvalidMountNameError()
     proc = await asyncio.create_subprocess_exec(
         *[
             "sudo",
