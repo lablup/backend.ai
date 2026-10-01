@@ -1,10 +1,9 @@
+import importlib.metadata
 import site
 import subprocess
 import sys
 from collections import namedtuple
 from pathlib import Path
-
-import pkg_resources
 
 Package = namedtuple("Package", "name version is_user")
 
@@ -22,12 +21,10 @@ def install(pkgname: str, force_install: bool = False) -> None:
             raise RuntimeError("USER_SITE is not available")
         user_path = Path(site.USER_SITE).resolve()
         installed_pkgs = []
-        for pkg in pkg_resources.working_set:
-            if pkg.location is None:
-                continue
-            pkg_path = Path(pkg.location).resolve()
+        for dist in importlib.metadata.distributions():
+            pkg_path = Path(str(dist.locate_file(""))).resolve()
             is_user = user_path in pkg_path.parents
-            installed_pkgs.append(Package(pkg.key, pkg.version, is_user))
+            installed_pkgs.append(Package(dist.metadata["Name"], dist.version, is_user))
 
         for installed_pkg in installed_pkgs:
             if pkgname.lower() == installed_pkg.name.lower():
