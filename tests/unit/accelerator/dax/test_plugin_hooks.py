@@ -128,6 +128,39 @@ class TestGrantHooks:
             )
 
 
+class TestMixedSizeGrant:
+    @pytest.fixture
+    async def plugin(self, fake_sysfs: FakeSysfs, plugin_factory: PluginFactory) -> DAXPlugin:
+        fake_sysfs.add_non_cxl_device("dax0.0", size=32 * ALIGN)
+        fake_sysfs.add_cxl_device("dax1.0", region="region1", serials=("0x3c4d",))
+        return await plugin_factory("allow_non_cxl = true\nallow_mixed_sizes = true\n")
+
+    async def test_docker_args_mount_both_devices_in_admitted_order(
+        self, plugin: DAXPlugin
+    ) -> None:
+        dram = DeviceId("dax-dax0.0")
+        args = await plugin.generate_docker_args(
+            MagicMock(), {SLOT: {DEV_B: Decimal(1), dram: Decimal(1)}}
+        )
+
+        assert args["HostConfig"]["Devices"] == [
+            {"PathOnHost": PATH_A, "PathInContainer": "/dev/dax0.0", "CgroupPermissions": "rw"},
+            {"PathOnHost": PATH_B, "PathInContainer": "/dev/dax1.0", "CgroupPermissions": "rw"},
+        ]
+        env = dict(item.split("=", 1) for item in args["Env"])
+        assert env["BACKENDAI_DAX_PATHS"] == "/dev/dax0.0,/dev/dax1.0"
+        assert [
+            (d["id"], d["size"], d["serials"]) for d in json.loads(env["BACKENDAI_DAX_DEVICES"])
+        ] == [
+            (dram, 32 * ALIGN, []),
+            (DEV_B, DEVICE_SIZE, ["0x3c4d"]),
+        ]
+        assert plugin.get_additional_gids() == [FAKE_GID]
+
+    async def test_slots_count_devices(self, plugin: DAXPlugin) -> None:
+        assert await plugin.available_slots() == {SLOT: Decimal(2)}
+
+
 class TestCapacity:
     async def test_slots_are_devices_times_max_holders(
         self, two_devices: None, plugin_factory: PluginFactory

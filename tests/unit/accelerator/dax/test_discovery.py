@@ -155,6 +155,22 @@ class TestDiscoverExcluded:
             "dax1.0": ExcludedReason.HETEROGENEOUS_SIZE,
         }
 
+    def test_heterogeneous_size_without_mixed_sizes_flag(
+        self, fake_sysfs: FakeSysfs, fake_stat: FakeStat
+    ) -> None:
+        fake_sysfs.add_cxl_device("dax0.0", size=64 * ALIGN)
+        fake_sysfs.add_non_cxl_device("dax1.0", size=32 * ALIGN)
+
+        result = discover_devices(
+            DAXPluginConfig(sysfs_root=fake_sysfs.root, allow_non_cxl=True), fake_stat
+        )
+
+        assert result.admitted == []
+        assert _reasons(result) == {
+            "dax0.0": ExcludedReason.HETEROGENEOUS_SIZE,
+            "dax1.0": ExcludedReason.HETEROGENEOUS_SIZE,
+        }
+
     def test_heterogeneous_size_is_checked_after_allowlist(
         self, fake_sysfs: FakeSysfs, fake_stat: FakeStat
     ) -> None:
@@ -214,6 +230,42 @@ class TestDiscoverEdge:
             (),
         )
         assert (cxl.size, cxl.align) == (non_cxl.size, non_cxl.align) == (64 * ALIGN, ALIGN)
+
+    def test_allow_mixed_sizes_admits_different_sizes(
+        self, fake_sysfs: FakeSysfs, fake_stat: FakeStat
+    ) -> None:
+        fake_sysfs.add_non_cxl_device("dax0.0", size=32 * ALIGN)
+        fake_sysfs.add_cxl_device("dax1.0", region="region1", serials=("0x3c4d",), size=64 * ALIGN)
+
+        result = discover_devices(
+            DAXPluginConfig(
+                sysfs_root=fake_sysfs.root,
+                allow_non_cxl=True,
+                allow_mixed_sizes=True,
+                allowlist=["dax0.0", "dax-0x3c4d"],
+            ),
+            fake_stat,
+        )
+
+        assert result.excluded == []
+        assert [(info.device_id, info.size) for info in result.admitted] == [
+            ("dax-dax0.0", 32 * ALIGN),
+            ("dax-0x3c4d", 64 * ALIGN),
+        ]
+
+    def test_allow_mixed_sizes_keeps_other_exclusions(
+        self, fake_sysfs: FakeSysfs, fake_stat: FakeStat
+    ) -> None:
+        fake_sysfs.add_cxl_device("dax0.0", size=64 * ALIGN)
+        fake_sysfs.add_cxl_device("dax1.0", region="region1", serials=("0x3c4d",), size=32 * ALIGN)
+        fake_stat.missing.add("dax1.0")
+
+        result = discover_devices(
+            DAXPluginConfig(sysfs_root=fake_sysfs.root, allow_mixed_sizes=True), fake_stat
+        )
+
+        assert [info.name for info in result.admitted] == ["dax0.0"]
+        assert _reasons(result) == {"dax1.0": ExcludedReason.NODE_MISSING}
 
     def test_mock_skips_node_checks(self, fake_sysfs: FakeSysfs, fake_stat: FakeStat) -> None:
         fake_sysfs.add_cxl_device("dax0.0")

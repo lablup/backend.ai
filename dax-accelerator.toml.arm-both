@@ -1,0 +1,6 @@
+# coco, design 2a: DRAM dax0.0 and XCENA CXL dax1.0 (sizes differ) for one kernel.
+# Copy over `dax-accelerator.toml` in the agent's working directory and restart the agent.
+max_holders = 1
+allow_non_cxl = true
+allow_mixed_sizes = true
+allowlist = ["dax0.0", "dax-0x3150303130303934"]

@@ -210,7 +210,7 @@ def discover_devices(config: DAXPluginConfig, stat_func: StatFunc = os.stat) -> 
             candidates.append(info)
         else:
             excluded.append(info)
-    if len({info.size for info in candidates}) > 1:
+    if not config.allow_mixed_sizes and len({info.size for info in candidates}) > 1:
         excluded.extend(
             replace(info, excluded_reason=ExcludedReason.HETEROGENEOUS_SIZE) for info in candidates
         )

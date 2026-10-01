@@ -13,6 +13,10 @@ max_holders = 1
 # Admit devices whose CXL serial cannot be resolved through sysfs.
 allow_non_cxl = false
 
+# Admit devices of different sizes; `dax.device` then counts devices, not bytes.
+# Off (the default) excludes every device when the admitted sizes differ.
+allow_mixed_sizes = false
+
 # Sysfs and devtmpfs roots read by discovery.
 sysfs_root = "/sys"
 dev_root = "/dev"

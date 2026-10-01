@@ -16,6 +16,7 @@ class DAXPluginConfig(BaseModel):
     max_holders: int = Field(default=1, ge=1)
     allowlist: Sequence[str] | None = None
     allow_non_cxl: bool = False
+    allow_mixed_sizes: bool = False
     sysfs_root: Path = Path("/sys")
     dev_root: Path = Path("/dev")
     mock: bool = False
