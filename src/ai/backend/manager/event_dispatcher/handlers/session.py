@@ -221,7 +221,7 @@ class SessionEventHandler:
             )
             session = await self._session_repository.get_session_validated(
                 event.session_id,
-                kernel_loading_strategy=KernelLoadingStrategy.MAIN_KERNEL_ONLY,
+                kernel_loading_strategy=KernelLoadingStrategy.NONE,
                 allow_stale=allow_stale,
             )
         except SessionNotFound:

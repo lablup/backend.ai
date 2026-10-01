@@ -15,13 +15,14 @@ from ai.backend.common.metrics.metric import DomainType, LayerType
 from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPolicy
 from ai.backend.common.resilience.policies.retry import BackoffStrategy, RetryArgs, RetryPolicy
 from ai.backend.common.resilience.resilience import Resilience
-from ai.backend.common.types import AccessKey, KernelId, SessionId
+from ai.backend.common.types import AccessKey, AgentId, KernelId, SessionId
 from ai.backend.manager.data.container_registry.types import ContainerRegistryData
 from ai.backend.manager.data.image.types import ImageData
 from ai.backend.manager.data.resource_slot.types import ResourceAllocationAggregate
 from ai.backend.manager.data.session.types import (
     SessionData,
     SessionRoutingInfo,
+    SessionWithKernelsData,
 )
 from ai.backend.manager.data.user.types import SessionOwnerContext, UserData
 from ai.backend.manager.models.image.row import ImageRow
@@ -104,6 +105,18 @@ class SessionRepository:
         )
 
     @session_repository_resilience.apply()
+    async def get_session_with_kernels(
+        self,
+        session_id: SessionId,
+        allow_stale: bool = False,
+    ) -> SessionWithKernelsData:
+        return await self._db_source.get_session_with_kernels(session_id, allow_stale)
+
+    @session_repository_resilience.apply()
+    async def get_agent_public_host(self, agent_id: AgentId) -> str | None:
+        return await self._db_source.get_agent_public_host(agent_id)
+
+    @session_repository_resilience.apply()
     async def match_sessions(
         self,
         id_or_name_prefix: str,
@@ -134,7 +147,7 @@ class SessionRepository:
         self,
         session_id: SessionId,
         new_name: str,
-    ) -> SessionRow:
+    ) -> SessionData:
         return await self._db_source.update_session_name(session_id, new_name)
 
     @session_repository_resilience.apply()
@@ -215,7 +228,7 @@ class SessionRepository:
         self,
         updater: SessionUpdater,
         session_name: str | None = None,
-    ) -> SessionRow | None:
+    ) -> SessionData | None:
         return await self._db_source.update_session(updater, session_name)
 
     @session_repository_resilience.apply()
@@ -262,17 +275,6 @@ class SessionRepository:
         session_id: SessionId,
     ) -> dict[str, list[Any] | str]:
         return await self._db_source.find_dependency_sessions(session_id)
-
-    @session_repository_resilience.apply()
-    async def get_session_with_group(
-        self,
-        session_id: SessionId,
-        kernel_loading_strategy: KernelLoadingStrategy = KernelLoadingStrategy.MAIN_KERNEL_ONLY,
-        allow_stale: bool = False,
-    ) -> SessionRow:
-        return await self._db_source.get_session_with_group(
-            session_id, kernel_loading_strategy, allow_stale
-        )
 
     @session_repository_resilience.apply()
     async def get_session_with_routing_minimal(

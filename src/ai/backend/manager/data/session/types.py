@@ -37,7 +37,7 @@ from ai.backend.manager.data.session.options import SessionStoredOptions
 from ai.backend.manager.data.user.types import UserData
 
 if TYPE_CHECKING:
-    from ai.backend.manager.data.kernel.types import KernelStatus
+    from ai.backend.manager.data.kernel.types import KernelInfo, KernelStatus
     from ai.backend.manager.data.network.types import NetworkType
     from ai.backend.manager.data.session.options import SessionHandlerOptions
 
@@ -388,6 +388,18 @@ class SessionRoutingInfo:
     kernel_host: str | None
     agent_addr: str | None
     service_ports: list[dict[str, Any]]
+
+
+@dataclass(frozen=True)
+class SessionWithKernelsData:
+    """A session with its kernels, read by a separate kernel query.
+
+    ``main_kernel`` is the one in the default cluster role; ``session.service_ports`` are its ports.
+    """
+
+    session: SessionData
+    main_kernel: KernelInfo
+    kernels: list[KernelInfo]
 
 
 @dataclass

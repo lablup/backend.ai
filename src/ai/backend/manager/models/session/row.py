@@ -443,9 +443,9 @@ class SessionRow(CreatedAtMixin, Base):
         nullable=True,
         default=None,
     )
-    # Loaded by gql_legacy, registry.py and the v2 db_sources, and read by main_kernel,
-    # resource_opts and get_kernel_by_id. Delete it together with KernelRow.session
-    # once the v2 services stop reading main_kernel off a SessionRow.
+    # Read by gql_legacy and registry.py. v2 loads it only for the SessionRow handed to registry.py
+    # (SessionDBSource.get_session_validated/get_session_by_id, StreamDBSource.get_streaming_session).
+    # Delete it together with KernelRow.session once those registry.py calls are gone.
     kernels: Mapped[list[KernelRow]] = relationship("KernelRow", back_populates="session")
 
     # Resource ownership
@@ -718,7 +718,7 @@ class SessionRow(CreatedAtMixin, Base):
         instance.id = SessionId(session_data.id)
         return instance
 
-    def to_dataclass(self, owner: UserData | None = None) -> SessionData:
+    def to_dataclass(self, main_kernel: KernelRow, owner: UserData | None = None) -> SessionData:
         return SessionData(
             id=self.id,
             creation_id=self.creation_id,
@@ -761,9 +761,7 @@ class SessionRow(CreatedAtMixin, Base):
             last_stat=self.last_stat,
             network_type=self.network_type,
             network_id=self.network_id,
-            service_ports=str(self.main_kernel.service_ports)
-            if self.main_kernel.service_ports
-            else None,
+            service_ports=str(main_kernel.service_ports) if main_kernel.service_ports else None,
             owner=owner if owner is not None else None,
             replica_id=self.replica_id,
         )

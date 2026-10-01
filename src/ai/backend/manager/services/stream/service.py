@@ -71,16 +71,15 @@ class StreamService:
     async def get_streaming_session(
         self, action: GetStreamingSessionAction
     ) -> GetStreamingSessionActionResult:
-        session = await self._repository.get_streaming_session(action.session_id)
-        kernel = session.main_kernel
+        kernel = await self._repository.get_streaming_main_kernel(action.session_id)
         return GetStreamingSessionActionResult(
-            session_id=session.id,
+            session_id=action.session_id,
             kernel_id=kernel.id,
-            kernel_host=kernel.kernel_host,
-            agent_addr=kernel.agent_addr,
-            repl_in_port=kernel.repl_in_port,
-            repl_out_port=kernel.repl_out_port,
-            service_ports=kernel.service_ports or [],
+            kernel_host=kernel.network.kernel_host,
+            agent_addr=kernel.resource.agent_addr,
+            repl_in_port=kernel.network.repl_in_port,
+            repl_out_port=kernel.network.repl_out_port,
+            service_ports=kernel.network.service_ports or [],
         )
 
     async def execute_in_stream(self, action: ExecuteInStreamAction) -> ExecuteInStreamActionResult:
@@ -114,12 +113,13 @@ class StreamService:
     async def start_service_in_stream(
         self, action: StartServiceInStreamAction
     ) -> StartServiceInStreamActionResult:
-        session = await self._repository.get_streaming_session(action.session_id)
-        main_kernel = session.main_kernel
-        if main_kernel.agent is None:
-            raise AgentNotAllocated(f"Session {session.id} main kernel has no agent allocated")
+        main_kernel = await self._repository.get_streaming_main_kernel(action.session_id)
+        if main_kernel.resource.agent is None:
+            raise AgentNotAllocated(
+                f"Session {action.session_id} main kernel has no agent allocated"
+            )
         result = await self._registry.start_service(
-            main_kernel.id, AgentId(main_kernel.agent), action.service, action.opts
+            main_kernel.id, AgentId(main_kernel.resource.agent), action.service, action.opts
         )
         return StartServiceInStreamActionResult(result=dict(result))
 

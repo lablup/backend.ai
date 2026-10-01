@@ -10,7 +10,7 @@ from sqlalchemy.orm import InstrumentedAttribute
 from ai.backend.common.data.entity.session import SessionID
 from ai.backend.common.data.filter_specs import UUIDInMatchSpec
 from ai.backend.common.types import SessionId
-from ai.backend.manager.data.session.types import SessionData, SessionEntityData, SessionStatus
+from ai.backend.manager.data.session.types import SessionEntityData, SessionStatus
 from ai.backend.manager.models.clauses import QueryCondition
 from ai.backend.manager.models.session.row import SessionRow
 from ai.backend.manager.models.session.searchable_fields import SessionSearchableFields
@@ -21,7 +21,7 @@ from ai.backend.manager.types import OptionalState
 
 
 @dataclass
-class SessionUpdater(DataUpdater[SessionRow, SessionData]):
+class SessionUpdater(DataUpdater[SessionRow, SessionEntityData]):
     """Rename a session or re-rank it.
 
     A rename also names every kernel of the session, which the caller carries out
@@ -58,8 +58,8 @@ class SessionUpdater(DataUpdater[SessionRow, SessionData]):
         return to_update
 
     @override
-    def to_data(self, row: SessionRow) -> SessionData:
-        return row.to_dataclass()
+    def to_data(self, row: SessionRow) -> SessionEntityData:
+        return SessionSearchableFields.own.to_data(row)
 
 
 @dataclass

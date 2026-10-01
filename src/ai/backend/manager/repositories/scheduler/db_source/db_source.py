@@ -1748,26 +1748,29 @@ class ScheduleDBSource:
             return []
 
         async with self._db.begin_readonly_session_read_committed() as session:
-            query = (
-                sa.select(SessionRow)
-                .where(SessionRow.id.in_(session_ids))
-                .options(
-                    selectinload(SessionRow.kernels).options(
-                        load_only(
-                            KernelRow.id,
-                            KernelRow.status,
-                            KernelRow.container_id,
-                            KernelRow.agent,
-                            KernelRow.agent_addr,
-                        )
-                    )
-                )
-            )
+            query = sa.select(SessionRow).where(SessionRow.id.in_(session_ids))
             result = await session.execute(query)
             session_rows = list(result.scalars().all())
+            kernel_result = await session.scalars(
+                sa.select(KernelRow)
+                .options(
+                    load_only(
+                        KernelRow.id,
+                        KernelRow.session_id,
+                        KernelRow.status,
+                        KernelRow.container_id,
+                        KernelRow.agent,
+                        KernelRow.agent_addr,
+                    )
+                )
+                .where(KernelRow.session_id.in_([row.id for row in session_rows]))
+            )
+            kernel_rows: dict[SessionId, list[KernelRow]] = defaultdict(list)
+            for kernel_row in kernel_result:
+                kernel_rows[kernel_row.session_id].append(kernel_row)
             allocations = await batch_load_kernel_allocations(
                 session,
-                [KernelId(kernel.id) for row in session_rows for kernel in row.kernels],
+                [KernelId(kernel.id) for kernels in kernel_rows.values() for kernel in kernels],
             )
 
             terminating_sessions = []
@@ -1785,7 +1788,7 @@ class ScheduleDBSource:
                             else ResourceSlot()
                         ),
                     )
-                    for kernel in session_row.kernels
+                    for kernel in kernel_rows[session_row.id]
                 ]
 
                 terminating_sessions.append(
@@ -3991,24 +3994,29 @@ class ScheduleDBSource:
             List of SessionWithKernels containing SessionInfo and KernelInfo objects.
         """
         async with self._db.begin_readonly_session_read_committed() as db_sess:
-            stmt = (
-                sa.select(SessionRow)
-                .where(
-                    SessionRow.resource_group_id == resource_group_id,
-                    SessionRow.status.in_(session_statuses),
-                )
-                .options(selectinload(SessionRow.kernels))
+            stmt = sa.select(SessionRow).where(
+                SessionRow.resource_group_id == resource_group_id,
+                SessionRow.status.in_(session_statuses),
             )
             result = await db_sess.execute(stmt)
             sessions = result.scalars().all()
+            kernel_result = await db_sess.scalars(
+                sa.select(KernelRow).where(
+                    KernelRow.session_id.in_([session.id for session in sessions])
+                )
+            )
+            kernel_rows: dict[SessionId, list[KernelRow]] = defaultdict(list)
+            for kernel_row in kernel_result:
+                kernel_rows[kernel_row.session_id].append(kernel_row)
 
             handler_sessions: list[SessionWithKernels] = []
             for session in sessions:
+                session_kernels = kernel_rows[session.id]
                 # If kernel_statuses is specified (not None), check if any kernel matches
                 # For ALL/ANY/NOT_ANY conditions, use fetch_sessions_for_promotion() instead
                 if kernel_statuses is not None:
                     has_matching_kernel = any(
-                        kernel.status in kernel_statuses for kernel in session.kernels
+                        kernel.status in kernel_statuses for kernel in session_kernels
                     )
                     if not has_matching_kernel:
                         continue
@@ -4017,7 +4025,7 @@ class ScheduleDBSource:
                 handler_sessions.append(
                     SessionWithKernels(
                         session_info=session.to_session_info(),
-                        kernel_infos=[kernel.to_kernel_info() for kernel in session.kernels],
+                        kernel_infos=[kernel.to_kernel_info() for kernel in session_kernels],
                     )
                 )
 

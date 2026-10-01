@@ -532,8 +532,9 @@ class EndpointRow(Base):
         target_user_uuid: UserID,
         target_access_key: AccessKey,
     ) -> None:
+        from ai.backend.manager.models.kernel.row import KernelRow
         from ai.backend.manager.models.replica_group.row import ReplicaGroupRow
-        from ai.backend.manager.models.session.row import KernelLoadingStrategy, SessionRow
+        from ai.backend.manager.models.session.row import DEAD_SESSION_STATUSES, SessionRow
         from ai.backend.manager.models.session_group.row import SessionGroupRow
 
         endpoint_rows = await EndpointRow.list_endpoint(
@@ -552,11 +553,22 @@ class EndpointRow(Base):
                 routing_row.delegate_ownership(target_user_uuid)
                 if routing_row.session is not None:
                     session_ids.append(routing_row.session)
-        session_rows = await SessionRow.list_sessions(
-            db_session, session_ids, kernel_loading_strategy=KernelLoadingStrategy.ALL_KERNELS
+        live_session_ids = list(
+            await db_session.scalars(
+                sa.select(SessionRow.id).where(
+                    SessionRow.id.in_(session_ids) & ~SessionRow.status.in_(DEAD_SESSION_STATUSES)
+                )
+            )
         )
-        for session_row in session_rows:
-            session_row.delegate_ownership(target_user_uuid, target_access_key)
+        owner_values = {"user_uuid": target_user_uuid, "access_key": target_access_key}
+        await db_session.execute(
+            sa.update(SessionRow).where(SessionRow.id.in_(live_session_ids)).values(owner_values)
+        )
+        await db_session.execute(
+            sa.update(KernelRow)
+            .where(KernelRow.session_id.in_(live_session_ids))
+            .values(owner_values)
+        )
         # The placement groups of the delegated replica groups follow their
         # members: a group's members all belong to its owner (BEP-1064).
         await db_session.execute(
