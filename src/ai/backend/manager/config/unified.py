@@ -289,6 +289,23 @@ class DatabaseConfig(BaseConfigSchema):
             example=ConfigExample(local="127.0.0.1:5432", prod="db.example.com:5432"),
         ),
     ]
+    extra_primary_addrs: Annotated[
+        list[HostPortPair],
+        Field(
+            default_factory=list,
+            validation_alias=AliasChoices("extra-primary-addrs", "extra_primary_addrs"),
+            serialization_alias="extra-primary-addrs",
+        ),
+        BackendAIConfigMeta(
+            description=(
+                "Other nodes of the cluster that can become the primary, tried in order "
+                "after addr. They share the [db] connection pool, and the manager connects "
+                "only to the node that accepts writes, so a failover needs no config change."
+            ),
+            added_version=NEXT_RELEASE_VERSION,
+            example=ConfigExample(local="", prod="db-2.example.com:5432"),
+        ),
+    ]
     name: Annotated[
         str,
         Field(default="DB_NAME", min_length=2, max_length=64),
@@ -424,6 +441,10 @@ class DatabaseConfig(BaseConfigSchema):
             example=ConfigExample(local="0", prod="30"),
         ),
     ]
+
+    @property
+    def primary_addrs(self) -> list[HostPortPair]:
+        return [self.addr, *self.extra_primary_addrs]
 
 
 class EventLoopType(enum.StrEnum):

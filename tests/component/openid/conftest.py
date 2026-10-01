@@ -333,6 +333,7 @@ def db_config(postgres_container: Any, test_db: str) -> DatabaseConfig:  # noqa:
     return DatabaseConfig(
         type="postgresql",
         addr=HostPortPairModel(host=addr.host, port=addr.port),
+        extra_primary_addrs=[],
         name=test_db,
         user=POSTGRES_USER,
         password=POSTGRES_PASSWORD,

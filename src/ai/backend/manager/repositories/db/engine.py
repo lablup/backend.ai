@@ -5,11 +5,11 @@ import json
 import logging
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager as actxmgr
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Final
 
 import sqlalchemy as sa
+from sqlalchemy.engine import URL
 from sqlalchemy.engine import create_engine as _create_engine
-from yarl import URL
 
 from ai.backend.common.exception import DatabaseError
 from ai.backend.common.json import ExtendedJSONEncoder
@@ -22,6 +22,8 @@ if TYPE_CHECKING:
     from ai.backend.manager.config.unified import DatabaseConfig
 
 log = StructuredLogger(logging.getLogger(__spec__.name))
+
+TARGET_SESSION_ATTRS_READ_WRITE: Final = "read-write"
 
 
 def create_async_engine(
@@ -39,20 +41,46 @@ def create_async_engine(
     )
 
 
+def build_db_url(db_config: DatabaseConfig) -> URL:
+    """
+    URL for create_async_engine(). Lists every primary candidate so asyncpg picks the
+    one that accepts writes.
+    """
+    return URL.create(
+        "postgresql+asyncpg",
+        username=db_config.user,
+        password=db_config.password,
+        database=db_config.name,
+        query={
+            "host": [f"{addr.host}:{addr.port}" for addr in db_config.primary_addrs],
+            "target_session_attrs": TARGET_SESSION_ATTRS_READ_WRITE,
+        },
+    )
+
+
+def build_libpq_uri(db_config: DatabaseConfig) -> str:
+    """
+    Connection string for psql (dbshell). Same addresses as build_db_url() in libpq's
+    comma-separated form.
+    """
+    hosts = ",".join(f"{addr.host}:{addr.port}" for addr in db_config.primary_addrs)
+    auth = db_config.user
+    if db_config.password is not None:
+        auth = f"{auth}:{db_config.password}"
+    return (
+        f"postgres://{auth}@{hosts}/{db_config.name}"
+        f"?target_session_attrs={TARGET_SESSION_ATTRS_READ_WRITE}"
+    )
+
+
 @actxmgr
 async def connect_database(
     db_config: DatabaseConfig,
     isolation_level: str = "SERIALIZABLE",
 ) -> AsyncIterator[ExtendedAsyncSAEngine]:
-    db_url = (
-        URL(f"postgresql+asyncpg://{db_config.addr.host}/{db_config.name}")
-        .with_port(db_config.addr.port)
-        .with_user(db_config.user)
-    )
-    if db_config.password is not None:
-        db_url = db_url.with_password(db_config.password)
+    db_url = build_db_url(db_config)
 
-    version_check_db = create_async_engine(str(db_url))
+    version_check_db = create_async_engine(db_url)
     async with version_check_db.begin() as conn:
         result = await conn.execute(sa.text("show server_version"))
         version_str = result.scalar()
@@ -64,7 +92,7 @@ async def connect_database(
     await version_check_db.dispose()
 
     db = create_async_engine(
-        str(db_url),
+        db_url,
         connect_args=pgsql_connect_opts,
         pool_size=db_config.pool_size,
         pool_recycle=db_config.pool_recycle,

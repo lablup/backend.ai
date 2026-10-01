@@ -8,6 +8,7 @@ from contextlib import asynccontextmanager as actxmgr
 from typing import (
     Any,
     Concatenate,
+    Final,
     ParamSpec,
     TypeVar,
     overload,
@@ -15,7 +16,9 @@ from typing import (
 )
 
 import sqlalchemy as sa
+from asyncpg.exceptions import ReadOnlySQLTransactionError
 from sqlalchemy.dialects import postgresql as psql
+from sqlalchemy.engine.interfaces import ExceptionContext
 from sqlalchemy.exc import DBAPIError
 from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
 from sqlalchemy.ext.asyncio import AsyncEngine as SAEngine
@@ -40,7 +43,7 @@ from ai.backend.manager.types import Sentinel
 log = StructuredLogger(logging.getLogger(__spec__.name))
 column_constraints = ["nullable", "index", "unique", "primary_key"]
 
-# TODO: Implement begin(), begin_readonly() for AsyncSession also
+PG_READONLY_EXEC_OPTION: Final = "postgresql_readonly"
 
 
 class ExtendedAsyncSAEngine(SAEngine):
@@ -64,6 +67,21 @@ class ExtendedAsyncSAEngine(SAEngine):
         self._generic_txn_over_threshold = False
         self._sess_factory = async_sessionmaker(self, expire_on_commit=False)
         self._readonly_sess_factory = async_sessionmaker(self)
+        sa.event.listen(self.sync_engine, "handle_error", self._invalidate_on_read_only_server)
+
+    def _invalidate_on_read_only_server(self, context: ExceptionContext) -> None:
+        orig = context.original_exception
+        if not isinstance(orig, ReadOnlySQLTransactionError) and not isinstance(
+            orig.__cause__, ReadOnlySQLTransactionError
+        ):
+            return
+        if context.connection is not None and context.connection.get_execution_options().get(
+            PG_READONLY_EXEC_OPTION
+        ):
+            return
+        # Documented as assignable, but ExceptionContext declares __slots__ = () so mypy
+        # rejects it: https://github.com/sqlalchemy/sqlalchemy/issues/13627
+        context.is_disconnect = True  # type: ignore[misc]
 
     def _check_generic_txn_cnt(self) -> None:
         over = self._is_over_txn_threshold(self._generic_txn_count)

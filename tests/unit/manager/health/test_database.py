@@ -55,7 +55,7 @@ class TestDatabaseHealthChecker:
             "postgresql+asyncpg://invalid:invalid@localhost:99999/invalid",
             echo=False,
         )
-        extended_engine = ExtendedAsyncSAEngine(dummy_engine)
+        extended_engine = ExtendedAsyncSAEngine(dummy_engine.sync_engine)
 
         try:
             timeout_value = 3.5
@@ -92,7 +92,7 @@ class TestDatabaseHealthChecker:
         )
 
         # Wrap in ExtendedAsyncSAEngine
-        extended_engine = ExtendedAsyncSAEngine(invalid_engine)
+        extended_engine = ExtendedAsyncSAEngine(invalid_engine.sync_engine)
 
         try:
             checker = DatabaseHealthChecker(

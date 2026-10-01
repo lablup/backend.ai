@@ -117,6 +117,7 @@ def dbshell(
     import sys
 
     from ai.backend.cli.types import ExitCode
+    from ai.backend.manager.repositories.db.engine import build_libpq_uri
 
     bootstrap_config = asyncio.run(cli_ctx.get_bootstrap_config())
     db_config = bootstrap_config.db
@@ -155,7 +156,7 @@ def dbshell(
         # Use the host-provided psql command
         cmd = [
             "psql",
-            (f"postgres://{db_config.user}:{db_config.password}@{db_config.addr}/{db_config.name}"),
+            build_libpq_uri(db_config),
             *_psql_args,
         ]
         subprocess.run(cmd)

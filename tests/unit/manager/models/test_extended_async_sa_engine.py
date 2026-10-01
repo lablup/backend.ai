@@ -5,6 +5,8 @@ from dataclasses import dataclass
 
 import pytest
 import sqlalchemy as sa
+from asyncpg.exceptions import ReadOnlySQLTransactionError
+from sqlalchemy.exc import DBAPIError
 from sqlalchemy.ext.asyncio import AsyncConnection
 
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
@@ -557,3 +559,65 @@ class TestExtendedAsyncSAEngineReadCommitted:
             # Verify phantom count
             phantom_count = len(final_rows) - len(initial_rows)
             assert phantom_count == 2
+
+
+class TestExtendedAsyncSAEngineReadOnlyServer:
+    """
+    A server that has become a replica rejects writes with 25006 while SELECT 1 still
+    succeeds. The engine must drop such connections so the pool reconnects.
+    """
+
+    @pytest.fixture
+    def test_table_metadata(self) -> sa.MetaData:
+        metadata = sa.MetaData()
+        sa.Table(
+            "test_read_only_server",
+            metadata,
+            sa.Column("id", sa.Integer, primary_key=True, autoincrement=True),
+        )
+        return metadata
+
+    @pytest.fixture(autouse=True)
+    async def test_table_in_db(
+        self,
+        database_connection: ExtendedAsyncSAEngine,
+        test_table_metadata: sa.MetaData,
+    ) -> AsyncIterator[sa.Table]:
+        async with database_connection.begin() as conn:
+            await conn.run_sync(test_table_metadata.create_all)
+        yield test_table_metadata.tables["test_read_only_server"]
+        async with database_connection.begin() as conn:
+            await conn.run_sync(test_table_metadata.drop_all)
+
+    async def test_write_rejected_by_read_only_server_discards_the_connection(
+        self,
+        database_connection: ExtendedAsyncSAEngine,
+        test_table_in_db: sa.Table,
+    ) -> None:
+        conn = await database_connection.connect()
+        conn = await conn.execution_options(isolation_level="AUTOCOMMIT")
+        await conn.execute(sa.text("SET default_transaction_read_only = on"))
+
+        with pytest.raises(DBAPIError) as excinfo:
+            await conn.execute(sa.insert(test_table_in_db).values())
+        await conn.close()
+
+        assert excinfo.value.orig is not None
+        assert isinstance(excinfo.value.orig.__cause__, ReadOnlySQLTransactionError)
+        assert excinfo.value.connection_invalidated is True
+        async with database_connection.begin() as fresh_conn:
+            result = await fresh_conn.execute(sa.text("SHOW default_transaction_read_only"))
+            assert result.scalar() == "off"
+
+    async def test_write_inside_read_only_transaction_keeps_the_connection(
+        self,
+        database_connection: ExtendedAsyncSAEngine,
+        test_table_in_db: sa.Table,
+    ) -> None:
+        with pytest.raises(DBAPIError) as excinfo:
+            async with database_connection.begin_readonly() as conn:
+                await conn.execute(sa.insert(test_table_in_db).values())
+
+        assert excinfo.value.orig is not None
+        assert isinstance(excinfo.value.orig.__cause__, ReadOnlySQLTransactionError)
+        assert excinfo.value.connection_invalidated is False

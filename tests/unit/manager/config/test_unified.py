@@ -3,7 +3,7 @@ import logging
 import pytest
 
 from ai.backend.common.typed_validators import HostPortPair
-from ai.backend.manager.config.unified import ManagerConfig, MetricConfig
+from ai.backend.manager.config.unified import DatabaseConfig, ManagerConfig, MetricConfig
 
 CONFIG_LOGGER = "ai.backend.common.config"
 
@@ -48,3 +48,25 @@ class TestUnknownFieldWarning:
 
         assert _unknown_field_warnings(caplog) == []
         assert config.num_proc == 2
+
+
+class TestDatabaseConfigPrimaryAddrs:
+    def test_addr_alone(self) -> None:
+        config = DatabaseConfig.model_validate({"addr": "10.0.0.1:5432"}, by_name=True)
+
+        assert config.primary_addrs == [HostPortPair(host="10.0.0.1", port=5432)]
+
+    def test_extra_primary_addrs_follow_addr_in_order(self) -> None:
+        config = DatabaseConfig.model_validate(
+            {
+                "addr": "pg1:5432",
+                "extra-primary-addrs": ["pg2:5432", {"host": "pg3", "port": 5433}],
+            },
+            by_name=True,
+        )
+
+        assert config.primary_addrs == [
+            HostPortPair(host="pg1", port=5432),
+            HostPortPair(host="pg2", port=5432),
+            HostPortPair(host="pg3", port=5433),
+        ]
