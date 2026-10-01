@@ -27,6 +27,7 @@ from ai.backend.manager.clients.storage_proxy.session_manager import StorageSess
 from ai.backend.manager.data.bootstrap_script.types import BootstrapScriptRevisionData
 from ai.backend.manager.data.dotfile.types import DotfileData, DotfileEntries, DotfileEntry
 from ai.backend.manager.data.keypair.types import GeneratedKeyPairData, KeyPairCreator, KeyPairData
+from ai.backend.manager.data.session.types import SessionEntityData
 from ai.backend.manager.data.user.types import (
     BulkUserCreateResultData,
     BulkUserUpdateResultData,
@@ -49,7 +50,6 @@ from ai.backend.manager.models.keypair.purgers import NonDefaultKeypairPurger
 from ai.backend.manager.models.keypair.queriers import DefaultKeypairQuerier
 from ai.backend.manager.models.keypair.row import generate_keypair_data
 from ai.backend.manager.models.keypair.updaters import KeypairUpdater
-from ai.backend.manager.models.session.row import SessionRow
 from ai.backend.manager.models.specs.pagination import NoPagination, OffsetPagination
 from ai.backend.manager.models.specs.updater import GuardedDataUpdater
 from ai.backend.manager.models.user.creators import UserCreator
@@ -209,7 +209,7 @@ class UserRepository:
         )
 
     @user_repository_resilience.apply()
-    async def retrieve_active_sessions(self, user_uuid: UUID) -> list[SessionRow]:
+    async def retrieve_active_sessions(self, user_uuid: UUID) -> list[SessionEntityData]:
         """Retrieve active sessions for a user."""
         return await self._db_source.retrieve_active_sessions(user_uuid)
 

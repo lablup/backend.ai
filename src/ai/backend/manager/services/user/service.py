@@ -7,6 +7,7 @@ from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeySta
 from ai.backend.common.data.entity.bootstrap_script import BootstrapScript
 from ai.backend.common.events.event_types.kernel.types import KernelLifecycleEventReason
 from ai.backend.common.exception import BackendAIError
+from ai.backend.common.types import SessionId
 from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
 from ai.backend.manager.data.dotfile.types import MAXIMUM_DOTFILE_COUNT
@@ -230,7 +231,7 @@ class UserService:
         # Handle active sessions
         if active_sessions := await self._user_repository.retrieve_active_sessions(user_uuid):
             await self._scheduling_controller.mark_sessions_for_termination(
-                [session.id for session in active_sessions],
+                [SessionId(session.id) for session in active_sessions],
                 reason=KernelLifecycleEventReason.USER_PURGED,
                 forced=True,
             )
