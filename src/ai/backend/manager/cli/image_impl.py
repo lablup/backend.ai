@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import dataclasses
 import logging
 from decimal import Decimal
 from pprint import pprint
@@ -7,7 +8,6 @@ from typing import Any
 
 import click
 import sqlalchemy as sa
-from sqlalchemy.orm import selectinload
 from tabulate import tabulate
 
 from ai.backend.common.arch import CURRENT_ARCH
@@ -135,14 +135,12 @@ async def inspect_image(cli_ctx: CLIContext, canonical_or_alias: str, architectu
     bootstrap_config = await cli_ctx.get_bootstrap_config()
     async with connect_database(bootstrap_config.db) as db:
         try:
-            image = await _first_image(
-                db, _reference_searcher(canonical_or_alias, architecture), canonical_or_alias
+            details = await ImageDBSource(db, V2DBOpsProvider(db)).search_image_details(
+                [], _reference_searcher(canonical_or_alias, architecture)
             )
-            async with db.begin_readonly_session() as session:
-                image_row = await session.get_one(
-                    ImageRow, image.id, options=[selectinload(ImageRow.aliases)]
-                )
-                pprint(await image_row.inspect())
+            if not details:
+                raise UnknownImageReference(canonical_or_alias)
+            pprint(dataclasses.asdict(details[0]))
         except UnknownImageReference:
             log.error("image not found", image_ref=canonical_or_alias)
         except Exception:

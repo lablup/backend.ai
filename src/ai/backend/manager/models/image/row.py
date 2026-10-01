@@ -4,7 +4,7 @@ import enum
 import functools
 import logging
 import uuid
-from collections.abc import Callable, Mapping
+from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime
 from decimal import Decimal
@@ -397,46 +397,6 @@ class ImageRow(CreatedAtMixin, Base):
 
         result: dict[SlotName, dict[str, Any]] = ImageRow._resources.type._schema.check(resources)
         return result
-
-    def _parse_row(self) -> dict[str, Any]:
-        res_limits = []
-        for slot_key, slot_range in self.resources.items():
-            min_value = slot_range.get("min")
-            if min_value is None:
-                min_value = Decimal(0)
-            max_value = slot_range.get("max")
-            if max_value is None:
-                max_value = Decimal("Infinity")
-            res_limits.append({
-                "key": slot_key,
-                "min": min_value,
-                "max": max_value,
-            })
-
-        accels_str = self.accelerators
-        if accels_str is None:
-            accels: list[str] = []
-        else:
-            accels = accels_str.split(",")
-
-        return {
-            "canonical_ref": self.name,
-            "name": self.image,
-            "humanized_name": self.image,  # TODO: implement
-            "tag": self.tag,
-            "architecture": self.architecture,
-            "registry": self.registry,
-            "digest": self.trimmed_digest or None,
-            "labels": self.labels,
-            "size_bytes": self.size_bytes,
-            "resource_limits": res_limits,
-            "supported_accelerators": accels,
-        }
-
-    async def inspect(self) -> Mapping[str, Any]:
-        parsed_image_info = self._parse_row()
-        parsed_image_info["reverse_aliases"] = [x.alias for x in self.aliases]
-        return parsed_image_info
 
     def set_resource_limit(
         self,
