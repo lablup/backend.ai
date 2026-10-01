@@ -4,13 +4,13 @@ from collections.abc import Mapping, Sequence
 from datetime import datetime, tzinfo
 from decimal import Decimal
 from enum import StrEnum
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, NamedTuple
 from uuid import UUID
 
 import attrs
 import msgpack
 import sqlalchemy as sa
-from sqlalchemy.orm import joinedload, load_only
+from sqlalchemy.orm import load_only
 from sqlalchemy.sql.elements import ColumnElement
 
 from ai.backend.common.types import KernelId, ResourceSlot, SlotName
@@ -34,6 +34,7 @@ from .utils import ExtendedAsyncSAEngine
 
 __all__: Sequence[str] = (
     "BaseResourceUsageGroup",
+    "KernelUsageRecord",
     "ResourceGroupUnit",
     "ResourceUsage",
     "fetch_resource_usage",
@@ -500,13 +501,13 @@ def parse_resource_usage(
 
 
 async def parse_resource_usage_groups(
-    kernels: list[KernelRow],
+    kernel_rows: list[KernelUsageRecord],
     allocated_slots: Mapping[UUID, ResourceSlot],
     valkey_stat_client: ValkeyStatClient,
     local_tz: tzinfo,
 ) -> list[BaseResourceUsageGroup]:
-    stat_map = {k.id: k.last_stat for k in kernels}
-    stat_empty_kerns = [k.id for k in kernels if not k.last_stat]
+    stat_map = {row.kernel.id: row.kernel.last_stat for row in kernel_rows}
+    stat_empty_kerns = [row.kernel.id for row in kernel_rows if not row.kernel.last_stat]
 
     kernel_ids_str = [str(kern_id) for kern_id in stat_empty_kerns]
     raw_stats = await valkey_stat_client.get_user_kernel_statistics_batch(kernel_ids_str)
@@ -518,8 +519,8 @@ async def parse_resource_usage_groups(
     return [
         BaseResourceUsageGroup(
             kernel_row=kern,
-            project_row=kern.session.group,
-            session_row=kern.session,
+            project_row=project,
+            session_row=session,
             created_at=kern.created_at,
             terminated_at=kern.terminated_at,
             scheduled_at=(
@@ -530,17 +531,17 @@ async def parse_resource_usage_groups(
             used_time=kern.used_time,
             used_days=kern.get_used_days(local_tz),
             last_stat=stat_map.get(kern.id),
-            user_id=kern.session.user_uuid,
-            user_email=kern.session.user.email if kern.session.user is not None else None,
-            access_key=kern.session.access_key,
-            project_id=kern.session.group.id if kern.session.group is not None else None,
-            project_name=kern.session.group.name if kern.session.group is not None else None,
+            user_id=session.user_uuid,
+            user_email=user_email,
+            access_key=session.access_key,
+            project_id=project.id if project is not None else None,
+            project_name=project.name if project is not None else None,
             kernel_id=kern.id,
             container_ids={kern.container_id} if kern.container_id else set(),
             session_id=kern.session_id,
-            session_name=kern.session.name,
-            domain_name=kern.session.domain_name,
-            full_name=kern.session.user.full_name if kern.session.user is not None else None,
+            session_name=session.name,
+            domain_name=session.domain_name,
+            full_name=full_name,
             images={kern.image} if kern.image else set(),
             agents={kern.agent} if kern.agent else set(),
             status=kern.status.name,
@@ -552,7 +553,7 @@ async def parse_resource_usage_groups(
                 kern, allocated_slots.get(kern.id, ResourceSlot()), stat_map.get(kern.id)
             ),
         )
-        for kern in kernels
+        for kern, session, project, user_email, full_name in kernel_rows
     ]
 
 
@@ -598,30 +599,36 @@ KERNEL_RESOURCE_SELECT_COLS = (
 )
 
 
+class KernelUsageRecord(NamedTuple):
+    """A kernel with its session, the session's project and the owner's name, joined."""
+
+    kernel: KernelRow
+    session: SessionRow
+    project: ProjectRow | None
+    user_email: str | None
+    full_name: str | None
+
+
 def _parse_query(
     kernel_cond: ColumnElement[bool] | None = None,
     session_cond: ColumnElement[bool] | None = None,
     project_cond: ColumnElement[bool] | None = None,
 ) -> sa.sql.Select[Any]:
-    session_load = joinedload(KernelRow.session)
-    if session_cond is not None:
-        session_load = joinedload(KernelRow.session.and_(session_cond))
-
-    project_load = joinedload(SessionRow.group)
-    if project_cond is not None:
-        project_load = joinedload(SessionRow.group.and_(project_cond))
-    query = sa.select(KernelRow).options(
-        load_only(*KERNEL_RESOURCE_SELECT_COLS),
-        session_load.options(
+    query = (
+        sa.select(KernelRow, SessionRow, ProjectRow, UserRow.email, UserRow.full_name)
+        .select_from(KernelRow)
+        .join(SessionRow, KernelRow.session_id == SessionRow.id)
+        .outerjoin(ProjectRow, ProjectRow.id == SessionRow.group_id)
+        .outerjoin(UserRow, UserRow.uuid == SessionRow.user_uuid)
+        .options(
+            load_only(*KERNEL_RESOURCE_SELECT_COLS),
             load_only(*SESSION_RESOURCE_SELECT_COLS),
-            joinedload(SessionRow.user).options(
-                load_only(UserRow.email, UserRow.username, UserRow.full_name)
-            ),
-            project_load.options(load_only(*PROJECT_RESOURCE_SELECT_COLS)),
-        ),
+            load_only(*PROJECT_RESOURCE_SELECT_COLS),
+        )
     )
-    if kernel_cond is not None:
-        query = query.where(kernel_cond)
+    for cond in (kernel_cond, session_cond, project_cond):
+        if cond is not None:
+            query = query.where(cond)
     return query
 
 
@@ -631,7 +638,7 @@ async def fetch_resource_usage(
     end_date: datetime,
     session_ids: Sequence[UUID] | None = None,
     project_ids: Sequence[UUID] | None = None,
-) -> tuple[list[KernelRow], dict[UUID, ResourceSlot]]:
+) -> tuple[list[KernelUsageRecord], dict[UUID, ResourceSlot]]:
     """Fetch the kernels overlapping the period with the slots they were allocated."""
     project_cond = None
     if project_ids:
@@ -656,11 +663,11 @@ async def fetch_resource_usage(
     )
     async with db_engine.begin_readonly_session() as db_sess:
         result = await db_sess.execute(query)
-        kernels: list[KernelRow] = list(result.scalars().all())
+        kernel_rows = [KernelUsageRecord(*row) for row in result.all()]
         aggregates = await batch_load_kernel_allocations(
-            db_sess, [KernelId(kernel.id) for kernel in kernels]
+            db_sess, [KernelId(row.kernel.id) for row in kernel_rows]
         )
     allocated_slots: dict[UUID, ResourceSlot] = {
         kernel_id: aggregate.allocated for kernel_id, aggregate in aggregates.items()
     }
-    return kernels, allocated_slots
+    return kernel_rows, allocated_slots

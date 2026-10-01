@@ -56,7 +56,7 @@ from ai.backend.manager.models.project.scopes import (
 from ai.backend.manager.models.project.searchable_fields import ProjectSearchableFields
 from ai.backend.manager.models.project.searchers import ProjectSearcher
 from ai.backend.manager.models.resource_slot.aggregates import kernel_allocated_slots_expr
-from ai.backend.manager.models.resource_usage import fetch_resource_usage
+from ai.backend.manager.models.resource_usage import KernelUsageRecord, fetch_resource_usage
 from ai.backend.manager.models.routing.row import RoutingRow
 from ai.backend.manager.models.user.row import users
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
@@ -283,7 +283,7 @@ class ProjectDBSource:
         start_date: datetime,
         end_date: datetime,
         project_ids: Sequence[UUID] | None = None,
-    ) -> tuple[list[KernelRow], dict[UUID, ResourceSlot]]:
+    ) -> tuple[list[KernelUsageRecord], dict[UUID, ResourceSlot]]:
         """Fetch the project's kernels with the slots they were allocated."""
         return await fetch_resource_usage(self._db, start_date, end_date, project_ids=project_ids)
 

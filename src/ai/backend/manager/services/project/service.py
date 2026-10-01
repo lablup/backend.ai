@@ -101,12 +101,12 @@ class ProjectService:
         end_date: datetime,
         project_ids: Sequence[UUID] | None = None,
     ) -> dict[UUID, ProjectResourceUsage]:
-        kernels, allocated_slots = await self._group_repository.fetch_project_resource_usage(
+        kernel_rows, allocated_slots = await self._group_repository.fetch_project_resource_usage(
             start_date, end_date, project_ids=project_ids
         )
         local_tz = self._config_provider.config.system.timezone
         usage_groups = await parse_resource_usage_groups(
-            kernels, allocated_slots, self._valkey_stat_client, local_tz
+            kernel_rows, allocated_slots, self._valkey_stat_client, local_tz
         )
         total_groups, _ = parse_total_resource_group(usage_groups)
         return total_groups
