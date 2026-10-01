@@ -73,7 +73,7 @@ Filter combination (`AND`/`OR`/`NOT`), sort and cursor or offset pagination are 
 
 ## Update validates the `url` and `type` values of the registry
 
-- The `url` validation checks only that a host is present and does not restrict the scheme.
+- The request DTO validates the `url` value. It checks only that a host is present and does not restrict the scheme.
 - A `url` value that does not start with `http` or `https` is parsed after `http://` is prepended. So `ftp://reg.example` and a string containing whitespace pass too, and only a `url` value with an empty host is rejected.
 - Whether to tighten this validation is not decided yet.
 - The validation targets the final value after the update. Even when the request omits the `url` or `project` value, the update is rejected when the stored value violates the rule.
