@@ -18,10 +18,16 @@ import trafaret as t
 from aiohttp import web
 from setproctitle import setproctitle
 
-from ai.backend.agent.errors.watcher import InvalidWatcherTokenError
+from ai.backend.agent.errors.watcher import (
+    InvalidMountNameError,
+    InvalidWatcherTokenError,
+    VolumeMountFailedError,
+    VolumeUnmountFailedError,
+)
 from ai.backend.common import config, utils
 from ai.backend.common import validators as tx
 from ai.backend.common.etcd import AsyncEtcd, ConfigScopes
+from ai.backend.common.exception import BackendAIError
 from ai.backend.common.msgpack import DEFAULT_PACK_OPTS, DEFAULT_UNPACK_OPTS
 from ai.backend.common.utils import Fstab
 from ai.backend.logging import Logger, LogLevel
@@ -47,6 +53,8 @@ async def auth_middleware(
             log.trace("watcher target service not loaded", error_repr=repr(e))
             message = "Agent is not loaded with systemctl."
             return web.json_response({"message": message}, status=HTTPStatus.OK)
+        except BackendAIError:
+            raise
         except Exception:
             log.exception("watcher request failed")
             raise
@@ -174,10 +182,7 @@ async def handle_mount(request: web.Request) -> web.Response:
         mount_prefix = "/mnt"
     mountpoint = _mountpoint_under_prefix(mount_prefix, params["name"])
     if mountpoint is None:
-        return web.Response(
-            text="The volume name must point to a directory under the mount prefix.",
-            status=HTTPStatus.BAD_REQUEST,
-        )
+        raise InvalidMountNameError()
     mountpoint.mkdir(exist_ok=True)
     if params.get("options", None):
         cmd = [
@@ -201,7 +206,7 @@ async def handle_mount(request: web.Request) -> web.Response:
     await proc.wait()
     if err:
         log.error("volume mount failed", mountpoint=mountpoint, stderr=err)
-        return web.Response(text=err, status=HTTPStatus.INTERNAL_SERVER_ERROR)
+        raise VolumeMountFailedError(extra_msg=err)
     log.info("volume mounted", volume_name=params["name"], mount_prefix=mount_prefix)
     if params["edit_fstab"]:
         fstab_path = params["fstab_path"] if params["fstab_path"] else "/etc/fstab"
@@ -223,10 +228,7 @@ async def handle_umount(request: web.Request) -> web.Response:
         mount_prefix = "/mnt"
     mountpoint = _mountpoint_under_prefix(mount_prefix, params["name"])
     if mountpoint is None:
-        return web.Response(
-            text="The volume name must point to a directory under the mount prefix.",
-            status=HTTPStatus.BAD_REQUEST,
-        )
+        raise InvalidMountNameError()
     proc = await asyncio.create_subprocess_exec(
         *[
             "sudo",
@@ -242,7 +244,7 @@ async def handle_umount(request: web.Request) -> web.Response:
     await proc.wait()
     if err:
         log.error("volume unmount failed", mountpoint=mountpoint, stderr=err)
-        return web.Response(text=err, status=HTTPStatus.INTERNAL_SERVER_ERROR)
+        raise VolumeUnmountFailedError(extra_msg=err)
     log.info("volume unmounted", volume_name=params["name"], mount_prefix=mount_prefix)
     try:
         mountpoint.rmdir()  # delete directory if empty
