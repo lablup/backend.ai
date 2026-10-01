@@ -437,18 +437,29 @@ class ImageDBSource:
 
     async def scan_image(self, canonical: str, architecture: str) -> ImageData:
         registries = await self._load_configured_registries(None)
-        # Select registered registries whose registry/project prefix matches the image canonical.
-        matching = self._filter_by_img_canonical(registries, canonical)
-        if not matching:
+        result = await self.scan_registry_with_img_canonical(registries, canonical)
+        if result is None:
             raise RegistryNotFoundForImage(
                 f"Registry not found for image: Image canonical - {canonical}"
             )
-        if len(matching) > 1:
-            raise InternalServerError(
-                f"Multiple container registries match image: Image canonical - {canonical}"
-            )
+        architecture = arch_name_aliases.get(architecture, architecture)
+        image = next((image for image in result.images if image.architecture == architecture), None)
+        if image is None:
+            raise ImageNotFound
+        return image
+
+    async def scan_registry_with_img_canonical(
+        self, registries: dict[str, ContainerRegistryRow], canonical: str
+    ) -> RescanImagesResult | None:
+        """Scan the one registry whose registry/project prefix matches the canonical.
+
+        Answers None when no registry matches, so the caller decides what that means.
+        """
+        matching = self._filter_by_img_canonical(registries, canonical)
+        if not matching:
+            return None
         registry_key, registry_row = next(iter(matching.items()))
-        # The loader keys rows by registry/project, which hides duplicate rows.
+        # The loader keys rows by registry/project, so a duplicate row hides behind one key.
         async with self._db.begin_readonly_session() as session:
             count = await session.scalar(
                 sa.select(sa.func.count())
@@ -458,16 +469,11 @@ class ImageDBSource:
                     ContainerRegistryRow.project == registry_row.project,
                 )
             )
-        if count != 1:
+        if len(matching) > 1 or count != 1:
             raise InternalServerError(
-                f"Expected one container registry for registry_name and project: Actual count - {count}"
+                f"Multiple container registries match image: Image canonical - {canonical}"
             )
-        result = await self.scan_single_image(registry_key, registry_row, canonical)
-        architecture = arch_name_aliases.get(architecture, architecture)
-        image = next((image for image in result.images if image.architecture == architecture), None)
-        if image is None:
-            raise ImageNotFound
-        return image
+        return await self.scan_single_image(registry_key, registry_row, canonical)
 
     async def rescan_images(
         self,
@@ -489,16 +495,9 @@ class ImageDBSource:
         if registry_or_image is None:
             return await self._scan_registries(registries, reporter=reporter)
 
-        matching_registries = self._filter_by_img_canonical(registries, registry_or_image)
-
-        if matching_registries:
-            if len(matching_registries) > 1:
-                raise RuntimeError(
-                    "ContainerRegistryRows exist with the same registry_name and project!",
-                )
-
-            registry_key, registry_row = next(iter(matching_registries.items()))
-            return await self.scan_single_image(registry_key, registry_row, registry_or_image)
+        scanned = await self.scan_registry_with_img_canonical(registries, registry_or_image)
+        if scanned is not None:
+            return scanned
 
         matching_registries = self._filter_by_registry_name(registries, registry_or_image)
 
