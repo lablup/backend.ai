@@ -6,6 +6,7 @@ Create Date: 2026-09-04
 
 """
 
+import uuid
 from typing import Any
 
 import sqlalchemy as sa
@@ -23,22 +24,51 @@ branch_labels = None
 depends_on = None
 
 
-# Capability names a volume implementation reports.
-_BUILTIN_BACKEND_TYPES: list[tuple[str, list[str]]] = [
-    ("vfs", ["vfolder"]),
-    ("xfs", ["vfolder", "quota"]),
-    ("cephfs", ["vfolder", "quota", "fast-size"]),
-    ("purestorage", ["vfolder", "metric", "fast-fs-size", "fast-scan"]),
-    ("netapp", ["vfolder", "metric", "quota", "fast-fs-size", "fast-size"]),
-    ("weka", ["vfolder", "metric", "quota", "fast-fs-size"]),
-    ("gpfs", ["vfolder", "metric", "quota", "fast-fs-size"]),
-    ("spectrumscale", ["vfolder", "metric", "quota", "fast-fs-size"]),
-    ("dellemc-onefs", ["vfolder", "metric", "quota", "fast-fs-size"]),
-    ("vast", ["vfolder", "metric", "quota", "fast-fs-size", "fast-size"]),
-    ("exascaler", ["vfolder", "quota"]),
-    ("hammerspace", ["vfolder", "quota"]),
-    ("hammerspace-base", ["vfolder"]),
-    ("noop", []),
+# Ids and capability names as fixtures/manager/example-storage-backend-types.json carries
+# them, so a migrated database and a fixture-populated one hold the same rows.
+_BUILTIN_BACKEND_TYPES: list[tuple[str, str, list[str]]] = [
+    ("01a0f746-b6d3-72d2-9e9a-a544b9652bcd", "vfs", ["vfolder"]),
+    ("01a0f746-b6d4-7fdd-a23e-c95ecaad2c62", "xfs", ["vfolder", "quota"]),
+    ("01a0f746-b6d5-7895-a119-c45f92d8d89a", "cephfs", ["vfolder", "quota", "fast-size"]),
+    (
+        "01a0f746-b6d6-747e-a8ee-870a4213b94a",
+        "purestorage",
+        ["vfolder", "metric", "fast-fs-size", "fast-scan"],
+    ),
+    (
+        "01a0f746-b6d7-7b8c-946a-f478acd05689",
+        "netapp",
+        ["vfolder", "metric", "quota", "fast-fs-size", "fast-size"],
+    ),
+    (
+        "01a0f746-b6d8-7cda-9ead-032dc99d3611",
+        "weka",
+        ["vfolder", "metric", "quota", "fast-fs-size"],
+    ),
+    (
+        "01a0f746-b6d9-775d-ba54-e6b4ba0b86f4",
+        "gpfs",
+        ["vfolder", "metric", "quota", "fast-fs-size"],
+    ),
+    (
+        "01a0f746-b6da-7e3c-8633-ceaffa04892e",
+        "spectrumscale",
+        ["vfolder", "metric", "quota", "fast-fs-size"],
+    ),
+    (
+        "01a0f746-b6db-7bc1-925b-9a4603421848",
+        "dellemc-onefs",
+        ["vfolder", "metric", "quota", "fast-fs-size"],
+    ),
+    (
+        "01a0f746-b6dc-7409-bec6-12b74452d7de",
+        "vast",
+        ["vfolder", "metric", "quota", "fast-fs-size", "fast-size"],
+    ),
+    ("01a0f746-b6dd-7113-bfd8-8c37075724f2", "exascaler", ["vfolder", "quota"]),
+    ("01a0f746-b6de-7cac-92dd-c23348356510", "hammerspace", ["vfolder", "quota"]),
+    ("01a0f746-b6df-7b9b-be97-35f559617a35", "hammerspace-base", ["vfolder"]),
+    ("01a0f746-b6e0-7efc-8855-34cab4efcea3", "noop", []),
 ]
 
 
@@ -79,45 +109,38 @@ def upgrade() -> None:
         "storage_backends",
         sa.Column("id", GUID(), server_default=sa.text("uuid_generate_v7()"), nullable=False),
         sa.Column("name", sa.String(length=64), nullable=False),
-        sa.Column("type_id", GUID(), nullable=False),
-        sa.Column(
-            "status_stale_after",
-            sa.Interval(),
-            server_default=sa.text("'3600 seconds'"),
-            nullable=False,
-        ),
+        sa.Column("storage_backend_type_id", GUID(), nullable=False),
         *_timestamp_columns(),
         sa.PrimaryKeyConstraint("id", name=op.f("pk_storage_backends")),
         sa.ForeignKeyConstraint(
-            ["type_id"],
+            ["storage_backend_type_id"],
             ["storage_backend_types.id"],
-            name="fk_storage_backends_type_id",
+            name="fk_storage_backends_storage_backend_type_id",
             ondelete="RESTRICT",
         ),
     )
 
     op.create_table(
-        "storage_backend_service_reports",
+        "service_storage_backend_status",
         sa.Column("service_catalog_id", GUID(), nullable=False),
         sa.Column("storage_backend_id", GUID(), nullable=False),
-        sa.Column("status", sa.String(length=64), nullable=False),
-        sa.Column("status_checked_at", sa.DateTime(timezone=True), nullable=False),
+        sa.Column("status_checked_at", sa.DateTime(timezone=True), nullable=True),
         *_timestamp_columns(),
         sa.PrimaryKeyConstraint(
             "service_catalog_id",
             "storage_backend_id",
-            name=op.f("pk_storage_backend_service_reports"),
+            name=op.f("pk_service_storage_backend_status"),
         ),
         sa.ForeignKeyConstraint(
             ["service_catalog_id"],
             ["service_catalog.id"],
-            name="fk_storage_backend_service_reports_service_catalog_id",
+            name="fk_service_storage_backend_status_service_catalog_id",
             ondelete="CASCADE",
         ),
         sa.ForeignKeyConstraint(
             ["storage_backend_id"],
             ["storage_backends.id"],
-            name="fk_storage_backend_service_reports_storage_backend_id",
+            name="fk_service_storage_backend_status_storage_backend_id",
             ondelete="RESTRICT",
         ),
     )
@@ -151,7 +174,7 @@ def upgrade() -> None:
         sa.Column("service_catalog_id", GUID(), nullable=False),
         sa.Column("storage_volume_id", GUID(), nullable=False),
         sa.Column("status", sa.String(length=64), nullable=False),
-        sa.Column("status_checked_at", sa.DateTime(timezone=True), nullable=False),
+        sa.Column("status_checked_at", sa.DateTime(timezone=True), nullable=True),
         *_timestamp_columns(),
         sa.PrimaryKeyConstraint(
             "service_catalog_id",
@@ -218,14 +241,15 @@ def upgrade() -> None:
 
     storage_backend_types = sa.table(
         "storage_backend_types",
+        sa.column("id", GUID),
         sa.column("name", sa.String),
         sa.column("capabilities", pgsql.JSONB),
     )
     op.bulk_insert(
         storage_backend_types,
         [
-            {"name": name, "capabilities": {"supported": capabilities}}
-            for name, capabilities in _BUILTIN_BACKEND_TYPES
+            {"id": uuid.UUID(id_), "name": name, "capabilities": {"supported": capabilities}}
+            for id_, name, capabilities in _BUILTIN_BACKEND_TYPES
         ],
     )
 
@@ -238,6 +262,6 @@ def downgrade() -> None:
     op.drop_table("resource_group_volume_offers")
     op.drop_table("storage_volume_service_holdings")
     op.drop_table("storage_volumes")
-    op.drop_table("storage_backend_service_reports")
+    op.drop_table("service_storage_backend_status")
     op.drop_table("storage_backends")
     op.drop_table("storage_backend_types")
