@@ -35,6 +35,7 @@ from ai.backend.manager.errors.image import (
     AliasImageActionValueError,
     ImageAliasNotFound,
     ImageNotFound,
+    ImagePurgeInProgress,
     PurgeImageActionByIdObjectDBError,
     RegistryNotFoundForImage,
     UpdateImageActionValueError,
@@ -159,6 +160,12 @@ class ImageDBSource:
                 aliases[ImageID(owners[alias.id])].append(alias.alias)
         return aliases
 
+    @staticmethod
+    def _reject_while_purging(image_row: ImageRow) -> None:
+        """Refuse a status write while a purge is working through this image."""
+        if image_row.status in ImageStatus.purge_in_progress():
+            raise ImagePurgeInProgress(f"Image is being purged: {image_row.id}")
+
     async def _get_image_alias_by_name(self, session: SASession, alias: str) -> ImageAliasRow:
         """
         Private method to get an image alias by name using an existing session.
@@ -202,7 +209,9 @@ class ImageDBSource:
         """
         async with self._db.begin_session() as session:
             image_row = await self._get_image_row_for_write(session, image_id, [ImageStatus.ALIVE])
-            await image_row.mark_as_deleted(session)
+            self._reject_while_purging(image_row)
+            image_row.status = ImageStatus.DELETED
+            await session.flush()
             return ImageSearchableFields.own.to_data(image_row)
 
     async def mark_image_alive_by_id(
@@ -216,7 +225,9 @@ class ImageDBSource:
             image_row = await self._get_image_row_for_write(
                 session, image_id, ImageStatus.restorable()
             )
-            await image_row.mark_as_alive(session)
+            self._reject_while_purging(image_row)
+            image_row.status = ImageStatus.ALIVE
+            await session.flush()
             return ImageSearchableFields.own.to_data(image_row)
 
     async def fetch_image_by_id(self, image_id: ImageID, load_aliases: bool = False) -> ImageData:

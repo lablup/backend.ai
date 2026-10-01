@@ -17,6 +17,7 @@ from ai.backend.common.exception import UnknownImageReference
 from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.container_registry.harbor import HarborRegistry_v2
 from ai.backend.manager.data.image.types import ImageData, ImageStatus
+from ai.backend.manager.errors.image import ImageNotFound
 from ai.backend.manager.models.container_registry.row import ContainerRegistryRow
 from ai.backend.manager.models.image.purgers import ImagePurger
 from ai.backend.manager.models.image.row import ImageAliasRow, ImageRow
@@ -156,10 +157,8 @@ async def forget_image(cli_ctx: CLIContext, canonical_or_alias: str, architectur
             image = await _first_image(
                 db, _reference_searcher(canonical_or_alias, architecture), canonical_or_alias
             )
-            async with db.begin_session() as session:
-                image_row = await session.get_one(ImageRow, image.id)
-                await image_row.mark_as_deleted(session)
-        except UnknownImageReference:
+            await ImageDBSource(db, V2DBOpsProvider(db)).mark_image_deleted_by_id(image.id)
+        except (UnknownImageReference, ImageNotFound):
             log.error("image not found", image_ref=canonical_or_alias)
         except Exception:
             log.exception("image command failed")
