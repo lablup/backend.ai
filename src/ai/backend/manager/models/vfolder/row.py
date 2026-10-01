@@ -5,7 +5,7 @@ import logging
 import uuid
 from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
-from datetime import UTC, datetime
+from datetime import datetime
 from typing import (
     Any,
     Final,
@@ -79,11 +79,6 @@ from ai.backend.manager.models.storage import (
     PermissionContextBuilder as StorageHostPermissionContextBuilder,
 )
 from ai.backend.manager.models.user.row import UserRole, UserRow
-from ai.backend.manager.models.utils import (
-    ExtendedAsyncSAEngine,
-    execute_with_retry,
-    sql_json_merge,
-)
 from ai.backend.manager.models.virtual_entity.queries import (
     user_scope_membership_exists,
 )
@@ -104,7 +99,6 @@ __all__: Sequence[str] = (
     "VFolderPermissionValidator",
     "VFolderRow",
     "VFolderStatusSet",
-    "update_vfolder_status",
     "vfolder_status_map",
     "vfolders",
 )
@@ -482,71 +476,6 @@ class VFolderUserMountPolicyRow(LifecycleTimestampsMixin, Base):
     permission: Mapped[VFolderMountPolicy] = mapped_column(
         "permission", StrEnumType(VFolderMountPolicy), nullable=False
     )
-
-
-async def update_vfolder_status(
-    engine: ExtendedAsyncSAEngine,
-    vfolder_ids: Sequence[uuid.UUID],
-    update_status: VFolderOperationStatus,
-    do_log: bool = True,
-    force: bool = False,
-) -> None:
-    vfolder_info_len = len(vfolder_ids)
-    cond: sa.ColumnElement[bool] = vfolders.c.id.in_(vfolder_ids)
-    if vfolder_info_len == 0:
-        return
-    if vfolder_info_len == 1:
-        cond = vfolders.c.id == vfolder_ids[0]
-
-    now = datetime.now(UTC)
-
-    if update_status.is_deletable(force):
-        select_stmt = sa.select(VFolderRow).where(VFolderRow.id.in_(vfolder_ids))
-        async with engine.begin_readonly_session() as db_session:
-            for vf_row in await db_session.scalars(select_stmt):
-                mount_sessions = await get_sessions_by_mounted_folder(
-                    db_session, VFolderID.from_row(vf_row)
-                )
-                if mount_sessions:
-                    session_ids = [str(s) for s in mount_sessions]
-                    raise InvalidAPIParameters(
-                        f"Cannot delete the vfolder. The vfolder(id: {vf_row.id}) is mounted on sessions(ids: {session_ids})"
-                    )
-
-    if update_status == VFolderOperationStatus.DELETE_ERROR:
-        folder_ids: list[uuid.UUID] = []
-        select_stmt = sa.select(VFolderRow).where(VFolderRow.id.in_(vfolder_ids))
-        async with engine.begin_readonly_session() as db_session:
-            for vf_row in await db_session.scalars(select_stmt):
-                if vf_row.status == VFolderOperationStatus.DELETE_PENDING:
-                    folder_ids.append(vf_row.id)
-        cond = VFolderRow.id.in_(folder_ids)
-
-    async def _update() -> None:
-        async with engine.begin_session() as db_session:
-            values = {
-                "status": update_status,
-                "status_changed": now,
-                "status_history": sql_json_merge(
-                    vfolders.c.status_history,
-                    (),
-                    {
-                        update_status.name: now.isoformat(),
-                    },
-                ),
-            }
-            if update_status == VFolderOperationStatus.DELETE_ONGOING:
-                values["name"] = VFolderRow.name + f"_deleted_{now.strftime('%Y-%m-%dT%H%M%S%z')}"
-            query = sa.update(vfolders).values(**values).where(cond)
-            await db_session.execute(query)
-
-    await execute_with_retry(_update)
-    if do_log:
-        log.debug(
-            "vfolder status updated",
-            vfolder_ids=", ".join(str(x) for x in vfolder_ids),
-            vfolder_status=update_status,
-        )
 
 
 async def ensure_quota_scope_accessible_by_user(
