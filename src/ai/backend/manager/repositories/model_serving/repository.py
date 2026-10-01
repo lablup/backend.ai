@@ -85,7 +85,6 @@ from ai.backend.manager.models.routing.row import RoutingRow
 from ai.backend.manager.models.routing.searchable_fields import ReplicaSearchableFields
 from ai.backend.manager.models.routing.searchers import RoutingDataSearcher
 from ai.backend.manager.models.runtime_variant.row import RuntimeVariantRow
-from ai.backend.manager.models.session.row import KernelLoadingStrategy, SessionRow
 from ai.backend.manager.models.specs.pagination import NoPagination
 from ai.backend.manager.models.user.row import UserRole, UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine, execute_with_retry
@@ -703,21 +702,6 @@ class ModelServingRepository:
             if conn is None:
                 raise DatabaseConnectionUnavailable("Database connection is not available")
             return await resolve_group_name_or_id(conn, domain_name, group_name_or_id)
-
-    @model_serving_repository_resilience.apply()
-    async def get_session_by_id(
-        self, session_id: uuid.UUID, kernel_loading_strategy: KernelLoadingStrategy
-    ) -> SessionRow | None:
-        """
-        Get session by ID with specified kernel loading strategy.
-        """
-        async with self._db.begin_readonly_session_read_committed() as session:
-            try:
-                return await SessionRow.get_session(
-                    session, session_id, None, kernel_loading_strategy=kernel_loading_strategy
-                )
-            except NoResultFound:
-                return None
 
     @model_serving_repository_resilience.apply()
     async def get_image_by_id(self, image_id: uuid.UUID) -> ImageData:

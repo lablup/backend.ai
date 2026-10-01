@@ -131,7 +131,6 @@ __all__ = (
     "KernelLoadingStrategy",
     "SessionDependencyRow",
     "SessionRow",
-    "check_all_dependencies",
     "handle_session_exception",
 )
 
@@ -1227,27 +1226,6 @@ class SessionDependencyRow(Base):
         # constraint
         sa.PrimaryKeyConstraint("session_id", "depends_on", name="sess_dep_pk"),
     )
-
-
-async def check_all_dependencies(
-    db_session: SASession,
-    sess_ctx: SessionRow,
-) -> list[SessionRow]:
-    j = sa.join(
-        SessionDependencyRow,
-        SessionRow,
-        SessionDependencyRow.depends_on == SessionDependencyRow.session_id,
-    )
-    query = (
-        sa.select(SessionRow.id, SessionRow.name, SessionRow.result)
-        .select_from(j)
-        .where(SessionDependencyRow.session_id == sess_ctx.id)
-    )
-    result = await db_session.execute(query)
-    rows = result.scalars().all()
-    return [
-        sess_row for sess_row in rows if SessionResult(sess_row.result) != SessionResult.SUCCESS
-    ]
 
 
 DEFAULT_SESSION_ORDERING = [
