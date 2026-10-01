@@ -108,6 +108,13 @@ pytest-dependency>=0.6.0
 pytest-mock>=3.14.0
 testcontainers[postgres,redis,minio]~=4.13.3
 
+# installed by pants [pytest] and [mypy] from this resolve
+mypy==1.18.2
+pytest-asyncio>=0.24.0
+pytest-cov>=5.0
+pytest-custom_exit_code>=0.3.0
+pytest-timeout>=2.3.1
+
 # type stubs
 types-six
 types-setuptools

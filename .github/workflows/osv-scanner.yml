@@ -31,11 +31,8 @@ jobs:
       # requirements.txt holds only lower bounds; the uv lockfiles hold the installed versions.
       scan-args: |-
         --lockfile=uv.lock:python.lock
-        --lockfile=uv.lock:tools/black.lock
         --lockfile=uv.lock:tools/coverage-py.lock
-        --lockfile=uv.lock:tools/mypy.lock
         --lockfile=uv.lock:tools/pants-plugins.lock
-        --lockfile=uv.lock:tools/pytest.lock
         --lockfile=uv.lock:tools/setuptools.lock
         --lockfile=uv.lock:tools/towncrier.lock
         --lockfile=uv.lock:python-kernel.lock
