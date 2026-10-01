@@ -13,19 +13,6 @@ from ai.backend.common.exception import (
 )
 
 
-class InvalidWatcherTokenError(BackendAIError, web.HTTPForbidden):
-    error_type = "https://api.backend.ai/probs/agent/invalid-watcher-token"
-    error_title = "Invalid watcher token."
-
-    @override
-    def error_code(self) -> ErrorCode:
-        return ErrorCode(
-            domain=ErrorDomain.WATCHER,
-            operation=ErrorOperation.AUTH,
-            error_detail=ErrorDetail.FORBIDDEN,
-        )
-
-
 class InvalidMountNameError(BackendAIError, web.HTTPBadRequest):
     error_type = "https://api.backend.ai/probs/agent/invalid-mount-name"
     error_title = "The volume name must point to a directory under the mount prefix."

@@ -18,15 +18,11 @@ import trafaret as t
 from aiohttp import web
 from setproctitle import setproctitle
 
-<<<<<<< HEAD
-=======
 from ai.backend.agent.errors.watcher import (
     InvalidMountNameError,
-    InvalidWatcherTokenError,
     VolumeMountFailedError,
     VolumeUnmountFailedError,
 )
->>>>>>> 708850309 (fix(BA-8232): reject watcher mount names that resolve outside the mount prefix (#15161))
 from ai.backend.common import config, utils
 from ai.backend.common import validators as tx
 from ai.backend.common.etcd import AsyncEtcd, ConfigScopes
@@ -55,15 +51,10 @@ async def auth_middleware(
             log.info(repr(e))
             message = "Agent is not loaded with systemctl."
             return web.json_response({"message": message}, status=HTTPStatus.OK)
-<<<<<<< HEAD
-        except Exception as e:
-            log.exception(repr(e))
-=======
         except BackendAIError:
             raise
-        except Exception:
-            log.exception("watcher request failed")
->>>>>>> 708850309 (fix(BA-8232): reject watcher mount names that resolve outside the mount prefix (#15161))
+        except Exception as e:
+            log.exception(repr(e))
             raise
     log.info("invalid requested token")
     return web.HTTPForbidden()
@@ -216,15 +207,9 @@ async def handle_mount(request: web.Request) -> web.Response:
     err = raw_err.decode("utf8")
     await proc.wait()
     if err:
-<<<<<<< HEAD
         log.error("Mount error: " + err)
-        return web.Response(text=err, status=HTTPStatus.INTERNAL_SERVER_ERROR)
-    log.info("Mounted " + params["name"] + " on " + mount_prefix)
-=======
-        log.error("volume mount failed", mountpoint=mountpoint, stderr=err)
         raise VolumeMountFailedError(extra_msg=err)
-    log.info("volume mounted", volume_name=params["name"], mount_prefix=mount_prefix)
->>>>>>> 708850309 (fix(BA-8232): reject watcher mount names that resolve outside the mount prefix (#15161))
+    log.info("Mounted " + params["name"] + " on " + mount_prefix)
     if params["edit_fstab"]:
         fstab_path = params["fstab_path"] if params["fstab_path"] else "/etc/fstab"
         # FIXME: Remove ignore if https://github.com/python/typeshed/pull/4650 is released
@@ -258,15 +243,9 @@ async def handle_umount(request: web.Request) -> web.Response:
     err = raw_err.decode("utf8")
     await proc.wait()
     if err:
-<<<<<<< HEAD
         log.error("Unmount error: " + err)
-        return web.Response(text=err, status=HTTPStatus.INTERNAL_SERVER_ERROR)
-    log.info("Unmounted " + params["name"] + " from " + mount_prefix)
-=======
-        log.error("volume unmount failed", mountpoint=mountpoint, stderr=err)
         raise VolumeUnmountFailedError(extra_msg=err)
-    log.info("volume unmounted", volume_name=params["name"], mount_prefix=mount_prefix)
->>>>>>> 708850309 (fix(BA-8232): reject watcher mount names that resolve outside the mount prefix (#15161))
+    log.info("Unmounted " + params["name"] + " from " + mount_prefix)
     try:
         mountpoint.rmdir()  # delete directory if empty
     except OSError:
