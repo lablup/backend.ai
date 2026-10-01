@@ -214,6 +214,8 @@ class ImageRow(CreatedAtMixin, Base):
     # Delete it together with the gql_legacy cleanup.
     aliases = relationship("ImageAliasRow")
     # sessions = relationship("SessionRow", back_populates="image_row")
+    # Read only by ImagePermissionContextBuilder (legacy RBAC) in this file; v2 joins
+    # ContainerRegistryRow directly. Delete it together with the legacy RBAC cleanup.
     registry_row = relationship(
         "ContainerRegistryRow",
         primaryjoin=_get_container_registry_join_condition,

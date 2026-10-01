@@ -84,6 +84,7 @@ from ai.backend.manager.errors.resource import DomainNotFound, ResourceGroupNotF
 from ai.backend.manager.errors.resource_slot import AgentResourceCapacityExceeded
 from ai.backend.manager.exceptions import ErrorStatusInfo
 from ai.backend.manager.models.agent.row import AgentRow
+from ai.backend.manager.models.container_registry.row import ContainerRegistryRow
 from ai.backend.manager.models.domain.row import DomainRow, domains, query_domain_dotfiles
 from ai.backend.manager.models.image.row import ImageRow
 from ai.backend.manager.models.kernel.creators import KernelCreator
@@ -3597,17 +3598,18 @@ class ScheduleDBSource:
 
         # Query all images at once with registry info using ImageConditions
         condition = ImageConditions.by_identifiers(identifiers)
-        stmt = sa.select(ImageRow).where(condition()).options(selectinload(ImageRow.registry_row))
-
+        stmt = (
+            sa.select(ImageRow, ContainerRegistryRow)
+            .join(ContainerRegistryRow, ImageRow.registry_id == ContainerRegistryRow.id)
+            .where(condition())
+        )
         result = await db_sess.execute(stmt)
-        image_rows = result.scalars().all()
 
         # Convert to ImageConfigData
         image_configs: dict[UUID, ImageConfigData] = {}
-        for image_row in image_rows:
+        for image_row, registry_row in result.tuples().all():
             try:
                 img_ref = image_row.image_ref
-                registry_row = image_row.registry_row
 
                 image_config = ImageConfigData(
                     id=image_row.id,
