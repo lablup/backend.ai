@@ -186,6 +186,7 @@ from pathlib import Path
 from pprint import pformat
 from typing import Annotated, Any, Literal, Self, override
 
+import sqlalchemy as sa
 from pydantic import (
     AliasChoices,
     ConfigDict,
@@ -277,16 +278,30 @@ class DatabaseConfig(BaseConfigSchema):
         ),
     ]
     addr: Annotated[
-        HostPortPair,
-        Field(default=HostPortPair(host="127.0.0.1", port=5432)),
+        HostPortPair | None,
+        Field(default=None),
         BackendAIConfigMeta(
             description=(
                 "Network address and port of the PostgreSQL database server. "
-                "Default is the standard PostgreSQL port (5432) on localhost. "
-                "In production, point this to your database server or cluster endpoint."
+                "Read as a one-member addrs list when addrs is not set."
             ),
             added_version="25.8.0",
-            example=ConfigExample(local="127.0.0.1:5432", prod="db.example.com:5432"),
+            deprecated_version=NEXT_RELEASE_VERSION,
+            deprecation_hint="Use addrs instead.",
+        ),
+    ]
+    addrs: Annotated[
+        list[HostPortPair],
+        Field(default_factory=lambda: [HostPortPair(host="127.0.0.1", port=5432)], min_length=1),
+        BackendAIConfigMeta(
+            description=(
+                "Addresses of the PostgreSQL cluster members. "
+                "List every member of an HA cluster, or a single address of a standalone "
+                "server or a proxy in front of the cluster."
+            ),
+            added_version=NEXT_RELEASE_VERSION,
+            composite=CompositeType.LIST,
+            example=ConfigExample(local="127.0.0.1:5432", prod="db1.example.com:5432"),
         ),
     ]
     name: Annotated[
@@ -424,6 +439,29 @@ class DatabaseConfig(BaseConfigSchema):
             example=ConfigExample(local="0", prod="30"),
         ),
     ]
+
+    @model_validator(mode="before")
+    @classmethod
+    def _read_addr_as_addrs(cls, data: Any) -> Any:
+        if (
+            not isinstance(data, Mapping)
+            or data.get("addr") is None
+            or data.get("addrs") is not None
+        ):
+            return data
+        return {**data, "addrs": [data["addr"]]}
+
+    def sqlalchemy_url(self) -> sa.engine.URL:
+        return sa.engine.URL.create(
+            "postgresql+asyncpg",
+            username=self.user,
+            password=self.password,
+            database=self.name,
+            query={
+                "host": ",".join(addr.host for addr in self.addrs),
+                "port": ",".join(str(addr.port) for addr in self.addrs),
+            },
+        )
 
 
 class EventLoopType(enum.StrEnum):

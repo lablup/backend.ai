@@ -9,7 +9,6 @@ from typing import TYPE_CHECKING, Any
 
 import sqlalchemy as sa
 from sqlalchemy.engine import create_engine as _create_engine
-from yarl import URL
 
 from ai.backend.common.exception import DatabaseError
 from ai.backend.common.json import ExtendedJSONEncoder
@@ -44,15 +43,9 @@ async def connect_database(
     db_config: DatabaseConfig,
     isolation_level: str = "SERIALIZABLE",
 ) -> AsyncIterator[ExtendedAsyncSAEngine]:
-    db_url = (
-        URL(f"postgresql+asyncpg://{db_config.addr.host}/{db_config.name}")
-        .with_port(db_config.addr.port)
-        .with_user(db_config.user)
-    )
-    if db_config.password is not None:
-        db_url = db_url.with_password(db_config.password)
+    db_url = db_config.sqlalchemy_url()
 
-    version_check_db = create_async_engine(str(db_url))
+    version_check_db = create_async_engine(db_url)
     async with version_check_db.begin() as conn:
         result = await conn.execute(sa.text("show server_version"))
         version_str = result.scalar()
@@ -64,7 +57,7 @@ async def connect_database(
     await version_check_db.dispose()
 
     db = create_async_engine(
-        str(db_url),
+        db_url,
         connect_args=pgsql_connect_opts,
         pool_size=db_config.pool_size,
         pool_recycle=db_config.pool_recycle,
