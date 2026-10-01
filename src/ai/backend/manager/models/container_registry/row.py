@@ -38,6 +38,16 @@ def _get_association_join_condition() -> sa.ColumnElement[bool]:
 class ContainerRegistryRow(Base):
     __tablename__ = "container_registries"
 
+    # A Harbor registry addresses images through a project, so the column cannot be
+    # empty there and the name has to be one Harbor accepts. The other types ignore it.
+    __table_args__ = (
+        sa.CheckConstraint(
+            "type NOT IN ('harbor', 'harbor2')"
+            " OR (project IS NOT NULL AND project ~ '^[a-z0-9]+([._-][a-z0-9]+)*$')",
+            name="harbor_project",
+        ),
+    )
+
     id: Mapped[ContainerRegistryID] = mapped_column(
         "id",
         GUID(ContainerRegistryID),
