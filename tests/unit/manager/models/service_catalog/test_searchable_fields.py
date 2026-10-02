@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import uuid
 from datetime import UTC, datetime
-from typing import Any, cast
+from typing import Any
 
 import pytest
 
@@ -20,24 +20,23 @@ from ai.backend.manager.models.service_catalog.searchable_fields import (
 from ai.backend.manager.models.service_catalog.types import ServiceCatalogEndpointRowJson
 
 
-def _endpoint_json(service_id: uuid.UUID, role: str, **overrides: Any) -> dict[str, Any]:
-    endpoint: dict[str, Any] = {
+def _endpoint_json(
+    service_id: uuid.UUID,
+    role: str,
+    *,
+    port: int = 8080,
+    metadata: dict[str, Any] | None,
+) -> ServiceCatalogEndpointRowJson:
+    return {
         "id": str(uuid.uuid4()),
         "service_id": str(service_id),
         "role": role,
         "scope": "public",
         "address": "10.0.0.1",
-        "port": 8080,
+        "port": port,
         "protocol": "http",
-        "metadata": {"weight": 1},
+        "metadata": metadata,
     }
-    endpoint.update(overrides)
-    return endpoint
-
-
-def _as_endpoint_rows(endpoints: list[dict[str, Any]]) -> list[ServiceCatalogEndpointRowJson]:
-    """The rows as the searcher's json_agg hands them over, unchecked against the keys."""
-    return cast(list[ServiceCatalogEndpointRowJson], endpoints)
 
 
 class TestServiceCatalogToData:
@@ -61,25 +60,24 @@ class TestServiceCatalogToData:
     @pytest.fixture
     def service_with_two_endpoints(
         self, service_row: ServiceCatalogRow
-    ) -> tuple[ServiceCatalogRow, list[dict[str, Any]]]:
+    ) -> tuple[ServiceCatalogRow, list[ServiceCatalogEndpointRowJson]]:
         endpoints = [
-            _endpoint_json(service_row.id, "main"),
-            _endpoint_json(service_row.id, "health", port=8081),
+            _endpoint_json(service_row.id, "main", metadata={"weight": 1}),
+            _endpoint_json(service_row.id, "health", port=8081, metadata={"weight": 1}),
         ]
-        service_row.endpoint_rows = _as_endpoint_rows(endpoints)
+        service_row.endpoint_rows = endpoints
         return service_row, endpoints
 
     @pytest.fixture
     def service_with_null_metadata_endpoint(
         self, service_row: ServiceCatalogRow
     ) -> ServiceCatalogRow:
-        service_row.endpoint_rows = _as_endpoint_rows([
-            _endpoint_json(service_row.id, "main", metadata=None)
-        ])
+        service_row.endpoint_rows = [_endpoint_json(service_row.id, "main", metadata=None)]
         return service_row
 
     def test_endpoint_rows_become_endpoints_with_their_own_id_types(
-        self, service_with_two_endpoints: tuple[ServiceCatalogRow, list[dict[str, Any]]]
+        self,
+        service_with_two_endpoints: tuple[ServiceCatalogRow, list[ServiceCatalogEndpointRowJson]],
     ) -> None:
         row, endpoints = service_with_two_endpoints
 
