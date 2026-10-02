@@ -72,6 +72,27 @@ class StorageBackendCapabilities(BackendAISchema):
     supported: frozenset[StorageBackendCapability] = Field(default_factory=frozenset)
 
 
+class StorageVolumeUsageField(enum.StrEnum):
+    """A usage figure a volume may show a user, named as the ``exposed_volume_info``
+    setting names it."""
+
+    PERCENTAGE = "percentage"
+    USED_BYTES = "used_bytes"
+    CAPACITY_BYTES = "capacity_bytes"
+
+
+class StorageVolumeUsageExposure(BackendAISchema):
+    """Which usage figures a volume shows a user.
+
+    A percentage tells how full the volume is without disclosing its size, which is why
+    it alone is exposed by default.
+    """
+
+    exposed: frozenset[StorageVolumeUsageField] = Field(
+        default_factory=lambda: frozenset({StorageVolumeUsageField.PERCENTAGE})
+    )
+
+
 class ServiceStorageStatus(enum.StrEnum):
     """How a service currently sees a storage backend or volume it relates to.
 

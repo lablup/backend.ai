@@ -156,9 +156,12 @@ def upgrade() -> None:
             server_default=sa.text("'3600 seconds'"),
             nullable=False,
         ),
-        sa.Column("expose_percentage", sa.Boolean(), server_default=sa.true(), nullable=False),
-        sa.Column("expose_used_bytes", sa.Boolean(), server_default=sa.false(), nullable=False),
-        sa.Column("expose_capacity_bytes", sa.Boolean(), server_default=sa.false(), nullable=False),
+        sa.Column(
+            "usage_exposure",
+            pgsql.JSONB(),
+            server_default=sa.text("""'{"exposed": ["percentage"]}'::jsonb"""),
+            nullable=False,
+        ),
         *_timestamp_columns(),
         sa.PrimaryKeyConstraint("id", name=op.f("pk_storage_volumes")),
         sa.ForeignKeyConstraint(
@@ -217,7 +220,7 @@ def upgrade() -> None:
             ["storage_volume_id"],
             ["storage_volumes.id"],
             name="fk_resource_group_volume_offers_storage_volume_id",
-            ondelete="CASCADE",
+            ondelete="RESTRICT",
         ),
     )
 
@@ -236,7 +239,7 @@ def upgrade() -> None:
         "storage_volumes",
         ["storage_volume_id"],
         ["id"],
-        ondelete="SET NULL",
+        ondelete="RESTRICT",
     )
 
     storage_backend_types = sa.table(
