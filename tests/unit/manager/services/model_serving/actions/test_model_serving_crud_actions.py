@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import uuid
 from collections.abc import Iterator
+from datetime import UTC, datetime
 from typing import Any, cast
 from unittest.mock import AsyncMock, MagicMock
 
@@ -23,8 +24,8 @@ from ai.backend.common.events.hub import EventHub
 from ai.backend.common.types import SessionId
 from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
 from ai.backend.manager.config.provider import ManagerConfigProvider
-from ai.backend.manager.data.deployment.types import RouteStatus
-from ai.backend.manager.data.model_serving.types import MutationResult
+from ai.backend.manager.data.deployment.types import RouteHealthStatus, RouteStatus
+from ai.backend.manager.data.model_serving.types import MutationResult, RoutingData
 from ai.backend.manager.errors.api import InvalidAPIParameters
 from ai.backend.manager.errors.service import (
     EndpointAccessForbiddenError,
@@ -487,6 +488,24 @@ class TestDeleteRoute(ModelServingCRUDBaseFixtures):
             domain=user_data.domain_name,
         )
 
+    def _make_route_data(
+        self,
+        route_id: uuid.UUID,
+        service_id: uuid.UUID,
+        status: RouteStatus,
+        session: uuid.UUID | None,
+    ) -> RoutingData:
+        return RoutingData(
+            id=route_id,
+            endpoint=service_id,
+            session=session,
+            status=status,
+            health_status=RouteHealthStatus.HEALTHY,
+            traffic_ratio=1.0,
+            created_at=datetime.now(UTC),
+            error_data={},
+        )
+
     async def test_healthy_route_deletion_success(
         self,
         model_serving_service: ModelServingService,
@@ -504,8 +523,8 @@ class TestDeleteRoute(ModelServingCRUDBaseFixtures):
             user_data
         )
         session_id = uuid.uuid4()
-        mock_get_route_by_id.return_value = MagicMock(
-            status=RouteStatus.RUNNING, session=session_id
+        mock_get_route_by_id.return_value = self._make_route_data(
+            route_id, service_id, RouteStatus.RUNNING, session_id
         )
 
         action = DeleteRouteAction(deployment_id=DeploymentID(service_id), route_id=route_id)
@@ -533,7 +552,9 @@ class TestDeleteRoute(ModelServingCRUDBaseFixtures):
         mock_get_endpoint_access_validation_data.return_value = self._make_validation_data(
             user_data
         )
-        mock_get_route_by_id.return_value = MagicMock(status=RouteStatus.PROVISIONING)
+        mock_get_route_by_id.return_value = self._make_route_data(
+            route_id, service_id, RouteStatus.PROVISIONING, None
+        )
 
         action = DeleteRouteAction(deployment_id=DeploymentID(service_id), route_id=route_id)
         with pytest.raises(InvalidAPIParameters, match="PROVISIONING"):
@@ -555,7 +576,9 @@ class TestDeleteRoute(ModelServingCRUDBaseFixtures):
         mock_get_endpoint_access_validation_data.return_value = self._make_validation_data(
             user_data
         )
-        mock_get_route_by_id.return_value = MagicMock(status=RouteStatus.RUNNING, session=None)
+        mock_get_route_by_id.return_value = self._make_route_data(
+            route_id, service_id, RouteStatus.RUNNING, None
+        )
 
         action = DeleteRouteAction(deployment_id=DeploymentID(service_id), route_id=route_id)
         result = await model_serving_service.delete_route(action)

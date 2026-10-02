@@ -11,8 +11,11 @@ import pytest
 
 from ai.backend.common.data.endpoint.types import EndpointLifecycle
 from ai.backend.common.data.entity.deployment import DeploymentID
+from ai.backend.common.data.entity.deployment_revision import DeploymentRevisionID
 from ai.backend.common.data.entity.domain import DomainID
+from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.replica import ReplicaID
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.types import ResourceSlot
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.deployment.types import (
@@ -115,8 +118,8 @@ class TestGetRouteById:
         domain_name = f"d-{suffix}"
         domain_id = DomainID(uuid.uuid4())
         resource_group_name = f"sg-{suffix}"
-        user_id = uuid.uuid4()
-        project_id = uuid.uuid4()
+        user_id = UserID(uuid.uuid4())
+        project_id = ProjectID(uuid.uuid4())
         endpoint_id = DeploymentID(uuid.uuid4())
         other_endpoint_id = DeploymentID(uuid.uuid4())
         route_id = ReplicaID(uuid.uuid4())
@@ -206,7 +209,7 @@ class TestGetRouteById:
                     health_status=RouteHealthStatus.HEALTHY,
                     traffic_status=RouteTrafficStatus.ACTIVE,
                     traffic_ratio=1.0,
-                    revision=uuid.uuid4(),
+                    revision=DeploymentRevisionID(uuid.uuid4()),
                 )
             )
 

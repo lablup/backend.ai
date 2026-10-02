@@ -13,9 +13,12 @@ import sqlalchemy as sa
 
 from ai.backend.common.data.endpoint.types import EndpointLifecycle
 from ai.backend.common.data.entity.deployment import DeploymentID
+from ai.backend.common.data.entity.deployment_revision import DeploymentRevisionID
 from ai.backend.common.data.entity.domain import DomainID
+from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.replica import ReplicaID
 from ai.backend.common.data.entity.resource_group import ResourceGroupID
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.types import (
     ClusterMode,
     ResourceSlot,
@@ -134,13 +137,13 @@ class TestRouteSessionUpdates:
         domain_id = DomainID(uuid.uuid4())
         resource_group_id = ResourceGroupID(uuid.uuid4())
         resource_group_name = f"sg-{suffix}"
-        user_id = uuid.uuid4()
-        project_id = uuid.uuid4()
+        user_id = UserID(uuid.uuid4())
+        project_id = ProjectID(uuid.uuid4())
         endpoint_id = DeploymentID(uuid.uuid4())
         session_id = SessionId(uuid.uuid4())
         session_route_id = ReplicaID(uuid.uuid4())
         failed_route_id = ReplicaID(uuid.uuid4())
-        revision_id = uuid.uuid4()
+        revision_id = DeploymentRevisionID(uuid.uuid4())
 
         async with db_with_cleanup.begin_session() as db_sess:
             db_sess.add(
