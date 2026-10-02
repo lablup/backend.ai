@@ -86,7 +86,7 @@ NEXT_DEV_VERSION={next_version} scripts/release.sh {target_version} [webui_versi
    **Report its output to the user**: a retirement means that version stops receiving backports and drops out of the installer channel selection from that point on.
 6. Generates sample config files
 7. Generates API docs (OpenAPI, GraphQL schema)
-8. Runs quality checks: `pants tailor --check`, `pants check ::`
+8. Runs quality checks: `pants tailor --check`, `pants check ::` (final and patch releases only; skipped for `a`/`rc`, whose release PR CI runs the same checks)
 9. Commits everything as `release: {target_version}`
 10. For sprint releases only (`{year}.{sprint}.0`): advances `NEXT_RELEASE_VERSION` in `meta.py` to the next sprint and commits it separately as `chore: bump NEXT_RELEASE_VERSION to {next_version}`
 
