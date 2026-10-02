@@ -414,8 +414,8 @@ def database(
     and install the table schema using alembic.
     """
     db_url = (
-        yarl.URL(f"postgresql+asyncpg://{bootstrap_config.db.addr.host}/testing")
-        .with_port(bootstrap_config.db.addr.port)
+        yarl.URL(f"postgresql+asyncpg://{bootstrap_config.db.addrs[0].host}/testing")
+        .with_port(bootstrap_config.db.addrs[0].port)
         .with_user(bootstrap_config.db.user)
     )
     if bootstrap_config.db.password is not None:
@@ -542,8 +542,8 @@ async def db_engine(
 ) -> AsyncIterator[SAEngine]:
     """Provide a function-scoped SQLAlchemy async engine connected to the test database."""
     db_url = (
-        yarl.URL(f"postgresql+asyncpg://{bootstrap_config.db.addr.host}/{test_db}")
-        .with_port(bootstrap_config.db.addr.port)
+        yarl.URL(f"postgresql+asyncpg://{bootstrap_config.db.addrs[0].host}/{test_db}")
+        .with_port(bootstrap_config.db.addrs[0].port)
         .with_user(bootstrap_config.db.user)
     )
     if bootstrap_config.db.password is not None:
