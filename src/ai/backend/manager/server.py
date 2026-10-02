@@ -33,9 +33,6 @@ import click
 import uvloop
 from aiohttp import web
 from aiohttp.typedefs import Handler, Middleware
-from opentelemetry.instrumentation.aiohttp_server import (
-    middleware as otel_server_middleware,
-)
 from setproctitle import setproctitle
 
 from ai.backend.common.cli import LazyGroup
@@ -51,8 +48,8 @@ from ai.backend.common.utils import env_info
 from ai.backend.logging import BraceStyleAdapter, Logger, LogLevel
 from ai.backend.logging.otel import (
     OpenTelemetrySpec,
+    build_otel_server_middleware,
     instrument_aiohttp_client,
-    instrument_aiohttp_server,
 )
 
 from . import __version__
@@ -393,10 +390,6 @@ async def server_main(
         config_provider = dep_resources.bootstrap.config_provider
         await manager_init_stack.enter_async_context(manager_status_ctx(pidx, config_provider))
 
-        # TODO: Remove manual middleware injection once the manager startup is
-        # decoupled from the aiohttp Application lifecycle. Currently root_app is
-        # instantiated before OTel config is available, so instrument_aiohttp_server()
-        # (which patches the class via setattr) cannot take effect automatically.
         if config_provider.config.otel.enabled:
             meta = dep_resources.system.sd_loop.metadata
             otel_spec = OpenTelemetrySpec(
@@ -410,9 +403,8 @@ async def server_main(
                 max_export_batch_size=config_provider.config.otel.max_export_batch_size,
             )
             BraceStyleAdapter.apply_otel(otel_spec)
-            instrument_aiohttp_server()
             instrument_aiohttp_client()
-            root_app.middlewares.insert(0, otel_server_middleware)
+            root_app.middlewares.insert(0, build_otel_server_middleware())
 
         # Plugin webapps should be loaded before runner.setup() because root_app is frozen upon on_startup event.
         await manager_init_stack.enter_async_context(

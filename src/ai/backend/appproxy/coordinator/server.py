@@ -128,7 +128,7 @@ from ai.backend.common.types import (
 )
 from ai.backend.common.utils import env_info
 from ai.backend.logging import BraceStyleAdapter, Logger, LogLevel
-from ai.backend.logging.otel import OpenTelemetrySpec
+from ai.backend.logging.otel import OpenTelemetrySpec, build_otel_server_middleware
 
 from . import __version__
 from .config import ServerConfig
@@ -991,6 +991,8 @@ def build_root_app(
             build_api_metric_middleware(root_ctx.metrics.api),
         ]
     )
+    if local_config.otel.enabled:
+        app.middlewares.insert(0, build_otel_server_middleware(parent_required_prefixes=("/api/",)))
     global_exception_handler = functools.partial(handle_loop_error, root_ctx)
     loop = asyncio.get_running_loop()
     loop.set_exception_handler(global_exception_handler)

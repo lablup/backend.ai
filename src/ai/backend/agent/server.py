@@ -57,10 +57,12 @@ from ai.backend.agent.health.docker import DockerHealthChecker
 from ai.backend.agent.metrics.metric import RPCMetricObserver
 from ai.backend.agent.monitor import AgentErrorPluginContext, AgentStatsPluginContext
 from ai.backend.agent.resources import collect_device_capacities, scan_gpu_alloc_map
+from ai.backend.agent.rpc.context import with_rpc_trace
 from ai.backend.agent.rpc.health.registry import register_health_domain
 from ai.backend.agent.rpc.hwinfo.registry import register_hwinfo_domain
 from ai.backend.agent.rpc.kernel.registry import register_kernel_domain
 from ai.backend.agent.rpc.middlewares.metric import build_metric_middleware
+from ai.backend.agent.rpc.middlewares.tracing import build_tracing_middleware
 from ai.backend.agent.rpc.routing import AgentRPCRegistry
 from ai.backend.agent.runtime import AgentRuntime
 from ai.backend.agent.types import AgentBackend
@@ -137,7 +139,7 @@ from ai.backend.common.types import (
     safe_print_redis_config,
 )
 from ai.backend.logging import BraceStyleAdapter, Logger, LogLevel
-from ai.backend.logging.otel import OpenTelemetrySpec
+from ai.backend.logging.otel import OpenTelemetrySpec, build_otel_server_middleware
 
 from . import __version__ as VERSION
 from .config.unified import (
@@ -189,6 +191,7 @@ class RPCFunctionRegistry:
         meth: Callable[..., Coroutine[None, None, Any]],
     ) -> Callable[[AgentRPCServer, RPCMessage], Coroutine[None, None, Any]]:
         @functools.wraps(meth)
+        @_trace_rpc(meth.__name__)
         @_collect_metrics(self._metric_observer, meth.__name__)
         async def _inner(self_: AgentRPCServer, request: RPCMessage) -> Any:
             try:
@@ -226,6 +229,7 @@ class RPCFunctionRegistryV2:
         meth: Callable[..., Coroutine[None, None, AbstractAgentResp]],
     ) -> Callable[[AgentRPCServer, RPCMessage], Coroutine[None, None, Any]]:
         @functools.wraps(meth)
+        @_trace_rpc(meth.__name__)
         @_collect_metrics(self._metric_observer, meth.__name__)
         async def _inner(self_: AgentRPCServer, request: RPCMessage) -> Any:
             try:
@@ -249,6 +253,18 @@ class RPCFunctionRegistryV2:
 
         self.functions.add(meth.__name__)
         return _inner
+
+
+def _trace_rpc(method_name: str) -> Callable[..., Any]:
+    def decorator(meth: Callable[..., Any]) -> Callable[[AgentRPCServer, RPCMessage], Any]:
+        @functools.wraps(meth)
+        async def _inner(self: AgentRPCServer, request: RPCMessage) -> Any:
+            with with_rpc_trace(request, method_name):
+                return await meth(self, request)
+
+        return _inner
+
+    return decorator
 
 
 def _collect_metrics(observer: RPCMetricObserver, method_name: str) -> Callable[..., Any]:
@@ -465,7 +481,10 @@ class AgentRPCServer(aobject):
         # hard-coded.
         self._rpc_registry = AgentRPCRegistry(
             runtime=self.runtime,
-            middlewares=[build_metric_middleware(RPCMetricObserver.instance())],
+            middlewares=[
+                build_tracing_middleware(),
+                build_metric_middleware(RPCMetricObserver.instance()),
+            ],
         )
         register_kernel_domain(self._rpc_registry)
         register_health_domain(self._rpc_registry, health_probe=self.health_probe)
@@ -1520,6 +1539,8 @@ async def agent_server_ctx(
     )
     app = build_root_server()
     app["health_probe"] = agent_server.health_probe
+    if local_config.otel.enabled:
+        app.middlewares.insert(0, build_otel_server_middleware())
     runner = web.AppRunner(app)
     await runner.setup()
     internal_addr = local_config.agent_common.internal_addr.to_legacy()

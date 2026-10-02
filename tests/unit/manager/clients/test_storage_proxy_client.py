@@ -1,12 +1,15 @@
 from __future__ import annotations
 
 import asyncio
+import contextlib
 from collections.abc import Callable, Coroutine
 from typing import Any
 
 import pytest
 from aiohttp import ClientTimeout, web
 from aiohttp.test_utils import TestClient
+from opentelemetry import trace
+from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
 
 from ai.backend.common.configs.client import HttpTimeoutConfig
 from ai.backend.common.exception import ErrorDetail, ErrorDomain, ErrorOperation, PassthroughError
@@ -53,6 +56,32 @@ def storage_proxy_client_factory(
 
 
 class TestStorageProxyClient:
+    @pytest.mark.parametrize("in_span", [True, False])
+    async def test_traceparent_header_follows_the_current_span(
+        self,
+        storage_proxy_client_factory: StorageProxyClientFactory,
+        span_exporter: InMemorySpanExporter,
+        in_span: bool,
+    ) -> None:
+        received: list[str | None] = []
+
+        async def handler(request: web.Request) -> web.Response:
+            received.append(request.headers.get("traceparent"))
+            return web.Response(status=204)
+
+        client = await storage_proxy_client_factory("echo", handler)
+        expected: str | None = None
+        with contextlib.ExitStack() as stack:
+            if in_span:
+                span = stack.enter_context(
+                    trace.get_tracer(__name__).start_as_current_span("manager")
+                )
+                context = span.get_span_context()
+                expected = f"00-{context.trace_id:032x}-{context.span_id:016x}-01"
+            await client.request(method="GET", url="echo", request_timeout=DEFAULT_TIMEOUT)
+
+        assert received == [expected]
+
     async def test_client_gracefully_handle_non_json_response(
         self, storage_proxy_client_factory: StorageProxyClientFactory
     ) -> None:

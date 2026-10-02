@@ -21,9 +21,8 @@ import attrs
 from aiomonitor.task import preserve_termination_log
 from aiotools.taskgroup import PersistentTaskGroup
 from aiotools.taskgroup.types import AsyncExceptionHandler
+from opentelemetry.trace import SpanKind
 
-from ai.backend.common.contexts.request_id import current_request_id
-from ai.backend.common.contexts.user import current_user, triggered_user
 from ai.backend.common.message_queue.message import MessageId, MQMessage
 from ai.backend.common.message_queue.payload import (
     AnycastMessagePayload,
@@ -527,7 +526,10 @@ class EventDispatcher(EventDispatcherGroup):
 
                 # Apply all context variables from metadata if available
                 if metadata:
-                    with metadata.apply_context():
+                    with (
+                        metadata.apply_context(),
+                        metadata.continue_trace(event_type, SpanKind.CONSUMER),
+                    ):
                         if asyncio.iscoroutinefunction(cb):
                             # mypy cannot catch the meaning of asyncio.iscoroutinefunction().
                             await cb(evh.context, source, event)
@@ -687,15 +689,7 @@ class EventProducer:
         if source_override is not None:
             source = source_override
 
-        # Capture current request_id and other metadata
-        request_id = current_request_id()
-        user = current_user()
-        triggered = triggered_user()
-        metadata = MessageMetadata(
-            request_id=request_id,
-            user=user,
-            triggered_user=triggered,
-        )
+        metadata = MessageMetadata.from_current_context()
         message = event.to_message()
         payload = AnycastMessagePayload.from_event_body(
             name=message.name,
@@ -715,15 +709,7 @@ class EventProducer:
         source = self._source
         if source_override is not None:
             source = source_override
-        # Capture current request_id and other metadata
-        request_id = current_request_id()
-        user = current_user()
-        triggered = triggered_user()
-        metadata = MessageMetadata(
-            request_id=request_id,
-            user=user,
-            triggered_user=triggered,
-        )
+        metadata = MessageMetadata.from_current_context()
         message = event.to_message()
         payload = BroadcastMessagePayload.from_event_body(
             name=message.name,
@@ -742,15 +728,7 @@ class EventProducer:
         Broadcast a message to all subscribers with cache.
         The message will be delivered to all subscribers.
         """
-        # Capture current request_id and other metadata
-        request_id = current_request_id()
-        user = current_user()
-        triggered = triggered_user()
-        metadata = MessageMetadata(
-            request_id=request_id,
-            user=user,
-            triggered_user=triggered,
-        )
+        metadata = MessageMetadata.from_current_context()
         message = event.to_message()
         payload = BroadcastMessagePayload.from_event_body(
             name=message.name,
@@ -776,15 +754,7 @@ class EventProducer:
         if not events:
             return
 
-        # Capture current request_id and other metadata
-        request_id = current_request_id()
-        user = current_user()
-        triggered = triggered_user()
-        metadata = MessageMetadata(
-            request_id=request_id,
-            user=user,
-            triggered_user=triggered,
-        )
+        metadata = MessageMetadata.from_current_context()
 
         broadcast_payloads: list[CachedBroadcastMessagePayload] = []
         for event in events:
