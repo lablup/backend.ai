@@ -38,6 +38,14 @@ from .preparers import (
     AssignUserIdentityRule,
     BuildInternalDataRule,
     ComputeKernelResourcesRule,
+<<<<<<< HEAD
+=======
+)
+from ai.backend.manager.sokovan.scheduling_controller.preparers.resources.drop_zero_resource_slots_rule import (
+    DropZeroResourceSlotsRule,
+)
+from ai.backend.manager.sokovan.scheduling_controller.preparers.resources.expand_kernel_groups_rule import (
+>>>>>>> ae434cd65 (fix(BA-8264): drop zero-quantity resource slots on the legacy path and inside enqueue (#15209))
     ExpandKernelGroupsRule,
     InjectSessionEnvironRule,
     MergeResourceGroupDefaultsRule,
@@ -107,6 +115,7 @@ class SchedulingController:
         self._metric_observer = SchedulerPhaseMetricObserver.instance()
         self._operation_metrics = SchedulerOperationMetricObserver.instance()
 
+<<<<<<< HEAD
         # Draft-based spec preparer chain: builds a fully-resolved
         # ``SessionSpec`` from a caller-supplied ``SessionSpecDraft``.
         # Order matters — RG defaults merge first so later rules see the
@@ -123,6 +132,30 @@ class SchedulingController:
             BuildInternalDataRule(),
             ResolveVFolderMountsRule(),
         ])
+=======
+        # Draft-based spec preparer. Order matters — RG defaults merge
+        # first so later rules see the merged baseline; expand last on
+        # the options side so kernel specs exist before per-kernel rules
+        # run. The resource rules determine resource amounts (identity
+        # included so the draft can be promoted) and are runnable alone
+        # via prepare_resources() for the fitting check.
+        self._spec_preparer = SessionSpecPreparer(
+            resource_rules=(
+                MergeResourceGroupDefaultsRule(),
+                ComputeKernelResourcesRule(),
+                DropZeroResourceSlotsRule(),
+                ExpandKernelGroupsRule(),
+            ),
+            spec_rules=(
+                AssignUserIdentityRule(),
+                AssignNetworkConfigRule(),
+                AssignContainerUserMappingRule(),
+                InjectSessionEnvironRule(),
+                BuildInternalDataRule(),
+                ResolveVFolderMountsRule(),
+            ),
+        )
+>>>>>>> ae434cd65 (fix(BA-8264): drop zero-quantity resource slots on the legacy path and inside enqueue (#15209))
 
         # Draft-based spec validator chain. Runs against the finalized
         # ``SessionSpec`` + ``SessionSpecValidationContext``.

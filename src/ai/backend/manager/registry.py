@@ -272,13 +272,26 @@ class AgentRegistry:
         ``"1g"``) for memory-like slots; normalise them to plain decimal
         strings so downstream ``Decimal(quantity)`` calls in the scheduler
         and ``ResourceSlotEntry.to_resource_slot`` keep working unchanged.
+        Zero-quantity slots are dropped.
         """
         if not resources:
             return ()
+<<<<<<< HEAD
         return tuple(
             ResourceSlotEntry(resource_type=str(k), quantity=str(parse_quantity(v)))
             for k, v in resources.items()
         )
+=======
+        entries: list[ResourceSlotEntry] = []
+        for k, v in resources.items():
+            quantity = parse_quantity(v)
+            if quantity == 0:
+                continue
+            entries.append(
+                ResourceSlotEntry(resource_type=ResourceSlotName(str(k)), quantity=str(quantity))
+            )
+        return tuple(entries)
+>>>>>>> ae434cd65 (fix(BA-8264): drop zero-quantity resource slots on the legacy path and inside enqueue (#15209))
 
     def __init__(
         self,
