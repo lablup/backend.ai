@@ -29,12 +29,12 @@ fi
 TARGET_VERSION=$1
 WEBUI_VERSION=$2
 
-# An alpha is an internal build: the release PR's CI runs the same checks, so the
-# local dependency and BUILD-file checks below are skipped for it.
-if [[ "$TARGET_VERSION" =~ a[0-9]+$ ]]; then
-    IS_ALPHA=true
+# An alpha or rc is an internal build: the release PR's CI runs the same checks,
+# so the local dependency and BUILD-file checks below are skipped for it.
+if [[ "$TARGET_VERSION" =~ (a|rc)[0-9]+$ ]]; then
+    IS_INTERNAL=true
 else
-    IS_ALPHA=false
+    IS_INTERNAL=false
 fi
 
 if [ "$#" -eq 1 ]; then
@@ -91,8 +91,8 @@ python3 scripts/run-towncrier.py "${TARGET_VERSION}"
 .github/scripts/update-maintained-versions.sh "${TARGET_VERSION}" "${LTS_ARG[@]}"
 
 # Check dependencies
-if [ "$IS_ALPHA" = "true" ]; then
-    echo "Skipping the dependency and BUILD-file checks for alpha version ${TARGET_VERSION}"
+if [ "$IS_INTERNAL" = "true" ]; then
+    echo "Skipping the dependency and BUILD-file checks for internal version ${TARGET_VERSION}"
 else
     pants tailor --check update-build-files --check '::'
     pants check ::
