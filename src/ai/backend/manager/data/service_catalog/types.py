@@ -3,17 +3,19 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any, override
-from uuid import UUID
 
-from ai.backend.common.data.entity.service_catalog import ServiceCatalogID
+from ai.backend.common.data.entity.service_catalog import (
+    ServiceCatalogEndpointID,
+    ServiceCatalogID,
+)
 from ai.backend.common.data.entity.types import EntityData, EntityIdentifier, FieldData
 from ai.backend.common.types import ServiceCatalogStatus
 
 
 @dataclass
 class ServiceCatalogEndpointData(FieldData):
-    id: ServiceCatalogID
-    service_id: UUID
+    id: ServiceCatalogEndpointID
+    service_id: ServiceCatalogID
     role: str
     scope: str
     address: str
