@@ -19,11 +19,10 @@
   # management.
   # Added in 25.8.0
   type = "postgresql"
-  # Network address and port of the PostgreSQL database server. Default is the
-  # standard PostgreSQL port (5432) on localhost. In production, point this to
-  # your database server or cluster endpoint.
-  # Added in 25.8.0
-  addr = { host = "db.example.com", port = 5432 }
+  # Timeout in seconds for connecting to one member of addrs. When it expires,
+  # the next member is tried.
+  # Added in 26.9.0
+  connect-timeout = 5.0
   # Name of the PostgreSQL database to use for Backend.AI. This database must
   # exist and be accessible by the configured user. The database should be
   # created before starting the manager. Length must be between 2 and 64
@@ -71,6 +70,21 @@
   # indefinite blocking.
   # Added in 25.8.0
   lock-conn-timeout = 30.0
+
+  # Addresses of the PostgreSQL cluster members. List every member of an HA
+  # cluster, or a single address of a standalone server or a proxy in front of
+  # the cluster.
+  # Added in 26.9.0
+  [[db.addrs]]
+  # Add multiple [[db.addrs]] sections as needed
+    # Host address of the service. Can be a hostname, IP address, or special
+    # addresses like 0.0.0.0 to bind to all interfaces.
+    # Added in 22.03.0
+    host = "db1.example.com"
+    # Port number of the service. Must be between 1 and 65535. Ports below 1024
+    # require root/admin privileges.
+    # Added in 22.03.0
+    port = 5432
 
 # Etcd distributed key-value store configuration. Etcd is used for cluster
 # coordination, service discovery, and shared configuration between manager

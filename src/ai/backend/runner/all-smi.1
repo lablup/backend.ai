@@ -1,4 +1,4 @@
-.TH ALL-SMI 1 "September 2026" "all-smi 0.26.3" "User Commands"
+.TH ALL-SMI 1 "October 2026" "all-smi 0.27.0" "User Commands"
 .SH NAME
 all-smi \- Command-line utility for monitoring GPU hardware
 .SH SYNOPSIS
@@ -20,7 +20,7 @@ all-smi \- Command-line utility for monitoring GPU hardware
 .B all-smi
 is a comprehensive hardware monitoring tool that provides real-time information about GPU/NPU utilization,
 memory usage, temperature, power consumption, chassis-level metrics, and other system information. It supports various hardware platforms
-including NVIDIA GPUs, AMD GPUs, Apple Silicon, NVIDIA Jetson, Intel Arc/Iris Xe client GPUs, Google Cloud TPUs, Tenstorrent NPUs, Rebellions NPUs, and Furiosa NPUs.
+including NVIDIA GPUs, AMD GPUs, Apple Silicon, NVIDIA Jetson, Intel Arc/Iris Xe client GPUs, Google Cloud TPUs, Tenstorrent NPUs, Rebellions NPUs, Furiosa NPUs, and AWS Neuron (Trainium/Inferentia) devices.
 Chassis monitoring provides node-level power consumption tracking (CPU+GPU+ANE), thermal pressure monitoring (Apple Silicon),
 and BMC sensor integration for inlet/outlet temperatures and fan speeds on server systems.
 
@@ -497,8 +497,11 @@ Support for TPU v2-v7/Ironwood architectures, HBM memory tracking, and integrati
 .B Tenstorrent NPUs
 Support for Wormhole and Blackhole architectures with multiple temperature sensors and clock domains
 .TP
+.B AWS Neuron
+Support for Trainium and Inferentia devices: one row per NeuronCore, device HBM and PCI topology from neuron-ls, per-core memory from the neuron driver sysfs tree, and best-effort per-core utilization from neuron-monitor while a Neuron runtime is attached
+.TP
 .B Rebellions NPUs
-Support for ATOM, ATOM+, and ATOM Max variants with PCIe Gen4 interface
+Support for ATOM, ATOM+, and ATOM Max variants with PCIe Gen5 x16 interfaces. An ATOM Max card has four dies that share one power reading; it is counted once, on the lowest\-numbered die of the card, and the other dies show the card value in parentheses and export no power series
 .TP
 .B Furiosa NPUs
 Support for RNGD architecture with 8-core NPUs and PE utilization tracking
