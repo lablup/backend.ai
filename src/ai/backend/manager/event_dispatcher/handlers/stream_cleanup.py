@@ -6,7 +6,6 @@ from collections.abc import Awaitable, Callable
 from typing import Final
 
 import sqlalchemy as sa
-from sqlalchemy.orm import noload
 
 from ai.backend.common.events.event_types.kernel.broadcast import (
     KernelTerminatingBroadcastEvent,
@@ -56,9 +55,7 @@ class StreamCleanupEventHandler:
         async def _query() -> KernelRow:
             async with self._db.begin_readonly_session() as db_sess:
                 kernel = (
-                    await db_sess.execute(
-                        sa.select(KernelRow).where(KernelRow.id == kernel_id).options(noload("*"))
-                    )
+                    await db_sess.execute(sa.select(KernelRow).where(KernelRow.id == kernel_id))
                 ).scalar_one_or_none()
                 if kernel is None:
                     raise SessionNotFound
