@@ -71,6 +71,7 @@ jobs:
             - 'python*.lock'
             - 'tools/*.lock'
             - '.github/workflows/ci*.yml'
+            - '.github/workflows/docker-images.yml'
             - '.github/actions/pants-caches/**'
             - '.github/scripts/plan-ci-targets.py'
           models:
@@ -400,6 +401,22 @@ jobs:
       release-audience: ${{ needs.determine-release-grade.outputs.RELEASE_AUDIENCE }}
       is-prerelease: ${{ needs.determine-release-grade.outputs.IS_PRERELEASE }}
     secrets: inherit
+
+  # Publishes the lablup/backend.ai-* service images from the wheels built in
+  # this run. The release never waits for images, so a Docker Hub outage must
+  # not block the PyPI/GitHub release. The reverse dependency does hold: images
+  # wait for a successful release so that a failed release cannot publish
+  # images (and `latest`) for a version that was never released. Like PyPI,
+  # only public releases are published; internal alphas are not.
+  build-docker-images:
+    needs: [determine-release-grade, release]
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
+      && needs.determine-release-grade.outputs.RELEASE_AUDIENCE == 'public'
+    permissions:
+      contents: read
+      actions: read  # the called workflow downloads wheel artifacts via the REST API
+      id-token: write  # the called workflow mints the OIDC token for Docker Hub
+    uses: ./.github/workflows/docker-images.yml
 
   post-release:
     # `contents: write`: uploads the Windows conda pack to the release
