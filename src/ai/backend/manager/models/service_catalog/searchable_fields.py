@@ -4,7 +4,10 @@ from __future__ import annotations
 
 from typing import Any, override
 
-from ai.backend.common.data.entity.service_catalog import ServiceCatalogID
+from ai.backend.common.data.entity.service_catalog import (
+    ServiceCatalogEndpointID,
+    ServiceCatalogID,
+)
 from ai.backend.common.types import ServiceCatalogStatus
 from ai.backend.manager.data.service_catalog.types import (
     ServiceCatalogData,
@@ -72,7 +75,7 @@ class _ServiceCatalogEndpointOwnFields(
     @override
     def to_data(self, row: ServiceCatalogEndpointRow) -> ServiceCatalogEndpointData:
         return ServiceCatalogEndpointData(
-            id=ServiceCatalogID(self.field_id.read(row)),
+            id=ServiceCatalogEndpointID(self.field_id.read(row)),
             service_id=ServiceCatalogID(self.service_id.read(row)),
             role=self.role.read(row),
             scope=self.scope.read(row),
@@ -154,7 +157,7 @@ class _ServiceCatalogOwnFields(RowDataConverter[ServiceCatalogRow, ServiceCatalo
         """One element of ``ServiceCatalogRow.endpoint_rows``, keyed by column name."""
         endpoint = ServiceCatalogEndpointRowJson.model_validate(raw)
         return ServiceCatalogEndpointData(
-            id=ServiceCatalogID(endpoint.id),
+            id=ServiceCatalogEndpointID(endpoint.id),
             service_id=ServiceCatalogID(endpoint.service_id),
             role=endpoint.role,
             scope=endpoint.scope,
