@@ -62,6 +62,9 @@ from ai.backend.manager.sokovan.scheduler.provisioner.selectors.types import (
     ResourceRequirements,
 )
 from ai.backend.manager.sokovan.scheduler.types import ScheduleType
+from ai.backend.manager.sokovan.scheduling_controller.preparers.resources.drop_zero_resource_slots_rule import (
+    DropZeroResourceSlotsRule,
+)
 from ai.backend.manager.sokovan.scheduling_controller.types import SessionValidationSpec
 from ai.backend.manager.views.sokovan.scheduling import ComputeScheduleData
 from ai.backend.manager.views.sokovan.session import MarkTerminatingResult
@@ -157,6 +160,7 @@ class SchedulingController:
             resource_rules=(
                 MergeResourceGroupDefaultsRule(),
                 ComputeKernelResourcesRule(),
+                DropZeroResourceSlotsRule(),
                 ExpandKernelGroupsRule(),
             ),
             spec_rules=(
