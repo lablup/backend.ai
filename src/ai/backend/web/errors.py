@@ -57,6 +57,18 @@ class ManagerConnectionUnavailable(BackendAIError, web.HTTPServiceUnavailable):
         )
 
 
+class SignupDisabledError(BackendAIError, web.HTTPForbidden):
+    error_type = "https://api.backend.ai/probs/webserver/signup-disabled"
+    error_title = "Signup is disabled."
+
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.AUTH,
+            operation=ErrorOperation.CREATE,
+            error_detail=ErrorDetail.FORBIDDEN,
+        )
+
+
 class UnexpectedAuthResponseError(BackendAIError, web.HTTPInternalServerError):
     """Raised when the Manager returns an unrecognized authorization response type."""
 
