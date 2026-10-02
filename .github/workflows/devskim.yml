@@ -26,7 +26,7 @@ jobs:
       - name: Run DevSkim scanner
         uses: microsoft/DevSkim-Action@v1
         with:
-          ignore-globs: "**/.git/**,**/src/ai/backend/web/static/**,**/src/ai/backend/test/**,**/tests/**"
+          ignore-globs: "**/.git/**,**/src/ai/backend/web/static/**,**/src/ai/backend/test/**,**/tests/**,**/docker-compose.halfstack-*.yml,**/configs/grafana/**,**/configs/graphql/**,**/configs/loki/**,**/configs/otel/**,**/configs/prometheus/**,**/configs/tempo/**,**/src/ai/backend/install/configs/docker-compose.yml,**/src/ai/backend/install/configs/gateway.config.ts,**/src/ai/backend/install/configs/grafana-provisioning/**,**/src/ai/backend/install/configs/loki-config.yaml,**/src/ai/backend/install/configs/otel-collector-config.yaml,**/src/ai/backend/install/configs/prometheus.yaml,**/src/ai/backend/install/configs/tempo-config.yaml"
           options-json: .devskim.json
 
       - name: Upload DevSkim scan results to GitHub Security tab

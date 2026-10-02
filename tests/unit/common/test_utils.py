@@ -8,8 +8,8 @@ from string import ascii_uppercase
 from tempfile import NamedTemporaryFile
 from unittest import mock
 
+import aiohttp
 import pytest
-from aioresponses import aioresponses
 from pytest_mock import MockerFixture
 
 from ai.backend.common.asyncio import AsyncBarrier, run_through
@@ -137,23 +137,35 @@ def test_str_to_timedelta() -> None:
         assert str_to_timedelta("")
 
 
-async def test_curl_returns_stripped_body() -> None:
-    with aioresponses() as m:
-        m.get("http://example.com/test/url", status=200, body="success  ")
+def _mock_client_session(get: mock.Mock) -> mock.Mock:
+    session = mock.Mock(get=get)
+    session.__aenter__ = mock.AsyncMock(return_value=session)
+    session.__aexit__ = mock.AsyncMock(return_value=None)
+    return mock.Mock(return_value=session)
 
-        resp = await curl("http://example.com/test/url", "")
-        assert resp == "success"  # stripped body
+
+async def test_curl_returns_stripped_body() -> None:
+    resp = mock.Mock(text=mock.AsyncMock(return_value="success  "))
+    resp.__aenter__ = mock.AsyncMock(return_value=resp)
+    resp.__aexit__ = mock.AsyncMock(return_value=None)
+    with mock.patch(
+        "ai.backend.common.networking.aiohttp.ClientSession",
+        _mock_client_session(mock.Mock(return_value=resp)),
+    ):
+        assert await curl("http://example.com/test/url", "") == "success"
 
 
 async def test_curl_returns_default_value_if_not_success() -> None:
-    with aioresponses() as m:
-        m.get("http://example.com/test/url", status=400, body="bad request")
-
-        resp = await curl("http://example.com/test/url", default_value="default")
-        assert resp == "default"  # from value
-
-        resp = await curl("http://example.com/test/url", default_value=lambda: "default")
-        assert resp == "default"  # from callable
+    # `raise_for_status=True` turns a 4xx/5xx into a ClientResponseError.
+    error = aiohttp.ClientResponseError(mock.Mock(), (), status=400)
+    with mock.patch(
+        "ai.backend.common.networking.aiohttp.ClientSession",
+        _mock_client_session(mock.Mock(side_effect=error)),
+    ):
+        assert await curl("http://example.com/test/url", default_value="default") == "default"
+        assert (
+            await curl("http://example.com/test/url", default_value=lambda: "default") == "default"
+        )
 
 
 def test_string_set_flag() -> None:

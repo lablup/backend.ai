@@ -148,6 +148,7 @@ BEP numbers start from 1000.
 | [1075](BEP-1075-entity-relation-operations.md) | Entity Relation Operations | HyeokJin Kim | Draft |
 | [1076](BEP-1076-project-membership.md) | Project Membership | HyeokJin Kim | Draft |
 | [1077](BEP-1077-project-scoped-ownership.md) | Project-Scoped Ownership and Access | HyeokJin Kim | Draft |
+| [1078](BEP-1078-storage-proxy-enhancement.md) | Storage Proxy Enhancement | Sanghun Lee | Draft |
 | _next_ | _(reserve your number here)_ | | |
 
 ## File Structure
