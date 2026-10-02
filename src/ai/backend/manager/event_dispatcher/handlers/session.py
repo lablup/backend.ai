@@ -29,14 +29,12 @@ from ai.backend.common.events.kernel import (
 from ai.backend.common.plugin.event import EventDispatcherPluginContext
 from ai.backend.common.types import (
     AgentId,
-    SessionTypes,
 )
 from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.errors.kernel import SessionNotFound
 from ai.backend.manager.models.session.row import KernelLoadingStrategy, SessionRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.registry import AgentRegistry
-from ai.backend.manager.repositories.deployment.repository import DeploymentRepository
 from ai.backend.manager.sokovan.scheduling_controller.scheduling_controller import (
     SchedulingController,
 )
@@ -50,7 +48,6 @@ class SessionEventHandler:
     _event_dispatcher_plugin_ctx: EventDispatcherPluginContext
     _scheduling_controller: SchedulingController
     _valkey_live: ValkeyLiveClient
-    _deployment_repository: DeploymentRepository
 
     def __init__(
         self,
@@ -59,14 +56,12 @@ class SessionEventHandler:
         event_dispatcher_plugin_ctx: EventDispatcherPluginContext,
         scheduling_controller: SchedulingController,
         valkey_live: ValkeyLiveClient,
-        deployment_repository: DeploymentRepository,
     ) -> None:
         self._registry = registry
         self._db = db
         self._event_dispatcher_plugin_ctx = event_dispatcher_plugin_ctx
         self._scheduling_controller = scheduling_controller
         self._valkey_live = valkey_live
-        self._deployment_repository = deployment_repository
 
     async def _handle_started_or_cancelled(
         self,
@@ -220,30 +215,6 @@ class SessionEventHandler:
                 )
         except SessionNotFound:
             return
-
-        try:
-            # Update routing status
-            # TODO: Check session health
-            if session.session_type == SessionTypes.INFERENCE:
-                if isinstance(event, SessionCancelledAnycastEvent):
-                    error_data: dict[str, Any] | None = None
-                    status_data = session.status_data
-                    if status_data and "error" in status_data:
-                        if status_data["error"]["name"] == "MultiAgentError":
-                            errors = status_data["error"]["collection"]
-                        else:
-                            errors = [status_data["error"]]
-                        error_data = {
-                            "type": "session_cancelled",
-                            "errors": errors,
-                            "session_id": session.id,
-                        }
-                    await self._deployment_repository.mark_route_failed_by_session(
-                        session.id, error_data
-                    )
-                await self._deployment_repository.clear_endpoint_errors_by_session(session.id)
-        except Exception:
-            log.exception("route status update failed")
 
         if (callback_url := session.callback_url) is None:
             return
