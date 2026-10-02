@@ -16,6 +16,33 @@ Changes
 
 <!-- towncrier release notes start -->
 
+## 26.4.12 (2026-10-02)
+
+### Fixes
+* Fix `backend.ai session ssh` failing with a `FileNotFoundError` when several invocations run concurrently from the same working directory, and stop it from writing the downloaded container SSH key into the current directory ([#14464](https://github.com/lablup/backend.ai/issues/14464))
+* Fix `modify_domain_node` reading the allowed vfolder hosts as the allowed docker registries ([#14687](https://github.com/lablup/backend.ai/issues/14687))
+* Encode the relay cursors that paginated GraphQL resolvers emit, so a page end cursor can be passed back as `after`. ([#14747](https://github.com/lablup/backend.ai/issues/14747))
+* Fix cursor pagination in v2 search APIs skipping and repeating rows when an order is supplied; the caller's order is now dropped under cursor pagination as documented. ([#14922](https://github.com/lablup/backend.ai/issues/14922))
+* Stop Prometheus from scraping a multi-worker component once per worker. Every worker registered itself in service discovery under the same shared address, so each `sum()` over the metrics came out inflated by `num-proc`. ([#14942](https://github.com/lablup/backend.ai/issues/14942))
+* Detect lost agents on the leader instead of in every manager worker. Each worker ran the check on its own and fired a termination event per lost agent, so a single lost agent produced one event per worker every second. ([#14943](https://github.com/lablup/backend.ai/issues/14943))
+* Fix route termination on deployment deletion failing on the agent by passing termination and transition reasons as `KernelLifecycleEventReason` values ([#14954](https://github.com/lablup/backend.ai/issues/14954))
+* Fix the legacy GraphQL `available_services` connection and `AvailableServiceNode.service_variants`, which always failed, and deprecate `available_services` ([#14964](https://github.com/lablup/backend.ai/issues/14964))
+* Fix the legacy GraphQL `domain_node` query, which failed for every global id ([#14971](https://github.com/lablup/backend.ai/issues/14971))
+* Stop a rejected rename of a non-running session from changing its name ([#14973](https://github.com/lablup/backend.ai/issues/14973))
+* Fix reading the `image` field of a deployment revision (`currentRevision`, `deployingRevision`, `revisionHistory`) in GraphQL, which failed on every selected image field ([#14978](https://github.com/lablup/backend.ai/issues/14978))
+* Refuse an admin-only GraphQL call with `InsufficientPrivilege`. The refusal previously raised an aiohttp exception the GraphQL handler did not recognise as a client error, so an ordinary permission check was logged as an unexpected error with a stack trace. ([#15005](https://github.com/lablup/backend.ai/issues/15005))
+* Return the manager's error status from the webserver's password update without authentication, so a rejected change is no longer reported as successful ([#15133](https://github.com/lablup/backend.ai/issues/15133))
+* Reject agent watcher mount and unmount requests whose volume name resolves outside the mount prefix ([#15161](https://github.com/lablup/backend.ai/issues/15161))
+* Reject `auth/signup` requests at the webserver with 403 when `service.enable-signup` is disabled, instead of forwarding them to the manager ([#15189](https://github.com/lablup/backend.ai/issues/15189))
+* Fix sessions requesting zero-quantity accelerator slots staying PENDING in resource groups whose agents lack those slots ([#15209](https://github.com/lablup/backend.ai/issues/15209))
+
+### External Dependency Updates
+* Bump PyJWT to 2.15.1, setuptools to 84.0.0 and the kernel runner's msgpack to 1.2.3 to clear reported CVEs ([#15147](https://github.com/lablup/backend.ai/issues/15147))
+
+### Miscellaneous
+* Raise the local `pantsd_max_memory_usage` to 6GiB. A repo-wide goal exceeds the 4GiB default and restarts pantsd mid-write to the machine-wide LMDB store that every checkout shares, leaving pants unusable in all of them until the store is rebuilt. CI keeps the previous default. ([#14939](https://github.com/lablup/backend.ai/issues/14939))
+
+
 ## 26.4.11 (2026-09-22)
 
 ### Features
