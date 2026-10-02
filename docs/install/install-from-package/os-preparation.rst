@@ -246,8 +246,12 @@ set up and working. Please refer to the vendor documentation for the details.
 
 - To integrate NVIDIA GPUs,
 
-   - Install the NVIDIA driver and CUDA toolkit.
-   - Install the NVIDIA container toolkit (nvidia-docker2).
+   - Install the NVIDIA driver. The open-source CUDA plugin talks to the
+     driver directly via the CUDA driver API, so the CUDA toolkit is *not*
+     required on the host. Install the toolkit only if you need it for other
+     purposes (e.g., compiling CUDA programs on the host).
+   - Install the NVIDIA container toolkit (nvidia-docker2) for containerized
+     deployments so that containers can access the GPUs.
 
 
 Pull container images
