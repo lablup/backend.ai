@@ -129,16 +129,14 @@ __dependencies_rules__(
 )
 
 # Who may import the manager component (equivalent to visibility_private_component).
-__dependents_rules__(
-    (
-        {"type": "*"},
-        "/**",  # code within this component may import itself
-        "//src/ai/backend/testutils/**",  # allowed extra dependents
-        "//tests/**",  # tests may import the source files
-        "//plugins/**",  # external plugins may import the source files
-        "!*",  # no one else may import the source files
-    )
-)
+__dependents_rules__((
+    {"type": "*"},
+    "/**",  # code within this component may import itself
+    "//src/ai/backend/testutils/**",  # allowed extra dependents
+    "//tests/**",  # tests may import the source files
+    "//plugins/**",  # external plugins may import the source files
+    "!*",  # no one else may import the source files
+))
 
 python_distribution(
     name="dist",

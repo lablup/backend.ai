@@ -90,5 +90,13 @@ class OIDCWebAppConfig(BackendAISchema):
     login_uri: str = Field(
         description="The login page URI to redirect users to.",
     )
+    allowed_redirect_hosts: list[str] | None = Field(
+        default=None,
+        description=(
+            "Hostnames a sign-in may return to, in addition to the login_uri host. "
+            "When set, a sign-in started from any other host returns to login_uri. "
+            "When unset, any return address is accepted."
+        ),
+    )
 
     model_config = {"extra": "ignore"}
