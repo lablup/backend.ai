@@ -3,6 +3,7 @@ from typing import Any, cast
 
 import aiohttp
 from aiohttp.client_exceptions import ClientConnectorError
+from opentelemetry.propagate import inject
 
 from ai.backend.appproxy.common.errors import (
     CoordinatorConnectionError,
@@ -42,10 +43,12 @@ def _get_coordinator_session(root_ctx: RootContext) -> aiohttp.ClientSession:
 
 def _get_request_headers(root_ctx: RootContext, request_id: str) -> dict[str, str]:
     """Get request-specific headers for coordinator API calls."""
-    return {
+    headers = {
         "X-BackendAI-RequestID": request_id,
         "X-BackendAI-Token": root_ctx.local_config.secrets.api_secret,
     }
+    inject(headers)
+    return headers
 
 
 async def get_circuit_info(root_ctx: RootContext, request_id: str, circuit_id: str) -> Circuit:
