@@ -13,6 +13,7 @@ from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.entity.types import EntityIdentifier
 from ai.backend.common.types import KernelId
 from ai.backend.manager.data.domain.types import DomainData
+from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.errors.resource import (
     DomainHasActiveKernels,
     DomainHasGroups,
@@ -21,7 +22,6 @@ from ai.backend.manager.errors.resource import (
 from ai.backend.manager.models.domain.row import DomainRow
 from ai.backend.manager.models.domain.searchable_fields import DomainSearchableFields
 from ai.backend.manager.models.kernel.row import KernelRow
-from ai.backend.manager.models.kernel.statuses import AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES
 from ai.backend.manager.models.project.row import ProjectRow
 from ai.backend.manager.models.specs.purger import EntityPurger, FieldBatchPurger
 from ai.backend.manager.models.specs.types import ConflictCheck
@@ -89,7 +89,7 @@ class DomainKernelPurger(FieldBatchPurger[DomainID, KernelRow, KernelId]):
         return (
             ConflictCheck(
                 condition=lambda: (KernelRow.domain_name == self.name)
-                & (KernelRow.status.in_(AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES)),
+                & (KernelRow.status.in_(KernelStatus.agent_resource_occupying_statuses())),
                 error=DomainHasActiveKernels(
                     "Domain has some active kernels. Terminate them first."
                 ),

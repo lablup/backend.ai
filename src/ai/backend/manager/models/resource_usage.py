@@ -21,10 +21,6 @@ if TYPE_CHECKING:
     from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
 
 from ai.backend.manager.models.kernel.row import KernelRow
-from ai.backend.manager.models.kernel.statuses import (
-    LIVE_STATUS,
-    RESOURCE_USAGE_KERNEL_STATUSES,
-)
 from ai.backend.manager.models.project.row import ProjectRow
 from ai.backend.manager.models.session.row import SessionRow
 from ai.backend.manager.models.user.row import UserRow
@@ -661,11 +657,14 @@ async def fetch_resource_usage(
             (
                 (KernelRow.terminated_at >= start_date)
                 & (KernelRow.created_at < end_date)
-                & (KernelRow.status.in_(RESOURCE_USAGE_KERNEL_STATUSES))
+                & (KernelRow.status.in_(KernelStatus.resource_usage_statuses()))
             )
             |
             # Or, filter running sessions which created before requested end_date
-            ((KernelRow.created_at < end_date) & (KernelRow.status.in_(LIVE_STATUS)))
+            (
+                (KernelRow.created_at < end_date)
+                & (KernelRow.status.in_(KernelStatus.live_statuses()))
+            )
         ),
         session_cond=session_cond,
         project_cond=project_cond,

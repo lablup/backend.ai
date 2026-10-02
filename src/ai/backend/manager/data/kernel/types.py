@@ -192,6 +192,30 @@ class KernelStatus(CIStrEnum):
             )
         )
 
+    @classmethod
+    @lru_cache(maxsize=1)
+    def agent_resource_occupying_statuses(cls) -> tuple[KernelStatus, ...]:
+        """Statuses counted when calculating the current resource usage of agents and users."""
+        return tuple(
+            status for status in cls if status not in (cls.TERMINATED, cls.PENDING, cls.CANCELLED)
+        )
+
+    @classmethod
+    @lru_cache(maxsize=1)
+    def resource_usage_statuses(cls) -> tuple[KernelStatus, ...]:
+        """Statuses counted when calculating the historical resource usage."""
+        return (cls.TERMINATED, cls.RUNNING)
+
+    @classmethod
+    @lru_cache(maxsize=1)
+    def dead_statuses(cls) -> tuple[KernelStatus, ...]:
+        return (cls.CANCELLED, cls.TERMINATED)
+
+    @classmethod
+    @lru_cache(maxsize=1)
+    def live_statuses(cls) -> tuple[KernelStatus, ...]:
+        return (cls.RUNNING,)
+
 
 @dataclass(frozen=True)
 class KernelStatusInMatchSpec:
