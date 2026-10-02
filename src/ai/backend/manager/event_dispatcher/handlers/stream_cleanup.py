@@ -13,7 +13,7 @@ from ai.backend.common.events.event_types.kernel.broadcast import (
 from ai.backend.common.types import AgentId, KernelId
 from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.defs import DEFAULT_ROLE
-from ai.backend.manager.errors.kernel import SessionNotFound
+from ai.backend.manager.errors.kernel import KernelNotFound
 from ai.backend.manager.models.kernel.row import KernelRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine, execute_with_retry
 
@@ -39,7 +39,7 @@ class StreamCleanupEventHandler:
     ) -> None:
         try:
             kernel = await self._fetch_kernel(event.kernel_id)
-        except SessionNotFound:
+        except KernelNotFound:
             return
         if kernel.cluster_role == DEFAULT_ROLE:
             coros = [callback(kernel) for callback in self._callbacks]
@@ -58,7 +58,7 @@ class StreamCleanupEventHandler:
                     await db_sess.execute(sa.select(KernelRow).where(KernelRow.id == kernel_id))
                 ).scalar_one_or_none()
                 if kernel is None:
-                    raise SessionNotFound
+                    raise KernelNotFound(f"Kernel {kernel_id} not found")
                 return kernel
 
         return await execute_with_retry(_query)
