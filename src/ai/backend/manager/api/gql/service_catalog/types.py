@@ -23,7 +23,6 @@ from ai.backend.common.dto.manager.v2.service_catalog.types import (
 from ai.backend.common.dto.manager.v2.service_catalog.types import (
     ServiceCatalogStatusFilter as ServiceCatalogStatusFilterDTO,
 )
-from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import OrderDirection, StringFilter
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
@@ -91,7 +90,7 @@ class ServiceCatalogGQL(PydanticNodeMixin[ServiceCatalogNode]):
     id: NodeID[str] = gql_field(description="Relay-style global node ID.")
     entity_id: UUID = gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.9.0",
             description="UUID of the service catalog.",
         ),
     )

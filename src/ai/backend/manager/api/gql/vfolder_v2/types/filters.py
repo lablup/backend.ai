@@ -10,7 +10,6 @@ from ai.backend.common.dto.manager.v2.vfolder.types import (
     VFolderStatusFilter,
     VFolderUsageModeFilter,
 )
-from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import (
     DateTimeFilter,
     OrderDirection,
@@ -91,7 +90,7 @@ class VFolderFilterGQL(PydanticInputMixin[VFolderFilter]):
     created_at: DateTimeFilter | None = None
     labels: EntityLabelNestedFilterGQL | None = gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.9.0",
             description="Select entities by the labels on them.",
         ),
         default=None,

@@ -9,7 +9,6 @@ from ai.backend.common.dto.manager.v2.deployment.types import (
     DeploymentUsage,
     DeploymentUses,
 )
-from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import UUIDScopeGQL
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
@@ -25,7 +24,7 @@ from ai.backend.manager.api.gql.pydantic_compat import PydanticInputMixin
             "Scope for the scoped deployment query. Each list is OR'd internally and "
             "across lists, and every scope named is authorized before the read runs."
         ),
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.9.0",
     ),
     name="DeploymentSearchScope",
 )
@@ -46,7 +45,7 @@ class DeploymentScopeGQL(PydanticInputMixin[DeploymentScope]):
 @gql_pydantic_input(
     BackendAIGQLMeta(
         description="Entities a deployment uses, whose ids narrow the read.",
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.9.0",
     ),
     name="DeploymentUses",
 )
@@ -85,7 +84,7 @@ class DeploymentUsesGQL(PydanticInputMixin[DeploymentUses]):
             "to read each listed entity, or the request is refused. Only deployments the caller "
             "can read are returned, even when a listed entity is tied to others."
         ),
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.9.0",
     ),
     name="DeploymentUsage",
 )

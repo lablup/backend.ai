@@ -210,7 +210,6 @@ from ai.backend.common.data.storage.types import ArtifactStorageImportStep, Name
 from ai.backend.common.defs import DEFAULT_FILE_IO_TIMEOUT
 from ai.backend.common.lock import EtcdLock, FileLock, RedisLock
 from ai.backend.common.meta import (
-    NEXT_RELEASE_VERSION,
     BackendAIConfigMeta,
     CompositeType,
     ConfigExample,
@@ -286,7 +285,7 @@ class DatabaseConfig(BaseConfigSchema):
                 "Read as a one-member addrs list when addrs is not set."
             ),
             added_version="25.8.0",
-            deprecated_version=NEXT_RELEASE_VERSION,
+            deprecated_version="26.9.0",
             deprecation_hint="Use addrs instead.",
         ),
     ]
@@ -299,7 +298,7 @@ class DatabaseConfig(BaseConfigSchema):
                 "List every member of an HA cluster, or a single address of a standalone "
                 "server or a proxy in front of the cluster."
             ),
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.9.0",
             composite=CompositeType.LIST,
             example=ConfigExample(local="127.0.0.1:5432", prod="db1.example.com:5432"),
         ),
@@ -317,7 +316,7 @@ class DatabaseConfig(BaseConfigSchema):
                 "Timeout in seconds for connecting to one member of addrs. "
                 "When it expires, the next member is tried."
             ),
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.9.0",
             example=ConfigExample(local="10", prod="5"),
         ),
     ]
@@ -606,7 +605,7 @@ class ConfigKeyProviderConfig(BaseConfigSchema):
                 "id to the key list and pointing this at it; the previous ids stay so their "
                 "values keep decrypting."
             ),
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.9.0",
             example=ConfigExample(local="v1", prod="v1"),
         ),
     ]
@@ -621,7 +620,7 @@ class ConfigKeyProviderConfig(BaseConfigSchema):
                 "values themselves, so an id may be retired only once no stored value still "
                 "names it."
             ),
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.9.0",
             secret=True,
         ),
     ]
@@ -660,7 +659,7 @@ class SecretEncryptionConfig(BaseConfigSchema):
                 "secrets written earlier keep decrypting through the provider they name, and "
                 "a batch re-encryption normalizes stored secrets to whatever this names."
             ),
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.9.0",
             example=ConfigExample(local="plain", prod="config"),
         ),
     ]
@@ -677,7 +676,7 @@ class SecretEncryptionConfig(BaseConfigSchema):
                 "id 'config'. Omit this section to leave that provider unconfigured, in which "
                 "case no stored secret naming it can be read."
             ),
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.9.0",
             composite=CompositeType.FIELD,
         ),
     ]
@@ -1666,7 +1665,7 @@ class AuditLogConfig(BaseConfigSchema):
                 "operations are always recorded and listing them here is rejected. Failed "
                 "and denied reads are recorded either way."
             ),
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.9.0",
         ),
     ]
 
@@ -3721,7 +3720,7 @@ class ManagerUnifiedConfig(BaseConfigSchema):
                 "failures and permission denials; this section only opts successful read "
                 "operations in."
             ),
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.9.0",
             composite=CompositeType.FIELD,
         ),
     ]
@@ -3857,7 +3856,7 @@ class ManagerUnifiedConfig(BaseConfigSchema):
                 "Names which key provider writes new secrets and configures the providers. "
                 "New secrets are stored as plaintext until a write provider is named."
             ),
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.9.0",
             composite=CompositeType.FIELD,
         ),
     ]

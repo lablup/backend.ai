@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from enum import StrEnum
 
-from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.decorators import BackendAIGQLMeta, gql_enum
 
 
@@ -15,7 +14,7 @@ from ai.backend.manager.api.gql.decorators import BackendAIGQLMeta, gql_enum
             "Project type determining its purpose and behavior. "
             "GENERAL: Standard project for general computation. "
             "MODEL_STORE: Project for model storage and management. "
-            f"PERSONAL: Added in {NEXT_RELEASE_VERSION}. "
+            "PERSONAL: Added in 26.9.0. "
             "Project holding one user's own resources, created and removed with that user."
         ),
     ),

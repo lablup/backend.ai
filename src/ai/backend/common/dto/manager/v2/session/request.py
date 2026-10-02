@@ -42,7 +42,6 @@ from ai.backend.common.dto.manager.v2.session.types import (
     SessionUsage,
 )
 from ai.backend.common.dto.manager.v2.session_options.types import AgentSelectionPolicyEnum
-from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 
 __all__ = (
     "AdminSearchSessionsInput",
@@ -502,19 +501,15 @@ class TerminateSessionsInput(BaseRequestModel):
 class SessionIdleCheckTargetInput(BaseRequestModel):
     """One (checker, session) pair targeted by an idle-check exclusion or inclusion."""
 
-    checker_id: IdleCheckerID = Field(
-        description=f"Added in {NEXT_RELEASE_VERSION}. Idle checker UUID of the pair."
-    )
-    session_id: SessionID = Field(
-        description=f"Added in {NEXT_RELEASE_VERSION}. Session UUID of the pair."
-    )
+    checker_id: IdleCheckerID = Field(description="Added in 26.9.0. Idle checker UUID of the pair.")
+    session_id: SessionID = Field(description="Added in 26.9.0. Session UUID of the pair.")
 
 
 class ExcludeSessionIdleChecksInput(BaseRequestModel):
     """Input for excluding session pairs from idle checks."""
 
     targets: list[SessionIdleCheckTargetInput] = Field(
-        description=f"Added in {NEXT_RELEASE_VERSION}. Checker-session pairs to exclude."
+        description="Added in 26.9.0. Checker-session pairs to exclude."
     )
 
 
@@ -523,7 +518,7 @@ class IncludeSessionIdleChecksInput(BaseRequestModel):
 
     targets: list[SessionIdleCheckTargetInput] = Field(
         description=(
-            f"Added in {NEXT_RELEASE_VERSION}. Checker-session pairs to include; "
+            "Added in 26.9.0. Checker-session pairs to include; "
             "checks start from the initial grace period."
         )
     )

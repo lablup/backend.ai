@@ -32,7 +32,6 @@ from ai.backend.common.dto.manager.query import NullableDateTimeFilter as Nullab
 from ai.backend.common.dto.manager.query import StringFilter as StringFilterDTO
 from ai.backend.common.dto.manager.query import UUIDFilter as UUIDFilterDTO
 from ai.backend.common.dto.manager.v2.rbac.types import UUIDScope
-from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.adapter_options.cursor.cursor import decode_cursor as decode_cursor
 from ai.backend.manager.api.adapter_options.cursor.cursor import encode_cursor as encode_cursor
 from ai.backend.manager.api.gql.decorators import (
@@ -270,7 +269,7 @@ class IntFilter(PydanticInputMixin[IntFilterDTO]):
 @gql_pydantic_input(
     BackendAIGQLMeta(
         description="Filter for decimal fields supporting equality and comparison operations.",
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.9.0",
     ),
     name="DecimalFilter",
 )

@@ -19,7 +19,6 @@ from ai.backend.common.data.entity.resource_group import ResourceGroupID
 from ai.backend.common.data.entity.session import SessionID
 from ai.backend.common.dto.manager.pagination import PaginationInfo
 from ai.backend.common.dto.manager.v2.agent.types import ConflictingSessionCleanupPolicyEnum
-from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.common.types import AgentId
 
 __all__ = (
@@ -153,12 +152,12 @@ class AgentNode(BaseResponseModel):
 
     id: str = Field(description="Agent ID.")
     entity_id: UUID = Field(
-        description=f"UUID of the agent. Added in {NEXT_RELEASE_VERSION}.",
+        description="UUID of the agent. Added in 26.9.0.",
     )
     uuid: AgentUUID = Field(
         description=(
             "Agent UUID, which is what rows keyed on the agent carry. "
-            f"Deprecated since {NEXT_RELEASE_VERSION}. Use entity_id."
+            "Deprecated since 26.9.0. Use entity_id."
         ),
         deprecated=True,
     )

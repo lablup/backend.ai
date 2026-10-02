@@ -11,7 +11,6 @@ from uuid import UUID
 from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseResponseModel
-from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 
 from .types import (
     ArtifactAvailability,
@@ -68,7 +67,7 @@ class ArtifactRevisionNode(BaseResponseModel):
 
     id: UUID = Field(description="Artifact revision ID")
     field_id: UUID = Field(
-        description=f"UUID of the artifact revision. Added in {NEXT_RELEASE_VERSION}.",
+        description="UUID of the artifact revision. Added in 26.9.0.",
     )
     artifact_id: UUID = Field(description="Parent artifact ID")
     version: str = Field(description="Revision version string")
@@ -89,7 +88,7 @@ class ArtifactNode(BaseResponseModel):
 
     id: UUID = Field(description="Artifact ID")
     entity_id: UUID = Field(
-        description=f"UUID of the artifact. Added in {NEXT_RELEASE_VERSION}.",
+        description="UUID of the artifact. Added in 26.9.0.",
     )
     name: str = Field(description="Artifact name")
     type: ArtifactType = Field(description="Artifact type")
@@ -220,7 +219,7 @@ class ArtifactGQLNode(BaseResponseModel):
 
     id: UUID = Field(description="Artifact ID")
     entity_id: UUID = Field(
-        description=f"UUID of the artifact. Added in {NEXT_RELEASE_VERSION}.",
+        description="UUID of the artifact. Added in 26.9.0.",
     )
     name: str = Field(description="Artifact name")
     type: ArtifactType = Field(description="Artifact type")

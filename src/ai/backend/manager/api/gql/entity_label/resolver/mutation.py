@@ -7,7 +7,6 @@ from uuid import UUID
 from strawberry import ID, Info
 
 from ai.backend.common.data.entity.entity_label import EntityLabelID
-from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     gql_mutation,
@@ -26,7 +25,7 @@ from ai.backend.manager.api.gql.types import StrawberryGQLContext
             "Set one key on an entity, replacing the value it carries. Reachable by any "
             "caller RBAC authorizes to write the entity."
         ),
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.9.0",
     )
 )
 async def upsert_entity_label(
@@ -43,7 +42,7 @@ async def upsert_entity_label(
             "Take one label off, named by its own id. Which entity answers for it is read "
             "from the row before the delete runs."
         ),
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.9.0",
     )
 )
 async def purge_entity_label(
