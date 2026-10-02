@@ -4,6 +4,7 @@ import asyncio
 import base64
 import json
 import logging
+import posixpath
 from collections.abc import AsyncIterator, Awaitable, Callable, Iterable
 from contextlib import AbstractAsyncContextManager, asynccontextmanager
 from typing import Any, Final, cast
@@ -22,7 +23,7 @@ from ai.backend.common.web.session import STORAGE_KEY, extra_config_headers, get
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.web.clients.endpoint_pool import AcquiredEndpoint, HealthyEndpointPool
 from ai.backend.web.config.unified import WebServerUnifiedConfig
-from ai.backend.web.errors import InvalidAPIConfigurationError
+from ai.backend.web.errors import InvalidAPIConfigurationError, SignupDisabledError
 
 from .auth import (
     fill_forwarding_hdrs_to_api_session,
@@ -208,6 +209,14 @@ def _strip_route_prefix(request: web.Request, *, prefix: str) -> str | None:
     return None
 
 
+def _reject_disabled_signup(request: web.Request, path: str | None) -> None:
+    config: WebServerUnifiedConfig = request.app["config"]
+    if config.service.enable_signup or path is None:
+        return
+    if posixpath.normpath("/" + path).strip("/") == "auth/signup":
+        raise SignupDisabledError()
+
+
 async def _run_proxy_request(
     frontend_rqst: web.Request,
     *,
@@ -346,6 +355,8 @@ async def web_handler(
     is_anonymous: bool = False,
     http_headers_to_forward_extra: Iterable[str] | None = None,
 ) -> web.StreamResponse:
+    path = _strip_route_prefix(frontend_rqst, prefix="/func")
+    _reject_disabled_signup(frontend_rqst, path)
     if _is_websocket_upgrade(frontend_rqst):
         return await websocket_handler(
             frontend_rqst,
@@ -355,7 +366,7 @@ async def web_handler(
     return await _run_proxy_request(
         frontend_rqst,
         acquire_ctx=endpoint_pool.acquire(),
-        path=_strip_route_prefix(frontend_rqst, prefix="/func"),
+        path=path,
         is_anonymous=is_anonymous,
         http_headers_to_forward_extra=http_headers_to_forward_extra,
         log_prefix="web_handler",
@@ -559,9 +570,10 @@ async def web_plugin_handler(
     content-type and content-length headers before sending up-requests.
     It also configures the domain in the json body for "auth/signup" requests.
     """
+    path = frontend_rqst.match_info["path"]
+    _reject_disabled_signup(frontend_rqst, path)
     stats: WebStats = frontend_rqst.app["stats"]
     stats.active_proxy_plugin_handlers.add(asyncio.current_task())  # type: ignore
-    path = frontend_rqst.match_info["path"]
     config: WebServerUnifiedConfig = frontend_rqst.app["config"]
     open_session = get_anonymous_session if is_anonymous else get_api_session
     try:
