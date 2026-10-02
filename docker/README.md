@@ -1,12 +1,26 @@
 # `docker/` — Service and infra images
 
 The `backend.ai-*` dockerfiles in this directory are built and published to
-Docker Hub for every release tag by `.github/workflows/docker-images.yml`
-(matrix from `scripts/list-dockerfiles.sh --service`), multi-arch
-(`linux/amd64` + `linux/arm64`). The remaining dockerfiles are runtime helper
-images and are not published.
+Docker Hub for every release tag by `.github/workflows/docker-images.yml` in a
+single `docker buildx bake` run (`docker-bake.hcl` at the repository root),
+multi-arch (`linux/amd64` + `linux/arm64`).
+`scripts/list-dockerfiles.sh` stays the publishing allowlist — the workflow
+fails when it and the bake targets drift apart
+(`scripts/check-bake-targets.sh`). The remaining dockerfiles are runtime
+helper images and are not published.
 
 ## Published images
+
+All published images are thin layers over a shared, **unpublished** base image
+(`backend.ai-base.dockerfile`) that installs every backend.ai package once:
+
+- Every image contains **all** backend.ai packages and the full `backend.ai`
+  CLI; the images differ only in their default command, prepared directories,
+  and service extras (e.g. the agent's Docker CLI and entrypoint).
+- A host running several services downloads the shared base layers once; the
+  per-service layers are a few KB.
+- The same-version rule below is structural: one base build feeds all seven
+  images of a release.
 
 | Dockerfile | Docker Hub | Role |
 |---|---|---|
@@ -25,9 +39,22 @@ images and are not published.
 | `<version>` (e.g. `26.9.0`, `26.9.0rc1`) | The normalized package version of the release tag that built the image |
 | `latest` | Applied to **any** final (non-prerelease) release — never moved by rc/alpha/beta releases. This includes hotfixes cut from older release branches, so `latest` can move *backwards*; pin explicit versions in production |
 
-All images take the same build-arg contract: `PYTHON_VERSION` (from
-`pants.toml`) and `PKGVER` (normalized `VERSION`), and install the release
-wheels staged in `dist/` with the build context at the repository root.
+**Build contract.** The base image takes `PYTHON_VERSION` (from `pants.toml`)
+and `PKGVER` (normalized `VERSION`) and installs the release wheels staged in
+`dist/` (falling back to PyPI for a version already released there); the
+service dockerfiles take only `PKGVER` and start
+`FROM backend.ai-base:${PKGVER}`. Always build through bake — it builds the
+base as an in-run dependency of the service targets (via a named build
+context), so the base never needs to be pre-built or pushed anywhere:
+
+```sh
+PYTHON_VERSION=<ver from pants.toml> \
+PKGVER=$(python3 scripts/normalize-version.py "$(cat VERSION)") \
+  docker buildx bake backend_ai-manager --set '*.platform=linux/arm64' --load
+```
+
+(Bake target names replace the `.` of the image name with `_`; the build
+context is the repository root.)
 
 **Run every `lablup/backend.ai-*` image in one deployment at the SAME version.**
 The components exchange serialized messages over the shared Redis/Valkey event

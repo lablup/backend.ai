@@ -24,4 +24,4 @@ mkdir -p /var/log/backend.ai
 mkdir -p /tmp/backend.ai/ipc
 
 echo "=== Manager server starting ==="
-exec python -m ai.backend.manager.server --config /etc/backend.ai/manager.toml
+exec backend.ai mgr start-server --config /etc/backend.ai/manager.toml

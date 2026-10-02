@@ -1,0 +1,1 @@
+Build the published service images from a shared `backend.ai-base` image installing every backend.ai package once (defined in `docker-bake.hcl`), and start them via the `backend.ai <alias> start-server` CLI entry points
