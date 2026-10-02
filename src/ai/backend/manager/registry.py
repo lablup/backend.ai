@@ -136,10 +136,6 @@ from ai.backend.manager.models.kernel.row import (
     KernelRow,
     kernels,
 )
-from ai.backend.manager.models.kernel.statuses import (
-    AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES,
-    USER_RESOURCE_OCCUPYING_KERNEL_STATUSES,
-)
 from ai.backend.manager.models.keypair.row import query_bootstrap_script
 from ai.backend.manager.models.network.row import NetworkRow, NetworkType
 from ai.backend.manager.models.resource_group.row import resource_groups
@@ -1297,7 +1293,7 @@ class AgentRegistry:
                     .select_from(ra.join(k, ra.c.kernel_id == k.c.id))
                     .where(
                         k.c.user_uuid == user_id,
-                        k.c.status.in_(USER_RESOURCE_OCCUPYING_KERNEL_STATUSES),
+                        k.c.status.in_(KernelStatus.agent_resource_occupying_statuses()),
                         k.c.session_type.not_in(PRIVATE_SESSION_TYPES),
                         ra.c.free_at.is_(None),
                     )
@@ -1325,7 +1321,7 @@ class AgentRegistry:
                     .select_from(ra.join(k, ra.c.kernel_id == k.c.id))
                     .where(
                         k.c.access_key == access_key,
-                        k.c.status.in_(USER_RESOURCE_OCCUPYING_KERNEL_STATUSES),
+                        k.c.status.in_(KernelStatus.agent_resource_occupying_statuses()),
                         k.c.session_type.not_in(PRIVATE_SESSION_TYPES),
                         ra.c.free_at.is_(None),
                     )
@@ -1353,7 +1349,7 @@ class AgentRegistry:
                     .select_from(ra.join(k, ra.c.kernel_id == k.c.id))
                     .where(
                         k.c.domain_name == domain_name,
-                        k.c.status.in_(USER_RESOURCE_OCCUPYING_KERNEL_STATUSES),
+                        k.c.status.in_(KernelStatus.agent_resource_occupying_statuses()),
                         k.c.session_type.not_in(PRIVATE_SESSION_TYPES),
                         ra.c.free_at.is_(None),
                     )
@@ -1381,7 +1377,7 @@ class AgentRegistry:
                     .select_from(ra.join(k, ra.c.kernel_id == k.c.id))
                     .where(
                         k.c.group_id == group_id,
-                        k.c.status.in_(USER_RESOURCE_OCCUPYING_KERNEL_STATUSES),
+                        k.c.status.in_(KernelStatus.agent_resource_occupying_statuses()),
                         k.c.session_type.not_in(PRIVATE_SESSION_TYPES),
                         ra.c.free_at.is_(None),
                     )
@@ -1682,7 +1678,7 @@ class AgentRegistry:
                 .select_from(kernels)
                 .where(
                     (kernels.c.agent == agent_id)
-                    & (kernels.c.status.in_(AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES))
+                    & (kernels.c.status.in_(KernelStatus.agent_resource_occupying_statuses()))
                 )
             )
             result = await db_conn.execute(query)

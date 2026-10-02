@@ -13,9 +13,9 @@ from sqlalchemy.sql.expression import null, true
 from ai.backend.common.cron import PeriodicTask
 from ai.backend.common.plugin.monitor import GAUGE
 from ai.backend.logging.structured import StructuredLogger
+from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.defs import DEFAULT_ROLE
 from ai.backend.manager.models.kernel.row import kernels
-from ai.backend.manager.models.kernel.statuses import AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES
 from ai.backend.manager.models.keypair.row import keypairs
 
 if TYPE_CHECKING:
@@ -78,7 +78,7 @@ class StatsReporterTask(PeriodicTask):
                     .select_from(kernels)
                     .where(
                         (kernels.c.cluster_role == DEFAULT_ROLE)
-                        & (kernels.c.status.in_(AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES)),
+                        & (kernels.c.status.in_(KernelStatus.agent_resource_occupying_statuses())),
                     )
                 )
                 n = await conn.scalar(query)
