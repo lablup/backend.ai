@@ -12,7 +12,6 @@ from ai.backend.common.dto.manager.v2.vfolder.request import (
     ScopedSearchVFoldersInput,
     SearchVFoldersInput,
 )
-from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import encode_cursor
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
@@ -43,7 +42,7 @@ async def admin_vfolders_v2(
         VFolderUsageGQL | None,
         strawberry.argument(
             description=(
-                f"Added in {NEXT_RELEASE_VERSION}. Uses narrowing the result. Each listed "
+                "Added in 26.9.0. Uses narrowing the result. Each listed "
                 "entity must be readable by the caller; vfolders the caller cannot read "
                 "are left out."
             )
@@ -104,7 +103,7 @@ async def vfolder_v2(
 
 @gql_root_field(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.9.0",
         description=(
             "Page through the virtual folders the named scopes reach, combined with OR. "
             "Every scope is authorized before the read runs."
@@ -119,7 +118,7 @@ async def scoped_vfolders_v2(
         VFolderUsageGQL | None,
         strawberry.argument(
             description=(
-                f"Added in {NEXT_RELEASE_VERSION}. Uses narrowing the result. Each listed "
+                "Added in 26.9.0. Uses narrowing the result. Each listed "
                 "entity must be readable by the caller; vfolders the caller cannot read "
                 "are left out."
             )
@@ -176,7 +175,7 @@ async def project_vfolders(
         VFolderUsageGQL | None,
         strawberry.argument(
             description=(
-                f"Added in {NEXT_RELEASE_VERSION}. Uses narrowing the result. Each listed "
+                "Added in 26.9.0. Uses narrowing the result. Each listed "
                 "entity must be readable by the caller; vfolders the caller cannot read "
                 "are left out."
             )
@@ -232,7 +231,7 @@ async def my_vfolders(
         VFolderUsageGQL | None,
         strawberry.argument(
             description=(
-                f"Added in {NEXT_RELEASE_VERSION}. Uses narrowing the result. Each listed "
+                "Added in 26.9.0. Uses narrowing the result. Each listed "
                 "entity must be readable by the caller; vfolders the caller cannot read "
                 "are left out."
             )
@@ -277,7 +276,7 @@ async def my_vfolders(
 
 @gql_root_field(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.9.0",
         description="The mount levels set on a virtual folder, one row per user.",
     )
 )  # type: ignore[misc]

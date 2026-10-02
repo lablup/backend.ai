@@ -69,7 +69,6 @@ from ai.backend.common.dto.manager.v2.resource_slot.types import (
 from ai.backend.common.dto.manager.v2.resource_slot.types import (
     NumberFormatInput as NumberFormatInputDTO,
 )
-from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import OrderDirection, StringFilter
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
@@ -159,7 +158,7 @@ class ResourceSlotTypeGQL(PydanticNodeMixin[ResourceSlotTypeNodeDTO]):
     id: NodeID[str]
     entity_id: UUID = gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.9.0",
             description="UUID of the resource slot type.",
         ),
     )
@@ -171,13 +170,13 @@ class ResourceSlotTypeGQL(PydanticNodeMixin[ResourceSlotTypeNodeDTO]):
     )
     required: bool = gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.9.0",
             description="Whether a session request must name this slot.",
         ),
     )
     enabled: bool = gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.9.0",
             description=(
                 "Whether the scheduler considers this slot when placing sessions. "
                 "A disabled slot is ignored by the image slot-type rule."
@@ -289,7 +288,7 @@ class ResourceSlotTypeOrderByGQL(PydanticInputMixin[ResourceSlotTypeOrderDTO]):
 
 @gql_pydantic_input(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.9.0",
         description="Number format configuration written with a resource slot type.",
     ),
     name="NumberFormatInput",
@@ -306,7 +305,7 @@ class NumberFormatInputGQL(PydanticInputMixin[NumberFormatInputDTO]):
 
 @gql_pydantic_input(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.9.0",
         description="Input for registering a new resource slot type.",
     ),
     name="CreateResourceSlotTypeInput",
@@ -337,7 +336,7 @@ class CreateResourceSlotTypeInputGQL(PydanticInputMixin[CreateResourceSlotTypeIn
 
 @gql_pydantic_type(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.9.0",
         description="Payload for resource slot type registration.",
     ),
     model=CreateResourceSlotTypePayloadDTO,
@@ -351,7 +350,7 @@ class CreateResourceSlotTypePayloadGQL:
 
 @gql_pydantic_input(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.9.0",
         description=(
             "Input for updating a resource slot type. The slot name and slot type are "
             "immutable; omitted fields stay unchanged."
@@ -380,7 +379,7 @@ class UpdateResourceSlotTypeInputGQL(PydanticInputMixin[UpdateResourceSlotTypeIn
 
 @gql_pydantic_type(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.9.0",
         description="Payload for resource slot type update.",
     ),
     model=UpdateResourceSlotTypePayloadDTO,
@@ -394,7 +393,7 @@ class UpdateResourceSlotTypePayloadGQL:
 
 @gql_pydantic_input(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.9.0",
         description="Input for removing a resource slot type.",
     ),
     name="PurgeResourceSlotTypeInput",
@@ -405,7 +404,7 @@ class PurgeResourceSlotTypeInputGQL(PydanticInputMixin[PurgeResourceSlotTypeInpu
 
 @gql_pydantic_type(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.9.0",
         description="Payload for resource slot type removal.",
     ),
     model=PurgeResourceSlotTypePayloadDTO,
@@ -434,7 +433,7 @@ class AgentResourceSlotGQL(PydanticNodeMixin[AgentResourceNodeDTO]):
     id: NodeID[str]
     field_id: UUID = gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.9.0",
             description="UUID of the agent resource.",
         ),
     )
@@ -553,7 +552,7 @@ class KernelResourceAllocationGQL(PydanticNodeMixin[Any]):
     id: NodeID[str]
     field_id: UUID = gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.9.0",
             description="UUID of the resource allocation.",
         ),
     )

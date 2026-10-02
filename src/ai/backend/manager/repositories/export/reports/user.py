@@ -7,7 +7,6 @@ from decimal import Decimal
 from typing import Any
 
 from ai.backend.common.data.entity.project import ProjectEntityType
-from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.models.keypair import KeyPairRow
 from ai.backend.manager.models.project.row import ProjectRow
 from ai.backend.manager.models.resource_policy import UserResourcePolicyRow
@@ -252,7 +251,7 @@ USER_FIELDS: list[ExportFieldDef] = [
         key="main_access_key",
         name="Main Access Key",
         description=(
-            f"Main keypair access key. Deprecated since {NEXT_RELEASE_VERSION}."
+            "Main keypair access key. Deprecated since 26.9.0."
             " Use the keypair report's is_default field."
         ),
         field_type=ExportFieldType.STRING,

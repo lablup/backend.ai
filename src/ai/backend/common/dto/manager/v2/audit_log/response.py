@@ -8,7 +8,6 @@ from uuid import UUID
 from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseResponseModel
-from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 
 from .types import AuditLogStatus
 
@@ -23,7 +22,7 @@ class AuditLogNode(BaseResponseModel):
 
     id: UUID = Field(description="Audit log entry ID")
     field_id: UUID = Field(
-        description=f"UUID of the audit log record. Added in {NEXT_RELEASE_VERSION}.",
+        description="UUID of the audit log record. Added in 26.9.0.",
     )
     action_id: UUID = Field(description="UUID of the action that generated this log")
     entity_type: str | None = Field(
@@ -52,7 +51,7 @@ class AuditLogNode(BaseResponseModel):
     client_ip: str | None = Field(
         default=None,
         description=(
-            f"Added in {NEXT_RELEASE_VERSION}. IP address of the request that produced this "
+            "Added in 26.9.0. IP address of the request that produced this "
             "record, masked per the client IP masking policy. Null when the policy records "
             "none, or when the address was unavailable or unusable."
         ),

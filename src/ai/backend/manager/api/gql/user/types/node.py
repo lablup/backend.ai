@@ -14,7 +14,6 @@ from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.dto.manager.v2.user.response import UserNode
 from ai.backend.common.dto.manager.v2.user.types import UserFairShareScope, UserUsageScope
 from ai.backend.common.exception import InvalidAPIParameters
-from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     gql_added_field,
@@ -104,7 +103,7 @@ class UserV2GQL(PydanticNodeMixin[UserNode]):
     id: NodeID[str] = gql_field(description="Unique identifier for the user (UUID).")
     entity_id: UUID = gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.9.0",
             description="UUID of the user.",
         ),
     )
@@ -286,7 +285,7 @@ class UserV2GQL(PydanticNodeMixin[UserNode]):
 
     @gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.9.0",
             description="Resource groups this user may schedule on.",
         )
     )  # type: ignore[misc]

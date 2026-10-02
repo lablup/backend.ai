@@ -41,7 +41,6 @@ from ai.backend.common.dto.manager.v2.fair_share.response import (
     UpsertProjectFairShareWeightPayload as UpsertProjectFairShareWeightPayloadDTO,
 )
 from ai.backend.common.dto.manager.v2.group.types import ProjectTypeFilter
-from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import OrderDirection, StringFilter, UUIDFilter
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
@@ -239,11 +238,11 @@ class ProjectFairShareProjectNestedFilter(
 
 
 _PROJECT_FILTER_DEPRECATION = (
-    f"Deprecated since {NEXT_RELEASE_VERSION}. A filter on another entity's columns cannot check"
+    "Deprecated since 26.9.0. A filter on another entity's columns cannot check"
     " whether the caller may read that row. Search projects first, then narrow by projectId."
 )
 _PROJECT_ORDER_DEPRECATION = (
-    f"Deprecated since {NEXT_RELEASE_VERSION}. An order on another entity's columns cannot check"
+    "Deprecated since 26.9.0. An order on another entity's columns cannot check"
     " whether the caller may read that row. Search projects first, then order there."
 )
 

@@ -13,7 +13,6 @@ from ai.backend.common.dto.manager.v2.session.request import (
     ScopedSearchSessionsInput,
     TerminateSessionsInput,
 )
-from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.common.types import SessionId
 from ai.backend.manager.api.gql.base import encode_cursor
 from ai.backend.manager.api.gql.decorators import (
@@ -72,7 +71,7 @@ async def admin_sessions_v2(
         SessionUsageGQL | None,
         strawberry.argument(
             description=(
-                f"Added in {NEXT_RELEASE_VERSION}. Uses narrowing the result. Each listed "
+                "Added in 26.9.0. Uses narrowing the result. Each listed "
                 "entity must be readable by the caller; sessions the caller cannot read "
                 "are left out."
             )
@@ -117,7 +116,7 @@ async def admin_sessions_v2(
 
 @gql_root_field(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.9.0",
         description=(
             "Page through the sessions the named scopes reach, combined with OR. "
             "Every scope is authorized before the read runs."
@@ -131,7 +130,7 @@ async def scoped_sessions_v2(
         SessionUsageGQL | None,
         strawberry.argument(
             description=(
-                f"Added in {NEXT_RELEASE_VERSION}. Uses narrowing the result. Each listed "
+                "Added in 26.9.0. Uses narrowing the result. Each listed "
                 "entity must be readable by the caller; sessions the caller cannot read "
                 "are left out."
             )
@@ -188,7 +187,7 @@ async def project_sessions_v2(
         SessionUsageGQL | None,
         strawberry.argument(
             description=(
-                f"Added in {NEXT_RELEASE_VERSION}. Uses narrowing the result. Each listed "
+                "Added in 26.9.0. Uses narrowing the result. Each listed "
                 "entity must be readable by the caller; sessions the caller cannot read "
                 "are left out."
             )
@@ -290,7 +289,7 @@ async def terminate_sessions_v2(
 
 @gql_mutation(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.9.0",
         description=(
             "Exclude checker-session pairs from idle checks. Per-session RBAC permission "
             "is enforced by the bulk validator; any denial fails the whole request."
@@ -324,7 +323,7 @@ async def exclude_session_idle_checks(
 
 @gql_mutation(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.9.0",
         description=(
             "Include checker-session pairs into idle checks, resetting them so checks "
             "start from the initial grace period. Per-session RBAC permission "

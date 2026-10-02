@@ -6,7 +6,7 @@ Create Date: 2026-08-06 14:06:17
 
 """
 
-# Part of: NEXT_RELEASE_VERSION
+# Part of: 26.9.0
 
 import sqlalchemy as sa
 from alembic import op

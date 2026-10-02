@@ -14,7 +14,6 @@ from ai.backend.common.dto.manager.v2.role_preset.request import (
 from ai.backend.common.dto.manager.v2.role_preset.request import (
     RolePresetPermissionNestedFilter as RolePresetPermissionNestedFilterDTO,
 )
-from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import OrderDirection, StringFilter, UUIDFilter
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
@@ -31,7 +30,7 @@ from .permission import RolePermissionPresetFilterGQL
 @gql_pydantic_input(
     BackendAIGQLMeta(
         description="Filter role presets by conditions on the permission entries they carry.",
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.9.0",
     ),
     name="RolePresetPermissionNestedFilter",
 )
@@ -87,7 +86,7 @@ class RolePresetFilterGQL(PydanticInputMixin[RolePresetFilterDTO]):
     )
     permissions: RolePresetPermissionNestedFilterGQL | None = gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.9.0",
             description="Filter by conditions on the permission entries the preset carries.",
         ),
         default=None,

@@ -8,7 +8,6 @@ from uuid import UUID
 from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseResponseModel
-from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 
 __all__ = (
     "UpsertEntityLabelPayload",
@@ -23,7 +22,7 @@ class EntityLabelNode(BaseResponseModel):
 
     id: UUID = Field(description="Label ID")
     field_id: UUID = Field(
-        description=f"UUID of the entity label. Added in {NEXT_RELEASE_VERSION}.",
+        description="UUID of the entity label. Added in 26.9.0.",
     )
     entity_type: str = Field(description="Type of the labeled entity")
     entity_id: UUID = Field(description="ID of the labeled entity")

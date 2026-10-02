@@ -5,7 +5,6 @@ from __future__ import annotations
 import strawberry
 from strawberry import Info
 
-from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     gql_root_field,
@@ -23,10 +22,10 @@ from ai.backend.manager.api.gql.utils import check_admin_only
     BackendAIGQLMeta(
         added_version="26.3.0",
         description="Search entity associations (admin only).",
-        deprecated_version=NEXT_RELEASE_VERSION,
+        deprecated_version="26.9.0",
     ),
     deprecation_reason=(
-        f"Deprecated since {NEXT_RELEASE_VERSION}. The scope-entity association is removed;"
+        "Deprecated since 26.9.0. The scope-entity association is removed;"
         " this connection is always empty."
     ),
 )  # type: ignore[misc]

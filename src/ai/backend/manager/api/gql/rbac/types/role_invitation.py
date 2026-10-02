@@ -15,7 +15,6 @@ from strawberry.relay import Connection, Edge, NodeID
 from ai.backend.common.dto.manager.v2.rbac.response import (
     CreateRoleInvitationPayload as CreateRoleInvitationPayloadDTO,
 )
-from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import OrderDirection, StringFilter, UUIDFilter
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
@@ -44,7 +43,7 @@ def _meta(description: str) -> BackendAIGQLMeta:
     return BackendAIGQLMeta(
         added_version="26.4.4",
         description=description,
-        deprecated_version=NEXT_RELEASE_VERSION,
+        deprecated_version="26.9.0",
         deprecation_hint=_HINT,
     )
 

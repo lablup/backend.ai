@@ -104,7 +104,6 @@ from ai.backend.common.dto.manager.v2.rbac.types import (
 from ai.backend.common.dto.manager.v2.rbac.types import (
     RoleStatusFilter as RoleStatusFilterDTO,
 )
-from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import OrderDirection, StringFilter, UUIDFilter, encode_cursor
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
@@ -174,7 +173,7 @@ class RoleGQL(PydanticNodeMixin[RoleNode]):
     id: NodeID[str]
     entity_id: UUID = gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.9.0",
             description="UUID of the role.",
         ),
     )
@@ -196,13 +195,13 @@ class RoleGQL(PydanticNodeMixin[RoleNode]):
     )
     scope_type: str = gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.9.0",
             description="Type of the scope the role belongs to.",
         )
     )
     scope_id: UUID = gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.9.0",
             description="ID of the scope the role belongs to.",
         )
     )
@@ -219,7 +218,7 @@ class RoleGQL(PydanticNodeMixin[RoleNode]):
 
     @gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.9.0",
             description="The scope the role belongs to.",
         )
     )  # type: ignore[misc]
@@ -352,12 +351,11 @@ class RoleGQL(PydanticNodeMixin[RoleNode]):
         BackendAIGQLMeta(
             added_version="26.3.0",
             description="Users assigned to this role, as assignment rows.",
-            deprecated_version=NEXT_RELEASE_VERSION,
+            deprecated_version="26.9.0",
             deprecation_hint="`usersV2`",
         ),
         deprecation_reason=(
-            f"Deprecated since {NEXT_RELEASE_VERSION}. Use `usersV2`, which answers with the "
-            "users themselves."
+            "Deprecated since 26.9.0. Use `usersV2`, which answers with the users themselves."
         ),
     )  # type: ignore[misc]
     async def users(
@@ -405,7 +403,7 @@ class RoleGQL(PydanticNodeMixin[RoleNode]):
 
     @gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.9.0",
             description="Users holding this role.",
         )
     )  # type: ignore[misc]
@@ -477,11 +475,11 @@ class RoleGQL(PydanticNodeMixin[RoleNode]):
         BackendAIGQLMeta(
             added_version="26.4.2",
             description="Scopes this role is registered in.",
-            deprecated_version=NEXT_RELEASE_VERSION,
+            deprecated_version="26.9.0",
             deprecation_hint="`scope`",
         ),
         deprecation_reason=(
-            f"Deprecated since {NEXT_RELEASE_VERSION}. Use `scope`. A role belongs to one "
+            "Deprecated since 26.9.0. Use `scope`. A role belongs to one "
             "scope, so this connection holds that one scope and ignores `filter` and `order_by`."
         ),
     )  # type: ignore[misc]
@@ -690,7 +688,7 @@ class RoleMappedScopeNestedFilterGQL(PydanticInputMixin[MappedScopeNestedFilterD
 @gql_pydantic_input(
     BackendAIGQLMeta(
         description="Entities a role uses, whose ids narrow the read.",
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.9.0",
     ),
     name="RoleUses",
 )
@@ -709,7 +707,7 @@ class RoleUsesGQL(PydanticInputMixin[RoleUsesDTO]):
             "to read each listed entity, or the request is refused. Only roles the caller "
             "can read are returned, even when a listed entity is tied to others."
         ),
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.9.0",
     ),
     name="RoleUsage",
 )
@@ -733,7 +731,7 @@ class RoleFilter(PydanticInputMixin[RoleFilterDTO], GQLFilter):
         default=None,
         description="Filter roles by the users holding them.",
         deprecation_reason=(
-            f"Deprecated since {NEXT_RELEASE_VERSION}. A filter reaching the rows that join"
+            "Deprecated since 26.9.0. A filter reaching the rows that join"
             " a role to a user cannot check whether the caller may read that user. Search"
             " roles within that user's scope instead."
         ),
@@ -747,7 +745,7 @@ class RoleFilter(PydanticInputMixin[RoleFilterDTO], GQLFilter):
         | None
     ) = gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.9.0",
             description="Filter by conditions on the role's permission entries.",
         ),
         default=None,
@@ -776,7 +774,7 @@ class RoleAssignmentRoleNestedFilterGQL(PydanticInputMixin[RoleNestedFilterDTO])
 
 
 _ASSIGNMENT_ROLE_DEPRECATION = (
-    f"Deprecated since {NEXT_RELEASE_VERSION}. A filter on the role an assignment names, or"
+    "Deprecated since 26.9.0. A filter on the role an assignment names, or"
     " on what that role carries, cannot check whether the caller may read it. Search roles"
     " first and narrow by `roleId`."
 )
@@ -854,9 +852,7 @@ class CreateRoleInput(PydanticInputMixin[CreateRoleInputDTO]):
     source: RoleSourceGQL | None = gql_field(
         description="Deprecated and ignored: a created role is always custom.",
         default=None,
-        deprecation_reason=(
-            f"Deprecated since {NEXT_RELEASE_VERSION}. Ignored: a created role is always custom."
-        ),
+        deprecation_reason=("Deprecated since 26.9.0. Ignored: a created role is always custom."),
     )
     auto_assign: bool = gql_added_field(
         BackendAIGQLMeta(
@@ -870,7 +866,7 @@ class CreateRoleInput(PydanticInputMixin[CreateRoleInputDTO]):
     )
     scope: ScopeInputGQL | None = gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.9.0",
             description="The scope the role belongs to.",
         ),
         default=None,
@@ -878,7 +874,7 @@ class CreateRoleInput(PydanticInputMixin[CreateRoleInputDTO]):
     scopes: list[ScopeInputGQL] | None = gql_field(
         description="Deprecated: use `scope`. Accepts exactly one entry.",
         default=None,
-        deprecation_reason=f"Deprecated since {NEXT_RELEASE_VERSION}. Use `scope`.",
+        deprecation_reason="Deprecated since 26.9.0. Use `scope`.",
     )
 
 

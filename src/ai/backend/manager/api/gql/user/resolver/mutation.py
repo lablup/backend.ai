@@ -17,7 +17,6 @@ from ai.backend.common.dto.manager.v2.user.request import (
     RestoreUserInput,
 )
 from ai.backend.common.exception import InvalidIpAddressValue, UnreachableError
-from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.common.tristate.unset import Unset
 from ai.backend.common.types import AccessKey, ReadableCIDR
 from ai.backend.manager.api.adapters.user.adapter import UserAdapter
@@ -383,7 +382,7 @@ async def admin_delete_user_v2(
 
 @gql_mutation(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.9.0",
         description="Restore a soft-deleted user (admin only). Requires superadmin privileges. Sets the user status back to ACTIVE",
     )
 )

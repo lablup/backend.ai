@@ -15,7 +15,6 @@ from ai.backend.common.dto.manager.v2.role_preset.request import (
     RolePresetOrder,
     SearchRolePresetsInput,
 )
-from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import encode_cursor
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
@@ -60,7 +59,7 @@ async def admin_role_presets(
         RolePresetUsageGQL | None,
         strawberry.argument(
             description=(
-                f"Added in {NEXT_RELEASE_VERSION}. Uses narrowing the result. Each listed "
+                "Added in 26.9.0. Uses narrowing the result. Each listed "
                 "entity must be readable by the caller."
             )
         ),

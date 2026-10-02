@@ -17,7 +17,6 @@ from ai.backend.common.dto.manager.v2.entity_share.types import (
     EntityShareOrderField,
     EntityShareSideDTO,
 )
-from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import encode_cursor
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
@@ -40,7 +39,7 @@ from ai.backend.manager.api.gql.types import StrawberryGQLContext
 
 @gql_root_field(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.9.0",
         description=(
             "Page through the shares the caller stands on a side of. Naming no side reads both."
         ),
@@ -75,7 +74,7 @@ async def my_entity_shares(
 
 @gql_root_field(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.9.0",
         description=(
             "Page through the shares the named scopes reach, combined with OR. "
             "Every scope is authorized before the read runs."
@@ -142,7 +141,7 @@ def _to_connection(result: SearchEntitySharesPayload) -> EntityShareConnection:
 
 @gql_root_field(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.9.0",
         description=(
             "Read one share by id, from the side that offered it. "
             "The receiving side reaches theirs through the search addressed to it."
@@ -159,7 +158,7 @@ async def entity_share(
 
 @gql_mutation(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.9.0",
         description="Offer one entity to one project, one person, or one address.",
     )
 )
@@ -171,9 +170,7 @@ async def create_entity_share(
     return EntitySharePayloadGQL.from_pydantic(payload)
 
 
-@gql_mutation(
-    BackendAIGQLMeta(added_version=NEXT_RELEASE_VERSION, description="Take what was offered.")
-)
+@gql_mutation(BackendAIGQLMeta(added_version="26.9.0", description="Take what was offered."))
 async def accept_entity_share(
     info: Info[StrawberryGQLContext],
     id: UUID,
@@ -182,9 +179,7 @@ async def accept_entity_share(
     return EntitySharePayloadGQL.from_pydantic(payload)
 
 
-@gql_mutation(
-    BackendAIGQLMeta(added_version=NEXT_RELEASE_VERSION, description="Turn down what was offered.")
-)
+@gql_mutation(BackendAIGQLMeta(added_version="26.9.0", description="Turn down what was offered."))
 async def reject_entity_share(
     info: Info[StrawberryGQLContext],
     id: UUID,
@@ -195,7 +190,7 @@ async def reject_entity_share(
 
 @gql_mutation(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION, description="Withdraw an offer before it was answered."
+        added_version="26.9.0", description="Withdraw an offer before it was answered."
     )
 )
 async def cancel_entity_share(
@@ -206,9 +201,7 @@ async def cancel_entity_share(
     return EntitySharePayloadGQL.from_pydantic(payload)
 
 
-@gql_mutation(
-    BackendAIGQLMeta(added_version=NEXT_RELEASE_VERSION, description="Take back what was lent.")
-)
+@gql_mutation(BackendAIGQLMeta(added_version="26.9.0", description="Take back what was lent."))
 async def revoke_entity_share(
     info: Info[StrawberryGQLContext],
     id: UUID,
@@ -217,9 +210,7 @@ async def revoke_entity_share(
     return EntitySharePayloadGQL.from_pydantic(payload)
 
 
-@gql_mutation(
-    BackendAIGQLMeta(added_version=NEXT_RELEASE_VERSION, description="Give back what was taken.")
-)
+@gql_mutation(BackendAIGQLMeta(added_version="26.9.0", description="Give back what was taken."))
 async def leave_entity_share(
     info: Info[StrawberryGQLContext],
     id: UUID,
