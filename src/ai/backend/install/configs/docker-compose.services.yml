@@ -1,0 +1,116 @@
+# Backend.AI service containers (DOCKER install mode).
+#
+# This file is a template: the installer substitutes the install-directory
+# and release-version placeholders, and uncomments the GPU device-reservation
+# lines of the agent service when a CUDA accelerator is selected (the marker
+# prefix keeps that block a comment otherwise).
+#
+# Design contract (see docker/README.md for the rationale):
+# - The compose project name is fixed so this file never shares a compose
+#   project with the halfstack file living in the same directory.
+# - Every service runs on the host network, so the generated configs use the
+#   same 127.0.0.1 addressing as the package-based install layout.
+# - The install directory is bind-mounted at the SAME absolute path (path
+#   parity): every path under it that a service hands to the host Docker
+#   daemon (scratch roots, IPC sockets, vfolder trees, plugin var state)
+#   resolves identically on the host and inside the containers.
+# - The agent additionally needs pid/cgroup host namespaces and the
+#   /var/lib/backend.ai/krunner share for kernel-runner bind-mounts.
+# - No agent-watcher container ships in this mode; the watcher endpoint in
+#   the generated agent config is inert.
+# - The manager-cli service is a non-privileged twin of the manager used only
+#   for one-off management commands via `docker compose run`; its "cli"
+#   profile keeps `docker compose up -d` from ever starting it.
+name: backendai-services
+services:
+  manager:
+    image: lablup/backend.ai-manager:{{VERSION}}
+    network_mode: host
+    privileged: true
+    working_dir: {{BASE_PATH}}
+    command: ["python", "-m", "ai.backend.manager.server", "--config", "{{BASE_PATH}}/manager.toml"]
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - /etc/machine-id:/etc/machine-id:ro
+      - {{BASE_PATH}}:{{BASE_PATH}}
+    restart: unless-stopped
+
+  manager-cli:
+    image: lablup/backend.ai-manager:{{VERSION}}
+    network_mode: host
+    working_dir: {{BASE_PATH}}
+    profiles: ["cli"]
+    command: ["true"]
+    volumes:
+      - /etc/machine-id:/etc/machine-id:ro
+      - {{BASE_PATH}}:{{BASE_PATH}}
+
+  agent:
+    image: lablup/backend.ai-agent:{{VERSION}}
+    network_mode: host
+    privileged: true
+    pid: host
+    # REQUIRED: on cgroup v2 hosts Docker defaults to a private cgroup
+    # namespace even for privileged containers, which breaks the agent's
+    # host-PID -> container-PID translation.
+    cgroup: host
+#gpu#    deploy:
+#gpu#      resources:
+#gpu#        reservations:
+#gpu#          devices:
+#gpu#            - driver: nvidia
+#gpu#              count: all
+#gpu#              capabilities: [gpu]
+    working_dir: {{BASE_PATH}}
+    command: ["python", "-m", "ai.backend.agent.server", "-f", "{{BASE_PATH}}/agent.toml"]
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - /etc/machine-id:/etc/machine-id:ro
+      - {{BASE_PATH}}:{{BASE_PATH}}
+      - /var/lib/backend.ai/krunner:/var/lib/backend.ai/krunner
+    restart: unless-stopped
+
+  webserver:
+    image: lablup/backend.ai-webserver:{{VERSION}}
+    network_mode: host
+    working_dir: {{BASE_PATH}}
+    command: ["python", "-m", "ai.backend.web.server", "-f", "{{BASE_PATH}}/webserver.conf"]
+    volumes:
+      - {{BASE_PATH}}:{{BASE_PATH}}
+    restart: unless-stopped
+
+  storage-proxy:
+    image: lablup/backend.ai-storage-proxy:{{VERSION}}
+    network_mode: host
+    working_dir: {{BASE_PATH}}
+    command: ["python", "-m", "ai.backend.storage.server", "-f", "{{BASE_PATH}}/storage-proxy.toml"]
+    volumes:
+      - {{BASE_PATH}}:{{BASE_PATH}}
+    restart: unless-stopped
+
+  appproxy-coordinator:
+    image: lablup/backend.ai-appproxy-coordinator:{{VERSION}}
+    network_mode: host
+    working_dir: {{BASE_PATH}}
+    command: ["python", "-m", "ai.backend.appproxy.coordinator.server", "-f", "{{BASE_PATH}}/app-proxy-coordinator.toml"]
+    volumes:
+      - {{BASE_PATH}}:{{BASE_PATH}}
+    restart: unless-stopped
+
+  appproxy-worker:
+    image: lablup/backend.ai-appproxy-worker:{{VERSION}}
+    network_mode: host
+    working_dir: {{BASE_PATH}}
+    command: ["python", "-m", "ai.backend.appproxy.worker.server", "-f", "{{BASE_PATH}}/app-proxy-worker.toml"]
+    volumes:
+      - {{BASE_PATH}}:{{BASE_PATH}}
+    restart: unless-stopped
+
+  appproxy-worker-tcp:
+    image: lablup/backend.ai-appproxy-worker:{{VERSION}}
+    network_mode: host
+    working_dir: {{BASE_PATH}}
+    command: ["python", "-m", "ai.backend.appproxy.worker.server", "-f", "{{BASE_PATH}}/app-proxy-worker-tcp.toml"]
+    volumes:
+      - {{BASE_PATH}}:{{BASE_PATH}}
+    restart: unless-stopped
