@@ -1,0 +1,3 @@
+const __vite__mapDeps=(i,m=__vite__mapDeps,d=(m.f||(m.f=["assets/ChangePasswordView-C75N-FSo.js","assets/index-BQcmV02I.js","assets/index-C4uaMx_W.css"])))=>i.map(i=>d[i]);
+import{j as e,eL as o,l as r,i as n,b$ as i,d_ as l}from"./index-BQcmV02I.js";import{u as c}from"./useApiEndpoint-pInlj-mx.js";const p=i.lazy(()=>l(()=>import("./ChangePasswordView-C75N-FSo.js"),__vite__mapDeps([0,1,2]))),x=()=>e.jsxs(e.Fragment,{children:[e.jsx(o,{}),e.jsx(r.Suspense,{fallback:null,children:e.jsx(u,{})})]}),u=()=>{"use memo";const s=n.c(2),a=c();let t;return s[0]!==a?(t=e.jsx(p,{apiEndpoint:a,active:!0}),s[0]=a,s[1]=t):t=s[1],t};export{x as default};
+//# sourceMappingURL=ChangePasswordPage-Dk_WTcD5.js.map

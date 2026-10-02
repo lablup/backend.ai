@@ -1,0 +1,5 @@
+import{a7 as g,i as p,ak as y,bB as f,gU as K,j as T,bI as b,gV as x,gW as S}from"./index-BQcmV02I.js";/**
+ @license
+ Copyright (c) 2015-2026 Lablup Inc. All rights reserved.
+ */const q=t=>{const[e,u]=g(`hiddenColumnKeys.${t}`);return[e,u]},h=t=>{"use memo";const e=p.c(17),{open:u,onRequestClose:c,columns:C,hiddenColumnKeys:r}=t;let s,n,o,l;if(e[0]!==C||e[1]!==r||e[2]!==u){const a=y(C,R);s=K,n=u,o=a;let d;e[7]!==r?(d=r??[],e[7]=r,e[8]=d):d=e[8],l=f(y(a,"key"),d),e[0]=C,e[1]=r,e[2]=u,e[3]=s,e[4]=n,e[5]=o,e[6]=l}else s=e[3],n=e[4],o=e[5],l=e[6];let i;e[9]!==c?(i=a=>c(a?{selectedColumnKeys:a.selectedColumnKeys}:void 0),e[9]=c,e[10]=i):i=e[10];let m;return e[11]!==s||e[12]!==n||e[13]!==o||e[14]!==l||e[15]!==i?(m=T.jsx(s,{open:n,columns:o,visibleColumnKeys:l,disableReorder:!0,onRequestClose:i}),e[11]=s,e[12]=n,e[13]=o,e[14]=l,e[15]=i,e[16]=m):m=e[16],m};function R(t){const e=b(t.key);return{key:e,label:x(S(t)).trim()||e,required:!!t.required}}export{h as T,q as u};
+//# sourceMappingURL=TableColumnsSettingModal-BLIvNSez.js.map
