@@ -174,7 +174,7 @@ class _ReplicaOwnFields(RowDataConverter[RoutingRow, ModelReplicaData]):
         )
 
     def to_routing_data(self, row: RoutingRow) -> RoutingData:
-        """The same row read as the legacy REST v1 route projection."""
+        """The same row read as the routing record the replica specs and route reads return."""
         return RoutingData(
             id=self.field_id.read(row),
             endpoint=self.deployment_id.read(row),
