@@ -145,7 +145,12 @@ from ai.backend.common.types import (
     safe_print_redis_config,
 )
 from ai.backend.logging import Logger, LogLevel
-from ai.backend.logging.otel import LegacyOtelLogging, OpenTelemetrySpec, apply_otel_tracer
+from ai.backend.logging.otel import (
+    LegacyOtelLogging,
+    OpenTelemetrySpec,
+    apply_otel_tracer,
+    build_otel_server_middleware,
+)
 from ai.backend.logging.structured import StructuredLogger, with_log_context
 from ai.backend.logging.structured_otel import StructuredOtelLogging
 
@@ -1530,6 +1535,8 @@ async def agent_server_ctx(
     )
     app = build_root_server()
     app["health_probe"] = agent_server.health_probe
+    if local_config.otel.enabled:
+        app.middlewares.insert(0, build_otel_server_middleware())
     runner = web.AppRunner(app)
     await runner.setup()
     internal_addr = local_config.agent_common.internal_addr.to_legacy()
