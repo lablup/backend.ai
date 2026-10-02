@@ -2002,7 +2002,9 @@ class DeploymentDBSource:
                 )
             image_row = await db_sess.get(ImageRow, revision_row.image)
             if image_row is None:
-                raise DeploymentHasNoTargetRevision(f"Revision {revision_id} has no image")
+                raise ImageNotFound(
+                    f"Image {revision_row.image} of revision {revision_id} not found"
+                )
 
             # Resolve runtime variant preset values from revision
             resolved_presets: ResolvedPresetValues | None = None
