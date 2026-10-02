@@ -40,6 +40,7 @@ from ai.backend.common.exception import InvalidAPIParameters
 from ai.backend.common.plugin.hook import PASSED, HookResult, HookResults
 from ai.backend.common.types import (
     AccessKey,
+    BinarySize,
     ClusterMode,
     MountInfoEntry,
     MountPermission,
@@ -79,6 +80,7 @@ from ai.backend.manager.data.session.options import (
     SessionHandlerOptions,
 )
 from ai.backend.manager.data.session.spec import SessionSpec
+from ai.backend.manager.defs import DEFAULT_SHARED_MEMORY_SIZE
 from ai.backend.manager.errors.common import RejectedByHook
 from ai.backend.manager.models.network.row import NetworkType
 from ai.backend.manager.sokovan.scheduling_controller.scheduling_controller import (
@@ -501,6 +503,86 @@ class TestEnqueueSessionFromDraft:
 
         enqueued_spec = repository.enqueue_session_from_spec.await_args.args[0]
         assert enqueued_spec.resource_spec.network.network_type == NetworkType.VOLATILE
+
+
+class TestZeroResourceSlots:
+    def _with_resources(
+        self, draft: SessionSpecDraft, resources: dict[str, str]
+    ) -> SessionSpecDraft:
+        resource = draft.resource_spec.resource
+        assert resource.options.kernel_groups is not None
+        group = resource.options.kernel_groups[0]
+        resource_input = group.execution_spec.resource_input.model_copy(
+            update={
+                "resources": tuple(
+                    ResourceSlotEntry(resource_type=ResourceSlotName(k), quantity=v)
+                    for k, v in resources.items()
+                )
+            }
+        )
+        group = group.model_copy(
+            update={
+                "execution_spec": group.execution_spec.model_copy(
+                    update={"resource_input": resource_input}
+                )
+            }
+        )
+        options = resource.options.model_copy(update={"kernel_groups": (group,)})
+        return draft.model_copy(
+            update={
+                "resource_spec": draft.resource_spec.model_copy(
+                    update={"resource": resource.model_copy(update={"options": options})}
+                )
+            }
+        )
+
+    async def _enqueued_slots(
+        self, draft: SessionSpecDraft, image_id: ImageID
+    ) -> dict[str, Decimal]:
+        repository = AsyncMock()
+        repository.fetch_session_spec_context.return_value = _spec_context(image_id)
+        repository.query_accessible_resource_group_ids.return_value = frozenset({
+            draft.scope.resource_group_id
+        })
+        repository.enqueue_session_from_spec.return_value = SessionID(uuid.uuid4())
+        controller, _, _ = _build_controller(repository)
+
+        with with_user_context(_make_user()):
+            await controller.enqueue_session_from_draft(draft)
+
+        enqueued_spec = repository.enqueue_session_from_spec.await_args.args[0]
+        (kernel,) = enqueued_spec.resource_spec.kernel_specs
+        return {
+            str(entry.resource_type): Decimal(entry.quantity)
+            for entry in kernel.execution_spec.resource_input.resources
+        }
+
+    async def test_zero_accelerator_slots_are_not_enqueued(
+        self,
+        draft: SessionSpecDraft,
+        image_id: ImageID,
+    ) -> None:
+        """Zero accelerator slots in a resource group serving only cpu/mem do not reach the spec."""
+        draft = self._with_resources(
+            draft,
+            {"cpu": "1", "mem": "1140850688", "cuda.device": "0", "cuda.shares": "0"},
+        )
+
+        slots = await self._enqueued_slots(draft, image_id)
+
+        assert slots == {"cpu": Decimal(1), "mem": Decimal(1140850688)}
+
+    async def test_zero_intrinsic_slots_are_filled_from_image_minimum(
+        self,
+        draft: SessionSpecDraft,
+        image_id: ImageID,
+    ) -> None:
+        draft = self._with_resources(draft, {"cpu": "0", "mem": "0", "cuda.shares": "0"})
+
+        slots = await self._enqueued_slots(draft, image_id)
+
+        shmem = Decimal(int(BinarySize.finite_from_str(DEFAULT_SHARED_MEMORY_SIZE)))
+        assert slots == {"cpu": Decimal(1), "mem": Decimal(256 * 1024 * 1024) + shmem}
 
 
 class TestResourceGroupAccessibility:

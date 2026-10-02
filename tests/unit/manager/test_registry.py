@@ -224,6 +224,32 @@ def _make_scheduling_event(
     )
 
 
+class TestResourceEntriesFromLegacyDict:
+    """Tests for ``AgentRegistry._resource_entries_from_legacy_dict``."""
+
+    def test_drops_zero_quantity_slots(self) -> None:
+        entries = AgentRegistry._resource_entries_from_legacy_dict({
+            "cpu": 1,
+            "mem": "1140850688",
+            "cuda.device": 0,
+            "cuda.shares": "0",
+        })
+        assert {str(e.resource_type): e.quantity for e in entries} == {
+            "cpu": "1",
+            "mem": "1140850688",
+        }
+
+    def test_normalizes_binary_size_shortcuts(self) -> None:
+        entries = AgentRegistry._resource_entries_from_legacy_dict({
+            "mem": "1g",
+            "cuda.shares": "0.5",
+        })
+        assert {str(e.resource_type): e.quantity for e in entries} == {
+            "mem": str(1024**3),
+            "cuda.shares": "0.5",
+        }
+
+
 class TestWaitForSessionRunning:
     """Tests for _wait_for_session_running() timeout behavior."""
 

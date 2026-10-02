@@ -16,6 +16,10 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
   cancel-in-progress: true
 
+# `contents: read`: `plan-targets` and `determine-release-grade` only read the source
+permissions:
+  contents: read
+
 jobs:
 
   labeler:
@@ -28,6 +32,11 @@ jobs:
       - uses: lablup/auto-labeler@main
 
   detect-changes:
+    # `contents: read`: only diffs against the base revision
+    # `pull-requests: read`: `dorny/paths-filter` only lists the changed files
+    permissions:
+      contents: read
+      pull-requests: read
     runs-on: ubuntu-latest
     outputs:
       code: ${{ steps.filter.outputs.code }}
@@ -72,6 +81,11 @@ jobs:
   # a branch passes `cache-branch`, and the caches are saved only when
   # `decide-cache-save.sh` finds it at the tip of main or of a maintained version.
   check-build-and-lint:
+    # `contents: read`: only lints and builds
+    # `actions: write`: `pants-caches` deletes superseded caches
+    permissions:
+      contents: read
+      actions: write
     needs: detect-changes
     if: |
       always()
@@ -167,6 +181,11 @@ jobs:
       if: always()  # We want the log even on failures.
 
   typecheck:
+    # `contents: read`: only type-checks
+    # `actions: write`: `pants-caches` deletes superseded caches
+    permissions:
+      contents: read
+      actions: write
     needs: plan-targets
     if: needs.plan-targets.result == 'success' && needs.plan-targets.outputs.typecheck == 'true'
     uses: ./.github/workflows/ci-typecheck.yml
@@ -196,6 +215,11 @@ jobs:
         echo "OK"
 
   alembic:
+    # `contents: read`: only checks the migration history
+    # `actions: read`: `ci-alembic.yml` declares it
+    permissions:
+      contents: read
+      actions: read
     needs: detect-changes
     if: |
       needs.detect-changes.result == 'success'
@@ -222,6 +246,11 @@ jobs:
         fi
 
   test-unit:
+    # `contents: read`: only runs the unit tests
+    # `actions: write`: `pants-caches` deletes superseded caches
+    permissions:
+      contents: read
+      actions: write
     needs: [detect-changes, plan-targets]
     if: needs.plan-targets.result == 'success' && needs.plan-targets.outputs.unit-shards != '[]'
     uses: ./.github/workflows/ci-test.yml
@@ -233,6 +262,11 @@ jobs:
       cache-branch: ${{ github.event_name == 'push' && startsWith(github.ref, 'refs/heads/') && github.ref_name || '' }}
 
   test-scenario:
+    # `contents: read`: only runs the scenario tests
+    # `actions: write`: `pants-caches` deletes superseded caches
+    permissions:
+      contents: read
+      actions: write
     needs: plan-targets
     if: needs.plan-targets.result == 'success' && needs.plan-targets.outputs.scenario-shards != '[]'
     uses: ./.github/workflows/ci-test-scenario.yml
@@ -243,6 +277,11 @@ jobs:
       cache-branch: ${{ github.event_name == 'push' && startsWith(github.ref, 'refs/heads/') && github.ref_name || '' }}
 
   test-component:
+    # `contents: read`: only runs the component tests
+    # `actions: write`: `pants-caches` deletes superseded caches
+    permissions:
+      contents: read
+      actions: write
     needs: [detect-changes, plan-targets]
     if: needs.plan-targets.result == 'success' && needs.plan-targets.outputs.component-shards != '[]'
     uses: ./.github/workflows/ci-test.yml
@@ -255,6 +294,11 @@ jobs:
       cache-branch: ${{ github.event_name == 'push' && startsWith(github.ref, 'refs/heads/') && github.ref_name || '' }}
 
   test-integration:
+    # `contents: read`: only runs the integration tests
+    # `actions: write`: `pants-caches` deletes superseded caches
+    permissions:
+      contents: read
+      actions: write
     needs: [detect-changes, plan-targets]
     if: needs.plan-targets.result == 'success' && needs.plan-targets.outputs.integration-shards != '[]'
     uses: ./.github/workflows/ci-test.yml
@@ -340,6 +384,14 @@ jobs:
       run: python3 ./scripts/determine-release-type.py "$(cat VERSION)" >> "$GITHUB_OUTPUT"
 
   release:
+    # `contents: write`: `ci-release.yml` creates the GitHub release
+    # `actions: read`: `ci-release.yml` declares it
+    # `id-token`, `attestations: write`: `sbom.yml` signs the SBOM attestations
+    permissions:
+      contents: write
+      actions: read
+      id-token: write
+      attestations: write
     needs: [determine-release-grade, lint-and-typecheck, test-unit-gate, test-component-gate, test-integration-gate, check-alembic-migrations]
     if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
     uses: ./.github/workflows/ci-release.yml
@@ -350,6 +402,11 @@ jobs:
     secrets: inherit
 
   post-release:
+    # `contents: write`: uploads the Windows conda pack to the release
+    # `actions: read`: `ci-post-release.yml` declares it
+    permissions:
+      contents: write
+      actions: read
     needs: [determine-release-grade, release]
     if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
     uses: ./.github/workflows/ci-post-release.yml
