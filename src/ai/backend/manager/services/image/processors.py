@@ -122,7 +122,7 @@ class ImageProcessors:
     untag_image_from_registry: GlobalActionProcessor[
         UntagImageFromRegistryAction, UntagImageFromRegistryActionResult
     ]
-    scan_image: GlobalActionProcessor[ScanImageAction, ScanImageActionResult]
+    scan_already_registered_image: GlobalActionProcessor[ScanImageAction, ScanImageActionResult]
     purge_image: GlobalActionProcessor[PurgeImageAction, PurgeImageActionResult]
     purge_images: GlobalActionProcessor[PurgeImagesAction, PurgeImagesActionResult]
     clear_image_custom_resource_limit: GlobalActionProcessor[
@@ -200,7 +200,9 @@ class ImageProcessors:
         self.global_scan_image = group.global_scope(
             GlobalScanImageAction, service.global_scan_image
         )
-        self.scan_image = group.global_scope(ScanImageAction, service.scan_image)
+        self.scan_already_registered_image = group.global_scope(
+            ScanImageAction, service.scan_already_registered_image
+        )
         self.purge_image = group.global_scope(PurgeImageAction, service.purge_image)
         self.purge_images = group.global_scope(PurgeImagesAction, service.purge_images)
         self.clear_image_custom_resource_limit = group.global_scope(
