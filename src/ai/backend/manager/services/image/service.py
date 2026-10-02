@@ -353,7 +353,7 @@ class ImageService:
         image = await self._image_repository.scan_image(action.canonical, action.architecture)
         return GlobalScanImageActionResult(image=image)
 
-    async def scan_image(self, action: ScanImageAction) -> ScanImageActionResult:
+    async def scan_already_registered_image(self, action: ScanImageAction) -> ScanImageActionResult:
         image_canonical = action.canonical
         architecture = action.architecture
 
