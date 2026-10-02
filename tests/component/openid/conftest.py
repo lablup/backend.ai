@@ -334,7 +334,9 @@ def db_config(postgres_container: Any, test_db: str) -> DatabaseConfig:  # noqa:
     _, addr = postgres_container
     return DatabaseConfig(
         type="postgresql",
-        addr=HostPortPairModel(host=addr.host, port=addr.port),
+        addr=None,
+        addrs=[HostPortPairModel(host=addr.host, port=addr.port)],
+        connect_timeout=10.0,
         name=test_db,
         user=POSTGRES_USER,
         password=POSTGRES_PASSWORD,
@@ -352,7 +354,7 @@ def database(request: pytest.FixtureRequest, db_config: DatabaseConfig, test_db:
     Create the test database and install the schema via Alembic oneshot.
     Must be synchronous because cli_schema_oneshot internally calls asyncio.run().
     """
-    addr = db_config.addr
+    addr = db_config.addrs[0]
     address = f"{addr.host}:{addr.port}"
     user = db_config.user or "postgres"
     password = db_config.password or ""
