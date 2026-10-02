@@ -30,6 +30,9 @@ from ai.backend.manager.repositories.scheduler import (
     SchedulerRepository,
 )
 from ai.backend.manager.sokovan.scheduler.types import ScheduleType
+from ai.backend.manager.sokovan.scheduling_controller.preparers.drop_zero_resource_slots_rule import (
+    DropZeroResourceSlotsRule,
+)
 from ai.backend.manager.sokovan.scheduling_controller.types import SessionValidationSpec
 
 from .preparers import (
@@ -116,6 +119,7 @@ class SchedulingController:
             AssignUserIdentityRule(),
             MergeResourceGroupDefaultsRule(),
             ComputeKernelResourcesRule(),
+            DropZeroResourceSlotsRule(),
             ExpandKernelGroupsRule(),
             AssignNetworkConfigRule(),
             AssignContainerUserMappingRule(),
