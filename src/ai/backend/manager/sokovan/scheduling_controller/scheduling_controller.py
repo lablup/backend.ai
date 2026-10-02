@@ -62,42 +62,9 @@ from ai.backend.manager.sokovan.scheduler.provisioner.selectors.types import (
     ResourceRequirements,
 )
 from ai.backend.manager.sokovan.scheduler.types import ScheduleType
-<<<<<<< HEAD
-=======
-from ai.backend.manager.sokovan.scheduling_controller.preparers.resources.compute_kernel_resources_rule import (
-    ComputeKernelResourcesRule,
-)
 from ai.backend.manager.sokovan.scheduling_controller.preparers.resources.drop_zero_resource_slots_rule import (
     DropZeroResourceSlotsRule,
 )
-from ai.backend.manager.sokovan.scheduling_controller.preparers.resources.expand_kernel_groups_rule import (
-    ExpandKernelGroupsRule,
-)
-from ai.backend.manager.sokovan.scheduling_controller.preparers.resources.merge_resource_group_defaults_rule import (
-    MergeResourceGroupDefaultsRule,
-)
-from ai.backend.manager.sokovan.scheduling_controller.preparers.session_spec_preparer import (
-    SessionSpecPreparer,
-)
-from ai.backend.manager.sokovan.scheduling_controller.preparers.specs.assign_container_user_mapping_rule import (
-    AssignContainerUserMappingRule,
-)
-from ai.backend.manager.sokovan.scheduling_controller.preparers.specs.assign_network_config_rule import (
-    AssignNetworkConfigRule,
-)
-from ai.backend.manager.sokovan.scheduling_controller.preparers.specs.assign_user_identity_rule import (
-    AssignUserIdentityRule,
-)
-from ai.backend.manager.sokovan.scheduling_controller.preparers.specs.build_internal_data_rule import (
-    BuildInternalDataRule,
-)
-from ai.backend.manager.sokovan.scheduling_controller.preparers.specs.inject_session_environ_rule import (
-    InjectSessionEnvironRule,
-)
-from ai.backend.manager.sokovan.scheduling_controller.preparers.specs.resolve_vfolder_mounts_rule import (
-    ResolveVFolderMountsRule,
-)
->>>>>>> ae434cd6 (fix(BA-8264): drop zero-quantity resource slots on the legacy path and inside enqueue (#15209))
 from ai.backend.manager.sokovan.scheduling_controller.types import SessionValidationSpec
 from ai.backend.manager.views.sokovan.scheduling import ComputeScheduleData
 from ai.backend.manager.views.sokovan.session import MarkTerminatingResult

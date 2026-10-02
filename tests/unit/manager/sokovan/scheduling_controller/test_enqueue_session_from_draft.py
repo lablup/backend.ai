@@ -547,7 +547,7 @@ class TestZeroResourceSlots:
         repository.enqueue_session_from_spec.return_value = SessionID(uuid.uuid4())
         controller, _, _ = _build_controller(repository)
 
-        with with_user_context(_make_user()):
+        with with_user(_make_user()):
             await controller.enqueue_session_from_draft(draft)
 
         enqueued_spec = repository.enqueue_session_from_spec.await_args.args[0]
