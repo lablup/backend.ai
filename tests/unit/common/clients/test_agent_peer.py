@@ -63,4 +63,5 @@ async def test_call_without_context_carries_empty_metadata() -> None:
         "request_id": None,
         "user": None,
         "triggered_user": None,
+        "traceparent": None,
     }
