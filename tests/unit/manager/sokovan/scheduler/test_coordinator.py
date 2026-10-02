@@ -776,7 +776,6 @@ class TestScheduleCoordinatorStatusTransition:
             return_value=FailureClassificationResult(give_up=[], expired=[], need_retry=[])
         )
         mock_coordinator._apply_transition = AsyncMock()
-        mock_coordinator._broadcast_transition_events = AsyncMock()
 
         # Act
         await ScheduleCoordinator._handle_result(
@@ -835,7 +834,6 @@ class TestScheduleCoordinatorStatusTransition:
         )
         mock_coordinator._classify_failures = MagicMock(return_value=expected_classification)
         mock_coordinator._apply_transition = AsyncMock()
-        mock_coordinator._broadcast_transition_events = AsyncMock()
 
         # Act
         classified = await ScheduleCoordinator._handle_result(
@@ -1334,7 +1332,6 @@ class TestScheduleCoordinatorPromotionRecordOrdering:
         coordinator._repository = AsyncMock()
         coordinator._repository.get_db_now = AsyncMock(return_value=datetime.now(tzutc()))
         coordinator._apply_transition = AsyncMock()
-        coordinator._broadcast_transition_events = AsyncMock()
         return coordinator
 
     @pytest.fixture
@@ -1477,3 +1474,72 @@ class TestScheduleCoordinatorFaultLogging:
             await coordinator._process_lifecycle_handler_schedule(ScheduleType.SCHEDULE, handler)
 
         assert self._error_records(caplog) == []
+
+
+class TestScheduleCoordinatorTransitionEvents:
+    """Every session status write in _apply_transition anycasts a transition event."""
+
+    @pytest.fixture
+    def mock_coordinator(self) -> MagicMock:
+        coordinator = MagicMock(spec=ScheduleCoordinator)
+        coordinator._repository = AsyncMock()
+        coordinator._repository.update_with_history = AsyncMock(return_value=1)
+        coordinator._apply_kernel_pending_resets = AsyncMock()
+        coordinator._event_producer = AsyncMock()
+        return coordinator
+
+    async def _apply(
+        self,
+        coordinator: MagicMock,
+        info: SessionTransitionInfo,
+        to_status: SessionStatus,
+        scheduling_result: SchedulingResult,
+    ) -> None:
+        await ScheduleCoordinator._apply_transition(
+            coordinator,
+            handler_name="test_handler",
+            session_infos=[info],
+            transition=TransitionStatus(session=to_status, kernel=None),
+            scheduling_result=scheduling_result,
+            records={},
+            status_changed_at=datetime.now(tzutc()),
+        )
+
+    async def test_give_up_is_anycast_without_broadcast(self, mock_coordinator: MagicMock) -> None:
+        info = _create_session_transition_info(from_status=SessionStatus.PENDING)
+
+        await self._apply(
+            mock_coordinator, info, SessionStatus.DEPRIORITIZING, SchedulingResult.GIVE_UP
+        )
+
+        event = mock_coordinator._event_producer.anycast_event.await_args.args[0]
+        assert (event.session_id, event.status) == (info.session_id, "DEPRIORITIZING")
+        mock_coordinator._event_producer.broadcast_events_batch.assert_not_awaited()
+
+    async def test_success_is_anycast_and_broadcast(self, mock_coordinator: MagicMock) -> None:
+        info = _create_session_transition_info(from_status=SessionStatus.CREATING)
+
+        await self._apply(mock_coordinator, info, SessionStatus.RUNNING, SchedulingResult.SUCCESS)
+
+        event = mock_coordinator._event_producer.anycast_event.await_args.args[0]
+        assert (event.session_id, event.status) == (info.session_id, "RUNNING")
+        (broadcast,) = mock_coordinator._event_producer.broadcast_events_batch.await_args.args[0]
+        assert broadcast.status_transition == "RUNNING"
+
+    async def test_missing_creation_id_is_still_anycast(self, mock_coordinator: MagicMock) -> None:
+        info = SessionTransitionInfo(
+            session_id=SessionId(uuid4()), from_status=SessionStatus.CREATING, creation_id=None
+        )
+
+        await self._apply(mock_coordinator, info, SessionStatus.RUNNING, SchedulingResult.SUCCESS)
+
+        mock_coordinator._event_producer.anycast_event.assert_awaited_once()
+        assert mock_coordinator._event_producer.broadcast_events_batch.await_args.args[0] == []
+
+    async def test_same_status_rerun_is_not_anycast(self, mock_coordinator: MagicMock) -> None:
+        info = _create_session_transition_info(from_status=SessionStatus.PREPARING)
+
+        await self._apply(mock_coordinator, info, SessionStatus.PREPARING, SchedulingResult.SUCCESS)
+
+        mock_coordinator._event_producer.anycast_event.assert_not_awaited()
+        mock_coordinator._event_producer.broadcast_events_batch.assert_awaited_once()

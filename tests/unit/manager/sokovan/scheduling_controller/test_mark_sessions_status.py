@@ -12,6 +12,7 @@ from ai.backend.manager.sokovan.scheduling_controller.scheduling_controller impo
     SchedulingController,
     SchedulingControllerArgs,
 )
+from ai.backend.manager.views.sokovan.session import MarkTerminatingResult
 
 _REASON = KernelLifecycleEventReason.PREEMPTED_BY_SCHEDULER
 
@@ -21,6 +22,7 @@ def _build_controller() -> tuple[SchedulingController, AsyncMock, MagicMock, Mag
     repository = AsyncMock()
     event_producer = MagicMock()
     event_producer.broadcast_events_batch = AsyncMock()
+    event_producer.anycast_event = AsyncMock()
     valkey_schedule = MagicMock()
     valkey_schedule.mark_schedules_needed_batch = AsyncMock()
 
@@ -70,3 +72,47 @@ class TestMarkSessionsStatus:
 
         assert result == []
         event_producer.broadcast_events_batch.assert_not_awaited()
+
+    async def test_transitioned_sessions_are_anycast(self) -> None:
+        """Each moved session gets one transition anycast, which drives the session callback."""
+        controller, repository, _valkey_schedule, event_producer = _build_controller()
+        victims = [SessionId(uuid.uuid4()), SessionId(uuid.uuid4())]
+        repository.mark_sessions_status.return_value = victims
+
+        await controller.mark_sessions_status(victims, SessionStatus.PREEMPTED, _REASON)
+
+        anycast = [call.args[0] for call in event_producer.anycast_event.await_args_list]
+        assert [(e.session_id, e.status, e.reason) for e in anycast] == [
+            (victim, "PREEMPTED", _REASON) for victim in victims
+        ]
+
+
+class TestMarkSessionsForTermination:
+    async def test_every_marked_session_is_anycast_with_its_status(self) -> None:
+        controller, repository, valkey_schedule, event_producer = _build_controller()
+        valkey_schedule.add_force_terminated_sessions = AsyncMock()
+        cancelled, terminating, terminated = (SessionId(uuid.uuid4()) for _ in range(3))
+        repository.mark_sessions_terminating.return_value = MarkTerminatingResult(
+            cancelled_sessions=[cancelled],
+            terminating_sessions=[terminating],
+            force_terminated_sessions=[terminated],
+            skipped_sessions=[SessionId(uuid.uuid4())],
+        )
+
+        await controller.mark_sessions_for_termination(
+            [cancelled, terminating, terminated], _REASON
+        )
+
+        anycast = [call.args[0] for call in event_producer.anycast_event.await_args_list]
+        assert [(e.session_id, e.status) for e in anycast] == [
+            (cancelled, "CANCELLED"),
+            (terminating, "TERMINATING"),
+            (terminated, "TERMINATED"),
+        ]
+        broadcast = event_producer.broadcast_events_batch.await_args.args[0]
+        assert [e.status_transition for e in broadcast] == [
+            "CANCELLED",
+            "TERMINATING",
+            "TERMINATED",
+        ]
+        assert {e.creation_id for e in broadcast} == {""}

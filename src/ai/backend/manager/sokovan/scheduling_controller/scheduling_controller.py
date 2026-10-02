@@ -14,8 +14,6 @@ from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.defs import RESERVED_VFOLDER_PATTERNS, RESERVED_VFOLDERS
 from ai.backend.common.events.dispatcher import EventProducer
 from ai.backend.common.events.event_types.kernel.types import KernelLifecycleEventReason
-from ai.backend.common.events.event_types.session.broadcast import SchedulingBroadcastEvent
-from ai.backend.common.events.types import AbstractBroadcastEvent
 from ai.backend.common.exception import InvalidAPIParameters
 from ai.backend.common.plugin.hook import ALL_COMPLETED, PASSED, HookPluginContext
 from ai.backend.common.types import (
@@ -60,6 +58,10 @@ from ai.backend.manager.sokovan.scheduler.provisioner.selectors.tracker import (
 )
 from ai.backend.manager.sokovan.scheduler.provisioner.selectors.types import (
     ResourceRequirements,
+)
+from ai.backend.manager.sokovan.scheduler.session_transition_events import (
+    SessionStatusTransition,
+    produce_session_status_transition_events,
 )
 from ai.backend.manager.sokovan.scheduler.types import ScheduleType
 from ai.backend.manager.sokovan.scheduling_controller.preparers.resources.compute_kernel_resources_rule import (
@@ -340,14 +342,17 @@ class SchedulingController:
             session_name=spec.resource_spec.identity.session_name,
         )
 
-        await self._event_producer.broadcast_events_batch([
-            SchedulingBroadcastEvent(
-                session_id=session_id,
-                creation_id=spec.resource_spec.identity.creation_id,
-                status_transition=str(SessionStatus.PENDING),
-                reason="Session enqueued",
-            )
-        ])
+        await produce_session_status_transition_events(
+            self._event_producer,
+            [
+                SessionStatusTransition(
+                    session_id=session_id,
+                    to_status=SessionStatus.PENDING,
+                    reason="Session enqueued",
+                    creation_id=spec.resource_spec.identity.creation_id,
+                )
+            ],
+        )
 
         try:
             await self.mark_scheduling_needed([ScheduleType.SCHEDULE])
@@ -565,36 +570,18 @@ class SchedulingController:
                 force_terminated_count=len(result.force_terminated_sessions),
             )
 
-            # Broadcast status events for cancelled, terminating, and force-terminated sessions
-            broadcast_events: list[AbstractBroadcastEvent] = [
-                SchedulingBroadcastEvent(
-                    session_id=session_id,
-                    creation_id="",
-                    status_transition=str(SessionStatus.CANCELLED),
-                    reason=reason,
-                )
-                for session_id in result.cancelled_sessions
-            ]
-            broadcast_events.extend([
-                SchedulingBroadcastEvent(
-                    session_id=session_id,
-                    creation_id="",
-                    status_transition=str(SessionStatus.TERMINATING),
-                    reason=reason,
-                )
-                for session_id in result.terminating_sessions
-            ])
-            broadcast_events.extend([
-                SchedulingBroadcastEvent(
-                    session_id=session_id,
-                    creation_id="",
-                    status_transition=str(SessionStatus.TERMINATED),
-                    reason=reason,
-                )
-                for session_id in result.force_terminated_sessions
-            ])
-            if broadcast_events:
-                await self._event_producer.broadcast_events_batch(broadcast_events)
+            await produce_session_status_transition_events(
+                self._event_producer,
+                [
+                    SessionStatusTransition(session_id=session_id, to_status=status, reason=reason)
+                    for status, session_ids_in_status in (
+                        (SessionStatus.CANCELLED, result.cancelled_sessions),
+                        (SessionStatus.TERMINATING, result.terminating_sessions),
+                        (SessionStatus.TERMINATED, result.force_terminated_sessions),
+                    )
+                    for session_id in session_ids_in_status
+                ],
+            )
             # Record metric for termination attempts
             self._operation_metrics.observe_success(
                 operation="mark_sessions_terminating",
@@ -644,15 +631,13 @@ class SchedulingController:
         log.trace(
             "sessions marked with status", session_count=len(marked_sessions), to_status=to_status
         )
-        await self._event_producer.broadcast_events_batch([
-            SchedulingBroadcastEvent(
-                session_id=session_id,
-                creation_id="",
-                status_transition=str(to_status),
-                reason=reason,
-            )
-            for session_id in marked_sessions
-        ])
+        await produce_session_status_transition_events(
+            self._event_producer,
+            [
+                SessionStatusTransition(session_id=session_id, to_status=to_status, reason=reason)
+                for session_id in marked_sessions
+            ],
+        )
         self._operation_metrics.observe_success(
             operation="mark_sessions_status",
             count=len(marked_sessions),

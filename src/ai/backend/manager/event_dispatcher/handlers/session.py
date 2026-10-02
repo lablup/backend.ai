@@ -1,8 +1,9 @@
 import asyncio
 import logging
 import time
+from collections.abc import Mapping
 from datetime import UTC, datetime
-from typing import Any
+from typing import Any, Final
 
 import aiohttp
 import sqlalchemy as sa
@@ -21,6 +22,7 @@ from ai.backend.common.events.event_types.session.anycast import (
     SessionEnqueuedAnycastEvent,
     SessionFailureAnycastEvent,
     SessionStartedAnycastEvent,
+    SessionStatusTransitionAnycastEvent,
     SessionSuccessAnycastEvent,
     SessionTerminatedAnycastEvent,
     SessionTerminatingAnycastEvent,
@@ -35,6 +37,7 @@ from ai.backend.common.types import (
 )
 from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.data.deployment.types import RouteHealthStatus, RouteStatus
+from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.errors.kernel import SessionNotFound
 from ai.backend.manager.models.endpoint.row import EndpointRow
 from ai.backend.manager.models.routing.row import RoutingRow
@@ -49,6 +52,16 @@ from ai.backend.manager.sokovan.scheduling_controller.scheduling_controller impo
 )
 
 log = StructuredLogger(logging.getLogger(__spec__.name))
+
+#: Names the callback sent for these statuses before Sokovan; any other status sends its lowercased name.
+_LEGACY_CALLBACK_EVENT_NAMES: Final[Mapping[str, str]] = {
+    SessionStatus.PENDING: "enqueued",
+    SessionStatus.PREPARING: "checking_precondition",
+    SessionStatus.RUNNING: "started",
+    SessionStatus.CANCELLED: "cancelled",
+    SessionStatus.TERMINATING: "terminating",
+    SessionStatus.TERMINATED: "terminated",
+}
 
 
 class SessionEventHandler:
@@ -208,13 +221,20 @@ class SessionEventHandler:
             | SessionTerminatedAnycastEvent
             | SessionSuccessAnycastEvent
             | SessionFailureAnycastEvent
+            | SessionStatusTransitionAnycastEvent
         ),
     ) -> None:
         log.trace("invoking session callback")
+        match event:
+            case SessionStatusTransitionAnycastEvent(status=status):
+                callback_event = _LEGACY_CALLBACK_EVENT_NAMES.get(status, status.lower())
+                allow_stale = status in (SessionStatus.CANCELLED, SessionStatus.TERMINATED)
+            case _:
+                callback_event = event.event_name().removeprefix("session_")
+                allow_stale = isinstance(
+                    event, (SessionCancelledAnycastEvent, SessionTerminatedAnycastEvent)
+                )
         try:
-            allow_stale = isinstance(
-                event, (SessionCancelledAnycastEvent, SessionTerminatedAnycastEvent)
-            )
             async with self._db.begin_readonly_session() as db_sess:
                 session = await SessionRow.get_session(
                     db_sess,
@@ -228,7 +248,9 @@ class SessionEventHandler:
         try:
             # Update routing status
             # TODO: Check session health
-            if session.session_type == SessionTypes.INFERENCE:
+            if session.session_type == SessionTypes.INFERENCE and not isinstance(
+                event, SessionStatusTransitionAnycastEvent
+            ):
 
                 async def _update() -> None:
                     async with self._db.begin_session() as db_sess:
@@ -305,7 +327,7 @@ class SessionEventHandler:
 
         data = {
             "type": "session_lifecycle",
-            "event": event.event_name().removeprefix("session_"),
+            "event": callback_event,
             "session_id": str(event.session_id),
             "when": datetime.now(UTC).isoformat(),
             # Enriched fields — allow the callback receiver to reconstruct

@@ -25,10 +25,6 @@ from ai.backend.common.events.event_types.schedule.anycast import (
     DoSokovanProcessIfNeededEvent,
     DoSokovanProcessScheduleEvent,
 )
-from ai.backend.common.events.event_types.session.broadcast import (
-    SchedulingBroadcastEvent,
-)
-from ai.backend.common.events.types import AbstractBroadcastEvent
 from ai.backend.common.leader.tasks import EventTaskSpec
 from ai.backend.common.types import AccessKey, AgentId, SessionId
 from ai.backend.logging.structured import StructuredLogger, with_log_context
@@ -73,6 +69,10 @@ from ai.backend.manager.sokovan.scheduler.post_processors.factory import (
 )
 from ai.backend.manager.sokovan.scheduler.recorder.context import SessionRecorderContext
 from ai.backend.manager.sokovan.scheduler.scheduler import SchedulerComponents
+from ai.backend.manager.sokovan.scheduler.session_transition_events import (
+    SessionStatusTransition,
+    produce_session_status_transition_events,
+)
 from ai.backend.manager.sokovan.scheduler.types import ScheduleType
 from ai.backend.manager.sokovan.scheduling_controller.scheduling_controller import (
     SchedulingController,
@@ -206,7 +206,7 @@ class ScheduleCoordinator:
         self._operation_metrics = SchedulerOperationMetricObserver.instance()
 
         # Initialize kernel state engine with the component's repository
-        self._kernel_state_engine = KernelStateEngine(components.repository)
+        self._kernel_state_engine = KernelStateEngine(components.repository, event_producer)
 
         # Initialize hook registry from components
         self._hook_registry = components.hook_registry
@@ -904,9 +904,6 @@ class ScheduleCoordinator:
                 current_time,
             )
 
-            # Broadcast events for successful transitions
-            await self._broadcast_transition_events(sessions_to_transition, to_status)
-
     async def _execute_transition_hooks(
         self,
         session_infos: list[SessionTransitionInfo],
@@ -1012,49 +1009,6 @@ class ScheduleCoordinator:
             with with_log_context(session_id=session.session_info.identity.id):
                 await hook.execute(session)
 
-    async def _broadcast_transition_events(
-        self,
-        sessions: list[SessionTransitionInfo],
-        to_status: SessionStatus,
-    ) -> None:
-        """Broadcast scheduling events for session status transitions.
-
-        Creates SchedulingBroadcastEvent for each session and broadcasts them in batch.
-        Uses session data from SessionTransitionInfo (session_id, creation_id, reason).
-
-        Args:
-            sessions: Sessions that transitioned successfully
-            to_status: The target status sessions transitioned to
-        """
-        if not sessions:
-            return
-
-        events: list[AbstractBroadcastEvent] = []
-        for session_info in sessions:
-            if session_info.creation_id is None:
-                log.warning(
-                    "event broadcast skipped, creation_id missing",
-                    session_id=session_info.session_id,
-                )
-                continue
-
-            events.append(
-                SchedulingBroadcastEvent(
-                    session_id=session_info.session_id,
-                    creation_id=session_info.creation_id,
-                    status_transition=str(to_status),
-                    reason=(
-                        session_info.reason
-                        or session_info.message
-                        or KernelLifecycleEventReason.TRIGGERED_BY_SCHEDULER
-                    ),
-                )
-            )
-
-        if events:
-            await self._event_producer.broadcast_events_batch(events)
-            log.debug("transition events broadcast", event_count=len(events), to_status=to_status)
-
     async def _handle_result(
         self,
         handler: SessionLifecycleHandler,
@@ -1099,11 +1053,6 @@ class ScheduleCoordinator:
                 records,
                 current_time,
             )
-            # Broadcast events for successful transitions
-            if transitions.success.session:
-                await self._broadcast_transition_events(
-                    result.successes, transitions.success.session
-                )
 
         # FAILURE transitions - Coordinator classifies failures into give_up/expired/need_retry.
         # A classification without a declared transition keeps the current status but
@@ -1294,6 +1243,25 @@ class ScheduleCoordinator:
                 session_count=updated,
                 to_status=transition.session,
                 scheduling_result=scheduling_result,
+            )
+            await produce_session_status_transition_events(
+                self._event_producer,
+                [
+                    SessionStatusTransition(
+                        session_id=info.session_id,
+                        to_status=transition.session,
+                        reason=(
+                            info.reason
+                            or info.message
+                            or KernelLifecycleEventReason.TRIGGERED_BY_SCHEDULER
+                        ),
+                        from_status=info.from_status,
+                        creation_id=info.creation_id,
+                    )
+                    for info in session_infos
+                ],
+                # Only successes have ever been broadcast; the anycast covers every transition.
+                broadcast=scheduling_result == SchedulingResult.SUCCESS,
             )
 
         # Kernel status reset if transitioning to PENDING

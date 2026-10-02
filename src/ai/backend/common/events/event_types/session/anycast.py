@@ -115,6 +115,18 @@ class SessionTerminatedAnycastEvent(SessionTerminationEvent):
         return "session_terminated"
 
 
+class SessionStatusTransitionAnycastEvent(BaseSessionEvent):
+    """A session moved to ``status`` (a manager ``SessionStatus`` value)."""
+
+    status: str
+    reason: str = ""
+
+    @classmethod
+    @override
+    def event_name(cls) -> str:
+        return "session_status_transition"
+
+
 class SessionResultEvent(BaseSessionEvent):
     reason: KernelLifecycleEventReason = KernelLifecycleEventReason.UNKNOWN
     exit_code: int = -1

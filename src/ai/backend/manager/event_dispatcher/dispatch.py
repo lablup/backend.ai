@@ -90,6 +90,7 @@ from ai.backend.common.events.event_types.session.anycast import (
     SessionEnqueuedAnycastEvent,
     SessionFailureAnycastEvent,
     SessionStartedAnycastEvent,
+    SessionStatusTransitionAnycastEvent,
     SessionSuccessAnycastEvent,
     SessionTerminatedAnycastEvent,
     SessionTerminatingAnycastEvent,
@@ -526,6 +527,13 @@ class Dispatchers:
             SessionCheckingPrecondAnycastEvent,
             None,
             self._session_event_handler.invoke_session_callback,
+        )
+        # No coalescing: it drops events, and each transition is one callback.
+        evd.consume(
+            SessionStatusTransitionAnycastEvent,
+            None,
+            self._session_event_handler.invoke_session_callback,
+            name="api.session.stransition",
         )
         evd.consume(
             SessionSuccessAnycastEvent, None, self._session_event_handler.handle_batch_result

@@ -258,6 +258,7 @@ def _build_controller(
     storage_manager = MagicMock()
     event_producer = MagicMock()
     event_producer.broadcast_events_batch = AsyncMock()
+    event_producer.anycast_event = AsyncMock()
     valkey_schedule = MagicMock()
     valkey_schedule.mark_schedules_needed_batch = AsyncMock()
     network_plugin_ctx = MagicMock()
@@ -348,6 +349,11 @@ class TestEnqueueSessionFromDraft:
         broadcast_batch = event_producer.broadcast_events_batch.await_args.args[0]
         assert len(broadcast_batch) == 1
         assert broadcast_batch[0].session_id == expected_session_id
+
+        # PENDING anycast fired once, for the session callback
+        event_producer.anycast_event.assert_awaited_once()
+        anycast = event_producer.anycast_event.await_args.args[0]
+        assert (anycast.session_id, anycast.status) == (expected_session_id, "PENDING")
 
     async def test_explicit_job_priority_flows_into_spec(
         self,

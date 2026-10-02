@@ -8,13 +8,19 @@ All database operations go through the repository pattern.
 import logging
 from uuid import UUID
 
+from ai.backend.common.events.dispatcher import EventProducer
 from ai.backend.common.events.event_types.kernel.types import (
     KernelCreationInfo,
     KernelLifecycleEventReason,
 )
 from ai.backend.common.types import AgentId, KernelId, SessionId
 from ai.backend.logging.structured import StructuredLogger
+from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.repositories.scheduler.repository import SchedulerRepository
+from ai.backend.manager.sokovan.scheduler.session_transition_events import (
+    SessionStatusTransition,
+    produce_session_status_transition_events,
+)
 
 log = StructuredLogger(logging.getLogger(__spec__.name))
 
@@ -32,14 +38,17 @@ class KernelStateEngine:
     """
 
     _repository: SchedulerRepository
+    _event_producer: EventProducer
 
-    def __init__(self, repository: SchedulerRepository) -> None:
+    def __init__(self, repository: SchedulerRepository, event_producer: EventProducer) -> None:
         """
         Initialize the KernelStateEngine with a repository.
 
         :param repository: SchedulerRepository for database operations
+        :param event_producer: Producer for the session transition this engine writes (CANCELLED)
         """
         self._repository = repository
+        self._event_producer = event_producer
 
     async def mark_kernel_pulling(
         self,
@@ -131,7 +140,19 @@ class KernelStateEngine:
 
         if success:
             # Check if the session should be cancelled when all kernels are cancelled
-            await self._repository.check_and_cancel_session_if_needed(session_id)
+            if await self._repository.check_and_cancel_session_if_needed(session_id):
+                await produce_session_status_transition_events(
+                    self._event_producer,
+                    [
+                        SessionStatusTransition(
+                            session_id=session_id,
+                            to_status=SessionStatus.CANCELLED,
+                            reason=reason,
+                        )
+                    ],
+                    # This path has never broadcast; the anycast alone restores the callback.
+                    broadcast=False,
+                )
 
         return success
 

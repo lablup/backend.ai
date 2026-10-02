@@ -16,7 +16,10 @@ from ai.backend.common.events.event_types.session.anycast import (
     ExecutionFinishedAnycastEvent,
     ExecutionStartedAnycastEvent,
     ExecutionTimeoutAnycastEvent,
+    SessionFailureAnycastEvent,
     SessionStartedAnycastEvent,
+    SessionStatusTransitionAnycastEvent,
+    SessionSuccessAnycastEvent,
     SessionTerminatedAnycastEvent,
 )
 from ai.backend.common.types import (
@@ -25,6 +28,7 @@ from ai.backend.common.types import (
     SessionResult,
     SessionTypes,
 )
+from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.event_dispatcher.handlers.session import SessionEventHandler
 
 
@@ -94,7 +98,7 @@ def _make_handler(mock_db: MagicMock) -> tuple[SessionEventHandler, MagicMock, A
 
 async def _invoke_and_capture(
     mock_row: MagicMock,
-    event: SessionTerminatedAnycastEvent,
+    event: SessionTerminatedAnycastEvent | SessionStatusTransitionAnycastEvent,
 ) -> dict[str, Any]:
     """Run invoke_session_callback and return the captured webhook payload data."""
     mock_db_session = AsyncMock()
@@ -299,3 +303,146 @@ class TestSessionActivityMarkers:
         await handler.handle_execution_ended(None, AgentId("i-test"), event)
 
         mock_valkey_live.update_session_last_access.assert_awaited_once_with(session_id)
+
+
+class TestSessionStatusTransitionCallback:
+    """The transition anycast drives one session_lifecycle callback per event."""
+
+    @pytest.mark.parametrize(
+        ("status", "expected_event"),
+        [
+            pytest.param(SessionStatus.PENDING, "enqueued", id="pending"),
+            pytest.param(SessionStatus.PREPARING, "checking_precondition", id="preparing"),
+            pytest.param(SessionStatus.RUNNING, "started", id="running"),
+            pytest.param(SessionStatus.CANCELLED, "cancelled", id="cancelled"),
+            pytest.param(SessionStatus.TERMINATING, "terminating", id="terminating"),
+            pytest.param(SessionStatus.TERMINATED, "terminated", id="terminated"),
+            pytest.param(SessionStatus.RESERVED, "reserved", id="reserved"),
+            pytest.param(SessionStatus.PREEMPTED, "preempted", id="preempted"),
+            pytest.param(SessionStatus.RESCHEDULING, "rescheduling", id="rescheduling"),
+            pytest.param(SessionStatus.DEPRIORITIZING, "deprioritizing", id="deprioritizing"),
+            pytest.param(SessionStatus.SCHEDULED, "scheduled", id="scheduled"),
+            pytest.param(SessionStatus.PULLING, "pulling", id="pulling"),
+            pytest.param(SessionStatus.PREPARED, "prepared", id="prepared"),
+            pytest.param(SessionStatus.CREATING, "creating", id="creating"),
+        ],
+    )
+    async def test_status_maps_to_callback_event(
+        self, status: SessionStatus, expected_event: str
+    ) -> None:
+        session_id = SessionId(uuid.uuid4())
+        history = {"PENDING": "2026-01-01T00:00:00"}
+        event = SessionStatusTransitionAnycastEvent(
+            session_id=session_id, status=str(status), reason="test"
+        )
+
+        data = await _invoke_and_capture(_make_mock_session_row(status_history=history), event)
+
+        assert data["type"] == "session_lifecycle"
+        assert data["event"] == expected_event
+        assert data["session_id"] == str(session_id)
+        assert data["status_history"] == history
+        assert set(data) == {
+            "type",
+            "event",
+            "session_id",
+            "when",
+            "status_history",
+            "result",
+            "status_data",
+        }
+
+    async def test_one_callback_per_event(self) -> None:
+        handler, mock_registry, _ = _make_handler(_make_mock_db(AsyncMock()))
+        event = SessionStatusTransitionAnycastEvent(
+            session_id=SessionId(uuid.uuid4()), status="RUNNING"
+        )
+
+        with (
+            patch(
+                "ai.backend.manager.event_dispatcher.handlers.session.SessionRow.get_session",
+                new_callable=AsyncMock,
+                return_value=_make_mock_session_row(session_type=SessionTypes.INTERACTIVE),
+            ),
+            patch(
+                "ai.backend.manager.event_dispatcher.handlers.session._make_session_callback",
+                new=MagicMock(),
+            ),
+        ):
+            await handler.invoke_session_callback(None, AgentId("i-test"), event)
+
+        mock_registry.webhook_ptask_group.create_task.assert_called_once()
+
+    @pytest.mark.parametrize(
+        ("status", "allow_stale"),
+        [
+            pytest.param("TERMINATED", True, id="terminated"),
+            pytest.param("CANCELLED", True, id="cancelled"),
+            pytest.param("RUNNING", False, id="running"),
+        ],
+    )
+    async def test_ended_session_is_read_stale(self, status: str, allow_stale: bool) -> None:
+        handler, _, _ = _make_handler(_make_mock_db(AsyncMock()))
+        event = SessionStatusTransitionAnycastEvent(
+            session_id=SessionId(uuid.uuid4()), status=status
+        )
+
+        with patch(
+            "ai.backend.manager.event_dispatcher.handlers.session.SessionRow.get_session",
+            new_callable=AsyncMock,
+            return_value=_make_mock_session_row(callback_url=None),
+        ) as get_session:
+            await handler.invoke_session_callback(None, AgentId("i-test"), event)
+
+        assert get_session.await_args_list[0].kwargs["allow_stale"] is allow_stale
+
+
+class TestBatchResultCallback:
+    """The agent's batch success/failure path keeps its own callback names."""
+
+    @pytest.mark.parametrize(
+        ("event_cls", "expected_event", "success"),
+        [
+            pytest.param(SessionSuccessAnycastEvent, "success", True, id="success"),
+            pytest.param(SessionFailureAnycastEvent, "failure", False, id="failure"),
+        ],
+    )
+    async def test_batch_result_sends_its_callback(
+        self,
+        event_cls: type[SessionSuccessAnycastEvent] | type[SessionFailureAnycastEvent],
+        expected_event: str,
+        success: bool,
+    ) -> None:
+        handler, _, _ = _make_handler(_make_mock_db(AsyncMock()))
+        scheduling_controller = MagicMock()
+        scheduling_controller.mark_sessions_for_termination = AsyncMock()
+        handler._scheduling_controller = scheduling_controller
+        session_id = SessionId(uuid.uuid4())
+        captured: dict[str, Any] = {}
+
+        def _capture(data: dict[str, Any], url: yarl.URL) -> MagicMock:
+            captured.update(data)
+            return MagicMock()
+
+        with (
+            patch(
+                "ai.backend.manager.event_dispatcher.handlers.session.SessionRow.get_session",
+                new_callable=AsyncMock,
+                return_value=_make_mock_session_row(),
+            ),
+            patch(
+                "ai.backend.manager.event_dispatcher.handlers.session.SessionRow.set_session_result",
+                new_callable=AsyncMock,
+            ) as set_result,
+            patch(
+                "ai.backend.manager.event_dispatcher.handlers.session._make_session_callback",
+                new=_capture,
+            ),
+        ):
+            await handler.handle_batch_result(
+                None, AgentId("i-test"), event_cls(session_id=session_id)
+            )
+
+        assert set_result.await_args_list[0].kwargs["success"] is success
+        scheduling_controller.mark_sessions_for_termination.assert_awaited_once()
+        assert captured["event"] == expected_event
