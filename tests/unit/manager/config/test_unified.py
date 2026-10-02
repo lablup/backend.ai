@@ -1,9 +1,5 @@
-<<<<<<< HEAD
-=======
-import logging
 from typing import Any
 
->>>>>>> 6be94a7d (feat(BA-8244): connect the manager to PostgreSQL by cluster members and node role (#15186))
 import pytest
 from sqlalchemy.ext.asyncio import create_async_engine
 
