@@ -77,7 +77,11 @@ from ai.backend.common.web.session import (
 from ai.backend.common.web.session import setup as setup_session
 from ai.backend.common.web.session.redis_storage import RedisStorage
 from ai.backend.logging import BraceStyleAdapter, Logger, LogLevel
-from ai.backend.logging.otel import OpenTelemetrySpec
+from ai.backend.logging.otel import (
+    OpenTelemetrySpec,
+    build_otel_server_middleware,
+    instrument_aiohttp_client,
+)
 from ai.backend.web.clients.apollo_router_pool import (
     ApolloRouterEndpointsHealthChecker,
     ApolloRouterPoolGateHealthChecker,
@@ -1175,6 +1179,11 @@ async def server_main(
                 general_exception_middleware,
             ],
         )
+        if config.otel.enabled:
+            instrument_aiohttp_client()
+            app.middlewares.insert(
+                0, build_otel_server_middleware(untraced_handlers={console_handler, static_handler})
+            )
         app["config"] = config
         app["stats"] = WebStats()
         app["client_pool"] = await web_init_stack.enter_async_context(client_ctx(config, app))

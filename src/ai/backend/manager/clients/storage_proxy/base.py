@@ -8,6 +8,7 @@ from typing import Any, Final, cast
 import aiohttp
 import yarl
 from aiohttp import ClientTimeout
+from opentelemetry.propagate import inject
 
 from ai.backend.common.exception import (
     ErrorCode,
@@ -148,6 +149,8 @@ class StorageProxyHTTPClient:
         headers = {
             AUTH_TOKEN_HDR: self._secret,
         }
+        # The session predates client instrumentation, so the trace context is set here.
+        inject(headers)
         try:
             async with self._client_session.request(
                 method,

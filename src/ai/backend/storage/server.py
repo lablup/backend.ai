@@ -39,7 +39,7 @@ from ai.backend.common.plugin import AbstractPlugin, BasePluginContext
 from ai.backend.common.types import HostPortPair as CommonHostPortPair
 from ai.backend.common.utils import env_info
 from ai.backend.logging import BraceStyleAdapter, Logger, LogLevel
-from ai.backend.logging.otel import OpenTelemetrySpec
+from ai.backend.logging.otel import OpenTelemetrySpec, build_otel_server_middleware
 from ai.backend.storage.context_types import ArtifactVerifierContext
 
 try:
@@ -181,6 +181,8 @@ async def api_ctx(
                 str(local_config.api.client.ssl_privkey),
             )
         client_api_app = await init_client_app(root_ctx)
+        if local_config.otel.enabled:
+            client_api_app.middlewares.insert(0, build_otel_server_middleware())
         client_api_runner = web.AppRunner(client_api_app)
         await client_api_runner.setup()
         client_service_addr = local_config.api.client.service_addr
@@ -208,6 +210,10 @@ async def api_ctx(
                 str(local_config.api.manager.ssl_privkey),
             )
         manager_api_app = await init_manager_app(root_ctx)
+        if local_config.otel.enabled:
+            manager_api_app.middlewares.insert(
+                0, build_otel_server_middleware(parent_required_prefixes=("/",))
+            )
         manager_api_runner = web.AppRunner(manager_api_app)
         await manager_api_runner.setup()
         manager_service_addr_config = local_config.api.manager.service_addr
@@ -232,6 +238,8 @@ async def api_ctx(
     @asynccontextmanager
     async def internal_api_ctx() -> AsyncGenerator[web.Application]:
         internal_api_app = init_internal_app(root_ctx)
+        if local_config.otel.enabled:
+            internal_api_app.middlewares.insert(0, build_otel_server_middleware())
         internal_api_runner = web.AppRunner(internal_api_app)
         await internal_api_runner.setup()
         internal_addr = local_config.api.manager.internal_addr
