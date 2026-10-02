@@ -12,10 +12,12 @@ from ai.backend.common.data.entity.storage_volume import StorageVolumeID
 from ai.backend.common.data.storage.types import (
     DEFAULT_STATUS_STALE_AFTER,
     ServiceStorageStatus,
+    StorageVolumeUsageExposure,
 )
 from ai.backend.manager.models.base import (
     GUID,
     Base,
+    PydanticColumn,
     StrEnumType,
 )
 from ai.backend.manager.models.mixins.timestamp import LifecycleTimestampsMixin
@@ -56,16 +58,11 @@ class StorageVolumeRow(LifecycleTimestampsMixin, Base):
         nullable=False,
         server_default=sa.text(f"'{int(DEFAULT_STATUS_STALE_AFTER.total_seconds())} seconds'"),
     )
-    # Which usage figures this volume reports to a user. A percentage tells how full the
-    # volume is without disclosing its size, which is why it alone is exposed by default.
-    expose_percentage: Mapped[bool] = mapped_column(
-        "expose_percentage", sa.Boolean, nullable=False, server_default=sa.true()
-    )
-    expose_used_bytes: Mapped[bool] = mapped_column(
-        "expose_used_bytes", sa.Boolean, nullable=False, server_default=sa.false()
-    )
-    expose_capacity_bytes: Mapped[bool] = mapped_column(
-        "expose_capacity_bytes", sa.Boolean, nullable=False, server_default=sa.false()
+    usage_exposure: Mapped[StorageVolumeUsageExposure] = mapped_column(
+        "usage_exposure",
+        PydanticColumn(StorageVolumeUsageExposure),
+        nullable=False,
+        server_default=sa.text("""'{"exposed": ["percentage"]}'::jsonb"""),
     )
 
 
@@ -127,7 +124,7 @@ class ResourceGroupVolumeOfferRow(LifecycleTimestampsMixin, Base):
         GUID(StorageVolumeID),
         sa.ForeignKey(
             "storage_volumes.id",
-            ondelete="CASCADE",
+            ondelete="RESTRICT",
             name="fk_resource_group_volume_offers_storage_volume_id",
         ),
         primary_key=True,
