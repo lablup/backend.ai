@@ -371,7 +371,7 @@ class ModelServingRepository:
                 load_revisions=True,
             )
             if endpoint is None:
-                raise NoResultFound
+                raise EndpointNotFound
 
             await valkey_live.store_live_data(
                 f"endpoint.{service_id}.session.{route.session}.traffic_ratio",
