@@ -153,9 +153,14 @@ def dbshell(
             sys.exit(ExitCode.FAILURE)
     elif container_name == "-":
         # Use the host-provided psql command
+        hosts = ",".join(addr.host for addr in db_config.addrs)
+        ports = ",".join(str(addr.port) for addr in db_config.addrs)
         cmd = [
             "psql",
-            (f"postgres://{db_config.user}:{db_config.password}@{db_config.addr}/{db_config.name}"),
+            (
+                f"postgres://{db_config.user}:{db_config.password}@/{db_config.name}"
+                f"?host={hosts}&port={ports}&target_session_attrs=primary"
+            ),
             *_psql_args,
         ]
         subprocess.run(cmd)
