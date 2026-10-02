@@ -16,6 +16,7 @@ from ai.backend.common.events.event_types.session.anycast import (
     ExecutionFinishedAnycastEvent,
     ExecutionStartedAnycastEvent,
     ExecutionTimeoutAnycastEvent,
+    SessionCancelledAnycastEvent,
     SessionStartedAnycastEvent,
     SessionTerminatedAnycastEvent,
 )
@@ -68,7 +69,10 @@ def _make_mock_session_row(
     return row
 
 
-def _make_handler(mock_db: MagicMock) -> tuple[SessionEventHandler, MagicMock, AsyncMock]:
+def _make_handler(
+    mock_db: MagicMock,
+    deployment_repository: AsyncMock | None = None,
+) -> tuple[SessionEventHandler, MagicMock, AsyncMock]:
     """Create a SessionEventHandler with mocked dependencies.
 
     Returns the handler with the mock registry and mock valkey-live client so
@@ -88,7 +92,7 @@ def _make_handler(mock_db: MagicMock) -> tuple[SessionEventHandler, MagicMock, A
         event_dispatcher_plugin_ctx=mock_event_dispatcher_plugin_ctx,
         scheduling_controller=mock_scheduling_controller,
         valkey_live=mock_valkey_live,
-        deployment_repository=AsyncMock(),
+        deployment_repository=deployment_repository or AsyncMock(),
     )
     return handler, mock_registry, mock_valkey_live
 
@@ -300,3 +304,103 @@ class TestSessionActivityMarkers:
         await handler.handle_execution_ended(None, AgentId("i-test"), event)
 
         mock_valkey_live.update_session_last_access.assert_awaited_once_with(session_id)
+
+
+class TestInvokeSessionCallbackRouteUpdates:
+    """Tests for the route updates an inference session's callback hands to the repository."""
+
+    @pytest.fixture
+    def session_id(self) -> SessionId:
+        return SessionId(uuid.uuid4())
+
+    @pytest.fixture
+    def deployment_repository(self) -> AsyncMock:
+        return AsyncMock()
+
+    async def _invoke(
+        self,
+        deployment_repository: AsyncMock,
+        session_id: SessionId,
+        event: SessionCancelledAnycastEvent | SessionTerminatedAnycastEvent,
+        *,
+        session_type: SessionTypes = SessionTypes.INFERENCE,
+        status_data: dict[str, Any] | None = None,
+    ) -> None:
+        mock_row = _make_mock_session_row(
+            session_type=session_type, callback_url=None, status_data=status_data
+        )
+        mock_row.id = session_id
+        handler, _mock_registry, _mock_valkey_live = _make_handler(
+            _make_mock_db(AsyncMock()), deployment_repository
+        )
+        with patch(
+            "ai.backend.manager.event_dispatcher.handlers.session.SessionRow.get_session",
+            new_callable=AsyncMock,
+            return_value=mock_row,
+        ):
+            await handler.invoke_session_callback(None, AgentId("i-test"), event)
+
+    async def test_cancelled_with_an_error_marks_the_route_failed_with_it(
+        self, deployment_repository: AsyncMock, session_id: SessionId
+    ) -> None:
+        error = {"name": "InstanceNotAvailable", "repr": "no instance"}
+        event = SessionCancelledAnycastEvent(session_id=session_id, creation_id="c")
+
+        await self._invoke(deployment_repository, session_id, event, status_data={"error": error})
+
+        deployment_repository.mark_route_failed_by_session.assert_awaited_once_with(
+            session_id,
+            {"type": "session_cancelled", "errors": [error], "session_id": session_id},
+        )
+        deployment_repository.clear_endpoint_errors_by_session.assert_awaited_once_with(session_id)
+
+    async def test_cancelled_with_a_multi_agent_error_records_its_collection(
+        self, deployment_repository: AsyncMock, session_id: SessionId
+    ) -> None:
+        collection = [{"name": "A"}, {"name": "B"}]
+        event = SessionCancelledAnycastEvent(session_id=session_id, creation_id="c")
+
+        await self._invoke(
+            deployment_repository,
+            session_id,
+            event,
+            status_data={"error": {"name": "MultiAgentError", "collection": collection}},
+        )
+
+        deployment_repository.mark_route_failed_by_session.assert_awaited_once_with(
+            session_id,
+            {"type": "session_cancelled", "errors": collection, "session_id": session_id},
+        )
+
+    async def test_cancelled_without_an_error_marks_the_route_failed_without_error_data(
+        self, deployment_repository: AsyncMock, session_id: SessionId
+    ) -> None:
+        event = SessionCancelledAnycastEvent(session_id=session_id, creation_id="c")
+
+        await self._invoke(deployment_repository, session_id, event, status_data=None)
+
+        deployment_repository.mark_route_failed_by_session.assert_awaited_once_with(
+            session_id, None
+        )
+
+    async def test_other_event_only_clears_endpoint_errors(
+        self, deployment_repository: AsyncMock, session_id: SessionId
+    ) -> None:
+        event = SessionTerminatedAnycastEvent(session_id=session_id, reason="user-requested")
+
+        await self._invoke(deployment_repository, session_id, event)
+
+        deployment_repository.mark_route_failed_by_session.assert_not_awaited()
+        deployment_repository.clear_endpoint_errors_by_session.assert_awaited_once_with(session_id)
+
+    async def test_non_inference_session_leaves_routes_alone(
+        self, deployment_repository: AsyncMock, session_id: SessionId
+    ) -> None:
+        event = SessionCancelledAnycastEvent(session_id=session_id, creation_id="c")
+
+        await self._invoke(
+            deployment_repository, session_id, event, session_type=SessionTypes.BATCH
+        )
+
+        deployment_repository.mark_route_failed_by_session.assert_not_awaited()
+        deployment_repository.clear_endpoint_errors_by_session.assert_not_awaited()
