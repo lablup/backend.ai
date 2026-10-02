@@ -5,7 +5,6 @@ from __future__ import annotations
 from uuid import UUID
 
 from ai.backend.common.dto.manager.v2.entity.types import EntityTarget
-from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     gql_field,
@@ -22,7 +21,7 @@ __all__ = ("EntityTargetGQL",)
             "One entity, named by its type and its id. `entityTypes` lists the types a "
             "request may name."
         ),
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.9.0",
     ),
     name="EntityTarget",
 )

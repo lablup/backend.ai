@@ -10,7 +10,6 @@ from uuid import UUID
 from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseResponseModel
-from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 
 from .types import ContainerRegistryType
 
@@ -28,7 +27,7 @@ class ContainerRegistryNode(BaseResponseModel):
 
     id: UUID = Field(description="Unique identifier of the container registry.")
     entity_id: UUID = Field(
-        description=f"UUID of the container registry. Added in {NEXT_RELEASE_VERSION}.",
+        description="UUID of the container registry. Added in 26.9.0.",
     )
     url: str = Field(description="URL of the container registry.")
     registry_name: str = Field(description="Unique name identifying the container registry.")

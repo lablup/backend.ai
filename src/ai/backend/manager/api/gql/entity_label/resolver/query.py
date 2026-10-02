@@ -10,7 +10,6 @@ from ai.backend.common.dto.manager.v2.entity_label.request import (
     EntityLabelOrder,
     SearchEntityLabelsInput,
 )
-from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import encode_cursor
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
@@ -33,7 +32,7 @@ from ai.backend.manager.api.gql.types import StrawberryGQLContext
             "Read the labels on the entities named. Scope items are OR'd, and naming an "
             "entity the caller cannot read refuses the whole read."
         ),
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.9.0",
     )
 )  # type: ignore[misc]
 async def entity_labels(

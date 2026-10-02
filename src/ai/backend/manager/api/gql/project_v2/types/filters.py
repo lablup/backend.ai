@@ -11,7 +11,6 @@ from ai.backend.common.dto.manager.v2.group.types import (
     ProjectTypeFilter,
     ProjectUserFilter,
 )
-from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import (
     DateTimeFilter,
     OrderDirection,
@@ -90,14 +89,12 @@ class ProjectV2Filter(PydanticInputMixin[ProjectFilter]):
     name: StringFilter | None = None
     domain_name: StringFilter | None = None
     description: StringFilter | None = gql_added_field(
-        BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION, description="Filter by project description."
-        ),
+        BackendAIGQLMeta(added_version="26.9.0", description="Filter by project description."),
         default=None,
     )
     integration_name: StringFilter | None = gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.9.0",
             description="Filter by the external integration name.",
         ),
         default=None,
@@ -110,7 +107,7 @@ class ProjectV2Filter(PydanticInputMixin[ProjectFilter]):
         default=None,
         description="Filter by the domain holding the project.",
         deprecation_reason=(
-            f"Deprecated since {NEXT_RELEASE_VERSION}. A filter on another entity's columns"
+            "Deprecated since 26.9.0. A filter on another entity's columns"
             " cannot check whether the caller may read that row. Search domains first, then"
             " narrow by `domainName`."
         ),
@@ -119,7 +116,7 @@ class ProjectV2Filter(PydanticInputMixin[ProjectFilter]):
         default=None,
         description="Filter by the users enrolled in the project.",
         deprecation_reason=(
-            f"Deprecated since {NEXT_RELEASE_VERSION}. A filter on another entity's columns"
+            "Deprecated since 26.9.0. A filter on another entity's columns"
             " cannot check whether the caller may read that row. Search users first, then pass"
             " their ids as the `user` scope."
         ),
@@ -130,7 +127,7 @@ class ProjectV2Filter(PydanticInputMixin[ProjectFilter]):
 
 
 _USER_ORDER_DEPRECATION_TEMPLATE = (
-    f"Deprecated since {NEXT_RELEASE_VERSION}. A project holds many users, so this order"
+    "Deprecated since 26.9.0. A project holds many users, so this order"
     " folds them into a single {subject}. Narrow the results with the `user` filter instead."
 )
 

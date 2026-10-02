@@ -8,7 +8,6 @@ from ai.backend.common.dto.manager.v2.app_config.request import (
     MyGetAppConfigsInput,
     PublicGetAppConfigsInput,
 )
-from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.decorators import BackendAIGQLMeta, gql_root_field
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 
@@ -17,7 +16,7 @@ from .types import AppConfigGQL
 
 @gql_root_field(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.9.0",
         description=(
             "Read the acting user's merged config for each of the given names — public, the "
             "caller's domain, and the caller's own fragments deep-merged by allow-list rank. "
@@ -38,7 +37,7 @@ async def my_app_configs(
 
 @gql_root_field(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.9.0",
         description=(
             "Read the merged config for each of the given names from public fragments only. "
             "Served by the `public` subgraph without authentication, for pre-login clients that "

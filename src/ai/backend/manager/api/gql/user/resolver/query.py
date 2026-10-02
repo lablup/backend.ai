@@ -11,7 +11,6 @@ from ai.backend.common.contexts.client_ip import current_client_ip
 from ai.backend.common.contexts.user import current_user
 from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.dto.manager.v2.user.request import AdminSearchUsersInput
-from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import encode_cursor
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
@@ -93,7 +92,7 @@ async def admin_users_v2(
 
 @gql_root_field(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.9.0",
         description=(
             "Page through the users the named scopes reach, combined with OR. "
             "Every scope is authorized before the read runs."

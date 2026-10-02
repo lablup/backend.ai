@@ -5,7 +5,6 @@ from __future__ import annotations
 from strawberry.relay import NodeID
 
 from ai.backend.common.dto.manager.v2.entity.response import EntityTypeNode
-from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     gql_field,
@@ -23,7 +22,7 @@ __all__ = ("EntityTypeGQL",)
             "declared where its operations are wired, not as a fixed enum, so this is "
             "what a request may name."
         ),
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.9.0",
     ),
     name="EntityType",
 )

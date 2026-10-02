@@ -6,7 +6,6 @@ import strawberry
 from strawberry import Info
 
 from ai.backend.common.dto.manager.v2.rbac.request import AdminSearchPermissionsGQLInput
-from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import encode_cursor
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
@@ -218,7 +217,7 @@ async def admin_replace_role_permissions(
 
 @gql_root_field(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.9.0",
         description=(
             "The permissions the caller holds on one entity type within one scope, read"
             " through every scope that governs it. A scope that does not exist and a scope"
@@ -236,7 +235,7 @@ async def my_scope_permissions(
 
 @gql_root_field(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.9.0",
         description=(
             "The same answer as `myScopePermissions` for several targets at once, resolved"
             " in one grouped pass. Atomic: there is no per-target failure, so the payload"

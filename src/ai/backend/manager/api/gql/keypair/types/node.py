@@ -12,7 +12,6 @@ from strawberry.relay import Connection, Edge, NodeID
 
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.dto.manager.v2.keypair.response import KeypairNode
-from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     gql_added_field,
@@ -44,7 +43,7 @@ class KeyPairGQL(PydanticNodeMixin[KeypairNode]):
     id: NodeID[str] = gql_field(description="Access key (primary key, used as the Relay Node ID).")
     field_id: UUID = gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.9.0",
             description="UUID of the keypair.",
         ),
     )
@@ -53,7 +52,7 @@ class KeyPairGQL(PydanticNodeMixin[KeypairNode]):
     is_admin: bool | None = gql_field(description="Whether the keypair has admin privileges.")
     is_default: bool = gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.9.0",
             description="Whether this is the owner's default keypair.",
         ),
         default=False,

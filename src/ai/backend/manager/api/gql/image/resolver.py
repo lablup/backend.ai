@@ -22,7 +22,6 @@ from ai.backend.common.dto.manager.v2.image.request import (
 )
 from ai.backend.common.dto.manager.v2.image.types import ImageScope
 from ai.backend.common.dto.manager.v2.rbac.types import UUIDScope
-from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.common.types import ImageID
 from ai.backend.manager.api.gql.base import encode_cursor
 from ai.backend.manager.api.gql.decorators import (
@@ -63,7 +62,7 @@ async def admin_images_v2(
         ImageUsageGQL | None,
         strawberry.argument(
             description=(
-                f"Added in {NEXT_RELEASE_VERSION}. Uses narrowing the result. Each listed "
+                "Added in 26.9.0. Uses narrowing the result. Each listed "
                 "entity must be readable by the caller; images the caller cannot read "
                 "are left out."
             )
@@ -112,7 +111,7 @@ async def admin_images_v2(
 
 @gql_root_field(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.9.0",
         description=(
             "Page through the images the named scopes reach, combined with OR. "
             "Every scope is authorized before the read runs."
@@ -127,7 +126,7 @@ async def scoped_images_v2(
         ImageUsageGQL | None,
         strawberry.argument(
             description=(
-                f"Added in {NEXT_RELEASE_VERSION}. Uses narrowing the result. Each listed "
+                "Added in 26.9.0. Uses narrowing the result. Each listed "
                 "entity must be readable by the caller; images the caller cannot read "
                 "are left out."
             )

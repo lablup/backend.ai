@@ -9,7 +9,6 @@ from strawberry.relay import Connection, Edge, NodeID
 
 from ai.backend.common.data.artifact.types import ArtifactRegistryType
 from ai.backend.common.dto.manager.v2.artifact_registry.response import ArtifactRegistryGQLNode
-from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     gql_added_field,
@@ -32,7 +31,7 @@ class ArtifactRegistryMeta(PydanticNodeMixin[ArtifactRegistryGQLNode]):
     id: NodeID[str]
     entity_id: uuid.UUID = gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.9.0",
             description="UUID of the artifact registry.",
         ),
     )

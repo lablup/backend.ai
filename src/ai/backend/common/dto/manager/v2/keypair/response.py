@@ -11,7 +11,6 @@ from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseResponseModel
 from ai.backend.common.dto.manager.pagination import PaginationInfo
-from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.common.types import SecretKey
 
 __all__ = (
@@ -38,7 +37,7 @@ class KeypairNode(BaseResponseModel):
 
     id: str = Field(description="The primary key, equal to access_key. Used as the Relay Node ID.")
     field_id: UUID = Field(
-        description=f"UUID of the keypair. Added in {NEXT_RELEASE_VERSION}.",
+        description="UUID of the keypair. Added in 26.9.0.",
     )
     access_key: str = Field(description="The access key (acts as the unique identifier).")
     is_active: bool | None = Field(default=None, description="Whether the keypair is active.")
@@ -47,7 +46,7 @@ class KeypairNode(BaseResponseModel):
     )
     is_default: bool = Field(
         default=False,
-        description=f"Whether this is the owner's default keypair. Added in {NEXT_RELEASE_VERSION}.",
+        description="Whether this is the owner's default keypair. Added in 26.9.0.",
     )
     created_at: datetime | None = Field(default=None, description="When the keypair was created.")
     modified_at: datetime | None = Field(

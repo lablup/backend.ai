@@ -14,7 +14,6 @@ from ai.backend.common.dto.manager.v2.rbac.request import (
     SearchRoleAssignmentsInput,
     SearchRolesInput,
 )
-from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import encode_cursor
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
@@ -77,7 +76,7 @@ async def admin_roles(
         RoleUsageGQL | None,
         strawberry.argument(
             description=(
-                f"Added in {NEXT_RELEASE_VERSION}. Uses narrowing the result. Each listed "
+                "Added in 26.9.0. Uses narrowing the result. Each listed "
                 "entity must be readable by the caller; roles the caller cannot read "
                 "are left out."
             )
@@ -178,12 +177,11 @@ async def admin_role_assignments(
             "List the assignment rows joining the current authenticated user to the roles "
             "they hold."
         ),
-        deprecated_version=NEXT_RELEASE_VERSION,
+        deprecated_version="26.9.0",
         deprecation_hint="`myRolesV2`",
     ),
     deprecation_reason=(
-        f"Deprecated since {NEXT_RELEASE_VERSION}. Use `myRolesV2`, which answers with the "
-        "roles themselves."
+        "Deprecated since 26.9.0. Use `myRolesV2`, which answers with the roles themselves."
     ),
 )  # type: ignore[misc]
 async def my_roles(
@@ -236,7 +234,7 @@ async def my_roles(
 
 @gql_root_field(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.9.0",
         description="List the roles the current authenticated user holds.",
     )
 )  # type: ignore[misc]
@@ -246,7 +244,7 @@ async def my_roles_v2(
         RoleUsageGQL | None,
         strawberry.argument(
             description=(
-                f"Added in {NEXT_RELEASE_VERSION}. Uses narrowing the result. Each listed "
+                "Added in 26.9.0. Uses narrowing the result. Each listed "
                 "entity must be readable by the caller; roles the caller cannot read "
                 "are left out."
             )
@@ -303,7 +301,7 @@ async def project_roles(
         RoleUsageGQL | None,
         strawberry.argument(
             description=(
-                f"Added in {NEXT_RELEASE_VERSION}. Uses narrowing the result. Each listed "
+                "Added in 26.9.0. Uses narrowing the result. Each listed "
                 "entity must be readable by the caller; roles the caller cannot read "
                 "are left out."
             )

@@ -34,7 +34,6 @@ from ai.backend.common.dto.manager.v2.role_preset.types import (
 from ai.backend.common.dto.manager.v2.role_preset.types import (
     RolePresetUsedBy as RolePresetUsedByDTO,
 )
-from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     gql_field,
@@ -58,9 +57,7 @@ class RolePermissionPresetEntryInputGQL(PydanticInputMixin[RolePermissionPresetE
     operation: OperationTypeGQL | None = gql_field(
         description="Operation granted by the permission.",
         default=None,
-        deprecation_reason=(
-            f"Deprecated since {NEXT_RELEASE_VERSION}. Use `permission`; the value is ignored."
-        ),
+        deprecation_reason=("Deprecated since 26.9.0. Use `permission`; the value is ignored."),
     )
 
 
@@ -171,7 +168,7 @@ class BulkRemoveRolePermissionPresetsInputGQL(
 @gql_pydantic_input(
     BackendAIGQLMeta(
         description="Entities whose use of a role preset narrows the read.",
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.9.0",
     ),
     name="RolePresetUsedBy",
 )
@@ -190,7 +187,7 @@ class RolePresetUsedByGQL(PydanticInputMixin[RolePresetUsedByDTO]):
             "to read each listed entity, or the request is refused. Only presets the caller "
             "can read are returned, even when a listed entity is tied to others."
         ),
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.9.0",
     ),
     name="RolePresetUsage",
 )

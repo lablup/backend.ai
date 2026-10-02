@@ -14,7 +14,7 @@ from ai.backend.manager.models.base import GUID
 # revision identifiers, used by Alembic.
 revision = "8f21c46a0b73"
 down_revision = "c04f8b1a6e37"
-# Part of: NEXT_RELEASE_VERSION
+# Part of: 26.9.0
 branch_labels = None
 depends_on = None
 

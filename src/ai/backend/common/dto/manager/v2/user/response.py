@@ -14,7 +14,6 @@ from ai.backend.common.api_handlers import BaseResponseModel
 from ai.backend.common.dto.manager.pagination import PaginationInfo
 from ai.backend.common.dto.manager.v2.keypair.response import CreateKeypairPayload
 from ai.backend.common.dto.manager.v2.user.types import UserRole, UserStatus
-from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.common.types import BackendAISchema
 
 __all__ = (
@@ -109,7 +108,7 @@ class UserOrganizationInfo(BackendAISchema):
     )
     main_access_key: str | None = Field(
         default=None,
-        description=f"Primary API access key for this user. Deprecated since {NEXT_RELEASE_VERSION}. Use the keypair's is_default field.",
+        description="Primary API access key for this user. Deprecated since 26.9.0. Use the keypair's is_default field.",
         deprecated=True,
     )
 
@@ -175,7 +174,7 @@ class UserNode(BaseResponseModel):
         description="Unique identifier for the user (UUID).",
     )
     entity_id: UUID = Field(
-        description=f"UUID of the user. Added in {NEXT_RELEASE_VERSION}.",
+        description="UUID of the user. Added in 26.9.0.",
     )
     basic_info: UserBasicInfo = Field(
         description="Basic profile information including username, email, and display name.",
@@ -295,7 +294,7 @@ class BulkPurgeUsersPayload(BaseResponseModel):
     purged_count: int = Field(
         description=(
             "Number of users successfully purged. "
-            f"Deprecated since {NEXT_RELEASE_VERSION}. Use the length of successes."
+            "Deprecated since 26.9.0. Use the length of successes."
         ),
         deprecated=True,
     )

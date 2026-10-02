@@ -28,7 +28,6 @@ from ai.backend.common.dto.manager.v2.reservoir_registry.response import Reservo
 from ai.backend.common.dto.manager.v2.reservoir_registry.response import (
     UpdateReservoirRegistryPayload as UpdateReservoirRegistryPayloadDTO,
 )
-from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.artifact_registry_meta import ArtifactRegistryMetaConnection
 from ai.backend.manager.api.gql.base import encode_cursor
 from ai.backend.manager.api.gql.decorators import (
@@ -59,7 +58,7 @@ class ReservoirRegistry(PydanticNodeMixin[ReservoirRegistryNode]):
     id: NodeID[str]
     entity_id: UUID = gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.9.0",
             description="UUID of the reservoir registry.",
         ),
     )

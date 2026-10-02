@@ -106,7 +106,6 @@ from ai.backend.common.dto.manager.v2.notification.types import (
     SMTPConnectionInfo,
     WebhookSpecInfo,
 )
-from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import OrderDirection, StringFilter
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
@@ -214,7 +213,7 @@ class NotificationChannel(PydanticNodeMixin[NotificationChannelNode]):
     id: NodeID[str]
     entity_id: UUID = gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.9.0",
             description="UUID of the notification channel.",
         ),
     )
@@ -244,7 +243,7 @@ class NotificationRule(PydanticNodeMixin[NotificationRuleNode]):
     id: NodeID[str]
     entity_id: UUID = gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.9.0",
             description="UUID of the notification rule.",
         ),
     )

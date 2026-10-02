@@ -11,7 +11,7 @@ from alembic import op
 
 from ai.backend.manager.models.base import GUID
 
-# Part of: NEXT_RELEASE_VERSION
+# Part of: 26.9.0
 
 # revision identifiers, used by Alembic.
 revision = "fa8236974782"

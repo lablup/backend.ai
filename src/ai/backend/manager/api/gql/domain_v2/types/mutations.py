@@ -22,7 +22,6 @@ from ai.backend.common.dto.manager.v2.domain.response import (
 from ai.backend.common.dto.manager.v2.domain.response import (
     RestoreDomainPayload as RestoreDomainPayloadDTO,
 )
-from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     gql_field,
@@ -110,7 +109,7 @@ class DeleteDomainPayloadGQL(PydanticOutputMixin[DeleteDomainPayloadDTO]):
 
 @gql_pydantic_type(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.9.0",
         description="Payload for domain restore mutation.",
     ),
     model=RestoreDomainPayloadDTO,

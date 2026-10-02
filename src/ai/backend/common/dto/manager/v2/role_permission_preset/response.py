@@ -12,7 +12,6 @@ from ai.backend.common.data.entity.role_permission_preset import RolePermissionP
 from ai.backend.common.data.entity.role_preset import RolePresetID
 from ai.backend.common.data.entity.types import EntityType
 from ai.backend.common.dto.manager.v2.rbac.types import PermissionBitDTO
-from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 
 __all__ = (
     "BulkAddRolePermissionPresetFailureInfo",
@@ -29,7 +28,7 @@ class RolePermissionPresetNode(BaseResponseModel):
 
     id: RolePermissionPresetID = Field(description="Permission entry UUID.")
     field_id: UUID = Field(
-        description=f"UUID of the role permission preset. Added in {NEXT_RELEASE_VERSION}.",
+        description="UUID of the role permission preset. Added in 26.9.0.",
     )
     role_preset_id: RolePresetID = Field(description="UUID of the parent role preset.")
     entity_type: EntityType = Field(
