@@ -1233,10 +1233,19 @@ async def populate_fixture(
 
             match op_mode:
                 case FixtureOpModes.INSERT:
-                    insert_stmt = (
-                        sa.dialects.postgresql.insert(table).values(rows).on_conflict_do_nothing()
-                    )
-                    await conn.execute(insert_stmt)
+                    # A multi-row INSERT takes its column list from the FIRST row, silently
+                    # dropping keys that only later rows carry. Group the rows by attribute
+                    # set so every row's own columns reach the server.
+                    row_groups: dict[tuple[str, ...], list[dict[str, Any]]] = {}
+                    for row in rows:
+                        row_groups.setdefault(tuple(sorted(row)), []).append(row)
+                    for row_group in row_groups.values():
+                        insert_stmt = (
+                            sa.dialects.postgresql.insert(table)
+                            .values(row_group)
+                            .on_conflict_do_nothing()
+                        )
+                        await conn.execute(insert_stmt)
                 case FixtureOpModes.UPDATE:
                     update_stmt = sa.update(table)
                     pkcols = []
