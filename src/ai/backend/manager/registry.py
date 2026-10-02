@@ -272,15 +272,19 @@ class AgentRegistry:
         ``"1g"``) for memory-like slots; normalise them to plain decimal
         strings so downstream ``Decimal(quantity)`` calls in the scheduler
         and ``ResourceSlotEntry.to_resource_slot`` keep working unchanged.
+        Zero-quantity slots are dropped.
         """
         if not resources:
             return ()
-        return tuple(
-            ResourceSlotEntry(
-                resource_type=ResourceSlotName(str(k)), quantity=str(parse_quantity(v))
+        entries: list[ResourceSlotEntry] = []
+        for k, v in resources.items():
+            quantity = parse_quantity(v)
+            if quantity == 0:
+                continue
+            entries.append(
+                ResourceSlotEntry(resource_type=ResourceSlotName(str(k)), quantity=str(quantity))
             )
-            for k, v in resources.items()
-        )
+        return tuple(entries)
 
     def __init__(
         self,
