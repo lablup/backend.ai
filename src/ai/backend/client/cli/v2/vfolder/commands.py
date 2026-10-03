@@ -138,26 +138,16 @@ def create(
 
 @vfolder.command()
 @click.argument("vfolder_id", type=click.UUID)
-@click.argument("filenames", nargs=-1, required=True)
+@click.argument("filenames", nargs=-1, required=True, type=click.Path(exists=True, dir_okay=False))
 def upload(vfolder_id: UUID, filenames: tuple[str, ...]) -> None:
-    """Upload files to a vfolder.
-
-    Creates an upload session per file and prints the session token/url.
-    The actual file transfer uses TUS protocol to the returned URL.
-    """
-
-    from ai.backend.common.dto.manager.v2.vfolder.request import CreateUploadSessionInput
+    """Upload files into the root of a vfolder over TUS."""
 
     async def _run() -> None:
         registry = await create_v2_registry(load_v2_config())
         try:
             for filepath in filenames:
-                p = Path(filepath)
-                size = p.stat().st_size
-                filename = p.name
-                request = CreateUploadSessionInput(path=filename, size=size)
-                result = await registry.vfolder.create_upload_session(vfolder_id, request)
-                print_result(result)
+                await registry.vfolder.upload_file(vfolder_id, Path(filepath))
+                click.echo(f"Uploaded {filepath}")
         finally:
             await registry.close()
 
@@ -482,18 +472,28 @@ def rm(vfolder_id: UUID, files: tuple[str, ...], recursive: bool) -> None:
 @vfolder.command()
 @click.argument("vfolder_id", type=click.UUID)
 @click.argument("path", type=str)
-@click.option("--archive", is_flag=True, default=False, help="Archive the file for download.")
-def download(vfolder_id: UUID, path: str, archive: bool) -> None:
-    """Create a download session for a file in a vfolder."""
+@click.option(
+    "--archive", is_flag=True, default=False, help="Download a directory as a zip archive."
+)
+@click.option(
+    "-o",
+    "--output",
+    type=click.Path(dir_okay=False, path_type=Path),
+    default=None,
+    help="Local file to write. [default: the basename of PATH, plus .zip with --archive]",
+)
+def download(vfolder_id: UUID, path: str, archive: bool, output: Path | None) -> None:
+    """Download a file (or an archived directory) from a vfolder."""
 
-    from ai.backend.common.dto.manager.v2.vfolder.request import CreateDownloadSessionInput
+    dest = output or Path(Path(path).name + (".zip" if archive else ""))
+    if dest.exists():
+        raise click.ClickException(f"{dest} already exists")
 
     async def _run() -> None:
         registry = await create_v2_registry(load_v2_config())
         try:
-            request = CreateDownloadSessionInput(path=path, archive=archive)
-            result = await registry.vfolder.create_download_session(vfolder_id, request)
-            print_result(result)
+            await registry.vfolder.download_file(vfolder_id, path, dest, archive=archive)
+            click.echo(f"Downloaded {path} to {dest}")
         finally:
             await registry.close()
 
