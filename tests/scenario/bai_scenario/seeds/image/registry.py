@@ -24,6 +24,9 @@ class SeedContainerRegistry(SeedRow[ContainerRegistryData]):
     name_hint: str = "registry"
     registry_type: ContainerRegistryType = ContainerRegistryType.DOCKER
     is_global: bool = True
+    project: str | None = None
+    """Harbor addresses images through a project, so a row of that type needs one.
+    Left out, a Harbor registry takes its own name."""
 
     @override
     def kind(self) -> str:
@@ -39,11 +42,18 @@ class SeedContainerRegistry(SeedRow[ContainerRegistryData]):
 
     @override
     def seed(self, name: str) -> ContainerRegistryCreator:
+        project = self.project
+        if project is None and self.registry_type in (
+            ContainerRegistryType.HARBOR,
+            ContainerRegistryType.HARBOR2,
+        ):
+            project = name
         return ContainerRegistryCreator(
             url=f"https://{name}.scenario.local",
             type=self.registry_type,
             registry_name=name,
             is_global=self.is_global,
+            project=project,
         )
 
 

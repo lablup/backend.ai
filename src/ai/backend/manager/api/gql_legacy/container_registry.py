@@ -19,11 +19,7 @@ from ai.backend.manager.data.container_registry.types import ContainerRegistryDa
 from ai.backend.manager.defs import PASSWORD_PLACEHOLDER
 from ai.backend.manager.models.container_registry.creators import ContainerRegistryCreator
 from ai.backend.manager.models.container_registry.purgers import ContainerRegistryPurger
-from ai.backend.manager.models.container_registry.row import (
-    ContainerRegistryRow,
-    ContainerRegistryValidator,
-    ContainerRegistryValidatorArgs,
-)
+from ai.backend.manager.models.container_registry.row import ContainerRegistryRow
 from ai.backend.manager.models.container_registry.updaters import ContainerRegistryUpdater
 from ai.backend.manager.models.minilang import FieldSpecItem, OrderSpecItem
 from ai.backend.manager.models.minilang.ordering import QueryOrderParser
@@ -51,6 +47,10 @@ from ai.backend.manager.services.container_registry.actions.update_container_reg
 )
 from ai.backend.manager.services.container_registry.actions.update_registry_quota import (
     UpdateRegistryQuotaAction,
+)
+from ai.backend.manager.services.container_registry.validator import (
+    ContainerRegistryValidator,
+    ContainerRegistryValidatorArgs,
 )
 from ai.backend.manager.types import OptionalState, TriState
 

@@ -14,10 +14,6 @@ from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.api.adapters.container_registry.adapter import ContainerRegistryAdapter
 from ai.backend.manager.models.container_registry.creators import ContainerRegistryCreator
 from ai.backend.manager.models.container_registry.purgers import ContainerRegistryPurger
-from ai.backend.manager.models.container_registry.row import (
-    ContainerRegistryValidator,
-    ContainerRegistryValidatorArgs,
-)
 from ai.backend.manager.models.container_registry.updaters import ContainerRegistryUpdater
 from ai.backend.manager.models.user.row import UserRole
 from ai.backend.manager.services.container_registry.actions.create_container_registry import (
@@ -28,6 +24,10 @@ from ai.backend.manager.services.container_registry.actions.delete_container_reg
 )
 from ai.backend.manager.services.container_registry.actions.update_container_registry import (
     UpdateContainerRegistryAction,
+)
+from ai.backend.manager.services.container_registry.validator import (
+    ContainerRegistryValidator,
+    ContainerRegistryValidatorArgs,
 )
 from ai.backend.manager.types import OptionalState, TriState
 
