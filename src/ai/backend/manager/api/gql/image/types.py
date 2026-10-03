@@ -51,6 +51,7 @@ from ai.backend.common.dto.manager.v2.image.types import (
 from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.common.types import ImageID
 from ai.backend.manager.api.gql.base import (
+    BigInt,
     DateTimeFilter,
     IntFilter,
     OrderDirection,
@@ -220,7 +221,16 @@ class ImageV2IdentityInfoGQL:
 )
 class ImageV2MetadataInfoGQL:
     digest: str | None = gql_field(description="Config digest (image hash) for verification.")
-    size_bytes: int = gql_field(description="Image size in bytes.")
+    size_bytes: int = gql_field(
+        description="Image size in bytes.",
+        deprecation_reason="Use sizeV2; this field cannot carry sizes over 2 GiB.",
+    )
+    size_v2: BigInt | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="Image size in bytes.",
+        ),
+    )
     created_at: datetime | None = gql_field(
         description="Timestamp when the image was created/registered."
     )

@@ -198,6 +198,7 @@ class ImageMetadataInfoDTO(BaseResponseModel):
 
     digest: str | None = Field(default=None, description="Config digest for verification.")
     size_bytes: int = Field(description="Image size in bytes.")
+    size_v2: int | None = Field(default=None, description="Image size in bytes.")
     created_at: datetime | None = Field(default=None, description="Image creation timestamp.")
     last_used_at: datetime | None = Field(
         default=None,

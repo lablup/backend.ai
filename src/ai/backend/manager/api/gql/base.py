@@ -51,6 +51,15 @@ if TYPE_CHECKING:
     )
 
 
+@strawberry.scalar(
+    description="Integer that may exceed the 32-bit range of Int.",
+    serialize=int,
+    parse_value=int,
+)
+class BigInt(int):
+    pass
+
+
 @strawberry.scalar
 class ByteSize(str):
     """
