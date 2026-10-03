@@ -1,8 +1,8 @@
 from __future__ import annotations
 
 import tomllib
+from collections.abc import Mapping
 from importlib.resources.abc import Traversable
-from typing import Any
 
 import orjson
 import yaml
@@ -15,21 +15,29 @@ __all__ = ("FileLoader",)
 
 
 class FileLoader:
-    """Loads a file into plain Python values in the format its suffix names. A YAML file
-    is read as one document."""
+    """Loads a file whose top level is a mapping, in the format its suffix names. A YAML
+    file is read as one document; any other top level is refused."""
 
-    def load(self, entry: Traversable) -> Any:
+    def load(self, entry: Traversable) -> Mapping[str, object]:
         return self.parse(entry.name, entry.read_text(encoding="utf-8"))
 
-    def parse(self, name: str, text: str) -> Any:
+    def parse(self, name: str, text: str) -> Mapping[str, object]:
         file_format = FileFormat.from_name(name)
         try:
-            match file_format:
-                case FileFormat.YAML:
-                    return yaml.safe_load(text)
-                case FileFormat.JSON:
-                    return load_json(text)
-                case FileFormat.TOML:
-                    return tomllib.loads(text)
+            value = self._decode(file_format, text)
         except (yaml.YAMLError, orjson.JSONDecodeError, tomllib.TOMLDecodeError) as e:
             raise InvalidFileContent(f"{name} is not readable as {file_format}: {e}") from e
+        if not isinstance(value, Mapping):
+            raise InvalidFileContent(
+                f"{name}: the top level is {type(value).__name__}, not a mapping"
+            )
+        return value
+
+    def _decode(self, file_format: FileFormat, text: str) -> object:
+        match file_format:
+            case FileFormat.YAML:
+                return yaml.safe_load(text)
+            case FileFormat.JSON:
+                return load_json(text)
+            case FileFormat.TOML:
+                return tomllib.loads(text)

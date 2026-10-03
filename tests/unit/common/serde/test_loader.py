@@ -59,6 +59,20 @@ class TestFileLoader:
         with pytest.raises(InvalidFileContent):
             FileLoader().parse(name, text)
 
+    @pytest.mark.parametrize(
+        ("name", "text"),
+        [
+            ("a.yaml", "- a\n- b\n"),
+            ("a.yaml", ""),
+            ("a.yml", "just a string"),
+            ("a.json", "[1, 2]"),
+            ("a.json", "3"),
+        ],
+    )
+    def test_a_top_level_other_than_a_mapping_is_refused(self, name: str, text: str) -> None:
+        with pytest.raises(InvalidFileContent, match="not a mapping"):
+            FileLoader().parse(name, text)
+
     def test_a_path_is_loaded_by_its_suffix(self, tmp_path: Path) -> None:
         path = tmp_path / "seed.toml"
         path.write_text(_SAME_CONTENT["seed.toml"])
