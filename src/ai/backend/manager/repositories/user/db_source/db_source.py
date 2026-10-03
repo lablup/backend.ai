@@ -26,6 +26,7 @@ from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
 from ai.backend.manager.data.common.bulk import BulkCreateFailure, BulkUpdateFailure
 from ai.backend.manager.data.entity_share.types import EntityShareStatus
+from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.data.keypair.types import (
     KeyPairCreator,
     KeyPairData,
@@ -55,11 +56,7 @@ from ai.backend.manager.models.endpoint.row import EndpointRow
 from ai.backend.manager.models.entity_share.purgers import EntitySharePendingOfferBatchPurger
 from ai.backend.manager.models.entity_share.row import EntityShareRow
 from ai.backend.manager.models.entity_share.updaters import EntityShareRevokeUpdater
-from ai.backend.manager.models.kernel.row import (
-    AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES,
-    RESOURCE_USAGE_KERNEL_STATUSES,
-    kernels,
-)
+from ai.backend.manager.models.kernel.row import kernels
 from ai.backend.manager.models.keypair.row import (
     KeyPairRow,
     generate_keypair_data,
@@ -500,7 +497,7 @@ class UserDBSource:
                 .select_from(kernels)
                 .where(
                     (kernels.c.terminated_at >= start_date)
-                    & (kernels.c.status.in_(RESOURCE_USAGE_KERNEL_STATUSES)),
+                    & (kernels.c.status.in_(KernelStatus.resource_usage_statuses())),
                 )
                 .order_by(sa.asc(kernels.c.created_at))
             )
@@ -753,7 +750,7 @@ class UserDBSource:
         query = (
             sa.select(kernels.c.mounts)
             .select_from(kernels)
-            .where(kernels.c.status.in_(AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES))
+            .where(kernels.c.status.in_(KernelStatus.agent_resource_occupying_statuses()))
         )
         async for row in await conn.stream(query):
             for _mount in row.mounts:

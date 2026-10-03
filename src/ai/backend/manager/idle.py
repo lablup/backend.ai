@@ -67,7 +67,8 @@ from ai.backend.common.types import (
 from ai.backend.common.utils import nmget
 from ai.backend.logging.structured import StructuredLogger, with_log_context
 from ai.backend.manager.config.provider import ManagerConfigProvider
-from ai.backend.manager.models.kernel.row import LIVE_STATUS, kernels
+from ai.backend.manager.data.kernel.types import KernelStatus
+from ai.backend.manager.models.kernel.row import kernels
 from ai.backend.manager.models.keypair.row import keypairs
 from ai.backend.manager.models.resource_policy.row import keypair_resource_policies
 from ai.backend.manager.models.user.row import users
@@ -284,7 +285,7 @@ class IdleCheckerHost:
                 )
                 .select_from(j)
                 .where(
-                    (kernels.c.status.in_(LIVE_STATUS))
+                    (kernels.c.status.in_(KernelStatus.live_statuses()))
                     & (kernels.c.cluster_role == DEFAULT_ROLE)
                     & (kernels.c.session_type != SessionTypes.INFERENCE),
                 )
@@ -981,7 +982,8 @@ class UtilizationIdleChecker(BaseIdleChecker):
         # Get current utilization data from all containers of the session.
         if kernel.cluster_size > 1:
             query = sa.select(kernels.c.id).where(
-                (kernels.c.session_id == session_id) & (kernels.c.status.in_(LIVE_STATUS)),
+                (kernels.c.session_id == session_id)
+                & (kernels.c.status.in_(KernelStatus.live_statuses())),
             )
             rows = (await dbconn.execute(query)).fetchall()
             kernel_ids = [k.id for k in rows]

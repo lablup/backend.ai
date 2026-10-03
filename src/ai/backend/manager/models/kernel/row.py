@@ -1,9 +1,6 @@
 from __future__ import annotations
 
-import logging
-import uuid
-from collections.abc import Sequence
-from datetime import datetime, tzinfo
+from datetime import datetime
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -12,14 +9,11 @@ from typing import (
 import sqlalchemy as sa
 import yarl
 from sqlalchemy.dialects import postgresql as pgsql
-from sqlalchemy.ext.asyncio import AsyncSession as SASession
 from sqlalchemy.orm import (
     Mapped,
     foreign,
     mapped_column,
-    noload,
     relationship,
-    selectinload,
 )
 
 from ai.backend.common.data.entity.image import ImageID
@@ -27,7 +21,6 @@ from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.resource_group import ResourceGroupID
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.types import (
-    AccessKey,
     ClusterMode,
     KernelId,
     SessionId,
@@ -35,22 +28,7 @@ from ai.backend.common.types import (
     SessionTypes,
     VFolderMount,
 )
-from ai.backend.logging.structured import StructuredLogger
-from ai.backend.manager.data.image.types import ImageIdentifier
-from ai.backend.manager.data.kernel.types import (
-    ClusterConfig,
-    ImageInfo,
-    KernelInfo,
-    KernelStatus,
-    LifecycleStatus,
-    Metadata,
-    Metrics,
-    NetworkConfig,
-    RelatedSessionInfo,
-    ResourceInfo,
-    RuntimeConfig,
-    UserPermission,
-)
+from ai.backend.manager.data.kernel.types import KernelStatus
 
 if TYPE_CHECKING:
     from ai.backend.manager.models.agent.row import AgentRow
@@ -60,7 +38,6 @@ if TYPE_CHECKING:
     from ai.backend.manager.models.user.row import UserRow
 
 from ai.backend.manager.defs import DEFAULT_ROLE
-from ai.backend.manager.errors.kernel import SessionNotFound
 from ai.backend.manager.models.base import (
     GUID,
     Base,
@@ -71,59 +48,11 @@ from ai.backend.manager.models.base import (
     URLColumn,
 )
 from ai.backend.manager.models.mixins.timestamp import CreatedAtMixin
-from ai.backend.manager.models.utils import (
-    ExtendedAsyncSAEngine,
-    execute_with_retry,
-)
 
 __all__ = (
-    "AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES",
-    "DEAD_KERNEL_STATUSES",
-    "LIVE_STATUS",
-    "RESOURCE_USAGE_KERNEL_STATUSES",
-    "USER_RESOURCE_OCCUPYING_KERNEL_STATUSES",
     "KernelRow",
     "kernels",
 )
-
-log = StructuredLogger(logging.getLogger("ai.backend.manager.models.kernel"))
-
-
-# statuses to consider when calculating current resource usage
-AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES = tuple(
-    e
-    for e in KernelStatus
-    if e
-    not in (
-        KernelStatus.TERMINATED,
-        KernelStatus.PENDING,
-        KernelStatus.CANCELLED,
-    )
-)
-
-USER_RESOURCE_OCCUPYING_KERNEL_STATUSES = tuple(
-    e
-    for e in KernelStatus
-    if e
-    not in (
-        KernelStatus.TERMINATED,
-        KernelStatus.PENDING,
-        KernelStatus.CANCELLED,
-    )
-)
-
-# statuses to consider when calculating historical resource usage
-RESOURCE_USAGE_KERNEL_STATUSES = (
-    KernelStatus.TERMINATED,
-    KernelStatus.RUNNING,
-)
-
-DEAD_KERNEL_STATUSES = (
-    KernelStatus.CANCELLED,
-    KernelStatus.TERMINATED,
-)
-
-LIVE_STATUS = (KernelStatus.RUNNING,)
 
 
 def default_hostname(context: Any) -> str:
@@ -432,160 +361,6 @@ class KernelRow(CreatedAtMixin, Base):
         primaryjoin=_get_user_row_join_condition,
         foreign_keys="KernelRow.user_uuid",
     )
-
-    @property
-    def used_time(self) -> str | None:
-        if self.terminated_at is not None and self.created_at is not None:
-            return str(self.terminated_at - self.created_at)
-        return None
-
-    def get_used_days(self, local_tz: tzinfo) -> int | None:
-        if self.terminated_at is not None and self.created_at is not None:
-            return (
-                self.terminated_at.astimezone(local_tz).toordinal()
-                - self.created_at.astimezone(local_tz).toordinal()
-                + 1
-            )
-        return None
-
-    @staticmethod
-    async def batch_load_main_kernels_by_session_id(
-        session: SASession, session_ids: list[uuid.UUID]
-    ) -> Sequence[KernelRow]:
-        query = (
-            sa.select(KernelRow)
-            .where(KernelRow.session_id.in_(session_ids))
-            .where(KernelRow.cluster_role == DEFAULT_ROLE)
-        )
-        return (await session.execute(query)).scalars().all()
-
-    @staticmethod
-    async def get_kernel(
-        db: ExtendedAsyncSAEngine, kern_id: uuid.UUID, allow_stale: bool = False
-    ) -> KernelRow:
-        from ai.backend.manager.data.agent.types import AgentStatus
-
-        async def _query() -> KernelRow:
-            async with db.begin_readonly_session() as db_sess:
-                query = (
-                    sa.select(KernelRow)
-                    .where(KernelRow.id == kern_id)
-                    .options(
-                        noload("*"),
-                        selectinload(KernelRow.agent_row).options(noload("*")),
-                    )
-                )
-                result = (await db_sess.execute(query)).scalars().all()
-
-                cand = result
-                if not allow_stale:
-                    cand = [
-                        k
-                        for k in result
-                        if (k.status not in DEAD_KERNEL_STATUSES)
-                        and (k.agent_row is not None and k.agent_row.status == AgentStatus.ALIVE)
-                    ]
-                if not cand:
-                    raise SessionNotFound
-                return cand[0]
-
-        return await execute_with_retry(_query)
-
-    def delegate_ownership(self, user_uuid: UserID, access_key: AccessKey) -> None:
-        self.user_uuid = user_uuid
-        self.access_key = access_key
-
-    def to_kernel_info(self) -> KernelInfo:
-        return KernelInfo(
-            id=self.id,
-            session=RelatedSessionInfo(
-                session_id=str(self.session_id),
-                creation_id=self.session_creation_id,
-                name=self.session_name,
-                session_type=self.session_type,
-            ),
-            user_permission=UserPermission(
-                user_uuid=self.user_uuid,
-                access_key=self.access_key or "",
-                domain_name=self.domain_name,
-                group_id=self.group_id,
-                uid=self.uid,
-                main_gid=self.main_gid,
-                gids=self.gids,
-            ),
-            image=ImageInfo(
-                image_id=self.image_id,
-                identifier=ImageIdentifier(
-                    canonical=self.image,
-                    architecture=self.architecture or "",
-                )
-                if self.image
-                else None,
-                registry=self.registry,
-                tag=self.tag,
-                architecture=self.architecture,
-            ),
-            network=NetworkConfig(
-                kernel_host=self.kernel_host,
-                repl_in_port=self.repl_in_port,
-                repl_out_port=self.repl_out_port,
-                stdin_port=self.stdin_port,
-                stdout_port=self.stdout_port,
-                service_ports=self.service_ports,
-                preopen_ports=self.preopen_ports,
-                use_host_network=self.use_host_network,
-            ),
-            cluster=ClusterConfig(
-                cluster_mode=self.cluster_mode,
-                cluster_size=self.cluster_size,
-                cluster_role=self.cluster_role,
-                cluster_idx=self.cluster_idx,
-                local_rank=self.local_rank,
-                cluster_hostname=self.cluster_hostname,
-            ),
-            resource=ResourceInfo(
-                resource_group=self.scaling_group,
-                resource_group_id=self.resource_group_id,
-                agent=self.agent,
-                agent_addr=self.agent_addr,
-                container_id=self.container_id,
-                occupied_shares=self.occupied_shares,
-                attached_devices=self.attached_devices or {},
-                resource_opts=self.resource_opts or {},
-            ),
-            runtime=RuntimeConfig(
-                environ=self.environ,
-                mounts=self.mounts,
-                mount_map=self.mount_map,
-                vfolder_mounts=[m.to_json() for m in self.vfolder_mounts]
-                if self.vfolder_mounts
-                else None,
-                bootstrap_script=self.bootstrap_script,
-                startup_command=self.startup_command,
-            ),
-            lifecycle=LifecycleStatus(
-                status=self.status,
-                result=self.result,
-                created_at=self.created_at,
-                terminated_at=self.terminated_at,
-                starts_at=self.starts_at,
-                status_changed=self.status_changed,
-                status_info=self.status_info,
-                status_data=self.status_data,
-                status_history=self.status_history,
-                last_seen=self.last_seen,
-                last_observed_at=self.last_observed_at,
-            ),
-            metrics=Metrics(
-                num_queries=self.num_queries or 0,
-                last_stat=self.last_stat,
-                container_log=self.container_log,
-            ),
-            metadata=Metadata(
-                callback_url=str(self.callback_url) if self.callback_url else None,
-                internal_data=self.internal_data,
-            ),
-        )
 
 
 # For compatibility

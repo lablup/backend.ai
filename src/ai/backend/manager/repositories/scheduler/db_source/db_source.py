@@ -87,10 +87,7 @@ from ai.backend.manager.models.agent.row import AgentRow
 from ai.backend.manager.models.domain.row import DomainRow, domains, query_domain_dotfiles
 from ai.backend.manager.models.image.row import ImageRow
 from ai.backend.manager.models.kernel.creators import KernelCreator
-from ai.backend.manager.models.kernel.row import (
-    USER_RESOURCE_OCCUPYING_KERNEL_STATUSES,
-    KernelRow,
-)
+from ai.backend.manager.models.kernel.row import KernelRow
 from ai.backend.manager.models.kernel.searchable_fields import KernelSearchableFields
 from ai.backend.manager.models.kernel.searchers import KernelSearcher
 from ai.backend.manager.models.keypair.row import KeyPairRow, keypairs
@@ -3868,7 +3865,7 @@ class ScheduleDBSource:
                 .select_from(KernelRow)
                 .where(
                     (KernelRow.access_key == access_key)
-                    & (KernelRow.status.in_(USER_RESOURCE_OCCUPYING_KERNEL_STATUSES))
+                    & (KernelRow.status.in_(KernelStatus.agent_resource_occupying_statuses()))
                 )
             )
 
@@ -3977,7 +3974,7 @@ class ScheduleDBSource:
         This method is for SessionLifecycleHandler. For SessionPromotionHandler,
         use fetch_sessions_for_promotion() which supports ALL/ANY/NOT_ANY conditions.
 
-        Uses SessionRow.to_session_info() and KernelRow.to_kernel_info() for
+        Uses SessionRow.to_session_info() and KernelSearchableFields.own.to_data() for
         unified data representation across all handlers.
 
         Args:
@@ -4017,7 +4014,9 @@ class ScheduleDBSource:
                 handler_sessions.append(
                     SessionWithKernels(
                         session_info=session.to_session_info(),
-                        kernel_infos=[kernel.to_kernel_info() for kernel in session.kernels],
+                        kernel_infos=[
+                            KernelSearchableFields.own.to_data(kernel) for kernel in session.kernels
+                        ],
                     )
                 )
 
@@ -4659,7 +4658,7 @@ class ScheduleDBSource:
                     kernel_infos=[],
                 )
 
-            # 2. Query kernels for these sessions (full rows for to_kernel_info conversion)
+            # 2. Query kernels for these sessions (full rows for the KernelInfo conversion)
             kernel_query = (
                 sa.select(KernelRow)
                 .where(
@@ -4676,7 +4675,9 @@ class ScheduleDBSource:
             for kernel_row in kernel_rows:
                 session_id = kernel_row.session_id
                 if session_id in sessions_map:
-                    sessions_map[session_id].kernel_infos.append(kernel_row.to_kernel_info())
+                    sessions_map[session_id].kernel_infos.append(
+                        KernelSearchableFields.own.to_data(kernel_row)
+                    )
 
             return list(sessions_map.values())
 

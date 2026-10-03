@@ -22,6 +22,7 @@ from ai.backend.common.utils import nmget
 from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
 from ai.backend.manager.config.provider import ManagerConfigProvider
+from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.data.model_serving.types import EndpointLifecycle
 from ai.backend.manager.data.project.types import ProjectData, ProjectType
 from ai.backend.manager.errors.resource import (
@@ -32,9 +33,6 @@ from ai.backend.manager.errors.resource import (
 )
 from ai.backend.manager.models.endpoint.row import EndpointRow
 from ai.backend.manager.models.kernel.row import (
-    AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES,
-    LIVE_STATUS,
-    RESOURCE_USAGE_KERNEL_STATUSES,
     KernelRow,
     kernels,
 )
@@ -143,11 +141,14 @@ class ProjectDBSource:
                     (
                         (kernels.c.terminated_at >= start_date)
                         & (kernels.c.created_at < end_date)
-                        & (kernels.c.status.in_(RESOURCE_USAGE_KERNEL_STATUSES))
+                        & (kernels.c.status.in_(KernelStatus.resource_usage_statuses()))
                     )
                     |
                     # Or, filter running sessions which created before requested end_date
-                    ((kernels.c.created_at < end_date) & (kernels.c.status.in_(LIVE_STATUS))),
+                    (
+                        (kernels.c.created_at < end_date)
+                        & (kernels.c.status.in_(KernelStatus.live_statuses()))
+                    ),
                 )
                 .order_by(sa.asc(kernels.c.terminated_at))
             )
@@ -338,7 +339,7 @@ class ProjectDBSource:
             await sess.scalars(
                 sa.select(KernelRow.mounts).where(
                     KernelRow.group_id == group_id,
-                    KernelRow.status.in_(AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES),
+                    KernelRow.status.in_(KernelStatus.agent_resource_occupying_statuses()),
                 )
             )
         ).all()
