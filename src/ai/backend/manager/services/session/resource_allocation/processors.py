@@ -1,7 +1,6 @@
 """Processors for resource allocation operations."""
 
 from ai.backend.manager.actions.registry.group import ProcessorGroup
-from ai.backend.manager.actions.v2.global_scope.processor import GlobalActionProcessor
 from ai.backend.manager.actions.v2.scope.processor import ScopeActionProcessor
 from ai.backend.manager.actions.v2.single_entity.processor import SingleEntityActionProcessor
 from ai.backend.manager.data.domain.types import DomainData
@@ -54,7 +53,7 @@ class ResourceAllocationProcessors:
         GetProjectUsageAction, GetProjectUsageActionResult
     ]
     get_domain_usage: SingleEntityActionProcessor[GetDomainUsageAction, GetDomainUsageActionResult]
-    get_resource_group_usage: GlobalActionProcessor[
+    get_resource_group_usage: SingleEntityActionProcessor[
         GetResourceGroupUsageAction, GetResourceGroupUsageActionResult
     ]
     get_effective_allocation: ScopeActionProcessor[
@@ -84,7 +83,7 @@ class ResourceAllocationProcessors:
             GetProjectUsageAction, service.get_project_usage
         )
         self.get_domain_usage = domain.single_entity(GetDomainUsageAction, service.get_domain_usage)
-        self.get_resource_group_usage = resource_group.global_scope(
+        self.get_resource_group_usage = resource_group.single_entity(
             GetResourceGroupUsageAction, service.get_resource_group_usage
         )
         self.get_effective_allocation = session.scope(
