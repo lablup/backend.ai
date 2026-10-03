@@ -38,7 +38,11 @@ class ImageStatusType(StrEnum):
 
 
 class ImageTypeEnum(StrEnum):
-    """Type category of an image."""
+    """Type category of an image.
+
+    ``SERVICE`` is deprecated: nothing writes it and nothing reads it, so an image is
+    never this type. It is removed in the next release.
+    """
 
     COMPUTE = "compute"
     SYSTEM = "system"

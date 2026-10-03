@@ -7046,7 +7046,7 @@ type ImageV2TagEntry {
 enum ImageV2Type {
   COMPUTE
   SYSTEM
-  SERVICE
+  SERVICE @deprecated(reason: "Deprecated since 26.9.0. The scan never writes this type, so no image is ever one. It is removed in the next release.")
 }
 
 """

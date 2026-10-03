@@ -24,6 +24,7 @@ from ai.backend.common.bgtask.reporter import ProgressReporter
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.filter_specs import StringInMatchSpec, UUIDEqualMatchSpec
 from ai.backend.common.docker import ImageRef, KernelFeatures, LabelName
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.common.types import (
     AgentId,
     DispatchResult,
@@ -198,7 +199,14 @@ _queryorder_colmap: ColumnMapType = {
 }
 
 ImageStatusType = graphene.Enum.from_enum(ImageStatus, description="Added in 25.4.0.")
-ImageTypeEnum = graphene.Enum.from_enum(ImageType, description="Added in 25.12.0.")
+ImageTypeEnum = graphene.Enum.from_enum(
+    ImageType,
+    description=(
+        "Added in 25.12.0."
+        f" `SERVICE` is deprecated since {NEXT_RELEASE_VERSION}: the scan never writes"
+        " it, and it is removed in the next release."
+    ),
+)
 
 
 class Image(graphene.ObjectType):  # type: ignore[misc]
