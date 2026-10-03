@@ -11,6 +11,7 @@ from sqlalchemy.exc import DBAPIError
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
 from sqlalchemy.orm import selectinload
 
+from ai.backend.common.arch import arch_name_aliases
 from ai.backend.common.bgtask.reporter import ProgressReporter
 from ai.backend.common.data.entity.image_alias import ImageAliasID
 from ai.backend.common.data.entity.user import UserID
@@ -30,6 +31,7 @@ from ai.backend.manager.data.image.types import (
     RescanImagesResult,
     ResourceLimitInput,
 )
+from ai.backend.manager.errors.common import InternalServerError
 from ai.backend.manager.errors.image import (
     AliasImageActionDBError,
     AliasImageActionValueError,
@@ -433,6 +435,46 @@ class ImageDBSource:
                 has_previous_page=result.has_previous_page,
             )
 
+    async def scan_image(self, canonical: str, architecture: str) -> ImageData:
+        registries = await self._load_configured_registries(None)
+        result = await self.scan_registry_with_img_canonical(registries, canonical)
+        if result is None:
+            raise RegistryNotFoundForImage(
+                f"Registry not found for image: Image canonical - {canonical}"
+            )
+        architecture = arch_name_aliases.get(architecture, architecture)
+        image = next((image for image in result.images if image.architecture == architecture), None)
+        if image is None:
+            raise ImageNotFound
+        return image
+
+    async def scan_registry_with_img_canonical(
+        self, registries: dict[str, ContainerRegistryRow], canonical: str
+    ) -> RescanImagesResult | None:
+        """Scan the one registry whose registry/project prefix matches the canonical.
+
+        Answers None when no registry matches, so the caller decides what that means.
+        """
+        matching = self._filter_by_img_canonical(registries, canonical)
+        if not matching:
+            return None
+        registry_key, registry_row = next(iter(matching.items()))
+        # The loader keys rows by registry/project, so a duplicate row hides behind one key.
+        async with self._db.begin_readonly_session() as session:
+            count = await session.scalar(
+                sa.select(sa.func.count())
+                .select_from(ContainerRegistryRow)
+                .where(
+                    ContainerRegistryRow.registry_name == registry_row.registry_name,
+                    ContainerRegistryRow.project == registry_row.project,
+                )
+            )
+        if len(matching) > 1 or count != 1:
+            raise InternalServerError(
+                f"Multiple container registries match image: Image canonical - {canonical}"
+            )
+        return await self.scan_single_image(registry_key, registry_row, canonical)
+
     async def rescan_images(
         self,
         registry_or_image: str | None = None,
@@ -453,16 +495,9 @@ class ImageDBSource:
         if registry_or_image is None:
             return await self._scan_registries(registries, reporter=reporter)
 
-        matching_registries = self._filter_by_img_canonical(registries, registry_or_image)
-
-        if matching_registries:
-            if len(matching_registries) > 1:
-                raise RuntimeError(
-                    "ContainerRegistryRows exist with the same registry_name and project!",
-                )
-
-            registry_key, registry_row = next(iter(matching_registries.items()))
-            return await self.scan_single_image(registry_key, registry_row, registry_or_image)
+        scanned = await self.scan_registry_with_img_canonical(registries, registry_or_image)
+        if scanned is not None:
+            return scanned
 
         matching_registries = self._filter_by_registry_name(registries, registry_or_image)
 

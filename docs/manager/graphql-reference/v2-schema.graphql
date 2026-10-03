@@ -9263,6 +9263,11 @@ type MoveFileV2Payload {
 
 type Mutation {
   """
+  Added in 26.9.0. Scan one image tag and return the requested architecture, including images not yet registered (superadmin only).
+  """
+  adminScanImage(input: ScanImageInput!): ScanImagePayload
+
+  """
   Added in 26.8.0. Change the resource group of an agent (superadmin only). Sessions still running on the agent under the old resource group are cleaned up per the given policy; without force, the change is rejected with a conflict error when such sessions exist.
   """
   adminUpdateAgentResourceGroup(input: UpdateAgentResourceGroupInput!): UpdateAgentResourceGroupPayload
@@ -16236,6 +16241,25 @@ Added in 25.14.0. Response payload for artifact scanning operations. Contains th
 type ScanArtifactsPayload {
   """List of scanned artifacts."""
   artifacts: [Artifact!]!
+}
+
+"""
+Added in 26.9.0. Input for scanning one image tag and selecting its architecture.
+"""
+input ScanImageInput {
+  """
+  Image canonical name to scan. Defaults to latest when the tag is omitted.
+  """
+  canonical: String!
+
+  """Image architecture to return."""
+  architecture: String!
+}
+
+"""Added in 26.9.0. Scanned image matching the requested architecture."""
+type ScanImagePayload {
+  """Scanned image matching the requested architecture."""
+  item: ImageV2!
 }
 
 """

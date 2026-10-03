@@ -1052,7 +1052,7 @@ class TestPreloadImage(ImageServiceBaseFixtures):
 
 
 class TestScanImage(ImageServiceBaseFixtures):
-    """Tests for ImageService.scan_image"""
+    """Tests for ImageService.scan_already_registered_image"""
 
     async def test_scan_image_success(
         self,
@@ -1070,7 +1070,7 @@ class TestScanImage(ImageServiceBaseFixtures):
             architecture=image_data.architecture,
         )
 
-        result = await image_service.scan_image(action)
+        result = await image_service.scan_already_registered_image(action)
 
         assert result.image == image_data
         assert result.errors == []
@@ -1095,7 +1095,7 @@ class TestScanImage(ImageServiceBaseFixtures):
             architecture=image_data.architecture,
         )
 
-        result = await image_service.scan_image(action)
+        result = await image_service.scan_already_registered_image(action)
 
         assert result.image == image_data
         assert result.errors == scan_errors
@@ -1114,7 +1114,7 @@ class TestScanImage(ImageServiceBaseFixtures):
         )
 
         with pytest.raises(ImageNotFound):
-            await image_service.scan_image(action)
+            await image_service.scan_already_registered_image(action)
 
 
 class TestGetImageInstalledAgents(ImageServiceBaseFixtures):
