@@ -70,12 +70,6 @@ When the line being cut is LTS:
 scripts/release.sh --lts {target_version} [webui_version]
 ```
 
-To override the next development version (year rollover or planned sprint skip):
-
-```bash
-NEXT_DEV_VERSION={next_version} scripts/release.sh {target_version} [webui_version]
-```
-
 **What the script does:**
 1. Creates branch `release/{target_version}`
 2. Downloads WebUI release (if `webui_version` provided)
@@ -88,13 +82,10 @@ NEXT_DEV_VERSION={next_version} scripts/release.sh {target_version} [webui_versi
 7. Generates API docs (OpenAPI, GraphQL schema)
 8. Runs quality checks: `pants tailor --check`, `pants check ::` (final and patch releases only; skipped for `a`/`rc`, whose release PR CI runs the same checks)
 9. Commits everything as `release: {target_version}`
-10. For sprint releases only (`{year}.{sprint}.0`): advances `NEXT_RELEASE_VERSION` in `meta.py` to the next sprint and commits it separately as `chore: bump NEXT_RELEASE_VERSION to {next_version}`
-
-**NEXT_RELEASE_VERSION auto-advance (step 10):**
-- Runs only for sprint releases — patch must be `0` (e.g. `26.7.0`). Patch releases (`26.7.1`) and pre-releases (`rc`/`a`/`b`/`dev`/`post`) are skipped automatically.
-- Default: increments the sprint number, resets patch to `0` (`26.7.0` → `26.8.0`).
-- Override the default by setting `NEXT_DEV_VERSION` (e.g. `27.1.0` for a year rollover, or to skip sprints).
-- Produces a second commit, kept separate from the `release:` commit (freeze = this release; bump = next dev cycle).
+**Advancing NEXT_RELEASE_VERSION:**
+- `release.sh` does not advance it. When an `X.Y.0rc1` release PR merges and cuts `X.Y`, `create-version-branch.yml` opens a `release: bump NEXT_RELEASE_VERSION to X.(Y+1).0` PR against `main`
+- No PR is opened when `main` is already at that version or past it
+- For a year rollover or a sprint skip, set the `NEXT_DEV_VERSION` repository variable (e.g. `27.1.0`) before the rc1 merges, and clear it afterwards
 
 **Error handling:**
 - If quality checks fail, report errors and stop
