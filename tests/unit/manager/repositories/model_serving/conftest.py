@@ -230,14 +230,6 @@ def patch_endpoint_get(mocker: MockerFixture) -> AsyncMock:
 
 
 @pytest.fixture
-def patch_routing_get(mocker: MockerFixture) -> AsyncMock:
-    """Patch RoutingRow.get method using mocker."""
-    return mocker.patch(
-        "ai.backend.manager.models.routing.row.RoutingRow.get", new_callable=AsyncMock
-    )
-
-
-@pytest.fixture
 def patch_user_get(mocker: MockerFixture) -> AsyncMock:
     """Patch UserRow.get method using mocker."""
     return mocker.patch("ai.backend.manager.models.user.row.UserRow.get", new_callable=AsyncMock)
