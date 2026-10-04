@@ -23,7 +23,7 @@ _DOMAIN_MEMBER_PRESET_REVISION = "a3f60d2b7c19_grant_domain_members_read_on_reso
 _PUBLIC_MEMBER_REVISION = "c3e8a1f05b27_add_preset_scope_and_public_member_role"
 _MEMBER_READS_REVISION = "a1f6b7c4d902_grant_image_and_project_reads_to_members"
 _OWN_POLICY_READS_REVISION = "b8e0c1f4a276_grant_seed_roles_read_on_their_own_policy"
-_REPOSITORY = Path(__file__).resolve().parents[6]
+_REPOSITORY = Path(__file__).resolve().parents[5]
 _VERSIONS = _REPOSITORY / "src/ai/backend/manager/models/alembic/versions"
 
 
