@@ -14,7 +14,6 @@ import glide
 from aiotools.server import process_index
 
 from ai.backend.common.clients.valkey_client.valkey_stream.client import ValkeyStreamClient
-from ai.backend.common.defs import REDIS_STREAM_DB
 from ai.backend.common.message_queue.abc import AbstractConsumer
 from ai.backend.common.message_queue.exceptions import InvalidMessagePayloadError
 from ai.backend.common.message_queue.message import MessageId, MQMessage
@@ -77,6 +76,7 @@ class RedisConsumer(AbstractConsumer):
     _group_name: str
     _consumer_id: str
     _redis_target: RedisTarget
+    _db: int
     _autoclaim_idle_timeout: int
     _closed: bool
     _loop_tasks: list[asyncio.Task[Any]]
@@ -109,6 +109,7 @@ class RedisConsumer(AbstractConsumer):
         self._group_name = args.group_name
         self._consumer_id = _generate_consumer_id(args.node_id)
         self._redis_target = redis_target
+        self._db = args.db
         self._autoclaim_idle_timeout = args.autoclaim_idle_timeout
         self._closed = False
 
@@ -249,7 +250,7 @@ class RedisConsumer(AbstractConsumer):
         client = await ValkeyStreamClient.create(
             target,
             human_readable_name="redis_consumer_reader",
-            db_id=REDIS_STREAM_DB,
+            db_id=self._db,
         )
 
         try:
