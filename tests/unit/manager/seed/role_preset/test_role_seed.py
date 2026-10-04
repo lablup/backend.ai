@@ -1,8 +1,9 @@
-"""The seed role declaration answers for every kind this build knows."""
+"""The role seed model, its checker and the fixture rendered from it.
+
+The role files themselves are checked in CI with `mgr seed check`."""
 
 from __future__ import annotations
 
-import json
 import uuid
 
 import pytest
@@ -11,14 +12,13 @@ from pydantic import ValidationError
 from ai.backend.common.data.entity.global_entity import GlobalEntityName
 from ai.backend.common.data.entity.types import EntityType
 from ai.backend.common.data.permission.types import Permission
-from ai.backend.manager.cli.permissions import _REPOSITORY, _render
+from ai.backend.manager.cli.permissions import _render
 from ai.backend.manager.cli.role_fixture import RoleFixture
-from ai.backend.manager.data.permission.seed.check import RoleSeedChecker
-from ai.backend.manager.data.permission.seed.kinds import PermissionKinds
-from ai.backend.manager.data.permission.seed.loader import RoleSeedLoader
-from ai.backend.manager.data.permission.seed.role import RoleSeed
 from ai.backend.manager.errors.permission import InvalidRoleSeed
 from ai.backend.manager.models.base import ensure_all_tables_registered, metadata
+from ai.backend.manager.seed.role_preset.check import RoleSeedChecker
+from ai.backend.manager.seed.role_preset.kinds import PermissionKinds
+from ai.backend.manager.seed.role_preset.role import RoleSeed
 
 
 @pytest.fixture(scope="module")
@@ -27,8 +27,14 @@ def kinds() -> PermissionKinds:
 
 
 @pytest.fixture(scope="module")
-def seeds() -> list[RoleSeed]:
-    return RoleSeedLoader().load()
+def seeds(kinds: PermissionKinds) -> list[RoleSeed]:
+    return [
+        _seed(
+            "project_admin",
+            _empty(kinds) | {"session": ["read", "update", "create"], "project": ["read"]},
+        ),
+        _seed("project_member", _empty(kinds) | {"session": ["read"]}),
+    ]
 
 
 def _entity_type_subclasses() -> list[type[EntityType]]:
@@ -53,24 +59,6 @@ def _seed(name: str, permissions: dict[str, list[str]]) -> RoleSeed:
         "auto_assign": False,
         "permissions": permissions,
     })
-
-
-class TestDeclaration:
-    def test_every_role_states_every_kind(
-        self, kinds: PermissionKinds, seeds: list[RoleSeed]
-    ) -> None:
-        for seed in seeds:
-            assert set(seed.permissions) == kinds.declared(), seed.name
-
-    def test_the_declaration_has_no_findings(
-        self, kinds: PermissionKinds, seeds: list[RoleSeed]
-    ) -> None:
-        findings = RoleSeedChecker(kinds, seeds).findings()
-        assert findings == [], [finding.render() for finding in findings]
-
-    def test_role_names_are_unique(self, seeds: list[RoleSeed]) -> None:
-        names = [seed.name for seed in seeds]
-        assert len(names) == len(set(names))
 
 
 class TestKindCatalog:
@@ -165,11 +153,6 @@ class TestScope:
         with pytest.raises(ValidationError, match="every project"):
             RoleSeed.model_validate(self._header("project", scope="public"))
 
-    def test_the_public_member_role_is_created_in_public(self, seeds: list[RoleSeed]) -> None:
-        seed = next(seed for seed in seeds if seed.name == "public_member")
-        assert seed.scope is GlobalEntityName.PUBLIC
-        assert seed.auto_assign
-
 
 class TestChecker:
     def test_a_missing_kind_is_reported(self, kinds: PermissionKinds) -> None:
@@ -201,14 +184,7 @@ class TestChecker:
 
 
 class TestFixture:
-    """The preset fixture is what the declaration renders, never edited by hand."""
-
-    def test_the_written_file_is_current(self, seeds: list[RoleSeed]) -> None:
-        for target, rendered in _render(seeds).items():
-            written = (_REPOSITORY / target).read_text(encoding="utf-8")
-            assert written == json.dumps(rendered, indent=4) + "\n", (
-                f"{target} is stale; run `mgr permissions emit`"
-            )
+    """The preset fixture rendered from the role seeds."""
 
     def test_rendering_twice_is_the_same(self, seeds: list[RoleSeed]) -> None:
         assert _render(seeds) == _render(seeds)
