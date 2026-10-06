@@ -99,7 +99,7 @@ def _sessions_mounting(vfolder_id: VFolderID) -> sa.ColumnElement[bool]:
 
 def _kernels_mounting(vfolder_id: VFolderID) -> sa.ColumnElement[bool]:
     return KernelRow.status.not_in(
-        KernelStatus.dead_statuses()
+        KernelStatus.terminal_statuses()
     ) & KernelRow.vfolder_mounts.contains([{"vfid": str(vfolder_id)}])
 
 
