@@ -36,7 +36,6 @@ from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.types import ResourceSlot, VFolderHostPermissionMap
 from ai.backend.logging.structured import StructuredLogger
-from ai.backend.manager.data.dotfile.types import RESERVED_DOTFILES
 from ai.backend.manager.data.permission.permission_defs import ProjectPermission
 from ai.backend.manager.data.project.types import ProjectStatus, ProjectType
 from ai.backend.manager.errors.resource import ProjectNotFound
@@ -95,7 +94,6 @@ __all__: Sequence[str] = (
     "query_group_domain",
     "query_group_dotfiles",
     "resolve_group_name_or_id",
-    "verify_dotfile_name",
 )
 
 MAXIMUM_DOTFILE_SIZE = 64 * 1024  # 61 KiB
@@ -512,10 +510,6 @@ async def query_group_domain(
 ) -> str | None:
     query = sa.select(groups.c.domain_name).select_from(groups).where(groups.c.id == group_id)
     return await db_conn.scalar(query)
-
-
-def verify_dotfile_name(dotfile: str) -> bool:
-    return dotfile not in RESERVED_DOTFILES
 
 
 ALL_PROJECT_PERMISSIONS = frozenset([perm for perm in ProjectPermission])

@@ -18,7 +18,6 @@ from ai.backend.common import msgpack
 from ai.backend.common.data.entity.keypair import KeyPairID
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.types import AccessKey, SecretKey
-from ai.backend.manager.data.dotfile.types import RESERVED_DOTFILES
 from ai.backend.manager.data.keypair.types import KeyPairSecrets
 from ai.backend.manager.models.base import (
     GUID,
@@ -42,7 +41,6 @@ __all__: Sequence[str] = (
     "keypairs",
     "query_bootstrap_script",
     "query_owned_dotfiles",
-    "verify_dotfile_name",
 )
 
 
@@ -210,7 +208,3 @@ async def query_bootstrap_script(
     if script is None:
         return "", MAXIMUM_DOTFILE_SIZE
     return script, MAXIMUM_DOTFILE_SIZE - len(script)
-
-
-def verify_dotfile_name(dotfile: str) -> bool:
-    return dotfile not in RESERVED_DOTFILES
