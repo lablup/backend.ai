@@ -306,7 +306,7 @@ class ResourceGroupRow(CreatedAtMixin, Base):
     def scope_name_expr(cls) -> SQLColumnExpression[str]:
         return cls.name
 
-    # Called only by resolve_scaling_groups_for_user_group in api/gql_legacy/schema.py.
+    # Called only by resolve_accessible_scaling_groups in api/gql_legacy/schema.py:2322.
     # Delete it with gql_legacy.
     @classmethod
     async def list_by_condition(
@@ -332,6 +332,9 @@ def and_names(names: Iterable[str]) -> Callable[..., sa.sql.Select[Any]]:
 resource_groups = ResourceGroupRow.__table__
 
 
+# Everything below serves the legacy RBAC path alone: get_resource_groups is its way in,
+# and its only caller, _ensure_sgroup_permission in api/gql_legacy/domain.py, is called by
+# nothing. Delete the whole block together with gql_legacy.
 @dataclass
 class ResourceGroupModel(RBACModel[ResourceGroupPermission]):
     id: ResourceGroupID
@@ -641,6 +644,7 @@ class ResourceGroupPermissionContextBuilder(
         return MEMBER_PERMISSIONS
 
 
+# Called only by _ensure_sgroup_permission in api/gql_legacy/domain.py:371.
 async def get_resource_groups(
     target_scope: ScopeType,
     requested_permission: ResourceGroupPermission,
