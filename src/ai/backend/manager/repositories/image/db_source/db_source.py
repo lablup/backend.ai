@@ -34,7 +34,6 @@ from ai.backend.manager.errors.image import (
     AliasImageActionValueError,
     ImageAliasNotFound,
     ImageNotFound,
-    ImagePurgeInProgress,
     PurgeImageActionByIdObjectDBError,
     RegistryNotFoundForImage,
     UpdateImageActionValueError,
@@ -161,12 +160,6 @@ class ImageDBSource:
             raise ImageNotFound()
         return row
 
-    @staticmethod
-    def _reject_while_purging(image_row: ImageRow) -> None:
-        """Refuse a status write while a purge is working through this image."""
-        if image_row.status in ImageStatus.purge_in_progress():
-            raise ImagePurgeInProgress(f"Image is being purged: {image_row.id}")
-
     async def _get_image_alias_by_name(self, session: SASession, alias: str) -> ImageAliasRow:
         """
         Private method to get an image alias by name using an existing session.
@@ -210,7 +203,6 @@ class ImageDBSource:
         """
         async with self._db.begin_session() as session:
             image_row = await self._get_image_row_for_write(session, image_id, [ImageStatus.ALIVE])
-            self._reject_while_purging(image_row)
             image_row.status = ImageStatus.DELETED
             await session.flush()
             return ImageSearchableFields.own.to_data(image_row)
@@ -226,7 +218,6 @@ class ImageDBSource:
             image_row = await self._get_image_row_for_write(
                 session, image_id, ImageStatus.restorable()
             )
-            self._reject_while_purging(image_row)
             image_row.status = ImageStatus.ALIVE
             await session.flush()
             return ImageSearchableFields.own.to_data(image_row)
