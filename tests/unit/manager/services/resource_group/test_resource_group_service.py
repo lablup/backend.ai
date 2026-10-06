@@ -21,6 +21,7 @@ from ai.backend.manager.data.resource_group.types import (
     ResourceGroupDriverConfig,
     ResourceGroupMetadata,
     ResourceGroupNetworkConfig,
+    ResourceGroupOpts,
     ResourceGroupSchedulerConfig,
     ResourceGroupSchedulerOptions,
     ResourceGroupStatus,
@@ -33,7 +34,6 @@ from ai.backend.manager.errors.resource import (
     ResourceGroupSessionTypeNotAllowed,
 )
 from ai.backend.manager.models.resource_group.creators import ResourceGroupCreator
-from ai.backend.manager.models.resource_group.row import ResourceGroupOpts
 from ai.backend.manager.models.resource_group.scopes import UserResourceGroupTarget
 from ai.backend.manager.models.resource_group.updaters import ResourceGroupUpdater
 from ai.backend.manager.registry import check_resource_group

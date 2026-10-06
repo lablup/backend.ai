@@ -12,8 +12,8 @@ from ai.backend.client.v2.exceptions import NotFoundError
 from ai.backend.client.v2.registry import BackendAIClientRegistry
 from ai.backend.common.data.entity.resource_group import ResourceGroupName
 from ai.backend.common.dto.manager.scaling_group import ListScalingGroupsResponse
+from ai.backend.manager.data.resource_group.types import ResourceGroupOpts
 from ai.backend.manager.models.resource_group.row import (
-    ResourceGroupOpts,
     resource_groups,
     sgroups_for_domains,
     sgroups_for_groups,

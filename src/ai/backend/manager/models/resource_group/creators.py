@@ -17,13 +17,13 @@ from ai.backend.manager.data.permission.scope_template import ScopeTemplateValue
 from ai.backend.manager.data.resource_group.types import (
     FairShareResourceGroupSpec,
     ResourceGroupData,
+    ResourceGroupOpts,
 )
 from ai.backend.manager.errors.repository import UniqueConstraintViolationError
 from ai.backend.manager.models.resource_group.row import (
     ResourceGroupForDomainRow,
     ResourceGroupForKeypairsRow,
     ResourceGroupForProjectRow,
-    ResourceGroupOpts,
     ResourceGroupRow,
 )
 from ai.backend.manager.models.resource_group.searchable_fields import (

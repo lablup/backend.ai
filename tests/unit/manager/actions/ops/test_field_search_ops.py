@@ -28,11 +28,14 @@ from ai.backend.manager.api.adapter_options.pagination.pagination import (
     build_orders,
     build_pagination,
 )
+from ai.backend.manager.data.resource_group.types import ResourceGroupOpts
 from ai.backend.manager.data.resource_usage_history.types import DomainUsageBucketData
 from ai.backend.manager.errors.permission import NotEnoughPermission
 from ai.backend.manager.errors.repository import EmptyOperationScopeError
 from ai.backend.manager.errors.resource import ResourceGroupNotFound
-from ai.backend.manager.models.resource_group.row import ResourceGroupOpts, ResourceGroupRow
+from ai.backend.manager.models.resource_group.row import (
+    ResourceGroupRow,
+)
 from ai.backend.manager.models.resource_usage_history.row import DomainUsageBucketRow
 from ai.backend.manager.models.resource_usage_history.scopes import DomainUsageBucketTarget
 from ai.backend.manager.models.resource_usage_history.searchable_fields import (

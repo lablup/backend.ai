@@ -51,6 +51,7 @@ from ai.backend.manager.config.unified import (
     ManagerConfig,
 )
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
+from ai.backend.manager.data.resource_group.types import ResourceGroupOpts
 from ai.backend.manager.data.user.types import UserStatus
 from ai.backend.manager.dependencies.composer import DependencyInput, ManagerDependencyComposer
 from ai.backend.manager.models.base import pgsql_connect_opts
@@ -61,7 +62,6 @@ from ai.backend.manager.models.kernel.row import kernels
 from ai.backend.manager.models.keypair.row import keypairs
 from ai.backend.manager.models.project.row import ProjectRow, association_groups_users
 from ai.backend.manager.models.resource_group.row import (
-    ResourceGroupOpts,
     resource_groups,
     sgroups_for_domains,
 )

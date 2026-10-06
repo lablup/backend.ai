@@ -36,10 +36,10 @@ from ai.backend.common.dto.manager.domain import (
     UpdateDomainRequest,
 )
 from ai.backend.common.dto.manager.query import StringFilter
+from ai.backend.manager.data.resource_group.types import ResourceGroupOpts
 from ai.backend.manager.models.domain.row import domains
 from ai.backend.manager.models.project.row import groups
 from ai.backend.manager.models.resource_group.row import (
-    ResourceGroupOpts,
     resource_groups,
     sgroups_for_domains,
 )

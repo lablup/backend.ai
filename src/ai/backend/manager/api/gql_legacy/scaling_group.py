@@ -23,6 +23,7 @@ from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.types import AccessKey, ResourceSlot
 from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.data.agent.types import AgentStatus
+from ai.backend.manager.data.resource_group.types import ResourceGroupOpts
 from ai.backend.manager.errors.resource import ResourceGroupNotFound
 from ai.backend.manager.models.domain.row import DomainRow
 from ai.backend.manager.models.resource_group.creators import (
@@ -40,7 +41,6 @@ from ai.backend.manager.models.resource_group.row import (
     ResourceGroupForDomainRow,
     ResourceGroupForKeypairsRow,
     ResourceGroupForProjectRow,
-    ResourceGroupOpts,
     ResourceGroupRow,
     resource_groups,
     sgroups_for_domains,

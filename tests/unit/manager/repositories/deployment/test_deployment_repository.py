@@ -61,6 +61,7 @@ from ai.backend.manager.data.deployment.types import (
 )
 from ai.backend.manager.data.image.types import ImageType
 from ai.backend.manager.data.kernel.types import KernelStatus
+from ai.backend.manager.data.resource_group.types import ResourceGroupOpts
 from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.data.session_group.types import (
     SessionGroupPlacementDirection,
@@ -97,7 +98,9 @@ from ai.backend.manager.models.rbac_models.permission.permission import Permissi
 from ai.backend.manager.models.rbac_models.role.row import RoleRow
 from ai.backend.manager.models.rbac_models.user_role.row import UserRoleRow
 from ai.backend.manager.models.replica_group.row import ReplicaGroupRow
-from ai.backend.manager.models.resource_group.row import ResourceGroupOpts, ResourceGroupRow
+from ai.backend.manager.models.resource_group.row import (
+    ResourceGroupRow,
+)
 from ai.backend.manager.models.resource_policy.row import (
     KeyPairResourcePolicyRow,
     ProjectResourcePolicyRow,
