@@ -8,24 +8,20 @@ from typing import (
     TYPE_CHECKING,
     Any,
     Self,
-    TypedDict,
     override,
 )
 
 import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql as pgsql
-from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
 from sqlalchemy.orm import Mapped, load_only, mapped_column, relationship
 from sqlalchemy.sql.expression import SQLColumnExpression
 
-from ai.backend.common import msgpack
 from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.types import ResourceSlot, VFolderHostPermissionMap
 from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.data.domain.types import DomainStatus
 from ai.backend.manager.data.permission.permission_defs import DomainPermission
-from ai.backend.manager.defs import RESERVED_DOTFILES
 from ai.backend.manager.models.base import (
     GUID,
     Base,
@@ -54,14 +50,7 @@ if TYPE_CHECKING:
 log = StructuredLogger(logging.getLogger(__spec__.name))
 
 
-__all__: Sequence[str] = (
-    "MAXIMUM_DOTFILE_SIZE",
-    "DomainDotfile",
-    "DomainRow",
-    "domains",
-    "query_domain_dotfiles",
-    "verify_dotfile_name",
-)
+__all__: Sequence[str] = ("DomainRow",)
 
 MAXIMUM_DOTFILE_SIZE = 64 * 1024  # 61 KiB
 
@@ -121,6 +110,9 @@ class DomainRow(LifecycleTimestampsMixin, Base):
         "dotfiles", sa.LargeBinary(length=MAXIMUM_DOTFILE_SIZE), nullable=False, default=b"\x90"
     )
 
+    # Read only by build_ctx_in_domain_scope (the legacy RBAC) in
+    # models/resource_group/row.py, whose entry point _ensure_sgroup_permission in
+    # api/gql_legacy/domain.py nothing calls. Delete it with the legacy RBAC.
     sgroup_for_domains_rows: Mapped[list[ResourceGroupForDomainRow]] = relationship(
         "ResourceGroupForDomainRow",
     )
@@ -139,6 +131,9 @@ class DomainRow(LifecycleTimestampsMixin, Base):
 domains = DomainRow.__table__
 
 
+# Everything below serves the legacy RBAC path alone: api/gql_legacy/domain.py imports
+# get_permission_ctx and DomainModel, and nothing else reads these names. Delete the
+# whole block together with gql_legacy.
 @dataclass
 class DomainModel(RBACModel[DomainPermission]):
     id: DomainID
@@ -206,28 +201,6 @@ class DomainModel(RBACModel[DomainPermission]):
         )
 
 
-class DomainDotfile(TypedDict):
-    data: str
-    path: str
-    perm: str
-
-
-async def query_domain_dotfiles(
-    conn: SAConnection,
-    name: str,
-) -> tuple[list[DomainDotfile], int]:
-    query = sa.select(DomainRow.dotfiles).where(DomainRow.name == name)
-    packed_dotfile = await conn.scalar(query)
-    if packed_dotfile is None:
-        return [], MAXIMUM_DOTFILE_SIZE
-    rows = msgpack.unpackb(packed_dotfile)
-    return rows, MAXIMUM_DOTFILE_SIZE - len(packed_dotfile)
-
-
-def verify_dotfile_name(dotfile: str) -> bool:
-    return dotfile not in RESERVED_DOTFILES
-
-
 ALL_DOMAIN_PERMISSIONS = frozenset([perm for perm in DomainPermission])
 OWNER_PERMISSIONS: frozenset[DomainPermission] = ALL_DOMAIN_PERMISSIONS
 ADMIN_PERMISSIONS: frozenset[DomainPermission] = ALL_DOMAIN_PERMISSIONS
@@ -243,6 +216,8 @@ MEMBER_PERMISSIONS: frozenset[DomainPermission] = frozenset([DomainPermission.RE
 type WhereClauseType = sa.sql.expression.BinaryExpression[Any] | sa.sql.expression.BooleanClauseList
 
 
+# Built by DomainPermissionContextBuilder below and read by
+# api/gql_legacy/domain.py:256, :319; the v2 path judges through models/scopes.py instead.
 @dataclass
 class DomainPermissionContext(AbstractPermissionContext[DomainPermission, DomainRow, str]):
     @property
@@ -287,6 +262,7 @@ class DomainPermissionContext(AbstractPermissionContext[DomainPermission, Domain
         return permissions
 
 
+# Reached only through get_permission_ctx below; no other name refers to it.
 class DomainPermissionContextBuilder(
     AbstractPermissionContextBuilder[DomainPermission, DomainPermissionContext]
 ):
@@ -375,6 +351,7 @@ class DomainPermissionContextBuilder(
         return MEMBER_PERMISSIONS
 
 
+# Called only by api/gql_legacy/domain.py:256, :319 — the way into everything above.
 async def get_permission_ctx(
     target_scope: ScopeType,
     requested_permission: DomainPermission,
@@ -384,27 +361,3 @@ async def get_permission_ctx(
 ) -> DomainPermissionContext:
     builder = DomainPermissionContextBuilder(db_session)
     return await builder.build(ctx, target_scope, requested_permission)
-
-
-async def get_domains(
-    target_scope: ScopeType,
-    requested_permission: DomainPermission,
-    domain_names: Iterable[str] | None = None,
-    *,
-    ctx: ClientContext,
-    db_session: SASession,
-) -> list[DomainModel]:
-    ret: list[DomainModel] = []
-    permission_ctx = await get_permission_ctx(
-        target_scope, requested_permission, ctx=ctx, db_session=db_session
-    )
-    cond = permission_ctx.query_condition
-    if cond is None:
-        return ret
-    query_stmt = sa.select(DomainRow).where(cond)
-    if domain_names is not None:
-        query_stmt = query_stmt.where(DomainRow.name.in_(domain_names))
-    async for row in await db_session.stream_scalars(query_stmt):
-        permissions = await permission_ctx.calculate_final_permission(row)
-        ret.append(DomainModel.from_row(row, permissions))
-    return ret

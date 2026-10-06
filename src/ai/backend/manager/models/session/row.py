@@ -612,8 +612,7 @@ class SessionRow(CreatedAtMixin, Base):
     # FK to routings.id with ON DELETE SET NULL: when the replica's route row is
     # deleted, this auto-clears instead of dangling. This forms an intentional
     # nullable cycle with routings.session -> sessions.id; `use_alter` lets
-    # create_all() order the two tables, and the routing/session_row relationship
-    # below pins `foreign_keys` so SQLAlchemy can disambiguate the two FK paths.
+    # create_all() order the two tables.
     replica_id: Mapped[ReplicaID | None] = mapped_column(
         "replica_id",
         GUID(ReplicaID),
