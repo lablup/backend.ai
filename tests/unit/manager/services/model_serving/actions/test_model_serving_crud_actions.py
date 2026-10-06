@@ -493,7 +493,7 @@ class TestDeleteRoute(ModelServingCRUDBaseFixtures):
         route_id: uuid.UUID,
         service_id: uuid.UUID,
         status: RouteStatus,
-        session: uuid.UUID | None,
+        session: SessionId | None,
     ) -> RoutingData:
         return RoutingData(
             id=route_id,
@@ -522,7 +522,7 @@ class TestDeleteRoute(ModelServingCRUDBaseFixtures):
         mock_get_endpoint_access_validation_data.return_value = self._make_validation_data(
             user_data
         )
-        session_id = uuid.uuid4()
+        session_id = SessionId(uuid.uuid4())
         mock_get_route_by_id.return_value = self._make_route_data(
             route_id, service_id, RouteStatus.RUNNING, session_id
         )
@@ -532,7 +532,7 @@ class TestDeleteRoute(ModelServingCRUDBaseFixtures):
 
         assert result.route_id == route_id
         mock_scheduling_controller.mark_sessions_for_termination.assert_called_once_with(
-            [SessionId(session_id)],
+            [session_id],
             reason=KernelLifecycleEventReason.SERVICE_SCALED_DOWN,
             forced=False,
         )

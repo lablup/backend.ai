@@ -44,7 +44,6 @@ from ai.backend.common.types import (
     MountInfoEntry,
     MountPermission,
     ResourceSlotEntry,
-    SessionId,
     SessionTypes,
 )
 from ai.backend.logging.structured import StructuredLogger
@@ -732,7 +731,7 @@ class ModelServingService:
 
         if route_data.session is not None:
             await self._scheduling_controller.mark_sessions_for_termination(
-                [SessionId(route_data.session)],
+                [route_data.session],
                 reason=KernelLifecycleEventReason.SERVICE_SCALED_DOWN,
                 forced=False,
             )

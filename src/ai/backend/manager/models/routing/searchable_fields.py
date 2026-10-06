@@ -175,10 +175,11 @@ class _ReplicaOwnFields(RowDataConverter[RoutingRow, ModelReplicaData]):
 
     def to_routing_data(self, row: RoutingRow) -> RoutingData:
         """The same row read as the routing record the replica specs and route reads return."""
+        session_id = self.session.read(row)
         return RoutingData(
             id=self.field_id.read(row),
             endpoint=self.deployment_id.read(row),
-            session=self.session.read(row),
+            session=SessionId(session_id) if session_id else None,
             status=self.status.read(row),
             health_status=self.health_status.read(row),
             traffic_ratio=self.traffic_ratio.read(row),
