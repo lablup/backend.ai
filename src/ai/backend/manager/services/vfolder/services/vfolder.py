@@ -38,11 +38,14 @@ from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.project.types import ProjectResourceInfo
 from ai.backend.manager.data.vfolder.dto import UserIdentity
 from ai.backend.manager.data.vfolder.types import (
+    VFolderCloneInfo,
     VFolderCreation,
     VFolderData,
     VFolderOperationStatus,
     VFolderOwnershipType,
+    VFolderStatusSet,
     VFolderUsageData,
+    vfolder_status_map,
 )
 from ai.backend.manager.defs import is_unmanaged
 from ai.backend.manager.errors.common import Forbidden, InternalServerError
@@ -67,11 +70,6 @@ from ai.backend.manager.models.vfolder.creators import (
     PersonalVFolderCreator,
     UnmanagedVFolderMixin,
     VFolderBaseCreator,
-)
-from ai.backend.manager.models.vfolder.row import (
-    VFolderCloneInfo,
-    VFolderStatusSet,
-    vfolder_status_map,
 )
 from ai.backend.manager.models.vfolder.scopes import (
     ProjectVFolderTarget,

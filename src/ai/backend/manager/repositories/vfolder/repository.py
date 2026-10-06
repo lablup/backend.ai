@@ -38,13 +38,16 @@ from ai.backend.manager.data.project.types import ProjectResourceInfo
 from ai.backend.manager.data.vfolder.dto import UserIdentity
 from ai.backend.manager.data.vfolder.types import (
     UserWithVFolderHostPermissions,
-    ValidatedVFolderInfo,
+    VFolderCloneInfo,
     VFolderCreation,
     VFolderData,
     VFolderInvitationData,
     VFolderMountPolicyData,
     VFolderOperationStatus,
     VFolderOwnershipType,
+    VFolderStatusSet,
+    VFolderStorageTarget,
+    vfolder_status_map,
 )
 from ai.backend.manager.defs import is_unmanaged
 from ai.backend.manager.errors.api import InvalidAPIParameters
@@ -116,13 +119,9 @@ from ai.backend.manager.models.vfolder.queriers import (
     VFolderUserMountPolicyQuerier,
 )
 from ai.backend.manager.models.vfolder.row import (
-    VFolderCloneInfo,
-    VFolderDeletionInfo,
     VFolderRow,
-    VFolderStatusSet,
     VFolderUserMountPolicyRow,
     ensure_quota_scope_accessible_by_user,
-    vfolder_status_map,
     vfolders,
 )
 from ai.backend.manager.models.vfolder.scopes import UserVFolderTarget
@@ -550,7 +549,7 @@ class VfolderRepository:
                     quota_scope_id=vfolder_row.quota_scope_id,
                     folder_id=vfolder_row.id,
                 )
-                deletion_info = VFolderDeletionInfo(
+                deletion_info = VFolderStorageTarget(
                     vfolder_id=vfolder_id_obj,
                     host=vfolder_row.host,
                     unmanaged_path=vfolder_row.unmanaged_path,
@@ -1556,7 +1555,7 @@ class VfolderRepository:
         permission: VFolderHostPermission,
         allowed_vfolder_types: Sequence[str],
         resource_policy: Mapping[str, Any],
-    ) -> ValidatedVFolderInfo:
+    ) -> VFolderStorageTarget:
         """
         Resolve user from context, validate vfolder access, check host permission,
         and return validated VFolderID with storage info.
@@ -1573,7 +1572,7 @@ class VfolderRepository:
             resource_policy=resource_policy,
             domain_name=vfolder_data.domain_name,
         )
-        return ValidatedVFolderInfo(
+        return VFolderStorageTarget(
             vfolder_id=VFolderID(
                 quota_scope_id=vfolder_data.quota_scope_id,
                 folder_id=vfolder_data.id,

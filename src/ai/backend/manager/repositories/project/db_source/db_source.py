@@ -24,6 +24,11 @@ from ai.backend.manager.clients.storage_proxy.session_manager import StorageSess
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.model_serving.types import EndpointLifecycle
 from ai.backend.manager.data.project.types import ProjectData, ProjectType
+from ai.backend.manager.data.vfolder.types import (
+    VFolderStatusSet,
+    VFolderStorageTarget,
+    vfolder_status_map,
+)
 from ai.backend.manager.errors.resource import (
     PersonalProjectDeletionError,
     ProjectHasActiveEndpointsError,
@@ -60,12 +65,7 @@ from ai.backend.manager.models.resource_usage import fetch_resource_usage
 from ai.backend.manager.models.routing.row import RoutingRow
 from ai.backend.manager.models.user.row import users
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.models.vfolder.row import (
-    VFolderDeletionInfo,
-    VFolderRow,
-    VFolderStatusSet,
-    vfolder_status_map,
-)
+from ai.backend.manager.models.vfolder.row import VFolderRow
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.repositories.project.types import ProjectSearchResult
 from ai.backend.manager.repositories.vfolder.deletion import initiate_vfolder_deletion
@@ -387,7 +387,7 @@ class ProjectDBSource:
 
     async def _purgable_project_vfolders(
         self, sess: SASession, group_id: uuid.UUID
-    ) -> list[VFolderDeletionInfo]:
+    ) -> list[VFolderStorageTarget]:
         """The project's vfolders whose status allows the owner to purge them."""
         rows = (
             await sess.scalars(
@@ -398,13 +398,13 @@ class ProjectDBSource:
             )
         ).all()
         return [
-            VFolderDeletionInfo(VFolderID.from_row(row), row.host, row.unmanaged_path)
+            VFolderStorageTarget(VFolderID.from_row(row), row.host, row.unmanaged_path)
             for row in rows
         ]
 
     async def _delete_project_vfolders(
         self,
-        target_vfs: list[VFolderDeletionInfo],
+        target_vfs: list[VFolderStorageTarget],
         storage_manager: StorageSessionManager,
     ) -> None:
         """Hand the project's purgable vfolders to the storage-side deletion."""

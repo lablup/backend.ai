@@ -17,7 +17,7 @@ import sqlalchemy as sa
 from ai.backend.common.types import VFolderID
 from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
-from ai.backend.manager.data.vfolder.types import VFolderOperationStatus
+from ai.backend.manager.data.vfolder.types import VFolderOperationStatus, VFolderStorageTarget
 from ai.backend.manager.defs import is_unmanaged
 from ai.backend.manager.errors.api import InvalidAPIParameters
 from ai.backend.manager.errors.storage import VFolderGone, VFolderOperationFailed
@@ -27,7 +27,6 @@ from ai.backend.manager.models.utils import (
     sql_json_merge,
 )
 from ai.backend.manager.models.vfolder.row import (
-    VFolderDeletionInfo,
     VFolderRow,
     vfolders,
 )
@@ -103,7 +102,7 @@ async def update_vfolder_status(
 
 async def initiate_vfolder_deletion(
     db_engine: ExtendedAsyncSAEngine,
-    requested_vfolders: Sequence[VFolderDeletionInfo],
+    requested_vfolders: Sequence[VFolderStorageTarget],
     storage_manager: StorageSessionManager,
     _storage_ptask_group: aiotools.PersistentTaskGroup | None = None,
     *,
@@ -115,7 +114,7 @@ async def initiate_vfolder_deletion(
     repository/service refactor.
     """
     vfolder_info_len = len(requested_vfolders)
-    vfolder_ids = tuple(vf_id.folder_id for vf_id, _, _ in requested_vfolders)
+    vfolder_ids = tuple(info.vfolder_id.folder_id for info in requested_vfolders)
     if vfolder_info_len == 0:
         return 0
 
@@ -127,10 +126,12 @@ async def initiate_vfolder_deletion(
         force=force,
     )
 
-    already_deleted: list[VFolderDeletionInfo] = []
+    already_deleted: list[VFolderStorageTarget] = []
 
     for vfolder_info in requested_vfolders:
-        folder_id, host_name, unmanaged_path = vfolder_info
+        folder_id = vfolder_info.vfolder_id
+        host_name = vfolder_info.host
+        unmanaged_path = vfolder_info.unmanaged_path
         proxy_name, volume_name = storage_manager.get_proxy_and_volume(
             host_name, is_unmanaged(unmanaged_path)
         )
@@ -143,7 +144,7 @@ async def initiate_vfolder_deletion(
         except VFolderGone:
             already_deleted.append(vfolder_info)
     if already_deleted:
-        vfolder_ids = tuple(vf_id.folder_id for vf_id, _, _ in already_deleted)
+        vfolder_ids = tuple(info.vfolder_id.folder_id for info in already_deleted)
 
         await update_vfolder_status(
             db_engine, vfolder_ids, VFolderOperationStatus.DELETE_COMPLETE, do_log=False
