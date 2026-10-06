@@ -14,9 +14,6 @@ sources:
 generated:
   by: claude-code/opus-5
   at: 2026-09-21
-updated:
-  by: codex/gpt-6
-  at: 2026-10-06
 status: stable
 ---
 
