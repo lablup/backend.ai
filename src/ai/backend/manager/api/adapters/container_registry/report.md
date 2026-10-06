@@ -2,11 +2,12 @@
 
 [무엇을 보장하는가](/src/ai/backend/manager/api/adapters/container_registry/KNOWLEDGE.md) · [어댑터](/src/ai/backend/manager/api/adapters/container_registry/adapter.py)
 
-시나리오: 미완 1 / 7
+시나리오: 미완 1 / 8
 
-- ops 로 구성 (2)
+- ops 로 구성 (3)
   - admin_search — 대표 성공 ✓ · 대표 실패 ✓
   - batch_load_by_ids — 대표 성공 ✓ · 대표 실패 ✓
+  - lookup_by_name_and_project — 대표 성공 ✓ · 대표 실패 ✓
 - 직접 구현 (5)
   - admin_create — 성공 있음 2 · 실패 있음 2 (global_scope, relation)
   - admin_delete — 성공 있음 2 · 실패 있음 2 (global_scope)
@@ -30,6 +31,14 @@
 | [빈 id 목록으로 조회하면 하위 계층을 호출하지 않고 빈 응답이 반환된다](#reading-an-empty-id-list-answers-empty-without-calling-the-wiring) | 성공 |
 | [슈퍼관리자가 미리 만들어 둔 레지스트리 둘과 존재하지 않는 id 하나를 한 번에 조회하면, 미리 만들어 둔 레지스트리는 요청한 순서대로 반환된다. 존재하지 않는 id의 항목에 무엇이 반환되는지는 아직 정해지지 않았다](#reading-loading-many-ids-keeps-the-order) | 성공 |
 | [권한을 받지 않은 사용자가 id 여럿을 한 번에 조회하면, 요청 전체가 거부되는 대신 항목마다 권한 부족 거부가 담겨 반환된다. 존재하지 않는 id도 같은 거부로 반환되어 있는지 없는지가 드러나지 않는다](#reading-a-plain-user-loading-many-ids-is-refused-on-every-id) | 거부 |
+
+**lookup_by_name_and_project**
+
+| 시나리오 | 판정 |
+|---|---|
+| [읽기 권한이 있는 사용자는 프로젝트명이 없는 레지스트리의 이름을 식별자로 변환할 수 있다](#looking_up-readable-registry-key-resolves) | 성공 |
+| [존재하지 않는 이름은 읽기 권한이 없는 경우와 같은 오류로 거부된다](#looking_up-missing-registry-key-is-unresolvable) | 거부 |
+| [읽기 권한이 없는 사용자의 이름 조회는 대상의 존재 여부를 드러내지 않고 거부된다](#looking_up-unreadable-registry-key-is-unresolvable) | 거부 |
 
 **admin_create**
 
@@ -285,6 +294,97 @@ Then
   - 거부: NotEnoughPermission
   - 거부: NotEnoughPermission
   - 거부: NotEnoughPermission
+
+### lookup_by_name_and_project
+
+<a id="looking_up-readable-registry-key-resolves"></a>
+
+#### [readable-registry-key-resolves](/tests/scenario/bai_scenario/manager/container_registry/test_looking_up.py) — pass
+
+읽기 권한이 있는 사용자는 프로젝트명이 없는 레지스트리의 이름을 식별자로 변환할 수 있다
+
+Given
+
+- 레지스트리 하나, 프로젝트 하나, 레지스트리에 권한 있음인 사용자 한 명
+  - 도메인 home-1
+  - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+  - 프로젝트 project-1
+  - 컨테이너 레지스트리 host-1: 이미지를 가져오는 곳
+  - 도메인에 속한 사용자 한 명 준비
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+  - allow-on-registry 권한을 받은 사용자 준비
+    - 역할 allow-on-registry-1: 이 역할이 앉은 스코프 안에서만 통한다
+    - 역할 allow-on-registry-1: container_registry 전체에 READ 허용
+    - 일반 사용자 user-1: 역할 allow-on-registry-1 보유
+
+When
+
+- ContainerRegistryAdapter.lookup_by_name_and_project — 일반 사용자가 이름과 프로젝트명으로 레지스트리 식별자를 조회
+
+Then
+
+- 준비한 레지스트리의 식별자가 반환된다
+  - registry: 준비한 레지스트리와 같다
+
+<a id="looking_up-missing-registry-key-is-unresolvable"></a>
+
+#### [missing-registry-key-is-unresolvable](/tests/scenario/bai_scenario/manager/container_registry/test_looking_up.py) — pass
+
+존재하지 않는 이름은 읽기 권한이 없는 경우와 같은 오류로 거부된다
+
+Given
+
+- 레지스트리 하나, 프로젝트 하나, 레지스트리에 권한 있음인 사용자 한 명
+  - 도메인 home-1
+  - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+  - 프로젝트 project-1
+  - 컨테이너 레지스트리 host-1: 이미지를 가져오는 곳
+  - 도메인에 속한 사용자 한 명 준비
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+  - allow-on-registry 권한을 받은 사용자 준비
+    - 역할 allow-on-registry-1: 이 역할이 앉은 스코프 안에서만 통한다
+    - 역할 allow-on-registry-1: container_registry 전체에 READ 허용
+    - 일반 사용자 user-1: 역할 allow-on-registry-1 보유
+
+When
+
+- ContainerRegistryAdapter.lookup_by_name_and_project — 일반 사용자가 이름과 프로젝트명으로 레지스트리 식별자를 조회
+
+Then
+
+- 거부된다
+  - 거부: GenericBadRequest
+
+<a id="looking_up-unreadable-registry-key-is-unresolvable"></a>
+
+#### [unreadable-registry-key-is-unresolvable](/tests/scenario/bai_scenario/manager/container_registry/test_looking_up.py) — pass
+
+읽기 권한이 없는 사용자의 이름 조회는 대상의 존재 여부를 드러내지 않고 거부된다
+
+Given
+
+- 레지스트리 하나, 프로젝트 하나, 아무 권한도 없음인 사용자 한 명
+  - 도메인 home-1
+  - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+  - 프로젝트 project-1
+  - 컨테이너 레지스트리 host-1: 이미지를 가져오는 곳
+  - 도메인에 속한 사용자 한 명 준비
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+
+When
+
+- ContainerRegistryAdapter.lookup_by_name_and_project — 일반 사용자가 이름과 프로젝트명으로 레지스트리 식별자를 조회
+
+Then
+
+- 거부된다
+  - 거부: GenericBadRequest
 
 ### admin_create
 

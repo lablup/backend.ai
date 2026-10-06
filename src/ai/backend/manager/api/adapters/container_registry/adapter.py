@@ -59,6 +59,9 @@ from ai.backend.manager.services.container_registry.actions.create_container_reg
 from ai.backend.manager.services.container_registry.actions.delete_container_registry import (
     DeleteContainerRegistryAction,
 )
+from ai.backend.manager.services.container_registry.actions.lookup import (
+    LookupContainerRegistryAction,
+)
 from ai.backend.manager.services.container_registry.actions.search_container_registries import (
     SearchContainerRegistriesAction,
 )
@@ -378,3 +381,11 @@ class ContainerRegistryAdapter(BaseAdapter):
             is_global=data.is_global,
             extra=data.extra,
         )
+
+    async def lookup_by_name_and_project(
+        self, registry_name: str, project_name: str | None
+    ) -> ContainerRegistryID:
+        result = await self._container_registry.lookup_by_name_and_project.run(
+            LookupContainerRegistryAction(registry_name, project_name)
+        )
+        return result.entity_id()

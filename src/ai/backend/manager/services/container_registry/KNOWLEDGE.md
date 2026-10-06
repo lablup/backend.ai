@@ -14,6 +14,9 @@ sources:
 generated:
   by: claude-code/opus-5
   at: 2026-09-21
+updated:
+  by: codex/gpt-6
+  at: 2026-10-06
 status: stable
 ---
 
@@ -53,3 +56,9 @@ status: stable
   `ContainerRegistryQuotaNotConfigurable`로 거부된다. `ssl_verify`는 null이어도 거부하지 않고
   `True`(TLS 검증)로 본다. 컬럼의 `server_default`와 같다.
 - `HarborQuotaClient`는 호출마다 세션을 열므로 pool은 연결 상태를 갖지 않고 close도 필요 없다.
+
+## 이름과 프로젝트명 조회는 찾은 레지스트리의 읽기 권한을 검사한다
+
+- `lookup_by_name_and_project`는 이름과 프로젝트명을 기존 lookup으로 해석하고 registry ID를 반환한다.
+- 인증 후 lookup을 수행하고, 찾은 registry의 읽기 권한을 검사한다. 일반 사용자에게는 미존재와 권한 부족을 같은 오류로 반환한다.
+- 여러 registry가 같은 키에 대응하면 공통 lookup이 거부하며 임의의 행을 선택하지 않는다.
