@@ -62,7 +62,6 @@ from ai.backend.manager.models.rbac import (
 from ai.backend.manager.models.rbac.context import ClientContext
 from ai.backend.manager.models.user.row import UserRow
 from ai.backend.manager.models.vfolder.row import (
-    DEAD_VFOLDER_STATUSES,
     VFolderRow,
     VFolderUserMountPolicyRow,
     ensure_quota_scope_accessible_by_user,
@@ -731,7 +730,7 @@ class ModelCard(graphene.ObjectType):  # type: ignore[misc]
                     f"The vfolder is not model. expect: {VFolderUsageMode.MODEL.value}, got:"
                     f" {vfolder_row.usage_mode.value}. (id: {vfolder_row_id})"
                 )
-            if vfolder_row.status in DEAD_VFOLDER_STATUSES:
+            if vfolder_row.status in VFolderOperationStatus.dead():
                 raise ValueError(
                     f"The vfolder is deleted. (id: {vfolder_row_id}, status: {vfolder_row.status})"
                 )
@@ -792,7 +791,7 @@ class ModelCard(graphene.ObjectType):  # type: ignore[misc]
                 .scalars()
                 .all()
             )
-            additional_cond = (VFolderRow.status.not_in(DEAD_VFOLDER_STATUSES)) & (
+            additional_cond = (VFolderRow.status.not_in(VFolderOperationStatus.dead())) & (
                 VFolderRow.group.in_(model_store_project_gids)
             )
             query = query.where(additional_cond)

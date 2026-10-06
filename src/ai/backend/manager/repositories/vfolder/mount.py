@@ -28,7 +28,7 @@ from ai.backend.common.types import (
 from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
 from ai.backend.manager.data.project.types import ProjectType as DataProjectType
-from ai.backend.manager.data.vfolder.types import VFolderOwnershipType
+from ai.backend.manager.data.vfolder.types import VFolderOperationStatus, VFolderOwnershipType
 from ai.backend.manager.defs import VFOLDER_DSTPATHS_MAP
 from ai.backend.manager.errors.api import InvalidAPIParameters
 from ai.backend.manager.errors.storage import (
@@ -42,7 +42,6 @@ from ai.backend.manager.models.scopes import OperationScope
 from ai.backend.manager.models.specs.orders.condition import ConditionOrder
 from ai.backend.manager.models.user.queries import joined_project_ids_query
 from ai.backend.manager.models.vfolder.row import (
-    DEAD_VFOLDER_STATUSES,
     VFolderRow,
     VFolderUserMountPolicyRow,
     vfolders,
@@ -255,7 +254,9 @@ async def prepare_vfolder_mounts(
             extra_vf_conds,
             VFolderRow.id.in_(requested_vfolder_ids),
         )
-    extra_vf_conds = sa.and_(extra_vf_conds, VFolderRow.status.not_in(DEAD_VFOLDER_STATUSES))
+    extra_vf_conds = sa.and_(
+        extra_vf_conds, VFolderRow.status.not_in(VFolderOperationStatus.dead())
+    )
     accessible_vfolders = await query_reachable_vfolders(
         conn, user_scope, extra_vf_conds, held_permissions
     )

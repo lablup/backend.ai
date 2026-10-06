@@ -205,24 +205,9 @@ vfolder_status_map: Final[dict[VFolderStatusSet, set[VFolderOperationStatus]]] =
 }
 
 
-SOFT_DELETED_VFOLDER_STATUSES = (
-    VFolderOperationStatus.DELETE_PENDING,
-    VFolderOperationStatus.DELETE_ONGOING,
-)
-
 #: The name of the index holding a folder name unique within its project. Named here
 #: so the spec that maps its violation and the migration that creates it agree.
 VFOLDER_NAME_IN_PROJECT_INDEX: Final = "uq_vfolders_project_name"
-
-HARD_DELETED_VFOLDER_STATUSES = (
-    VFolderOperationStatus.DELETE_COMPLETE,
-    VFolderOperationStatus.DELETE_ERROR,
-)
-
-DEAD_VFOLDER_STATUSES = (
-    *SOFT_DELETED_VFOLDER_STATUSES,
-    *HARD_DELETED_VFOLDER_STATUSES,
-)
 
 
 class VFolderDeletionInfo(NamedTuple):

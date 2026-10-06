@@ -116,7 +116,6 @@ from ai.backend.manager.models.vfolder.queriers import (
     VFolderUserMountPolicyQuerier,
 )
 from ai.backend.manager.models.vfolder.row import (
-    HARD_DELETED_VFOLDER_STATUSES,
     VFolderCloneInfo,
     VFolderDeletionInfo,
     VFolderRow,
@@ -986,7 +985,7 @@ class VfolderRepository:
                 .select_from(VFolderRow)
                 .where(
                     (VFolderRow.user == user_id)
-                    & (VFolderRow.status.not_in(HARD_DELETED_VFOLDER_STATUSES))
+                    & (VFolderRow.status.not_in(VFolderOperationStatus.hard_deleted()))
                 )
             )
             result = await session.scalar(query)
@@ -1005,7 +1004,7 @@ class VfolderRepository:
                 .where(
                     (VFolderRow.group == group_id)
                     & (VFolderRow.ownership_type == VFolderOwnershipType.GROUP)
-                    & (VFolderRow.status.not_in(HARD_DELETED_VFOLDER_STATUSES))
+                    & (VFolderRow.status.not_in(VFolderOperationStatus.hard_deleted()))
                 )
             )
             result = await session.scalar(query)
@@ -1019,7 +1018,7 @@ class VfolderRepository:
                 sa.select(VFolderRow.id)
                 .where(
                     VFolderRow.name == name,
-                    VFolderRow.status.not_in(HARD_DELETED_VFOLDER_STATUSES),
+                    VFolderRow.status.not_in(VFolderOperationStatus.hard_deleted()),
                     scope.to_condition()(),
                 )
                 .exists()
