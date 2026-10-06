@@ -5,8 +5,8 @@ from collections.abc import Sequence
 from typing import Final
 
 from ai.backend.common.data.permission.types import Permission
-from ai.backend.manager.data.permission.seed.kinds import PermissionKinds
-from ai.backend.manager.data.permission.seed.role import RoleSeed
+from ai.backend.manager.seed.role_preset.kinds import PermissionKinds
+from ai.backend.manager.seed.role_preset.role import RoleSeed
 
 # A member role is compared with the admin role whose name shares its prefix.
 _MEMBER_SUFFIX: Final[str] = "_member"

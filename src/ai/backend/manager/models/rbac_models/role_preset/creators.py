@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import override
 
 from ai.backend.common.data.entity.role_preset import RolePresetID
@@ -51,3 +51,20 @@ class RolePresetCreator(
     @override
     def to_data(self, row: RolePresetRow) -> RolePresetData:
         return RolePresetSearchableFields.own.to_data(row)
+
+
+@dataclass
+class RolePresetSeedCreator(RolePresetCreator):
+    """A role preset created under the id its seed file states.
+
+    Used only by the seed kinds in `manager/seed/`; every other path leaves the id to the
+    database. See `models/specs/AGENTS.md`.
+    """
+
+    id: RolePresetID = field(kw_only=True)
+
+    @override
+    def build_row(self) -> RolePresetRow:
+        row = super().build_row()
+        row.id = self.id
+        return row
