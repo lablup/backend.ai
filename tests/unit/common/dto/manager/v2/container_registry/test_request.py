@@ -14,7 +14,10 @@ from ai.backend.common.dto.manager.v2.container_registry.request import (
     UpdateContainerRegistryInput,
 )
 from ai.backend.common.dto.manager.v2.container_registry.types import ContainerRegistryType
-from ai.backend.common.exception import BackendAISchemaValidationFailed
+from ai.backend.common.exception import (
+    BackendAISchemaValidationFailed,
+    InvalidContainerRegistryURL,
+)
 
 
 class TestAllowedGroupsInput:
@@ -132,16 +135,16 @@ class TestCreateContainerRegistryInput:
 class TestCreateContainerRegistryInputValidationFailures:
     """Tests for CreateContainerRegistryInput validation failures."""
 
-    def test_blank_url_raises_validation_error(self) -> None:
-        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
+    def test_blank_url_raises_invalid_url(self) -> None:
+        with pytest.raises(InvalidContainerRegistryURL):
             CreateContainerRegistryInput(
                 url="",
                 registry_name="my-registry",
                 type=ContainerRegistryType.DOCKER,
             )
 
-    def test_whitespace_only_url_raises_validation_error(self) -> None:
-        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
+    def test_whitespace_only_url_raises_invalid_url(self) -> None:
+        with pytest.raises(InvalidContainerRegistryURL):
             CreateContainerRegistryInput(
                 url="   ",
                 registry_name="my-registry",
@@ -168,8 +171,8 @@ class TestCreateContainerRegistryInputValidationFailures:
         assert parsed.url == url
 
     @pytest.mark.parametrize("url", ["https://", "http://", "/library"])
-    def test_url_without_a_host_raises_validation_error(self, url: str) -> None:
-        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
+    def test_url_without_a_host_raises_invalid_url(self, url: str) -> None:
+        with pytest.raises(InvalidContainerRegistryURL):
             CreateContainerRegistryInput(
                 url=url,
                 registry_name="my-registry",
@@ -272,20 +275,20 @@ class TestUpdateContainerRegistryInput:
 class TestUpdateContainerRegistryInputValidationFailures:
     """Tests for UpdateContainerRegistryInput validation failures."""
 
-    def test_blank_url_raises_validation_error(self) -> None:
+    def test_blank_url_raises_invalid_url(self) -> None:
         reg_id = uuid.uuid4()
-        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
+        with pytest.raises(InvalidContainerRegistryURL):
             UpdateContainerRegistryInput(id=reg_id, url="")
 
-    def test_whitespace_only_url_raises_validation_error(self) -> None:
+    def test_whitespace_only_url_raises_invalid_url(self) -> None:
         reg_id = uuid.uuid4()
-        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
+        with pytest.raises(InvalidContainerRegistryURL):
             UpdateContainerRegistryInput(id=reg_id, url="   ")
 
     @pytest.mark.parametrize("url", ["https://", "http://", "/library"])
-    def test_url_without_a_host_raises_validation_error(self, url: str) -> None:
+    def test_url_without_a_host_raises_invalid_url(self, url: str) -> None:
         reg_id = uuid.uuid4()
-        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
+        with pytest.raises(InvalidContainerRegistryURL):
             UpdateContainerRegistryInput(id=reg_id, url=url)
 
     def test_url_left_out_is_not_checked(self) -> None:

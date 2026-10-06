@@ -861,7 +861,7 @@ When
 Then
 
 - 거부된다
-  - 거부: ValidationError
+  - 거부: InvalidContainerRegistryURL
 
 <a id="editing-editing-an-id-that-holds-no-registry-is-refused"></a>
 
