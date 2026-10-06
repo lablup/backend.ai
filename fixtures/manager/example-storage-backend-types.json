@@ -1,0 +1,74 @@
+{
+  "storage_backend_types": [
+    {
+      "id": "01a0f746-b6d3-72d2-9e9a-a544b9652bcd",
+      "name": "vfs",
+      "capabilities": {"supported": ["vfolder"]}
+    },
+    {
+      "id": "01a0f746-b6d4-7fdd-a23e-c95ecaad2c62",
+      "name": "xfs",
+      "capabilities": {"supported": ["vfolder", "quota"]}
+    },
+    {
+      "id": "01a0f746-b6d5-7895-a119-c45f92d8d89a",
+      "name": "cephfs",
+      "capabilities": {"supported": ["vfolder", "quota", "fast-size"]}
+    },
+    {
+      "id": "01a0f746-b6d6-747e-a8ee-870a4213b94a",
+      "name": "purestorage",
+      "capabilities": {"supported": ["vfolder", "metric", "fast-fs-size", "fast-scan"]}
+    },
+    {
+      "id": "01a0f746-b6d7-7b8c-946a-f478acd05689",
+      "name": "netapp",
+      "capabilities": {"supported": ["vfolder", "metric", "quota", "fast-fs-size", "fast-size"]}
+    },
+    {
+      "id": "01a0f746-b6d8-7cda-9ead-032dc99d3611",
+      "name": "weka",
+      "capabilities": {"supported": ["vfolder", "metric", "quota", "fast-fs-size"]}
+    },
+    {
+      "id": "01a0f746-b6d9-775d-ba54-e6b4ba0b86f4",
+      "name": "gpfs",
+      "capabilities": {"supported": ["vfolder", "metric", "quota", "fast-fs-size"]}
+    },
+    {
+      "id": "01a0f746-b6da-7e3c-8633-ceaffa04892e",
+      "name": "spectrumscale",
+      "capabilities": {"supported": ["vfolder", "metric", "quota", "fast-fs-size"]}
+    },
+    {
+      "id": "01a0f746-b6db-7bc1-925b-9a4603421848",
+      "name": "dellemc-onefs",
+      "capabilities": {"supported": ["vfolder", "metric", "quota", "fast-fs-size"]}
+    },
+    {
+      "id": "01a0f746-b6dc-7409-bec6-12b74452d7de",
+      "name": "vast",
+      "capabilities": {"supported": ["vfolder", "metric", "quota", "fast-fs-size", "fast-size"]}
+    },
+    {
+      "id": "01a0f746-b6dd-7113-bfd8-8c37075724f2",
+      "name": "exascaler",
+      "capabilities": {"supported": ["vfolder", "quota"]}
+    },
+    {
+      "id": "01a0f746-b6de-7cac-92dd-c23348356510",
+      "name": "hammerspace",
+      "capabilities": {"supported": ["vfolder", "quota"]}
+    },
+    {
+      "id": "01a0f746-b6df-7b9b-be97-35f559617a35",
+      "name": "hammerspace-base",
+      "capabilities": {"supported": ["vfolder"]}
+    },
+    {
+      "id": "01a0f746-b6e0-7efc-8855-34cab4efcea3",
+      "name": "noop",
+      "capabilities": {"supported": []}
+    }
+  ]
+}

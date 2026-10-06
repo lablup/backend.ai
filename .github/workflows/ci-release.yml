@@ -12,7 +12,7 @@ on:
         type: string
         required: true
       release-audience:
-        description: RELEASE_AUDIENCE from `scripts/determine-release-type.py`; `internal` builds wheels only
+        description: RELEASE_AUDIENCE from `scripts/determine-release-type.py`; `internal` builds wheels and the supergraph schema only
         type: string
         required: true
       is-prerelease:
@@ -151,7 +151,6 @@ jobs:
     uses: ./.github/workflows/sbom.yml
 
   build-supergraph:
-    if: inputs.release-audience != 'internal'
     runs-on: ubuntu-latest
     steps:
     - name: Check out the revision
@@ -203,8 +202,8 @@ jobs:
 
   make-final-release:
     needs: [build-scies, build-wheels, build-supergraph]
-    # `build-scies` and `build-supergraph` are skipped for an internal release, so
-    # only `build-wheels` is required to have succeeded.
+    # `build-scies` is skipped for an internal release, so only `build-wheels` is
+    # required to have succeeded.
     if: |
       !cancelled()
       && needs.build-wheels.result == 'success'
@@ -255,7 +254,6 @@ jobs:
         name: SBOM report
         path: dist
     - name: Download supergraph schema
-      if: inputs.release-audience != 'internal'
       uses: actions/download-artifact@v6
       with:
         name: supergraph
@@ -304,6 +302,8 @@ jobs:
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     - name: Resolve the installer channels
+      # An internal release ships no installer to point the channels at.
+      if: inputs.release-audience != 'internal'
       id: channels
       run: |
         # `main` is the authority on which versions are alive: the checked-out
