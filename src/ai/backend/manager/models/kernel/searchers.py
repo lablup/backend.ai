@@ -9,7 +9,6 @@ import sqlalchemy as sa
 
 from ai.backend.manager.data.kernel.types import KernelInfo
 from ai.backend.manager.models.kernel.row import KernelRow
-from ai.backend.manager.models.kernel.searchable_fields import KernelSearchableFields
 from ai.backend.manager.models.specs.searcher import Searcher
 
 
@@ -24,4 +23,4 @@ class KernelSearcher(Searcher[KernelRow, KernelInfo]):
 
     @override
     def to_data(self, row: KernelRow) -> KernelInfo:
-        return KernelSearchableFields.own.to_data(row)
+        return row.to_kernel_info()
