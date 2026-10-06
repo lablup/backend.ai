@@ -25,6 +25,8 @@ class AuditLogOrderFieldGQL(StrEnum):
     ENTITY_TYPE = "entity_type"
     OPERATION = "operation"
     STATUS = "status"
+    ACTION_NAME = "action_name"
+    ACTION_KIND = "action_kind"
 
 
 @gql_pydantic_input(
