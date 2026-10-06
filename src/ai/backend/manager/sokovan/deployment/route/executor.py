@@ -10,6 +10,7 @@ from ai.backend.common.clients.valkey_client.valkey_schedule import (
     ReplicaProbeTarget,
     ValkeyScheduleClient,
 )
+from ai.backend.common.data.endpoint.types import EndpointLifecycle
 from ai.backend.common.data.entity.deployment import DeploymentID
 from ai.backend.common.data.entity.deployment_revision import DeploymentRevisionID
 from ai.backend.common.data.entity.replica import ReplicaID
@@ -48,6 +49,8 @@ from ai.backend.manager.errors.deployment import (
     RouteSessionNotFound,
     RouteSessionTerminated,
 )
+from ai.backend.manager.models.endpoint.searchable_fields import DeploymentSearchableFields
+from ai.backend.manager.models.endpoint.searchers import DeploymentIDSearcher
 from ai.backend.manager.models.routing.searchable_fields import ReplicaSearchableFields
 from ai.backend.manager.models.routing.searchers import RouteInfoSearcher
 from ai.backend.manager.models.specs.pagination import NoPagination
@@ -975,9 +978,35 @@ class RouteExecutor:
         proxy_targets = await self._deployment_repo.fetch_resource_group_proxy_targets(
             resource_groups
         )
+        inactive_ids = [
+            endpoint_id for endpoint_id in endpoint_ids if endpoint_id not in deployment_by_id
+        ]
+        destroyed_ids: set[DeploymentID] = set()
+        if inactive_ids:
+            deployment_fields = DeploymentSearchableFields.own
+            destroyed_ids = set(
+                await self._deployment_repo.search_deployment_ids(
+                    searcher=DeploymentIDSearcher(
+                        pagination=NoPagination(),
+                        conditions=[
+                            deployment_fields.entity_id.filter.in_(
+                                UUIDInMatchSpec(values=inactive_ids, negated=False)
+                            ),
+                            deployment_fields.lifecycle_stage.filter.in_([
+                                EndpointLifecycle.DESTROYING,
+                                EndpointLifecycle.DESTROYED,
+                            ]),
+                        ],
+                    )
+                )
+            )
 
         items_by_target: dict[tuple[str, str], list[UnregisterRoutesItem]] = {}
         for endpoint_id in endpoint_ids:
+            if endpoint_id in destroyed_ids:
+                # Destroying the deployment deleted its AppProxy endpoint, and the routes with it.
+                successes.extend(routes_by_endpoint[endpoint_id])
+                continue
             deployment = deployment_by_id.get(endpoint_id)
             if deployment is None:
                 for route in routes_by_endpoint[endpoint_id]:
