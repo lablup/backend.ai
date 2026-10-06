@@ -3,7 +3,6 @@ from __future__ import annotations
 import enum
 import functools
 import logging
-import uuid
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime
@@ -42,10 +41,8 @@ from ai.backend.common.types import (
 from ai.backend.common.utils import join_non_empty
 from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.data.image.types import (
-    ImageAliasData,
     ImageData,
     ImageDataWithDetails,
-    ImageIdentifier,
     ImageStatus,
     ImageType,
     Resources,
@@ -83,10 +80,7 @@ log = StructuredLogger(logging.getLogger(__spec__.name))
 
 __all__ = (
     "ImageAliasRow",
-    "ImageIdentifier",
-    "ImageLoadFilter",
     "ImageRow",
-    "PublicImageLoadFilter",
 )
 
 
@@ -423,10 +417,6 @@ class ImageAliasRow(Base):
     image_id: Mapped[ImageID] = mapped_column(
         "image", GUID(ImageID), sa.ForeignKey("images.id", ondelete="CASCADE"), nullable=False
     )
-
-    @classmethod
-    def from_dataclass(cls, alias_data: ImageAliasData, image_id: uuid.UUID) -> Self:
-        return cls(id=alias_data.id, alias=alias_data.alias, image_id=image_id)
 
 
 type WhereClauseType = sa.sql.expression.BinaryExpression[Any] | sa.sql.expression.BooleanClauseList
