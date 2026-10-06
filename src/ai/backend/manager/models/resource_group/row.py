@@ -176,7 +176,8 @@ class ResourceGroupForProjectRow(Base):
     )
 
 
-# For compatibility
+# For compatibility. In src, only gql_legacy (scaling_group.py) uses it.
+# Delete it with the gql_legacy cleanup.
 sgroups_for_groups = ResourceGroupForProjectRow.__table__
 
 
@@ -208,7 +209,8 @@ class ResourceGroupForKeypairsRow(Base):
     )
 
 
-# For compatibility
+# For compatibility. In src, only gql_legacy (scaling_group.py) uses it.
+# Delete it with the gql_legacy cleanup.
 sgroups_for_keypairs = ResourceGroupForKeypairsRow.__table__
 
 
@@ -298,7 +300,7 @@ class ResourceGroupRow(CreatedAtMixin, Base):
     def scope_name_expr(cls) -> SQLColumnExpression[str]:
         return cls.name
 
-    # Called only by resolve_accessible_scaling_groups in api/gql_legacy/schema.py:2322.
+    # Called only by resolve_accessible_scaling_groups in api/gql_legacy/schema.py.
     # Delete it with gql_legacy.
     @classmethod
     async def list_by_condition(
@@ -314,8 +316,8 @@ class ResourceGroupRow(CreatedAtMixin, Base):
             return list((await db_session.scalars(stmt)).all())
 
 
-# Builds the condition list_by_condition takes; api/gql_legacy/schema.py:146, :2321 is
-# the only caller. Delete it with gql_legacy.
+# Builds the condition list_by_condition takes; api/gql_legacy/schema.py is the only
+# caller. Delete it with gql_legacy.
 def and_names(names: Iterable[str]) -> Callable[..., sa.sql.Select[Any]]:
     return lambda query_stmt: query_stmt.where(ResourceGroupRow.name.in_(names))
 
@@ -636,7 +638,7 @@ class ResourceGroupPermissionContextBuilder(
         return MEMBER_PERMISSIONS
 
 
-# Called only by _ensure_sgroup_permission in api/gql_legacy/domain.py:371.
+# Called only by _ensure_sgroup_permission in api/gql_legacy/domain.py.
 async def get_resource_groups(
     target_scope: ScopeType,
     requested_permission: ResourceGroupPermission,
