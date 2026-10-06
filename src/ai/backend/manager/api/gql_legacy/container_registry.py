@@ -18,14 +18,8 @@ from ai.backend.manager.api.adapters.container_registry.adapter import Container
 from ai.backend.manager.api.gql.base import resolve_entity_id
 from ai.backend.manager.data.container_registry.types import ContainerRegistryData
 from ai.backend.manager.defs import PASSWORD_PLACEHOLDER
-<<<<<<< HEAD
-from ai.backend.manager.models.container_registry import (
-=======
 from ai.backend.manager.errors.api import InvalidAPIParameters
-from ai.backend.manager.models.container_registry.creators import ContainerRegistryCreator
-from ai.backend.manager.models.container_registry.purgers import ContainerRegistryPurger
-from ai.backend.manager.models.container_registry.row import (
->>>>>>> 9ff12c6c (fix(BA-8122): answer a malformed GraphQL node id with a 400 instead of an internal error (#15257))
+from ai.backend.manager.models.container_registry import (
     ContainerRegistryRow,
     ContainerRegistryValidator,
     ContainerRegistryValidatorArgs,

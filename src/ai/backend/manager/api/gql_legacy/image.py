@@ -29,12 +29,8 @@ from ai.backend.common.types import (
     DispatchResult,
     ImageID,
 )
-<<<<<<< HEAD
 from ai.backend.logging import BraceStyleAdapter
-=======
-from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.api.gql.base import resolve_entity_id
->>>>>>> 9ff12c6c (fix(BA-8122): answer a malformed GraphQL node id with a 400 instead of an internal error (#15257))
 from ai.backend.manager.bgtask.tasks.purge_images import (
     PurgeAgentSpec,
     PurgeImagesManifest,

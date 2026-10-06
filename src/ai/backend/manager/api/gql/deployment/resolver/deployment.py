@@ -16,15 +16,11 @@ from ai.backend.common.dto.manager.v2.deployment.request import (
     ReplaceDeploymentOptionsInput,
     ScopedSearchDeploymentsInput,
 )
-<<<<<<< HEAD
-from ai.backend.manager.api.gql.base import encode_cursor, resolve_global_id
-=======
-from ai.backend.common.dto.manager.v2.deployment.types import DeploymentScope
-from ai.backend.common.dto.manager.v2.rbac.types import UUIDScope
-from ai.backend.common.exception import UnreachableError
-from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
-from ai.backend.manager.api.gql.base import encode_cursor, parse_uuid, resolve_entity_id
->>>>>>> 9ff12c6c (fix(BA-8122): answer a malformed GraphQL node id with a 400 instead of an internal error (#15257))
+from ai.backend.manager.api.gql.base import (
+    encode_cursor,
+    parse_uuid,
+    resolve_entity_id,
+)
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     gql_mutation,

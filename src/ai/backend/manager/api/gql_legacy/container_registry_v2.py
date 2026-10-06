@@ -12,14 +12,8 @@ from ai.backend.common.container_registry import AllowedGroupsModel
 from ai.backend.common.data.entity.container_registry import ContainerRegistryID
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.api.adapters.container_registry.adapter import ContainerRegistryAdapter
-<<<<<<< HEAD
-from ai.backend.manager.models.container_registry import (
-=======
 from ai.backend.manager.errors.api import InvalidAPIParameters
-from ai.backend.manager.models.container_registry.creators import ContainerRegistryCreator
-from ai.backend.manager.models.container_registry.purgers import ContainerRegistryPurger
-from ai.backend.manager.models.container_registry.row import (
->>>>>>> 9ff12c6c (fix(BA-8122): answer a malformed GraphQL node id with a 400 instead of an internal error (#15257))
+from ai.backend.manager.models.container_registry import (
     ContainerRegistryValidator,
     ContainerRegistryValidatorArgs,
 )

@@ -25,11 +25,7 @@ from ai.backend.common.exception import (
     InvalidAPIParameters,
 )
 from ai.backend.common.types import ResourceSlot, VFolderHostPermissionMap
-<<<<<<< HEAD
-=======
-from ai.backend.manager.api.adapters.project.adapter import ProjectAdapter
 from ai.backend.manager.api.gql.base import resolve_entity_id
->>>>>>> 9ff12c6c (fix(BA-8122): answer a malformed GraphQL node id with a 400 instead of an internal error (#15257))
 from ai.backend.manager.data.container_registry.types import ImageCommitRegistry
 from ai.backend.manager.data.permission.permission_defs import ProjectPermission
 from ai.backend.manager.data.project.types import ProjectData
