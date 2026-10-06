@@ -86,6 +86,7 @@ from ai.backend.manager.models.deployment_policy.searchable_fields import (
     DeploymentPolicySearchableFields,
 )
 from ai.backend.manager.models.image.searchable_fields import ImageSearchableFields
+from ai.backend.manager.models.routing.searchable_fields import ReplicaSearchableFields
 
 if TYPE_CHECKING:
     from ai.backend.manager.models.deployment_policy.row import DeploymentPolicyRow
@@ -549,7 +550,7 @@ class EndpointRow(Base):
             for token_row in row.tokens:
                 token_row.delegate_ownership(target_user_uuid)
             for routing_row in row.routings:
-                routing_row.delegate_ownership(target_user_uuid)
+                routing_row.session_owner = target_user_uuid
                 if routing_row.session is not None:
                     session_ids.append(routing_row.session)
         session_rows = await SessionRow.list_sessions(
@@ -681,7 +682,9 @@ class EndpointRow(Base):
             extra_mounts=current_rev.extra_mounts if current_rev is not None else [],
             scaling_state=self.scaling_state,
             model_definition=current_rev.model_definition if current_rev is not None else None,
-            routings=[routing.to_data() for routing in self.routings]
+            routings=[
+                ReplicaSearchableFields.own.to_routing_data(routing) for routing in self.routings
+            ]
             if self.routings is not None
             else [],
         )
