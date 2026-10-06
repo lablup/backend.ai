@@ -50,7 +50,7 @@ from ai.backend.manager.errors.deployment import (
     RouteSessionTerminated,
 )
 from ai.backend.manager.models.endpoint.searchable_fields import DeploymentSearchableFields
-from ai.backend.manager.models.endpoint.searchers import DeploymentIDSearcher
+from ai.backend.manager.models.endpoint.searchers import DeploymentInfoSearcher
 from ai.backend.manager.models.routing.searchable_fields import ReplicaSearchableFields
 from ai.backend.manager.models.routing.searchers import RouteInfoSearcher
 from ai.backend.manager.models.specs.pagination import NoPagination
@@ -59,6 +59,7 @@ from ai.backend.manager.repositories.deployment.types.endpoint import (
     RouteSessionInfo,
     RouteSessionKernelInfo,
 )
+from ai.backend.manager.repositories.ops.repository import OpsRepository
 from ai.backend.manager.sokovan.deployment.deployment_draft_builder import (
     DeploymentSessionDraftBuilder,
 )
@@ -92,9 +93,20 @@ def _extract_error_code(exception: BaseException) -> str | None:
 class RouteExecutor:
     """Executor for route lifecycle operations."""
 
+    _deployment_repo: DeploymentRepository
+    _deployment_ops: OpsRepository[DeploymentInfo]
+    _scheduling_controller: SchedulingController
+    _config_provider: ManagerConfigProvider
+    _client_pool: ClientPool
+    _valkey_schedule: ValkeyScheduleClient
+    _service_discovery: ServiceDiscovery
+    _event_producer: EventProducer
+    _appproxy_client_pool: AppProxyClientPool
+
     def __init__(
         self,
         deployment_repo: DeploymentRepository,
+        deployment_ops: OpsRepository[DeploymentInfo],
         scheduling_controller: SchedulingController,
         config_provider: ManagerConfigProvider,
         client_pool: ClientPool,
@@ -104,6 +116,7 @@ class RouteExecutor:
         appproxy_client_pool: AppProxyClientPool,
     ) -> None:
         self._deployment_repo = deployment_repo
+        self._deployment_ops = deployment_ops
         self._scheduling_controller = scheduling_controller
         self._config_provider = config_provider
         self._client_pool = client_pool
@@ -972,41 +985,29 @@ class RouteExecutor:
         successes: list[RouteData] = []
         errors: list[RouteExecutionError] = []
 
-        deployments = await self._deployment_repo.get_deployments_by_ids(set(endpoint_ids))
-        deployment_by_id = {dep.id: dep for dep in deployments}
-        resource_groups = {dep.metadata.resource_group for dep in deployments}
+        searched = await self._deployment_ops.search_in_global(
+            DeploymentInfoSearcher(
+                pagination=NoPagination(),
+                conditions=[
+                    DeploymentSearchableFields.own.entity_id.filter.in_(
+                        UUIDInMatchSpec(values=endpoint_ids, negated=False)
+                    )
+                ],
+            )
+        )
+        deployment_by_id = {dep.id: dep for dep in searched.items}
+        destroyed_lifecycles = {EndpointLifecycle.DESTROYING, EndpointLifecycle.DESTROYED}
+        resource_groups = {
+            dep.metadata.resource_group
+            for dep in searched.items
+            if dep.state.lifecycle not in destroyed_lifecycles
+        }
         proxy_targets = await self._deployment_repo.fetch_resource_group_proxy_targets(
             resource_groups
         )
-        inactive_ids = [
-            endpoint_id for endpoint_id in endpoint_ids if endpoint_id not in deployment_by_id
-        ]
-        destroyed_ids: set[DeploymentID] = set()
-        if inactive_ids:
-            deployment_fields = DeploymentSearchableFields.own
-            destroyed_ids = set(
-                await self._deployment_repo.search_deployment_ids(
-                    searcher=DeploymentIDSearcher(
-                        pagination=NoPagination(),
-                        conditions=[
-                            deployment_fields.entity_id.filter.in_(
-                                UUIDInMatchSpec(values=inactive_ids, negated=False)
-                            ),
-                            deployment_fields.lifecycle_stage.filter.in_([
-                                EndpointLifecycle.DESTROYING,
-                                EndpointLifecycle.DESTROYED,
-                            ]),
-                        ],
-                    )
-                )
-            )
 
         items_by_target: dict[tuple[str, str], list[UnregisterRoutesItem]] = {}
         for endpoint_id in endpoint_ids:
-            if endpoint_id in destroyed_ids:
-                # Destroying the deployment deleted its AppProxy endpoint, and the routes with it.
-                successes.extend(routes_by_endpoint[endpoint_id])
-                continue
             deployment = deployment_by_id.get(endpoint_id)
             if deployment is None:
                 for route in routes_by_endpoint[endpoint_id]:
@@ -1018,6 +1019,10 @@ class RouteExecutor:
                             error_code=None,
                         )
                     )
+                continue
+            if deployment.state.lifecycle in destroyed_lifecycles:
+                # Destroying the deployment deleted its AppProxy endpoint, and the routes with it.
+                successes.extend(routes_by_endpoint[endpoint_id])
                 continue
             target = proxy_targets.get(deployment.metadata.resource_group)
             if target is None:

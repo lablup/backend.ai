@@ -27,6 +27,7 @@ from ai.backend.manager.data.deployment.types import (
     RouteStatus,
     RouteTrafficStatus,
 )
+from ai.backend.manager.models.specs.searcher import SearcherResult
 from ai.backend.manager.sokovan.deployment.route.executor import RouteExecutor
 
 # =============================================================================
@@ -45,6 +46,18 @@ def mock_deployment_repo() -> AsyncMock:
     repo.get_resource_group_cleanup_configs = AsyncMock(return_value={})
     repo.fetch_deployment_context = AsyncMock(return_value=MagicMock())
     return repo
+
+
+@pytest.fixture
+def mock_deployment_ops() -> AsyncMock:
+    """Mock OpsRepository[DeploymentInfo]."""
+    ops = AsyncMock()
+    ops.search_in_global = AsyncMock(
+        return_value=SearcherResult(
+            items=[], total_count=0, has_next_page=False, has_previous_page=False
+        )
+    )
+    return ops
 
 
 @pytest.fixture
@@ -114,6 +127,7 @@ def mock_appproxy_client_pool() -> MagicMock:
 @pytest.fixture
 def route_executor(
     mock_deployment_repo: AsyncMock,
+    mock_deployment_ops: AsyncMock,
     mock_scheduling_controller: AsyncMock,
     mock_config_provider: MagicMock,
     mock_client_pool: MagicMock,
@@ -125,6 +139,7 @@ def route_executor(
     """Create RouteExecutor with mocked dependencies."""
     return RouteExecutor(
         deployment_repo=mock_deployment_repo,
+        deployment_ops=mock_deployment_ops,
         scheduling_controller=mock_scheduling_controller,
         config_provider=mock_config_provider,
         client_pool=mock_client_pool,

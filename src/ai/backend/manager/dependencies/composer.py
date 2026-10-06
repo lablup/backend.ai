@@ -55,6 +55,7 @@ from ai.backend.manager.dependencies.system.composer import (
     SystemResources,
 )
 from ai.backend.manager.plugin.monitor import ManagerErrorPluginContext, ManagerStatsPluginContext
+from ai.backend.manager.repositories.ops.repository import OpsRepository
 from ai.backend.manager.sokovan.scheduler.provisioner.selectors.pool import (
     create_agent_selector,
 )
@@ -298,6 +299,7 @@ class ManagerDependencyComposer(DependencyComposer[DependencyInput, DependencyRe
                 pidx=setup_input.pidx,
                 scheduler_repository=domain.repositories.scheduler.repository,
                 deployment_repository=domain.repositories.deployment.repository,
+                deployment_ops=OpsRepository(domain.repositories.v2_ops_provider),
                 replica_group_repository=domain.repositories.replica_group.repository,
                 idle_checker_repository=domain.repositories.idle_checker.repository,
                 metric_repository=domain.repositories.metric.repository,
