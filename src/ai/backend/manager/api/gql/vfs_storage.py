@@ -30,7 +30,7 @@ from ai.backend.common.dto.manager.v2.vfs_storage.response import (
 from ai.backend.common.dto.manager.v2.vfs_storage.response import (
     VFSStorageNode,
 )
-from ai.backend.manager.api.gql.base import encode_cursor
+from ai.backend.manager.api.gql.base import encode_cursor, parse_uuid
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     gql_added_field,
@@ -101,7 +101,7 @@ class VFSStorageConnection(Connection[VFSStorage]):
 
 @gql_root_field(BackendAIGQLMeta(added_version="25.16.0", description="Get a VFS storage by ID"))  # type: ignore[misc]
 async def vfs_storage(id: ID, info: Info[StrawberryGQLContext]) -> VFSStorage | None:
-    node = await info.context.adapters.vfs_storage.get(UUID(id))
+    node = await info.context.adapters.vfs_storage.get(parse_uuid(id))
     return VFSStorage.from_pydantic(node)
 
 

@@ -32,7 +32,7 @@ from ai.backend.common.dto.manager.v2.huggingface_registry.response import (
 from ai.backend.common.dto.manager.v2.huggingface_registry.response import (
     UpdateHuggingFaceRegistryPayload as UpdateHuggingFaceRegistryPayloadDTO,
 )
-from ai.backend.manager.api.gql.base import encode_cursor
+from ai.backend.manager.api.gql.base import encode_cursor, parse_uuid
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     PydanticInputMixin,
@@ -111,7 +111,7 @@ class HuggingFaceRegistryConnection(Connection[HuggingFaceRegistry]):
 async def huggingface_registry(
     id: ID, info: Info[StrawberryGQLContext]
 ) -> HuggingFaceRegistry | None:
-    node = await info.context.adapters.huggingface_registry.get(UUID(id))
+    node = await info.context.adapters.huggingface_registry.get(parse_uuid(id))
     return HuggingFaceRegistry.from_pydantic(node)
 
 

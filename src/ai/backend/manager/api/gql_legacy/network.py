@@ -19,6 +19,7 @@ from ai.backend.common.data.entity.project import ProjectEntityType, ProjectID
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.network.types import NetworkData
+from ai.backend.manager.errors.api import InvalidAPIParameters
 from ai.backend.manager.errors.common import (
     GenericForbidden,
     ServerMisconfiguredError,
@@ -149,12 +150,14 @@ class NetworkNode(graphene.ObjectType):  # type: ignore[misc]
         _, raw_network_id = AsyncNode.resolve_global_id(info, id)
         if not raw_network_id:
             raw_network_id = id
+        try:
+            network_id = uuid.UUID(raw_network_id)
+        except ValueError as e:
+            raise InvalidAPIParameters(f"Invalid id: {id}") from e
 
         async with graph_ctx.db.begin_readonly_session() as db_session:
             try:
-                return cls.from_row(
-                    await NetworkRow.get(db_session, uuid.UUID(raw_network_id), load_project=True)
-                )
+                return cls.from_row(await NetworkRow.get(db_session, network_id, load_project=True))
             except NoResultFound as e:
                 raise ValueError(f"Network not found (id: {raw_network_id})") from e
 

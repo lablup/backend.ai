@@ -6,9 +6,7 @@ This module provides GraphQL query fields for ImageV2.
 
 from __future__ import annotations
 
-import uuid
 from typing import Annotated
-from uuid import UUID
 
 import strawberry
 from strawberry import ID, Info
@@ -23,7 +21,7 @@ from ai.backend.common.dto.manager.v2.image.request import (
 from ai.backend.common.dto.manager.v2.image.types import ImageScope
 from ai.backend.common.dto.manager.v2.rbac.types import UUIDScope
 from ai.backend.common.types import ImageID
-from ai.backend.manager.api.gql.base import encode_cursor
+from ai.backend.manager.api.gql.base import encode_cursor, parse_uuid
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     gql_root_field,
@@ -178,7 +176,7 @@ async def scoped_images_v2(
     )
 )  # type: ignore[misc]
 async def image_v2(id: ID, info: Info[StrawberryGQLContext]) -> ImageV2GQL | None:
-    image_data = await info.context.data_loaders.image_loader.load(ImageID(UUID(id)))
+    image_data = await info.context.data_loaders.image_loader.load(ImageID(parse_uuid(id)))
     if image_data is None:
         return None
     return image_data
@@ -288,7 +286,7 @@ async def admin_image_aliases(
 )  # type: ignore[misc]
 async def image_alias(id: ID, info: Info[StrawberryGQLContext]) -> ImageV2AliasGQL | None:
     alias_data = await info.context.data_loaders.image_alias_loader.load(
-        ImageAliasID(uuid.UUID(id))
+        ImageAliasID(parse_uuid(id))
     )
     if alias_data is None:
         return None
