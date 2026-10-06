@@ -208,11 +208,6 @@ class KernelStatus(CIStrEnum):
 
     @classmethod
     @lru_cache(maxsize=1)
-    def dead_statuses(cls) -> tuple[KernelStatus, ...]:
-        return (cls.CANCELLED, cls.TERMINATED)
-
-    @classmethod
-    @lru_cache(maxsize=1)
     def live_statuses(cls) -> tuple[KernelStatus, ...]:
         return (cls.RUNNING,)
 
