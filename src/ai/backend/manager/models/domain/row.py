@@ -50,11 +50,7 @@ if TYPE_CHECKING:
 log = StructuredLogger(logging.getLogger(__spec__.name))
 
 
-__all__: Sequence[str] = (
-    "MAXIMUM_DOTFILE_SIZE",
-    "DomainRow",
-    "domains",
-)
+__all__: Sequence[str] = ("DomainRow",)
 
 MAXIMUM_DOTFILE_SIZE = 64 * 1024  # 61 KiB
 
