@@ -38,12 +38,11 @@ from ai.backend.manager.data.permission.permission_defs import StorageHostPermis
 from ai.backend.manager.data.permission.permission_defs import (
     VFolderPermission as VFolderRBACPermission,
 )
+from ai.backend.manager.data.vfolder.types import VFolderMountPermission as VFolderPermission
 from ai.backend.manager.data.vfolder.types import (
-    VFolderInvitationState,
     VFolderOperationStatus,
     VFolderOwnershipType,
 )
-from ai.backend.manager.data.vfolder.types import VFolderMountPermission as VFolderPermission
 from ai.backend.manager.errors.api import InvalidAPIParameters
 from ai.backend.manager.errors.storage import (
     VFolderNotFound,
@@ -82,23 +81,8 @@ from ai.backend.manager.models.virtual_entity.queries import (
 )
 
 __all__: Sequence[str] = (
-    "DEAD_VFOLDER_STATUSES",
-    "DEAD_VFOLDER_STATUSES",
-    "HARD_DELETED_VFOLDER_STATUSES",
-    "VFOLDER_NAME_IN_PROJECT_INDEX",
-    "SOFT_DELETED_VFOLDER_STATUSES",
-    "VFolderCloneInfo",
-    "VFolderDeletionInfo",
-    "VFolderInvitationState",
-    "VFolderOperationStatus",
-    "VFolderOwnershipType",
-    "VFolderPermission",
-    "VFolderPermissionSetAlias",
-    "VFolderPermissionValidator",
     "VFolderRow",
-    "VFolderStatusSet",
-    "vfolder_status_map",
-    "vfolders",
+    "VFolderUserMountPolicyRow",
 )
 
 
@@ -219,16 +203,6 @@ vfolder_status_map: Final[dict[VFolderStatusSet, set[VFolderOperationStatus]]] =
         VFolderOperationStatus.DELETE_ERROR,
     },
 }
-
-
-class VFolderPermissionSetAlias(enum.Enum):
-    READABLE = {
-        VFolderPermission.READ_ONLY,
-        VFolderPermission.READ_WRITE,
-        VFolderPermission.RW_DELETE,
-    }
-    WRITABLE = {VFolderPermission.READ_WRITE, VFolderPermission.RW_DELETE}
-    DELETABLE = {VFolderPermission.RW_DELETE}
 
 
 SOFT_DELETED_VFOLDER_STATUSES = (
