@@ -2,14 +2,12 @@ from __future__ import annotations
 
 import logging
 import uuid
-from collections.abc import Iterable, Mapping, Sequence
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from datetime import datetime
 from typing import (
     Any,
     Final,
-    NamedTuple,
-    cast,
     override,
 )
 
@@ -61,7 +59,6 @@ from ai.backend.manager.models.rbac import (
     DomainScope,
     ProjectScope,
     ScopeType,
-    StorageHost,
     get_predefined_roles_in_scope,
 )
 from ai.backend.manager.models.rbac import (
@@ -69,9 +66,6 @@ from ai.backend.manager.models.rbac import (
 )
 from ai.backend.manager.models.rbac.context import ClientContext
 from ai.backend.manager.models.storage import PermissionContext as StorageHostPermissionContext
-from ai.backend.manager.models.storage import (
-    PermissionContextBuilder as StorageHostPermissionContextBuilder,
-)
 from ai.backend.manager.models.user.row import UserRole, UserRow
 from ai.backend.manager.models.virtual_entity.queries import (
     user_scope_membership_exists,
@@ -351,7 +345,8 @@ async def ensure_quota_scope_accessible_by_user(
 # VirtualFolderPermissionList, QuotaDetails, QuotaScope, QuotaScopeInput, SetQuotaScope,
 # UnsetQuotaScope) have been moved to api/gql_legacy/vfolder.py
 
-# RBAC
+# Everything below serves the legacy RBAC path alone: api/gql_legacy/session.py calls
+# get_permission_ctx, which is the way in. Delete the whole block together with gql_legacy.
 type WhereClauseType = sa.sql.expression.BinaryExpression[Any] | sa.sql.expression.BooleanClauseList
 # TypeAlias is deprecated since 3.12 but mypy does not follow up yet
 
@@ -435,7 +430,6 @@ _STORAGE_HOST_PERMISSION_TO_VFOLDER_PERMISSION_MAP: Mapping[
 }
 
 
-# RBAC
 @dataclass
 class VFolderPermissionContext(
     AbstractPermissionContext[VFolderRBACPermission, VFolderRow, VFolderUUID]
@@ -767,55 +761,7 @@ class VFolderPermissionContextBuilder(
         return MEMBER_PERMISSIONS
 
 
-class VFolderWithPermissionSet(NamedTuple):
-    vfolder_row: VFolderRow
-    permissions: frozenset[VFolderRBACPermission]
-
-
-async def get_vfolders(
-    db_conn: SAConnection,
-    ctx: ClientContext,
-    target_scope: ScopeType,
-    requested_permission: VFolderRBACPermission,
-    _extra_scope: StorageHost | None = None,
-    *,
-    vfolder_id: uuid.UUID | None = None,
-    vfolder_name: str | None = None,
-    usage_mode: VFolderUsageMode | None = None,
-    allowed_status: Iterable[VFolderOperationStatus] | None = None,
-    blocked_status: Iterable[VFolderOperationStatus] | None = None,
-) -> list[VFolderWithPermissionSet]:
-    async with ctx.db.begin_readonly_session(db_conn) as db_session:
-        host_permission = _VFOLDER_PERMISSION_TO_STORAGE_HOST_PERMISSION_MAP[requested_permission]
-        host_permission_ctx = await StorageHostPermissionContextBuilder(db_session).build(
-            ctx, target_scope, host_permission
-        )
-        builder = VFolderPermissionContextBuilder(db_session)
-        permission_ctx = await builder.build(ctx, target_scope, requested_permission)
-        permission_ctx.apply_host_permission_ctx(host_permission_ctx)
-
-        query_stmt = await permission_ctx.build_query()
-        if query_stmt is None:
-            return []
-        if vfolder_id is not None:
-            query_stmt = query_stmt.where(VFolderRow.id == vfolder_id)
-        if vfolder_name is not None:
-            query_stmt = query_stmt.where(VFolderRow.name == vfolder_name)
-        if usage_mode is not None:
-            query_stmt = query_stmt.where(VFolderRow.usage_mode == usage_mode)
-        if allowed_status is not None:
-            query_stmt = query_stmt.where(VFolderRow.status.in_(allowed_status))
-        if blocked_status is not None:
-            query_stmt = query_stmt.where(VFolderRow.status.not_in(blocked_status))
-
-        result: list[VFolderWithPermissionSet] = []
-        for row in await db_session.scalars(query_stmt):
-            row = cast(VFolderRow, row)
-            permissions = await permission_ctx.calculate_final_permission(row)
-            result.append(VFolderWithPermissionSet(row, permissions))
-        return result
-
-
+# Called only by api/gql_legacy/session.py, as get_vfolder_permission_ctx.
 async def get_permission_ctx(
     db_conn: SAConnection,
     ctx: ClientContext,
