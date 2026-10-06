@@ -34,9 +34,9 @@ from sqlalchemy.sql.expression import SQLColumnExpression
 from ai.backend.common import msgpack
 from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.user import UserID
-from ai.backend.common.defs import RESERVED_DOTFILES
 from ai.backend.common.types import ResourceSlot, VFolderHostPermissionMap
 from ai.backend.logging.structured import StructuredLogger
+from ai.backend.manager.data.dotfile.types import RESERVED_DOTFILES
 from ai.backend.manager.data.permission.permission_defs import ProjectPermission
 from ai.backend.manager.data.project.types import ProjectStatus, ProjectType
 from ai.backend.manager.errors.resource import ProjectNotFound

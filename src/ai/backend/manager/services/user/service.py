@@ -5,14 +5,17 @@ from uuid import UUID
 
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
 from ai.backend.common.data.entity.keypair import KeyPairID
-from ai.backend.common.defs import verify_dotfile_name
 from ai.backend.common.dto.manager.config.types import MAXIMUM_DOTFILE_SIZE
 from ai.backend.common.events.event_types.kernel.types import KernelLifecycleEventReason
 from ai.backend.common.exception import BackendAIError, InvalidAPIParameters
 from ai.backend.common.types import AccessKey
 from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
-from ai.backend.manager.data.dotfile.types import DotfileEntries, normalize_newlines
+from ai.backend.manager.data.dotfile.types import (
+    DotfileEntries,
+    normalize_newlines,
+    verify_dotfile_name,
+)
 from ai.backend.manager.data.user.types import (
     BulkPurgeError,
     BulkUserPurgeResultData,

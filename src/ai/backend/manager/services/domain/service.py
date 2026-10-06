@@ -3,12 +3,11 @@ from __future__ import annotations
 import logging
 
 from ai.backend.common.data.entity.domain import DomainID
-from ai.backend.common.defs import verify_dotfile_name
 from ai.backend.common.exception import InvalidAPIParameters
 from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.actions.v2.ops.result import CreatedEntityOpsResult
 from ai.backend.manager.data.domain.types import DomainData
-from ai.backend.manager.data.dotfile.types import DotfileEntries
+from ai.backend.manager.data.dotfile.types import DotfileEntries, verify_dotfile_name
 from ai.backend.manager.models.domain.updaters import DomainDotfilesUpdater
 from ai.backend.manager.repositories.domain.repository import DomainRepository
 from ai.backend.manager.services.domain.actions.create_domain import CreateDomainAction
