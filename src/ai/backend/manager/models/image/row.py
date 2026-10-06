@@ -84,6 +84,7 @@ __all__ = (
 )
 
 
+# Used only by gql_legacy (schema.py). Delete it together with the gql_legacy cleanup.
 class PublicImageLoadFilter(enum.StrEnum):
     """Shorthand of `ImageLoadFilter` enum with `CUSTOMIZED_GLOBAL` removed (as it is not intended for API input)."""
 
@@ -95,6 +96,7 @@ class PublicImageLoadFilter(enum.StrEnum):
     """Include customized images owned or accessible by API callee."""
 
 
+# Used only by gql_legacy (schema.py, image.py). Delete it together with the gql_legacy cleanup.
 class ImageLoadFilter(enum.StrEnum):
     """Enum describing kind of a "search preset" when loading Image data via GQL. Not intended for declaring attributes of image data itself."""
 
@@ -272,6 +274,8 @@ class ImageRow(CreatedAtMixin, Base):
             image_name, self.project, tag, self.registry, self.architecture, self.is_local
         )
 
+    # Called only by gql_legacy (image.py) and from_optional_dataclass.
+    # Delete it together with the gql_legacy cleanup.
     @classmethod
     def from_dataclass(cls, image_data: ImageData) -> Self:
         image_row = cls(
@@ -296,6 +300,7 @@ class ImageRow(CreatedAtMixin, Base):
             image_row.created_at = image_data.created_at
         return image_row
 
+    # Called only by gql_legacy (image.py). Delete it together with the gql_legacy cleanup.
     @classmethod
     def from_dataclass_with_details(cls, image_data: ImageDataWithDetails) -> Self:
         resources: dict[str, dict[str, str | None]] = {}
@@ -322,6 +327,7 @@ class ImageRow(CreatedAtMixin, Base):
         image_row.id = image_data.id
         return image_row
 
+    # Called only by gql_legacy (endpoint.py). Delete it together with the gql_legacy cleanup.
     @classmethod
     def from_optional_dataclass(cls, image_data: ImageData | None) -> Self | None:
         if image_data is None:
@@ -419,6 +425,8 @@ class ImageAliasRow(Base):
     )
 
 
+# Everything below serves the legacy RBAC path alone: api/gql_legacy/image.py calls
+# get_permission_ctx, which is the way in. Delete the whole block together with gql_legacy.
 type WhereClauseType = sa.sql.expression.BinaryExpression[Any] | sa.sql.expression.BooleanClauseList
 # TypeAlias is deprecated since 3.12 but mypy does not follow up yet
 
@@ -885,6 +893,7 @@ class ImagePermissionContextBuilder(
         return MEMBER_PERMISSIONS
 
 
+# Called only by api/gql_legacy/image.py.
 async def get_permission_ctx(
     db_conn: AsyncConnection,
     ctx: ClientContext,
