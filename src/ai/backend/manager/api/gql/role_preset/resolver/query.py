@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-from uuid import UUID
-
 from strawberry import ID, Info
 from strawberry.relay import PageInfo
 
@@ -13,7 +11,7 @@ from ai.backend.common.dto.manager.v2.role_preset.request import (
     SearchRolePresetsInput,
 )
 from ai.backend.common.identifier.role_preset import RolePresetID
-from ai.backend.manager.api.gql.base import encode_cursor
+from ai.backend.manager.api.gql.base import encode_cursor, parse_uuid
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     gql_root_field,
@@ -40,7 +38,7 @@ async def admin_role_preset(
     id: ID,
 ) -> RolePresetGQL | None:
     check_admin_only()
-    node = await info.context.adapters.role_preset.get(RolePresetID(UUID(str(id))))
+    node = await info.context.adapters.role_preset.get(RolePresetID(parse_uuid(id)))
     return RolePresetGQL.from_pydantic(node)
 
 

@@ -2,15 +2,13 @@
 
 from __future__ import annotations
 
-from uuid import UUID
-
 from strawberry import ID, Info
 from strawberry.relay import PageInfo
 
 from ai.backend.common.dto.manager.v2.prometheus_query_preset.request import (
     SearchQueryDefinitionsInput,
 )
-from ai.backend.manager.api.gql.base import encode_cursor
+from ai.backend.manager.api.gql.base import encode_cursor, parse_uuid
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     gql_root_field,
@@ -40,7 +38,7 @@ async def prometheus_query_preset(
     info: Info[StrawberryGQLContext],
     id: ID,
 ) -> QueryDefinitionGQL | None:
-    payload = await info.context.adapters.prometheus_query_preset.get(UUID(id))
+    payload = await info.context.adapters.prometheus_query_preset.get(parse_uuid(id))
     if payload.item is None:
         return None
     return QueryDefinitionGQL.from_pydantic(payload.item)
@@ -100,7 +98,7 @@ async def prometheus_query_preset_result(
     time_window: str | None = None,
 ) -> QueryDefinitionResultGQL | None:
     dto = await info.context.adapters.prometheus_query_preset.execute_preset(
-        preset_id=UUID(id),
+        preset_id=parse_uuid(id),
         options=options.to_pydantic() if options is not None else None,
         time_window=time_window,
         time_range=time_range.to_pydantic() if time_range is not None else None,

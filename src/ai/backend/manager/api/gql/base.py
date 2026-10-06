@@ -38,6 +38,7 @@ from ai.backend.manager.api.gql.decorators import (
     gql_pydantic_input,
 )
 from ai.backend.manager.data.common.types import SearchResult
+from ai.backend.manager.errors.api import InvalidAPIParameters
 
 if TYPE_CHECKING:
     from ai.backend.manager.repositories.base import QueryCondition
@@ -454,6 +455,13 @@ def resolve_global_id(global_id: str) -> tuple[str, str]:
     unbased_global_id = unbase64(global_id)
     type_, _, id_ = unbased_global_id.partition(":")
     return type_, id_
+
+
+def parse_uuid(value: str) -> uuid.UUID:
+    try:
+        return uuid.UUID(value)
+    except ValueError as e:
+        raise InvalidAPIParameters(f"Invalid id: {value}") from e
 
 
 def build_pagination_options(

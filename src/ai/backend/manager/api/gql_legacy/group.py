@@ -24,6 +24,7 @@ from ai.backend.common.exception import (
     InvalidAPIParameters,
 )
 from ai.backend.common.types import ResourceSlot, VFolderHostPermissionMap
+from ai.backend.manager.api.gql.base import parse_uuid
 from ai.backend.manager.data.group.types import GroupData
 from ai.backend.manager.models.group import (
     GroupRow,
@@ -250,7 +251,8 @@ class GroupNode(graphene.ObjectType):  # type: ignore[misc]
     @classmethod
     async def get_node(cls, info: graphene.ResolveInfo, id: str) -> Self:
         graph_ctx: GraphQueryContext = info.context
-        _, group_id = AsyncNode.resolve_global_id(info, id)
+        _, raw_group_id = AsyncNode.resolve_global_id(info, id)
+        group_id = parse_uuid(raw_group_id)
         query = sa.select(GroupRow).where(GroupRow.id == group_id)
         async with graph_ctx.db.begin_readonly_session() as db_session:
             group_row = (await db_session.scalars(query)).first()

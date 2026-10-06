@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from collections.abc import AsyncGenerator
-from uuid import UUID
 
 from strawberry import ID, Info
 from strawberry.relay import PageInfo
@@ -14,7 +13,7 @@ from ai.backend.common.dto.manager.v2.deployment.request import (
     ReplaceDeploymentOptionsInput,
 )
 from ai.backend.common.identifier.deployment import DeploymentID
-from ai.backend.manager.api.gql.base import encode_cursor, resolve_global_id
+from ai.backend.manager.api.gql.base import encode_cursor, parse_uuid, resolve_global_id
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     gql_mutation,
@@ -196,7 +195,7 @@ async def my_deployments(
 async def deployment(id: ID, info: Info[StrawberryGQLContext]) -> ModelDeployment | None:
     """Get a specific deployment by ID."""
     _, deployment_id = resolve_global_id(id)
-    node = await info.context.adapters.deployment.get(DeploymentID(UUID(deployment_id)))
+    node = await info.context.adapters.deployment.get(DeploymentID(parse_uuid(deployment_id)))
     return ModelDeployment.from_pydantic(node)
 
 
@@ -221,7 +220,7 @@ async def update_model_deployment(
 ) -> UpdateDeploymentPayload | None:
     """Update an existing model deployment."""
     payload = await info.context.adapters.deployment.update(
-        input.to_pydantic(), DeploymentID(UUID(input.id))
+        input.to_pydantic(), DeploymentID(parse_uuid(input.id))
     )
     return UpdateDeploymentPayload(deployment=ModelDeployment.from_pydantic(payload.deployment))
 

@@ -3,13 +3,12 @@
 from __future__ import annotations
 
 from collections.abc import AsyncGenerator
-from uuid import UUID
 
 from strawberry import ID, Info
 from strawberry.relay import PageInfo
 
 from ai.backend.common.dto.manager.v2.deployment.request import SearchReplicasInput
-from ai.backend.manager.api.gql.base import encode_cursor, resolve_global_id
+from ai.backend.manager.api.gql.base import encode_cursor, parse_uuid, resolve_global_id
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     gql_root_field,
@@ -80,7 +79,7 @@ async def replicas(
 async def replica(id: ID, info: Info[StrawberryGQLContext]) -> ModelReplica | None:
     """Get a specific replica by ID."""
     _, replica_id = resolve_global_id(id)
-    node = await info.context.adapters.deployment.get_replica(UUID(replica_id))
+    node = await info.context.adapters.deployment.get_replica(parse_uuid(replica_id))
     if node is None:
         return None
     return ModelReplica.from_pydantic(node)

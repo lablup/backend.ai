@@ -28,6 +28,7 @@ from ai.backend.common.types import (
     ImageID,
 )
 from ai.backend.logging import BraceStyleAdapter
+from ai.backend.manager.api.gql.base import parse_uuid
 from ai.backend.manager.bgtask.tasks.purge_images import (
     PurgeAgentSpec,
     PurgeImagesManifest,
@@ -733,7 +734,7 @@ class ImageNode(graphene.ObjectType):  # type: ignore[misc]
         _, image_id = AsyncNode.resolve_global_id(info, self.id)
         action_result = await ctx.processors.image.get_image_by_id.wait_for_complete(
             GetImageByIdAction(
-                image_id=ImageID(UUID(image_id)),
+                image_id=ImageID(parse_uuid(image_id)),
                 image_status=None,
             )
         )

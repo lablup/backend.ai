@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-from uuid import UUID
-
 from strawberry import ID, Info
 from strawberry.relay import PageInfo
 
@@ -13,7 +11,7 @@ from ai.backend.common.data.model_deployment.types import (
 from ai.backend.common.dto.manager.v2.deployment.request import (
     SearchRoutesInput,
 )
-from ai.backend.manager.api.gql.base import encode_cursor, resolve_global_id
+from ai.backend.manager.api.gql.base import encode_cursor, parse_uuid, resolve_global_id
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     gql_mutation,
@@ -58,7 +56,7 @@ async def routes(
     pydantic_filter = filter.to_pydantic() if filter else None
     pydantic_order = [o.to_pydantic() for o in order_by] if order_by else None
     payload = await info.context.adapters.deployment.search_routes(
-        scope=RouteSearchScope(deployment_id=UUID(endpoint_id)),
+        scope=RouteSearchScope(deployment_id=parse_uuid(endpoint_id)),
         input=SearchRoutesInput(
             filter=pydantic_filter,
             order=pydantic_order,
@@ -90,7 +88,7 @@ async def routes(
 async def route(id: ID, info: Info[StrawberryGQLContext]) -> Route | None:
     """Get a specific route by ID."""
     _, route_id = resolve_global_id(id)
-    return await info.context.data_loaders.route_loader.load(UUID(route_id))
+    return await info.context.data_loaders.route_loader.load(parse_uuid(route_id))
 
 
 # Mutation resolvers
@@ -106,7 +104,7 @@ async def update_route_traffic_status(
     """Update route traffic status (ACTIVE/INACTIVE)."""
     _, route_id = resolve_global_id(input.route_id)
     route_node = await info.context.adapters.deployment.update_route_traffic(
-        UUID(route_id),
+        parse_uuid(route_id),
         RouteTrafficStatusCommon(input.traffic_status.value),  # type: ignore[attr-defined]
     )
     return UpdateRouteTrafficStatusPayloadGQL(

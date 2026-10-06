@@ -34,7 +34,7 @@ from ai.backend.common.types import (
     VFolderID,
     VFolderMount,
 )
-from ai.backend.manager.api.gql.base import resolve_global_id
+from ai.backend.manager.api.gql.base import parse_uuid, resolve_global_id
 from ai.backend.manager.data.session.types import SessionData, SessionStatus
 from ai.backend.manager.defs import DEFAULT_ROLE
 from ai.backend.manager.errors.api import NotImplementedAPI
@@ -308,7 +308,7 @@ class ComputeSessionNode(graphene.ObjectType):  # type: ignore[misc]
         async with graphene_ctx.db.begin_readonly_session() as db_session:
             stmt = (
                 sa.select(SessionRow)
-                .where(SessionRow.id == uuid.UUID(raw_session_id))
+                .where(SessionRow.id == parse_uuid(raw_session_id))
                 .options(selectinload(SessionRow.kernels), joinedload(SessionRow.user))
             )
             query_result = await db_session.scalar(stmt)
@@ -725,7 +725,7 @@ class ComputeSessionNode(graphene.ObjectType):  # type: ignore[misc]
             cond = permission_ctx.query_condition
             if cond is None:
                 return None
-            query = sa.select(SessionRow).where(cond & (SessionRow.id == uuid.UUID(session_id)))
+            query = sa.select(SessionRow).where(cond & (SessionRow.id == parse_uuid(session_id)))
             query = cls._add_basic_options_to_query(query)
             async with graph_ctx.db.begin_readonly_session(db_conn) as db_session:
                 session_row = await db_session.scalar(query)

@@ -34,6 +34,7 @@ from ai.backend.common.types import (
     VFolderUsageMode,
 )
 from ai.backend.logging import BraceStyleAdapter
+from ai.backend.manager.api.gql.base import parse_uuid
 from ai.backend.manager.data.permission.types import (
     EntityType as PermissionEntityType,
 )
@@ -309,7 +310,7 @@ class VirtualFolderNode(graphene.ObjectType):  # type: ignore[misc]
             cond = permission_ctx.query_condition
             if cond is None:
                 return None
-            query = query.where(sa.and_(cond, VFolderRow.id == uuid.UUID(vfolder_row_id)))
+            query = query.where(sa.and_(cond, VFolderRow.id == parse_uuid(vfolder_row_id)))
             async with graph_ctx.db.begin_readonly_session(db_conn) as db_session:
                 vfolder_row = await db_session.scalar(query)
         if vfolder_row is None:
@@ -708,7 +709,7 @@ class ModelCard(graphene.ObjectType):  # type: ignore[misc]
         _, vfolder_row_id = AsyncNode.resolve_global_id(info, id)
         async with graph_ctx.db.begin_readonly_session() as db_session:
             vfolder_row = await VFolderRow.get(
-                db_session, uuid.UUID(vfolder_row_id), load_user=True, load_group=True
+                db_session, parse_uuid(vfolder_row_id), load_user=True, load_group=True
             )
             if vfolder_row.usage_mode != VFolderUsageMode.MODEL:
                 raise ValueError(
