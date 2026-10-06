@@ -3974,7 +3974,7 @@ class ScheduleDBSource:
         This method is for SessionLifecycleHandler. For SessionPromotionHandler,
         use fetch_sessions_for_promotion() which supports ALL/ANY/NOT_ANY conditions.
 
-        Uses SessionRow.to_session_info() and KernelSearchableFields.own.to_data() for
+        Uses SessionRow.to_session_info() and KernelRow.to_kernel_info() for
         unified data representation across all handlers.
 
         Args:
@@ -4014,9 +4014,7 @@ class ScheduleDBSource:
                 handler_sessions.append(
                     SessionWithKernels(
                         session_info=session.to_session_info(),
-                        kernel_infos=[
-                            KernelSearchableFields.own.to_data(kernel) for kernel in session.kernels
-                        ],
+                        kernel_infos=[kernel.to_kernel_info() for kernel in session.kernels],
                     )
                 )
 
@@ -4658,7 +4656,7 @@ class ScheduleDBSource:
                     kernel_infos=[],
                 )
 
-            # 2. Query kernels for these sessions (full rows for the KernelInfo conversion)
+            # 2. Query kernels for these sessions (full rows for to_kernel_info conversion)
             kernel_query = (
                 sa.select(KernelRow)
                 .where(
@@ -4675,9 +4673,7 @@ class ScheduleDBSource:
             for kernel_row in kernel_rows:
                 session_id = kernel_row.session_id
                 if session_id in sessions_map:
-                    sessions_map[session_id].kernel_infos.append(
-                        KernelSearchableFields.own.to_data(kernel_row)
-                    )
+                    sessions_map[session_id].kernel_infos.append(kernel_row.to_kernel_info())
 
             return list(sessions_map.values())
 

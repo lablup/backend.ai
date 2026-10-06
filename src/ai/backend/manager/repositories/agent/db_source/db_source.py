@@ -26,7 +26,6 @@ from ai.backend.manager.models.agent.searchable_fields import AgentSearchableFie
 from ai.backend.manager.models.agent.upserters import AgentHeartbeatUpserter
 from ai.backend.manager.models.image.row import ImageRow
 from ai.backend.manager.models.kernel.row import KernelRow
-from ai.backend.manager.models.kernel.searchable_fields import KernelSearchableFields
 from ai.backend.manager.models.resource_group.row import ResourceGroupRow
 from ai.backend.manager.models.resource_slot.row import AgentResourceRow
 from ai.backend.manager.models.resource_slot.upserters import AgentResourceUpserter
@@ -250,7 +249,7 @@ class AgentDBSource:
                 .scalars()
                 .all()
             )
-            kernels = [KernelSearchableFields.own.to_data(row) for row in rows]
+            kernels = [row.to_kernel_info() for row in rows]
             if kernels and not force:
                 distinct_sessions = len({kernel.session.session_id for kernel in kernels})
                 raise AgentHasConflictingSessions(agent_id, distinct_sessions)
