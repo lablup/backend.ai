@@ -1904,6 +1904,36 @@ type AssociateScalingGroupWithUserGroup
   msg: String
 }
 
+"""Added in 26.10.0. Shape of the action that wrote an audit log entry."""
+enum AuditLogActionKind
+  @join__type(graph: STRAWBERRY)
+{
+  SINGLE_ENTITY @join__enumValue(graph: STRAWBERRY)
+  BULK @join__enumValue(graph: STRAWBERRY)
+  SCOPE @join__enumValue(graph: STRAWBERRY)
+  RELATION @join__enumValue(graph: STRAWBERRY)
+  MEMBERSHIP @join__enumValue(graph: STRAWBERRY)
+  GLOBAL @join__enumValue(graph: STRAWBERRY)
+  LOOKUP @join__enumValue(graph: STRAWBERRY)
+}
+
+"""Added in 26.10.0. Filter for audit log action kind field."""
+input AuditLogActionKindFilter
+  @join__type(graph: STRAWBERRY)
+{
+  """Exact action kind match."""
+  equals: AuditLogActionKind = null
+
+  """Action kind is in list."""
+  in: [AuditLogActionKind!] = null
+
+  """Excludes exact action kind match."""
+  notEquals: AuditLogActionKind = null
+
+  """Action kind is not in list."""
+  notIn: [AuditLogActionKind!] = null
+}
+
 """Added in 25.6.0."""
 type AuditLogConnection
   @join__type(graph: GRAPHENE)
@@ -1942,6 +1972,22 @@ input AuditLogFilter
 
   """Added in 26.8.0. Filter by acted_as (the effective/acting user UUID)."""
   actedAs: UUIDFilter = null
+
+  """Added in 26.10.0. Filter by the name of the action that wrote the log."""
+  actionName: StringFilter = null
+
+  """
+  Added in 26.10.0. Filter by the shape of the action that wrote the log.
+  """
+  actionKind: AuditLogActionKindFilter = null
+
+  """
+  Added in 26.10.0. Filter by the kind of natural key a lookup action read.
+  """
+  lookupKind: StringFilter = null
+
+  """Added in 26.10.0. Filter by the natural key a lookup action read."""
+  lookupKey: StringFilter = null
   AND: [AuditLogFilter!] = null
   OR: [AuditLogFilter!] = null
   NOT: [AuditLogFilter!] = null
@@ -2005,6 +2051,8 @@ enum AuditLogOrderField
   ENTITY_TYPE @join__enumValue(graph: STRAWBERRY)
   OPERATION @join__enumValue(graph: STRAWBERRY)
   STATUS @join__enumValue(graph: STRAWBERRY)
+  ACTION_NAME @join__enumValue(graph: STRAWBERRY)
+  ACTION_KIND @join__enumValue(graph: STRAWBERRY)
 }
 
 """
@@ -2080,6 +2128,24 @@ type AuditLogV2 implements Node
 
   """UUID of the action that generated this log."""
   actionId: UUID!
+
+  """Added in 26.10.0. Name of the action that wrote this log."""
+  actionName: String!
+
+  """
+  Added in 26.10.0. Shape of the action that wrote this log. Null for a log written before the action kind was recorded.
+  """
+  actionKind: AuditLogActionKind
+
+  """
+  Added in 26.10.0. Kind of natural key a lookup action read. Null for other action kinds.
+  """
+  lookupKind: String
+
+  """
+  Added in 26.10.0. Natural key a lookup action read. Null for other action kinds.
+  """
+  lookupKey: String
 
   """
   Type of entity this log relates to. Null for an operation that names scopes and no entity kind, such as linking two entities.

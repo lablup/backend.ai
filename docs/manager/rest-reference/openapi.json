@@ -2424,6 +2424,83 @@
         "title": "RestoreArtifactsInput",
         "type": "object"
       },
+      "AuditLogActionKind": {
+        "description": "Shape of the action that wrote an audit log entry.",
+        "enum": [
+          "single_entity",
+          "bulk",
+          "scope",
+          "relation",
+          "membership",
+          "global",
+          "lookup"
+        ],
+        "title": "AuditLogActionKind",
+        "type": "string"
+      },
+      "AuditLogActionKindFilter": {
+        "description": "Filter for audit log action kind.",
+        "properties": {
+          "equals": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AuditLogActionKind"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Exact action kind match"
+          },
+          "in": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/AuditLogActionKind"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Action kind is in list",
+            "title": "In"
+          },
+          "not_equals": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AuditLogActionKind"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Excludes exact action kind match"
+          },
+          "not_in": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/AuditLogActionKind"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Action kind is not in list",
+            "title": "Not In"
+          }
+        },
+        "title": "AuditLogActionKindFilter",
+        "type": "object"
+      },
       "AuditLogFilter": {
         "description": "Filter for audit logs.",
         "properties": {
@@ -2511,6 +2588,54 @@
             "default": null,
             "description": "Filter logs by created_at datetime"
           },
+          "action_name": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/StringFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Action name filter"
+          },
+          "action_kind": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AuditLogActionKindFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Action kind filter"
+          },
+          "lookup_kind": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/StringFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Lookup kind filter"
+          },
+          "lookup_key": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/StringFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Lookup key filter"
+          },
           "AND": {
             "anyOf": [
               {
@@ -2586,7 +2711,9 @@
           "created_at",
           "entity_type",
           "operation",
-          "status"
+          "status",
+          "action_name",
+          "action_kind"
         ],
         "title": "AuditLogOrderField",
         "type": "string"

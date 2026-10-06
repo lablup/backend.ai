@@ -11,6 +11,7 @@ from ai.backend.common.data.entity.types import EntityType, RuntimeEntityID
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.dto.manager.v2.audit_log.request import (
     AdminSearchAuditLogsInput,
+    AuditLogActionKindFilter,
     AuditLogFilter,
     AuditLogOrder,
     AuditLogStatusFilter,
@@ -21,6 +22,7 @@ from ai.backend.common.dto.manager.v2.audit_log.response import (
     SearchAuditLogsPayload,
 )
 from ai.backend.common.dto.manager.v2.audit_log.types import (
+    AuditLogActionKind,
     AuditLogOrderField,
     AuditLogStatus,
     OrderDirection,
@@ -162,9 +164,14 @@ class AuditLogAdapter(BaseAdapter):
             *self.apply_string_filter(f.triggered_by, fields.triggered_by.filter),
             *self.apply_uuid_filter(f.acted_as, fields.acted_as.filter),
             *self.apply_datetime_filter(f.created_at, fields.created_at.filter),
+            *self.apply_string_filter(f.action_name, fields.action_name.filter),
+            *self.apply_string_filter(f.lookup_kind, fields.lookup_kind.filter),
+            *self.apply_string_filter(f.lookup_key, fields.lookup_key.filter),
         ]
         if f.status is not None:
             self._apply_status_filter(f.status, conditions)
+        if f.action_kind is not None:
+            self._apply_action_kind_filter(f.action_kind, conditions)
         if f.AND:
             for sub_filter in f.AND:
                 conditions.extend(self._convert_filter(sub_filter))
@@ -195,6 +202,22 @@ class AuditLogAdapter(BaseAdapter):
             conditions.append(status.not_in([status.to_value(value) for value in s.not_in]))
 
     @staticmethod
+    def _apply_action_kind_filter(
+        k: AuditLogActionKindFilter, conditions: list[QueryCondition]
+    ) -> None:
+        action_kind = AuditLogSearchableFields.own.action_kind.filter
+        if k.equals is not None:
+            conditions.append(action_kind.equals(action_kind.to_value(k.equals)))
+        if k.in_ is not None:
+            conditions.append(action_kind.in_([action_kind.to_value(value) for value in k.in_]))
+        if k.not_equals is not None:
+            conditions.append(action_kind.not_equals(action_kind.to_value(k.not_equals)))
+        if k.not_in is not None:
+            conditions.append(
+                action_kind.not_in([action_kind.to_value(value) for value in k.not_in])
+            )
+
+    @staticmethod
     def _convert_orders(orders: list[AuditLogOrder]) -> list[QueryOrder]:
         fields = AuditLogSearchableFields.own
         result: list[QueryOrder] = []
@@ -209,6 +232,10 @@ class AuditLogAdapter(BaseAdapter):
                     result.append(fields.operation.order.apply(ascending))
                 case AuditLogOrderField.STATUS:
                     result.append(fields.status.order.apply(ascending))
+                case AuditLogOrderField.ACTION_NAME:
+                    result.append(fields.action_name.order.apply(ascending))
+                case AuditLogOrderField.ACTION_KIND:
+                    result.append(fields.action_kind.order.apply(ascending))
                 case _:
                     assert_never(o.field)
         return result
@@ -219,6 +246,12 @@ class AuditLogAdapter(BaseAdapter):
             id=data.id,
             field_id=data.id,
             action_id=data.action_id,
+            action_name=data.action_name,
+            action_kind=(
+                AuditLogActionKind(data.action_kind.value) if data.action_kind is not None else None
+            ),
+            lookup_kind=data.lookup_kind,
+            lookup_key=data.lookup_key,
             entity_type=data.entity_type,
             operation=data.operation,
             entity_id=data.target_entity_id,
