@@ -12,6 +12,7 @@ from pydantic import Field, field_validator
 
 from ai.backend.common.api_handlers import BaseRequestModel
 from ai.backend.common.dto.manager.query import StringFilter
+from ai.backend.common.exception import InvalidContainerRegistryURL
 
 from .types import (
     ContainerRegistryOrderField,
@@ -38,11 +39,11 @@ def _validate_registry_url(url: str) -> str:
     """
     stripped = url.strip()
     if not stripped:
-        raise ValueError("url must not be blank")
+        raise InvalidContainerRegistryURL("url must not be blank")
     candidate = stripped if stripped.startswith(("http://", "https://")) else f"http://{stripped}"
     parsed = urlparse(candidate)
     if not (parsed.scheme and parsed.netloc):
-        raise ValueError(f"url is not a valid registry address: {stripped}")
+        raise InvalidContainerRegistryURL(f"url is not a valid registry address: {stripped}")
     return stripped
 
 

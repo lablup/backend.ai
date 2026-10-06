@@ -24,16 +24,6 @@ class InvalidContainerRegistryProject(BackendAIError, web.HTTPBadRequest):
         )
 
 
-class InvalidContainerRegistryURL(BackendAIError, web.HTTPBadRequest):
-    @override
-    def error_code(self) -> ErrorCode:
-        return ErrorCode(
-            domain=ErrorDomain.CONTAINER_REGISTRY,
-            operation=ErrorOperation.CREATE,
-            error_detail=ErrorDetail.BAD_REQUEST,
-        )
-
-
 class ContainerRegistryQuotaNotSupported(EntityError, web.HTTPBadRequest):
     error_type = "https://api.backend.ai/probs/container-registry/quota-not-supported"
     error_title = "The container registry type does not support quota management."

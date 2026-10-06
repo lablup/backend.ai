@@ -6,7 +6,6 @@ from dataclasses import dataclass, field
 from typing import override
 
 import pytest
-from pydantic import ValidationError
 
 from ai.backend.common.container_registry import ContainerRegistryType
 from ai.backend.common.data.user.types import UserRole
@@ -15,6 +14,7 @@ from ai.backend.common.dto.manager.v2.container_registry.request import (
     UpdateContainerRegistryInput,
 )
 from ai.backend.common.dto.manager.v2.container_registry.response import ContainerRegistryNode
+from ai.backend.common.exception import InvalidContainerRegistryURL
 from ai.backend.manager.api.adapters.container_registry.adapter import ContainerRegistryAdapter
 from ai.backend.manager.errors.auth import InsufficientPrivilege
 from ai.backend.manager.errors.container_registry import InvalidContainerRegistryProject
@@ -189,7 +189,7 @@ class AnAddressWithoutAHostIsRefused(
 
     @override
     def then(self) -> Then[ARegistryAndACaller, ContainerRegistryNode]:
-        return TheCallIsRefused(ValidationError)
+        return TheCallIsRefused(InvalidContainerRegistryURL)
 
 
 @dataclass(frozen=True)
