@@ -101,7 +101,7 @@ class ServiceStorageBackendStatusRow(LifecycleTimestampsMixin, Base):
         GUID(StorageBackendID),
         sa.ForeignKey(
             "storage_backends.id",
-            ondelete="RESTRICT",
+            ondelete="CASCADE",
             name="fk_service_storage_backend_status_storage_backend_id",
         ),
         primary_key=True,

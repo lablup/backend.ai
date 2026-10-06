@@ -141,7 +141,7 @@ def upgrade() -> None:
             ["storage_backend_id"],
             ["storage_backends.id"],
             name="fk_service_storage_backend_status_storage_backend_id",
-            ondelete="RESTRICT",
+            ondelete="CASCADE",
         ),
     )
 
@@ -194,7 +194,7 @@ def upgrade() -> None:
             ["storage_volume_id"],
             ["storage_volumes.id"],
             name="fk_storage_volume_service_holdings_storage_volume_id",
-            ondelete="RESTRICT",
+            ondelete="CASCADE",
         ),
     )
 
@@ -220,7 +220,7 @@ def upgrade() -> None:
             ["storage_volume_id"],
             ["storage_volumes.id"],
             name="fk_resource_group_volume_offers_storage_volume_id",
-            ondelete="RESTRICT",
+            ondelete="CASCADE",
         ),
     )
 

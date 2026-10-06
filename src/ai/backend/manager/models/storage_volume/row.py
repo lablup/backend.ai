@@ -89,7 +89,7 @@ class StorageVolumeServiceHoldingRow(LifecycleTimestampsMixin, Base):
         GUID(StorageVolumeID),
         sa.ForeignKey(
             "storage_volumes.id",
-            ondelete="RESTRICT",
+            ondelete="CASCADE",
             name="fk_storage_volume_service_holdings_storage_volume_id",
         ),
         primary_key=True,
@@ -124,7 +124,7 @@ class ResourceGroupVolumeOfferRow(LifecycleTimestampsMixin, Base):
         GUID(StorageVolumeID),
         sa.ForeignKey(
             "storage_volumes.id",
-            ondelete="RESTRICT",
+            ondelete="CASCADE",
             name="fk_resource_group_volume_offers_storage_volume_id",
         ),
         primary_key=True,
