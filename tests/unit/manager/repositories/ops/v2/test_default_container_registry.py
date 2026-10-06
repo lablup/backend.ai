@@ -1,8 +1,7 @@
 """Default registry reads follow association IDs, independent of legacy JSON or names."""
 
 import uuid
-from collections.abc import AsyncGenerator
-from dataclasses import dataclass
+from collections.abc import AsyncGenerator, Awaitable, Callable
 
 import pytest
 
@@ -39,137 +38,248 @@ from ai.backend.testutils.fixtures import DomainFactory
 _ORM_CLUSTER = (AgentRow, ResourceGroupForDomainRow)
 
 
-@dataclass(frozen=True)
-class RegistryProjects:
-    projects: tuple[ProjectID, ...]
-    registries: tuple[ContainerRegistryData, ...]
+class TestDefaultContainerRegistry:
+    @pytest.fixture
+    async def database(
+        self, database_connection: ExtendedAsyncSAEngine
+    ) -> AsyncGenerator[ExtendedAsyncSAEngine]:
+        async with with_tables(
+            database_connection,
+            [
+                VirtualEntityRow,
+                DomainRow,
+                ProjectResourcePolicyRow,
+                UserResourcePolicyRow,
+                UserRow,
+                ProjectRow,
+                ContainerRegistryRow,
+                AssociationContainerRegistriesGroupsRow,
+            ],
+        ):
+            yield database_connection
 
+    @pytest.fixture
+    def provider(self, database: ExtendedAsyncSAEngine) -> ProjectRegistryOpsProvider:
+        return ProjectRegistryOpsProvider(database)
 
-@pytest.fixture
-async def database(
-    database_connection: ExtendedAsyncSAEngine,
-) -> AsyncGenerator[ExtendedAsyncSAEngine]:
-    async with with_tables(
-        database_connection,
-        [
-            VirtualEntityRow,
-            DomainRow,
-            ProjectResourcePolicyRow,
-            UserResourcePolicyRow,
-            UserRow,
-            ProjectRow,
-            ContainerRegistryRow,
-            AssociationContainerRegistriesGroupsRow,
-        ],
-    ):
-        yield database_connection
-
-
-@pytest.fixture
-async def configured_projects(
-    database: ExtendedAsyncSAEngine, domain_factory: DomainFactory
-) -> RegistryProjects:
-    domain = await domain_factory(database)
-    projects = tuple(ProjectID(uuid.uuid4()) for _ in range(4))
-    registries = tuple(
-        ContainerRegistryData(
-            id=ContainerRegistryID(uuid.uuid4()),
-            url=f"https://registry-{index}.example.com",
-            registry_name="same-name",
-            type=ContainerRegistryType.HARBOR2,
-            project="same-registry-project",
-            username=f"user-{index}",
-            password=f"password-{index}",
-            ssl_verify=True,
-            is_global=False,
-            extra={"index": index},
-        )
-        for index in range(2)
-    )
-    async with database.begin_session() as session:
-        session.add(
-            ProjectResourcePolicyRow(
-                name="default-registry-test-policy",
-                max_vfolder_count=0,
-                max_quota_scope_size=-1,
-                max_network_count=3,
-            )
-        )
-        await session.flush()
-        for index, project_id in enumerate(projects):
+    @pytest.fixture
+    async def project_factory(
+        self, database: ExtendedAsyncSAEngine, domain_factory: DomainFactory
+    ) -> Callable[[], Awaitable[ProjectID]]:
+        domain = await domain_factory(database)
+        policy_name = "default-registry-test-policy"
+        async with database.begin_session() as session:
             session.add(
-                ProjectRow(
-                    id=project_id,
-                    name=f"project-{index}",
-                    domain_name=domain.domain_name,
-                    resource_policy="default-registry-test-policy",
-                    total_resource_slots=ResourceSlot(),
-                    container_registry={"registry": "legacy-only", "project": "unrelated"},
+                ProjectResourcePolicyRow(
+                    name=policy_name,
+                    max_vfolder_count=0,
+                    max_quota_scope_size=-1,
+                    max_network_count=3,
                 )
             )
-        for registry in registries:
-            session.add(
-                ContainerRegistryRow(
-                    id=registry.id,
-                    url=registry.url,
-                    registry_name=registry.registry_name,
-                    type=registry.type,
-                    project=registry.project,
-                    username=registry.username,
-                    password=registry.password,
-                    ssl_verify=registry.ssl_verify,
-                    is_global=registry.is_global,
-                    extra=registry.extra,
-                )
-            )
-        await session.flush()
-        for index, project_id in enumerate(projects[:3]):
-            for registry_index, registry in enumerate(registries):
+
+        async def create_project() -> ProjectID:
+            project_id = ProjectID(uuid.uuid4())
+            async with database.begin_session() as session:
                 session.add(
-                    AssociationContainerRegistriesGroupsRow(
-                        group_id=project_id,
-                        registry_id=registry.id,
-                        is_default=index == registry_index,
+                    ProjectRow(
+                        id=project_id,
+                        name=f"project-{project_id}",
+                        domain_name=domain.domain_name,
+                        resource_policy=policy_name,
+                        total_resource_slots=ResourceSlot(),
+                        container_registry={"registry": "legacy-only", "project": "unrelated"},
                     )
                 )
-    return RegistryProjects(projects, registries)
+            return project_id
 
+        return create_project
 
-async def test_defaults_use_registry_ids_and_preserve_registry_data(
-    database: ExtendedAsyncSAEngine, configured_projects: RegistryProjects
-) -> None:
-    async with ProjectRegistryOpsProvider(database).read_ops() as ops:
-        found = await ops.default_registries(
-            DefaultContainerRegistryQuery(configured_projects.projects)
-        )
-    assert found == dict(
-        zip(configured_projects.projects[:2], configured_projects.registries, strict=True)
-    )
+    @pytest.fixture
+    def registry_factory(
+        self, database: ExtendedAsyncSAEngine
+    ) -> Callable[[str], Awaitable[ContainerRegistryData]]:
+        async def create_registry(label: str) -> ContainerRegistryData:
+            registry = ContainerRegistryData(
+                id=ContainerRegistryID(uuid.uuid4()),
+                url=f"https://{label}.example.com",
+                registry_name="same-name",
+                type=ContainerRegistryType.HARBOR2,
+                project="same-registry-project",
+                username=f"user-{label}",
+                password=f"password-{label}",
+                ssl_verify=True,
+                is_global=False,
+                extra={"label": label},
+            )
+            async with database.begin_session() as session:
+                session.add(
+                    ContainerRegistryRow(
+                        id=registry.id,
+                        url=registry.url,
+                        registry_name=registry.registry_name,
+                        type=registry.type,
+                        project=registry.project,
+                        username=registry.username,
+                        password=registry.password,
+                        ssl_verify=registry.ssl_verify,
+                        is_global=registry.is_global,
+                        extra=registry.extra,
+                    )
+                )
+            return registry
 
+        return create_registry
 
-async def test_only_requested_projects_are_returned(
-    database: ExtendedAsyncSAEngine, configured_projects: RegistryProjects
-) -> None:
-    async with ProjectRegistryOpsProvider(database).read_ops() as ops:
-        found = await ops.default_registries(
-            DefaultContainerRegistryQuery([configured_projects.projects[1]])
-        )
-    assert found == {configured_projects.projects[1]: configured_projects.registries[1]}
+    @pytest.fixture
+    async def default_registry(
+        self, registry_factory: Callable[[str], Awaitable[ContainerRegistryData]]
+    ) -> ContainerRegistryData:
+        return await registry_factory("default")
 
+    @pytest.fixture
+    async def same_name_registry(
+        self, registry_factory: Callable[[str], Awaitable[ContainerRegistryData]]
+    ) -> ContainerRegistryData:
+        return await registry_factory("same-name")
 
-async def test_missing_defaults_and_missing_projects_are_absent(
-    database: ExtendedAsyncSAEngine, configured_projects: RegistryProjects
-) -> None:
-    async with ProjectRegistryOpsProvider(database).read_ops() as ops:
-        found = await ops.default_registries(
-            DefaultContainerRegistryQuery([
-                *configured_projects.projects[2:],
-                ProjectID(uuid.uuid4()),
+    @pytest.fixture
+    async def project_with_default(
+        self,
+        database: ExtendedAsyncSAEngine,
+        project_factory: Callable[[], Awaitable[ProjectID]],
+        default_registry: ContainerRegistryData,
+        same_name_registry: ContainerRegistryData,
+    ) -> ProjectID:
+        project_id = await project_factory()
+        async with database.begin_session() as session:
+            session.add_all([
+                AssociationContainerRegistriesGroupsRow(
+                    group_id=project_id,
+                    registry_id=default_registry.id,
+                    is_default=True,
+                ),
+                AssociationContainerRegistriesGroupsRow(
+                    group_id=project_id,
+                    registry_id=same_name_registry.id,
+                    is_default=False,
+                ),
             ])
-        )
-    assert found == {}
+        return project_id
 
+    @pytest.fixture
+    async def another_project_with_default(
+        self,
+        database: ExtendedAsyncSAEngine,
+        project_factory: Callable[[], Awaitable[ProjectID]],
+        same_name_registry: ContainerRegistryData,
+    ) -> ProjectID:
+        project_id = await project_factory()
+        async with database.begin_session() as session:
+            session.add(
+                AssociationContainerRegistriesGroupsRow(
+                    group_id=project_id,
+                    registry_id=same_name_registry.id,
+                    is_default=True,
+                )
+            )
+        return project_id
 
-async def test_empty_request_returns_no_registries(database: ExtendedAsyncSAEngine) -> None:
-    async with ProjectRegistryOpsProvider(database).read_ops() as ops:
-        assert await ops.default_registries(DefaultContainerRegistryQuery([])) == {}
+    @pytest.fixture
+    async def project_with_access_only(
+        self,
+        database: ExtendedAsyncSAEngine,
+        project_factory: Callable[[], Awaitable[ProjectID]],
+        default_registry: ContainerRegistryData,
+    ) -> ProjectID:
+        project_id = await project_factory()
+        async with database.begin_session() as session:
+            session.add(
+                AssociationContainerRegistriesGroupsRow(
+                    group_id=project_id,
+                    registry_id=default_registry.id,
+                    is_default=False,
+                )
+            )
+        return project_id
+
+    @pytest.fixture
+    async def project_without_access(
+        self, project_factory: Callable[[], Awaitable[ProjectID]]
+    ) -> ProjectID:
+        return await project_factory()
+
+    @pytest.fixture
+    def missing_project(self) -> ProjectID:
+        return ProjectID(uuid.uuid4())
+
+    async def test_defaults_use_registry_ids_and_preserve_registry_data(
+        self,
+        provider: ProjectRegistryOpsProvider,
+        project_with_default: ProjectID,
+        another_project_with_default: ProjectID,
+        default_registry: ContainerRegistryData,
+        same_name_registry: ContainerRegistryData,
+    ) -> None:
+        async with provider.read_ops() as ops:
+            found = await ops.default_registries(
+                DefaultContainerRegistryQuery([
+                    project_with_default,
+                    another_project_with_default,
+                ])
+            )
+        assert found == {
+            project_with_default: default_registry,
+            another_project_with_default: same_name_registry,
+        }
+
+    async def test_only_requested_projects_are_returned(
+        self,
+        provider: ProjectRegistryOpsProvider,
+        project_with_default: ProjectID,
+        another_project_with_default: ProjectID,
+        default_registry: ContainerRegistryData,
+    ) -> None:
+        async with provider.read_ops() as ops:
+            found = await ops.default_registries(
+                DefaultContainerRegistryQuery([project_with_default])
+            )
+        assert found == {project_with_default: default_registry}
+
+    async def test_access_without_default_returns_no_registry(
+        self,
+        provider: ProjectRegistryOpsProvider,
+        project_with_access_only: ProjectID,
+    ) -> None:
+        async with provider.read_ops() as ops:
+            found = await ops.default_registries(
+                DefaultContainerRegistryQuery([project_with_access_only])
+            )
+        assert found == {}
+
+    async def test_project_without_access_returns_no_registry(
+        self,
+        provider: ProjectRegistryOpsProvider,
+        project_without_access: ProjectID,
+    ) -> None:
+        async with provider.read_ops() as ops:
+            found = await ops.default_registries(
+                DefaultContainerRegistryQuery([project_without_access])
+            )
+        assert found == {}
+
+    async def test_missing_project_returns_no_registry(
+        self,
+        provider: ProjectRegistryOpsProvider,
+        missing_project: ProjectID,
+    ) -> None:
+        async with provider.read_ops() as ops:
+            found = await ops.default_registries(DefaultContainerRegistryQuery([missing_project]))
+        assert found == {}
+
+    async def test_empty_request_returns_no_registries(
+        self,
+        provider: ProjectRegistryOpsProvider,
+    ) -> None:
+        async with provider.read_ops() as ops:
+            assert await ops.default_registries(DefaultContainerRegistryQuery([])) == {}

@@ -23,11 +23,16 @@ class ProjectRegistryReadOps(V2ReadOps):
     ) -> Mapping[ProjectID, ContainerRegistryData]:
         if not query.project_ids:
             return {}
-        association = AssociationContainerRegistriesGroupsRow
         rows = await self._sess.execute(
-            sa.select(association.group_id, ContainerRegistryRow)
-            .join(ContainerRegistryRow, ContainerRegistryRow.id == association.registry_id)
-            .where(association.group_id.in_(query.project_ids), association.is_default)
+            sa.select(AssociationContainerRegistriesGroupsRow.group_id, ContainerRegistryRow)
+            .join(
+                ContainerRegistryRow,
+                ContainerRegistryRow.id == AssociationContainerRegistriesGroupsRow.registry_id,
+            )
+            .where(
+                AssociationContainerRegistriesGroupsRow.group_id.in_(query.project_ids),
+                AssociationContainerRegistriesGroupsRow.is_default,
+            )
         )
         return {
             project_id: ContainerRegistrySearchableFields.own.to_data(registry)
