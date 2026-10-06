@@ -6,7 +6,7 @@ from collections.abc import Mapping, Sequence
 from typing import Any, Final
 
 from ai.backend.common.data.permission.types import Permission
-from ai.backend.manager.data.permission.seed.role import RoleSeed
+from ai.backend.manager.seed.role_preset.role import RoleSeed
 
 # A derived id is a uuid7 whose timestamp is fixed and whose remaining bits come from
 # what it identifies, so the same declaration writes the same file. The timestamp is

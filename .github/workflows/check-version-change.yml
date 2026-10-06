@@ -33,3 +33,6 @@ jobs:
           echo "(or close and reopen the PR) to re-trigger CI with the full test suite."
           echo "Otherwise, revert the VERSION file change."
           exit 1
+      - name: Fail if the release notes exceed GitHub's release body limit
+        if: env.IS_RELEASE_PR == 'true'
+        run: python3 scripts/extract-release-changelog.py "$(cat VERSION)" --draft > /dev/null
