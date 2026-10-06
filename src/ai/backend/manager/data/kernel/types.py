@@ -206,11 +206,6 @@ class KernelStatus(CIStrEnum):
         """Statuses counted when calculating the historical resource usage."""
         return (cls.TERMINATED, cls.RUNNING)
 
-    @classmethod
-    @lru_cache(maxsize=1)
-    def live_statuses(cls) -> tuple[KernelStatus, ...]:
-        return (cls.RUNNING,)
-
 
 @dataclass(frozen=True)
 class KernelStatusInMatchSpec:

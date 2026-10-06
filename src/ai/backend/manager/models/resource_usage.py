@@ -661,10 +661,7 @@ async def fetch_resource_usage(
             )
             |
             # Or, filter running sessions which created before requested end_date
-            (
-                (KernelRow.created_at < end_date)
-                & (KernelRow.status.in_(KernelStatus.live_statuses()))
-            )
+            ((KernelRow.created_at < end_date) & (KernelRow.status == KernelStatus.RUNNING))
         ),
         session_cond=session_cond,
         project_cond=project_cond,

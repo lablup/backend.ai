@@ -691,7 +691,7 @@ class LegacyComputeSession(graphene.ObjectType):  # type: ignore[misc]
         if not hasattr(self, "status"):
             return None
         graph_ctx: GraphQueryContext = info.context
-        if KernelStatus[self.status] not in KernelStatus.live_statuses():
+        if KernelStatus[self.status] != KernelStatus.RUNNING:
             if self.last_stat is None:
                 return convert_type(0)
             metric = self.last_stat.get(metric_key)

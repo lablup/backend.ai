@@ -147,7 +147,7 @@ class ProjectDBSource:
                     # Or, filter running sessions which created before requested end_date
                     (
                         (kernels.c.created_at < end_date)
-                        & (kernels.c.status.in_(KernelStatus.live_statuses()))
+                        & (kernels.c.status == KernelStatus.RUNNING)
                     ),
                 )
                 .order_by(sa.asc(kernels.c.terminated_at))
