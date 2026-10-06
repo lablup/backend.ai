@@ -16,7 +16,7 @@ def upgrade() -> None:
         sa.Column("is_default", sa.Boolean(), nullable=False, server_default=sa.false()),
     )
     op.create_index(
-        "uq_project_image_commit_target",
+        "uq_project_default_registry",
         "association_container_registries_groups",
         ["group_id"],
         unique=True,
@@ -26,6 +26,6 @@ def upgrade() -> None:
 
 def downgrade() -> None:
     op.drop_index(
-        "uq_project_image_commit_target", table_name="association_container_registries_groups"
+        "uq_project_default_registry", table_name="association_container_registries_groups"
     )
     op.drop_column("association_container_registries_groups", "is_default")

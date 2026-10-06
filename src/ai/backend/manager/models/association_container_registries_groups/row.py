@@ -21,7 +21,7 @@ class AssociationContainerRegistriesGroupsRow(Base):
     __tablename__ = "association_container_registries_groups"
     __table_args__ = (
         sa.Index(
-            "uq_project_image_commit_target",
+            "uq_project_default_registry",
             "group_id",
             unique=True,
             postgresql_where=sa.text("is_default"),
