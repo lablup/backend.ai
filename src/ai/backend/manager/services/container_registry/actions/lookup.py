@@ -4,20 +4,22 @@ from typing import Any, override
 from ai.backend.common.data.entity.container_registry import (
     ContainerRegistryEntityType,
     ContainerRegistryID,
+    ContainerRegistryName,
+    ContainerRegistryProjectName,
 )
 from ai.backend.common.data.entity.types import EntityType
 from ai.backend.manager.actions.v2.lookup.base import LookupKey
 from ai.backend.manager.actions.v2.ops.base import LookupEntityOpsAction
 from ai.backend.manager.models.container_registry.lookups import (
-    ContainerRegistryByNameAndProjectLookup,
+    ContainerRegistryByNameAndRegistryProjectLookup,
 )
 from ai.backend.manager.models.container_registry.row import ContainerRegistryRow
 
 
 @dataclass(frozen=True)
 class ContainerRegistryNameProjectKey(LookupKey):
-    registry_name: str
-    project_name: str | None
+    registry_name: ContainerRegistryName
+    registry_project_name: ContainerRegistryProjectName | None
 
     @override
     def kind(self) -> str:
@@ -25,15 +27,15 @@ class ContainerRegistryNameProjectKey(LookupKey):
 
     @override
     def to_dict(self) -> dict[str, Any]:
-        return {"registry": self.registry_name, "project": self.project_name}
+        return {"registry": self.registry_name, "project": self.registry_project_name}
 
 
 @dataclass(frozen=True)
 class LookupContainerRegistryAction(
     LookupEntityOpsAction[ContainerRegistryRow, ContainerRegistryID]
 ):
-    registry_name: str
-    project_name: str | None
+    registry_name: ContainerRegistryName
+    registry_project_name: ContainerRegistryProjectName | None
 
     @override
     @classmethod
@@ -47,8 +49,10 @@ class LookupContainerRegistryAction(
 
     @override
     def lookup_key(self) -> ContainerRegistryNameProjectKey:
-        return ContainerRegistryNameProjectKey(self.registry_name, self.project_name)
+        return ContainerRegistryNameProjectKey(self.registry_name, self.registry_project_name)
 
     @override
-    def to_lookup(self) -> ContainerRegistryByNameAndProjectLookup:
-        return ContainerRegistryByNameAndProjectLookup(self.registry_name, self.project_name)
+    def to_lookup(self) -> ContainerRegistryByNameAndRegistryProjectLookup:
+        return ContainerRegistryByNameAndRegistryProjectLookup(
+            self.registry_name, self.registry_project_name
+        )

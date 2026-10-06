@@ -78,7 +78,7 @@ from ai.backend.manager.services.container_registry.service import ContainerRegi
 
 
 class ContainerRegistryProcessors:
-    lookup_by_name_and_project: LookupActionProcessor[
+    lookup_by_name_and_registry_project: LookupActionProcessor[
         LookupContainerRegistryAction, LookupOpsResult[ContainerRegistryID]
     ]
 
@@ -129,7 +129,7 @@ class ContainerRegistryProcessors:
     def __init__(
         self, group: ProcessorGroup[ContainerRegistryData], service: ContainerRegistryService
     ) -> None:
-        self.lookup_by_name_and_project = group.lookup_ops(LookupContainerRegistryAction)
+        self.lookup_by_name_and_registry_project = group.lookup_ops(LookupContainerRegistryAction)
         self.rescan_images = group.global_scope(RescanImagesAction, service.rescan_images)
         self.clear_images = group.global_scope(ClearImagesAction, service.clear_images)
         self.load_container_registries = group.global_scope(

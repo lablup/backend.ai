@@ -6,7 +6,11 @@ import uuid
 from collections.abc import Sequence
 
 from ai.backend.common.container_registry import AllowedGroupsModel
-from ai.backend.common.data.entity.container_registry import ContainerRegistryID
+from ai.backend.common.data.entity.container_registry import (
+    ContainerRegistryID,
+    ContainerRegistryName,
+    ContainerRegistryProjectName,
+)
 from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.dto.manager.v2.container_registry.request import (
     AdminSearchContainerRegistriesInput,
@@ -382,10 +386,12 @@ class ContainerRegistryAdapter(BaseAdapter):
             extra=data.extra,
         )
 
-    async def lookup_by_name_and_project(
-        self, registry_name: str, project_name: str | None
+    async def lookup_by_name_and_registry_project(
+        self,
+        registry_name: ContainerRegistryName,
+        registry_project_name: ContainerRegistryProjectName | None,
     ) -> ContainerRegistryID:
-        result = await self._container_registry.lookup_by_name_and_project.run(
-            LookupContainerRegistryAction(registry_name, project_name)
+        result = await self._container_registry.lookup_by_name_and_registry_project.run(
+            LookupContainerRegistryAction(registry_name, registry_project_name)
         )
         return result.entity_id()

@@ -7,7 +7,7 @@
 - ops 로 구성 (3)
   - admin_search — 대표 성공 ✓ · 대표 실패 ✓
   - batch_load_by_ids — 대표 성공 ✓ · 대표 실패 ✓
-  - lookup_by_name_and_project — 대표 성공 ✓ · 대표 실패 ✓
+  - lookup_by_name_and_registry_project — 대표 성공 ✓ · 대표 실패 ✓
 - 직접 구현 (5)
   - admin_create — 성공 있음 2 · 실패 있음 2 (global_scope, relation)
   - admin_delete — 성공 있음 2 · 실패 있음 2 (global_scope)
@@ -32,11 +32,11 @@
 | [슈퍼관리자가 미리 만들어 둔 레지스트리 둘과 존재하지 않는 id 하나를 한 번에 조회하면, 미리 만들어 둔 레지스트리는 요청한 순서대로 반환된다. 존재하지 않는 id의 항목에 무엇이 반환되는지는 아직 정해지지 않았다](#reading-loading-many-ids-keeps-the-order) | 성공 |
 | [권한을 받지 않은 사용자가 id 여럿을 한 번에 조회하면, 요청 전체가 거부되는 대신 항목마다 권한 부족 거부가 담겨 반환된다. 존재하지 않는 id도 같은 거부로 반환되어 있는지 없는지가 드러나지 않는다](#reading-a-plain-user-loading-many-ids-is-refused-on-every-id) | 거부 |
 
-**lookup_by_name_and_project**
+**lookup_by_name_and_registry_project**
 
 | 시나리오 | 판정 |
 |---|---|
-| [읽기 권한이 있는 사용자는 프로젝트명이 없는 레지스트리의 이름을 식별자로 변환할 수 있다](#looking_up-readable-registry-key-resolves) | 성공 |
+| [읽기 권한이 있는 사용자는 registry 내부 프로젝트명이 없는 레지스트리의 이름을 식별자로 변환할 수 있다](#looking_up-readable-registry-key-resolves) | 성공 |
 | [존재하지 않는 이름은 읽기 권한이 없는 경우와 같은 오류로 거부된다](#looking_up-missing-registry-key-is-unresolvable) | 거부 |
 | [읽기 권한이 없는 사용자의 이름 조회는 대상의 존재 여부를 드러내지 않고 거부된다](#looking_up-unreadable-registry-key-is-unresolvable) | 거부 |
 
@@ -295,13 +295,13 @@ Then
   - 거부: NotEnoughPermission
   - 거부: NotEnoughPermission
 
-### lookup_by_name_and_project
+### lookup_by_name_and_registry_project
 
 <a id="looking_up-readable-registry-key-resolves"></a>
 
 #### [readable-registry-key-resolves](/tests/scenario/bai_scenario/manager/container_registry/test_looking_up.py) — pass
 
-읽기 권한이 있는 사용자는 프로젝트명이 없는 레지스트리의 이름을 식별자로 변환할 수 있다
+읽기 권한이 있는 사용자는 registry 내부 프로젝트명이 없는 레지스트리의 이름을 식별자로 변환할 수 있다
 
 Given
 
@@ -321,7 +321,7 @@ Given
 
 When
 
-- ContainerRegistryAdapter.lookup_by_name_and_project — 일반 사용자가 이름과 프로젝트명으로 레지스트리 식별자를 조회
+- ContainerRegistryAdapter.lookup_by_name_and_registry_project — 일반 사용자가 이름과 registry 내부 프로젝트명으로 레지스트리 식별자를 조회
 
 Then
 
@@ -352,7 +352,7 @@ Given
 
 When
 
-- ContainerRegistryAdapter.lookup_by_name_and_project — 일반 사용자가 이름과 프로젝트명으로 레지스트리 식별자를 조회
+- ContainerRegistryAdapter.lookup_by_name_and_registry_project — 일반 사용자가 이름과 registry 내부 프로젝트명으로 레지스트리 식별자를 조회
 
 Then
 
@@ -379,7 +379,7 @@ Given
 
 When
 
-- ContainerRegistryAdapter.lookup_by_name_and_project — 일반 사용자가 이름과 프로젝트명으로 레지스트리 식별자를 조회
+- ContainerRegistryAdapter.lookup_by_name_and_registry_project — 일반 사용자가 이름과 registry 내부 프로젝트명으로 레지스트리 식별자를 조회
 
 Then
 

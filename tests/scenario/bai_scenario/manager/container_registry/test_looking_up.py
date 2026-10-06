@@ -5,7 +5,11 @@ from typing import override
 
 import pytest
 
-from ai.backend.common.data.entity.container_registry import ContainerRegistryID
+from ai.backend.common.data.entity.container_registry import (
+    ContainerRegistryID,
+    ContainerRegistryName,
+    ContainerRegistryProjectName,
+)
 from ai.backend.manager.api.adapters.container_registry.adapter import ContainerRegistryAdapter
 from ai.backend.manager.data.permission.types import Permission
 from ai.backend.manager.errors.common import GenericBadRequest
@@ -36,11 +40,11 @@ class LookingUp(When[ARegistryToAllowAndACaller, ContainerRegistryAdapter, Conta
 
     @override
     def operation(self) -> str:
-        return "lookup_by_name_and_project"
+        return "lookup_by_name_and_registry_project"
 
     @override
     def describe(self, laid: ARegistryToAllowAndACaller) -> str:
-        return "일반 사용자가 이름과 프로젝트명으로 레지스트리 식별자를 조회"
+        return "일반 사용자가 이름과 registry 내부 프로젝트명으로 레지스트리 식별자를 조회"
 
     @override
     async def call(
@@ -48,8 +52,11 @@ class LookingUp(When[ARegistryToAllowAndACaller, ContainerRegistryAdapter, Conta
     ) -> ContainerRegistryID:
         name = laid.registry.registry_name
         with ActingAs(laid.caller):
-            return await adapter.lookup_by_name_and_project(
-                f"{name}-missing" if self.missing else name, laid.registry.project
+            return await adapter.lookup_by_name_and_registry_project(
+                ContainerRegistryName(f"{name}-missing" if self.missing else name),
+                ContainerRegistryProjectName(laid.registry.project)
+                if laid.registry.project is not None
+                else None,
             )
 
 
@@ -98,7 +105,7 @@ class LookupRegistry(
         if self.missing:
             return "존재하지 않는 이름은 읽기 권한이 없는 경우와 같은 오류로 거부된다"
         if self.readable:
-            return "읽기 권한이 있는 사용자는 프로젝트명이 없는 레지스트리의 이름을 식별자로 변환할 수 있다"
+            return "읽기 권한이 있는 사용자는 registry 내부 프로젝트명이 없는 레지스트리의 이름을 식별자로 변환할 수 있다"
         return "읽기 권한이 없는 사용자의 이름 조회는 대상의 존재 여부를 드러내지 않고 거부된다"
 
     @override
