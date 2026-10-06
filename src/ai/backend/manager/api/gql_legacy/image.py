@@ -42,11 +42,21 @@ from ai.backend.manager.data.image.types import (
     ImageWithAgentInstallStatus,
 )
 from ai.backend.manager.defs import DEFAULT_IMAGE_ARCH
+<<<<<<< HEAD
 from ai.backend.manager.models.image import (
     ImageIdentifier,
     ImageLoadFilter,
     ImageRow,
     get_permission_ctx,
+=======
+from ai.backend.manager.errors.api import InvalidCursor
+from ai.backend.manager.errors.image import ImageNotFound
+from ai.backend.manager.models.clauses import QueryCondition
+from ai.backend.manager.models.image.row import ImageLoadFilter, ImageRow, get_permission_ctx
+from ai.backend.manager.models.image.scopes import (
+    ImageTarget,
+    VisibleImageTarget,
+>>>>>>> a95f360ee (fix(BA-8304): reject a non-UUID imageNodes cursor with InvalidCursor (#15272))
 )
 from ai.backend.manager.models.minilang import EnumFieldItem
 from ai.backend.manager.models.minilang.ordering import ColumnMapType, QueryOrderParser
@@ -129,6 +139,49 @@ __all__ = (
     "UntagImageFromRegistry",
 )
 
+<<<<<<< HEAD
+=======
+
+def _status_searcher(statuses: list[ImageStatus], *conditions: QueryCondition) -> ImageSearcher:
+    """Every image matching the conditions and one of the statuses."""
+    return ImageSearcher(
+        pagination=NoPagination(),
+        conditions=[ImageSearchableFields.own.status.filter.in_(statuses), *conditions],
+    )
+
+
+def _single_image(
+    items: Sequence[ImageWithAgentInstallStatus], key: str
+) -> ImageWithAgentInstallStatus:
+    """The image a key was expected to name. Several matches is a broken state, so it is
+    logged and the first the searcher's order picked answers."""
+    if not items:
+        raise ImageNotFound()
+    if len(items) > 1:
+        log.warning("image key matched several rows", image_key=key, image_count=len(items))
+    return items[0]
+
+
+def _caller_targets(ctx: GraphQueryContext) -> list[ImageTarget]:
+    """The one scope these reads are answered from: everything the caller's roles grant
+    image READ on. These reads take no project, so a caller who named nothing still has
+    to be answered with everything they reach. A superadmin's read is unscoped, which
+    the service decides."""
+    return [VisibleImageTarget(user_id=UserID(ctx.user["uuid"]))]
+
+
+def _validate_cursor(info: graphene.ResolveInfo, cursor: str | None) -> None:
+    """A cursor names an `images.id` row, so one that is not a UUID cannot reach the bind."""
+    if cursor is None:
+        return
+    _, row_id = AsyncNode.resolve_global_id(info, cursor)
+    try:
+        UUID(row_id)
+    except (ValueError, AttributeError, TypeError) as e:
+        raise InvalidCursor(f"Invalid cursor: {cursor}") from e
+
+
+>>>>>>> a95f360ee (fix(BA-8304): reject a non-UUID imageNodes cursor with InvalidCursor (#15272))
 _queryfilter_fieldspec: FieldSpecType = {
     "id": ("id", None),
     "name": ("name", None),
@@ -669,6 +722,8 @@ class ImageNode(graphene.ObjectType):  # type: ignore[misc]
     ) -> ConnectionResolverResult[Self]:
         if filter_by_statuses is None:
             filter_by_statuses = [ImageStatus.ALIVE]
+        _validate_cursor(info, after)
+        _validate_cursor(info, before)
         graph_ctx: GraphQueryContext = info.context
         _filter_arg = (
             FilterExprArg(filter_expr, QueryFilterParser(_queryfilter_fieldspec))
