@@ -1453,16 +1453,16 @@ class OverridableContainerConfig(BaseConfigSchema):
             example=ConfigExample(local="-1", prod="1000"),
         ),
     ]
-    run_user: Annotated[
+    entrypoint_user: Annotated[
         str | None,
         Field(
             default=None,
-            validation_alias=AliasChoices("run-user", "run_user"),
-            serialization_alias="run-user",
+            validation_alias=AliasChoices("entrypoint-user", "entrypoint_user"),
+            serialization_alias="entrypoint-user",
         ),
         BackendAIConfigMeta(
             description=(
-                "User the kernel container process starts as, as the container runtime's "
+                "User the kernel container entrypoint starts as, as the container runtime's "
                 'User field ("uid", "uid:gid" or a name). '
                 "None lets the container runtime decide. "
                 "Agent-wide: it does not follow the per-user container_uid, "

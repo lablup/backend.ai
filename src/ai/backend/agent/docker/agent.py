@@ -1340,8 +1340,8 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
             },
         }
 
-        if (run_user := self.local_config.container.run_user) is not None:
-            container_config["User"] = run_user
+        if (entrypoint_user := self.local_config.container.entrypoint_user) is not None:
+            container_config["User"] = entrypoint_user
 
         await self._apply_seccomp_profile(container_config)
 
