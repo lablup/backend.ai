@@ -7,9 +7,8 @@ import uuid
 import pytest
 import sqlalchemy as sa
 
-from ai.backend.common import msgpack
 from ai.backend.common.types import AccessKey
-from ai.backend.manager.data.dotfile.types import DotfileBundle, DotfileEntry
+from ai.backend.manager.data.dotfile.types import DotfileBundle, DotfileEntries, DotfileEntry
 from ai.backend.manager.models.domain.row import DomainRow
 from ai.backend.manager.models.keypair.row import KeyPairRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
@@ -20,12 +19,6 @@ from ai.backend.testutils.fixtures import DomainFixtureData
 
 _DOMAIN_ENTRY = DotfileEntry(path=".bashrc", perm="644", data="domain")
 _KEYPAIR_ENTRY = DotfileEntry(path=".bashrc", perm="600", data="keypair")
-
-
-def _packed(*entries: DotfileEntry) -> bytes:
-    return msgpack.packb([
-        {"path": entry.path, "perm": entry.perm, "data": entry.data} for entry in entries
-    ])
 
 
 class TestFetchDomainDotfiles:
@@ -41,7 +34,7 @@ class TestFetchDomainDotfiles:
             await db_sess.execute(
                 sa.update(DomainRow)
                 .where(DomainRow.name == test_domain.domain_name)
-                .values(dotfiles=_packed(_DOMAIN_ENTRY))
+                .values(dotfiles=DotfileEntries(entries=(_DOMAIN_ENTRY,)).pack())
             )
         return test_domain
 
@@ -53,7 +46,7 @@ class TestFetchDomainDotfiles:
             await db_sess.execute(
                 sa.update(KeyPairRow)
                 .where(KeyPairRow.access_key == test_access_key)
-                .values(dotfiles=_packed(_KEYPAIR_ENTRY))
+                .values(dotfiles=DotfileEntries(entries=(_KEYPAIR_ENTRY,)).pack())
             )
         return test_access_key
 
