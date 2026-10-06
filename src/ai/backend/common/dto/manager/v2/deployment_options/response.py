@@ -5,10 +5,26 @@ from __future__ import annotations
 from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseResponseModel
-from ai.backend.common.dto.manager.v2.session_options import (
-    HandlerOptionsEntryInfo,
-    HandlerOptionsInfo,
-)
+
+
+class HandlerOptionsInfo(BaseResponseModel):
+    """Per-handler scheduler policy snapshot for deployments."""
+
+    timeout_sec: int | None = Field(
+        description="Phase timeout in seconds; `null` means unbounded for this entry.",
+    )
+    max_retry_count: int | None = Field(
+        description=(
+            "Per-phase retry budget; `null` means the retry limit is "
+            "disabled (`give_up` never fires for this handler)."
+        ),
+    )
+
+
+class HandlerOptionsEntryInfo(HandlerOptionsInfo):
+    """A named deployment handler's scheduler policy snapshot."""
+
+    handler_name: str = Field(description="Deployment handler identifier.")
 
 
 class DeploymentHandlerOptionsInfo(BaseResponseModel):
