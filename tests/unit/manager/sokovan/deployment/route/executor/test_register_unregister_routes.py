@@ -24,7 +24,6 @@ from uuid import UUID, uuid4
 
 from dateutil.tz import tzutc
 
-from ai.backend.common.data.endpoint.types import EndpointLifecycle
 from ai.backend.common.data.entity.deployment import DeploymentID
 from ai.backend.common.data.entity.deployment_revision import DeploymentRevisionID
 from ai.backend.common.data.entity.replica import ReplicaID
@@ -44,7 +43,6 @@ from ai.backend.manager.data.deployment.types import (
     RouteTrafficStatus,
 )
 from ai.backend.manager.data.resource.types import ResourceGroupProxyTarget
-from ai.backend.manager.models.specs.searcher import SearcherResult
 from ai.backend.manager.sokovan.deployment.route.executor import RouteExecutor
 
 
@@ -76,13 +74,11 @@ def _make_deployment_mock(deployment_id: UUID, resource_group: str) -> MagicMock
     deployment = MagicMock()
     deployment.id = deployment_id
     deployment.metadata.resource_group = resource_group
-    deployment.state.lifecycle = EndpointLifecycle.READY
     return deployment
 
 
 def _wire_proxy_target(
     mock_deployment_repo: AsyncMock,
-    mock_deployment_ops: AsyncMock,
     endpoint_ids: list[DeploymentID],
     *,
     resource_group: str = "default",
@@ -91,12 +87,6 @@ def _wire_proxy_target(
 ) -> None:
     deployments = [_make_deployment_mock(UUID(str(eid)), resource_group) for eid in endpoint_ids]
     mock_deployment_repo.get_deployments_by_ids.return_value = deployments
-    mock_deployment_ops.search_in_global.return_value = SearcherResult(
-        items=deployments,
-        total_count=len(deployments),
-        has_next_page=False,
-        has_previous_page=False,
-    )
     mock_deployment_repo.fetch_resource_group_proxy_targets.return_value = {
         resource_group: ResourceGroupProxyTarget(addr=addr, api_token=token),
     }
@@ -123,13 +113,12 @@ class TestRegisterRoutesNow:
         self,
         route_executor: RouteExecutor,
         mock_deployment_repo: AsyncMock,
-        mock_deployment_ops: AsyncMock,
         mock_appproxy_client_pool: MagicMock,
     ) -> None:
         """RR-REG-002: Two routes for one endpoint collapse into one bulk call."""
         endpoint_id = DeploymentID(uuid4())
         routes = [_route_with_replica(endpoint_id), _route_with_replica(endpoint_id)]
-        _wire_proxy_target(mock_deployment_repo, mock_deployment_ops, [endpoint_id])
+        _wire_proxy_target(mock_deployment_repo, [endpoint_id])
         client = mock_appproxy_client_pool.load_client.return_value
         client.bulk_register_routes.return_value = BulkRegisterRoutesResponse(
             endpoints=[
@@ -159,14 +148,13 @@ class TestRegisterRoutesNow:
         self,
         route_executor: RouteExecutor,
         mock_deployment_repo: AsyncMock,
-        mock_deployment_ops: AsyncMock,
         mock_appproxy_client_pool: MagicMock,
     ) -> None:
         """RR-REG-003: Routes missing replica info land in errors, not the request."""
         endpoint_id = DeploymentID(uuid4())
         good = _route_with_replica(endpoint_id)
         bad = _route_with_replica(endpoint_id, replica_host=None, replica_port=None)
-        _wire_proxy_target(mock_deployment_repo, mock_deployment_ops, [endpoint_id])
+        _wire_proxy_target(mock_deployment_repo, [endpoint_id])
         client = mock_appproxy_client_pool.load_client.return_value
         client.bulk_register_routes.return_value = BulkRegisterRoutesResponse(
             endpoints=[
@@ -192,13 +180,12 @@ class TestRegisterRoutesNow:
         self,
         route_executor: RouteExecutor,
         mock_deployment_repo: AsyncMock,
-        mock_deployment_ops: AsyncMock,
         mock_appproxy_client_pool: MagicMock,
     ) -> None:
         """RR-REG-004: One endpoint marked failed by AppProxy doesn't drop other successes."""
         endpoint_ids = [DeploymentID(uuid4()) for _ in range(3)]
         routes = [_route_with_replica(eid) for eid in endpoint_ids]
-        _wire_proxy_target(mock_deployment_repo, mock_deployment_ops, endpoint_ids)
+        _wire_proxy_target(mock_deployment_repo, endpoint_ids)
         client = mock_appproxy_client_pool.load_client.return_value
         client.bulk_register_routes.return_value = BulkRegisterRoutesResponse(
             endpoints=[
@@ -233,7 +220,7 @@ class TestUnregisterRoutesNow:
     async def test_empty_routes_is_noop(
         self,
         route_executor: RouteExecutor,
-        mock_deployment_ops: AsyncMock,
+        mock_deployment_repo: AsyncMock,
         mock_appproxy_client_pool: MagicMock,
     ) -> None:
         """RR-UNREG-001: Empty input is a no-op."""
@@ -241,20 +228,19 @@ class TestUnregisterRoutesNow:
 
         assert result.successes == []
         assert result.errors == []
-        mock_deployment_ops.search_in_global.assert_not_awaited()
+        mock_deployment_repo.get_deployments_by_ids.assert_not_awaited()
         mock_appproxy_client_pool.load_client.assert_not_called()
 
     async def test_single_endpoint_unregister_once(
         self,
         route_executor: RouteExecutor,
         mock_deployment_repo: AsyncMock,
-        mock_deployment_ops: AsyncMock,
         mock_appproxy_client_pool: MagicMock,
     ) -> None:
         """RR-UNREG-002: Two routes for one endpoint collapse into one unregister call."""
         endpoint_id = DeploymentID(uuid4())
         routes = [_route_with_replica(endpoint_id), _route_with_replica(endpoint_id)]
-        _wire_proxy_target(mock_deployment_repo, mock_deployment_ops, [endpoint_id])
+        _wire_proxy_target(mock_deployment_repo, [endpoint_id])
         client = mock_appproxy_client_pool.load_client.return_value
         client.bulk_unregister_routes.return_value = BulkUnregisterRoutesResponse(
             endpoints=[
@@ -283,13 +269,12 @@ class TestUnregisterRoutesNow:
         self,
         route_executor: RouteExecutor,
         mock_deployment_repo: AsyncMock,
-        mock_deployment_ops: AsyncMock,
         mock_appproxy_client_pool: MagicMock,
     ) -> None:
         """RR-UNREG-003: One endpoint marked failed by AppProxy doesn't drop other successes."""
         endpoint_ids = [DeploymentID(uuid4()) for _ in range(3)]
         routes = [_route_with_replica(eid) for eid in endpoint_ids]
-        _wire_proxy_target(mock_deployment_repo, mock_deployment_ops, endpoint_ids)
+        _wire_proxy_target(mock_deployment_repo, endpoint_ids)
         client = mock_appproxy_client_pool.load_client.return_value
         client.bulk_unregister_routes.return_value = BulkUnregisterRoutesResponse(
             endpoints=[

@@ -17,7 +17,6 @@ from ai.backend.manager.clients.agent.pool import AgentClientPool
 from ai.backend.manager.clients.appproxy.client import AppProxyClientPool
 from ai.backend.manager.clients.prometheus.client import PrometheusClient
 from ai.backend.manager.config.provider import ManagerConfigProvider
-from ai.backend.manager.data.deployment.types import DeploymentInfo
 from ai.backend.manager.idle import IdleCheckerHost
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.plugin.network import NetworkPluginContext
@@ -25,7 +24,6 @@ from ai.backend.manager.repositories.deployment.repository import DeploymentRepo
 from ai.backend.manager.repositories.fair_share.repository import FairShareRepository
 from ai.backend.manager.repositories.idle_checker.repository import IdleCheckerRepository
 from ai.backend.manager.repositories.metric.repository import MetricRepository
-from ai.backend.manager.repositories.ops.repository import OpsRepository
 from ai.backend.manager.repositories.prometheus_query_preset.repository import (
     PrometheusQueryPresetRepository,
 )
@@ -71,7 +69,6 @@ class OrchestrationInput:
     # Sokovan-specific
     scheduler_repository: SchedulerRepository
     deployment_repository: DeploymentRepository
-    deployment_ops: OpsRepository[DeploymentInfo]
     replica_group_repository: ReplicaGroupRepository
     idle_checker_repository: IdleCheckerRepository
     metric_repository: MetricRepository
@@ -154,7 +151,6 @@ class OrchestrationComposer(DependencyComposer[OrchestrationInput, Orchestration
         sokovan_input = SokovanOrchestratorInput(
             scheduler_repository=setup_input.scheduler_repository,
             deployment_repository=setup_input.deployment_repository,
-            deployment_ops=setup_input.deployment_ops,
             replica_group_repository=setup_input.replica_group_repository,
             idle_checker_repository=setup_input.idle_checker_repository,
             metric_repository=setup_input.metric_repository,

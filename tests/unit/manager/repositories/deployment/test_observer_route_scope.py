@@ -399,7 +399,6 @@ class TestObserverCycleRouteScope:
         coord = RouteCoordinator(
             valkey_schedule=AsyncMock(),
             deployment_repository=repository,
-            deployment_ops=MagicMock(),
             event_producer=AsyncMock(),
             lock_factory=MagicMock(),
             config_provider=MagicMock(),

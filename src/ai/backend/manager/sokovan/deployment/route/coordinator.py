@@ -21,7 +21,6 @@ from ai.backend.logging.structured import StructuredLogger, with_log_context
 from ai.backend.manager.clients.appproxy.client import AppProxyClientPool
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.deployment.types import (
-    DeploymentInfo,
     RouteHealthStatus,
     RouteStatus,
     RouteSubStatus,
@@ -36,7 +35,6 @@ from ai.backend.manager.models.scheduling_history.creators import RouteHistoryCr
 from ai.backend.manager.models.specs.pagination import NoPagination
 from ai.backend.manager.repositories.deployment.repository import DeploymentRepository
 from ai.backend.manager.repositories.deployment.types.endpoint import RouteHistoryToCreate
-from ai.backend.manager.repositories.ops.repository import OpsRepository
 from ai.backend.manager.sokovan.deployment.route.executor import RouteExecutor
 from ai.backend.manager.sokovan.deployment.route.handlers.appproxy_sync import (
     AppProxySyncRouteHandler,
@@ -121,7 +119,6 @@ class RouteCoordinator:
         self,
         valkey_schedule: ValkeyScheduleClient,
         deployment_repository: DeploymentRepository,
-        deployment_ops: OpsRepository[DeploymentInfo],
         event_producer: EventProducer,
         lock_factory: DistributedLockFactory,
         config_provider: ManagerConfigProvider,
@@ -140,7 +137,6 @@ class RouteCoordinator:
         # Create route executor
         executor = RouteExecutor(
             deployment_repo=self._deployment_repository,
-            deployment_ops=deployment_ops,
             scheduling_controller=scheduling_controller,
             config_provider=self._config_provider,
             client_pool=client_pool,

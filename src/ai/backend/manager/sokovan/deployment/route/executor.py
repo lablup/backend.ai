@@ -10,7 +10,6 @@ from ai.backend.common.clients.valkey_client.valkey_schedule import (
     ReplicaProbeTarget,
     ValkeyScheduleClient,
 )
-from ai.backend.common.data.endpoint.types import EndpointLifecycle
 from ai.backend.common.data.entity.deployment import DeploymentID
 from ai.backend.common.data.entity.deployment_revision import DeploymentRevisionID
 from ai.backend.common.data.entity.replica import ReplicaID
@@ -49,8 +48,6 @@ from ai.backend.manager.errors.deployment import (
     RouteSessionNotFound,
     RouteSessionTerminated,
 )
-from ai.backend.manager.models.endpoint.searchable_fields import DeploymentSearchableFields
-from ai.backend.manager.models.endpoint.searchers import DeploymentInfoSearcher
 from ai.backend.manager.models.routing.searchable_fields import ReplicaSearchableFields
 from ai.backend.manager.models.routing.searchers import RouteInfoSearcher
 from ai.backend.manager.models.specs.pagination import NoPagination
@@ -59,7 +56,6 @@ from ai.backend.manager.repositories.deployment.types.endpoint import (
     RouteSessionInfo,
     RouteSessionKernelInfo,
 )
-from ai.backend.manager.repositories.ops.repository import OpsRepository
 from ai.backend.manager.sokovan.deployment.deployment_draft_builder import (
     DeploymentSessionDraftBuilder,
 )
@@ -93,20 +89,9 @@ def _extract_error_code(exception: BaseException) -> str | None:
 class RouteExecutor:
     """Executor for route lifecycle operations."""
 
-    _deployment_repo: DeploymentRepository
-    _deployment_ops: OpsRepository[DeploymentInfo]
-    _scheduling_controller: SchedulingController
-    _config_provider: ManagerConfigProvider
-    _client_pool: ClientPool
-    _valkey_schedule: ValkeyScheduleClient
-    _service_discovery: ServiceDiscovery
-    _event_producer: EventProducer
-    _appproxy_client_pool: AppProxyClientPool
-
     def __init__(
         self,
         deployment_repo: DeploymentRepository,
-        deployment_ops: OpsRepository[DeploymentInfo],
         scheduling_controller: SchedulingController,
         config_provider: ManagerConfigProvider,
         client_pool: ClientPool,
@@ -116,7 +101,6 @@ class RouteExecutor:
         appproxy_client_pool: AppProxyClientPool,
     ) -> None:
         self._deployment_repo = deployment_repo
-        self._deployment_ops = deployment_ops
         self._scheduling_controller = scheduling_controller
         self._config_provider = config_provider
         self._client_pool = client_pool
@@ -985,23 +969,9 @@ class RouteExecutor:
         successes: list[RouteData] = []
         errors: list[RouteExecutionError] = []
 
-        searched = await self._deployment_ops.search_in_global(
-            DeploymentInfoSearcher(
-                pagination=NoPagination(),
-                conditions=[
-                    DeploymentSearchableFields.own.entity_id.filter.in_(
-                        UUIDInMatchSpec(values=endpoint_ids, negated=False)
-                    )
-                ],
-            )
-        )
-        deployment_by_id = {dep.id: dep for dep in searched.items}
-        destroyed_lifecycles = {EndpointLifecycle.DESTROYING, EndpointLifecycle.DESTROYED}
-        resource_groups = {
-            dep.metadata.resource_group
-            for dep in searched.items
-            if dep.state.lifecycle not in destroyed_lifecycles
-        }
+        deployments = await self._deployment_repo.get_deployments_by_ids(set(endpoint_ids))
+        deployment_by_id = {dep.id: dep for dep in deployments}
+        resource_groups = {dep.metadata.resource_group for dep in deployments}
         proxy_targets = await self._deployment_repo.fetch_resource_group_proxy_targets(
             resource_groups
         )
@@ -1019,10 +989,6 @@ class RouteExecutor:
                             error_code=None,
                         )
                     )
-                continue
-            if deployment.state.lifecycle in destroyed_lifecycles:
-                # Destroying the deployment deleted its AppProxy endpoint, and the routes with it.
-                successes.extend(routes_by_endpoint[endpoint_id])
                 continue
             target = proxy_targets.get(deployment.metadata.resource_group)
             if target is None:

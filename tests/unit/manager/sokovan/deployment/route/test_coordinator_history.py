@@ -297,7 +297,6 @@ def coordinator_with_provisioning_routes(
     coordinator = RouteCoordinator(
         valkey_schedule=mock_valkey_schedule,
         deployment_repository=mock_deployment_repository,
-        deployment_ops=MagicMock(),
         event_producer=mock_event_producer,
         lock_factory=mock_lock_factory,
         config_provider=mock_config_provider,
@@ -326,7 +325,6 @@ def coordinator_without_routes(
     coordinator = RouteCoordinator(
         valkey_schedule=mock_valkey_schedule,
         deployment_repository=mock_deployment_repository,
-        deployment_ops=MagicMock(),
         event_producer=mock_event_producer,
         lock_factory=mock_lock_factory,
         config_provider=mock_config_provider,
