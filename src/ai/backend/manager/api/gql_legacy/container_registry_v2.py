@@ -9,19 +9,10 @@ import sqlalchemy as sa
 from graphql import Undefined
 
 from ai.backend.common.container_registry import AllowedGroupsModel
-<<<<<<< HEAD
 from ai.backend.logging import BraceStyleAdapter
+from ai.backend.manager.errors.api import InvalidAPIParameters
 from ai.backend.manager.models.container_registry import (
     ContainerRegistryRow,
-=======
-from ai.backend.common.data.entity.container_registry import ContainerRegistryID
-from ai.backend.logging.structured import StructuredLogger
-from ai.backend.manager.api.adapters.container_registry.adapter import ContainerRegistryAdapter
-from ai.backend.manager.errors.api import InvalidAPIParameters
-from ai.backend.manager.models.container_registry.creators import ContainerRegistryCreator
-from ai.backend.manager.models.container_registry.purgers import ContainerRegistryPurger
-from ai.backend.manager.models.container_registry.row import (
->>>>>>> 9ff12c6cd (fix(BA-8122): answer a malformed GraphQL node id with a 400 instead of an internal error (#15257))
     ContainerRegistryValidator,
     ContainerRegistryValidatorArgs,
 )

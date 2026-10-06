@@ -3,11 +3,6 @@
 from __future__ import annotations
 
 from collections.abc import AsyncGenerator
-<<<<<<< HEAD
-from uuid import UUID
-=======
-from typing import Annotated
->>>>>>> 9ff12c6cd (fix(BA-8122): answer a malformed GraphQL node id with a 400 instead of an internal error (#15257))
 
 from strawberry import ID, Info
 from strawberry.relay import PageInfo
@@ -17,16 +12,8 @@ from ai.backend.common.dto.manager.v2.deployment.request import (
     AdminSearchDeploymentsInput,
     ReplaceDeploymentOptionsInput,
 )
-<<<<<<< HEAD
 from ai.backend.common.identifier.deployment import DeploymentID
-from ai.backend.manager.api.gql.base import encode_cursor, resolve_global_id
-=======
-from ai.backend.common.dto.manager.v2.deployment.types import DeploymentScope
-from ai.backend.common.dto.manager.v2.rbac.types import UUIDScope
-from ai.backend.common.exception import UnreachableError
-from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
-from ai.backend.manager.api.gql.base import encode_cursor, parse_uuid, resolve_entity_id
->>>>>>> 9ff12c6cd (fix(BA-8122): answer a malformed GraphQL node id with a 400 instead of an internal error (#15257))
+from ai.backend.manager.api.gql.base import encode_cursor, parse_uuid, resolve_global_id
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     gql_mutation,
@@ -207,8 +194,8 @@ async def my_deployments(
 )  # type: ignore[misc]
 async def deployment(id: ID, info: Info[StrawberryGQLContext]) -> ModelDeployment | None:
     """Get a specific deployment by ID."""
-    deployment_id = resolve_entity_id(id, DeploymentID)
-    node = await info.context.adapters.deployment.get(deployment_id)
+    _, deployment_id = resolve_global_id(id)
+    node = await info.context.adapters.deployment.get(DeploymentID(parse_uuid(deployment_id)))
     return ModelDeployment.from_pydantic(node)
 
 

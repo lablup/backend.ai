@@ -19,13 +19,8 @@ from graphql import Undefined
 from sqlalchemy.engine.row import Row
 
 from ai.backend.common.exception import UserNotFound
-<<<<<<< HEAD
+from ai.backend.manager.api.gql.base import parse_uuid
 from ai.backend.manager.data.permission.types import EntityType, ScopeType
-=======
-from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
-from ai.backend.common.types import AccessKey
-from ai.backend.manager.api.gql.base import resolve_entity_id
->>>>>>> 9ff12c6cd (fix(BA-8122): answer a malformed GraphQL node id with a 400 instead of an internal error (#15257))
 from ai.backend.manager.data.user.types import (
     UserData,
     UserInfoContext,
@@ -204,7 +199,8 @@ class UserNode(graphene.ObjectType):  # type: ignore[misc]
     async def get_node(cls, info: graphene.ResolveInfo, id: str) -> Self:
         graph_ctx: GraphQueryContext = info.context
 
-        user_id = resolve_entity_id(id, UserID)
+        _, raw_user_id = AsyncNode.resolve_global_id(info, id)
+        user_id = parse_uuid(raw_user_id)
         query = sa.select(UserRow).where(UserRow.uuid == user_id)
         async with graph_ctx.db.begin_readonly_session() as db_session:
             user_row = (await db_session.scalars(query)).first()

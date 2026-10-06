@@ -27,12 +27,8 @@ from ai.backend.common.types import (
     DispatchResult,
     ImageID,
 )
-<<<<<<< HEAD
 from ai.backend.logging import BraceStyleAdapter
-=======
-from ai.backend.logging.structured import StructuredLogger
-from ai.backend.manager.api.gql.base import resolve_entity_id
->>>>>>> 9ff12c6cd (fix(BA-8122): answer a malformed GraphQL node id with a 400 instead of an internal error (#15257))
+from ai.backend.manager.api.gql.base import parse_uuid
 from ai.backend.manager.bgtask.tasks.purge_images import (
     PurgeAgentSpec,
     PurgeImagesManifest,
@@ -735,32 +731,14 @@ class ImageNode(graphene.ObjectType):  # type: ignore[misc]
     # TODO: Introduce access control logic considering scope and permission
     async def __resolve_reference(self, info: graphene.ResolveInfo, **kwargs: Any) -> Image:
         ctx: GraphQueryContext = info.context
-<<<<<<< HEAD
         _, image_id = AsyncNode.resolve_global_id(info, self.id)
         action_result = await ctx.processors.image.get_image_by_id.wait_for_complete(
             GetImageByIdAction(
-                image_id=ImageID(UUID(image_id)),
+                image_id=ImageID(parse_uuid(image_id)),
                 image_status=None,
             )
         )
         image_data = action_result.image_with_agent_install_status.image
-=======
-        image_uuid = resolve_entity_id(self.id, ImageID)
-        action_result = await ctx.processors.image.search_with_install_status.run(
-            SearchImagesWithInstallStatusAction(
-                targets=_caller_targets(ctx),
-                searcher=ImageSearcher(
-                    pagination=NoPagination(),
-                    conditions=[
-                        ImageSearchableFields.own.id.filter.equals(
-                            UUIDEqualMatchSpec(value=image_uuid, negated=False)
-                        )
-                    ],
-                ),
-            )
-        )
-        image_data = _single_image(action_result.items, str(image_uuid)).image
->>>>>>> 9ff12c6cd (fix(BA-8122): answer a malformed GraphQL node id with a 400 instead of an internal error (#15257))
         return ImageNode.from_row(ctx, ImageRow.from_dataclass_with_details(image_data))
 
 

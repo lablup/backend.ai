@@ -15,7 +15,6 @@ from graphql_relay.utils import base64, unbase64
 from strawberry.relay import Edge, Node
 from strawberry.types import get_object_definition, has_object_definition
 
-from ai.backend.common.data.entity.types import EntityIdentifier, FieldIdentifier
 from ai.backend.common.data.filter_specs import (
     StringInMatchSpec,
     StringMatchSpec,
@@ -458,29 +457,9 @@ def resolve_global_id(global_id: str) -> tuple[str, str]:
     return type_, id_
 
 
-def resolve_entity_id[TEntityId: EntityIdentifier](
-    global_id: str, id_type: type[TEntityId]
-) -> TEntityId:
-    _, raw_id = resolve_global_id(global_id)
+def parse_uuid(value: str) -> uuid.UUID:
     try:
-        return id_type(UUID(raw_id))
-    except ValueError as e:
-        raise InvalidAPIParameters(f"Invalid id: {global_id}") from e
-
-
-def resolve_field_id[TFieldId: FieldIdentifier](
-    global_id: str, id_type: type[TFieldId]
-) -> TFieldId:
-    _, raw_id = resolve_global_id(global_id)
-    try:
-        return id_type(UUID(raw_id))
-    except ValueError as e:
-        raise InvalidAPIParameters(f"Invalid id: {global_id}") from e
-
-
-def parse_uuid(value: str) -> UUID:
-    try:
-        return UUID(value)
+        return uuid.UUID(value)
     except ValueError as e:
         raise InvalidAPIParameters(f"Invalid id: {value}") from e
 

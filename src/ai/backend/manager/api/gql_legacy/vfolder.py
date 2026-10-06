@@ -25,12 +25,6 @@ from sqlalchemy.engine.row import Row
 from sqlalchemy.orm import joinedload, selectinload
 
 from ai.backend.common.config import ModelDefinition, ModelMetadata
-<<<<<<< HEAD
-=======
-from ai.backend.common.data.entity.project import ProjectEntityType
-from ai.backend.common.data.entity.user import UserEntityType
-from ai.backend.common.data.entity.vfolder import VFolderEntityType, VFolderUUID
->>>>>>> 9ff12c6cd (fix(BA-8122): answer a malformed GraphQL node id with a 400 instead of an internal error (#15257))
 from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.exception import ModelDefinitionValidationError, VFolderNotFound
 from ai.backend.common.types import (
@@ -39,20 +33,13 @@ from ai.backend.common.types import (
     VFolderID,
     VFolderUsageMode,
 )
-<<<<<<< HEAD
 from ai.backend.logging import BraceStyleAdapter
+from ai.backend.manager.api.gql.base import parse_uuid
 from ai.backend.manager.data.permission.types import (
     EntityType as PermissionEntityType,
 )
 from ai.backend.manager.data.permission.types import (
     ScopeType as PermissionScopeType,
-=======
-from ai.backend.logging.structured import StructuredLogger
-from ai.backend.manager.api.gql.base import resolve_entity_id
-from ai.backend.manager.data.entity_share.types import EntityShareStatus
-from ai.backend.manager.data.permission.permission_defs import (
-    VFolderPermission as VFolderRBACPermission,
->>>>>>> 9ff12c6cd (fix(BA-8122): answer a malformed GraphQL node id with a 400 instead of an internal error (#15257))
 )
 from ai.backend.manager.errors.storage import (
     ModelCardParseError,
@@ -307,6 +294,7 @@ class VirtualFolderNode(graphene.ObjectType):  # type: ignore[misc]
         permission: VFolderRBACPermission = VFolderRBACPermission.READ_ATTRIBUTE,
     ) -> Self | None:
         graph_ctx: GraphQueryContext = info.context
+        _, vfolder_row_id = AsyncNode.resolve_global_id(info, id)
         query = sa.select(VFolderRow).options(
             joinedload(VFolderRow.user_row),
             joinedload(VFolderRow.group_row),
@@ -322,8 +310,7 @@ class VirtualFolderNode(graphene.ObjectType):  # type: ignore[misc]
             cond = permission_ctx.query_condition
             if cond is None:
                 return None
-            vfolder_id = resolve_entity_id(id, VFolderUUID)
-            query = query.where(sa.and_(cond, VFolderRow.id == vfolder_id))
+            query = query.where(sa.and_(cond, VFolderRow.id == parse_uuid(vfolder_row_id)))
             async with graph_ctx.db.begin_readonly_session(db_conn) as db_session:
                 vfolder_row = await db_session.scalar(query)
         if vfolder_row is None:
@@ -719,19 +706,19 @@ class ModelCard(graphene.ObjectType):  # type: ignore[misc]
     async def get_node(cls, info: graphene.ResolveInfo, id: str) -> Self | None:
         graph_ctx: GraphQueryContext = info.context
 
-        vfolder_id = resolve_entity_id(id, VFolderUUID)
+        _, vfolder_row_id = AsyncNode.resolve_global_id(info, id)
         async with graph_ctx.db.begin_readonly_session() as db_session:
             vfolder_row = await VFolderRow.get(
-                db_session, vfolder_id, load_user=True, load_group=True
+                db_session, parse_uuid(vfolder_row_id), load_user=True, load_group=True
             )
             if vfolder_row.usage_mode != VFolderUsageMode.MODEL:
                 raise ValueError(
                     f"The vfolder is not model. expect: {VFolderUsageMode.MODEL.value}, got:"
-                    f" {vfolder_row.usage_mode.value}. (id: {vfolder_id})"
+                    f" {vfolder_row.usage_mode.value}. (id: {vfolder_row_id})"
                 )
             if vfolder_row.status in DEAD_VFOLDER_STATUSES:
                 raise ValueError(
-                    f"The vfolder is deleted. (id: {vfolder_id}, status: {vfolder_row.status})"
+                    f"The vfolder is deleted. (id: {vfolder_row_id}, status: {vfolder_row.status})"
                 )
         return await cls.from_row(graph_ctx, vfolder_row)
 

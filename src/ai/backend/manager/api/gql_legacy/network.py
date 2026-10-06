@@ -13,18 +13,10 @@ from graphene.types.datetime import DateTime as GQLDateTime
 from sqlalchemy.exc import NoResultFound
 from sqlalchemy.orm import selectinload
 
-<<<<<<< HEAD
 from ai.backend.common.data.permission.types import RBACElementType
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.permission.types import RBACElementRef
-=======
-from ai.backend.common.data.entity.network import NetworkID
-from ai.backend.common.data.entity.project import ProjectEntityType, ProjectID
-from ai.backend.logging.structured import StructuredLogger
-from ai.backend.manager.actions.types import ActionOperationType
-from ai.backend.manager.data.network.types import NetworkData
 from ai.backend.manager.errors.api import InvalidAPIParameters
->>>>>>> 9ff12c6cd (fix(BA-8122): answer a malformed GraphQL node id with a 400 instead of an internal error (#15257))
 from ai.backend.manager.errors.common import (
     GenericForbidden,
     ObjectNotFound,

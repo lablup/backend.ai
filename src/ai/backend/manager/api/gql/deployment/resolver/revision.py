@@ -14,12 +14,8 @@ from ai.backend.common.dto.manager.v2.deployment.request import (
 from ai.backend.common.dto.manager.v2.deployment.request import (
     AdminSearchRevisionsInput,
 )
-<<<<<<< HEAD
 from ai.backend.common.identifier.deployment_revision import DeploymentRevisionID
-from ai.backend.manager.api.gql.base import encode_cursor, resolve_global_id
-=======
-from ai.backend.manager.api.gql.base import encode_cursor, resolve_field_id
->>>>>>> 9ff12c6cd (fix(BA-8122): answer a malformed GraphQL node id with a 400 instead of an internal error (#15257))
+from ai.backend.manager.api.gql.base import encode_cursor, parse_uuid, resolve_global_id
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     gql_mutation,
@@ -100,8 +96,10 @@ async def revisions(
 )  # type: ignore[misc]
 async def revision(id: ID, info: Info[StrawberryGQLContext]) -> ModelRevision | None:
     """Get a specific revision by ID."""
-    revision_id = resolve_field_id(id, DeploymentRevisionID)
-    node = await info.context.adapters.deployment.get_revision(revision_id)
+    _, revision_id = resolve_global_id(id)
+    node = await info.context.adapters.deployment.get_revision(
+        DeploymentRevisionID(parse_uuid(revision_id))
+    )
     return ModelRevision.from_pydantic(node)
 
 

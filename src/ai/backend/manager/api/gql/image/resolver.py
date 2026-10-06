@@ -6,13 +6,6 @@ This module provides GraphQL query fields for ImageV2.
 
 from __future__ import annotations
 
-<<<<<<< HEAD
-import uuid
-from uuid import UUID
-=======
-from typing import Annotated
->>>>>>> 9ff12c6cd (fix(BA-8122): answer a malformed GraphQL node id with a 400 instead of an internal error (#15257))
-
 import strawberry
 from strawberry import ID, Info
 
@@ -214,13 +207,7 @@ async def admin_image_aliases(
     )
 )  # type: ignore[misc]
 async def image_alias(id: ID, info: Info[StrawberryGQLContext]) -> ImageV2AliasGQL | None:
-<<<<<<< HEAD
-    alias_data = await info.context.data_loaders.image_alias_loader.load(uuid.UUID(id))
-=======
-    alias_data = await info.context.data_loaders.image_alias_loader.load(
-        ImageAliasID(parse_uuid(id))
-    )
->>>>>>> 9ff12c6cd (fix(BA-8122): answer a malformed GraphQL node id with a 400 instead of an internal error (#15257))
+    alias_data = await info.context.data_loaders.image_alias_loader.load(parse_uuid(id))
     if alias_data is None:
         return None
     return alias_data
