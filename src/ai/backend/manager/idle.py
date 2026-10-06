@@ -285,7 +285,7 @@ class IdleCheckerHost:
                 )
                 .select_from(j)
                 .where(
-                    (kernels.c.status.in_(KernelStatus.live_statuses()))
+                    (kernels.c.status == KernelStatus.RUNNING)
                     & (kernels.c.cluster_role == DEFAULT_ROLE)
                     & (kernels.c.session_type != SessionTypes.INFERENCE),
                 )
@@ -982,8 +982,7 @@ class UtilizationIdleChecker(BaseIdleChecker):
         # Get current utilization data from all containers of the session.
         if kernel.cluster_size > 1:
             query = sa.select(kernels.c.id).where(
-                (kernels.c.session_id == session_id)
-                & (kernels.c.status.in_(KernelStatus.live_statuses())),
+                (kernels.c.session_id == session_id) & (kernels.c.status == KernelStatus.RUNNING),
             )
             rows = (await dbconn.execute(query)).fetchall()
             kernel_ids = [k.id for k in rows]
