@@ -13,16 +13,14 @@ depends_on = None
 def upgrade() -> None:
     op.add_column(
         "association_container_registries_groups",
-        sa.Column(
-            "is_image_commit_target", sa.Boolean(), nullable=False, server_default=sa.false()
-        ),
+        sa.Column("is_default", sa.Boolean(), nullable=False, server_default=sa.false()),
     )
     op.create_index(
         "uq_project_image_commit_target",
         "association_container_registries_groups",
         ["group_id"],
         unique=True,
-        postgresql_where=sa.text("is_image_commit_target"),
+        postgresql_where=sa.text("is_default"),
     )
 
 
@@ -30,4 +28,4 @@ def downgrade() -> None:
     op.drop_index(
         "uq_project_image_commit_target", table_name="association_container_registries_groups"
     )
-    op.drop_column("association_container_registries_groups", "is_image_commit_target")
+    op.drop_column("association_container_registries_groups", "is_default")

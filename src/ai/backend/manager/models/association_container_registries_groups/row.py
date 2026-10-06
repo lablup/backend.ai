@@ -24,7 +24,7 @@ class AssociationContainerRegistriesGroupsRow(Base):
             "uq_project_image_commit_target",
             "group_id",
             unique=True,
-            postgresql_where=sa.text("is_image_commit_target"),
+            postgresql_where=sa.text("is_default"),
         ),
         sa.UniqueConstraint("registry_id", "group_id", name="uq_registry_id_group_id"),
     )
@@ -55,6 +55,6 @@ class AssociationContainerRegistriesGroupsRow(Base):
         nullable=False,
     )
 
-    is_image_commit_target: Mapped[bool] = mapped_column(
+    is_default: Mapped[bool] = mapped_column(
         sa.Boolean, nullable=False, default=False, server_default=sa.false()
     )
