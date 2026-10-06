@@ -58,15 +58,7 @@ from ai.backend.manager.models.types import QueryCondition
 from ai.backend.manager.models.user.row import UserRole
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 
-__all__: Sequence[str] = (
-    # table defs
-    "resource_groups",
-    "ResourceGroupOpts",
-    "ResourceGroupRow",
-    "sgroups_for_domains",
-    "sgroups_for_groups",
-    "sgroups_for_keypairs",
-)
+__all__: Sequence[str] = ("ResourceGroupRow",)
 
 
 class ResourceGroupOpts(BackendAISchema):
