@@ -11,7 +11,6 @@ from ai.backend.common.data.entity.image import ImageID
 from ai.backend.common.data.entity.resource_group import ResourceGroupID
 from ai.backend.common.data.entity.resource_slot import ResourceSlotName
 from ai.backend.common.data.entity.user import UserID
-from ai.backend.common.defs import RESERVED_VFOLDER_PATTERNS, RESERVED_VFOLDERS
 from ai.backend.common.events.dispatcher import EventProducer
 from ai.backend.common.events.event_types.kernel.types import KernelLifecycleEventReason
 from ai.backend.common.events.event_types.session.broadcast import SchedulingBroadcastEvent
@@ -42,6 +41,7 @@ from ai.backend.manager.data.session.spec import (
     SessionSpec,
 )
 from ai.backend.manager.data.session.types import SessionStatus
+from ai.backend.manager.data.vfolder.types import verify_vfolder_name
 from ai.backend.manager.errors.common import InternalServerError, RejectedByHook
 from ai.backend.manager.errors.image import ImageNotFound
 from ai.backend.manager.metrics.scheduler import (
@@ -670,7 +670,7 @@ class SchedulingController:
                 alias_name = alias_name.replace("/home/work/", "")
             if alias_name == "":
                 raise InvalidAPIParameters("Alias name cannot be empty.")
-            if not _verify_vfolder_name(alias_name):
+            if not verify_vfolder_name(alias_name):
                 raise InvalidAPIParameters(str(alias_name) + " is reserved for internal path.")
             if alias_name in original_refs:
                 raise InvalidAPIParameters(
@@ -691,12 +691,3 @@ class SchedulingController:
         if user is None:
             raise InvalidAPIParameters("User context is required for image validation.")
         await self._repository.check_available_image(spec.image_id, user.domain_name, user.user_id)
-
-
-def _verify_vfolder_name(folder: str) -> bool:
-    if folder in RESERVED_VFOLDERS:
-        return False
-    for pattern in RESERVED_VFOLDER_PATTERNS:
-        if pattern.match(folder):
-            return False
-    return True

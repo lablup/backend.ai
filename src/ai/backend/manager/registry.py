@@ -51,7 +51,6 @@ from ai.backend.common.data.entity.resource_slot import ResourceSlotName
 from ai.backend.common.data.entity.session import SessionID
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.entity.vfolder import VFolderUUID
-from ai.backend.common.defs import verify_vfolder_name
 from ai.backend.common.defs.session import JOB_PRIORITY_DEFAULT, SESSION_PRIORITY_DEFAULT
 from ai.backend.common.docker import ImageRef, LabelName
 from ai.backend.common.dto.agent.response import (
@@ -125,6 +124,7 @@ from ai.backend.manager.data.session.options import (
     ResourceOpts,
 )
 from ai.backend.manager.data.session.types import SessionStatus
+from ai.backend.manager.data.vfolder.types import verify_vfolder_name
 from ai.backend.manager.models.agent.row import AgentRow, agents
 from ai.backend.manager.models.domain.row import domains
 from ai.backend.manager.models.endpoint.row import EndpointRow

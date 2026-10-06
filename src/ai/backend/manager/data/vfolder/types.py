@@ -10,6 +10,7 @@ from ai.backend.common.data.entity.types import EntityData, EntityIdentifier, Fi
 from ai.backend.common.data.entity.vfolder import VFolderUUID
 from ai.backend.common.data.entity.vfolder_mount_policy import VFolderMountPolicyID
 from ai.backend.common.data.user.types import UserRole
+from ai.backend.common.defs import RESERVED_VFOLDER_PATTERNS, RESERVED_VFOLDERS
 from ai.backend.common.dto.manager.field import (
     VFolderOperationStatusField,
     VFolderOwnershipTypeField,
@@ -24,6 +25,15 @@ from ai.backend.common.types import (
     VFolderUsageMode,
 )
 from ai.backend.manager.errors.resource import DataTransformationFailed
+
+
+def verify_vfolder_name(folder: str) -> bool:
+    if folder in RESERVED_VFOLDERS:
+        return False
+    for pattern in RESERVED_VFOLDER_PATTERNS:
+        if pattern.match(folder):
+            return False
+    return True
 
 
 class VFolderOwnershipType(CIStrEnum):
