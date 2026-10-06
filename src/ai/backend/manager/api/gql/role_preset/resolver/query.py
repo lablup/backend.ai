@@ -2,7 +2,11 @@
 
 from __future__ import annotations
 
+<<<<<<< HEAD
 from uuid import UUID
+=======
+from typing import Annotated
+>>>>>>> 9ff12c6cd (fix(BA-8122): answer a malformed GraphQL node id with a 400 instead of an internal error (#15257))
 
 from strawberry import ID, Info
 from strawberry.relay import PageInfo
@@ -12,8 +16,13 @@ from ai.backend.common.dto.manager.v2.role_preset.request import (
     RolePresetOrder,
     SearchRolePresetsInput,
 )
+<<<<<<< HEAD
 from ai.backend.common.identifier.role_preset import RolePresetID
 from ai.backend.manager.api.gql.base import encode_cursor
+=======
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
+from ai.backend.manager.api.gql.base import encode_cursor, parse_uuid
+>>>>>>> 9ff12c6cd (fix(BA-8122): answer a malformed GraphQL node id with a 400 instead of an internal error (#15257))
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     gql_root_field,
@@ -40,7 +49,7 @@ async def admin_role_preset(
     id: ID,
 ) -> RolePresetGQL | None:
     check_admin_only()
-    node = await info.context.adapters.role_preset.get(RolePresetID(UUID(str(id))))
+    node = await info.context.adapters.role_preset.get(RolePresetID(parse_uuid(id)))
     return RolePresetGQL.from_pydantic(node)
 
 

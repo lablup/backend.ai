@@ -17,6 +17,7 @@ from ai.backend.common.dto.manager.v2.artifact.request import (
 )
 from ai.backend.manager.api.gql.base import (
     encode_cursor,
+    parse_uuid,
 )
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
@@ -145,7 +146,7 @@ async def artifacts(
     )
 )  # type: ignore[misc]
 async def artifact(id: ID, info: Info[StrawberryGQLContext]) -> Artifact | None:
-    artifact_id = UUID(id)
+    artifact_id = parse_uuid(id)
     artifact_node = await info.context.adapters.artifact.get(artifact_id)
 
     data_loaders = info.context.data_loaders
@@ -220,7 +221,7 @@ async def artifact_revisions(
     )
 )  # type: ignore[misc]
 async def artifact_revision(id: ID, info: Info[StrawberryGQLContext]) -> ArtifactRevision | None:
-    revision_node = await info.context.adapters.artifact.get_revision(UUID(id))
+    revision_node = await info.context.adapters.artifact.get_revision(parse_uuid(id))
     return make_artifact_revision_from_node(revision_node)
 
 
@@ -512,7 +513,7 @@ async def restore_artifacts(
     input: RestoreArtifactsInput, info: Info[StrawberryGQLContext]
 ) -> RestoreArtifactsPayload | None:
     artifact_node_list = await info.context.adapters.artifact.restore(
-        artifact_ids=[UUID(id) for id in input.artifact_ids],
+        artifact_ids=[parse_uuid(id) for id in input.artifact_ids],
     )
 
     data_loaders = info.context.data_loaders

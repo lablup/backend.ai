@@ -11,10 +11,23 @@ import sqlalchemy as sa
 from graphql import Undefined, UndefinedType
 
 from ai.backend.common.container_registry import AllowedGroupsModel, ContainerRegistryType
+<<<<<<< HEAD
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.container_registry.types import ContainerRegistryData
 from ai.backend.manager.defs import PASSWORD_PLACEHOLDER
 from ai.backend.manager.models.container_registry import (
+=======
+from ai.backend.common.data.entity.container_registry import ContainerRegistryID
+from ai.backend.logging.structured import StructuredLogger
+from ai.backend.manager.api.adapters.container_registry.adapter import ContainerRegistryAdapter
+from ai.backend.manager.api.gql.base import resolve_entity_id
+from ai.backend.manager.data.container_registry.types import ContainerRegistryData
+from ai.backend.manager.defs import PASSWORD_PLACEHOLDER
+from ai.backend.manager.errors.api import InvalidAPIParameters
+from ai.backend.manager.models.container_registry.creators import ContainerRegistryCreator
+from ai.backend.manager.models.container_registry.purgers import ContainerRegistryPurger
+from ai.backend.manager.models.container_registry.row import (
+>>>>>>> 9ff12c6cd (fix(BA-8122): answer a malformed GraphQL node id with a 400 instead of an internal error (#15257))
     ContainerRegistryRow,
     ContainerRegistryValidator,
     ContainerRegistryValidatorArgs,
@@ -154,7 +167,7 @@ class ContainerRegistryNode(graphene.ObjectType):  # type: ignore[misc]
     @classmethod
     async def get_node(cls, info: graphene.ResolveInfo, id: str) -> ContainerRegistryNode:
         graph_ctx: GraphQueryContext = info.context
-        _, reg_id = AsyncNode.resolve_global_id(info, id)
+        reg_id = resolve_entity_id(id, ContainerRegistryID)
         select_stmt = sa.select(ContainerRegistryRow).where(ContainerRegistryRow.id == reg_id)
         async with graph_ctx.db.begin_readonly_session() as db_session:
             reg_row = cast(ContainerRegistryRow | None, await db_session.scalar(select_stmt))
@@ -447,7 +460,10 @@ class ModifyContainerRegistryNode(graphene.Mutation):  # type: ignore[misc]
         ctx: GraphQueryContext = info.context
 
         _, _id = AsyncNode.resolve_global_id(info, id)
-        reg_id = uuid.UUID(_id) if _id else uuid.UUID(id)
+        try:
+            reg_id = uuid.UUID(_id) if _id else uuid.UUID(id)
+        except ValueError as e:
+            raise InvalidAPIParameters(f"Invalid id: {id}") from e
 
         action = ModifyContainerRegistryAction(
             updater=Updater(
@@ -504,7 +520,10 @@ class DeleteContainerRegistryNode(graphene.Mutation):  # type: ignore[misc]
         ctx: GraphQueryContext = info.context
 
         _, _id = AsyncNode.resolve_global_id(info, id)
-        reg_id = uuid.UUID(_id) if _id else uuid.UUID(id)
+        try:
+            reg_id = uuid.UUID(_id) if _id else uuid.UUID(id)
+        except ValueError as e:
+            raise InvalidAPIParameters(f"Invalid id: {id}") from e
 
         result = (
             await ctx.processors.container_registry.delete_container_registry.wait_for_complete(

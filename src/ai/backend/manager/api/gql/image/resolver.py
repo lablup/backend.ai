@@ -6,8 +6,12 @@ This module provides GraphQL query fields for ImageV2.
 
 from __future__ import annotations
 
+<<<<<<< HEAD
 import uuid
 from uuid import UUID
+=======
+from typing import Annotated
+>>>>>>> 9ff12c6cd (fix(BA-8122): answer a malformed GraphQL node id with a 400 instead of an internal error (#15257))
 
 import strawberry
 from strawberry import ID, Info
@@ -17,7 +21,7 @@ from ai.backend.common.dto.manager.v2.image.request import (
     AdminSearchImagesInput,
 )
 from ai.backend.common.types import ImageID
-from ai.backend.manager.api.gql.base import encode_cursor
+from ai.backend.manager.api.gql.base import encode_cursor, parse_uuid
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     gql_root_field,
@@ -98,7 +102,7 @@ async def admin_images_v2(
     )
 )  # type: ignore[misc]
 async def image_v2(id: ID, info: Info[StrawberryGQLContext]) -> ImageV2GQL | None:
-    image_data = await info.context.data_loaders.image_loader.load(ImageID(UUID(id)))
+    image_data = await info.context.data_loaders.image_loader.load(ImageID(parse_uuid(id)))
     if image_data is None:
         return None
     return image_data
@@ -210,7 +214,13 @@ async def admin_image_aliases(
     )
 )  # type: ignore[misc]
 async def image_alias(id: ID, info: Info[StrawberryGQLContext]) -> ImageV2AliasGQL | None:
+<<<<<<< HEAD
     alias_data = await info.context.data_loaders.image_alias_loader.load(uuid.UUID(id))
+=======
+    alias_data = await info.context.data_loaders.image_alias_loader.load(
+        ImageAliasID(parse_uuid(id))
+    )
+>>>>>>> 9ff12c6cd (fix(BA-8122): answer a malformed GraphQL node id with a 400 instead of an internal error (#15257))
     if alias_data is None:
         return None
     return alias_data

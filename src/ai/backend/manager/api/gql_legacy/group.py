@@ -24,9 +24,25 @@ from ai.backend.common.exception import (
     InvalidAPIParameters,
 )
 from ai.backend.common.types import ResourceSlot, VFolderHostPermissionMap
+<<<<<<< HEAD
 from ai.backend.manager.data.group.types import GroupData
 from ai.backend.manager.models.group import (
     GroupRow,
+=======
+from ai.backend.manager.api.adapters.project.adapter import ProjectAdapter
+from ai.backend.manager.api.gql.base import resolve_entity_id
+from ai.backend.manager.data.container_registry.types import ImageCommitRegistry
+from ai.backend.manager.data.permission.permission_defs import ProjectPermission
+from ai.backend.manager.data.project.types import ProjectData
+from ai.backend.manager.dto.container_registry_request import ImageCommitRegistryReq
+from ai.backend.manager.errors.resource import InvalidUserUpdateMode
+from ai.backend.manager.models.minilang import EnumFieldItem, FieldSpecItem, OrderSpecItem
+from ai.backend.manager.models.minilang.ordering import QueryOrderParser
+from ai.backend.manager.models.minilang.queryfilter import QueryFilterParser
+from ai.backend.manager.models.project.creators import ProjectCreator
+from ai.backend.manager.models.project.row import (
+    ProjectRow,
+>>>>>>> 9ff12c6cd (fix(BA-8122): answer a malformed GraphQL node id with a 400 instead of an internal error (#15257))
     ProjectType,
     get_permission_ctx,
     groups,
@@ -250,8 +266,13 @@ class GroupNode(graphene.ObjectType):  # type: ignore[misc]
     @classmethod
     async def get_node(cls, info: graphene.ResolveInfo, id: str) -> Self:
         graph_ctx: GraphQueryContext = info.context
+<<<<<<< HEAD
         _, group_id = AsyncNode.resolve_global_id(info, id)
         query = sa.select(GroupRow).where(GroupRow.id == group_id)
+=======
+        group_id = resolve_entity_id(id, ProjectID)
+        query = sa.select(ProjectRow).where(ProjectRow.id == group_id)
+>>>>>>> 9ff12c6cd (fix(BA-8122): answer a malformed GraphQL node id with a 400 instead of an internal error (#15257))
         async with graph_ctx.db.begin_readonly_session() as db_session:
             group_row = (await db_session.scalars(query)).first()
             if group_row is None:

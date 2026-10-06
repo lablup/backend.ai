@@ -2,18 +2,18 @@
 
 from __future__ import annotations
 
-from uuid import UUID
-
 from strawberry import ID, Info
 from strawberry.relay import PageInfo
 
+from ai.backend.common.data.entity.deployment import DeploymentID
+from ai.backend.common.data.entity.replica import ReplicaID
 from ai.backend.common.data.model_deployment.types import (
     RouteTrafficStatus as RouteTrafficStatusCommon,
 )
 from ai.backend.common.dto.manager.v2.deployment.request import (
     SearchRoutesInput,
 )
-from ai.backend.manager.api.gql.base import encode_cursor, resolve_global_id
+from ai.backend.manager.api.gql.base import encode_cursor, resolve_entity_id, resolve_field_id
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     gql_mutation,
@@ -54,11 +54,15 @@ async def routes(
     offset: int | None = None,
 ) -> RouteConnection | None:
     """List routes for a deployment with optional filters."""
-    _, endpoint_id = resolve_global_id(deployment_id)
+    endpoint_id = resolve_entity_id(deployment_id, DeploymentID)
     pydantic_filter = filter.to_pydantic() if filter else None
     pydantic_order = [o.to_pydantic() for o in order_by] if order_by else None
     payload = await info.context.adapters.deployment.search_routes(
+<<<<<<< HEAD
         scope=RouteSearchScope(deployment_id=UUID(endpoint_id)),
+=======
+        scope=RouteOperationScope(deployment_id=endpoint_id),
+>>>>>>> 9ff12c6cd (fix(BA-8122): answer a malformed GraphQL node id with a 400 instead of an internal error (#15257))
         input=SearchRoutesInput(
             filter=pydantic_filter,
             order=pydantic_order,
@@ -89,8 +93,8 @@ async def routes(
 )  # type: ignore[misc]
 async def route(id: ID, info: Info[StrawberryGQLContext]) -> Route | None:
     """Get a specific route by ID."""
-    _, route_id = resolve_global_id(id)
-    return await info.context.data_loaders.route_loader.load(UUID(route_id))
+    route_id = resolve_field_id(id, ReplicaID)
+    return await info.context.data_loaders.route_loader.load(route_id)
 
 
 # Mutation resolvers
@@ -104,9 +108,9 @@ async def update_route_traffic_status(
     info: Info[StrawberryGQLContext],
 ) -> UpdateRouteTrafficStatusPayloadGQL | None:
     """Update route traffic status (ACTIVE/INACTIVE)."""
-    _, route_id = resolve_global_id(input.route_id)
+    route_id = resolve_field_id(input.route_id, ReplicaID)
     route_node = await info.context.adapters.deployment.update_route_traffic(
-        UUID(route_id),
+        route_id,
         RouteTrafficStatusCommon(input.traffic_status.value),  # type: ignore[attr-defined]
     )
     return UpdateRouteTrafficStatusPayloadGQL(

@@ -2626,7 +2626,10 @@ class Query(graphene.ObjectType):  # type: ignore[misc]
             result = result[offset:]
         if after is not None:
             _, raw_session_id = AsyncNode.resolve_global_id(info, after)
-            target_id = uuid.UUID(raw_session_id)
+            try:
+                target_id = uuid.UUID(raw_session_id)
+            except ValueError as e:
+                raise InvalidAPIParameters(f"Invalid cursor value: {after}") from e
             idx = 0
             for idx, session_node in enumerate(result):
                 if session_node.id == target_id:
@@ -2638,7 +2641,10 @@ class Query(graphene.ObjectType):  # type: ignore[misc]
             page_size = first
         if before is not None:
             _, raw_session_id = AsyncNode.resolve_global_id(info, before)
-            target_id = uuid.UUID(raw_session_id)
+            try:
+                target_id = uuid.UUID(raw_session_id)
+            except ValueError as e:
+                raise InvalidAPIParameters(f"Invalid cursor value: {before}") from e
             idx = len(result)
             for idx, session_node in enumerate(result):
                 if session_node.id == target_id:

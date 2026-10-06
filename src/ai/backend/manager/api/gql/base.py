@@ -15,6 +15,7 @@ from graphql_relay.utils import base64, unbase64
 from strawberry.relay import Edge, Node
 from strawberry.types import get_object_definition, has_object_definition
 
+from ai.backend.common.data.entity.types import EntityIdentifier, FieldIdentifier
 from ai.backend.common.data.filter_specs import (
     StringInMatchSpec,
     StringMatchSpec,
@@ -38,6 +39,7 @@ from ai.backend.manager.api.gql.decorators import (
     gql_pydantic_input,
 )
 from ai.backend.manager.data.common.types import SearchResult
+from ai.backend.manager.errors.api import InvalidAPIParameters
 
 if TYPE_CHECKING:
     from ai.backend.manager.repositories.base import QueryCondition
@@ -454,6 +456,33 @@ def resolve_global_id(global_id: str) -> tuple[str, str]:
     unbased_global_id = unbase64(global_id)
     type_, _, id_ = unbased_global_id.partition(":")
     return type_, id_
+
+
+def resolve_entity_id[TEntityId: EntityIdentifier](
+    global_id: str, id_type: type[TEntityId]
+) -> TEntityId:
+    _, raw_id = resolve_global_id(global_id)
+    try:
+        return id_type(UUID(raw_id))
+    except ValueError as e:
+        raise InvalidAPIParameters(f"Invalid id: {global_id}") from e
+
+
+def resolve_field_id[TFieldId: FieldIdentifier](
+    global_id: str, id_type: type[TFieldId]
+) -> TFieldId:
+    _, raw_id = resolve_global_id(global_id)
+    try:
+        return id_type(UUID(raw_id))
+    except ValueError as e:
+        raise InvalidAPIParameters(f"Invalid id: {global_id}") from e
+
+
+def parse_uuid(value: str) -> UUID:
+    try:
+        return UUID(value)
+    except ValueError as e:
+        raise InvalidAPIParameters(f"Invalid id: {value}") from e
 
 
 def build_pagination_options(
