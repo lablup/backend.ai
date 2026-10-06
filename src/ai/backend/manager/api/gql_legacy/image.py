@@ -42,6 +42,7 @@ from ai.backend.manager.data.image.types import (
     ImageWithAgentInstallStatus,
 )
 from ai.backend.manager.defs import DEFAULT_IMAGE_ARCH
+from ai.backend.manager.errors.api import InvalidCursor
 from ai.backend.manager.models.image import (
     ImageIdentifier,
     ImageLoadFilter,
@@ -128,6 +129,18 @@ __all__ = (
     "RescanImages",
     "UntagImageFromRegistry",
 )
+
+
+def _validate_cursor(info: graphene.ResolveInfo, cursor: str | None) -> None:
+    """A cursor names an `images.id` row, so one that is not a UUID cannot reach the bind."""
+    if cursor is None:
+        return
+    _, row_id = AsyncNode.resolve_global_id(info, cursor)
+    try:
+        UUID(row_id)
+    except (ValueError, AttributeError, TypeError) as e:
+        raise InvalidCursor(f"Invalid cursor: {cursor}") from e
+
 
 _queryfilter_fieldspec: FieldSpecType = {
     "id": ("id", None),
@@ -669,6 +682,8 @@ class ImageNode(graphene.ObjectType):  # type: ignore[misc]
     ) -> ConnectionResolverResult[Self]:
         if filter_by_statuses is None:
             filter_by_statuses = [ImageStatus.ALIVE]
+        _validate_cursor(info, after)
+        _validate_cursor(info, before)
         graph_ctx: GraphQueryContext = info.context
         _filter_arg = (
             FilterExprArg(filter_expr, QueryFilterParser(_queryfilter_fieldspec))
