@@ -24,7 +24,9 @@ class HandlerOptionsInfo(BaseResponseModel):
 class HandlerOptionsEntryInfo(HandlerOptionsInfo):
     """A named deployment handler's scheduler policy snapshot."""
 
-    handler_name: str = Field(description="Deployment handler identifier.")
+    handler_name: str = Field(
+        description="Handler identifier matching `SessionLifecycleHandler.name()`."
+    )
 
 
 class DeploymentHandlerOptionsInfo(BaseResponseModel):

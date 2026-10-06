@@ -9014,7 +9014,7 @@ type HandlerOptionsEntryInfo
   """
   maxRetryCount: Int
 
-  """Deployment handler identifier."""
+  """Handler identifier matching `SessionLifecycleHandler.name()`."""
   handlerName: String!
 }
 
