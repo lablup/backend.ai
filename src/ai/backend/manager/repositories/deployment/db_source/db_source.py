@@ -1469,6 +1469,9 @@ class DeploymentDBSource:
         self,
         resource_group: set[str],
     ) -> Mapping[str, ResourceGroupProxyTarget | None]:
+        if not resource_group:
+            return {}
+
         async with self._begin_readonly_session_read_committed() as db_sess:
             query = (
                 sa.select(
