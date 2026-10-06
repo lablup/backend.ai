@@ -30,6 +30,7 @@ from ai.backend.common.types import (
     ImageID,
 )
 from ai.backend.logging.structured import StructuredLogger
+from ai.backend.manager.api.gql.base import resolve_entity_id
 from ai.backend.manager.bgtask.tasks.purge_images import (
     PurgeAgentSpec,
     PurgeImagesManifest,
@@ -778,7 +779,7 @@ class ImageNode(graphene.ObjectType):  # type: ignore[misc]
     # TODO: Introduce access control logic considering scope and permission
     async def __resolve_reference(self, info: graphene.ResolveInfo, **kwargs: Any) -> Image:
         ctx: GraphQueryContext = info.context
-        _, image_id = AsyncNode.resolve_global_id(info, self.id)
+        image_uuid = resolve_entity_id(self.id, ImageID)
         action_result = await ctx.processors.image.search_with_install_status.run(
             SearchImagesWithInstallStatusAction(
                 targets=_caller_targets(ctx),
@@ -786,13 +787,13 @@ class ImageNode(graphene.ObjectType):  # type: ignore[misc]
                     pagination=NoPagination(),
                     conditions=[
                         ImageSearchableFields.own.id.filter.equals(
-                            UUIDEqualMatchSpec(value=UUID(image_id), negated=False)
+                            UUIDEqualMatchSpec(value=image_uuid, negated=False)
                         )
                     ],
                 ),
             )
         )
-        image_data = _single_image(action_result.items, image_id).image
+        image_data = _single_image(action_result.items, str(image_uuid)).image
         return ImageNode.from_row(ctx, ImageRow.from_dataclass_with_details(image_data))
 
 
