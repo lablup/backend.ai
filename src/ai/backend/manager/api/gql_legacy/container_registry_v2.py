@@ -12,7 +12,14 @@ from ai.backend.common.container_registry import AllowedGroupsModel
 from ai.backend.common.data.entity.container_registry import ContainerRegistryID
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.api.adapters.container_registry.adapter import ContainerRegistryAdapter
+<<<<<<< HEAD
 from ai.backend.manager.models.container_registry import (
+=======
+from ai.backend.manager.errors.api import InvalidAPIParameters
+from ai.backend.manager.models.container_registry.creators import ContainerRegistryCreator
+from ai.backend.manager.models.container_registry.purgers import ContainerRegistryPurger
+from ai.backend.manager.models.container_registry.row import (
+>>>>>>> 9ff12c6c (fix(BA-8122): answer a malformed GraphQL node id with a 400 instead of an internal error (#15257))
     ContainerRegistryValidator,
     ContainerRegistryValidatorArgs,
 )
@@ -201,7 +208,10 @@ class ModifyContainerRegistryNodeV2(graphene.Mutation):  # type: ignore[misc]
         ctx: GraphQueryContext = info.context
 
         _, _id = AsyncNode.resolve_global_id(info, id)
-        reg_id = uuid.UUID(_id) if _id else uuid.UUID(id)
+        try:
+            reg_id = uuid.UUID(_id) if _id else uuid.UUID(id)
+        except ValueError as e:
+            raise InvalidAPIParameters(f"Invalid id: {id}") from e
 
         allowed_groups = props.to_allowed_groups()
         if allowed_groups is not None:
@@ -243,7 +253,10 @@ class DeleteContainerRegistryNodeV2(graphene.Mutation):  # type: ignore[misc]
         ctx: GraphQueryContext = info.context
 
         _, _id = AsyncNode.resolve_global_id(info, id)
-        reg_id = uuid.UUID(_id) if _id else uuid.UUID(id)
+        try:
+            reg_id = uuid.UUID(_id) if _id else uuid.UUID(id)
+        except ValueError as e:
+            raise InvalidAPIParameters(f"Invalid id: {id}") from e
 
         result = await ctx.processors.container_registry.delete_container_registry.run(
             DeleteContainerRegistryAction(

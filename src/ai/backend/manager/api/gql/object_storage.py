@@ -46,7 +46,12 @@ from ai.backend.common.dto.manager.v2.object_storage.response import (
 from ai.backend.common.dto.manager.v2.object_storage.response import (
     UpdateObjectStoragePayload as UpdateObjectStoragePayloadDTO,
 )
+<<<<<<< HEAD
 from ai.backend.manager.api.gql.base import encode_cursor
+=======
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
+from ai.backend.manager.api.gql.base import encode_cursor, parse_uuid
+>>>>>>> 9ff12c6c (fix(BA-8122): answer a malformed GraphQL node id with a 400 instead of an internal error (#15257))
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     gql_added_field,
@@ -149,7 +154,7 @@ class ObjectStorageConnection(Connection[ObjectStorage]):
     BackendAIGQLMeta(added_version="25.14.0", description="Get an object storage by ID")
 )  # type: ignore[misc]
 async def object_storage(id: ID, info: Info[StrawberryGQLContext]) -> ObjectStorage | None:
-    node = await info.context.adapters.object_storage.get(UUID(id))
+    node = await info.context.adapters.object_storage.get(parse_uuid(id))
     return ObjectStorage.from_pydantic(node, extra={"region": node.region or ""})
 
 
