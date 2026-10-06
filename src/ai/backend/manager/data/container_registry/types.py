@@ -1,8 +1,10 @@
+import uuid
 from dataclasses import dataclass
 from typing import Any, override
 
 from ai.backend.common.container_registry import ContainerRegistryType
 from ai.backend.common.data.entity.container_registry import ContainerRegistryID
+from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.types import EntityData
 
 
@@ -42,3 +44,11 @@ class ImageCommitRegistry:
 
     def to_json(self) -> dict[str, str | None]:
         return {"registry": self.registry_name, "project": self.project_name}
+
+
+@dataclass(frozen=True)
+class AssociationContainerRegistriesGroupsData:
+    id: uuid.UUID
+    group_id: ProjectID
+    registry_id: ContainerRegistryID
+    is_default: bool
