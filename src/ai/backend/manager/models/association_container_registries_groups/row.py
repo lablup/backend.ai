@@ -20,7 +20,12 @@ __all__: Sequence[str] = ("AssociationContainerRegistriesGroupsRow",)
 class AssociationContainerRegistriesGroupsRow(Base):
     __tablename__ = "association_container_registries_groups"
     __table_args__ = (
-        # constraint
+        sa.Index(
+            "uq_project_image_commit_target",
+            "group_id",
+            unique=True,
+            postgresql_where=sa.text("is_image_commit_target"),
+        ),
         sa.UniqueConstraint("registry_id", "group_id", name="uq_registry_id_group_id"),
     )
 
@@ -48,4 +53,8 @@ class AssociationContainerRegistriesGroupsRow(Base):
             name="fk_association_container_registries_groups_group_id",
         ),
         nullable=False,
+    )
+
+    is_image_commit_target: Mapped[bool] = mapped_column(
+        sa.Boolean, nullable=False, default=False, server_default=sa.false()
     )
