@@ -366,6 +366,11 @@ def fixture() -> None:
     """Command set for managing fixtures."""
 
 
+@main.group(cls=LazyGroup, import_name="ai.backend.manager.cli.seed:cli")
+def seed() -> None:
+    """Command set for applying seed files."""
+
+
 @main.group(cls=LazyGroup, import_name="ai.backend.manager.cli.api:cli")
 def api() -> None:
     """Command set for API schema inspection and manipulation."""

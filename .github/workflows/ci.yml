@@ -41,6 +41,7 @@ jobs:
     outputs:
       code: ${{ steps.filter.outputs.code }}
       models: ${{ steps.filter.outputs.models }}
+      seeds: ${{ steps.filter.outputs.seeds }}
       release: ${{ steps.release.outputs.release }}
       base-ref: ${{ steps.base.outputs.ref }}
     steps:
@@ -75,6 +76,8 @@ jobs:
             - '.github/scripts/plan-ci-targets.py'
           models:
             - 'src/ai/backend/manager/models/**'
+          seeds:
+            - 'seeds/**'
 
   # A tag and a release PR check every target; anything else only what changed
   # since `base-ref`. A fork PR gets no problem-matcher annotations. Only a push to
@@ -229,6 +232,26 @@ jobs:
         || (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/'))
       )
     uses: ./.github/workflows/ci-alembic.yml
+
+  # The seed files are data no test reads, and what they must state follows the entity
+  # types the code defines, so a change to either runs the check.
+  seed:
+    # `contents: read`: only reads the seed files
+    # `actions: read`: `ci-seed.yml` declares it
+    permissions:
+      contents: read
+      actions: read
+    needs: detect-changes
+    if: |
+      always()
+      && (
+        needs.detect-changes.result != 'success'
+        || needs.detect-changes.outputs.code == 'true'
+        || needs.detect-changes.outputs.seeds == 'true'
+        || startsWith(github.ref, 'refs/tags/')
+        || needs.detect-changes.outputs.release == 'true'
+      )
+    uses: ./.github/workflows/ci-seed.yml
 
   check-alembic-migrations:
     needs: [alembic]
@@ -392,7 +415,7 @@ jobs:
       actions: read
       id-token: write
       attestations: write
-    needs: [determine-release-grade, lint-and-typecheck, test-unit-gate, test-component-gate, test-integration-gate, check-alembic-migrations]
+    needs: [determine-release-grade, lint-and-typecheck, test-unit-gate, test-component-gate, test-integration-gate, check-alembic-migrations, seed]
     if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
     uses: ./.github/workflows/ci-release.yml
     with:
