@@ -65,6 +65,9 @@ from ai.backend.manager.sokovan.scheduler.types import ScheduleType
 from ai.backend.manager.sokovan.scheduling_controller.preparers.resources.compute_kernel_resources_rule import (
     ComputeKernelResourcesRule,
 )
+from ai.backend.manager.sokovan.scheduling_controller.preparers.resources.drop_zero_resource_slots_rule import (
+    DropZeroResourceSlotsRule,
+)
 from ai.backend.manager.sokovan.scheduling_controller.preparers.resources.expand_kernel_groups_rule import (
     ExpandKernelGroupsRule,
 )
@@ -198,6 +201,7 @@ class SchedulingController:
             resource_rules=(
                 MergeResourceGroupDefaultsRule(),
                 ComputeKernelResourcesRule(),
+                DropZeroResourceSlotsRule(),
                 ExpandKernelGroupsRule(),
             ),
             spec_rules=(

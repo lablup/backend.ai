@@ -24,7 +24,7 @@ directive @join__unionMember(graph: join__Graph!, member: String!) repeatable on
 directive @link(url: String, as: String, for: link__Purpose, import: [link__Import]) repeatable on SCHEMA
 
 """
-Added in 26.4.4. Input for accepting a role invitation. Deprecated since 26.9.0. Use role assignments.
+Added in 26.4.4. Input for accepting a role invitation. Deprecated since 26.10.0. Use role assignments.
 """
 input AcceptRoleInvitationInput
   @join__type(graph: STRAWBERRY)
@@ -40,7 +40,7 @@ type AccessToken implements Node
   """The Globally Unique ID of this object"""
   id: ID!
 
-  """Added in 26.9.0. UUID of the access token."""
+  """Added in 26.10.0. UUID of the access token."""
   fieldId: UUID!
 
   """The access token."""
@@ -83,7 +83,7 @@ input AccessTokenFilter
   expiresAt: DateTimeFilter = null
   createdAt: DateTimeFilter = null
 
-  """Added in 26.9.0. Filter by access token ID."""
+  """Added in 26.10.0. Filter by access token ID."""
   fieldId: UUIDFilter = null
   AND: [AccessTokenFilter!] = null
   OR: [AccessTokenFilter!] = null
@@ -291,7 +291,7 @@ type AdminGetSSHKeypairPayload
 }
 
 """
-Added in 26.9.0. What one re-encryption pass wrote, and what the columns hold afterwards.
+Added in 26.10.0. What one re-encryption pass wrote, and what the columns hold afterwards.
 """
 type AdminReencryptSecretsPayload
   @join__type(graph: STRAWBERRY)
@@ -343,7 +343,7 @@ type AdminRegisterSSHKeypairPayload
 }
 
 """
-Added in 26.9.0. Which key each stored secret sits on, across every encrypted column.
+Added in 26.10.0. Which key each stored secret sits on, across every encrypted column.
 """
 type AdminSecretStatusPayload
   @join__type(graph: STRAWBERRY)
@@ -456,7 +456,7 @@ input AgentFilter
   schedulable: Boolean = null
   scalingGroup: StringFilter = null
 
-  """Added in 26.9.0. Select entities by the labels on them."""
+  """Added in 26.10.0. Select entities by the labels on them."""
   labels: EntityLabelNestedFilter = null
   AND: [AgentFilter!] = null
   OR: [AgentFilter!] = null
@@ -605,7 +605,7 @@ type AgentResourceSlot implements Node
   """The Globally Unique ID of this object"""
   id: ID!
 
-  """Added in 26.9.0. UUID of the agent resource."""
+  """Added in 26.10.0. UUID of the agent resource."""
   fieldId: UUID!
 
   """Resource slot identifier (e.g., 'cpu', 'mem', 'cuda.device')."""
@@ -766,7 +766,7 @@ type AgentSystemInfo
 }
 
 """
-Added in 26.9.0. Uses narrowing an agent query; every id is AND-ed. The caller must be able to read each listed entity, or the request is refused. Only agents the caller can read are returned, even when a listed entity is tied to others.
+Added in 26.10.0. Uses narrowing an agent query; every id is AND-ed. The caller must be able to read each listed entity, or the request is refused. Only agents the caller can read are returned, even when a listed entity is tied to others.
 """
 input AgentUsage
   @join__type(graph: STRAWBERRY)
@@ -775,7 +775,7 @@ input AgentUsage
   usedBy: AgentUsedBy = null
 }
 
-"""Added in 26.9.0. Entities whose use of an agent narrows the read."""
+"""Added in 26.10.0. Entities whose use of an agent narrows the read."""
 input AgentUsedBy
   @join__type(graph: STRAWBERRY)
 {
@@ -791,13 +791,13 @@ type AgentV2 implements Node
   """The Globally Unique ID of this object"""
   id: ID!
 
-  """Added in 26.9.0. UUID of the agent."""
+  """Added in 26.10.0. UUID of the agent."""
   entityId: UUID!
 
   """
-  Added in 26.9.0. Agent UUID. The agent's primary key is its name, so rows keyed on the agent carry this instead. Deprecated since 26.9.0. Use entityId.
+  Added in 26.10.0. Agent UUID. The agent's primary key is its name, so rows keyed on the agent carry this instead. Deprecated since 26.10.0. Use entityId.
   """
-  uuid: UUID! @deprecated(reason: "Deprecated since 26.9.0. Use entityId.")
+  uuid: UUID! @deprecated(reason: "Deprecated since 26.10.0. Use entityId.")
 
   """
   Hardware resource capacity, usage, and availability information. Contains capacity (total), used (occupied by sessions), and free (available) resource slots including CPU cores, memory, accelerators (GPUs, TPUs), and other compute resources.
@@ -829,7 +829,7 @@ type AgentV2 implements Node
   """
   scalingGroup: String!
 
-  """Added in 26.9.0. The labels on this agent."""
+  """Added in 26.10.0. The labels on this agent."""
   entityLabels(filter: EntityLabelFilter = null, orderBy: [EntityLabelOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): EntityLabelConnection
 
   """Added in 26.1.0. Load the container count for this agent."""
@@ -969,7 +969,7 @@ type AllowedResourceGroupsPayload
 }
 
 """
-Added in 26.9.0. The merged config for one config name: every fragment visible to the caller, deep-merged in ascending allow-list rank order.
+Added in 26.10.0. The merged config for one config name: every fragment visible to the caller, deep-merged in ascending allow-list rank order.
 """
 type AppConfig
   @join__type(graph: PUBLIC)
@@ -994,7 +994,7 @@ type AppConfigAllowList implements Node
   """The Globally Unique ID of this object"""
   id: ID!
 
-  """Added in 26.9.0. UUID of the app config allow list."""
+  """Added in 26.10.0. UUID of the app config allow list."""
   entityId: UUID!
 
   """The config name this entry permits writes for."""
@@ -1104,7 +1104,7 @@ type AppConfigDefinition implements Node
   """The Globally Unique ID of this object"""
   id: ID!
 
-  """Added in 26.9.0. UUID of the app config definition."""
+  """Added in 26.10.0. UUID of the app config definition."""
   entityId: UUID!
 
   """Registered config name."""
@@ -1201,7 +1201,7 @@ type AppConfigFragment implements Node
   """The Globally Unique ID of this object"""
   id: ID!
 
-  """Added in 26.9.0. UUID of the app config fragment."""
+  """Added in 26.10.0. UUID of the app config fragment."""
   entityId: UUID!
 
   """Config name the fragment belongs to."""
@@ -1315,7 +1315,7 @@ input AppConfigFragmentScopeTypeFilter
 }
 
 """
-Added in 26.9.0. One failed item of a partial bulk fragment upsert, named by its config name — the batch shares one scope, and a rejected insert never had a fragment id.
+Added in 26.10.0. One failed item of a partial bulk fragment upsert, named by its config name — the batch shares one scope, and a rejected insert never had a fragment id.
 """
 type AppConfigFragmentUpsertError
   @join__type(graph: STRAWBERRY)
@@ -1328,7 +1328,7 @@ type AppConfigFragmentUpsertError
 }
 
 """
-Added in 26.9.0. One (config_name, config) pair to upsert at the request's scope.
+Added in 26.10.0. One (config_name, config) pair to upsert at the request's scope.
 """
 input AppConfigFragmentUpsertItem
   @join__type(graph: STRAWBERRY)
@@ -1409,7 +1409,7 @@ type Artifact implements Node
   """The Globally Unique ID of this object"""
   id: ID!
 
-  """Added in 26.9.0. UUID of the artifact."""
+  """Added in 26.10.0. UUID of the artifact."""
   entityId: UUID!
   name: String!
   type: ArtifactType!
@@ -1511,7 +1511,7 @@ enum ArtifactOrderField
 {
   NAME @join__enumValue(graph: STRAWBERRY)
   TYPE @join__enumValue(graph: STRAWBERRY)
-  SIZE @join__enumValue(graph: STRAWBERRY) @deprecated(reason: "Deprecated since 26.9.0. A size belongs to a revision rather than the artifact, so this value is not used for ordering. It is removed in the next release.")
+  SIZE @join__enumValue(graph: STRAWBERRY) @deprecated(reason: "Deprecated since 26.10.0. A size belongs to a revision rather than the artifact, so this value is not used for ordering. It is removed in the next release.")
   SCANNED_AT @join__enumValue(graph: STRAWBERRY)
   UPDATED_AT @join__enumValue(graph: STRAWBERRY)
 }
@@ -1547,7 +1547,7 @@ type ArtifactRegistryMeta implements Node
   """The Globally Unique ID of this object"""
   id: ID!
 
-  """Added in 26.9.0. UUID of the artifact registry."""
+  """Added in 26.10.0. UUID of the artifact registry."""
   entityId: UUID!
   name: String!
   registryId: ID!
@@ -1605,7 +1605,7 @@ type ArtifactRevision implements Node
   """The Globally Unique ID of this object"""
   id: ID!
 
-  """Added in 26.9.0. UUID of the artifact revision."""
+  """Added in 26.10.0. UUID of the artifact revision."""
   fieldId: UUID!
   status: ArtifactStatus!
 
@@ -2075,7 +2075,7 @@ type AuditLogV2 implements Node
   """The Globally Unique ID of this object"""
   id: ID!
 
-  """Added in 26.9.0. UUID of the audit log record."""
+  """Added in 26.10.0. UUID of the audit log record."""
   fieldId: UUID!
 
   """UUID of the action that generated this log."""
@@ -2116,12 +2116,12 @@ type AuditLogV2 implements Node
   status: AuditLogStatus!
 
   """
-  Added in 26.9.0. IP address of the request that produced this record, masked per the client IP masking policy. Null when the policy records none, or when the address was unavailable or unusable.
+  Added in 26.10.0. IP address of the request that produced this record, masked per the client IP masking policy. Null when the policy records none, or when the address was unavailable or unusable.
   """
   clientIp: String
 
   """
-  Added in 26.9.0. The entity the logged operation acted on. Null when the log names no entity, or when the recorded id does not name one that still exists.
+  Added in 26.10.0. The entity the logged operation acted on. Null when the log names no entity, or when the recorded id does not name one that still exists.
   """
   entity: EntityNode
 
@@ -2183,7 +2183,7 @@ enum AutoScalingMetricSource
   PROMETHEUS @join__enumValue(graph: GRAPHENE) @join__enumValue(graph: STRAWBERRY)
 }
 
-"""Added in 26.9.0. Filter for the auto-scaling metric source."""
+"""Added in 26.10.0. Filter for the auto-scaling metric source."""
 input AutoScalingMetricSourceFilter
   @join__type(graph: STRAWBERRY)
 {
@@ -2208,7 +2208,7 @@ type AutoScalingRule implements Node
   """The Globally Unique ID of this object"""
   id: ID!
 
-  """Added in 26.9.0. UUID of the auto scaling rule."""
+  """Added in 26.10.0. UUID of the auto scaling rule."""
   fieldId: UUID!
 
   """The source of the scaling metric (e.g. KERNEL, INFERENCE_FRAMEWORK)."""
@@ -2278,34 +2278,34 @@ input AutoScalingRuleFilter
   createdAt: DateTimeFilter = null
   lastTriggeredAt: NullableDateTimeFilter = null
 
-  """Added in 26.9.0. Filter by rule ID."""
+  """Added in 26.10.0. Filter by rule ID."""
   fieldId: UUIDFilter = null
 
-  """Added in 26.9.0. Filter by metric source."""
+  """Added in 26.10.0. Filter by metric source."""
   metricSource: AutoScalingMetricSourceFilter = null
 
-  """Added in 26.9.0. Filter by metric name."""
+  """Added in 26.10.0. Filter by metric name."""
   metricName: StringFilter = null
 
-  """Added in 26.9.0. Filter by the scale-down threshold."""
+  """Added in 26.10.0. Filter by the scale-down threshold."""
   minThreshold: DecimalFilter = null
 
-  """Added in 26.9.0. Filter by the scale-up threshold."""
+  """Added in 26.10.0. Filter by the scale-up threshold."""
   maxThreshold: DecimalFilter = null
 
-  """Added in 26.9.0. Filter by step size."""
+  """Added in 26.10.0. Filter by step size."""
   stepSize: IntFilter = null
 
-  """Added in 26.9.0. Filter by the cooldown window."""
+  """Added in 26.10.0. Filter by the cooldown window."""
   timeWindow: IntFilter = null
 
-  """Added in 26.9.0. Filter by the replica floor."""
+  """Added in 26.10.0. Filter by the replica floor."""
   minReplicas: IntFilter = null
 
-  """Added in 26.9.0. Filter by the replica ceiling."""
+  """Added in 26.10.0. Filter by the replica ceiling."""
   maxReplicas: IntFilter = null
 
-  """Added in 26.9.0. Filter by the Prometheus query preset."""
+  """Added in 26.10.0. Filter by the Prometheus query preset."""
   prometheusQueryPresetId: UUIDFilter = null
   AND: [AutoScalingRuleFilter!] = null
   OR: [AutoScalingRuleFilter!] = null
@@ -2455,13 +2455,13 @@ type BulkAddRolePermissionFailureInfo
   @join__type(graph: STRAWBERRY)
 {
   """Scope element type of the failed entry."""
-  scopeType: String @deprecated(reason: "Deprecated since 26.9.0. A permission follows the scope of its role; this field is always null.")
+  scopeType: String @deprecated(reason: "Deprecated since 26.10.0. A permission follows the scope of its role; this field is always null.")
 
   """Scope element ID of the failed entry."""
-  scopeId: String @deprecated(reason: "Deprecated since 26.9.0. A permission follows the scope of its role; this field is always null.")
+  scopeId: String @deprecated(reason: "Deprecated since 26.10.0. A permission follows the scope of its role; this field is always null.")
 
   """Operation type of the failed entry."""
-  operation: String @deprecated(reason: "Deprecated since 26.9.0. Use `permission`; this field is always null.")
+  operation: String @deprecated(reason: "Deprecated since 26.10.0. Use `permission`; this field is always null.")
 
   """Role ID of the failed entry."""
   roleId: UUID!
@@ -2483,7 +2483,7 @@ type BulkAddRolePermissionPresetFailureInfo
   @join__type(graph: STRAWBERRY)
 {
   """Operation of the permission entry that failed."""
-  operation: OperationType @deprecated(reason: "Deprecated since 26.9.0. Use `permission`; this field is always null.")
+  operation: OperationType @deprecated(reason: "Deprecated since 26.10.0. Use `permission`; this field is always null.")
 
   """Entity type of the permission entry that failed."""
   entityType: String!
@@ -2696,23 +2696,23 @@ type BulkDeleteVFoldersV2Payload
   @join__type(graph: STRAWBERRY)
 {
   """
-  Added in 26.9.0. The vfolders that were soft-deleted, in the order they were requested. A soft-deleted vfolder is still addressable, so it is returned whole. Together with `failed` this answers for every requested vfolder exactly once.
+  Added in 26.10.0. The vfolders that were soft-deleted, in the order they were requested. A soft-deleted vfolder is still addressable, so it is returned whole. Together with `failed` this answers for every requested vfolder exactly once.
   """
   items: [VFolder!]!
 
   """
-  Added in 26.4.2. Number of virtual folders successfully soft-deleted. Deprecated since 26.9.0.
+  Added in 26.4.2. Number of virtual folders successfully soft-deleted. Deprecated since 26.10.0.
   """
   deletedCount: Int! @deprecated(reason: "Use the length of items.")
 
   """
-  Added in 26.9.0. List of errors for vfolders that failed to be soft-deleted.
+  Added in 26.10.0. List of errors for vfolders that failed to be soft-deleted.
   """
   failed: [BulkDeleteVFolderV2Error!]!
 }
 
 """
-Added in 26.9.0. Failure detail for a single vfolder in a bulk soft-deletion.
+Added in 26.10.0. Failure detail for a single vfolder in a bulk soft-deletion.
 """
 type BulkDeleteVFolderV2Error
   @join__type(graph: STRAWBERRY)
@@ -2776,12 +2776,12 @@ type BulkPurgeUsersV2Payload
   @join__type(graph: STRAWBERRY)
 {
   """
-  Added in 26.9.0. UUIDs of the users that were purged, in the order they were requested. Together with `failed` this answers for every requested user exactly once.
+  Added in 26.10.0. UUIDs of the users that were purged, in the order they were requested. Together with `failed` this answers for every requested user exactly once.
   """
   successes: [UUID!]!
 
   """
-  Added in 26.3.0. Number of users successfully purged. Deprecated since 26.9.0.
+  Added in 26.3.0. Number of users successfully purged. Deprecated since 26.10.0.
   """
   purgedCount: Int! @deprecated(reason: "Use the length of successes.")
 
@@ -2820,12 +2820,12 @@ type BulkPurgeVFoldersV2Payload
   @join__type(graph: STRAWBERRY)
 {
   """
-  Added in 26.9.0. UUIDs of the vfolders that were purged, in the order they were requested. Together with `failed` this answers for every requested vfolder exactly once.
+  Added in 26.10.0. UUIDs of the vfolders that were purged, in the order they were requested. Together with `failed` this answers for every requested vfolder exactly once.
   """
   successes: [UUID!]!
 
   """
-  Added in 26.4.2. Number of virtual folders successfully purged. Deprecated since 26.9.0.
+  Added in 26.4.2. Number of virtual folders successfully purged. Deprecated since 26.10.0.
   """
   purgedCount: Int! @deprecated(reason: "Use the length of successes.")
 
@@ -3122,7 +3122,7 @@ type CancelImportArtifactPayload
 }
 
 """
-Added in 26.4.4. Input for canceling a role invitation. Deprecated since 26.9.0. Use role assignments.
+Added in 26.4.4. Input for canceling a role invitation. Deprecated since 26.10.0. Use role assignments.
 """
 input CancelRoleInvitationInput
   @join__type(graph: STRAWBERRY)
@@ -3273,7 +3273,7 @@ type ClearImages
 }
 
 """
-Added in 26.9.0. Masking applied before a client IP is stored. 'none' keeps the address as observed, 'truncate' zeroes the host bits — keeping an IPv4 /24 and an IPv6 /48 — and 'drop' records no address at all.
+Added in 26.10.0. Masking applied before a client IP is stored. 'none' keeps the address as observed, 'truncate' zeroes the host bits — keeping an IPv4 /24 and an IPv6 /48 — and 'drop' records no address at all.
 """
 enum ClientIPMaskingMode
   @join__type(graph: STRAWBERRY)
@@ -3284,7 +3284,7 @@ enum ClientIPMaskingMode
 }
 
 """
-Added in 26.9.0. The masking one target gets. A target with no policy falls back to the 'default' target, and no default means the address is recorded as observed.
+Added in 26.10.0. The masking one target gets. A target with no policy falls back to the 'default' target, and no default means the address is recorded as observed.
 """
 type ClientIPMaskingPolicy implements Node
   @join__implements(graph: STRAWBERRY, interface: "Node")
@@ -3293,7 +3293,7 @@ type ClientIPMaskingPolicy implements Node
   """The Globally Unique ID of this object"""
   id: ID!
 
-  """Added in 26.9.0. UUID of the client IP masking policy."""
+  """Added in 26.10.0. UUID of the client IP masking policy."""
   entityId: UUID!
 
   """Which recorded client IP is governed."""
@@ -3315,7 +3315,7 @@ type ClientIPMaskingPolicy implements Node
   updatedAt: DateTime!
 }
 
-"""Added in 26.9.0. Paginated list of client IP masking policies."""
+"""Added in 26.10.0. Paginated list of client IP masking policies."""
 type ClientIPMaskingPolicyConnection
   @join__type(graph: STRAWBERRY)
 {
@@ -3340,7 +3340,7 @@ type ClientIPMaskingPolicyEdge
   node: ClientIPMaskingPolicy!
 }
 
-"""Added in 26.9.0. Filter for client IP masking policies."""
+"""Added in 26.10.0. Filter for client IP masking policies."""
 input ClientIPMaskingPolicyFilter
   @join__type(graph: STRAWBERRY)
 {
@@ -3351,7 +3351,7 @@ input ClientIPMaskingPolicyFilter
   mode: ClientIPMaskingMode = null
 }
 
-"""Added in 26.9.0. Order specification for client IP masking policies."""
+"""Added in 26.10.0. Order specification for client IP masking policies."""
 input ClientIPMaskingPolicyOrderBy
   @join__type(graph: STRAWBERRY)
 {
@@ -3362,7 +3362,7 @@ input ClientIPMaskingPolicyOrderBy
   direction: String! = "ASC"
 }
 
-"""Added in 26.9.0. Order fields for client IP masking policies."""
+"""Added in 26.10.0. Order fields for client IP masking policies."""
 enum ClientIPMaskingPolicyOrderField
   @join__type(graph: STRAWBERRY)
 {
@@ -3373,7 +3373,7 @@ enum ClientIPMaskingPolicyOrderField
 }
 
 """
-Added in 26.9.0. Payload carrying the settled client IP masking policy.
+Added in 26.10.0. Payload carrying the settled client IP masking policy.
 """
 type ClientIPMaskingPolicyPayload
   @join__type(graph: STRAWBERRY)
@@ -3382,7 +3382,7 @@ type ClientIPMaskingPolicyPayload
   policy: ClientIPMaskingPolicy!
 }
 
-"""Added in 26.9.0. Which recorded client IP a masking policy governs."""
+"""Added in 26.10.0. Which recorded client IP a masking policy governs."""
 enum ClientIPMaskingTarget
   @join__type(graph: STRAWBERRY)
 {
@@ -3916,7 +3916,7 @@ type ContainerRegistryV2 implements Node
   """The Globally Unique ID of this object"""
   id: ID!
 
-  """Added in 26.9.0. UUID of the container registry."""
+  """Added in 26.10.0. UUID of the container registry."""
   entityId: UUID!
 
   """URL of the container registry"""
@@ -4452,7 +4452,7 @@ type CreateEndpointAutoScalingRuleNode
   rule: EndpointAutoScalingRuleNode
 }
 
-"""Added in 26.9.0. Create entity share input."""
+"""Added in 26.10.0. Create entity share input."""
 input CreateEntityShareInput
   @join__type(graph: STRAWBERRY)
 {
@@ -4818,13 +4818,13 @@ input CreatePermissionInput
   permission: PermissionBit!
 
   """Scope type."""
-  scopeType: RBACElementType = null @deprecated(reason: "Deprecated since 26.9.0. A permission follows the scope of its role; the value is ignored.")
+  scopeType: RBACElementType = null @deprecated(reason: "Deprecated since 26.10.0. A permission follows the scope of its role; the value is ignored.")
 
   """Scope ID."""
-  scopeId: String = null @deprecated(reason: "Deprecated since 26.9.0. A permission follows the scope of its role; the value is ignored.")
+  scopeId: String = null @deprecated(reason: "Deprecated since 26.10.0. A permission follows the scope of its role; the value is ignored.")
 
   """Operation type."""
-  operation: OperationType = null @deprecated(reason: "Deprecated since 26.9.0. Use `permission`; the value is ignored.")
+  operation: OperationType = null @deprecated(reason: "Deprecated since 26.10.0. Use `permission`; the value is ignored.")
 }
 
 """Added in 26.4.2. Input for creating a new project."""
@@ -4974,7 +4974,7 @@ input CreateResourceGroupInput
   description: String = null
 
   """
-  Added in 26.9.0. Make this the default resource group. At most one resource group may hold the flag, so this is rejected while another one holds it; clear that one first.
+  Added in 26.10.0. Make this the default resource group. At most one resource group may hold the flag, so this is rejected while another one holds it; clear that one first.
   """
   isDefault: Boolean! = false
 }
@@ -5032,7 +5032,7 @@ input CreateResourcePresetV2Input
   resourceGroupName: String = null
 }
 
-"""Added in 26.9.0. Input for registering a new resource slot type."""
+"""Added in 26.10.0. Input for registering a new resource slot type."""
 input CreateResourceSlotTypeInput
   @join__type(graph: STRAWBERRY)
 {
@@ -5069,7 +5069,7 @@ input CreateResourceSlotTypeInput
   rank: Int! = 0
 }
 
-"""Added in 26.9.0. Payload for resource slot type registration."""
+"""Added in 26.10.0. Payload for resource slot type registration."""
 type CreateResourceSlotTypePayload
   @join__type(graph: STRAWBERRY)
 {
@@ -5132,22 +5132,22 @@ input CreateRoleInput
   description: String = null
 
   """Deprecated and ignored: a created role is always custom."""
-  source: RoleSource = null @deprecated(reason: "Deprecated since 26.9.0. Ignored: a created role is always custom.")
+  source: RoleSource = null @deprecated(reason: "Deprecated since 26.10.0. Ignored: a created role is always custom.")
 
   """
   Added in 26.4.4. When true, the role is automatically granted to a user when the user is added to a scope this role is registered in.
   """
   autoAssign: Boolean! = false
 
-  """Added in 26.9.0. The scope the role belongs to."""
+  """Added in 26.10.0. The scope the role belongs to."""
   scope: ScopeInput = null
 
   """Deprecated: use `scope`. Accepts exactly one entry."""
-  scopes: [ScopeInput!] = null @deprecated(reason: "Deprecated since 26.9.0. Use `scope`.")
+  scopes: [ScopeInput!] = null @deprecated(reason: "Deprecated since 26.10.0. Use `scope`.")
 }
 
 """
-Added in 26.4.4. Input for creating role invitations. Deprecated since 26.9.0. Use role assignments.
+Added in 26.4.4. Input for creating role invitations. Deprecated since 26.10.0. Use role assignments.
 """
 input CreateRoleInvitationInput
   @join__type(graph: STRAWBERRY)
@@ -5157,7 +5157,7 @@ input CreateRoleInvitationInput
 }
 
 """
-Added in 26.4.4. Payload for role invitation creation. Deprecated since 26.9.0. Use role assignments.
+Added in 26.4.4. Payload for role invitation creation. Deprecated since 26.10.0. Use role assignments.
 """
 type CreateRoleInvitationPayload
   @join__type(graph: STRAWBERRY)
@@ -5251,22 +5251,22 @@ input CreateRuntimeVariantPresetInput
   required: Boolean! = false
 
   """
-  Added in 26.9.0. Runtime version this preset becomes available in. Dot-separated numbers.
+  Added in 26.10.0. Runtime version this preset becomes available in. Dot-separated numbers.
   """
   addedVersion: String
 
   """
-  Added in 26.9.0. Runtime version this preset is removed in, exclusive. Dot-separated numbers.
+  Added in 26.10.0. Runtime version this preset is removed in, exclusive. Dot-separated numbers.
   """
   deprecatedVersion: String
 
-  """Added in 26.9.0. UI category group for organizing parameters."""
+  """Added in 26.10.0. UI category group for organizing parameters."""
   category: String
 
-  """Added in 26.9.0. Human-readable display label for the UI."""
+  """Added in 26.10.0. Human-readable display label for the UI."""
   displayName: String
 
-  """Added in 26.9.0. UI rendering options."""
+  """Added in 26.10.0. UI rendering options."""
   uiOption: RuntimeVariantPresetUIOptionInput
 }
 
@@ -5600,7 +5600,7 @@ scalar Decimal
   @join__type(graph: STRAWBERRY)
 
 """
-Added in 26.9.0. Filter for decimal fields supporting equality and comparison operations.
+Added in 26.10.0. Filter for decimal fields supporting equality and comparison operations.
 """
 input DecimalFilter
   @join__type(graph: STRAWBERRY)
@@ -6307,11 +6307,11 @@ Added in 26.4.2. Partial-success payload for a bulk runtime variant deletion.
 type DeleteRuntimeVariantsPayload
   @join__type(graph: STRAWBERRY)
 {
-  """Added in 26.9.0. Ids of successfully deleted runtime variants."""
+  """Added in 26.10.0. Ids of successfully deleted runtime variants."""
   items: [UUID!]!
 
   """
-  Added in 26.9.0. Per-item failures, each naming the runtime variant it targeted.
+  Added in 26.10.0. Per-item failures, each naming the runtime variant it targeted.
   """
   failed: [RuntimeVariantBulkFailureInfo!]!
 
@@ -6437,16 +6437,16 @@ input DeploymentFilter
   """Added in 26.8.0. Filter by conditions on deployment replicas."""
   replicas: ReplicaNestedFilter = null
 
-  """Added in 26.9.0. Select entities by the labels on them."""
+  """Added in 26.10.0. Select entities by the labels on them."""
   labels: EntityLabelNestedFilter = null
 
-  """Added in 26.9.0. Filter by deployment ID."""
+  """Added in 26.10.0. Filter by deployment ID."""
   entityId: UUIDFilter = null
 
-  """Added in 26.9.0. Filter by the requested replica count."""
+  """Added in 26.10.0. Filter by the requested replica count."""
   desiredReplicas: IntFilter = null
 
-  """Added in 26.9.0. Filter by scaling state."""
+  """Added in 26.10.0. Filter by scaling state."""
   scalingState: ScalingStateFilter = null
   AND: [DeploymentFilter!] = null
   OR: [DeploymentFilter!] = null
@@ -6480,7 +6480,7 @@ type DeploymentHistory implements Node
   """The Globally Unique ID of this object"""
   id: ID!
 
-  """Added in 26.9.0. UUID of the deployment history record."""
+  """Added in 26.10.0. UUID of the deployment history record."""
   fieldId: UUID!
   deploymentId: ID!
   phase: String!
@@ -6610,7 +6610,7 @@ type DeploymentPolicy implements Node
   """The Globally Unique ID of this object"""
   id: ID!
 
-  """Added in 26.9.0. UUID of the deployment policy."""
+  """Added in 26.10.0. UUID of the deployment policy."""
   fieldId: UUID!
   strategySpec: DeploymentStrategySpec!
   createdAt: DateTime!
@@ -6627,7 +6627,7 @@ type DeploymentRevisionPreset implements Node
   """The Globally Unique ID of this object"""
   id: ID!
 
-  """Added in 26.9.0. UUID of the deployment revision preset."""
+  """Added in 26.10.0. UUID of the deployment revision preset."""
   entityId: UUID!
 
   """The runtime variant this preset is designed for (e.g., vLLM, SGLang)."""
@@ -6770,7 +6770,7 @@ enum DeploymentRevisionPresetOrderField
 }
 
 """
-Added in 26.9.0. Uses narrowing a deployment preset query; every id is AND-ed. The caller must be able to read each listed entity, or the request is refused. Only presets the caller can read are returned, even when a listed entity is tied to others.
+Added in 26.10.0. Uses narrowing a deployment preset query; every id is AND-ed. The caller must be able to read each listed entity, or the request is refused. Only presets the caller can read are returned, even when a listed entity is tied to others.
 """
 input DeploymentRevisionPresetUsage
   @join__type(graph: STRAWBERRY)
@@ -6780,7 +6780,7 @@ input DeploymentRevisionPresetUsage
 }
 
 """
-Added in 26.9.0. Entities whose use of a deployment preset narrows the read.
+Added in 26.10.0. Entities whose use of a deployment preset narrows the read.
 """
 input DeploymentRevisionPresetUsedBy
   @join__type(graph: STRAWBERRY)
@@ -6798,7 +6798,7 @@ input DeploymentScope
 }
 
 """
-Added in 26.9.0. Scope for the scoped deployment query. Each list is OR'd internally and across lists, and every scope named is authorized before the read runs.
+Added in 26.10.0. Scope for the scoped deployment query. Each list is OR'd internally and across lists, and every scope named is authorized before the read runs.
 """
 input DeploymentSearchScope
   @join__type(graph: STRAWBERRY)
@@ -6890,7 +6890,7 @@ enum DeploymentStrategyType
 }
 
 """
-Added in 26.9.0. Uses narrowing a deployment query; every id is AND-ed. The caller must be able to read each listed entity, or the request is refused. Only deployments the caller can read are returned, even when a listed entity is tied to others.
+Added in 26.10.0. Uses narrowing a deployment query; every id is AND-ed. The caller must be able to read each listed entity, or the request is refused. Only deployments the caller can read are returned, even when a listed entity is tied to others.
 """
 input DeploymentUsage
   @join__type(graph: STRAWBERRY)
@@ -6900,7 +6900,7 @@ input DeploymentUsage
 }
 
 """
-Added in 26.9.0. Entities a deployment uses, whose ids narrow the read.
+Added in 26.10.0. Entities a deployment uses, whose ids narrow the read.
 """
 input DeploymentUses
   @join__type(graph: STRAWBERRY)
@@ -7228,7 +7228,7 @@ input DomainFairShareFilter
   """
   Added in 26.2.0. Filter by the domain this fair share is calculated for.
   """
-  domain: DomainFairShareDomainNestedFilter = null @deprecated(reason: "Deprecated since 26.9.0. A filter on another entity's columns cannot check whether the caller may read that row. Search domains first, then narrow by domainName.")
+  domain: DomainFairShareDomainNestedFilter = null @deprecated(reason: "Deprecated since 26.10.0. A filter on another entity's columns cannot check whether the caller may read that row. Search domains first, then narrow by domainName.")
 
   """Combine multiple filters with AND logic. All conditions must match."""
   AND: [DomainFairShareFilter!] = null
@@ -7270,7 +7270,7 @@ enum DomainFairShareOrderField
   FAIR_SHARE_FACTOR @join__enumValue(graph: STRAWBERRY)
   DOMAIN_NAME @join__enumValue(graph: STRAWBERRY)
   CREATED_AT @join__enumValue(graph: STRAWBERRY)
-  DOMAIN_IS_ACTIVE @join__enumValue(graph: STRAWBERRY) @deprecated(reason: "Deprecated since 26.9.0. An order on another entity's columns cannot check whether the caller may read that row. Search domains first, then order there.")
+  DOMAIN_IS_ACTIVE @join__enumValue(graph: STRAWBERRY) @deprecated(reason: "Deprecated since 26.10.0. An order on another entity's columns cannot check whether the caller may read that row. Search domains first, then order there.")
 }
 
 """Added in 24.09.0. """
@@ -7304,7 +7304,7 @@ type DomainLifecycleInfo
   isActive: Boolean!
 
   """
-  Added in 26.9.0. Whether this is the default domain. At most one domain carries the marker.
+  Added in 26.10.0. Whether this is the default domain. At most one domain carries the marker.
   """
   isDefault: Boolean!
 
@@ -7394,7 +7394,7 @@ type DomainResourceAllocationV2
 }
 
 """
-Added in 26.9.0. Scope for the scoped domain query. Each list is OR'd internally, and every scope named is authorized before the read runs.
+Added in 26.10.0. Scope for the scoped domain query. Each list is OR'd internally, and every scope named is authorized before the read runs.
 """
 input DomainScope
   @join__type(graph: STRAWBERRY)
@@ -7413,7 +7413,7 @@ type DomainUsageBucket implements Node
   """The Globally Unique ID of this object"""
   id: ID!
 
-  """Added in 26.9.0. UUID of the usage bucket."""
+  """Added in 26.10.0. UUID of the usage bucket."""
   fieldId: UUID!
 
   """Name of the domain this usage bucket belongs to."""
@@ -7574,7 +7574,7 @@ type DomainV2 implements Node
   """The Globally Unique ID of this object"""
   id: ID!
 
-  """Added in 26.9.0. UUID of the domain."""
+  """Added in 26.10.0. UUID of the domain."""
   entityId: UUID!
 
   """Basic domain information including name and description."""
@@ -7607,7 +7607,7 @@ type DomainV2 implements Node
   """Users belonging to this domain."""
   users(filter: UserV2Filter = null, orderBy: [UserV2OrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): UserV2Connection
 
-  """Added in 26.9.0. Resource groups this domain may schedule on."""
+  """Added in 26.10.0. Resource groups this domain may schedule on."""
   resourceGroups(filter: ResourceGroupFilter = null, orderBy: [ResourceGroupOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ResourceGroupConnection
 }
 
@@ -7646,7 +7646,7 @@ input DomainV2Filter
 {
   name: StringFilter = null
 
-  """Added in 26.9.0. Filter by domain uuid."""
+  """Added in 26.10.0. Filter by domain uuid."""
   id: UUIDFilter = null
   description: StringFilter = null
   isActive: Boolean = null
@@ -7654,10 +7654,10 @@ input DomainV2Filter
   modifiedAt: DateTimeFilter = null
 
   """Filter by the projects the domain holds."""
-  project: DomainProjectNestedFilter = null @deprecated(reason: "Deprecated since 26.9.0. A filter on another entity's columns cannot check whether the caller may read that row. Search projects first, then narrow by their domain.")
+  project: DomainProjectNestedFilter = null @deprecated(reason: "Deprecated since 26.10.0. A filter on another entity's columns cannot check whether the caller may read that row. Search projects first, then narrow by their domain.")
 
   """Filter by the users the domain holds."""
-  user: DomainUserNestedFilter = null @deprecated(reason: "Deprecated since 26.9.0. A filter on another entity's columns cannot check whether the caller may read that row. Search users first, then narrow by their domain.")
+  user: DomainUserNestedFilter = null @deprecated(reason: "Deprecated since 26.10.0. A filter on another entity's columns cannot check whether the caller may read that row. Search users first, then narrow by their domain.")
   AND: [DomainV2Filter!] = null
   OR: [DomainV2Filter!] = null
   NOT: [DomainV2Filter!] = null
@@ -7683,9 +7683,9 @@ enum DomainV2OrderField
   MODIFIED_AT @join__enumValue(graph: STRAWBERRY)
   NAME @join__enumValue(graph: STRAWBERRY)
   IS_ACTIVE @join__enumValue(graph: STRAWBERRY)
-  PROJECT_NAME @join__enumValue(graph: STRAWBERRY) @deprecated(reason: "Deprecated since 26.9.0. A domain holds many projects, so this order folds them into a single project name. Narrow the results with the matching filter instead.")
-  USER_USERNAME @join__enumValue(graph: STRAWBERRY) @deprecated(reason: "Deprecated since 26.9.0. A domain holds many users, so this order folds them into a single username. Narrow the results with the matching filter instead.")
-  USER_EMAIL @join__enumValue(graph: STRAWBERRY) @deprecated(reason: "Deprecated since 26.9.0. A domain holds many users, so this order folds them into a single email address. Narrow the results with the matching filter instead.")
+  PROJECT_NAME @join__enumValue(graph: STRAWBERRY) @deprecated(reason: "Deprecated since 26.10.0. A domain holds many projects, so this order folds them into a single project name. Narrow the results with the matching filter instead.")
+  USER_USERNAME @join__enumValue(graph: STRAWBERRY) @deprecated(reason: "Deprecated since 26.10.0. A domain holds many users, so this order folds them into a single username. Narrow the results with the matching filter instead.")
+  USER_EMAIL @join__enumValue(graph: STRAWBERRY) @deprecated(reason: "Deprecated since 26.10.0. A domain holds many users, so this order folds them into a single email address. Narrow the results with the matching filter instead.")
 }
 
 """
@@ -7970,11 +7970,11 @@ input EnqueueSessionInput
   """Bootstrap script."""
   bootstrapScript: String = null
 
-  """Added in 26.9.0. Scheduling tier (0-100)."""
+  """Added in 26.10.0. Scheduling tier (0-100)."""
   tier: Int = null
 
   """Scheduling tier (0-100)."""
-  priority: Int = null @deprecated(reason: "Deprecated since 26.9.0. Renamed to `tier`; the value and its meaning are unchanged.")
+  priority: Int = null @deprecated(reason: "Deprecated since 26.10.0. Renamed to `tier`; the value and its meaning are unchanged.")
 
   """Scope-local preemption priority among the requester's own sessions."""
   jobPriority: Int! = 0
@@ -8029,7 +8029,7 @@ type EntityActionInfo
 }
 
 """
-Added in 26.3.0. Entity connection. Deprecated since 26.9.0. Use `Role.scope`.
+Added in 26.3.0. Entity connection. Deprecated since 26.10.0. Use `Role.scope`.
 """
 type EntityConnection
   @join__type(graph: STRAWBERRY)
@@ -8043,7 +8043,7 @@ type EntityConnection
 }
 
 """
-Added in 26.3.0. Filter for entity associations Deprecated since 26.9.0. Use `Role.scope`.
+Added in 26.3.0. Filter for entity associations Deprecated since 26.10.0. Use `Role.scope`.
 """
 input EntityFilter
   @join__type(graph: STRAWBERRY)
@@ -8065,7 +8065,7 @@ input EntityFilter
   NOT: [EntityFilter!] = null
 }
 
-"""Added in 26.9.0. One `key=value` label and the entity carrying it."""
+"""Added in 26.10.0. One `key=value` label and the entity carrying it."""
 type EntityLabel implements Node
   @join__implements(graph: STRAWBERRY, interface: "Node")
   @join__type(graph: STRAWBERRY)
@@ -8073,7 +8073,7 @@ type EntityLabel implements Node
   """The Globally Unique ID of this object"""
   id: ID!
 
-  """Added in 26.9.0. UUID of the entity label."""
+  """Added in 26.10.0. UUID of the entity label."""
   fieldId: UUID!
 
   """Type of the labeled entity."""
@@ -8094,11 +8094,11 @@ type EntityLabel implements Node
   """When the label's value was last replaced."""
   updatedAt: DateTime!
 
-  """Added in 26.9.0. The labeled entity."""
+  """Added in 26.10.0. The labeled entity."""
   entity: EntityNode
 }
 
-"""Added in 26.9.0. Paginated connection for label records."""
+"""Added in 26.10.0. Paginated connection for label records."""
 type EntityLabelConnection
   @join__type(graph: STRAWBERRY)
 {
@@ -8124,7 +8124,7 @@ type EntityLabelEdge
 }
 
 """
-Added in 26.9.0. Filter matching a single label. A key and a value given together constrain the same label rather than two different ones.
+Added in 26.10.0. Filter matching a single label. A key and a value given together constrain the same label rather than two different ones.
 """
 input EntityLabelFilter
   @join__type(graph: STRAWBERRY)
@@ -8139,7 +8139,7 @@ input EntityLabelFilter
 }
 
 """
-Added in 26.9.0. Filter selecting entities by the labels on them. Each relation matches one label at a time; requiring two different labels is two relations combined by the entity filter's own AND.
+Added in 26.10.0. Filter selecting entities by the labels on them. Each relation matches one label at a time; requiring two different labels is two relations combined by the entity filter's own AND.
 """
 input EntityLabelNestedFilter
   @join__type(graph: STRAWBERRY)
@@ -8150,7 +8150,7 @@ input EntityLabelNestedFilter
   none: EntityLabelFilter = null
 }
 
-"""Added in 26.9.0. Ordering specification for labels."""
+"""Added in 26.10.0. Ordering specification for labels."""
 input EntityLabelOrderBy
   @join__type(graph: STRAWBERRY)
 {
@@ -8158,7 +8158,7 @@ input EntityLabelOrderBy
   direction: OrderDirection! = DESC
 }
 
-"""Added in 26.9.0. Fields available for ordering labels."""
+"""Added in 26.10.0. Fields available for ordering labels."""
 enum EntityLabelOrderField
   @join__type(graph: STRAWBERRY)
 {
@@ -8210,7 +8210,7 @@ type EntityOperationCombination
 }
 
 """
-Added in 26.3.0. Order by specification for entity associations Deprecated since 26.9.0. Use `Role.scope`.
+Added in 26.3.0. Order by specification for entity associations Deprecated since 26.10.0. Use `Role.scope`.
 """
 input EntityOrderBy
   @join__type(graph: STRAWBERRY)
@@ -8220,7 +8220,7 @@ input EntityOrderBy
 }
 
 """
-Added in 26.3.0. Entity ordering field Deprecated since 26.9.0. Use `Role.scope`.
+Added in 26.3.0. Entity ordering field Deprecated since 26.10.0. Use `Role.scope`.
 """
 enum EntityOrderField
   @join__type(graph: STRAWBERRY)
@@ -8230,7 +8230,7 @@ enum EntityOrderField
 }
 
 """
-Added in 26.3.0. A role and the scope it belongs to. Deprecated since 26.9.0. Use `Role.scope`.
+Added in 26.3.0. A role and the scope it belongs to. Deprecated since 26.10.0. Use `Role.scope`.
 """
 type EntityRef implements Node
   @join__implements(graph: STRAWBERRY, interface: "Node")
@@ -8265,7 +8265,7 @@ type EntityRefEdge
 }
 
 """
-Added in 26.9.0. One entity handed to one scope: offered, taken, or taken back.
+Added in 26.10.0. One entity handed to one scope: offered, taken, or taken back.
 """
 type EntityShare implements Node
   @join__implements(graph: STRAWBERRY, interface: "Node")
@@ -8274,7 +8274,7 @@ type EntityShare implements Node
   """The Globally Unique ID of this object"""
   id: ID!
 
-  """Added in 26.9.0. UUID of the entity share."""
+  """Added in 26.10.0. UUID of the entity share."""
   entityId: UUID!
 
   """Who sent the offer, while that account is still there."""
@@ -8311,7 +8311,7 @@ type EntityShare implements Node
   updatedAt: DateTime!
 }
 
-"""Added in 26.9.0. Paginated list of entity shares."""
+"""Added in 26.10.0. Paginated list of entity shares."""
 type EntityShareConnection
   @join__type(graph: STRAWBERRY)
 {
@@ -8323,7 +8323,7 @@ type EntityShareConnection
   count: Int!
 }
 
-"""Added in 26.9.0. One entity share within a connection."""
+"""Added in 26.10.0. One entity share within a connection."""
 type EntityShareEdge
   @join__type(graph: STRAWBERRY)
 {
@@ -8334,7 +8334,7 @@ type EntityShareEdge
   node: EntityShare!
 }
 
-"""Added in 26.9.0. Filter for entity shares."""
+"""Added in 26.10.0. Filter for entity shares."""
 input EntityShareFilter
   @join__type(graph: STRAWBERRY)
 {
@@ -8348,7 +8348,7 @@ input EntityShareFilter
   recipientEmail: String = null
 }
 
-"""Added in 26.9.0. Order specification."""
+"""Added in 26.10.0. Order specification."""
 input EntityShareOrderBy
   @join__type(graph: STRAWBERRY)
 {
@@ -8359,7 +8359,7 @@ input EntityShareOrderBy
   direction: String! = "DESC"
 }
 
-"""Added in 26.9.0. Order fields for entity shares."""
+"""Added in 26.10.0. Order fields for entity shares."""
 enum EntityShareOrderField
   @join__type(graph: STRAWBERRY)
 {
@@ -8368,7 +8368,7 @@ enum EntityShareOrderField
   STATUS @join__enumValue(graph: STRAWBERRY)
 }
 
-"""Added in 26.9.0. Entity share payload."""
+"""Added in 26.10.0. Entity share payload."""
 type EntitySharePayload
   @join__type(graph: STRAWBERRY)
 {
@@ -8376,7 +8376,7 @@ type EntitySharePayload
   share: EntityShare!
 }
 
-"""Added in 26.9.0. Who an offer goes to; exactly one of the three."""
+"""Added in 26.10.0. Who an offer goes to; exactly one of the three."""
 input EntityShareRecipientInput
   @join__type(graph: STRAWBERRY)
 {
@@ -8391,7 +8391,7 @@ input EntityShareRecipientInput
 }
 
 """
-Added in 26.9.0. Scope for the scoped entity share query. All items are OR'd; raises an error if every field is empty.
+Added in 26.10.0. Scope for the scoped entity share query. All items are OR'd; raises an error if every field is empty.
 """
 input EntityShareScope
   @join__type(graph: STRAWBERRY)
@@ -8409,7 +8409,7 @@ input EntityShareScope
   target: [EntityShareTargetScope!] = null
 }
 
-"""Added in 26.9.0. Which side of a share the caller stands on."""
+"""Added in 26.10.0. Which side of a share the caller stands on."""
 enum EntityShareSide
   @join__type(graph: STRAWBERRY)
 {
@@ -8417,7 +8417,7 @@ enum EntityShareSide
   SHARER @join__enumValue(graph: STRAWBERRY)
 }
 
-"""Added in 26.9.0. Where a share stands."""
+"""Added in 26.10.0. Where a share stands."""
 enum EntityShareStatus
   @join__type(graph: STRAWBERRY)
 {
@@ -8428,7 +8428,7 @@ enum EntityShareStatus
   REVOKED @join__enumValue(graph: STRAWBERRY)
 }
 
-"""Added in 26.9.0. One entity whose shares are being read."""
+"""Added in 26.10.0. One entity whose shares are being read."""
 input EntityShareTargetScope
   @join__type(graph: STRAWBERRY)
 {
@@ -8440,7 +8440,7 @@ input EntityShareTargetScope
 }
 
 """
-Added in 26.9.0. One entity, named by its type and its id. `entityTypes` lists the types a request may name.
+Added in 26.10.0. One entity, named by its type and its id. `entityTypes` lists the types a request may name.
 """
 input EntityTarget
   @join__type(graph: STRAWBERRY)
@@ -8466,7 +8466,7 @@ type EntityTimestamps
 }
 
 """
-Added in 26.9.0. One entity type the manager has operations wired for. An entity type is declared where its operations are wired, not as a fixed enum, so this is what a request may name.
+Added in 26.10.0. One entity type the manager has operations wired for. An entity type is declared where its operations are wired, not as a fixed enum, so this is what a request may name.
 """
 type EntityType implements Node
   @join__implements(graph: STRAWBERRY, interface: "Node")
@@ -8545,7 +8545,7 @@ input EnvironmentVariablesInput
   entries: [EnvironmentVariableEntryInput!]!
 }
 
-"""Added in 26.9.0. Why one pair could not be excluded from idle checks."""
+"""Added in 26.10.0. Why one pair could not be excluded from idle checks."""
 type ExcludeSessionIdleChecksFailureInfo
   @join__type(graph: STRAWBERRY)
 {
@@ -8559,7 +8559,7 @@ type ExcludeSessionIdleChecksFailureInfo
   message: String!
 }
 
-"""Added in 26.9.0. Input for excluding session pairs from idle checks."""
+"""Added in 26.10.0. Input for excluding session pairs from idle checks."""
 input ExcludeSessionIdleChecksInput
   @join__type(graph: STRAWBERRY)
 {
@@ -8568,7 +8568,7 @@ input ExcludeSessionIdleChecksInput
 }
 
 """
-Added in 26.9.0. Payload returned after excluding session pairs from idle checks.
+Added in 26.10.0. Payload returned after excluding session pairs from idle checks.
 """
 type ExcludeSessionIdleChecksPayload
   @join__type(graph: STRAWBERRY)
@@ -8996,7 +8996,7 @@ type HuggingFaceRegistry implements Node
   """The Globally Unique ID of this object"""
   id: ID!
 
-  """Added in 26.9.0. UUID of the HuggingFace registry."""
+  """Added in 26.10.0. UUID of the HuggingFace registry."""
   entityId: UUID!
   url: String!
   name: String!
@@ -9040,7 +9040,7 @@ type IdleChecker implements Node
   """The Globally Unique ID of this object"""
   id: ID!
 
-  """Added in 26.9.0. UUID of the idle checker."""
+  """Added in 26.10.0. UUID of the idle checker."""
   entityId: UUID!
 
   """Idle checker name."""
@@ -9538,7 +9538,7 @@ input ImageRefType
 }
 
 """
-Added in 26.9.0. Scope for the scoped image query. Each list is OR'd internally and across lists, and every scope named is authorized before the read runs. `global` is answered for at the public scope, which every account reaches.
+Added in 26.10.0. Scope for the scoped image query. Each list is OR'd internally and across lists, and every scope named is authorized before the read runs. `global` is answered for at the public scope, which every account reaches.
 """
 input ImageSearchScope
   @join__type(graph: STRAWBERRY)
@@ -9579,7 +9579,7 @@ enum ImageType
 }
 
 """
-Added in 26.9.0. Uses narrowing an image query; every id is AND-ed. The caller must be able to read each listed entity, or the request is refused. Only images the caller can read are returned, even when a listed entity is tied to others.
+Added in 26.10.0. Uses narrowing an image query; every id is AND-ed. The caller must be able to read each listed entity, or the request is refused. Only images the caller can read are returned, even when a listed entity is tied to others.
 """
 input ImageUsage
   @join__type(graph: STRAWBERRY)
@@ -9588,7 +9588,7 @@ input ImageUsage
   usedBy: ImageUsedBy = null
 }
 
-"""Added in 26.9.0. Entities whose use of an image narrows the read."""
+"""Added in 26.10.0. Entities whose use of an image narrows the read."""
 input ImageUsedBy
   @join__type(graph: STRAWBERRY)
 {
@@ -9611,7 +9611,7 @@ type ImageV2 implements Node
   """The Globally Unique ID of this object"""
   id: ID!
 
-  """Added in 26.9.0. UUID of the image."""
+  """Added in 26.10.0. UUID of the image."""
   entityId: UUID!
 
   """Image identity information (name, architecture)."""
@@ -9637,7 +9637,7 @@ type ImageV2 implements Node
   """Added in 26.2.0. Aliases for this image."""
   aliases(filter: ImageV2AliasFilter = null, orderBy: [ImageV2AliasOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null): ImageV2AliasConnection
 
-  """Added in 26.9.0. The labels on this image."""
+  """Added in 26.10.0. The labels on this image."""
   entityLabels(filter: EntityLabelFilter = null, orderBy: [EntityLabelOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): EntityLabelConnection
 }
 
@@ -9651,7 +9651,7 @@ type ImageV2Alias implements Node
   """The Globally Unique ID of this object"""
   id: ID!
 
-  """Added in 26.9.0. UUID of the image alias."""
+  """Added in 26.10.0. UUID of the image alias."""
   fieldId: UUID!
 
   """The alias string for the image."""
@@ -9696,7 +9696,7 @@ input ImageV2AliasFilter
   """Added in 26.4.0. Filter by image ID."""
   imageId: UUIDFilter = null
 
-  """Added in 26.9.0. Filter by alias row ID."""
+  """Added in 26.10.0. Filter by alias row ID."""
   fieldId: UUIDFilter = null
   AND: [ImageV2AliasFilter!] = null
   OR: [ImageV2AliasFilter!] = null
@@ -9764,34 +9764,34 @@ input ImageV2Filter
   """Added in 26.4.0. Filter by container registry ID."""
   registryId: UUIDFilter = null
 
-  """Added in 26.9.0. Filter by namespace/path within the registry."""
+  """Added in 26.10.0. Filter by namespace/path within the registry."""
   image: StringFilter = null
 
-  """Added in 26.9.0. Filter by registry hostname."""
+  """Added in 26.10.0. Filter by registry hostname."""
   registry: StringFilter = null
 
-  """Added in 26.9.0. Filter by project (namespace) within the registry."""
+  """Added in 26.10.0. Filter by project (namespace) within the registry."""
   project: StringFilter = null
 
-  """Added in 26.9.0. Filter by image tag."""
+  """Added in 26.10.0. Filter by image tag."""
   tag: StringFilter = null
 
-  """Added in 26.9.0. Filter by image config digest."""
+  """Added in 26.10.0. Filter by image config digest."""
   configDigest: StringFilter = null
 
-  """Added in 26.9.0. Filter by accelerator requirement string."""
+  """Added in 26.10.0. Filter by accelerator requirement string."""
   accelerators: StringFilter = null
 
-  """Added in 26.9.0. Filter by image size in bytes."""
+  """Added in 26.10.0. Filter by image size in bytes."""
   sizeBytes: IntFilter = null
 
-  """Added in 26.9.0. Filter by local-only status."""
+  """Added in 26.10.0. Filter by local-only status."""
   isLocal: Boolean = null
 
-  """Added in 26.9.0. Filter by image type category."""
+  """Added in 26.10.0. Filter by image type category."""
   type: ImageV2TypeFilter = null
 
-  """Added in 26.9.0. Filter by creation datetime (before/after)."""
+  """Added in 26.10.0. Filter by creation datetime (before/after)."""
   createdAt: DateTimeFilter = null
 
   """Added in 26.3.0. Filter by nested alias conditions."""
@@ -9800,7 +9800,7 @@ input ImageV2Filter
   """Added in 26.3.0. Filter by last used datetime (before/after)."""
   lastUsed: DateTimeFilter = null
 
-  """Added in 26.9.0. Select entities by the labels on them."""
+  """Added in 26.10.0. Select entities by the labels on them."""
   labels: EntityLabelNestedFilter = null
   AND: [ImageV2Filter!] = null
   OR: [ImageV2Filter!] = null
@@ -9986,7 +9986,7 @@ type ImageV2TagEntry
   value: String!
 }
 
-"""Added in 26.9.0. Type category of an image."""
+"""Added in 26.10.0. Type category of an image."""
 enum ImageV2Type
   @join__type(graph: STRAWBERRY)
 {
@@ -9996,7 +9996,7 @@ enum ImageV2Type
 }
 
 """
-Added in 26.9.0. Filter for the image type category with equality and membership operators.
+Added in 26.10.0. Filter for the image type category with equality and membership operators.
 """
 input ImageV2TypeFilter
   @join__type(graph: STRAWBERRY)
@@ -10059,7 +10059,7 @@ type ImportArtifactsPayload
   tasks: [ArtifactRevisionImportTask!]!
 }
 
-"""Added in 26.9.0. Why one pair could not be included into idle checks."""
+"""Added in 26.10.0. Why one pair could not be included into idle checks."""
 type IncludeSessionIdleChecksFailureInfo
   @join__type(graph: STRAWBERRY)
 {
@@ -10073,7 +10073,7 @@ type IncludeSessionIdleChecksFailureInfo
   message: String!
 }
 
-"""Added in 26.9.0. Input for including session pairs into idle checks."""
+"""Added in 26.10.0. Input for including session pairs into idle checks."""
 input IncludeSessionIdleChecksInput
   @join__type(graph: STRAWBERRY)
 {
@@ -10084,7 +10084,7 @@ input IncludeSessionIdleChecksInput
 }
 
 """
-Added in 26.9.0. Payload returned after including session pairs into idle checks.
+Added in 26.10.0. Payload returned after including session pairs into idle checks.
 """
 type IncludeSessionIdleChecksPayload
   @join__type(graph: STRAWBERRY)
@@ -10273,7 +10273,7 @@ type KernelResourceAllocation implements Node
   """The Globally Unique ID of this object"""
   id: ID!
 
-  """Added in 26.9.0. UUID of the resource allocation."""
+  """Added in 26.10.0. UUID of the resource allocation."""
   fieldId: UUID!
 
   """Resource slot identifier (e.g., 'cpu', 'mem', 'cuda.device')."""
@@ -10338,7 +10338,7 @@ type KernelSchedulingHistory implements Node
   """The Globally Unique ID of this object"""
   id: ID!
 
-  """Added in 26.9.0. UUID of the kernel scheduling history record."""
+  """Added in 26.10.0. UUID of the kernel scheduling history record."""
   fieldId: UUID!
   kernelId: ID!
   sessionId: ID!
@@ -10446,7 +10446,7 @@ type KernelV2 implements Node
   """The Globally Unique ID of this object"""
   id: ID!
 
-  """Added in 26.9.0. UUID of the kernel."""
+  """Added in 26.10.0. UUID of the kernel."""
   fieldId: UUID!
 
   """
@@ -10720,7 +10720,7 @@ type KeyPair implements Item
   is_active: Boolean
   is_admin: Boolean
 
-  """Added in 26.9.0. Whether this is the owner's default keypair."""
+  """Added in 26.10.0. Whether this is the owner's default keypair."""
   is_default: Boolean
   resource_policy: String
   created_at: DateTime
@@ -10766,7 +10766,7 @@ input KeypairFilter
   isAdmin: Boolean = null
 
   """
-  Added in 26.9.0. Filter keypairs by whether they are their owner's default one.
+  Added in 26.10.0. Filter keypairs by whether they are their owner's default one.
   """
   isDefault: Boolean = null
   accessKey: StringFilter = null
@@ -10876,7 +10876,7 @@ type KeypairResourcePolicyV2 implements Node
   """The Globally Unique ID of this object"""
   id: ID!
 
-  """Added in 26.9.0. UUID of the policy."""
+  """Added in 26.10.0. UUID of the policy."""
   entityId: UUID!
 
   """Policy name."""
@@ -11022,7 +11022,7 @@ type KeyPairV2 implements Node
   """The Globally Unique ID of this object"""
   id: ID!
 
-  """Added in 26.9.0. UUID of the keypair."""
+  """Added in 26.10.0. UUID of the keypair."""
   fieldId: UUID!
 
   """The access key string."""
@@ -11034,7 +11034,7 @@ type KeyPairV2 implements Node
   """Whether the keypair has admin privileges."""
   isAdmin: Boolean
 
-  """Added in 26.9.0. Whether this is the owner's default keypair."""
+  """Added in 26.10.0. Whether this is the owner's default keypair."""
   isDefault: Boolean!
 
   """Timestamp when the keypair was created."""
@@ -11226,7 +11226,7 @@ type LoginClientType implements Node
   """The Globally Unique ID of this object"""
   id: ID!
 
-  """Added in 26.9.0. UUID of the login client type."""
+  """Added in 26.10.0. UUID of the login client type."""
   entityId: UUID!
 
   """Unique login client type name (e.g. 'core', 'webui')."""
@@ -11362,7 +11362,7 @@ type LoginHistoryV2 implements Node
   """The Globally Unique ID of this object"""
   id: ID!
 
-  """Added in 26.9.0. UUID of the login history record."""
+  """Added in 26.10.0. UUID of the login history record."""
   fieldId: UUID!
 
   """UUID of the user who attempted to log in."""
@@ -11378,7 +11378,7 @@ type LoginHistoryV2 implements Node
   failReason: String
 
   """
-  Added in 26.9.0. IP address of the request that produced this entry, masked per the client IP masking policy. Null when the policy records none, or when the address was unavailable or unusable.
+  Added in 26.10.0. IP address of the request that produced this entry, masked per the client IP masking policy. Null when the policy records none, or when the address was unavailable or unusable.
   """
   clientIp: String
 
@@ -11481,7 +11481,7 @@ type LoginSessionV2 implements Node
   """The Globally Unique ID of this object"""
   id: ID!
 
-  """Added in 26.9.0. UUID of the login session."""
+  """Added in 26.10.0. UUID of the login session."""
   fieldId: UUID!
 
   """UUID of the user who owns the session."""
@@ -11669,23 +11669,23 @@ type ModelCardEdge
 }
 
 """
-Added in 26.9.0. Scope for the scoped model card query. Each list is OR'd internally, and every scope named is authorized before the read runs.
+Added in 26.10.0. Scope for the scoped model card query. Each list is OR'd internally, and every scope named is authorized before the read runs.
 """
 input ModelCardScope
   @join__type(graph: STRAWBERRY)
 {
-  """Added in 26.9.0. Domains whose model cards are being read."""
+  """Added in 26.10.0. Domains whose model cards are being read."""
   domain: [UUIDScope!] = null
 
   """Projects whose model cards are being read."""
   project: [UUIDScope!] = null
 
-  """Added in 26.9.0. Users whose model cards are being read."""
+  """Added in 26.10.0. Users whose model cards are being read."""
   user: [UUIDScope!] = null
 }
 
 """
-Added in 26.9.0. Uses narrowing a model card query; every id is AND-ed. The caller must be able to read each listed entity, or the request is refused. Only model cards the caller can read are returned, even when a listed entity is tied to others.
+Added in 26.10.0. Uses narrowing a model card query; every id is AND-ed. The caller must be able to read each listed entity, or the request is refused. Only model cards the caller can read are returned, even when a listed entity is tied to others.
 """
 input ModelCardUsage
   @join__type(graph: STRAWBERRY)
@@ -11695,7 +11695,7 @@ input ModelCardUsage
 }
 
 """
-Added in 26.9.0. Entities a model card uses, whose ids narrow the read.
+Added in 26.10.0. Entities a model card uses, whose ids narrow the read.
 """
 input ModelCardUses
   @join__type(graph: STRAWBERRY)
@@ -11714,7 +11714,7 @@ type ModelCardV2 implements Node
   """The Globally Unique ID of this object"""
   id: ID!
 
-  """Added in 26.9.0. UUID of the model card."""
+  """Added in 26.10.0. UUID of the model card."""
   entityId: UUID!
 
   """Display name of the registered model."""
@@ -11817,13 +11817,13 @@ type ModelCardV2Edge
 input ModelCardV2Filter
   @join__type(graph: STRAWBERRY)
 {
-  """Added in 26.9.0. Filter by model card ID."""
+  """Added in 26.10.0. Filter by model card ID."""
   entityId: UUIDFilter = null
 
   """Name filter."""
   name: StringFilter = null
 
-  """Added in 26.9.0. Filter by the VFolder holding the model."""
+  """Added in 26.10.0. Filter by the VFolder holding the model."""
   vfolderId: UUIDFilter = null
 
   """Domain filter."""
@@ -11832,48 +11832,48 @@ input ModelCardV2Filter
   """Project filter."""
   projectId: UUIDFilter = null
 
-  """Added in 26.9.0. Filter by the user who created the model card."""
+  """Added in 26.10.0. Filter by the user who created the model card."""
   creatorId: UUIDFilter = null
 
-  """Added in 26.9.0. Author filter."""
+  """Added in 26.10.0. Author filter."""
   author: StringFilter = null
 
-  """Added in 26.9.0. Title filter."""
+  """Added in 26.10.0. Title filter."""
   title: StringFilter = null
 
-  """Added in 26.9.0. Model version filter."""
+  """Added in 26.10.0. Model version filter."""
   modelVersion: StringFilter = null
 
-  """Added in 26.9.0. Task filter."""
+  """Added in 26.10.0. Task filter."""
   task: StringFilter = null
 
-  """Added in 26.9.0. Category filter."""
+  """Added in 26.10.0. Category filter."""
   category: StringFilter = null
 
-  """Added in 26.9.0. Architecture filter."""
+  """Added in 26.10.0. Architecture filter."""
   architecture: StringFilter = null
 
-  """Added in 26.9.0. License filter."""
+  """Added in 26.10.0. License filter."""
   license: StringFilter = null
 
   """
-  Added in 26.9.0. Access level filter. The column stores the level as text, so this is a string match rather than an enum comparison.
+  Added in 26.10.0. Access level filter. The column stores the level as text, so this is a string match rather than an enum comparison.
   """
   accessLevel: StringFilter = null
 
   """
   Filter by the storage host backing the model card's VFolder. Matches via an EXISTS subquery against the VFolder host column.
   """
-  storageHost: StringFilter = null @deprecated(reason: "Deprecated since 26.9.0. Search vfolders by host first, then pass their ids as `usedBy.vfolder`.")
+  storageHost: StringFilter = null @deprecated(reason: "Deprecated since 26.10.0. Search vfolders by host first, then pass their ids as `usedBy.vfolder`.")
 
-  """Added in 26.9.0. Creation datetime filter."""
+  """Added in 26.10.0. Creation datetime filter."""
   createdAt: DateTimeFilter = null
 
-  """Added in 26.9.0. Update datetime filter."""
+  """Added in 26.10.0. Update datetime filter."""
   updatedAt: NullableDateTimeFilter = null
 
   """
-  Added in 26.9.0. Filter by conditions on the minimum resource requirements.
+  Added in 26.10.0. Filter by conditions on the minimum resource requirements.
   """
   minResource: ModelCardV2ResourceRequirementNestedFilter = null
 
@@ -11966,7 +11966,7 @@ enum ModelCardV2OrderField
 }
 
 """
-Added in 26.9.0. Filter for one minimum resource requirement of a model card.
+Added in 26.10.0. Filter for one minimum resource requirement of a model card.
 """
 input ModelCardV2ResourceRequirementFilter
   @join__type(graph: STRAWBERRY)
@@ -11979,7 +11979,7 @@ input ModelCardV2ResourceRequirementFilter
 }
 
 """
-Added in 26.9.0. Filter model cards by conditions on their minimum resource requirements.
+Added in 26.10.0. Filter model cards by conditions on their minimum resource requirements.
 """
 input ModelCardV2ResourceRequirementNestedFilter
   @join__type(graph: STRAWBERRY)
@@ -12082,7 +12082,7 @@ type ModelDeployment implements Node
   """The Globally Unique ID of this object"""
   id: ID!
 
-  """Added in 26.9.0. UUID of the deployment."""
+  """Added in 26.10.0. UUID of the deployment."""
   entityId: UUID!
   metadata: ModelDeploymentMetadata!
   networkAccess: ModelDeploymentNetworkAccess!
@@ -12129,7 +12129,7 @@ type ModelDeployment implements Node
   """The access tokens of this entity."""
   accessTokens(filter: AccessTokenFilter = null, orderBy: [AccessTokenOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): AccessTokenConnection
 
-  """Added in 26.9.0. The labels on this deployment."""
+  """Added in 26.10.0. The labels on this deployment."""
   entityLabels(filter: EntityLabelFilter = null, orderBy: [EntityLabelOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): EntityLabelConnection
 }
 
@@ -12412,7 +12412,7 @@ type ModelReplica implements Node
   """The Globally Unique ID of this object"""
   id: ID!
 
-  """Added in 26.9.0. UUID of the replica."""
+  """Added in 26.10.0. UUID of the replica."""
   fieldId: UUID!
   sessionId: ID
   revisionId: ID!
@@ -12494,7 +12494,7 @@ type ModelRevision implements Node
   id: ID!
   imageId: ID!
 
-  """Added in 26.9.0. UUID of the revision."""
+  """Added in 26.10.0. UUID of the revision."""
   fieldId: UUID!
 
   """
@@ -12596,25 +12596,25 @@ input ModelRevisionFilter
   """Added in 26.4.3. Filter by revision creation datetime."""
   createdAt: DateTimeFilter = null
 
-  """Added in 26.9.0. Filter by runtime variant ID."""
+  """Added in 26.10.0. Filter by runtime variant ID."""
   runtimeVariantId: UUIDFilter = null
 
-  """Added in 26.9.0. Filter by revision ID."""
+  """Added in 26.10.0. Filter by revision ID."""
   fieldId: UUIDFilter = null
 
-  """Added in 26.9.0. Filter by the model mount destination."""
+  """Added in 26.10.0. Filter by the model mount destination."""
   modelMountDestination: StringFilter = null
 
-  """Added in 26.9.0. Filter by the subpath within the model vfolder."""
+  """Added in 26.10.0. Filter by the subpath within the model vfolder."""
   vfolderSubpath: StringFilter = null
 
-  """Added in 26.9.0. Filter by the model definition path."""
+  """Added in 26.10.0. Filter by the model definition path."""
   modelDefinitionPath: StringFilter = null
 
-  """Added in 26.9.0. Filter by cluster size."""
+  """Added in 26.10.0. Filter by cluster size."""
   clusterSize: IntFilter = null
 
-  """Added in 26.9.0. Filter by the preset that produced the revision."""
+  """Added in 26.10.0. Filter by the preset that produced the revision."""
   revisionPresetId: UUIDFilter = null
   AND: [ModelRevisionFilter!] = null
   OR: [ModelRevisionFilter!] = null
@@ -13695,16 +13695,18 @@ type Mutation
   """
   purgeIdleCheckerAssignment(input: PurgeIdleCheckerAssignmentInput!): PurgeIdleCheckerAssignmentPayload! @join__field(graph: STRAWBERRY)
 
-  """Added in 26.9.0. Register a new resource slot type (super admin only)."""
+  """
+  Added in 26.10.0. Register a new resource slot type (super admin only).
+  """
   adminCreateResourceSlotType(input: CreateResourceSlotTypeInput!): CreateResourceSlotTypePayload @join__field(graph: STRAWBERRY)
 
   """
-  Added in 26.9.0. Update a resource slot type by slot name (super admin only).
+  Added in 26.10.0. Update a resource slot type by slot name (super admin only).
   """
   adminUpdateResourceSlotType(input: UpdateResourceSlotTypeInput!): UpdateResourceSlotTypePayload @join__field(graph: STRAWBERRY)
 
   """
-  Added in 26.9.0. Remove a resource slot type by slot name (super admin only).
+  Added in 26.10.0. Remove a resource slot type by slot name (super admin only).
   """
   adminPurgeResourceSlotType(input: PurgeResourceSlotTypeInput!): PurgeResourceSlotTypePayload @join__field(graph: STRAWBERRY)
 
@@ -13724,12 +13726,12 @@ type Mutation
   adminUpdateAppConfigAllowList(input: UpdateAppConfigAllowListInput!): UpdateAppConfigAllowListPayload @join__field(graph: STRAWBERRY)
 
   """
-  Added in 26.9.0. Upsert many app config fragments at one scope (insert, or replace config on conflict), with per-item partial success (not in effect yet: still all-or-nothing).
+  Added in 26.10.0. Upsert many app config fragments at one scope (insert, or replace config on conflict), with per-item partial success (not in effect yet: still all-or-nothing).
   """
   scopedUpsertAppConfigFragments(input: ScopedUpsertAppConfigFragmentsInput!): UpsertAppConfigFragmentsPayload! @join__field(graph: STRAWBERRY)
 
   """
-  Added in 26.9.0. Upsert many app config fragments at the current user's own user scope, with per-item partial success (not in effect yet: still all-or-nothing).
+  Added in 26.10.0. Upsert many app config fragments at the current user's own user scope, with per-item partial success (not in effect yet: still all-or-nothing).
   """
   myUpsertAppConfigFragments(input: MyUpsertAppConfigFragmentsInput!): UpsertAppConfigFragmentsPayload! @join__field(graph: STRAWBERRY)
 
@@ -14075,7 +14077,7 @@ type Mutation
   adminDeleteDomainV2(domainName: String!): DeleteDomainPayload @join__field(graph: STRAWBERRY)
 
   """
-  Added in 26.9.0. Restore a soft-deleted domain (admin only). Requires superadmin privileges.
+  Added in 26.10.0. Restore a soft-deleted domain (admin only). Requires superadmin privileges.
   """
   adminRestoreDomainV2(domainName: String!): RestoreDomainPayload @join__field(graph: STRAWBERRY)
 
@@ -14105,7 +14107,7 @@ type Mutation
   adminPurgeProjectV2(projectId: UUID!): PurgeProjectPayload @join__field(graph: STRAWBERRY)
 
   """
-  Added in 26.9.0. Restore a soft-deleted project (admin only). Requires superadmin privileges.
+  Added in 26.10.0. Restore a soft-deleted project (admin only). Requires superadmin privileges.
   """
   adminRestoreProjectV2(projectId: UUID!): RestoreProjectPayload @join__field(graph: STRAWBERRY)
 
@@ -14150,7 +14152,7 @@ type Mutation
   adminDeleteUserV2(userId: UUID!): DeleteUserV2Payload @join__field(graph: STRAWBERRY)
 
   """
-  Added in 26.9.0. Restore a soft-deleted user (admin only). Requires superadmin privileges. Sets the user status back to ACTIVE
+  Added in 26.10.0. Restore a soft-deleted user (admin only). Requires superadmin privileges. Sets the user status back to ACTIVE
   """
   adminRestoreUserV2(userId: UUID!): RestoreUserV2Payload @join__field(graph: STRAWBERRY)
 
@@ -14211,7 +14213,7 @@ type Mutation
   adminDeleteSshKeypairV2(accessKey: String!): AdminDeleteSSHKeypairPayload @join__field(graph: STRAWBERRY)
 
   """
-  Added in 26.9.0. Admin encrypts every stored secret again through the configured write provider, under a fresh data encryption key. The pass runs in chunks and reports the count per column and key id afterwards.
+  Added in 26.10.0. Admin encrypts every stored secret again through the configured write provider, under a fresh data encryption key. The pass runs in chunks and reports the count per column and key id afterwards.
   """
   adminReencryptSecrets: AdminReencryptSecretsPayload @join__field(graph: STRAWBERRY)
 
@@ -14322,24 +14324,24 @@ type Mutation
   adminReplaceRolePermissions(input: ReplaceRolePermissionsInput!): ReplaceRolePermissionsPayload @join__field(graph: STRAWBERRY)
 
   """
-  Added in 26.4.4. Create role invitations by email. Deprecated since 26.9.0.
+  Added in 26.4.4. Create role invitations by email. Deprecated since 26.10.0.
   """
-  createRoleInvitation(input: CreateRoleInvitationInput!): CreateRoleInvitationPayload @join__field(graph: STRAWBERRY) @deprecated(reason: "Deprecated since 26.9.0. Role invitations are removed; this mutation always fails.")
+  createRoleInvitation(input: CreateRoleInvitationInput!): CreateRoleInvitationPayload @join__field(graph: STRAWBERRY) @deprecated(reason: "Deprecated since 26.10.0. Role invitations are removed; this mutation always fails.")
 
   """
-  Added in 26.4.4. Accept a pending role invitation. Deprecated since 26.9.0.
+  Added in 26.4.4. Accept a pending role invitation. Deprecated since 26.10.0.
   """
-  acceptRoleInvitation(input: AcceptRoleInvitationInput!): RoleInvitation @join__field(graph: STRAWBERRY) @deprecated(reason: "Deprecated since 26.9.0. Role invitations are removed; this mutation always fails.")
+  acceptRoleInvitation(input: AcceptRoleInvitationInput!): RoleInvitation @join__field(graph: STRAWBERRY) @deprecated(reason: "Deprecated since 26.10.0. Role invitations are removed; this mutation always fails.")
 
   """
-  Added in 26.4.4. Reject a pending role invitation. Deprecated since 26.9.0.
+  Added in 26.4.4. Reject a pending role invitation. Deprecated since 26.10.0.
   """
-  rejectRoleInvitation(input: RejectRoleInvitationInput!): RoleInvitation @join__field(graph: STRAWBERRY) @deprecated(reason: "Deprecated since 26.9.0. Role invitations are removed; this mutation always fails.")
+  rejectRoleInvitation(input: RejectRoleInvitationInput!): RoleInvitation @join__field(graph: STRAWBERRY) @deprecated(reason: "Deprecated since 26.10.0. Role invitations are removed; this mutation always fails.")
 
   """
-  Added in 26.4.4. Cancel a pending role invitation (admin only). Deprecated since 26.9.0.
+  Added in 26.4.4. Cancel a pending role invitation (admin only). Deprecated since 26.10.0.
   """
-  adminCancelRoleInvitation(input: CancelRoleInvitationInput!): RoleInvitation @join__field(graph: STRAWBERRY) @deprecated(reason: "Deprecated since 26.9.0. Role invitations are removed; this mutation always fails.")
+  adminCancelRoleInvitation(input: CancelRoleInvitationInput!): RoleInvitation @join__field(graph: STRAWBERRY) @deprecated(reason: "Deprecated since 26.10.0. Role invitations are removed; this mutation always fails.")
 
   """Added in 26.4.2. Create a new keypair resource policy (admin only)."""
   adminCreateKeypairResourcePolicyV2(input: CreateKeypairResourcePolicyInput!): CreateKeypairResourcePolicyPayload @join__field(graph: STRAWBERRY)
@@ -14415,12 +14417,12 @@ type Mutation
   adminDeleteRuntimeVariants(input: DeleteRuntimeVariantsInput!): DeleteRuntimeVariantsPayload @join__field(graph: STRAWBERRY)
 
   """
-  Added in 26.9.0. Set the client IP masking one target gets (superadmin only).
+  Added in 26.10.0. Set the client IP masking one target gets (superadmin only).
   """
   adminUpsertClientIpMaskingPolicy(input: UpsertClientIPMaskingPolicyInput!): ClientIPMaskingPolicyPayload @join__field(graph: STRAWBERRY)
 
   """
-  Added in 26.9.0. Drop one target's client IP masking policy so it falls back to the default (superadmin only).
+  Added in 26.10.0. Drop one target's client IP masking policy so it falls back to the default (superadmin only).
   """
   adminPurgeClientIpMaskingPolicy(id: UUID!): ClientIPMaskingPolicyPayload @join__field(graph: STRAWBERRY)
 
@@ -14428,23 +14430,23 @@ type Mutation
   adminCreateRetentionPolicy(input: CreateRetentionPolicyInput!): CreateRetentionPolicyPayload @join__field(graph: STRAWBERRY)
 
   """
-  Added in 26.9.0. Offer one entity to one project, one person, or one address.
+  Added in 26.10.0. Offer one entity to one project, one person, or one address.
   """
   createEntityShare(input: CreateEntityShareInput!): EntitySharePayload @join__field(graph: STRAWBERRY)
 
-  """Added in 26.9.0. Take what was offered."""
+  """Added in 26.10.0. Take what was offered."""
   acceptEntityShare(id: UUID!): EntitySharePayload @join__field(graph: STRAWBERRY)
 
-  """Added in 26.9.0. Turn down what was offered."""
+  """Added in 26.10.0. Turn down what was offered."""
   rejectEntityShare(id: UUID!): EntitySharePayload @join__field(graph: STRAWBERRY)
 
-  """Added in 26.9.0. Withdraw an offer before it was answered."""
+  """Added in 26.10.0. Withdraw an offer before it was answered."""
   cancelEntityShare(id: UUID!): EntitySharePayload @join__field(graph: STRAWBERRY)
 
-  """Added in 26.9.0. Take back what was lent."""
+  """Added in 26.10.0. Take back what was lent."""
   revokeEntityShare(id: UUID!): EntitySharePayload @join__field(graph: STRAWBERRY)
 
-  """Added in 26.9.0. Give back what was taken."""
+  """Added in 26.10.0. Give back what was taken."""
   leaveEntityShare(id: UUID!): EntitySharePayload @join__field(graph: STRAWBERRY)
 
   """Added in 26.8.0. Update a retention policy (superadmin only)."""
@@ -14520,12 +14522,12 @@ type Mutation
   restoreVFolder(vfolderId: UUID!): RestoreVFolderPayload @join__field(graph: STRAWBERRY)
 
   """
-  Added in 26.9.0. Set the mount level one user gets on a virtual folder. Requires UPDATE on the folder; a requester who reaches the folder through a share may not hand out more than they mount at.
+  Added in 26.10.0. Set the mount level one user gets on a virtual folder. Requires UPDATE on the folder; a requester who reaches the folder through a share may not hand out more than they mount at.
   """
   setVFolderMountPolicy(vfolderId: UUID!, input: SetVFolderMountPolicyInput!): SetVFolderMountPolicyPayload @join__field(graph: STRAWBERRY)
 
   """
-  Added in 26.9.0. Take back the mount level one user was given on a virtual folder.
+  Added in 26.10.0. Take back the mount level one user was given on a virtual folder.
   """
   unsetVFolderMountPolicy(vfolderId: UUID!, input: UnsetVFolderMountPolicyInput!): UnsetVFolderMountPolicyPayload @join__field(graph: STRAWBERRY)
 
@@ -14568,28 +14570,28 @@ type Mutation
   terminateSessionsV2(sessionIds: [ID!]!, forced: Boolean! = false): TerminateSessionsPayload @join__field(graph: STRAWBERRY)
 
   """
-  Added in 26.9.0. Exclude checker-session pairs from idle checks. Per-session RBAC permission is enforced by the bulk validator; any denial fails the whole request.
+  Added in 26.10.0. Exclude checker-session pairs from idle checks. Per-session RBAC permission is enforced by the bulk validator; any denial fails the whole request.
   """
   excludeSessionIdleChecks(input: ExcludeSessionIdleChecksInput!): ExcludeSessionIdleChecksPayload @join__field(graph: STRAWBERRY)
 
   """
-  Added in 26.9.0. Include checker-session pairs into idle checks, resetting them so checks start from the initial grace period. Per-session RBAC permission is enforced by the bulk validator; any denial fails the whole request.
+  Added in 26.10.0. Include checker-session pairs into idle checks, resetting them so checks start from the initial grace period. Per-session RBAC permission is enforced by the bulk validator; any denial fails the whole request.
   """
   includeSessionIdleChecks(input: IncludeSessionIdleChecksInput!): IncludeSessionIdleChecksPayload @join__field(graph: STRAWBERRY)
 
   """
-  Added in 26.9.0. Set one key on an entity, replacing the value it carries. Reachable by any caller RBAC authorizes to write the entity.
+  Added in 26.10.0. Set one key on an entity, replacing the value it carries. Reachable by any caller RBAC authorizes to write the entity.
   """
   upsertEntityLabel(input: UpsertEntityLabelInput!): UpsertEntityLabelPayload @join__field(graph: STRAWBERRY)
 
   """
-  Added in 26.9.0. Take one label off, named by its own id. Which entity answers for it is read from the row before the delete runs.
+  Added in 26.10.0. Take one label off, named by its own id. Which entity answers for it is read from the row before the delete runs.
   """
   purgeEntityLabel(id: ID!): PurgeEntityLabelPayload @join__field(graph: STRAWBERRY)
 }
 
 """
-Added in 26.9.0. Input for the caller's permissions on several scopes and entity types.
+Added in 26.10.0. Input for the caller's permissions on several scopes and entity types.
 """
 input MyAtomicBulkScopePermissionsInput
   @join__type(graph: STRAWBERRY)
@@ -14601,7 +14603,7 @@ input MyAtomicBulkScopePermissionsInput
 }
 
 """
-Added in 26.9.0. Payload for the caller's permissions on several scopes and entity types.
+Added in 26.10.0. Payload for the caller's permissions on several scopes and entity types.
 """
 type MyAtomicBulkScopePermissionsPayload
   @join__type(graph: STRAWBERRY)
@@ -14621,7 +14623,7 @@ type MyClientIp
 }
 
 """
-Added in 26.9.0. Input for the caller's permissions on one scope and entity type.
+Added in 26.10.0. Input for the caller's permissions on one scope and entity type.
 """
 input MyScopePermissionsInput
   @join__type(graph: STRAWBERRY)
@@ -14631,7 +14633,7 @@ input MyScopePermissionsInput
 }
 
 """
-Added in 26.9.0. Payload for the caller's permissions on one scope and entity type.
+Added in 26.10.0. Payload for the caller's permissions on one scope and entity type.
 """
 type MyScopePermissionsPayload
   @join__type(graph: STRAWBERRY)
@@ -14651,7 +14653,7 @@ type MyStorageHostPermissionsPayload
 }
 
 """
-Added in 26.9.0. Upsert many fragments at the current user's own user scope.
+Added in 26.10.0. Upsert many fragments at the current user's own user scope.
 """
 input MyUpsertAppConfigFragmentsInput
   @join__type(graph: STRAWBERRY)
@@ -14743,7 +14745,7 @@ type NotificationChannel implements Node
   """The Globally Unique ID of this object"""
   id: ID!
 
-  """Added in 26.9.0. UUID of the notification channel."""
+  """Added in 26.10.0. UUID of the notification channel."""
   entityId: UUID!
   name: String!
   description: String
@@ -14858,7 +14860,7 @@ type NotificationRule implements Node
   """The Globally Unique ID of this object"""
   id: ID!
 
-  """Added in 26.9.0. UUID of the notification rule."""
+  """Added in 26.10.0. UUID of the notification rule."""
   entityId: UUID!
   name: String!
   description: String
@@ -14982,7 +14984,7 @@ type NumberFormat
 }
 
 """
-Added in 26.9.0. Number format configuration written with a resource slot type.
+Added in 26.10.0. Number format configuration written with a resource slot type.
 """
 input NumberFormatInput
   @join__type(graph: STRAWBERRY)
@@ -15013,7 +15015,7 @@ type ObjectStorage implements Node
   """The Globally Unique ID of this object"""
   id: ID!
 
-  """Added in 26.9.0. UUID of the object storage."""
+  """Added in 26.10.0. UUID of the object storage."""
   entityId: UUID!
   name: String!
   host: String!
@@ -15068,7 +15070,7 @@ type OperationInfo
 }
 
 """
-Added in 26.3.0. RBAC operation type Deprecated since 26.9.0. Use `PermissionBit`.
+Added in 26.3.0. RBAC operation type Deprecated since 26.10.0. Use `PermissionBit`.
 """
 enum OperationType
   @join__type(graph: STRAWBERRY)
@@ -15086,7 +15088,7 @@ enum OperationType
 }
 
 """
-Added in 26.4.4. Filter for permission operation columns. Supports equals / in / not_equals / not_in. Deprecated since 26.9.0. Use `PermissionBitFilter`.
+Added in 26.4.4. Filter for permission operation columns. Supports equals / in / not_equals / not_in. Deprecated since 26.10.0. Use `PermissionBitFilter`.
 """
 input OperationTypeFilter
   @join__type(graph: STRAWBERRY)
@@ -15147,32 +15149,32 @@ type Permission implements Node
   """The Globally Unique ID of this object"""
   id: ID!
 
-  """Added in 26.9.0. UUID of the permission row."""
+  """Added in 26.10.0. UUID of the permission row."""
   fieldId: UUID!
   roleId: UUID!
   entityType: String!
   createdAt: DateTime!
 
-  """Added in 26.9.0. The permission bit the row holds."""
+  """Added in 26.10.0. The permission bit the row holds."""
   permission: PermissionBit!
 
   """The role this permission belongs to."""
   role: Role
 
   """Scope type."""
-  scopeType: RBACElementType @deprecated(reason: "Deprecated since 26.9.0. A permission follows the scope of its role; this field is always null.")
+  scopeType: RBACElementType @deprecated(reason: "Deprecated since 26.10.0. A permission follows the scope of its role; this field is always null.")
 
   """Scope ID."""
-  scopeId: String @deprecated(reason: "Deprecated since 26.9.0. A permission follows the scope of its role; this field is always null.")
+  scopeId: String @deprecated(reason: "Deprecated since 26.10.0. A permission follows the scope of its role; this field is always null.")
 
   """Operation type."""
-  operation: OperationType @deprecated(reason: "Deprecated since 26.9.0. Use `permission`; this field is always null.")
+  operation: OperationType @deprecated(reason: "Deprecated since 26.10.0. Use `permission`; this field is always null.")
 
   """The scope this permission applies to."""
-  scope: EntityNode @deprecated(reason: "Deprecated since 26.9.0. A permission follows the scope of its role; this field is always null.")
+  scope: EntityNode @deprecated(reason: "Deprecated since 26.10.0. A permission follows the scope of its role; this field is always null.")
 }
 
-"""Added in 26.9.0. One bit of a permission mask."""
+"""Added in 26.10.0. One bit of a permission mask."""
 enum PermissionBit
   @join__type(graph: STRAWBERRY)
 {
@@ -15184,7 +15186,7 @@ enum PermissionBit
 }
 
 """
-Added in 26.9.0. Filter for a permission-bit column. Supports equals / in / not_equals / not_in.
+Added in 26.10.0. Filter for a permission-bit column. Supports equals / in / not_equals / not_in.
 """
 input PermissionBitFilter
   @join__type(graph: STRAWBERRY)
@@ -15232,15 +15234,15 @@ input PermissionFilter
   roleId: UUIDFilter = null
   entityType: StringFilter = null
 
-  """Added in 26.9.0. Filter by the permission bit the entry grants."""
+  """Added in 26.10.0. Filter by the permission bit the entry grants."""
   permission: PermissionBitFilter = null
   createdAt: DateTimeFilter = null
 
   """Scope type."""
-  scopeType: RBACElementTypeFilter = null @deprecated(reason: "Deprecated since 26.9.0. A permission follows the scope of its role; the value is ignored.")
+  scopeType: RBACElementTypeFilter = null @deprecated(reason: "Deprecated since 26.10.0. A permission follows the scope of its role; the value is ignored.")
 
   """Scope ID."""
-  scopeId: StringFilter = null @deprecated(reason: "Deprecated since 26.9.0. A permission follows the scope of its role; the value is ignored.")
+  scopeId: StringFilter = null @deprecated(reason: "Deprecated since 26.10.0. A permission follows the scope of its role; the value is ignored.")
   AND: [PermissionFilter!] = null
   OR: [PermissionFilter!] = null
   NOT: [PermissionFilter!] = null
@@ -15256,13 +15258,13 @@ input PermissionNestedFilter
   permission: PermissionBitFilter = null
 
   """Scope ID."""
-  scopeId: StringFilter = null @deprecated(reason: "Deprecated since 26.9.0. A permission follows the scope of its role; the value is ignored.")
+  scopeId: StringFilter = null @deprecated(reason: "Deprecated since 26.10.0. A permission follows the scope of its role; the value is ignored.")
 
   """Scope type."""
-  scopeType: RBACElementTypeFilter = null @deprecated(reason: "Deprecated since 26.9.0. A permission follows the scope of its role; the value is ignored.")
+  scopeType: RBACElementTypeFilter = null @deprecated(reason: "Deprecated since 26.10.0. A permission follows the scope of its role; the value is ignored.")
 
   """Operation type."""
-  operation: OperationTypeFilter = null @deprecated(reason: "Deprecated since 26.9.0. Use `permission`; the value is ignored.")
+  operation: OperationTypeFilter = null @deprecated(reason: "Deprecated since 26.10.0. Use `permission`; the value is ignored.")
   AND: [PermissionNestedFilter!] = null
   OR: [PermissionNestedFilter!] = null
   NOT: [PermissionNestedFilter!] = null
@@ -15286,7 +15288,7 @@ enum PermissionOrderField
 }
 
 """
-Added in 26.9.0. One scope and entity type to answer the caller's permissions for.
+Added in 26.10.0. One scope and entity type to answer the caller's permissions for.
 """
 input PermissionTarget
   @join__type(graph: STRAWBERRY)
@@ -15509,7 +15511,7 @@ type PresetExecutionSpec
 }
 
 """
-Added in 26.9.0. Configuration for a single model stored in a preset model definition.
+Added in 26.10.0. Configuration for a single model stored in a preset model definition.
 """
 type PresetModelConfig
   @join__type(graph: STRAWBERRY)
@@ -15532,7 +15534,7 @@ type PresetModelConfig
 }
 
 """
-Added in 26.9.0. Configuration for a single model within a preset model definition.
+Added in 26.10.0. Configuration for a single model within a preset model definition.
 """
 input PresetModelConfigInput
   @join__type(graph: STRAWBERRY)
@@ -15553,7 +15555,7 @@ input PresetModelConfigInput
 }
 
 """
-Added in 26.9.0. Model definition stored in a preset; sparse fields inherit merge-chain defaults at revision resolution.
+Added in 26.10.0. Model definition stored in a preset; sparse fields inherit merge-chain defaults at revision resolution.
 """
 type PresetModelDefinition
   @join__type(graph: STRAWBERRY)
@@ -15649,7 +15651,7 @@ input PresetModelMetadataInput
 }
 
 """
-Added in 26.9.0. Service configuration for a model entry stored in a preset.
+Added in 26.10.0. Service configuration for a model entry stored in a preset.
 """
 type PresetModelServiceConfig
   @join__type(graph: STRAWBERRY)
@@ -15679,7 +15681,7 @@ type PresetModelServiceConfig
   healthCheck: ModelHealthCheck
 }
 
-"""Added in 26.9.0. Service configuration for a preset model entry."""
+"""Added in 26.10.0. Service configuration for a preset model entry."""
 input PresetModelServiceConfigInput
   @join__type(graph: STRAWBERRY)
 {
@@ -15941,7 +15943,7 @@ input ProjectFairShareFilter
   """
   Added in 26.2.0. Filter by the project this fair share is calculated for.
   """
-  project: ProjectFairShareProjectNestedFilter = null @deprecated(reason: "Deprecated since 26.9.0. A filter on another entity's columns cannot check whether the caller may read that row. Search projects first, then narrow by projectId.")
+  project: ProjectFairShareProjectNestedFilter = null @deprecated(reason: "Deprecated since 26.10.0. A filter on another entity's columns cannot check whether the caller may read that row. Search projects first, then narrow by projectId.")
 
   """Combine multiple filters with AND logic. All conditions must match."""
   AND: [ProjectFairShareFilter!] = null
@@ -15982,8 +15984,8 @@ enum ProjectFairShareOrderField
 {
   FAIR_SHARE_FACTOR @join__enumValue(graph: STRAWBERRY)
   CREATED_AT @join__enumValue(graph: STRAWBERRY)
-  PROJECT_NAME @join__enumValue(graph: STRAWBERRY) @deprecated(reason: "Deprecated since 26.9.0. An order on another entity's columns cannot check whether the caller may read that row. Search projects first, then order there.")
-  PROJECT_IS_ACTIVE @join__enumValue(graph: STRAWBERRY) @deprecated(reason: "Deprecated since 26.9.0. An order on another entity's columns cannot check whether the caller may read that row. Search projects first, then order there.")
+  PROJECT_NAME @join__enumValue(graph: STRAWBERRY) @deprecated(reason: "Deprecated since 26.10.0. An order on another entity's columns cannot check whether the caller may read that row. Search projects first, then order there.")
+  PROJECT_IS_ACTIVE @join__enumValue(graph: STRAWBERRY) @deprecated(reason: "Deprecated since 26.10.0. An order on another entity's columns cannot check whether the caller may read that row. Search projects first, then order there.")
 }
 
 """
@@ -16131,7 +16133,7 @@ type ProjectResourcePolicyV2 implements Node
   """The Globally Unique ID of this object"""
   id: ID!
 
-  """Added in 26.9.0. UUID of the policy."""
+  """Added in 26.10.0. UUID of the policy."""
   entityId: UUID!
 
   """Policy name."""
@@ -16220,7 +16222,7 @@ enum ProjectResourcePolicyV2OrderField
 }
 
 """
-Added in 26.9.0. Scope for the scoped project query. Each list is OR'd internally and across lists, and every scope named is authorized before the read runs.
+Added in 26.10.0. Scope for the scoped project query. Each list is OR'd internally and across lists, and every scope named is authorized before the read runs.
 """
 input ProjectScope
   @join__type(graph: STRAWBERRY)
@@ -16258,7 +16260,7 @@ type ProjectStorageInfo
 }
 
 """
-Added in 26.2.0. Project type determining its purpose and behavior. GENERAL: Standard project for general computation. MODEL_STORE: Project for model storage and management. PERSONAL: Added in 26.9.0. Project holding one user's own resources, created and removed with that user.
+Added in 26.2.0. Project type determining its purpose and behavior. GENERAL: Standard project for general computation. MODEL_STORE: Project for model storage and management. PERSONAL: Added in 26.10.0. Project holding one user's own resources, created and removed with that user.
 """
 enum ProjectTypeV2
   @join__type(graph: STRAWBERRY)
@@ -16290,7 +16292,7 @@ type ProjectUsageBucket implements Node
   """The Globally Unique ID of this object"""
   id: ID!
 
-  """Added in 26.9.0. UUID of the usage bucket."""
+  """Added in 26.10.0. UUID of the usage bucket."""
   fieldId: UUID!
 
   """UUID of the project this usage bucket belongs to."""
@@ -16471,7 +16473,7 @@ type ProjectV2 implements Node
   """The Globally Unique ID of this object"""
   id: ID!
 
-  """Added in 26.9.0. UUID of the project."""
+  """Added in 26.10.0. UUID of the project."""
   entityId: UUID!
 
   """Basic project information including name, type, and description."""
@@ -16509,10 +16511,10 @@ type ProjectV2 implements Node
   """Users who are members of this project."""
   users(filter: UserV2Filter = null, orderBy: [UserV2OrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): UserV2Connection
 
-  """Added in 26.9.0. Resource groups this project may schedule on."""
+  """Added in 26.10.0. Resource groups this project may schedule on."""
   resourceGroups(filter: ResourceGroupFilter = null, orderBy: [ResourceGroupOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ResourceGroupConnection
 
-  """Added in 26.9.0. Model cards belonging to this project."""
+  """Added in 26.10.0. Model cards belonging to this project."""
   modelCards(filter: ModelCardV2Filter = null, orderBy: [ModelCardV2OrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ModelCardV2Connection
 }
 
@@ -16553,10 +16555,10 @@ input ProjectV2Filter
   name: StringFilter = null
   domainName: StringFilter = null
 
-  """Added in 26.9.0. Filter by project description."""
+  """Added in 26.10.0. Filter by project description."""
   description: StringFilter = null
 
-  """Added in 26.9.0. Filter by the external integration name."""
+  """Added in 26.10.0. Filter by the external integration name."""
   integrationName: StringFilter = null
   type: ProjectTypeV2EnumFilter = null
   isActive: Boolean = null
@@ -16564,10 +16566,10 @@ input ProjectV2Filter
   modifiedAt: DateTimeFilter = null
 
   """Filter by the domain holding the project."""
-  domain: ProjectDomainNestedFilter = null @deprecated(reason: "Deprecated since 26.9.0. A filter on another entity's columns cannot check whether the caller may read that row. Search domains first, then narrow by `domainName`.")
+  domain: ProjectDomainNestedFilter = null @deprecated(reason: "Deprecated since 26.10.0. A filter on another entity's columns cannot check whether the caller may read that row. Search domains first, then narrow by `domainName`.")
 
   """Filter by the users enrolled in the project."""
-  user: ProjectUserNestedFilter = null @deprecated(reason: "Deprecated since 26.9.0. A filter on another entity's columns cannot check whether the caller may read that row. Search users first, then pass their ids as the `user` scope.")
+  user: ProjectUserNestedFilter = null @deprecated(reason: "Deprecated since 26.10.0. A filter on another entity's columns cannot check whether the caller may read that row. Search users first, then pass their ids as the `user` scope.")
   AND: [ProjectV2Filter!] = null
   OR: [ProjectV2Filter!] = null
   NOT: [ProjectV2Filter!] = null
@@ -16598,8 +16600,8 @@ enum ProjectV2OrderField
   ID @join__enumValue(graph: STRAWBERRY)
   DESCRIPTION @join__enumValue(graph: STRAWBERRY)
   INTEGRATION_NAME @join__enumValue(graph: STRAWBERRY)
-  USER_USERNAME @join__enumValue(graph: STRAWBERRY) @deprecated(reason: "Deprecated since 26.9.0. A project holds many users, so this order folds them into a single username. Narrow the results with the `user` filter instead.")
-  USER_EMAIL @join__enumValue(graph: STRAWBERRY) @deprecated(reason: "Deprecated since 26.9.0. A project holds many users, so this order folds them into a single email address. Narrow the results with the `user` filter instead.")
+  USER_USERNAME @join__enumValue(graph: STRAWBERRY) @deprecated(reason: "Deprecated since 26.10.0. A project holds many users, so this order folds them into a single username. Narrow the results with the `user` filter instead.")
+  USER_EMAIL @join__enumValue(graph: STRAWBERRY) @deprecated(reason: "Deprecated since 26.10.0. A project holds many users, so this order folds them into a single email address. Narrow the results with the `user` filter instead.")
 }
 
 """
@@ -16673,7 +16675,7 @@ type PurgeDomainPayload
   purged: Boolean!
 }
 
-"""Added in 26.9.0. Payload returned after taking a label off an entity."""
+"""Added in 26.10.0. Payload returned after taking a label off an entity."""
 type PurgeEntityLabelPayload
   @join__type(graph: STRAWBERRY)
 {
@@ -16784,7 +16786,7 @@ type PurgeProjectPayload
   purged: Boolean!
 }
 
-"""Added in 26.9.0. Input for removing a resource slot type."""
+"""Added in 26.10.0. Input for removing a resource slot type."""
 input PurgeResourceSlotTypeInput
   @join__type(graph: STRAWBERRY)
 {
@@ -16792,7 +16794,7 @@ input PurgeResourceSlotTypeInput
   slotName: String!
 }
 
-"""Added in 26.9.0. Payload for resource slot type removal."""
+"""Added in 26.10.0. Payload for resource slot type removal."""
 type PurgeResourceSlotTypePayload
   @join__type(graph: STRAWBERRY)
 {
@@ -17292,11 +17294,11 @@ type Query
   """Added in 25.8.0."""
   service_configs(services: [String]!, filter: String, order: String, offset: Int, before: String, after: String, first: Int, last: Int): ServiceConfigConnection @join__field(graph: GRAPHENE)
 
-  """Added in 26.9.0. Returns 'pong'"""
+  """Added in 26.10.0. Returns 'pong'"""
   ping: String! @join__field(graph: PUBLIC)
 
   """
-  Added in 26.9.0. Read the merged config for each of the given names from public fragments only. Served by the `public` subgraph without authentication, for pre-login clients that need config before they have credentials.
+  Added in 26.10.0. Read the merged config for each of the given names from public fragments only. Served by the `public` subgraph without authentication, for pre-login clients that need config before they have credentials.
   """
   publicAppConfigs(configNames: [String!]!): [AppConfig!]! @join__field(graph: PUBLIC)
 
@@ -17306,7 +17308,7 @@ type Query
   """Added in 26.1.0. List agents with filtering and pagination"""
   agentsV2(
     """
-    Added in 26.9.0. Uses narrowing the result. Each listed entity must be readable by the caller; agents the caller cannot read are left out.
+    Added in 26.10.0. Uses narrowing the result. Each listed entity must be readable by the caller; agents the caller cannot read are left out.
     """
     usage: AgentUsage = null
     filter: AgentFilter = null
@@ -17363,7 +17365,7 @@ type Query
   myAppConfigFragmentsByNames(configNames: [String!]!): [AppConfigFragment]! @join__field(graph: STRAWBERRY)
 
   """
-  Added in 26.9.0. Read the acting user's merged config for each of the given names — public, the caller's domain, and the caller's own fragments deep-merged by allow-list rank. One entry per requested name, in request order; a name nothing visible contributes to yields an empty merge.
+  Added in 26.10.0. Read the acting user's merged config for each of the given names — public, the caller's domain, and the caller's own fragments deep-merged by allow-list rank. One entry per requested name, in request order; a name nothing visible contributes to yields an empty merge.
   """
   myAppConfigs(configNames: [String!]!): [AppConfig!]! @join__field(graph: STRAWBERRY)
 
@@ -17454,7 +17456,7 @@ type Query
   """Added in 26.2.0. List resource groups (admin only)"""
   adminResourceGroups(
     """
-    Added in 26.9.0. Uses narrowing the result. Each listed entity must be readable by the caller; resource groups the caller cannot read are left out.
+    Added in 26.10.0. Uses narrowing the result. Each listed entity must be readable by the caller; resource groups the caller cannot read are left out.
     """
     usage: ResourceGroupUsage = null
     filter: ResourceGroupFilter = null
@@ -17468,13 +17470,13 @@ type Query
   ): ResourceGroupConnection @join__field(graph: STRAWBERRY)
 
   """
-  Added in 26.9.0. Page through the resource groups the named scopes reach, combined with OR. Every scope is authorized before the read runs.
+  Added in 26.10.0. Page through the resource groups the named scopes reach, combined with OR. Every scope is authorized before the read runs.
   """
   scopedResourceGroups(
     scope: ResourceGroupScope!
 
     """
-    Added in 26.9.0. Uses narrowing the result. Each listed entity must be readable by the caller; resource groups the caller cannot read are left out.
+    Added in 26.10.0. Uses narrowing the result. Each listed entity must be readable by the caller; resource groups the caller cannot read are left out.
     """
     usage: ResourceGroupUsage = null
     filter: ResourceGroupFilter = null
@@ -17532,7 +17534,7 @@ type Query
   """Added in 25.16.0. List all deployments (superadmin only)."""
   adminDeployments(
     """
-    Added in 26.9.0. Uses narrowing the result. Each listed entity must be readable by the caller; deployments the caller cannot read are left out.
+    Added in 26.10.0. Uses narrowing the result. Each listed entity must be readable by the caller; deployments the caller cannot read are left out.
     """
     usage: DeploymentUsage = null
     filter: DeploymentFilter = null
@@ -17600,7 +17602,7 @@ type Query
   """
   adminImagesV2(
     """
-    Added in 26.9.0. Uses narrowing the result. Each listed entity must be readable by the caller; images the caller cannot read are left out.
+    Added in 26.10.0. Uses narrowing the result. Each listed entity must be readable by the caller; images the caller cannot read are left out.
     """
     usage: ImageUsage = null
     filter: ImageV2Filter = null
@@ -17614,13 +17616,13 @@ type Query
   ): ImageV2Connection @join__field(graph: STRAWBERRY)
 
   """
-  Added in 26.9.0. Page through the images the named scopes reach, combined with OR. Every scope is authorized before the read runs.
+  Added in 26.10.0. Page through the images the named scopes reach, combined with OR. Every scope is authorized before the read runs.
   """
   scopedImagesV2(
     scope: ImageSearchScope!
 
     """
-    Added in 26.9.0. Uses narrowing the result. Each listed entity must be readable by the caller; images the caller cannot read are left out.
+    Added in 26.10.0. Uses narrowing the result. Each listed entity must be readable by the caller; images the caller cannot read are left out.
     """
     usage: ImageUsage = null
     filter: ImageV2Filter = null
@@ -17633,7 +17635,7 @@ type Query
     offset: Int = null
   ): ImageV2Connection @join__field(graph: STRAWBERRY)
 
-  """Added in 26.9.0. Page through the images the current user can reach."""
+  """Added in 26.10.0. Page through the images the current user can reach."""
   myImagesV2(
     """
     Uses narrowing the result. Each listed entity must be readable by the caller; images the caller cannot read are left out.
@@ -17665,12 +17667,12 @@ type Query
   scopedAuditLogsV2(scope: AuditLogScope!, filter: AuditLogFilter = null, orderBy: [AuditLogOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): AuditLogV2Connection @join__field(graph: STRAWBERRY)
 
   """
-  Added in 26.9.0. Every entity type the manager has operations wired for, in name order. What a field taking an entity type may be given is what this lists.
+  Added in 26.10.0. Every entity type the manager has operations wired for, in name order. What a field taking an entity type may be given is what this lists.
   """
   entityTypes: [EntityType!]! @join__field(graph: STRAWBERRY)
 
   """
-  Added in 26.9.0. Read the labels on the entities named. Scope items are OR'd, and naming an entity the caller cannot read refuses the whole read.
+  Added in 26.10.0. Read the labels on the entities named. Scope items are OR'd, and naming an entity the caller cannot read refuses the whole read.
   """
   entityLabels(scope: [EntityTarget!]!, filter: EntityLabelFilter = null, orderBy: [EntityLabelOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): EntityLabelConnection @join__field(graph: STRAWBERRY)
 
@@ -17694,7 +17696,7 @@ type Query
   """
   adminSessionsV2(
     """
-    Added in 26.9.0. Uses narrowing the result. Each listed entity must be readable by the caller; sessions the caller cannot read are left out.
+    Added in 26.10.0. Uses narrowing the result. Each listed entity must be readable by the caller; sessions the caller cannot read are left out.
     """
     usage: SessionUsage = null
     filter: SessionV2Filter = null
@@ -17714,7 +17716,7 @@ type Query
     scope: ProjectSessionV2Scope!
 
     """
-    Added in 26.9.0. Uses narrowing the result. Each listed entity must be readable by the caller; sessions the caller cannot read are left out.
+    Added in 26.10.0. Uses narrowing the result. Each listed entity must be readable by the caller; sessions the caller cannot read are left out.
     """
     usage: SessionUsage = null
     filter: SessionV2Filter = null
@@ -17728,13 +17730,13 @@ type Query
   ): SessionV2Connection @join__field(graph: STRAWBERRY)
 
   """
-  Added in 26.9.0. Page through the sessions the named scopes reach, combined with OR. Every scope is authorized before the read runs.
+  Added in 26.10.0. Page through the sessions the named scopes reach, combined with OR. Every scope is authorized before the read runs.
   """
   scopedSessionsV2(
     scope: SessionSearchScope!
 
     """
-    Added in 26.9.0. Uses narrowing the result. Each listed entity must be readable by the caller; sessions the caller cannot read are left out.
+    Added in 26.10.0. Uses narrowing the result. Each listed entity must be readable by the caller; sessions the caller cannot read are left out.
     """
     usage: SessionUsage = null
     filter: SessionV2Filter = null
@@ -17747,7 +17749,7 @@ type Query
     offset: Int = null
   ): SessionV2Connection @join__field(graph: STRAWBERRY)
 
-  """Added in 26.9.0. Page through the sessions the current user owns."""
+  """Added in 26.10.0. Page through the sessions the current user owns."""
   mySessionsV2(
     """
     Uses narrowing the result. Each listed entity must be readable by the caller; sessions the caller cannot read are left out.
@@ -17773,7 +17775,7 @@ type Query
     scope: ProjectDeploymentScope!
 
     """
-    Added in 26.9.0. Uses narrowing the result. Each listed entity must be readable by the caller; deployments the caller cannot read are left out.
+    Added in 26.10.0. Uses narrowing the result. Each listed entity must be readable by the caller; deployments the caller cannot read are left out.
     """
     usage: DeploymentUsage = null
     filter: DeploymentFilter = null
@@ -17787,13 +17789,13 @@ type Query
   ): ModelDeploymentConnection @join__field(graph: STRAWBERRY)
 
   """
-  Added in 26.9.0. Page through the deployments the named scopes reach, combined with OR. Every scope is authorized before the read runs.
+  Added in 26.10.0. Page through the deployments the named scopes reach, combined with OR. Every scope is authorized before the read runs.
   """
   scopedDeployments(
     scope: DeploymentSearchScope!
 
     """
-    Added in 26.9.0. Uses narrowing the result. Each listed entity must be readable by the caller; deployments the caller cannot read are left out.
+    Added in 26.10.0. Uses narrowing the result. Each listed entity must be readable by the caller; deployments the caller cannot read are left out.
     """
     usage: DeploymentUsage = null
     filter: DeploymentFilter = null
@@ -17809,7 +17811,7 @@ type Query
   """Added in 25.19.0. List deployments owned by the current user."""
   myDeployments(
     """
-    Added in 26.9.0. Uses narrowing the result. Each listed entity must be readable by the caller; deployments the caller cannot read are left out.
+    Added in 26.10.0. Uses narrowing the result. Each listed entity must be readable by the caller; deployments the caller cannot read are left out.
     """
     usage: DeploymentUsage = null
     filter: DeploymentFilter = null
@@ -17875,7 +17877,7 @@ type Query
   """
   adminRolePresets(
     """
-    Added in 26.9.0. Uses narrowing the result. Each listed entity must be readable by the caller.
+    Added in 26.10.0. Uses narrowing the result. Each listed entity must be readable by the caller.
     """
     usage: RolePresetUsage = null
     filter: RolePresetFilter = null
@@ -17896,7 +17898,7 @@ type Query
   """
   adminRoles(
     """
-    Added in 26.9.0. Uses narrowing the result. Each listed entity must be readable by the caller; roles the caller cannot read are left out.
+    Added in 26.10.0. Uses narrowing the result. Each listed entity must be readable by the caller; roles the caller cannot read are left out.
     """
     usage: RoleUsage = null
     filter: RoleFilter = null
@@ -17920,29 +17922,29 @@ type Query
   adminRoleAssignments(filter: RoleAssignmentFilter = null, orderBy: [RoleAssignmentOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): RoleAssignmentConnection @join__field(graph: STRAWBERRY)
 
   """
-  Added in 26.3.0. Search entity associations (admin only). Deprecated since 26.9.0.
+  Added in 26.3.0. Search entity associations (admin only). Deprecated since 26.10.0.
   """
-  adminEntities(filter: EntityFilter = null, orderBy: [EntityOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): EntityConnection @join__field(graph: STRAWBERRY) @deprecated(reason: "Deprecated since 26.9.0. The scope-entity association is removed; this connection is always empty.")
+  adminEntities(filter: EntityFilter = null, orderBy: [EntityOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): EntityConnection @join__field(graph: STRAWBERRY) @deprecated(reason: "Deprecated since 26.10.0. The scope-entity association is removed; this connection is always empty.")
 
   """
-  Added in 26.4.4. List all role invitations across the system (superadmin only). Deprecated since 26.9.0.
+  Added in 26.4.4. List all role invitations across the system (superadmin only). Deprecated since 26.10.0.
   """
-  adminRoleInvitations(filter: RoleInvitationFilter = null, orderBy: [RoleInvitationOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): RoleInvitationConnection @join__field(graph: STRAWBERRY) @deprecated(reason: "Deprecated since 26.9.0. Role invitations are removed; this connection is always empty.")
+  adminRoleInvitations(filter: RoleInvitationFilter = null, orderBy: [RoleInvitationOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): RoleInvitationConnection @join__field(graph: STRAWBERRY) @deprecated(reason: "Deprecated since 26.10.0. Role invitations are removed; this connection is always empty.")
 
   """
-  Added in 26.4.4. List the current user's role invitations. Deprecated since 26.9.0.
+  Added in 26.4.4. List the current user's role invitations. Deprecated since 26.10.0.
   """
-  myRoleInvitations(filter: RoleInvitationFilter = null, orderBy: [RoleInvitationOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): RoleInvitationConnection @join__field(graph: STRAWBERRY) @deprecated(reason: "Deprecated since 26.9.0. Role invitations are removed; this connection is always empty.")
+  myRoleInvitations(filter: RoleInvitationFilter = null, orderBy: [RoleInvitationOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): RoleInvitationConnection @join__field(graph: STRAWBERRY) @deprecated(reason: "Deprecated since 26.10.0. Role invitations are removed; this connection is always empty.")
 
   """
-  Added in 26.4.4. List role invitations sent by the current user. Deprecated since 26.9.0.
+  Added in 26.4.4. List role invitations sent by the current user. Deprecated since 26.10.0.
   """
-  mySentRoleInvitations(filter: RoleInvitationFilter = null, orderBy: [RoleInvitationOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): RoleInvitationConnection @join__field(graph: STRAWBERRY) @deprecated(reason: "Deprecated since 26.9.0. Role invitations are removed; this connection is always empty.")
+  mySentRoleInvitations(filter: RoleInvitationFilter = null, orderBy: [RoleInvitationOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): RoleInvitationConnection @join__field(graph: STRAWBERRY) @deprecated(reason: "Deprecated since 26.10.0. Role invitations are removed; this connection is always empty.")
 
   """
-  Added in 26.4.4. List invitations for a specific role. Deprecated since 26.9.0.
+  Added in 26.4.4. List invitations for a specific role. Deprecated since 26.10.0.
   """
-  roleScopedRoleInvitations(roleId: UUID!, filter: RoleInvitationFilter = null, orderBy: [RoleInvitationOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): RoleInvitationConnection @join__field(graph: STRAWBERRY) @deprecated(reason: "Deprecated since 26.9.0. Role invitations are removed; this connection is always empty.")
+  roleScopedRoleInvitations(roleId: UUID!, filter: RoleInvitationFilter = null, orderBy: [RoleInvitationOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): RoleInvitationConnection @join__field(graph: STRAWBERRY) @deprecated(reason: "Deprecated since 26.10.0. Role invitations are removed; this connection is always empty.")
 
   """
   Added in 26.4.2. List keypairs owned by the current authenticated user. Supports filtering, ordering, and both cursor-based and offset-based pagination.
@@ -17965,7 +17967,7 @@ type Query
   adminSshKeypairV2(accessKey: String!): AdminGetSSHKeypairPayload @join__field(graph: STRAWBERRY)
 
   """
-  Added in 26.9.0. Report the stored secrets of every encrypted column per key id (admin only). Requires superadmin privileges.
+  Added in 26.10.0. Report the stored secrets of every encrypted column per key id (admin only). Requires superadmin privileges.
   """
   adminSecretStatus: AdminSecretStatusPayload @join__field(graph: STRAWBERRY)
 
@@ -17980,14 +17982,14 @@ type Query
   myLoginHistoryV2(filter: LoginHistoryFilter = null, orderBy: [LoginHistoryOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): LoginHistoryV2Connection @join__field(graph: STRAWBERRY)
 
   """
-  Added in 26.3.0. List the assignment rows joining the current authenticated user to the roles they hold. Deprecated since 26.9.0. Use `myRolesV2`.
+  Added in 26.3.0. List the assignment rows joining the current authenticated user to the roles they hold. Deprecated since 26.10.0. Use `myRolesV2`.
   """
-  myRoles(filter: RoleAssignmentFilter = null, orderBy: [RoleAssignmentOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): RoleAssignmentConnection @join__field(graph: STRAWBERRY) @deprecated(reason: "Deprecated since 26.9.0. Use `myRolesV2`, which answers with the roles themselves.")
+  myRoles(filter: RoleAssignmentFilter = null, orderBy: [RoleAssignmentOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): RoleAssignmentConnection @join__field(graph: STRAWBERRY) @deprecated(reason: "Deprecated since 26.10.0. Use `myRolesV2`, which answers with the roles themselves.")
 
-  """Added in 26.9.0. List the roles the current authenticated user holds."""
+  """Added in 26.10.0. List the roles the current authenticated user holds."""
   myRolesV2(
     """
-    Added in 26.9.0. Uses narrowing the result. Each listed entity must be readable by the caller; roles the caller cannot read are left out.
+    Added in 26.10.0. Uses narrowing the result. Each listed entity must be readable by the caller; roles the caller cannot read are left out.
     """
     usage: RoleUsage = null
     filter: RoleFilter = null
@@ -18005,7 +18007,7 @@ type Query
     projectId: UUID!
 
     """
-    Added in 26.9.0. Uses narrowing the result. Each listed entity must be readable by the caller; roles the caller cannot read are left out.
+    Added in 26.10.0. Uses narrowing the result. Each listed entity must be readable by the caller; roles the caller cannot read are left out.
     """
     usage: RoleUsage = null
     filter: RoleFilter = null
@@ -18030,12 +18032,12 @@ type Query
   rbacPermissionMatrix: [ScopeEntityOperationCombination!] @join__field(graph: STRAWBERRY)
 
   """
-  Added in 26.9.0. The permissions the caller holds on one entity type within one scope, read through every scope that governs it. A scope that does not exist and a scope the caller reaches nothing on answer alike, with no bits.
+  Added in 26.10.0. The permissions the caller holds on one entity type within one scope, read through every scope that governs it. A scope that does not exist and a scope the caller reaches nothing on answer alike, with no bits.
   """
   myScopePermissions(input: MyScopePermissionsInput!): MyScopePermissionsPayload @join__field(graph: STRAWBERRY)
 
   """
-  Added in 26.9.0. The same answer as `myScopePermissions` for several targets at once, resolved in one grouped pass. Atomic: there is no per-target failure, so the payload carries no failure channel and the whole query fails or none of it does.
+  Added in 26.10.0. The same answer as `myScopePermissions` for several targets at once, resolved in one grouped pass. Atomic: there is no per-target failure, so the payload carries no failure channel and the whole query fails or none of it does.
   """
   myAtomicBulkScopePermissions(input: MyAtomicBulkScopePermissionsInput!): MyAtomicBulkScopePermissionsPayload @join__field(graph: STRAWBERRY)
 
@@ -18192,7 +18194,7 @@ type Query
   projectUsersV2(scope: ProjectUserV2Scope!, filter: UserV2Filter = null, orderBy: [UserV2OrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): UserV2Connection @join__field(graph: STRAWBERRY)
 
   """
-  Added in 26.9.0. Page through the users the named scopes reach, combined with OR. Every scope is authorized before the read runs.
+  Added in 26.10.0. Page through the users the named scopes reach, combined with OR. Every scope is authorized before the read runs.
   """
   scopedUsersV2(scope: UserScope!, filter: UserV2Filter = null, orderBy: [UserV2OrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): UserV2Connection @join__field(graph: STRAWBERRY)
 
@@ -18210,7 +18212,7 @@ type Query
   rgDomainsV2(scope: ResourceGroupDomainScope!, filter: DomainV2Filter = null, orderBy: [DomainV2OrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): DomainV2Connection @join__field(graph: STRAWBERRY)
 
   """
-  Added in 26.9.0. Page through the domains the named scopes reach, combined with OR. Every scope is authorized before the read runs.
+  Added in 26.10.0. Page through the domains the named scopes reach, combined with OR. Every scope is authorized before the read runs.
   """
   scopedDomainsV2(scope: DomainScope!, filter: DomainV2Filter = null, orderBy: [DomainV2OrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): DomainV2Connection @join__field(graph: STRAWBERRY)
 
@@ -18230,12 +18232,12 @@ type Query
   domainProjectsV2(scope: DomainProjectV2Scope!, filter: ProjectV2Filter = null, orderBy: [ProjectV2OrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ProjectV2Connection @join__field(graph: STRAWBERRY)
 
   """
-  Added in 26.9.0. Page through the projects the named scopes reach, combined with OR. Every scope is authorized before the read runs.
+  Added in 26.10.0. Page through the projects the named scopes reach, combined with OR. Every scope is authorized before the read runs.
   """
   scopedProjectsV2(scope: ProjectScope!, filter: ProjectV2Filter = null, orderBy: [ProjectV2OrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ProjectV2Connection @join__field(graph: STRAWBERRY)
 
   """
-  Added in 26.9.0. Page through the projects the current user is a member of.
+  Added in 26.10.0. Page through the projects the current user is a member of.
   """
   myProjectsV2(filter: ProjectV2Filter = null, orderBy: [ProjectV2OrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ProjectV2Connection @join__field(graph: STRAWBERRY)
 
@@ -18281,7 +18283,7 @@ type Query
   myUserResourcePolicyV2: UserResourcePolicyV2 @join__field(graph: STRAWBERRY)
 
   """
-  Added in 26.9.0. Get the resource policy the named project is subject to.
+  Added in 26.10.0. Get the resource policy the named project is subject to.
   """
   scopedProjectResourcePolicyV2(projectId: ID!): ProjectResourcePolicyV2 @join__field(graph: STRAWBERRY)
 
@@ -18317,7 +18319,7 @@ type Query
   """Added in 26.4.2. Search runtime variants."""
   runtimeVariants(
     """
-    Added in 26.9.0. Uses narrowing the result. Each listed entity must be readable by the caller.
+    Added in 26.10.0. Uses narrowing the result. Each listed entity must be readable by the caller.
     """
     usage: RuntimeVariantUsage = null
     filter: RuntimeVariantFilter = null
@@ -18334,7 +18336,7 @@ type Query
   runtimeVariant(id: UUID!): RuntimeVariant @join__field(graph: STRAWBERRY)
 
   """
-  Added in 26.9.0. Read the client IP masking set for every target (superadmin only).
+  Added in 26.10.0. Read the client IP masking set for every target (superadmin only).
   """
   adminClientIpMaskingPolicies(filter: ClientIPMaskingPolicyFilter = null, orderBy: [ClientIPMaskingPolicyOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ClientIPMaskingPolicyConnection @join__field(graph: STRAWBERRY)
 
@@ -18347,17 +18349,17 @@ type Query
   adminRetentionPolicy(id: UUID!): RetentionPolicy @join__field(graph: STRAWBERRY)
 
   """
-  Added in 26.9.0. Read one share by id, from the side that offered it. The receiving side reaches theirs through the search addressed to it.
+  Added in 26.10.0. Read one share by id, from the side that offered it. The receiving side reaches theirs through the search addressed to it.
   """
   entityShare(id: UUID!): EntityShare @join__field(graph: STRAWBERRY)
 
   """
-  Added in 26.9.0. Page through the shares the named scopes reach, combined with OR. Every scope is authorized before the read runs.
+  Added in 26.10.0. Page through the shares the named scopes reach, combined with OR. Every scope is authorized before the read runs.
   """
   entityShares(scope: EntityShareScope!, filter: EntityShareFilter = null, orderBy: [EntityShareOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): EntityShareConnection @join__field(graph: STRAWBERRY)
 
   """
-  Added in 26.9.0. Page through the shares the caller stands on a side of. Naming no side reads both.
+  Added in 26.10.0. Page through the shares the caller stands on a side of. Naming no side reads both.
   """
   myEntityShares(sides: [EntityShareSide!] = null, filter: EntityShareFilter = null, orderBy: [EntityShareOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): EntityShareConnection @join__field(graph: STRAWBERRY)
 
@@ -18370,7 +18372,7 @@ type Query
   """Added in 26.4.2. Search deployment revision presets."""
   deploymentRevisionPresets(
     """
-    Added in 26.9.0. Uses narrowing the result. Each listed entity must be readable by the caller.
+    Added in 26.10.0. Uses narrowing the result. Each listed entity must be readable by the caller.
     """
     usage: DeploymentRevisionPresetUsage = null
     filter: DeploymentRevisionPresetFilter = null
@@ -18389,7 +18391,7 @@ type Query
   """Added in 26.4.2. Search all model cards (superadmin only)."""
   adminModelCardsV2(
     """
-    Added in 26.9.0. Uses narrowing the result. Each listed entity must be readable by the caller; model cards the caller cannot read are left out.
+    Added in 26.10.0. Uses narrowing the result. Each listed entity must be readable by the caller; model cards the caller cannot read are left out.
     """
     usage: ModelCardUsage = null
     filter: ModelCardV2Filter = null
@@ -18407,7 +18409,7 @@ type Query
     scope: ProjectModelCardV2Scope!
 
     """
-    Added in 26.9.0. Uses narrowing the result. Each listed entity must be readable by the caller; model cards the caller cannot read are left out.
+    Added in 26.10.0. Uses narrowing the result. Each listed entity must be readable by the caller; model cards the caller cannot read are left out.
     """
     usage: ModelCardUsage = null
     filter: ModelCardV2Filter = null
@@ -18421,13 +18423,13 @@ type Query
   ): ModelCardV2Connection @join__field(graph: STRAWBERRY)
 
   """
-  Added in 26.9.0. Page through the model cards the named scopes reach, combined with OR. Every scope is authorized before the read runs.
+  Added in 26.10.0. Page through the model cards the named scopes reach, combined with OR. Every scope is authorized before the read runs.
   """
   scopedModelCardsV2(
     scope: ModelCardScope!
 
     """
-    Added in 26.9.0. Uses narrowing the result. Each listed entity must be readable by the caller; model cards the caller cannot read are left out.
+    Added in 26.10.0. Uses narrowing the result. Each listed entity must be readable by the caller; model cards the caller cannot read are left out.
     """
     usage: ModelCardUsage = null
     filter: ModelCardV2Filter = null
@@ -18441,7 +18443,7 @@ type Query
   ): ModelCardV2Connection @join__field(graph: STRAWBERRY)
 
   """
-  Added in 26.9.0. Page through the model cards the current user holds through membership.
+  Added in 26.10.0. Page through the model cards the current user holds through membership.
   """
   myModelCardsV2(
     """
@@ -18496,7 +18498,7 @@ type Query
   """Added in 26.4.2. Search all virtual folders (superadmin only)."""
   adminVfoldersV2(
     """
-    Added in 26.9.0. Uses narrowing the result. Each listed entity must be readable by the caller; vfolders the caller cannot read are left out.
+    Added in 26.10.0. Uses narrowing the result. Each listed entity must be readable by the caller; vfolders the caller cannot read are left out.
     """
     usage: VFolderUsage = null
     filter: VFolderFilter = null
@@ -18517,7 +18519,7 @@ type Query
     projectId: UUID!
 
     """
-    Added in 26.9.0. Uses narrowing the result. Each listed entity must be readable by the caller; vfolders the caller cannot read are left out.
+    Added in 26.10.0. Uses narrowing the result. Each listed entity must be readable by the caller; vfolders the caller cannot read are left out.
     """
     usage: VFolderUsage = null
     filter: VFolderFilter = null
@@ -18531,13 +18533,13 @@ type Query
   ): VFolderConnection @join__field(graph: STRAWBERRY)
 
   """
-  Added in 26.9.0. Page through the virtual folders the named scopes reach, combined with OR. Every scope is authorized before the read runs.
+  Added in 26.10.0. Page through the virtual folders the named scopes reach, combined with OR. Every scope is authorized before the read runs.
   """
   scopedVFoldersV2(
     scope: VFolderScope!
 
     """
-    Added in 26.9.0. Uses narrowing the result. Each listed entity must be readable by the caller; vfolders the caller cannot read are left out.
+    Added in 26.10.0. Uses narrowing the result. Each listed entity must be readable by the caller; vfolders the caller cannot read are left out.
     """
     usage: VFolderUsage = null
     filter: VFolderFilter = null
@@ -18551,7 +18553,7 @@ type Query
   ): VFolderConnection @join__field(graph: STRAWBERRY)
 
   """
-  Added in 26.9.0. The mount levels set on a virtual folder, one row per user.
+  Added in 26.10.0. The mount levels set on a virtual folder, one row per user.
   """
   vfolderMountPolicies(vfolderId: UUID!): VFolderMountPoliciesPayload @join__field(graph: STRAWBERRY)
 
@@ -18560,7 +18562,7 @@ type Query
   """
   myVfolders(
     """
-    Added in 26.9.0. Uses narrowing the result. Each listed entity must be readable by the caller; vfolders the caller cannot read are left out.
+    Added in 26.10.0. Uses narrowing the result. Each listed entity must be readable by the caller; vfolders the caller cannot read are left out.
     """
     usage: VFolderUsage = null
     filter: VFolderFilter = null
@@ -18584,7 +18586,7 @@ type QueryDefinition implements Node
   """The Globally Unique ID of this object"""
   id: ID!
 
-  """Added in 26.9.0. UUID of the query preset."""
+  """Added in 26.10.0. UUID of the query preset."""
   entityId: UUID!
 
   """Human-readable query definition identifier."""
@@ -18811,7 +18813,7 @@ input QuotaScopeInput
 }
 
 """
-Added in 26.3.0. Unified RBAC element type for scope-entity relationships. Deprecated since 26.9.0. Use an entity type string.
+Added in 26.3.0. Unified RBAC element type for scope-entity relationships. Deprecated since 26.10.0. Use an entity type string.
 """
 enum RBACElementType
   @join__type(graph: STRAWBERRY)
@@ -18864,7 +18866,7 @@ enum RBACElementType
 }
 
 """
-Added in 26.4.4. Filter for RBAC element type fields (scope_type / entity_type). Supports equals / in / not_equals / not_in. Deprecated since 26.9.0. Use `StringFilter`.
+Added in 26.4.4. Filter for RBAC element type fields (scope_type / entity_type). Supports equals / in / not_equals / not_in. Deprecated since 26.10.0. Use `StringFilter`.
 """
 input RBACElementTypeFilter
   @join__type(graph: STRAWBERRY)
@@ -18933,7 +18935,7 @@ type RejectArtifactPayload
 }
 
 """
-Added in 26.4.4. Input for rejecting a role invitation. Deprecated since 26.9.0. Use role assignments.
+Added in 26.4.4. Input for rejecting a role invitation. Deprecated since 26.10.0. Use role assignments.
 """
 input RejectRoleInvitationInput
   @join__type(graph: STRAWBERRY)
@@ -19000,13 +19002,13 @@ type ReplaceRolePermissionFailureInfo
   @join__type(graph: STRAWBERRY)
 {
   """Scope element type of the failed entry."""
-  scopeType: String @deprecated(reason: "Deprecated since 26.9.0. A permission follows the scope of its role; this field is always null.")
+  scopeType: String @deprecated(reason: "Deprecated since 26.10.0. A permission follows the scope of its role; this field is always null.")
 
   """Scope element ID of the failed entry."""
-  scopeId: String @deprecated(reason: "Deprecated since 26.9.0. A permission follows the scope of its role; this field is always null.")
+  scopeId: String @deprecated(reason: "Deprecated since 26.10.0. A permission follows the scope of its role; this field is always null.")
 
   """Operation type of the failed entry."""
-  operation: String @deprecated(reason: "Deprecated since 26.9.0. Use `permission`; this field is always null.")
+  operation: String @deprecated(reason: "Deprecated since 26.10.0. Use `permission`; this field is always null.")
 
   """Role ID of the failed entry."""
   roleId: UUID!
@@ -19054,16 +19056,16 @@ input ReplicaFilter
   healthStatus: ReplicaHealthStatusFilter = null
   trafficStatus: TrafficStatusFilter = null
 
-  """Added in 26.9.0. Filter by replica creation datetime."""
+  """Added in 26.10.0. Filter by replica creation datetime."""
   createdAt: DateTimeFilter = null
 
-  """Added in 26.9.0. Filter by replica ID."""
+  """Added in 26.10.0. Filter by replica ID."""
   fieldId: UUIDFilter = null
 
-  """Added in 26.9.0. Filter by session ID."""
+  """Added in 26.10.0. Filter by session ID."""
   sessionId: UUIDFilter = null
 
-  """Added in 26.9.0. Filter by revision ID."""
+  """Added in 26.10.0. Filter by revision ID."""
   revisionId: UUIDFilter = null
   AND: [ReplicaFilter!] = null
   OR: [ReplicaFilter!] = null
@@ -19078,7 +19080,7 @@ type ReplicaGroupHistory implements Node
   """The Globally Unique ID of this object"""
   id: ID!
 
-  """Added in 26.9.0. UUID of the replica group history record."""
+  """Added in 26.10.0. UUID of the replica group history record."""
   fieldId: UUID!
   deploymentId: ID!
   category: ReplicaGroupHistoryCategory!
@@ -19219,7 +19221,7 @@ input ReplicaNestedFilter
   @join__type(graph: STRAWBERRY)
 {
   """
-  Added in 26.9.0. Matches parents that have at least one replica when true, and parents with none when false. Says nothing about what the replicas hold.
+  Added in 26.10.0. Matches parents that have at least one replica when true, and parents with none when false. Says nothing about what the replicas hold.
   """
   exists: Boolean = null
 
@@ -19324,7 +19326,7 @@ type ReservoirRegistry implements Node
   """The Globally Unique ID of this object"""
   id: ID!
 
-  """Added in 26.9.0. UUID of the reservoir registry."""
+  """Added in 26.10.0. UUID of the reservoir registry."""
   entityId: UUID!
   name: String!
   endpoint: String!
@@ -19432,7 +19434,7 @@ type ResourceGroup implements Node
   """The Globally Unique ID of this object"""
   id: ID!
 
-  """Added in 26.9.0. UUID of the resource group."""
+  """Added in 26.10.0. UUID of the resource group."""
   entityId: UUID!
 
   """
@@ -19476,13 +19478,13 @@ type ResourceGroup implements Node
   """
   resourceInfo: ResourceInfo
 
-  """Added in 26.9.0. Domains this resource group serves."""
+  """Added in 26.10.0. Domains this resource group serves."""
   domains(filter: DomainV2Filter = null, orderBy: [DomainV2OrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): DomainV2Connection
 
-  """Added in 26.9.0. Projects this resource group serves."""
+  """Added in 26.10.0. Projects this resource group serves."""
   projects(filter: ProjectV2Filter = null, orderBy: [ProjectV2OrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ProjectV2Connection
 
-  """Added in 26.9.0. The labels on this resource group."""
+  """Added in 26.10.0. The labels on this resource group."""
   entityLabels(filter: EntityLabelFilter = null, orderBy: [EntityLabelOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): EntityLabelConnection
 }
 
@@ -19527,7 +19529,7 @@ input ResourceGroupFilter
   isPublic: Boolean = null
   isDefault: Boolean = null
 
-  """Added in 26.9.0. Select entities by the labels on them."""
+  """Added in 26.10.0. Select entities by the labels on them."""
   labels: EntityLabelNestedFilter = null
   AND: [ResourceGroupFilter!] = null
   OR: [ResourceGroupFilter!] = null
@@ -19610,7 +19612,7 @@ type ResourceGroupSchedulerConfig
 }
 
 """
-Added in 26.9.0. Scope for the scoped resource group query. Each list is OR'd internally and across lists, and every scope named is authorized before the read runs.
+Added in 26.10.0. Scope for the scoped resource group query. Each list is OR'd internally and across lists, and every scope named is authorized before the read runs.
 """
 input ResourceGroupScope
   @join__type(graph: STRAWBERRY)
@@ -19642,7 +19644,7 @@ type ResourceGroupStatus
 }
 
 """
-Added in 26.9.0. Uses narrowing a resource group query; every id is AND-ed. The caller must be able to read each listed entity, or the request is refused. Only resource groups the caller can read are returned, even when a listed entity is tied to others.
+Added in 26.10.0. Uses narrowing a resource group query; every id is AND-ed. The caller must be able to read each listed entity, or the request is refused. Only resource groups the caller can read are returned, even when a listed entity is tied to others.
 """
 input ResourceGroupUsage
   @join__type(graph: STRAWBERRY)
@@ -19671,7 +19673,7 @@ type ResourceGroupUsageV2
 }
 
 """
-Added in 26.9.0. Entities whose use of a resource group narrows the read.
+Added in 26.10.0. Entities whose use of a resource group narrows the read.
 """
 input ResourceGroupUsedBy
   @join__type(graph: STRAWBERRY)
@@ -19856,7 +19858,7 @@ type ResourcePresetV2 implements Node
   """The Globally Unique ID of this object"""
   id: ID!
 
-  """Added in 26.9.0. UUID of the resource preset."""
+  """Added in 26.10.0. UUID of the resource preset."""
   entityId: UUID!
 
   """Resource preset name."""
@@ -19949,7 +19951,7 @@ type ResourceSlotType implements Node
   """The Globally Unique ID of this object"""
   id: ID!
 
-  """Added in 26.9.0. UUID of the resource slot type."""
+  """Added in 26.10.0. UUID of the resource slot type."""
   entityId: UUID!
 
   """
@@ -19962,11 +19964,11 @@ type ResourceSlotType implements Node
   """
   slotType: String!
 
-  """Added in 26.9.0. Whether a session request must name this slot."""
+  """Added in 26.10.0. Whether a session request must name this slot."""
   required: Boolean!
 
   """
-  Added in 26.9.0. Whether the scheduler considers this slot when placing sessions. A disabled slot is ignored by the image slot-type rule.
+  Added in 26.10.0. Whether the scheduler considers this slot when placing sessions. A disabled slot is ignored by the image slot-type rule.
   """
   enabled: Boolean!
 
@@ -20105,7 +20107,7 @@ type RestoreArtifactsPayload
   artifacts: [Artifact!]!
 }
 
-"""Added in 26.9.0. Payload for domain restore mutation."""
+"""Added in 26.10.0. Payload for domain restore mutation."""
 type RestoreDomainPayload
   @join__type(graph: STRAWBERRY)
 {
@@ -20113,7 +20115,7 @@ type RestoreDomainPayload
   restored: Boolean!
 }
 
-"""Added in 26.9.0. Payload for project restore mutation."""
+"""Added in 26.10.0. Payload for project restore mutation."""
 type RestoreProjectPayload
   @join__type(graph: STRAWBERRY)
 {
@@ -20121,7 +20123,7 @@ type RestoreProjectPayload
   restored: Boolean!
 }
 
-"""Added in 26.9.0. Payload for single user restore mutation."""
+"""Added in 26.10.0. Payload for single user restore mutation."""
 type RestoreUserV2Payload
   @join__type(graph: STRAWBERRY)
 {
@@ -20165,7 +20167,7 @@ type RetentionPolicy implements Node
   """The Globally Unique ID of this object"""
   id: ID!
 
-  """Added in 26.9.0. UUID of the retention policy."""
+  """Added in 26.10.0. UUID of the retention policy."""
   entityId: UUID!
 
   """Retention category."""
@@ -20309,7 +20311,7 @@ input RGDomainFairShareFilter
   domainName: StringFilter = null
 
   """Filter by the domain this fair share is calculated for."""
-  domain: DomainFairShareDomainNestedFilter = null @deprecated(reason: "Deprecated since 26.9.0. A filter on another entity's columns cannot check whether the caller may read that row. Search domains first, then narrow by domainName.")
+  domain: DomainFairShareDomainNestedFilter = null @deprecated(reason: "Deprecated since 26.10.0. A filter on another entity's columns cannot check whether the caller may read that row. Search domains first, then narrow by domainName.")
 
   """Combine with AND logic."""
   AND: [RGDomainFairShareFilter!] = null
@@ -20337,7 +20339,7 @@ input RGProjectFairShareFilter
   domainName: StringFilter = null
 
   """Filter by the project this fair share is calculated for."""
-  project: ProjectFairShareProjectNestedFilter = null @deprecated(reason: "Deprecated since 26.9.0. A filter on another entity's columns cannot check whether the caller may read that row. Search projects first, then narrow by projectId.")
+  project: ProjectFairShareProjectNestedFilter = null @deprecated(reason: "Deprecated since 26.10.0. A filter on another entity's columns cannot check whether the caller may read that row. Search projects first, then narrow by projectId.")
 
   """Combine with AND logic."""
   AND: [RGProjectFairShareFilter!] = null
@@ -20368,7 +20370,7 @@ input RGUserFairShareFilter
   domainName: StringFilter = null
 
   """Filter by the user this fair share is calculated for."""
-  user: UserFairShareUserNestedFilter = null @deprecated(reason: "Deprecated since 26.9.0. A filter on another entity's columns cannot check whether the caller may read that row. Search users first, then narrow by userUuid.")
+  user: UserFairShareUserNestedFilter = null @deprecated(reason: "Deprecated since 26.10.0. A filter on another entity's columns cannot check whether the caller may read that row. Search users first, then narrow by userUuid.")
 
   """Combine with AND logic."""
   AND: [RGUserFairShareFilter!] = null
@@ -20388,7 +20390,7 @@ type Role implements Node
   """The Globally Unique ID of this object"""
   id: ID!
 
-  """Added in 26.9.0. UUID of the role."""
+  """Added in 26.10.0. UUID of the role."""
   entityId: UUID!
   name: String!
   description: String
@@ -20403,22 +20405,22 @@ type Role implements Node
   """
   autoAssign: Boolean!
 
-  """Added in 26.9.0. Type of the scope the role belongs to."""
+  """Added in 26.10.0. Type of the scope the role belongs to."""
   scopeType: String!
 
-  """Added in 26.9.0. ID of the scope the role belongs to."""
+  """Added in 26.10.0. ID of the scope the role belongs to."""
   scopeId: UUID!
 
   """
-  Added in 26.9.0. ID of the role preset the role was instantiated from. Null when the role was not created from a preset or the preset has been purged.
+  Added in 26.10.0. ID of the role preset the role was instantiated from. Null when the role was not created from a preset or the preset has been purged.
   """
   rolePresetId: UUID
 
-  """Added in 26.9.0. The scope the role belongs to."""
+  """Added in 26.10.0. The scope the role belongs to."""
   scope: EntityNode
 
   """
-  Added in 26.9.0. The role preset the role was instantiated from. Null when the role was not created from a preset or the preset has been purged.
+  Added in 26.10.0. The role preset the role was instantiated from. Null when the role was not created from a preset or the preset has been purged.
   """
   rolePreset: RolePreset
 
@@ -20426,17 +20428,17 @@ type Role implements Node
   permissions(filter: PermissionFilter = null, orderBy: [PermissionOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): PermissionConnection
 
   """
-  Added in 26.3.0. Users assigned to this role, as assignment rows. Deprecated since 26.9.0. Use `usersV2`.
+  Added in 26.3.0. Users assigned to this role, as assignment rows. Deprecated since 26.10.0. Use `usersV2`.
   """
-  users(filter: RoleAssignmentFilter = null, orderBy: [RoleAssignmentOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): RoleAssignmentConnection @deprecated(reason: "Deprecated since 26.9.0. Use `usersV2`, which answers with the users themselves.")
+  users(filter: RoleAssignmentFilter = null, orderBy: [RoleAssignmentOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): RoleAssignmentConnection @deprecated(reason: "Deprecated since 26.10.0. Use `usersV2`, which answers with the users themselves.")
 
-  """Added in 26.9.0. Users holding this role."""
+  """Added in 26.10.0. Users holding this role."""
   usersV2(filter: UserV2Filter = null, orderBy: [UserV2OrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): UserV2Connection
 
   """
-  Added in 26.4.2. Scopes this role is registered in. Deprecated since 26.9.0. Use `scope`.
+  Added in 26.4.2. Scopes this role is registered in. Deprecated since 26.10.0. Use `scope`.
   """
-  scopes(filter: EntityFilter = null, orderBy: [EntityOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): EntityConnection @deprecated(reason: "Deprecated since 26.9.0. Use `scope`. A role belongs to one scope, so this connection holds that one scope and ignores `filter` and `order_by`.")
+  scopes(filter: EntityFilter = null, orderBy: [EntityOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): EntityConnection @deprecated(reason: "Deprecated since 26.10.0. Use `scope`. A role belongs to one scope, so this connection holds that one scope and ignores `filter` and `order_by`.")
 }
 
 """Added in 26.3.0. RBAC role assignment (user-role association)."""
@@ -20497,10 +20499,10 @@ input RoleAssignmentFilter
   roleId: UUIDFilter = null
 
   """Filter assignments by the role they name."""
-  role: RoleAssignmentRoleNestedFilter = null @deprecated(reason: "Deprecated since 26.9.0. A filter on the role an assignment names, or on what that role carries, cannot check whether the caller may read it. Search roles first and narrow by `roleId`.")
+  role: RoleAssignmentRoleNestedFilter = null @deprecated(reason: "Deprecated since 26.10.0. A filter on the role an assignment names, or on what that role carries, cannot check whether the caller may read it. Search roles first and narrow by `roleId`.")
 
   """Filter assignments by the permissions their role carries."""
-  permission: PermissionNestedFilter = null @deprecated(reason: "Deprecated since 26.9.0. A filter on the role an assignment names, or on what that role carries, cannot check whether the caller may read it. Search roles first and narrow by `roleId`.")
+  permission: PermissionNestedFilter = null @deprecated(reason: "Deprecated since 26.10.0. A filter on the role an assignment names, or on what that role carries, cannot check whether the caller may read it. Search roles first and narrow by `roleId`.")
   username: StringFilter = null
   email: StringFilter = null
   AND: [RoleAssignmentFilter!] = null
@@ -20571,11 +20573,11 @@ input RoleFilter
   status: RoleStatusFilter = null
 
   """Filter roles by the users holding them."""
-  assignedUser: RoleUserNestedFilter = null @deprecated(reason: "Deprecated since 26.9.0. A filter reaching the rows that join a role to a user cannot check whether the caller may read that user. Search roles within that user's scope instead.")
+  assignedUser: RoleUserNestedFilter = null @deprecated(reason: "Deprecated since 26.10.0. A filter reaching the rows that join a role to a user cannot check whether the caller may read that user. Search roles within that user's scope instead.")
   mappedScope: RoleMappedScopeNestedFilter = null
 
   """
-  Added in 26.9.0. Filter by conditions on the role's permission entries.
+  Added in 26.10.0. Filter by conditions on the role's permission entries.
   """
   permissions: RolePermissionNestedFilter = null
   AND: [RoleFilter!] = null
@@ -20584,7 +20586,7 @@ input RoleFilter
 }
 
 """
-Added in 26.4.4. A role invitation. Deprecated since 26.9.0. Use role assignments.
+Added in 26.4.4. A role invitation. Deprecated since 26.10.0. Use role assignments.
 """
 type RoleInvitation implements Node
   @join__implements(graph: STRAWBERRY, interface: "Node")
@@ -20626,7 +20628,7 @@ type RoleInvitation implements Node
 }
 
 """
-Added in 26.4.4. Role invitation connection. Deprecated since 26.9.0. Use role assignments.
+Added in 26.4.4. Role invitation connection. Deprecated since 26.10.0. Use role assignments.
 """
 type RoleInvitationConnection
   @join__type(graph: STRAWBERRY)
@@ -20651,7 +20653,7 @@ type RoleInvitationEdge
 }
 
 """
-Added in 26.4.4. Filter for role invitations. Deprecated since 26.9.0. Use role assignments.
+Added in 26.4.4. Filter for role invitations. Deprecated since 26.10.0. Use role assignments.
 """
 input RoleInvitationFilter
   @join__type(graph: STRAWBERRY)
@@ -20667,7 +20669,7 @@ input RoleInvitationFilter
 }
 
 """
-Added in 26.4.4. Order by specification for role invitations. Deprecated since 26.9.0. Use role assignments.
+Added in 26.4.4. Order by specification for role invitations. Deprecated since 26.10.0. Use role assignments.
 """
 input RoleInvitationOrderBy
   @join__type(graph: STRAWBERRY)
@@ -20677,7 +20679,7 @@ input RoleInvitationOrderBy
 }
 
 """
-Added in 26.4.4. Role invitation ordering field. Deprecated since 26.9.0. Use role assignments.
+Added in 26.4.4. Role invitation ordering field. Deprecated since 26.10.0. Use role assignments.
 """
 enum RoleInvitationOrderField
   @join__type(graph: STRAWBERRY)
@@ -20688,7 +20690,7 @@ enum RoleInvitationOrderField
 }
 
 """
-Added in 26.4.4. Nested filter for the role associated with an invitation. Deprecated since 26.9.0. Use role assignments.
+Added in 26.4.4. Nested filter for the role associated with an invitation. Deprecated since 26.10.0. Use role assignments.
 """
 input RoleInvitationRoleNestedFilter
   @join__type(graph: STRAWBERRY)
@@ -20697,7 +20699,7 @@ input RoleInvitationRoleNestedFilter
 }
 
 """
-Added in 26.4.4. Role invitation state. Deprecated since 26.9.0. Use role assignments.
+Added in 26.4.4. Role invitation state. Deprecated since 26.10.0. Use role assignments.
 """
 enum RoleInvitationState
   @join__type(graph: STRAWBERRY)
@@ -20709,7 +20711,7 @@ enum RoleInvitationState
 }
 
 """
-Added in 26.4.4. Filter for role invitation state. Deprecated since 26.9.0. Use role assignments.
+Added in 26.4.4. Filter for role invitation state. Deprecated since 26.10.0. Use role assignments.
 """
 input RoleInvitationStateFilter
   @join__type(graph: STRAWBERRY)
@@ -20727,7 +20729,7 @@ input RoleInvitationStateFilter
 }
 
 """
-Added in 26.4.4. Nested filter for a user (inviter or invitee) of an invitation. Deprecated since 26.9.0. Use role assignments.
+Added in 26.4.4. Nested filter for a user (inviter or invitee) of an invitation. Deprecated since 26.10.0. Use role assignments.
 """
 input RoleInvitationUserNestedFilter
   @join__type(graph: STRAWBERRY)
@@ -20766,7 +20768,7 @@ enum RoleOrderField
 }
 
 """
-Added in 26.9.0. Filter roles by conditions on the permission entries they carry.
+Added in 26.10.0. Filter roles by conditions on the permission entries they carry.
 """
 input RolePermissionNestedFilter
   @join__type(graph: STRAWBERRY)
@@ -20798,7 +20800,7 @@ type RolePermissionPreset implements Node
   """The Globally Unique ID of this object"""
   id: ID!
 
-  """Added in 26.9.0. UUID of the role permission preset."""
+  """Added in 26.10.0. UUID of the role permission preset."""
   fieldId: UUID!
 
   """UUID of the parent role preset."""
@@ -20814,7 +20816,7 @@ type RolePermissionPreset implements Node
   createdAt: DateTime!
 
   """Operation granted by the permission."""
-  operation: OperationType @deprecated(reason: "Deprecated since 26.9.0. Use `permission`; this field is always null.")
+  operation: OperationType @deprecated(reason: "Deprecated since 26.10.0. Use `permission`; this field is always null.")
 }
 
 """
@@ -20857,7 +20859,7 @@ input RolePermissionPresetEntryInput
   permission: PermissionBit!
 
   """Operation granted by the permission."""
-  operation: OperationType = null @deprecated(reason: "Deprecated since 26.9.0. Use `permission`; the value is ignored.")
+  operation: OperationType = null @deprecated(reason: "Deprecated since 26.10.0. Use `permission`; the value is ignored.")
 }
 
 """
@@ -20876,7 +20878,7 @@ input RolePermissionPresetFilter
   permission: PermissionBitFilter = null
 
   """Filter by granted operation."""
-  operation: OperationTypeFilter = null @deprecated(reason: "Deprecated since 26.9.0. Use `permission`; the value is ignored.")
+  operation: OperationTypeFilter = null @deprecated(reason: "Deprecated since 26.10.0. Use `permission`; the value is ignored.")
 
   """Filter by creation timestamp."""
   createdAt: DateTimeFilter = null
@@ -20915,7 +20917,7 @@ enum RolePermissionPresetOrderField
   ENTITY_TYPE @join__enumValue(graph: STRAWBERRY)
   PERMISSION @join__enumValue(graph: STRAWBERRY)
   CREATED_AT @join__enumValue(graph: STRAWBERRY)
-  OPERATION @join__enumValue(graph: STRAWBERRY) @deprecated(reason: "Deprecated since 26.9.0. Use `PERMISSION`; ordering by it is ignored.")
+  OPERATION @join__enumValue(graph: STRAWBERRY) @deprecated(reason: "Deprecated since 26.10.0. Use `PERMISSION`; ordering by it is ignored.")
 }
 
 """
@@ -20928,7 +20930,7 @@ type RolePreset implements Node
   """The Globally Unique ID of this object"""
   id: ID!
 
-  """Added in 26.9.0. UUID of the role preset."""
+  """Added in 26.10.0. UUID of the role preset."""
   entityId: UUID!
 
   """Role preset name."""
@@ -20986,7 +20988,7 @@ type RolePresetEdge
 input RolePresetFilter
   @join__type(graph: STRAWBERRY)
 {
-  """Added in 26.9.0. Filter by role preset ID."""
+  """Added in 26.10.0. Filter by role preset ID."""
   id: UUIDFilter = null
 
   """Filter by name."""
@@ -21004,7 +21006,7 @@ input RolePresetFilter
   deleted: Boolean = null
 
   """
-  Added in 26.9.0. Filter by conditions on the permission entries the preset carries.
+  Added in 26.10.0. Filter by conditions on the permission entries the preset carries.
   """
   permissions: RolePresetPermissionNestedFilter = null
 
@@ -21042,7 +21044,7 @@ enum RolePresetOrderField
 }
 
 """
-Added in 26.9.0. Filter role presets by conditions on the permission entries they carry.
+Added in 26.10.0. Filter role presets by conditions on the permission entries they carry.
 """
 input RolePresetPermissionNestedFilter
   @join__type(graph: STRAWBERRY)
@@ -21067,7 +21069,7 @@ input RolePresetPermissionNestedFilter
 }
 
 """
-Added in 26.9.0. Uses narrowing a role preset query; every id is AND-ed. The caller must be able to read each listed entity, or the request is refused. Only presets the caller can read are returned, even when a listed entity is tied to others.
+Added in 26.10.0. Uses narrowing a role preset query; every id is AND-ed. The caller must be able to read each listed entity, or the request is refused. Only presets the caller can read are returned, even when a listed entity is tied to others.
 """
 input RolePresetUsage
   @join__type(graph: STRAWBERRY)
@@ -21076,7 +21078,9 @@ input RolePresetUsage
   usedBy: RolePresetUsedBy = null
 }
 
-"""Added in 26.9.0. Entities whose use of a role preset narrows the read."""
+"""
+Added in 26.10.0. Entities whose use of a role preset narrows the read.
+"""
 input RolePresetUsedBy
   @join__type(graph: STRAWBERRY)
 {
@@ -21140,7 +21144,7 @@ input RoleStatusFilter
 }
 
 """
-Added in 26.9.0. Uses narrowing a role query; every id is AND-ed. The caller must be able to read each listed entity, or the request is refused. Only roles the caller can read are returned, even when a listed entity is tied to others.
+Added in 26.10.0. Uses narrowing a role query; every id is AND-ed. The caller must be able to read each listed entity, or the request is refused. Only roles the caller can read are returned, even when a listed entity is tied to others.
 """
 input RoleUsage
   @join__type(graph: STRAWBERRY)
@@ -21159,7 +21163,7 @@ input RoleUserNestedFilter
   NOT: [RoleUserNestedFilter!] = null
 }
 
-"""Added in 26.9.0. Entities a role uses, whose ids narrow the read."""
+"""Added in 26.10.0. Entities a role uses, whose ids narrow the read."""
 input RoleUses
   @join__type(graph: STRAWBERRY)
 {
@@ -21185,7 +21189,7 @@ type Route implements Node
   """The Globally Unique ID of this object"""
   id: ID!
 
-  """Added in 26.9.0. UUID of the route."""
+  """Added in 26.10.0. UUID of the route."""
   fieldId: UUID!
   deploymentId: ID!
   sessionId: ID
@@ -21256,13 +21260,13 @@ input RouteFilter
   @join__type(graph: STRAWBERRY)
 {
   """Route lifecycle statuses to match."""
-  status: [RouteStatus!] = null @deprecated(reason: "Deprecated since 26.9.0. A bare list only asks for membership. Read the same rows through a deployment's `replicas` with `ReplicaFilter`, which also offers equals / notEquals / notIn.")
+  status: [RouteStatus!] = null @deprecated(reason: "Deprecated since 26.10.0. A bare list only asks for membership. Read the same rows through a deployment's `replicas` with `ReplicaFilter`, which also offers equals / notEquals / notIn.")
 
   """Route health statuses to match."""
-  healthStatus: [RouteHealthStatus!] = null @deprecated(reason: "Deprecated since 26.9.0. A bare list only asks for membership. Read the same rows through a deployment's `replicas` with `ReplicaFilter`, which also offers equals / notEquals / notIn.")
+  healthStatus: [RouteHealthStatus!] = null @deprecated(reason: "Deprecated since 26.10.0. A bare list only asks for membership. Read the same rows through a deployment's `replicas` with `ReplicaFilter`, which also offers equals / notEquals / notIn.")
 
   """Route traffic statuses to match."""
-  trafficStatus: [RouteTrafficStatus!] = null @deprecated(reason: "Deprecated since 26.9.0. A bare list only asks for membership. Read the same rows through a deployment's `replicas` with `ReplicaFilter`, which also offers equals / notEquals / notIn.")
+  trafficStatus: [RouteTrafficStatus!] = null @deprecated(reason: "Deprecated since 26.10.0. A bare list only asks for membership. Read the same rows through a deployment's `replicas` with `ReplicaFilter`, which also offers equals / notEquals / notIn.")
   AND: [RouteFilter!] = null
   OR: [RouteFilter!] = null
   NOT: [RouteFilter!] = null
@@ -21286,7 +21290,7 @@ type RouteHistory implements Node
   """The Globally Unique ID of this object"""
   id: ID!
 
-  """Added in 26.9.0. UUID of the route history record."""
+  """Added in 26.10.0. UUID of the route history record."""
   fieldId: UUID!
   routeId: ID!
   deploymentId: ID!
@@ -21452,7 +21456,7 @@ type RuntimeVariant implements Node
   """The Globally Unique ID of this object"""
   id: ID!
 
-  """Added in 26.9.0. UUID of the runtime variant."""
+  """Added in 26.10.0. UUID of the runtime variant."""
   entityId: UUID!
 
   """
@@ -21483,7 +21487,7 @@ type RuntimeVariant implements Node
 }
 
 """
-Added in 26.9.0. One failed item of a partial-success bulk runtime variant operation.
+Added in 26.10.0. One failed item of a partial-success bulk runtime variant operation.
 """
 type RuntimeVariantBulkFailureInfo
   @join__type(graph: STRAWBERRY)
@@ -21651,7 +21655,7 @@ type RuntimeVariantPreset implements Node
   """The Globally Unique ID of this object"""
   id: ID!
 
-  """Added in 26.9.0. UUID of the runtime variant preset."""
+  """Added in 26.10.0. UUID of the runtime variant preset."""
   entityId: UUID!
 
   """The runtime variant this preset belongs to."""
@@ -21683,12 +21687,12 @@ type RuntimeVariantPreset implements Node
   required: Boolean!
 
   """
-  Added in 26.9.0. Runtime version this preset became available in; null means it always was.
+  Added in 26.10.0. Runtime version this preset became available in; null means it always was.
   """
   addedVersion: String
 
   """
-  Added in 26.9.0. Runtime version this preset was removed in, exclusive; null means it is still offered.
+  Added in 26.10.0. Runtime version this preset was removed in, exclusive; null means it is still offered.
   """
   deprecatedVersion: String
 
@@ -21713,7 +21717,7 @@ type RuntimeVariantPreset implements Node
   runtimeVariant: RuntimeVariant
 }
 
-"""Added in 26.9.0. Choice item input."""
+"""Added in 26.10.0. Choice item input."""
 input RuntimeVariantPresetChoiceItemInput
   @join__type(graph: STRAWBERRY)
 {
@@ -21724,7 +21728,7 @@ input RuntimeVariantPresetChoiceItemInput
   label: String!
 }
 
-"""Added in 26.9.0. Select UI config input."""
+"""Added in 26.10.0. Select UI config input."""
 input RuntimeVariantPresetChoiceOptionInput
   @join__type(graph: STRAWBERRY)
 {
@@ -21766,7 +21770,7 @@ input RuntimeVariantPresetFilter
   runtimeVariantId: UUIDFilter = null
 
   """
-  Added in 26.9.0. Keep only presets valid at this runtime version, that is added_version <= version < deprecated_version. Dot-separated numbers.
+  Added in 26.10.0. Keep only presets valid at this runtime version, that is added_version <= version < deprecated_version. Dot-separated numbers.
   """
   runtimeVersion: String = null
 
@@ -21780,7 +21784,7 @@ input RuntimeVariantPresetFilter
   NOT: [RuntimeVariantPresetFilter!] = null
 }
 
-"""Added in 26.9.0. Number input UI config input."""
+"""Added in 26.10.0. Number input UI config input."""
 input RuntimeVariantPresetNumberOptionInput
   @join__type(graph: STRAWBERRY)
 {
@@ -21813,7 +21817,7 @@ enum RuntimeVariantPresetOrderField
   DEPRECATED_VERSION @join__enumValue(graph: STRAWBERRY)
 }
 
-"""Added in 26.9.0. Slider UI config input."""
+"""Added in 26.10.0. Slider UI config input."""
 input RuntimeVariantPresetSliderOptionInput
   @join__type(graph: STRAWBERRY)
 {
@@ -21827,7 +21831,7 @@ input RuntimeVariantPresetSliderOptionInput
   step: Float! = 1
 }
 
-"""Added in 26.9.0. Text input UI config input."""
+"""Added in 26.10.0. Text input UI config input."""
 input RuntimeVariantPresetTextOptionInput
   @join__type(graph: STRAWBERRY)
 {
@@ -21835,7 +21839,7 @@ input RuntimeVariantPresetTextOptionInput
   placeholder: String = null
 }
 
-"""Added in 26.9.0. UI rendering options input."""
+"""Added in 26.10.0. UI rendering options input."""
 input RuntimeVariantPresetUIOptionInput
   @join__type(graph: STRAWBERRY)
 {
@@ -21855,7 +21859,7 @@ input RuntimeVariantPresetUIOptionInput
   text: RuntimeVariantPresetTextOptionInput = null
 }
 
-"""Added in 26.9.0. UI control type for a runtime variant preset."""
+"""Added in 26.10.0. UI control type for a runtime variant preset."""
 enum RuntimeVariantPresetUIType
   @join__type(graph: STRAWBERRY)
 {
@@ -21926,7 +21930,7 @@ input RuntimeVariantPresetValueInput
 }
 
 """
-Added in 26.9.0. Uses narrowing a runtime variant query; every id is AND-ed. The caller must be able to read each listed entity, or the request is refused. Only runtime variants the caller can read are returned, even when a listed entity is tied to others.
+Added in 26.10.0. Uses narrowing a runtime variant query; every id is AND-ed. The caller must be able to read each listed entity, or the request is refused. Only runtime variants the caller can read are returned, even when a listed entity is tied to others.
 """
 input RuntimeVariantUsage
   @join__type(graph: STRAWBERRY)
@@ -21936,7 +21940,7 @@ input RuntimeVariantUsage
 }
 
 """
-Added in 26.9.0. Entities whose use of a runtime variant narrows the read.
+Added in 26.10.0. Entities whose use of a runtime variant narrows the read.
 """
 input RuntimeVariantUsedBy
   @join__type(graph: STRAWBERRY)
@@ -22051,7 +22055,7 @@ enum ScalingState
   SCALING @join__enumValue(graph: STRAWBERRY)
 }
 
-"""Added in 26.9.0. Filter for the deployment scaling state."""
+"""Added in 26.10.0. Filter for the deployment scaling state."""
 input ScalingStateFilter
   @join__type(graph: STRAWBERRY)
 {
@@ -22237,7 +22241,7 @@ enum SchedulingStatus
 }
 
 """
-Added in 26.9.0. Upsert many fragments at one scope; the scope is named once for all items.
+Added in 26.10.0. Upsert many fragments at one scope; the scope is named once for all items.
 """
 input ScopedUpsertAppConfigFragmentsInput
   @join__type(graph: STRAWBERRY)
@@ -22276,7 +22280,7 @@ type ScopeEntityOperationCombination
 }
 
 """
-Added in 26.9.0. The bits the caller holds on one entity type within one scope.
+Added in 26.10.0. The bits the caller holds on one entity type within one scope.
 """
 type ScopeEntityPermission
   @join__type(graph: STRAWBERRY)
@@ -22329,7 +22333,7 @@ type ScopeResourceUsageV2
 }
 
 """
-Added in 26.9.0. How many stored secrets of one column one provider's one key holds.
+Added in 26.10.0. How many stored secrets of one column one provider's one key holds.
 """
 type SecretKeyCount
   @join__type(graph: STRAWBERRY)
@@ -22357,7 +22361,7 @@ type ServiceCatalog implements Node
   """The Globally Unique ID of this object"""
   id: ID!
 
-  """Added in 26.9.0. UUID of the service catalog."""
+  """Added in 26.10.0. UUID of the service catalog."""
   entityId: UUID!
 
   """Logical group name (e.g., 'manager', 'agent', 'storage-proxy')."""
@@ -22618,7 +22622,7 @@ enum SessionFailurePolicy
 }
 
 """
-Added in 26.9.0. One (checker, session) pair an idle-check exclusion or inclusion applied to.
+Added in 26.10.0. One (checker, session) pair an idle-check exclusion or inclusion applied to.
 """
 type SessionIdleCheckTargetInfo
   @join__type(graph: STRAWBERRY)
@@ -22631,7 +22635,7 @@ type SessionIdleCheckTargetInfo
 }
 
 """
-Added in 26.9.0. One (checker, session) pair targeted by an idle-check exclusion or inclusion.
+Added in 26.10.0. One (checker, session) pair targeted by an idle-check exclusion or inclusion.
 """
 input SessionIdleCheckTargetInput
   @join__type(graph: STRAWBERRY)
@@ -22742,7 +22746,7 @@ type SessionSchedulingHistory implements Node
   """The Globally Unique ID of this object"""
   id: ID!
 
-  """Added in 26.9.0. UUID of the session scheduling history record."""
+  """Added in 26.10.0. UUID of the session scheduling history record."""
   fieldId: UUID!
   sessionId: ID!
   phase: String!
@@ -22831,7 +22835,7 @@ input SessionScope
 }
 
 """
-Added in 26.9.0. Scope for the scoped session query. Each list is OR'd internally and across lists, and every scope named is authorized before the read runs.
+Added in 26.10.0. Scope for the scoped session query. Each list is OR'd internally and across lists, and every scope named is authorized before the read runs.
 """
 input SessionSearchScope
   @join__type(graph: STRAWBERRY)
@@ -22856,7 +22860,7 @@ enum SessionTypes
 }
 
 """
-Added in 26.9.0. Uses narrowing a session query; every id is AND-ed. The caller must be able to read each listed entity, or the request is refused. Only sessions the caller can read are returned, even when a listed entity is tied to others.
+Added in 26.10.0. Uses narrowing a session query; every id is AND-ed. The caller must be able to read each listed entity, or the request is refused. Only sessions the caller can read are returned, even when a listed entity is tied to others.
 """
 input SessionUsage
   @join__type(graph: STRAWBERRY)
@@ -22868,7 +22872,7 @@ input SessionUsage
   uses: SessionUses = null
 }
 
-"""Added in 26.9.0. Entities whose use of a session narrows the read."""
+"""Added in 26.10.0. Entities whose use of a session narrows the read."""
 input SessionUsedBy
   @join__type(graph: STRAWBERRY)
 {
@@ -22876,7 +22880,7 @@ input SessionUsedBy
   deployment: [UUID!] = null
 }
 
-"""Added in 26.9.0. Entities a session uses, whose ids narrow the read."""
+"""Added in 26.10.0. Entities a session uses, whose ids narrow the read."""
 input SessionUses
   @join__type(graph: STRAWBERRY)
 {
@@ -22898,7 +22902,7 @@ type SessionV2 implements Node
   """The Globally Unique ID of this object"""
   id: ID!
 
-  """Added in 26.9.0. UUID of the session."""
+  """Added in 26.10.0. UUID of the session."""
   entityId: UUID!
 
   """
@@ -22959,7 +22963,7 @@ type SessionV2 implements Node
   """
   resourceAllocation: ResourceAllocation!
 
-  """Added in 26.9.0. The labels on this session."""
+  """Added in 26.10.0. The labels on this session."""
   entityLabels(filter: EntityLabelFilter = null, orderBy: [EntityLabelOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): EntityLabelConnection
 }
 
@@ -22997,65 +23001,65 @@ input SessionV2Filter
   projectId: UUIDFilter = null
   userUuid: UUIDFilter = null
 
-  """Added in 26.9.0. Select entities by the labels on them."""
+  """Added in 26.10.0. Select entities by the labels on them."""
   labels: EntityLabelNestedFilter = null
 
-  """Added in 26.9.0. Filter by the id the creating request carried."""
+  """Added in 26.10.0. Filter by the id the creating request carried."""
   creationId: StringFilter = null
 
-  """Added in 26.9.0. Filter by session type."""
+  """Added in 26.10.0. Filter by session type."""
   sessionType: SessionV2TypeFilter = null
 
-  """Added in 26.9.0. Filter by the scheduling tier of the pending queue."""
+  """Added in 26.10.0. Filter by the scheduling tier of the pending queue."""
   tier: IntFilter = null
 
-  """Added in 26.9.0. Filter by the scheduling tier of the pending queue."""
-  priority: IntFilter = null @deprecated(reason: "Deprecated since 26.9.0. Renamed to `tier`; the value and its meaning are unchanged.")
+  """Added in 26.10.0. Filter by the scheduling tier of the pending queue."""
+  priority: IntFilter = null @deprecated(reason: "Deprecated since 26.10.0. Renamed to `tier`; the value and its meaning are unchanged.")
 
   """
-  Added in 26.9.0. Filter by the preemption priority among the owner's sessions.
+  Added in 26.10.0. Filter by the preemption priority among the owner's sessions.
   """
   jobPriority: IntFilter = null
 
-  """Added in 26.9.0. Filter by whether the session may be preempted."""
+  """Added in 26.10.0. Filter by whether the session may be preempted."""
   isPreemptible: Boolean = null
 
-  """Added in 26.9.0. Filter by the number of kernels in the session."""
+  """Added in 26.10.0. Filter by the number of kernels in the session."""
   clusterSize: IntFilter = null
 
-  """Added in 26.9.0. Filter by the resource group the session runs in."""
+  """Added in 26.10.0. Filter by the resource group the session runs in."""
   resourceGroupName: StringFilter = null
 
   """
-  Added in 26.9.0. Filter by the access key the session was created with.
+  Added in 26.10.0. Filter by the access key the session was created with.
   """
   accessKey: StringFilter = null
 
-  """Added in 26.9.0. Filter by the user-supplied tag."""
+  """Added in 26.10.0. Filter by the user-supplied tag."""
   tag: StringFilter = null
 
-  """Added in 26.9.0. Filter by whether the session uses the host network."""
+  """Added in 26.10.0. Filter by whether the session uses the host network."""
   useHostNetwork: Boolean = null
 
-  """Added in 26.9.0. Filter by the batch execution timeout in seconds."""
+  """Added in 26.10.0. Filter by the batch execution timeout in seconds."""
   batchTimeout: IntFilter = null
 
-  """Added in 26.9.0. Filter by when the session started running."""
+  """Added in 26.10.0. Filter by when the session started running."""
   startsAt: DateTimeFilter = null
 
-  """Added in 26.9.0. Filter by when the session terminated."""
+  """Added in 26.10.0. Filter by when the session terminated."""
   terminatedAt: DateTimeFilter = null
 
-  """Added in 26.9.0. Filter by the session result."""
+  """Added in 26.10.0. Filter by the session result."""
   result: SessionV2ResultFilter = null
 
-  """Added in 26.9.0. Filter by the inter-container network type."""
+  """Added in 26.10.0. Filter by the inter-container network type."""
   networkType: SessionV2NetworkTypeFilter = null
 
-  """Added in 26.9.0. Filter by the network reference the session uses."""
+  """Added in 26.10.0. Filter by the network reference the session uses."""
   networkId: StringFilter = null
 
-  """Added in 26.9.0. Filter by the deployment replica the session serves."""
+  """Added in 26.10.0. Filter by the deployment replica the session serves."""
   replicaId: UUIDFilter = null
   AND: [SessionV2Filter!] = null
   OR: [SessionV2Filter!] = null
@@ -23107,11 +23111,11 @@ type SessionV2MetadataInfo
   """Number of nodes in the cluster."""
   clusterSize: Int!
 
-  """Added in 26.9.0. Scheduling tier of the session."""
+  """Added in 26.10.0. Scheduling tier of the session."""
   tier: Int!
 
   """Scheduling tier of the session."""
-  priority: Int! @deprecated(reason: "Deprecated since 26.9.0. Renamed to `tier`; the value and its meaning are unchanged.")
+  priority: Int! @deprecated(reason: "Deprecated since 26.10.0. Renamed to `tier`; the value and its meaning are unchanged.")
 
   """
   Added in 26.8.0. Preemption priority among the owner's own sessions. A pending session may reclaim another session's resources only when both belong to the same user and the other session's value is strictly lower, so equal values never preempt each other; among the eligible sessions the lowest value is reclaimed first. Independent of `priority`, which orders the pending queue and takes no part in this comparison.
@@ -23141,7 +23145,7 @@ type SessionV2NetworkInfo
   networkId: String
 }
 
-"""Added in 26.9.0. Inter-container network type a session uses."""
+"""Added in 26.10.0. Inter-container network type a session uses."""
 enum SessionV2NetworkType
   @join__type(graph: STRAWBERRY)
 {
@@ -23150,7 +23154,7 @@ enum SessionV2NetworkType
   HOST @join__enumValue(graph: STRAWBERRY)
 }
 
-"""Added in 26.9.0. Filter for the session network type."""
+"""Added in 26.10.0. Filter for the session network type."""
 input SessionV2NetworkTypeFilter
   @join__type(graph: STRAWBERRY)
 {
@@ -23186,7 +23190,7 @@ enum SessionV2OrderField
   NAME @join__enumValue(graph: STRAWBERRY)
   CREATION_ID @join__enumValue(graph: STRAWBERRY)
   SESSION_TYPE @join__enumValue(graph: STRAWBERRY)
-  PRIORITY @join__enumValue(graph: STRAWBERRY) @deprecated(reason: "Deprecated since 26.9.0. Renamed to `tier`; the value and its meaning are unchanged.")
+  PRIORITY @join__enumValue(graph: STRAWBERRY) @deprecated(reason: "Deprecated since 26.10.0. Renamed to `tier`; the value and its meaning are unchanged.")
   TIER @join__enumValue(graph: STRAWBERRY)
   JOB_PRIORITY @join__enumValue(graph: STRAWBERRY)
   IS_PREEMPTIBLE @join__enumValue(graph: STRAWBERRY)
@@ -23228,7 +23232,7 @@ enum SessionV2Result
   FAILURE @join__enumValue(graph: STRAWBERRY)
 }
 
-"""Added in 26.9.0. Filter for the session result."""
+"""Added in 26.10.0. Filter for the session result."""
 input SessionV2ResultFilter
   @join__type(graph: STRAWBERRY)
 {
@@ -23307,7 +23311,7 @@ enum SessionV2Type
   SYSTEM @join__enumValue(graph: STRAWBERRY)
 }
 
-"""Added in 26.9.0. Filter for the session type."""
+"""Added in 26.10.0. Filter for the session type."""
 input SessionV2TypeFilter
   @join__type(graph: STRAWBERRY)
 {
@@ -23331,7 +23335,7 @@ type SetQuotaScope
 }
 
 """
-Added in 26.9.0. Input for setting the mount level one user gets on a virtual folder.
+Added in 26.10.0. Input for setting the mount level one user gets on a virtual folder.
 """
 input SetVFolderMountPolicyInput
   @join__type(graph: STRAWBERRY)
@@ -23345,7 +23349,7 @@ input SetVFolderMountPolicyInput
   permission: VFolderMountPermission!
 }
 
-"""Added in 26.9.0. Payload returned after setting a mount policy."""
+"""Added in 26.10.0. Payload returned after setting a mount policy."""
 type SetVFolderMountPolicyPayload
   @join__type(graph: STRAWBERRY)
 {
@@ -23439,7 +23443,7 @@ type StorageNamespace implements Node
   """The Globally Unique ID of this object"""
   id: ID!
 
-  """Added in 26.9.0. UUID of the storage namespace."""
+  """Added in 26.10.0. UUID of the storage namespace."""
   entityId: UUID!
   storageId: ID!
   namespace: String!
@@ -23792,7 +23796,7 @@ type UnsetQuotaScope
 }
 
 """
-Added in 26.9.0. Input for taking back the mount level one user was given on a virtual folder.
+Added in 26.10.0. Input for taking back the mount level one user was given on a virtual folder.
 """
 input UnsetVFolderMountPolicyInput
   @join__type(graph: STRAWBERRY)
@@ -23801,7 +23805,7 @@ input UnsetVFolderMountPolicyInput
   userId: UUID!
 }
 
-"""Added in 26.9.0. Payload returned after unsetting a mount policy."""
+"""Added in 26.10.0. Payload returned after unsetting a mount policy."""
 type UnsetVFolderMountPolicyPayload
   @join__type(graph: STRAWBERRY)
 {
@@ -24155,7 +24159,7 @@ input UpdateDeploymentRevisionPresetInput
   imageId: UUID
 
   """
-  Added in 26.9.0. Model definition patch. Set to null to clear the whole model definition.
+  Added in 26.10.0. Model definition patch. Set to null to clear the whole model definition.
   """
   modelDefinition: UpdatePresetModelDefinitionInput
 
@@ -24546,17 +24550,17 @@ input UpdatePermissionInput
   permission: PermissionBit
 
   """Scope type."""
-  scopeType: RBACElementType = null @deprecated(reason: "Deprecated since 26.9.0. A permission follows the scope of its role; the value is ignored.")
+  scopeType: RBACElementType = null @deprecated(reason: "Deprecated since 26.10.0. A permission follows the scope of its role; the value is ignored.")
 
   """Scope ID."""
-  scopeId: String = null @deprecated(reason: "Deprecated since 26.9.0. A permission follows the scope of its role; the value is ignored.")
+  scopeId: String = null @deprecated(reason: "Deprecated since 26.10.0. A permission follows the scope of its role; the value is ignored.")
 
   """Operation type."""
-  operation: OperationType = null @deprecated(reason: "Deprecated since 26.9.0. Use `permission`; the value is ignored.")
+  operation: OperationType = null @deprecated(reason: "Deprecated since 26.10.0. Use `permission`; the value is ignored.")
 }
 
 """
-Added in 26.9.0. Patch for a single preset model entry. Omit a field to keep its current stored value.
+Added in 26.10.0. Patch for a single preset model entry. Omit a field to keep its current stored value.
 """
 input UpdatePresetModelConfigInput
   @join__type(graph: STRAWBERRY)
@@ -24575,7 +24579,7 @@ input UpdatePresetModelConfigInput
 }
 
 """
-Added in 26.9.0. Patch for a preset's model definition. Omit `models` to keep the current model entry.
+Added in 26.10.0. Patch for a preset's model definition. Omit `models` to keep the current model entry.
 """
 input UpdatePresetModelDefinitionInput
   @join__type(graph: STRAWBERRY)
@@ -24587,7 +24591,7 @@ input UpdatePresetModelDefinitionInput
 }
 
 """
-Added in 26.9.0. Patch for a preset model's health check. Omit a field to keep its current stored value.
+Added in 26.10.0. Patch for a preset model's health check. Omit a field to keep its current stored value.
 """
 input UpdatePresetModelHealthCheckInput
   @join__type(graph: STRAWBERRY)
@@ -24627,7 +24631,7 @@ input UpdatePresetModelHealthCheckInput
 }
 
 """
-Added in 26.9.0. Patch for a preset model's metadata. Omit a field to keep its current stored value.
+Added in 26.10.0. Patch for a preset model's metadata. Omit a field to keep its current stored value.
 """
 input UpdatePresetModelMetadataInput
   @join__type(graph: STRAWBERRY)
@@ -24672,7 +24676,7 @@ input UpdatePresetModelMetadataInput
 }
 
 """
-Added in 26.9.0. Patch for a preset model's service config. Omit a field to keep its current stored value.
+Added in 26.10.0. Patch for a preset model's service config. Omit a field to keep its current stored value.
 """
 input UpdatePresetModelServiceConfigInput
   @join__type(graph: STRAWBERRY)
@@ -24827,7 +24831,7 @@ input UpdateResourceGroupInput
   isPublic: Boolean
 
   """
-  Added in 26.9.0. Whether this is the default resource group. At most one resource group may hold the flag, so setting it to true is rejected while another one holds it; clear that one first. Omit to leave unchanged.
+  Added in 26.10.0. Whether this is the default resource group. At most one resource group may hold the flag, so setting it to true is rejected while another one holds it; clear that one first. Omit to leave unchanged.
   """
   isDefault: Boolean
 
@@ -24891,7 +24895,7 @@ input UpdateResourcePresetV2Input
 }
 
 """
-Added in 26.9.0. Input for updating a resource slot type. The slot name and slot type are immutable; omitted fields stay unchanged.
+Added in 26.10.0. Input for updating a resource slot type. The slot name and slot type are immutable; omitted fields stay unchanged.
 """
 input UpdateResourceSlotTypeInput
   @join__type(graph: STRAWBERRY)
@@ -24924,7 +24928,7 @@ input UpdateResourceSlotTypeInput
   rank: Int = null
 }
 
-"""Added in 26.9.0. Payload for resource slot type update."""
+"""Added in 26.10.0. Payload for resource slot type update."""
 type UpdateResourceSlotTypePayload
   @join__type(graph: STRAWBERRY)
 {
@@ -25072,19 +25076,19 @@ input UpdateRuntimeVariantPresetInput
   """Added in 26.4.4. New required flag."""
   required: Boolean
 
-  """Added in 26.9.0. New version this preset becomes available in."""
+  """Added in 26.10.0. New version this preset becomes available in."""
   addedVersion: String
 
-  """Added in 26.9.0. New version this preset is removed in, exclusive."""
+  """Added in 26.10.0. New version this preset is removed in, exclusive."""
   deprecatedVersion: String
 
-  """Added in 26.9.0. New UI category group."""
+  """Added in 26.10.0. New UI category group."""
   category: String
 
-  """Added in 26.9.0. New human-readable display label."""
+  """Added in 26.10.0. New human-readable display label."""
   displayName: String
 
-  """Added in 26.9.0. New UI rendering options."""
+  """Added in 26.10.0. New UI rendering options."""
   uiOption: RuntimeVariantPresetUIOptionInput
 }
 
@@ -25210,7 +25214,7 @@ type UpdateVFSStoragePayload
 }
 
 """
-Added in 26.9.0. Partial-success payload for a bulk fragment upsert (not in effect yet: still all-or-nothing).
+Added in 26.10.0. Partial-success payload for a bulk fragment upsert (not in effect yet: still all-or-nothing).
 """
 type UpsertAppConfigFragmentsPayload
   @join__type(graph: STRAWBERRY)
@@ -25223,7 +25227,7 @@ type UpsertAppConfigFragmentsPayload
 }
 
 """
-Added in 26.9.0. Set the masking one target gets, replacing the policy it already has.
+Added in 26.10.0. Set the masking one target gets, replacing the policy it already has.
 """
 input UpsertClientIPMaskingPolicyInput
   @join__type(graph: STRAWBERRY)
@@ -25268,7 +25272,7 @@ type UpsertDomainFairShareWeightPayload
 }
 
 """
-Added in 26.9.0. Input for putting one key on one entity. A key holds one value, so naming a key the entity already carries replaces that value.
+Added in 26.10.0. Input for putting one key on one entity. A key holds one value, so naming a key the entity already carries replaces that value.
 """
 input UpsertEntityLabelInput
   @join__type(graph: STRAWBERRY)
@@ -25283,7 +25287,7 @@ input UpsertEntityLabelInput
   value: String!
 }
 
-"""Added in 26.9.0. Payload returned after putting a label on an entity."""
+"""Added in 26.10.0. Payload returned after putting a label on an entity."""
 type UpsertEntityLabelPayload
   @join__type(graph: STRAWBERRY)
 {
@@ -25410,9 +25414,9 @@ type User implements Item
   sudo_session_enabled: Boolean
 
   """
-  Added in 24.03.0. Deprecated since 26.9.0. Use the keypair's is_default field. Used as the default authentication credential for password-based logins and sets the user's total resource usage limit. User's main_access_key cannot be deleted, and only super-admin can replace main_access_key.
+  Added in 24.03.0. Deprecated since 26.10.0. Use the keypair's is_default field. Used as the default authentication credential for password-based logins and sets the user's total resource usage limit. User's main_access_key cannot be deleted, and only super-admin can replace main_access_key.
   """
-  main_access_key: String @deprecated(reason: "Deprecated since 26.9.0. Use the keypair's is_default field.")
+  main_access_key: String @deprecated(reason: "Deprecated since 26.10.0. Use the keypair's is_default field.")
 
   """
   Added in 25.2.0. The user ID (UID) assigned to processes running inside the container.
@@ -25575,7 +25579,7 @@ input UserFairShareFilter
   domainName: StringFilter = null
 
   """Added in 26.2.0. Filter by the user this fair share is calculated for."""
-  user: UserFairShareUserNestedFilter = null @deprecated(reason: "Deprecated since 26.9.0. A filter on another entity's columns cannot check whether the caller may read that row. Search users first, then narrow by userUuid.")
+  user: UserFairShareUserNestedFilter = null @deprecated(reason: "Deprecated since 26.10.0. A filter on another entity's columns cannot check whether the caller may read that row. Search users first, then narrow by userUuid.")
 
   """Combine multiple filters with AND logic. All conditions must match."""
   AND: [UserFairShareFilter!] = null
@@ -25616,8 +25620,8 @@ enum UserFairShareOrderField
 {
   FAIR_SHARE_FACTOR @join__enumValue(graph: STRAWBERRY)
   CREATED_AT @join__enumValue(graph: STRAWBERRY)
-  USER_USERNAME @join__enumValue(graph: STRAWBERRY) @deprecated(reason: "Deprecated since 26.9.0. An order on another entity's columns cannot check whether the caller may read that row. Search users first, then order there.")
-  USER_EMAIL @join__enumValue(graph: STRAWBERRY) @deprecated(reason: "Deprecated since 26.9.0. An order on another entity's columns cannot check whether the caller may read that row. Search users first, then order there.")
+  USER_USERNAME @join__enumValue(graph: STRAWBERRY) @deprecated(reason: "Deprecated since 26.10.0. An order on another entity's columns cannot check whether the caller may read that row. Search users first, then order there.")
+  USER_EMAIL @join__enumValue(graph: STRAWBERRY) @deprecated(reason: "Deprecated since 26.10.0. An order on another entity's columns cannot check whether the caller may read that row. Search users first, then order there.")
 }
 
 """Added in 24.09.0. Scope parameters for filtering user fair shares."""
@@ -25699,7 +25703,7 @@ input UserInput
   container_gids: [Int]
 }
 
-"""Added in 26.9.0. Filter users by conditions on the keypairs they own."""
+"""Added in 26.10.0. Filter users by conditions on the keypairs they own."""
 input UserKeypairNestedFilter
   @join__type(graph: STRAWBERRY)
 {
@@ -25834,7 +25838,7 @@ type UserResourcePolicyV2 implements Node
   """The Globally Unique ID of this object"""
   id: ID!
 
-  """Added in 26.9.0. UUID of the policy."""
+  """Added in 26.10.0. UUID of the policy."""
   entityId: UUID!
 
   """Policy name."""
@@ -25959,7 +25963,7 @@ input UserRoleV2EnumFilter
 }
 
 """
-Added in 26.9.0. Scope for the scoped user query. Each list is OR'd internally and across lists, and every scope named is authorized before the read runs.
+Added in 26.10.0. Scope for the scoped user query. Each list is OR'd internally and across lists, and every scope named is authorized before the read runs.
 """
 input UserScope
   @join__type(graph: STRAWBERRY)
@@ -25970,7 +25974,7 @@ input UserScope
   """Projects whose users are being read."""
   project: [UUIDScope!] = null
 
-  """Added in 26.9.0. Roles whose holders are being read."""
+  """Added in 26.10.0. Roles whose holders are being read."""
   role: [UUIDScope!] = null
 }
 
@@ -26010,7 +26014,7 @@ type UserUsageBucket implements Node
   """The Globally Unique ID of this object"""
   id: ID!
 
-  """Added in 26.9.0. UUID of the usage bucket."""
+  """Added in 26.10.0. UUID of the usage bucket."""
   fieldId: UUID!
 
   """UUID of the user this usage bucket belongs to."""
@@ -26202,7 +26206,7 @@ type UserV2 implements Node
   """The Globally Unique ID of this object"""
   id: ID!
 
-  """Added in 26.9.0. UUID of the user."""
+  """Added in 26.10.0. UUID of the user."""
   entityId: UUID!
 
   """Basic profile information including username, email, and display name."""
@@ -26239,7 +26243,7 @@ type UserV2 implements Node
   """Projects this user is a member of."""
   projects(filter: ProjectV2Filter = null, orderBy: [ProjectV2OrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ProjectV2Connection
 
-  """Added in 26.9.0. Resource groups this user may schedule on."""
+  """Added in 26.10.0. Resource groups this user may schedule on."""
   resourceGroups(filter: ResourceGroupFilter = null, orderBy: [ResourceGroupOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ResourceGroupConnection
 }
 
@@ -26335,7 +26339,7 @@ input UserV2Filter
   statusInfo: StringFilter = null
   domainName: StringFilter = null
 
-  """Added in 26.9.0. Filter by domain ID."""
+  """Added in 26.10.0. Filter by domain ID."""
   domainId: UUIDFilter = null
 
   """Added in 26.4.2. Filter by external integration identifier."""
@@ -26364,22 +26368,22 @@ input UserV2Filter
   containerGids: IntArrayFilter = null
   createdAt: DateTimeFilter = null
 
-  """Added in 26.9.0. Filter by last modification timestamp."""
+  """Added in 26.10.0. Filter by last modification timestamp."""
   modifiedAt: DateTimeFilter = null
 
-  """Added in 26.9.0. Filter by when TOTP two-factor auth was activated."""
+  """Added in 26.10.0. Filter by when TOTP two-factor auth was activated."""
   totpActivatedAt: NullableDateTimeFilter = null
 
-  """Added in 26.9.0. Filter by conditions on the user's keypairs."""
+  """Added in 26.10.0. Filter by conditions on the user's keypairs."""
   keypairs: UserKeypairNestedFilter = null
 
   """
-  Filter by the user's domain. Deprecated since 26.9.0. The condition is evaluated on rows the caller may not be able to read. Use the `domainName` filter, or look the domain up first.
+  Filter by the user's domain. Deprecated since 26.10.0. The condition is evaluated on rows the caller may not be able to read. Use the `domainName` filter, or look the domain up first.
   """
   domain: UserDomainNestedFilter = null
 
   """
-  Filter by the user's projects. Deprecated since 26.9.0. The condition is evaluated on rows the caller may not be able to read. Use `projectUsersV2`, which reads the users of one project.
+  Filter by the user's projects. Deprecated since 26.10.0. The condition is evaluated on rows the caller may not be able to read. Use `projectUsersV2`, which reads the users of one project.
   """
   project: UserProjectNestedFilter = null
   AND: [UserV2Filter!] = null
@@ -26398,7 +26402,7 @@ input UserV2OrderBy
 }
 
 """
-Added in 26.2.0. Fields available for ordering user query results. Added in 26.9.0: ENTITY_ID, FULL_NAME, DESCRIPTION, STATUS_INFO, ROLE, DOMAIN_ID, INTEGRATION_NAME, RESOURCE_POLICY, NEED_PASSWORD_CHANGE, TOTP_ACTIVATED, TOTP_ACTIVATED_AT, SUDO_SESSION_ENABLED, CONTAINER_UID, CONTAINER_MAIN_GID. Each value orders by the user column of the same name; ENTITY_ID orders by the user's own id and PROJECT_NAME folds the projects the user is on.
+Added in 26.2.0. Fields available for ordering user query results. Added in 26.10.0: ENTITY_ID, FULL_NAME, DESCRIPTION, STATUS_INFO, ROLE, DOMAIN_ID, INTEGRATION_NAME, RESOURCE_POLICY, NEED_PASSWORD_CHANGE, TOTP_ACTIVATED, TOTP_ACTIVATED_AT, SUDO_SESSION_ENABLED, CONTAINER_UID, CONTAINER_MAIN_GID. Each value orders by the user column of the same name; ENTITY_ID orders by the user's own id and PROJECT_NAME folds the projects the user is on.
 """
 enum UserV2OrderField
   @join__type(graph: STRAWBERRY)
@@ -26423,7 +26427,7 @@ enum UserV2OrderField
   SUDO_SESSION_ENABLED @join__enumValue(graph: STRAWBERRY)
   CONTAINER_UID @join__enumValue(graph: STRAWBERRY)
   CONTAINER_MAIN_GID @join__enumValue(graph: STRAWBERRY)
-  PROJECT_NAME @join__enumValue(graph: STRAWBERRY) @deprecated(reason: "Deprecated since 26.9.0. A user belongs to many projects, so this order folds them into a single name. Narrow the results with the `project` filter instead.")
+  PROJECT_NAME @join__enumValue(graph: STRAWBERRY) @deprecated(reason: "Deprecated since 26.10.0. A user belongs to many projects, so this order folds them into a single name. Narrow the results with the `project` filter instead.")
 }
 
 """
@@ -26435,7 +26439,7 @@ type UserV2OrganizationInfo
   """Name of the domain this user belongs to."""
   domainName: String
 
-  """Added in 26.9.0. ID of the domain this user belongs to."""
+  """Added in 26.10.0. ID of the domain this user belongs to."""
   domainId: UUID
 
   """User's role determining access permissions. See UserRoleV2 enum."""
@@ -26445,7 +26449,7 @@ type UserV2OrganizationInfo
   resourcePolicy: String!
 
   """Primary API access key for this user."""
-  mainAccessKey: String @deprecated(reason: "Deprecated since 26.9.0. Use the keypair's is_default field.")
+  mainAccessKey: String @deprecated(reason: "Deprecated since 26.10.0. Use the keypair's is_default field.")
 }
 
 """
@@ -26546,10 +26550,10 @@ type UtilizationIdleCheckerThreshold
   """Underutilization threshold."""
   threshold: Decimal!
 
-  """Added in 26.9.0. Label filters injected into the preset query."""
+  """Added in 26.10.0. Label filters injected into the preset query."""
   filterLabels: [MetricLabelEntry!]!
 
-  """Added in 26.9.0. Group-by labels injected into the preset query."""
+  """Added in 26.10.0. Group-by labels injected into the preset query."""
   groupLabels: [String!]!
 }
 
@@ -26563,11 +26567,11 @@ input UtilizationIdleCheckerThresholdInput
   """Underutilization threshold."""
   threshold: Decimal!
 
-  """Added in 26.9.0. Label filters injected into the preset query."""
+  """Added in 26.10.0. Label filters injected into the preset query."""
   filterLabels: [MetricLabelEntryInput!]! = []
 
   """
-  Added in 26.9.0. Group-by labels injected into the preset query. Per-session mapping requires 'session_id'; when included, the query is also scoped to the sessions under evaluation.
+  Added in 26.10.0. Group-by labels injected into the preset query. Per-session mapping requires 'session_id'; when included, the query is also scoped to the sessions under evaluation.
   """
   groupLabels: [String!]! = ["session_id"]
 }
@@ -26649,7 +26653,7 @@ type VFolder implements Node
   """The Globally Unique ID of this object"""
   id: ID!
 
-  """Added in 26.9.0. UUID of the vfolder."""
+  """Added in 26.10.0. UUID of the vfolder."""
   entityId: UUID!
 
   """
@@ -26687,15 +26691,15 @@ type VFolder implements Node
   usage: VFolderUsageInfo
 
   """
-  Added in 26.4.4. Model cards backed by this vfolder. Deprecated since 26.9.0. Use a model card search narrowed by `usedBy: { vfolder }`.
+  Added in 26.4.4. Model cards backed by this vfolder. Deprecated since 26.10.0. Use a model card search narrowed by `usedBy: { vfolder }`.
   """
-  modelCards(filter: ModelCardV2Filter = null, orderBy: [ModelCardV2OrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ModelCardV2Connection @deprecated(reason: "Deprecated since 26.9.0. Use a model card search narrowed by `usedBy: { vfolder }`.")
+  modelCards(filter: ModelCardV2Filter = null, orderBy: [ModelCardV2OrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ModelCardV2Connection @deprecated(reason: "Deprecated since 26.10.0. Use a model card search narrowed by `usedBy: { vfolder }`.")
 
-  """Added in 26.9.0. The labels on this vfolder."""
+  """Added in 26.10.0. The labels on this vfolder."""
   entityLabels(filter: EntityLabelFilter = null, orderBy: [EntityLabelOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): EntityLabelConnection
 
   """
-  Added in 26.9.0. The permission bits the current user holds on this vfolder.
+  Added in 26.10.0. The permission bits the current user holds on this vfolder.
   """
   permissions: [PermissionBit!]!
 }
@@ -26780,7 +26784,7 @@ input VFolderFilter
   cloneable: Boolean = null
   createdAt: DateTimeFilter = null
 
-  """Added in 26.9.0. Select entities by the labels on them."""
+  """Added in 26.10.0. Select entities by the labels on them."""
   labels: EntityLabelNestedFilter = null
   AND: [VFolderFilter!] = null
   OR: [VFolderFilter!] = null
@@ -26857,7 +26861,7 @@ type VFolderMetadataInfo
 }
 
 """
-Added in 26.4.2. Mount permission level for a virtual folder. NONE (added in 26.9.0) mounts to nobody; RW_DELETE mounts as READ_WRITE.
+Added in 26.4.2. Mount permission level for a virtual folder. NONE (added in 26.10.0) mounts to nobody; RW_DELETE mounts as READ_WRITE.
 """
 enum VFolderMountPermission
   @join__type(graph: STRAWBERRY)
@@ -26869,7 +26873,7 @@ enum VFolderMountPermission
 }
 
 """
-Added in 26.9.0. The mount levels set on a virtual folder, one row per user.
+Added in 26.10.0. The mount levels set on a virtual folder, one row per user.
 """
 type VFolderMountPoliciesPayload
   @join__type(graph: STRAWBERRY)
@@ -26878,7 +26882,7 @@ type VFolderMountPoliciesPayload
   items: [VFolderMountPolicy!]!
 }
 
-"""Added in 26.9.0. The mount level one user gets on a virtual folder."""
+"""Added in 26.10.0. The mount level one user gets on a virtual folder."""
 type VFolderMountPolicy
   @join__type(graph: STRAWBERRY)
 {
@@ -27016,7 +27020,7 @@ type VFolderQuotaInfo
 }
 
 """
-Added in 26.9.0. Scope for the scoped vfolder query. Each list is OR'd internally and across lists, and every scope named is authorized before the read runs.
+Added in 26.10.0. Scope for the scoped vfolder query. Each list is OR'd internally and across lists, and every scope named is authorized before the read runs.
 """
 input VFolderScope
   @join__type(graph: STRAWBERRY)
@@ -27032,7 +27036,7 @@ input VFolderScope
 }
 
 """
-Added in 26.9.0. Uses narrowing a vfolder query; every id is AND-ed. The caller must be able to read each listed entity, or the request is refused. Only vfolders the caller can read are returned, even when a listed entity is tied to others.
+Added in 26.10.0. Uses narrowing a vfolder query; every id is AND-ed. The caller must be able to read each listed entity, or the request is refused. Only vfolders the caller can read are returned, even when a listed entity is tied to others.
 """
 input VFolderUsage
   @join__type(graph: STRAWBERRY)
@@ -27087,7 +27091,7 @@ input VFolderUsageModeFilter
   notIn: [VFolderUsageMode!] = null
 }
 
-"""Added in 26.9.0. Entities whose use of a vfolder narrows the read."""
+"""Added in 26.10.0. Entities whose use of a vfolder narrows the read."""
 input VFolderUsedBy
   @join__type(graph: STRAWBERRY)
 {
@@ -27108,7 +27112,7 @@ type VFSStorage implements Node
   """The Globally Unique ID of this object"""
   id: ID!
 
-  """Added in 26.9.0. UUID of the VFS storage."""
+  """Added in 26.10.0. UUID of the VFS storage."""
   entityId: UUID!
   name: String!
   host: String!

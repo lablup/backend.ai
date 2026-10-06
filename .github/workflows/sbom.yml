@@ -2,6 +2,10 @@ name: SBOM report
 
 on: [workflow_dispatch, workflow_call]
 
+# `contents: read`: only generates the SBOMs
+permissions:
+  contents: read
+
 jobs:
   sbom-python:
     name: Generate Python SBOM

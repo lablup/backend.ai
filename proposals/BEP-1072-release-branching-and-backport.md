@@ -180,7 +180,7 @@ Who does what, once this is in place.
 | Cut 2 | CI | `check-version-change` confirms the release prefix; full test suite |
 | Cut 3 | Human | Squash-merge |
 | Cut 4 | **Automated** | Tag `<version>.0rc1` (PAT) and create branch `<version>` at the merge commit |
-| Cut 5 | **Automated** | Tag push → `ci.yml make-final-release` → wheels/scies, GitHub Release (prerelease), PyPI |
+| Cut 5 | **Automated** | Tag push → `ci.yml make-final-release` → GitHub Release (prerelease) with wheels and `supergraph.graphql` only |
 | rc period | **Automated** | fix PRs merged to `main` → `backport.yml` opens cherry-pick PRs on `<version>`; success auto-merges, conflict lands as a draft PR + `pending:backport` |
 | rc period | Human | Resolve conflicted draft PRs. For more verification, `release.sh <version>.0rc2` on the branch |
 | rc period | WebUI | Build against the rc1 `supergraph.graphql` asset and ship a bundle; it lands here as its own `chore: update webui to <x>` PR |
@@ -191,7 +191,7 @@ Who does what, once this is in place.
 
 Humans run two scripts, merge two PRs, and resolve backport conflicts. Tagging, branching, and the changelog copy are automated.
 
-rc releases are published to PyPI like any other tag; `make-final-release` already uploads on every tag, so this needs no change beyond confirming the `deploy-to-pypi` environment gate.
+rc releases, like alphas, go out only as a GitHub prerelease carrying wheels and `supergraph.graphql`. Scies, the SBOM, the conda pack and the PyPI upload ship with the final release only.
 
 ### (f) Work scope
 
@@ -222,7 +222,7 @@ rc releases are published to PyPI like any other tag; `make-final-release` alrea
 | Changelog content | Complete release note from the rc onward, consolidated at the final release; a patch release records only the fixes backported into it |
 | Fragment ownership | Each tree drains its own pool with its own release. No backward movement |
 | Reflection into `main` | **One version file copied** per final tag. Not a cherry-pick |
-| rc on PyPI | Published like any other tag. No workflow change needed |
+| rc on PyPI | Not published. An rc is a GitHub prerelease with wheels and `supergraph.graphql` only |
 | Schema policy | From the rc1 tag onward a version branch **may add to the GraphQL schema but must not break it**. The rc1 release asset is the **lower bound** of the schema WebUI may depend on, not that version's final schema |
 | Schema enforcement | The existing `graphql-inspector` job, retargeted from `schema.graphql` to `supergraph.graphql` so v1 and v2 are both covered — the 26.8 breaking change (#13277) was v2-only and slipped through. Merge blocking stays a required status check on that job |
 | WebUI bundle pin | Pinned by its own PR, never inside a release commit. A release carries whatever bundle the branch holds, so WebUI never blocks `.0`; a patch release may exist solely to advance the bundle |

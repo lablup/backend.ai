@@ -5,7 +5,7 @@
   ],
   "generated_with_requirements": [
     "Cython~=3.0",
-    "setuptools~=80.0.0",
+    "setuptools~=84.0.0",
     "wheel~=0.46.2"
   ],
   "manylinux": null,

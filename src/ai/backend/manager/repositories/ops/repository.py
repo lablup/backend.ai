@@ -42,6 +42,7 @@ from ai.backend.manager.models.specs.lookup import (
 )
 from ai.backend.manager.models.specs.purger import (
     EntityBatchPurger,
+    FieldBatchPurger,
     GuardedEntityPurger,
     GuardedFieldPurger,
 )
@@ -481,6 +482,21 @@ class OpsRepository[TData]:
         idempotently. Never absent."""
         async with self._ops.write_ops() as w:
             return await w.upsert_entity(upserter)
+
+    async def upsert_entity_with_fields[TEntityData: EntityData, TFieldData: FieldData](
+        self,
+        upserter: EntityUpserter[Any, TEntityData],
+        field_upserters: Sequence[FieldUpserter[Any, Any, TFieldData]],
+        field_purgers: Sequence[FieldBatchPurger[Any, Any, Any]],
+    ) -> EntityWithFieldsResult[TEntityData, TFieldData]:
+        """Insert or update an entity row, drop the field rows ``field_purgers`` select, then
+        insert or update the field rows ``field_upserters`` state, in one transaction."""
+        async with self._ops.write_ops() as w:
+            data = await w.upsert_entity(upserter)
+            for purger in field_purgers:
+                await w.batch_purge_field_entities(data.entity_id(), purger)
+            fields = await w.atomic_upsert_field_entities(data.entity_id(), field_upserters)
+            return EntityWithFieldsResult(data=data, fields=fields)
 
     async def atomic_upsert_global_entities(
         self, upserters: Sequence[GlobalEntityUpserter[Any, TData]]
