@@ -18,10 +18,10 @@ from ai.backend.manager.actions.registry.types import WiredProcessor
 from ai.backend.manager.actions.types import ActionGate
 from ai.backend.manager.cli.role_fixture import RoleFixture
 from ai.backend.manager.data.permission.global_entity import global_entity_id
-from ai.backend.manager.data.permission.seed.check import RoleSeedChecker
-from ai.backend.manager.data.permission.seed.kinds import PermissionKinds
-from ai.backend.manager.data.permission.seed.loader import RoleSeedLoader
-from ai.backend.manager.data.permission.seed.role import RoleSeed
+from ai.backend.manager.seed.role_preset.check import RoleSeedChecker
+from ai.backend.manager.seed.role_preset.kinds import PermissionKinds
+from ai.backend.manager.seed.role_preset.loader import RoleSeedLoader
+from ai.backend.manager.seed.role_preset.role import RoleSeed
 from ai.backend.manager.services.catalog import load_wiring_catalog
 
 if TYPE_CHECKING:
@@ -40,6 +40,9 @@ _LEGEND: Final[str] = "R read  U update  C create  S soft-delete  H hard-delete"
 _ABSENT: Final[str] = "-"
 # The entity type of a global operation, which the superadmin gate covers.
 _GLOBAL: Final[str] = "global"
+# The checkout this command reads the role files from and writes the fixture to.
+_REPOSITORY: Final[Path] = Path(__file__).resolve().parents[5]
+_ROLE_SEEDS: Final[Path] = _REPOSITORY / "seeds/manager/role_preset"
 _OPERATION_COLUMNS: Final[tuple[str, ...]] = (
     "entity_type",
     "field_type",
@@ -146,8 +149,8 @@ class RoleOperations:
         return Verdict.ALLOWED if held.covers(required) else Verdict.DENIED
 
 
-def _load() -> list[RoleSeed]:
-    return RoleSeedLoader().load()
+def _load(seeds: Path) -> list[RoleSeed]:
+    return RoleSeedLoader(seeds).load()
 
 
 def _column(seed: RoleSeed) -> str:
@@ -180,7 +183,16 @@ def cli() -> None:
     type=click.Choice(["table", "json", "tsv"]),
     help="Set the output style of the command results.",
 )
-def show(role: str | None, entity: str | None, granted_only: bool, output: str) -> None:
+@click.option(
+    "--seeds",
+    "seed_dir",
+    default=_ROLE_SEEDS,
+    type=click.Path(exists=True, file_okay=False, path_type=Path),
+    help="Read the role files from this directory.",
+)
+def show(
+    role: str | None, entity: str | None, granted_only: bool, output: str, seed_dir: Path
+) -> None:
     """
     Print the seed roles as a grid: one row per kind, one column per role.
 
@@ -191,7 +203,7 @@ def show(role: str | None, entity: str | None, granted_only: bool, output: str) 
 
         $ backend.ai mgr permissions show --granted-only
     """
-    seeds = _load()
+    seeds = _load(seed_dir)
     if role is not None:
         seeds = [seed for seed in seeds if seed.name == role]
         if not seeds:
@@ -237,7 +249,14 @@ def show(role: str | None, entity: str | None, granted_only: bool, output: str) 
 
 
 @cli.command(name="check")
-def check() -> None:
+@click.option(
+    "--seeds",
+    "seed_dir",
+    default=_ROLE_SEEDS,
+    type=click.Path(exists=True, file_okay=False, path_type=Path),
+    help="Read the role files from this directory.",
+)
+def check(seed_dir: Path) -> None:
     """
     Compare the role files with the entity types this build defines.
 
@@ -250,7 +269,7 @@ def check() -> None:
         $ backend.ai mgr permissions check
     """
     kinds = PermissionKinds()
-    findings = RoleSeedChecker(kinds, _load()).findings()
+    findings = RoleSeedChecker(kinds, _load(seed_dir)).findings()
     print(f"{len(kinds.declared())} entity types stated by each role.")
     if not findings:
         print("The declaration answers for every kind.")
@@ -277,7 +296,16 @@ def check() -> None:
     type=click.Choice(["table", "json", "tsv"]),
     help="Set the output style of the command results.",
 )
-def operations(role: str, verdict: str | None, entity: str | None, output: str) -> None:
+@click.option(
+    "--seeds",
+    "seed_dir",
+    default=_ROLE_SEEDS,
+    type=click.Path(exists=True, file_okay=False, path_type=Path),
+    help="Read the role files from this directory.",
+)
+def operations(
+    role: str, verdict: str | None, entity: str | None, output: str, seed_dir: Path
+) -> None:
     """
     Read every wired operation against ROLE's grant.
 
@@ -292,7 +320,7 @@ def operations(role: str, verdict: str | None, entity: str | None, output: str) 
       $ backend.ai mgr permissions operations project_member --verdict denied
       $ backend.ai mgr permissions operations domain_admin --entity vfolder
     """
-    seeds = [seed for seed in _load() if seed.name == role]
+    seeds = [seed for seed in _load(seed_dir) if seed.name == role]
     if not seeds:
         raise click.ClickException(f"No role is named {role}.")
     catalog = asyncio.run(load_wiring_catalog())
@@ -327,8 +355,6 @@ def operations(role: str, verdict: str | None, entity: str | None, output: str) 
             print(f"{len(readings)} operations read against {role}")
 
 
-# The checkout this command writes the seed to.
-_REPOSITORY: Final[Path] = Path(__file__).resolve().parents[5]
 # The installer fixture of the same name is a symlink to this one.
 _PRESETS_TARGET: Final[Path] = Path("fixtures/manager/example-role-presets.json")
 
@@ -345,7 +371,14 @@ def _render(seeds: Sequence[RoleSeed]) -> dict[Path, dict[str, Any]]:
     help="Write the seed into this checkout.",
 )
 @click.option("--check", is_flag=True, help="Report whether the files are current, write nothing.")
-def emit(repository: Path | None, check: bool) -> None:
+@click.option(
+    "--seeds",
+    "seed_dir",
+    default=_ROLE_SEEDS,
+    type=click.Path(exists=True, file_okay=False, path_type=Path),
+    help="Read the role files from this directory.",
+)
+def emit(repository: Path | None, check: bool, seed_dir: Path) -> None:
     """
     Write the preset fixture from the role files.
 
@@ -359,7 +392,7 @@ def emit(repository: Path | None, check: bool) -> None:
       $ backend.ai mgr permissions emit --check
     """
     root = repository if repository is not None else _REPOSITORY
-    rendered = _render(_load())
+    rendered = _render(_load(seed_dir))
     for tables in rendered.values():
         for table, rows in tables.items():
             if not table.startswith("__"):
@@ -387,8 +420,15 @@ _CREATOR_PRESET: Final[str] = "project_admin"
 
 
 @cli.command(name="provision")
+@click.option(
+    "--seeds",
+    "seed_dir",
+    default=_ROLE_SEEDS,
+    type=click.Path(exists=True, file_okay=False, path_type=Path),
+    help="Read the role files from this directory.",
+)
 @click.pass_obj
-def provision(cli_ctx: CLIContext) -> None:
+def provision(cli_ctx: CLIContext, seed_dir: Path) -> None:
     """
     Instantiate the presets in every domain, project and user that lacks their role.
 
@@ -400,6 +440,7 @@ def provision(cli_ctx: CLIContext) -> None:
 
     \b
       $ backend.ai mgr permissions provision
+      $ backend.ai mgr permissions provision --seeds /path/to/role_preset
     """
     from ai.backend.manager.models.base import ensure_all_tables_registered
     from ai.backend.manager.repositories.db.engine import connect_database
@@ -407,7 +448,7 @@ def provision(cli_ctx: CLIContext) -> None:
     from ai.backend.manager.repositories.ops.v2.role_preset.provider import RolePresetOpsProvider
     from ai.backend.manager.repositories.role_preset.repository import RolePresetRepository
 
-    seeds = _load()
+    seeds = _load(seed_dir)
     creator_preset_ids = [seed.id for seed in seeds if seed.name == _CREATOR_PRESET]
 
     async def _provision() -> None:

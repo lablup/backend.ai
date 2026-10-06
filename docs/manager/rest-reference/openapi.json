@@ -33568,13 +33568,13 @@
         "description": "One (checker, session) pair targeted by an idle-check exclusion or inclusion.",
         "properties": {
           "checker_id": {
-            "description": "Added in 26.9.0. Idle checker UUID of the pair.",
+            "description": "Added in 26.10.0. Idle checker UUID of the pair.",
             "format": "uuid",
             "title": "Checker Id",
             "type": "string"
           },
           "session_id": {
-            "description": "Added in 26.9.0. Session UUID of the pair.",
+            "description": "Added in 26.10.0. Session UUID of the pair.",
             "format": "uuid",
             "title": "Session Id",
             "type": "string"
@@ -33591,7 +33591,7 @@
         "description": "Input for excluding session pairs from idle checks.",
         "properties": {
           "targets": {
-            "description": "Added in 26.9.0. Checker-session pairs to exclude.",
+            "description": "Added in 26.10.0. Checker-session pairs to exclude.",
             "items": {
               "$ref": "#/components/schemas/SessionIdleCheckTargetInput"
             },
@@ -33609,7 +33609,7 @@
         "description": "Input for including session pairs into idle checks.",
         "properties": {
           "targets": {
-            "description": "Added in 26.9.0. Checker-session pairs to include; checks start from the initial grace period.",
+            "description": "Added in 26.10.0. Checker-session pairs to include; checks start from the initial grace period.",
             "items": {
               "$ref": "#/components/schemas/SessionIdleCheckTargetInput"
             },

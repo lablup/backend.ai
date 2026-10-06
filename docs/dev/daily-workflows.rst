@@ -814,10 +814,10 @@ What the script does, in the order that matters:
   receiving backports and drops out of the installer channel selection.  See
   :doc:`/dev/version-management-and-upgrades`.
 
-* After a sprint release (``X.Y.0``), ``NEXT_RELEASE_VERSION`` is advanced to the
-  next sprint as a separate ``chore:`` commit.  Set ``NEXT_DEV_VERSION`` to
-  override the computed default (e.g. ``NEXT_DEV_VERSION=27.1.0`` for a year
-  rollover).
+* ``NEXT_RELEASE_VERSION`` is not advanced here.  When an ``X.Y.0rc1`` cuts
+  ``X.Y``, ``create-version-branch.yml`` opens a PR advancing it on ``main`` to
+  ``X.(Y+1).0``.  For a year rollover, set the ``NEXT_DEV_VERSION`` repository
+  variable (e.g. ``27.1.0``) before the rc1 merges, and clear it afterwards.
 
 Then, by hand:
 
