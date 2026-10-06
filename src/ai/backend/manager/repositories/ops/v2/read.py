@@ -304,15 +304,13 @@ class V2ReadOps(V2GraphReadOpsBase):
         conditions; each scope's existence checks are validated first.
         """
         query = searcher.build_select()
-        count_query = sa.select(sa.func.count()).select_from(query.froms[0])
         if scopes:
             await self._validate_scope_existence(scopes)
             scope_clause = self._scopes_condition(scopes)
             query = query.where(scope_clause)
-            count_query = count_query.where(scope_clause)
         for condition in (*used_by, *searcher.conditions):
             query = query.where(condition())
-            count_query = count_query.where(condition())
+        count_query = sa.select(sa.func.count()).select_from(query.order_by(None).subquery())
         # Pagination applies its own default order (cursor pagination includes the
         # cursor condition); the searcher's orders follow as secondary criteria.
         query = searcher.pagination.apply(query)

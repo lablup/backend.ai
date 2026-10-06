@@ -20,22 +20,15 @@ from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.permission.id import FieldPath
 from ai.backend.common.data.permission.types import Permission
 from ai.backend.common.data.user.types import UserRole
-from ai.backend.manager.data.permission.status import RoleStatus
 from ai.backend.manager.data.permission.virtual_entity import (
     GovernCheckKey,
     OwnCheckKey,
 )
 from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
 from ai.backend.manager.models.rbac_models.permission.permission_field import PermissionFieldRow
-from ai.backend.manager.models.rbac_models.role.row import RoleRow
-from ai.backend.manager.models.rbac_models.user_role.row import UserRoleRow
+from ai.backend.manager.models.rbac_models.permission.queries import owned_permission_query
 from ai.backend.manager.models.specs.permission import PermissionEntry
 from ai.backend.manager.models.user.row import UserRow
-from ai.backend.manager.models.virtual_entity.entity_membership import EntityMembershipRow
-from ai.backend.manager.models.virtual_entity.entity_membership_cap import (
-    EntityMembershipCapRow,
-)
-from ai.backend.manager.models.virtual_entity.scope_binding import ScopeBindingRow
 from ai.backend.manager.models.virtual_entity.virtual_entity import VirtualEntityRow
 from ai.backend.manager.repositories.ops.v2.read import V2ReadOps
 
@@ -217,77 +210,7 @@ class PermissionReadOps(V2ReadOps):
     def _owned_query(
         self, group_key: _GroupKey, entity_ids: Sequence[uuid.UUID]
     ) -> sa.Select[tuple[uuid.UUID, int]]:
-        """Run the virtual-entity-chain query for a single ``(user_id, entity_type,
-        subject_entity_type)`` group with N entity_ids.
-
-        Returns a mapping from entity_id to its effective (cap-clipped, OR-combined)
-        :class:`Permission`. Entities with no reachable grant are absent from the map.
-        """
-        own = EntityMembershipRow.__table__
-        share_cap = EntityMembershipCapRow.__table__
-        govern = ScopeBindingRow.__table__
-        entity = VirtualEntityRow.__table__.alias("entity")
-        governor = VirtualEntityRow.__table__.alias("governor")
-        perm = PermissionRow.__table__
-        roles = RoleRow.__table__
-        user_roles = UserRoleRow.__table__
-
-        full_cap = int(Permission.full())
-        # entity <- own - ve <- govern - governor <- permission <- role <- user; one row
-        # per entity, the paths OR-ed in SQL after each is clipped by its govern cap.
-        return (
-            sa.select(
-                entity.c.entity_id,
-                sa.func.bit_or(
-                    perm.c.permission.op("&")(sa.func.coalesce(govern.c.permission_cap, full_cap))
-                ).label("granted"),
-            )
-            .select_from(
-                own.join(entity, entity.c.id == own.c.member_entity_id)
-                .join(govern, govern.c.virtual_entity_id == own.c.virtual_entity_id)
-                .join(governor, governor.c.id == govern.c.scope_entity_id)
-                .join(
-                    roles,
-                    sa.and_(
-                        roles.c.scope_type == governor.c.entity_type,
-                        roles.c.scope_id == governor.c.entity_id,
-                    ),
-                )
-                .join(
-                    perm,
-                    sa.and_(
-                        perm.c.role_id == roles.c.id,
-                        perm.c.entity_type == group_key.subject_entity_type,
-                        perm.c.all_fields.is_(True),
-                    ),
-                )
-                .join(user_roles, user_roles.c.role_id == roles.c.id)
-                .outerjoin(
-                    share_cap,
-                    sa.and_(
-                        share_cap.c.membership_id == own.c.id,
-                        share_cap.c.permission == perm.c.permission,
-                        share_cap.c.all_fields.is_(True),
-                    ),
-                )
-            )
-            .where(
-                entity.c.entity_type == group_key.entity_type,
-                entity.c.entity_id.in_(entity_ids),
-                user_roles.c.user_id == group_key.user_id,
-                roles.c.status == RoleStatus.ACTIVE,
-                # Own answers through every governor. A share answers only with a cap
-                # row on every field for the bit, only for the shared entity's own type,
-                # and only through the ve's own govern. Path-capped bits wait for the
-                # field check.
-                sa.or_(
-                    own.c.capped.is_(False),
-                    sa.and_(
-                        share_cap.c.id.is_not(None),
-                        entity.c.entity_type == group_key.subject_entity_type,
-                        govern.c.scope_entity_id == govern.c.virtual_entity_id,
-                    ),
-                ),
-            )
-            .group_by(entity.c.entity_id)
+        query = owned_permission_query(
+            group_key.user_id, group_key.entity_type, group_key.subject_entity_type
         )
+        return query.where(query.selected_columns.entity_id.in_(entity_ids))
