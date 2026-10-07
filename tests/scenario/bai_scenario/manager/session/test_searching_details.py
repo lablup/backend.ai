@@ -49,7 +49,7 @@ from bai_scenario.seeds.session.session import SeedSession
 
 
 @dataclass(frozen=True)
-class SeedPlacementGroup(SeedRowFromTwo[ProjectData, UserData, SessionGroupData]):
+class SeedSessionGroup(SeedRowFromTwo[ProjectData, UserData, SessionGroupData]):
     @override
     def kind(self) -> str:
         return "세션 그룹"
@@ -72,14 +72,14 @@ class SeedPlacementGroup(SeedRowFromTwo[ProjectData, UserData, SessionGroupData]
 
 
 @dataclass(frozen=True, kw_only=True)
-class SeedSessionWithPlacement(SeedSession):
+class SeedSessionWithSchedulingConditions(SeedSession):
     image_id: ImageID
     session_group_id: SessionGroupID
     designated_agents: tuple[AgentId, ...]
 
     @override
     def detail(self) -> str:
-        return "세션 그룹, 에이전트 둘, 요청한 시작 시각을 지정한 대기 세션"
+        return "세션 그룹, designated_agent_ids 둘, requested_starts_at을 지정한 대기 세션"
 
     @override
     def seed(
@@ -136,12 +136,10 @@ class ASessionToRead(Given[SeedingSession, ASessionAndACaller]):
         place = await lay_a_place(seeding, slots=0)
         session_seed: SeedSession = SeedSession(access_key=place.access_key)
         if self.configured:
-            group = await seeding.creating_from_two(
-                SeedPlacementGroup(), place.project, place.owner
-            )
+            group = await seeding.creating_from_two(SeedSessionGroup(), place.project, place.owner)
             first_agent = await seeding.creating_from(SeedAgent(), place.group)
             second_agent = await seeding.creating_from(SeedAgent(), place.group)
-            session_seed = SeedSessionWithPlacement(
+            session_seed = SeedSessionWithSchedulingConditions(
                 access_key=place.access_key,
                 image_id=ImageID(seeding.made(place.image).id),
                 session_group_id=seeding.made(group).id,
@@ -253,7 +251,7 @@ class TheWholeSessionIsReturned(Then[ASessionAndACaller, AdminSearchSessionsPayl
 
 
 @dataclass(frozen=True)
-class SessionPlacementIsPreserved(
+class SessionSchedulingConditionsArePreserved(
     Scenario[SeedingSession, ASessionAndACaller, SessionAdapter, AdminSearchSessionsPayload]
 ):
     configured: bool
@@ -261,7 +259,7 @@ class SessionPlacementIsPreserved(
     @override
     def summary(self) -> str:
         suffix = "configured" if self.configured else "unset"
-        return f"session-placement-is-preserved-when-{suffix}"
+        return f"session-scheduling-conditions-are-preserved-when-{suffix}"
 
     @override
     def describe(self) -> str:
@@ -283,11 +281,14 @@ class SessionPlacementIsPreserved(
 
 @pytest.mark.parametrize(
     "scenario",
-    [SessionPlacementIsPreserved(configured=True), SessionPlacementIsPreserved(configured=False)],
+    [
+        SessionSchedulingConditionsArePreserved(configured=True),
+        SessionSchedulingConditionsArePreserved(configured=False),
+    ],
     ids=lambda scenario: scenario.summary(),
 )
 async def test_searching_details(
-    scenario: SessionPlacementIsPreserved,
+    scenario: SessionSchedulingConditionsArePreserved,
     adapter: SessionAdapter,
     engine: ExtendedAsyncSAEngine,
 ) -> None:

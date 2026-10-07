@@ -34,8 +34,8 @@
 | 시나리오 | 판정 |
 |---|---|
 | [세션을 하나도 심지 않은 상태에서 슈퍼관리자가 조회하면, 답은 비어 있다](#session-a-scenario-that-laid-no-session-finds-none) | 성공 |
-| [슈퍼관리자가 지정된 세션 스케줄링 조건을 읽으면 기존 세션 정보와 함께 유지된다](#searching_details-session-placement-is-preserved-when-configured) | 성공 |
-| [슈퍼관리자가 미설정인 세션 스케줄링 조건을 읽으면 기존 세션 정보와 함께 유지된다](#searching_details-session-placement-is-preserved-when-unset) | 성공 |
+| [슈퍼관리자가 지정된 세션 스케줄링 조건을 읽으면 기존 세션 정보와 함께 유지된다](#searching_details-session-scheduling-conditions-are-preserved-when-configured) | 성공 |
+| [슈퍼관리자가 미설정인 세션 스케줄링 조건을 읽으면 기존 세션 정보와 함께 유지된다](#searching_details-session-scheduling-conditions-are-preserved-when-unset) | 성공 |
 | [필터 없는 전체 조회는 슈퍼관리자 역할로만 열리므로, 아무 권한도 받지 않은 사용자는 역할 부족으로 거부된다](#session-a-user-granted-nothing-may-not-search-sessions) | 거부 |
 
 ### admin_search
@@ -68,9 +68,9 @@ Then
   - has_next_page = False
   - has_previous_page = False
 
-<a id="searching_details-session-placement-is-preserved-when-configured"></a>
+<a id="searching_details-session-scheduling-conditions-are-preserved-when-configured"></a>
 
-#### [session-placement-is-preserved-when-configured](/tests/scenario/bai_scenario/manager/session/test_searching_details.py) — pass
+#### [session-scheduling-conditions-are-preserved-when-configured](/tests/scenario/bai_scenario/manager/session/test_searching_details.py) — pass
 
 슈퍼관리자가 지정된 세션 스케줄링 조건을 읽으면 기존 세션 정보와 함께 유지된다
 
@@ -95,7 +95,7 @@ Given
   - 세션 그룹 session-group-1: 가능하면 세션들을 서로 다른 에이전트에 배치한다
   - 에이전트 agent-1: 살아 있고, 아직 보고한 슬롯이 없다
   - 에이전트 agent-2: 살아 있고, 아직 보고한 슬롯이 없다
-  - 세션 session-1: 세션 그룹, 에이전트 둘, 요청한 시작 시각을 지정한 대기 세션
+  - 세션 session-1: 세션 그룹, designated_agent_ids 둘, requested_starts_at을 지정한 대기 세션
 
 When
 
@@ -109,9 +109,9 @@ Then
   - has_next_page = False
   - has_previous_page = False
 
-<a id="searching_details-session-placement-is-preserved-when-unset"></a>
+<a id="searching_details-session-scheduling-conditions-are-preserved-when-unset"></a>
 
-#### [session-placement-is-preserved-when-unset](/tests/scenario/bai_scenario/manager/session/test_searching_details.py) — pass
+#### [session-scheduling-conditions-are-preserved-when-unset](/tests/scenario/bai_scenario/manager/session/test_searching_details.py) — pass
 
 슈퍼관리자가 미설정인 세션 스케줄링 조건을 읽으면 기존 세션 정보와 함께 유지된다
 
