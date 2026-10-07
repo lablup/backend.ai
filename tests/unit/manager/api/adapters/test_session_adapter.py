@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from datetime import UTC, datetime
 from decimal import Decimal
 from http import HTTPStatus
+from typing import cast
 from unittest.mock import AsyncMock, MagicMock
 from uuid import UUID, uuid4
 
@@ -219,12 +221,43 @@ class TestSessionDataToNode:
         assert len(node.resource.allocation.used.entries) == 0
 
 
+@dataclass(frozen=True, kw_only=True)
+class SessionSchedulingCase:
+    name: str
+    session_group_id: SessionGroupID | None
+    designated_agent_ids: list[str] | None
+    requested_starts_at: datetime | None
+
+
 class TestSessionSchedulingResponses:
     @pytest.fixture(
-        params=[None, [], ["designated-b", "designated-a"]], ids=["null", "empty", "set"]
+        params=[
+            SessionSchedulingCase(
+                name="null",
+                session_group_id=None,
+                designated_agent_ids=None,
+                requested_starts_at=None,
+            ),
+            SessionSchedulingCase(
+                name="empty",
+                session_group_id=None,
+                designated_agent_ids=[],
+                requested_starts_at=None,
+            ),
+            SessionSchedulingCase(
+                name="set",
+                session_group_id=SessionGroupID(UUID("8b7ce6d2-71fc-4e66-ad7f-508493b94131")),
+                designated_agent_ids=["designated-b", "designated-a"],
+                requested_starts_at=datetime(2026, 10, 7, 1, tzinfo=UTC),
+            ),
+        ],
+        ids=lambda case: case.name,
     )
-    def session_entity(self, request: pytest.FixtureRequest) -> SessionEntityData:
-        populated = bool(request.param)
+    def scheduling_case(self, request: pytest.FixtureRequest) -> SessionSchedulingCase:
+        return cast(SessionSchedulingCase, request.param)
+
+    @pytest.fixture
+    def session_entity(self, scheduling_case: SessionSchedulingCase) -> SessionEntityData:
         return SessionEntityData(
             id=SessionID(uuid4()),
             creation_id="creation-id",
@@ -237,10 +270,8 @@ class TestSessionSchedulingResponses:
             cluster_size=1,
             options=SessionStoredOptions(),
             agent_ids=["allocated-agent"],
-            designated_agent_ids=request.param,
-            session_group_id=SessionGroupID(UUID("8b7ce6d2-71fc-4e66-ad7f-508493b94131"))
-            if populated
-            else None,
+            designated_agent_ids=scheduling_case.designated_agent_ids,
+            session_group_id=scheduling_case.session_group_id,
             resource_group_id=ResourceGroupID(uuid4()),
             resource_group_name="default",
             target_sgroup_names=None,
@@ -260,7 +291,7 @@ class TestSessionSchedulingResponses:
             batch_timeout=None,
             terminated_at=None,
             starts_at=datetime(2026, 10, 7, 2, tzinfo=UTC),
-            requested_starts_at=datetime(2026, 10, 7, 1, tzinfo=UTC) if populated else None,
+            requested_starts_at=scheduling_case.requested_starts_at,
             status=SessionStatus.PENDING,
             status_info=None,
             status_data=None,

@@ -86,7 +86,7 @@ class SeedSessionWithPlacement(SeedSession):
         self, name: str, first: ProjectData, second: UserData, third: ResourceGroupData
     ) -> SessionCreator:
         creator = super().seed(name, first, second, third)
-        resource = creator.spec.resource_spec
+        resource_spec = creator.spec.resource_spec
         kernel = KernelSpec(
             cluster_role="main",
             cluster_idx=1,
@@ -97,31 +97,23 @@ class SeedSessionWithPlacement(SeedSession):
                 starts_at=datetime(2030, 1, 2, 3, 4, tzinfo=UTC),
             ),
         )
-        return replace(
-            creator,
-            spec=creator.spec.model_copy(
-                update={
-                    "scope": creator.spec.scope.model_copy(
-                        update={"session_group_id": self.session_group_id}
-                    ),
-                    "resource_spec": resource.model_copy(
-                        update={
-                            "classification": resource.classification.model_copy(
-                                update={"session_type": SessionTypes.BATCH}
-                            ),
-                            "kernel_specs": (kernel,),
-                            "options": resource.options.model_copy(
-                                update={
-                                    "scheduling_target": resource.options.scheduling_target.model_copy(
-                                        update={"designated_agents": list(self.designated_agents)}
-                                    )
-                                }
-                            ),
-                        }
-                    ),
-                }
-            ),
+        scheduling_target = resource_spec.options.scheduling_target.model_copy(
+            update={"designated_agents": list(self.designated_agents)}
         )
+        options = resource_spec.options.model_copy(update={"scheduling_target": scheduling_target})
+        classification = resource_spec.classification.model_copy(
+            update={"session_type": SessionTypes.BATCH}
+        )
+        resource_spec = resource_spec.model_copy(
+            update={
+                "classification": classification,
+                "kernel_specs": (kernel,),
+                "options": options,
+            }
+        )
+        scope = creator.spec.scope.model_copy(update={"session_group_id": self.session_group_id})
+        spec = creator.spec.model_copy(update={"scope": scope, "resource_spec": resource_spec})
+        return replace(creator, spec=spec)
 
 
 @dataclass(frozen=True)
