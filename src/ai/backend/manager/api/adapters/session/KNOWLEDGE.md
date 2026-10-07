@@ -5,8 +5,8 @@ description: what the session adapter guarantees, as scenarios; the tests in tes
 scope: src/ai/backend/manager/api/adapters/session
 keywords: [session, scenario, adapter, rbac, enqueue]
 generated:
-  by: codex/gpt-6
-  at: 2026-10-07
+  by: claude-code/opus-5
+  at: 2026-09-10
 status: draft
 ---
 # 세션 어댑터 — 시나리오
