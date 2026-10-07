@@ -9325,7 +9325,7 @@ type MoveFileV2Payload {
 
 type Mutation {
   """
-  Added in 26.9.0. Scan one image tag and return the requested architecture, including images not yet registered (superadmin only).
+  Added in 26.10.0. Scan one image tag and return the requested architecture, including images not yet registered (superadmin only).
   """
   adminScanImage(input: ScanImageInput!): ScanImagePayload
 
@@ -16310,7 +16310,7 @@ type ScanArtifactsPayload {
 }
 
 """
-Added in 26.9.0. Input for scanning one image tag and selecting its architecture.
+Added in 26.10.0. Input for scanning one image tag and selecting its architecture.
 """
 input ScanImageInput {
   """
@@ -16322,7 +16322,7 @@ input ScanImageInput {
   architecture: String!
 }
 
-"""Added in 26.9.0. Scanned image matching the requested architecture."""
+"""Added in 26.10.0. Scanned image matching the requested architecture."""
 type ScanImagePayload {
   """Scanned image matching the requested architecture."""
   item: ImageV2!

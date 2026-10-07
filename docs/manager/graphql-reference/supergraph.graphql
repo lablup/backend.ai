@@ -13727,7 +13727,7 @@ type Mutation
   delete_network(network: String!): DeleteNetwork @join__field(graph: GRAPHENE)
 
   """
-  Added in 26.9.0. Scan one image tag and return the requested architecture, including images not yet registered (superadmin only).
+  Added in 26.10.0. Scan one image tag and return the requested architecture, including images not yet registered (superadmin only).
   """
   adminScanImage(input: ScanImageInput!): ScanImagePayload @join__field(graph: STRAWBERRY)
 
@@ -22195,7 +22195,7 @@ type ScanArtifactsPayload
 }
 
 """
-Added in 26.9.0. Input for scanning one image tag and selecting its architecture.
+Added in 26.10.0. Input for scanning one image tag and selecting its architecture.
 """
 input ScanImageInput
   @join__type(graph: STRAWBERRY)
@@ -22209,7 +22209,7 @@ input ScanImageInput
   architecture: String!
 }
 
-"""Added in 26.9.0. Scanned image matching the requested architecture."""
+"""Added in 26.10.0. Scanned image matching the requested architecture."""
 type ScanImagePayload
   @join__type(graph: STRAWBERRY)
 {
