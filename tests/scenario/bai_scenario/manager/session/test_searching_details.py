@@ -129,7 +129,7 @@ class ASessionToRead(Given[SeedingSession, ASessionAndACaller]):
     @override
     def describe(self) -> str:
         detail = "세 값이 지정된" if self.configured else "세 값이 미설정인"
-        return f"세션 그룹, 지정 에이전트, 요청한 시작 시각의 {detail} 세션과 슈퍼관리자"
+        return f"세션 그룹, designated_agent_ids, requested_starts_at의 {detail} 세션과 슈퍼관리자"
 
     @override
     async def lay(self, seeding: SeedingSession) -> ASessionAndACaller:

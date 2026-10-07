@@ -76,7 +76,7 @@ Then
 
 Given
 
-- 세션 그룹, 지정 에이전트, 요청한 시작 시각의 세 값이 지정된 세션과 슈퍼관리자
+- 세션 그룹, designated_agent_ids, requested_starts_at의 세 값이 지정된 세션과 슈퍼관리자
   - 도메인 home-1
   - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
   - 프로젝트 team-1
@@ -117,7 +117,7 @@ Then
 
 Given
 
-- 세션 그룹, 지정 에이전트, 요청한 시작 시각의 세 값이 미설정인 세션과 슈퍼관리자
+- 세션 그룹, designated_agent_ids, requested_starts_at의 세 값이 미설정인 세션과 슈퍼관리자
   - 도메인 home-1
   - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
   - 프로젝트 team-1
