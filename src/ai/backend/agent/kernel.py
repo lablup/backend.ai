@@ -33,6 +33,7 @@ import zmq
 import zmq.asyncio
 from async_timeout import timeout
 
+from ai.backend.agent.errors.kernel import KernelRunnerReplyTimeoutError
 from ai.backend.common import msgpack
 from ai.backend.common.asyncio import cancel_task, current_loop
 from ai.backend.common.docker import ImageRef
@@ -79,6 +80,10 @@ log = StructuredLogger(logging.getLogger(__spec__.name))
 # Must exceed the launch timeout that ai.backend.kernel.base grants a service port, which cannot
 # be imported here because that package runs inside the container.
 SERVICE_START_REPLY_TIMEOUT_SEC = 35.0
+
+#: How long one request to the kernel runner may wait for its reply. Every wait needs a bound:
+#: `create_kernel` retries status-then-apps under one shared `stop_after_delay` budget.
+KERNEL_REPLY_TIMEOUT_SEC = 10.0
 
 # msg types visible to the API client.
 # (excluding control signals such as 'finished' and 'waiting-input'
@@ -849,6 +854,9 @@ class AbstractCodeRunner(aobject, metaclass=ABCMeta):
     async def ping(self) -> dict[str, float] | None:
         try:
             return await self.feed_and_get_status()
+        except KernelRunnerReplyTimeoutError:
+            log.warning("code runner ping got no reply", kernel_id=self.kernel_id)
+            return None
         except Exception:
             log.exception("code runner ping failed", kernel_id=self.kernel_id)
             return None
@@ -860,9 +868,14 @@ class AbstractCodeRunner(aobject, metaclass=ABCMeta):
         """
         try:
             while True:
-                ret = await self.feed_and_get_status()
-                if ret is None:
-                    break
+                try:
+                    ret = await self.feed_and_get_status()
+                except KernelRunnerReplyTimeoutError:
+                    # A runner slow to start serving is not gone: keep the NAT entry alive.
+                    log.debug("code runner status ping got no reply", kernel_id=self.kernel_id)
+                else:
+                    if ret is None:
+                        break
                 await asyncio.sleep(10)
         except asyncio.CancelledError:
             pass
@@ -916,12 +929,19 @@ class AbstractCodeRunner(aobject, metaclass=ABCMeta):
     async def feed_and_get_status(self) -> dict[str, float] | None:
         sock = await self._get_socket_pair()
         await sock.send_multipart([b"status", b""])
+        # A reply that arrives after its request timed out is consumed by the next request.
+        # Status replies are interchangeable snapshots, so that is tolerated rather than drained.
         try:
-            result = await self.status_queue.get()
+            async with asyncio.timeout(KERNEL_REPLY_TIMEOUT_SEC):
+                result = await self.status_queue.get()
             self.status_queue.task_done()
             return cast(dict[str, float] | None, msgpack.unpackb(result))
         except asyncio.CancelledError:
             return None
+        except TimeoutError as e:
+            raise KernelRunnerReplyTimeoutError(
+                f"kernel runner did not answer status within {KERNEL_REPLY_TIMEOUT_SEC}s"
+            ) from e
 
     async def feed_and_get_completion(
         self, code_text: str, opts: Mapping[str, Any]
@@ -995,7 +1015,7 @@ class AbstractCodeRunner(aobject, metaclass=ABCMeta):
             b"",
         ])
         try:
-            with timeout(10):
+            async with asyncio.timeout(KERNEL_REPLY_TIMEOUT_SEC):
                 result = await self.service_apps_info_queue.get()
             self.service_apps_info_queue.task_done()
             return cast(dict[str, Any], load_json(result))
@@ -1237,6 +1257,13 @@ class AbstractCodeRunner(aobject, metaclass=ABCMeta):
             # from the kernel.
             self.output_queue = None
 
+    def _enqueue_status(self, msg_data: bytes) -> None:
+        # Late replies pile up here; replace the oldest so `read_output` never blocks on status.
+        if self.status_queue.full():
+            self.status_queue.get_nowait()
+            self.status_queue.task_done()
+        self.status_queue.put_nowait(msg_data)
+
     async def read_output(self) -> None:
         # We should use incremental decoder because some kernels may
         # send us incomplete UTF-8 byte sequences (e.g., Julia).
@@ -1259,7 +1286,7 @@ class AbstractCodeRunner(aobject, metaclass=ABCMeta):
                 try:
                     match msg_type:
                         case b"status":
-                            await self.status_queue.put(msg_data)
+                            self._enqueue_status(msg_data)
                         case b"completion":
                             await self.completion_queue.put(msg_data)
                         case b"service-result":

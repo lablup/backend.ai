@@ -25,6 +25,7 @@ from aiotools import TaskGroup
 from ai.backend.agent.config.unified import AgentUnifiedConfig
 from ai.backend.agent.docker.utils import PersistentServiceContainer
 from ai.backend.agent.errors import KernelRunnerNotInitializedError, SubprocessStreamError
+from ai.backend.agent.errors.kernel import KernelRunnerReplyTimeoutError
 from ai.backend.agent.kernel import AbstractCodeRunner, AbstractKernel
 from ai.backend.agent.resources import KernelResourceSpec
 from ai.backend.agent.types import AgentEventData, KernelOwnershipData
@@ -120,7 +121,11 @@ class DockerKernel(AbstractKernel):
     async def check_status(self) -> dict[str, Any] | None:
         if self.runner is None:
             raise KernelRunnerNotInitializedError("Kernel runner is not initialized")
-        return await self.runner.feed_and_get_status()
+        try:
+            return await self.runner.feed_and_get_status()
+        except KernelRunnerReplyTimeoutError:
+            # No reply yet is not a failure here: the caller goes on to the retried apps request.
+            return None
 
     @override
     async def get_logs(self) -> dict[str, Any]:
