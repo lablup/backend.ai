@@ -13,8 +13,8 @@ from ai.backend.common.data.entity.role_preset import RolePresetID
 from ai.backend.common.data.entity.types import EntityType
 from ai.backend.manager.data.role_preset.types import RolePresetData
 from ai.backend.manager.errors.role_preset import (
-    RolePresetNameConflict,
-    RolePresetRenameConflict,
+    RolePresetCreateConflict,
+    RolePresetUpdateConflict,
 )
 from ai.backend.manager.models.base import ensure_all_tables_registered
 from ai.backend.manager.models.domain.row import DomainRow
@@ -139,7 +139,7 @@ class TestCreate:
     async def test_a_name_taken_in_the_scope_is_refused(
         self, ops: OpsRepository[RolePresetData], presets: _Presets, case: _NameCase
     ) -> None:
-        with pytest.raises(RolePresetNameConflict):
+        with pytest.raises(RolePresetCreateConflict):
             await ops.create_entity_with_fields(
                 RolePresetCreator(name=case.name, scope_type=case.scope_type),
                 list[RolePermissionPresetCreator](),
@@ -161,7 +161,7 @@ class TestUpdate:
     async def test_renaming_onto_a_name_taken_in_the_scope_is_refused(
         self, repository: RolePresetRepository, presets: _Presets, name: str
     ) -> None:
-        with pytest.raises(RolePresetRenameConflict):
+        with pytest.raises(RolePresetUpdateConflict):
             await repository.update(
                 RolePresetUpdater(preset_id=presets.other, name=OptionalState.update(name))
             )
