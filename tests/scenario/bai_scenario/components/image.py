@@ -586,6 +586,15 @@ class TheImageNode(Then[Any, ImageNode]):
             self.resource_limits_gql if self.resource_limits_gql is not None else DEFAULT_LIMITS_GQL
         )
         written = WrittenByThisRun(datetime.now(UTC))
+        creator: Verdict = (
+            Same("creator_id", node.creator_id, None)
+            if image.creator_id is None
+            else Held[UserID | None](
+                "creator_id",
+                node.creator_id,
+                SameAs(image.creator_id, "이미지를 커밋한 사용자의 ID"),
+            )
+        )
         return [
             Held("id", node.id, SameAs(planted, "미리 만들어 둔 이미지의 ID")),
             Same("name", node.name, name),
@@ -613,11 +622,7 @@ class TheImageNode(Then[Any, ImageNode]):
             Same("config_digest", node.config_digest, config_digest),
             Same("is_local", node.is_local, is_local),
             Same("customized", node.customized, image.customized),
-            Held(
-                "creator_id",
-                node.creator_id,
-                SameAs(image.creator_id, "미리 만들어 둔 이미지를 커밋한 사용자"),
-            ),
+            creator,
             Held("created_at", node.created_at, written),
             Skipped("last_used_at", "세션이 기록하는 값이라 이 실행에서는 알 수 없다"),
             Same("identity.canonical_name", identity.canonical_name, name),

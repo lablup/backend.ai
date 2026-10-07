@@ -426,6 +426,13 @@ class OnlyImagesOfTheCustomizationAreReturned(Then[ManyImagesAndACaller, AdminSe
         if payload is None:
             return [Held("응답", answered.response, Filled())]
         expected = [one for one in laid.laid if one.customized is self.customized]
+        got_creators = [one.creator_id for one in payload.items]
+        committed_for: list[UserID | None] = [UserID(laid.caller.id)]
+        creator: Verdict = (
+            Held("creator_id", got_creators, SameAs(committed_for, "호출자의 ID"))
+            if self.customized
+            else Same("creator_id", got_creators, [one.creator_id for one in expected])
+        )
         return [
             Same("items", [one.name for one in payload.items], [str(one.name) for one in expected]),
             Same(
@@ -433,13 +440,7 @@ class OnlyImagesOfTheCustomizationAreReturned(Then[ManyImagesAndACaller, AdminSe
                 [one.customized for one in payload.items],
                 [one.customized for one in expected],
             ),
-            Held(
-                "creator_id",
-                [one.creator_id for one in payload.items],
-                SameAs(
-                    [one.creator_id for one in expected], "미리 만들어 둔 이미지를 커밋한 사용자"
-                ),
-            ),
+            creator,
             Same("total_count", payload.total_count, len(expected)),
             Same("has_next_page", payload.has_next_page, False),
             Same("has_previous_page", payload.has_previous_page, False),

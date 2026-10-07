@@ -243,7 +243,7 @@ Then
 - 커스텀 이미지만 반환되고, 커밋한 사용자로 호출자가 담긴다
   - items = ['customized-1']
   - customized = [True]
-  - creator_id: 미리 만들어 둔 이미지를 커밋한 사용자와 같다
+  - creator_id: 호출자의 ID와 같다
   - total_count = 1
   - has_next_page = False
   - has_previous_page = False
@@ -308,7 +308,7 @@ Then
 - 커스텀 이미지가 아닌 이미지만 반환되고, 커밋한 사용자는 비어 있다
   - items = ['uncustomized-1']
   - customized = [False]
-  - creator_id: 미리 만들어 둔 이미지를 커밋한 사용자와 같다
+  - creator_id = [None]
   - total_count = 1
   - has_next_page = False
   - has_previous_page = False
@@ -1235,7 +1235,7 @@ Then
   - config_digest = 'sha256:000000000000000000000000000000000000000000000000000000000image-1'
   - is_local = False
   - customized = False
-  - creator_id: 미리 만들어 둔 이미지를 커밋한 사용자와 같다
+  - creator_id = None
   - created_at: 이 실행이 쓴 시각
   - last_used_at: 무시함 — 세션이 기록하는 값이라 이 실행에서는 알 수 없다
   - identity.canonical_name = 'image-1'
@@ -1300,7 +1300,7 @@ Then
   - config_digest = 'sha256:000000000000000000000000000000000000000000000000000000000image-1'
   - is_local = False
   - customized = True
-  - creator_id: 미리 만들어 둔 이미지를 커밋한 사용자와 같다
+  - creator_id: 이미지를 커밋한 사용자의 ID와 같다
   - created_at: 이 실행이 쓴 시각
   - last_used_at: 무시함 — 세션이 기록하는 값이라 이 실행에서는 알 수 없다
   - identity.canonical_name = 'image-1'
@@ -1503,7 +1503,7 @@ Then
   - config_digest = 'sha256:000000000000000000000000000000000000000000000000000000000image-1'
   - is_local = False
   - customized = False
-  - creator_id: 미리 만들어 둔 이미지를 커밋한 사용자와 같다
+  - creator_id = None
   - created_at: 이 실행이 쓴 시각
   - last_used_at: 무시함 — 세션이 기록하는 값이라 이 실행에서는 알 수 없다
   - identity.canonical_name = 'image-1'
@@ -1562,7 +1562,7 @@ Then
   - config_digest = 'sha256:000000000000000000000000000000000000000000000000000000000image-1'
   - is_local = False
   - customized = False
-  - creator_id: 미리 만들어 둔 이미지를 커밋한 사용자와 같다
+  - creator_id = None
   - created_at: 이 실행이 쓴 시각
   - last_used_at: 무시함 — 세션이 기록하는 값이라 이 실행에서는 알 수 없다
   - identity.canonical_name = 'image-1'
@@ -1627,7 +1627,7 @@ Then
   - config_digest = 'sha256:000000000000000000000000000000000000000000000000000000000image-1'
   - is_local = False
   - customized = True
-  - creator_id: 미리 만들어 둔 이미지를 커밋한 사용자와 같다
+  - creator_id: 이미지를 커밋한 사용자의 ID와 같다
   - created_at: 이 실행이 쓴 시각
   - last_used_at: 무시함 — 세션이 기록하는 값이라 이 실행에서는 알 수 없다
   - identity.canonical_name = 'image-1'
@@ -1775,7 +1775,7 @@ Then
   - config_digest = 'sha256:000000000000000000000000000000000000000000000000000000000image-1'
   - is_local = False
   - customized = False
-  - creator_id: 미리 만들어 둔 이미지를 커밋한 사용자와 같다
+  - creator_id = None
   - created_at: 이 실행이 쓴 시각
   - last_used_at: 무시함 — 세션이 기록하는 값이라 이 실행에서는 알 수 없다
   - identity.canonical_name = 'image-1'
@@ -1834,7 +1834,7 @@ Then
   - config_digest = 'sha256:000000000000000000000000000000000000000000000000000000000image-1'
   - is_local = False
   - customized = False
-  - creator_id: 미리 만들어 둔 이미지를 커밋한 사용자와 같다
+  - creator_id = None
   - created_at: 이 실행이 쓴 시각
   - last_used_at: 무시함 — 세션이 기록하는 값이라 이 실행에서는 알 수 없다
   - identity.canonical_name = 'image-1'
@@ -2075,7 +2075,7 @@ Then
   - config_digest = 'sha256:000000000000000000000000000000000000000000000000000000000image-1'
   - is_local = False
   - customized = False
-  - creator_id: 미리 만들어 둔 이미지를 커밋한 사용자와 같다
+  - creator_id = None
   - created_at: 이 실행이 쓴 시각
   - last_used_at: 무시함 — 세션이 기록하는 값이라 이 실행에서는 알 수 없다
   - identity.canonical_name = 'image-1'
@@ -2134,7 +2134,7 @@ Then
   - config_digest = 'sha256:000000000000000000000000000000000000000000000000000000000image-1'
   - is_local = False
   - customized = False
-  - creator_id: 미리 만들어 둔 이미지를 커밋한 사용자와 같다
+  - creator_id = None
   - created_at: 이 실행이 쓴 시각
   - last_used_at: 무시함 — 세션이 기록하는 값이라 이 실행에서는 알 수 없다
   - identity.canonical_name = 'image-1'
@@ -2193,7 +2193,7 @@ Then
   - config_digest = 'sha256:000000000000000000000000000000000000000000000000000000000image-1'
   - is_local = False
   - customized = False
-  - creator_id: 미리 만들어 둔 이미지를 커밋한 사용자와 같다
+  - creator_id = None
   - created_at: 이 실행이 쓴 시각
   - last_used_at: 무시함 — 세션이 기록하는 값이라 이 실행에서는 알 수 없다
   - identity.canonical_name = 'image-1'
@@ -2252,7 +2252,7 @@ Then
   - config_digest = 'sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff'
   - is_local = True
   - customized = False
-  - creator_id: 미리 만들어 둔 이미지를 커밋한 사용자와 같다
+  - creator_id = None
   - created_at: 이 실행이 쓴 시각
   - last_used_at: 무시함 — 세션이 기록하는 값이라 이 실행에서는 알 수 없다
   - identity.canonical_name = 'updated-image'
@@ -2311,7 +2311,7 @@ Then
   - config_digest = 'sha256:000000000000000000000000000000000000000000000000000000000image-1'
   - is_local = False
   - customized = False
-  - creator_id: 미리 만들어 둔 이미지를 커밋한 사용자와 같다
+  - creator_id = None
   - created_at: 이 실행이 쓴 시각
   - last_used_at: 무시함 — 세션이 기록하는 값이라 이 실행에서는 알 수 없다
   - identity.canonical_name = 'image-1'
@@ -2370,7 +2370,7 @@ Then
   - config_digest = 'sha256:000000000000000000000000000000000000000000000000000000000image-1'
   - is_local = False
   - customized = False
-  - creator_id: 미리 만들어 둔 이미지를 커밋한 사용자와 같다
+  - creator_id = None
   - created_at: 이 실행이 쓴 시각
   - last_used_at: 무시함 — 세션이 기록하는 값이라 이 실행에서는 알 수 없다
   - identity.canonical_name = 'image-1'
