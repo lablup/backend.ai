@@ -30,15 +30,22 @@ class RolePresetNameConflict(EntityError, web.HTTPConflict):
     error_type = "https://api.backend.ai/probs/role-preset-name-conflict"
     error_title = "A role preset with this name already exists in the same scope."
 
-    _operation: ActionOperationType
+    @override
+    def entity_error_code(self) -> EntityErrorCode:
+        return EntityErrorCode(
+            RolePresetEntityType(), ActionOperationType.CREATE, ErrorDetail.CONFLICT
+        )
 
-    def __init__(self, extra_msg: str | None = None, *, operation: ActionOperationType) -> None:
-        self._operation = operation
-        super().__init__(extra_msg)
+
+class RolePresetRenameConflict(EntityError, web.HTTPConflict):
+    error_type = "https://api.backend.ai/probs/role-preset-rename-conflict"
+    error_title = "Another role preset in the same scope already has this name."
 
     @override
     def entity_error_code(self) -> EntityErrorCode:
-        return EntityErrorCode(RolePresetEntityType(), self._operation, ErrorDetail.CONFLICT)
+        return EntityErrorCode(
+            RolePresetEntityType(), ActionOperationType.UPDATE, ErrorDetail.CONFLICT
+        )
 
 
 class RolePresetScopeNotFound(EntityError, web.HTTPNotFound):
