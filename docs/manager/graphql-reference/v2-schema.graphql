@@ -17071,6 +17071,9 @@ type SessionV2LifecycleInfo {
   """Scheduled start time for the session, if applicable."""
   startsAt: DateTime
 
+  """Added in 26.10.0. Reserved start time requested for a batch session."""
+  requestedStartsAt: DateTime
+
   """Batch execution timeout in seconds. Applicable to batch sessions."""
   batchTimeout: Int
 }
@@ -17191,6 +17194,14 @@ type SessionV2ResourceInfo {
 
   """The resource group (scaling group) this session is assigned to."""
   resourceGroupName: String
+
+  """
+  Added in 26.10.0. Placement group ID. Null if no placement constraint is set.
+  """
+  sessionGroupId: UUID
+
+  """Added in 26.10.0. Agent IDs designated at session creation."""
+  designatedAgentIds: [String!]
 }
 
 """
