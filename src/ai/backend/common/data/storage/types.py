@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import enum
-from datetime import timedelta
+from datetime import datetime, timedelta
 from typing import Final, NewType
 
 from pydantic import ConfigDict, Field
@@ -106,3 +106,25 @@ class ServiceStorageStatus(enum.StrEnum):
     HEALTHY = "healthy"
     UNHEALTHY = "unhealthy"
     LOST = "lost"
+
+
+class StorageStatusResult(BackendAISchema):
+    """One status check's outcome, never instantiated itself.
+
+    The subclass carries the verdict, so not_checked is the absence of a result rather
+    than one of its values.
+    """
+
+    checked_at: datetime
+
+
+class StorageStatusSuccess(StorageStatusResult):
+    """A check that found the subject usable."""
+
+    duration: timedelta
+
+
+class StorageStatusFailure(StorageStatusResult):
+    """A check that found a problem, failed, or did not return in time."""
+
+    detail: str
