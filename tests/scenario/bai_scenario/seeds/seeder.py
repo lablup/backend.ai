@@ -14,9 +14,9 @@ Which ops path writes a row follows from the spec's type, so no scenario names a
     GlobalEntityUpserter            -> upsert_global_entity
     GuardedDataUpdater              -> update_data
 
-A field row is written under an owner, so it has its own entry: ``adding`` runs
-``create_field`` for a ``FieldCreator`` and ``upsert_field_entity`` for a
-``FieldUpserter``.
+A field row is written under an owner, so it has its own entry, ``adding``. A
+``SeedField`` runs ``create_field`` for its ``FieldCreator`` and a ``SeedUpsertedField``
+runs ``upsert_field_entity`` for its ``FieldUpserter``.
 
 Taking a share is an update too, but the settle and the share are one operation, so it
 has its own entry: ``accepting`` runs ``accept_share``.
@@ -28,7 +28,7 @@ from abc import ABC, abstractmethod
 from collections.abc import Awaitable, Callable, Sequence
 from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
-from typing import Any, Final, cast
+from typing import Any, Final, cast, override
 
 from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.role import RoleID
@@ -188,7 +188,7 @@ class SeedNest[D](ABC):
         raise NotImplementedError
 
 
-class SeedField[A, D: FieldData](ABC):
+class SeedFieldBase[A, D: FieldData](ABC):
     """A field row written under an owner the scenario already laid.
 
     A field grants nothing of its own and dies with its owner, so it is never laid on
@@ -205,8 +205,32 @@ class SeedField[A, D: FieldData](ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def seed(self) -> FieldCreator[Any, Any, D] | FieldUpserter[Any, Any, D]:
+    async def write(self, ops: SeedOps, owner_id: Any) -> D:
         raise NotImplementedError
+
+
+class SeedField[A, D: FieldData](SeedFieldBase[A, D]):
+    """A field row the manager inserts."""
+
+    @abstractmethod
+    def seed(self) -> FieldCreator[Any, Any, D]:
+        raise NotImplementedError
+
+    @override
+    async def write(self, ops: SeedOps, owner_id: Any) -> D:
+        return await ops.create_field(owner_id, self.seed())
+
+
+class SeedUpsertedField[A, D: FieldData](SeedFieldBase[A, D]):
+    """A field row the manager upserts, such as the slot rows an agent reports."""
+
+    @abstractmethod
+    def seed(self) -> FieldUpserter[Any, Any, D]:
+        raise NotImplementedError
+
+    @override
+    async def write(self, ops: SeedOps, owner_id: Any) -> D:
+        return await ops.upsert_field_entity(owner_id, self.seed())
 
 
 class SeedLink[S, T](ABC):
@@ -448,15 +472,11 @@ class Seeder:
             write=project,
         )
 
-    def adding[A, D: FieldData](self, seed: SeedField[A, D], owner: Laid[A], /) -> Laid[D]:
+    def adding[A, D: FieldData](self, seed: SeedFieldBase[A, D], owner: Laid[A], /) -> Laid[D]:
         """Lay one field row under the owner the scenario already laid."""
 
         async def write(ops: SeedOps, values: Sequence[Any]) -> Any:
-            owner_id = seed.owner_id(values[0])
-            spec = seed.seed()
-            if isinstance(spec, FieldUpserter):
-                return await ops.upsert_field_entity(owner_id, spec)
-            return await ops.create_field(owner_id, spec)
+            return await seed.write(ops, seed.owner_id(values[0]))
 
         return self._remember(
             Laid(

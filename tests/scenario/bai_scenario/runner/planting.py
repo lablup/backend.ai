@@ -21,7 +21,7 @@ from bai_scenario.seeds.ops import SeedOps
 from bai_scenario.seeds.seeder import (
     Laid,
     Seeder,
-    SeedField,
+    SeedFieldBase,
     SeedFieldWithNestedRows,
     SeedLink,
     SeedNest,
@@ -104,7 +104,7 @@ class SeedingSession:
     async def once[D](self, one: SeedRow[D], /) -> Laid[D]:
         return await self._settle(self._seed.once(one))
 
-    async def adding[A, D: FieldData](self, one: SeedField[A, D], owner: Laid[A], /) -> Laid[D]:
+    async def adding[A, D: FieldData](self, one: SeedFieldBase[A, D], owner: Laid[A], /) -> Laid[D]:
         return await self._settle(self._seed.adding(one, owner))
 
     async def adding_with_nested[A, D: FieldData](
