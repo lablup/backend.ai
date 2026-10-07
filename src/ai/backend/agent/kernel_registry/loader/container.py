@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING, Any, override
 from ai.backend.agent.kernel_registry.exception import (
     KernelRegistryLoadError,
     KernelRegistryNotFound,
+    UnsupportedKernelType,
 )
 from ai.backend.agent.kernel_registry.types import KernelRecoveryData
 from ai.backend.agent.scratch.utils import ScratchConfig, ScratchUtils
@@ -64,12 +65,23 @@ class ContainerBasedKernelRegistryLoader(AbstractKernelRegistryLoader):
                 continue
             try:
                 recovery_data = await self._load_kernel_recovery_from_scratch(config_path)
-                result[kernel_id] = recovery_data.to_docker_kernel()
             except (KernelRegistryNotFound, KernelRegistryLoadError) as e:
                 log.warning(
                     "kernel recovery data load failed",
                     exc_info=e,
                     kernel_id=kernel_id,
+                    scratch_path=config_path,
+                )
+                continue
+            try:
+                result[kernel_id] = recovery_data.to_kernel()
+            except UnsupportedKernelType as e:
+                # Written by a newer build (e.g. before a downgrade): skip it, keep the agent up.
+                log.warning(
+                    "kernel recovery data has an unsupported kernel type",
+                    exc_info=e,
+                    kernel_id=kernel_id,
+                    kernel_type=recovery_data.kernel_type,
                     scratch_path=config_path,
                 )
                 continue
