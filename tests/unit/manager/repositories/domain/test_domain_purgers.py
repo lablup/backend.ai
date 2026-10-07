@@ -16,7 +16,6 @@ from ai.backend.common.data.entity.resource_group import ResourceGroupID
 from ai.backend.common.types import ResourceSlot, SessionTypes, VFolderHostPermissionMap
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.kernel.types import KernelStatus
-from ai.backend.manager.data.resource_group.types import ResourceGroupOpts
 from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.errors.resource import DomainHasGroups, DomainHasUsers
 from ai.backend.manager.models.agent.row import AgentRow
@@ -33,6 +32,7 @@ from ai.backend.manager.models.project.row import ProjectRow, ProjectType
 from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
 from ai.backend.manager.models.rbac_models.role.row import RoleRow
 from ai.backend.manager.models.resource_group.row import ResourceGroupRow
+from ai.backend.manager.models.resource_group.types import ResourceGroupOpts
 from ai.backend.manager.models.resource_policy.row import (
     KeyPairResourcePolicyRow,
     ProjectResourcePolicyRow,

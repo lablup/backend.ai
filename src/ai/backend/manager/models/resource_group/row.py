@@ -28,10 +28,7 @@ from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.entity.resource_group import ResourceGroupID
 from ai.backend.manager.data.deployment.types import DeploymentOptions
 from ai.backend.manager.data.permission.permission_defs import ResourceGroupPermission
-from ai.backend.manager.data.resource_group.types import (
-    FairShareResourceGroupSpec,
-    ResourceGroupOpts,
-)
+from ai.backend.manager.data.resource_group.types import FairShareResourceGroupSpec
 from ai.backend.manager.data.session.options import DefaultSessionOptions
 from ai.backend.manager.models.base import (
     GUID,
@@ -50,6 +47,7 @@ from ai.backend.manager.models.rbac import (
     get_predefined_roles_in_scope,
 )
 from ai.backend.manager.models.rbac.context import ClientContext
+from ai.backend.manager.models.resource_group.types import ResourceGroupOpts
 from ai.backend.manager.models.types import QueryCondition
 from ai.backend.manager.models.user.row import UserRole
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine

@@ -23,7 +23,6 @@ from ai.backend.common.data.permission.types import Permission
 from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.types import ResourceSlot, SessionTypes
 from ai.backend.manager.data.idle_checker.types import IdleCheckerAssignmentData, IdleCheckerData
-from ai.backend.manager.data.resource_group.types import ResourceGroupOpts
 from ai.backend.manager.data.user.types import UserStatus
 from ai.backend.manager.errors.idle_checker import (
     IdleCheckerAssignmentNotFound,
@@ -53,6 +52,7 @@ from ai.backend.manager.models.project.row import ProjectRow
 from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
 from ai.backend.manager.models.rbac_models.role.row import RoleRow
 from ai.backend.manager.models.resource_group.row import ResourceGroupRow
+from ai.backend.manager.models.resource_group.types import ResourceGroupOpts
 from ai.backend.manager.models.resource_policy.row import (
     ProjectResourcePolicyRow,
     UserResourcePolicyRow,

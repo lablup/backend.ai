@@ -18,7 +18,6 @@ from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.entity.resource_group import ResourceGroupID
 from ai.backend.common.types import ResourceSlot
 from ai.backend.manager.api.rest.export.adapter import ExportAdapter
-from ai.backend.manager.data.resource_group.types import ResourceGroupOpts
 from ai.backend.manager.models.agent.row import AgentRow
 from ai.backend.manager.models.association_container_registries_groups.row import (
     AssociationContainerRegistriesGroupsRow,
@@ -30,6 +29,7 @@ from ai.backend.manager.models.resource_group.row import (
     ResourceGroupForProjectRow,
     ResourceGroupRow,
 )
+from ai.backend.manager.models.resource_group.types import ResourceGroupOpts
 from ai.backend.manager.models.resource_policy.row import (
     ProjectResourcePolicyRow,
     UserResourcePolicyRow,

@@ -16,7 +16,6 @@ from ai.backend.common.data.entity.resource_group import ResourceGroupEntityType
 from ai.backend.common.data.entity.resource_preset import ResourcePresetID
 from ai.backend.common.typed_validators import HostPortPair as HostPortPairModel
 from ai.backend.common.types import AccessKey, BinarySize, ResourceSlot, ValkeyTarget
-from ai.backend.manager.data.resource_group.types import ResourceGroupOpts
 from ai.backend.manager.data.resource_preset.types import ResourcePresetData
 from ai.backend.manager.models.agent.row import AgentRow
 from ai.backend.manager.models.container_registry.row import ContainerRegistryRow
@@ -41,6 +40,7 @@ from ai.backend.manager.models.resource_group.row import (
     sgroups_for_groups,
     sgroups_for_keypairs,
 )
+from ai.backend.manager.models.resource_group.types import ResourceGroupOpts
 from ai.backend.manager.models.resource_policy.row import (
     KeyPairResourcePolicyRow,
     ProjectResourcePolicyRow,

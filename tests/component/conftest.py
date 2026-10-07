@@ -113,7 +113,6 @@ from ai.backend.manager.config.unified import (
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.manager_status.types import ManagerStatus
 from ai.backend.manager.data.permission.global_entity import GlobalEntityIDCache
-from ai.backend.manager.data.resource_group.types import ResourceGroupOpts
 from ai.backend.manager.data.secret.types import KeyProviderType
 from ai.backend.manager.data.user.types import UserStatus
 from ai.backend.manager.dependencies.infrastructure.redis import ValkeyClients
@@ -133,6 +132,7 @@ from ai.backend.manager.models.resource_group.row import (
     resource_groups,
     sgroups_for_domains,
 )
+from ai.backend.manager.models.resource_group.types import ResourceGroupOpts
 from ai.backend.manager.models.resource_policy.row import (
     ProjectResourcePolicyRow,
     UserResourcePolicyRow,

@@ -23,7 +23,6 @@ from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.deployment.types import ModelDeploymentData
 from ai.backend.manager.data.image.types import ImageType
 from ai.backend.manager.data.project.types import ProjectType
-from ai.backend.manager.data.resource_group.types import ResourceGroupOpts
 from ai.backend.manager.errors.resource import ProjectNotFound
 from ai.backend.manager.errors.user import UserNotFound
 from ai.backend.manager.models.agent.row import AgentRow
@@ -51,6 +50,7 @@ from ai.backend.manager.models.rbac_models.role.row import RoleRow
 from ai.backend.manager.models.rbac_models.user_role.row import UserRoleRow
 from ai.backend.manager.models.replica_group.row import ReplicaGroupRow
 from ai.backend.manager.models.resource_group.row import ResourceGroupRow
+from ai.backend.manager.models.resource_group.types import ResourceGroupOpts
 from ai.backend.manager.models.resource_policy.row import (
     KeyPairResourcePolicyRow,
     ProjectResourcePolicyRow,

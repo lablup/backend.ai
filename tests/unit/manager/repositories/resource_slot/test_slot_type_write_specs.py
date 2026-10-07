@@ -16,7 +16,6 @@ from ai.backend.common.data.entity.resource_group import ResourceGroupID
 from ai.backend.common.data.entity.resource_slot import ResourceSlotTypeUUID
 from ai.backend.common.types import ResourceSlot, SlotTypes
 from ai.backend.manager.data.agent.types import AgentStatus
-from ai.backend.manager.data.resource_group.types import ResourceGroupOpts
 from ai.backend.manager.data.resource_slot.types import ResourceSlotTypeData
 from ai.backend.manager.errors.resource_slot import (
     ResourceSlotTypeAlreadyExists,
@@ -40,6 +39,7 @@ from ai.backend.manager.models.rbac_models.role.row import RoleRow
 from ai.backend.manager.models.rbac_models.user_role.row import UserRoleRow
 from ai.backend.manager.models.replica_group.row import ReplicaGroupRow
 from ai.backend.manager.models.resource_group.row import ResourceGroupRow
+from ai.backend.manager.models.resource_group.types import ResourceGroupOpts
 from ai.backend.manager.models.resource_policy.row import (
     KeyPairResourcePolicyRow,
     ProjectResourcePolicyRow,

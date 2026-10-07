@@ -27,7 +27,6 @@ from ai.backend.common.types import ResourceSlot
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.image.types import ImageType
 from ai.backend.manager.data.model_serving.types import EndpointLifecycle
-from ai.backend.manager.data.resource_group.types import ResourceGroupOpts
 from ai.backend.manager.models.container_registry.row import ContainerRegistryRow
 from ai.backend.manager.models.deployment_revision.row import DeploymentRevisionRow
 from ai.backend.manager.models.deployment_revision_preset.row import DeploymentRevisionPresetRow
@@ -45,6 +44,7 @@ from ai.backend.manager.models.resource_group.row import (
     ResourceGroupForProjectRow,
     ResourceGroupRow,
 )
+from ai.backend.manager.models.resource_group.types import ResourceGroupOpts
 from ai.backend.manager.models.resource_policy.row import (
     KeyPairResourcePolicyRow,
     ProjectResourcePolicyRow,

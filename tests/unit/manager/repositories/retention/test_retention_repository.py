@@ -51,7 +51,6 @@ from ai.backend.manager.data.error_log.types import ErrorLogSeverity
 from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.data.model_serving.types import EndpointLifecycle
 from ai.backend.manager.data.permission.status import RoleStatus
-from ai.backend.manager.data.resource_group.types import ResourceGroupOpts
 from ai.backend.manager.data.retention.types import RetentionCategory, RetentionPurgeResult
 from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.data.session_group.types import (
@@ -79,6 +78,7 @@ from ai.backend.manager.models.rbac_models.role.row import RoleRow
 from ai.backend.manager.models.replica_group.row import ReplicaGroupRow
 from ai.backend.manager.models.replica_group_history.row import ReplicaGroupHistoryRow
 from ai.backend.manager.models.resource_group.row import ResourceGroupRow
+from ai.backend.manager.models.resource_group.types import ResourceGroupOpts
 from ai.backend.manager.models.resource_policy.row import (
     KeyPairResourcePolicyRow,
     ProjectResourcePolicyRow,

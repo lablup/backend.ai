@@ -25,7 +25,6 @@ from ai.backend.common.data.entity.project import ProjectEntityType
 from ai.backend.common.data.entity.resource_group import ResourceGroupID
 from ai.backend.common.data.filter_specs import StringMatchSpec, UUIDEqualMatchSpec
 from ai.backend.common.types import ResourceSlot
-from ai.backend.manager.data.resource_group.types import ResourceGroupOpts
 from ai.backend.manager.errors.resource import ResourceGroupNotFound
 from ai.backend.manager.models.agent.row import AgentRow
 from ai.backend.manager.models.domain.row import DomainRow
@@ -59,6 +58,7 @@ from ai.backend.manager.models.resource_group.row import (
     ResourceGroupForProjectRow,
     ResourceGroupRow,
 )
+from ai.backend.manager.models.resource_group.types import ResourceGroupOpts
 from ai.backend.manager.models.resource_policy.row import (
     KeyPairResourcePolicyRow,
     ProjectResourcePolicyRow,

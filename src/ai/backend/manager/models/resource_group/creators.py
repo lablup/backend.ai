@@ -17,7 +17,6 @@ from ai.backend.manager.data.permission.scope_template import ScopeTemplateValue
 from ai.backend.manager.data.resource_group.types import (
     FairShareResourceGroupSpec,
     ResourceGroupData,
-    ResourceGroupOpts,
 )
 from ai.backend.manager.errors.repository import UniqueConstraintViolationError
 from ai.backend.manager.models.resource_group.row import (
@@ -29,6 +28,7 @@ from ai.backend.manager.models.resource_group.row import (
 from ai.backend.manager.models.resource_group.searchable_fields import (
     ResourceGroupSearchableFields,
 )
+from ai.backend.manager.models.resource_group.types import ResourceGroupOpts
 from ai.backend.manager.models.specs.created_in import CreatedInGlobal
 from ai.backend.manager.models.specs.creator import RoleManagedEntityCreator
 from ai.backend.manager.models.specs.relation import RelationCreator

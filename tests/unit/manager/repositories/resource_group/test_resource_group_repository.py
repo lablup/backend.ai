@@ -18,7 +18,6 @@ from ai.backend.common.types import (
 )
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.resource_group.types import PreemptionConfig as DataPreemptionConfig
-from ai.backend.manager.data.resource_group.types import ResourceGroupOpts
 from ai.backend.manager.data.user.types import UserStatus
 from ai.backend.manager.errors.resource import (
     DefaultResourceGroupAlreadyExists,
@@ -56,6 +55,7 @@ from ai.backend.manager.models.resource_group.row import (
     ResourceGroupForProjectRow,
     ResourceGroupRow,
 )
+from ai.backend.manager.models.resource_group.types import ResourceGroupOpts
 from ai.backend.manager.models.resource_group.updaters import ResourceGroupUpdater
 from ai.backend.manager.models.resource_policy.row import (
     KeyPairResourcePolicyRow,

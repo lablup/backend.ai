@@ -10,7 +10,6 @@ from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.types import DefaultForUnspecified, ResourceSlot
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
-from ai.backend.manager.data.resource_group.types import ResourceGroupOpts
 from ai.backend.manager.data.user.types import UserStatus
 from ai.backend.manager.models.domain.row import DomainRow
 from ai.backend.manager.models.hasher.types import PasswordInfo
@@ -23,6 +22,7 @@ from ai.backend.manager.models.resource_group.row import (
     ResourceGroupRow,
 )
 from ai.backend.manager.models.resource_group.searchers import AllowedResourceGroupsSearch
+from ai.backend.manager.models.resource_group.types import ResourceGroupOpts
 from ai.backend.manager.models.resource_policy.row import (
     KeyPairResourcePolicyRow,
     ProjectResourcePolicyRow,
