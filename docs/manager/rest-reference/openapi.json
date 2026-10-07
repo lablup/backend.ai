@@ -12926,6 +12926,19 @@
             "description": "Filter by local-only status.",
             "title": "Is Local"
           },
+          "customized": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter by whether a session commit made the image.",
+            "title": "Customized"
+          },
           "type": {
             "anyOf": [
               {

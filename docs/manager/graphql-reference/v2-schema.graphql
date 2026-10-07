@@ -6792,6 +6792,17 @@ type ImageV2 implements Node {
   """UUID of the container registry where this image is stored."""
   registryId: UUID!
 
+  """Added in 26.10.0. Whether a session commit made this image."""
+  customized: Boolean!
+
+  """
+  Added in 26.10.0. UUID of the user a customized image was committed for. Null where the image is not customized, or where that user is gone.
+  """
+  creatorId: UUID
+
+  """Added in 26.10.0. The user a customized image was committed for."""
+  creator: UserV2
+
   """
   Added in 26.3.0. Timestamp of the most recent session created with this image. Returns null if the image has never been used.
   """
@@ -6931,6 +6942,9 @@ input ImageV2Filter {
 
   """Added in 26.10.0. Filter by local-only status."""
   isLocal: Boolean = null
+
+  """Added in 26.10.0. Filter by whether a session commit made the image."""
+  customized: Boolean = null
 
   """Added in 26.10.0. Filter by image type category."""
   type: ImageV2TypeFilter = null

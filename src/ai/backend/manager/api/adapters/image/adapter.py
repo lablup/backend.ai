@@ -418,6 +418,7 @@ class ImageAdapter(BaseAdapter):
             *self.apply_string_filter(filter.accelerators, fields.accelerators.filter),
             *self.apply_int_filter(filter.size_bytes, fields.size_bytes.filter),
             *self.apply_bool_filter(filter.is_local, fields.is_local.filter),
+            *self.apply_bool_filter(filter.customized, fields.customized.filter),
             *self.apply_enum_filter(filter.type, fields.type.filter),
             *self.apply_datetime_filter(filter.created_at, fields.created_at.filter),
             *self.apply_datetime_filter(filter.last_used, fields.last_used_at.filter),
@@ -582,6 +583,8 @@ class ImageAdapter(BaseAdapter):
             is_local=data.is_local,
             created_at=data.created_at,
             last_used_at=data.last_used_at,
+            customized=data.customized,
+            creator_id=data.creator_id,
             identity=ImageIdentityInfoDTO(
                 canonical_name=str(data.name),
                 namespace=data.image,

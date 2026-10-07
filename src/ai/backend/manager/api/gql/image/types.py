@@ -11,7 +11,7 @@ import uuid
 from collections.abc import Iterable
 from datetime import datetime
 from enum import StrEnum
-from typing import Any, Self, cast, override
+from typing import TYPE_CHECKING, Annotated, Any, Self, cast, override
 
 import strawberry
 from strawberry import Info
@@ -20,6 +20,7 @@ from strawberry.relay import Connection, Edge, NodeID
 from ai.backend.common.data.entity.image import ImageEntityType
 from ai.backend.common.data.entity.image_alias import ImageAliasID
 from ai.backend.common.data.entity.types import RuntimeEntityID
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.dto.manager.v2.image.request import (
     ContainerRegistryScopeInputDTO,
     ImageAliasFilterInputDTO,
@@ -82,6 +83,9 @@ from ai.backend.manager.api.gql.pydantic_compat import (
     PydanticOutputMixin,
 )
 from ai.backend.manager.api.gql.types import GQLFilter, GQLOrderBy, StrawberryGQLContext
+
+if TYPE_CHECKING:
+    from ai.backend.manager.api.gql.user.types.node import UserV2GQL
 
 # =============================================================================
 # Enums
@@ -307,6 +311,42 @@ class ImageV2GQL(PydanticNodeMixin[ImageNode]):
     registry_id: uuid.UUID = gql_field(
         description="UUID of the container registry where this image is stored."
     )
+    customized: bool = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="Whether a session commit made this image.",
+        ),
+    )
+    creator_id: uuid.UUID | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description=(
+                "UUID of the user a customized image was committed for. Null where the image "
+                "is not customized, or where that user is gone."
+            ),
+        ),
+        default=None,
+    )
+
+    @gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="The user a customized image was committed for.",
+        )
+    )  # type: ignore[misc]
+    async def creator(
+        self,
+        info: Info[StrawberryGQLContext],
+    ) -> (
+        Annotated[
+            UserV2GQL,
+            strawberry.lazy("ai.backend.manager.api.gql.user.types.node"),
+        ]
+        | None
+    ):
+        if self.creator_id is None:
+            return None
+        return await info.context.data_loaders.user_loader.load(UserID(self.creator_id))
 
     @gql_added_field(
         BackendAIGQLMeta(
@@ -666,6 +706,13 @@ class ImageV2FilterGQL(PydanticInputMixin[ImageFilterInputDTO], GQLFilter):
     is_local: bool | None = gql_added_field(
         BackendAIGQLMeta(
             added_version=NEXT_RELEASE_VERSION, description="Filter by local-only status."
+        ),
+        default=None,
+    )
+    customized: bool | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="Filter by whether a session commit made the image.",
         ),
         default=None,
     )

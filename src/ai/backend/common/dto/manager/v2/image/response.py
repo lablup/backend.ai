@@ -10,6 +10,7 @@ from uuid import UUID
 from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseResponseModel
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.dto.manager.pagination import PaginationInfo
 from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 
@@ -75,6 +76,16 @@ class ImageNode(BaseResponseModel):
     last_used_at: datetime | None = Field(
         default=None,
         description="Timestamp of the most recent session created with this image.",
+    )
+    customized: bool = Field(
+        description=f"Whether a session commit made this image. Added in {NEXT_RELEASE_VERSION}.",
+    )
+    creator_id: UserID | None = Field(
+        default=None,
+        description=(
+            "The user a customized image was committed for. Null where the image is not "
+            f"customized, or where that user is gone. Added in {NEXT_RELEASE_VERSION}."
+        ),
     )
     identity: ImageIdentityInfoDTO | None = Field(
         default=None, description="Identity information (name, architecture)."

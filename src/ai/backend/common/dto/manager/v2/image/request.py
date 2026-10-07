@@ -112,6 +112,9 @@ class ImageFilterInputDTO(BaseRequestModel):
     )
     size_bytes: IntFilter | None = Field(default=None, description="Filter by image size in bytes.")
     is_local: bool | None = Field(default=None, description="Filter by local-only status.")
+    customized: bool | None = Field(
+        default=None, description="Filter by whether a session commit made the image."
+    )
     type: ImageTypeFilterInputDTO | None = Field(
         default=None, description="Filter by image type category."
     )

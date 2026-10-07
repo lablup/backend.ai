@@ -25,7 +25,9 @@
 | 시나리오 | 판정 |
 |---|---|
 | [슈퍼관리자가 크기와 오프셋 없이 커서만 지정해 검색하면 지정한 개수만 반환되고 다음 페이지가 있다고 알린다](#searching-a-cursor-alone-answers-the-first-page-and-says-there-is-more) | 성공 |
+| [커스텀 이미지와 커스텀 이미지가 아닌 이미지 중 커스텀 이미지로 검색하면 커스텀 이미지만 커밋 대상 사용자와 함께 반환된다](#searching-filtering-images-by-customized-returns-only-customized-images) | 성공 |
 | [슈퍼관리자가 한 이미지의 이름으로 검색하면 그 이미지만 반환된다](#searching-filtering-images-by-name-returns-only-the-match) | 성공 |
+| [커스텀 이미지와 커스텀 이미지가 아닌 이미지 중 커스텀 이미지가 아닌 것으로 검색하면 커스텀 이미지가 아닌 이미지만 반환된다](#searching-filtering-images-by-not-customized-returns-only-uncustomized-images) | 성공 |
 | [살아 있는 이미지와 삭제된 이미지 중 살아 있는 상태로 검색하면 해당 이미지만 반환된다](#searching-filtering-images-by-status-returns-only-alive-images) | 성공 |
 | [슈퍼관리자가 페이지 크기를 생략하고 검색하면, 50개까지만 반환되고 다음 페이지가 있다고 알린다](#searching-omitting-the-page-size-answers-with-fifty-and-says-there-is-more) | 성공 |
 | [이름 내림차순으로 정렬하고 첫 항목을 제외하면 두 번째와 세 번째 이미지가 반환된다](#searching-ordering-by-name-and-offsetting-returns-the-middle-page) | 성공 |
@@ -177,6 +179,39 @@ Then
   - has_next_page = True
   - has_previous_page = False
 
+<a id="searching-filtering-images-by-customized-returns-only-customized-images"></a>
+
+#### [filtering-images-by-customized-returns-only-customized-images](/tests/scenario/bai_scenario/manager/image/test_searching.py) — pass
+
+커스텀 이미지와 커스텀 이미지가 아닌 이미지 중 커스텀 이미지로 검색하면 커스텀 이미지만 커밋 대상 사용자와 함께 반환된다
+
+Given
+
+- 호출자를 위해 커밋된 커스텀 이미지 1개와 커스텀 이미지가 아닌 이미지 1개, superadmin 1명
+  - 도메인 home-1
+  - 컨테이너 레지스트리 host-1: 이미지를 가져오는 곳
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+  - 이미지 customized-1: x86_64 이미지, 커스터마이즈된 이미지라 소유자가 있다
+  - 이미지 uncustomized-1: x86_64 이미지
+
+When
+
+- ImageAdapter.admin_search — user-1이 커스텀 이미지로 한 페이지에 50개씩 검색함
+
+Then
+
+- 커스텀 이미지만 반환되고, 커밋 대상 사용자로 호출자가 담긴다
+  - items = ['customized-1']
+  - customized = [True]
+  - creator_id: 미리 만들어 둔 이미지의 커밋 대상 사용자와 같다
+  - total_count = 1
+  - has_next_page = False
+  - has_previous_page = False
+
 <a id="searching-filtering-images-by-name-returns-only-the-match"></a>
 
 #### [filtering-images-by-name-returns-only-the-match](/tests/scenario/bai_scenario/manager/image/test_searching.py) — pass
@@ -205,6 +240,39 @@ Then
 
 - 이름이 일치하는 이미지만 반환된다
   - items = ['image-0-1']
+  - total_count = 1
+  - has_next_page = False
+  - has_previous_page = False
+
+<a id="searching-filtering-images-by-not-customized-returns-only-uncustomized-images"></a>
+
+#### [filtering-images-by-not-customized-returns-only-uncustomized-images](/tests/scenario/bai_scenario/manager/image/test_searching.py) — pass
+
+커스텀 이미지와 커스텀 이미지가 아닌 이미지 중 커스텀 이미지가 아닌 것으로 검색하면 커스텀 이미지가 아닌 이미지만 반환된다
+
+Given
+
+- 호출자를 위해 커밋된 커스텀 이미지 1개와 커스텀 이미지가 아닌 이미지 1개, superadmin 1명
+  - 도메인 home-1
+  - 컨테이너 레지스트리 host-1: 이미지를 가져오는 곳
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+  - 이미지 customized-1: x86_64 이미지, 커스터마이즈된 이미지라 소유자가 있다
+  - 이미지 uncustomized-1: x86_64 이미지
+
+When
+
+- ImageAdapter.admin_search — user-1이 커스텀 이미지가 아닌 것으로 한 페이지에 50개씩 검색함
+
+Then
+
+- 커스텀 이미지가 아닌 이미지만 반환되고, 커밋 대상 사용자는 비어 있다
+  - items = ['uncustomized-1']
+  - customized = [False]
+  - creator_id: 미리 만들어 둔 이미지의 커밋 대상 사용자와 같다
   - total_count = 1
   - has_next_page = False
   - has_previous_page = False
@@ -1130,6 +1198,8 @@ Then
   - accelerators = None
   - config_digest = 'sha256:000000000000000000000000000000000000000000000000000000000image-1'
   - is_local = False
+  - customized = False
+  - creator_id: 미리 만들어 둔 이미지의 커밋 대상 사용자와 같다
   - created_at: 이 실행이 쓴 시각
   - last_used_at: 무시함 — 세션이 기록하는 값이라 이 실행에서는 알 수 없다
   - identity.canonical_name = 'image-1'
@@ -1193,6 +1263,8 @@ Then
   - accelerators = None
   - config_digest = 'sha256:000000000000000000000000000000000000000000000000000000000image-1'
   - is_local = False
+  - customized = True
+  - creator_id: 미리 만들어 둔 이미지의 커밋 대상 사용자와 같다
   - created_at: 이 실행이 쓴 시각
   - last_used_at: 무시함 — 세션이 기록하는 값이라 이 실행에서는 알 수 없다
   - identity.canonical_name = 'image-1'
@@ -1394,6 +1466,8 @@ Then
   - accelerators = None
   - config_digest = 'sha256:000000000000000000000000000000000000000000000000000000000image-1'
   - is_local = False
+  - customized = False
+  - creator_id: 미리 만들어 둔 이미지의 커밋 대상 사용자와 같다
   - created_at: 이 실행이 쓴 시각
   - last_used_at: 무시함 — 세션이 기록하는 값이라 이 실행에서는 알 수 없다
   - identity.canonical_name = 'image-1'
@@ -1451,6 +1525,8 @@ Then
   - accelerators = None
   - config_digest = 'sha256:000000000000000000000000000000000000000000000000000000000image-1'
   - is_local = False
+  - customized = False
+  - creator_id: 미리 만들어 둔 이미지의 커밋 대상 사용자와 같다
   - created_at: 이 실행이 쓴 시각
   - last_used_at: 무시함 — 세션이 기록하는 값이라 이 실행에서는 알 수 없다
   - identity.canonical_name = 'image-1'
@@ -1514,6 +1590,8 @@ Then
   - accelerators = None
   - config_digest = 'sha256:000000000000000000000000000000000000000000000000000000000image-1'
   - is_local = False
+  - customized = True
+  - creator_id: 미리 만들어 둔 이미지의 커밋 대상 사용자와 같다
   - created_at: 이 실행이 쓴 시각
   - last_used_at: 무시함 — 세션이 기록하는 값이라 이 실행에서는 알 수 없다
   - identity.canonical_name = 'image-1'
@@ -1660,6 +1738,8 @@ Then
   - accelerators = None
   - config_digest = 'sha256:000000000000000000000000000000000000000000000000000000000image-1'
   - is_local = False
+  - customized = False
+  - creator_id: 미리 만들어 둔 이미지의 커밋 대상 사용자와 같다
   - created_at: 이 실행이 쓴 시각
   - last_used_at: 무시함 — 세션이 기록하는 값이라 이 실행에서는 알 수 없다
   - identity.canonical_name = 'image-1'
@@ -1717,6 +1797,8 @@ Then
   - accelerators = None
   - config_digest = 'sha256:000000000000000000000000000000000000000000000000000000000image-1'
   - is_local = False
+  - customized = False
+  - creator_id: 미리 만들어 둔 이미지의 커밋 대상 사용자와 같다
   - created_at: 이 실행이 쓴 시각
   - last_used_at: 무시함 — 세션이 기록하는 값이라 이 실행에서는 알 수 없다
   - identity.canonical_name = 'image-1'
@@ -1956,6 +2038,8 @@ Then
   - accelerators = None
   - config_digest = 'sha256:000000000000000000000000000000000000000000000000000000000image-1'
   - is_local = False
+  - customized = False
+  - creator_id: 미리 만들어 둔 이미지의 커밋 대상 사용자와 같다
   - created_at: 이 실행이 쓴 시각
   - last_used_at: 무시함 — 세션이 기록하는 값이라 이 실행에서는 알 수 없다
   - identity.canonical_name = 'image-1'
@@ -2013,6 +2097,8 @@ Then
   - accelerators = None
   - config_digest = 'sha256:000000000000000000000000000000000000000000000000000000000image-1'
   - is_local = False
+  - customized = False
+  - creator_id: 미리 만들어 둔 이미지의 커밋 대상 사용자와 같다
   - created_at: 이 실행이 쓴 시각
   - last_used_at: 무시함 — 세션이 기록하는 값이라 이 실행에서는 알 수 없다
   - identity.canonical_name = 'image-1'
@@ -2070,6 +2156,8 @@ Then
   - accelerators = None
   - config_digest = 'sha256:000000000000000000000000000000000000000000000000000000000image-1'
   - is_local = False
+  - customized = False
+  - creator_id: 미리 만들어 둔 이미지의 커밋 대상 사용자와 같다
   - created_at: 이 실행이 쓴 시각
   - last_used_at: 무시함 — 세션이 기록하는 값이라 이 실행에서는 알 수 없다
   - identity.canonical_name = 'image-1'
@@ -2127,6 +2215,8 @@ Then
   - accelerators = None
   - config_digest = 'sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff'
   - is_local = True
+  - customized = False
+  - creator_id: 미리 만들어 둔 이미지의 커밋 대상 사용자와 같다
   - created_at: 이 실행이 쓴 시각
   - last_used_at: 무시함 — 세션이 기록하는 값이라 이 실행에서는 알 수 없다
   - identity.canonical_name = 'updated-image'
@@ -2184,6 +2274,8 @@ Then
   - accelerators = None
   - config_digest = 'sha256:000000000000000000000000000000000000000000000000000000000image-1'
   - is_local = False
+  - customized = False
+  - creator_id: 미리 만들어 둔 이미지의 커밋 대상 사용자와 같다
   - created_at: 이 실행이 쓴 시각
   - last_used_at: 무시함 — 세션이 기록하는 값이라 이 실행에서는 알 수 없다
   - identity.canonical_name = 'image-1'
@@ -2241,6 +2333,8 @@ Then
   - accelerators = 'cuda'
   - config_digest = 'sha256:000000000000000000000000000000000000000000000000000000000image-1'
   - is_local = False
+  - customized = False
+  - creator_id: 미리 만들어 둔 이미지의 커밋 대상 사용자와 같다
   - created_at: 이 실행이 쓴 시각
   - last_used_at: 무시함 — 세션이 기록하는 값이라 이 실행에서는 알 수 없다
   - identity.canonical_name = 'image-1'
