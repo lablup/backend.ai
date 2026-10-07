@@ -1862,13 +1862,24 @@ class AbstractAgent[
                         session_id = kernel_obj.session_id
                         kernel_session_map[kernel_id] = session_id
                     # Check if: kernel_registry has the container but it's gone.
-                    for kernel_id in known_kernels.keys() - alive_kernels.keys():
-                        kernel_obj = self.kernel_registry[kernel_id]
-                        if (
-                            kernel_id in self.restarting_kernels
-                            or kernel_obj.state != KernelLifecycleStatus.RUNNING
-                        ):
-                            continue
+                    missing = [
+                        kernel_id
+                        for kernel_id in known_kernels.keys() - alive_kernels.keys()
+                        if kernel_id not in self.restarting_kernels
+                        and self.kernel_registry[kernel_id].state == KernelLifecycleStatus.RUNNING
+                    ]
+                    if missing:
+                        # The listing predates the lock: a kernel that became RUNNING since is
+                        # missing from it. Listed again under the lock, it no longer can be.
+                        relisted = dict(await self.enumerate_containers(ACTIVE_STATUS_SET))
+                        for kernel_id in missing:
+                            if (relisted_container := relisted.get(kernel_id)) is None:
+                                continue
+                            alive_kernels[kernel_id] = relisted_container.id
+                            if _get_session_id(relisted_container) is not None:
+                                own_kernels[kernel_id] = relisted_container.id
+                        missing = [kernel_id for kernel_id in missing if kernel_id not in relisted]
+                    for kernel_id in missing:
                         log.info("kernel without container detected", kernel_id=kernel_id)
                         terminated_kernels[kernel_id] = ContainerLifecycleEvent(
                             kernel_id,
