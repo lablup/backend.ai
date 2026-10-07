@@ -8,7 +8,6 @@ from uuid import uuid4
 
 import pytest
 import strawberry
-from pydantic import ValidationError
 
 from ai.backend.common.data.entity.agent_resource import AgentResourceID
 from ai.backend.common.dto.manager.v2.resource_slot.request import AgentResourceFilter
@@ -17,6 +16,7 @@ from ai.backend.common.dto.manager.v2.resource_slot.response import (
     AgentResourceNode,
 )
 from ai.backend.common.dto.manager.v2.resource_slot.types import AgentResourceOrderField
+from ai.backend.common.exception import BackendAISchemaValidationFailed
 from ai.backend.manager.api.adapters.resource_slot.adapter import ResourceSlotAdapter
 from ai.backend.manager.api.gql.agent.types import AgentV2GQL
 from ai.backend.manager.api.gql.base import DecimalFilter
@@ -121,5 +121,5 @@ class TestAgentResourceReservations:
 
     @pytest.mark.parametrize("field", ["reserved", "prereserved"])
     def test_invalid_decimal_is_rejected(self, field: str) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises(BackendAISchemaValidationFailed, match=field):
             AgentResourceFilter.model_validate({field: {"equals": "not-a-number"}})
