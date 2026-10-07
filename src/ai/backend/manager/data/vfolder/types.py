@@ -390,7 +390,7 @@ class VFolderLocation:
     usage_mode: VFolderUsageMode = VFolderUsageMode.GENERAL
 
 
-@dataclass
+@dataclass(frozen=True)
 class VFolderStorageTarget:
     """Where a vfolder lives in storage: its id, its host and an unmanaged path if it has one."""
 
@@ -399,7 +399,7 @@ class VFolderStorageTarget:
     unmanaged_path: str | None
 
 
-@dataclass
+@dataclass(frozen=True)
 class VFolderCloneInfo:
     source_vfolder_id: VFolderID
     source_host: str
