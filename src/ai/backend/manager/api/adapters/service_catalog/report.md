@@ -18,7 +18,7 @@
 | [상태마다 하나씩 있는 서비스를 비정상·등록 해제 목록에 들지 않은 것으로 걸러 조회하면 정상 서비스만 반환된다](#searching-a-status-not-in-filter-drops-the-services-of-a-listed-status) | 성공 |
 | [서비스 11개가 있을 때 크기 없이 조회하면 10건까지 반환되고 다음 페이지가 있다고 응답한다](#searching-omitting-the-page-size-answers-ten-services-and-a-next-page) | 성공 |
 | [모니터 역할이 필터 없이 조회하면 슈퍼관리자와 같은 답을 받는다. 이 검색은 읽기 연산이라 모니터 역할이 전역 역할 검사를 통과한다](#searching-the-monitor-role-counts-every-service-as-the-superadmin-does) | 성공 |
-| [서비스 둘 중 하나가 엔드포인트를 가질 때 슈퍼관리자가 필터 없이 조회하면, 둘 다 집계되고 엔드포인트가 함께 담긴다](#searching-the-superadmin-counts-every-service-laid-with-its-endpoints) | 성공 |
+| [서비스 둘 중 하나가 엔드포인트를 가질 때 슈퍼관리자가 필터 없이 조회하면, 둘 다 한 번씩 집계된다](#searching-the-superadmin-counts-every-service-laid-once) | 성공 |
 | [슈퍼관리자가 아닌 사용자가 전체 조회를 요청하면 역할 부족으로 거부된다](#searching-a-user-who-is-not-the-superadmin-may-not-search-services) | 거부 |
 
 ### admin_search
@@ -251,7 +251,7 @@ When
 
 Then
 
-- 심은 서비스가 모두, 엔드포인트와 함께 통째로 집계된다
+- 심은 서비스가 모두 한 번씩, 통째로 집계된다
   - items.instance_id = ['other-1', 'wanted-1']
   - total_count = 2
   - has_next_page = False
@@ -267,7 +267,6 @@ Then
   - items[0].registered_at: 이 실행이 쓴 시각
   - items[0].last_heartbeat: 이 실행이 쓴 시각
   - items[0].config_hash = ''
-  - items[0].len(endpoints) = 0
   - items[1].id: 심은 서비스와 같다
   - items[1].service_group = 'manager'
   - items[1].instance_id = 'wanted-1'
@@ -279,20 +278,12 @@ Then
   - items[1].registered_at: 이 실행이 쓴 시각
   - items[1].last_heartbeat: 이 실행이 쓴 시각
   - items[1].config_hash = ''
-  - items[1].len(endpoints) = 1
-  - items[1].endpoints[0].id: 무시함 — 데이터베이스가 만든다
-  - items[1].endpoints[0].role = 'api'
-  - items[1].endpoints[0].scope = 'public'
-  - items[1].endpoints[0].address = '127.0.0.1'
-  - items[1].endpoints[0].port = 8080
-  - items[1].endpoints[0].protocol = 'http'
-  - items[1].endpoints[0].metadata = {'zone': 'a'}
 
-<a id="searching-the-superadmin-counts-every-service-laid-with-its-endpoints"></a>
+<a id="searching-the-superadmin-counts-every-service-laid-once"></a>
 
-#### [the-superadmin-counts-every-service-laid-with-its-endpoints](/tests/scenario/bai_scenario/manager/service_catalog/test_searching.py) — pass
+#### [the-superadmin-counts-every-service-laid-once](/tests/scenario/bai_scenario/manager/service_catalog/test_searching.py) — pass
 
-서비스 둘 중 하나가 엔드포인트를 가질 때 슈퍼관리자가 필터 없이 조회하면, 둘 다 집계되고 엔드포인트가 함께 담긴다
+서비스 둘 중 하나가 엔드포인트를 가질 때 슈퍼관리자가 필터 없이 조회하면, 둘 다 한 번씩 집계된다
 
 Given
 
@@ -313,7 +304,7 @@ When
 
 Then
 
-- 심은 서비스가 모두, 엔드포인트와 함께 통째로 집계된다
+- 심은 서비스가 모두 한 번씩, 통째로 집계된다
   - items.instance_id = ['other-1', 'wanted-1']
   - total_count = 2
   - has_next_page = False
@@ -329,7 +320,6 @@ Then
   - items[0].registered_at: 이 실행이 쓴 시각
   - items[0].last_heartbeat: 이 실행이 쓴 시각
   - items[0].config_hash = ''
-  - items[0].len(endpoints) = 0
   - items[1].id: 심은 서비스와 같다
   - items[1].service_group = 'manager'
   - items[1].instance_id = 'wanted-1'
@@ -341,14 +331,6 @@ Then
   - items[1].registered_at: 이 실행이 쓴 시각
   - items[1].last_heartbeat: 이 실행이 쓴 시각
   - items[1].config_hash = ''
-  - items[1].len(endpoints) = 1
-  - items[1].endpoints[0].id: 무시함 — 데이터베이스가 만든다
-  - items[1].endpoints[0].role = 'api'
-  - items[1].endpoints[0].scope = 'public'
-  - items[1].endpoints[0].address = '127.0.0.1'
-  - items[1].endpoints[0].port = 8080
-  - items[1].endpoints[0].protocol = 'http'
-  - items[1].endpoints[0].metadata = {'zone': 'a'}
 
 <a id="searching-a-user-who-is-not-the-superadmin-may-not-search-services"></a>
 

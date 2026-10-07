@@ -195,20 +195,20 @@ class SearchingByStatusNotIn(When[ManyServicesAndACaller, ServiceCatalogAdapter,
 
 
 @dataclass(frozen=True)
-class TheSuperadminCountsEveryServiceWithItsEndpoints(
+class TheSuperadminCountsEveryServiceOnce(
     Scenario[SeedingSession, ManyServicesAndACaller, ServiceCatalogAdapter, Searched]
 ):
     started: datetime
 
     @override
     def summary(self) -> str:
-        return "the-superadmin-counts-every-service-laid-with-its-endpoints"
+        return "the-superadmin-counts-every-service-laid-once"
 
     @override
     def describe(self) -> str:
         return (
             "서비스 둘 중 하나가 엔드포인트를 가질 때 슈퍼관리자가 필터 없이 조회하면, "
-            "둘 다 집계되고 엔드포인트가 함께 담긴다"
+            "둘 다 한 번씩 집계된다"
         )
 
     @override
@@ -453,7 +453,7 @@ class AUserWhoIsNotTheSuperadminMayNotSearch(
 
 
 SCENARIOS: list[SearchingStep] = [
-    TheSuperadminCountsEveryServiceWithItsEndpoints(started=datetime.now(UTC)),
+    TheSuperadminCountsEveryServiceOnce(started=datetime.now(UTC)),
     AGroupFilterNarrows(),
     AStatusEqualsFilterKeepsThatStatus(),
     AStatusNotEqualsFilterDropsThatStatus(),

@@ -19,7 +19,6 @@ from ai.backend.common.dto.manager.v2.service_catalog.response import (
     ServiceCatalogNode,
 )
 from ai.backend.common.types import ServiceCatalogStatus
-from ai.backend.manager.data.service_catalog.types import ServiceCatalogEndpointData
 from ai.backend.manager.data.user.types import UserData
 from ai.backend.manager.errors.auth import InsufficientPrivilege
 from ai.backend.testutils.scenario_steps import (
@@ -29,7 +28,6 @@ from ai.backend.testutils.scenario_steps import (
     Refused,
     Same,
     SameAs,
-    Skipped,
     Then,
     Verdict,
 )
@@ -59,7 +57,6 @@ class ALaidService:
     service_group: str
     instance_id: str
     status: ServiceCatalogStatus
-    endpoints: tuple[ServiceCatalogEndpointData, ...]
 
 
 @dataclass(frozen=True)
@@ -85,21 +82,15 @@ class ManyServicesAndSomeone(Given[Any, ManyServicesAndACaller]):
     @override
     async def lay(self, seeding: Any) -> ManyServicesAndACaller:
         wanted = await seeding.creating(SeedService(service_group=GROUP, name_hint="wanted"))
-        endpoint = await seeding.adding(SeedEndpointOf(), wanted)
+        await seeding.adding(SeedEndpointOf(), wanted)
         others = [
             await seeding.creating(SeedService(service_group=GROUP, name_hint="other"))
             for _ in range(self.besides)
         ]
         caller = await lay_a_caller(seeding, self.role)
-        first = ALaidService(
-            seeding.made(wanted),
-            GROUP,
-            wanted.name,
-            ServiceCatalogStatus.HEALTHY,
-            (seeding.made(endpoint),),
-        )
+        first = ALaidService(seeding.made(wanted), GROUP, wanted.name, ServiceCatalogStatus.HEALTHY)
         rest = [
-            ALaidService(seeding.made(one), GROUP, one.name, ServiceCatalogStatus.HEALTHY, ())
+            ALaidService(seeding.made(one), GROUP, one.name, ServiceCatalogStatus.HEALTHY)
             for one in others
         ]
         return ManyServicesAndACaller(laid=(first, *rest), named=first, caller=seeding.made(caller))
@@ -120,11 +111,9 @@ class ServicesOfTwoGroupsAndSomeone(Given[Any, ManyServicesAndACaller]):
         wanted = await seeding.creating(SeedService(service_group=GROUP, name_hint="wanted"))
         other = await seeding.creating(SeedService(service_group=OTHER_GROUP, name_hint="other"))
         caller = await lay_a_caller(seeding, self.role)
-        first = ALaidService(
-            seeding.made(wanted), GROUP, wanted.name, ServiceCatalogStatus.HEALTHY, ()
-        )
+        first = ALaidService(seeding.made(wanted), GROUP, wanted.name, ServiceCatalogStatus.HEALTHY)
         second = ALaidService(
-            seeding.made(other), OTHER_GROUP, other.name, ServiceCatalogStatus.HEALTHY, ()
+            seeding.made(other), OTHER_GROUP, other.name, ServiceCatalogStatus.HEALTHY
         )
         return ManyServicesAndACaller(
             laid=(first, second), named=first, caller=seeding.made(caller)
@@ -157,11 +146,9 @@ class ServicesOfEveryStatusAndSomeone(Given[Any, ManyServicesAndACaller]):
         ]
         caller = await lay_a_caller(seeding, self.role)
         first = ALaidService(
-            seeding.made(healthy), GROUP, healthy.name, ServiceCatalogStatus.HEALTHY, ()
+            seeding.made(healthy), GROUP, healthy.name, ServiceCatalogStatus.HEALTHY
         )
-        rest = [
-            ALaidService(seeding.made(one), GROUP, one.name, status, ()) for status, one in others
-        ]
+        rest = [ALaidService(seeding.made(one), GROUP, one.name, status) for status, one in others]
         return ManyServicesAndACaller(laid=(first, *rest), named=first, caller=seeding.made(caller))
 
 
@@ -181,30 +168,19 @@ def service_verdicts(
         Held(f"{at}registered_at", node.registered_at, written),
         Held(f"{at}last_heartbeat", node.last_heartbeat, written),
         Same(f"{at}config_hash", node.config_hash, ""),
-        Same(f"{at}len(endpoints)", len(node.endpoints), len(laid.endpoints)),
     ]
-    for j, (got, expected) in enumerate(zip(node.endpoints, laid.endpoints, strict=False)):
-        seen.extend([
-            Skipped(f"{at}endpoints[{j}].id", "데이터베이스가 만든다"),
-            Same(f"{at}endpoints[{j}].role", got.role, expected.role),
-            Same(f"{at}endpoints[{j}].scope", got.scope, expected.scope),
-            Same(f"{at}endpoints[{j}].address", got.address, expected.address),
-            Same(f"{at}endpoints[{j}].port", got.port, expected.port),
-            Same(f"{at}endpoints[{j}].protocol", got.protocol, expected.protocol),
-            Same(f"{at}endpoints[{j}].metadata", got.metadata, expected.metadata),
-        ])
     return seen
 
 
 @dataclass(frozen=True)
 class EveryLaidServiceComesWhole(Then[ManyServicesAndACaller, AdminSearchServiceCatalogsPayload]):
-    """심은 서비스가 모두 집계되고, 각각이 엔드포인트까지 통째로 온다. 인스턴스 id 순으로 본다."""
+    """심은 서비스가 모두 한 번씩 집계되고, 각각이 통째로 온다. 인스턴스 id 순으로 본다."""
 
     started: datetime
 
     @override
     def says(self) -> str:
-        return "심은 서비스가 모두, 엔드포인트와 함께 통째로 집계된다"
+        return "심은 서비스가 모두 한 번씩, 통째로 집계된다"
 
     @override
     def look(

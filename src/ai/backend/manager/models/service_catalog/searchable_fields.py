@@ -3,12 +3,8 @@
 from __future__ import annotations
 
 from typing import override
-from uuid import UUID
 
-from ai.backend.common.data.entity.service_catalog import (
-    ServiceCatalogEndpointID,
-    ServiceCatalogID,
-)
+from ai.backend.common.data.entity.service_catalog import ServiceCatalogID
 from ai.backend.common.types import ServiceCatalogStatus
 from ai.backend.manager.data.service_catalog.types import (
     ServiceCatalogData,
@@ -18,7 +14,6 @@ from ai.backend.manager.models.service_catalog.row import (
     ServiceCatalogEndpointRow,
     ServiceCatalogRow,
 )
-from ai.backend.manager.models.service_catalog.types import ServiceCatalogEndpointRowJson
 from ai.backend.manager.models.specs.conditions.datetime import DateTimeConditions
 from ai.backend.manager.models.specs.conditions.enum import EnumConditions
 from ai.backend.manager.models.specs.conditions.integer import IntConditions
@@ -76,7 +71,7 @@ class _ServiceCatalogEndpointOwnFields(
     @override
     def to_data(self, row: ServiceCatalogEndpointRow) -> ServiceCatalogEndpointData:
         return ServiceCatalogEndpointData(
-            id=ServiceCatalogEndpointID(self.field_id.read(row)),
+            id=ServiceCatalogID(self.field_id.read(row)),
             service_id=ServiceCatalogID(self.service_id.read(row)),
             role=self.role.read(row),
             scope=self.scope.read(row),
@@ -92,11 +87,7 @@ class ServiceCatalogEndpointSearchableFields:
 
 
 class _ServiceCatalogOwnFields(RowDataConverter[ServiceCatalogRow, ServiceCatalogData]):
-    """The registered service's own columns.
-
-    ``endpoints`` come back through ``endpoint_rows``, a JSON aggregate the searcher
-    loads; filtering by them goes through ``nested.endpoints``.
-    """
+    """The registered service's own columns. ``endpoints`` are declared in ``nested``."""
 
     id = SearchableField(
         ServiceCatalogRow.id,
@@ -150,22 +141,6 @@ class _ServiceCatalogOwnFields(RowDataConverter[ServiceCatalogRow, ServiceCatalo
         StringConditions(ServiceCatalogRow.config_hash),
         ColumnOrder(ServiceCatalogRow.config_hash),
     )
-    endpoint_rows = SearchableField(ServiceCatalogRow.endpoint_rows, None, None)
-    """Derived: the endpoint rows as JSON, aggregated by the searcher's subquery."""
-
-    @staticmethod
-    def _endpoint_from_json(endpoint: ServiceCatalogEndpointRowJson) -> ServiceCatalogEndpointData:
-        """One element of ``ServiceCatalogRow.endpoint_rows``, keyed by column name."""
-        return ServiceCatalogEndpointData(
-            id=ServiceCatalogEndpointID(UUID(endpoint["id"])),
-            service_id=ServiceCatalogID(UUID(endpoint["service_id"])),
-            role=endpoint["role"],
-            scope=endpoint["scope"],
-            address=endpoint["address"],
-            port=endpoint["port"],
-            protocol=endpoint["protocol"],
-            metadata=endpoint["metadata"],
-        )
 
     @override
     def to_data(self, row: ServiceCatalogRow) -> ServiceCatalogData:
@@ -181,10 +156,6 @@ class _ServiceCatalogOwnFields(RowDataConverter[ServiceCatalogRow, ServiceCatalo
             registered_at=self.registered_at.read(row),
             last_heartbeat=self.last_heartbeat.read(row),
             config_hash=self.config_hash.read(row),
-            endpoints=[
-                self._endpoint_from_json(endpoint)
-                for endpoint in self.endpoint_rows.read(row) or []
-            ],
         )
 
 
