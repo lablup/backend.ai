@@ -8890,7 +8890,7 @@ type GetPresignedUploadURLPayload
 }
 
 """
-Added in 26.10.0. The global entity a global role preset's role is created in.
+Added in 26.10.0. The name of a singleton scope of the `global` entity type.
 """
 enum GlobalEntityName
   @join__type(graph: STRAWBERRY)

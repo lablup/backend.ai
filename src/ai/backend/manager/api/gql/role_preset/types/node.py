@@ -42,7 +42,7 @@ from .permission import (
 GlobalEntityNameGQL: type[GlobalEntityName] = gql_enum(
     BackendAIGQLMeta(
         added_version=NEXT_RELEASE_VERSION,
-        description="The global entity a global role preset's role is created in.",
+        description="The name of a singleton scope of the `global` entity type.",
     ),
     GlobalEntityName,
     name="GlobalEntityName",
