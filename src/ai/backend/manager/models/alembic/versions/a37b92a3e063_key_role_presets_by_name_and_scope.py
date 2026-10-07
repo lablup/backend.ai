@@ -11,7 +11,6 @@ Create Date: 2026-10-07
 
 import sqlalchemy as sa
 from alembic import op
-from sqlalchemy.engine import Connection
 
 # revision identifiers, used by Alembic.
 revision = "a37b92a3e063"
@@ -26,8 +25,8 @@ SELECT name, scope_type, scope_id, array_agg(id) FROM role_presets
 GROUP BY 1, 2, 3 HAVING count(*) > 1;"""
 
 
-def refuse_duplicate_names(conn: Connection) -> None:
-    duplicated = conn.execute(sa.text(_CHECK_QUERY)).all()
+def upgrade() -> None:
+    duplicated = op.get_bind().execute(sa.text(_CHECK_QUERY)).all()
     if duplicated:
         listed = "; ".join(
             f"{name!r} in {scope_type}/{scope_id or '*'}"
@@ -38,10 +37,6 @@ def refuse_duplicate_names(conn: Connection) -> None:
             f"{' ...' if len(duplicated) > 20 else ''}. Rename or purge them first; "
             f"check query:\n{_CHECK_QUERY}"
         )
-
-
-def upgrade() -> None:
-    refuse_duplicate_names(op.get_bind())
     op.create_unique_constraint(
         op.f("uq_role_presets_name"),
         "role_presets",
