@@ -23,7 +23,7 @@ from bai_scenario.seeds.seeder import Naming, TestSeedRowFrom, TestSeedRowFromTw
 
 
 @dataclass(frozen=True)
-class SeedPersonalVFolder(TestSeedRowFrom[UserData, VFolderData]):
+class TestSeedPersonalVFolder(TestSeedRowFrom[UserData, VFolderData]):
     """A ready folder of the given person's own, on the given host."""
 
     host: str
@@ -62,7 +62,7 @@ class SeedPersonalVFolder(TestSeedRowFrom[UserData, VFolderData]):
 
 
 @dataclass(frozen=True)
-class SeedProjectVFolder(TestSeedRowFromTwo[ProjectData, UserData, VFolderData]):
+class TestSeedProjectVFolder(TestSeedRowFromTwo[ProjectData, UserData, VFolderData]):
     """A ready folder of the given project, made by the given person, on the given host."""
 
     host: str

@@ -14,7 +14,7 @@ from bai_scenario.seeds.seeder import Naming, TestSeedRowFromTwo
 
 
 @dataclass(frozen=True)
-class SeedProject(TestSeedRowFromTwo[DomainData, ProjectResourcePolicyData, ProjectData]):
+class TestSeedProject(TestSeedRowFromTwo[DomainData, ProjectResourcePolicyData, ProjectData]):
     """A project of the given domain, under the given policy."""
 
     name_hint: str = "project"

@@ -13,7 +13,7 @@ from bai_scenario.seeds.seeder import Naming, TestSeedRow
 
 
 @dataclass(frozen=True)
-class SeedSlotType(TestSeedRow[ResourceSlotTypeData]):
+class TestSeedSlotType(TestSeedRow[ResourceSlotTypeData]):
     """A slot type in the global catalog.
 
     The manager fixes the name, so the row answers with it. A slot a revision allocates
@@ -54,7 +54,7 @@ class SeedSlotType(TestSeedRow[ResourceSlotTypeData]):
 
 
 @dataclass(frozen=True)
-class SeedResourceSlotType(TestSeedRow[ResourceSlotTypeData]):
+class TestSeedResourceSlotType(TestSeedRow[ResourceSlotTypeData]):
     """A slot type in the global catalog. Its name is what every call addresses it by."""
 
     name_hint: str = "slot"

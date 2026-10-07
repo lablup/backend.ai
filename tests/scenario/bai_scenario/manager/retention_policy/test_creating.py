@@ -29,12 +29,12 @@ from bai_scenario.components.retention_policy import (
 )
 from bai_scenario.components.system import ENFORCEMENT, ACaller, SomeoneAlone
 from bai_scenario.runner.acting import ActingAs
-from bai_scenario.runner.planting import SeedingSession
+from bai_scenario.runner.planting import TestSeedingSession
 from bai_scenario.runner.steps import run_scenario
 
 DAYS = 90
 
-type CreatingStep = Scenario[SeedingSession, Any, RetentionPolicyAdapter, RetentionPolicyNode]
+type CreatingStep = Scenario[TestSeedingSession, Any, RetentionPolicyAdapter, RetentionPolicyNode]
 
 
 @dataclass(frozen=True)
@@ -93,7 +93,7 @@ class CreatingTheLaidCategoryAgain(
 
 @dataclass(frozen=True)
 class TheSuperadminMakesOneNeverSwept(
-    Scenario[SeedingSession, ACaller, RetentionPolicyAdapter, RetentionPolicyNode]
+    Scenario[TestSeedingSession, ACaller, RetentionPolicyAdapter, RetentionPolicyNode]
 ):
     started: datetime
 
@@ -109,7 +109,7 @@ class TheSuperadminMakesOneNeverSwept(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, ACaller]:
+    def given(self) -> Given[TestSeedingSession, ACaller]:
         return SomeoneAlone(role=UserRole.SUPERADMIN)
 
     @override
@@ -125,7 +125,7 @@ class TheSuperadminMakesOneNeverSwept(
 
 @dataclass(frozen=True)
 class AnInactiveOneIsMadeInactive(
-    Scenario[SeedingSession, ACaller, RetentionPolicyAdapter, RetentionPolicyNode]
+    Scenario[TestSeedingSession, ACaller, RetentionPolicyAdapter, RetentionPolicyNode]
 ):
     started: datetime
 
@@ -138,7 +138,7 @@ class AnInactiveOneIsMadeInactive(
         return "활성 여부를 거짓으로 지정해 생성하면 비활성 상태가 담긴 노드가 반환된다"
 
     @override
-    def given(self) -> Given[SeedingSession, ACaller]:
+    def given(self) -> Given[TestSeedingSession, ACaller]:
         return SomeoneAlone(role=UserRole.SUPERADMIN)
 
     @override
@@ -154,7 +154,7 @@ class AnInactiveOneIsMadeInactive(
 
 @dataclass(frozen=True)
 class EachCategoryIsAccepted(
-    Scenario[SeedingSession, ACaller, RetentionPolicyAdapter, RetentionPolicyNode]
+    Scenario[TestSeedingSession, ACaller, RetentionPolicyAdapter, RetentionPolicyNode]
 ):
     started: datetime
     category: RetentionCategory
@@ -168,7 +168,7 @@ class EachCategoryIsAccepted(
         return f"슈퍼관리자가 {self.category.value} 카테고리의 정책을 생성하면 그 카테고리가 담긴 노드가 반환된다"
 
     @override
-    def given(self) -> Given[SeedingSession, ACaller]:
+    def given(self) -> Given[TestSeedingSession, ACaller]:
         return SomeoneAlone(role=UserRole.SUPERADMIN)
 
     @override
@@ -182,7 +182,7 @@ class EachCategoryIsAccepted(
 
 @dataclass(frozen=True)
 class ASecondPolicyForACategoryIsRefused(
-    Scenario[SeedingSession, APolicyAndACaller, RetentionPolicyAdapter, RetentionPolicyNode]
+    Scenario[TestSeedingSession, APolicyAndACaller, RetentionPolicyAdapter, RetentionPolicyNode]
 ):
     @override
     def summary(self) -> str:
@@ -193,7 +193,7 @@ class ASecondPolicyForACategoryIsRefused(
         return "어떤 카테고리의 정책이 이미 있을 때 같은 카테고리로 다시 생성하면, 카테고리 중복으로 거부된다"
 
     @override
-    def given(self) -> Given[SeedingSession, APolicyAndACaller]:
+    def given(self) -> Given[TestSeedingSession, APolicyAndACaller]:
         return APolicyAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
@@ -207,7 +207,7 @@ class ASecondPolicyForACategoryIsRefused(
 
 @dataclass(frozen=True)
 class AUserWhoIsNotTheSuperadminMayNotCreate(
-    Scenario[SeedingSession, ACaller, RetentionPolicyAdapter, RetentionPolicyNode]
+    Scenario[TestSeedingSession, ACaller, RetentionPolicyAdapter, RetentionPolicyNode]
 ):
     @override
     def summary(self) -> str:
@@ -218,7 +218,7 @@ class AUserWhoIsNotTheSuperadminMayNotCreate(
         return "슈퍼관리자가 아닌 사용자가 정책을 생성하면 역할 부족으로 거부된다"
 
     @override
-    def given(self) -> Given[SeedingSession, ACaller]:
+    def given(self) -> Given[TestSeedingSession, ACaller]:
         return SomeoneAlone()
 
     @override
@@ -232,7 +232,7 @@ class AUserWhoIsNotTheSuperadminMayNotCreate(
 
 @dataclass(frozen=True)
 class TheMonitorMayNotCreate(
-    Scenario[SeedingSession, ACaller, RetentionPolicyAdapter, RetentionPolicyNode]
+    Scenario[TestSeedingSession, ACaller, RetentionPolicyAdapter, RetentionPolicyNode]
 ):
     @override
     def summary(self) -> str:
@@ -243,7 +243,7 @@ class TheMonitorMayNotCreate(
         return "모니터 역할이 정책을 생성하면 역할 부족으로 거부된다. 모니터는 슈퍼관리자 검사에서 읽기만 통과한다"
 
     @override
-    def given(self) -> Given[SeedingSession, ACaller]:
+    def given(self) -> Given[TestSeedingSession, ACaller]:
         return SomeoneAlone(role=UserRole.MONITOR)
 
     @override
@@ -257,7 +257,7 @@ class TheMonitorMayNotCreate(
 
 @dataclass(frozen=True)
 class EnforcementOffStillNeedsTheSuperadmin(
-    Scenario[SeedingSession, ACaller, RetentionPolicyAdapter, RetentionPolicyNode], Configured
+    Scenario[TestSeedingSession, ACaller, RetentionPolicyAdapter, RetentionPolicyNode], Configured
 ):
     @override
     def summary(self) -> str:
@@ -272,7 +272,7 @@ class EnforcementOffStillNeedsTheSuperadmin(
         return {ENFORCEMENT: False}
 
     @override
-    def given(self) -> Given[SeedingSession, ACaller]:
+    def given(self) -> Given[TestSeedingSession, ACaller]:
         return SomeoneAlone()
 
     @override

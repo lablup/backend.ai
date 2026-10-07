@@ -86,7 +86,7 @@ def session_spec(
 
 
 @dataclass(frozen=True)
-class SeedSession(
+class TestSeedSession(
     TestSeedRowFromThree[ProjectData, UserData, ResourceGroupData, SessionEntityData]
 ):
     """A session of the given project, owned by the given user, on the given group.

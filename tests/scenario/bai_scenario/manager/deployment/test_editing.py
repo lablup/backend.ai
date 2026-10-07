@@ -27,14 +27,14 @@ from bai_scenario.components.deployment import (
     TheDeploymentNode,
 )
 from bai_scenario.runner.acting import ActingAs
-from bai_scenario.runner.planting import SeedingSession
+from bai_scenario.runner.planting import TestSeedingSession
 from bai_scenario.runner.steps import run_scenario
 
 RENAMED = "renamed"
 KEPT = "keep"
 
 type EditingStep = Scenario[
-    SeedingSession, ADeploymentAndACaller, DeploymentAdapter, DeploymentNode
+    TestSeedingSession, ADeploymentAndACaller, DeploymentAdapter, DeploymentNode
 ]
 
 
@@ -91,7 +91,7 @@ class Editing(When[ADeploymentAndACaller, DeploymentAdapter, DeploymentNode]):
 
 @dataclass(frozen=True)
 class TheNameChangesAndNothingElse(
-    Scenario[SeedingSession, ADeploymentAndACaller, DeploymentAdapter, DeploymentNode]
+    Scenario[TestSeedingSession, ADeploymentAndACaller, DeploymentAdapter, DeploymentNode]
 ):
     started: datetime
 
@@ -104,7 +104,7 @@ class TheNameChangesAndNothingElse(
         return "수정 권한을 받은 사용자가 이름을 바꾸면, 이름만 새 값이 되고 나머지는 그대로다"
 
     @override
-    def given(self) -> Given[SeedingSession, ADeploymentAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ADeploymentAndACaller]:
         return ADeploymentInThatPlace(granted=(Permission.UPDATE,))
 
     @override
@@ -118,7 +118,7 @@ class TheNameChangesAndNothingElse(
 
 @dataclass(frozen=True)
 class TheReplicaCountChanges(
-    Scenario[SeedingSession, ADeploymentAndACaller, DeploymentAdapter, DeploymentNode]
+    Scenario[TestSeedingSession, ADeploymentAndACaller, DeploymentAdapter, DeploymentNode]
 ):
     started: datetime
 
@@ -131,7 +131,7 @@ class TheReplicaCountChanges(
         return "수정 권한을 받은 사용자가 복제 수를 올리면, 두려는 복제 수가 새 값이 된다"
 
     @override
-    def given(self) -> Given[SeedingSession, ADeploymentAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ADeploymentAndACaller]:
         return ADeploymentInThatPlace(granted=(Permission.UPDATE,), replica_count=1)
 
     @override
@@ -145,7 +145,7 @@ class TheReplicaCountChanges(
 
 @dataclass(frozen=True)
 class TheTagsAreCleared(
-    Scenario[SeedingSession, ADeploymentAndACaller, DeploymentAdapter, DeploymentNode]
+    Scenario[TestSeedingSession, ADeploymentAndACaller, DeploymentAdapter, DeploymentNode]
 ):
     started: datetime
 
@@ -158,7 +158,7 @@ class TheTagsAreCleared(
         return "태그가 붙은 배포의 태그를 비우면, 태그가 하나도 남지 않는다"
 
     @override
-    def given(self) -> Given[SeedingSession, ADeploymentAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ADeploymentAndACaller]:
         return ADeploymentInThatPlace(granted=(Permission.UPDATE,), tag=KEPT)
 
     @override
@@ -172,7 +172,7 @@ class TheTagsAreCleared(
 
 @dataclass(frozen=True)
 class ItIsOpenedToThePublic(
-    Scenario[SeedingSession, ADeploymentAndACaller, DeploymentAdapter, DeploymentNode]
+    Scenario[TestSeedingSession, ADeploymentAndACaller, DeploymentAdapter, DeploymentNode]
 ):
     started: datetime
 
@@ -185,7 +185,7 @@ class ItIsOpenedToThePublic(
         return "공개가 아닌 배포를 수정 권한을 받은 사용자가 공개로 바꾸면, 공개로 바뀐 상태가 온다"
 
     @override
-    def given(self) -> Given[SeedingSession, ADeploymentAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ADeploymentAndACaller]:
         return ADeploymentInThatPlace(granted=(Permission.UPDATE,), open_to_public=False)
 
     @override
@@ -199,7 +199,7 @@ class ItIsOpenedToThePublic(
 
 @dataclass(frozen=True)
 class TheSuperadminEditsAnothers(
-    Scenario[SeedingSession, ADeploymentAndACaller, DeploymentAdapter, DeploymentNode]
+    Scenario[TestSeedingSession, ADeploymentAndACaller, DeploymentAdapter, DeploymentNode]
 ):
     started: datetime
 
@@ -215,7 +215,7 @@ class TheSuperadminEditsAnothers(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, ADeploymentAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ADeploymentAndACaller]:
         return AnothersDeploymentAndASuperadmin()
 
     @override
@@ -229,7 +229,7 @@ class TheSuperadminEditsAnothers(
 
 @dataclass(frozen=True)
 class ReadingIsNotEnoughToEdit(
-    Scenario[SeedingSession, ADeploymentAndACaller, DeploymentAdapter, DeploymentNode]
+    Scenario[TestSeedingSession, ADeploymentAndACaller, DeploymentAdapter, DeploymentNode]
 ):
     @override
     def summary(self) -> str:
@@ -240,7 +240,7 @@ class ReadingIsNotEnoughToEdit(
         return "읽기 권한만 받은 사용자가 배포를 수정하면, 권한 부족으로 거부된다"
 
     @override
-    def given(self) -> Given[SeedingSession, ADeploymentAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ADeploymentAndACaller]:
         return ADeploymentInThatPlace(granted=(Permission.READ,))
 
     @override
@@ -254,7 +254,7 @@ class ReadingIsNotEnoughToEdit(
 
 @dataclass(frozen=True)
 class EditingAnUnknownIdIsNotFoundForASuperadmin(
-    Scenario[SeedingSession, ADeploymentAndACaller, DeploymentAdapter, DeploymentNode]
+    Scenario[TestSeedingSession, ADeploymentAndACaller, DeploymentAdapter, DeploymentNode]
 ):
     @override
     def summary(self) -> str:
@@ -265,7 +265,7 @@ class EditingAnUnknownIdIsNotFoundForASuperadmin(
         return "슈퍼관리자가 아무것도 갖지 않은 id를 수정하면, 대상이 없다는 것으로 거부된다"
 
     @override
-    def given(self) -> Given[SeedingSession, ADeploymentAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ADeploymentAndACaller]:
         return ADeploymentInThatPlace(role=UserRole.SUPERADMIN)
 
     @override

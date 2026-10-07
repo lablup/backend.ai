@@ -15,7 +15,7 @@ from bai_scenario.seeds.seeder import Naming, TestSeedRow
 
 
 @dataclass(frozen=True)
-class SeedCategory(TestSeedRow[PrometheusQueryPresetCategoryData]):
+class TestSeedCategory(TestSeedRow[PrometheusQueryPresetCategoryData]):
     """A category in the global preset catalog. The name is the seeder's."""
 
     name_hint: str = "category"

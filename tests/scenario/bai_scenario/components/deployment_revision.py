@@ -59,16 +59,16 @@ from bai_scenario.components.deployment import (
 )
 from bai_scenario.components.domain import SomeoneOf, WrittenByThisRun
 from bai_scenario.components.vfolder import STORAGE_HOST, SomeoneReadingFoldersIn
-from bai_scenario.seeds.deployment.revision import SeedRevisionOf
-from bai_scenario.seeds.entity_share.share import SeedShareTaken, SeedVFolderShare
-from bai_scenario.seeds.image.image import SeedImage
-from bai_scenario.seeds.image.registry import SeedContainerRegistry
-from bai_scenario.seeds.project.project import SeedProject
-from bai_scenario.seeds.resource_policy.project import SeedProjectPolicy
-from bai_scenario.seeds.resource_slot.slot_type import SeedSlotType
-from bai_scenario.seeds.runtime_variant.runtime_variant import SeedRuntimeVariant
-from bai_scenario.seeds.seeder import Laid, Seeder, TestSeedNest
-from bai_scenario.seeds.vfolder.vfolder import SeedPersonalVFolder
+from bai_scenario.seeds.deployment.revision import TestSeedRevisionOf
+from bai_scenario.seeds.entity_share.share import TestSeedShareTaken, TestSeedVFolderShare
+from bai_scenario.seeds.image.image import TestSeedImage
+from bai_scenario.seeds.image.registry import TestSeedContainerRegistry
+from bai_scenario.seeds.project.project import TestSeedProject
+from bai_scenario.seeds.resource_policy.project import TestSeedProjectPolicy
+from bai_scenario.seeds.resource_slot.slot_type import TestSeedSlotType
+from bai_scenario.seeds.runtime_variant.runtime_variant import TestSeedRuntimeVariant
+from bai_scenario.seeds.seeder import Laid, TestSeeder, TestSeedNest
+from bai_scenario.seeds.vfolder.vfolder import TestSeedPersonalVFolder
 
 MOUNTED_AT = "/models"
 SERVED = "served"
@@ -137,31 +137,31 @@ class WhatARevisionStandsOn(TestSeedNest[LaidMaterials]):
         return "리비전이 딛는 이미지, 모델 폴더, 런타임 변형, 자원 슬롯 타입 준비"
 
     @override
-    def lay(self, seed: Seeder) -> LaidMaterials:
-        registry = seed.creating(SeedContainerRegistry())
-        image = seed.creating_from(SeedImage(), registry)
+    def lay(self, seed: TestSeeder) -> LaidMaterials:
+        registry = seed.creating(TestSeedContainerRegistry())
+        image = seed.creating_from(TestSeedImage(), registry)
         folder = self._folder(seed)
         if self.folder_readable:
             own = seed.personal_project_of(self.folder_owner)
             seed.within(SomeoneReadingFoldersIn(own, lambda p: ProjectID(p.id), self.folder_owner))
-        runtime = seed.creating(SeedRuntimeVariant())
-        cpu = seed.creating(SeedSlotType(IntrinsicSlotNames.CPU, required=self.cpu_required))
-        memory = seed.creating(SeedSlotType(IntrinsicSlotNames.MEMORY))
+        runtime = seed.creating(TestSeedRuntimeVariant())
+        cpu = seed.creating(TestSeedSlotType(IntrinsicSlotNames.CPU, required=self.cpu_required))
+        memory = seed.creating(TestSeedSlotType(IntrinsicSlotNames.MEMORY))
         return LaidMaterials(image=image, folder=folder, runtime=runtime, cpu=cpu, memory=memory)
 
-    def _folder(self, seed: Seeder) -> Laid[VFolderData]:
+    def _folder(self, seed: TestSeeder) -> Laid[VFolderData]:
         if self.lender is None:
-            return seed.creating_from(SeedPersonalVFolder(host=STORAGE_HOST), self.folder_owner)
+            return seed.creating_from(TestSeedPersonalVFolder(host=STORAGE_HOST), self.folder_owner)
         folder = seed.creating_from(
-            SeedPersonalVFolder(
+            TestSeedPersonalVFolder(
                 host=STORAGE_HOST, default_mount_permission=VFolderMountPolicy.READ_ONLY
             ),
             self.lender,
         )
         offer = seed.creating_from_three(
-            SeedVFolderShare(cap=Permission.READ), self.lender, folder, self.folder_owner
+            TestSeedVFolderShare(cap=Permission.READ), self.lender, folder, self.folder_owner
         )
-        seed.accepting(SeedShareTaken(), offer)
+        seed.accepting(TestSeedShareTaken(), offer)
         return folder
 
 
@@ -180,7 +180,7 @@ async def lay_revisions(
     made: list[ModelRevisionData] = []
     for _ in range(count):
         laid = await seeding.adding(
-            SeedRevisionOf(
+            TestSeedRevisionOf(
                 image_id=image.id,
                 folder_id=folder.id,
                 runtime_variant_id=runtime.id,
@@ -321,9 +321,9 @@ class RevisionsInTwoProjects(Given[Any, RevisionsAndACaller]):
     @override
     async def lay(self, seeding: Any) -> RevisionsAndACaller:
         place = await lay_a_place(seeding, granted=self.granted, role=self.role)
-        policy = await seeding.once(SeedProjectPolicy())
+        policy = await seeding.once(TestSeedProjectPolicy())
         other = await seeding.creating_from_two(
-            SeedProject(name_hint="other"), place.domain, policy
+            TestSeedProject(name_hint="other"), place.domain, policy
         )
         beside = LaidPlace(
             domain=place.domain,

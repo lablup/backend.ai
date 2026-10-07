@@ -13,7 +13,7 @@ from bai_scenario.seeds.seeder import Naming, TestSeedRow
 
 
 @dataclass(frozen=True)
-class SeedRetentionPolicy(TestSeedRow[RetentionPolicyData]):
+class TestSeedRetentionPolicy(TestSeedRow[RetentionPolicyData]):
     """The one policy of a category. Its name is the category, which the manager fixes."""
 
     category: RetentionCategory = RetentionCategory.LOGS

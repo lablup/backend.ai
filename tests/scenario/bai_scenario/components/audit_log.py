@@ -37,12 +37,12 @@ from ai.backend.testutils.scenario_steps import (
     Verdict,
 )
 from bai_scenario.components.domain import WAS_HERE, SomeoneOf
-from bai_scenario.runner.planting import SeedingSession
-from bai_scenario.seeds.audit_log.audit_log import SeedAuditRecord, SeedScopedAuditRecord
-from bai_scenario.seeds.domain.domain import SeedDomain
-from bai_scenario.seeds.project.project import SeedProject
-from bai_scenario.seeds.rbac.role import SeedPermission, SeedRole
-from bai_scenario.seeds.resource_policy.project import SeedProjectPolicy
+from bai_scenario.runner.planting import TestSeedingSession
+from bai_scenario.seeds.audit_log.audit_log import TestSeedAuditRecord, TestSeedScopedAuditRecord
+from bai_scenario.seeds.domain.domain import TestSeedDomain
+from bai_scenario.seeds.project.project import TestSeedProject
+from bai_scenario.seeds.rbac.role import TestSeedPermission, TestSeedRole
+from bai_scenario.seeds.resource_policy.project import TestSeedProjectPolicy
 from bai_scenario.seeds.seeder import Laid
 
 # Two clearly ordered timestamps, so a "newest first" answer is a fixed order rather than
@@ -150,7 +150,7 @@ class ScopedActors:
 
 
 async def grant_reading(
-    seeding: SeedingSession,
+    seeding: TestSeedingSession,
     entity: Laid[Any],
     to: Laid[UserData],
     *,
@@ -159,8 +159,10 @@ async def grant_reading(
 ) -> None:
     """Give ``to`` READ on ``entity`` through a role in that entity's own scope: the role,
     the READ permission on the entity's type, and the grant."""
-    role = await seeding.creating_from(SeedRole(scope_of, name_hint="record-reader"), entity)
-    await seeding.adding(SeedPermission(entity_type=entity_type, permission=Permission.READ), role)
+    role = await seeding.creating_from(TestSeedRole(scope_of, name_hint="record-reader"), entity)
+    await seeding.adding(
+        TestSeedPermission(entity_type=entity_type, permission=Permission.READ), role
+    )
     await seeding.granting(role, to, role_id=lambda r: r.id, user_id=lambda u: UserID(u.id))
 
 
@@ -177,7 +179,7 @@ class TwoProjectsLaid:
 
 
 async def lay_two_projects(
-    seeding: SeedingSession,
+    seeding: TestSeedingSession,
     *,
     grant_first: bool = False,
     grant_second: bool = False,
@@ -186,17 +188,19 @@ async def lay_two_projects(
     """A domain with two projects, one record on each, and a caller granted READ on the
     projects asked for."""
     domain: Laid[DomainData] = await seeding.creating(
-        SeedDomain(name_hint="home", description=WAS_HERE)
+        TestSeedDomain(name_hint="home", description=WAS_HERE)
     )
-    policy = await seeding.once(SeedProjectPolicy())
-    first = await seeding.creating_from_two(SeedProject(name_hint="team"), domain, policy)
-    second = await seeding.creating_from_two(SeedProject(name_hint="other"), domain, policy)
+    policy = await seeding.once(TestSeedProjectPolicy())
+    first = await seeding.creating_from_two(TestSeedProject(name_hint="team"), domain, policy)
+    second = await seeding.creating_from_two(TestSeedProject(name_hint="other"), domain, policy)
     first_record = await seeding.adding(
-        SeedAuditRecord(owner_of=lambda p: ProjectID(p.id), operation=OP_LATE, created_at=LATE),
+        TestSeedAuditRecord(owner_of=lambda p: ProjectID(p.id), operation=OP_LATE, created_at=LATE),
         first,
     )
     second_record = await seeding.adding(
-        SeedAuditRecord(owner_of=lambda p: ProjectID(p.id), operation=OP_EARLY, created_at=EARLY),
+        TestSeedAuditRecord(
+            owner_of=lambda p: ProjectID(p.id), operation=OP_EARLY, created_at=EARLY
+        ),
         second,
     )
     caller = await seeding.within(SomeoneOf(domain, role=role))
@@ -226,7 +230,7 @@ async def lay_two_projects(
 
 
 async def lay_two_actors(
-    seeding: SeedingSession,
+    seeding: TestSeedingSession,
     *,
     caller_is_first: bool = False,
     grant_first_to_caller: bool = False,
@@ -234,14 +238,14 @@ async def lay_two_actors(
     """A domain with two users who each triggered a record, and a caller. The caller is
     the first user, or a third person granted READ on the first user."""
     domain: Laid[DomainData] = await seeding.creating(
-        SeedDomain(name_hint="home", description=WAS_HERE)
+        TestSeedDomain(name_hint="home", description=WAS_HERE)
     )
     first = await seeding.within(SomeoneOf(domain))
     second = await seeding.within(SomeoneOf(domain))
     first_id = seeding.made(first).id
     second_id = seeding.made(second).id
     await seeding.adding(
-        SeedAuditRecord(
+        TestSeedAuditRecord(
             owner_of=lambda u: UserID(u.id),
             operation=OP_MINE,
             created_at=LATE,
@@ -250,7 +254,7 @@ async def lay_two_actors(
         first,
     )
     await seeding.adding(
-        SeedAuditRecord(
+        TestSeedAuditRecord(
             owner_of=lambda u: UserID(u.id),
             operation=OP_THEIRS,
             created_at=EARLY,
@@ -277,15 +281,19 @@ class TwoRecordsGlobally(Given[Any, RecordsAndACaller]):
         return f"서로 다른 시각의 기록 둘과, {self.role.value} 한 명"
 
     @override
-    async def lay(self, seeding: SeedingSession) -> RecordsAndACaller:
-        domain = await seeding.creating(SeedDomain(name_hint="home", description=WAS_HERE))
+    async def lay(self, seeding: TestSeedingSession) -> RecordsAndACaller:
+        domain = await seeding.creating(TestSeedDomain(name_hint="home", description=WAS_HERE))
         caller = await seeding.within(SomeoneOf(domain, role=self.role))
         await seeding.adding(
-            SeedAuditRecord(owner_of=lambda u: UserID(u.id), operation=OP_LATE, created_at=LATE),
+            TestSeedAuditRecord(
+                owner_of=lambda u: UserID(u.id), operation=OP_LATE, created_at=LATE
+            ),
             caller,
         )
         await seeding.adding(
-            SeedAuditRecord(owner_of=lambda u: UserID(u.id), operation=OP_EARLY, created_at=EARLY),
+            TestSeedAuditRecord(
+                owner_of=lambda u: UserID(u.id), operation=OP_EARLY, created_at=EARLY
+            ),
             caller,
         )
         made = seeding.made(caller)
@@ -307,15 +315,15 @@ class MixedStatusGlobally(Given[Any, RecordsAndACaller]):
         return "성공한 기록과 거부된 기록, 그리고 슈퍼관리자 한 명"
 
     @override
-    async def lay(self, seeding: SeedingSession) -> RecordsAndACaller:
-        domain = await seeding.creating(SeedDomain(name_hint="home", description=WAS_HERE))
+    async def lay(self, seeding: TestSeedingSession) -> RecordsAndACaller:
+        domain = await seeding.creating(TestSeedDomain(name_hint="home", description=WAS_HERE))
         caller = await seeding.within(SomeoneOf(domain, role=UserRole.SUPERADMIN))
         await seeding.adding(
-            SeedAuditRecord(owner_of=lambda u: UserID(u.id), operation=OP_OK, created_at=LATE),
+            TestSeedAuditRecord(owner_of=lambda u: UserID(u.id), operation=OP_OK, created_at=LATE),
             caller,
         )
         await seeding.adding(
-            SeedAuditRecord(
+            TestSeedAuditRecord(
                 owner_of=lambda u: UserID(u.id),
                 operation=OP_DENIED,
                 created_at=EARLY,
@@ -337,13 +345,13 @@ class TwoActorsGlobally(Given[Any, RecordsAndACaller]):
         return "두 사용자가 각각 남긴 기록과, 슈퍼관리자 한 명"
 
     @override
-    async def lay(self, seeding: SeedingSession) -> RecordsAndACaller:
-        domain = await seeding.creating(SeedDomain(name_hint="home", description=WAS_HERE))
+    async def lay(self, seeding: TestSeedingSession) -> RecordsAndACaller:
+        domain = await seeding.creating(TestSeedDomain(name_hint="home", description=WAS_HERE))
         first = await seeding.within(SomeoneOf(domain))
         second = await seeding.within(SomeoneOf(domain))
         first_id = seeding.made(first).id
         await seeding.adding(
-            SeedAuditRecord(
+            TestSeedAuditRecord(
                 owner_of=lambda u: UserID(u.id),
                 operation=OP_MINE,
                 created_at=LATE,
@@ -352,7 +360,7 @@ class TwoActorsGlobally(Given[Any, RecordsAndACaller]):
             first,
         )
         await seeding.adding(
-            SeedAuditRecord(
+            TestSeedAuditRecord(
                 owner_of=lambda u: UserID(u.id),
                 operation=OP_THEIRS,
                 created_at=EARLY,
@@ -379,12 +387,12 @@ class ManyRecordsGlobally(Given[Any, RecordsAndACaller]):
         return f"기록 {self.total}개와, 슈퍼관리자 한 명"
 
     @override
-    async def lay(self, seeding: SeedingSession) -> RecordsAndACaller:
-        domain = await seeding.creating(SeedDomain(name_hint="home", description=WAS_HERE))
+    async def lay(self, seeding: TestSeedingSession) -> RecordsAndACaller:
+        domain = await seeding.creating(TestSeedDomain(name_hint="home", description=WAS_HERE))
         caller = await seeding.within(SomeoneOf(domain, role=UserRole.SUPERADMIN))
         for i in range(self.total):
             await seeding.adding(
-                SeedAuditRecord(
+                TestSeedAuditRecord(
                     owner_of=lambda u: UserID(u.id), operation=f"op-{i}", created_at=EARLY
                 ),
                 caller,
@@ -403,15 +411,19 @@ class TwoRecordsToRead(Given[Any, RecordsToLoad]):
         return f"id로 조회할 자기에 대한 기록 둘과, {self.role.value} 한 명"
 
     @override
-    async def lay(self, seeding: SeedingSession) -> RecordsToLoad:
-        domain = await seeding.creating(SeedDomain(name_hint="home", description=WAS_HERE))
+    async def lay(self, seeding: TestSeedingSession) -> RecordsToLoad:
+        domain = await seeding.creating(TestSeedDomain(name_hint="home", description=WAS_HERE))
         caller = await seeding.within(SomeoneOf(domain, role=self.role))
         first = await seeding.adding(
-            SeedAuditRecord(owner_of=lambda u: UserID(u.id), operation=OP_LATE, created_at=LATE),
+            TestSeedAuditRecord(
+                owner_of=lambda u: UserID(u.id), operation=OP_LATE, created_at=LATE
+            ),
             caller,
         )
         second = await seeding.adding(
-            SeedAuditRecord(owner_of=lambda u: UserID(u.id), operation=OP_EARLY, created_at=EARLY),
+            TestSeedAuditRecord(
+                owner_of=lambda u: UserID(u.id), operation=OP_EARLY, created_at=EARLY
+            ),
             caller,
         )
         made = seeding.made(caller)
@@ -442,7 +454,7 @@ class ProjectRecords(Given[Any, ScopedEntities]):
         return f"서로 다른 프로젝트의 기록 둘과, {holding} {self.role.value} 한 명"
 
     @override
-    async def lay(self, seeding: SeedingSession) -> ScopedEntities:
+    async def lay(self, seeding: TestSeedingSession) -> ScopedEntities:
         laid = await lay_two_projects(
             seeding,
             grant_first=self.grant_first,
@@ -478,7 +490,7 @@ class ProjectRecordsToLoad(Given[Any, RecordsToLoad]):
         return "서로 다른 프로젝트의 기록 둘과, 첫째 프로젝트에만 읽기 권한을 받은 사용자 한 명"
 
     @override
-    async def lay(self, seeding: SeedingSession) -> RecordsToLoad:
+    async def lay(self, seeding: TestSeedingSession) -> RecordsToLoad:
         laid = await lay_two_projects(seeding, grant_first=True)
         return RecordsToLoad(
             laid.caller,
@@ -497,16 +509,18 @@ class OneProjectMixedStatus(Given[Any, ScopedEntities]):
         return "성공한 기록과 거부된 기록을 가진 프로젝트 하나와, 읽기 권한을 받은 사용자 한 명"
 
     @override
-    async def lay(self, seeding: SeedingSession) -> ScopedEntities:
-        domain = await seeding.creating(SeedDomain(name_hint="home", description=WAS_HERE))
-        policy = await seeding.once(SeedProjectPolicy())
-        project = await seeding.creating_from_two(SeedProject(name_hint="team"), domain, policy)
+    async def lay(self, seeding: TestSeedingSession) -> ScopedEntities:
+        domain = await seeding.creating(TestSeedDomain(name_hint="home", description=WAS_HERE))
+        policy = await seeding.once(TestSeedProjectPolicy())
+        project = await seeding.creating_from_two(TestSeedProject(name_hint="team"), domain, policy)
         await seeding.adding(
-            SeedAuditRecord(owner_of=lambda p: ProjectID(p.id), operation=OP_OK, created_at=LATE),
+            TestSeedAuditRecord(
+                owner_of=lambda p: ProjectID(p.id), operation=OP_OK, created_at=LATE
+            ),
             project,
         )
         await seeding.adding(
-            SeedAuditRecord(
+            TestSeedAuditRecord(
                 owner_of=lambda p: ProjectID(p.id),
                 operation=OP_DENIED,
                 created_at=EARLY,
@@ -539,13 +553,13 @@ class OneProjectManyRecords(Given[Any, ScopedEntities]):
         return f"기록 {self.total}개를 가진 프로젝트 하나와, 읽기 권한을 받은 사용자 한 명"
 
     @override
-    async def lay(self, seeding: SeedingSession) -> ScopedEntities:
-        domain = await seeding.creating(SeedDomain(name_hint="home", description=WAS_HERE))
-        policy = await seeding.once(SeedProjectPolicy())
-        project = await seeding.creating_from_two(SeedProject(name_hint="team"), domain, policy)
+    async def lay(self, seeding: TestSeedingSession) -> ScopedEntities:
+        domain = await seeding.creating(TestSeedDomain(name_hint="home", description=WAS_HERE))
+        policy = await seeding.once(TestSeedProjectPolicy())
+        project = await seeding.creating_from_two(TestSeedProject(name_hint="team"), domain, policy)
         for i in range(self.total):
             await seeding.adding(
-                SeedAuditRecord(
+                TestSeedAuditRecord(
                     owner_of=lambda p: ProjectID(p.id), operation=f"op-{i}", created_at=EARLY
                 ),
                 project,
@@ -575,14 +589,14 @@ class ARecordScopedToAProject(Given[Any, ScopedEntities]):
         )
 
     @override
-    async def lay(self, seeding: SeedingSession) -> ScopedEntities:
-        domain = await seeding.creating(SeedDomain(name_hint="home", description=WAS_HERE))
-        policy = await seeding.once(SeedProjectPolicy())
-        project = await seeding.creating_from_two(SeedProject(name_hint="team"), domain, policy)
+    async def lay(self, seeding: TestSeedingSession) -> ScopedEntities:
+        domain = await seeding.creating(TestSeedDomain(name_hint="home", description=WAS_HERE))
+        policy = await seeding.once(TestSeedProjectPolicy())
+        project = await seeding.creating_from_two(TestSeedProject(name_hint="team"), domain, policy)
         subject = await seeding.within(SomeoneOf(domain))
         pid = seeding.made(project).id
         await seeding.adding_with_nested(
-            SeedScopedAuditRecord(
+            TestSeedScopedAuditRecord(
                 owner_of=lambda u: UserID(u.id),
                 operation=OP_SCOPED,
                 created_at=LATE,
@@ -623,7 +637,7 @@ class ActorRecords(Given[Any, ScopedActors]):
         return f"두 사용자가 각각 실행한 기록과, {who}"
 
     @override
-    async def lay(self, seeding: SeedingSession) -> ScopedActors:
+    async def lay(self, seeding: TestSeedingSession) -> ScopedActors:
         caller, first_id, _second_id = await lay_two_actors(
             seeding, caller_is_first=self.caller_is_first, grant_first_to_caller=self.grant
         )

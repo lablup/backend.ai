@@ -46,12 +46,12 @@ from bai_scenario.components.domain import (
     WrittenByThisRun,
 )
 from bai_scenario.runner.acting import ActingAs
-from bai_scenario.runner.planting import SeedingSession
+from bai_scenario.runner.planting import TestSeedingSession
 from bai_scenario.runner.steps import run_scenario
-from bai_scenario.seeds.domain.domain import SeedDomain
-from bai_scenario.seeds.project.project import SeedProject
-from bai_scenario.seeds.rbac.role import SeedRole
-from bai_scenario.seeds.resource_policy.project import SeedProjectPolicy
+from bai_scenario.seeds.domain.domain import TestSeedDomain
+from bai_scenario.seeds.project.project import TestSeedProject
+from bai_scenario.seeds.rbac.role import TestSeedRole
+from bai_scenario.seeds.resource_policy.project import TestSeedProjectPolicy
 
 MADE = "research"
 
@@ -89,8 +89,8 @@ class ADomainAndAPolicy(Given[Any, ADomainAPolicyAndACaller]):
 
     @override
     async def lay(self, seeding: Any) -> ADomainAPolicyAndACaller:
-        domain = await seeding.creating(SeedDomain(name_hint="home", description=WAS_HERE))
-        policy = await seeding.once(SeedProjectPolicy())
+        domain = await seeding.creating(TestSeedDomain(name_hint="home", description=WAS_HERE))
+        policy = await seeding.once(TestSeedProjectPolicy())
         caller = await seeding.within(SomeoneOf(domain, role=self.role))
         return ADomainAPolicyAndACaller(
             seeding.made(domain), seeding.made(policy), seeding.made(caller)
@@ -107,12 +107,12 @@ class AProjectAndAMember(Given[Any, AProjectAMemberAndACaller]):
 
     @override
     async def lay(self, seeding: Any) -> AProjectAMemberAndACaller:
-        domain = await seeding.creating(SeedDomain(name_hint="home", description=WAS_HERE))
-        policy = await seeding.once(SeedProjectPolicy())
-        project = await seeding.creating_from_two(SeedProject(name_hint=MADE), domain, policy)
+        domain = await seeding.creating(TestSeedDomain(name_hint="home", description=WAS_HERE))
+        policy = await seeding.once(TestSeedProjectPolicy())
+        project = await seeding.creating_from_two(TestSeedProject(name_hint=MADE), domain, policy)
         member = await seeding.within(SomeoneOf(domain))
         role = await seeding.creating_from(
-            SeedRole(lambda one: ProjectID(one.id), name_hint="project-member"), project
+            TestSeedRole(lambda one: ProjectID(one.id), name_hint="project-member"), project
         )
         caller = await seeding.within(SomeoneOf(domain, role=UserRole.SUPERADMIN))
         return AProjectAMemberAndACaller(
@@ -229,7 +229,7 @@ class TheRosterHoldsTheMember(Then[AProjectAMemberAndACaller, Answer]):
 
 @dataclass(frozen=True)
 class TheSuperadminMakesAProject(
-    Scenario[SeedingSession, ADomainAPolicyAndACaller, ProjectAdapter, Answer]
+    Scenario[TestSeedingSession, ADomainAPolicyAndACaller, ProjectAdapter, Answer]
 ):
     started: datetime
 
@@ -245,7 +245,7 @@ class TheSuperadminMakesAProject(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, ADomainAPolicyAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ADomainAPolicyAndACaller]:
         return ADomainAndAPolicy(role=UserRole.SUPERADMIN)
 
     @override
@@ -259,7 +259,7 @@ class TheSuperadminMakesAProject(
 
 @dataclass(frozen=True)
 class AUserGrantedNothingMayNotMakeAProject(
-    Scenario[SeedingSession, ADomainAPolicyAndACaller, ProjectAdapter, Answer]
+    Scenario[TestSeedingSession, ADomainAPolicyAndACaller, ProjectAdapter, Answer]
 ):
     @override
     def summary(self) -> str:
@@ -273,7 +273,7 @@ class AUserGrantedNothingMayNotMakeAProject(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, ADomainAPolicyAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ADomainAPolicyAndACaller]:
         return ADomainAndAPolicy()
 
     @override
@@ -287,7 +287,7 @@ class AUserGrantedNothingMayNotMakeAProject(
 
 @dataclass(frozen=True)
 class AssigningAUserPutsThemOnTheRoster(
-    Scenario[SeedingSession, AProjectAMemberAndACaller, ProjectAdapter, Answer]
+    Scenario[TestSeedingSession, AProjectAMemberAndACaller, ProjectAdapter, Answer]
 ):
     @override
     def summary(self) -> str:
@@ -301,7 +301,7 @@ class AssigningAUserPutsThemOnTheRoster(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, AProjectAMemberAndACaller]:
+    def given(self) -> Given[TestSeedingSession, AProjectAMemberAndACaller]:
         return AProjectAndAMember()
 
     @override
@@ -313,7 +313,7 @@ class AssigningAUserPutsThemOnTheRoster(
         return TheRosterHoldsTheMember()
 
 
-SCENARIOS: list[Scenario[SeedingSession, Any, ProjectAdapter, Answer]] = [
+SCENARIOS: list[Scenario[TestSeedingSession, Any, ProjectAdapter, Answer]] = [
     TheSuperadminMakesAProject(started=datetime.now(UTC)),
     AUserGrantedNothingMayNotMakeAProject(),
     AssigningAUserPutsThemOnTheRoster(),
@@ -322,7 +322,7 @@ SCENARIOS: list[Scenario[SeedingSession, Any, ProjectAdapter, Answer]] = [
 
 @pytest.mark.parametrize("scenario", SCENARIOS, ids=lambda s: s.summary())
 async def test_project(
-    scenario: Scenario[SeedingSession, Any, ProjectAdapter, Answer],
+    scenario: Scenario[TestSeedingSession, Any, ProjectAdapter, Answer],
     adapter: ProjectAdapter,
     engine: ExtendedAsyncSAEngine,
 ) -> None:

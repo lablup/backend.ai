@@ -20,13 +20,13 @@ from ai.backend.manager.data.user.types import UserData
 from ai.backend.manager.data.vfolder.types import VFolderData
 from ai.backend.testutils.scenario_steps import Given, Held, Same, SameAs, Skipped, Verdict
 from bai_scenario.components.domain import WAS_HERE, GrantedUser, SomeoneOf, WrittenByThisRun
-from bai_scenario.seeds.domain.domain import SeedDomain
-from bai_scenario.seeds.entity_share.share import SeedShareTaken, SeedVFolderShare
-from bai_scenario.seeds.project.project import SeedProject
-from bai_scenario.seeds.rbac.role import SeedPermission, SeedRole
-from bai_scenario.seeds.resource_policy.project import SeedProjectPolicy
-from bai_scenario.seeds.seeder import Laid, Seeder, TestSeedNest, TestSeedRow
-from bai_scenario.seeds.vfolder.vfolder import SeedPersonalVFolder, SeedProjectVFolder
+from bai_scenario.seeds.domain.domain import TestSeedDomain
+from bai_scenario.seeds.entity_share.share import TestSeedShareTaken, TestSeedVFolderShare
+from bai_scenario.seeds.project.project import TestSeedProject
+from bai_scenario.seeds.rbac.role import TestSeedPermission, TestSeedRole
+from bai_scenario.seeds.resource_policy.project import TestSeedProjectPolicy
+from bai_scenario.seeds.seeder import Laid, TestSeeder, TestSeedNest, TestSeedRow
+from bai_scenario.seeds.vfolder.vfolder import TestSeedPersonalVFolder, TestSeedProjectVFolder
 
 STORAGE_HOST = "local:volume1"
 """The one host the faked storage manager answers for."""
@@ -34,7 +34,7 @@ STORAGE_HOST = "local:volume1"
 
 def seed_domain_with_storage() -> TestSeedRow[DomainData]:
     """A domain whose folders may land on the host the fake answers for."""
-    return SeedDomain(name_hint="home", vfolder_hosts=[STORAGE_HOST])
+    return TestSeedDomain(name_hint="home", vfolder_hosts=[STORAGE_HOST])
 
 
 @dataclass(frozen=True)
@@ -98,16 +98,16 @@ class SomeoneMakingFolders(TestSeedNest[GrantedUser]):
         return "폴더를 만들 수 있는 사용자 준비"
 
     @override
-    def lay(self, seed: Seeder) -> GrantedUser:
+    def lay(self, seed: TestSeeder) -> GrantedUser:
         someone = seed.within(SomeoneOf(self.domain, vfolder_hosts=[STORAGE_HOST]))
         role = seed.creating_from(
-            SeedRole(lambda u: UserID(u.id), name_hint="folder-owner"), someone
+            TestSeedRole(lambda u: UserID(u.id), name_hint="folder-owner"), someone
         )
         seed.adding(
-            SeedPermission(entity_type=VFolderEntityType(), permission=Permission.CREATE), role
+            TestSeedPermission(entity_type=VFolderEntityType(), permission=Permission.CREATE), role
         )
         seed.adding(
-            SeedPermission(entity_type=VFolderEntityType(), permission=Permission.READ), role
+            TestSeedPermission(entity_type=VFolderEntityType(), permission=Permission.READ), role
         )
         grant = seed.granting(role, someone, role_id=lambda r: r.id, user_id=lambda u: UserID(u.id))
         return GrantedUser(someone, grant)
@@ -132,7 +132,7 @@ class SomeoneWhoMayMakeFolders(Given[Any, AFolderMakerAndTheirDomain]):
     @override
     async def lay(self, seeding: Any) -> AFolderMakerAndTheirDomain:
         domain = await seeding.creating(
-            SeedDomain(name_hint="home", description=WAS_HERE, vfolder_hosts=[STORAGE_HOST])
+            TestSeedDomain(name_hint="home", description=WAS_HERE, vfolder_hosts=[STORAGE_HOST])
         )
         granted = await seeding.within(SomeoneMakingFolders(domain))
         return AFolderMakerAndTheirDomain(seeding.made(domain), seeding.made(granted.user))
@@ -151,10 +151,12 @@ class SomeoneReadingFoldersIn[S](TestSeedNest[Laid[None]]):
         return "폴더 읽기 권한 부여"
 
     @override
-    def lay(self, seed: Seeder) -> Laid[None]:
-        role = seed.creating_from(SeedRole(self.scope_of, name_hint="folder-reader"), self.scope)
+    def lay(self, seed: TestSeeder) -> Laid[None]:
+        role = seed.creating_from(
+            TestSeedRole(self.scope_of, name_hint="folder-reader"), self.scope
+        )
         seed.adding(
-            SeedPermission(entity_type=VFolderEntityType(), permission=Permission.READ), role
+            TestSeedPermission(entity_type=VFolderEntityType(), permission=Permission.READ), role
         )
         return seed.granting(
             role, self.someone, role_id=lambda r: r.id, user_id=lambda u: UserID(u.id)
@@ -187,10 +189,10 @@ class SomeoneWithAFolderOfTheirOwn(Given[Any, AFolderAndItsReader]):
     @override
     async def lay(self, seeding: Any) -> AFolderAndItsReader:
         domain = await seeding.creating(
-            SeedDomain(name_hint="home", description=WAS_HERE, vfolder_hosts=[STORAGE_HOST])
+            TestSeedDomain(name_hint="home", description=WAS_HERE, vfolder_hosts=[STORAGE_HOST])
         )
         someone = await seeding.within(SomeoneOf(domain, vfolder_hosts=[STORAGE_HOST]))
-        folder = await seeding.creating_from(SeedPersonalVFolder(host=STORAGE_HOST), someone)
+        folder = await seeding.creating_from(TestSeedPersonalVFolder(host=STORAGE_HOST), someone)
         if self.granted:
             own = await seeding.personal_project_of(someone)
             await seeding.within(SomeoneReadingFoldersIn(own, lambda p: ProjectID(p.id), someone))
@@ -211,13 +213,13 @@ class AProjectFolderAndSomeone(Given[Any, AFolderAndItsReader]):
     @override
     async def lay(self, seeding: Any) -> AFolderAndItsReader:
         domain = await seeding.creating(
-            SeedDomain(name_hint="home", description=WAS_HERE, vfolder_hosts=[STORAGE_HOST])
+            TestSeedDomain(name_hint="home", description=WAS_HERE, vfolder_hosts=[STORAGE_HOST])
         )
         someone = await seeding.within(SomeoneOf(domain, vfolder_hosts=[STORAGE_HOST]))
-        policy = await seeding.once(SeedProjectPolicy())
-        project = await seeding.creating_from_two(SeedProject(), domain, policy)
+        policy = await seeding.once(TestSeedProjectPolicy())
+        project = await seeding.creating_from_two(TestSeedProject(), domain, policy)
         folder = await seeding.creating_from_two(
-            SeedProjectVFolder(host=STORAGE_HOST), project, someone
+            TestSeedProjectVFolder(host=STORAGE_HOST), project, someone
         )
         if self.granted:
             await seeding.within(
@@ -243,16 +245,16 @@ class AFolderOfferedToSomeone(Given[Any, AFolderAndItsReader]):
     @override
     async def lay(self, seeding: Any) -> AFolderAndItsReader:
         domain = await seeding.creating(
-            SeedDomain(name_hint="home", description=WAS_HERE, vfolder_hosts=[STORAGE_HOST])
+            TestSeedDomain(name_hint="home", description=WAS_HERE, vfolder_hosts=[STORAGE_HOST])
         )
         owner = await seeding.within(SomeoneOf(domain, vfolder_hosts=[STORAGE_HOST]))
         reader = await seeding.within(SomeoneOf(domain, vfolder_hosts=[STORAGE_HOST]))
-        folder = await seeding.creating_from(SeedPersonalVFolder(host=STORAGE_HOST), owner)
+        folder = await seeding.creating_from(TestSeedPersonalVFolder(host=STORAGE_HOST), owner)
         offer = await seeding.creating_from_three(
-            SeedVFolderShare(cap=Permission.READ), owner, folder, reader
+            TestSeedVFolderShare(cap=Permission.READ), owner, folder, reader
         )
         if self.accepted:
-            await seeding.accepting(SeedShareTaken(), offer)
+            await seeding.accepting(TestSeedShareTaken(), offer)
         own = await seeding.personal_project_of(reader)
         await seeding.within(SomeoneReadingFoldersIn(own, lambda p: ProjectID(p.id), reader))
         return AFolderAndItsReader(seeding.made(folder), seeding.made(reader))
@@ -281,12 +283,12 @@ class SomeoneWithTheirFolderAndAnothers(Given[Any, AReaderAndTwoFolders]):
     @override
     async def lay(self, seeding: Any) -> AReaderAndTwoFolders:
         domain = await seeding.creating(
-            SeedDomain(name_hint="home", description=WAS_HERE, vfolder_hosts=[STORAGE_HOST])
+            TestSeedDomain(name_hint="home", description=WAS_HERE, vfolder_hosts=[STORAGE_HOST])
         )
         reader = await seeding.within(SomeoneOf(domain, vfolder_hosts=[STORAGE_HOST]))
         other = await seeding.within(SomeoneOf(domain, vfolder_hosts=[STORAGE_HOST]))
-        readable = await seeding.creating_from(SeedPersonalVFolder(host=STORAGE_HOST), reader)
-        unreadable = await seeding.creating_from(SeedPersonalVFolder(host=STORAGE_HOST), other)
+        readable = await seeding.creating_from(TestSeedPersonalVFolder(host=STORAGE_HOST), reader)
+        unreadable = await seeding.creating_from(TestSeedPersonalVFolder(host=STORAGE_HOST), other)
         own = await seeding.personal_project_of(reader)
         await seeding.within(SomeoneReadingFoldersIn(own, lambda p: ProjectID(p.id), reader))
         return AReaderAndTwoFolders(
@@ -305,11 +307,11 @@ class SomeonesFolderAndTheSuperadmin(Given[Any, AFolderAndItsReader]):
     @override
     async def lay(self, seeding: Any) -> AFolderAndItsReader:
         domain = await seeding.creating(
-            SeedDomain(name_hint="home", description=WAS_HERE, vfolder_hosts=[STORAGE_HOST])
+            TestSeedDomain(name_hint="home", description=WAS_HERE, vfolder_hosts=[STORAGE_HOST])
         )
         owner = await seeding.within(SomeoneOf(domain, vfolder_hosts=[STORAGE_HOST]))
         superadmin = await seeding.within(SomeoneOf(domain, role=UserRole.SUPERADMIN))
-        folder = await seeding.creating_from(SeedPersonalVFolder(host=STORAGE_HOST), owner)
+        folder = await seeding.creating_from(TestSeedPersonalVFolder(host=STORAGE_HOST), owner)
         return AFolderAndItsReader(seeding.made(folder), seeding.made(superadmin))
 
 
@@ -324,7 +326,7 @@ class SomeoneWithNoGrant(Given[Any, AFolderMakerAndTheirDomain]):
     @override
     async def lay(self, seeding: Any) -> AFolderMakerAndTheirDomain:
         domain = await seeding.creating(
-            SeedDomain(name_hint="home", description=WAS_HERE, vfolder_hosts=[STORAGE_HOST])
+            TestSeedDomain(name_hint="home", description=WAS_HERE, vfolder_hosts=[STORAGE_HOST])
         )
         caller = await seeding.within(SomeoneOf(domain, vfolder_hosts=[STORAGE_HOST]))
         return AFolderMakerAndTheirDomain(seeding.made(domain), seeding.made(caller))

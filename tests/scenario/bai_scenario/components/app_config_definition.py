@@ -29,10 +29,10 @@ from ai.backend.testutils.scenario_steps import (
     Verdict,
 )
 from bai_scenario.components.domain import WAS_HERE, SomeoneOf, WrittenByThisRun
-from bai_scenario.seeds.app_config.allow_list import SeedAllowListEntry
-from bai_scenario.seeds.app_config.definition import SeedDefinition
-from bai_scenario.seeds.app_config.fragment import SeedPublicFragment
-from bai_scenario.seeds.domain.domain import SeedDomain
+from bai_scenario.seeds.app_config.allow_list import TestSeedAllowListEntry
+from bai_scenario.seeds.app_config.definition import TestSeedDefinition
+from bai_scenario.seeds.app_config.fragment import TestSeedPublicFragment
+from bai_scenario.seeds.domain.domain import TestSeedDomain
 
 
 def _who(role: UserRole) -> str:
@@ -69,13 +69,13 @@ class ADefinitionAndSomeone(Given[Any, ADefinitionAndACaller]):
 
     @override
     async def lay(self, seeding: Any) -> ADefinitionAndACaller:
-        home = await seeding.creating(SeedDomain(name_hint="home", description=WAS_HERE))
-        definition = await seeding.creating(SeedDefinition())
+        home = await seeding.creating(TestSeedDomain(name_hint="home", description=WAS_HERE))
+        definition = await seeding.creating(TestSeedDefinition())
         if self.with_fragment:
             entry = await seeding.creating_from(
-                SeedAllowListEntry(scope_type=AppConfigScopeType.PUBLIC), definition
+                TestSeedAllowListEntry(scope_type=AppConfigScopeType.PUBLIC), definition
             )
-            await seeding.creating_from(SeedPublicFragment(config={"theme": "light"}), entry)
+            await seeding.creating_from(TestSeedPublicFragment(config={"theme": "light"}), entry)
         caller = await seeding.within(SomeoneOf(home, role=self.role))
         return ADefinitionAndACaller(
             domain=seeding.made(home),
@@ -105,9 +105,9 @@ class ManyDefinitionsAndSomeone(Given[Any, ManyDefinitionsAndACaller]):
 
     @override
     async def lay(self, seeding: Any) -> ManyDefinitionsAndACaller:
-        home = await seeding.creating(SeedDomain(name_hint="home", description=WAS_HERE))
+        home = await seeding.creating(TestSeedDomain(name_hint="home", description=WAS_HERE))
         laid = [
-            await seeding.creating(SeedDefinition(name_hint="definition"))
+            await seeding.creating(TestSeedDefinition(name_hint="definition"))
             for _ in range(self.count)
         ]
         caller = await seeding.within(SomeoneOf(home, role=self.role))
@@ -138,9 +138,9 @@ class TwoDefinitionsAndSomeone(Given[Any, TwoDefinitionsAndACaller]):
 
     @override
     async def lay(self, seeding: Any) -> TwoDefinitionsAndACaller:
-        home = await seeding.creating(SeedDomain(name_hint="home", description=WAS_HERE))
-        first = await seeding.creating(SeedDefinition(name_hint="first"))
-        second = await seeding.creating(SeedDefinition(name_hint="second"))
+        home = await seeding.creating(TestSeedDomain(name_hint="home", description=WAS_HERE))
+        first = await seeding.creating(TestSeedDefinition(name_hint="first"))
+        second = await seeding.creating(TestSeedDefinition(name_hint="second"))
         caller = await seeding.within(SomeoneOf(home, role=self.role))
         return TwoDefinitionsAndACaller(
             caller=seeding.made(caller),

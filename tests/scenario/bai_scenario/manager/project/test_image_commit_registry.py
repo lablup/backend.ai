@@ -27,12 +27,12 @@ from ai.backend.testutils.scenario_steps import (
 )
 from bai_scenario.components.domain import SomeoneOf
 from bai_scenario.runner.acting import ActingAs
-from bai_scenario.runner.planting import SeedingSession
+from bai_scenario.runner.planting import TestSeedingSession
 from bai_scenario.runner.steps import run_scenario
-from bai_scenario.seeds.domain.domain import SeedDomain
-from bai_scenario.seeds.project.project import SeedProject
-from bai_scenario.seeds.rbac.role import SeedPermission, SeedRole
-from bai_scenario.seeds.resource_policy.project import SeedProjectPolicy
+from bai_scenario.seeds.domain.domain import TestSeedDomain
+from bai_scenario.seeds.project.project import TestSeedProject
+from bai_scenario.seeds.rbac.role import TestSeedPermission, TestSeedRole
+from bai_scenario.seeds.resource_policy.project import TestSeedProjectPolicy
 
 type Targets = Sequence[ImageCommitRegistry | Exception | None]
 
@@ -45,7 +45,7 @@ class ProjectAndTarget:
 
 
 @dataclass(frozen=True)
-class ProjectWithReadPermission(Given[SeedingSession, ProjectAndTarget]):
+class ProjectWithReadPermission(Given[TestSeedingSession, ProjectAndTarget]):
     configured: bool
     may_read: bool
 
@@ -59,17 +59,17 @@ class ProjectWithReadPermission(Given[SeedingSession, ProjectAndTarget]):
         )
 
     @override
-    async def lay(self, seeding: SeedingSession) -> ProjectAndTarget:
-        domain = await seeding.creating(SeedDomain())
-        policy = await seeding.once(SeedProjectPolicy())
+    async def lay(self, seeding: TestSeedingSession) -> ProjectAndTarget:
+        domain = await seeding.creating(TestSeedDomain())
+        policy = await seeding.once(TestSeedProjectPolicy())
         target = ImageCommitRegistry("registry.example.com", "images")
         project = await seeding.creating_from_two(
-            SeedProject(container_registry=target if self.configured else None), domain, policy
+            TestSeedProject(container_registry=target if self.configured else None), domain, policy
         )
         caller = await seeding.within(SomeoneOf(domain))
         if self.may_read:
-            role = await seeding.creating_from(SeedRole(lambda one: ProjectID(one.id)), project)
-            await seeding.adding(SeedPermission(ProjectEntityType(), Permission.READ), role)
+            role = await seeding.creating_from(TestSeedRole(lambda one: ProjectID(one.id)), project)
+            await seeding.adding(TestSeedPermission(ProjectEntityType(), Permission.READ), role)
             await seeding.granting(
                 role, caller, role_id=lambda one: one.id, user_id=lambda one: UserID(one.id)
             )
@@ -121,7 +121,7 @@ class TargetsInRequestOrder(Then[ProjectAndTarget, Targets]):
 
 
 @dataclass(frozen=True)
-class ReadTargetsScenario(Scenario[SeedingSession, ProjectAndTarget, ProjectAdapter, Targets]):
+class ReadTargetsScenario(Scenario[TestSeedingSession, ProjectAndTarget, ProjectAdapter, Targets]):
     name: str
     description: str
     configured: bool = False
@@ -136,7 +136,7 @@ class ReadTargetsScenario(Scenario[SeedingSession, ProjectAndTarget, ProjectAdap
         return self.description
 
     @override
-    def given(self) -> Given[SeedingSession, ProjectAndTarget]:
+    def given(self) -> Given[TestSeedingSession, ProjectAndTarget]:
         return ProjectWithReadPermission(self.configured, self.may_read)
 
     @override

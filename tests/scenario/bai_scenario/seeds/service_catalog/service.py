@@ -49,7 +49,7 @@ class ServiceCatalogInStatusUpserter(ServiceCatalogUpserter):
 
 
 @dataclass(frozen=True)
-class SeedService(TestSeedRow[ServiceCatalogID]):
+class TestSeedService(TestSeedRow[ServiceCatalogID]):
     """One service instance, registered healthy in the group it is given.
 
     The instance id is the seeder's name, and the display name repeats it.
@@ -84,7 +84,7 @@ class SeedService(TestSeedRow[ServiceCatalogID]):
 
 
 @dataclass(frozen=True)
-class SeedServiceInStatus(TestSeedRow[ServiceCatalogID]):
+class TestSeedServiceInStatus(TestSeedRow[ServiceCatalogID]):
     """One service instance, registered in the group and the status it is given.
 
     Takes the test-side spec, so it is for a status the registration spec cannot write.
@@ -121,7 +121,7 @@ class SeedServiceInStatus(TestSeedRow[ServiceCatalogID]):
 
 
 @dataclass(frozen=True)
-class SeedEndpointOf(TestSeedFieldCreator[ServiceCatalogID, ServiceCatalogEndpointData]):
+class TestSeedEndpointOf(TestSeedFieldCreator[ServiceCatalogID, ServiceCatalogEndpointData]):
     """One endpoint the service announced."""
 
     role: str = "api"

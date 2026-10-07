@@ -18,7 +18,7 @@ from bai_scenario.seeds.seeder import Naming, TestSeedLink, TestSeedRow
 
 
 @dataclass(frozen=True)
-class SeedContainerRegistry(TestSeedRow[ContainerRegistryData]):
+class TestSeedContainerRegistry(TestSeedRow[ContainerRegistryData]):
     """A registry. An image joins the one it came from, so it is laid first."""
 
     name_hint: str = "registry"

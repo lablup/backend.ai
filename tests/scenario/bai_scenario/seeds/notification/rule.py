@@ -18,7 +18,7 @@ TEMPLATE = "Session {{ session_name }} is {{ status }}"
 
 
 @dataclass(frozen=True)
-class SeedRuleOf(TestSeedRowFromTwo[NotificationChannelData, UserData, NotificationRuleData]):
+class TestSeedRuleOf(TestSeedRowFromTwo[NotificationChannelData, UserData, NotificationRuleData]):
     """A rule dispatching through the channel laid before it, created by that user."""
 
     name_hint: str = "rule"
@@ -58,7 +58,7 @@ class SeedRuleOf(TestSeedRowFromTwo[NotificationChannelData, UserData, Notificat
 
 
 @dataclass(frozen=True)
-class SeedRuleOfNoChannel(TestSeedRowFrom[UserData, NotificationRuleData]):
+class TestSeedRuleOfNoChannel(TestSeedRowFrom[UserData, NotificationRuleData]):
     """A rule naming a channel id no row answers to. Nothing stops the write."""
 
     name_hint: str = "orphan-rule"

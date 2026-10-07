@@ -11,7 +11,7 @@ from bai_scenario.seeds.seeder import Naming, TestSeedRow
 
 
 @dataclass(frozen=True)
-class SeedRuntimeVariant(TestSeedRow[RuntimeVariantData]):
+class TestSeedRuntimeVariant(TestSeedRow[RuntimeVariantData]):
     """A runtime a revision names.
 
     The write spec stores an empty baseline model definition and takes no say on reading

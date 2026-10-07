@@ -23,11 +23,11 @@ from ai.backend.testutils.scenario_steps import Given, Scenario, Then, When
 from bai_scenario.components.answers import NothingIsFound, TheCallIsRefused
 from bai_scenario.components.domain import ADomainAndACaller, ADomainAndSomeone
 from bai_scenario.runner.acting import ActingAs
-from bai_scenario.runner.planting import SeedingSession
+from bai_scenario.runner.planting import TestSeedingSession
 from bai_scenario.runner.steps import run_scenario
 
 type Searched = AdminSearchSessionsPayload
-type SessionStep = Scenario[SeedingSession, ADomainAndACaller, SessionAdapter, Searched]
+type SessionStep = Scenario[TestSeedingSession, ADomainAndACaller, SessionAdapter, Searched]
 
 
 @dataclass(frozen=True)
@@ -50,7 +50,7 @@ class SearchingEverySession(When[ADomainAndACaller, SessionAdapter, Searched]):
 
 @dataclass(frozen=True)
 class NoSessionLaidMeansNoneFound(
-    Scenario[SeedingSession, ADomainAndACaller, SessionAdapter, Searched]
+    Scenario[TestSeedingSession, ADomainAndACaller, SessionAdapter, Searched]
 ):
     @override
     def summary(self) -> str:
@@ -61,7 +61,7 @@ class NoSessionLaidMeansNoneFound(
         return "세션을 하나도 심지 않은 상태에서 슈퍼관리자가 조회하면, 답은 비어 있다"
 
     @override
-    def given(self) -> Given[SeedingSession, ADomainAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ADomainAndACaller]:
         return ADomainAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
@@ -75,7 +75,7 @@ class NoSessionLaidMeansNoneFound(
 
 @dataclass(frozen=True)
 class AUserGrantedNothingMayNotSearch(
-    Scenario[SeedingSession, ADomainAndACaller, SessionAdapter, Searched]
+    Scenario[TestSeedingSession, ADomainAndACaller, SessionAdapter, Searched]
 ):
     @override
     def summary(self) -> str:
@@ -89,7 +89,7 @@ class AUserGrantedNothingMayNotSearch(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, ADomainAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ADomainAndACaller]:
         return ADomainAndSomeone()
 
     @override

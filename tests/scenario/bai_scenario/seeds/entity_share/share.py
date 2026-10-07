@@ -17,7 +17,7 @@ from bai_scenario.seeds.seeder import Naming, TestSeedRowFromThree, TestSeedShar
 
 
 @dataclass(frozen=True)
-class SeedVFolderShare(TestSeedRowFromThree[UserData, VFolderData, UserData, EntityShareData]):
+class TestSeedVFolderShare(TestSeedRowFromThree[UserData, VFolderData, UserData, EntityShareData]):
     """The first person offers the folder to the second, under ``cap``."""
 
     cap: Permission
@@ -48,7 +48,7 @@ class SeedVFolderShare(TestSeedRowFromThree[UserData, VFolderData, UserData, Ent
 
 
 @dataclass(frozen=True)
-class SeedShareTaken(TestSeedShareAcceptance[EntityShareData]):
+class TestSeedShareTaken(TestSeedShareAcceptance[EntityShareData]):
     """The recipient the offer names takes it."""
 
     @override

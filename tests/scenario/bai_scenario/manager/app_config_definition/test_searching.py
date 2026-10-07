@@ -27,12 +27,12 @@ from bai_scenario.components.app_config_definition import (
     ManyDefinitionsAndSomeone,
 )
 from bai_scenario.runner.acting import ActingAs
-from bai_scenario.runner.planting import SeedingSession
+from bai_scenario.runner.planting import TestSeedingSession
 from bai_scenario.runner.steps import run_scenario
 
 type Searched = SearchAppConfigDefinitionsPayload
 type SearchingStep = Scenario[
-    SeedingSession, ManyDefinitionsAndACaller, AppConfigDefinitionAdapter, Searched
+    TestSeedingSession, ManyDefinitionsAndACaller, AppConfigDefinitionAdapter, Searched
 ]
 
 
@@ -58,7 +58,7 @@ class SearchingEverything(When[ManyDefinitionsAndACaller, AppConfigDefinitionAda
 
 @dataclass(frozen=True)
 class TheSuperadminCountsEveryOne(
-    Scenario[SeedingSession, ManyDefinitionsAndACaller, AppConfigDefinitionAdapter, Searched]
+    Scenario[TestSeedingSession, ManyDefinitionsAndACaller, AppConfigDefinitionAdapter, Searched]
 ):
     @override
     def summary(self) -> str:
@@ -69,7 +69,7 @@ class TheSuperadminCountsEveryOne(
         return "설정 정의 셋이 있고 슈퍼관리자가 필터 없이 전체를 검색하면, 셋 다 집계된다"
 
     @override
-    def given(self) -> Given[SeedingSession, ManyDefinitionsAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ManyDefinitionsAndACaller]:
         return ManyDefinitionsAndSomeone(count=3, role=UserRole.SUPERADMIN)
 
     @override
@@ -83,7 +83,7 @@ class TheSuperadminCountsEveryOne(
 
 @dataclass(frozen=True)
 class APlainUserMayNotSearch(
-    Scenario[SeedingSession, ManyDefinitionsAndACaller, AppConfigDefinitionAdapter, Searched]
+    Scenario[TestSeedingSession, ManyDefinitionsAndACaller, AppConfigDefinitionAdapter, Searched]
 ):
     @override
     def summary(self) -> str:
@@ -94,7 +94,7 @@ class APlainUserMayNotSearch(
         return "일반 사용자가 전체를 검색하면, 슈퍼관리자 권한이 없어 거부된다"
 
     @override
-    def given(self) -> Given[SeedingSession, ManyDefinitionsAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ManyDefinitionsAndACaller]:
         return ManyDefinitionsAndSomeone(count=3)
 
     @override

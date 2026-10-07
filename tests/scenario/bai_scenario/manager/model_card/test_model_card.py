@@ -17,11 +17,11 @@ from ai.backend.testutils.scenario_steps import Given, Scenario, Then, When
 from bai_scenario.components.answers import NothingIsFound, TheCallIsRefused
 from bai_scenario.components.domain import ADomainAndACaller, ADomainAndSomeone
 from bai_scenario.runner.acting import ActingAs
-from bai_scenario.runner.planting import SeedingSession
+from bai_scenario.runner.planting import TestSeedingSession
 from bai_scenario.runner.steps import run_scenario
 
 type Searched = SearchModelCardsPayload
-type CardStep = Scenario[SeedingSession, ADomainAndACaller, ModelCardAdapter, Searched]
+type CardStep = Scenario[TestSeedingSession, ADomainAndACaller, ModelCardAdapter, Searched]
 
 
 @dataclass(frozen=True)
@@ -44,7 +44,7 @@ class SearchingEveryCard(When[ADomainAndACaller, ModelCardAdapter, Searched]):
 
 @dataclass(frozen=True)
 class NoCardLaidMeansNoneFound(
-    Scenario[SeedingSession, ADomainAndACaller, ModelCardAdapter, Searched]
+    Scenario[TestSeedingSession, ADomainAndACaller, ModelCardAdapter, Searched]
 ):
     @override
     def summary(self) -> str:
@@ -55,7 +55,7 @@ class NoCardLaidMeansNoneFound(
         return "모델 카드를 하나도 심지 않은 상태에서 슈퍼관리자가 전체 조회를 하면, 답은 비어 있다"
 
     @override
-    def given(self) -> Given[SeedingSession, ADomainAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ADomainAndACaller]:
         return ADomainAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
@@ -69,7 +69,7 @@ class NoCardLaidMeansNoneFound(
 
 @dataclass(frozen=True)
 class APlainUserMayNotSearchEveryCard(
-    Scenario[SeedingSession, ADomainAndACaller, ModelCardAdapter, Searched]
+    Scenario[TestSeedingSession, ADomainAndACaller, ModelCardAdapter, Searched]
 ):
     @override
     def summary(self) -> str:
@@ -80,7 +80,7 @@ class APlainUserMayNotSearchEveryCard(
         return "슈퍼관리자가 아닌 사용자가 전체 모델 카드 조회를 요청하면 역할로 막힌다"
 
     @override
-    def given(self) -> Given[SeedingSession, ADomainAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ADomainAndACaller]:
         return ADomainAndSomeone()
 
     @override

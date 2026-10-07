@@ -51,13 +51,13 @@ from ai.backend.testutils.scenario_steps import (
     Verdict,
 )
 from bai_scenario.components.domain import WAS_HERE, SomeoneOf, WrittenByThisRun
-from bai_scenario.seeds.deployment.deployment import SeedDeployment
-from bai_scenario.seeds.domain.domain import SeedDomain
-from bai_scenario.seeds.project.project import SeedProject
-from bai_scenario.seeds.rbac.role import SeedPermission, SeedRole
-from bai_scenario.seeds.resource_group.resource_group import SeedResourceGroup
-from bai_scenario.seeds.resource_policy.project import SeedProjectPolicy
-from bai_scenario.seeds.seeder import Laid, Seeder, TestSeedNest
+from bai_scenario.seeds.deployment.deployment import TestSeedDeployment
+from bai_scenario.seeds.domain.domain import TestSeedDomain
+from bai_scenario.seeds.project.project import TestSeedProject
+from bai_scenario.seeds.rbac.role import TestSeedPermission, TestSeedRole
+from bai_scenario.seeds.resource_group.resource_group import TestSeedResourceGroup
+from bai_scenario.seeds.resource_policy.project import TestSeedProjectPolicy
+from bai_scenario.seeds.seeder import Laid, TestSeeder, TestSeedNest
 
 
 def _names(granted: Sequence[Permission]) -> str:
@@ -145,15 +145,17 @@ class SomeoneOfTheProject(TestSeedNest[Laid[UserData]]):
         return f"배포에 {_names(self.granted)} 권한을 받은 사용자 준비"
 
     @override
-    def lay(self, seed: Seeder) -> Laid[UserData]:
+    def lay(self, seed: TestSeeder) -> Laid[UserData]:
         someone = seed.within(SomeoneOf(self.domain, role=self.role))
         if not self.granted:
             return someone
         role = seed.creating_from(
-            SeedRole(lambda p: ProjectID(p.id), name_hint="deployment-user"), self.project
+            TestSeedRole(lambda p: ProjectID(p.id), name_hint="deployment-user"), self.project
         )
         for one in self.granted:
-            seed.adding(SeedPermission(entity_type=DeploymentEntityType(), permission=one), role)
+            seed.adding(
+                TestSeedPermission(entity_type=DeploymentEntityType(), permission=one), role
+            )
         seed.granting(role, someone, role_id=lambda r: r.id, user_id=lambda u: UserID(u.id))
         return someone
 
@@ -173,13 +175,13 @@ class SomeoneReadingTheirOwn(TestSeedNest[Laid[UserData]]):
         return "자기 스코프에서 배포를 읽을 수 있는 사용자 준비"
 
     @override
-    def lay(self, seed: Seeder) -> Laid[UserData]:
+    def lay(self, seed: TestSeeder) -> Laid[UserData]:
         someone = seed.within(SomeoneOf(self.domain))
         role = seed.creating_from(
-            SeedRole(lambda u: UserID(u.id), name_hint="deployment-owner"), someone
+            TestSeedRole(lambda u: UserID(u.id), name_hint="deployment-owner"), someone
         )
         seed.adding(
-            SeedPermission(entity_type=DeploymentEntityType(), permission=Permission.READ), role
+            TestSeedPermission(entity_type=DeploymentEntityType(), permission=Permission.READ), role
         )
         seed.granting(role, someone, role_id=lambda r: r.id, user_id=lambda u: UserID(u.id))
         return someone
@@ -192,10 +194,10 @@ async def lay_a_place(
     role: UserRole = UserRole.USER,
 ) -> LaidPlace:
     """배포가 놓일 자리를 세우고, 그 안에 사용자 한 명을 둔다."""
-    domain = await seeding.creating(SeedDomain(name_hint="home", description=WAS_HERE))
-    policy = await seeding.once(SeedProjectPolicy())
-    project = await seeding.creating_from_two(SeedProject(name_hint="team"), domain, policy)
-    group = await seeding.creating(SeedResourceGroup())
+    domain = await seeding.creating(TestSeedDomain(name_hint="home", description=WAS_HERE))
+    policy = await seeding.once(TestSeedProjectPolicy())
+    project = await seeding.creating_from_two(TestSeedProject(name_hint="team"), domain, policy)
+    group = await seeding.creating(TestSeedResourceGroup())
     caller = await seeding.within(
         SomeoneOfTheProject(domain, project, granted=tuple(granted), role=role)
     )
@@ -213,7 +215,7 @@ async def lay_a_deployment(
 ) -> Laid[DeploymentInfo]:
     """그 자리에 배포 하나를 심는다. 소유는 그 자리의 사용자에게 있다."""
     laid: Laid[DeploymentInfo] = await seeding.creating_from_three(
-        SeedDeployment(
+        TestSeedDeployment(
             name_hint=name_hint,
             replica_count=replica_count,
             tag=tag,
@@ -267,11 +269,11 @@ class AProjectGrantedElsewhere(Given[Any, APlaceAndACaller]):
 
     @override
     async def lay(self, seeding: Any) -> APlaceAndACaller:
-        domain = await seeding.creating(SeedDomain(name_hint="home", description=WAS_HERE))
-        policy = await seeding.once(SeedProjectPolicy())
-        wanted = await seeding.creating_from_two(SeedProject(name_hint="team"), domain, policy)
-        other = await seeding.creating_from_two(SeedProject(name_hint="other"), domain, policy)
-        group = await seeding.creating(SeedResourceGroup())
+        domain = await seeding.creating(TestSeedDomain(name_hint="home", description=WAS_HERE))
+        policy = await seeding.once(TestSeedProjectPolicy())
+        wanted = await seeding.creating_from_two(TestSeedProject(name_hint="team"), domain, policy)
+        other = await seeding.creating_from_two(TestSeedProject(name_hint="other"), domain, policy)
+        group = await seeding.creating(TestSeedResourceGroup())
         caller = await seeding.within(
             SomeoneOfTheProject(domain, other, granted=tuple(self.granted))
         )
@@ -387,9 +389,9 @@ class DeploymentsInTwoProjects(Given[Any, ManyDeploymentsAndACaller]):
     @override
     async def lay(self, seeding: Any) -> ManyDeploymentsAndACaller:
         place = await lay_a_place(seeding, granted=self.granted)
-        policy = await seeding.once(SeedProjectPolicy())
+        policy = await seeding.once(TestSeedProjectPolicy())
         other = await seeding.creating_from_two(
-            SeedProject(name_hint="other"), place.domain, policy
+            TestSeedProject(name_hint="other"), place.domain, policy
         )
         elsewhere = LaidPlace(
             domain=place.domain,
@@ -425,10 +427,10 @@ class MineBesideAnothers(Given[Any, ManyDeploymentsAndACaller]):
 
     @override
     async def lay(self, seeding: Any) -> ManyDeploymentsAndACaller:
-        domain = await seeding.creating(SeedDomain(name_hint="home", description=WAS_HERE))
-        policy = await seeding.once(SeedProjectPolicy())
-        project = await seeding.creating_from_two(SeedProject(name_hint="team"), domain, policy)
-        group = await seeding.creating(SeedResourceGroup())
+        domain = await seeding.creating(TestSeedDomain(name_hint="home", description=WAS_HERE))
+        policy = await seeding.once(TestSeedProjectPolicy())
+        project = await seeding.creating_from_two(TestSeedProject(name_hint="team"), domain, policy)
+        group = await seeding.creating(TestSeedResourceGroup())
         if self.reads_own:
             caller = await seeding.within(SomeoneReadingTheirOwn(domain))
         else:

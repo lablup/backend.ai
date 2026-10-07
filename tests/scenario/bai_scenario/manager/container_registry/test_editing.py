@@ -29,16 +29,16 @@ from bai_scenario.components.container_registry import (
     ARegistryAndSomeone,
     MissingRegistry,
     RegistryTarget,
-    SeededRegistry,
+    TestSeededRegistry,
     TheUpdatedRegistryNode,
     allowed_project_count,
 )
 from bai_scenario.runner.acting import ActingAs
-from bai_scenario.runner.planting import SeedingSession
+from bai_scenario.runner.planting import TestSeedingSession
 from bai_scenario.runner.steps import run_scenario
 
 type EditingScenario = Scenario[
-    SeedingSession, ARegistryAndACaller, ContainerRegistryAdapter, ContainerRegistryNode
+    TestSeedingSession, ARegistryAndACaller, ContainerRegistryAdapter, ContainerRegistryNode
 ]
 
 
@@ -48,7 +48,7 @@ class Editing(When[ARegistryAndACaller, ContainerRegistryAdapter, ContainerRegis
     registry_type: ContainerRegistryType | None = None
     project: str | None = None
     allow_project: bool = False
-    target: RegistryTarget = field(default_factory=SeededRegistry)
+    target: RegistryTarget = field(default_factory=TestSeededRegistry)
 
     @override
     def operation(self) -> str:
@@ -91,7 +91,9 @@ class Editing(When[ARegistryAndACaller, ContainerRegistryAdapter, ContainerRegis
 
 @dataclass(frozen=True)
 class ChangingOnlyTheAddress(
-    Scenario[SeedingSession, ARegistryAndACaller, ContainerRegistryAdapter, ContainerRegistryNode]
+    Scenario[
+        TestSeedingSession, ARegistryAndACaller, ContainerRegistryAdapter, ContainerRegistryNode
+    ]
 ):
     @override
     def summary(self) -> str:
@@ -102,7 +104,7 @@ class ChangingOnlyTheAddress(
         return "슈퍼관리자가 주소만 수정하면 주소만 새 값이 되고 나머지 필드는 그대로다"
 
     @override
-    def given(self) -> Given[SeedingSession, ARegistryAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ARegistryAndACaller]:
         return ARegistryAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
@@ -116,7 +118,9 @@ class ChangingOnlyTheAddress(
 
 @dataclass(frozen=True)
 class AnEmptyEditChangesNothing(
-    Scenario[SeedingSession, ARegistryAndACaller, ContainerRegistryAdapter, ContainerRegistryNode]
+    Scenario[
+        TestSeedingSession, ARegistryAndACaller, ContainerRegistryAdapter, ContainerRegistryNode
+    ]
 ):
     @override
     def summary(self) -> str:
@@ -129,7 +133,7 @@ class AnEmptyEditChangesNothing(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, ARegistryAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ARegistryAndACaller]:
         return ARegistryAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
@@ -143,7 +147,9 @@ class AnEmptyEditChangesNothing(
 
 @dataclass(frozen=True)
 class AddingAllowedProjectWhileEditing(
-    Scenario[SeedingSession, ARegistryAndACaller, ContainerRegistryAdapter, ContainerRegistryNode]
+    Scenario[
+        TestSeedingSession, ARegistryAndACaller, ContainerRegistryAdapter, ContainerRegistryNode
+    ]
 ):
     @override
     def summary(self) -> str:
@@ -154,7 +160,7 @@ class AddingAllowedProjectWhileEditing(
         return "슈퍼관리자가 레지스트리를 수정하며 프로젝트를 허용하면 그 관계가 생성된다"
 
     @override
-    def given(self) -> Given[SeedingSession, ARegistryAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ARegistryAndACaller]:
         return ARegistryAndSomeone(role=UserRole.SUPERADMIN, with_project=True)
 
     @override
@@ -168,7 +174,9 @@ class AddingAllowedProjectWhileEditing(
 
 @dataclass(frozen=True)
 class AnAddressWithoutAHostIsRefused(
-    Scenario[SeedingSession, ARegistryAndACaller, ContainerRegistryAdapter, ContainerRegistryNode]
+    Scenario[
+        TestSeedingSession, ARegistryAndACaller, ContainerRegistryAdapter, ContainerRegistryNode
+    ]
 ):
     @override
     def summary(self) -> str:
@@ -182,7 +190,7 @@ class AnAddressWithoutAHostIsRefused(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, ARegistryAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ARegistryAndACaller]:
         return ARegistryAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
@@ -196,7 +204,9 @@ class AnAddressWithoutAHostIsRefused(
 
 @dataclass(frozen=True)
 class HarborWithoutAProjectIsRefused(
-    Scenario[SeedingSession, ARegistryAndACaller, ContainerRegistryAdapter, ContainerRegistryNode]
+    Scenario[
+        TestSeedingSession, ARegistryAndACaller, ContainerRegistryAdapter, ContainerRegistryNode
+    ]
 ):
     @override
     def summary(self) -> str:
@@ -210,7 +220,7 @@ class HarborWithoutAProjectIsRefused(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, ARegistryAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ARegistryAndACaller]:
         return ARegistryAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
@@ -224,7 +234,9 @@ class HarborWithoutAProjectIsRefused(
 
 @dataclass(frozen=True)
 class MissingRegistryIsRefused(
-    Scenario[SeedingSession, ARegistryAndACaller, ContainerRegistryAdapter, ContainerRegistryNode]
+    Scenario[
+        TestSeedingSession, ARegistryAndACaller, ContainerRegistryAdapter, ContainerRegistryNode
+    ]
 ):
     @override
     def summary(self) -> str:
@@ -235,7 +247,7 @@ class MissingRegistryIsRefused(
         return "존재하지 않는 id를 수정하려 하면 대상을 찾을 수 없어 거부된다"
 
     @override
-    def given(self) -> Given[SeedingSession, ARegistryAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ARegistryAndACaller]:
         return ARegistryAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
@@ -249,7 +261,9 @@ class MissingRegistryIsRefused(
 
 @dataclass(frozen=True)
 class APlainUserMayNotEdit(
-    Scenario[SeedingSession, ARegistryAndACaller, ContainerRegistryAdapter, ContainerRegistryNode]
+    Scenario[
+        TestSeedingSession, ARegistryAndACaller, ContainerRegistryAdapter, ContainerRegistryNode
+    ]
 ):
     @override
     def summary(self) -> str:
@@ -263,7 +277,7 @@ class APlainUserMayNotEdit(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, ARegistryAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ARegistryAndACaller]:
         return ARegistryAndSomeone()
 
     @override

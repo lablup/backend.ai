@@ -21,7 +21,7 @@ from bai_scenario.seeds.seeder import Naming, TestSeedRowFromThree
 
 
 @dataclass(frozen=True)
-class SeedDeployment(
+class TestSeedDeployment(
     TestSeedRowFromThree[ProjectData, ResourceGroupData, UserData, DeploymentInfo]
 ):
     """A deployment of the given project, on the given group, owned by the given user.

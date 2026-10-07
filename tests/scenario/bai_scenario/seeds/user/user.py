@@ -32,7 +32,7 @@ PASSWORD = "scenario-password"
 
 
 @dataclass(frozen=True)
-class SeedUserOf(TestSeedUser[DomainData, UserResourcePolicyData, KeyPairResourcePolicyData]):
+class TestSeedUserOf(TestSeedUser[DomainData, UserResourcePolicyData, KeyPairResourcePolicyData]):
     """A user of the given domain, held to the given policies.
 
     All three are values earlier rows answered, so nothing here names a domain or a

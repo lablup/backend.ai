@@ -25,7 +25,7 @@ from bai_scenario.seeds.session.session import session_spec
 
 
 @dataclass(frozen=True)
-class SeedKernelOf(TestSeedFieldWithNestedRows[SessionEntityData, KernelInfo]):
+class TestSeedKernelOf(TestSeedFieldWithNestedRows[SessionEntityData, KernelInfo]):
     """The main kernel of the session, with what it asked for in each slot written under it.
 
     The session and the image are values earlier rows answered. The kernel waits as

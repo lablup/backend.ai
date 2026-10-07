@@ -29,7 +29,7 @@ from bai_scenario.seeds.seeder import TestSeedFieldCreator
 
 
 @dataclass(frozen=True)
-class SeedKeypairOf(TestSeedFieldCreator[UserData, KeyPairData]):
+class TestSeedKeypairOf(TestSeedFieldCreator[UserData, KeyPairData]):
     """A keypair besides the one the user authorizes with.
 
     The policy name is a value an earlier row answered; this seed names none of its own.
@@ -64,7 +64,7 @@ class SeedKeypairOf(TestSeedFieldCreator[UserData, KeyPairData]):
 
 
 @dataclass(frozen=True)
-class SeedLoginSessionOf(TestSeedFieldCreator[UserData, LoginSessionData]):
+class TestSeedLoginSessionOf(TestSeedFieldCreator[UserData, LoginSessionData]):
     """A login the user holds, made with the key an earlier row answered."""
 
     access_key: str
@@ -83,7 +83,7 @@ class SeedLoginSessionOf(TestSeedFieldCreator[UserData, LoginSessionData]):
 
 
 @dataclass(frozen=True)
-class SeedLoginHistoryOf(TestSeedFieldCreator[UserData, LoginHistoryData]):
+class TestSeedLoginHistoryOf(TestSeedFieldCreator[UserData, LoginHistoryData]):
     """The record one successful login of the user left, under the user's own domain."""
 
     domain_name: str

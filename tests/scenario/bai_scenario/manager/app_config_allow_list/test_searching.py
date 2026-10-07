@@ -31,12 +31,12 @@ from bai_scenario.components.app_config_allow_list import (
     in_page_order,
 )
 from bai_scenario.runner.acting import ActingAs
-from bai_scenario.runner.planting import SeedingSession
+from bai_scenario.runner.planting import TestSeedingSession
 from bai_scenario.runner.steps import run_scenario
 
 type Searched = SearchAppConfigAllowListPayload
 type SearchingStep = Scenario[
-    SeedingSession, ManyEntriesAndACaller, AppConfigAllowListAdapter, Searched
+    TestSeedingSession, ManyEntriesAndACaller, AppConfigAllowListAdapter, Searched
 ]
 
 
@@ -85,7 +85,7 @@ class SearchingAfterTheFirst(When[ManyEntriesAndACaller, AppConfigAllowListAdapt
 
 @dataclass(frozen=True)
 class TheSuperadminCountsEveryOne(
-    Scenario[SeedingSession, ManyEntriesAndACaller, AppConfigAllowListAdapter, Searched]
+    Scenario[TestSeedingSession, ManyEntriesAndACaller, AppConfigAllowListAdapter, Searched]
 ):
     @override
     def summary(self) -> str:
@@ -96,7 +96,7 @@ class TheSuperadminCountsEveryOne(
         return "설정 이름 둘에 allow_list 넷이 있고 슈퍼관리자가 필터 없이 검색하면, 네 allow_list가 모두 반환된다"
 
     @override
-    def given(self) -> Given[SeedingSession, ManyEntriesAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ManyEntriesAndACaller]:
         return EntriesLaidAcross(
             names=2,
             kinds=(AppConfigScopeType.PUBLIC, AppConfigScopeType.USER),
@@ -114,7 +114,7 @@ class TheSuperadminCountsEveryOne(
 
 @dataclass(frozen=True)
 class AForwardCursorAnswersTheNextOne(
-    Scenario[SeedingSession, ManyEntriesAndACaller, AppConfigAllowListAdapter, Searched]
+    Scenario[TestSeedingSession, ManyEntriesAndACaller, AppConfigAllowListAdapter, Searched]
 ):
     @override
     def summary(self) -> str:
@@ -125,7 +125,7 @@ class AForwardCursorAnswersTheNextOne(
         return "생성 시각이 모두 같은 allow_list 넷이 있고 슈퍼관리자가 기본 순서 첫 항목의 커서 뒤로 한 건을 검색하면, 바로 다음 allow_list 하나와 앞뒤 페이지가 모두 있다고 응답한다"
 
     @override
-    def given(self) -> Given[SeedingSession, ManyEntriesAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ManyEntriesAndACaller]:
         return EntriesLaidAcross(names=4, role=UserRole.SUPERADMIN)
 
     @override
@@ -139,7 +139,7 @@ class AForwardCursorAnswersTheNextOne(
 
 @dataclass(frozen=True)
 class APlainUserMayNotSearch(
-    Scenario[SeedingSession, ManyEntriesAndACaller, AppConfigAllowListAdapter, Searched]
+    Scenario[TestSeedingSession, ManyEntriesAndACaller, AppConfigAllowListAdapter, Searched]
 ):
     @override
     def summary(self) -> str:
@@ -150,7 +150,7 @@ class APlainUserMayNotSearch(
         return "일반 사용자가 allow_list를 검색하면, 슈퍼관리자 권한이 없어 거부된다"
 
     @override
-    def given(self) -> Given[SeedingSession, ManyEntriesAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ManyEntriesAndACaller]:
         return EntriesLaidAcross(names=2)
 
     @override

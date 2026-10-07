@@ -21,7 +21,7 @@ from bai_scenario.seeds.seeder import Naming, TestSeedRowFrom
 
 
 @dataclass(frozen=True)
-class SeedAgent(TestSeedRowFrom[ResourceGroupData, AgentUUID]):
+class TestSeedAgent(TestSeedRowFrom[ResourceGroupData, AgentUUID]):
     """An agent of the given resource group, registered the way its first heartbeat
     registers it. It reports no slot; the slots it carries are laid under it."""
 

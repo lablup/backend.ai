@@ -36,11 +36,11 @@ from bai_scenario.components.resource_group import (
     TheGroupNode,
 )
 from bai_scenario.runner.acting import ActingAs
-from bai_scenario.runner.planting import SeedingSession
+from bai_scenario.runner.planting import TestSeedingSession
 from bai_scenario.runner.steps import run_scenario
 
 type EditingStep = Scenario[
-    SeedingSession, AGroupAndACaller, ResourceGroupAdapter, ResourceGroupDetailNode
+    TestSeedingSession, AGroupAndACaller, ResourceGroupAdapter, ResourceGroupDetailNode
 ]
 
 UNKNOWN = "no-such-group"
@@ -138,7 +138,7 @@ class EditingTheConfig(When[AGroupAndACaller, ResourceGroupAdapter, ResourceGrou
 
 @dataclass(frozen=True)
 class TheSuperadminChangesTheDescription(
-    Scenario[SeedingSession, AGroupAndACaller, ResourceGroupAdapter, ResourceGroupDetailNode]
+    Scenario[TestSeedingSession, AGroupAndACaller, ResourceGroupAdapter, ResourceGroupDetailNode]
 ):
     started: datetime
 
@@ -151,7 +151,7 @@ class TheSuperadminChangesTheDescription(
         return "슈퍼관리자가 설명만 바꾸면 설명은 새 값이고 나머지는 그대로인 그룹 전체가 반환된다"
 
     @override
-    def given(self) -> Given[SeedingSession, AGroupAndACaller]:
+    def given(self) -> Given[TestSeedingSession, AGroupAndACaller]:
         return AGroupAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
@@ -165,7 +165,7 @@ class TheSuperadminChangesTheDescription(
 
 @dataclass(frozen=True)
 class DeactivatingAGroup(
-    Scenario[SeedingSession, AGroupAndACaller, ResourceGroupAdapter, ResourceGroupDetailNode]
+    Scenario[TestSeedingSession, AGroupAndACaller, ResourceGroupAdapter, ResourceGroupDetailNode]
 ):
     started: datetime
 
@@ -178,7 +178,7 @@ class DeactivatingAGroup(
         return "활성 그룹을 비활성으로 바꾸면 비활성인 그룹이 반환된다"
 
     @override
-    def given(self) -> Given[SeedingSession, AGroupAndACaller]:
+    def given(self) -> Given[TestSeedingSession, AGroupAndACaller]:
         return AGroupAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
@@ -192,7 +192,7 @@ class DeactivatingAGroup(
 
 @dataclass(frozen=True)
 class MakingAGroupTheDefault(
-    Scenario[SeedingSession, AGroupAndACaller, ResourceGroupAdapter, ResourceGroupDetailNode]
+    Scenario[TestSeedingSession, AGroupAndACaller, ResourceGroupAdapter, ResourceGroupDetailNode]
 ):
     started: datetime
 
@@ -205,7 +205,7 @@ class MakingAGroupTheDefault(
         return "기본 그룹이 없을 때 그룹을 기본으로 바꾸면 기본인 그룹이 반환된다"
 
     @override
-    def given(self) -> Given[SeedingSession, AGroupAndACaller]:
+    def given(self) -> Given[TestSeedingSession, AGroupAndACaller]:
         return AGroupAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
@@ -219,7 +219,7 @@ class MakingAGroupTheDefault(
 
 @dataclass(frozen=True)
 class ASecondDefaultIsRefused(
-    Scenario[SeedingSession, AGroupAndACaller, ResourceGroupAdapter, ResourceGroupDetailNode]
+    Scenario[TestSeedingSession, AGroupAndACaller, ResourceGroupAdapter, ResourceGroupDetailNode]
 ):
     @override
     def summary(self) -> str:
@@ -230,7 +230,7 @@ class ASecondDefaultIsRefused(
         return "기본 그룹이 따로 있을 때 다른 그룹을 기본으로 바꾸려 하면 기본 그룹이 이미 있다는 이유로 거부된다"
 
     @override
-    def given(self) -> Given[SeedingSession, AGroupAndACaller]:
+    def given(self) -> Given[TestSeedingSession, AGroupAndACaller]:
         return AGroupBesideTheDefaultAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
@@ -244,7 +244,7 @@ class ASecondDefaultIsRefused(
 
 @dataclass(frozen=True)
 class AnEmptyEditChangesNothing(
-    Scenario[SeedingSession, AGroupAndACaller, ResourceGroupAdapter, ResourceGroupDetailNode]
+    Scenario[TestSeedingSession, AGroupAndACaller, ResourceGroupAdapter, ResourceGroupDetailNode]
 ):
     started: datetime
 
@@ -257,7 +257,7 @@ class AnEmptyEditChangesNothing(
         return "아무 필드도 지정하지 않고 수정하면 아무것도 바뀌지 않은 그룹이 반환된다"
 
     @override
-    def given(self) -> Given[SeedingSession, AGroupAndACaller]:
+    def given(self) -> Given[TestSeedingSession, AGroupAndACaller]:
         return AGroupAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
@@ -271,7 +271,7 @@ class AnEmptyEditChangesNothing(
 
 @dataclass(frozen=True)
 class AUserGrantedUpdateOnTheGroupEditsIt(
-    Scenario[SeedingSession, AGroupAndACaller, ResourceGroupAdapter, ResourceGroupDetailNode]
+    Scenario[TestSeedingSession, AGroupAndACaller, ResourceGroupAdapter, ResourceGroupDetailNode]
 ):
     started: datetime
 
@@ -284,7 +284,7 @@ class AUserGrantedUpdateOnTheGroupEditsIt(
         return "그 그룹에 앉힌 역할로 수정 권한을 받은 사용자가 설명을 바꾸면 설명이 새 값인 그룹이 반환된다"
 
     @override
-    def given(self) -> Given[SeedingSession, AGroupAndACaller]:
+    def given(self) -> Given[TestSeedingSession, AGroupAndACaller]:
         return AGroupAndSomeone(granted=Permission.UPDATE)
 
     @override
@@ -298,7 +298,7 @@ class AUserGrantedUpdateOnTheGroupEditsIt(
 
 @dataclass(frozen=True)
 class AUserGrantedNothingMayNotEdit(
-    Scenario[SeedingSession, AGroupAndACaller, ResourceGroupAdapter, ResourceGroupDetailNode]
+    Scenario[TestSeedingSession, AGroupAndACaller, ResourceGroupAdapter, ResourceGroupDetailNode]
 ):
     @override
     def summary(self) -> str:
@@ -309,7 +309,7 @@ class AUserGrantedNothingMayNotEdit(
         return "아무 권한도 없는 사용자가 설명을 바꾸려 하면 권한 부족으로 거부된다"
 
     @override
-    def given(self) -> Given[SeedingSession, AGroupAndACaller]:
+    def given(self) -> Given[TestSeedingSession, AGroupAndACaller]:
         return AGroupAndSomeone()
 
     @override
@@ -323,7 +323,7 @@ class AUserGrantedNothingMayNotEdit(
 
 @dataclass(frozen=True)
 class TheSuperadminEditingAnUnknownNameIsNotFound(
-    Scenario[SeedingSession, AGroupAndACaller, ResourceGroupAdapter, ResourceGroupDetailNode]
+    Scenario[TestSeedingSession, AGroupAndACaller, ResourceGroupAdapter, ResourceGroupDetailNode]
 ):
     @override
     def summary(self) -> str:
@@ -334,7 +334,7 @@ class TheSuperadminEditingAnUnknownNameIsNotFound(
         return "슈퍼관리자가 존재하지 않는 이름을 수정하면 대상을 찾을 수 없다는 이유로 거부된다"
 
     @override
-    def given(self) -> Given[SeedingSession, AGroupAndACaller]:
+    def given(self) -> Given[TestSeedingSession, AGroupAndACaller]:
         return AGroupAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
@@ -348,7 +348,7 @@ class TheSuperadminEditingAnUnknownNameIsNotFound(
 
 @dataclass(frozen=True)
 class TheSuperadminChangesTheConfig(
-    Scenario[SeedingSession, AGroupAndACaller, ResourceGroupAdapter, ResourceGroupDetailNode]
+    Scenario[TestSeedingSession, AGroupAndACaller, ResourceGroupAdapter, ResourceGroupDetailNode]
 ):
     started: datetime
 
@@ -364,7 +364,7 @@ class TheSuperadminChangesTheConfig(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, AGroupAndACaller]:
+    def given(self) -> Given[TestSeedingSession, AGroupAndACaller]:
         return AGroupAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
@@ -386,7 +386,7 @@ class TheSuperadminChangesTheConfig(
 
 @dataclass(frozen=True)
 class TheSuperadminChangesThePreemptionConfig(
-    Scenario[SeedingSession, AGroupAndACaller, ResourceGroupAdapter, ResourceGroupDetailNode]
+    Scenario[TestSeedingSession, AGroupAndACaller, ResourceGroupAdapter, ResourceGroupDetailNode]
 ):
     started: datetime
 
@@ -399,7 +399,7 @@ class TheSuperadminChangesThePreemptionConfig(
         return "슈퍼관리자가 선점 설정을 바꾸면 선점 설정이 새 값인 그룹 전체가 반환된다"
 
     @override
-    def given(self) -> Given[SeedingSession, AGroupAndACaller]:
+    def given(self) -> Given[TestSeedingSession, AGroupAndACaller]:
         return AGroupAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
@@ -423,7 +423,7 @@ class TheSuperadminChangesThePreemptionConfig(
 
 @dataclass(frozen=True)
 class AUserGrantedNothingMayNotEditTheConfig(
-    Scenario[SeedingSession, AGroupAndACaller, ResourceGroupAdapter, ResourceGroupDetailNode]
+    Scenario[TestSeedingSession, AGroupAndACaller, ResourceGroupAdapter, ResourceGroupDetailNode]
 ):
     @override
     def summary(self) -> str:
@@ -434,7 +434,7 @@ class AUserGrantedNothingMayNotEditTheConfig(
         return "아무 권한도 없는 사용자가 설정을 바꾸려 하면 권한 부족으로 거부된다"
 
     @override
-    def given(self) -> Given[SeedingSession, AGroupAndACaller]:
+    def given(self) -> Given[TestSeedingSession, AGroupAndACaller]:
         return AGroupAndSomeone()
 
     @override

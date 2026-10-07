@@ -35,15 +35,15 @@ from bai_scenario.components.container_registry import (
     ARegistryAndSomeone,
     MissingRegistry,
     RegistryTarget,
-    SeededRegistry,
+    TestSeededRegistry,
     allowed_project_count,
 )
 from bai_scenario.runner.acting import ActingAs
-from bai_scenario.runner.planting import SeedingSession
+from bai_scenario.runner.planting import TestSeedingSession
 from bai_scenario.runner.steps import run_scenario
 
 type DeletionScenario = Scenario[
-    SeedingSession,
+    TestSeedingSession,
     ARegistryAndACaller,
     ContainerRegistryAdapter,
     DeleteContainerRegistryPayload,
@@ -52,7 +52,7 @@ type DeletionScenario = Scenario[
 
 @dataclass(frozen=True)
 class Deleting(When[ARegistryAndACaller, ContainerRegistryAdapter, DeleteContainerRegistryPayload]):
-    target: RegistryTarget = field(default_factory=SeededRegistry)
+    target: RegistryTarget = field(default_factory=TestSeededRegistry)
 
     @override
     def operation(self) -> str:
@@ -91,7 +91,7 @@ class TheDeletedIdComesBack(Then[ARegistryAndACaller, DeleteContainerRegistryPay
 @dataclass(frozen=True)
 class DeletingAnswersWithTheRemovedId(
     Scenario[
-        SeedingSession,
+        TestSeedingSession,
         ARegistryAndACaller,
         ContainerRegistryAdapter,
         DeleteContainerRegistryPayload,
@@ -106,7 +106,7 @@ class DeletingAnswersWithTheRemovedId(
         return "슈퍼관리자가 레지스트리를 삭제하면 삭제한 id를 담은 응답이 반환된다"
 
     @override
-    def given(self) -> Given[SeedingSession, ARegistryAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ARegistryAndACaller]:
         return ARegistryAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
@@ -123,7 +123,7 @@ class DeletingAnswersWithTheRemovedId(
 @dataclass(frozen=True)
 class DeletingTakesTheAllowedProjectWithIt(
     Scenario[
-        SeedingSession,
+        TestSeedingSession,
         ARegistryAndACaller,
         ContainerRegistryAdapter,
         DeleteContainerRegistryPayload,
@@ -138,7 +138,7 @@ class DeletingTakesTheAllowedProjectWithIt(
         return "허용 프로젝트가 있는 레지스트리를 삭제하면, 외래 키를 통해 그 허용 목록까지 함께 삭제된다"
 
     @override
-    def given(self) -> Given[SeedingSession, ARegistryAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ARegistryAndACaller]:
         return ARegistryAndSomeone(role=UserRole.SUPERADMIN, allowed=True)
 
     @override
@@ -155,7 +155,7 @@ class DeletingTakesTheAllowedProjectWithIt(
 @dataclass(frozen=True)
 class MissingRegistryIsRefused(
     Scenario[
-        SeedingSession,
+        TestSeedingSession,
         ARegistryAndACaller,
         ContainerRegistryAdapter,
         DeleteContainerRegistryPayload,
@@ -170,7 +170,7 @@ class MissingRegistryIsRefused(
         return "존재하지 않는 id를 삭제하려 하면 대상을 찾을 수 없어 거부된다"
 
     @override
-    def given(self) -> Given[SeedingSession, ARegistryAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ARegistryAndACaller]:
         return ARegistryAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
@@ -187,7 +187,7 @@ class MissingRegistryIsRefused(
 @dataclass(frozen=True)
 class APlainUserMayNotDelete(
     Scenario[
-        SeedingSession,
+        TestSeedingSession,
         ARegistryAndACaller,
         ContainerRegistryAdapter,
         DeleteContainerRegistryPayload,
@@ -205,7 +205,7 @@ class APlainUserMayNotDelete(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, ARegistryAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ARegistryAndACaller]:
         return ARegistryAndSomeone()
 
     @override

@@ -23,11 +23,11 @@ from bai_scenario.components.notification import (
     TheDeletedRuleId,
 )
 from bai_scenario.runner.acting import ActingAs
-from bai_scenario.runner.planting import SeedingSession
+from bai_scenario.runner.planting import TestSeedingSession
 from bai_scenario.runner.steps import run_scenario
 
 type Deleted = DeleteNotificationRulePayload
-type RetiringStep = Scenario[SeedingSession, ARuleAndACaller, NotificationAdapter, Any]
+type RetiringStep = Scenario[TestSeedingSession, ARuleAndACaller, NotificationAdapter, Any]
 
 
 @dataclass(frozen=True)
@@ -55,7 +55,7 @@ class Deleting(When[ARuleAndACaller, NotificationAdapter, Deleted]):
 
 @dataclass(frozen=True)
 class TheSuperadminDeletesARule(
-    Scenario[SeedingSession, ARuleAndACaller, NotificationAdapter, Deleted]
+    Scenario[TestSeedingSession, ARuleAndACaller, NotificationAdapter, Deleted]
 ):
     @override
     def summary(self) -> str:
@@ -66,7 +66,7 @@ class TheSuperadminDeletesARule(
         return "규칙 하나가 있고 슈퍼관리자가 삭제하면 삭제한 규칙의 id가 반환된다"
 
     @override
-    def given(self) -> Given[SeedingSession, ARuleAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ARuleAndACaller]:
         return ARuleAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
@@ -80,7 +80,7 @@ class TheSuperadminDeletesARule(
 
 @dataclass(frozen=True)
 class TheSuperadminDeletingAnUnknownIdIsNotFound(
-    Scenario[SeedingSession, ARuleAndACaller, NotificationAdapter, Deleted]
+    Scenario[TestSeedingSession, ARuleAndACaller, NotificationAdapter, Deleted]
 ):
     @override
     def summary(self) -> str:
@@ -91,7 +91,7 @@ class TheSuperadminDeletingAnUnknownIdIsNotFound(
         return "슈퍼관리자가 존재하지 않는 id를 삭제하면 대상을 찾을 수 없다는 이유로 거부된다"
 
     @override
-    def given(self) -> Given[SeedingSession, ARuleAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ARuleAndACaller]:
         return ARuleAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
@@ -105,7 +105,7 @@ class TheSuperadminDeletingAnUnknownIdIsNotFound(
 
 @dataclass(frozen=True)
 class AUserGrantedNothingMayNotDelete(
-    Scenario[SeedingSession, ARuleAndACaller, NotificationAdapter, Deleted]
+    Scenario[TestSeedingSession, ARuleAndACaller, NotificationAdapter, Deleted]
 ):
     @override
     def summary(self) -> str:
@@ -116,7 +116,7 @@ class AUserGrantedNothingMayNotDelete(
         return "아무 권한도 없는 사용자가 삭제하려 하면 권한 부족으로 거부된다"
 
     @override
-    def given(self) -> Given[SeedingSession, ARuleAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ARuleAndACaller]:
         return ARuleAndSomeone()
 
     @override

@@ -20,7 +20,7 @@ from bai_scenario.seeds.seeder import Naming, TestSeedFieldCreator, TestSeedRowF
 
 
 @dataclass(frozen=True)
-class SeedImage(TestSeedRowFrom[ContainerRegistryData, ImageData]):
+class TestSeedImage(TestSeedRowFrom[ContainerRegistryData, ImageData]):
     """An image of the given registry. A session names one to run."""
 
     name_hint: str = "image"
@@ -72,7 +72,7 @@ class SeedImage(TestSeedRowFrom[ContainerRegistryData, ImageData]):
 
 
 @dataclass(frozen=True)
-class SeedTaggedImage(TestSeedRowFrom[ContainerRegistryData, ImageData]):
+class TestSeedTaggedImage(TestSeedRowFrom[ContainerRegistryData, ImageData]):
     """An image registered under a tag of the given registry, as a scan would name it."""
 
     repository: str
@@ -111,7 +111,7 @@ class SeedTaggedImage(TestSeedRowFrom[ContainerRegistryData, ImageData]):
 
 
 @dataclass(frozen=True)
-class SeedAlias(TestSeedFieldCreator[ImageData, ImageAliasData]):
+class TestSeedAlias(TestSeedFieldCreator[ImageData, ImageAliasData]):
     """One alias of an image.
 
     The alias column is unique across every image, and each scenario runs against its

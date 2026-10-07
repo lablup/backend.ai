@@ -40,12 +40,12 @@ from ai.backend.testutils.scenario_steps import (
     Verdict,
 )
 from bai_scenario.components.domain import WAS_HERE, SomeoneOf
-from bai_scenario.seeds.app_config.allow_list import SCOPE_NAMES, SeedAllowListEntry
-from bai_scenario.seeds.app_config.definition import SeedDefinition
-from bai_scenario.seeds.app_config.fragment import SeedFragmentOf, SeedPublicFragment
-from bai_scenario.seeds.domain.domain import SeedDomain
-from bai_scenario.seeds.rbac.role import SeedPermission, SeedRole
-from bai_scenario.seeds.seeder import Laid, Seeder, TestSeedNest
+from bai_scenario.seeds.app_config.allow_list import SCOPE_NAMES, TestSeedAllowListEntry
+from bai_scenario.seeds.app_config.definition import TestSeedDefinition
+from bai_scenario.seeds.app_config.fragment import TestSeedFragmentOf, TestSeedPublicFragment
+from bai_scenario.seeds.domain.domain import TestSeedDomain
+from bai_scenario.seeds.rbac.role import TestSeedPermission, TestSeedRole
+from bai_scenario.seeds.seeder import Laid, TestSeeder, TestSeedNest
 
 ENFORCEMENT = "manager.rbac.enforcement_enabled"
 
@@ -85,13 +85,15 @@ class SomeoneGrantedOnTheirOwn(TestSeedNest[Laid[UserData]]):
         return f"자기 스코프에서 {what}에 대한 {names_of(self.granted)} 권한을 받은 사용자 준비"
 
     @override
-    def lay(self, seed: Seeder) -> Laid[UserData]:
+    def lay(self, seed: TestSeeder) -> Laid[UserData]:
         someone = seed.within(SomeoneOf(self.domain, role=self.role))
         if not self.granted:
             return someone
-        role = seed.creating_from(SeedRole(lambda u: UserID(u.id), name_hint="own-scope"), someone)
+        role = seed.creating_from(
+            TestSeedRole(lambda u: UserID(u.id), name_hint="own-scope"), someone
+        )
         for one in self.granted:
-            seed.adding(SeedPermission(entity_type=self.entity_type, permission=one), role)
+            seed.adding(TestSeedPermission(entity_type=self.entity_type, permission=one), role)
         seed.granting(role, someone, role_id=lambda r: r.id, user_id=lambda u: UserID(u.id))
         return someone
 
@@ -118,13 +120,13 @@ class SomeoneGrantedOn[Seat](TestSeedNest[Laid[UserData]]):
         return f"{self.seat.describe}에서 {what}에 대한 {names_of(self.granted)} 권한을 받은 사용자 준비"
 
     @override
-    def lay(self, seed: Seeder) -> Laid[UserData]:
+    def lay(self, seed: TestSeeder) -> Laid[UserData]:
         someone = seed.within(SomeoneOf(self.domain, role=self.role))
         if not self.granted:
             return someone
-        role = seed.creating_from(SeedRole(self.seat_id, name_hint="seated"), self.seat)
+        role = seed.creating_from(TestSeedRole(self.seat_id, name_hint="seated"), self.seat)
         for one in self.granted:
-            seed.adding(SeedPermission(entity_type=self.entity_type, permission=one), role)
+            seed.adding(TestSeedPermission(entity_type=self.entity_type, permission=one), role)
         seed.granting(role, someone, role_id=lambda r: r.id, user_id=lambda u: UserID(u.id))
         return someone
 
@@ -156,11 +158,11 @@ class ADesignOf(TestSeedNest[LaidDesign]):
         return f"{opened} 스코프에 허용된 설정 이름 준비"
 
     @override
-    def lay(self, seed: Seeder) -> LaidDesign:
-        definition = seed.creating(SeedDefinition(name_hint=self.name_hint))
+    def lay(self, seed: TestSeeder) -> LaidDesign:
+        definition = seed.creating(TestSeedDefinition(name_hint=self.name_hint))
         entries = {
             one: seed.creating_from(
-                SeedAllowListEntry(scope_type=one, rank=self.ranks.get(one)), definition
+                TestSeedAllowListEntry(scope_type=one, rank=self.ranks.get(one)), definition
             )
             for one in self.allowed
         }
@@ -235,7 +237,7 @@ class AConfigLaidAcross(Given[Any, AMergeAndACaller]):
 
     @override
     async def lay(self, seeding: Any) -> AMergeAndACaller:
-        home = await seeding.creating(SeedDomain(name_hint="home", description=WAS_HERE))
+        home = await seeding.creating(TestSeedDomain(name_hint="home", description=WAS_HERE))
         caller = await seeding.within(
             SomeoneGrantedOnTheirOwn(
                 home,
@@ -249,11 +251,11 @@ class AConfigLaidAcross(Given[Any, AMergeAndACaller]):
         entries = design.entries
         if self.public is not None:
             await seeding.creating_from(
-                SeedPublicFragment(config=self.public), entries[AppConfigScopeType.PUBLIC]
+                TestSeedPublicFragment(config=self.public), entries[AppConfigScopeType.PUBLIC]
             )
         if self.domain is not None:
             await seeding.creating_from_two(
-                SeedFragmentOf(
+                TestSeedFragmentOf(
                     owner_of=domain_owner, config=self.domain, name_hint="domain-fragment"
                 ),
                 entries[AppConfigScopeType.DOMAIN],
@@ -261,23 +263,23 @@ class AConfigLaidAcross(Given[Any, AMergeAndACaller]):
             )
         if self.user is not None:
             await seeding.creating_from_two(
-                SeedFragmentOf(owner_of=user_owner, config=self.user, name_hint="own-fragment"),
+                TestSeedFragmentOf(owner_of=user_owner, config=self.user, name_hint="own-fragment"),
                 entries[AppConfigScopeType.USER],
                 caller,
             )
         if self.another_user is not None:
             other = await seeding.within(SomeoneOf(home))
             await seeding.creating_from_two(
-                SeedFragmentOf(
+                TestSeedFragmentOf(
                     owner_of=user_owner, config=self.another_user, name_hint="anothers-fragment"
                 ),
                 entries[AppConfigScopeType.USER],
                 other,
             )
         if self.another_domain is not None:
-            away = await seeding.creating(SeedDomain(name_hint="away", description=WAS_HERE))
+            away = await seeding.creating(TestSeedDomain(name_hint="away", description=WAS_HERE))
             await seeding.creating_from_two(
-                SeedFragmentOf(
+                TestSeedFragmentOf(
                     owner_of=domain_owner,
                     config=self.another_domain,
                     name_hint="other-domains-fragment",
@@ -307,7 +309,7 @@ class SeveralConfigsLaid(Given[Any, AMergeAndACaller]):
 
     @override
     async def lay(self, seeding: Any) -> AMergeAndACaller:
-        home = await seeding.creating(SeedDomain(name_hint="home", description=WAS_HERE))
+        home = await seeding.creating(TestSeedDomain(name_hint="home", description=WAS_HERE))
         caller = await seeding.within(
             SomeoneGrantedOnTheirOwn(
                 home,
@@ -319,7 +321,7 @@ class SeveralConfigsLaid(Given[Any, AMergeAndACaller]):
         for config in self.publics:
             design = await seeding.within(ADesignOf(allowed=(AppConfigScopeType.PUBLIC,)))
             await seeding.creating_from(
-                SeedPublicFragment(config=config), design.entries[AppConfigScopeType.PUBLIC]
+                TestSeedPublicFragment(config=config), design.entries[AppConfigScopeType.PUBLIC]
             )
             names.append(seeding.made(design.definition).config_name)
         return AMergeAndACaller(caller=seeding.made(caller), names=tuple(names))

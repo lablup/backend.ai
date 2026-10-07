@@ -22,7 +22,7 @@ from bai_scenario.seeds.seeder import Naming, TestSeedFieldCreator, TestSeedRowF
 
 
 @dataclass(frozen=True)
-class SeedRole[S](TestSeedRowFrom[S, RoleData]):
+class TestSeedRole[S](TestSeedRowFrom[S, RoleData]):
     """A custom role in the scope of the row it is given."""
 
     scope_of: Callable[[S], EntityIdentifier]
@@ -46,7 +46,7 @@ class SeedRole[S](TestSeedRowFrom[S, RoleData]):
 
 
 @dataclass(frozen=True)
-class SeedPermission(TestSeedFieldCreator[RoleData, PermissionData]):
+class TestSeedPermission(TestSeedFieldCreator[RoleData, PermissionData]):
     """One operation the role may perform on one entity type."""
 
     entity_type: EntityType

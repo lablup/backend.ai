@@ -30,14 +30,14 @@ from bai_scenario.components.runtime_variant_preset import (
     TheLaidPresetsAreLeft,
 )
 from bai_scenario.runner.acting import ActingAs
-from bai_scenario.runner.planting import SeedingSession
+from bai_scenario.runner.planting import TestSeedingSession
 from bai_scenario.runner.steps import run_scenario
 
 DEFAULT_PAGE = 10
 
 type Searched = SearchRuntimeVariantPresetsPayload
 type SearchingStep = Scenario[
-    SeedingSession, ManyPresetsAndACaller, RuntimeVariantPresetAdapter, Searched
+    TestSeedingSession, ManyPresetsAndACaller, RuntimeVariantPresetAdapter, Searched
 ]
 
 
@@ -113,7 +113,7 @@ class SearchingValidAtAVersion(When[ManyPresetsAndACaller, RuntimeVariantPresetA
 
 @dataclass(frozen=True)
 class AUserGrantedNothingCountsEveryPreset(
-    Scenario[SeedingSession, ManyPresetsAndACaller, RuntimeVariantPresetAdapter, Searched]
+    Scenario[TestSeedingSession, ManyPresetsAndACaller, RuntimeVariantPresetAdapter, Searched]
 ):
     @override
     def summary(self) -> str:
@@ -124,7 +124,7 @@ class AUserGrantedNothingCountsEveryPreset(
         return "프리셋이 둘 있을 때 아무 권한도 없는 사용자가 필터 없이 조회하면 두 프리셋이 모두 반환된다"
 
     @override
-    def given(self) -> Given[SeedingSession, ManyPresetsAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ManyPresetsAndACaller]:
         return ManyPresetsAndSomeone(besides=1)
 
     @override
@@ -138,7 +138,7 @@ class AUserGrantedNothingCountsEveryPreset(
 
 @dataclass(frozen=True)
 class AVariantFilterNarrows(
-    Scenario[SeedingSession, ManyPresetsAndACaller, RuntimeVariantPresetAdapter, Searched]
+    Scenario[TestSeedingSession, ManyPresetsAndACaller, RuntimeVariantPresetAdapter, Searched]
 ):
     @override
     def summary(self) -> str:
@@ -149,7 +149,7 @@ class AVariantFilterNarrows(
         return "프리셋이 두 변형에 나뉘어 있을 때 한 변형을 필터로 조회하면 해당 변형의 프리셋만 반환된다"
 
     @override
-    def given(self) -> Given[SeedingSession, ManyPresetsAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ManyPresetsAndACaller]:
         return PresetsInTwoVariants()
 
     @override
@@ -163,7 +163,7 @@ class AVariantFilterNarrows(
 
 @dataclass(frozen=True)
 class AVersionFilterKeepsWhatIsValidThen(
-    Scenario[SeedingSession, ManyPresetsAndACaller, RuntimeVariantPresetAdapter, Searched]
+    Scenario[TestSeedingSession, ManyPresetsAndACaller, RuntimeVariantPresetAdapter, Searched]
 ):
     @override
     def summary(self) -> str:
@@ -177,7 +177,7 @@ class AVersionFilterKeepsWhatIsValidThen(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, ManyPresetsAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ManyPresetsAndACaller]:
         return PresetsAcrossVersions()
 
     @override
@@ -191,7 +191,7 @@ class AVersionFilterKeepsWhatIsValidThen(
 
 @dataclass(frozen=True)
 class OmittingThePageSizeGivesTen(
-    Scenario[SeedingSession, ManyPresetsAndACaller, RuntimeVariantPresetAdapter, Searched]
+    Scenario[TestSeedingSession, ManyPresetsAndACaller, RuntimeVariantPresetAdapter, Searched]
 ):
     @override
     def summary(self) -> str:
@@ -202,7 +202,7 @@ class OmittingThePageSizeGivesTen(
         return "프리셋이 11개 있을 때 페이지 크기를 생략하면 10건을 반환하고 다음 페이지가 있음을 표시한다"
 
     @override
-    def given(self) -> Given[SeedingSession, ManyPresetsAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ManyPresetsAndACaller]:
         return ManyPresetsAndSomeone(besides=DEFAULT_PAGE)
 
     @override

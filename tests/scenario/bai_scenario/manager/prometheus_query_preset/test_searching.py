@@ -41,14 +41,14 @@ from bai_scenario.components.prometheus_query_preset import (
     PresetsInTwoCategories,
 )
 from bai_scenario.runner.acting import ActingAs
-from bai_scenario.runner.planting import SeedingSession
+from bai_scenario.runner.planting import TestSeedingSession
 from bai_scenario.runner.steps import run_scenario
 
 type Searched = SearchQueryDefinitionsPayload
 type SearchingStep = Scenario[
-    SeedingSession, ManyPresetsAndACaller, PrometheusQueryPresetAdapter, Searched
+    TestSeedingSession, ManyPresetsAndACaller, PrometheusQueryPresetAdapter, Searched
 ]
-type NobodyStep = Scenario[SeedingSession, APresetAlone, PrometheusQueryPresetAdapter, Searched]
+type NobodyStep = Scenario[TestSeedingSession, APresetAlone, PrometheusQueryPresetAdapter, Searched]
 
 
 @dataclass(frozen=True)
@@ -163,7 +163,7 @@ class OnlyTheNamedOneIsFound(Then[ManyPresetsAndACaller, Searched]):
 
 @dataclass(frozen=True)
 class AnyoneCountsEveryOne(
-    Scenario[SeedingSession, ManyPresetsAndACaller, PrometheusQueryPresetAdapter, Searched]
+    Scenario[TestSeedingSession, ManyPresetsAndACaller, PrometheusQueryPresetAdapter, Searched]
 ):
     @override
     def summary(self) -> str:
@@ -174,7 +174,7 @@ class AnyoneCountsEveryOne(
         return "프리셋 둘이 있고 아무 권한도 없는 사용자가 필터 없이 검색하면, 둘 다 집계된다"
 
     @override
-    def given(self) -> Given[SeedingSession, ManyPresetsAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ManyPresetsAndACaller]:
         return ManyPresetsAndSomeone(besides=1)
 
     @override
@@ -188,7 +188,7 @@ class AnyoneCountsEveryOne(
 
 @dataclass(frozen=True)
 class FilteringByNameKeepsThatOne(
-    Scenario[SeedingSession, ManyPresetsAndACaller, PrometheusQueryPresetAdapter, Searched]
+    Scenario[TestSeedingSession, ManyPresetsAndACaller, PrometheusQueryPresetAdapter, Searched]
 ):
     @override
     def summary(self) -> str:
@@ -199,7 +199,7 @@ class FilteringByNameKeepsThatOne(
         return "이름이 다른 프리셋 셋이 있을 때 이름 필터로 검색하면, 그 이름의 프리셋만 반환된다"
 
     @override
-    def given(self) -> Given[SeedingSession, ManyPresetsAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ManyPresetsAndACaller]:
         return ManyPresetsAndSomeone(besides=2)
 
     @override
@@ -213,7 +213,7 @@ class FilteringByNameKeepsThatOne(
 
 @dataclass(frozen=True)
 class FilteringByCategoryKeepsItsOwn(
-    Scenario[SeedingSession, ManyPresetsAndACaller, PrometheusQueryPresetAdapter, Searched]
+    Scenario[TestSeedingSession, ManyPresetsAndACaller, PrometheusQueryPresetAdapter, Searched]
 ):
     @override
     def summary(self) -> str:
@@ -224,7 +224,7 @@ class FilteringByCategoryKeepsItsOwn(
         return "두 카테고리에 프리셋이 나뉘어 있을 때 한 카테고리 필터로 검색하면, 그 카테고리의 프리셋만 반환된다"
 
     @override
-    def given(self) -> Given[SeedingSession, ManyPresetsAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ManyPresetsAndACaller]:
         return PresetsInTwoCategories()
 
     @override
@@ -238,7 +238,7 @@ class FilteringByCategoryKeepsItsOwn(
 
 @dataclass(frozen=True)
 class OmittingThePageSizeAnswersTen(
-    Scenario[SeedingSession, ManyPresetsAndACaller, PrometheusQueryPresetAdapter, Searched]
+    Scenario[TestSeedingSession, ManyPresetsAndACaller, PrometheusQueryPresetAdapter, Searched]
 ):
     @override
     def summary(self) -> str:
@@ -249,7 +249,7 @@ class OmittingThePageSizeAnswersTen(
         return "프리셋 11개가 있을 때 크기 없이 검색하면, 10건까지 반환되고 다음 페이지가 있다고 응답한다"
 
     @override
-    def given(self) -> Given[SeedingSession, ManyPresetsAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ManyPresetsAndACaller]:
         return ManyPresetsAndSomeone(besides=10)
 
     @override
@@ -263,7 +263,7 @@ class OmittingThePageSizeAnswersTen(
 
 @dataclass(frozen=True)
 class NobodyMayNotSearch(
-    Scenario[SeedingSession, APresetAlone, PrometheusQueryPresetAdapter, Searched]
+    Scenario[TestSeedingSession, APresetAlone, PrometheusQueryPresetAdapter, Searched]
 ):
     @override
     def summary(self) -> str:
@@ -274,7 +274,7 @@ class NobodyMayNotSearch(
         return "프리셋 하나가 있고 사용자 컨텍스트 없이 검색하면, 호출자를 알 수 없어 거부된다"
 
     @override
-    def given(self) -> Given[SeedingSession, APresetAlone]:
+    def given(self) -> Given[TestSeedingSession, APresetAlone]:
         return APresetAndNobody()
 
     @override

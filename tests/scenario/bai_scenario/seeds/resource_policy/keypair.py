@@ -18,7 +18,7 @@ from bai_scenario.seeds.seeder import Naming, TestSeedRow
 
 
 @dataclass(frozen=True)
-class SeedKeypairPolicy(TestSeedRow[KeyPairResourcePolicyData]):
+class TestSeedKeypairPolicy(TestSeedRow[KeyPairResourcePolicyData]):
     """What a keypair is allowed. The session limits a scenario varies live here.
 
     The row also carries an ``is_default`` flag, which decides the policy a keypair

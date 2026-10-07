@@ -43,7 +43,7 @@ from bai_scenario.components.prometheus_query_preset import (
     ThePresetNode,
 )
 from bai_scenario.runner.acting import ActingAs
-from bai_scenario.runner.planting import SeedingSession
+from bai_scenario.runner.planting import TestSeedingSession
 from bai_scenario.runner.steps import run_scenario
 
 RENAMED = "cpu-by-session"
@@ -51,7 +51,7 @@ RETUNED = "sum by (${{group_by}}) (rate(container_cpu_seconds_total{${{labels}}}
 ENFORCEMENT = "manager.rbac.enforcement_enabled"
 
 type EditingStep = Scenario[
-    SeedingSession, APresetAndACaller, PrometheusQueryPresetAdapter, PresetNodeAnswer
+    TestSeedingSession, APresetAndACaller, PrometheusQueryPresetAdapter, PresetNodeAnswer
 ]
 
 
@@ -122,7 +122,7 @@ class Editing(When[APresetAndACaller, PrometheusQueryPresetAdapter, PresetNodeAn
 
 @dataclass(frozen=True)
 class TheSuperadminRetunesTheTemplate(
-    Scenario[SeedingSession, APresetAndACaller, PrometheusQueryPresetAdapter, PresetNodeAnswer]
+    Scenario[TestSeedingSession, APresetAndACaller, PrometheusQueryPresetAdapter, PresetNodeAnswer]
 ):
     started: datetime
 
@@ -135,7 +135,7 @@ class TheSuperadminRetunesTheTemplate(
         return "프리셋 하나가 있고 슈퍼관리자가 템플릿만 수정하면, 템플릿은 새 값이고 나머지는 그대로다"
 
     @override
-    def given(self) -> Given[SeedingSession, APresetAndACaller]:
+    def given(self) -> Given[TestSeedingSession, APresetAndACaller]:
         return APresetAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
@@ -149,7 +149,7 @@ class TheSuperadminRetunesTheTemplate(
 
 @dataclass(frozen=True)
 class ClearingTheDescription(
-    Scenario[SeedingSession, APresetAndACaller, PrometheusQueryPresetAdapter, PresetNodeAnswer]
+    Scenario[TestSeedingSession, APresetAndACaller, PrometheusQueryPresetAdapter, PresetNodeAnswer]
 ):
     started: datetime
 
@@ -162,7 +162,7 @@ class ClearingTheDescription(
         return "설명이 있는 프리셋을 슈퍼관리자가 설명을 비우도록 수정하면, 설명이 없어진다"
 
     @override
-    def given(self) -> Given[SeedingSession, APresetAndACaller]:
+    def given(self) -> Given[TestSeedingSession, APresetAndACaller]:
         return APresetAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
@@ -176,7 +176,7 @@ class ClearingTheDescription(
 
 @dataclass(frozen=True)
 class MovingToAnotherCategory(
-    Scenario[SeedingSession, APresetAndACaller, PrometheusQueryPresetAdapter, PresetNodeAnswer]
+    Scenario[TestSeedingSession, APresetAndACaller, PrometheusQueryPresetAdapter, PresetNodeAnswer]
 ):
     started: datetime
 
@@ -189,7 +189,7 @@ class MovingToAnotherCategory(
         return "카테고리 둘 중 한쪽에 속한 프리셋을 슈퍼관리자가 다른 카테고리로 옮기면, 응답의 카테고리가 그것을 가리킨다"
 
     @override
-    def given(self) -> Given[SeedingSession, APresetAndACaller]:
+    def given(self) -> Given[TestSeedingSession, APresetAndACaller]:
         return APresetInOneOfTwoCategories(role=UserRole.SUPERADMIN)
 
     @override
@@ -203,7 +203,7 @@ class MovingToAnotherCategory(
 
 @dataclass(frozen=True)
 class ChangingOnlyTheFilterLabels(
-    Scenario[SeedingSession, APresetAndACaller, PrometheusQueryPresetAdapter, PresetNodeAnswer]
+    Scenario[TestSeedingSession, APresetAndACaller, PrometheusQueryPresetAdapter, PresetNodeAnswer]
 ):
     started: datetime
 
@@ -219,7 +219,7 @@ class ChangingOnlyTheFilterLabels(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, APresetAndACaller]:
+    def given(self) -> Given[TestSeedingSession, APresetAndACaller]:
         return APresetAndSomeone(
             role=UserRole.SUPERADMIN, filter_labels=("kernel_id",), group_labels=("agent_id",)
         )
@@ -235,7 +235,7 @@ class ChangingOnlyTheFilterLabels(
 
 @dataclass(frozen=True)
 class GivingNothingChangesNothing(
-    Scenario[SeedingSession, APresetAndACaller, PrometheusQueryPresetAdapter, PresetNodeAnswer]
+    Scenario[TestSeedingSession, APresetAndACaller, PrometheusQueryPresetAdapter, PresetNodeAnswer]
 ):
     started: datetime
 
@@ -250,7 +250,7 @@ class GivingNothingChangesNothing(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, APresetAndACaller]:
+    def given(self) -> Given[TestSeedingSession, APresetAndACaller]:
         return APresetAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
@@ -264,7 +264,7 @@ class GivingNothingChangesNothing(
 
 @dataclass(frozen=True)
 class AnUnknownCategoryIsRefused(
-    Scenario[SeedingSession, APresetAndACaller, PrometheusQueryPresetAdapter, PresetNodeAnswer]
+    Scenario[TestSeedingSession, APresetAndACaller, PrometheusQueryPresetAdapter, PresetNodeAnswer]
 ):
     @override
     def summary(self) -> str:
@@ -278,7 +278,7 @@ class AnUnknownCategoryIsRefused(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, APresetAndACaller]:
+    def given(self) -> Given[TestSeedingSession, APresetAndACaller]:
         return APresetAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
@@ -292,7 +292,7 @@ class AnUnknownCategoryIsRefused(
 
 @dataclass(frozen=True)
 class AUserGrantedNothingMayNotEdit(
-    Scenario[SeedingSession, APresetAndACaller, PrometheusQueryPresetAdapter, PresetNodeAnswer]
+    Scenario[TestSeedingSession, APresetAndACaller, PrometheusQueryPresetAdapter, PresetNodeAnswer]
 ):
     @override
     def summary(self) -> str:
@@ -306,7 +306,7 @@ class AUserGrantedNothingMayNotEdit(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, APresetAndACaller]:
+    def given(self) -> Given[TestSeedingSession, APresetAndACaller]:
         return APresetAndSomeone()
 
     @override
@@ -320,7 +320,7 @@ class AUserGrantedNothingMayNotEdit(
 
 @dataclass(frozen=True)
 class EnforcementOffLetsAnyoneEdit(
-    Scenario[SeedingSession, APresetAndACaller, PrometheusQueryPresetAdapter, PresetNodeAnswer],
+    Scenario[TestSeedingSession, APresetAndACaller, PrometheusQueryPresetAdapter, PresetNodeAnswer],
     Configured,
 ):
     started: datetime
@@ -338,7 +338,7 @@ class EnforcementOffLetsAnyoneEdit(
         return {ENFORCEMENT: False}
 
     @override
-    def given(self) -> Given[SeedingSession, APresetAndACaller]:
+    def given(self) -> Given[TestSeedingSession, APresetAndACaller]:
         return APresetAndSomeone()
 
     @override
@@ -352,7 +352,7 @@ class EnforcementOffLetsAnyoneEdit(
 
 @dataclass(frozen=True)
 class AnUnknownIdIsNotFoundForASuperadmin(
-    Scenario[SeedingSession, APresetAndACaller, PrometheusQueryPresetAdapter, PresetNodeAnswer]
+    Scenario[TestSeedingSession, APresetAndACaller, PrometheusQueryPresetAdapter, PresetNodeAnswer]
 ):
     @override
     def summary(self) -> str:
@@ -365,7 +365,7 @@ class AnUnknownIdIsNotFoundForASuperadmin(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, APresetAndACaller]:
+    def given(self) -> Given[TestSeedingSession, APresetAndACaller]:
         return APresetAndSomeone(role=UserRole.SUPERADMIN)
 
     @override

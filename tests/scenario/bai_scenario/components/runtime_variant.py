@@ -44,7 +44,7 @@ from bai_scenario.components.system import (
     lay_a_public_reader,
     role_named,
 )
-from bai_scenario.seeds.runtime_variant.runtime_variant import SeedRuntimeVariant
+from bai_scenario.seeds.runtime_variant.runtime_variant import TestSeedRuntimeVariant
 
 DESCRIBED = "미리 만들어 둔 런타임 변형"
 """시드가 미리 만들어 두는 변형의 설명. 시나리오가 기대값으로 다시 쓰므로 한 곳에 둔다."""
@@ -86,7 +86,7 @@ class AVariantAndSomeone(Given[Any, AVariantAndACaller]):
     @override
     async def lay(self, seeding: Any) -> AVariantAndACaller:
         variant = await seeding.creating(
-            SeedRuntimeVariant(name_hint="variant", description=self.described)
+            TestSeedRuntimeVariant(name_hint="variant", description=self.described)
         )
         caller = await lay_a_public_reader(seeding, RuntimeVariantEntityType(), self.role)
         return AVariantAndACaller(seeding.made(variant), seeding.made(caller))
@@ -106,10 +106,10 @@ class ManyVariantsAndSomeone(Given[Any, ManyVariantsAndACaller]):
     @override
     async def lay(self, seeding: Any) -> ManyVariantsAndACaller:
         wanted = await seeding.creating(
-            SeedRuntimeVariant(name_hint="wanted", description=DESCRIBED)
+            TestSeedRuntimeVariant(name_hint="wanted", description=DESCRIBED)
         )
         others = [
-            await seeding.creating(SeedRuntimeVariant(name_hint="other", description=DESCRIBED))
+            await seeding.creating(TestSeedRuntimeVariant(name_hint="other", description=DESCRIBED))
             for _ in range(self.besides)
         ]
         caller = await lay_a_public_reader(seeding, RuntimeVariantEntityType(), self.role)

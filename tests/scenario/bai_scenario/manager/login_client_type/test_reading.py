@@ -21,11 +21,11 @@ from bai_scenario.components.login_client_type import (
     TheTypeNode,
 )
 from bai_scenario.runner.acting import ActingAs
-from bai_scenario.runner.planting import SeedingSession
+from bai_scenario.runner.planting import TestSeedingSession
 from bai_scenario.runner.steps import run_scenario
 
 type ReadingStep = Scenario[
-    SeedingSession, ATypeAndACaller, LoginClientTypeAdapter, LoginClientTypeNode
+    TestSeedingSession, ATypeAndACaller, LoginClientTypeAdapter, LoginClientTypeNode
 ]
 
 
@@ -54,7 +54,7 @@ class ReadingById(When[ATypeAndACaller, LoginClientTypeAdapter, LoginClientTypeN
 
 @dataclass(frozen=True)
 class AUserGrantedNothingReadsById(
-    Scenario[SeedingSession, ATypeAndACaller, LoginClientTypeAdapter, LoginClientTypeNode]
+    Scenario[TestSeedingSession, ATypeAndACaller, LoginClientTypeAdapter, LoginClientTypeNode]
 ):
     started: datetime
 
@@ -67,7 +67,7 @@ class AUserGrantedNothingReadsById(
         return "아무 권한도 없는 사용자가 id로 조회하면 그 종류 전체가 반환된다. 이 조회는 인증만 확인한다"
 
     @override
-    def given(self) -> Given[SeedingSession, ATypeAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ATypeAndACaller]:
         return ATypeAndSomeone()
 
     @override
@@ -81,7 +81,7 @@ class AUserGrantedNothingReadsById(
 
 @dataclass(frozen=True)
 class AnIdNothingAnswersToIsRefused(
-    Scenario[SeedingSession, ATypeAndACaller, LoginClientTypeAdapter, LoginClientTypeNode]
+    Scenario[TestSeedingSession, ATypeAndACaller, LoginClientTypeAdapter, LoginClientTypeNode]
 ):
     @override
     def summary(self) -> str:
@@ -92,7 +92,7 @@ class AnIdNothingAnswersToIsRefused(
         return "존재하지 않는 id로 조회하면 대상을 찾을 수 없다는 이유로 거부된다"
 
     @override
-    def given(self) -> Given[SeedingSession, ATypeAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ATypeAndACaller]:
         return ATypeAndSomeone()
 
     @override

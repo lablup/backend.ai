@@ -29,9 +29,9 @@ from bai_scenario.components.answers import TheCallIsRefused
 from bai_scenario.components.domain import WAS_HERE, SomeoneOf
 from bai_scenario.components.user import AGrant
 from bai_scenario.runner.acting import ActingAs
-from bai_scenario.runner.planting import SeedingSession
+from bai_scenario.runner.planting import TestSeedingSession
 from bai_scenario.runner.steps import run_scenario
-from bai_scenario.seeds.domain.domain import SeedDomain
+from bai_scenario.seeds.domain.domain import TestSeedDomain
 
 MADE = "made"
 """만들려는 사용자의 이름. 시나리오가 정한 값이다."""
@@ -59,7 +59,7 @@ class SomeoneInADomain(Given[Any, ADomainAndACaller]):
 
     @override
     async def lay(self, seeding: Any) -> ADomainAndACaller:
-        domain = await seeding.creating(SeedDomain(name_hint="home", description=WAS_HERE))
+        domain = await seeding.creating(TestSeedDomain(name_hint="home", description=WAS_HERE))
         caller = await seeding.within(SomeoneOf(domain))
         if self.granted:
             await seeding.within(AGrant.on_domain(domain, caller, Permission.CREATE))
@@ -139,7 +139,7 @@ class BulkCreatingAUser(When[ADomainAndACaller, UserAdapter, Any]):
 
 @dataclass(frozen=True)
 class AUserGrantedNothingMayNotCreateAUser(
-    Scenario[SeedingSession, ADomainAndACaller, UserAdapter, Any]
+    Scenario[TestSeedingSession, ADomainAndACaller, UserAdapter, Any]
 ):
     @override
     def summary(self) -> str:
@@ -150,7 +150,7 @@ class AUserGrantedNothingMayNotCreateAUser(
         return "역할을 받지 않은 사용자가 만들려 하면, 도메인 스코프 권한 문이 막는다"
 
     @override
-    def given(self) -> Given[SeedingSession, ADomainAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ADomainAndACaller]:
         return SomeoneInADomain(granted=False)
 
     @override
@@ -164,7 +164,7 @@ class AUserGrantedNothingMayNotCreateAUser(
 
 @dataclass(frozen=True)
 class ANameNoDomainHoldsMayNotHoldAUser(
-    Scenario[SeedingSession, ADomainAndACaller, UserAdapter, Any]
+    Scenario[TestSeedingSession, ADomainAndACaller, UserAdapter, Any]
 ):
     @override
     def summary(self) -> str:
@@ -178,7 +178,7 @@ class ANameNoDomainHoldsMayNotHoldAUser(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, ADomainAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ADomainAndACaller]:
         return SomeoneInADomain(granted=True)
 
     @override
@@ -191,7 +191,9 @@ class ANameNoDomainHoldsMayNotHoldAUser(
 
 
 @dataclass(frozen=True)
-class OnlyTheSuperadminMayBulkCreate(Scenario[SeedingSession, ADomainAndACaller, UserAdapter, Any]):
+class OnlyTheSuperadminMayBulkCreate(
+    Scenario[TestSeedingSession, ADomainAndACaller, UserAdapter, Any]
+):
     @override
     def summary(self) -> str:
         return "a-user-who-is-not-the-superadmin-may-not-bulk-create-users"
@@ -204,7 +206,7 @@ class OnlyTheSuperadminMayBulkCreate(Scenario[SeedingSession, ADomainAndACaller,
         )
 
     @override
-    def given(self) -> Given[SeedingSession, ADomainAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ADomainAndACaller]:
         return SomeoneInADomain(granted=True)
 
     @override
@@ -218,7 +220,7 @@ class OnlyTheSuperadminMayBulkCreate(Scenario[SeedingSession, ADomainAndACaller,
 
 @dataclass(frozen=True)
 class OnlyTheSuperadminMayBulkCreateWithKeypairs(
-    Scenario[SeedingSession, ADomainAndACaller, UserAdapter, Any]
+    Scenario[TestSeedingSession, ADomainAndACaller, UserAdapter, Any]
 ):
     @override
     def summary(self) -> str:
@@ -229,7 +231,7 @@ class OnlyTheSuperadminMayBulkCreateWithKeypairs(
         return "권한 받은 사용자가 이 일괄 생성을 하려 하면, 전역 역할 문이 막는다"
 
     @override
-    def given(self) -> Given[SeedingSession, ADomainAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ADomainAndACaller]:
         return SomeoneInADomain(granted=True)
 
     @override
@@ -241,7 +243,7 @@ class OnlyTheSuperadminMayBulkCreateWithKeypairs(
         return TheCallIsRefused(InsufficientPrivilege)
 
 
-SCENARIOS: list[Scenario[SeedingSession, Any, UserAdapter, Any]] = [
+SCENARIOS: list[Scenario[TestSeedingSession, Any, UserAdapter, Any]] = [
     AUserGrantedNothingMayNotCreateAUser(),
     ANameNoDomainHoldsMayNotHoldAUser(),
     OnlyTheSuperadminMayBulkCreate(),
@@ -251,7 +253,7 @@ SCENARIOS: list[Scenario[SeedingSession, Any, UserAdapter, Any]] = [
 
 @pytest.mark.parametrize("scenario", SCENARIOS, ids=lambda s: s.summary())
 async def test_creating(
-    scenario: Scenario[SeedingSession, Any, UserAdapter, Any],
+    scenario: Scenario[TestSeedingSession, Any, UserAdapter, Any],
     adapter: UserAdapter,
     engine: ExtendedAsyncSAEngine,
 ) -> None:

@@ -21,11 +21,11 @@ from ai.backend.manager.data.user.types import UserData
 from ai.backend.testutils.scenario_steps import Given
 from bai_scenario.components.domain import WAS_HERE, SomeoneOf
 from bai_scenario.components.system import role_named
-from bai_scenario.seeds.agent.agent import SeedAgent
-from bai_scenario.seeds.domain.domain import SeedDomain
-from bai_scenario.seeds.rbac.role import SeedPermission, SeedRole
-from bai_scenario.seeds.resource_group.resource_group import SeedResourceGroup
-from bai_scenario.seeds.seeder import Laid, Seeder, TestSeedNest
+from bai_scenario.seeds.agent.agent import TestSeedAgent
+from bai_scenario.seeds.domain.domain import TestSeedDomain
+from bai_scenario.seeds.rbac.role import TestSeedPermission, TestSeedRole
+from bai_scenario.seeds.resource_group.resource_group import TestSeedResourceGroup
+from bai_scenario.seeds.seeder import Laid, TestSeeder, TestSeedNest
 
 
 @dataclass(frozen=True)
@@ -65,12 +65,14 @@ class SomeoneReadingAgentsIn(TestSeedNest[Laid[UserData]]):
         return "리소스 그룹의 에이전트 조회 권한을 받은 사용자 준비"
 
     @override
-    def lay(self, seed: Seeder) -> Laid[UserData]:
+    def lay(self, seed: TestSeeder) -> Laid[UserData]:
         someone = seed.within(SomeoneOf(self.domain))
         role = seed.creating_from(
-            SeedRole(lambda g: ResourceGroupID(g.id), name_hint="agent-reader"), self.group
+            TestSeedRole(lambda g: ResourceGroupID(g.id), name_hint="agent-reader"), self.group
         )
-        seed.adding(SeedPermission(entity_type=AgentEntityType(), permission=Permission.READ), role)
+        seed.adding(
+            TestSeedPermission(entity_type=AgentEntityType(), permission=Permission.READ), role
+        )
         seed.granting(role, someone, role_id=lambda r: r.id, user_id=lambda u: UserID(u.id))
         return someone
 
@@ -90,9 +92,9 @@ class AnAgentAndSomeone(Given[Any, AnAgentAndACaller]):
 
     @override
     async def lay(self, seeding: Any) -> AnAgentAndACaller:
-        group = await seeding.creating(SeedResourceGroup())
-        agent = await seeding.creating_from(SeedAgent(), group)
-        home = await seeding.creating(SeedDomain(name_hint="home", description=WAS_HERE))
+        group = await seeding.creating(TestSeedResourceGroup())
+        agent = await seeding.creating_from(TestSeedAgent(), group)
+        home = await seeding.creating(TestSeedDomain(name_hint="home", description=WAS_HERE))
         if self.granted:
             caller = await seeding.within(SomeoneReadingAgentsIn(home, group))
         else:
@@ -113,11 +115,11 @@ class TwoAgentsAndSomeoneReadingOne(Given[Any, TwoAgentsAndACaller]):
 
     @override
     async def lay(self, seeding: Any) -> TwoAgentsAndACaller:
-        mine = await seeding.creating(SeedResourceGroup(name_hint="mine"))
-        readable = await seeding.creating_from(SeedAgent(name_hint="readable"), mine)
-        elsewhere = await seeding.creating(SeedResourceGroup(name_hint="elsewhere"))
-        other = await seeding.creating_from(SeedAgent(name_hint="other"), elsewhere)
-        home = await seeding.creating(SeedDomain(name_hint="home", description=WAS_HERE))
+        mine = await seeding.creating(TestSeedResourceGroup(name_hint="mine"))
+        readable = await seeding.creating_from(TestSeedAgent(name_hint="readable"), mine)
+        elsewhere = await seeding.creating(TestSeedResourceGroup(name_hint="elsewhere"))
+        other = await seeding.creating_from(TestSeedAgent(name_hint="other"), elsewhere)
+        home = await seeding.creating(TestSeedDomain(name_hint="home", description=WAS_HERE))
         caller = await seeding.within(SomeoneReadingAgentsIn(home, mine))
         return TwoAgentsAndACaller(
             readable=AnAgent(agent_id=readable.name, agent_uuid=seeding.made(readable)),

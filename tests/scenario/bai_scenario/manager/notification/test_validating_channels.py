@@ -27,11 +27,11 @@ from bai_scenario.components.notification import (
     TheValidatedChannelId,
 )
 from bai_scenario.runner.acting import ActingAs
-from bai_scenario.runner.planting import SeedingSession
+from bai_scenario.runner.planting import TestSeedingSession
 from bai_scenario.runner.steps import run_scenario
 
 type Validated = ValidateNotificationChannelPayload
-type ValidatingStep = Scenario[SeedingSession, AChannelAndACaller, NotificationAdapter, Any]
+type ValidatingStep = Scenario[TestSeedingSession, AChannelAndACaller, NotificationAdapter, Any]
 
 TEST_MESSAGE = "scenario test message"
 
@@ -63,7 +63,7 @@ class Validating(When[AChannelAndACaller, NotificationAdapter, Validated]):
 
 @dataclass(frozen=True)
 class TheSuperadminValidatesAWebhookChannel(
-    Scenario[SeedingSession, AChannelAndACaller, NotificationAdapter, Validated]
+    Scenario[TestSeedingSession, AChannelAndACaller, NotificationAdapter, Validated]
 ):
     @override
     def summary(self) -> str:
@@ -74,7 +74,7 @@ class TheSuperadminValidatesAWebhookChannel(
         return "webhook 채널 하나가 있고 슈퍼관리자가 시험 메시지로 검증하면 검증한 채널의 id가 반환된다"
 
     @override
-    def given(self) -> Given[SeedingSession, AChannelAndACaller]:
+    def given(self) -> Given[TestSeedingSession, AChannelAndACaller]:
         return AChannelAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
@@ -88,7 +88,7 @@ class TheSuperadminValidatesAWebhookChannel(
 
 @dataclass(frozen=True)
 class TheSuperadminValidatingAnUnknownIdIsNotFound(
-    Scenario[SeedingSession, AChannelAndACaller, NotificationAdapter, Validated]
+    Scenario[TestSeedingSession, AChannelAndACaller, NotificationAdapter, Validated]
 ):
     @override
     def summary(self) -> str:
@@ -99,7 +99,7 @@ class TheSuperadminValidatingAnUnknownIdIsNotFound(
         return "슈퍼관리자가 존재하지 않는 id를 검증하면 대상을 찾을 수 없다는 이유로 거부된다"
 
     @override
-    def given(self) -> Given[SeedingSession, AChannelAndACaller]:
+    def given(self) -> Given[TestSeedingSession, AChannelAndACaller]:
         return AChannelAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
@@ -113,7 +113,7 @@ class TheSuperadminValidatingAnUnknownIdIsNotFound(
 
 @dataclass(frozen=True)
 class AUserGrantedNothingMayNotValidate(
-    Scenario[SeedingSession, AChannelAndACaller, NotificationAdapter, Validated]
+    Scenario[TestSeedingSession, AChannelAndACaller, NotificationAdapter, Validated]
 ):
     @override
     def summary(self) -> str:
@@ -124,7 +124,7 @@ class AUserGrantedNothingMayNotValidate(
         return "아무 권한도 없는 사용자가 검증하려 하면 권한 부족으로 거부된다"
 
     @override
-    def given(self) -> Given[SeedingSession, AChannelAndACaller]:
+    def given(self) -> Given[TestSeedingSession, AChannelAndACaller]:
         return AChannelAndSomeone()
 
     @override

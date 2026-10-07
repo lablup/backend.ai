@@ -33,7 +33,7 @@ from ai.backend.testutils.scenario_steps import (
 )
 from bai_scenario.components.domain import WrittenByThisRun
 from bai_scenario.components.system import KEPT, Kept, lay_a_caller, role_named
-from bai_scenario.seeds.client_ip_masking.policy import SeedClientIPMaskingPolicy
+from bai_scenario.seeds.client_ip_masking.policy import TestSeedClientIPMaskingPolicy
 
 IPV4 = 24
 IPV6 = 48
@@ -71,7 +71,7 @@ class AMaskingPolicyAndSomeone(Given[Any, AMaskingPolicyAndACaller]):
     @override
     async def lay(self, seeding: Any) -> AMaskingPolicyAndACaller:
         policy = await seeding.creating(
-            SeedClientIPMaskingPolicy(
+            TestSeedClientIPMaskingPolicy(
                 target_type=self.target, mode=self.mode, ipv4_prefix=IPV4, ipv6_prefix=IPV6
             )
         )
@@ -92,10 +92,10 @@ class TwoMaskingPoliciesAndSomeone(Given[Any, ManyMaskingPoliciesAndACaller]):
     @override
     async def lay(self, seeding: Any) -> ManyMaskingPoliciesAndACaller:
         wanted = await seeding.creating(
-            SeedClientIPMaskingPolicy(target_type=ClientIPMaskingTarget.DEFAULT)
+            TestSeedClientIPMaskingPolicy(target_type=ClientIPMaskingTarget.DEFAULT)
         )
         other = await seeding.creating(
-            SeedClientIPMaskingPolicy(target_type=ClientIPMaskingTarget.LOGIN_HISTORY)
+            TestSeedClientIPMaskingPolicy(target_type=ClientIPMaskingTarget.LOGIN_HISTORY)
         )
         caller = await lay_a_caller(seeding, self.role)
         return ManyMaskingPoliciesAndACaller(

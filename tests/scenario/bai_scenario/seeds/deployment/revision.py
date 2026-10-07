@@ -18,7 +18,7 @@ from bai_scenario.seeds.seeder import TestSeedFieldCreator
 
 
 @dataclass(frozen=True)
-class SeedRevisionOf(TestSeedFieldCreator[DeploymentInfo, ModelRevisionData]):
+class TestSeedRevisionOf(TestSeedFieldCreator[DeploymentInfo, ModelRevisionData]):
     """One revision of the deployment, numbered one past its last.
 
     The image, folder, runtime and group are values earlier rows answered; this seed

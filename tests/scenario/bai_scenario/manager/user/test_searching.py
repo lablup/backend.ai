@@ -50,19 +50,19 @@ from bai_scenario.components.answers import TheCallIsRefused
 from bai_scenario.components.domain import WAS_HERE, SomeoneOf
 from bai_scenario.components.user import AGrant
 from bai_scenario.runner.acting import ActingAs
-from bai_scenario.runner.planting import SeedingSession
+from bai_scenario.runner.planting import TestSeedingSession
 from bai_scenario.runner.steps import run_scenario
-from bai_scenario.seeds.domain.domain import SeedDomain
-from bai_scenario.seeds.project.project import SeedProject
-from bai_scenario.seeds.rbac.role import SeedRole
-from bai_scenario.seeds.resource_policy.keypair import SeedKeypairPolicy
-from bai_scenario.seeds.resource_policy.project import SeedProjectPolicy
-from bai_scenario.seeds.resource_policy.user import SeedUserPolicy
-from bai_scenario.seeds.seeder import Laid, Seeder, TestSeedNest
-from bai_scenario.seeds.user.user import SeedUserOf
+from bai_scenario.seeds.domain.domain import TestSeedDomain
+from bai_scenario.seeds.project.project import TestSeedProject
+from bai_scenario.seeds.rbac.role import TestSeedRole
+from bai_scenario.seeds.resource_policy.keypair import TestSeedKeypairPolicy
+from bai_scenario.seeds.resource_policy.project import TestSeedProjectPolicy
+from bai_scenario.seeds.resource_policy.user import TestSeedUserPolicy
+from bai_scenario.seeds.seeder import Laid, TestSeeder, TestSeedNest
+from bai_scenario.seeds.user.user import TestSeedUserOf
 
 type Answer = SearchUsersPayload | AdminSearchUsersPayload
-type SearchStep = Scenario[SeedingSession, Any, UserAdapter, Answer]
+type SearchStep = Scenario[TestSeedingSession, Any, UserAdapter, Answer]
 
 NO_SUCH_DOMAIN = "no-such-domain"
 
@@ -105,13 +105,13 @@ class SomeoneInADomain(Given[Any, AnAskerAndWhomTheyReach]):
 
     @override
     async def lay(self, seeding: Any) -> AnAskerAndWhomTheyReach:
-        home = await seeding.creating(SeedDomain(name_hint="home", description=WAS_HERE))
+        home = await seeding.creating(TestSeedDomain(name_hint="home", description=WAS_HERE))
         reached = []
         other_domain = None
         if self.with_neighbours:
             reached.append(await seeding.within(SomeoneOf(home)))
             other_domain = await seeding.creating(
-                SeedDomain(name_hint="other", description=WAS_HERE)
+                TestSeedDomain(name_hint="other", description=WAS_HERE)
             )
             await seeding.within(SomeoneOf(other_domain))
         caller = await seeding.within(SomeoneOf(home, role=self.role))
@@ -138,7 +138,7 @@ class ManyUsersAndTheSuperadmin(Given[Any, AnAskerAndWhomTheyReach]):
 
     @override
     async def lay(self, seeding: Any) -> AnAskerAndWhomTheyReach:
-        home = await seeding.creating(SeedDomain(name_hint="home", description=WAS_HERE))
+        home = await seeding.creating(TestSeedDomain(name_hint="home", description=WAS_HERE))
         users = [await seeding.within(SomeoneOf(home)) for _ in range(self.count)]
         caller = await seeding.within(SomeoneOf(home, role=UserRole.SUPERADMIN))
         return AnAskerAndWhomTheyReach(
@@ -159,12 +159,15 @@ class SomeoneDeletedOf(TestSeedNest[Laid[UserData]]):
         return "도메인에 속한 삭제 상태 사용자 한 명 준비"
 
     @override
-    def lay(self, seed: Seeder) -> Laid[UserData]:
-        seed.once(SeedProjectPolicy())
-        policy = seed.creating(SeedUserPolicy())
-        key_policy = seed.creating(SeedKeypairPolicy())
+    def lay(self, seed: TestSeeder) -> Laid[UserData]:
+        seed.once(TestSeedProjectPolicy())
+        policy = seed.creating(TestSeedUserPolicy())
+        key_policy = seed.creating(TestSeedKeypairPolicy())
         return seed.provisioning(
-            SeedUserOf(is_active=False, status=UserStatus.DELETED), self.domain, policy, key_policy
+            TestSeedUserOf(is_active=False, status=UserStatus.DELETED),
+            self.domain,
+            policy,
+            key_policy,
         )
 
 
@@ -178,7 +181,7 @@ class AnActiveAndADeletedUser(Given[Any, AnAskerAndWhomTheyReach]):
 
     @override
     async def lay(self, seeding: Any) -> AnAskerAndWhomTheyReach:
-        home = await seeding.creating(SeedDomain(name_hint="home", description=WAS_HERE))
+        home = await seeding.creating(TestSeedDomain(name_hint="home", description=WAS_HERE))
         active = await seeding.within(SomeoneOf(home))
         deleted = await seeding.within(SomeoneDeletedOf(home))
         caller = await seeding.within(SomeoneOf(home, role=UserRole.SUPERADMIN))
@@ -212,11 +215,11 @@ class TwoUsersOneHoldingARole(Given[Any, AnAskerAndWhomTheyReach]):
 
     @override
     async def lay(self, seeding: Any) -> AnAskerAndWhomTheyReach:
-        home = await seeding.creating(SeedDomain(name_hint="home", description=WAS_HERE))
+        home = await seeding.creating(TestSeedDomain(name_hint="home", description=WAS_HERE))
         holder = await seeding.within(SomeoneOf(home))
         await seeding.within(SomeoneOf(home))
         role = await seeding.creating_from(
-            SeedRole(lambda one: one.id, name_hint="holder-role"), home
+            TestSeedRole(lambda one: one.id, name_hint="holder-role"), home
         )
         await seeding.granting(
             role, holder, role_id=lambda one: one.id, user_id=lambda one: UserID(one.id)
@@ -242,9 +245,11 @@ class AProjectAndSomeone(Given[Any, AnAskerAndWhomTheyReach]):
 
     @override
     async def lay(self, seeding: Any) -> AnAskerAndWhomTheyReach:
-        home = await seeding.creating(SeedDomain(name_hint="home", description=WAS_HERE))
-        policy = await seeding.once(SeedProjectPolicy())
-        project = await seeding.creating_from_two(SeedProject(name_hint="research"), home, policy)
+        home = await seeding.creating(TestSeedDomain(name_hint="home", description=WAS_HERE))
+        policy = await seeding.once(TestSeedProjectPolicy())
+        project = await seeding.creating_from_two(
+            TestSeedProject(name_hint="research"), home, policy
+        )
         caller = await seeding.within(SomeoneOf(home))
         return AnAskerAndWhomTheyReach(
             caller=seeding.made(caller),
@@ -270,9 +275,11 @@ class AProjectWithAMember(Given[Any, AnAskerAndWhomTheyReach]):
 
     @override
     async def lay(self, seeding: Any) -> AnAskerAndWhomTheyReach:
-        home = await seeding.creating(SeedDomain(name_hint="home", description=WAS_HERE))
-        policy = await seeding.once(SeedProjectPolicy())
-        project = await seeding.creating_from_two(SeedProject(name_hint="research"), home, policy)
+        home = await seeding.creating(TestSeedDomain(name_hint="home", description=WAS_HERE))
+        policy = await seeding.once(TestSeedProjectPolicy())
+        project = await seeding.creating_from_two(
+            TestSeedProject(name_hint="research"), home, policy
+        )
         member = await seeding.within(SomeoneOf(home))
         await seeding.joining(
             project, member, project_id=lambda one: ProjectID(one.id), user_id=_user_id
@@ -308,10 +315,12 @@ class TwoScopes(Given[Any, AnAskerAndWhomTheyReach]):
 
     @override
     async def lay(self, seeding: Any) -> AnAskerAndWhomTheyReach:
-        home = await seeding.creating(SeedDomain(name_hint="home", description=WAS_HERE))
-        other = await seeding.creating(SeedDomain(name_hint="other", description=WAS_HERE))
-        policy = await seeding.once(SeedProjectPolicy())
-        project = await seeding.creating_from_two(SeedProject(name_hint="research"), other, policy)
+        home = await seeding.creating(TestSeedDomain(name_hint="home", description=WAS_HERE))
+        other = await seeding.creating(TestSeedDomain(name_hint="other", description=WAS_HERE))
+        policy = await seeding.once(TestSeedProjectPolicy())
+        project = await seeding.creating_from_two(
+            TestSeedProject(name_hint="research"), other, policy
+        )
         member = await seeding.within(SomeoneOf(other))
         await seeding.joining(
             project, member, project_id=lambda one: ProjectID(one.id), user_id=_user_id
@@ -692,7 +701,7 @@ class TheOffsetPageWithStatuses(Then[AnAskerAndWhomTheyReach, Answer]):
 
 
 @dataclass(frozen=True)
-class TheSuperadminCountsDeletedUsersToo(Scenario[SeedingSession, Any, UserAdapter, Answer]):
+class TheSuperadminCountsDeletedUsersToo(Scenario[TestSeedingSession, Any, UserAdapter, Answer]):
     @override
     def summary(self) -> str:
         return "the-superadmin-searching-every-user-counts-deleted-ones-too"
@@ -705,7 +714,7 @@ class TheSuperadminCountsDeletedUsersToo(Scenario[SeedingSession, Any, UserAdapt
         )
 
     @override
-    def given(self) -> Given[SeedingSession, Any]:
+    def given(self) -> Given[TestSeedingSession, Any]:
         return AnActiveAndADeletedUser()
 
     @override
@@ -719,7 +728,7 @@ class TheSuperadminCountsDeletedUsersToo(Scenario[SeedingSession, Any, UserAdapt
 
 @dataclass(frozen=True)
 class TheSuperadminSearchesEveryUserWithoutPaging(
-    Scenario[SeedingSession, Any, UserAdapter, Answer]
+    Scenario[TestSeedingSession, Any, UserAdapter, Answer]
 ):
     @override
     def summary(self) -> str:
@@ -733,7 +742,7 @@ class TheSuperadminSearchesEveryUserWithoutPaging(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, Any]:
+    def given(self) -> Given[TestSeedingSession, Any]:
         return ManyUsersAndTheSuperadmin(count=11)
 
     @override
@@ -746,7 +755,7 @@ class TheSuperadminSearchesEveryUserWithoutPaging(
 
 
 @dataclass(frozen=True)
-class OnlyTheSuperadminSearchesEveryUser(Scenario[SeedingSession, Any, UserAdapter, Answer]):
+class OnlyTheSuperadminSearchesEveryUser(Scenario[TestSeedingSession, Any, UserAdapter, Answer]):
     @override
     def summary(self) -> str:
         return "a-user-who-is-not-the-superadmin-may-not-search-every-user"
@@ -756,7 +765,7 @@ class OnlyTheSuperadminSearchesEveryUser(Scenario[SeedingSession, Any, UserAdapt
         return "도메인 스코프 권한을 받은 사용자라도 전체 검색을 하려 하면, 전역 역할 문이 막는다"
 
     @override
-    def given(self) -> Given[SeedingSession, Any]:
+    def given(self) -> Given[TestSeedingSession, Any]:
         return SomeoneInADomain(granted=True)
 
     @override
@@ -769,7 +778,9 @@ class OnlyTheSuperadminSearchesEveryUser(Scenario[SeedingSession, Any, UserAdapt
 
 
 @dataclass(frozen=True)
-class OnlyTheSuperadminSearchesEveryUserByGql(Scenario[SeedingSession, Any, UserAdapter, Answer]):
+class OnlyTheSuperadminSearchesEveryUserByGql(
+    Scenario[TestSeedingSession, Any, UserAdapter, Answer]
+):
     @override
     def summary(self) -> str:
         return "a-user-who-is-not-the-superadmin-may-not-gql-search-every-user"
@@ -779,7 +790,7 @@ class OnlyTheSuperadminSearchesEveryUserByGql(Scenario[SeedingSession, Any, User
         return "권한 받은 사용자가 GQL 전체 검색을 하려 하면, 전역 역할 문이 막는다"
 
     @override
-    def given(self) -> Given[SeedingSession, Any]:
+    def given(self) -> Given[TestSeedingSession, Any]:
         return SomeoneInADomain(granted=True)
 
     @override
@@ -792,7 +803,7 @@ class OnlyTheSuperadminSearchesEveryUserByGql(Scenario[SeedingSession, Any, User
 
 
 @dataclass(frozen=True)
-class TheSuperadminSearchesByRole(Scenario[SeedingSession, Any, UserAdapter, Answer]):
+class TheSuperadminSearchesByRole(Scenario[TestSeedingSession, Any, UserAdapter, Answer]):
     @override
     def summary(self) -> str:
         return "the-superadmin-searching-by-role-finds-only-its-holders"
@@ -805,7 +816,7 @@ class TheSuperadminSearchesByRole(Scenario[SeedingSession, Any, UserAdapter, Ans
         )
 
     @override
-    def given(self) -> Given[SeedingSession, Any]:
+    def given(self) -> Given[TestSeedingSession, Any]:
         return TwoUsersOneHoldingARole(role=UserRole.SUPERADMIN)
 
     @override
@@ -818,7 +829,7 @@ class TheSuperadminSearchesByRole(Scenario[SeedingSession, Any, UserAdapter, Ans
 
 
 @dataclass(frozen=True)
-class AGrantedUserSearchesByRole(Scenario[SeedingSession, Any, UserAdapter, Answer]):
+class AGrantedUserSearchesByRole(Scenario[TestSeedingSession, Any, UserAdapter, Answer]):
     @override
     def summary(self) -> str:
         return "a-user-granted-on-the-role-scope-searching-by-role-finds-only-its-holders"
@@ -831,7 +842,7 @@ class AGrantedUserSearchesByRole(Scenario[SeedingSession, Any, UserAdapter, Answ
         )
 
     @override
-    def given(self) -> Given[SeedingSession, Any]:
+    def given(self) -> Given[TestSeedingSession, Any]:
         return TwoUsersOneHoldingARole(role=UserRole.USER)
 
     @override
@@ -844,7 +855,7 @@ class AGrantedUserSearchesByRole(Scenario[SeedingSession, Any, UserAdapter, Answ
 
 
 @dataclass(frozen=True)
-class AUserGrantedNothingMayNotSearchByRole(Scenario[SeedingSession, Any, UserAdapter, Answer]):
+class AUserGrantedNothingMayNotSearchByRole(Scenario[TestSeedingSession, Any, UserAdapter, Answer]):
     @override
     def summary(self) -> str:
         return "a-user-granted-nothing-may-not-search-by-role"
@@ -854,7 +865,7 @@ class AUserGrantedNothingMayNotSearchByRole(Scenario[SeedingSession, Any, UserAd
         return "아무 권한도 받지 않은 사용자가 역할로 훑으려 하면, 스코프 권한 문이 막는다"
 
     @override
-    def given(self) -> Given[SeedingSession, Any]:
+    def given(self) -> Given[TestSeedingSession, Any]:
         return TwoUsersOneHoldingARole(role=UserRole.USER, granted=False)
 
     @override
@@ -867,7 +878,7 @@ class AUserGrantedNothingMayNotSearchByRole(Scenario[SeedingSession, Any, UserAd
 
 
 @dataclass(frozen=True)
-class AGrantedUserSearchesTheirDomain(Scenario[SeedingSession, Any, UserAdapter, Answer]):
+class AGrantedUserSearchesTheirDomain(Scenario[TestSeedingSession, Any, UserAdapter, Answer]):
     @override
     def summary(self) -> str:
         return "a-user-granted-on-a-domain-searching-it-by-name-finds-only-its-users"
@@ -880,7 +891,7 @@ class AGrantedUserSearchesTheirDomain(Scenario[SeedingSession, Any, UserAdapter,
         )
 
     @override
-    def given(self) -> Given[SeedingSession, Any]:
+    def given(self) -> Given[TestSeedingSession, Any]:
         return SomeoneInADomain(granted=True, with_neighbours=True)
 
     @override
@@ -893,7 +904,9 @@ class AGrantedUserSearchesTheirDomain(Scenario[SeedingSession, Any, UserAdapter,
 
 
 @dataclass(frozen=True)
-class AUserGrantedNothingMayNotSearchADomain(Scenario[SeedingSession, Any, UserAdapter, Answer]):
+class AUserGrantedNothingMayNotSearchADomain(
+    Scenario[TestSeedingSession, Any, UserAdapter, Answer]
+):
     @override
     def summary(self) -> str:
         return "a-user-granted-nothing-may-not-search-a-domain-by-name"
@@ -903,7 +916,7 @@ class AUserGrantedNothingMayNotSearchADomain(Scenario[SeedingSession, Any, UserA
         return "역할을 받지 않은 사용자가 도메인 이름으로 훑으려 하면, 스코프 권한 문이 막는다"
 
     @override
-    def given(self) -> Given[SeedingSession, Any]:
+    def given(self) -> Given[TestSeedingSession, Any]:
         return SomeoneInADomain()
 
     @override
@@ -916,7 +929,7 @@ class AUserGrantedNothingMayNotSearchADomain(Scenario[SeedingSession, Any, UserA
 
 
 @dataclass(frozen=True)
-class ADomainNameNothingAnswersToIsNotFound(Scenario[SeedingSession, Any, UserAdapter, Answer]):
+class ADomainNameNothingAnswersToIsNotFound(Scenario[TestSeedingSession, Any, UserAdapter, Answer]):
     @override
     def summary(self) -> str:
         return "searching-a-domain-name-nothing-answers-to-is-not-found"
@@ -929,7 +942,7 @@ class ADomainNameNothingAnswersToIsNotFound(Scenario[SeedingSession, Any, UserAd
         )
 
     @override
-    def given(self) -> Given[SeedingSession, Any]:
+    def given(self) -> Given[TestSeedingSession, Any]:
         return SomeoneInADomain(granted=True)
 
     @override
@@ -942,7 +955,7 @@ class ADomainNameNothingAnswersToIsNotFound(Scenario[SeedingSession, Any, UserAd
 
 
 @dataclass(frozen=True)
-class AGrantedUserSearchesTheirDomainByGql(Scenario[SeedingSession, Any, UserAdapter, Answer]):
+class AGrantedUserSearchesTheirDomainByGql(Scenario[TestSeedingSession, Any, UserAdapter, Answer]):
     @override
     def summary(self) -> str:
         return "a-user-granted-on-a-domain-gql-searching-it-finds-only-its-users"
@@ -952,7 +965,7 @@ class AGrantedUserSearchesTheirDomainByGql(Scenario[SeedingSession, Any, UserAda
         return "같은 권한으로 GQL 도메인 검색을 하면, 그 도메인 사용자만 커서 답으로 온다"
 
     @override
-    def given(self) -> Given[SeedingSession, Any]:
+    def given(self) -> Given[TestSeedingSession, Any]:
         return SomeoneInADomain(granted=True, with_neighbours=True)
 
     @override
@@ -965,7 +978,9 @@ class AGrantedUserSearchesTheirDomainByGql(Scenario[SeedingSession, Any, UserAda
 
 
 @dataclass(frozen=True)
-class AUserGrantedNothingMayNotGqlSearchADomain(Scenario[SeedingSession, Any, UserAdapter, Answer]):
+class AUserGrantedNothingMayNotGqlSearchADomain(
+    Scenario[TestSeedingSession, Any, UserAdapter, Answer]
+):
     @override
     def summary(self) -> str:
         return "a-user-granted-nothing-may-not-gql-search-a-domain"
@@ -975,7 +990,7 @@ class AUserGrantedNothingMayNotGqlSearchADomain(Scenario[SeedingSession, Any, Us
         return "역할 없이 GQL 도메인 검색을 하면, 스코프 권한 문이 막는다"
 
     @override
-    def given(self) -> Given[SeedingSession, Any]:
+    def given(self) -> Given[TestSeedingSession, Any]:
         return SomeoneInADomain()
 
     @override
@@ -988,7 +1003,9 @@ class AUserGrantedNothingMayNotGqlSearchADomain(Scenario[SeedingSession, Any, Us
 
 
 @dataclass(frozen=True)
-class AUserGrantedNothingMayNotSearchAProject(Scenario[SeedingSession, Any, UserAdapter, Answer]):
+class AUserGrantedNothingMayNotSearchAProject(
+    Scenario[TestSeedingSession, Any, UserAdapter, Answer]
+):
     @override
     def summary(self) -> str:
         return "a-user-granted-nothing-may-not-search-a-project"
@@ -998,7 +1015,7 @@ class AUserGrantedNothingMayNotSearchAProject(Scenario[SeedingSession, Any, User
         return "역할 없이 프로젝트 검색을 하면, 스코프 권한 문이 막는다"
 
     @override
-    def given(self) -> Given[SeedingSession, Any]:
+    def given(self) -> Given[TestSeedingSession, Any]:
         return AProjectAndSomeone()
 
     @override
@@ -1012,7 +1029,7 @@ class AUserGrantedNothingMayNotSearchAProject(Scenario[SeedingSession, Any, User
 
 @dataclass(frozen=True)
 class AUserGrantedNothingMayNotGqlSearchAProject(
-    Scenario[SeedingSession, Any, UserAdapter, Answer]
+    Scenario[TestSeedingSession, Any, UserAdapter, Answer]
 ):
     @override
     def summary(self) -> str:
@@ -1023,7 +1040,7 @@ class AUserGrantedNothingMayNotGqlSearchAProject(
         return "역할 없이 GQL 프로젝트 검색을 하면, 스코프 권한 문이 막는다"
 
     @override
-    def given(self) -> Given[SeedingSession, Any]:
+    def given(self) -> Given[TestSeedingSession, Any]:
         return AProjectAndSomeone()
 
     @override
@@ -1036,7 +1053,9 @@ class AUserGrantedNothingMayNotGqlSearchAProject(
 
 
 @dataclass(frozen=True)
-class OneUngrantedScopeRefusesTheScopedSearch(Scenario[SeedingSession, Any, UserAdapter, Answer]):
+class OneUngrantedScopeRefusesTheScopedSearch(
+    Scenario[TestSeedingSession, Any, UserAdapter, Answer]
+):
     @override
     def summary(self) -> str:
         return "one-scope-without-a-grant-refuses-the-whole-scoped-search"
@@ -1046,7 +1065,7 @@ class OneUngrantedScopeRefusesTheScopedSearch(Scenario[SeedingSession, Any, User
         return "첫 스코프에만 READ를 받은 사용자가 두 스코프를 함께 주면, 스코프 권한 문이 전체를 막는다"
 
     @override
-    def given(self) -> Given[SeedingSession, Any]:
+    def given(self) -> Given[TestSeedingSession, Any]:
         return TwoScopes(both=False)
 
     @override
@@ -1060,7 +1079,7 @@ class OneUngrantedScopeRefusesTheScopedSearch(Scenario[SeedingSession, Any, User
 
 @dataclass(frozen=True)
 class OneUngrantedScopeRefusesTheGqlScopedSearch(
-    Scenario[SeedingSession, Any, UserAdapter, Answer]
+    Scenario[TestSeedingSession, Any, UserAdapter, Answer]
 ):
     @override
     def summary(self) -> str:
@@ -1073,7 +1092,7 @@ class OneUngrantedScopeRefusesTheGqlScopedSearch(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, Any]:
+    def given(self) -> Given[TestSeedingSession, Any]:
         return TwoScopes(both=False)
 
     @override
@@ -1086,7 +1105,9 @@ class OneUngrantedScopeRefusesTheGqlScopedSearch(
 
 
 @dataclass(frozen=True)
-class AScopedSearchWithoutPagingAnswersFifty(Scenario[SeedingSession, Any, UserAdapter, Answer]):
+class AScopedSearchWithoutPagingAnswersFifty(
+    Scenario[TestSeedingSession, Any, UserAdapter, Answer]
+):
     @override
     def summary(self) -> str:
         return "a-scoped-search-without-page-arguments-answers-up-to-fifty"
@@ -1096,7 +1117,7 @@ class AScopedSearchWithoutPagingAnswersFifty(Scenario[SeedingSession, Any, UserA
         return "권한 받은 사용자가 페이지 인자 없이 스코프 검색을 하면, limit 50 offset 0이 답에 실린다"
 
     @override
-    def given(self) -> Given[SeedingSession, Any]:
+    def given(self) -> Given[TestSeedingSession, Any]:
         return SomeoneInADomain(granted=True)
 
     @override
@@ -1109,7 +1130,7 @@ class AScopedSearchWithoutPagingAnswersFifty(Scenario[SeedingSession, Any, UserA
 
 
 @dataclass(frozen=True)
-class AGrantedUserSearchesTheRoster(Scenario[SeedingSession, Any, UserAdapter, Answer]):
+class AGrantedUserSearchesTheRoster(Scenario[TestSeedingSession, Any, UserAdapter, Answer]):
     @override
     def summary(self) -> str:
         return "a-user-granted-on-a-project-searching-it-finds-only-its-roster"
@@ -1122,7 +1143,7 @@ class AGrantedUserSearchesTheRoster(Scenario[SeedingSession, Any, UserAdapter, A
         )
 
     @override
-    def given(self) -> Given[SeedingSession, Any]:
+    def given(self) -> Given[TestSeedingSession, Any]:
         return AProjectWithAMember()
 
     @override
@@ -1135,7 +1156,7 @@ class AGrantedUserSearchesTheRoster(Scenario[SeedingSession, Any, UserAdapter, A
 
 
 @dataclass(frozen=True)
-class AGrantedUserSearchesTheRosterByGql(Scenario[SeedingSession, Any, UserAdapter, Answer]):
+class AGrantedUserSearchesTheRosterByGql(Scenario[TestSeedingSession, Any, UserAdapter, Answer]):
     @override
     def summary(self) -> str:
         return "a-user-granted-on-a-project-gql-searching-it-finds-only-its-roster"
@@ -1145,7 +1166,7 @@ class AGrantedUserSearchesTheRosterByGql(Scenario[SeedingSession, Any, UserAdapt
         return "같은 권한으로 GQL 프로젝트 검색을 하면, 명부의 사용자만 커서 답으로 온다"
 
     @override
-    def given(self) -> Given[SeedingSession, Any]:
+    def given(self) -> Given[TestSeedingSession, Any]:
         return AProjectWithAMember()
 
     @override
@@ -1158,7 +1179,7 @@ class AGrantedUserSearchesTheRosterByGql(Scenario[SeedingSession, Any, UserAdapt
 
 
 @dataclass(frozen=True)
-class TwoGrantedScopesAreJoined(Scenario[SeedingSession, Any, UserAdapter, Answer]):
+class TwoGrantedScopesAreJoined(Scenario[TestSeedingSession, Any, UserAdapter, Answer]):
     @override
     def summary(self) -> str:
         return "a-scoped-search-over-two-granted-scopes-joins-their-users"
@@ -1171,7 +1192,7 @@ class TwoGrantedScopesAreJoined(Scenario[SeedingSession, Any, UserAdapter, Answe
         )
 
     @override
-    def given(self) -> Given[SeedingSession, Any]:
+    def given(self) -> Given[TestSeedingSession, Any]:
         return TwoScopes(both=True)
 
     @override
@@ -1184,7 +1205,7 @@ class TwoGrantedScopesAreJoined(Scenario[SeedingSession, Any, UserAdapter, Answe
 
 
 @dataclass(frozen=True)
-class TwoGrantedScopesAreJoinedByGql(Scenario[SeedingSession, Any, UserAdapter, Answer]):
+class TwoGrantedScopesAreJoinedByGql(Scenario[TestSeedingSession, Any, UserAdapter, Answer]):
     @override
     def summary(self) -> str:
         return "a-gql-scoped-search-over-two-granted-scopes-joins-their-users"
@@ -1194,7 +1215,7 @@ class TwoGrantedScopesAreJoinedByGql(Scenario[SeedingSession, Any, UserAdapter, 
         return "같은 권한으로 GQL 스코프 검색을 하면, 두 스코프 사용자가 커서 답으로 온다"
 
     @override
-    def given(self) -> Given[SeedingSession, Any]:
+    def given(self) -> Given[TestSeedingSession, Any]:
         return TwoScopes(both=True)
 
     @override

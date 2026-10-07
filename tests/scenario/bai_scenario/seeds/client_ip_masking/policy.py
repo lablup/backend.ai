@@ -12,7 +12,7 @@ from bai_scenario.seeds.seeder import Naming, TestSeedRow
 
 
 @dataclass(frozen=True)
-class SeedClientIPMaskingPolicy(TestSeedRow[ClientIPMaskingPolicyData]):
+class TestSeedClientIPMaskingPolicy(TestSeedRow[ClientIPMaskingPolicyData]):
     """The one policy of a target. Its name is the target, which the manager fixes."""
 
     target_type: ClientIPMaskingTarget = ClientIPMaskingTarget.DEFAULT

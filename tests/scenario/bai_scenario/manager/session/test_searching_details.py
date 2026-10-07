@@ -41,15 +41,15 @@ from ai.backend.testutils.scenario_steps import (
 from bai_scenario.components.answers import MissingResponse
 from bai_scenario.components.resource_allocation import Granted, lay_a_caller_of, lay_a_place
 from bai_scenario.runner.acting import ActingAs
-from bai_scenario.runner.planting import SeedingSession
+from bai_scenario.runner.planting import TestSeedingSession
 from bai_scenario.runner.steps import run_scenario
-from bai_scenario.seeds.agent.agent import SeedAgent
+from bai_scenario.seeds.agent.agent import TestSeedAgent
 from bai_scenario.seeds.seeder import Naming, TestSeedRowFromTwo
-from bai_scenario.seeds.session.session import SeedSession
+from bai_scenario.seeds.session.session import TestSeedSession
 
 
 @dataclass(frozen=True)
-class SeedSessionGroup(TestSeedRowFromTwo[ProjectData, UserData, SessionGroupData]):
+class TestSeedSessionGroup(TestSeedRowFromTwo[ProjectData, UserData, SessionGroupData]):
     @override
     def kind(self) -> str:
         return "세션 그룹"
@@ -72,7 +72,7 @@ class SeedSessionGroup(TestSeedRowFromTwo[ProjectData, UserData, SessionGroupDat
 
 
 @dataclass(frozen=True, kw_only=True)
-class SeedSessionWithSchedulingConditions(SeedSession):
+class TestSeedSessionWithSchedulingConditions(TestSeedSession):
     image_id: ImageID
     session_group_id: SessionGroupID
     designated_agents: tuple[AgentId, ...]
@@ -123,7 +123,7 @@ class ASessionAndACaller:
 
 
 @dataclass(frozen=True)
-class ASessionToRead(Given[SeedingSession, ASessionAndACaller]):
+class ASessionToRead(Given[TestSeedingSession, ASessionAndACaller]):
     configured: bool
 
     @override
@@ -132,14 +132,16 @@ class ASessionToRead(Given[SeedingSession, ASessionAndACaller]):
         return f"세션 그룹, designated_agent_ids, requested_starts_at의 {detail} 세션과 슈퍼관리자"
 
     @override
-    async def lay(self, seeding: SeedingSession) -> ASessionAndACaller:
+    async def lay(self, seeding: TestSeedingSession) -> ASessionAndACaller:
         place = await lay_a_place(seeding, slots=0)
-        session_seed: SeedSession = SeedSession(access_key=place.access_key)
+        session_seed: TestSeedSession = TestSeedSession(access_key=place.access_key)
         if self.configured:
-            group = await seeding.creating_from_two(SeedSessionGroup(), place.project, place.owner)
-            first_agent = await seeding.creating_from(SeedAgent(), place.group)
-            second_agent = await seeding.creating_from(SeedAgent(), place.group)
-            session_seed = SeedSessionWithSchedulingConditions(
+            group = await seeding.creating_from_two(
+                TestSeedSessionGroup(), place.project, place.owner
+            )
+            first_agent = await seeding.creating_from(TestSeedAgent(), place.group)
+            second_agent = await seeding.creating_from(TestSeedAgent(), place.group)
+            session_seed = TestSeedSessionWithSchedulingConditions(
                 access_key=place.access_key,
                 image_id=ImageID(seeding.made(place.image).id),
                 session_group_id=seeding.made(group).id,
@@ -252,7 +254,7 @@ class TheWholeSessionIsReturned(Then[ASessionAndACaller, AdminSearchSessionsPayl
 
 @dataclass(frozen=True)
 class SessionSchedulingConditionsArePreserved(
-    Scenario[SeedingSession, ASessionAndACaller, SessionAdapter, AdminSearchSessionsPayload]
+    Scenario[TestSeedingSession, ASessionAndACaller, SessionAdapter, AdminSearchSessionsPayload]
 ):
     configured: bool
 
@@ -267,7 +269,7 @@ class SessionSchedulingConditionsArePreserved(
         return f"슈퍼관리자가 {detail} 세션 스케줄링 조건을 읽으면 기존 세션 정보와 함께 유지된다"
 
     @override
-    def given(self) -> Given[SeedingSession, ASessionAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ASessionAndACaller]:
         return ASessionToRead(configured=self.configured)
 
     @override

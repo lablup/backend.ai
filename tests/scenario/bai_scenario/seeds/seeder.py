@@ -58,7 +58,7 @@ from ai.backend.manager.repositories.ops.v2.user.write import (
     FullUserCreator,
     FullUserCreatorResult,
 )
-from bai_scenario.seeds.ops import SeedOps
+from bai_scenario.seeds.ops import TestSeedOps
 
 type WriteSpec[D] = (
     GlobalEntityCreator[Any, D]
@@ -77,6 +77,8 @@ type Naming = Callable[[str], str]
 
 class TestSeed(ABC):
     """What the report says about one row a scenario lays."""
+
+    __test__ = False
 
     @abstractmethod
     def kind(self) -> str:
@@ -150,6 +152,8 @@ class TestSeedFieldWithNestedRows[A, D: FieldData](ABC):
     :class:`TestSeedFieldCreator`, the row's name and report line come from the owner it is laid under.
     """
 
+    __test__ = False
+
     @abstractmethod
     def kind(self) -> str:
         """이 필드를 가진 주인이 무엇을 할 수 있게 되는지."""
@@ -174,9 +178,11 @@ class TestSeedNest[D](ABC):
     단위가 행 하나가 아니라 "폴더를 만들 수 있는 사용자" 같은 전제다. 무엇을 준비하는지는
     ``kind``가 말하고, 어떤 seed와 어떤 nest를 딛는지는 ``lay`` 안이 보여준다.
 
-    ``Seeder``를 받지만 그 입구가 전부 seed 객체를 요구하므로, nest가 행을 직접 쓰는
+    ``TestSeeder``를 받지만 그 입구가 전부 seed 객체를 요구하므로, nest가 행을 직접 쓰는
     길은 없다.
     """
+
+    __test__ = False
 
     @abstractmethod
     def kind(self) -> str:
@@ -184,7 +190,7 @@ class TestSeedNest[D](ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def lay(self, seed: Seeder) -> D:
+    def lay(self, seed: TestSeeder) -> D:
         raise NotImplementedError
 
 
@@ -194,6 +200,8 @@ class TestSeedField[A, D: FieldData](ABC):
     A field grants nothing of its own and dies with its owner, so it is never laid on
     its own: the owner comes with it, and its name with the owner.
     """
+
+    __test__ = False
 
     @abstractmethod
     def kind(self) -> str:
@@ -205,7 +213,7 @@ class TestSeedField[A, D: FieldData](ABC):
         raise NotImplementedError
 
     @abstractmethod
-    async def write(self, ops: SeedOps, owner_id: Any) -> D:
+    async def write(self, ops: TestSeedOps, owner_id: Any) -> D:
         raise NotImplementedError
 
 
@@ -217,7 +225,7 @@ class TestSeedFieldCreator[A, D: FieldData](TestSeedField[A, D]):
         raise NotImplementedError
 
     @override
-    async def write(self, ops: SeedOps, owner_id: Any) -> D:
+    async def write(self, ops: TestSeedOps, owner_id: Any) -> D:
         return await ops.create_field(owner_id, self.seed())
 
 
@@ -229,7 +237,7 @@ class TestSeedFieldUpserter[A, D: FieldData](TestSeedField[A, D]):
         raise NotImplementedError
 
     @override
-    async def write(self, ops: SeedOps, owner_id: Any) -> D:
+    async def write(self, ops: TestSeedOps, owner_id: Any) -> D:
         return await ops.upsert_field_entity(owner_id, self.seed())
 
 
@@ -240,6 +248,8 @@ class TestSeedLink[S, T](ABC):
     to a domain, a project, or a user's keypair, and the session's scope has to find it
     on one of those three paths.
     """
+
+    __test__ = False
 
     @abstractmethod
     def kind(self) -> str:
@@ -264,6 +274,8 @@ class TestSeedShareAcceptance[A](ABC):
 
     The settle and the share it grants are one operation, and a seed takes it whole.
     """
+
+    __test__ = False
 
     @abstractmethod
     def kind(self) -> str:
@@ -294,7 +306,7 @@ class Laid[D]:
     states: str
     """What laying this row establishes, as a sentence, for the report."""
     sources: tuple[Laid[Any], ...]
-    write: Callable[[SeedOps, Sequence[Any]], Awaitable[D]]
+    write: Callable[[TestSeedOps, Sequence[Any]], Awaitable[D]]
 
 
 SKEW: Final = timedelta(seconds=30)
@@ -320,7 +332,7 @@ def _states(sentence: str, detail: str) -> str:
     return f"{sentence}: {detail}" if detail else sentence
 
 
-async def _write(ops: SeedOps, spec: WriteSpec[Any]) -> Any:
+async def _write(ops: TestSeedOps, spec: WriteSpec[Any]) -> Any:
     """Run one spec down the ops path its own type calls for."""
     if isinstance(spec, RoleManagedGlobalEntityCreator):
         return await ops.create_role_managed_global_entity(spec)
@@ -338,12 +350,14 @@ async def _write(ops: SeedOps, spec: WriteSpec[Any]) -> Any:
 
 
 @dataclass
-class Seeder:
+class TestSeeder:
     """The rows one scenario lays, and the names it gives them.
 
     A scenario builder is handed a fresh one, so the numbering restarts at every row of
     the table and a name says which row of this scenario made it.
     """
+
+    __test__ = False
 
     _counts: dict[str, int] = field(default_factory=dict)
     _laid: list[Laid[Any]] = field(default_factory=list)
@@ -397,7 +411,7 @@ class Seeder:
         """Lay a row that needs nothing but its own name."""
         name = seed.name(self.name)
 
-        async def write(ops: SeedOps, values: Sequence[Any]) -> Any:
+        async def write(ops: TestSeedOps, values: Sequence[Any]) -> Any:
             return await _write(ops, seed.seed(name))
 
         return self._remember(self._given(seed, name, (), write, _there_is(seed, name)))
@@ -406,7 +420,7 @@ class Seeder:
         """Lay a row that reads one row laid before it."""
         name = seed.name(self.name)
 
-        async def write(ops: SeedOps, values: Sequence[Any]) -> Any:
+        async def write(ops: TestSeedOps, values: Sequence[Any]) -> Any:
             return await _write(ops, seed.seed(name, values[0]))
 
         return self._remember(self._given(seed, name, (a,), write, _there_is(seed, name)))
@@ -417,7 +431,7 @@ class Seeder:
         """Lay a row that reads two rows laid before it."""
         name = seed.name(self.name)
 
-        async def write(ops: SeedOps, values: Sequence[Any]) -> Any:
+        async def write(ops: TestSeedOps, values: Sequence[Any]) -> Any:
             return await _write(ops, seed.seed(name, values[0], values[1]))
 
         return self._remember(self._given(seed, name, (a, b), write, _there_is(seed, name)))
@@ -428,7 +442,7 @@ class Seeder:
         """Lay a row that reads three rows laid before it."""
         name = seed.name(self.name)
 
-        async def write(ops: SeedOps, values: Sequence[Any]) -> Any:
+        async def write(ops: TestSeedOps, values: Sequence[Any]) -> Any:
             return await _write(ops, seed.seed(name, values[0], values[1], values[2]))
 
         return self._remember(self._given(seed, name, (a, b, c), write, _there_is(seed, name)))
@@ -444,10 +458,10 @@ class Seeder:
         """Provision what the manager provisions as one operation."""
         name = seed.name(self.name)
 
-        async def provision(ops: SeedOps, values: Sequence[Any]) -> FullUserCreatorResult:
+        async def provision(ops: TestSeedOps, values: Sequence[Any]) -> FullUserCreatorResult:
             return await ops.create_user(seed.seed(name, *values))
 
-        async def user(ops: SeedOps, values: Sequence[Any]) -> UserData:
+        async def user(ops: TestSeedOps, values: Sequence[Any]) -> UserData:
             return cast("FullUserCreatorResult", values[0]).user
 
         provisioned = self._given(seed, name, (a, b, c), provision, _there_is(seed, name))
@@ -459,7 +473,7 @@ class Seeder:
         """The personal project provisioning made for this user. It writes nothing of its own."""
         provisioned = self._provisioned[user]
 
-        async def project(ops: SeedOps, values: Sequence[Any]) -> ProjectData:
+        async def project(ops: TestSeedOps, values: Sequence[Any]) -> ProjectData:
             return cast("FullUserCreatorResult", values[0]).personal_project
 
         return Laid(
@@ -475,7 +489,7 @@ class Seeder:
     def adding[A, D: FieldData](self, seed: TestSeedField[A, D], owner: Laid[A], /) -> Laid[D]:
         """Lay one field row under the owner the scenario already laid."""
 
-        async def write(ops: SeedOps, values: Sequence[Any]) -> Any:
+        async def write(ops: TestSeedOps, values: Sequence[Any]) -> Any:
             return await seed.write(ops, seed.owner_id(values[0]))
 
         return self._remember(
@@ -495,7 +509,7 @@ class Seeder:
     ) -> Laid[D]:
         """Lay one field row and the rows it owns, in the one write a monitor uses."""
 
-        async def write(ops: SeedOps, values: Sequence[Any]) -> Any:
+        async def write(ops: TestSeedOps, values: Sequence[Any]) -> Any:
             created = await ops.atomic_create_fields_with_nested(
                 [FieldToCreate(owner_id=seed.owner_id(values[0]), creator=seed.field())],
                 list(seed.nested()),
@@ -519,7 +533,7 @@ class Seeder:
     ) -> Laid[None]:
         """Link the two rows this scenario laid, the way an operator would."""
 
-        async def write(ops: SeedOps, values: Sequence[Any]) -> None:
+        async def write(ops: TestSeedOps, values: Sequence[Any]) -> None:
             await ops.create_relations(
                 seed.seed(), [(seed.scope_id(values[0]), seed.target_id(values[1]))]
             )
@@ -541,7 +555,7 @@ class Seeder:
     ) -> Laid[EntityShareData]:
         """Take the offer the way its recipient would."""
 
-        async def write(ops: SeedOps, values: Sequence[Any]) -> EntityShareData:
+        async def write(ops: TestSeedOps, values: Sequence[Any]) -> EntityShareData:
             taken = await ops.accept_share(seed.seed(values[0]))
             if taken is None:
                 raise LookupError("the offer was not open to its recipient")
@@ -569,7 +583,7 @@ class Seeder:
     ) -> Laid[None]:
         """Give the user the role, the way an operator would."""
 
-        async def write(ops: SeedOps, values: Sequence[Any]) -> None:
+        async def write(ops: TestSeedOps, values: Sequence[Any]) -> None:
             await ops.grant_roles(user_id(values[1]), [role_id(values[0])])
 
         return self._remember(
@@ -594,7 +608,7 @@ class Seeder:
     ) -> Laid[None]:
         """Put the user on the project's roster, the way an operator would."""
 
-        async def write(ops: SeedOps, values: Sequence[Any]) -> None:
+        async def write(ops: TestSeedOps, values: Sequence[Any]) -> None:
             await ops.join_member(project_id(values[0]), user_id(values[1]))
 
         return self._remember(
@@ -614,7 +628,7 @@ class Seeder:
         seed: TestSeed,
         name: str,
         sources: Sequence[Laid[Any]],
-        write: Callable[[SeedOps, Sequence[Any]], Awaitable[D]],
+        write: Callable[[TestSeedOps, Sequence[Any]], Awaitable[D]],
         sentence: str,
     ) -> Laid[D]:
         return Laid(
@@ -628,7 +642,7 @@ class Seeder:
         )
 
 
-async def lay(ops: SeedOps, wanted: Sequence[Laid[Any]], made: dict[Laid[Any], Any]) -> None:
+async def lay(ops: TestSeedOps, wanted: Sequence[Laid[Any]], made: dict[Laid[Any], Any]) -> None:
     """Write every row the wanted rows rest on, each once, in this session.
 
     What has been written is carried in ``made`` rather than answered, so a caller that

@@ -26,12 +26,12 @@ from bai_scenario.components.prometheus_query_preset_category import (
     TheCategoryNode,
 )
 from bai_scenario.runner.acting import ActingAs
-from bai_scenario.runner.planting import SeedingSession
+from bai_scenario.runner.planting import TestSeedingSession
 from bai_scenario.runner.steps import run_scenario
 
 type Adapter = PrometheusQueryPresetCategoryAdapter
-type ReadingStep = Scenario[SeedingSession, ACategoryAndACaller, Adapter, CategoryNodeAnswer]
-type NobodyStep = Scenario[SeedingSession, ACategoryAlone, Adapter, CategoryNodeAnswer]
+type ReadingStep = Scenario[TestSeedingSession, ACategoryAndACaller, Adapter, CategoryNodeAnswer]
+type NobodyStep = Scenario[TestSeedingSession, ACategoryAlone, Adapter, CategoryNodeAnswer]
 
 
 @dataclass(frozen=True)
@@ -77,7 +77,7 @@ class ReadingAsNobody(When[ACategoryAlone, Adapter, CategoryNodeAnswer]):
 
 @dataclass(frozen=True)
 class AUserGrantedNothingReadsIt(
-    Scenario[SeedingSession, ACategoryAndACaller, Adapter, CategoryNodeAnswer]
+    Scenario[TestSeedingSession, ACategoryAndACaller, Adapter, CategoryNodeAnswer]
 ):
     started: datetime
 
@@ -90,7 +90,7 @@ class AUserGrantedNothingReadsIt(
         return "카테고리 하나가 있고 아무 권한도 없는 사용자가 id로 조회하면, 그 카테고리 전체가 반환된다"
 
     @override
-    def given(self) -> Given[SeedingSession, ACategoryAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ACategoryAndACaller]:
         return ACategoryAndSomeone()
 
     @override
@@ -104,7 +104,7 @@ class AUserGrantedNothingReadsIt(
 
 @dataclass(frozen=True)
 class AnUnknownIdIsNotFound(
-    Scenario[SeedingSession, ACategoryAndACaller, Adapter, CategoryNodeAnswer]
+    Scenario[TestSeedingSession, ACategoryAndACaller, Adapter, CategoryNodeAnswer]
 ):
     @override
     def summary(self) -> str:
@@ -118,7 +118,7 @@ class AnUnknownIdIsNotFound(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, ACategoryAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ACategoryAndACaller]:
         return ACategoryAndSomeone()
 
     @override
@@ -131,7 +131,7 @@ class AnUnknownIdIsNotFound(
 
 
 @dataclass(frozen=True)
-class NobodyMayNotRead(Scenario[SeedingSession, ACategoryAlone, Adapter, CategoryNodeAnswer]):
+class NobodyMayNotRead(Scenario[TestSeedingSession, ACategoryAlone, Adapter, CategoryNodeAnswer]):
     @override
     def summary(self) -> str:
         return "a-call-carrying-no-user-may-not-read-a-category"
@@ -143,7 +143,7 @@ class NobodyMayNotRead(Scenario[SeedingSession, ACategoryAlone, Adapter, Categor
         )
 
     @override
-    def given(self) -> Given[SeedingSession, ACategoryAlone]:
+    def given(self) -> Given[TestSeedingSession, ACategoryAlone]:
         return ACategoryAndNobody()
 
     @override

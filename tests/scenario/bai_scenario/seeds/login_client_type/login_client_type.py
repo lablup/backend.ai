@@ -11,7 +11,7 @@ from bai_scenario.seeds.seeder import Naming, TestSeedRow
 
 
 @dataclass(frozen=True)
-class SeedLoginClientType(TestSeedRow[LoginClientTypeData]):
+class TestSeedLoginClientType(TestSeedRow[LoginClientTypeData]):
     """A login client type in the global catalog."""
 
     name_hint: str = "client"

@@ -27,7 +27,7 @@ SMTP_PASSWORD = "scenario-smtp-password"
 
 
 @dataclass(frozen=True)
-class SeedWebhookChannel(TestSeedRowFrom[UserData, NotificationChannelData]):
+class TestSeedWebhookChannel(TestSeedRowFrom[UserData, NotificationChannelData]):
     """A channel that posts to a webhook. Created by the user laid before it."""
 
     name_hint: str = "channel"
@@ -62,7 +62,7 @@ class SeedWebhookChannel(TestSeedRowFrom[UserData, NotificationChannelData]):
 
 
 @dataclass(frozen=True)
-class SeedEmailChannel(TestSeedRowFrom[UserData, NotificationChannelData]):
+class TestSeedEmailChannel(TestSeedRowFrom[UserData, NotificationChannelData]):
     """A channel that mails through an SMTP server. Created by the user laid before it."""
 
     name_hint: str = "mail-channel"

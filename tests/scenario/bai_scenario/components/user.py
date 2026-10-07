@@ -23,8 +23,8 @@ from ai.backend.manager.data.project.types import ProjectData
 from ai.backend.manager.data.user.types import UserData
 from ai.backend.testutils.scenario_steps import Condition, Held, Same, SameAs, Skipped, Verdict
 from bai_scenario.components.domain import WrittenByThisRun
-from bai_scenario.seeds.rbac.role import SeedPermission, SeedRole
-from bai_scenario.seeds.seeder import Laid, Seeder, TestSeedNest
+from bai_scenario.seeds.rbac.role import TestSeedPermission, TestSeedRole
+from bai_scenario.seeds.seeder import Laid, TestSeeder, TestSeedNest
 
 
 @dataclass(frozen=True)
@@ -62,10 +62,12 @@ class AGrant(TestSeedNest[Laid[None]]):
         return f"사용자 {names} 권한을 준 역할 배정"
 
     @override
-    def lay(self, seed: Seeder) -> Laid[None]:
-        role = seed.creating_from(SeedRole(self.scope_of, name_hint="user-role"), self.scope)
+    def lay(self, seed: TestSeeder) -> Laid[None]:
+        role = seed.creating_from(TestSeedRole(self.scope_of, name_hint="user-role"), self.scope)
         for permission in self.permissions:
-            seed.adding(SeedPermission(entity_type=UserEntityType(), permission=permission), role)
+            seed.adding(
+                TestSeedPermission(entity_type=UserEntityType(), permission=permission), role
+            )
         return seed.granting(
             role, self.to, role_id=lambda one: one.id, user_id=lambda one: UserID(one.id)
         )

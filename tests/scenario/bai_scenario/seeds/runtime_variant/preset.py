@@ -18,7 +18,7 @@ from bai_scenario.seeds.seeder import Naming, TestSeedRowFrom
 
 
 @dataclass(frozen=True)
-class SeedRuntimeVariantPreset(TestSeedRowFrom[RuntimeVariantData, RuntimeVariantPresetData]):
+class TestSeedRuntimeVariantPreset(TestSeedRowFrom[RuntimeVariantData, RuntimeVariantPresetData]):
     """A preset of the variant laid before it. The insert ranks it last in that variant."""
 
     name_hint: str = "preset"

@@ -39,11 +39,13 @@ from ai.backend.testutils.scenario_steps import (
 from bai_scenario.components.answers import TheCallIsRefused
 from bai_scenario.components.app_config_allow_list import AnEntryAndACaller, AnEntryAndSomeone
 from bai_scenario.runner.acting import ActingAs
-from bai_scenario.runner.planting import SeedingSession
+from bai_scenario.runner.planting import TestSeedingSession
 from bai_scenario.runner.steps import run_scenario
 
 type Purged = PurgeAppConfigAllowListPayload
-type PurgingStep = Scenario[SeedingSession, AnEntryAndACaller, AppConfigAllowListAdapter, Purged]
+type PurgingStep = Scenario[
+    TestSeedingSession, AnEntryAndACaller, AppConfigAllowListAdapter, Purged
+]
 
 
 @dataclass(frozen=True)
@@ -91,7 +93,7 @@ class ThePurgedOneIsNamed(Then[AnEntryAndACaller, Purged]):
 
 @dataclass(frozen=True)
 class TheSuperadminPurgesIt(
-    Scenario[SeedingSession, AnEntryAndACaller, AppConfigAllowListAdapter, Purged]
+    Scenario[TestSeedingSession, AnEntryAndACaller, AppConfigAllowListAdapter, Purged]
 ):
     @override
     def summary(self) -> str:
@@ -102,7 +104,7 @@ class TheSuperadminPurgesIt(
         return "설정 조각이 없는 allow_list를 슈퍼관리자가 영구 삭제하면, 삭제한 allow_list의 ID가 반환된다"
 
     @override
-    def given(self) -> Given[SeedingSession, AnEntryAndACaller]:
+    def given(self) -> Given[TestSeedingSession, AnEntryAndACaller]:
         return AnEntryAndSomeone(opened=AppConfigScopeType.USER, role=UserRole.SUPERADMIN)
 
     @override
@@ -116,7 +118,7 @@ class TheSuperadminPurgesIt(
 
 @dataclass(frozen=True)
 class AFragmentDoesNotBlockIt(
-    Scenario[SeedingSession, AnEntryAndACaller, AppConfigAllowListAdapter, Purged]
+    Scenario[TestSeedingSession, AnEntryAndACaller, AppConfigAllowListAdapter, Purged]
 ):
     @override
     def summary(self) -> str:
@@ -127,7 +129,7 @@ class AFragmentDoesNotBlockIt(
         return "설정 조각이 있는 allow_list를 슈퍼관리자가 영구 삭제하면, 설정 조각이 막지 않고 allow_list의 ID가 반환된다"
 
     @override
-    def given(self) -> Given[SeedingSession, AnEntryAndACaller]:
+    def given(self) -> Given[TestSeedingSession, AnEntryAndACaller]:
         return AnEntryAndSomeone(role=UserRole.SUPERADMIN, with_fragment=True)
 
     @override
@@ -141,7 +143,7 @@ class AFragmentDoesNotBlockIt(
 
 @dataclass(frozen=True)
 class AUserGrantedNothingMayNotPurge(
-    Scenario[SeedingSession, AnEntryAndACaller, AppConfigAllowListAdapter, Purged]
+    Scenario[TestSeedingSession, AnEntryAndACaller, AppConfigAllowListAdapter, Purged]
 ):
     @override
     def summary(self) -> str:
@@ -152,7 +154,7 @@ class AUserGrantedNothingMayNotPurge(
         return "같은 allow_list를 권한이 없는 일반 사용자가 영구 삭제하면, 엔티티 삭제 권한이 없어 거부된다"
 
     @override
-    def given(self) -> Given[SeedingSession, AnEntryAndACaller]:
+    def given(self) -> Given[TestSeedingSession, AnEntryAndACaller]:
         return AnEntryAndSomeone(opened=AppConfigScopeType.USER)
 
     @override
@@ -166,7 +168,7 @@ class AUserGrantedNothingMayNotPurge(
 
 @dataclass(frozen=True)
 class AnUnknownIdIsNotFoundForASuperadmin(
-    Scenario[SeedingSession, AnEntryAndACaller, AppConfigAllowListAdapter, Purged]
+    Scenario[TestSeedingSession, AnEntryAndACaller, AppConfigAllowListAdapter, Purged]
 ):
     @override
     def summary(self) -> str:
@@ -179,7 +181,7 @@ class AnUnknownIdIsNotFoundForASuperadmin(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, AnEntryAndACaller]:
+    def given(self) -> Given[TestSeedingSession, AnEntryAndACaller]:
         return AnEntryAndSomeone(role=UserRole.SUPERADMIN)
 
     @override

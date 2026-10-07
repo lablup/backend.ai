@@ -22,7 +22,7 @@ SCOPE_NAMES = {
 
 
 @dataclass(frozen=True)
-class SeedAllowListEntry(TestSeedRowFrom[AppConfigDefinitionData, AppConfigAllowListData]):
+class TestSeedAllowListEntry(TestSeedRowFrom[AppConfigDefinitionData, AppConfigAllowListData]):
     """The entry opening the given definition's name to one scope kind.
 
     The row carries no name of its own; the seeder's name only tells the rows apart in

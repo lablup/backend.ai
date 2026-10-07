@@ -24,11 +24,11 @@ from bai_scenario.components.resource_group import (
     TheGroupNode,
 )
 from bai_scenario.runner.acting import ActingAs
-from bai_scenario.runner.planting import SeedingSession
+from bai_scenario.runner.planting import TestSeedingSession
 from bai_scenario.runner.steps import run_scenario
 
 type RetiringStep = Scenario[
-    SeedingSession, AGroupAndACaller, ResourceGroupAdapter, ResourceGroupDetailNode
+    TestSeedingSession, AGroupAndACaller, ResourceGroupAdapter, ResourceGroupDetailNode
 ]
 
 UNKNOWN = "no-such-group"
@@ -59,7 +59,7 @@ class Purging(When[AGroupAndACaller, ResourceGroupAdapter, ResourceGroupDetailNo
 
 @dataclass(frozen=True)
 class TheSuperadminPurgesAGroup(
-    Scenario[SeedingSession, AGroupAndACaller, ResourceGroupAdapter, ResourceGroupDetailNode]
+    Scenario[TestSeedingSession, AGroupAndACaller, ResourceGroupAdapter, ResourceGroupDetailNode]
 ):
     started: datetime
 
@@ -72,7 +72,7 @@ class TheSuperadminPurgesAGroup(
         return "리소스 그룹 하나가 있고 슈퍼관리자가 완전 삭제하면 지운 그룹 전체가 반환된다"
 
     @override
-    def given(self) -> Given[SeedingSession, AGroupAndACaller]:
+    def given(self) -> Given[TestSeedingSession, AGroupAndACaller]:
         return AGroupAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
@@ -86,7 +86,7 @@ class TheSuperadminPurgesAGroup(
 
 @dataclass(frozen=True)
 class AUserGrantedHardDeleteOnTheGroupPurgesIt(
-    Scenario[SeedingSession, AGroupAndACaller, ResourceGroupAdapter, ResourceGroupDetailNode]
+    Scenario[TestSeedingSession, AGroupAndACaller, ResourceGroupAdapter, ResourceGroupDetailNode]
 ):
     started: datetime
 
@@ -99,7 +99,7 @@ class AUserGrantedHardDeleteOnTheGroupPurgesIt(
         return "그 그룹에 앉힌 역할로 완전 삭제 권한을 받은 사용자가 완전 삭제하면 지운 그룹 전체가 반환된다"
 
     @override
-    def given(self) -> Given[SeedingSession, AGroupAndACaller]:
+    def given(self) -> Given[TestSeedingSession, AGroupAndACaller]:
         return AGroupAndSomeone(granted=Permission.HARD_DELETE)
 
     @override
@@ -113,7 +113,7 @@ class AUserGrantedHardDeleteOnTheGroupPurgesIt(
 
 @dataclass(frozen=True)
 class AUserGrantedNothingMayNotPurge(
-    Scenario[SeedingSession, AGroupAndACaller, ResourceGroupAdapter, ResourceGroupDetailNode]
+    Scenario[TestSeedingSession, AGroupAndACaller, ResourceGroupAdapter, ResourceGroupDetailNode]
 ):
     @override
     def summary(self) -> str:
@@ -124,7 +124,7 @@ class AUserGrantedNothingMayNotPurge(
         return "아무 권한도 없는 사용자가 완전 삭제하려 하면 권한 부족으로 거부된다"
 
     @override
-    def given(self) -> Given[SeedingSession, AGroupAndACaller]:
+    def given(self) -> Given[TestSeedingSession, AGroupAndACaller]:
         return AGroupAndSomeone()
 
     @override
@@ -138,7 +138,7 @@ class AUserGrantedNothingMayNotPurge(
 
 @dataclass(frozen=True)
 class TheSuperadminPurgingAnUnknownNameIsNotFound(
-    Scenario[SeedingSession, AGroupAndACaller, ResourceGroupAdapter, ResourceGroupDetailNode]
+    Scenario[TestSeedingSession, AGroupAndACaller, ResourceGroupAdapter, ResourceGroupDetailNode]
 ):
     @override
     def summary(self) -> str:
@@ -151,7 +151,7 @@ class TheSuperadminPurgingAnUnknownNameIsNotFound(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, AGroupAndACaller]:
+    def given(self) -> Given[TestSeedingSession, AGroupAndACaller]:
         return AGroupAndSomeone(role=UserRole.SUPERADMIN)
 
     @override

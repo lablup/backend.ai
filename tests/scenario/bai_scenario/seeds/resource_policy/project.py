@@ -15,7 +15,7 @@ from bai_scenario.seeds.seeder import Naming, TestSeedRow
 
 
 @dataclass(frozen=True)
-class SeedProjectPolicy(TestSeedRow[ProjectResourcePolicyData]):
+class TestSeedProjectPolicy(TestSeedRow[ProjectResourcePolicyData]):
     """프로젝트가 무엇을 허용받는지.
 
     이름은 시더가 아니라 매니저가 정한다. 사용자를 만들면 개인 프로젝트가 딸려 만들어지고,
@@ -58,7 +58,7 @@ class SeedProjectPolicy(TestSeedRow[ProjectResourcePolicyData]):
 
 
 @dataclass(frozen=True)
-class SeedNamedProjectPolicy(TestSeedRow[ProjectResourcePolicyData]):
+class TestSeedNamedProjectPolicy(TestSeedRow[ProjectResourcePolicyData]):
     """A project policy under a name of its own. No personal project looks for it, so a
     scenario that reads, edits or purges a project policy targets this one."""
 

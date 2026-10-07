@@ -16,7 +16,7 @@ from bai_scenario.seeds.seeder import TestSeedFieldCreator
 
 
 @dataclass(frozen=True)
-class SeedKeypair(TestSeedFieldCreator[UserData, KeyPairData]):
+class TestSeedKeypair(TestSeedFieldCreator[UserData, KeyPairData]):
     """One more keypair under a user, held to the named policy.
 
     The one made with the user carries the default marker; this one never does, so

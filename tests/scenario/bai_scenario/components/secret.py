@@ -27,12 +27,12 @@ from ai.backend.manager.secret.types import SecretValue
 from ai.backend.testutils.scenario_steps import Answered, Given, Refused, Same, Then, Verdict
 from bai_scenario.components.domain import WAS_HERE, SomeoneOf
 from bai_scenario.components.system import role_named
-from bai_scenario.seeds.domain.domain import SeedDomain
-from bai_scenario.seeds.resource_policy.keypair import SeedKeypairPolicy
-from bai_scenario.seeds.resource_policy.project import SeedProjectPolicy
-from bai_scenario.seeds.resource_policy.user import SeedUserPolicy
-from bai_scenario.seeds.seeder import Laid, Seeder, TestSeedNest
-from bai_scenario.seeds.user.user import SeedUserOf
+from bai_scenario.seeds.domain.domain import TestSeedDomain
+from bai_scenario.seeds.resource_policy.keypair import TestSeedKeypairPolicy
+from bai_scenario.seeds.resource_policy.project import TestSeedProjectPolicy
+from bai_scenario.seeds.resource_policy.user import TestSeedUserPolicy
+from bai_scenario.seeds.seeder import Laid, TestSeeder, TestSeedNest
+from bai_scenario.seeds.user.user import TestSeedUserOf
 
 KEY_ID = SecretKeyId("k1")
 KEY_MATERIAL = SecretKeyMaterial(base64.b64encode(b"0123456789abcdef0123456789abcdef").decode())
@@ -79,12 +79,15 @@ class SomeoneWithASecret(TestSeedNest[Laid[UserData]]):
         return "암호화된 비밀 키를 가진 사용자 한 명 준비"
 
     @override
-    def lay(self, seed: Seeder) -> Laid[UserData]:
-        seed.once(SeedProjectPolicy())
-        policy = seed.creating(SeedUserPolicy())
-        key_policy = seed.creating(SeedKeypairPolicy())
+    def lay(self, seed: TestSeeder) -> Laid[UserData]:
+        seed.once(TestSeedProjectPolicy())
+        policy = seed.creating(TestSeedUserPolicy())
+        key_policy = seed.creating(TestSeedKeypairPolicy())
         return seed.provisioning(
-            SeedUserOf(role=self.role, secret_key=self.secret_key), self.domain, policy, key_policy
+            TestSeedUserOf(role=self.role, secret_key=self.secret_key),
+            self.domain,
+            policy,
+            key_policy,
         )
 
 
@@ -108,7 +111,7 @@ class UsersHoldingSecrets(Given[Any, AKeyringAndACaller]):
 
     @override
     async def lay(self, seeding: Any) -> AKeyringAndACaller:
-        home = await seeding.creating(SeedDomain(name_hint="home", description=WAS_HERE))
+        home = await seeding.creating(TestSeedDomain(name_hint="home", description=WAS_HERE))
         pool = config_key_pool(KeyProviderType.CONFIG)
         if self.caller_encrypted:
             secret = await pool.encrypt("sk-caller", KEYPAIR_SECRET_KEY_CONTEXT)

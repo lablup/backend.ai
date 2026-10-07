@@ -39,13 +39,13 @@ from bai_scenario.components.domain import (
     TheNewDomainNode,
 )
 from bai_scenario.runner.acting import ActingAs
-from bai_scenario.runner.planting import SeedingSession
+from bai_scenario.runner.planting import TestSeedingSession
 from bai_scenario.runner.steps import run_scenario
 
 FRESH = "새로 만든 도메인"
 ENFORCEMENT = "manager.rbac.enforcement_enabled"
 
-type DomainStep = Scenario[SeedingSession, ADomainAndACaller, DomainAdapter, DomainNode]
+type DomainStep = Scenario[TestSeedingSession, ADomainAndACaller, DomainAdapter, DomainNode]
 
 
 @dataclass(frozen=True)
@@ -118,7 +118,9 @@ class CreatingThenFindingByItsModelStore(When[ADomainAndACaller, DomainAdapter, 
 
 
 @dataclass(frozen=True)
-class TheWholeNodeComesBack(Scenario[SeedingSession, ADomainAndACaller, DomainAdapter, DomainNode]):
+class TheWholeNodeComesBack(
+    Scenario[TestSeedingSession, ADomainAndACaller, DomainAdapter, DomainNode]
+):
     started: datetime
 
     @override
@@ -133,7 +135,7 @@ class TheWholeNodeComesBack(Scenario[SeedingSession, ADomainAndACaller, DomainAd
         )
 
     @override
-    def given(self) -> Given[SeedingSession, ADomainAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ADomainAndACaller]:
         return ADomainAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
@@ -147,7 +149,7 @@ class TheWholeNodeComesBack(Scenario[SeedingSession, ADomainAndACaller, DomainAd
 
 @dataclass(frozen=True)
 class ANameAnotherDomainHoldsIsRefused(
-    Scenario[SeedingSession, ADomainAndACaller, DomainAdapter, DomainNode]
+    Scenario[TestSeedingSession, ADomainAndACaller, DomainAdapter, DomainNode]
 ):
     @override
     def summary(self) -> str:
@@ -161,7 +163,7 @@ class ANameAnotherDomainHoldsIsRefused(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, ADomainAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ADomainAndACaller]:
         return ADomainAndSomeone(role=UserRole.SUPERADMIN, name_hint="taken")
 
     @override
@@ -174,7 +176,9 @@ class ANameAnotherDomainHoldsIsRefused(
 
 
 @dataclass(frozen=True)
-class ABlankNameIsRefused(Scenario[SeedingSession, ADomainAndACaller, DomainAdapter, DomainNode]):
+class ABlankNameIsRefused(
+    Scenario[TestSeedingSession, ADomainAndACaller, DomainAdapter, DomainNode]
+):
     @override
     def summary(self) -> str:
         return "a-blank-name-is-refused"
@@ -184,7 +188,7 @@ class ABlankNameIsRefused(Scenario[SeedingSession, ADomainAndACaller, DomainAdap
         return "이름이 공백뿐이면 도메인을 만들 수 없다"
 
     @override
-    def given(self) -> Given[SeedingSession, ADomainAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ADomainAndACaller]:
         return ADomainAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
@@ -198,7 +202,7 @@ class ABlankNameIsRefused(Scenario[SeedingSession, ADomainAndACaller, DomainAdap
 
 @dataclass(frozen=True)
 class APlainUserMayNotCreate(
-    Scenario[SeedingSession, ADomainAndACaller, DomainAdapter, DomainNode]
+    Scenario[TestSeedingSession, ADomainAndACaller, DomainAdapter, DomainNode]
 ):
     @override
     def summary(self) -> str:
@@ -212,7 +216,7 @@ class APlainUserMayNotCreate(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, ADomainAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ADomainAndACaller]:
         return ADomainAndSomeone()
 
     @override
@@ -226,7 +230,7 @@ class APlainUserMayNotCreate(
 
 @dataclass(frozen=True)
 class EnforcementOffChangesNothing(
-    Scenario[SeedingSession, ADomainAndACaller, DomainAdapter, DomainNode], Configured
+    Scenario[TestSeedingSession, ADomainAndACaller, DomainAdapter, DomainNode], Configured
 ):
     @override
     def summary(self) -> str:
@@ -244,7 +248,7 @@ class EnforcementOffChangesNothing(
         return {ENFORCEMENT: False}
 
     @override
-    def given(self) -> Given[SeedingSession, ADomainAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ADomainAndACaller]:
         return ADomainAndSomeone()
 
     @override
@@ -258,7 +262,7 @@ class EnforcementOffChangesNothing(
 
 @dataclass(frozen=True)
 class AModelStoreProjectComesWithIt(
-    Scenario[SeedingSession, ADomainAndACaller, DomainAdapter, DomainNode]
+    Scenario[TestSeedingSession, ADomainAndACaller, DomainAdapter, DomainNode]
 ):
     started: datetime
 
@@ -274,7 +278,7 @@ class AModelStoreProjectComesWithIt(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, ADomainAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ADomainAndACaller]:
         return ADomainAndSomeone(role=UserRole.SUPERADMIN)
 
     @override

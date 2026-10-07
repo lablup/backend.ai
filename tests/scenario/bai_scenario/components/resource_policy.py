@@ -83,14 +83,17 @@ from ai.backend.testutils.scenario_steps import (
     Verdict,
 )
 from bai_scenario.components.domain import WAS_HERE, WrittenByThisRun
-from bai_scenario.seeds.domain.domain import SeedDomain
-from bai_scenario.seeds.keypair.keypair import SeedKeypair
-from bai_scenario.seeds.rbac.role import SeedPermission, SeedRole
-from bai_scenario.seeds.resource_policy.keypair import SeedKeypairPolicy
-from bai_scenario.seeds.resource_policy.project import SeedNamedProjectPolicy, SeedProjectPolicy
-from bai_scenario.seeds.resource_policy.user import SeedUserPolicy
-from bai_scenario.seeds.seeder import Laid, Seeder, TestSeedNest, TestSeedRow
-from bai_scenario.seeds.user.user import SeedUserOf
+from bai_scenario.seeds.domain.domain import TestSeedDomain
+from bai_scenario.seeds.keypair.keypair import TestSeedKeypair
+from bai_scenario.seeds.rbac.role import TestSeedPermission, TestSeedRole
+from bai_scenario.seeds.resource_policy.keypair import TestSeedKeypairPolicy
+from bai_scenario.seeds.resource_policy.project import (
+    TestSeedNamedProjectPolicy,
+    TestSeedProjectPolicy,
+)
+from bai_scenario.seeds.resource_policy.user import TestSeedUserPolicy
+from bai_scenario.seeds.seeder import Laid, TestSeeder, TestSeedNest, TestSeedRow
+from bai_scenario.seeds.user.user import TestSeedUserOf
 
 type Searched = (
     SearchProjectResourcePoliciesPayload
@@ -300,7 +303,7 @@ class ProjectPolicies(Family[ProjectResourcePolicyData, ProjectResourcePolicyNod
     def seed(
         self, name_hint: str = "project-policy", *, holding_optional: bool = False
     ) -> TestSeedRow[ProjectResourcePolicyData]:
-        return SeedNamedProjectPolicy(name_hint=name_hint)
+        return TestSeedNamedProjectPolicy(name_hint=name_hint)
 
     @override
     def own_of(self, holder: LaidHolder) -> Laid[ProjectResourcePolicyData]:
@@ -454,7 +457,7 @@ class KeypairPolicies(OwnFamily[KeyPairResourcePolicyData, KeypairResourcePolicy
     def seed(
         self, name_hint: str = "keypair-policy", *, holding_optional: bool = False
     ) -> TestSeedRow[KeyPairResourcePolicyData]:
-        return SeedKeypairPolicy(
+        return TestSeedKeypairPolicy(
             name_hint=name_hint, max_pending_session_count=2 if holding_optional else None
         )
 
@@ -734,7 +737,7 @@ class UserPolicies(OwnFamily[UserResourcePolicyData, UserResourcePolicyNode]):
     def seed(
         self, name_hint: str = "user-policy", *, holding_optional: bool = False
     ) -> TestSeedRow[UserResourcePolicyData]:
-        return SeedUserPolicy(
+        return TestSeedUserPolicy(
             name_hint=name_hint, max_concurrent_logins=3 if holding_optional else None
         )
 
@@ -908,14 +911,14 @@ class SomeoneHeldToPolicies(TestSeedNest[LaidHolder]):
         return "정책이 할당된 사용자 한 명 준비"
 
     @override
-    def lay(self, seed: Seeder) -> LaidHolder:
-        project_policy = seed.once(SeedProjectPolicy())
-        user_policy = seed.creating(SeedUserPolicy())
-        keypair_policy = seed.creating(SeedKeypairPolicy())
+    def lay(self, seed: TestSeeder) -> LaidHolder:
+        project_policy = seed.once(TestSeedProjectPolicy())
+        user_policy = seed.creating(TestSeedUserPolicy())
+        keypair_policy = seed.creating(TestSeedKeypairPolicy())
         # TODO(BA-7935): the report line for this user does not say it is inactive;
         # SeedUserOf.detail() reports only an explicit status.
         user = seed.provisioning(
-            SeedUserOf(role=self.role, is_active=self.active),
+            TestSeedUserOf(role=self.role, is_active=self.active),
             self.domain,
             user_policy,
             keypair_policy,
@@ -941,11 +944,13 @@ class ReadingOwnPolicies(TestSeedNest[Laid[None]]):
         return f"자기 스코프에서 {self.entity_type} 읽기 권한을 주는 역할 부여"
 
     @override
-    def lay(self, seed: Seeder) -> Laid[None]:
+    def lay(self, seed: TestSeeder) -> Laid[None]:
         role = seed.creating_from(
-            SeedRole(lambda u: UserID(u.id), name_hint="policy-reader"), self.user
+            TestSeedRole(lambda u: UserID(u.id), name_hint="policy-reader"), self.user
         )
-        seed.adding(SeedPermission(entity_type=self.entity_type, permission=Permission.READ), role)
+        seed.adding(
+            TestSeedPermission(entity_type=self.entity_type, permission=Permission.READ), role
+        )
         return seed.granting(
             role, self.user, role_id=lambda r: r.id, user_id=lambda u: UserID(u.id)
         )
@@ -953,7 +958,7 @@ class ReadingOwnPolicies(TestSeedNest[Laid[None]]):
 
 async def lay_a_holder(seeding: Any, *, role: UserRole, active: bool = True) -> LaidHolder:
     """도메인 하나와, 그 도메인에 속하며 정책이 할당된 사용자 한 명."""
-    domain = await seeding.creating(SeedDomain(name_hint="home", description=WAS_HERE))
+    domain = await seeding.creating(TestSeedDomain(name_hint="home", description=WAS_HERE))
     holder: LaidHolder = await seeding.within(
         SomeoneHeldToPolicies(domain, role=role, active=active)
     )
@@ -1068,8 +1073,8 @@ class SomeoneWithAnotherKey(Given[Any, APolicyAndACaller[Any]]):
     @override
     async def lay(self, seeding: Any) -> APolicyAndACaller[Any]:
         holder = await lay_a_holder(seeding, role=UserRole.USER, active=self.active)
-        other = await seeding.creating(SeedKeypairPolicy(name_hint="other"))
-        await seeding.adding(SeedKeypair(resource_policy=seeding.made(other).name), holder.user)
+        other = await seeding.creating(TestSeedKeypairPolicy(name_hint="other"))
+        await seeding.adding(TestSeedKeypair(resource_policy=seeding.made(other).name), holder.user)
         await seeding.within(ReadingOwnPolicies(holder.user, KEYPAIR.entity_type))
         expected = holder.keypair_policy if self.active else other
         return APolicyAndACaller(seeding.made(expected), seeding.made(holder.user))

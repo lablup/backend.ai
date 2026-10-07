@@ -24,7 +24,7 @@ from bai_scenario.seeds.seeder import Naming, TestSeedRowFrom, TestSeedRowFromTw
 
 
 @dataclass(frozen=True)
-class SeedFragmentOf[Owner](
+class TestSeedFragmentOf[Owner](
     TestSeedRowFromTwo[AppConfigAllowListData, Owner, AppConfigFragmentData]
 ):
     """The fragment the given owner holds under the given entry's name."""
@@ -57,7 +57,7 @@ class SeedFragmentOf[Owner](
 
 
 @dataclass(frozen=True)
-class SeedPublicFragment(TestSeedRowFrom[AppConfigAllowListData, AppConfigFragmentData]):
+class TestSeedPublicFragment(TestSeedRowFrom[AppConfigAllowListData, AppConfigFragmentData]):
     """The public fragment under the given entry's name. It belongs to no one."""
 
     config: Mapping[str, Any]

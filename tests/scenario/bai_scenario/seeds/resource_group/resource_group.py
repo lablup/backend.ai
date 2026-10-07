@@ -24,7 +24,7 @@ from bai_scenario.seeds.seeder import Naming, TestSeedLink, TestSeedRow
 
 
 @dataclass(frozen=True)
-class SeedResourceGroup(TestSeedRow[ResourceGroupData]):
+class TestSeedResourceGroup(TestSeedRow[ResourceGroupData]):
     """The scope agents and sessions are created under."""
 
     name_hint: str = "resource-group"

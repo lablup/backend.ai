@@ -36,15 +36,15 @@ from ai.backend.testutils.scenario_steps import (
     Then,
     Verdict,
 )
-from bai_scenario.seeds.domain.domain import SeedDomain
-from bai_scenario.seeds.project.project import SeedProject
-from bai_scenario.seeds.rbac.role import SeedPermission, SeedRole
-from bai_scenario.seeds.resource_group.resource_group import LinkToDomain, SeedResourceGroup
-from bai_scenario.seeds.resource_policy.keypair import SeedKeypairPolicy
-from bai_scenario.seeds.resource_policy.project import SeedProjectPolicy
-from bai_scenario.seeds.resource_policy.user import SeedUserPolicy
-from bai_scenario.seeds.seeder import Laid, Seeder, TestSeedNest
-from bai_scenario.seeds.user.user import SeedUserOf
+from bai_scenario.seeds.domain.domain import TestSeedDomain
+from bai_scenario.seeds.project.project import TestSeedProject
+from bai_scenario.seeds.rbac.role import TestSeedPermission, TestSeedRole
+from bai_scenario.seeds.resource_group.resource_group import LinkToDomain, TestSeedResourceGroup
+from bai_scenario.seeds.resource_policy.keypair import TestSeedKeypairPolicy
+from bai_scenario.seeds.resource_policy.project import TestSeedProjectPolicy
+from bai_scenario.seeds.resource_policy.user import TestSeedUserPolicy
+from bai_scenario.seeds.seeder import Laid, TestSeeder, TestSeedNest
+from bai_scenario.seeds.user.user import TestSeedUserOf
 
 WAS_HERE = "이미 있던 도메인"
 """시드가 미리 만드는 도메인의 설명. 시나리오가 기대값으로 다시 쓰므로 한 자리에 둔다."""
@@ -74,7 +74,9 @@ class ADomainAndSomeone(Given[Any, ADomainAndACaller]):
 
     @override
     async def lay(self, seeding: Any) -> ADomainAndACaller:
-        domain = await seeding.creating(SeedDomain(name_hint=self.name_hint, description=WAS_HERE))
+        domain = await seeding.creating(
+            TestSeedDomain(name_hint=self.name_hint, description=WAS_HERE)
+        )
         caller = await seeding.within(SomeoneOf(domain, role=self.role))
         return ADomainAndACaller(seeding.made(domain), seeding.made(caller))
 
@@ -106,12 +108,14 @@ class ATargetAndSomeone(Given[Any, ADomainAndACaller]):
 
     @override
     async def lay(self, seeding: Any) -> ADomainAndACaller:
-        home = await seeding.creating(SeedDomain(name_hint="home", description=WAS_HERE))
-        target = await seeding.creating(SeedDomain(name_hint=self.name_hint, description=WAS_HERE))
+        home = await seeding.creating(TestSeedDomain(name_hint="home", description=WAS_HERE))
+        target = await seeding.creating(
+            TestSeedDomain(name_hint=self.name_hint, description=WAS_HERE)
+        )
         match self.holds:
             case TargetHolds.PROJECT:
-                policy = await seeding.once(SeedProjectPolicy())
-                await seeding.creating_from_two(SeedProject(name_hint="team"), target, policy)
+                policy = await seeding.once(TestSeedProjectPolicy())
+                await seeding.creating_from_two(TestSeedProject(name_hint="team"), target, policy)
             case TargetHolds.USER:
                 await seeding.within(SomeoneOf(target))
             case None:
@@ -142,10 +146,10 @@ class ManyDomainsAndSomeone(Given[Any, ManyDomainsAndACaller]):
 
     @override
     async def lay(self, seeding: Any) -> ManyDomainsAndACaller:
-        home = await seeding.creating(SeedDomain(name_hint="home", description=WAS_HERE))
-        wanted = await seeding.creating(SeedDomain(name_hint="wanted", description=WAS_HERE))
+        home = await seeding.creating(TestSeedDomain(name_hint="home", description=WAS_HERE))
+        wanted = await seeding.creating(TestSeedDomain(name_hint="wanted", description=WAS_HERE))
         others = [
-            await seeding.creating(SeedDomain(name_hint="other", description=WAS_HERE))
+            await seeding.creating(TestSeedDomain(name_hint="other", description=WAS_HERE))
             for _ in range(self.besides)
         ]
         caller = await seeding.within(SomeoneOf(home, role=self.role))
@@ -299,11 +303,11 @@ class SomeoneOf(TestSeedNest[Laid[UserData]]):
         return "도메인에 속한 사용자 한 명 준비"
 
     @override
-    def lay(self, seed: Seeder) -> Laid[UserData]:
-        seed.once(SeedProjectPolicy())
-        policy = seed.creating(SeedUserPolicy())
-        key_policy = seed.creating(SeedKeypairPolicy(vfolder_hosts=self.vfolder_hosts))
-        return seed.provisioning(SeedUserOf(role=self.role), self.domain, policy, key_policy)
+    def lay(self, seed: TestSeeder) -> Laid[UserData]:
+        seed.once(TestSeedProjectPolicy())
+        policy = seed.creating(TestSeedUserPolicy())
+        key_policy = seed.creating(TestSeedKeypairPolicy(vfolder_hosts=self.vfolder_hosts))
+        return seed.provisioning(TestSeedUserOf(role=self.role), self.domain, policy, key_policy)
 
 
 @dataclass(frozen=True)
@@ -317,11 +321,13 @@ class SomeoneReadingDomains(TestSeedNest[GrantedUser]):
         return "도메인 조회 권한을 받은 사용자 준비"
 
     @override
-    def lay(self, seed: Seeder) -> GrantedUser:
+    def lay(self, seed: TestSeeder) -> GrantedUser:
         someone = seed.within(SomeoneOf(self.domain))
-        role = seed.creating_from(SeedRole(lambda d: d.id, name_hint="domain-reader"), self.domain)
+        role = seed.creating_from(
+            TestSeedRole(lambda d: d.id, name_hint="domain-reader"), self.domain
+        )
         seed.adding(
-            SeedPermission(entity_type=DomainEntityType(), permission=Permission.READ), role
+            TestSeedPermission(entity_type=DomainEntityType(), permission=Permission.READ), role
         )
         grant = seed.granting(role, someone, role_id=lambda r: r.id, user_id=lambda u: UserID(u.id))
         return GrantedUser(someone, grant)
@@ -339,12 +345,12 @@ class SomeoneReadingDomainsOfTheGroup(TestSeedNest[Laid[None]]):
         return "리소스 그룹 범위의 도메인 읽기 역할을 받은 사용자 준비"
 
     @override
-    def lay(self, seed: Seeder) -> Laid[None]:
+    def lay(self, seed: TestSeeder) -> Laid[None]:
         role = seed.creating_from(
-            SeedRole(lambda g: ResourceGroupID(g.id), name_hint="domain-reader"), self.group
+            TestSeedRole(lambda g: ResourceGroupID(g.id), name_hint="domain-reader"), self.group
         )
         seed.adding(
-            SeedPermission(entity_type=DomainEntityType(), permission=Permission.READ), role
+            TestSeedPermission(entity_type=DomainEntityType(), permission=Permission.READ), role
         )
         return seed.granting(
             role, self.user, role_id=lambda r: r.id, user_id=lambda u: UserID(u.id)
@@ -381,10 +387,10 @@ class DomainsOfAGroupAndSomeone(Given[Any, DomainsOfAGroupAndACaller]):
 
     @override
     async def lay(self, seeding: Any) -> DomainsOfAGroupAndACaller:
-        home = await seeding.creating(SeedDomain(name_hint="home", description=WAS_HERE))
-        group = await seeding.creating(SeedResourceGroup())
+        home = await seeding.creating(TestSeedDomain(name_hint="home", description=WAS_HERE))
+        group = await seeding.creating(TestSeedResourceGroup())
         linked = [
-            await seeding.creating(SeedDomain(name_hint="linked", description=WAS_HERE))
+            await seeding.creating(TestSeedDomain(name_hint="linked", description=WAS_HERE))
             for _ in range(2)
         ]
         for one in linked:

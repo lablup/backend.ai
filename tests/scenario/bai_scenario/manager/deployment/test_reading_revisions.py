@@ -32,11 +32,13 @@ from bai_scenario.components.deployment_revision import (
     TheRevisionNode,
 )
 from bai_scenario.runner.acting import ActingAs
-from bai_scenario.runner.planting import SeedingSession
+from bai_scenario.runner.planting import TestSeedingSession
 from bai_scenario.runner.steps import run_scenario
 
-type ReadingStep = Scenario[SeedingSession, RevisionsAndACaller, DeploymentAdapter, RevisionNode]
-type LoadingStep = Scenario[SeedingSession, RevisionsAndACaller, DeploymentAdapter, Loaded]
+type ReadingStep = Scenario[
+    TestSeedingSession, RevisionsAndACaller, DeploymentAdapter, RevisionNode
+]
+type LoadingStep = Scenario[TestSeedingSession, RevisionsAndACaller, DeploymentAdapter, Loaded]
 
 
 @dataclass(frozen=True)
@@ -91,7 +93,7 @@ class LoadingRevisionsById(When[RevisionsAndACaller, DeploymentAdapter, Loaded])
 
 @dataclass(frozen=True)
 class TheGrantedUserReadsIt(
-    Scenario[SeedingSession, RevisionsAndACaller, DeploymentAdapter, RevisionNode]
+    Scenario[TestSeedingSession, RevisionsAndACaller, DeploymentAdapter, RevisionNode]
 ):
     started: datetime
 
@@ -104,7 +106,7 @@ class TheGrantedUserReadsIt(
         return "배포 읽기 권한을 받은 사용자가 그 배포의 리비전을 id로 조회하면, 그 리비전이 온다"
 
     @override
-    def given(self) -> Given[SeedingSession, RevisionsAndACaller]:
+    def given(self) -> Given[TestSeedingSession, RevisionsAndACaller]:
         return ADeploymentToRevise(granted=(Permission.READ,), revisions=1)
 
     @override
@@ -118,7 +120,7 @@ class TheGrantedUserReadsIt(
 
 @dataclass(frozen=True)
 class AUserGrantedNothingMayNotReadIt(
-    Scenario[SeedingSession, RevisionsAndACaller, DeploymentAdapter, RevisionNode]
+    Scenario[TestSeedingSession, RevisionsAndACaller, DeploymentAdapter, RevisionNode]
 ):
     @override
     def summary(self) -> str:
@@ -132,7 +134,7 @@ class AUserGrantedNothingMayNotReadIt(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, RevisionsAndACaller]:
+    def given(self) -> Given[TestSeedingSession, RevisionsAndACaller]:
         return ADeploymentToRevise(revisions=1)
 
     @override
@@ -146,7 +148,7 @@ class AUserGrantedNothingMayNotReadIt(
 
 @dataclass(frozen=True)
 class AnUnknownIdIsRefusedAsUnresolvable(
-    Scenario[SeedingSession, RevisionsAndACaller, DeploymentAdapter, RevisionNode]
+    Scenario[TestSeedingSession, RevisionsAndACaller, DeploymentAdapter, RevisionNode]
 ):
     @override
     def summary(self) -> str:
@@ -160,7 +162,7 @@ class AnUnknownIdIsRefusedAsUnresolvable(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, RevisionsAndACaller]:
+    def given(self) -> Given[TestSeedingSession, RevisionsAndACaller]:
         return ADeploymentToRevise(granted=(Permission.READ,), revisions=1)
 
     @override
@@ -174,7 +176,7 @@ class AnUnknownIdIsRefusedAsUnresolvable(
 
 @dataclass(frozen=True)
 class AnUnknownIdIsNotFoundForASuperadmin(
-    Scenario[SeedingSession, RevisionsAndACaller, DeploymentAdapter, RevisionNode]
+    Scenario[TestSeedingSession, RevisionsAndACaller, DeploymentAdapter, RevisionNode]
 ):
     @override
     def summary(self) -> str:
@@ -188,7 +190,7 @@ class AnUnknownIdIsNotFoundForASuperadmin(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, RevisionsAndACaller]:
+    def given(self) -> Given[TestSeedingSession, RevisionsAndACaller]:
         return ADeploymentToRevise(role=UserRole.SUPERADMIN, revisions=1)
 
     @override
@@ -202,7 +204,7 @@ class AnUnknownIdIsNotFoundForASuperadmin(
 
 @dataclass(frozen=True)
 class EachNamedIdIsAnsweredOnItsOwn(
-    Scenario[SeedingSession, RevisionsAndACaller, DeploymentAdapter, Loaded]
+    Scenario[TestSeedingSession, RevisionsAndACaller, DeploymentAdapter, Loaded]
 ):
     started: datetime
 
@@ -219,7 +221,7 @@ class EachNamedIdIsAnsweredOnItsOwn(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, RevisionsAndACaller]:
+    def given(self) -> Given[TestSeedingSession, RevisionsAndACaller]:
         return RevisionsInTwoProjects(granted=(Permission.READ,))
 
     @override

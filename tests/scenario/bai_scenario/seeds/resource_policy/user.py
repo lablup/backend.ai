@@ -11,7 +11,7 @@ from bai_scenario.seeds.seeder import Naming, TestSeedRow
 
 
 @dataclass(frozen=True)
-class SeedUserPolicy(TestSeedRow[UserResourcePolicyData]):
+class TestSeedUserPolicy(TestSeedRow[UserResourcePolicyData]):
     """What a user is allowed, as a row of its own rather than a name borrowed from
     somewhere else."""
 

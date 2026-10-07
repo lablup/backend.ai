@@ -31,12 +31,12 @@ from bai_scenario.components.container_registry import (
     ManyRegistriesAndSomeone,
 )
 from bai_scenario.runner.acting import ActingAs
-from bai_scenario.runner.planting import SeedingSession
+from bai_scenario.runner.planting import TestSeedingSession
 from bai_scenario.runner.steps import run_scenario
 
 type Loaded = list[ContainerRegistryNode | Exception | None]
 type ReadingScenario = Scenario[
-    SeedingSession, ManyRegistriesAndACaller, ContainerRegistryAdapter, Loaded
+    TestSeedingSession, ManyRegistriesAndACaller, ContainerRegistryAdapter, Loaded
 ]
 
 
@@ -135,7 +135,7 @@ class AnEmptyListComesBack(Then[ManyRegistriesAndACaller, Loaded]):
 
 @dataclass(frozen=True)
 class LoadingKeepsTheOrder(
-    Scenario[SeedingSession, ManyRegistriesAndACaller, ContainerRegistryAdapter, Loaded]
+    Scenario[TestSeedingSession, ManyRegistriesAndACaller, ContainerRegistryAdapter, Loaded]
 ):
     @override
     def summary(self) -> str:
@@ -150,7 +150,7 @@ class LoadingKeepsTheOrder(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, ManyRegistriesAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ManyRegistriesAndACaller]:
         return ManyRegistriesAndSomeone()
 
     @override
@@ -164,7 +164,7 @@ class LoadingKeepsTheOrder(
 
 @dataclass(frozen=True)
 class AnEmptyListAsksNothing(
-    Scenario[SeedingSession, ManyRegistriesAndACaller, ContainerRegistryAdapter, Loaded]
+    Scenario[TestSeedingSession, ManyRegistriesAndACaller, ContainerRegistryAdapter, Loaded]
 ):
     @override
     def summary(self) -> str:
@@ -175,7 +175,7 @@ class AnEmptyListAsksNothing(
         return "빈 id 목록으로 조회하면 하위 계층을 호출하지 않고 빈 응답이 반환된다"
 
     @override
-    def given(self) -> Given[SeedingSession, ManyRegistriesAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ManyRegistriesAndACaller]:
         return ManyRegistriesAndSomeone()
 
     @override
@@ -189,7 +189,7 @@ class AnEmptyListAsksNothing(
 
 @dataclass(frozen=True)
 class APlainUserIsRefusedOnEveryId(
-    Scenario[SeedingSession, ManyRegistriesAndACaller, ContainerRegistryAdapter, Loaded]
+    Scenario[TestSeedingSession, ManyRegistriesAndACaller, ContainerRegistryAdapter, Loaded]
 ):
     @override
     def summary(self) -> str:
@@ -204,7 +204,7 @@ class APlainUserIsRefusedOnEveryId(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, ManyRegistriesAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ManyRegistriesAndACaller]:
         return ManyRegistriesAndSomeone(role=UserRole.USER)
 
     @override
