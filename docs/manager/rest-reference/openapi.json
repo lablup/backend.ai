@@ -32592,6 +32592,30 @@
             "default": null,
             "description": "Filter by the deployment replica the session serves"
           },
+          "session_group_id": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/UUIDFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter by the session group the session belongs to"
+          },
+          "requested_starts_at": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DateTimeFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter by the reserved start time requested at creation"
+          },
           "AND": {
             "anyOf": [
               {
@@ -32685,7 +32709,9 @@
           "result",
           "network_type",
           "network_id",
-          "replica_id"
+          "replica_id",
+          "session_group_id",
+          "requested_starts_at"
         ],
         "title": "SessionOrderField",
         "type": "string"
