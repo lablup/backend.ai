@@ -67,7 +67,7 @@ def apply(cli_ctx: CLIContext, paths: tuple[Path, ...], overwrite: bool) -> None
     from ai.backend.cli.types import ExitCode
     from ai.backend.manager.models.base import ensure_all_tables_registered
     from ai.backend.manager.repositories.db.engine import connect_database
-    from ai.backend.manager.repositories.global_entity.loader import GlobalEntityCacheLoader
+    from ai.backend.manager.repositories.global_entity.loader import GlobalEntityIDLoader
     from ai.backend.manager.repositories.ops.v2.seed.provider import SeedOpsProvider
     from ai.backend.manager.repositories.seed.repository import SeedRepository
     from ai.backend.manager.seed.factory import create_seed_kind_registry
@@ -80,7 +80,7 @@ def apply(cli_ctx: CLIContext, paths: tuple[Path, ...], overwrite: bool) -> None
         # A standalone CLI process has not imported the full model tree.
         ensure_all_tables_registered()
         async with connect_database(bootstrap_config.db) as db:
-            await GlobalEntityCacheLoader(db).load()
+            await GlobalEntityIDLoader(db).load()
             repository = SeedRepository(SeedOpsProvider(db))
             return await SeedApplier(repository).apply(plan, overwrite)
 
