@@ -64,11 +64,13 @@ from ai.backend.manager.models.user.row import UserRow
 from ai.backend.manager.models.vfolder.row import (
     VFolderRow,
     VFolderUserMountPolicyRow,
-    ensure_quota_scope_accessible_by_user,
     get_permission_ctx,
     vfolders,
 )
 from ai.backend.manager.models.virtual_entity.queries import user_scope_membership_query
+from ai.backend.manager.repositories.vfolder.quota_scope import (
+    ensure_quota_scope_accessible_by_user,
+)
 
 # Re-export for backward compatibility
 __all__ = (

@@ -121,7 +121,6 @@ from ai.backend.manager.models.vfolder.queriers import (
 from ai.backend.manager.models.vfolder.row import (
     VFolderRow,
     VFolderUserMountPolicyRow,
-    ensure_quota_scope_accessible_by_user,
     vfolders,
 )
 from ai.backend.manager.models.vfolder.scopes import UserVFolderTarget
@@ -149,6 +148,9 @@ from ai.backend.manager.repositories.vfolder.purge_guards import (
     find_active_vfolder_references,
     get_sessions_by_mounted_folder,
     vfolder_reference_conflict_checks,
+)
+from ai.backend.manager.repositories.vfolder.quota_scope import (
+    ensure_quota_scope_accessible_by_user,
 )
 from ai.backend.manager.repositories.vfolder.types import (
     BulkVFolderPurgeResult,
