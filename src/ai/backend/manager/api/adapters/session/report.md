@@ -34,8 +34,8 @@
 | 시나리오 | 판정 |
 |---|---|
 | [세션을 하나도 심지 않은 상태에서 슈퍼관리자가 조회하면, 답은 비어 있다](#session-a-scenario-that-laid-no-session-finds-none) | 성공 |
-| [슈퍼관리자가 지정된 세션 배치 정보를 읽으면 기존 세션 정보와 함께 유지된다](#searching_details-session-placement-is-preserved-when-configured) | 성공 |
-| [슈퍼관리자가 미설정인 세션 배치 정보를 읽으면 기존 세션 정보와 함께 유지된다](#searching_details-session-placement-is-preserved-when-unset) | 성공 |
+| [슈퍼관리자가 지정된 세션 스케줄링 조건을 읽으면 기존 세션 정보와 함께 유지된다](#searching_details-session-placement-is-preserved-when-configured) | 성공 |
+| [슈퍼관리자가 미설정인 세션 스케줄링 조건을 읽으면 기존 세션 정보와 함께 유지된다](#searching_details-session-placement-is-preserved-when-unset) | 성공 |
 | [필터 없는 전체 조회는 슈퍼관리자 역할로만 열리므로, 아무 권한도 받지 않은 사용자는 역할 부족으로 거부된다](#session-a-user-granted-nothing-may-not-search-sessions) | 거부 |
 
 ### admin_search
@@ -72,7 +72,7 @@ Then
 
 #### [session-placement-is-preserved-when-configured](/tests/scenario/bai_scenario/manager/session/test_searching_details.py) — pass
 
-슈퍼관리자가 지정된 세션 배치 정보를 읽으면 기존 세션 정보와 함께 유지된다
+슈퍼관리자가 지정된 세션 스케줄링 조건을 읽으면 기존 세션 정보와 함께 유지된다
 
 Given
 
@@ -103,7 +103,7 @@ When
 
 Then
 
-- 배치 정보를 포함한 세션 정보 전체가 저장된 그대로 반환된다
+- 스케줄링 조건을 포함한 세션 정보 전체가 저장된 그대로 반환된다
   - items: 저장된 세션의 전체 정보와 같다
   - total_count = 1
   - has_next_page = False
@@ -113,7 +113,7 @@ Then
 
 #### [session-placement-is-preserved-when-unset](/tests/scenario/bai_scenario/manager/session/test_searching_details.py) — pass
 
-슈퍼관리자가 미설정인 세션 배치 정보를 읽으면 기존 세션 정보와 함께 유지된다
+슈퍼관리자가 미설정인 세션 스케줄링 조건을 읽으면 기존 세션 정보와 함께 유지된다
 
 Given
 
@@ -141,7 +141,7 @@ When
 
 Then
 
-- 배치 정보를 포함한 세션 정보 전체가 저장된 그대로 반환된다
+- 스케줄링 조건을 포함한 세션 정보 전체가 저장된 그대로 반환된다
   - items: 저장된 세션의 전체 정보와 같다
   - total_count = 1
   - has_next_page = False

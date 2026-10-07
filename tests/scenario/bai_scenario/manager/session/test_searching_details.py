@@ -1,4 +1,4 @@
-"""저장된 배치 정보를 포함한 세션 조회 응답 전체."""
+"""저장된 스케줄링 조건을 포함한 세션 조회 응답 전체."""
 
 from __future__ import annotations
 
@@ -178,7 +178,7 @@ class SearchingSessions(When[ASessionAndACaller, SessionAdapter, AdminSearchSess
 class TheWholeSessionIsReturned(Then[ASessionAndACaller, AdminSearchSessionsPayload]):
     @override
     def says(self) -> str:
-        return "배치 정보를 포함한 세션 정보 전체가 저장된 그대로 반환된다"
+        return "스케줄링 조건을 포함한 세션 정보 전체가 저장된 그대로 반환된다"
 
     @override
     def look(
@@ -266,7 +266,7 @@ class SessionPlacementIsPreserved(
     @override
     def describe(self) -> str:
         detail = "지정된" if self.configured else "미설정인"
-        return f"슈퍼관리자가 {detail} 세션 배치 정보를 읽으면 기존 세션 정보와 함께 유지된다"
+        return f"슈퍼관리자가 {detail} 세션 스케줄링 조건을 읽으면 기존 세션 정보와 함께 유지된다"
 
     @override
     def given(self) -> Given[SeedingSession, ASessionAndACaller]:
