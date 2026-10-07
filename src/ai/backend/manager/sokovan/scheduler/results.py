@@ -5,6 +5,7 @@ Result type for scheduling operations.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from enum import StrEnum
 
 from ai.backend.common.events.event_types.kernel.types import KernelLifecycleEventReason
 from ai.backend.common.types import (
@@ -68,6 +69,16 @@ class ScheduleResult:
 # ============================================================================
 
 
+class FailureDisposition(StrEnum):
+    """How a handler classifies a failure that the retry counters cannot."""
+
+    #: Nothing was asked of any agent: retried under the normal retry budget.
+    REPLACE = "replace"
+    #: An agent's kernel creation finished with an error; other kernels may already exist,
+    #: and give-up tears them down. Never re-placed.
+    ABANDON = "abandon"
+
+
 @dataclass
 class SessionTransitionInfo:
     """Session transition information for history recording and event broadcasting.
@@ -85,6 +96,8 @@ class SessionTransitionInfo:
     error_code: str | None = None
     creation_id: str | None = None
     access_key: AccessKey | None = None
+    #: Set where the handler knows something the retry counters do not.
+    disposition: FailureDisposition | None = None
 
 
 @dataclass

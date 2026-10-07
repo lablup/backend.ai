@@ -139,22 +139,36 @@ class StartSessionsLifecycleHandler(SessionLifecycleHandler):
 
         # Start kernels on agents via Launcher
         # Note: RecorderContext is handled inside Launcher
-        await self._launcher.start_sessions_for_handler(
+        failed = await self._launcher.start_sessions_for_handler(
             sessions_data.sessions,
             sessions_data.image_configs,
         )
 
-        # Mark all sessions as success for status transition
+        # A session the launcher could not start is a failure carrying its disposition.
         for session in sessions:
             session_info = session.session_info
-            result.successes.append(
-                SessionTransitionInfo(
-                    session_id=session_info.identity.id,
-                    from_status=session_info.lifecycle.status,
-                    reason=KernelLifecycleEventReason.TRIGGERED_BY_SCHEDULER,
-                    creation_id=session_info.identity.creation_id,
-                    access_key=AccessKey(session_info.metadata.access_key),
+            failure = failed.get(session_info.identity.id)
+            if failure is None:
+                result.successes.append(
+                    SessionTransitionInfo(
+                        session_id=session_info.identity.id,
+                        from_status=session_info.lifecycle.status,
+                        reason=KernelLifecycleEventReason.TRIGGERED_BY_SCHEDULER,
+                        creation_id=session_info.identity.creation_id,
+                        access_key=AccessKey(session_info.metadata.access_key),
+                    )
                 )
-            )
+            else:
+                result.failures.append(
+                    SessionTransitionInfo(
+                        session_id=session_info.identity.id,
+                        from_status=session_info.lifecycle.status,
+                        reason=KernelLifecycleEventReason.FAILED_TO_START,
+                        message=failure.message,
+                        creation_id=session_info.identity.creation_id,
+                        access_key=AccessKey(session_info.metadata.access_key),
+                        disposition=failure.disposition,
+                    )
+                )
 
         return result
