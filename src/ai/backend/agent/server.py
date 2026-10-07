@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import asyncio
+import errno
+import fcntl
 import functools
 import inspect
 import logging
@@ -27,6 +29,7 @@ from ipaddress import ip_network
 from pathlib import Path
 from pprint import pformat, pprint
 from typing import (
+    IO,
     Any,
     ClassVar,
     Final,
@@ -55,6 +58,7 @@ from ai.backend.agent.errors import (
     ResourceError,
 )
 from ai.backend.agent.errors.agent import (
+    AgentAlreadyRunningError,
     ImagePullFailedError,
     ImagePullTimeoutError,
     KernelNotFoundError,
@@ -1699,6 +1703,63 @@ async def server_main(
         await agent_init_stack.__aexit__(None, None, None)
 
 
+_PID_FILE_LOCK_ATTEMPTS: Final = 5
+
+
+def _is_same_file(handle: IO[str], path: Path) -> bool:
+    try:
+        on_disk = path.stat()
+    except FileNotFoundError:
+        return False
+    opened = os.fstat(handle.fileno())
+    return (opened.st_dev, opened.st_ino) == (on_disk.st_dev, on_disk.st_ino)
+
+
+def _write_pid(handle: IO[str]) -> None:
+    handle.seek(0)
+    handle.truncate()
+    handle.write(str(os.getpid()))
+    handle.flush()
+
+
+def _hold_pid_file(pid_file: Path) -> IO[str] | None:
+    """Write the pid under an exclusive `flock`, held until the returned handle is closed.
+
+    Returns None without locking for /dev/null, non-regular paths, or a filesystem without flock.
+    """
+    resolved = pid_file.resolve()
+    if resolved == Path(os.devnull).resolve() or (resolved.exists() and not resolved.is_file()):
+        return None
+    for _ in range(_PID_FILE_LOCK_ATTEMPTS):
+        handle = pid_file.open("a+")
+        try:
+            fcntl.flock(handle, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except OSError as e:
+            if e.errno in (errno.EWOULDBLOCK, errno.EAGAIN):
+                handle.close()
+                raise AgentAlreadyRunningError(
+                    f"another agent process already holds {pid_file}"
+                ) from e
+            # The filesystem cannot lock it (ENOLCK, EOPNOTSUPP on NFS/FUSE): run unlocked.
+            # Printed: this runs in `main()` before the logger is configured.
+            print(
+                f"Warning: pid file {pid_file} cannot be locked"
+                f" ({errno.errorcode.get(e.errno or 0, str(e.errno))});"
+                " running without the single-instance guard",
+                file=sys.stderr,
+            )
+            _write_pid(handle)
+            handle.close()
+            return None
+        if not _is_same_file(handle, pid_file):
+            # The holder unlinked the file we opened; the lock we got is on an orphaned inode.
+            handle.close()
+            continue
+        _write_pid(handle)
+        return handle
+    raise AgentAlreadyRunningError(f"{pid_file} kept being replaced while locking it")
+
+
 @click.group(invoke_without_command=True)
 @click.option(
     "-f",
@@ -1789,7 +1850,12 @@ def main(
         raise click.Abort() from e
 
     if not is_invoked_subcommand:
-        server_config.agent_common.pid_file.write_text(str(os.getpid()))
+        try:
+            # Forked workers inherit the lock fd, so the lock lives until they all exit too.
+            pid_lock = _hold_pid_file(server_config.agent_common.pid_file)
+        except AgentAlreadyRunningError as e:
+            print(f"AgentAlreadyRunningError: {e}", file=sys.stderr)
+            raise click.Abort() from e
         image_commit_path = server_config.agent_common.image_commit_path
         image_commit_path.mkdir(parents=True, exist_ok=True)
         ipc_base_path = server_config.agent_common.ipc_base_path
@@ -1857,6 +1923,9 @@ def main(
             if server_config.agent_common.pid_file.is_file():
                 # check is_file() to prevent deleting /dev/null!
                 server_config.agent_common.pid_file.unlink()
+            if pid_lock is not None:
+                # Released after the unlink so that no successor's pid file gets removed.
+                pid_lock.close()
     else:
         # Click is going to invoke a subcommand.
         pass
