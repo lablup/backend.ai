@@ -61,35 +61,8 @@ from ai.backend.manager.models.specs.searcher import SearcherResult
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.base.querier import BatchQuerier, execute_batch_querier
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
-from ai.backend.manager.repositories.ops.v2.read import V2ReadOps
 
 log = StructuredLogger(logging.getLogger(__spec__.name))
-
-
-async def aliases_by_image(
-    read_ops: V2ReadOps, image_ids: Collection[ImageID]
-) -> Mapping[ImageID, list[str]]:
-    """The aliases of each image, keyed by image id; an image without an alias is absent."""
-    if not image_ids:
-        return {}
-    result = await read_ops.search_in_global(
-        ImageAliasSearcher(
-            pagination=NoPagination(),
-            conditions=[
-                ImageAliasSearchableFields.own.image_id.filter.in_(
-                    UUIDInMatchSpec(values=list(image_ids), negated=False)
-                )
-            ],
-        )
-    )
-    owners = await read_ops.lookup_field_owners(
-        ImageAliasOwnerLookup(), [alias.id for alias in result.items]
-    )
-    aliases: defaultdict[ImageID, list[str]] = defaultdict(list)
-    for alias in result.items:
-        if alias.alias:
-            aliases[ImageID(owners[alias.id])].append(alias.alias)
-    return aliases
 
 
 class ImageDBSource:
@@ -160,6 +133,31 @@ class ImageDBSource:
             raise ImageNotFound()
         return row
 
+    async def _aliases_by_image(
+        self, image_ids: Collection[ImageID]
+    ) -> Mapping[ImageID, list[str]]:
+        if not image_ids:
+            return {}
+        async with self._ops_provider.read_ops() as r:
+            result = await r.search_in_global(
+                ImageAliasSearcher(
+                    pagination=NoPagination(),
+                    conditions=[
+                        ImageAliasSearchableFields.own.image_id.filter.in_(
+                            UUIDInMatchSpec(values=list(image_ids), negated=False)
+                        )
+                    ],
+                )
+            )
+            owners = await r.lookup_field_owners(
+                ImageAliasOwnerLookup(), [alias.id for alias in result.items]
+            )
+        aliases: defaultdict[ImageID, list[str]] = defaultdict(list)
+        for alias in result.items:
+            if alias.alias:
+                aliases[ImageID(owners[alias.id])].append(alias.alias)
+        return aliases
+
     async def _get_image_alias_by_name(self, session: SASession, alias: str) -> ImageAliasRow:
         """
         Private method to get an image alias by name using an existing session.
@@ -184,7 +182,7 @@ class ImageDBSource:
                 if scopes
                 else await r.search_in_global(searcher)
             )
-            aliases = await aliases_by_image(r, [image.id for image in result.items])
+        aliases = await self._aliases_by_image([image.id for image in result.items])
         return [image.to_detailed(aliases.get(image.id, [])) for image in result.items]
 
     async def mark_image_deleted(self, reference: str, architecture: str) -> ImageData:

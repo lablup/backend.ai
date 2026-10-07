@@ -16,7 +16,7 @@ from ai.backend.manager.data.agent.types import (
     AgentHeartbeatUpsert,
     UpsertResult,
 )
-from ai.backend.manager.data.image.types import ImageDataWithDetails, ImageIdentifier
+from ai.backend.manager.data.image.types import ImageIdentifier
 from ai.backend.manager.data.kernel.types import KernelInfo, KernelStatus
 from ai.backend.manager.errors.agent import AgentHasConflictingSessions, AgentNotFound
 from ai.backend.manager.errors.resource import ResourceGroupNotFound, UnresolvableResourceGroup
@@ -24,13 +24,11 @@ from ai.backend.manager.models.agent.row import AgentRow, agents
 from ai.backend.manager.models.agent.searchable_fields import AgentSearchableFields
 from ai.backend.manager.models.agent.upserters import AgentHeartbeatUpserter
 from ai.backend.manager.models.image.row import ImageRow
-from ai.backend.manager.models.image.searchable_fields import ImageSearchableFields
 from ai.backend.manager.models.kernel.row import KernelRow
 from ai.backend.manager.models.resource_group.row import ResourceGroupRow
 from ai.backend.manager.models.resource_slot.row import AgentResourceRow
 from ai.backend.manager.models.resource_slot.upserters import AgentResourceUpserter
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.repositories.image.db_source.db_source import aliases_by_image
 from ai.backend.manager.repositories.ops.v2.share.provider import ShareOpsProvider
 
 log = StructuredLogger(logging.getLogger(__spec__.name))
@@ -49,32 +47,24 @@ class AgentDBSource:
         self._db = db
         self._v2_ops = v2_ops
 
-    async def get_images_by_image_identifiers(
+    async def image_ids_by_identifiers(
         self, image_identifiers: list[ImageIdentifier]
-    ) -> dict[ImageID, ImageDataWithDetails]:
+    ) -> list[ImageID]:
+        """The ids of the images matching a canonical and architecture pair."""
         identifier_tuples = [
             (identifier.canonical, identifier.architecture) for identifier in image_identifiers
         ]
-        query = sa.select(ImageRow).where(
+        query = sa.select(ImageRow.id).where(
             sa.tuple_(ImageRow.name, ImageRow.architecture).in_(identifier_tuples)
         )
-        return await self._images_with_details(query)
-
-    async def get_images_by_digest(self, digests: list[str]) -> dict[ImageID, ImageDataWithDetails]:
-        query = sa.select(ImageRow).where(ImageRow.config_digest.in_(digests))
-        return await self._images_with_details(query)
-
-    async def _images_with_details(
-        self, query: sa.Select[tuple[ImageRow]]
-    ) -> dict[ImageID, ImageDataWithDetails]:
         async with self._db.begin_readonly_session_read_committed() as db_session:
-            images = [
-                ImageSearchableFields.own.to_data(row)
-                for row in (await db_session.scalars(query)).all()
-            ]
-        async with self._v2_ops.read_ops() as r:
-            aliases = await aliases_by_image(r, [image.id for image in images])
-        return {image.id: image.to_detailed(aliases.get(image.id, [])) for image in images}
+            return list((await db_session.scalars(query)).all())
+
+    async def image_ids_by_digest(self, digests: list[str]) -> list[ImageID]:
+        """The ids of the images whose config digest is one of the given digests."""
+        query = sa.select(ImageRow.id).where(ImageRow.config_digest.in_(digests))
+        async with self._db.begin_readonly_session_read_committed() as db_session:
+            return list((await db_session.scalars(query)).all())
 
     async def agent_names_by_uuid(
         self, agent_uuids: Sequence[AgentUUID]
