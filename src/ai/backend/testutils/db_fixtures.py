@@ -18,11 +18,14 @@ import pytest
 import sqlalchemy as sa
 
 from ai.backend.common.typed_validators import HostPortPair as HostPortPairModel
-from ai.backend.manager.data.permission.global_entity import GlobalEntityIDCache
+from ai.backend.manager.data.permission.global_entity import (
+    GlobalEntityIDCache,
+    GlobalEntityNameCache,
+)
 from ai.backend.manager.models.base import pgsql_connect_opts
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.db.engine import create_async_engine
-from ai.backend.manager.repositories.global_entity.loader import GlobalEntityIDLoader
+from ai.backend.manager.repositories.global_entity.loader import GlobalEntityCacheLoader
 from ai.backend.testutils.bootstrap import (
     POSTGRES_MAINTENANCE_DB,
     POSTGRES_PASSWORD,
@@ -122,8 +125,9 @@ async def global_entity_ids(
     from them. Cleared on exit.
     """
     async with with_global_entities(database_connection):
-        await GlobalEntityIDLoader(database_connection).load()
+        await GlobalEntityCacheLoader(database_connection).load()
         try:
             yield database_connection
         finally:
             GlobalEntityIDCache.clear()
+            GlobalEntityNameCache.clear()

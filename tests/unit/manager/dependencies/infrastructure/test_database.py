@@ -10,7 +10,7 @@ from ai.backend.manager.config.unified import ManagerUnifiedConfig
 from ai.backend.manager.dependencies.infrastructure.database import DatabaseDependency
 from ai.backend.manager.errors.permission import GlobalEntityMissing
 
-_LOADER = "ai.backend.manager.dependencies.infrastructure.database.GlobalEntityIDLoader"
+_LOADER = "ai.backend.manager.dependencies.infrastructure.database.GlobalEntityCacheLoader"
 
 
 class TestDatabaseDependency:

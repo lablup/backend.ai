@@ -8,6 +8,7 @@ from ai.backend.manager.errors.permission import GlobalEntityMissing, GlobalEnti
 
 __all__ = (
     "GlobalEntityIDCache",
+    "GlobalEntityNameCache",
     "global_entity_id",
 )
 
@@ -34,14 +35,31 @@ class GlobalEntityIDCache:
             raise GlobalEntityNotLoaded(f"Read the id of {name} before the ids are loaded.")
         return cls._ids[name]
 
+
+class GlobalEntityNameCache:
+    """The name of each global entity by its id, loaded once when the manager starts."""
+
+    _names: ClassVar[Mapping[GlobalEntityID, GlobalEntityName] | None] = None
+
+    @classmethod
+    def fill(cls, names: Mapping[GlobalEntityID, GlobalEntityName]) -> None:
+        missing = [name for name in GlobalEntityName if name not in names.values()]
+        if missing:
+            raise GlobalEntityMissing(f"No global entity is named {', '.join(missing)}.")
+        cls._names = dict(names)
+
+    @classmethod
+    def clear(cls) -> None:
+        cls._names = None
+
     @classmethod
     def name_of(cls, id_: GlobalEntityID) -> GlobalEntityName:
-        if cls._ids is None:
-            raise GlobalEntityNotLoaded(f"Read the name of {id_} before the ids are loaded.")
-        for name, global_id in cls._ids.items():
-            if global_id == id_:
-                return name
-        raise GlobalEntityMissing(f"No global entity has the id {id_}.")
+        if cls._names is None:
+            raise GlobalEntityNotLoaded(f"Read the name of {id_} before the names are loaded.")
+        name = cls._names.get(id_)
+        if name is None:
+            raise GlobalEntityMissing(f"No global entity has the id {id_}.")
+        return name
 
 
 def global_entity_id(name: GlobalEntityName) -> GlobalEntityID:
