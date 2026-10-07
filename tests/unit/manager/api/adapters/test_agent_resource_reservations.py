@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from decimal import Decimal
 from unittest.mock import AsyncMock, MagicMock
 from uuid import uuid4
@@ -29,16 +30,37 @@ from ai.backend.manager.api.gql.resource_slot.types import (
 from ai.backend.manager.data.resource_slot.types import AgentResourceData
 
 
-@pytest.fixture(params=[("0", "0"), ("1.23456789", "0.00000001")])
+@dataclass(frozen=True, kw_only=True)
+class ReservationAmountsCase:
+    name: str
+    reserved: Decimal
+    prereserved: Decimal
+
+
+@dataclass(frozen=True, kw_only=True)
+class ReservationOrderFieldCase:
+    gql_field: AgentResourceSlotOrderFieldGQL
+    dto_field: AgentResourceOrderField
+
+
+@pytest.fixture(
+    params=[
+        ReservationAmountsCase(name="zero", reserved=Decimal("0"), prereserved=Decimal("0")),
+        ReservationAmountsCase(
+            name="fractional", reserved=Decimal("1.23456789"), prereserved=Decimal("0.00000001")
+        ),
+    ],
+    ids=lambda case: case.name,
+)
 def resource_data(request: pytest.FixtureRequest) -> AgentResourceData:
-    reserved, prereserved = request.param
+    case: ReservationAmountsCase = request.param
     return AgentResourceData(
         id=AgentResourceID(uuid4()),
         agent_id="agent-test",
         slot_name="cpu",
         capacity=Decimal("8"),
-        reserved=Decimal(reserved),
-        prereserved=Decimal(prereserved),
+        reserved=case.reserved,
+        prereserved=case.prereserved,
         used=Decimal("2"),
     )
 
@@ -108,16 +130,23 @@ class TestAgentResourceReservations:
         assert search_input.filter.prereserved.equals == resource_data.prereserved
 
     @pytest.mark.parametrize(
-        ("gql_field", "dto_field"),
+        "case",
         [
-            (AgentResourceSlotOrderFieldGQL.RESERVED, AgentResourceOrderField.RESERVED),
-            (AgentResourceSlotOrderFieldGQL.PRERESERVED, AgentResourceOrderField.PRERESERVED),
+            ReservationOrderFieldCase(
+                gql_field=AgentResourceSlotOrderFieldGQL.RESERVED,
+                dto_field=AgentResourceOrderField.RESERVED,
+            ),
+            ReservationOrderFieldCase(
+                gql_field=AgentResourceSlotOrderFieldGQL.PRERESERVED,
+                dto_field=AgentResourceOrderField.PRERESERVED,
+            ),
         ],
+        ids=lambda case: case.dto_field.value,
     )
-    def test_graphql_order_maps_to_rest_field(
-        self, gql_field: AgentResourceSlotOrderFieldGQL, dto_field: AgentResourceOrderField
-    ) -> None:
-        assert AgentResourceSlotOrderByGQL(field=gql_field).to_pydantic().field == dto_field
+    def test_graphql_order_maps_to_rest_field(self, case: ReservationOrderFieldCase) -> None:
+        assert (
+            AgentResourceSlotOrderByGQL(field=case.gql_field).to_pydantic().field == case.dto_field
+        )
 
     @pytest.mark.parametrize("field", ["reserved", "prereserved"])
     def test_invalid_decimal_is_rejected(self, field: str) -> None:
