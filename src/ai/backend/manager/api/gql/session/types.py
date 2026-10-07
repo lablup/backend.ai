@@ -202,6 +202,8 @@ class SessionV2OrderFieldGQL(StrEnum):
     NETWORK_TYPE = "network_type"
     NETWORK_ID = "network_id"
     REPLICA_ID = "replica_id"
+    SESSION_GROUP_ID = "session_group_id"
+    REQUESTED_STARTS_AT = "requested_starts_at"
 
 
 @gql_pydantic_input(
@@ -443,6 +445,20 @@ class SessionV2FilterGQL(PydanticInputMixin[SessionFilter]):
         ),
         default=None,
     )
+    session_group_id: UUIDFilter | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="Filter by the session group the session belongs to.",
+        ),
+        default=None,
+    )
+    requested_starts_at: DateTimeFilter | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="Filter by the reserved start time requested at creation.",
+        ),
+        default=None,
+    )
 
     AND: list[Self] | None = None
     OR: list[Self] | None = None
@@ -543,6 +559,18 @@ class SessionV2ResourceInfoGQL:
     resource_group_name: str | None = gql_field(
         description="The resource group (scaling group) this session is assigned to."
     )
+    session_group_id: UUID | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="Placement group ID. Null if the session does not belong to a session group.",
+        )
+    )
+    designated_agent_ids: list[str] | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="Agent IDs designated at session creation.",
+        )
+    )
 
 
 @gql_pydantic_type(
@@ -563,7 +591,13 @@ class SessionV2LifecycleInfoGQL:
         description="Timestamp when the session was terminated. Null if still active."
     )
     starts_at: datetime | None = gql_field(
-        description="Scheduled start time for the session, if applicable."
+        description="When the session started running. Null until it reaches RUNNING."
+    )
+    requested_starts_at: datetime | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="Reserved start time requested at creation. The scheduler honors it only for batch sessions.",
+        )
     )
     batch_timeout: int | None = gql_field(
         description="Batch execution timeout in seconds. Applicable to batch sessions."

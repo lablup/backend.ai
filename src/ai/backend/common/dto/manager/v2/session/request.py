@@ -167,6 +167,12 @@ class SessionFilter(BaseRequestModel):
     replica_id: UUIDFilter | None = Field(
         default=None, description="Filter by the deployment replica the session serves"
     )
+    session_group_id: UUIDFilter | None = Field(
+        default=None, description="Filter by the session group the session belongs to"
+    )
+    requested_starts_at: DateTimeFilter | None = Field(
+        default=None, description="Filter by the reserved start time requested at creation"
+    )
     AND: list[SessionFilter] | None = None
     OR: list[SessionFilter] | None = None
     NOT: list[SessionFilter] | None = None
