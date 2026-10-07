@@ -8895,6 +8895,16 @@ Added in 24.09.0. Global ID of GQL relay spec. Base64 encoded version of "<node 
 scalar GlobalIDField
   @join__type(graph: GRAPHENE)
 
+"""
+Added in 26.10.0. The global entity a global role preset's role is created in.
+"""
+enum GlobalScopeKind
+  @join__type(graph: STRAWBERRY)
+{
+  GLOBAL @join__enumValue(graph: STRAWBERRY)
+  PUBLIC @join__enumValue(graph: STRAWBERRY)
+}
+
 type Group
   @join__type(graph: GRAPHENE)
 {
@@ -21008,7 +21018,7 @@ type RolePreset implements Node
   """
   Added in 26.10.0. The global entity a global preset's role is created in. Null when the preset is not global, or when it applies to every global entity.
   """
-  globalScope: RolePresetGlobalScope
+  globalScope: GlobalScopeKind
 
   """
   Added in 26.10.0. Jinja template rendering the name of each role instantiated from this preset.
@@ -21096,16 +21106,6 @@ input RolePresetFilter
 
   """Negate the specified filters. Matching records are excluded."""
   NOT: [RolePresetFilter!] = null
-}
-
-"""
-Added in 26.10.0. The global entity a global role preset's role is created in.
-"""
-enum RolePresetGlobalScope
-  @join__type(graph: STRAWBERRY)
-{
-  GLOBAL @join__enumValue(graph: STRAWBERRY)
-  PUBLIC @join__enumValue(graph: STRAWBERRY)
 }
 
 """Added in 26.4.4. Specifies ordering for role preset results."""
