@@ -16,9 +16,18 @@ from ai.backend.common.data.entity.resource_group import ResourceGroupEntityType
 from ai.backend.common.data.permission.types import Permission
 from ai.backend.manager.models.base import populate_fixture
 from ai.backend.manager.models.domain.row import DomainRow
+from ai.backend.manager.models.project.row import ProjectRow, association_groups_users
 from ai.backend.manager.models.resource_group.row import ResourceGroupRow, sgroups_for_domains
+from ai.backend.manager.models.resource_policy.row import (
+    ProjectResourcePolicyRow,
+    UserResourcePolicyRow,
+)
+from ai.backend.manager.models.user.row import UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.virtual_entity.entity_membership import EntityMembershipRow
+from ai.backend.manager.models.virtual_entity.entity_membership_cap import (
+    EntityMembershipCapRow,
+)
 from ai.backend.manager.models.virtual_entity.fixture import provision_fixture_entities
 from ai.backend.manager.models.virtual_entity.scope_binding import ScopeBindingRow
 from ai.backend.manager.models.virtual_entity.virtual_entity import VirtualEntityRow
@@ -26,6 +35,34 @@ from ai.backend.testutils.db import with_tables
 
 _FIXTURE: Final = (
     pathlib.Path(__file__).resolve().parents[5] / "fixtures" / "manager" / "example-users.json"
+)
+
+#: The tables whose rows an earlier install wrote, and the ones among them the
+#: migration gives a graph node.
+_MIGRATED_TABLES: Final = (
+    "domains",
+    "user_resource_policies",
+    "project_resource_policies",
+    "scaling_groups",
+    "users",
+    "groups",
+)
+_MIGRATED_ENTITIES: Final = ("domains", "scaling_groups", "users", "groups")
+
+#: Every table the seed declares.
+_ACCOUNT_TABLES: Final = (
+    "domains",
+    "user_resource_policies",
+    "project_resource_policies",
+    "scaling_groups",
+    "sgroups_for_domains",
+    "users",
+    "groups",
+    "association_groups_users",
+    "virtual_entities",
+    "entity_memberships",
+    "scope_bindings",
+    "entity_membership_caps",
 )
 
 
@@ -245,9 +282,9 @@ class TestExampleUsersScalingGroupReference:
 
 
 class TestExampleUsersGraphOnAMigratedDatabase:
-    """A database whose graph an earlier release's migration already built holds a
-    node for the `default` scaling group and for its domain under ids of its own.
-    The seed declares a node for each of those entities under its pinned id."""
+    """A database an earlier install seeded holds its accounts, its projects and the
+    graph the migration built for them, the rows the migration made under ids of its own.
+    The seed declares all of them under pinned ids."""
 
     @pytest.fixture
     async def db_engine(
@@ -257,10 +294,16 @@ class TestExampleUsersGraphOnAMigratedDatabase:
             global_entity_ids,
             [
                 DomainRow,
+                UserResourcePolicyRow,
+                ProjectResourcePolicyRow,
                 ResourceGroupRow,
                 sgroups_for_domains,
+                UserRow,
+                ProjectRow,
+                association_groups_users,
                 VirtualEntityRow,
                 EntityMembershipRow,
+                EntityMembershipCapRow,
                 ScopeBindingRow,
             ],
         ):
@@ -271,53 +314,54 @@ class TestExampleUsersGraphOnAMigratedDatabase:
         self, db_engine: ExtendedAsyncSAEngine, seed: dict[str, Any]
     ) -> dict[str, Any]:
         """The seed's rows on this path, over a database an earlier install made."""
-        return copy.deepcopy({
-            key: seed[key]
-            for key in (
-                "domains",
-                "scaling_groups",
-                "sgroups_for_domains",
-                "virtual_entities",
-                "entity_memberships",
-                "scope_bindings",
-            )
-        })
+        return copy.deepcopy({key: seed[key] for key in _ACCOUNT_TABLES})
 
     @pytest.fixture
     async def migrated_database(
         self, db_engine: ExtendedAsyncSAEngine, migrated: dict[str, Any]
     ) -> ExtendedAsyncSAEngine:
+        """What the earlier install wrote: its account and project rows, the domain and
+        the scaling group under ids this database minted, and the graph nodes the
+        migration built for them under ids of their own."""
         for table in ("domains", "scaling_groups"):
             migrated[table][0].pop("id")
-        await populate_fixture(
-            db_engine, {key: migrated[key] for key in ("domains", "scaling_groups")}
-        )
+        await populate_fixture(db_engine, {key: migrated[key] for key in _MIGRATED_TABLES})
         async with db_engine.begin() as conn:
-            await provision_fixture_entities(conn, ("domains", "scaling_groups"))
+            await provision_fixture_entities(conn, _MIGRATED_ENTITIES)
         return db_engine
 
-    async def test_the_seed_lands_on_the_nodes_the_database_holds(
+    async def test_the_seed_lands_on_the_rows_and_nodes_the_database_holds(
         self,
         migrated_database: ExtendedAsyncSAEngine,
         migrated: dict[str, Any],
     ) -> None:
         await populate_fixture(
             migrated_database,
-            {
-                key: rows
-                for key, rows in migrated.items()
-                if key not in ("domains", "scaling_groups")
-            },
+            {key: rows for key, rows in migrated.items() if key not in _MIGRATED_TABLES},
         )
 
         async with migrated_database.begin_readonly_session() as db_sess:
             nodes = list((await db_sess.scalars(sa.select(VirtualEntityRow))).all())
             memberships = list((await db_sess.scalars(sa.select(EntityMembershipRow))).all())
             bindings = list(await db_sess.scalars(sa.select(ScopeBindingRow)))
+            roster = list((await db_sess.execute(sa.select(association_groups_users))).mappings())
+            held: dict[str, set[Any]] = {
+                "domain": set(await db_sess.scalars(sa.select(DomainRow.id))),
+                "resource_group": set(await db_sess.scalars(sa.select(ResourceGroupRow.id))),
+                "project": set(await db_sess.scalars(sa.select(ProjectRow.id))),
+                "user": set(await db_sess.scalars(sa.select(UserRow.uuid))),
+            }
+            group_ids = held["project"]
 
         node_ids = {node.id for node in nodes}
         assert len({(node.entity_type, node.entity_id) for node in nodes}) == len(nodes)
+        assert all(
+            node.entity_id in held[str(node.entity_type)]
+            for node in nodes
+            if str(node.entity_type) in held
+        )
         assert all(row.virtual_entity_id in node_ids for row in memberships)
         assert all(row.member_entity_id in node_ids for row in memberships)
         assert all(row.virtual_entity_id in node_ids for row in bindings)
         assert all(row.scope_entity_id in node_ids for row in bindings)
+        assert roster and all(row["group_id"] in group_ids for row in roster)

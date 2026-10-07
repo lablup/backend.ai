@@ -1380,41 +1380,37 @@ async def _reconcile_fixture_graph(
             if not rows or table is None:
                 continue
             await _resolve_fixture_references(conn, table, rows)
-            keyed = [row for row in rows if row.get("id") and all(c in row for c in key_columns)]
-            if not keyed:
+            if not any(row.get("id") for row in rows):
                 continue
             key_cols = [table.columns[column] for column in key_columns]
             id_col = table.columns["id"]
-            result = await conn.execute(
-                sa.select(id_col, *key_cols).where(
-                    sa.tuple_(*key_cols).in_([
-                        tuple(row[column] for column in key_columns) for row in keyed
-                    ])
-                )
-            )
-            held = {
-                tuple(row._mapping[column] for column in key_cols): row._mapping[id_col]
-                for row in result
-            }
+            result = await conn.execute(sa.select(id_col, *key_cols))
+            # Compared as text: a fixture value is whatever JSON holds, a row's is what
+            # the column's type decorator reads back.
+            held = {_fixture_key(row._mapping, key_cols): row._mapping[id_col] for row in result}
             remap = {
-                row["id"]: held[key]
-                for row in keyed
-                if (key := tuple(row[column] for column in key_columns)) in held
-                and held[key] != row["id"]
+                str(row["id"]): held[key]
+                for row in rows
+                if (key := _fixture_key(row, key_columns)) in held
+                and str(held[key]) != str(row["id"])
             }
             if remap:
                 _rewrite_fixture_graph_ids(graph_rows, remap)
 
 
+def _fixture_key(row: Mapping[Any, Any], columns: Sequence[Any]) -> tuple[str, ...]:
+    return tuple(str(row[column]) for column in columns)
+
+
 def _rewrite_fixture_graph_ids(
     graph_rows: Mapping[str, Sequence[dict[str, Any]]],
-    remap: Mapping[Any, Any],
+    remap: Mapping[str, Any],
 ) -> None:
     for rows in graph_rows.values():
         for row in rows:
             for column, value in row.items():
-                if isinstance(value, (str, uuid.UUID)) and value in remap:
-                    row[column] = remap[value]
+                if isinstance(value, (str, uuid.UUID)) and str(value) in remap:
+                    row[column] = remap[str(value)]
 
 
 async def _resolve_fixture_references(
