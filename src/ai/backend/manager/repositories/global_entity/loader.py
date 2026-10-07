@@ -4,22 +4,19 @@ import sqlalchemy as sa
 
 from ai.backend.common.data.entity.global_entity import GlobalEntityID, GlobalEntityName
 from ai.backend.common.data.entity.types import GlobalEntityType
-from ai.backend.manager.data.permission.global_entity import (
-    GlobalEntityIDCache,
-    GlobalEntityNameCache,
-)
+from ai.backend.manager.data.permission.global_entity import GlobalEntityIDCache
 from ai.backend.manager.errors.permission import GlobalEntityMissing
 from ai.backend.manager.models.global_entity.row import GlobalEntityRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.virtual_entity.virtual_entity import VirtualEntityRow
 
-__all__ = ("GlobalEntityCacheLoader",)
+__all__ = ("GlobalEntityIDLoader",)
 
 _RECOVERY_COMMAND = "backend.ai mgr permissions provision"
 
 
-class GlobalEntityCacheLoader:
-    """Reads the global entities that have a virtual entity and fills the id and name caches."""
+class GlobalEntityIDLoader:
+    """Reads the global entities that have a virtual entity and fills the id cache."""
 
     _db: ExtendedAsyncSAEngine
 
@@ -44,4 +41,3 @@ class GlobalEntityCacheLoader:
                 f" exist. Run `{_RECOVERY_COMMAND}` and restart the manager."
             )
         GlobalEntityIDCache.fill(ids)
-        GlobalEntityNameCache.fill({id_: name for name, id_ in ids.items()})

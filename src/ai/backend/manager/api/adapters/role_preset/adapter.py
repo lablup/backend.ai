@@ -60,7 +60,7 @@ from ai.backend.common.dto.manager.v2.role_preset.types import (
 )
 from ai.backend.manager.api.adapter_options.pagination.pagination import PaginationSpec
 from ai.backend.manager.api.adapters.base import BaseAdapter
-from ai.backend.manager.data.permission.global_entity import GlobalEntityNameCache
+from ai.backend.manager.data.permission.global_entity import GlobalEntityIDCache
 from ai.backend.manager.data.role_preset.types import (
     RolePermissionPresetData,
     RolePresetData,
@@ -492,9 +492,7 @@ class RolePresetAdapter(BaseAdapter):
     @staticmethod
     def _data_to_node(data: RolePresetData) -> RolePresetNode:
         global_scope = (
-            RolePresetGlobalScope(
-                GlobalEntityNameCache.name_of(GlobalEntityID(data.scope_id)).value
-            )
+            RolePresetGlobalScope(GlobalEntityIDCache.name_of(GlobalEntityID(data.scope_id)).value)
             if data.scope_type == GlobalEntityType() and data.scope_id is not None
             else None
         )

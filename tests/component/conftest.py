@@ -112,10 +112,7 @@ from ai.backend.manager.config.unified import (
 )
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.manager_status.types import ManagerStatus
-from ai.backend.manager.data.permission.global_entity import (
-    GlobalEntityIDCache,
-    GlobalEntityNameCache,
-)
+from ai.backend.manager.data.permission.global_entity import GlobalEntityIDCache
 from ai.backend.manager.data.secret.types import KeyProviderType
 from ai.backend.manager.data.user.types import UserStatus
 from ai.backend.manager.dependencies.infrastructure.redis import ValkeyClients
@@ -167,7 +164,7 @@ from ai.backend.manager.repositories.db.engine import (
     connect_database,
     create_async_engine,
 )
-from ai.backend.manager.repositories.global_entity.loader import GlobalEntityCacheLoader
+from ai.backend.manager.repositories.global_entity.loader import GlobalEntityIDLoader
 from ai.backend.manager.repositories.ops.repository import OpsRepository
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.repositories.ops.v2.resource_policy.provider import (
@@ -604,12 +601,11 @@ async def database_engine(
 ) -> AsyncIterator[ExtendedAsyncSAEngine]:
     """Provide a function-scoped ExtendedAsyncSAEngine for repository/service fixtures."""
     async with connect_database(bootstrap_config.db) as db:
-        await GlobalEntityCacheLoader(db).load()
+        await GlobalEntityIDLoader(db).load()
         try:
             yield db
         finally:
             GlobalEntityIDCache.clear()
-            GlobalEntityNameCache.clear()
 
 
 @pytest.fixture()
