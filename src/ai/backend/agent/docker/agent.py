@@ -2357,11 +2357,14 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
                     with timeout(90):
                         await container.delete(force=True, v=True)
                 except DockerError as e:
-                    if (
-                        e.status == HTTPStatus.CONFLICT and "already in progress" in e.message
-                    ) or e.status == HTTPStatus.NOT_FOUND:
+                    if e.status == HTTPStatus.CONFLICT and "already in progress" in e.message:
+                        # Whoever is removing the container also cleans what is left.
                         return
-                    log.exception("container delete failed", container_id=container_id)
+                    if e.status == HTTPStatus.NOT_FOUND:
+                        # Already gone: carry on so its scratch is still cleaned.
+                        log.debug("container already removed", container_id=container_id)
+                    else:
+                        log.exception("container delete failed", container_id=container_id)
                 except TimeoutError:
                     log.warning("container delete timed out", container_id=container_id)
 
