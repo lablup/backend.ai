@@ -33,9 +33,7 @@ from ai.backend.manager.errors.resource_slot import ResourceSlotTypeInUse
 from ai.backend.manager.errors.role_preset import SystemRoleNotEditable
 from ai.backend.manager.models.agent.row import AgentRow
 from ai.backend.manager.models.rbac_models.role.row import RoleRow
-from ai.backend.manager.models.resource_group.row import (
-    ResourceGroupRow,
-)
+from ai.backend.manager.models.resource_group.row import ResourceGroupRow
 from ai.backend.manager.models.resource_slot.purgers import ResourceSlotTypePurger
 from ai.backend.manager.models.resource_slot.row import (
     AgentResourceRow,

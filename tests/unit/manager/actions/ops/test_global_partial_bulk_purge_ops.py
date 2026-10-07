@@ -45,9 +45,7 @@ from ai.backend.manager.models.audit_log.row import AuditLogRow
 from ai.backend.manager.models.rbac_models.role.purgers import RolePurger
 from ai.backend.manager.models.rbac_models.role.row import RoleRow
 from ai.backend.manager.models.rbac_models.role_preset.row import RolePresetRow
-from ai.backend.manager.models.resource_group.row import (
-    ResourceGroupRow,
-)
+from ai.backend.manager.models.resource_group.row import ResourceGroupRow
 from ai.backend.manager.models.resource_slot.purgers import ResourceSlotTypePurger
 from ai.backend.manager.models.resource_slot.row import (
     AgentResourceRow,

@@ -20,9 +20,7 @@ from ai.backend.common.types import ResourceSlot
 from ai.backend.manager.data.permission.global_entity import global_entity_id
 from ai.backend.manager.data.resource_group.types import ResourceGroupOpts
 from ai.backend.manager.data.resource_preset.types import ResourcePresetData
-from ai.backend.manager.models.resource_group.row import (
-    ResourceGroupRow,
-)
+from ai.backend.manager.models.resource_group.row import ResourceGroupRow
 from ai.backend.manager.models.resource_preset.creators import ResourcePresetCreator
 from ai.backend.manager.models.resource_preset.row import ResourcePresetRow
 from ai.backend.manager.models.resource_preset.updaters import (

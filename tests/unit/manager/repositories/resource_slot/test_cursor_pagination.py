@@ -39,9 +39,7 @@ from ai.backend.manager.models.domain.row import DomainRow
 from ai.backend.manager.models.image.row import ImageRow
 from ai.backend.manager.models.kernel.row import KernelRow
 from ai.backend.manager.models.project.row import ProjectRow
-from ai.backend.manager.models.resource_group.row import (
-    ResourceGroupRow,
-)
+from ai.backend.manager.models.resource_group.row import ResourceGroupRow
 from ai.backend.manager.models.resource_policy.row import (
     ProjectResourcePolicyRow,
     UserResourcePolicyRow,

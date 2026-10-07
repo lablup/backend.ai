@@ -19,9 +19,7 @@ from ai.backend.manager.models.keypair.row import KeyPairRow
 from ai.backend.manager.models.project.row import ProjectRow
 from ai.backend.manager.models.rbac_models.role.row import RoleRow
 from ai.backend.manager.models.rbac_models.user_role.row import UserRoleRow
-from ai.backend.manager.models.resource_group.row import (
-    ResourceGroupRow,
-)
+from ai.backend.manager.models.resource_group.row import ResourceGroupRow
 from ai.backend.manager.models.resource_policy.row import (
     KeyPairResourcePolicyRow,
     ProjectResourcePolicyRow,

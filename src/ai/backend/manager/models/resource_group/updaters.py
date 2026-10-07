@@ -21,9 +21,7 @@ from ai.backend.manager.data.resource_group.types import (
 from ai.backend.manager.data.resource_group.types import PreemptionConfig as DataPreemptionConfig
 from ai.backend.manager.errors.repository import UniqueConstraintViolationError
 from ai.backend.manager.errors.resource import DefaultResourceGroupAlreadyExists
-from ai.backend.manager.models.resource_group.row import (
-    ResourceGroupRow,
-)
+from ai.backend.manager.models.resource_group.row import ResourceGroupRow
 from ai.backend.manager.models.resource_group.searchable_fields import (
     ResourceGroupSearchableFields,
 )

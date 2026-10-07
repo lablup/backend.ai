@@ -30,9 +30,7 @@ from ai.backend.manager.models.domain.row import DomainRow, domains
 from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.kernel.row import kernels
 from ai.backend.manager.models.project.row import groups
-from ai.backend.manager.models.resource_group.row import (
-    resource_groups,
-)
+from ai.backend.manager.models.resource_group.row import resource_groups
 from ai.backend.manager.models.session.row import SessionRow
 from ai.backend.manager.models.user.row import users
 

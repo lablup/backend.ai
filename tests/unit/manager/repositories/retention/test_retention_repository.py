@@ -78,9 +78,7 @@ from ai.backend.manager.models.project.row import ProjectRow, ProjectType
 from ai.backend.manager.models.rbac_models.role.row import RoleRow
 from ai.backend.manager.models.replica_group.row import ReplicaGroupRow
 from ai.backend.manager.models.replica_group_history.row import ReplicaGroupHistoryRow
-from ai.backend.manager.models.resource_group.row import (
-    ResourceGroupRow,
-)
+from ai.backend.manager.models.resource_group.row import ResourceGroupRow
 from ai.backend.manager.models.resource_policy.row import (
     KeyPairResourcePolicyRow,
     ProjectResourcePolicyRow,
