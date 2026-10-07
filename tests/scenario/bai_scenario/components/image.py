@@ -298,14 +298,14 @@ class ImagesWithTwoStatuses(Given[Any, ManyImagesAndACaller]):
 
 @dataclass(frozen=True)
 class CustomizedAndUncustomizedImages(Given[Any, ManyImagesAndACaller]):
-    """호출자를 위해 커밋된 커스텀 이미지와 커스텀 이미지가 아닌 이미지, 슈퍼관리자.
+    """호출자가 만든 커스텀 이미지와 커스텀 이미지가 아닌 이미지, 슈퍼관리자.
 
     `named`는 커스텀 이미지다.
     """
 
     @override
     def describe(self) -> str:
-        return "호출자를 위해 커밋된 커스텀 이미지 1개와 커스텀 이미지가 아닌 이미지 1개, superadmin 1명"
+        return "호출자가 만든 커스텀 이미지 1개와 커스텀 이미지가 아닌 이미지 1개, superadmin 1명"
 
     @override
     async def lay(self, seeding: Any) -> ManyImagesAndACaller:
@@ -329,16 +329,15 @@ class CustomizedAndUncustomizedImages(Given[Any, ManyImagesAndACaller]):
 
 @dataclass(frozen=True)
 class ImagesCommittedForTwoUsers(Given[Any, ManyImagesAndACaller]):
-    """호출자를 위해 커밋된 커스텀 이미지와 다른 사용자를 위해 커밋된 커스텀 이미지, 슈퍼관리자.
+    """호출자가 만든 커스텀 이미지와 다른 사용자가 만든 커스텀 이미지, 슈퍼관리자.
 
-    `named`는 호출자를 위해 커밋된 이미지다.
+    `named`는 호출자가 만든 이미지다.
     """
 
     @override
     def describe(self) -> str:
         return (
-            "호출자를 위해 커밋된 커스텀 이미지 1개와 다른 사용자를 위해 커밋된 커스텀 이미지 1개, "
-            "superadmin 1명"
+            "호출자가 만든 커스텀 이미지 1개와 다른 사용자가 만든 커스텀 이미지 1개, superadmin 1명"
         )
 
     @override
@@ -619,7 +618,7 @@ class TheImageNode(Then[Any, ImageNode]):
             Held(
                 "creator_id",
                 node.creator_id,
-                SameAs(image.creator_id, "미리 만들어 둔 이미지의 커밋 대상 사용자"),
+                SameAs(image.creator_id, "미리 만들어 둔 이미지의 작성자"),
             ),
             Held("created_at", node.created_at, written),
             Skipped("last_used_at", "세션이 기록하는 값이라 이 실행에서는 알 수 없다"),

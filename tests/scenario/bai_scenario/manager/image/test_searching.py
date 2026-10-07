@@ -107,7 +107,7 @@ class Searching(When[ManyImagesAndACaller, ImageAdapter, AdminSearchImagesPayloa
                 "커스텀 이미지로" if self.customized else "커스텀 이미지가 아닌 것으로"
             )
         if self.committed_for_caller:
-            conditions.append("자신을 커밋 대상 사용자로")
+            conditions.append("자신이 만든 이미지로")
         if self.descending:
             conditions.append("이름 내림차순으로 정렬해")
         conditions.append(self.paging.says())
@@ -408,15 +408,15 @@ class OnlyTheAliveImageIsReturned(Then[ManyImagesAndACaller, AdminSearchImagesPa
 
 @dataclass(frozen=True)
 class OnlyImagesOfTheCustomizationAreReturned(Then[ManyImagesAndACaller, AdminSearchImagesPayload]):
-    """커스텀 여부가 일치하는 이미지만, 커스텀 여부와 커밋 대상 사용자를 담아 반환된다."""
+    """커스텀 여부가 일치하는 이미지만, 커스텀 여부와 만든 사용자를 담아 반환된다."""
 
     customized: bool
 
     @override
     def says(self) -> str:
         if self.customized:
-            return "커스텀 이미지만 반환되고, 커밋 대상 사용자로 호출자가 담긴다"
-        return "커스텀 이미지가 아닌 이미지만 반환되고, 커밋 대상 사용자는 비어 있다"
+            return "커스텀 이미지만 반환되고, 만든 사용자로 호출자가 담긴다"
+        return "커스텀 이미지가 아닌 이미지만 반환되고, 만든 사용자는 비어 있다"
 
     @override
     def look(
@@ -436,9 +436,7 @@ class OnlyImagesOfTheCustomizationAreReturned(Then[ManyImagesAndACaller, AdminSe
             Held(
                 "creator_id",
                 [one.creator_id for one in payload.items],
-                SameAs(
-                    [one.creator_id for one in expected], "미리 만들어 둔 이미지의 커밋 대상 사용자"
-                ),
+                SameAs([one.creator_id for one in expected], "미리 만들어 둔 이미지의 작성자"),
             ),
             Same("total_count", payload.total_count, len(expected)),
             Same("has_next_page", payload.has_next_page, False),
@@ -450,11 +448,11 @@ class OnlyImagesOfTheCustomizationAreReturned(Then[ManyImagesAndACaller, AdminSe
 class OnlyTheImageCommittedForTheCallerIsReturned(
     Then[ManyImagesAndACaller, AdminSearchImagesPayload]
 ):
-    """호출자를 위해 커밋된 이미지만 반환된다."""
+    """호출자가 만든 이미지만 반환된다."""
 
     @override
     def says(self) -> str:
-        return "호출자를 위해 커밋된 이미지만 반환된다"
+        return "호출자가 만든 이미지만 반환된다"
 
     @override
     def look(
@@ -672,7 +670,7 @@ class SearchingByCustomizationReturnsOnlyTheMatch(
         if self.customized:
             return (
                 "커스텀 이미지와 커스텀 이미지가 아닌 이미지 중 커스텀 이미지로 검색하면 "
-                "커스텀 이미지만 커밋 대상 사용자와 함께 반환된다"
+                "커스텀 이미지만 만든 사용자와 함께 반환된다"
             )
         return (
             "커스텀 이미지와 커스텀 이미지가 아닌 이미지 중 커스텀 이미지가 아닌 것으로 검색하면 "
@@ -698,13 +696,13 @@ class SearchingByCreatorReturnsOnlyTheirImages(
 ):
     @override
     def summary(self) -> str:
-        return "filtering-images-by-creator-returns-only-images-committed-for-them"
+        return "filtering-images-by-creator-returns-only-images-they-made"
 
     @override
     def describe(self) -> str:
         return (
-            "호출자와 다른 사용자를 위해 각각 커밋된 커스텀 이미지 중 호출자를 커밋 대상 사용자로 "
-            "검색하면 호출자를 위해 커밋된 이미지만 반환된다"
+            "호출자와 다른 사용자가 각각 만든 커스텀 이미지 중 호출자가 만든 것으로 "
+            "검색하면 호출자가 만든 이미지만 반환된다"
         )
 
     @override
