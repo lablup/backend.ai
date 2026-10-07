@@ -17196,7 +17196,7 @@ type SessionV2ResourceInfo {
   resourceGroupName: String
 
   """
-  Added in 26.10.0. Placement group ID. Null if no placement constraint is set.
+  Added in 26.10.0. Placement group ID. Null if the session does not belong to a session group.
   """
   sessionGroupId: UUID
 

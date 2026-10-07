@@ -546,7 +546,7 @@ class SessionV2ResourceInfoGQL:
     session_group_id: UUID | None = gql_added_field(
         BackendAIGQLMeta(
             added_version=NEXT_RELEASE_VERSION,
-            description="Placement group ID. Null if no placement constraint is set.",
+            description="Placement group ID. Null if the session does not belong to a session group.",
         )
     )
     designated_agent_ids: list[str] | None = gql_added_field(

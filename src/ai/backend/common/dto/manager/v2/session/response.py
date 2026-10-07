@@ -427,7 +427,8 @@ class SessionResourceInfoGQLDTO(BaseResponseModel):
         description="The resource group (scaling group) this session is assigned to.",
     )
     session_group_id: UUID | None = Field(
-        default=None, description="Placement group ID. Null if no placement constraint is set."
+        default=None,
+        description="Placement group ID. Null if the session does not belong to a session group.",
     )
     designated_agent_ids: list[str] | None = Field(
         default=None, description="Agent IDs designated at session creation."
