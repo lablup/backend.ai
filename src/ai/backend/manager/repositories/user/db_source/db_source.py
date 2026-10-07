@@ -38,6 +38,11 @@ from ai.backend.manager.data.user.types import (
     UserData,
     UserSearchResult,
 )
+from ai.backend.manager.data.vfolder.types import (
+    VFolderStatusSet,
+    VFolderStorageTarget,
+    vfolder_status_map,
+)
 from ai.backend.manager.errors.keypair import NoDefaultKeypairResourcePolicy
 from ai.backend.manager.errors.resource import PersonalProjectNotFound
 from ai.backend.manager.errors.user import (
@@ -93,10 +98,7 @@ from ai.backend.manager.models.user.searchers import UserSearcher
 from ai.backend.manager.models.user.updaters import UserUpdater
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.vfolder.row import (
-    VFolderDeletionInfo,
     VFolderRow,
-    VFolderStatusSet,
-    vfolder_status_map,
     vfolders,
 )
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
@@ -517,7 +519,7 @@ class UserDBSource:
         """
         Delete user's all virtual folders as well as their physical data.
         """
-        target_vfs: list[VFolderDeletionInfo] = []
+        target_vfs: list[VFolderStorageTarget] = []
         async with self._db.begin_session() as db_session:
             result = await db_session.scalars(
                 sa.select(VFolderRow).where(
@@ -530,7 +532,7 @@ class UserDBSource:
             rows = result.fetchall()
             for vf in rows:
                 target_vfs.append(
-                    VFolderDeletionInfo(VFolderID.from_row(vf), vf.host, vf.unmanaged_path)
+                    VFolderStorageTarget(VFolderID.from_row(vf), vf.host, vf.unmanaged_path)
                 )
 
         storage_ptask_group = aiotools.PersistentTaskGroup()

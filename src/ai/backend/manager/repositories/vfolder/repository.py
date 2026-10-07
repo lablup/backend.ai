@@ -38,14 +38,18 @@ from ai.backend.manager.data.project.types import ProjectResourceInfo
 from ai.backend.manager.data.vfolder.dto import UserIdentity
 from ai.backend.manager.data.vfolder.types import (
     UserWithVFolderHostPermissions,
-    ValidatedVFolderInfo,
+    VFolderCloneInfo,
     VFolderCreation,
     VFolderData,
     VFolderInvitationData,
     VFolderMountPolicyData,
     VFolderOperationStatus,
     VFolderOwnershipType,
+    VFolderStatusSet,
+    VFolderStorageTarget,
+    vfolder_status_map,
 )
+from ai.backend.manager.defs import is_unmanaged
 from ai.backend.manager.errors.api import InvalidAPIParameters
 from ai.backend.manager.errors.auth import AuthorizationFailed
 from ai.backend.manager.errors.entity_share import EntityShareNotFound
@@ -115,19 +119,8 @@ from ai.backend.manager.models.vfolder.queriers import (
     VFolderUserMountPolicyQuerier,
 )
 from ai.backend.manager.models.vfolder.row import (
-    HARD_DELETED_VFOLDER_STATUSES,
-    VFolderCloneInfo,
-    VFolderDeletionInfo,
     VFolderRow,
-    VFolderStatusSet,
     VFolderUserMountPolicyRow,
-    ensure_host_permission_allowed,
-    ensure_quota_scope_accessible_by_user,
-    get_allowed_vfolder_hosts_by_group,
-    get_allowed_vfolder_hosts_by_user,
-    get_sessions_by_mounted_folder,
-    is_unmanaged,
-    vfolder_status_map,
     vfolders,
 )
 from ai.backend.manager.models.vfolder.scopes import UserVFolderTarget
@@ -146,9 +139,18 @@ from ai.backend.manager.models.virtual_entity.queries import (
 from ai.backend.manager.repositories.base.integrity import match_integrity_error
 from ai.backend.manager.repositories.ops.v2.share.provider import ShareOpsProvider
 from ai.backend.manager.repositories.ops.v2.share.write import V2ShareWriteOps
+from ai.backend.manager.repositories.vfolder.host_permission import (
+    ensure_host_permission_allowed,
+    get_allowed_vfolder_hosts_by_group,
+    get_allowed_vfolder_hosts_by_user,
+)
 from ai.backend.manager.repositories.vfolder.purge_guards import (
     find_active_vfolder_references,
+    get_sessions_by_mounted_folder,
     vfolder_reference_conflict_checks,
+)
+from ai.backend.manager.repositories.vfolder.quota_scope import (
+    ensure_quota_scope_accessible_by_user,
 )
 from ai.backend.manager.repositories.vfolder.types import (
     BulkVFolderPurgeResult,
@@ -549,7 +551,7 @@ class VfolderRepository:
                     quota_scope_id=vfolder_row.quota_scope_id,
                     folder_id=vfolder_row.id,
                 )
-                deletion_info = VFolderDeletionInfo(
+                deletion_info = VFolderStorageTarget(
                     vfolder_id=vfolder_id_obj,
                     host=vfolder_row.host,
                     unmanaged_path=vfolder_row.unmanaged_path,
@@ -984,7 +986,7 @@ class VfolderRepository:
                 .select_from(VFolderRow)
                 .where(
                     (VFolderRow.user == user_id)
-                    & (VFolderRow.status.not_in(HARD_DELETED_VFOLDER_STATUSES))
+                    & (VFolderRow.status.not_in(VFolderOperationStatus.hard_deleted()))
                 )
             )
             result = await session.scalar(query)
@@ -1003,7 +1005,7 @@ class VfolderRepository:
                 .where(
                     (VFolderRow.group == group_id)
                     & (VFolderRow.ownership_type == VFolderOwnershipType.GROUP)
-                    & (VFolderRow.status.not_in(HARD_DELETED_VFOLDER_STATUSES))
+                    & (VFolderRow.status.not_in(VFolderOperationStatus.hard_deleted()))
                 )
             )
             result = await session.scalar(query)
@@ -1017,7 +1019,7 @@ class VfolderRepository:
                 sa.select(VFolderRow.id)
                 .where(
                     VFolderRow.name == name,
-                    VFolderRow.status.not_in(HARD_DELETED_VFOLDER_STATUSES),
+                    VFolderRow.status.not_in(VFolderOperationStatus.hard_deleted()),
                     scope.to_condition()(),
                 )
                 .exists()
@@ -1555,7 +1557,7 @@ class VfolderRepository:
         permission: VFolderHostPermission,
         allowed_vfolder_types: Sequence[str],
         resource_policy: Mapping[str, Any],
-    ) -> ValidatedVFolderInfo:
+    ) -> VFolderStorageTarget:
         """
         Resolve user from context, validate vfolder access, check host permission,
         and return validated VFolderID with storage info.
@@ -1572,7 +1574,7 @@ class VfolderRepository:
             resource_policy=resource_policy,
             domain_name=vfolder_data.domain_name,
         )
-        return ValidatedVFolderInfo(
+        return VFolderStorageTarget(
             vfolder_id=VFolderID(
                 quota_scope_id=vfolder_data.quota_scope_id,
                 folder_id=vfolder_data.id,

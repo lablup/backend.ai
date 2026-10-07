@@ -124,6 +124,7 @@ from ai.backend.manager.data.session.options import (
     ResourceOpts,
 )
 from ai.backend.manager.data.session.types import SessionStatus
+from ai.backend.manager.data.vfolder.types import verify_vfolder_name
 from ai.backend.manager.models.agent.row import AgentRow, agents
 from ai.backend.manager.models.domain.row import domains
 from ai.backend.manager.models.endpoint.row import EndpointRow
@@ -149,9 +150,6 @@ from ai.backend.manager.models.session.row import (
     handle_session_exception,
 )
 from ai.backend.manager.models.user.row import UserRow
-from ai.backend.manager.models.vfolder.row import (
-    verify_vfolder_name,
-)
 from ai.backend.manager.plugin.network import NetworkPluginContext
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.repositories.resource_slot.repository import ResourceSlotRepository

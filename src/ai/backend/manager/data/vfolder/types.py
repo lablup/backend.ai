@@ -4,12 +4,13 @@ import enum
 import uuid
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Any, override
+from typing import Any, Final, override
 
 from ai.backend.common.data.entity.types import EntityData, EntityIdentifier, FieldData
 from ai.backend.common.data.entity.vfolder import VFolderUUID
 from ai.backend.common.data.entity.vfolder_mount_policy import VFolderMountPolicyID
 from ai.backend.common.data.user.types import UserRole
+from ai.backend.common.defs import RESERVED_VFOLDER_PATTERNS, RESERVED_VFOLDERS
 from ai.backend.common.dto.manager.field import (
     VFolderOperationStatusField,
     VFolderOwnershipTypeField,
@@ -24,6 +25,15 @@ from ai.backend.common.types import (
     VFolderUsageMode,
 )
 from ai.backend.manager.errors.resource import DataTransformationFailed
+
+
+def verify_vfolder_name(folder: str) -> bool:
+    if folder in RESERVED_VFOLDERS:
+        return False
+    for pattern in RESERVED_VFOLDER_PATTERNS:
+        if pattern.match(folder):
+            return False
+    return True
 
 
 class VFolderOwnershipType(CIStrEnum):
@@ -110,6 +120,21 @@ class VFolderOperationStatus(enum.StrEnum):
         """
         return frozenset({cls.DELETE_ONGOING, cls.DELETE_ERROR})
 
+    @classmethod
+    def hard_deleted(cls) -> frozenset[VFolderOperationStatus]:
+        """Statuses of a folder whose storage is gone or failed to go; only its row remains."""
+        return frozenset({cls.DELETE_COMPLETE, cls.DELETE_ERROR})
+
+    @classmethod
+    def dead(cls) -> frozenset[VFolderOperationStatus]:
+        """Statuses of a folder in the trash or past it, which no session may mount."""
+        return frozenset({
+            cls.DELETE_PENDING,
+            cls.DELETE_ONGOING,
+            cls.DELETE_COMPLETE,
+            cls.DELETE_ERROR,
+        })
+
     @override
     @classmethod
     def _missing_(cls, value: Any) -> VFolderOperationStatus | None:
@@ -152,6 +177,107 @@ class VFolderOperationStatus(enum.StrEnum):
 
     def to_field(self) -> VFolderOperationStatusField:
         return VFolderOperationStatusField(self)
+
+
+class VFolderStatusSet(enum.StrEnum):
+    """
+    Acts as an alias to represent set of VFolder statuses. Use this value as a key of
+    `vfolder_status_map` dictionary to retrieve actual `VFolderOperationStatus` values.
+    """
+
+    ALL = "all"
+    """Represents VFolder in all state"""
+
+    READABLE = "readable"
+    """Represents VFolder in a normal (readable, mountable and clonable) state"""
+
+    MOUNTABLE = "mountable"
+    """Represents VFolder in a mountable state"""
+
+    UPDATABLE = "updatable"
+    """Represents VFolder in idle (not performing active clone or removal) state"""
+
+    DELETABLE = "deletable"
+    """Simillar with UPDATABLE but does not allow VFolder in MOUNTED state"""
+
+    PURGABLE = "purgable"
+    """Represents VFolder located in trash bin. The meaning of `purge` here is
+    completely different between our VFolder `/purge` API so be sure not to confuse.
+    That API will be renamed any soon in a more self-representitive way."""
+
+    RECOVERABLE = "recoverable"
+    """alias of VFolderStatusSet.PURGABLE"""
+
+    INACCESSIBLE = "inaccessible"
+    """Represents VFolder which is now completely removed from storage and only its record is being kept"""
+
+    OWNER_PURGABLE = "owner-purgable"
+    """Represents VFolder whose storage payload must be reclaimed when its owning
+    user or group is purged. Unlike DELETABLE, this includes folders in the trash
+    bin and folders whose previous deletion stalled or failed, since the owner row
+    is removed right after and any skipped folder becomes a permanent orphan."""
+
+
+vfolder_status_map: Final[dict[VFolderStatusSet, set[VFolderOperationStatus]]] = {
+    VFolderStatusSet.ALL: {
+        VFolderOperationStatus.READY,
+        VFolderOperationStatus.CREATING,
+        VFolderOperationStatus.PERFORMING,
+        VFolderOperationStatus.CLONING,
+        VFolderOperationStatus.MOUNTED,
+        VFolderOperationStatus.ERROR,
+        VFolderOperationStatus.DELETE_PENDING,
+        VFolderOperationStatus.DELETE_ONGOING,
+        VFolderOperationStatus.DELETE_COMPLETE,
+        VFolderOperationStatus.DELETE_ERROR,
+    },
+    VFolderStatusSet.READABLE: {
+        VFolderOperationStatus.READY,
+        VFolderOperationStatus.PERFORMING,
+        VFolderOperationStatus.CLONING,
+        VFolderOperationStatus.MOUNTED,
+        VFolderOperationStatus.ERROR,
+        VFolderOperationStatus.DELETE_PENDING,
+    },
+    VFolderStatusSet.MOUNTABLE: {
+        VFolderOperationStatus.READY,
+        VFolderOperationStatus.PERFORMING,
+        VFolderOperationStatus.CLONING,
+        VFolderOperationStatus.MOUNTED,
+    },
+    # if UPDATABLE access status is requested, READY and MOUNTED operation statuses are accepted.
+    VFolderStatusSet.UPDATABLE: {
+        VFolderOperationStatus.READY,
+        VFolderOperationStatus.MOUNTED,
+    },
+    # if DELETABLE access status is requested, only READY operation status is accepted.
+    VFolderStatusSet.DELETABLE: {
+        VFolderOperationStatus.READY,
+    },
+    # if DELETABLE access status is requested, DELETE_PENDING, DELETE_COMPLETE operation status is accepted.
+    # CREATING is purgable: the row is there but its storage folder may not be, and
+    # nobody can have used it — a readable or mountable state it never was.
+    VFolderStatusSet.PURGABLE: {
+        VFolderOperationStatus.CREATING,
+        VFolderOperationStatus.DELETE_PENDING,
+        VFolderOperationStatus.DELETE_COMPLETE,
+    },
+    VFolderStatusSet.RECOVERABLE: {
+        VFolderOperationStatus.DELETE_PENDING,
+    },
+    VFolderStatusSet.INACCESSIBLE: {
+        VFolderOperationStatus.DELETE_COMPLETE,
+    },
+    # DELETE_COMPLETE is excluded: its storage payload is already gone, so there
+    # is nothing left to reclaim on owner purge.
+    VFolderStatusSet.OWNER_PURGABLE: {
+        VFolderOperationStatus.READY,
+        VFolderOperationStatus.CREATING,
+        VFolderOperationStatus.DELETE_PENDING,
+        VFolderOperationStatus.DELETE_ONGOING,
+        VFolderOperationStatus.DELETE_ERROR,
+    },
+}
 
 
 @dataclass(frozen=True)
@@ -251,40 +377,6 @@ class VFolderCreation:
 
 
 @dataclass
-class VFolderDeleteParams:
-    vfolder_id: VFolderID
-    host: str
-    unmanaged_path: str | None = None
-
-
-class DeleteStatus(enum.StrEnum):
-    DELETE_ONGOING = "delete_ongoing"
-    ALREADY_DELETED = "already_deleted"
-    ERROR = "error"
-
-
-@dataclass
-class VFolderDeleteResult:
-    """
-    Result of a VFolder delete operation.
-    """
-
-    vfolder_id: VFolderID
-    status: DeleteStatus
-
-
-@dataclass
-class ValidatedVFolderInfo:
-    """
-    VFolder info returned after access validation and host permission checks.
-    """
-
-    vfolder_id: VFolderID
-    host: str
-    unmanaged_path: str | None
-
-
-@dataclass
 class VFolderLocation:
     """
     Minimal VFolder location information for storage access.
@@ -296,3 +388,30 @@ class VFolderLocation:
     host: str
     ownership_type: VFolderOwnershipType
     usage_mode: VFolderUsageMode = VFolderUsageMode.GENERAL
+
+
+@dataclass(frozen=True)
+class VFolderStorageTarget:
+    """Where a vfolder lives in storage: its id, its host and an unmanaged path if it has one."""
+
+    vfolder_id: VFolderID
+    host: str
+    unmanaged_path: str | None
+
+
+@dataclass(frozen=True)
+class VFolderCloneInfo:
+    source_vfolder_id: VFolderID
+    source_host: str
+    unmanaged_path: str | None
+    domain_name: str
+
+    # Target Vfolder infos
+    target_quota_scope_id: QuotaScopeID
+    target_vfolder_name: str
+    target_host: str
+    usage_mode: VFolderUsageMode
+    permission: VFolderMountPolicy
+    email: str
+    user_id: uuid.UUID
+    cloneable: bool

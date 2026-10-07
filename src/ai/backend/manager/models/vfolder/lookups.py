@@ -13,14 +13,13 @@ import sqlalchemy as sa
 from ai.backend.common.data.entity.types import EntityType, FieldType
 from ai.backend.common.data.entity.vfolder import VFolderEntityType, VFolderUUID
 from ai.backend.common.data.entity.vfolder_mount_policy import VFolderMountPolicyID
+from ai.backend.manager.data.vfolder.types import VFolderStatusSet, vfolder_status_map
 from ai.backend.manager.models.clauses import QueryCondition
 from ai.backend.manager.models.scopes import OperationScope
 from ai.backend.manager.models.specs.lookup import DataLookup, FieldKeyLookup
 from ai.backend.manager.models.vfolder.row import (
     VFolderRow,
-    VFolderStatusSet,
     VFolderUserMountPolicyRow,
-    vfolder_status_map,
 )
 
 __all__ = (
