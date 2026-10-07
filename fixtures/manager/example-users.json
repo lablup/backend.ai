@@ -62,7 +62,6 @@
             "status": "active",
             "status_info": "admin-requested",
             "domain_name": "default",
-            "domain_id": "b9e676dc-e23e-54c6-b350-e83fba4127e9",
             "resource_policy": "default",
             "role": "superadmin"
         },
@@ -77,7 +76,6 @@
             "status": "active",
             "status_info": "admin-requested",
             "domain_name": "default",
-            "domain_id": "b9e676dc-e23e-54c6-b350-e83fba4127e9",
             "resource_policy": "default",
             "role": "admin"
         },
@@ -92,7 +90,6 @@
             "status": "active",
             "status_info": "admin-requested",
             "domain_name": "default",
-            "domain_id": "b9e676dc-e23e-54c6-b350-e83fba4127e9",
             "resource_policy": "default",
             "role": "user"
         },
@@ -107,7 +104,6 @@
             "status": "active",
             "status_info": "admin-requested",
             "domain_name": "default",
-            "domain_id": "b9e676dc-e23e-54c6-b350-e83fba4127e9",
             "resource_policy": "default",
             "role": "user"
         },
@@ -122,7 +118,6 @@
             "status": "active",
             "status_info": "admin-requested",
             "domain_name": "default",
-            "domain_id": "b9e676dc-e23e-54c6-b350-e83fba4127e9",
             "resource_policy": "default",
             "role": "monitor"
         }
@@ -259,7 +254,7 @@
         {
             "id": "df651a2a-3138-5cbe-b6d4-081ddb8ae04d",
             "entity_type": "domain",
-            "entity_id": "b9e676dc-e23e-54c6-b350-e83fba4127e9"
+            "domain_name": "default"
         },
         {
             "id": "12e8b72e-9dc7-598f-953f-55576c104d19",
