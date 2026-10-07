@@ -2,11 +2,11 @@
 
 from __future__ import annotations
 
-from pydantic import Field
+from pydantic import Field, field_validator
 
 from ai.backend.common.api_handlers import BaseRequestModel
 from ai.backend.common.data.entity.role_preset import RolePresetID
-from ai.backend.common.data.entity.types import DeclaredEntityType
+from ai.backend.common.data.entity.types import DeclaredEntityType, EntityType, GlobalEntityType
 from ai.backend.common.dto.manager.query import StringFilter, ToManyFilter, UUIDFilter
 from ai.backend.common.dto.manager.v2.common import OrderDirection
 from ai.backend.common.dto.manager.v2.role_permission_preset.request import (
@@ -50,6 +50,13 @@ class CreateRolePresetInput(BaseRequestModel):
         default_factory=list,
         description="Permission entries carried by the preset.",
     )
+
+    @field_validator("scope_type")
+    @classmethod
+    def _reject_global_scope(cls, value: EntityType) -> EntityType:
+        if value == GlobalEntityType():
+            raise ValueError("a global role preset cannot be created through the API")
+        return value
 
 
 class UpdateRolePresetBody(BaseRequestModel):

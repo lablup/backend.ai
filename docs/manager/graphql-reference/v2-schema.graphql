@@ -6312,6 +6312,12 @@ type GetPresignedUploadURLPayload {
   fields: String!
 }
 
+"""Added in 26.10.0. A singleton scope of the global entity type."""
+enum GlobalEntityName {
+  GLOBAL
+  PUBLIC
+}
+
 extend type GroupNode implements Node @key(fields: "id") {
   """The Globally Unique ID of this object"""
   id: ID!
@@ -15361,6 +15367,16 @@ type RolePreset implements Node {
 
   """Scope type this preset targets (e.g., domain, project)."""
   scopeType: String!
+
+  """
+  Added in 26.10.0. The global entity a global preset's role is created in. Null when the preset is not global, or when it applies to every global entity.
+  """
+  scope: GlobalEntityName
+
+  """
+  Added in 26.10.0. Jinja template rendering the name of each role instantiated from this preset.
+  """
+  roleNameTemplate: String
 
   """
   Default value for the `auto_assign` flag copied onto roles instantiated from this preset.

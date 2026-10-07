@@ -14,7 +14,10 @@ from sqlalchemy.orm import InstrumentedAttribute
 
 from ai.backend.common.data.entity.role_preset import RolePresetID
 from ai.backend.common.data.entity.types import EntityType
+from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.role_preset.types import RolePresetData
+from ai.backend.manager.errors.repository import UniqueConstraintViolationError
+from ai.backend.manager.errors.role_preset import RolePresetNameConflict
 from ai.backend.manager.models.rbac_models.role_preset.row import RolePresetRow
 from ai.backend.manager.models.rbac_models.role_preset.searchable_fields import (
     RolePresetSearchableFields,
@@ -50,7 +53,17 @@ class RolePresetUpdater(DataUpdater[RolePresetRow, RolePresetData]):
     @property
     @override
     def integrity_error_checks(self) -> Sequence[IntegrityErrorCheck]:
-        return ()
+        return (
+            IntegrityErrorCheck(
+                violation_type=UniqueConstraintViolationError,
+                constraint_name="uq_role_presets_name",
+                error=RolePresetNameConflict(
+                    f"Role preset {self.preset_id} would share its name with another "
+                    "preset in the same scope",
+                    operation=ActionOperationType.UPDATE,
+                ),
+            ),
+        )
 
     @override
     def build_values(self) -> dict[str, Any]:

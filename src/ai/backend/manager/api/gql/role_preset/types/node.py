@@ -9,6 +9,7 @@ from uuid import UUID
 from strawberry import Info
 from strawberry.relay import Connection, Edge, NodeID, PageInfo
 
+from ai.backend.common.data.entity.global_entity import GlobalEntityName
 from ai.backend.common.data.entity.role_preset import RolePresetID
 from ai.backend.common.dto.manager.v2.role_permission_preset.request import (
     RolePermissionPresetFilter,
@@ -22,6 +23,7 @@ from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     gql_added_field,
     gql_connection_type,
+    gql_enum,
     gql_field,
     gql_node_type,
 )
@@ -35,6 +37,15 @@ from .permission import (
     RolePermissionPresetGQL,
     RolePermissionPresetOrderByGQL,
     RolePermissionPresetOrderFieldGQL,
+)
+
+GlobalEntityNameGQL: type[GlobalEntityName] = gql_enum(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="A singleton scope of the global entity type.",
+    ),
+    GlobalEntityName,
+    name="GlobalEntityName",
 )
 
 
@@ -56,6 +67,25 @@ class RolePresetGQL(PydanticNodeMixin[RolePresetNode]):
     name: str = gql_field(description="Role preset name.")
     scope_type: str = gql_field(
         description="Scope type this preset targets (e.g., domain, project)."
+    )
+    scope: GlobalEntityNameGQL | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description=(
+                "The global entity a global preset's role is created in. Null when the "
+                "preset is not global, or when it applies to every global entity."
+            ),
+        ),
+        default=None,
+    )
+    role_name_template: str | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description=(
+                "Jinja template rendering the name of each role instantiated from this preset."
+            ),
+        ),
+        default=None,
     )
     auto_assign: bool = gql_field(
         description=(
