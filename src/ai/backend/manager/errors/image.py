@@ -33,17 +33,6 @@ class ImageNotFound(EntityError, ObjectNotFound):
         return EntityErrorCode(ImageEntityType(), ActionOperationType.GET, ErrorDetail.NOT_FOUND)
 
 
-class ImagePurgeInProgress(EntityError, web.HTTPConflict):
-    """Raised when a write names an image a purge is working through."""
-
-    error_type = "https://api.backend.ai/probs/image-purge-in-progress"
-    error_title = "Image is being purged."
-
-    @override
-    def entity_error_code(self) -> EntityErrorCode:
-        return EntityErrorCode(ImageEntityType(), ActionOperationType.UPDATE, ErrorDetail.CONFLICT)
-
-
 class ImageAliasNotFound(FieldError, ObjectNotFound):
     object_name = "image alias"
 

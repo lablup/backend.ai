@@ -343,29 +343,6 @@ class ImageDBSource:
         except DBAPIError as e:
             raise AliasImageActionDBError(str(e)) from e
 
-    async def query_images_by_ids(
-        self,
-        image_ids: list[ImageID],
-        status_filter: list[ImageStatus] | None = None,
-    ) -> dict[ImageID, ImageDataWithDetails]:
-        """
-        Queries images by their IDs with optional status filter.
-        Returns a dictionary mapping ImageID to ImageDataWithDetails.
-        """
-        if not image_ids:
-            return {}
-
-        query = sa.select(ImageRow).where(ImageRow.id.in_(image_ids))
-        if status_filter:
-            query = query.where(ImageRow.status.in_(status_filter))
-
-        async with self._db.begin_readonly_session_read_committed() as session:
-            result = await session.execute(query)
-            images = [ImageSearchableFields.own.to_data(row) for row in result.scalars().all()]
-        async with self._ops_provider.read_ops() as r:
-            aliases = await aliases_by_image(r, [image.id for image in images])
-        return {image.id: image.to_detailed(aliases.get(image.id, [])) for image in images}
-
     async def clear_image_resource_limits_by_id(self, image_id: ImageID) -> ImageData:
         """
         Clears image resource limits by image ID.
