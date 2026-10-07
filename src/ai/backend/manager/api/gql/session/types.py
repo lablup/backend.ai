@@ -591,12 +591,12 @@ class SessionV2LifecycleInfoGQL:
         description="Timestamp when the session was terminated. Null if still active."
     )
     starts_at: datetime | None = gql_field(
-        description="Scheduled start time for the session, if applicable."
+        description="When the session started running. Null until it reaches RUNNING."
     )
     requested_starts_at: datetime | None = gql_added_field(
         BackendAIGQLMeta(
             added_version=NEXT_RELEASE_VERSION,
-            description="Reserved start time requested for a batch session.",
+            description="Reserved start time requested at creation. The scheduler honors it only for batch sessions.",
         )
     )
     batch_timeout: int | None = gql_field(

@@ -17076,10 +17076,12 @@ type SessionV2LifecycleInfo {
   """Timestamp when the session was terminated. Null if still active."""
   terminatedAt: DateTime
 
-  """Scheduled start time for the session, if applicable."""
+  """When the session started running. Null until it reaches RUNNING."""
   startsAt: DateTime
 
-  """Added in 26.10.0. Reserved start time requested for a batch session."""
+  """
+  Added in 26.10.0. Reserved start time requested at creation. The scheduler honors it only for batch sessions.
+  """
   requestedStartsAt: DateTime
 
   """Batch execution timeout in seconds. Applicable to batch sessions."""

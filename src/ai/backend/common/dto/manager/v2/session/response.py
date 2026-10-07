@@ -451,10 +451,11 @@ class SessionLifecycleInfoGQLDTO(BaseResponseModel):
         description="Timestamp when the session was terminated. Null if still active.",
     )
     starts_at: datetime | None = Field(
-        default=None, description="Scheduled start time for the session, if applicable."
+        default=None, description="When the session started running. Null until it reaches RUNNING."
     )
     requested_starts_at: datetime | None = Field(
-        default=None, description="Reserved start time requested for a batch session."
+        default=None,
+        description="Reserved start time requested at creation. The scheduler honors it only for batch sessions.",
     )
     batch_timeout: int | None = Field(
         default=None,
