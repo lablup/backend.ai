@@ -3,46 +3,20 @@ from __future__ import annotations
 import asyncio
 import logging
 import time
-from abc import ABCMeta, abstractmethod
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from typing import override
 
 from ai.backend.common.cron.base import PeriodicTask
-from ai.backend.common.data.entity.storage_backend import StorageBackendID
 from ai.backend.common.data.storage.types import (
     StorageStatusFailure,
     StorageStatusResult,
     StorageStatusSuccess,
 )
+from ai.backend.common.storage.backend.abc import AbstractStorageBackendStatusCheck
 from ai.backend.logging.structured import StructuredLogger
 
 log = StructuredLogger(logging.getLogger(__spec__.name))
-
-
-class AbstractStorageBackendStatusCheck[TResult](metaclass=ABCMeta):
-    """
-    The status check of one storage appliance, and nothing else.
-
-    It is not an abstraction of the appliance: it answers only whether the appliance is
-    reachable from this service. Everything else about a backend lives elsewhere.
-    """
-
-    @property
-    @abstractmethod
-    def backend_id(self) -> StorageBackendID:
-        """The operator-assigned id every service declaring this appliance writes down."""
-        raise NotImplementedError
-
-    @abstractmethod
-    async def check_status(self) -> TResult:
-        """
-        Answers whether this appliance is reachable from this service.
-
-        Separate from a volume's check because the two fail independently: an appliance
-        can answer its management API while the storage has gone away on one service.
-        """
-        raise NotImplementedError
 
 
 @dataclass

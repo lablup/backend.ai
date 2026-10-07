@@ -3,46 +3,20 @@ from __future__ import annotations
 import asyncio
 import logging
 import time
-from abc import ABCMeta, abstractmethod
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from typing import override
 
 from ai.backend.common.cron.base import PeriodicTask
-from ai.backend.common.data.entity.storage_volume import StorageVolumeID
 from ai.backend.common.data.storage.types import (
     StorageStatusFailure,
     StorageStatusResult,
     StorageStatusSuccess,
 )
+from ai.backend.common.storage.volume.abc import AbstractVolumeStatusCheck
 from ai.backend.logging.structured import StructuredLogger
 
 log = StructuredLogger(logging.getLogger(__spec__.name))
-
-
-class AbstractVolumeStatusCheck[TResult](metaclass=ABCMeta):
-    """
-    The status check of one volume, and nothing else.
-
-    It is not an abstraction of the volume: it answers only whether the volume is usable
-    on the service holding it. File and vfolder operations live elsewhere.
-    """
-
-    @property
-    @abstractmethod
-    def volume_id(self) -> StorageVolumeID:
-        """The operator-assigned id every service declaring this volume writes down."""
-        raise NotImplementedError
-
-    @abstractmethod
-    async def check_status(self) -> TResult:
-        """
-        Answers whether this volume is usable right now.
-
-        How that is decided is entirely the implementation's own: a device id
-        comparison, filesystem statistics, a marker file, a vendor API call, or none.
-        """
-        raise NotImplementedError
 
 
 @dataclass
