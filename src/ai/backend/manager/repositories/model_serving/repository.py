@@ -80,7 +80,6 @@ from ai.backend.manager.models.keypair.row import KeyPairRow
 from ai.backend.manager.models.project.row import resolve_group_name_or_id
 from ai.backend.manager.models.resource_group.row import resource_groups
 from ai.backend.manager.models.resource_group.searchers import AllowedResourceGroupsSearch
-from ai.backend.manager.models.resource_policy.row import keypair_resource_policies
 from ai.backend.manager.models.routing.row import RoutingRow
 from ai.backend.manager.models.routing.searchable_fields import ReplicaSearchableFields
 from ai.backend.manager.models.routing.searchers import RoutingDataSearcher
@@ -518,32 +517,21 @@ class ModelServingRepository:
             return vfolder_ownership_type
 
     @model_serving_repository_resilience.apply()
-    async def get_user_with_keypair(self, user_id: uuid.UUID) -> Any | None:
+    async def get_user_with_keypair(self, user_id: uuid.UUID) -> UserRow:
         """
         Get the user row joined with one of their keypairs.
         """
         async with self._db.begin_readonly_session_read_committed() as session:
             query = (
-                sa.select(UserRow, KeyPairRow)
+                sa.select(UserRow)
                 .select_from(sa.join(UserRow, KeyPairRow, KeyPairRow.user == UserRow.uuid))
                 .where(UserRow.uuid == user_id)
             )
             result = await session.execute(query)
-            return result.fetchone()
-
-    @model_serving_repository_resilience.apply()
-    async def get_keypair_resource_policy(self, policy_name: str) -> Any | None:
-        """
-        Get keypair resource policy by name.
-        """
-        async with self._db.begin_readonly_session_read_committed() as session:
-            query = (
-                sa.select(keypair_resource_policies)
-                .select_from(keypair_resource_policies)
-                .where(keypair_resource_policies.c.name == policy_name)
-            )
-            result = await session.execute(query)
-            return result.first()
+            user = result.scalar()
+            if user is None:
+                raise InvalidAPIParameters("User not found")
+            return user
 
     @model_serving_repository_resilience.apply()
     async def get_endpoint_for_appproxy_update(self, service_id: uuid.UUID) -> EndpointRow | None:
