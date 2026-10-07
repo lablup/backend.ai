@@ -6315,7 +6315,7 @@ type GetPresignedUploadURLPayload {
 """
 Added in 26.10.0. The global entity a global role preset's role is created in.
 """
-enum GlobalScopeKind {
+enum GlobalEntityName {
   GLOBAL
   PUBLIC
 }
@@ -15373,7 +15373,7 @@ type RolePreset implements Node {
   """
   Added in 26.10.0. The global entity a global preset's role is created in. Null when the preset is not global, or when it applies to every global entity.
   """
-  globalScope: GlobalScopeKind
+  globalScope: GlobalEntityName
 
   """
   Added in 26.10.0. Jinja template rendering the name of each role instantiated from this preset.

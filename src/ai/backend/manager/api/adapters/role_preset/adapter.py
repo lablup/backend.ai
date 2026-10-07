@@ -54,7 +54,6 @@ from ai.backend.common.dto.manager.v2.role_preset.response import (
     UpdateRolePresetPayload,
 )
 from ai.backend.common.dto.manager.v2.role_preset.types import (
-    GlobalScopeKind,
     RolePresetOrderField,
     RolePresetUsage,
 )
@@ -492,7 +491,7 @@ class RolePresetAdapter(BaseAdapter):
     @staticmethod
     def _data_to_node(data: RolePresetData) -> RolePresetNode:
         global_scope = (
-            GlobalScopeKind.of(GlobalEntityIDCache.name_of(GlobalEntityID(data.scope_id)))
+            GlobalEntityIDCache.name_of(GlobalEntityID(data.scope_id))
             if data.scope_type == GlobalEntityType() and data.scope_id is not None
             else None
         )
