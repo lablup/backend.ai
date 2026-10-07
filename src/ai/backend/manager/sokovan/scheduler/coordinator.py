@@ -468,7 +468,15 @@ class ScheduleCoordinator:
         with with_log_context(schedule_type=schedule_type, handler_name=handler.name()):
             log.debug("cleanup schedule processing")
 
-            with self._operation_metrics.measure_operation(handler.name()):
+            async with AsyncExitStack() as stack:
+                stack.enter_context(self._operation_metrics.measure_operation(handler.name()))
+                if handler.lock_id is not None:
+                    lock_lifetime = (
+                        self._config_provider.config.manager.session_schedule_lock_lifetime
+                    )
+                    await stack.enter_async_context(
+                        self._lock_factory(handler.lock_id, lock_lifetime)
+                    )
                 session_ids = await handler.fetch_session_ids()
                 if not session_ids:
                     return True

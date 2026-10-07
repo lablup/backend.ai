@@ -861,9 +861,11 @@ class TestForceTerminatedCleanupQueue:
             human_readable_name="test-force-terminated-cleanup",
         )
         try:
-            key = ValkeyScheduleClient._get_force_terminated_cleanup_key()
             async with client._client.client() as conn:
-                await conn.delete([key])
+                await conn.delete([
+                    ValkeyScheduleClient._get_force_terminated_cleanup_key(),
+                    ValkeyScheduleClient._get_force_terminated_release_attempts_key(),
+                ])
             yield client
         finally:
             await client.close()
@@ -903,6 +905,47 @@ class TestForceTerminatedCleanupQueue:
         result = await valkey_schedule_client.get_force_terminated_sessions()
 
         assert result == [sid_keep]
+
+    async def test_release_failures_are_counted_per_session(
+        self, valkey_schedule_client: ValkeyScheduleClient
+    ) -> None:
+        sid_a = SessionId(uuid4())
+        sid_b = SessionId(uuid4())
+
+        assert await valkey_schedule_client.get_force_terminated_release_attempts() == {}
+        assert await valkey_schedule_client.record_force_terminated_release_failure(sid_a) == 1
+        assert await valkey_schedule_client.record_force_terminated_release_failure(sid_a) == 2
+        assert await valkey_schedule_client.record_force_terminated_release_failure(sid_b) == 1
+
+        assert await valkey_schedule_client.get_force_terminated_release_attempts() == {
+            sid_a: 2,
+            sid_b: 1,
+        }
+
+    async def test_release_failure_count_expires(
+        self, valkey_schedule_client: ValkeyScheduleClient
+    ) -> None:
+        await valkey_schedule_client.record_force_terminated_release_failure(
+            SessionId(uuid4()), ttl_sec=600
+        )
+
+        key = ValkeyScheduleClient._get_force_terminated_release_attempts_key()
+        async with valkey_schedule_client._client.client() as conn:
+            ttl = await conn.ttl(key)
+        assert 0 < ttl <= 600
+
+    async def test_remove_also_forgets_release_failures(
+        self, valkey_schedule_client: ValkeyScheduleClient
+    ) -> None:
+        sid_keep = SessionId(uuid4())
+        sid_remove = SessionId(uuid4())
+        await valkey_schedule_client.add_force_terminated_sessions([sid_keep, sid_remove])
+        await valkey_schedule_client.record_force_terminated_release_failure(sid_keep)
+        await valkey_schedule_client.record_force_terminated_release_failure(sid_remove)
+
+        await valkey_schedule_client.remove_force_terminated_sessions([sid_remove])
+
+        assert await valkey_schedule_client.get_force_terminated_release_attempts() == {sid_keep: 1}
 
 
 class TestReplicaProbeTargetClient:

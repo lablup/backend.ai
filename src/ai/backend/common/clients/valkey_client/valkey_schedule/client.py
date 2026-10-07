@@ -1128,7 +1128,47 @@ class ValkeyScheduleClient:
         """
         if not session_ids:
             return
-        key = self._get_force_terminated_cleanup_key()
         members: list[str] = [str(sid) for sid in session_ids]
+        batch = Batch(is_atomic=True)
+        batch.srem(self._get_force_terminated_cleanup_key(), members)
+        batch.hdel(self._get_force_terminated_release_attempts_key(), members)
         async with self._client.client() as conn:
-            await conn.srem(key, members)
+            await conn.exec(batch, raise_on_error=True)
+
+    @staticmethod
+    def _get_force_terminated_release_attempts_key() -> str:
+        return "force_terminated_network_release_attempts"
+
+    @valkey_schedule_resilience.apply()
+    async def get_force_terminated_release_attempts(self) -> dict[SessionId, int]:
+        """
+        Read the failed network-release count of force-terminated sessions.
+        A session listed here has had its destroy RPCs sent already.
+        """
+        key = self._get_force_terminated_release_attempts_key()
+        async with self._client.client() as conn:
+            raw = await conn.hgetall(key)
+        if not raw:
+            return {}
+        return {SessionId(UUID(k.decode())): int(v) for k, v in raw.items()}
+
+    @valkey_schedule_resilience.apply()
+    async def record_force_terminated_release_failure(
+        self,
+        session_id: SessionId,
+        ttl_sec: int = FORCE_TERMINATED_CLEANUP_TTL_SEC,
+    ) -> int:
+        """
+        Count one failed network release of a force-terminated session.
+
+        :return: The number of failed releases so far
+        """
+        key = self._get_force_terminated_release_attempts_key()
+        batch = Batch(is_atomic=True)
+        batch.hincrby(key, str(session_id), 1)
+        batch.expire(key, ttl_sec)
+        async with self._client.client() as conn:
+            results = await conn.exec(batch, raise_on_error=True)
+        if not results:
+            return 0
+        return cast(int, results[0])

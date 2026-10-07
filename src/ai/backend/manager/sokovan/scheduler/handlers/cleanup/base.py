@@ -6,6 +6,7 @@ from abc import ABC, abstractmethod
 from collections.abc import Sequence
 
 from ai.backend.common.types import SessionId
+from ai.backend.manager.defs import LockID
 
 
 class CleanupHandler(ABC):
@@ -27,6 +28,12 @@ class CleanupHandler(ABC):
     def name(cls) -> str:
         """Get the name of the handler for logging and metrics."""
         raise NotImplementedError("Subclasses must implement name()")
+
+    @property
+    @abstractmethod
+    def lock_id(self) -> LockID | None:
+        """The lock the coordinator holds around fetch and execute; None runs unlocked."""
+        raise NotImplementedError("Subclasses must implement lock_id")
 
     @abstractmethod
     async def fetch_session_ids(self) -> Sequence[SessionId]:
