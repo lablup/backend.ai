@@ -12,9 +12,15 @@ to a service method of its own, and that promotion has to be visible at the wiri
 rather than hidden in an argument.
 """
 
+from collections.abc import Mapping, Sequence
 from typing import Any
 
-from ai.backend.common.data.entity.types import EntityData, FieldData
+from ai.backend.common.data.entity.types import (
+    EntityData,
+    FieldData,
+    FieldIdentifier,
+    RuntimeEntityID,
+)
 from ai.backend.manager.actions.run_status import ActionRunStatus
 from ai.backend.manager.actions.types import ActionOperationType, OperationStatus
 from ai.backend.manager.actions.v2.bulk.result import (
@@ -32,7 +38,10 @@ from ai.backend.manager.actions.v2.field.lookup import (
     FieldOwnerLookupOpsAction,
     RuntimeFieldOwnerLookupOpsAction,
 )
-from ai.backend.manager.actions.v2.field.ops import PartialBulkGetFieldOpsAction
+from ai.backend.manager.actions.v2.field.ops import (
+    PartialBulkGetFieldOpsAction,
+    PartialBulkGetOwnerCandidatesFieldOpsAction,
+)
 from ai.backend.manager.actions.v2.lookup.bulk_base import BulkLookupKeyResult
 from ai.backend.manager.actions.v2.ops.base import (
     BatchPurgeOpsAction,
@@ -92,6 +101,7 @@ from ai.backend.manager.actions.v2.ops.result import (
 )
 from ai.backend.manager.errors.base.entity import EntityNotFoundError
 from ai.backend.manager.errors.base.field import FieldNotFoundError
+from ai.backend.manager.models.specs.owner_candidates import FieldOwnerCandidates
 from ai.backend.manager.models.specs.types import BulkResultWithFailures
 from ai.backend.manager.repositories.ops.repository import OpsRepository
 
@@ -393,6 +403,24 @@ class BulkRuntimeFieldOwnerLookupService:
             for field_id in field_ids
         ]
         return BulkFieldOwnerLookupOpsResult(owners=owners, key_results=key_results)
+
+
+class FieldOwnerCandidatesService:
+    """Reads the owners of the field rows of a group whose rows belong to several."""
+
+    _repository: OpsRepository[Any]
+    _candidates: FieldOwnerCandidates[Any]
+
+    def __init__(
+        self, repository: OpsRepository[Any], candidates: FieldOwnerCandidates[Any]
+    ) -> None:
+        self._repository = repository
+        self._candidates = candidates
+
+    async def execute(
+        self, field_ids: Sequence[FieldIdentifier]
+    ) -> Mapping[FieldIdentifier, Sequence[RuntimeEntityID]]:
+        return await self._repository.field_owner_candidates(self._candidates, field_ids)
 
 
 class SearchService[TData: EntityData]:
@@ -769,7 +797,9 @@ class FieldPartialBulkGetService[TData: FieldData]:
         self._repository = repository
 
     async def execute(
-        self, action: PartialBulkGetFieldOpsAction[Any, Any, Any, TData]
+        self,
+        action: PartialBulkGetFieldOpsAction[Any, Any, Any, TData]
+        | PartialBulkGetOwnerCandidatesFieldOpsAction[Any, Any, TData],
     ) -> BulkFieldOpsResult[TData]:
         field_ids = action.field_ids()
         querier = action.to_querier()

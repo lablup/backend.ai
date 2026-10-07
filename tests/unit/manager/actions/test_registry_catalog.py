@@ -57,10 +57,14 @@ from ai.backend.manager.actions.registry.types import (
 from ai.backend.manager.actions.types import ActionBacking, ActionGate, ActionKind
 from ai.backend.manager.actions.v2.bulk.base import BaseBulkAction
 from ai.backend.manager.actions.v2.field.base import (
+    BaseNestedFieldSearchAction,
     BaseRuntimeSingleFieldAction,
     BaseSingleFieldAction,
 )
-from ai.backend.manager.actions.v2.field.bulk_base import BaseBulkFieldAction
+from ai.backend.manager.actions.v2.field.bulk_base import (
+    BaseBulkFieldAction,
+    BasePartialBulkOwnerCandidatesFieldAction,
+)
 from ai.backend.manager.actions.v2.global_scope.base import BaseGlobalAction
 from ai.backend.manager.actions.v2.global_scope.validator.refusing import (
     RefusingGlobalActionValidator,
@@ -311,6 +315,8 @@ _V2_ACTION_BASES: tuple[type[Any], ...] = (
     BaseSingleFieldAction,
     BaseRuntimeSingleFieldAction,
     BaseBulkFieldAction,
+    BaseNestedFieldSearchAction,
+    BasePartialBulkOwnerCandidatesFieldAction,
 )
 
 _SNAKE_CASE = re.compile(r"^[a-z][a-z0-9]*(_[a-z0-9]+)*$")

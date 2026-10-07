@@ -3,11 +3,17 @@
 from __future__ import annotations
 
 from collections.abc import Callable, Sequence
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, overload
 
 from ai.backend.common.data.entity.types import FieldIdentifier
-from ai.backend.manager.actions.v2.field.bulk_base import BasePartialBulkFieldAction
-from ai.backend.manager.actions.v2.field.bulk_processor import PartialBulkFieldActionProcessor
+from ai.backend.manager.actions.v2.field.bulk_base import (
+    BasePartialBulkFieldAction,
+    BasePartialBulkOwnerCandidatesFieldAction,
+)
+from ai.backend.manager.actions.v2.field.bulk_processor import (
+    PartialBulkFieldActionProcessor,
+    PartialBulkOwnerCandidatesFieldActionProcessor,
+)
 from ai.backend.manager.actions.v2.ops.result import BulkFieldOpsResult
 from ai.backend.manager.api.adapter_options.pagination.pagination import (
     PaginationOptions,
@@ -72,10 +78,33 @@ class BaseAdapter(BaseFilterAdapter):
                 conditions.append(negate_conditions(not_conditions))
         return conditions
 
+    @overload
     async def batch_load_fields[TAction: BasePartialBulkFieldAction[Any, Any], TData, TNode](
         self,
         processor: PartialBulkFieldActionProcessor[TAction, TData],
         action: TAction,
+        field_ids: Sequence[FieldIdentifier],
+        to_node: Callable[[TData], TNode],
+    ) -> list[TNode | Exception | None]: ...
+
+    @overload
+    async def batch_load_fields[
+        TAction: BasePartialBulkOwnerCandidatesFieldAction[Any],
+        TData,
+        TNode,
+    ](
+        self,
+        processor: PartialBulkOwnerCandidatesFieldActionProcessor[TAction, TData],
+        action: TAction,
+        field_ids: Sequence[FieldIdentifier],
+        to_node: Callable[[TData], TNode],
+    ) -> list[TNode | Exception | None]: ...
+
+    async def batch_load_fields[TData, TNode](
+        self,
+        processor: PartialBulkFieldActionProcessor[Any, TData]
+        | PartialBulkOwnerCandidatesFieldActionProcessor[Any, TData],
+        action: Any,
         field_ids: Sequence[FieldIdentifier],
         to_node: Callable[[TData], TNode],
     ) -> list[TNode | Exception | None]:

@@ -7,15 +7,20 @@ from typing import override
 from ai.backend.common.data.entity.types import EntityIdentifier, FieldData, FieldIdentifier
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.actions.v2.field.base import (
+    BaseNestedFieldSearchAction,
     BaseRuntimeSingleFieldAction,
     BaseSingleFieldAction,
 )
-from ai.backend.manager.actions.v2.field.bulk_base import BasePartialBulkFieldAction
+from ai.backend.manager.actions.v2.field.bulk_base import (
+    BasePartialBulkFieldAction,
+    BasePartialBulkOwnerCandidatesFieldAction,
+)
 from ai.backend.manager.actions.v2.ops.base import (
     FieldGetOpsAction,
     FieldPartialBulkGetOpsAction,
     FieldPartialBulkPurgeOpsAction,
     FieldPurgeOpsAction,
+    SearchOpsAction,
     UpdateOpsAction,
 )
 from ai.backend.manager.models.base import Base
@@ -28,6 +33,8 @@ __all__ = (
     "PurgeFieldOpsAction",
     "PartialBulkGetFieldOpsAction",
     "PartialBulkPurgeFieldOpsAction",
+    "NestedFieldSearchOpsAction",
+    "PartialBulkGetOwnerCandidatesFieldOpsAction",
 )
 
 
@@ -146,6 +153,35 @@ class PartialBulkGetFieldOpsAction[
     whose owner the caller may not read and a row matching nothing are both one failed
     item, told apart by the error each carries.
     """
+
+    @override
+    @classmethod
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.GET
+
+
+class NestedFieldSearchOpsAction[TFieldID: FieldIdentifier, TRow: Base, TData](
+    BaseNestedFieldSearchAction[TFieldID], SearchOpsAction[TRow, TData], ABC
+):
+    """A page of the rows nested under the field row the caller named."""
+
+    @override
+    @classmethod
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.SEARCH
+
+
+class PartialBulkGetOwnerCandidatesFieldOpsAction[
+    TFieldID: FieldIdentifier,
+    TRow: Base,
+    TData: FieldData,
+](
+    BasePartialBulkOwnerCandidatesFieldAction[TFieldID],
+    FieldPartialBulkGetOpsAction[TRow, TData],
+    ABC,
+):
+    """A read over the field rows the caller named, each reached through any one of its
+    owners."""
 
     @override
     @classmethod
