@@ -53,7 +53,7 @@ class CreateRolePresetInput(BaseRequestModel):
 
     @field_validator("scope_type")
     @classmethod
-    def _reject_global_scope(cls, value: EntityType) -> EntityType:
+    def _validate_scope_type(cls, value: EntityType) -> EntityType:
         if value == GlobalEntityType():
             raise ValueError("a global role preset cannot be created through the API")
         return value
