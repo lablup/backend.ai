@@ -17049,6 +17049,14 @@ input SessionV2Filter {
 
   """Added in 26.10.0. Filter by the deployment replica the session serves."""
   replicaId: UUIDFilter = null
+
+  """Added in 26.10.0. Filter by the session group the session belongs to."""
+  sessionGroupId: UUIDFilter = null
+
+  """
+  Added in 26.10.0. Filter by the reserved start time requested at creation.
+  """
+  requestedStartsAt: DateTimeFilter = null
   AND: [SessionV2Filter!] = null
   OR: [SessionV2Filter!] = null
   NOT: [SessionV2Filter!] = null
@@ -17185,6 +17193,8 @@ enum SessionV2OrderField {
   NETWORK_TYPE
   NETWORK_ID
   REPLICA_ID
+  SESSION_GROUP_ID
+  REQUESTED_STARTS_AT
 }
 
 """Added in 26.3.0. Resource allocation information for a session."""

@@ -834,6 +834,8 @@ class SessionAdapter(BaseAdapter):
             *self.apply_enum_filter(f.network_type, fields.network_type.filter),
             *self.apply_string_filter(f.network_id, fields.network_id.filter),
             *self.apply_uuid_filter(f.replica_id, fields.replica_id.filter),
+            *self.apply_uuid_filter(f.session_group_id, fields.session_group_id.filter),
+            *self.apply_datetime_filter(f.requested_starts_at, fields.requested_starts_at.filter),
         ]
         if f.AND:
             for sub in f.AND:
@@ -907,6 +909,10 @@ class SessionAdapter(BaseAdapter):
                 return fields.network_id.order.apply(ascending)
             case SessionOrderField.REPLICA_ID:
                 return fields.replica_id.order.apply(ascending)
+            case SessionOrderField.SESSION_GROUP_ID:
+                return fields.session_group_id.order.apply(ascending)
+            case SessionOrderField.REQUESTED_STARTS_AT:
+                return fields.requested_starts_at.order.apply(ascending)
             case _:
                 assert_never(order.field)
 

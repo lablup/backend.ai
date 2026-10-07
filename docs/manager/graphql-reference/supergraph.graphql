@@ -23127,6 +23127,14 @@ input SessionV2Filter
 
   """Added in 26.10.0. Filter by the deployment replica the session serves."""
   replicaId: UUIDFilter = null
+
+  """Added in 26.10.0. Filter by the session group the session belongs to."""
+  sessionGroupId: UUIDFilter = null
+
+  """
+  Added in 26.10.0. Filter by the reserved start time requested at creation.
+  """
+  requestedStartsAt: DateTimeFilter = null
   AND: [SessionV2Filter!] = null
   OR: [SessionV2Filter!] = null
   NOT: [SessionV2Filter!] = null
@@ -23277,6 +23285,8 @@ enum SessionV2OrderField
   NETWORK_TYPE @join__enumValue(graph: STRAWBERRY)
   NETWORK_ID @join__enumValue(graph: STRAWBERRY)
   REPLICA_ID @join__enumValue(graph: STRAWBERRY)
+  SESSION_GROUP_ID @join__enumValue(graph: STRAWBERRY)
+  REQUESTED_STARTS_AT @join__enumValue(graph: STRAWBERRY)
 }
 
 """Added in 26.3.0. Resource allocation information for a session."""

@@ -202,6 +202,8 @@ class SessionV2OrderFieldGQL(StrEnum):
     NETWORK_TYPE = "network_type"
     NETWORK_ID = "network_id"
     REPLICA_ID = "replica_id"
+    SESSION_GROUP_ID = "session_group_id"
+    REQUESTED_STARTS_AT = "requested_starts_at"
 
 
 @gql_pydantic_input(
@@ -440,6 +442,20 @@ class SessionV2FilterGQL(PydanticInputMixin[SessionFilter]):
         BackendAIGQLMeta(
             added_version=NEXT_RELEASE_VERSION,
             description="Filter by the deployment replica the session serves.",
+        ),
+        default=None,
+    )
+    session_group_id: UUIDFilter | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="Filter by the session group the session belongs to.",
+        ),
+        default=None,
+    )
+    requested_starts_at: DateTimeFilter | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="Filter by the reserved start time requested at creation.",
         ),
         default=None,
     )
