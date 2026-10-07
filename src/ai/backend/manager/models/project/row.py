@@ -212,9 +212,6 @@ class ProjectRow(LifecycleTimestampsMixin, Base):
     sgroup_for_groups_rows: Mapped[list[ResourceGroupForProjectRow]] = relationship(
         "ResourceGroupForProjectRow"
     )
-    # Only the role lookup functions in models/rbac/__init__.py read this, and their
-    # callers are the legacy RBAC builders. Delete it with the legacy RBAC cleanup.
-    users: Mapped[list[AssocGroupUserRow]] = relationship("AssocGroupUserRow")
     # Read by gql_legacy (network.py, resource_policy.py, vfolder.py) and ProjectRow.get.
     # v2 (the vfolder repository) joins ProjectResourcePolicyRow directly from F-1 on.
     # Delete it with the gql_legacy cleanup.
