@@ -8,6 +8,7 @@ from uuid import UUID
 from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseRequestModel
+from ai.backend.common.data.entity.global_entity import GlobalEntityName
 
 __all__ = (
     "GlobalScopeKind",
@@ -22,6 +23,14 @@ class GlobalScopeKind(StrEnum):
 
     GLOBAL = "global"
     PUBLIC = "public"
+
+    @classmethod
+    def of(cls, name: GlobalEntityName) -> GlobalScopeKind:
+        match name:
+            case GlobalEntityName.GLOBAL:
+                return cls.GLOBAL
+            case GlobalEntityName.PUBLIC:
+                return cls.PUBLIC
 
 
 class RolePresetOrderField(StrEnum):

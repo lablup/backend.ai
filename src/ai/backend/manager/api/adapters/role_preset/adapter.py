@@ -492,7 +492,7 @@ class RolePresetAdapter(BaseAdapter):
     @staticmethod
     def _data_to_node(data: RolePresetData) -> RolePresetNode:
         global_scope = (
-            GlobalScopeKind(GlobalEntityIDCache.name_of(GlobalEntityID(data.scope_id)).value)
+            GlobalScopeKind.of(GlobalEntityIDCache.name_of(GlobalEntityID(data.scope_id)))
             if data.scope_type == GlobalEntityType() and data.scope_id is not None
             else None
         )
