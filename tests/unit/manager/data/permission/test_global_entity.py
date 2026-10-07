@@ -8,6 +8,7 @@ import pytest
 from ai.backend.common.data.entity.global_entity import GlobalEntityID, GlobalEntityName
 from ai.backend.manager.data.permission.global_entity import (
     GlobalEntityIDCache,
+    GlobalEntityNameCache,
     global_entity_id,
 )
 from ai.backend.manager.errors.permission import GlobalEntityMissing, GlobalEntityNotLoaded
@@ -38,32 +39,47 @@ class TestGlobalEntityIDCache:
         for name in GlobalEntityName:
             assert global_entity_id(name) == ids[name]
 
+
+class TestGlobalEntityNameCache:
+    @pytest.fixture(autouse=True)
+    def cleared(self) -> Iterator[None]:
+        GlobalEntityNameCache.clear()
+        yield
+        GlobalEntityNameCache.clear()
+
     @pytest.fixture
     def loaded_ids(self) -> dict[GlobalEntityName, GlobalEntityID]:
         ids = {name: GlobalEntityID(uuid.uuid4()) for name in GlobalEntityName}
-        GlobalEntityIDCache.fill(ids)
+        GlobalEntityNameCache.fill({id_: name for name, id_ in ids.items()})
         return ids
+
+    def test_fill_without_every_name_raises_and_stays_unloaded(self) -> None:
+        with pytest.raises(GlobalEntityMissing):
+            GlobalEntityNameCache.fill({GlobalEntityID(uuid.uuid4()): GlobalEntityName.GLOBAL})
+
+        with pytest.raises(GlobalEntityNotLoaded):
+            GlobalEntityNameCache.name_of(GlobalEntityID(uuid.uuid4()))
 
     @pytest.mark.parametrize("name", list(GlobalEntityName), ids=lambda name: name.value)
     def test_reads_the_name_of_each_id(
         self, loaded_ids: dict[GlobalEntityName, GlobalEntityID], name: GlobalEntityName
     ) -> None:
-        assert GlobalEntityIDCache.name_of(loaded_ids[name]) == name
+        assert GlobalEntityNameCache.name_of(loaded_ids[name]) == name
 
     def test_name_read_before_load_raises(self) -> None:
         with pytest.raises(GlobalEntityNotLoaded):
-            GlobalEntityIDCache.name_of(GlobalEntityID(uuid.uuid4()))
+            GlobalEntityNameCache.name_of(GlobalEntityID(uuid.uuid4()))
 
     def test_name_of_an_unknown_id_raises(
         self, loaded_ids: dict[GlobalEntityName, GlobalEntityID]
     ) -> None:
         with pytest.raises(GlobalEntityMissing):
-            GlobalEntityIDCache.name_of(GlobalEntityID(uuid.uuid4()))
+            GlobalEntityNameCache.name_of(GlobalEntityID(uuid.uuid4()))
 
     def test_clear_forgets_the_names(
         self, loaded_ids: dict[GlobalEntityName, GlobalEntityID]
     ) -> None:
-        GlobalEntityIDCache.clear()
+        GlobalEntityNameCache.clear()
 
         with pytest.raises(GlobalEntityNotLoaded):
-            GlobalEntityIDCache.name_of(loaded_ids[GlobalEntityName.GLOBAL])
+            GlobalEntityNameCache.name_of(loaded_ids[GlobalEntityName.GLOBAL])

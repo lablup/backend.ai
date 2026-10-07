@@ -17,7 +17,7 @@ from ai.backend.common.data.entity.role_preset import RolePresetID
 from ai.backend.common.data.entity.types import EntityType, GlobalEntityType
 from ai.backend.common.dto.manager.v2.role_preset.types import RolePresetGlobalScope
 from ai.backend.manager.api.adapters.role_preset.adapter import RolePresetAdapter
-from ai.backend.manager.data.permission.global_entity import GlobalEntityIDCache
+from ai.backend.manager.data.permission.global_entity import GlobalEntityNameCache
 from ai.backend.manager.data.role_preset.types import RolePresetData
 
 _GLOBAL_ID = GlobalEntityID(UUID("00000000-0000-0000-0000-000000000001"))
@@ -34,13 +34,13 @@ class _ScopeCase:
 
 
 @pytest.fixture(autouse=True)
-def loaded_ids() -> Iterator[None]:
-    GlobalEntityIDCache.fill({
-        GlobalEntityName.GLOBAL: _GLOBAL_ID,
-        GlobalEntityName.PUBLIC: _PUBLIC_ID,
+def loaded_names() -> Iterator[None]:
+    GlobalEntityNameCache.fill({
+        _GLOBAL_ID: GlobalEntityName.GLOBAL,
+        _PUBLIC_ID: GlobalEntityName.PUBLIC,
     })
     yield
-    GlobalEntityIDCache.clear()
+    GlobalEntityNameCache.clear()
 
 
 @pytest.fixture

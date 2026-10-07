@@ -444,7 +444,7 @@ def provision(cli_ctx: CLIContext, seed_dir: Path) -> None:
     """
     from ai.backend.manager.models.base import ensure_all_tables_registered
     from ai.backend.manager.repositories.db.engine import connect_database
-    from ai.backend.manager.repositories.global_entity.loader import GlobalEntityIDLoader
+    from ai.backend.manager.repositories.global_entity.loader import GlobalEntityCacheLoader
     from ai.backend.manager.repositories.ops.v2.role_preset.provider import RolePresetOpsProvider
     from ai.backend.manager.repositories.role_preset.repository import RolePresetRepository
 
@@ -456,7 +456,7 @@ def provision(cli_ctx: CLIContext, seed_dir: Path) -> None:
         # A standalone CLI process has not imported the full model tree.
         ensure_all_tables_registered()
         async with connect_database(bootstrap_config.db) as db:
-            await GlobalEntityIDLoader(db).load()
+            await GlobalEntityCacheLoader(db).load()
             preset_scopes = {
                 seed.id: global_entity_id(seed.scope) for seed in seeds if seed.scope is not None
             }

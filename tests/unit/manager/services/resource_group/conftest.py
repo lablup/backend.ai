@@ -23,7 +23,10 @@ from sqlalchemy import text
 from ai.backend.common.data.entity.user import UserEntityType
 from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.types import DefaultForUnspecified, ResourceSlot, VFolderHostPermissionMap
-from ai.backend.manager.data.permission.global_entity import GlobalEntityIDCache
+from ai.backend.manager.data.permission.global_entity import (
+    GlobalEntityIDCache,
+    GlobalEntityNameCache,
+)
 from ai.backend.manager.data.user.types import UserStatus
 from ai.backend.manager.models.agent.row import AgentRow
 from ai.backend.manager.models.container_registry.row import ContainerRegistryRow
@@ -77,7 +80,7 @@ from ai.backend.manager.models.virtual_entity.entity_membership_field import (
 from ai.backend.manager.models.virtual_entity.scope_binding import ScopeBindingRow
 from ai.backend.manager.models.virtual_entity.virtual_entity import VirtualEntityRow
 from ai.backend.manager.repositories.db.engine import create_async_engine
-from ai.backend.manager.repositories.global_entity.loader import GlobalEntityIDLoader
+from ai.backend.manager.repositories.global_entity.loader import GlobalEntityCacheLoader
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.repositories.ops.v2.relation.provider import RelationOpsProvider
 from ai.backend.manager.repositories.rbac.relation_repository import RbacRelationRepository
@@ -186,11 +189,12 @@ async def database_fixture(
         ],
     ):
         async with with_global_entities(database_engine):
-            await GlobalEntityIDLoader(database_engine).load()
+            await GlobalEntityCacheLoader(database_engine).load()
             try:
                 yield
             finally:
                 GlobalEntityIDCache.clear()
+                GlobalEntityNameCache.clear()
 
 
 # ---------------------------------------------------------------------------
