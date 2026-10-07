@@ -22,13 +22,13 @@ from ai.backend.manager.api.adapters.prometheus_query_preset.adapter import (
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.testutils.scenario_steps import (
     Answered,
+    Given,
     Refused,
     Same,
-    TestGiven,
-    TestScenario,
-    TestThen,
-    TestVerdict,
-    TestWhen,
+    Scenario,
+    Then,
+    Verdict,
+    When,
 )
 from bai_scenario.components.answers import TheCallIsRefused
 from bai_scenario.components.prometheus_query_preset import (
@@ -45,14 +45,14 @@ from bai_scenario.runner.planting import SeedingSession
 from bai_scenario.runner.steps import run_scenario
 
 type Searched = SearchQueryDefinitionsPayload
-type SearchingStep = TestScenario[
+type SearchingStep = Scenario[
     SeedingSession, ManyPresetsAndACaller, PrometheusQueryPresetAdapter, Searched
 ]
-type NobodyStep = TestScenario[SeedingSession, APresetAlone, PrometheusQueryPresetAdapter, Searched]
+type NobodyStep = Scenario[SeedingSession, APresetAlone, PrometheusQueryPresetAdapter, Searched]
 
 
 @dataclass(frozen=True)
-class SearchingEverything(TestWhen[ManyPresetsAndACaller, PrometheusQueryPresetAdapter, Searched]):
+class SearchingEverything(When[ManyPresetsAndACaller, PrometheusQueryPresetAdapter, Searched]):
     """필터도 크기도 없이 전체를 검색한다."""
 
     @override
@@ -72,7 +72,7 @@ class SearchingEverything(TestWhen[ManyPresetsAndACaller, PrometheusQueryPresetA
 
 
 @dataclass(frozen=True)
-class SearchingByName(TestWhen[ManyPresetsAndACaller, PrometheusQueryPresetAdapter, Searched]):
+class SearchingByName(When[ManyPresetsAndACaller, PrometheusQueryPresetAdapter, Searched]):
     """미리 만들어 둔 프리셋 중 골라낸 하나의 이름을 필터로 검색한다."""
 
     @override
@@ -96,7 +96,7 @@ class SearchingByName(TestWhen[ManyPresetsAndACaller, PrometheusQueryPresetAdapt
 
 
 @dataclass(frozen=True)
-class SearchingByCategory(TestWhen[ManyPresetsAndACaller, PrometheusQueryPresetAdapter, Searched]):
+class SearchingByCategory(When[ManyPresetsAndACaller, PrometheusQueryPresetAdapter, Searched]):
     """미리 만들어 둔 카테고리를 필터로 검색한다."""
 
     @override
@@ -124,7 +124,7 @@ class SearchingByCategory(TestWhen[ManyPresetsAndACaller, PrometheusQueryPresetA
 
 
 @dataclass(frozen=True)
-class SearchingAsNobody(TestWhen[APresetAlone, PrometheusQueryPresetAdapter, Searched]):
+class SearchingAsNobody(When[APresetAlone, PrometheusQueryPresetAdapter, Searched]):
     """사용자 컨텍스트 없이 검색한다."""
 
     @override
@@ -141,7 +141,7 @@ class SearchingAsNobody(TestWhen[APresetAlone, PrometheusQueryPresetAdapter, Sea
 
 
 @dataclass(frozen=True)
-class OnlyTheNamedOneIsFound(TestThen[ManyPresetsAndACaller, Searched]):
+class OnlyTheNamedOneIsFound(Then[ManyPresetsAndACaller, Searched]):
     """골라낸 하나만 집계된다."""
 
     @override
@@ -149,7 +149,7 @@ class OnlyTheNamedOneIsFound(TestThen[ManyPresetsAndACaller, Searched]):
         return "이름 필터에 맞는 하나만 집계된다"
 
     @override
-    def look(self, laid: ManyPresetsAndACaller, answered: Answered[Searched]) -> list[TestVerdict]:
+    def look(self, laid: ManyPresetsAndACaller, answered: Answered[Searched]) -> list[Verdict]:
         page = answered.response
         if page is None:
             return [Refused(UnreachableError, answered.raised)]
@@ -163,7 +163,7 @@ class OnlyTheNamedOneIsFound(TestThen[ManyPresetsAndACaller, Searched]):
 
 @dataclass(frozen=True)
 class AnyoneCountsEveryOne(
-    TestScenario[SeedingSession, ManyPresetsAndACaller, PrometheusQueryPresetAdapter, Searched]
+    Scenario[SeedingSession, ManyPresetsAndACaller, PrometheusQueryPresetAdapter, Searched]
 ):
     @override
     def summary(self) -> str:
@@ -174,21 +174,21 @@ class AnyoneCountsEveryOne(
         return "프리셋 둘이 있고 아무 권한도 없는 사용자가 필터 없이 검색하면, 둘 다 집계된다"
 
     @override
-    def given(self) -> TestGiven[SeedingSession, ManyPresetsAndACaller]:
+    def given(self) -> Given[SeedingSession, ManyPresetsAndACaller]:
         return ManyPresetsAndSomeone(besides=1)
 
     @override
-    def when(self) -> TestWhen[ManyPresetsAndACaller, PrometheusQueryPresetAdapter, Searched]:
+    def when(self) -> When[ManyPresetsAndACaller, PrometheusQueryPresetAdapter, Searched]:
         return SearchingEverything()
 
     @override
-    def then(self) -> TestThen[ManyPresetsAndACaller, Searched]:
+    def then(self) -> Then[ManyPresetsAndACaller, Searched]:
         return EveryLaidPresetIsFound()
 
 
 @dataclass(frozen=True)
 class FilteringByNameKeepsThatOne(
-    TestScenario[SeedingSession, ManyPresetsAndACaller, PrometheusQueryPresetAdapter, Searched]
+    Scenario[SeedingSession, ManyPresetsAndACaller, PrometheusQueryPresetAdapter, Searched]
 ):
     @override
     def summary(self) -> str:
@@ -199,21 +199,21 @@ class FilteringByNameKeepsThatOne(
         return "이름이 다른 프리셋 셋이 있을 때 이름 필터로 검색하면, 그 이름의 프리셋만 반환된다"
 
     @override
-    def given(self) -> TestGiven[SeedingSession, ManyPresetsAndACaller]:
+    def given(self) -> Given[SeedingSession, ManyPresetsAndACaller]:
         return ManyPresetsAndSomeone(besides=2)
 
     @override
-    def when(self) -> TestWhen[ManyPresetsAndACaller, PrometheusQueryPresetAdapter, Searched]:
+    def when(self) -> When[ManyPresetsAndACaller, PrometheusQueryPresetAdapter, Searched]:
         return SearchingByName()
 
     @override
-    def then(self) -> TestThen[ManyPresetsAndACaller, Searched]:
+    def then(self) -> Then[ManyPresetsAndACaller, Searched]:
         return OnlyTheNamedOneIsFound()
 
 
 @dataclass(frozen=True)
 class FilteringByCategoryKeepsItsOwn(
-    TestScenario[SeedingSession, ManyPresetsAndACaller, PrometheusQueryPresetAdapter, Searched]
+    Scenario[SeedingSession, ManyPresetsAndACaller, PrometheusQueryPresetAdapter, Searched]
 ):
     @override
     def summary(self) -> str:
@@ -224,21 +224,21 @@ class FilteringByCategoryKeepsItsOwn(
         return "두 카테고리에 프리셋이 나뉘어 있을 때 한 카테고리 필터로 검색하면, 그 카테고리의 프리셋만 반환된다"
 
     @override
-    def given(self) -> TestGiven[SeedingSession, ManyPresetsAndACaller]:
+    def given(self) -> Given[SeedingSession, ManyPresetsAndACaller]:
         return PresetsInTwoCategories()
 
     @override
-    def when(self) -> TestWhen[ManyPresetsAndACaller, PrometheusQueryPresetAdapter, Searched]:
+    def when(self) -> When[ManyPresetsAndACaller, PrometheusQueryPresetAdapter, Searched]:
         return SearchingByCategory()
 
     @override
-    def then(self) -> TestThen[ManyPresetsAndACaller, Searched]:
+    def then(self) -> Then[ManyPresetsAndACaller, Searched]:
         return EveryLaidPresetIsFound()
 
 
 @dataclass(frozen=True)
 class OmittingThePageSizeAnswersTen(
-    TestScenario[SeedingSession, ManyPresetsAndACaller, PrometheusQueryPresetAdapter, Searched]
+    Scenario[SeedingSession, ManyPresetsAndACaller, PrometheusQueryPresetAdapter, Searched]
 ):
     @override
     def summary(self) -> str:
@@ -249,21 +249,21 @@ class OmittingThePageSizeAnswersTen(
         return "프리셋 11개가 있을 때 크기 없이 검색하면, 10건까지 반환되고 다음 페이지가 있다고 응답한다"
 
     @override
-    def given(self) -> TestGiven[SeedingSession, ManyPresetsAndACaller]:
+    def given(self) -> Given[SeedingSession, ManyPresetsAndACaller]:
         return ManyPresetsAndSomeone(besides=10)
 
     @override
-    def when(self) -> TestWhen[ManyPresetsAndACaller, PrometheusQueryPresetAdapter, Searched]:
+    def when(self) -> When[ManyPresetsAndACaller, PrometheusQueryPresetAdapter, Searched]:
         return SearchingEverything()
 
     @override
-    def then(self) -> TestThen[ManyPresetsAndACaller, Searched]:
+    def then(self) -> Then[ManyPresetsAndACaller, Searched]:
         return OnePageOfThemComesBack()
 
 
 @dataclass(frozen=True)
 class NobodyMayNotSearch(
-    TestScenario[SeedingSession, APresetAlone, PrometheusQueryPresetAdapter, Searched]
+    Scenario[SeedingSession, APresetAlone, PrometheusQueryPresetAdapter, Searched]
 ):
     @override
     def summary(self) -> str:
@@ -274,15 +274,15 @@ class NobodyMayNotSearch(
         return "프리셋 하나가 있고 사용자 컨텍스트 없이 검색하면, 호출자를 알 수 없어 거부된다"
 
     @override
-    def given(self) -> TestGiven[SeedingSession, APresetAlone]:
+    def given(self) -> Given[SeedingSession, APresetAlone]:
         return APresetAndNobody()
 
     @override
-    def when(self) -> TestWhen[APresetAlone, PrometheusQueryPresetAdapter, Searched]:
+    def when(self) -> When[APresetAlone, PrometheusQueryPresetAdapter, Searched]:
         return SearchingAsNobody()
 
     @override
-    def then(self) -> TestThen[APresetAlone, Searched]:
+    def then(self) -> Then[APresetAlone, Searched]:
         return TheCallIsRefused(UnreachableError)
 
 

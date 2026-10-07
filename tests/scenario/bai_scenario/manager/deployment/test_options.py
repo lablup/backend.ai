@@ -29,15 +29,15 @@ from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.sokovan.deployment.handlers.replica import CheckReplicaDeploymentHandler
 from ai.backend.testutils.scenario_steps import (
     Answered,
+    Given,
     Held,
     Refused,
     Same,
     SameAs,
-    TestGiven,
-    TestScenario,
-    TestThen,
-    TestVerdict,
-    TestWhen,
+    Scenario,
+    Then,
+    Verdict,
+    When,
 )
 from bai_scenario.components.answers import TheCallIsRefused
 from bai_scenario.components.deployment import ADeploymentAndACaller, ADeploymentInThatPlace
@@ -51,15 +51,13 @@ WAITS = 600
 RETRIES = 3
 
 type Entry = tuple[str, int | None, int | None]
-type OptionsStep = TestScenario[
+type OptionsStep = Scenario[
     SeedingSession, ADeploymentAndACaller, DeploymentAdapter, ReplaceDeploymentOptionsPayload
 ]
 
 
 @dataclass(frozen=True)
-class Replacing(
-    TestWhen[ADeploymentAndACaller, DeploymentAdapter, ReplaceDeploymentOptionsPayload]
-):
+class Replacing(When[ADeploymentAndACaller, DeploymentAdapter, ReplaceDeploymentOptionsPayload]):
     """배포의 옵션을 준 것으로 갈아끼운다."""
 
     entries: tuple[Entry, ...] = ()
@@ -98,7 +96,7 @@ class Replacing(
 
 
 @dataclass(frozen=True)
-class TheOptionsAreReplaced(TestThen[ADeploymentAndACaller, ReplaceDeploymentOptionsPayload]):
+class TheOptionsAreReplaced(Then[ADeploymentAndACaller, ReplaceDeploymentOptionsPayload]):
     """준 옵션이 통째로 온다. 배포 전체가 아니라 옵션만 싣는다."""
 
     entries: tuple[Entry, ...] = field(default_factory=tuple)
@@ -112,7 +110,7 @@ class TheOptionsAreReplaced(TestThen[ADeploymentAndACaller, ReplaceDeploymentOpt
         self,
         laid: ADeploymentAndACaller,
         answered: Answered[ReplaceDeploymentOptionsPayload],
-    ) -> list[TestVerdict]:
+    ) -> list[Verdict]:
         payload = answered.response
         if payload is None:
             return [Refused(EntityNotFoundError, answered.raised)]
@@ -135,7 +133,7 @@ class TheOptionsAreReplaced(TestThen[ADeploymentAndACaller, ReplaceDeploymentOpt
 
 @dataclass(frozen=True)
 class WhatIsGivenBecomesTheOptions(
-    TestScenario[
+    Scenario[
         SeedingSession, ADeploymentAndACaller, DeploymentAdapter, ReplaceDeploymentOptionsPayload
     ]
 ):
@@ -151,23 +149,23 @@ class WhatIsGivenBecomesTheOptions(
         )
 
     @override
-    def given(self) -> TestGiven[SeedingSession, ADeploymentAndACaller]:
+    def given(self) -> Given[SeedingSession, ADeploymentAndACaller]:
         return ADeploymentInThatPlace(granted=(Permission.UPDATE,))
 
     @override
     def when(
         self,
-    ) -> TestWhen[ADeploymentAndACaller, DeploymentAdapter, ReplaceDeploymentOptionsPayload]:
+    ) -> When[ADeploymentAndACaller, DeploymentAdapter, ReplaceDeploymentOptionsPayload]:
         return Replacing(entries=((REGISTERED, None, 1),))
 
     @override
-    def then(self) -> TestThen[ADeploymentAndACaller, ReplaceDeploymentOptionsPayload]:
+    def then(self) -> Then[ADeploymentAndACaller, ReplaceDeploymentOptionsPayload]:
         return TheOptionsAreReplaced(entries=((REGISTERED, None, 1),))
 
 
 @dataclass(frozen=True)
 class WhatIsNotGivenDoesNotStay(
-    TestScenario[
+    Scenario[
         SeedingSession, ADeploymentAndACaller, DeploymentAdapter, ReplaceDeploymentOptionsPayload
     ]
 ):
@@ -183,23 +181,23 @@ class WhatIsNotGivenDoesNotStay(
         )
 
     @override
-    def given(self) -> TestGiven[SeedingSession, ADeploymentAndACaller]:
+    def given(self) -> Given[SeedingSession, ADeploymentAndACaller]:
         return ADeploymentInThatPlace(granted=(Permission.UPDATE,))
 
     @override
     def when(
         self,
-    ) -> TestWhen[ADeploymentAndACaller, DeploymentAdapter, ReplaceDeploymentOptionsPayload]:
+    ) -> When[ADeploymentAndACaller, DeploymentAdapter, ReplaceDeploymentOptionsPayload]:
         return Replacing()
 
     @override
-    def then(self) -> TestThen[ADeploymentAndACaller, ReplaceDeploymentOptionsPayload]:
+    def then(self) -> Then[ADeploymentAndACaller, ReplaceDeploymentOptionsPayload]:
         return TheOptionsAreReplaced()
 
 
 @dataclass(frozen=True)
 class AnUnregisteredHandlerIsRefused(
-    TestScenario[
+    Scenario[
         SeedingSession, ADeploymentAndACaller, DeploymentAdapter, ReplaceDeploymentOptionsPayload
     ]
 ):
@@ -212,23 +210,23 @@ class AnUnregisteredHandlerIsRefused(
         return "등록되지 않은 처리기 이름을 담아 옵션을 갈아끼우면, 입력이 틀렸다는 이유로 거부된다"
 
     @override
-    def given(self) -> TestGiven[SeedingSession, ADeploymentAndACaller]:
+    def given(self) -> Given[SeedingSession, ADeploymentAndACaller]:
         return ADeploymentInThatPlace(granted=(Permission.UPDATE,))
 
     @override
     def when(
         self,
-    ) -> TestWhen[ADeploymentAndACaller, DeploymentAdapter, ReplaceDeploymentOptionsPayload]:
+    ) -> When[ADeploymentAndACaller, DeploymentAdapter, ReplaceDeploymentOptionsPayload]:
         return Replacing(entries=((UNREGISTERED, None, 1),))
 
     @override
-    def then(self) -> TestThen[ADeploymentAndACaller, ReplaceDeploymentOptionsPayload]:
+    def then(self) -> Then[ADeploymentAndACaller, ReplaceDeploymentOptionsPayload]:
         return TheCallIsRefused(InvalidAPIParameters)
 
 
 @dataclass(frozen=True)
 class AHandlerNamedTwiceIsRefused(
-    TestScenario[
+    Scenario[
         SeedingSession, ADeploymentAndACaller, DeploymentAdapter, ReplaceDeploymentOptionsPayload
     ]
 ):
@@ -241,23 +239,23 @@ class AHandlerNamedTwiceIsRefused(
         return "같은 처리기 이름을 두 번 담아 옵션을 갈아끼우면, 입력이 틀렸다는 이유로 거부된다"
 
     @override
-    def given(self) -> TestGiven[SeedingSession, ADeploymentAndACaller]:
+    def given(self) -> Given[SeedingSession, ADeploymentAndACaller]:
         return ADeploymentInThatPlace(granted=(Permission.UPDATE,))
 
     @override
     def when(
         self,
-    ) -> TestWhen[ADeploymentAndACaller, DeploymentAdapter, ReplaceDeploymentOptionsPayload]:
+    ) -> When[ADeploymentAndACaller, DeploymentAdapter, ReplaceDeploymentOptionsPayload]:
         return Replacing(entries=((REGISTERED, None, 1), (REGISTERED, None, 2)))
 
     @override
-    def then(self) -> TestThen[ADeploymentAndACaller, ReplaceDeploymentOptionsPayload]:
+    def then(self) -> Then[ADeploymentAndACaller, ReplaceDeploymentOptionsPayload]:
         return TheCallIsRefused(InvalidAPIParameters)
 
 
 @dataclass(frozen=True)
 class ReadingIsNotEnoughToReplace(
-    TestScenario[
+    Scenario[
         SeedingSession, ADeploymentAndACaller, DeploymentAdapter, ReplaceDeploymentOptionsPayload
     ]
 ):
@@ -270,17 +268,17 @@ class ReadingIsNotEnoughToReplace(
         return "읽기 권한만 받은 사용자가 옵션을 갈아끼우면, 권한 부족으로 거부된다"
 
     @override
-    def given(self) -> TestGiven[SeedingSession, ADeploymentAndACaller]:
+    def given(self) -> Given[SeedingSession, ADeploymentAndACaller]:
         return ADeploymentInThatPlace(granted=(Permission.READ,))
 
     @override
     def when(
         self,
-    ) -> TestWhen[ADeploymentAndACaller, DeploymentAdapter, ReplaceDeploymentOptionsPayload]:
+    ) -> When[ADeploymentAndACaller, DeploymentAdapter, ReplaceDeploymentOptionsPayload]:
         return Replacing(entries=((REGISTERED, None, 1),))
 
     @override
-    def then(self) -> TestThen[ADeploymentAndACaller, ReplaceDeploymentOptionsPayload]:
+    def then(self) -> Then[ADeploymentAndACaller, ReplaceDeploymentOptionsPayload]:
         return TheCallIsRefused(NotEnoughPermission)
 
 

@@ -39,14 +39,14 @@ from ai.backend.manager.errors.base.entity import EntityNotFoundError
 from ai.backend.manager.errors.permission import NotEnoughPermission
 from ai.backend.testutils.scenario_steps import (
     Answered,
+    Given,
     Held,
     Refused,
     Same,
     SameAs,
     Skipped,
-    TestGiven,
-    TestThen,
-    TestVerdict,
+    Then,
+    Verdict,
 )
 from bai_scenario.components.domain import WAS_HERE, SomeoneOf, WrittenByThisRun
 from bai_scenario.components.system import KEPT, Kept, role_named
@@ -155,7 +155,7 @@ class SomeoneReadingGroupsInTheDomain(TestSeedNest[Laid[None]]):
 
 
 @dataclass(frozen=True)
-class AGroupAndSomeone(TestGiven[Any, AGroupAndACaller]):
+class AGroupAndSomeone(Given[Any, AGroupAndACaller]):
     """그룹 하나와 사용자 한 명. ``granted``를 주면 그 그룹에 앉힌 역할로 그 권한을 받는다."""
 
     role: UserRole = UserRole.USER
@@ -186,7 +186,7 @@ class AGroupAndSomeone(TestGiven[Any, AGroupAndACaller]):
 
 
 @dataclass(frozen=True)
-class AGroupBesideTheDefaultAndSomeone(TestGiven[Any, AGroupAndACaller]):
+class AGroupBesideTheDefaultAndSomeone(Given[Any, AGroupAndACaller]):
     """기본 그룹이 따로 있을 때의 그룹 하나와 사용자 한 명. ``group``은 기본이 아닌 쪽이다."""
 
     role: UserRole = UserRole.USER
@@ -207,7 +207,7 @@ class AGroupBesideTheDefaultAndSomeone(TestGiven[Any, AGroupAndACaller]):
 
 
 @dataclass(frozen=True)
-class TwoGroupsAndSomeone(TestGiven[Any, ManyGroupsAndACaller]):
+class TwoGroupsAndSomeone(Given[Any, ManyGroupsAndACaller]):
     """그룹 둘과 사용자 한 명. ``named``는 앞의 것이다."""
 
     role: UserRole = UserRole.USER
@@ -230,7 +230,7 @@ class TwoGroupsAndSomeone(TestGiven[Any, ManyGroupsAndACaller]):
 
 
 @dataclass(frozen=True)
-class AnActiveAndAnInactiveGroup(TestGiven[Any, ManyGroupsAndACaller]):
+class AnActiveAndAnInactiveGroup(Given[Any, ManyGroupsAndACaller]):
     """활성 그룹 하나와 비활성 그룹 하나, 사용자 한 명. ``laid``는 활성인 것뿐이다."""
 
     role: UserRole = UserRole.USER
@@ -253,7 +253,7 @@ class AnActiveAndAnInactiveGroup(TestGiven[Any, ManyGroupsAndACaller]):
 
 
 @dataclass(frozen=True)
-class ADomainGroupsAndSomeone(TestGiven[Any, ADomainGroupsAndACaller]):
+class ADomainGroupsAndSomeone(Given[Any, ADomainGroupsAndACaller]):
     """호출자의 도메인에 건 그룹 하나와 걸지 않은 그룹 하나, 사용자 한 명.
 
     ``reading``이면 그 도메인 범위에서 리소스 그룹을 읽는 역할을 받는다. ``linked``가
@@ -292,7 +292,7 @@ class ADomainGroupsAndSomeone(TestGiven[Any, ADomainGroupsAndACaller]):
 
 
 @dataclass(frozen=True)
-class AProjectAGroupAndSomeone(TestGiven[Any, AProjectAGroupAndACaller]):
+class AProjectAGroupAndSomeone(Given[Any, AProjectAGroupAndACaller]):
     """호출자의 도메인에 있는 프로젝트 하나와 그룹 하나, 사용자 한 명. ``linked``면 그룹을 프로젝트에 건다."""
 
     role: UserRole = UserRole.USER
@@ -342,7 +342,7 @@ class GroupLook:
 
     def verdicts(
         self, prefix: str, node: ResourceGroupDetailNode, seed: ResourceGroupData
-    ) -> list[TestVerdict]:
+    ) -> list[Verdict]:
         preemption = seed.scheduler.options.preemption
         return [
             Skipped(f"{prefix}id", "데이터베이스가 만든다"),
@@ -427,7 +427,7 @@ def _or[V](asked: V | Kept, kept: V) -> V:
 
 
 @dataclass(frozen=True)
-class TheNewGroupNode(TestThen[Any, ResourceGroupDetailNode]):
+class TheNewGroupNode(Then[Any, ResourceGroupDetailNode]):
     """방금 만든 그룹이 통째로 반환된다. 기대값은 요청이 지정한 값과 코드의 기본값이다."""
 
     started: datetime
@@ -439,7 +439,7 @@ class TheNewGroupNode(TestThen[Any, ResourceGroupDetailNode]):
         return "만든 리소스 그룹 전체가 반환된다"
 
     @override
-    def look(self, laid: Any, answered: Answered[ResourceGroupDetailNode]) -> list[TestVerdict]:
+    def look(self, laid: Any, answered: Answered[ResourceGroupDetailNode]) -> list[Verdict]:
         node = answered.response
         if node is None:
             return [Refused(EntityNotFoundError, answered.raised)]
@@ -486,7 +486,7 @@ class TheNewGroupNode(TestThen[Any, ResourceGroupDetailNode]):
 
 
 @dataclass(frozen=True)
-class TheGroupNode(TestThen[AGroupAndACaller, ResourceGroupDetailNode]):
+class TheGroupNode(Then[AGroupAndACaller, ResourceGroupDetailNode]):
     """미리 만들어 둔 그룹이 통째로 반환된다. 수정 요청은 바뀌어야 하는 자리만 ``look``에 준다."""
 
     look_for: GroupLook
@@ -498,7 +498,7 @@ class TheGroupNode(TestThen[AGroupAndACaller, ResourceGroupDetailNode]):
     @override
     def look(
         self, laid: AGroupAndACaller, answered: Answered[ResourceGroupDetailNode]
-    ) -> list[TestVerdict]:
+    ) -> list[Verdict]:
         node = answered.response
         if node is None:
             return [Refused(EntityNotFoundError, answered.raised)]
@@ -506,7 +506,7 @@ class TheGroupNode(TestThen[AGroupAndACaller, ResourceGroupDetailNode]):
 
 
 @dataclass(frozen=True)
-class TheLaidGroupsAreLeft(TestThen[ManyGroupsAndACaller, ResourceGroupSearchPayload]):
+class TheLaidGroupsAreLeft(Then[ManyGroupsAndACaller, ResourceGroupSearchPayload]):
     """응답에 나와야 하는 그룹이 모두, 그리고 그것만 반환된다."""
 
     @override
@@ -516,7 +516,7 @@ class TheLaidGroupsAreLeft(TestThen[ManyGroupsAndACaller, ResourceGroupSearchPay
     @override
     def look(
         self, laid: ManyGroupsAndACaller, answered: Answered[ResourceGroupSearchPayload]
-    ) -> list[TestVerdict]:
+    ) -> list[Verdict]:
         page = answered.response
         if page is None:
             return [Refused(EntityNotFoundError, answered.raised)]
@@ -533,7 +533,7 @@ class TheLaidGroupsAreLeft(TestThen[ManyGroupsAndACaller, ResourceGroupSearchPay
 
 
 @dataclass(frozen=True)
-class OnlyTheNamedGroupIsLeft(TestThen[ManyGroupsAndACaller, ResourceGroupSearchPayload]):
+class OnlyTheNamedGroupIsLeft(Then[ManyGroupsAndACaller, ResourceGroupSearchPayload]):
     """필터에 맞는 그 하나만 반환된다."""
 
     @override
@@ -543,7 +543,7 @@ class OnlyTheNamedGroupIsLeft(TestThen[ManyGroupsAndACaller, ResourceGroupSearch
     @override
     def look(
         self, laid: ManyGroupsAndACaller, answered: Answered[ResourceGroupSearchPayload]
-    ) -> list[TestVerdict]:
+    ) -> list[Verdict]:
         page = answered.response
         if page is None:
             return [Refused(EntityNotFoundError, answered.raised)]
@@ -556,7 +556,7 @@ class OnlyTheNamedGroupIsLeft(TestThen[ManyGroupsAndACaller, ResourceGroupSearch
 
 
 @dataclass(frozen=True)
-class TheFirstGroupPage(TestThen[ManyGroupsAndACaller, ResourceGroupSearchPayload]):
+class TheFirstGroupPage(Then[ManyGroupsAndACaller, ResourceGroupSearchPayload]):
     """한 건짜리 첫 페이지. 한 건이 반환되고 다음 페이지가 있다고 응답한다."""
 
     @override
@@ -566,7 +566,7 @@ class TheFirstGroupPage(TestThen[ManyGroupsAndACaller, ResourceGroupSearchPayloa
     @override
     def look(
         self, laid: ManyGroupsAndACaller, answered: Answered[ResourceGroupSearchPayload]
-    ) -> list[TestVerdict]:
+    ) -> list[Verdict]:
         page = answered.response
         if page is None:
             return [Refused(EntityNotFoundError, answered.raised)]
@@ -579,7 +579,7 @@ class TheFirstGroupPage(TestThen[ManyGroupsAndACaller, ResourceGroupSearchPayloa
 
 
 @dataclass(frozen=True)
-class OnlyTheLinkedGroupIsLeft(TestThen[ADomainGroupsAndACaller, ResourceGroupSearchPayload]):
+class OnlyTheLinkedGroupIsLeft(Then[ADomainGroupsAndACaller, ResourceGroupSearchPayload]):
     """도메인에 건 그룹 하나만 반환된다."""
 
     @override
@@ -589,7 +589,7 @@ class OnlyTheLinkedGroupIsLeft(TestThen[ADomainGroupsAndACaller, ResourceGroupSe
     @override
     def look(
         self, laid: ADomainGroupsAndACaller, answered: Answered[ResourceGroupSearchPayload]
-    ) -> list[TestVerdict]:
+    ) -> list[Verdict]:
         page = answered.response
         if page is None:
             return [Refused(EntityNotFoundError, answered.raised)]
@@ -602,7 +602,7 @@ class OnlyTheLinkedGroupIsLeft(TestThen[ADomainGroupsAndACaller, ResourceGroupSe
 
 
 @dataclass(frozen=True)
-class TheGroupsInTheOrderAsked(TestThen[ManyGroupsAndACaller, Loaded]):
+class TheGroupsInTheOrderAsked(Then[ManyGroupsAndACaller, Loaded]):
     """요청한 순서대로 한 항목씩 반환된다. 미리 만들어 둔 것은 노드로, 없는 것은 빈 항목으로."""
 
     started: datetime
@@ -612,12 +612,12 @@ class TheGroupsInTheOrderAsked(TestThen[ManyGroupsAndACaller, Loaded]):
         return "요청한 순서대로 반환되고, 없는 것에 해당하는 항목은 비어 있다"
 
     @override
-    def look(self, laid: ManyGroupsAndACaller, answered: Answered[Loaded]) -> list[TestVerdict]:
+    def look(self, laid: ManyGroupsAndACaller, answered: Answered[Loaded]) -> list[Verdict]:
         items = answered.response
         if items is None:
             return [Refused(EntityNotFoundError, answered.raised)]
         asked = len(laid.laid) + 1
-        seen: list[TestVerdict] = [Same("len(items)", len(items), asked)]
+        seen: list[Verdict] = [Same("len(items)", len(items), asked)]
         look = GroupLook(started=self.started)
         for i, expected in enumerate(laid.laid):
             got = items[i] if i < len(items) else None
@@ -631,7 +631,7 @@ class TheGroupsInTheOrderAsked(TestThen[ManyGroupsAndACaller, Loaded]):
 
 
 @dataclass(frozen=True)
-class EachItemIsRefused(TestThen[Any, list[Any]]):
+class EachItemIsRefused(Then[Any, list[Any]]):
     """요청한 항목마다 권한 부족 거부가 담긴다."""
 
     asked: int
@@ -641,11 +641,11 @@ class EachItemIsRefused(TestThen[Any, list[Any]]):
         return "항목마다 권한 부족 거부가 담긴다"
 
     @override
-    def look(self, laid: Any, answered: Answered[list[Any]]) -> list[TestVerdict]:
+    def look(self, laid: Any, answered: Answered[list[Any]]) -> list[Verdict]:
         items = answered.response
         if items is None:
             return [Refused(EntityNotFoundError, answered.raised)]
-        seen: list[TestVerdict] = [Same("len(items)", len(items), self.asked)]
+        seen: list[Verdict] = [Same("len(items)", len(items), self.asked)]
         for i in range(self.asked):
             got = items[i] if i < len(items) else None
             seen.append(
@@ -659,7 +659,7 @@ class EachItemIsRefused(TestThen[Any, list[Any]]):
 
 
 @dataclass(frozen=True)
-class NothingComesBack(TestThen[Any, list[Any]]):
+class NothingComesBack(Then[Any, list[Any]]):
     """빈 응답이 반환된다."""
 
     @override
@@ -667,7 +667,7 @@ class NothingComesBack(TestThen[Any, list[Any]]):
         return "빈 응답이 반환된다"
 
     @override
-    def look(self, laid: Any, answered: Answered[list[Any]]) -> list[TestVerdict]:
+    def look(self, laid: Any, answered: Answered[list[Any]]) -> list[Verdict]:
         items = answered.response
         if items is None:
             return [Refused(EntityNotFoundError, answered.raised)]
@@ -675,7 +675,7 @@ class NothingComesBack(TestThen[Any, list[Any]]):
 
 
 @dataclass(frozen=True)
-class TheResourceInfoIsEmpty(TestThen[AGroupAndACaller, ResourceInfoNode]):
+class TheResourceInfoIsEmpty(Then[AGroupAndACaller, ResourceInfoNode]):
     """에이전트가 없어 용량·사용량·여유가 모두 비어 있다."""
 
     @override
@@ -683,9 +683,7 @@ class TheResourceInfoIsEmpty(TestThen[AGroupAndACaller, ResourceInfoNode]):
         return "용량·사용량·여유가 모두 비어 있다"
 
     @override
-    def look(
-        self, laid: AGroupAndACaller, answered: Answered[ResourceInfoNode]
-    ) -> list[TestVerdict]:
+    def look(self, laid: AGroupAndACaller, answered: Answered[ResourceInfoNode]) -> list[Verdict]:
         info = answered.response
         if info is None:
             return [Refused(EntityNotFoundError, answered.raised)]
@@ -697,7 +695,7 @@ class TheResourceInfoIsEmpty(TestThen[AGroupAndACaller, ResourceInfoNode]):
 
 
 @dataclass(frozen=True)
-class TheLinkedGroupIsAllowed(TestThen[ADomainGroupsAndACaller, AllowedResourceGroupsPayload]):
+class TheLinkedGroupIsAllowed(Then[ADomainGroupsAndACaller, AllowedResourceGroupsPayload]):
     """도메인에 건 그룹 이름만 담긴다."""
 
     @override
@@ -707,7 +705,7 @@ class TheLinkedGroupIsAllowed(TestThen[ADomainGroupsAndACaller, AllowedResourceG
     @override
     def look(
         self, laid: ADomainGroupsAndACaller, answered: Answered[AllowedResourceGroupsPayload]
-    ) -> list[TestVerdict]:
+    ) -> list[Verdict]:
         payload = answered.response
         if payload is None:
             return [Refused(EntityNotFoundError, answered.raised)]
@@ -715,7 +713,7 @@ class TheLinkedGroupIsAllowed(TestThen[ADomainGroupsAndACaller, AllowedResourceG
 
 
 @dataclass(frozen=True)
-class TheOtherGroupIsAllowed(TestThen[ADomainGroupsAndACaller, AllowedResourceGroupsPayload]):
+class TheOtherGroupIsAllowed(Then[ADomainGroupsAndACaller, AllowedResourceGroupsPayload]):
     """걸지 않았던 그룹 이름만 담긴다. 그것을 방금 걸었을 때 본다."""
 
     @override
@@ -725,7 +723,7 @@ class TheOtherGroupIsAllowed(TestThen[ADomainGroupsAndACaller, AllowedResourceGr
     @override
     def look(
         self, laid: ADomainGroupsAndACaller, answered: Answered[AllowedResourceGroupsPayload]
-    ) -> list[TestVerdict]:
+    ) -> list[Verdict]:
         payload = answered.response
         if payload is None:
             return [Refused(EntityNotFoundError, answered.raised)]
@@ -733,9 +731,7 @@ class TheOtherGroupIsAllowed(TestThen[ADomainGroupsAndACaller, AllowedResourceGr
 
 
 @dataclass(frozen=True)
-class TheGroupIsAllowedForTheProject(
-    TestThen[AProjectAGroupAndACaller, AllowedResourceGroupsPayload]
-):
+class TheGroupIsAllowedForTheProject(Then[AProjectAGroupAndACaller, AllowedResourceGroupsPayload]):
     """그 그룹 이름만 담긴다."""
 
     @override
@@ -745,7 +741,7 @@ class TheGroupIsAllowedForTheProject(
     @override
     def look(
         self, laid: AProjectAGroupAndACaller, answered: Answered[AllowedResourceGroupsPayload]
-    ) -> list[TestVerdict]:
+    ) -> list[Verdict]:
         payload = answered.response
         if payload is None:
             return [Refused(EntityNotFoundError, answered.raised)]
@@ -753,7 +749,7 @@ class TheGroupIsAllowedForTheProject(
 
 
 @dataclass(frozen=True)
-class NothingIsAllowed(TestThen[Any, Any]):
+class NothingIsAllowed(Then[Any, Any]):
     """허용 목록이 비어 있다. 그룹·도메인·프로젝트 목록 모두 같은 자리 이름을 쓴다."""
 
     @override
@@ -761,7 +757,7 @@ class NothingIsAllowed(TestThen[Any, Any]):
         return "허용 목록이 비어 있다"
 
     @override
-    def look(self, laid: Any, answered: Answered[Any]) -> list[TestVerdict]:
+    def look(self, laid: Any, answered: Answered[Any]) -> list[Verdict]:
         payload = answered.response
         if payload is None:
             return [Refused(EntityNotFoundError, answered.raised)]
@@ -769,7 +765,7 @@ class NothingIsAllowed(TestThen[Any, Any]):
 
 
 @dataclass(frozen=True)
-class TheAllowedDomainNames(TestThen[ADomainGroupsAndACaller, AllowedDomainsPayload]):
+class TheAllowedDomainNames(Then[ADomainGroupsAndACaller, AllowedDomainsPayload]):
     """허용 도메인에 그 도메인 이름만 담긴다."""
 
     @override
@@ -779,7 +775,7 @@ class TheAllowedDomainNames(TestThen[ADomainGroupsAndACaller, AllowedDomainsPayl
     @override
     def look(
         self, laid: ADomainGroupsAndACaller, answered: Answered[AllowedDomainsPayload]
-    ) -> list[TestVerdict]:
+    ) -> list[Verdict]:
         payload = answered.response
         if payload is None:
             return [Refused(EntityNotFoundError, answered.raised)]
@@ -787,7 +783,7 @@ class TheAllowedDomainNames(TestThen[ADomainGroupsAndACaller, AllowedDomainsPayl
 
 
 @dataclass(frozen=True)
-class TheAllowedProjectIds(TestThen[AProjectAGroupAndACaller, AllowedProjectsPayload]):
+class TheAllowedProjectIds(Then[AProjectAGroupAndACaller, AllowedProjectsPayload]):
     """허용 프로젝트에 그 프로젝트 id만 담긴다."""
 
     @override
@@ -797,7 +793,7 @@ class TheAllowedProjectIds(TestThen[AProjectAGroupAndACaller, AllowedProjectsPay
     @override
     def look(
         self, laid: AProjectAGroupAndACaller, answered: Answered[AllowedProjectsPayload]
-    ) -> list[TestVerdict]:
+    ) -> list[Verdict]:
         payload = answered.response
         if payload is None:
             return [Refused(EntityNotFoundError, answered.raised)]
@@ -809,7 +805,7 @@ class TheAllowedProjectIds(TestThen[AProjectAGroupAndACaller, AllowedProjectsPay
 
 
 @dataclass(frozen=True)
-class TheFairShareDefaults(TestThen[AGroupAndACaller, FairShareResourceGroupSpecInfo]):
+class TheFairShareDefaults(Then[AGroupAndACaller, FairShareResourceGroupSpecInfo]):
     """코드가 정한 기본 fair share 설정. 에이전트가 없어 가중치 목록은 비어 있다."""
 
     @override
@@ -819,7 +815,7 @@ class TheFairShareDefaults(TestThen[AGroupAndACaller, FairShareResourceGroupSpec
     @override
     def look(
         self, laid: AGroupAndACaller, answered: Answered[FairShareResourceGroupSpecInfo]
-    ) -> list[TestVerdict]:
+    ) -> list[Verdict]:
         spec = answered.response
         if spec is None:
             return [Refused(EntityNotFoundError, answered.raised)]

@@ -17,7 +17,7 @@ from ai.backend.manager.data.permission.types import Permission
 from ai.backend.manager.errors.base.entity import EntityNotFoundError
 from ai.backend.manager.errors.permission import NotEnoughPermission
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.testutils.scenario_steps import TestGiven, TestScenario, TestThen, TestWhen
+from ai.backend.testutils.scenario_steps import Given, Scenario, Then, When
 from bai_scenario.components.answers import TheCallIsRefused
 from bai_scenario.components.app_config_fragment import (
     AFragmentAndACaller,
@@ -29,13 +29,13 @@ from bai_scenario.runner.acting import ActingAs
 from bai_scenario.runner.planting import SeedingSession
 from bai_scenario.runner.steps import run_scenario
 
-type ReadingStep = TestScenario[
+type ReadingStep = Scenario[
     SeedingSession, AFragmentAndACaller, AppConfigFragmentAdapter, AppConfigFragmentNode
 ]
 
 
 @dataclass(frozen=True)
-class ReadingById(TestWhen[AFragmentAndACaller, AppConfigFragmentAdapter, AppConfigFragmentNode]):
+class ReadingById(When[AFragmentAndACaller, AppConfigFragmentAdapter, AppConfigFragmentNode]):
     """id로 조회한다. id를 지정하지 않으면 미리 만들어 둔 조각의 id를 쓴다."""
 
     other: UUID | None = None
@@ -62,9 +62,7 @@ class ReadingById(TestWhen[AFragmentAndACaller, AppConfigFragmentAdapter, AppCon
 
 @dataclass(frozen=True)
 class TheGrantedUserReadsTheirOwn(
-    TestScenario[
-        SeedingSession, AFragmentAndACaller, AppConfigFragmentAdapter, AppConfigFragmentNode
-    ]
+    Scenario[SeedingSession, AFragmentAndACaller, AppConfigFragmentAdapter, AppConfigFragmentNode]
 ):
     started: datetime
 
@@ -77,25 +75,21 @@ class TheGrantedUserReadsTheirOwn(
         return "자기 조각 하나가 있고 자기 스코프에 읽기 권한을 받은 사용자가 id로 조회하면, 그 조각 전체가 반환된다"
 
     @override
-    def given(self) -> TestGiven[SeedingSession, AFragmentAndACaller]:
+    def given(self) -> Given[SeedingSession, AFragmentAndACaller]:
         return AFragmentAndSomeone(granted=(Permission.READ,))
 
     @override
-    def when(
-        self,
-    ) -> TestWhen[AFragmentAndACaller, AppConfigFragmentAdapter, AppConfigFragmentNode]:
+    def when(self) -> When[AFragmentAndACaller, AppConfigFragmentAdapter, AppConfigFragmentNode]:
         return ReadingById()
 
     @override
-    def then(self) -> TestThen[AFragmentAndACaller, AppConfigFragmentNode]:
+    def then(self) -> Then[AFragmentAndACaller, AppConfigFragmentNode]:
         return TheFragmentNode(started=self.started)
 
 
 @dataclass(frozen=True)
 class AnotherUsersFragmentIsRefused(
-    TestScenario[
-        SeedingSession, AFragmentAndACaller, AppConfigFragmentAdapter, AppConfigFragmentNode
-    ]
+    Scenario[SeedingSession, AFragmentAndACaller, AppConfigFragmentAdapter, AppConfigFragmentNode]
 ):
     @override
     def summary(self) -> str:
@@ -106,25 +100,21 @@ class AnotherUsersFragmentIsRefused(
         return "다른 사용자의 조각을 자기 스코프에만 읽기 권한을 받은 사용자가 id로 조회하면, 권한 부족으로 거부된다"
 
     @override
-    def given(self) -> TestGiven[SeedingSession, AFragmentAndACaller]:
+    def given(self) -> Given[SeedingSession, AFragmentAndACaller]:
         return AFragmentAndSomeone(whose=Whose.ANOTHERS, granted=(Permission.READ,))
 
     @override
-    def when(
-        self,
-    ) -> TestWhen[AFragmentAndACaller, AppConfigFragmentAdapter, AppConfigFragmentNode]:
+    def when(self) -> When[AFragmentAndACaller, AppConfigFragmentAdapter, AppConfigFragmentNode]:
         return ReadingById()
 
     @override
-    def then(self) -> TestThen[AFragmentAndACaller, AppConfigFragmentNode]:
+    def then(self) -> Then[AFragmentAndACaller, AppConfigFragmentNode]:
         return TheCallIsRefused(NotEnoughPermission)
 
 
 @dataclass(frozen=True)
 class APublicFragmentIsReadByIdByAnyone(
-    TestScenario[
-        SeedingSession, AFragmentAndACaller, AppConfigFragmentAdapter, AppConfigFragmentNode
-    ]
+    Scenario[SeedingSession, AFragmentAndACaller, AppConfigFragmentAdapter, AppConfigFragmentNode]
 ):
     started: datetime
 
@@ -137,25 +127,21 @@ class APublicFragmentIsReadByIdByAnyone(
         return "공개 조각을 아무 권한도 없는 사용자가 id로 조회하면, 스코프로 조회할 때와 같이 그 조각 전체가 반환된다"
 
     @override
-    def given(self) -> TestGiven[SeedingSession, AFragmentAndACaller]:
+    def given(self) -> Given[SeedingSession, AFragmentAndACaller]:
         return AFragmentAndSomeone(whose=Whose.PUBLIC)
 
     @override
-    def when(
-        self,
-    ) -> TestWhen[AFragmentAndACaller, AppConfigFragmentAdapter, AppConfigFragmentNode]:
+    def when(self) -> When[AFragmentAndACaller, AppConfigFragmentAdapter, AppConfigFragmentNode]:
         return ReadingById()
 
     @override
-    def then(self) -> TestThen[AFragmentAndACaller, AppConfigFragmentNode]:
+    def then(self) -> Then[AFragmentAndACaller, AppConfigFragmentNode]:
         return TheFragmentNode(started=self.started)
 
 
 @dataclass(frozen=True)
 class AnUnknownIdIsRefusedAsPermission(
-    TestScenario[
-        SeedingSession, AFragmentAndACaller, AppConfigFragmentAdapter, AppConfigFragmentNode
-    ]
+    Scenario[SeedingSession, AFragmentAndACaller, AppConfigFragmentAdapter, AppConfigFragmentNode]
 ):
     @override
     def summary(self) -> str:
@@ -169,25 +155,21 @@ class AnUnknownIdIsRefusedAsPermission(
         )
 
     @override
-    def given(self) -> TestGiven[SeedingSession, AFragmentAndACaller]:
+    def given(self) -> Given[SeedingSession, AFragmentAndACaller]:
         return AFragmentAndSomeone(granted=(Permission.READ,))
 
     @override
-    def when(
-        self,
-    ) -> TestWhen[AFragmentAndACaller, AppConfigFragmentAdapter, AppConfigFragmentNode]:
+    def when(self) -> When[AFragmentAndACaller, AppConfigFragmentAdapter, AppConfigFragmentNode]:
         return ReadingById(other=uuid4())
 
     @override
-    def then(self) -> TestThen[AFragmentAndACaller, AppConfigFragmentNode]:
+    def then(self) -> Then[AFragmentAndACaller, AppConfigFragmentNode]:
         return TheCallIsRefused(NotEnoughPermission)
 
 
 @dataclass(frozen=True)
 class AnUnknownIdIsNotFoundForASuperadmin(
-    TestScenario[
-        SeedingSession, AFragmentAndACaller, AppConfigFragmentAdapter, AppConfigFragmentNode
-    ]
+    Scenario[SeedingSession, AFragmentAndACaller, AppConfigFragmentAdapter, AppConfigFragmentNode]
 ):
     @override
     def summary(self) -> str:
@@ -201,17 +183,15 @@ class AnUnknownIdIsNotFoundForASuperadmin(
         )
 
     @override
-    def given(self) -> TestGiven[SeedingSession, AFragmentAndACaller]:
+    def given(self) -> Given[SeedingSession, AFragmentAndACaller]:
         return AFragmentAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
-    def when(
-        self,
-    ) -> TestWhen[AFragmentAndACaller, AppConfigFragmentAdapter, AppConfigFragmentNode]:
+    def when(self) -> When[AFragmentAndACaller, AppConfigFragmentAdapter, AppConfigFragmentNode]:
         return ReadingById(other=uuid4())
 
     @override
-    def then(self) -> TestThen[AFragmentAndACaller, AppConfigFragmentNode]:
+    def then(self) -> Then[AFragmentAndACaller, AppConfigFragmentNode]:
         return TheCallIsRefused(EntityNotFoundError)
 
 

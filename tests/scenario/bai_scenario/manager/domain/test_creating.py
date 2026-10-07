@@ -25,11 +25,11 @@ from ai.backend.manager.errors.auth import InsufficientPrivilege
 from ai.backend.manager.models.project.creators import ProjectCreator
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.testutils.scenario_steps import (
-    TestConfigured,
-    TestGiven,
-    TestScenario,
-    TestThen,
-    TestWhen,
+    Configured,
+    Given,
+    Scenario,
+    Then,
+    When,
 )
 from bai_scenario.components.domain import (
     WAS_HERE,
@@ -45,11 +45,11 @@ from bai_scenario.runner.steps import run_scenario
 FRESH = "새로 만든 도메인"
 ENFORCEMENT = "manager.rbac.enforcement_enabled"
 
-type DomainStep = TestScenario[SeedingSession, ADomainAndACaller, DomainAdapter, DomainNode]
+type DomainStep = Scenario[SeedingSession, ADomainAndACaller, DomainAdapter, DomainNode]
 
 
 @dataclass(frozen=True)
-class Creating(TestWhen[ADomainAndACaller, DomainAdapter, DomainNode]):
+class Creating(When[ADomainAndACaller, DomainAdapter, DomainNode]):
     """도메인을 만든다. 이름을 대지 않으면 미리 만든 도메인의 이름을 그대로 쓴다."""
 
     named: str | None = None
@@ -73,7 +73,7 @@ class Creating(TestWhen[ADomainAndACaller, DomainAdapter, DomainNode]):
 
 
 @dataclass(frozen=True)
-class CreatingThenFindingByItsModelStore(TestWhen[ADomainAndACaller, DomainAdapter, DomainNode]):
+class CreatingThenFindingByItsModelStore(When[ADomainAndACaller, DomainAdapter, DomainNode]):
     """도메인을 만든 뒤, 그 도메인의 model-store 프로젝트를 가진 도메인으로 걸러 다시 찾는다.
 
     그 프로젝트가 없으면 걸러 찾은 답이 비어 거부로 끝난다.
@@ -118,9 +118,7 @@ class CreatingThenFindingByItsModelStore(TestWhen[ADomainAndACaller, DomainAdapt
 
 
 @dataclass(frozen=True)
-class TheWholeNodeComesBack(
-    TestScenario[SeedingSession, ADomainAndACaller, DomainAdapter, DomainNode]
-):
+class TheWholeNodeComesBack(Scenario[SeedingSession, ADomainAndACaller, DomainAdapter, DomainNode]):
     started: datetime
 
     @override
@@ -135,21 +133,21 @@ class TheWholeNodeComesBack(
         )
 
     @override
-    def given(self) -> TestGiven[SeedingSession, ADomainAndACaller]:
+    def given(self) -> Given[SeedingSession, ADomainAndACaller]:
         return ADomainAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
-    def when(self) -> TestWhen[ADomainAndACaller, DomainAdapter, DomainNode]:
+    def when(self) -> When[ADomainAndACaller, DomainAdapter, DomainNode]:
         return Creating(named="new-domain", described=FRESH)
 
     @override
-    def then(self) -> TestThen[ADomainAndACaller, DomainNode]:
+    def then(self) -> Then[ADomainAndACaller, DomainNode]:
         return TheNewDomainNode(started=self.started, named="new-domain", described=FRESH)
 
 
 @dataclass(frozen=True)
 class ANameAnotherDomainHoldsIsRefused(
-    TestScenario[SeedingSession, ADomainAndACaller, DomainAdapter, DomainNode]
+    Scenario[SeedingSession, ADomainAndACaller, DomainAdapter, DomainNode]
 ):
     @override
     def summary(self) -> str:
@@ -163,22 +161,20 @@ class ANameAnotherDomainHoldsIsRefused(
         )
 
     @override
-    def given(self) -> TestGiven[SeedingSession, ADomainAndACaller]:
+    def given(self) -> Given[SeedingSession, ADomainAndACaller]:
         return ADomainAndSomeone(role=UserRole.SUPERADMIN, name_hint="taken")
 
     @override
-    def when(self) -> TestWhen[ADomainAndACaller, DomainAdapter, DomainNode]:
+    def when(self) -> When[ADomainAndACaller, DomainAdapter, DomainNode]:
         return Creating(described=WAS_HERE)
 
     @override
-    def then(self) -> TestThen[ADomainAndACaller, DomainNode]:
+    def then(self) -> Then[ADomainAndACaller, DomainNode]:
         return TheCallIsRefused(InvalidAPIParameters)
 
 
 @dataclass(frozen=True)
-class ABlankNameIsRefused(
-    TestScenario[SeedingSession, ADomainAndACaller, DomainAdapter, DomainNode]
-):
+class ABlankNameIsRefused(Scenario[SeedingSession, ADomainAndACaller, DomainAdapter, DomainNode]):
     @override
     def summary(self) -> str:
         return "a-blank-name-is-refused"
@@ -188,21 +184,21 @@ class ABlankNameIsRefused(
         return "이름이 공백뿐이면 도메인을 만들 수 없다"
 
     @override
-    def given(self) -> TestGiven[SeedingSession, ADomainAndACaller]:
+    def given(self) -> Given[SeedingSession, ADomainAndACaller]:
         return ADomainAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
-    def when(self) -> TestWhen[ADomainAndACaller, DomainAdapter, DomainNode]:
+    def when(self) -> When[ADomainAndACaller, DomainAdapter, DomainNode]:
         return Creating(named="   ")
 
     @override
-    def then(self) -> TestThen[ADomainAndACaller, DomainNode]:
+    def then(self) -> Then[ADomainAndACaller, DomainNode]:
         return TheCallIsRefused(InvalidAPIParameters)
 
 
 @dataclass(frozen=True)
 class APlainUserMayNotCreate(
-    TestScenario[SeedingSession, ADomainAndACaller, DomainAdapter, DomainNode]
+    Scenario[SeedingSession, ADomainAndACaller, DomainAdapter, DomainNode]
 ):
     @override
     def summary(self) -> str:
@@ -216,21 +212,21 @@ class APlainUserMayNotCreate(
         )
 
     @override
-    def given(self) -> TestGiven[SeedingSession, ADomainAndACaller]:
+    def given(self) -> Given[SeedingSession, ADomainAndACaller]:
         return ADomainAndSomeone()
 
     @override
-    def when(self) -> TestWhen[ADomainAndACaller, DomainAdapter, DomainNode]:
+    def when(self) -> When[ADomainAndACaller, DomainAdapter, DomainNode]:
         return Creating(named="by-a-user")
 
     @override
-    def then(self) -> TestThen[ADomainAndACaller, DomainNode]:
+    def then(self) -> Then[ADomainAndACaller, DomainNode]:
         return TheCallIsRefused(InsufficientPrivilege)
 
 
 @dataclass(frozen=True)
 class EnforcementOffChangesNothing(
-    TestScenario[SeedingSession, ADomainAndACaller, DomainAdapter, DomainNode], TestConfigured
+    Scenario[SeedingSession, ADomainAndACaller, DomainAdapter, DomainNode], Configured
 ):
     @override
     def summary(self) -> str:
@@ -248,21 +244,21 @@ class EnforcementOffChangesNothing(
         return {ENFORCEMENT: False}
 
     @override
-    def given(self) -> TestGiven[SeedingSession, ADomainAndACaller]:
+    def given(self) -> Given[SeedingSession, ADomainAndACaller]:
         return ADomainAndSomeone()
 
     @override
-    def when(self) -> TestWhen[ADomainAndACaller, DomainAdapter, DomainNode]:
+    def when(self) -> When[ADomainAndACaller, DomainAdapter, DomainNode]:
         return Creating(named="by-a-user-again")
 
     @override
-    def then(self) -> TestThen[ADomainAndACaller, DomainNode]:
+    def then(self) -> Then[ADomainAndACaller, DomainNode]:
         return TheCallIsRefused(InsufficientPrivilege)
 
 
 @dataclass(frozen=True)
 class AModelStoreProjectComesWithIt(
-    TestScenario[SeedingSession, ADomainAndACaller, DomainAdapter, DomainNode]
+    Scenario[SeedingSession, ADomainAndACaller, DomainAdapter, DomainNode]
 ):
     started: datetime
 
@@ -278,15 +274,15 @@ class AModelStoreProjectComesWithIt(
         )
 
     @override
-    def given(self) -> TestGiven[SeedingSession, ADomainAndACaller]:
+    def given(self) -> Given[SeedingSession, ADomainAndACaller]:
         return ADomainAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
-    def when(self) -> TestWhen[ADomainAndACaller, DomainAdapter, DomainNode]:
+    def when(self) -> When[ADomainAndACaller, DomainAdapter, DomainNode]:
         return CreatingThenFindingByItsModelStore(named="with-model-store", described=FRESH)
 
     @override
-    def then(self) -> TestThen[ADomainAndACaller, DomainNode]:
+    def then(self) -> Then[ADomainAndACaller, DomainNode]:
         return TheNewDomainNode(started=self.started, named="with-model-store", described=FRESH)
 
 

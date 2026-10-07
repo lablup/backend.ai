@@ -17,13 +17,7 @@ from ai.backend.manager.api.adapters.login_client_type.adapter import LoginClien
 from ai.backend.manager.errors.base.entity import EntityNotFoundError
 from ai.backend.manager.errors.permission import NotEnoughPermission
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.testutils.scenario_steps import (
-    TestConfigured,
-    TestGiven,
-    TestScenario,
-    TestThen,
-    TestWhen,
-)
+from ai.backend.testutils.scenario_steps import Configured, Given, Scenario, Then, When
 from bai_scenario.components.answers import TheCallIsRefused
 from bai_scenario.components.login_client_type import (
     ATypeAndACaller,
@@ -36,11 +30,11 @@ from bai_scenario.runner.planting import SeedingSession
 from bai_scenario.runner.steps import run_scenario
 
 type Deleted = DeleteLoginClientTypePayload
-type RetiringStep = TestScenario[SeedingSession, ATypeAndACaller, LoginClientTypeAdapter, Deleted]
+type RetiringStep = Scenario[SeedingSession, ATypeAndACaller, LoginClientTypeAdapter, Deleted]
 
 
 @dataclass(frozen=True)
-class Deleting(TestWhen[ATypeAndACaller, LoginClientTypeAdapter, Deleted]):
+class Deleting(When[ATypeAndACaller, LoginClientTypeAdapter, Deleted]):
     """미리 만들어 둔 종류 하나를 삭제한다."""
 
     unknown: bool = False
@@ -62,7 +56,7 @@ class Deleting(TestWhen[ATypeAndACaller, LoginClientTypeAdapter, Deleted]):
 
 @dataclass(frozen=True)
 class TheSuperadminDeletesAType(
-    TestScenario[SeedingSession, ATypeAndACaller, LoginClientTypeAdapter, Deleted]
+    Scenario[SeedingSession, ATypeAndACaller, LoginClientTypeAdapter, Deleted]
 ):
     @override
     def summary(self) -> str:
@@ -73,21 +67,21 @@ class TheSuperadminDeletesAType(
         return "슈퍼관리자가 종류를 삭제하면 삭제한 종류의 id를 담은 응답이 반환된다"
 
     @override
-    def given(self) -> TestGiven[SeedingSession, ATypeAndACaller]:
+    def given(self) -> Given[SeedingSession, ATypeAndACaller]:
         return ATypeAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
-    def when(self) -> TestWhen[ATypeAndACaller, LoginClientTypeAdapter, Deleted]:
+    def when(self) -> When[ATypeAndACaller, LoginClientTypeAdapter, Deleted]:
         return Deleting()
 
     @override
-    def then(self) -> TestThen[ATypeAndACaller, Deleted]:
+    def then(self) -> Then[ATypeAndACaller, Deleted]:
         return TheDeletedTypeId()
 
 
 @dataclass(frozen=True)
 class AnIdNothingAnswersToIsNotFound(
-    TestScenario[SeedingSession, ATypeAndACaller, LoginClientTypeAdapter, Deleted]
+    Scenario[SeedingSession, ATypeAndACaller, LoginClientTypeAdapter, Deleted]
 ):
     @override
     def summary(self) -> str:
@@ -98,21 +92,21 @@ class AnIdNothingAnswersToIsNotFound(
         return "슈퍼관리자가 존재하지 않는 id를 삭제하면 대상을 찾을 수 없다는 이유로 거부된다"
 
     @override
-    def given(self) -> TestGiven[SeedingSession, ATypeAndACaller]:
+    def given(self) -> Given[SeedingSession, ATypeAndACaller]:
         return ATypeAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
-    def when(self) -> TestWhen[ATypeAndACaller, LoginClientTypeAdapter, Deleted]:
+    def when(self) -> When[ATypeAndACaller, LoginClientTypeAdapter, Deleted]:
         return Deleting(unknown=True)
 
     @override
-    def then(self) -> TestThen[ATypeAndACaller, Deleted]:
+    def then(self) -> Then[ATypeAndACaller, Deleted]:
         return TheCallIsRefused(EntityNotFoundError)
 
 
 @dataclass(frozen=True)
 class AUserGrantedNothingMayNotDelete(
-    TestScenario[SeedingSession, ATypeAndACaller, LoginClientTypeAdapter, Deleted]
+    Scenario[SeedingSession, ATypeAndACaller, LoginClientTypeAdapter, Deleted]
 ):
     @override
     def summary(self) -> str:
@@ -123,21 +117,21 @@ class AUserGrantedNothingMayNotDelete(
         return "아무 권한도 없는 사용자가 종류를 삭제하면 권한 부족으로 거부된다"
 
     @override
-    def given(self) -> TestGiven[SeedingSession, ATypeAndACaller]:
+    def given(self) -> Given[SeedingSession, ATypeAndACaller]:
         return ATypeAndSomeone()
 
     @override
-    def when(self) -> TestWhen[ATypeAndACaller, LoginClientTypeAdapter, Deleted]:
+    def when(self) -> When[ATypeAndACaller, LoginClientTypeAdapter, Deleted]:
         return Deleting()
 
     @override
-    def then(self) -> TestThen[ATypeAndACaller, Deleted]:
+    def then(self) -> Then[ATypeAndACaller, Deleted]:
         return TheCallIsRefused(NotEnoughPermission)
 
 
 @dataclass(frozen=True)
 class EnforcementOffLetsAnyoneDelete(
-    TestScenario[SeedingSession, ATypeAndACaller, LoginClientTypeAdapter, Deleted], TestConfigured
+    Scenario[SeedingSession, ATypeAndACaller, LoginClientTypeAdapter, Deleted], Configured
 ):
     @override
     def summary(self) -> str:
@@ -152,15 +146,15 @@ class EnforcementOffLetsAnyoneDelete(
         return {ENFORCEMENT: False}
 
     @override
-    def given(self) -> TestGiven[SeedingSession, ATypeAndACaller]:
+    def given(self) -> Given[SeedingSession, ATypeAndACaller]:
         return ATypeAndSomeone()
 
     @override
-    def when(self) -> TestWhen[ATypeAndACaller, LoginClientTypeAdapter, Deleted]:
+    def when(self) -> When[ATypeAndACaller, LoginClientTypeAdapter, Deleted]:
         return Deleting()
 
     @override
-    def then(self) -> TestThen[ATypeAndACaller, Deleted]:
+    def then(self) -> Then[ATypeAndACaller, Deleted]:
         return TheDeletedTypeId()
 
 

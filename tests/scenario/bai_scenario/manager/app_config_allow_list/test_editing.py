@@ -27,7 +27,7 @@ from ai.backend.manager.api.adapters.app_config_allow_list.adapter import (
 from ai.backend.manager.errors.base.entity import EntityNotFoundError
 from ai.backend.manager.errors.permission import NotEnoughPermission
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.testutils.scenario_steps import TestGiven, TestScenario, TestThen, TestWhen
+from ai.backend.testutils.scenario_steps import Given, Scenario, Then, When
 from bai_scenario.components.answers import TheCallIsRefused
 from bai_scenario.components.app_config_allow_list import (
     AnEntryAndACaller,
@@ -38,15 +38,13 @@ from bai_scenario.runner.acting import ActingAs
 from bai_scenario.runner.planting import SeedingSession
 from bai_scenario.runner.steps import run_scenario
 
-type EditingStep = TestScenario[
+type EditingStep = Scenario[
     SeedingSession, AnEntryAndACaller, AppConfigAllowListAdapter, AppConfigAllowListNode
 ]
 
 
 @dataclass(frozen=True)
-class ChangingTheRank(
-    TestWhen[AnEntryAndACaller, AppConfigAllowListAdapter, AppConfigAllowListNode]
-):
+class ChangingTheRank(When[AnEntryAndACaller, AppConfigAllowListAdapter, AppConfigAllowListNode]):
     """순위를 수정한다. ID를 지정하지 않으면 준비한 allow_list를 수정한다."""
 
     rank: int | None = None
@@ -81,9 +79,7 @@ class ChangingTheRank(
 
 @dataclass(frozen=True)
 class TheSuperadminChangesTheRank(
-    TestScenario[
-        SeedingSession, AnEntryAndACaller, AppConfigAllowListAdapter, AppConfigAllowListNode
-    ]
+    Scenario[SeedingSession, AnEntryAndACaller, AppConfigAllowListAdapter, AppConfigAllowListNode]
 ):
     started: datetime
 
@@ -96,25 +92,21 @@ class TheSuperadminChangesTheRank(
         return "allow_list 하나가 있고 슈퍼관리자가 순위를 바꾸면, 순위만 변경되고 설정 이름과 스코프 유형은 그대로다"
 
     @override
-    def given(self) -> TestGiven[SeedingSession, AnEntryAndACaller]:
+    def given(self) -> Given[SeedingSession, AnEntryAndACaller]:
         return AnEntryAndSomeone(opened=AppConfigScopeType.USER, role=UserRole.SUPERADMIN)
 
     @override
-    def when(
-        self,
-    ) -> TestWhen[AnEntryAndACaller, AppConfigAllowListAdapter, AppConfigAllowListNode]:
+    def when(self) -> When[AnEntryAndACaller, AppConfigAllowListAdapter, AppConfigAllowListNode]:
         return ChangingTheRank(rank=150)
 
     @override
-    def then(self) -> TestThen[AnEntryAndACaller, AppConfigAllowListNode]:
+    def then(self) -> Then[AnEntryAndACaller, AppConfigAllowListNode]:
         return TheEntryNode(started=self.started, rank=150)
 
 
 @dataclass(frozen=True)
 class AnEmptyEditChangesNothing(
-    TestScenario[
-        SeedingSession, AnEntryAndACaller, AppConfigAllowListAdapter, AppConfigAllowListNode
-    ]
+    Scenario[SeedingSession, AnEntryAndACaller, AppConfigAllowListAdapter, AppConfigAllowListNode]
 ):
     started: datetime
 
@@ -127,25 +119,21 @@ class AnEmptyEditChangesNothing(
         return "슈퍼관리자가 아무 값도 지정하지 않고 수정하면, 아무것도 바뀌지 않은 노드가 반환된다"
 
     @override
-    def given(self) -> TestGiven[SeedingSession, AnEntryAndACaller]:
+    def given(self) -> Given[SeedingSession, AnEntryAndACaller]:
         return AnEntryAndSomeone(opened=AppConfigScopeType.USER, role=UserRole.SUPERADMIN)
 
     @override
-    def when(
-        self,
-    ) -> TestWhen[AnEntryAndACaller, AppConfigAllowListAdapter, AppConfigAllowListNode]:
+    def when(self) -> When[AnEntryAndACaller, AppConfigAllowListAdapter, AppConfigAllowListNode]:
         return ChangingTheRank()
 
     @override
-    def then(self) -> TestThen[AnEntryAndACaller, AppConfigAllowListNode]:
+    def then(self) -> Then[AnEntryAndACaller, AppConfigAllowListNode]:
         return TheEntryNode(started=self.started)
 
 
 @dataclass(frozen=True)
 class AUserGrantedNothingMayNotEdit(
-    TestScenario[
-        SeedingSession, AnEntryAndACaller, AppConfigAllowListAdapter, AppConfigAllowListNode
-    ]
+    Scenario[SeedingSession, AnEntryAndACaller, AppConfigAllowListAdapter, AppConfigAllowListNode]
 ):
     @override
     def summary(self) -> str:
@@ -158,25 +146,21 @@ class AUserGrantedNothingMayNotEdit(
         )
 
     @override
-    def given(self) -> TestGiven[SeedingSession, AnEntryAndACaller]:
+    def given(self) -> Given[SeedingSession, AnEntryAndACaller]:
         return AnEntryAndSomeone(opened=AppConfigScopeType.USER)
 
     @override
-    def when(
-        self,
-    ) -> TestWhen[AnEntryAndACaller, AppConfigAllowListAdapter, AppConfigAllowListNode]:
+    def when(self) -> When[AnEntryAndACaller, AppConfigAllowListAdapter, AppConfigAllowListNode]:
         return ChangingTheRank(rank=150)
 
     @override
-    def then(self) -> TestThen[AnEntryAndACaller, AppConfigAllowListNode]:
+    def then(self) -> Then[AnEntryAndACaller, AppConfigAllowListNode]:
         return TheCallIsRefused(NotEnoughPermission)
 
 
 @dataclass(frozen=True)
 class AnUnknownIdIsNotFoundForASuperadmin(
-    TestScenario[
-        SeedingSession, AnEntryAndACaller, AppConfigAllowListAdapter, AppConfigAllowListNode
-    ]
+    Scenario[SeedingSession, AnEntryAndACaller, AppConfigAllowListAdapter, AppConfigAllowListNode]
 ):
     @override
     def summary(self) -> str:
@@ -189,17 +173,15 @@ class AnUnknownIdIsNotFoundForASuperadmin(
         )
 
     @override
-    def given(self) -> TestGiven[SeedingSession, AnEntryAndACaller]:
+    def given(self) -> Given[SeedingSession, AnEntryAndACaller]:
         return AnEntryAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
-    def when(
-        self,
-    ) -> TestWhen[AnEntryAndACaller, AppConfigAllowListAdapter, AppConfigAllowListNode]:
+    def when(self) -> When[AnEntryAndACaller, AppConfigAllowListAdapter, AppConfigAllowListNode]:
         return ChangingTheRank(rank=150, other=uuid4())
 
     @override
-    def then(self) -> TestThen[AnEntryAndACaller, AppConfigAllowListNode]:
+    def then(self) -> Then[AnEntryAndACaller, AppConfigAllowListNode]:
         return TheCallIsRefused(EntityNotFoundError)
 
 

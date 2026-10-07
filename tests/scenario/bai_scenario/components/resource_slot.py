@@ -24,12 +24,12 @@ from ai.backend.manager.data.user.types import UserData
 from ai.backend.manager.errors.base.entity import EntityNotFoundError
 from ai.backend.testutils.scenario_steps import (
     Answered,
+    Given,
     Refused,
     Same,
     Skipped,
-    TestGiven,
-    TestThen,
-    TestVerdict,
+    Then,
+    Verdict,
 )
 from bai_scenario.components.system import (
     KEPT,
@@ -64,7 +64,7 @@ class ManySlotTypesAndACaller:
 
 
 @dataclass(frozen=True)
-class ASlotTypeAndSomeone(TestGiven[Any, ASlotTypeAndACaller]):
+class ASlotTypeAndSomeone(Given[Any, ASlotTypeAndACaller]):
     """슬롯 종류 하나와 사용자 한 명."""
 
     role: UserRole = UserRole.USER
@@ -82,7 +82,7 @@ class ASlotTypeAndSomeone(TestGiven[Any, ASlotTypeAndACaller]):
 
 
 @dataclass(frozen=True)
-class ManySlotTypesAndSomeone(TestGiven[Any, ManySlotTypesAndACaller]):
+class ManySlotTypesAndSomeone(Given[Any, ManySlotTypesAndACaller]):
     """슬롯 종류 여럿과 사용자 한 명."""
 
     role: UserRole = UserRole.USER
@@ -128,7 +128,7 @@ def slot_type_verdicts(
     display_icon: str,
     number_format: NumberFormatInfo,
     rank: int,
-) -> list[TestVerdict]:
+) -> list[Verdict]:
     """Every place of one slot type node. The id is the name, so it is seen and the uuid is not."""
     return [
         Same("id", node.id, named),
@@ -147,7 +147,7 @@ def slot_type_verdicts(
 
 
 @dataclass(frozen=True)
-class TheNewSlotTypeNode(TestThen[Any, ResourceSlotTypeNode]):
+class TheNewSlotTypeNode(Then[Any, ResourceSlotTypeNode]):
     """방금 생성한 슬롯 종류가 통째로 반환된다. 기대값은 요청이 지정한 값에서 읽는다."""
 
     named: str
@@ -166,7 +166,7 @@ class TheNewSlotTypeNode(TestThen[Any, ResourceSlotTypeNode]):
         return "생성한 슬롯 종류 전체가 반환된다"
 
     @override
-    def look(self, laid: Any, answered: Answered[ResourceSlotTypeNode]) -> list[TestVerdict]:
+    def look(self, laid: Any, answered: Answered[ResourceSlotTypeNode]) -> list[Verdict]:
         node = answered.response
         if node is None:
             return [Refused(EntityNotFoundError, answered.raised)]
@@ -186,7 +186,7 @@ class TheNewSlotTypeNode(TestThen[Any, ResourceSlotTypeNode]):
 
 
 @dataclass(frozen=True)
-class TheSlotTypeNode(TestThen[ASlotTypeAndACaller, ResourceSlotTypeNode]):
+class TheSlotTypeNode(Then[ASlotTypeAndACaller, ResourceSlotTypeNode]):
     """미리 만들어 둔 슬롯 종류가 통째로 반환된다. 수정 요청은 바뀌어야 하는 필드만 인자로 준다."""
 
     display_name: str | Kept = KEPT
@@ -199,7 +199,7 @@ class TheSlotTypeNode(TestThen[ASlotTypeAndACaller, ResourceSlotTypeNode]):
     @override
     def look(
         self, laid: ASlotTypeAndACaller, answered: Answered[ResourceSlotTypeNode]
-    ) -> list[TestVerdict]:
+    ) -> list[Verdict]:
         node = answered.response
         if node is None:
             return [Refused(EntityNotFoundError, answered.raised)]
@@ -225,7 +225,7 @@ class TheSlotTypeNode(TestThen[ASlotTypeAndACaller, ResourceSlotTypeNode]):
 
 @dataclass(frozen=True)
 class EveryLaidSlotTypeIsCounted(
-    TestThen[ManySlotTypesAndACaller, AdminSearchResourceSlotTypesPayload]
+    Then[ManySlotTypesAndACaller, AdminSearchResourceSlotTypesPayload]
 ):
     """미리 만들어 둔 슬롯 종류가 모두 집계된다."""
 
@@ -238,7 +238,7 @@ class EveryLaidSlotTypeIsCounted(
         self,
         laid: ManySlotTypesAndACaller,
         answered: Answered[AdminSearchResourceSlotTypesPayload],
-    ) -> list[TestVerdict]:
+    ) -> list[Verdict]:
         page = answered.response
         if page is None:
             return [Refused(EntityNotFoundError, answered.raised)]
@@ -256,7 +256,7 @@ class EveryLaidSlotTypeIsCounted(
 
 @dataclass(frozen=True)
 class OnlyTheNamedSlotTypeIsLeft(
-    TestThen[ManySlotTypesAndACaller, AdminSearchResourceSlotTypesPayload]
+    Then[ManySlotTypesAndACaller, AdminSearchResourceSlotTypesPayload]
 ):
     """필터에 맞는 그 하나만 반환된다."""
 
@@ -269,7 +269,7 @@ class OnlyTheNamedSlotTypeIsLeft(
         self,
         laid: ManySlotTypesAndACaller,
         answered: Answered[AdminSearchResourceSlotTypesPayload],
-    ) -> list[TestVerdict]:
+    ) -> list[Verdict]:
         page = answered.response
         if page is None:
             return [Refused(EntityNotFoundError, answered.raised)]
@@ -282,9 +282,7 @@ class OnlyTheNamedSlotTypeIsLeft(
 
 
 @dataclass(frozen=True)
-class TheFirstPageOfSlotTypes(
-    TestThen[ManySlotTypesAndACaller, AdminSearchResourceSlotTypesPayload]
-):
+class TheFirstPageOfSlotTypes(Then[ManySlotTypesAndACaller, AdminSearchResourceSlotTypesPayload]):
     """크기를 지정하지 않은 첫 페이지. 기본 크기만큼 반환되고 다음 페이지가 있다고 응답한다."""
 
     size: int
@@ -298,7 +296,7 @@ class TheFirstPageOfSlotTypes(
         self,
         laid: ManySlotTypesAndACaller,
         answered: Answered[AdminSearchResourceSlotTypesPayload],
-    ) -> list[TestVerdict]:
+    ) -> list[Verdict]:
         page = answered.response
         if page is None:
             return [Refused(EntityNotFoundError, answered.raised)]
@@ -311,7 +309,7 @@ class TheFirstPageOfSlotTypes(
 
 
 @dataclass(frozen=True)
-class TheDeletedSlotName(TestThen[ASlotTypeAndACaller, PurgeResourceSlotTypePayload]):
+class TheDeletedSlotName(Then[ASlotTypeAndACaller, PurgeResourceSlotTypePayload]):
     """삭제한 슬롯 종류의 이름을 담은 응답."""
 
     @override
@@ -321,7 +319,7 @@ class TheDeletedSlotName(TestThen[ASlotTypeAndACaller, PurgeResourceSlotTypePayl
     @override
     def look(
         self, laid: ASlotTypeAndACaller, answered: Answered[PurgeResourceSlotTypePayload]
-    ) -> list[TestVerdict]:
+    ) -> list[Verdict]:
         payload = answered.response
         if payload is None:
             return [Refused(EntityNotFoundError, answered.raised)]

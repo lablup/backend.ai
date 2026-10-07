@@ -23,14 +23,14 @@ from ai.backend.manager.errors.service import EndpointNotFound
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.testutils.scenario_steps import (
     Answered,
+    Given,
     Held,
     Refused,
     SameAs,
-    TestGiven,
-    TestScenario,
-    TestThen,
-    TestVerdict,
-    TestWhen,
+    Scenario,
+    Then,
+    Verdict,
+    When,
 )
 from bai_scenario.components.answers import TheCallIsRefused
 from bai_scenario.components.deployment import (
@@ -42,13 +42,13 @@ from bai_scenario.runner.acting import ActingAs
 from bai_scenario.runner.planting import SeedingSession
 from bai_scenario.runner.steps import run_scenario
 
-type RetiringStep = TestScenario[
+type RetiringStep = Scenario[
     SeedingSession, ADeploymentAndACaller, DeploymentAdapter, DeleteDeploymentPayload
 ]
 
 
 @dataclass(frozen=True)
-class Retiring(TestWhen[ADeploymentAndACaller, DeploymentAdapter, DeleteDeploymentPayload]):
+class Retiring(When[ADeploymentAndACaller, DeploymentAdapter, DeleteDeploymentPayload]):
     """배포 하나를 지운다. id를 대지 않으면 심은 배포를 지운다."""
 
     other: UUID | None = None
@@ -74,7 +74,7 @@ class Retiring(TestWhen[ADeploymentAndACaller, DeploymentAdapter, DeleteDeployme
 
 
 @dataclass(frozen=True)
-class TheRetiredOneIsNamed(TestThen[ADeploymentAndACaller, DeleteDeploymentPayload]):
+class TheRetiredOneIsNamed(Then[ADeploymentAndACaller, DeleteDeploymentPayload]):
     """지우기 시작한 배포가 무엇인지 답한다."""
 
     @override
@@ -84,7 +84,7 @@ class TheRetiredOneIsNamed(TestThen[ADeploymentAndACaller, DeleteDeploymentPaylo
     @override
     def look(
         self, laid: ADeploymentAndACaller, answered: Answered[DeleteDeploymentPayload]
-    ) -> list[TestVerdict]:
+    ) -> list[Verdict]:
         payload = answered.response
         if payload is None:
             return [Refused(EntityNotFoundError, answered.raised)]
@@ -93,7 +93,7 @@ class TheRetiredOneIsNamed(TestThen[ADeploymentAndACaller, DeleteDeploymentPaylo
 
 @dataclass(frozen=True)
 class TheGrantedUserRetiresIt(
-    TestScenario[SeedingSession, ADeploymentAndACaller, DeploymentAdapter, DeleteDeploymentPayload]
+    Scenario[SeedingSession, ADeploymentAndACaller, DeploymentAdapter, DeleteDeploymentPayload]
 ):
     @override
     def summary(self) -> str:
@@ -104,21 +104,21 @@ class TheGrantedUserRetiresIt(
         return "soft-delete 권한을 받은 사용자가 배포를 지우면, 그 배포를 지우기 시작했다고 답한다"
 
     @override
-    def given(self) -> TestGiven[SeedingSession, ADeploymentAndACaller]:
+    def given(self) -> Given[SeedingSession, ADeploymentAndACaller]:
         return ADeploymentInThatPlace(granted=(Permission.SOFT_DELETE,))
 
     @override
-    def when(self) -> TestWhen[ADeploymentAndACaller, DeploymentAdapter, DeleteDeploymentPayload]:
+    def when(self) -> When[ADeploymentAndACaller, DeploymentAdapter, DeleteDeploymentPayload]:
         return Retiring()
 
     @override
-    def then(self) -> TestThen[ADeploymentAndACaller, DeleteDeploymentPayload]:
+    def then(self) -> Then[ADeploymentAndACaller, DeleteDeploymentPayload]:
         return TheRetiredOneIsNamed()
 
 
 @dataclass(frozen=True)
 class TheSuperadminRetiresAnothers(
-    TestScenario[SeedingSession, ADeploymentAndACaller, DeploymentAdapter, DeleteDeploymentPayload]
+    Scenario[SeedingSession, ADeploymentAndACaller, DeploymentAdapter, DeleteDeploymentPayload]
 ):
     @override
     def summary(self) -> str:
@@ -132,21 +132,21 @@ class TheSuperadminRetiresAnothers(
         )
 
     @override
-    def given(self) -> TestGiven[SeedingSession, ADeploymentAndACaller]:
+    def given(self) -> Given[SeedingSession, ADeploymentAndACaller]:
         return AnothersDeploymentAndASuperadmin()
 
     @override
-    def when(self) -> TestWhen[ADeploymentAndACaller, DeploymentAdapter, DeleteDeploymentPayload]:
+    def when(self) -> When[ADeploymentAndACaller, DeploymentAdapter, DeleteDeploymentPayload]:
         return Retiring()
 
     @override
-    def then(self) -> TestThen[ADeploymentAndACaller, DeleteDeploymentPayload]:
+    def then(self) -> Then[ADeploymentAndACaller, DeleteDeploymentPayload]:
         return TheRetiredOneIsNamed()
 
 
 @dataclass(frozen=True)
 class UpdatingIsNotEnoughToRetire(
-    TestScenario[SeedingSession, ADeploymentAndACaller, DeploymentAdapter, DeleteDeploymentPayload]
+    Scenario[SeedingSession, ADeploymentAndACaller, DeploymentAdapter, DeleteDeploymentPayload]
 ):
     @override
     def summary(self) -> str:
@@ -160,21 +160,21 @@ class UpdatingIsNotEnoughToRetire(
         )
 
     @override
-    def given(self) -> TestGiven[SeedingSession, ADeploymentAndACaller]:
+    def given(self) -> Given[SeedingSession, ADeploymentAndACaller]:
         return ADeploymentInThatPlace(granted=(Permission.UPDATE,))
 
     @override
-    def when(self) -> TestWhen[ADeploymentAndACaller, DeploymentAdapter, DeleteDeploymentPayload]:
+    def when(self) -> When[ADeploymentAndACaller, DeploymentAdapter, DeleteDeploymentPayload]:
         return Retiring()
 
     @override
-    def then(self) -> TestThen[ADeploymentAndACaller, DeleteDeploymentPayload]:
+    def then(self) -> Then[ADeploymentAndACaller, DeleteDeploymentPayload]:
         return TheCallIsRefused(NotEnoughPermission)
 
 
 @dataclass(frozen=True)
 class RetiringAnUnknownIdIsNotFoundForASuperadmin(
-    TestScenario[SeedingSession, ADeploymentAndACaller, DeploymentAdapter, DeleteDeploymentPayload]
+    Scenario[SeedingSession, ADeploymentAndACaller, DeploymentAdapter, DeleteDeploymentPayload]
 ):
     @override
     def summary(self) -> str:
@@ -185,15 +185,15 @@ class RetiringAnUnknownIdIsNotFoundForASuperadmin(
         return "슈퍼관리자가 아무것도 갖지 않은 id를 지우면, 대상이 없다는 것으로 거부된다"
 
     @override
-    def given(self) -> TestGiven[SeedingSession, ADeploymentAndACaller]:
+    def given(self) -> Given[SeedingSession, ADeploymentAndACaller]:
         return ADeploymentInThatPlace(role=UserRole.SUPERADMIN)
 
     @override
-    def when(self) -> TestWhen[ADeploymentAndACaller, DeploymentAdapter, DeleteDeploymentPayload]:
+    def when(self) -> When[ADeploymentAndACaller, DeploymentAdapter, DeleteDeploymentPayload]:
         return Retiring(other=uuid4())
 
     @override
-    def then(self) -> TestThen[ADeploymentAndACaller, DeleteDeploymentPayload]:
+    def then(self) -> Then[ADeploymentAndACaller, DeleteDeploymentPayload]:
         return TheCallIsRefused(EndpointNotFound)
 
 

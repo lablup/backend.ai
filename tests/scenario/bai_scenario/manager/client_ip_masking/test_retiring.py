@@ -21,13 +21,7 @@ from ai.backend.manager.api.adapters.client_ip_masking.adapter import ClientIPMa
 from ai.backend.manager.errors.base.entity import EntityNotFoundError
 from ai.backend.manager.errors.permission import NotEnoughPermission
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.testutils.scenario_steps import (
-    TestConfigured,
-    TestGiven,
-    TestScenario,
-    TestThen,
-    TestWhen,
-)
+from ai.backend.testutils.scenario_steps import Configured, Given, Scenario, Then, When
 from bai_scenario.components.answers import TheCallIsRefused
 from bai_scenario.components.client_ip_masking import (
     AMaskingPolicyAndACaller,
@@ -39,15 +33,13 @@ from bai_scenario.runner.acting import ActingAs
 from bai_scenario.runner.planting import SeedingSession
 from bai_scenario.runner.steps import run_scenario
 
-type RetiringStep = TestScenario[
+type RetiringStep = Scenario[
     SeedingSession, AMaskingPolicyAndACaller, ClientIPMaskingAdapter, ClientIPMaskingPolicyNode
 ]
 
 
 @dataclass(frozen=True)
-class Purging(
-    TestWhen[AMaskingPolicyAndACaller, ClientIPMaskingAdapter, ClientIPMaskingPolicyNode]
-):
+class Purging(When[AMaskingPolicyAndACaller, ClientIPMaskingAdapter, ClientIPMaskingPolicyNode]):
     """미리 만들어 둔 정책을 id로 삭제한다. 응답에 담긴 노드를 꺼내서 준다."""
 
     unknown: bool = False
@@ -76,7 +68,7 @@ class Purging(
 
 @dataclass(frozen=True)
 class TheSuperadminPurgesAPolicy(
-    TestScenario[
+    Scenario[
         SeedingSession, AMaskingPolicyAndACaller, ClientIPMaskingAdapter, ClientIPMaskingPolicyNode
     ]
 ):
@@ -91,23 +83,23 @@ class TheSuperadminPurgesAPolicy(
         return "슈퍼관리자가 정책을 id로 삭제하면 삭제한 정책 전체를 담은 응답이 반환된다"
 
     @override
-    def given(self) -> TestGiven[SeedingSession, AMaskingPolicyAndACaller]:
+    def given(self) -> Given[SeedingSession, AMaskingPolicyAndACaller]:
         return AMaskingPolicyAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
     def when(
         self,
-    ) -> TestWhen[AMaskingPolicyAndACaller, ClientIPMaskingAdapter, ClientIPMaskingPolicyNode]:
+    ) -> When[AMaskingPolicyAndACaller, ClientIPMaskingAdapter, ClientIPMaskingPolicyNode]:
         return Purging()
 
     @override
-    def then(self) -> TestThen[AMaskingPolicyAndACaller, ClientIPMaskingPolicyNode]:
+    def then(self) -> Then[AMaskingPolicyAndACaller, ClientIPMaskingPolicyNode]:
         return TheDeletedMaskingPolicy(started=self.started)
 
 
 @dataclass(frozen=True)
 class AnIdNothingAnswersToIsNotFound(
-    TestScenario[
+    Scenario[
         SeedingSession, AMaskingPolicyAndACaller, ClientIPMaskingAdapter, ClientIPMaskingPolicyNode
     ]
 ):
@@ -120,23 +112,23 @@ class AnIdNothingAnswersToIsNotFound(
         return "슈퍼관리자가 존재하지 않는 id를 삭제하면 대상을 찾을 수 없다는 이유로 거부된다"
 
     @override
-    def given(self) -> TestGiven[SeedingSession, AMaskingPolicyAndACaller]:
+    def given(self) -> Given[SeedingSession, AMaskingPolicyAndACaller]:
         return AMaskingPolicyAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
     def when(
         self,
-    ) -> TestWhen[AMaskingPolicyAndACaller, ClientIPMaskingAdapter, ClientIPMaskingPolicyNode]:
+    ) -> When[AMaskingPolicyAndACaller, ClientIPMaskingAdapter, ClientIPMaskingPolicyNode]:
         return Purging(unknown=True)
 
     @override
-    def then(self) -> TestThen[AMaskingPolicyAndACaller, ClientIPMaskingPolicyNode]:
+    def then(self) -> Then[AMaskingPolicyAndACaller, ClientIPMaskingPolicyNode]:
         return TheCallIsRefused(EntityNotFoundError)
 
 
 @dataclass(frozen=True)
 class AUserGrantedNothingMayNotPurge(
-    TestScenario[
+    Scenario[
         SeedingSession, AMaskingPolicyAndACaller, ClientIPMaskingAdapter, ClientIPMaskingPolicyNode
     ]
 ):
@@ -149,23 +141,23 @@ class AUserGrantedNothingMayNotPurge(
         return "아무 권한도 없는 사용자가 정책을 삭제하면 권한 부족으로 거부된다. 등록이 역할 부족으로 거부되는 것과는 다른 검사다"
 
     @override
-    def given(self) -> TestGiven[SeedingSession, AMaskingPolicyAndACaller]:
+    def given(self) -> Given[SeedingSession, AMaskingPolicyAndACaller]:
         return AMaskingPolicyAndSomeone()
 
     @override
     def when(
         self,
-    ) -> TestWhen[AMaskingPolicyAndACaller, ClientIPMaskingAdapter, ClientIPMaskingPolicyNode]:
+    ) -> When[AMaskingPolicyAndACaller, ClientIPMaskingAdapter, ClientIPMaskingPolicyNode]:
         return Purging()
 
     @override
-    def then(self) -> TestThen[AMaskingPolicyAndACaller, ClientIPMaskingPolicyNode]:
+    def then(self) -> Then[AMaskingPolicyAndACaller, ClientIPMaskingPolicyNode]:
         return TheCallIsRefused(NotEnoughPermission)
 
 
 @dataclass(frozen=True)
 class AUserGrantedNothingPurgingAnUnknownIdIsRefusedForPermission(
-    TestScenario[
+    Scenario[
         SeedingSession, AMaskingPolicyAndACaller, ClientIPMaskingAdapter, ClientIPMaskingPolicyNode
     ]
 ):
@@ -183,26 +175,26 @@ class AUserGrantedNothingPurgingAnUnknownIdIsRefusedForPermission(
         )
 
     @override
-    def given(self) -> TestGiven[SeedingSession, AMaskingPolicyAndACaller]:
+    def given(self) -> Given[SeedingSession, AMaskingPolicyAndACaller]:
         return AMaskingPolicyAndSomeone()
 
     @override
     def when(
         self,
-    ) -> TestWhen[AMaskingPolicyAndACaller, ClientIPMaskingAdapter, ClientIPMaskingPolicyNode]:
+    ) -> When[AMaskingPolicyAndACaller, ClientIPMaskingAdapter, ClientIPMaskingPolicyNode]:
         return Purging(unknown=True)
 
     @override
-    def then(self) -> TestThen[AMaskingPolicyAndACaller, ClientIPMaskingPolicyNode]:
+    def then(self) -> Then[AMaskingPolicyAndACaller, ClientIPMaskingPolicyNode]:
         return TheCallIsRefused(NotEnoughPermission)
 
 
 @dataclass(frozen=True)
 class EnforcementOffLetsAnyonePurge(
-    TestScenario[
+    Scenario[
         SeedingSession, AMaskingPolicyAndACaller, ClientIPMaskingAdapter, ClientIPMaskingPolicyNode
     ],
-    TestConfigured,
+    Configured,
 ):
     started: datetime
 
@@ -219,17 +211,17 @@ class EnforcementOffLetsAnyonePurge(
         return {ENFORCEMENT: False}
 
     @override
-    def given(self) -> TestGiven[SeedingSession, AMaskingPolicyAndACaller]:
+    def given(self) -> Given[SeedingSession, AMaskingPolicyAndACaller]:
         return AMaskingPolicyAndSomeone()
 
     @override
     def when(
         self,
-    ) -> TestWhen[AMaskingPolicyAndACaller, ClientIPMaskingAdapter, ClientIPMaskingPolicyNode]:
+    ) -> When[AMaskingPolicyAndACaller, ClientIPMaskingAdapter, ClientIPMaskingPolicyNode]:
         return Purging()
 
     @override
-    def then(self) -> TestThen[AMaskingPolicyAndACaller, ClientIPMaskingPolicyNode]:
+    def then(self) -> Then[AMaskingPolicyAndACaller, ClientIPMaskingPolicyNode]:
         return TheDeletedMaskingPolicy(started=self.started)
 
 

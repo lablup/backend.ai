@@ -18,13 +18,7 @@ from ai.backend.common.dto.manager.v2.login_client_type.response import LoginCli
 from ai.backend.manager.api.adapters.login_client_type.adapter import LoginClientTypeAdapter
 from ai.backend.manager.errors.auth import InsufficientPrivilege, LoginClientTypeConflict
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.testutils.scenario_steps import (
-    TestConfigured,
-    TestGiven,
-    TestScenario,
-    TestThen,
-    TestWhen,
-)
+from ai.backend.testutils.scenario_steps import Configured, Given, Scenario, Then, When
 from bai_scenario.components.answers import TheCallIsRefused
 from bai_scenario.components.login_client_type import (
     ATypeAndACaller,
@@ -39,11 +33,11 @@ from bai_scenario.runner.steps import run_scenario
 MADE = "webui"
 DESCRIBED = "새로 지정한 설명"
 
-type CreatingStep = TestScenario[SeedingSession, Any, LoginClientTypeAdapter, LoginClientTypeNode]
+type CreatingStep = Scenario[SeedingSession, Any, LoginClientTypeAdapter, LoginClientTypeNode]
 
 
 @dataclass(frozen=True)
-class Creating(TestWhen[ACaller, LoginClientTypeAdapter, LoginClientTypeNode]):
+class Creating(When[ACaller, LoginClientTypeAdapter, LoginClientTypeNode]):
     """종류 하나를 생성한다. 응답에 담긴 노드를 꺼내서 준다."""
 
     named: str = MADE
@@ -67,9 +61,7 @@ class Creating(TestWhen[ACaller, LoginClientTypeAdapter, LoginClientTypeNode]):
 
 
 @dataclass(frozen=True)
-class CreatingWithTheLaidName(
-    TestWhen[ATypeAndACaller, LoginClientTypeAdapter, LoginClientTypeNode]
-):
+class CreatingWithTheLaidName(When[ATypeAndACaller, LoginClientTypeAdapter, LoginClientTypeNode]):
     """미리 만들어 둔 종류와 같은 이름으로 생성한다."""
 
     @override
@@ -93,7 +85,7 @@ class CreatingWithTheLaidName(
 
 @dataclass(frozen=True)
 class TheSuperadminMakesOneWithANameAlone(
-    TestScenario[SeedingSession, ACaller, LoginClientTypeAdapter, LoginClientTypeNode]
+    Scenario[SeedingSession, ACaller, LoginClientTypeAdapter, LoginClientTypeNode]
 ):
     started: datetime
 
@@ -106,21 +98,21 @@ class TheSuperadminMakesOneWithANameAlone(
         return "슈퍼관리자가 이름만 지정해 생성하면 설명이 비어 있는 노드가 반환된다"
 
     @override
-    def given(self) -> TestGiven[SeedingSession, ACaller]:
+    def given(self) -> Given[SeedingSession, ACaller]:
         return SomeoneAlone(role=UserRole.SUPERADMIN)
 
     @override
-    def when(self) -> TestWhen[ACaller, LoginClientTypeAdapter, LoginClientTypeNode]:
+    def when(self) -> When[ACaller, LoginClientTypeAdapter, LoginClientTypeNode]:
         return Creating()
 
     @override
-    def then(self) -> TestThen[ACaller, LoginClientTypeNode]:
+    def then(self) -> Then[ACaller, LoginClientTypeNode]:
         return TheNewTypeNode(started=self.started, named=MADE, described=None)
 
 
 @dataclass(frozen=True)
 class ADescriptionComesBackAsGiven(
-    TestScenario[SeedingSession, ACaller, LoginClientTypeAdapter, LoginClientTypeNode]
+    Scenario[SeedingSession, ACaller, LoginClientTypeAdapter, LoginClientTypeNode]
 ):
     started: datetime
 
@@ -133,21 +125,21 @@ class ADescriptionComesBackAsGiven(
         return "슈퍼관리자가 이름과 설명을 함께 지정해 생성하면 지정한 값이 그대로 담긴 노드가 반환된다"
 
     @override
-    def given(self) -> TestGiven[SeedingSession, ACaller]:
+    def given(self) -> Given[SeedingSession, ACaller]:
         return SomeoneAlone(role=UserRole.SUPERADMIN)
 
     @override
-    def when(self) -> TestWhen[ACaller, LoginClientTypeAdapter, LoginClientTypeNode]:
+    def when(self) -> When[ACaller, LoginClientTypeAdapter, LoginClientTypeNode]:
         return Creating(described=DESCRIBED)
 
     @override
-    def then(self) -> TestThen[ACaller, LoginClientTypeNode]:
+    def then(self) -> Then[ACaller, LoginClientTypeNode]:
         return TheNewTypeNode(started=self.started, named=MADE, described=DESCRIBED)
 
 
 @dataclass(frozen=True)
 class ANameAlreadyTakenIsRefused(
-    TestScenario[SeedingSession, ATypeAndACaller, LoginClientTypeAdapter, LoginClientTypeNode]
+    Scenario[SeedingSession, ATypeAndACaller, LoginClientTypeAdapter, LoginClientTypeNode]
 ):
     @override
     def summary(self) -> str:
@@ -158,21 +150,21 @@ class ANameAlreadyTakenIsRefused(
         return "같은 이름의 종류가 이미 있을 때 그 이름으로 다시 생성하면, 이름 중복으로 거부된다"
 
     @override
-    def given(self) -> TestGiven[SeedingSession, ATypeAndACaller]:
+    def given(self) -> Given[SeedingSession, ATypeAndACaller]:
         return ATypeAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
-    def when(self) -> TestWhen[ATypeAndACaller, LoginClientTypeAdapter, LoginClientTypeNode]:
+    def when(self) -> When[ATypeAndACaller, LoginClientTypeAdapter, LoginClientTypeNode]:
         return CreatingWithTheLaidName()
 
     @override
-    def then(self) -> TestThen[ATypeAndACaller, LoginClientTypeNode]:
+    def then(self) -> Then[ATypeAndACaller, LoginClientTypeNode]:
         return TheCallIsRefused(LoginClientTypeConflict)
 
 
 @dataclass(frozen=True)
 class AUserWhoIsNotTheSuperadminMayNotCreate(
-    TestScenario[SeedingSession, ACaller, LoginClientTypeAdapter, LoginClientTypeNode]
+    Scenario[SeedingSession, ACaller, LoginClientTypeAdapter, LoginClientTypeNode]
 ):
     @override
     def summary(self) -> str:
@@ -183,22 +175,21 @@ class AUserWhoIsNotTheSuperadminMayNotCreate(
         return "슈퍼관리자가 아닌 사용자가 종류를 생성하면 역할 부족으로 거부된다"
 
     @override
-    def given(self) -> TestGiven[SeedingSession, ACaller]:
+    def given(self) -> Given[SeedingSession, ACaller]:
         return SomeoneAlone()
 
     @override
-    def when(self) -> TestWhen[ACaller, LoginClientTypeAdapter, LoginClientTypeNode]:
+    def when(self) -> When[ACaller, LoginClientTypeAdapter, LoginClientTypeNode]:
         return Creating()
 
     @override
-    def then(self) -> TestThen[ACaller, LoginClientTypeNode]:
+    def then(self) -> Then[ACaller, LoginClientTypeNode]:
         return TheCallIsRefused(InsufficientPrivilege)
 
 
 @dataclass(frozen=True)
 class EnforcementOffStillNeedsTheSuperadmin(
-    TestScenario[SeedingSession, ACaller, LoginClientTypeAdapter, LoginClientTypeNode],
-    TestConfigured,
+    Scenario[SeedingSession, ACaller, LoginClientTypeAdapter, LoginClientTypeNode], Configured
 ):
     @override
     def summary(self) -> str:
@@ -213,15 +204,15 @@ class EnforcementOffStillNeedsTheSuperadmin(
         return {ENFORCEMENT: False}
 
     @override
-    def given(self) -> TestGiven[SeedingSession, ACaller]:
+    def given(self) -> Given[SeedingSession, ACaller]:
         return SomeoneAlone()
 
     @override
-    def when(self) -> TestWhen[ACaller, LoginClientTypeAdapter, LoginClientTypeNode]:
+    def when(self) -> When[ACaller, LoginClientTypeAdapter, LoginClientTypeNode]:
         return Creating()
 
     @override
-    def then(self) -> TestThen[ACaller, LoginClientTypeNode]:
+    def then(self) -> Then[ACaller, LoginClientTypeNode]:
         return TheCallIsRefused(InsufficientPrivilege)
 
 

@@ -24,13 +24,7 @@ from ai.backend.common.dto.manager.v2.resource_slot.response import (
 from ai.backend.manager.api.adapters.resource_slot.adapter import ResourceSlotAdapter
 from ai.backend.manager.errors.permission import NotEnoughPermission
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.testutils.scenario_steps import (
-    TestConfigured,
-    TestGiven,
-    TestScenario,
-    TestThen,
-    TestWhen,
-)
+from ai.backend.testutils.scenario_steps import Configured, Given, Scenario, Then, When
 from bai_scenario.components.agent_resource import (
     AnAgentAndACaller,
     AnAgentAndSomeone,
@@ -44,14 +38,12 @@ from bai_scenario.runner.planting import SeedingSession
 from bai_scenario.runner.steps import run_scenario
 
 type Searched = AdminSearchAgentResourcesPayload
-type OneAgentStep = TestScenario[SeedingSession, AnAgentAndACaller, ResourceSlotAdapter, Searched]
-type TwoAgentsStep = TestScenario[
-    SeedingSession, TwoAgentsAndACaller, ResourceSlotAdapter, Searched
-]
+type OneAgentStep = Scenario[SeedingSession, AnAgentAndACaller, ResourceSlotAdapter, Searched]
+type TwoAgentsStep = Scenario[SeedingSession, TwoAgentsAndACaller, ResourceSlotAdapter, Searched]
 
 
 @dataclass(frozen=True)
-class SearchingTheAgent(TestWhen[AnAgentAndACaller, ResourceSlotAdapter, Searched]):
+class SearchingTheAgent(When[AnAgentAndACaller, ResourceSlotAdapter, Searched]):
     """미리 만들어 둔 에이전트 하나를 지정해 검색한다."""
 
     @override
@@ -73,7 +65,7 @@ class SearchingTheAgent(TestWhen[AnAgentAndACaller, ResourceSlotAdapter, Searche
 
 
 @dataclass(frozen=True)
-class SearchingBothAgents(TestWhen[TwoAgentsAndACaller, ResourceSlotAdapter, Searched]):
+class SearchingBothAgents(When[TwoAgentsAndACaller, ResourceSlotAdapter, Searched]):
     """미리 만들어 둔 에이전트 둘을 함께 지정해 검색한다."""
 
     @override
@@ -104,7 +96,7 @@ class SearchingBothAgents(TestWhen[TwoAgentsAndACaller, ResourceSlotAdapter, Sea
 
 @dataclass(frozen=True)
 class AUserReadingAgentsInTheGroupSearchesTheAgent(
-    TestScenario[SeedingSession, AnAgentAndACaller, ResourceSlotAdapter, Searched]
+    Scenario[SeedingSession, AnAgentAndACaller, ResourceSlotAdapter, Searched]
 ):
     @override
     def summary(self) -> str:
@@ -118,21 +110,21 @@ class AUserReadingAgentsInTheGroupSearchesTheAgent(
         )
 
     @override
-    def given(self) -> TestGiven[SeedingSession, AnAgentAndACaller]:
+    def given(self) -> Given[SeedingSession, AnAgentAndACaller]:
         return AnAgentAndSomeone(granted=True)
 
     @override
-    def when(self) -> TestWhen[AnAgentAndACaller, ResourceSlotAdapter, Searched]:
+    def when(self) -> When[AnAgentAndACaller, ResourceSlotAdapter, Searched]:
         return SearchingTheAgent()
 
     @override
-    def then(self) -> TestThen[AnAgentAndACaller, Searched]:
+    def then(self) -> Then[AnAgentAndACaller, Searched]:
         return NothingIsFound()
 
 
 @dataclass(frozen=True)
 class TheSuperadminSearchesTheAgent(
-    TestScenario[SeedingSession, AnAgentAndACaller, ResourceSlotAdapter, Searched]
+    Scenario[SeedingSession, AnAgentAndACaller, ResourceSlotAdapter, Searched]
 ):
     @override
     def summary(self) -> str:
@@ -143,21 +135,21 @@ class TheSuperadminSearchesTheAgent(
         return "슈퍼관리자가 아직 슬롯을 보고하지 않은 에이전트를 지정해 조회하면 응답이 비어 있다"
 
     @override
-    def given(self) -> TestGiven[SeedingSession, AnAgentAndACaller]:
+    def given(self) -> Given[SeedingSession, AnAgentAndACaller]:
         return AnAgentAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
-    def when(self) -> TestWhen[AnAgentAndACaller, ResourceSlotAdapter, Searched]:
+    def when(self) -> When[AnAgentAndACaller, ResourceSlotAdapter, Searched]:
         return SearchingTheAgent()
 
     @override
-    def then(self) -> TestThen[AnAgentAndACaller, Searched]:
+    def then(self) -> Then[AnAgentAndACaller, Searched]:
         return NothingIsFound()
 
 
 @dataclass(frozen=True)
 class AUserGrantedNothingMayNotSearchTheAgent(
-    TestScenario[SeedingSession, AnAgentAndACaller, ResourceSlotAdapter, Searched]
+    Scenario[SeedingSession, AnAgentAndACaller, ResourceSlotAdapter, Searched]
 ):
     @override
     def summary(self) -> str:
@@ -168,21 +160,21 @@ class AUserGrantedNothingMayNotSearchTheAgent(
         return "아무 권한도 없는 사용자가 에이전트를 지정해 조회하면 권한 부족으로 거부된다"
 
     @override
-    def given(self) -> TestGiven[SeedingSession, AnAgentAndACaller]:
+    def given(self) -> Given[SeedingSession, AnAgentAndACaller]:
         return AnAgentAndSomeone()
 
     @override
-    def when(self) -> TestWhen[AnAgentAndACaller, ResourceSlotAdapter, Searched]:
+    def when(self) -> When[AnAgentAndACaller, ResourceSlotAdapter, Searched]:
         return SearchingTheAgent()
 
     @override
-    def then(self) -> TestThen[AnAgentAndACaller, Searched]:
+    def then(self) -> Then[AnAgentAndACaller, Searched]:
         return TheCallIsRefused(NotEnoughPermission)
 
 
 @dataclass(frozen=True)
 class OneAgentTheCallerMayNotReadRefusesTheWholeSearch(
-    TestScenario[SeedingSession, TwoAgentsAndACaller, ResourceSlotAdapter, Searched]
+    Scenario[SeedingSession, TwoAgentsAndACaller, ResourceSlotAdapter, Searched]
 ):
     @override
     def summary(self) -> str:
@@ -196,21 +188,21 @@ class OneAgentTheCallerMayNotReadRefusesTheWholeSearch(
         )
 
     @override
-    def given(self) -> TestGiven[SeedingSession, TwoAgentsAndACaller]:
+    def given(self) -> Given[SeedingSession, TwoAgentsAndACaller]:
         return TwoAgentsAndSomeoneReadingOne()
 
     @override
-    def when(self) -> TestWhen[TwoAgentsAndACaller, ResourceSlotAdapter, Searched]:
+    def when(self) -> When[TwoAgentsAndACaller, ResourceSlotAdapter, Searched]:
         return SearchingBothAgents()
 
     @override
-    def then(self) -> TestThen[TwoAgentsAndACaller, Searched]:
+    def then(self) -> Then[TwoAgentsAndACaller, Searched]:
         return TheCallIsRefused(NotEnoughPermission)
 
 
 @dataclass(frozen=True)
 class EnforcementOffLetsAnyoneSearchTheAgent(
-    TestScenario[SeedingSession, AnAgentAndACaller, ResourceSlotAdapter, Searched], TestConfigured
+    Scenario[SeedingSession, AnAgentAndACaller, ResourceSlotAdapter, Searched], Configured
 ):
     @override
     def summary(self) -> str:
@@ -225,15 +217,15 @@ class EnforcementOffLetsAnyoneSearchTheAgent(
         return {ENFORCEMENT: False}
 
     @override
-    def given(self) -> TestGiven[SeedingSession, AnAgentAndACaller]:
+    def given(self) -> Given[SeedingSession, AnAgentAndACaller]:
         return AnAgentAndSomeone()
 
     @override
-    def when(self) -> TestWhen[AnAgentAndACaller, ResourceSlotAdapter, Searched]:
+    def when(self) -> When[AnAgentAndACaller, ResourceSlotAdapter, Searched]:
         return SearchingTheAgent()
 
     @override
-    def then(self) -> TestThen[AnAgentAndACaller, Searched]:
+    def then(self) -> Then[AnAgentAndACaller, Searched]:
         return NothingIsFound()
 
 

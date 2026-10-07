@@ -19,14 +19,14 @@ from ai.backend.manager.data.user.types import UserData
 from ai.backend.manager.errors.permission import NotEnoughPermission
 from ai.backend.testutils.scenario_steps import (
     Answered,
+    Given,
     Held,
     Refused,
     Same,
     SameAs,
     Skipped,
-    TestGiven,
-    TestThen,
-    TestVerdict,
+    Then,
+    Verdict,
 )
 from bai_scenario.components.domain import WAS_HERE, SomeoneOf, WrittenByThisRun
 from bai_scenario.seeds.app_config.allow_list import SeedAllowListEntry
@@ -49,7 +49,7 @@ class ADefinitionAndACaller:
 
 
 @dataclass(frozen=True)
-class ADefinitionAndSomeone(TestGiven[Any, ADefinitionAndACaller]):
+class ADefinitionAndSomeone(Given[Any, ADefinitionAndACaller]):
     """설정 정의 하나와 슈퍼관리자 또는 권한이 없는 일반 사용자 한 명.
 
     ``with_fragment``는 그 이름에 공개 허용 목록 항목과 공개 설정 조각을 함께 만들어 둔다.
@@ -93,7 +93,7 @@ class ManyDefinitionsAndACaller:
 
 
 @dataclass(frozen=True)
-class ManyDefinitionsAndSomeone(TestGiven[Any, ManyDefinitionsAndACaller]):
+class ManyDefinitionsAndSomeone(Given[Any, ManyDefinitionsAndACaller]):
     """설정 정의 여럿과 슈퍼관리자 또는 권한이 없는 일반 사용자 한 명."""
 
     count: int = 3
@@ -127,7 +127,7 @@ class TwoDefinitionsAndACaller:
 
 
 @dataclass(frozen=True)
-class TwoDefinitionsAndSomeone(TestGiven[Any, TwoDefinitionsAndACaller]):
+class TwoDefinitionsAndSomeone(Given[Any, TwoDefinitionsAndACaller]):
     """설정 정의 둘과 슈퍼관리자 또는 권한이 없는 일반 사용자 한 명."""
 
     role: UserRole = UserRole.USER
@@ -150,7 +150,7 @@ class TwoDefinitionsAndSomeone(TestGiven[Any, TwoDefinitionsAndACaller]):
 
 
 @dataclass(frozen=True)
-class TheDefinitionNode(TestThen[ADefinitionAndACaller, AppConfigDefinitionNode]):
+class TheDefinitionNode(Then[ADefinitionAndACaller, AppConfigDefinitionNode]):
     """미리 만들어 둔 설정 정의의 모든 필드가 반환된다."""
 
     started: datetime
@@ -162,7 +162,7 @@ class TheDefinitionNode(TestThen[ADefinitionAndACaller, AppConfigDefinitionNode]
     @override
     def look(
         self, laid: ADefinitionAndACaller, answered: Answered[AppConfigDefinitionNode]
-    ) -> list[TestVerdict]:
+    ) -> list[Verdict]:
         node = answered.response
         if node is None:
             return [Refused(NotEnoughPermission, answered.raised)]
@@ -176,7 +176,7 @@ class TheDefinitionNode(TestThen[ADefinitionAndACaller, AppConfigDefinitionNode]
 
 
 @dataclass(frozen=True)
-class TheNewDefinitionNode(TestThen[Any, AppConfigDefinitionNode]):
+class TheNewDefinitionNode(Then[Any, AppConfigDefinitionNode]):
     """방금 등록한 설정 정의의 모든 필드가 반환된다."""
 
     started: datetime
@@ -187,7 +187,7 @@ class TheNewDefinitionNode(TestThen[Any, AppConfigDefinitionNode]):
         return "등록한 설정 정의의 모든 필드가 반환된다"
 
     @override
-    def look(self, laid: Any, answered: Answered[AppConfigDefinitionNode]) -> list[TestVerdict]:
+    def look(self, laid: Any, answered: Answered[AppConfigDefinitionNode]) -> list[Verdict]:
         node = answered.response
         if node is None:
             return [Refused(NotEnoughPermission, answered.raised)]
@@ -202,7 +202,7 @@ class TheNewDefinitionNode(TestThen[Any, AppConfigDefinitionNode]):
 
 @dataclass(frozen=True)
 class EveryLaidDefinitionIsFound(
-    TestThen[ManyDefinitionsAndACaller, SearchAppConfigDefinitionsPayload]
+    Then[ManyDefinitionsAndACaller, SearchAppConfigDefinitionsPayload]
 ):
     """미리 만들어 둔 설정 정의가 모두, 그리고 그것만 집계된다."""
 
@@ -215,7 +215,7 @@ class EveryLaidDefinitionIsFound(
         self,
         laid: ManyDefinitionsAndACaller,
         answered: Answered[SearchAppConfigDefinitionsPayload],
-    ) -> list[TestVerdict]:
+    ) -> list[Verdict]:
         payload = answered.response
         if payload is None:
             return [Refused(NotEnoughPermission, answered.raised)]

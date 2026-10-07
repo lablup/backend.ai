@@ -15,13 +15,13 @@ from ai.backend.manager.errors.base.entity import EntityNotFoundError
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.testutils.scenario_steps import (
     Answered,
+    Given,
     Held,
     SameAs,
-    TestGiven,
-    TestScenario,
-    TestThen,
-    TestVerdict,
-    TestWhen,
+    Scenario,
+    Then,
+    Verdict,
+    When,
 )
 from bai_scenario.components.answers import MissingResponse, TheCallIsRefused
 from bai_scenario.components.resource_group import AGroupAndACaller, AGroupAndSomeone
@@ -29,7 +29,7 @@ from bai_scenario.runner.acting import ActingAs
 from bai_scenario.runner.planting import SeedingSession
 from bai_scenario.runner.steps import run_scenario
 
-type LookingUpStep = TestScenario[
+type LookingUpStep = Scenario[
     SeedingSession, AGroupAndACaller, ResourceGroupAdapter, ResourceGroupID
 ]
 
@@ -37,7 +37,7 @@ UNKNOWN = "no-such-group"
 
 
 @dataclass(frozen=True)
-class LookingUpTheName(TestWhen[AGroupAndACaller, ResourceGroupAdapter, ResourceGroupID]):
+class LookingUpTheName(When[AGroupAndACaller, ResourceGroupAdapter, ResourceGroupID]):
     """이름으로 id를 찾는다. ``unknown``이면 어느 행에도 없는 이름을 쓴다."""
 
     unknown: bool = False
@@ -58,7 +58,7 @@ class LookingUpTheName(TestWhen[AGroupAndACaller, ResourceGroupAdapter, Resource
 
 
 @dataclass(frozen=True)
-class TheGroupsIdComesBack(TestThen[AGroupAndACaller, ResourceGroupID]):
+class TheGroupsIdComesBack(Then[AGroupAndACaller, ResourceGroupID]):
     """그 이름을 가진 리소스 그룹의 id가 온다."""
 
     @override
@@ -66,9 +66,7 @@ class TheGroupsIdComesBack(TestThen[AGroupAndACaller, ResourceGroupID]):
         return "그 리소스 그룹의 id가 온다"
 
     @override
-    def look(
-        self, laid: AGroupAndACaller, answered: Answered[ResourceGroupID]
-    ) -> list[TestVerdict]:
+    def look(self, laid: AGroupAndACaller, answered: Answered[ResourceGroupID]) -> list[Verdict]:
         found = answered.response
         if found is None:
             return [MissingResponse(answered.raised)]
@@ -77,7 +75,7 @@ class TheGroupsIdComesBack(TestThen[AGroupAndACaller, ResourceGroupID]):
 
 @dataclass(frozen=True)
 class TheSuperadminLooksUpAName(
-    TestScenario[SeedingSession, AGroupAndACaller, ResourceGroupAdapter, ResourceGroupID]
+    Scenario[SeedingSession, AGroupAndACaller, ResourceGroupAdapter, ResourceGroupID]
 ):
     @override
     def summary(self) -> str:
@@ -88,21 +86,21 @@ class TheSuperadminLooksUpAName(
         return "슈퍼관리자가 리소스 그룹 이름으로 id를 찾으면, 그 리소스 그룹의 id가 온다"
 
     @override
-    def given(self) -> TestGiven[SeedingSession, AGroupAndACaller]:
+    def given(self) -> Given[SeedingSession, AGroupAndACaller]:
         return AGroupAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
-    def when(self) -> TestWhen[AGroupAndACaller, ResourceGroupAdapter, ResourceGroupID]:
+    def when(self) -> When[AGroupAndACaller, ResourceGroupAdapter, ResourceGroupID]:
         return LookingUpTheName()
 
     @override
-    def then(self) -> TestThen[AGroupAndACaller, ResourceGroupID]:
+    def then(self) -> Then[AGroupAndACaller, ResourceGroupID]:
         return TheGroupsIdComesBack()
 
 
 @dataclass(frozen=True)
 class AUserGrantedNothingStillLooksUpAName(
-    TestScenario[SeedingSession, AGroupAndACaller, ResourceGroupAdapter, ResourceGroupID]
+    Scenario[SeedingSession, AGroupAndACaller, ResourceGroupAdapter, ResourceGroupID]
 ):
     @override
     def summary(self) -> str:
@@ -116,21 +114,21 @@ class AUserGrantedNothingStillLooksUpAName(
         )
 
     @override
-    def given(self) -> TestGiven[SeedingSession, AGroupAndACaller]:
+    def given(self) -> Given[SeedingSession, AGroupAndACaller]:
         return AGroupAndSomeone()
 
     @override
-    def when(self) -> TestWhen[AGroupAndACaller, ResourceGroupAdapter, ResourceGroupID]:
+    def when(self) -> When[AGroupAndACaller, ResourceGroupAdapter, ResourceGroupID]:
         return LookingUpTheName()
 
     @override
-    def then(self) -> TestThen[AGroupAndACaller, ResourceGroupID]:
+    def then(self) -> Then[AGroupAndACaller, ResourceGroupID]:
         return TheGroupsIdComesBack()
 
 
 @dataclass(frozen=True)
 class ANameNothingAnswersToIsNotFound(
-    TestScenario[SeedingSession, AGroupAndACaller, ResourceGroupAdapter, ResourceGroupID]
+    Scenario[SeedingSession, AGroupAndACaller, ResourceGroupAdapter, ResourceGroupID]
 ):
     @override
     def summary(self) -> str:
@@ -141,15 +139,15 @@ class ANameNothingAnswersToIsNotFound(
         return "아무 리소스 그룹도 갖지 않은 이름으로 id를 찾으면 대상이 없다는 것으로 거부된다"
 
     @override
-    def given(self) -> TestGiven[SeedingSession, AGroupAndACaller]:
+    def given(self) -> Given[SeedingSession, AGroupAndACaller]:
         return AGroupAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
-    def when(self) -> TestWhen[AGroupAndACaller, ResourceGroupAdapter, ResourceGroupID]:
+    def when(self) -> When[AGroupAndACaller, ResourceGroupAdapter, ResourceGroupID]:
         return LookingUpTheName(unknown=True)
 
     @override
-    def then(self) -> TestThen[AGroupAndACaller, ResourceGroupID]:
+    def then(self) -> Then[AGroupAndACaller, ResourceGroupID]:
         return TheCallIsRefused(EntityNotFoundError)
 
 

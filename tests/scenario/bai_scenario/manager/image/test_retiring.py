@@ -15,10 +15,10 @@ from ai.backend.manager.errors.image import ImageAccessForbiddenError, ImageNotF
 from ai.backend.manager.errors.permission import NotEnoughPermission
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.testutils.scenario_steps import (
-    TestGiven,
-    TestScenario,
-    TestThen,
-    TestWhen,
+    Given,
+    Scenario,
+    Then,
+    When,
 )
 from bai_scenario.components.answers import TheCallIsRefused
 from bai_scenario.components.image import (
@@ -39,7 +39,7 @@ from bai_scenario.runner.steps import run_scenario
 
 
 @dataclass(frozen=True)
-class Retiring(TestWhen[AnImageAndACaller, ImageAdapter, ImageNode]):
+class Retiring(When[AnImageAndACaller, ImageAdapter, ImageNode]):
     """이미지를 완전 삭제한다."""
 
     at: Target = field(default_factory=TheLaidImage)
@@ -64,7 +64,7 @@ class Retiring(TestWhen[AnImageAndACaller, ImageAdapter, ImageNode]):
 
 
 @dataclass(frozen=True)
-class RetiringTheAliased(TestWhen[AnAliasAndACaller, ImageAdapter, ImageNode]):
+class RetiringTheAliased(When[AnAliasAndACaller, ImageAdapter, ImageNode]):
     """별칭이 등록된 이미지를 완전 삭제한다."""
 
     @override
@@ -84,7 +84,7 @@ class RetiringTheAliased(TestWhen[AnAliasAndACaller, ImageAdapter, ImageNode]):
 
 @dataclass(frozen=True)
 class PurgingAnswersWithTheRemovedImage(
-    TestScenario[SeedingSession, AnImageAndACaller, ImageAdapter, ImageNode]
+    Scenario[SeedingSession, AnImageAndACaller, ImageAdapter, ImageNode]
 ):
     @override
     def summary(self) -> str:
@@ -95,21 +95,21 @@ class PurgingAnswersWithTheRemovedImage(
         return "슈퍼관리자가 이미지를 완전 삭제하면 삭제된 이미지가 반환된다"
 
     @override
-    def given(self) -> TestGiven[SeedingSession, AnImageAndACaller]:
+    def given(self) -> Given[SeedingSession, AnImageAndACaller]:
         return AnImageAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
-    def when(self) -> TestWhen[AnImageAndACaller, ImageAdapter, ImageNode]:
+    def when(self) -> When[AnImageAndACaller, ImageAdapter, ImageNode]:
         return Retiring()
 
     @override
-    def then(self) -> TestThen[AnImageAndACaller, ImageNode]:
+    def then(self) -> Then[AnImageAndACaller, ImageNode]:
         return TheImageNode()
 
 
 @dataclass(frozen=True)
 class TheMakerOfACustomImageMayPurgeIt(
-    TestScenario[SeedingSession, AnImageAndACaller, ImageAdapter, ImageNode]
+    Scenario[SeedingSession, AnImageAndACaller, ImageAdapter, ImageNode]
 ):
     @override
     def summary(self) -> str:
@@ -123,21 +123,21 @@ class TheMakerOfACustomImageMayPurgeIt(
         )
 
     @override
-    def given(self) -> TestGiven[SeedingSession, AnImageAndACaller]:
+    def given(self) -> Given[SeedingSession, AnImageAndACaller]:
         return AnImageTheCallerMade()
 
     @override
-    def when(self) -> TestWhen[AnImageAndACaller, ImageAdapter, ImageNode]:
+    def when(self) -> When[AnImageAndACaller, ImageAdapter, ImageNode]:
         return Retiring()
 
     @override
-    def then(self) -> TestThen[AnImageAndACaller, ImageNode]:
+    def then(self) -> Then[AnImageAndACaller, ImageNode]:
         return TheImageNode()
 
 
 @dataclass(frozen=True)
 class PurgingAnAliasedImageReturnsTheRemovedImage(
-    TestScenario[SeedingSession, AnAliasAndACaller, ImageAdapter, ImageNode]
+    Scenario[SeedingSession, AnAliasAndACaller, ImageAdapter, ImageNode]
 ):
     @override
     def summary(self) -> str:
@@ -148,22 +148,20 @@ class PurgingAnAliasedImageReturnsTheRemovedImage(
         return "별칭이 등록된 이미지를 완전 삭제하면 삭제된 이미지가 반환된다"
 
     @override
-    def given(self) -> TestGiven[SeedingSession, AnAliasAndACaller]:
+    def given(self) -> Given[SeedingSession, AnAliasAndACaller]:
         return AnAliasAndSomeone()
 
     @override
-    def when(self) -> TestWhen[AnAliasAndACaller, ImageAdapter, ImageNode]:
+    def when(self) -> When[AnAliasAndACaller, ImageAdapter, ImageNode]:
         return RetiringTheAliased()
 
     @override
-    def then(self) -> TestThen[AnAliasAndACaller, ImageNode]:
+    def then(self) -> Then[AnAliasAndACaller, ImageNode]:
         return TheImageNode()
 
 
 @dataclass(frozen=True)
-class RetiringWhatIsNotThere(
-    TestScenario[SeedingSession, AnImageAndACaller, ImageAdapter, ImageNode]
-):
+class RetiringWhatIsNotThere(Scenario[SeedingSession, AnImageAndACaller, ImageAdapter, ImageNode]):
     @override
     def summary(self) -> str:
         return "purging-an-id-that-holds-no-image-is-refused"
@@ -173,21 +171,21 @@ class RetiringWhatIsNotThere(
         return "어느 이미지도 가리키지 않는 ID를 완전 삭제하려 하면 대상을 찾을 수 없어 거부된다"
 
     @override
-    def given(self) -> TestGiven[SeedingSession, AnImageAndACaller]:
+    def given(self) -> Given[SeedingSession, AnImageAndACaller]:
         return AnImageAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
-    def when(self) -> TestWhen[AnImageAndACaller, ImageAdapter, ImageNode]:
+    def when(self) -> When[AnImageAndACaller, ImageAdapter, ImageNode]:
         return Retiring(at=AnIdThatHoldsNothing())
 
     @override
-    def then(self) -> TestThen[AnImageAndACaller, ImageNode]:
+    def then(self) -> Then[AnImageAndACaller, ImageNode]:
         return TheCallIsRefused(ImageNotFound)
 
 
 @dataclass(frozen=True)
 class AnUngrantedUserMayNotRetire(
-    TestScenario[SeedingSession, AnImageAndACaller, ImageAdapter, ImageNode]
+    Scenario[SeedingSession, AnImageAndACaller, ImageAdapter, ImageNode]
 ):
     @override
     def summary(self) -> str:
@@ -198,21 +196,21 @@ class AnUngrantedUserMayNotRetire(
         return "아무 권한도 받지 않은 사용자가 이미지를 완전 삭제하려 하면 권한 부족으로 거부된다"
 
     @override
-    def given(self) -> TestGiven[SeedingSession, AnImageAndACaller]:
+    def given(self) -> Given[SeedingSession, AnImageAndACaller]:
         return AnUncustomizedImageAndSomeone(granted=False)
 
     @override
-    def when(self) -> TestWhen[AnImageAndACaller, ImageAdapter, ImageNode]:
+    def when(self) -> When[AnImageAndACaller, ImageAdapter, ImageNode]:
         return Retiring()
 
     @override
-    def then(self) -> TestThen[AnImageAndACaller, ImageNode]:
+    def then(self) -> Then[AnImageAndACaller, ImageNode]:
         return TheCallIsRefused(NotEnoughPermission)
 
 
 @dataclass(frozen=True)
 class AGrantDoesNotSkipTheCreatorCheck(
-    TestScenario[SeedingSession, AnImageAndACaller, ImageAdapter, ImageNode]
+    Scenario[SeedingSession, AnImageAndACaller, ImageAdapter, ImageNode]
 ):
     @override
     def summary(self) -> str:
@@ -226,15 +224,15 @@ class AGrantDoesNotSkipTheCreatorCheck(
         )
 
     @override
-    def given(self) -> TestGiven[SeedingSession, AnImageAndACaller]:
+    def given(self) -> Given[SeedingSession, AnImageAndACaller]:
         return AnUncustomizedImageAndSomeone()
 
     @override
-    def when(self) -> TestWhen[AnImageAndACaller, ImageAdapter, ImageNode]:
+    def when(self) -> When[AnImageAndACaller, ImageAdapter, ImageNode]:
         return Retiring()
 
     @override
-    def then(self) -> TestThen[AnImageAndACaller, ImageNode]:
+    def then(self) -> Then[AnImageAndACaller, ImageNode]:
         return TheCallIsRefused(ImageAccessForbiddenError)
 
 

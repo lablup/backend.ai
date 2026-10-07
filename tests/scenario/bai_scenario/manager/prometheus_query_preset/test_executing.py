@@ -33,11 +33,11 @@ from ai.backend.manager.api.adapters.prometheus_query_preset.adapter import (
 from ai.backend.manager.errors.permission import NotEnoughPermission
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.testutils.scenario_steps import (
-    TestConfigured,
-    TestGiven,
-    TestScenario,
-    TestThen,
-    TestWhen,
+    Configured,
+    Given,
+    Scenario,
+    Then,
+    When,
 )
 from bai_scenario.components.answers import TheCallIsRefused
 from bai_scenario.components.prometheus_query_preset import (
@@ -56,13 +56,13 @@ PRESET_WINDOW = "1h"
 ASKED_WINDOW = "30s"
 
 type Result = QueryDefinitionResultInfo
-type ExecutingStep = TestScenario[
+type ExecutingStep = Scenario[
     SeedingSession, APresetAndACaller, PrometheusQueryPresetAdapter, Result
 ]
 
 
 @dataclass(frozen=True)
-class Executing(TestWhen[APresetAndACaller, PrometheusQueryPresetAdapter, Result]):
+class Executing(When[APresetAndACaller, PrometheusQueryPresetAdapter, Result]):
     """미리 만들어 둔 프리셋을 실행한다. 시간 창과 조회 구간은 지정한 것만 담는다."""
 
     time_window: str | None = None
@@ -106,7 +106,7 @@ class Executing(TestWhen[APresetAndACaller, PrometheusQueryPresetAdapter, Result
 
 @dataclass(frozen=True)
 class TheSuperadminRunsItWithoutARange(
-    TestScenario[SeedingSession, APresetAndACaller, PrometheusQueryPresetAdapter, Result]
+    Scenario[SeedingSession, APresetAndACaller, PrometheusQueryPresetAdapter, Result]
 ):
     @override
     def summary(self) -> str:
@@ -120,21 +120,21 @@ class TheSuperadminRunsItWithoutARange(
         )
 
     @override
-    def given(self) -> TestGiven[SeedingSession, APresetAndACaller]:
+    def given(self) -> Given[SeedingSession, APresetAndACaller]:
         return APresetAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
-    def when(self) -> TestWhen[APresetAndACaller, PrometheusQueryPresetAdapter, Result]:
+    def when(self) -> When[APresetAndACaller, PrometheusQueryPresetAdapter, Result]:
         return Executing(time_window=ASKED_WINDOW)
 
     @override
-    def then(self) -> TestThen[APresetAndACaller, Result]:
+    def then(self) -> Then[APresetAndACaller, Result]:
         return TheQueryAnswered(query="avg by () (rate(container_cpu_seconds_total{}[30s]))")
 
 
 @dataclass(frozen=True)
 class RunningOverARangeIsARangeQuery(
-    TestScenario[SeedingSession, APresetAndACaller, PrometheusQueryPresetAdapter, Result]
+    Scenario[SeedingSession, APresetAndACaller, PrometheusQueryPresetAdapter, Result]
 ):
     @override
     def summary(self) -> str:
@@ -145,15 +145,15 @@ class RunningOverARangeIsARangeQuery(
         return "슈퍼관리자가 시작·끝·간격을 지정해 실행하면, 모의 서버가 범위 질의로 응답한다"
 
     @override
-    def given(self) -> TestGiven[SeedingSession, APresetAndACaller]:
+    def given(self) -> Given[SeedingSession, APresetAndACaller]:
         return APresetAndSomeone(role=UserRole.SUPERADMIN, time_window=PRESET_WINDOW)
 
     @override
-    def when(self) -> TestWhen[APresetAndACaller, PrometheusQueryPresetAdapter, Result]:
+    def when(self) -> When[APresetAndACaller, PrometheusQueryPresetAdapter, Result]:
         return Executing(over_a_range=True)
 
     @override
-    def then(self) -> TestThen[APresetAndACaller, Result]:
+    def then(self) -> Then[APresetAndACaller, Result]:
         return TheQueryAnswered(
             query="avg by () (rate(container_cpu_seconds_total{}[1h]))", result_type=RANGE
         )
@@ -161,7 +161,7 @@ class RunningOverARangeIsARangeQuery(
 
 @dataclass(frozen=True)
 class PrometheusRefusingTheQueryIsPassedOn(
-    TestScenario[SeedingSession, APresetAndACaller, PrometheusQueryPresetAdapter, Result]
+    Scenario[SeedingSession, APresetAndACaller, PrometheusQueryPresetAdapter, Result]
 ):
     @override
     def summary(self) -> str:
@@ -175,21 +175,21 @@ class PrometheusRefusingTheQueryIsPassedOn(
         )
 
     @override
-    def given(self) -> TestGiven[SeedingSession, APresetAndACaller]:
+    def given(self) -> Given[SeedingSession, APresetAndACaller]:
         return APresetAndSomeone(role=UserRole.SUPERADMIN, query_template=EMPTY_WITHOUT_LABELS)
 
     @override
-    def when(self) -> TestWhen[APresetAndACaller, PrometheusQueryPresetAdapter, Result]:
+    def when(self) -> When[APresetAndACaller, PrometheusQueryPresetAdapter, Result]:
         return Executing()
 
     @override
-    def then(self) -> TestThen[APresetAndACaller, Result]:
+    def then(self) -> Then[APresetAndACaller, Result]:
         return TheCallIsRefused(FailedToGetMetric)
 
 
 @dataclass(frozen=True)
 class AUserGrantedNothingMayNotRun(
-    TestScenario[SeedingSession, APresetAndACaller, PrometheusQueryPresetAdapter, Result]
+    Scenario[SeedingSession, APresetAndACaller, PrometheusQueryPresetAdapter, Result]
 ):
     @override
     def summary(self) -> str:
@@ -203,22 +203,22 @@ class AUserGrantedNothingMayNotRun(
         )
 
     @override
-    def given(self) -> TestGiven[SeedingSession, APresetAndACaller]:
+    def given(self) -> Given[SeedingSession, APresetAndACaller]:
         return APresetAndSomeone(reading_in_public=False)
 
     @override
-    def when(self) -> TestWhen[APresetAndACaller, PrometheusQueryPresetAdapter, Result]:
+    def when(self) -> When[APresetAndACaller, PrometheusQueryPresetAdapter, Result]:
         return Executing()
 
     @override
-    def then(self) -> TestThen[APresetAndACaller, Result]:
+    def then(self) -> Then[APresetAndACaller, Result]:
         return TheCallIsRefused(NotEnoughPermission)
 
 
 @dataclass(frozen=True)
 class EnforcementOffLetsAnyoneRun(
-    TestScenario[SeedingSession, APresetAndACaller, PrometheusQueryPresetAdapter, Result],
-    TestConfigured,
+    Scenario[SeedingSession, APresetAndACaller, PrometheusQueryPresetAdapter, Result],
+    Configured,
 ):
     @override
     def summary(self) -> str:
@@ -233,21 +233,21 @@ class EnforcementOffLetsAnyoneRun(
         return {ENFORCEMENT: False}
 
     @override
-    def given(self) -> TestGiven[SeedingSession, APresetAndACaller]:
+    def given(self) -> Given[SeedingSession, APresetAndACaller]:
         return APresetAndSomeone(time_window=PRESET_WINDOW)
 
     @override
-    def when(self) -> TestWhen[APresetAndACaller, PrometheusQueryPresetAdapter, Result]:
+    def when(self) -> When[APresetAndACaller, PrometheusQueryPresetAdapter, Result]:
         return Executing()
 
     @override
-    def then(self) -> TestThen[APresetAndACaller, Result]:
+    def then(self) -> Then[APresetAndACaller, Result]:
         return TheQueryAnswered(query="avg by () (rate(container_cpu_seconds_total{}[1h]))")
 
 
 @dataclass(frozen=True)
 class AnUnknownIdIsRefusedAsPermission(
-    TestScenario[SeedingSession, APresetAndACaller, PrometheusQueryPresetAdapter, Result]
+    Scenario[SeedingSession, APresetAndACaller, PrometheusQueryPresetAdapter, Result]
 ):
     @override
     def summary(self) -> str:
@@ -261,21 +261,21 @@ class AnUnknownIdIsRefusedAsPermission(
         )
 
     @override
-    def given(self) -> TestGiven[SeedingSession, APresetAndACaller]:
+    def given(self) -> Given[SeedingSession, APresetAndACaller]:
         return APresetAndSomeone()
 
     @override
-    def when(self) -> TestWhen[APresetAndACaller, PrometheusQueryPresetAdapter, Result]:
+    def when(self) -> When[APresetAndACaller, PrometheusQueryPresetAdapter, Result]:
         return Executing(other=uuid4())
 
     @override
-    def then(self) -> TestThen[APresetAndACaller, Result]:
+    def then(self) -> Then[APresetAndACaller, Result]:
         return TheCallIsRefused(NotEnoughPermission)
 
 
 @dataclass(frozen=True)
 class AnUnknownIdIsNotFoundForASuperadmin(
-    TestScenario[SeedingSession, APresetAndACaller, PrometheusQueryPresetAdapter, Result]
+    Scenario[SeedingSession, APresetAndACaller, PrometheusQueryPresetAdapter, Result]
 ):
     @override
     def summary(self) -> str:
@@ -289,15 +289,15 @@ class AnUnknownIdIsNotFoundForASuperadmin(
         )
 
     @override
-    def given(self) -> TestGiven[SeedingSession, APresetAndACaller]:
+    def given(self) -> Given[SeedingSession, APresetAndACaller]:
         return APresetAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
-    def when(self) -> TestWhen[APresetAndACaller, PrometheusQueryPresetAdapter, Result]:
+    def when(self) -> When[APresetAndACaller, PrometheusQueryPresetAdapter, Result]:
         return Executing(other=uuid4())
 
     @override
-    def then(self) -> TestThen[APresetAndACaller, Result]:
+    def then(self) -> Then[APresetAndACaller, Result]:
         return TheCallIsRefused(PrometheusQueryPresetNotFound)
 
 

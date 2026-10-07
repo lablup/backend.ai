@@ -25,13 +25,13 @@ from ai.backend.manager.errors.permission import NotEnoughPermission
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.testutils.scenario_steps import (
     Answered,
+    Given,
     Refused,
     Same,
-    TestGiven,
-    TestScenario,
-    TestThen,
-    TestVerdict,
-    TestWhen,
+    Scenario,
+    Then,
+    Verdict,
+    When,
 )
 from bai_scenario.components.answers import TheCallIsRefused
 from bai_scenario.components.runtime_variant_preset import (
@@ -47,13 +47,11 @@ from bai_scenario.runner.planting import SeedingSession
 from bai_scenario.runner.steps import run_scenario
 
 type Loaded = list[RuntimeVariantPresetNode | None]
-type ReadingStep = TestScenario[SeedingSession, Any, RuntimeVariantPresetAdapter, Any]
+type ReadingStep = Scenario[SeedingSession, Any, RuntimeVariantPresetAdapter, Any]
 
 
 @dataclass(frozen=True)
-class ReadingById(
-    TestWhen[APresetAndACaller, RuntimeVariantPresetAdapter, RuntimeVariantPresetNode]
-):
+class ReadingById(When[APresetAndACaller, RuntimeVariantPresetAdapter, RuntimeVariantPresetNode]):
     """ID로 조회한다. ``unknown``이면 어느 행에도 없는 ID를 사용한다."""
 
     unknown: bool = False
@@ -76,7 +74,7 @@ class ReadingById(
 
 
 @dataclass(frozen=True)
-class ReadingManyByIds(TestWhen[ManyPresetsAndACaller, RuntimeVariantPresetAdapter, Loaded]):
+class ReadingManyByIds(When[ManyPresetsAndACaller, RuntimeVariantPresetAdapter, Loaded]):
     """미리 만들어 둔 프리셋들의 ID와 존재하지 않는 ID 하나를 함께 조회한다."""
 
     @override
@@ -103,7 +101,7 @@ class ReadingManyByIds(TestWhen[ManyPresetsAndACaller, RuntimeVariantPresetAdapt
 
 
 @dataclass(frozen=True)
-class ReadingNoIds(TestWhen[APresetAndACaller, RuntimeVariantPresetAdapter, Loaded]):
+class ReadingNoIds(When[APresetAndACaller, RuntimeVariantPresetAdapter, Loaded]):
     """빈 ID 목록으로 조회한다."""
 
     @override
@@ -121,7 +119,7 @@ class ReadingNoIds(TestWhen[APresetAndACaller, RuntimeVariantPresetAdapter, Load
 
 
 @dataclass(frozen=True)
-class NothingComesBack(TestThen[Any, Loaded]):
+class NothingComesBack(Then[Any, Loaded]):
     """빈 응답이 반환된다."""
 
     @override
@@ -129,7 +127,7 @@ class NothingComesBack(TestThen[Any, Loaded]):
         return "빈 응답이 반환된다"
 
     @override
-    def look(self, laid: Any, answered: Answered[Loaded]) -> list[TestVerdict]:
+    def look(self, laid: Any, answered: Answered[Loaded]) -> list[Verdict]:
         items = answered.response
         if items is None:
             return [Refused(EntityNotFoundError, answered.raised)]
@@ -138,7 +136,7 @@ class NothingComesBack(TestThen[Any, Loaded]):
 
 @dataclass(frozen=True)
 class AUserGrantedNothingReadsById(
-    TestScenario[
+    Scenario[
         SeedingSession, APresetAndACaller, RuntimeVariantPresetAdapter, RuntimeVariantPresetNode
     ]
 ):
@@ -153,23 +151,23 @@ class AUserGrantedNothingReadsById(
         return "아무 권한도 없는 사용자가 ID로 조회해도 해당 프리셋 전체가 반환된다. 이 조회는 인증 여부만 확인한다"
 
     @override
-    def given(self) -> TestGiven[SeedingSession, APresetAndACaller]:
+    def given(self) -> Given[SeedingSession, APresetAndACaller]:
         return APresetAndSomeone()
 
     @override
     def when(
         self,
-    ) -> TestWhen[APresetAndACaller, RuntimeVariantPresetAdapter, RuntimeVariantPresetNode]:
+    ) -> When[APresetAndACaller, RuntimeVariantPresetAdapter, RuntimeVariantPresetNode]:
         return ReadingById()
 
     @override
-    def then(self) -> TestThen[APresetAndACaller, RuntimeVariantPresetNode]:
+    def then(self) -> Then[APresetAndACaller, RuntimeVariantPresetNode]:
         return ThePresetNode(started=self.started)
 
 
 @dataclass(frozen=True)
 class AnIdNothingAnswersToIsNotFound(
-    TestScenario[
+    Scenario[
         SeedingSession, APresetAndACaller, RuntimeVariantPresetAdapter, RuntimeVariantPresetNode
     ]
 ):
@@ -185,23 +183,23 @@ class AnIdNothingAnswersToIsNotFound(
         )
 
     @override
-    def given(self) -> TestGiven[SeedingSession, APresetAndACaller]:
+    def given(self) -> Given[SeedingSession, APresetAndACaller]:
         return APresetAndSomeone()
 
     @override
     def when(
         self,
-    ) -> TestWhen[APresetAndACaller, RuntimeVariantPresetAdapter, RuntimeVariantPresetNode]:
+    ) -> When[APresetAndACaller, RuntimeVariantPresetAdapter, RuntimeVariantPresetNode]:
         return ReadingById(unknown=True)
 
     @override
-    def then(self) -> TestThen[APresetAndACaller, RuntimeVariantPresetNode]:
+    def then(self) -> Then[APresetAndACaller, RuntimeVariantPresetNode]:
         return TheCallIsRefused(NotEnoughPermission)
 
 
 @dataclass(frozen=True)
 class MixedIdsComeBackInOrder(
-    TestScenario[SeedingSession, ManyPresetsAndACaller, RuntimeVariantPresetAdapter, Loaded]
+    Scenario[SeedingSession, ManyPresetsAndACaller, RuntimeVariantPresetAdapter, Loaded]
 ):
     started: datetime
 
@@ -214,21 +212,21 @@ class MixedIdsComeBackInOrder(
         return "존재하는 ID 둘과 존재하지 않는 ID 하나를 함께 조회하면 요청한 순서대로 반환되고, 존재하지 않는 ID의 위치는 비어 있다"
 
     @override
-    def given(self) -> TestGiven[SeedingSession, ManyPresetsAndACaller]:
+    def given(self) -> Given[SeedingSession, ManyPresetsAndACaller]:
         return ManyPresetsAndSomeone(besides=1)
 
     @override
-    def when(self) -> TestWhen[ManyPresetsAndACaller, RuntimeVariantPresetAdapter, Loaded]:
+    def when(self) -> When[ManyPresetsAndACaller, RuntimeVariantPresetAdapter, Loaded]:
         return ReadingManyByIds()
 
     @override
-    def then(self) -> TestThen[ManyPresetsAndACaller, Loaded]:
+    def then(self) -> Then[ManyPresetsAndACaller, Loaded]:
         return ThePresetsInTheOrderAsked(started=self.started)
 
 
 @dataclass(frozen=True)
 class AnEmptyListAnswersEmpty(
-    TestScenario[SeedingSession, APresetAndACaller, RuntimeVariantPresetAdapter, Loaded]
+    Scenario[SeedingSession, APresetAndACaller, RuntimeVariantPresetAdapter, Loaded]
 ):
     @override
     def summary(self) -> str:
@@ -239,15 +237,15 @@ class AnEmptyListAnswersEmpty(
         return "빈 ID 목록으로 조회하면 빈 응답이 반환되며 하위 계층은 호출하지 않는다"
 
     @override
-    def given(self) -> TestGiven[SeedingSession, APresetAndACaller]:
+    def given(self) -> Given[SeedingSession, APresetAndACaller]:
         return APresetAndSomeone()
 
     @override
-    def when(self) -> TestWhen[APresetAndACaller, RuntimeVariantPresetAdapter, Loaded]:
+    def when(self) -> When[APresetAndACaller, RuntimeVariantPresetAdapter, Loaded]:
         return ReadingNoIds()
 
     @override
-    def then(self) -> TestThen[APresetAndACaller, Loaded]:
+    def then(self) -> Then[APresetAndACaller, Loaded]:
         return NothingComesBack()
 
 

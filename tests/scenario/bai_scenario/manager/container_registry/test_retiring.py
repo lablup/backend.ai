@@ -21,13 +21,13 @@ from ai.backend.manager.errors.image import ContainerRegistryNotFound
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.testutils.scenario_steps import (
     Answered,
+    Given,
     Held,
     SameAs,
-    TestGiven,
-    TestScenario,
-    TestThen,
-    TestVerdict,
-    TestWhen,
+    Scenario,
+    Then,
+    Verdict,
+    When,
 )
 from bai_scenario.components.answers import MissingResponse, TheCallIsRefused
 from bai_scenario.components.container_registry import (
@@ -42,7 +42,7 @@ from bai_scenario.runner.acting import ActingAs
 from bai_scenario.runner.planting import SeedingSession
 from bai_scenario.runner.steps import run_scenario
 
-type DeletionScenario = TestScenario[
+type DeletionScenario = Scenario[
     SeedingSession,
     ARegistryAndACaller,
     ContainerRegistryAdapter,
@@ -51,9 +51,7 @@ type DeletionScenario = TestScenario[
 
 
 @dataclass(frozen=True)
-class Deleting(
-    TestWhen[ARegistryAndACaller, ContainerRegistryAdapter, DeleteContainerRegistryPayload]
-):
+class Deleting(When[ARegistryAndACaller, ContainerRegistryAdapter, DeleteContainerRegistryPayload]):
     target: RegistryTarget = field(default_factory=SeededRegistry)
 
     @override
@@ -74,7 +72,7 @@ class Deleting(
 
 
 @dataclass(frozen=True)
-class TheDeletedIdComesBack(TestThen[ARegistryAndACaller, DeleteContainerRegistryPayload]):
+class TheDeletedIdComesBack(Then[ARegistryAndACaller, DeleteContainerRegistryPayload]):
     @override
     def says(self) -> str:
         return "삭제한 id가 반환된다"
@@ -82,7 +80,7 @@ class TheDeletedIdComesBack(TestThen[ARegistryAndACaller, DeleteContainerRegistr
     @override
     def look(
         self, laid: ARegistryAndACaller, answered: Answered[DeleteContainerRegistryPayload]
-    ) -> list[TestVerdict]:
+    ) -> list[Verdict]:
         payload = answered.response
         if payload is None:
             return [MissingResponse(answered.raised)]
@@ -92,7 +90,7 @@ class TheDeletedIdComesBack(TestThen[ARegistryAndACaller, DeleteContainerRegistr
 
 @dataclass(frozen=True)
 class DeletingAnswersWithTheRemovedId(
-    TestScenario[
+    Scenario[
         SeedingSession,
         ARegistryAndACaller,
         ContainerRegistryAdapter,
@@ -108,23 +106,23 @@ class DeletingAnswersWithTheRemovedId(
         return "슈퍼관리자가 레지스트리를 삭제하면 삭제한 id를 담은 응답이 반환된다"
 
     @override
-    def given(self) -> TestGiven[SeedingSession, ARegistryAndACaller]:
+    def given(self) -> Given[SeedingSession, ARegistryAndACaller]:
         return ARegistryAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
     def when(
         self,
-    ) -> TestWhen[ARegistryAndACaller, ContainerRegistryAdapter, DeleteContainerRegistryPayload]:
+    ) -> When[ARegistryAndACaller, ContainerRegistryAdapter, DeleteContainerRegistryPayload]:
         return Deleting()
 
     @override
-    def then(self) -> TestThen[ARegistryAndACaller, DeleteContainerRegistryPayload]:
+    def then(self) -> Then[ARegistryAndACaller, DeleteContainerRegistryPayload]:
         return TheDeletedIdComesBack()
 
 
 @dataclass(frozen=True)
 class DeletingTakesTheAllowedProjectWithIt(
-    TestScenario[
+    Scenario[
         SeedingSession,
         ARegistryAndACaller,
         ContainerRegistryAdapter,
@@ -140,23 +138,23 @@ class DeletingTakesTheAllowedProjectWithIt(
         return "허용 프로젝트가 있는 레지스트리를 삭제하면, 외래 키를 통해 그 허용 목록까지 함께 삭제된다"
 
     @override
-    def given(self) -> TestGiven[SeedingSession, ARegistryAndACaller]:
+    def given(self) -> Given[SeedingSession, ARegistryAndACaller]:
         return ARegistryAndSomeone(role=UserRole.SUPERADMIN, allowed=True)
 
     @override
     def when(
         self,
-    ) -> TestWhen[ARegistryAndACaller, ContainerRegistryAdapter, DeleteContainerRegistryPayload]:
+    ) -> When[ARegistryAndACaller, ContainerRegistryAdapter, DeleteContainerRegistryPayload]:
         return Deleting()
 
     @override
-    def then(self) -> TestThen[ARegistryAndACaller, DeleteContainerRegistryPayload]:
+    def then(self) -> Then[ARegistryAndACaller, DeleteContainerRegistryPayload]:
         return TheDeletedIdComesBack()
 
 
 @dataclass(frozen=True)
 class MissingRegistryIsRefused(
-    TestScenario[
+    Scenario[
         SeedingSession,
         ARegistryAndACaller,
         ContainerRegistryAdapter,
@@ -172,23 +170,23 @@ class MissingRegistryIsRefused(
         return "존재하지 않는 id를 삭제하려 하면 대상을 찾을 수 없어 거부된다"
 
     @override
-    def given(self) -> TestGiven[SeedingSession, ARegistryAndACaller]:
+    def given(self) -> Given[SeedingSession, ARegistryAndACaller]:
         return ARegistryAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
     def when(
         self,
-    ) -> TestWhen[ARegistryAndACaller, ContainerRegistryAdapter, DeleteContainerRegistryPayload]:
+    ) -> When[ARegistryAndACaller, ContainerRegistryAdapter, DeleteContainerRegistryPayload]:
         return Deleting(target=MissingRegistry())
 
     @override
-    def then(self) -> TestThen[ARegistryAndACaller, DeleteContainerRegistryPayload]:
+    def then(self) -> Then[ARegistryAndACaller, DeleteContainerRegistryPayload]:
         return TheCallIsRefused(ContainerRegistryNotFound)
 
 
 @dataclass(frozen=True)
 class APlainUserMayNotDelete(
-    TestScenario[
+    Scenario[
         SeedingSession,
         ARegistryAndACaller,
         ContainerRegistryAdapter,
@@ -207,17 +205,17 @@ class APlainUserMayNotDelete(
         )
 
     @override
-    def given(self) -> TestGiven[SeedingSession, ARegistryAndACaller]:
+    def given(self) -> Given[SeedingSession, ARegistryAndACaller]:
         return ARegistryAndSomeone()
 
     @override
     def when(
         self,
-    ) -> TestWhen[ARegistryAndACaller, ContainerRegistryAdapter, DeleteContainerRegistryPayload]:
+    ) -> When[ARegistryAndACaller, ContainerRegistryAdapter, DeleteContainerRegistryPayload]:
         return Deleting()
 
     @override
-    def then(self) -> TestThen[ARegistryAndACaller, DeleteContainerRegistryPayload]:
+    def then(self) -> Then[ARegistryAndACaller, DeleteContainerRegistryPayload]:
         return TheCallIsRefused(InsufficientPrivilege)
 
 

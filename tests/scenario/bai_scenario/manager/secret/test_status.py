@@ -18,13 +18,7 @@ from ai.backend.manager.api.adapters.secret.adapter import SecretAdapter
 from ai.backend.manager.data.secret.types import KeyProviderType
 from ai.backend.manager.errors.auth import InsufficientPrivilege
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.testutils.scenario_steps import (
-    TestConfigured,
-    TestGiven,
-    TestScenario,
-    TestThen,
-    TestWhen,
-)
+from ai.backend.testutils.scenario_steps import Configured, Given, Scenario, Then, When
 from bai_scenario.components.answers import TheCallIsRefused
 from bai_scenario.components.secret import (
     CONFIG_KEYS,
@@ -38,13 +32,13 @@ from bai_scenario.runner.acting import ActingAs
 from bai_scenario.runner.planting import SeedingSession
 from bai_scenario.runner.steps import run_scenario
 
-type StatusStep = TestScenario[
+type StatusStep = Scenario[
     SeedingSession, AKeyringAndACaller, SecretAdapter, AdminSecretStatusPayload
 ]
 
 
 @dataclass(frozen=True)
-class ReadingTheStatus(TestWhen[AKeyringAndACaller, SecretAdapter, AdminSecretStatusPayload]):
+class ReadingTheStatus(When[AKeyringAndACaller, SecretAdapter, AdminSecretStatusPayload]):
     """상태를 조회한다."""
 
     @override
@@ -65,7 +59,7 @@ class ReadingTheStatus(TestWhen[AKeyringAndACaller, SecretAdapter, AdminSecretSt
 
 @dataclass(frozen=True)
 class TheSuperadminCountsPlaintextSecrets(
-    TestScenario[SeedingSession, AKeyringAndACaller, SecretAdapter, AdminSecretStatusPayload]
+    Scenario[SeedingSession, AKeyringAndACaller, SecretAdapter, AdminSecretStatusPayload]
 ):
     @override
     def summary(self) -> str:
@@ -79,22 +73,22 @@ class TheSuperadminCountsPlaintextSecrets(
         )
 
     @override
-    def given(self) -> TestGiven[SeedingSession, AKeyringAndACaller]:
+    def given(self) -> Given[SeedingSession, AKeyringAndACaller]:
         return UsersHoldingSecrets(role=UserRole.SUPERADMIN, plaintext_besides=1)
 
     @override
-    def when(self) -> TestWhen[AKeyringAndACaller, SecretAdapter, AdminSecretStatusPayload]:
+    def when(self) -> When[AKeyringAndACaller, SecretAdapter, AdminSecretStatusPayload]:
         return ReadingTheStatus()
 
     @override
-    def then(self) -> TestThen[AKeyringAndACaller, AdminSecretStatusPayload]:
+    def then(self) -> Then[AKeyringAndACaller, AdminSecretStatusPayload]:
         return TheStatusCountsWhatIsLaid(write_provider=KeyProviderType.PLAIN)
 
 
 @dataclass(frozen=True)
 class MixedKeysAreCountedApart(
-    TestScenario[SeedingSession, AKeyringAndACaller, SecretAdapter, AdminSecretStatusPayload],
-    TestConfigured,
+    Scenario[SeedingSession, AKeyringAndACaller, SecretAdapter, AdminSecretStatusPayload],
+    Configured,
 ):
     @override
     def summary(self) -> str:
@@ -112,23 +106,23 @@ class MixedKeysAreCountedApart(
         return {WRITE_PROVIDER: KeyProviderType.CONFIG.value, CONFIG_PROVIDER: CONFIG_KEYS}
 
     @override
-    def given(self) -> TestGiven[SeedingSession, AKeyringAndACaller]:
+    def given(self) -> Given[SeedingSession, AKeyringAndACaller]:
         return UsersHoldingSecrets(
             role=UserRole.SUPERADMIN, plaintext_besides=0, encrypted_besides=1
         )
 
     @override
-    def when(self) -> TestWhen[AKeyringAndACaller, SecretAdapter, AdminSecretStatusPayload]:
+    def when(self) -> When[AKeyringAndACaller, SecretAdapter, AdminSecretStatusPayload]:
         return ReadingTheStatus()
 
     @override
-    def then(self) -> TestThen[AKeyringAndACaller, AdminSecretStatusPayload]:
+    def then(self) -> Then[AKeyringAndACaller, AdminSecretStatusPayload]:
         return TheStatusCountsWhatIsLaid(write_provider=KeyProviderType.CONFIG)
 
 
 @dataclass(frozen=True)
 class TheMonitorReadsTheStatusLikeTheSuperadmin(
-    TestScenario[SeedingSession, AKeyringAndACaller, SecretAdapter, AdminSecretStatusPayload]
+    Scenario[SeedingSession, AKeyringAndACaller, SecretAdapter, AdminSecretStatusPayload]
 ):
     @override
     def summary(self) -> str:
@@ -139,21 +133,21 @@ class TheMonitorReadsTheStatusLikeTheSuperadmin(
         return "모니터 역할이 상태를 조회하면 슈퍼관리자와 같은 응답이 반환된다. 슈퍼관리자 검사는 모니터의 읽기를 허용한다"
 
     @override
-    def given(self) -> TestGiven[SeedingSession, AKeyringAndACaller]:
+    def given(self) -> Given[SeedingSession, AKeyringAndACaller]:
         return UsersHoldingSecrets(role=UserRole.MONITOR, plaintext_besides=1)
 
     @override
-    def when(self) -> TestWhen[AKeyringAndACaller, SecretAdapter, AdminSecretStatusPayload]:
+    def when(self) -> When[AKeyringAndACaller, SecretAdapter, AdminSecretStatusPayload]:
         return ReadingTheStatus()
 
     @override
-    def then(self) -> TestThen[AKeyringAndACaller, AdminSecretStatusPayload]:
+    def then(self) -> Then[AKeyringAndACaller, AdminSecretStatusPayload]:
         return TheStatusCountsWhatIsLaid(write_provider=KeyProviderType.PLAIN)
 
 
 @dataclass(frozen=True)
 class AUserWhoIsNotTheSuperadminMayNotReadTheStatus(
-    TestScenario[SeedingSession, AKeyringAndACaller, SecretAdapter, AdminSecretStatusPayload]
+    Scenario[SeedingSession, AKeyringAndACaller, SecretAdapter, AdminSecretStatusPayload]
 ):
     @override
     def summary(self) -> str:
@@ -164,15 +158,15 @@ class AUserWhoIsNotTheSuperadminMayNotReadTheStatus(
         return "슈퍼관리자가 아닌 사용자가 상태를 조회하면 역할 부족으로 거부된다"
 
     @override
-    def given(self) -> TestGiven[SeedingSession, AKeyringAndACaller]:
+    def given(self) -> Given[SeedingSession, AKeyringAndACaller]:
         return UsersHoldingSecrets(role=UserRole.USER, plaintext_besides=0)
 
     @override
-    def when(self) -> TestWhen[AKeyringAndACaller, SecretAdapter, AdminSecretStatusPayload]:
+    def when(self) -> When[AKeyringAndACaller, SecretAdapter, AdminSecretStatusPayload]:
         return ReadingTheStatus()
 
     @override
-    def then(self) -> TestThen[AKeyringAndACaller, AdminSecretStatusPayload]:
+    def then(self) -> Then[AKeyringAndACaller, AdminSecretStatusPayload]:
         return TheCallIsRefused(InsufficientPrivilege)
 
 

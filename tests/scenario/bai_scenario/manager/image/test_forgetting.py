@@ -16,13 +16,7 @@ from ai.backend.manager.data.image.types import ImageStatus
 from ai.backend.manager.errors.image import ImageAccessForbiddenError, ImageNotFound
 from ai.backend.manager.errors.permission import NotEnoughPermission
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.testutils.scenario_steps import (
-    TestConfigured,
-    TestGiven,
-    TestScenario,
-    TestThen,
-    TestWhen,
-)
+from ai.backend.testutils.scenario_steps import Configured, Given, Scenario, Then, When
 from bai_scenario.components.answers import TheCallIsRefused
 from bai_scenario.components.image import (
     AnIdThatHoldsNothing,
@@ -42,7 +36,7 @@ ENFORCEMENT = "manager.rbac.enforcement_enabled"
 
 
 @dataclass(frozen=True)
-class Forgetting(TestWhen[AnImageAndACaller, ImageAdapter, ImageNode]):
+class Forgetting(When[AnImageAndACaller, ImageAdapter, ImageNode]):
     """이미지를 소프트 삭제한다. 행은 남고 상태만 바뀐다."""
 
     at: Target = field(default_factory=TheLaidImage)
@@ -67,7 +61,7 @@ class Forgetting(TestWhen[AnImageAndACaller, ImageAdapter, ImageNode]):
 
 
 @dataclass(frozen=True)
-class Restoring(TestWhen[AnImageAndACaller, ImageAdapter, ImageNode]):
+class Restoring(When[AnImageAndACaller, ImageAdapter, ImageNode]):
     """소프트 삭제한 이미지를 복원한다."""
 
     at: Target = field(default_factory=TheLaidImage)
@@ -93,7 +87,7 @@ class Restoring(TestWhen[AnImageAndACaller, ImageAdapter, ImageNode]):
 
 @dataclass(frozen=True)
 class ForgettingMarksItDeletedAndKeepsTheRow(
-    TestScenario[SeedingSession, AnImageAndACaller, ImageAdapter, ImageNode]
+    Scenario[SeedingSession, AnImageAndACaller, ImageAdapter, ImageNode]
 ):
     @override
     def summary(self) -> str:
@@ -104,21 +98,21 @@ class ForgettingMarksItDeletedAndKeepsTheRow(
         return "슈퍼관리자가 이미지를 소프트 삭제하면, 행은 남고 삭제됨 상태가 담긴 노드가 반환된다"
 
     @override
-    def given(self) -> TestGiven[SeedingSession, AnImageAndACaller]:
+    def given(self) -> Given[SeedingSession, AnImageAndACaller]:
         return AnImageAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
-    def when(self) -> TestWhen[AnImageAndACaller, ImageAdapter, ImageNode]:
+    def when(self) -> When[AnImageAndACaller, ImageAdapter, ImageNode]:
         return Forgetting()
 
     @override
-    def then(self) -> TestThen[AnImageAndACaller, ImageNode]:
+    def then(self) -> Then[AnImageAndACaller, ImageNode]:
         return TheImageNode(status=ImageStatus.DELETED)
 
 
 @dataclass(frozen=True)
 class TheMakerOfACustomImageMayForgetIt(
-    TestScenario[SeedingSession, AnImageAndACaller, ImageAdapter, ImageNode]
+    Scenario[SeedingSession, AnImageAndACaller, ImageAdapter, ImageNode]
 ):
     @override
     def summary(self) -> str:
@@ -132,21 +126,21 @@ class TheMakerOfACustomImageMayForgetIt(
         )
 
     @override
-    def given(self) -> TestGiven[SeedingSession, AnImageAndACaller]:
+    def given(self) -> Given[SeedingSession, AnImageAndACaller]:
         return AnImageTheCallerMade()
 
     @override
-    def when(self) -> TestWhen[AnImageAndACaller, ImageAdapter, ImageNode]:
+    def when(self) -> When[AnImageAndACaller, ImageAdapter, ImageNode]:
         return Forgetting()
 
     @override
-    def then(self) -> TestThen[AnImageAndACaller, ImageNode]:
+    def then(self) -> Then[AnImageAndACaller, ImageNode]:
         return TheImageNode(status=ImageStatus.DELETED)
 
 
 @dataclass(frozen=True)
 class RestoringBringsAForgottenImageBack(
-    TestScenario[SeedingSession, AnImageAndACaller, ImageAdapter, ImageNode]
+    Scenario[SeedingSession, AnImageAndACaller, ImageAdapter, ImageNode]
 ):
     @override
     def summary(self) -> str:
@@ -157,21 +151,21 @@ class RestoringBringsAForgottenImageBack(
         return "슈퍼관리자가 삭제된 이미지를 복원하면 살아 있는 상태가 담긴 노드가 반환된다"
 
     @override
-    def given(self) -> TestGiven[SeedingSession, AnImageAndACaller]:
+    def given(self) -> Given[SeedingSession, AnImageAndACaller]:
         return AnImageAndSomeone(role=UserRole.SUPERADMIN, status=ImageStatus.DELETED)
 
     @override
-    def when(self) -> TestWhen[AnImageAndACaller, ImageAdapter, ImageNode]:
+    def when(self) -> When[AnImageAndACaller, ImageAdapter, ImageNode]:
         return Restoring()
 
     @override
-    def then(self) -> TestThen[AnImageAndACaller, ImageNode]:
+    def then(self) -> Then[AnImageAndACaller, ImageNode]:
         return TheImageNode(status=ImageStatus.ALIVE)
 
 
 @dataclass(frozen=True)
 class RestoringWhatWasNeverForgotten(
-    TestScenario[SeedingSession, AnImageAndACaller, ImageAdapter, ImageNode]
+    Scenario[SeedingSession, AnImageAndACaller, ImageAdapter, ImageNode]
 ):
     @override
     def summary(self) -> str:
@@ -182,21 +176,21 @@ class RestoringWhatWasNeverForgotten(
         return "살아 있는 이미지를 복원해도 살아 있는 상태 그대로다"
 
     @override
-    def given(self) -> TestGiven[SeedingSession, AnImageAndACaller]:
+    def given(self) -> Given[SeedingSession, AnImageAndACaller]:
         return AnImageAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
-    def when(self) -> TestWhen[AnImageAndACaller, ImageAdapter, ImageNode]:
+    def when(self) -> When[AnImageAndACaller, ImageAdapter, ImageNode]:
         return Restoring()
 
     @override
-    def then(self) -> TestThen[AnImageAndACaller, ImageNode]:
+    def then(self) -> Then[AnImageAndACaller, ImageNode]:
         return TheImageNode(status=ImageStatus.ALIVE)
 
 
 @dataclass(frozen=True)
 class ForgettingWhatIsNotThere(
-    TestScenario[SeedingSession, AnImageAndACaller, ImageAdapter, ImageNode]
+    Scenario[SeedingSession, AnImageAndACaller, ImageAdapter, ImageNode]
 ):
     @override
     def summary(self) -> str:
@@ -207,22 +201,20 @@ class ForgettingWhatIsNotThere(
         return "어느 이미지도 가리키지 않는 ID를 소프트 삭제하려 하면 대상을 찾을 수 없어 거부된다"
 
     @override
-    def given(self) -> TestGiven[SeedingSession, AnImageAndACaller]:
+    def given(self) -> Given[SeedingSession, AnImageAndACaller]:
         return AnImageAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
-    def when(self) -> TestWhen[AnImageAndACaller, ImageAdapter, ImageNode]:
+    def when(self) -> When[AnImageAndACaller, ImageAdapter, ImageNode]:
         return Forgetting(at=AnIdThatHoldsNothing())
 
     @override
-    def then(self) -> TestThen[AnImageAndACaller, ImageNode]:
+    def then(self) -> Then[AnImageAndACaller, ImageNode]:
         return TheCallIsRefused(ImageNotFound)
 
 
 @dataclass(frozen=True)
-class RestoringWhatIsNotThere(
-    TestScenario[SeedingSession, AnImageAndACaller, ImageAdapter, ImageNode]
-):
+class RestoringWhatIsNotThere(Scenario[SeedingSession, AnImageAndACaller, ImageAdapter, ImageNode]):
     @override
     def summary(self) -> str:
         return "restoring-an-id-that-holds-no-image-is-refused"
@@ -232,21 +224,21 @@ class RestoringWhatIsNotThere(
         return "어느 이미지도 가리키지 않는 ID를 복원하려 하면 대상을 찾을 수 없어 거부된다"
 
     @override
-    def given(self) -> TestGiven[SeedingSession, AnImageAndACaller]:
+    def given(self) -> Given[SeedingSession, AnImageAndACaller]:
         return AnImageAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
-    def when(self) -> TestWhen[AnImageAndACaller, ImageAdapter, ImageNode]:
+    def when(self) -> When[AnImageAndACaller, ImageAdapter, ImageNode]:
         return Restoring(at=AnIdThatHoldsNothing())
 
     @override
-    def then(self) -> TestThen[AnImageAndACaller, ImageNode]:
+    def then(self) -> Then[AnImageAndACaller, ImageNode]:
         return TheCallIsRefused(ImageNotFound)
 
 
 @dataclass(frozen=True)
 class AnUngrantedUserMayNotForget(
-    TestScenario[SeedingSession, AnImageAndACaller, ImageAdapter, ImageNode]
+    Scenario[SeedingSession, AnImageAndACaller, ImageAdapter, ImageNode]
 ):
     @override
     def summary(self) -> str:
@@ -257,21 +249,21 @@ class AnUngrantedUserMayNotForget(
         return "아무 권한도 받지 않은 사용자가 이미지를 소프트 삭제하려 하면 권한 부족으로 거부된다"
 
     @override
-    def given(self) -> TestGiven[SeedingSession, AnImageAndACaller]:
+    def given(self) -> Given[SeedingSession, AnImageAndACaller]:
         return AnUncustomizedImageAndSomeone(granted=False)
 
     @override
-    def when(self) -> TestWhen[AnImageAndACaller, ImageAdapter, ImageNode]:
+    def when(self) -> When[AnImageAndACaller, ImageAdapter, ImageNode]:
         return Forgetting()
 
     @override
-    def then(self) -> TestThen[AnImageAndACaller, ImageNode]:
+    def then(self) -> Then[AnImageAndACaller, ImageNode]:
         return TheCallIsRefused(NotEnoughPermission)
 
 
 @dataclass(frozen=True)
 class AnUngrantedUserMayNotRestore(
-    TestScenario[SeedingSession, AnImageAndACaller, ImageAdapter, ImageNode]
+    Scenario[SeedingSession, AnImageAndACaller, ImageAdapter, ImageNode]
 ):
     @override
     def summary(self) -> str:
@@ -282,21 +274,21 @@ class AnUngrantedUserMayNotRestore(
         return "아무 권한도 받지 않은 사용자가 이미지를 복원하려 하면 권한 부족으로 거부된다"
 
     @override
-    def given(self) -> TestGiven[SeedingSession, AnImageAndACaller]:
+    def given(self) -> Given[SeedingSession, AnImageAndACaller]:
         return AnUncustomizedImageAndSomeone(granted=False)
 
     @override
-    def when(self) -> TestWhen[AnImageAndACaller, ImageAdapter, ImageNode]:
+    def when(self) -> When[AnImageAndACaller, ImageAdapter, ImageNode]:
         return Restoring()
 
     @override
-    def then(self) -> TestThen[AnImageAndACaller, ImageNode]:
+    def then(self) -> Then[AnImageAndACaller, ImageNode]:
         return TheCallIsRefused(NotEnoughPermission)
 
 
 @dataclass(frozen=True)
 class AGrantDoesNotSkipTheCreatorCheck(
-    TestScenario[SeedingSession, AnImageAndACaller, ImageAdapter, ImageNode]
+    Scenario[SeedingSession, AnImageAndACaller, ImageAdapter, ImageNode]
 ):
     @override
     def summary(self) -> str:
@@ -310,21 +302,21 @@ class AGrantDoesNotSkipTheCreatorCheck(
         )
 
     @override
-    def given(self) -> TestGiven[SeedingSession, AnImageAndACaller]:
+    def given(self) -> Given[SeedingSession, AnImageAndACaller]:
         return AnUncustomizedImageAndSomeone()
 
     @override
-    def when(self) -> TestWhen[AnImageAndACaller, ImageAdapter, ImageNode]:
+    def when(self) -> When[AnImageAndACaller, ImageAdapter, ImageNode]:
         return Forgetting()
 
     @override
-    def then(self) -> TestThen[AnImageAndACaller, ImageNode]:
+    def then(self) -> Then[AnImageAndACaller, ImageNode]:
         return TheCallIsRefused(ImageAccessForbiddenError)
 
 
 @dataclass(frozen=True)
 class EnforcementOffDoesNotSkipTheCreatorCheck(
-    TestScenario[SeedingSession, AnImageAndACaller, ImageAdapter, ImageNode], TestConfigured
+    Scenario[SeedingSession, AnImageAndACaller, ImageAdapter, ImageNode], Configured
 ):
     @override
     def summary(self) -> str:
@@ -339,21 +331,21 @@ class EnforcementOffDoesNotSkipTheCreatorCheck(
         return {ENFORCEMENT: False}
 
     @override
-    def given(self) -> TestGiven[SeedingSession, AnImageAndACaller]:
+    def given(self) -> Given[SeedingSession, AnImageAndACaller]:
         return AnUncustomizedImageAndSomeone(granted=False)
 
     @override
-    def when(self) -> TestWhen[AnImageAndACaller, ImageAdapter, ImageNode]:
+    def when(self) -> When[AnImageAndACaller, ImageAdapter, ImageNode]:
         return Forgetting()
 
     @override
-    def then(self) -> TestThen[AnImageAndACaller, ImageNode]:
+    def then(self) -> Then[AnImageAndACaller, ImageNode]:
         return TheCallIsRefused(ImageAccessForbiddenError)
 
 
 @dataclass(frozen=True)
 class AnImageBeingPurgedIsNotVisible(
-    TestScenario[SeedingSession, AnImageAndACaller, ImageAdapter, ImageNode]
+    Scenario[SeedingSession, AnImageAndACaller, ImageAdapter, ImageNode]
 ):
     @override
     def summary(self) -> str:
@@ -367,19 +359,19 @@ class AnImageBeingPurgedIsNotVisible(
         )
 
     @override
-    def given(self) -> TestGiven[SeedingSession, AnImageAndACaller]:
+    def given(self) -> Given[SeedingSession, AnImageAndACaller]:
         return AnImageAndSomeone(role=UserRole.SUPERADMIN, status=ImageStatus.PURGING)
 
     @override
-    def when(self) -> TestWhen[AnImageAndACaller, ImageAdapter, ImageNode]:
+    def when(self) -> When[AnImageAndACaller, ImageAdapter, ImageNode]:
         return Forgetting()
 
     @override
-    def then(self) -> TestThen[AnImageAndACaller, ImageNode]:
+    def then(self) -> Then[AnImageAndACaller, ImageNode]:
         return TheCallIsRefused(ImageNotFound)
 
 
-SCENARIOS: list[TestScenario[SeedingSession, AnImageAndACaller, ImageAdapter, ImageNode]] = [
+SCENARIOS: list[Scenario[SeedingSession, AnImageAndACaller, ImageAdapter, ImageNode]] = [
     ForgettingMarksItDeletedAndKeepsTheRow(),
     TheMakerOfACustomImageMayForgetIt(),
     RestoringBringsAForgottenImageBack(),
@@ -396,7 +388,7 @@ SCENARIOS: list[TestScenario[SeedingSession, AnImageAndACaller, ImageAdapter, Im
 
 @pytest.mark.parametrize("scenario", SCENARIOS, ids=lambda s: s.summary())
 async def test_forgetting(
-    scenario: TestScenario[SeedingSession, AnImageAndACaller, ImageAdapter, ImageNode],
+    scenario: Scenario[SeedingSession, AnImageAndACaller, ImageAdapter, ImageNode],
     adapter: ImageAdapter,
     engine: ExtendedAsyncSAEngine,
 ) -> None:

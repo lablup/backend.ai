@@ -35,17 +35,17 @@ from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.services.user.actions.purge_user import BulkPurgeUserAction
 from ai.backend.testutils.scenario_steps import (
     Answered,
+    Condition,
+    Given,
     Held,
     Refused,
     Same,
     SameAs,
+    Scenario,
     Skipped,
-    TestCondition,
-    TestGiven,
-    TestScenario,
-    TestThen,
-    TestVerdict,
-    TestWhen,
+    Then,
+    Verdict,
+    When,
 )
 from bai_scenario.components.answers import TheCallIsRefused
 from bai_scenario.components.domain import WAS_HERE, SomeoneOf
@@ -111,7 +111,7 @@ class SomeoneStandingAs(TestSeedNest[Laid[UserData]]):
 
 
 @dataclass(frozen=True)
-class ATargetAndSomeone(TestGiven[Any, ACallerAndATarget]):
+class ATargetAndSomeone(Given[Any, ACallerAndATarget]):
     """한 도메인의 대상 사용자와 부르는 사람. 부르는 사람은 대상 사용자에 `permissions`를 받는다."""
 
     permissions: tuple[Permission, ...] = ()
@@ -156,7 +156,7 @@ class ATargetAndSomeone(TestGiven[Any, ACallerAndATarget]):
 
 
 @dataclass(frozen=True)
-class ASuperadminAndSomeUsers(TestGiven[Any, ASuperadminAndUsers]):
+class ASuperadminAndSomeUsers(Given[Any, ASuperadminAndUsers]):
     """한 도메인의 슈퍼관리자와 사용자 `count`명. `with_missing`이면 없는 id 하나를 곁들인다."""
 
     count: int
@@ -180,7 +180,7 @@ class ASuperadminAndSomeUsers(TestGiven[Any, ASuperadminAndUsers]):
 
 
 @dataclass(frozen=True)
-class SomeoneGrantedOnTheDomain(TestGiven[Any, ASuperadminAndUsers]):
+class SomeoneGrantedOnTheDomain(Given[Any, ASuperadminAndUsers]):
     """한 도메인의 사용자 하나와, 도메인 스코프에서 사용자 HARD_DELETE를 받은 사람."""
 
     @override
@@ -197,7 +197,7 @@ class SomeoneGrantedOnTheDomain(TestGiven[Any, ASuperadminAndUsers]):
 
 
 @dataclass(frozen=True)
-class DeletingTheTarget(TestWhen[ACallerAndATarget, UserAdapter, Answer]):
+class DeletingTheTarget(When[ACallerAndATarget, UserAdapter, Answer]):
     """대상 사용자를 물린다. `then_reading`이면 뒤이어 그 사용자를 읽는다."""
 
     then_reading: bool = True
@@ -222,7 +222,7 @@ class DeletingTheTarget(TestWhen[ACallerAndATarget, UserAdapter, Answer]):
 
 
 @dataclass(frozen=True)
-class RestoringTheTarget(TestWhen[ACallerAndATarget, UserAdapter, Answer]):
+class RestoringTheTarget(When[ACallerAndATarget, UserAdapter, Answer]):
     """대상 사용자를 되살린다. `then_reading`이면 뒤이어 그 사용자를 읽는다."""
 
     then_reading: bool = True
@@ -247,7 +247,7 @@ class RestoringTheTarget(TestWhen[ACallerAndATarget, UserAdapter, Answer]):
 
 
 @dataclass(frozen=True)
-class PurgingTheTarget(TestWhen[ACallerAndATarget, UserAdapter, Answer]):
+class PurgingTheTarget(When[ACallerAndATarget, UserAdapter, Answer]):
     """대상 사용자를 지운다. 넘겨받을 관리자는 부르는 사람이고, `to_nobody`면 없는 id다.
 
     지켜보는 슈퍼관리자가 있으면 뒤이어 그 사람이 대상을 일괄로 읽는다.
@@ -280,7 +280,7 @@ class PurgingTheTarget(TestWhen[ACallerAndATarget, UserAdapter, Answer]):
 
 
 @dataclass(frozen=True)
-class PurgingInBulk(TestWhen[ASuperadminAndUsers, UserAdapter, Answer]):
+class PurgingInBulk(When[ASuperadminAndUsers, UserAdapter, Answer]):
     """사용자들을, 있으면 없는 id까지 함께 일괄로 지운다. 넘겨받는 사람은 부르는 사람이다."""
 
     @override
@@ -305,7 +305,7 @@ class PurgingInBulk(TestWhen[ASuperadminAndUsers, UserAdapter, Answer]):
 
 
 @dataclass(frozen=True)
-class NoKey(TestCondition[str | None]):
+class NoKey(Condition[str | None]):
     """기본 키가 비어 있다. 비활성 사용자의 기본 키는 활성이 아니다."""
 
     @override
@@ -318,7 +318,7 @@ class NoKey(TestCondition[str | None]):
 
 
 @dataclass(frozen=True)
-class TheTargetNowStands(TestThen[ACallerAndATarget, Answer]):
+class TheTargetNowStands(Then[ACallerAndATarget, Answer]):
     """성공이 오고, 다시 읽은 대상은 `status` 상태다."""
 
     started: datetime
@@ -330,7 +330,7 @@ class TheTargetNowStands(TestThen[ACallerAndATarget, Answer]):
         return f"성공이 오고, 다시 읽은 사용자는 {self.status} 상태다"
 
     @override
-    def look(self, laid: ACallerAndATarget, answered: Answered[Answer]) -> list[TestVerdict]:
+    def look(self, laid: ACallerAndATarget, answered: Answered[Answer]) -> list[Verdict]:
         answer = answered.response
         if not isinstance(answer, tuple) or not isinstance(answer[1], UserNode):
             return [Refused(NotEnoughPermission, answered.raised)]
@@ -350,7 +350,7 @@ class TheTargetNowStands(TestThen[ACallerAndATarget, Answer]):
 
 
 @dataclass(frozen=True)
-class TheTargetIsGone(TestThen[ACallerAndATarget, Answer]):
+class TheTargetIsGone(Then[ACallerAndATarget, Answer]):
     """성공이 오고, 슈퍼관리자가 일괄로 읽으면 그 자리가 비어 온다."""
 
     @override
@@ -358,7 +358,7 @@ class TheTargetIsGone(TestThen[ACallerAndATarget, Answer]):
         return "성공이 오고, 그 사용자를 더 찾을 수 없다"
 
     @override
-    def look(self, laid: ACallerAndATarget, answered: Answered[Answer]) -> list[TestVerdict]:
+    def look(self, laid: ACallerAndATarget, answered: Answered[Answer]) -> list[Verdict]:
         answer = answered.response
         if not isinstance(answer, tuple) or not isinstance(answer[1], list):
             return [Refused(NotEnoughPermission, answered.raised)]
@@ -370,7 +370,7 @@ class TheTargetIsGone(TestThen[ACallerAndATarget, Answer]):
 
 
 @dataclass(frozen=True)
-class EveryoneIsPurged(TestThen[ASuperadminAndUsers, Answer]):
+class EveryoneIsPurged(Then[ASuperadminAndUsers, Answer]):
     """심은 사용자가 모두 지워지고, 없는 id가 있으면 그것만 실패로 담긴다."""
 
     @override
@@ -378,11 +378,11 @@ class EveryoneIsPurged(TestThen[ASuperadminAndUsers, Answer]):
         return "지운 사용자 id와 개수, 그리고 실패가 온다"
 
     @override
-    def look(self, laid: ASuperadminAndUsers, answered: Answered[Answer]) -> list[TestVerdict]:
+    def look(self, laid: ASuperadminAndUsers, answered: Answered[Answer]) -> list[Verdict]:
         payload = answered.response
         if not isinstance(payload, BulkPurgeUsersPayload):
             return [Refused(InsufficientPrivilege, answered.raised)]
-        seen: list[TestVerdict] = [
+        seen: list[Verdict] = [
             Held(
                 "successes",
                 list(payload.successes),
@@ -405,9 +405,7 @@ class EveryoneIsPurged(TestThen[ASuperadminAndUsers, Answer]):
 
 
 @dataclass(frozen=True)
-class AGrantedUserDeletesAUser(
-    TestScenario[SeedingSession, ACallerAndATarget, UserAdapter, Answer]
-):
+class AGrantedUserDeletesAUser(Scenario[SeedingSession, ACallerAndATarget, UserAdapter, Answer]):
     started: datetime
 
     @override
@@ -419,21 +417,21 @@ class AGrantedUserDeletesAUser(
         return "대상 사용자 스코프에서 SOFT_DELETE를 받은 사용자가 물리면, 성공이 오고 그 사용자 상태가 삭제로 바뀐다"
 
     @override
-    def given(self) -> TestGiven[SeedingSession, ACallerAndATarget]:
+    def given(self) -> Given[SeedingSession, ACallerAndATarget]:
         return ATargetAndSomeone(permissions=(Permission.SOFT_DELETE, Permission.READ))
 
     @override
-    def when(self) -> TestWhen[ACallerAndATarget, UserAdapter, Answer]:
+    def when(self) -> When[ACallerAndATarget, UserAdapter, Answer]:
         return DeletingTheTarget()
 
     @override
-    def then(self) -> TestThen[ACallerAndATarget, Answer]:
+    def then(self) -> Then[ACallerAndATarget, Answer]:
         return TheTargetNowStands(started=self.started, status="deleted")
 
 
 @dataclass(frozen=True)
 class AUserGrantedNothingMayNotDelete(
-    TestScenario[SeedingSession, ACallerAndATarget, UserAdapter, Answer]
+    Scenario[SeedingSession, ACallerAndATarget, UserAdapter, Answer]
 ):
     @override
     def summary(self) -> str:
@@ -444,21 +442,21 @@ class AUserGrantedNothingMayNotDelete(
         return "역할 없이 물리려 하면, 엔티티 권한 문이 막는다"
 
     @override
-    def given(self) -> TestGiven[SeedingSession, ACallerAndATarget]:
+    def given(self) -> Given[SeedingSession, ACallerAndATarget]:
         return ATargetAndSomeone()
 
     @override
-    def when(self) -> TestWhen[ACallerAndATarget, UserAdapter, Answer]:
+    def when(self) -> When[ACallerAndATarget, UserAdapter, Answer]:
         return DeletingTheTarget(then_reading=False)
 
     @override
-    def then(self) -> TestThen[ACallerAndATarget, Answer]:
+    def then(self) -> Then[ACallerAndATarget, Answer]:
         return TheCallIsRefused(NotEnoughPermission)
 
 
 @dataclass(frozen=True)
 class AGrantedUserRestoresADeletedUser(
-    TestScenario[SeedingSession, ACallerAndATarget, UserAdapter, Answer]
+    Scenario[SeedingSession, ACallerAndATarget, UserAdapter, Answer]
 ):
     started: datetime
 
@@ -471,24 +469,24 @@ class AGrantedUserRestoresADeletedUser(
         return "대상 사용자 스코프에서 SOFT_DELETE를 받은 사용자가 삭제 상태 사용자를 되살리면, 성공이 오고 상태가 활성으로 바뀐다"
 
     @override
-    def given(self) -> TestGiven[SeedingSession, ACallerAndATarget]:
+    def given(self) -> Given[SeedingSession, ACallerAndATarget]:
         return ATargetAndSomeone(
             permissions=(Permission.SOFT_DELETE, Permission.READ),
             target_status=UserStatus.DELETED,
         )
 
     @override
-    def when(self) -> TestWhen[ACallerAndATarget, UserAdapter, Answer]:
+    def when(self) -> When[ACallerAndATarget, UserAdapter, Answer]:
         return RestoringTheTarget()
 
     @override
-    def then(self) -> TestThen[ACallerAndATarget, Answer]:
+    def then(self) -> Then[ACallerAndATarget, Answer]:
         return TheTargetNowStands(started=self.started, status="active", key_is_active=False)
 
 
 @dataclass(frozen=True)
 class RestoringAnInactiveUserMakesThemActive(
-    TestScenario[SeedingSession, ACallerAndATarget, UserAdapter, Answer]
+    Scenario[SeedingSession, ACallerAndATarget, UserAdapter, Answer]
 ):
     started: datetime
 
@@ -501,24 +499,24 @@ class RestoringAnInactiveUserMakesThemActive(
         return "권한 받은 사용자가 비활성 사용자를 되살리면, 현재 상태와 무관하게 활성이 된다"
 
     @override
-    def given(self) -> TestGiven[SeedingSession, ACallerAndATarget]:
+    def given(self) -> Given[SeedingSession, ACallerAndATarget]:
         return ATargetAndSomeone(
             permissions=(Permission.SOFT_DELETE, Permission.READ),
             target_status=UserStatus.INACTIVE,
         )
 
     @override
-    def when(self) -> TestWhen[ACallerAndATarget, UserAdapter, Answer]:
+    def when(self) -> When[ACallerAndATarget, UserAdapter, Answer]:
         return RestoringTheTarget()
 
     @override
-    def then(self) -> TestThen[ACallerAndATarget, Answer]:
+    def then(self) -> Then[ACallerAndATarget, Answer]:
         return TheTargetNowStands(started=self.started, status="active", key_is_active=False)
 
 
 @dataclass(frozen=True)
 class AUserGrantedNothingMayNotRestore(
-    TestScenario[SeedingSession, ACallerAndATarget, UserAdapter, Answer]
+    Scenario[SeedingSession, ACallerAndATarget, UserAdapter, Answer]
 ):
     @override
     def summary(self) -> str:
@@ -529,20 +527,20 @@ class AUserGrantedNothingMayNotRestore(
         return "역할 없이 되살리려 하면, 엔티티 권한 문이 막는다"
 
     @override
-    def given(self) -> TestGiven[SeedingSession, ACallerAndATarget]:
+    def given(self) -> Given[SeedingSession, ACallerAndATarget]:
         return ATargetAndSomeone(target_status=UserStatus.DELETED)
 
     @override
-    def when(self) -> TestWhen[ACallerAndATarget, UserAdapter, Answer]:
+    def when(self) -> When[ACallerAndATarget, UserAdapter, Answer]:
         return RestoringTheTarget(then_reading=False)
 
     @override
-    def then(self) -> TestThen[ACallerAndATarget, Answer]:
+    def then(self) -> Then[ACallerAndATarget, Answer]:
         return TheCallIsRefused(NotEnoughPermission)
 
 
 @dataclass(frozen=True)
-class AGrantedUserPurgesAUser(TestScenario[SeedingSession, ACallerAndATarget, UserAdapter, Answer]):
+class AGrantedUserPurgesAUser(Scenario[SeedingSession, ACallerAndATarget, UserAdapter, Answer]):
     @override
     def summary(self) -> str:
         return "a-user-granted-hard-delete-purges-a-user-with-no-folders-or-sessions"
@@ -552,21 +550,21 @@ class AGrantedUserPurgesAUser(TestScenario[SeedingSession, ACallerAndATarget, Us
         return "대상 사용자 스코프에서 HARD_DELETE를 받은 사용자가 물리지 않은 사용자를 지워도, 성공이 오고 그 사용자를 더 찾을 수 없다"
 
     @override
-    def given(self) -> TestGiven[SeedingSession, ACallerAndATarget]:
+    def given(self) -> Given[SeedingSession, ACallerAndATarget]:
         return ATargetAndSomeone(permissions=(Permission.HARD_DELETE,), overseer=True)
 
     @override
-    def when(self) -> TestWhen[ACallerAndATarget, UserAdapter, Answer]:
+    def when(self) -> When[ACallerAndATarget, UserAdapter, Answer]:
         return PurgingTheTarget()
 
     @override
-    def then(self) -> TestThen[ACallerAndATarget, Answer]:
+    def then(self) -> Then[ACallerAndATarget, Answer]:
         return TheTargetIsGone()
 
 
 @dataclass(frozen=True)
 class AUserGrantedNothingMayNotPurge(
-    TestScenario[SeedingSession, ACallerAndATarget, UserAdapter, Answer]
+    Scenario[SeedingSession, ACallerAndATarget, UserAdapter, Answer]
 ):
     @override
     def summary(self) -> str:
@@ -577,22 +575,20 @@ class AUserGrantedNothingMayNotPurge(
         return "역할 없이 지우려 하면, 엔티티 권한 문이 막는다"
 
     @override
-    def given(self) -> TestGiven[SeedingSession, ACallerAndATarget]:
+    def given(self) -> Given[SeedingSession, ACallerAndATarget]:
         return ATargetAndSomeone()
 
     @override
-    def when(self) -> TestWhen[ACallerAndATarget, UserAdapter, Answer]:
+    def when(self) -> When[ACallerAndATarget, UserAdapter, Answer]:
         return PurgingTheTarget()
 
     @override
-    def then(self) -> TestThen[ACallerAndATarget, Answer]:
+    def then(self) -> Then[ACallerAndATarget, Answer]:
         return TheCallIsRefused(NotEnoughPermission)
 
 
 @dataclass(frozen=True)
-class PurgingToNobodyIsRefused(
-    TestScenario[SeedingSession, ACallerAndATarget, UserAdapter, Answer]
-):
+class PurgingToNobodyIsRefused(Scenario[SeedingSession, ACallerAndATarget, UserAdapter, Answer]):
     @override
     def summary(self) -> str:
         return "purging-a-user-to-an-admin-who-does-not-exist-is-refused"
@@ -602,21 +598,21 @@ class PurgingToNobodyIsRefused(
         return "권한 받은 사용자가 넘겨받을 관리자로 없는 id를 주면, 입력 검증이 막는다"
 
     @override
-    def given(self) -> TestGiven[SeedingSession, ACallerAndATarget]:
+    def given(self) -> Given[SeedingSession, ACallerAndATarget]:
         return ATargetAndSomeone(permissions=(Permission.HARD_DELETE,))
 
     @override
-    def when(self) -> TestWhen[ACallerAndATarget, UserAdapter, Answer]:
+    def when(self) -> When[ACallerAndATarget, UserAdapter, Answer]:
         return PurgingTheTarget(to_nobody=True)
 
     @override
-    def then(self) -> TestThen[ACallerAndATarget, Answer]:
+    def then(self) -> Then[ACallerAndATarget, Answer]:
         return TheCallIsRefused(UserNotFound)
 
 
 @dataclass(frozen=True)
 class TheSuperadminPurgesTwoInBulk(
-    TestScenario[SeedingSession, ASuperadminAndUsers, UserAdapter, Answer]
+    Scenario[SeedingSession, ASuperadminAndUsers, UserAdapter, Answer]
 ):
     @override
     def summary(self) -> str:
@@ -629,21 +625,21 @@ class TheSuperadminPurgesTwoInBulk(
         )
 
     @override
-    def given(self) -> TestGiven[SeedingSession, ASuperadminAndUsers]:
+    def given(self) -> Given[SeedingSession, ASuperadminAndUsers]:
         return ASuperadminAndSomeUsers(count=2)
 
     @override
-    def when(self) -> TestWhen[ASuperadminAndUsers, UserAdapter, Answer]:
+    def when(self) -> When[ASuperadminAndUsers, UserAdapter, Answer]:
         return PurgingInBulk()
 
     @override
-    def then(self) -> TestThen[ASuperadminAndUsers, Answer]:
+    def then(self) -> Then[ASuperadminAndUsers, Answer]:
         return EveryoneIsPurged()
 
 
 @dataclass(frozen=True)
 class ABulkPurgeRecordsAMissingIdAsAFailure(
-    TestScenario[SeedingSession, ASuperadminAndUsers, UserAdapter, Answer]
+    Scenario[SeedingSession, ASuperadminAndUsers, UserAdapter, Answer]
 ):
     @override
     def summary(self) -> str:
@@ -654,21 +650,21 @@ class ABulkPurgeRecordsAMissingIdAsAFailure(
         return "슈퍼관리자가 있는 사용자와 없는 id를 함께 주면, 하나는 지워지고 없는 id는 실패로 담긴다"
 
     @override
-    def given(self) -> TestGiven[SeedingSession, ASuperadminAndUsers]:
+    def given(self) -> Given[SeedingSession, ASuperadminAndUsers]:
         return ASuperadminAndSomeUsers(count=1, with_missing=True)
 
     @override
-    def when(self) -> TestWhen[ASuperadminAndUsers, UserAdapter, Answer]:
+    def when(self) -> When[ASuperadminAndUsers, UserAdapter, Answer]:
         return PurgingInBulk()
 
     @override
-    def then(self) -> TestThen[ASuperadminAndUsers, Answer]:
+    def then(self) -> Then[ASuperadminAndUsers, Answer]:
         return EveryoneIsPurged()
 
 
 @dataclass(frozen=True)
 class AUserWhoIsNotTheSuperadminMayNotPurgeInBulk(
-    TestScenario[SeedingSession, ASuperadminAndUsers, UserAdapter, Answer]
+    Scenario[SeedingSession, ASuperadminAndUsers, UserAdapter, Answer]
 ):
     @override
     def summary(self) -> str:
@@ -679,19 +675,19 @@ class AUserWhoIsNotTheSuperadminMayNotPurgeInBulk(
         return "도메인 스코프에서 HARD_DELETE를 받은 사용자라도 일괄 지우기를 하려 하면, 전역 역할 문이 막는다"
 
     @override
-    def given(self) -> TestGiven[SeedingSession, ASuperadminAndUsers]:
+    def given(self) -> Given[SeedingSession, ASuperadminAndUsers]:
         return SomeoneGrantedOnTheDomain()
 
     @override
-    def when(self) -> TestWhen[ASuperadminAndUsers, UserAdapter, Answer]:
+    def when(self) -> When[ASuperadminAndUsers, UserAdapter, Answer]:
         return PurgingInBulk()
 
     @override
-    def then(self) -> TestThen[ASuperadminAndUsers, Answer]:
+    def then(self) -> Then[ASuperadminAndUsers, Answer]:
         return TheCallIsRefused(InsufficientPrivilege)
 
 
-SCENARIOS: list[TestScenario[SeedingSession, Any, UserAdapter, Answer]] = [
+SCENARIOS: list[Scenario[SeedingSession, Any, UserAdapter, Answer]] = [
     AGrantedUserDeletesAUser(started=datetime.now(UTC)),
     AUserGrantedNothingMayNotDelete(),
     AGrantedUserRestoresADeletedUser(started=datetime.now(UTC)),
@@ -708,7 +704,7 @@ SCENARIOS: list[TestScenario[SeedingSession, Any, UserAdapter, Answer]] = [
 
 @pytest.mark.parametrize("scenario", SCENARIOS, ids=lambda s: s.summary())
 async def test_retiring(
-    scenario: TestScenario[SeedingSession, Any, UserAdapter, Answer],
+    scenario: Scenario[SeedingSession, Any, UserAdapter, Answer],
     adapter: UserAdapter,
     engine: ExtendedAsyncSAEngine,
 ) -> None:

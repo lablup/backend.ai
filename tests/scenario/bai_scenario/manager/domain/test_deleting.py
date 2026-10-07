@@ -25,13 +25,13 @@ from ai.backend.manager.errors.resource import DomainHasGroups, DomainHasUsers
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.testutils.scenario_steps import (
     Answered,
+    Given,
     Refused,
     Same,
-    TestGiven,
-    TestScenario,
-    TestThen,
-    TestVerdict,
-    TestWhen,
+    Scenario,
+    Then,
+    Verdict,
+    When,
 )
 from bai_scenario.components.domain import (
     ADomainAndACaller,
@@ -44,11 +44,11 @@ from bai_scenario.runner.planting import SeedingSession
 from bai_scenario.runner.steps import run_scenario
 
 type Deleted = DeleteDomainPayload | RestoreDomainPayload | PurgeDomainPayload
-type DomainStep = TestScenario[SeedingSession, ADomainAndACaller, DomainAdapter, Deleted]
+type DomainStep = Scenario[SeedingSession, ADomainAndACaller, DomainAdapter, Deleted]
 
 
 @dataclass(frozen=True)
-class SoftDeleting(TestWhen[ADomainAndACaller, DomainAdapter, Deleted]):
+class SoftDeleting(When[ADomainAndACaller, DomainAdapter, Deleted]):
     """도메인을 soft delete 한다."""
 
     named: str | None = None
@@ -68,7 +68,7 @@ class SoftDeleting(TestWhen[ADomainAndACaller, DomainAdapter, Deleted]):
 
 
 @dataclass(frozen=True)
-class SoftDeletingThenRestoring(TestWhen[ADomainAndACaller, DomainAdapter, Deleted]):
+class SoftDeletingThenRestoring(When[ADomainAndACaller, DomainAdapter, Deleted]):
     """soft delete 한 다음 restore 한다."""
 
     @override
@@ -87,7 +87,7 @@ class SoftDeletingThenRestoring(TestWhen[ADomainAndACaller, DomainAdapter, Delet
 
 
 @dataclass(frozen=True)
-class SoftDeletingTwice(TestWhen[ADomainAndACaller, DomainAdapter, Deleted]):
+class SoftDeletingTwice(When[ADomainAndACaller, DomainAdapter, Deleted]):
     """soft delete 를 두 번 부른다. 두 번째 답을 준다."""
 
     @override
@@ -106,7 +106,7 @@ class SoftDeletingTwice(TestWhen[ADomainAndACaller, DomainAdapter, Deleted]):
 
 
 @dataclass(frozen=True)
-class Restoring(TestWhen[ADomainAndACaller, DomainAdapter, Deleted]):
+class Restoring(When[ADomainAndACaller, DomainAdapter, Deleted]):
     """미리 만든 그대로의 도메인을 restore 한다."""
 
     @override
@@ -124,7 +124,7 @@ class Restoring(TestWhen[ADomainAndACaller, DomainAdapter, Deleted]):
 
 
 @dataclass(frozen=True)
-class Purging(TestWhen[ADomainAndACaller, DomainAdapter, Deleted]):
+class Purging(When[ADomainAndACaller, DomainAdapter, Deleted]):
     """purge 한다."""
 
     named: str | None = None
@@ -144,7 +144,7 @@ class Purging(TestWhen[ADomainAndACaller, DomainAdapter, Deleted]):
 
 
 @dataclass(frozen=True)
-class ItSaysItWasDone(TestThen[ADomainAndACaller, Deleted]):
+class ItSaysItWasDone(Then[ADomainAndACaller, Deleted]):
     """했다는 답이 온다. 답이 실은 것은 그 한 가지뿐이다."""
 
     called: str
@@ -154,7 +154,7 @@ class ItSaysItWasDone(TestThen[ADomainAndACaller, Deleted]):
         return "했다는 답이 온다"
 
     @override
-    def look(self, laid: ADomainAndACaller, answered: Answered[Deleted]) -> list[TestVerdict]:
+    def look(self, laid: ADomainAndACaller, answered: Answered[Deleted]) -> list[Verdict]:
         payload = answered.response
         if payload is None:
             return [Refused(EntityNotFoundError, answered.raised)]
@@ -163,7 +163,7 @@ class ItSaysItWasDone(TestThen[ADomainAndACaller, Deleted]):
 
 @dataclass(frozen=True)
 class TheSuperadminSoftDeletesADomain(
-    TestScenario[SeedingSession, ADomainAndACaller, DomainAdapter, Deleted]
+    Scenario[SeedingSession, ADomainAndACaller, DomainAdapter, Deleted]
 ):
     @override
     def summary(self) -> str:
@@ -174,22 +174,20 @@ class TheSuperadminSoftDeletesADomain(
         return "슈퍼관리자가 도메인을 soft delete 하면, soft delete 했다는 답이 온다"
 
     @override
-    def given(self) -> TestGiven[SeedingSession, ADomainAndACaller]:
+    def given(self) -> Given[SeedingSession, ADomainAndACaller]:
         return ATargetAndSomeone(role=UserRole.SUPERADMIN, name_hint="to-delete")
 
     @override
-    def when(self) -> TestWhen[ADomainAndACaller, DomainAdapter, Deleted]:
+    def when(self) -> When[ADomainAndACaller, DomainAdapter, Deleted]:
         return SoftDeleting()
 
     @override
-    def then(self) -> TestThen[ADomainAndACaller, Deleted]:
+    def then(self) -> Then[ADomainAndACaller, Deleted]:
         return ItSaysItWasDone("deleted")
 
 
 @dataclass(frozen=True)
-class RestoringSaysItRestored(
-    TestScenario[SeedingSession, ADomainAndACaller, DomainAdapter, Deleted]
-):
+class RestoringSaysItRestored(Scenario[SeedingSession, ADomainAndACaller, DomainAdapter, Deleted]):
     @override
     def summary(self) -> str:
         return "restoring-answers-that-it-restored"
@@ -199,21 +197,21 @@ class RestoringSaysItRestored(
         return "soft delete 된 도메인을 restore 하면, restore 했다는 답이 온다"
 
     @override
-    def given(self) -> TestGiven[SeedingSession, ADomainAndACaller]:
+    def given(self) -> Given[SeedingSession, ADomainAndACaller]:
         return ATargetAndSomeone(role=UserRole.SUPERADMIN, name_hint="to-restore")
 
     @override
-    def when(self) -> TestWhen[ADomainAndACaller, DomainAdapter, Deleted]:
+    def when(self) -> When[ADomainAndACaller, DomainAdapter, Deleted]:
         return SoftDeletingThenRestoring()
 
     @override
-    def then(self) -> TestThen[ADomainAndACaller, Deleted]:
+    def then(self) -> Then[ADomainAndACaller, Deleted]:
         return ItSaysItWasDone("restored")
 
 
 @dataclass(frozen=True)
 class PurgingADomainNothingRefersTo(
-    TestScenario[SeedingSession, ADomainAndACaller, DomainAdapter, Deleted]
+    Scenario[SeedingSession, ADomainAndACaller, DomainAdapter, Deleted]
 ):
     @override
     def summary(self) -> str:
@@ -224,21 +222,21 @@ class PurgingADomainNothingRefersTo(
         return "아무것도 딸려 있지 않은 도메인은 purge 할 수 있다"
 
     @override
-    def given(self) -> TestGiven[SeedingSession, ADomainAndACaller]:
+    def given(self) -> Given[SeedingSession, ADomainAndACaller]:
         return ATargetAndSomeone(role=UserRole.SUPERADMIN, name_hint="to-purge")
 
     @override
-    def when(self) -> TestWhen[ADomainAndACaller, DomainAdapter, Deleted]:
+    def when(self) -> When[ADomainAndACaller, DomainAdapter, Deleted]:
         return Purging()
 
     @override
-    def then(self) -> TestThen[ADomainAndACaller, Deleted]:
+    def then(self) -> Then[ADomainAndACaller, Deleted]:
         return ItSaysItWasDone("purged")
 
 
 @dataclass(frozen=True)
 class ANameNothingAnswersToIsNotFound(
-    TestScenario[SeedingSession, ADomainAndACaller, DomainAdapter, Deleted]
+    Scenario[SeedingSession, ADomainAndACaller, DomainAdapter, Deleted]
 ):
     @override
     def summary(self) -> str:
@@ -249,21 +247,21 @@ class ANameNothingAnswersToIsNotFound(
         return "아무 도메인도 갖지 않은 이름을 soft delete 하려 하면 대상이 없다는 것으로 거부된다"
 
     @override
-    def given(self) -> TestGiven[SeedingSession, ADomainAndACaller]:
+    def given(self) -> Given[SeedingSession, ADomainAndACaller]:
         return ATargetAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
-    def when(self) -> TestWhen[ADomainAndACaller, DomainAdapter, Deleted]:
+    def when(self) -> When[ADomainAndACaller, DomainAdapter, Deleted]:
         return SoftDeleting(named="no-such-domain")
 
     @override
-    def then(self) -> TestThen[ADomainAndACaller, Deleted]:
+    def then(self) -> Then[ADomainAndACaller, Deleted]:
         return TheCallIsRefused(EntityNotFoundError)
 
 
 @dataclass(frozen=True)
 class AUserGrantedNothingMayNotSoftDelete(
-    TestScenario[SeedingSession, ADomainAndACaller, DomainAdapter, Deleted]
+    Scenario[SeedingSession, ADomainAndACaller, DomainAdapter, Deleted]
 ):
     @override
     def summary(self) -> str:
@@ -274,21 +272,21 @@ class AUserGrantedNothingMayNotSoftDelete(
         return "아무 권한도 받지 않은 사용자는 도메인을 soft delete 할 수 없다"
 
     @override
-    def given(self) -> TestGiven[SeedingSession, ADomainAndACaller]:
+    def given(self) -> Given[SeedingSession, ADomainAndACaller]:
         return ATargetAndSomeone(name_hint="untouchable")
 
     @override
-    def when(self) -> TestWhen[ADomainAndACaller, DomainAdapter, Deleted]:
+    def when(self) -> When[ADomainAndACaller, DomainAdapter, Deleted]:
         return SoftDeleting()
 
     @override
-    def then(self) -> TestThen[ADomainAndACaller, Deleted]:
+    def then(self) -> Then[ADomainAndACaller, Deleted]:
         return TheCallIsRefused(NotEnoughPermission)
 
 
 @dataclass(frozen=True)
 class SoftDeletingASoftDeletedDomainAgain(
-    TestScenario[SeedingSession, ADomainAndACaller, DomainAdapter, Deleted]
+    Scenario[SeedingSession, ADomainAndACaller, DomainAdapter, Deleted]
 ):
     @override
     def summary(self) -> str:
@@ -299,21 +297,21 @@ class SoftDeletingASoftDeletedDomainAgain(
         return "이미 soft delete 된 도메인을 슈퍼관리자가 다시 soft delete 하면, soft delete 했다는 답이 온다"
 
     @override
-    def given(self) -> TestGiven[SeedingSession, ADomainAndACaller]:
+    def given(self) -> Given[SeedingSession, ADomainAndACaller]:
         return ATargetAndSomeone(role=UserRole.SUPERADMIN, name_hint="twice")
 
     @override
-    def when(self) -> TestWhen[ADomainAndACaller, DomainAdapter, Deleted]:
+    def when(self) -> When[ADomainAndACaller, DomainAdapter, Deleted]:
         return SoftDeletingTwice()
 
     @override
-    def then(self) -> TestThen[ADomainAndACaller, Deleted]:
+    def then(self) -> Then[ADomainAndACaller, Deleted]:
         return ItSaysItWasDone("deleted")
 
 
 @dataclass(frozen=True)
 class AUserGrantedNothingMayNotRestore(
-    TestScenario[SeedingSession, ADomainAndACaller, DomainAdapter, Deleted]
+    Scenario[SeedingSession, ADomainAndACaller, DomainAdapter, Deleted]
 ):
     @override
     def summary(self) -> str:
@@ -324,22 +322,20 @@ class AUserGrantedNothingMayNotRestore(
         return "아무 권한도 받지 않은 사용자는 도메인을 restore 할 수 없다"
 
     @override
-    def given(self) -> TestGiven[SeedingSession, ADomainAndACaller]:
+    def given(self) -> Given[SeedingSession, ADomainAndACaller]:
         return ATargetAndSomeone(name_hint="untouchable")
 
     @override
-    def when(self) -> TestWhen[ADomainAndACaller, DomainAdapter, Deleted]:
+    def when(self) -> When[ADomainAndACaller, DomainAdapter, Deleted]:
         return Restoring()
 
     @override
-    def then(self) -> TestThen[ADomainAndACaller, Deleted]:
+    def then(self) -> Then[ADomainAndACaller, Deleted]:
         return TheCallIsRefused(NotEnoughPermission)
 
 
 @dataclass(frozen=True)
-class RestoringAnActiveDomain(
-    TestScenario[SeedingSession, ADomainAndACaller, DomainAdapter, Deleted]
-):
+class RestoringAnActiveDomain(Scenario[SeedingSession, ADomainAndACaller, DomainAdapter, Deleted]):
     @override
     def summary(self) -> str:
         return "restoring-a-domain-that-is-not-soft-deleted"
@@ -349,21 +345,21 @@ class RestoringAnActiveDomain(
         return "soft delete 되지 않은 도메인을 슈퍼관리자가 restore 하면, restore 했다는 답이 온다"
 
     @override
-    def given(self) -> TestGiven[SeedingSession, ADomainAndACaller]:
+    def given(self) -> Given[SeedingSession, ADomainAndACaller]:
         return ATargetAndSomeone(role=UserRole.SUPERADMIN, name_hint="active")
 
     @override
-    def when(self) -> TestWhen[ADomainAndACaller, DomainAdapter, Deleted]:
+    def when(self) -> When[ADomainAndACaller, DomainAdapter, Deleted]:
         return Restoring()
 
     @override
-    def then(self) -> TestThen[ADomainAndACaller, Deleted]:
+    def then(self) -> Then[ADomainAndACaller, Deleted]:
         return ItSaysItWasDone("restored")
 
 
 @dataclass(frozen=True)
 class AUserGrantedNothingMayNotPurge(
-    TestScenario[SeedingSession, ADomainAndACaller, DomainAdapter, Deleted]
+    Scenario[SeedingSession, ADomainAndACaller, DomainAdapter, Deleted]
 ):
     @override
     def summary(self) -> str:
@@ -374,21 +370,21 @@ class AUserGrantedNothingMayNotPurge(
         return "아무 권한도 받지 않은 사용자는 아무것도 딸리지 않은 도메인이라도 purge 할 수 없다"
 
     @override
-    def given(self) -> TestGiven[SeedingSession, ADomainAndACaller]:
+    def given(self) -> Given[SeedingSession, ADomainAndACaller]:
         return ATargetAndSomeone(name_hint="untouchable")
 
     @override
-    def when(self) -> TestWhen[ADomainAndACaller, DomainAdapter, Deleted]:
+    def when(self) -> When[ADomainAndACaller, DomainAdapter, Deleted]:
         return Purging()
 
     @override
-    def then(self) -> TestThen[ADomainAndACaller, Deleted]:
+    def then(self) -> Then[ADomainAndACaller, Deleted]:
         return TheCallIsRefused(NotEnoughPermission)
 
 
 @dataclass(frozen=True)
 class ADomainHoldingAProjectIsNotPurged(
-    TestScenario[SeedingSession, ADomainAndACaller, DomainAdapter, Deleted]
+    Scenario[SeedingSession, ADomainAndACaller, DomainAdapter, Deleted]
 ):
     @override
     def summary(self) -> str:
@@ -399,21 +395,21 @@ class ADomainHoldingAProjectIsNotPurged(
         return "프로젝트가 딸린 도메인은 슈퍼관리자라도 purge 할 수 없다"
 
     @override
-    def given(self) -> TestGiven[SeedingSession, ADomainAndACaller]:
+    def given(self) -> Given[SeedingSession, ADomainAndACaller]:
         return ATargetAndSomeone(role=UserRole.SUPERADMIN, holds=TargetHolds.PROJECT)
 
     @override
-    def when(self) -> TestWhen[ADomainAndACaller, DomainAdapter, Deleted]:
+    def when(self) -> When[ADomainAndACaller, DomainAdapter, Deleted]:
         return Purging()
 
     @override
-    def then(self) -> TestThen[ADomainAndACaller, Deleted]:
+    def then(self) -> Then[ADomainAndACaller, Deleted]:
         return TheCallIsRefused(DomainHasGroups)
 
 
 @dataclass(frozen=True)
 class ADomainHoldingAUserIsNotPurged(
-    TestScenario[SeedingSession, ADomainAndACaller, DomainAdapter, Deleted]
+    Scenario[SeedingSession, ADomainAndACaller, DomainAdapter, Deleted]
 ):
     @override
     def summary(self) -> str:
@@ -424,21 +420,21 @@ class ADomainHoldingAUserIsNotPurged(
         return "사용자가 딸린 도메인은 슈퍼관리자라도 purge 할 수 없다"
 
     @override
-    def given(self) -> TestGiven[SeedingSession, ADomainAndACaller]:
+    def given(self) -> Given[SeedingSession, ADomainAndACaller]:
         return ATargetAndSomeone(role=UserRole.SUPERADMIN, holds=TargetHolds.USER)
 
     @override
-    def when(self) -> TestWhen[ADomainAndACaller, DomainAdapter, Deleted]:
+    def when(self) -> When[ADomainAndACaller, DomainAdapter, Deleted]:
         return Purging()
 
     @override
-    def then(self) -> TestThen[ADomainAndACaller, Deleted]:
+    def then(self) -> Then[ADomainAndACaller, Deleted]:
         return TheCallIsRefused(DomainHasUsers)
 
 
 @dataclass(frozen=True)
 class PurgingANameNothingAnswersToIsNotFound(
-    TestScenario[SeedingSession, ADomainAndACaller, DomainAdapter, Deleted]
+    Scenario[SeedingSession, ADomainAndACaller, DomainAdapter, Deleted]
 ):
     @override
     def summary(self) -> str:
@@ -449,15 +445,15 @@ class PurgingANameNothingAnswersToIsNotFound(
         return "아무 도메인도 갖지 않은 이름을 purge 하려 하면 대상이 없다는 것으로 거부된다"
 
     @override
-    def given(self) -> TestGiven[SeedingSession, ADomainAndACaller]:
+    def given(self) -> Given[SeedingSession, ADomainAndACaller]:
         return ATargetAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
-    def when(self) -> TestWhen[ADomainAndACaller, DomainAdapter, Deleted]:
+    def when(self) -> When[ADomainAndACaller, DomainAdapter, Deleted]:
         return Purging(named="no-such-domain")
 
     @override
-    def then(self) -> TestThen[ADomainAndACaller, Deleted]:
+    def then(self) -> Then[ADomainAndACaller, Deleted]:
         return TheCallIsRefused(EntityNotFoundError)
 
 

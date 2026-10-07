@@ -22,14 +22,14 @@ from ai.backend.manager.data.user.types import UserData
 from ai.backend.manager.errors.base.entity import EntityNotFoundError
 from ai.backend.testutils.scenario_steps import (
     Answered,
+    Given,
     Held,
     Refused,
     Same,
     SameAs,
     Skipped,
-    TestGiven,
-    TestThen,
-    TestVerdict,
+    Then,
+    Verdict,
 )
 from bai_scenario.components.domain import WrittenByThisRun
 from bai_scenario.components.system import KEPT, Kept, lay_a_caller, role_named
@@ -57,7 +57,7 @@ class ManyMaskingPoliciesAndACaller:
 
 
 @dataclass(frozen=True)
-class AMaskingPolicyAndSomeone(TestGiven[Any, AMaskingPolicyAndACaller]):
+class AMaskingPolicyAndSomeone(Given[Any, AMaskingPolicyAndACaller]):
     """정책 하나와 사용자 한 명."""
 
     role: UserRole = UserRole.USER
@@ -80,7 +80,7 @@ class AMaskingPolicyAndSomeone(TestGiven[Any, AMaskingPolicyAndACaller]):
 
 
 @dataclass(frozen=True)
-class TwoMaskingPoliciesAndSomeone(TestGiven[Any, ManyMaskingPoliciesAndACaller]):
+class TwoMaskingPoliciesAndSomeone(Given[Any, ManyMaskingPoliciesAndACaller]):
     """대상이 다른 정책 둘과 사용자 한 명."""
 
     role: UserRole = UserRole.USER
@@ -107,13 +107,13 @@ class TwoMaskingPoliciesAndSomeone(TestGiven[Any, ManyMaskingPoliciesAndACaller]
 def masking_verdicts(
     node: ClientIPMaskingPolicyNode,
     *,
-    identity: TestVerdict,
+    identity: Verdict,
     target: ClientIPMaskingTarget,
     mode: ClientIPMaskingMode,
     ipv4: int | None,
     ipv6: int | None,
     written: WrittenByThisRun,
-) -> list[TestVerdict]:
+) -> list[Verdict]:
     """Every place of one masking policy node. The id verdict is the caller's, since an
     upsert either makes a row or keeps one."""
     return [
@@ -128,7 +128,7 @@ def masking_verdicts(
 
 
 @dataclass(frozen=True)
-class TheNewMaskingPolicyNode(TestThen[Any, ClientIPMaskingPolicyNode]):
+class TheNewMaskingPolicyNode(Then[Any, ClientIPMaskingPolicyNode]):
     """방금 등록한 정책이 통째로 반환된다. 기대값은 요청이 지정한 값에서 읽는다."""
 
     started: datetime
@@ -142,7 +142,7 @@ class TheNewMaskingPolicyNode(TestThen[Any, ClientIPMaskingPolicyNode]):
         return "등록한 정책 전체가 반환된다"
 
     @override
-    def look(self, laid: Any, answered: Answered[ClientIPMaskingPolicyNode]) -> list[TestVerdict]:
+    def look(self, laid: Any, answered: Answered[ClientIPMaskingPolicyNode]) -> list[Verdict]:
         node = answered.response
         if node is None:
             return [Refused(EntityNotFoundError, answered.raised)]
@@ -158,7 +158,7 @@ class TheNewMaskingPolicyNode(TestThen[Any, ClientIPMaskingPolicyNode]):
 
 
 @dataclass(frozen=True)
-class TheSameRowRewritten(TestThen[AMaskingPolicyAndACaller, ClientIPMaskingPolicyNode]):
+class TheSameRowRewritten(Then[AMaskingPolicyAndACaller, ClientIPMaskingPolicyNode]):
     """미리 만들어 둔 정책이 같은 id를 유지한 채, 지정한 값으로 통째로 바뀌어 반환된다."""
 
     started: datetime
@@ -173,7 +173,7 @@ class TheSameRowRewritten(TestThen[AMaskingPolicyAndACaller, ClientIPMaskingPoli
     @override
     def look(
         self, laid: AMaskingPolicyAndACaller, answered: Answered[ClientIPMaskingPolicyNode]
-    ) -> list[TestVerdict]:
+    ) -> list[Verdict]:
         node = answered.response
         if node is None:
             return [Refused(EntityNotFoundError, answered.raised)]
@@ -191,7 +191,7 @@ class TheSameRowRewritten(TestThen[AMaskingPolicyAndACaller, ClientIPMaskingPoli
 
 @dataclass(frozen=True)
 class TheLaidMaskingPoliciesAreLeft(
-    TestThen[ManyMaskingPoliciesAndACaller, AdminSearchClientIPMaskingPoliciesPayload]
+    Then[ManyMaskingPoliciesAndACaller, AdminSearchClientIPMaskingPoliciesPayload]
 ):
     """응답에 나와야 하는 정책이 모두, 그리고 그것만 반환된다."""
 
@@ -204,7 +204,7 @@ class TheLaidMaskingPoliciesAreLeft(
         self,
         laid: ManyMaskingPoliciesAndACaller,
         answered: Answered[AdminSearchClientIPMaskingPoliciesPayload],
-    ) -> list[TestVerdict]:
+    ) -> list[Verdict]:
         page = answered.response
         if page is None:
             return [Refused(EntityNotFoundError, answered.raised)]
@@ -221,7 +221,7 @@ class TheLaidMaskingPoliciesAreLeft(
 
 
 @dataclass(frozen=True)
-class TheDeletedMaskingPolicy(TestThen[AMaskingPolicyAndACaller, ClientIPMaskingPolicyNode]):
+class TheDeletedMaskingPolicy(Then[AMaskingPolicyAndACaller, ClientIPMaskingPolicyNode]):
     """삭제한 정책이 통째로 반환된다. 기대값은 미리 만들어 둔 데이터에서 읽는다."""
 
     started: datetime
@@ -233,7 +233,7 @@ class TheDeletedMaskingPolicy(TestThen[AMaskingPolicyAndACaller, ClientIPMasking
     @override
     def look(
         self, laid: AMaskingPolicyAndACaller, answered: Answered[ClientIPMaskingPolicyNode]
-    ) -> list[TestVerdict]:
+    ) -> list[Verdict]:
         node = answered.response
         if node is None:
             return [Refused(EntityNotFoundError, answered.raised)]

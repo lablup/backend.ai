@@ -24,15 +24,15 @@ from ai.backend.manager.errors.permission import NotEnoughPermission
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.testutils.scenario_steps import (
     Answered,
+    Given,
     Held,
     Refused,
     Same,
     SameAs,
-    TestGiven,
-    TestScenario,
-    TestThen,
-    TestVerdict,
-    TestWhen,
+    Scenario,
+    Then,
+    Verdict,
+    When,
 )
 from bai_scenario.components.app_config_allow_list import (
     TwoEntriesAndACaller,
@@ -43,13 +43,11 @@ from bai_scenario.runner.planting import SeedingSession
 from bai_scenario.runner.steps import run_scenario
 
 type Loaded = list[AppConfigAllowListNode | Exception | None]
-type LoadingStep = TestScenario[
-    SeedingSession, TwoEntriesAndACaller, AppConfigAllowListAdapter, Loaded
-]
+type LoadingStep = Scenario[SeedingSession, TwoEntriesAndACaller, AppConfigAllowListAdapter, Loaded]
 
 
 @dataclass(frozen=True)
-class LoadingByIds(TestWhen[TwoEntriesAndACaller, AppConfigAllowListAdapter, Loaded]):
+class LoadingByIds(When[TwoEntriesAndACaller, AppConfigAllowListAdapter, Loaded]):
     """준비한 ID 둘과 존재하지 않는 ID를 조회한다. 빈 목록도 허용한다."""
 
     nothing: bool = False
@@ -80,7 +78,7 @@ class LoadingByIds(TestWhen[TwoEntriesAndACaller, AppConfigAllowListAdapter, Loa
 
 
 @dataclass(frozen=True)
-class EveryIdIsRefused(TestThen[TwoEntriesAndACaller, Loaded]):
+class EveryIdIsRefused(Then[TwoEntriesAndACaller, Loaded]):
     """세 입력 위치에 각각 권한 오류가 반환된다."""
 
     @override
@@ -88,11 +86,11 @@ class EveryIdIsRefused(TestThen[TwoEntriesAndACaller, Loaded]):
         return "있는 ID 둘과 없는 ID 모두 각 위치에 권한 오류가 반환된다"
 
     @override
-    def look(self, laid: TwoEntriesAndACaller, answered: Answered[Loaded]) -> list[TestVerdict]:
+    def look(self, laid: TwoEntriesAndACaller, answered: Answered[Loaded]) -> list[Verdict]:
         items = answered.response
         if items is None:
             return [Refused(NotEnoughPermission, answered.raised)]
-        seen: list[TestVerdict] = [Same("items", len(items), 3)]
+        seen: list[Verdict] = [Same("items", len(items), 3)]
         if len(items) != 3:
             return seen
         return [
@@ -105,7 +103,7 @@ class EveryIdIsRefused(TestThen[TwoEntriesAndACaller, Loaded]):
 
 
 @dataclass(frozen=True)
-class TwoNodesOneMissing(TestThen[TwoEntriesAndACaller, Loaded]):
+class TwoNodesOneMissing(Then[TwoEntriesAndACaller, Loaded]):
     """존재하는 ID는 노드, 존재하지 않는 ID는 ``None``으로 반환된다."""
 
     @override
@@ -113,11 +111,11 @@ class TwoNodesOneMissing(TestThen[TwoEntriesAndACaller, Loaded]):
         return "있는 ID 둘은 노드로, 없는 ID는 None으로 반환된다"
 
     @override
-    def look(self, laid: TwoEntriesAndACaller, answered: Answered[Loaded]) -> list[TestVerdict]:
+    def look(self, laid: TwoEntriesAndACaller, answered: Answered[Loaded]) -> list[Verdict]:
         items = answered.response
         if items is None:
             return [Refused(NotEnoughPermission, answered.raised)]
-        seen: list[TestVerdict] = [Same("items", len(items), 3)]
+        seen: list[Verdict] = [Same("items", len(items), 3)]
         if len(items) != 3:
             return seen
         return [
@@ -137,7 +135,7 @@ class TwoNodesOneMissing(TestThen[TwoEntriesAndACaller, Loaded]):
 
 
 @dataclass(frozen=True)
-class NothingIsAnswered(TestThen[TwoEntriesAndACaller, Loaded]):
+class NothingIsAnswered(Then[TwoEntriesAndACaller, Loaded]):
     """빈 응답."""
 
     @override
@@ -145,7 +143,7 @@ class NothingIsAnswered(TestThen[TwoEntriesAndACaller, Loaded]):
         return "빈 응답이 반환된다"
 
     @override
-    def look(self, laid: TwoEntriesAndACaller, answered: Answered[Loaded]) -> list[TestVerdict]:
+    def look(self, laid: TwoEntriesAndACaller, answered: Answered[Loaded]) -> list[Verdict]:
         items = answered.response
         if items is None:
             return [Refused(NotEnoughPermission, answered.raised)]
@@ -153,7 +151,7 @@ class NothingIsAnswered(TestThen[TwoEntriesAndACaller, Loaded]):
 
 
 @dataclass(frozen=True)
-class TheDuplicateIdKeepsBothPositions(TestThen[TwoEntriesAndACaller, Loaded]):
+class TheDuplicateIdKeepsBothPositions(Then[TwoEntriesAndACaller, Loaded]):
     """같은 ID를 두 번 요청하면 두 위치에 같은 노드가 반환된다."""
 
     @override
@@ -161,11 +159,11 @@ class TheDuplicateIdKeepsBothPositions(TestThen[TwoEntriesAndACaller, Loaded]):
         return "중복 ID의 두 위치에 같은 allow_list가 반환된다"
 
     @override
-    def look(self, laid: TwoEntriesAndACaller, answered: Answered[Loaded]) -> list[TestVerdict]:
+    def look(self, laid: TwoEntriesAndACaller, answered: Answered[Loaded]) -> list[Verdict]:
         items = answered.response
         if items is None:
             return [Refused(NotEnoughPermission, answered.raised)]
-        seen: list[TestVerdict] = [Same("items", len(items), 2)]
+        seen: list[Verdict] = [Same("items", len(items), 2)]
         if len(items) != 2:
             return seen
         return [
@@ -185,7 +183,7 @@ class TheDuplicateIdKeepsBothPositions(TestThen[TwoEntriesAndACaller, Loaded]):
 
 @dataclass(frozen=True)
 class APlainUserIsRefusedPerId(
-    TestScenario[SeedingSession, TwoEntriesAndACaller, AppConfigAllowListAdapter, Loaded]
+    Scenario[SeedingSession, TwoEntriesAndACaller, AppConfigAllowListAdapter, Loaded]
 ):
     @override
     def summary(self) -> str:
@@ -199,21 +197,21 @@ class APlainUserIsRefusedPerId(
         )
 
     @override
-    def given(self) -> TestGiven[SeedingSession, TwoEntriesAndACaller]:
+    def given(self) -> Given[SeedingSession, TwoEntriesAndACaller]:
         return TwoEntriesAndSomeone()
 
     @override
-    def when(self) -> TestWhen[TwoEntriesAndACaller, AppConfigAllowListAdapter, Loaded]:
+    def when(self) -> When[TwoEntriesAndACaller, AppConfigAllowListAdapter, Loaded]:
         return LoadingByIds()
 
     @override
-    def then(self) -> TestThen[TwoEntriesAndACaller, Loaded]:
+    def then(self) -> Then[TwoEntriesAndACaller, Loaded]:
         return EveryIdIsRefused()
 
 
 @dataclass(frozen=True)
 class TheSuperadminSeesBoth(
-    TestScenario[SeedingSession, TwoEntriesAndACaller, AppConfigAllowListAdapter, Loaded]
+    Scenario[SeedingSession, TwoEntriesAndACaller, AppConfigAllowListAdapter, Loaded]
 ):
     @override
     def summary(self) -> str:
@@ -227,21 +225,21 @@ class TheSuperadminSeesBoth(
         )
 
     @override
-    def given(self) -> TestGiven[SeedingSession, TwoEntriesAndACaller]:
+    def given(self) -> Given[SeedingSession, TwoEntriesAndACaller]:
         return TwoEntriesAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
-    def when(self) -> TestWhen[TwoEntriesAndACaller, AppConfigAllowListAdapter, Loaded]:
+    def when(self) -> When[TwoEntriesAndACaller, AppConfigAllowListAdapter, Loaded]:
         return LoadingByIds()
 
     @override
-    def then(self) -> TestThen[TwoEntriesAndACaller, Loaded]:
+    def then(self) -> Then[TwoEntriesAndACaller, Loaded]:
         return TwoNodesOneMissing()
 
 
 @dataclass(frozen=True)
 class DuplicateIdsKeepTheirPositions(
-    TestScenario[SeedingSession, TwoEntriesAndACaller, AppConfigAllowListAdapter, Loaded]
+    Scenario[SeedingSession, TwoEntriesAndACaller, AppConfigAllowListAdapter, Loaded]
 ):
     @override
     def summary(self) -> str:
@@ -252,21 +250,21 @@ class DuplicateIdsKeepTheirPositions(
         return "슈퍼관리자가 같은 allow_list의 ID를 두 번 조회하면, 같은 노드가 두 위치에 반환된다"
 
     @override
-    def given(self) -> TestGiven[SeedingSession, TwoEntriesAndACaller]:
+    def given(self) -> Given[SeedingSession, TwoEntriesAndACaller]:
         return TwoEntriesAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
-    def when(self) -> TestWhen[TwoEntriesAndACaller, AppConfigAllowListAdapter, Loaded]:
+    def when(self) -> When[TwoEntriesAndACaller, AppConfigAllowListAdapter, Loaded]:
         return LoadingByIds(duplicate_first=True)
 
     @override
-    def then(self) -> TestThen[TwoEntriesAndACaller, Loaded]:
+    def then(self) -> Then[TwoEntriesAndACaller, Loaded]:
         return TheDuplicateIdKeepsBothPositions()
 
 
 @dataclass(frozen=True)
 class AnEmptyListAnswersEmpty(
-    TestScenario[SeedingSession, TwoEntriesAndACaller, AppConfigAllowListAdapter, Loaded]
+    Scenario[SeedingSession, TwoEntriesAndACaller, AppConfigAllowListAdapter, Loaded]
 ):
     @override
     def summary(self) -> str:
@@ -277,15 +275,15 @@ class AnEmptyListAnswersEmpty(
         return "빈 ID 목록으로 조회하면 빈 목록이 반환된다"
 
     @override
-    def given(self) -> TestGiven[SeedingSession, TwoEntriesAndACaller]:
+    def given(self) -> Given[SeedingSession, TwoEntriesAndACaller]:
         return TwoEntriesAndSomeone()
 
     @override
-    def when(self) -> TestWhen[TwoEntriesAndACaller, AppConfigAllowListAdapter, Loaded]:
+    def when(self) -> When[TwoEntriesAndACaller, AppConfigAllowListAdapter, Loaded]:
         return LoadingByIds(nothing=True)
 
     @override
-    def then(self) -> TestThen[TwoEntriesAndACaller, Loaded]:
+    def then(self) -> Then[TwoEntriesAndACaller, Loaded]:
         return NothingIsAnswered()
 
 

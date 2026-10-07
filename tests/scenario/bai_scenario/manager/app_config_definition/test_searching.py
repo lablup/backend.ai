@@ -19,7 +19,7 @@ from ai.backend.manager.api.adapters.app_config_definition.adapter import (
 )
 from ai.backend.manager.errors.auth import InsufficientPrivilege
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.testutils.scenario_steps import TestGiven, TestScenario, TestThen, TestWhen
+from ai.backend.testutils.scenario_steps import Given, Scenario, Then, When
 from bai_scenario.components.answers import TheCallIsRefused
 from bai_scenario.components.app_config_definition import (
     EveryLaidDefinitionIsFound,
@@ -31,15 +31,13 @@ from bai_scenario.runner.planting import SeedingSession
 from bai_scenario.runner.steps import run_scenario
 
 type Searched = SearchAppConfigDefinitionsPayload
-type SearchingStep = TestScenario[
+type SearchingStep = Scenario[
     SeedingSession, ManyDefinitionsAndACaller, AppConfigDefinitionAdapter, Searched
 ]
 
 
 @dataclass(frozen=True)
-class SearchingEverything(
-    TestWhen[ManyDefinitionsAndACaller, AppConfigDefinitionAdapter, Searched]
-):
+class SearchingEverything(When[ManyDefinitionsAndACaller, AppConfigDefinitionAdapter, Searched]):
     """필터 없이 전체를 검색한다."""
 
     @override
@@ -60,7 +58,7 @@ class SearchingEverything(
 
 @dataclass(frozen=True)
 class TheSuperadminCountsEveryOne(
-    TestScenario[SeedingSession, ManyDefinitionsAndACaller, AppConfigDefinitionAdapter, Searched]
+    Scenario[SeedingSession, ManyDefinitionsAndACaller, AppConfigDefinitionAdapter, Searched]
 ):
     @override
     def summary(self) -> str:
@@ -71,21 +69,21 @@ class TheSuperadminCountsEveryOne(
         return "설정 정의 셋이 있고 슈퍼관리자가 필터 없이 전체를 검색하면, 셋 다 집계된다"
 
     @override
-    def given(self) -> TestGiven[SeedingSession, ManyDefinitionsAndACaller]:
+    def given(self) -> Given[SeedingSession, ManyDefinitionsAndACaller]:
         return ManyDefinitionsAndSomeone(count=3, role=UserRole.SUPERADMIN)
 
     @override
-    def when(self) -> TestWhen[ManyDefinitionsAndACaller, AppConfigDefinitionAdapter, Searched]:
+    def when(self) -> When[ManyDefinitionsAndACaller, AppConfigDefinitionAdapter, Searched]:
         return SearchingEverything()
 
     @override
-    def then(self) -> TestThen[ManyDefinitionsAndACaller, Searched]:
+    def then(self) -> Then[ManyDefinitionsAndACaller, Searched]:
         return EveryLaidDefinitionIsFound()
 
 
 @dataclass(frozen=True)
 class APlainUserMayNotSearch(
-    TestScenario[SeedingSession, ManyDefinitionsAndACaller, AppConfigDefinitionAdapter, Searched]
+    Scenario[SeedingSession, ManyDefinitionsAndACaller, AppConfigDefinitionAdapter, Searched]
 ):
     @override
     def summary(self) -> str:
@@ -96,15 +94,15 @@ class APlainUserMayNotSearch(
         return "일반 사용자가 전체를 검색하면, 슈퍼관리자 권한이 없어 거부된다"
 
     @override
-    def given(self) -> TestGiven[SeedingSession, ManyDefinitionsAndACaller]:
+    def given(self) -> Given[SeedingSession, ManyDefinitionsAndACaller]:
         return ManyDefinitionsAndSomeone(count=3)
 
     @override
-    def when(self) -> TestWhen[ManyDefinitionsAndACaller, AppConfigDefinitionAdapter, Searched]:
+    def when(self) -> When[ManyDefinitionsAndACaller, AppConfigDefinitionAdapter, Searched]:
         return SearchingEverything()
 
     @override
-    def then(self) -> TestThen[ManyDefinitionsAndACaller, Searched]:
+    def then(self) -> Then[ManyDefinitionsAndACaller, Searched]:
         return TheCallIsRefused(InsufficientPrivilege)
 
 

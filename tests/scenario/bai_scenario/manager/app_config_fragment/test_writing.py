@@ -33,13 +33,7 @@ from ai.backend.manager.errors.app_config import AppConfigFragmentWriteNotAllowe
 from ai.backend.manager.errors.auth import InsufficientPrivilege
 from ai.backend.manager.errors.permission import NotEnoughPermission, VirtualEntityNotFound
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.testutils.scenario_steps import (
-    TestConfigured,
-    TestGiven,
-    TestScenario,
-    TestThen,
-    TestWhen,
-)
+from ai.backend.testutils.scenario_steps import Configured, Given, Scenario, Then, When
 from bai_scenario.components.answers import TheCallIsRefused
 from bai_scenario.components.app_config import ENFORCEMENT
 from bai_scenario.components.app_config_fragment import (
@@ -57,8 +51,8 @@ from bai_scenario.runner.steps import run_scenario
 from bai_scenario.seeds.app_config.allow_list import SCOPE_NAMES
 
 type Written = UpsertAppConfigFragmentsPayload
-type MineStep = TestScenario[SeedingSession, AWritingPlace, AppConfigFragmentAdapter, Written]
-type ScopedStep = TestScenario[SeedingSession, ATargetAndACaller, AppConfigFragmentAdapter, Written]
+type MineStep = Scenario[SeedingSession, AWritingPlace, AppConfigFragmentAdapter, Written]
+type ScopedStep = Scenario[SeedingSession, ATargetAndACaller, AppConfigFragmentAdapter, Written]
 
 FIRST: Mapping[str, Any] = MappingProxyType({"theme": "light", "menu": {"home": True}})
 SECOND: Mapping[str, Any] = MappingProxyType({"editor": {"wrap": True}})
@@ -66,7 +60,7 @@ REPLACED: Mapping[str, Any] = MappingProxyType({"menu": {"docs": True}})
 
 
 @dataclass(frozen=True)
-class WritingMine(TestWhen[AWritingPlace, AppConfigFragmentAdapter, Written]):
+class WritingMine(When[AWritingPlace, AppConfigFragmentAdapter, Written]):
     """자기 스코프에 쓴다. 이름은 미리 만들어 둔 것에서, 값은 시나리오가 정한 것에서 읽는다."""
 
     configs: tuple[Mapping[str, Any], ...] = (FIRST,)
@@ -92,7 +86,7 @@ class WritingMine(TestWhen[AWritingPlace, AppConfigFragmentAdapter, Written]):
 
 
 @dataclass(frozen=True)
-class WritingAt(TestWhen[ATargetAndACaller, AppConfigFragmentAdapter, Written]):
+class WritingAt(When[ATargetAndACaller, AppConfigFragmentAdapter, Written]):
     """지정한 스코프에 쓴다."""
 
     config: Mapping[str, Any] = FIRST
@@ -124,7 +118,7 @@ class WritingAt(TestWhen[ATargetAndACaller, AppConfigFragmentAdapter, Written]):
 
 @dataclass(frozen=True)
 class TheGrantedUserWritesTheirFirstFragment(
-    TestScenario[SeedingSession, AWritingPlace, AppConfigFragmentAdapter, Written]
+    Scenario[SeedingSession, AWritingPlace, AppConfigFragmentAdapter, Written]
 ):
     started: datetime
 
@@ -140,21 +134,21 @@ class TheGrantedUserWritesTheirFirstFragment(
         )
 
     @override
-    def given(self) -> TestGiven[SeedingSession, AWritingPlace]:
+    def given(self) -> Given[SeedingSession, AWritingPlace]:
         return MyWritingPlace(granted=WRITING)
 
     @override
-    def when(self) -> TestWhen[AWritingPlace, AppConfigFragmentAdapter, Written]:
+    def when(self) -> When[AWritingPlace, AppConfigFragmentAdapter, Written]:
         return WritingMine()
 
     @override
-    def then(self) -> TestThen[AWritingPlace, Written]:
+    def then(self) -> Then[AWritingPlace, Written]:
         return TheWrittenFragments(started=self.started, configs=(FIRST,))
 
 
 @dataclass(frozen=True)
 class WritingAgainReplacesTheValueWhole(
-    TestScenario[SeedingSession, AWritingPlace, AppConfigFragmentAdapter, Written]
+    Scenario[SeedingSession, AWritingPlace, AppConfigFragmentAdapter, Written]
 ):
     started: datetime
 
@@ -170,21 +164,21 @@ class WritingAgainReplacesTheValueWhole(
         )
 
     @override
-    def given(self) -> TestGiven[SeedingSession, AWritingPlace]:
+    def given(self) -> Given[SeedingSession, AWritingPlace]:
         return MyWritingPlace(granted=WRITING, existing=FIRST)
 
     @override
-    def when(self) -> TestWhen[AWritingPlace, AppConfigFragmentAdapter, Written]:
+    def when(self) -> When[AWritingPlace, AppConfigFragmentAdapter, Written]:
         return WritingMine(configs=(REPLACED,))
 
     @override
-    def then(self) -> TestThen[AWritingPlace, Written]:
+    def then(self) -> Then[AWritingPlace, Written]:
         return TheWrittenFragments(started=self.started, configs=(REPLACED,), replacing=True)
 
 
 @dataclass(frozen=True)
 class SeveralNamesAreWrittenAtOnce(
-    TestScenario[SeedingSession, AWritingPlace, AppConfigFragmentAdapter, Written]
+    Scenario[SeedingSession, AWritingPlace, AppConfigFragmentAdapter, Written]
 ):
     started: datetime
 
@@ -197,21 +191,21 @@ class SeveralNamesAreWrittenAtOnce(
         return "사용자 스코프에 허용된 이름 둘에 한 번에 쓰면, 둘 다 쓰이고 요청 순서대로 반환된다"
 
     @override
-    def given(self) -> TestGiven[SeedingSession, AWritingPlace]:
+    def given(self) -> Given[SeedingSession, AWritingPlace]:
         return MyWritingPlace(granted=WRITING, more_opened=1)
 
     @override
-    def when(self) -> TestWhen[AWritingPlace, AppConfigFragmentAdapter, Written]:
+    def when(self) -> When[AWritingPlace, AppConfigFragmentAdapter, Written]:
         return WritingMine(configs=(FIRST, SECOND))
 
     @override
-    def then(self) -> TestThen[AWritingPlace, Written]:
+    def then(self) -> Then[AWritingPlace, Written]:
         return TheWrittenFragments(started=self.started, configs=(FIRST, SECOND))
 
 
 @dataclass(frozen=True)
 class OneNameNotAllowedSinksTheWholeWrite(
-    TestScenario[SeedingSession, AWritingPlace, AppConfigFragmentAdapter, Written]
+    Scenario[SeedingSession, AWritingPlace, AppConfigFragmentAdapter, Written]
 ):
     @override
     def summary(self) -> str:
@@ -225,21 +219,21 @@ class OneNameNotAllowedSinksTheWholeWrite(
         )
 
     @override
-    def given(self) -> TestGiven[SeedingSession, AWritingPlace]:
+    def given(self) -> Given[SeedingSession, AWritingPlace]:
         return MyWritingPlace(granted=WRITING, more_unopened=1)
 
     @override
-    def when(self) -> TestWhen[AWritingPlace, AppConfigFragmentAdapter, Written]:
+    def when(self) -> When[AWritingPlace, AppConfigFragmentAdapter, Written]:
         return WritingMine(configs=(FIRST, SECOND))
 
     @override
-    def then(self) -> TestThen[AWritingPlace, Written]:
+    def then(self) -> Then[AWritingPlace, Written]:
         return TheCallIsRefused(AppConfigFragmentWriteNotAllowed)
 
 
 @dataclass(frozen=True)
 class AnUnregisteredNameIsRefused(
-    TestScenario[SeedingSession, AWritingPlace, AppConfigFragmentAdapter, Written]
+    Scenario[SeedingSession, AWritingPlace, AppConfigFragmentAdapter, Written]
 ):
     @override
     def summary(self) -> str:
@@ -250,21 +244,21 @@ class AnUnregisteredNameIsRefused(
         return "등록되지 않은 이름에 쓰기 권한을 받은 사용자가 쓰면, 쓰기 허용 안 됨으로 거부된다"
 
     @override
-    def given(self) -> TestGiven[SeedingSession, AWritingPlace]:
+    def given(self) -> Given[SeedingSession, AWritingPlace]:
         return MyWritingPlace(granted=WRITING, defined=False)
 
     @override
-    def when(self) -> TestWhen[AWritingPlace, AppConfigFragmentAdapter, Written]:
+    def when(self) -> When[AWritingPlace, AppConfigFragmentAdapter, Written]:
         return WritingMine()
 
     @override
-    def then(self) -> TestThen[AWritingPlace, Written]:
+    def then(self) -> Then[AWritingPlace, Written]:
         return TheCallIsRefused(AppConfigFragmentWriteNotAllowed)
 
 
 @dataclass(frozen=True)
 class ANameOpenedToAnotherKindIsRefused(
-    TestScenario[SeedingSession, AWritingPlace, AppConfigFragmentAdapter, Written]
+    Scenario[SeedingSession, AWritingPlace, AppConfigFragmentAdapter, Written]
 ):
     @override
     def summary(self) -> str:
@@ -278,21 +272,21 @@ class ANameOpenedToAnotherKindIsRefused(
         )
 
     @override
-    def given(self) -> TestGiven[SeedingSession, AWritingPlace]:
+    def given(self) -> Given[SeedingSession, AWritingPlace]:
         return MyWritingPlace(granted=WRITING, kinds=(AppConfigScopeType.DOMAIN,))
 
     @override
-    def when(self) -> TestWhen[AWritingPlace, AppConfigFragmentAdapter, Written]:
+    def when(self) -> When[AWritingPlace, AppConfigFragmentAdapter, Written]:
         return WritingMine()
 
     @override
-    def then(self) -> TestThen[AWritingPlace, Written]:
+    def then(self) -> Then[AWritingPlace, Written]:
         return TheCallIsRefused(AppConfigFragmentWriteNotAllowed)
 
 
 @dataclass(frozen=True)
 class CreateAloneIsNotEnough(
-    TestScenario[SeedingSession, AWritingPlace, AppConfigFragmentAdapter, Written]
+    Scenario[SeedingSession, AWritingPlace, AppConfigFragmentAdapter, Written]
 ):
     @override
     def summary(self) -> str:
@@ -306,21 +300,21 @@ class CreateAloneIsNotEnough(
         )
 
     @override
-    def given(self) -> TestGiven[SeedingSession, AWritingPlace]:
+    def given(self) -> Given[SeedingSession, AWritingPlace]:
         return MyWritingPlace(granted=(Permission.CREATE,))
 
     @override
-    def when(self) -> TestWhen[AWritingPlace, AppConfigFragmentAdapter, Written]:
+    def when(self) -> When[AWritingPlace, AppConfigFragmentAdapter, Written]:
         return WritingMine()
 
     @override
-    def then(self) -> TestThen[AWritingPlace, Written]:
+    def then(self) -> Then[AWritingPlace, Written]:
         return TheCallIsRefused(NotEnoughPermission)
 
 
 @dataclass(frozen=True)
 class AUserGrantedNothingMayNotWrite(
-    TestScenario[SeedingSession, AWritingPlace, AppConfigFragmentAdapter, Written]
+    Scenario[SeedingSession, AWritingPlace, AppConfigFragmentAdapter, Written]
 ):
     @override
     def summary(self) -> str:
@@ -331,21 +325,21 @@ class AUserGrantedNothingMayNotWrite(
         return "사용자 종류에 허용된 이름에 아무 권한도 없는 사용자가 쓰면, 권한 부족으로 거부된다"
 
     @override
-    def given(self) -> TestGiven[SeedingSession, AWritingPlace]:
+    def given(self) -> Given[SeedingSession, AWritingPlace]:
         return MyWritingPlace()
 
     @override
-    def when(self) -> TestWhen[AWritingPlace, AppConfigFragmentAdapter, Written]:
+    def when(self) -> When[AWritingPlace, AppConfigFragmentAdapter, Written]:
         return WritingMine()
 
     @override
-    def then(self) -> TestThen[AWritingPlace, Written]:
+    def then(self) -> Then[AWritingPlace, Written]:
         return TheCallIsRefused(NotEnoughPermission)
 
 
 @dataclass(frozen=True)
 class EnforcementOffLetsAnyoneWrite(
-    TestScenario[SeedingSession, AWritingPlace, AppConfigFragmentAdapter, Written], TestConfigured
+    Scenario[SeedingSession, AWritingPlace, AppConfigFragmentAdapter, Written], Configured
 ):
     started: datetime
 
@@ -362,21 +356,21 @@ class EnforcementOffLetsAnyoneWrite(
         return {ENFORCEMENT: False}
 
     @override
-    def given(self) -> TestGiven[SeedingSession, AWritingPlace]:
+    def given(self) -> Given[SeedingSession, AWritingPlace]:
         return MyWritingPlace()
 
     @override
-    def when(self) -> TestWhen[AWritingPlace, AppConfigFragmentAdapter, Written]:
+    def when(self) -> When[AWritingPlace, AppConfigFragmentAdapter, Written]:
         return WritingMine()
 
     @override
-    def then(self) -> TestThen[AWritingPlace, Written]:
+    def then(self) -> Then[AWritingPlace, Written]:
         return TheWrittenFragments(started=self.started, configs=(FIRST,))
 
 
 @dataclass(frozen=True)
 class TheGrantedUserWritesADomainFragment(
-    TestScenario[SeedingSession, ATargetAndACaller, AppConfigFragmentAdapter, Written]
+    Scenario[SeedingSession, ATargetAndACaller, AppConfigFragmentAdapter, Written]
 ):
     started: datetime
 
@@ -389,21 +383,21 @@ class TheGrantedUserWritesADomainFragment(
         return "자기 도메인 스코프에 쓰기 권한을 받은 사용자가 도메인을 지정해 쓰면, 스코프 종류는 도메인이고 소유자는 그 도메인이다"
 
     @override
-    def given(self) -> TestGiven[SeedingSession, ATargetAndACaller]:
+    def given(self) -> Given[SeedingSession, ATargetAndACaller]:
         return SomewhereToTarget(target=Target.HOME_DOMAIN, granted=WRITING)
 
     @override
-    def when(self) -> TestWhen[ATargetAndACaller, AppConfigFragmentAdapter, Written]:
+    def when(self) -> When[ATargetAndACaller, AppConfigFragmentAdapter, Written]:
         return WritingAt()
 
     @override
-    def then(self) -> TestThen[ATargetAndACaller, Written]:
+    def then(self) -> Then[ATargetAndACaller, Written]:
         return TheWrittenFragments(started=self.started, configs=(FIRST,))
 
 
 @dataclass(frozen=True)
 class TheSuperadminWritesAPublicFragment(
-    TestScenario[SeedingSession, ATargetAndACaller, AppConfigFragmentAdapter, Written]
+    Scenario[SeedingSession, ATargetAndACaller, AppConfigFragmentAdapter, Written]
 ):
     started: datetime
 
@@ -416,21 +410,21 @@ class TheSuperadminWritesAPublicFragment(
         return "슈퍼관리자가 공개 스코프를 지정해 쓰면, 스코프 종류는 공개이고 소유자 필드는 비어 있다. 공개 쓰기는 슈퍼관리자인지 검사한다"
 
     @override
-    def given(self) -> TestGiven[SeedingSession, ATargetAndACaller]:
+    def given(self) -> Given[SeedingSession, ATargetAndACaller]:
         return SomewhereToTarget(target=Target.PUBLIC, role=UserRole.SUPERADMIN)
 
     @override
-    def when(self) -> TestWhen[ATargetAndACaller, AppConfigFragmentAdapter, Written]:
+    def when(self) -> When[ATargetAndACaller, AppConfigFragmentAdapter, Written]:
         return WritingAt()
 
     @override
-    def then(self) -> TestThen[ATargetAndACaller, Written]:
+    def then(self) -> Then[ATargetAndACaller, Written]:
         return TheWrittenFragments(started=self.started, configs=(FIRST,))
 
 
 @dataclass(frozen=True)
 class APlainUserMayNotWritePublic(
-    TestScenario[SeedingSession, ATargetAndACaller, AppConfigFragmentAdapter, Written]
+    Scenario[SeedingSession, ATargetAndACaller, AppConfigFragmentAdapter, Written]
 ):
     @override
     def summary(self) -> str:
@@ -444,22 +438,21 @@ class APlainUserMayNotWritePublic(
         )
 
     @override
-    def given(self) -> TestGiven[SeedingSession, ATargetAndACaller]:
+    def given(self) -> Given[SeedingSession, ATargetAndACaller]:
         return SomewhereToTarget(target=Target.PUBLIC, granted=WRITING)
 
     @override
-    def when(self) -> TestWhen[ATargetAndACaller, AppConfigFragmentAdapter, Written]:
+    def when(self) -> When[ATargetAndACaller, AppConfigFragmentAdapter, Written]:
         return WritingAt()
 
     @override
-    def then(self) -> TestThen[ATargetAndACaller, Written]:
+    def then(self) -> Then[ATargetAndACaller, Written]:
         return TheCallIsRefused(InsufficientPrivilege)
 
 
 @dataclass(frozen=True)
 class EnforcementOffDoesNotOpenPublic(
-    TestScenario[SeedingSession, ATargetAndACaller, AppConfigFragmentAdapter, Written],
-    TestConfigured,
+    Scenario[SeedingSession, ATargetAndACaller, AppConfigFragmentAdapter, Written], Configured
 ):
     @override
     def summary(self) -> str:
@@ -474,21 +467,21 @@ class EnforcementOffDoesNotOpenPublic(
         return {ENFORCEMENT: False}
 
     @override
-    def given(self) -> TestGiven[SeedingSession, ATargetAndACaller]:
+    def given(self) -> Given[SeedingSession, ATargetAndACaller]:
         return SomewhereToTarget(target=Target.PUBLIC)
 
     @override
-    def when(self) -> TestWhen[ATargetAndACaller, AppConfigFragmentAdapter, Written]:
+    def when(self) -> When[ATargetAndACaller, AppConfigFragmentAdapter, Written]:
         return WritingAt()
 
     @override
-    def then(self) -> TestThen[ATargetAndACaller, Written]:
+    def then(self) -> Then[ATargetAndACaller, Written]:
         return TheCallIsRefused(InsufficientPrivilege)
 
 
 @dataclass(frozen=True)
 class AnotherUsersScopeIsRefused(
-    TestScenario[SeedingSession, ATargetAndACaller, AppConfigFragmentAdapter, Written]
+    Scenario[SeedingSession, ATargetAndACaller, AppConfigFragmentAdapter, Written]
 ):
     @override
     def summary(self) -> str:
@@ -499,21 +492,21 @@ class AnotherUsersScopeIsRefused(
         return "자기 스코프에만 쓰기 권한을 받은 사용자가 다른 사용자를 지정해 쓰면, 권한 부족으로 거부된다"
 
     @override
-    def given(self) -> TestGiven[SeedingSession, ATargetAndACaller]:
+    def given(self) -> Given[SeedingSession, ATargetAndACaller]:
         return SomewhereToTarget(target=Target.ANOTHER_USER, granted=WRITING)
 
     @override
-    def when(self) -> TestWhen[ATargetAndACaller, AppConfigFragmentAdapter, Written]:
+    def when(self) -> When[ATargetAndACaller, AppConfigFragmentAdapter, Written]:
         return WritingAt()
 
     @override
-    def then(self) -> TestThen[ATargetAndACaller, Written]:
+    def then(self) -> Then[ATargetAndACaller, Written]:
         return TheCallIsRefused(NotEnoughPermission)
 
 
 @dataclass(frozen=True)
 class AnOwnerNothingAnswersToIsRefused(
-    TestScenario[SeedingSession, ATargetAndACaller, AppConfigFragmentAdapter, Written]
+    Scenario[SeedingSession, ATargetAndACaller, AppConfigFragmentAdapter, Written]
 ):
     @override
     def summary(self) -> str:
@@ -527,15 +520,15 @@ class AnOwnerNothingAnswersToIsRefused(
         )
 
     @override
-    def given(self) -> TestGiven[SeedingSession, ATargetAndACaller]:
+    def given(self) -> Given[SeedingSession, ATargetAndACaller]:
         return SomewhereToTarget(target=Target.NOBODY, role=UserRole.SUPERADMIN)
 
     @override
-    def when(self) -> TestWhen[ATargetAndACaller, AppConfigFragmentAdapter, Written]:
+    def when(self) -> When[ATargetAndACaller, AppConfigFragmentAdapter, Written]:
         return WritingAt()
 
     @override
-    def then(self) -> TestThen[ATargetAndACaller, Written]:
+    def then(self) -> Then[ATargetAndACaller, Written]:
         return TheCallIsRefused(VirtualEntityNotFound)
 
 

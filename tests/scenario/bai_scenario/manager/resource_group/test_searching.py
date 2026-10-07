@@ -23,7 +23,7 @@ from ai.backend.manager.api.adapters.resource_group.adapter import (
 from ai.backend.manager.errors.auth import InsufficientPrivilege
 from ai.backend.manager.errors.permission import NotEnoughPermission
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.testutils.scenario_steps import TestGiven, TestScenario, TestThen, TestWhen
+from ai.backend.testutils.scenario_steps import Given, Scenario, Then, When
 from bai_scenario.components.answers import TheCallIsRefused
 from bai_scenario.components.resource_group import (
     ADomainGroupsAndACaller,
@@ -41,11 +41,11 @@ from bai_scenario.runner.planting import SeedingSession
 from bai_scenario.runner.steps import run_scenario
 
 type Searched = ResourceGroupSearchPayload
-type SearchingStep = TestScenario[SeedingSession, Any, ResourceGroupAdapter, Searched]
+type SearchingStep = Scenario[SeedingSession, Any, ResourceGroupAdapter, Searched]
 
 
 @dataclass(frozen=True)
-class SearchingEveryGroup(TestWhen[ManyGroupsAndACaller, ResourceGroupAdapter, Searched]):
+class SearchingEveryGroup(When[ManyGroupsAndACaller, ResourceGroupAdapter, Searched]):
     """필터 없이 전체를 검색한다."""
 
     @override
@@ -63,7 +63,7 @@ class SearchingEveryGroup(TestWhen[ManyGroupsAndACaller, ResourceGroupAdapter, S
 
 
 @dataclass(frozen=True)
-class SearchingByName(TestWhen[ManyGroupsAndACaller, ResourceGroupAdapter, Searched]):
+class SearchingByName(When[ManyGroupsAndACaller, ResourceGroupAdapter, Searched]):
     """골라낸 하나의 이름을 필터로 검색한다."""
 
     @override
@@ -85,7 +85,7 @@ class SearchingByName(TestWhen[ManyGroupsAndACaller, ResourceGroupAdapter, Searc
 
 
 @dataclass(frozen=True)
-class SearchingTheActiveOnes(TestWhen[ManyGroupsAndACaller, ResourceGroupAdapter, Searched]):
+class SearchingTheActiveOnes(When[ManyGroupsAndACaller, ResourceGroupAdapter, Searched]):
     """활성인 그룹만 필터로 검색한다."""
 
     @override
@@ -105,7 +105,7 @@ class SearchingTheActiveOnes(TestWhen[ManyGroupsAndACaller, ResourceGroupAdapter
 
 
 @dataclass(frozen=True)
-class SearchingTheFirstOne(TestWhen[ManyGroupsAndACaller, ResourceGroupAdapter, Searched]):
+class SearchingTheFirstOne(When[ManyGroupsAndACaller, ResourceGroupAdapter, Searched]):
     """앞에서 한 건만 요청한다."""
 
     @override
@@ -123,7 +123,7 @@ class SearchingTheFirstOne(TestWhen[ManyGroupsAndACaller, ResourceGroupAdapter, 
 
 
 @dataclass(frozen=True)
-class SearchingTheDomainScope(TestWhen[ADomainGroupsAndACaller, ResourceGroupAdapter, Searched]):
+class SearchingTheDomainScope(When[ADomainGroupsAndACaller, ResourceGroupAdapter, Searched]):
     """호출자의 도메인을 스코프로 검색한다."""
 
     @override
@@ -146,7 +146,7 @@ class SearchingTheDomainScope(TestWhen[ADomainGroupsAndACaller, ResourceGroupAda
 
 @dataclass(frozen=True)
 class TheSuperadminCountsEveryGroup(
-    TestScenario[SeedingSession, ManyGroupsAndACaller, ResourceGroupAdapter, Searched]
+    Scenario[SeedingSession, ManyGroupsAndACaller, ResourceGroupAdapter, Searched]
 ):
     @override
     def summary(self) -> str:
@@ -157,21 +157,21 @@ class TheSuperadminCountsEveryGroup(
         return "리소스 그룹 둘이 있을 때 슈퍼관리자가 필터 없이 조회하면 둘 다 반환된다"
 
     @override
-    def given(self) -> TestGiven[SeedingSession, ManyGroupsAndACaller]:
+    def given(self) -> Given[SeedingSession, ManyGroupsAndACaller]:
         return TwoGroupsAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
-    def when(self) -> TestWhen[ManyGroupsAndACaller, ResourceGroupAdapter, Searched]:
+    def when(self) -> When[ManyGroupsAndACaller, ResourceGroupAdapter, Searched]:
         return SearchingEveryGroup()
 
     @override
-    def then(self) -> TestThen[ManyGroupsAndACaller, Searched]:
+    def then(self) -> Then[ManyGroupsAndACaller, Searched]:
         return TheLaidGroupsAreLeft()
 
 
 @dataclass(frozen=True)
 class ANameFilterNarrows(
-    TestScenario[SeedingSession, ManyGroupsAndACaller, ResourceGroupAdapter, Searched]
+    Scenario[SeedingSession, ManyGroupsAndACaller, ResourceGroupAdapter, Searched]
 ):
     @override
     def summary(self) -> str:
@@ -182,21 +182,21 @@ class ANameFilterNarrows(
         return "리소스 그룹 둘 중 한쪽 이름을 필터로 조회하면 그 그룹 하나만 반환된다"
 
     @override
-    def given(self) -> TestGiven[SeedingSession, ManyGroupsAndACaller]:
+    def given(self) -> Given[SeedingSession, ManyGroupsAndACaller]:
         return TwoGroupsAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
-    def when(self) -> TestWhen[ManyGroupsAndACaller, ResourceGroupAdapter, Searched]:
+    def when(self) -> When[ManyGroupsAndACaller, ResourceGroupAdapter, Searched]:
         return SearchingByName()
 
     @override
-    def then(self) -> TestThen[ManyGroupsAndACaller, Searched]:
+    def then(self) -> Then[ManyGroupsAndACaller, Searched]:
         return OnlyTheNamedGroupIsLeft()
 
 
 @dataclass(frozen=True)
 class AnActiveFilterNarrows(
-    TestScenario[SeedingSession, ManyGroupsAndACaller, ResourceGroupAdapter, Searched]
+    Scenario[SeedingSession, ManyGroupsAndACaller, ResourceGroupAdapter, Searched]
 ):
     @override
     def summary(self) -> str:
@@ -207,21 +207,21 @@ class AnActiveFilterNarrows(
         return "활성 그룹과 비활성 그룹이 섞여 있을 때 활성 필터로 조회하면 활성인 것만 반환된다"
 
     @override
-    def given(self) -> TestGiven[SeedingSession, ManyGroupsAndACaller]:
+    def given(self) -> Given[SeedingSession, ManyGroupsAndACaller]:
         return AnActiveAndAnInactiveGroup(role=UserRole.SUPERADMIN)
 
     @override
-    def when(self) -> TestWhen[ManyGroupsAndACaller, ResourceGroupAdapter, Searched]:
+    def when(self) -> When[ManyGroupsAndACaller, ResourceGroupAdapter, Searched]:
         return SearchingTheActiveOnes()
 
     @override
-    def then(self) -> TestThen[ManyGroupsAndACaller, Searched]:
+    def then(self) -> Then[ManyGroupsAndACaller, Searched]:
         return TheLaidGroupsAreLeft()
 
 
 @dataclass(frozen=True)
 class TheFirstPageSaysThereIsMore(
-    TestScenario[SeedingSession, ManyGroupsAndACaller, ResourceGroupAdapter, Searched]
+    Scenario[SeedingSession, ManyGroupsAndACaller, ResourceGroupAdapter, Searched]
 ):
     @override
     def summary(self) -> str:
@@ -232,21 +232,21 @@ class TheFirstPageSaysThereIsMore(
         return "리소스 그룹 둘이 있을 때 앞에서 한 건만 요청하면 한 건이 반환되고 다음 페이지가 있다고 응답한다"
 
     @override
-    def given(self) -> TestGiven[SeedingSession, ManyGroupsAndACaller]:
+    def given(self) -> Given[SeedingSession, ManyGroupsAndACaller]:
         return TwoGroupsAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
-    def when(self) -> TestWhen[ManyGroupsAndACaller, ResourceGroupAdapter, Searched]:
+    def when(self) -> When[ManyGroupsAndACaller, ResourceGroupAdapter, Searched]:
         return SearchingTheFirstOne()
 
     @override
-    def then(self) -> TestThen[ManyGroupsAndACaller, Searched]:
+    def then(self) -> Then[ManyGroupsAndACaller, Searched]:
         return TheFirstGroupPage()
 
 
 @dataclass(frozen=True)
 class TheMonitorSearchesLikeTheSuperadmin(
-    TestScenario[SeedingSession, ManyGroupsAndACaller, ResourceGroupAdapter, Searched]
+    Scenario[SeedingSession, ManyGroupsAndACaller, ResourceGroupAdapter, Searched]
 ):
     @override
     def summary(self) -> str:
@@ -257,21 +257,21 @@ class TheMonitorSearchesLikeTheSuperadmin(
         return "모니터가 필터 없이 조회하면 슈퍼관리자와 같은 응답을 받는다"
 
     @override
-    def given(self) -> TestGiven[SeedingSession, ManyGroupsAndACaller]:
+    def given(self) -> Given[SeedingSession, ManyGroupsAndACaller]:
         return TwoGroupsAndSomeone(role=UserRole.MONITOR)
 
     @override
-    def when(self) -> TestWhen[ManyGroupsAndACaller, ResourceGroupAdapter, Searched]:
+    def when(self) -> When[ManyGroupsAndACaller, ResourceGroupAdapter, Searched]:
         return SearchingEveryGroup()
 
     @override
-    def then(self) -> TestThen[ManyGroupsAndACaller, Searched]:
+    def then(self) -> Then[ManyGroupsAndACaller, Searched]:
         return TheLaidGroupsAreLeft()
 
 
 @dataclass(frozen=True)
 class AUserWhoIsNotTheSuperadminMayNotSearch(
-    TestScenario[SeedingSession, ManyGroupsAndACaller, ResourceGroupAdapter, Searched]
+    Scenario[SeedingSession, ManyGroupsAndACaller, ResourceGroupAdapter, Searched]
 ):
     @override
     def summary(self) -> str:
@@ -282,21 +282,21 @@ class AUserWhoIsNotTheSuperadminMayNotSearch(
         return "슈퍼관리자가 아닌 사용자가 필터 없이 전체를 조회하면 역할 부족으로 거부된다"
 
     @override
-    def given(self) -> TestGiven[SeedingSession, ManyGroupsAndACaller]:
+    def given(self) -> Given[SeedingSession, ManyGroupsAndACaller]:
         return TwoGroupsAndSomeone()
 
     @override
-    def when(self) -> TestWhen[ManyGroupsAndACaller, ResourceGroupAdapter, Searched]:
+    def when(self) -> When[ManyGroupsAndACaller, ResourceGroupAdapter, Searched]:
         return SearchingEveryGroup()
 
     @override
-    def then(self) -> TestThen[ManyGroupsAndACaller, Searched]:
+    def then(self) -> Then[ManyGroupsAndACaller, Searched]:
         return TheCallIsRefused(InsufficientPrivilege)
 
 
 @dataclass(frozen=True)
 class AUserReadingInTheDomainSearchesItsScope(
-    TestScenario[SeedingSession, ADomainGroupsAndACaller, ResourceGroupAdapter, Searched]
+    Scenario[SeedingSession, ADomainGroupsAndACaller, ResourceGroupAdapter, Searched]
 ):
     @override
     def summary(self) -> str:
@@ -310,21 +310,21 @@ class AUserReadingInTheDomainSearchesItsScope(
         )
 
     @override
-    def given(self) -> TestGiven[SeedingSession, ADomainGroupsAndACaller]:
+    def given(self) -> Given[SeedingSession, ADomainGroupsAndACaller]:
         return ADomainGroupsAndSomeone(reading=True)
 
     @override
-    def when(self) -> TestWhen[ADomainGroupsAndACaller, ResourceGroupAdapter, Searched]:
+    def when(self) -> When[ADomainGroupsAndACaller, ResourceGroupAdapter, Searched]:
         return SearchingTheDomainScope()
 
     @override
-    def then(self) -> TestThen[ADomainGroupsAndACaller, Searched]:
+    def then(self) -> Then[ADomainGroupsAndACaller, Searched]:
         return OnlyTheLinkedGroupIsLeft()
 
 
 @dataclass(frozen=True)
 class TheSuperadminSearchesTheDomainScope(
-    TestScenario[SeedingSession, ADomainGroupsAndACaller, ResourceGroupAdapter, Searched]
+    Scenario[SeedingSession, ADomainGroupsAndACaller, ResourceGroupAdapter, Searched]
 ):
     @override
     def summary(self) -> str:
@@ -335,21 +335,21 @@ class TheSuperadminSearchesTheDomainScope(
         return "슈퍼관리자가 도메인 스코프로 조회해도 그 도메인에 건 그룹 하나만 반환된다"
 
     @override
-    def given(self) -> TestGiven[SeedingSession, ADomainGroupsAndACaller]:
+    def given(self) -> Given[SeedingSession, ADomainGroupsAndACaller]:
         return ADomainGroupsAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
-    def when(self) -> TestWhen[ADomainGroupsAndACaller, ResourceGroupAdapter, Searched]:
+    def when(self) -> When[ADomainGroupsAndACaller, ResourceGroupAdapter, Searched]:
         return SearchingTheDomainScope()
 
     @override
-    def then(self) -> TestThen[ADomainGroupsAndACaller, Searched]:
+    def then(self) -> Then[ADomainGroupsAndACaller, Searched]:
         return OnlyTheLinkedGroupIsLeft()
 
 
 @dataclass(frozen=True)
 class AUserGrantedNothingMayNotSearchTheDomainScope(
-    TestScenario[SeedingSession, ADomainGroupsAndACaller, ResourceGroupAdapter, Searched]
+    Scenario[SeedingSession, ADomainGroupsAndACaller, ResourceGroupAdapter, Searched]
 ):
     @override
     def summary(self) -> str:
@@ -360,15 +360,15 @@ class AUserGrantedNothingMayNotSearchTheDomainScope(
         return "아무 권한도 없는 사용자가 자기 도메인 스코프로 조회하면 권한 부족으로 거부된다"
 
     @override
-    def given(self) -> TestGiven[SeedingSession, ADomainGroupsAndACaller]:
+    def given(self) -> Given[SeedingSession, ADomainGroupsAndACaller]:
         return ADomainGroupsAndSomeone()
 
     @override
-    def when(self) -> TestWhen[ADomainGroupsAndACaller, ResourceGroupAdapter, Searched]:
+    def when(self) -> When[ADomainGroupsAndACaller, ResourceGroupAdapter, Searched]:
         return SearchingTheDomainScope()
 
     @override
-    def then(self) -> TestThen[ADomainGroupsAndACaller, Searched]:
+    def then(self) -> Then[ADomainGroupsAndACaller, Searched]:
         return TheCallIsRefused(NotEnoughPermission)
 
 

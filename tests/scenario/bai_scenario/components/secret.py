@@ -24,14 +24,7 @@ from ai.backend.manager.secret.config_provider import ConfigKeyProvider
 from ai.backend.manager.secret.keys import KeyEncryptionKey
 from ai.backend.manager.secret.pool import KeyProviderPool
 from ai.backend.manager.secret.types import SecretValue
-from ai.backend.testutils.scenario_steps import (
-    Answered,
-    Refused,
-    Same,
-    TestGiven,
-    TestThen,
-    TestVerdict,
-)
+from ai.backend.testutils.scenario_steps import Answered, Given, Refused, Same, Then, Verdict
 from bai_scenario.components.domain import WAS_HERE, SomeoneOf
 from bai_scenario.components.system import role_named
 from bai_scenario.seeds.domain.domain import SeedDomain
@@ -96,7 +89,7 @@ class SomeoneWithASecret(TestSeedNest[Laid[UserData]]):
 
 
 @dataclass(frozen=True)
-class UsersHoldingSecrets(TestGiven[Any, AKeyringAndACaller]):
+class UsersHoldingSecrets(Given[Any, AKeyringAndACaller]):
     """호출자와 그 밖의 사용자들. 평문 비밀 키를 가진 사용자와 암호화된 비밀 키를 가진 사용자의 수를 정한다."""
 
     role: UserRole = UserRole.SUPERADMIN
@@ -151,7 +144,7 @@ def status_verdicts(
     write_provider: KeyProviderType,
     plaintext: int,
     encrypted: int,
-) -> list[TestVerdict]:
+) -> list[Verdict]:
     """Every place of one status answer."""
     return [
         Same(f"{at}write_provider_type", status.write_provider_type, write_provider.value),
@@ -164,7 +157,7 @@ def status_verdicts(
 
 
 @dataclass(frozen=True)
-class TheStatusCountsWhatIsLaid(TestThen[AKeyringAndACaller, AdminSecretStatusPayload]):
+class TheStatusCountsWhatIsLaid(Then[AKeyringAndACaller, AdminSecretStatusPayload]):
     """미리 만들어 둔 비밀 키를 암호화 키별로 센 집계가 반환된다."""
 
     write_provider: KeyProviderType
@@ -176,7 +169,7 @@ class TheStatusCountsWhatIsLaid(TestThen[AKeyringAndACaller, AdminSecretStatusPa
     @override
     def look(
         self, laid: AKeyringAndACaller, answered: Answered[AdminSecretStatusPayload]
-    ) -> list[TestVerdict]:
+    ) -> list[Verdict]:
         status = answered.response
         if status is None:
             return [Refused(InsufficientPrivilege, answered.raised)]
@@ -190,7 +183,7 @@ class TheStatusCountsWhatIsLaid(TestThen[AKeyringAndACaller, AdminSecretStatusPa
 
 
 @dataclass(frozen=True)
-class EveryRowIsRewrittenOntoTheWriter(TestThen[AKeyringAndACaller, AdminReencryptSecretsPayload]):
+class EveryRowIsRewrittenOntoTheWriter(Then[AKeyringAndACaller, AdminReencryptSecretsPayload]):
     """미리 만들어 둔 비밀 키를 모두 스캔해 모두 다시 쓰고, 그 뒤의 상태는 전부 쓰기 제공자로 암호화돼 있다."""
 
     write_provider: KeyProviderType
@@ -202,7 +195,7 @@ class EveryRowIsRewrittenOntoTheWriter(TestThen[AKeyringAndACaller, AdminReencry
     @override
     def look(
         self, laid: AKeyringAndACaller, answered: Answered[AdminReencryptSecretsPayload]
-    ) -> list[TestVerdict]:
+    ) -> list[Verdict]:
         progress = answered.response
         if progress is None:
             return [Refused(InsufficientPrivilege, answered.raised)]

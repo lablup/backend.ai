@@ -21,7 +21,7 @@ from ai.backend.common.dto.manager.v2.client_ip_masking.response import (
 from ai.backend.manager.api.adapters.client_ip_masking.adapter import ClientIPMaskingAdapter
 from ai.backend.manager.errors.auth import InsufficientPrivilege
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.testutils.scenario_steps import TestGiven, TestScenario, TestThen, TestWhen
+from ai.backend.testutils.scenario_steps import Given, Scenario, Then, When
 from bai_scenario.components.answers import TheCallIsRefused
 from bai_scenario.components.client_ip_masking import (
     ManyMaskingPoliciesAndACaller,
@@ -33,15 +33,13 @@ from bai_scenario.runner.planting import SeedingSession
 from bai_scenario.runner.steps import run_scenario
 
 type Searched = AdminSearchClientIPMaskingPoliciesPayload
-type SearchingStep = TestScenario[
+type SearchingStep = Scenario[
     SeedingSession, ManyMaskingPoliciesAndACaller, ClientIPMaskingAdapter, Searched
 ]
 
 
 @dataclass(frozen=True)
-class SearchingEveryPolicy(
-    TestWhen[ManyMaskingPoliciesAndACaller, ClientIPMaskingAdapter, Searched]
-):
+class SearchingEveryPolicy(When[ManyMaskingPoliciesAndACaller, ClientIPMaskingAdapter, Searched]):
     """필터 없이 전체를 검색한다."""
 
     @override
@@ -62,7 +60,7 @@ class SearchingEveryPolicy(
 
 @dataclass(frozen=True)
 class TheSuperadminCountsEveryPolicy(
-    TestScenario[SeedingSession, ManyMaskingPoliciesAndACaller, ClientIPMaskingAdapter, Searched]
+    Scenario[SeedingSession, ManyMaskingPoliciesAndACaller, ClientIPMaskingAdapter, Searched]
 ):
     @override
     def summary(self) -> str:
@@ -73,21 +71,21 @@ class TheSuperadminCountsEveryPolicy(
         return "대상이 다른 정책 둘이 있을 때 슈퍼관리자가 필터 없이 조회하면 둘 다 집계된다"
 
     @override
-    def given(self) -> TestGiven[SeedingSession, ManyMaskingPoliciesAndACaller]:
+    def given(self) -> Given[SeedingSession, ManyMaskingPoliciesAndACaller]:
         return TwoMaskingPoliciesAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
-    def when(self) -> TestWhen[ManyMaskingPoliciesAndACaller, ClientIPMaskingAdapter, Searched]:
+    def when(self) -> When[ManyMaskingPoliciesAndACaller, ClientIPMaskingAdapter, Searched]:
         return SearchingEveryPolicy()
 
     @override
-    def then(self) -> TestThen[ManyMaskingPoliciesAndACaller, Searched]:
+    def then(self) -> Then[ManyMaskingPoliciesAndACaller, Searched]:
         return TheLaidMaskingPoliciesAreLeft()
 
 
 @dataclass(frozen=True)
 class TheMonitorSearchesLikeTheSuperadmin(
-    TestScenario[SeedingSession, ManyMaskingPoliciesAndACaller, ClientIPMaskingAdapter, Searched]
+    Scenario[SeedingSession, ManyMaskingPoliciesAndACaller, ClientIPMaskingAdapter, Searched]
 ):
     @override
     def summary(self) -> str:
@@ -98,21 +96,21 @@ class TheMonitorSearchesLikeTheSuperadmin(
         return "모니터 역할이 필터 없이 조회하면 슈퍼관리자와 같은 응답이 반환된다. 슈퍼관리자 검사는 모니터의 읽기를 허용한다"
 
     @override
-    def given(self) -> TestGiven[SeedingSession, ManyMaskingPoliciesAndACaller]:
+    def given(self) -> Given[SeedingSession, ManyMaskingPoliciesAndACaller]:
         return TwoMaskingPoliciesAndSomeone(role=UserRole.MONITOR)
 
     @override
-    def when(self) -> TestWhen[ManyMaskingPoliciesAndACaller, ClientIPMaskingAdapter, Searched]:
+    def when(self) -> When[ManyMaskingPoliciesAndACaller, ClientIPMaskingAdapter, Searched]:
         return SearchingEveryPolicy()
 
     @override
-    def then(self) -> TestThen[ManyMaskingPoliciesAndACaller, Searched]:
+    def then(self) -> Then[ManyMaskingPoliciesAndACaller, Searched]:
         return TheLaidMaskingPoliciesAreLeft()
 
 
 @dataclass(frozen=True)
 class AUserWhoIsNotTheSuperadminMayNotSearch(
-    TestScenario[SeedingSession, ManyMaskingPoliciesAndACaller, ClientIPMaskingAdapter, Searched]
+    Scenario[SeedingSession, ManyMaskingPoliciesAndACaller, ClientIPMaskingAdapter, Searched]
 ):
     @override
     def summary(self) -> str:
@@ -123,15 +121,15 @@ class AUserWhoIsNotTheSuperadminMayNotSearch(
         return "슈퍼관리자가 아닌 사용자가 전체 조회를 요청하면 역할 부족으로 거부된다"
 
     @override
-    def given(self) -> TestGiven[SeedingSession, ManyMaskingPoliciesAndACaller]:
+    def given(self) -> Given[SeedingSession, ManyMaskingPoliciesAndACaller]:
         return TwoMaskingPoliciesAndSomeone()
 
     @override
-    def when(self) -> TestWhen[ManyMaskingPoliciesAndACaller, ClientIPMaskingAdapter, Searched]:
+    def when(self) -> When[ManyMaskingPoliciesAndACaller, ClientIPMaskingAdapter, Searched]:
         return SearchingEveryPolicy()
 
     @override
-    def then(self) -> TestThen[ManyMaskingPoliciesAndACaller, Searched]:
+    def then(self) -> Then[ManyMaskingPoliciesAndACaller, Searched]:
         return TheCallIsRefused(InsufficientPrivilege)
 
 

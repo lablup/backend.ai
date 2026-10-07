@@ -26,11 +26,11 @@ from ai.backend.manager.errors.auth import InsufficientPrivilege
 from ai.backend.manager.errors.repository import ForeignKeyViolationError
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.testutils.scenario_steps import (
-    TestConfigured,
-    TestGiven,
-    TestScenario,
-    TestThen,
-    TestWhen,
+    Configured,
+    Given,
+    Scenario,
+    Then,
+    When,
 )
 from bai_scenario.components.answers import TheCallIsRefused
 from bai_scenario.components.prometheus_query_preset import (
@@ -51,10 +51,10 @@ MADE = "cpu-by-kernel"
 WINDOW = "5m"
 ENFORCEMENT = "manager.rbac.enforcement_enabled"
 
-type CreatingStep = TestScenario[
+type CreatingStep = Scenario[
     SeedingSession, ACatalogAndACaller, PrometheusQueryPresetAdapter, PresetNodeAnswer
 ]
-type RepeatingStep = TestScenario[
+type RepeatingStep = Scenario[
     SeedingSession, APresetAndACaller, PrometheusQueryPresetAdapter, PresetNodeAnswer
 ]
 
@@ -76,7 +76,7 @@ def _create_input(
 
 
 @dataclass(frozen=True)
-class Creating(TestWhen[ACatalogAndACaller, PrometheusQueryPresetAdapter, PresetNodeAnswer]):
+class Creating(When[ACatalogAndACaller, PrometheusQueryPresetAdapter, PresetNodeAnswer]):
     """프리셋 하나를 생성한다. 카테고리는 미리 만들어 둔 것을 가리키거나, 존재하지 않는 id를 지정하거나, 없다."""
 
     named: str = MADE
@@ -115,7 +115,7 @@ class Creating(TestWhen[ACatalogAndACaller, PrometheusQueryPresetAdapter, Preset
 
 @dataclass(frozen=True)
 class CreatingUnderTheSameName(
-    TestWhen[APresetAndACaller, PrometheusQueryPresetAdapter, PresetNodeAnswer]
+    When[APresetAndACaller, PrometheusQueryPresetAdapter, PresetNodeAnswer]
 ):
     """미리 만들어 둔 프리셋과 같은 이름으로 하나 더 생성한다."""
 
@@ -138,7 +138,7 @@ class CreatingUnderTheSameName(
 
 @dataclass(frozen=True)
 class TheRequiredValuesMakeAWholeNode(
-    TestScenario[SeedingSession, ACatalogAndACaller, PrometheusQueryPresetAdapter, PresetNodeAnswer]
+    Scenario[SeedingSession, ACatalogAndACaller, PrometheusQueryPresetAdapter, PresetNodeAnswer]
 ):
     started: datetime
 
@@ -154,21 +154,21 @@ class TheRequiredValuesMakeAWholeNode(
         )
 
     @override
-    def given(self) -> TestGiven[SeedingSession, ACatalogAndACaller]:
+    def given(self) -> Given[SeedingSession, ACatalogAndACaller]:
         return JustSomeone(role=UserRole.SUPERADMIN)
 
     @override
-    def when(self) -> TestWhen[ACatalogAndACaller, PrometheusQueryPresetAdapter, PresetNodeAnswer]:
+    def when(self) -> When[ACatalogAndACaller, PrometheusQueryPresetAdapter, PresetNodeAnswer]:
         return Creating()
 
     @override
-    def then(self) -> TestThen[ACatalogAndACaller, PresetNodeAnswer]:
+    def then(self) -> Then[ACatalogAndACaller, PresetNodeAnswer]:
         return TheNewPresetNode(started=self.started, named=MADE)
 
 
 @dataclass(frozen=True)
 class FiledUnderACategory(
-    TestScenario[SeedingSession, ACatalogAndACaller, PrometheusQueryPresetAdapter, PresetNodeAnswer]
+    Scenario[SeedingSession, ACatalogAndACaller, PrometheusQueryPresetAdapter, PresetNodeAnswer]
 ):
     started: datetime
 
@@ -181,21 +181,21 @@ class FiledUnderACategory(
         return "카테고리 하나가 있고 슈퍼관리자가 그 카테고리를 지정해 생성하면, 응답의 카테고리가 그것을 가리킨다"
 
     @override
-    def given(self) -> TestGiven[SeedingSession, ACatalogAndACaller]:
+    def given(self) -> Given[SeedingSession, ACatalogAndACaller]:
         return ACategoryAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
-    def when(self) -> TestWhen[ACatalogAndACaller, PrometheusQueryPresetAdapter, PresetNodeAnswer]:
+    def when(self) -> When[ACatalogAndACaller, PrometheusQueryPresetAdapter, PresetNodeAnswer]:
         return Creating(under_the_category=True)
 
     @override
-    def then(self) -> TestThen[ACatalogAndACaller, PresetNodeAnswer]:
+    def then(self) -> Then[ACatalogAndACaller, PresetNodeAnswer]:
         return TheNewPresetNode(started=self.started, named=MADE, under_the_category=True)
 
 
 @dataclass(frozen=True)
 class WithAWindow(
-    TestScenario[SeedingSession, ACatalogAndACaller, PrometheusQueryPresetAdapter, PresetNodeAnswer]
+    Scenario[SeedingSession, ACatalogAndACaller, PrometheusQueryPresetAdapter, PresetNodeAnswer]
 ):
     started: datetime
 
@@ -208,21 +208,21 @@ class WithAWindow(
         return "슈퍼관리자가 시간 창을 함께 지정해 생성하면, 노드에 그 시간 창이 담긴다"
 
     @override
-    def given(self) -> TestGiven[SeedingSession, ACatalogAndACaller]:
+    def given(self) -> Given[SeedingSession, ACatalogAndACaller]:
         return JustSomeone(role=UserRole.SUPERADMIN)
 
     @override
-    def when(self) -> TestWhen[ACatalogAndACaller, PrometheusQueryPresetAdapter, PresetNodeAnswer]:
+    def when(self) -> When[ACatalogAndACaller, PrometheusQueryPresetAdapter, PresetNodeAnswer]:
         return Creating(time_window=WINDOW)
 
     @override
-    def then(self) -> TestThen[ACatalogAndACaller, PresetNodeAnswer]:
+    def then(self) -> Then[ACatalogAndACaller, PresetNodeAnswer]:
         return TheNewPresetNode(started=self.started, named=MADE, time_window=WINDOW)
 
 
 @dataclass(frozen=True)
 class AnUnknownCategoryIsRefused(
-    TestScenario[SeedingSession, ACatalogAndACaller, PrometheusQueryPresetAdapter, PresetNodeAnswer]
+    Scenario[SeedingSession, ACatalogAndACaller, PrometheusQueryPresetAdapter, PresetNodeAnswer]
 ):
     @override
     def summary(self) -> str:
@@ -236,21 +236,21 @@ class AnUnknownCategoryIsRefused(
         )
 
     @override
-    def given(self) -> TestGiven[SeedingSession, ACatalogAndACaller]:
+    def given(self) -> Given[SeedingSession, ACatalogAndACaller]:
         return JustSomeone(role=UserRole.SUPERADMIN)
 
     @override
-    def when(self) -> TestWhen[ACatalogAndACaller, PrometheusQueryPresetAdapter, PresetNodeAnswer]:
+    def when(self) -> When[ACatalogAndACaller, PrometheusQueryPresetAdapter, PresetNodeAnswer]:
         return Creating(under_an_unknown_category=True)
 
     @override
-    def then(self) -> TestThen[ACatalogAndACaller, PresetNodeAnswer]:
+    def then(self) -> Then[ACatalogAndACaller, PresetNodeAnswer]:
         return TheCallIsRefused(ForeignKeyViolationError)
 
 
 @dataclass(frozen=True)
 class TheSameNameIsAllowedTwice(
-    TestScenario[SeedingSession, APresetAndACaller, PrometheusQueryPresetAdapter, PresetNodeAnswer]
+    Scenario[SeedingSession, APresetAndACaller, PrometheusQueryPresetAdapter, PresetNodeAnswer]
 ):
     started: datetime
 
@@ -266,21 +266,21 @@ class TheSameNameIsAllowedTwice(
         )
 
     @override
-    def given(self) -> TestGiven[SeedingSession, APresetAndACaller]:
+    def given(self) -> Given[SeedingSession, APresetAndACaller]:
         return APresetAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
-    def when(self) -> TestWhen[APresetAndACaller, PrometheusQueryPresetAdapter, PresetNodeAnswer]:
+    def when(self) -> When[APresetAndACaller, PrometheusQueryPresetAdapter, PresetNodeAnswer]:
         return CreatingUnderTheSameName()
 
     @override
-    def then(self) -> TestThen[APresetAndACaller, PresetNodeAnswer]:
+    def then(self) -> Then[APresetAndACaller, PresetNodeAnswer]:
         return TheNewPresetNode(started=self.started, named=None)
 
 
 @dataclass(frozen=True)
 class APlainUserMayNotCreate(
-    TestScenario[SeedingSession, ACatalogAndACaller, PrometheusQueryPresetAdapter, PresetNodeAnswer]
+    Scenario[SeedingSession, ACatalogAndACaller, PrometheusQueryPresetAdapter, PresetNodeAnswer]
 ):
     @override
     def summary(self) -> str:
@@ -291,21 +291,21 @@ class APlainUserMayNotCreate(
         return "슈퍼관리자가 아닌 사용자가 프리셋을 생성하려 하면, 역할 부족으로 거부된다"
 
     @override
-    def given(self) -> TestGiven[SeedingSession, ACatalogAndACaller]:
+    def given(self) -> Given[SeedingSession, ACatalogAndACaller]:
         return JustSomeone()
 
     @override
-    def when(self) -> TestWhen[ACatalogAndACaller, PrometheusQueryPresetAdapter, PresetNodeAnswer]:
+    def when(self) -> When[ACatalogAndACaller, PrometheusQueryPresetAdapter, PresetNodeAnswer]:
         return Creating()
 
     @override
-    def then(self) -> TestThen[ACatalogAndACaller, PresetNodeAnswer]:
+    def then(self) -> Then[ACatalogAndACaller, PresetNodeAnswer]:
         return TheCallIsRefused(InsufficientPrivilege)
 
 
 @dataclass(frozen=True)
 class AMonitorMayNotCreate(
-    TestScenario[SeedingSession, ACatalogAndACaller, PrometheusQueryPresetAdapter, PresetNodeAnswer]
+    Scenario[SeedingSession, ACatalogAndACaller, PrometheusQueryPresetAdapter, PresetNodeAnswer]
 ):
     @override
     def summary(self) -> str:
@@ -319,24 +319,22 @@ class AMonitorMayNotCreate(
         )
 
     @override
-    def given(self) -> TestGiven[SeedingSession, ACatalogAndACaller]:
+    def given(self) -> Given[SeedingSession, ACatalogAndACaller]:
         return JustSomeone(role=UserRole.MONITOR)
 
     @override
-    def when(self) -> TestWhen[ACatalogAndACaller, PrometheusQueryPresetAdapter, PresetNodeAnswer]:
+    def when(self) -> When[ACatalogAndACaller, PrometheusQueryPresetAdapter, PresetNodeAnswer]:
         return Creating()
 
     @override
-    def then(self) -> TestThen[ACatalogAndACaller, PresetNodeAnswer]:
+    def then(self) -> Then[ACatalogAndACaller, PresetNodeAnswer]:
         return TheCallIsRefused(InsufficientPrivilege)
 
 
 @dataclass(frozen=True)
 class EnforcementOffChangesNothing(
-    TestScenario[
-        SeedingSession, ACatalogAndACaller, PrometheusQueryPresetAdapter, PresetNodeAnswer
-    ],
-    TestConfigured,
+    Scenario[SeedingSession, ACatalogAndACaller, PrometheusQueryPresetAdapter, PresetNodeAnswer],
+    Configured,
 ):
     @override
     def summary(self) -> str:
@@ -351,15 +349,15 @@ class EnforcementOffChangesNothing(
         return {ENFORCEMENT: False}
 
     @override
-    def given(self) -> TestGiven[SeedingSession, ACatalogAndACaller]:
+    def given(self) -> Given[SeedingSession, ACatalogAndACaller]:
         return JustSomeone()
 
     @override
-    def when(self) -> TestWhen[ACatalogAndACaller, PrometheusQueryPresetAdapter, PresetNodeAnswer]:
+    def when(self) -> When[ACatalogAndACaller, PrometheusQueryPresetAdapter, PresetNodeAnswer]:
         return Creating()
 
     @override
-    def then(self) -> TestThen[ACatalogAndACaller, PresetNodeAnswer]:
+    def then(self) -> Then[ACatalogAndACaller, PresetNodeAnswer]:
         return TheCallIsRefused(InsufficientPrivilege)
 
 

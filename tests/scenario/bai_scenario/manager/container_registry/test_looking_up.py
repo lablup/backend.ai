@@ -16,13 +16,13 @@ from ai.backend.manager.errors.common import GenericBadRequest
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.testutils.scenario_steps import (
     Answered,
+    Given,
     Held,
     SameAs,
-    TestGiven,
-    TestScenario,
-    TestThen,
-    TestVerdict,
-    TestWhen,
+    Scenario,
+    Then,
+    Verdict,
+    When,
 )
 from bai_scenario.components.answers import MissingResponse, TheCallIsRefused
 from bai_scenario.components.container_registry import (
@@ -35,9 +35,7 @@ from bai_scenario.runner.steps import run_scenario
 
 
 @dataclass(frozen=True)
-class LookingUp(
-    TestWhen[ARegistryToAllowAndACaller, ContainerRegistryAdapter, ContainerRegistryID]
-):
+class LookingUp(When[ARegistryToAllowAndACaller, ContainerRegistryAdapter, ContainerRegistryID]):
     missing: bool = False
 
     @override
@@ -63,7 +61,7 @@ class LookingUp(
 
 
 @dataclass(frozen=True)
-class TheRegistryIsResolved(TestThen[ARegistryToAllowAndACaller, ContainerRegistryID]):
+class TheRegistryIsResolved(Then[ARegistryToAllowAndACaller, ContainerRegistryID]):
     @override
     def says(self) -> str:
         return "준비한 레지스트리의 식별자가 반환된다"
@@ -71,7 +69,7 @@ class TheRegistryIsResolved(TestThen[ARegistryToAllowAndACaller, ContainerRegist
     @override
     def look(
         self, laid: ARegistryToAllowAndACaller, answered: Answered[ContainerRegistryID]
-    ) -> list[TestVerdict]:
+    ) -> list[Verdict]:
         if answered.response is None:
             return [MissingResponse(answered.raised)]
         return [
@@ -85,7 +83,7 @@ class TheRegistryIsResolved(TestThen[ARegistryToAllowAndACaller, ContainerRegist
 
 @dataclass(frozen=True)
 class LookupRegistry(
-    TestScenario[
+    Scenario[
         SeedingSession, ARegistryToAllowAndACaller, ContainerRegistryAdapter, ContainerRegistryID
     ]
 ):
@@ -111,7 +109,7 @@ class LookupRegistry(
         return "읽기 권한이 없는 사용자의 이름 조회는 대상의 존재 여부를 드러내지 않고 거부된다"
 
     @override
-    def given(self) -> TestGiven[SeedingSession, ARegistryToAllowAndACaller]:
+    def given(self) -> Given[SeedingSession, ARegistryToAllowAndACaller]:
         return ARegistryAndAProjectToAllow(
             on_registry=self.readable, on_project=False, permissions=(Permission.READ,)
         )
@@ -119,11 +117,11 @@ class LookupRegistry(
     @override
     def when(
         self,
-    ) -> TestWhen[ARegistryToAllowAndACaller, ContainerRegistryAdapter, ContainerRegistryID]:
+    ) -> When[ARegistryToAllowAndACaller, ContainerRegistryAdapter, ContainerRegistryID]:
         return LookingUp(missing=self.missing)
 
     @override
-    def then(self) -> TestThen[ARegistryToAllowAndACaller, ContainerRegistryID]:
+    def then(self) -> Then[ARegistryToAllowAndACaller, ContainerRegistryID]:
         if self.missing or not self.readable:
             return TheCallIsRefused(GenericBadRequest)
         return TheRegistryIsResolved()

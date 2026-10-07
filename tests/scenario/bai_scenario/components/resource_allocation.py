@@ -39,14 +39,14 @@ from ai.backend.manager.data.user.types import UserData
 from ai.backend.manager.errors.base.entity import EntityNotFoundError
 from ai.backend.testutils.scenario_steps import (
     Answered,
+    Condition,
+    Given,
     Held,
     Refused,
     Same,
     SameAs,
-    TestCondition,
-    TestGiven,
-    TestThen,
-    TestVerdict,
+    Then,
+    Verdict,
 )
 from bai_scenario.components.deployment import lay_a_deployment
 from bai_scenario.components.deployment import lay_a_place as lay_a_deployment_place
@@ -227,7 +227,7 @@ def _who(role: UserRole, granted: Granted) -> str:
 
 
 @dataclass(frozen=True)
-class AKernelAndSomeone(TestGiven[Any, AKernelAndACaller]):
+class AKernelAndSomeone(Given[Any, AKernelAndACaller]):
     """슬롯 둘을 요구하는 커널 하나와 사용자 한 명."""
 
     role: UserRole = UserRole.USER
@@ -251,7 +251,7 @@ class AKernelAndSomeone(TestGiven[Any, AKernelAndACaller]):
 
 
 @dataclass(frozen=True)
-class KernelsAndSomeone(TestGiven[Any, KernelsAndACaller]):
+class KernelsAndSomeone(Given[Any, KernelsAndACaller]):
     """커널 여럿과 사용자 한 명. 커널마다 같은 슬롯 종류들을 요구한다."""
 
     role: UserRole = UserRole.USER
@@ -274,7 +274,7 @@ class KernelsAndSomeone(TestGiven[Any, KernelsAndACaller]):
 
 
 @dataclass(frozen=True)
-class ASlotTypeAKernelAsksForAndSomeone(TestGiven[Any, ASlotTypeAndACaller]):
+class ASlotTypeAKernelAsksForAndSomeone(Given[Any, ASlotTypeAndACaller]):
     """커널 하나가 요구하는 슬롯 종류 하나와 사용자 한 명."""
 
     role: UserRole = UserRole.USER
@@ -296,7 +296,7 @@ class ASlotTypeAKernelAsksForAndSomeone(TestGiven[Any, ASlotTypeAndACaller]):
 
 
 @dataclass(frozen=True)
-class ASlotTypeARevisionUsesAndSomeone(TestGiven[Any, ASlotTypeAndACaller]):
+class ASlotTypeARevisionUsesAndSomeone(Given[Any, ASlotTypeAndACaller]):
     """배포 리비전 하나가 사용하는 슬롯 종류 하나와 사용자 한 명."""
 
     role: UserRole = UserRole.USER
@@ -317,7 +317,7 @@ class ASlotTypeARevisionUsesAndSomeone(TestGiven[Any, ASlotTypeAndACaller]):
 
 
 @dataclass(frozen=True)
-class AmountOf(TestCondition[str]):
+class AmountOf(Condition[str]):
     """이 양이어야 한다. 응답은 열의 소수 자릿수까지 붙인 문자열이므로 수로 비교한다."""
 
     wanted: Decimal
@@ -331,9 +331,7 @@ class AmountOf(TestCondition[str]):
         return Decimal(got) == self.wanted
 
 
-def allocation_verdicts(
-    node: ResourceAllocationNode, kernel: AKernel, slot: str
-) -> list[TestVerdict]:
+def allocation_verdicts(node: ResourceAllocationNode, kernel: AKernel, slot: str) -> list[Verdict]:
     """Every place of one allocation node. The ids are the kernel's, so they are compared
     with the laid kernel rather than written into the report."""
     return [
@@ -352,7 +350,7 @@ def allocation_verdicts(
 
 
 @dataclass(frozen=True)
-class TheAllocationNode(TestThen[AKernelAndACaller, ResourceAllocationNode]):
+class TheAllocationNode(Then[AKernelAndACaller, ResourceAllocationNode]):
     """미리 만들어 둔 커널의 첫 슬롯 할당이 통째로 반환된다. 아직 스케줄링되지 않았으므로
     요구한 양만 있고 실제 사용량은 없다."""
 
@@ -363,7 +361,7 @@ class TheAllocationNode(TestThen[AKernelAndACaller, ResourceAllocationNode]):
     @override
     def look(
         self, laid: AKernelAndACaller, answered: Answered[ResourceAllocationNode]
-    ) -> list[TestVerdict]:
+    ) -> list[Verdict]:
         node = answered.response
         if node is None:
             return [Refused(EntityNotFoundError, answered.raised)]
@@ -371,9 +369,7 @@ class TheAllocationNode(TestThen[AKernelAndACaller, ResourceAllocationNode]):
 
 
 @dataclass(frozen=True)
-class EveryLaidAllocationIsCounted(
-    TestThen[KernelsAndACaller, AdminSearchResourceAllocationsPayload]
-):
+class EveryLaidAllocationIsCounted(Then[KernelsAndACaller, AdminSearchResourceAllocationsPayload]):
     """미리 만들어 둔 할당이 모두 집계된다."""
 
     @override
@@ -383,7 +379,7 @@ class EveryLaidAllocationIsCounted(
     @override
     def look(
         self, laid: KernelsAndACaller, answered: Answered[AdminSearchResourceAllocationsPayload]
-    ) -> list[TestVerdict]:
+    ) -> list[Verdict]:
         page = answered.response
         if page is None:
             return [Refused(EntityNotFoundError, answered.raised)]
@@ -401,7 +397,7 @@ class EveryLaidAllocationIsCounted(
 
 
 @dataclass(frozen=True)
-class OnlyTheNamedSlotIsLeft(TestThen[KernelsAndACaller, AdminSearchResourceAllocationsPayload]):
+class OnlyTheNamedSlotIsLeft(Then[KernelsAndACaller, AdminSearchResourceAllocationsPayload]):
     """필터에 맞는 슬롯의 할당만 반환된다."""
 
     @override
@@ -411,7 +407,7 @@ class OnlyTheNamedSlotIsLeft(TestThen[KernelsAndACaller, AdminSearchResourceAllo
     @override
     def look(
         self, laid: KernelsAndACaller, answered: Answered[AdminSearchResourceAllocationsPayload]
-    ) -> list[TestVerdict]:
+    ) -> list[Verdict]:
         page = answered.response
         if page is None:
             return [Refused(EntityNotFoundError, answered.raised)]
@@ -430,7 +426,7 @@ class OnlyTheNamedSlotIsLeft(TestThen[KernelsAndACaller, AdminSearchResourceAllo
 
 
 @dataclass(frozen=True)
-class OnlyTheNamedKernelIsLeft(TestThen[KernelsAndACaller, AdminSearchResourceAllocationsPayload]):
+class OnlyTheNamedKernelIsLeft(Then[KernelsAndACaller, AdminSearchResourceAllocationsPayload]):
     """필터에 맞는 커널의 할당만 반환된다."""
 
     @override
@@ -440,7 +436,7 @@ class OnlyTheNamedKernelIsLeft(TestThen[KernelsAndACaller, AdminSearchResourceAl
     @override
     def look(
         self, laid: KernelsAndACaller, answered: Answered[AdminSearchResourceAllocationsPayload]
-    ) -> list[TestVerdict]:
+    ) -> list[Verdict]:
         page = answered.response
         if page is None:
             return [Refused(EntityNotFoundError, answered.raised)]
@@ -460,7 +456,7 @@ class OnlyTheNamedKernelIsLeft(TestThen[KernelsAndACaller, AdminSearchResourceAl
 
 
 @dataclass(frozen=True)
-class TheFirstPageOfAllocations(TestThen[KernelsAndACaller, AdminSearchResourceAllocationsPayload]):
+class TheFirstPageOfAllocations(Then[KernelsAndACaller, AdminSearchResourceAllocationsPayload]):
     """크기를 지정하지 않은 첫 페이지. 기본 크기만큼 반환되고 다음 페이지가 있다고 응답한다."""
 
     size: int
@@ -472,7 +468,7 @@ class TheFirstPageOfAllocations(TestThen[KernelsAndACaller, AdminSearchResourceA
     @override
     def look(
         self, laid: KernelsAndACaller, answered: Answered[AdminSearchResourceAllocationsPayload]
-    ) -> list[TestVerdict]:
+    ) -> list[Verdict]:
         page = answered.response
         if page is None:
             return [Refused(EntityNotFoundError, answered.raised)]
@@ -485,7 +481,7 @@ class TheFirstPageOfAllocations(TestThen[KernelsAndACaller, AdminSearchResourceA
 
 
 @dataclass(frozen=True)
-class NothingIsOccupied(TestThen[Any, ActiveResourceOverviewInfoDTO]):
+class NothingIsOccupied(Then[Any, ActiveResourceOverviewInfoDTO]):
     """점유된 슬롯이 없고 세션 수가 0인 개요. 대기 중인 커널은 세지 않는다."""
 
     @override
@@ -493,9 +489,7 @@ class NothingIsOccupied(TestThen[Any, ActiveResourceOverviewInfoDTO]):
         return "점유된 슬롯이 없고 세션 수가 0인 개요가 반환된다"
 
     @override
-    def look(
-        self, laid: Any, answered: Answered[ActiveResourceOverviewInfoDTO]
-    ) -> list[TestVerdict]:
+    def look(self, laid: Any, answered: Answered[ActiveResourceOverviewInfoDTO]) -> list[Verdict]:
         overview = answered.response
         if overview is None:
             return [Refused(EntityNotFoundError, answered.raised)]

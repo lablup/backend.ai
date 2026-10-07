@@ -30,14 +30,14 @@ from ai.backend.manager.errors.permission import NotEnoughPermission
 from ai.backend.manager.errors.user import UserNotFound
 from ai.backend.testutils.scenario_steps import (
     Answered,
+    Given,
     Held,
     Refused,
     Same,
     SameAs,
     Skipped,
-    TestGiven,
-    TestThen,
-    TestVerdict,
+    Then,
+    Verdict,
 )
 from bai_scenario.components.domain import WrittenByThisRun
 from bai_scenario.components.system import lay_a_public_reader
@@ -91,7 +91,7 @@ async def lay_someone(seeding: Any, role: UserRole) -> Laid[UserData]:
 
 
 @dataclass(frozen=True)
-class JustSomeone(TestGiven[Any, ACallerAlone]):
+class JustSomeone(Given[Any, ACallerAlone]):
     """카테고리가 하나도 없고, 호출자 한 명."""
 
     role: UserRole = UserRole.USER
@@ -107,7 +107,7 @@ class JustSomeone(TestGiven[Any, ACallerAlone]):
 
 
 @dataclass(frozen=True)
-class ACategoryAndSomeone(TestGiven[Any, ACategoryAndACaller]):
+class ACategoryAndSomeone(Given[Any, ACategoryAndACaller]):
     """이미 있는 카테고리 하나와, 호출자 한 명."""
 
     role: UserRole = UserRole.USER
@@ -124,7 +124,7 @@ class ACategoryAndSomeone(TestGiven[Any, ACategoryAndACaller]):
 
 
 @dataclass(frozen=True)
-class ACategoryAndNobody(TestGiven[Any, ACategoryAlone]):
+class ACategoryAndNobody(Given[Any, ACategoryAlone]):
     """카테고리 하나뿐이고, 호출자는 없다."""
 
     @override
@@ -138,7 +138,7 @@ class ACategoryAndNobody(TestGiven[Any, ACategoryAlone]):
 
 
 @dataclass(frozen=True)
-class ManyCategoriesAndSomeone(TestGiven[Any, ManyCategoriesAndACaller]):
+class ManyCategoriesAndSomeone(Given[Any, ManyCategoriesAndACaller]):
     """카테고리 여럿과, 호출자 한 명."""
 
     role: UserRole = UserRole.USER
@@ -163,7 +163,7 @@ class ManyCategoriesAndSomeone(TestGiven[Any, ManyCategoriesAndACaller]):
 
 
 @dataclass(frozen=True)
-class TheNewCategoryNode(TestThen[Any, CategoryNodeAnswer]):
+class TheNewCategoryNode(Then[Any, CategoryNodeAnswer]):
     """방금 생성한 카테고리가 통째로 반환된다. 이름과 설명은 시나리오가 정한 값이다."""
 
     started: datetime
@@ -175,7 +175,7 @@ class TheNewCategoryNode(TestThen[Any, CategoryNodeAnswer]):
         return "생성한 카테고리 전체가 반환된다"
 
     @override
-    def look(self, laid: Any, answered: Answered[CategoryNodeAnswer]) -> list[TestVerdict]:
+    def look(self, laid: Any, answered: Answered[CategoryNodeAnswer]) -> list[Verdict]:
         node = answered.response
         if node is None:
             return [Refused(EntityNotFoundError, answered.raised)]
@@ -190,7 +190,7 @@ class TheNewCategoryNode(TestThen[Any, CategoryNodeAnswer]):
 
 
 @dataclass(frozen=True)
-class TheCategoryNode(TestThen[ACategoryAndACaller, CategoryNodeAnswer]):
+class TheCategoryNode(Then[ACategoryAndACaller, CategoryNodeAnswer]):
     """미리 만들어 둔 카테고리가 통째로 반환된다. 기대값은 미리 만들어 둔 데이터에서 읽는다."""
 
     started: datetime
@@ -202,7 +202,7 @@ class TheCategoryNode(TestThen[ACategoryAndACaller, CategoryNodeAnswer]):
     @override
     def look(
         self, laid: ACategoryAndACaller, answered: Answered[CategoryNodeAnswer]
-    ) -> list[TestVerdict]:
+    ) -> list[Verdict]:
         node = answered.response
         if node is None:
             return [Refused(EntityNotFoundError, answered.raised)]
@@ -217,7 +217,7 @@ class TheCategoryNode(TestThen[ACategoryAndACaller, CategoryNodeAnswer]):
 
 
 @dataclass(frozen=True)
-class EveryLaidCategoryIsFound(TestThen[ManyCategoriesAndACaller, SearchCategoriesPayload]):
+class EveryLaidCategoryIsFound(Then[ManyCategoriesAndACaller, SearchCategoriesPayload]):
     """미리 만들어 둔 카테고리가 모두, 그리고 그것만 집계된다."""
 
     @override
@@ -227,7 +227,7 @@ class EveryLaidCategoryIsFound(TestThen[ManyCategoriesAndACaller, SearchCategori
     @override
     def look(
         self, laid: ManyCategoriesAndACaller, answered: Answered[SearchCategoriesPayload]
-    ) -> list[TestVerdict]:
+    ) -> list[Verdict]:
         page = answered.response
         if page is None:
             return [Refused(UserNotFound, answered.raised)]
@@ -244,7 +244,7 @@ class EveryLaidCategoryIsFound(TestThen[ManyCategoriesAndACaller, SearchCategori
 
 
 @dataclass(frozen=True)
-class OnePageOfThemComesBack(TestThen[ManyCategoriesAndACaller, SearchCategoriesPayload]):
+class OnePageOfThemComesBack(Then[ManyCategoriesAndACaller, SearchCategoriesPayload]):
     """크기를 지정하지 않은 검색은 한 페이지 분량만 응답하고, 다음 페이지가 있다고 알린다."""
 
     @override
@@ -254,7 +254,7 @@ class OnePageOfThemComesBack(TestThen[ManyCategoriesAndACaller, SearchCategories
     @override
     def look(
         self, laid: ManyCategoriesAndACaller, answered: Answered[SearchCategoriesPayload]
-    ) -> list[TestVerdict]:
+    ) -> list[Verdict]:
         page = answered.response
         if page is None:
             return [Refused(UserNotFound, answered.raised)]
@@ -279,7 +279,7 @@ def node_of(seeded: PrometheusQueryPresetCategoryData) -> CategoryNode:
 
 
 @dataclass(frozen=True)
-class TheBatchAnswersInOrder(TestThen[ManyCategoriesAndACaller, list[LoadedCategory]]):
+class TheBatchAnswersInOrder(Then[ManyCategoriesAndACaller, list[LoadedCategory]]):
     """요청한 순서대로 응답한다. 미리 만들어 둔 것은 노드 전체로, 마지막의 없는 id는 거부로."""
 
     @override
@@ -289,11 +289,11 @@ class TheBatchAnswersInOrder(TestThen[ManyCategoriesAndACaller, list[LoadedCateg
     @override
     def look(
         self, laid: ManyCategoriesAndACaller, answered: Answered[list[LoadedCategory]]
-    ) -> list[TestVerdict]:
+    ) -> list[Verdict]:
         answer = answered.response
         if answer is None:
             return [Refused(UserNotFound, answered.raised)]
-        seen: list[TestVerdict] = [Same("len", len(answer), len(laid.laid) + 1)]
+        seen: list[Verdict] = [Same("len", len(answer), len(laid.laid) + 1)]
         if len(answer) != len(laid.laid) + 1:
             return seen
         for at, (got, wanted) in enumerate(zip(answer, laid.laid, strict=False)):
@@ -312,7 +312,7 @@ class TheBatchAnswersInOrder(TestThen[ManyCategoriesAndACaller, list[LoadedCateg
 
 
 @dataclass(frozen=True)
-class NothingIsAnswered(TestThen[Any, list[LoadedCategory]]):
+class NothingIsAnswered(Then[Any, list[LoadedCategory]]):
     """빈 목록에는 빈 응답이다."""
 
     @override
@@ -320,7 +320,7 @@ class NothingIsAnswered(TestThen[Any, list[LoadedCategory]]):
         return "빈 응답이 반환된다"
 
     @override
-    def look(self, laid: Any, answered: Answered[list[LoadedCategory]]) -> list[TestVerdict]:
+    def look(self, laid: Any, answered: Answered[list[LoadedCategory]]) -> list[Verdict]:
         answer = answered.response
         if answer is None:
             return [Refused(UserNotFound, answered.raised)]
@@ -328,7 +328,7 @@ class NothingIsAnswered(TestThen[Any, list[LoadedCategory]]):
 
 
 @dataclass(frozen=True)
-class TheRemovedOneIsNamed(TestThen[ACategoryAndACaller, DeleteCategoryPayload]):
+class TheRemovedOneIsNamed(Then[ACategoryAndACaller, DeleteCategoryPayload]):
     """삭제한 카테고리가 무엇인지 응답한다."""
 
     @override
@@ -338,7 +338,7 @@ class TheRemovedOneIsNamed(TestThen[ACategoryAndACaller, DeleteCategoryPayload])
     @override
     def look(
         self, laid: ACategoryAndACaller, answered: Answered[DeleteCategoryPayload]
-    ) -> list[TestVerdict]:
+    ) -> list[Verdict]:
         payload = answered.response
         if payload is None:
             return [Refused(EntityNotFoundError, answered.raised)]

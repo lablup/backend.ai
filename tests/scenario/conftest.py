@@ -27,7 +27,7 @@ from ai.backend.manager.repositories.rbac.permission_check_repository import (
     RbacPermissionCheckRepository,
 )
 from ai.backend.testutils.bootstrap import flush_redis
-from ai.backend.testutils.scenario_steps import TestConfigured
+from ai.backend.testutils.scenario_steps import Configured
 from bai_scenario.config import ScenarioConfigProvider, base_config_dict, make_config
 from bai_scenario.db import (
     TemplateDatabase,
@@ -126,7 +126,7 @@ def config(
     """
     callspec = getattr(request.node, "callspec", None)
     asked = callspec.params.get("scenario") if callspec is not None else None
-    overrides = dict(asked.config()) if isinstance(asked, TestConfigured) else {}
+    overrides = dict(asked.config()) if isinstance(asked, Configured) else {}
     return ScenarioConfigProvider(
         make_config(base_config_dict(template.addr, test_db, valkey_addr), overrides)
     )

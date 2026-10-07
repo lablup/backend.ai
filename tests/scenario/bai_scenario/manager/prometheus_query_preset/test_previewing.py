@@ -27,11 +27,11 @@ from ai.backend.manager.api.adapters.prometheus_query_preset.adapter import (
 from ai.backend.manager.errors.auth import InsufficientPrivilege
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.testutils.scenario_steps import (
-    TestConfigured,
-    TestGiven,
-    TestScenario,
-    TestThen,
-    TestWhen,
+    Configured,
+    Given,
+    Scenario,
+    Then,
+    When,
 )
 from bai_scenario.components.answers import TheCallIsRefused
 from bai_scenario.components.prometheus_query_preset import (
@@ -48,13 +48,13 @@ SERVER_WINDOW_PATH = "metric.timewindow"
 SERVER_WINDOW = "2m"
 
 type Result = QueryDefinitionResultInfo
-type PreviewingStep = TestScenario[
+type PreviewingStep = Scenario[
     SeedingSession, ACatalogAndACaller, PrometheusQueryPresetAdapter, Result
 ]
 
 
 @dataclass(frozen=True)
-class Previewing(TestWhen[ACatalogAndACaller, PrometheusQueryPresetAdapter, Result]):
+class Previewing(When[ACatalogAndACaller, PrometheusQueryPresetAdapter, Result]):
     """템플릿 문자열만 지정해 미리 본다."""
 
     query_template: str = TEMPLATE
@@ -80,8 +80,8 @@ class Previewing(TestWhen[ACatalogAndACaller, PrometheusQueryPresetAdapter, Resu
 
 @dataclass(frozen=True)
 class TheSuperadminPreviewsATemplate(
-    TestScenario[SeedingSession, ACatalogAndACaller, PrometheusQueryPresetAdapter, Result],
-    TestConfigured,
+    Scenario[SeedingSession, ACatalogAndACaller, PrometheusQueryPresetAdapter, Result],
+    Configured,
 ):
     @override
     def summary(self) -> str:
@@ -99,21 +99,21 @@ class TheSuperadminPreviewsATemplate(
         return {SERVER_WINDOW_PATH: SERVER_WINDOW}
 
     @override
-    def given(self) -> TestGiven[SeedingSession, ACatalogAndACaller]:
+    def given(self) -> Given[SeedingSession, ACatalogAndACaller]:
         return JustSomeone(role=UserRole.SUPERADMIN)
 
     @override
-    def when(self) -> TestWhen[ACatalogAndACaller, PrometheusQueryPresetAdapter, Result]:
+    def when(self) -> When[ACatalogAndACaller, PrometheusQueryPresetAdapter, Result]:
         return Previewing()
 
     @override
-    def then(self) -> TestThen[ACatalogAndACaller, Result]:
+    def then(self) -> Then[ACatalogAndACaller, Result]:
         return TheQueryAnswered(query="avg by () (rate(container_cpu_seconds_total{}[2m]))")
 
 
 @dataclass(frozen=True)
 class PrometheusRefusingTheQueryIsAnEvaluationFailure(
-    TestScenario[SeedingSession, ACatalogAndACaller, PrometheusQueryPresetAdapter, Result]
+    Scenario[SeedingSession, ACatalogAndACaller, PrometheusQueryPresetAdapter, Result]
 ):
     @override
     def summary(self) -> str:
@@ -127,22 +127,22 @@ class PrometheusRefusingTheQueryIsAnEvaluationFailure(
         )
 
     @override
-    def given(self) -> TestGiven[SeedingSession, ACatalogAndACaller]:
+    def given(self) -> Given[SeedingSession, ACatalogAndACaller]:
         return JustSomeone(role=UserRole.SUPERADMIN)
 
     @override
-    def when(self) -> TestWhen[ACatalogAndACaller, PrometheusQueryPresetAdapter, Result]:
+    def when(self) -> When[ACatalogAndACaller, PrometheusQueryPresetAdapter, Result]:
         return Previewing(query_template=EMPTY_WITHOUT_LABELS)
 
     @override
-    def then(self) -> TestThen[ACatalogAndACaller, Result]:
+    def then(self) -> Then[ACatalogAndACaller, Result]:
         return TheCallIsRefused(PrometheusQueryEvaluationFailed)
 
 
 @dataclass(frozen=True)
 class AMonitorPreviewsToo(
-    TestScenario[SeedingSession, ACatalogAndACaller, PrometheusQueryPresetAdapter, Result],
-    TestConfigured,
+    Scenario[SeedingSession, ACatalogAndACaller, PrometheusQueryPresetAdapter, Result],
+    Configured,
 ):
     @override
     def summary(self) -> str:
@@ -157,21 +157,21 @@ class AMonitorPreviewsToo(
         return {SERVER_WINDOW_PATH: SERVER_WINDOW}
 
     @override
-    def given(self) -> TestGiven[SeedingSession, ACatalogAndACaller]:
+    def given(self) -> Given[SeedingSession, ACatalogAndACaller]:
         return JustSomeone(role=UserRole.MONITOR)
 
     @override
-    def when(self) -> TestWhen[ACatalogAndACaller, PrometheusQueryPresetAdapter, Result]:
+    def when(self) -> When[ACatalogAndACaller, PrometheusQueryPresetAdapter, Result]:
         return Previewing()
 
     @override
-    def then(self) -> TestThen[ACatalogAndACaller, Result]:
+    def then(self) -> Then[ACatalogAndACaller, Result]:
         return TheQueryAnswered(query="avg by () (rate(container_cpu_seconds_total{}[2m]))")
 
 
 @dataclass(frozen=True)
 class APlainUserMayNotPreview(
-    TestScenario[SeedingSession, ACatalogAndACaller, PrometheusQueryPresetAdapter, Result]
+    Scenario[SeedingSession, ACatalogAndACaller, PrometheusQueryPresetAdapter, Result]
 ):
     @override
     def summary(self) -> str:
@@ -182,15 +182,15 @@ class APlainUserMayNotPreview(
         return "슈퍼관리자가 아닌 사용자가 미리 보려 하면, 역할 부족으로 거부된다"
 
     @override
-    def given(self) -> TestGiven[SeedingSession, ACatalogAndACaller]:
+    def given(self) -> Given[SeedingSession, ACatalogAndACaller]:
         return JustSomeone()
 
     @override
-    def when(self) -> TestWhen[ACatalogAndACaller, PrometheusQueryPresetAdapter, Result]:
+    def when(self) -> When[ACatalogAndACaller, PrometheusQueryPresetAdapter, Result]:
         return Previewing()
 
     @override
-    def then(self) -> TestThen[ACatalogAndACaller, Result]:
+    def then(self) -> Then[ACatalogAndACaller, Result]:
         return TheCallIsRefused(InsufficientPrivilege)
 
 

@@ -17,13 +17,13 @@ from ai.backend.manager.errors.permission import NotEnoughPermission
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.testutils.scenario_steps import (
     Answered,
+    Given,
     Refused,
     Same,
-    TestGiven,
-    TestScenario,
-    TestThen,
-    TestVerdict,
-    TestWhen,
+    Scenario,
+    Then,
+    Verdict,
+    When,
 )
 from bai_scenario.components.domain import SomeoneOf
 from bai_scenario.runner.acting import ActingAs
@@ -45,7 +45,7 @@ class ProjectAndTarget:
 
 
 @dataclass(frozen=True)
-class ProjectWithReadPermission(TestGiven[SeedingSession, ProjectAndTarget]):
+class ProjectWithReadPermission(Given[SeedingSession, ProjectAndTarget]):
     configured: bool
     may_read: bool
 
@@ -77,7 +77,7 @@ class ProjectWithReadPermission(TestGiven[SeedingSession, ProjectAndTarget]):
 
 
 @dataclass(frozen=True)
-class ReadingTargets(TestWhen[ProjectAndTarget, ProjectAdapter, Targets]):
+class ReadingTargets(When[ProjectAndTarget, ProjectAdapter, Targets]):
     configured: bool
 
     @override
@@ -96,7 +96,7 @@ class ReadingTargets(TestWhen[ProjectAndTarget, ProjectAdapter, Targets]):
 
 
 @dataclass(frozen=True)
-class TargetsInRequestOrder(TestThen[ProjectAndTarget, Targets]):
+class TargetsInRequestOrder(Then[ProjectAndTarget, Targets]):
     configured: bool
     may_read: bool
 
@@ -105,7 +105,7 @@ class TargetsInRequestOrder(TestThen[ProjectAndTarget, Targets]):
         return "요청마다 image commit을 위한 Container Registry나 빈 값 또는 권한 거부를 응답한다"
 
     @override
-    def look(self, laid: ProjectAndTarget, answered: Answered[Targets]) -> list[TestVerdict]:
+    def look(self, laid: ProjectAndTarget, answered: Answered[Targets]) -> list[Verdict]:
         values = answered.response
         assert values is not None, answered.raised
         if not self.may_read:
@@ -121,7 +121,7 @@ class TargetsInRequestOrder(TestThen[ProjectAndTarget, Targets]):
 
 
 @dataclass(frozen=True)
-class ReadTargetsScenario(TestScenario[SeedingSession, ProjectAndTarget, ProjectAdapter, Targets]):
+class ReadTargetsScenario(Scenario[SeedingSession, ProjectAndTarget, ProjectAdapter, Targets]):
     name: str
     description: str
     configured: bool = False
@@ -136,15 +136,15 @@ class ReadTargetsScenario(TestScenario[SeedingSession, ProjectAndTarget, Project
         return self.description
 
     @override
-    def given(self) -> TestGiven[SeedingSession, ProjectAndTarget]:
+    def given(self) -> Given[SeedingSession, ProjectAndTarget]:
         return ProjectWithReadPermission(self.configured, self.may_read)
 
     @override
-    def when(self) -> TestWhen[ProjectAndTarget, ProjectAdapter, Targets]:
+    def when(self) -> When[ProjectAndTarget, ProjectAdapter, Targets]:
         return ReadingTargets(self.configured)
 
     @override
-    def then(self) -> TestThen[ProjectAndTarget, Targets]:
+    def then(self) -> Then[ProjectAndTarget, Targets]:
         return TargetsInRequestOrder(self.configured, self.may_read)
 
 

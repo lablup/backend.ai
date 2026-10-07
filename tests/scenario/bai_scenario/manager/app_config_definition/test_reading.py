@@ -25,13 +25,7 @@ from ai.backend.manager.api.adapters.app_config_definition.adapter import (
 from ai.backend.manager.errors.base.entity import EntityNotFoundError
 from ai.backend.manager.errors.permission import NotEnoughPermission
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.testutils.scenario_steps import (
-    TestConfigured,
-    TestGiven,
-    TestScenario,
-    TestThen,
-    TestWhen,
-)
+from ai.backend.testutils.scenario_steps import Configured, Given, Scenario, Then, When
 from bai_scenario.components.answers import TheCallIsRefused
 from bai_scenario.components.app_config import ENFORCEMENT
 from bai_scenario.components.app_config_definition import (
@@ -43,15 +37,13 @@ from bai_scenario.runner.acting import ActingAs
 from bai_scenario.runner.planting import SeedingSession
 from bai_scenario.runner.steps import run_scenario
 
-type ReadingStep = TestScenario[
+type ReadingStep = Scenario[
     SeedingSession, ADefinitionAndACaller, AppConfigDefinitionAdapter, AppConfigDefinitionNode
 ]
 
 
 @dataclass(frozen=True)
-class ReadingById(
-    TestWhen[ADefinitionAndACaller, AppConfigDefinitionAdapter, AppConfigDefinitionNode]
-):
+class ReadingById(When[ADefinitionAndACaller, AppConfigDefinitionAdapter, AppConfigDefinitionNode]):
     """ID로 조회한다. ID를 지정하지 않으면 미리 만든 정의의 ID를 쓴다."""
 
     other: UUID | None = None
@@ -76,7 +68,7 @@ class ReadingById(
 
 @dataclass(frozen=True)
 class TheSuperadminReadsIt(
-    TestScenario[
+    Scenario[
         SeedingSession, ADefinitionAndACaller, AppConfigDefinitionAdapter, AppConfigDefinitionNode
     ]
 ):
@@ -91,23 +83,23 @@ class TheSuperadminReadsIt(
         return "설정 정의 하나가 있고 슈퍼관리자가 ID로 조회하면, 그 정의의 모든 필드가 반환된다"
 
     @override
-    def given(self) -> TestGiven[SeedingSession, ADefinitionAndACaller]:
+    def given(self) -> Given[SeedingSession, ADefinitionAndACaller]:
         return ADefinitionAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
     def when(
         self,
-    ) -> TestWhen[ADefinitionAndACaller, AppConfigDefinitionAdapter, AppConfigDefinitionNode]:
+    ) -> When[ADefinitionAndACaller, AppConfigDefinitionAdapter, AppConfigDefinitionNode]:
         return ReadingById()
 
     @override
-    def then(self) -> TestThen[ADefinitionAndACaller, AppConfigDefinitionNode]:
+    def then(self) -> Then[ADefinitionAndACaller, AppConfigDefinitionNode]:
         return TheDefinitionNode(started=self.started)
 
 
 @dataclass(frozen=True)
 class AUserGrantedNothingMayNotRead(
-    TestScenario[
+    Scenario[
         SeedingSession, ADefinitionAndACaller, AppConfigDefinitionAdapter, AppConfigDefinitionNode
     ]
 ):
@@ -123,23 +115,23 @@ class AUserGrantedNothingMayNotRead(
         )
 
     @override
-    def given(self) -> TestGiven[SeedingSession, ADefinitionAndACaller]:
+    def given(self) -> Given[SeedingSession, ADefinitionAndACaller]:
         return ADefinitionAndSomeone()
 
     @override
     def when(
         self,
-    ) -> TestWhen[ADefinitionAndACaller, AppConfigDefinitionAdapter, AppConfigDefinitionNode]:
+    ) -> When[ADefinitionAndACaller, AppConfigDefinitionAdapter, AppConfigDefinitionNode]:
         return ReadingById()
 
     @override
-    def then(self) -> TestThen[ADefinitionAndACaller, AppConfigDefinitionNode]:
+    def then(self) -> Then[ADefinitionAndACaller, AppConfigDefinitionNode]:
         return TheCallIsRefused(NotEnoughPermission)
 
 
 @dataclass(frozen=True)
 class AnUnknownIdIsNotFoundForASuperadmin(
-    TestScenario[
+    Scenario[
         SeedingSession, ADefinitionAndACaller, AppConfigDefinitionAdapter, AppConfigDefinitionNode
     ]
 ):
@@ -155,26 +147,26 @@ class AnUnknownIdIsNotFoundForASuperadmin(
         )
 
     @override
-    def given(self) -> TestGiven[SeedingSession, ADefinitionAndACaller]:
+    def given(self) -> Given[SeedingSession, ADefinitionAndACaller]:
         return ADefinitionAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
     def when(
         self,
-    ) -> TestWhen[ADefinitionAndACaller, AppConfigDefinitionAdapter, AppConfigDefinitionNode]:
+    ) -> When[ADefinitionAndACaller, AppConfigDefinitionAdapter, AppConfigDefinitionNode]:
         return ReadingById(other=uuid4())
 
     @override
-    def then(self) -> TestThen[ADefinitionAndACaller, AppConfigDefinitionNode]:
+    def then(self) -> Then[ADefinitionAndACaller, AppConfigDefinitionNode]:
         return TheCallIsRefused(EntityNotFoundError)
 
 
 @dataclass(frozen=True)
 class EnforcementOffLetsAnyoneRead(
-    TestScenario[
+    Scenario[
         SeedingSession, ADefinitionAndACaller, AppConfigDefinitionAdapter, AppConfigDefinitionNode
     ],
-    TestConfigured,
+    Configured,
 ):
     started: datetime
 
@@ -191,17 +183,17 @@ class EnforcementOffLetsAnyoneRead(
         return {ENFORCEMENT: False}
 
     @override
-    def given(self) -> TestGiven[SeedingSession, ADefinitionAndACaller]:
+    def given(self) -> Given[SeedingSession, ADefinitionAndACaller]:
         return ADefinitionAndSomeone()
 
     @override
     def when(
         self,
-    ) -> TestWhen[ADefinitionAndACaller, AppConfigDefinitionAdapter, AppConfigDefinitionNode]:
+    ) -> When[ADefinitionAndACaller, AppConfigDefinitionAdapter, AppConfigDefinitionNode]:
         return ReadingById()
 
     @override
-    def then(self) -> TestThen[ADefinitionAndACaller, AppConfigDefinitionNode]:
+    def then(self) -> Then[ADefinitionAndACaller, AppConfigDefinitionNode]:
         return TheDefinitionNode(started=self.started)
 
 

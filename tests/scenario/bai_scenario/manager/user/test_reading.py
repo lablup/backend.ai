@@ -19,13 +19,13 @@ from ai.backend.manager.errors.permission import NotEnoughPermission
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.testutils.scenario_steps import (
     Answered,
+    Given,
     Refused,
     Same,
-    TestGiven,
-    TestScenario,
-    TestThen,
-    TestVerdict,
-    TestWhen,
+    Scenario,
+    Then,
+    Verdict,
+    When,
 )
 from bai_scenario.components.answers import TheCallIsRefused
 from bai_scenario.components.domain import WAS_HERE, SomeoneOf
@@ -57,7 +57,7 @@ class AReaderAndTwoUsers:
 
 
 @dataclass(frozen=True)
-class SomeoneAndAnother(TestGiven[Any, AReaderAndATarget]):
+class SomeoneAndAnother(Given[Any, AReaderAndATarget]):
     """한 도메인의 사용자 둘. `granted`면 부르는 사람이 상대 사용자에 READ를 받는다."""
 
     granted: bool
@@ -80,7 +80,7 @@ class SomeoneAndAnother(TestGiven[Any, AReaderAndATarget]):
 
 
 @dataclass(frozen=True)
-class SomeoneReadingOneOfTwo(TestGiven[Any, AReaderAndTwoUsers]):
+class SomeoneReadingOneOfTwo(Given[Any, AReaderAndTwoUsers]):
     """한 도메인의 사용자 셋. 부르는 사람은 둘 중 한 사람에게만 READ를 받았다."""
 
     @override
@@ -100,7 +100,7 @@ class SomeoneReadingOneOfTwo(TestGiven[Any, AReaderAndTwoUsers]):
 
 
 @dataclass(frozen=True)
-class ReadingTheTarget(TestWhen[AReaderAndATarget, UserAdapter, Answer]):
+class ReadingTheTarget(When[AReaderAndATarget, UserAdapter, Answer]):
     """상대 사용자를 id로 읽는다."""
 
     @override
@@ -119,7 +119,7 @@ class ReadingTheTarget(TestWhen[AReaderAndATarget, UserAdapter, Answer]):
 
 
 @dataclass(frozen=True)
-class LoadingReadableUnreadableAndMissing(TestWhen[AReaderAndTwoUsers, UserAdapter, Answer]):
+class LoadingReadableUnreadableAndMissing(When[AReaderAndTwoUsers, UserAdapter, Answer]):
     """읽을 수 있는 사람, 읽을 수 없는 사람, 없는 id 순으로 한 번에 읽는다."""
 
     @override
@@ -144,7 +144,7 @@ class LoadingReadableUnreadableAndMissing(TestWhen[AReaderAndTwoUsers, UserAdapt
 
 
 @dataclass(frozen=True)
-class LoadingTheTargetAndMissing(TestWhen[AReaderAndATarget, UserAdapter, Answer]):
+class LoadingTheTargetAndMissing(When[AReaderAndATarget, UserAdapter, Answer]):
     """있는 사람과 없는 id를 한 번에 읽는다."""
 
     @override
@@ -162,7 +162,7 @@ class LoadingTheTargetAndMissing(TestWhen[AReaderAndATarget, UserAdapter, Answer
 
 
 @dataclass(frozen=True)
-class LoadingNothing(TestWhen[AReaderAndATarget, UserAdapter, Answer]):
+class LoadingNothing(When[AReaderAndATarget, UserAdapter, Answer]):
     """빈 id 목록으로 읽는다."""
 
     @override
@@ -180,7 +180,7 @@ class LoadingNothing(TestWhen[AReaderAndATarget, UserAdapter, Answer]):
 
 
 @dataclass(frozen=True)
-class TheTargetNode(TestThen[AReaderAndATarget, Answer]):
+class TheTargetNode(Then[AReaderAndATarget, Answer]):
     """읽힌 사용자 노드가 통째로 온다."""
 
     started: datetime
@@ -190,7 +190,7 @@ class TheTargetNode(TestThen[AReaderAndATarget, Answer]):
         return "읽힌 사용자 전체가 온다"
 
     @override
-    def look(self, laid: AReaderAndATarget, answered: Answered[Answer]) -> list[TestVerdict]:
+    def look(self, laid: AReaderAndATarget, answered: Answered[Answer]) -> list[Verdict]:
         node = answered.response
         if not isinstance(node, UserNode):
             return [Refused(NotEnoughPermission, answered.raised)]
@@ -198,7 +198,7 @@ class TheTargetNode(TestThen[AReaderAndATarget, Answer]):
 
 
 @dataclass(frozen=True)
-class EachElementInOrder(TestThen[AReaderAndTwoUsers, Answer]):
+class EachElementInOrder(Then[AReaderAndTwoUsers, Answer]):
     """원소마다 노드와 거부가 입력 순서대로 온다."""
 
     started: datetime
@@ -208,12 +208,12 @@ class EachElementInOrder(TestThen[AReaderAndTwoUsers, Answer]):
         return "원소마다 결과가 입력 순서대로 온다"
 
     @override
-    def look(self, laid: AReaderAndTwoUsers, answered: Answered[Answer]) -> list[TestVerdict]:
+    def look(self, laid: AReaderAndTwoUsers, answered: Answered[Answer]) -> list[Verdict]:
         loaded = answered.response
         if not isinstance(loaded, list):
             return [Refused(NotEnoughPermission, answered.raised)]
         first, second, third = loaded
-        seen: list[TestVerdict] = [Same("length", len(loaded), 3)]
+        seen: list[Verdict] = [Same("length", len(loaded), 3)]
         if isinstance(first, UserNode):
             seen.extend(UserNodeLook(self.started).verdicts(first, laid.readable, at="[0]."))
         else:
@@ -224,7 +224,7 @@ class EachElementInOrder(TestThen[AReaderAndTwoUsers, Answer]):
 
 
 @dataclass(frozen=True)
-class TheNodeThenNothing(TestThen[AReaderAndATarget, Answer]):
+class TheNodeThenNothing(Then[AReaderAndATarget, Answer]):
     """있는 사람은 노드, 없는 id는 빈 값."""
 
     started: datetime
@@ -234,12 +234,12 @@ class TheNodeThenNothing(TestThen[AReaderAndATarget, Answer]):
         return "있는 사람은 노드, 없는 id 자리는 비어서 온다"
 
     @override
-    def look(self, laid: AReaderAndATarget, answered: Answered[Answer]) -> list[TestVerdict]:
+    def look(self, laid: AReaderAndATarget, answered: Answered[Answer]) -> list[Verdict]:
         loaded = answered.response
         if not isinstance(loaded, list):
             return [Refused(NotEnoughPermission, answered.raised)]
         first, second = loaded
-        seen: list[TestVerdict] = [Same("length", len(loaded), 2)]
+        seen: list[Verdict] = [Same("length", len(loaded), 2)]
         if isinstance(first, UserNode):
             seen.extend(UserNodeLook(self.started).verdicts(first, laid.target, at="[0]."))
         else:
@@ -249,7 +249,7 @@ class TheNodeThenNothing(TestThen[AReaderAndATarget, Answer]):
 
 
 @dataclass(frozen=True)
-class AnEmptyList(TestThen[AReaderAndATarget, Answer]):
+class AnEmptyList(Then[AReaderAndATarget, Answer]):
     """빈 목록이 온다."""
 
     @override
@@ -257,16 +257,14 @@ class AnEmptyList(TestThen[AReaderAndATarget, Answer]):
         return "빈 목록이 온다"
 
     @override
-    def look(self, laid: AReaderAndATarget, answered: Answered[Answer]) -> list[TestVerdict]:
+    def look(self, laid: AReaderAndATarget, answered: Answered[Answer]) -> list[Verdict]:
         if answered.raised is not None:
             return [Same("raised", type(answered.raised).__name__, None)]
         return [Same("loaded", answered.response, [])]
 
 
 @dataclass(frozen=True)
-class AGrantedUserReadsAnother(
-    TestScenario[SeedingSession, AReaderAndATarget, UserAdapter, Answer]
-):
+class AGrantedUserReadsAnother(Scenario[SeedingSession, AReaderAndATarget, UserAdapter, Answer]):
     started: datetime
 
     @override
@@ -281,21 +279,21 @@ class AGrantedUserReadsAnother(
         )
 
     @override
-    def given(self) -> TestGiven[SeedingSession, AReaderAndATarget]:
+    def given(self) -> Given[SeedingSession, AReaderAndATarget]:
         return SomeoneAndAnother(granted=True)
 
     @override
-    def when(self) -> TestWhen[AReaderAndATarget, UserAdapter, Answer]:
+    def when(self) -> When[AReaderAndATarget, UserAdapter, Answer]:
         return ReadingTheTarget()
 
     @override
-    def then(self) -> TestThen[AReaderAndATarget, Answer]:
+    def then(self) -> Then[AReaderAndATarget, Answer]:
         return TheTargetNode(started=self.started)
 
 
 @dataclass(frozen=True)
 class AUserGrantedNothingMayNotReadAnother(
-    TestScenario[SeedingSession, AReaderAndATarget, UserAdapter, Answer]
+    Scenario[SeedingSession, AReaderAndATarget, UserAdapter, Answer]
 ):
     @override
     def summary(self) -> str:
@@ -306,21 +304,21 @@ class AUserGrantedNothingMayNotReadAnother(
         return "아무 역할도 받지 않은 사용자가 다른 사용자를 읽으려 하면, 엔티티 권한 문이 막는다"
 
     @override
-    def given(self) -> TestGiven[SeedingSession, AReaderAndATarget]:
+    def given(self) -> Given[SeedingSession, AReaderAndATarget]:
         return SomeoneAndAnother(granted=False)
 
     @override
-    def when(self) -> TestWhen[AReaderAndATarget, UserAdapter, Answer]:
+    def when(self) -> When[AReaderAndATarget, UserAdapter, Answer]:
         return ReadingTheTarget()
 
     @override
-    def then(self) -> TestThen[AReaderAndATarget, Answer]:
+    def then(self) -> Then[AReaderAndATarget, Answer]:
         return TheCallIsRefused(NotEnoughPermission)
 
 
 @dataclass(frozen=True)
 class ABatchLoadAnswersEachElementInOrder(
-    TestScenario[SeedingSession, AReaderAndTwoUsers, UserAdapter, Answer]
+    Scenario[SeedingSession, AReaderAndTwoUsers, UserAdapter, Answer]
 ):
     started: datetime
 
@@ -336,21 +334,21 @@ class ABatchLoadAnswersEachElementInOrder(
         )
 
     @override
-    def given(self) -> TestGiven[SeedingSession, AReaderAndTwoUsers]:
+    def given(self) -> Given[SeedingSession, AReaderAndTwoUsers]:
         return SomeoneReadingOneOfTwo()
 
     @override
-    def when(self) -> TestWhen[AReaderAndTwoUsers, UserAdapter, Answer]:
+    def when(self) -> When[AReaderAndTwoUsers, UserAdapter, Answer]:
         return LoadingReadableUnreadableAndMissing()
 
     @override
-    def then(self) -> TestThen[AReaderAndTwoUsers, Answer]:
+    def then(self) -> Then[AReaderAndTwoUsers, Answer]:
         return EachElementInOrder(started=self.started)
 
 
 @dataclass(frozen=True)
 class TheSuperadminBatchLoadLeavesAMissingIdEmpty(
-    TestScenario[SeedingSession, AReaderAndATarget, UserAdapter, Answer]
+    Scenario[SeedingSession, AReaderAndATarget, UserAdapter, Answer]
 ):
     started: datetime
 
@@ -366,21 +364,21 @@ class TheSuperadminBatchLoadLeavesAMissingIdEmpty(
         )
 
     @override
-    def given(self) -> TestGiven[SeedingSession, AReaderAndATarget]:
+    def given(self) -> Given[SeedingSession, AReaderAndATarget]:
         return SomeoneAndAnother(granted=False, role=UserRole.SUPERADMIN)
 
     @override
-    def when(self) -> TestWhen[AReaderAndATarget, UserAdapter, Answer]:
+    def when(self) -> When[AReaderAndATarget, UserAdapter, Answer]:
         return LoadingTheTargetAndMissing()
 
     @override
-    def then(self) -> TestThen[AReaderAndATarget, Answer]:
+    def then(self) -> Then[AReaderAndATarget, Answer]:
         return TheNodeThenNothing(started=self.started)
 
 
 @dataclass(frozen=True)
 class ABatchLoadOfNothingAnswersNothing(
-    TestScenario[SeedingSession, AReaderAndATarget, UserAdapter, Answer]
+    Scenario[SeedingSession, AReaderAndATarget, UserAdapter, Answer]
 ):
     @override
     def summary(self) -> str:
@@ -391,19 +389,19 @@ class ABatchLoadOfNothingAnswersNothing(
         return "권한 없는 사용자가 빈 id 목록을 주면, 어떤 액션도 부르지 않고 빈 목록이 답으로 온다"
 
     @override
-    def given(self) -> TestGiven[SeedingSession, AReaderAndATarget]:
+    def given(self) -> Given[SeedingSession, AReaderAndATarget]:
         return SomeoneAndAnother(granted=False)
 
     @override
-    def when(self) -> TestWhen[AReaderAndATarget, UserAdapter, Answer]:
+    def when(self) -> When[AReaderAndATarget, UserAdapter, Answer]:
         return LoadingNothing()
 
     @override
-    def then(self) -> TestThen[AReaderAndATarget, Answer]:
+    def then(self) -> Then[AReaderAndATarget, Answer]:
         return AnEmptyList()
 
 
-SCENARIOS: list[TestScenario[SeedingSession, Any, UserAdapter, Answer]] = [
+SCENARIOS: list[Scenario[SeedingSession, Any, UserAdapter, Answer]] = [
     AGrantedUserReadsAnother(started=datetime.now(UTC)),
     AUserGrantedNothingMayNotReadAnother(),
     ABatchLoadAnswersEachElementInOrder(started=datetime.now(UTC)),
@@ -414,7 +412,7 @@ SCENARIOS: list[TestScenario[SeedingSession, Any, UserAdapter, Answer]] = [
 
 @pytest.mark.parametrize("scenario", SCENARIOS, ids=lambda s: s.summary())
 async def test_reading(
-    scenario: TestScenario[SeedingSession, Any, UserAdapter, Answer],
+    scenario: Scenario[SeedingSession, Any, UserAdapter, Answer],
     adapter: UserAdapter,
     engine: ExtendedAsyncSAEngine,
 ) -> None:

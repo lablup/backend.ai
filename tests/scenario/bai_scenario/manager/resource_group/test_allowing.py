@@ -26,7 +26,7 @@ from ai.backend.manager.errors.base.entity import EntityNotFoundError
 from ai.backend.manager.errors.permission import NotEnoughPermission
 from ai.backend.manager.errors.resource import ResourceGroupNotFound
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.testutils.scenario_steps import TestGiven, TestScenario, TestThen, TestWhen
+from ai.backend.testutils.scenario_steps import Given, Scenario, Then, When
 from bai_scenario.components.answers import TheCallIsRefused
 from bai_scenario.components.resource_group import (
     ADomainGroupsAndACaller,
@@ -46,7 +46,7 @@ from bai_scenario.runner.acting import ActingAs
 from bai_scenario.runner.planting import SeedingSession
 from bai_scenario.runner.steps import run_scenario
 
-type AllowingStep = TestScenario[SeedingSession, Any, ResourceGroupAdapter, Any]
+type AllowingStep = Scenario[SeedingSession, Any, ResourceGroupAdapter, Any]
 
 UNKNOWN_GROUP = "no-such-group"
 UNKNOWN_DOMAIN = "no-such-domain"
@@ -57,7 +57,7 @@ UNKNOWN_DOMAIN = "no-such-domain"
 
 @dataclass(frozen=True)
 class AllowingForTheDomain(
-    TestWhen[ADomainGroupsAndACaller, ResourceGroupAdapter, AllowedResourceGroupsPayload]
+    When[ADomainGroupsAndACaller, ResourceGroupAdapter, AllowedResourceGroupsPayload]
 ):
     """도메인의 허용 목록에 그룹을 더하거나 뺀다. ``unknown``이면 어느 행에도 없는 이름을 쓴다."""
 
@@ -98,7 +98,7 @@ class AllowingForTheDomain(
 
 @dataclass(frozen=True)
 class ReadingTheDomainsAllowed(
-    TestWhen[ADomainGroupsAndACaller, ResourceGroupAdapter, AllowedResourceGroupsPayload]
+    When[ADomainGroupsAndACaller, ResourceGroupAdapter, AllowedResourceGroupsPayload]
 ):
     """도메인의 허용 목록을 읽는다. ``unknown``이면 어느 행에도 없는 도메인 이름을 쓴다."""
 
@@ -128,7 +128,7 @@ class ReadingTheDomainsAllowed(
 
 @dataclass(frozen=True)
 class AllowingForTheProject(
-    TestWhen[AProjectAGroupAndACaller, ResourceGroupAdapter, AllowedResourceGroupsPayload]
+    When[AProjectAGroupAndACaller, ResourceGroupAdapter, AllowedResourceGroupsPayload]
 ):
     """프로젝트의 허용 목록에 그룹을 더한다."""
 
@@ -154,7 +154,7 @@ class AllowingForTheProject(
 
 @dataclass(frozen=True)
 class ReadingTheProjectsAllowed(
-    TestWhen[AProjectAGroupAndACaller, ResourceGroupAdapter, AllowedResourceGroupsPayload]
+    When[AProjectAGroupAndACaller, ResourceGroupAdapter, AllowedResourceGroupsPayload]
 ):
     """프로젝트의 허용 목록을 읽는다."""
 
@@ -179,7 +179,7 @@ class ReadingTheProjectsAllowed(
 
 @dataclass(frozen=True)
 class AllowingADomainForTheGroup(
-    TestWhen[ADomainGroupsAndACaller, ResourceGroupAdapter, AllowedDomainsPayload]
+    When[ADomainGroupsAndACaller, ResourceGroupAdapter, AllowedDomainsPayload]
 ):
     """그룹의 허용 도메인에 도메인을 더하거나 뺀다. ``unknown``이면 어느 행에도 없는 도메인 이름을 쓴다."""
 
@@ -213,7 +213,7 @@ class AllowingADomainForTheGroup(
 
 @dataclass(frozen=True)
 class ReadingTheGroupsDomains(
-    TestWhen[ADomainGroupsAndACaller, ResourceGroupAdapter, AllowedDomainsPayload]
+    When[ADomainGroupsAndACaller, ResourceGroupAdapter, AllowedDomainsPayload]
 ):
     """그룹의 허용 도메인을 읽는다. 도메인에 건 그룹을 읽는다."""
 
@@ -235,7 +235,7 @@ class ReadingTheGroupsDomains(
 
 @dataclass(frozen=True)
 class AllowingAProjectForTheGroup(
-    TestWhen[AProjectAGroupAndACaller, ResourceGroupAdapter, AllowedProjectsPayload]
+    When[AProjectAGroupAndACaller, ResourceGroupAdapter, AllowedProjectsPayload]
 ):
     """그룹의 허용 프로젝트에 프로젝트를 더한다."""
 
@@ -263,7 +263,7 @@ class AllowingAProjectForTheGroup(
 
 @dataclass(frozen=True)
 class ReadingTheGroupsProjects(
-    TestWhen[AProjectAGroupAndACaller, ResourceGroupAdapter, AllowedProjectsPayload]
+    When[AProjectAGroupAndACaller, ResourceGroupAdapter, AllowedProjectsPayload]
 ):
     """그룹의 허용 프로젝트를 읽는다."""
 
@@ -285,7 +285,7 @@ class ReadingTheGroupsProjects(
 
 @dataclass(frozen=True)
 class ReadingTheOwnGroupsDomains(
-    TestWhen[AGroupAndACaller, ResourceGroupAdapter, AllowedDomainsPayload]
+    When[AGroupAndACaller, ResourceGroupAdapter, AllowedDomainsPayload]
 ):
     """그룹의 허용 도메인을 읽는다."""
 
@@ -310,7 +310,7 @@ class ReadingTheOwnGroupsDomains(
 
 @dataclass(frozen=True)
 class TheSuperadminAllowsAGroupForADomain(
-    TestScenario[
+    Scenario[
         SeedingSession, ADomainGroupsAndACaller, ResourceGroupAdapter, AllowedResourceGroupsPayload
     ]
 ):
@@ -323,23 +323,23 @@ class TheSuperadminAllowsAGroupForADomain(
         return "슈퍼관리자가 도메인의 허용 목록에 그룹을 더하면 그 그룹 이름이 담긴 목록이 반환된다"
 
     @override
-    def given(self) -> TestGiven[SeedingSession, ADomainGroupsAndACaller]:
+    def given(self) -> Given[SeedingSession, ADomainGroupsAndACaller]:
         return ADomainGroupsAndSomeone(role=UserRole.SUPERADMIN, linked=False)
 
     @override
     def when(
         self,
-    ) -> TestWhen[ADomainGroupsAndACaller, ResourceGroupAdapter, AllowedResourceGroupsPayload]:
+    ) -> When[ADomainGroupsAndACaller, ResourceGroupAdapter, AllowedResourceGroupsPayload]:
         return AllowingForTheDomain()
 
     @override
-    def then(self) -> TestThen[ADomainGroupsAndACaller, AllowedResourceGroupsPayload]:
+    def then(self) -> Then[ADomainGroupsAndACaller, AllowedResourceGroupsPayload]:
         return TheOtherGroupIsAllowed()
 
 
 @dataclass(frozen=True)
 class TheSuperadminDisallowsAGroupForADomain(
-    TestScenario[
+    Scenario[
         SeedingSession, ADomainGroupsAndACaller, ResourceGroupAdapter, AllowedResourceGroupsPayload
     ]
 ):
@@ -352,23 +352,23 @@ class TheSuperadminDisallowsAGroupForADomain(
         return "도메인에 건 그룹을 슈퍼관리자가 허용 목록에서 빼면 빈 목록이 반환된다"
 
     @override
-    def given(self) -> TestGiven[SeedingSession, ADomainGroupsAndACaller]:
+    def given(self) -> Given[SeedingSession, ADomainGroupsAndACaller]:
         return ADomainGroupsAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
     def when(
         self,
-    ) -> TestWhen[ADomainGroupsAndACaller, ResourceGroupAdapter, AllowedResourceGroupsPayload]:
+    ) -> When[ADomainGroupsAndACaller, ResourceGroupAdapter, AllowedResourceGroupsPayload]:
         return AllowingForTheDomain(remove=True)
 
     @override
-    def then(self) -> TestThen[ADomainGroupsAndACaller, AllowedResourceGroupsPayload]:
+    def then(self) -> Then[ADomainGroupsAndACaller, AllowedResourceGroupsPayload]:
         return NothingIsAllowed()
 
 
 @dataclass(frozen=True)
 class AllowingAnUnknownGroupForADomainIsNotFound(
-    TestScenario[
+    Scenario[
         SeedingSession, ADomainGroupsAndACaller, ResourceGroupAdapter, AllowedResourceGroupsPayload
     ]
 ):
@@ -381,23 +381,23 @@ class AllowingAnUnknownGroupForADomainIsNotFound(
         return "존재하지 않는 그룹 이름을 도메인의 허용 목록에 더하려 하면 대상을 찾을 수 없다는 이유로 거부된다"
 
     @override
-    def given(self) -> TestGiven[SeedingSession, ADomainGroupsAndACaller]:
+    def given(self) -> Given[SeedingSession, ADomainGroupsAndACaller]:
         return ADomainGroupsAndSomeone(role=UserRole.SUPERADMIN, linked=False)
 
     @override
     def when(
         self,
-    ) -> TestWhen[ADomainGroupsAndACaller, ResourceGroupAdapter, AllowedResourceGroupsPayload]:
+    ) -> When[ADomainGroupsAndACaller, ResourceGroupAdapter, AllowedResourceGroupsPayload]:
         return AllowingForTheDomain(unknown=True)
 
     @override
-    def then(self) -> TestThen[ADomainGroupsAndACaller, AllowedResourceGroupsPayload]:
+    def then(self) -> Then[ADomainGroupsAndACaller, AllowedResourceGroupsPayload]:
         return TheCallIsRefused(ResourceGroupNotFound)
 
 
 @dataclass(frozen=True)
 class DisallowingAnUnknownGroupForADomainIsSkipped(
-    TestScenario[
+    Scenario[
         SeedingSession, ADomainGroupsAndACaller, ResourceGroupAdapter, AllowedResourceGroupsPayload
     ]
 ):
@@ -410,23 +410,23 @@ class DisallowingAnUnknownGroupForADomainIsSkipped(
         return "존재하지 않는 그룹 이름을 도메인의 허용 목록에서 빼려 하면 그 이름은 건너뛰고 빈 목록이 반환된다"
 
     @override
-    def given(self) -> TestGiven[SeedingSession, ADomainGroupsAndACaller]:
+    def given(self) -> Given[SeedingSession, ADomainGroupsAndACaller]:
         return ADomainGroupsAndSomeone(role=UserRole.SUPERADMIN, linked=False)
 
     @override
     def when(
         self,
-    ) -> TestWhen[ADomainGroupsAndACaller, ResourceGroupAdapter, AllowedResourceGroupsPayload]:
+    ) -> When[ADomainGroupsAndACaller, ResourceGroupAdapter, AllowedResourceGroupsPayload]:
         return AllowingForTheDomain(remove=True, unknown=True)
 
     @override
-    def then(self) -> TestThen[ADomainGroupsAndACaller, AllowedResourceGroupsPayload]:
+    def then(self) -> Then[ADomainGroupsAndACaller, AllowedResourceGroupsPayload]:
         return NothingIsAllowed()
 
 
 @dataclass(frozen=True)
 class AUserWhoIsNotTheSuperadminMayNotAllowForADomain(
-    TestScenario[
+    Scenario[
         SeedingSession, ADomainGroupsAndACaller, ResourceGroupAdapter, AllowedResourceGroupsPayload
     ]
 ):
@@ -442,23 +442,23 @@ class AUserWhoIsNotTheSuperadminMayNotAllowForADomain(
         )
 
     @override
-    def given(self) -> TestGiven[SeedingSession, ADomainGroupsAndACaller]:
+    def given(self) -> Given[SeedingSession, ADomainGroupsAndACaller]:
         return ADomainGroupsAndSomeone(linked=False)
 
     @override
     def when(
         self,
-    ) -> TestWhen[ADomainGroupsAndACaller, ResourceGroupAdapter, AllowedResourceGroupsPayload]:
+    ) -> When[ADomainGroupsAndACaller, ResourceGroupAdapter, AllowedResourceGroupsPayload]:
         return AllowingForTheDomain()
 
     @override
-    def then(self) -> TestThen[ADomainGroupsAndACaller, AllowedResourceGroupsPayload]:
+    def then(self) -> Then[ADomainGroupsAndACaller, AllowedResourceGroupsPayload]:
         return TheCallIsRefused(InsufficientPrivilege)
 
 
 @dataclass(frozen=True)
 class TheSuperadminReadsADomainsAllowed(
-    TestScenario[
+    Scenario[
         SeedingSession, ADomainGroupsAndACaller, ResourceGroupAdapter, AllowedResourceGroupsPayload
     ]
 ):
@@ -471,23 +471,23 @@ class TheSuperadminReadsADomainsAllowed(
         return "도메인에 건 그룹과 걸지 않은 그룹이 있을 때 슈퍼관리자가 도메인의 허용 목록을 읽으면 건 그룹 이름만 담긴다"
 
     @override
-    def given(self) -> TestGiven[SeedingSession, ADomainGroupsAndACaller]:
+    def given(self) -> Given[SeedingSession, ADomainGroupsAndACaller]:
         return ADomainGroupsAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
     def when(
         self,
-    ) -> TestWhen[ADomainGroupsAndACaller, ResourceGroupAdapter, AllowedResourceGroupsPayload]:
+    ) -> When[ADomainGroupsAndACaller, ResourceGroupAdapter, AllowedResourceGroupsPayload]:
         return ReadingTheDomainsAllowed()
 
     @override
-    def then(self) -> TestThen[ADomainGroupsAndACaller, AllowedResourceGroupsPayload]:
+    def then(self) -> Then[ADomainGroupsAndACaller, AllowedResourceGroupsPayload]:
         return TheLinkedGroupIsAllowed()
 
 
 @dataclass(frozen=True)
 class AUserReadingInTheDomainReadsItsAllowed(
-    TestScenario[
+    Scenario[
         SeedingSession, ADomainGroupsAndACaller, ResourceGroupAdapter, AllowedResourceGroupsPayload
     ]
 ):
@@ -500,23 +500,23 @@ class AUserReadingInTheDomainReadsItsAllowed(
         return "도메인 범위에서 리소스 그룹 읽기 역할을 받은 사용자가 그 도메인의 허용 목록을 읽으면 건 그룹 이름만 담긴다"
 
     @override
-    def given(self) -> TestGiven[SeedingSession, ADomainGroupsAndACaller]:
+    def given(self) -> Given[SeedingSession, ADomainGroupsAndACaller]:
         return ADomainGroupsAndSomeone(reading=True)
 
     @override
     def when(
         self,
-    ) -> TestWhen[ADomainGroupsAndACaller, ResourceGroupAdapter, AllowedResourceGroupsPayload]:
+    ) -> When[ADomainGroupsAndACaller, ResourceGroupAdapter, AllowedResourceGroupsPayload]:
         return ReadingTheDomainsAllowed()
 
     @override
-    def then(self) -> TestThen[ADomainGroupsAndACaller, AllowedResourceGroupsPayload]:
+    def then(self) -> Then[ADomainGroupsAndACaller, AllowedResourceGroupsPayload]:
         return TheLinkedGroupIsAllowed()
 
 
 @dataclass(frozen=True)
 class AUserGrantedNothingMayNotReadADomainsAllowed(
-    TestScenario[
+    Scenario[
         SeedingSession, ADomainGroupsAndACaller, ResourceGroupAdapter, AllowedResourceGroupsPayload
     ]
 ):
@@ -531,23 +531,23 @@ class AUserGrantedNothingMayNotReadADomainsAllowed(
         )
 
     @override
-    def given(self) -> TestGiven[SeedingSession, ADomainGroupsAndACaller]:
+    def given(self) -> Given[SeedingSession, ADomainGroupsAndACaller]:
         return ADomainGroupsAndSomeone()
 
     @override
     def when(
         self,
-    ) -> TestWhen[ADomainGroupsAndACaller, ResourceGroupAdapter, AllowedResourceGroupsPayload]:
+    ) -> When[ADomainGroupsAndACaller, ResourceGroupAdapter, AllowedResourceGroupsPayload]:
         return ReadingTheDomainsAllowed()
 
     @override
-    def then(self) -> TestThen[ADomainGroupsAndACaller, AllowedResourceGroupsPayload]:
+    def then(self) -> Then[ADomainGroupsAndACaller, AllowedResourceGroupsPayload]:
         return TheCallIsRefused(NotEnoughPermission)
 
 
 @dataclass(frozen=True)
 class ReadingAnUnknownDomainsAllowedIsNotFound(
-    TestScenario[
+    Scenario[
         SeedingSession, ADomainGroupsAndACaller, ResourceGroupAdapter, AllowedResourceGroupsPayload
     ]
 ):
@@ -560,17 +560,17 @@ class ReadingAnUnknownDomainsAllowedIsNotFound(
         return "존재하지 않는 도메인 이름의 허용 목록을 읽으려 하면 대상을 찾을 수 없다는 이유로 거부된다"
 
     @override
-    def given(self) -> TestGiven[SeedingSession, ADomainGroupsAndACaller]:
+    def given(self) -> Given[SeedingSession, ADomainGroupsAndACaller]:
         return ADomainGroupsAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
     def when(
         self,
-    ) -> TestWhen[ADomainGroupsAndACaller, ResourceGroupAdapter, AllowedResourceGroupsPayload]:
+    ) -> When[ADomainGroupsAndACaller, ResourceGroupAdapter, AllowedResourceGroupsPayload]:
         return ReadingTheDomainsAllowed(unknown=True)
 
     @override
-    def then(self) -> TestThen[ADomainGroupsAndACaller, AllowedResourceGroupsPayload]:
+    def then(self) -> Then[ADomainGroupsAndACaller, AllowedResourceGroupsPayload]:
         return TheCallIsRefused(EntityNotFoundError)
 
 
@@ -579,7 +579,7 @@ class ReadingAnUnknownDomainsAllowedIsNotFound(
 
 @dataclass(frozen=True)
 class TheSuperadminAllowsAGroupForAProject(
-    TestScenario[
+    Scenario[
         SeedingSession, AProjectAGroupAndACaller, ResourceGroupAdapter, AllowedResourceGroupsPayload
     ]
 ):
@@ -594,23 +594,23 @@ class TheSuperadminAllowsAGroupForAProject(
         )
 
     @override
-    def given(self) -> TestGiven[SeedingSession, AProjectAGroupAndACaller]:
+    def given(self) -> Given[SeedingSession, AProjectAGroupAndACaller]:
         return AProjectAGroupAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
     def when(
         self,
-    ) -> TestWhen[AProjectAGroupAndACaller, ResourceGroupAdapter, AllowedResourceGroupsPayload]:
+    ) -> When[AProjectAGroupAndACaller, ResourceGroupAdapter, AllowedResourceGroupsPayload]:
         return AllowingForTheProject()
 
     @override
-    def then(self) -> TestThen[AProjectAGroupAndACaller, AllowedResourceGroupsPayload]:
+    def then(self) -> Then[AProjectAGroupAndACaller, AllowedResourceGroupsPayload]:
         return TheGroupIsAllowedForTheProject()
 
 
 @dataclass(frozen=True)
 class AUserWhoIsNotTheSuperadminMayNotAllowForAProject(
-    TestScenario[
+    Scenario[
         SeedingSession, AProjectAGroupAndACaller, ResourceGroupAdapter, AllowedResourceGroupsPayload
     ]
 ):
@@ -623,23 +623,23 @@ class AUserWhoIsNotTheSuperadminMayNotAllowForAProject(
         return "슈퍼관리자가 아닌 사용자가 프로젝트의 허용 목록에 그룹을 더하려 하면 역할 부족으로 거부된다"
 
     @override
-    def given(self) -> TestGiven[SeedingSession, AProjectAGroupAndACaller]:
+    def given(self) -> Given[SeedingSession, AProjectAGroupAndACaller]:
         return AProjectAGroupAndSomeone()
 
     @override
     def when(
         self,
-    ) -> TestWhen[AProjectAGroupAndACaller, ResourceGroupAdapter, AllowedResourceGroupsPayload]:
+    ) -> When[AProjectAGroupAndACaller, ResourceGroupAdapter, AllowedResourceGroupsPayload]:
         return AllowingForTheProject()
 
     @override
-    def then(self) -> TestThen[AProjectAGroupAndACaller, AllowedResourceGroupsPayload]:
+    def then(self) -> Then[AProjectAGroupAndACaller, AllowedResourceGroupsPayload]:
         return TheCallIsRefused(InsufficientPrivilege)
 
 
 @dataclass(frozen=True)
 class TheSuperadminReadsAProjectsAllowed(
-    TestScenario[
+    Scenario[
         SeedingSession, AProjectAGroupAndACaller, ResourceGroupAdapter, AllowedResourceGroupsPayload
     ]
 ):
@@ -652,23 +652,23 @@ class TheSuperadminReadsAProjectsAllowed(
         return "프로젝트에 건 그룹이 있을 때 슈퍼관리자가 프로젝트의 허용 목록을 읽으면 건 그룹 이름이 담긴다"
 
     @override
-    def given(self) -> TestGiven[SeedingSession, AProjectAGroupAndACaller]:
+    def given(self) -> Given[SeedingSession, AProjectAGroupAndACaller]:
         return AProjectAGroupAndSomeone(role=UserRole.SUPERADMIN, linked=True)
 
     @override
     def when(
         self,
-    ) -> TestWhen[AProjectAGroupAndACaller, ResourceGroupAdapter, AllowedResourceGroupsPayload]:
+    ) -> When[AProjectAGroupAndACaller, ResourceGroupAdapter, AllowedResourceGroupsPayload]:
         return ReadingTheProjectsAllowed()
 
     @override
-    def then(self) -> TestThen[AProjectAGroupAndACaller, AllowedResourceGroupsPayload]:
+    def then(self) -> Then[AProjectAGroupAndACaller, AllowedResourceGroupsPayload]:
         return TheGroupIsAllowedForTheProject()
 
 
 @dataclass(frozen=True)
 class AUserGrantedNothingMayNotReadAProjectsAllowed(
-    TestScenario[
+    Scenario[
         SeedingSession, AProjectAGroupAndACaller, ResourceGroupAdapter, AllowedResourceGroupsPayload
     ]
 ):
@@ -684,17 +684,17 @@ class AUserGrantedNothingMayNotReadAProjectsAllowed(
         )
 
     @override
-    def given(self) -> TestGiven[SeedingSession, AProjectAGroupAndACaller]:
+    def given(self) -> Given[SeedingSession, AProjectAGroupAndACaller]:
         return AProjectAGroupAndSomeone(linked=True)
 
     @override
     def when(
         self,
-    ) -> TestWhen[AProjectAGroupAndACaller, ResourceGroupAdapter, AllowedResourceGroupsPayload]:
+    ) -> When[AProjectAGroupAndACaller, ResourceGroupAdapter, AllowedResourceGroupsPayload]:
         return ReadingTheProjectsAllowed()
 
     @override
-    def then(self) -> TestThen[AProjectAGroupAndACaller, AllowedResourceGroupsPayload]:
+    def then(self) -> Then[AProjectAGroupAndACaller, AllowedResourceGroupsPayload]:
         return TheCallIsRefused(NotEnoughPermission)
 
 
@@ -703,9 +703,7 @@ class AUserGrantedNothingMayNotReadAProjectsAllowed(
 
 @dataclass(frozen=True)
 class TheSuperadminAllowsADomainForAGroup(
-    TestScenario[
-        SeedingSession, ADomainGroupsAndACaller, ResourceGroupAdapter, AllowedDomainsPayload
-    ]
+    Scenario[SeedingSession, ADomainGroupsAndACaller, ResourceGroupAdapter, AllowedDomainsPayload]
 ):
     @override
     def summary(self) -> str:
@@ -716,25 +714,21 @@ class TheSuperadminAllowsADomainForAGroup(
         return "슈퍼관리자가 그룹의 허용 도메인에 도메인을 더하면 그 도메인 이름이 담긴 목록이 반환된다"
 
     @override
-    def given(self) -> TestGiven[SeedingSession, ADomainGroupsAndACaller]:
+    def given(self) -> Given[SeedingSession, ADomainGroupsAndACaller]:
         return ADomainGroupsAndSomeone(role=UserRole.SUPERADMIN, linked=False)
 
     @override
-    def when(
-        self,
-    ) -> TestWhen[ADomainGroupsAndACaller, ResourceGroupAdapter, AllowedDomainsPayload]:
+    def when(self) -> When[ADomainGroupsAndACaller, ResourceGroupAdapter, AllowedDomainsPayload]:
         return AllowingADomainForTheGroup()
 
     @override
-    def then(self) -> TestThen[ADomainGroupsAndACaller, AllowedDomainsPayload]:
+    def then(self) -> Then[ADomainGroupsAndACaller, AllowedDomainsPayload]:
         return TheAllowedDomainNames()
 
 
 @dataclass(frozen=True)
 class AllowingAnUnknownDomainForAGroupIsNotFound(
-    TestScenario[
-        SeedingSession, ADomainGroupsAndACaller, ResourceGroupAdapter, AllowedDomainsPayload
-    ]
+    Scenario[SeedingSession, ADomainGroupsAndACaller, ResourceGroupAdapter, AllowedDomainsPayload]
 ):
     @override
     def summary(self) -> str:
@@ -745,25 +739,21 @@ class AllowingAnUnknownDomainForAGroupIsNotFound(
         return "존재하지 않는 도메인 이름을 그룹의 허용 도메인에 더하려 하면 대상을 찾을 수 없다는 이유로 거부된다"
 
     @override
-    def given(self) -> TestGiven[SeedingSession, ADomainGroupsAndACaller]:
+    def given(self) -> Given[SeedingSession, ADomainGroupsAndACaller]:
         return ADomainGroupsAndSomeone(role=UserRole.SUPERADMIN, linked=False)
 
     @override
-    def when(
-        self,
-    ) -> TestWhen[ADomainGroupsAndACaller, ResourceGroupAdapter, AllowedDomainsPayload]:
+    def when(self) -> When[ADomainGroupsAndACaller, ResourceGroupAdapter, AllowedDomainsPayload]:
         return AllowingADomainForTheGroup(unknown=True)
 
     @override
-    def then(self) -> TestThen[ADomainGroupsAndACaller, AllowedDomainsPayload]:
+    def then(self) -> Then[ADomainGroupsAndACaller, AllowedDomainsPayload]:
         return TheCallIsRefused(EntityNotFoundError)
 
 
 @dataclass(frozen=True)
 class DisallowingAnUnknownDomainForAGroupIsNotFound(
-    TestScenario[
-        SeedingSession, ADomainGroupsAndACaller, ResourceGroupAdapter, AllowedDomainsPayload
-    ]
+    Scenario[SeedingSession, ADomainGroupsAndACaller, ResourceGroupAdapter, AllowedDomainsPayload]
 ):
     @override
     def summary(self) -> str:
@@ -777,25 +767,21 @@ class DisallowingAnUnknownDomainForAGroupIsNotFound(
         )
 
     @override
-    def given(self) -> TestGiven[SeedingSession, ADomainGroupsAndACaller]:
+    def given(self) -> Given[SeedingSession, ADomainGroupsAndACaller]:
         return ADomainGroupsAndSomeone(role=UserRole.SUPERADMIN, linked=False)
 
     @override
-    def when(
-        self,
-    ) -> TestWhen[ADomainGroupsAndACaller, ResourceGroupAdapter, AllowedDomainsPayload]:
+    def when(self) -> When[ADomainGroupsAndACaller, ResourceGroupAdapter, AllowedDomainsPayload]:
         return AllowingADomainForTheGroup(remove=True, unknown=True)
 
     @override
-    def then(self) -> TestThen[ADomainGroupsAndACaller, AllowedDomainsPayload]:
+    def then(self) -> Then[ADomainGroupsAndACaller, AllowedDomainsPayload]:
         return TheCallIsRefused(EntityNotFoundError)
 
 
 @dataclass(frozen=True)
 class AUserGrantedNothingMayNotAllowADomainForAGroup(
-    TestScenario[
-        SeedingSession, ADomainGroupsAndACaller, ResourceGroupAdapter, AllowedDomainsPayload
-    ]
+    Scenario[SeedingSession, ADomainGroupsAndACaller, ResourceGroupAdapter, AllowedDomainsPayload]
 ):
     @override
     def summary(self) -> str:
@@ -809,25 +795,21 @@ class AUserGrantedNothingMayNotAllowADomainForAGroup(
         )
 
     @override
-    def given(self) -> TestGiven[SeedingSession, ADomainGroupsAndACaller]:
+    def given(self) -> Given[SeedingSession, ADomainGroupsAndACaller]:
         return ADomainGroupsAndSomeone(linked=False)
 
     @override
-    def when(
-        self,
-    ) -> TestWhen[ADomainGroupsAndACaller, ResourceGroupAdapter, AllowedDomainsPayload]:
+    def when(self) -> When[ADomainGroupsAndACaller, ResourceGroupAdapter, AllowedDomainsPayload]:
         return AllowingADomainForTheGroup()
 
     @override
-    def then(self) -> TestThen[ADomainGroupsAndACaller, AllowedDomainsPayload]:
+    def then(self) -> Then[ADomainGroupsAndACaller, AllowedDomainsPayload]:
         return TheCallIsRefused(NotEnoughPermission)
 
 
 @dataclass(frozen=True)
 class TheSuperadminReadsAGroupsDomains(
-    TestScenario[
-        SeedingSession, ADomainGroupsAndACaller, ResourceGroupAdapter, AllowedDomainsPayload
-    ]
+    Scenario[SeedingSession, ADomainGroupsAndACaller, ResourceGroupAdapter, AllowedDomainsPayload]
 ):
     @override
     def summary(self) -> str:
@@ -838,23 +820,21 @@ class TheSuperadminReadsAGroupsDomains(
         return "도메인에 건 그룹의 허용 도메인을 슈퍼관리자가 읽으면 그 도메인 이름이 담긴다"
 
     @override
-    def given(self) -> TestGiven[SeedingSession, ADomainGroupsAndACaller]:
+    def given(self) -> Given[SeedingSession, ADomainGroupsAndACaller]:
         return ADomainGroupsAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
-    def when(
-        self,
-    ) -> TestWhen[ADomainGroupsAndACaller, ResourceGroupAdapter, AllowedDomainsPayload]:
+    def when(self) -> When[ADomainGroupsAndACaller, ResourceGroupAdapter, AllowedDomainsPayload]:
         return ReadingTheGroupsDomains()
 
     @override
-    def then(self) -> TestThen[ADomainGroupsAndACaller, AllowedDomainsPayload]:
+    def then(self) -> Then[ADomainGroupsAndACaller, AllowedDomainsPayload]:
         return TheAllowedDomainNames()
 
 
 @dataclass(frozen=True)
 class AUserGrantedReadOnTheGroupReadsItsDomains(
-    TestScenario[SeedingSession, AGroupAndACaller, ResourceGroupAdapter, AllowedDomainsPayload]
+    Scenario[SeedingSession, AGroupAndACaller, ResourceGroupAdapter, AllowedDomainsPayload]
 ):
     @override
     def summary(self) -> str:
@@ -865,21 +845,21 @@ class AUserGrantedReadOnTheGroupReadsItsDomains(
         return "그 그룹에 앉힌 역할로 읽기 권한을 받은 사용자가 그룹의 허용 도메인을 읽으면 걸린 도메인이 없어 빈 목록이 반환된다"
 
     @override
-    def given(self) -> TestGiven[SeedingSession, AGroupAndACaller]:
+    def given(self) -> Given[SeedingSession, AGroupAndACaller]:
         return AGroupAndSomeone(granted=Permission.READ)
 
     @override
-    def when(self) -> TestWhen[AGroupAndACaller, ResourceGroupAdapter, AllowedDomainsPayload]:
+    def when(self) -> When[AGroupAndACaller, ResourceGroupAdapter, AllowedDomainsPayload]:
         return ReadingTheOwnGroupsDomains()
 
     @override
-    def then(self) -> TestThen[AGroupAndACaller, AllowedDomainsPayload]:
+    def then(self) -> Then[AGroupAndACaller, AllowedDomainsPayload]:
         return NothingIsAllowed()
 
 
 @dataclass(frozen=True)
 class AUserGrantedNothingMayNotReadAGroupsDomains(
-    TestScenario[SeedingSession, AGroupAndACaller, ResourceGroupAdapter, AllowedDomainsPayload]
+    Scenario[SeedingSession, AGroupAndACaller, ResourceGroupAdapter, AllowedDomainsPayload]
 ):
     @override
     def summary(self) -> str:
@@ -890,23 +870,21 @@ class AUserGrantedNothingMayNotReadAGroupsDomains(
         return "아무 권한도 없는 사용자가 그룹의 허용 도메인을 읽으려 하면 권한 부족으로 거부된다"
 
     @override
-    def given(self) -> TestGiven[SeedingSession, AGroupAndACaller]:
+    def given(self) -> Given[SeedingSession, AGroupAndACaller]:
         return AGroupAndSomeone()
 
     @override
-    def when(self) -> TestWhen[AGroupAndACaller, ResourceGroupAdapter, AllowedDomainsPayload]:
+    def when(self) -> When[AGroupAndACaller, ResourceGroupAdapter, AllowedDomainsPayload]:
         return ReadingTheOwnGroupsDomains()
 
     @override
-    def then(self) -> TestThen[AGroupAndACaller, AllowedDomainsPayload]:
+    def then(self) -> Then[AGroupAndACaller, AllowedDomainsPayload]:
         return TheCallIsRefused(NotEnoughPermission)
 
 
 @dataclass(frozen=True)
 class TheSuperadminAllowsAProjectForAGroup(
-    TestScenario[
-        SeedingSession, AProjectAGroupAndACaller, ResourceGroupAdapter, AllowedProjectsPayload
-    ]
+    Scenario[SeedingSession, AProjectAGroupAndACaller, ResourceGroupAdapter, AllowedProjectsPayload]
 ):
     @override
     def summary(self) -> str:
@@ -917,25 +895,21 @@ class TheSuperadminAllowsAProjectForAGroup(
         return "슈퍼관리자가 그룹의 허용 프로젝트에 프로젝트를 더하면 그 프로젝트 id가 담긴 목록이 반환된다"
 
     @override
-    def given(self) -> TestGiven[SeedingSession, AProjectAGroupAndACaller]:
+    def given(self) -> Given[SeedingSession, AProjectAGroupAndACaller]:
         return AProjectAGroupAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
-    def when(
-        self,
-    ) -> TestWhen[AProjectAGroupAndACaller, ResourceGroupAdapter, AllowedProjectsPayload]:
+    def when(self) -> When[AProjectAGroupAndACaller, ResourceGroupAdapter, AllowedProjectsPayload]:
         return AllowingAProjectForTheGroup()
 
     @override
-    def then(self) -> TestThen[AProjectAGroupAndACaller, AllowedProjectsPayload]:
+    def then(self) -> Then[AProjectAGroupAndACaller, AllowedProjectsPayload]:
         return TheAllowedProjectIds()
 
 
 @dataclass(frozen=True)
 class AUserGrantedNothingMayNotAllowAProjectForAGroup(
-    TestScenario[
-        SeedingSession, AProjectAGroupAndACaller, ResourceGroupAdapter, AllowedProjectsPayload
-    ]
+    Scenario[SeedingSession, AProjectAGroupAndACaller, ResourceGroupAdapter, AllowedProjectsPayload]
 ):
     @override
     def summary(self) -> str:
@@ -946,25 +920,21 @@ class AUserGrantedNothingMayNotAllowAProjectForAGroup(
         return "아무 권한도 없는 사용자가 그룹의 허용 프로젝트에 프로젝트를 더하려 하면 권한 부족으로 거부된다"
 
     @override
-    def given(self) -> TestGiven[SeedingSession, AProjectAGroupAndACaller]:
+    def given(self) -> Given[SeedingSession, AProjectAGroupAndACaller]:
         return AProjectAGroupAndSomeone()
 
     @override
-    def when(
-        self,
-    ) -> TestWhen[AProjectAGroupAndACaller, ResourceGroupAdapter, AllowedProjectsPayload]:
+    def when(self) -> When[AProjectAGroupAndACaller, ResourceGroupAdapter, AllowedProjectsPayload]:
         return AllowingAProjectForTheGroup()
 
     @override
-    def then(self) -> TestThen[AProjectAGroupAndACaller, AllowedProjectsPayload]:
+    def then(self) -> Then[AProjectAGroupAndACaller, AllowedProjectsPayload]:
         return TheCallIsRefused(NotEnoughPermission)
 
 
 @dataclass(frozen=True)
 class TheSuperadminReadsAGroupsProjects(
-    TestScenario[
-        SeedingSession, AProjectAGroupAndACaller, ResourceGroupAdapter, AllowedProjectsPayload
-    ]
+    Scenario[SeedingSession, AProjectAGroupAndACaller, ResourceGroupAdapter, AllowedProjectsPayload]
 ):
     @override
     def summary(self) -> str:
@@ -975,25 +945,21 @@ class TheSuperadminReadsAGroupsProjects(
         return "프로젝트에 건 그룹의 허용 프로젝트를 슈퍼관리자가 읽으면 그 프로젝트 id가 담긴다"
 
     @override
-    def given(self) -> TestGiven[SeedingSession, AProjectAGroupAndACaller]:
+    def given(self) -> Given[SeedingSession, AProjectAGroupAndACaller]:
         return AProjectAGroupAndSomeone(role=UserRole.SUPERADMIN, linked=True)
 
     @override
-    def when(
-        self,
-    ) -> TestWhen[AProjectAGroupAndACaller, ResourceGroupAdapter, AllowedProjectsPayload]:
+    def when(self) -> When[AProjectAGroupAndACaller, ResourceGroupAdapter, AllowedProjectsPayload]:
         return ReadingTheGroupsProjects()
 
     @override
-    def then(self) -> TestThen[AProjectAGroupAndACaller, AllowedProjectsPayload]:
+    def then(self) -> Then[AProjectAGroupAndACaller, AllowedProjectsPayload]:
         return TheAllowedProjectIds()
 
 
 @dataclass(frozen=True)
 class AUserGrantedNothingMayNotReadAGroupsProjects(
-    TestScenario[
-        SeedingSession, AProjectAGroupAndACaller, ResourceGroupAdapter, AllowedProjectsPayload
-    ]
+    Scenario[SeedingSession, AProjectAGroupAndACaller, ResourceGroupAdapter, AllowedProjectsPayload]
 ):
     @override
     def summary(self) -> str:
@@ -1004,17 +970,15 @@ class AUserGrantedNothingMayNotReadAGroupsProjects(
         return "아무 권한도 없는 사용자가 그룹의 허용 프로젝트를 읽으려 하면 권한 부족으로 거부된다"
 
     @override
-    def given(self) -> TestGiven[SeedingSession, AProjectAGroupAndACaller]:
+    def given(self) -> Given[SeedingSession, AProjectAGroupAndACaller]:
         return AProjectAGroupAndSomeone(linked=True)
 
     @override
-    def when(
-        self,
-    ) -> TestWhen[AProjectAGroupAndACaller, ResourceGroupAdapter, AllowedProjectsPayload]:
+    def when(self) -> When[AProjectAGroupAndACaller, ResourceGroupAdapter, AllowedProjectsPayload]:
         return ReadingTheGroupsProjects()
 
     @override
-    def then(self) -> TestThen[AProjectAGroupAndACaller, AllowedProjectsPayload]:
+    def then(self) -> Then[AProjectAGroupAndACaller, AllowedProjectsPayload]:
         return TheCallIsRefused(NotEnoughPermission)
 
 

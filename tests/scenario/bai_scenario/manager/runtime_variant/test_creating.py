@@ -20,13 +20,7 @@ from ai.backend.manager.api.adapters.runtime_variant.adapter import RuntimeVaria
 from ai.backend.manager.errors.auth import InsufficientPrivilege
 from ai.backend.manager.errors.resource import RuntimeVariantConflict
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.testutils.scenario_steps import (
-    TestConfigured,
-    TestGiven,
-    TestScenario,
-    TestThen,
-    TestWhen,
-)
+from ai.backend.testutils.scenario_steps import Configured, Given, Scenario, Then, When
 from bai_scenario.components.answers import TheCallIsRefused
 from bai_scenario.components.runtime_variant import (
     AVariantAndACaller,
@@ -41,11 +35,11 @@ from bai_scenario.runner.steps import run_scenario
 MADE = "vllm"
 DESCRIBED = "새로 지정한 설명"
 
-type CreatingStep = TestScenario[SeedingSession, Any, RuntimeVariantAdapter, RuntimeVariantNode]
+type CreatingStep = Scenario[SeedingSession, Any, RuntimeVariantAdapter, RuntimeVariantNode]
 
 
 @dataclass(frozen=True)
-class Creating(TestWhen[ACaller, RuntimeVariantAdapter, RuntimeVariantNode]):
+class Creating(When[ACaller, RuntimeVariantAdapter, RuntimeVariantNode]):
     """변형 하나를 생성한다. 응답에 담긴 노드를 꺼내서 준다."""
 
     named: str = MADE
@@ -69,9 +63,7 @@ class Creating(TestWhen[ACaller, RuntimeVariantAdapter, RuntimeVariantNode]):
 
 
 @dataclass(frozen=True)
-class CreatingWithTheLaidName(
-    TestWhen[AVariantAndACaller, RuntimeVariantAdapter, RuntimeVariantNode]
-):
+class CreatingWithTheLaidName(When[AVariantAndACaller, RuntimeVariantAdapter, RuntimeVariantNode]):
     """미리 만들어 둔 변형과 같은 이름으로 생성한다."""
 
     @override
@@ -93,7 +85,7 @@ class CreatingWithTheLaidName(
 
 @dataclass(frozen=True)
 class TheSuperadminMakesOneWithANameAlone(
-    TestScenario[SeedingSession, ACaller, RuntimeVariantAdapter, RuntimeVariantNode]
+    Scenario[SeedingSession, ACaller, RuntimeVariantAdapter, RuntimeVariantNode]
 ):
     started: datetime
 
@@ -109,21 +101,21 @@ class TheSuperadminMakesOneWithANameAlone(
         )
 
     @override
-    def given(self) -> TestGiven[SeedingSession, ACaller]:
+    def given(self) -> Given[SeedingSession, ACaller]:
         return SomeoneAlone(role=UserRole.SUPERADMIN)
 
     @override
-    def when(self) -> TestWhen[ACaller, RuntimeVariantAdapter, RuntimeVariantNode]:
+    def when(self) -> When[ACaller, RuntimeVariantAdapter, RuntimeVariantNode]:
         return Creating()
 
     @override
-    def then(self) -> TestThen[ACaller, RuntimeVariantNode]:
+    def then(self) -> Then[ACaller, RuntimeVariantNode]:
         return TheNewVariantNode(started=self.started, named=MADE, described=None)
 
 
 @dataclass(frozen=True)
 class ADescriptionComesBackAsGiven(
-    TestScenario[SeedingSession, ACaller, RuntimeVariantAdapter, RuntimeVariantNode]
+    Scenario[SeedingSession, ACaller, RuntimeVariantAdapter, RuntimeVariantNode]
 ):
     started: datetime
 
@@ -136,21 +128,21 @@ class ADescriptionComesBackAsGiven(
         return "슈퍼관리자가 이름과 설명을 함께 지정해 생성하면, 지정한 값이 그대로 담긴 노드가 반환된다"
 
     @override
-    def given(self) -> TestGiven[SeedingSession, ACaller]:
+    def given(self) -> Given[SeedingSession, ACaller]:
         return SomeoneAlone(role=UserRole.SUPERADMIN)
 
     @override
-    def when(self) -> TestWhen[ACaller, RuntimeVariantAdapter, RuntimeVariantNode]:
+    def when(self) -> When[ACaller, RuntimeVariantAdapter, RuntimeVariantNode]:
         return Creating(described=DESCRIBED)
 
     @override
-    def then(self) -> TestThen[ACaller, RuntimeVariantNode]:
+    def then(self) -> Then[ACaller, RuntimeVariantNode]:
         return TheNewVariantNode(started=self.started, named=MADE, described=DESCRIBED)
 
 
 @dataclass(frozen=True)
 class ANameAlreadyTakenIsRefused(
-    TestScenario[SeedingSession, AVariantAndACaller, RuntimeVariantAdapter, RuntimeVariantNode]
+    Scenario[SeedingSession, AVariantAndACaller, RuntimeVariantAdapter, RuntimeVariantNode]
 ):
     @override
     def summary(self) -> str:
@@ -161,21 +153,21 @@ class ANameAlreadyTakenIsRefused(
         return "같은 이름의 변형이 이미 있을 때 그 이름으로 다시 생성하면, 이름 중복으로 거부된다"
 
     @override
-    def given(self) -> TestGiven[SeedingSession, AVariantAndACaller]:
+    def given(self) -> Given[SeedingSession, AVariantAndACaller]:
         return AVariantAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
-    def when(self) -> TestWhen[AVariantAndACaller, RuntimeVariantAdapter, RuntimeVariantNode]:
+    def when(self) -> When[AVariantAndACaller, RuntimeVariantAdapter, RuntimeVariantNode]:
         return CreatingWithTheLaidName()
 
     @override
-    def then(self) -> TestThen[AVariantAndACaller, RuntimeVariantNode]:
+    def then(self) -> Then[AVariantAndACaller, RuntimeVariantNode]:
         return TheCallIsRefused(RuntimeVariantConflict)
 
 
 @dataclass(frozen=True)
 class AUserWhoIsNotTheSuperadminMayNotCreate(
-    TestScenario[SeedingSession, ACaller, RuntimeVariantAdapter, RuntimeVariantNode]
+    Scenario[SeedingSession, ACaller, RuntimeVariantAdapter, RuntimeVariantNode]
 ):
     @override
     def summary(self) -> str:
@@ -186,21 +178,21 @@ class AUserWhoIsNotTheSuperadminMayNotCreate(
         return "슈퍼관리자가 아닌 사용자가 변형을 생성하면 역할 부족으로 거부된다"
 
     @override
-    def given(self) -> TestGiven[SeedingSession, ACaller]:
+    def given(self) -> Given[SeedingSession, ACaller]:
         return SomeoneAlone()
 
     @override
-    def when(self) -> TestWhen[ACaller, RuntimeVariantAdapter, RuntimeVariantNode]:
+    def when(self) -> When[ACaller, RuntimeVariantAdapter, RuntimeVariantNode]:
         return Creating()
 
     @override
-    def then(self) -> TestThen[ACaller, RuntimeVariantNode]:
+    def then(self) -> Then[ACaller, RuntimeVariantNode]:
         return TheCallIsRefused(InsufficientPrivilege)
 
 
 @dataclass(frozen=True)
 class EnforcementOffStillNeedsTheSuperadmin(
-    TestScenario[SeedingSession, ACaller, RuntimeVariantAdapter, RuntimeVariantNode], TestConfigured
+    Scenario[SeedingSession, ACaller, RuntimeVariantAdapter, RuntimeVariantNode], Configured
 ):
     @override
     def summary(self) -> str:
@@ -215,15 +207,15 @@ class EnforcementOffStillNeedsTheSuperadmin(
         return {ENFORCEMENT: False}
 
     @override
-    def given(self) -> TestGiven[SeedingSession, ACaller]:
+    def given(self) -> Given[SeedingSession, ACaller]:
         return SomeoneAlone()
 
     @override
-    def when(self) -> TestWhen[ACaller, RuntimeVariantAdapter, RuntimeVariantNode]:
+    def when(self) -> When[ACaller, RuntimeVariantAdapter, RuntimeVariantNode]:
         return Creating()
 
     @override
-    def then(self) -> TestThen[ACaller, RuntimeVariantNode]:
+    def then(self) -> Then[ACaller, RuntimeVariantNode]:
         return TheCallIsRefused(InsufficientPrivilege)
 
 

@@ -29,14 +29,14 @@ from ai.backend.manager.models.session_group.creators import SessionGroupCreator
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.testutils.scenario_steps import (
     Answered,
+    Given,
     Held,
     Same,
     SameAs,
-    TestGiven,
-    TestScenario,
-    TestThen,
-    TestVerdict,
-    TestWhen,
+    Scenario,
+    Then,
+    Verdict,
+    When,
 )
 from bai_scenario.components.answers import MissingResponse
 from bai_scenario.components.resource_allocation import Granted, lay_a_caller_of, lay_a_place
@@ -123,7 +123,7 @@ class ASessionAndACaller:
 
 
 @dataclass(frozen=True)
-class ASessionToRead(TestGiven[SeedingSession, ASessionAndACaller]):
+class ASessionToRead(Given[SeedingSession, ASessionAndACaller]):
     configured: bool
 
     @override
@@ -155,7 +155,7 @@ class ASessionToRead(TestGiven[SeedingSession, ASessionAndACaller]):
 
 
 @dataclass(frozen=True)
-class SearchingSessions(TestWhen[ASessionAndACaller, SessionAdapter, AdminSearchSessionsPayload]):
+class SearchingSessions(When[ASessionAndACaller, SessionAdapter, AdminSearchSessionsPayload]):
     @override
     def operation(self) -> str:
         return "admin_search"
@@ -173,7 +173,7 @@ class SearchingSessions(TestWhen[ASessionAndACaller, SessionAdapter, AdminSearch
 
 
 @dataclass(frozen=True)
-class TheWholeSessionIsReturned(TestThen[ASessionAndACaller, AdminSearchSessionsPayload]):
+class TheWholeSessionIsReturned(Then[ASessionAndACaller, AdminSearchSessionsPayload]):
     @override
     def says(self) -> str:
         return "스케줄링 조건을 포함한 세션 정보 전체가 저장된 그대로 반환된다"
@@ -181,7 +181,7 @@ class TheWholeSessionIsReturned(TestThen[ASessionAndACaller, AdminSearchSessions
     @override
     def look(
         self, laid: ASessionAndACaller, answered: Answered[AdminSearchSessionsPayload]
-    ) -> list[TestVerdict]:
+    ) -> list[Verdict]:
         page = answered.response
         if page is None:
             return [MissingResponse(answered.raised)]
@@ -252,7 +252,7 @@ class TheWholeSessionIsReturned(TestThen[ASessionAndACaller, AdminSearchSessions
 
 @dataclass(frozen=True)
 class SessionSchedulingConditionsArePreserved(
-    TestScenario[SeedingSession, ASessionAndACaller, SessionAdapter, AdminSearchSessionsPayload]
+    Scenario[SeedingSession, ASessionAndACaller, SessionAdapter, AdminSearchSessionsPayload]
 ):
     configured: bool
 
@@ -267,15 +267,15 @@ class SessionSchedulingConditionsArePreserved(
         return f"슈퍼관리자가 {detail} 세션 스케줄링 조건을 읽으면 기존 세션 정보와 함께 유지된다"
 
     @override
-    def given(self) -> TestGiven[SeedingSession, ASessionAndACaller]:
+    def given(self) -> Given[SeedingSession, ASessionAndACaller]:
         return ASessionToRead(configured=self.configured)
 
     @override
-    def when(self) -> TestWhen[ASessionAndACaller, SessionAdapter, AdminSearchSessionsPayload]:
+    def when(self) -> When[ASessionAndACaller, SessionAdapter, AdminSearchSessionsPayload]:
         return SearchingSessions()
 
     @override
-    def then(self) -> TestThen[ASessionAndACaller, AdminSearchSessionsPayload]:
+    def then(self) -> Then[ASessionAndACaller, AdminSearchSessionsPayload]:
         return TheWholeSessionIsReturned()
 
 

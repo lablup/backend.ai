@@ -22,15 +22,15 @@ from ai.backend.manager.errors.permission import NotEnoughPermission
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.testutils.scenario_steps import (
     Answered,
+    Given,
     Held,
     Refused,
     Same,
     SameAs,
-    TestGiven,
-    TestScenario,
-    TestThen,
-    TestVerdict,
-    TestWhen,
+    Scenario,
+    Then,
+    Verdict,
+    When,
 )
 from bai_scenario.components.app_config_fragment import (
     SomeFragmentsAndACaller,
@@ -41,13 +41,13 @@ from bai_scenario.runner.planting import SeedingSession
 from bai_scenario.runner.steps import run_scenario
 
 type Loaded = list[AppConfigFragmentNode | Exception | None]
-type LoadingStep = TestScenario[
+type LoadingStep = Scenario[
     SeedingSession, SomeFragmentsAndACaller, AppConfigFragmentAdapter, Loaded
 ]
 
 
 @dataclass(frozen=True)
-class LoadingByIds(TestWhen[SomeFragmentsAndACaller, AppConfigFragmentAdapter, Loaded]):
+class LoadingByIds(When[SomeFragmentsAndACaller, AppConfigFragmentAdapter, Loaded]):
     """자기 조각, 남의 조각, 존재하지 않는 id를 한 번에 조회한다. 빈 목록을 줄 수도 있다."""
 
     nothing: bool = False
@@ -74,7 +74,7 @@ class LoadingByIds(TestWhen[SomeFragmentsAndACaller, AppConfigFragmentAdapter, L
 
 
 @dataclass(frozen=True)
-class OneNodeAndTwoRefused(TestThen[SomeFragmentsAndACaller, Loaded]):
+class OneNodeAndTwoRefused(Then[SomeFragmentsAndACaller, Loaded]):
     """첫째는 노드, 둘째와 셋째는 그 항목만 거부된다."""
 
     @override
@@ -82,11 +82,11 @@ class OneNodeAndTwoRefused(TestThen[SomeFragmentsAndACaller, Loaded]):
         return "자기 것은 노드, 남의 것과 없는 id는 그 항목만 거부된다"
 
     @override
-    def look(self, laid: SomeFragmentsAndACaller, answered: Answered[Loaded]) -> list[TestVerdict]:
+    def look(self, laid: SomeFragmentsAndACaller, answered: Answered[Loaded]) -> list[Verdict]:
         items = answered.response
         if items is None:
             return [Refused(NotEnoughPermission, answered.raised)]
-        seen: list[TestVerdict] = [Same("items", len(items), 3)]
+        seen: list[Verdict] = [Same("items", len(items), 3)]
         if len(items) != 3:
             return seen
         second, third = items[1], items[2]
@@ -103,7 +103,7 @@ class OneNodeAndTwoRefused(TestThen[SomeFragmentsAndACaller, Loaded]):
 
 
 @dataclass(frozen=True)
-class TwoNodesOneMissing(TestThen[SomeFragmentsAndACaller, Loaded]):
+class TwoNodesOneMissing(Then[SomeFragmentsAndACaller, Loaded]):
     """둘은 노드, 셋째는 빈 항목."""
 
     @override
@@ -111,11 +111,11 @@ class TwoNodesOneMissing(TestThen[SomeFragmentsAndACaller, Loaded]):
         return "있는 둘은 노드로 반환되고, 없는 id에 해당하는 항목은 비어 있다"
 
     @override
-    def look(self, laid: SomeFragmentsAndACaller, answered: Answered[Loaded]) -> list[TestVerdict]:
+    def look(self, laid: SomeFragmentsAndACaller, answered: Answered[Loaded]) -> list[Verdict]:
         items = answered.response
         if items is None:
             return [Refused(NotEnoughPermission, answered.raised)]
-        seen: list[TestVerdict] = [Same("items", len(items), 3)]
+        seen: list[Verdict] = [Same("items", len(items), 3)]
         if len(items) != 3:
             return seen
         return [
@@ -135,7 +135,7 @@ class TwoNodesOneMissing(TestThen[SomeFragmentsAndACaller, Loaded]):
 
 
 @dataclass(frozen=True)
-class NothingIsAnswered(TestThen[SomeFragmentsAndACaller, Loaded]):
+class NothingIsAnswered(Then[SomeFragmentsAndACaller, Loaded]):
     """빈 응답."""
 
     @override
@@ -143,7 +143,7 @@ class NothingIsAnswered(TestThen[SomeFragmentsAndACaller, Loaded]):
         return "빈 응답이 반환된다"
 
     @override
-    def look(self, laid: SomeFragmentsAndACaller, answered: Answered[Loaded]) -> list[TestVerdict]:
+    def look(self, laid: SomeFragmentsAndACaller, answered: Answered[Loaded]) -> list[Verdict]:
         items = answered.response
         if items is None:
             return [Refused(NotEnoughPermission, answered.raised)]
@@ -152,7 +152,7 @@ class NothingIsAnswered(TestThen[SomeFragmentsAndACaller, Loaded]):
 
 @dataclass(frozen=True)
 class MixedIdsAreAnsweredEach(
-    TestScenario[SeedingSession, SomeFragmentsAndACaller, AppConfigFragmentAdapter, Loaded]
+    Scenario[SeedingSession, SomeFragmentsAndACaller, AppConfigFragmentAdapter, Loaded]
 ):
     @override
     def summary(self) -> str:
@@ -167,21 +167,21 @@ class MixedIdsAreAnsweredEach(
         )
 
     @override
-    def given(self) -> TestGiven[SeedingSession, SomeFragmentsAndACaller]:
+    def given(self) -> Given[SeedingSession, SomeFragmentsAndACaller]:
         return SomeFragmentsAndSomeone(granted=(Permission.READ,))
 
     @override
-    def when(self) -> TestWhen[SomeFragmentsAndACaller, AppConfigFragmentAdapter, Loaded]:
+    def when(self) -> When[SomeFragmentsAndACaller, AppConfigFragmentAdapter, Loaded]:
         return LoadingByIds()
 
     @override
-    def then(self) -> TestThen[SomeFragmentsAndACaller, Loaded]:
+    def then(self) -> Then[SomeFragmentsAndACaller, Loaded]:
         return OneNodeAndTwoRefused()
 
 
 @dataclass(frozen=True)
 class TheSuperadminSeesBoth(
-    TestScenario[SeedingSession, SomeFragmentsAndACaller, AppConfigFragmentAdapter, Loaded]
+    Scenario[SeedingSession, SomeFragmentsAndACaller, AppConfigFragmentAdapter, Loaded]
 ):
     @override
     def summary(self) -> str:
@@ -195,21 +195,21 @@ class TheSuperadminSeesBoth(
         )
 
     @override
-    def given(self) -> TestGiven[SeedingSession, SomeFragmentsAndACaller]:
+    def given(self) -> Given[SeedingSession, SomeFragmentsAndACaller]:
         return SomeFragmentsAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
-    def when(self) -> TestWhen[SomeFragmentsAndACaller, AppConfigFragmentAdapter, Loaded]:
+    def when(self) -> When[SomeFragmentsAndACaller, AppConfigFragmentAdapter, Loaded]:
         return LoadingByIds()
 
     @override
-    def then(self) -> TestThen[SomeFragmentsAndACaller, Loaded]:
+    def then(self) -> Then[SomeFragmentsAndACaller, Loaded]:
         return TwoNodesOneMissing()
 
 
 @dataclass(frozen=True)
 class AnEmptyListAnswersEmpty(
-    TestScenario[SeedingSession, SomeFragmentsAndACaller, AppConfigFragmentAdapter, Loaded]
+    Scenario[SeedingSession, SomeFragmentsAndACaller, AppConfigFragmentAdapter, Loaded]
 ):
     @override
     def summary(self) -> str:
@@ -220,15 +220,15 @@ class AnEmptyListAnswersEmpty(
         return "빈 id 목록을 주면 빈 응답이 반환된다. 하위 계층을 호출하지 않는다"
 
     @override
-    def given(self) -> TestGiven[SeedingSession, SomeFragmentsAndACaller]:
+    def given(self) -> Given[SeedingSession, SomeFragmentsAndACaller]:
         return SomeFragmentsAndSomeone()
 
     @override
-    def when(self) -> TestWhen[SomeFragmentsAndACaller, AppConfigFragmentAdapter, Loaded]:
+    def when(self) -> When[SomeFragmentsAndACaller, AppConfigFragmentAdapter, Loaded]:
         return LoadingByIds(nothing=True)
 
     @override
-    def then(self) -> TestThen[SomeFragmentsAndACaller, Loaded]:
+    def then(self) -> Then[SomeFragmentsAndACaller, Loaded]:
         return NothingIsAnswered()
 
 

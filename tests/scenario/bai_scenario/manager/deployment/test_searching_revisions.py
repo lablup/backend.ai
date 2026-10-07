@@ -30,7 +30,7 @@ from ai.backend.manager.errors.auth import InsufficientPrivilege
 from ai.backend.manager.errors.common import GenericBadRequest
 from ai.backend.manager.errors.permission import NotEnoughPermission
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.testutils.scenario_steps import TestGiven, TestScenario, TestThen, TestWhen
+from ai.backend.testutils.scenario_steps import Given, Scenario, Then, When
 from bai_scenario.components.answers import TheCallIsRefused
 from bai_scenario.components.deployment_revision import (
     ADeploymentToRevise,
@@ -45,12 +45,12 @@ from bai_scenario.runner.steps import run_scenario
 
 type Searched = AdminSearchRevisionsPayload
 type Slots = SearchAllocatedResourceSlotsPayload
-type SearchingStep = TestScenario[SeedingSession, RevisionsAndACaller, DeploymentAdapter, Searched]
-type SlotStep = TestScenario[SeedingSession, RevisionsAndACaller, DeploymentAdapter, Slots]
+type SearchingStep = Scenario[SeedingSession, RevisionsAndACaller, DeploymentAdapter, Searched]
+type SlotStep = Scenario[SeedingSession, RevisionsAndACaller, DeploymentAdapter, Slots]
 
 
 @dataclass(frozen=True)
-class SearchingTheDeployment(TestWhen[RevisionsAndACaller, DeploymentAdapter, Searched]):
+class SearchingTheDeployment(When[RevisionsAndACaller, DeploymentAdapter, Searched]):
     """부를 배포 하나의 리비전을 훑는다. ``number``를 대면 그 번호로 거른다."""
 
     number: int | None = None
@@ -79,7 +79,7 @@ class SearchingTheDeployment(TestWhen[RevisionsAndACaller, DeploymentAdapter, Se
 
 
 @dataclass(frozen=True)
-class SearchingEveryRevision(TestWhen[RevisionsAndACaller, DeploymentAdapter, Searched]):
+class SearchingEveryRevision(When[RevisionsAndACaller, DeploymentAdapter, Searched]):
     """필터 없이 모든 배포의 리비전을 훑는다."""
 
     @override
@@ -97,7 +97,7 @@ class SearchingEveryRevision(TestWhen[RevisionsAndACaller, DeploymentAdapter, Se
 
 
 @dataclass(frozen=True)
-class SearchingTheSlots(TestWhen[RevisionsAndACaller, DeploymentAdapter, Slots]):
+class SearchingTheSlots(When[RevisionsAndACaller, DeploymentAdapter, Slots]):
     """심은 첫 리비전이 잡은 자원 슬롯을 훑는다."""
 
     @override
@@ -119,7 +119,7 @@ class SearchingTheSlots(TestWhen[RevisionsAndACaller, DeploymentAdapter, Slots])
 
 @dataclass(frozen=True)
 class TheGrantedUserCountsTheDeploymentsRevisions(
-    TestScenario[SeedingSession, RevisionsAndACaller, DeploymentAdapter, Searched]
+    Scenario[SeedingSession, RevisionsAndACaller, DeploymentAdapter, Searched]
 ):
     @override
     def summary(self) -> str:
@@ -133,21 +133,21 @@ class TheGrantedUserCountsTheDeploymentsRevisions(
         )
 
     @override
-    def given(self) -> TestGiven[SeedingSession, RevisionsAndACaller]:
+    def given(self) -> Given[SeedingSession, RevisionsAndACaller]:
         return ADeploymentToRevise(granted=(Permission.READ,), revisions=3)
 
     @override
-    def when(self) -> TestWhen[RevisionsAndACaller, DeploymentAdapter, Searched]:
+    def when(self) -> When[RevisionsAndACaller, DeploymentAdapter, Searched]:
         return SearchingTheDeployment()
 
     @override
-    def then(self) -> TestThen[RevisionsAndACaller, Searched]:
+    def then(self) -> Then[RevisionsAndACaller, Searched]:
         return EveryLaidRevisionIsCounted()
 
 
 @dataclass(frozen=True)
 class FilteringByNumberLeavesThatOne(
-    TestScenario[SeedingSession, RevisionsAndACaller, DeploymentAdapter, Searched]
+    Scenario[SeedingSession, RevisionsAndACaller, DeploymentAdapter, Searched]
 ):
     @override
     def summary(self) -> str:
@@ -158,21 +158,21 @@ class FilteringByNumberLeavesThatOne(
         return "리비전 셋이 딸린 배포의 리비전을 번호로 걸러 훑으면, 그 번호의 것만 남는다"
 
     @override
-    def given(self) -> TestGiven[SeedingSession, RevisionsAndACaller]:
+    def given(self) -> Given[SeedingSession, RevisionsAndACaller]:
         return ADeploymentToRevise(granted=(Permission.READ,), revisions=3)
 
     @override
-    def when(self) -> TestWhen[RevisionsAndACaller, DeploymentAdapter, Searched]:
+    def when(self) -> When[RevisionsAndACaller, DeploymentAdapter, Searched]:
         return SearchingTheDeployment(number=2)
 
     @override
-    def then(self) -> TestThen[RevisionsAndACaller, Searched]:
+    def then(self) -> Then[RevisionsAndACaller, Searched]:
         return EveryLaidRevisionIsCounted(number=2)
 
 
 @dataclass(frozen=True)
 class AnotherDeploymentsRevisionsStayOut(
-    TestScenario[SeedingSession, RevisionsAndACaller, DeploymentAdapter, Searched]
+    Scenario[SeedingSession, RevisionsAndACaller, DeploymentAdapter, Searched]
 ):
     @override
     def summary(self) -> str:
@@ -186,21 +186,21 @@ class AnotherDeploymentsRevisionsStayOut(
         )
 
     @override
-    def given(self) -> TestGiven[SeedingSession, RevisionsAndACaller]:
+    def given(self) -> Given[SeedingSession, RevisionsAndACaller]:
         return RevisionsInTwoProjects(granted=(Permission.READ,), named=2, elsewhere=1)
 
     @override
-    def when(self) -> TestWhen[RevisionsAndACaller, DeploymentAdapter, Searched]:
+    def when(self) -> When[RevisionsAndACaller, DeploymentAdapter, Searched]:
         return SearchingTheDeployment()
 
     @override
-    def then(self) -> TestThen[RevisionsAndACaller, Searched]:
+    def then(self) -> Then[RevisionsAndACaller, Searched]:
         return EveryLaidRevisionIsCounted()
 
 
 @dataclass(frozen=True)
 class AUserGrantedNothingMayNotSearchIt(
-    TestScenario[SeedingSession, RevisionsAndACaller, DeploymentAdapter, Searched]
+    Scenario[SeedingSession, RevisionsAndACaller, DeploymentAdapter, Searched]
 ):
     @override
     def summary(self) -> str:
@@ -211,21 +211,21 @@ class AUserGrantedNothingMayNotSearchIt(
         return "아무 배포 권한도 받지 않은 사용자가 배포의 리비전을 훑으면, 권한 부족으로 거부된다"
 
     @override
-    def given(self) -> TestGiven[SeedingSession, RevisionsAndACaller]:
+    def given(self) -> Given[SeedingSession, RevisionsAndACaller]:
         return ADeploymentToRevise(revisions=1)
 
     @override
-    def when(self) -> TestWhen[RevisionsAndACaller, DeploymentAdapter, Searched]:
+    def when(self) -> When[RevisionsAndACaller, DeploymentAdapter, Searched]:
         return SearchingTheDeployment()
 
     @override
-    def then(self) -> TestThen[RevisionsAndACaller, Searched]:
+    def then(self) -> Then[RevisionsAndACaller, Searched]:
         return TheCallIsRefused(NotEnoughPermission)
 
 
 @dataclass(frozen=True)
 class TheSuperadminCountsEveryRevision(
-    TestScenario[SeedingSession, RevisionsAndACaller, DeploymentAdapter, Searched]
+    Scenario[SeedingSession, RevisionsAndACaller, DeploymentAdapter, Searched]
 ):
     @override
     def summary(self) -> str:
@@ -239,21 +239,21 @@ class TheSuperadminCountsEveryRevision(
         )
 
     @override
-    def given(self) -> TestGiven[SeedingSession, RevisionsAndACaller]:
+    def given(self) -> Given[SeedingSession, RevisionsAndACaller]:
         return RevisionsInTwoProjects(role=UserRole.SUPERADMIN, named=2, elsewhere=1)
 
     @override
-    def when(self) -> TestWhen[RevisionsAndACaller, DeploymentAdapter, Searched]:
+    def when(self) -> When[RevisionsAndACaller, DeploymentAdapter, Searched]:
         return SearchingEveryRevision()
 
     @override
-    def then(self) -> TestThen[RevisionsAndACaller, Searched]:
+    def then(self) -> Then[RevisionsAndACaller, Searched]:
         return EveryLaidRevisionIsCounted(elsewhere_too=True)
 
 
 @dataclass(frozen=True)
 class AReadGrantDoesNotOpenTheGlobalDoor(
-    TestScenario[SeedingSession, RevisionsAndACaller, DeploymentAdapter, Searched]
+    Scenario[SeedingSession, RevisionsAndACaller, DeploymentAdapter, Searched]
 ):
     @override
     def summary(self) -> str:
@@ -267,21 +267,21 @@ class AReadGrantDoesNotOpenTheGlobalDoor(
         )
 
     @override
-    def given(self) -> TestGiven[SeedingSession, RevisionsAndACaller]:
+    def given(self) -> Given[SeedingSession, RevisionsAndACaller]:
         return ADeploymentToRevise(granted=(Permission.READ,), revisions=1)
 
     @override
-    def when(self) -> TestWhen[RevisionsAndACaller, DeploymentAdapter, Searched]:
+    def when(self) -> When[RevisionsAndACaller, DeploymentAdapter, Searched]:
         return SearchingEveryRevision()
 
     @override
-    def then(self) -> TestThen[RevisionsAndACaller, Searched]:
+    def then(self) -> Then[RevisionsAndACaller, Searched]:
         return TheCallIsRefused(InsufficientPrivilege)
 
 
 @dataclass(frozen=True)
 class TheGrantedUserCountsARevisionsSlots(
-    TestScenario[SeedingSession, RevisionsAndACaller, DeploymentAdapter, Slots]
+    Scenario[SeedingSession, RevisionsAndACaller, DeploymentAdapter, Slots]
 ):
     @override
     def summary(self) -> str:
@@ -295,21 +295,21 @@ class TheGrantedUserCountsARevisionsSlots(
         )
 
     @override
-    def given(self) -> TestGiven[SeedingSession, RevisionsAndACaller]:
+    def given(self) -> Given[SeedingSession, RevisionsAndACaller]:
         return ADeploymentToRevise(granted=(Permission.READ,), revisions=1)
 
     @override
-    def when(self) -> TestWhen[RevisionsAndACaller, DeploymentAdapter, Slots]:
+    def when(self) -> When[RevisionsAndACaller, DeploymentAdapter, Slots]:
         return SearchingTheSlots()
 
     @override
-    def then(self) -> TestThen[RevisionsAndACaller, Slots]:
+    def then(self) -> Then[RevisionsAndACaller, Slots]:
         return EveryRevisionSlotIsCounted()
 
 
 @dataclass(frozen=True)
 class AUserGrantedNothingMayNotSearchTheSlots(
-    TestScenario[SeedingSession, RevisionsAndACaller, DeploymentAdapter, Slots]
+    Scenario[SeedingSession, RevisionsAndACaller, DeploymentAdapter, Slots]
 ):
     @override
     def summary(self) -> str:
@@ -323,15 +323,15 @@ class AUserGrantedNothingMayNotSearchTheSlots(
         )
 
     @override
-    def given(self) -> TestGiven[SeedingSession, RevisionsAndACaller]:
+    def given(self) -> Given[SeedingSession, RevisionsAndACaller]:
         return ADeploymentToRevise(revisions=1)
 
     @override
-    def when(self) -> TestWhen[RevisionsAndACaller, DeploymentAdapter, Slots]:
+    def when(self) -> When[RevisionsAndACaller, DeploymentAdapter, Slots]:
         return SearchingTheSlots()
 
     @override
-    def then(self) -> TestThen[RevisionsAndACaller, Slots]:
+    def then(self) -> Then[RevisionsAndACaller, Slots]:
         return TheCallIsRefused(GenericBadRequest)
 
 

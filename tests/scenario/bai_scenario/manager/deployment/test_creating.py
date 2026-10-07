@@ -29,11 +29,11 @@ from ai.backend.manager.data.permission.types import Permission
 from ai.backend.manager.errors.permission import NotEnoughPermission
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.testutils.scenario_steps import (
-    TestConfigured,
-    TestGiven,
-    TestScenario,
-    TestThen,
-    TestWhen,
+    Configured,
+    Given,
+    Scenario,
+    Then,
+    When,
 )
 from bai_scenario.components.answers import TheCallIsRefused
 from bai_scenario.components.deployment import (
@@ -51,13 +51,11 @@ ENFORCEMENT = "manager.rbac.enforcement_enabled"
 SURGE = IntOrPercent(count=2)
 UNAVAILABLE = IntOrPercent(count=0)
 
-type CreatingStep = TestScenario[
-    SeedingSession, APlaceAndACaller, DeploymentAdapter, DeploymentNode
-]
+type CreatingStep = Scenario[SeedingSession, APlaceAndACaller, DeploymentAdapter, DeploymentNode]
 
 
 @dataclass(frozen=True)
-class Creating(TestWhen[APlaceAndACaller, DeploymentAdapter, DeploymentNode]):
+class Creating(When[APlaceAndACaller, DeploymentAdapter, DeploymentNode]):
     """배포 하나를 만든다. 이름을 대지 않으면 서버가 짓는다."""
 
     named: str | None = MADE
@@ -99,7 +97,7 @@ class Creating(TestWhen[APlaceAndACaller, DeploymentAdapter, DeploymentNode]):
 
 @dataclass(frozen=True)
 class TheWholeNodeComesBack(
-    TestScenario[SeedingSession, APlaceAndACaller, DeploymentAdapter, DeploymentNode]
+    Scenario[SeedingSession, APlaceAndACaller, DeploymentAdapter, DeploymentNode]
 ):
     started: datetime
 
@@ -115,15 +113,15 @@ class TheWholeNodeComesBack(
         )
 
     @override
-    def given(self) -> TestGiven[SeedingSession, APlaceAndACaller]:
+    def given(self) -> Given[SeedingSession, APlaceAndACaller]:
         return APlaceForDeployments(granted=(Permission.CREATE,))
 
     @override
-    def when(self) -> TestWhen[APlaceAndACaller, DeploymentAdapter, DeploymentNode]:
+    def when(self) -> When[APlaceAndACaller, DeploymentAdapter, DeploymentNode]:
         return Creating(replicas=2)
 
     @override
-    def then(self) -> TestThen[APlaceAndACaller, DeploymentNode]:
+    def then(self) -> Then[APlaceAndACaller, DeploymentNode]:
         return TheNewDeploymentNode(
             started=self.started,
             named=MADE,
@@ -135,7 +133,7 @@ class TheWholeNodeComesBack(
 
 @dataclass(frozen=True)
 class ANamelessOneIsNamedAfterItsMaker(
-    TestScenario[SeedingSession, APlaceAndACaller, DeploymentAdapter, DeploymentNode]
+    Scenario[SeedingSession, APlaceAndACaller, DeploymentAdapter, DeploymentNode]
 ):
     started: datetime
 
@@ -148,15 +146,15 @@ class ANamelessOneIsNamedAfterItsMaker(
         return "이름을 대지 않고 배포를 만들면, 만든 사람에게서 이름이 지어진다"
 
     @override
-    def given(self) -> TestGiven[SeedingSession, APlaceAndACaller]:
+    def given(self) -> Given[SeedingSession, APlaceAndACaller]:
         return APlaceForDeployments(granted=(Permission.CREATE,))
 
     @override
-    def when(self) -> TestWhen[APlaceAndACaller, DeploymentAdapter, DeploymentNode]:
+    def when(self) -> When[APlaceAndACaller, DeploymentAdapter, DeploymentNode]:
         return Creating(named=None)
 
     @override
-    def then(self) -> TestThen[APlaceAndACaller, DeploymentNode]:
+    def then(self) -> Then[APlaceAndACaller, DeploymentNode]:
         return TheNewDeploymentNode(
             started=self.started,
             named=None,
@@ -168,7 +166,7 @@ class ANamelessOneIsNamedAfterItsMaker(
 
 @dataclass(frozen=True)
 class AUserGrantedNothingMayNotCreate(
-    TestScenario[SeedingSession, APlaceAndACaller, DeploymentAdapter, DeploymentNode]
+    Scenario[SeedingSession, APlaceAndACaller, DeploymentAdapter, DeploymentNode]
 ):
     @override
     def summary(self) -> str:
@@ -179,21 +177,21 @@ class AUserGrantedNothingMayNotCreate(
         return "아무 배포 권한도 받지 않은 사용자가 배포를 만들면, 권한 부족으로 거부된다"
 
     @override
-    def given(self) -> TestGiven[SeedingSession, APlaceAndACaller]:
+    def given(self) -> Given[SeedingSession, APlaceAndACaller]:
         return APlaceForDeployments()
 
     @override
-    def when(self) -> TestWhen[APlaceAndACaller, DeploymentAdapter, DeploymentNode]:
+    def when(self) -> When[APlaceAndACaller, DeploymentAdapter, DeploymentNode]:
         return Creating()
 
     @override
-    def then(self) -> TestThen[APlaceAndACaller, DeploymentNode]:
+    def then(self) -> Then[APlaceAndACaller, DeploymentNode]:
         return TheCallIsRefused(NotEnoughPermission)
 
 
 @dataclass(frozen=True)
 class AGrantInAnotherProjectDoesNotReachHere(
-    TestScenario[SeedingSession, APlaceAndACaller, DeploymentAdapter, DeploymentNode]
+    Scenario[SeedingSession, APlaceAndACaller, DeploymentAdapter, DeploymentNode]
 ):
     @override
     def summary(self) -> str:
@@ -206,22 +204,21 @@ class AGrantInAnotherProjectDoesNotReachHere(
         )
 
     @override
-    def given(self) -> TestGiven[SeedingSession, APlaceAndACaller]:
+    def given(self) -> Given[SeedingSession, APlaceAndACaller]:
         return AProjectGrantedElsewhere(granted=(Permission.CREATE,))
 
     @override
-    def when(self) -> TestWhen[APlaceAndACaller, DeploymentAdapter, DeploymentNode]:
+    def when(self) -> When[APlaceAndACaller, DeploymentAdapter, DeploymentNode]:
         return Creating()
 
     @override
-    def then(self) -> TestThen[APlaceAndACaller, DeploymentNode]:
+    def then(self) -> Then[APlaceAndACaller, DeploymentNode]:
         return TheCallIsRefused(NotEnoughPermission)
 
 
 @dataclass(frozen=True)
 class EnforcementOffLetsAnyoneCreate(
-    TestScenario[SeedingSession, APlaceAndACaller, DeploymentAdapter, DeploymentNode],
-    TestConfigured,
+    Scenario[SeedingSession, APlaceAndACaller, DeploymentAdapter, DeploymentNode], Configured
 ):
     started: datetime
 
@@ -241,15 +238,15 @@ class EnforcementOffLetsAnyoneCreate(
         return {ENFORCEMENT: False}
 
     @override
-    def given(self) -> TestGiven[SeedingSession, APlaceAndACaller]:
+    def given(self) -> Given[SeedingSession, APlaceAndACaller]:
         return APlaceForDeployments()
 
     @override
-    def when(self) -> TestWhen[APlaceAndACaller, DeploymentAdapter, DeploymentNode]:
+    def when(self) -> When[APlaceAndACaller, DeploymentAdapter, DeploymentNode]:
         return Creating()
 
     @override
-    def then(self) -> TestThen[APlaceAndACaller, DeploymentNode]:
+    def then(self) -> Then[APlaceAndACaller, DeploymentNode]:
         return TheNewDeploymentNode(
             started=self.started,
             named=MADE,

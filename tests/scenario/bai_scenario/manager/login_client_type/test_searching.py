@@ -18,7 +18,7 @@ from ai.backend.common.dto.manager.v2.login_client_type.response import (
 )
 from ai.backend.manager.api.adapters.login_client_type.adapter import LoginClientTypeAdapter
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.testutils.scenario_steps import TestGiven, TestScenario, TestThen, TestWhen
+from ai.backend.testutils.scenario_steps import Given, Scenario, Then, When
 from bai_scenario.components.login_client_type import (
     EveryLaidTypeIsCounted,
     ManyTypesAndACaller,
@@ -29,13 +29,11 @@ from bai_scenario.runner.planting import SeedingSession
 from bai_scenario.runner.steps import run_scenario
 
 type Searched = SearchLoginClientTypesPayload
-type SearchingStep = TestScenario[
-    SeedingSession, ManyTypesAndACaller, LoginClientTypeAdapter, Searched
-]
+type SearchingStep = Scenario[SeedingSession, ManyTypesAndACaller, LoginClientTypeAdapter, Searched]
 
 
 @dataclass(frozen=True)
-class SearchingEveryType(TestWhen[ManyTypesAndACaller, LoginClientTypeAdapter, Searched]):
+class SearchingEveryType(When[ManyTypesAndACaller, LoginClientTypeAdapter, Searched]):
     """필터도 크기도 없이 전체를 검색한다."""
 
     @override
@@ -54,7 +52,7 @@ class SearchingEveryType(TestWhen[ManyTypesAndACaller, LoginClientTypeAdapter, S
 
 @dataclass(frozen=True)
 class AUserGrantedNothingCountsEveryType(
-    TestScenario[SeedingSession, ManyTypesAndACaller, LoginClientTypeAdapter, Searched]
+    Scenario[SeedingSession, ManyTypesAndACaller, LoginClientTypeAdapter, Searched]
 ):
     @override
     def summary(self) -> str:
@@ -65,15 +63,15 @@ class AUserGrantedNothingCountsEveryType(
         return "종류 둘이 있을 때 아무 권한도 없는 사용자가 필터 없이 조회하면 둘 다 집계된다"
 
     @override
-    def given(self) -> TestGiven[SeedingSession, ManyTypesAndACaller]:
+    def given(self) -> Given[SeedingSession, ManyTypesAndACaller]:
         return ManyTypesAndSomeone(besides=1)
 
     @override
-    def when(self) -> TestWhen[ManyTypesAndACaller, LoginClientTypeAdapter, Searched]:
+    def when(self) -> When[ManyTypesAndACaller, LoginClientTypeAdapter, Searched]:
         return SearchingEveryType()
 
     @override
-    def then(self) -> TestThen[ManyTypesAndACaller, Searched]:
+    def then(self) -> Then[ManyTypesAndACaller, Searched]:
         return EveryLaidTypeIsCounted()
 
 

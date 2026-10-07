@@ -13,14 +13,14 @@ from ai.backend.testutils.scenario_steps import (
     Answered,
     Refused,
     Same,
-    TestThen,
-    TestVerdict,
+    Then,
     Told,
+    Verdict,
 )
 
 
 @dataclass(frozen=True)
-class MissingResponse(TestVerdict):
+class MissingResponse(Verdict):
     """기대한 응답이 없을 때 성공 시나리오를 실패시킨다."""
 
     raised: BaseException | None
@@ -35,7 +35,7 @@ class MissingResponse(TestVerdict):
 
 
 @dataclass(frozen=True)
-class NothingIsFound(TestThen[Any, Any]):
+class NothingIsFound(Then[Any, Any]):
     """훑었지만 아무것도 없다."""
 
     @override
@@ -43,7 +43,7 @@ class NothingIsFound(TestThen[Any, Any]):
         return "답이 비어 있다"
 
     @override
-    def look(self, laid: Any, answered: Answered[Any]) -> list[TestVerdict]:
+    def look(self, laid: Any, answered: Answered[Any]) -> list[Verdict]:
         page = answered.response
         if page is None:
             return [MissingResponse(answered.raised)]
@@ -56,7 +56,7 @@ class NothingIsFound(TestThen[Any, Any]):
 
 
 @dataclass(frozen=True)
-class TheCallIsRefused(TestThen[Any, Any]):
+class TheCallIsRefused(Then[Any, Any]):
     """이 이름으로 거부된다."""
 
     expected: type[BaseException]
@@ -66,5 +66,5 @@ class TheCallIsRefused(TestThen[Any, Any]):
         return "거부된다"
 
     @override
-    def look(self, laid: Any, answered: Answered[Any]) -> list[TestVerdict]:
+    def look(self, laid: Any, answered: Answered[Any]) -> list[Verdict]:
         return [Refused(self.expected, answered.raised)]

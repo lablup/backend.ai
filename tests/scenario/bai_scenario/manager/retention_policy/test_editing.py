@@ -19,13 +19,7 @@ from ai.backend.manager.errors.base.entity import EntityNotFoundError
 from ai.backend.manager.errors.permission import NotEnoughPermission
 from ai.backend.manager.errors.repository import UniqueConstraintViolationError
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.testutils.scenario_steps import (
-    TestConfigured,
-    TestGiven,
-    TestScenario,
-    TestThen,
-    TestWhen,
-)
+from ai.backend.testutils.scenario_steps import Configured, Given, Scenario, Then, When
 from bai_scenario.components.answers import TheCallIsRefused
 from bai_scenario.components.retention_policy import (
     APolicyAndACaller,
@@ -41,11 +35,11 @@ from bai_scenario.runner.steps import run_scenario
 
 LONGER = 180
 
-type EditingStep = TestScenario[SeedingSession, Any, RetentionPolicyAdapter, RetentionPolicyNode]
+type EditingStep = Scenario[SeedingSession, Any, RetentionPolicyAdapter, RetentionPolicyNode]
 
 
 @dataclass(frozen=True)
-class Editing(TestWhen[APolicyAndACaller, RetentionPolicyAdapter, RetentionPolicyNode]):
+class Editing(When[APolicyAndACaller, RetentionPolicyAdapter, RetentionPolicyNode]):
     """미리 만들어 둔 정책을 수정한다. 응답에 담긴 노드를 꺼내서 준다."""
 
     days: int | None = None
@@ -85,7 +79,7 @@ class Editing(TestWhen[APolicyAndACaller, RetentionPolicyAdapter, RetentionPolic
 
 @dataclass(frozen=True)
 class MovingToATakenCategory(
-    TestWhen[ManyPoliciesAndACaller, RetentionPolicyAdapter, RetentionPolicyNode]
+    When[ManyPoliciesAndACaller, RetentionPolicyAdapter, RetentionPolicyNode]
 ):
     """골라낸 하나의 카테고리를 함께 만들어 둔 다른 정책의 카테고리로 바꾼다."""
 
@@ -115,7 +109,7 @@ class MovingToATakenCategory(
 
 @dataclass(frozen=True)
 class TheDaysChangeAndTheRestStays(
-    TestScenario[SeedingSession, APolicyAndACaller, RetentionPolicyAdapter, RetentionPolicyNode]
+    Scenario[SeedingSession, APolicyAndACaller, RetentionPolicyAdapter, RetentionPolicyNode]
 ):
     started: datetime
 
@@ -128,21 +122,21 @@ class TheDaysChangeAndTheRestStays(
         return "슈퍼관리자가 보존 일수만 수정하면, 일수는 새 값이 되고 카테고리와 활성 여부는 그대로 유지된다"
 
     @override
-    def given(self) -> TestGiven[SeedingSession, APolicyAndACaller]:
+    def given(self) -> Given[SeedingSession, APolicyAndACaller]:
         return APolicyAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
-    def when(self) -> TestWhen[APolicyAndACaller, RetentionPolicyAdapter, RetentionPolicyNode]:
+    def when(self) -> When[APolicyAndACaller, RetentionPolicyAdapter, RetentionPolicyNode]:
         return Editing(days=LONGER)
 
     @override
-    def then(self) -> TestThen[APolicyAndACaller, RetentionPolicyNode]:
+    def then(self) -> Then[APolicyAndACaller, RetentionPolicyNode]:
         return ThePolicyNode(started=self.started, days=LONGER)
 
 
 @dataclass(frozen=True)
 class DisablingIt(
-    TestScenario[SeedingSession, APolicyAndACaller, RetentionPolicyAdapter, RetentionPolicyNode]
+    Scenario[SeedingSession, APolicyAndACaller, RetentionPolicyAdapter, RetentionPolicyNode]
 ):
     started: datetime
 
@@ -155,21 +149,21 @@ class DisablingIt(
         return "활성 정책의 활성 여부를 끄면 비활성 상태가 담긴 노드가 반환된다"
 
     @override
-    def given(self) -> TestGiven[SeedingSession, APolicyAndACaller]:
+    def given(self) -> Given[SeedingSession, APolicyAndACaller]:
         return APolicyAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
-    def when(self) -> TestWhen[APolicyAndACaller, RetentionPolicyAdapter, RetentionPolicyNode]:
+    def when(self) -> When[APolicyAndACaller, RetentionPolicyAdapter, RetentionPolicyNode]:
         return Editing(enabled=False)
 
     @override
-    def then(self) -> TestThen[APolicyAndACaller, RetentionPolicyNode]:
+    def then(self) -> Then[APolicyAndACaller, RetentionPolicyNode]:
         return ThePolicyNode(started=self.started, enabled=False)
 
 
 @dataclass(frozen=True)
 class AnEmptyEditChangesNothing(
-    TestScenario[SeedingSession, APolicyAndACaller, RetentionPolicyAdapter, RetentionPolicyNode]
+    Scenario[SeedingSession, APolicyAndACaller, RetentionPolicyAdapter, RetentionPolicyNode]
 ):
     started: datetime
 
@@ -182,23 +176,21 @@ class AnEmptyEditChangesNothing(
         return "값을 하나도 지정하지 않고 수정하면 아무것도 바뀌지 않은 노드가 반환된다"
 
     @override
-    def given(self) -> TestGiven[SeedingSession, APolicyAndACaller]:
+    def given(self) -> Given[SeedingSession, APolicyAndACaller]:
         return APolicyAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
-    def when(self) -> TestWhen[APolicyAndACaller, RetentionPolicyAdapter, RetentionPolicyNode]:
+    def when(self) -> When[APolicyAndACaller, RetentionPolicyAdapter, RetentionPolicyNode]:
         return Editing()
 
     @override
-    def then(self) -> TestThen[APolicyAndACaller, RetentionPolicyNode]:
+    def then(self) -> Then[APolicyAndACaller, RetentionPolicyNode]:
         return ThePolicyNode(started=self.started)
 
 
 @dataclass(frozen=True)
 class MovingToATakenCategoryIsRefused(
-    TestScenario[
-        SeedingSession, ManyPoliciesAndACaller, RetentionPolicyAdapter, RetentionPolicyNode
-    ]
+    Scenario[SeedingSession, ManyPoliciesAndACaller, RetentionPolicyAdapter, RetentionPolicyNode]
 ):
     @override
     def summary(self) -> str:
@@ -212,21 +204,21 @@ class MovingToATakenCategoryIsRefused(
         )
 
     @override
-    def given(self) -> TestGiven[SeedingSession, ManyPoliciesAndACaller]:
+    def given(self) -> Given[SeedingSession, ManyPoliciesAndACaller]:
         return TwoPoliciesAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
-    def when(self) -> TestWhen[ManyPoliciesAndACaller, RetentionPolicyAdapter, RetentionPolicyNode]:
+    def when(self) -> When[ManyPoliciesAndACaller, RetentionPolicyAdapter, RetentionPolicyNode]:
         return MovingToATakenCategory()
 
     @override
-    def then(self) -> TestThen[ManyPoliciesAndACaller, RetentionPolicyNode]:
+    def then(self) -> Then[ManyPoliciesAndACaller, RetentionPolicyNode]:
         return TheCallIsRefused(UniqueConstraintViolationError)
 
 
 @dataclass(frozen=True)
 class TheSuperadminEditingAnUnknownIdIsNotFound(
-    TestScenario[SeedingSession, APolicyAndACaller, RetentionPolicyAdapter, RetentionPolicyNode]
+    Scenario[SeedingSession, APolicyAndACaller, RetentionPolicyAdapter, RetentionPolicyNode]
 ):
     @override
     def summary(self) -> str:
@@ -237,21 +229,21 @@ class TheSuperadminEditingAnUnknownIdIsNotFound(
         return "슈퍼관리자가 존재하지 않는 id를 수정하면 대상을 찾을 수 없다는 이유로 거부된다"
 
     @override
-    def given(self) -> TestGiven[SeedingSession, APolicyAndACaller]:
+    def given(self) -> Given[SeedingSession, APolicyAndACaller]:
         return APolicyAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
-    def when(self) -> TestWhen[APolicyAndACaller, RetentionPolicyAdapter, RetentionPolicyNode]:
+    def when(self) -> When[APolicyAndACaller, RetentionPolicyAdapter, RetentionPolicyNode]:
         return Editing(days=LONGER, unknown=True)
 
     @override
-    def then(self) -> TestThen[APolicyAndACaller, RetentionPolicyNode]:
+    def then(self) -> Then[APolicyAndACaller, RetentionPolicyNode]:
         return TheCallIsRefused(EntityNotFoundError)
 
 
 @dataclass(frozen=True)
 class AUserGrantedNothingMayNotEdit(
-    TestScenario[SeedingSession, APolicyAndACaller, RetentionPolicyAdapter, RetentionPolicyNode]
+    Scenario[SeedingSession, APolicyAndACaller, RetentionPolicyAdapter, RetentionPolicyNode]
 ):
     @override
     def summary(self) -> str:
@@ -262,22 +254,22 @@ class AUserGrantedNothingMayNotEdit(
         return "아무 권한도 없는 사용자가 정책을 수정하면 권한 부족으로 거부된다"
 
     @override
-    def given(self) -> TestGiven[SeedingSession, APolicyAndACaller]:
+    def given(self) -> Given[SeedingSession, APolicyAndACaller]:
         return APolicyAndSomeone()
 
     @override
-    def when(self) -> TestWhen[APolicyAndACaller, RetentionPolicyAdapter, RetentionPolicyNode]:
+    def when(self) -> When[APolicyAndACaller, RetentionPolicyAdapter, RetentionPolicyNode]:
         return Editing(days=LONGER)
 
     @override
-    def then(self) -> TestThen[APolicyAndACaller, RetentionPolicyNode]:
+    def then(self) -> Then[APolicyAndACaller, RetentionPolicyNode]:
         return TheCallIsRefused(NotEnoughPermission)
 
 
 @dataclass(frozen=True)
 class EnforcementOffLetsAnyoneEdit(
-    TestScenario[SeedingSession, APolicyAndACaller, RetentionPolicyAdapter, RetentionPolicyNode],
-    TestConfigured,
+    Scenario[SeedingSession, APolicyAndACaller, RetentionPolicyAdapter, RetentionPolicyNode],
+    Configured,
 ):
     started: datetime
 
@@ -294,15 +286,15 @@ class EnforcementOffLetsAnyoneEdit(
         return {ENFORCEMENT: False}
 
     @override
-    def given(self) -> TestGiven[SeedingSession, APolicyAndACaller]:
+    def given(self) -> Given[SeedingSession, APolicyAndACaller]:
         return APolicyAndSomeone()
 
     @override
-    def when(self) -> TestWhen[APolicyAndACaller, RetentionPolicyAdapter, RetentionPolicyNode]:
+    def when(self) -> When[APolicyAndACaller, RetentionPolicyAdapter, RetentionPolicyNode]:
         return Editing(days=LONGER)
 
     @override
-    def then(self) -> TestThen[APolicyAndACaller, RetentionPolicyNode]:
+    def then(self) -> Then[APolicyAndACaller, RetentionPolicyNode]:
         return ThePolicyNode(started=self.started, days=LONGER)
 
 

@@ -16,7 +16,7 @@ from ai.backend.common.data.entity.audit_log import AuditLogID
 from ai.backend.common.data.user.types import UserRole
 from ai.backend.manager.api.adapters.audit_log.adapter import AuditLogAdapter
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.testutils.scenario_steps import TestGiven, TestScenario, TestThen, TestWhen
+from ai.backend.testutils.scenario_steps import Given, Scenario, Then, When
 from bai_scenario.components.audit_log import (
     Loaded,
     ProjectRecordsToLoad,
@@ -28,11 +28,11 @@ from bai_scenario.runner.acting import ActingAs
 from bai_scenario.runner.planting import SeedingSession
 from bai_scenario.runner.steps import run_scenario
 
-type LoadingStep = TestScenario[SeedingSession, RecordsToLoad, AuditLogAdapter, Loaded]
+type LoadingStep = Scenario[SeedingSession, RecordsToLoad, AuditLogAdapter, Loaded]
 
 
 @dataclass(frozen=True)
-class LoadingWithAGap(TestWhen[RecordsToLoad, AuditLogAdapter, Loaded]):
+class LoadingWithAGap(When[RecordsToLoad, AuditLogAdapter, Loaded]):
     """있는 id 둘 사이에 없는 id 하나를 끼워 조회한다."""
 
     @override
@@ -54,7 +54,7 @@ class LoadingWithAGap(TestWhen[RecordsToLoad, AuditLogAdapter, Loaded]):
 
 
 @dataclass(frozen=True)
-class LoadingReadableUnreadableAndMissing(TestWhen[RecordsToLoad, AuditLogAdapter, Loaded]):
+class LoadingReadableUnreadableAndMissing(When[RecordsToLoad, AuditLogAdapter, Loaded]):
     """읽을 수 있는 기록, 읽을 수 없는 기록, 없는 id 순으로 한 번에 조회한다."""
 
     @override
@@ -76,7 +76,7 @@ class LoadingReadableUnreadableAndMissing(TestWhen[RecordsToLoad, AuditLogAdapte
 
 
 @dataclass(frozen=True)
-class LoadingNothing(TestWhen[RecordsToLoad, AuditLogAdapter, Loaded]):
+class LoadingNothing(When[RecordsToLoad, AuditLogAdapter, Loaded]):
     """빈 목록을 준다."""
 
     @override
@@ -94,7 +94,7 @@ class LoadingNothing(TestWhen[RecordsToLoad, AuditLogAdapter, Loaded]):
 
 
 @dataclass(frozen=True)
-class LoadingBoth(TestWhen[RecordsToLoad, AuditLogAdapter, Loaded]):
+class LoadingBoth(When[RecordsToLoad, AuditLogAdapter, Loaded]):
     """있는 id 둘을 한 번에 조회한다."""
 
     @override
@@ -116,7 +116,7 @@ class LoadingBoth(TestWhen[RecordsToLoad, AuditLogAdapter, Loaded]):
 
 @dataclass(frozen=True)
 class AGrantedReaderIsAnsweredPerSlot(
-    TestScenario[SeedingSession, RecordsToLoad, AuditLogAdapter, Loaded]
+    Scenario[SeedingSession, RecordsToLoad, AuditLogAdapter, Loaded]
 ):
     @override
     def summary(self) -> str:
@@ -130,22 +130,20 @@ class AGrantedReaderIsAnsweredPerSlot(
         )
 
     @override
-    def given(self) -> TestGiven[SeedingSession, RecordsToLoad]:
+    def given(self) -> Given[SeedingSession, RecordsToLoad]:
         return ProjectRecordsToLoad()
 
     @override
-    def when(self) -> TestWhen[RecordsToLoad, AuditLogAdapter, Loaded]:
+    def when(self) -> When[RecordsToLoad, AuditLogAdapter, Loaded]:
         return LoadingReadableUnreadableAndMissing()
 
     @override
-    def then(self) -> TestThen[RecordsToLoad, Loaded]:
+    def then(self) -> Then[RecordsToLoad, Loaded]:
         return TheSlotsInOrder(("first", "refused", "gap"))
 
 
 @dataclass(frozen=True)
-class TheNodesComeBackWithAGap(
-    TestScenario[SeedingSession, RecordsToLoad, AuditLogAdapter, Loaded]
-):
+class TheNodesComeBackWithAGap(Scenario[SeedingSession, RecordsToLoad, AuditLogAdapter, Loaded]):
     @override
     def summary(self) -> str:
         return "the-superadmin-reading-present-and-absent-ids-is-answered-in-order-with-a-gap"
@@ -155,20 +153,20 @@ class TheNodesComeBackWithAGap(
         return "슈퍼관리자가 있는 id 둘과 없는 id 하나를 한 번에 조회하면, 요청한 순서대로 반환되고 없는 id에 해당하는 항목은 비어 있다"
 
     @override
-    def given(self) -> TestGiven[SeedingSession, RecordsToLoad]:
+    def given(self) -> Given[SeedingSession, RecordsToLoad]:
         return TwoRecordsToRead(role=UserRole.SUPERADMIN)
 
     @override
-    def when(self) -> TestWhen[RecordsToLoad, AuditLogAdapter, Loaded]:
+    def when(self) -> When[RecordsToLoad, AuditLogAdapter, Loaded]:
         return LoadingWithAGap()
 
     @override
-    def then(self) -> TestThen[RecordsToLoad, Loaded]:
+    def then(self) -> Then[RecordsToLoad, Loaded]:
         return TheSlotsInOrder(("first", "gap", "second"))
 
 
 @dataclass(frozen=True)
-class AnEmptyListReadsNothing(TestScenario[SeedingSession, RecordsToLoad, AuditLogAdapter, Loaded]):
+class AnEmptyListReadsNothing(Scenario[SeedingSession, RecordsToLoad, AuditLogAdapter, Loaded]):
     @override
     def summary(self) -> str:
         return "reading-an-empty-list-answers-empty-without-passing-the-gate"
@@ -178,21 +176,21 @@ class AnEmptyListReadsNothing(TestScenario[SeedingSession, RecordsToLoad, AuditL
         return "빈 id 목록으로 조회하면, 권한 검사도 거치지 않고 빈 응답이 반환된다"
 
     @override
-    def given(self) -> TestGiven[SeedingSession, RecordsToLoad]:
+    def given(self) -> Given[SeedingSession, RecordsToLoad]:
         return TwoRecordsToRead(role=UserRole.USER)
 
     @override
-    def when(self) -> TestWhen[RecordsToLoad, AuditLogAdapter, Loaded]:
+    def when(self) -> When[RecordsToLoad, AuditLogAdapter, Loaded]:
         return LoadingNothing()
 
     @override
-    def then(self) -> TestThen[RecordsToLoad, Loaded]:
+    def then(self) -> Then[RecordsToLoad, Loaded]:
         return TheSlotsInOrder(())
 
 
 @dataclass(frozen=True)
 class TheMonitorRoleWithoutAGrantIsRefusedPerSlot(
-    TestScenario[SeedingSession, RecordsToLoad, AuditLogAdapter, Loaded]
+    Scenario[SeedingSession, RecordsToLoad, AuditLogAdapter, Loaded]
 ):
     @override
     def summary(self) -> str:
@@ -203,21 +201,21 @@ class TheMonitorRoleWithoutAGrantIsRefusedPerSlot(
         return "아무 권한도 받지 않은 모니터 역할 사용자가 id 둘을 조회하면, 항목마다 권한 부족으로 응답한다"
 
     @override
-    def given(self) -> TestGiven[SeedingSession, RecordsToLoad]:
+    def given(self) -> Given[SeedingSession, RecordsToLoad]:
         return TwoRecordsToRead(role=UserRole.MONITOR)
 
     @override
-    def when(self) -> TestWhen[RecordsToLoad, AuditLogAdapter, Loaded]:
+    def when(self) -> When[RecordsToLoad, AuditLogAdapter, Loaded]:
         return LoadingBoth()
 
     @override
-    def then(self) -> TestThen[RecordsToLoad, Loaded]:
+    def then(self) -> Then[RecordsToLoad, Loaded]:
         return TheSlotsInOrder(("refused", "refused"))
 
 
 @dataclass(frozen=True)
 class AUserGrantedNothingIsRefusedPerSlot(
-    TestScenario[SeedingSession, RecordsToLoad, AuditLogAdapter, Loaded]
+    Scenario[SeedingSession, RecordsToLoad, AuditLogAdapter, Loaded]
 ):
     @override
     def summary(self) -> str:
@@ -228,15 +226,15 @@ class AUserGrantedNothingIsRefusedPerSlot(
         return "읽기 권한이 없는 사용자가 자기에 대한 기록 둘을 id로 조회하면, 항목마다 권한 부족으로 응답한다"
 
     @override
-    def given(self) -> TestGiven[SeedingSession, RecordsToLoad]:
+    def given(self) -> Given[SeedingSession, RecordsToLoad]:
         return TwoRecordsToRead(role=UserRole.USER)
 
     @override
-    def when(self) -> TestWhen[RecordsToLoad, AuditLogAdapter, Loaded]:
+    def when(self) -> When[RecordsToLoad, AuditLogAdapter, Loaded]:
         return LoadingBoth()
 
     @override
-    def then(self) -> TestThen[RecordsToLoad, Loaded]:
+    def then(self) -> Then[RecordsToLoad, Loaded]:
         return TheSlotsInOrder(("refused", "refused"))
 
 

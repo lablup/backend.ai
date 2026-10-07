@@ -17,13 +17,7 @@ from ai.backend.manager.api.adapters.retention_policy.adapter import RetentionPo
 from ai.backend.manager.errors.base.entity import EntityNotFoundError
 from ai.backend.manager.errors.permission import NotEnoughPermission
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.testutils.scenario_steps import (
-    TestConfigured,
-    TestGiven,
-    TestScenario,
-    TestThen,
-    TestWhen,
-)
+from ai.backend.testutils.scenario_steps import Configured, Given, Scenario, Then, When
 from bai_scenario.components.answers import TheCallIsRefused
 from bai_scenario.components.retention_policy import (
     APolicyAndACaller,
@@ -35,13 +29,13 @@ from bai_scenario.runner.acting import ActingAs
 from bai_scenario.runner.planting import SeedingSession
 from bai_scenario.runner.steps import run_scenario
 
-type ReadingStep = TestScenario[
+type ReadingStep = Scenario[
     SeedingSession, APolicyAndACaller, RetentionPolicyAdapter, RetentionPolicyNode
 ]
 
 
 @dataclass(frozen=True)
-class ReadingById(TestWhen[APolicyAndACaller, RetentionPolicyAdapter, RetentionPolicyNode]):
+class ReadingById(When[APolicyAndACaller, RetentionPolicyAdapter, RetentionPolicyNode]):
     """id로 조회한다. ``unknown``이면 어느 행에도 없는 id를 쓴다."""
 
     unknown: bool = False
@@ -67,7 +61,7 @@ class ReadingById(TestWhen[APolicyAndACaller, RetentionPolicyAdapter, RetentionP
 
 @dataclass(frozen=True)
 class TheSuperadminReadsAPolicy(
-    TestScenario[SeedingSession, APolicyAndACaller, RetentionPolicyAdapter, RetentionPolicyNode]
+    Scenario[SeedingSession, APolicyAndACaller, RetentionPolicyAdapter, RetentionPolicyNode]
 ):
     started: datetime
 
@@ -80,21 +74,21 @@ class TheSuperadminReadsAPolicy(
         return "정책 하나가 있고 슈퍼관리자가 id로 조회하면, 그 정책 전체가 반환된다"
 
     @override
-    def given(self) -> TestGiven[SeedingSession, APolicyAndACaller]:
+    def given(self) -> Given[SeedingSession, APolicyAndACaller]:
         return APolicyAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
-    def when(self) -> TestWhen[APolicyAndACaller, RetentionPolicyAdapter, RetentionPolicyNode]:
+    def when(self) -> When[APolicyAndACaller, RetentionPolicyAdapter, RetentionPolicyNode]:
         return ReadingById()
 
     @override
-    def then(self) -> TestThen[APolicyAndACaller, RetentionPolicyNode]:
+    def then(self) -> Then[APolicyAndACaller, RetentionPolicyNode]:
         return ThePolicyNode(started=self.started)
 
 
 @dataclass(frozen=True)
 class AUserGrantedNothingMayNotRead(
-    TestScenario[SeedingSession, APolicyAndACaller, RetentionPolicyAdapter, RetentionPolicyNode]
+    Scenario[SeedingSession, APolicyAndACaller, RetentionPolicyAdapter, RetentionPolicyNode]
 ):
     @override
     def summary(self) -> str:
@@ -108,21 +102,21 @@ class AUserGrantedNothingMayNotRead(
         )
 
     @override
-    def given(self) -> TestGiven[SeedingSession, APolicyAndACaller]:
+    def given(self) -> Given[SeedingSession, APolicyAndACaller]:
         return APolicyAndSomeone()
 
     @override
-    def when(self) -> TestWhen[APolicyAndACaller, RetentionPolicyAdapter, RetentionPolicyNode]:
+    def when(self) -> When[APolicyAndACaller, RetentionPolicyAdapter, RetentionPolicyNode]:
         return ReadingById()
 
     @override
-    def then(self) -> TestThen[APolicyAndACaller, RetentionPolicyNode]:
+    def then(self) -> Then[APolicyAndACaller, RetentionPolicyNode]:
         return TheCallIsRefused(NotEnoughPermission)
 
 
 @dataclass(frozen=True)
 class TheSuperadminReadingAnUnknownIdIsNotFound(
-    TestScenario[SeedingSession, APolicyAndACaller, RetentionPolicyAdapter, RetentionPolicyNode]
+    Scenario[SeedingSession, APolicyAndACaller, RetentionPolicyAdapter, RetentionPolicyNode]
 ):
     @override
     def summary(self) -> str:
@@ -133,21 +127,21 @@ class TheSuperadminReadingAnUnknownIdIsNotFound(
         return "슈퍼관리자가 존재하지 않는 id로 조회하면 대상을 찾을 수 없다는 이유로 거부된다"
 
     @override
-    def given(self) -> TestGiven[SeedingSession, APolicyAndACaller]:
+    def given(self) -> Given[SeedingSession, APolicyAndACaller]:
         return APolicyAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
-    def when(self) -> TestWhen[APolicyAndACaller, RetentionPolicyAdapter, RetentionPolicyNode]:
+    def when(self) -> When[APolicyAndACaller, RetentionPolicyAdapter, RetentionPolicyNode]:
         return ReadingById(unknown=True)
 
     @override
-    def then(self) -> TestThen[APolicyAndACaller, RetentionPolicyNode]:
+    def then(self) -> Then[APolicyAndACaller, RetentionPolicyNode]:
         return TheCallIsRefused(EntityNotFoundError)
 
 
 @dataclass(frozen=True)
 class AUserGrantedNothingReadingAnUnknownIdIsRefusedForPermission(
-    TestScenario[SeedingSession, APolicyAndACaller, RetentionPolicyAdapter, RetentionPolicyNode]
+    Scenario[SeedingSession, APolicyAndACaller, RetentionPolicyAdapter, RetentionPolicyNode]
 ):
     @override
     def summary(self) -> str:
@@ -161,22 +155,22 @@ class AUserGrantedNothingReadingAnUnknownIdIsRefusedForPermission(
         )
 
     @override
-    def given(self) -> TestGiven[SeedingSession, APolicyAndACaller]:
+    def given(self) -> Given[SeedingSession, APolicyAndACaller]:
         return APolicyAndSomeone()
 
     @override
-    def when(self) -> TestWhen[APolicyAndACaller, RetentionPolicyAdapter, RetentionPolicyNode]:
+    def when(self) -> When[APolicyAndACaller, RetentionPolicyAdapter, RetentionPolicyNode]:
         return ReadingById(unknown=True)
 
     @override
-    def then(self) -> TestThen[APolicyAndACaller, RetentionPolicyNode]:
+    def then(self) -> Then[APolicyAndACaller, RetentionPolicyNode]:
         return TheCallIsRefused(NotEnoughPermission)
 
 
 @dataclass(frozen=True)
 class EnforcementOffLetsAnyoneRead(
-    TestScenario[SeedingSession, APolicyAndACaller, RetentionPolicyAdapter, RetentionPolicyNode],
-    TestConfigured,
+    Scenario[SeedingSession, APolicyAndACaller, RetentionPolicyAdapter, RetentionPolicyNode],
+    Configured,
 ):
     started: datetime
 
@@ -193,15 +187,15 @@ class EnforcementOffLetsAnyoneRead(
         return {ENFORCEMENT: False}
 
     @override
-    def given(self) -> TestGiven[SeedingSession, APolicyAndACaller]:
+    def given(self) -> Given[SeedingSession, APolicyAndACaller]:
         return APolicyAndSomeone()
 
     @override
-    def when(self) -> TestWhen[APolicyAndACaller, RetentionPolicyAdapter, RetentionPolicyNode]:
+    def when(self) -> When[APolicyAndACaller, RetentionPolicyAdapter, RetentionPolicyNode]:
         return ReadingById()
 
     @override
-    def then(self) -> TestThen[APolicyAndACaller, RetentionPolicyNode]:
+    def then(self) -> Then[APolicyAndACaller, RetentionPolicyNode]:
         return ThePolicyNode(started=self.started)
 
 

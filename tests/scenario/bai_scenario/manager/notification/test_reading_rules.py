@@ -17,7 +17,7 @@ from ai.backend.manager.api.adapters.notification.adapter import NotificationAda
 from ai.backend.manager.errors.base.entity import EntityNotFoundError
 from ai.backend.manager.errors.permission import NotEnoughPermission
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.testutils.scenario_steps import TestGiven, TestScenario, TestThen, TestWhen
+from ai.backend.testutils.scenario_steps import Given, Scenario, Then, When
 from bai_scenario.components.answers import TheCallIsRefused
 from bai_scenario.components.notification import (
     ARuleAndACaller,
@@ -34,11 +34,11 @@ from bai_scenario.runner.acting import ActingAs
 from bai_scenario.runner.planting import SeedingSession
 from bai_scenario.runner.steps import run_scenario
 
-type ReadingStep = TestScenario[SeedingSession, Any, NotificationAdapter, Any]
+type ReadingStep = Scenario[SeedingSession, Any, NotificationAdapter, Any]
 
 
 @dataclass(frozen=True)
-class ReadingById(TestWhen[ARuleAndACaller, NotificationAdapter, NotificationRuleNode]):
+class ReadingById(When[ARuleAndACaller, NotificationAdapter, NotificationRuleNode]):
     """id로 조회한다. ``unknown``이면 어느 행에도 없는 id를 쓴다."""
 
     unknown: bool = False
@@ -62,7 +62,7 @@ class ReadingById(TestWhen[ARuleAndACaller, NotificationAdapter, NotificationRul
 
 
 @dataclass(frozen=True)
-class ReadingManyByIds(TestWhen[ManyRulesAndACaller, NotificationAdapter, LoadedRules]):
+class ReadingManyByIds(When[ManyRulesAndACaller, NotificationAdapter, LoadedRules]):
     """미리 만들어 둔 규칙들의 id 뒤에 없는 id 하나를 붙여 한 번에 조회한다."""
 
     @override
@@ -84,7 +84,7 @@ class ReadingManyByIds(TestWhen[ManyRulesAndACaller, NotificationAdapter, Loaded
 
 
 @dataclass(frozen=True)
-class ReadingTheLaidByIds(TestWhen[ManyRulesAndACaller, NotificationAdapter, LoadedRules]):
+class ReadingTheLaidByIds(When[ManyRulesAndACaller, NotificationAdapter, LoadedRules]):
     """미리 만들어 둔 규칙들만 한 번에 조회한다."""
 
     @override
@@ -102,7 +102,7 @@ class ReadingTheLaidByIds(TestWhen[ManyRulesAndACaller, NotificationAdapter, Loa
 
 
 @dataclass(frozen=True)
-class ReadingNoIds(TestWhen[ManyRulesAndACaller, NotificationAdapter, LoadedRules]):
+class ReadingNoIds(When[ManyRulesAndACaller, NotificationAdapter, LoadedRules]):
     """빈 id 목록으로 조회한다."""
 
     @override
@@ -121,7 +121,7 @@ class ReadingNoIds(TestWhen[ManyRulesAndACaller, NotificationAdapter, LoadedRule
 
 @dataclass(frozen=True)
 class TheSuperadminReadsARule(
-    TestScenario[SeedingSession, ARuleAndACaller, NotificationAdapter, NotificationRuleNode]
+    Scenario[SeedingSession, ARuleAndACaller, NotificationAdapter, NotificationRuleNode]
 ):
     started: datetime
 
@@ -134,21 +134,21 @@ class TheSuperadminReadsARule(
         return "규칙 하나가 있고 슈퍼관리자가 id로 조회하면, 그 규칙 전체가 반환된다"
 
     @override
-    def given(self) -> TestGiven[SeedingSession, ARuleAndACaller]:
+    def given(self) -> Given[SeedingSession, ARuleAndACaller]:
         return ARuleAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
-    def when(self) -> TestWhen[ARuleAndACaller, NotificationAdapter, NotificationRuleNode]:
+    def when(self) -> When[ARuleAndACaller, NotificationAdapter, NotificationRuleNode]:
         return ReadingById()
 
     @override
-    def then(self) -> TestThen[ARuleAndACaller, NotificationRuleNode]:
+    def then(self) -> Then[ARuleAndACaller, NotificationRuleNode]:
         return TheRuleNode(started=self.started)
 
 
 @dataclass(frozen=True)
 class AUserGrantedNothingMayNotRead(
-    TestScenario[SeedingSession, ARuleAndACaller, NotificationAdapter, NotificationRuleNode]
+    Scenario[SeedingSession, ARuleAndACaller, NotificationAdapter, NotificationRuleNode]
 ):
     @override
     def summary(self) -> str:
@@ -159,21 +159,21 @@ class AUserGrantedNothingMayNotRead(
         return "아무 권한도 없는 사용자가 id로 조회하면 권한 부족으로 거부된다"
 
     @override
-    def given(self) -> TestGiven[SeedingSession, ARuleAndACaller]:
+    def given(self) -> Given[SeedingSession, ARuleAndACaller]:
         return ARuleAndSomeone()
 
     @override
-    def when(self) -> TestWhen[ARuleAndACaller, NotificationAdapter, NotificationRuleNode]:
+    def when(self) -> When[ARuleAndACaller, NotificationAdapter, NotificationRuleNode]:
         return ReadingById()
 
     @override
-    def then(self) -> TestThen[ARuleAndACaller, NotificationRuleNode]:
+    def then(self) -> Then[ARuleAndACaller, NotificationRuleNode]:
         return TheCallIsRefused(NotEnoughPermission)
 
 
 @dataclass(frozen=True)
 class TheSuperadminReadingAnUnknownIdIsNotFound(
-    TestScenario[SeedingSession, ARuleAndACaller, NotificationAdapter, NotificationRuleNode]
+    Scenario[SeedingSession, ARuleAndACaller, NotificationAdapter, NotificationRuleNode]
 ):
     @override
     def summary(self) -> str:
@@ -184,21 +184,21 @@ class TheSuperadminReadingAnUnknownIdIsNotFound(
         return "슈퍼관리자가 존재하지 않는 id로 조회하면 대상을 찾을 수 없다는 이유로 거부된다"
 
     @override
-    def given(self) -> TestGiven[SeedingSession, ARuleAndACaller]:
+    def given(self) -> Given[SeedingSession, ARuleAndACaller]:
         return ARuleAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
-    def when(self) -> TestWhen[ARuleAndACaller, NotificationAdapter, NotificationRuleNode]:
+    def when(self) -> When[ARuleAndACaller, NotificationAdapter, NotificationRuleNode]:
         return ReadingById(unknown=True)
 
     @override
-    def then(self) -> TestThen[ARuleAndACaller, NotificationRuleNode]:
+    def then(self) -> Then[ARuleAndACaller, NotificationRuleNode]:
         return TheCallIsRefused(EntityNotFoundError)
 
 
 @dataclass(frozen=True)
 class TheSuperadminLoadsLaidAndMissing(
-    TestScenario[SeedingSession, ManyRulesAndACaller, NotificationAdapter, LoadedRules]
+    Scenario[SeedingSession, ManyRulesAndACaller, NotificationAdapter, LoadedRules]
 ):
     started: datetime
 
@@ -214,21 +214,21 @@ class TheSuperadminLoadsLaidAndMissing(
         )
 
     @override
-    def given(self) -> TestGiven[SeedingSession, ManyRulesAndACaller]:
+    def given(self) -> Given[SeedingSession, ManyRulesAndACaller]:
         return TwoRulesAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
-    def when(self) -> TestWhen[ManyRulesAndACaller, NotificationAdapter, LoadedRules]:
+    def when(self) -> When[ManyRulesAndACaller, NotificationAdapter, LoadedRules]:
         return ReadingManyByIds()
 
     @override
-    def then(self) -> TestThen[ManyRulesAndACaller, LoadedRules]:
+    def then(self) -> Then[ManyRulesAndACaller, LoadedRules]:
         return TheRulesInTheOrderAsked(started=self.started)
 
 
 @dataclass(frozen=True)
 class AUserGrantedNothingIsRefusedPerItem(
-    TestScenario[SeedingSession, ManyRulesAndACaller, NotificationAdapter, LoadedRules]
+    Scenario[SeedingSession, ManyRulesAndACaller, NotificationAdapter, LoadedRules]
 ):
     @override
     def summary(self) -> str:
@@ -242,21 +242,21 @@ class AUserGrantedNothingIsRefusedPerItem(
         )
 
     @override
-    def given(self) -> TestGiven[SeedingSession, ManyRulesAndACaller]:
+    def given(self) -> Given[SeedingSession, ManyRulesAndACaller]:
         return TwoRulesAndSomeone()
 
     @override
-    def when(self) -> TestWhen[ManyRulesAndACaller, NotificationAdapter, LoadedRules]:
+    def when(self) -> When[ManyRulesAndACaller, NotificationAdapter, LoadedRules]:
         return ReadingTheLaidByIds()
 
     @override
-    def then(self) -> TestThen[ManyRulesAndACaller, LoadedRules]:
+    def then(self) -> Then[ManyRulesAndACaller, LoadedRules]:
         return EachItemIsRefused(asked=2)
 
 
 @dataclass(frozen=True)
 class ABatchLoadOfNothingAnswersNothing(
-    TestScenario[SeedingSession, ManyRulesAndACaller, NotificationAdapter, LoadedRules]
+    Scenario[SeedingSession, ManyRulesAndACaller, NotificationAdapter, LoadedRules]
 ):
     @override
     def summary(self) -> str:
@@ -267,15 +267,15 @@ class ABatchLoadOfNothingAnswersNothing(
         return "빈 id 목록으로 조회하면 하위 계층을 부르지 않고 빈 응답이 반환된다"
 
     @override
-    def given(self) -> TestGiven[SeedingSession, ManyRulesAndACaller]:
+    def given(self) -> Given[SeedingSession, ManyRulesAndACaller]:
         return TwoRulesAndSomeone()
 
     @override
-    def when(self) -> TestWhen[ManyRulesAndACaller, NotificationAdapter, LoadedRules]:
+    def when(self) -> When[ManyRulesAndACaller, NotificationAdapter, LoadedRules]:
         return ReadingNoIds()
 
     @override
-    def then(self) -> TestThen[ManyRulesAndACaller, LoadedRules]:
+    def then(self) -> Then[ManyRulesAndACaller, LoadedRules]:
         return NothingComesBack()
 
 

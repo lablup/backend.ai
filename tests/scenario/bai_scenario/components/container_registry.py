@@ -31,11 +31,11 @@ from ai.backend.manager.models.association_container_registries_groups.row impor
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.testutils.scenario_steps import (
     Answered,
+    Given,
     Same,
     Skipped,
-    TestGiven,
-    TestThen,
-    TestVerdict,
+    Then,
+    Verdict,
 )
 from bai_scenario.components.answers import MissingResponse
 from bai_scenario.components.domain import SomeoneOf
@@ -81,7 +81,7 @@ class ARegistryToAllowAndACaller:
 
 
 @dataclass(frozen=True)
-class NoRegistryYet(TestGiven[SeedingSession, AProjectAndACaller]):
+class NoRegistryYet(Given[SeedingSession, AProjectAndACaller]):
     role: UserRole = UserRole.USER
 
     @override
@@ -98,7 +98,7 @@ class NoRegistryYet(TestGiven[SeedingSession, AProjectAndACaller]):
 
 
 @dataclass(frozen=True)
-class ARegistryAndSomeone(TestGiven[SeedingSession, ARegistryAndACaller]):
+class ARegistryAndSomeone(Given[SeedingSession, ARegistryAndACaller]):
     role: UserRole = UserRole.USER
     name_hint: str = "host"
     with_project: bool = False
@@ -130,7 +130,7 @@ class ARegistryAndSomeone(TestGiven[SeedingSession, ARegistryAndACaller]):
 
 
 @dataclass(frozen=True)
-class ManyRegistriesAndSomeone(TestGiven[SeedingSession, ManyRegistriesAndACaller]):
+class ManyRegistriesAndSomeone(Given[SeedingSession, ManyRegistriesAndACaller]):
     role: UserRole = UserRole.SUPERADMIN
 
     @override
@@ -160,7 +160,7 @@ ALLOWING = (Permission.CREATE, Permission.SOFT_DELETE)
 
 
 @dataclass(frozen=True)
-class ARegistryAndAProjectToAllow(TestGiven[SeedingSession, ARegistryToAllowAndACaller]):
+class ARegistryAndAProjectToAllow(Given[SeedingSession, ARegistryToAllowAndACaller]):
     """관계 연산은 지정한 스코프 모두에 권한이 있어야 실행된다. 그래서 한쪽에만 권한을 주는 상황이 필요하다."""
 
     role: UserRole = UserRole.USER
@@ -250,7 +250,7 @@ async def allowed_project_count(engine: ExtendedAsyncSAEngine) -> int:
 
 
 @dataclass(frozen=True)
-class TheNewRegistryNode(TestThen[AProjectAndACaller, ContainerRegistryNode]):
+class TheNewRegistryNode(Then[AProjectAndACaller, ContainerRegistryNode]):
     url: str
     registry_name: str
     registry_type: ContainerRegistryType = ContainerRegistryType.DOCKER
@@ -267,7 +267,7 @@ class TheNewRegistryNode(TestThen[AProjectAndACaller, ContainerRegistryNode]):
     @override
     def look(
         self, laid: AProjectAndACaller, answered: Answered[ContainerRegistryNode]
-    ) -> list[TestVerdict]:
+    ) -> list[Verdict]:
         node = answered.response
         if node is None:
             return [MissingResponse(answered.raised)]
@@ -285,7 +285,7 @@ class TheNewRegistryNode(TestThen[AProjectAndACaller, ContainerRegistryNode]):
 
 
 @dataclass(frozen=True)
-class TheUpdatedRegistryNode(TestThen[ARegistryAndACaller, ContainerRegistryNode]):
+class TheUpdatedRegistryNode(Then[ARegistryAndACaller, ContainerRegistryNode]):
     url: str | None = None
 
     @override
@@ -295,7 +295,7 @@ class TheUpdatedRegistryNode(TestThen[ARegistryAndACaller, ContainerRegistryNode
     @override
     def look(
         self, laid: ARegistryAndACaller, answered: Answered[ContainerRegistryNode]
-    ) -> list[TestVerdict]:
+    ) -> list[Verdict]:
         node = answered.response
         if node is None:
             return [MissingResponse(answered.raised)]

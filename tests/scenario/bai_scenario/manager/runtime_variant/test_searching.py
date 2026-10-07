@@ -15,7 +15,7 @@ from ai.backend.common.dto.manager.v2.runtime_variant.request import (
 from ai.backend.common.dto.manager.v2.runtime_variant.response import SearchRuntimeVariantsPayload
 from ai.backend.manager.api.adapters.runtime_variant.adapter import RuntimeVariantAdapter
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.testutils.scenario_steps import TestGiven, TestScenario, TestThen, TestWhen
+from ai.backend.testutils.scenario_steps import Given, Scenario, Then, When
 from bai_scenario.components.runtime_variant import (
     EveryLaidVariantIsCounted,
     ManyVariantsAndACaller,
@@ -30,13 +30,13 @@ from bai_scenario.runner.steps import run_scenario
 DEFAULT_PAGE = 10
 
 type Searched = SearchRuntimeVariantsPayload
-type SearchingStep = TestScenario[
+type SearchingStep = Scenario[
     SeedingSession, ManyVariantsAndACaller, RuntimeVariantAdapter, Searched
 ]
 
 
 @dataclass(frozen=True)
-class SearchingEveryVariant(TestWhen[ManyVariantsAndACaller, RuntimeVariantAdapter, Searched]):
+class SearchingEveryVariant(When[ManyVariantsAndACaller, RuntimeVariantAdapter, Searched]):
     """필터도 크기도 없이 전체를 검색한다."""
 
     @override
@@ -54,7 +54,7 @@ class SearchingEveryVariant(TestWhen[ManyVariantsAndACaller, RuntimeVariantAdapt
 
 
 @dataclass(frozen=True)
-class SearchingByName(TestWhen[ManyVariantsAndACaller, RuntimeVariantAdapter, Searched]):
+class SearchingByName(When[ManyVariantsAndACaller, RuntimeVariantAdapter, Searched]):
     """미리 만들어 둔 변형 중 하나의 이름을 필터로 검색한다."""
 
     @override
@@ -77,7 +77,7 @@ class SearchingByName(TestWhen[ManyVariantsAndACaller, RuntimeVariantAdapter, Se
 
 @dataclass(frozen=True)
 class AUserGrantedNothingCountsEveryVariant(
-    TestScenario[SeedingSession, ManyVariantsAndACaller, RuntimeVariantAdapter, Searched]
+    Scenario[SeedingSession, ManyVariantsAndACaller, RuntimeVariantAdapter, Searched]
 ):
     @override
     def summary(self) -> str:
@@ -88,21 +88,21 @@ class AUserGrantedNothingCountsEveryVariant(
         return "변형 둘이 있을 때 아무 권한도 없는 사용자가 필터 없이 조회하면 둘 다 집계된다"
 
     @override
-    def given(self) -> TestGiven[SeedingSession, ManyVariantsAndACaller]:
+    def given(self) -> Given[SeedingSession, ManyVariantsAndACaller]:
         return ManyVariantsAndSomeone(besides=1)
 
     @override
-    def when(self) -> TestWhen[ManyVariantsAndACaller, RuntimeVariantAdapter, Searched]:
+    def when(self) -> When[ManyVariantsAndACaller, RuntimeVariantAdapter, Searched]:
         return SearchingEveryVariant()
 
     @override
-    def then(self) -> TestThen[ManyVariantsAndACaller, Searched]:
+    def then(self) -> Then[ManyVariantsAndACaller, Searched]:
         return EveryLaidVariantIsCounted()
 
 
 @dataclass(frozen=True)
 class ANameFilterNarrows(
-    TestScenario[SeedingSession, ManyVariantsAndACaller, RuntimeVariantAdapter, Searched]
+    Scenario[SeedingSession, ManyVariantsAndACaller, RuntimeVariantAdapter, Searched]
 ):
     @override
     def summary(self) -> str:
@@ -113,21 +113,21 @@ class ANameFilterNarrows(
         return "변형 여럿 중 하나의 이름을 필터로 조회하면, 응답에는 그 이름의 변형만 남는다"
 
     @override
-    def given(self) -> TestGiven[SeedingSession, ManyVariantsAndACaller]:
+    def given(self) -> Given[SeedingSession, ManyVariantsAndACaller]:
         return ManyVariantsAndSomeone(besides=2)
 
     @override
-    def when(self) -> TestWhen[ManyVariantsAndACaller, RuntimeVariantAdapter, Searched]:
+    def when(self) -> When[ManyVariantsAndACaller, RuntimeVariantAdapter, Searched]:
         return SearchingByName()
 
     @override
-    def then(self) -> TestThen[ManyVariantsAndACaller, Searched]:
+    def then(self) -> Then[ManyVariantsAndACaller, Searched]:
         return OnlyTheNamedVariantIsLeft()
 
 
 @dataclass(frozen=True)
 class OmittingThePageSizeGivesTen(
-    TestScenario[SeedingSession, ManyVariantsAndACaller, RuntimeVariantAdapter, Searched]
+    Scenario[SeedingSession, ManyVariantsAndACaller, RuntimeVariantAdapter, Searched]
 ):
     @override
     def summary(self) -> str:
@@ -140,15 +140,15 @@ class OmittingThePageSizeGivesTen(
         )
 
     @override
-    def given(self) -> TestGiven[SeedingSession, ManyVariantsAndACaller]:
+    def given(self) -> Given[SeedingSession, ManyVariantsAndACaller]:
         return ManyVariantsAndSomeone(besides=DEFAULT_PAGE)
 
     @override
-    def when(self) -> TestWhen[ManyVariantsAndACaller, RuntimeVariantAdapter, Searched]:
+    def when(self) -> When[ManyVariantsAndACaller, RuntimeVariantAdapter, Searched]:
         return SearchingEveryVariant()
 
     @override
-    def then(self) -> TestThen[ManyVariantsAndACaller, Searched]:
+    def then(self) -> Then[ManyVariantsAndACaller, Searched]:
         return TheFirstPageOfVariants(size=DEFAULT_PAGE)
 
 

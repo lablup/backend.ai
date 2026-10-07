@@ -19,13 +19,7 @@ from ai.backend.manager.api.adapters.retention_policy.adapter import RetentionPo
 from ai.backend.manager.errors.base.entity import EntityNotFoundError
 from ai.backend.manager.errors.permission import NotEnoughPermission
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.testutils.scenario_steps import (
-    TestConfigured,
-    TestGiven,
-    TestScenario,
-    TestThen,
-    TestWhen,
-)
+from ai.backend.testutils.scenario_steps import Configured, Given, Scenario, Then, When
 from bai_scenario.components.answers import TheCallIsRefused
 from bai_scenario.components.retention_policy import (
     APolicyAndACaller,
@@ -37,11 +31,11 @@ from bai_scenario.runner.acting import ActingAs
 from bai_scenario.runner.planting import SeedingSession
 from bai_scenario.runner.steps import run_scenario
 
-type RetiringStep = TestScenario[SeedingSession, APolicyAndACaller, RetentionPolicyAdapter, Any]
+type RetiringStep = Scenario[SeedingSession, APolicyAndACaller, RetentionPolicyAdapter, Any]
 
 
 @dataclass(frozen=True)
-class Deleting(TestWhen[APolicyAndACaller, RetentionPolicyAdapter, DeleteRetentionPolicyPayload]):
+class Deleting(When[APolicyAndACaller, RetentionPolicyAdapter, DeleteRetentionPolicyPayload]):
     """미리 만들어 둔 정책을 삭제한다."""
 
     unknown: bool = False
@@ -68,7 +62,7 @@ class Deleting(TestWhen[APolicyAndACaller, RetentionPolicyAdapter, DeleteRetenti
 
 
 @dataclass(frozen=True)
-class Purging(TestWhen[APolicyAndACaller, RetentionPolicyAdapter, PurgeRetentionPolicyPayload]):
+class Purging(When[APolicyAndACaller, RetentionPolicyAdapter, PurgeRetentionPolicyPayload]):
     """미리 만들어 둔 정책을 완전 삭제한다."""
 
     @override
@@ -89,7 +83,7 @@ class Purging(TestWhen[APolicyAndACaller, RetentionPolicyAdapter, PurgeRetention
 
 @dataclass(frozen=True)
 class TheSuperadminDeletesAPolicy(
-    TestScenario[
+    Scenario[
         SeedingSession, APolicyAndACaller, RetentionPolicyAdapter, DeleteRetentionPolicyPayload
     ]
 ):
@@ -102,25 +96,21 @@ class TheSuperadminDeletesAPolicy(
         return "슈퍼관리자가 정책을 삭제하면 삭제한 정책의 id를 담은 응답이 반환된다"
 
     @override
-    def given(self) -> TestGiven[SeedingSession, APolicyAndACaller]:
+    def given(self) -> Given[SeedingSession, APolicyAndACaller]:
         return APolicyAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
-    def when(
-        self,
-    ) -> TestWhen[APolicyAndACaller, RetentionPolicyAdapter, DeleteRetentionPolicyPayload]:
+    def when(self) -> When[APolicyAndACaller, RetentionPolicyAdapter, DeleteRetentionPolicyPayload]:
         return Deleting()
 
     @override
-    def then(self) -> TestThen[APolicyAndACaller, DeleteRetentionPolicyPayload]:
+    def then(self) -> Then[APolicyAndACaller, DeleteRetentionPolicyPayload]:
         return TheDeletedPolicyId()
 
 
 @dataclass(frozen=True)
 class PurgingIsTheSameHardDelete(
-    TestScenario[
-        SeedingSession, APolicyAndACaller, RetentionPolicyAdapter, PurgeRetentionPolicyPayload
-    ]
+    Scenario[SeedingSession, APolicyAndACaller, RetentionPolicyAdapter, PurgeRetentionPolicyPayload]
 ):
     @override
     def summary(self) -> str:
@@ -131,23 +121,21 @@ class PurgingIsTheSameHardDelete(
         return "슈퍼관리자가 정책을 완전 삭제하면 삭제와 같은 응답이 반환된다. 둘 다 행을 지우고 soft delete는 없다"
 
     @override
-    def given(self) -> TestGiven[SeedingSession, APolicyAndACaller]:
+    def given(self) -> Given[SeedingSession, APolicyAndACaller]:
         return APolicyAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
-    def when(
-        self,
-    ) -> TestWhen[APolicyAndACaller, RetentionPolicyAdapter, PurgeRetentionPolicyPayload]:
+    def when(self) -> When[APolicyAndACaller, RetentionPolicyAdapter, PurgeRetentionPolicyPayload]:
         return Purging()
 
     @override
-    def then(self) -> TestThen[APolicyAndACaller, PurgeRetentionPolicyPayload]:
+    def then(self) -> Then[APolicyAndACaller, PurgeRetentionPolicyPayload]:
         return TheDeletedPolicyId()
 
 
 @dataclass(frozen=True)
 class AnIdNothingAnswersToIsNotFound(
-    TestScenario[
+    Scenario[
         SeedingSession, APolicyAndACaller, RetentionPolicyAdapter, DeleteRetentionPolicyPayload
     ]
 ):
@@ -160,23 +148,21 @@ class AnIdNothingAnswersToIsNotFound(
         return "슈퍼관리자가 존재하지 않는 id를 삭제하면 대상을 찾을 수 없다는 이유로 거부된다"
 
     @override
-    def given(self) -> TestGiven[SeedingSession, APolicyAndACaller]:
+    def given(self) -> Given[SeedingSession, APolicyAndACaller]:
         return APolicyAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
-    def when(
-        self,
-    ) -> TestWhen[APolicyAndACaller, RetentionPolicyAdapter, DeleteRetentionPolicyPayload]:
+    def when(self) -> When[APolicyAndACaller, RetentionPolicyAdapter, DeleteRetentionPolicyPayload]:
         return Deleting(unknown=True)
 
     @override
-    def then(self) -> TestThen[APolicyAndACaller, DeleteRetentionPolicyPayload]:
+    def then(self) -> Then[APolicyAndACaller, DeleteRetentionPolicyPayload]:
         return TheCallIsRefused(EntityNotFoundError)
 
 
 @dataclass(frozen=True)
 class AUserGrantedNothingMayNotDelete(
-    TestScenario[
+    Scenario[
         SeedingSession, APolicyAndACaller, RetentionPolicyAdapter, DeleteRetentionPolicyPayload
     ]
 ):
@@ -189,25 +175,21 @@ class AUserGrantedNothingMayNotDelete(
         return "아무 권한도 없는 사용자가 정책을 삭제하면 권한 부족으로 거부된다"
 
     @override
-    def given(self) -> TestGiven[SeedingSession, APolicyAndACaller]:
+    def given(self) -> Given[SeedingSession, APolicyAndACaller]:
         return APolicyAndSomeone()
 
     @override
-    def when(
-        self,
-    ) -> TestWhen[APolicyAndACaller, RetentionPolicyAdapter, DeleteRetentionPolicyPayload]:
+    def when(self) -> When[APolicyAndACaller, RetentionPolicyAdapter, DeleteRetentionPolicyPayload]:
         return Deleting()
 
     @override
-    def then(self) -> TestThen[APolicyAndACaller, DeleteRetentionPolicyPayload]:
+    def then(self) -> Then[APolicyAndACaller, DeleteRetentionPolicyPayload]:
         return TheCallIsRefused(NotEnoughPermission)
 
 
 @dataclass(frozen=True)
 class AUserGrantedNothingMayNotPurge(
-    TestScenario[
-        SeedingSession, APolicyAndACaller, RetentionPolicyAdapter, PurgeRetentionPolicyPayload
-    ]
+    Scenario[SeedingSession, APolicyAndACaller, RetentionPolicyAdapter, PurgeRetentionPolicyPayload]
 ):
     @override
     def summary(self) -> str:
@@ -218,26 +200,24 @@ class AUserGrantedNothingMayNotPurge(
         return "아무 권한도 없는 사용자가 정책을 완전 삭제하면 권한 부족으로 거부된다"
 
     @override
-    def given(self) -> TestGiven[SeedingSession, APolicyAndACaller]:
+    def given(self) -> Given[SeedingSession, APolicyAndACaller]:
         return APolicyAndSomeone()
 
     @override
-    def when(
-        self,
-    ) -> TestWhen[APolicyAndACaller, RetentionPolicyAdapter, PurgeRetentionPolicyPayload]:
+    def when(self) -> When[APolicyAndACaller, RetentionPolicyAdapter, PurgeRetentionPolicyPayload]:
         return Purging()
 
     @override
-    def then(self) -> TestThen[APolicyAndACaller, PurgeRetentionPolicyPayload]:
+    def then(self) -> Then[APolicyAndACaller, PurgeRetentionPolicyPayload]:
         return TheCallIsRefused(NotEnoughPermission)
 
 
 @dataclass(frozen=True)
 class EnforcementOffLetsAnyoneDelete(
-    TestScenario[
+    Scenario[
         SeedingSession, APolicyAndACaller, RetentionPolicyAdapter, DeleteRetentionPolicyPayload
     ],
-    TestConfigured,
+    Configured,
 ):
     @override
     def summary(self) -> str:
@@ -252,17 +232,15 @@ class EnforcementOffLetsAnyoneDelete(
         return {ENFORCEMENT: False}
 
     @override
-    def given(self) -> TestGiven[SeedingSession, APolicyAndACaller]:
+    def given(self) -> Given[SeedingSession, APolicyAndACaller]:
         return APolicyAndSomeone()
 
     @override
-    def when(
-        self,
-    ) -> TestWhen[APolicyAndACaller, RetentionPolicyAdapter, DeleteRetentionPolicyPayload]:
+    def when(self) -> When[APolicyAndACaller, RetentionPolicyAdapter, DeleteRetentionPolicyPayload]:
         return Deleting()
 
     @override
-    def then(self) -> TestThen[APolicyAndACaller, DeleteRetentionPolicyPayload]:
+    def then(self) -> Then[APolicyAndACaller, DeleteRetentionPolicyPayload]:
         return TheDeletedPolicyId()
 
 

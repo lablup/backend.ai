@@ -13,13 +13,13 @@ from ai.backend.manager.errors.auth import InsufficientPrivilege
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.testutils.scenario_steps import (
     Answered,
+    Given,
     Refused,
     Same,
-    TestGiven,
-    TestScenario,
-    TestThen,
-    TestVerdict,
-    TestWhen,
+    Scenario,
+    Then,
+    Verdict,
+    When,
 )
 from bai_scenario.components.answers import TheCallIsRefused
 from bai_scenario.components.resource_policy import (
@@ -36,13 +36,13 @@ from bai_scenario.runner.acting import ActingAs
 from bai_scenario.runner.planting import SeedingSession
 from bai_scenario.runner.steps import run_scenario
 
-type SearchingStep = TestScenario[
+type SearchingStep = Scenario[
     SeedingSession, ManyPoliciesAndACaller[Any], ResourcePolicyAdapter, Searched
 ]
 
 
 @dataclass(frozen=True)
-class SearchingEverything(TestWhen[ManyPoliciesAndACaller[Any], ResourcePolicyAdapter, Searched]):
+class SearchingEverything(When[ManyPoliciesAndACaller[Any], ResourcePolicyAdapter, Searched]):
     """필터 없이 전체를 검색한다."""
 
     family: Family[Any, Any]
@@ -64,7 +64,7 @@ class SearchingEverything(TestWhen[ManyPoliciesAndACaller[Any], ResourcePolicyAd
 
 
 @dataclass(frozen=True)
-class SearchingByName(TestWhen[ManyPoliciesAndACaller[Any], ResourcePolicyAdapter, Searched]):
+class SearchingByName(When[ManyPoliciesAndACaller[Any], ResourcePolicyAdapter, Searched]):
     """미리 만들어 둔 정책 중 하나의 이름을 필터로 검색한다."""
 
     family: Family[Any, Any]
@@ -86,7 +86,7 @@ class SearchingByName(TestWhen[ManyPoliciesAndACaller[Any], ResourcePolicyAdapte
 
 
 @dataclass(frozen=True)
-class SearchingByHolder(TestWhen[ManyPoliciesAndACaller[Any], ResourcePolicyAdapter, Searched]):
+class SearchingByHolder(When[ManyPoliciesAndACaller[Any], ResourcePolicyAdapter, Searched]):
     """호출자 자신의 키페어에 할당된 정책을 필터로 검색한다."""
 
     @override
@@ -106,7 +106,7 @@ class SearchingByHolder(TestWhen[ManyPoliciesAndACaller[Any], ResourcePolicyAdap
 
 
 @dataclass(frozen=True)
-class OnlyTheHeldOneIsFound(TestThen[ManyPoliciesAndACaller[Any], Searched]):
+class OnlyTheHeldOneIsFound(Then[ManyPoliciesAndACaller[Any], Searched]):
     """호출자의 키페어에 할당된 정책 하나만 반환된다."""
 
     @override
@@ -116,7 +116,7 @@ class OnlyTheHeldOneIsFound(TestThen[ManyPoliciesAndACaller[Any], Searched]):
     @override
     def look(
         self, laid: ManyPoliciesAndACaller[Any], answered: Answered[Searched]
-    ) -> list[TestVerdict]:
+    ) -> list[Verdict]:
         payload = answered.response
         if payload is None:
             return [Refused(InsufficientPrivilege, answered.raised)]
@@ -128,7 +128,7 @@ class OnlyTheHeldOneIsFound(TestThen[ManyPoliciesAndACaller[Any], Searched]):
 
 @dataclass(frozen=True)
 class TheSuperadminFindsEveryOne(
-    TestScenario[SeedingSession, ManyPoliciesAndACaller[Any], ResourcePolicyAdapter, Searched]
+    Scenario[SeedingSession, ManyPoliciesAndACaller[Any], ResourcePolicyAdapter, Searched]
 ):
     family: Family[Any, Any]
 
@@ -144,21 +144,21 @@ class TheSuperadminFindsEveryOne(
         )
 
     @override
-    def given(self) -> TestGiven[SeedingSession, ManyPoliciesAndACaller[Any]]:
+    def given(self) -> Given[SeedingSession, ManyPoliciesAndACaller[Any]]:
         return ManyPoliciesAndSomeone(self.family, role=UserRole.SUPERADMIN)
 
     @override
-    def when(self) -> TestWhen[ManyPoliciesAndACaller[Any], ResourcePolicyAdapter, Searched]:
+    def when(self) -> When[ManyPoliciesAndACaller[Any], ResourcePolicyAdapter, Searched]:
         return SearchingEverything(self.family)
 
     @override
-    def then(self) -> TestThen[ManyPoliciesAndACaller[Any], Searched]:
+    def then(self) -> Then[ManyPoliciesAndACaller[Any], Searched]:
         return EveryLaidPolicyIsFound(self.family)
 
 
 @dataclass(frozen=True)
 class FilteringByNameLeavesThatOne(
-    TestScenario[SeedingSession, ManyPoliciesAndACaller[Any], ResourcePolicyAdapter, Searched]
+    Scenario[SeedingSession, ManyPoliciesAndACaller[Any], ResourcePolicyAdapter, Searched]
 ):
     family: Family[Any, Any]
 
@@ -174,21 +174,21 @@ class FilteringByNameLeavesThatOne(
         )
 
     @override
-    def given(self) -> TestGiven[SeedingSession, ManyPoliciesAndACaller[Any]]:
+    def given(self) -> Given[SeedingSession, ManyPoliciesAndACaller[Any]]:
         return ManyPoliciesAndSomeone(self.family, role=UserRole.SUPERADMIN)
 
     @override
-    def when(self) -> TestWhen[ManyPoliciesAndACaller[Any], ResourcePolicyAdapter, Searched]:
+    def when(self) -> When[ManyPoliciesAndACaller[Any], ResourcePolicyAdapter, Searched]:
         return SearchingByName(self.family)
 
     @override
-    def then(self) -> TestThen[ManyPoliciesAndACaller[Any], Searched]:
+    def then(self) -> Then[ManyPoliciesAndACaller[Any], Searched]:
         return OnlyTheNamedOneIsFound(self.family)
 
 
 @dataclass(frozen=True)
 class FilteringByHolderLeavesTheirs(
-    TestScenario[SeedingSession, ManyPoliciesAndACaller[Any], ResourcePolicyAdapter, Searched]
+    Scenario[SeedingSession, ManyPoliciesAndACaller[Any], ResourcePolicyAdapter, Searched]
 ):
     @override
     def summary(self) -> str:
@@ -202,21 +202,21 @@ class FilteringByHolderLeavesTheirs(
         )
 
     @override
-    def given(self) -> TestGiven[SeedingSession, ManyPoliciesAndACaller[Any]]:
+    def given(self) -> Given[SeedingSession, ManyPoliciesAndACaller[Any]]:
         return ManyPoliciesAndSomeone(KEYPAIR, role=UserRole.SUPERADMIN)
 
     @override
-    def when(self) -> TestWhen[ManyPoliciesAndACaller[Any], ResourcePolicyAdapter, Searched]:
+    def when(self) -> When[ManyPoliciesAndACaller[Any], ResourcePolicyAdapter, Searched]:
         return SearchingByHolder()
 
     @override
-    def then(self) -> TestThen[ManyPoliciesAndACaller[Any], Searched]:
+    def then(self) -> Then[ManyPoliciesAndACaller[Any], Searched]:
         return OnlyTheHeldOneIsFound()
 
 
 @dataclass(frozen=True)
 class AMonitorFindsEveryOne(
-    TestScenario[SeedingSession, ManyPoliciesAndACaller[Any], ResourcePolicyAdapter, Searched]
+    Scenario[SeedingSession, ManyPoliciesAndACaller[Any], ResourcePolicyAdapter, Searched]
 ):
     family: Family[Any, Any]
 
@@ -232,21 +232,21 @@ class AMonitorFindsEveryOne(
         )
 
     @override
-    def given(self) -> TestGiven[SeedingSession, ManyPoliciesAndACaller[Any]]:
+    def given(self) -> Given[SeedingSession, ManyPoliciesAndACaller[Any]]:
         return ManyPoliciesAndSomeone(self.family, role=UserRole.MONITOR)
 
     @override
-    def when(self) -> TestWhen[ManyPoliciesAndACaller[Any], ResourcePolicyAdapter, Searched]:
+    def when(self) -> When[ManyPoliciesAndACaller[Any], ResourcePolicyAdapter, Searched]:
         return SearchingEverything(self.family)
 
     @override
-    def then(self) -> TestThen[ManyPoliciesAndACaller[Any], Searched]:
+    def then(self) -> Then[ManyPoliciesAndACaller[Any], Searched]:
         return EveryLaidPolicyIsFound(self.family)
 
 
 @dataclass(frozen=True)
 class APlainUserMayNotSearch(
-    TestScenario[SeedingSession, ManyPoliciesAndACaller[Any], ResourcePolicyAdapter, Searched]
+    Scenario[SeedingSession, ManyPoliciesAndACaller[Any], ResourcePolicyAdapter, Searched]
 ):
     family: Family[Any, Any]
 
@@ -259,15 +259,15 @@ class APlainUserMayNotSearch(
         return f"슈퍼관리자가 아닌 사용자가 {self.family.kind} 전체를 검색하려 하면 역할 부족으로 거부된다"
 
     @override
-    def given(self) -> TestGiven[SeedingSession, ManyPoliciesAndACaller[Any]]:
+    def given(self) -> Given[SeedingSession, ManyPoliciesAndACaller[Any]]:
         return ManyPoliciesAndSomeone(self.family)
 
     @override
-    def when(self) -> TestWhen[ManyPoliciesAndACaller[Any], ResourcePolicyAdapter, Searched]:
+    def when(self) -> When[ManyPoliciesAndACaller[Any], ResourcePolicyAdapter, Searched]:
         return SearchingEverything(self.family)
 
     @override
-    def then(self) -> TestThen[ManyPoliciesAndACaller[Any], Searched]:
+    def then(self) -> Then[ManyPoliciesAndACaller[Any], Searched]:
         return TheCallIsRefused(InsufficientPrivilege)
 
 

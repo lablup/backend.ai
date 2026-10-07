@@ -17,7 +17,7 @@ from ai.backend.manager.api.adapters.notification.adapter import NotificationAda
 from ai.backend.manager.errors.base.entity import EntityNotFoundError
 from ai.backend.manager.errors.permission import NotEnoughPermission
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.testutils.scenario_steps import TestGiven, TestScenario, TestThen, TestWhen
+from ai.backend.testutils.scenario_steps import Given, Scenario, Then, When
 from bai_scenario.components.answers import TheCallIsRefused
 from bai_scenario.components.notification import (
     AChannelAndACaller,
@@ -30,11 +30,11 @@ from bai_scenario.runner.planting import SeedingSession
 from bai_scenario.runner.steps import run_scenario
 
 type Deleted = DeleteNotificationChannelPayload
-type RetiringStep = TestScenario[SeedingSession, AChannelAndACaller, NotificationAdapter, Any]
+type RetiringStep = Scenario[SeedingSession, AChannelAndACaller, NotificationAdapter, Any]
 
 
 @dataclass(frozen=True)
-class Deleting(TestWhen[AChannelAndACaller, NotificationAdapter, Deleted]):
+class Deleting(When[AChannelAndACaller, NotificationAdapter, Deleted]):
     """채널을 삭제한다. ``unknown``이면 어느 행에도 없는 id를 쓴다."""
 
     unknown: bool = False
@@ -58,7 +58,7 @@ class Deleting(TestWhen[AChannelAndACaller, NotificationAdapter, Deleted]):
 
 @dataclass(frozen=True)
 class TheSuperadminDeletesAChannel(
-    TestScenario[SeedingSession, AChannelAndACaller, NotificationAdapter, Deleted]
+    Scenario[SeedingSession, AChannelAndACaller, NotificationAdapter, Deleted]
 ):
     @override
     def summary(self) -> str:
@@ -69,21 +69,21 @@ class TheSuperadminDeletesAChannel(
         return "채널 하나가 있고 슈퍼관리자가 삭제하면 삭제한 채널의 id가 반환된다"
 
     @override
-    def given(self) -> TestGiven[SeedingSession, AChannelAndACaller]:
+    def given(self) -> Given[SeedingSession, AChannelAndACaller]:
         return AChannelAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
-    def when(self) -> TestWhen[AChannelAndACaller, NotificationAdapter, Deleted]:
+    def when(self) -> When[AChannelAndACaller, NotificationAdapter, Deleted]:
         return Deleting()
 
     @override
-    def then(self) -> TestThen[AChannelAndACaller, Deleted]:
+    def then(self) -> Then[AChannelAndACaller, Deleted]:
         return TheDeletedChannelId()
 
 
 @dataclass(frozen=True)
 class AChannelARulePointsAtIsDeletedAllTheSame(
-    TestScenario[SeedingSession, AChannelAndACaller, NotificationAdapter, Deleted]
+    Scenario[SeedingSession, AChannelAndACaller, NotificationAdapter, Deleted]
 ):
     @override
     def summary(self) -> str:
@@ -97,21 +97,21 @@ class AChannelARulePointsAtIsDeletedAllTheSame(
         )
 
     @override
-    def given(self) -> TestGiven[SeedingSession, AChannelAndACaller]:
+    def given(self) -> Given[SeedingSession, AChannelAndACaller]:
         return AChannelARuleAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
-    def when(self) -> TestWhen[AChannelAndACaller, NotificationAdapter, Deleted]:
+    def when(self) -> When[AChannelAndACaller, NotificationAdapter, Deleted]:
         return Deleting()
 
     @override
-    def then(self) -> TestThen[AChannelAndACaller, Deleted]:
+    def then(self) -> Then[AChannelAndACaller, Deleted]:
         return TheDeletedChannelId()
 
 
 @dataclass(frozen=True)
 class TheSuperadminDeletingAnUnknownIdIsNotFound(
-    TestScenario[SeedingSession, AChannelAndACaller, NotificationAdapter, Deleted]
+    Scenario[SeedingSession, AChannelAndACaller, NotificationAdapter, Deleted]
 ):
     @override
     def summary(self) -> str:
@@ -122,21 +122,21 @@ class TheSuperadminDeletingAnUnknownIdIsNotFound(
         return "슈퍼관리자가 존재하지 않는 id를 삭제하면 대상을 찾을 수 없다는 이유로 거부된다"
 
     @override
-    def given(self) -> TestGiven[SeedingSession, AChannelAndACaller]:
+    def given(self) -> Given[SeedingSession, AChannelAndACaller]:
         return AChannelAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
-    def when(self) -> TestWhen[AChannelAndACaller, NotificationAdapter, Deleted]:
+    def when(self) -> When[AChannelAndACaller, NotificationAdapter, Deleted]:
         return Deleting(unknown=True)
 
     @override
-    def then(self) -> TestThen[AChannelAndACaller, Deleted]:
+    def then(self) -> Then[AChannelAndACaller, Deleted]:
         return TheCallIsRefused(EntityNotFoundError)
 
 
 @dataclass(frozen=True)
 class AUserGrantedNothingMayNotDelete(
-    TestScenario[SeedingSession, AChannelAndACaller, NotificationAdapter, Deleted]
+    Scenario[SeedingSession, AChannelAndACaller, NotificationAdapter, Deleted]
 ):
     @override
     def summary(self) -> str:
@@ -147,15 +147,15 @@ class AUserGrantedNothingMayNotDelete(
         return "아무 권한도 없는 사용자가 삭제하려 하면 권한 부족으로 거부된다"
 
     @override
-    def given(self) -> TestGiven[SeedingSession, AChannelAndACaller]:
+    def given(self) -> Given[SeedingSession, AChannelAndACaller]:
         return AChannelAndSomeone()
 
     @override
-    def when(self) -> TestWhen[AChannelAndACaller, NotificationAdapter, Deleted]:
+    def when(self) -> When[AChannelAndACaller, NotificationAdapter, Deleted]:
         return Deleting()
 
     @override
-    def then(self) -> TestThen[AChannelAndACaller, Deleted]:
+    def then(self) -> Then[AChannelAndACaller, Deleted]:
         return TheCallIsRefused(NotEnoughPermission)
 
 

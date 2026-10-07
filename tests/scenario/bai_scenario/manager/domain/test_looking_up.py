@@ -15,14 +15,14 @@ from ai.backend.manager.errors.user import UserNotFound
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.testutils.scenario_steps import (
     Answered,
+    Given,
     Held,
     Same,
     SameAs,
-    TestGiven,
-    TestScenario,
-    TestThen,
-    TestVerdict,
-    TestWhen,
+    Scenario,
+    Then,
+    Verdict,
+    When,
 )
 from bai_scenario.components.answers import MissingResponse
 from bai_scenario.components.domain import ADomainAndACaller, ATargetAndSomeone, TheCallIsRefused
@@ -30,15 +30,15 @@ from bai_scenario.runner.acting import ActingAs
 from bai_scenario.runner.planting import SeedingSession
 from bai_scenario.runner.steps import run_scenario
 
-type DomainStep = TestScenario[SeedingSession, ADomainAndACaller, DomainAdapter, DomainID]
+type DomainStep = Scenario[SeedingSession, ADomainAndACaller, DomainAdapter, DomainID]
 type Found = list[DomainID | None]
-type BulkStep = TestScenario[SeedingSession, ADomainAndACaller, DomainAdapter, Found]
+type BulkStep = Scenario[SeedingSession, ADomainAndACaller, DomainAdapter, Found]
 
 UNKNOWN = "no-such-domain"
 
 
 @dataclass(frozen=True)
-class LookingUpTheName(TestWhen[ADomainAndACaller, DomainAdapter, DomainID]):
+class LookingUpTheName(When[ADomainAndACaller, DomainAdapter, DomainID]):
     """이름으로 id를 찾는다. 이름을 대지 않으면 미리 만든 도메인의 이름을 쓴다."""
 
     named: str | None = None
@@ -58,7 +58,7 @@ class LookingUpTheName(TestWhen[ADomainAndACaller, DomainAdapter, DomainID]):
 
 
 @dataclass(frozen=True)
-class TheDomainsIdComesBack(TestThen[ADomainAndACaller, DomainID]):
+class TheDomainsIdComesBack(Then[ADomainAndACaller, DomainID]):
     """그 이름을 가진 도메인의 id가 온다."""
 
     @override
@@ -66,7 +66,7 @@ class TheDomainsIdComesBack(TestThen[ADomainAndACaller, DomainID]):
         return "그 도메인의 id가 온다"
 
     @override
-    def look(self, laid: ADomainAndACaller, answered: Answered[DomainID]) -> list[TestVerdict]:
+    def look(self, laid: ADomainAndACaller, answered: Answered[DomainID]) -> list[Verdict]:
         found = answered.response
         if found is None:
             return [MissingResponse(answered.raised)]
@@ -75,7 +75,7 @@ class TheDomainsIdComesBack(TestThen[ADomainAndACaller, DomainID]):
 
 @dataclass(frozen=True)
 class TheSuperadminLooksUpAName(
-    TestScenario[SeedingSession, ADomainAndACaller, DomainAdapter, DomainID]
+    Scenario[SeedingSession, ADomainAndACaller, DomainAdapter, DomainID]
 ):
     @override
     def summary(self) -> str:
@@ -86,21 +86,21 @@ class TheSuperadminLooksUpAName(
         return "슈퍼관리자가 도메인 이름으로 id를 찾으면, 그 도메인의 id가 온다"
 
     @override
-    def given(self) -> TestGiven[SeedingSession, ADomainAndACaller]:
+    def given(self) -> Given[SeedingSession, ADomainAndACaller]:
         return ATargetAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
-    def when(self) -> TestWhen[ADomainAndACaller, DomainAdapter, DomainID]:
+    def when(self) -> When[ADomainAndACaller, DomainAdapter, DomainID]:
         return LookingUpTheName()
 
     @override
-    def then(self) -> TestThen[ADomainAndACaller, DomainID]:
+    def then(self) -> Then[ADomainAndACaller, DomainID]:
         return TheDomainsIdComesBack()
 
 
 @dataclass(frozen=True)
 class AUserGrantedNothingStillLooksUpAName(
-    TestScenario[SeedingSession, ADomainAndACaller, DomainAdapter, DomainID]
+    Scenario[SeedingSession, ADomainAndACaller, DomainAdapter, DomainID]
 ):
     @override
     def summary(self) -> str:
@@ -114,20 +114,20 @@ class AUserGrantedNothingStillLooksUpAName(
         )
 
     @override
-    def given(self) -> TestGiven[SeedingSession, ADomainAndACaller]:
+    def given(self) -> Given[SeedingSession, ADomainAndACaller]:
         return ATargetAndSomeone()
 
     @override
-    def when(self) -> TestWhen[ADomainAndACaller, DomainAdapter, DomainID]:
+    def when(self) -> When[ADomainAndACaller, DomainAdapter, DomainID]:
         return LookingUpTheName()
 
     @override
-    def then(self) -> TestThen[ADomainAndACaller, DomainID]:
+    def then(self) -> Then[ADomainAndACaller, DomainID]:
         return TheDomainsIdComesBack()
 
 
 @dataclass(frozen=True)
-class LookingUpNames(TestWhen[ADomainAndACaller, DomainAdapter, Found]):
+class LookingUpNames(When[ADomainAndACaller, DomainAdapter, Found]):
     """미리 만든 도메인의 이름과 어느 도메인도 갖지 않은 이름으로 id를 여럿 찾는다."""
 
     @override
@@ -145,7 +145,7 @@ class LookingUpNames(TestWhen[ADomainAndACaller, DomainAdapter, Found]):
 
 
 @dataclass(frozen=True)
-class OnlyTheKnownNameHasAnId(TestThen[ADomainAndACaller, Found]):
+class OnlyTheKnownNameHasAnId(Then[ADomainAndACaller, Found]):
     """있는 이름의 자리에 그 도메인의 id가, 없는 이름의 자리에 빈 값이 온다."""
 
     @override
@@ -153,7 +153,7 @@ class OnlyTheKnownNameHasAnId(TestThen[ADomainAndACaller, Found]):
         return "있는 이름에는 그 도메인의 id, 없는 이름에는 빈 값이 온다"
 
     @override
-    def look(self, laid: ADomainAndACaller, answered: Answered[Found]) -> list[TestVerdict]:
+    def look(self, laid: ADomainAndACaller, answered: Answered[Found]) -> list[Verdict]:
         found = answered.response
         if found is None:
             return [MissingResponse(answered.raised)]
@@ -170,9 +170,7 @@ class OnlyTheKnownNameHasAnId(TestThen[ADomainAndACaller, Found]):
 
 
 @dataclass(frozen=True)
-class TheSuperadminLooksUpNames(
-    TestScenario[SeedingSession, ADomainAndACaller, DomainAdapter, Found]
-):
+class TheSuperadminLooksUpNames(Scenario[SeedingSession, ADomainAndACaller, DomainAdapter, Found]):
     @override
     def summary(self) -> str:
         return "the-superadmin-looks-up-domains-by-name"
@@ -185,21 +183,21 @@ class TheSuperadminLooksUpNames(
         )
 
     @override
-    def given(self) -> TestGiven[SeedingSession, ADomainAndACaller]:
+    def given(self) -> Given[SeedingSession, ADomainAndACaller]:
         return ATargetAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
-    def when(self) -> TestWhen[ADomainAndACaller, DomainAdapter, Found]:
+    def when(self) -> When[ADomainAndACaller, DomainAdapter, Found]:
         return LookingUpNames()
 
     @override
-    def then(self) -> TestThen[ADomainAndACaller, Found]:
+    def then(self) -> Then[ADomainAndACaller, Found]:
         return OnlyTheKnownNameHasAnId()
 
 
 @dataclass(frozen=True)
 class AUserGrantedNothingGetsTheSameIds(
-    TestScenario[SeedingSession, ADomainAndACaller, DomainAdapter, Found]
+    Scenario[SeedingSession, ADomainAndACaller, DomainAdapter, Found]
 ):
     @override
     def summary(self) -> str:
@@ -213,20 +211,20 @@ class AUserGrantedNothingGetsTheSameIds(
         )
 
     @override
-    def given(self) -> TestGiven[SeedingSession, ADomainAndACaller]:
+    def given(self) -> Given[SeedingSession, ADomainAndACaller]:
         return ATargetAndSomeone()
 
     @override
-    def when(self) -> TestWhen[ADomainAndACaller, DomainAdapter, Found]:
+    def when(self) -> When[ADomainAndACaller, DomainAdapter, Found]:
         return LookingUpNames()
 
     @override
-    def then(self) -> TestThen[ADomainAndACaller, Found]:
+    def then(self) -> Then[ADomainAndACaller, Found]:
         return OnlyTheKnownNameHasAnId()
 
 
 @dataclass(frozen=True)
-class LookingUpNamesWithoutLogin(TestWhen[ADomainAndACaller, DomainAdapter, Found]):
+class LookingUpNamesWithoutLogin(When[ADomainAndACaller, DomainAdapter, Found]):
     """로그인 문맥 없이 미리 만든 도메인의 이름으로 id를 여럿 찾는다."""
 
     @override
@@ -243,9 +241,7 @@ class LookingUpNamesWithoutLogin(TestWhen[ADomainAndACaller, DomainAdapter, Foun
 
 
 @dataclass(frozen=True)
-class ACallWithoutLoginIsRefused(
-    TestScenario[SeedingSession, ADomainAndACaller, DomainAdapter, Found]
-):
+class ACallWithoutLoginIsRefused(Scenario[SeedingSession, ADomainAndACaller, DomainAdapter, Found]):
     @override
     def summary(self) -> str:
         return "looking-up-domains-by-name-without-login-is-refused"
@@ -255,15 +251,15 @@ class ACallWithoutLoginIsRefused(
         return "로그인 문맥 없이 이름으로 id를 여럿 찾으면, 사용자를 찾을 수 없다는 것으로 거부된다"
 
     @override
-    def given(self) -> TestGiven[SeedingSession, ADomainAndACaller]:
+    def given(self) -> Given[SeedingSession, ADomainAndACaller]:
         return ATargetAndSomeone()
 
     @override
-    def when(self) -> TestWhen[ADomainAndACaller, DomainAdapter, Found]:
+    def when(self) -> When[ADomainAndACaller, DomainAdapter, Found]:
         return LookingUpNamesWithoutLogin()
 
     @override
-    def then(self) -> TestThen[ADomainAndACaller, Found]:
+    def then(self) -> Then[ADomainAndACaller, Found]:
         return TheCallIsRefused(UserNotFound)
 
 
@@ -276,7 +272,7 @@ BULK_SCENARIOS: list[BulkStep] = [
 
 @dataclass(frozen=True)
 class ANameNothingAnswersToIsNotFound(
-    TestScenario[SeedingSession, ADomainAndACaller, DomainAdapter, DomainID]
+    Scenario[SeedingSession, ADomainAndACaller, DomainAdapter, DomainID]
 ):
     @override
     def summary(self) -> str:
@@ -287,15 +283,15 @@ class ANameNothingAnswersToIsNotFound(
         return "아무 도메인도 갖지 않은 이름으로 id를 찾으면 대상이 없다는 것으로 거부된다"
 
     @override
-    def given(self) -> TestGiven[SeedingSession, ADomainAndACaller]:
+    def given(self) -> Given[SeedingSession, ADomainAndACaller]:
         return ATargetAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
-    def when(self) -> TestWhen[ADomainAndACaller, DomainAdapter, DomainID]:
+    def when(self) -> When[ADomainAndACaller, DomainAdapter, DomainID]:
         return LookingUpTheName(named=UNKNOWN)
 
     @override
-    def then(self) -> TestThen[ADomainAndACaller, DomainID]:
+    def then(self) -> Then[ADomainAndACaller, DomainID]:
         return TheCallIsRefused(EntityNotFoundError)
 
 

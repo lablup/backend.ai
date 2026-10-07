@@ -18,7 +18,7 @@ from ai.backend.manager.data.domain.types import DomainData
 from ai.backend.manager.data.permission.types import Permission
 from ai.backend.manager.data.resource_group.types import ResourceGroupData
 from ai.backend.manager.data.user.types import UserData
-from ai.backend.testutils.scenario_steps import TestGiven
+from ai.backend.testutils.scenario_steps import Given
 from bai_scenario.components.domain import WAS_HERE, SomeoneOf
 from bai_scenario.components.system import role_named
 from bai_scenario.seeds.agent.agent import SeedAgent
@@ -76,7 +76,7 @@ class SomeoneReadingAgentsIn(TestSeedNest[Laid[UserData]]):
 
 
 @dataclass(frozen=True)
-class AnAgentAndSomeone(TestGiven[Any, AnAgentAndACaller]):
+class AnAgentAndSomeone(Given[Any, AnAgentAndACaller]):
     """에이전트 하나와 사용자 한 명."""
 
     role: UserRole = UserRole.USER
@@ -104,7 +104,7 @@ class AnAgentAndSomeone(TestGiven[Any, AnAgentAndACaller]):
 
 
 @dataclass(frozen=True)
-class TwoAgentsAndSomeoneReadingOne(TestGiven[Any, TwoAgentsAndACaller]):
+class TwoAgentsAndSomeoneReadingOne(Given[Any, TwoAgentsAndACaller]):
     """리소스 그룹이 다른 에이전트 둘과, 한쪽 그룹의 에이전트만 읽을 수 있는 사용자 한 명."""
 
     @override

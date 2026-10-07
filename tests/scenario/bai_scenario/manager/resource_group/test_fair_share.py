@@ -21,7 +21,7 @@ from ai.backend.manager.api.adapters.resource_group.adapter import ResourceGroup
 from ai.backend.manager.errors.base.entity import EntityNotFoundError
 from ai.backend.manager.errors.permission import NotEnoughPermission
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.testutils.scenario_steps import TestGiven, TestScenario, TestThen, TestWhen
+from ai.backend.testutils.scenario_steps import Given, Scenario, Then, When
 from bai_scenario.components.answers import TheCallIsRefused
 from bai_scenario.components.resource_group import (
     AGroupAndACaller,
@@ -34,16 +34,14 @@ from bai_scenario.runner.acting import ActingAs
 from bai_scenario.runner.planting import SeedingSession
 from bai_scenario.runner.steps import run_scenario
 
-type FairShareStep = TestScenario[SeedingSession, AGroupAndACaller, ResourceGroupAdapter, Any]
+type FairShareStep = Scenario[SeedingSession, AGroupAndACaller, ResourceGroupAdapter, Any]
 
 UNKNOWN = "no-such-group"
 HALF_LIFE = 14
 
 
 @dataclass(frozen=True)
-class ReadingTheSpec(
-    TestWhen[AGroupAndACaller, ResourceGroupAdapter, FairShareResourceGroupSpecInfo]
-):
+class ReadingTheSpec(When[AGroupAndACaller, ResourceGroupAdapter, FairShareResourceGroupSpecInfo]):
     """fair share 설정을 읽는다. ``unknown``이면 어느 행에도 없는 이름을 쓴다."""
 
     unknown: bool = False
@@ -66,7 +64,7 @@ class ReadingTheSpec(
 
 
 @dataclass(frozen=True)
-class EditingTheSpec(TestWhen[AGroupAndACaller, ResourceGroupAdapter, ResourceGroupDetailNode]):
+class EditingTheSpec(When[AGroupAndACaller, ResourceGroupAdapter, ResourceGroupDetailNode]):
     """fair share 설정의 반감기를 바꾼다."""
 
     unknown: bool = False
@@ -95,9 +93,7 @@ class EditingTheSpec(TestWhen[AGroupAndACaller, ResourceGroupAdapter, ResourceGr
 
 @dataclass(frozen=True)
 class TheSuperadminReadsTheDefaults(
-    TestScenario[
-        SeedingSession, AGroupAndACaller, ResourceGroupAdapter, FairShareResourceGroupSpecInfo
-    ]
+    Scenario[SeedingSession, AGroupAndACaller, ResourceGroupAdapter, FairShareResourceGroupSpecInfo]
 ):
     @override
     def summary(self) -> str:
@@ -111,25 +107,21 @@ class TheSuperadminReadsTheDefaults(
         )
 
     @override
-    def given(self) -> TestGiven[SeedingSession, AGroupAndACaller]:
+    def given(self) -> Given[SeedingSession, AGroupAndACaller]:
         return AGroupAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
-    def when(
-        self,
-    ) -> TestWhen[AGroupAndACaller, ResourceGroupAdapter, FairShareResourceGroupSpecInfo]:
+    def when(self) -> When[AGroupAndACaller, ResourceGroupAdapter, FairShareResourceGroupSpecInfo]:
         return ReadingTheSpec()
 
     @override
-    def then(self) -> TestThen[AGroupAndACaller, FairShareResourceGroupSpecInfo]:
+    def then(self) -> Then[AGroupAndACaller, FairShareResourceGroupSpecInfo]:
         return TheFairShareDefaults()
 
 
 @dataclass(frozen=True)
 class AUserGrantedReadOnTheGroupReadsTheSpec(
-    TestScenario[
-        SeedingSession, AGroupAndACaller, ResourceGroupAdapter, FairShareResourceGroupSpecInfo
-    ]
+    Scenario[SeedingSession, AGroupAndACaller, ResourceGroupAdapter, FairShareResourceGroupSpecInfo]
 ):
     @override
     def summary(self) -> str:
@@ -143,25 +135,21 @@ class AUserGrantedReadOnTheGroupReadsTheSpec(
         )
 
     @override
-    def given(self) -> TestGiven[SeedingSession, AGroupAndACaller]:
+    def given(self) -> Given[SeedingSession, AGroupAndACaller]:
         return AGroupAndSomeone(granted=Permission.READ)
 
     @override
-    def when(
-        self,
-    ) -> TestWhen[AGroupAndACaller, ResourceGroupAdapter, FairShareResourceGroupSpecInfo]:
+    def when(self) -> When[AGroupAndACaller, ResourceGroupAdapter, FairShareResourceGroupSpecInfo]:
         return ReadingTheSpec()
 
     @override
-    def then(self) -> TestThen[AGroupAndACaller, FairShareResourceGroupSpecInfo]:
+    def then(self) -> Then[AGroupAndACaller, FairShareResourceGroupSpecInfo]:
         return TheFairShareDefaults()
 
 
 @dataclass(frozen=True)
 class AUserGrantedNothingMayNotReadTheSpec(
-    TestScenario[
-        SeedingSession, AGroupAndACaller, ResourceGroupAdapter, FairShareResourceGroupSpecInfo
-    ]
+    Scenario[SeedingSession, AGroupAndACaller, ResourceGroupAdapter, FairShareResourceGroupSpecInfo]
 ):
     @override
     def summary(self) -> str:
@@ -172,25 +160,21 @@ class AUserGrantedNothingMayNotReadTheSpec(
         return "아무 권한도 없는 사용자가 fair share 설정을 읽으려 하면 권한 부족으로 거부된다"
 
     @override
-    def given(self) -> TestGiven[SeedingSession, AGroupAndACaller]:
+    def given(self) -> Given[SeedingSession, AGroupAndACaller]:
         return AGroupAndSomeone()
 
     @override
-    def when(
-        self,
-    ) -> TestWhen[AGroupAndACaller, ResourceGroupAdapter, FairShareResourceGroupSpecInfo]:
+    def when(self) -> When[AGroupAndACaller, ResourceGroupAdapter, FairShareResourceGroupSpecInfo]:
         return ReadingTheSpec()
 
     @override
-    def then(self) -> TestThen[AGroupAndACaller, FairShareResourceGroupSpecInfo]:
+    def then(self) -> Then[AGroupAndACaller, FairShareResourceGroupSpecInfo]:
         return TheCallIsRefused(NotEnoughPermission)
 
 
 @dataclass(frozen=True)
 class ReadingTheSpecOfAnUnknownNameIsNotFound(
-    TestScenario[
-        SeedingSession, AGroupAndACaller, ResourceGroupAdapter, FairShareResourceGroupSpecInfo
-    ]
+    Scenario[SeedingSession, AGroupAndACaller, ResourceGroupAdapter, FairShareResourceGroupSpecInfo]
 ):
     @override
     def summary(self) -> str:
@@ -201,23 +185,21 @@ class ReadingTheSpecOfAnUnknownNameIsNotFound(
         return "슈퍼관리자가 존재하지 않는 이름의 fair share 설정을 읽으면 대상을 찾을 수 없다는 이유로 거부된다"
 
     @override
-    def given(self) -> TestGiven[SeedingSession, AGroupAndACaller]:
+    def given(self) -> Given[SeedingSession, AGroupAndACaller]:
         return AGroupAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
-    def when(
-        self,
-    ) -> TestWhen[AGroupAndACaller, ResourceGroupAdapter, FairShareResourceGroupSpecInfo]:
+    def when(self) -> When[AGroupAndACaller, ResourceGroupAdapter, FairShareResourceGroupSpecInfo]:
         return ReadingTheSpec(unknown=True)
 
     @override
-    def then(self) -> TestThen[AGroupAndACaller, FairShareResourceGroupSpecInfo]:
+    def then(self) -> Then[AGroupAndACaller, FairShareResourceGroupSpecInfo]:
         return TheCallIsRefused(EntityNotFoundError)
 
 
 @dataclass(frozen=True)
 class TheSuperadminChangesTheHalfLife(
-    TestScenario[SeedingSession, AGroupAndACaller, ResourceGroupAdapter, ResourceGroupDetailNode]
+    Scenario[SeedingSession, AGroupAndACaller, ResourceGroupAdapter, ResourceGroupDetailNode]
 ):
     started: datetime
 
@@ -230,21 +212,21 @@ class TheSuperadminChangesTheHalfLife(
         return "슈퍼관리자가 반감기를 바꾸면 그룹 전체가 반환된다. 반환되는 노드에는 이 설정이 실리지 않는다"
 
     @override
-    def given(self) -> TestGiven[SeedingSession, AGroupAndACaller]:
+    def given(self) -> Given[SeedingSession, AGroupAndACaller]:
         return AGroupAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
-    def when(self) -> TestWhen[AGroupAndACaller, ResourceGroupAdapter, ResourceGroupDetailNode]:
+    def when(self) -> When[AGroupAndACaller, ResourceGroupAdapter, ResourceGroupDetailNode]:
         return EditingTheSpec()
 
     @override
-    def then(self) -> TestThen[AGroupAndACaller, ResourceGroupDetailNode]:
+    def then(self) -> Then[AGroupAndACaller, ResourceGroupDetailNode]:
         return TheGroupNode(GroupLook(started=self.started))
 
 
 @dataclass(frozen=True)
 class AUserGrantedUpdateOnTheGroupChangesTheSpec(
-    TestScenario[SeedingSession, AGroupAndACaller, ResourceGroupAdapter, ResourceGroupDetailNode]
+    Scenario[SeedingSession, AGroupAndACaller, ResourceGroupAdapter, ResourceGroupDetailNode]
 ):
     started: datetime
 
@@ -259,21 +241,21 @@ class AUserGrantedUpdateOnTheGroupChangesTheSpec(
         )
 
     @override
-    def given(self) -> TestGiven[SeedingSession, AGroupAndACaller]:
+    def given(self) -> Given[SeedingSession, AGroupAndACaller]:
         return AGroupAndSomeone(granted=Permission.UPDATE)
 
     @override
-    def when(self) -> TestWhen[AGroupAndACaller, ResourceGroupAdapter, ResourceGroupDetailNode]:
+    def when(self) -> When[AGroupAndACaller, ResourceGroupAdapter, ResourceGroupDetailNode]:
         return EditingTheSpec()
 
     @override
-    def then(self) -> TestThen[AGroupAndACaller, ResourceGroupDetailNode]:
+    def then(self) -> Then[AGroupAndACaller, ResourceGroupDetailNode]:
         return TheGroupNode(GroupLook(started=self.started))
 
 
 @dataclass(frozen=True)
 class AUserGrantedNothingMayNotChangeTheSpec(
-    TestScenario[SeedingSession, AGroupAndACaller, ResourceGroupAdapter, ResourceGroupDetailNode]
+    Scenario[SeedingSession, AGroupAndACaller, ResourceGroupAdapter, ResourceGroupDetailNode]
 ):
     @override
     def summary(self) -> str:
@@ -284,21 +266,21 @@ class AUserGrantedNothingMayNotChangeTheSpec(
         return "아무 권한도 없는 사용자가 반감기를 바꾸려 하면 권한 부족으로 거부된다"
 
     @override
-    def given(self) -> TestGiven[SeedingSession, AGroupAndACaller]:
+    def given(self) -> Given[SeedingSession, AGroupAndACaller]:
         return AGroupAndSomeone()
 
     @override
-    def when(self) -> TestWhen[AGroupAndACaller, ResourceGroupAdapter, ResourceGroupDetailNode]:
+    def when(self) -> When[AGroupAndACaller, ResourceGroupAdapter, ResourceGroupDetailNode]:
         return EditingTheSpec()
 
     @override
-    def then(self) -> TestThen[AGroupAndACaller, ResourceGroupDetailNode]:
+    def then(self) -> Then[AGroupAndACaller, ResourceGroupDetailNode]:
         return TheCallIsRefused(NotEnoughPermission)
 
 
 @dataclass(frozen=True)
 class ChangingTheSpecOfAnUnknownNameIsNotFound(
-    TestScenario[SeedingSession, AGroupAndACaller, ResourceGroupAdapter, ResourceGroupDetailNode]
+    Scenario[SeedingSession, AGroupAndACaller, ResourceGroupAdapter, ResourceGroupDetailNode]
 ):
     @override
     def summary(self) -> str:
@@ -309,15 +291,15 @@ class ChangingTheSpecOfAnUnknownNameIsNotFound(
         return "슈퍼관리자가 존재하지 않는 이름의 반감기를 바꾸면 대상을 찾을 수 없다는 이유로 거부된다"
 
     @override
-    def given(self) -> TestGiven[SeedingSession, AGroupAndACaller]:
+    def given(self) -> Given[SeedingSession, AGroupAndACaller]:
         return AGroupAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
-    def when(self) -> TestWhen[AGroupAndACaller, ResourceGroupAdapter, ResourceGroupDetailNode]:
+    def when(self) -> When[AGroupAndACaller, ResourceGroupAdapter, ResourceGroupDetailNode]:
         return EditingTheSpec(unknown=True)
 
     @override
-    def then(self) -> TestThen[AGroupAndACaller, ResourceGroupDetailNode]:
+    def then(self) -> Then[AGroupAndACaller, ResourceGroupDetailNode]:
         return TheCallIsRefused(EntityNotFoundError)
 
 

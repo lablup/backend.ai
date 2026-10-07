@@ -37,13 +37,13 @@ from ai.backend.manager.errors.resource import RuntimeVariantPresetConflict
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.testutils.scenario_steps import (
     Answered,
+    Configured,
+    Given,
     Refused,
-    TestConfigured,
-    TestGiven,
-    TestScenario,
-    TestThen,
-    TestVerdict,
-    TestWhen,
+    Scenario,
+    Then,
+    Verdict,
+    When,
 )
 from bai_scenario.components.answers import TheCallIsRefused
 from bai_scenario.components.domain import WrittenByThisRun
@@ -76,13 +76,13 @@ ARGS_INT = PresetTargetSpec(
 )
 SLIDER = UIOption(ui_type=UIType.SLIDER, slider=SliderOption(min=1, max=8, step=1))
 
-type CreatingStep = TestScenario[
+type CreatingStep = Scenario[
     SeedingSession, Any, RuntimeVariantPresetAdapter, RuntimeVariantPresetNode
 ]
 
 
 @dataclass(frozen=True)
-class Creating(TestWhen[AVariantAndACaller, RuntimeVariantPresetAdapter, RuntimeVariantPresetNode]):
+class Creating(When[AVariantAndACaller, RuntimeVariantPresetAdapter, RuntimeVariantPresetNode]):
     """미리 만들어 둔 변형에 프리셋 하나를 생성하고 응답 노드를 반환한다."""
 
     named: str = MADE
@@ -118,7 +118,7 @@ class Creating(TestWhen[AVariantAndACaller, RuntimeVariantPresetAdapter, Runtime
 
 @dataclass(frozen=True)
 class CreatingBesideTheLaidOne(
-    TestWhen[APresetAndACaller, RuntimeVariantPresetAdapter, RuntimeVariantPresetNode]
+    When[APresetAndACaller, RuntimeVariantPresetAdapter, RuntimeVariantPresetNode]
 ):
     """이미 프리셋이 있는 변형에 하나 더 생성한다. 이름을 생략하면 기존 이름을 사용한다."""
 
@@ -154,7 +154,7 @@ class CreatingBesideTheLaidOne(
 
 @dataclass(frozen=True)
 class CreatingTheSameNameUnderTheOther(
-    TestWhen[TwoVariantsAndAPreset, RuntimeVariantPresetAdapter, RuntimeVariantPresetNode]
+    When[TwoVariantsAndAPreset, RuntimeVariantPresetAdapter, RuntimeVariantPresetNode]
 ):
     """프리셋이 없는 변형에 다른 변형의 프리셋과 같은 이름으로 생성한다."""
 
@@ -184,7 +184,7 @@ class CreatingTheSameNameUnderTheOther(
 
 
 @dataclass(frozen=True)
-class TheNextPresetNode(TestThen[APresetAndACaller, RuntimeVariantPresetNode]):
+class TheNextPresetNode(Then[APresetAndACaller, RuntimeVariantPresetNode]):
     """같은 변형에 새로 생성한 프리셋. 순위는 기존 프리셋보다 지정된 간격만큼 크다."""
 
     started: datetime
@@ -196,7 +196,7 @@ class TheNextPresetNode(TestThen[APresetAndACaller, RuntimeVariantPresetNode]):
     @override
     def look(
         self, laid: APresetAndACaller, answered: Answered[RuntimeVariantPresetNode]
-    ) -> list[TestVerdict]:
+    ) -> list[Verdict]:
         node = answered.response
         if node is None:
             return [Refused(EntityNotFoundError, answered.raised)]
@@ -220,7 +220,7 @@ class TheNextPresetNode(TestThen[APresetAndACaller, RuntimeVariantPresetNode]):
 
 @dataclass(frozen=True)
 class TheFirstPresetIsRankedAHundred(
-    TestScenario[
+    Scenario[
         SeedingSession, AVariantAndACaller, RuntimeVariantPresetAdapter, RuntimeVariantPresetNode
     ]
 ):
@@ -238,23 +238,23 @@ class TheFirstPresetIsRankedAHundred(
         )
 
     @override
-    def given(self) -> TestGiven[SeedingSession, AVariantAndACaller]:
+    def given(self) -> Given[SeedingSession, AVariantAndACaller]:
         return AVariantAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
     def when(
         self,
-    ) -> TestWhen[AVariantAndACaller, RuntimeVariantPresetAdapter, RuntimeVariantPresetNode]:
+    ) -> When[AVariantAndACaller, RuntimeVariantPresetAdapter, RuntimeVariantPresetNode]:
         return Creating()
 
     @override
-    def then(self) -> TestThen[AVariantAndACaller, RuntimeVariantPresetNode]:
+    def then(self) -> Then[AVariantAndACaller, RuntimeVariantPresetNode]:
         return TheNewPresetNode(started=self.started, named=MADE, target=ENV_STR)
 
 
 @dataclass(frozen=True)
 class TheSecondPresetIsRankedAHundredHigher(
-    TestScenario[
+    Scenario[
         SeedingSession, APresetAndACaller, RuntimeVariantPresetAdapter, RuntimeVariantPresetNode
     ]
 ):
@@ -271,23 +271,23 @@ class TheSecondPresetIsRankedAHundredHigher(
         )
 
     @override
-    def given(self) -> TestGiven[SeedingSession, APresetAndACaller]:
+    def given(self) -> Given[SeedingSession, APresetAndACaller]:
         return APresetAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
     def when(
         self,
-    ) -> TestWhen[APresetAndACaller, RuntimeVariantPresetAdapter, RuntimeVariantPresetNode]:
+    ) -> When[APresetAndACaller, RuntimeVariantPresetAdapter, RuntimeVariantPresetNode]:
         return CreatingBesideTheLaidOne()
 
     @override
-    def then(self) -> TestThen[APresetAndACaller, RuntimeVariantPresetNode]:
+    def then(self) -> Then[APresetAndACaller, RuntimeVariantPresetNode]:
         return TheNextPresetNode(started=self.started)
 
 
 @dataclass(frozen=True)
 class FourValuesComeBackAsOneSpec(
-    TestScenario[
+    Scenario[
         SeedingSession, AVariantAndACaller, RuntimeVariantPresetAdapter, RuntimeVariantPresetNode
     ]
 ):
@@ -302,23 +302,23 @@ class FourValuesComeBackAsOneSpec(
         return "대상·값 종류·기본값·키를 모두 지정해 생성하면 네 값이 하나의 명세로 묶여 반환된다"
 
     @override
-    def given(self) -> TestGiven[SeedingSession, AVariantAndACaller]:
+    def given(self) -> Given[SeedingSession, AVariantAndACaller]:
         return AVariantAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
     def when(
         self,
-    ) -> TestWhen[AVariantAndACaller, RuntimeVariantPresetAdapter, RuntimeVariantPresetNode]:
+    ) -> When[AVariantAndACaller, RuntimeVariantPresetAdapter, RuntimeVariantPresetNode]:
         return Creating(target=ARGS_INT)
 
     @override
-    def then(self) -> TestThen[AVariantAndACaller, RuntimeVariantPresetNode]:
+    def then(self) -> Then[AVariantAndACaller, RuntimeVariantPresetNode]:
         return TheNewPresetNode(started=self.started, named=MADE, target=ARGS_INT)
 
 
 @dataclass(frozen=True)
 class AUiOptionCarriesItsType(
-    TestScenario[
+    Scenario[
         SeedingSession, AVariantAndACaller, RuntimeVariantPresetAdapter, RuntimeVariantPresetNode
     ]
 ):
@@ -333,23 +333,23 @@ class AUiOptionCarriesItsType(
         return "슬라이더 옵션을 추가하여 생성하면 UI 종류를 옵션에서 읽어 응답 노드에 함께 담는다"
 
     @override
-    def given(self) -> TestGiven[SeedingSession, AVariantAndACaller]:
+    def given(self) -> Given[SeedingSession, AVariantAndACaller]:
         return AVariantAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
     def when(
         self,
-    ) -> TestWhen[AVariantAndACaller, RuntimeVariantPresetAdapter, RuntimeVariantPresetNode]:
+    ) -> When[AVariantAndACaller, RuntimeVariantPresetAdapter, RuntimeVariantPresetNode]:
         return Creating(ui_option=SLIDER)
 
     @override
-    def then(self) -> TestThen[AVariantAndACaller, RuntimeVariantPresetNode]:
+    def then(self) -> Then[AVariantAndACaller, RuntimeVariantPresetNode]:
         return TheNewPresetNode(started=self.started, named=MADE, target=ENV_STR, ui_option=SLIDER)
 
 
 @dataclass(frozen=True)
 class ANameTakenInTheSameVariantIsRefused(
-    TestScenario[
+    Scenario[
         SeedingSession, APresetAndACaller, RuntimeVariantPresetAdapter, RuntimeVariantPresetNode
     ]
 ):
@@ -362,23 +362,23 @@ class ANameTakenInTheSameVariantIsRefused(
         return "같은 변형에 같은 이름의 프리셋을 다시 생성하면 이름이 중복되어 요청이 거부된다"
 
     @override
-    def given(self) -> TestGiven[SeedingSession, APresetAndACaller]:
+    def given(self) -> Given[SeedingSession, APresetAndACaller]:
         return APresetAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
     def when(
         self,
-    ) -> TestWhen[APresetAndACaller, RuntimeVariantPresetAdapter, RuntimeVariantPresetNode]:
+    ) -> When[APresetAndACaller, RuntimeVariantPresetAdapter, RuntimeVariantPresetNode]:
         return CreatingBesideTheLaidOne(named=None)
 
     @override
-    def then(self) -> TestThen[APresetAndACaller, RuntimeVariantPresetNode]:
+    def then(self) -> Then[APresetAndACaller, RuntimeVariantPresetNode]:
         return TheCallIsRefused(RuntimeVariantPresetConflict)
 
 
 @dataclass(frozen=True)
 class TheSameNameIsFreeInAnotherVariant(
-    TestScenario[
+    Scenario[
         SeedingSession, TwoVariantsAndAPreset, RuntimeVariantPresetAdapter, RuntimeVariantPresetNode
     ]
 ):
@@ -393,23 +393,23 @@ class TheSameNameIsFreeInAnotherVariant(
         return "고유성 제약은 변형과 이름의 조합에 적용되므로 다른 변형에는 같은 이름의 프리셋을 생성할 수 있다"
 
     @override
-    def given(self) -> TestGiven[SeedingSession, TwoVariantsAndAPreset]:
+    def given(self) -> Given[SeedingSession, TwoVariantsAndAPreset]:
         return TwoVariantsOneWithAPreset(role=UserRole.SUPERADMIN)
 
     @override
     def when(
         self,
-    ) -> TestWhen[TwoVariantsAndAPreset, RuntimeVariantPresetAdapter, RuntimeVariantPresetNode]:
+    ) -> When[TwoVariantsAndAPreset, RuntimeVariantPresetAdapter, RuntimeVariantPresetNode]:
         return CreatingTheSameNameUnderTheOther()
 
     @override
-    def then(self) -> TestThen[TwoVariantsAndAPreset, RuntimeVariantPresetNode]:
+    def then(self) -> Then[TwoVariantsAndAPreset, RuntimeVariantPresetNode]:
         return TheSameNameUnderTheOtherVariant(started=self.started, target=ENV_STR)
 
 
 @dataclass(frozen=True)
 class AUserWhoIsNotTheSuperadminMayNotCreate(
-    TestScenario[
+    Scenario[
         SeedingSession, AVariantAndACaller, RuntimeVariantPresetAdapter, RuntimeVariantPresetNode
     ]
 ):
@@ -422,26 +422,26 @@ class AUserWhoIsNotTheSuperadminMayNotCreate(
         return "슈퍼관리자가 아닌 사용자가 프리셋을 생성하면 역할이 부족하여 요청이 거부된다"
 
     @override
-    def given(self) -> TestGiven[SeedingSession, AVariantAndACaller]:
+    def given(self) -> Given[SeedingSession, AVariantAndACaller]:
         return AVariantAndSomeone()
 
     @override
     def when(
         self,
-    ) -> TestWhen[AVariantAndACaller, RuntimeVariantPresetAdapter, RuntimeVariantPresetNode]:
+    ) -> When[AVariantAndACaller, RuntimeVariantPresetAdapter, RuntimeVariantPresetNode]:
         return Creating()
 
     @override
-    def then(self) -> TestThen[AVariantAndACaller, RuntimeVariantPresetNode]:
+    def then(self) -> Then[AVariantAndACaller, RuntimeVariantPresetNode]:
         return TheCallIsRefused(InsufficientPrivilege)
 
 
 @dataclass(frozen=True)
 class EnforcementOffStillNeedsTheSuperadmin(
-    TestScenario[
+    Scenario[
         SeedingSession, AVariantAndACaller, RuntimeVariantPresetAdapter, RuntimeVariantPresetNode
     ],
-    TestConfigured,
+    Configured,
 ):
     @override
     def summary(self) -> str:
@@ -456,17 +456,17 @@ class EnforcementOffStillNeedsTheSuperadmin(
         return {ENFORCEMENT: False}
 
     @override
-    def given(self) -> TestGiven[SeedingSession, AVariantAndACaller]:
+    def given(self) -> Given[SeedingSession, AVariantAndACaller]:
         return AVariantAndSomeone()
 
     @override
     def when(
         self,
-    ) -> TestWhen[AVariantAndACaller, RuntimeVariantPresetAdapter, RuntimeVariantPresetNode]:
+    ) -> When[AVariantAndACaller, RuntimeVariantPresetAdapter, RuntimeVariantPresetNode]:
         return Creating()
 
     @override
-    def then(self) -> TestThen[AVariantAndACaller, RuntimeVariantPresetNode]:
+    def then(self) -> Then[AVariantAndACaller, RuntimeVariantPresetNode]:
         return TheCallIsRefused(InsufficientPrivilege)
 
 

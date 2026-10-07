@@ -18,7 +18,7 @@ from ai.backend.common.dto.manager.v2.vfolder.response import VFolderNode
 from ai.backend.manager.data.domain.types import DomainData
 from ai.backend.manager.data.user.types import UserData
 from ai.backend.manager.data.vfolder.types import VFolderData
-from ai.backend.testutils.scenario_steps import Held, Same, SameAs, Skipped, TestGiven, TestVerdict
+from ai.backend.testutils.scenario_steps import Given, Held, Same, SameAs, Skipped, Verdict
 from bai_scenario.components.domain import WAS_HERE, GrantedUser, SomeoneOf, WrittenByThisRun
 from bai_scenario.seeds.domain.domain import SeedDomain
 from bai_scenario.seeds.entity_share.share import SeedShareTaken, SeedVFolderShare
@@ -43,7 +43,7 @@ class VFolderNodeLook:
 
     started: datetime
 
-    def verdicts(self, node: VFolderNode, folder: VFolderData, at: str = "") -> list[TestVerdict]:
+    def verdicts(self, node: VFolderNode, folder: VFolderData, at: str = "") -> list[Verdict]:
         """``at``은 답이 목록일 때 원소 자리를 앞에 붙인다."""
         return [
             Held(f"{at}id", node.id, SameAs[UUID](folder.id, "심은 폴더")),
@@ -122,7 +122,7 @@ class AFolderMakerAndTheirDomain:
 
 
 @dataclass(frozen=True)
-class SomeoneWhoMayMakeFolders(TestGiven[Any, AFolderMakerAndTheirDomain]):
+class SomeoneWhoMayMakeFolders(Given[Any, AFolderMakerAndTheirDomain]):
     """폴더 생성·조회 권한을 받은 사용자와, 그 폴더를 받아줄 도메인."""
 
     @override
@@ -170,7 +170,7 @@ class AFolderAndItsReader:
 
 
 @dataclass(frozen=True)
-class SomeoneWithAFolderOfTheirOwn(TestGiven[Any, AFolderAndItsReader]):
+class SomeoneWithAFolderOfTheirOwn(Given[Any, AFolderAndItsReader]):
     """자기 개인 폴더 하나를 가진 사용자. 개인 프로젝트에서 폴더를 읽을 수 있는지는 행이 정한다."""
 
     granted: bool
@@ -198,7 +198,7 @@ class SomeoneWithAFolderOfTheirOwn(TestGiven[Any, AFolderAndItsReader]):
 
 
 @dataclass(frozen=True)
-class AProjectFolderAndSomeone(TestGiven[Any, AFolderAndItsReader]):
+class AProjectFolderAndSomeone(Given[Any, AFolderAndItsReader]):
     """프로젝트 폴더 하나와 사용자 한 명. 그 프로젝트에서 폴더를 읽을 수 있는지는 행이 정한다."""
 
     granted: bool
@@ -227,7 +227,7 @@ class AProjectFolderAndSomeone(TestGiven[Any, AFolderAndItsReader]):
 
 
 @dataclass(frozen=True)
-class AFolderOfferedToSomeone(TestGiven[Any, AFolderAndItsReader]):
+class AFolderOfferedToSomeone(Given[Any, AFolderAndItsReader]):
     """남의 개인 폴더가 읽기로 공유 제안된 사용자. 받아들였는지는 행이 정한다."""
 
     accepted: bool
@@ -268,7 +268,7 @@ class AReaderAndTwoFolders:
 
 
 @dataclass(frozen=True)
-class SomeoneWithTheirFolderAndAnothers(TestGiven[Any, AReaderAndTwoFolders]):
+class SomeoneWithTheirFolderAndAnothers(Given[Any, AReaderAndTwoFolders]):
     """자기 개인 폴더를 읽을 수 있는 사용자와, 공유받지 않은 남의 개인 폴더 하나."""
 
     @override
@@ -295,7 +295,7 @@ class SomeoneWithTheirFolderAndAnothers(TestGiven[Any, AReaderAndTwoFolders]):
 
 
 @dataclass(frozen=True)
-class SomeonesFolderAndTheSuperadmin(TestGiven[Any, AFolderAndItsReader]):
+class SomeonesFolderAndTheSuperadmin(Given[Any, AFolderAndItsReader]):
     """남의 개인 폴더 하나와, 아무 역할도 받지 않은 슈퍼관리자."""
 
     @override
@@ -314,7 +314,7 @@ class SomeonesFolderAndTheSuperadmin(TestGiven[Any, AFolderAndItsReader]):
 
 
 @dataclass(frozen=True)
-class SomeoneWithNoGrant(TestGiven[Any, AFolderMakerAndTheirDomain]):
+class SomeoneWithNoGrant(Given[Any, AFolderMakerAndTheirDomain]):
     """폴더를 놓을 수 있는 도메인과, 아무 권한도 받지 않은 사용자 한 명."""
 
     @override

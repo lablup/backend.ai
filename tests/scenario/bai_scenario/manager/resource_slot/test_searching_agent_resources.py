@@ -20,13 +20,7 @@ from ai.backend.common.dto.manager.v2.resource_slot.response import (
 from ai.backend.manager.api.adapters.resource_slot.adapter import ResourceSlotAdapter
 from ai.backend.manager.errors.auth import InsufficientPrivilege
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.testutils.scenario_steps import (
-    TestConfigured,
-    TestGiven,
-    TestScenario,
-    TestThen,
-    TestWhen,
-)
+from ai.backend.testutils.scenario_steps import Configured, Given, Scenario, Then, When
 from bai_scenario.components.agent_resource import AnAgentAndACaller, AnAgentAndSomeone
 from bai_scenario.components.answers import NothingIsFound, TheCallIsRefused
 from bai_scenario.components.system import ENFORCEMENT
@@ -35,11 +29,11 @@ from bai_scenario.runner.planting import SeedingSession
 from bai_scenario.runner.steps import run_scenario
 
 type Searched = AdminSearchAgentResourcesPayload
-type SearchingStep = TestScenario[SeedingSession, AnAgentAndACaller, ResourceSlotAdapter, Searched]
+type SearchingStep = Scenario[SeedingSession, AnAgentAndACaller, ResourceSlotAdapter, Searched]
 
 
 @dataclass(frozen=True)
-class SearchingEveryAgentResource(TestWhen[AnAgentAndACaller, ResourceSlotAdapter, Searched]):
+class SearchingEveryAgentResource(When[AnAgentAndACaller, ResourceSlotAdapter, Searched]):
     """필터도 크기도 없이 전체를 검색한다."""
 
     @override
@@ -58,7 +52,7 @@ class SearchingEveryAgentResource(TestWhen[AnAgentAndACaller, ResourceSlotAdapte
 
 @dataclass(frozen=True)
 class NoSlotReportedMeansNoneFound(
-    TestScenario[SeedingSession, AnAgentAndACaller, ResourceSlotAdapter, Searched]
+    Scenario[SeedingSession, AnAgentAndACaller, ResourceSlotAdapter, Searched]
 ):
     @override
     def summary(self) -> str:
@@ -69,22 +63,20 @@ class NoSlotReportedMeansNoneFound(
         return "아직 슬롯을 보고하지 않은 에이전트만 있을 때 슈퍼관리자가 필터 없이 조회하면 응답이 비어 있다"
 
     @override
-    def given(self) -> TestGiven[SeedingSession, AnAgentAndACaller]:
+    def given(self) -> Given[SeedingSession, AnAgentAndACaller]:
         return AnAgentAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
-    def when(self) -> TestWhen[AnAgentAndACaller, ResourceSlotAdapter, Searched]:
+    def when(self) -> When[AnAgentAndACaller, ResourceSlotAdapter, Searched]:
         return SearchingEveryAgentResource()
 
     @override
-    def then(self) -> TestThen[AnAgentAndACaller, Searched]:
+    def then(self) -> Then[AnAgentAndACaller, Searched]:
         return NothingIsFound()
 
 
 @dataclass(frozen=True)
-class AMonitorMaySearch(
-    TestScenario[SeedingSession, AnAgentAndACaller, ResourceSlotAdapter, Searched]
-):
+class AMonitorMaySearch(Scenario[SeedingSession, AnAgentAndACaller, ResourceSlotAdapter, Searched]):
     @override
     def summary(self) -> str:
         return "a-monitor-may-search-agent-resources"
@@ -94,21 +86,21 @@ class AMonitorMaySearch(
         return "모니터가 필터 없이 조회하면 응답이 반환된다. 슈퍼관리자인지 검사하는 조회는 모니터도 통과한다"
 
     @override
-    def given(self) -> TestGiven[SeedingSession, AnAgentAndACaller]:
+    def given(self) -> Given[SeedingSession, AnAgentAndACaller]:
         return AnAgentAndSomeone(role=UserRole.MONITOR)
 
     @override
-    def when(self) -> TestWhen[AnAgentAndACaller, ResourceSlotAdapter, Searched]:
+    def when(self) -> When[AnAgentAndACaller, ResourceSlotAdapter, Searched]:
         return SearchingEveryAgentResource()
 
     @override
-    def then(self) -> TestThen[AnAgentAndACaller, Searched]:
+    def then(self) -> Then[AnAgentAndACaller, Searched]:
         return NothingIsFound()
 
 
 @dataclass(frozen=True)
 class AUserGrantedNothingMayNotSearch(
-    TestScenario[SeedingSession, AnAgentAndACaller, ResourceSlotAdapter, Searched]
+    Scenario[SeedingSession, AnAgentAndACaller, ResourceSlotAdapter, Searched]
 ):
     @override
     def summary(self) -> str:
@@ -119,21 +111,21 @@ class AUserGrantedNothingMayNotSearch(
         return "아무 권한도 없는 사용자가 조회하면 역할 부족으로 거부된다"
 
     @override
-    def given(self) -> TestGiven[SeedingSession, AnAgentAndACaller]:
+    def given(self) -> Given[SeedingSession, AnAgentAndACaller]:
         return AnAgentAndSomeone()
 
     @override
-    def when(self) -> TestWhen[AnAgentAndACaller, ResourceSlotAdapter, Searched]:
+    def when(self) -> When[AnAgentAndACaller, ResourceSlotAdapter, Searched]:
         return SearchingEveryAgentResource()
 
     @override
-    def then(self) -> TestThen[AnAgentAndACaller, Searched]:
+    def then(self) -> Then[AnAgentAndACaller, Searched]:
         return TheCallIsRefused(InsufficientPrivilege)
 
 
 @dataclass(frozen=True)
 class EnforcementOffStillNeedsTheRole(
-    TestScenario[SeedingSession, AnAgentAndACaller, ResourceSlotAdapter, Searched], TestConfigured
+    Scenario[SeedingSession, AnAgentAndACaller, ResourceSlotAdapter, Searched], Configured
 ):
     @override
     def summary(self) -> str:
@@ -148,15 +140,15 @@ class EnforcementOffStillNeedsTheRole(
         return {ENFORCEMENT: False}
 
     @override
-    def given(self) -> TestGiven[SeedingSession, AnAgentAndACaller]:
+    def given(self) -> Given[SeedingSession, AnAgentAndACaller]:
         return AnAgentAndSomeone()
 
     @override
-    def when(self) -> TestWhen[AnAgentAndACaller, ResourceSlotAdapter, Searched]:
+    def when(self) -> When[AnAgentAndACaller, ResourceSlotAdapter, Searched]:
         return SearchingEveryAgentResource()
 
     @override
-    def then(self) -> TestThen[AnAgentAndACaller, Searched]:
+    def then(self) -> Then[AnAgentAndACaller, Searched]:
         return TheCallIsRefused(InsufficientPrivilege)
 
 

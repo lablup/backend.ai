@@ -17,14 +17,14 @@ from ai.backend.manager.errors.permission import NotEnoughPermission
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.testutils.scenario_steps import (
     Answered,
+    Given,
     Held,
     Refused,
     Same,
-    TestGiven,
-    TestScenario,
-    TestThen,
-    TestVerdict,
-    TestWhen,
+    Scenario,
+    Then,
+    Verdict,
+    When,
 )
 from bai_scenario.components.image import (
     AnAliasAndACaller,
@@ -45,7 +45,7 @@ type LoadedAliases = list[ImageAliasNode | Exception | None]
 
 
 @dataclass(frozen=True)
-class LoadingImages(TestWhen[ManyImagesAndACaller, ImageAdapter, LoadedImages]):
+class LoadingImages(When[ManyImagesAndACaller, ImageAdapter, LoadedImages]):
     """이미지 ID 목록으로 한 번에 조회한다."""
 
     nothing_is_asked: bool = False
@@ -77,7 +77,7 @@ class LoadingImages(TestWhen[ManyImagesAndACaller, ImageAdapter, LoadedImages]):
 
 
 @dataclass(frozen=True)
-class LoadingAliases(TestWhen[AnAliasAndACaller, ImageAdapter, LoadedAliases]):
+class LoadingAliases(When[AnAliasAndACaller, ImageAdapter, LoadedAliases]):
     """별칭 ID 목록으로 한 번에 조회한다."""
 
     nothing_is_asked: bool = False
@@ -100,7 +100,7 @@ class LoadingAliases(TestWhen[AnAliasAndACaller, ImageAdapter, LoadedAliases]):
 
 
 @dataclass(frozen=True)
-class TheImageOrderIsKept(TestThen[ManyImagesAndACaller, LoadedImages]):
+class TheImageOrderIsKept(Then[ManyImagesAndACaller, LoadedImages]):
     """요청한 순서대로 반환되고, 없는 ID 위치는 비어 있다."""
 
     @override
@@ -108,9 +108,7 @@ class TheImageOrderIsKept(TestThen[ManyImagesAndACaller, LoadedImages]):
         return "요청한 순서대로 반환되고 없는 ID 위치는 비어 있다"
 
     @override
-    def look(
-        self, laid: ManyImagesAndACaller, answered: Answered[LoadedImages]
-    ) -> list[TestVerdict]:
+    def look(self, laid: ManyImagesAndACaller, answered: Answered[LoadedImages]) -> list[Verdict]:
         got = answered.response
         if got is None:
             return [Held("응답", answered.response, Filled())]
@@ -128,7 +126,7 @@ class TheImageOrderIsKept(TestThen[ManyImagesAndACaller, LoadedImages]):
 
 
 @dataclass(frozen=True)
-class EachImageIsRefused(TestThen[ManyImagesAndACaller, LoadedImages]):
+class EachImageIsRefused(Then[ManyImagesAndACaller, LoadedImages]):
     """원소마다 권한 부족 거부가 반환된다."""
 
     @override
@@ -136,9 +134,7 @@ class EachImageIsRefused(TestThen[ManyImagesAndACaller, LoadedImages]):
         return "원소마다 권한 부족 거부가 입력 순서대로 반환된다"
 
     @override
-    def look(
-        self, laid: ManyImagesAndACaller, answered: Answered[LoadedImages]
-    ) -> list[TestVerdict]:
+    def look(self, laid: ManyImagesAndACaller, answered: Answered[LoadedImages]) -> list[Verdict]:
         got = answered.response
         if got is None:
             return [Held("응답", answered.response, Filled())]
@@ -148,7 +144,7 @@ class EachImageIsRefused(TestThen[ManyImagesAndACaller, LoadedImages]):
 
 
 @dataclass(frozen=True)
-class NothingIsAsked(TestThen[ManyImagesAndACaller, LoadedImages]):
+class NothingIsAsked(Then[ManyImagesAndACaller, LoadedImages]):
     """빈 목록을 전달하면 빈 목록이 반환된다."""
 
     @override
@@ -156,9 +152,7 @@ class NothingIsAsked(TestThen[ManyImagesAndACaller, LoadedImages]):
         return "빈 목록이 반환된다"
 
     @override
-    def look(
-        self, laid: ManyImagesAndACaller, answered: Answered[LoadedImages]
-    ) -> list[TestVerdict]:
+    def look(self, laid: ManyImagesAndACaller, answered: Answered[LoadedImages]) -> list[Verdict]:
         got = answered.response
         if got is None:
             return [Held("응답", answered.response, Filled())]
@@ -166,7 +160,7 @@ class NothingIsAsked(TestThen[ManyImagesAndACaller, LoadedImages]):
 
 
 @dataclass(frozen=True)
-class NoAliasesAreAsked(TestThen[AnAliasAndACaller, LoadedAliases]):
+class NoAliasesAreAsked(Then[AnAliasAndACaller, LoadedAliases]):
     """빈 별칭 ID 목록을 전달하면 빈 목록이 반환된다."""
 
     @override
@@ -174,7 +168,7 @@ class NoAliasesAreAsked(TestThen[AnAliasAndACaller, LoadedAliases]):
         return "빈 목록이 반환된다"
 
     @override
-    def look(self, laid: AnAliasAndACaller, answered: Answered[LoadedAliases]) -> list[TestVerdict]:
+    def look(self, laid: AnAliasAndACaller, answered: Answered[LoadedAliases]) -> list[Verdict]:
         got = answered.response
         if got is None:
             return [Held("응답", answered.response, Filled())]
@@ -182,7 +176,7 @@ class NoAliasesAreAsked(TestThen[AnAliasAndACaller, LoadedAliases]):
 
 
 @dataclass(frozen=True)
-class TheDuplicateImageIsReturnedTwice(TestThen[ManyImagesAndACaller, LoadedImages]):
+class TheDuplicateImageIsReturnedTwice(Then[ManyImagesAndACaller, LoadedImages]):
     """같은 ID를 두 번 요청하면 같은 이미지가 두 위치에 반환된다."""
 
     @override
@@ -190,9 +184,7 @@ class TheDuplicateImageIsReturnedTwice(TestThen[ManyImagesAndACaller, LoadedImag
         return "같은 이미지가 두 위치에 반환된다"
 
     @override
-    def look(
-        self, laid: ManyImagesAndACaller, answered: Answered[LoadedImages]
-    ) -> list[TestVerdict]:
+    def look(self, laid: ManyImagesAndACaller, answered: Answered[LoadedImages]) -> list[Verdict]:
         got = answered.response
         if got is None:
             return [Held("응답", answered.response, Filled())]
@@ -207,7 +199,7 @@ class TheDuplicateImageIsReturnedTwice(TestThen[ManyImagesAndACaller, LoadedImag
 
 
 @dataclass(frozen=True)
-class TheAliasOrderIsKept(TestThen[AnAliasAndACaller, LoadedAliases]):
+class TheAliasOrderIsKept(Then[AnAliasAndACaller, LoadedAliases]):
     """별칭은 요청한 순서대로 반환되고 없는 ID 위치는 비어 있다."""
 
     @override
@@ -215,7 +207,7 @@ class TheAliasOrderIsKept(TestThen[AnAliasAndACaller, LoadedAliases]):
         return "요청한 순서대로 반환되고 없는 ID 위치는 비어 있다"
 
     @override
-    def look(self, laid: AnAliasAndACaller, answered: Answered[LoadedAliases]) -> list[TestVerdict]:
+    def look(self, laid: AnAliasAndACaller, answered: Answered[LoadedAliases]) -> list[Verdict]:
         got = answered.response
         if got is None:
             return [Held("응답", answered.response, Filled())]
@@ -230,7 +222,7 @@ class TheAliasOrderIsKept(TestThen[AnAliasAndACaller, LoadedAliases]):
 
 
 @dataclass(frozen=True)
-class TheAliasIsRefusedAndTheHoleStays(TestThen[AnAliasAndACaller, LoadedAliases]):
+class TheAliasIsRefusedAndTheHoleStays(Then[AnAliasAndACaller, LoadedAliases]):
     """있는 별칭 위치에는 권한 부족 거부가, 없는 ID 위치에는 빈 값이 반환된다."""
 
     @override
@@ -238,7 +230,7 @@ class TheAliasIsRefusedAndTheHoleStays(TestThen[AnAliasAndACaller, LoadedAliases
         return "있는 별칭 위치에는 권한 부족 거부가, 없는 ID 위치에는 빈 값이 반환된다"
 
     @override
-    def look(self, laid: AnAliasAndACaller, answered: Answered[LoadedAliases]) -> list[TestVerdict]:
+    def look(self, laid: AnAliasAndACaller, answered: Answered[LoadedAliases]) -> list[Verdict]:
         got = answered.response
         if got is None:
             return [Held("응답", answered.response, Filled())]
@@ -252,7 +244,7 @@ class TheAliasIsRefusedAndTheHoleStays(TestThen[AnAliasAndACaller, LoadedAliases
 
 @dataclass(frozen=True)
 class LoadingKeepsTheOrderAndLeavesHoles(
-    TestScenario[SeedingSession, ManyImagesAndACaller, ImageAdapter, LoadedImages]
+    Scenario[SeedingSession, ManyImagesAndACaller, ImageAdapter, LoadedImages]
 ):
     @override
     def summary(self) -> str:
@@ -266,21 +258,21 @@ class LoadingKeepsTheOrderAndLeavesHoles(
         )
 
     @override
-    def given(self) -> TestGiven[SeedingSession, ManyImagesAndACaller]:
+    def given(self) -> Given[SeedingSession, ManyImagesAndACaller]:
         return ManyImagesAndSomeone()
 
     @override
-    def when(self) -> TestWhen[ManyImagesAndACaller, ImageAdapter, LoadedImages]:
+    def when(self) -> When[ManyImagesAndACaller, ImageAdapter, LoadedImages]:
         return LoadingImages()
 
     @override
-    def then(self) -> TestThen[ManyImagesAndACaller, LoadedImages]:
+    def then(self) -> Then[ManyImagesAndACaller, LoadedImages]:
         return TheImageOrderIsKept()
 
 
 @dataclass(frozen=True)
 class AnEmptyListAsksNothing(
-    TestScenario[SeedingSession, ManyImagesAndACaller, ImageAdapter, LoadedImages]
+    Scenario[SeedingSession, ManyImagesAndACaller, ImageAdapter, LoadedImages]
 ):
     @override
     def summary(self) -> str:
@@ -291,21 +283,21 @@ class AnEmptyListAsksNothing(
         return "빈 ID 목록으로 조회하면 빈 목록이 반환된다"
 
     @override
-    def given(self) -> TestGiven[SeedingSession, ManyImagesAndACaller]:
+    def given(self) -> Given[SeedingSession, ManyImagesAndACaller]:
         return ManyImagesAndSomeone()
 
     @override
-    def when(self) -> TestWhen[ManyImagesAndACaller, ImageAdapter, LoadedImages]:
+    def when(self) -> When[ManyImagesAndACaller, ImageAdapter, LoadedImages]:
         return LoadingImages(nothing_is_asked=True)
 
     @override
-    def then(self) -> TestThen[ManyImagesAndACaller, LoadedImages]:
+    def then(self) -> Then[ManyImagesAndACaller, LoadedImages]:
         return NothingIsAsked()
 
 
 @dataclass(frozen=True)
 class APlainUserIsRefusedPerElement(
-    TestScenario[SeedingSession, ManyImagesAndACaller, ImageAdapter, LoadedImages]
+    Scenario[SeedingSession, ManyImagesAndACaller, ImageAdapter, LoadedImages]
 ):
     @override
     def summary(self) -> str:
@@ -319,21 +311,21 @@ class APlainUserIsRefusedPerElement(
         )
 
     @override
-    def given(self) -> TestGiven[SeedingSession, ManyImagesAndACaller]:
+    def given(self) -> Given[SeedingSession, ManyImagesAndACaller]:
         return ManyImagesAndSomeone(role=UserRole.USER)
 
     @override
-    def when(self) -> TestWhen[ManyImagesAndACaller, ImageAdapter, LoadedImages]:
+    def when(self) -> When[ManyImagesAndACaller, ImageAdapter, LoadedImages]:
         return LoadingImages()
 
     @override
-    def then(self) -> TestThen[ManyImagesAndACaller, LoadedImages]:
+    def then(self) -> Then[ManyImagesAndACaller, LoadedImages]:
         return EachImageIsRefused()
 
 
 @dataclass(frozen=True)
 class DuplicateImageIdsKeepBothPositions(
-    TestScenario[SeedingSession, ManyImagesAndACaller, ImageAdapter, LoadedImages]
+    Scenario[SeedingSession, ManyImagesAndACaller, ImageAdapter, LoadedImages]
 ):
     @override
     def summary(self) -> str:
@@ -344,21 +336,21 @@ class DuplicateImageIdsKeepBothPositions(
         return "같은 이미지 ID를 두 번 조회하면 같은 이미지가 두 위치에 반환된다"
 
     @override
-    def given(self) -> TestGiven[SeedingSession, ManyImagesAndACaller]:
+    def given(self) -> Given[SeedingSession, ManyImagesAndACaller]:
         return ManyImagesAndSomeone(count=1)
 
     @override
-    def when(self) -> TestWhen[ManyImagesAndACaller, ImageAdapter, LoadedImages]:
+    def when(self) -> When[ManyImagesAndACaller, ImageAdapter, LoadedImages]:
         return LoadingImages(duplicate_is_asked=True)
 
     @override
-    def then(self) -> TestThen[ManyImagesAndACaller, LoadedImages]:
+    def then(self) -> Then[ManyImagesAndACaller, LoadedImages]:
         return TheDuplicateImageIsReturnedTwice()
 
 
 @dataclass(frozen=True)
 class LoadingAliasesKeepsTheOrderToo(
-    TestScenario[SeedingSession, AnAliasAndACaller, ImageAdapter, LoadedAliases]
+    Scenario[SeedingSession, AnAliasAndACaller, ImageAdapter, LoadedAliases]
 ):
     @override
     def summary(self) -> str:
@@ -372,21 +364,21 @@ class LoadingAliasesKeepsTheOrderToo(
         )
 
     @override
-    def given(self) -> TestGiven[SeedingSession, AnAliasAndACaller]:
+    def given(self) -> Given[SeedingSession, AnAliasAndACaller]:
         return AnAliasAndSomeone()
 
     @override
-    def when(self) -> TestWhen[AnAliasAndACaller, ImageAdapter, LoadedAliases]:
+    def when(self) -> When[AnAliasAndACaller, ImageAdapter, LoadedAliases]:
         return LoadingAliases()
 
     @override
-    def then(self) -> TestThen[AnAliasAndACaller, LoadedAliases]:
+    def then(self) -> Then[AnAliasAndACaller, LoadedAliases]:
         return TheAliasOrderIsKept()
 
 
 @dataclass(frozen=True)
 class APlainUserIsRefusedPerAlias(
-    TestScenario[SeedingSession, AnAliasAndACaller, ImageAdapter, LoadedAliases]
+    Scenario[SeedingSession, AnAliasAndACaller, ImageAdapter, LoadedAliases]
 ):
     @override
     def summary(self) -> str:
@@ -400,21 +392,21 @@ class APlainUserIsRefusedPerAlias(
         )
 
     @override
-    def given(self) -> TestGiven[SeedingSession, AnAliasAndACaller]:
+    def given(self) -> Given[SeedingSession, AnAliasAndACaller]:
         return AnAliasAndSomeone(role=UserRole.USER)
 
     @override
-    def when(self) -> TestWhen[AnAliasAndACaller, ImageAdapter, LoadedAliases]:
+    def when(self) -> When[AnAliasAndACaller, ImageAdapter, LoadedAliases]:
         return LoadingAliases()
 
     @override
-    def then(self) -> TestThen[AnAliasAndACaller, LoadedAliases]:
+    def then(self) -> Then[AnAliasAndACaller, LoadedAliases]:
         return TheAliasIsRefusedAndTheHoleStays()
 
 
 @dataclass(frozen=True)
 class AnEmptyAliasListAsksNothing(
-    TestScenario[SeedingSession, AnAliasAndACaller, ImageAdapter, LoadedAliases]
+    Scenario[SeedingSession, AnAliasAndACaller, ImageAdapter, LoadedAliases]
 ):
     @override
     def summary(self) -> str:
@@ -425,15 +417,15 @@ class AnEmptyAliasListAsksNothing(
         return "빈 별칭 ID 목록으로 조회하면 빈 목록이 반환된다"
 
     @override
-    def given(self) -> TestGiven[SeedingSession, AnAliasAndACaller]:
+    def given(self) -> Given[SeedingSession, AnAliasAndACaller]:
         return AnAliasAndSomeone()
 
     @override
-    def when(self) -> TestWhen[AnAliasAndACaller, ImageAdapter, LoadedAliases]:
+    def when(self) -> When[AnAliasAndACaller, ImageAdapter, LoadedAliases]:
         return LoadingAliases(nothing_is_asked=True)
 
     @override
-    def then(self) -> TestThen[AnAliasAndACaller, LoadedAliases]:
+    def then(self) -> Then[AnAliasAndACaller, LoadedAliases]:
         return NoAliasesAreAsked()
 
 

@@ -22,13 +22,13 @@ from ai.backend.manager.api.adapters.prometheus_query_preset_category.adapter im
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.testutils.scenario_steps import (
     Answered,
+    Given,
     Refused,
     Same,
-    TestGiven,
-    TestScenario,
-    TestThen,
-    TestVerdict,
-    TestWhen,
+    Scenario,
+    Then,
+    Verdict,
+    When,
 )
 from bai_scenario.components.answers import TheCallIsRefused
 from bai_scenario.components.prometheus_query_preset_category import (
@@ -45,12 +45,12 @@ from bai_scenario.runner.steps import run_scenario
 
 type Adapter = PrometheusQueryPresetCategoryAdapter
 type Searched = SearchCategoriesPayload
-type SearchingStep = TestScenario[SeedingSession, ManyCategoriesAndACaller, Adapter, Searched]
-type NobodyStep = TestScenario[SeedingSession, ACategoryAlone, Adapter, Searched]
+type SearchingStep = Scenario[SeedingSession, ManyCategoriesAndACaller, Adapter, Searched]
+type NobodyStep = Scenario[SeedingSession, ACategoryAlone, Adapter, Searched]
 
 
 @dataclass(frozen=True)
-class SearchingEverything(TestWhen[ManyCategoriesAndACaller, Adapter, Searched]):
+class SearchingEverything(When[ManyCategoriesAndACaller, Adapter, Searched]):
     """필터도 크기도 없이 전체를 검색한다."""
 
     @override
@@ -68,7 +68,7 @@ class SearchingEverything(TestWhen[ManyCategoriesAndACaller, Adapter, Searched])
 
 
 @dataclass(frozen=True)
-class SearchingByName(TestWhen[ManyCategoriesAndACaller, Adapter, Searched]):
+class SearchingByName(When[ManyCategoriesAndACaller, Adapter, Searched]):
     """미리 만들어 둔 카테고리 중 골라낸 하나의 이름을 필터로 검색한다."""
 
     @override
@@ -90,7 +90,7 @@ class SearchingByName(TestWhen[ManyCategoriesAndACaller, Adapter, Searched]):
 
 
 @dataclass(frozen=True)
-class SearchingAsNobody(TestWhen[ACategoryAlone, Adapter, Searched]):
+class SearchingAsNobody(When[ACategoryAlone, Adapter, Searched]):
     """사용자 컨텍스트 없이 검색한다."""
 
     @override
@@ -107,7 +107,7 @@ class SearchingAsNobody(TestWhen[ACategoryAlone, Adapter, Searched]):
 
 
 @dataclass(frozen=True)
-class OnlyTheNamedOneIsFound(TestThen[ManyCategoriesAndACaller, Searched]):
+class OnlyTheNamedOneIsFound(Then[ManyCategoriesAndACaller, Searched]):
     """골라낸 하나만 집계된다."""
 
     @override
@@ -115,9 +115,7 @@ class OnlyTheNamedOneIsFound(TestThen[ManyCategoriesAndACaller, Searched]):
         return "이름 필터에 맞는 하나만 집계된다"
 
     @override
-    def look(
-        self, laid: ManyCategoriesAndACaller, answered: Answered[Searched]
-    ) -> list[TestVerdict]:
+    def look(self, laid: ManyCategoriesAndACaller, answered: Answered[Searched]) -> list[Verdict]:
         page = answered.response
         if page is None:
             return [Refused(UnreachableError, answered.raised)]
@@ -130,9 +128,7 @@ class OnlyTheNamedOneIsFound(TestThen[ManyCategoriesAndACaller, Searched]):
 
 
 @dataclass(frozen=True)
-class AnyoneCountsEveryOne(
-    TestScenario[SeedingSession, ManyCategoriesAndACaller, Adapter, Searched]
-):
+class AnyoneCountsEveryOne(Scenario[SeedingSession, ManyCategoriesAndACaller, Adapter, Searched]):
     @override
     def summary(self) -> str:
         return "a-user-granted-nothing-counts-every-category"
@@ -142,21 +138,21 @@ class AnyoneCountsEveryOne(
         return "카테고리 둘이 있고 아무 권한도 없는 사용자가 필터 없이 검색하면, 둘 다 집계된다"
 
     @override
-    def given(self) -> TestGiven[SeedingSession, ManyCategoriesAndACaller]:
+    def given(self) -> Given[SeedingSession, ManyCategoriesAndACaller]:
         return ManyCategoriesAndSomeone(besides=1)
 
     @override
-    def when(self) -> TestWhen[ManyCategoriesAndACaller, Adapter, Searched]:
+    def when(self) -> When[ManyCategoriesAndACaller, Adapter, Searched]:
         return SearchingEverything()
 
     @override
-    def then(self) -> TestThen[ManyCategoriesAndACaller, Searched]:
+    def then(self) -> Then[ManyCategoriesAndACaller, Searched]:
         return EveryLaidCategoryIsFound()
 
 
 @dataclass(frozen=True)
 class FilteringByNameKeepsThatOne(
-    TestScenario[SeedingSession, ManyCategoriesAndACaller, Adapter, Searched]
+    Scenario[SeedingSession, ManyCategoriesAndACaller, Adapter, Searched]
 ):
     @override
     def summary(self) -> str:
@@ -169,21 +165,21 @@ class FilteringByNameKeepsThatOne(
         )
 
     @override
-    def given(self) -> TestGiven[SeedingSession, ManyCategoriesAndACaller]:
+    def given(self) -> Given[SeedingSession, ManyCategoriesAndACaller]:
         return ManyCategoriesAndSomeone(besides=2)
 
     @override
-    def when(self) -> TestWhen[ManyCategoriesAndACaller, Adapter, Searched]:
+    def when(self) -> When[ManyCategoriesAndACaller, Adapter, Searched]:
         return SearchingByName()
 
     @override
-    def then(self) -> TestThen[ManyCategoriesAndACaller, Searched]:
+    def then(self) -> Then[ManyCategoriesAndACaller, Searched]:
         return OnlyTheNamedOneIsFound()
 
 
 @dataclass(frozen=True)
 class OmittingThePageSizeAnswersTen(
-    TestScenario[SeedingSession, ManyCategoriesAndACaller, Adapter, Searched]
+    Scenario[SeedingSession, ManyCategoriesAndACaller, Adapter, Searched]
 ):
     @override
     def summary(self) -> str:
@@ -194,20 +190,20 @@ class OmittingThePageSizeAnswersTen(
         return "카테고리 11개가 있을 때 크기 없이 검색하면, 10건까지 반환되고 다음 페이지가 있다고 응답한다"
 
     @override
-    def given(self) -> TestGiven[SeedingSession, ManyCategoriesAndACaller]:
+    def given(self) -> Given[SeedingSession, ManyCategoriesAndACaller]:
         return ManyCategoriesAndSomeone(besides=10)
 
     @override
-    def when(self) -> TestWhen[ManyCategoriesAndACaller, Adapter, Searched]:
+    def when(self) -> When[ManyCategoriesAndACaller, Adapter, Searched]:
         return SearchingEverything()
 
     @override
-    def then(self) -> TestThen[ManyCategoriesAndACaller, Searched]:
+    def then(self) -> Then[ManyCategoriesAndACaller, Searched]:
         return OnePageOfThemComesBack()
 
 
 @dataclass(frozen=True)
-class NobodyMayNotSearch(TestScenario[SeedingSession, ACategoryAlone, Adapter, Searched]):
+class NobodyMayNotSearch(Scenario[SeedingSession, ACategoryAlone, Adapter, Searched]):
     @override
     def summary(self) -> str:
         return "a-call-carrying-no-user-may-not-search-categories"
@@ -217,15 +213,15 @@ class NobodyMayNotSearch(TestScenario[SeedingSession, ACategoryAlone, Adapter, S
         return "카테고리 하나가 있고 사용자 컨텍스트 없이 검색하면, 인증 실패로 거부된다"
 
     @override
-    def given(self) -> TestGiven[SeedingSession, ACategoryAlone]:
+    def given(self) -> Given[SeedingSession, ACategoryAlone]:
         return ACategoryAndNobody()
 
     @override
-    def when(self) -> TestWhen[ACategoryAlone, Adapter, Searched]:
+    def when(self) -> When[ACategoryAlone, Adapter, Searched]:
         return SearchingAsNobody()
 
     @override
-    def then(self) -> TestThen[ACategoryAlone, Searched]:
+    def then(self) -> Then[ACategoryAlone, Searched]:
         return TheCallIsRefused(UnreachableError)
 
 

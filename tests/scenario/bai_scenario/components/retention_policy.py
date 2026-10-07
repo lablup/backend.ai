@@ -22,14 +22,14 @@ from ai.backend.manager.data.user.types import UserData
 from ai.backend.manager.errors.base.entity import EntityNotFoundError
 from ai.backend.testutils.scenario_steps import (
     Answered,
+    Given,
     Held,
     Refused,
     Same,
     SameAs,
     Skipped,
-    TestGiven,
-    TestThen,
-    TestVerdict,
+    Then,
+    Verdict,
 )
 from bai_scenario.components.domain import WrittenByThisRun
 from bai_scenario.components.system import KEPT, Kept, lay_a_caller, role_named
@@ -57,7 +57,7 @@ class ManyPoliciesAndACaller:
 
 
 @dataclass(frozen=True)
-class APolicyAndSomeone(TestGiven[Any, APolicyAndACaller]):
+class APolicyAndSomeone(Given[Any, APolicyAndACaller]):
     """정책 하나와 사용자 한 명."""
 
     role: UserRole = UserRole.USER
@@ -80,7 +80,7 @@ class APolicyAndSomeone(TestGiven[Any, APolicyAndACaller]):
 
 
 @dataclass(frozen=True)
-class TwoPoliciesAndSomeone(TestGiven[Any, ManyPoliciesAndACaller]):
+class TwoPoliciesAndSomeone(Given[Any, ManyPoliciesAndACaller]):
     """카테고리가 다른 정책 둘과 사용자 한 명. ``named``는 앞의 것이다."""
 
     role: UserRole = UserRole.USER
@@ -102,7 +102,7 @@ class TwoPoliciesAndSomeone(TestGiven[Any, ManyPoliciesAndACaller]):
 
 
 @dataclass(frozen=True)
-class AnActiveAndAnInactivePolicy(TestGiven[Any, ManyPoliciesAndACaller]):
+class AnActiveAndAnInactivePolicy(Given[Any, ManyPoliciesAndACaller]):
     """활성 정책 하나와 비활성 정책 하나, 사용자 한 명. ``laid``는 활성인 것뿐이다."""
 
     role: UserRole = UserRole.USER
@@ -130,7 +130,7 @@ def policy_verdicts(
     days: int,
     enabled: bool,
     written: WrittenByThisRun,
-) -> list[TestVerdict]:
+) -> list[Verdict]:
     """Every place of one policy node."""
     return [
         Skipped("id", "데이터베이스가 만든다"),
@@ -144,7 +144,7 @@ def policy_verdicts(
 
 
 @dataclass(frozen=True)
-class TheNewPolicyNode(TestThen[Any, RetentionPolicyNode]):
+class TheNewPolicyNode(Then[Any, RetentionPolicyNode]):
     """방금 생성한 정책이 통째로 반환된다. 기대값은 요청이 지정한 값에서 읽는다."""
 
     started: datetime
@@ -157,7 +157,7 @@ class TheNewPolicyNode(TestThen[Any, RetentionPolicyNode]):
         return "생성한 정책 전체가 반환된다"
 
     @override
-    def look(self, laid: Any, answered: Answered[RetentionPolicyNode]) -> list[TestVerdict]:
+    def look(self, laid: Any, answered: Answered[RetentionPolicyNode]) -> list[Verdict]:
         node = answered.response
         if node is None:
             return [Refused(EntityNotFoundError, answered.raised)]
@@ -171,7 +171,7 @@ class TheNewPolicyNode(TestThen[Any, RetentionPolicyNode]):
 
 
 @dataclass(frozen=True)
-class ThePolicyNode(TestThen[APolicyAndACaller, RetentionPolicyNode]):
+class ThePolicyNode(Then[APolicyAndACaller, RetentionPolicyNode]):
     """미리 만들어 둔 정책이 통째로 반환된다. 수정 요청은 바뀌어야 하는 필드만 인자로 준다."""
 
     started: datetime
@@ -185,7 +185,7 @@ class ThePolicyNode(TestThen[APolicyAndACaller, RetentionPolicyNode]):
     @override
     def look(
         self, laid: APolicyAndACaller, answered: Answered[RetentionPolicyNode]
-    ) -> list[TestVerdict]:
+    ) -> list[Verdict]:
         node = answered.response
         if node is None:
             return [Refused(EntityNotFoundError, answered.raised)]
@@ -200,7 +200,7 @@ class ThePolicyNode(TestThen[APolicyAndACaller, RetentionPolicyNode]):
 
 
 @dataclass(frozen=True)
-class TheLaidPoliciesAreLeft(TestThen[ManyPoliciesAndACaller, SearchRetentionPoliciesPayload]):
+class TheLaidPoliciesAreLeft(Then[ManyPoliciesAndACaller, SearchRetentionPoliciesPayload]):
     """응답에 나와야 하는 정책이 모두, 그리고 그것만 반환된다."""
 
     @override
@@ -210,7 +210,7 @@ class TheLaidPoliciesAreLeft(TestThen[ManyPoliciesAndACaller, SearchRetentionPol
     @override
     def look(
         self, laid: ManyPoliciesAndACaller, answered: Answered[SearchRetentionPoliciesPayload]
-    ) -> list[TestVerdict]:
+    ) -> list[Verdict]:
         page = answered.response
         if page is None:
             return [Refused(EntityNotFoundError, answered.raised)]
@@ -227,7 +227,7 @@ class TheLaidPoliciesAreLeft(TestThen[ManyPoliciesAndACaller, SearchRetentionPol
 
 
 @dataclass(frozen=True)
-class OnlyTheNamedPolicyIsLeft(TestThen[ManyPoliciesAndACaller, SearchRetentionPoliciesPayload]):
+class OnlyTheNamedPolicyIsLeft(Then[ManyPoliciesAndACaller, SearchRetentionPoliciesPayload]):
     """필터에 맞는 그 하나만 반환된다."""
 
     @override
@@ -237,7 +237,7 @@ class OnlyTheNamedPolicyIsLeft(TestThen[ManyPoliciesAndACaller, SearchRetentionP
     @override
     def look(
         self, laid: ManyPoliciesAndACaller, answered: Answered[SearchRetentionPoliciesPayload]
-    ) -> list[TestVerdict]:
+    ) -> list[Verdict]:
         page = answered.response
         if page is None:
             return [Refused(EntityNotFoundError, answered.raised)]
@@ -250,7 +250,7 @@ class OnlyTheNamedPolicyIsLeft(TestThen[ManyPoliciesAndACaller, SearchRetentionP
 
 
 @dataclass(frozen=True)
-class TheDeletedPolicyId(TestThen[APolicyAndACaller, Any]):
+class TheDeletedPolicyId(Then[APolicyAndACaller, Any]):
     """삭제한 정책의 id를 담은 응답. 삭제와 완전 삭제가 같은 형태로 응답한다."""
 
     @override
@@ -258,7 +258,7 @@ class TheDeletedPolicyId(TestThen[APolicyAndACaller, Any]):
         return "삭제한 정책의 id가 반환된다"
 
     @override
-    def look(self, laid: APolicyAndACaller, answered: Answered[Any]) -> list[TestVerdict]:
+    def look(self, laid: APolicyAndACaller, answered: Answered[Any]) -> list[Verdict]:
         payload = answered.response
         if payload is None:
             return [Refused(EntityNotFoundError, answered.raised)]

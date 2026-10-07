@@ -27,13 +27,7 @@ from ai.backend.manager.api.adapters.client_ip_masking.adapter import ClientIPMa
 from ai.backend.manager.data.client_ip.masking import ClientIPMaskingMode, ClientIPMaskingTarget
 from ai.backend.manager.errors.auth import InsufficientPrivilege
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.testutils.scenario_steps import (
-    TestConfigured,
-    TestGiven,
-    TestScenario,
-    TestThen,
-    TestWhen,
-)
+from ai.backend.testutils.scenario_steps import Configured, Given, Scenario, Then, When
 from bai_scenario.components.answers import TheCallIsRefused
 from bai_scenario.components.client_ip_masking import (
     IPV4,
@@ -48,13 +42,13 @@ from bai_scenario.runner.acting import ActingAs
 from bai_scenario.runner.planting import SeedingSession
 from bai_scenario.runner.steps import run_scenario
 
-type UpsertingStep = TestScenario[
+type UpsertingStep = Scenario[
     SeedingSession, Any, ClientIPMaskingAdapter, ClientIPMaskingPolicyNode
 ]
 
 
 @dataclass(frozen=True)
-class Upserting(TestWhen[ACaller, ClientIPMaskingAdapter, ClientIPMaskingPolicyNode]):
+class Upserting(When[ACaller, ClientIPMaskingAdapter, ClientIPMaskingPolicyNode]):
     """기본값 대상에 truncate 모드 정책을 등록한다. 응답에 담긴 노드를 꺼내서 준다."""
 
     ipv4: int | None = IPV4
@@ -87,7 +81,7 @@ class Upserting(TestWhen[ACaller, ClientIPMaskingAdapter, ClientIPMaskingPolicyN
 
 @dataclass(frozen=True)
 class UpsertingTheLaidTargetAgain(
-    TestWhen[AMaskingPolicyAndACaller, ClientIPMaskingAdapter, ClientIPMaskingPolicyNode]
+    When[AMaskingPolicyAndACaller, ClientIPMaskingAdapter, ClientIPMaskingPolicyNode]
 ):
     """미리 만들어 둔 정책의 대상에 다시 등록한다."""
 
@@ -125,7 +119,7 @@ class UpsertingTheLaidTargetAgain(
 
 @dataclass(frozen=True)
 class TheSuperadminPutsAPolicyOnATarget(
-    TestScenario[SeedingSession, ACaller, ClientIPMaskingAdapter, ClientIPMaskingPolicyNode]
+    Scenario[SeedingSession, ACaller, ClientIPMaskingAdapter, ClientIPMaskingPolicyNode]
 ):
     started: datetime
 
@@ -138,15 +132,15 @@ class TheSuperadminPutsAPolicyOnATarget(
         return "정책이 없을 때 슈퍼관리자가 대상·모드·두 접두 길이를 지정해 등록하면 지정한 값이 그대로 담긴 노드가 반환된다"
 
     @override
-    def given(self) -> TestGiven[SeedingSession, ACaller]:
+    def given(self) -> Given[SeedingSession, ACaller]:
         return SomeoneAlone(role=UserRole.SUPERADMIN)
 
     @override
-    def when(self) -> TestWhen[ACaller, ClientIPMaskingAdapter, ClientIPMaskingPolicyNode]:
+    def when(self) -> When[ACaller, ClientIPMaskingAdapter, ClientIPMaskingPolicyNode]:
         return Upserting()
 
     @override
-    def then(self) -> TestThen[ACaller, ClientIPMaskingPolicyNode]:
+    def then(self) -> Then[ACaller, ClientIPMaskingPolicyNode]:
         return TheNewMaskingPolicyNode(
             started=self.started,
             target=ClientIPMaskingTarget.DEFAULT,
@@ -158,7 +152,7 @@ class TheSuperadminPutsAPolicyOnATarget(
 
 @dataclass(frozen=True)
 class OmittedPrefixesStayEmpty(
-    TestScenario[SeedingSession, ACaller, ClientIPMaskingAdapter, ClientIPMaskingPolicyNode]
+    Scenario[SeedingSession, ACaller, ClientIPMaskingAdapter, ClientIPMaskingPolicyNode]
 ):
     started: datetime
 
@@ -171,15 +165,15 @@ class OmittedPrefixesStayEmpty(
         return "대상과 모드만 지정해 등록하면 두 접두 길이가 비어 있는 노드가 반환된다"
 
     @override
-    def given(self) -> TestGiven[SeedingSession, ACaller]:
+    def given(self) -> Given[SeedingSession, ACaller]:
         return SomeoneAlone(role=UserRole.SUPERADMIN)
 
     @override
-    def when(self) -> TestWhen[ACaller, ClientIPMaskingAdapter, ClientIPMaskingPolicyNode]:
+    def when(self) -> When[ACaller, ClientIPMaskingAdapter, ClientIPMaskingPolicyNode]:
         return Upserting(ipv4=None, ipv6=None)
 
     @override
-    def then(self) -> TestThen[ACaller, ClientIPMaskingPolicyNode]:
+    def then(self) -> Then[ACaller, ClientIPMaskingPolicyNode]:
         return TheNewMaskingPolicyNode(
             started=self.started,
             target=ClientIPMaskingTarget.DEFAULT,
@@ -191,7 +185,7 @@ class OmittedPrefixesStayEmpty(
 
 @dataclass(frozen=True)
 class PuttingOnATakenTargetRewritesTheRow(
-    TestScenario[
+    Scenario[
         SeedingSession, AMaskingPolicyAndACaller, ClientIPMaskingAdapter, ClientIPMaskingPolicyNode
     ]
 ):
@@ -206,23 +200,23 @@ class PuttingOnATakenTargetRewritesTheRow(
         return "이미 정책이 있는 대상에 다른 모드로 등록하면, 새 행이 아니라 같은 id의 행이 새 모드로 바뀐 노드가 반환된다"
 
     @override
-    def given(self) -> TestGiven[SeedingSession, AMaskingPolicyAndACaller]:
+    def given(self) -> Given[SeedingSession, AMaskingPolicyAndACaller]:
         return AMaskingPolicyAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
     def when(
         self,
-    ) -> TestWhen[AMaskingPolicyAndACaller, ClientIPMaskingAdapter, ClientIPMaskingPolicyNode]:
+    ) -> When[AMaskingPolicyAndACaller, ClientIPMaskingAdapter, ClientIPMaskingPolicyNode]:
         return UpsertingTheLaidTargetAgain(mode=ClientIPMaskingMode.DROP)
 
     @override
-    def then(self) -> TestThen[AMaskingPolicyAndACaller, ClientIPMaskingPolicyNode]:
+    def then(self) -> Then[AMaskingPolicyAndACaller, ClientIPMaskingPolicyNode]:
         return TheSameRowRewritten(started=self.started, mode=ClientIPMaskingMode.DROP)
 
 
 @dataclass(frozen=True)
 class PuttingAgainWithoutPrefixesClearsThem(
-    TestScenario[
+    Scenario[
         SeedingSession, AMaskingPolicyAndACaller, ClientIPMaskingAdapter, ClientIPMaskingPolicyNode
     ]
 ):
@@ -240,23 +234,23 @@ class PuttingAgainWithoutPrefixesClearsThem(
         )
 
     @override
-    def given(self) -> TestGiven[SeedingSession, AMaskingPolicyAndACaller]:
+    def given(self) -> Given[SeedingSession, AMaskingPolicyAndACaller]:
         return AMaskingPolicyAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
     def when(
         self,
-    ) -> TestWhen[AMaskingPolicyAndACaller, ClientIPMaskingAdapter, ClientIPMaskingPolicyNode]:
+    ) -> When[AMaskingPolicyAndACaller, ClientIPMaskingAdapter, ClientIPMaskingPolicyNode]:
         return UpsertingTheLaidTargetAgain(mode=ClientIPMaskingMode.TRUNCATE, ipv4=None, ipv6=None)
 
     @override
-    def then(self) -> TestThen[AMaskingPolicyAndACaller, ClientIPMaskingPolicyNode]:
+    def then(self) -> Then[AMaskingPolicyAndACaller, ClientIPMaskingPolicyNode]:
         return TheSameRowRewritten(started=self.started, ipv4=None, ipv6=None)
 
 
 @dataclass(frozen=True)
 class AUserWhoIsNotTheSuperadminMayNotPut(
-    TestScenario[SeedingSession, ACaller, ClientIPMaskingAdapter, ClientIPMaskingPolicyNode]
+    Scenario[SeedingSession, ACaller, ClientIPMaskingAdapter, ClientIPMaskingPolicyNode]
 ):
     @override
     def summary(self) -> str:
@@ -267,21 +261,21 @@ class AUserWhoIsNotTheSuperadminMayNotPut(
         return "슈퍼관리자가 아닌 사용자가 정책을 등록하면 역할 부족으로 거부된다"
 
     @override
-    def given(self) -> TestGiven[SeedingSession, ACaller]:
+    def given(self) -> Given[SeedingSession, ACaller]:
         return SomeoneAlone()
 
     @override
-    def when(self) -> TestWhen[ACaller, ClientIPMaskingAdapter, ClientIPMaskingPolicyNode]:
+    def when(self) -> When[ACaller, ClientIPMaskingAdapter, ClientIPMaskingPolicyNode]:
         return Upserting()
 
     @override
-    def then(self) -> TestThen[ACaller, ClientIPMaskingPolicyNode]:
+    def then(self) -> Then[ACaller, ClientIPMaskingPolicyNode]:
         return TheCallIsRefused(InsufficientPrivilege)
 
 
 @dataclass(frozen=True)
 class TheMonitorMayNotPut(
-    TestScenario[SeedingSession, ACaller, ClientIPMaskingAdapter, ClientIPMaskingPolicyNode]
+    Scenario[SeedingSession, ACaller, ClientIPMaskingAdapter, ClientIPMaskingPolicyNode]
 ):
     @override
     def summary(self) -> str:
@@ -292,22 +286,22 @@ class TheMonitorMayNotPut(
         return "모니터 역할이 정책을 등록하면 역할 부족으로 거부된다. 모니터는 슈퍼관리자 검사에서 읽기만 통과한다"
 
     @override
-    def given(self) -> TestGiven[SeedingSession, ACaller]:
+    def given(self) -> Given[SeedingSession, ACaller]:
         return SomeoneAlone(role=UserRole.MONITOR)
 
     @override
-    def when(self) -> TestWhen[ACaller, ClientIPMaskingAdapter, ClientIPMaskingPolicyNode]:
+    def when(self) -> When[ACaller, ClientIPMaskingAdapter, ClientIPMaskingPolicyNode]:
         return Upserting()
 
     @override
-    def then(self) -> TestThen[ACaller, ClientIPMaskingPolicyNode]:
+    def then(self) -> Then[ACaller, ClientIPMaskingPolicyNode]:
         return TheCallIsRefused(InsufficientPrivilege)
 
 
 @dataclass(frozen=True)
 class EnforcementOffStillNeedsTheSuperadmin(
-    TestScenario[SeedingSession, ACaller, ClientIPMaskingAdapter, ClientIPMaskingPolicyNode],
-    TestConfigured,
+    Scenario[SeedingSession, ACaller, ClientIPMaskingAdapter, ClientIPMaskingPolicyNode],
+    Configured,
 ):
     @override
     def summary(self) -> str:
@@ -322,15 +316,15 @@ class EnforcementOffStillNeedsTheSuperadmin(
         return {ENFORCEMENT: False}
 
     @override
-    def given(self) -> TestGiven[SeedingSession, ACaller]:
+    def given(self) -> Given[SeedingSession, ACaller]:
         return SomeoneAlone()
 
     @override
-    def when(self) -> TestWhen[ACaller, ClientIPMaskingAdapter, ClientIPMaskingPolicyNode]:
+    def when(self) -> When[ACaller, ClientIPMaskingAdapter, ClientIPMaskingPolicyNode]:
         return Upserting()
 
     @override
-    def then(self) -> TestThen[ACaller, ClientIPMaskingPolicyNode]:
+    def then(self) -> Then[ACaller, ClientIPMaskingPolicyNode]:
         return TheCallIsRefused(InsufficientPrivilege)
 
 

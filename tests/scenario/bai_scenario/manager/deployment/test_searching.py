@@ -26,13 +26,13 @@ from ai.backend.manager.errors.permission import NotEnoughPermission
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.testutils.scenario_steps import (
     Answered,
+    Given,
     Refused,
     Same,
-    TestGiven,
-    TestScenario,
-    TestThen,
-    TestVerdict,
-    TestWhen,
+    Scenario,
+    Then,
+    Verdict,
+    When,
 )
 from bai_scenario.components.answers import TheCallIsRefused
 from bai_scenario.components.deployment import (
@@ -46,13 +46,13 @@ from bai_scenario.runner.planting import SeedingSession
 from bai_scenario.runner.steps import run_scenario
 
 type Searched = AdminSearchDeploymentsPayload
-type SearchingStep = TestScenario[
+type SearchingStep = Scenario[
     SeedingSession, ManyDeploymentsAndACaller, DeploymentAdapter, Searched
 ]
 
 
 @dataclass(frozen=True)
-class SearchingEverything(TestWhen[ManyDeploymentsAndACaller, DeploymentAdapter, Searched]):
+class SearchingEverything(When[ManyDeploymentsAndACaller, DeploymentAdapter, Searched]):
     """필터 없이 전체를 훑는다."""
 
     @override
@@ -70,7 +70,7 @@ class SearchingEverything(TestWhen[ManyDeploymentsAndACaller, DeploymentAdapter,
 
 
 @dataclass(frozen=True)
-class SearchingTheProject(TestWhen[ManyDeploymentsAndACaller, DeploymentAdapter, Searched]):
+class SearchingTheProject(When[ManyDeploymentsAndACaller, DeploymentAdapter, Searched]):
     """부르는 사람이 속한 프로젝트 안을 훑는다."""
 
     @override
@@ -90,7 +90,7 @@ class SearchingTheProject(TestWhen[ManyDeploymentsAndACaller, DeploymentAdapter,
 
 
 @dataclass(frozen=True)
-class SearchingMine(TestWhen[ManyDeploymentsAndACaller, DeploymentAdapter, Searched]):
+class SearchingMine(When[ManyDeploymentsAndACaller, DeploymentAdapter, Searched]):
     """부르는 사람이 만든 것을 훑는다."""
 
     @override
@@ -112,7 +112,7 @@ class SearchingMine(TestWhen[ManyDeploymentsAndACaller, DeploymentAdapter, Searc
 
 
 @dataclass(frozen=True)
-class EveryLaidDeploymentIsFound(TestThen[ManyDeploymentsAndACaller, Searched]):
+class EveryLaidDeploymentIsFound(Then[ManyDeploymentsAndACaller, Searched]):
     """답으로 받은 배포가 모두, 그리고 그것만 세어진다."""
 
     @override
@@ -120,9 +120,7 @@ class EveryLaidDeploymentIsFound(TestThen[ManyDeploymentsAndACaller, Searched]):
         return "심은 배포가 모두, 그리고 그것만 세어진다"
 
     @override
-    def look(
-        self, laid: ManyDeploymentsAndACaller, answered: Answered[Searched]
-    ) -> list[TestVerdict]:
+    def look(self, laid: ManyDeploymentsAndACaller, answered: Answered[Searched]) -> list[Verdict]:
         payload = answered.response
         if payload is None:
             return [Refused(NotEnoughPermission, answered.raised)]
@@ -140,7 +138,7 @@ class EveryLaidDeploymentIsFound(TestThen[ManyDeploymentsAndACaller, Searched]):
 
 @dataclass(frozen=True)
 class TheSuperadminCountsEveryOne(
-    TestScenario[SeedingSession, ManyDeploymentsAndACaller, DeploymentAdapter, Searched]
+    Scenario[SeedingSession, ManyDeploymentsAndACaller, DeploymentAdapter, Searched]
 ):
     @override
     def summary(self) -> str:
@@ -151,21 +149,21 @@ class TheSuperadminCountsEveryOne(
         return "배포 셋이 있고 슈퍼관리자가 필터 없이 전체를 훑으면, 셋을 모두 센다"
 
     @override
-    def given(self) -> TestGiven[SeedingSession, ManyDeploymentsAndACaller]:
+    def given(self) -> Given[SeedingSession, ManyDeploymentsAndACaller]:
         return ManyDeploymentsInThatPlace(role=UserRole.SUPERADMIN)
 
     @override
-    def when(self) -> TestWhen[ManyDeploymentsAndACaller, DeploymentAdapter, Searched]:
+    def when(self) -> When[ManyDeploymentsAndACaller, DeploymentAdapter, Searched]:
         return SearchingEverything()
 
     @override
-    def then(self) -> TestThen[ManyDeploymentsAndACaller, Searched]:
+    def then(self) -> Then[ManyDeploymentsAndACaller, Searched]:
         return EveryLaidDeploymentIsFound()
 
 
 @dataclass(frozen=True)
 class AGrantDoesNotOpenTheGlobalDoor(
-    TestScenario[SeedingSession, ManyDeploymentsAndACaller, DeploymentAdapter, Searched]
+    Scenario[SeedingSession, ManyDeploymentsAndACaller, DeploymentAdapter, Searched]
 ):
     @override
     def summary(self) -> str:
@@ -179,21 +177,21 @@ class AGrantDoesNotOpenTheGlobalDoor(
         )
 
     @override
-    def given(self) -> TestGiven[SeedingSession, ManyDeploymentsAndACaller]:
+    def given(self) -> Given[SeedingSession, ManyDeploymentsAndACaller]:
         return ManyDeploymentsInThatPlace(granted=(Permission.READ,))
 
     @override
-    def when(self) -> TestWhen[ManyDeploymentsAndACaller, DeploymentAdapter, Searched]:
+    def when(self) -> When[ManyDeploymentsAndACaller, DeploymentAdapter, Searched]:
         return SearchingEverything()
 
     @override
-    def then(self) -> TestThen[ManyDeploymentsAndACaller, Searched]:
+    def then(self) -> Then[ManyDeploymentsAndACaller, Searched]:
         return TheCallIsRefused(InsufficientPrivilege)
 
 
 @dataclass(frozen=True)
 class OnlyThatProjectsOnesAreFound(
-    TestScenario[SeedingSession, ManyDeploymentsAndACaller, DeploymentAdapter, Searched]
+    Scenario[SeedingSession, ManyDeploymentsAndACaller, DeploymentAdapter, Searched]
 ):
     @override
     def summary(self) -> str:
@@ -207,21 +205,21 @@ class OnlyThatProjectsOnesAreFound(
         )
 
     @override
-    def given(self) -> TestGiven[SeedingSession, ManyDeploymentsAndACaller]:
+    def given(self) -> Given[SeedingSession, ManyDeploymentsAndACaller]:
         return DeploymentsInTwoProjects(granted=(Permission.READ,))
 
     @override
-    def when(self) -> TestWhen[ManyDeploymentsAndACaller, DeploymentAdapter, Searched]:
+    def when(self) -> When[ManyDeploymentsAndACaller, DeploymentAdapter, Searched]:
         return SearchingTheProject()
 
     @override
-    def then(self) -> TestThen[ManyDeploymentsAndACaller, Searched]:
+    def then(self) -> Then[ManyDeploymentsAndACaller, Searched]:
         return EveryLaidDeploymentIsFound()
 
 
 @dataclass(frozen=True)
 class AProjectWithNoGrantIsRefused(
-    TestScenario[SeedingSession, ManyDeploymentsAndACaller, DeploymentAdapter, Searched]
+    Scenario[SeedingSession, ManyDeploymentsAndACaller, DeploymentAdapter, Searched]
 ):
     @override
     def summary(self) -> str:
@@ -232,21 +230,21 @@ class AProjectWithNoGrantIsRefused(
         return "그 프로젝트에 읽기 권한이 없는 사용자가 프로젝트를 훑으면, 권한 부족으로 거부된다"
 
     @override
-    def given(self) -> TestGiven[SeedingSession, ManyDeploymentsAndACaller]:
+    def given(self) -> Given[SeedingSession, ManyDeploymentsAndACaller]:
         return ManyDeploymentsInThatPlace()
 
     @override
-    def when(self) -> TestWhen[ManyDeploymentsAndACaller, DeploymentAdapter, Searched]:
+    def when(self) -> When[ManyDeploymentsAndACaller, DeploymentAdapter, Searched]:
         return SearchingTheProject()
 
     @override
-    def then(self) -> TestThen[ManyDeploymentsAndACaller, Searched]:
+    def then(self) -> Then[ManyDeploymentsAndACaller, Searched]:
         return TheCallIsRefused(NotEnoughPermission)
 
 
 @dataclass(frozen=True)
 class OnlyMyOwnAreFound(
-    TestScenario[SeedingSession, ManyDeploymentsAndACaller, DeploymentAdapter, Searched]
+    Scenario[SeedingSession, ManyDeploymentsAndACaller, DeploymentAdapter, Searched]
 ):
     @override
     def summary(self) -> str:
@@ -260,21 +258,21 @@ class OnlyMyOwnAreFound(
         )
 
     @override
-    def given(self) -> TestGiven[SeedingSession, ManyDeploymentsAndACaller]:
+    def given(self) -> Given[SeedingSession, ManyDeploymentsAndACaller]:
         return MineBesideAnothers(reads_own=True)
 
     @override
-    def when(self) -> TestWhen[ManyDeploymentsAndACaller, DeploymentAdapter, Searched]:
+    def when(self) -> When[ManyDeploymentsAndACaller, DeploymentAdapter, Searched]:
         return SearchingMine()
 
     @override
-    def then(self) -> TestThen[ManyDeploymentsAndACaller, Searched]:
+    def then(self) -> Then[ManyDeploymentsAndACaller, Searched]:
         return EveryLaidDeploymentIsFound()
 
 
 @dataclass(frozen=True)
 class MyOwnNeedAGrantToo(
-    TestScenario[SeedingSession, ManyDeploymentsAndACaller, DeploymentAdapter, Searched]
+    Scenario[SeedingSession, ManyDeploymentsAndACaller, DeploymentAdapter, Searched]
 ):
     @override
     def summary(self) -> str:
@@ -288,15 +286,15 @@ class MyOwnNeedAGrantToo(
         )
 
     @override
-    def given(self) -> TestGiven[SeedingSession, ManyDeploymentsAndACaller]:
+    def given(self) -> Given[SeedingSession, ManyDeploymentsAndACaller]:
         return MineBesideAnothers()
 
     @override
-    def when(self) -> TestWhen[ManyDeploymentsAndACaller, DeploymentAdapter, Searched]:
+    def when(self) -> When[ManyDeploymentsAndACaller, DeploymentAdapter, Searched]:
         return SearchingMine()
 
     @override
-    def then(self) -> TestThen[ManyDeploymentsAndACaller, Searched]:
+    def then(self) -> Then[ManyDeploymentsAndACaller, Searched]:
         return TheCallIsRefused(NotEnoughPermission)
 
 

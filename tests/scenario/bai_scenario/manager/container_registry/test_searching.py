@@ -28,14 +28,14 @@ from ai.backend.manager.errors.auth import InsufficientPrivilege
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.testutils.scenario_steps import (
     Answered,
+    Given,
     Held,
     Same,
     SameAs,
-    TestGiven,
-    TestScenario,
-    TestThen,
-    TestVerdict,
-    TestWhen,
+    Scenario,
+    Then,
+    Verdict,
+    When,
 )
 from bai_scenario.components.answers import MissingResponse, TheCallIsRefused
 from bai_scenario.components.container_registry import (
@@ -46,18 +46,18 @@ from bai_scenario.runner.acting import ActingAs
 from bai_scenario.runner.planting import SeedingSession
 from bai_scenario.runner.steps import run_scenario
 
-type SearchScenario = TestScenario[
+type SearchScenario = Scenario[
     SeedingSession,
     ManyRegistriesAndACaller,
     ContainerRegistryAdapter,
     AdminSearchContainerRegistriesPayload,
 ]
-type SearchGiven = TestGiven[SeedingSession, ManyRegistriesAndACaller]
-type SearchThen = TestThen[ManyRegistriesAndACaller, AdminSearchContainerRegistriesPayload]
+type SearchGiven = Given[SeedingSession, ManyRegistriesAndACaller]
+type SearchThen = Then[ManyRegistriesAndACaller, AdminSearchContainerRegistriesPayload]
 
 
 class ContainerRegistrySearchScenario(
-    TestScenario[
+    Scenario[
         SeedingSession,
         ManyRegistriesAndACaller,
         ContainerRegistryAdapter,
@@ -93,7 +93,7 @@ def registry_items_match(
     got: Sequence[ContainerRegistryNode],
     wanted: Sequence[ContainerRegistryData],
     came_from: str = "미리 만들어 둔 레지스트리",
-) -> TestVerdict:
+) -> Verdict:
     return Held(
         "items",
         [registry_snapshot(one) for one in got],
@@ -103,9 +103,7 @@ def registry_items_match(
 
 @dataclass(frozen=True)
 class Searching(
-    TestWhen[
-        ManyRegistriesAndACaller, ContainerRegistryAdapter, AdminSearchContainerRegistriesPayload
-    ]
+    When[ManyRegistriesAndACaller, ContainerRegistryAdapter, AdminSearchContainerRegistriesPayload]
 ):
     filter_kind: FilterKind = FilterKind.NONE
 
@@ -143,7 +141,7 @@ class Searching(
 
 @dataclass(frozen=True)
 class AllSeededRegistriesAreReturned(
-    TestThen[ManyRegistriesAndACaller, AdminSearchContainerRegistriesPayload]
+    Then[ManyRegistriesAndACaller, AdminSearchContainerRegistriesPayload]
 ):
     @override
     def says(self) -> str:
@@ -154,7 +152,7 @@ class AllSeededRegistriesAreReturned(
         self,
         laid: ManyRegistriesAndACaller,
         answered: Answered[AdminSearchContainerRegistriesPayload],
-    ) -> list[TestVerdict]:
+    ) -> list[Verdict]:
         payload = answered.response
         if payload is None:
             return [MissingResponse(answered.raised)]
@@ -171,7 +169,7 @@ class AllSeededRegistriesAreReturned(
 
 @dataclass(frozen=True)
 class OnlyTheMatchingRegistryIsReturned(
-    TestThen[ManyRegistriesAndACaller, AdminSearchContainerRegistriesPayload]
+    Then[ManyRegistriesAndACaller, AdminSearchContainerRegistriesPayload]
 ):
     @override
     def says(self) -> str:
@@ -182,7 +180,7 @@ class OnlyTheMatchingRegistryIsReturned(
         self,
         laid: ManyRegistriesAndACaller,
         answered: Answered[AdminSearchContainerRegistriesPayload],
-    ) -> list[TestVerdict]:
+    ) -> list[Verdict]:
         payload = answered.response
         if payload is None:
             return [MissingResponse(answered.raised)]
@@ -196,7 +194,7 @@ class OnlyTheMatchingRegistryIsReturned(
 
 @dataclass(frozen=True)
 class OnlyNonGlobalRegistriesAreReturned(
-    TestThen[ManyRegistriesAndACaller, AdminSearchContainerRegistriesPayload]
+    Then[ManyRegistriesAndACaller, AdminSearchContainerRegistriesPayload]
 ):
     @override
     def says(self) -> str:
@@ -207,7 +205,7 @@ class OnlyNonGlobalRegistriesAreReturned(
         self,
         laid: ManyRegistriesAndACaller,
         answered: Answered[AdminSearchContainerRegistriesPayload],
-    ) -> list[TestVerdict]:
+    ) -> list[Verdict]:
         payload = answered.response
         if payload is None:
             return [MissingResponse(answered.raised)]

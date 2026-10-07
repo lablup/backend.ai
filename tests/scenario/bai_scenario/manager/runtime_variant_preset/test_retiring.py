@@ -19,13 +19,7 @@ from ai.backend.manager.api.adapters.runtime_variant_preset.adapter import (
 from ai.backend.manager.errors.base.entity import EntityNotFoundError
 from ai.backend.manager.errors.permission import NotEnoughPermission
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.testutils.scenario_steps import (
-    TestConfigured,
-    TestGiven,
-    TestScenario,
-    TestThen,
-    TestWhen,
-)
+from ai.backend.testutils.scenario_steps import Configured, Given, Scenario, Then, When
 from bai_scenario.components.answers import TheCallIsRefused
 from bai_scenario.components.runtime_variant_preset import (
     APresetAndACaller,
@@ -38,13 +32,13 @@ from bai_scenario.runner.planting import SeedingSession
 from bai_scenario.runner.steps import run_scenario
 
 type Deleted = DeleteRuntimeVariantPresetPayload
-type RetiringStep = TestScenario[
+type RetiringStep = Scenario[
     SeedingSession, APresetAndACaller, RuntimeVariantPresetAdapter, Deleted
 ]
 
 
 @dataclass(frozen=True)
-class Deleting(TestWhen[APresetAndACaller, RuntimeVariantPresetAdapter, Deleted]):
+class Deleting(When[APresetAndACaller, RuntimeVariantPresetAdapter, Deleted]):
     """미리 만들어 둔 프리셋 하나를 삭제한다."""
 
     unknown: bool = False
@@ -66,7 +60,7 @@ class Deleting(TestWhen[APresetAndACaller, RuntimeVariantPresetAdapter, Deleted]
 
 @dataclass(frozen=True)
 class TheSuperadminDeletesAPreset(
-    TestScenario[SeedingSession, APresetAndACaller, RuntimeVariantPresetAdapter, Deleted]
+    Scenario[SeedingSession, APresetAndACaller, RuntimeVariantPresetAdapter, Deleted]
 ):
     @override
     def summary(self) -> str:
@@ -77,21 +71,21 @@ class TheSuperadminDeletesAPreset(
         return "슈퍼관리자가 프리셋을 삭제하면 삭제한 프리셋의 ID를 담은 응답이 반환된다"
 
     @override
-    def given(self) -> TestGiven[SeedingSession, APresetAndACaller]:
+    def given(self) -> Given[SeedingSession, APresetAndACaller]:
         return APresetAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
-    def when(self) -> TestWhen[APresetAndACaller, RuntimeVariantPresetAdapter, Deleted]:
+    def when(self) -> When[APresetAndACaller, RuntimeVariantPresetAdapter, Deleted]:
         return Deleting()
 
     @override
-    def then(self) -> TestThen[APresetAndACaller, Deleted]:
+    def then(self) -> Then[APresetAndACaller, Deleted]:
         return TheDeletedPresetId()
 
 
 @dataclass(frozen=True)
 class AnIdNothingAnswersToIsNotFound(
-    TestScenario[SeedingSession, APresetAndACaller, RuntimeVariantPresetAdapter, Deleted]
+    Scenario[SeedingSession, APresetAndACaller, RuntimeVariantPresetAdapter, Deleted]
 ):
     @override
     def summary(self) -> str:
@@ -102,21 +96,21 @@ class AnIdNothingAnswersToIsNotFound(
         return "슈퍼관리자가 존재하지 않는 ID를 삭제하면 대상을 찾을 수 없어 요청이 거부된다"
 
     @override
-    def given(self) -> TestGiven[SeedingSession, APresetAndACaller]:
+    def given(self) -> Given[SeedingSession, APresetAndACaller]:
         return APresetAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
-    def when(self) -> TestWhen[APresetAndACaller, RuntimeVariantPresetAdapter, Deleted]:
+    def when(self) -> When[APresetAndACaller, RuntimeVariantPresetAdapter, Deleted]:
         return Deleting(unknown=True)
 
     @override
-    def then(self) -> TestThen[APresetAndACaller, Deleted]:
+    def then(self) -> Then[APresetAndACaller, Deleted]:
         return TheCallIsRefused(EntityNotFoundError)
 
 
 @dataclass(frozen=True)
 class AUserGrantedNothingMayNotDelete(
-    TestScenario[SeedingSession, APresetAndACaller, RuntimeVariantPresetAdapter, Deleted]
+    Scenario[SeedingSession, APresetAndACaller, RuntimeVariantPresetAdapter, Deleted]
 ):
     @override
     def summary(self) -> str:
@@ -127,22 +121,21 @@ class AUserGrantedNothingMayNotDelete(
         return "아무 권한도 없는 사용자가 프리셋을 삭제하면 권한이 부족하여 요청이 거부된다"
 
     @override
-    def given(self) -> TestGiven[SeedingSession, APresetAndACaller]:
+    def given(self) -> Given[SeedingSession, APresetAndACaller]:
         return APresetAndSomeone()
 
     @override
-    def when(self) -> TestWhen[APresetAndACaller, RuntimeVariantPresetAdapter, Deleted]:
+    def when(self) -> When[APresetAndACaller, RuntimeVariantPresetAdapter, Deleted]:
         return Deleting()
 
     @override
-    def then(self) -> TestThen[APresetAndACaller, Deleted]:
+    def then(self) -> Then[APresetAndACaller, Deleted]:
         return TheCallIsRefused(NotEnoughPermission)
 
 
 @dataclass(frozen=True)
 class EnforcementOffLetsAnyoneDelete(
-    TestScenario[SeedingSession, APresetAndACaller, RuntimeVariantPresetAdapter, Deleted],
-    TestConfigured,
+    Scenario[SeedingSession, APresetAndACaller, RuntimeVariantPresetAdapter, Deleted], Configured
 ):
     @override
     def summary(self) -> str:
@@ -157,15 +150,15 @@ class EnforcementOffLetsAnyoneDelete(
         return {ENFORCEMENT: False}
 
     @override
-    def given(self) -> TestGiven[SeedingSession, APresetAndACaller]:
+    def given(self) -> Given[SeedingSession, APresetAndACaller]:
         return APresetAndSomeone()
 
     @override
-    def when(self) -> TestWhen[APresetAndACaller, RuntimeVariantPresetAdapter, Deleted]:
+    def when(self) -> When[APresetAndACaller, RuntimeVariantPresetAdapter, Deleted]:
         return Deleting()
 
     @override
-    def then(self) -> TestThen[APresetAndACaller, Deleted]:
+    def then(self) -> Then[APresetAndACaller, Deleted]:
         return TheDeletedPresetId()
 
 

@@ -28,16 +28,16 @@ from ai.backend.manager.errors.permission import NotEnoughPermission
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.testutils.scenario_steps import (
     Answered,
+    Given,
     Held,
     Refused,
     Same,
     SameAs,
+    Scenario,
     Skipped,
-    TestGiven,
-    TestScenario,
-    TestThen,
-    TestVerdict,
-    TestWhen,
+    Then,
+    Verdict,
+    When,
 )
 from bai_scenario.components.answers import TheCallIsRefused
 from bai_scenario.components.domain import (
@@ -78,7 +78,7 @@ class AProjectAMemberAndACaller:
 
 
 @dataclass(frozen=True)
-class ADomainAndAPolicy(TestGiven[Any, ADomainAPolicyAndACaller]):
+class ADomainAndAPolicy(Given[Any, ADomainAPolicyAndACaller]):
     """도메인 하나와, 프로젝트가 딛는 정책, 그리고 부를 사람 한 명."""
 
     role: UserRole = UserRole.USER
@@ -98,7 +98,7 @@ class ADomainAndAPolicy(TestGiven[Any, ADomainAPolicyAndACaller]):
 
 
 @dataclass(frozen=True)
-class AProjectAndAMember(TestGiven[Any, AProjectAMemberAndACaller]):
+class AProjectAndAMember(Given[Any, AProjectAMemberAndACaller]):
     """프로젝트 하나와 그 스코프의 역할, 올릴 사람, 그리고 슈퍼관리자."""
 
     @override
@@ -124,7 +124,7 @@ class AProjectAndAMember(TestGiven[Any, AProjectAMemberAndACaller]):
 
 
 @dataclass(frozen=True)
-class MakingAProject(TestWhen[ADomainAPolicyAndACaller, ProjectAdapter, Answer]):
+class MakingAProject(When[ADomainAPolicyAndACaller, ProjectAdapter, Answer]):
     """그 도메인 아래에 프로젝트를 만든다."""
 
     named: str = MADE
@@ -151,7 +151,7 @@ class MakingAProject(TestWhen[ADomainAPolicyAndACaller, ProjectAdapter, Answer])
 
 
 @dataclass(frozen=True)
-class AssigningTheMember(TestWhen[AProjectAMemberAndACaller, ProjectAdapter, Answer]):
+class AssigningTheMember(When[AProjectAMemberAndACaller, ProjectAdapter, Answer]):
     """그 사용자를 프로젝트 명부에 올린다."""
 
     @override
@@ -172,7 +172,7 @@ class AssigningTheMember(TestWhen[AProjectAMemberAndACaller, ProjectAdapter, Ans
 
 
 @dataclass(frozen=True)
-class TheProjectSitsUnderTheDomain(TestThen[ADomainAPolicyAndACaller, Answer]):
+class TheProjectSitsUnderTheDomain(Then[ADomainAPolicyAndACaller, Answer]):
     """만든 프로젝트가 통째로 오고, 그 도메인과 정책 아래에 있다."""
 
     started: datetime
@@ -183,7 +183,7 @@ class TheProjectSitsUnderTheDomain(TestThen[ADomainAPolicyAndACaller, Answer]):
         return "만든 프로젝트 전체가 온다"
 
     @override
-    def look(self, laid: ADomainAPolicyAndACaller, answered: Answered[Answer]) -> list[TestVerdict]:
+    def look(self, laid: ADomainAPolicyAndACaller, answered: Answered[Answer]) -> list[Verdict]:
         node = answered.response
         if not isinstance(node, ProjectNode):
             return [Refused(NotEnoughPermission, answered.raised)]
@@ -206,7 +206,7 @@ class TheProjectSitsUnderTheDomain(TestThen[ADomainAPolicyAndACaller, Answer]):
 
 
 @dataclass(frozen=True)
-class TheRosterHoldsTheMember(TestThen[AProjectAMemberAndACaller, Answer]):
+class TheRosterHoldsTheMember(Then[AProjectAMemberAndACaller, Answer]):
     """명부에 그 사람 하나가 올라 있다."""
 
     @override
@@ -214,9 +214,7 @@ class TheRosterHoldsTheMember(TestThen[AProjectAMemberAndACaller, Answer]):
         return "명부에 배정한 사람만 올라 있다"
 
     @override
-    def look(
-        self, laid: AProjectAMemberAndACaller, answered: Answered[Answer]
-    ) -> list[TestVerdict]:
+    def look(self, laid: AProjectAMemberAndACaller, answered: Answered[Answer]) -> list[Verdict]:
         payload = answered.response
         if not isinstance(payload, AssignUsersToProjectPayload):
             return [Refused(NotEnoughPermission, answered.raised)]
@@ -231,7 +229,7 @@ class TheRosterHoldsTheMember(TestThen[AProjectAMemberAndACaller, Answer]):
 
 @dataclass(frozen=True)
 class TheSuperadminMakesAProject(
-    TestScenario[SeedingSession, ADomainAPolicyAndACaller, ProjectAdapter, Answer]
+    Scenario[SeedingSession, ADomainAPolicyAndACaller, ProjectAdapter, Answer]
 ):
     started: datetime
 
@@ -247,21 +245,21 @@ class TheSuperadminMakesAProject(
         )
 
     @override
-    def given(self) -> TestGiven[SeedingSession, ADomainAPolicyAndACaller]:
+    def given(self) -> Given[SeedingSession, ADomainAPolicyAndACaller]:
         return ADomainAndAPolicy(role=UserRole.SUPERADMIN)
 
     @override
-    def when(self) -> TestWhen[ADomainAPolicyAndACaller, ProjectAdapter, Answer]:
+    def when(self) -> When[ADomainAPolicyAndACaller, ProjectAdapter, Answer]:
         return MakingAProject()
 
     @override
-    def then(self) -> TestThen[ADomainAPolicyAndACaller, Answer]:
+    def then(self) -> Then[ADomainAPolicyAndACaller, Answer]:
         return TheProjectSitsUnderTheDomain(started=self.started)
 
 
 @dataclass(frozen=True)
 class AUserGrantedNothingMayNotMakeAProject(
-    TestScenario[SeedingSession, ADomainAPolicyAndACaller, ProjectAdapter, Answer]
+    Scenario[SeedingSession, ADomainAPolicyAndACaller, ProjectAdapter, Answer]
 ):
     @override
     def summary(self) -> str:
@@ -275,21 +273,21 @@ class AUserGrantedNothingMayNotMakeAProject(
         )
 
     @override
-    def given(self) -> TestGiven[SeedingSession, ADomainAPolicyAndACaller]:
+    def given(self) -> Given[SeedingSession, ADomainAPolicyAndACaller]:
         return ADomainAndAPolicy()
 
     @override
-    def when(self) -> TestWhen[ADomainAPolicyAndACaller, ProjectAdapter, Answer]:
+    def when(self) -> When[ADomainAPolicyAndACaller, ProjectAdapter, Answer]:
         return MakingAProject(named="refused")
 
     @override
-    def then(self) -> TestThen[ADomainAPolicyAndACaller, Answer]:
+    def then(self) -> Then[ADomainAPolicyAndACaller, Answer]:
         return TheCallIsRefused(NotEnoughPermission)
 
 
 @dataclass(frozen=True)
 class AssigningAUserPutsThemOnTheRoster(
-    TestScenario[SeedingSession, AProjectAMemberAndACaller, ProjectAdapter, Answer]
+    Scenario[SeedingSession, AProjectAMemberAndACaller, ProjectAdapter, Answer]
 ):
     @override
     def summary(self) -> str:
@@ -303,19 +301,19 @@ class AssigningAUserPutsThemOnTheRoster(
         )
 
     @override
-    def given(self) -> TestGiven[SeedingSession, AProjectAMemberAndACaller]:
+    def given(self) -> Given[SeedingSession, AProjectAMemberAndACaller]:
         return AProjectAndAMember()
 
     @override
-    def when(self) -> TestWhen[AProjectAMemberAndACaller, ProjectAdapter, Answer]:
+    def when(self) -> When[AProjectAMemberAndACaller, ProjectAdapter, Answer]:
         return AssigningTheMember()
 
     @override
-    def then(self) -> TestThen[AProjectAMemberAndACaller, Answer]:
+    def then(self) -> Then[AProjectAMemberAndACaller, Answer]:
         return TheRosterHoldsTheMember()
 
 
-SCENARIOS: list[TestScenario[SeedingSession, Any, ProjectAdapter, Answer]] = [
+SCENARIOS: list[Scenario[SeedingSession, Any, ProjectAdapter, Answer]] = [
     TheSuperadminMakesAProject(started=datetime.now(UTC)),
     AUserGrantedNothingMayNotMakeAProject(),
     AssigningAUserPutsThemOnTheRoster(),
@@ -324,7 +322,7 @@ SCENARIOS: list[TestScenario[SeedingSession, Any, ProjectAdapter, Answer]] = [
 
 @pytest.mark.parametrize("scenario", SCENARIOS, ids=lambda s: s.summary())
 async def test_project(
-    scenario: TestScenario[SeedingSession, Any, ProjectAdapter, Answer],
+    scenario: Scenario[SeedingSession, Any, ProjectAdapter, Answer],
     adapter: ProjectAdapter,
     engine: ExtendedAsyncSAEngine,
 ) -> None:

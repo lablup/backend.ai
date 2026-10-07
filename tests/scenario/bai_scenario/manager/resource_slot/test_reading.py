@@ -11,7 +11,7 @@ from ai.backend.common.dto.manager.v2.resource_slot.response import ResourceSlot
 from ai.backend.manager.api.adapters.resource_slot.adapter import ResourceSlotAdapter
 from ai.backend.manager.errors.common import GenericBadRequest
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.testutils.scenario_steps import TestGiven, TestScenario, TestThen, TestWhen
+from ai.backend.testutils.scenario_steps import Given, Scenario, Then, When
 from bai_scenario.components.answers import TheCallIsRefused
 from bai_scenario.components.resource_slot import (
     ASlotTypeAndACaller,
@@ -24,13 +24,13 @@ from bai_scenario.runner.steps import run_scenario
 
 UNKNOWN = "no-such-slot"
 
-type ReadingStep = TestScenario[
+type ReadingStep = Scenario[
     SeedingSession, ASlotTypeAndACaller, ResourceSlotAdapter, ResourceSlotTypeNode
 ]
 
 
 @dataclass(frozen=True)
-class ReadingByName(TestWhen[ASlotTypeAndACaller, ResourceSlotAdapter, ResourceSlotTypeNode]):
+class ReadingByName(When[ASlotTypeAndACaller, ResourceSlotAdapter, ResourceSlotTypeNode]):
     """이름으로 조회한다. 이름을 지정하지 않으면 미리 만들어 둔 슬롯 종류의 이름을 쓴다."""
 
     named: str | None = None
@@ -53,7 +53,7 @@ class ReadingByName(TestWhen[ASlotTypeAndACaller, ResourceSlotAdapter, ResourceS
 
 @dataclass(frozen=True)
 class AUserGrantedNothingReadsByName(
-    TestScenario[SeedingSession, ASlotTypeAndACaller, ResourceSlotAdapter, ResourceSlotTypeNode]
+    Scenario[SeedingSession, ASlotTypeAndACaller, ResourceSlotAdapter, ResourceSlotTypeNode]
 ):
     @override
     def summary(self) -> str:
@@ -67,21 +67,21 @@ class AUserGrantedNothingReadsByName(
         )
 
     @override
-    def given(self) -> TestGiven[SeedingSession, ASlotTypeAndACaller]:
+    def given(self) -> Given[SeedingSession, ASlotTypeAndACaller]:
         return ASlotTypeAndSomeone()
 
     @override
-    def when(self) -> TestWhen[ASlotTypeAndACaller, ResourceSlotAdapter, ResourceSlotTypeNode]:
+    def when(self) -> When[ASlotTypeAndACaller, ResourceSlotAdapter, ResourceSlotTypeNode]:
         return ReadingByName()
 
     @override
-    def then(self) -> TestThen[ASlotTypeAndACaller, ResourceSlotTypeNode]:
+    def then(self) -> Then[ASlotTypeAndACaller, ResourceSlotTypeNode]:
         return TheSlotTypeNode()
 
 
 @dataclass(frozen=True)
 class ANameNothingAnswersToIsRefused(
-    TestScenario[SeedingSession, ASlotTypeAndACaller, ResourceSlotAdapter, ResourceSlotTypeNode]
+    Scenario[SeedingSession, ASlotTypeAndACaller, ResourceSlotAdapter, ResourceSlotTypeNode]
 ):
     @override
     def summary(self) -> str:
@@ -95,15 +95,15 @@ class ANameNothingAnswersToIsRefused(
         )
 
     @override
-    def given(self) -> TestGiven[SeedingSession, ASlotTypeAndACaller]:
+    def given(self) -> Given[SeedingSession, ASlotTypeAndACaller]:
         return ASlotTypeAndSomeone()
 
     @override
-    def when(self) -> TestWhen[ASlotTypeAndACaller, ResourceSlotAdapter, ResourceSlotTypeNode]:
+    def when(self) -> When[ASlotTypeAndACaller, ResourceSlotAdapter, ResourceSlotTypeNode]:
         return ReadingByName(named=UNKNOWN)
 
     @override
-    def then(self) -> TestThen[ASlotTypeAndACaller, ResourceSlotTypeNode]:
+    def then(self) -> Then[ASlotTypeAndACaller, ResourceSlotTypeNode]:
         return TheCallIsRefused(GenericBadRequest)
 
 

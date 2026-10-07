@@ -17,12 +17,12 @@ from ai.backend.manager.errors.permission import NotEnoughPermission
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.testutils.scenario_steps import (
     Answered,
+    Given,
     Same,
-    TestGiven,
-    TestScenario,
-    TestThen,
-    TestVerdict,
-    TestWhen,
+    Scenario,
+    Then,
+    Verdict,
+    When,
 )
 from bai_scenario.components.answers import MissingResponse, TheCallIsRefused
 from bai_scenario.components.domain import DomainsOfAGroupAndACaller, DomainsOfAGroupAndSomeone
@@ -31,11 +31,11 @@ from bai_scenario.runner.planting import SeedingSession
 from bai_scenario.runner.steps import run_scenario
 
 type Searched = AdminSearchDomainsPayload
-type DomainStep = TestScenario[SeedingSession, DomainsOfAGroupAndACaller, DomainAdapter, Searched]
+type DomainStep = Scenario[SeedingSession, DomainsOfAGroupAndACaller, DomainAdapter, Searched]
 
 
 @dataclass(frozen=True)
-class SearchingInTheGroup(TestWhen[DomainsOfAGroupAndACaller, DomainAdapter, Searched]):
+class SearchingInTheGroup(When[DomainsOfAGroupAndACaller, DomainAdapter, Searched]):
     """그 리소스 그룹 범위에서 필터 없이 search 한다."""
 
     @override
@@ -57,7 +57,7 @@ class SearchingInTheGroup(TestWhen[DomainsOfAGroupAndACaller, DomainAdapter, Sea
 
 
 @dataclass(frozen=True)
-class OnlyTheLinkedDomainsAreLeft(TestThen[DomainsOfAGroupAndACaller, Searched]):
+class OnlyTheLinkedDomainsAreLeft(Then[DomainsOfAGroupAndACaller, Searched]):
     """그 그룹을 쓸 수 있는 도메인만 남는다."""
 
     @override
@@ -65,9 +65,7 @@ class OnlyTheLinkedDomainsAreLeft(TestThen[DomainsOfAGroupAndACaller, Searched])
         return "그 그룹을 쓸 수 있는 도메인만 남는다"
 
     @override
-    def look(
-        self, laid: DomainsOfAGroupAndACaller, answered: Answered[Searched]
-    ) -> list[TestVerdict]:
+    def look(self, laid: DomainsOfAGroupAndACaller, answered: Answered[Searched]) -> list[Verdict]:
         payload = answered.response
         if payload is None:
             return [MissingResponse(answered.raised)]
@@ -85,7 +83,7 @@ class OnlyTheLinkedDomainsAreLeft(TestThen[DomainsOfAGroupAndACaller, Searched])
 
 @dataclass(frozen=True)
 class TheSuperadminSearchesInAGroup(
-    TestScenario[SeedingSession, DomainsOfAGroupAndACaller, DomainAdapter, Searched]
+    Scenario[SeedingSession, DomainsOfAGroupAndACaller, DomainAdapter, Searched]
 ):
     @override
     def summary(self) -> str:
@@ -96,21 +94,21 @@ class TheSuperadminSearchesInAGroup(
         return "슈퍼관리자가 리소스 그룹 범위에서 search 하면, 그 그룹을 쓸 수 있는 도메인만 온다"
 
     @override
-    def given(self) -> TestGiven[SeedingSession, DomainsOfAGroupAndACaller]:
+    def given(self) -> Given[SeedingSession, DomainsOfAGroupAndACaller]:
         return DomainsOfAGroupAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
-    def when(self) -> TestWhen[DomainsOfAGroupAndACaller, DomainAdapter, Searched]:
+    def when(self) -> When[DomainsOfAGroupAndACaller, DomainAdapter, Searched]:
         return SearchingInTheGroup()
 
     @override
-    def then(self) -> TestThen[DomainsOfAGroupAndACaller, Searched]:
+    def then(self) -> Then[DomainsOfAGroupAndACaller, Searched]:
         return OnlyTheLinkedDomainsAreLeft()
 
 
 @dataclass(frozen=True)
 class AUserReadingInTheGroupSearches(
-    TestScenario[SeedingSession, DomainsOfAGroupAndACaller, DomainAdapter, Searched]
+    Scenario[SeedingSession, DomainsOfAGroupAndACaller, DomainAdapter, Searched]
 ):
     @override
     def summary(self) -> str:
@@ -124,21 +122,21 @@ class AUserReadingInTheGroupSearches(
         )
 
     @override
-    def given(self) -> TestGiven[SeedingSession, DomainsOfAGroupAndACaller]:
+    def given(self) -> Given[SeedingSession, DomainsOfAGroupAndACaller]:
         return DomainsOfAGroupAndSomeone(reading=True)
 
     @override
-    def when(self) -> TestWhen[DomainsOfAGroupAndACaller, DomainAdapter, Searched]:
+    def when(self) -> When[DomainsOfAGroupAndACaller, DomainAdapter, Searched]:
         return SearchingInTheGroup()
 
     @override
-    def then(self) -> TestThen[DomainsOfAGroupAndACaller, Searched]:
+    def then(self) -> Then[DomainsOfAGroupAndACaller, Searched]:
         return OnlyTheLinkedDomainsAreLeft()
 
 
 @dataclass(frozen=True)
 class AUserGrantedNothingMayNotSearchInTheGroup(
-    TestScenario[SeedingSession, DomainsOfAGroupAndACaller, DomainAdapter, Searched]
+    Scenario[SeedingSession, DomainsOfAGroupAndACaller, DomainAdapter, Searched]
 ):
     @override
     def summary(self) -> str:
@@ -151,15 +149,15 @@ class AUserGrantedNothingMayNotSearchInTheGroup(
         )
 
     @override
-    def given(self) -> TestGiven[SeedingSession, DomainsOfAGroupAndACaller]:
+    def given(self) -> Given[SeedingSession, DomainsOfAGroupAndACaller]:
         return DomainsOfAGroupAndSomeone()
 
     @override
-    def when(self) -> TestWhen[DomainsOfAGroupAndACaller, DomainAdapter, Searched]:
+    def when(self) -> When[DomainsOfAGroupAndACaller, DomainAdapter, Searched]:
         return SearchingInTheGroup()
 
     @override
-    def then(self) -> TestThen[DomainsOfAGroupAndACaller, Searched]:
+    def then(self) -> Then[DomainsOfAGroupAndACaller, Searched]:
         return TheCallIsRefused(NotEnoughPermission)
 
 

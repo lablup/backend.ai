@@ -19,13 +19,13 @@ from ai.backend.manager.errors.repository import ForeignKeyViolationError
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.testutils.scenario_steps import (
     Answered,
+    Given,
     Refused,
     Same,
-    TestGiven,
-    TestScenario,
-    TestThen,
-    TestVerdict,
-    TestWhen,
+    Scenario,
+    Then,
+    Verdict,
+    When,
 )
 from bai_scenario.components.answers import TheCallIsRefused
 from bai_scenario.components.resource_policy import (
@@ -50,13 +50,11 @@ class Purged:
     left: int
 
 
-type RetiringStep = TestScenario[
-    SeedingSession, APolicyAndACaller[Any], ResourcePolicyAdapter, Purged
-]
+type RetiringStep = Scenario[SeedingSession, APolicyAndACaller[Any], ResourcePolicyAdapter, Purged]
 
 
 @dataclass(frozen=True)
-class Purging(TestWhen[APolicyAndACaller[Any], ResourcePolicyAdapter, Purged]):
+class Purging(When[APolicyAndACaller[Any], ResourcePolicyAdapter, Purged]):
     """정책을 삭제하고 같은 이름으로 다시 검색한다. 이름을 지정하지 않으면 미리 만들어 둔 정책을 삭제한다."""
 
     family: Family[Any, Any]
@@ -80,7 +78,7 @@ class Purging(TestWhen[APolicyAndACaller[Any], ResourcePolicyAdapter, Purged]):
 
 
 @dataclass(frozen=True)
-class TheNameIsAnsweredAndGone(TestThen[APolicyAndACaller[Any], Purged]):
+class TheNameIsAnsweredAndGone(Then[APolicyAndACaller[Any], Purged]):
     """삭제한 이름이 응답에 담기고, 그 이름으로는 더 이상 검색되지 않는다."""
 
     @override
@@ -88,7 +86,7 @@ class TheNameIsAnsweredAndGone(TestThen[APolicyAndACaller[Any], Purged]):
         return "삭제한 이름이 반환되고 다시 검색하면 없다"
 
     @override
-    def look(self, laid: APolicyAndACaller[Any], answered: Answered[Purged]) -> list[TestVerdict]:
+    def look(self, laid: APolicyAndACaller[Any], answered: Answered[Purged]) -> list[Verdict]:
         purged = answered.response
         if purged is None:
             return [Refused(EntityNotFoundError, answered.raised)]
@@ -100,7 +98,7 @@ class TheNameIsAnsweredAndGone(TestThen[APolicyAndACaller[Any], Purged]):
 
 @dataclass(frozen=True)
 class TheSuperadminPurgesAnUnusedPolicy(
-    TestScenario[SeedingSession, APolicyAndACaller[Any], ResourcePolicyAdapter, Purged]
+    Scenario[SeedingSession, APolicyAndACaller[Any], ResourcePolicyAdapter, Purged]
 ):
     family: Family[Any, Any]
 
@@ -116,21 +114,21 @@ class TheSuperadminPurgesAnUnusedPolicy(
         )
 
     @override
-    def given(self) -> TestGiven[SeedingSession, APolicyAndACaller[Any]]:
+    def given(self) -> Given[SeedingSession, APolicyAndACaller[Any]]:
         return APolicyAndSomeone(self.family, role=UserRole.SUPERADMIN)
 
     @override
-    def when(self) -> TestWhen[APolicyAndACaller[Any], ResourcePolicyAdapter, Purged]:
+    def when(self) -> When[APolicyAndACaller[Any], ResourcePolicyAdapter, Purged]:
         return Purging(self.family)
 
     @override
-    def then(self) -> TestThen[APolicyAndACaller[Any], Purged]:
+    def then(self) -> Then[APolicyAndACaller[Any], Purged]:
         return TheNameIsAnsweredAndGone()
 
 
 @dataclass(frozen=True)
 class APolicyStillHeldIsRefused(
-    TestScenario[SeedingSession, APolicyAndACaller[Any], ResourcePolicyAdapter, Purged]
+    Scenario[SeedingSession, APolicyAndACaller[Any], ResourcePolicyAdapter, Purged]
 ):
     family: Family[Any, Any]
 
@@ -146,21 +144,21 @@ class APolicyStillHeldIsRefused(
         )
 
     @override
-    def given(self) -> TestGiven[SeedingSession, APolicyAndACaller[Any]]:
+    def given(self) -> Given[SeedingSession, APolicyAndACaller[Any]]:
         return AHeldPolicyAndSomeone(self.family)
 
     @override
-    def when(self) -> TestWhen[APolicyAndACaller[Any], ResourcePolicyAdapter, Purged]:
+    def when(self) -> When[APolicyAndACaller[Any], ResourcePolicyAdapter, Purged]:
         return Purging(self.family)
 
     @override
-    def then(self) -> TestThen[APolicyAndACaller[Any], Purged]:
+    def then(self) -> Then[APolicyAndACaller[Any], Purged]:
         return TheCallIsRefused(ForeignKeyViolationError)
 
 
 @dataclass(frozen=True)
 class AUserGrantedNothingMayNotPurge(
-    TestScenario[SeedingSession, APolicyAndACaller[Any], ResourcePolicyAdapter, Purged]
+    Scenario[SeedingSession, APolicyAndACaller[Any], ResourcePolicyAdapter, Purged]
 ):
     family: Family[Any, Any]
 
@@ -176,21 +174,21 @@ class AUserGrantedNothingMayNotPurge(
         )
 
     @override
-    def given(self) -> TestGiven[SeedingSession, APolicyAndACaller[Any]]:
+    def given(self) -> Given[SeedingSession, APolicyAndACaller[Any]]:
         return APolicyAndSomeone(self.family)
 
     @override
-    def when(self) -> TestWhen[APolicyAndACaller[Any], ResourcePolicyAdapter, Purged]:
+    def when(self) -> When[APolicyAndACaller[Any], ResourcePolicyAdapter, Purged]:
         return Purging(self.family)
 
     @override
-    def then(self) -> TestThen[APolicyAndACaller[Any], Purged]:
+    def then(self) -> Then[APolicyAndACaller[Any], Purged]:
         return TheCallIsRefused(GenericBadRequest)
 
 
 @dataclass(frozen=True)
 class ANameNothingAnswersToIsNotFound(
-    TestScenario[SeedingSession, APolicyAndACaller[Any], ResourcePolicyAdapter, Purged]
+    Scenario[SeedingSession, APolicyAndACaller[Any], ResourcePolicyAdapter, Purged]
 ):
     family: Family[Any, Any]
 
@@ -206,15 +204,15 @@ class ANameNothingAnswersToIsNotFound(
         )
 
     @override
-    def given(self) -> TestGiven[SeedingSession, APolicyAndACaller[Any]]:
+    def given(self) -> Given[SeedingSession, APolicyAndACaller[Any]]:
         return APolicyAndSomeone(self.family, role=UserRole.SUPERADMIN)
 
     @override
-    def when(self) -> TestWhen[APolicyAndACaller[Any], ResourcePolicyAdapter, Purged]:
+    def when(self) -> When[APolicyAndACaller[Any], ResourcePolicyAdapter, Purged]:
         return Purging(self.family, named=NOBODY)
 
     @override
-    def then(self) -> TestThen[APolicyAndACaller[Any], Purged]:
+    def then(self) -> Then[APolicyAndACaller[Any], Purged]:
         return TheCallIsRefused(EntityNotFoundError)
 
 

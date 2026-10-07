@@ -22,13 +22,7 @@ from ai.backend.manager.api.adapters.app_config_definition.adapter import (
 from ai.backend.manager.errors.auth import InsufficientPrivilege
 from ai.backend.manager.errors.repository import UniqueConstraintViolationError
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.testutils.scenario_steps import (
-    TestConfigured,
-    TestGiven,
-    TestScenario,
-    TestThen,
-    TestWhen,
-)
+from ai.backend.testutils.scenario_steps import Configured, Given, Scenario, Then, When
 from bai_scenario.components.answers import TheCallIsRefused
 from bai_scenario.components.app_config import ENFORCEMENT
 from bai_scenario.components.app_config_definition import (
@@ -40,7 +34,7 @@ from bai_scenario.runner.acting import ActingAs
 from bai_scenario.runner.planting import SeedingSession
 from bai_scenario.runner.steps import run_scenario
 
-type RegisteringStep = TestScenario[
+type RegisteringStep = Scenario[
     SeedingSession, ADefinitionAndACaller, AppConfigDefinitionAdapter, AppConfigDefinitionNode
 ]
 
@@ -48,9 +42,7 @@ FRESH = "fresh-config"
 
 
 @dataclass(frozen=True)
-class Registering(
-    TestWhen[ADefinitionAndACaller, AppConfigDefinitionAdapter, AppConfigDefinitionNode]
-):
+class Registering(When[ADefinitionAndACaller, AppConfigDefinitionAdapter, AppConfigDefinitionNode]):
     """설정 이름을 등록한다. 이름을 지정하지 않으면 미리 만들어 둔 정의의 이름을 그대로 쓴다."""
 
     named: str | None = None
@@ -77,7 +69,7 @@ class Registering(
 
 @dataclass(frozen=True)
 class TheSuperadminRegistersAName(
-    TestScenario[
+    Scenario[
         SeedingSession, ADefinitionAndACaller, AppConfigDefinitionAdapter, AppConfigDefinitionNode
     ]
 ):
@@ -95,23 +87,23 @@ class TheSuperadminRegistersAName(
         )
 
     @override
-    def given(self) -> TestGiven[SeedingSession, ADefinitionAndACaller]:
+    def given(self) -> Given[SeedingSession, ADefinitionAndACaller]:
         return ADefinitionAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
     def when(
         self,
-    ) -> TestWhen[ADefinitionAndACaller, AppConfigDefinitionAdapter, AppConfigDefinitionNode]:
+    ) -> When[ADefinitionAndACaller, AppConfigDefinitionAdapter, AppConfigDefinitionNode]:
         return Registering(named=FRESH)
 
     @override
-    def then(self) -> TestThen[ADefinitionAndACaller, AppConfigDefinitionNode]:
+    def then(self) -> Then[ADefinitionAndACaller, AppConfigDefinitionNode]:
         return TheNewDefinitionNode(started=self.started, named=FRESH)
 
 
 @dataclass(frozen=True)
 class ANameAlreadyRegisteredIsRefused(
-    TestScenario[
+    Scenario[
         SeedingSession, ADefinitionAndACaller, AppConfigDefinitionAdapter, AppConfigDefinitionNode
     ]
 ):
@@ -127,23 +119,23 @@ class ANameAlreadyRegisteredIsRefused(
         )
 
     @override
-    def given(self) -> TestGiven[SeedingSession, ADefinitionAndACaller]:
+    def given(self) -> Given[SeedingSession, ADefinitionAndACaller]:
         return ADefinitionAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
     def when(
         self,
-    ) -> TestWhen[ADefinitionAndACaller, AppConfigDefinitionAdapter, AppConfigDefinitionNode]:
+    ) -> When[ADefinitionAndACaller, AppConfigDefinitionAdapter, AppConfigDefinitionNode]:
         return Registering()
 
     @override
-    def then(self) -> TestThen[ADefinitionAndACaller, AppConfigDefinitionNode]:
+    def then(self) -> Then[ADefinitionAndACaller, AppConfigDefinitionNode]:
         return TheCallIsRefused(UniqueConstraintViolationError)
 
 
 @dataclass(frozen=True)
 class APlainUserMayNotRegister(
-    TestScenario[
+    Scenario[
         SeedingSession, ADefinitionAndACaller, AppConfigDefinitionAdapter, AppConfigDefinitionNode
     ]
 ):
@@ -156,26 +148,26 @@ class APlainUserMayNotRegister(
         return "일반 사용자가 설정 정의를 등록하려 하면, 슈퍼관리자 권한이 없어 거부된다"
 
     @override
-    def given(self) -> TestGiven[SeedingSession, ADefinitionAndACaller]:
+    def given(self) -> Given[SeedingSession, ADefinitionAndACaller]:
         return ADefinitionAndSomeone()
 
     @override
     def when(
         self,
-    ) -> TestWhen[ADefinitionAndACaller, AppConfigDefinitionAdapter, AppConfigDefinitionNode]:
+    ) -> When[ADefinitionAndACaller, AppConfigDefinitionAdapter, AppConfigDefinitionNode]:
         return Registering(named=FRESH)
 
     @override
-    def then(self) -> TestThen[ADefinitionAndACaller, AppConfigDefinitionNode]:
+    def then(self) -> Then[ADefinitionAndACaller, AppConfigDefinitionNode]:
         return TheCallIsRefused(InsufficientPrivilege)
 
 
 @dataclass(frozen=True)
 class EnforcementOffChangesNothing(
-    TestScenario[
+    Scenario[
         SeedingSession, ADefinitionAndACaller, AppConfigDefinitionAdapter, AppConfigDefinitionNode
     ],
-    TestConfigured,
+    Configured,
 ):
     @override
     def summary(self) -> str:
@@ -190,17 +182,17 @@ class EnforcementOffChangesNothing(
         return {ENFORCEMENT: False}
 
     @override
-    def given(self) -> TestGiven[SeedingSession, ADefinitionAndACaller]:
+    def given(self) -> Given[SeedingSession, ADefinitionAndACaller]:
         return ADefinitionAndSomeone()
 
     @override
     def when(
         self,
-    ) -> TestWhen[ADefinitionAndACaller, AppConfigDefinitionAdapter, AppConfigDefinitionNode]:
+    ) -> When[ADefinitionAndACaller, AppConfigDefinitionAdapter, AppConfigDefinitionNode]:
         return Registering(named=FRESH)
 
     @override
-    def then(self) -> TestThen[ADefinitionAndACaller, AppConfigDefinitionNode]:
+    def then(self) -> Then[ADefinitionAndACaller, AppConfigDefinitionNode]:
         return TheCallIsRefused(InsufficientPrivilege)
 
 

@@ -24,14 +24,14 @@ from ai.backend.manager.data.user.types import UserData
 from ai.backend.manager.errors.auth import InsufficientPrivilege
 from ai.backend.testutils.scenario_steps import (
     Answered,
+    Given,
     Held,
     Refused,
     Same,
     SameAs,
     Skipped,
-    TestGiven,
-    TestThen,
-    TestVerdict,
+    Then,
+    Verdict,
 )
 from bai_scenario.components.domain import WrittenByThisRun
 from bai_scenario.components.system import lay_a_caller, role_named
@@ -72,7 +72,7 @@ class ManyServicesAndACaller:
 
 
 @dataclass(frozen=True)
-class ManyServicesAndSomeone(TestGiven[Any, ManyServicesAndACaller]):
+class ManyServicesAndSomeone(Given[Any, ManyServicesAndACaller]):
     """같은 그룹의 서비스 여럿과 사용자 한 명. 첫 서비스만 엔드포인트 하나를 갖는다."""
 
     role: UserRole = UserRole.USER
@@ -106,7 +106,7 @@ class ManyServicesAndSomeone(TestGiven[Any, ManyServicesAndACaller]):
 
 
 @dataclass(frozen=True)
-class ServicesOfTwoGroupsAndSomeone(TestGiven[Any, ManyServicesAndACaller]):
+class ServicesOfTwoGroupsAndSomeone(Given[Any, ManyServicesAndACaller]):
     """그룹이 다른 서비스 둘과 사용자 한 명. ``named``는 첫 그룹의 것이다."""
 
     role: UserRole = UserRole.USER
@@ -132,7 +132,7 @@ class ServicesOfTwoGroupsAndSomeone(TestGiven[Any, ManyServicesAndACaller]):
 
 
 @dataclass(frozen=True)
-class ServicesOfEveryStatusAndSomeone(TestGiven[Any, ManyServicesAndACaller]):
+class ServicesOfEveryStatusAndSomeone(Given[Any, ManyServicesAndACaller]):
     """상태마다 서비스 하나씩과 사용자 한 명. ``named``는 정상 상태의 것이다."""
 
     role: UserRole = UserRole.USER
@@ -167,9 +167,9 @@ class ServicesOfEveryStatusAndSomeone(TestGiven[Any, ManyServicesAndACaller]):
 
 def service_verdicts(
     at: str, node: ServiceCatalogNode, *, laid: ALaidService, written: WrittenByThisRun
-) -> list[TestVerdict]:
+) -> list[Verdict]:
     """Every place of one service node, prefixed for a node inside a list."""
-    seen: list[TestVerdict] = [
+    seen: list[Verdict] = [
         Held[UUID](f"{at}id", node.id, SameAs[UUID](laid.id, "심은 서비스")),
         Same(f"{at}service_group", node.service_group, laid.service_group),
         Same(f"{at}instance_id", node.instance_id, laid.instance_id),
@@ -197,9 +197,7 @@ def service_verdicts(
 
 
 @dataclass(frozen=True)
-class EveryLaidServiceComesWhole(
-    TestThen[ManyServicesAndACaller, AdminSearchServiceCatalogsPayload]
-):
+class EveryLaidServiceComesWhole(Then[ManyServicesAndACaller, AdminSearchServiceCatalogsPayload]):
     """심은 서비스가 모두 집계되고, 각각이 엔드포인트까지 통째로 온다. 인스턴스 id 순으로 본다."""
 
     started: datetime
@@ -211,14 +209,14 @@ class EveryLaidServiceComesWhole(
     @override
     def look(
         self, laid: ManyServicesAndACaller, answered: Answered[AdminSearchServiceCatalogsPayload]
-    ) -> list[TestVerdict]:
+    ) -> list[Verdict]:
         payload = answered.response
         if payload is None:
             return [Refused(InsufficientPrivilege, answered.raised)]
         written = WrittenByThisRun(self.started)
         got = sorted(payload.items, key=lambda one: one.instance_id)
         expected = sorted(laid.laid, key=lambda one: one.instance_id)
-        seen: list[TestVerdict] = [
+        seen: list[Verdict] = [
             Same(
                 "items.instance_id",
                 [one.instance_id for one in got],
@@ -234,9 +232,7 @@ class EveryLaidServiceComesWhole(
 
 
 @dataclass(frozen=True)
-class OnlyTheServicesOfStatuses(
-    TestThen[ManyServicesAndACaller, AdminSearchServiceCatalogsPayload]
-):
+class OnlyTheServicesOfStatuses(Then[ManyServicesAndACaller, AdminSearchServiceCatalogsPayload]):
     """심은 서비스 중 이 상태들의 것만, 그리고 그것들 모두가 반환된다."""
 
     statuses: tuple[ServiceCatalogStatus, ...]
@@ -249,7 +245,7 @@ class OnlyTheServicesOfStatuses(
     @override
     def look(
         self, laid: ManyServicesAndACaller, answered: Answered[AdminSearchServiceCatalogsPayload]
-    ) -> list[TestVerdict]:
+    ) -> list[Verdict]:
         payload = answered.response
         if payload is None:
             return [Refused(InsufficientPrivilege, answered.raised)]
@@ -277,7 +273,7 @@ class OnlyTheServicesOfStatuses(
 
 
 @dataclass(frozen=True)
-class OnlyTheNamedGroupIsLeft(TestThen[ManyServicesAndACaller, AdminSearchServiceCatalogsPayload]):
+class OnlyTheNamedGroupIsLeft(Then[ManyServicesAndACaller, AdminSearchServiceCatalogsPayload]):
     """골라낸 그룹의 서비스만 남는다."""
 
     @override
@@ -287,7 +283,7 @@ class OnlyTheNamedGroupIsLeft(TestThen[ManyServicesAndACaller, AdminSearchServic
     @override
     def look(
         self, laid: ManyServicesAndACaller, answered: Answered[AdminSearchServiceCatalogsPayload]
-    ) -> list[TestVerdict]:
+    ) -> list[Verdict]:
         payload = answered.response
         if payload is None:
             return [Refused(InsufficientPrivilege, answered.raised)]
@@ -309,7 +305,7 @@ class OnlyTheNamedGroupIsLeft(TestThen[ManyServicesAndACaller, AdminSearchServic
 
 
 @dataclass(frozen=True)
-class TheFirstPageOfServices(TestThen[ManyServicesAndACaller, AdminSearchServiceCatalogsPayload]):
+class TheFirstPageOfServices(Then[ManyServicesAndACaller, AdminSearchServiceCatalogsPayload]):
     """크기를 지정하지 않은 첫 페이지. 기본 크기만큼 반환되고 다음 페이지가 있다고 응답한다."""
 
     size: int
@@ -321,7 +317,7 @@ class TheFirstPageOfServices(TestThen[ManyServicesAndACaller, AdminSearchService
     @override
     def look(
         self, laid: ManyServicesAndACaller, answered: Answered[AdminSearchServiceCatalogsPayload]
-    ) -> list[TestVerdict]:
+    ) -> list[Verdict]:
         payload = answered.response
         if payload is None:
             return [Refused(InsufficientPrivilege, answered.raised)]

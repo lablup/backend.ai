@@ -20,13 +20,7 @@ from ai.backend.manager.errors.base.entity import EntityNotFoundError
 from ai.backend.manager.errors.permission import NotEnoughPermission
 from ai.backend.manager.errors.resource_slot import ResourceSlotTypeInUse
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.testutils.scenario_steps import (
-    TestConfigured,
-    TestGiven,
-    TestScenario,
-    TestThen,
-    TestWhen,
-)
+from ai.backend.testutils.scenario_steps import Configured, Given, Scenario, Then, When
 from bai_scenario.components.answers import TheCallIsRefused
 from bai_scenario.components.resource_allocation import (
     ASlotTypeAKernelAsksForAndSomeone,
@@ -45,11 +39,11 @@ from bai_scenario.runner.steps import run_scenario
 UNKNOWN = "no-such-slot"
 
 type Purged = PurgeResourceSlotTypePayload
-type RetiringStep = TestScenario[SeedingSession, ASlotTypeAndACaller, ResourceSlotAdapter, Purged]
+type RetiringStep = Scenario[SeedingSession, ASlotTypeAndACaller, ResourceSlotAdapter, Purged]
 
 
 @dataclass(frozen=True)
-class Purging(TestWhen[ASlotTypeAndACaller, ResourceSlotAdapter, Purged]):
+class Purging(When[ASlotTypeAndACaller, ResourceSlotAdapter, Purged]):
     """미리 만들어 둔 슬롯 종류를 이름으로 지정해 삭제한다."""
 
     unknown: bool = False
@@ -75,7 +69,7 @@ class Purging(TestWhen[ASlotTypeAndACaller, ResourceSlotAdapter, Purged]):
 
 @dataclass(frozen=True)
 class TheSuperadminPurgesASlotType(
-    TestScenario[SeedingSession, ASlotTypeAndACaller, ResourceSlotAdapter, Purged]
+    Scenario[SeedingSession, ASlotTypeAndACaller, ResourceSlotAdapter, Purged]
 ):
     @override
     def summary(self) -> str:
@@ -86,21 +80,21 @@ class TheSuperadminPurgesASlotType(
         return "아무것도 참조하지 않는 슬롯 종류를 슈퍼관리자가 이름으로 삭제하면 삭제한 이름을 담은 응답이 반환된다"
 
     @override
-    def given(self) -> TestGiven[SeedingSession, ASlotTypeAndACaller]:
+    def given(self) -> Given[SeedingSession, ASlotTypeAndACaller]:
         return ASlotTypeAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
-    def when(self) -> TestWhen[ASlotTypeAndACaller, ResourceSlotAdapter, Purged]:
+    def when(self) -> When[ASlotTypeAndACaller, ResourceSlotAdapter, Purged]:
         return Purging()
 
     @override
-    def then(self) -> TestThen[ASlotTypeAndACaller, Purged]:
+    def then(self) -> Then[ASlotTypeAndACaller, Purged]:
         return TheDeletedSlotName()
 
 
 @dataclass(frozen=True)
 class ASlotAKernelStillAsksForMayNotBePurged(
-    TestScenario[SeedingSession, ASlotTypeAndACaller, ResourceSlotAdapter, Purged]
+    Scenario[SeedingSession, ASlotTypeAndACaller, ResourceSlotAdapter, Purged]
 ):
     @override
     def summary(self) -> str:
@@ -111,21 +105,21 @@ class ASlotAKernelStillAsksForMayNotBePurged(
         return "커널이 아직 할당받은 슬롯 종류를 슈퍼관리자가 삭제하면 아직 사용 중이라는 이유로 거부된다"
 
     @override
-    def given(self) -> TestGiven[SeedingSession, ASlotTypeAndACaller]:
+    def given(self) -> Given[SeedingSession, ASlotTypeAndACaller]:
         return ASlotTypeAKernelAsksForAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
-    def when(self) -> TestWhen[ASlotTypeAndACaller, ResourceSlotAdapter, Purged]:
+    def when(self) -> When[ASlotTypeAndACaller, ResourceSlotAdapter, Purged]:
         return Purging()
 
     @override
-    def then(self) -> TestThen[ASlotTypeAndACaller, Purged]:
+    def then(self) -> Then[ASlotTypeAndACaller, Purged]:
         return TheCallIsRefused(ResourceSlotTypeInUse)
 
 
 @dataclass(frozen=True)
 class ASlotARevisionStillUsesMayNotBePurged(
-    TestScenario[SeedingSession, ASlotTypeAndACaller, ResourceSlotAdapter, Purged]
+    Scenario[SeedingSession, ASlotTypeAndACaller, ResourceSlotAdapter, Purged]
 ):
     @override
     def summary(self) -> str:
@@ -136,21 +130,21 @@ class ASlotARevisionStillUsesMayNotBePurged(
         return "배포 리비전이 아직 사용하는 슬롯 종류를 슈퍼관리자가 삭제하면 아직 사용 중이라는 이유로 거부된다"
 
     @override
-    def given(self) -> TestGiven[SeedingSession, ASlotTypeAndACaller]:
+    def given(self) -> Given[SeedingSession, ASlotTypeAndACaller]:
         return ASlotTypeARevisionUsesAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
-    def when(self) -> TestWhen[ASlotTypeAndACaller, ResourceSlotAdapter, Purged]:
+    def when(self) -> When[ASlotTypeAndACaller, ResourceSlotAdapter, Purged]:
         return Purging()
 
     @override
-    def then(self) -> TestThen[ASlotTypeAndACaller, Purged]:
+    def then(self) -> Then[ASlotTypeAndACaller, Purged]:
         return TheCallIsRefused(ResourceSlotTypeInUse)
 
 
 @dataclass(frozen=True)
 class ANameNothingAnswersToIsNotFound(
-    TestScenario[SeedingSession, ASlotTypeAndACaller, ResourceSlotAdapter, Purged]
+    Scenario[SeedingSession, ASlotTypeAndACaller, ResourceSlotAdapter, Purged]
 ):
     @override
     def summary(self) -> str:
@@ -161,21 +155,21 @@ class ANameNothingAnswersToIsNotFound(
         return "슈퍼관리자가 존재하지 않는 이름을 삭제하면 대상을 찾을 수 없다는 이유로 거부된다"
 
     @override
-    def given(self) -> TestGiven[SeedingSession, ASlotTypeAndACaller]:
+    def given(self) -> Given[SeedingSession, ASlotTypeAndACaller]:
         return ASlotTypeAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
-    def when(self) -> TestWhen[ASlotTypeAndACaller, ResourceSlotAdapter, Purged]:
+    def when(self) -> When[ASlotTypeAndACaller, ResourceSlotAdapter, Purged]:
         return Purging(unknown=True)
 
     @override
-    def then(self) -> TestThen[ASlotTypeAndACaller, Purged]:
+    def then(self) -> Then[ASlotTypeAndACaller, Purged]:
         return TheCallIsRefused(EntityNotFoundError)
 
 
 @dataclass(frozen=True)
 class AUserGrantedNothingMayNotPurge(
-    TestScenario[SeedingSession, ASlotTypeAndACaller, ResourceSlotAdapter, Purged]
+    Scenario[SeedingSession, ASlotTypeAndACaller, ResourceSlotAdapter, Purged]
 ):
     @override
     def summary(self) -> str:
@@ -189,21 +183,21 @@ class AUserGrantedNothingMayNotPurge(
         )
 
     @override
-    def given(self) -> TestGiven[SeedingSession, ASlotTypeAndACaller]:
+    def given(self) -> Given[SeedingSession, ASlotTypeAndACaller]:
         return ASlotTypeAndSomeone()
 
     @override
-    def when(self) -> TestWhen[ASlotTypeAndACaller, ResourceSlotAdapter, Purged]:
+    def when(self) -> When[ASlotTypeAndACaller, ResourceSlotAdapter, Purged]:
         return Purging()
 
     @override
-    def then(self) -> TestThen[ASlotTypeAndACaller, Purged]:
+    def then(self) -> Then[ASlotTypeAndACaller, Purged]:
         return TheCallIsRefused(NotEnoughPermission)
 
 
 @dataclass(frozen=True)
 class AUserGrantedNothingPurgingAnUnknownNameIsRefusedByPermission(
-    TestScenario[SeedingSession, ASlotTypeAndACaller, ResourceSlotAdapter, Purged]
+    Scenario[SeedingSession, ASlotTypeAndACaller, ResourceSlotAdapter, Purged]
 ):
     @override
     def summary(self) -> str:
@@ -217,21 +211,21 @@ class AUserGrantedNothingPurgingAnUnknownNameIsRefusedByPermission(
         )
 
     @override
-    def given(self) -> TestGiven[SeedingSession, ASlotTypeAndACaller]:
+    def given(self) -> Given[SeedingSession, ASlotTypeAndACaller]:
         return ASlotTypeAndSomeone()
 
     @override
-    def when(self) -> TestWhen[ASlotTypeAndACaller, ResourceSlotAdapter, Purged]:
+    def when(self) -> When[ASlotTypeAndACaller, ResourceSlotAdapter, Purged]:
         return Purging(unknown=True)
 
     @override
-    def then(self) -> TestThen[ASlotTypeAndACaller, Purged]:
+    def then(self) -> Then[ASlotTypeAndACaller, Purged]:
         return TheCallIsRefused(NotEnoughPermission)
 
 
 @dataclass(frozen=True)
 class EnforcementOffLetsAnyonePurge(
-    TestScenario[SeedingSession, ASlotTypeAndACaller, ResourceSlotAdapter, Purged], TestConfigured
+    Scenario[SeedingSession, ASlotTypeAndACaller, ResourceSlotAdapter, Purged], Configured
 ):
     @override
     def summary(self) -> str:
@@ -246,15 +240,15 @@ class EnforcementOffLetsAnyonePurge(
         return {ENFORCEMENT: False}
 
     @override
-    def given(self) -> TestGiven[SeedingSession, ASlotTypeAndACaller]:
+    def given(self) -> Given[SeedingSession, ASlotTypeAndACaller]:
         return ASlotTypeAndSomeone()
 
     @override
-    def when(self) -> TestWhen[ASlotTypeAndACaller, ResourceSlotAdapter, Purged]:
+    def when(self) -> When[ASlotTypeAndACaller, ResourceSlotAdapter, Purged]:
         return Purging()
 
     @override
-    def then(self) -> TestThen[ASlotTypeAndACaller, Purged]:
+    def then(self) -> Then[ASlotTypeAndACaller, Purged]:
         return TheDeletedSlotName()
 
 

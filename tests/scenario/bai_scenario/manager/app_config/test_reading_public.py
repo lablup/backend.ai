@@ -16,7 +16,7 @@ from ai.backend.common.dto.manager.v2.app_config.request import PublicGetAppConf
 from ai.backend.common.dto.manager.v2.app_config.response import GetAppConfigsPayload
 from ai.backend.manager.api.adapters.app_config.adapter import AppConfigAdapter
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.testutils.scenario_steps import TestGiven, TestScenario, TestThen, TestWhen
+from ai.backend.testutils.scenario_steps import Given, Scenario, Then, When
 from bai_scenario.components.app_config import (
     AConfigLaidAcross,
     AMergeAndACaller,
@@ -27,7 +27,7 @@ from bai_scenario.runner.acting import ActingAs
 from bai_scenario.runner.planting import SeedingSession
 from bai_scenario.runner.steps import run_scenario
 
-type ReadingStep = TestScenario[
+type ReadingStep = Scenario[
     SeedingSession, AMergeAndACaller, AppConfigAdapter, GetAppConfigsPayload
 ]
 
@@ -37,7 +37,7 @@ MINE = {"theme": "solar"}
 
 
 @dataclass(frozen=True)
-class ReadingPublic(TestWhen[AMergeAndACaller, AppConfigAdapter, GetAppConfigsPayload]):
+class ReadingPublic(When[AMergeAndACaller, AppConfigAdapter, GetAppConfigsPayload]):
     """아무 스코프도 지정하지 않고 조회한다. 로그인한 채 호출할 수도 있지만 그 사실은 쓰이지 않는다."""
 
     signed_in: bool = False
@@ -62,7 +62,7 @@ class ReadingPublic(TestWhen[AMergeAndACaller, AppConfigAdapter, GetAppConfigsPa
 
 @dataclass(frozen=True)
 class AnonymousReadsThePublicValueOnly(
-    TestScenario[SeedingSession, AMergeAndACaller, AppConfigAdapter, GetAppConfigsPayload]
+    Scenario[SeedingSession, AMergeAndACaller, AppConfigAdapter, GetAppConfigsPayload]
 ):
     @override
     def summary(self) -> str:
@@ -76,21 +76,21 @@ class AnonymousReadsThePublicValueOnly(
         )
 
     @override
-    def given(self) -> TestGiven[SeedingSession, AMergeAndACaller]:
+    def given(self) -> Given[SeedingSession, AMergeAndACaller]:
         return AConfigLaidAcross(public=PUBLIC, domain=DOMAIN, user=MINE, granted=False)
 
     @override
-    def when(self) -> TestWhen[AMergeAndACaller, AppConfigAdapter, GetAppConfigsPayload]:
+    def when(self) -> When[AMergeAndACaller, AppConfigAdapter, GetAppConfigsPayload]:
         return ReadingPublic()
 
     @override
-    def then(self) -> TestThen[AMergeAndACaller, GetAppConfigsPayload]:
+    def then(self) -> Then[AMergeAndACaller, GetAppConfigsPayload]:
         return TheMergedConfigs(wanted=(PUBLIC,))
 
 
 @dataclass(frozen=True)
 class ANameWithNoPublicFragmentAnswersEmpty(
-    TestScenario[SeedingSession, AMergeAndACaller, AppConfigAdapter, GetAppConfigsPayload]
+    Scenario[SeedingSession, AMergeAndACaller, AppConfigAdapter, GetAppConfigsPayload]
 ):
     @override
     def summary(self) -> str:
@@ -101,21 +101,21 @@ class ANameWithNoPublicFragmentAnswersEmpty(
         return "사용자 조각만 있는 이름을 로그인 없이 조회하면, 빈 설정이 반환된다"
 
     @override
-    def given(self) -> TestGiven[SeedingSession, AMergeAndACaller]:
+    def given(self) -> Given[SeedingSession, AMergeAndACaller]:
         return AConfigLaidAcross(user=MINE, granted=False)
 
     @override
-    def when(self) -> TestWhen[AMergeAndACaller, AppConfigAdapter, GetAppConfigsPayload]:
+    def when(self) -> When[AMergeAndACaller, AppConfigAdapter, GetAppConfigsPayload]:
         return ReadingPublic()
 
     @override
-    def then(self) -> TestThen[AMergeAndACaller, GetAppConfigsPayload]:
+    def then(self) -> Then[AMergeAndACaller, GetAppConfigsPayload]:
         return TheMergedConfigs(wanted=({},))
 
 
 @dataclass(frozen=True)
 class AnUnregisteredNameAnswersEmptyToo(
-    TestScenario[SeedingSession, AMergeAndACaller, AppConfigAdapter, GetAppConfigsPayload]
+    Scenario[SeedingSession, AMergeAndACaller, AppConfigAdapter, GetAppConfigsPayload]
 ):
     @override
     def summary(self) -> str:
@@ -129,21 +129,21 @@ class AnUnregisteredNameAnswersEmptyToo(
         )
 
     @override
-    def given(self) -> TestGiven[SeedingSession, AMergeAndACaller]:
+    def given(self) -> Given[SeedingSession, AMergeAndACaller]:
         return AConfigLaidAcross(defined=False, granted=False)
 
     @override
-    def when(self) -> TestWhen[AMergeAndACaller, AppConfigAdapter, GetAppConfigsPayload]:
+    def when(self) -> When[AMergeAndACaller, AppConfigAdapter, GetAppConfigsPayload]:
         return ReadingPublic()
 
     @override
-    def then(self) -> TestThen[AMergeAndACaller, GetAppConfigsPayload]:
+    def then(self) -> Then[AMergeAndACaller, GetAppConfigsPayload]:
         return TheMergedConfigs(wanted=({},))
 
 
 @dataclass(frozen=True)
 class ASignedInUserGetsTheSameAnswer(
-    TestScenario[SeedingSession, AMergeAndACaller, AppConfigAdapter, GetAppConfigsPayload]
+    Scenario[SeedingSession, AMergeAndACaller, AppConfigAdapter, GetAppConfigsPayload]
 ):
     @override
     def summary(self) -> str:
@@ -157,21 +157,21 @@ class ASignedInUserGetsTheSameAnswer(
         )
 
     @override
-    def given(self) -> TestGiven[SeedingSession, AMergeAndACaller]:
+    def given(self) -> Given[SeedingSession, AMergeAndACaller]:
         return AConfigLaidAcross(public=PUBLIC, domain=DOMAIN, user=MINE, granted=False)
 
     @override
-    def when(self) -> TestWhen[AMergeAndACaller, AppConfigAdapter, GetAppConfigsPayload]:
+    def when(self) -> When[AMergeAndACaller, AppConfigAdapter, GetAppConfigsPayload]:
         return ReadingPublic(signed_in=True)
 
     @override
-    def then(self) -> TestThen[AMergeAndACaller, GetAppConfigsPayload]:
+    def then(self) -> Then[AMergeAndACaller, GetAppConfigsPayload]:
         return TheMergedConfigs(wanted=(PUBLIC,))
 
 
 @dataclass(frozen=True)
 class SeveralNamesAnswerInRequestOrder(
-    TestScenario[SeedingSession, AMergeAndACaller, AppConfigAdapter, GetAppConfigsPayload]
+    Scenario[SeedingSession, AMergeAndACaller, AppConfigAdapter, GetAppConfigsPayload]
 ):
     publics: tuple[Mapping[str, Any], ...] = ({"n": 1}, {"n": 2}, {"n": 3})
 
@@ -184,15 +184,15 @@ class SeveralNamesAnswerInRequestOrder(
         return "이름 셋을 한 번에 로그인 없이 조회하면, 각각의 공개 값이 요청한 순서대로 반환된다"
 
     @override
-    def given(self) -> TestGiven[SeedingSession, AMergeAndACaller]:
+    def given(self) -> Given[SeedingSession, AMergeAndACaller]:
         return SeveralConfigsLaid(publics=self.publics, granted=False)
 
     @override
-    def when(self) -> TestWhen[AMergeAndACaller, AppConfigAdapter, GetAppConfigsPayload]:
+    def when(self) -> When[AMergeAndACaller, AppConfigAdapter, GetAppConfigsPayload]:
         return ReadingPublic()
 
     @override
-    def then(self) -> TestThen[AMergeAndACaller, GetAppConfigsPayload]:
+    def then(self) -> Then[AMergeAndACaller, GetAppConfigsPayload]:
         return TheMergedConfigs(wanted=self.publics)
 
 

@@ -24,11 +24,11 @@ from ai.backend.manager.errors.auth import InsufficientPrivilege
 from ai.backend.manager.errors.repository import UniqueConstraintViolationError
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.testutils.scenario_steps import (
-    TestConfigured,
-    TestGiven,
-    TestScenario,
-    TestThen,
-    TestWhen,
+    Configured,
+    Given,
+    Scenario,
+    Then,
+    When,
 )
 from bai_scenario.components.answers import TheCallIsRefused
 from bai_scenario.components.prometheus_query_preset_category import (
@@ -48,12 +48,12 @@ FRESH = "새로 만든 카테고리"
 ENFORCEMENT = "manager.rbac.enforcement_enabled"
 
 type Adapter = PrometheusQueryPresetCategoryAdapter
-type CreatingStep = TestScenario[SeedingSession, ACallerAlone, Adapter, CategoryNodeAnswer]
-type RepeatingStep = TestScenario[SeedingSession, ACategoryAndACaller, Adapter, CategoryNodeAnswer]
+type CreatingStep = Scenario[SeedingSession, ACallerAlone, Adapter, CategoryNodeAnswer]
+type RepeatingStep = Scenario[SeedingSession, ACategoryAndACaller, Adapter, CategoryNodeAnswer]
 
 
 @dataclass(frozen=True)
-class Creating(TestWhen[ACallerAlone, Adapter, CategoryNodeAnswer]):
+class Creating(When[ACallerAlone, Adapter, CategoryNodeAnswer]):
     """카테고리 하나를 생성한다."""
 
     named: str = MADE
@@ -77,7 +77,7 @@ class Creating(TestWhen[ACallerAlone, Adapter, CategoryNodeAnswer]):
 
 
 @dataclass(frozen=True)
-class CreatingUnderTheSameName(TestWhen[ACategoryAndACaller, Adapter, CategoryNodeAnswer]):
+class CreatingUnderTheSameName(When[ACategoryAndACaller, Adapter, CategoryNodeAnswer]):
     """미리 만들어 둔 카테고리와 같은 이름으로 하나 더 생성한다."""
 
     @override
@@ -97,7 +97,7 @@ class CreatingUnderTheSameName(TestWhen[ACategoryAndACaller, Adapter, CategoryNo
 
 @dataclass(frozen=True)
 class TheNameAloneMakesAWholeNode(
-    TestScenario[SeedingSession, ACallerAlone, Adapter, CategoryNodeAnswer]
+    Scenario[SeedingSession, ACallerAlone, Adapter, CategoryNodeAnswer]
 ):
     started: datetime
 
@@ -112,21 +112,21 @@ class TheNameAloneMakesAWholeNode(
         )
 
     @override
-    def given(self) -> TestGiven[SeedingSession, ACallerAlone]:
+    def given(self) -> Given[SeedingSession, ACallerAlone]:
         return JustSomeone(role=UserRole.SUPERADMIN)
 
     @override
-    def when(self) -> TestWhen[ACallerAlone, Adapter, CategoryNodeAnswer]:
+    def when(self) -> When[ACallerAlone, Adapter, CategoryNodeAnswer]:
         return Creating()
 
     @override
-    def then(self) -> TestThen[ACallerAlone, CategoryNodeAnswer]:
+    def then(self) -> Then[ACallerAlone, CategoryNodeAnswer]:
         return TheNewCategoryNode(started=self.started, named=MADE, described=None)
 
 
 @dataclass(frozen=True)
 class TheDescriptionComesBackAsGiven(
-    TestScenario[SeedingSession, ACallerAlone, Adapter, CategoryNodeAnswer]
+    Scenario[SeedingSession, ACallerAlone, Adapter, CategoryNodeAnswer]
 ):
     started: datetime
 
@@ -139,21 +139,21 @@ class TheDescriptionComesBackAsGiven(
         return "슈퍼관리자가 이름과 설명을 함께 지정해 생성하면, 지정한 값이 그대로 담긴 노드가 반환된다"
 
     @override
-    def given(self) -> TestGiven[SeedingSession, ACallerAlone]:
+    def given(self) -> Given[SeedingSession, ACallerAlone]:
         return JustSomeone(role=UserRole.SUPERADMIN)
 
     @override
-    def when(self) -> TestWhen[ACallerAlone, Adapter, CategoryNodeAnswer]:
+    def when(self) -> When[ACallerAlone, Adapter, CategoryNodeAnswer]:
         return Creating(described=FRESH)
 
     @override
-    def then(self) -> TestThen[ACallerAlone, CategoryNodeAnswer]:
+    def then(self) -> Then[ACallerAlone, CategoryNodeAnswer]:
         return TheNewCategoryNode(started=self.started, named=MADE, described=FRESH)
 
 
 @dataclass(frozen=True)
 class ANameAnotherCategoryHoldsIsRefused(
-    TestScenario[SeedingSession, ACategoryAndACaller, Adapter, CategoryNodeAnswer]
+    Scenario[SeedingSession, ACategoryAndACaller, Adapter, CategoryNodeAnswer]
 ):
     @override
     def summary(self) -> str:
@@ -167,22 +167,20 @@ class ANameAnotherCategoryHoldsIsRefused(
         )
 
     @override
-    def given(self) -> TestGiven[SeedingSession, ACategoryAndACaller]:
+    def given(self) -> Given[SeedingSession, ACategoryAndACaller]:
         return ACategoryAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
-    def when(self) -> TestWhen[ACategoryAndACaller, Adapter, CategoryNodeAnswer]:
+    def when(self) -> When[ACategoryAndACaller, Adapter, CategoryNodeAnswer]:
         return CreatingUnderTheSameName()
 
     @override
-    def then(self) -> TestThen[ACategoryAndACaller, CategoryNodeAnswer]:
+    def then(self) -> Then[ACategoryAndACaller, CategoryNodeAnswer]:
         return TheCallIsRefused(UniqueConstraintViolationError)
 
 
 @dataclass(frozen=True)
-class APlainUserMayNotCreate(
-    TestScenario[SeedingSession, ACallerAlone, Adapter, CategoryNodeAnswer]
-):
+class APlainUserMayNotCreate(Scenario[SeedingSession, ACallerAlone, Adapter, CategoryNodeAnswer]):
     @override
     def summary(self) -> str:
         return "a-user-who-is-not-the-superadmin-may-not-create-a-category"
@@ -192,21 +190,21 @@ class APlainUserMayNotCreate(
         return "슈퍼관리자가 아닌 사용자가 카테고리를 생성하려 하면, 역할 부족으로 거부된다"
 
     @override
-    def given(self) -> TestGiven[SeedingSession, ACallerAlone]:
+    def given(self) -> Given[SeedingSession, ACallerAlone]:
         return JustSomeone()
 
     @override
-    def when(self) -> TestWhen[ACallerAlone, Adapter, CategoryNodeAnswer]:
+    def when(self) -> When[ACallerAlone, Adapter, CategoryNodeAnswer]:
         return Creating()
 
     @override
-    def then(self) -> TestThen[ACallerAlone, CategoryNodeAnswer]:
+    def then(self) -> Then[ACallerAlone, CategoryNodeAnswer]:
         return TheCallIsRefused(InsufficientPrivilege)
 
 
 @dataclass(frozen=True)
 class EnforcementOffChangesNothing(
-    TestScenario[SeedingSession, ACallerAlone, Adapter, CategoryNodeAnswer], TestConfigured
+    Scenario[SeedingSession, ACallerAlone, Adapter, CategoryNodeAnswer], Configured
 ):
     @override
     def summary(self) -> str:
@@ -221,15 +219,15 @@ class EnforcementOffChangesNothing(
         return {ENFORCEMENT: False}
 
     @override
-    def given(self) -> TestGiven[SeedingSession, ACallerAlone]:
+    def given(self) -> Given[SeedingSession, ACallerAlone]:
         return JustSomeone()
 
     @override
-    def when(self) -> TestWhen[ACallerAlone, Adapter, CategoryNodeAnswer]:
+    def when(self) -> When[ACallerAlone, Adapter, CategoryNodeAnswer]:
         return Creating()
 
     @override
-    def then(self) -> TestThen[ACallerAlone, CategoryNodeAnswer]:
+    def then(self) -> Then[ACallerAlone, CategoryNodeAnswer]:
         return TheCallIsRefused(InsufficientPrivilege)
 
 

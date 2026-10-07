@@ -27,14 +27,14 @@ from ai.backend.manager.data.user.types import UserData
 from ai.backend.manager.errors.permission import NotEnoughPermission
 from ai.backend.testutils.scenario_steps import (
     Answered,
+    Given,
     Held,
     Refused,
     Same,
     SameAs,
     Skipped,
-    TestGiven,
-    TestThen,
-    TestVerdict,
+    Then,
+    Verdict,
 )
 from bai_scenario.components.domain import WAS_HERE, SomeoneOf
 from bai_scenario.runner.planting import SeedingSession
@@ -77,10 +77,10 @@ class ExpectedRecord:
     triggered_by: UUID | None = None
 
 
-def look_node(node: AuditLogNode, expected: ExpectedRecord, *, at: str = "") -> list[TestVerdict]:
+def look_node(node: AuditLogNode, expected: ExpectedRecord, *, at: str = "") -> list[Verdict]:
     """The whole node, checked. The ids the database and the run make are skipped; the
     owner and actor are read as coming from the rows earlier steps laid."""
-    verdicts: list[TestVerdict] = [
+    verdicts: list[Verdict] = [
         Skipped(f"{at}id", "데이터베이스가 만든다"),
         Skipped(f"{at}action_id", "실행마다 새로 생성된다"),
         Same(f"{at}operation", node.operation, expected.operation),
@@ -267,7 +267,7 @@ async def lay_two_actors(
 
 
 @dataclass(frozen=True)
-class TwoRecordsGlobally(TestGiven[Any, RecordsAndACaller]):
+class TwoRecordsGlobally(Given[Any, RecordsAndACaller]):
     """Two records that exist, and a caller of the given role. The newer one is first."""
 
     role: UserRole = UserRole.SUPERADMIN
@@ -299,7 +299,7 @@ class TwoRecordsGlobally(TestGiven[Any, RecordsAndACaller]):
 
 
 @dataclass(frozen=True)
-class MixedStatusGlobally(TestGiven[Any, RecordsAndACaller]):
+class MixedStatusGlobally(Given[Any, RecordsAndACaller]):
     """A successful record and a denied one, with a superadmin caller."""
 
     @override
@@ -328,7 +328,7 @@ class MixedStatusGlobally(TestGiven[Any, RecordsAndACaller]):
 
 
 @dataclass(frozen=True)
-class TwoActorsGlobally(TestGiven[Any, RecordsAndACaller]):
+class TwoActorsGlobally(Given[Any, RecordsAndACaller]):
     """Two users who each triggered a record, and a superadmin caller narrowing to the
     first actor."""
 
@@ -369,7 +369,7 @@ class TwoActorsGlobally(TestGiven[Any, RecordsAndACaller]):
 
 
 @dataclass(frozen=True)
-class ManyRecordsGlobally(TestGiven[Any, RecordsAndACaller]):
+class ManyRecordsGlobally(Given[Any, RecordsAndACaller]):
     """More records than one default page holds, with a superadmin caller."""
 
     total: int = 11
@@ -393,7 +393,7 @@ class ManyRecordsGlobally(TestGiven[Any, RecordsAndACaller]):
 
 
 @dataclass(frozen=True)
-class TwoRecordsToRead(TestGiven[Any, RecordsToLoad]):
+class TwoRecordsToRead(Given[Any, RecordsToLoad]):
     """Two records to name by id, and a caller of the given role."""
 
     role: UserRole = UserRole.SUPERADMIN
@@ -423,7 +423,7 @@ class TwoRecordsToRead(TestGiven[Any, RecordsToLoad]):
 
 
 @dataclass(frozen=True)
-class ProjectRecords(TestGiven[Any, ScopedEntities]):
+class ProjectRecords(Given[Any, ScopedEntities]):
     """Two projects with a record each, and a caller granted READ on the projects asked
     for. ``name`` says what the request will scope to: the first, both, or an id nothing
     answers to."""
@@ -469,7 +469,7 @@ class ProjectRecords(TestGiven[Any, ScopedEntities]):
 
 
 @dataclass(frozen=True)
-class ProjectRecordsToLoad(TestGiven[Any, RecordsToLoad]):
+class ProjectRecordsToLoad(Given[Any, RecordsToLoad]):
     """Two projects with a record each, and a caller granted READ on the first project
     only. The first record is the one the caller may read."""
 
@@ -488,7 +488,7 @@ class ProjectRecordsToLoad(TestGiven[Any, RecordsToLoad]):
 
 
 @dataclass(frozen=True)
-class OneProjectMixedStatus(TestGiven[Any, ScopedEntities]):
+class OneProjectMixedStatus(Given[Any, ScopedEntities]):
     """A single project holding a successful record and a denied one, with a caller
     granted READ on it."""
 
@@ -529,7 +529,7 @@ class OneProjectMixedStatus(TestGiven[Any, ScopedEntities]):
 
 
 @dataclass(frozen=True)
-class OneProjectManyRecords(TestGiven[Any, ScopedEntities]):
+class OneProjectManyRecords(Given[Any, ScopedEntities]):
     """A single project holding more records than a default page, with a granted caller."""
 
     total: int = 11
@@ -562,7 +562,7 @@ class OneProjectManyRecords(TestGiven[Any, ScopedEntities]):
 
 
 @dataclass(frozen=True)
-class ARecordScopedToAProject(TestGiven[Any, ScopedEntities]):
+class ARecordScopedToAProject(Given[Any, ScopedEntities]):
     """A record about a user, tagged with a project scope, and a caller granted READ on
     that project. The record's own entity is not the project, so only the scope tag makes
     a search by the project find it."""
@@ -606,7 +606,7 @@ class ARecordScopedToAProject(TestGiven[Any, ScopedEntities]):
 
 
 @dataclass(frozen=True)
-class ActorRecords(TestGiven[Any, ScopedActors]):
+class ActorRecords(Given[Any, ScopedActors]):
     """Two users who each triggered a record, and a caller. ``caller_is_first`` makes the
     caller the first actor; ``grant`` gives a separate reader READ on the first user."""
 
@@ -635,7 +635,7 @@ class ActorRecords(TestGiven[Any, ScopedActors]):
 
 
 @dataclass(frozen=True)
-class TheRecordsAnswered(TestThen[Any, SearchAuditLogsPayload]):
+class TheRecordsAnswered(Then[Any, SearchAuditLogsPayload]):
     """The records expected come back, in order and whole, and only those.
 
     Each item is checked field by field against what was laid; a page carries the counts
@@ -647,11 +647,11 @@ class TheRecordsAnswered(TestThen[Any, SearchAuditLogsPayload]):
         return "지정한 기록이 순서대로, 그리고 그것만 반환된다"
 
     @override
-    def look(self, laid: Any, answered: Answered[SearchAuditLogsPayload]) -> list[TestVerdict]:
+    def look(self, laid: Any, answered: Answered[SearchAuditLogsPayload]) -> list[Verdict]:
         payload = answered.response
         if payload is None:
             return [Same("answer", repr(answered.raised), "a page of records")]
-        verdicts: list[TestVerdict] = [
+        verdicts: list[Verdict] = [
             Same("item_count", len(payload.items), len(laid.visible)),
             Same("total_count", payload.total_count, len(laid.visible)),
             Same("has_next_page", payload.has_next_page, False),
@@ -663,7 +663,7 @@ class TheRecordsAnswered(TestThen[Any, SearchAuditLogsPayload]):
 
 
 @dataclass(frozen=True)
-class ThePageIsCapped(TestThen[Any, SearchAuditLogsPayload]):
+class ThePageIsCapped(Then[Any, SearchAuditLogsPayload]):
     """The default page comes back capped, and says another page follows."""
 
     size: int
@@ -674,7 +674,7 @@ class ThePageIsCapped(TestThen[Any, SearchAuditLogsPayload]):
         return "기본 페이지 크기만큼 반환되고 다음 페이지가 있다고 응답한다"
 
     @override
-    def look(self, laid: Any, answered: Answered[SearchAuditLogsPayload]) -> list[TestVerdict]:
+    def look(self, laid: Any, answered: Answered[SearchAuditLogsPayload]) -> list[Verdict]:
         payload = answered.response
         if payload is None:
             return [Same("answer", repr(answered.raised), "a page of records")]
@@ -690,7 +690,7 @@ type Loaded = list[AuditLogNode | Exception | None]
 
 
 @dataclass(frozen=True)
-class TheSlotsInOrder(TestThen[RecordsToLoad, Loaded]):
+class TheSlotsInOrder(Then[RecordsToLoad, Loaded]):
     """Each id is answered in the order named: its node whole, a refusal, or a gap for an
     id nothing answers to. A slot names which — ``first``, ``second``, ``refused``, ``gap``."""
 
@@ -701,12 +701,12 @@ class TheSlotsInOrder(TestThen[RecordsToLoad, Loaded]):
         return "요청한 순서대로 항목마다 노드, 거부, 또는 빈 항목이 반환된다"
 
     @override
-    def look(self, laid: RecordsToLoad, answered: Answered[Loaded]) -> list[TestVerdict]:
+    def look(self, laid: RecordsToLoad, answered: Answered[Loaded]) -> list[Verdict]:
         loaded = answered.response
         if loaded is None:
             return [Same("answer", repr(answered.raised), "a list of nodes")]
         by = {"first": laid.first[1], "second": laid.second[1]}
-        verdicts: list[TestVerdict] = [Same("length", len(loaded), len(self.slots))]
+        verdicts: list[Verdict] = [Same("length", len(loaded), len(self.slots))]
         for index, (got, slot) in enumerate(zip(loaded, self.slots, strict=False)):
             match slot:
                 case "gap":

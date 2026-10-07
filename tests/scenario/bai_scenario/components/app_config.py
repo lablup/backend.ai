@@ -31,13 +31,13 @@ from ai.backend.manager.data.permission.types import Permission
 from ai.backend.manager.data.user.types import UserData
 from ai.backend.testutils.scenario_steps import (
     Answered,
+    Given,
     Held,
     Same,
     SameAs,
-    TestGiven,
-    TestThen,
-    TestVerdict,
+    Then,
     Told,
+    Verdict,
 )
 from bai_scenario.components.domain import WAS_HERE, SomeoneOf
 from bai_scenario.seeds.app_config.allow_list import SCOPE_NAMES, SeedAllowListEntry
@@ -187,7 +187,7 @@ class AMergeAndACaller:
 
 
 @dataclass(frozen=True)
-class AConfigLaidAcross(TestGiven[Any, AMergeAndACaller]):
+class AConfigLaidAcross(Given[Any, AMergeAndACaller]):
     """설정 이름 하나에 도메인·프로젝트·사용자 스코프의 설정 조각을 미리 만들어 두고, 그 도메인의 사용자 한 명.
 
     값을 지정한 스코프에만 설정 조각이 만들어지고, 그 종류의 허용 목록 항목은 조각과 함께
@@ -290,7 +290,7 @@ class AConfigLaidAcross(TestGiven[Any, AMergeAndACaller]):
 
 
 @dataclass(frozen=True)
-class SeveralConfigsLaid(TestGiven[Any, AMergeAndACaller]):
+class SeveralConfigsLaid(Given[Any, AMergeAndACaller]):
     """공개 설정 조각을 하나씩 가진 설정 이름 여럿과, 그 도메인의 사용자 한 명."""
 
     publics: tuple[Mapping[str, Any], ...]
@@ -326,7 +326,7 @@ class SeveralConfigsLaid(TestGiven[Any, AMergeAndACaller]):
 
 
 @dataclass(frozen=True)
-class NotRefused(TestVerdict):
+class NotRefused(Verdict):
     """응답이 반환되어야 한다. 거부되면 그 예외 이름을 문제로 적는다."""
 
     raised: BaseException | None
@@ -340,7 +340,7 @@ class NotRefused(TestVerdict):
 
 
 @dataclass(frozen=True)
-class TheMergedConfigs(TestThen[AMergeAndACaller, GetAppConfigsPayload]):
+class TheMergedConfigs(Then[AMergeAndACaller, GetAppConfigsPayload]):
     """요청한 이름마다 하나씩, 요청 순서대로, 병합된 설정이 통째로 반환된다."""
 
     wanted: tuple[Mapping[str, Any], ...]
@@ -352,11 +352,11 @@ class TheMergedConfigs(TestThen[AMergeAndACaller, GetAppConfigsPayload]):
     @override
     def look(
         self, laid: AMergeAndACaller, answered: Answered[GetAppConfigsPayload]
-    ) -> list[TestVerdict]:
+    ) -> list[Verdict]:
         payload = answered.response
         if payload is None:
             return [NotRefused(answered.raised)]
-        seen: list[TestVerdict] = [Same("app_configs", len(payload.app_configs), len(self.wanted))]
+        seen: list[Verdict] = [Same("app_configs", len(payload.app_configs), len(self.wanted))]
         for i, (got, wanted) in enumerate(zip(payload.app_configs, self.wanted, strict=False)):
             seen.append(
                 Held(

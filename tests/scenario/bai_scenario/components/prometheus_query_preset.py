@@ -37,14 +37,14 @@ from ai.backend.manager.errors.base.entity import EntityNotFoundError
 from ai.backend.manager.errors.user import UserNotFound
 from ai.backend.testutils.scenario_steps import (
     Answered,
+    Given,
     Held,
     Refused,
     Same,
     SameAs,
     Skipped,
-    TestGiven,
-    TestThen,
-    TestVerdict,
+    Then,
+    Verdict,
 )
 from bai_scenario.components.domain import WrittenByThisRun
 from bai_scenario.components.system import lay_a_caller, lay_a_public_reader
@@ -105,7 +105,7 @@ async def lay_someone(seeding: Any, role: UserRole) -> Laid[UserData]:
 
 
 @dataclass(frozen=True)
-class JustSomeone(TestGiven[Any, ACatalogAndACaller]):
+class JustSomeone(Given[Any, ACatalogAndACaller]):
     """프리셋도 카테고리도 없이, 호출자 한 명."""
 
     role: UserRole = UserRole.USER
@@ -121,7 +121,7 @@ class JustSomeone(TestGiven[Any, ACatalogAndACaller]):
 
 
 @dataclass(frozen=True)
-class ACategoryAndSomeone(TestGiven[Any, ACatalogAndACaller]):
+class ACategoryAndSomeone(Given[Any, ACatalogAndACaller]):
     """카테고리 하나와, 호출자 한 명."""
 
     role: UserRole = UserRole.USER
@@ -138,7 +138,7 @@ class ACategoryAndSomeone(TestGiven[Any, ACatalogAndACaller]):
 
 
 @dataclass(frozen=True)
-class APresetAndSomeone(TestGiven[Any, APresetAndACaller]):
+class APresetAndSomeone(Given[Any, APresetAndACaller]):
     """이미 있는 프리셋 하나와, 호출자 한 명."""
 
     role: UserRole = UserRole.USER
@@ -173,7 +173,7 @@ class APresetAndSomeone(TestGiven[Any, APresetAndACaller]):
 
 
 @dataclass(frozen=True)
-class APresetInOneOfTwoCategories(TestGiven[Any, APresetAndACaller]):
+class APresetInOneOfTwoCategories(Given[Any, APresetAndACaller]):
     """카테고리 둘과 한쪽에 속한 프리셋 하나, 그리고 호출자 한 명."""
 
     role: UserRole = UserRole.USER
@@ -196,7 +196,7 @@ class APresetInOneOfTwoCategories(TestGiven[Any, APresetAndACaller]):
 
 
 @dataclass(frozen=True)
-class APresetAndNobody(TestGiven[Any, APresetAlone]):
+class APresetAndNobody(Given[Any, APresetAlone]):
     """프리셋 하나뿐이고, 호출자는 없다."""
 
     @override
@@ -210,7 +210,7 @@ class APresetAndNobody(TestGiven[Any, APresetAlone]):
 
 
 @dataclass(frozen=True)
-class ManyPresetsAndSomeone(TestGiven[Any, ManyPresetsAndACaller]):
+class ManyPresetsAndSomeone(Given[Any, ManyPresetsAndACaller]):
     """프리셋 여럿과, 호출자 한 명."""
 
     role: UserRole = UserRole.USER
@@ -235,7 +235,7 @@ class ManyPresetsAndSomeone(TestGiven[Any, ManyPresetsAndACaller]):
 
 
 @dataclass(frozen=True)
-class PresetsInTwoCategories(TestGiven[Any, ManyPresetsAndACaller]):
+class PresetsInTwoCategories(Given[Any, ManyPresetsAndACaller]):
     """두 카테고리에 나뉜 프리셋들과, 호출자 한 명.
 
     반환하는 ``laid``는 ``category``에 속한 것뿐이다. 다른 카테고리의 프리셋은 만들어 두기만
@@ -265,7 +265,7 @@ class PresetsInTwoCategories(TestGiven[Any, ManyPresetsAndACaller]):
 
 
 @dataclass(frozen=True)
-class TheNewPresetNode(TestThen[Any, PresetNodeAnswer]):
+class TheNewPresetNode(Then[Any, PresetNodeAnswer]):
     """방금 생성한 프리셋이 통째로 반환된다. 기대값은 요청이 지정한 값에서 읽는다.
 
     이름을 지정하지 않으면 미리 만들어 둔 프리셋의 이름을 기대한다. 같은 이름으로 다시 생성하는
@@ -286,12 +286,12 @@ class TheNewPresetNode(TestThen[Any, PresetNodeAnswer]):
         return "생성한 프리셋 전체가 반환된다"
 
     @override
-    def look(self, laid: Any, answered: Answered[PresetNodeAnswer]) -> list[TestVerdict]:
+    def look(self, laid: Any, answered: Answered[PresetNodeAnswer]) -> list[Verdict]:
         node = answered.response
         if node is None:
             return [Refused(EntityNotFoundError, answered.raised)]
         written = WrittenByThisRun(self.started)
-        category: TestVerdict = (
+        category: Verdict = (
             Held(
                 "category_id",
                 node.category_id,
@@ -317,7 +317,7 @@ class TheNewPresetNode(TestThen[Any, PresetNodeAnswer]):
 
 
 @dataclass(frozen=True)
-class ThePresetNode(TestThen[APresetAndACaller, PresetNodeAnswer]):
+class ThePresetNode(Then[APresetAndACaller, PresetNodeAnswer]):
     """미리 만들어 둔 프리셋이 통째로 반환된다. 기대값은 미리 만들어 둔 데이터에서 읽는다.
 
     수정 요청이 이 검사를 쓸 때는 바뀌어야 하는 필드만 인자로 받는다. 나머지 필드가 함께 바뀌면
@@ -335,7 +335,7 @@ class ThePresetNode(TestThen[APresetAndACaller, PresetNodeAnswer]):
     def says(self) -> str:
         return "미리 만들어 둔 프리셋 전체가 반환된다"
 
-    def _category_seen(self, got: UUID | None, laid: APresetAndACaller) -> TestVerdict:
+    def _category_seen(self, got: UUID | None, laid: APresetAndACaller) -> Verdict:
         if self.moved_elsewhere and laid.elsewhere is not None:
             return Held("category_id", got, SameAs[UUID | None](laid.elsewhere.id, "다른 카테고리"))
         if laid.preset.category_id is None:
@@ -347,9 +347,7 @@ class ThePresetNode(TestThen[APresetAndACaller, PresetNodeAnswer]):
         )
 
     @override
-    def look(
-        self, laid: APresetAndACaller, answered: Answered[PresetNodeAnswer]
-    ) -> list[TestVerdict]:
+    def look(self, laid: APresetAndACaller, answered: Answered[PresetNodeAnswer]) -> list[Verdict]:
         node = answered.response
         if node is None:
             return [Refused(EntityNotFoundError, answered.raised)]
@@ -386,7 +384,7 @@ class ThePresetNode(TestThen[APresetAndACaller, PresetNodeAnswer]):
 
 
 @dataclass(frozen=True)
-class EveryLaidPresetIsFound(TestThen[ManyPresetsAndACaller, SearchQueryDefinitionsPayload]):
+class EveryLaidPresetIsFound(Then[ManyPresetsAndACaller, SearchQueryDefinitionsPayload]):
     """미리 만들어 둔 프리셋이 모두, 그리고 그것만 집계된다."""
 
     @override
@@ -396,7 +394,7 @@ class EveryLaidPresetIsFound(TestThen[ManyPresetsAndACaller, SearchQueryDefiniti
     @override
     def look(
         self, laid: ManyPresetsAndACaller, answered: Answered[SearchQueryDefinitionsPayload]
-    ) -> list[TestVerdict]:
+    ) -> list[Verdict]:
         page = answered.response
         if page is None:
             return [Refused(UserNotFound, answered.raised)]
@@ -413,7 +411,7 @@ class EveryLaidPresetIsFound(TestThen[ManyPresetsAndACaller, SearchQueryDefiniti
 
 
 @dataclass(frozen=True)
-class OnePageOfThemComesBack(TestThen[ManyPresetsAndACaller, SearchQueryDefinitionsPayload]):
+class OnePageOfThemComesBack(Then[ManyPresetsAndACaller, SearchQueryDefinitionsPayload]):
     """크기를 지정하지 않은 검색은 한 페이지 분량만 응답하고, 다음 페이지가 있다고 알린다."""
 
     @override
@@ -423,7 +421,7 @@ class OnePageOfThemComesBack(TestThen[ManyPresetsAndACaller, SearchQueryDefiniti
     @override
     def look(
         self, laid: ManyPresetsAndACaller, answered: Answered[SearchQueryDefinitionsPayload]
-    ) -> list[TestVerdict]:
+    ) -> list[Verdict]:
         page = answered.response
         if page is None:
             return [Refused(UserNotFound, answered.raised)]
@@ -456,7 +454,7 @@ def node_of(seeded: PrometheusQueryPresetData) -> QueryDefinitionNode:
 
 
 @dataclass(frozen=True)
-class TheBatchAnswersInOrder(TestThen[ManyPresetsAndACaller, list[PresetNodeAnswer]]):
+class TheBatchAnswersInOrder(Then[ManyPresetsAndACaller, list[PresetNodeAnswer]]):
     """요청한 순서대로 응답한다. 미리 만들어 둔 것은 노드 전체로, 마지막의 없는 id는 빈 항목으로."""
 
     @override
@@ -466,11 +464,11 @@ class TheBatchAnswersInOrder(TestThen[ManyPresetsAndACaller, list[PresetNodeAnsw
     @override
     def look(
         self, laid: ManyPresetsAndACaller, answered: Answered[list[PresetNodeAnswer]]
-    ) -> list[TestVerdict]:
+    ) -> list[Verdict]:
         answer = answered.response
         if answer is None:
             return [Refused(UserNotFound, answered.raised)]
-        seen: list[TestVerdict] = [Same("len", len(answer), len(laid.laid) + 1)]
+        seen: list[Verdict] = [Same("len", len(answer), len(laid.laid) + 1)]
         if len(answer) != len(laid.laid) + 1:
             return seen
         for at, (got, wanted) in enumerate(zip(answer, laid.laid, strict=False)):
@@ -488,7 +486,7 @@ class TheBatchAnswersInOrder(TestThen[ManyPresetsAndACaller, list[PresetNodeAnsw
 
 
 @dataclass(frozen=True)
-class NothingIsAnswered(TestThen[Any, list[PresetNodeAnswer]]):
+class NothingIsAnswered(Then[Any, list[PresetNodeAnswer]]):
     """빈 목록에는 빈 응답이다."""
 
     @override
@@ -496,7 +494,7 @@ class NothingIsAnswered(TestThen[Any, list[PresetNodeAnswer]]):
         return "빈 응답이 반환된다"
 
     @override
-    def look(self, laid: Any, answered: Answered[list[PresetNodeAnswer]]) -> list[TestVerdict]:
+    def look(self, laid: Any, answered: Answered[list[PresetNodeAnswer]]) -> list[Verdict]:
         answer = answered.response
         if answer is None:
             return [Refused(UserNotFound, answered.raised)]
@@ -504,7 +502,7 @@ class NothingIsAnswered(TestThen[Any, list[PresetNodeAnswer]]):
 
 
 @dataclass(frozen=True)
-class TheQueryAnswered(TestThen[Any, QueryDefinitionResultInfo]):
+class TheQueryAnswered(Then[Any, QueryDefinitionResultInfo]):
     """모의 서버가 응답한 결과가 그대로 담겨 반환된다. 샘플의 값이 모의 서버가 받은 질의이므로,
     무엇이 Prometheus에 전달됐는지를 여기서 확인한다."""
 
@@ -516,7 +514,7 @@ class TheQueryAnswered(TestThen[Any, QueryDefinitionResultInfo]):
         return "모의 서버가 받은 질의를 담은 결과가 반환된다"
 
     @override
-    def look(self, laid: Any, answered: Answered[QueryDefinitionResultInfo]) -> list[TestVerdict]:
+    def look(self, laid: Any, answered: Answered[QueryDefinitionResultInfo]) -> list[Verdict]:
         result = answered.response
         if result is None:
             return [Refused(PrometheusQueryPresetNotFound, answered.raised)]
@@ -538,7 +536,7 @@ class TheQueryAnswered(TestThen[Any, QueryDefinitionResultInfo]):
 
 
 @dataclass(frozen=True)
-class TheRemovedOneIsNamed(TestThen[APresetAndACaller, DeleteQueryDefinitionPayload]):
+class TheRemovedOneIsNamed(Then[APresetAndACaller, DeleteQueryDefinitionPayload]):
     """삭제한 프리셋이 무엇인지 응답한다."""
 
     @override
@@ -548,7 +546,7 @@ class TheRemovedOneIsNamed(TestThen[APresetAndACaller, DeleteQueryDefinitionPayl
     @override
     def look(
         self, laid: APresetAndACaller, answered: Answered[DeleteQueryDefinitionPayload]
-    ) -> list[TestVerdict]:
+    ) -> list[Verdict]:
         payload = answered.response
         if payload is None:
             return [Refused(EntityNotFoundError, answered.raised)]

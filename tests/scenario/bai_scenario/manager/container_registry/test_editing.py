@@ -22,7 +22,7 @@ from ai.backend.manager.errors.container_registry import (
 )
 from ai.backend.manager.errors.image import ContainerRegistryNotFound
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.testutils.scenario_steps import TestGiven, TestScenario, TestThen, TestWhen
+from ai.backend.testutils.scenario_steps import Given, Scenario, Then, When
 from bai_scenario.components.answers import TheCallIsRefused
 from bai_scenario.components.container_registry import (
     ARegistryAndACaller,
@@ -37,13 +37,13 @@ from bai_scenario.runner.acting import ActingAs
 from bai_scenario.runner.planting import SeedingSession
 from bai_scenario.runner.steps import run_scenario
 
-type EditingScenario = TestScenario[
+type EditingScenario = Scenario[
     SeedingSession, ARegistryAndACaller, ContainerRegistryAdapter, ContainerRegistryNode
 ]
 
 
 @dataclass(frozen=True)
-class Editing(TestWhen[ARegistryAndACaller, ContainerRegistryAdapter, ContainerRegistryNode]):
+class Editing(When[ARegistryAndACaller, ContainerRegistryAdapter, ContainerRegistryNode]):
     url: str | None = None
     registry_type: ContainerRegistryType | None = None
     project: str | None = None
@@ -91,9 +91,7 @@ class Editing(TestWhen[ARegistryAndACaller, ContainerRegistryAdapter, ContainerR
 
 @dataclass(frozen=True)
 class ChangingOnlyTheAddress(
-    TestScenario[
-        SeedingSession, ARegistryAndACaller, ContainerRegistryAdapter, ContainerRegistryNode
-    ]
+    Scenario[SeedingSession, ARegistryAndACaller, ContainerRegistryAdapter, ContainerRegistryNode]
 ):
     @override
     def summary(self) -> str:
@@ -104,7 +102,7 @@ class ChangingOnlyTheAddress(
         return "슈퍼관리자가 주소만 수정하면 주소만 새 값이 되고 나머지 필드는 그대로다"
 
     @override
-    def given(self) -> TestGiven[SeedingSession, ARegistryAndACaller]:
+    def given(self) -> Given[SeedingSession, ARegistryAndACaller]:
         return ARegistryAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
@@ -112,15 +110,13 @@ class ChangingOnlyTheAddress(
         return Editing(url="https://moved.scenario.local")
 
     @override
-    def then(self) -> TestThen[ARegistryAndACaller, ContainerRegistryNode]:
+    def then(self) -> Then[ARegistryAndACaller, ContainerRegistryNode]:
         return TheUpdatedRegistryNode(url=self.when().url)
 
 
 @dataclass(frozen=True)
 class AnEmptyEditChangesNothing(
-    TestScenario[
-        SeedingSession, ARegistryAndACaller, ContainerRegistryAdapter, ContainerRegistryNode
-    ]
+    Scenario[SeedingSession, ARegistryAndACaller, ContainerRegistryAdapter, ContainerRegistryNode]
 ):
     @override
     def summary(self) -> str:
@@ -133,25 +129,21 @@ class AnEmptyEditChangesNothing(
         )
 
     @override
-    def given(self) -> TestGiven[SeedingSession, ARegistryAndACaller]:
+    def given(self) -> Given[SeedingSession, ARegistryAndACaller]:
         return ARegistryAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
-    def when(
-        self,
-    ) -> TestWhen[ARegistryAndACaller, ContainerRegistryAdapter, ContainerRegistryNode]:
+    def when(self) -> When[ARegistryAndACaller, ContainerRegistryAdapter, ContainerRegistryNode]:
         return Editing()
 
     @override
-    def then(self) -> TestThen[ARegistryAndACaller, ContainerRegistryNode]:
+    def then(self) -> Then[ARegistryAndACaller, ContainerRegistryNode]:
         return TheUpdatedRegistryNode()
 
 
 @dataclass(frozen=True)
 class AddingAllowedProjectWhileEditing(
-    TestScenario[
-        SeedingSession, ARegistryAndACaller, ContainerRegistryAdapter, ContainerRegistryNode
-    ]
+    Scenario[SeedingSession, ARegistryAndACaller, ContainerRegistryAdapter, ContainerRegistryNode]
 ):
     @override
     def summary(self) -> str:
@@ -162,25 +154,21 @@ class AddingAllowedProjectWhileEditing(
         return "슈퍼관리자가 레지스트리를 수정하며 프로젝트를 허용하면 그 관계가 생성된다"
 
     @override
-    def given(self) -> TestGiven[SeedingSession, ARegistryAndACaller]:
+    def given(self) -> Given[SeedingSession, ARegistryAndACaller]:
         return ARegistryAndSomeone(role=UserRole.SUPERADMIN, with_project=True)
 
     @override
-    def when(
-        self,
-    ) -> TestWhen[ARegistryAndACaller, ContainerRegistryAdapter, ContainerRegistryNode]:
+    def when(self) -> When[ARegistryAndACaller, ContainerRegistryAdapter, ContainerRegistryNode]:
         return Editing(allow_project=True)
 
     @override
-    def then(self) -> TestThen[ARegistryAndACaller, ContainerRegistryNode]:
+    def then(self) -> Then[ARegistryAndACaller, ContainerRegistryNode]:
         return TheUpdatedRegistryNode()
 
 
 @dataclass(frozen=True)
 class AnAddressWithoutAHostIsRefused(
-    TestScenario[
-        SeedingSession, ARegistryAndACaller, ContainerRegistryAdapter, ContainerRegistryNode
-    ]
+    Scenario[SeedingSession, ARegistryAndACaller, ContainerRegistryAdapter, ContainerRegistryNode]
 ):
     @override
     def summary(self) -> str:
@@ -194,25 +182,21 @@ class AnAddressWithoutAHostIsRefused(
         )
 
     @override
-    def given(self) -> TestGiven[SeedingSession, ARegistryAndACaller]:
+    def given(self) -> Given[SeedingSession, ARegistryAndACaller]:
         return ARegistryAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
-    def when(
-        self,
-    ) -> TestWhen[ARegistryAndACaller, ContainerRegistryAdapter, ContainerRegistryNode]:
+    def when(self) -> When[ARegistryAndACaller, ContainerRegistryAdapter, ContainerRegistryNode]:
         return Editing(url="http://")
 
     @override
-    def then(self) -> TestThen[ARegistryAndACaller, ContainerRegistryNode]:
+    def then(self) -> Then[ARegistryAndACaller, ContainerRegistryNode]:
         return TheCallIsRefused(InvalidContainerRegistryURL)
 
 
 @dataclass(frozen=True)
 class HarborWithoutAProjectIsRefused(
-    TestScenario[
-        SeedingSession, ARegistryAndACaller, ContainerRegistryAdapter, ContainerRegistryNode
-    ]
+    Scenario[SeedingSession, ARegistryAndACaller, ContainerRegistryAdapter, ContainerRegistryNode]
 ):
     @override
     def summary(self) -> str:
@@ -226,25 +210,21 @@ class HarborWithoutAProjectIsRefused(
         )
 
     @override
-    def given(self) -> TestGiven[SeedingSession, ARegistryAndACaller]:
+    def given(self) -> Given[SeedingSession, ARegistryAndACaller]:
         return ARegistryAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
-    def when(
-        self,
-    ) -> TestWhen[ARegistryAndACaller, ContainerRegistryAdapter, ContainerRegistryNode]:
+    def when(self) -> When[ARegistryAndACaller, ContainerRegistryAdapter, ContainerRegistryNode]:
         return Editing(registry_type=ContainerRegistryType.HARBOR2)
 
     @override
-    def then(self) -> TestThen[ARegistryAndACaller, ContainerRegistryNode]:
+    def then(self) -> Then[ARegistryAndACaller, ContainerRegistryNode]:
         return TheCallIsRefused(InvalidContainerRegistryProject)
 
 
 @dataclass(frozen=True)
 class MissingRegistryIsRefused(
-    TestScenario[
-        SeedingSession, ARegistryAndACaller, ContainerRegistryAdapter, ContainerRegistryNode
-    ]
+    Scenario[SeedingSession, ARegistryAndACaller, ContainerRegistryAdapter, ContainerRegistryNode]
 ):
     @override
     def summary(self) -> str:
@@ -255,25 +235,21 @@ class MissingRegistryIsRefused(
         return "존재하지 않는 id를 수정하려 하면 대상을 찾을 수 없어 거부된다"
 
     @override
-    def given(self) -> TestGiven[SeedingSession, ARegistryAndACaller]:
+    def given(self) -> Given[SeedingSession, ARegistryAndACaller]:
         return ARegistryAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
-    def when(
-        self,
-    ) -> TestWhen[ARegistryAndACaller, ContainerRegistryAdapter, ContainerRegistryNode]:
+    def when(self) -> When[ARegistryAndACaller, ContainerRegistryAdapter, ContainerRegistryNode]:
         return Editing(url="https://moved.scenario.local", target=MissingRegistry())
 
     @override
-    def then(self) -> TestThen[ARegistryAndACaller, ContainerRegistryNode]:
+    def then(self) -> Then[ARegistryAndACaller, ContainerRegistryNode]:
         return TheCallIsRefused(ContainerRegistryNotFound)
 
 
 @dataclass(frozen=True)
 class APlainUserMayNotEdit(
-    TestScenario[
-        SeedingSession, ARegistryAndACaller, ContainerRegistryAdapter, ContainerRegistryNode
-    ]
+    Scenario[SeedingSession, ARegistryAndACaller, ContainerRegistryAdapter, ContainerRegistryNode]
 ):
     @override
     def summary(self) -> str:
@@ -287,17 +263,15 @@ class APlainUserMayNotEdit(
         )
 
     @override
-    def given(self) -> TestGiven[SeedingSession, ARegistryAndACaller]:
+    def given(self) -> Given[SeedingSession, ARegistryAndACaller]:
         return ARegistryAndSomeone()
 
     @override
-    def when(
-        self,
-    ) -> TestWhen[ARegistryAndACaller, ContainerRegistryAdapter, ContainerRegistryNode]:
+    def when(self) -> When[ARegistryAndACaller, ContainerRegistryAdapter, ContainerRegistryNode]:
         return Editing(url="https://moved.scenario.local")
 
     @override
-    def then(self) -> TestThen[ARegistryAndACaller, ContainerRegistryNode]:
+    def then(self) -> Then[ARegistryAndACaller, ContainerRegistryNode]:
         return TheCallIsRefused(InsufficientPrivilege)
 
 

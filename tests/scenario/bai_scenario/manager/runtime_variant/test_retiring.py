@@ -23,13 +23,7 @@ from ai.backend.manager.api.adapters.runtime_variant.adapter import RuntimeVaria
 from ai.backend.manager.errors.base.entity import EntityNotFoundError
 from ai.backend.manager.errors.permission import NotEnoughPermission
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.testutils.scenario_steps import (
-    TestConfigured,
-    TestGiven,
-    TestScenario,
-    TestThen,
-    TestWhen,
-)
+from ai.backend.testutils.scenario_steps import Configured, Given, Scenario, Then, When
 from bai_scenario.components.answers import TheCallIsRefused
 from bai_scenario.components.runtime_variant import (
     AVariantAndACaller,
@@ -46,11 +40,11 @@ from bai_scenario.runner.acting import ActingAs
 from bai_scenario.runner.planting import SeedingSession
 from bai_scenario.runner.steps import run_scenario
 
-type RetiringStep = TestScenario[SeedingSession, Any, RuntimeVariantAdapter, Any]
+type RetiringStep = Scenario[SeedingSession, Any, RuntimeVariantAdapter, Any]
 
 
 @dataclass(frozen=True)
-class Deleting(TestWhen[AVariantAndACaller, RuntimeVariantAdapter, DeleteRuntimeVariantPayload]):
+class Deleting(When[AVariantAndACaller, RuntimeVariantAdapter, DeleteRuntimeVariantPayload]):
     """미리 만들어 둔 변형 하나를 삭제한다."""
 
     unknown: bool = False
@@ -74,7 +68,7 @@ class Deleting(TestWhen[AVariantAndACaller, RuntimeVariantAdapter, DeleteRuntime
 
 @dataclass(frozen=True)
 class DeletingMany(
-    TestWhen[ManyVariantsAndACaller, RuntimeVariantAdapter, DeleteRuntimeVariantsPayload]
+    When[ManyVariantsAndACaller, RuntimeVariantAdapter, DeleteRuntimeVariantsPayload]
 ):
     """미리 만들어 둔 변형 전부를 한 번에 삭제한다."""
 
@@ -98,7 +92,7 @@ class DeletingMany(
 
 @dataclass(frozen=True)
 class DeletingWithAnUnknownIdBehind(
-    TestWhen[AVariantAndACaller, RuntimeVariantAdapter, DeleteRuntimeVariantsPayload]
+    When[AVariantAndACaller, RuntimeVariantAdapter, DeleteRuntimeVariantsPayload]
 ):
     """미리 만들어 둔 변형의 id 뒤에 없는 id를 붙여 한 번에 삭제한다."""
 
@@ -122,9 +116,7 @@ class DeletingWithAnUnknownIdBehind(
 
 @dataclass(frozen=True)
 class TheSuperadminDeletesAVariant(
-    TestScenario[
-        SeedingSession, AVariantAndACaller, RuntimeVariantAdapter, DeleteRuntimeVariantPayload
-    ]
+    Scenario[SeedingSession, AVariantAndACaller, RuntimeVariantAdapter, DeleteRuntimeVariantPayload]
 ):
     @override
     def summary(self) -> str:
@@ -135,25 +127,21 @@ class TheSuperadminDeletesAVariant(
         return "슈퍼관리자가 변형을 삭제하면 삭제한 변형의 id를 담은 응답이 반환된다"
 
     @override
-    def given(self) -> TestGiven[SeedingSession, AVariantAndACaller]:
+    def given(self) -> Given[SeedingSession, AVariantAndACaller]:
         return AVariantAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
-    def when(
-        self,
-    ) -> TestWhen[AVariantAndACaller, RuntimeVariantAdapter, DeleteRuntimeVariantPayload]:
+    def when(self) -> When[AVariantAndACaller, RuntimeVariantAdapter, DeleteRuntimeVariantPayload]:
         return Deleting()
 
     @override
-    def then(self) -> TestThen[AVariantAndACaller, DeleteRuntimeVariantPayload]:
+    def then(self) -> Then[AVariantAndACaller, DeleteRuntimeVariantPayload]:
         return TheDeletedVariantId()
 
 
 @dataclass(frozen=True)
 class AnIdNothingAnswersToIsNotFound(
-    TestScenario[
-        SeedingSession, AVariantAndACaller, RuntimeVariantAdapter, DeleteRuntimeVariantPayload
-    ]
+    Scenario[SeedingSession, AVariantAndACaller, RuntimeVariantAdapter, DeleteRuntimeVariantPayload]
 ):
     @override
     def summary(self) -> str:
@@ -164,25 +152,21 @@ class AnIdNothingAnswersToIsNotFound(
         return "슈퍼관리자가 존재하지 않는 id를 삭제하면 대상을 찾을 수 없다는 이유로 거부된다"
 
     @override
-    def given(self) -> TestGiven[SeedingSession, AVariantAndACaller]:
+    def given(self) -> Given[SeedingSession, AVariantAndACaller]:
         return AVariantAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
-    def when(
-        self,
-    ) -> TestWhen[AVariantAndACaller, RuntimeVariantAdapter, DeleteRuntimeVariantPayload]:
+    def when(self) -> When[AVariantAndACaller, RuntimeVariantAdapter, DeleteRuntimeVariantPayload]:
         return Deleting(unknown=True)
 
     @override
-    def then(self) -> TestThen[AVariantAndACaller, DeleteRuntimeVariantPayload]:
+    def then(self) -> Then[AVariantAndACaller, DeleteRuntimeVariantPayload]:
         return TheCallIsRefused(EntityNotFoundError)
 
 
 @dataclass(frozen=True)
 class AUserGrantedNothingMayNotDelete(
-    TestScenario[
-        SeedingSession, AVariantAndACaller, RuntimeVariantAdapter, DeleteRuntimeVariantPayload
-    ]
+    Scenario[SeedingSession, AVariantAndACaller, RuntimeVariantAdapter, DeleteRuntimeVariantPayload]
 ):
     @override
     def summary(self) -> str:
@@ -193,26 +177,24 @@ class AUserGrantedNothingMayNotDelete(
         return "아무 권한도 없는 사용자가 변형을 삭제하면 권한 부족으로 거부된다"
 
     @override
-    def given(self) -> TestGiven[SeedingSession, AVariantAndACaller]:
+    def given(self) -> Given[SeedingSession, AVariantAndACaller]:
         return AVariantAndSomeone()
 
     @override
-    def when(
-        self,
-    ) -> TestWhen[AVariantAndACaller, RuntimeVariantAdapter, DeleteRuntimeVariantPayload]:
+    def when(self) -> When[AVariantAndACaller, RuntimeVariantAdapter, DeleteRuntimeVariantPayload]:
         return Deleting()
 
     @override
-    def then(self) -> TestThen[AVariantAndACaller, DeleteRuntimeVariantPayload]:
+    def then(self) -> Then[AVariantAndACaller, DeleteRuntimeVariantPayload]:
         return TheCallIsRefused(NotEnoughPermission)
 
 
 @dataclass(frozen=True)
 class EnforcementOffLetsAnyoneDelete(
-    TestScenario[
+    Scenario[
         SeedingSession, AVariantAndACaller, RuntimeVariantAdapter, DeleteRuntimeVariantPayload
     ],
-    TestConfigured,
+    Configured,
 ):
     @override
     def summary(self) -> str:
@@ -227,23 +209,21 @@ class EnforcementOffLetsAnyoneDelete(
         return {ENFORCEMENT: False}
 
     @override
-    def given(self) -> TestGiven[SeedingSession, AVariantAndACaller]:
+    def given(self) -> Given[SeedingSession, AVariantAndACaller]:
         return AVariantAndSomeone()
 
     @override
-    def when(
-        self,
-    ) -> TestWhen[AVariantAndACaller, RuntimeVariantAdapter, DeleteRuntimeVariantPayload]:
+    def when(self) -> When[AVariantAndACaller, RuntimeVariantAdapter, DeleteRuntimeVariantPayload]:
         return Deleting()
 
     @override
-    def then(self) -> TestThen[AVariantAndACaller, DeleteRuntimeVariantPayload]:
+    def then(self) -> Then[AVariantAndACaller, DeleteRuntimeVariantPayload]:
         return TheDeletedVariantId()
 
 
 @dataclass(frozen=True)
 class ManyAreDeletedAtOnce(
-    TestScenario[
+    Scenario[
         SeedingSession, ManyVariantsAndACaller, RuntimeVariantAdapter, DeleteRuntimeVariantsPayload
     ]
 ):
@@ -256,23 +236,23 @@ class ManyAreDeletedAtOnce(
         return "슈퍼관리자가 변형 둘을 한 번에 삭제하면, 둘 다 삭제된 목록에 반환되고 실패 목록은 비어 있다"
 
     @override
-    def given(self) -> TestGiven[SeedingSession, ManyVariantsAndACaller]:
+    def given(self) -> Given[SeedingSession, ManyVariantsAndACaller]:
         return ManyVariantsAndSomeone(role=UserRole.SUPERADMIN, besides=1)
 
     @override
     def when(
         self,
-    ) -> TestWhen[ManyVariantsAndACaller, RuntimeVariantAdapter, DeleteRuntimeVariantsPayload]:
+    ) -> When[ManyVariantsAndACaller, RuntimeVariantAdapter, DeleteRuntimeVariantsPayload]:
         return DeletingMany()
 
     @override
-    def then(self) -> TestThen[ManyVariantsAndACaller, DeleteRuntimeVariantsPayload]:
+    def then(self) -> Then[ManyVariantsAndACaller, DeleteRuntimeVariantsPayload]:
         return EveryLaidVariantIsDeleted()
 
 
 @dataclass(frozen=True)
 class AnUnknownIdInTheListFailsAlone(
-    TestScenario[
+    Scenario[
         SeedingSession, AVariantAndACaller, RuntimeVariantAdapter, DeleteRuntimeVariantsPayload
     ]
 ):
@@ -288,23 +268,23 @@ class AnUnknownIdInTheListFailsAlone(
         )
 
     @override
-    def given(self) -> TestGiven[SeedingSession, AVariantAndACaller]:
+    def given(self) -> Given[SeedingSession, AVariantAndACaller]:
         return AVariantAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
     def when(
         self,
-    ) -> TestWhen[AVariantAndACaller, RuntimeVariantAdapter, DeleteRuntimeVariantsPayload]:
+    ) -> When[AVariantAndACaller, RuntimeVariantAdapter, DeleteRuntimeVariantsPayload]:
         return DeletingWithAnUnknownIdBehind()
 
     @override
-    def then(self) -> TestThen[AVariantAndACaller, DeleteRuntimeVariantsPayload]:
+    def then(self) -> Then[AVariantAndACaller, DeleteRuntimeVariantsPayload]:
         return TheLaidOneIsDeletedTheUnknownFails()
 
 
 @dataclass(frozen=True)
 class AUserGrantedNothingHasEveryVariantRefused(
-    TestScenario[
+    Scenario[
         SeedingSession, ManyVariantsAndACaller, RuntimeVariantAdapter, DeleteRuntimeVariantsPayload
     ]
 ):
@@ -320,17 +300,17 @@ class AUserGrantedNothingHasEveryVariantRefused(
         )
 
     @override
-    def given(self) -> TestGiven[SeedingSession, ManyVariantsAndACaller]:
+    def given(self) -> Given[SeedingSession, ManyVariantsAndACaller]:
         return ManyVariantsAndSomeone(besides=1)
 
     @override
     def when(
         self,
-    ) -> TestWhen[ManyVariantsAndACaller, RuntimeVariantAdapter, DeleteRuntimeVariantsPayload]:
+    ) -> When[ManyVariantsAndACaller, RuntimeVariantAdapter, DeleteRuntimeVariantsPayload]:
         return DeletingMany()
 
     @override
-    def then(self) -> TestThen[ManyVariantsAndACaller, DeleteRuntimeVariantsPayload]:
+    def then(self) -> Then[ManyVariantsAndACaller, DeleteRuntimeVariantsPayload]:
         return EveryLaidVariantIsRefused()
 
 

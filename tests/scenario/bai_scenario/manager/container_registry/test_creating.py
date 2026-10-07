@@ -17,7 +17,7 @@ from ai.backend.manager.api.adapters.container_registry.adapter import Container
 from ai.backend.manager.errors.auth import InsufficientPrivilege
 from ai.backend.manager.errors.resource import ProjectNotFound
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.testutils.scenario_steps import TestGiven, TestScenario, TestThen, TestWhen
+from ai.backend.testutils.scenario_steps import Given, Scenario, Then, When
 from bai_scenario.components.answers import TheCallIsRefused
 from bai_scenario.components.container_registry import (
     AllowedProjects,
@@ -33,13 +33,13 @@ from bai_scenario.runner.acting import ActingAs
 from bai_scenario.runner.planting import SeedingSession
 from bai_scenario.runner.steps import run_scenario
 
-type CreationScenario = TestScenario[
+type CreationScenario = Scenario[
     SeedingSession, AProjectAndACaller, ContainerRegistryAdapter, ContainerRegistryNode
 ]
 
 
 @dataclass(frozen=True)
-class Creating(TestWhen[AProjectAndACaller, ContainerRegistryAdapter, ContainerRegistryNode]):
+class Creating(When[AProjectAndACaller, ContainerRegistryAdapter, ContainerRegistryNode]):
     url: str = "https://made.scenario.local"
     registry_name: str = "made-registry"
     allowed_projects: AllowedProjects = field(default_factory=NoProjects)
@@ -70,9 +70,7 @@ class Creating(TestWhen[AProjectAndACaller, ContainerRegistryAdapter, ContainerR
 
 @dataclass(frozen=True)
 class CreatingWithOnlyTheRequiredValues(
-    TestScenario[
-        SeedingSession, AProjectAndACaller, ContainerRegistryAdapter, ContainerRegistryNode
-    ]
+    Scenario[SeedingSession, AProjectAndACaller, ContainerRegistryAdapter, ContainerRegistryNode]
 ):
     @override
     def summary(self) -> str:
@@ -86,7 +84,7 @@ class CreatingWithOnlyTheRequiredValues(
         )
 
     @override
-    def given(self) -> TestGiven[SeedingSession, AProjectAndACaller]:
+    def given(self) -> Given[SeedingSession, AProjectAndACaller]:
         return NoRegistryYet(role=UserRole.SUPERADMIN)
 
     @override
@@ -94,16 +92,14 @@ class CreatingWithOnlyTheRequiredValues(
         return Creating()
 
     @override
-    def then(self) -> TestThen[AProjectAndACaller, ContainerRegistryNode]:
+    def then(self) -> Then[AProjectAndACaller, ContainerRegistryNode]:
         sent = self.when()
         return TheNewRegistryNode(url=sent.url, registry_name=sent.registry_name)
 
 
 @dataclass(frozen=True)
 class AllowingAProjectWhileCreating(
-    TestScenario[
-        SeedingSession, AProjectAndACaller, ContainerRegistryAdapter, ContainerRegistryNode
-    ]
+    Scenario[SeedingSession, AProjectAndACaller, ContainerRegistryAdapter, ContainerRegistryNode]
 ):
     @override
     def summary(self) -> str:
@@ -114,7 +110,7 @@ class AllowingAProjectWhileCreating(
         return "슈퍼관리자가 허용 프로젝트를 함께 지정해 레지스트리를 생성하면 그 관계도 생성된다"
 
     @override
-    def given(self) -> TestGiven[SeedingSession, AProjectAndACaller]:
+    def given(self) -> Given[SeedingSession, AProjectAndACaller]:
         return NoRegistryYet(role=UserRole.SUPERADMIN)
 
     @override
@@ -122,16 +118,14 @@ class AllowingAProjectWhileCreating(
         return Creating(allowed_projects=SeededProject())
 
     @override
-    def then(self) -> TestThen[AProjectAndACaller, ContainerRegistryNode]:
+    def then(self) -> Then[AProjectAndACaller, ContainerRegistryNode]:
         sent = self.when()
         return TheNewRegistryNode(url=sent.url, registry_name=sent.registry_name)
 
 
 @dataclass(frozen=True)
 class AProjectThatIsNotThereIsRefused(
-    TestScenario[
-        SeedingSession, AProjectAndACaller, ContainerRegistryAdapter, ContainerRegistryNode
-    ]
+    Scenario[SeedingSession, AProjectAndACaller, ContainerRegistryAdapter, ContainerRegistryNode]
 ):
     @override
     def summary(self) -> str:
@@ -145,23 +139,21 @@ class AProjectThatIsNotThereIsRefused(
         )
 
     @override
-    def given(self) -> TestGiven[SeedingSession, AProjectAndACaller]:
+    def given(self) -> Given[SeedingSession, AProjectAndACaller]:
         return NoRegistryYet(role=UserRole.SUPERADMIN)
 
     @override
-    def when(self) -> TestWhen[AProjectAndACaller, ContainerRegistryAdapter, ContainerRegistryNode]:
+    def when(self) -> When[AProjectAndACaller, ContainerRegistryAdapter, ContainerRegistryNode]:
         return Creating(allowed_projects=MissingProject())
 
     @override
-    def then(self) -> TestThen[AProjectAndACaller, ContainerRegistryNode]:
+    def then(self) -> Then[AProjectAndACaller, ContainerRegistryNode]:
         return TheCallIsRefused(ProjectNotFound)
 
 
 @dataclass(frozen=True)
 class APlainUserMayNotCreate(
-    TestScenario[
-        SeedingSession, AProjectAndACaller, ContainerRegistryAdapter, ContainerRegistryNode
-    ]
+    Scenario[SeedingSession, AProjectAndACaller, ContainerRegistryAdapter, ContainerRegistryNode]
 ):
     @override
     def summary(self) -> str:
@@ -175,15 +167,15 @@ class APlainUserMayNotCreate(
         )
 
     @override
-    def given(self) -> TestGiven[SeedingSession, AProjectAndACaller]:
+    def given(self) -> Given[SeedingSession, AProjectAndACaller]:
         return NoRegistryYet()
 
     @override
-    def when(self) -> TestWhen[AProjectAndACaller, ContainerRegistryAdapter, ContainerRegistryNode]:
+    def when(self) -> When[AProjectAndACaller, ContainerRegistryAdapter, ContainerRegistryNode]:
         return Creating()
 
     @override
-    def then(self) -> TestThen[AProjectAndACaller, ContainerRegistryNode]:
+    def then(self) -> Then[AProjectAndACaller, ContainerRegistryNode]:
         return TheCallIsRefused(InsufficientPrivilege)
 
 
