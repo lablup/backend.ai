@@ -920,7 +920,7 @@ class TestUtilizationIdleChecker:
         async def get_live_data_side_effect(key: str) -> bytes | None:
             if key.endswith(".util_last_collected"):
                 return str(window_start).encode()
-            if key.endswith(".util_samples"):
+            if key.endswith(".util_series_v2"):
                 return msgpack.packb({
                     "observed_since": window_start,
                     "collected_at": [window_start],
@@ -1273,7 +1273,7 @@ class TestUtilizationIdleChecker:
 
         # Setup side_effect using key inspection
         def mock_get_live_data_side_effect(key: str) -> bytes | None:
-            if ".util_samples" in key:
+            if ".util_series_v2" in key:
                 return msgpack.packb({
                     "observed_since": window_start,
                     "collected_at": [window_start],
@@ -1343,7 +1343,7 @@ class TestUtilizationIdleChecker:
         window_start = now.timestamp() - time_window_seconds
 
         def get_live_data_side_effect(key: str) -> bytes | None:
-            if ".util_samples" in key:
+            if ".util_series_v2" in key:
                 return msgpack.packb({
                     "observed_since": window_start,
                     "collected_at": [window_start],

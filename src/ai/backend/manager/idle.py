@@ -952,7 +952,7 @@ class UtilizationIdleChecker(BaseIdleChecker):
         requested_slots = cast(ResourceSlot, kernel.requested_slots)
         excluded_resources: set[str] = set()
 
-        util_samples_key = f"session.{session_id}.util_samples"
+        util_series_v2_key = f"session.{session_id}.util_series_v2"
         util_last_collected_key = self._get_last_collected_key(session_id)
 
         if time_window.total_seconds() < interval:
@@ -1019,9 +1019,9 @@ class UtilizationIdleChecker(BaseIdleChecker):
 
         # Update utilization time-series data.
         window_start = util_now - time_window.total_seconds()
-        raw_util_samples = await self._redis_live.get_live_data(util_samples_key)
-        if raw_util_samples is not None:
-            samples = _UtilizationSamples.unpack(raw_util_samples)
+        raw_util_series_v2 = await self._redis_live.get_live_data(util_series_v2_key)
+        if raw_util_series_v2 is not None:
+            samples = _UtilizationSamples.unpack(raw_util_series_v2)
         else:
             samples = _UtilizationSamples(observed_since=util_now, collected_at=[], series={})
         samples.drop_before(window_start)
@@ -1032,7 +1032,7 @@ class UtilizationIdleChecker(BaseIdleChecker):
         do_idle_check = samples.observed_since <= window_start
 
         await self._redis_live.store_live_data(
-            util_samples_key,
+            util_series_v2_key,
             samples.pack(),
             ex=max(86400, int(self.time_window.total_seconds() * 2)),
         )
