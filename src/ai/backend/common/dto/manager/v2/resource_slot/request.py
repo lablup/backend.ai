@@ -5,7 +5,7 @@ from __future__ import annotations
 from pydantic import Field, model_validator
 
 from ai.backend.common.api_handlers import BaseRequestModel
-from ai.backend.common.dto.manager.query import StringFilter, UUIDFilter
+from ai.backend.common.dto.manager.query import DecimalFilter, StringFilter, UUIDFilter
 from ai.backend.common.dto.manager.v2.rbac.types import UUIDScope
 from ai.backend.common.types import SlotTypes
 
@@ -169,6 +169,10 @@ class AgentResourceFilter(BaseRequestModel):
 
     slot_name: StringFilter | None = Field(default=None, description="Filter by slot name.")
     agent_id: StringFilter | None = Field(default=None, description="Filter by agent ID.")
+    reserved: DecimalFilter | None = Field(default=None, description="Filter by reserved amount.")
+    prereserved: DecimalFilter | None = Field(
+        default=None, description="Filter by pre-reserved amount."
+    )
     AND: list[AgentResourceFilter] | None = Field(
         default=None, description="Logical AND of multiple filter conditions."
     )

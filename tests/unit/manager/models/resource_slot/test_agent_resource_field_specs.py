@@ -8,12 +8,23 @@ from __future__ import annotations
 
 import uuid
 from decimal import Decimal
+from unittest.mock import MagicMock
 
 import pytest
 import sqlalchemy as sa
 
 from ai.backend.common.data.entity.agent import AgentUUID
 from ai.backend.common.data.entity.agent_resource import AgentResourceID
+from ai.backend.common.dto.manager.v2.resource_slot.request import (
+    AdminSearchAgentResourcesInput,
+    AgentResourceFilter,
+    AgentResourceOrder,
+)
+from ai.backend.common.dto.manager.v2.resource_slot.types import (
+    AgentResourceOrderField,
+    OrderDirection,
+)
+from ai.backend.manager.api.adapters.resource_slot.adapter import ResourceSlotAdapter
 from ai.backend.manager.data.resource_slot.types import AgentResourceData
 from ai.backend.manager.models.agent.row import AgentRow
 from ai.backend.manager.models.resource_slot.lookups import AgentResourceOwnerLookup
@@ -47,6 +58,8 @@ async def agent_uuid(
                 agent_uuid=owner,
                 slot_name="cpu",
                 capacity=Decimal(4),
+                reserved=Decimal("1.25"),
+                prereserved=Decimal("0.5"),
                 used=Decimal(1),
             )
         )
@@ -103,3 +116,112 @@ async def test_owner_lookup_crosses_to_the_agent_uuid(
     owners = await repository.field_owners(AgentResourceOwnerLookup(), [*row_ids, absent])
 
     assert owners == dict.fromkeys(row_ids, agent_uuid)
+
+
+@pytest.fixture
+def adapter() -> ResourceSlotAdapter:
+    return ResourceSlotAdapter(MagicMock(), MagicMock(), MagicMock())
+
+
+class TestAgentReservations:
+    async def test_stored_reservations_are_returned(
+        self, repository: OpsRepository[AgentResourceData], agent_uuid: AgentUUID
+    ) -> None:
+        result = await repository.search_in_scopes(
+            [AgentResourceTarget(agent_uuid=agent_uuid)], _searcher()
+        )
+        assert [(item.slot_name, item.reserved, item.prereserved) for item in result.items] == [
+            ("mem", Decimal(0), Decimal(0)),
+            ("cpu", Decimal("1.25"), Decimal("0.5")),
+        ]
+
+    @pytest.mark.parametrize("field", ["reserved", "prereserved"])
+    @pytest.mark.parametrize(
+        ("operator", "expected"),
+        [
+            ("equals", ["mem"]),
+            ("not_equals", ["cpu"]),
+            ("greater_than", ["cpu"]),
+            ("greater_than_or_equal", ["mem", "cpu"]),
+            ("less_than", []),
+            ("less_than_or_equal", ["mem"]),
+        ],
+    )
+    async def test_filter_reservations(
+        self,
+        repository: OpsRepository[AgentResourceData],
+        agent_uuid: AgentUUID,
+        adapter: ResourceSlotAdapter,
+        field: str,
+        operator: str,
+        expected: list[str],
+    ) -> None:
+        filter = AgentResourceFilter.model_validate({field: {operator: "0"}})
+        result = await repository.search_in_scopes(
+            [AgentResourceTarget(agent_uuid=agent_uuid)],
+            AgentResourceSearcher(
+                pagination=OffsetPagination(offset=0, limit=20),
+                conditions=adapter._convert_agent_resource_filter(filter),
+            ),
+        )
+        assert [item.slot_name for item in result.items] == expected
+
+    @pytest.mark.parametrize(
+        "field", [AgentResourceOrderField.RESERVED, AgentResourceOrderField.PRERESERVED]
+    )
+    @pytest.mark.parametrize("direction", [OrderDirection.ASC, OrderDirection.DESC])
+    async def test_order_reservations(
+        self,
+        repository: OpsRepository[AgentResourceData],
+        agent_uuid: AgentUUID,
+        adapter: ResourceSlotAdapter,
+        field: AgentResourceOrderField,
+        direction: OrderDirection,
+    ) -> None:
+        result = await repository.search_in_scopes(
+            [AgentResourceTarget(agent_uuid=agent_uuid)],
+            AgentResourceSearcher(
+                pagination=OffsetPagination(offset=0, limit=20),
+                orders=adapter._convert_agent_resource_orders([
+                    AgentResourceOrder(field=field, direction=direction)
+                ]),
+            ),
+        )
+        expected = ["mem", "cpu"] if direction == OrderDirection.ASC else ["cpu", "mem"]
+        assert [item.slot_name for item in result.items] == expected
+
+    @pytest.mark.parametrize(
+        ("query", "expected"),
+        [
+            (
+                '{"AND": [{"reserved": {"greater_than": "0"}}, {"prereserved": {"equals": "0.5"}}]}',
+                ["cpu"],
+            ),
+            (
+                '{"OR": [{"reserved": {"equals": "0"}, "prereserved": {"greater_than": "0"}}, {"reserved": {"equals": "1.25"}}]}',
+                ["cpu"],
+            ),
+            ('{"NOT": [{"reserved": {"greater_than": "0"}}]}', ["mem"]),
+        ],
+    )
+    async def test_combined_reservation_filters(
+        self,
+        repository: OpsRepository[AgentResourceData],
+        agent_uuid: AgentUUID,
+        adapter: ResourceSlotAdapter,
+        query: str,
+        expected: list[str],
+    ) -> None:
+        input = AdminSearchAgentResourcesInput(
+            filter=AgentResourceFilter.model_validate_json(query)
+        )
+        querier = adapter._build_agent_resource_querier(input)
+        result = await repository.search_in_scopes(
+            [AgentResourceTarget(agent_uuid=agent_uuid)],
+            AgentResourceSearcher(
+                pagination=querier.pagination,
+                conditions=querier.conditions,
+                orders=querier.orders,
+            ),
+        )
+        assert [item.slot_name for item in result.items] == expected

@@ -70,7 +70,7 @@ from ai.backend.common.dto.manager.v2.resource_slot.types import (
     NumberFormatInput as NumberFormatInputDTO,
 )
 from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
-from ai.backend.manager.api.gql.base import OrderDirection, StringFilter
+from ai.backend.manager.api.gql.base import DecimalFilter, OrderDirection, StringFilter
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     gql_added_field,
@@ -444,6 +444,18 @@ class AgentResourceSlotGQL(PydanticNodeMixin[AgentResourceNodeDTO]):
     capacity: Decimal = gql_field(
         description="Total hardware resource capacity for this slot on the agent."
     )
+    reserved: Decimal = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="Amount reserved by scheduling for this slot.",
+        ),
+    )
+    prereserved: Decimal = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="Amount reserved in advance by preemption plans.",
+        ),
+    )
     used: Decimal = gql_field(
         description="Amount of this slot currently consumed by running and scheduled sessions."
     )
@@ -505,6 +517,8 @@ class AgentResourceConnectionGQL(Connection[AgentResourceSlotGQL]):
 class AgentResourceSlotOrderFieldGQL(StrEnum):
     SLOT_NAME = "slot_name"
     CAPACITY = "capacity"
+    RESERVED = "reserved"
+    PRERESERVED = "prereserved"
     USED = "used"
 
 
@@ -517,6 +531,18 @@ class AgentResourceSlotOrderFieldGQL(StrEnum):
 class AgentResourceSlotFilterGQL(PydanticInputMixin[AgentResourceFilterDTO]):
     slot_name: StringFilter | None = None
     agent_id: StringFilter | None = None
+    reserved: DecimalFilter | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION, description="Filter by reserved amount."
+        ),
+        default=None,
+    )
+    prereserved: DecimalFilter | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION, description="Filter by pre-reserved amount."
+        ),
+        default=None,
+    )
 
     AND: list[Self] | None = None
     OR: list[Self] | None = None

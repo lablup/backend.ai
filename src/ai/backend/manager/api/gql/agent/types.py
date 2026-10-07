@@ -642,8 +642,6 @@ class AgentV2GQL(PydanticNodeMixin[AgentNode]):
         | None
     ):
         """Fetch per-slot resource capacity and usage for this agent."""
-        from decimal import Decimal
-
         import strawberry as _strawberry
 
         from ai.backend.common.dto.manager.query import StringFilter as StringFilterDTO
@@ -668,12 +666,8 @@ class AgentV2GQL(PydanticNodeMixin[AgentNode]):
         if filter is not None:
             pydantic_filter = filter.to_pydantic()
             if pydantic_filter.agent_id is None:
-                pydantic_filter = AgentResourceFilterDTO(
-                    slot_name=pydantic_filter.slot_name,
-                    agent_id=StringFilterDTO(equals=agent_id),
-                    AND=pydantic_filter.AND,
-                    OR=pydantic_filter.OR,
-                    NOT=pydantic_filter.NOT,
+                pydantic_filter = pydantic_filter.model_copy(
+                    update={"agent_id": StringFilterDTO(equals=agent_id)},
                 )
         else:
             pydantic_filter = AgentResourceFilterDTO(
@@ -698,14 +692,7 @@ class AgentV2GQL(PydanticNodeMixin[AgentNode]):
 
         edges = []
         for item in payload.items:
-            slot_name = item.slot_name
-            node = AgentResourceSlotGQL(
-                id=_strawberry.ID(item.id),
-                field_id=item.field_id,
-                slot_name=slot_name,
-                capacity=Decimal(item.capacity),
-                used=Decimal(item.used),
-            )
+            node = AgentResourceSlotGQL.from_pydantic(item)
             cursor = encode_cursor(item.field_id)
             edges.append(AgentResourceSlotEdgeGQL(node=node, cursor=cursor))
 

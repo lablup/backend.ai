@@ -166,6 +166,7 @@ class _AgentResourceOwnFields(RowDataConverter[AgentResourceRow, AgentResourceDa
             slot_name=self.slot_name.read(row),
             capacity=self.capacity.read(row),
             reserved=self.reserved.read(row),
+            prereserved=self.prereserved.read(row),
             used=self.used.read(row),
         )
 

@@ -60,6 +60,11 @@ from ai.backend.manager.data.resource_slot.types import (
     ResourceSlotTypeData,
 )
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
+from ai.backend.manager.models.condition_utils import (
+    combine_conditions_and,
+    combine_conditions_or,
+    negate_conditions,
+)
 from ai.backend.manager.models.resource_slot.creators import ResourceSlotTypeCreator
 from ai.backend.manager.models.resource_slot.purgers import ResourceSlotTypePurger
 from ai.backend.manager.models.resource_slot.row import (
@@ -419,10 +424,29 @@ class ResourceSlotAdapter(BaseAdapter):
 
     def _convert_agent_resource_filter(self, filter: AgentResourceFilter) -> list[QueryCondition]:
         fields = AgentResourceSearchableFields.own
-        return [
+        conditions = [
             *self.apply_string_filter(filter.slot_name, fields.slot_name.filter),
             *self.apply_string_filter(filter.agent_id, fields.agent_id.filter),
+            *self.apply_decimal_filter(filter.reserved, fields.reserved.filter),
+            *self.apply_decimal_filter(filter.prereserved, fields.prereserved.filter),
         ]
+        if filter.AND:
+            for sub in filter.AND:
+                conditions.extend(self._convert_agent_resource_filter(sub))
+        if filter.OR:
+            or_groups: list[QueryCondition] = []
+            for sub in filter.OR:
+                sub_conditions = self._convert_agent_resource_filter(sub)
+                if sub_conditions:
+                    or_groups.append(combine_conditions_and(sub_conditions))
+            if or_groups:
+                conditions.append(combine_conditions_or(or_groups))
+        if filter.NOT:
+            for sub in filter.NOT:
+                sub_conditions = self._convert_agent_resource_filter(sub)
+                if sub_conditions:
+                    conditions.append(negate_conditions(sub_conditions))
+        return conditions
 
     @staticmethod
     def _convert_agent_resource_orders(orders: list[AgentResourceOrder]) -> list[QueryOrder]:
@@ -437,6 +461,10 @@ class ResourceSlotAdapter(BaseAdapter):
                     converted.append(fields.slot_name.order.apply(ascending))
                 case AgentResourceOrderField.CAPACITY:
                     converted.append(fields.capacity.order.apply(ascending))
+                case AgentResourceOrderField.RESERVED:
+                    converted.append(fields.reserved.order.apply(ascending))
+                case AgentResourceOrderField.PRERESERVED:
+                    converted.append(fields.prereserved.order.apply(ascending))
                 case AgentResourceOrderField.USED:
                     converted.append(fields.used.order.apply(ascending))
                 case _:
@@ -452,6 +480,8 @@ class ResourceSlotAdapter(BaseAdapter):
             agent_id=data.agent_id,
             slot_name=data.slot_name,
             capacity=str(data.capacity),
+            reserved=str(data.reserved),
+            prereserved=str(data.prereserved),
             used=str(data.used),
         )
 

@@ -42,6 +42,8 @@ class AgentResourceOrderField(StrEnum):
     AGENT_ID = "agent_id"
     SLOT_NAME = "slot_name"
     CAPACITY = "capacity"
+    RESERVED = "reserved"
+    PRERESERVED = "prereserved"
     USED = "used"
 
 

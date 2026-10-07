@@ -411,6 +411,12 @@ type AgentResourceSlot implements Node {
   """Total hardware resource capacity for this slot on the agent."""
   capacity: Decimal!
 
+  """Added in 26.10.0. Amount reserved by scheduling for this slot."""
+  reserved: Decimal!
+
+  """Added in 26.10.0. Amount reserved in advance by preemption plans."""
+  prereserved: Decimal!
+
   """
   Amount of this slot currently consumed by running and scheduled sessions.
   """
@@ -430,6 +436,12 @@ type AgentResourceSlotEdge {
 input AgentResourceSlotFilter {
   slotName: StringFilter = null
   agentId: StringFilter = null
+
+  """Added in 26.10.0. Filter by reserved amount."""
+  reserved: DecimalFilter = null
+
+  """Added in 26.10.0. Filter by pre-reserved amount."""
+  prereserved: DecimalFilter = null
   AND: [AgentResourceSlotFilter!] = null
   OR: [AgentResourceSlotFilter!] = null
   NOT: [AgentResourceSlotFilter!] = null
@@ -445,6 +457,8 @@ input AgentResourceSlotOrderBy {
 enum AgentResourceSlotOrderField {
   SLOT_NAME
   CAPACITY
+  RESERVED
+  PRERESERVED
   USED
 }
 
