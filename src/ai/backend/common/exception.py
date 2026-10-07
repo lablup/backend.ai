@@ -1456,3 +1456,16 @@ class CloudDetectionError(BackendAIError, web.HTTPInternalServerError):
             operation=ErrorOperation.READ,
             error_detail=ErrorDetail.BAD_REQUEST,
         )
+
+
+class StorageVolumeUnusableError(BackendAIError, web.HTTPServiceUnavailable):
+    error_type = "https://api.backend.ai/probs/storage-volume-unusable"
+    error_title = "The storage volume is not usable on this service."
+
+    @override
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.STORAGE,
+            operation=ErrorOperation.ACCESS,
+            error_detail=ErrorDetail.UNAVAILABLE,
+        )
