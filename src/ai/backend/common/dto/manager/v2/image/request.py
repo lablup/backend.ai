@@ -115,6 +115,9 @@ class ImageFilterInputDTO(BaseRequestModel):
     customized: bool | None = Field(
         default=None, description="Filter by whether a session commit made the image."
     )
+    creator_id: UUIDFilter | None = Field(
+        default=None, description="Filter by the user a customized image was committed for."
+    )
     type: ImageTypeFilterInputDTO | None = Field(
         default=None, description="Filter by image type category."
     )

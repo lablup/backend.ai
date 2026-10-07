@@ -25,6 +25,7 @@
 | 시나리오 | 판정 |
 |---|---|
 | [슈퍼관리자가 크기와 오프셋 없이 커서만 지정해 검색하면 지정한 개수만 반환되고 다음 페이지가 있다고 알린다](#searching-a-cursor-alone-answers-the-first-page-and-says-there-is-more) | 성공 |
+| [호출자와 다른 사용자를 위해 각각 커밋된 커스텀 이미지 중 호출자를 커밋 대상 사용자로 검색하면 호출자를 위해 커밋된 이미지만 반환된다](#searching-filtering-images-by-creator-returns-only-images-committed-for-them) | 성공 |
 | [커스텀 이미지와 커스텀 이미지가 아닌 이미지 중 커스텀 이미지로 검색하면 커스텀 이미지만 커밋 대상 사용자와 함께 반환된다](#searching-filtering-images-by-customized-returns-only-customized-images) | 성공 |
 | [슈퍼관리자가 한 이미지의 이름으로 검색하면 그 이미지만 반환된다](#searching-filtering-images-by-name-returns-only-the-match) | 성공 |
 | [커스텀 이미지와 커스텀 이미지가 아닌 이미지 중 커스텀 이미지가 아닌 것으로 검색하면 커스텀 이미지가 아닌 이미지만 반환된다](#searching-filtering-images-by-not-customized-returns-only-uncustomized-images) | 성공 |
@@ -177,6 +178,41 @@ Then
   - length = 2
   - total_count = 3
   - has_next_page = True
+  - has_previous_page = False
+
+<a id="searching-filtering-images-by-creator-returns-only-images-committed-for-them"></a>
+
+#### [filtering-images-by-creator-returns-only-images-committed-for-them](/tests/scenario/bai_scenario/manager/image/test_searching.py) — pass
+
+호출자와 다른 사용자를 위해 각각 커밋된 커스텀 이미지 중 호출자를 커밋 대상 사용자로 검색하면 호출자를 위해 커밋된 이미지만 반환된다
+
+Given
+
+- 호출자를 위해 커밋된 커스텀 이미지 1개와 다른 사용자를 위해 커밋된 커스텀 이미지 1개, superadmin 1명
+  - 도메인 home-1
+  - 컨테이너 레지스트리 host-1: 이미지를 가져오는 곳
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+    - 사용자 정책 user-policy-2: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
+    - 일반 사용자 user-2: 자기 키와 개인 프로젝트를 갖는다
+  - 이미지 mine-1: x86_64 이미지, 커스터마이즈된 이미지라 소유자가 있다
+  - 이미지 theirs-1: x86_64 이미지, 커스터마이즈된 이미지라 소유자가 있다
+
+When
+
+- ImageAdapter.admin_search — user-1이 자신을 커밋 대상 사용자로 한 페이지에 50개씩 검색함
+
+Then
+
+- 호출자를 위해 커밋된 이미지만 반환된다
+  - items = ['mine-1']
+  - creator_id: 호출자의 ID와 같다
+  - total_count = 1
+  - has_next_page = False
   - has_previous_page = False
 
 <a id="searching-filtering-images-by-customized-returns-only-customized-images"></a>

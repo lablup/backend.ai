@@ -716,6 +716,13 @@ class ImageV2FilterGQL(PydanticInputMixin[ImageFilterInputDTO], GQLFilter):
         ),
         default=None,
     )
+    creator_id: UUIDFilter | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="Filter by the user a customized image was committed for.",
+        ),
+        default=None,
+    )
     type: ImageV2TypeFilterGQL | None = gql_added_field(
         BackendAIGQLMeta(
             added_version=NEXT_RELEASE_VERSION, description="Filter by image type category."

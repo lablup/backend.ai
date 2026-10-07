@@ -6946,6 +6946,11 @@ input ImageV2Filter {
   """Added in 26.10.0. Filter by whether a session commit made the image."""
   customized: Boolean = null
 
+  """
+  Added in 26.10.0. Filter by the user a customized image was committed for.
+  """
+  creatorId: UUIDFilter = null
+
   """Added in 26.10.0. Filter by image type category."""
   type: ImageV2TypeFilter = null
 

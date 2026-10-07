@@ -419,6 +419,7 @@ class ImageAdapter(BaseAdapter):
             *self.apply_int_filter(filter.size_bytes, fields.size_bytes.filter),
             *self.apply_bool_filter(filter.is_local, fields.is_local.filter),
             *self.apply_bool_filter(filter.customized, fields.customized.filter),
+            *self.apply_uuid_filter(filter.creator_id, fields.creator_id.filter),
             *self.apply_enum_filter(filter.type, fields.type.filter),
             *self.apply_datetime_filter(filter.created_at, fields.created_at.filter),
             *self.apply_datetime_filter(filter.last_used, fields.last_used_at.filter),

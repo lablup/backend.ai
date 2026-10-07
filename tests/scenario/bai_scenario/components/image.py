@@ -328,6 +328,46 @@ class CustomizedAndUncustomizedImages(Given[Any, ManyImagesAndACaller]):
 
 
 @dataclass(frozen=True)
+class ImagesCommittedForTwoUsers(Given[Any, ManyImagesAndACaller]):
+    """호출자를 위해 커밋된 커스텀 이미지와 다른 사용자를 위해 커밋된 커스텀 이미지, 슈퍼관리자.
+
+    `named`는 호출자를 위해 커밋된 이미지다.
+    """
+
+    @override
+    def describe(self) -> str:
+        return (
+            "호출자를 위해 커밋된 커스텀 이미지 1개와 다른 사용자를 위해 커밋된 커스텀 이미지 1개, "
+            "superadmin 1명"
+        )
+
+    @override
+    async def lay(self, seeding: Any) -> ManyImagesAndACaller:
+        domain = await seeding.creating(SeedDomain(name_hint="home"))
+        registry = await seeding.creating(SeedContainerRegistry(name_hint="host"))
+        caller = await seeding.within(SomeoneOf(domain, role=UserRole.SUPERADMIN))
+        other = await seeding.within(SomeoneOf(domain))
+        made_caller = seeding.made(caller)
+        mine = await seeding.creating_from(
+            SeedImage(name_hint="mine", customized=True, creator_id=UserID(made_caller.id)),
+            registry,
+        )
+        theirs = await seeding.creating_from(
+            SeedImage(
+                name_hint="theirs", customized=True, creator_id=UserID(seeding.made(other).id)
+            ),
+            registry,
+        )
+        made_mine = seeding.made(mine)
+        return ManyImagesAndACaller(
+            laid=(made_mine, seeding.made(theirs)),
+            named=made_mine,
+            registry=seeding.made(registry),
+            caller=made_caller,
+        )
+
+
+@dataclass(frozen=True)
 class ImagesInTwoRegistriesAndAPlainUser(Given[Any, ManyImagesAndACaller]):
     """레지스트리 2개에 나뉘어 있는 이미지들과, 한쪽 레지스트리에 권한을 받았거나 받지 않은 사용자.
 

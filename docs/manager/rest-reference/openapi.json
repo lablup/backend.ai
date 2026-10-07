@@ -12939,6 +12939,18 @@
             "description": "Filter by whether a session commit made the image.",
             "title": "Customized"
           },
+          "creator_id": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/UUIDFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter by the user a customized image was committed for."
+          },
           "type": {
             "anyOf": [
               {
