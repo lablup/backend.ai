@@ -8,7 +8,6 @@ from typing import TYPE_CHECKING
 
 import click
 from sqlalchemy.ext.asyncio import create_async_engine
-from yarl import URL
 
 from ai.backend.cli.types import ExitCode
 from ai.backend.common.json import load_json
@@ -38,18 +37,7 @@ def populate(cli_ctx: CLIContext, fixture_path: Path) -> None:
             log.error("no such fixture", fixture_path=fixture_path)
             return
         bootstrap_config = await cli_ctx.get_bootstrap_config()
-        db_username = bootstrap_config.db.user
-        db_password = bootstrap_config.db.password
-        db_addr = bootstrap_config.db.addr
-        db_name = bootstrap_config.db.name
-        db_url = (
-            URL(f"postgresql+asyncpg://{db_addr.host}/{db_name}")
-            .with_port(db_addr.port)
-            .with_user(db_username)
-        )
-        if db_password is not None:
-            db_url = db_url.with_password(db_password)
-        engine = create_async_engine(str(db_url))
+        engine = create_async_engine(bootstrap_config.db.sqlalchemy_url())
         try:
             await populate_fixture(engine, fixture)
         except Exception:

@@ -89,7 +89,7 @@ from ai.backend.manager.errors.resource import DomainNotFound, ResourceGroupNotF
 from ai.backend.manager.errors.resource_slot import AgentResourceCapacityExceeded
 from ai.backend.manager.exceptions import ErrorStatusInfo
 from ai.backend.manager.models.agent.row import AgentRow
-from ai.backend.manager.models.domain.row import DomainRow, domains, query_domain_dotfiles
+from ai.backend.manager.models.domain.row import DomainRow, domains
 from ai.backend.manager.models.image.row import ImageRow
 from ai.backend.manager.models.kernel.creators import KernelCreator
 from ai.backend.manager.models.kernel.row import (
@@ -2392,7 +2392,12 @@ class ScheduleDBSource:
                 ordered_entries.append(group_entry)
                 seen_paths.add(group_entry.path)
 
-        domain_dotfiles, _ = await query_domain_dotfiles(conn, user_scope.domain_name)
+        packed_domain_dotfiles = await conn.scalar(
+            sa.select(DomainRow.dotfiles).where(DomainRow.name == user_scope.domain_name)
+        )
+        domain_dotfiles = (
+            msgpack.unpackb(packed_domain_dotfiles) if packed_domain_dotfiles is not None else []
+        )
         for entry in domain_dotfiles:
             if entry["path"] not in seen_paths:
                 ordered_entries.append(

@@ -7,7 +7,11 @@ from typing import Any
 
 from sqlalchemy.orm.strategy_options import _AbstractLoad
 
-from ai.backend.common.data.entity.container_registry import ContainerRegistryID
+from ai.backend.common.data.entity.container_registry import (
+    ContainerRegistryID,
+    ContainerRegistryName,
+    ContainerRegistryProjectName,
+)
 from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.session import SessionID
 from ai.backend.common.exception import BackendAIError
@@ -150,8 +154,11 @@ class SessionRepository:
         registry_hostname: str,
         registry_project: str | None,
     ) -> ContainerRegistryData:
-        registry_id = await self._registry_db_source.lookup_id_by_name_and_project(
-            registry_hostname, registry_project
+        registry_id = await self._registry_db_source.lookup_id_by_name_and_registry_project(
+            ContainerRegistryName(registry_hostname),
+            ContainerRegistryProjectName(registry_project)
+            if registry_project is not None
+            else None,
         )
         return await self._registry_db_source.fetch_by_id(registry_id)
 

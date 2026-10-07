@@ -17,8 +17,6 @@ from typing import Any
 
 from callosum.rpc import Peer
 
-from ai.backend.common.contexts.request_id import current_request_id
-from ai.backend.common.contexts.user import current_user, triggered_user
 from ai.backend.common.message_queue.types import MessageMetadata
 
 
@@ -37,11 +35,7 @@ class PeerInvoker(Peer):
                 return f
 
             async def _wrapped(*args: Any, **kwargs: Any) -> Any:
-                metadata = MessageMetadata(
-                    request_id=current_request_id(),
-                    user=current_user(),
-                    triggered_user=triggered_user(),
-                )
+                metadata = MessageMetadata.from_current_context()
                 request_body = {
                     "args": args,
                     "kwargs": kwargs,

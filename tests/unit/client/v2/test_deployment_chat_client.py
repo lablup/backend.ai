@@ -1,10 +1,12 @@
 from __future__ import annotations
 
+import json
 from collections.abc import AsyncIterator
-from typing import Any
+from typing import Any, cast
+from unittest.mock import AsyncMock, Mock
 
+import aiohttp
 import pytest
-from aioresponses import aioresponses
 from pydantic import ValidationError
 from yarl import URL
 
@@ -37,35 +39,46 @@ def _make_body() -> dict[str, Any]:
     }
 
 
-def _last_call(mock: aioresponses, method: str, url: str) -> Any:
-    """Return the most recent ``RequestCall`` aioresponses captured for (method, url)."""
-    key = (method.upper(), URL(url))
-    calls = mock.requests[key]
-    assert calls, f"no request was captured for {method} {url}"
-    return calls[-1]
+@pytest.fixture
+async def http_session(chat_client: DeploymentChatClient) -> Mock:
+    """Replace the client's ``aiohttp.ClientSession``; set replies with ``_reply()``."""
+    await chat_client.close()
+    session = Mock(closed=False, close=AsyncMock())
+    chat_client._session = cast(aiohttp.ClientSession, session)
+    return session
+
+
+def _reply(
+    session: Mock, *, status: int = 200, payload: Any = None, body: str | None = None
+) -> None:
+    resp = Mock(status=status, reason=None)
+    resp.text = AsyncMock(return_value=body if body is not None else json.dumps(payload))
+    resp.__aenter__ = AsyncMock(return_value=resp)
+    resp.__aexit__ = AsyncMock(return_value=None)
+    session.request = Mock(return_value=resp)
 
 
 class TestChatCompletionSuccess:
     async def test_posts_to_v1_chat_completions_with_bearer_header(
-        self, chat_client: DeploymentChatClient
+        self, chat_client: DeploymentChatClient, http_session: Mock
     ) -> None:
-        with aioresponses() as m:
-            m.post(
-                CHAT_URL,
-                payload={
-                    "id": "cmpl-1",
-                    "choices": [
-                        {
-                            "index": 0,
-                            "message": {"role": "assistant", "content": "hi"},
-                            "finish_reason": "stop",
-                        }
-                    ],
-                },
-            )
-            resp = await chat_client.chat_completion(BASE_URL, "sk-test-token", _make_body())
-            call = _last_call(m, "POST", CHAT_URL)
+        _reply(
+            http_session,
+            payload={
+                "id": "cmpl-1",
+                "choices": [
+                    {
+                        "index": 0,
+                        "message": {"role": "assistant", "content": "hi"},
+                        "finish_reason": "stop",
+                    }
+                ],
+            },
+        )
+        resp = await chat_client.chat_completion(BASE_URL, "sk-test-token", _make_body())
+        call = http_session.request.call_args
 
+        assert call.args == ("POST", CHAT_URL)
         assert call.kwargs["headers"]["Authorization"] == "Bearer sk-test-token"
         assert call.kwargs["headers"]["Content-Type"] == "application/json"
         assert call.kwargs["json"] == _make_body()
@@ -74,82 +87,72 @@ class TestChatCompletionSuccess:
         assert resp.assistant_message == "hi"
 
     async def test_endpoint_url_already_ending_in_chat_completions(
-        self, chat_client: DeploymentChatClient
+        self, chat_client: DeploymentChatClient, http_session: Mock
     ) -> None:
-        with aioresponses() as m:
-            m.post(CHAT_URL, payload={"choices": []})
-            await chat_client.chat_completion(CHAT_URL, "sk-x", _make_body())
-            assert (("POST", URL(CHAT_URL))) in m.requests
+        _reply(http_session, payload={"choices": []})
+        await chat_client.chat_completion(CHAT_URL, "sk-x", _make_body())
+        assert http_session.request.call_args.args == ("POST", CHAT_URL)
 
     async def test_endpoint_url_with_trailing_slash_is_normalized(
-        self, chat_client: DeploymentChatClient
+        self, chat_client: DeploymentChatClient, http_session: Mock
     ) -> None:
-        with aioresponses() as m:
-            m.post(CHAT_URL, payload={"choices": []})
-            await chat_client.chat_completion(f"{CHAT_URL}/", "sk-x", _make_body())
-            assert (("POST", URL(CHAT_URL))) in m.requests
+        _reply(http_session, payload={"choices": []})
+        await chat_client.chat_completion(f"{CHAT_URL}/", "sk-x", _make_body())
+        assert http_session.request.call_args.args == ("POST", CHAT_URL)
 
     async def test_omits_authorization_when_token_is_none(
-        self, chat_client: DeploymentChatClient
+        self, chat_client: DeploymentChatClient, http_session: Mock
     ) -> None:
-        with aioresponses() as m:
-            m.post(CHAT_URL, payload={"choices": []})
-            await chat_client.chat_completion(BASE_URL, None, _make_body())
-            call = _last_call(m, "POST", CHAT_URL)
-        assert "Authorization" not in call.kwargs["headers"]
+        _reply(http_session, payload={"choices": []})
+        await chat_client.chat_completion(BASE_URL, None, _make_body())
+        assert "Authorization" not in http_session.request.call_args.kwargs["headers"]
 
 
 class TestAuthErrors:
-    async def test_401_raises_DeploymentAuthError(self, chat_client: DeploymentChatClient) -> None:
-        with aioresponses() as m:
-            m.post(CHAT_URL, status=401, payload={"error": "invalid api key"})
-            with pytest.raises(DeploymentAuthError) as exc_info:
-                await chat_client.chat_completion(BASE_URL, "bad", _make_body())
+    async def test_401_raises_DeploymentAuthError(
+        self, chat_client: DeploymentChatClient, http_session: Mock
+    ) -> None:
+        _reply(http_session, status=401, payload={"error": "invalid api key"})
+        with pytest.raises(DeploymentAuthError) as exc_info:
+            await chat_client.chat_completion(BASE_URL, "bad", _make_body())
         assert exc_info.value.status == 401
 
-    async def test_403_raises_DeploymentAuthError(self, chat_client: DeploymentChatClient) -> None:
-        with aioresponses() as m:
-            m.post(CHAT_URL, status=403, payload={"error": "forbidden"})
-            with pytest.raises(DeploymentAuthError):
-                await chat_client.chat_completion(BASE_URL, "bad", _make_body())
+    async def test_403_raises_DeploymentAuthError(
+        self, chat_client: DeploymentChatClient, http_session: Mock
+    ) -> None:
+        _reply(http_session, status=403, payload={"error": "forbidden"})
+        with pytest.raises(DeploymentAuthError):
+            await chat_client.chat_completion(BASE_URL, "bad", _make_body())
 
 
 class TestServerErrors:
     async def test_500_raises_BackendAPIError_not_auth(
-        self, chat_client: DeploymentChatClient
+        self, chat_client: DeploymentChatClient, http_session: Mock
     ) -> None:
-        with aioresponses() as m:
-            m.post(CHAT_URL, status=500, payload={"error": "boom"})
-            with pytest.raises(BackendAPIError) as exc_info:
-                await chat_client.chat_completion(BASE_URL, "sk", _make_body())
+        _reply(http_session, status=500, payload={"error": "boom"})
+        with pytest.raises(BackendAPIError) as exc_info:
+            await chat_client.chat_completion(BASE_URL, "sk", _make_body())
         assert not isinstance(exc_info.value, DeploymentAuthError)
         assert exc_info.value.status == 500
 
 
 class TestNonJsonResponse:
     async def test_non_json_2xx_raises_client_error(
-        self, chat_client: DeploymentChatClient
+        self, chat_client: DeploymentChatClient, http_session: Mock
     ) -> None:
-        with aioresponses() as m:
-            m.post(CHAT_URL, status=200, body="not-json", content_type="text/plain")
-            with pytest.raises(BackendClientError):
-                await chat_client.chat_completion(BASE_URL, "sk", _make_body())
+        _reply(http_session, status=200, body="not-json")
+        with pytest.raises(BackendClientError):
+            await chat_client.chat_completion(BASE_URL, "sk", _make_body())
 
     async def test_html_5xx_raises_backend_api_error_with_body(
-        self, chat_client: DeploymentChatClient
+        self, chat_client: DeploymentChatClient, http_session: Mock
     ) -> None:
         # app-proxy / cloud LB error pages: 5xx with HTML body. The HTTP
         # status carries the meaningful failure signal, so this surfaces as
         # BackendAPIError with the raw body in ``detail``.
-        with aioresponses() as m:
-            m.post(
-                CHAT_URL,
-                status=502,
-                body="<html><body>Bad Gateway</body></html>",
-                content_type="text/html",
-            )
-            with pytest.raises(BackendAPIError) as exc_info:
-                await chat_client.chat_completion(BASE_URL, "sk", _make_body())
+        _reply(http_session, status=502, body="<html><body>Bad Gateway</body></html>")
+        with pytest.raises(BackendAPIError) as exc_info:
+            await chat_client.chat_completion(BASE_URL, "sk", _make_body())
         assert exc_info.value.status == 502
         assert "Bad Gateway" in exc_info.value.data["detail"]
 

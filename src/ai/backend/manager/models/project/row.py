@@ -33,7 +33,6 @@ from ai.backend.common.types import ResourceSlot, VFolderHostPermissionMap
 from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.data.permission.permission_defs import ProjectPermission
 from ai.backend.manager.data.project.types import ProjectStatus, ProjectType
-from ai.backend.manager.defs import RESERVED_DOTFILES
 from ai.backend.manager.models.association_container_registries_groups.row import (
     AssociationContainerRegistriesGroupsRow,
 )
@@ -79,7 +78,6 @@ __all__: Sequence[str] = (
     "ProjectType",
     "association_groups_users",
     "groups",
-    "verify_dotfile_name",
 )
 
 MAXIMUM_DOTFILE_SIZE = 64 * 1024  # 61 KiB
@@ -336,10 +334,6 @@ class ProjectModel(RBACModel[ProjectPermission]):
             _container_registry=row.container_registry,
             _permissions=frozenset(permissions),
         )
-
-
-def verify_dotfile_name(dotfile: str) -> bool:
-    return dotfile not in RESERVED_DOTFILES
 
 
 ALL_PROJECT_PERMISSIONS = frozenset([perm for perm in ProjectPermission])
