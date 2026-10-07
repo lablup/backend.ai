@@ -35,7 +35,6 @@ class ServiceCatalogData(EntityData):
     registered_at: datetime
     last_heartbeat: datetime
     config_hash: str
-    endpoints: list[ServiceCatalogEndpointData] = field(default_factory=list)
 
     @override
     def entity_id(self) -> EntityIdentifier:

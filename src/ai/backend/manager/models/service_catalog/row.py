@@ -12,7 +12,7 @@ from typing import Any
 
 import sqlalchemy as sa
 from sqlalchemy.dialects.postgresql import JSONB
-from sqlalchemy.orm import Mapped, mapped_column, relationship
+from sqlalchemy.orm import Mapped, mapped_column
 
 from ai.backend.common.data.entity.service_catalog import ServiceCatalogID
 from ai.backend.common.types import ServiceCatalogStatus
@@ -68,11 +68,6 @@ class ServiceCatalogRow(Base):
     )
     config_hash: Mapped[str] = mapped_column(
         "config_hash", sa.String(length=128), nullable=False, server_default=sa.text("''")
-    )
-
-    endpoints: Mapped[list[ServiceCatalogEndpointRow]] = relationship(
-        "ServiceCatalogEndpointRow",
-        cascade="all, delete-orphan",
     )
 
     __table_args__ = (
