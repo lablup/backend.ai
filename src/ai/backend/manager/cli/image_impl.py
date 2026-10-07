@@ -17,7 +17,8 @@ from ai.backend.common.exception import UnknownImageReference
 from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.container_registry.harbor import HarborRegistry_v2
 from ai.backend.manager.data.image.types import ImageData, ImageStatus
-from ai.backend.manager.errors.image import AliasImageActionDBError, ImageNotFound
+from ai.backend.manager.errors.image import ImageNotFound
+from ai.backend.manager.errors.repository import UniqueConstraintViolationError
 from ai.backend.manager.models.container_registry.row import ContainerRegistryRow
 from ai.backend.manager.models.image.creators import ImageAliasCreator
 from ai.backend.manager.models.image.purgers import ImagePurger
@@ -250,8 +251,8 @@ async def alias(cli_ctx: CLIContext, alias: str, target: str, architecture: str)
             )
         except UnknownImageReference:
             log.error("image not found", image_ref=target)
-        except AliasImageActionDBError:
-            log.exception("image alias creation failed", image_alias=alias)
+        except UniqueConstraintViolationError:
+            log.error("image alias already exists", image_alias=alias)
         except Exception:
             log.exception("image command failed")
 
