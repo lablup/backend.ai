@@ -9,7 +9,6 @@ from uuid import UUID
 from strawberry import Info
 from strawberry.relay import Connection, Edge, NodeID, PageInfo
 
-from ai.backend.common.data.entity.global_entity import GlobalEntityName
 from ai.backend.common.data.entity.role_preset import RolePresetID
 from ai.backend.common.dto.manager.v2.role_permission_preset.request import (
     RolePermissionPresetFilter,
@@ -17,6 +16,7 @@ from ai.backend.common.dto.manager.v2.role_permission_preset.request import (
     SearchRolePermissionPresetsInput,
 )
 from ai.backend.common.dto.manager.v2.role_preset.response import RolePresetNode
+from ai.backend.common.dto.manager.v2.role_preset.types import RolePresetGlobalScope
 from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import encode_cursor
 from ai.backend.manager.api.gql.decorators import (
@@ -39,13 +39,13 @@ from .permission import (
     RolePermissionPresetOrderFieldGQL,
 )
 
-GlobalEntityNameGQL: type[GlobalEntityName] = gql_enum(
+RolePresetGlobalScopeGQL: type[RolePresetGlobalScope] = gql_enum(
     BackendAIGQLMeta(
         added_version=NEXT_RELEASE_VERSION,
-        description="A singleton scope of the global entity type.",
+        description="The global entity a global role preset's role is created in.",
     ),
-    GlobalEntityName,
-    name="GlobalEntityName",
+    RolePresetGlobalScope,
+    name="RolePresetGlobalScope",
 )
 
 
@@ -68,7 +68,7 @@ class RolePresetGQL(PydanticNodeMixin[RolePresetNode]):
     scope_type: str = gql_field(
         description="Scope type this preset targets (e.g., domain, project)."
     )
-    scope: GlobalEntityNameGQL | None = gql_added_field(
+    global_scope: RolePresetGlobalScopeGQL | None = gql_added_field(
         BackendAIGQLMeta(
             added_version=NEXT_RELEASE_VERSION,
             description=(

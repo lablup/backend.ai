@@ -15,6 +15,7 @@ from ai.backend.common.data.entity.domain import DomainEntityType
 from ai.backend.common.data.entity.global_entity import GlobalEntityID, GlobalEntityName
 from ai.backend.common.data.entity.role_preset import RolePresetID
 from ai.backend.common.data.entity.types import EntityType, GlobalEntityType
+from ai.backend.common.dto.manager.v2.role_preset.types import RolePresetGlobalScope
 from ai.backend.manager.api.adapters.role_preset.adapter import RolePresetAdapter
 from ai.backend.manager.data.permission.global_entity import GlobalEntityIDCache
 from ai.backend.manager.data.role_preset.types import RolePresetData
@@ -29,7 +30,7 @@ _PRESET_ID = RolePresetID(uuid4())
 class _ScopeCase:
     scope_type: EntityType
     scope_id: UUID | None
-    expected: GlobalEntityName | None
+    expected: RolePresetGlobalScope | None
 
 
 @pytest.fixture(autouse=True)
@@ -71,12 +72,12 @@ class TestRolePresetNode:
             _ScopeCase(
                 scope_type=GlobalEntityType(),
                 scope_id=_GLOBAL_ID,
-                expected=GlobalEntityName.GLOBAL,
+                expected=RolePresetGlobalScope.GLOBAL,
             ),
             _ScopeCase(
                 scope_type=GlobalEntityType(),
                 scope_id=_PUBLIC_ID,
-                expected=GlobalEntityName.PUBLIC,
+                expected=RolePresetGlobalScope.PUBLIC,
             ),
             _ScopeCase(scope_type=GlobalEntityType(), scope_id=None, expected=None),
             _ScopeCase(scope_type=DomainEntityType(), scope_id=_DOMAIN_ID, expected=None),
@@ -89,5 +90,5 @@ class TestRolePresetNode:
     ) -> None:
         node = await adapter.get(_PRESET_ID)
 
-        assert node.scope == case.expected
+        assert node.global_scope == case.expected
         assert node.role_name_template == preset.role_name_template

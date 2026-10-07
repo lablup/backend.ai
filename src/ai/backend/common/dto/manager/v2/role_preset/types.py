@@ -10,10 +10,18 @@ from pydantic import Field
 from ai.backend.common.api_handlers import BaseRequestModel
 
 __all__ = (
+    "RolePresetGlobalScope",
     "RolePresetOrderField",
     "RolePresetUsage",
     "RolePresetUsedBy",
 )
+
+
+class RolePresetGlobalScope(StrEnum):
+    """The global entity a global role preset's role is created in."""
+
+    GLOBAL = "global"
+    PUBLIC = "public"
 
 
 class RolePresetOrderField(StrEnum):
