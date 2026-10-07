@@ -8,6 +8,7 @@ from typing import Any, override
 import pytest
 
 from ai.backend.common.data.entity.image import ImageID
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.dto.manager.query import StringFilter, UUIDFilter
 from ai.backend.common.dto.manager.v2.image.request import (
@@ -45,6 +46,7 @@ from ai.backend.testutils.scenario_steps import (
     Given,
     Held,
     Same,
+    SameAs,
     Scenario,
     Then,
     Verdict,
@@ -61,7 +63,9 @@ from bai_scenario.components.image import (
     ByCursor,
     ByOffset,
     ByTwoModesAtOnce,
+    CustomizedAndUncustomizedImages,
     Filled,
+    ImagesCommittedForTwoUsers,
     ImagesInTwoRegistriesAndAPlainUser,
     ImagesWithTwoStatuses,
     ManyImagesAndACaller,
@@ -83,6 +87,8 @@ class Searching(When[ManyImagesAndACaller, ImageAdapter, AdminSearchImagesPayloa
     paging: Paging = field(default_factory=ByOffset)
     named_only: bool = False
     status: ImageStatusType | None = None
+    customized: bool | None = None
+    committed_for_caller: bool = False
     descending: bool = False
 
     @override
@@ -96,6 +102,12 @@ class Searching(When[ManyImagesAndACaller, ImageAdapter, AdminSearchImagesPayloa
             conditions.append(f"{laid.named.name} 이름으로")
         if self.status is not None:
             conditions.append(f"{self.status.value} 상태로")
+        if self.customized is not None:
+            conditions.append(
+                "커스텀 이미지로" if self.customized else "커스텀 이미지가 아닌 것으로"
+            )
+        if self.committed_for_caller:
+            conditions.append("자신이 커밋한 이미지로")
         if self.descending:
             conditions.append("이름 내림차순으로 정렬해")
         conditions.append(self.paging.says())
@@ -106,13 +118,22 @@ class Searching(When[ManyImagesAndACaller, ImageAdapter, AdminSearchImagesPayloa
         self, adapter: ImageAdapter, laid: ManyImagesAndACaller
     ) -> AdminSearchImagesPayload:
         filter_input = None
-        if self.named_only or self.status is not None:
+        if (
+            self.named_only
+            or self.status is not None
+            or self.customized is not None
+            or self.committed_for_caller
+        ):
             filter_input = ImageFilterInputDTO(
                 name=StringFilter(equals=str(laid.named.name)) if self.named_only else None,
                 status=(
                     ImageStatusFilterInputDTO(equals=self.status)
                     if self.status is not None
                     else None
+                ),
+                customized=self.customized,
+                creator_id=(
+                    UUIDFilter(equals=laid.caller.id) if self.committed_for_caller else None
                 ),
             )
         order = (
@@ -386,6 +407,78 @@ class OnlyTheAliveImageIsReturned(Then[ManyImagesAndACaller, AdminSearchImagesPa
 
 
 @dataclass(frozen=True)
+class OnlyImagesOfTheCustomizationAreReturned(Then[ManyImagesAndACaller, AdminSearchImagesPayload]):
+    """커스텀 여부가 일치하는 이미지만, 커스텀 여부와 커밋한 사용자를 담아 반환된다."""
+
+    customized: bool
+
+    @override
+    def says(self) -> str:
+        if self.customized:
+            return "커스텀 이미지만 반환되고, 커밋한 사용자로 호출자가 담긴다"
+        return "커스텀 이미지가 아닌 이미지만 반환되고, 커밋한 사용자는 비어 있다"
+
+    @override
+    def look(
+        self, laid: ManyImagesAndACaller, answered: Answered[AdminSearchImagesPayload]
+    ) -> list[Verdict]:
+        payload = answered.response
+        if payload is None:
+            return [Held("응답", answered.response, Filled())]
+        expected = [one for one in laid.laid if one.customized is self.customized]
+        got_creators = [one.creator_id for one in payload.items]
+        committed_for: list[UserID | None] = [UserID(laid.caller.id)]
+        creator: Verdict = (
+            Held("creator_id", got_creators, SameAs(committed_for, "호출자의 ID"))
+            if self.customized
+            else Same("creator_id", got_creators, [one.creator_id for one in expected])
+        )
+        return [
+            Same("items", [one.name for one in payload.items], [str(one.name) for one in expected]),
+            Same(
+                "customized",
+                [one.customized for one in payload.items],
+                [one.customized for one in expected],
+            ),
+            creator,
+            Same("total_count", payload.total_count, len(expected)),
+            Same("has_next_page", payload.has_next_page, False),
+            Same("has_previous_page", payload.has_previous_page, False),
+        ]
+
+
+@dataclass(frozen=True)
+class OnlyTheImageCommittedForTheCallerIsReturned(
+    Then[ManyImagesAndACaller, AdminSearchImagesPayload]
+):
+    """호출자가 커밋한 이미지만 반환된다."""
+
+    @override
+    def says(self) -> str:
+        return "호출자가 커밋한 이미지만 반환된다"
+
+    @override
+    def look(
+        self, laid: ManyImagesAndACaller, answered: Answered[AdminSearchImagesPayload]
+    ) -> list[Verdict]:
+        payload = answered.response
+        if payload is None:
+            return [Held("응답", answered.response, Filled())]
+        committed_for: list[UserID | None] = [UserID(laid.caller.id)]
+        return [
+            Same("items", [one.name for one in payload.items], [str(laid.named.name)]),
+            Held(
+                "creator_id",
+                [one.creator_id for one in payload.items],
+                SameAs(committed_for, "호출자의 ID"),
+            ),
+            Same("total_count", payload.total_count, 1),
+            Same("has_next_page", payload.has_next_page, False),
+            Same("has_previous_page", payload.has_previous_page, False),
+        ]
+
+
+@dataclass(frozen=True)
 class TheMiddleOfTheDescendingOrderIsReturned(Then[ManyImagesAndACaller, AdminSearchImagesPayload]):
     """이름 내림차순으로 정렬한 뒤 첫 항목을 제외한 2개가 반환된다."""
 
@@ -561,6 +654,71 @@ class SearchingByStatusReturnsOnlyAliveImages(
     @override
     def then(self) -> Then[ManyImagesAndACaller, AdminSearchImagesPayload]:
         return OnlyTheAliveImageIsReturned()
+
+
+@dataclass(frozen=True)
+class SearchingByCustomizationReturnsOnlyTheMatch(
+    Scenario[SeedingSession, ManyImagesAndACaller, ImageAdapter, AdminSearchImagesPayload]
+):
+    customized: bool
+
+    @override
+    def summary(self) -> str:
+        if self.customized:
+            return "filtering-images-by-customized-returns-only-customized-images"
+        return "filtering-images-by-not-customized-returns-only-uncustomized-images"
+
+    @override
+    def describe(self) -> str:
+        if self.customized:
+            return (
+                "커스텀 이미지와 커스텀 이미지가 아닌 이미지 중 커스텀 이미지로 검색하면 "
+                "커스텀 이미지만 커밋한 사용자와 함께 반환된다"
+            )
+        return (
+            "커스텀 이미지와 커스텀 이미지가 아닌 이미지 중 커스텀 이미지가 아닌 것으로 검색하면 "
+            "커스텀 이미지가 아닌 이미지만 반환된다"
+        )
+
+    @override
+    def given(self) -> Given[SeedingSession, ManyImagesAndACaller]:
+        return CustomizedAndUncustomizedImages()
+
+    @override
+    def when(self) -> When[ManyImagesAndACaller, ImageAdapter, AdminSearchImagesPayload]:
+        return Searching(paging=ByOffset(limit=DEFAULT_PAGE), customized=self.customized)
+
+    @override
+    def then(self) -> Then[ManyImagesAndACaller, AdminSearchImagesPayload]:
+        return OnlyImagesOfTheCustomizationAreReturned(customized=self.customized)
+
+
+@dataclass(frozen=True)
+class SearchingByCreatorReturnsOnlyTheirImages(
+    Scenario[SeedingSession, ManyImagesAndACaller, ImageAdapter, AdminSearchImagesPayload]
+):
+    @override
+    def summary(self) -> str:
+        return "filtering-images-by-creator-returns-only-images-they-committed"
+
+    @override
+    def describe(self) -> str:
+        return (
+            "호출자와 다른 사용자가 각각 커밋한 커스텀 이미지 중 호출자가 커밋한 것으로 "
+            "검색하면 호출자가 커밋한 이미지만 반환된다"
+        )
+
+    @override
+    def given(self) -> Given[SeedingSession, ManyImagesAndACaller]:
+        return ImagesCommittedForTwoUsers()
+
+    @override
+    def when(self) -> When[ManyImagesAndACaller, ImageAdapter, AdminSearchImagesPayload]:
+        return Searching(paging=ByOffset(limit=DEFAULT_PAGE), committed_for_caller=True)
+
+    @override
+    def then(self) -> Then[ManyImagesAndACaller, AdminSearchImagesPayload]:
+        return OnlyTheImageCommittedForTheCallerIsReturned()
 
 
 @dataclass(frozen=True)
@@ -984,6 +1142,9 @@ SCENARIOS: list[Any] = [
     SearchingWithoutAFilterCountsEvery(),
     SearchingByNameReturnsOnlyTheMatch(),
     SearchingByStatusReturnsOnlyAliveImages(),
+    SearchingByCustomizationReturnsOnlyTheMatch(customized=True),
+    SearchingByCustomizationReturnsOnlyTheMatch(customized=False),
+    SearchingByCreatorReturnsOnlyTheirImages(),
     OrderingAndOffsetChooseTheMiddlePage(),
     ThePageSizeDefaultsToFifty(),
     ACursorAloneReadsFromTheFront(),

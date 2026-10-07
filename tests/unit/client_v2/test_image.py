@@ -57,6 +57,7 @@ _SAMPLE_IMAGE_DATA = {
     "accelerators": None,
     "config_digest": "sha256:abc123",
     "is_local": False,
+    "customized": False,
     "created_at": "2025-01-01T00:00:00Z",
 }
 
