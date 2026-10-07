@@ -8,11 +8,9 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 
-from ai.backend.common.data.entity.global_entity import GlobalEntityID
 from ai.backend.common.data.entity.role import RoleID
 from ai.backend.common.data.entity.role_permission_preset import RolePermissionPresetID
 from ai.backend.common.data.entity.role_preset import RolePresetID
-from ai.backend.common.data.entity.types import GlobalEntityType
 from ai.backend.common.dto.manager.v2.common import OrderDirection
 from ai.backend.common.dto.manager.v2.rbac.types import PermissionBitDTO, PermissionBitFilter
 from ai.backend.common.dto.manager.v2.role_permission_preset.request import (
@@ -490,17 +488,12 @@ class RolePresetAdapter(BaseAdapter):
 
     @staticmethod
     def _data_to_node(data: RolePresetData) -> RolePresetNode:
-        global_scope = (
-            GlobalEntityIDCache.name_of(GlobalEntityID(data.scope_id))
-            if data.scope_type == GlobalEntityType() and data.scope_id is not None
-            else None
-        )
         return RolePresetNode(
             id=data.id,
             entity_id=data.entity_id(),
             name=data.name,
             scope_type=data.scope_type,
-            global_scope=global_scope,
+            global_scope=GlobalEntityIDCache.name_of_scope(data.scope_type, data.scope_id),
             role_name_template=data.role_name_template,
             auto_assign=data.auto_assign,
             deleted=data.deleted,
