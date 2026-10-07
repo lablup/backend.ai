@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import logging
 import uuid
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
@@ -28,7 +27,6 @@ from ai.backend.common.types import (
     VFolderMountPolicy,
     VFolderUsageMode,
 )
-from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.data.entity_share.types import EntityShareStatus
 from ai.backend.manager.data.permission.permission_defs import StorageHostPermission
 from ai.backend.manager.data.permission.permission_defs import (
@@ -74,9 +72,6 @@ __all__: Sequence[str] = (
     "VFolderRow",
     "VFolderUserMountPolicyRow",
 )
-
-
-log = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 def _get_user_row_join_condition() -> sa.sql.elements.ColumnElement[Any]:
@@ -352,22 +347,6 @@ MOUNT_POLICY_TO_RBAC_PERMISSION_MAP: Mapping[
 }
 
 
-_VFOLDER_PERMISSION_TO_STORAGE_HOST_PERMISSION_MAP: Mapping[
-    VFolderRBACPermission, StorageHostPermission
-] = {
-    VFolderRBACPermission.CLONE: StorageHostPermission.CLONE,
-    VFolderRBACPermission.ASSIGN_PERMISSION_TO_OTHERS: StorageHostPermission.ASSIGN_PERMISSION_TO_OTHERS,
-    VFolderRBACPermission.READ_ATTRIBUTE: StorageHostPermission.READ_ATTRIBUTE,
-    VFolderRBACPermission.UPDATE_ATTRIBUTE: StorageHostPermission.UPDATE_ATTRIBUTE,
-    VFolderRBACPermission.DELETE_VFOLDER: StorageHostPermission.DELETE_VFOLDER,
-    VFolderRBACPermission.READ_CONTENT: StorageHostPermission.READ_CONTENT,
-    VFolderRBACPermission.WRITE_CONTENT: StorageHostPermission.WRITE_CONTENT,
-    VFolderRBACPermission.DELETE_CONTENT: StorageHostPermission.DELETE_CONTENT,
-    VFolderRBACPermission.MOUNT_RO: StorageHostPermission.MOUNT_RO,
-    VFolderRBACPermission.MOUNT_RW: StorageHostPermission.MOUNT_RW,
-    VFolderRBACPermission.MOUNT_WD: StorageHostPermission.MOUNT_WD,
-}
-
 _STORAGE_HOST_PERMISSION_TO_VFOLDER_PERMISSION_MAP: Mapping[
     StorageHostPermission, VFolderRBACPermission
 ] = {
@@ -425,9 +404,6 @@ class VFolderPermissionContext(
                 host_names = self.host_permission_ctx.host_to_permissions_map.keys()
                 cond = cond & VFolderRow.host.in_(host_names)
         return cond
-
-    def apply_host_permission_ctx(self, host_permission_ctx: StorageHostPermissionContext) -> None:
-        self.host_permission_ctx = host_permission_ctx
 
     @override
     async def build_query(self) -> sa.sql.Select[Any] | None:
@@ -726,9 +702,3 @@ async def get_permission_ctx(
     async with ctx.db.begin_readonly_session(db_conn) as db_session:
         builder = VFolderPermissionContextBuilder(db_session)
         return await builder.build(ctx, target_scope, requested_permission)
-        # TODO: Plan how to check storage host permission with recursive scopes
-        # host_permission = _VFOLDER_PERMISSION_TO_STORAGE_HOST_PERMISSION_MAP[requested_permission]
-        # host_permission_ctx = await StorageHostPermissionContextBuilder(db_session).build(
-        #     ctx, target_scope, host_permission
-        # )
-        # permission_ctx.apply_host_permission_ctx(host_permission_ctx)
