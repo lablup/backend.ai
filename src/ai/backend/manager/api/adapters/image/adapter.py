@@ -26,6 +26,7 @@ from ai.backend.common.dto.manager.v2.image.request import (
     ImageOrderByInputDTO,
     PurgeImageInput,
     RestoreImageInput,
+    ScanImageInput,
     ScopedSearchImagesInput,
     SearchImageAliasesInput,
     UpdateImageInput,
@@ -42,6 +43,7 @@ from ai.backend.common.dto.manager.v2.image.response import (
     ImageRequirementsInfoDTO,
     PurgeImagePayload,
     RestoreImagePayload,
+    ScanImagePayload,
     ScopedSearchImagesPayload,
     SearchImageAliasesPayload,
     UpdateImagePayload,
@@ -92,6 +94,7 @@ from ai.backend.manager.services.image.actions.dealias_image import DealiasImage
 from ai.backend.manager.services.image.actions.forget_image import ForgetImageByIdAction
 from ai.backend.manager.services.image.actions.purge_images import PurgeImageByIdAction
 from ai.backend.manager.services.image.actions.restore_image import RestoreImageByIdAction
+from ai.backend.manager.services.image.actions.scan_image import GlobalScanImageAction
 from ai.backend.manager.services.image.actions.scoped_search import (
     ScopedSearchImagesAction,
 )
@@ -336,6 +339,12 @@ class ImageAdapter(BaseAdapter):
         )
 
     # ------------------------------------------------------------------ mutations
+
+    async def admin_scan_image(self, input: ScanImageInput) -> ScanImagePayload:
+        result = await self._image.global_scan_image.run(
+            GlobalScanImageAction(canonical=input.canonical, architecture=input.architecture)
+        )
+        return ScanImagePayload(item=self._data_to_dto(result.image))
 
     async def admin_forget(self, input: ForgetImageInput) -> ForgetImagePayload:
         """Forget (soft-delete) an image by ID."""

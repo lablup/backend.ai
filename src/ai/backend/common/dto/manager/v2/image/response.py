@@ -37,7 +37,7 @@ __all__ = (
     "ImagePermissionInfoDTO",
     "ImageRequirementsInfoDTO",
     "PurgeImagePayload",
-    "RescanImagesPayload",
+    "ScanImagePayload",
     "SearchImageAliasesPayload",
     "SearchImagesPayload",
     "UpdateImagePayload",
@@ -100,11 +100,10 @@ class GetImagePayload(BaseResponseModel):
     item: ImageNode = Field(description="Retrieved image")
 
 
-class RescanImagesPayload(BaseResponseModel):
-    """Payload for image rescan result."""
+class ScanImagePayload(BaseResponseModel):
+    """Scanned image matching the requested architecture."""
 
-    item: ImageNode = Field(description="Rescanned image")
-    errors: list[str] = Field(default_factory=list, description="Errors encountered during rescan")
+    item: ImageNode = Field(description="Scanned image matching the requested architecture")
 
 
 class AliasImagePayload(BaseResponseModel):
