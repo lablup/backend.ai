@@ -3282,6 +3282,10 @@ class AbstractAgent[
     def get_public_service_ports(self, service_ports: list[ServicePort]) -> list[ServicePort]:
         return [port for port in service_ports if port["protocol"] != ServicePortProtocols.INTERNAL]
 
+    def is_kernel_creation_in_flight(self, kernel_id: KernelId) -> bool:
+        """Whether a create_kernel call is still waiting for this kernel to initialize."""
+        return kernel_id in self._pending_creation_tasks
+
     @abstractmethod
     async def extract_image_command(self, image: str) -> list[str] | None:
         raise NotImplementedError

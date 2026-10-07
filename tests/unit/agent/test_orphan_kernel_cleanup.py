@@ -9,7 +9,7 @@ from __future__ import annotations
 from collections.abc import MutableMapping
 from dataclasses import dataclass
 from typing import Protocol
-from unittest.mock import AsyncMock, PropertyMock
+from unittest.mock import AsyncMock, Mock, PropertyMock
 from uuid import uuid4
 
 import pytest
@@ -23,6 +23,22 @@ from ai.backend.common.clients.valkey_client.valkey_schedule.client import (
 )
 from ai.backend.common.events.event_types.kernel.types import KernelLifecycleEventReason
 from ai.backend.common.types import AgentId, KernelId, SessionId
+
+# The observer's own clock, patched by path so the debounce runs in test time.
+_MONOTONIC = "ai.backend.agent.observer.orphan_kernel_cleanup.time.monotonic"
+
+
+class _Clock:
+    """A monotonic clock the test moves, so a debounce measured in minutes runs in no time."""
+
+    def __init__(self) -> None:
+        self._now = 0.0
+
+    def __call__(self) -> float:
+        return self._now
+
+    def advance(self, seconds: float) -> None:
+        self._now += seconds
 
 
 @dataclass
@@ -54,15 +70,22 @@ class AgentProtocol(Protocol):
         suppress_events: bool = False,
     ) -> None: ...
 
+    def is_kernel_creation_in_flight(self, kernel_id: KernelId) -> bool: ...
+
 
 class TestOrphanKernelCleanupObserver:
     """Test cases for OrphanKernelCleanupObserver.
 
-    These tests verify the strict cleanup conditions:
-    - agent_last_check must exist
-    - kernel status must exist in Redis
-    - kernel.last_check < agent_last_check - THRESHOLD
+    Rule (a): a kernel the manager checked and then stopped checking is an orphan
+    (kernel.last_check < agent_last_check - THRESHOLD). Rule (b): a running kernel no
+    sweeping manager has ever checked is one after staying unknown for THRESHOLD.
     """
+
+    @pytest.fixture
+    def clock(self, monkeypatch: pytest.MonkeyPatch) -> _Clock:
+        clock = _Clock()
+        monkeypatch.setattr(_MONOTONIC, clock)
+        return clock
 
     @pytest.fixture
     def mock_agent(self) -> AsyncMock:
@@ -72,6 +95,7 @@ class TestOrphanKernelCleanupObserver:
         # Use PropertyMock for kernel_registry
         type(agent).kernel_registry = PropertyMock(return_value={})
         agent.inject_container_lifecycle_event = AsyncMock()
+        agent.is_kernel_creation_in_flight = Mock(return_value=False)
         return agent
 
     @pytest.fixture
@@ -80,6 +104,9 @@ class TestOrphanKernelCleanupObserver:
         client = AsyncMock()
         client.get_agent_last_check = AsyncMock(return_value=None)
         client.get_kernel_presence_batch = AsyncMock(return_value={})
+        # Redis' clock and the manager's sweep mark, both at 1000: the manager sweeps now.
+        client.get_redis_time = AsyncMock(return_value=1000)
+        client.get_manager_sweep_epoch = AsyncMock(return_value=1000)
         return client
 
     @pytest.fixture
@@ -109,7 +136,7 @@ class TestOrphanKernelCleanupObserver:
         mock_agent: AsyncMock,
         mock_valkey_client: AsyncMock,
     ) -> None:
-        """Test that observe() skips when agent_last_check is None."""
+        """Test that observe() does not reap on the first pass when agent_last_check is None."""
         mock_valkey_client.get_agent_last_check.return_value = None
 
         await observer.observe()
@@ -139,7 +166,7 @@ class TestOrphanKernelCleanupObserver:
         kernel_id: KernelId,
         session_id: SessionId,
     ) -> None:
-        """Test that observe() skips kernel when status is None (no Redis entry)."""
+        """Test that observe() does not reap on the first pass when status is None."""
         mock_valkey_client.get_agent_last_check.return_value = 1000
         type(mock_agent).kernel_registry = PropertyMock(
             return_value={kernel_id: MockKernel(session_id=session_id)}
@@ -160,7 +187,7 @@ class TestOrphanKernelCleanupObserver:
         kernel_id: KernelId,
         session_id: SessionId,
     ) -> None:
-        """Test that observe() skips kernel when last_check is None."""
+        """Test that observe() does not reap on the first pass when last_check is None."""
         mock_valkey_client.get_agent_last_check.return_value = 1000
         type(mock_agent).kernel_registry = PropertyMock(
             return_value={kernel_id: MockKernel(session_id=session_id)}
@@ -439,6 +466,464 @@ class TestOrphanKernelCleanupObserver:
             KernelLifecycleEventReason.NOT_FOUND_IN_MANAGER,
             suppress_events=True,
         )
+
+    # ===== A kernel the manager has never checked (rule b) =====
+
+    @staticmethod
+    def _running_unchecked() -> KernelStatus:
+        """A kernel this agent reports running that no manager sweep has ever stamped."""
+        return KernelStatus(
+            presence=HealthCheckStatus.HEALTHY,
+            last_presence=1000,
+            last_check=None,
+            created_at=1000,
+        )
+
+    async def test_an_unknown_kernel_is_reaped_once_it_stays_unknown(
+        self,
+        observer: OrphanKernelCleanupObserver,
+        mock_agent: AsyncMock,
+        mock_valkey_client: AsyncMock,
+        kernel_id: KernelId,
+        session_id: SessionId,
+        clock: _Clock,
+    ) -> None:
+        """What an agent restart leaves behind: the presence key expired while the agent was
+        down, its presence observer recreated it without last_check, and the manager has no
+        such kernel to check."""
+        mock_valkey_client.get_agent_last_check.return_value = 1000
+        type(mock_agent).kernel_registry = PropertyMock(
+            return_value={kernel_id: MockKernel(session_id=session_id)}
+        )
+        mock_valkey_client.get_kernel_presence_batch.return_value = {
+            kernel_id: self._running_unchecked()
+        }
+
+        await observer.observe()
+        mock_agent.inject_container_lifecycle_event.assert_not_called()
+
+        # Both clocks move, so a gate going stale during the debounce would show.
+        clock.advance(ORPHAN_KERNEL_THRESHOLD_SEC)
+        mock_valkey_client.get_redis_time.return_value = 1000 + ORPHAN_KERNEL_THRESHOLD_SEC
+        mock_valkey_client.get_manager_sweep_epoch.return_value = 1000 + ORPHAN_KERNEL_THRESHOLD_SEC
+        await observer.observe()
+
+        mock_agent.inject_container_lifecycle_event.assert_called_once_with(
+            kernel_id,
+            session_id,
+            LifecycleEvent.DESTROY,
+            KernelLifecycleEventReason.NOT_FOUND_IN_MANAGER,
+            suppress_events=False,
+        )
+
+    async def test_an_unknown_kernel_the_manager_then_checks_is_kept(
+        self,
+        observer: OrphanKernelCleanupObserver,
+        mock_agent: AsyncMock,
+        mock_valkey_client: AsyncMock,
+        kernel_id: KernelId,
+        session_id: SessionId,
+        clock: _Clock,
+    ) -> None:
+        # A kernel just started, which the manager has not swept yet: the debounce keeps it.
+        mock_valkey_client.get_agent_last_check.return_value = 1000
+        type(mock_agent).kernel_registry = PropertyMock(
+            return_value={kernel_id: MockKernel(session_id=session_id)}
+        )
+        mock_valkey_client.get_kernel_presence_batch.return_value = {
+            kernel_id: self._running_unchecked()
+        }
+
+        await observer.observe()
+        mock_valkey_client.get_kernel_presence_batch.return_value = {
+            kernel_id: KernelStatus(
+                presence=HealthCheckStatus.HEALTHY,
+                last_presence=1000,
+                last_check=1000,
+                created_at=900,
+            ),
+        }
+        clock.advance(ORPHAN_KERNEL_THRESHOLD_SEC * 10)
+        await observer.observe()
+
+        mock_agent.inject_container_lifecycle_event.assert_not_called()
+
+    @pytest.mark.parametrize(
+        "status",
+        [
+            pytest.param(None, id="no-presence-key"),
+            pytest.param(
+                KernelStatus(
+                    presence=HealthCheckStatus.STALE,
+                    last_presence=100,
+                    last_check=None,
+                    created_at=100,
+                ),
+                id="container-not-running",
+            ),
+            pytest.param(
+                KernelStatus(
+                    presence=None,
+                    last_presence=None,
+                    last_check=None,
+                    created_at=100,
+                ),
+                id="presence-never-reported",
+            ),
+        ],
+    )
+    async def test_a_kernel_still_being_created_is_never_reaped_as_unknown(
+        self,
+        observer: OrphanKernelCleanupObserver,
+        mock_agent: AsyncMock,
+        mock_valkey_client: AsyncMock,
+        kernel_id: KernelId,
+        session_id: SessionId,
+        clock: _Clock,
+        status: KernelStatus | None,
+    ) -> None:
+        """The manager stamps only kernels it holds RUNNING. A kernel whose container is not
+        running here (a long pull or create) is unchecked for a legitimate reason."""
+        mock_valkey_client.get_agent_last_check.return_value = 1000
+        type(mock_agent).kernel_registry = PropertyMock(
+            return_value={kernel_id: MockKernel(session_id=session_id)}
+        )
+        mock_valkey_client.get_kernel_presence_batch.return_value = {kernel_id: status}
+
+        await observer.observe()
+        clock.advance(ORPHAN_KERNEL_THRESHOLD_SEC * 10)
+        await observer.observe()
+
+        mock_agent.inject_container_lifecycle_event.assert_not_called()
+
+    async def test_nothing_is_reaped_when_the_manager_sweep_went_stale(
+        self,
+        observer: OrphanKernelCleanupObserver,
+        mock_agent: AsyncMock,
+        mock_valkey_client: AsyncMock,
+        kernel_id: KernelId,
+        session_id: SessionId,
+        clock: _Clock,
+    ) -> None:
+        """A stale sweep mark says the manager is not looking, which says nothing about any
+        one kernel. Reaping on it would empty a healthy node while the manager restarts."""
+        mock_valkey_client.get_agent_last_check.return_value = 1000
+        mock_valkey_client.get_redis_time.return_value = 1000 + ORPHAN_KERNEL_THRESHOLD_SEC + 1
+        type(mock_agent).kernel_registry = PropertyMock(
+            return_value={kernel_id: MockKernel(session_id=session_id)}
+        )
+        mock_valkey_client.get_kernel_presence_batch.return_value = {
+            kernel_id: self._running_unchecked()
+        }
+
+        await observer.observe()
+        clock.advance(ORPHAN_KERNEL_THRESHOLD_SEC * 10)
+        await observer.observe()
+
+        mock_agent.inject_container_lifecycle_event.assert_not_called()
+
+    async def test_the_orphan_is_reaped_when_it_is_the_only_kernel_on_the_node(
+        self,
+        observer: OrphanKernelCleanupObserver,
+        mock_agent: AsyncMock,
+        mock_valkey_client: AsyncMock,
+        kernel_id: KernelId,
+        session_id: SessionId,
+        clock: _Clock,
+    ) -> None:
+        """agent_last_check stays frozen when the orphan is the node's only kernel, since the
+        manager has nothing on it to check; the cluster-wide mark is what keeps advancing."""
+        mock_valkey_client.get_agent_last_check.return_value = 1000
+        type(mock_agent).kernel_registry = PropertyMock(
+            return_value={kernel_id: MockKernel(session_id=session_id)}
+        )
+        mock_valkey_client.get_kernel_presence_batch.return_value = {
+            kernel_id: self._running_unchecked()
+        }
+
+        await observer.observe()
+        mock_agent.inject_container_lifecycle_event.assert_not_called()
+
+        elapsed = ORPHAN_KERNEL_THRESHOLD_SEC + 1
+        clock.advance(elapsed)
+        mock_valkey_client.get_redis_time.return_value = 1000 + elapsed
+        mock_valkey_client.get_manager_sweep_epoch.return_value = 1000 + elapsed
+        await observer.observe()
+
+        mock_agent.inject_container_lifecycle_event.assert_called_once_with(
+            kernel_id,
+            session_id,
+            LifecycleEvent.DESTROY,
+            KernelLifecycleEventReason.NOT_FOUND_IN_MANAGER,
+            suppress_events=False,
+        )
+
+    async def test_the_debounce_restarts_after_the_manager_goes_quiet(
+        self,
+        observer: OrphanKernelCleanupObserver,
+        mock_agent: AsyncMock,
+        mock_valkey_client: AsyncMock,
+        kernel_id: KernelId,
+        session_id: SessionId,
+        clock: _Clock,
+    ) -> None:
+        # Time the manager was not looking is not time the kernel was unknown to a looking one.
+        mock_valkey_client.get_agent_last_check.return_value = 1000
+        type(mock_agent).kernel_registry = PropertyMock(
+            return_value={kernel_id: MockKernel(session_id=session_id)}
+        )
+        mock_valkey_client.get_kernel_presence_batch.return_value = {
+            kernel_id: self._running_unchecked()
+        }
+        await observer.observe()
+
+        mock_valkey_client.get_redis_time.return_value = 1000 + ORPHAN_KERNEL_THRESHOLD_SEC + 1
+        clock.advance(ORPHAN_KERNEL_THRESHOLD_SEC)
+        await observer.observe()  # manager quiet: the debounce is dropped
+
+        mock_valkey_client.get_redis_time.return_value = 1000
+        await observer.observe()  # manager back: this is the first pass again
+
+        mock_agent.inject_container_lifecycle_event.assert_not_called()
+
+    async def test_an_outage_that_outlives_the_agent_timestamp_still_reaps(
+        self,
+        observer: OrphanKernelCleanupObserver,
+        mock_agent: AsyncMock,
+        mock_valkey_client: AsyncMock,
+        kernel_id: KernelId,
+        session_id: SessionId,
+        clock: _Clock,
+    ) -> None:
+        """agent:last_check expires after 20 minutes and is never rewritten for a node whose
+        only kernel is the orphan, so rule (b) must not depend on it."""
+        mock_valkey_client.get_agent_last_check.return_value = None
+        type(mock_agent).kernel_registry = PropertyMock(
+            return_value={kernel_id: MockKernel(session_id=session_id)}
+        )
+        mock_valkey_client.get_kernel_presence_batch.return_value = {
+            kernel_id: self._running_unchecked()
+        }
+
+        await observer.observe()
+        mock_agent.inject_container_lifecycle_event.assert_not_called()
+
+        clock.advance(ORPHAN_KERNEL_THRESHOLD_SEC)
+        await observer.observe()
+
+        mock_agent.inject_container_lifecycle_event.assert_called_once_with(
+            kernel_id,
+            session_id,
+            LifecycleEvent.DESTROY,
+            KernelLifecycleEventReason.NOT_FOUND_IN_MANAGER,
+            suppress_events=False,
+        )
+
+    async def test_a_kernel_whose_creation_is_in_flight_is_not_reaped_as_unknown(
+        self,
+        observer: OrphanKernelCleanupObserver,
+        mock_agent: AsyncMock,
+        mock_valkey_client: AsyncMock,
+        kernel_id: KernelId,
+        session_id: SessionId,
+        clock: _Clock,
+    ) -> None:
+        # An init timeout above the threshold leaves a running, unchecked container initializing.
+        mock_valkey_client.get_agent_last_check.return_value = 1000
+        mock_agent.is_kernel_creation_in_flight.return_value = True
+        type(mock_agent).kernel_registry = PropertyMock(
+            return_value={kernel_id: MockKernel(session_id=session_id)}
+        )
+        mock_valkey_client.get_kernel_presence_batch.return_value = {
+            kernel_id: self._running_unchecked()
+        }
+
+        await observer.observe()
+        clock.advance(ORPHAN_KERNEL_THRESHOLD_SEC * 10)
+        await observer.observe()
+
+        mock_agent.is_kernel_creation_in_flight.assert_called_with(kernel_id)
+        mock_agent.inject_container_lifecycle_event.assert_not_called()
+
+    async def test_the_debounce_restarts_when_the_mark_goes_stale_without_agent_last_check(
+        self,
+        observer: OrphanKernelCleanupObserver,
+        mock_agent: AsyncMock,
+        mock_valkey_client: AsyncMock,
+        kernel_id: KernelId,
+        session_id: SessionId,
+        clock: _Clock,
+    ) -> None:
+        # The stale pass returns early (no agent_last_check); it must still drop the wait timer.
+        mock_valkey_client.get_agent_last_check.return_value = None
+        type(mock_agent).kernel_registry = PropertyMock(
+            return_value={kernel_id: MockKernel(session_id=session_id)}
+        )
+        mock_valkey_client.get_kernel_presence_batch.return_value = {
+            kernel_id: self._running_unchecked()
+        }
+        await observer.observe()  # fresh: the wait starts
+
+        mock_valkey_client.get_redis_time.return_value = 1000 + ORPHAN_KERNEL_THRESHOLD_SEC + 1
+        clock.advance(ORPHAN_KERNEL_THRESHOLD_SEC)
+        await observer.observe()  # stale
+
+        mock_valkey_client.get_redis_time.return_value = 1000
+        await observer.observe()  # fresh again: the wait starts over
+        mock_agent.inject_container_lifecycle_event.assert_not_called()
+
+        clock.advance(ORPHAN_KERNEL_THRESHOLD_SEC)
+        await observer.observe()
+        mock_agent.inject_container_lifecycle_event.assert_called_once_with(
+            kernel_id,
+            session_id,
+            LifecycleEvent.DESTROY,
+            KernelLifecycleEventReason.NOT_FOUND_IN_MANAGER,
+            suppress_events=False,
+        )
+
+    # ===== Managers that never publish the sweep mark (rolling upgrade) =====
+
+    async def test_rule_a_still_reaps_when_no_manager_publishes_the_mark(
+        self,
+        observer: OrphanKernelCleanupObserver,
+        mock_agent: AsyncMock,
+        mock_valkey_client: AsyncMock,
+        kernel_id: KernelId,
+        session_id: SessionId,
+    ) -> None:
+        """Against managers that predate the mark, the agent keeps the previous behavior."""
+        agent_last_check = 1000
+        kernel_last_check = agent_last_check - ORPHAN_KERNEL_THRESHOLD_SEC - 100
+        mock_valkey_client.get_manager_sweep_epoch.return_value = None
+        mock_valkey_client.get_agent_last_check.return_value = agent_last_check
+        type(mock_agent).kernel_registry = PropertyMock(
+            return_value={kernel_id: MockKernel(session_id=session_id)}
+        )
+        mock_valkey_client.get_kernel_presence_batch.return_value = {
+            kernel_id: KernelStatus(
+                presence=HealthCheckStatus.HEALTHY,
+                last_presence=kernel_last_check,
+                last_check=kernel_last_check,
+                created_at=0,
+            ),
+        }
+
+        await observer.observe()
+
+        mock_agent.inject_container_lifecycle_event.assert_called_once_with(
+            kernel_id,
+            session_id,
+            LifecycleEvent.DESTROY,
+            KernelLifecycleEventReason.NOT_FOUND_IN_MANAGER,
+            suppress_events=True,
+        )
+
+    async def test_rule_b_is_off_when_no_manager_publishes_the_mark(
+        self,
+        observer: OrphanKernelCleanupObserver,
+        mock_agent: AsyncMock,
+        mock_valkey_client: AsyncMock,
+        kernel_id: KernelId,
+        session_id: SessionId,
+        clock: _Clock,
+    ) -> None:
+        mock_valkey_client.get_manager_sweep_epoch.return_value = None
+        mock_valkey_client.get_agent_last_check.return_value = 1000
+        type(mock_agent).kernel_registry = PropertyMock(
+            return_value={kernel_id: MockKernel(session_id=session_id)}
+        )
+        mock_valkey_client.get_kernel_presence_batch.return_value = {
+            kernel_id: self._running_unchecked()
+        }
+
+        await observer.observe()
+        clock.advance(ORPHAN_KERNEL_THRESHOLD_SEC * 10)
+        await observer.observe()
+
+        mock_agent.inject_container_lifecycle_event.assert_not_called()
+
+    # ===== A mark that was seen, then expired or went stale =====
+
+    @staticmethod
+    def _make_mark_not_fresh(mock_valkey_client: AsyncMock, mark: str) -> None:
+        if mark == "expired":
+            mock_valkey_client.get_manager_sweep_epoch.return_value = None
+        else:
+            mock_valkey_client.get_redis_time.return_value = 1000 + ORPHAN_KERNEL_THRESHOLD_SEC + 1
+
+    @pytest.mark.parametrize("mark", ["expired", "stale"])
+    async def test_rule_a_still_reaps_once_a_seen_mark_is_not_fresh(
+        self,
+        observer: OrphanKernelCleanupObserver,
+        mock_agent: AsyncMock,
+        mock_valkey_client: AsyncMock,
+        kernel_id: KernelId,
+        session_id: SessionId,
+        mark: str,
+    ) -> None:
+        """Rule (a) gates itself on agent_last_check, so the mark only switches rule (b)."""
+        agent_last_check = 1000
+        kernel_last_check = agent_last_check - ORPHAN_KERNEL_THRESHOLD_SEC - 100
+        mock_valkey_client.get_agent_last_check.return_value = agent_last_check
+        type(mock_agent).kernel_registry = PropertyMock(
+            return_value={kernel_id: MockKernel(session_id=session_id)}
+        )
+        mock_valkey_client.get_kernel_presence_batch.return_value = {
+            kernel_id: KernelStatus(
+                presence=HealthCheckStatus.HEALTHY,
+                last_presence=agent_last_check,
+                last_check=agent_last_check,
+                created_at=0,
+            ),
+        }
+        await observer.observe()  # the mark is seen fresh
+        mock_agent.inject_container_lifecycle_event.assert_not_called()
+
+        self._make_mark_not_fresh(mock_valkey_client, mark)
+        mock_valkey_client.get_kernel_presence_batch.return_value = {
+            kernel_id: KernelStatus(
+                presence=HealthCheckStatus.HEALTHY,
+                last_presence=kernel_last_check,
+                last_check=kernel_last_check,
+                created_at=0,
+            ),
+        }
+        await observer.observe()
+
+        mock_agent.inject_container_lifecycle_event.assert_called_once_with(
+            kernel_id,
+            session_id,
+            LifecycleEvent.DESTROY,
+            KernelLifecycleEventReason.NOT_FOUND_IN_MANAGER,
+            suppress_events=True,
+        )
+
+    @pytest.mark.parametrize("mark", ["expired", "stale"])
+    async def test_rule_b_is_off_once_a_seen_mark_is_not_fresh(
+        self,
+        observer: OrphanKernelCleanupObserver,
+        mock_agent: AsyncMock,
+        mock_valkey_client: AsyncMock,
+        kernel_id: KernelId,
+        session_id: SessionId,
+        clock: _Clock,
+        mark: str,
+    ) -> None:
+        mock_valkey_client.get_agent_last_check.return_value = 1000
+        type(mock_agent).kernel_registry = PropertyMock(
+            return_value={kernel_id: MockKernel(session_id=session_id)}
+        )
+        mock_valkey_client.get_kernel_presence_batch.return_value = {
+            kernel_id: self._running_unchecked()
+        }
+        await observer.observe()  # the mark is seen fresh
+
+        self._make_mark_not_fresh(mock_valkey_client, mark)
+        clock.advance(ORPHAN_KERNEL_THRESHOLD_SEC * 10)
+        await observer.observe()
+
+        mock_agent.inject_container_lifecycle_event.assert_not_called()
 
     def test_observe_interval(self, observer: OrphanKernelCleanupObserver) -> None:
         """Test that observe_interval returns correct value (5 minutes)."""
