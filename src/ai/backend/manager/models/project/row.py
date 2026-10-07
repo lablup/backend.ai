@@ -212,9 +212,9 @@ class ProjectRow(LifecycleTimestampsMixin, Base):
     sgroup_for_groups_rows: Mapped[list[ResourceGroupForProjectRow]] = relationship(
         "ResourceGroupForProjectRow"
     )
-    # Read by gql_legacy (network.py, resource_policy.py, vfolder.py) and ProjectRow.get.
-    # v2 (the vfolder repository) joins ProjectResourcePolicyRow directly from F-1 on.
-    # Delete it with the gql_legacy cleanup.
+    # Read by gql_legacy (network.py, resource_policy.py, vfolder.py), ProjectRow.get and
+    # the vfolder repository. Delete it once the vfolder repository joins
+    # ProjectResourcePolicyRow directly and gql_legacy is cleaned up.
     resource_policy_row: Mapped[ProjectResourcePolicyRow] = relationship("ProjectResourcePolicyRow")
     # Only ProjectPermissionContext in this file (legacy RBAC) reads this. Delete it
     # together with the legacy RBAC cleanup.
@@ -257,6 +257,8 @@ class ProjectRow(LifecycleTimestampsMixin, Base):
 groups = ProjectRow.__table__
 
 
+# Everything below serves the legacy RBAC path alone: api/gql_legacy/group.py calls
+# get_permission_ctx, which is the way in. Delete the whole block together with gql_legacy.
 @dataclass
 class ProjectModel(RBACModel[ProjectPermission]):
     id: uuid.UUID
@@ -518,6 +520,7 @@ class ProjectPermissionContextBuilder(
         return MEMBER_PERMISSIONS
 
 
+# Called only by api/gql_legacy/group.py.
 async def get_permission_ctx(
     db_conn: SAConnection,
     ctx: ClientContext,
