@@ -10,7 +10,7 @@ from pydantic import Field
 from ai.backend.common.api_handlers import BaseResponseModel
 from ai.backend.common.data.entity.role_preset import RolePresetID
 from ai.backend.common.data.entity.types import EntityType
-from ai.backend.common.dto.manager.v2.role_preset.types import RolePresetGlobalScope
+from ai.backend.common.dto.manager.v2.role_preset.types import GlobalScopeKind
 from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 
 __all__ = (
@@ -38,7 +38,7 @@ class RolePresetNode(BaseResponseModel):
     )
     name: str = Field(description="Role preset name.")
     scope_type: EntityType = Field(description="Scope type this preset targets.")
-    global_scope: RolePresetGlobalScope | None = Field(
+    global_scope: GlobalScopeKind | None = Field(
         default=None,
         description=(
             "The global entity a global preset's role is created in. Null when the preset "
