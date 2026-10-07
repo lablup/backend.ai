@@ -14,7 +14,7 @@ from ai.backend.common.dto.manager.v2.image.request import ScanImageInput
 from ai.backend.common.dto.manager.v2.image.response import ImageNode
 from ai.backend.manager.api.adapters.image.adapter import ImageAdapter
 from ai.backend.manager.data.container_registry.types import ContainerRegistryData
-from ai.backend.manager.data.image.types import ImageStatus, ImageType
+from ai.backend.manager.data.image.types import ImageData, ImageStatus, ImageType
 from ai.backend.manager.data.user.types import UserData
 from ai.backend.manager.errors.auth import InsufficientPrivilege
 from ai.backend.manager.errors.image import ImageNotFound, RegistryNotFoundForImage
@@ -39,6 +39,7 @@ from bai_scenario.runner.acting import ActingAs
 from bai_scenario.runner.planting import SeedingSession
 from bai_scenario.runner.steps import run_scenario
 from bai_scenario.seeds.domain.domain import SeedDomain
+from bai_scenario.seeds.image.image import SeedTaggedImage
 from bai_scenario.seeds.image.registry import SeedContainerRegistry
 
 PROJECT = "stable"
@@ -50,10 +51,11 @@ ANY_ACCELERATOR = "*"
 
 @dataclass(frozen=True)
 class ARegistryAndACaller:
-    """태그를 내놓는 레지스트리 1개와 호출자."""
+    """태그를 내놓는 레지스트리 1개와 호출자. 태그가 이미 등록되어 있으면 그 이미지도."""
 
     registry: ContainerRegistryData
     caller: UserData
+    registered: ImageData | None = None
 
 
 @dataclass(frozen=True)
@@ -61,13 +63,15 @@ class ARegistryServingATag(Given[Any, ARegistryAndACaller]):
     """레지스트리 1개와 호출자 1명. 레지스트리는 태그 하나를 두 아키텍처로 내놓는다."""
 
     role: UserRole = UserRole.SUPERADMIN
+    already_registered: bool = False
 
     @override
     def describe(self) -> str:
         arches = ", ".join(SERVED.architectures)
+        registered = ", 그 태그로 이미 등록된 x86_64 이미지 1개" if self.already_registered else ""
         return (
-            f"{SERVED.repository}:{SERVED.tag} 태그를 {arches}로 내놓는 레지스트리 1개, "
-            f"{self.role.value} 1명"
+            f"{SERVED.repository}:{SERVED.tag} 태그를 {arches}로 내놓는 레지스트리 1개"
+            f"{registered}, {self.role.value} 1명"
         )
 
     @override
@@ -75,7 +79,13 @@ class ARegistryServingATag(Given[Any, ARegistryAndACaller]):
         domain = await seeding.creating(SeedDomain(name_hint="home"))
         registry = await seeding.creating(SeedContainerRegistry(name_hint="host", project=PROJECT))
         caller = await seeding.within(SomeoneOf(domain, role=self.role))
-        return ARegistryAndACaller(seeding.made(registry), seeding.made(caller))
+        registered = None
+        if self.already_registered:
+            image = await seeding.creating_from(
+                SeedTaggedImage(repository=SERVED.repository, tag=SERVED.tag), registry
+            )
+            registered = seeding.made(image)
+        return ARegistryAndACaller(seeding.made(registry), seeding.made(caller), registered)
 
 
 class Canonical:
@@ -129,7 +139,7 @@ class Scanning(When[ARegistryAndACaller, ImageAdapter, ImageNode]):
 
 @dataclass(frozen=True)
 class TheScannedImageNode(Then[ARegistryAndACaller, ImageNode]):
-    """레지스트리가 내놓은 태그로 새로 등록된 이미지 노드의 전체 필드를 확인한다."""
+    """레지스트리가 내놓은 태그로 등록되거나 갱신된 이미지 노드의 전체 필드를 확인한다."""
 
     @override
     def says(self) -> str:
@@ -151,7 +161,9 @@ class TheScannedImageNode(Then[ARegistryAndACaller, ImageNode]):
         name = f"{registry.registry_name}/{SERVED.repository}:{SERVED.tag}"
         written = WrittenByThisRun(datetime.now(UTC))
         return [
-            Skipped("id", "스캔이 새로 만든 행이라 데이터베이스가 정한다"),
+            Skipped("id", "스캔이 새로 만든 행이라 데이터베이스가 정한다")
+            if laid.registered is None
+            else Held("id", node.id, SameAs[UUID](laid.registered.id, "이미 등록된 이미지의 ID")),
             Same("name", node.name, name),
             Same("image", node.image, SERVED.repository),
             Same("registry", node.registry, registry.registry_name),
@@ -223,6 +235,34 @@ class ScanningAnUnregisteredImage(
     @override
     def given(self) -> Given[SeedingSession, ARegistryAndACaller]:
         return ARegistryServingATag()
+
+    @override
+    def when(self) -> When[ARegistryAndACaller, ImageAdapter, ImageNode]:
+        return Scanning()
+
+    @override
+    def then(self) -> Then[ARegistryAndACaller, ImageNode]:
+        return TheScannedImageNode()
+
+
+@dataclass(frozen=True)
+class ScanningARegisteredImage(
+    Scenario[SeedingSession, ARegistryAndACaller, ImageAdapter, ImageNode]
+):
+    @override
+    def summary(self) -> str:
+        return "scanning-a-registered-image-refreshes-it-from-the-registry"
+
+    @override
+    def describe(self) -> str:
+        return (
+            "슈퍼관리자가 이미 등록된 이미지를 scan하면 새 이미지를 만들지 않고 "
+            "등록된 이미지를 레지스트리 값으로 갱신해 반환한다"
+        )
+
+    @override
+    def given(self) -> Given[SeedingSession, ARegistryAndACaller]:
+        return ARegistryServingATag(already_registered=True)
 
     @override
     def when(self) -> When[ARegistryAndACaller, ImageAdapter, ImageNode]:
@@ -311,6 +351,7 @@ class AMissingTagIsNotASuccess(
 
 SCENARIOS: list[Any] = [
     ScanningAnUnregisteredImage(),
+    ScanningARegisteredImage(),
     APlainUserMayNotScan(),
     NoRegistryMatchesTheImage(),
     AMissingTagIsNotASuccess(),

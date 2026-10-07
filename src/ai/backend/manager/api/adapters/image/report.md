@@ -17,7 +17,7 @@
   - admin_forget — 성공 있음 2 · 실패 있음 5 (single_entity)
   - admin_purge — 성공 있음 3 · 실패 있음 3 (single_entity)
   - admin_restore — 성공 있음 2 · 실패 있음 2 (single_entity)
-  - admin_scan_image — 성공 있음 1 · 실패 있음 3 (global_scope)
+  - admin_scan_image — 성공 있음 2 · 실패 있음 3 (global_scope)
   - admin_search_image_aliases — 성공 있음 3 · 실패 있음 1 (global_scope)
   - admin_update — 성공 있음 6 · 실패 있음 2 (global_scope)
 
@@ -126,6 +126,7 @@
 
 | 시나리오 | 판정 |
 |---|---|
+| [슈퍼관리자가 이미 등록된 이미지를 scan하면 새 이미지를 만들지 않고 등록된 이미지를 레지스트리 값으로 갱신해 반환한다](#scanning-scanning-a-registered-image-refreshes-it-from-the-registry) | 성공 |
 | [슈퍼관리자가 미등록된 이미지를 scan하면 요청한 아키텍처의 이미지 하나가 반환된다. scan은 슈퍼관리자 역할이 있어야만 실행된다](#scanning-scanning-an-unregistered-image-registers-the-requested-architecture) | 성공 |
 | [이미지에 맞는 registry가 없으면 scan하지 않고 거부한다. 레지스트리 이름만 주어도 레지스트리 전체를 스캔하지 않는다](#scanning-a-name-no-registry-holds-as-an-image-is-refused-without-a-scan) | 거부 |
 | [레지스트리에 없는 태그를 scan하면 이미지를 찾을 수 없어 거부된다](#scanning-a-tag-the-registry-does-not-hold-is-refused) | 거부 |
@@ -1797,6 +1798,63 @@ Then
   - 거부: ImageNotFound
 
 ### admin_scan_image
+
+<a id="scanning-scanning-a-registered-image-refreshes-it-from-the-registry"></a>
+
+#### [scanning-a-registered-image-refreshes-it-from-the-registry](/tests/scenario/bai_scenario/manager/image/test_scanning.py) — pass
+
+슈퍼관리자가 이미 등록된 이미지를 scan하면 새 이미지를 만들지 않고 등록된 이미지를 레지스트리 값으로 갱신해 반환한다
+
+Given
+
+- stable/python:latest 태그를 amd64, arm64로 내놓는 레지스트리 1개, 그 태그로 이미 등록된 x86_64 이미지 1개, superadmin 1명
+  - 도메인 home-1
+  - 컨테이너 레지스트리 host-1: 이미지를 가져오는 곳, 프로젝트는 stable
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+  - 이미지 stable/python:latest: x86_64 이미지, 설정 다이제스트는 sha256:before-scan
+
+When
+
+- ImageAdapter.admin_scan_image — user-1이 stable/python:latest 태그를 x86_64 아키텍처로 스캔
+
+Then
+
+- 요청한 아키텍처로 등록된 이미지 노드가 반환된다
+  - id: 이미 등록된 이미지의 ID와 같다
+  - name = 'host-1/stable/python:latest'
+  - image = 'stable/python'
+  - registry = 'host-1'
+  - registry_id: 미리 만들어 둔 레지스트리의 ID와 같다
+  - project = 'stable'
+  - tag = 'latest'
+  - architecture = 'x86_64'
+  - size_bytes = 10
+  - type = <ImageType.COMPUTE: 'compute'>
+  - status = <ImageStatus.ALIVE: 'ALIVE'>
+  - labels = []
+  - tags = []
+  - resource_limits = [ImageResourceLimitInfo(key='cpu', min='1', max=None), ImageResourceLimitInfo(key='mem', min='1073741824', max=None)]
+  - accelerators = '*'
+  - config_digest = 'sha256:config-amd64'
+  - is_local = False
+  - created_at: 이 실행이 쓴 시각
+  - last_used_at: 무시함 — 세션이 기록하는 값이라 이 실행에서는 알 수 없다
+  - identity.canonical_name = 'host-1/stable/python:latest'
+  - identity.namespace = 'stable/python'
+  - identity.architecture = 'x86_64'
+  - metadata.digest = 'sha256:config-amd64'
+  - metadata.size_bytes = 10
+  - metadata.created_at: 이 실행이 쓴 시각
+  - metadata.last_used_at: 노드의 last_used_at 필드와 같다
+  - metadata.tags = []
+  - metadata.labels = []
+  - metadata.status = <ImageStatus.ALIVE: 'ALIVE'>
+  - requirements.supported_accelerators = ['*']
+  - requirements.resource_limits = [ImageResourceLimitGQLInfo(key='cpu', min='1', max='Infinity'), ImageResourceLimitGQLInfo(key='mem', min='1073741824', max='Infinity')]
 
 <a id="scanning-scanning-an-unregistered-image-registers-the-requested-architecture"></a>
 
