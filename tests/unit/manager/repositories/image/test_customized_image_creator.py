@@ -9,13 +9,16 @@ makes. Also covers scanning a single image in its registry.
 from __future__ import annotations
 
 from collections.abc import AsyncGenerator, AsyncIterator, Iterator
-from typing import Any, override
+from contextlib import asynccontextmanager
+from dataclasses import dataclass, field
+from typing import Any, Self, override
+from unittest.mock import patch
 from uuid import UUID, uuid4
 
 import aiohttp
 import pytest
 import sqlalchemy as sa
-from aioresponses import aioresponses
+import yarl
 
 from ai.backend.common.container_registry import ContainerRegistryType
 from ai.backend.common.data.entity.container_registry import (
@@ -27,6 +30,7 @@ from ai.backend.common.data.entity.image import ImageID
 from ai.backend.common.data.entity.project import ProjectEntityType, ProjectID
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.docker import LabelName
+from ai.backend.common.json import dump_json_str
 from ai.backend.common.types import ResourceSlot
 from ai.backend.manager.container_registry.base import (
     BaseContainerRegistry,
@@ -91,6 +95,57 @@ _ORM_CLUSTER = (
     KeyPairRow,
     ResourceGroupForDomainRow,
 )
+
+
+@dataclass(frozen=True)
+class _Reply:
+    status: int = 200
+    payload: Any = None
+    headers: dict[str, str] = field(default_factory=dict)
+
+    async def __aenter__(self) -> Self:
+        return self
+
+    async def __aexit__(self, *_: object) -> None:
+        return None
+
+    async def read(self) -> bytes:
+        return dump_json_str(self.payload).encode()
+
+    async def json(self) -> Any:
+        return self.payload
+
+    def raise_for_status(self) -> None:
+        if self.status >= 400:
+            raise aiohttp.ClientError(f"HTTP {self.status}")
+
+
+class _RegistrySession:
+    """Answers GETs by path, 404 for any other path, and records what was asked."""
+
+    requested: list[str]
+    _replies: dict[str, _Reply]
+
+    def __init__(self, replies: dict[str, _Reply]) -> None:
+        self.requested = []
+        self._replies = replies
+
+    def get(self, url: yarl.URL | str, **_: Any) -> _Reply:
+        path = yarl.URL(url).path
+        self.requested.append(path)
+        return self._replies.get(path, _Reply(status=404))
+
+
+def _serving(session: _RegistrySession) -> Any:
+    """Hand ``session`` to every scanner in place of the HTTP session it opens."""
+
+    @asynccontextmanager
+    async def prepare_client_session(
+        registry: BaseContainerRegistry,
+    ) -> AsyncIterator[tuple[yarl.URL, _RegistrySession]]:
+        yield registry.registry_url, session
+
+    return patch.object(BaseContainerRegistry, "prepare_client_session", prepare_client_session)
 
 
 class _FakeRegistryScanner(BaseContainerRegistry):
@@ -582,11 +637,11 @@ class TestScanImage:
         return ImageDBSource(db_with_cleanup, V2DBOpsProvider(db_with_cleanup))
 
     @pytest.fixture
-    def registry_manifests(self) -> Iterator[aioresponses]:
-        with aioresponses() as mocked:
-            mocked.get(f"https://{REGISTRY_NAME}/v2/", status=200, repeat=True)
-            mocked.get(
-                f"https://{REGISTRY_NAME}/v2/stable/python/manifests/latest",
+    def registry_manifests(self) -> Iterator[_RegistrySession]:
+        repository = "/v2/stable/python"
+        replies = {
+            "/v2/": _Reply(),
+            f"{repository}/manifests/latest": _Reply(
                 payload={
                     "manifests": [
                         {
@@ -597,23 +652,18 @@ class TestScanImage:
                     ]
                 },
                 headers={"Content-Type": BaseContainerRegistry.MEDIA_TYPE_DOCKER_MANIFEST_LIST},
-                repeat=True,
+            ),
+        }
+        for arch in ("amd64", "arm64"):
+            replies[f"{repository}/manifests/sha256:{arch}"] = _Reply(
+                payload={"config": {"digest": f"sha256:config-{arch}", "size": 10}, "layers": []}
             )
-            for arch in ("amd64", "arm64"):
-                mocked.get(
-                    f"https://{REGISTRY_NAME}/v2/stable/python/manifests/sha256:{arch}",
-                    payload={
-                        "config": {"digest": f"sha256:config-{arch}", "size": 10},
-                        "layers": [],
-                    },
-                    repeat=True,
-                )
-                mocked.get(
-                    f"https://{REGISTRY_NAME}/v2/stable/python/blobs/sha256:config-{arch}",
-                    payload={"architecture": arch, "config": {"Labels": {}}},
-                    repeat=True,
-                )
-            yield mocked
+            replies[f"{repository}/blobs/sha256:config-{arch}"] = _Reply(
+                payload={"architecture": arch, "config": {"Labels": {}}}
+            )
+        session = _RegistrySession(replies)
+        with _serving(session):
+            yield session
 
     @pytest.mark.parametrize(
         "architecture, expected_architecture",
@@ -624,7 +674,7 @@ class TestScanImage:
         db_with_cleanup: ExtendedAsyncSAEngine,
         registry_id: ContainerRegistryID,
         source: ImageDBSource,
-        registry_manifests: aioresponses,
+        registry_manifests: _RegistrySession,
         architecture: str,
         expected_architecture: str,
     ) -> None:
@@ -646,7 +696,7 @@ class TestScanImage:
         db_with_cleanup: ExtendedAsyncSAEngine,
         registry_id: ContainerRegistryID,
         source: ImageDBSource,
-        registry_manifests: aioresponses,
+        registry_manifests: _RegistrySession,
     ) -> None:
         canonical = f"{REGISTRY_NAME}/{REGISTRY_PROJECT}/python:latest"
         first = await source.scan_image(canonical, "x86_64")
@@ -665,10 +715,11 @@ class TestScanImage:
         source: ImageDBSource,
         canonical: str,
     ) -> None:
-        with aioresponses() as requests:
+        session = _RegistrySession({})
+        with _serving(session):
             with pytest.raises(RegistryNotFoundForImage):
                 await source.scan_image(canonical, "x86_64")
-            assert not requests.requests
+        assert not session.requested
 
     async def test_canonical_scan_rejects_duplicate_registry_rows(
         self,
@@ -695,13 +746,10 @@ class TestScanImage:
         self,
         registry_id: ContainerRegistryID,
         source: ImageDBSource,
-        registry_manifests: aioresponses,
+        registry_manifests: _RegistrySession,
         tag: str,
         architecture: str,
     ) -> None:
-        registry_manifests.get(
-            f"https://{REGISTRY_NAME}/v2/stable/python/manifests/removed", status=404
-        )
         with pytest.raises(ImageNotFound):
             await source.scan_image(
                 f"{REGISTRY_NAME}/{REGISTRY_PROJECT}/python:{tag}", architecture
