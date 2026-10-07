@@ -12,7 +12,10 @@ from ai.backend.common.data.entity.project import ProjectEntityType
 from ai.backend.common.data.entity.role_preset import RolePresetID
 from ai.backend.common.data.entity.types import EntityType
 from ai.backend.manager.data.role_preset.types import RolePresetData
-from ai.backend.manager.errors.role_preset import RolePresetNameConflict
+from ai.backend.manager.errors.role_preset import (
+    RolePresetNameConflict,
+    RolePresetRenameConflict,
+)
 from ai.backend.manager.models.base import ensure_all_tables_registered
 from ai.backend.manager.models.domain.row import DomainRow
 from ai.backend.manager.models.keypair.row import KeyPairRow
@@ -158,7 +161,7 @@ class TestUpdate:
     async def test_renaming_onto_a_name_taken_in_the_scope_is_refused(
         self, repository: RolePresetRepository, presets: _Presets, name: str
     ) -> None:
-        with pytest.raises(RolePresetNameConflict):
+        with pytest.raises(RolePresetRenameConflict):
             await repository.update(
                 RolePresetUpdater(preset_id=presets.other, name=OptionalState.update(name))
             )
