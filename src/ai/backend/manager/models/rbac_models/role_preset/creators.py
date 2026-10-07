@@ -8,7 +8,7 @@ from ai.backend.common.data.entity.role_preset import RolePresetID
 from ai.backend.common.data.entity.types import EntityType
 from ai.backend.manager.data.role_preset.types import RolePresetData
 from ai.backend.manager.errors.repository import UniqueConstraintViolationError
-from ai.backend.manager.errors.role_preset import RolePresetNameConflict
+from ai.backend.manager.errors.role_preset import RolePresetCreateConflict
 from ai.backend.manager.models.rbac_models.role_preset.row import RolePresetRow
 from ai.backend.manager.models.rbac_models.role_preset.searchable_fields import (
     RolePresetSearchableFields,
@@ -43,7 +43,7 @@ class RolePresetCreator(
             IntegrityErrorCheck(
                 violation_type=UniqueConstraintViolationError,
                 constraint_name="uq_role_presets_name",
-                error=RolePresetNameConflict(
+                error=RolePresetCreateConflict(
                     f"A role preset named '{self.name}' already exists for {self.scope_type}"
                 ),
             ),
