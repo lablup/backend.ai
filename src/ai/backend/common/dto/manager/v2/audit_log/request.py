@@ -10,10 +10,11 @@ from ai.backend.common.api_handlers import BaseRequestModel
 from ai.backend.common.dto.manager.query import DateTimeFilter, StringFilter, UUIDFilter
 from ai.backend.common.dto.manager.v2.rbac.types import EntityTypeScope, UUIDScope
 
-from .types import AuditLogOrderField, AuditLogStatus, OrderDirection
+from .types import AuditLogActionKind, AuditLogOrderField, AuditLogStatus, OrderDirection
 
 __all__ = (
     "AdminSearchAuditLogsInput",
+    "AuditLogActionKindFilter",
     "AuditLogFilter",
     "AuditLogOrder",
     "AuditLogScope",
@@ -35,6 +36,21 @@ class AuditLogStatusFilter(BaseRequestModel):
     not_in: list[AuditLogStatus] | None = Field(default=None, description="Status is not in list")
 
 
+class AuditLogActionKindFilter(BaseRequestModel):
+    """Filter for audit log action kind."""
+
+    equals: AuditLogActionKind | None = Field(default=None, description="Exact action kind match")
+    in_: list[AuditLogActionKind] | None = Field(
+        default=None, alias="in", description="Action kind is in list"
+    )
+    not_equals: AuditLogActionKind | None = Field(
+        default=None, description="Excludes exact action kind match"
+    )
+    not_in: list[AuditLogActionKind] | None = Field(
+        default=None, description="Action kind is not in list"
+    )
+
+
 class AuditLogFilter(BaseRequestModel):
     """Filter for audit logs."""
 
@@ -49,6 +65,12 @@ class AuditLogFilter(BaseRequestModel):
     created_at: DateTimeFilter | None = Field(
         default=None, description="Filter logs by created_at datetime"
     )
+    action_name: StringFilter | None = Field(default=None, description="Action name filter")
+    action_kind: AuditLogActionKindFilter | None = Field(
+        default=None, description="Action kind filter"
+    )
+    lookup_kind: StringFilter | None = Field(default=None, description="Lookup kind filter")
+    lookup_key: StringFilter | None = Field(default=None, description="Lookup key filter")
     AND: list[AuditLogFilter] | None = Field(default=None, description="All conditions must match")
     OR: list[AuditLogFilter] | None = Field(
         default=None, description="At least one condition must match"

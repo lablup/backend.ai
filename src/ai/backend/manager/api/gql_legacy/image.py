@@ -30,6 +30,7 @@ from ai.backend.common.types import (
     ImageID,
 )
 from ai.backend.logging.structured import StructuredLogger
+from ai.backend.manager.api.gql.base import resolve_entity_id
 from ai.backend.manager.bgtask.tasks.purge_images import (
     PurgeAgentSpec,
     PurgeImagesManifest,
@@ -45,6 +46,7 @@ from ai.backend.manager.data.image.types import (
 )
 from ai.backend.manager.data.permission.permission_defs import ImagePermission
 from ai.backend.manager.defs import DEFAULT_IMAGE_ARCH
+from ai.backend.manager.errors.api import InvalidCursor
 from ai.backend.manager.errors.image import ImageNotFound
 from ai.backend.manager.models.clauses import QueryCondition
 from ai.backend.manager.models.image.row import ImageLoadFilter, ImageRow, get_permission_ctx
@@ -159,6 +161,17 @@ def _caller_targets(ctx: GraphQueryContext) -> list[ImageTarget]:
     to be answered with everything they reach. A superadmin's read is unscoped, which
     the service decides."""
     return [VisibleImageTarget(user_id=UserID(ctx.user["uuid"]))]
+
+
+def _validate_cursor(info: graphene.ResolveInfo, cursor: str | None) -> None:
+    """A cursor names an `images.id` row, so one that is not a UUID cannot reach the bind."""
+    if cursor is None:
+        return
+    _, row_id = AsyncNode.resolve_global_id(info, cursor)
+    try:
+        UUID(row_id)
+    except (ValueError, AttributeError, TypeError) as e:
+        raise InvalidCursor(f"Invalid cursor: {cursor}") from e
 
 
 _queryfilter_fieldspec: FieldSpecType = {
@@ -716,6 +729,8 @@ class ImageNode(graphene.ObjectType):  # type: ignore[misc]
     ) -> ConnectionResolverResult[Self]:
         if filter_by_statuses is None:
             filter_by_statuses = [ImageStatus.ALIVE]
+        _validate_cursor(info, after)
+        _validate_cursor(info, before)
         graph_ctx: GraphQueryContext = info.context
         _filter_arg = (
             FilterExprArg(filter_expr, QueryFilterParser(_queryfilter_fieldspec))
@@ -778,7 +793,7 @@ class ImageNode(graphene.ObjectType):  # type: ignore[misc]
     # TODO: Introduce access control logic considering scope and permission
     async def __resolve_reference(self, info: graphene.ResolveInfo, **kwargs: Any) -> Image:
         ctx: GraphQueryContext = info.context
-        _, image_id = AsyncNode.resolve_global_id(info, self.id)
+        image_uuid = resolve_entity_id(self.id, ImageID)
         action_result = await ctx.processors.image.search_with_install_status.run(
             SearchImagesWithInstallStatusAction(
                 targets=_caller_targets(ctx),
@@ -786,13 +801,13 @@ class ImageNode(graphene.ObjectType):  # type: ignore[misc]
                     pagination=NoPagination(),
                     conditions=[
                         ImageSearchableFields.own.id.filter.equals(
-                            UUIDEqualMatchSpec(value=UUID(image_id), negated=False)
+                            UUIDEqualMatchSpec(value=image_uuid, negated=False)
                         )
                     ],
                 ),
             )
         )
-        image_data = _single_image(action_result.items, image_id).image
+        image_data = _single_image(action_result.items, str(image_uuid)).image
         return ImageNode.from_row(ctx, ImageRow.from_dataclass_with_details(image_data))
 
 

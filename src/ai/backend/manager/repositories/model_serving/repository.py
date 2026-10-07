@@ -316,12 +316,22 @@ class ModelServingRepository:
         Get route by ID.
         Returns None if route doesn't exist or doesn't belong to service.
         """
-        async with self._db.begin_readonly_session_read_committed() as session:
-            route = await self._get_route_by_id(session, route_id, load_endpoint=True)
-            if not route or route.endpoint != service_id:
-                return None
-
-            return route.to_data()
+        replica_fields = ReplicaSearchableFields.own
+        async with self._v2_ops.read_ops() as r:
+            result = await r.search_in_global(
+                RoutingDataSearcher(
+                    pagination=NoPagination(),
+                    conditions=[
+                        replica_fields.field_id.filter.equals(
+                            UUIDEqualMatchSpec(value=route_id, negated=False)
+                        ),
+                        replica_fields.deployment_id.filter.equals(
+                            UUIDEqualMatchSpec(value=service_id, negated=False)
+                        ),
+                    ],
+                )
+            )
+        return result.items[0] if result.items else None
 
     @model_serving_repository_resilience.apply()
     async def update_route_traffic(
@@ -336,8 +346,14 @@ class ModelServingRepository:
         Returns updated endpoint data if successful, None if not found.
         """
         async with self._db.begin_session() as session:
-            route = await self._get_route_by_id(session, route_id, load_endpoint=True)
-            if not route or route.endpoint != service_id:
+            route = (
+                await session.execute(
+                    sa.select(RoutingRow.endpoint, RoutingRow.session).where(
+                        RoutingRow.id == route_id
+                    )
+                )
+            ).one_or_none()
+            if route is None or route.endpoint != service_id:
                 return None
 
             query = (
@@ -355,7 +371,7 @@ class ModelServingRepository:
                 load_revisions=True,
             )
             if endpoint is None:
-                raise NoResultFound
+                raise EndpointNotFound
 
             await valkey_live.store_live_data(
                 f"endpoint.{service_id}.session.{route.session}.traffic_ratio",
@@ -457,23 +473,6 @@ class ModelServingRepository:
         except NoResultFound:
             return None
 
-    async def _get_route_by_id(
-        self,
-        session: SASession,
-        route_id: uuid.UUID,
-        load_endpoint: bool = False,
-        load_session: bool = False,
-    ) -> RoutingRow | None:
-        """
-        Private method to get route by ID using an existing session.
-        """
-        try:
-            return await RoutingRow.get(
-                session, route_id, load_endpoint=load_endpoint, load_session=load_session
-            )
-        except NoResultFound:
-            return None
-
     async def _validate_endpoint_access(
         self,
         session: SASession,
@@ -553,16 +552,6 @@ class ModelServingRepository:
         """
         async with self._db.begin_readonly_session_read_committed() as session:
             return await self._get_endpoint_by_id(session, service_id, load_routes=True)
-
-    @model_serving_repository_resilience.apply()
-    async def get_route_with_session(self, route_id: uuid.UUID) -> RoutingRow | None:
-        """
-        Get route with endpoint and session data loaded.
-        """
-        async with self._db.begin_readonly_session_read_committed() as session:
-            return await self._get_route_by_id(
-                session, route_id, load_endpoint=True, load_session=True
-            )
 
     @model_serving_repository_resilience.apply()
     async def update_endpoint_replicas(

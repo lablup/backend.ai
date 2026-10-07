@@ -8,6 +8,7 @@ python_test_utils(
         # pytest_plugins in conftest.py
         "src/ai/backend/testutils/bootstrap.py",
         "src/ai/backend/testutils/db_fixtures.py",
+        "src/ai/backend/testutils/otel.py",
     ],
 )
 

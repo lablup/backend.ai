@@ -10,7 +10,6 @@ python_sources(
         "__init__.py": {"dependencies": [":version"]},
         "api/rest/app.py": {"dependencies": [":vendor"]},
         "cli/dbschema.py": {"dependencies": [":revision-history"]},
-        "data/permission/seed/loader.py": {"dependencies": [":seed-roles"]},
     },
 )
 
@@ -129,16 +128,14 @@ __dependencies_rules__(
 )
 
 # Who may import the manager component (equivalent to visibility_private_component).
-__dependents_rules__(
-    (
-        {"type": "*"},
-        "/**",  # code within this component may import itself
-        "//src/ai/backend/testutils/**",  # allowed extra dependents
-        "//tests/**",  # tests may import the source files
-        "//plugins/**",  # external plugins may import the source files
-        "!*",  # no one else may import the source files
-    )
-)
+__dependents_rules__((
+    {"type": "*"},
+    "/**",  # code within this component may import itself
+    "//src/ai/backend/testutils/**",  # allowed extra dependents
+    "//tests/**",  # tests may import the source files
+    "//plugins/**",  # external plugins may import the source files
+    "!*",  # no one else may import the source files
+))
 
 python_distribution(
     name="dist",
@@ -220,10 +217,6 @@ resources(
         "vendor/*",
         "vendor/**/*",
     ],
-)
-resources(
-    name="seed-roles",
-    sources=["data/permission/seed/roles/*.yaml"],
 )
 resources(
     name="revision-history",

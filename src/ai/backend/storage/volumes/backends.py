@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 
+from ai.backend.common.data.storage.types import StorageBackendType
+
 from .abc import AbstractVolume
 from .cephfs import CephFSVolume
 from .ddn import EXAScalerFSVolume
@@ -27,7 +29,7 @@ DEFAULT_BACKENDS: Mapping[str, type[AbstractVolume]] = {
     DellEMCOneFSVolume.name: DellEMCOneFSVolume,
     WekaVolume.name: WekaVolume,
     GPFSVolume.name: GPFSVolume,  # IBM SpectrumScale or GPFS
-    "spectrumscale": GPFSVolume,  # IBM SpectrumScale or GPFS
+    StorageBackendType("spectrumscale"): GPFSVolume,  # IBM SpectrumScale or GPFS
     CephFSVolume.name: CephFSVolume,
     VASTVolume.name: VASTVolume,
     EXAScalerFSVolume.name: EXAScalerFSVolume,

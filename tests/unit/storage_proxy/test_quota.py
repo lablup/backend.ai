@@ -6,9 +6,10 @@ from typing import Final
 import pytest
 from tenacity import AsyncRetrying, stop_after_delay, wait_exponential
 
+from ai.backend.common.data.storage.types import StorageBackendCapability
 from ai.backend.common.types import QuotaScopeID, QuotaScopeType
 from ai.backend.storage.types import QuotaConfig, QuotaUsage
-from ai.backend.storage.volumes.abc import CAP_QUOTA, AbstractQuotaModel, AbstractVolume
+from ai.backend.storage.volumes.abc import AbstractQuotaModel, AbstractVolume
 
 MiB: Final = 2**20
 
@@ -45,7 +46,7 @@ async def test_quota_scope_creation_and_deletion(volume: AbstractVolume) -> None
     await volume.quota_model.delete_quota_scope(qs)
     assert not volume.quota_model.mangle_qspath(qs).exists()
 
-    if CAP_QUOTA in (await volume.get_capabilities()):
+    if StorageBackendCapability.QUOTA in (await volume.get_capabilities()):
         qs = QuotaScopeID(QuotaScopeType.USER, uuid.uuid4())
         await volume.quota_model.create_quota_scope(qs, QuotaConfig(10 * MiB))
         assert volume.quota_model.mangle_qspath(qs).is_dir()
@@ -55,7 +56,7 @@ async def test_quota_scope_creation_and_deletion(volume: AbstractVolume) -> None
 
 async def test_quota_limit(volume: AbstractVolume) -> None:
     caps = await volume.get_capabilities()
-    if CAP_QUOTA not in caps:
+    if StorageBackendCapability.QUOTA not in caps:
         pytest.skip("this backend does not support quota management")
 
     block_size = os.statvfs(volume.mount_path).f_bsize

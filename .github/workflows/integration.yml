@@ -6,6 +6,10 @@ on:
   workflow_dispatch:
 
 
+# `contents: read`: only runs the integration tests
+permissions:
+  contents: read
+
 jobs:
   integration:
     runs-on: ubuntu-latest

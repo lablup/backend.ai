@@ -26,6 +26,21 @@ AUDIT_LOG_FIELDS: list[ExportFieldDef] = [
         column=AuditLogRow.action_id,
     ),
     ExportFieldDef(
+        key="action_name",
+        name="Action Name",
+        description="Name of the action that wrote this log",
+        field_type=ExportFieldType.STRING,
+        column=AuditLogRow.action_name,
+    ),
+    ExportFieldDef(
+        key="action_kind",
+        name="Action Kind",
+        description="Shape of the action that wrote this log",
+        field_type=ExportFieldType.ENUM,
+        column=AuditLogRow.action_kind,
+        formatter=lambda v: str(v) if v else "",
+    ),
+    ExportFieldDef(
         key="entity_type",
         name="Entity Type",
         description="Type of entity affected (e.g., session, user)",
@@ -38,6 +53,20 @@ AUDIT_LOG_FIELDS: list[ExportFieldDef] = [
         description="ID of the affected entity",
         field_type=ExportFieldType.STRING,
         column=AuditLogRow.entity_id,
+    ),
+    ExportFieldDef(
+        key="lookup_kind",
+        name="Lookup Kind",
+        description="Kind of natural key a lookup action read",
+        field_type=ExportFieldType.STRING,
+        column=AuditLogRow.lookup_kind,
+    ),
+    ExportFieldDef(
+        key="lookup_key",
+        name="Lookup Key",
+        description="Natural key a lookup action read",
+        field_type=ExportFieldType.STRING,
+        column=AuditLogRow.lookup_key,
     ),
     ExportFieldDef(
         key="operation",
@@ -89,6 +118,13 @@ AUDIT_LOG_FIELDS: list[ExportFieldDef] = [
         description="Effective user the action ran as (differs during impersonation)",
         field_type=ExportFieldType.UUID,
         column=AuditLogRow.acted_as,
+    ),
+    ExportFieldDef(
+        key="client_ip",
+        name="Client IP",
+        description="IP address of the request, masked per the client IP masking policy",
+        field_type=ExportFieldType.STRING,
+        column=AuditLogRow.client_ip,
     ),
     ExportFieldDef(
         key="duration",

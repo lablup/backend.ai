@@ -10,7 +10,7 @@ from pydantic import Field
 from ai.backend.common.api_handlers import BaseResponseModel
 from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 
-from .types import AuditLogStatus
+from .types import AuditLogActionKind, AuditLogStatus
 
 __all__ = (
     "AuditLogNode",
@@ -26,6 +26,30 @@ class AuditLogNode(BaseResponseModel):
         description=f"UUID of the audit log record. Added in {NEXT_RELEASE_VERSION}.",
     )
     action_id: UUID = Field(description="UUID of the action that generated this log")
+    action_name: str = Field(
+        description=f"Added in {NEXT_RELEASE_VERSION}. Name of the action that wrote this log.",
+    )
+    action_kind: AuditLogActionKind | None = Field(
+        default=None,
+        description=(
+            f"Added in {NEXT_RELEASE_VERSION}. Shape of the action that wrote this log. "
+            "Null for a log written before the action kind was recorded."
+        ),
+    )
+    lookup_kind: str | None = Field(
+        default=None,
+        description=(
+            f"Added in {NEXT_RELEASE_VERSION}. Kind of natural key a lookup action read. "
+            "Null for other action kinds."
+        ),
+    )
+    lookup_key: str | None = Field(
+        default=None,
+        description=(
+            f"Added in {NEXT_RELEASE_VERSION}. Natural key a lookup action read. "
+            "Null for other action kinds."
+        ),
+    )
     entity_type: str | None = Field(
         default=None,
         description=(

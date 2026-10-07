@@ -15,7 +15,6 @@ from ai.backend.manager.models.image.searchable_fields import (
     ImageAliasSearchableFields,
     ImageSearchableFields,
 )
-from ai.backend.testutils.mock import mock_aioresponses_sequential_payloads
 
 RESOURCE_LIMITS = {"cuda.device": {"min": "1", "max": None}}
 
@@ -81,33 +80,3 @@ IMAGE_ALIAS_ROW_FIXTURE = ImageAliasRow(
 IMAGE_ALIAS_DATA = ImageAliasSearchableFields.own.to_data(IMAGE_ALIAS_ROW_FIXTURE)
 IMAGE_ALIAS_DICT = dataclasses.asdict(IMAGE_ALIAS_DATA)
 IMAGE_ALIAS_DICT["image"] = IMAGE_ALIAS_ROW_FIXTURE.image_id
-
-
-DOCKERHUB_RESPONSE_MOCK = {
-    "get_token": {"token": "fake-token"},
-    "get_catalog": {
-        "repositories": [
-            "test_project/python",
-            "other/dangling-image1",
-            "other/dangling-image2",
-            "other/python",
-        ],
-    },
-    "get_tags": mock_aioresponses_sequential_payloads([
-        {"tags": ["latest"]},
-        {"tags": []},
-        {"tags": None},
-        {"tags": ["latest"]},
-    ]),
-    "get_manifest": {
-        "schemaVersion": 2,
-        "mediaType": "application/vnd.docker.distribution.manifest.v2+json",
-        "config": {
-            "mediaType": "application/vnd.docker.container.image.v1+json",
-            "size": 100,
-            "digest": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
-        },
-        "layers": [],
-    },
-    "get_config": {"architecture": "amd64", "os": "linux"},
-}

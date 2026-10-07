@@ -34,3 +34,25 @@ jobs:
         env:
           COMMIT: ${{ github.sha }}
         run: .github/scripts/create-version-branch.sh "$COMMIT"
+
+  bump-main:
+    # A job of its own, so that re-running it after a failure does not repeat the
+    # cut, which refuses to move existing refs.
+    needs: cut
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out the release commit
+        uses: actions/checkout@v6
+        with:
+          lfs: false
+          # The pull request's checks only run when its branch is pushed by
+          # something other than the workflow's own token.
+          token: ${{ secrets.OCTODOG }}
+      - name: Advance NEXT_RELEASE_VERSION on main
+        # Set the `NEXT_DEV_VERSION` repository variable (e.g. 27.1.0) before
+        # cutting the last line of a year, and clear it afterwards.
+        env:
+          GH_TOKEN: ${{ secrets.OCTODOG }}
+          COMMIT: ${{ github.sha }}
+          NEXT_DEV_VERSION: ${{ vars.NEXT_DEV_VERSION }}
+        run: .github/scripts/bump-next-release-on-main.sh "$COMMIT" ${NEXT_DEV_VERSION:+--next "$NEXT_DEV_VERSION"}

@@ -45,6 +45,23 @@ class AuditLogStatusGQL(StrEnum):
     DENIED = "denied"
 
 
+@gql_enum(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Shape of the action that wrote an audit log entry.",
+    ),
+    name="AuditLogActionKind",
+)
+class AuditLogActionKindGQL(StrEnum):
+    SINGLE_ENTITY = "single_entity"
+    BULK = "bulk"
+    SCOPE = "scope"
+    RELATION = "relation"
+    MEMBERSHIP = "membership"
+    GLOBAL = "global"
+    LOOKUP = "lookup"
+
+
 @gql_node_type(
     BackendAIGQLMeta(
         added_version="26.3.0",
@@ -62,6 +79,36 @@ class AuditLogV2GQL(PydanticNodeMixin[AuditLogNode]):
     )
 
     action_id: UUID = gql_field(description="UUID of the action that generated this log.")
+    action_name: str = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="Name of the action that wrote this log.",
+        ),
+    )
+    action_kind: AuditLogActionKindGQL | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description=(
+                "Shape of the action that wrote this log. "
+                "Null for a log written before the action kind was recorded."
+            ),
+        ),
+        default=None,
+    )
+    lookup_kind: str | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description=("Kind of natural key a lookup action read. Null for other action kinds."),
+        ),
+        default=None,
+    )
+    lookup_key: str | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="Natural key a lookup action read. Null for other action kinds.",
+        ),
+        default=None,
+    )
     entity_type: str | None = gql_field(
         description=(
             "Type of entity this log relates to. Null for an operation that names "

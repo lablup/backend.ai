@@ -5,9 +5,11 @@ from __future__ import annotations
 from typing import Self
 
 from ai.backend.common.dto.manager.v2.audit_log.request import (
+    AuditLogActionKindFilter,
     AuditLogFilter,
     AuditLogStatusFilter,
 )
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import DateTimeFilter, StringFilter, UUIDFilter
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
@@ -17,7 +19,7 @@ from ai.backend.manager.api.gql.decorators import (
 )
 from ai.backend.manager.api.gql.pydantic_compat import PydanticInputMixin
 
-from .node import AuditLogStatusGQL
+from .node import AuditLogActionKindGQL, AuditLogStatusGQL
 
 
 @gql_pydantic_input(
@@ -37,6 +39,28 @@ class AuditLogStatusFilterGQL(PydanticInputMixin[AuditLogStatusFilter]):
 
 @gql_pydantic_input(
     BackendAIGQLMeta(
+        description="Filter for audit log action kind field.",
+        added_version=NEXT_RELEASE_VERSION,
+    ),
+    name="AuditLogActionKindFilter",
+)
+class AuditLogActionKindFilterGQL(PydanticInputMixin[AuditLogActionKindFilter]):
+    equals: AuditLogActionKindGQL | None = gql_field(
+        description="Exact action kind match.", default=None
+    )
+    in_: list[AuditLogActionKindGQL] | None = gql_field(
+        description="Action kind is in list.", name="in", default=None
+    )
+    not_equals: AuditLogActionKindGQL | None = gql_field(
+        description="Excludes exact action kind match.", name="notEquals", default=None
+    )
+    not_in: list[AuditLogActionKindGQL] | None = gql_field(
+        description="Action kind is not in list.", default=None
+    )
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(
         description="Filter criteria for querying audit logs.", added_version="24.09.0"
     ),
     name="AuditLogFilter",
@@ -52,6 +76,34 @@ class AuditLogFilterGQL(PydanticInputMixin[AuditLogFilter]):
         BackendAIGQLMeta(
             added_version="26.8.0",
             description="Filter by acted_as (the effective/acting user UUID).",
+        ),
+        default=None,
+    )
+    action_name: StringFilter | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="Filter by the name of the action that wrote the log.",
+        ),
+        default=None,
+    )
+    action_kind: AuditLogActionKindFilterGQL | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="Filter by the shape of the action that wrote the log.",
+        ),
+        default=None,
+    )
+    lookup_kind: StringFilter | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="Filter by the kind of natural key a lookup action read.",
+        ),
+        default=None,
+    )
+    lookup_key: StringFilter | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="Filter by the natural key a lookup action read.",
         ),
         default=None,
     )

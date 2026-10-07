@@ -18,10 +18,16 @@ import trafaret as t
 from aiohttp import web
 from setproctitle import setproctitle
 
-from ai.backend.agent.errors.watcher import InvalidWatcherTokenError
+from ai.backend.agent.errors.watcher import (
+    InvalidMountNameError,
+    InvalidWatcherTokenError,
+    VolumeMountFailedError,
+    VolumeUnmountFailedError,
+)
 from ai.backend.common import config, utils
 from ai.backend.common import validators as tx
 from ai.backend.common.etcd import AsyncEtcd, ConfigScopes
+from ai.backend.common.exception import BackendAIError
 from ai.backend.common.msgpack import DEFAULT_PACK_OPTS, DEFAULT_UNPACK_OPTS
 from ai.backend.common.utils import Fstab
 from ai.backend.logging import Logger, LogLevel
@@ -47,6 +53,8 @@ async def auth_middleware(
             log.trace("watcher target service not loaded", error_repr=repr(e))
             message = "Agent is not loaded with systemctl."
             return web.json_response({"message": message}, status=HTTPStatus.OK)
+        except BackendAIError:
+            raise
         except Exception:
             log.exception("watcher request failed")
             raise
@@ -153,6 +161,24 @@ async def handle_list_mounts(request: web.Request) -> web.Response:
     return web.json_response(sorted(mounts))
 
 
+def _mountpoint_under_prefix(mount_prefix: str, name: str) -> Path:
+    prefix_dir = os.path.normpath(mount_prefix).rstrip(os.sep) + os.sep
+    real_prefix = os.path.realpath(mount_prefix)
+    real_prefix_dir = real_prefix.rstrip(os.sep) + os.sep
+    mountpoint = os.path.normpath(Path(mount_prefix) / name)
+    if not mountpoint.startswith(prefix_dir):
+        raise InvalidMountNameError(f"{name!r} resolves to {mountpoint}, outside {mount_prefix}")
+    real_mountpoint = os.path.realpath(mountpoint)
+    if not real_mountpoint.startswith(real_prefix_dir):
+        raise InvalidMountNameError(
+            f"{name!r} follows a symlink to {real_mountpoint}, outside {mount_prefix}"
+        )
+    # With `/` as the prefix, the prefix itself also passes the checks above
+    if real_mountpoint == real_prefix:
+        raise InvalidMountNameError(f"{name!r} resolves to the mount prefix {mount_prefix} itself")
+    return Path(mountpoint)
+
+
 async def handle_mount(request: web.Request) -> web.Response:
     log.trace("mount requested")
     params = await request.json()
@@ -160,7 +186,7 @@ async def handle_mount(request: web.Request) -> web.Response:
     mount_prefix = await config.get("volumes/_mount")
     if mount_prefix is None:
         mount_prefix = "/mnt"
-    mountpoint = Path(mount_prefix) / params["name"]
+    mountpoint = _mountpoint_under_prefix(mount_prefix, params["name"])
     mountpoint.mkdir(exist_ok=True)
     if params.get("options", None):
         cmd = [
@@ -184,7 +210,7 @@ async def handle_mount(request: web.Request) -> web.Response:
     await proc.wait()
     if err:
         log.error("volume mount failed", mountpoint=mountpoint, stderr=err)
-        return web.Response(text=err, status=HTTPStatus.INTERNAL_SERVER_ERROR)
+        raise VolumeMountFailedError(extra_msg=err)
     log.info("volume mounted", volume_name=params["name"], mount_prefix=mount_prefix)
     if params["edit_fstab"]:
         fstab_path = params["fstab_path"] if params["fstab_path"] else "/etc/fstab"
@@ -204,12 +230,7 @@ async def handle_umount(request: web.Request) -> web.Response:
     mount_prefix = await config.get("volumes/_mount")
     if mount_prefix is None:
         mount_prefix = "/mnt"
-    mountpoint = Path(mount_prefix) / params["name"]
-    if Path(mount_prefix) == mountpoint:
-        return web.Response(
-            text="Cannot unmount the mount prefix directory itself.",
-            status=HTTPStatus.BAD_REQUEST,
-        )
+    mountpoint = _mountpoint_under_prefix(mount_prefix, params["name"])
     proc = await asyncio.create_subprocess_exec(
         *[
             "sudo",
@@ -225,7 +246,7 @@ async def handle_umount(request: web.Request) -> web.Response:
     await proc.wait()
     if err:
         log.error("volume unmount failed", mountpoint=mountpoint, stderr=err)
-        return web.Response(text=err, status=HTTPStatus.INTERNAL_SERVER_ERROR)
+        raise VolumeUnmountFailedError(extra_msg=err)
     log.info("volume unmounted", volume_name=params["name"], mount_prefix=mount_prefix)
     try:
         mountpoint.rmdir()  # delete directory if empty

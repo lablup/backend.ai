@@ -3,7 +3,7 @@ schema @link(url: "https://specs.apollo.dev/federation/v2.7", import: ["@shareab
 }
 
 """
-Added in 26.9.0. The merged config for one config name: every fragment visible to the caller, deep-merged in ascending allow-list rank order.
+Added in 26.10.0. The merged config for one config name: every fragment visible to the caller, deep-merged in ascending allow-list rank order.
 """
 type AppConfig @shareable {
   """Config name this view is for."""
@@ -23,11 +23,11 @@ scalar JSON @specifiedBy(url: "https://ecma-international.org/wp-content/uploads
 type Query {
   _service: _Service!
 
-  """Added in 26.9.0. Returns 'pong'"""
+  """Added in 26.10.0. Returns 'pong'"""
   ping: String!
 
   """
-  Added in 26.9.0. Read the merged config for each of the given names from public fragments only. Served by the `public` subgraph without authentication, for pre-login clients that need config before they have credentials.
+  Added in 26.10.0. Read the merged config for each of the given names from public fragments only. Served by the `public` subgraph without authentication, for pre-login clients that need config before they have credentials.
   """
   publicAppConfigs(configNames: [String!]!): [AppConfig!]!
 }

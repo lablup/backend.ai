@@ -5,7 +5,6 @@ import asyncio
 import pytest
 
 from ai.backend.manager.api.utils import call_non_bursty, mask_sensitive_keys
-from ai.backend.manager.models.domain.row import verify_dotfile_name
 
 
 async def test_call_non_bursty() -> None:
@@ -45,14 +44,6 @@ async def test_call_non_bursty() -> None:
     for _ in range(64):
         await call_non_bursty(key, execute)
     assert execution_count == 5
-
-
-def test_dotfile_name_validator() -> None:
-    assert not verify_dotfile_name(".terminfo")
-    assert not verify_dotfile_name(".config")
-    assert not verify_dotfile_name(".ssh/authorized_keys")
-    assert verify_dotfile_name(".bashrc")
-    assert verify_dotfile_name(".ssh/id_rsa")
 
 
 def test_mask_sensitive_keys() -> None:

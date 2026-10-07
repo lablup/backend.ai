@@ -16,6 +16,12 @@ from ai.backend.manager.errors.storage import (
 
 MAXIMUM_DOTFILE_COUNT = 100
 
+RESERVED_DOTFILES = [".terminfo", ".jupyter", ".ssh", ".ssh/authorized_keys", ".local", ".config"]
+
+
+def verify_dotfile_name(dotfile: str) -> bool:
+    return dotfile not in RESERVED_DOTFILES
+
 
 class DotfileScope(enum.StrEnum):
     DOMAIN = "domain"

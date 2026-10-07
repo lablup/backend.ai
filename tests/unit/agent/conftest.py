@@ -31,6 +31,10 @@ from ai.backend.testutils.bootstrap import (  # noqa: F401
 )
 from ai.backend.testutils.pants import get_parallel_slot
 
+pytest_plugins = [
+    "ai.backend.testutils.otel",
+]
+
 
 @pytest.fixture(scope="session")
 def test_id() -> str:

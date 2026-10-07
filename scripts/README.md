@@ -75,11 +75,12 @@ current, see `AGENTS.md` in this directory.
 | `freeze_release_version.py` | Replaces `NEXT_RELEASE_VERSION` placeholders with the version being released (skipped for pre-releases) | auto — `release.sh` |
 | `run-towncrier.py` | Runs towncrier against the version-branch changelog file | auto — `release.sh` |
 | `changelog_files.py` | Module, not a command: maps a version to its `CHANGELOG/<version>.md` | auto — imported by `run-towncrier.py`, `extract-release-changelog.py` |
-| `bump_next_release_version.py` | Advances `NEXT_RELEASE_VERSION` to the next sprint after a sprint release | auto — `release.sh` |
+| `bump_next_release_version.py` | Rewrites or prints `NEXT_RELEASE_VERSION` in `meta.py` | auto — `.github/scripts/bump-next-release-on-main.sh` |
 | `.github/scripts/update-maintained-versions.sh` | Registers a newly cut line in `.github/maintained-versions.yml` and retires the due ones | auto — `release.sh` |
 | `.github/scripts/create-version-branch.sh` | Tags the `X.Y.0rc1` a release commit made and cuts the `X.Y` branch at that same commit | auto — `create-version-branch.yml` |
+| `.github/scripts/bump-next-release-on-main.sh` | Opens the pull request advancing `main`'s `NEXT_RELEASE_VERSION` past the line an `X.Y.0rc1` cut (`--next` overrides the target, e.g. for a year rollover) | auto — `create-version-branch.yml` |
 | `.github/scripts/sync-changelog-to-main.sh` | Opens the pull request carrying a final release's `CHANGELOG/X.Y.md` back to `main` | auto — `changelog-sync.yml` |
-| `extract-release-changelog.py` | Extracts the tagged version's block for the GitHub release body | auto — `ci.yml` (release job) |
+| `extract-release-changelog.py` | Extracts the tagged version's block for the GitHub release body; fails when it exceeds GitHub's 125,000-character limit | auto — `ci.yml` (release job), `check-version-change.yml` (release PRs) |
 | `list-dockerfiles.sh` | Prints the `docker/` dockerfile build matrix (`--service` / `--infra`) as JSON; a new `backend.ai-*` dockerfile must be registered in its allowlist | auto — `sbom.yml`; `osv-scanner.yml` (also scheduled: weekly cron + push to `main`) |
 | `determine-release-type.py` | Prints `RELEASE_AUDIENCE` and `IS_PRERELEASE` for the `VERSION` file; rejects a version that is neither an alpha, a release candidate nor a final release | auto — `ci.yml` (`determine-release-grade`) |
 | `test_determine_release_type.py` | Checks `determine-release-type.py` against every classified and rejected version | auto — `ci.yml` (`check-build-and-lint`) |

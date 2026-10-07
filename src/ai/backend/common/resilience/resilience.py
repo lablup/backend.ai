@@ -5,6 +5,8 @@ from collections.abc import Callable, Coroutine, Iterable
 from contextvars import ContextVar
 from typing import Any, ParamSpec, TypeVar
 
+from opentelemetry import trace
+
 from .policy import Policy
 
 P = ParamSpec("P")
@@ -96,8 +98,12 @@ class Resilience:
 
                         next_call = make_wrapper(policy, next_call)
 
-                    # Execute the chain
-                    return await next_call(*args, **kwargs)
+                    # Retries happen inside next_call, so they share one span.
+                    if not trace.get_current_span().get_span_context().is_valid:
+                        return await next_call(*args, **kwargs)
+                    tracer = trace.get_tracer(__name__)
+                    with tracer.start_as_current_span(func.__qualname__):
+                        return await next_call(*args, **kwargs)
                 finally:
                     # Reset context variable
                     _current_operation.reset(token)

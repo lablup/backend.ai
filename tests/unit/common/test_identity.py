@@ -1,17 +1,14 @@
 from __future__ import annotations
 
 import json
-import random
-import secrets
-import socket
-from collections.abc import AsyncGenerator, Generator
+from collections.abc import Generator, Mapping
 from dataclasses import dataclass
-from typing import Any
-from unittest.mock import AsyncMock, MagicMock, patch
+from typing import Any, cast
+from unittest.mock import AsyncMock, MagicMock, Mock, patch
 
 import aiohttp
 import pytest
-from aioresponses import aioresponses
+from yarl import URL
 
 import ai.backend.common.identity
 from ai.backend.common.exception import CloudDetectionError
@@ -65,180 +62,70 @@ def test_is_containerized() -> None:
         assert not ai.backend.common.identity.is_containerized()
 
 
-@pytest.mark.skip
-@pytest.mark.parametrize("provider", ["amazon", "google", "azure", None])
-async def test_get_instance_id(provider: str | None) -> None:
-    ai.backend.common.identity.current_provider = (
-        ai.backend.common.identity.CloudProvider(provider) if provider else None
-    )
-    ai.backend.common.identity._defined = False
-    ai.backend.common.identity._define_functions()
-
-    with aioresponses() as m:
-        random_id = secrets.token_hex(16)
-        if provider == "amazon":
-            m.get("http://169.254.169.254/latest/meta-data/instance-id", body=random_id)
-            ret = await ai.backend.common.identity.get_instance_id()
-            assert ret == random_id
-        elif provider == "azure":
-            m.get(
-                "http://169.254.169.254/metadata/instance?version=2017-03-01",
-                payload={
-                    "compute": {
-                        "vmId": random_id,
-                    },
-                },
-            )
-            ret = await ai.backend.common.identity.get_instance_id()
-            assert ret == random_id
-        elif provider == "google":
-            m.get("http://metadata.google.internal/computeMetadata/v1/instance/id", body=random_id)
-            ret = await ai.backend.common.identity.get_instance_id()
-            assert ret == random_id
-        elif provider is None:
-            with patch("socket.gethostname", return_value="myname"):
-                ret = await ai.backend.common.identity.get_instance_id()
-                assert ret == "i-myname"
-
-
-@pytest.mark.skip
-@pytest.mark.parametrize("provider", ["amazon", "google", "azure", None])
-async def test_get_instance_id_failures(provider: str | None) -> None:
-    ai.backend.common.identity.current_provider = (
-        ai.backend.common.identity.CloudProvider(provider) if provider else None
-    )
-    ai.backend.common.identity._defined = False
-    ai.backend.common.identity._define_functions()
-
-    with aioresponses():
-        # If we don't set any mocked responses, aioresponses will raise ClientConnectionError.
-        ret = await ai.backend.common.identity.get_instance_id()
-        assert ret == f"i-{socket.gethostname()}"
-
-
-@pytest.mark.skip
-@pytest.mark.parametrize("provider", ["amazon", "google", "azure", None])
-async def test_get_instance_ip(provider: str | None) -> None:
-    ai.backend.common.identity.current_provider = (
-        ai.backend.common.identity.CloudProvider(provider) if provider else None
-    )
-    ai.backend.common.identity._defined = False
-    ai.backend.common.identity._define_functions()
-
-    with aioresponses() as m:
-        random_ip = ".".join(str(random.randint(0, 255)) for _ in range(4))
-        if provider == "amazon":
-            m.get("http://169.254.169.254/latest/meta-data/local-ipv4", body=random_ip)
-            ret = await ai.backend.common.identity.get_instance_ip(None)
-            assert ret == random_ip
-        elif provider == "azure":
-            m.get(
-                "http://169.254.169.254/metadata/instance?version=2017-03-01",
-                payload={
-                    "network": {
-                        "interface": [
-                            {
-                                "ipv4": {
-                                    "ipaddress": [
-                                        {"ipaddress": random_ip},
-                                    ],
-                                },
-                            },
-                        ],
-                    },
-                },
-            )
-            ret = await ai.backend.common.identity.get_instance_ip(None)
-            assert ret == random_ip
-        elif provider == "google":
-            m.get(
-                "http://metadata.google.internal/computeMetadata/v1/instance/network-interfaces/0/ip",
-                body=random_ip,
-            )
-            ret = await ai.backend.common.identity.get_instance_ip(None)
-            assert ret == random_ip
-        elif provider is None:
-
-            async def coro_return_addrinfo(*args: Any, **kwargs: Any) -> list[Any]:
-                return [(socket.AF_INET, socket.SOCK_STREAM, 6, "", ("10.1.2.3", 0))]
-
-            mocked_loop = MagicMock()
-            mocked_loop.getaddrinfo = coro_return_addrinfo
-            with (
-                patch("asyncio.get_running_loop", return_value=mocked_loop),
-                patch("socket.gethostname", return_value="myname"),
-            ):
-                ret = await ai.backend.common.identity.get_instance_ip(None)
-                assert ret == "10.1.2.3"
-
-            async def coro_raise_error(*args: Any, **kwargs: Any) -> None:
-                raise socket.gaierror(socket.EAI_NONAME, "domain not found")
-
-            mocked_loop = MagicMock()
-            mocked_loop.getaddrinfo = coro_raise_error
-            with (
-                patch("asyncio.get_running_loop", return_value=mocked_loop),
-                patch("socket.gethostname", return_value="myname"),
-            ):
-                ret = await ai.backend.common.identity.get_instance_ip(None)
-                assert ret == "127.0.0.1"
-
-
-@pytest.mark.skip
-@pytest.mark.parametrize("provider", ["amazon", "google", "azure", None])
-async def test_get_instance_type(provider: str | None) -> None:
-    ai.backend.common.identity.current_provider = (
-        ai.backend.common.identity.CloudProvider(provider) if provider else None
-    )
-    ai.backend.common.identity._defined = False
-    ai.backend.common.identity._define_functions()
-
-    with aioresponses() as m:
-        random_type = secrets.token_hex(16)
-        if provider == "amazon":
-            m.get("http://169.254.169.254/latest/meta-data/instance-type", body=random_type)
-            ret = await ai.backend.common.identity.get_instance_type()
-            assert ret == random_type
-        elif provider == "azure":
-            m.get(
-                "http://169.254.169.254/metadata/instance?version=2017-03-01",
-                payload={
-                    "compute": {
-                        "vmSize": random_type,
-                    },
-                },
-            )
-            ret = await ai.backend.common.identity.get_instance_type()
-            assert ret == random_type
-        elif provider == "google":
-            m.get(
-                "http://metadata.google.internal/computeMetadata/v1/instance/machine-type",
-                body=random_type,
-            )
-            ret = await ai.backend.common.identity.get_instance_type()
-            assert ret == random_type
-        elif provider is None:
-            ret = await ai.backend.common.identity.get_instance_type()
-            assert ret == "default"
-
-
 _AWS_URL = "http://169.254.169.254/latest/meta-data/"
 _AZURE_URL = "http://169.254.169.254/metadata/instance/compute?api-version=2021-02-01"
 _GCP_URL = "http://169.254.169.254/computeMetadata/v1/instance/id"
 
 
+@dataclass(frozen=True)
+class IMDSMock:
+    """Mocked IMDS endpoint response specification."""
+
+    body: str = ""
+    status: int = 200
+
+
+class IMDSRoutes:
+    """IMDS responses by URL, served through a mocked ``aiohttp.ClientSession``."""
+
+    _routes: dict[str, IMDSMock | BaseException]
+
+    def __init__(self) -> None:
+        self._routes = {}
+
+    def add(
+        self,
+        url: str,
+        *,
+        status: int = 200,
+        body: str = "",
+        exception: BaseException | None = None,
+    ) -> None:
+        self._routes[url] = exception if exception is not None else IMDSMock(body, status)
+
+    def session(self) -> Mock:
+        session = Mock()
+        session.get = Mock(side_effect=self._respond)
+        session.__aenter__ = AsyncMock(return_value=session)
+        session.__aexit__ = AsyncMock(return_value=None)
+        return session
+
+    def _respond(
+        self, url: str, *, params: Mapping[str, str] | None = None, headers: Any = None
+    ) -> Mock:
+        key = str(URL(url).update_query(params)) if params else url
+        route = self._routes.get(key)
+        if route is None:
+            raise aiohttp.ClientConnectionError(key)
+        if isinstance(route, BaseException):
+            raise route
+        body = route.body
+        resp = Mock(status=route.status)
+        resp.text = AsyncMock(return_value=body)
+        resp.json = AsyncMock(side_effect=lambda: json.loads(body))
+        resp.__aenter__ = AsyncMock(return_value=resp)
+        resp.__aexit__ = AsyncMock(return_value=None)
+        return resp
+
+
 class TestDetectCloudServices:
     @pytest.fixture
-    def mock_responses(self) -> Generator[aioresponses, None, None]:
-        with aioresponses() as m:
-            yield m
+    def mock_responses(self) -> IMDSRoutes:
+        return IMDSRoutes()
 
     @pytest.fixture
-    async def client_session(
-        self, mock_responses: aioresponses
-    ) -> AsyncGenerator[aiohttp.ClientSession, None]:
-        async with aiohttp.ClientSession() as session:
-            yield session
+    def client_session(self, mock_responses: IMDSRoutes) -> aiohttp.ClientSession:
+        return cast(aiohttp.ClientSession, mock_responses.session())
 
     @pytest.fixture
     def aws_metadata_url(self) -> str:
@@ -246,11 +133,11 @@ class TestDetectCloudServices:
 
     async def test_valid_aws_metadata(
         self,
-        mock_responses: aioresponses,
+        mock_responses: IMDSRoutes,
         client_session: aiohttp.ClientSession,
         aws_metadata_url: str,
     ) -> None:
-        mock_responses.get(
+        mock_responses.add(
             aws_metadata_url,
             body="ami-id\nami-launch-index\ninstance-id\ninstance-type\nlocal-hostname",
         )
@@ -264,24 +151,24 @@ class TestDetectCloudServices:
     )
     async def test_rejects_non_aws_response(
         self,
-        mock_responses: aioresponses,
+        mock_responses: IMDSRoutes,
         client_session: aiohttp.ClientSession,
         aws_metadata_url: str,
         body: str,
     ) -> None:
-        mock_responses.get(aws_metadata_url, body=body)
+        mock_responses.add(aws_metadata_url, body=body)
         with pytest.raises(CloudDetectionError, match="AWS detection failed"):
             await _detect_aws(client_session)
 
     @pytest.mark.parametrize("status", [404, 500, 503], ids=["404", "500", "503"])
     async def test_rejects_non_200_aws_response(
         self,
-        mock_responses: aioresponses,
+        mock_responses: IMDSRoutes,
         client_session: aiohttp.ClientSession,
         aws_metadata_url: str,
         status: int,
     ) -> None:
-        mock_responses.get(aws_metadata_url, status=status, body="error")
+        mock_responses.add(aws_metadata_url, status=status, body="error")
         with pytest.raises(CloudDetectionError, match=f"AWS detection failed with status {status}"):
             await _detect_aws(client_session)
 
@@ -291,11 +178,11 @@ class TestDetectCloudServices:
 
     async def test_valid_azure_metadata(
         self,
-        mock_responses: aioresponses,
+        mock_responses: IMDSRoutes,
         client_session: aiohttp.ClientSession,
         azure_metadata_url: str,
     ) -> None:
-        mock_responses.get(
+        mock_responses.add(
             azure_metadata_url,
             body=json.dumps({"vmId": "abc-123", "name": "myvm", "vmSize": "Standard_D2s_v3"}),
         )
@@ -313,24 +200,24 @@ class TestDetectCloudServices:
     )
     async def test_rejects_non_azure_response(
         self,
-        mock_responses: aioresponses,
+        mock_responses: IMDSRoutes,
         client_session: aiohttp.ClientSession,
         azure_metadata_url: str,
         body: str,
     ) -> None:
-        mock_responses.get(azure_metadata_url, body=body)
+        mock_responses.add(azure_metadata_url, body=body)
         with pytest.raises(CloudDetectionError, match="Azure detection failed"):
             await _detect_azure(client_session)
 
     @pytest.mark.parametrize("status", [404, 500, 503], ids=["404", "500", "503"])
     async def test_rejects_non_200_azure_response(
         self,
-        mock_responses: aioresponses,
+        mock_responses: IMDSRoutes,
         client_session: aiohttp.ClientSession,
         azure_metadata_url: str,
         status: int,
     ) -> None:
-        mock_responses.get(azure_metadata_url, status=status, body="error")
+        mock_responses.add(azure_metadata_url, status=status, body="error")
         with pytest.raises(
             CloudDetectionError, match=f"Azure detection failed with status {status}"
         ):
@@ -342,11 +229,11 @@ class TestDetectCloudServices:
 
     async def test_valid_gcp_metadata(
         self,
-        mock_responses: aioresponses,
+        mock_responses: IMDSRoutes,
         client_session: aiohttp.ClientSession,
         gcp_metadata_url: str,
     ) -> None:
-        mock_responses.get(gcp_metadata_url, body="1234567890123456")
+        mock_responses.add(gcp_metadata_url, body="1234567890123456")
         result = await _detect_gcp(client_session)
         assert result == CloudProvider.GCP
 
@@ -357,34 +244,26 @@ class TestDetectCloudServices:
     )
     async def test_rejects_non_gcp_response(
         self,
-        mock_responses: aioresponses,
+        mock_responses: IMDSRoutes,
         client_session: aiohttp.ClientSession,
         gcp_metadata_url: str,
         body: str,
     ) -> None:
-        mock_responses.get(gcp_metadata_url, body=body)
+        mock_responses.add(gcp_metadata_url, body=body)
         with pytest.raises(CloudDetectionError, match="GCP detection failed"):
             await _detect_gcp(client_session)
 
     @pytest.mark.parametrize("status", [404, 500, 503], ids=["404", "500", "503"])
     async def test_rejects_non_200_gcp_response(
         self,
-        mock_responses: aioresponses,
+        mock_responses: IMDSRoutes,
         client_session: aiohttp.ClientSession,
         gcp_metadata_url: str,
         status: int,
     ) -> None:
-        mock_responses.get(gcp_metadata_url, status=status, body="error")
+        mock_responses.add(gcp_metadata_url, status=status, body="error")
         with pytest.raises(CloudDetectionError, match=f"GCP detection failed with status {status}"):
             await _detect_gcp(client_session)
-
-
-@dataclass(frozen=True)
-class IMDSMock:
-    """Mocked IMDS endpoint response specification."""
-
-    body: str = ""
-    status: int = 200
 
 
 @dataclass(frozen=True)
@@ -399,9 +278,13 @@ class DetectCloudScenario:
 
 class TestDetectCloud:
     @pytest.fixture
-    def mock_responses(self) -> Generator[aioresponses, None, None]:
-        with aioresponses() as m:
-            yield m
+    def mock_responses(self) -> Generator[IMDSRoutes, None, None]:
+        routes = IMDSRoutes()
+        with patch(
+            "ai.backend.common.identity.aiohttp.ClientSession",
+            Mock(return_value=routes.session()),
+        ):
+            yield routes
 
     @pytest.mark.parametrize(
         "scenario",
@@ -446,32 +329,32 @@ class TestDetectCloud:
     )
     async def test_detect_cloud(
         self,
-        mock_responses: aioresponses,
+        mock_responses: IMDSRoutes,
         scenario: DetectCloudScenario,
     ) -> None:
-        mock_responses.get(_AWS_URL, status=scenario.aws.status, body=scenario.aws.body)
-        mock_responses.get(_AZURE_URL, status=scenario.azure.status, body=scenario.azure.body)
-        mock_responses.get(_GCP_URL, status=scenario.gcp.status, body=scenario.gcp.body)
+        mock_responses.add(_AWS_URL, status=scenario.aws.status, body=scenario.aws.body)
+        mock_responses.add(_AZURE_URL, status=scenario.azure.status, body=scenario.azure.body)
+        mock_responses.add(_GCP_URL, status=scenario.gcp.status, body=scenario.gcp.body)
         result = await detect_cloud()
         assert result == scenario.expected
 
     async def test_detect_cloud_returns_none_on_network_errors(
         self,
-        mock_responses: aioresponses,
+        mock_responses: IMDSRoutes,
     ) -> None:
-        mock_responses.get(_AWS_URL, exception=aiohttp.ClientConnectionError())
-        mock_responses.get(_AZURE_URL, exception=aiohttp.ClientConnectionError())
-        mock_responses.get(_GCP_URL, exception=aiohttp.ClientConnectionError())
+        mock_responses.add(_AWS_URL, exception=aiohttp.ClientConnectionError())
+        mock_responses.add(_AZURE_URL, exception=aiohttp.ClientConnectionError())
+        mock_responses.add(_GCP_URL, exception=aiohttp.ClientConnectionError())
         result = await detect_cloud()
         assert result is None
 
     async def test_detect_cloud_picks_valid_when_others_fail(
         self,
-        mock_responses: aioresponses,
+        mock_responses: IMDSRoutes,
     ) -> None:
-        mock_responses.get(_AWS_URL, body="<html>not aws</html>")
-        mock_responses.get(_AZURE_URL, exception=aiohttp.ClientConnectionError())
-        mock_responses.get(_GCP_URL, body="1234567890123456")
+        mock_responses.add(_AWS_URL, body="<html>not aws</html>")
+        mock_responses.add(_AZURE_URL, exception=aiohttp.ClientConnectionError())
+        mock_responses.add(_GCP_URL, body="1234567890123456")
         result = await detect_cloud()
         assert result == CloudProvider.GCP
 

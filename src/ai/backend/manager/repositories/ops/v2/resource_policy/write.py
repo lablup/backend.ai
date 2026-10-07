@@ -6,7 +6,7 @@ lends a project its members: an uncapped membership would carry the enclosing
 scope's admin roles onto a shared catalog row.
 
 The cap grants nothing by itself. What a scope may do with the policy it reaches is
-the read its own roles state (``data/permission/seed/roles/``).
+the read its own roles state (``seeds/manager/role_preset/``).
 
 Restating is the whole surface: each method reads the policy the scope is subject to
 now, drops whatever policy of that type the scope held, and lends the current one.

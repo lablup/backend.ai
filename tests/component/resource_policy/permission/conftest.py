@@ -65,7 +65,6 @@ from ai.backend.manager.api.rest.v2.resource_policy.registry import (
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.keypair.types import KeyPairSecrets
-from ai.backend.manager.data.permission.seed.loader import RoleSeedLoader
 from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.keypair.row import keypairs
 from ai.backend.manager.models.project.creators import ProjectCreator
@@ -92,6 +91,7 @@ from ai.backend.manager.repositories.rbac.permission_check_repository import (
     RbacPermissionCheckRepository,
 )
 from ai.backend.manager.secret.types import SecretValue
+from ai.backend.manager.seed.role_preset.role import RoleSeed
 from ai.backend.manager.services.keypair_resource_policy.processors import (
     KeypairResourcePolicyProcessors,
 )
@@ -109,7 +109,59 @@ if TYPE_CHECKING:
 
 # The seed roles a user created the way every user is comes to hold: their own scope's,
 # and the one every project puts on its roster.
-_AUTO_ASSIGNED: tuple[str, ...] = ("user_owner", "project_member")
+# The auto-assigned presets, as `seeds/manager/role_preset/` states them.
+_AUTO_ASSIGNED: tuple[dict[str, Any], ...] = (
+    {
+        "id": "776c1366-dcf3-5abd-b8de-bc3ad3b759ad",
+        "name": "user_owner",
+        "scope_type": "user",
+        "auto_assign": True,
+        "permissions": {
+            "agent": ["read"],
+            "app_config_fragment": ["read", "update", "create", "soft_delete", "hard_delete"],
+            "container_registry": ["read"],
+            "deployment": ["read", "update", "create", "soft_delete", "hard_delete"],
+            "domain": ["read"],
+            "entity_share": ["read", "update", "create", "soft_delete", "hard_delete"],
+            "idle_checker": ["read", "update", "create", "soft_delete", "hard_delete"],
+            "image": ["read", "update", "create", "soft_delete", "hard_delete"],
+            "keypair_resource_policy": ["read"],
+            "network": ["read", "update", "create", "soft_delete", "hard_delete"],
+            "project": ["read"],
+            "resource_group": ["read"],
+            "resource_preset": ["read", "update", "create", "soft_delete", "hard_delete"],
+            "role": ["read"],
+            "session": ["read", "update", "create", "soft_delete", "hard_delete"],
+            "session_group": ["read", "update", "create", "soft_delete", "hard_delete"],
+            "session_template": ["read", "update", "create", "soft_delete", "hard_delete"],
+            "user": ["read", "update", "soft_delete", "hard_delete"],
+            "user_resource_policy": ["read"],
+            "vfolder": ["read", "update", "create", "soft_delete", "hard_delete"],
+        },
+    },
+    {
+        "id": "06057849-3534-546f-b74c-b79d5d3ecf5e",
+        "name": "project_member",
+        "scope_type": "project",
+        "auto_assign": True,
+        "permissions": {
+            "agent": ["read"],
+            "app_config_fragment": ["read"],
+            "container_registry": ["read"],
+            "deployment": ["create"],
+            "image": ["read"],
+            "model_card": ["read"],
+            "project": ["read"],
+            "project_resource_policy": ["read"],
+            "resource_group": ["read"],
+            "resource_preset": ["read"],
+            "session": ["create"],
+            "session_group": ["create"],
+            "user": ["read"],
+            "vfolder": ["read", "update", "create", "soft_delete", "hard_delete"],
+        },
+    },
+)
 
 _BITS: tuple[Permission, ...] = (
     Permission.READ,
@@ -189,9 +241,8 @@ def server_module_registries(
 
 @pytest.fixture()
 async def declared_presets(db_engine: SAEngine) -> AsyncIterator[list[RolePresetID]]:
-    """The auto-assigned presets and their grants as the seed declaration states them."""
-    seeds = [seed for seed in RoleSeedLoader().load() if seed.name in _AUTO_ASSIGNED]
-    assert len(seeds) == len(_AUTO_ASSIGNED)
+    """The auto-assigned presets and their grants."""
+    seeds = [RoleSeed.model_validate(declared) for declared in _AUTO_ASSIGNED]
     async with db_engine.begin() as conn:
         await conn.execute(
             sa.insert(RolePresetRow.__table__).values([

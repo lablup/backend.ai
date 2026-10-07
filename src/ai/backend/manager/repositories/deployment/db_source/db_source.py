@@ -16,7 +16,7 @@ from sqlalchemy.exc import NoResultFound
 from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
 from sqlalchemy.ext.asyncio import async_sessionmaker
-from sqlalchemy.orm import aliased, selectinload
+from sqlalchemy.orm import aliased, contains_eager, selectinload
 
 from ai.backend.common.config import ModelHealthCheck
 from ai.backend.common.data.endpoint.types import EndpointLifecycle
@@ -165,6 +165,7 @@ from ai.backend.manager.models.endpoint.updaters import (
     EndpointLifecycleBatchUpdater,
     EndpointReplicaGroupUpdater,
 )
+from ai.backend.manager.models.image.row import ImageRow
 from ai.backend.manager.models.image.searchers import ReferenceImageSearcher
 from ai.backend.manager.models.kernel.row import KernelRow
 from ai.backend.manager.models.keypair.row import keypairs
@@ -174,6 +175,7 @@ from ai.backend.manager.models.replica_group.row import ReplicaGroupRow
 from ai.backend.manager.models.replica_group.updaters import ReplicaGroupRevisionSwapUpdater
 from ai.backend.manager.models.resource_group.row import ResourceGroupRow, resource_groups
 from ai.backend.manager.models.resource_slot.row import (
+    DeploymentRevisionResourceSlotRow,
     PresetResourceSlotRow,
     ResourceSlotTypeRow,
 )
@@ -1993,18 +1995,16 @@ class DeploymentDBSource:
                 db_sess, deployment_info
             )
 
-            revision_query = (
-                sa.select(DeploymentRevisionRow)
-                .where(DeploymentRevisionRow.id == revision_id)
-                .options(selectinload(DeploymentRevisionRow.image_row))
-            )
-            revision_result = await db_sess.execute(revision_query)
-            revision_row = revision_result.scalar_one_or_none()
-            if revision_row is None or revision_row.image_row is None:
+            revision_row = await db_sess.get(DeploymentRevisionRow, revision_id)
+            if revision_row is None or revision_row.image is None:
                 raise DeploymentHasNoTargetRevision(
                     f"Revision {revision_id} not found or has no image"
                 )
-            image_row = revision_row.image_row
+            image_row = await db_sess.get(ImageRow, revision_row.image)
+            if image_row is None:
+                raise ImageNotFound(
+                    f"Image {revision_row.image} of revision {revision_id} not found"
+                )
 
             # Resolve runtime variant preset values from revision
             resolved_presets: ResolvedPresetValues | None = None
@@ -2471,19 +2471,28 @@ class DeploymentDBSource:
     async def _fetch_latest_revision_row(
         session: SASession, endpoint_id: DeploymentID
     ) -> DeploymentRevisionRow:
+        latest_revision_id = (
+            sa.select(DeploymentRevisionRow.id)
+            .where(DeploymentRevisionRow.endpoint == endpoint_id)
+            .order_by(DeploymentRevisionRow.revision_number.desc())
+            .limit(1)
+            .scalar_subquery()
+        )
         row = (
-            await session.execute(
-                sa.select(DeploymentRevisionRow)
-                .where(DeploymentRevisionRow.endpoint == endpoint_id)
-                .order_by(DeploymentRevisionRow.revision_number.desc())
-                .limit(1)
-                .options(
-                    selectinload(DeploymentRevisionRow.resource_slot_rows),
-                    selectinload(DeploymentRevisionRow.runtime_variant_row),
-                    selectinload(DeploymentRevisionRow.image_row),
+            (
+                await session.execute(
+                    sa.select(DeploymentRevisionRow)
+                    .where(DeploymentRevisionRow.id == latest_revision_id)
+                    .outerjoin(
+                        DeploymentRevisionResourceSlotRow,
+                        DeploymentRevisionResourceSlotRow.revision_id == DeploymentRevisionRow.id,
+                    )
+                    .options(contains_eager(DeploymentRevisionRow.resource_slot_rows))
                 )
             )
-        ).scalar_one_or_none()
+            .unique()
+            .scalar_one_or_none()
+        )
         if row is None:
             raise DeploymentRevisionNotFound(f"No revisions exist for endpoint {endpoint_id}")
         return row

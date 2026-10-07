@@ -1,7 +1,9 @@
+import base64
 import json
 import logging
 import random
 import string
+import time
 import urllib.parse
 import uuid
 from collections.abc import Mapping, Sequence
@@ -16,20 +18,24 @@ from typing import (
 
 import aiohttp
 import aiohttp_cors
+import httpx  # pants: no-infer-dep
 import jwt
 import yarl
 from aiohttp import web
 from authlib.common.security import generate_token  # pants: no-infer-dep
+from authlib.integrations.base_client.errors import OAuthError  # pants: no-infer-dep
 from authlib.integrations.httpx_client import AsyncOAuth2Client  # pants: no-infer-dep
 from authlib.jose import jwt as joseJWT  # pants: no-infer-dep
+from authlib.oauth2.rfc7523 import PrivateKeyJWT  # pants: no-infer-dep
 from authlib.oidc.core import CodeIDToken  # pants: no-infer-dep
+from cryptography import x509
+from cryptography.hazmat.primitives import hashes
 
 from ai.backend.common.cron import LocalCron, PeriodicTask
 from ai.backend.common.data.entity.domain import DomainName
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.api.rest.types import CORSOptions, WebMiddleware
-from ai.backend.manager.errors.auth import OpenIDAuthenticationFailed
 from ai.backend.manager.models.domain.lookups import DomainNameLookup
 from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.project.lookups import ProjectNameInDomainLookup
@@ -40,15 +46,24 @@ from ai.backend.manager.plugin.webapp import WebappPlugin
 from ai.backend.manager.repositories.auth.repository import AuthRepository
 
 from .config import OIDCWebAppConfig
+from .exceptions import (
+    InvalidSession,
+    OpenIDAccessDenied,
+    OpenIDAuthenticationFailed,
+    OpenIDDomainNotFound,
+    OpenIDEndpointNotConfigured,
+    OpenIDGroupNotAllowed,
+    OpenIDProviderMisconfigured,
+    OpenIDProviderUnavailable,
+    OpenIDRedirectError,
+)
 from .valkey_client import ValkeyOpenIDClient
 
 log = StructuredLogger(logging.getLogger(__name__))
 
 scope = "openid profile email"
-
-
-class OpenIDError(Exception):
-    pass
+_CALLBACK_PATH: Final[str] = "/func/openid/redirect"
+_RESULT_QUERY_KEYS: Final[tuple[str, ...]] = ("bai_error", "sToken")
 
 
 async def ping(_request: web.Request) -> web.Response:
@@ -98,7 +113,7 @@ def generate_user_data(
                 break
 
     if not group_found:
-        raise OpenIDError("User does not belong to group allowed to access this resource")
+        raise OpenIDGroupNotAllowed
 
     return {
         "user": {
@@ -138,7 +153,7 @@ async def create_user_if_not_exists(
     domain_name = DomainName(user_data["domain_name"])
     domain_id = await auth_repository.lookup(DomainNameLookup(domain_name))
     if domain_id is None:
-        raise OpenIDError(f"Domain '{domain_name}' does not exist")
+        raise OpenIDDomainNotFound(extra_msg=f"Domain '{domain_name}' does not exist")
     project_id = await auth_repository.lookup(
         ProjectNameInDomainLookup(domain_name, user_info["project"])
     )
@@ -166,6 +181,7 @@ async def create_user_if_not_exists(
 
 
 _JWKS_REFRESH_INTERVAL: Final[float] = 86400.0
+_CLIENT_ASSERTION_LIFETIME: Final[int] = 300
 
 
 class JwksRefreshTask(PeriodicTask):
@@ -234,7 +250,9 @@ class OIDCWebAppPlugin(WebappPlugin):
             for key in ("authorization_endpoint", "token_endpoint", "jwks_uri"):
                 value = getattr(openid_config, key)
                 if value is None:
-                    raise OpenIDError(f"both well_known and {key} not configured")
+                    raise OpenIDEndpointNotConfigured(
+                        extra_msg=f"both well_known and {key} not configured"
+                    )
                 app[f"openid.{key}"] = value
 
         app["openid.jwks_refresh_cron"] = LocalCron([JwksRefreshTask(app)])
@@ -254,22 +272,44 @@ class OIDCWebAppPlugin(WebappPlugin):
         valkey_client: ValkeyOpenIDClient = app["valkey_client"]
         await valkey_client.close()
 
-    async def login(self, request: web.Request) -> web.Response:
-        post_data = await request.post()
-        redirect_to = post_data.get("redirect_to", None)
-        force = post_data.get("force", "false")
+    def _create_oauth2_client(self, token_endpoint: str) -> AsyncOAuth2Client:
         openid_config = self._config.openid
-        authorization_endpoint = request.app["openid.authorization_endpoint"]
-
-        redirect_uri = yarl.URL(self._config.login_uri)
-
+        if openid_config.private_key is None or openid_config.certificate is None:
+            return AsyncOAuth2Client(
+                openid_config.client_id,
+                openid_config.client_secret,
+                scope=scope,
+                proxies={},
+                code_challenge_method="S256",
+            )
+        certificate = x509.load_pem_x509_certificate(openid_config.certificate.encode())
+        thumbprint = base64.urlsafe_b64encode(certificate.fingerprint(hashes.SHA256()))
+        now = int(time.time())
         client = AsyncOAuth2Client(
             openid_config.client_id,
-            openid_config.client_secret,
+            openid_config.private_key,
+            token_endpoint_auth_method=PrivateKeyJWT.name,
             scope=scope,
             proxies={},
             code_challenge_method="S256",
         )
+        client.register_client_auth_method(
+            PrivateKeyJWT(
+                token_endpoint,
+                claims={"nbf": now, "exp": now + _CLIENT_ASSERTION_LIFETIME},
+                headers={"typ": "JWT", "x5t#S256": thumbprint.rstrip(b"=").decode()},
+                alg=openid_config.client_assertion_alg,
+            )
+        )
+        return client
+
+    async def login(self, request: web.Request) -> web.Response:
+        post_data = await request.post()
+        redirect_to = post_data.get("redirect_to", None)
+        force = post_data.get("force", "false")
+        authorization_endpoint = request.app["openid.authorization_endpoint"]
+
+        client = self._create_oauth2_client(request.app["openid.token_endpoint"])
         session_key = str(uuid.uuid4())
         code_verifier = generate_token(48)
         valkey_client: ValkeyOpenIDClient = request.app["valkey_client"]
@@ -278,12 +318,12 @@ class OIDCWebAppPlugin(WebappPlugin):
         uri, _ = client.create_authorization_url(
             authorization_endpoint,
             state=urllib.parse.urlencode({
-                "redirect": redirect_to or "",
+                "redirect": str(self._return_uri(redirect_to)),
                 "session": session_key,
                 "force": force,
             }),
             code_verifier=code_verifier,
-            redirect_uri=str(redirect_uri.with_path("/func/openid/redirect")),
+            redirect_uri=self._callback_uri(),
         )
 
         return web.Response(
@@ -294,42 +334,124 @@ class OIDCWebAppPlugin(WebappPlugin):
         )
 
     async def redirect(self, request: web.Request) -> web.Response:
+        state = urllib.parse.parse_qs(request.query.get("state", ""))
+        redirect_uri = self._return_uri(state.get("redirect", [None])[0])
+        try:
+            stoken = await self._authorize(request, state)
+        except OpenIDRedirectError as e:
+            self._log_authorization_failure(e)
+            return self._redirect_to(redirect_uri, {"bai_error": e.error_slug()})
+        except Exception:
+            log.exception("openid authorization failed")
+            return self._redirect_to(redirect_uri, {"bai_error": "internal-server-error"})
+        return self._redirect_to(redirect_uri, {"sToken": stoken})
+
+    def _callback_uri(self) -> str:
+        return str(yarl.URL(self._config.login_uri).with_path(_CALLBACK_PATH))
+
+    def _return_uri(self, candidate: object) -> yarl.URL:
+        """Return ``candidate`` unless ``allowed_redirect_hosts`` rejects its host."""
+        login_uri = yarl.URL(self._config.login_uri)
+        if not isinstance(candidate, str) or not candidate:
+            return login_uri
+        uri = yarl.URL(candidate)
+        if self._config.allowed_redirect_hosts is None:
+            return uri
+        allowed_hosts = {login_uri.host, *(h.lower() for h in self._config.allowed_redirect_hosts)}
+        if uri.scheme not in ("http", "https") or uri.host not in allowed_hosts:
+            return login_uri
+        return uri
+
+    def _log_authorization_failure(self, error: OpenIDRedirectError) -> None:
+        detail = str(error.__cause__) if error.__cause__ is not None else str(error)
+        if error.is_client_error():
+            log.trace("openid authorization rejected", error_type=error.error_slug(), error=detail)
+        elif isinstance(error, OpenIDProviderUnavailable):
+            log.warning("openid provider unavailable", error_type=error.error_slug(), error=detail)
+        else:
+            log.error("openid authorization failed", error_type=error.error_slug(), error=detail)
+
+    def _provider_error(self, error: OAuthError) -> OpenIDRedirectError:
+        match error.error:
+            case (
+                "access_denied"
+                | "consent_required"
+                | "interaction_required"
+                | "login_required"
+                | "account_selection_required"
+            ):
+                return OpenIDAccessDenied()
+            case "invalid_grant":
+                return InvalidSession()
+            case "server_error" | "temporarily_unavailable":
+                return OpenIDProviderUnavailable()
+            case (
+                "invalid_client"
+                | "unauthorized_client"
+                | "invalid_scope"
+                | "invalid_request"
+                | "unsupported_response_type"
+                | "unsupported_grant_type"
+                | "invalid_request_uri"
+                | "invalid_request_object"
+                | "request_not_supported"
+                | "request_uri_not_supported"
+                | "registration_not_supported"
+            ):
+                return OpenIDProviderMisconfigured()
+            case _:
+                return OpenIDAuthenticationFailed()
+
+    def _redirect_to(self, redirect_uri: yarl.URL, query: Mapping[str, str]) -> web.Response:
+        return web.Response(
+            status=HTTPStatus.FOUND,
+            headers={
+                "Location": str(
+                    redirect_uri.without_query_params(*_RESULT_QUERY_KEYS).update_query(query)
+                )
+            },
+            # Legacy body that aiohttp's HTTP*Redirect filled in.
+            text=f"{HTTPStatus.FOUND.value}: {HTTPStatus.FOUND.phrase}",
+        )
+
+    async def _authorize(self, request: web.Request, state: Mapping[str, list[str]]) -> str:
+        if "error" in request.query:
+            callback_error = OAuthError(
+                error=request.query["error"],
+                description=request.query.get("error_description"),
+            )
+            raise self._provider_error(callback_error) from callback_error
+        if "session" not in state:
+            raise InvalidSession(reason="OpenID state carries no session")
+
         root_app = request.app["_root_app"]
         config_provider = root_app["_config_provider"]
         auth_repository = cast(AuthRepository, root_app["_auth_repository"])
         openid_config = self._config.openid
         token_endpoint = request.app["openid.token_endpoint"]
-        state = urllib.parse.parse_qs(request.query["state"])
-        if "redirect" in state:
-            redirect_uri = yarl.URL(state["redirect"][0])
-        else:
-            redirect_uri = yarl.URL(self._config.login_uri)
 
         valkey_client: ValkeyOpenIDClient = request.app["valkey_client"]
         code_verifier = await valkey_client.get_openid_key(state["session"][0])
 
-        client = AsyncOAuth2Client(
-            openid_config.client_id,
-            openid_config.client_secret,
-            scope=scope,
-            proxies={},
-            code_challenge_method="S256",
-        )
+        client = self._create_oauth2_client(token_endpoint)
 
         try:
             token = await client.fetch_token(
                 token_endpoint,
                 authorization_response=str(request.url),
                 code_verifier=code_verifier,
-                redirect_uri=str(redirect_uri.with_path("/func/openid/redirect")),
+                redirect_uri=self._callback_uri(),
             )
-
+        except OAuthError as e:
+            raise self._provider_error(e) from e
+        except httpx.HTTPError as e:
+            raise OpenIDProviderUnavailable from e
+        try:
             claims = joseJWT.decode(
                 token["id_token"], request.app["openid.jwks"], claims_cls=CodeIDToken
             )
             claims.validate()
         except Exception as e:
-            log.trace("openid request not authenticated")
             raise OpenIDAuthenticationFailed from e
 
         log.trace("openid request authorized", id_token_claims=json.dumps(claims))
@@ -354,13 +476,7 @@ class OIDCWebAppPlugin(WebappPlugin):
             "exp": datetime.now(UTC) + timedelta(seconds=60),
             "force": force,
         }
-        token = encode_jwt_token(token_data, self._config.secret)
-        return web.Response(
-            status=HTTPStatus.FOUND,
-            headers={"Location": str(redirect_uri.update_query({"sToken": token}))},
-            # Legacy body that aiohttp's HTTP*Redirect filled in.
-            text=f"{HTTPStatus.FOUND.value}: {HTTPStatus.FOUND.phrase}",
-        )
+        return encode_jwt_token(token_data, self._config.secret)
 
     @override
     async def create_app(

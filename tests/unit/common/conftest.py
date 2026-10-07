@@ -35,6 +35,10 @@ from ai.backend.testutils.bootstrap import (  # noqa: F401
     sync_file_lock,
 )
 
+pytest_plugins = [
+    "ai.backend.testutils.otel",
+]
+
 
 def pytest_addoption(parser: Any) -> None:
     parser.addoption(

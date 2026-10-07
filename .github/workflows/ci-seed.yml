@@ -1,0 +1,44 @@
+name: ci-seed
+
+# Checks the seed files under `seeds/` with the CLI that applies them, called by `ci.yml`.
+
+on:
+  workflow_call:
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+
+  seed:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Check out the revision
+      uses: actions/checkout@v6
+      with:
+        lfs: false
+    - name: Parse versions from config
+      run: |
+        PYTHON_VERSION=$(grep -m 1 -oP '(?<=CPython==)([^"]+)' pants.toml)
+        echo "PANTS_CONFIG_FILES=pants.ci.toml" >> $GITHUB_ENV
+        echo "PROJECT_PYTHON_VERSION=$PYTHON_VERSION" >> $GITHUB_ENV
+    - name: Set up Python as Runtime
+      uses: actions/setup-python@v6
+      with:
+        python-version: ${{ env.PROJECT_PYTHON_VERSION }}
+    - name: Restore the Pants caches
+      uses: ./.github/actions/pants-caches
+      with:
+        mode: restore
+    - name: Bootstrap Pants
+      uses: pantsbuild/actions/init-pants@v11
+      with:
+        named-caches-hash: disable
+        cache-lmdb-store: 'false'
+    - name: Pants export
+      run: pants export --resolve=python-default
+    - name: Check the manager seeds
+      run: ./backend.ai mgr seed check seeds/manager
+    - name: Check the role preset fixture is what the role seeds render
+      run: ./backend.ai mgr permissions emit --check
