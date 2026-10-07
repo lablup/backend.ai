@@ -2,13 +2,26 @@
 
 from __future__ import annotations
 
+import copy
 import json
 import pathlib
+import uuid
+from collections.abc import AsyncGenerator
 from typing import Any, Final
 
 import pytest
+import sqlalchemy as sa
 
+from ai.backend.common.data.entity.resource_group import ResourceGroupEntityType
 from ai.backend.common.data.permission.types import Permission
+from ai.backend.manager.models.base import populate_fixture
+from ai.backend.manager.models.domain.row import DomainRow
+from ai.backend.manager.models.resource_group.row import ResourceGroupRow, sgroups_for_domains
+from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.models.virtual_entity.entity_membership import EntityMembershipRow
+from ai.backend.manager.models.virtual_entity.scope_binding import ScopeBindingRow
+from ai.backend.manager.models.virtual_entity.virtual_entity import VirtualEntityRow
+from ai.backend.testutils.db import with_tables
 
 _FIXTURE: Final = (
     pathlib.Path(__file__).resolve().parents[5] / "fixtures" / "manager" / "example-users.json"
@@ -23,7 +36,13 @@ def seed() -> dict[str, Any]:
 
 @pytest.fixture(scope="module")
 def nodes(seed: dict[str, Any]) -> dict[tuple[str, str], str]:
-    return {(row["entity_type"], row["entity_id"]): row["id"] for row in seed["virtual_entities"]}
+    """The node each declared entity id holds. A row that names its entity instead of
+    its id is resolved against the database when the seed is loaded, not here."""
+    return {
+        (row["entity_type"], row["entity_id"]): row["id"]
+        for row in seed["virtual_entities"]
+        if "entity_id" in row
+    }
 
 
 @pytest.fixture(scope="module")
@@ -124,3 +143,95 @@ class TestExampleUsersRoster:
                     "all_fields": True,
                 }
             ]
+
+
+class TestExampleUsersScalingGroupReference:
+    """The seed declares the default scaling group's UUID for a database it builds
+    itself, and names the group where the row may already be held under a UUID the
+    database minted. Loading resolves both references against the row that is there,
+    so `sgroups_for_domains` and the group's node point at it either way."""
+
+    @pytest.fixture
+    async def db_engine(
+        self, global_entity_ids: ExtendedAsyncSAEngine
+    ) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
+        async with with_tables(
+            global_entity_ids,
+            [
+                DomainRow,
+                ResourceGroupRow,
+                sgroups_for_domains,
+                VirtualEntityRow,
+                EntityMembershipRow,
+                ScopeBindingRow,
+            ],
+        ):
+            yield global_entity_ids
+
+    @pytest.fixture
+    def scaling_group_seed(self, seed: dict[str, Any]) -> dict[str, Any]:
+        """The seed's rows on the scaling group path, read from the file the installer
+        loads. Its own copy: loading resolves a row's aliases in place."""
+        return copy.deepcopy({
+            **{key: seed[key] for key in ("domains", "scaling_groups", "sgroups_for_domains")},
+            "virtual_entities": [
+                row for row in seed["virtual_entities"] if row["entity_type"] == "resource_group"
+            ],
+        })
+
+    async def _read_references(
+        self, db_engine: ExtendedAsyncSAEngine
+    ) -> tuple[uuid.UUID, uuid.UUID | None, list[VirtualEntityRow]]:
+        """The `default` scaling group's id, the id `sgroups_for_domains` points at (if
+        the association is there), and the resource group's graph nodes."""
+        async with db_engine.begin_session() as db_sess:
+            group_id = await db_sess.scalar(
+                sa.select(ResourceGroupRow.id).where(ResourceGroupRow.name == "default")
+            )
+            link_id = await db_sess.scalar(sa.select(sgroups_for_domains.c.resource_group_id))
+            nodes = list(
+                (
+                    await db_sess.scalars(
+                        sa.select(VirtualEntityRow).where(
+                            VirtualEntityRow.entity_type == ResourceGroupEntityType()
+                        )
+                    )
+                ).all()
+            )
+        assert group_id is not None
+        return group_id, link_id, nodes
+
+    async def test_resolves_in_an_empty_database(
+        self,
+        db_engine: ExtendedAsyncSAEngine,
+        scaling_group_seed: dict[str, Any],
+    ) -> None:
+        await populate_fixture(db_engine, scaling_group_seed)
+
+        group_id, link_id, nodes = await self._read_references(db_engine)
+
+        assert group_id == uuid.UUID("4d1e9b32-90c7-5b32-8f0e-6f470b8ed24a")
+        assert link_id == group_id
+        assert len(nodes) == 1
+        assert nodes[0].id == uuid.UUID("7a0f4c2e-3b91-5d6a-9e84-1c5f2b7d9a63")
+        assert nodes[0].entity_id == group_id
+
+    async def test_reuses_an_existing_default_scaling_group(
+        self,
+        db_engine: ExtendedAsyncSAEngine,
+        scaling_group_seed: dict[str, Any],
+    ) -> None:
+        """A database migrated from an older release already holds the `default`
+        scaling group, under a UUID its own row minted."""
+        existing = dict(scaling_group_seed["scaling_groups"][0])
+        existing.pop("id")
+        await populate_fixture(db_engine, {"scaling_groups": [existing]})
+        preexisting_id, preexisting_link_id, _ = await self._read_references(db_engine)
+        assert preexisting_link_id is None
+
+        await populate_fixture(db_engine, scaling_group_seed)
+
+        group_id, link_id, nodes = await self._read_references(db_engine)
+        assert group_id == preexisting_id
+        assert link_id == preexisting_id
+        assert [node.entity_id for node in nodes] == [preexisting_id]

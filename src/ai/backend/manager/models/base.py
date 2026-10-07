@@ -172,6 +172,34 @@ FIXTURE_REFERENCE_SPECS: Final[Mapping[str, Sequence[FixtureReferenceSpec]]] = {
             lookup_referenced_column="id",
         ),
     ),
+    # The seed names the default scaling group wherever it references a row a database
+    # may already hold under another UUID: `scaling_groups` is keyed by name, so the
+    # seed's own insert is skipped there and a pinned reference has no row to point at.
+    "sgroups_for_domains": (
+        FixtureReferenceSpec(
+            fixture_alias_column="scaling_group",
+            fixture_fk_column="resource_group_id",
+            lookup_table="scaling_groups",
+            lookup_match_column="name",
+            lookup_referenced_column="id",
+        ),
+        FixtureReferenceSpec(
+            fixture_alias_column="domain",
+            fixture_fk_column="domain_id",
+            lookup_table="domains",
+            lookup_match_column="name",
+            lookup_referenced_column="id",
+        ),
+    ),
+    "virtual_entities": (
+        FixtureReferenceSpec(
+            fixture_alias_column="scaling_group_name",
+            fixture_fk_column="entity_id",
+            lookup_table="scaling_groups",
+            lookup_match_column="name",
+            lookup_referenced_column="id",
+        ),
+    ),
 }
 
 

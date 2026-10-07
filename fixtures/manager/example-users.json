@@ -46,8 +46,8 @@
     ],
     "sgroups_for_domains": [
         {
-            "resource_group_id": "4d1e9b32-90c7-5b32-8f0e-6f470b8ed24a",
-            "domain_id": "b9e676dc-e23e-54c6-b350-e83fba4127e9"
+            "scaling_group": "default",
+            "domain": "default"
         }
     ],
     "users": [
@@ -299,7 +299,7 @@
         {
             "id": "7a0f4c2e-3b91-5d6a-9e84-1c5f2b7d9a63",
             "entity_type": "resource_group",
-            "entity_id": "4d1e9b32-90c7-5b32-8f0e-6f470b8ed24a"
+            "scaling_group_name": "default"
         },
         {
             "id": "c17a5bef-8fa9-594d-8f92-6420b478e87e",
