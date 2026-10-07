@@ -16535,30 +16535,6 @@ type ServiceCatalog implements Node {
 
   """Hash of the service configuration."""
   configHash: String!
-
-  """Endpoints exposed by this service instance."""
-  endpoints: [ServiceCatalogEndpoint!]!
-}
-
-"""Added in 26.3.0. An endpoint exposed by a service instance."""
-type ServiceCatalogEndpoint {
-  """Role of this endpoint (e.g., 'main', 'health')."""
-  role: String!
-
-  """Network scope (e.g., 'public', 'private', 'internal')."""
-  scope: String!
-
-  """Hostname or IP address."""
-  address: String!
-
-  """Port number."""
-  port: Int!
-
-  """Protocol (e.g., 'grpc', 'http', 'https')."""
-  protocol: String!
-
-  """Additional metadata."""
-  metadata: JSON
 }
 
 """Added in 26.3.0. Filter for service catalog queries."""
