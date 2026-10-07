@@ -11,6 +11,7 @@ from ai.backend.agent.kernel_registry.exception import (
     KernelRegistryLoadError,
     KernelRegistryNotFound,
 )
+from ai.backend.common.asyncio import run_in_executor_with_context
 from ai.backend.common.types import KernelId
 from ai.backend.logging.structured import StructuredLogger
 
@@ -53,3 +54,14 @@ class PickleBasedKernelRegistryLoader(AbstractKernelRegistryLoader):
             raise KernelRegistryLoadError from e
         except FileNotFoundError as e:
             raise KernelRegistryNotFound from e
+
+    @override
+    async def mark_migrated(self) -> None:
+        """Rename the snapshot to `<name>.migrated`: an older agent would re-adapt it, bringing
+        back the scratch records of kernels that ended after this migration."""
+        final_file_path = self._last_registry_file_path
+        migrated_path = final_file_path.with_name(f"{final_file_path.name}.migrated")
+        try:
+            await run_in_executor_with_context(None, final_file_path.replace, migrated_path)
+        except FileNotFoundError:
+            pass
