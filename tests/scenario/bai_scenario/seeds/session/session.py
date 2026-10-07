@@ -32,7 +32,7 @@ from ai.backend.manager.data.session.spec import (
 from ai.backend.manager.data.session.types import SessionEntityData
 from ai.backend.manager.data.user.types import UserData
 from ai.backend.manager.models.session.creators import SessionCreator
-from bai_scenario.seeds.seeder import Naming, SeedRowFromThree
+from bai_scenario.seeds.seeder import Naming, TestSeedRowFromThree
 
 
 def session_spec(
@@ -86,7 +86,9 @@ def session_spec(
 
 
 @dataclass(frozen=True)
-class SeedSession(SeedRowFromThree[ProjectData, UserData, ResourceGroupData, SessionEntityData]):
+class SeedSession(
+    TestSeedRowFromThree[ProjectData, UserData, ResourceGroupData, SessionEntityData]
+):
     """A session of the given project, owned by the given user, on the given group.
 
     It waits as enqueued and has no kernel yet; a kernel is laid under it. The access

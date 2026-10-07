@@ -59,7 +59,7 @@ from bai_scenario.seeds.resource_group.resource_group import (
     SeedResourceGroup,
 )
 from bai_scenario.seeds.resource_policy.project import SeedProjectPolicy
-from bai_scenario.seeds.seeder import Laid, Seeder, SeedNest
+from bai_scenario.seeds.seeder import Laid, Seeder, TestSeedNest
 
 type Loaded = list[ResourceGroupDetailNode | Exception | None]
 
@@ -106,7 +106,7 @@ class AProjectAGroupAndACaller:
 
 
 @dataclass(frozen=True)
-class SomeoneGrantedOnTheGroup(SeedNest[Laid[None]]):
+class SomeoneGrantedOnTheGroup(TestSeedNest[Laid[None]]):
     """그 그룹에 앉힌 역할로 권한 하나를 받은 사용자."""
 
     group: Laid[ResourceGroupData]
@@ -132,7 +132,7 @@ class SomeoneGrantedOnTheGroup(SeedNest[Laid[None]]):
 
 
 @dataclass(frozen=True)
-class SomeoneReadingGroupsInTheDomain(SeedNest[Laid[None]]):
+class SomeoneReadingGroupsInTheDomain(TestSeedNest[Laid[None]]):
     """그 도메인 범위에서 리소스 그룹을 읽을 수 있는 사용자."""
 
     domain: Laid[DomainData]

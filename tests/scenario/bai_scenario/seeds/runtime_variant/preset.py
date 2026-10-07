@@ -14,11 +14,11 @@ from ai.backend.common.dto.manager.v2.runtime_variant_preset.types import (
 from ai.backend.manager.data.runtime_variant.types import RuntimeVariantData
 from ai.backend.manager.data.runtime_variant_preset.types import RuntimeVariantPresetData
 from ai.backend.manager.models.runtime_variant_preset.creators import RuntimeVariantPresetCreator
-from bai_scenario.seeds.seeder import Naming, SeedRowFrom
+from bai_scenario.seeds.seeder import Naming, TestSeedRowFrom
 
 
 @dataclass(frozen=True)
-class SeedRuntimeVariantPreset(SeedRowFrom[RuntimeVariantData, RuntimeVariantPresetData]):
+class SeedRuntimeVariantPreset(TestSeedRowFrom[RuntimeVariantData, RuntimeVariantPresetData]):
     """A preset of the variant laid before it. The insert ranks it last in that variant."""
 
     name_hint: str = "preset"

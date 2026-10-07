@@ -41,15 +41,15 @@
   `adding`, `adding_with_nested`, `linking`, `accepting`, `granting`, `joining` — 외에
   데이터베이스를 건드리지 않는다. `accepting`은 공유 제안을 받는 쪽이 받아들이는 연산을
   통째로 쓴다. `joining`은 사용자를 프로젝트 명부에 올린다. `adding`은 필드 행을 심는다.
-  매니저가 생성하는 행은 `SeedFieldCreator`, upsert하는 행은 `SeedFieldUpserter`로 적는다.
+  매니저가 생성하는 행은 `TestSeedFieldCreator`, upsert하는 행은 `TestSeedFieldUpserter`로 적는다.
   `adding_with_nested`는 필드 행과 그것이 소유하는 행(감사 기록과 그 스코프 행처럼)을 한
   쓰기로 심는다. 앞 행을 읽는 seed는 읽는 개수만큼의 입구(`creating_from`,
   `creating_from_two`, `creating_from_three`)를 쓴다.
-- seed 하나는 클래스 하나다. `SeedRow` 계열을 구현해 자기가 무엇인지(`kind`), 무엇을
+- seed 하나는 클래스 하나다. `TestSeedRow` 계열을 구현해 자기가 무엇인지(`kind`), 무엇을
   세워두는지(`detail`), 어떤 이름으로 들어가는지(`name`), 무엇을 쓰는지(`seed`)를 답한다.
 - 이름을 매니저가 못박은 행은 `name`이 그 이름을 답한다. 시더가 붙이는 번호를 받지 않는다.
   그 이름은 src에서 읽는다. 테스트가 리터럴로 다시 적지 않는다.
-- 행 여러 개가 한 전제를 이루면 `SeedNest`로 묶는다. `kind`가 무엇을 준비하는지 말하고,
+- 행 여러 개가 한 전제를 이루면 `TestSeedNest`로 묶는다. `kind`가 무엇을 준비하는지 말하고,
   `seed.within`으로 심으면 레포트가 그 묶음 아래로 행들을 들여쓴다. 묶음이 묶음을 딛는 것도
   `within`이다.
 - 한 시나리오에 하나만 있어야 하는 행은 `seed.once`로 심는다. 같음의 기준은 seed의 타입이다.

@@ -45,7 +45,7 @@ from bai_scenario.seeds.app_config.definition import SeedDefinition
 from bai_scenario.seeds.app_config.fragment import SeedFragmentOf, SeedPublicFragment
 from bai_scenario.seeds.domain.domain import SeedDomain
 from bai_scenario.seeds.rbac.role import SeedPermission, SeedRole
-from bai_scenario.seeds.seeder import Laid, Seeder, SeedNest
+from bai_scenario.seeds.seeder import Laid, Seeder, TestSeedNest
 
 ENFORCEMENT = "manager.rbac.enforcement_enabled"
 
@@ -66,7 +66,7 @@ def names_of(granted: Sequence[Permission]) -> str:
 
 
 @dataclass(frozen=True)
-class SomeoneGrantedOnTheirOwn(SeedNest[Laid[UserData]]):
+class SomeoneGrantedOnTheirOwn(TestSeedNest[Laid[UserData]]):
     """자기 스코프에 부여된 역할로, 한 엔티티 종류에 지정한 권한만 받은 사용자.
 
     권한을 하나도 지정하지 않으면 역할을 만들지 않는다.
@@ -97,7 +97,7 @@ class SomeoneGrantedOnTheirOwn(SeedNest[Laid[UserData]]):
 
 
 @dataclass(frozen=True)
-class SomeoneGrantedOn[Seat](SeedNest[Laid[UserData]]):
+class SomeoneGrantedOn[Seat](TestSeedNest[Laid[UserData]]):
     """지정한 스코프 행에 부여된 역할로, 한 엔티티 종류에 지정한 권한만 받은 사용자.
 
     도메인 스코프에 부여하면 그 도메인 안의 엔티티를 관리한다.
@@ -138,7 +138,7 @@ class LaidDesign:
 
 
 @dataclass(frozen=True)
-class ADesignOf(SeedNest[LaidDesign]):
+class ADesignOf(TestSeedNest[LaidDesign]):
     """설정 이름 하나를 등록하고, 지정한 스코프 종류마다 허용 목록 항목을 만든다.
 
     ``ranks``에 없는 종류는 그 종류의 기본 순위를 받는다.

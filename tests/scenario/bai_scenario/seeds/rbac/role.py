@@ -18,11 +18,11 @@ from ai.backend.manager.data.permission.role import RoleData
 from ai.backend.manager.data.permission.types import Permission
 from ai.backend.manager.models.rbac_models.permission.creators import RolePermissionCreator
 from ai.backend.manager.models.rbac_models.role.creators import RoleCreator
-from bai_scenario.seeds.seeder import Naming, SeedFieldCreator, SeedRowFrom
+from bai_scenario.seeds.seeder import Naming, TestSeedFieldCreator, TestSeedRowFrom
 
 
 @dataclass(frozen=True)
-class SeedRole[S](SeedRowFrom[S, RoleData]):
+class SeedRole[S](TestSeedRowFrom[S, RoleData]):
     """A custom role in the scope of the row it is given."""
 
     scope_of: Callable[[S], EntityIdentifier]
@@ -46,7 +46,7 @@ class SeedRole[S](SeedRowFrom[S, RoleData]):
 
 
 @dataclass(frozen=True)
-class SeedPermission(SeedFieldCreator[RoleData, PermissionData]):
+class SeedPermission(TestSeedFieldCreator[RoleData, PermissionData]):
     """One operation the role may perform on one entity type."""
 
     entity_type: EntityType

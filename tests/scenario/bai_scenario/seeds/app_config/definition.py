@@ -7,11 +7,11 @@ from typing import override
 
 from ai.backend.manager.data.app_config.types import AppConfigDefinitionData
 from ai.backend.manager.models.app_config_definition.creators import AppConfigDefinitionCreator
-from bai_scenario.seeds.seeder import Naming, SeedRow
+from bai_scenario.seeds.seeder import Naming, TestSeedRow
 
 
 @dataclass(frozen=True)
-class SeedDefinition(SeedRow[AppConfigDefinitionData]):
+class SeedDefinition(TestSeedRow[AppConfigDefinitionData]):
     """One registered config name. The name is the seeder's and doubles as the config name."""
 
     name_hint: str = "config"

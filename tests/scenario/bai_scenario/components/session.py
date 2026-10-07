@@ -13,11 +13,11 @@ from ai.backend.manager.data.permission.types import Permission
 from ai.backend.manager.data.project.types import ProjectData
 from bai_scenario.components.domain import GrantedUser, SomeoneOf
 from bai_scenario.seeds.rbac.role import SeedPermission, SeedRole
-from bai_scenario.seeds.seeder import Laid, Seeder, SeedNest
+from bai_scenario.seeds.seeder import Laid, Seeder, TestSeedNest
 
 
 @dataclass(frozen=True)
-class SomeoneMakingSessions(SeedNest[GrantedUser]):
+class SomeoneMakingSessions(TestSeedNest[GrantedUser]):
     """그 프로젝트에서 세션을 만들고 조회할 수 있는 사용자.
 
     세션은 자기가 속한 프로젝트를 이름으로 대므로 역할이 프로젝트 스코프에 앉고, 그 역할을

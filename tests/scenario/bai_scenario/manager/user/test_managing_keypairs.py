@@ -57,7 +57,7 @@ from bai_scenario.seeds.domain.domain import SeedDomain
 from bai_scenario.seeds.resource_policy.keypair import SeedKeypairPolicy
 from bai_scenario.seeds.resource_policy.project import SeedProjectPolicy
 from bai_scenario.seeds.resource_policy.user import SeedUserPolicy
-from bai_scenario.seeds.seeder import Laid, Seeder, SeedNest
+from bai_scenario.seeds.seeder import Laid, Seeder, TestSeedNest
 from bai_scenario.seeds.user.fields import SeedKeypairOf
 from bai_scenario.seeds.user.user import SeedUserOf
 
@@ -145,7 +145,9 @@ class SomeoneAndAKeyOwner(Given[Any, AKeyOwnerAndACaller]):
 
 
 @dataclass(frozen=True)
-class SomeoneUnderTheirOwnPolicy(SeedNest[tuple[Laid[UserData], Laid[KeyPairResourcePolicyData]]]):
+class SomeoneUnderTheirOwnPolicy(
+    TestSeedNest[tuple[Laid[UserData], Laid[KeyPairResourcePolicyData]]]
+):
     """자기만의 키페어 정책으로 만든 사용자 한 명. 정책이 기대값이 되므로 함께 답한다."""
 
     domain: Laid[Any]

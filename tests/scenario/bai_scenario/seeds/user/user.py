@@ -26,13 +26,13 @@ from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.user.creators import UserCreator
 from ai.backend.manager.repositories.ops.v2.user.write import FullUserCreator
 from ai.backend.manager.secret.types import SecretValue
-from bai_scenario.seeds.seeder import Naming, SeedUser
+from bai_scenario.seeds.seeder import Naming, TestSeedUser
 
 PASSWORD = "scenario-password"
 
 
 @dataclass(frozen=True)
-class SeedUserOf(SeedUser[DomainData, UserResourcePolicyData, KeyPairResourcePolicyData]):
+class SeedUserOf(TestSeedUser[DomainData, UserResourcePolicyData, KeyPairResourcePolicyData]):
     """A user of the given domain, held to the given policies.
 
     All three are values earlier rows answered, so nothing here names a domain or a

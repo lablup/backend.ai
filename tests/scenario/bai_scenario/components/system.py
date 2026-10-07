@@ -22,7 +22,7 @@ from ai.backend.testutils.scenario_steps import Given
 from bai_scenario.components.domain import WAS_HERE, SomeoneOf
 from bai_scenario.seeds.domain.domain import SeedDomain
 from bai_scenario.seeds.rbac.role import SeedPermission, SeedRole
-from bai_scenario.seeds.seeder import Laid, Seeder, SeedNest
+from bai_scenario.seeds.seeder import Laid, Seeder, TestSeedNest
 from bai_scenario.seeds.user.user import SeedUserOf
 
 ENFORCEMENT = "manager.rbac.enforcement_enabled"
@@ -56,7 +56,7 @@ async def lay_a_caller(seeding: Any, role: UserRole = UserRole.USER) -> Laid[Use
 
 
 @dataclass(frozen=True)
-class SomeoneReadingInPublic(SeedNest[Laid[UserData]]):
+class SomeoneReadingInPublic(TestSeedNest[Laid[UserData]]):
     """그 사용자에게 public 에서 한 엔티티 타입을 읽을 권한을 준다.
 
     설치본은 모든 계정에 public_member 를 자동으로 붙이지만 시나리오 스키마는 시드 역할을

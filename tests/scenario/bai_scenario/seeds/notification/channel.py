@@ -15,7 +15,7 @@ from ai.backend.common.data.notification.types import (
 from ai.backend.manager.data.notification.types import NotificationChannelData
 from ai.backend.manager.data.user.types import UserData
 from ai.backend.manager.models.notification.creators import NotificationChannelCreator
-from bai_scenario.seeds.seeder import Naming, SeedRowFrom
+from bai_scenario.seeds.seeder import Naming, TestSeedRowFrom
 
 WEBHOOK_URL = "https://hooks.example.test/notify"
 SMTP_HOST = "smtp.example.test"
@@ -27,7 +27,7 @@ SMTP_PASSWORD = "scenario-smtp-password"
 
 
 @dataclass(frozen=True)
-class SeedWebhookChannel(SeedRowFrom[UserData, NotificationChannelData]):
+class SeedWebhookChannel(TestSeedRowFrom[UserData, NotificationChannelData]):
     """A channel that posts to a webhook. Created by the user laid before it."""
 
     name_hint: str = "channel"
@@ -62,7 +62,7 @@ class SeedWebhookChannel(SeedRowFrom[UserData, NotificationChannelData]):
 
 
 @dataclass(frozen=True)
-class SeedEmailChannel(SeedRowFrom[UserData, NotificationChannelData]):
+class SeedEmailChannel(TestSeedRowFrom[UserData, NotificationChannelData]):
     """A channel that mails through an SMTP server. Created by the user laid before it."""
 
     name_hint: str = "mail-channel"

@@ -20,11 +20,13 @@ from ai.backend.manager.models.app_config_fragment.upserters import (
     AppConfigFragmentUpserter,
     PublicAppConfigFragmentUpserter,
 )
-from bai_scenario.seeds.seeder import Naming, SeedRowFrom, SeedRowFromTwo
+from bai_scenario.seeds.seeder import Naming, TestSeedRowFrom, TestSeedRowFromTwo
 
 
 @dataclass(frozen=True)
-class SeedFragmentOf[Owner](SeedRowFromTwo[AppConfigAllowListData, Owner, AppConfigFragmentData]):
+class SeedFragmentOf[Owner](
+    TestSeedRowFromTwo[AppConfigAllowListData, Owner, AppConfigFragmentData]
+):
     """The fragment the given owner holds under the given entry's name."""
 
     owner_of: Callable[[Owner], EntityIdentifier]
@@ -55,7 +57,7 @@ class SeedFragmentOf[Owner](SeedRowFromTwo[AppConfigAllowListData, Owner, AppCon
 
 
 @dataclass(frozen=True)
-class SeedPublicFragment(SeedRowFrom[AppConfigAllowListData, AppConfigFragmentData]):
+class SeedPublicFragment(TestSeedRowFrom[AppConfigAllowListData, AppConfigFragmentData]):
     """The public fragment under the given entry's name. It belongs to no one."""
 
     config: Mapping[str, Any]

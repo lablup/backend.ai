@@ -17,7 +17,7 @@ from ai.backend.common.types import ServiceCatalogStatus
 from ai.backend.manager.data.service_catalog.types import ServiceCatalogEndpointData
 from ai.backend.manager.models.service_catalog.creators import ServiceCatalogEndpointCreator
 from ai.backend.manager.models.service_catalog.upserters import ServiceCatalogUpserter
-from bai_scenario.seeds.seeder import Naming, SeedFieldCreator, SeedRow
+from bai_scenario.seeds.seeder import Naming, TestSeedFieldCreator, TestSeedRow
 
 VERSION = "26.9.0"
 """The version every laid service reports."""
@@ -49,7 +49,7 @@ class ServiceCatalogInStatusUpserter(ServiceCatalogUpserter):
 
 
 @dataclass(frozen=True)
-class SeedService(SeedRow[ServiceCatalogID]):
+class SeedService(TestSeedRow[ServiceCatalogID]):
     """One service instance, registered healthy in the group it is given.
 
     The instance id is the seeder's name, and the display name repeats it.
@@ -84,7 +84,7 @@ class SeedService(SeedRow[ServiceCatalogID]):
 
 
 @dataclass(frozen=True)
-class SeedServiceInStatus(SeedRow[ServiceCatalogID]):
+class SeedServiceInStatus(TestSeedRow[ServiceCatalogID]):
     """One service instance, registered in the group and the status it is given.
 
     Takes the test-side spec, so it is for a status the registration spec cannot write.
@@ -121,7 +121,7 @@ class SeedServiceInStatus(SeedRow[ServiceCatalogID]):
 
 
 @dataclass(frozen=True)
-class SeedEndpointOf(SeedFieldCreator[ServiceCatalogID, ServiceCatalogEndpointData]):
+class SeedEndpointOf(TestSeedFieldCreator[ServiceCatalogID, ServiceCatalogEndpointData]):
     """One endpoint the service announced."""
 
     role: str = "api"

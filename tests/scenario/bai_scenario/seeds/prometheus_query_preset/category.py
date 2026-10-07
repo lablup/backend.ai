@@ -11,11 +11,11 @@ from ai.backend.manager.data.prometheus_query_preset_category.types import (
 from ai.backend.manager.models.prometheus_query_preset_category.creators import (
     PrometheusQueryPresetCategoryCreator,
 )
-from bai_scenario.seeds.seeder import Naming, SeedRow
+from bai_scenario.seeds.seeder import Naming, TestSeedRow
 
 
 @dataclass(frozen=True)
-class SeedCategory(SeedRow[PrometheusQueryPresetCategoryData]):
+class SeedCategory(TestSeedRow[PrometheusQueryPresetCategoryData]):
     """A category in the global preset catalog. The name is the seeder's."""
 
     name_hint: str = "category"

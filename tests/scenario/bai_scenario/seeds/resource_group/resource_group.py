@@ -20,11 +20,11 @@ from ai.backend.manager.models.resource_group.creators import (
     ResourceGroupForKeypairRelationCreator,
     ResourceGroupForProjectRelationCreator,
 )
-from bai_scenario.seeds.seeder import Naming, SeedLink, SeedRow
+from bai_scenario.seeds.seeder import Naming, TestSeedLink, TestSeedRow
 
 
 @dataclass(frozen=True)
-class SeedResourceGroup(SeedRow[ResourceGroupData]):
+class SeedResourceGroup(TestSeedRow[ResourceGroupData]):
     """The scope agents and sessions are created under."""
 
     name_hint: str = "resource-group"
@@ -63,7 +63,7 @@ class SeedResourceGroup(SeedRow[ResourceGroupData]):
 
 
 @dataclass(frozen=True)
-class LinkToDomain(SeedLink[DomainData, ResourceGroupData]):
+class LinkToDomain(TestSeedLink[DomainData, ResourceGroupData]):
     """Every session of that domain may schedule on the group."""
 
     @override
@@ -84,7 +84,7 @@ class LinkToDomain(SeedLink[DomainData, ResourceGroupData]):
 
 
 @dataclass(frozen=True)
-class LinkToProject(SeedLink[ProjectData, ResourceGroupData]):
+class LinkToProject(TestSeedLink[ProjectData, ResourceGroupData]):
     """Every session of that project may schedule on the group."""
 
     @override
@@ -105,7 +105,7 @@ class LinkToProject(SeedLink[ProjectData, ResourceGroupData]):
 
 
 @dataclass(frozen=True)
-class LinkToKeypair(SeedLink[UserData, ResourceGroupData]):
+class LinkToKeypair(TestSeedLink[UserData, ResourceGroupData]):
     """Only sessions asked for with that key may schedule on the group."""
 
     access_key: str

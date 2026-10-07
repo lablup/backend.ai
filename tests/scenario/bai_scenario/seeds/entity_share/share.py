@@ -13,11 +13,11 @@ from ai.backend.manager.data.user.types import UserData
 from ai.backend.manager.data.vfolder.types import VFolderData
 from ai.backend.manager.models.entity_share.creators import EntityShareCreator
 from ai.backend.manager.models.entity_share.updaters import EntityShareAcceptUpdater
-from bai_scenario.seeds.seeder import Naming, SeedRowFromThree, SeedShareAcceptance
+from bai_scenario.seeds.seeder import Naming, TestSeedRowFromThree, TestSeedShareAcceptance
 
 
 @dataclass(frozen=True)
-class SeedVFolderShare(SeedRowFromThree[UserData, VFolderData, UserData, EntityShareData]):
+class SeedVFolderShare(TestSeedRowFromThree[UserData, VFolderData, UserData, EntityShareData]):
     """The first person offers the folder to the second, under ``cap``."""
 
     cap: Permission
@@ -48,7 +48,7 @@ class SeedVFolderShare(SeedRowFromThree[UserData, VFolderData, UserData, EntityS
 
 
 @dataclass(frozen=True)
-class SeedShareTaken(SeedShareAcceptance[EntityShareData]):
+class SeedShareTaken(TestSeedShareAcceptance[EntityShareData]):
     """The recipient the offer names takes it."""
 
     @override

@@ -14,11 +14,11 @@ from ai.backend.common.types import (
 )
 from ai.backend.manager.data.resource.types import KeyPairResourcePolicyData
 from ai.backend.manager.models.resource_policy.creators import KeyPairResourcePolicyCreator
-from bai_scenario.seeds.seeder import Naming, SeedRow
+from bai_scenario.seeds.seeder import Naming, TestSeedRow
 
 
 @dataclass(frozen=True)
-class SeedKeypairPolicy(SeedRow[KeyPairResourcePolicyData]):
+class SeedKeypairPolicy(TestSeedRow[KeyPairResourcePolicyData]):
     """What a keypair is allowed. The session limits a scenario varies live here.
 
     The row also carries an ``is_default`` flag, which decides the policy a keypair

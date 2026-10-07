@@ -55,7 +55,7 @@ from bai_scenario.seeds.domain.domain import SeedDomain
 from bai_scenario.seeds.resource_policy.keypair import SeedKeypairPolicy
 from bai_scenario.seeds.resource_policy.project import SeedProjectPolicy
 from bai_scenario.seeds.resource_policy.user import SeedUserPolicy
-from bai_scenario.seeds.seeder import Laid, Seeder, SeedNest
+from bai_scenario.seeds.seeder import Laid, Seeder, TestSeedNest
 from bai_scenario.seeds.user.fields import SeedKeypairOf
 from bai_scenario.seeds.user.user import SeedUserOf
 
@@ -108,7 +108,9 @@ type Answer = object
 
 
 @dataclass(frozen=True)
-class SomeoneAndTheirKeyPolicy(SeedNest[tuple[Laid[KeyPairResourcePolicyData], Laid[UserData]]]):
+class SomeoneAndTheirKeyPolicy(
+    TestSeedNest[tuple[Laid[KeyPairResourcePolicyData], Laid[UserData]]]
+):
     """그 도메인의 사용자 한 명과, 그 사람 기본 키가 딛는 키 정책."""
 
     domain: Laid[Any]

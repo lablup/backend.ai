@@ -25,11 +25,11 @@ from ai.backend.manager.models.login_session.creators import (
     LoginSessionCreator,
 )
 from ai.backend.manager.secret.types import SecretValue
-from bai_scenario.seeds.seeder import SeedFieldCreator
+from bai_scenario.seeds.seeder import TestSeedFieldCreator
 
 
 @dataclass(frozen=True)
-class SeedKeypairOf(SeedFieldCreator[UserData, KeyPairData]):
+class SeedKeypairOf(TestSeedFieldCreator[UserData, KeyPairData]):
     """A keypair besides the one the user authorizes with.
 
     The policy name is a value an earlier row answered; this seed names none of its own.
@@ -64,7 +64,7 @@ class SeedKeypairOf(SeedFieldCreator[UserData, KeyPairData]):
 
 
 @dataclass(frozen=True)
-class SeedLoginSessionOf(SeedFieldCreator[UserData, LoginSessionData]):
+class SeedLoginSessionOf(TestSeedFieldCreator[UserData, LoginSessionData]):
     """A login the user holds, made with the key an earlier row answered."""
 
     access_key: str
@@ -83,7 +83,7 @@ class SeedLoginSessionOf(SeedFieldCreator[UserData, LoginSessionData]):
 
 
 @dataclass(frozen=True)
-class SeedLoginHistoryOf(SeedFieldCreator[UserData, LoginHistoryData]):
+class SeedLoginHistoryOf(TestSeedFieldCreator[UserData, LoginHistoryData]):
     """The record one successful login of the user left, under the user's own domain."""
 
     domain_name: str

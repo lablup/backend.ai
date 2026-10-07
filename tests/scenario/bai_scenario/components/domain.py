@@ -43,7 +43,7 @@ from bai_scenario.seeds.resource_group.resource_group import LinkToDomain, SeedR
 from bai_scenario.seeds.resource_policy.keypair import SeedKeypairPolicy
 from bai_scenario.seeds.resource_policy.project import SeedProjectPolicy
 from bai_scenario.seeds.resource_policy.user import SeedUserPolicy
-from bai_scenario.seeds.seeder import Laid, Seeder, SeedNest
+from bai_scenario.seeds.seeder import Laid, Seeder, TestSeedNest
 from bai_scenario.seeds.user.user import SeedUserOf
 
 WAS_HERE = "이미 있던 도메인"
@@ -282,7 +282,7 @@ class GrantedUser:
 
 
 @dataclass(frozen=True)
-class SomeoneOf(SeedNest[Laid[UserData]]):
+class SomeoneOf(TestSeedNest[Laid[UserData]]):
     """그 도메인에 속한 사용자 한 명. 매니저가 사용자를 만드는 경로를 그대로 탄다.
 
     그 경로가 인증에 쓰는 키와, 자기 폴더가 사는 개인 프로젝트까지 함께 만든다. 둘 다
@@ -307,7 +307,7 @@ class SomeoneOf(SeedNest[Laid[UserData]]):
 
 
 @dataclass(frozen=True)
-class SomeoneReadingDomains(SeedNest[GrantedUser]):
+class SomeoneReadingDomains(TestSeedNest[GrantedUser]):
     """그 도메인 범위에서 도메인을 읽을 수 있는 사용자."""
 
     domain: Laid[DomainData]
@@ -328,7 +328,7 @@ class SomeoneReadingDomains(SeedNest[GrantedUser]):
 
 
 @dataclass(frozen=True)
-class SomeoneReadingDomainsOfTheGroup(SeedNest[Laid[None]]):
+class SomeoneReadingDomainsOfTheGroup(TestSeedNest[Laid[None]]):
     """그 리소스 그룹 범위에서 도메인을 읽을 수 있는 사용자."""
 
     group: Laid[ResourceGroupData]

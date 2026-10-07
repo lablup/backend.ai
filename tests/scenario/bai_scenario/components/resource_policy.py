@@ -89,7 +89,7 @@ from bai_scenario.seeds.rbac.role import SeedPermission, SeedRole
 from bai_scenario.seeds.resource_policy.keypair import SeedKeypairPolicy
 from bai_scenario.seeds.resource_policy.project import SeedNamedProjectPolicy, SeedProjectPolicy
 from bai_scenario.seeds.resource_policy.user import SeedUserPolicy
-from bai_scenario.seeds.seeder import Laid, Seeder, SeedNest, SeedRow
+from bai_scenario.seeds.seeder import Laid, Seeder, TestSeedNest, TestSeedRow
 from bai_scenario.seeds.user.user import SeedUserOf
 
 type Searched = (
@@ -175,7 +175,7 @@ class Family[PolicyData, PolicyNode](ABC):
     @abstractmethod
     def seed(
         self, name_hint: str = "policy", *, holding_optional: bool = False
-    ) -> SeedRow[PolicyData]:
+    ) -> TestSeedRow[PolicyData]:
         """정책 하나. ``holding_optional``이면 비울 수 있는 항목에도 값을 넣는다."""
         raise NotImplementedError
 
@@ -299,7 +299,7 @@ class ProjectPolicies(Family[ProjectResourcePolicyData, ProjectResourcePolicyNod
     @override
     def seed(
         self, name_hint: str = "project-policy", *, holding_optional: bool = False
-    ) -> SeedRow[ProjectResourcePolicyData]:
+    ) -> TestSeedRow[ProjectResourcePolicyData]:
         return SeedNamedProjectPolicy(name_hint=name_hint)
 
     @override
@@ -453,7 +453,7 @@ class KeypairPolicies(OwnFamily[KeyPairResourcePolicyData, KeypairResourcePolicy
     @override
     def seed(
         self, name_hint: str = "keypair-policy", *, holding_optional: bool = False
-    ) -> SeedRow[KeyPairResourcePolicyData]:
+    ) -> TestSeedRow[KeyPairResourcePolicyData]:
         return SeedKeypairPolicy(
             name_hint=name_hint, max_pending_session_count=2 if holding_optional else None
         )
@@ -733,7 +733,7 @@ class UserPolicies(OwnFamily[UserResourcePolicyData, UserResourcePolicyNode]):
     @override
     def seed(
         self, name_hint: str = "user-policy", *, holding_optional: bool = False
-    ) -> SeedRow[UserResourcePolicyData]:
+    ) -> TestSeedRow[UserResourcePolicyData]:
         return SeedUserPolicy(
             name_hint=name_hint, max_concurrent_logins=3 if holding_optional else None
         )
@@ -891,7 +891,7 @@ class ManyPoliciesAndACaller[PolicyData]:
 
 
 @dataclass(frozen=True)
-class SomeoneHeldToPolicies(SeedNest[LaidHolder]):
+class SomeoneHeldToPolicies(TestSeedNest[LaidHolder]):
     """정책들이 할당된 사용자 한 명. 매니저가 사용자를 만드는 경로를 그대로 사용한다.
 
     그 경로는 사용자 정책과 키페어 정책의 이름을 사용자 행에 기록하고, 함께 생성되는 개인
@@ -930,7 +930,7 @@ class SomeoneHeldToPolicies(SeedNest[LaidHolder]):
 
 
 @dataclass(frozen=True)
-class ReadingOwnPolicies(SeedNest[Laid[None]]):
+class ReadingOwnPolicies(TestSeedNest[Laid[None]]):
     """자기 스코프에서 그 정책을 읽을 수 있게 하는 역할과, 그 역할의 부여."""
 
     user: Laid[UserData]

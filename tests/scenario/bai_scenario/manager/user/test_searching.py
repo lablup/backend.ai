@@ -58,7 +58,7 @@ from bai_scenario.seeds.rbac.role import SeedRole
 from bai_scenario.seeds.resource_policy.keypair import SeedKeypairPolicy
 from bai_scenario.seeds.resource_policy.project import SeedProjectPolicy
 from bai_scenario.seeds.resource_policy.user import SeedUserPolicy
-from bai_scenario.seeds.seeder import Laid, Seeder, SeedNest
+from bai_scenario.seeds.seeder import Laid, Seeder, TestSeedNest
 from bai_scenario.seeds.user.user import SeedUserOf
 
 type Answer = SearchUsersPayload | AdminSearchUsersPayload
@@ -149,7 +149,7 @@ class ManyUsersAndTheSuperadmin(Given[Any, AnAskerAndWhomTheyReach]):
 
 
 @dataclass(frozen=True)
-class SomeoneDeletedOf(SeedNest[Laid[UserData]]):
+class SomeoneDeletedOf(TestSeedNest[Laid[UserData]]):
     """그 도메인에 속했다가 삭제 상태가 된 사용자 한 명."""
 
     domain: Laid[DomainData]

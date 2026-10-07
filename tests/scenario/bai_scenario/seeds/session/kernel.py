@@ -20,12 +20,12 @@ from ai.backend.manager.data.session.spec import KernelSpec
 from ai.backend.manager.data.session.types import SessionEntityData
 from ai.backend.manager.models.kernel.creators import KernelCreator
 from ai.backend.manager.models.resource_slot.creators import KernelResourceAllocationCreator
-from bai_scenario.seeds.seeder import SeedFieldWithNestedRows
+from bai_scenario.seeds.seeder import TestSeedFieldWithNestedRows
 from bai_scenario.seeds.session.session import session_spec
 
 
 @dataclass(frozen=True)
-class SeedKernelOf(SeedFieldWithNestedRows[SessionEntityData, KernelInfo]):
+class SeedKernelOf(TestSeedFieldWithNestedRows[SessionEntityData, KernelInfo]):
     """The main kernel of the session, with what it asked for in each slot written under it.
 
     The session and the image are values earlier rows answered. The kernel waits as

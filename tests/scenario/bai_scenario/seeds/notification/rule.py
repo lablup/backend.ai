@@ -11,14 +11,14 @@ from ai.backend.common.data.notification import NotificationRuleType
 from ai.backend.manager.data.notification.types import NotificationChannelData, NotificationRuleData
 from ai.backend.manager.data.user.types import UserData
 from ai.backend.manager.models.notification.creators import NotificationRuleCreator
-from bai_scenario.seeds.seeder import Naming, SeedRowFrom, SeedRowFromTwo
+from bai_scenario.seeds.seeder import Naming, TestSeedRowFrom, TestSeedRowFromTwo
 
 TEMPLATE = "Session {{ session_name }} is {{ status }}"
 """A template the session.started data fills in whole."""
 
 
 @dataclass(frozen=True)
-class SeedRuleOf(SeedRowFromTwo[NotificationChannelData, UserData, NotificationRuleData]):
+class SeedRuleOf(TestSeedRowFromTwo[NotificationChannelData, UserData, NotificationRuleData]):
     """A rule dispatching through the channel laid before it, created by that user."""
 
     name_hint: str = "rule"
@@ -58,7 +58,7 @@ class SeedRuleOf(SeedRowFromTwo[NotificationChannelData, UserData, NotificationR
 
 
 @dataclass(frozen=True)
-class SeedRuleOfNoChannel(SeedRowFrom[UserData, NotificationRuleData]):
+class SeedRuleOfNoChannel(TestSeedRowFrom[UserData, NotificationRuleData]):
     """A rule naming a channel id no row answers to. Nothing stops the write."""
 
     name_hint: str = "orphan-rule"

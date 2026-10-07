@@ -67,7 +67,7 @@ from bai_scenario.seeds.project.project import SeedProject
 from bai_scenario.seeds.resource_policy.project import SeedProjectPolicy
 from bai_scenario.seeds.resource_slot.slot_type import SeedSlotType
 from bai_scenario.seeds.runtime_variant.runtime_variant import SeedRuntimeVariant
-from bai_scenario.seeds.seeder import Laid, Seeder, SeedNest
+from bai_scenario.seeds.seeder import Laid, Seeder, TestSeedNest
 from bai_scenario.seeds.vfolder.vfolder import SeedPersonalVFolder
 
 MOUNTED_AT = "/models"
@@ -118,7 +118,7 @@ class LaidMaterials:
 
 
 @dataclass(frozen=True)
-class WhatARevisionStandsOn(SeedNest[LaidMaterials]):
+class WhatARevisionStandsOn(TestSeedNest[LaidMaterials]):
     """리비전이 딛는 이미지, 모델 폴더, 런타임 변형, 자원 슬롯 타입.
 
     모델 폴더는 ``folder_owner``의 개인 폴더다. ``folder_readable``이면 그 사람이 자기 개인

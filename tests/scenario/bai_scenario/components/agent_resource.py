@@ -25,7 +25,7 @@ from bai_scenario.seeds.agent.agent import SeedAgent
 from bai_scenario.seeds.domain.domain import SeedDomain
 from bai_scenario.seeds.rbac.role import SeedPermission, SeedRole
 from bai_scenario.seeds.resource_group.resource_group import SeedResourceGroup
-from bai_scenario.seeds.seeder import Laid, Seeder, SeedNest
+from bai_scenario.seeds.seeder import Laid, Seeder, TestSeedNest
 
 
 @dataclass(frozen=True)
@@ -54,7 +54,7 @@ class TwoAgentsAndACaller:
 
 
 @dataclass(frozen=True)
-class SomeoneReadingAgentsIn(SeedNest[Laid[UserData]]):
+class SomeoneReadingAgentsIn(TestSeedNest[Laid[UserData]]):
     """그 리소스 그룹의 에이전트를 읽을 수 있는 사용자."""
 
     domain: Laid[DomainData]

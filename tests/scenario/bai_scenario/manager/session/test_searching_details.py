@@ -44,12 +44,12 @@ from bai_scenario.runner.acting import ActingAs
 from bai_scenario.runner.planting import SeedingSession
 from bai_scenario.runner.steps import run_scenario
 from bai_scenario.seeds.agent.agent import SeedAgent
-from bai_scenario.seeds.seeder import Naming, SeedRowFromTwo
+from bai_scenario.seeds.seeder import Naming, TestSeedRowFromTwo
 from bai_scenario.seeds.session.session import SeedSession
 
 
 @dataclass(frozen=True)
-class SeedSessionGroup(SeedRowFromTwo[ProjectData, UserData, SessionGroupData]):
+class SeedSessionGroup(TestSeedRowFromTwo[ProjectData, UserData, SessionGroupData]):
     @override
     def kind(self) -> str:
         return "세션 그룹"

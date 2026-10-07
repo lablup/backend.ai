@@ -16,11 +16,11 @@ from ai.backend.manager.data.image.types import (
     ImageType,
 )
 from ai.backend.manager.models.image.creators import ImageAliasCreator, ImageCreator
-from bai_scenario.seeds.seeder import Naming, SeedFieldCreator, SeedRowFrom
+from bai_scenario.seeds.seeder import Naming, TestSeedFieldCreator, TestSeedRowFrom
 
 
 @dataclass(frozen=True)
-class SeedImage(SeedRowFrom[ContainerRegistryData, ImageData]):
+class SeedImage(TestSeedRowFrom[ContainerRegistryData, ImageData]):
     """An image of the given registry. A session names one to run."""
 
     name_hint: str = "image"
@@ -72,7 +72,7 @@ class SeedImage(SeedRowFrom[ContainerRegistryData, ImageData]):
 
 
 @dataclass(frozen=True)
-class SeedTaggedImage(SeedRowFrom[ContainerRegistryData, ImageData]):
+class SeedTaggedImage(TestSeedRowFrom[ContainerRegistryData, ImageData]):
     """An image registered under a tag of the given registry, as a scan would name it."""
 
     repository: str
@@ -111,7 +111,7 @@ class SeedTaggedImage(SeedRowFrom[ContainerRegistryData, ImageData]):
 
 
 @dataclass(frozen=True)
-class SeedAlias(SeedFieldCreator[ImageData, ImageAliasData]):
+class SeedAlias(TestSeedFieldCreator[ImageData, ImageAliasData]):
     """One alias of an image.
 
     The alias column is unique across every image, and each scenario runs against its

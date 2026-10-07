@@ -17,11 +17,11 @@ from ai.backend.manager.data.agent.types import (
 )
 from ai.backend.manager.data.resource_group.types import ResourceGroupData
 from ai.backend.manager.models.agent.upserters import AgentHeartbeatUpserter
-from bai_scenario.seeds.seeder import Naming, SeedRowFrom
+from bai_scenario.seeds.seeder import Naming, TestSeedRowFrom
 
 
 @dataclass(frozen=True)
-class SeedAgent(SeedRowFrom[ResourceGroupData, AgentUUID]):
+class SeedAgent(TestSeedRowFrom[ResourceGroupData, AgentUUID]):
     """An agent of the given resource group, registered the way its first heartbeat
     registers it. It reports no slot; the slots it carries are laid under it."""
 

@@ -45,7 +45,7 @@ from bai_scenario.seeds.image.registry import AllowProject, SeedContainerRegistr
 from bai_scenario.seeds.project.project import SeedProject
 from bai_scenario.seeds.rbac.role import SeedPermission, SeedRole
 from bai_scenario.seeds.resource_policy.project import SeedProjectPolicy
-from bai_scenario.seeds.seeder import Laid, Seeder, SeedNest
+from bai_scenario.seeds.seeder import Laid, Seeder, TestSeedNest
 
 MISSING_ENTITY_ID = uuid.UUID("00000000-0000-0000-0000-0000000000ff")
 """어떤 행에도 대응하지 않는 ID."""
@@ -219,7 +219,7 @@ class ARegistryAndAProjectToAllow(Given[SeedingSession, ARegistryToAllowAndACall
 
 
 @dataclass(frozen=True)
-class SomeoneAllowingIn[ScopeData](SeedNest[Laid[None]]):
+class SomeoneAllowingIn[ScopeData](TestSeedNest[Laid[None]]):
     """스코프 안에서 레지스트리 허용 목록을 수정할 역할을 사용자에게 부여한다."""
 
     scope: Laid[ScopeData]

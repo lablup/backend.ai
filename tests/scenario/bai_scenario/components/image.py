@@ -44,7 +44,7 @@ from bai_scenario.seeds.domain.domain import SeedDomain
 from bai_scenario.seeds.image.image import SeedAlias, SeedImage
 from bai_scenario.seeds.image.registry import SeedContainerRegistry
 from bai_scenario.seeds.rbac.role import SeedPermission, SeedRole
-from bai_scenario.seeds.seeder import Laid, Seeder, SeedNest
+from bai_scenario.seeds.seeder import Laid, Seeder, TestSeedNest
 
 NOTHING = uuid.UUID("00000000-0000-0000-0000-0000000000ff")
 """어느 행도 가리키지 않는 ID. 대상이 없을 때 무엇이 반환되는지 확인하려고 지정한다."""
@@ -147,7 +147,7 @@ class AliasesAndACaller:
 
 
 @dataclass(frozen=True)
-class ARegistryWithImages(SeedNest[tuple[ContainerRegistryData, tuple[Laid[ImageData], ...]]]):
+class ARegistryWithImages(TestSeedNest[tuple[ContainerRegistryData, tuple[Laid[ImageData], ...]]]):
     """레지스트리 1개와 그 안의 이미지들. 이미지는 레지스트리에 속해야 만들 수 있다."""
 
     count: int = 1
@@ -482,7 +482,7 @@ class AliasesOnTwoImagesAndSomeone(Given[Any, AliasesAndACaller]):
 
 
 @dataclass(frozen=True)
-class SomeoneReachingImages(SeedNest[Laid[None]]):
+class SomeoneReachingImages(TestSeedNest[Laid[None]]):
     """그 레지스트리 안의 이미지를 조회·소프트 삭제·완전 삭제할 수 있는 사용자.
 
     이미지는 자신을 담은 레지스트리 아래에 만들어진다. 그래서 역할이 놓이는 스코프는

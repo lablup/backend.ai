@@ -63,7 +63,7 @@ from bai_scenario.seeds.resource_group.resource_group import SeedResourceGroup
 from bai_scenario.seeds.resource_policy.keypair import SeedKeypairPolicy
 from bai_scenario.seeds.resource_policy.project import SeedProjectPolicy
 from bai_scenario.seeds.resource_slot.slot_type import SeedResourceSlotType
-from bai_scenario.seeds.seeder import Laid, Seeder, SeedNest
+from bai_scenario.seeds.seeder import Laid, Seeder, TestSeedNest
 from bai_scenario.seeds.session.kernel import SeedKernelOf
 from bai_scenario.seeds.session.session import SeedSession
 from bai_scenario.seeds.user.fields import SeedKeypairOf
@@ -113,7 +113,7 @@ class KernelsAndACaller:
 
 
 @dataclass(frozen=True)
-class SomeoneReadingSessionsIn[S](SeedNest[Laid[UserData]]):
+class SomeoneReadingSessionsIn[S](TestSeedNest[Laid[UserData]]):
     """그 스코프에서 세션을 읽을 수 있는 사용자."""
 
     domain: Laid[DomainData]

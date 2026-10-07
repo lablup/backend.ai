@@ -57,7 +57,7 @@ from bai_scenario.seeds.domain.domain import SeedDomain
 from bai_scenario.seeds.resource_policy.keypair import SeedKeypairPolicy
 from bai_scenario.seeds.resource_policy.project import SeedProjectPolicy
 from bai_scenario.seeds.resource_policy.user import SeedUserPolicy
-from bai_scenario.seeds.seeder import Laid, Seeder, SeedNest
+from bai_scenario.seeds.seeder import Laid, Seeder, TestSeedNest
 from bai_scenario.seeds.user.user import SeedUserOf
 
 type Loaded = list[UserNode | Exception | None]
@@ -90,7 +90,7 @@ class ASuperadminAndUsers:
 
 
 @dataclass(frozen=True)
-class SomeoneStandingAs(SeedNest[Laid[UserData]]):
+class SomeoneStandingAs(TestSeedNest[Laid[UserData]]):
     """그 도메인에 속한 사용자 한 명을 `status` 상태로. 매니저가 사용자를 만드는 경로를 그대로 탄다."""
 
     domain: Laid[DomainData]

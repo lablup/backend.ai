@@ -17,11 +17,13 @@ from ai.backend.manager.models.endpoint.creators import (
     DeploymentNetworkFields,
     DeploymentReplicaFields,
 )
-from bai_scenario.seeds.seeder import Naming, SeedRowFromThree
+from bai_scenario.seeds.seeder import Naming, TestSeedRowFromThree
 
 
 @dataclass(frozen=True)
-class SeedDeployment(SeedRowFromThree[ProjectData, ResourceGroupData, UserData, DeploymentInfo]):
+class SeedDeployment(
+    TestSeedRowFromThree[ProjectData, ResourceGroupData, UserData, DeploymentInfo]
+):
     """A deployment of the given project, on the given group, owned by the given user.
 
     It is laid without a revision: the row a scenario needs to read, edit or retire does

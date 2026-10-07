@@ -31,7 +31,7 @@ from bai_scenario.seeds.domain.domain import SeedDomain
 from bai_scenario.seeds.resource_policy.keypair import SeedKeypairPolicy
 from bai_scenario.seeds.resource_policy.project import SeedProjectPolicy
 from bai_scenario.seeds.resource_policy.user import SeedUserPolicy
-from bai_scenario.seeds.seeder import Laid, Seeder, SeedNest
+from bai_scenario.seeds.seeder import Laid, Seeder, TestSeedNest
 from bai_scenario.seeds.user.user import SeedUserOf
 
 KEY_ID = SecretKeyId("k1")
@@ -67,7 +67,7 @@ class AKeyringAndACaller:
 
 
 @dataclass(frozen=True)
-class SomeoneWithASecret(SeedNest[Laid[UserData]]):
+class SomeoneWithASecret(TestSeedNest[Laid[UserData]]):
     """비밀 키를 미리 정해 둔 사용자 한 명. 암호화된 비밀 키를 넣는 유일한 방법이다."""
 
     domain: Laid[Any]

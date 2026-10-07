@@ -25,14 +25,14 @@ from bai_scenario.seeds.entity_share.share import SeedShareTaken, SeedVFolderSha
 from bai_scenario.seeds.project.project import SeedProject
 from bai_scenario.seeds.rbac.role import SeedPermission, SeedRole
 from bai_scenario.seeds.resource_policy.project import SeedProjectPolicy
-from bai_scenario.seeds.seeder import Laid, Seeder, SeedNest, SeedRow
+from bai_scenario.seeds.seeder import Laid, Seeder, TestSeedNest, TestSeedRow
 from bai_scenario.seeds.vfolder.vfolder import SeedPersonalVFolder, SeedProjectVFolder
 
 STORAGE_HOST = "local:volume1"
 """The one host the faked storage manager answers for."""
 
 
-def seed_domain_with_storage() -> SeedRow[DomainData]:
+def seed_domain_with_storage() -> TestSeedRow[DomainData]:
     """A domain whose folders may land on the host the fake answers for."""
     return SeedDomain(name_hint="home", vfolder_hosts=[STORAGE_HOST])
 
@@ -85,7 +85,7 @@ class VFolderNodeLook:
 
 
 @dataclass(frozen=True)
-class SomeoneMakingFolders(SeedNest[GrantedUser]):
+class SomeoneMakingFolders(TestSeedNest[GrantedUser]):
     """자기 폴더를 만들고 조회할 수 있는 사용자.
 
     범위는 사용자 자신이다. 개인 폴더는 만든 사람의 스코프에 생기므로 역할도 거기 앉는다.
@@ -139,7 +139,7 @@ class SomeoneWhoMayMakeFolders(Given[Any, AFolderMakerAndTheirDomain]):
 
 
 @dataclass(frozen=True)
-class SomeoneReadingFoldersIn[S](SeedNest[Laid[None]]):
+class SomeoneReadingFoldersIn[S](TestSeedNest[Laid[None]]):
     """그 스코프에서 폴더를 읽을 수 있게 된 사용자."""
 
     scope: Laid[S]

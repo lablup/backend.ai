@@ -20,7 +20,7 @@ from ai.backend.manager.data.prometheus_query_preset_category.types import (
 from ai.backend.manager.models.prometheus_query_preset.creators import (
     PrometheusQueryPresetCreator,
 )
-from bai_scenario.seeds.seeder import Naming, SeedRow, SeedRowFrom
+from bai_scenario.seeds.seeder import Naming, TestSeedRow, TestSeedRowFrom
 
 METRIC = "container_cpu_seconds_total"
 TEMPLATE = "avg by (${{group_by}}) (rate(container_cpu_seconds_total{${{labels}}}[${{window}}]))"
@@ -32,7 +32,7 @@ Prometheus refuses the empty query it becomes."""
 
 
 @dataclass(frozen=True)
-class SeedPreset(SeedRow[PrometheusQueryPresetData]):
+class SeedPreset(TestSeedRow[PrometheusQueryPresetData]):
     """A query preset in the global catalog, filed under no category."""
 
     name_hint: str = "preset"
@@ -77,7 +77,7 @@ class SeedPreset(SeedRow[PrometheusQueryPresetData]):
 
 
 @dataclass(frozen=True)
-class SeedPresetIn(SeedRowFrom[PrometheusQueryPresetCategoryData, PrometheusQueryPresetData]):
+class SeedPresetIn(TestSeedRowFrom[PrometheusQueryPresetCategoryData, PrometheusQueryPresetData]):
     """The same preset, filed under the given category."""
 
     preset: SeedPreset = SeedPreset()

@@ -57,7 +57,7 @@ from bai_scenario.seeds.project.project import SeedProject
 from bai_scenario.seeds.rbac.role import SeedPermission, SeedRole
 from bai_scenario.seeds.resource_group.resource_group import SeedResourceGroup
 from bai_scenario.seeds.resource_policy.project import SeedProjectPolicy
-from bai_scenario.seeds.seeder import Laid, Seeder, SeedNest
+from bai_scenario.seeds.seeder import Laid, Seeder, TestSeedNest
 
 
 def _names(granted: Sequence[Permission]) -> str:
@@ -126,7 +126,7 @@ class LaidPlace:
 
 
 @dataclass(frozen=True)
-class SomeoneOfTheProject(SeedNest[Laid[UserData]]):
+class SomeoneOfTheProject(TestSeedNest[Laid[UserData]]):
     """그 프로젝트 안에서 배포에 대해 정해진 권한만 가진 사용자.
 
     배포는 프로젝트 스코프에 생기므로 역할도 거기 앉고, 그 역할을 주는 일이 곧 그 사람을
@@ -159,7 +159,7 @@ class SomeoneOfTheProject(SeedNest[Laid[UserData]]):
 
 
 @dataclass(frozen=True)
-class SomeoneReadingTheirOwn(SeedNest[Laid[UserData]]):
+class SomeoneReadingTheirOwn(TestSeedNest[Laid[UserData]]):
     """자기 스코프에서 배포를 읽을 수 있는 사용자.
 
     범위는 사용자 자신이다. 배포는 만든 사람의 스코프에도 생기므로, 거기 앉은 역할이 자기가

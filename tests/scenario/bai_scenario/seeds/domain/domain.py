@@ -9,11 +9,11 @@ from typing import override
 from ai.backend.common.types import VFolderHostPermission
 from ai.backend.manager.data.domain.types import DomainData
 from ai.backend.manager.models.domain.creators import DomainCreator
-from bai_scenario.seeds.seeder import Naming, SeedRow
+from bai_scenario.seeds.seeder import Naming, TestSeedRow
 
 
 @dataclass(frozen=True)
-class SeedDomain(SeedRow[DomainData]):
+class SeedDomain(TestSeedRow[DomainData]):
     """A domain. The name is the seeder's; the hint only says which row made it.
 
     ``vfolder_hosts`` are the storage hosts folders of this domain may land on. A
