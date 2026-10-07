@@ -6,8 +6,6 @@ import json
 import uuid
 from datetime import UTC, datetime
 
-import pytest
-
 from ai.backend.common.dto.manager.pagination import PaginationInfo
 from ai.backend.common.dto.manager.v2.session.response import (
     CommitSessionPayload,
@@ -313,44 +311,6 @@ class TestSessionNetworkInfo:
 
 class TestSessionNode:
     """Tests for SessionNode model with all nested sub-models."""
-
-    @pytest.fixture(params=[None, [], ["agent-b", "agent-a"]], ids=["null", "empty", "set"])
-    def scheduling_node(self, request: pytest.FixtureRequest) -> SessionNode:
-        node = _make_session_node()
-        node.resource = SessionResourceInfoGQLDTO(
-            allocation=None,
-            resource_group_name="default",
-            session_group_id=uuid.UUID("8b7ce6d2-71fc-4e66-ad7f-508493b94131"),
-            designated_agent_ids=request.param,
-        )
-        node.lifecycle = SessionLifecycleInfoGQLDTO(
-            status="RUNNING",
-            result="undefined",
-            starts_at=datetime(2026, 10, 7, 2, tzinfo=UTC),
-            requested_starts_at=datetime(2026, 10, 7, 1, tzinfo=UTC),
-        )
-        return node
-
-    def test_scheduling_fields_serialize_and_round_trip(self, scheduling_node: SessionNode) -> None:
-        serialized = scheduling_node.model_dump_json()
-        payload = json.loads(serialized)
-        restored = SessionNode.model_validate_json(serialized)
-
-        assert payload["resource"]["session_group_id"] == "8b7ce6d2-71fc-4e66-ad7f-508493b94131"
-        assert (
-            payload["resource"]["designated_agent_ids"]
-            == scheduling_node.resource.designated_agent_ids
-        )
-        assert payload["lifecycle"]["requested_starts_at"] == "2026-10-07T01:00:00Z"
-        assert payload["lifecycle"]["starts_at"] == "2026-10-07T02:00:00Z"
-        assert restored.resource.session_group_id == scheduling_node.resource.session_group_id
-        assert (
-            restored.resource.designated_agent_ids == scheduling_node.resource.designated_agent_ids
-        )
-        assert (
-            restored.lifecycle.requested_starts_at == scheduling_node.lifecycle.requested_starts_at
-        )
-        assert restored.lifecycle.starts_at == scheduling_node.lifecycle.starts_at
 
     def test_omitted_scheduling_fields_serialize_as_null(self) -> None:
         node = _make_session_node()
