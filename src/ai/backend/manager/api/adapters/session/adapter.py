@@ -1290,6 +1290,8 @@ class SessionAdapter(BaseAdapter):
             resource=SessionResourceInfoGQLDTO(
                 allocation=allocation,
                 resource_group_name=data.resource_group_name,
+                session_group_id=data.session_group_id,
+                designated_agent_ids=data.designated_agent_ids,
             ),
             lifecycle=SessionLifecycleInfoGQLDTO(
                 status=_fold_session_status(data.status),
@@ -1297,6 +1299,7 @@ class SessionAdapter(BaseAdapter):
                 created_at=data.created_at,
                 terminated_at=data.terminated_at,
                 starts_at=data.starts_at,
+                requested_starts_at=data.requested_starts_at,
                 batch_timeout=data.batch_timeout,
             ),
             runtime=SessionRuntimeInfoGQLDTO(

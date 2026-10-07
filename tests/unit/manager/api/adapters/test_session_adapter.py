@@ -4,14 +4,21 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 from decimal import Decimal
+from http import HTTPStatus
 from unittest.mock import AsyncMock, MagicMock
 from uuid import UUID, uuid4
 
 import pytest
+import strawberry
 
+from ai.backend.common.api_handlers import APIResponse
+from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.entity.kernel import KernelFieldType, KernelID
+from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.resource_group import ResourceGroupID
 from ai.backend.common.data.entity.session import SessionID
+from ai.backend.common.data.entity.session_group import SessionGroupID
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.dto.manager.v2.common import (
     ResourceSlotEntryInfo,
     ResourceSlotEntryInput,
@@ -42,6 +49,7 @@ from ai.backend.manager.actions.v2.bulk.result import (
 )
 from ai.backend.manager.actions.v2.ops.result import BulkFieldOpsResult
 from ai.backend.manager.api.adapters.session.adapter import SessionAdapter
+from ai.backend.manager.api.gql.session.types import SessionV2GQL
 from ai.backend.manager.data.kernel.types import (
     ClusterConfig,
     ImageInfo,
@@ -57,7 +65,7 @@ from ai.backend.manager.data.kernel.types import (
     UserPermission,
 )
 from ai.backend.manager.data.resource_slot.types import ResourceAllocationAggregate
-from ai.backend.manager.data.session.options import AgentSelectionPolicy
+from ai.backend.manager.data.session.options import AgentSelectionPolicy, SessionStoredOptions
 from ai.backend.manager.data.session.types import (
     SessionData,
     SessionEntityData,
@@ -209,6 +217,120 @@ class TestSessionDataToNode:
         data = _create_session_data()
         node = SessionAdapter._session_data_to_node(data, _create_allocation())
         assert len(node.resource.allocation.used.entries) == 0
+
+
+class TestSessionSchedulingResponses:
+    @pytest.fixture(
+        params=[None, [], ["designated-b", "designated-a"]], ids=["null", "empty", "set"]
+    )
+    def session_entity(self, request: pytest.FixtureRequest) -> SessionEntityData:
+        populated = bool(request.param)
+        return SessionEntityData(
+            id=SessionID(uuid4()),
+            creation_id="creation-id",
+            name="scheduled-session",
+            session_type=SessionTypes.BATCH,
+            priority=10,
+            is_preemptible=True,
+            job_priority=0,
+            cluster_mode=ClusterMode.SINGLE_NODE.value,
+            cluster_size=1,
+            options=SessionStoredOptions(),
+            agent_ids=["allocated-agent"],
+            designated_agent_ids=request.param,
+            session_group_id=SessionGroupID(UUID("8b7ce6d2-71fc-4e66-ad7f-508493b94131"))
+            if populated
+            else None,
+            resource_group_id=ResourceGroupID(uuid4()),
+            resource_group_name="default",
+            target_sgroup_names=None,
+            domain_name="default",
+            domain_id=DomainID(uuid4()),
+            group_id=ProjectID(uuid4()),
+            user_uuid=UserID(uuid4()),
+            access_key=None,
+            images=None,
+            image_ids=None,
+            tag=None,
+            vfolder_mounts=None,
+            environ=None,
+            bootstrap_script=None,
+            use_host_network=False,
+            timeout=None,
+            batch_timeout=None,
+            terminated_at=None,
+            starts_at=datetime(2026, 10, 7, 2, tzinfo=UTC),
+            requested_starts_at=datetime(2026, 10, 7, 1, tzinfo=UTC) if populated else None,
+            status=SessionStatus.PENDING,
+            status_info=None,
+            status_data=None,
+            status_history=None,
+            callback_url=None,
+            startup_command=None,
+            result=SessionResult.UNDEFINED,
+            num_queries=0,
+            last_stat=None,
+            network_type=None,
+            network_id=None,
+            replica_id=None,
+            created_at=datetime(2026, 10, 7, tzinfo=UTC),
+        )
+
+    def test_rest_response_retains_scheduling_fields(
+        self, session_entity: SessionEntityData
+    ) -> None:
+        node = SessionAdapter._session_data_to_node(
+            session_entity.to_session_data(), _create_allocation()
+        )
+
+        payload = APIResponse.build(HTTPStatus.OK, node).to_json
+
+        assert isinstance(payload, dict)
+        assert payload["resource"]["session_group_id"] == (
+            str(session_entity.session_group_id) if session_entity.session_group_id else None
+        )
+        assert payload["resource"]["designated_agent_ids"] == session_entity.designated_agent_ids
+        assert payload["lifecycle"]["requested_starts_at"] == (
+            "2026-10-07T01:00:00Z" if session_entity.requested_starts_at else None
+        )
+        assert payload["lifecycle"]["starts_at"] == "2026-10-07T02:00:00Z"
+        assert payload["metadata"]["name"] == "scheduled-session"
+        assert payload["resource"]["resource_group_name"] == "default"
+
+    def test_graphql_query_retains_scheduling_fields(
+        self, session_entity: SessionEntityData
+    ) -> None:
+        node = SessionAdapter._session_data_to_node(
+            session_entity.to_session_data(), _create_allocation()
+        )
+        session = SessionV2GQL.from_pydantic(node)
+
+        result = strawberry.Schema(query=SessionV2GQL).execute_sync(
+            """{
+                metadata { name }
+                resource { resourceGroupName sessionGroupId designatedAgentIds }
+                lifecycle { startsAt requestedStartsAt }
+            }""",
+            root_value=session,
+        )
+
+        assert result.errors is None
+        assert result.data == {
+            "metadata": {"name": "scheduled-session"},
+            "resource": {
+                "resourceGroupName": "default",
+                "sessionGroupId": str(session_entity.session_group_id)
+                if session_entity.session_group_id
+                else None,
+                "designatedAgentIds": session_entity.designated_agent_ids,
+            },
+            "lifecycle": {
+                "startsAt": "2026-10-07T02:00:00+00:00",
+                "requestedStartsAt": "2026-10-07T01:00:00+00:00"
+                if session_entity.requested_starts_at
+                else None,
+            },
+        }
 
 
 async def _no_allocations(

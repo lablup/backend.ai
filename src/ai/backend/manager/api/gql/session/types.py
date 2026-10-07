@@ -543,6 +543,18 @@ class SessionV2ResourceInfoGQL:
     resource_group_name: str | None = gql_field(
         description="The resource group (scaling group) this session is assigned to."
     )
+    session_group_id: UUID | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="Placement group ID. Null if no placement constraint is set.",
+        )
+    )
+    designated_agent_ids: list[str] | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="Agent IDs designated at session creation.",
+        )
+    )
 
 
 @gql_pydantic_type(
@@ -564,6 +576,12 @@ class SessionV2LifecycleInfoGQL:
     )
     starts_at: datetime | None = gql_field(
         description="Scheduled start time for the session, if applicable."
+    )
+    requested_starts_at: datetime | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="Reserved start time requested for a batch session.",
+        )
     )
     batch_timeout: int | None = gql_field(
         description="Batch execution timeout in seconds. Applicable to batch sessions."
