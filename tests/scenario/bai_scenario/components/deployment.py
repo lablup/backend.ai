@@ -40,15 +40,15 @@ from ai.backend.manager.data.user.types import UserData
 from ai.backend.manager.errors.base.entity import EntityNotFoundError
 from ai.backend.testutils.scenario_steps import (
     Answered,
-    Condition,
-    Given,
     Held,
     Refused,
     Same,
     SameAs,
     Skipped,
-    Then,
-    Verdict,
+    TestCondition,
+    TestGiven,
+    TestThen,
+    TestVerdict,
 )
 from bai_scenario.components.domain import WAS_HERE, SomeoneOf, WrittenByThisRun
 from bai_scenario.seeds.deployment.deployment import SeedDeployment
@@ -227,7 +227,7 @@ async def lay_a_deployment(
 
 
 @dataclass(frozen=True)
-class APlaceForDeployments(Given[Any, APlaceAndACaller]):
+class APlaceForDeployments(TestGiven[Any, APlaceAndACaller]):
     """배포를 받아줄 프로젝트와 리소스 그룹, 그리고 그 안의 사용자 한 명."""
 
     granted: tuple[Permission, ...] = ()
@@ -249,7 +249,7 @@ class APlaceForDeployments(Given[Any, APlaceAndACaller]):
 
 
 @dataclass(frozen=True)
-class AProjectGrantedElsewhere(Given[Any, APlaceAndACaller]):
+class AProjectGrantedElsewhere(TestGiven[Any, APlaceAndACaller]):
     """만들려는 프로젝트와, 권한이 다른 프로젝트에 걸린 사용자.
 
     권한이 스코프를 넘지 않는지 보는 자리다. 요청이 가리키는 프로젝트와 역할이 앉은
@@ -284,7 +284,7 @@ class AProjectGrantedElsewhere(Given[Any, APlaceAndACaller]):
 
 
 @dataclass(frozen=True)
-class ADeploymentInThatPlace(Given[Any, ADeploymentAndACaller]):
+class ADeploymentInThatPlace(TestGiven[Any, ADeploymentAndACaller]):
     """이미 있는 배포 하나와, 그 프로젝트 안의 사용자 한 명."""
 
     granted: tuple[Permission, ...] = ()
@@ -313,7 +313,7 @@ class ADeploymentInThatPlace(Given[Any, ADeploymentAndACaller]):
 
 
 @dataclass(frozen=True)
-class AnothersDeploymentAndASuperadmin(Given[Any, ADeploymentAndACaller]):
+class AnothersDeploymentAndASuperadmin(TestGiven[Any, ADeploymentAndACaller]):
     """다른 사람이 만든 배포 하나와, 아무 권한도 받지 않은 슈퍼관리자.
 
     권한 그래프에 아무것도 걸리지 않은 사람이 역할만으로 남의 배포에 닿는지 보는 자리다.
@@ -342,7 +342,7 @@ class AnothersDeploymentAndASuperadmin(Given[Any, ADeploymentAndACaller]):
 
 
 @dataclass(frozen=True)
-class ManyDeploymentsInThatPlace(Given[Any, ManyDeploymentsAndACaller]):
+class ManyDeploymentsInThatPlace(TestGiven[Any, ManyDeploymentsAndACaller]):
     """배포 여럿과, 그 프로젝트 안의 사용자 한 명."""
 
     granted: tuple[Permission, ...] = ()
@@ -368,7 +368,7 @@ class ManyDeploymentsInThatPlace(Given[Any, ManyDeploymentsAndACaller]):
 
 
 @dataclass(frozen=True)
-class DeploymentsInTwoProjects(Given[Any, ManyDeploymentsAndACaller]):
+class DeploymentsInTwoProjects(TestGiven[Any, ManyDeploymentsAndACaller]):
     """두 프로젝트에 나뉜 배포들과, 한쪽 프로젝트에만 권한을 받은 사용자.
 
     답으로 오는 ``laid``는 권한을 받은 프로젝트의 것뿐이다. 다른 프로젝트의 배포는 심기만
@@ -408,7 +408,7 @@ class DeploymentsInTwoProjects(Given[Any, ManyDeploymentsAndACaller]):
 
 
 @dataclass(frozen=True)
-class MineBesideAnothers(Given[Any, ManyDeploymentsAndACaller]):
+class MineBesideAnothers(TestGiven[Any, ManyDeploymentsAndACaller]):
     """같은 프로젝트에 두 사람이 각자 만든 배포와, 그중 한 사람.
 
     답으로 오는 ``laid``는 부르는 사람의 것뿐이다. 다른 사람의 배포는 심기만 하고 답하지
@@ -446,7 +446,7 @@ class MineBesideAnothers(Given[Any, ManyDeploymentsAndACaller]):
 
 
 @dataclass(frozen=True)
-class NamedAfterTheMaker(Condition[str]):
+class NamedAfterTheMaker(TestCondition[str]):
     """만든 사람에게서 지어진 이름. 값은 사람마다 달라 레포트에 넣지 않는다."""
 
     maker: UUID
@@ -461,7 +461,7 @@ class NamedAfterTheMaker(Condition[str]):
 
 
 @dataclass(frozen=True)
-class TheNewDeploymentNode(Then[APlaceAndACaller, DeploymentNode]):
+class TheNewDeploymentNode(TestThen[APlaceAndACaller, DeploymentNode]):
     """방금 만든 배포가 통째로 온다. 요청이 정한 것만 여기로 받는다."""
 
     started: datetime
@@ -476,13 +476,13 @@ class TheNewDeploymentNode(Then[APlaceAndACaller, DeploymentNode]):
     def says(self) -> str:
         return "만든 배포 전체가 온다"
 
-    def _name_seen(self, got: str, laid: APlaceAndACaller) -> Verdict:
+    def _name_seen(self, got: str, laid: APlaceAndACaller) -> TestVerdict:
         if self.named is None:
             return Held("metadata.name", got, NamedAfterTheMaker(laid.caller.id))
         return Same("metadata.name", got, self.named)
 
     @override
-    def look(self, laid: APlaceAndACaller, answered: Answered[DeploymentNode]) -> list[Verdict]:
+    def look(self, laid: APlaceAndACaller, answered: Answered[DeploymentNode]) -> list[TestVerdict]:
         node = answered.response
         if node is None:
             return [Refused(EntityNotFoundError, answered.raised)]
@@ -549,7 +549,7 @@ class TheNewDeploymentNode(Then[APlaceAndACaller, DeploymentNode]):
 
 
 @dataclass(frozen=True)
-class TheDeploymentNode(Then[ADeploymentAndACaller, DeploymentNode]):
+class TheDeploymentNode(TestThen[ADeploymentAndACaller, DeploymentNode]):
     """심은 배포가 통째로 온다. 값은 심은 것에서 읽는다.
 
     바꾸는 요청이 이것을 쓸 때는 바뀌어야 하는 자리만 인자로 받는다. 나머지가 조용히 함께
@@ -569,7 +569,7 @@ class TheDeploymentNode(Then[ADeploymentAndACaller, DeploymentNode]):
     @override
     def look(
         self, laid: ADeploymentAndACaller, answered: Answered[DeploymentNode]
-    ) -> list[Verdict]:
+    ) -> list[TestVerdict]:
         node = answered.response
         if node is None:
             return [Refused(EntityNotFoundError, answered.raised)]

@@ -27,15 +27,15 @@ from ai.backend.manager.errors.permission import NotEnoughPermission
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.testutils.scenario_steps import (
     Answered,
-    Given,
     Held,
     Refused,
     Same,
     SameAs,
-    Scenario,
-    Then,
-    Verdict,
-    When,
+    TestGiven,
+    TestScenario,
+    TestThen,
+    TestVerdict,
+    TestWhen,
 )
 from bai_scenario.components.answers import TheCallIsRefused
 from bai_scenario.components.domain import WAS_HERE, SomeoneOf, WrittenByThisRun
@@ -75,7 +75,7 @@ class HistoryLayer:
 
 
 @dataclass(frozen=True)
-class SomeoneAndAnother(Given[Any, TwoPeopleAndTheirHistory]):
+class SomeoneAndAnother(TestGiven[Any, TwoPeopleAndTheirHistory]):
     """한 도메인의 사용자 둘. 부르는 사람은 ``permissions``만큼 자기 사용자 권한을 받는다."""
 
     permissions: tuple[Permission, ...] = ()
@@ -104,7 +104,7 @@ class SomeoneAndAnother(Given[Any, TwoPeopleAndTheirHistory]):
 
 
 @dataclass(frozen=True)
-class TheSuperadminAndTwoRecords(Given[Any, TwoPeopleAndTheirHistory]):
+class TheSuperadminAndTwoRecords(TestGiven[Any, TwoPeopleAndTheirHistory]):
     """슈퍼관리자 한 명과, 기록을 하나씩 남긴 사용자 둘."""
 
     @override
@@ -124,7 +124,7 @@ class TheSuperadminAndTwoRecords(Given[Any, TwoPeopleAndTheirHistory]):
 
 
 @dataclass(frozen=True)
-class SomeoneReadingTheDomain(Given[Any, TwoPeopleAndTheirHistory]):
+class SomeoneReadingTheDomain(TestGiven[Any, TwoPeopleAndTheirHistory]):
     """도메인 스코프에서 사용자 READ를 받은 사람."""
 
     @override
@@ -140,7 +140,7 @@ class SomeoneReadingTheDomain(Given[Any, TwoPeopleAndTheirHistory]):
 
 
 @dataclass(frozen=True)
-class SearchingEveryRecord(When[TwoPeopleAndTheirHistory, LoginHistoryAdapter, Answer]):
+class SearchingEveryRecord(TestWhen[TwoPeopleAndTheirHistory, LoginHistoryAdapter, Answer]):
     """페이지 인자 없이 기록 전체를 훑는다."""
 
     @override
@@ -158,7 +158,7 @@ class SearchingEveryRecord(When[TwoPeopleAndTheirHistory, LoginHistoryAdapter, A
 
 
 @dataclass(frozen=True)
-class SearchingMyRecords(When[TwoPeopleAndTheirHistory, LoginHistoryAdapter, Answer]):
+class SearchingMyRecords(TestWhen[TwoPeopleAndTheirHistory, LoginHistoryAdapter, Answer]):
     """자기 기록을 훑는다."""
 
     @override
@@ -185,7 +185,7 @@ class HistoryNodeLook:
 
     def verdicts(
         self, node: LoginHistoryNode, expected: LoginHistoryData, at: str
-    ) -> list[Verdict]:
+    ) -> list[TestVerdict]:
         return [
             Held(f"{at}id", node.id, SameAs(expected.id, "심은 기록")),
             Held(f"{at}user_id", node.user_id, SameAs(expected.user_id, "기록의 주인")),
@@ -198,7 +198,7 @@ class HistoryNodeLook:
 
 
 @dataclass(frozen=True)
-class EveryRecordInOrder(Then[TwoPeopleAndTheirHistory, Answer]):
+class EveryRecordInOrder(TestThen[TwoPeopleAndTheirHistory, Answer]):
     """심은 기록 둘이 순서대로 온다."""
 
     started: datetime
@@ -208,13 +208,13 @@ class EveryRecordInOrder(Then[TwoPeopleAndTheirHistory, Answer]):
         return "심은 기록이 모두 순서대로 온다"
 
     @override
-    def look(self, laid: TwoPeopleAndTheirHistory, answered: Answered[Answer]) -> list[Verdict]:
+    def look(self, laid: TwoPeopleAndTheirHistory, answered: Answered[Answer]) -> list[TestVerdict]:
         page = answered.response
         if not isinstance(page, AdminSearchLoginHistoryPayload):
             return [Refused(InsufficientPrivilege, answered.raised)]
         first, second = laid.other_history, laid.caller_history
         assert first is not None and second is not None
-        seen: list[Verdict] = [
+        seen: list[TestVerdict] = [
             Same("total_count", page.total_count, 2),
             Same("has_next_page", page.has_next_page, False),
             Same("has_previous_page", page.has_previous_page, False),
@@ -228,7 +228,7 @@ class EveryRecordInOrder(Then[TwoPeopleAndTheirHistory, Answer]):
 
 
 @dataclass(frozen=True)
-class OnlyMyRecord(Then[TwoPeopleAndTheirHistory, Answer]):
+class OnlyMyRecord(TestThen[TwoPeopleAndTheirHistory, Answer]):
     """부르는 사람의 기록 하나만 온다."""
 
     started: datetime
@@ -238,12 +238,12 @@ class OnlyMyRecord(Then[TwoPeopleAndTheirHistory, Answer]):
         return "자기 기록 하나만 온다"
 
     @override
-    def look(self, laid: TwoPeopleAndTheirHistory, answered: Answered[Answer]) -> list[Verdict]:
+    def look(self, laid: TwoPeopleAndTheirHistory, answered: Answered[Answer]) -> list[TestVerdict]:
         page = answered.response
         if not isinstance(page, MySearchLoginHistoryPayload):
             return [Refused(NotEnoughPermission, answered.raised)]
         assert laid.caller_history is not None
-        seen: list[Verdict] = [
+        seen: list[TestVerdict] = [
             Same("total_count", page.total_count, 1),
             Same("has_next_page", page.has_next_page, False),
             Same("has_previous_page", page.has_previous_page, False),
@@ -258,12 +258,14 @@ class OnlyMyRecord(Then[TwoPeopleAndTheirHistory, Answer]):
         return seen
 
 
-type HistoryStep = Scenario[SeedingSession, TwoPeopleAndTheirHistory, LoginHistoryAdapter, Answer]
+type HistoryStep = TestScenario[
+    SeedingSession, TwoPeopleAndTheirHistory, LoginHistoryAdapter, Answer
+]
 
 
 @dataclass(frozen=True)
 class TheSuperadminSearchesEveryRecord(
-    Scenario[SeedingSession, TwoPeopleAndTheirHistory, LoginHistoryAdapter, Answer]
+    TestScenario[SeedingSession, TwoPeopleAndTheirHistory, LoginHistoryAdapter, Answer]
 ):
     started: datetime
 
@@ -279,21 +281,21 @@ class TheSuperadminSearchesEveryRecord(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, TwoPeopleAndTheirHistory]:
+    def given(self) -> TestGiven[SeedingSession, TwoPeopleAndTheirHistory]:
         return TheSuperadminAndTwoRecords()
 
     @override
-    def when(self) -> When[TwoPeopleAndTheirHistory, LoginHistoryAdapter, Answer]:
+    def when(self) -> TestWhen[TwoPeopleAndTheirHistory, LoginHistoryAdapter, Answer]:
         return SearchingEveryRecord()
 
     @override
-    def then(self) -> Then[TwoPeopleAndTheirHistory, Answer]:
+    def then(self) -> TestThen[TwoPeopleAndTheirHistory, Answer]:
         return EveryRecordInOrder(started=self.started)
 
 
 @dataclass(frozen=True)
 class OnlyTheSuperadminSearchesEveryRecord(
-    Scenario[SeedingSession, TwoPeopleAndTheirHistory, LoginHistoryAdapter, Answer]
+    TestScenario[SeedingSession, TwoPeopleAndTheirHistory, LoginHistoryAdapter, Answer]
 ):
     @override
     def summary(self) -> str:
@@ -304,21 +306,21 @@ class OnlyTheSuperadminSearchesEveryRecord(
         return "권한 받은 사용자가 이력 전체 검색을 하려 하면, 전역 역할 문이 막는다"
 
     @override
-    def given(self) -> Given[SeedingSession, TwoPeopleAndTheirHistory]:
+    def given(self) -> TestGiven[SeedingSession, TwoPeopleAndTheirHistory]:
         return SomeoneReadingTheDomain()
 
     @override
-    def when(self) -> When[TwoPeopleAndTheirHistory, LoginHistoryAdapter, Answer]:
+    def when(self) -> TestWhen[TwoPeopleAndTheirHistory, LoginHistoryAdapter, Answer]:
         return SearchingEveryRecord()
 
     @override
-    def then(self) -> Then[TwoPeopleAndTheirHistory, Answer]:
+    def then(self) -> TestThen[TwoPeopleAndTheirHistory, Answer]:
         return TheCallIsRefused(InsufficientPrivilege)
 
 
 @dataclass(frozen=True)
 class AGrantedUserSearchesOnlyTheirOwnHistory(
-    Scenario[SeedingSession, TwoPeopleAndTheirHistory, LoginHistoryAdapter, Answer]
+    TestScenario[SeedingSession, TwoPeopleAndTheirHistory, LoginHistoryAdapter, Answer]
 ):
     started: datetime
 
@@ -331,21 +333,21 @@ class AGrantedUserSearchesOnlyTheirOwnHistory(
         return "자기 스코프에서 READ를 받은 사용자가 훑으면, 다른 사용자의 이력은 빠진다"
 
     @override
-    def given(self) -> Given[SeedingSession, TwoPeopleAndTheirHistory]:
+    def given(self) -> TestGiven[SeedingSession, TwoPeopleAndTheirHistory]:
         return SomeoneAndAnother(permissions=(Permission.READ,))
 
     @override
-    def when(self) -> When[TwoPeopleAndTheirHistory, LoginHistoryAdapter, Answer]:
+    def when(self) -> TestWhen[TwoPeopleAndTheirHistory, LoginHistoryAdapter, Answer]:
         return SearchingMyRecords()
 
     @override
-    def then(self) -> Then[TwoPeopleAndTheirHistory, Answer]:
+    def then(self) -> TestThen[TwoPeopleAndTheirHistory, Answer]:
         return OnlyMyRecord(started=self.started)
 
 
 @dataclass(frozen=True)
 class AUserGrantedNothingMayNotSearchTheirHistory(
-    Scenario[SeedingSession, TwoPeopleAndTheirHistory, LoginHistoryAdapter, Answer]
+    TestScenario[SeedingSession, TwoPeopleAndTheirHistory, LoginHistoryAdapter, Answer]
 ):
     @override
     def summary(self) -> str:
@@ -356,15 +358,15 @@ class AUserGrantedNothingMayNotSearchTheirHistory(
         return "역할 없이 자기 이력을 훑으려 하면, 본인이어도 스코프 권한 문이 막는다"
 
     @override
-    def given(self) -> Given[SeedingSession, TwoPeopleAndTheirHistory]:
+    def given(self) -> TestGiven[SeedingSession, TwoPeopleAndTheirHistory]:
         return SomeoneAndAnother(other_has_history=False)
 
     @override
-    def when(self) -> When[TwoPeopleAndTheirHistory, LoginHistoryAdapter, Answer]:
+    def when(self) -> TestWhen[TwoPeopleAndTheirHistory, LoginHistoryAdapter, Answer]:
         return SearchingMyRecords()
 
     @override
-    def then(self) -> Then[TwoPeopleAndTheirHistory, Answer]:
+    def then(self) -> TestThen[TwoPeopleAndTheirHistory, Answer]:
         return TheCallIsRefused(NotEnoughPermission)
 
 

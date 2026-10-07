@@ -18,7 +18,7 @@ from ai.backend.common.dto.manager.v2.resource_slot.response import (
 from ai.backend.common.types import SlotTypes
 from ai.backend.manager.api.adapters.resource_slot.adapter import ResourceSlotAdapter
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.testutils.scenario_steps import Given, Scenario, Then, When
+from ai.backend.testutils.scenario_steps import TestGiven, TestScenario, TestThen, TestWhen
 from bai_scenario.components.resource_slot import (
     EveryLaidSlotTypeIsCounted,
     ManySlotTypesAndACaller,
@@ -36,13 +36,13 @@ DISTINCT_DISPLAY = "눈에 띄는 슬롯"
 """표시 이름 필터로 골라낼 슬롯 종류에만 붙이는 표시 이름."""
 
 type Searched = AdminSearchResourceSlotTypesPayload
-type SearchingStep = Scenario[
+type SearchingStep = TestScenario[
     SeedingSession, ManySlotTypesAndACaller, ResourceSlotAdapter, Searched
 ]
 
 
 @dataclass(frozen=True)
-class SearchingEverySlotType(When[ManySlotTypesAndACaller, ResourceSlotAdapter, Searched]):
+class SearchingEverySlotType(TestWhen[ManySlotTypesAndACaller, ResourceSlotAdapter, Searched]):
     """필터도 크기도 없이 전체를 검색한다."""
 
     @override
@@ -60,7 +60,7 @@ class SearchingEverySlotType(When[ManySlotTypesAndACaller, ResourceSlotAdapter, 
 
 
 @dataclass(frozen=True)
-class SearchingByName(When[ManySlotTypesAndACaller, ResourceSlotAdapter, Searched]):
+class SearchingByName(TestWhen[ManySlotTypesAndACaller, ResourceSlotAdapter, Searched]):
     """미리 만들어 둔 슬롯 종류 중 하나의 이름을 필터로 검색한다."""
 
     @override
@@ -84,7 +84,7 @@ class SearchingByName(When[ManySlotTypesAndACaller, ResourceSlotAdapter, Searche
 
 
 @dataclass(frozen=True)
-class SearchingByKind(When[ManySlotTypesAndACaller, ResourceSlotAdapter, Searched]):
+class SearchingByKind(TestWhen[ManySlotTypesAndACaller, ResourceSlotAdapter, Searched]):
     """미리 만들어 둔 슬롯 종류 중 하나의 종류를 필터로 검색한다."""
 
     @override
@@ -108,7 +108,7 @@ class SearchingByKind(When[ManySlotTypesAndACaller, ResourceSlotAdapter, Searche
 
 
 @dataclass(frozen=True)
-class SearchingByDisplayName(When[ManySlotTypesAndACaller, ResourceSlotAdapter, Searched]):
+class SearchingByDisplayName(TestWhen[ManySlotTypesAndACaller, ResourceSlotAdapter, Searched]):
     """미리 만들어 둔 슬롯 종류 중 하나의 표시 이름을 필터로 검색한다."""
 
     @override
@@ -132,7 +132,7 @@ class SearchingByDisplayName(When[ManySlotTypesAndACaller, ResourceSlotAdapter, 
 
 
 @dataclass(frozen=True)
-class SearchingTheFirst(When[ManySlotTypesAndACaller, ResourceSlotAdapter, Searched]):
+class SearchingTheFirst(TestWhen[ManySlotTypesAndACaller, ResourceSlotAdapter, Searched]):
     """앞에서 몇 건만 청한다. 크기가 아니라 커서 쪽의 개수다."""
 
     first: int
@@ -155,7 +155,7 @@ class SearchingTheFirst(When[ManySlotTypesAndACaller, ResourceSlotAdapter, Searc
 
 @dataclass(frozen=True)
 class AUserGrantedNothingCountsEverySlotType(
-    Scenario[SeedingSession, ManySlotTypesAndACaller, ResourceSlotAdapter, Searched]
+    TestScenario[SeedingSession, ManySlotTypesAndACaller, ResourceSlotAdapter, Searched]
 ):
     @override
     def summary(self) -> str:
@@ -166,21 +166,21 @@ class AUserGrantedNothingCountsEverySlotType(
         return "슬롯 종류 둘이 있을 때 아무 권한도 없는 사용자가 필터 없이 조회하면 둘 다 집계된다"
 
     @override
-    def given(self) -> Given[SeedingSession, ManySlotTypesAndACaller]:
+    def given(self) -> TestGiven[SeedingSession, ManySlotTypesAndACaller]:
         return ManySlotTypesAndSomeone(besides=1)
 
     @override
-    def when(self) -> When[ManySlotTypesAndACaller, ResourceSlotAdapter, Searched]:
+    def when(self) -> TestWhen[ManySlotTypesAndACaller, ResourceSlotAdapter, Searched]:
         return SearchingEverySlotType()
 
     @override
-    def then(self) -> Then[ManySlotTypesAndACaller, Searched]:
+    def then(self) -> TestThen[ManySlotTypesAndACaller, Searched]:
         return EveryLaidSlotTypeIsCounted()
 
 
 @dataclass(frozen=True)
 class ANameFilterNarrows(
-    Scenario[SeedingSession, ManySlotTypesAndACaller, ResourceSlotAdapter, Searched]
+    TestScenario[SeedingSession, ManySlotTypesAndACaller, ResourceSlotAdapter, Searched]
 ):
     @override
     def summary(self) -> str:
@@ -193,21 +193,21 @@ class ANameFilterNarrows(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, ManySlotTypesAndACaller]:
+    def given(self) -> TestGiven[SeedingSession, ManySlotTypesAndACaller]:
         return ManySlotTypesAndSomeone(besides=2)
 
     @override
-    def when(self) -> When[ManySlotTypesAndACaller, ResourceSlotAdapter, Searched]:
+    def when(self) -> TestWhen[ManySlotTypesAndACaller, ResourceSlotAdapter, Searched]:
         return SearchingByName()
 
     @override
-    def then(self) -> Then[ManySlotTypesAndACaller, Searched]:
+    def then(self) -> TestThen[ManySlotTypesAndACaller, Searched]:
         return OnlyTheNamedSlotTypeIsLeft()
 
 
 @dataclass(frozen=True)
 class OmittingThePageSizeGivesTen(
-    Scenario[SeedingSession, ManySlotTypesAndACaller, ResourceSlotAdapter, Searched]
+    TestScenario[SeedingSession, ManySlotTypesAndACaller, ResourceSlotAdapter, Searched]
 ):
     @override
     def summary(self) -> str:
@@ -218,21 +218,21 @@ class OmittingThePageSizeGivesTen(
         return "슬롯 종류 11개가 있을 때 크기 없이 조회하면 10건까지 반환되고 다음 페이지가 있다고 응답한다"
 
     @override
-    def given(self) -> Given[SeedingSession, ManySlotTypesAndACaller]:
+    def given(self) -> TestGiven[SeedingSession, ManySlotTypesAndACaller]:
         return ManySlotTypesAndSomeone(besides=DEFAULT_PAGE)
 
     @override
-    def when(self) -> When[ManySlotTypesAndACaller, ResourceSlotAdapter, Searched]:
+    def when(self) -> TestWhen[ManySlotTypesAndACaller, ResourceSlotAdapter, Searched]:
         return SearchingEverySlotType()
 
     @override
-    def then(self) -> Then[ManySlotTypesAndACaller, Searched]:
+    def then(self) -> TestThen[ManySlotTypesAndACaller, Searched]:
         return TheFirstPageOfSlotTypes(size=DEFAULT_PAGE)
 
 
 @dataclass(frozen=True)
 class AKindFilterNarrows(
-    Scenario[SeedingSession, ManySlotTypesAndACaller, ResourceSlotAdapter, Searched]
+    TestScenario[SeedingSession, ManySlotTypesAndACaller, ResourceSlotAdapter, Searched]
 ):
     @override
     def summary(self) -> str:
@@ -246,21 +246,21 @@ class AKindFilterNarrows(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, ManySlotTypesAndACaller]:
+    def given(self) -> TestGiven[SeedingSession, ManySlotTypesAndACaller]:
         return ManySlotTypesAndSomeone(besides=2, named_kind=SlotTypes.BYTES)
 
     @override
-    def when(self) -> When[ManySlotTypesAndACaller, ResourceSlotAdapter, Searched]:
+    def when(self) -> TestWhen[ManySlotTypesAndACaller, ResourceSlotAdapter, Searched]:
         return SearchingByKind()
 
     @override
-    def then(self) -> Then[ManySlotTypesAndACaller, Searched]:
+    def then(self) -> TestThen[ManySlotTypesAndACaller, Searched]:
         return OnlyTheNamedSlotTypeIsLeft()
 
 
 @dataclass(frozen=True)
 class ADisplayNameFilterNarrows(
-    Scenario[SeedingSession, ManySlotTypesAndACaller, ResourceSlotAdapter, Searched]
+    TestScenario[SeedingSession, ManySlotTypesAndACaller, ResourceSlotAdapter, Searched]
 ):
     @override
     def summary(self) -> str:
@@ -274,21 +274,21 @@ class ADisplayNameFilterNarrows(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, ManySlotTypesAndACaller]:
+    def given(self) -> TestGiven[SeedingSession, ManySlotTypesAndACaller]:
         return ManySlotTypesAndSomeone(besides=2, named_display_name=DISTINCT_DISPLAY)
 
     @override
-    def when(self) -> When[ManySlotTypesAndACaller, ResourceSlotAdapter, Searched]:
+    def when(self) -> TestWhen[ManySlotTypesAndACaller, ResourceSlotAdapter, Searched]:
         return SearchingByDisplayName()
 
     @override
-    def then(self) -> Then[ManySlotTypesAndACaller, Searched]:
+    def then(self) -> TestThen[ManySlotTypesAndACaller, Searched]:
         return OnlyTheNamedSlotTypeIsLeft()
 
 
 @dataclass(frozen=True)
 class AskingForTheFirstOneGivesOne(
-    Scenario[SeedingSession, ManySlotTypesAndACaller, ResourceSlotAdapter, Searched]
+    TestScenario[SeedingSession, ManySlotTypesAndACaller, ResourceSlotAdapter, Searched]
 ):
     @override
     def summary(self) -> str:
@@ -299,15 +299,15 @@ class AskingForTheFirstOneGivesOne(
         return "슬롯 종류 셋이 있을 때 앞에서 한 건만 청해 조회하면 한 건이 반환되고 다음 페이지가 있다고 응답한다"
 
     @override
-    def given(self) -> Given[SeedingSession, ManySlotTypesAndACaller]:
+    def given(self) -> TestGiven[SeedingSession, ManySlotTypesAndACaller]:
         return ManySlotTypesAndSomeone(besides=2)
 
     @override
-    def when(self) -> When[ManySlotTypesAndACaller, ResourceSlotAdapter, Searched]:
+    def when(self) -> TestWhen[ManySlotTypesAndACaller, ResourceSlotAdapter, Searched]:
         return SearchingTheFirst(first=1)
 
     @override
-    def then(self) -> Then[ManySlotTypesAndACaller, Searched]:
+    def then(self) -> TestThen[ManySlotTypesAndACaller, Searched]:
         return TheFirstPageOfSlotTypes(size=1)
 
 

@@ -22,11 +22,11 @@ from ai.backend.manager.errors.repository import (
 )
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.testutils.scenario_steps import (
-    Configured,
-    Given,
-    Scenario,
-    Then,
-    When,
+    TestConfigured,
+    TestGiven,
+    TestScenario,
+    TestThen,
+    TestWhen,
 )
 from bai_scenario.components.answers import TheCallIsRefused
 from bai_scenario.components.resource_policy import (
@@ -46,11 +46,11 @@ from bai_scenario.runner.steps import run_scenario
 FRESH = "fresh-policy"
 ENFORCEMENT = "manager.rbac.enforcement_enabled"
 
-type CreatingStep = Scenario[SeedingSession, APolicyAndACaller[Any], ResourcePolicyAdapter, Any]
+type CreatingStep = TestScenario[SeedingSession, APolicyAndACaller[Any], ResourcePolicyAdapter, Any]
 
 
 @dataclass(frozen=True)
-class Creating(When[APolicyAndACaller[Any], ResourcePolicyAdapter, Any]):
+class Creating(TestWhen[APolicyAndACaller[Any], ResourcePolicyAdapter, Any]):
     """정책을 생성한다. 요청을 지정하지 않으면 미리 만들어 둔 정책의 이름으로 모든 값을 지정해 생성한다."""
 
     family: Family[Any, Any]
@@ -74,7 +74,7 @@ class Creating(When[APolicyAndACaller[Any], ResourcePolicyAdapter, Any]):
 
 @dataclass(frozen=True)
 class TheWholeNodeComesBack(
-    Scenario[SeedingSession, APolicyAndACaller[Any], ResourcePolicyAdapter, Any]
+    TestScenario[SeedingSession, APolicyAndACaller[Any], ResourcePolicyAdapter, Any]
 ):
     family: Family[Any, Any]
     started: datetime
@@ -91,21 +91,21 @@ class TheWholeNodeComesBack(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, APolicyAndACaller[Any]]:
+    def given(self) -> TestGiven[SeedingSession, APolicyAndACaller[Any]]:
         return APolicyAndSomeone(self.family, role=UserRole.SUPERADMIN)
 
     @override
-    def when(self) -> When[APolicyAndACaller[Any], ResourcePolicyAdapter, Any]:
+    def when(self) -> TestWhen[APolicyAndACaller[Any], ResourcePolicyAdapter, Any]:
         return Creating(self.family, self.family.everything(FRESH))
 
     @override
-    def then(self) -> Then[APolicyAndACaller[Any], Any]:
+    def then(self) -> TestThen[APolicyAndACaller[Any], Any]:
         return TheNewPolicyNode(self.family, self.started, self.family.everything(FRESH))
 
 
 @dataclass(frozen=True)
 class LeavingOptionalsOutLeavesThemEmpty(
-    Scenario[SeedingSession, APolicyAndACaller[Any], ResourcePolicyAdapter, Any]
+    TestScenario[SeedingSession, APolicyAndACaller[Any], ResourcePolicyAdapter, Any]
 ):
     family: Family[Any, Any]
     ask: Ask
@@ -123,21 +123,21 @@ class LeavingOptionalsOutLeavesThemEmpty(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, APolicyAndACaller[Any]]:
+    def given(self) -> TestGiven[SeedingSession, APolicyAndACaller[Any]]:
         return APolicyAndSomeone(self.family, role=UserRole.SUPERADMIN)
 
     @override
-    def when(self) -> When[APolicyAndACaller[Any], ResourcePolicyAdapter, Any]:
+    def when(self) -> TestWhen[APolicyAndACaller[Any], ResourcePolicyAdapter, Any]:
         return Creating(self.family, self.ask)
 
     @override
-    def then(self) -> Then[APolicyAndACaller[Any], Any]:
+    def then(self) -> TestThen[APolicyAndACaller[Any], Any]:
         return TheNewPolicyNode(self.family, self.started, self.ask)
 
 
 @dataclass(frozen=True)
 class AnUnlimitedSlotIsMarkedUnlimited(
-    Scenario[SeedingSession, APolicyAndACaller[Any], ResourcePolicyAdapter, Any]
+    TestScenario[SeedingSession, APolicyAndACaller[Any], ResourcePolicyAdapter, Any]
 ):
     started: datetime
 
@@ -153,21 +153,21 @@ class AnUnlimitedSlotIsMarkedUnlimited(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, APolicyAndACaller[Any]]:
+    def given(self) -> TestGiven[SeedingSession, APolicyAndACaller[Any]]:
         return APolicyAndSomeone(KEYPAIR, role=UserRole.SUPERADMIN)
 
     @override
-    def when(self) -> When[APolicyAndACaller[Any], ResourcePolicyAdapter, Any]:
+    def when(self) -> TestWhen[APolicyAndACaller[Any], ResourcePolicyAdapter, Any]:
         return Creating(KEYPAIR, KEYPAIR.unlimited_slot(FRESH))
 
     @override
-    def then(self) -> Then[APolicyAndACaller[Any], Any]:
+    def then(self) -> TestThen[APolicyAndACaller[Any], Any]:
         return TheNewPolicyNode(KEYPAIR, self.started, KEYPAIR.unlimited_slot(FRESH))
 
 
 @dataclass(frozen=True)
 class ANameAnotherPolicyHoldsIsRefused(
-    Scenario[SeedingSession, APolicyAndACaller[Any], ResourcePolicyAdapter, Any]
+    TestScenario[SeedingSession, APolicyAndACaller[Any], ResourcePolicyAdapter, Any]
 ):
     family: Family[Any, Any]
 
@@ -183,21 +183,21 @@ class ANameAnotherPolicyHoldsIsRefused(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, APolicyAndACaller[Any]]:
+    def given(self) -> TestGiven[SeedingSession, APolicyAndACaller[Any]]:
         return APolicyAndSomeone(self.family, role=UserRole.SUPERADMIN)
 
     @override
-    def when(self) -> When[APolicyAndACaller[Any], ResourcePolicyAdapter, Any]:
+    def when(self) -> TestWhen[APolicyAndACaller[Any], ResourcePolicyAdapter, Any]:
         return Creating(self.family)
 
     @override
-    def then(self) -> Then[APolicyAndACaller[Any], Any]:
+    def then(self) -> TestThen[APolicyAndACaller[Any], Any]:
         return TheCallIsRefused(UniqueConstraintViolationError)
 
 
 @dataclass(frozen=True)
 class APriorityCapOutOfRangeIsRefused(
-    Scenario[SeedingSession, APolicyAndACaller[Any], ResourcePolicyAdapter, Any]
+    TestScenario[SeedingSession, APolicyAndACaller[Any], ResourcePolicyAdapter, Any]
 ):
     @override
     def summary(self) -> str:
@@ -211,21 +211,21 @@ class APriorityCapOutOfRangeIsRefused(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, APolicyAndACaller[Any]]:
+    def given(self) -> TestGiven[SeedingSession, APolicyAndACaller[Any]]:
         return APolicyAndSomeone(KEYPAIR, role=UserRole.SUPERADMIN)
 
     @override
-    def when(self) -> When[APolicyAndACaller[Any], ResourcePolicyAdapter, Any]:
+    def when(self) -> TestWhen[APolicyAndACaller[Any], ResourcePolicyAdapter, Any]:
         return Creating(KEYPAIR, KEYPAIR.priority_out_of_range(FRESH))
 
     @override
-    def then(self) -> Then[APolicyAndACaller[Any], Any]:
+    def then(self) -> TestThen[APolicyAndACaller[Any], Any]:
         return TheCallIsRefused(CheckConstraintViolationError)
 
 
 @dataclass(frozen=True)
 class APlainUserMayNotCreate(
-    Scenario[SeedingSession, APolicyAndACaller[Any], ResourcePolicyAdapter, Any]
+    TestScenario[SeedingSession, APolicyAndACaller[Any], ResourcePolicyAdapter, Any]
 ):
     family: Family[Any, Any]
 
@@ -241,21 +241,21 @@ class APlainUserMayNotCreate(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, APolicyAndACaller[Any]]:
+    def given(self) -> TestGiven[SeedingSession, APolicyAndACaller[Any]]:
         return APolicyAndSomeone(self.family)
 
     @override
-    def when(self) -> When[APolicyAndACaller[Any], ResourcePolicyAdapter, Any]:
+    def when(self) -> TestWhen[APolicyAndACaller[Any], ResourcePolicyAdapter, Any]:
         return Creating(self.family, self.family.everything(FRESH))
 
     @override
-    def then(self) -> Then[APolicyAndACaller[Any], Any]:
+    def then(self) -> TestThen[APolicyAndACaller[Any], Any]:
         return TheCallIsRefused(InsufficientPrivilege)
 
 
 @dataclass(frozen=True)
 class AMonitorMayNotCreate(
-    Scenario[SeedingSession, APolicyAndACaller[Any], ResourcePolicyAdapter, Any]
+    TestScenario[SeedingSession, APolicyAndACaller[Any], ResourcePolicyAdapter, Any]
 ):
     family: Family[Any, Any]
 
@@ -271,21 +271,21 @@ class AMonitorMayNotCreate(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, APolicyAndACaller[Any]]:
+    def given(self) -> TestGiven[SeedingSession, APolicyAndACaller[Any]]:
         return APolicyAndSomeone(self.family, role=UserRole.MONITOR)
 
     @override
-    def when(self) -> When[APolicyAndACaller[Any], ResourcePolicyAdapter, Any]:
+    def when(self) -> TestWhen[APolicyAndACaller[Any], ResourcePolicyAdapter, Any]:
         return Creating(self.family, self.family.everything(FRESH))
 
     @override
-    def then(self) -> Then[APolicyAndACaller[Any], Any]:
+    def then(self) -> TestThen[APolicyAndACaller[Any], Any]:
         return TheCallIsRefused(InsufficientPrivilege)
 
 
 @dataclass(frozen=True)
 class EnforcementOffChangesNothing(
-    Scenario[SeedingSession, APolicyAndACaller[Any], ResourcePolicyAdapter, Any], Configured
+    TestScenario[SeedingSession, APolicyAndACaller[Any], ResourcePolicyAdapter, Any], TestConfigured
 ):
     family: Family[Any, Any]
 
@@ -302,15 +302,15 @@ class EnforcementOffChangesNothing(
         return {ENFORCEMENT: False}
 
     @override
-    def given(self) -> Given[SeedingSession, APolicyAndACaller[Any]]:
+    def given(self) -> TestGiven[SeedingSession, APolicyAndACaller[Any]]:
         return APolicyAndSomeone(self.family)
 
     @override
-    def when(self) -> When[APolicyAndACaller[Any], ResourcePolicyAdapter, Any]:
+    def when(self) -> TestWhen[APolicyAndACaller[Any], ResourcePolicyAdapter, Any]:
         return Creating(self.family, self.family.everything(FRESH))
 
     @override
-    def then(self) -> Then[APolicyAndACaller[Any], Any]:
+    def then(self) -> TestThen[APolicyAndACaller[Any], Any]:
         return TheCallIsRefused(InsufficientPrivilege)
 
 

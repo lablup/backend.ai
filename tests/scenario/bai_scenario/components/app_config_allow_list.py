@@ -19,14 +19,14 @@ from ai.backend.manager.data.user.types import UserData
 from ai.backend.manager.errors.permission import NotEnoughPermission
 from ai.backend.testutils.scenario_steps import (
     Answered,
-    Given,
     Held,
     Refused,
     Same,
     SameAs,
     Skipped,
-    Then,
-    Verdict,
+    TestGiven,
+    TestThen,
+    TestVerdict,
 )
 from bai_scenario.components.answers import MissingResponse
 from bai_scenario.components.app_config import UNREGISTERED
@@ -64,7 +64,7 @@ class AnEntryAndACaller:
 
 
 @dataclass(frozen=True)
-class AnEntryAndSomeone(Given[Any, AnEntryAndACaller]):
+class AnEntryAndSomeone(TestGiven[Any, AnEntryAndACaller]):
     """설정 정의와 allow_list를 만들고 호출자를 준비한다.
 
     ``opened``가 없으면 정의만 만들고, ``defined``가 거짓이면 정의도 만들지 않는다.
@@ -121,7 +121,7 @@ class ManyEntriesAndACaller:
 
 
 @dataclass(frozen=True)
-class EntriesLaidAcross(Given[Any, ManyEntriesAndACaller]):
+class EntriesLaidAcross(TestGiven[Any, ManyEntriesAndACaller]):
     """설정 이름마다 지정한 스코프 유형의 allow_list를 만든다."""
 
     names: int = 1
@@ -162,7 +162,7 @@ class TwoEntriesAndACaller:
 
 
 @dataclass(frozen=True)
-class TwoEntriesAndSomeone(Given[Any, TwoEntriesAndACaller]):
+class TwoEntriesAndSomeone(TestGiven[Any, TwoEntriesAndACaller]):
     """한 설정 이름에 속한 allow_list 둘과 호출자를 준비한다."""
 
     role: UserRole = UserRole.USER
@@ -188,7 +188,7 @@ class TwoEntriesAndSomeone(Given[Any, TwoEntriesAndACaller]):
 
 
 @dataclass(frozen=True)
-class TheEntryNode(Then[AnEntryAndACaller, AppConfigAllowListNode]):
+class TheEntryNode(TestThen[AnEntryAndACaller, AppConfigAllowListNode]):
     """준비한 allow_list의 모든 필드가 반환된다."""
 
     started: datetime
@@ -201,7 +201,7 @@ class TheEntryNode(Then[AnEntryAndACaller, AppConfigAllowListNode]):
     @override
     def look(
         self, laid: AnEntryAndACaller, answered: Answered[AppConfigAllowListNode]
-    ) -> list[Verdict]:
+    ) -> list[TestVerdict]:
         node = answered.response
         if node is None or laid.entry is None:
             return [Refused(NotEnoughPermission, answered.raised)]
@@ -217,7 +217,7 @@ class TheEntryNode(Then[AnEntryAndACaller, AppConfigAllowListNode]):
 
 
 @dataclass(frozen=True)
-class TheNewEntryNode(Then[AnEntryAndACaller, AppConfigAllowListNode]):
+class TheNewEntryNode(TestThen[AnEntryAndACaller, AppConfigAllowListNode]):
     """생성한 allow_list의 모든 필드가 반환된다."""
 
     started: datetime
@@ -231,7 +231,7 @@ class TheNewEntryNode(Then[AnEntryAndACaller, AppConfigAllowListNode]):
     @override
     def look(
         self, laid: AnEntryAndACaller, answered: Answered[AppConfigAllowListNode]
-    ) -> list[Verdict]:
+    ) -> list[TestVerdict]:
         node = answered.response
         if node is None:
             return [Refused(NotEnoughPermission, answered.raised)]
@@ -247,7 +247,7 @@ class TheNewEntryNode(Then[AnEntryAndACaller, AppConfigAllowListNode]):
 
 
 @dataclass(frozen=True)
-class EveryLaidEntryIsFound(Then[ManyEntriesAndACaller, SearchAppConfigAllowListPayload]):
+class EveryLaidEntryIsFound(TestThen[ManyEntriesAndACaller, SearchAppConfigAllowListPayload]):
     """준비한 allow_list만 모두 반환된다."""
 
     @override
@@ -257,7 +257,7 @@ class EveryLaidEntryIsFound(Then[ManyEntriesAndACaller, SearchAppConfigAllowList
     @override
     def look(
         self, laid: ManyEntriesAndACaller, answered: Answered[SearchAppConfigAllowListPayload]
-    ) -> list[Verdict]:
+    ) -> list[TestVerdict]:
         payload = answered.response
         if payload is None:
             return [Refused(NotEnoughPermission, answered.raised)]
@@ -274,7 +274,9 @@ class EveryLaidEntryIsFound(Then[ManyEntriesAndACaller, SearchAppConfigAllowList
 
 
 @dataclass(frozen=True)
-class TheEntryAfterTheCursorIsFound(Then[ManyEntriesAndACaller, SearchAppConfigAllowListPayload]):
+class TheEntryAfterTheCursorIsFound(
+    TestThen[ManyEntriesAndACaller, SearchAppConfigAllowListPayload]
+):
     """커서가 가리킨 allow_list 바로 다음 하나만 반환된다."""
 
     @override
@@ -284,7 +286,7 @@ class TheEntryAfterTheCursorIsFound(Then[ManyEntriesAndACaller, SearchAppConfigA
     @override
     def look(
         self, laid: ManyEntriesAndACaller, answered: Answered[SearchAppConfigAllowListPayload]
-    ) -> list[Verdict]:
+    ) -> list[TestVerdict]:
         payload = answered.response
         if payload is None:
             return [MissingResponse(answered.raised)]

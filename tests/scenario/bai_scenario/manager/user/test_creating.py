@@ -24,7 +24,7 @@ from ai.backend.manager.models.user.creators import UserCreator
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.user.creators import UserCreateSpec
 from ai.backend.manager.services.user.actions.create_user import BulkCreateUserAction
-from ai.backend.testutils.scenario_steps import Given, Scenario, Then, When
+from ai.backend.testutils.scenario_steps import TestGiven, TestScenario, TestThen, TestWhen
 from bai_scenario.components.answers import TheCallIsRefused
 from bai_scenario.components.domain import WAS_HERE, SomeoneOf
 from bai_scenario.components.user import AGrant
@@ -46,7 +46,7 @@ class ADomainAndACaller:
 
 
 @dataclass(frozen=True)
-class SomeoneInADomain(Given[Any, ADomainAndACaller]):
+class SomeoneInADomain(TestGiven[Any, ADomainAndACaller]):
     """도메인 하나와 그 도메인의 사용자 한 명. `granted`면 도메인 스코프에서 사용자 생성 권한을 받는다."""
 
     granted: bool
@@ -67,7 +67,7 @@ class SomeoneInADomain(Given[Any, ADomainAndACaller]):
 
 
 @dataclass(frozen=True)
-class CreatingAUser(When[ADomainAndACaller, UserAdapter, Any]):
+class CreatingAUser(TestWhen[ADomainAndACaller, UserAdapter, Any]):
     """필수 항목만 주고 사용자 하나를 만든다. `domain_name`을 주면 그 이름을 도메인으로 댄다."""
 
     domain_name: str | None = None
@@ -96,7 +96,7 @@ class CreatingAUser(When[ADomainAndACaller, UserAdapter, Any]):
 
 
 @dataclass(frozen=True)
-class BulkCreatingAUser(When[ADomainAndACaller, UserAdapter, Any]):
+class BulkCreatingAUser(TestWhen[ADomainAndACaller, UserAdapter, Any]):
     """사용자 하나를 일괄 생성으로 만든다. `with_keypair`면 키를 함께 받는 쪽을 부른다."""
 
     with_keypair: bool
@@ -139,7 +139,7 @@ class BulkCreatingAUser(When[ADomainAndACaller, UserAdapter, Any]):
 
 @dataclass(frozen=True)
 class AUserGrantedNothingMayNotCreateAUser(
-    Scenario[SeedingSession, ADomainAndACaller, UserAdapter, Any]
+    TestScenario[SeedingSession, ADomainAndACaller, UserAdapter, Any]
 ):
     @override
     def summary(self) -> str:
@@ -150,21 +150,21 @@ class AUserGrantedNothingMayNotCreateAUser(
         return "역할을 받지 않은 사용자가 만들려 하면, 도메인 스코프 권한 문이 막는다"
 
     @override
-    def given(self) -> Given[SeedingSession, ADomainAndACaller]:
+    def given(self) -> TestGiven[SeedingSession, ADomainAndACaller]:
         return SomeoneInADomain(granted=False)
 
     @override
-    def when(self) -> When[ADomainAndACaller, UserAdapter, Any]:
+    def when(self) -> TestWhen[ADomainAndACaller, UserAdapter, Any]:
         return CreatingAUser()
 
     @override
-    def then(self) -> Then[ADomainAndACaller, Any]:
+    def then(self) -> TestThen[ADomainAndACaller, Any]:
         return TheCallIsRefused(NotEnoughPermission)
 
 
 @dataclass(frozen=True)
 class ANameNoDomainHoldsMayNotHoldAUser(
-    Scenario[SeedingSession, ADomainAndACaller, UserAdapter, Any]
+    TestScenario[SeedingSession, ADomainAndACaller, UserAdapter, Any]
 ):
     @override
     def summary(self) -> str:
@@ -178,20 +178,22 @@ class ANameNoDomainHoldsMayNotHoldAUser(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, ADomainAndACaller]:
+    def given(self) -> TestGiven[SeedingSession, ADomainAndACaller]:
         return SomeoneInADomain(granted=True)
 
     @override
-    def when(self) -> When[ADomainAndACaller, UserAdapter, Any]:
+    def when(self) -> TestWhen[ADomainAndACaller, UserAdapter, Any]:
         return CreatingAUser(domain_name="no-such-domain")
 
     @override
-    def then(self) -> Then[ADomainAndACaller, Any]:
+    def then(self) -> TestThen[ADomainAndACaller, Any]:
         return TheCallIsRefused(EntityNotFoundError)
 
 
 @dataclass(frozen=True)
-class OnlyTheSuperadminMayBulkCreate(Scenario[SeedingSession, ADomainAndACaller, UserAdapter, Any]):
+class OnlyTheSuperadminMayBulkCreate(
+    TestScenario[SeedingSession, ADomainAndACaller, UserAdapter, Any]
+):
     @override
     def summary(self) -> str:
         return "a-user-who-is-not-the-superadmin-may-not-bulk-create-users"
@@ -204,21 +206,21 @@ class OnlyTheSuperadminMayBulkCreate(Scenario[SeedingSession, ADomainAndACaller,
         )
 
     @override
-    def given(self) -> Given[SeedingSession, ADomainAndACaller]:
+    def given(self) -> TestGiven[SeedingSession, ADomainAndACaller]:
         return SomeoneInADomain(granted=True)
 
     @override
-    def when(self) -> When[ADomainAndACaller, UserAdapter, Any]:
+    def when(self) -> TestWhen[ADomainAndACaller, UserAdapter, Any]:
         return BulkCreatingAUser(with_keypair=False)
 
     @override
-    def then(self) -> Then[ADomainAndACaller, Any]:
+    def then(self) -> TestThen[ADomainAndACaller, Any]:
         return TheCallIsRefused(InsufficientPrivilege)
 
 
 @dataclass(frozen=True)
 class OnlyTheSuperadminMayBulkCreateWithKeypairs(
-    Scenario[SeedingSession, ADomainAndACaller, UserAdapter, Any]
+    TestScenario[SeedingSession, ADomainAndACaller, UserAdapter, Any]
 ):
     @override
     def summary(self) -> str:
@@ -229,19 +231,19 @@ class OnlyTheSuperadminMayBulkCreateWithKeypairs(
         return "권한 받은 사용자가 이 일괄 생성을 하려 하면, 전역 역할 문이 막는다"
 
     @override
-    def given(self) -> Given[SeedingSession, ADomainAndACaller]:
+    def given(self) -> TestGiven[SeedingSession, ADomainAndACaller]:
         return SomeoneInADomain(granted=True)
 
     @override
-    def when(self) -> When[ADomainAndACaller, UserAdapter, Any]:
+    def when(self) -> TestWhen[ADomainAndACaller, UserAdapter, Any]:
         return BulkCreatingAUser(with_keypair=True)
 
     @override
-    def then(self) -> Then[ADomainAndACaller, Any]:
+    def then(self) -> TestThen[ADomainAndACaller, Any]:
         return TheCallIsRefused(InsufficientPrivilege)
 
 
-SCENARIOS: list[Scenario[SeedingSession, Any, UserAdapter, Any]] = [
+SCENARIOS: list[TestScenario[SeedingSession, Any, UserAdapter, Any]] = [
     AUserGrantedNothingMayNotCreateAUser(),
     ANameNoDomainHoldsMayNotHoldAUser(),
     OnlyTheSuperadminMayBulkCreate(),
@@ -251,7 +253,7 @@ SCENARIOS: list[Scenario[SeedingSession, Any, UserAdapter, Any]] = [
 
 @pytest.mark.parametrize("scenario", SCENARIOS, ids=lambda s: s.summary())
 async def test_creating(
-    scenario: Scenario[SeedingSession, Any, UserAdapter, Any],
+    scenario: TestScenario[SeedingSession, Any, UserAdapter, Any],
     adapter: UserAdapter,
     engine: ExtendedAsyncSAEngine,
 ) -> None:

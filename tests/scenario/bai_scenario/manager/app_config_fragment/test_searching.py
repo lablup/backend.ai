@@ -31,13 +31,13 @@ from ai.backend.manager.errors.resource import DomainNotFound
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.testutils.scenario_steps import (
     Answered,
-    Given,
     Refused,
     Same,
-    Scenario,
-    Then,
-    Verdict,
-    When,
+    TestGiven,
+    TestScenario,
+    TestThen,
+    TestVerdict,
+    TestWhen,
 )
 from bai_scenario.components.answers import TheCallIsRefused
 from bai_scenario.components.app_config_fragment import (
@@ -51,13 +51,13 @@ from bai_scenario.runner.steps import run_scenario
 from bai_scenario.seeds.app_config.allow_list import SCOPE_NAMES
 
 type Searched = SearchAppConfigFragmentPayload
-type SearchingStep = Scenario[
+type SearchingStep = TestScenario[
     SeedingSession, ManyFragmentsAndACaller, AppConfigFragmentAdapter, Searched
 ]
 
 
 @dataclass(frozen=True)
-class SearchingTheScope(When[ManyFragmentsAndACaller, AppConfigFragmentAdapter, Searched]):
+class SearchingTheScope(TestWhen[ManyFragmentsAndACaller, AppConfigFragmentAdapter, Searched]):
     """미리 만들어 둔 스코프 하나를 지정해 검색한다."""
 
     @override
@@ -85,7 +85,7 @@ class SearchingTheScope(When[ManyFragmentsAndACaller, AppConfigFragmentAdapter, 
 
 
 @dataclass(frozen=True)
-class SearchingTwoScopes(When[ManyFragmentsAndACaller, AppConfigFragmentAdapter, Searched]):
+class SearchingTwoScopes(TestWhen[ManyFragmentsAndACaller, AppConfigFragmentAdapter, Searched]):
     """자기 도메인과 자기 자신을 함께 지정해 검색한다."""
 
     @override
@@ -112,7 +112,7 @@ class SearchingTwoScopes(When[ManyFragmentsAndACaller, AppConfigFragmentAdapter,
 
 
 @dataclass(frozen=True)
-class SearchingEverything(When[ManyFragmentsAndACaller, AppConfigFragmentAdapter, Searched]):
+class SearchingEverything(TestWhen[ManyFragmentsAndACaller, AppConfigFragmentAdapter, Searched]):
     """스코프 없이 전체를 검색한다."""
 
     @override
@@ -132,7 +132,7 @@ class SearchingEverything(When[ManyFragmentsAndACaller, AppConfigFragmentAdapter
 
 
 @dataclass(frozen=True)
-class SearchingAnotherUser(When[ManyFragmentsAndACaller, AppConfigFragmentAdapter, Searched]):
+class SearchingAnotherUser(TestWhen[ManyFragmentsAndACaller, AppConfigFragmentAdapter, Searched]):
     """다른 사용자의 스코프를 지정해 검색한다. 그 사용자는 조각을 하나 갖고 있다."""
 
     @override
@@ -158,7 +158,7 @@ class SearchingAnotherUser(When[ManyFragmentsAndACaller, AppConfigFragmentAdapte
 
 
 @dataclass(frozen=True)
-class EveryFragmentIsCounted(Then[ManyFragmentsAndACaller, Searched]):
+class EveryFragmentIsCounted(TestThen[ManyFragmentsAndACaller, Searched]):
     """미리 만들어 둔 조각이 스코프를 가리지 않고 모두 집계된다."""
 
     count: int
@@ -168,7 +168,9 @@ class EveryFragmentIsCounted(Then[ManyFragmentsAndACaller, Searched]):
         return "스코프를 가리지 않고 미리 만들어 둔 조각이 모두 집계된다"
 
     @override
-    def look(self, laid: ManyFragmentsAndACaller, answered: Answered[Searched]) -> list[Verdict]:
+    def look(
+        self, laid: ManyFragmentsAndACaller, answered: Answered[Searched]
+    ) -> list[TestVerdict]:
         payload = answered.response
         if payload is None:
             return [Refused(InsufficientPrivilege, answered.raised)]
@@ -182,7 +184,7 @@ class EveryFragmentIsCounted(Then[ManyFragmentsAndACaller, Searched]):
 
 @dataclass(frozen=True)
 class TheGrantedUserCountsTheirOwn(
-    Scenario[SeedingSession, ManyFragmentsAndACaller, AppConfigFragmentAdapter, Searched]
+    TestScenario[SeedingSession, ManyFragmentsAndACaller, AppConfigFragmentAdapter, Searched]
 ):
     @override
     def summary(self) -> str:
@@ -196,21 +198,21 @@ class TheGrantedUserCountsTheirOwn(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, ManyFragmentsAndACaller]:
+    def given(self) -> TestGiven[SeedingSession, ManyFragmentsAndACaller]:
         return FragmentsLaidAcross(mine=2, anothers=1, granted=(Permission.READ,))
 
     @override
-    def when(self) -> When[ManyFragmentsAndACaller, AppConfigFragmentAdapter, Searched]:
+    def when(self) -> TestWhen[ManyFragmentsAndACaller, AppConfigFragmentAdapter, Searched]:
         return SearchingTheScope()
 
     @override
-    def then(self) -> Then[ManyFragmentsAndACaller, Searched]:
+    def then(self) -> TestThen[ManyFragmentsAndACaller, Searched]:
         return EveryAnsweringFragmentIsFound()
 
 
 @dataclass(frozen=True)
 class AnyoneSignedInSearchesThePublic(
-    Scenario[SeedingSession, ManyFragmentsAndACaller, AppConfigFragmentAdapter, Searched]
+    TestScenario[SeedingSession, ManyFragmentsAndACaller, AppConfigFragmentAdapter, Searched]
 ):
     @override
     def summary(self) -> str:
@@ -224,21 +226,21 @@ class AnyoneSignedInSearchesThePublic(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, ManyFragmentsAndACaller]:
+    def given(self) -> TestGiven[SeedingSession, ManyFragmentsAndACaller]:
         return FragmentsLaidAcross(publics=2, answers=AppConfigScopeType.PUBLIC)
 
     @override
-    def when(self) -> When[ManyFragmentsAndACaller, AppConfigFragmentAdapter, Searched]:
+    def when(self) -> TestWhen[ManyFragmentsAndACaller, AppConfigFragmentAdapter, Searched]:
         return SearchingTheScope()
 
     @override
-    def then(self) -> Then[ManyFragmentsAndACaller, Searched]:
+    def then(self) -> TestThen[ManyFragmentsAndACaller, Searched]:
         return EveryAnsweringFragmentIsFound()
 
 
 @dataclass(frozen=True)
 class TwoScopesAtOnceAreRefused(
-    Scenario[SeedingSession, ManyFragmentsAndACaller, AppConfigFragmentAdapter, Searched]
+    TestScenario[SeedingSession, ManyFragmentsAndACaller, AppConfigFragmentAdapter, Searched]
 ):
     @override
     def summary(self) -> str:
@@ -252,21 +254,21 @@ class TwoScopesAtOnceAreRefused(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, ManyFragmentsAndACaller]:
+    def given(self) -> TestGiven[SeedingSession, ManyFragmentsAndACaller]:
         return FragmentsLaidAcross(mine=1, granted=(Permission.READ,))
 
     @override
-    def when(self) -> When[ManyFragmentsAndACaller, AppConfigFragmentAdapter, Searched]:
+    def when(self) -> TestWhen[ManyFragmentsAndACaller, AppConfigFragmentAdapter, Searched]:
         return SearchingTwoScopes()
 
     @override
-    def then(self) -> Then[ManyFragmentsAndACaller, Searched]:
+    def then(self) -> TestThen[ManyFragmentsAndACaller, Searched]:
         return TheCallIsRefused(InvalidAPIParameters)
 
 
 @dataclass(frozen=True)
 class AnotherUsersScopeIsRefused(
-    Scenario[SeedingSession, ManyFragmentsAndACaller, AppConfigFragmentAdapter, Searched]
+    TestScenario[SeedingSession, ManyFragmentsAndACaller, AppConfigFragmentAdapter, Searched]
 ):
     @override
     def summary(self) -> str:
@@ -277,21 +279,21 @@ class AnotherUsersScopeIsRefused(
         return "자기 스코프에만 읽기 권한을 받은 사용자가 다른 사용자를 지정해 검색하면, 권한 부족으로 거부된다"
 
     @override
-    def given(self) -> Given[SeedingSession, ManyFragmentsAndACaller]:
+    def given(self) -> TestGiven[SeedingSession, ManyFragmentsAndACaller]:
         return FragmentsLaidAcross(mine=1, anothers=1, answers=None, granted=(Permission.READ,))
 
     @override
-    def when(self) -> When[ManyFragmentsAndACaller, AppConfigFragmentAdapter, Searched]:
+    def when(self) -> TestWhen[ManyFragmentsAndACaller, AppConfigFragmentAdapter, Searched]:
         return SearchingAnotherUser()
 
     @override
-    def then(self) -> Then[ManyFragmentsAndACaller, Searched]:
+    def then(self) -> TestThen[ManyFragmentsAndACaller, Searched]:
         return TheCallIsRefused(NotEnoughPermission)
 
 
 @dataclass(frozen=True)
 class AMissingDomainIsNotFoundForASuperadmin(
-    Scenario[SeedingSession, ManyFragmentsAndACaller, AppConfigFragmentAdapter, Searched]
+    TestScenario[SeedingSession, ManyFragmentsAndACaller, AppConfigFragmentAdapter, Searched]
 ):
     @override
     def summary(self) -> str:
@@ -302,23 +304,23 @@ class AMissingDomainIsNotFoundForASuperadmin(
         return "슈퍼관리자가 어느 도메인도 아닌 id를 지정해 검색하면, 대상을 찾을 수 없다는 이유로 거부된다"
 
     @override
-    def given(self) -> Given[SeedingSession, ManyFragmentsAndACaller]:
+    def given(self) -> TestGiven[SeedingSession, ManyFragmentsAndACaller]:
         return FragmentsLaidAcross(
             answers=AppConfigScopeType.DOMAIN, missing_domain=True, role=UserRole.SUPERADMIN
         )
 
     @override
-    def when(self) -> When[ManyFragmentsAndACaller, AppConfigFragmentAdapter, Searched]:
+    def when(self) -> TestWhen[ManyFragmentsAndACaller, AppConfigFragmentAdapter, Searched]:
         return SearchingTheScope()
 
     @override
-    def then(self) -> Then[ManyFragmentsAndACaller, Searched]:
+    def then(self) -> TestThen[ManyFragmentsAndACaller, Searched]:
         return TheCallIsRefused(DomainNotFound)
 
 
 @dataclass(frozen=True)
 class TheSuperadminCountsEveryOne(
-    Scenario[SeedingSession, ManyFragmentsAndACaller, AppConfigFragmentAdapter, Searched]
+    TestScenario[SeedingSession, ManyFragmentsAndACaller, AppConfigFragmentAdapter, Searched]
 ):
     @override
     def summary(self) -> str:
@@ -329,23 +331,23 @@ class TheSuperadminCountsEveryOne(
         return "공개·도메인·사용자 스코프에 조각 넷이 있고 슈퍼관리자가 전체를 검색하면, 넷 다 집계된다. 전체 검색은 슈퍼관리자인지 검사한다"
 
     @override
-    def given(self) -> Given[SeedingSession, ManyFragmentsAndACaller]:
+    def given(self) -> TestGiven[SeedingSession, ManyFragmentsAndACaller]:
         return FragmentsLaidAcross(
             mine=2, domains=1, publics=1, answers=None, role=UserRole.SUPERADMIN
         )
 
     @override
-    def when(self) -> When[ManyFragmentsAndACaller, AppConfigFragmentAdapter, Searched]:
+    def when(self) -> TestWhen[ManyFragmentsAndACaller, AppConfigFragmentAdapter, Searched]:
         return SearchingEverything()
 
     @override
-    def then(self) -> Then[ManyFragmentsAndACaller, Searched]:
+    def then(self) -> TestThen[ManyFragmentsAndACaller, Searched]:
         return EveryFragmentIsCounted(count=4)
 
 
 @dataclass(frozen=True)
 class AGrantDoesNotOpenTheGlobalDoor(
-    Scenario[SeedingSession, ManyFragmentsAndACaller, AppConfigFragmentAdapter, Searched]
+    TestScenario[SeedingSession, ManyFragmentsAndACaller, AppConfigFragmentAdapter, Searched]
 ):
     @override
     def summary(self) -> str:
@@ -359,17 +361,17 @@ class AGrantDoesNotOpenTheGlobalDoor(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, ManyFragmentsAndACaller]:
+    def given(self) -> TestGiven[SeedingSession, ManyFragmentsAndACaller]:
         return FragmentsLaidAcross(
             domains=1, answers=AppConfigScopeType.DOMAIN, granted=(Permission.READ,)
         )
 
     @override
-    def when(self) -> When[ManyFragmentsAndACaller, AppConfigFragmentAdapter, Searched]:
+    def when(self) -> TestWhen[ManyFragmentsAndACaller, AppConfigFragmentAdapter, Searched]:
         return SearchingEverything()
 
     @override
-    def then(self) -> Then[ManyFragmentsAndACaller, Searched]:
+    def then(self) -> TestThen[ManyFragmentsAndACaller, Searched]:
         return TheCallIsRefused(InsufficientPrivilege)
 
 

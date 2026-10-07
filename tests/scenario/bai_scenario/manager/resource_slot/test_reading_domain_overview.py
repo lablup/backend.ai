@@ -14,7 +14,13 @@ from ai.backend.manager.api.adapters.resource_slot.adapter import ResourceSlotAd
 from ai.backend.manager.errors.base.entity import EntityNotFoundError
 from ai.backend.manager.errors.permission import NotEnoughPermission
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.testutils.scenario_steps import Configured, Given, Scenario, Then, When
+from ai.backend.testutils.scenario_steps import (
+    TestConfigured,
+    TestGiven,
+    TestScenario,
+    TestThen,
+    TestWhen,
+)
 from bai_scenario.components.answers import TheCallIsRefused
 from bai_scenario.components.resource_allocation import (
     AKernelAndACaller,
@@ -30,11 +36,11 @@ from bai_scenario.runner.steps import run_scenario
 UNKNOWN = "no-such-domain"
 
 type Overview = ActiveResourceOverviewInfoDTO
-type OverviewStep = Scenario[SeedingSession, AKernelAndACaller, ResourceSlotAdapter, Overview]
+type OverviewStep = TestScenario[SeedingSession, AKernelAndACaller, ResourceSlotAdapter, Overview]
 
 
 @dataclass(frozen=True)
-class ReadingTheDomainOverview(When[AKernelAndACaller, ResourceSlotAdapter, Overview]):
+class ReadingTheDomainOverview(TestWhen[AKernelAndACaller, ResourceSlotAdapter, Overview]):
     """도메인 이름으로 개요를 조회한다. 지정하지 않으면 커널이 속한 도메인의 이름을 쓴다."""
 
     named: str | None = None
@@ -55,7 +61,7 @@ class ReadingTheDomainOverview(When[AKernelAndACaller, ResourceSlotAdapter, Over
 
 @dataclass(frozen=True)
 class TheSuperadminReadsADomainOverview(
-    Scenario[SeedingSession, AKernelAndACaller, ResourceSlotAdapter, Overview]
+    TestScenario[SeedingSession, AKernelAndACaller, ResourceSlotAdapter, Overview]
 ):
     @override
     def summary(self) -> str:
@@ -69,21 +75,21 @@ class TheSuperadminReadsADomainOverview(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, AKernelAndACaller]:
+    def given(self) -> TestGiven[SeedingSession, AKernelAndACaller]:
         return AKernelAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
-    def when(self) -> When[AKernelAndACaller, ResourceSlotAdapter, Overview]:
+    def when(self) -> TestWhen[AKernelAndACaller, ResourceSlotAdapter, Overview]:
         return ReadingTheDomainOverview()
 
     @override
-    def then(self) -> Then[AKernelAndACaller, Overview]:
+    def then(self) -> TestThen[AKernelAndACaller, Overview]:
         return NothingIsOccupied()
 
 
 @dataclass(frozen=True)
 class AUserReadingSessionsInTheDomainReadsItsOverview(
-    Scenario[SeedingSession, AKernelAndACaller, ResourceSlotAdapter, Overview]
+    TestScenario[SeedingSession, AKernelAndACaller, ResourceSlotAdapter, Overview]
 ):
     @override
     def summary(self) -> str:
@@ -94,21 +100,21 @@ class AUserReadingSessionsInTheDomainReadsItsOverview(
         return "도메인 범위에서 세션을 읽을 수 있는 사용자가 그 도메인의 개요를 조회하면 개요가 반환된다"
 
     @override
-    def given(self) -> Given[SeedingSession, AKernelAndACaller]:
+    def given(self) -> TestGiven[SeedingSession, AKernelAndACaller]:
         return AKernelAndSomeone(granted=Granted.THE_DOMAIN)
 
     @override
-    def when(self) -> When[AKernelAndACaller, ResourceSlotAdapter, Overview]:
+    def when(self) -> TestWhen[AKernelAndACaller, ResourceSlotAdapter, Overview]:
         return ReadingTheDomainOverview()
 
     @override
-    def then(self) -> Then[AKernelAndACaller, Overview]:
+    def then(self) -> TestThen[AKernelAndACaller, Overview]:
         return NothingIsOccupied()
 
 
 @dataclass(frozen=True)
 class AUserReadingSessionsInTheProjectMayNotReadTheDomainOverview(
-    Scenario[SeedingSession, AKernelAndACaller, ResourceSlotAdapter, Overview]
+    TestScenario[SeedingSession, AKernelAndACaller, ResourceSlotAdapter, Overview]
 ):
     @override
     def summary(self) -> str:
@@ -122,21 +128,21 @@ class AUserReadingSessionsInTheProjectMayNotReadTheDomainOverview(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, AKernelAndACaller]:
+    def given(self) -> TestGiven[SeedingSession, AKernelAndACaller]:
         return AKernelAndSomeone(granted=Granted.THE_PROJECT)
 
     @override
-    def when(self) -> When[AKernelAndACaller, ResourceSlotAdapter, Overview]:
+    def when(self) -> TestWhen[AKernelAndACaller, ResourceSlotAdapter, Overview]:
         return ReadingTheDomainOverview()
 
     @override
-    def then(self) -> Then[AKernelAndACaller, Overview]:
+    def then(self) -> TestThen[AKernelAndACaller, Overview]:
         return TheCallIsRefused(NotEnoughPermission)
 
 
 @dataclass(frozen=True)
 class AUserGrantedNothingMayNotReadADomainOverview(
-    Scenario[SeedingSession, AKernelAndACaller, ResourceSlotAdapter, Overview]
+    TestScenario[SeedingSession, AKernelAndACaller, ResourceSlotAdapter, Overview]
 ):
     @override
     def summary(self) -> str:
@@ -147,21 +153,21 @@ class AUserGrantedNothingMayNotReadADomainOverview(
         return "아무 권한도 없는 사용자가 조회하면 권한 부족으로 거부된다"
 
     @override
-    def given(self) -> Given[SeedingSession, AKernelAndACaller]:
+    def given(self) -> TestGiven[SeedingSession, AKernelAndACaller]:
         return AKernelAndSomeone()
 
     @override
-    def when(self) -> When[AKernelAndACaller, ResourceSlotAdapter, Overview]:
+    def when(self) -> TestWhen[AKernelAndACaller, ResourceSlotAdapter, Overview]:
         return ReadingTheDomainOverview()
 
     @override
-    def then(self) -> Then[AKernelAndACaller, Overview]:
+    def then(self) -> TestThen[AKernelAndACaller, Overview]:
         return TheCallIsRefused(NotEnoughPermission)
 
 
 @dataclass(frozen=True)
 class ADomainNameNothingAnswersToIsNotFound(
-    Scenario[SeedingSession, AKernelAndACaller, ResourceSlotAdapter, Overview]
+    TestScenario[SeedingSession, AKernelAndACaller, ResourceSlotAdapter, Overview]
 ):
     @override
     def summary(self) -> str:
@@ -172,21 +178,21 @@ class ADomainNameNothingAnswersToIsNotFound(
         return "존재하지 않는 도메인 이름으로 조회하면 대상을 찾을 수 없다는 이유로 거부된다"
 
     @override
-    def given(self) -> Given[SeedingSession, AKernelAndACaller]:
+    def given(self) -> TestGiven[SeedingSession, AKernelAndACaller]:
         return AKernelAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
-    def when(self) -> When[AKernelAndACaller, ResourceSlotAdapter, Overview]:
+    def when(self) -> TestWhen[AKernelAndACaller, ResourceSlotAdapter, Overview]:
         return ReadingTheDomainOverview(named=UNKNOWN)
 
     @override
-    def then(self) -> Then[AKernelAndACaller, Overview]:
+    def then(self) -> TestThen[AKernelAndACaller, Overview]:
         return TheCallIsRefused(EntityNotFoundError)
 
 
 @dataclass(frozen=True)
 class EnforcementOffLetsAnyoneReadADomainOverview(
-    Scenario[SeedingSession, AKernelAndACaller, ResourceSlotAdapter, Overview], Configured
+    TestScenario[SeedingSession, AKernelAndACaller, ResourceSlotAdapter, Overview], TestConfigured
 ):
     @override
     def summary(self) -> str:
@@ -201,15 +207,15 @@ class EnforcementOffLetsAnyoneReadADomainOverview(
         return {ENFORCEMENT: False}
 
     @override
-    def given(self) -> Given[SeedingSession, AKernelAndACaller]:
+    def given(self) -> TestGiven[SeedingSession, AKernelAndACaller]:
         return AKernelAndSomeone()
 
     @override
-    def when(self) -> When[AKernelAndACaller, ResourceSlotAdapter, Overview]:
+    def when(self) -> TestWhen[AKernelAndACaller, ResourceSlotAdapter, Overview]:
         return ReadingTheDomainOverview()
 
     @override
-    def then(self) -> Then[AKernelAndACaller, Overview]:
+    def then(self) -> TestThen[AKernelAndACaller, Overview]:
         return NothingIsOccupied()
 
 

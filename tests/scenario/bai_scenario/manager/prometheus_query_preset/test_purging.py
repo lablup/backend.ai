@@ -26,11 +26,11 @@ from ai.backend.manager.errors.base.entity import EntityNotFoundError
 from ai.backend.manager.errors.permission import NotEnoughPermission
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.testutils.scenario_steps import (
-    Configured,
-    Given,
-    Scenario,
-    Then,
-    When,
+    TestConfigured,
+    TestGiven,
+    TestScenario,
+    TestThen,
+    TestWhen,
 )
 from bai_scenario.components.answers import TheCallIsRefused
 from bai_scenario.components.prometheus_query_preset import (
@@ -45,13 +45,13 @@ from bai_scenario.runner.steps import run_scenario
 ENFORCEMENT = "manager.rbac.enforcement_enabled"
 
 type Removed = DeleteQueryDefinitionPayload
-type PurgingStep = Scenario[
+type PurgingStep = TestScenario[
     SeedingSession, APresetAndACaller, PrometheusQueryPresetAdapter, Removed
 ]
 
 
 @dataclass(frozen=True)
-class Removing(When[APresetAndACaller, PrometheusQueryPresetAdapter, Removed]):
+class Removing(TestWhen[APresetAndACaller, PrometheusQueryPresetAdapter, Removed]):
     """프리셋 하나를 삭제한다. id를 지정하지 않으면 미리 만들어 둔 프리셋을 삭제한다."""
 
     other: UUID | None = None
@@ -74,7 +74,7 @@ class Removing(When[APresetAndACaller, PrometheusQueryPresetAdapter, Removed]):
 
 @dataclass(frozen=True)
 class TheSuperadminRemovesIt(
-    Scenario[SeedingSession, APresetAndACaller, PrometheusQueryPresetAdapter, Removed]
+    TestScenario[SeedingSession, APresetAndACaller, PrometheusQueryPresetAdapter, Removed]
 ):
     @override
     def summary(self) -> str:
@@ -85,21 +85,21 @@ class TheSuperadminRemovesIt(
         return "프리셋 하나가 있고 슈퍼관리자가 삭제하면, 삭제한 id를 담은 응답이 반환된다"
 
     @override
-    def given(self) -> Given[SeedingSession, APresetAndACaller]:
+    def given(self) -> TestGiven[SeedingSession, APresetAndACaller]:
         return APresetAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
-    def when(self) -> When[APresetAndACaller, PrometheusQueryPresetAdapter, Removed]:
+    def when(self) -> TestWhen[APresetAndACaller, PrometheusQueryPresetAdapter, Removed]:
         return Removing()
 
     @override
-    def then(self) -> Then[APresetAndACaller, Removed]:
+    def then(self) -> TestThen[APresetAndACaller, Removed]:
         return TheRemovedOneIsNamed()
 
 
 @dataclass(frozen=True)
 class AUserGrantedNothingMayNotRemove(
-    Scenario[SeedingSession, APresetAndACaller, PrometheusQueryPresetAdapter, Removed]
+    TestScenario[SeedingSession, APresetAndACaller, PrometheusQueryPresetAdapter, Removed]
 ):
     @override
     def summary(self) -> str:
@@ -110,22 +110,22 @@ class AUserGrantedNothingMayNotRemove(
         return "같은 프리셋이 있고 아무 권한도 없는 사용자가 삭제하면, 권한 부족으로 거부된다"
 
     @override
-    def given(self) -> Given[SeedingSession, APresetAndACaller]:
+    def given(self) -> TestGiven[SeedingSession, APresetAndACaller]:
         return APresetAndSomeone()
 
     @override
-    def when(self) -> When[APresetAndACaller, PrometheusQueryPresetAdapter, Removed]:
+    def when(self) -> TestWhen[APresetAndACaller, PrometheusQueryPresetAdapter, Removed]:
         return Removing()
 
     @override
-    def then(self) -> Then[APresetAndACaller, Removed]:
+    def then(self) -> TestThen[APresetAndACaller, Removed]:
         return TheCallIsRefused(NotEnoughPermission)
 
 
 @dataclass(frozen=True)
 class EnforcementOffLetsAnyoneRemove(
-    Scenario[SeedingSession, APresetAndACaller, PrometheusQueryPresetAdapter, Removed],
-    Configured,
+    TestScenario[SeedingSession, APresetAndACaller, PrometheusQueryPresetAdapter, Removed],
+    TestConfigured,
 ):
     @override
     def summary(self) -> str:
@@ -140,21 +140,21 @@ class EnforcementOffLetsAnyoneRemove(
         return {ENFORCEMENT: False}
 
     @override
-    def given(self) -> Given[SeedingSession, APresetAndACaller]:
+    def given(self) -> TestGiven[SeedingSession, APresetAndACaller]:
         return APresetAndSomeone()
 
     @override
-    def when(self) -> When[APresetAndACaller, PrometheusQueryPresetAdapter, Removed]:
+    def when(self) -> TestWhen[APresetAndACaller, PrometheusQueryPresetAdapter, Removed]:
         return Removing()
 
     @override
-    def then(self) -> Then[APresetAndACaller, Removed]:
+    def then(self) -> TestThen[APresetAndACaller, Removed]:
         return TheRemovedOneIsNamed()
 
 
 @dataclass(frozen=True)
 class AnUnknownIdIsNotFoundForASuperadmin(
-    Scenario[SeedingSession, APresetAndACaller, PrometheusQueryPresetAdapter, Removed]
+    TestScenario[SeedingSession, APresetAndACaller, PrometheusQueryPresetAdapter, Removed]
 ):
     @override
     def summary(self) -> str:
@@ -165,15 +165,15 @@ class AnUnknownIdIsNotFoundForASuperadmin(
         return "슈퍼관리자가 존재하지 않는 id를 삭제하면, 대상을 찾을 수 없다는 이유로 거부된다"
 
     @override
-    def given(self) -> Given[SeedingSession, APresetAndACaller]:
+    def given(self) -> TestGiven[SeedingSession, APresetAndACaller]:
         return APresetAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
-    def when(self) -> When[APresetAndACaller, PrometheusQueryPresetAdapter, Removed]:
+    def when(self) -> TestWhen[APresetAndACaller, PrometheusQueryPresetAdapter, Removed]:
         return Removing(other=uuid4())
 
     @override
-    def then(self) -> Then[APresetAndACaller, Removed]:
+    def then(self) -> TestThen[APresetAndACaller, Removed]:
         return TheCallIsRefused(EntityNotFoundError)
 
 

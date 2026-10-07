@@ -26,15 +26,15 @@ from ai.backend.manager.data.user.types import UserData
 from ai.backend.manager.errors.base.entity import EntityNotFoundError
 from ai.backend.testutils.scenario_steps import (
     Answered,
-    Condition,
-    Given,
     Held,
     Refused,
     Same,
     SameAs,
     Skipped,
-    Then,
-    Verdict,
+    TestCondition,
+    TestGiven,
+    TestThen,
+    TestVerdict,
 )
 from bai_scenario.seeds.domain.domain import SeedDomain
 from bai_scenario.seeds.project.project import SeedProject
@@ -62,7 +62,7 @@ class ADomainAndACaller:
 
 
 @dataclass(frozen=True)
-class ADomainAndSomeone(Given[Any, ADomainAndACaller]):
+class ADomainAndSomeone(TestGiven[Any, ADomainAndACaller]):
     """도메인 하나와 그 도메인에 속한 사용자 한 명."""
 
     role: UserRole = UserRole.USER
@@ -87,7 +87,7 @@ class TargetHolds(enum.Enum):
 
 
 @dataclass(frozen=True)
-class ATargetAndSomeone(Given[Any, ADomainAndACaller]):
+class ATargetAndSomeone(TestGiven[Any, ADomainAndACaller]):
     """건드릴 도메인 하나와, 다른 도메인에 사는 사람 한 명.
 
     건드리는 대상이 부르는 사람의 집이면 안 되는 자리에 쓴다. purge 요청이 그렇다.
@@ -130,7 +130,7 @@ class ManyDomainsAndACaller:
 
 
 @dataclass(frozen=True)
-class ManyDomainsAndSomeone(Given[Any, ManyDomainsAndACaller]):
+class ManyDomainsAndSomeone(TestGiven[Any, ManyDomainsAndACaller]):
     """도메인 여럿과 그중 한 도메인에 속한 사용자 한 명."""
 
     role: UserRole = UserRole.USER
@@ -157,7 +157,7 @@ class ManyDomainsAndSomeone(Given[Any, ManyDomainsAndACaller]):
 
 
 @dataclass(frozen=True)
-class WrittenByThisRun(Condition[datetime | None]):
+class WrittenByThisRun(TestCondition[datetime | None]):
     """이 실행이 쓴 시각. 값 자체는 실행마다 달라 레포트에 넣지 않는다."""
 
     started: datetime
@@ -181,7 +181,7 @@ class DomainLook:
     described: str | None = WAS_HERE
     active: bool = True
 
-    def verdicts(self, prefix: str, node: DomainNode, laid: DomainData) -> list[Verdict]:
+    def verdicts(self, prefix: str, node: DomainNode, laid: DomainData) -> list[TestVerdict]:
         written = WrittenByThisRun(self.started)
         return [
             Same(f"{prefix}name", node.basic_info.name, laid.name),
@@ -200,7 +200,7 @@ class DomainLook:
 
 
 @dataclass(frozen=True)
-class TheDomainNode(Then[ADomainAndACaller, DomainNode]):
+class TheDomainNode(TestThen[ADomainAndACaller, DomainNode]):
     """도메인 노드 하나가 통째로 온다.
 
     시나리오가 정한 값만 여기로 받는다. 답이 노드를 감싸고 있으면 `when`이 벗겨서 준다.
@@ -215,7 +215,7 @@ class TheDomainNode(Then[ADomainAndACaller, DomainNode]):
         return "미리 만든 도메인 전체가 온다"
 
     @override
-    def look(self, laid: ADomainAndACaller, answered: Answered[DomainNode]) -> list[Verdict]:
+    def look(self, laid: ADomainAndACaller, answered: Answered[DomainNode]) -> list[TestVerdict]:
         node = answered.response
         if node is None:
             return [Refused(EntityNotFoundError, answered.raised)]
@@ -224,7 +224,7 @@ class TheDomainNode(Then[ADomainAndACaller, DomainNode]):
 
 
 @dataclass(frozen=True)
-class TheNewDomainNode(Then[Any, DomainNode]):
+class TheNewDomainNode(TestThen[Any, DomainNode]):
     """방금 만든 도메인이 통째로 온다. 이름과 설명은 시나리오가 정한 것이다."""
 
     started: datetime
@@ -236,7 +236,7 @@ class TheNewDomainNode(Then[Any, DomainNode]):
         return "만든 도메인 전체가 온다"
 
     @override
-    def look(self, laid: Any, answered: Answered[DomainNode]) -> list[Verdict]:
+    def look(self, laid: Any, answered: Answered[DomainNode]) -> list[TestVerdict]:
         node = answered.response
         if node is None:
             return [Refused(EntityNotFoundError, answered.raised)]
@@ -255,7 +255,7 @@ class TheNewDomainNode(Then[Any, DomainNode]):
 
 
 @dataclass(frozen=True)
-class TheCallIsRefused(Then[Any, Any]):
+class TheCallIsRefused(TestThen[Any, Any]):
     """이 이름으로 거부된다."""
 
     expected: type[BaseException]
@@ -265,7 +265,7 @@ class TheCallIsRefused(Then[Any, Any]):
         return "거부된다"
 
     @override
-    def look(self, laid: Any, answered: Answered[Any]) -> list[Verdict]:
+    def look(self, laid: Any, answered: Answered[Any]) -> list[TestVerdict]:
         return [Refused(self.expected, answered.raised)]
 
 
@@ -361,7 +361,7 @@ class DomainsOfAGroupAndACaller:
 
 
 @dataclass(frozen=True)
-class DomainsOfAGroupAndSomeone(Given[Any, DomainsOfAGroupAndACaller]):
+class DomainsOfAGroupAndSomeone(TestGiven[Any, DomainsOfAGroupAndACaller]):
     """리소스 그룹 하나와 도메인 셋. 그중 둘만 그 그룹을 쓸 수 있다.
 
     ``reading``이면 부르는 사람이 그 그룹 범위에서 도메인 읽기 역할을 받는다.

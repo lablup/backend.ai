@@ -35,7 +35,7 @@ from ai.backend.manager.errors.api import InvalidAPIParameters
 from ai.backend.manager.errors.permission import NotEnoughPermission
 from ai.backend.manager.errors.storage import VFolderNotFound, VFolderPermissionError
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.testutils.scenario_steps import Given, Scenario, Then, When
+from ai.backend.testutils.scenario_steps import TestGiven, TestScenario, TestThen, TestWhen
 from bai_scenario.components.answers import TheCallIsRefused
 from bai_scenario.components.deployment_revision import (
     MOUNTED_AT,
@@ -54,11 +54,11 @@ MEMORY_ONLY: tuple[tuple[str, Decimal], ...] = tuple(
     one for one in SLOTS if one[0] == str(IntrinsicSlotNames.MEMORY.value)
 )
 
-type AddingStep = Scenario[SeedingSession, RevisionsAndACaller, DeploymentAdapter, RevisionNode]
+type AddingStep = TestScenario[SeedingSession, RevisionsAndACaller, DeploymentAdapter, RevisionNode]
 
 
 @dataclass(frozen=True)
-class AddingARevision(When[RevisionsAndACaller, DeploymentAdapter, RevisionNode]):
+class AddingARevision(TestWhen[RevisionsAndACaller, DeploymentAdapter, RevisionNode]):
     """리비전 하나를 더한다. 끈 자리는 요청에서 뺀다.
 
     ``slots``가 없으면 자원과 클러스터를 함께 뺀다. 어댑터가 둘을 한 묶음으로 읽는다.
@@ -136,7 +136,7 @@ class AddingARevision(When[RevisionsAndACaller, DeploymentAdapter, RevisionNode]
 
 @dataclass(frozen=True)
 class TheGrantedUserAddsTheFirst(
-    Scenario[SeedingSession, RevisionsAndACaller, DeploymentAdapter, RevisionNode]
+    TestScenario[SeedingSession, RevisionsAndACaller, DeploymentAdapter, RevisionNode]
 ):
     started: datetime
 
@@ -152,21 +152,21 @@ class TheGrantedUserAddsTheFirst(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, RevisionsAndACaller]:
+    def given(self) -> TestGiven[SeedingSession, RevisionsAndACaller]:
         return ADeploymentToRevise(granted=(Permission.CREATE,))
 
     @override
-    def when(self) -> When[RevisionsAndACaller, DeploymentAdapter, RevisionNode]:
+    def when(self) -> TestWhen[RevisionsAndACaller, DeploymentAdapter, RevisionNode]:
         return AddingARevision()
 
     @override
-    def then(self) -> Then[RevisionsAndACaller, RevisionNode]:
+    def then(self) -> TestThen[RevisionsAndACaller, RevisionNode]:
         return TheRevisionNode(started=self.started, number=1)
 
 
 @dataclass(frozen=True)
 class TheNextOneIsNumberedOnePast(
-    Scenario[SeedingSession, RevisionsAndACaller, DeploymentAdapter, RevisionNode]
+    TestScenario[SeedingSession, RevisionsAndACaller, DeploymentAdapter, RevisionNode]
 ):
     started: datetime
 
@@ -179,21 +179,21 @@ class TheNextOneIsNumberedOnePast(
         return "리비전 하나가 딸린 배포에 리비전을 더하면, 번호 2를 단 리비전이 온다"
 
     @override
-    def given(self) -> Given[SeedingSession, RevisionsAndACaller]:
+    def given(self) -> TestGiven[SeedingSession, RevisionsAndACaller]:
         return ADeploymentToRevise(granted=(Permission.CREATE,), revisions=1)
 
     @override
-    def when(self) -> When[RevisionsAndACaller, DeploymentAdapter, RevisionNode]:
+    def when(self) -> TestWhen[RevisionsAndACaller, DeploymentAdapter, RevisionNode]:
         return AddingARevision()
 
     @override
-    def then(self) -> Then[RevisionsAndACaller, RevisionNode]:
+    def then(self) -> TestThen[RevisionsAndACaller, RevisionNode]:
         return TheRevisionNode(started=self.started, number=2)
 
 
 @dataclass(frozen=True)
 class LeavingOutResourcesRunsOnOneNodeWithNoSlot(
-    Scenario[SeedingSession, RevisionsAndACaller, DeploymentAdapter, RevisionNode]
+    TestScenario[SeedingSession, RevisionsAndACaller, DeploymentAdapter, RevisionNode]
 ):
     started: datetime
 
@@ -209,21 +209,21 @@ class LeavingOutResourcesRunsOnOneNodeWithNoSlot(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, RevisionsAndACaller]:
+    def given(self) -> TestGiven[SeedingSession, RevisionsAndACaller]:
         return ADeploymentToRevise(granted=(Permission.CREATE,))
 
     @override
-    def when(self) -> When[RevisionsAndACaller, DeploymentAdapter, RevisionNode]:
+    def when(self) -> TestWhen[RevisionsAndACaller, DeploymentAdapter, RevisionNode]:
         return AddingARevision(slots=None)
 
     @override
-    def then(self) -> Then[RevisionsAndACaller, RevisionNode]:
+    def then(self) -> TestThen[RevisionsAndACaller, RevisionNode]:
         return TheRevisionNode(started=self.started, number=1, slots=())
 
 
 @dataclass(frozen=True)
 class AMountBeyondTheFolderIsRefused(
-    Scenario[SeedingSession, RevisionsAndACaller, DeploymentAdapter, RevisionNode]
+    TestScenario[SeedingSession, RevisionsAndACaller, DeploymentAdapter, RevisionNode]
 ):
     @override
     def summary(self) -> str:
@@ -237,21 +237,21 @@ class AMountBeyondTheFolderIsRefused(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, RevisionsAndACaller]:
+    def given(self) -> TestGiven[SeedingSession, RevisionsAndACaller]:
         return ADeploymentToRevise(granted=(Permission.CREATE,), folder_lent=True)
 
     @override
-    def when(self) -> When[RevisionsAndACaller, DeploymentAdapter, RevisionNode]:
+    def when(self) -> TestWhen[RevisionsAndACaller, DeploymentAdapter, RevisionNode]:
         return AddingARevision(mount_perm=MountPermission.READ_WRITE)
 
     @override
-    def then(self) -> Then[RevisionsAndACaller, RevisionNode]:
+    def then(self) -> TestThen[RevisionsAndACaller, RevisionNode]:
         return TheCallIsRefused(VFolderPermissionError)
 
 
 @dataclass(frozen=True)
 class NoImageAnywhereIsRefused(
-    Scenario[SeedingSession, RevisionsAndACaller, DeploymentAdapter, RevisionNode]
+    TestScenario[SeedingSession, RevisionsAndACaller, DeploymentAdapter, RevisionNode]
 ):
     @override
     def summary(self) -> str:
@@ -262,21 +262,21 @@ class NoImageAnywhereIsRefused(
         return "프리셋 없이 이미지를 빼고 리비전을 더하면, 입력이 틀렸다는 이유로 거부된다"
 
     @override
-    def given(self) -> Given[SeedingSession, RevisionsAndACaller]:
+    def given(self) -> TestGiven[SeedingSession, RevisionsAndACaller]:
         return ADeploymentToRevise(granted=(Permission.CREATE,))
 
     @override
-    def when(self) -> When[RevisionsAndACaller, DeploymentAdapter, RevisionNode]:
+    def when(self) -> TestWhen[RevisionsAndACaller, DeploymentAdapter, RevisionNode]:
         return AddingARevision(image=False)
 
     @override
-    def then(self) -> Then[RevisionsAndACaller, RevisionNode]:
+    def then(self) -> TestThen[RevisionsAndACaller, RevisionNode]:
         return TheCallIsRefused(InvalidAPIParameters)
 
 
 @dataclass(frozen=True)
 class NoRuntimeAnywhereIsRefused(
-    Scenario[SeedingSession, RevisionsAndACaller, DeploymentAdapter, RevisionNode]
+    TestScenario[SeedingSession, RevisionsAndACaller, DeploymentAdapter, RevisionNode]
 ):
     @override
     def summary(self) -> str:
@@ -287,21 +287,21 @@ class NoRuntimeAnywhereIsRefused(
         return "프리셋 없이 런타임 변형을 빼고 리비전을 더하면, 입력이 틀렸다는 이유로 거부된다"
 
     @override
-    def given(self) -> Given[SeedingSession, RevisionsAndACaller]:
+    def given(self) -> TestGiven[SeedingSession, RevisionsAndACaller]:
         return ADeploymentToRevise(granted=(Permission.CREATE,))
 
     @override
-    def when(self) -> When[RevisionsAndACaller, DeploymentAdapter, RevisionNode]:
+    def when(self) -> TestWhen[RevisionsAndACaller, DeploymentAdapter, RevisionNode]:
         return AddingARevision(runtime=False)
 
     @override
-    def then(self) -> Then[RevisionsAndACaller, RevisionNode]:
+    def then(self) -> TestThen[RevisionsAndACaller, RevisionNode]:
         return TheCallIsRefused(InvalidAPIParameters)
 
 
 @dataclass(frozen=True)
 class NoModelDefinitionAnywhereIsRefused(
-    Scenario[SeedingSession, RevisionsAndACaller, DeploymentAdapter, RevisionNode]
+    TestScenario[SeedingSession, RevisionsAndACaller, DeploymentAdapter, RevisionNode]
 ):
     @override
     def summary(self) -> str:
@@ -315,21 +315,21 @@ class NoModelDefinitionAnywhereIsRefused(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, RevisionsAndACaller]:
+    def given(self) -> TestGiven[SeedingSession, RevisionsAndACaller]:
         return ADeploymentToRevise(granted=(Permission.CREATE,))
 
     @override
-    def when(self) -> When[RevisionsAndACaller, DeploymentAdapter, RevisionNode]:
+    def when(self) -> TestWhen[RevisionsAndACaller, DeploymentAdapter, RevisionNode]:
         return AddingARevision(definition=False)
 
     @override
-    def then(self) -> Then[RevisionsAndACaller, RevisionNode]:
+    def then(self) -> TestThen[RevisionsAndACaller, RevisionNode]:
         return TheCallIsRefused(BackendAISchemaValidationFailed)
 
 
 @dataclass(frozen=True)
 class AMissingRequiredSlotIsRefused(
-    Scenario[SeedingSession, RevisionsAndACaller, DeploymentAdapter, RevisionNode]
+    TestScenario[SeedingSession, RevisionsAndACaller, DeploymentAdapter, RevisionNode]
 ):
     @override
     def summary(self) -> str:
@@ -343,21 +343,21 @@ class AMissingRequiredSlotIsRefused(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, RevisionsAndACaller]:
+    def given(self) -> TestGiven[SeedingSession, RevisionsAndACaller]:
         return ADeploymentToRevise(granted=(Permission.CREATE,), cpu_required=True)
 
     @override
-    def when(self) -> When[RevisionsAndACaller, DeploymentAdapter, RevisionNode]:
+    def when(self) -> TestWhen[RevisionsAndACaller, DeploymentAdapter, RevisionNode]:
         return AddingARevision(slots=MEMORY_ONLY)
 
     @override
-    def then(self) -> Then[RevisionsAndACaller, RevisionNode]:
+    def then(self) -> TestThen[RevisionsAndACaller, RevisionNode]:
         return TheCallIsRefused(InvalidAPIParameters)
 
 
 @dataclass(frozen=True)
 class AReadGrantDoesNotAdd(
-    Scenario[SeedingSession, RevisionsAndACaller, DeploymentAdapter, RevisionNode]
+    TestScenario[SeedingSession, RevisionsAndACaller, DeploymentAdapter, RevisionNode]
 ):
     @override
     def summary(self) -> str:
@@ -368,21 +368,21 @@ class AReadGrantDoesNotAdd(
         return "배포 읽기 권한만 받은 사용자가 리비전을 더하면, 권한 부족으로 거부된다"
 
     @override
-    def given(self) -> Given[SeedingSession, RevisionsAndACaller]:
+    def given(self) -> TestGiven[SeedingSession, RevisionsAndACaller]:
         return ADeploymentToRevise(granted=(Permission.READ,))
 
     @override
-    def when(self) -> When[RevisionsAndACaller, DeploymentAdapter, RevisionNode]:
+    def when(self) -> TestWhen[RevisionsAndACaller, DeploymentAdapter, RevisionNode]:
         return AddingARevision()
 
     @override
-    def then(self) -> Then[RevisionsAndACaller, RevisionNode]:
+    def then(self) -> TestThen[RevisionsAndACaller, RevisionNode]:
         return TheCallIsRefused(NotEnoughPermission)
 
 
 @dataclass(frozen=True)
 class TheSuperadminAddsToAnothers(
-    Scenario[SeedingSession, RevisionsAndACaller, DeploymentAdapter, RevisionNode]
+    TestScenario[SeedingSession, RevisionsAndACaller, DeploymentAdapter, RevisionNode]
 ):
     started: datetime
 
@@ -398,21 +398,21 @@ class TheSuperadminAddsToAnothers(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, RevisionsAndACaller]:
+    def given(self) -> TestGiven[SeedingSession, RevisionsAndACaller]:
         return AnothersDeploymentToRevise()
 
     @override
-    def when(self) -> When[RevisionsAndACaller, DeploymentAdapter, RevisionNode]:
+    def when(self) -> TestWhen[RevisionsAndACaller, DeploymentAdapter, RevisionNode]:
         return AddingARevision()
 
     @override
-    def then(self) -> Then[RevisionsAndACaller, RevisionNode]:
+    def then(self) -> TestThen[RevisionsAndACaller, RevisionNode]:
         return TheRevisionNode(started=self.started, number=1)
 
 
 @dataclass(frozen=True)
 class AFolderTheCallerMayNotReadIsNotFound(
-    Scenario[SeedingSession, RevisionsAndACaller, DeploymentAdapter, RevisionNode]
+    TestScenario[SeedingSession, RevisionsAndACaller, DeploymentAdapter, RevisionNode]
 ):
     @override
     def summary(self) -> str:
@@ -426,15 +426,15 @@ class AFolderTheCallerMayNotReadIsNotFound(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, RevisionsAndACaller]:
+    def given(self) -> TestGiven[SeedingSession, RevisionsAndACaller]:
         return ADeploymentToRevise(granted=(Permission.CREATE,), folder_readable=False)
 
     @override
-    def when(self) -> When[RevisionsAndACaller, DeploymentAdapter, RevisionNode]:
+    def when(self) -> TestWhen[RevisionsAndACaller, DeploymentAdapter, RevisionNode]:
         return AddingARevision()
 
     @override
-    def then(self) -> Then[RevisionsAndACaller, RevisionNode]:
+    def then(self) -> TestThen[RevisionsAndACaller, RevisionNode]:
         return TheCallIsRefused(VFolderNotFound)
 
 

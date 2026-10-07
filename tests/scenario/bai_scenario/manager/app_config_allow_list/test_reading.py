@@ -26,7 +26,13 @@ from ai.backend.manager.api.adapters.app_config_allow_list.adapter import (
 from ai.backend.manager.errors.base.entity import EntityNotFoundError
 from ai.backend.manager.errors.permission import NotEnoughPermission
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.testutils.scenario_steps import Configured, Given, Scenario, Then, When
+from ai.backend.testutils.scenario_steps import (
+    TestConfigured,
+    TestGiven,
+    TestScenario,
+    TestThen,
+    TestWhen,
+)
 from bai_scenario.components.answers import TheCallIsRefused
 from bai_scenario.components.app_config import ENFORCEMENT
 from bai_scenario.components.app_config_allow_list import (
@@ -38,13 +44,13 @@ from bai_scenario.runner.acting import ActingAs
 from bai_scenario.runner.planting import SeedingSession
 from bai_scenario.runner.steps import run_scenario
 
-type ReadingStep = Scenario[
+type ReadingStep = TestScenario[
     SeedingSession, AnEntryAndACaller, AppConfigAllowListAdapter, AppConfigAllowListNode
 ]
 
 
 @dataclass(frozen=True)
-class ReadingById(When[AnEntryAndACaller, AppConfigAllowListAdapter, AppConfigAllowListNode]):
+class ReadingById(TestWhen[AnEntryAndACaller, AppConfigAllowListAdapter, AppConfigAllowListNode]):
     """ID로 조회한다. ID를 지정하지 않으면 준비한 allow_list의 ID를 쓴다."""
 
     other: UUID | None = None
@@ -74,7 +80,9 @@ class ReadingById(When[AnEntryAndACaller, AppConfigAllowListAdapter, AppConfigAl
 
 @dataclass(frozen=True)
 class TheSuperadminReadsIt(
-    Scenario[SeedingSession, AnEntryAndACaller, AppConfigAllowListAdapter, AppConfigAllowListNode]
+    TestScenario[
+        SeedingSession, AnEntryAndACaller, AppConfigAllowListAdapter, AppConfigAllowListNode
+    ]
 ):
     started: datetime
 
@@ -87,21 +95,25 @@ class TheSuperadminReadsIt(
         return "allow_list 하나가 있고 슈퍼관리자가 ID로 조회하면, 그 allow_list의 모든 필드가 반환된다"
 
     @override
-    def given(self) -> Given[SeedingSession, AnEntryAndACaller]:
+    def given(self) -> TestGiven[SeedingSession, AnEntryAndACaller]:
         return AnEntryAndSomeone(opened=AppConfigScopeType.USER, role=UserRole.SUPERADMIN)
 
     @override
-    def when(self) -> When[AnEntryAndACaller, AppConfigAllowListAdapter, AppConfigAllowListNode]:
+    def when(
+        self,
+    ) -> TestWhen[AnEntryAndACaller, AppConfigAllowListAdapter, AppConfigAllowListNode]:
         return ReadingById()
 
     @override
-    def then(self) -> Then[AnEntryAndACaller, AppConfigAllowListNode]:
+    def then(self) -> TestThen[AnEntryAndACaller, AppConfigAllowListNode]:
         return TheEntryNode(started=self.started)
 
 
 @dataclass(frozen=True)
 class AUserGrantedNothingMayNotRead(
-    Scenario[SeedingSession, AnEntryAndACaller, AppConfigAllowListAdapter, AppConfigAllowListNode]
+    TestScenario[
+        SeedingSession, AnEntryAndACaller, AppConfigAllowListAdapter, AppConfigAllowListNode
+    ]
 ):
     @override
     def summary(self) -> str:
@@ -114,21 +126,25 @@ class AUserGrantedNothingMayNotRead(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, AnEntryAndACaller]:
+    def given(self) -> TestGiven[SeedingSession, AnEntryAndACaller]:
         return AnEntryAndSomeone(opened=AppConfigScopeType.USER)
 
     @override
-    def when(self) -> When[AnEntryAndACaller, AppConfigAllowListAdapter, AppConfigAllowListNode]:
+    def when(
+        self,
+    ) -> TestWhen[AnEntryAndACaller, AppConfigAllowListAdapter, AppConfigAllowListNode]:
         return ReadingById()
 
     @override
-    def then(self) -> Then[AnEntryAndACaller, AppConfigAllowListNode]:
+    def then(self) -> TestThen[AnEntryAndACaller, AppConfigAllowListNode]:
         return TheCallIsRefused(NotEnoughPermission)
 
 
 @dataclass(frozen=True)
 class AnUnknownIdIsNotFoundForASuperadmin(
-    Scenario[SeedingSession, AnEntryAndACaller, AppConfigAllowListAdapter, AppConfigAllowListNode]
+    TestScenario[
+        SeedingSession, AnEntryAndACaller, AppConfigAllowListAdapter, AppConfigAllowListNode
+    ]
 ):
     @override
     def summary(self) -> str:
@@ -142,22 +158,26 @@ class AnUnknownIdIsNotFoundForASuperadmin(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, AnEntryAndACaller]:
+    def given(self) -> TestGiven[SeedingSession, AnEntryAndACaller]:
         return AnEntryAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
-    def when(self) -> When[AnEntryAndACaller, AppConfigAllowListAdapter, AppConfigAllowListNode]:
+    def when(
+        self,
+    ) -> TestWhen[AnEntryAndACaller, AppConfigAllowListAdapter, AppConfigAllowListNode]:
         return ReadingById(other=uuid4())
 
     @override
-    def then(self) -> Then[AnEntryAndACaller, AppConfigAllowListNode]:
+    def then(self) -> TestThen[AnEntryAndACaller, AppConfigAllowListNode]:
         return TheCallIsRefused(EntityNotFoundError)
 
 
 @dataclass(frozen=True)
 class EnforcementOffLetsAnyoneRead(
-    Scenario[SeedingSession, AnEntryAndACaller, AppConfigAllowListAdapter, AppConfigAllowListNode],
-    Configured,
+    TestScenario[
+        SeedingSession, AnEntryAndACaller, AppConfigAllowListAdapter, AppConfigAllowListNode
+    ],
+    TestConfigured,
 ):
     started: datetime
 
@@ -174,15 +194,17 @@ class EnforcementOffLetsAnyoneRead(
         return {ENFORCEMENT: False}
 
     @override
-    def given(self) -> Given[SeedingSession, AnEntryAndACaller]:
+    def given(self) -> TestGiven[SeedingSession, AnEntryAndACaller]:
         return AnEntryAndSomeone(opened=AppConfigScopeType.USER)
 
     @override
-    def when(self) -> When[AnEntryAndACaller, AppConfigAllowListAdapter, AppConfigAllowListNode]:
+    def when(
+        self,
+    ) -> TestWhen[AnEntryAndACaller, AppConfigAllowListAdapter, AppConfigAllowListNode]:
         return ReadingById()
 
     @override
-    def then(self) -> Then[AnEntryAndACaller, AppConfigAllowListNode]:
+    def then(self) -> TestThen[AnEntryAndACaller, AppConfigAllowListNode]:
         return TheEntryNode(started=self.started)
 
 

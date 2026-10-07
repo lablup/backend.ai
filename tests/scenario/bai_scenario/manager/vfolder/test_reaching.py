@@ -18,12 +18,12 @@ from ai.backend.manager.errors.permission import NotEnoughPermission
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.testutils.scenario_steps import (
     Answered,
-    Given,
     Same,
-    Scenario,
-    Then,
-    Verdict,
-    When,
+    TestGiven,
+    TestScenario,
+    TestThen,
+    TestVerdict,
+    TestWhen,
 )
 from bai_scenario.components.answers import TheCallIsRefused
 from bai_scenario.components.vfolder import (
@@ -38,11 +38,11 @@ from bai_scenario.runner.planting import SeedingSession
 from bai_scenario.runner.steps import run_scenario
 
 type Answer = VFolderNode | SearchVFoldersPayload
-type ReachStep = Scenario[SeedingSession, AFolderAndItsReader, VFolderAdapter, Answer]
+type ReachStep = TestScenario[SeedingSession, AFolderAndItsReader, VFolderAdapter, Answer]
 
 
 @dataclass(frozen=True)
-class ReadingTheFolder(When[AFolderAndItsReader, VFolderAdapter, Answer]):
+class ReadingTheFolder(TestWhen[AFolderAndItsReader, VFolderAdapter, Answer]):
     """폴더 하나를 읽는다."""
 
     @override
@@ -60,7 +60,7 @@ class ReadingTheFolder(When[AFolderAndItsReader, VFolderAdapter, Answer]):
 
 
 @dataclass(frozen=True)
-class ListingTheProjectFolders(When[AFolderAndItsReader, VFolderAdapter, Answer]):
+class ListingTheProjectFolders(TestWhen[AFolderAndItsReader, VFolderAdapter, Answer]):
     """폴더가 놓인 프로젝트의 폴더를 훑는다."""
 
     @override
@@ -81,7 +81,7 @@ class ListingTheProjectFolders(When[AFolderAndItsReader, VFolderAdapter, Answer]
 
 
 @dataclass(frozen=True)
-class TheFolderIsReached(Then[AFolderAndItsReader, Answer]):
+class TheFolderIsReached(TestThen[AFolderAndItsReader, Answer]):
     """심은 폴더가 통째로 온다. 훑었다면 그 폴더 하나만 온다."""
 
     started: datetime
@@ -91,12 +91,12 @@ class TheFolderIsReached(Then[AFolderAndItsReader, Answer]):
         return "심은 폴더 전체가 온다"
 
     @override
-    def look(self, laid: AFolderAndItsReader, answered: Answered[Answer]) -> list[Verdict]:
+    def look(self, laid: AFolderAndItsReader, answered: Answered[Answer]) -> list[TestVerdict]:
         answer = answered.response
         if isinstance(answer, VFolderNode):
             return VFolderNodeLook(self.started).verdicts(answer, laid.folder)
         if isinstance(answer, SearchVFoldersPayload):
-            page: list[Verdict] = [
+            page: list[TestVerdict] = [
                 Same("total_count", answer.total_count, 1),
                 Same("has_next_page", answer.has_next_page, False),
                 Same("has_previous_page", answer.has_previous_page, False),
@@ -115,7 +115,7 @@ class TheFolderIsReached(Then[AFolderAndItsReader, Answer]):
 
 @dataclass(frozen=True)
 class AUserReadsTheirOwnFolder(
-    Scenario[SeedingSession, AFolderAndItsReader, VFolderAdapter, Answer]
+    TestScenario[SeedingSession, AFolderAndItsReader, VFolderAdapter, Answer]
 ):
     started: datetime
 
@@ -131,21 +131,21 @@ class AUserReadsTheirOwnFolder(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, AFolderAndItsReader]:
+    def given(self) -> TestGiven[SeedingSession, AFolderAndItsReader]:
         return SomeoneWithAFolderOfTheirOwn(granted=True)
 
     @override
-    def when(self) -> When[AFolderAndItsReader, VFolderAdapter, Answer]:
+    def when(self) -> TestWhen[AFolderAndItsReader, VFolderAdapter, Answer]:
         return ReadingTheFolder()
 
     @override
-    def then(self) -> Then[AFolderAndItsReader, Answer]:
+    def then(self) -> TestThen[AFolderAndItsReader, Answer]:
         return TheFolderIsReached(started=self.started)
 
 
 @dataclass(frozen=True)
 class AUserGrantedNothingMayNotReadTheirOwnFolder(
-    Scenario[SeedingSession, AFolderAndItsReader, VFolderAdapter, Answer]
+    TestScenario[SeedingSession, AFolderAndItsReader, VFolderAdapter, Answer]
 ):
     @override
     def summary(self) -> str:
@@ -156,21 +156,21 @@ class AUserGrantedNothingMayNotReadTheirOwnFolder(
         return "아무 권한도 받지 않은 사용자가 자기 폴더를 읽으려 하면 권한 부족으로 거부된다"
 
     @override
-    def given(self) -> Given[SeedingSession, AFolderAndItsReader]:
+    def given(self) -> TestGiven[SeedingSession, AFolderAndItsReader]:
         return SomeoneWithAFolderOfTheirOwn(granted=False)
 
     @override
-    def when(self) -> When[AFolderAndItsReader, VFolderAdapter, Answer]:
+    def when(self) -> TestWhen[AFolderAndItsReader, VFolderAdapter, Answer]:
         return ReadingTheFolder()
 
     @override
-    def then(self) -> Then[AFolderAndItsReader, Answer]:
+    def then(self) -> TestThen[AFolderAndItsReader, Answer]:
         return TheCallIsRefused(NotEnoughPermission)
 
 
 @dataclass(frozen=True)
 class AProjectRoleListsTheProjectFolder(
-    Scenario[SeedingSession, AFolderAndItsReader, VFolderAdapter, Answer]
+    TestScenario[SeedingSession, AFolderAndItsReader, VFolderAdapter, Answer]
 ):
     started: datetime
 
@@ -186,21 +186,21 @@ class AProjectRoleListsTheProjectFolder(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, AFolderAndItsReader]:
+    def given(self) -> TestGiven[SeedingSession, AFolderAndItsReader]:
         return AProjectFolderAndSomeone(granted=True)
 
     @override
-    def when(self) -> When[AFolderAndItsReader, VFolderAdapter, Answer]:
+    def when(self) -> TestWhen[AFolderAndItsReader, VFolderAdapter, Answer]:
         return ListingTheProjectFolders()
 
     @override
-    def then(self) -> Then[AFolderAndItsReader, Answer]:
+    def then(self) -> TestThen[AFolderAndItsReader, Answer]:
         return TheFolderIsReached(started=self.started)
 
 
 @dataclass(frozen=True)
 class AUserGrantedNothingMayNotListAProjectsFolders(
-    Scenario[SeedingSession, AFolderAndItsReader, VFolderAdapter, Answer]
+    TestScenario[SeedingSession, AFolderAndItsReader, VFolderAdapter, Answer]
 ):
     @override
     def summary(self) -> str:
@@ -213,21 +213,21 @@ class AUserGrantedNothingMayNotListAProjectsFolders(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, AFolderAndItsReader]:
+    def given(self) -> TestGiven[SeedingSession, AFolderAndItsReader]:
         return AProjectFolderAndSomeone(granted=False)
 
     @override
-    def when(self) -> When[AFolderAndItsReader, VFolderAdapter, Answer]:
+    def when(self) -> TestWhen[AFolderAndItsReader, VFolderAdapter, Answer]:
         return ListingTheProjectFolders()
 
     @override
-    def then(self) -> Then[AFolderAndItsReader, Answer]:
+    def then(self) -> TestThen[AFolderAndItsReader, Answer]:
         return TheCallIsRefused(NotEnoughPermission)
 
 
 @dataclass(frozen=True)
 class AnAcceptedShareReachesSomeoneElsesFolder(
-    Scenario[SeedingSession, AFolderAndItsReader, VFolderAdapter, Answer]
+    TestScenario[SeedingSession, AFolderAndItsReader, VFolderAdapter, Answer]
 ):
     started: datetime
 
@@ -240,21 +240,21 @@ class AnAcceptedShareReachesSomeoneElsesFolder(
         return "남의 폴더를 읽기로 공유받아 받아들인 사용자가 그 폴더를 읽으면, 그 폴더가 온다"
 
     @override
-    def given(self) -> Given[SeedingSession, AFolderAndItsReader]:
+    def given(self) -> TestGiven[SeedingSession, AFolderAndItsReader]:
         return AFolderOfferedToSomeone(accepted=True)
 
     @override
-    def when(self) -> When[AFolderAndItsReader, VFolderAdapter, Answer]:
+    def when(self) -> TestWhen[AFolderAndItsReader, VFolderAdapter, Answer]:
         return ReadingTheFolder()
 
     @override
-    def then(self) -> Then[AFolderAndItsReader, Answer]:
+    def then(self) -> TestThen[AFolderAndItsReader, Answer]:
         return TheFolderIsReached(started=self.started)
 
 
 @dataclass(frozen=True)
 class AnUnansweredOfferDoesNotReachTheFolder(
-    Scenario[SeedingSession, AFolderAndItsReader, VFolderAdapter, Answer]
+    TestScenario[SeedingSession, AFolderAndItsReader, VFolderAdapter, Answer]
 ):
     @override
     def summary(self) -> str:
@@ -268,15 +268,15 @@ class AnUnansweredOfferDoesNotReachTheFolder(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, AFolderAndItsReader]:
+    def given(self) -> TestGiven[SeedingSession, AFolderAndItsReader]:
         return AFolderOfferedToSomeone(accepted=False)
 
     @override
-    def when(self) -> When[AFolderAndItsReader, VFolderAdapter, Answer]:
+    def when(self) -> TestWhen[AFolderAndItsReader, VFolderAdapter, Answer]:
         return ReadingTheFolder()
 
     @override
-    def then(self) -> Then[AFolderAndItsReader, Answer]:
+    def then(self) -> TestThen[AFolderAndItsReader, Answer]:
         return TheCallIsRefused(NotEnoughPermission)
 
 

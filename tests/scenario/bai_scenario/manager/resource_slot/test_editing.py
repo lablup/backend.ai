@@ -18,7 +18,13 @@ from ai.backend.manager.api.adapters.resource_slot.adapter import ResourceSlotAd
 from ai.backend.manager.errors.auth import InsufficientPrivilege
 from ai.backend.manager.errors.base.entity import EntityNotFoundError
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.testutils.scenario_steps import Configured, Given, Scenario, Then, When
+from ai.backend.testutils.scenario_steps import (
+    TestConfigured,
+    TestGiven,
+    TestScenario,
+    TestThen,
+    TestWhen,
+)
 from bai_scenario.components.answers import TheCallIsRefused
 from bai_scenario.components.resource_slot import (
     ASlotTypeAndACaller,
@@ -33,13 +39,13 @@ from bai_scenario.runner.steps import run_scenario
 RENAMED = "GPU shares"
 UNKNOWN = "no-such-slot"
 
-type EditingStep = Scenario[
+type EditingStep = TestScenario[
     SeedingSession, ASlotTypeAndACaller, ResourceSlotAdapter, ResourceSlotTypeNode
 ]
 
 
 @dataclass(frozen=True)
-class Editing(When[ASlotTypeAndACaller, ResourceSlotAdapter, ResourceSlotTypeNode]):
+class Editing(TestWhen[ASlotTypeAndACaller, ResourceSlotAdapter, ResourceSlotTypeNode]):
     """미리 만들어 둔 슬롯 종류를 이름으로 지정해 수정한다. 응답에 담긴 노드를 꺼내서 준다."""
 
     display_name: str | None = None
@@ -77,7 +83,7 @@ class Editing(When[ASlotTypeAndACaller, ResourceSlotAdapter, ResourceSlotTypeNod
 
 @dataclass(frozen=True)
 class TheDisplayNameChangesAndTheRestStays(
-    Scenario[SeedingSession, ASlotTypeAndACaller, ResourceSlotAdapter, ResourceSlotTypeNode]
+    TestScenario[SeedingSession, ASlotTypeAndACaller, ResourceSlotAdapter, ResourceSlotTypeNode]
 ):
     @override
     def summary(self) -> str:
@@ -88,21 +94,21 @@ class TheDisplayNameChangesAndTheRestStays(
         return "슈퍼관리자가 이름으로 지정해 표시 이름만 수정하면, 표시 이름은 새 값이 되고 나머지는 그대로 유지된다"
 
     @override
-    def given(self) -> Given[SeedingSession, ASlotTypeAndACaller]:
+    def given(self) -> TestGiven[SeedingSession, ASlotTypeAndACaller]:
         return ASlotTypeAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
-    def when(self) -> When[ASlotTypeAndACaller, ResourceSlotAdapter, ResourceSlotTypeNode]:
+    def when(self) -> TestWhen[ASlotTypeAndACaller, ResourceSlotAdapter, ResourceSlotTypeNode]:
         return Editing(display_name=RENAMED)
 
     @override
-    def then(self) -> Then[ASlotTypeAndACaller, ResourceSlotTypeNode]:
+    def then(self) -> TestThen[ASlotTypeAndACaller, ResourceSlotTypeNode]:
         return TheSlotTypeNode(display_name=RENAMED)
 
 
 @dataclass(frozen=True)
 class DisablingIt(
-    Scenario[SeedingSession, ASlotTypeAndACaller, ResourceSlotAdapter, ResourceSlotTypeNode]
+    TestScenario[SeedingSession, ASlotTypeAndACaller, ResourceSlotAdapter, ResourceSlotTypeNode]
 ):
     @override
     def summary(self) -> str:
@@ -113,21 +119,21 @@ class DisablingIt(
         return "사용 중인 슬롯 종류의 사용 여부를 끄면, 사용하지 않는 상태가 담긴 노드가 반환된다"
 
     @override
-    def given(self) -> Given[SeedingSession, ASlotTypeAndACaller]:
+    def given(self) -> TestGiven[SeedingSession, ASlotTypeAndACaller]:
         return ASlotTypeAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
-    def when(self) -> When[ASlotTypeAndACaller, ResourceSlotAdapter, ResourceSlotTypeNode]:
+    def when(self) -> TestWhen[ASlotTypeAndACaller, ResourceSlotAdapter, ResourceSlotTypeNode]:
         return Editing(enabled=False)
 
     @override
-    def then(self) -> Then[ASlotTypeAndACaller, ResourceSlotTypeNode]:
+    def then(self) -> TestThen[ASlotTypeAndACaller, ResourceSlotTypeNode]:
         return TheSlotTypeNode(enabled=False)
 
 
 @dataclass(frozen=True)
 class AnEmptyEditChangesNothing(
-    Scenario[SeedingSession, ASlotTypeAndACaller, ResourceSlotAdapter, ResourceSlotTypeNode]
+    TestScenario[SeedingSession, ASlotTypeAndACaller, ResourceSlotAdapter, ResourceSlotTypeNode]
 ):
     @override
     def summary(self) -> str:
@@ -138,21 +144,21 @@ class AnEmptyEditChangesNothing(
         return "슬롯 이름만 지정하고 나머지를 모두 생략해 수정하면 아무것도 바뀌지 않은 노드가 반환된다"
 
     @override
-    def given(self) -> Given[SeedingSession, ASlotTypeAndACaller]:
+    def given(self) -> TestGiven[SeedingSession, ASlotTypeAndACaller]:
         return ASlotTypeAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
-    def when(self) -> When[ASlotTypeAndACaller, ResourceSlotAdapter, ResourceSlotTypeNode]:
+    def when(self) -> TestWhen[ASlotTypeAndACaller, ResourceSlotAdapter, ResourceSlotTypeNode]:
         return Editing()
 
     @override
-    def then(self) -> Then[ASlotTypeAndACaller, ResourceSlotTypeNode]:
+    def then(self) -> TestThen[ASlotTypeAndACaller, ResourceSlotTypeNode]:
         return TheSlotTypeNode()
 
 
 @dataclass(frozen=True)
 class TheSuperadminEditingAnUnknownNameIsNotFound(
-    Scenario[SeedingSession, ASlotTypeAndACaller, ResourceSlotAdapter, ResourceSlotTypeNode]
+    TestScenario[SeedingSession, ASlotTypeAndACaller, ResourceSlotAdapter, ResourceSlotTypeNode]
 ):
     @override
     def summary(self) -> str:
@@ -163,21 +169,21 @@ class TheSuperadminEditingAnUnknownNameIsNotFound(
         return "슈퍼관리자가 존재하지 않는 이름을 수정하면 대상을 찾을 수 없다는 이유로 거부된다"
 
     @override
-    def given(self) -> Given[SeedingSession, ASlotTypeAndACaller]:
+    def given(self) -> TestGiven[SeedingSession, ASlotTypeAndACaller]:
         return ASlotTypeAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
-    def when(self) -> When[ASlotTypeAndACaller, ResourceSlotAdapter, ResourceSlotTypeNode]:
+    def when(self) -> TestWhen[ASlotTypeAndACaller, ResourceSlotAdapter, ResourceSlotTypeNode]:
         return Editing(display_name=RENAMED, unknown=True)
 
     @override
-    def then(self) -> Then[ASlotTypeAndACaller, ResourceSlotTypeNode]:
+    def then(self) -> TestThen[ASlotTypeAndACaller, ResourceSlotTypeNode]:
         return TheCallIsRefused(EntityNotFoundError)
 
 
 @dataclass(frozen=True)
 class AUserWhoIsNotTheSuperadminMayNotEdit(
-    Scenario[SeedingSession, ASlotTypeAndACaller, ResourceSlotAdapter, ResourceSlotTypeNode]
+    TestScenario[SeedingSession, ASlotTypeAndACaller, ResourceSlotAdapter, ResourceSlotTypeNode]
 ):
     @override
     def summary(self) -> str:
@@ -188,21 +194,21 @@ class AUserWhoIsNotTheSuperadminMayNotEdit(
         return "슈퍼관리자가 아닌 사용자가 슬롯 종류를 수정하면 역할 부족으로 거부된다"
 
     @override
-    def given(self) -> Given[SeedingSession, ASlotTypeAndACaller]:
+    def given(self) -> TestGiven[SeedingSession, ASlotTypeAndACaller]:
         return ASlotTypeAndSomeone()
 
     @override
-    def when(self) -> When[ASlotTypeAndACaller, ResourceSlotAdapter, ResourceSlotTypeNode]:
+    def when(self) -> TestWhen[ASlotTypeAndACaller, ResourceSlotAdapter, ResourceSlotTypeNode]:
         return Editing(display_name=RENAMED)
 
     @override
-    def then(self) -> Then[ASlotTypeAndACaller, ResourceSlotTypeNode]:
+    def then(self) -> TestThen[ASlotTypeAndACaller, ResourceSlotTypeNode]:
         return TheCallIsRefused(InsufficientPrivilege)
 
 
 @dataclass(frozen=True)
 class AUserWithoutTheRoleEditingAnUnknownNameIsRefusedByRole(
-    Scenario[SeedingSession, ASlotTypeAndACaller, ResourceSlotAdapter, ResourceSlotTypeNode]
+    TestScenario[SeedingSession, ASlotTypeAndACaller, ResourceSlotAdapter, ResourceSlotTypeNode]
 ):
     @override
     def summary(self) -> str:
@@ -216,22 +222,22 @@ class AUserWithoutTheRoleEditingAnUnknownNameIsRefusedByRole(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, ASlotTypeAndACaller]:
+    def given(self) -> TestGiven[SeedingSession, ASlotTypeAndACaller]:
         return ASlotTypeAndSomeone()
 
     @override
-    def when(self) -> When[ASlotTypeAndACaller, ResourceSlotAdapter, ResourceSlotTypeNode]:
+    def when(self) -> TestWhen[ASlotTypeAndACaller, ResourceSlotAdapter, ResourceSlotTypeNode]:
         return Editing(display_name=RENAMED, unknown=True)
 
     @override
-    def then(self) -> Then[ASlotTypeAndACaller, ResourceSlotTypeNode]:
+    def then(self) -> TestThen[ASlotTypeAndACaller, ResourceSlotTypeNode]:
         return TheCallIsRefused(InsufficientPrivilege)
 
 
 @dataclass(frozen=True)
 class EnforcementOffStillNeedsTheSuperadmin(
-    Scenario[SeedingSession, ASlotTypeAndACaller, ResourceSlotAdapter, ResourceSlotTypeNode],
-    Configured,
+    TestScenario[SeedingSession, ASlotTypeAndACaller, ResourceSlotAdapter, ResourceSlotTypeNode],
+    TestConfigured,
 ):
     @override
     def summary(self) -> str:
@@ -246,15 +252,15 @@ class EnforcementOffStillNeedsTheSuperadmin(
         return {ENFORCEMENT: False}
 
     @override
-    def given(self) -> Given[SeedingSession, ASlotTypeAndACaller]:
+    def given(self) -> TestGiven[SeedingSession, ASlotTypeAndACaller]:
         return ASlotTypeAndSomeone()
 
     @override
-    def when(self) -> When[ASlotTypeAndACaller, ResourceSlotAdapter, ResourceSlotTypeNode]:
+    def when(self) -> TestWhen[ASlotTypeAndACaller, ResourceSlotAdapter, ResourceSlotTypeNode]:
         return Editing(display_name=RENAMED)
 
     @override
-    def then(self) -> Then[ASlotTypeAndACaller, ResourceSlotTypeNode]:
+    def then(self) -> TestThen[ASlotTypeAndACaller, ResourceSlotTypeNode]:
         return TheCallIsRefused(InsufficientPrivilege)
 
 

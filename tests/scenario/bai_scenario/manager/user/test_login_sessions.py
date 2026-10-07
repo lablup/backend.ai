@@ -35,15 +35,15 @@ from ai.backend.manager.errors.permission import NotEnoughPermission
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.testutils.scenario_steps import (
     Answered,
-    Given,
     Held,
     Refused,
     Same,
     SameAs,
-    Scenario,
-    Then,
-    Verdict,
-    When,
+    TestGiven,
+    TestScenario,
+    TestThen,
+    TestVerdict,
+    TestWhen,
 )
 from bai_scenario.components.answers import TheCallIsRefused
 from bai_scenario.components.domain import WAS_HERE, SomeoneOf, WrittenByThisRun
@@ -103,7 +103,7 @@ class SessionLayer:
 
 
 @dataclass(frozen=True)
-class SomeoneAndAnother(Given[Any, TwoPeopleAndTheirSessions]):
+class SomeoneAndAnother(TestGiven[Any, TwoPeopleAndTheirSessions]):
     """한 도메인의 사용자 둘.
 
     부르는 사람은 ``permissions``만큼 자기 사용자 권한을 받는다. 세션은 ``sessions``가
@@ -139,7 +139,7 @@ class SomeoneAndAnother(Given[Any, TwoPeopleAndTheirSessions]):
 
 
 @dataclass(frozen=True)
-class TheSuperadminAndOthers(Given[Any, TwoPeopleAndTheirSessions]):
+class TheSuperadminAndOthers(TestGiven[Any, TwoPeopleAndTheirSessions]):
     """슈퍼관리자 한 명과, 세션을 가진 사용자 한두 명."""
 
     both_have_sessions: bool = True
@@ -170,7 +170,7 @@ class TheSuperadminAndOthers(Given[Any, TwoPeopleAndTheirSessions]):
 
 
 @dataclass(frozen=True)
-class SomeoneGrantedOnDomain(Given[Any, TwoPeopleAndTheirSessions]):
+class SomeoneGrantedOnDomain(TestGiven[Any, TwoPeopleAndTheirSessions]):
     """도메인 스코프에서 사용자 권한을 받은 사람과, 세션을 가진 다른 사용자."""
 
     permission: Permission
@@ -198,7 +198,7 @@ class SomeoneGrantedOnDomain(Given[Any, TwoPeopleAndTheirSessions]):
 
 
 @dataclass(frozen=True)
-class SearchingEverySession(When[TwoPeopleAndTheirSessions, LoginSessionAdapter, Answer]):
+class SearchingEverySession(TestWhen[TwoPeopleAndTheirSessions, LoginSessionAdapter, Answer]):
     """페이지 인자 없이 세션 전체를 훑는다."""
 
     @override
@@ -216,7 +216,7 @@ class SearchingEverySession(When[TwoPeopleAndTheirSessions, LoginSessionAdapter,
 
 
 @dataclass(frozen=True)
-class SearchingMySessions(When[TwoPeopleAndTheirSessions, LoginSessionAdapter, Answer]):
+class SearchingMySessions(TestWhen[TwoPeopleAndTheirSessions, LoginSessionAdapter, Answer]):
     """자기 세션을 훑는다."""
 
     @override
@@ -234,7 +234,7 @@ class SearchingMySessions(When[TwoPeopleAndTheirSessions, LoginSessionAdapter, A
 
 
 @dataclass(frozen=True)
-class RevokingASession(When[TwoPeopleAndTheirSessions, LoginSessionAdapter, Answer]):
+class RevokingASession(TestWhen[TwoPeopleAndTheirSessions, LoginSessionAdapter, Answer]):
     """자기 경로로 세션을 회수하고, 자기 세션을 다시 훑는다. `others`면 남의 세션을 준다."""
 
     others: bool = False
@@ -259,7 +259,7 @@ class RevokingASession(When[TwoPeopleAndTheirSessions, LoginSessionAdapter, Answ
 
 
 @dataclass(frozen=True)
-class RevokingAsAdmin(When[TwoPeopleAndTheirSessions, LoginSessionAdapter, Answer]):
+class RevokingAsAdmin(TestWhen[TwoPeopleAndTheirSessions, LoginSessionAdapter, Answer]):
     """관리자 경로로 세션을 회수하고, 세션 전체를 다시 훑는다. `missing`이면 없는 id를 준다."""
 
     missing: bool = False
@@ -289,7 +289,7 @@ class RevokingAsAdmin(When[TwoPeopleAndTheirSessions, LoginSessionAdapter, Answe
 
 
 @dataclass(frozen=True)
-class Unblocking(When[TwoPeopleAndTheirSessions, LoginSessionAdapter, Answer]):
+class Unblocking(TestWhen[TwoPeopleAndTheirSessions, LoginSessionAdapter, Answer]):
     """사용자 이름으로 차단을 푼다. `nobody`면 어떤 사용자도 아닌 이름을 준다."""
 
     nobody: bool = False
@@ -320,7 +320,7 @@ class SessionNodeLook:
 
     def verdicts(
         self, node: LoginSessionNode, expected: LoginSessionData, at: str
-    ) -> list[Verdict]:
+    ) -> list[TestVerdict]:
         return [
             Held(f"{at}id", node.id, SameAs(expected.id, "심은 세션")),
             Held(f"{at}user_id", node.user_id, SameAs(expected.user_id, "세션의 주인")),
@@ -333,7 +333,7 @@ class SessionNodeLook:
 
 
 @dataclass(frozen=True)
-class EverySessionInOrder(Then[TwoPeopleAndTheirSessions, Answer]):
+class EverySessionInOrder(TestThen[TwoPeopleAndTheirSessions, Answer]):
     """심은 세션 둘이 순서대로 온다."""
 
     started: datetime
@@ -343,13 +343,15 @@ class EverySessionInOrder(Then[TwoPeopleAndTheirSessions, Answer]):
         return "심은 세션이 모두 순서대로 온다"
 
     @override
-    def look(self, laid: TwoPeopleAndTheirSessions, answered: Answered[Answer]) -> list[Verdict]:
+    def look(
+        self, laid: TwoPeopleAndTheirSessions, answered: Answered[Answer]
+    ) -> list[TestVerdict]:
         page = answered.response
         if not isinstance(page, AdminSearchLoginSessionsPayload):
             return [Refused(InsufficientPrivilege, answered.raised)]
         first, second = laid.other_session, laid.caller_session
         assert first is not None and second is not None
-        seen: list[Verdict] = [
+        seen: list[TestVerdict] = [
             Same("total_count", page.total_count, 2),
             Same("has_next_page", page.has_next_page, False),
             Same("has_previous_page", page.has_previous_page, False),
@@ -363,7 +365,7 @@ class EverySessionInOrder(Then[TwoPeopleAndTheirSessions, Answer]):
 
 
 @dataclass(frozen=True)
-class OnlyMySession(Then[TwoPeopleAndTheirSessions, Answer]):
+class OnlyMySession(TestThen[TwoPeopleAndTheirSessions, Answer]):
     """부르는 사람의 세션 하나만 온다."""
 
     started: datetime
@@ -373,12 +375,14 @@ class OnlyMySession(Then[TwoPeopleAndTheirSessions, Answer]):
         return "자기 세션 하나만 온다"
 
     @override
-    def look(self, laid: TwoPeopleAndTheirSessions, answered: Answered[Answer]) -> list[Verdict]:
+    def look(
+        self, laid: TwoPeopleAndTheirSessions, answered: Answered[Answer]
+    ) -> list[TestVerdict]:
         page = answered.response
         if not isinstance(page, MySearchLoginSessionsPayload):
             return [Refused(NotEnoughPermission, answered.raised)]
         assert laid.caller_session is not None
-        seen: list[Verdict] = [
+        seen: list[TestVerdict] = [
             Same("total_count", page.total_count, 1),
             Same("has_next_page", page.has_next_page, False),
             Same("has_previous_page", page.has_previous_page, False),
@@ -394,7 +398,7 @@ class OnlyMySession(Then[TwoPeopleAndTheirSessions, Answer]):
 
 
 @dataclass(frozen=True)
-class RevokedAndGone(Then[TwoPeopleAndTheirSessions, Answer]):
+class RevokedAndGone(TestThen[TwoPeopleAndTheirSessions, Answer]):
     """회수가 성공하고, 뒤이어 훑으면 그 세션이 없다."""
 
     @override
@@ -402,7 +406,9 @@ class RevokedAndGone(Then[TwoPeopleAndTheirSessions, Answer]):
         return "회수가 성공하고 뒤이은 조회에 세션이 없다"
 
     @override
-    def look(self, laid: TwoPeopleAndTheirSessions, answered: Answered[Answer]) -> list[Verdict]:
+    def look(
+        self, laid: TwoPeopleAndTheirSessions, answered: Answered[Answer]
+    ) -> list[TestVerdict]:
         answer = answered.response
         if not isinstance(answer, RevokedThenSearched):
             return [Refused(NotEnoughPermission, answered.raised)]
@@ -416,7 +422,7 @@ class RevokedAndGone(Then[TwoPeopleAndTheirSessions, Answer]):
 
 
 @dataclass(frozen=True)
-class Unblocked(Then[TwoPeopleAndTheirSessions, Answer]):
+class Unblocked(TestThen[TwoPeopleAndTheirSessions, Answer]):
     """차단 해제가 성공한다."""
 
     @override
@@ -424,19 +430,23 @@ class Unblocked(Then[TwoPeopleAndTheirSessions, Answer]):
         return "차단 해제가 성공한다"
 
     @override
-    def look(self, laid: TwoPeopleAndTheirSessions, answered: Answered[Answer]) -> list[Verdict]:
+    def look(
+        self, laid: TwoPeopleAndTheirSessions, answered: Answered[Answer]
+    ) -> list[TestVerdict]:
         answer = answered.response
         if not isinstance(answer, UnblockUserPayload):
             return [Refused(InsufficientPrivilege, answered.raised)]
         return [Same("success", answer.success, True)]
 
 
-type SessionStep = Scenario[SeedingSession, TwoPeopleAndTheirSessions, LoginSessionAdapter, Answer]
+type SessionStep = TestScenario[
+    SeedingSession, TwoPeopleAndTheirSessions, LoginSessionAdapter, Answer
+]
 
 
 @dataclass(frozen=True)
 class TheSuperadminSearchesEverySession(
-    Scenario[SeedingSession, TwoPeopleAndTheirSessions, LoginSessionAdapter, Answer]
+    TestScenario[SeedingSession, TwoPeopleAndTheirSessions, LoginSessionAdapter, Answer]
 ):
     started: datetime
 
@@ -452,21 +462,21 @@ class TheSuperadminSearchesEverySession(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, TwoPeopleAndTheirSessions]:
+    def given(self) -> TestGiven[SeedingSession, TwoPeopleAndTheirSessions]:
         return TheSuperadminAndOthers()
 
     @override
-    def when(self) -> When[TwoPeopleAndTheirSessions, LoginSessionAdapter, Answer]:
+    def when(self) -> TestWhen[TwoPeopleAndTheirSessions, LoginSessionAdapter, Answer]:
         return SearchingEverySession()
 
     @override
-    def then(self) -> Then[TwoPeopleAndTheirSessions, Answer]:
+    def then(self) -> TestThen[TwoPeopleAndTheirSessions, Answer]:
         return EverySessionInOrder(started=self.started)
 
 
 @dataclass(frozen=True)
 class OnlyTheSuperadminSearchesEverySession(
-    Scenario[SeedingSession, TwoPeopleAndTheirSessions, LoginSessionAdapter, Answer]
+    TestScenario[SeedingSession, TwoPeopleAndTheirSessions, LoginSessionAdapter, Answer]
 ):
     @override
     def summary(self) -> str:
@@ -477,21 +487,21 @@ class OnlyTheSuperadminSearchesEverySession(
         return "권한 받은 사용자가 세션 전체 검색을 하려 하면, 전역 역할 문이 막는다"
 
     @override
-    def given(self) -> Given[SeedingSession, TwoPeopleAndTheirSessions]:
+    def given(self) -> TestGiven[SeedingSession, TwoPeopleAndTheirSessions]:
         return SomeoneGrantedOnDomain(Permission.READ)
 
     @override
-    def when(self) -> When[TwoPeopleAndTheirSessions, LoginSessionAdapter, Answer]:
+    def when(self) -> TestWhen[TwoPeopleAndTheirSessions, LoginSessionAdapter, Answer]:
         return SearchingEverySession()
 
     @override
-    def then(self) -> Then[TwoPeopleAndTheirSessions, Answer]:
+    def then(self) -> TestThen[TwoPeopleAndTheirSessions, Answer]:
         return TheCallIsRefused(InsufficientPrivilege)
 
 
 @dataclass(frozen=True)
 class AGrantedUserSearchesOnlyTheirOwnSessions(
-    Scenario[SeedingSession, TwoPeopleAndTheirSessions, LoginSessionAdapter, Answer]
+    TestScenario[SeedingSession, TwoPeopleAndTheirSessions, LoginSessionAdapter, Answer]
 ):
     started: datetime
 
@@ -504,21 +514,21 @@ class AGrantedUserSearchesOnlyTheirOwnSessions(
         return "자기 스코프에서 READ를 받은 사용자가 훑으면, 다른 사용자의 세션은 빠진다"
 
     @override
-    def given(self) -> Given[SeedingSession, TwoPeopleAndTheirSessions]:
+    def given(self) -> TestGiven[SeedingSession, TwoPeopleAndTheirSessions]:
         return SomeoneAndAnother(permissions=(Permission.READ,))
 
     @override
-    def when(self) -> When[TwoPeopleAndTheirSessions, LoginSessionAdapter, Answer]:
+    def when(self) -> TestWhen[TwoPeopleAndTheirSessions, LoginSessionAdapter, Answer]:
         return SearchingMySessions()
 
     @override
-    def then(self) -> Then[TwoPeopleAndTheirSessions, Answer]:
+    def then(self) -> TestThen[TwoPeopleAndTheirSessions, Answer]:
         return OnlyMySession(started=self.started)
 
 
 @dataclass(frozen=True)
 class AUserGrantedNothingMayNotSearchTheirSessions(
-    Scenario[SeedingSession, TwoPeopleAndTheirSessions, LoginSessionAdapter, Answer]
+    TestScenario[SeedingSession, TwoPeopleAndTheirSessions, LoginSessionAdapter, Answer]
 ):
     @override
     def summary(self) -> str:
@@ -529,21 +539,21 @@ class AUserGrantedNothingMayNotSearchTheirSessions(
         return "역할 없이 자기 세션을 훑으려 하면, 본인이어도 스코프 권한 문이 막는다"
 
     @override
-    def given(self) -> Given[SeedingSession, TwoPeopleAndTheirSessions]:
+    def given(self) -> TestGiven[SeedingSession, TwoPeopleAndTheirSessions]:
         return SomeoneAndAnother(other_has_session=False)
 
     @override
-    def when(self) -> When[TwoPeopleAndTheirSessions, LoginSessionAdapter, Answer]:
+    def when(self) -> TestWhen[TwoPeopleAndTheirSessions, LoginSessionAdapter, Answer]:
         return SearchingMySessions()
 
     @override
-    def then(self) -> Then[TwoPeopleAndTheirSessions, Answer]:
+    def then(self) -> TestThen[TwoPeopleAndTheirSessions, Answer]:
         return TheCallIsRefused(NotEnoughPermission)
 
 
 @dataclass(frozen=True)
 class AGrantedUserRevokesTheirOwnSession(
-    Scenario[SeedingSession, TwoPeopleAndTheirSessions, LoginSessionAdapter, Answer]
+    TestScenario[SeedingSession, TwoPeopleAndTheirSessions, LoginSessionAdapter, Answer]
 ):
     @override
     def summary(self) -> str:
@@ -557,23 +567,23 @@ class AGrantedUserRevokesTheirOwnSession(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, TwoPeopleAndTheirSessions]:
+    def given(self) -> TestGiven[SeedingSession, TwoPeopleAndTheirSessions]:
         return SomeoneAndAnother(
             permissions=(Permission.READ, Permission.UPDATE), other_has_session=False
         )
 
     @override
-    def when(self) -> When[TwoPeopleAndTheirSessions, LoginSessionAdapter, Answer]:
+    def when(self) -> TestWhen[TwoPeopleAndTheirSessions, LoginSessionAdapter, Answer]:
         return RevokingASession()
 
     @override
-    def then(self) -> Then[TwoPeopleAndTheirSessions, Answer]:
+    def then(self) -> TestThen[TwoPeopleAndTheirSessions, Answer]:
         return RevokedAndGone()
 
 
 @dataclass(frozen=True)
 class AUserGrantedNothingMayNotRevokeTheirSession(
-    Scenario[SeedingSession, TwoPeopleAndTheirSessions, LoginSessionAdapter, Answer]
+    TestScenario[SeedingSession, TwoPeopleAndTheirSessions, LoginSessionAdapter, Answer]
 ):
     @override
     def summary(self) -> str:
@@ -584,21 +594,21 @@ class AUserGrantedNothingMayNotRevokeTheirSession(
         return "역할 없이 회수하려 하면, 소유자 조회 단계가 막는다"
 
     @override
-    def given(self) -> Given[SeedingSession, TwoPeopleAndTheirSessions]:
+    def given(self) -> TestGiven[SeedingSession, TwoPeopleAndTheirSessions]:
         return SomeoneAndAnother(other_has_session=False)
 
     @override
-    def when(self) -> When[TwoPeopleAndTheirSessions, LoginSessionAdapter, Answer]:
+    def when(self) -> TestWhen[TwoPeopleAndTheirSessions, LoginSessionAdapter, Answer]:
         return RevokingASession()
 
     @override
-    def then(self) -> Then[TwoPeopleAndTheirSessions, Answer]:
+    def then(self) -> TestThen[TwoPeopleAndTheirSessions, Answer]:
         return TheCallIsRefused(GenericBadRequest)
 
 
 @dataclass(frozen=True)
 class AReaderMayNotRevokeTheirSession(
-    Scenario[SeedingSession, TwoPeopleAndTheirSessions, LoginSessionAdapter, Answer]
+    TestScenario[SeedingSession, TwoPeopleAndTheirSessions, LoginSessionAdapter, Answer]
 ):
     @override
     def summary(self) -> str:
@@ -609,21 +619,21 @@ class AReaderMayNotRevokeTheirSession(
         return "READ만 받고 회수하려 하면, 엔티티 권한 문이 막는다"
 
     @override
-    def given(self) -> Given[SeedingSession, TwoPeopleAndTheirSessions]:
+    def given(self) -> TestGiven[SeedingSession, TwoPeopleAndTheirSessions]:
         return SomeoneAndAnother(permissions=(Permission.READ,), other_has_session=False)
 
     @override
-    def when(self) -> When[TwoPeopleAndTheirSessions, LoginSessionAdapter, Answer]:
+    def when(self) -> TestWhen[TwoPeopleAndTheirSessions, LoginSessionAdapter, Answer]:
         return RevokingASession()
 
     @override
-    def then(self) -> Then[TwoPeopleAndTheirSessions, Answer]:
+    def then(self) -> TestThen[TwoPeopleAndTheirSessions, Answer]:
         return TheCallIsRefused(NotEnoughPermission)
 
 
 @dataclass(frozen=True)
 class OwnGrantsMayNotRevokeSomeoneElsesSession(
-    Scenario[SeedingSession, TwoPeopleAndTheirSessions, LoginSessionAdapter, Answer]
+    TestScenario[SeedingSession, TwoPeopleAndTheirSessions, LoginSessionAdapter, Answer]
 ):
     @override
     def summary(self) -> str:
@@ -637,23 +647,23 @@ class OwnGrantsMayNotRevokeSomeoneElsesSession(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, TwoPeopleAndTheirSessions]:
+    def given(self) -> TestGiven[SeedingSession, TwoPeopleAndTheirSessions]:
         return SomeoneAndAnother(
             permissions=(Permission.READ, Permission.UPDATE), caller_has_session=False
         )
 
     @override
-    def when(self) -> When[TwoPeopleAndTheirSessions, LoginSessionAdapter, Answer]:
+    def when(self) -> TestWhen[TwoPeopleAndTheirSessions, LoginSessionAdapter, Answer]:
         return RevokingASession(others=True)
 
     @override
-    def then(self) -> Then[TwoPeopleAndTheirSessions, Answer]:
+    def then(self) -> TestThen[TwoPeopleAndTheirSessions, Answer]:
         return TheCallIsRefused(GenericBadRequest)
 
 
 @dataclass(frozen=True)
 class TheSuperadminRevokesSomeoneElsesSession(
-    Scenario[SeedingSession, TwoPeopleAndTheirSessions, LoginSessionAdapter, Answer]
+    TestScenario[SeedingSession, TwoPeopleAndTheirSessions, LoginSessionAdapter, Answer]
 ):
     @override
     def summary(self) -> str:
@@ -667,21 +677,21 @@ class TheSuperadminRevokesSomeoneElsesSession(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, TwoPeopleAndTheirSessions]:
+    def given(self) -> TestGiven[SeedingSession, TwoPeopleAndTheirSessions]:
         return TheSuperadminAndOthers(both_have_sessions=False)
 
     @override
-    def when(self) -> When[TwoPeopleAndTheirSessions, LoginSessionAdapter, Answer]:
+    def when(self) -> TestWhen[TwoPeopleAndTheirSessions, LoginSessionAdapter, Answer]:
         return RevokingAsAdmin()
 
     @override
-    def then(self) -> Then[TwoPeopleAndTheirSessions, Answer]:
+    def then(self) -> TestThen[TwoPeopleAndTheirSessions, Answer]:
         return RevokedAndGone()
 
 
 @dataclass(frozen=True)
 class TheSuperadminMayNotRevokeAMissingSession(
-    Scenario[SeedingSession, TwoPeopleAndTheirSessions, LoginSessionAdapter, Answer]
+    TestScenario[SeedingSession, TwoPeopleAndTheirSessions, LoginSessionAdapter, Answer]
 ):
     @override
     def summary(self) -> str:
@@ -692,21 +702,21 @@ class TheSuperadminMayNotRevokeAMissingSession(
         return "슈퍼관리자가 없는 세션 id를 주면, 입력 검증이 막는다"
 
     @override
-    def given(self) -> Given[SeedingSession, TwoPeopleAndTheirSessions]:
+    def given(self) -> TestGiven[SeedingSession, TwoPeopleAndTheirSessions]:
         return TheSuperadminAndOthers(both_have_sessions=False)
 
     @override
-    def when(self) -> When[TwoPeopleAndTheirSessions, LoginSessionAdapter, Answer]:
+    def when(self) -> TestWhen[TwoPeopleAndTheirSessions, LoginSessionAdapter, Answer]:
         return RevokingAsAdmin(missing=True)
 
     @override
-    def then(self) -> Then[TwoPeopleAndTheirSessions, Answer]:
+    def then(self) -> TestThen[TwoPeopleAndTheirSessions, Answer]:
         return TheCallIsRefused(LoginSessionNotFoundError)
 
 
 @dataclass(frozen=True)
 class OnlyTheSuperadminRevokesAsAdmin(
-    Scenario[SeedingSession, TwoPeopleAndTheirSessions, LoginSessionAdapter, Answer]
+    TestScenario[SeedingSession, TwoPeopleAndTheirSessions, LoginSessionAdapter, Answer]
 ):
     @override
     def summary(self) -> str:
@@ -717,21 +727,21 @@ class OnlyTheSuperadminRevokesAsAdmin(
         return "권한 받은 사용자가 관리자 회수를 하려 하면, 전역 역할 문이 막는다"
 
     @override
-    def given(self) -> Given[SeedingSession, TwoPeopleAndTheirSessions]:
+    def given(self) -> TestGiven[SeedingSession, TwoPeopleAndTheirSessions]:
         return SomeoneGrantedOnDomain(Permission.UPDATE)
 
     @override
-    def when(self) -> When[TwoPeopleAndTheirSessions, LoginSessionAdapter, Answer]:
+    def when(self) -> TestWhen[TwoPeopleAndTheirSessions, LoginSessionAdapter, Answer]:
         return RevokingAsAdmin()
 
     @override
-    def then(self) -> Then[TwoPeopleAndTheirSessions, Answer]:
+    def then(self) -> TestThen[TwoPeopleAndTheirSessions, Answer]:
         return TheCallIsRefused(InsufficientPrivilege)
 
 
 @dataclass(frozen=True)
 class TheSuperadminUnblocksAUser(
-    Scenario[SeedingSession, TwoPeopleAndTheirSessions, LoginSessionAdapter, Answer]
+    TestScenario[SeedingSession, TwoPeopleAndTheirSessions, LoginSessionAdapter, Answer]
 ):
     @override
     def summary(self) -> str:
@@ -745,21 +755,21 @@ class TheSuperadminUnblocksAUser(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, TwoPeopleAndTheirSessions]:
+    def given(self) -> TestGiven[SeedingSession, TwoPeopleAndTheirSessions]:
         return TheSuperadminAndOthers(both_have_sessions=False)
 
     @override
-    def when(self) -> When[TwoPeopleAndTheirSessions, LoginSessionAdapter, Answer]:
+    def when(self) -> TestWhen[TwoPeopleAndTheirSessions, LoginSessionAdapter, Answer]:
         return Unblocking()
 
     @override
-    def then(self) -> Then[TwoPeopleAndTheirSessions, Answer]:
+    def then(self) -> TestThen[TwoPeopleAndTheirSessions, Answer]:
         return Unblocked()
 
 
 @dataclass(frozen=True)
 class UnblockingANameNobodyHoldsSucceeds(
-    Scenario[SeedingSession, TwoPeopleAndTheirSessions, LoginSessionAdapter, Answer]
+    TestScenario[SeedingSession, TwoPeopleAndTheirSessions, LoginSessionAdapter, Answer]
 ):
     @override
     def summary(self) -> str:
@@ -770,21 +780,21 @@ class UnblockingANameNobodyHoldsSucceeds(
         return "슈퍼관리자가 어떤 사용자도 아닌 이름을 주면, 존재를 확인하지 않고 성공이 온다"
 
     @override
-    def given(self) -> Given[SeedingSession, TwoPeopleAndTheirSessions]:
+    def given(self) -> TestGiven[SeedingSession, TwoPeopleAndTheirSessions]:
         return TheSuperadminAndOthers(both_have_sessions=False)
 
     @override
-    def when(self) -> When[TwoPeopleAndTheirSessions, LoginSessionAdapter, Answer]:
+    def when(self) -> TestWhen[TwoPeopleAndTheirSessions, LoginSessionAdapter, Answer]:
         return Unblocking(nobody=True)
 
     @override
-    def then(self) -> Then[TwoPeopleAndTheirSessions, Answer]:
+    def then(self) -> TestThen[TwoPeopleAndTheirSessions, Answer]:
         return Unblocked()
 
 
 @dataclass(frozen=True)
 class OnlyTheSuperadminUnblocks(
-    Scenario[SeedingSession, TwoPeopleAndTheirSessions, LoginSessionAdapter, Answer]
+    TestScenario[SeedingSession, TwoPeopleAndTheirSessions, LoginSessionAdapter, Answer]
 ):
     @override
     def summary(self) -> str:
@@ -795,15 +805,15 @@ class OnlyTheSuperadminUnblocks(
         return "권한 받은 사용자가 차단을 풀려 하면, 전역 역할 문이 막는다"
 
     @override
-    def given(self) -> Given[SeedingSession, TwoPeopleAndTheirSessions]:
+    def given(self) -> TestGiven[SeedingSession, TwoPeopleAndTheirSessions]:
         return SomeoneGrantedOnDomain(Permission.UPDATE)
 
     @override
-    def when(self) -> When[TwoPeopleAndTheirSessions, LoginSessionAdapter, Answer]:
+    def when(self) -> TestWhen[TwoPeopleAndTheirSessions, LoginSessionAdapter, Answer]:
         return Unblocking()
 
     @override
-    def then(self) -> Then[TwoPeopleAndTheirSessions, Answer]:
+    def then(self) -> TestThen[TwoPeopleAndTheirSessions, Answer]:
         return TheCallIsRefused(InsufficientPrivilege)
 
 

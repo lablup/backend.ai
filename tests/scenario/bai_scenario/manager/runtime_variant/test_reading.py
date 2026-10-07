@@ -19,15 +19,15 @@ from ai.backend.manager.errors.permission import NotEnoughPermission
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.testutils.scenario_steps import (
     Answered,
-    Given,
     Held,
     Refused,
     Same,
     SameAs,
-    Scenario,
-    Then,
-    Verdict,
-    When,
+    TestGiven,
+    TestScenario,
+    TestThen,
+    TestVerdict,
+    TestWhen,
 )
 from bai_scenario.components.answers import TheCallIsRefused
 from bai_scenario.components.runtime_variant import (
@@ -43,11 +43,11 @@ from bai_scenario.runner.planting import SeedingSession
 from bai_scenario.runner.steps import run_scenario
 
 type Loaded = list[RuntimeVariantNode | Exception | None]
-type ReadingStep = Scenario[SeedingSession, Any, RuntimeVariantAdapter, Any]
+type ReadingStep = TestScenario[SeedingSession, Any, RuntimeVariantAdapter, Any]
 
 
 @dataclass(frozen=True)
-class ReadingById(When[AVariantAndACaller, RuntimeVariantAdapter, RuntimeVariantNode]):
+class ReadingById(TestWhen[AVariantAndACaller, RuntimeVariantAdapter, RuntimeVariantNode]):
     """id로 조회한다. ``unknown``이면 어느 행에도 없는 id를 쓴다."""
 
     unknown: bool = False
@@ -70,7 +70,7 @@ class ReadingById(When[AVariantAndACaller, RuntimeVariantAdapter, RuntimeVariant
 
 
 @dataclass(frozen=True)
-class ResolvingByName(When[AVariantAndACaller, RuntimeVariantAdapter, RuntimeVariantID]):
+class ResolvingByName(TestWhen[AVariantAndACaller, RuntimeVariantAdapter, RuntimeVariantID]):
     """이름을 id로 변환한다. 이름을 지정하지 않으면 미리 만들어 둔 변형의 이름을 쓴다."""
 
     named: str | None = None
@@ -92,7 +92,7 @@ class ResolvingByName(When[AVariantAndACaller, RuntimeVariantAdapter, RuntimeVar
 
 
 @dataclass(frozen=True)
-class ReadingManyByIds(When[ManyVariantsAndACaller, RuntimeVariantAdapter, Loaded]):
+class ReadingManyByIds(TestWhen[ManyVariantsAndACaller, RuntimeVariantAdapter, Loaded]):
     """미리 만들어 둔 변형들의 id 뒤에 없는 id 하나를 붙여 한 번에 조회한다."""
 
     @override
@@ -114,7 +114,7 @@ class ReadingManyByIds(When[ManyVariantsAndACaller, RuntimeVariantAdapter, Loade
 
 
 @dataclass(frozen=True)
-class ReadingNoIds(When[AVariantAndACaller, RuntimeVariantAdapter, Loaded]):
+class ReadingNoIds(TestWhen[AVariantAndACaller, RuntimeVariantAdapter, Loaded]):
     """빈 id 목록으로 조회한다."""
 
     @override
@@ -132,7 +132,7 @@ class ReadingNoIds(When[AVariantAndACaller, RuntimeVariantAdapter, Loaded]):
 
 
 @dataclass(frozen=True)
-class TheLaidVariantsId(Then[AVariantAndACaller, RuntimeVariantID]):
+class TheLaidVariantsId(TestThen[AVariantAndACaller, RuntimeVariantID]):
     """미리 만들어 둔 변형의 id가 반환된다."""
 
     @override
@@ -140,7 +140,9 @@ class TheLaidVariantsId(Then[AVariantAndACaller, RuntimeVariantID]):
         return "미리 만들어 둔 변형의 id가 반환된다"
 
     @override
-    def look(self, laid: AVariantAndACaller, answered: Answered[RuntimeVariantID]) -> list[Verdict]:
+    def look(
+        self, laid: AVariantAndACaller, answered: Answered[RuntimeVariantID]
+    ) -> list[TestVerdict]:
         resolved = answered.response
         if resolved is None:
             return [Refused(EntityNotFoundError, answered.raised)]
@@ -148,7 +150,7 @@ class TheLaidVariantsId(Then[AVariantAndACaller, RuntimeVariantID]):
 
 
 @dataclass(frozen=True)
-class NothingComesBack(Then[Any, Loaded]):
+class NothingComesBack(TestThen[Any, Loaded]):
     """빈 응답이 반환된다."""
 
     @override
@@ -156,7 +158,7 @@ class NothingComesBack(Then[Any, Loaded]):
         return "빈 응답이 반환된다"
 
     @override
-    def look(self, laid: Any, answered: Answered[Loaded]) -> list[Verdict]:
+    def look(self, laid: Any, answered: Answered[Loaded]) -> list[TestVerdict]:
         items = answered.response
         if items is None:
             return [Refused(EntityNotFoundError, answered.raised)]
@@ -165,7 +167,7 @@ class NothingComesBack(Then[Any, Loaded]):
 
 @dataclass(frozen=True)
 class AUserGrantedNothingReadsById(
-    Scenario[SeedingSession, AVariantAndACaller, RuntimeVariantAdapter, RuntimeVariantNode]
+    TestScenario[SeedingSession, AVariantAndACaller, RuntimeVariantAdapter, RuntimeVariantNode]
 ):
     started: datetime
 
@@ -178,21 +180,21 @@ class AUserGrantedNothingReadsById(
         return "아무 권한도 없는 사용자가 id로 조회하면, 그 변형 전체가 반환된다. 이 조회는 인증만 확인한다"
 
     @override
-    def given(self) -> Given[SeedingSession, AVariantAndACaller]:
+    def given(self) -> TestGiven[SeedingSession, AVariantAndACaller]:
         return AVariantAndSomeone()
 
     @override
-    def when(self) -> When[AVariantAndACaller, RuntimeVariantAdapter, RuntimeVariantNode]:
+    def when(self) -> TestWhen[AVariantAndACaller, RuntimeVariantAdapter, RuntimeVariantNode]:
         return ReadingById()
 
     @override
-    def then(self) -> Then[AVariantAndACaller, RuntimeVariantNode]:
+    def then(self) -> TestThen[AVariantAndACaller, RuntimeVariantNode]:
         return TheVariantNode(started=self.started)
 
 
 @dataclass(frozen=True)
 class AnIdNothingAnswersToIsNotFound(
-    Scenario[SeedingSession, AVariantAndACaller, RuntimeVariantAdapter, RuntimeVariantNode]
+    TestScenario[SeedingSession, AVariantAndACaller, RuntimeVariantAdapter, RuntimeVariantNode]
 ):
     @override
     def summary(self) -> str:
@@ -206,21 +208,21 @@ class AnIdNothingAnswersToIsNotFound(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, AVariantAndACaller]:
+    def given(self) -> TestGiven[SeedingSession, AVariantAndACaller]:
         return AVariantAndSomeone()
 
     @override
-    def when(self) -> When[AVariantAndACaller, RuntimeVariantAdapter, RuntimeVariantNode]:
+    def when(self) -> TestWhen[AVariantAndACaller, RuntimeVariantAdapter, RuntimeVariantNode]:
         return ReadingById(unknown=True)
 
     @override
-    def then(self) -> Then[AVariantAndACaller, RuntimeVariantNode]:
+    def then(self) -> TestThen[AVariantAndACaller, RuntimeVariantNode]:
         return TheCallIsRefused(NotEnoughPermission)
 
 
 @dataclass(frozen=True)
 class ANameResolvesToItsId(
-    Scenario[SeedingSession, AVariantAndACaller, RuntimeVariantAdapter, RuntimeVariantID]
+    TestScenario[SeedingSession, AVariantAndACaller, RuntimeVariantAdapter, RuntimeVariantID]
 ):
     @override
     def summary(self) -> str:
@@ -231,21 +233,21 @@ class ANameResolvesToItsId(
         return "아무 권한도 없는 사용자가 이름을 id로 변환하면 그 변형의 id가 반환된다"
 
     @override
-    def given(self) -> Given[SeedingSession, AVariantAndACaller]:
+    def given(self) -> TestGiven[SeedingSession, AVariantAndACaller]:
         return AVariantAndSomeone()
 
     @override
-    def when(self) -> When[AVariantAndACaller, RuntimeVariantAdapter, RuntimeVariantID]:
+    def when(self) -> TestWhen[AVariantAndACaller, RuntimeVariantAdapter, RuntimeVariantID]:
         return ResolvingByName()
 
     @override
-    def then(self) -> Then[AVariantAndACaller, RuntimeVariantID]:
+    def then(self) -> TestThen[AVariantAndACaller, RuntimeVariantID]:
         return TheLaidVariantsId()
 
 
 @dataclass(frozen=True)
 class ANameNothingAnswersToIsNotFound(
-    Scenario[SeedingSession, AVariantAndACaller, RuntimeVariantAdapter, RuntimeVariantID]
+    TestScenario[SeedingSession, AVariantAndACaller, RuntimeVariantAdapter, RuntimeVariantID]
 ):
     @override
     def summary(self) -> str:
@@ -259,21 +261,21 @@ class ANameNothingAnswersToIsNotFound(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, AVariantAndACaller]:
+    def given(self) -> TestGiven[SeedingSession, AVariantAndACaller]:
         return AVariantAndSomeone()
 
     @override
-    def when(self) -> When[AVariantAndACaller, RuntimeVariantAdapter, RuntimeVariantID]:
+    def when(self) -> TestWhen[AVariantAndACaller, RuntimeVariantAdapter, RuntimeVariantID]:
         return ResolvingByName(named="no-such-variant")
 
     @override
-    def then(self) -> Then[AVariantAndACaller, RuntimeVariantID]:
+    def then(self) -> TestThen[AVariantAndACaller, RuntimeVariantID]:
         return TheCallIsRefused(GenericBadRequest)
 
 
 @dataclass(frozen=True)
 class MixedIdsComeBackInOrder(
-    Scenario[SeedingSession, ManyVariantsAndACaller, RuntimeVariantAdapter, Loaded]
+    TestScenario[SeedingSession, ManyVariantsAndACaller, RuntimeVariantAdapter, Loaded]
 ):
     started: datetime
 
@@ -286,21 +288,21 @@ class MixedIdsComeBackInOrder(
         return "있는 id 둘과 없는 id 하나를 한 번에 조회하면, 요청한 순서대로 반환되고 없는 id에 해당하는 항목은 비어 있다"
 
     @override
-    def given(self) -> Given[SeedingSession, ManyVariantsAndACaller]:
+    def given(self) -> TestGiven[SeedingSession, ManyVariantsAndACaller]:
         return ManyVariantsAndSomeone(besides=1)
 
     @override
-    def when(self) -> When[ManyVariantsAndACaller, RuntimeVariantAdapter, Loaded]:
+    def when(self) -> TestWhen[ManyVariantsAndACaller, RuntimeVariantAdapter, Loaded]:
         return ReadingManyByIds()
 
     @override
-    def then(self) -> Then[ManyVariantsAndACaller, Loaded]:
+    def then(self) -> TestThen[ManyVariantsAndACaller, Loaded]:
         return TheVariantsInTheOrderAsked(started=self.started)
 
 
 @dataclass(frozen=True)
 class AnEmptyListAnswersEmpty(
-    Scenario[SeedingSession, AVariantAndACaller, RuntimeVariantAdapter, Loaded]
+    TestScenario[SeedingSession, AVariantAndACaller, RuntimeVariantAdapter, Loaded]
 ):
     @override
     def summary(self) -> str:
@@ -311,15 +313,15 @@ class AnEmptyListAnswersEmpty(
         return "빈 id 목록을 주면 빈 응답이 반환된다. 하위 계층을 호출하지 않는다"
 
     @override
-    def given(self) -> Given[SeedingSession, AVariantAndACaller]:
+    def given(self) -> TestGiven[SeedingSession, AVariantAndACaller]:
         return AVariantAndSomeone()
 
     @override
-    def when(self) -> When[AVariantAndACaller, RuntimeVariantAdapter, Loaded]:
+    def when(self) -> TestWhen[AVariantAndACaller, RuntimeVariantAdapter, Loaded]:
         return ReadingNoIds()
 
     @override
-    def then(self) -> Then[AVariantAndACaller, Loaded]:
+    def then(self) -> TestThen[AVariantAndACaller, Loaded]:
         return NothingComesBack()
 
 

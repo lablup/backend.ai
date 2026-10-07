@@ -19,7 +19,7 @@ from ai.backend.manager.api.adapters.notification.adapter import NotificationAda
 from ai.backend.manager.errors.notification import NotificationChannelNotFound
 from ai.backend.manager.errors.permission import NotEnoughPermission
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.testutils.scenario_steps import Given, Scenario, Then, When
+from ai.backend.testutils.scenario_steps import TestGiven, TestScenario, TestThen, TestWhen
 from bai_scenario.components.answers import TheCallIsRefused
 from bai_scenario.components.notification import (
     AChannelAndACaller,
@@ -31,13 +31,13 @@ from bai_scenario.runner.planting import SeedingSession
 from bai_scenario.runner.steps import run_scenario
 
 type Validated = ValidateNotificationChannelPayload
-type ValidatingStep = Scenario[SeedingSession, AChannelAndACaller, NotificationAdapter, Any]
+type ValidatingStep = TestScenario[SeedingSession, AChannelAndACaller, NotificationAdapter, Any]
 
 TEST_MESSAGE = "scenario test message"
 
 
 @dataclass(frozen=True)
-class Validating(When[AChannelAndACaller, NotificationAdapter, Validated]):
+class Validating(TestWhen[AChannelAndACaller, NotificationAdapter, Validated]):
     """시험 메시지를 주고 채널을 검증한다. ``unknown``이면 어느 행에도 없는 id를 쓴다."""
 
     unknown: bool = False
@@ -63,7 +63,7 @@ class Validating(When[AChannelAndACaller, NotificationAdapter, Validated]):
 
 @dataclass(frozen=True)
 class TheSuperadminValidatesAWebhookChannel(
-    Scenario[SeedingSession, AChannelAndACaller, NotificationAdapter, Validated]
+    TestScenario[SeedingSession, AChannelAndACaller, NotificationAdapter, Validated]
 ):
     @override
     def summary(self) -> str:
@@ -74,21 +74,21 @@ class TheSuperadminValidatesAWebhookChannel(
         return "webhook 채널 하나가 있고 슈퍼관리자가 시험 메시지로 검증하면 검증한 채널의 id가 반환된다"
 
     @override
-    def given(self) -> Given[SeedingSession, AChannelAndACaller]:
+    def given(self) -> TestGiven[SeedingSession, AChannelAndACaller]:
         return AChannelAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
-    def when(self) -> When[AChannelAndACaller, NotificationAdapter, Validated]:
+    def when(self) -> TestWhen[AChannelAndACaller, NotificationAdapter, Validated]:
         return Validating()
 
     @override
-    def then(self) -> Then[AChannelAndACaller, Validated]:
+    def then(self) -> TestThen[AChannelAndACaller, Validated]:
         return TheValidatedChannelId()
 
 
 @dataclass(frozen=True)
 class TheSuperadminValidatingAnUnknownIdIsNotFound(
-    Scenario[SeedingSession, AChannelAndACaller, NotificationAdapter, Validated]
+    TestScenario[SeedingSession, AChannelAndACaller, NotificationAdapter, Validated]
 ):
     @override
     def summary(self) -> str:
@@ -99,21 +99,21 @@ class TheSuperadminValidatingAnUnknownIdIsNotFound(
         return "슈퍼관리자가 존재하지 않는 id를 검증하면 대상을 찾을 수 없다는 이유로 거부된다"
 
     @override
-    def given(self) -> Given[SeedingSession, AChannelAndACaller]:
+    def given(self) -> TestGiven[SeedingSession, AChannelAndACaller]:
         return AChannelAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
-    def when(self) -> When[AChannelAndACaller, NotificationAdapter, Validated]:
+    def when(self) -> TestWhen[AChannelAndACaller, NotificationAdapter, Validated]:
         return Validating(unknown=True)
 
     @override
-    def then(self) -> Then[AChannelAndACaller, Validated]:
+    def then(self) -> TestThen[AChannelAndACaller, Validated]:
         return TheCallIsRefused(NotificationChannelNotFound)
 
 
 @dataclass(frozen=True)
 class AUserGrantedNothingMayNotValidate(
-    Scenario[SeedingSession, AChannelAndACaller, NotificationAdapter, Validated]
+    TestScenario[SeedingSession, AChannelAndACaller, NotificationAdapter, Validated]
 ):
     @override
     def summary(self) -> str:
@@ -124,15 +124,15 @@ class AUserGrantedNothingMayNotValidate(
         return "아무 권한도 없는 사용자가 검증하려 하면 권한 부족으로 거부된다"
 
     @override
-    def given(self) -> Given[SeedingSession, AChannelAndACaller]:
+    def given(self) -> TestGiven[SeedingSession, AChannelAndACaller]:
         return AChannelAndSomeone()
 
     @override
-    def when(self) -> When[AChannelAndACaller, NotificationAdapter, Validated]:
+    def when(self) -> TestWhen[AChannelAndACaller, NotificationAdapter, Validated]:
         return Validating()
 
     @override
-    def then(self) -> Then[AChannelAndACaller, Validated]:
+    def then(self) -> TestThen[AChannelAndACaller, Validated]:
         return TheCallIsRefused(NotEnoughPermission)
 
 

@@ -16,13 +16,13 @@ from ai.backend.manager.errors.permission import NotEnoughPermission
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.testutils.scenario_steps import (
     Answered,
-    Given,
     Refused,
     Same,
-    Scenario,
-    Then,
-    Verdict,
-    When,
+    TestGiven,
+    TestScenario,
+    TestThen,
+    TestVerdict,
+    TestWhen,
 )
 from bai_scenario.components.answers import MissingResponse
 from bai_scenario.components.vfolder import (
@@ -41,11 +41,11 @@ from bai_scenario.runner.planting import SeedingSession
 from bai_scenario.runner.steps import run_scenario
 
 type Answer = list[VFolderNode | Exception | None]
-type LoadStep = Scenario[SeedingSession, Any, VFolderAdapter, Answer]
+type LoadStep = TestScenario[SeedingSession, Any, VFolderAdapter, Answer]
 
 
 @dataclass(frozen=True)
-class LoadingTheFolderById(When[AFolderAndItsReader, VFolderAdapter, Answer]):
+class LoadingTheFolderById(TestWhen[AFolderAndItsReader, VFolderAdapter, Answer]):
     """폴더 id 하나만 준다."""
 
     @override
@@ -63,7 +63,7 @@ class LoadingTheFolderById(When[AFolderAndItsReader, VFolderAdapter, Answer]):
 
 
 @dataclass(frozen=True)
-class LoadingReadableUnreadableAndMissing(When[AReaderAndTwoFolders, VFolderAdapter, Answer]):
+class LoadingReadableUnreadableAndMissing(TestWhen[AReaderAndTwoFolders, VFolderAdapter, Answer]):
     """닿을 수 있는 폴더, 닿을 수 없는 폴더, 없는 id 순으로 한 번에 읽는다."""
 
     @override
@@ -88,7 +88,7 @@ class LoadingReadableUnreadableAndMissing(When[AReaderAndTwoFolders, VFolderAdap
 
 
 @dataclass(frozen=True)
-class LoadingTheFolderAndMissing(When[AFolderAndItsReader, VFolderAdapter, Answer]):
+class LoadingTheFolderAndMissing(TestWhen[AFolderAndItsReader, VFolderAdapter, Answer]):
     """있는 폴더와 없는 id를 한 번에 읽는다."""
 
     @override
@@ -109,7 +109,7 @@ class LoadingTheFolderAndMissing(When[AFolderAndItsReader, VFolderAdapter, Answe
 
 
 @dataclass(frozen=True)
-class LoadingNothing(When[AFolderMakerAndTheirDomain, VFolderAdapter, Answer]):
+class LoadingNothing(TestWhen[AFolderMakerAndTheirDomain, VFolderAdapter, Answer]):
     """빈 id 목록으로 읽는다."""
 
     @override
@@ -127,7 +127,7 @@ class LoadingNothing(When[AFolderMakerAndTheirDomain, VFolderAdapter, Answer]):
 
 
 @dataclass(frozen=True)
-class TheFolderAlone(Then[AFolderAndItsReader, Answer]):
+class TheFolderAlone(TestThen[AFolderAndItsReader, Answer]):
     """심은 폴더 하나가 통째로 온다."""
 
     started: datetime
@@ -137,11 +137,11 @@ class TheFolderAlone(Then[AFolderAndItsReader, Answer]):
         return "심은 폴더 하나가 통째로 온다"
 
     @override
-    def look(self, laid: AFolderAndItsReader, answered: Answered[Answer]) -> list[Verdict]:
+    def look(self, laid: AFolderAndItsReader, answered: Answered[Answer]) -> list[TestVerdict]:
         loaded = answered.response
         if loaded is None:
             return [MissingResponse(answered.raised)]
-        seen: list[Verdict] = [Same("length", len(loaded), 1)]
+        seen: list[TestVerdict] = [Same("length", len(loaded), 1)]
         first = loaded[0] if loaded else None
         if isinstance(first, VFolderNode):
             seen.extend(VFolderNodeLook(self.started).verdicts(first, laid.folder, at="[0]."))
@@ -151,7 +151,7 @@ class TheFolderAlone(Then[AFolderAndItsReader, Answer]):
 
 
 @dataclass(frozen=True)
-class ARefusalAlone(Then[AFolderAndItsReader, Answer]):
+class ARefusalAlone(TestThen[AFolderAndItsReader, Answer]):
     """호출은 성공하고, 그 자리는 권한 부족으로 거부된다."""
 
     @override
@@ -159,7 +159,7 @@ class ARefusalAlone(Then[AFolderAndItsReader, Answer]):
         return "그 자리는 권한 부족으로 거부된다"
 
     @override
-    def look(self, laid: AFolderAndItsReader, answered: Answered[Answer]) -> list[Verdict]:
+    def look(self, laid: AFolderAndItsReader, answered: Answered[Answer]) -> list[TestVerdict]:
         loaded = answered.response
         if loaded is None:
             return [MissingResponse(answered.raised)]
@@ -171,7 +171,7 @@ class ARefusalAlone(Then[AFolderAndItsReader, Answer]):
 
 
 @dataclass(frozen=True)
-class EachElementInOrder(Then[AReaderAndTwoFolders, Answer]):
+class EachElementInOrder(TestThen[AReaderAndTwoFolders, Answer]):
     """입력 순서대로 자리마다 폴더 또는 거부가 온다."""
 
     started: datetime
@@ -181,11 +181,11 @@ class EachElementInOrder(Then[AReaderAndTwoFolders, Answer]):
         return "입력 순서대로 자리마다 폴더 또는 거부가 온다"
 
     @override
-    def look(self, laid: AReaderAndTwoFolders, answered: Answered[Answer]) -> list[Verdict]:
+    def look(self, laid: AReaderAndTwoFolders, answered: Answered[Answer]) -> list[TestVerdict]:
         loaded = answered.response
         if loaded is None:
             return [MissingResponse(answered.raised)]
-        seen: list[Verdict] = [Same("length", len(loaded), 3)]
+        seen: list[TestVerdict] = [Same("length", len(loaded), 3)]
         if len(loaded) != 3:
             return seen
         first, second, third = loaded
@@ -199,7 +199,7 @@ class EachElementInOrder(Then[AReaderAndTwoFolders, Answer]):
 
 
 @dataclass(frozen=True)
-class TheFolderThenNothing(Then[AFolderAndItsReader, Answer]):
+class TheFolderThenNothing(TestThen[AFolderAndItsReader, Answer]):
     """있는 폴더는 노드로, 없는 id 자리는 빈 값으로 온다."""
 
     started: datetime
@@ -209,11 +209,11 @@ class TheFolderThenNothing(Then[AFolderAndItsReader, Answer]):
         return "있는 폴더는 노드로, 없는 id 자리는 빈 값으로 온다"
 
     @override
-    def look(self, laid: AFolderAndItsReader, answered: Answered[Answer]) -> list[Verdict]:
+    def look(self, laid: AFolderAndItsReader, answered: Answered[Answer]) -> list[TestVerdict]:
         loaded = answered.response
         if loaded is None:
             return [MissingResponse(answered.raised)]
-        seen: list[Verdict] = [Same("length", len(loaded), 2)]
+        seen: list[TestVerdict] = [Same("length", len(loaded), 2)]
         if len(loaded) != 2:
             return seen
         first, second = loaded
@@ -226,7 +226,7 @@ class TheFolderThenNothing(Then[AFolderAndItsReader, Answer]):
 
 
 @dataclass(frozen=True)
-class AnEmptyList(Then[AFolderMakerAndTheirDomain, Answer]):
+class AnEmptyList(TestThen[AFolderMakerAndTheirDomain, Answer]):
     """빈 목록이 온다."""
 
     @override
@@ -234,7 +234,9 @@ class AnEmptyList(Then[AFolderMakerAndTheirDomain, Answer]):
         return "빈 목록이 온다"
 
     @override
-    def look(self, laid: AFolderMakerAndTheirDomain, answered: Answered[Answer]) -> list[Verdict]:
+    def look(
+        self, laid: AFolderMakerAndTheirDomain, answered: Answered[Answer]
+    ) -> list[TestVerdict]:
         loaded = answered.response
         if loaded is None:
             return [MissingResponse(answered.raised)]
@@ -243,7 +245,7 @@ class AnEmptyList(Then[AFolderMakerAndTheirDomain, Answer]):
 
 @dataclass(frozen=True)
 class AUserLoadsTheirOwnFolderById(
-    Scenario[SeedingSession, AFolderAndItsReader, VFolderAdapter, Answer]
+    TestScenario[SeedingSession, AFolderAndItsReader, VFolderAdapter, Answer]
 ):
     started: datetime
 
@@ -259,21 +261,21 @@ class AUserLoadsTheirOwnFolderById(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, AFolderAndItsReader]:
+    def given(self) -> TestGiven[SeedingSession, AFolderAndItsReader]:
         return SomeoneWithAFolderOfTheirOwn(granted=True)
 
     @override
-    def when(self) -> When[AFolderAndItsReader, VFolderAdapter, Answer]:
+    def when(self) -> TestWhen[AFolderAndItsReader, VFolderAdapter, Answer]:
         return LoadingTheFolderById()
 
     @override
-    def then(self) -> Then[AFolderAndItsReader, Answer]:
+    def then(self) -> TestThen[AFolderAndItsReader, Answer]:
         return TheFolderAlone(started=self.started)
 
 
 @dataclass(frozen=True)
 class AUserGrantedNothingGetsARefusalForTheirOwnFolder(
-    Scenario[SeedingSession, AFolderAndItsReader, VFolderAdapter, Answer]
+    TestScenario[SeedingSession, AFolderAndItsReader, VFolderAdapter, Answer]
 ):
     @override
     def summary(self) -> str:
@@ -287,21 +289,21 @@ class AUserGrantedNothingGetsARefusalForTheirOwnFolder(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, AFolderAndItsReader]:
+    def given(self) -> TestGiven[SeedingSession, AFolderAndItsReader]:
         return SomeoneWithAFolderOfTheirOwn(granted=False)
 
     @override
-    def when(self) -> When[AFolderAndItsReader, VFolderAdapter, Answer]:
+    def when(self) -> TestWhen[AFolderAndItsReader, VFolderAdapter, Answer]:
         return LoadingTheFolderById()
 
     @override
-    def then(self) -> Then[AFolderAndItsReader, Answer]:
+    def then(self) -> TestThen[AFolderAndItsReader, Answer]:
         return ARefusalAlone()
 
 
 @dataclass(frozen=True)
 class ABatchLoadAnswersEachElementInOrder(
-    Scenario[SeedingSession, AReaderAndTwoFolders, VFolderAdapter, Answer]
+    TestScenario[SeedingSession, AReaderAndTwoFolders, VFolderAdapter, Answer]
 ):
     started: datetime
 
@@ -317,21 +319,21 @@ class ABatchLoadAnswersEachElementInOrder(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, AReaderAndTwoFolders]:
+    def given(self) -> TestGiven[SeedingSession, AReaderAndTwoFolders]:
         return SomeoneWithTheirFolderAndAnothers()
 
     @override
-    def when(self) -> When[AReaderAndTwoFolders, VFolderAdapter, Answer]:
+    def when(self) -> TestWhen[AReaderAndTwoFolders, VFolderAdapter, Answer]:
         return LoadingReadableUnreadableAndMissing()
 
     @override
-    def then(self) -> Then[AReaderAndTwoFolders, Answer]:
+    def then(self) -> TestThen[AReaderAndTwoFolders, Answer]:
         return EachElementInOrder(started=self.started)
 
 
 @dataclass(frozen=True)
 class AnAcceptedShareLoadsSomeoneElsesFolderById(
-    Scenario[SeedingSession, AFolderAndItsReader, VFolderAdapter, Answer]
+    TestScenario[SeedingSession, AFolderAndItsReader, VFolderAdapter, Answer]
 ):
     started: datetime
 
@@ -347,21 +349,21 @@ class AnAcceptedShareLoadsSomeoneElsesFolderById(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, AFolderAndItsReader]:
+    def given(self) -> TestGiven[SeedingSession, AFolderAndItsReader]:
         return AFolderOfferedToSomeone(accepted=True)
 
     @override
-    def when(self) -> When[AFolderAndItsReader, VFolderAdapter, Answer]:
+    def when(self) -> TestWhen[AFolderAndItsReader, VFolderAdapter, Answer]:
         return LoadingTheFolderById()
 
     @override
-    def then(self) -> Then[AFolderAndItsReader, Answer]:
+    def then(self) -> TestThen[AFolderAndItsReader, Answer]:
         return TheFolderAlone(started=self.started)
 
 
 @dataclass(frozen=True)
 class AnUnansweredOfferGetsARefusalForTheFolder(
-    Scenario[SeedingSession, AFolderAndItsReader, VFolderAdapter, Answer]
+    TestScenario[SeedingSession, AFolderAndItsReader, VFolderAdapter, Answer]
 ):
     @override
     def summary(self) -> str:
@@ -375,21 +377,21 @@ class AnUnansweredOfferGetsARefusalForTheFolder(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, AFolderAndItsReader]:
+    def given(self) -> TestGiven[SeedingSession, AFolderAndItsReader]:
         return AFolderOfferedToSomeone(accepted=False)
 
     @override
-    def when(self) -> When[AFolderAndItsReader, VFolderAdapter, Answer]:
+    def when(self) -> TestWhen[AFolderAndItsReader, VFolderAdapter, Answer]:
         return LoadingTheFolderById()
 
     @override
-    def then(self) -> Then[AFolderAndItsReader, Answer]:
+    def then(self) -> TestThen[AFolderAndItsReader, Answer]:
         return ARefusalAlone()
 
 
 @dataclass(frozen=True)
 class TheSuperadminBatchLoadLeavesAMissingIdEmpty(
-    Scenario[SeedingSession, AFolderAndItsReader, VFolderAdapter, Answer]
+    TestScenario[SeedingSession, AFolderAndItsReader, VFolderAdapter, Answer]
 ):
     started: datetime
 
@@ -405,21 +407,21 @@ class TheSuperadminBatchLoadLeavesAMissingIdEmpty(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, AFolderAndItsReader]:
+    def given(self) -> TestGiven[SeedingSession, AFolderAndItsReader]:
         return SomeonesFolderAndTheSuperadmin()
 
     @override
-    def when(self) -> When[AFolderAndItsReader, VFolderAdapter, Answer]:
+    def when(self) -> TestWhen[AFolderAndItsReader, VFolderAdapter, Answer]:
         return LoadingTheFolderAndMissing()
 
     @override
-    def then(self) -> Then[AFolderAndItsReader, Answer]:
+    def then(self) -> TestThen[AFolderAndItsReader, Answer]:
         return TheFolderThenNothing(started=self.started)
 
 
 @dataclass(frozen=True)
 class ABatchLoadOfNothingAnswersNothing(
-    Scenario[SeedingSession, AFolderMakerAndTheirDomain, VFolderAdapter, Answer]
+    TestScenario[SeedingSession, AFolderMakerAndTheirDomain, VFolderAdapter, Answer]
 ):
     @override
     def summary(self) -> str:
@@ -430,15 +432,15 @@ class ABatchLoadOfNothingAnswersNothing(
         return "아무 권한도 받지 않은 사용자가 빈 id 목록을 주면, 권한 검사 없이 빈 목록이 온다"
 
     @override
-    def given(self) -> Given[SeedingSession, AFolderMakerAndTheirDomain]:
+    def given(self) -> TestGiven[SeedingSession, AFolderMakerAndTheirDomain]:
         return SomeoneWithNoGrant()
 
     @override
-    def when(self) -> When[AFolderMakerAndTheirDomain, VFolderAdapter, Answer]:
+    def when(self) -> TestWhen[AFolderMakerAndTheirDomain, VFolderAdapter, Answer]:
         return LoadingNothing()
 
     @override
-    def then(self) -> Then[AFolderMakerAndTheirDomain, Answer]:
+    def then(self) -> TestThen[AFolderMakerAndTheirDomain, Answer]:
         return AnEmptyList()
 
 

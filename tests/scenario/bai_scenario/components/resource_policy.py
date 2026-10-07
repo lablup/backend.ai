@@ -75,12 +75,12 @@ from ai.backend.manager.errors.auth import InsufficientPrivilege
 from ai.backend.manager.errors.base.entity import EntityNotFoundError
 from ai.backend.testutils.scenario_steps import (
     Answered,
-    Given,
     Held,
     Refused,
     Same,
-    Then,
-    Verdict,
+    TestGiven,
+    TestThen,
+    TestVerdict,
 )
 from bai_scenario.components.domain import WAS_HERE, WrittenByThisRun
 from bai_scenario.seeds.domain.domain import SeedDomain
@@ -230,10 +230,12 @@ class Family[PolicyData, PolicyNode](ABC):
     async def delete(self, adapter: ResourcePolicyAdapter, name: str) -> str:
         raise NotImplementedError
 
-    def verdicts(self, node: Any, wanted: Mapping[str, Any], started: datetime) -> list[Verdict]:
+    def verdicts(
+        self, node: Any, wanted: Mapping[str, Any], started: datetime
+    ) -> list[TestVerdict]:
         """응답의 모든 필드를 검사한다. 이름은 id 필드에도 그대로 담긴다."""
         got = self.view(node)
-        out: list[Verdict] = [
+        out: list[TestVerdict] = [
             Same("id", node.id, wanted["name"]),
             Same("name", node.name, wanted["name"]),
             Held("created_at", node.created_at, WrittenByThisRun(started)),
@@ -961,7 +963,7 @@ async def lay_a_holder(seeding: Any, *, role: UserRole, active: bool = True) -> 
 
 
 @dataclass(frozen=True)
-class APolicyAndSomeone(Given[Any, APolicyAndACaller[Any]]):
+class APolicyAndSomeone(TestGiven[Any, APolicyAndACaller[Any]]):
     """정책 하나와, 다른 정책이 할당된 사용자 한 명. 대상 정책은 아무도 사용하지 않는다."""
 
     family: Family[Any, Any]
@@ -980,7 +982,7 @@ class APolicyAndSomeone(Given[Any, APolicyAndACaller[Any]]):
 
 
 @dataclass(frozen=True)
-class AHeldPolicyAndSomeone(Given[Any, APolicyAndACaller[Any]]):
+class AHeldPolicyAndSomeone(TestGiven[Any, APolicyAndACaller[Any]]):
     """호출자 자신에게 할당된 정책. 그 사용자의 키페어·사용자 행·개인 프로젝트가 아직 이 이름을 참조한다."""
 
     family: Family[Any, Any]
@@ -999,7 +1001,7 @@ class AHeldPolicyAndSomeone(Given[Any, APolicyAndACaller[Any]]):
 
 
 @dataclass(frozen=True)
-class ManyPoliciesAndSomeone(Given[Any, ManyPoliciesAndACaller[Any]]):
+class ManyPoliciesAndSomeone(TestGiven[Any, ManyPoliciesAndACaller[Any]]):
     """정책 여럿과, 그중 하나가 할당된 사용자 한 명."""
 
     family: Family[Any, Any]
@@ -1027,7 +1029,7 @@ class ManyPoliciesAndSomeone(Given[Any, ManyPoliciesAndACaller[Any]]):
 
 
 @dataclass(frozen=True)
-class SomeoneHeldToTheirPolicy(Given[Any, APolicyAndACaller[Any]]):
+class SomeoneHeldToTheirPolicy(TestGiven[Any, APolicyAndACaller[Any]]):
     """자기 정책을 조회할 사용자. 반환되는 정책은 그 사용자에게 할당된 것이다."""
 
     family: OwnFamily[Any, Any]
@@ -1050,7 +1052,7 @@ class SomeoneHeldToTheirPolicy(Given[Any, APolicyAndACaller[Any]]):
 
 
 @dataclass(frozen=True)
-class SomeoneWithAnotherKey(Given[Any, APolicyAndACaller[Any]]):
+class SomeoneWithAnotherKey(TestGiven[Any, APolicyAndACaller[Any]]):
     """키페어를 하나 더 가진 사용자. 두 키페어에는 서로 다른 키페어 정책이 할당돼 있다.
 
     사용자와 함께 만들어진 키페어가 기본 키페어다. 사용자가 활성이면 기본 키페어의 정책이
@@ -1076,7 +1078,7 @@ class SomeoneWithAnotherKey(Given[Any, APolicyAndACaller[Any]]):
 
 
 @dataclass(frozen=True)
-class SomeoneWithNoActiveKey(Given[Any, APolicyAndACaller[Any]]):
+class SomeoneWithNoActiveKey(TestGiven[Any, APolicyAndACaller[Any]]):
     """비활성 사용자라 활성 키페어가 하나도 없는 사용자. 정책은 할당돼 있지만 키페어를 거쳐 도달할 수 없다."""
 
     @override
@@ -1091,7 +1093,7 @@ class SomeoneWithNoActiveKey(Given[Any, APolicyAndACaller[Any]]):
 
 
 @dataclass(frozen=True)
-class ThePolicyNode(Then[APolicyAndACaller[Any], Any]):
+class ThePolicyNode(TestThen[APolicyAndACaller[Any], Any]):
     """미리 만들어 둔 정책이 통째로 반환된다. 기대값은 미리 만들어 둔 데이터에서 읽는다.
 
     수정 요청이 이 검사를 쓸 때는 바뀌어야 하는 필드만 ``changed``로 받는다. 나머지 필드가
@@ -1107,7 +1109,7 @@ class ThePolicyNode(Then[APolicyAndACaller[Any], Any]):
         return f"미리 만들어 둔 {self.family.kind} 전체가 반환된다"
 
     @override
-    def look(self, laid: APolicyAndACaller[Any], answered: Answered[Any]) -> list[Verdict]:
+    def look(self, laid: APolicyAndACaller[Any], answered: Answered[Any]) -> list[TestVerdict]:
         node = answered.response
         if node is None:
             return [Refused(EntityNotFoundError, answered.raised)]
@@ -1116,7 +1118,7 @@ class ThePolicyNode(Then[APolicyAndACaller[Any], Any]):
 
 
 @dataclass(frozen=True)
-class TheNewPolicyNode(Then[Any, Any]):
+class TheNewPolicyNode(TestThen[Any, Any]):
     """방금 생성한 정책이 통째로 반환된다. 기대값은 요청이 지정한 값에서 읽는다."""
 
     family: Family[Any, Any]
@@ -1128,7 +1130,7 @@ class TheNewPolicyNode(Then[Any, Any]):
         return f"생성한 {self.family.kind} 전체가 반환된다"
 
     @override
-    def look(self, laid: Any, answered: Answered[Any]) -> list[Verdict]:
+    def look(self, laid: Any, answered: Answered[Any]) -> list[TestVerdict]:
         node = answered.response
         if node is None:
             return [Refused(EntityNotFoundError, answered.raised)]
@@ -1136,7 +1138,7 @@ class TheNewPolicyNode(Then[Any, Any]):
 
 
 @dataclass(frozen=True)
-class EveryLaidPolicyIsFound(Then[ManyPoliciesAndACaller[Any], Searched]):
+class EveryLaidPolicyIsFound(TestThen[ManyPoliciesAndACaller[Any], Searched]):
     """미리 만들어 둔 정책이 모두, 그리고 그것만 반환된다."""
 
     family: Family[Any, Any]
@@ -1148,7 +1150,7 @@ class EveryLaidPolicyIsFound(Then[ManyPoliciesAndACaller[Any], Searched]):
     @override
     def look(
         self, laid: ManyPoliciesAndACaller[Any], answered: Answered[Searched]
-    ) -> list[Verdict]:
+    ) -> list[TestVerdict]:
         payload = answered.response
         if payload is None:
             return [Refused(InsufficientPrivilege, answered.raised)]
@@ -1163,7 +1165,7 @@ class EveryLaidPolicyIsFound(Then[ManyPoliciesAndACaller[Any], Searched]):
 
 
 @dataclass(frozen=True)
-class OnlyTheNamedOneIsFound(Then[ManyPoliciesAndACaller[Any], Searched]):
+class OnlyTheNamedOneIsFound(TestThen[ManyPoliciesAndACaller[Any], Searched]):
     """필터에 맞는 그 하나만 반환된다."""
 
     family: Family[Any, Any]
@@ -1175,7 +1177,7 @@ class OnlyTheNamedOneIsFound(Then[ManyPoliciesAndACaller[Any], Searched]):
     @override
     def look(
         self, laid: ManyPoliciesAndACaller[Any], answered: Answered[Searched]
-    ) -> list[Verdict]:
+    ) -> list[TestVerdict]:
         payload = answered.response
         if payload is None:
             return [Refused(InsufficientPrivilege, answered.raised)]

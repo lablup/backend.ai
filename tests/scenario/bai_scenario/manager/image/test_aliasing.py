@@ -18,15 +18,15 @@ from ai.backend.manager.errors.repository import UniqueConstraintViolationError
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.testutils.scenario_steps import (
     Answered,
-    Given,
     Held,
     Same,
     SameAs,
-    Scenario,
     Skipped,
-    Then,
-    Verdict,
-    When,
+    TestGiven,
+    TestScenario,
+    TestThen,
+    TestVerdict,
+    TestWhen,
 )
 from bai_scenario.components.answers import TheCallIsRefused
 from bai_scenario.components.image import (
@@ -49,7 +49,7 @@ A_NAME_NO_IMAGE_HOLDS = "no-such-alias"
 
 
 @dataclass(frozen=True)
-class Aliasing(When[AnImageAndACaller, ImageAdapter, AliasImagePayload]):
+class Aliasing(TestWhen[AnImageAndACaller, ImageAdapter, AliasImagePayload]):
     """이미지에 별칭을 등록한다."""
 
     at: Target = field(default_factory=TheLaidImage)
@@ -74,7 +74,7 @@ class Aliasing(When[AnImageAndACaller, ImageAdapter, AliasImagePayload]):
 
 
 @dataclass(frozen=True)
-class AliasingTheTaken(When[AnAliasAndACaller, ImageAdapter, AliasImagePayload]):
+class AliasingTheTaken(TestWhen[AnAliasAndACaller, ImageAdapter, AliasImagePayload]):
     """이미 사용 중인 별칭을 등록한다."""
 
     @override
@@ -94,7 +94,7 @@ class AliasingTheTaken(When[AnAliasAndACaller, ImageAdapter, AliasImagePayload])
 
 
 @dataclass(frozen=True)
-class Dealiasing(When[AnAliasAndACaller, ImageAdapter, AliasImagePayload]):
+class Dealiasing(TestWhen[AnAliasAndACaller, ImageAdapter, AliasImagePayload]):
     """등록된 별칭을 해제한다. 이 호출은 id가 아니라 별칭 이름으로 대상을 지정한다."""
 
     named: str | None = None
@@ -118,7 +118,7 @@ class Dealiasing(When[AnAliasAndACaller, ImageAdapter, AliasImagePayload]):
 
 
 @dataclass(frozen=True)
-class TheAliasAndItsImage(Then[AnImageAndACaller, AliasImagePayload]):
+class TheAliasAndItsImage(TestThen[AnImageAndACaller, AliasImagePayload]):
     """등록한 별칭과 그 별칭이 가리키는 이미지가 반환된다."""
 
     alias: str
@@ -128,7 +128,9 @@ class TheAliasAndItsImage(Then[AnImageAndACaller, AliasImagePayload]):
         return "등록한 별칭과 그 이미지의 ID가 반환된다"
 
     @override
-    def look(self, laid: AnImageAndACaller, answered: Answered[AliasImagePayload]) -> list[Verdict]:
+    def look(
+        self, laid: AnImageAndACaller, answered: Answered[AliasImagePayload]
+    ) -> list[TestVerdict]:
         payload = answered.response
         if payload is None:
             return [Held("응답", answered.response, Filled())]
@@ -141,7 +143,7 @@ class TheAliasAndItsImage(Then[AnImageAndACaller, AliasImagePayload]):
 
 
 @dataclass(frozen=True)
-class TheRemovedAlias(Then[AnAliasAndACaller, AliasImagePayload]):
+class TheRemovedAlias(TestThen[AnAliasAndACaller, AliasImagePayload]):
     """해제한 별칭과 그 이미지가 반환된다."""
 
     @override
@@ -149,7 +151,9 @@ class TheRemovedAlias(Then[AnAliasAndACaller, AliasImagePayload]):
         return "해제한 별칭과 그 이미지의 ID가 반환된다"
 
     @override
-    def look(self, laid: AnAliasAndACaller, answered: Answered[AliasImagePayload]) -> list[Verdict]:
+    def look(
+        self, laid: AnAliasAndACaller, answered: Answered[AliasImagePayload]
+    ) -> list[TestVerdict]:
         payload = answered.response
         if payload is None:
             return [Held("응답", answered.response, Filled())]
@@ -163,7 +167,7 @@ class TheRemovedAlias(Then[AnAliasAndACaller, AliasImagePayload]):
 
 @dataclass(frozen=True)
 class AliasingAnswersWithTheAliasAndItsImage(
-    Scenario[SeedingSession, AnImageAndACaller, ImageAdapter, AliasImagePayload]
+    TestScenario[SeedingSession, AnImageAndACaller, ImageAdapter, AliasImagePayload]
 ):
     @override
     def summary(self) -> str:
@@ -174,21 +178,21 @@ class AliasingAnswersWithTheAliasAndItsImage(
         return "슈퍼관리자가 이미지에 별칭을 등록하면 그 별칭과 가리키는 이미지가 반환된다"
 
     @override
-    def given(self) -> Given[SeedingSession, AnImageAndACaller]:
+    def given(self) -> TestGiven[SeedingSession, AnImageAndACaller]:
         return AnImageAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
-    def when(self) -> When[AnImageAndACaller, ImageAdapter, AliasImagePayload]:
+    def when(self) -> TestWhen[AnImageAndACaller, ImageAdapter, AliasImagePayload]:
         return Aliasing()
 
     @override
-    def then(self) -> Then[AnImageAndACaller, AliasImagePayload]:
+    def then(self) -> TestThen[AnImageAndACaller, AliasImagePayload]:
         return TheAliasAndItsImage(alias=A_NEW_ALIAS)
 
 
 @dataclass(frozen=True)
 class DealiasingAnswersWithTheRemovedAlias(
-    Scenario[SeedingSession, AnAliasAndACaller, ImageAdapter, AliasImagePayload]
+    TestScenario[SeedingSession, AnAliasAndACaller, ImageAdapter, AliasImagePayload]
 ):
     @override
     def summary(self) -> str:
@@ -199,21 +203,21 @@ class DealiasingAnswersWithTheRemovedAlias(
         return "슈퍼관리자가 등록된 별칭을 해제하면 해제된 별칭과 그 이미지가 반환된다"
 
     @override
-    def given(self) -> Given[SeedingSession, AnAliasAndACaller]:
+    def given(self) -> TestGiven[SeedingSession, AnAliasAndACaller]:
         return AnAliasAndSomeone()
 
     @override
-    def when(self) -> When[AnAliasAndACaller, ImageAdapter, AliasImagePayload]:
+    def when(self) -> TestWhen[AnAliasAndACaller, ImageAdapter, AliasImagePayload]:
         return Dealiasing()
 
     @override
-    def then(self) -> Then[AnAliasAndACaller, AliasImagePayload]:
+    def then(self) -> TestThen[AnAliasAndACaller, AliasImagePayload]:
         return TheRemovedAlias()
 
 
 @dataclass(frozen=True)
 class AliasingWhatIsNotThere(
-    Scenario[SeedingSession, AnImageAndACaller, ImageAdapter, AliasImagePayload]
+    TestScenario[SeedingSession, AnImageAndACaller, ImageAdapter, AliasImagePayload]
 ):
     @override
     def summary(self) -> str:
@@ -224,21 +228,21 @@ class AliasingWhatIsNotThere(
         return "어느 이미지도 가리키지 않는 ID에 별칭을 등록하려 하면 대상을 찾을 수 없어 거부된다"
 
     @override
-    def given(self) -> Given[SeedingSession, AnImageAndACaller]:
+    def given(self) -> TestGiven[SeedingSession, AnImageAndACaller]:
         return AnImageAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
-    def when(self) -> When[AnImageAndACaller, ImageAdapter, AliasImagePayload]:
+    def when(self) -> TestWhen[AnImageAndACaller, ImageAdapter, AliasImagePayload]:
         return Aliasing(at=AnIdThatHoldsNothing())
 
     @override
-    def then(self) -> Then[AnImageAndACaller, AliasImagePayload]:
+    def then(self) -> TestThen[AnImageAndACaller, AliasImagePayload]:
         return TheCallIsRefused(ImageNotFound)
 
 
 @dataclass(frozen=True)
 class AnAliasAnotherImageHolds(
-    Scenario[SeedingSession, AnAliasAndACaller, ImageAdapter, AliasImagePayload]
+    TestScenario[SeedingSession, AnAliasAndACaller, ImageAdapter, AliasImagePayload]
 ):
     @override
     def summary(self) -> str:
@@ -249,21 +253,21 @@ class AnAliasAnotherImageHolds(
         return "이미 사용 중인 별칭을 등록하려 하면 유니크 제약 위반으로 거부된다"
 
     @override
-    def given(self) -> Given[SeedingSession, AnAliasAndACaller]:
+    def given(self) -> TestGiven[SeedingSession, AnAliasAndACaller]:
         return AnAliasAndSomeone()
 
     @override
-    def when(self) -> When[AnAliasAndACaller, ImageAdapter, AliasImagePayload]:
+    def when(self) -> TestWhen[AnAliasAndACaller, ImageAdapter, AliasImagePayload]:
         return AliasingTheTaken()
 
     @override
-    def then(self) -> Then[AnAliasAndACaller, AliasImagePayload]:
+    def then(self) -> TestThen[AnAliasAndACaller, AliasImagePayload]:
         return TheCallIsRefused(UniqueConstraintViolationError)
 
 
 @dataclass(frozen=True)
 class DealiasingWhatIsNotThere(
-    Scenario[SeedingSession, AnAliasAndACaller, ImageAdapter, AliasImagePayload]
+    TestScenario[SeedingSession, AnAliasAndACaller, ImageAdapter, AliasImagePayload]
 ):
     @override
     def summary(self) -> str:
@@ -274,21 +278,21 @@ class DealiasingWhatIsNotThere(
         return "어느 이미지도 가리키지 않는 별칭을 해제하려 하면 대상을 찾을 수 없어 거부된다"
 
     @override
-    def given(self) -> Given[SeedingSession, AnAliasAndACaller]:
+    def given(self) -> TestGiven[SeedingSession, AnAliasAndACaller]:
         return AnAliasAndSomeone()
 
     @override
-    def when(self) -> When[AnAliasAndACaller, ImageAdapter, AliasImagePayload]:
+    def when(self) -> TestWhen[AnAliasAndACaller, ImageAdapter, AliasImagePayload]:
         return Dealiasing(named=A_NAME_NO_IMAGE_HOLDS)
 
     @override
-    def then(self) -> Then[AnAliasAndACaller, AliasImagePayload]:
+    def then(self) -> TestThen[AnAliasAndACaller, AliasImagePayload]:
         return TheCallIsRefused(ImageAliasNotFound)
 
 
 @dataclass(frozen=True)
 class TheOwnerStillMayNotAlias(
-    Scenario[SeedingSession, AnImageAndACaller, ImageAdapter, AliasImagePayload]
+    TestScenario[SeedingSession, AnImageAndACaller, ImageAdapter, AliasImagePayload]
 ):
     @override
     def summary(self) -> str:
@@ -302,21 +306,21 @@ class TheOwnerStillMayNotAlias(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, AnImageAndACaller]:
+    def given(self) -> TestGiven[SeedingSession, AnImageAndACaller]:
         return AnImageTheCallerMade()
 
     @override
-    def when(self) -> When[AnImageAndACaller, ImageAdapter, AliasImagePayload]:
+    def when(self) -> TestWhen[AnImageAndACaller, ImageAdapter, AliasImagePayload]:
         return Aliasing()
 
     @override
-    def then(self) -> Then[AnImageAndACaller, AliasImagePayload]:
+    def then(self) -> TestThen[AnImageAndACaller, AliasImagePayload]:
         return TheCallIsRefused(InsufficientPrivilege)
 
 
 @dataclass(frozen=True)
 class APlainUserMayNotDealias(
-    Scenario[SeedingSession, AnAliasAndACaller, ImageAdapter, AliasImagePayload]
+    TestScenario[SeedingSession, AnAliasAndACaller, ImageAdapter, AliasImagePayload]
 ):
     @override
     def summary(self) -> str:
@@ -327,15 +331,15 @@ class APlainUserMayNotDealias(
         return "슈퍼관리자가 아닌 사용자가 별칭을 해제하려 하면 슈퍼관리자 권한 부족으로 거부된다"
 
     @override
-    def given(self) -> Given[SeedingSession, AnAliasAndACaller]:
+    def given(self) -> TestGiven[SeedingSession, AnAliasAndACaller]:
         return AnAliasAndSomeone(role=UserRole.USER)
 
     @override
-    def when(self) -> When[AnAliasAndACaller, ImageAdapter, AliasImagePayload]:
+    def when(self) -> TestWhen[AnAliasAndACaller, ImageAdapter, AliasImagePayload]:
         return Dealiasing()
 
     @override
-    def then(self) -> Then[AnAliasAndACaller, AliasImagePayload]:
+    def then(self) -> TestThen[AnAliasAndACaller, AliasImagePayload]:
         return TheCallIsRefused(InsufficientPrivilege)
 
 

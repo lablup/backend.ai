@@ -15,7 +15,7 @@ from ai.backend.manager.api.adapters.resource_group.adapter import ResourceGroup
 from ai.backend.manager.errors.base.entity import EntityNotFoundError
 from ai.backend.manager.errors.permission import NotEnoughPermission
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.testutils.scenario_steps import Given, Scenario, Then, When
+from ai.backend.testutils.scenario_steps import TestGiven, TestScenario, TestThen, TestWhen
 from bai_scenario.components.answers import TheCallIsRefused
 from bai_scenario.components.resource_group import (
     AGroupAndACaller,
@@ -27,7 +27,7 @@ from bai_scenario.runner.acting import ActingAs
 from bai_scenario.runner.planting import SeedingSession
 from bai_scenario.runner.steps import run_scenario
 
-type RetiringStep = Scenario[
+type RetiringStep = TestScenario[
     SeedingSession, AGroupAndACaller, ResourceGroupAdapter, ResourceGroupDetailNode
 ]
 
@@ -35,7 +35,7 @@ UNKNOWN = "no-such-group"
 
 
 @dataclass(frozen=True)
-class Purging(When[AGroupAndACaller, ResourceGroupAdapter, ResourceGroupDetailNode]):
+class Purging(TestWhen[AGroupAndACaller, ResourceGroupAdapter, ResourceGroupDetailNode]):
     """완전 삭제한다. ``unknown``이면 어느 행에도 없는 이름을 쓴다."""
 
     unknown: bool = False
@@ -59,7 +59,7 @@ class Purging(When[AGroupAndACaller, ResourceGroupAdapter, ResourceGroupDetailNo
 
 @dataclass(frozen=True)
 class TheSuperadminPurgesAGroup(
-    Scenario[SeedingSession, AGroupAndACaller, ResourceGroupAdapter, ResourceGroupDetailNode]
+    TestScenario[SeedingSession, AGroupAndACaller, ResourceGroupAdapter, ResourceGroupDetailNode]
 ):
     started: datetime
 
@@ -72,21 +72,21 @@ class TheSuperadminPurgesAGroup(
         return "리소스 그룹 하나가 있고 슈퍼관리자가 완전 삭제하면 지운 그룹 전체가 반환된다"
 
     @override
-    def given(self) -> Given[SeedingSession, AGroupAndACaller]:
+    def given(self) -> TestGiven[SeedingSession, AGroupAndACaller]:
         return AGroupAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
-    def when(self) -> When[AGroupAndACaller, ResourceGroupAdapter, ResourceGroupDetailNode]:
+    def when(self) -> TestWhen[AGroupAndACaller, ResourceGroupAdapter, ResourceGroupDetailNode]:
         return Purging()
 
     @override
-    def then(self) -> Then[AGroupAndACaller, ResourceGroupDetailNode]:
+    def then(self) -> TestThen[AGroupAndACaller, ResourceGroupDetailNode]:
         return TheGroupNode(GroupLook(started=self.started))
 
 
 @dataclass(frozen=True)
 class AUserGrantedHardDeleteOnTheGroupPurgesIt(
-    Scenario[SeedingSession, AGroupAndACaller, ResourceGroupAdapter, ResourceGroupDetailNode]
+    TestScenario[SeedingSession, AGroupAndACaller, ResourceGroupAdapter, ResourceGroupDetailNode]
 ):
     started: datetime
 
@@ -99,21 +99,21 @@ class AUserGrantedHardDeleteOnTheGroupPurgesIt(
         return "그 그룹에 앉힌 역할로 완전 삭제 권한을 받은 사용자가 완전 삭제하면 지운 그룹 전체가 반환된다"
 
     @override
-    def given(self) -> Given[SeedingSession, AGroupAndACaller]:
+    def given(self) -> TestGiven[SeedingSession, AGroupAndACaller]:
         return AGroupAndSomeone(granted=Permission.HARD_DELETE)
 
     @override
-    def when(self) -> When[AGroupAndACaller, ResourceGroupAdapter, ResourceGroupDetailNode]:
+    def when(self) -> TestWhen[AGroupAndACaller, ResourceGroupAdapter, ResourceGroupDetailNode]:
         return Purging()
 
     @override
-    def then(self) -> Then[AGroupAndACaller, ResourceGroupDetailNode]:
+    def then(self) -> TestThen[AGroupAndACaller, ResourceGroupDetailNode]:
         return TheGroupNode(GroupLook(started=self.started))
 
 
 @dataclass(frozen=True)
 class AUserGrantedNothingMayNotPurge(
-    Scenario[SeedingSession, AGroupAndACaller, ResourceGroupAdapter, ResourceGroupDetailNode]
+    TestScenario[SeedingSession, AGroupAndACaller, ResourceGroupAdapter, ResourceGroupDetailNode]
 ):
     @override
     def summary(self) -> str:
@@ -124,21 +124,21 @@ class AUserGrantedNothingMayNotPurge(
         return "아무 권한도 없는 사용자가 완전 삭제하려 하면 권한 부족으로 거부된다"
 
     @override
-    def given(self) -> Given[SeedingSession, AGroupAndACaller]:
+    def given(self) -> TestGiven[SeedingSession, AGroupAndACaller]:
         return AGroupAndSomeone()
 
     @override
-    def when(self) -> When[AGroupAndACaller, ResourceGroupAdapter, ResourceGroupDetailNode]:
+    def when(self) -> TestWhen[AGroupAndACaller, ResourceGroupAdapter, ResourceGroupDetailNode]:
         return Purging()
 
     @override
-    def then(self) -> Then[AGroupAndACaller, ResourceGroupDetailNode]:
+    def then(self) -> TestThen[AGroupAndACaller, ResourceGroupDetailNode]:
         return TheCallIsRefused(NotEnoughPermission)
 
 
 @dataclass(frozen=True)
 class TheSuperadminPurgingAnUnknownNameIsNotFound(
-    Scenario[SeedingSession, AGroupAndACaller, ResourceGroupAdapter, ResourceGroupDetailNode]
+    TestScenario[SeedingSession, AGroupAndACaller, ResourceGroupAdapter, ResourceGroupDetailNode]
 ):
     @override
     def summary(self) -> str:
@@ -151,15 +151,15 @@ class TheSuperadminPurgingAnUnknownNameIsNotFound(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, AGroupAndACaller]:
+    def given(self) -> TestGiven[SeedingSession, AGroupAndACaller]:
         return AGroupAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
-    def when(self) -> When[AGroupAndACaller, ResourceGroupAdapter, ResourceGroupDetailNode]:
+    def when(self) -> TestWhen[AGroupAndACaller, ResourceGroupAdapter, ResourceGroupDetailNode]:
         return Purging(unknown=True)
 
     @override
-    def then(self) -> Then[AGroupAndACaller, ResourceGroupDetailNode]:
+    def then(self) -> TestThen[AGroupAndACaller, ResourceGroupDetailNode]:
         return TheCallIsRefused(EntityNotFoundError)
 
 

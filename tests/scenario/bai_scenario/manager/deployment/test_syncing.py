@@ -16,13 +16,13 @@ from ai.backend.manager.errors.permission import NotEnoughPermission
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.testutils.scenario_steps import (
     Answered,
-    Given,
     Refused,
     Same,
-    Scenario,
-    Then,
-    Verdict,
-    When,
+    TestGiven,
+    TestScenario,
+    TestThen,
+    TestVerdict,
+    TestWhen,
 )
 from bai_scenario.components.answers import TheCallIsRefused
 from bai_scenario.components.deployment import ADeploymentAndACaller, ADeploymentInThatPlace
@@ -30,13 +30,13 @@ from bai_scenario.runner.acting import ActingAs
 from bai_scenario.runner.planting import SeedingSession
 from bai_scenario.runner.steps import run_scenario
 
-type SyncingStep = Scenario[
+type SyncingStep = TestScenario[
     SeedingSession, ADeploymentAndACaller, DeploymentAdapter, SyncReplicaPayload
 ]
 
 
 @dataclass(frozen=True)
-class Syncing(When[ADeploymentAndACaller, DeploymentAdapter, SyncReplicaPayload]):
+class Syncing(TestWhen[ADeploymentAndACaller, DeploymentAdapter, SyncReplicaPayload]):
     """배포의 복제를 맞추라고 한다."""
 
     @override
@@ -58,7 +58,7 @@ class Syncing(When[ADeploymentAndACaller, DeploymentAdapter, SyncReplicaPayload]
 
 
 @dataclass(frozen=True)
-class SyncingHasStarted(Then[ADeploymentAndACaller, SyncReplicaPayload]):
+class SyncingHasStarted(TestThen[ADeploymentAndACaller, SyncReplicaPayload]):
     """맞추기를 시작했다는 것만 답한다."""
 
     @override
@@ -68,7 +68,7 @@ class SyncingHasStarted(Then[ADeploymentAndACaller, SyncReplicaPayload]):
     @override
     def look(
         self, laid: ADeploymentAndACaller, answered: Answered[SyncReplicaPayload]
-    ) -> list[Verdict]:
+    ) -> list[TestVerdict]:
         payload = answered.response
         if payload is None:
             return [Refused(EntityNotFoundError, answered.raised)]
@@ -77,7 +77,7 @@ class SyncingHasStarted(Then[ADeploymentAndACaller, SyncReplicaPayload]):
 
 @dataclass(frozen=True)
 class TheGrantedUserStartsSyncing(
-    Scenario[SeedingSession, ADeploymentAndACaller, DeploymentAdapter, SyncReplicaPayload]
+    TestScenario[SeedingSession, ADeploymentAndACaller, DeploymentAdapter, SyncReplicaPayload]
 ):
     @override
     def summary(self) -> str:
@@ -88,21 +88,21 @@ class TheGrantedUserStartsSyncing(
         return "수정 권한을 받은 사용자가 복제 맞추기를 요청하면, 맞추기를 시작했다고 답한다"
 
     @override
-    def given(self) -> Given[SeedingSession, ADeploymentAndACaller]:
+    def given(self) -> TestGiven[SeedingSession, ADeploymentAndACaller]:
         return ADeploymentInThatPlace(granted=(Permission.UPDATE,), replica_count=2)
 
     @override
-    def when(self) -> When[ADeploymentAndACaller, DeploymentAdapter, SyncReplicaPayload]:
+    def when(self) -> TestWhen[ADeploymentAndACaller, DeploymentAdapter, SyncReplicaPayload]:
         return Syncing()
 
     @override
-    def then(self) -> Then[ADeploymentAndACaller, SyncReplicaPayload]:
+    def then(self) -> TestThen[ADeploymentAndACaller, SyncReplicaPayload]:
         return SyncingHasStarted()
 
 
 @dataclass(frozen=True)
 class ReadingIsNotEnoughToSync(
-    Scenario[SeedingSession, ADeploymentAndACaller, DeploymentAdapter, SyncReplicaPayload]
+    TestScenario[SeedingSession, ADeploymentAndACaller, DeploymentAdapter, SyncReplicaPayload]
 ):
     @override
     def summary(self) -> str:
@@ -113,15 +113,15 @@ class ReadingIsNotEnoughToSync(
         return "읽기 권한만 받은 사용자가 복제 맞추기를 요청하면, 권한 부족으로 거부된다"
 
     @override
-    def given(self) -> Given[SeedingSession, ADeploymentAndACaller]:
+    def given(self) -> TestGiven[SeedingSession, ADeploymentAndACaller]:
         return ADeploymentInThatPlace(granted=(Permission.READ,))
 
     @override
-    def when(self) -> When[ADeploymentAndACaller, DeploymentAdapter, SyncReplicaPayload]:
+    def when(self) -> TestWhen[ADeploymentAndACaller, DeploymentAdapter, SyncReplicaPayload]:
         return Syncing()
 
     @override
-    def then(self) -> Then[ADeploymentAndACaller, SyncReplicaPayload]:
+    def then(self) -> TestThen[ADeploymentAndACaller, SyncReplicaPayload]:
         return TheCallIsRefused(NotEnoughPermission)
 
 

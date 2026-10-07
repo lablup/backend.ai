@@ -23,7 +23,13 @@ from ai.backend.manager.api.adapters.runtime_variant_preset.adapter import (
 from ai.backend.manager.errors.permission import NotEnoughPermission
 from ai.backend.manager.errors.resource import RuntimeVariantPresetNotFound
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.testutils.scenario_steps import Configured, Given, Scenario, Then, When
+from ai.backend.testutils.scenario_steps import (
+    TestConfigured,
+    TestGiven,
+    TestScenario,
+    TestThen,
+    TestWhen,
+)
 from bai_scenario.components.answers import TheCallIsRefused
 from bai_scenario.components.runtime_variant_preset import (
     APresetAndACaller,
@@ -38,13 +44,13 @@ from bai_scenario.runner.steps import run_scenario
 RENAMED = "renamed"
 RERANKED = 7
 
-type EditingStep = Scenario[
+type EditingStep = TestScenario[
     SeedingSession, APresetAndACaller, RuntimeVariantPresetAdapter, RuntimeVariantPresetNode
 ]
 
 
 @dataclass(frozen=True)
-class Editing(When[APresetAndACaller, RuntimeVariantPresetAdapter, RuntimeVariantPresetNode]):
+class Editing(TestWhen[APresetAndACaller, RuntimeVariantPresetAdapter, RuntimeVariantPresetNode]):
     """미리 만들어 둔 프리셋을 수정한다. ``changes``에 없는 필드는 요청에 담지 않는다."""
 
     changes: Mapping[str, Any] = field(default_factory=dict)
@@ -75,7 +81,7 @@ class Editing(When[APresetAndACaller, RuntimeVariantPresetAdapter, RuntimeVarian
 
 @dataclass(frozen=True)
 class TheNameChangesAndTheRestStays(
-    Scenario[
+    TestScenario[
         SeedingSession, APresetAndACaller, RuntimeVariantPresetAdapter, RuntimeVariantPresetNode
     ]
 ):
@@ -92,23 +98,23 @@ class TheNameChangesAndTheRestStays(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, APresetAndACaller]:
+    def given(self) -> TestGiven[SeedingSession, APresetAndACaller]:
         return APresetAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
     def when(
         self,
-    ) -> When[APresetAndACaller, RuntimeVariantPresetAdapter, RuntimeVariantPresetNode]:
+    ) -> TestWhen[APresetAndACaller, RuntimeVariantPresetAdapter, RuntimeVariantPresetNode]:
         return Editing({"name": RENAMED})
 
     @override
-    def then(self) -> Then[APresetAndACaller, RuntimeVariantPresetNode]:
+    def then(self) -> TestThen[APresetAndACaller, RuntimeVariantPresetNode]:
         return ThePresetNode(started=self.started, named=RENAMED)
 
 
 @dataclass(frozen=True)
 class ClearingTheDescription(
-    Scenario[
+    TestScenario[
         SeedingSession, APresetAndACaller, RuntimeVariantPresetAdapter, RuntimeVariantPresetNode
     ]
 ):
@@ -123,23 +129,23 @@ class ClearingTheDescription(
         return "설명이 있는 프리셋의 설명을 비우면 설명이 없어진다"
 
     @override
-    def given(self) -> Given[SeedingSession, APresetAndACaller]:
+    def given(self) -> TestGiven[SeedingSession, APresetAndACaller]:
         return APresetAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
     def when(
         self,
-    ) -> When[APresetAndACaller, RuntimeVariantPresetAdapter, RuntimeVariantPresetNode]:
+    ) -> TestWhen[APresetAndACaller, RuntimeVariantPresetAdapter, RuntimeVariantPresetNode]:
         return Editing({"description": None})
 
     @override
-    def then(self) -> Then[APresetAndACaller, RuntimeVariantPresetNode]:
+    def then(self) -> TestThen[APresetAndACaller, RuntimeVariantPresetNode]:
         return ThePresetNode(started=self.started, described=None)
 
 
 @dataclass(frozen=True)
 class RerankingMovesIt(
-    Scenario[
+    TestScenario[
         SeedingSession, APresetAndACaller, RuntimeVariantPresetAdapter, RuntimeVariantPresetNode
     ]
 ):
@@ -154,23 +160,23 @@ class RerankingMovesIt(
         return "슈퍼관리자가 프리셋의 순위를 바꾸면 순위가 변경된 노드가 반환된다"
 
     @override
-    def given(self) -> Given[SeedingSession, APresetAndACaller]:
+    def given(self) -> TestGiven[SeedingSession, APresetAndACaller]:
         return APresetAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
     def when(
         self,
-    ) -> When[APresetAndACaller, RuntimeVariantPresetAdapter, RuntimeVariantPresetNode]:
+    ) -> TestWhen[APresetAndACaller, RuntimeVariantPresetAdapter, RuntimeVariantPresetNode]:
         return Editing({"rank": RERANKED})
 
     @override
-    def then(self) -> Then[APresetAndACaller, RuntimeVariantPresetNode]:
+    def then(self) -> TestThen[APresetAndACaller, RuntimeVariantPresetNode]:
         return ThePresetNode(started=self.started, rank=RERANKED)
 
 
 @dataclass(frozen=True)
 class AnEmptyEditChangesNothing(
-    Scenario[
+    TestScenario[
         SeedingSession, APresetAndACaller, RuntimeVariantPresetAdapter, RuntimeVariantPresetNode
     ]
 ):
@@ -185,23 +191,23 @@ class AnEmptyEditChangesNothing(
         return "변경할 값을 지정하지 않고 수정하면 아무것도 바뀌지 않은 노드가 반환된다"
 
     @override
-    def given(self) -> Given[SeedingSession, APresetAndACaller]:
+    def given(self) -> TestGiven[SeedingSession, APresetAndACaller]:
         return APresetAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
     def when(
         self,
-    ) -> When[APresetAndACaller, RuntimeVariantPresetAdapter, RuntimeVariantPresetNode]:
+    ) -> TestWhen[APresetAndACaller, RuntimeVariantPresetAdapter, RuntimeVariantPresetNode]:
         return Editing()
 
     @override
-    def then(self) -> Then[APresetAndACaller, RuntimeVariantPresetNode]:
+    def then(self) -> TestThen[APresetAndACaller, RuntimeVariantPresetNode]:
         return ThePresetNode(started=self.started)
 
 
 @dataclass(frozen=True)
 class TheSuperadminEditingAnUnknownIdIsNotFound(
-    Scenario[
+    TestScenario[
         SeedingSession, APresetAndACaller, RuntimeVariantPresetAdapter, RuntimeVariantPresetNode
     ]
 ):
@@ -214,23 +220,23 @@ class TheSuperadminEditingAnUnknownIdIsNotFound(
         return "슈퍼관리자가 존재하지 않는 ID를 수정하면 대상을 찾을 수 없어 요청이 거부된다"
 
     @override
-    def given(self) -> Given[SeedingSession, APresetAndACaller]:
+    def given(self) -> TestGiven[SeedingSession, APresetAndACaller]:
         return APresetAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
     def when(
         self,
-    ) -> When[APresetAndACaller, RuntimeVariantPresetAdapter, RuntimeVariantPresetNode]:
+    ) -> TestWhen[APresetAndACaller, RuntimeVariantPresetAdapter, RuntimeVariantPresetNode]:
         return Editing({"name": RENAMED}, unknown=True)
 
     @override
-    def then(self) -> Then[APresetAndACaller, RuntimeVariantPresetNode]:
+    def then(self) -> TestThen[APresetAndACaller, RuntimeVariantPresetNode]:
         return TheCallIsRefused(RuntimeVariantPresetNotFound)
 
 
 @dataclass(frozen=True)
 class AUserGrantedNothingMayNotEdit(
-    Scenario[
+    TestScenario[
         SeedingSession, APresetAndACaller, RuntimeVariantPresetAdapter, RuntimeVariantPresetNode
     ]
 ):
@@ -246,26 +252,26 @@ class AUserGrantedNothingMayNotEdit(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, APresetAndACaller]:
+    def given(self) -> TestGiven[SeedingSession, APresetAndACaller]:
         return APresetAndSomeone()
 
     @override
     def when(
         self,
-    ) -> When[APresetAndACaller, RuntimeVariantPresetAdapter, RuntimeVariantPresetNode]:
+    ) -> TestWhen[APresetAndACaller, RuntimeVariantPresetAdapter, RuntimeVariantPresetNode]:
         return Editing({"name": RENAMED})
 
     @override
-    def then(self) -> Then[APresetAndACaller, RuntimeVariantPresetNode]:
+    def then(self) -> TestThen[APresetAndACaller, RuntimeVariantPresetNode]:
         return TheCallIsRefused(NotEnoughPermission)
 
 
 @dataclass(frozen=True)
 class EnforcementOffLetsAnyoneEdit(
-    Scenario[
+    TestScenario[
         SeedingSession, APresetAndACaller, RuntimeVariantPresetAdapter, RuntimeVariantPresetNode
     ],
-    Configured,
+    TestConfigured,
 ):
     started: datetime
 
@@ -282,17 +288,17 @@ class EnforcementOffLetsAnyoneEdit(
         return {ENFORCEMENT: False}
 
     @override
-    def given(self) -> Given[SeedingSession, APresetAndACaller]:
+    def given(self) -> TestGiven[SeedingSession, APresetAndACaller]:
         return APresetAndSomeone()
 
     @override
     def when(
         self,
-    ) -> When[APresetAndACaller, RuntimeVariantPresetAdapter, RuntimeVariantPresetNode]:
+    ) -> TestWhen[APresetAndACaller, RuntimeVariantPresetAdapter, RuntimeVariantPresetNode]:
         return Editing({"name": RENAMED})
 
     @override
-    def then(self) -> Then[APresetAndACaller, RuntimeVariantPresetNode]:
+    def then(self) -> TestThen[APresetAndACaller, RuntimeVariantPresetNode]:
         return ThePresetNode(started=self.started, named=RENAMED)
 
 

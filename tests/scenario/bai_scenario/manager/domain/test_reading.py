@@ -15,7 +15,7 @@ from ai.backend.manager.api.adapters.domain.adapter import DomainAdapter
 from ai.backend.manager.errors.base.entity import EntityNotFoundError
 from ai.backend.manager.errors.permission import NotEnoughPermission
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.testutils.scenario_steps import Given, Scenario, Then, When
+from ai.backend.testutils.scenario_steps import TestGiven, TestScenario, TestThen, TestWhen
 from bai_scenario.components.domain import (
     ADomainAndACaller,
     ADomainAndSomeone,
@@ -27,11 +27,11 @@ from bai_scenario.runner.acting import ActingAs
 from bai_scenario.runner.planting import SeedingSession
 from bai_scenario.runner.steps import run_scenario
 
-type DomainStep = Scenario[SeedingSession, ADomainAndACaller, DomainAdapter, DomainNode]
+type DomainStep = TestScenario[SeedingSession, ADomainAndACaller, DomainAdapter, DomainNode]
 
 
 @dataclass(frozen=True)
-class ReadingByName(When[ADomainAndACaller, DomainAdapter, DomainNode]):
+class ReadingByName(TestWhen[ADomainAndACaller, DomainAdapter, DomainNode]):
     """이름으로 읽는다. 이름을 대지 않으면 미리 만든 도메인의 이름을 쓴다."""
 
     named: str | None = None
@@ -51,7 +51,7 @@ class ReadingByName(When[ADomainAndACaller, DomainAdapter, DomainNode]):
 
 
 @dataclass(frozen=True)
-class SoftDeletingThenReading(When[ADomainAndACaller, DomainAdapter, DomainNode]):
+class SoftDeletingThenReading(TestWhen[ADomainAndACaller, DomainAdapter, DomainNode]):
     """미리 만든 도메인을 soft delete 한 뒤 이름으로 읽는다."""
 
     @override
@@ -71,7 +71,7 @@ class SoftDeletingThenReading(When[ADomainAndACaller, DomainAdapter, DomainNode]
 
 @dataclass(frozen=True)
 class TheSuperadminReadsADomainByName(
-    Scenario[SeedingSession, ADomainAndACaller, DomainAdapter, DomainNode]
+    TestScenario[SeedingSession, ADomainAndACaller, DomainAdapter, DomainNode]
 ):
     started: datetime
 
@@ -84,21 +84,21 @@ class TheSuperadminReadsADomainByName(
         return "도메인 하나가 있고 슈퍼관리자가 이름으로 조회하면, 그 도메인이 답으로 온다"
 
     @override
-    def given(self) -> Given[SeedingSession, ADomainAndACaller]:
+    def given(self) -> TestGiven[SeedingSession, ADomainAndACaller]:
         return ADomainAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
-    def when(self) -> When[ADomainAndACaller, DomainAdapter, DomainNode]:
+    def when(self) -> TestWhen[ADomainAndACaller, DomainAdapter, DomainNode]:
         return ReadingByName()
 
     @override
-    def then(self) -> Then[ADomainAndACaller, DomainNode]:
+    def then(self) -> TestThen[ADomainAndACaller, DomainNode]:
         return TheDomainNode(started=self.started)
 
 
 @dataclass(frozen=True)
 class AUserGrantedNothingMayNotRead(
-    Scenario[SeedingSession, ADomainAndACaller, DomainAdapter, DomainNode]
+    TestScenario[SeedingSession, ADomainAndACaller, DomainAdapter, DomainNode]
 ):
     @override
     def summary(self) -> str:
@@ -112,21 +112,21 @@ class AUserGrantedNothingMayNotRead(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, ADomainAndACaller]:
+    def given(self) -> TestGiven[SeedingSession, ADomainAndACaller]:
         return ADomainAndSomeone()
 
     @override
-    def when(self) -> When[ADomainAndACaller, DomainAdapter, DomainNode]:
+    def when(self) -> TestWhen[ADomainAndACaller, DomainAdapter, DomainNode]:
         return ReadingByName()
 
     @override
-    def then(self) -> Then[ADomainAndACaller, DomainNode]:
+    def then(self) -> TestThen[ADomainAndACaller, DomainNode]:
         return TheCallIsRefused(NotEnoughPermission)
 
 
 @dataclass(frozen=True)
 class ANameNothingAnswersToIsNotFound(
-    Scenario[SeedingSession, ADomainAndACaller, DomainAdapter, DomainNode]
+    TestScenario[SeedingSession, ADomainAndACaller, DomainAdapter, DomainNode]
 ):
     @override
     def summary(self) -> str:
@@ -140,21 +140,21 @@ class ANameNothingAnswersToIsNotFound(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, ADomainAndACaller]:
+    def given(self) -> TestGiven[SeedingSession, ADomainAndACaller]:
         return ADomainAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
-    def when(self) -> When[ADomainAndACaller, DomainAdapter, DomainNode]:
+    def when(self) -> TestWhen[ADomainAndACaller, DomainAdapter, DomainNode]:
         return ReadingByName(named="no-such-domain")
 
     @override
-    def then(self) -> Then[ADomainAndACaller, DomainNode]:
+    def then(self) -> TestThen[ADomainAndACaller, DomainNode]:
         return TheCallIsRefused(EntityNotFoundError)
 
 
 @dataclass(frozen=True)
 class ASoftDeletedDomainIsStillRead(
-    Scenario[SeedingSession, ADomainAndACaller, DomainAdapter, DomainNode]
+    TestScenario[SeedingSession, ADomainAndACaller, DomainAdapter, DomainNode]
 ):
     started: datetime
 
@@ -167,15 +167,15 @@ class ASoftDeletedDomainIsStillRead(
         return "슈퍼관리자가 도메인을 soft delete 한 뒤 이름으로 조회하면, 비활성 상태를 실은 그 도메인이 온다"
 
     @override
-    def given(self) -> Given[SeedingSession, ADomainAndACaller]:
+    def given(self) -> TestGiven[SeedingSession, ADomainAndACaller]:
         return ATargetAndSomeone(role=UserRole.SUPERADMIN, name_hint="soft-deleted")
 
     @override
-    def when(self) -> When[ADomainAndACaller, DomainAdapter, DomainNode]:
+    def when(self) -> TestWhen[ADomainAndACaller, DomainAdapter, DomainNode]:
         return SoftDeletingThenReading()
 
     @override
-    def then(self) -> Then[ADomainAndACaller, DomainNode]:
+    def then(self) -> TestThen[ADomainAndACaller, DomainNode]:
         return TheDomainNode(started=self.started, active=False)
 
 

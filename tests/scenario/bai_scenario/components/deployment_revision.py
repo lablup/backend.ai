@@ -42,14 +42,14 @@ from ai.backend.manager.errors.base.entity import EntityNotFoundError
 from ai.backend.manager.errors.permission import NotEnoughPermission
 from ai.backend.testutils.scenario_steps import (
     Answered,
-    Given,
     Held,
     Refused,
     Same,
     SameAs,
     Skipped,
-    Then,
-    Verdict,
+    TestGiven,
+    TestThen,
+    TestVerdict,
 )
 from bai_scenario.components.deployment import (
     APlaceAndACaller,
@@ -215,7 +215,7 @@ def _revisions_and_a_caller(
 
 
 @dataclass(frozen=True)
-class ADeploymentToRevise(Given[Any, RevisionsAndACaller]):
+class ADeploymentToRevise(TestGiven[Any, RevisionsAndACaller]):
     """배포 하나와 거기 딸린 리비전들, 그리고 그 프로젝트 안의 사용자 한 명.
 
     모델 폴더는 부르는 사람의 것이다. ``folder_readable``이면 부르는 사람은 그 폴더를 읽을
@@ -266,7 +266,7 @@ class ADeploymentToRevise(Given[Any, RevisionsAndACaller]):
 
 
 @dataclass(frozen=True)
-class AnothersDeploymentToRevise(Given[Any, RevisionsAndACaller]):
+class AnothersDeploymentToRevise(TestGiven[Any, RevisionsAndACaller]):
     """다른 사람이 만든 리비전 없는 배포와, 아무 권한도 받지 않은 슈퍼관리자.
 
     모델 폴더는 슈퍼관리자 자신의 것이지만 그 폴더에도 권한을 심지 않는다. 역할이 배포
@@ -295,7 +295,7 @@ class AnothersDeploymentToRevise(Given[Any, RevisionsAndACaller]):
 
 
 @dataclass(frozen=True)
-class RevisionsInTwoProjects(Given[Any, RevisionsAndACaller]):
+class RevisionsInTwoProjects(TestGiven[Any, RevisionsAndACaller]):
     """두 프로젝트의 배포에 나뉜 리비전과, 한쪽 프로젝트에만 권한을 받은 사용자.
 
     부를 배포는 권한을 받은 프로젝트의 것이다. 다른 프로젝트의 배포에 심은 리비전은
@@ -348,12 +348,12 @@ def revision_verdicts(
     number: int,
     slots: tuple[tuple[str, Decimal], ...],
     seeded: ModelRevisionData | None,
-) -> list[Verdict]:
+) -> list[TestVerdict]:
     """리비전 노드 한 개의 자리를 모두 본다. ``at``은 자리 이름 앞에 붙는다."""
     mount = node.model_mount_config
     runtime = node.model_runtime_config
     resources = node.resource_config
-    identity: Verdict = (
+    identity: TestVerdict = (
         Held(f"{at}id", node.id, SameAs[UUID](seeded.id, "심은 리비전"))
         if seeded is not None
         else Skipped(f"{at}id", "데이터베이스가 만든다")
@@ -431,7 +431,7 @@ def revision_verdicts(
 
 
 @dataclass(frozen=True)
-class TheRevisionNode(Then[RevisionsAndACaller, RevisionNode]):
+class TheRevisionNode(TestThen[RevisionsAndACaller, RevisionNode]):
     """리비전 하나가 통째로 온다.
 
     ``seeded``를 대면 심은 리비전 중 그 차례의 것이어야 한다. 대지 않으면 방금 더한
@@ -448,7 +448,9 @@ class TheRevisionNode(Then[RevisionsAndACaller, RevisionNode]):
         return "리비전 전체가 온다"
 
     @override
-    def look(self, laid: RevisionsAndACaller, answered: Answered[RevisionNode]) -> list[Verdict]:
+    def look(
+        self, laid: RevisionsAndACaller, answered: Answered[RevisionNode]
+    ) -> list[TestVerdict]:
         node = answered.response
         if node is None:
             return [Refused(EntityNotFoundError, answered.raised)]
@@ -464,7 +466,7 @@ class TheRevisionNode(Then[RevisionsAndACaller, RevisionNode]):
 
 
 @dataclass(frozen=True)
-class EachNamedRevisionIsAnswered(Then[RevisionsAndACaller, Loaded]):
+class EachNamedRevisionIsAnswered(TestThen[RevisionsAndACaller, Loaded]):
     """읽을 수 있는 것, 볼 수 없는 것, 없는 것을 차례로 이름 댄 답.
 
     읽을 수 있는 것은 리비전으로, 볼 수 없는 것은 거부로, 없는 것은 빈 자리로 온다.
@@ -477,11 +479,11 @@ class EachNamedRevisionIsAnswered(Then[RevisionsAndACaller, Loaded]):
         return "이름 댄 순서대로 리비전, 거부, 빈 자리가 온다"
 
     @override
-    def look(self, laid: RevisionsAndACaller, answered: Answered[Loaded]) -> list[Verdict]:
+    def look(self, laid: RevisionsAndACaller, answered: Answered[Loaded]) -> list[TestVerdict]:
         items = answered.response
         if items is None:
             return [Refused(EntityNotFoundError, answered.raised)]
-        seen: list[Verdict] = [Same("len", len(items), 3)]
+        seen: list[TestVerdict] = [Same("len", len(items), 3)]
         if len(items) != 3:
             return seen
         readable, hidden, missing = items
@@ -505,7 +507,7 @@ class EachNamedRevisionIsAnswered(Then[RevisionsAndACaller, Loaded]):
 
 
 @dataclass(frozen=True)
-class EveryLaidRevisionIsCounted(Then[RevisionsAndACaller, AdminSearchRevisionsPayload]):
+class EveryLaidRevisionIsCounted(TestThen[RevisionsAndACaller, AdminSearchRevisionsPayload]):
     """심은 리비전이 모두, 그리고 그것만 세어진다.
 
     ``elsewhere_too``면 다른 프로젝트의 것까지, ``number``를 대면 그 번호의 것만 센다.
@@ -521,7 +523,7 @@ class EveryLaidRevisionIsCounted(Then[RevisionsAndACaller, AdminSearchRevisionsP
     @override
     def look(
         self, laid: RevisionsAndACaller, answered: Answered[AdminSearchRevisionsPayload]
-    ) -> list[Verdict]:
+    ) -> list[TestVerdict]:
         payload = answered.response
         if payload is None:
             return [Refused(NotEnoughPermission, answered.raised)]
@@ -546,7 +548,9 @@ class EveryLaidRevisionIsCounted(Then[RevisionsAndACaller, AdminSearchRevisionsP
 
 
 @dataclass(frozen=True)
-class EveryRevisionSlotIsCounted(Then[RevisionsAndACaller, SearchAllocatedResourceSlotsPayload]):
+class EveryRevisionSlotIsCounted(
+    TestThen[RevisionsAndACaller, SearchAllocatedResourceSlotsPayload]
+):
     """심은 리비전이 잡은 슬롯이 모두 세어진다."""
 
     @override
@@ -558,7 +562,7 @@ class EveryRevisionSlotIsCounted(Then[RevisionsAndACaller, SearchAllocatedResour
         self,
         laid: RevisionsAndACaller,
         answered: Answered[SearchAllocatedResourceSlotsPayload],
-    ) -> list[Verdict]:
+    ) -> list[TestVerdict]:
         payload = answered.response
         if payload is None:
             return [Refused(EntityNotFoundError, answered.raised)]

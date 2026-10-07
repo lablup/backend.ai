@@ -21,7 +21,14 @@ from ai.backend.manager.data.keypair.types import KeyPairData
 from ai.backend.manager.data.permission.types import Permission
 from ai.backend.manager.data.project.types import ProjectData
 from ai.backend.manager.data.user.types import UserData
-from ai.backend.testutils.scenario_steps import Condition, Held, Same, SameAs, Skipped, Verdict
+from ai.backend.testutils.scenario_steps import (
+    Held,
+    Same,
+    SameAs,
+    Skipped,
+    TestCondition,
+    TestVerdict,
+)
 from bai_scenario.components.domain import WrittenByThisRun
 from bai_scenario.seeds.rbac.role import SeedPermission, SeedRole
 from bai_scenario.seeds.seeder import Laid, Seeder, TestSeedNest
@@ -72,7 +79,7 @@ class AGrant(TestSeedNest[Laid[None]]):
 
 
 @dataclass(frozen=True)
-class AKeyIsThere(Condition[str | None]):
+class AKeyIsThere(TestCondition[str | None]):
     """기본 키가 채워져 있다. 키 값은 실행마다 새로 만들어진다."""
 
     @override
@@ -97,12 +104,12 @@ class UserNodeLook:
         self,
         node: UserNode,
         expected: UserData,
-        main_access_key: Condition[str | None] | None = None,
+        main_access_key: TestCondition[str | None] | None = None,
         at: str = "",
-    ) -> list[Verdict]:
+    ) -> list[TestVerdict]:
         """``at``은 답이 목록일 때 원소 자리를 앞에 붙인다."""
         written = WrittenByThisRun(self.started)
-        key: Verdict = (
+        key: TestVerdict = (
             Held(
                 f"{at}organization.main_access_key",
                 node.organization.main_access_key,
@@ -177,7 +184,9 @@ class KeypairNodeLook:
 
     started: datetime
 
-    def verdicts(self, node: KeypairNode, expected: KeyPairData, owner: UserData) -> list[Verdict]:
+    def verdicts(
+        self, node: KeypairNode, expected: KeyPairData, owner: UserData
+    ) -> list[TestVerdict]:
         written = WrittenByThisRun(self.started)
         return [
             Held("id", node.id, SameAs(str(expected.access_key), "심은 키")),
@@ -205,7 +214,7 @@ class KeypairNodeLook:
         is_default: bool,
         rate_limit: int,
         resource_policy: str,
-    ) -> list[Verdict]:
+    ) -> list[TestVerdict]:
         """방금 만들어진 키. 키 값과 SSH 키는 매니저가 만든다."""
         written = WrittenByThisRun(self.started)
         return [

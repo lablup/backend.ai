@@ -15,14 +15,14 @@ from ai.backend.manager.errors.permission import NotEnoughPermission
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.testutils.scenario_steps import (
     Answered,
-    Given,
     Refused,
     Same,
-    Scenario,
     Skipped,
-    Then,
-    Verdict,
-    When,
+    TestGiven,
+    TestScenario,
+    TestThen,
+    TestVerdict,
+    TestWhen,
 )
 from bai_scenario.components.answers import MissingResponse
 from bai_scenario.components.container_registry import (
@@ -35,13 +35,13 @@ from bai_scenario.runner.planting import SeedingSession
 from bai_scenario.runner.steps import run_scenario
 
 type Loaded = list[ContainerRegistryNode | Exception | None]
-type ReadingScenario = Scenario[
+type ReadingScenario = TestScenario[
     SeedingSession, ManyRegistriesAndACaller, ContainerRegistryAdapter, Loaded
 ]
 
 
 @dataclass(frozen=True)
-class Loading(When[ManyRegistriesAndACaller, ContainerRegistryAdapter, Loaded]):
+class Loading(TestWhen[ManyRegistriesAndACaller, ContainerRegistryAdapter, Loaded]):
     empty: bool = False
 
     @override
@@ -79,13 +79,13 @@ def registry_name_of(one: ContainerRegistryNode | Exception | None) -> str | Non
 
 
 @dataclass(frozen=True)
-class TheOrderIsKept(Then[ManyRegistriesAndACaller, Loaded]):
+class TheOrderIsKept(TestThen[ManyRegistriesAndACaller, Loaded]):
     @override
     def says(self) -> str:
         return "미리 만들어 둔 레지스트리는 요청한 순서대로 반환되고, 존재하지 않는 id의 항목은 검사하지 않는다"
 
     @override
-    def look(self, laid: ManyRegistriesAndACaller, answered: Answered[Loaded]) -> list[Verdict]:
+    def look(self, laid: ManyRegistriesAndACaller, answered: Answered[Loaded]) -> list[TestVerdict]:
         got = answered.response
         if got is None:
             return [MissingResponse(answered.raised)]
@@ -100,13 +100,13 @@ class TheOrderIsKept(Then[ManyRegistriesAndACaller, Loaded]):
 
 
 @dataclass(frozen=True)
-class EveryIdIsRefused(Then[ManyRegistriesAndACaller, Loaded]):
+class EveryIdIsRefused(TestThen[ManyRegistriesAndACaller, Loaded]):
     @override
     def says(self) -> str:
         return "항목마다 권한 부족 거부가 담겨 반환된다"
 
     @override
-    def look(self, laid: ManyRegistriesAndACaller, answered: Answered[Loaded]) -> list[Verdict]:
+    def look(self, laid: ManyRegistriesAndACaller, answered: Answered[Loaded]) -> list[TestVerdict]:
         got = answered.response
         if got is None:
             return [MissingResponse(answered.raised)]
@@ -120,13 +120,13 @@ class EveryIdIsRefused(Then[ManyRegistriesAndACaller, Loaded]):
 
 
 @dataclass(frozen=True)
-class AnEmptyListComesBack(Then[ManyRegistriesAndACaller, Loaded]):
+class AnEmptyListComesBack(TestThen[ManyRegistriesAndACaller, Loaded]):
     @override
     def says(self) -> str:
         return "빈 응답이 반환된다"
 
     @override
-    def look(self, laid: ManyRegistriesAndACaller, answered: Answered[Loaded]) -> list[Verdict]:
+    def look(self, laid: ManyRegistriesAndACaller, answered: Answered[Loaded]) -> list[TestVerdict]:
         got = answered.response
         if got is None:
             return [MissingResponse(answered.raised)]
@@ -135,7 +135,7 @@ class AnEmptyListComesBack(Then[ManyRegistriesAndACaller, Loaded]):
 
 @dataclass(frozen=True)
 class LoadingKeepsTheOrder(
-    Scenario[SeedingSession, ManyRegistriesAndACaller, ContainerRegistryAdapter, Loaded]
+    TestScenario[SeedingSession, ManyRegistriesAndACaller, ContainerRegistryAdapter, Loaded]
 ):
     @override
     def summary(self) -> str:
@@ -150,21 +150,21 @@ class LoadingKeepsTheOrder(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, ManyRegistriesAndACaller]:
+    def given(self) -> TestGiven[SeedingSession, ManyRegistriesAndACaller]:
         return ManyRegistriesAndSomeone()
 
     @override
-    def when(self) -> When[ManyRegistriesAndACaller, ContainerRegistryAdapter, Loaded]:
+    def when(self) -> TestWhen[ManyRegistriesAndACaller, ContainerRegistryAdapter, Loaded]:
         return Loading()
 
     @override
-    def then(self) -> Then[ManyRegistriesAndACaller, Loaded]:
+    def then(self) -> TestThen[ManyRegistriesAndACaller, Loaded]:
         return TheOrderIsKept()
 
 
 @dataclass(frozen=True)
 class AnEmptyListAsksNothing(
-    Scenario[SeedingSession, ManyRegistriesAndACaller, ContainerRegistryAdapter, Loaded]
+    TestScenario[SeedingSession, ManyRegistriesAndACaller, ContainerRegistryAdapter, Loaded]
 ):
     @override
     def summary(self) -> str:
@@ -175,21 +175,21 @@ class AnEmptyListAsksNothing(
         return "빈 id 목록으로 조회하면 하위 계층을 호출하지 않고 빈 응답이 반환된다"
 
     @override
-    def given(self) -> Given[SeedingSession, ManyRegistriesAndACaller]:
+    def given(self) -> TestGiven[SeedingSession, ManyRegistriesAndACaller]:
         return ManyRegistriesAndSomeone()
 
     @override
-    def when(self) -> When[ManyRegistriesAndACaller, ContainerRegistryAdapter, Loaded]:
+    def when(self) -> TestWhen[ManyRegistriesAndACaller, ContainerRegistryAdapter, Loaded]:
         return Loading(empty=True)
 
     @override
-    def then(self) -> Then[ManyRegistriesAndACaller, Loaded]:
+    def then(self) -> TestThen[ManyRegistriesAndACaller, Loaded]:
         return AnEmptyListComesBack()
 
 
 @dataclass(frozen=True)
 class APlainUserIsRefusedOnEveryId(
-    Scenario[SeedingSession, ManyRegistriesAndACaller, ContainerRegistryAdapter, Loaded]
+    TestScenario[SeedingSession, ManyRegistriesAndACaller, ContainerRegistryAdapter, Loaded]
 ):
     @override
     def summary(self) -> str:
@@ -204,15 +204,15 @@ class APlainUserIsRefusedOnEveryId(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, ManyRegistriesAndACaller]:
+    def given(self) -> TestGiven[SeedingSession, ManyRegistriesAndACaller]:
         return ManyRegistriesAndSomeone(role=UserRole.USER)
 
     @override
-    def when(self) -> When[ManyRegistriesAndACaller, ContainerRegistryAdapter, Loaded]:
+    def when(self) -> TestWhen[ManyRegistriesAndACaller, ContainerRegistryAdapter, Loaded]:
         return Loading()
 
     @override
-    def then(self) -> Then[ManyRegistriesAndACaller, Loaded]:
+    def then(self) -> TestThen[ManyRegistriesAndACaller, Loaded]:
         return EveryIdIsRefused()
 
 

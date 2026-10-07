@@ -21,7 +21,7 @@ from ai.backend.common.dto.manager.v2.notification.types import NotificationChan
 from ai.backend.manager.api.adapters.notification.adapter import NotificationAdapter
 from ai.backend.manager.errors.auth import InsufficientPrivilege
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.testutils.scenario_steps import Given, Scenario, Then, When
+from ai.backend.testutils.scenario_steps import TestGiven, TestScenario, TestThen, TestWhen
 from bai_scenario.components.answers import TheCallIsRefused
 from bai_scenario.components.notification import (
     AnEnabledAndADisabledChannel,
@@ -37,11 +37,13 @@ from bai_scenario.runner.planting import SeedingSession
 from bai_scenario.runner.steps import run_scenario
 
 type Searched = SearchNotificationChannelsPayload
-type SearchingStep = Scenario[SeedingSession, ManyChannelsAndACaller, NotificationAdapter, Searched]
+type SearchingStep = TestScenario[
+    SeedingSession, ManyChannelsAndACaller, NotificationAdapter, Searched
+]
 
 
 @dataclass(frozen=True)
-class SearchingEveryChannel(When[ManyChannelsAndACaller, NotificationAdapter, Searched]):
+class SearchingEveryChannel(TestWhen[ManyChannelsAndACaller, NotificationAdapter, Searched]):
     """필터 없이 전체를 검색한다."""
 
     @override
@@ -59,7 +61,7 @@ class SearchingEveryChannel(When[ManyChannelsAndACaller, NotificationAdapter, Se
 
 
 @dataclass(frozen=True)
-class SearchingByName(When[ManyChannelsAndACaller, NotificationAdapter, Searched]):
+class SearchingByName(TestWhen[ManyChannelsAndACaller, NotificationAdapter, Searched]):
     """골라낸 하나의 이름을 필터로 검색한다."""
 
     @override
@@ -81,7 +83,7 @@ class SearchingByName(When[ManyChannelsAndACaller, NotificationAdapter, Searched
 
 
 @dataclass(frozen=True)
-class SearchingEmailChannels(When[ManyChannelsAndACaller, NotificationAdapter, Searched]):
+class SearchingEmailChannels(TestWhen[ManyChannelsAndACaller, NotificationAdapter, Searched]):
     """email 종류만 필터로 검색한다."""
 
     @override
@@ -107,7 +109,7 @@ class SearchingEmailChannels(When[ManyChannelsAndACaller, NotificationAdapter, S
 
 
 @dataclass(frozen=True)
-class SearchingTheEnabledOnes(When[ManyChannelsAndACaller, NotificationAdapter, Searched]):
+class SearchingTheEnabledOnes(TestWhen[ManyChannelsAndACaller, NotificationAdapter, Searched]):
     """활성인 채널만 필터로 검색한다."""
 
     @override
@@ -127,7 +129,7 @@ class SearchingTheEnabledOnes(When[ManyChannelsAndACaller, NotificationAdapter, 
 
 
 @dataclass(frozen=True)
-class SearchingTheFirstOne(When[ManyChannelsAndACaller, NotificationAdapter, Searched]):
+class SearchingTheFirstOne(TestWhen[ManyChannelsAndACaller, NotificationAdapter, Searched]):
     """앞에서 한 건만 요청한다."""
 
     @override
@@ -146,7 +148,7 @@ class SearchingTheFirstOne(When[ManyChannelsAndACaller, NotificationAdapter, Sea
 
 @dataclass(frozen=True)
 class TheSuperadminCountsEveryChannel(
-    Scenario[SeedingSession, ManyChannelsAndACaller, NotificationAdapter, Searched]
+    TestScenario[SeedingSession, ManyChannelsAndACaller, NotificationAdapter, Searched]
 ):
     @override
     def summary(self) -> str:
@@ -157,21 +159,21 @@ class TheSuperadminCountsEveryChannel(
         return "채널 둘이 있을 때 슈퍼관리자가 필터 없이 조회하면 둘 다 반환된다"
 
     @override
-    def given(self) -> Given[SeedingSession, ManyChannelsAndACaller]:
+    def given(self) -> TestGiven[SeedingSession, ManyChannelsAndACaller]:
         return TwoChannelsAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
-    def when(self) -> When[ManyChannelsAndACaller, NotificationAdapter, Searched]:
+    def when(self) -> TestWhen[ManyChannelsAndACaller, NotificationAdapter, Searched]:
         return SearchingEveryChannel()
 
     @override
-    def then(self) -> Then[ManyChannelsAndACaller, Searched]:
+    def then(self) -> TestThen[ManyChannelsAndACaller, Searched]:
         return TheLaidChannelsAreLeft()
 
 
 @dataclass(frozen=True)
 class ANameFilterNarrows(
-    Scenario[SeedingSession, ManyChannelsAndACaller, NotificationAdapter, Searched]
+    TestScenario[SeedingSession, ManyChannelsAndACaller, NotificationAdapter, Searched]
 ):
     @override
     def summary(self) -> str:
@@ -182,21 +184,21 @@ class ANameFilterNarrows(
         return "채널 둘 중 한쪽 이름을 필터로 조회하면 그 채널 하나만 반환된다"
 
     @override
-    def given(self) -> Given[SeedingSession, ManyChannelsAndACaller]:
+    def given(self) -> TestGiven[SeedingSession, ManyChannelsAndACaller]:
         return TwoChannelsAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
-    def when(self) -> When[ManyChannelsAndACaller, NotificationAdapter, Searched]:
+    def when(self) -> TestWhen[ManyChannelsAndACaller, NotificationAdapter, Searched]:
         return SearchingByName()
 
     @override
-    def then(self) -> Then[ManyChannelsAndACaller, Searched]:
+    def then(self) -> TestThen[ManyChannelsAndACaller, Searched]:
         return OnlyTheNamedChannelIsLeft()
 
 
 @dataclass(frozen=True)
 class AChannelTypeFilterNarrows(
-    Scenario[SeedingSession, ManyChannelsAndACaller, NotificationAdapter, Searched]
+    TestScenario[SeedingSession, ManyChannelsAndACaller, NotificationAdapter, Searched]
 ):
     @override
     def summary(self) -> str:
@@ -207,21 +209,21 @@ class AChannelTypeFilterNarrows(
         return "webhook 채널과 email 채널이 있을 때 email 종류를 필터로 조회하면 email 채널 하나만 반환된다"
 
     @override
-    def given(self) -> Given[SeedingSession, ManyChannelsAndACaller]:
+    def given(self) -> TestGiven[SeedingSession, ManyChannelsAndACaller]:
         return AWebhookAndAnEmailChannel(role=UserRole.SUPERADMIN)
 
     @override
-    def when(self) -> When[ManyChannelsAndACaller, NotificationAdapter, Searched]:
+    def when(self) -> TestWhen[ManyChannelsAndACaller, NotificationAdapter, Searched]:
         return SearchingEmailChannels()
 
     @override
-    def then(self) -> Then[ManyChannelsAndACaller, Searched]:
+    def then(self) -> TestThen[ManyChannelsAndACaller, Searched]:
         return OnlyTheNamedChannelIsLeft()
 
 
 @dataclass(frozen=True)
 class AnEnabledFilterNarrows(
-    Scenario[SeedingSession, ManyChannelsAndACaller, NotificationAdapter, Searched]
+    TestScenario[SeedingSession, ManyChannelsAndACaller, NotificationAdapter, Searched]
 ):
     @override
     def summary(self) -> str:
@@ -232,21 +234,21 @@ class AnEnabledFilterNarrows(
         return "활성 채널과 비활성 채널이 섞여 있을 때 활성 필터로 조회하면 활성인 것만 반환된다"
 
     @override
-    def given(self) -> Given[SeedingSession, ManyChannelsAndACaller]:
+    def given(self) -> TestGiven[SeedingSession, ManyChannelsAndACaller]:
         return AnEnabledAndADisabledChannel(role=UserRole.SUPERADMIN)
 
     @override
-    def when(self) -> When[ManyChannelsAndACaller, NotificationAdapter, Searched]:
+    def when(self) -> TestWhen[ManyChannelsAndACaller, NotificationAdapter, Searched]:
         return SearchingTheEnabledOnes()
 
     @override
-    def then(self) -> Then[ManyChannelsAndACaller, Searched]:
+    def then(self) -> TestThen[ManyChannelsAndACaller, Searched]:
         return TheLaidChannelsAreLeft()
 
 
 @dataclass(frozen=True)
 class TheFirstPageSaysThereIsMore(
-    Scenario[SeedingSession, ManyChannelsAndACaller, NotificationAdapter, Searched]
+    TestScenario[SeedingSession, ManyChannelsAndACaller, NotificationAdapter, Searched]
 ):
     @override
     def summary(self) -> str:
@@ -257,21 +259,21 @@ class TheFirstPageSaysThereIsMore(
         return "채널 둘이 있을 때 앞에서 한 건만 요청하면 한 건이 반환되고 다음 페이지가 있다고 응답한다"
 
     @override
-    def given(self) -> Given[SeedingSession, ManyChannelsAndACaller]:
+    def given(self) -> TestGiven[SeedingSession, ManyChannelsAndACaller]:
         return TwoChannelsAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
-    def when(self) -> When[ManyChannelsAndACaller, NotificationAdapter, Searched]:
+    def when(self) -> TestWhen[ManyChannelsAndACaller, NotificationAdapter, Searched]:
         return SearchingTheFirstOne()
 
     @override
-    def then(self) -> Then[ManyChannelsAndACaller, Searched]:
+    def then(self) -> TestThen[ManyChannelsAndACaller, Searched]:
         return TheFirstChannelPage()
 
 
 @dataclass(frozen=True)
 class TheMonitorSearchesLikeTheSuperadmin(
-    Scenario[SeedingSession, ManyChannelsAndACaller, NotificationAdapter, Searched]
+    TestScenario[SeedingSession, ManyChannelsAndACaller, NotificationAdapter, Searched]
 ):
     @override
     def summary(self) -> str:
@@ -282,21 +284,21 @@ class TheMonitorSearchesLikeTheSuperadmin(
         return "모니터가 필터 없이 조회하면 슈퍼관리자와 같은 응답을 받는다"
 
     @override
-    def given(self) -> Given[SeedingSession, ManyChannelsAndACaller]:
+    def given(self) -> TestGiven[SeedingSession, ManyChannelsAndACaller]:
         return TwoChannelsAndSomeone(role=UserRole.MONITOR)
 
     @override
-    def when(self) -> When[ManyChannelsAndACaller, NotificationAdapter, Searched]:
+    def when(self) -> TestWhen[ManyChannelsAndACaller, NotificationAdapter, Searched]:
         return SearchingEveryChannel()
 
     @override
-    def then(self) -> Then[ManyChannelsAndACaller, Searched]:
+    def then(self) -> TestThen[ManyChannelsAndACaller, Searched]:
         return TheLaidChannelsAreLeft()
 
 
 @dataclass(frozen=True)
 class AUserWhoIsNotTheSuperadminMayNotSearch(
-    Scenario[SeedingSession, ManyChannelsAndACaller, NotificationAdapter, Searched]
+    TestScenario[SeedingSession, ManyChannelsAndACaller, NotificationAdapter, Searched]
 ):
     @override
     def summary(self) -> str:
@@ -307,15 +309,15 @@ class AUserWhoIsNotTheSuperadminMayNotSearch(
         return "슈퍼관리자가 아닌 사용자가 필터 없이 조회하면 역할 부족으로 거부된다"
 
     @override
-    def given(self) -> Given[SeedingSession, ManyChannelsAndACaller]:
+    def given(self) -> TestGiven[SeedingSession, ManyChannelsAndACaller]:
         return TwoChannelsAndSomeone()
 
     @override
-    def when(self) -> When[ManyChannelsAndACaller, NotificationAdapter, Searched]:
+    def when(self) -> TestWhen[ManyChannelsAndACaller, NotificationAdapter, Searched]:
         return SearchingEveryChannel()
 
     @override
-    def then(self) -> Then[ManyChannelsAndACaller, Searched]:
+    def then(self) -> TestThen[ManyChannelsAndACaller, Searched]:
         return TheCallIsRefused(InsufficientPrivilege)
 
 

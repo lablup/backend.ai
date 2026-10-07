@@ -18,7 +18,7 @@ from ai.backend.manager.api.adapters.prometheus_query_preset_category.adapter im
     PrometheusQueryPresetCategoryAdapter,
 )
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.testutils.scenario_steps import Given, Scenario, Then, When
+from ai.backend.testutils.scenario_steps import TestGiven, TestScenario, TestThen, TestWhen
 from bai_scenario.components.prometheus_query_preset_category import (
     LoadedCategory,
     ManyCategoriesAndACaller,
@@ -32,11 +32,11 @@ from bai_scenario.runner.steps import run_scenario
 
 type Adapter = PrometheusQueryPresetCategoryAdapter
 type Loaded = list[LoadedCategory]
-type LoadingStep = Scenario[SeedingSession, ManyCategoriesAndACaller, Adapter, Loaded]
+type LoadingStep = TestScenario[SeedingSession, ManyCategoriesAndACaller, Adapter, Loaded]
 
 
 @dataclass(frozen=True)
-class LoadingTheLaidAndOneUnknown(When[ManyCategoriesAndACaller, Adapter, Loaded]):
+class LoadingTheLaidAndOneUnknown(TestWhen[ManyCategoriesAndACaller, Adapter, Loaded]):
     """미리 만들어 둔 카테고리들의 id 뒤에 존재하지 않는 id 하나를 붙여 한 번에 조회한다."""
 
     @override
@@ -55,7 +55,7 @@ class LoadingTheLaidAndOneUnknown(When[ManyCategoriesAndACaller, Adapter, Loaded
 
 
 @dataclass(frozen=True)
-class LoadingNothing(When[ManyCategoriesAndACaller, Adapter, Loaded]):
+class LoadingNothing(TestWhen[ManyCategoriesAndACaller, Adapter, Loaded]):
     """빈 id 목록으로 조회한다."""
 
     @override
@@ -74,7 +74,7 @@ class LoadingNothing(When[ManyCategoriesAndACaller, Adapter, Loaded]):
 
 @dataclass(frozen=True)
 class TheLaidAndTheUnknownComeBackInOrder(
-    Scenario[SeedingSession, ManyCategoriesAndACaller, Adapter, Loaded]
+    TestScenario[SeedingSession, ManyCategoriesAndACaller, Adapter, Loaded]
 ):
     @override
     def summary(self) -> str:
@@ -88,21 +88,21 @@ class TheLaidAndTheUnknownComeBackInOrder(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, ManyCategoriesAndACaller]:
+    def given(self) -> TestGiven[SeedingSession, ManyCategoriesAndACaller]:
         return ManyCategoriesAndSomeone(besides=1)
 
     @override
-    def when(self) -> When[ManyCategoriesAndACaller, Adapter, Loaded]:
+    def when(self) -> TestWhen[ManyCategoriesAndACaller, Adapter, Loaded]:
         return LoadingTheLaidAndOneUnknown()
 
     @override
-    def then(self) -> Then[ManyCategoriesAndACaller, Loaded]:
+    def then(self) -> TestThen[ManyCategoriesAndACaller, Loaded]:
         return TheBatchAnswersInOrder()
 
 
 @dataclass(frozen=True)
 class AnEmptyListAnswersNothing(
-    Scenario[SeedingSession, ManyCategoriesAndACaller, Adapter, Loaded]
+    TestScenario[SeedingSession, ManyCategoriesAndACaller, Adapter, Loaded]
 ):
     @override
     def summary(self) -> str:
@@ -113,15 +113,15 @@ class AnEmptyListAnswersNothing(
         return "카테고리가 있어도 빈 id 목록으로 조회하면, 빈 응답이 반환된다"
 
     @override
-    def given(self) -> Given[SeedingSession, ManyCategoriesAndACaller]:
+    def given(self) -> TestGiven[SeedingSession, ManyCategoriesAndACaller]:
         return ManyCategoriesAndSomeone(besides=0)
 
     @override
-    def when(self) -> When[ManyCategoriesAndACaller, Adapter, Loaded]:
+    def when(self) -> TestWhen[ManyCategoriesAndACaller, Adapter, Loaded]:
         return LoadingNothing()
 
     @override
-    def then(self) -> Then[ManyCategoriesAndACaller, Loaded]:
+    def then(self) -> TestThen[ManyCategoriesAndACaller, Loaded]:
         return NothingIsAnswered()
 
 

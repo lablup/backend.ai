@@ -19,7 +19,7 @@ from ai.backend.manager.api.adapters.runtime_variant_preset.adapter import (
     RuntimeVariantPresetAdapter,
 )
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.testutils.scenario_steps import Given, Scenario, Then, When
+from ai.backend.testutils.scenario_steps import TestGiven, TestScenario, TestThen, TestWhen
 from bai_scenario.components.runtime_variant_preset import (
     VALID_AT,
     ManyPresetsAndACaller,
@@ -36,13 +36,13 @@ from bai_scenario.runner.steps import run_scenario
 DEFAULT_PAGE = 10
 
 type Searched = SearchRuntimeVariantPresetsPayload
-type SearchingStep = Scenario[
+type SearchingStep = TestScenario[
     SeedingSession, ManyPresetsAndACaller, RuntimeVariantPresetAdapter, Searched
 ]
 
 
 @dataclass(frozen=True)
-class SearchingEveryPreset(When[ManyPresetsAndACaller, RuntimeVariantPresetAdapter, Searched]):
+class SearchingEveryPreset(TestWhen[ManyPresetsAndACaller, RuntimeVariantPresetAdapter, Searched]):
     """필터와 페이지 크기를 지정하지 않고 전체를 검색한다."""
 
     @override
@@ -62,7 +62,7 @@ class SearchingEveryPreset(When[ManyPresetsAndACaller, RuntimeVariantPresetAdapt
 
 
 @dataclass(frozen=True)
-class SearchingByVariant(When[ManyPresetsAndACaller, RuntimeVariantPresetAdapter, Searched]):
+class SearchingByVariant(TestWhen[ManyPresetsAndACaller, RuntimeVariantPresetAdapter, Searched]):
     """미리 만들어 둔 변형을 필터로 검색한다."""
 
     @override
@@ -88,7 +88,9 @@ class SearchingByVariant(When[ManyPresetsAndACaller, RuntimeVariantPresetAdapter
 
 
 @dataclass(frozen=True)
-class SearchingValidAtAVersion(When[ManyPresetsAndACaller, RuntimeVariantPresetAdapter, Searched]):
+class SearchingValidAtAVersion(
+    TestWhen[ManyPresetsAndACaller, RuntimeVariantPresetAdapter, Searched]
+):
     """한 런타임 버전에 유효한 프리셋만 필터로 검색한다."""
 
     @override
@@ -113,7 +115,7 @@ class SearchingValidAtAVersion(When[ManyPresetsAndACaller, RuntimeVariantPresetA
 
 @dataclass(frozen=True)
 class AUserGrantedNothingCountsEveryPreset(
-    Scenario[SeedingSession, ManyPresetsAndACaller, RuntimeVariantPresetAdapter, Searched]
+    TestScenario[SeedingSession, ManyPresetsAndACaller, RuntimeVariantPresetAdapter, Searched]
 ):
     @override
     def summary(self) -> str:
@@ -124,21 +126,21 @@ class AUserGrantedNothingCountsEveryPreset(
         return "프리셋이 둘 있을 때 아무 권한도 없는 사용자가 필터 없이 조회하면 두 프리셋이 모두 반환된다"
 
     @override
-    def given(self) -> Given[SeedingSession, ManyPresetsAndACaller]:
+    def given(self) -> TestGiven[SeedingSession, ManyPresetsAndACaller]:
         return ManyPresetsAndSomeone(besides=1)
 
     @override
-    def when(self) -> When[ManyPresetsAndACaller, RuntimeVariantPresetAdapter, Searched]:
+    def when(self) -> TestWhen[ManyPresetsAndACaller, RuntimeVariantPresetAdapter, Searched]:
         return SearchingEveryPreset()
 
     @override
-    def then(self) -> Then[ManyPresetsAndACaller, Searched]:
+    def then(self) -> TestThen[ManyPresetsAndACaller, Searched]:
         return TheLaidPresetsAreLeft()
 
 
 @dataclass(frozen=True)
 class AVariantFilterNarrows(
-    Scenario[SeedingSession, ManyPresetsAndACaller, RuntimeVariantPresetAdapter, Searched]
+    TestScenario[SeedingSession, ManyPresetsAndACaller, RuntimeVariantPresetAdapter, Searched]
 ):
     @override
     def summary(self) -> str:
@@ -149,21 +151,21 @@ class AVariantFilterNarrows(
         return "프리셋이 두 변형에 나뉘어 있을 때 한 변형을 필터로 조회하면 해당 변형의 프리셋만 반환된다"
 
     @override
-    def given(self) -> Given[SeedingSession, ManyPresetsAndACaller]:
+    def given(self) -> TestGiven[SeedingSession, ManyPresetsAndACaller]:
         return PresetsInTwoVariants()
 
     @override
-    def when(self) -> When[ManyPresetsAndACaller, RuntimeVariantPresetAdapter, Searched]:
+    def when(self) -> TestWhen[ManyPresetsAndACaller, RuntimeVariantPresetAdapter, Searched]:
         return SearchingByVariant()
 
     @override
-    def then(self) -> Then[ManyPresetsAndACaller, Searched]:
+    def then(self) -> TestThen[ManyPresetsAndACaller, Searched]:
         return TheLaidPresetsAreLeft()
 
 
 @dataclass(frozen=True)
 class AVersionFilterKeepsWhatIsValidThen(
-    Scenario[SeedingSession, ManyPresetsAndACaller, RuntimeVariantPresetAdapter, Searched]
+    TestScenario[SeedingSession, ManyPresetsAndACaller, RuntimeVariantPresetAdapter, Searched]
 ):
     @override
     def summary(self) -> str:
@@ -177,21 +179,21 @@ class AVersionFilterKeepsWhatIsValidThen(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, ManyPresetsAndACaller]:
+    def given(self) -> TestGiven[SeedingSession, ManyPresetsAndACaller]:
         return PresetsAcrossVersions()
 
     @override
-    def when(self) -> When[ManyPresetsAndACaller, RuntimeVariantPresetAdapter, Searched]:
+    def when(self) -> TestWhen[ManyPresetsAndACaller, RuntimeVariantPresetAdapter, Searched]:
         return SearchingValidAtAVersion()
 
     @override
-    def then(self) -> Then[ManyPresetsAndACaller, Searched]:
+    def then(self) -> TestThen[ManyPresetsAndACaller, Searched]:
         return TheLaidPresetsAreLeft()
 
 
 @dataclass(frozen=True)
 class OmittingThePageSizeGivesTen(
-    Scenario[SeedingSession, ManyPresetsAndACaller, RuntimeVariantPresetAdapter, Searched]
+    TestScenario[SeedingSession, ManyPresetsAndACaller, RuntimeVariantPresetAdapter, Searched]
 ):
     @override
     def summary(self) -> str:
@@ -202,15 +204,15 @@ class OmittingThePageSizeGivesTen(
         return "프리셋이 11개 있을 때 페이지 크기를 생략하면 10건을 반환하고 다음 페이지가 있음을 표시한다"
 
     @override
-    def given(self) -> Given[SeedingSession, ManyPresetsAndACaller]:
+    def given(self) -> TestGiven[SeedingSession, ManyPresetsAndACaller]:
         return ManyPresetsAndSomeone(besides=DEFAULT_PAGE)
 
     @override
-    def when(self) -> When[ManyPresetsAndACaller, RuntimeVariantPresetAdapter, Searched]:
+    def when(self) -> TestWhen[ManyPresetsAndACaller, RuntimeVariantPresetAdapter, Searched]:
         return SearchingEveryPreset()
 
     @override
-    def then(self) -> Then[ManyPresetsAndACaller, Searched]:
+    def then(self) -> TestThen[ManyPresetsAndACaller, Searched]:
         return TheFirstPageOfPresets(size=DEFAULT_PAGE)
 
 

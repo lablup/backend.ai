@@ -15,7 +15,7 @@ from typing import Any
 
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.testutils.scenario_report import Line, ScenarioRecord
-from ai.backend.testutils.scenario_steps import Answered, Scenario, Told
+from ai.backend.testutils.scenario_steps import Answered, TestScenario, Told
 from bai_scenario.runner.planting import SeedingSession
 from bai_scenario.seeds.ops import SeedOpsProvider
 from bai_scenario.seeds.seeder import Seeder
@@ -54,7 +54,9 @@ class ScenarioRun:
 
 
 async def run_scenario(
-    scenario: Scenario[SeedingSession, Any, Any, Any], adapter: Any, engine: ExtendedAsyncSAEngine
+    scenario: TestScenario[SeedingSession, Any, Any, Any],
+    adapter: Any,
+    engine: ExtendedAsyncSAEngine,
 ) -> ScenarioRun:
     """세 단계를 순서대로 돌고, 어긋난 것이 있으면 그 자리에서 세운다."""
     given = scenario.given()
@@ -104,7 +106,7 @@ def _flatten(told: Told, *, skip_root: bool = False) -> tuple[Line, ...]:
 
 
 def _record(
-    scenario: Scenario[SeedingSession, Any, Any, Any],
+    scenario: TestScenario[SeedingSession, Any, Any, Any],
     run: ScenarioRun,
     adapter: Any,
     *,

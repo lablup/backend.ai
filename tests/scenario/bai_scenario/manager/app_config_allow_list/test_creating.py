@@ -28,7 +28,13 @@ from ai.backend.manager.errors.app_config import AppConfigDefinitionNotFound
 from ai.backend.manager.errors.auth import InsufficientPrivilege
 from ai.backend.manager.errors.repository import UniqueConstraintViolationError
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.testutils.scenario_steps import Configured, Given, Scenario, Then, When
+from ai.backend.testutils.scenario_steps import (
+    TestConfigured,
+    TestGiven,
+    TestScenario,
+    TestThen,
+    TestWhen,
+)
 from bai_scenario.components.answers import TheCallIsRefused
 from bai_scenario.components.app_config import ENFORCEMENT
 from bai_scenario.components.app_config_allow_list import (
@@ -41,13 +47,13 @@ from bai_scenario.runner.planting import SeedingSession
 from bai_scenario.runner.steps import run_scenario
 from bai_scenario.seeds.app_config.allow_list import SCOPE_NAMES
 
-type CreatingStep = Scenario[
+type CreatingStep = TestScenario[
     SeedingSession, AnEntryAndACaller, AppConfigAllowListAdapter, AppConfigAllowListNode
 ]
 
 
 @dataclass(frozen=True)
-class Opening(When[AnEntryAndACaller, AppConfigAllowListAdapter, AppConfigAllowListNode]):
+class Opening(TestWhen[AnEntryAndACaller, AppConfigAllowListAdapter, AppConfigAllowListNode]):
     """준비한 설정 이름으로 한 스코프 유형의 allow_list를 생성한다."""
 
     scope_type: AppConfigScopeType
@@ -80,7 +86,9 @@ class Opening(When[AnEntryAndACaller, AppConfigAllowListAdapter, AppConfigAllowL
 
 @dataclass(frozen=True)
 class LeavingTheRankOutTakesTheDefault(
-    Scenario[SeedingSession, AnEntryAndACaller, AppConfigAllowListAdapter, AppConfigAllowListNode]
+    TestScenario[
+        SeedingSession, AnEntryAndACaller, AppConfigAllowListAdapter, AppConfigAllowListNode
+    ]
 ):
     started: datetime
     scope_type: AppConfigScopeType
@@ -97,15 +105,17 @@ class LeavingTheRankOutTakesTheDefault(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, AnEntryAndACaller]:
+    def given(self) -> TestGiven[SeedingSession, AnEntryAndACaller]:
         return AnEntryAndSomeone(opened=None, role=UserRole.SUPERADMIN)
 
     @override
-    def when(self) -> When[AnEntryAndACaller, AppConfigAllowListAdapter, AppConfigAllowListNode]:
+    def when(
+        self,
+    ) -> TestWhen[AnEntryAndACaller, AppConfigAllowListAdapter, AppConfigAllowListNode]:
         return Opening(scope_type=self.scope_type)
 
     @override
-    def then(self) -> Then[AnEntryAndACaller, AppConfigAllowListNode]:
+    def then(self) -> TestThen[AnEntryAndACaller, AppConfigAllowListNode]:
         return TheNewEntryNode(
             started=self.started, scope_type=self.scope_type, rank=self.scope_type.default_rank()
         )
@@ -113,7 +123,9 @@ class LeavingTheRankOutTakesTheDefault(
 
 @dataclass(frozen=True)
 class AGivenRankIsKept(
-    Scenario[SeedingSession, AnEntryAndACaller, AppConfigAllowListAdapter, AppConfigAllowListNode]
+    TestScenario[
+        SeedingSession, AnEntryAndACaller, AppConfigAllowListAdapter, AppConfigAllowListNode
+    ]
 ):
     started: datetime
 
@@ -126,21 +138,25 @@ class AGivenRankIsKept(
         return "슈퍼관리자가 순위를 지정해 allow_list를 생성하면, 지정한 값이 그대로 저장된다"
 
     @override
-    def given(self) -> Given[SeedingSession, AnEntryAndACaller]:
+    def given(self) -> TestGiven[SeedingSession, AnEntryAndACaller]:
         return AnEntryAndSomeone(opened=None, role=UserRole.SUPERADMIN)
 
     @override
-    def when(self) -> When[AnEntryAndACaller, AppConfigAllowListAdapter, AppConfigAllowListNode]:
+    def when(
+        self,
+    ) -> TestWhen[AnEntryAndACaller, AppConfigAllowListAdapter, AppConfigAllowListNode]:
         return Opening(scope_type=AppConfigScopeType.DOMAIN, rank=250)
 
     @override
-    def then(self) -> Then[AnEntryAndACaller, AppConfigAllowListNode]:
+    def then(self) -> TestThen[AnEntryAndACaller, AppConfigAllowListNode]:
         return TheNewEntryNode(started=self.started, scope_type=AppConfigScopeType.DOMAIN, rank=250)
 
 
 @dataclass(frozen=True)
 class AnUnregisteredNameIsRefused(
-    Scenario[SeedingSession, AnEntryAndACaller, AppConfigAllowListAdapter, AppConfigAllowListNode]
+    TestScenario[
+        SeedingSession, AnEntryAndACaller, AppConfigAllowListAdapter, AppConfigAllowListNode
+    ]
 ):
     @override
     def summary(self) -> str:
@@ -151,21 +167,25 @@ class AnUnregisteredNameIsRefused(
         return "슈퍼관리자가 등록되지 않은 설정 이름으로 allow_list를 생성하면, 정의 없음 오류가 반환된다"
 
     @override
-    def given(self) -> Given[SeedingSession, AnEntryAndACaller]:
+    def given(self) -> TestGiven[SeedingSession, AnEntryAndACaller]:
         return AnEntryAndSomeone(defined=False, role=UserRole.SUPERADMIN)
 
     @override
-    def when(self) -> When[AnEntryAndACaller, AppConfigAllowListAdapter, AppConfigAllowListNode]:
+    def when(
+        self,
+    ) -> TestWhen[AnEntryAndACaller, AppConfigAllowListAdapter, AppConfigAllowListNode]:
         return Opening(scope_type=AppConfigScopeType.PUBLIC)
 
     @override
-    def then(self) -> Then[AnEntryAndACaller, AppConfigAllowListNode]:
+    def then(self) -> TestThen[AnEntryAndACaller, AppConfigAllowListNode]:
         return TheCallIsRefused(AppConfigDefinitionNotFound)
 
 
 @dataclass(frozen=True)
 class OpeningTheSameKindTwiceIsRefused(
-    Scenario[SeedingSession, AnEntryAndACaller, AppConfigAllowListAdapter, AppConfigAllowListNode]
+    TestScenario[
+        SeedingSession, AnEntryAndACaller, AppConfigAllowListAdapter, AppConfigAllowListNode
+    ]
 ):
     @override
     def summary(self) -> str:
@@ -179,21 +199,25 @@ class OpeningTheSameKindTwiceIsRefused(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, AnEntryAndACaller]:
+    def given(self) -> TestGiven[SeedingSession, AnEntryAndACaller]:
         return AnEntryAndSomeone(opened=AppConfigScopeType.PUBLIC, role=UserRole.SUPERADMIN)
 
     @override
-    def when(self) -> When[AnEntryAndACaller, AppConfigAllowListAdapter, AppConfigAllowListNode]:
+    def when(
+        self,
+    ) -> TestWhen[AnEntryAndACaller, AppConfigAllowListAdapter, AppConfigAllowListNode]:
         return Opening(scope_type=AppConfigScopeType.PUBLIC)
 
     @override
-    def then(self) -> Then[AnEntryAndACaller, AppConfigAllowListNode]:
+    def then(self) -> TestThen[AnEntryAndACaller, AppConfigAllowListNode]:
         return TheCallIsRefused(UniqueConstraintViolationError)
 
 
 @dataclass(frozen=True)
 class APlainUserMayNotOpen(
-    Scenario[SeedingSession, AnEntryAndACaller, AppConfigAllowListAdapter, AppConfigAllowListNode]
+    TestScenario[
+        SeedingSession, AnEntryAndACaller, AppConfigAllowListAdapter, AppConfigAllowListNode
+    ]
 ):
     @override
     def summary(self) -> str:
@@ -204,22 +228,26 @@ class APlainUserMayNotOpen(
         return "일반 사용자가 allow_list를 생성하면, 슈퍼관리자 권한이 없어 거부된다"
 
     @override
-    def given(self) -> Given[SeedingSession, AnEntryAndACaller]:
+    def given(self) -> TestGiven[SeedingSession, AnEntryAndACaller]:
         return AnEntryAndSomeone(opened=None)
 
     @override
-    def when(self) -> When[AnEntryAndACaller, AppConfigAllowListAdapter, AppConfigAllowListNode]:
+    def when(
+        self,
+    ) -> TestWhen[AnEntryAndACaller, AppConfigAllowListAdapter, AppConfigAllowListNode]:
         return Opening(scope_type=AppConfigScopeType.PUBLIC)
 
     @override
-    def then(self) -> Then[AnEntryAndACaller, AppConfigAllowListNode]:
+    def then(self) -> TestThen[AnEntryAndACaller, AppConfigAllowListNode]:
         return TheCallIsRefused(InsufficientPrivilege)
 
 
 @dataclass(frozen=True)
 class EnforcementOffChangesNothing(
-    Scenario[SeedingSession, AnEntryAndACaller, AppConfigAllowListAdapter, AppConfigAllowListNode],
-    Configured,
+    TestScenario[
+        SeedingSession, AnEntryAndACaller, AppConfigAllowListAdapter, AppConfigAllowListNode
+    ],
+    TestConfigured,
 ):
     @override
     def summary(self) -> str:
@@ -234,15 +262,17 @@ class EnforcementOffChangesNothing(
         return {ENFORCEMENT: False}
 
     @override
-    def given(self) -> Given[SeedingSession, AnEntryAndACaller]:
+    def given(self) -> TestGiven[SeedingSession, AnEntryAndACaller]:
         return AnEntryAndSomeone(opened=None)
 
     @override
-    def when(self) -> When[AnEntryAndACaller, AppConfigAllowListAdapter, AppConfigAllowListNode]:
+    def when(
+        self,
+    ) -> TestWhen[AnEntryAndACaller, AppConfigAllowListAdapter, AppConfigAllowListNode]:
         return Opening(scope_type=AppConfigScopeType.PUBLIC)
 
     @override
-    def then(self) -> Then[AnEntryAndACaller, AppConfigAllowListNode]:
+    def then(self) -> TestThen[AnEntryAndACaller, AppConfigAllowListNode]:
         return TheCallIsRefused(InsufficientPrivilege)
 
 

@@ -18,7 +18,7 @@ from ai.backend.common.data.user.types import UserRole
 from ai.backend.manager.data.permission.global_entity import global_entity_id
 from ai.backend.manager.data.permission.types import Permission
 from ai.backend.manager.data.user.types import UserData
-from ai.backend.testutils.scenario_steps import Given
+from ai.backend.testutils.scenario_steps import TestGiven
 from bai_scenario.components.domain import WAS_HERE, SomeoneOf
 from bai_scenario.seeds.domain.domain import SeedDomain
 from bai_scenario.seeds.rbac.role import SeedPermission, SeedRole
@@ -99,7 +99,7 @@ async def lay_a_public_reader(
 
 
 @dataclass(frozen=True)
-class SomeoneAlone(Given[Any, ACaller]):
+class SomeoneAlone(TestGiven[Any, ACaller]):
     """사용자 한 명만 있고 다른 데이터는 없다."""
 
     role: UserRole = UserRole.USER

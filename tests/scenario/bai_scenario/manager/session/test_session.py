@@ -19,7 +19,7 @@ from ai.backend.common.dto.manager.v2.session.response import AdminSearchSession
 from ai.backend.manager.api.adapters.session.adapter import SessionAdapter
 from ai.backend.manager.errors.auth import InsufficientPrivilege
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.testutils.scenario_steps import Given, Scenario, Then, When
+from ai.backend.testutils.scenario_steps import TestGiven, TestScenario, TestThen, TestWhen
 from bai_scenario.components.answers import NothingIsFound, TheCallIsRefused
 from bai_scenario.components.domain import ADomainAndACaller, ADomainAndSomeone
 from bai_scenario.runner.acting import ActingAs
@@ -27,11 +27,11 @@ from bai_scenario.runner.planting import SeedingSession
 from bai_scenario.runner.steps import run_scenario
 
 type Searched = AdminSearchSessionsPayload
-type SessionStep = Scenario[SeedingSession, ADomainAndACaller, SessionAdapter, Searched]
+type SessionStep = TestScenario[SeedingSession, ADomainAndACaller, SessionAdapter, Searched]
 
 
 @dataclass(frozen=True)
-class SearchingEverySession(When[ADomainAndACaller, SessionAdapter, Searched]):
+class SearchingEverySession(TestWhen[ADomainAndACaller, SessionAdapter, Searched]):
     """필터 없이 전체를 훑는다."""
 
     @override
@@ -50,7 +50,7 @@ class SearchingEverySession(When[ADomainAndACaller, SessionAdapter, Searched]):
 
 @dataclass(frozen=True)
 class NoSessionLaidMeansNoneFound(
-    Scenario[SeedingSession, ADomainAndACaller, SessionAdapter, Searched]
+    TestScenario[SeedingSession, ADomainAndACaller, SessionAdapter, Searched]
 ):
     @override
     def summary(self) -> str:
@@ -61,21 +61,21 @@ class NoSessionLaidMeansNoneFound(
         return "세션을 하나도 심지 않은 상태에서 슈퍼관리자가 조회하면, 답은 비어 있다"
 
     @override
-    def given(self) -> Given[SeedingSession, ADomainAndACaller]:
+    def given(self) -> TestGiven[SeedingSession, ADomainAndACaller]:
         return ADomainAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
-    def when(self) -> When[ADomainAndACaller, SessionAdapter, Searched]:
+    def when(self) -> TestWhen[ADomainAndACaller, SessionAdapter, Searched]:
         return SearchingEverySession()
 
     @override
-    def then(self) -> Then[ADomainAndACaller, Searched]:
+    def then(self) -> TestThen[ADomainAndACaller, Searched]:
         return NothingIsFound()
 
 
 @dataclass(frozen=True)
 class AUserGrantedNothingMayNotSearch(
-    Scenario[SeedingSession, ADomainAndACaller, SessionAdapter, Searched]
+    TestScenario[SeedingSession, ADomainAndACaller, SessionAdapter, Searched]
 ):
     @override
     def summary(self) -> str:
@@ -89,15 +89,15 @@ class AUserGrantedNothingMayNotSearch(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, ADomainAndACaller]:
+    def given(self) -> TestGiven[SeedingSession, ADomainAndACaller]:
         return ADomainAndSomeone()
 
     @override
-    def when(self) -> When[ADomainAndACaller, SessionAdapter, Searched]:
+    def when(self) -> TestWhen[ADomainAndACaller, SessionAdapter, Searched]:
         return SearchingEverySession()
 
     @override
-    def then(self) -> Then[ADomainAndACaller, Searched]:
+    def then(self) -> TestThen[ADomainAndACaller, Searched]:
         return TheCallIsRefused(InsufficientPrivilege)
 
 

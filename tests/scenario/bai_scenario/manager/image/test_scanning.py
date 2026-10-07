@@ -21,15 +21,15 @@ from ai.backend.manager.errors.image import ImageNotFound, RegistryNotFoundForIm
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.testutils.scenario_steps import (
     Answered,
-    Given,
     Held,
     Same,
     SameAs,
-    Scenario,
     Skipped,
-    Then,
-    Verdict,
-    When,
+    TestGiven,
+    TestScenario,
+    TestThen,
+    TestVerdict,
+    TestWhen,
 )
 from bai_scenario.components.answers import TheCallIsRefused
 from bai_scenario.components.domain import SomeoneOf, WrittenByThisRun
@@ -59,7 +59,7 @@ class ARegistryAndACaller:
 
 
 @dataclass(frozen=True)
-class ARegistryServingATag(Given[Any, ARegistryAndACaller]):
+class ARegistryServingATag(TestGiven[Any, ARegistryAndACaller]):
     """레지스트리 1개와 호출자 1명. 레지스트리는 태그 하나를 두 아키텍처로 내놓는다."""
 
     role: UserRole = UserRole.SUPERADMIN
@@ -111,7 +111,7 @@ THE_REGISTRY_ALONE = Canonical(None)
 
 
 @dataclass(frozen=True)
-class Scanning(When[ARegistryAndACaller, ImageAdapter, ImageNode]):
+class Scanning(TestWhen[ARegistryAndACaller, ImageAdapter, ImageNode]):
     """태그 하나를 아키텍처를 지정해 스캔한다."""
 
     canonical: Canonical = THE_SERVED_TAG
@@ -138,7 +138,7 @@ class Scanning(When[ARegistryAndACaller, ImageAdapter, ImageNode]):
 
 
 @dataclass(frozen=True)
-class TheScannedImageNode(Then[ARegistryAndACaller, ImageNode]):
+class TheScannedImageNode(TestThen[ARegistryAndACaller, ImageNode]):
     """레지스트리가 내놓은 태그로 등록되거나 갱신된 이미지 노드의 전체 필드를 확인한다."""
 
     @override
@@ -146,7 +146,7 @@ class TheScannedImageNode(Then[ARegistryAndACaller, ImageNode]):
         return "요청한 아키텍처로 등록된 이미지 노드가 반환된다"
 
     @override
-    def look(self, laid: ARegistryAndACaller, answered: Answered[ImageNode]) -> list[Verdict]:
+    def look(self, laid: ARegistryAndACaller, answered: Answered[ImageNode]) -> list[TestVerdict]:
         node = answered.response
         if node is None:
             return [Held("응답", node, Filled())]
@@ -219,7 +219,7 @@ class TheScannedImageNode(Then[ARegistryAndACaller, ImageNode]):
 
 @dataclass(frozen=True)
 class ScanningAnUnregisteredImage(
-    Scenario[SeedingSession, ARegistryAndACaller, ImageAdapter, ImageNode]
+    TestScenario[SeedingSession, ARegistryAndACaller, ImageAdapter, ImageNode]
 ):
     @override
     def summary(self) -> str:
@@ -233,21 +233,21 @@ class ScanningAnUnregisteredImage(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, ARegistryAndACaller]:
+    def given(self) -> TestGiven[SeedingSession, ARegistryAndACaller]:
         return ARegistryServingATag()
 
     @override
-    def when(self) -> When[ARegistryAndACaller, ImageAdapter, ImageNode]:
+    def when(self) -> TestWhen[ARegistryAndACaller, ImageAdapter, ImageNode]:
         return Scanning()
 
     @override
-    def then(self) -> Then[ARegistryAndACaller, ImageNode]:
+    def then(self) -> TestThen[ARegistryAndACaller, ImageNode]:
         return TheScannedImageNode()
 
 
 @dataclass(frozen=True)
 class ScanningARegisteredImage(
-    Scenario[SeedingSession, ARegistryAndACaller, ImageAdapter, ImageNode]
+    TestScenario[SeedingSession, ARegistryAndACaller, ImageAdapter, ImageNode]
 ):
     @override
     def summary(self) -> str:
@@ -261,20 +261,22 @@ class ScanningARegisteredImage(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, ARegistryAndACaller]:
+    def given(self) -> TestGiven[SeedingSession, ARegistryAndACaller]:
         return ARegistryServingATag(already_registered=True)
 
     @override
-    def when(self) -> When[ARegistryAndACaller, ImageAdapter, ImageNode]:
+    def when(self) -> TestWhen[ARegistryAndACaller, ImageAdapter, ImageNode]:
         return Scanning()
 
     @override
-    def then(self) -> Then[ARegistryAndACaller, ImageNode]:
+    def then(self) -> TestThen[ARegistryAndACaller, ImageNode]:
         return TheScannedImageNode()
 
 
 @dataclass(frozen=True)
-class APlainUserMayNotScan(Scenario[SeedingSession, ARegistryAndACaller, ImageAdapter, ImageNode]):
+class APlainUserMayNotScan(
+    TestScenario[SeedingSession, ARegistryAndACaller, ImageAdapter, ImageNode]
+):
     @override
     def summary(self) -> str:
         return "a-user-who-is-not-the-superadmin-may-not-scan"
@@ -284,21 +286,21 @@ class APlainUserMayNotScan(Scenario[SeedingSession, ARegistryAndACaller, ImageAd
         return "일반 사용자는 scan을 실행할 수 없어 슈퍼관리자 권한 부족으로 거부된다"
 
     @override
-    def given(self) -> Given[SeedingSession, ARegistryAndACaller]:
+    def given(self) -> TestGiven[SeedingSession, ARegistryAndACaller]:
         return ARegistryServingATag(role=UserRole.USER)
 
     @override
-    def when(self) -> When[ARegistryAndACaller, ImageAdapter, ImageNode]:
+    def when(self) -> TestWhen[ARegistryAndACaller, ImageAdapter, ImageNode]:
         return Scanning()
 
     @override
-    def then(self) -> Then[ARegistryAndACaller, ImageNode]:
+    def then(self) -> TestThen[ARegistryAndACaller, ImageNode]:
         return TheCallIsRefused(InsufficientPrivilege)
 
 
 @dataclass(frozen=True)
 class NoRegistryMatchesTheImage(
-    Scenario[SeedingSession, ARegistryAndACaller, ImageAdapter, ImageNode]
+    TestScenario[SeedingSession, ARegistryAndACaller, ImageAdapter, ImageNode]
 ):
     @override
     def summary(self) -> str:
@@ -312,21 +314,21 @@ class NoRegistryMatchesTheImage(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, ARegistryAndACaller]:
+    def given(self) -> TestGiven[SeedingSession, ARegistryAndACaller]:
         return ARegistryServingATag()
 
     @override
-    def when(self) -> When[ARegistryAndACaller, ImageAdapter, ImageNode]:
+    def when(self) -> TestWhen[ARegistryAndACaller, ImageAdapter, ImageNode]:
         return Scanning(canonical=THE_REGISTRY_ALONE)
 
     @override
-    def then(self) -> Then[ARegistryAndACaller, ImageNode]:
+    def then(self) -> TestThen[ARegistryAndACaller, ImageNode]:
         return TheCallIsRefused(RegistryNotFoundForImage)
 
 
 @dataclass(frozen=True)
 class AMissingTagIsNotASuccess(
-    Scenario[SeedingSession, ARegistryAndACaller, ImageAdapter, ImageNode]
+    TestScenario[SeedingSession, ARegistryAndACaller, ImageAdapter, ImageNode]
 ):
     @override
     def summary(self) -> str:
@@ -337,15 +339,15 @@ class AMissingTagIsNotASuccess(
         return "레지스트리에 없는 태그를 scan하면 이미지를 찾을 수 없어 거부된다"
 
     @override
-    def given(self) -> Given[SeedingSession, ARegistryAndACaller]:
+    def given(self) -> TestGiven[SeedingSession, ARegistryAndACaller]:
         return ARegistryServingATag()
 
     @override
-    def when(self) -> When[ARegistryAndACaller, ImageAdapter, ImageNode]:
+    def when(self) -> TestWhen[ARegistryAndACaller, ImageAdapter, ImageNode]:
         return Scanning(canonical=A_MISSING_TAG)
 
     @override
-    def then(self) -> Then[ARegistryAndACaller, ImageNode]:
+    def then(self) -> TestThen[ARegistryAndACaller, ImageNode]:
         return TheCallIsRefused(ImageNotFound)
 
 

@@ -29,13 +29,13 @@ from ai.backend.manager.data.permission.types import Permission
 from ai.backend.manager.data.user.types import UserData
 from ai.backend.testutils.scenario_steps import (
     Answered,
-    Given,
     Held,
     Same,
     SameAs,
     Skipped,
-    Then,
-    Verdict,
+    TestGiven,
+    TestThen,
+    TestVerdict,
 )
 from bai_scenario.components.app_config import (
     UNREGISTERED,
@@ -116,7 +116,7 @@ class AWritingPlace:
 
 
 @dataclass(frozen=True)
-class MyWritingPlace(Given[Any, AWritingPlace]):
+class MyWritingPlace(TestGiven[Any, AWritingPlace]):
     """설정 이름 몇 개와, 자기 스코프에 지정한 쓰기 권한만 받은 사용자 한 명.
 
     첫 이름은 ``kinds``에 허용되고, ``more_opened``개는 사용자 종류에 추가로 허용되며,
@@ -200,7 +200,7 @@ class ATargetAndACaller:
 
 
 @dataclass(frozen=True)
-class SomewhereToTarget(Given[Any, ATargetAndACaller]):
+class SomewhereToTarget(TestGiven[Any, ATargetAndACaller]):
     """지정할 스코프 하나에 설정 이름을 허용해 두고, 그 스코프에 대해 지정한 권한만 받은 사용자 한 명.
 
     자기 도메인을 지정하는 시나리오는 역할을 그 도메인에 부여하고, 다른 사용자를 지정하는
@@ -272,7 +272,9 @@ class SomewhereToTarget(Given[Any, ATargetAndACaller]):
 
 
 @dataclass(frozen=True)
-class TheWrittenFragments(Then[AWritingPlace | ATargetAndACaller, UpsertAppConfigFragmentsPayload]):
+class TheWrittenFragments(
+    TestThen[AWritingPlace | ATargetAndACaller, UpsertAppConfigFragmentsPayload]
+):
     """쓴 설정 조각이 요청 순서대로 통째로 반환된다.
 
     값은 시나리오가 정한 것이고, 소유자와 종류는 미리 만들어 둔 스코프에서 읽는다.
@@ -292,12 +294,12 @@ class TheWrittenFragments(Then[AWritingPlace | ATargetAndACaller, UpsertAppConfi
         self,
         laid: AWritingPlace | ATargetAndACaller,
         answered: Answered[UpsertAppConfigFragmentsPayload],
-    ) -> list[Verdict]:
+    ) -> list[TestVerdict]:
         payload = answered.response
         if payload is None:
             return [NotRefused(answered.raised)]
         written = WrittenByThisRun(self.started)
-        seen: list[Verdict] = [
+        seen: list[TestVerdict] = [
             Same("items", len(payload.items), len(self.configs)),
             Same("failed", list(payload.failed), []),
         ]
@@ -343,7 +345,7 @@ class AReadingPlace:
 
 
 @dataclass(frozen=True)
-class MyFragmentsLaid(Given[Any, AReadingPlace]):
+class MyFragmentsLaid(TestGiven[Any, AReadingPlace]):
     """사용자 스코프에 허용된 설정 이름 몇 개에 자기 조각을 미리 만들어 두고, 그것을 조회할 사용자 한 명.
 
     ``mine_on``에 든 위치에만 자기 조각이 만들어진다. 첫 이름에는 ``anothers``와 ``domains``로
@@ -413,7 +415,7 @@ class MyFragmentsLaid(Given[Any, AReadingPlace]):
 
 
 @dataclass(frozen=True)
-class EachNameAnsweredWithMine(Then[AReadingPlace, list[AppConfigFragmentNode | None]]):
+class EachNameAnsweredWithMine(TestThen[AReadingPlace, list[AppConfigFragmentNode | None]]):
     """이름마다 자기 조각이 있으면 그것, 없으면 빈 항목이 요청 순서대로 반환된다."""
 
     @override
@@ -423,11 +425,11 @@ class EachNameAnsweredWithMine(Then[AReadingPlace, list[AppConfigFragmentNode | 
     @override
     def look(
         self, laid: AReadingPlace, answered: Answered[list[AppConfigFragmentNode | None]]
-    ) -> list[Verdict]:
+    ) -> list[TestVerdict]:
         items = answered.response
         if items is None:
             return [NotRefused(answered.raised)]
-        seen: list[Verdict] = [Same("items", len(items), len(laid.names))]
+        seen: list[TestVerdict] = [Same("items", len(items), len(laid.names))]
         for i, (got, mine) in enumerate(zip(items, laid.mine, strict=False)):
             if mine is None:
                 seen.append(Same(f"items[{i}]", got, None))
@@ -444,7 +446,7 @@ class EachNameAnsweredWithMine(Then[AReadingPlace, list[AppConfigFragmentNode | 
 
 
 @dataclass(frozen=True)
-class TheTargetsFragmentByName(Then[ATargetAndACaller, list[AppConfigFragmentNode | None]]):
+class TheTargetsFragmentByName(TestThen[ATargetAndACaller, list[AppConfigFragmentNode | None]]):
     """지정한 스코프에 미리 만들어 둔 설정 조각 하나가 반환된다."""
 
     @override
@@ -454,11 +456,11 @@ class TheTargetsFragmentByName(Then[ATargetAndACaller, list[AppConfigFragmentNod
     @override
     def look(
         self, laid: ATargetAndACaller, answered: Answered[list[AppConfigFragmentNode | None]]
-    ) -> list[Verdict]:
+    ) -> list[TestVerdict]:
         items = answered.response
         if items is None or laid.fragment is None:
             return [NotRefused(answered.raised)]
-        seen: list[Verdict] = [Same("items", len(items), 1)]
+        seen: list[TestVerdict] = [Same("items", len(items), 1)]
         if len(items) != 1:
             return seen
         got = items[0]
@@ -497,7 +499,7 @@ class ManyFragmentsAndACaller:
 
 
 @dataclass(frozen=True)
-class FragmentsLaidAcross(Given[Any, ManyFragmentsAndACaller]):
+class FragmentsLaidAcross(TestGiven[Any, ManyFragmentsAndACaller]):
     """스코프 종류마다 설정 조각을 미리 만들어 두고, 그중 한 스코프를 검색할 사용자 한 명.
 
     ``mine``개는 자기 조각, ``publics``개는 공개 조각, ``domains``개는 자기 도메인 조각이고
@@ -606,7 +608,9 @@ class FragmentsLaidAcross(Given[Any, ManyFragmentsAndACaller]):
 
 
 @dataclass(frozen=True)
-class EveryAnsweringFragmentIsFound(Then[ManyFragmentsAndACaller, SearchAppConfigFragmentPayload]):
+class EveryAnsweringFragmentIsFound(
+    TestThen[ManyFragmentsAndACaller, SearchAppConfigFragmentPayload]
+):
     """응답에 나와야 하는 설정 조각이 모두, 그리고 그것만 집계된다."""
 
     @override
@@ -616,7 +620,7 @@ class EveryAnsweringFragmentIsFound(Then[ManyFragmentsAndACaller, SearchAppConfi
     @override
     def look(
         self, laid: ManyFragmentsAndACaller, answered: Answered[SearchAppConfigFragmentPayload]
-    ) -> list[Verdict]:
+    ) -> list[TestVerdict]:
         payload = answered.response
         if payload is None:
             return [NotRefused(answered.raised)]
@@ -662,7 +666,7 @@ class AFragmentAndACaller:
 
 
 @dataclass(frozen=True)
-class AFragmentAndSomeone(Given[Any, AFragmentAndACaller]):
+class AFragmentAndSomeone(TestGiven[Any, AFragmentAndACaller]):
     """설정 조각 하나와, 자기 스코프에 지정한 권한만 받은 사용자 한 명."""
 
     whose: Whose = Whose.MINE
@@ -715,7 +719,7 @@ class AFragmentAndSomeone(Given[Any, AFragmentAndACaller]):
 
 
 @dataclass(frozen=True)
-class TheFragmentNode(Then[AFragmentAndACaller, AppConfigFragmentNode]):
+class TheFragmentNode(TestThen[AFragmentAndACaller, AppConfigFragmentNode]):
     """미리 만들어 둔 설정 조각이 통째로 반환된다."""
 
     started: datetime
@@ -727,7 +731,7 @@ class TheFragmentNode(Then[AFragmentAndACaller, AppConfigFragmentNode]):
     @override
     def look(
         self, laid: AFragmentAndACaller, answered: Answered[AppConfigFragmentNode]
-    ) -> list[Verdict]:
+    ) -> list[TestVerdict]:
         node = answered.response
         if node is None:
             return [NotRefused(answered.raised)]
@@ -760,7 +764,7 @@ class SomeFragmentsAndACaller:
 
 
 @dataclass(frozen=True)
-class SomeFragmentsAndSomeone(Given[Any, SomeFragmentsAndACaller]):
+class SomeFragmentsAndSomeone(TestGiven[Any, SomeFragmentsAndACaller]):
     """자기 조각 몇 개와 다른 사용자의 조각 하나, 그리고 자기 스코프에 지정한 권한만 받은 사용자."""
 
     mine: int = 1

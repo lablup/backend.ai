@@ -22,7 +22,7 @@ from ai.backend.common.types import ServiceCatalogStatus
 from ai.backend.manager.api.adapters.service_catalog.adapter import ServiceCatalogAdapter
 from ai.backend.manager.errors.auth import InsufficientPrivilege
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.testutils.scenario_steps import Given, Scenario, Then, When
+from ai.backend.testutils.scenario_steps import TestGiven, TestScenario, TestThen, TestWhen
 from bai_scenario.components.answers import TheCallIsRefused
 from bai_scenario.components.service_catalog import (
     EveryLaidServiceComesWhole,
@@ -41,13 +41,13 @@ from bai_scenario.runner.steps import run_scenario
 DEFAULT_PAGE = 10
 
 type Searched = AdminSearchServiceCatalogsPayload
-type SearchingStep = Scenario[
+type SearchingStep = TestScenario[
     SeedingSession, ManyServicesAndACaller, ServiceCatalogAdapter, Searched
 ]
 
 
 @dataclass(frozen=True)
-class SearchingEveryService(When[ManyServicesAndACaller, ServiceCatalogAdapter, Searched]):
+class SearchingEveryService(TestWhen[ManyServicesAndACaller, ServiceCatalogAdapter, Searched]):
     """필터도 크기도 없이 전체를 검색한다."""
 
     @override
@@ -65,7 +65,7 @@ class SearchingEveryService(When[ManyServicesAndACaller, ServiceCatalogAdapter, 
 
 
 @dataclass(frozen=True)
-class SearchingByGroup(When[ManyServicesAndACaller, ServiceCatalogAdapter, Searched]):
+class SearchingByGroup(TestWhen[ManyServicesAndACaller, ServiceCatalogAdapter, Searched]):
     """심은 것 중 하나의 그룹으로 걸러 검색한다."""
 
     @override
@@ -89,7 +89,7 @@ class SearchingByGroup(When[ManyServicesAndACaller, ServiceCatalogAdapter, Searc
 
 
 @dataclass(frozen=True)
-class SearchingByStatusEquals(When[ManyServicesAndACaller, ServiceCatalogAdapter, Searched]):
+class SearchingByStatusEquals(TestWhen[ManyServicesAndACaller, ServiceCatalogAdapter, Searched]):
     """상태가 이것인 서비스로 걸러 검색한다."""
 
     status: ServiceCatalogStatus
@@ -115,7 +115,7 @@ class SearchingByStatusEquals(When[ManyServicesAndACaller, ServiceCatalogAdapter
 
 
 @dataclass(frozen=True)
-class SearchingByStatusNotEquals(When[ManyServicesAndACaller, ServiceCatalogAdapter, Searched]):
+class SearchingByStatusNotEquals(TestWhen[ManyServicesAndACaller, ServiceCatalogAdapter, Searched]):
     """상태가 이것이 아닌 서비스로 걸러 검색한다."""
 
     status: ServiceCatalogStatus
@@ -141,7 +141,7 @@ class SearchingByStatusNotEquals(When[ManyServicesAndACaller, ServiceCatalogAdap
 
 
 @dataclass(frozen=True)
-class SearchingByStatusIn(When[ManyServicesAndACaller, ServiceCatalogAdapter, Searched]):
+class SearchingByStatusIn(TestWhen[ManyServicesAndACaller, ServiceCatalogAdapter, Searched]):
     """상태가 이 목록에 든 서비스로 걸러 검색한다."""
 
     statuses: tuple[ServiceCatalogStatus, ...]
@@ -168,7 +168,7 @@ class SearchingByStatusIn(When[ManyServicesAndACaller, ServiceCatalogAdapter, Se
 
 
 @dataclass(frozen=True)
-class SearchingByStatusNotIn(When[ManyServicesAndACaller, ServiceCatalogAdapter, Searched]):
+class SearchingByStatusNotIn(TestWhen[ManyServicesAndACaller, ServiceCatalogAdapter, Searched]):
     """상태가 이 목록에 들지 않은 서비스로 걸러 검색한다."""
 
     statuses: tuple[ServiceCatalogStatus, ...]
@@ -196,7 +196,7 @@ class SearchingByStatusNotIn(When[ManyServicesAndACaller, ServiceCatalogAdapter,
 
 @dataclass(frozen=True)
 class TheSuperadminCountsEveryServiceWithItsEndpoints(
-    Scenario[SeedingSession, ManyServicesAndACaller, ServiceCatalogAdapter, Searched]
+    TestScenario[SeedingSession, ManyServicesAndACaller, ServiceCatalogAdapter, Searched]
 ):
     started: datetime
 
@@ -212,21 +212,21 @@ class TheSuperadminCountsEveryServiceWithItsEndpoints(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, ManyServicesAndACaller]:
+    def given(self) -> TestGiven[SeedingSession, ManyServicesAndACaller]:
         return ManyServicesAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
-    def when(self) -> When[ManyServicesAndACaller, ServiceCatalogAdapter, Searched]:
+    def when(self) -> TestWhen[ManyServicesAndACaller, ServiceCatalogAdapter, Searched]:
         return SearchingEveryService()
 
     @override
-    def then(self) -> Then[ManyServicesAndACaller, Searched]:
+    def then(self) -> TestThen[ManyServicesAndACaller, Searched]:
         return EveryLaidServiceComesWhole(started=self.started)
 
 
 @dataclass(frozen=True)
 class AGroupFilterNarrows(
-    Scenario[SeedingSession, ManyServicesAndACaller, ServiceCatalogAdapter, Searched]
+    TestScenario[SeedingSession, ManyServicesAndACaller, ServiceCatalogAdapter, Searched]
 ):
     @override
     def summary(self) -> str:
@@ -239,21 +239,21 @@ class AGroupFilterNarrows(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, ManyServicesAndACaller]:
+    def given(self) -> TestGiven[SeedingSession, ManyServicesAndACaller]:
         return ServicesOfTwoGroupsAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
-    def when(self) -> When[ManyServicesAndACaller, ServiceCatalogAdapter, Searched]:
+    def when(self) -> TestWhen[ManyServicesAndACaller, ServiceCatalogAdapter, Searched]:
         return SearchingByGroup()
 
     @override
-    def then(self) -> Then[ManyServicesAndACaller, Searched]:
+    def then(self) -> TestThen[ManyServicesAndACaller, Searched]:
         return OnlyTheNamedGroupIsLeft()
 
 
 @dataclass(frozen=True)
 class AStatusEqualsFilterKeepsThatStatus(
-    Scenario[SeedingSession, ManyServicesAndACaller, ServiceCatalogAdapter, Searched]
+    TestScenario[SeedingSession, ManyServicesAndACaller, ServiceCatalogAdapter, Searched]
 ):
     @override
     def summary(self) -> str:
@@ -264,21 +264,21 @@ class AStatusEqualsFilterKeepsThatStatus(
         return "상태마다 하나씩 있는 서비스를 비정상과 같은 것으로 걸러 조회하면 비정상 서비스만 반환된다"
 
     @override
-    def given(self) -> Given[SeedingSession, ManyServicesAndACaller]:
+    def given(self) -> TestGiven[SeedingSession, ManyServicesAndACaller]:
         return ServicesOfEveryStatusAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
-    def when(self) -> When[ManyServicesAndACaller, ServiceCatalogAdapter, Searched]:
+    def when(self) -> TestWhen[ManyServicesAndACaller, ServiceCatalogAdapter, Searched]:
         return SearchingByStatusEquals(ServiceCatalogStatus.UNHEALTHY)
 
     @override
-    def then(self) -> Then[ManyServicesAndACaller, Searched]:
+    def then(self) -> TestThen[ManyServicesAndACaller, Searched]:
         return OnlyTheServicesOfStatuses((ServiceCatalogStatus.UNHEALTHY,))
 
 
 @dataclass(frozen=True)
 class AStatusNotEqualsFilterDropsThatStatus(
-    Scenario[SeedingSession, ManyServicesAndACaller, ServiceCatalogAdapter, Searched]
+    TestScenario[SeedingSession, ManyServicesAndACaller, ServiceCatalogAdapter, Searched]
 ):
     @override
     def summary(self) -> str:
@@ -292,15 +292,15 @@ class AStatusNotEqualsFilterDropsThatStatus(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, ManyServicesAndACaller]:
+    def given(self) -> TestGiven[SeedingSession, ManyServicesAndACaller]:
         return ServicesOfEveryStatusAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
-    def when(self) -> When[ManyServicesAndACaller, ServiceCatalogAdapter, Searched]:
+    def when(self) -> TestWhen[ManyServicesAndACaller, ServiceCatalogAdapter, Searched]:
         return SearchingByStatusNotEquals(ServiceCatalogStatus.UNHEALTHY)
 
     @override
-    def then(self) -> Then[ManyServicesAndACaller, Searched]:
+    def then(self) -> TestThen[ManyServicesAndACaller, Searched]:
         return OnlyTheServicesOfStatuses((
             ServiceCatalogStatus.HEALTHY,
             ServiceCatalogStatus.DEREGISTERED,
@@ -309,7 +309,7 @@ class AStatusNotEqualsFilterDropsThatStatus(
 
 @dataclass(frozen=True)
 class AStatusInFilterKeepsListedStatuses(
-    Scenario[SeedingSession, ManyServicesAndACaller, ServiceCatalogAdapter, Searched]
+    TestScenario[SeedingSession, ManyServicesAndACaller, ServiceCatalogAdapter, Searched]
 ):
     @override
     def summary(self) -> str:
@@ -323,18 +323,18 @@ class AStatusInFilterKeepsListedStatuses(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, ManyServicesAndACaller]:
+    def given(self) -> TestGiven[SeedingSession, ManyServicesAndACaller]:
         return ServicesOfEveryStatusAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
-    def when(self) -> When[ManyServicesAndACaller, ServiceCatalogAdapter, Searched]:
+    def when(self) -> TestWhen[ManyServicesAndACaller, ServiceCatalogAdapter, Searched]:
         return SearchingByStatusIn((
             ServiceCatalogStatus.UNHEALTHY,
             ServiceCatalogStatus.DEREGISTERED,
         ))
 
     @override
-    def then(self) -> Then[ManyServicesAndACaller, Searched]:
+    def then(self) -> TestThen[ManyServicesAndACaller, Searched]:
         return OnlyTheServicesOfStatuses((
             ServiceCatalogStatus.UNHEALTHY,
             ServiceCatalogStatus.DEREGISTERED,
@@ -343,7 +343,7 @@ class AStatusInFilterKeepsListedStatuses(
 
 @dataclass(frozen=True)
 class AStatusNotInFilterDropsListedStatuses(
-    Scenario[SeedingSession, ManyServicesAndACaller, ServiceCatalogAdapter, Searched]
+    TestScenario[SeedingSession, ManyServicesAndACaller, ServiceCatalogAdapter, Searched]
 ):
     @override
     def summary(self) -> str:
@@ -357,24 +357,24 @@ class AStatusNotInFilterDropsListedStatuses(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, ManyServicesAndACaller]:
+    def given(self) -> TestGiven[SeedingSession, ManyServicesAndACaller]:
         return ServicesOfEveryStatusAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
-    def when(self) -> When[ManyServicesAndACaller, ServiceCatalogAdapter, Searched]:
+    def when(self) -> TestWhen[ManyServicesAndACaller, ServiceCatalogAdapter, Searched]:
         return SearchingByStatusNotIn((
             ServiceCatalogStatus.UNHEALTHY,
             ServiceCatalogStatus.DEREGISTERED,
         ))
 
     @override
-    def then(self) -> Then[ManyServicesAndACaller, Searched]:
+    def then(self) -> TestThen[ManyServicesAndACaller, Searched]:
         return OnlyTheServicesOfStatuses((ServiceCatalogStatus.HEALTHY,))
 
 
 @dataclass(frozen=True)
 class OmittingThePageSizeGivesTen(
-    Scenario[SeedingSession, ManyServicesAndACaller, ServiceCatalogAdapter, Searched]
+    TestScenario[SeedingSession, ManyServicesAndACaller, ServiceCatalogAdapter, Searched]
 ):
     @override
     def summary(self) -> str:
@@ -385,21 +385,21 @@ class OmittingThePageSizeGivesTen(
         return "서비스 11개가 있을 때 크기 없이 조회하면 10건까지 반환되고 다음 페이지가 있다고 응답한다"
 
     @override
-    def given(self) -> Given[SeedingSession, ManyServicesAndACaller]:
+    def given(self) -> TestGiven[SeedingSession, ManyServicesAndACaller]:
         return ManyServicesAndSomeone(role=UserRole.SUPERADMIN, besides=DEFAULT_PAGE)
 
     @override
-    def when(self) -> When[ManyServicesAndACaller, ServiceCatalogAdapter, Searched]:
+    def when(self) -> TestWhen[ManyServicesAndACaller, ServiceCatalogAdapter, Searched]:
         return SearchingEveryService()
 
     @override
-    def then(self) -> Then[ManyServicesAndACaller, Searched]:
+    def then(self) -> TestThen[ManyServicesAndACaller, Searched]:
         return TheFirstPageOfServices(size=DEFAULT_PAGE)
 
 
 @dataclass(frozen=True)
 class TheMonitorSeesWhatTheSuperadminSees(
-    Scenario[SeedingSession, ManyServicesAndACaller, ServiceCatalogAdapter, Searched]
+    TestScenario[SeedingSession, ManyServicesAndACaller, ServiceCatalogAdapter, Searched]
 ):
     started: datetime
 
@@ -415,21 +415,21 @@ class TheMonitorSeesWhatTheSuperadminSees(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, ManyServicesAndACaller]:
+    def given(self) -> TestGiven[SeedingSession, ManyServicesAndACaller]:
         return ManyServicesAndSomeone(role=UserRole.MONITOR)
 
     @override
-    def when(self) -> When[ManyServicesAndACaller, ServiceCatalogAdapter, Searched]:
+    def when(self) -> TestWhen[ManyServicesAndACaller, ServiceCatalogAdapter, Searched]:
         return SearchingEveryService()
 
     @override
-    def then(self) -> Then[ManyServicesAndACaller, Searched]:
+    def then(self) -> TestThen[ManyServicesAndACaller, Searched]:
         return EveryLaidServiceComesWhole(started=self.started)
 
 
 @dataclass(frozen=True)
 class AUserWhoIsNotTheSuperadminMayNotSearch(
-    Scenario[SeedingSession, ManyServicesAndACaller, ServiceCatalogAdapter, Searched]
+    TestScenario[SeedingSession, ManyServicesAndACaller, ServiceCatalogAdapter, Searched]
 ):
     @override
     def summary(self) -> str:
@@ -440,15 +440,15 @@ class AUserWhoIsNotTheSuperadminMayNotSearch(
         return "슈퍼관리자가 아닌 사용자가 전체 조회를 요청하면 역할 부족으로 거부된다"
 
     @override
-    def given(self) -> Given[SeedingSession, ManyServicesAndACaller]:
+    def given(self) -> TestGiven[SeedingSession, ManyServicesAndACaller]:
         return ManyServicesAndSomeone()
 
     @override
-    def when(self) -> When[ManyServicesAndACaller, ServiceCatalogAdapter, Searched]:
+    def when(self) -> TestWhen[ManyServicesAndACaller, ServiceCatalogAdapter, Searched]:
         return SearchingEveryService()
 
     @override
-    def then(self) -> Then[ManyServicesAndACaller, Searched]:
+    def then(self) -> TestThen[ManyServicesAndACaller, Searched]:
         return TheCallIsRefused(InsufficientPrivilege)
 
 

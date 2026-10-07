@@ -30,14 +30,14 @@ from ai.backend.manager.data.user.types import UserData
 from ai.backend.manager.defs import INTRINSIC_SLOTS_MIN
 from ai.backend.testutils.scenario_steps import (
     Answered,
-    Condition,
-    Given,
     Held,
     Same,
     SameAs,
     Skipped,
-    Then,
-    Verdict,
+    TestCondition,
+    TestGiven,
+    TestThen,
+    TestVerdict,
 )
 from bai_scenario.components.domain import SomeoneOf, WrittenByThisRun
 from bai_scenario.seeds.domain.domain import SeedDomain
@@ -167,7 +167,7 @@ class ARegistryWithImages(TestSeedNest[tuple[ContainerRegistryData, tuple[Laid[I
 
 
 @dataclass(frozen=True)
-class AnImageAndSomeone(Given[Any, AnImageAndACaller]):
+class AnImageAndSomeone(TestGiven[Any, AnImageAndACaller]):
     """이미지 1개와 호출자 1명."""
 
     role: UserRole = UserRole.USER
@@ -191,7 +191,7 @@ class AnImageAndSomeone(Given[Any, AnImageAndACaller]):
 
 
 @dataclass(frozen=True)
-class AnUncustomizedImageAndSomeone(Given[Any, AnImageAndACaller]):
+class AnUncustomizedImageAndSomeone(TestGiven[Any, AnImageAndACaller]):
     """커스텀 이미지가 아닌 이미지와 일반 사용자."""
 
     granted: bool = True
@@ -213,7 +213,7 @@ class AnUncustomizedImageAndSomeone(Given[Any, AnImageAndACaller]):
 
 
 @dataclass(frozen=True)
-class AnImageTheCallerMade(Given[Any, AnImageAndACaller]):
+class AnImageTheCallerMade(TestGiven[Any, AnImageAndACaller]):
     """호출자가 만든 커스텀 이미지 1개와, 그 이미지에 대한 권한.
 
     커스텀 이미지 작성자 검사를 통과하려면 두 조건이 모두 필요하다.
@@ -241,7 +241,7 @@ class AnImageTheCallerMade(Given[Any, AnImageAndACaller]):
 
 
 @dataclass(frozen=True)
-class ManyImagesAndSomeone(Given[Any, ManyImagesAndACaller]):
+class ManyImagesAndSomeone(TestGiven[Any, ManyImagesAndACaller]):
     """레지스트리 1개 안의 이미지 여러 개와 호출자 1명."""
 
     role: UserRole = UserRole.SUPERADMIN
@@ -269,7 +269,7 @@ class ManyImagesAndSomeone(Given[Any, ManyImagesAndACaller]):
 
 
 @dataclass(frozen=True)
-class ImagesWithTwoStatuses(Given[Any, ManyImagesAndACaller]):
+class ImagesWithTwoStatuses(TestGiven[Any, ManyImagesAndACaller]):
     """살아 있는 이미지와 삭제된 이미지, 슈퍼관리자."""
 
     @override
@@ -297,7 +297,7 @@ class ImagesWithTwoStatuses(Given[Any, ManyImagesAndACaller]):
 
 
 @dataclass(frozen=True)
-class CustomizedAndUncustomizedImages(Given[Any, ManyImagesAndACaller]):
+class CustomizedAndUncustomizedImages(TestGiven[Any, ManyImagesAndACaller]):
     """호출자가 커밋한 커스텀 이미지와 커스텀 이미지가 아닌 이미지, 슈퍼관리자.
 
     `named`는 커스텀 이미지다.
@@ -328,7 +328,7 @@ class CustomizedAndUncustomizedImages(Given[Any, ManyImagesAndACaller]):
 
 
 @dataclass(frozen=True)
-class ImagesCommittedForTwoUsers(Given[Any, ManyImagesAndACaller]):
+class ImagesCommittedForTwoUsers(TestGiven[Any, ManyImagesAndACaller]):
     """호출자가 커밋한 커스텀 이미지와 다른 사용자가 커밋한 커스텀 이미지, 슈퍼관리자.
 
     `named`는 호출자가 커밋한 이미지다.
@@ -365,7 +365,7 @@ class ImagesCommittedForTwoUsers(Given[Any, ManyImagesAndACaller]):
 
 
 @dataclass(frozen=True)
-class ImagesInTwoRegistriesAndAPlainUser(Given[Any, ManyImagesAndACaller]):
+class ImagesInTwoRegistriesAndAPlainUser(TestGiven[Any, ManyImagesAndACaller]):
     """레지스트리 2개에 나뉘어 있는 이미지들과, 한쪽 레지스트리에 권한을 받았거나 받지 않은 사용자.
 
     `registry`가 스코프로 지정할 한쪽이고, `laid`는 그 안의 이미지다.
@@ -406,7 +406,7 @@ class ImagesInTwoRegistriesAndAPlainUser(Given[Any, ManyImagesAndACaller]):
 
 
 @dataclass(frozen=True)
-class AnAliasAndSomeone(Given[Any, AnAliasAndACaller]):
+class AnAliasAndSomeone(TestGiven[Any, AnAliasAndACaller]):
     """별칭이 등록된 이미지 1개와 호출자 1명."""
 
     role: UserRole = UserRole.SUPERADMIN
@@ -430,7 +430,7 @@ class AnAliasAndSomeone(Given[Any, AnAliasAndACaller]):
 
 
 @dataclass(frozen=True)
-class AnAliasAndAPlainUser(Given[Any, AnAliasAndACaller]):
+class AnAliasAndAPlainUser(TestGiven[Any, AnAliasAndACaller]):
     """별칭이 등록된 이미지 1개와, 그 이미지에 권한을 받았거나 받지 않은 일반 사용자."""
 
     granted: bool = True
@@ -457,7 +457,7 @@ class AnAliasAndAPlainUser(Given[Any, AnAliasAndACaller]):
 
 
 @dataclass(frozen=True)
-class AliasesOnTwoImagesAndSomeone(Given[Any, AliasesAndACaller]):
+class AliasesOnTwoImagesAndSomeone(TestGiven[Any, AliasesAndACaller]):
     """이미지 2개에 별칭 3개가 나뉘어 등록된 상태와 슈퍼관리자."""
 
     @override
@@ -510,7 +510,7 @@ class SomeoneReachingImages(TestSeedNest[Laid[None]]):
 
 
 @dataclass(frozen=True)
-class Filled(Condition[Any]):
+class Filled(TestCondition[Any]):
     """값이 채워져 반환된다. 비어 있으면 그 안의 필드를 확인할 수 없다."""
 
     @override
@@ -523,7 +523,7 @@ class Filled(Condition[Any]):
 
 
 @dataclass(frozen=True)
-class TheImageNode(Then[Any, ImageNode]):
+class TheImageNode(TestThen[Any, ImageNode]):
     """이미지 노드의 전체 필드를 확인한다. 시나리오가 바꾼 필드만 인자로 받는다.
 
     이미지를 담은 전제면 무엇이든 받는다. `image` 필드로 이미지 1개를 들고 있으면 된다.
@@ -549,7 +549,7 @@ class TheImageNode(Then[Any, ImageNode]):
         return "이미지 노드의 모든 필드가 예상값과 일치한다"
 
     @override
-    def look(self, laid: Any, answered: Answered[ImageNode]) -> list[Verdict]:
+    def look(self, laid: Any, answered: Answered[ImageNode]) -> list[TestVerdict]:
         node = answered.response
         if node is None:
             return [Held("응답", node, Filled())]
@@ -586,7 +586,7 @@ class TheImageNode(Then[Any, ImageNode]):
             self.resource_limits_gql if self.resource_limits_gql is not None else DEFAULT_LIMITS_GQL
         )
         written = WrittenByThisRun(datetime.now(UTC))
-        creator: Verdict = (
+        creator: TestVerdict = (
             Same("creator_id", node.creator_id, None)
             if image.creator_id is None
             else Held[UserID | None](

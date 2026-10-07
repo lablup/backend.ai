@@ -30,14 +30,14 @@ from ai.backend.manager.data.user.types import UserData
 from ai.backend.manager.errors.base.entity import EntityNotFoundError
 from ai.backend.testutils.scenario_steps import (
     Answered,
-    Given,
     Held,
     Refused,
     Same,
     SameAs,
     Skipped,
-    Then,
-    Verdict,
+    TestGiven,
+    TestThen,
+    TestVerdict,
 )
 from bai_scenario.components.domain import WrittenByThisRun
 from bai_scenario.components.runtime_variant import AVariantAndACaller
@@ -89,7 +89,7 @@ class ManyPresetsAndACaller:
 
 
 @dataclass(frozen=True)
-class APresetAndSomeone(Given[Any, APresetAndACaller]):
+class APresetAndSomeone(TestGiven[Any, APresetAndACaller]):
     """변형 하나, 해당 변형의 프리셋 하나, 사용자 한 명."""
 
     role: UserRole = UserRole.USER
@@ -117,7 +117,7 @@ class APresetAndSomeone(Given[Any, APresetAndACaller]):
 
 
 @dataclass(frozen=True)
-class TwoVariantsOneWithAPreset(Given[Any, TwoVariantsAndAPreset]):
+class TwoVariantsOneWithAPreset(TestGiven[Any, TwoVariantsAndAPreset]):
     """변형 둘, 한쪽에만 있는 프리셋 하나, 사용자 한 명."""
 
     role: UserRole = UserRole.USER
@@ -138,7 +138,7 @@ class TwoVariantsOneWithAPreset(Given[Any, TwoVariantsAndAPreset]):
 
 
 @dataclass(frozen=True)
-class ManyPresetsAndSomeone(Given[Any, ManyPresetsAndACaller]):
+class ManyPresetsAndSomeone(TestGiven[Any, ManyPresetsAndACaller]):
     """한 변형의 프리셋 여러 개와 사용자 한 명."""
 
     role: UserRole = UserRole.USER
@@ -164,7 +164,7 @@ class ManyPresetsAndSomeone(Given[Any, ManyPresetsAndACaller]):
 
 
 @dataclass(frozen=True)
-class PresetsInTwoVariants(Given[Any, ManyPresetsAndACaller]):
+class PresetsInTwoVariants(TestGiven[Any, ManyPresetsAndACaller]):
     """두 변형에 나뉘어 있는 프리셋과 사용자 한 명. ``laid``에는 첫 변형의 것만 담는다."""
 
     @override
@@ -193,7 +193,7 @@ VALID_AT = "2.5.0"
 
 
 @dataclass(frozen=True)
-class PresetsAcrossVersions(Given[Any, ManyPresetsAndACaller]):
+class PresetsAcrossVersions(TestGiven[Any, ManyPresetsAndACaller]):
     """추가·폐기 버전이 서로 다른 프리셋 다섯 개. ``laid``에는 지정한 버전에 유효한 것만 담는다."""
 
     @override
@@ -245,7 +245,7 @@ def preset_verdicts(
     display_name: str | None,
     ui_option: UIOption | None,
     written: WrittenByThisRun,
-) -> list[Verdict]:
+) -> list[TestVerdict]:
     """Every place of one preset node, prefixed for a node inside a list."""
     return [
         Skipped(f"{at}id", "데이터베이스가 만든다"),
@@ -275,7 +275,7 @@ def laid_preset_verdicts(
     node: RuntimeVariantPresetNode,
     laid: RuntimeVariantPresetData,
     written: WrittenByThisRun,
-) -> list[Verdict]:
+) -> list[TestVerdict]:
     """Every place of one preset node, against the row the seed laid."""
     return preset_verdicts(
         at,
@@ -301,7 +301,7 @@ def laid_preset_verdicts(
 
 
 @dataclass(frozen=True)
-class TheNewPresetNode(Then[AVariantAndACaller, RuntimeVariantPresetNode]):
+class TheNewPresetNode(TestThen[AVariantAndACaller, RuntimeVariantPresetNode]):
     """방금 생성한 프리셋 전체가 반환된다. 기대값은 요청과 미리 만들어 둔 변형에서 읽는다."""
 
     started: datetime
@@ -323,7 +323,7 @@ class TheNewPresetNode(Then[AVariantAndACaller, RuntimeVariantPresetNode]):
     @override
     def look(
         self, laid: AVariantAndACaller, answered: Answered[RuntimeVariantPresetNode]
-    ) -> list[Verdict]:
+    ) -> list[TestVerdict]:
         node = answered.response
         if node is None:
             return [Refused(EntityNotFoundError, answered.raised)]
@@ -346,7 +346,7 @@ class TheNewPresetNode(Then[AVariantAndACaller, RuntimeVariantPresetNode]):
 
 
 @dataclass(frozen=True)
-class TheSameNameUnderTheOtherVariant(Then[TwoVariantsAndAPreset, RuntimeVariantPresetNode]):
+class TheSameNameUnderTheOtherVariant(TestThen[TwoVariantsAndAPreset, RuntimeVariantPresetNode]):
     """다른 변형에 같은 이름으로 생성한 프리셋 전체가 반환된다."""
 
     started: datetime
@@ -359,7 +359,7 @@ class TheSameNameUnderTheOtherVariant(Then[TwoVariantsAndAPreset, RuntimeVariant
     @override
     def look(
         self, laid: TwoVariantsAndAPreset, answered: Answered[RuntimeVariantPresetNode]
-    ) -> list[Verdict]:
+    ) -> list[TestVerdict]:
         node = answered.response
         if node is None:
             return [Refused(EntityNotFoundError, answered.raised)]
@@ -382,7 +382,7 @@ class TheSameNameUnderTheOtherVariant(Then[TwoVariantsAndAPreset, RuntimeVariant
 
 
 @dataclass(frozen=True)
-class ThePresetNode(Then[APresetAndACaller, RuntimeVariantPresetNode]):
+class ThePresetNode(TestThen[APresetAndACaller, RuntimeVariantPresetNode]):
     """미리 만들어 둔 프리셋 전체가 반환된다. 수정 요청에는 변경할 필드만 담는다."""
 
     started: datetime
@@ -397,7 +397,7 @@ class ThePresetNode(Then[APresetAndACaller, RuntimeVariantPresetNode]):
     @override
     def look(
         self, laid: APresetAndACaller, answered: Answered[RuntimeVariantPresetNode]
-    ) -> list[Verdict]:
+    ) -> list[TestVerdict]:
         node = answered.response
         if node is None:
             return [Refused(EntityNotFoundError, answered.raised)]
@@ -427,7 +427,7 @@ class ThePresetNode(Then[APresetAndACaller, RuntimeVariantPresetNode]):
 
 
 @dataclass(frozen=True)
-class TheLaidPresetsAreLeft(Then[ManyPresetsAndACaller, SearchRuntimeVariantPresetsPayload]):
+class TheLaidPresetsAreLeft(TestThen[ManyPresetsAndACaller, SearchRuntimeVariantPresetsPayload]):
     """응답에 포함되어야 하는 프리셋만 반환된다."""
 
     @override
@@ -437,7 +437,7 @@ class TheLaidPresetsAreLeft(Then[ManyPresetsAndACaller, SearchRuntimeVariantPres
     @override
     def look(
         self, laid: ManyPresetsAndACaller, answered: Answered[SearchRuntimeVariantPresetsPayload]
-    ) -> list[Verdict]:
+    ) -> list[TestVerdict]:
         page = answered.response
         if page is None:
             return [Refused(EntityNotFoundError, answered.raised)]
@@ -454,7 +454,7 @@ class TheLaidPresetsAreLeft(Then[ManyPresetsAndACaller, SearchRuntimeVariantPres
 
 
 @dataclass(frozen=True)
-class TheFirstPageOfPresets(Then[ManyPresetsAndACaller, SearchRuntimeVariantPresetsPayload]):
+class TheFirstPageOfPresets(TestThen[ManyPresetsAndACaller, SearchRuntimeVariantPresetsPayload]):
     """페이지 크기를 생략한 첫 페이지. 기본 크기만큼 반환하고 다음 페이지가 있음을 표시한다."""
 
     size: int
@@ -466,7 +466,7 @@ class TheFirstPageOfPresets(Then[ManyPresetsAndACaller, SearchRuntimeVariantPres
     @override
     def look(
         self, laid: ManyPresetsAndACaller, answered: Answered[SearchRuntimeVariantPresetsPayload]
-    ) -> list[Verdict]:
+    ) -> list[TestVerdict]:
         page = answered.response
         if page is None:
             return [Refused(EntityNotFoundError, answered.raised)]
@@ -479,7 +479,9 @@ class TheFirstPageOfPresets(Then[ManyPresetsAndACaller, SearchRuntimeVariantPres
 
 
 @dataclass(frozen=True)
-class ThePresetsInTheOrderAsked(Then[ManyPresetsAndACaller, list[RuntimeVariantPresetNode | None]]):
+class ThePresetsInTheOrderAsked(
+    TestThen[ManyPresetsAndACaller, list[RuntimeVariantPresetNode | None]]
+):
     """요청한 순서대로 반환한다. 존재하지 않는 ID의 위치에는 빈 항목을 반환한다."""
 
     started: datetime
@@ -493,13 +495,13 @@ class ThePresetsInTheOrderAsked(Then[ManyPresetsAndACaller, list[RuntimeVariantP
         self,
         laid: ManyPresetsAndACaller,
         answered: Answered[list[RuntimeVariantPresetNode | None]],
-    ) -> list[Verdict]:
+    ) -> list[TestVerdict]:
         items = answered.response
         if items is None:
             return [Refused(EntityNotFoundError, answered.raised)]
         written = WrittenByThisRun(self.started)
         asked = len(laid.laid) + 1
-        seen: list[Verdict] = [Same("len(items)", len(items), asked)]
+        seen: list[TestVerdict] = [Same("len(items)", len(items), asked)]
         for i, expected in enumerate(laid.laid):
             got = items[i] if i < len(items) else None
             if got is None:
@@ -512,7 +514,7 @@ class ThePresetsInTheOrderAsked(Then[ManyPresetsAndACaller, list[RuntimeVariantP
 
 
 @dataclass(frozen=True)
-class TheDeletedPresetId(Then[APresetAndACaller, DeleteRuntimeVariantPresetPayload]):
+class TheDeletedPresetId(TestThen[APresetAndACaller, DeleteRuntimeVariantPresetPayload]):
     """삭제한 프리셋의 ID를 담은 응답."""
 
     @override
@@ -522,7 +524,7 @@ class TheDeletedPresetId(Then[APresetAndACaller, DeleteRuntimeVariantPresetPaylo
     @override
     def look(
         self, laid: APresetAndACaller, answered: Answered[DeleteRuntimeVariantPresetPayload]
-    ) -> list[Verdict]:
+    ) -> list[TestVerdict]:
         payload = answered.response
         if payload is None:
             return [Refused(EntityNotFoundError, answered.raised)]

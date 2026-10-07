@@ -24,16 +24,16 @@ from ai.backend.manager.errors.permission import NotEnoughPermission
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.testutils.scenario_steps import (
     Answered,
-    Given,
     Held,
     Refused,
     Same,
     SameAs,
-    Scenario,
     Skipped,
-    Then,
-    Verdict,
-    When,
+    TestGiven,
+    TestScenario,
+    TestThen,
+    TestVerdict,
+    TestWhen,
 )
 from bai_scenario.components.answers import NothingIsFound, TheCallIsRefused
 from bai_scenario.components.domain import WrittenByThisRun
@@ -50,11 +50,11 @@ from bai_scenario.runner.steps import run_scenario
 MADE = "work"
 
 type Answer = VFolderNode | SearchVFoldersPayload
-type FolderStep = Scenario[SeedingSession, AFolderMakerAndTheirDomain, VFolderAdapter, Answer]
+type FolderStep = TestScenario[SeedingSession, AFolderMakerAndTheirDomain, VFolderAdapter, Answer]
 
 
 @dataclass(frozen=True)
-class MakingAFolder(When[AFolderMakerAndTheirDomain, VFolderAdapter, Answer]):
+class MakingAFolder(TestWhen[AFolderMakerAndTheirDomain, VFolderAdapter, Answer]):
     """자기 폴더를 하나 만든다."""
 
     named: str = MADE
@@ -75,7 +75,7 @@ class MakingAFolder(When[AFolderMakerAndTheirDomain, VFolderAdapter, Answer]):
 
 
 @dataclass(frozen=True)
-class ListingMyFolders(When[AFolderMakerAndTheirDomain, VFolderAdapter, Answer]):
+class ListingMyFolders(TestWhen[AFolderMakerAndTheirDomain, VFolderAdapter, Answer]):
     """자기 폴더를 훑는다."""
 
     @override
@@ -97,7 +97,7 @@ class ListingMyFolders(When[AFolderMakerAndTheirDomain, VFolderAdapter, Answer])
 
 
 @dataclass(frozen=True)
-class TheFolderBelongsToTheMaker(Then[AFolderMakerAndTheirDomain, Answer]):
+class TheFolderBelongsToTheMaker(TestThen[AFolderMakerAndTheirDomain, Answer]):
     """만든 폴더가 통째로 오고, 그 소유는 만든 사람에게 있다."""
 
     started: datetime
@@ -107,7 +107,9 @@ class TheFolderBelongsToTheMaker(Then[AFolderMakerAndTheirDomain, Answer]):
         return "만든 폴더 전체가 오고, 소유는 만든 사람에게 있다"
 
     @override
-    def look(self, laid: AFolderMakerAndTheirDomain, answered: Answered[Answer]) -> list[Verdict]:
+    def look(
+        self, laid: AFolderMakerAndTheirDomain, answered: Answered[Answer]
+    ) -> list[TestVerdict]:
         node = answered.response
         if not isinstance(node, VFolderNode):
             return [Refused(NotEnoughPermission, answered.raised)]
@@ -145,7 +147,7 @@ class TheFolderBelongsToTheMaker(Then[AFolderMakerAndTheirDomain, Answer]):
 
 @dataclass(frozen=True)
 class AGrantedUserMakesAFolderOfTheirOwn(
-    Scenario[SeedingSession, AFolderMakerAndTheirDomain, VFolderAdapter, Answer]
+    TestScenario[SeedingSession, AFolderMakerAndTheirDomain, VFolderAdapter, Answer]
 ):
     started: datetime
 
@@ -161,21 +163,21 @@ class AGrantedUserMakesAFolderOfTheirOwn(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, AFolderMakerAndTheirDomain]:
+    def given(self) -> TestGiven[SeedingSession, AFolderMakerAndTheirDomain]:
         return SomeoneWhoMayMakeFolders()
 
     @override
-    def when(self) -> When[AFolderMakerAndTheirDomain, VFolderAdapter, Answer]:
+    def when(self) -> TestWhen[AFolderMakerAndTheirDomain, VFolderAdapter, Answer]:
         return MakingAFolder()
 
     @override
-    def then(self) -> Then[AFolderMakerAndTheirDomain, Answer]:
+    def then(self) -> TestThen[AFolderMakerAndTheirDomain, Answer]:
         return TheFolderBelongsToTheMaker(started=self.started)
 
 
 @dataclass(frozen=True)
 class AUserGrantedNothingMayNotMakeAFolder(
-    Scenario[SeedingSession, AFolderMakerAndTheirDomain, VFolderAdapter, Answer]
+    TestScenario[SeedingSession, AFolderMakerAndTheirDomain, VFolderAdapter, Answer]
 ):
     @override
     def summary(self) -> str:
@@ -186,21 +188,21 @@ class AUserGrantedNothingMayNotMakeAFolder(
         return "아무 권한도 받지 않은 사용자가 폴더를 만들려 하면 권한 부족으로 거부된다"
 
     @override
-    def given(self) -> Given[SeedingSession, AFolderMakerAndTheirDomain]:
+    def given(self) -> TestGiven[SeedingSession, AFolderMakerAndTheirDomain]:
         return SomeoneWithNoGrant()
 
     @override
-    def when(self) -> When[AFolderMakerAndTheirDomain, VFolderAdapter, Answer]:
+    def when(self) -> TestWhen[AFolderMakerAndTheirDomain, VFolderAdapter, Answer]:
         return MakingAFolder(named="denied")
 
     @override
-    def then(self) -> Then[AFolderMakerAndTheirDomain, Answer]:
+    def then(self) -> TestThen[AFolderMakerAndTheirDomain, Answer]:
         return TheCallIsRefused(NotEnoughPermission)
 
 
 @dataclass(frozen=True)
 class AUserWhoMadeNoFolderListsNone(
-    Scenario[SeedingSession, AFolderMakerAndTheirDomain, VFolderAdapter, Answer]
+    TestScenario[SeedingSession, AFolderMakerAndTheirDomain, VFolderAdapter, Answer]
 ):
     @override
     def summary(self) -> str:
@@ -211,15 +213,15 @@ class AUserWhoMadeNoFolderListsNone(
         return "폴더를 하나도 만들지 않은 사용자가 자기 폴더를 조회하면, 답은 비어 있다"
 
     @override
-    def given(self) -> Given[SeedingSession, AFolderMakerAndTheirDomain]:
+    def given(self) -> TestGiven[SeedingSession, AFolderMakerAndTheirDomain]:
         return SomeoneWhoMayMakeFolders()
 
     @override
-    def when(self) -> When[AFolderMakerAndTheirDomain, VFolderAdapter, Answer]:
+    def when(self) -> TestWhen[AFolderMakerAndTheirDomain, VFolderAdapter, Answer]:
         return ListingMyFolders()
 
     @override
-    def then(self) -> Then[AFolderMakerAndTheirDomain, Answer]:
+    def then(self) -> TestThen[AFolderMakerAndTheirDomain, Answer]:
         return NothingIsFound()
 
 

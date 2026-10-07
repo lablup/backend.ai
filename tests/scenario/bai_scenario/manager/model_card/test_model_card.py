@@ -13,7 +13,7 @@ from ai.backend.common.dto.manager.v2.model_card.response import SearchModelCard
 from ai.backend.manager.api.adapters.model_card.adapter import ModelCardAdapter
 from ai.backend.manager.errors.auth import InsufficientPrivilege
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.testutils.scenario_steps import Given, Scenario, Then, When
+from ai.backend.testutils.scenario_steps import TestGiven, TestScenario, TestThen, TestWhen
 from bai_scenario.components.answers import NothingIsFound, TheCallIsRefused
 from bai_scenario.components.domain import ADomainAndACaller, ADomainAndSomeone
 from bai_scenario.runner.acting import ActingAs
@@ -21,11 +21,11 @@ from bai_scenario.runner.planting import SeedingSession
 from bai_scenario.runner.steps import run_scenario
 
 type Searched = SearchModelCardsPayload
-type CardStep = Scenario[SeedingSession, ADomainAndACaller, ModelCardAdapter, Searched]
+type CardStep = TestScenario[SeedingSession, ADomainAndACaller, ModelCardAdapter, Searched]
 
 
 @dataclass(frozen=True)
-class SearchingEveryCard(When[ADomainAndACaller, ModelCardAdapter, Searched]):
+class SearchingEveryCard(TestWhen[ADomainAndACaller, ModelCardAdapter, Searched]):
     """필터 없이 전체를 훑는다."""
 
     @override
@@ -44,7 +44,7 @@ class SearchingEveryCard(When[ADomainAndACaller, ModelCardAdapter, Searched]):
 
 @dataclass(frozen=True)
 class NoCardLaidMeansNoneFound(
-    Scenario[SeedingSession, ADomainAndACaller, ModelCardAdapter, Searched]
+    TestScenario[SeedingSession, ADomainAndACaller, ModelCardAdapter, Searched]
 ):
     @override
     def summary(self) -> str:
@@ -55,21 +55,21 @@ class NoCardLaidMeansNoneFound(
         return "모델 카드를 하나도 심지 않은 상태에서 슈퍼관리자가 전체 조회를 하면, 답은 비어 있다"
 
     @override
-    def given(self) -> Given[SeedingSession, ADomainAndACaller]:
+    def given(self) -> TestGiven[SeedingSession, ADomainAndACaller]:
         return ADomainAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
-    def when(self) -> When[ADomainAndACaller, ModelCardAdapter, Searched]:
+    def when(self) -> TestWhen[ADomainAndACaller, ModelCardAdapter, Searched]:
         return SearchingEveryCard()
 
     @override
-    def then(self) -> Then[ADomainAndACaller, Searched]:
+    def then(self) -> TestThen[ADomainAndACaller, Searched]:
         return NothingIsFound()
 
 
 @dataclass(frozen=True)
 class APlainUserMayNotSearchEveryCard(
-    Scenario[SeedingSession, ADomainAndACaller, ModelCardAdapter, Searched]
+    TestScenario[SeedingSession, ADomainAndACaller, ModelCardAdapter, Searched]
 ):
     @override
     def summary(self) -> str:
@@ -80,15 +80,15 @@ class APlainUserMayNotSearchEveryCard(
         return "슈퍼관리자가 아닌 사용자가 전체 모델 카드 조회를 요청하면 역할로 막힌다"
 
     @override
-    def given(self) -> Given[SeedingSession, ADomainAndACaller]:
+    def given(self) -> TestGiven[SeedingSession, ADomainAndACaller]:
         return ADomainAndSomeone()
 
     @override
-    def when(self) -> When[ADomainAndACaller, ModelCardAdapter, Searched]:
+    def when(self) -> TestWhen[ADomainAndACaller, ModelCardAdapter, Searched]:
         return SearchingEveryCard()
 
     @override
-    def then(self) -> Then[ADomainAndACaller, Searched]:
+    def then(self) -> TestThen[ADomainAndACaller, Searched]:
         return TheCallIsRefused(InsufficientPrivilege)
 
 

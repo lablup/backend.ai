@@ -32,14 +32,14 @@ from ai.backend.manager.errors.base.entity import EntityNotFoundError
 from ai.backend.manager.errors.permission import NotEnoughPermission
 from ai.backend.testutils.scenario_steps import (
     Answered,
-    Given,
     Held,
     Refused,
     Same,
     SameAs,
     Skipped,
-    Then,
-    Verdict,
+    TestGiven,
+    TestThen,
+    TestVerdict,
 )
 from bai_scenario.components.domain import WrittenByThisRun
 from bai_scenario.components.system import KEPT, Kept, lay_a_caller, role_named
@@ -98,7 +98,7 @@ class ManyRulesAndACaller:
 
 
 @dataclass(frozen=True)
-class AChannelAndSomeone(Given[Any, AChannelAndACaller]):
+class AChannelAndSomeone(TestGiven[Any, AChannelAndACaller]):
     """채널 하나와 사용자 한 명. 채널은 그 사용자가 만든 것으로 기록된다."""
 
     role: UserRole = UserRole.USER
@@ -118,7 +118,7 @@ class AChannelAndSomeone(Given[Any, AChannelAndACaller]):
 
 
 @dataclass(frozen=True)
-class AChannelARuleAndSomeone(Given[Any, AChannelAndACaller]):
+class AChannelARuleAndSomeone(TestGiven[Any, AChannelAndACaller]):
     """채널 하나와 그것을 가리키는 규칙 하나, 그리고 사용자 한 명."""
 
     role: UserRole = UserRole.USER
@@ -136,7 +136,7 @@ class AChannelARuleAndSomeone(Given[Any, AChannelAndACaller]):
 
 
 @dataclass(frozen=True)
-class TwoChannelsAndSomeone(Given[Any, ManyChannelsAndACaller]):
+class TwoChannelsAndSomeone(TestGiven[Any, ManyChannelsAndACaller]):
     """webhook 채널 둘과 사용자 한 명. ``named``는 앞의 것이다."""
 
     role: UserRole = UserRole.USER
@@ -158,7 +158,7 @@ class TwoChannelsAndSomeone(Given[Any, ManyChannelsAndACaller]):
 
 
 @dataclass(frozen=True)
-class AWebhookAndAnEmailChannel(Given[Any, ManyChannelsAndACaller]):
+class AWebhookAndAnEmailChannel(TestGiven[Any, ManyChannelsAndACaller]):
     """webhook 채널 하나와 email 채널 하나, 사용자 한 명. ``named``는 email 채널이다."""
 
     role: UserRole = UserRole.USER
@@ -180,7 +180,7 @@ class AWebhookAndAnEmailChannel(Given[Any, ManyChannelsAndACaller]):
 
 
 @dataclass(frozen=True)
-class AnEnabledAndADisabledChannel(Given[Any, ManyChannelsAndACaller]):
+class AnEnabledAndADisabledChannel(TestGiven[Any, ManyChannelsAndACaller]):
     """활성 채널 하나와 비활성 채널 하나, 사용자 한 명. ``laid``는 활성인 것뿐이다."""
 
     role: UserRole = UserRole.USER
@@ -202,7 +202,7 @@ class AnEnabledAndADisabledChannel(Given[Any, ManyChannelsAndACaller]):
 
 
 @dataclass(frozen=True)
-class ARuleAndSomeone(Given[Any, ARuleAndACaller]):
+class ARuleAndSomeone(TestGiven[Any, ARuleAndACaller]):
     """규칙 하나와 그것이 가리키는 webhook 채널, 그리고 사용자 한 명."""
 
     role: UserRole = UserRole.USER
@@ -231,7 +231,7 @@ class ARuleAndSomeone(Given[Any, ARuleAndACaller]):
 
 
 @dataclass(frozen=True)
-class AnOrphanRuleAndSomeone(Given[Any, ARuleAndACaller]):
+class AnOrphanRuleAndSomeone(TestGiven[Any, ARuleAndACaller]):
     """없는 채널 id를 가리키는 규칙 하나와 사용자 한 명. 채널 자리는 규칙과 무관한 채널 하나로 채운다."""
 
     role: UserRole = UserRole.USER
@@ -249,7 +249,7 @@ class AnOrphanRuleAndSomeone(Given[Any, ARuleAndACaller]):
 
 
 @dataclass(frozen=True)
-class TwoRulesAndSomeone(Given[Any, ManyRulesAndACaller]):
+class TwoRulesAndSomeone(TestGiven[Any, ManyRulesAndACaller]):
     """같은 채널을 가리키는 규칙 둘과 사용자 한 명. ``named``는 앞의 것이다."""
 
     role: UserRole = UserRole.USER
@@ -275,7 +275,7 @@ class TwoRulesAndSomeone(Given[Any, ManyRulesAndACaller]):
 
 
 @dataclass(frozen=True)
-class AnEnabledAndADisabledRule(Given[Any, ManyRulesAndACaller]):
+class AnEnabledAndADisabledRule(TestGiven[Any, ManyRulesAndACaller]):
     """활성 규칙 하나와 비활성 규칙 하나, 사용자 한 명. ``laid``는 활성인 것뿐이다."""
 
     role: UserRole = UserRole.USER
@@ -312,7 +312,7 @@ def _channel_seed(
 # ------------------------------------------------------------------ verdicts
 
 
-def webhook_spec_verdicts(prefix: str, spec: object, *, url: str) -> list[Verdict]:
+def webhook_spec_verdicts(prefix: str, spec: object, *, url: str) -> list[TestVerdict]:
     if not isinstance(spec, WebhookSpecInfo):
         return [Same(f"{prefix}spec", type(spec).__name__, WebhookSpecInfo.__name__)]
     return [
@@ -321,7 +321,7 @@ def webhook_spec_verdicts(prefix: str, spec: object, *, url: str) -> list[Verdic
     ]
 
 
-def email_spec_verdicts(prefix: str, spec: object) -> list[Verdict]:
+def email_spec_verdicts(prefix: str, spec: object) -> list[TestVerdict]:
     if not isinstance(spec, EmailSpecInfo):
         return [Same(f"{prefix}spec", type(spec).__name__, EmailSpecInfo.__name__)]
     return [
@@ -353,9 +353,9 @@ def channel_verdicts(
     enabled: bool,
     created_by: UUID,
     written: WrittenByThisRun,
-) -> list[Verdict]:
+) -> list[TestVerdict]:
     """Every place of one channel node."""
-    spec: list[Verdict]
+    spec: list[TestVerdict]
     match channel_type:
         case NotificationChannelType.WEBHOOK:
             spec = webhook_spec_verdicts(prefix, node.spec, url=url)
@@ -386,7 +386,7 @@ def rule_verdicts(
     enabled: bool,
     created_by: UUID,
     written: WrittenByThisRun,
-) -> list[Verdict]:
+) -> list[TestVerdict]:
     """Every place of one rule node."""
     return [
         Skipped(f"{prefix}id", "데이터베이스가 만든다"),
@@ -405,7 +405,7 @@ def rule_verdicts(
 
 
 @dataclass(frozen=True)
-class TheNewChannelNode(Then[Any, NotificationChannelNode]):
+class TheNewChannelNode(TestThen[Any, NotificationChannelNode]):
     """방금 생성한 채널이 통째로 반환된다. 기대값은 요청이 지정한 값에서 읽는다."""
 
     started: datetime
@@ -419,7 +419,7 @@ class TheNewChannelNode(Then[Any, NotificationChannelNode]):
         return "생성한 채널 전체가 반환된다"
 
     @override
-    def look(self, laid: Any, answered: Answered[NotificationChannelNode]) -> list[Verdict]:
+    def look(self, laid: Any, answered: Answered[NotificationChannelNode]) -> list[TestVerdict]:
         node = answered.response
         if node is None:
             return [Refused(EntityNotFoundError, answered.raised)]
@@ -437,7 +437,7 @@ class TheNewChannelNode(Then[Any, NotificationChannelNode]):
 
 
 @dataclass(frozen=True)
-class TheChannelNode(Then[AChannelAndACaller, NotificationChannelNode]):
+class TheChannelNode(TestThen[AChannelAndACaller, NotificationChannelNode]):
     """미리 만들어 둔 채널이 통째로 반환된다. 수정 요청은 바뀌어야 하는 필드만 인자로 준다."""
 
     started: datetime
@@ -453,7 +453,7 @@ class TheChannelNode(Then[AChannelAndACaller, NotificationChannelNode]):
     @override
     def look(
         self, laid: AChannelAndACaller, answered: Answered[NotificationChannelNode]
-    ) -> list[Verdict]:
+    ) -> list[TestVerdict]:
         node = answered.response
         if node is None:
             return [Refused(EntityNotFoundError, answered.raised)]
@@ -472,7 +472,7 @@ class TheChannelNode(Then[AChannelAndACaller, NotificationChannelNode]):
 
 
 @dataclass(frozen=True)
-class TheLaidChannelsAreLeft(Then[ManyChannelsAndACaller, SearchNotificationChannelsPayload]):
+class TheLaidChannelsAreLeft(TestThen[ManyChannelsAndACaller, SearchNotificationChannelsPayload]):
     """응답에 나와야 하는 채널이 모두, 그리고 그것만 반환된다."""
 
     @override
@@ -482,7 +482,7 @@ class TheLaidChannelsAreLeft(Then[ManyChannelsAndACaller, SearchNotificationChan
     @override
     def look(
         self, laid: ManyChannelsAndACaller, answered: Answered[SearchNotificationChannelsPayload]
-    ) -> list[Verdict]:
+    ) -> list[TestVerdict]:
         page = answered.response
         if page is None:
             return [Refused(EntityNotFoundError, answered.raised)]
@@ -499,7 +499,9 @@ class TheLaidChannelsAreLeft(Then[ManyChannelsAndACaller, SearchNotificationChan
 
 
 @dataclass(frozen=True)
-class OnlyTheNamedChannelIsLeft(Then[ManyChannelsAndACaller, SearchNotificationChannelsPayload]):
+class OnlyTheNamedChannelIsLeft(
+    TestThen[ManyChannelsAndACaller, SearchNotificationChannelsPayload]
+):
     """필터에 맞는 그 하나만 반환된다."""
 
     @override
@@ -509,7 +511,7 @@ class OnlyTheNamedChannelIsLeft(Then[ManyChannelsAndACaller, SearchNotificationC
     @override
     def look(
         self, laid: ManyChannelsAndACaller, answered: Answered[SearchNotificationChannelsPayload]
-    ) -> list[Verdict]:
+    ) -> list[TestVerdict]:
         page = answered.response
         if page is None:
             return [Refused(EntityNotFoundError, answered.raised)]
@@ -522,7 +524,7 @@ class OnlyTheNamedChannelIsLeft(Then[ManyChannelsAndACaller, SearchNotificationC
 
 
 @dataclass(frozen=True)
-class TheFirstChannelPage(Then[ManyChannelsAndACaller, SearchNotificationChannelsPayload]):
+class TheFirstChannelPage(TestThen[ManyChannelsAndACaller, SearchNotificationChannelsPayload]):
     """한 건짜리 첫 페이지. 한 건이 반환되고 다음 페이지가 있다고 응답한다."""
 
     @override
@@ -532,7 +534,7 @@ class TheFirstChannelPage(Then[ManyChannelsAndACaller, SearchNotificationChannel
     @override
     def look(
         self, laid: ManyChannelsAndACaller, answered: Answered[SearchNotificationChannelsPayload]
-    ) -> list[Verdict]:
+    ) -> list[TestVerdict]:
         page = answered.response
         if page is None:
             return [Refused(EntityNotFoundError, answered.raised)]
@@ -545,7 +547,7 @@ class TheFirstChannelPage(Then[ManyChannelsAndACaller, SearchNotificationChannel
 
 
 @dataclass(frozen=True)
-class TheChannelsInTheOrderAsked(Then[ManyChannelsAndACaller, LoadedChannels]):
+class TheChannelsInTheOrderAsked(TestThen[ManyChannelsAndACaller, LoadedChannels]):
     """요청한 순서대로 한 항목씩 반환된다. 미리 만들어 둔 것은 노드로, 없는 id는 빈 항목으로."""
 
     started: datetime
@@ -557,13 +559,13 @@ class TheChannelsInTheOrderAsked(Then[ManyChannelsAndACaller, LoadedChannels]):
     @override
     def look(
         self, laid: ManyChannelsAndACaller, answered: Answered[LoadedChannels]
-    ) -> list[Verdict]:
+    ) -> list[TestVerdict]:
         items = answered.response
         if items is None:
             return [Refused(EntityNotFoundError, answered.raised)]
         written = WrittenByThisRun(self.started)
         asked = len(laid.laid) + 1
-        seen: list[Verdict] = [Same("len(items)", len(items), asked)]
+        seen: list[TestVerdict] = [Same("len(items)", len(items), asked)]
         for i, expected in enumerate(laid.laid):
             got = items[i] if i < len(items) else None
             if not isinstance(got, NotificationChannelNode):
@@ -588,7 +590,7 @@ class TheChannelsInTheOrderAsked(Then[ManyChannelsAndACaller, LoadedChannels]):
 
 
 @dataclass(frozen=True)
-class EachItemIsRefused(Then[Any, list[Any]]):
+class EachItemIsRefused(TestThen[Any, list[Any]]):
     """요청한 id마다 권한 부족 거부가 담긴다."""
 
     asked: int
@@ -598,11 +600,11 @@ class EachItemIsRefused(Then[Any, list[Any]]):
         return "항목마다 권한 부족 거부가 담긴다"
 
     @override
-    def look(self, laid: Any, answered: Answered[list[Any]]) -> list[Verdict]:
+    def look(self, laid: Any, answered: Answered[list[Any]]) -> list[TestVerdict]:
         items = answered.response
         if items is None:
             return [Refused(EntityNotFoundError, answered.raised)]
-        seen: list[Verdict] = [Same("len(items)", len(items), self.asked)]
+        seen: list[TestVerdict] = [Same("len(items)", len(items), self.asked)]
         for i in range(self.asked):
             got = items[i] if i < len(items) else None
             seen.append(
@@ -616,7 +618,7 @@ class EachItemIsRefused(Then[Any, list[Any]]):
 
 
 @dataclass(frozen=True)
-class NothingComesBack(Then[Any, list[Any]]):
+class NothingComesBack(TestThen[Any, list[Any]]):
     """빈 응답이 반환된다."""
 
     @override
@@ -624,7 +626,7 @@ class NothingComesBack(Then[Any, list[Any]]):
         return "빈 응답이 반환된다"
 
     @override
-    def look(self, laid: Any, answered: Answered[list[Any]]) -> list[Verdict]:
+    def look(self, laid: Any, answered: Answered[list[Any]]) -> list[TestVerdict]:
         items = answered.response
         if items is None:
             return [Refused(EntityNotFoundError, answered.raised)]
@@ -632,7 +634,7 @@ class NothingComesBack(Then[Any, list[Any]]):
 
 
 @dataclass(frozen=True)
-class TheDeletedChannelId(Then[AChannelAndACaller, Any]):
+class TheDeletedChannelId(TestThen[AChannelAndACaller, Any]):
     """삭제한 채널의 id를 담은 응답."""
 
     @override
@@ -640,7 +642,7 @@ class TheDeletedChannelId(Then[AChannelAndACaller, Any]):
         return "삭제한 채널의 id가 반환된다"
 
     @override
-    def look(self, laid: AChannelAndACaller, answered: Answered[Any]) -> list[Verdict]:
+    def look(self, laid: AChannelAndACaller, answered: Answered[Any]) -> list[TestVerdict]:
         payload = answered.response
         if payload is None:
             return [Refused(EntityNotFoundError, answered.raised)]
@@ -648,7 +650,7 @@ class TheDeletedChannelId(Then[AChannelAndACaller, Any]):
 
 
 @dataclass(frozen=True)
-class TheValidatedChannelId(Then[AChannelAndACaller, Any]):
+class TheValidatedChannelId(TestThen[AChannelAndACaller, Any]):
     """검증한 채널의 id를 담은 응답."""
 
     @override
@@ -656,7 +658,7 @@ class TheValidatedChannelId(Then[AChannelAndACaller, Any]):
         return "검증한 채널의 id가 반환된다"
 
     @override
-    def look(self, laid: AChannelAndACaller, answered: Answered[Any]) -> list[Verdict]:
+    def look(self, laid: AChannelAndACaller, answered: Answered[Any]) -> list[TestVerdict]:
         payload = answered.response
         if payload is None:
             return [Refused(EntityNotFoundError, answered.raised)]
@@ -664,7 +666,7 @@ class TheValidatedChannelId(Then[AChannelAndACaller, Any]):
 
 
 @dataclass(frozen=True)
-class TheNewRuleNode(Then[AChannelAndACaller, NotificationRuleNode]):
+class TheNewRuleNode(TestThen[AChannelAndACaller, NotificationRuleNode]):
     """방금 생성한 규칙이 통째로 반환된다. 기대값은 요청이 지정한 값에서 읽는다."""
 
     started: datetime
@@ -682,7 +684,7 @@ class TheNewRuleNode(Then[AChannelAndACaller, NotificationRuleNode]):
     @override
     def look(
         self, laid: AChannelAndACaller, answered: Answered[NotificationRuleNode]
-    ) -> list[Verdict]:
+    ) -> list[TestVerdict]:
         node = answered.response
         if node is None:
             return [Refused(EntityNotFoundError, answered.raised)]
@@ -701,7 +703,7 @@ class TheNewRuleNode(Then[AChannelAndACaller, NotificationRuleNode]):
 
 
 @dataclass(frozen=True)
-class TheRuleNode(Then[ARuleAndACaller, NotificationRuleNode]):
+class TheRuleNode(TestThen[ARuleAndACaller, NotificationRuleNode]):
     """미리 만들어 둔 규칙이 통째로 반환된다. 수정 요청은 바뀌어야 하는 필드만 인자로 준다."""
 
     started: datetime
@@ -717,7 +719,7 @@ class TheRuleNode(Then[ARuleAndACaller, NotificationRuleNode]):
     @override
     def look(
         self, laid: ARuleAndACaller, answered: Answered[NotificationRuleNode]
-    ) -> list[Verdict]:
+    ) -> list[TestVerdict]:
         node = answered.response
         if node is None:
             return [Refused(EntityNotFoundError, answered.raised)]
@@ -741,7 +743,7 @@ class TheRuleNode(Then[ARuleAndACaller, NotificationRuleNode]):
 
 
 @dataclass(frozen=True)
-class TheLaidRulesAreLeft(Then[ManyRulesAndACaller, SearchNotificationRulesPayload]):
+class TheLaidRulesAreLeft(TestThen[ManyRulesAndACaller, SearchNotificationRulesPayload]):
     """응답에 나와야 하는 규칙이 모두, 그리고 그것만 반환된다."""
 
     @override
@@ -751,7 +753,7 @@ class TheLaidRulesAreLeft(Then[ManyRulesAndACaller, SearchNotificationRulesPaylo
     @override
     def look(
         self, laid: ManyRulesAndACaller, answered: Answered[SearchNotificationRulesPayload]
-    ) -> list[Verdict]:
+    ) -> list[TestVerdict]:
         page = answered.response
         if page is None:
             return [Refused(EntityNotFoundError, answered.raised)]
@@ -768,7 +770,7 @@ class TheLaidRulesAreLeft(Then[ManyRulesAndACaller, SearchNotificationRulesPaylo
 
 
 @dataclass(frozen=True)
-class OnlyTheNamedRuleIsLeft(Then[ManyRulesAndACaller, SearchNotificationRulesPayload]):
+class OnlyTheNamedRuleIsLeft(TestThen[ManyRulesAndACaller, SearchNotificationRulesPayload]):
     """필터에 맞는 그 하나만 반환된다."""
 
     @override
@@ -778,7 +780,7 @@ class OnlyTheNamedRuleIsLeft(Then[ManyRulesAndACaller, SearchNotificationRulesPa
     @override
     def look(
         self, laid: ManyRulesAndACaller, answered: Answered[SearchNotificationRulesPayload]
-    ) -> list[Verdict]:
+    ) -> list[TestVerdict]:
         page = answered.response
         if page is None:
             return [Refused(EntityNotFoundError, answered.raised)]
@@ -791,7 +793,7 @@ class OnlyTheNamedRuleIsLeft(Then[ManyRulesAndACaller, SearchNotificationRulesPa
 
 
 @dataclass(frozen=True)
-class TheRulesInTheOrderAsked(Then[ManyRulesAndACaller, LoadedRules]):
+class TheRulesInTheOrderAsked(TestThen[ManyRulesAndACaller, LoadedRules]):
     """요청한 순서대로 한 항목씩 반환된다. 미리 만들어 둔 것은 노드로, 없는 id는 빈 항목으로."""
 
     started: datetime
@@ -801,13 +803,13 @@ class TheRulesInTheOrderAsked(Then[ManyRulesAndACaller, LoadedRules]):
         return "요청한 순서대로 반환되고, 없는 id에 해당하는 항목은 비어 있다"
 
     @override
-    def look(self, laid: ManyRulesAndACaller, answered: Answered[LoadedRules]) -> list[Verdict]:
+    def look(self, laid: ManyRulesAndACaller, answered: Answered[LoadedRules]) -> list[TestVerdict]:
         items = answered.response
         if items is None:
             return [Refused(EntityNotFoundError, answered.raised)]
         written = WrittenByThisRun(self.started)
         asked = len(laid.laid) + 1
-        seen: list[Verdict] = [Same("len(items)", len(items), asked)]
+        seen: list[TestVerdict] = [Same("len(items)", len(items), asked)]
         for i, expected in enumerate(laid.laid):
             got = items[i] if i < len(items) else None
             if not isinstance(got, NotificationRuleNode):
@@ -833,7 +835,7 @@ class TheRulesInTheOrderAsked(Then[ManyRulesAndACaller, LoadedRules]):
 
 
 @dataclass(frozen=True)
-class TheDeletedRuleId(Then[ARuleAndACaller, Any]):
+class TheDeletedRuleId(TestThen[ARuleAndACaller, Any]):
     """삭제한 규칙의 id를 담은 응답."""
 
     @override
@@ -841,7 +843,7 @@ class TheDeletedRuleId(Then[ARuleAndACaller, Any]):
         return "삭제한 규칙의 id가 반환된다"
 
     @override
-    def look(self, laid: ARuleAndACaller, answered: Answered[Any]) -> list[Verdict]:
+    def look(self, laid: ARuleAndACaller, answered: Answered[Any]) -> list[TestVerdict]:
         payload = answered.response
         if payload is None:
             return [Refused(EntityNotFoundError, answered.raised)]
@@ -849,7 +851,7 @@ class TheDeletedRuleId(Then[ARuleAndACaller, Any]):
 
 
 @dataclass(frozen=True)
-class TheRenderedMessage(Then[ARuleAndACaller, ValidateNotificationRulePayload]):
+class TheRenderedMessage(TestThen[ARuleAndACaller, ValidateNotificationRulePayload]):
     """템플릿에 시험 데이터를 넣어 만든 문자열이 반환된다."""
 
     rendered: str
@@ -861,7 +863,7 @@ class TheRenderedMessage(Then[ARuleAndACaller, ValidateNotificationRulePayload])
     @override
     def look(
         self, laid: ARuleAndACaller, answered: Answered[ValidateNotificationRulePayload]
-    ) -> list[Verdict]:
+    ) -> list[TestVerdict]:
         payload = answered.response
         if payload is None:
             return [Refused(EntityNotFoundError, answered.raised)]

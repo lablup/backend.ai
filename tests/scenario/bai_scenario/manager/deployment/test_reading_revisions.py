@@ -21,7 +21,7 @@ from ai.backend.manager.data.permission.types import Permission
 from ai.backend.manager.errors.base.field import FieldNotFoundError
 from ai.backend.manager.errors.common import GenericBadRequest
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.testutils.scenario_steps import Given, Scenario, Then, When
+from ai.backend.testutils.scenario_steps import TestGiven, TestScenario, TestThen, TestWhen
 from bai_scenario.components.answers import TheCallIsRefused
 from bai_scenario.components.deployment_revision import (
     ADeploymentToRevise,
@@ -35,12 +35,14 @@ from bai_scenario.runner.acting import ActingAs
 from bai_scenario.runner.planting import SeedingSession
 from bai_scenario.runner.steps import run_scenario
 
-type ReadingStep = Scenario[SeedingSession, RevisionsAndACaller, DeploymentAdapter, RevisionNode]
-type LoadingStep = Scenario[SeedingSession, RevisionsAndACaller, DeploymentAdapter, Loaded]
+type ReadingStep = TestScenario[
+    SeedingSession, RevisionsAndACaller, DeploymentAdapter, RevisionNode
+]
+type LoadingStep = TestScenario[SeedingSession, RevisionsAndACaller, DeploymentAdapter, Loaded]
 
 
 @dataclass(frozen=True)
-class ReadingARevision(When[RevisionsAndACaller, DeploymentAdapter, RevisionNode]):
+class ReadingARevision(TestWhen[RevisionsAndACaller, DeploymentAdapter, RevisionNode]):
     """id로 리비전 하나를 읽는다. id를 대지 않으면 심은 첫 리비전을 읽는다."""
 
     named: UUID | None = None
@@ -66,7 +68,7 @@ class ReadingARevision(When[RevisionsAndACaller, DeploymentAdapter, RevisionNode
 
 
 @dataclass(frozen=True)
-class LoadingRevisionsById(When[RevisionsAndACaller, DeploymentAdapter, Loaded]):
+class LoadingRevisionsById(TestWhen[RevisionsAndACaller, DeploymentAdapter, Loaded]):
     """읽을 수 있는 것, 다른 프로젝트의 것, 없는 id를 차례로 이름 대 한 번에 집는다."""
 
     @override
@@ -91,7 +93,7 @@ class LoadingRevisionsById(When[RevisionsAndACaller, DeploymentAdapter, Loaded])
 
 @dataclass(frozen=True)
 class TheGrantedUserReadsIt(
-    Scenario[SeedingSession, RevisionsAndACaller, DeploymentAdapter, RevisionNode]
+    TestScenario[SeedingSession, RevisionsAndACaller, DeploymentAdapter, RevisionNode]
 ):
     started: datetime
 
@@ -104,21 +106,21 @@ class TheGrantedUserReadsIt(
         return "배포 읽기 권한을 받은 사용자가 그 배포의 리비전을 id로 조회하면, 그 리비전이 온다"
 
     @override
-    def given(self) -> Given[SeedingSession, RevisionsAndACaller]:
+    def given(self) -> TestGiven[SeedingSession, RevisionsAndACaller]:
         return ADeploymentToRevise(granted=(Permission.READ,), revisions=1)
 
     @override
-    def when(self) -> When[RevisionsAndACaller, DeploymentAdapter, RevisionNode]:
+    def when(self) -> TestWhen[RevisionsAndACaller, DeploymentAdapter, RevisionNode]:
         return ReadingARevision()
 
     @override
-    def then(self) -> Then[RevisionsAndACaller, RevisionNode]:
+    def then(self) -> TestThen[RevisionsAndACaller, RevisionNode]:
         return TheRevisionNode(started=self.started, number=1, seeded=0)
 
 
 @dataclass(frozen=True)
 class AUserGrantedNothingMayNotReadIt(
-    Scenario[SeedingSession, RevisionsAndACaller, DeploymentAdapter, RevisionNode]
+    TestScenario[SeedingSession, RevisionsAndACaller, DeploymentAdapter, RevisionNode]
 ):
     @override
     def summary(self) -> str:
@@ -132,21 +134,21 @@ class AUserGrantedNothingMayNotReadIt(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, RevisionsAndACaller]:
+    def given(self) -> TestGiven[SeedingSession, RevisionsAndACaller]:
         return ADeploymentToRevise(revisions=1)
 
     @override
-    def when(self) -> When[RevisionsAndACaller, DeploymentAdapter, RevisionNode]:
+    def when(self) -> TestWhen[RevisionsAndACaller, DeploymentAdapter, RevisionNode]:
         return ReadingARevision()
 
     @override
-    def then(self) -> Then[RevisionsAndACaller, RevisionNode]:
+    def then(self) -> TestThen[RevisionsAndACaller, RevisionNode]:
         return TheCallIsRefused(GenericBadRequest)
 
 
 @dataclass(frozen=True)
 class AnUnknownIdIsRefusedAsUnresolvable(
-    Scenario[SeedingSession, RevisionsAndACaller, DeploymentAdapter, RevisionNode]
+    TestScenario[SeedingSession, RevisionsAndACaller, DeploymentAdapter, RevisionNode]
 ):
     @override
     def summary(self) -> str:
@@ -160,21 +162,21 @@ class AnUnknownIdIsRefusedAsUnresolvable(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, RevisionsAndACaller]:
+    def given(self) -> TestGiven[SeedingSession, RevisionsAndACaller]:
         return ADeploymentToRevise(granted=(Permission.READ,), revisions=1)
 
     @override
-    def when(self) -> When[RevisionsAndACaller, DeploymentAdapter, RevisionNode]:
+    def when(self) -> TestWhen[RevisionsAndACaller, DeploymentAdapter, RevisionNode]:
         return ReadingARevision(named=uuid4())
 
     @override
-    def then(self) -> Then[RevisionsAndACaller, RevisionNode]:
+    def then(self) -> TestThen[RevisionsAndACaller, RevisionNode]:
         return TheCallIsRefused(GenericBadRequest)
 
 
 @dataclass(frozen=True)
 class AnUnknownIdIsNotFoundForASuperadmin(
-    Scenario[SeedingSession, RevisionsAndACaller, DeploymentAdapter, RevisionNode]
+    TestScenario[SeedingSession, RevisionsAndACaller, DeploymentAdapter, RevisionNode]
 ):
     @override
     def summary(self) -> str:
@@ -188,21 +190,21 @@ class AnUnknownIdIsNotFoundForASuperadmin(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, RevisionsAndACaller]:
+    def given(self) -> TestGiven[SeedingSession, RevisionsAndACaller]:
         return ADeploymentToRevise(role=UserRole.SUPERADMIN, revisions=1)
 
     @override
-    def when(self) -> When[RevisionsAndACaller, DeploymentAdapter, RevisionNode]:
+    def when(self) -> TestWhen[RevisionsAndACaller, DeploymentAdapter, RevisionNode]:
         return ReadingARevision(named=uuid4())
 
     @override
-    def then(self) -> Then[RevisionsAndACaller, RevisionNode]:
+    def then(self) -> TestThen[RevisionsAndACaller, RevisionNode]:
         return TheCallIsRefused(FieldNotFoundError)
 
 
 @dataclass(frozen=True)
 class EachNamedIdIsAnsweredOnItsOwn(
-    Scenario[SeedingSession, RevisionsAndACaller, DeploymentAdapter, Loaded]
+    TestScenario[SeedingSession, RevisionsAndACaller, DeploymentAdapter, Loaded]
 ):
     started: datetime
 
@@ -219,15 +221,15 @@ class EachNamedIdIsAnsweredOnItsOwn(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, RevisionsAndACaller]:
+    def given(self) -> TestGiven[SeedingSession, RevisionsAndACaller]:
         return RevisionsInTwoProjects(granted=(Permission.READ,))
 
     @override
-    def when(self) -> When[RevisionsAndACaller, DeploymentAdapter, Loaded]:
+    def when(self) -> TestWhen[RevisionsAndACaller, DeploymentAdapter, Loaded]:
         return LoadingRevisionsById()
 
     @override
-    def then(self) -> Then[RevisionsAndACaller, Loaded]:
+    def then(self) -> TestThen[RevisionsAndACaller, Loaded]:
         return EachNamedRevisionIsAnswered(started=self.started)
 
 

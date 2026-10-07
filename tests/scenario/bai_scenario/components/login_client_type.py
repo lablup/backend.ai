@@ -23,14 +23,14 @@ from ai.backend.manager.data.user.types import UserData
 from ai.backend.manager.errors.base.entity import EntityNotFoundError
 from ai.backend.testutils.scenario_steps import (
     Answered,
-    Given,
     Held,
     Refused,
     Same,
     SameAs,
     Skipped,
-    Then,
-    Verdict,
+    TestGiven,
+    TestThen,
+    TestVerdict,
 )
 from bai_scenario.components.domain import WrittenByThisRun
 from bai_scenario.components.system import (
@@ -63,7 +63,7 @@ class ManyTypesAndACaller:
 
 
 @dataclass(frozen=True)
-class ATypeAndSomeone(Given[Any, ATypeAndACaller]):
+class ATypeAndSomeone(TestGiven[Any, ATypeAndACaller]):
     """종류 하나와 사용자 한 명."""
 
     role: UserRole = UserRole.USER
@@ -80,7 +80,7 @@ class ATypeAndSomeone(Given[Any, ATypeAndACaller]):
 
 
 @dataclass(frozen=True)
-class ManyTypesAndSomeone(Given[Any, ManyTypesAndACaller]):
+class ManyTypesAndSomeone(TestGiven[Any, ManyTypesAndACaller]):
     """종류 여럿과 사용자 한 명."""
 
     role: UserRole = UserRole.USER
@@ -111,7 +111,7 @@ def type_verdicts(
     named: str,
     described: str | None,
     written: WrittenByThisRun,
-) -> list[Verdict]:
+) -> list[TestVerdict]:
     """Every place of one login client type node."""
     return [
         Skipped("id", "데이터베이스가 만든다"),
@@ -123,7 +123,7 @@ def type_verdicts(
 
 
 @dataclass(frozen=True)
-class TheNewTypeNode(Then[Any, LoginClientTypeNode]):
+class TheNewTypeNode(TestThen[Any, LoginClientTypeNode]):
     """방금 생성한 종류가 통째로 반환된다. 이름과 설명은 시나리오가 정한 값이다."""
 
     started: datetime
@@ -135,7 +135,7 @@ class TheNewTypeNode(Then[Any, LoginClientTypeNode]):
         return "생성한 종류 전체가 반환된다"
 
     @override
-    def look(self, laid: Any, answered: Answered[LoginClientTypeNode]) -> list[Verdict]:
+    def look(self, laid: Any, answered: Answered[LoginClientTypeNode]) -> list[TestVerdict]:
         node = answered.response
         if node is None:
             return [Refused(EntityNotFoundError, answered.raised)]
@@ -148,7 +148,7 @@ class TheNewTypeNode(Then[Any, LoginClientTypeNode]):
 
 
 @dataclass(frozen=True)
-class TheTypeNode(Then[ATypeAndACaller, LoginClientTypeNode]):
+class TheTypeNode(TestThen[ATypeAndACaller, LoginClientTypeNode]):
     """미리 만들어 둔 종류가 통째로 반환된다. 수정 요청은 바뀌어야 하는 필드만 인자로 준다."""
 
     started: datetime
@@ -160,7 +160,9 @@ class TheTypeNode(Then[ATypeAndACaller, LoginClientTypeNode]):
         return "미리 만들어 둔 종류 전체가 반환된다"
 
     @override
-    def look(self, laid: ATypeAndACaller, answered: Answered[LoginClientTypeNode]) -> list[Verdict]:
+    def look(
+        self, laid: ATypeAndACaller, answered: Answered[LoginClientTypeNode]
+    ) -> list[TestVerdict]:
         node = answered.response
         if node is None:
             return [Refused(EntityNotFoundError, answered.raised)]
@@ -174,7 +176,7 @@ class TheTypeNode(Then[ATypeAndACaller, LoginClientTypeNode]):
 
 
 @dataclass(frozen=True)
-class EveryLaidTypeIsCounted(Then[ManyTypesAndACaller, SearchLoginClientTypesPayload]):
+class EveryLaidTypeIsCounted(TestThen[ManyTypesAndACaller, SearchLoginClientTypesPayload]):
     """미리 만들어 둔 종류가 모두 집계된다."""
 
     @override
@@ -184,7 +186,7 @@ class EveryLaidTypeIsCounted(Then[ManyTypesAndACaller, SearchLoginClientTypesPay
     @override
     def look(
         self, laid: ManyTypesAndACaller, answered: Answered[SearchLoginClientTypesPayload]
-    ) -> list[Verdict]:
+    ) -> list[TestVerdict]:
         page = answered.response
         if page is None:
             return [Refused(EntityNotFoundError, answered.raised)]
@@ -201,7 +203,7 @@ class EveryLaidTypeIsCounted(Then[ManyTypesAndACaller, SearchLoginClientTypesPay
 
 
 @dataclass(frozen=True)
-class TheDeletedTypeId(Then[ATypeAndACaller, DeleteLoginClientTypePayload]):
+class TheDeletedTypeId(TestThen[ATypeAndACaller, DeleteLoginClientTypePayload]):
     """삭제한 종류의 id를 담은 응답."""
 
     @override
@@ -211,7 +213,7 @@ class TheDeletedTypeId(Then[ATypeAndACaller, DeleteLoginClientTypePayload]):
     @override
     def look(
         self, laid: ATypeAndACaller, answered: Answered[DeleteLoginClientTypePayload]
-    ) -> list[Verdict]:
+    ) -> list[TestVerdict]:
         payload = answered.response
         if payload is None:
             return [Refused(EntityNotFoundError, answered.raised)]

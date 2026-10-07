@@ -28,14 +28,14 @@ from ai.backend.manager.errors.base.entity import EntityNotFoundError
 from ai.backend.manager.errors.permission import NotEnoughPermission
 from ai.backend.testutils.scenario_steps import (
     Answered,
-    Given,
     Held,
     Refused,
     Same,
     SameAs,
     Skipped,
-    Then,
-    Verdict,
+    TestGiven,
+    TestThen,
+    TestVerdict,
 )
 from bai_scenario.components.domain import WrittenByThisRun
 from bai_scenario.components.system import (
@@ -73,7 +73,7 @@ class ManyVariantsAndACaller:
 
 
 @dataclass(frozen=True)
-class AVariantAndSomeone(Given[Any, AVariantAndACaller]):
+class AVariantAndSomeone(TestGiven[Any, AVariantAndACaller]):
     """변형 하나와 사용자 한 명."""
 
     role: UserRole = UserRole.USER
@@ -93,7 +93,7 @@ class AVariantAndSomeone(Given[Any, AVariantAndACaller]):
 
 
 @dataclass(frozen=True)
-class ManyVariantsAndSomeone(Given[Any, ManyVariantsAndACaller]):
+class ManyVariantsAndSomeone(TestGiven[Any, ManyVariantsAndACaller]):
     """변형 여럿과 사용자 한 명."""
 
     role: UserRole = UserRole.USER
@@ -127,7 +127,7 @@ def variant_verdicts(
     named: str,
     described: str | None,
     written: WrittenByThisRun,
-) -> list[Verdict]:
+) -> list[TestVerdict]:
     """Every place of one variant node, prefixed for a node inside a list."""
     return [
         Skipped(f"{at}id", "데이터베이스가 만든다"),
@@ -143,7 +143,7 @@ def variant_verdicts(
 
 
 @dataclass(frozen=True)
-class TheNewVariantNode(Then[Any, RuntimeVariantNode]):
+class TheNewVariantNode(TestThen[Any, RuntimeVariantNode]):
     """방금 생성한 변형이 통째로 반환된다. 이름과 설명은 시나리오가 정한 값이다."""
 
     started: datetime
@@ -155,7 +155,7 @@ class TheNewVariantNode(Then[Any, RuntimeVariantNode]):
         return "생성한 변형 전체가 반환된다"
 
     @override
-    def look(self, laid: Any, answered: Answered[RuntimeVariantNode]) -> list[Verdict]:
+    def look(self, laid: Any, answered: Answered[RuntimeVariantNode]) -> list[TestVerdict]:
         node = answered.response
         if node is None:
             return [Refused(EntityNotFoundError, answered.raised)]
@@ -169,7 +169,7 @@ class TheNewVariantNode(Then[Any, RuntimeVariantNode]):
 
 
 @dataclass(frozen=True)
-class TheVariantNode(Then[AVariantAndACaller, RuntimeVariantNode]):
+class TheVariantNode(TestThen[AVariantAndACaller, RuntimeVariantNode]):
     """미리 만들어 둔 변형이 통째로 반환된다. 수정 요청은 바뀌어야 하는 필드만 인자로 준다."""
 
     started: datetime
@@ -183,7 +183,7 @@ class TheVariantNode(Then[AVariantAndACaller, RuntimeVariantNode]):
     @override
     def look(
         self, laid: AVariantAndACaller, answered: Answered[RuntimeVariantNode]
-    ) -> list[Verdict]:
+    ) -> list[TestVerdict]:
         node = answered.response
         if node is None:
             return [Refused(EntityNotFoundError, answered.raised)]
@@ -195,7 +195,7 @@ class TheVariantNode(Then[AVariantAndACaller, RuntimeVariantNode]):
 
 
 @dataclass(frozen=True)
-class EveryLaidVariantIsCounted(Then[ManyVariantsAndACaller, SearchRuntimeVariantsPayload]):
+class EveryLaidVariantIsCounted(TestThen[ManyVariantsAndACaller, SearchRuntimeVariantsPayload]):
     """미리 만들어 둔 변형이 모두 집계된다."""
 
     @override
@@ -205,7 +205,7 @@ class EveryLaidVariantIsCounted(Then[ManyVariantsAndACaller, SearchRuntimeVarian
     @override
     def look(
         self, laid: ManyVariantsAndACaller, answered: Answered[SearchRuntimeVariantsPayload]
-    ) -> list[Verdict]:
+    ) -> list[TestVerdict]:
         page = answered.response
         if page is None:
             return [Refused(EntityNotFoundError, answered.raised)]
@@ -222,7 +222,7 @@ class EveryLaidVariantIsCounted(Then[ManyVariantsAndACaller, SearchRuntimeVarian
 
 
 @dataclass(frozen=True)
-class OnlyTheNamedVariantIsLeft(Then[ManyVariantsAndACaller, SearchRuntimeVariantsPayload]):
+class OnlyTheNamedVariantIsLeft(TestThen[ManyVariantsAndACaller, SearchRuntimeVariantsPayload]):
     """필터에 맞는 그 하나만 반환된다."""
 
     @override
@@ -232,7 +232,7 @@ class OnlyTheNamedVariantIsLeft(Then[ManyVariantsAndACaller, SearchRuntimeVarian
     @override
     def look(
         self, laid: ManyVariantsAndACaller, answered: Answered[SearchRuntimeVariantsPayload]
-    ) -> list[Verdict]:
+    ) -> list[TestVerdict]:
         page = answered.response
         if page is None:
             return [Refused(EntityNotFoundError, answered.raised)]
@@ -245,7 +245,7 @@ class OnlyTheNamedVariantIsLeft(Then[ManyVariantsAndACaller, SearchRuntimeVarian
 
 
 @dataclass(frozen=True)
-class TheFirstPageOfVariants(Then[ManyVariantsAndACaller, SearchRuntimeVariantsPayload]):
+class TheFirstPageOfVariants(TestThen[ManyVariantsAndACaller, SearchRuntimeVariantsPayload]):
     """크기를 지정하지 않은 첫 페이지. 기본 크기만큼 반환되고 다음 페이지가 있다고 응답한다."""
 
     size: int
@@ -257,7 +257,7 @@ class TheFirstPageOfVariants(Then[ManyVariantsAndACaller, SearchRuntimeVariantsP
     @override
     def look(
         self, laid: ManyVariantsAndACaller, answered: Answered[SearchRuntimeVariantsPayload]
-    ) -> list[Verdict]:
+    ) -> list[TestVerdict]:
         page = answered.response
         if page is None:
             return [Refused(EntityNotFoundError, answered.raised)]
@@ -271,7 +271,7 @@ class TheFirstPageOfVariants(Then[ManyVariantsAndACaller, SearchRuntimeVariantsP
 
 @dataclass(frozen=True)
 class TheVariantsInTheOrderAsked(
-    Then[ManyVariantsAndACaller, list[RuntimeVariantNode | Exception | None]]
+    TestThen[ManyVariantsAndACaller, list[RuntimeVariantNode | Exception | None]]
 ):
     """요청한 순서대로 한 항목씩 반환된다. 미리 만들어 둔 것은 노드로, 없는 id는 거부로."""
 
@@ -286,13 +286,13 @@ class TheVariantsInTheOrderAsked(
         self,
         laid: ManyVariantsAndACaller,
         answered: Answered[list[RuntimeVariantNode | Exception | None]],
-    ) -> list[Verdict]:
+    ) -> list[TestVerdict]:
         items = answered.response
         if items is None:
             return [Refused(EntityNotFoundError, answered.raised)]
         written = WrittenByThisRun(self.started)
         asked = len(laid.laid) + 1
-        seen: list[Verdict] = [Same("len(items)", len(items), asked)]
+        seen: list[TestVerdict] = [Same("len(items)", len(items), asked)]
         for i, expected in enumerate(laid.laid):
             got = items[i] if i < len(items) else None
             if not isinstance(got, RuntimeVariantNode):
@@ -313,7 +313,7 @@ class TheVariantsInTheOrderAsked(
 
 
 @dataclass(frozen=True)
-class TheDeletedVariantId(Then[AVariantAndACaller, DeleteRuntimeVariantPayload]):
+class TheDeletedVariantId(TestThen[AVariantAndACaller, DeleteRuntimeVariantPayload]):
     """삭제한 변형의 id를 담은 응답."""
 
     @override
@@ -323,7 +323,7 @@ class TheDeletedVariantId(Then[AVariantAndACaller, DeleteRuntimeVariantPayload])
     @override
     def look(
         self, laid: AVariantAndACaller, answered: Answered[DeleteRuntimeVariantPayload]
-    ) -> list[Verdict]:
+    ) -> list[TestVerdict]:
         payload = answered.response
         if payload is None:
             return [Refused(EntityNotFoundError, answered.raised)]
@@ -334,7 +334,7 @@ MESSAGE_IS_FREE_TEXT = "이유는 문자열로 오고, 문자열은 바뀌어도
 
 
 @dataclass(frozen=True)
-class EveryLaidVariantIsDeleted(Then[ManyVariantsAndACaller, DeleteRuntimeVariantsPayload]):
+class EveryLaidVariantIsDeleted(TestThen[ManyVariantsAndACaller, DeleteRuntimeVariantsPayload]):
     """미리 만들어 둔 변형의 id가 요청한 순서대로 삭제된 목록에 반환되고, 실패 목록은 비어 있다."""
 
     @override
@@ -344,7 +344,7 @@ class EveryLaidVariantIsDeleted(Then[ManyVariantsAndACaller, DeleteRuntimeVarian
     @override
     def look(
         self, laid: ManyVariantsAndACaller, answered: Answered[DeleteRuntimeVariantsPayload]
-    ) -> list[Verdict]:
+    ) -> list[TestVerdict]:
         payload = answered.response
         if payload is None:
             return [Refused(EntityNotFoundError, answered.raised)]
@@ -360,7 +360,9 @@ class EveryLaidVariantIsDeleted(Then[ManyVariantsAndACaller, DeleteRuntimeVarian
 
 
 @dataclass(frozen=True)
-class TheLaidOneIsDeletedTheUnknownFails(Then[AVariantAndACaller, DeleteRuntimeVariantsPayload]):
+class TheLaidOneIsDeletedTheUnknownFails(
+    TestThen[AVariantAndACaller, DeleteRuntimeVariantsPayload]
+):
     """미리 만들어 둔 변형은 삭제된 목록에, 없는 id는 실패 목록에 반환된다."""
 
     @override
@@ -370,7 +372,7 @@ class TheLaidOneIsDeletedTheUnknownFails(Then[AVariantAndACaller, DeleteRuntimeV
     @override
     def look(
         self, laid: AVariantAndACaller, answered: Answered[DeleteRuntimeVariantsPayload]
-    ) -> list[Verdict]:
+    ) -> list[TestVerdict]:
         payload = answered.response
         if payload is None:
             return [Refused(EntityNotFoundError, answered.raised)]
@@ -388,7 +390,7 @@ class TheLaidOneIsDeletedTheUnknownFails(Then[AVariantAndACaller, DeleteRuntimeV
 
 
 @dataclass(frozen=True)
-class EveryLaidVariantIsRefused(Then[ManyVariantsAndACaller, DeleteRuntimeVariantsPayload]):
+class EveryLaidVariantIsRefused(TestThen[ManyVariantsAndACaller, DeleteRuntimeVariantsPayload]):
     """미리 만들어 둔 변형 전부가 요청한 순서대로 실패 목록에 반환되고, 삭제된 목록은 비어 있다."""
 
     @override
@@ -398,7 +400,7 @@ class EveryLaidVariantIsRefused(Then[ManyVariantsAndACaller, DeleteRuntimeVarian
     @override
     def look(
         self, laid: ManyVariantsAndACaller, answered: Answered[DeleteRuntimeVariantsPayload]
-    ) -> list[Verdict]:
+    ) -> list[TestVerdict]:
         payload = answered.response
         if payload is None:
             return [Refused(EntityNotFoundError, answered.raised)]

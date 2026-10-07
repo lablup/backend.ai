@@ -19,7 +19,13 @@ from ai.backend.manager.errors.base.entity import EntityNotFoundError
 from ai.backend.manager.errors.permission import NotEnoughPermission
 from ai.backend.manager.errors.repository import UniqueConstraintViolationError
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.testutils.scenario_steps import Configured, Given, Scenario, Then, When
+from ai.backend.testutils.scenario_steps import (
+    TestConfigured,
+    TestGiven,
+    TestScenario,
+    TestThen,
+    TestWhen,
+)
 from bai_scenario.components.answers import TheCallIsRefused
 from bai_scenario.components.runtime_variant import (
     AVariantAndACaller,
@@ -35,11 +41,11 @@ from bai_scenario.runner.steps import run_scenario
 
 RENAMED = "renamed"
 
-type EditingStep = Scenario[SeedingSession, Any, RuntimeVariantAdapter, RuntimeVariantNode]
+type EditingStep = TestScenario[SeedingSession, Any, RuntimeVariantAdapter, RuntimeVariantNode]
 
 
 @dataclass(frozen=True)
-class Editing(When[AVariantAndACaller, RuntimeVariantAdapter, RuntimeVariantNode]):
+class Editing(TestWhen[AVariantAndACaller, RuntimeVariantAdapter, RuntimeVariantNode]):
     """미리 만들어 둔 변형을 수정한다. 응답에 담긴 노드를 꺼내서 준다."""
 
     named: str | None = None
@@ -77,7 +83,7 @@ class Editing(When[AVariantAndACaller, RuntimeVariantAdapter, RuntimeVariantNode
 
 @dataclass(frozen=True)
 class RenamingToAnothersName(
-    When[ManyVariantsAndACaller, RuntimeVariantAdapter, RuntimeVariantNode]
+    TestWhen[ManyVariantsAndACaller, RuntimeVariantAdapter, RuntimeVariantNode]
 ):
     """골라낸 하나의 이름을 함께 만들어 둔 다른 변형의 이름으로 바꾼다."""
 
@@ -104,7 +110,7 @@ class RenamingToAnothersName(
 
 @dataclass(frozen=True)
 class TheNameChangesAndTheDescriptionStays(
-    Scenario[SeedingSession, AVariantAndACaller, RuntimeVariantAdapter, RuntimeVariantNode]
+    TestScenario[SeedingSession, AVariantAndACaller, RuntimeVariantAdapter, RuntimeVariantNode]
 ):
     started: datetime
 
@@ -117,21 +123,21 @@ class TheNameChangesAndTheDescriptionStays(
         return "슈퍼관리자가 변형의 이름만 바꾸면, 이름은 새 값이 되고 설명은 그대로 유지된다"
 
     @override
-    def given(self) -> Given[SeedingSession, AVariantAndACaller]:
+    def given(self) -> TestGiven[SeedingSession, AVariantAndACaller]:
         return AVariantAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
-    def when(self) -> When[AVariantAndACaller, RuntimeVariantAdapter, RuntimeVariantNode]:
+    def when(self) -> TestWhen[AVariantAndACaller, RuntimeVariantAdapter, RuntimeVariantNode]:
         return Editing(named=RENAMED)
 
     @override
-    def then(self) -> Then[AVariantAndACaller, RuntimeVariantNode]:
+    def then(self) -> TestThen[AVariantAndACaller, RuntimeVariantNode]:
         return TheVariantNode(started=self.started, named=RENAMED)
 
 
 @dataclass(frozen=True)
 class ClearingTheDescription(
-    Scenario[SeedingSession, AVariantAndACaller, RuntimeVariantAdapter, RuntimeVariantNode]
+    TestScenario[SeedingSession, AVariantAndACaller, RuntimeVariantAdapter, RuntimeVariantNode]
 ):
     started: datetime
 
@@ -144,21 +150,21 @@ class ClearingTheDescription(
         return "설명이 있는 변형에 설명을 비우는 수정을 하면, 설명이 없어진다"
 
     @override
-    def given(self) -> Given[SeedingSession, AVariantAndACaller]:
+    def given(self) -> TestGiven[SeedingSession, AVariantAndACaller]:
         return AVariantAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
-    def when(self) -> When[AVariantAndACaller, RuntimeVariantAdapter, RuntimeVariantNode]:
+    def when(self) -> TestWhen[AVariantAndACaller, RuntimeVariantAdapter, RuntimeVariantNode]:
         return Editing(described=None)
 
     @override
-    def then(self) -> Then[AVariantAndACaller, RuntimeVariantNode]:
+    def then(self) -> TestThen[AVariantAndACaller, RuntimeVariantNode]:
         return TheVariantNode(started=self.started, described=None)
 
 
 @dataclass(frozen=True)
 class AnEmptyEditChangesNothing(
-    Scenario[SeedingSession, AVariantAndACaller, RuntimeVariantAdapter, RuntimeVariantNode]
+    TestScenario[SeedingSession, AVariantAndACaller, RuntimeVariantAdapter, RuntimeVariantNode]
 ):
     started: datetime
 
@@ -171,21 +177,21 @@ class AnEmptyEditChangesNothing(
         return "값을 하나도 지정하지 않고 수정하면 아무것도 바뀌지 않은 노드가 반환된다"
 
     @override
-    def given(self) -> Given[SeedingSession, AVariantAndACaller]:
+    def given(self) -> TestGiven[SeedingSession, AVariantAndACaller]:
         return AVariantAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
-    def when(self) -> When[AVariantAndACaller, RuntimeVariantAdapter, RuntimeVariantNode]:
+    def when(self) -> TestWhen[AVariantAndACaller, RuntimeVariantAdapter, RuntimeVariantNode]:
         return Editing()
 
     @override
-    def then(self) -> Then[AVariantAndACaller, RuntimeVariantNode]:
+    def then(self) -> TestThen[AVariantAndACaller, RuntimeVariantNode]:
         return TheVariantNode(started=self.started)
 
 
 @dataclass(frozen=True)
 class RenamingToATakenNameIsRefused(
-    Scenario[SeedingSession, ManyVariantsAndACaller, RuntimeVariantAdapter, RuntimeVariantNode]
+    TestScenario[SeedingSession, ManyVariantsAndACaller, RuntimeVariantAdapter, RuntimeVariantNode]
 ):
     @override
     def summary(self) -> str:
@@ -199,21 +205,21 @@ class RenamingToATakenNameIsRefused(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, ManyVariantsAndACaller]:
+    def given(self) -> TestGiven[SeedingSession, ManyVariantsAndACaller]:
         return ManyVariantsAndSomeone(role=UserRole.SUPERADMIN, besides=1)
 
     @override
-    def when(self) -> When[ManyVariantsAndACaller, RuntimeVariantAdapter, RuntimeVariantNode]:
+    def when(self) -> TestWhen[ManyVariantsAndACaller, RuntimeVariantAdapter, RuntimeVariantNode]:
         return RenamingToAnothersName()
 
     @override
-    def then(self) -> Then[ManyVariantsAndACaller, RuntimeVariantNode]:
+    def then(self) -> TestThen[ManyVariantsAndACaller, RuntimeVariantNode]:
         return TheCallIsRefused(UniqueConstraintViolationError)
 
 
 @dataclass(frozen=True)
 class TheSuperadminEditingAnUnknownIdIsNotFound(
-    Scenario[SeedingSession, AVariantAndACaller, RuntimeVariantAdapter, RuntimeVariantNode]
+    TestScenario[SeedingSession, AVariantAndACaller, RuntimeVariantAdapter, RuntimeVariantNode]
 ):
     @override
     def summary(self) -> str:
@@ -224,21 +230,21 @@ class TheSuperadminEditingAnUnknownIdIsNotFound(
         return "슈퍼관리자가 존재하지 않는 id를 수정하면 대상을 찾을 수 없다는 이유로 거부된다"
 
     @override
-    def given(self) -> Given[SeedingSession, AVariantAndACaller]:
+    def given(self) -> TestGiven[SeedingSession, AVariantAndACaller]:
         return AVariantAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
-    def when(self) -> When[AVariantAndACaller, RuntimeVariantAdapter, RuntimeVariantNode]:
+    def when(self) -> TestWhen[AVariantAndACaller, RuntimeVariantAdapter, RuntimeVariantNode]:
         return Editing(named=RENAMED, unknown=True)
 
     @override
-    def then(self) -> Then[AVariantAndACaller, RuntimeVariantNode]:
+    def then(self) -> TestThen[AVariantAndACaller, RuntimeVariantNode]:
         return TheCallIsRefused(EntityNotFoundError)
 
 
 @dataclass(frozen=True)
 class AUserGrantedNothingMayNotEdit(
-    Scenario[SeedingSession, AVariantAndACaller, RuntimeVariantAdapter, RuntimeVariantNode]
+    TestScenario[SeedingSession, AVariantAndACaller, RuntimeVariantAdapter, RuntimeVariantNode]
 ):
     @override
     def summary(self) -> str:
@@ -252,21 +258,21 @@ class AUserGrantedNothingMayNotEdit(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, AVariantAndACaller]:
+    def given(self) -> TestGiven[SeedingSession, AVariantAndACaller]:
         return AVariantAndSomeone()
 
     @override
-    def when(self) -> When[AVariantAndACaller, RuntimeVariantAdapter, RuntimeVariantNode]:
+    def when(self) -> TestWhen[AVariantAndACaller, RuntimeVariantAdapter, RuntimeVariantNode]:
         return Editing(named=RENAMED)
 
     @override
-    def then(self) -> Then[AVariantAndACaller, RuntimeVariantNode]:
+    def then(self) -> TestThen[AVariantAndACaller, RuntimeVariantNode]:
         return TheCallIsRefused(NotEnoughPermission)
 
 
 @dataclass(frozen=True)
 class AUserGrantedNothingEditingAnUnknownIdIsRefusedTheSameWay(
-    Scenario[SeedingSession, AVariantAndACaller, RuntimeVariantAdapter, RuntimeVariantNode]
+    TestScenario[SeedingSession, AVariantAndACaller, RuntimeVariantAdapter, RuntimeVariantNode]
 ):
     @override
     def summary(self) -> str:
@@ -280,22 +286,22 @@ class AUserGrantedNothingEditingAnUnknownIdIsRefusedTheSameWay(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, AVariantAndACaller]:
+    def given(self) -> TestGiven[SeedingSession, AVariantAndACaller]:
         return AVariantAndSomeone()
 
     @override
-    def when(self) -> When[AVariantAndACaller, RuntimeVariantAdapter, RuntimeVariantNode]:
+    def when(self) -> TestWhen[AVariantAndACaller, RuntimeVariantAdapter, RuntimeVariantNode]:
         return Editing(named=RENAMED, unknown=True)
 
     @override
-    def then(self) -> Then[AVariantAndACaller, RuntimeVariantNode]:
+    def then(self) -> TestThen[AVariantAndACaller, RuntimeVariantNode]:
         return TheCallIsRefused(NotEnoughPermission)
 
 
 @dataclass(frozen=True)
 class EnforcementOffLetsAnyoneEdit(
-    Scenario[SeedingSession, AVariantAndACaller, RuntimeVariantAdapter, RuntimeVariantNode],
-    Configured,
+    TestScenario[SeedingSession, AVariantAndACaller, RuntimeVariantAdapter, RuntimeVariantNode],
+    TestConfigured,
 ):
     started: datetime
 
@@ -312,15 +318,15 @@ class EnforcementOffLetsAnyoneEdit(
         return {ENFORCEMENT: False}
 
     @override
-    def given(self) -> Given[SeedingSession, AVariantAndACaller]:
+    def given(self) -> TestGiven[SeedingSession, AVariantAndACaller]:
         return AVariantAndSomeone()
 
     @override
-    def when(self) -> When[AVariantAndACaller, RuntimeVariantAdapter, RuntimeVariantNode]:
+    def when(self) -> TestWhen[AVariantAndACaller, RuntimeVariantAdapter, RuntimeVariantNode]:
         return Editing(named=RENAMED)
 
     @override
-    def then(self) -> Then[AVariantAndACaller, RuntimeVariantNode]:
+    def then(self) -> TestThen[AVariantAndACaller, RuntimeVariantNode]:
         return TheVariantNode(started=self.started, named=RENAMED)
 
 

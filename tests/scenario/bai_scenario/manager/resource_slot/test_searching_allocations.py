@@ -21,7 +21,13 @@ from ai.backend.common.dto.manager.v2.resource_slot.response import (
 from ai.backend.manager.api.adapters.resource_slot.adapter import ResourceSlotAdapter
 from ai.backend.manager.errors.auth import InsufficientPrivilege
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.testutils.scenario_steps import Configured, Given, Scenario, Then, When
+from ai.backend.testutils.scenario_steps import (
+    TestConfigured,
+    TestGiven,
+    TestScenario,
+    TestThen,
+    TestWhen,
+)
 from bai_scenario.components.answers import TheCallIsRefused
 from bai_scenario.components.resource_allocation import (
     EveryLaidAllocationIsCounted,
@@ -39,11 +45,11 @@ from bai_scenario.runner.steps import run_scenario
 DEFAULT_PAGE = 10
 
 type Searched = AdminSearchResourceAllocationsPayload
-type SearchingStep = Scenario[SeedingSession, KernelsAndACaller, ResourceSlotAdapter, Searched]
+type SearchingStep = TestScenario[SeedingSession, KernelsAndACaller, ResourceSlotAdapter, Searched]
 
 
 @dataclass(frozen=True)
-class SearchingEveryAllocation(When[KernelsAndACaller, ResourceSlotAdapter, Searched]):
+class SearchingEveryAllocation(TestWhen[KernelsAndACaller, ResourceSlotAdapter, Searched]):
     """필터도 크기도 없이 전체를 검색한다."""
 
     @override
@@ -61,7 +67,7 @@ class SearchingEveryAllocation(When[KernelsAndACaller, ResourceSlotAdapter, Sear
 
 
 @dataclass(frozen=True)
-class SearchingBySlotName(When[KernelsAndACaller, ResourceSlotAdapter, Searched]):
+class SearchingBySlotName(TestWhen[KernelsAndACaller, ResourceSlotAdapter, Searched]):
     """미리 만들어 둔 커널이 요구한 슬롯 중 첫 슬롯의 이름을 필터로 검색한다."""
 
     @override
@@ -85,7 +91,7 @@ class SearchingBySlotName(When[KernelsAndACaller, ResourceSlotAdapter, Searched]
 
 
 @dataclass(frozen=True)
-class SearchingByKernelId(When[KernelsAndACaller, ResourceSlotAdapter, Searched]):
+class SearchingByKernelId(TestWhen[KernelsAndACaller, ResourceSlotAdapter, Searched]):
     """미리 만들어 둔 커널 중 하나의 id를 필터로 검색한다."""
 
     @override
@@ -109,7 +115,7 @@ class SearchingByKernelId(When[KernelsAndACaller, ResourceSlotAdapter, Searched]
 
 
 @dataclass(frozen=True)
-class SearchingTheFirst(When[KernelsAndACaller, ResourceSlotAdapter, Searched]):
+class SearchingTheFirst(TestWhen[KernelsAndACaller, ResourceSlotAdapter, Searched]):
     """앞에서 몇 건만 청한다. 크기가 아니라 커서 쪽의 개수다."""
 
     first: int
@@ -132,7 +138,7 @@ class SearchingTheFirst(When[KernelsAndACaller, ResourceSlotAdapter, Searched]):
 
 @dataclass(frozen=True)
 class TheSuperadminCountsEveryAllocation(
-    Scenario[SeedingSession, KernelsAndACaller, ResourceSlotAdapter, Searched]
+    TestScenario[SeedingSession, KernelsAndACaller, ResourceSlotAdapter, Searched]
 ):
     @override
     def summary(self) -> str:
@@ -143,21 +149,21 @@ class TheSuperadminCountsEveryAllocation(
         return "슬롯 둘을 요구하는 커널 하나가 있을 때 슈퍼관리자가 필터 없이 조회하면 할당 둘이 다 집계된다"
 
     @override
-    def given(self) -> Given[SeedingSession, KernelsAndACaller]:
+    def given(self) -> TestGiven[SeedingSession, KernelsAndACaller]:
         return KernelsAndSomeone(role=UserRole.SUPERADMIN, kernels=1, slots_each=2)
 
     @override
-    def when(self) -> When[KernelsAndACaller, ResourceSlotAdapter, Searched]:
+    def when(self) -> TestWhen[KernelsAndACaller, ResourceSlotAdapter, Searched]:
         return SearchingEveryAllocation()
 
     @override
-    def then(self) -> Then[KernelsAndACaller, Searched]:
+    def then(self) -> TestThen[KernelsAndACaller, Searched]:
         return EveryLaidAllocationIsCounted()
 
 
 @dataclass(frozen=True)
 class ASlotNameFilterNarrows(
-    Scenario[SeedingSession, KernelsAndACaller, ResourceSlotAdapter, Searched]
+    TestScenario[SeedingSession, KernelsAndACaller, ResourceSlotAdapter, Searched]
 ):
     @override
     def summary(self) -> str:
@@ -168,21 +174,21 @@ class ASlotNameFilterNarrows(
         return "슬롯 둘을 요구하는 커널 하나가 있을 때 한 슬롯의 이름을 필터로 조회하면, 응답에는 그 슬롯의 할당만 남는다"
 
     @override
-    def given(self) -> Given[SeedingSession, KernelsAndACaller]:
+    def given(self) -> TestGiven[SeedingSession, KernelsAndACaller]:
         return KernelsAndSomeone(role=UserRole.SUPERADMIN, kernels=1, slots_each=2)
 
     @override
-    def when(self) -> When[KernelsAndACaller, ResourceSlotAdapter, Searched]:
+    def when(self) -> TestWhen[KernelsAndACaller, ResourceSlotAdapter, Searched]:
         return SearchingBySlotName()
 
     @override
-    def then(self) -> Then[KernelsAndACaller, Searched]:
+    def then(self) -> TestThen[KernelsAndACaller, Searched]:
         return OnlyTheNamedSlotIsLeft()
 
 
 @dataclass(frozen=True)
 class AKernelIdFilterNarrows(
-    Scenario[SeedingSession, KernelsAndACaller, ResourceSlotAdapter, Searched]
+    TestScenario[SeedingSession, KernelsAndACaller, ResourceSlotAdapter, Searched]
 ):
     @override
     def summary(self) -> str:
@@ -193,21 +199,21 @@ class AKernelIdFilterNarrows(
         return "슬롯 하나씩 요구하는 커널 둘이 있을 때 한 커널의 id를 필터로 조회하면, 응답에는 그 커널의 할당만 남는다"
 
     @override
-    def given(self) -> Given[SeedingSession, KernelsAndACaller]:
+    def given(self) -> TestGiven[SeedingSession, KernelsAndACaller]:
         return KernelsAndSomeone(role=UserRole.SUPERADMIN, kernels=2, slots_each=1)
 
     @override
-    def when(self) -> When[KernelsAndACaller, ResourceSlotAdapter, Searched]:
+    def when(self) -> TestWhen[KernelsAndACaller, ResourceSlotAdapter, Searched]:
         return SearchingByKernelId()
 
     @override
-    def then(self) -> Then[KernelsAndACaller, Searched]:
+    def then(self) -> TestThen[KernelsAndACaller, Searched]:
         return OnlyTheNamedKernelIsLeft()
 
 
 @dataclass(frozen=True)
 class OmittingThePageSizeGivesTen(
-    Scenario[SeedingSession, KernelsAndACaller, ResourceSlotAdapter, Searched]
+    TestScenario[SeedingSession, KernelsAndACaller, ResourceSlotAdapter, Searched]
 ):
     @override
     def summary(self) -> str:
@@ -220,21 +226,21 @@ class OmittingThePageSizeGivesTen(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, KernelsAndACaller]:
+    def given(self) -> TestGiven[SeedingSession, KernelsAndACaller]:
         return KernelsAndSomeone(role=UserRole.SUPERADMIN, kernels=1, slots_each=DEFAULT_PAGE + 1)
 
     @override
-    def when(self) -> When[KernelsAndACaller, ResourceSlotAdapter, Searched]:
+    def when(self) -> TestWhen[KernelsAndACaller, ResourceSlotAdapter, Searched]:
         return SearchingEveryAllocation()
 
     @override
-    def then(self) -> Then[KernelsAndACaller, Searched]:
+    def then(self) -> TestThen[KernelsAndACaller, Searched]:
         return TheFirstPageOfAllocations(size=DEFAULT_PAGE)
 
 
 @dataclass(frozen=True)
 class AskingForTheFirstOneGivesOne(
-    Scenario[SeedingSession, KernelsAndACaller, ResourceSlotAdapter, Searched]
+    TestScenario[SeedingSession, KernelsAndACaller, ResourceSlotAdapter, Searched]
 ):
     @override
     def summary(self) -> str:
@@ -245,21 +251,21 @@ class AskingForTheFirstOneGivesOne(
         return "할당 둘이 있을 때 앞에서 한 건만 청해 조회하면 한 건이 반환되고 다음 페이지가 있다고 응답한다"
 
     @override
-    def given(self) -> Given[SeedingSession, KernelsAndACaller]:
+    def given(self) -> TestGiven[SeedingSession, KernelsAndACaller]:
         return KernelsAndSomeone(role=UserRole.SUPERADMIN, kernels=1, slots_each=2)
 
     @override
-    def when(self) -> When[KernelsAndACaller, ResourceSlotAdapter, Searched]:
+    def when(self) -> TestWhen[KernelsAndACaller, ResourceSlotAdapter, Searched]:
         return SearchingTheFirst(first=1)
 
     @override
-    def then(self) -> Then[KernelsAndACaller, Searched]:
+    def then(self) -> TestThen[KernelsAndACaller, Searched]:
         return TheFirstPageOfAllocations(size=1)
 
 
 @dataclass(frozen=True)
 class AMonitorCountsEveryAllocation(
-    Scenario[SeedingSession, KernelsAndACaller, ResourceSlotAdapter, Searched]
+    TestScenario[SeedingSession, KernelsAndACaller, ResourceSlotAdapter, Searched]
 ):
     @override
     def summary(self) -> str:
@@ -270,21 +276,21 @@ class AMonitorCountsEveryAllocation(
         return "모니터가 필터 없이 조회하면 할당이 다 집계된다. 슈퍼관리자인지 검사하는 조회는 모니터도 통과한다"
 
     @override
-    def given(self) -> Given[SeedingSession, KernelsAndACaller]:
+    def given(self) -> TestGiven[SeedingSession, KernelsAndACaller]:
         return KernelsAndSomeone(role=UserRole.MONITOR, kernels=1, slots_each=2)
 
     @override
-    def when(self) -> When[KernelsAndACaller, ResourceSlotAdapter, Searched]:
+    def when(self) -> TestWhen[KernelsAndACaller, ResourceSlotAdapter, Searched]:
         return SearchingEveryAllocation()
 
     @override
-    def then(self) -> Then[KernelsAndACaller, Searched]:
+    def then(self) -> TestThen[KernelsAndACaller, Searched]:
         return EveryLaidAllocationIsCounted()
 
 
 @dataclass(frozen=True)
 class AUserGrantedNothingMayNotSearch(
-    Scenario[SeedingSession, KernelsAndACaller, ResourceSlotAdapter, Searched]
+    TestScenario[SeedingSession, KernelsAndACaller, ResourceSlotAdapter, Searched]
 ):
     @override
     def summary(self) -> str:
@@ -295,21 +301,21 @@ class AUserGrantedNothingMayNotSearch(
         return "아무 권한도 없는 사용자가 조회하면 역할 부족으로 거부된다"
 
     @override
-    def given(self) -> Given[SeedingSession, KernelsAndACaller]:
+    def given(self) -> TestGiven[SeedingSession, KernelsAndACaller]:
         return KernelsAndSomeone()
 
     @override
-    def when(self) -> When[KernelsAndACaller, ResourceSlotAdapter, Searched]:
+    def when(self) -> TestWhen[KernelsAndACaller, ResourceSlotAdapter, Searched]:
         return SearchingEveryAllocation()
 
     @override
-    def then(self) -> Then[KernelsAndACaller, Searched]:
+    def then(self) -> TestThen[KernelsAndACaller, Searched]:
         return TheCallIsRefused(InsufficientPrivilege)
 
 
 @dataclass(frozen=True)
 class EnforcementOffStillNeedsTheRole(
-    Scenario[SeedingSession, KernelsAndACaller, ResourceSlotAdapter, Searched], Configured
+    TestScenario[SeedingSession, KernelsAndACaller, ResourceSlotAdapter, Searched], TestConfigured
 ):
     @override
     def summary(self) -> str:
@@ -324,15 +330,15 @@ class EnforcementOffStillNeedsTheRole(
         return {ENFORCEMENT: False}
 
     @override
-    def given(self) -> Given[SeedingSession, KernelsAndACaller]:
+    def given(self) -> TestGiven[SeedingSession, KernelsAndACaller]:
         return KernelsAndSomeone()
 
     @override
-    def when(self) -> When[KernelsAndACaller, ResourceSlotAdapter, Searched]:
+    def when(self) -> TestWhen[KernelsAndACaller, ResourceSlotAdapter, Searched]:
         return SearchingEveryAllocation()
 
     @override
-    def then(self) -> Then[KernelsAndACaller, Searched]:
+    def then(self) -> TestThen[KernelsAndACaller, Searched]:
         return TheCallIsRefused(InsufficientPrivilege)
 
 

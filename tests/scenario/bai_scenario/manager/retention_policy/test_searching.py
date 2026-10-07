@@ -22,7 +22,7 @@ from ai.backend.common.dto.manager.v2.retention_policy.response import (
 from ai.backend.manager.api.adapters.retention_policy.adapter import RetentionPolicyAdapter
 from ai.backend.manager.errors.auth import InsufficientPrivilege
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.testutils.scenario_steps import Given, Scenario, Then, When
+from ai.backend.testutils.scenario_steps import TestGiven, TestScenario, TestThen, TestWhen
 from bai_scenario.components.answers import TheCallIsRefused
 from bai_scenario.components.retention_policy import (
     AnActiveAndAnInactivePolicy,
@@ -36,13 +36,13 @@ from bai_scenario.runner.planting import SeedingSession
 from bai_scenario.runner.steps import run_scenario
 
 type Searched = SearchRetentionPoliciesPayload
-type SearchingStep = Scenario[
+type SearchingStep = TestScenario[
     SeedingSession, ManyPoliciesAndACaller, RetentionPolicyAdapter, Searched
 ]
 
 
 @dataclass(frozen=True)
-class SearchingEveryPolicy(When[ManyPoliciesAndACaller, RetentionPolicyAdapter, Searched]):
+class SearchingEveryPolicy(TestWhen[ManyPoliciesAndACaller, RetentionPolicyAdapter, Searched]):
     """필터 없이 전체를 검색한다."""
 
     @override
@@ -60,7 +60,7 @@ class SearchingEveryPolicy(When[ManyPoliciesAndACaller, RetentionPolicyAdapter, 
 
 
 @dataclass(frozen=True)
-class SearchingByCategory(When[ManyPoliciesAndACaller, RetentionPolicyAdapter, Searched]):
+class SearchingByCategory(TestWhen[ManyPoliciesAndACaller, RetentionPolicyAdapter, Searched]):
     """골라낸 하나의 카테고리를 필터로 검색한다."""
 
     @override
@@ -82,7 +82,7 @@ class SearchingByCategory(When[ManyPoliciesAndACaller, RetentionPolicyAdapter, S
 
 
 @dataclass(frozen=True)
-class SearchingTheActiveOnes(When[ManyPoliciesAndACaller, RetentionPolicyAdapter, Searched]):
+class SearchingTheActiveOnes(TestWhen[ManyPoliciesAndACaller, RetentionPolicyAdapter, Searched]):
     """활성인 정책만 필터로 검색한다."""
 
     @override
@@ -103,7 +103,7 @@ class SearchingTheActiveOnes(When[ManyPoliciesAndACaller, RetentionPolicyAdapter
 
 @dataclass(frozen=True)
 class TheSuperadminCountsEveryPolicy(
-    Scenario[SeedingSession, ManyPoliciesAndACaller, RetentionPolicyAdapter, Searched]
+    TestScenario[SeedingSession, ManyPoliciesAndACaller, RetentionPolicyAdapter, Searched]
 ):
     @override
     def summary(self) -> str:
@@ -114,21 +114,21 @@ class TheSuperadminCountsEveryPolicy(
         return "카테고리가 다른 정책 둘이 있을 때 슈퍼관리자가 필터 없이 조회하면 둘 다 집계된다"
 
     @override
-    def given(self) -> Given[SeedingSession, ManyPoliciesAndACaller]:
+    def given(self) -> TestGiven[SeedingSession, ManyPoliciesAndACaller]:
         return TwoPoliciesAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
-    def when(self) -> When[ManyPoliciesAndACaller, RetentionPolicyAdapter, Searched]:
+    def when(self) -> TestWhen[ManyPoliciesAndACaller, RetentionPolicyAdapter, Searched]:
         return SearchingEveryPolicy()
 
     @override
-    def then(self) -> Then[ManyPoliciesAndACaller, Searched]:
+    def then(self) -> TestThen[ManyPoliciesAndACaller, Searched]:
         return TheLaidPoliciesAreLeft()
 
 
 @dataclass(frozen=True)
 class ACategoryFilterNarrows(
-    Scenario[SeedingSession, ManyPoliciesAndACaller, RetentionPolicyAdapter, Searched]
+    TestScenario[SeedingSession, ManyPoliciesAndACaller, RetentionPolicyAdapter, Searched]
 ):
     @override
     def summary(self) -> str:
@@ -139,21 +139,21 @@ class ACategoryFilterNarrows(
         return "카테고리가 다른 정책 여럿 중 하나의 카테고리를 필터로 조회하면 그 카테고리의 정책 하나만 반환된다"
 
     @override
-    def given(self) -> Given[SeedingSession, ManyPoliciesAndACaller]:
+    def given(self) -> TestGiven[SeedingSession, ManyPoliciesAndACaller]:
         return TwoPoliciesAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
-    def when(self) -> When[ManyPoliciesAndACaller, RetentionPolicyAdapter, Searched]:
+    def when(self) -> TestWhen[ManyPoliciesAndACaller, RetentionPolicyAdapter, Searched]:
         return SearchingByCategory()
 
     @override
-    def then(self) -> Then[ManyPoliciesAndACaller, Searched]:
+    def then(self) -> TestThen[ManyPoliciesAndACaller, Searched]:
         return OnlyTheNamedPolicyIsLeft()
 
 
 @dataclass(frozen=True)
 class AnEnabledFilterKeepsTheActive(
-    Scenario[SeedingSession, ManyPoliciesAndACaller, RetentionPolicyAdapter, Searched]
+    TestScenario[SeedingSession, ManyPoliciesAndACaller, RetentionPolicyAdapter, Searched]
 ):
     @override
     def summary(self) -> str:
@@ -164,21 +164,21 @@ class AnEnabledFilterKeepsTheActive(
         return "활성과 비활성이 섞여 있을 때 활성 필터로 조회하면 활성인 정책만 반환된다"
 
     @override
-    def given(self) -> Given[SeedingSession, ManyPoliciesAndACaller]:
+    def given(self) -> TestGiven[SeedingSession, ManyPoliciesAndACaller]:
         return AnActiveAndAnInactivePolicy(role=UserRole.SUPERADMIN)
 
     @override
-    def when(self) -> When[ManyPoliciesAndACaller, RetentionPolicyAdapter, Searched]:
+    def when(self) -> TestWhen[ManyPoliciesAndACaller, RetentionPolicyAdapter, Searched]:
         return SearchingTheActiveOnes()
 
     @override
-    def then(self) -> Then[ManyPoliciesAndACaller, Searched]:
+    def then(self) -> TestThen[ManyPoliciesAndACaller, Searched]:
         return TheLaidPoliciesAreLeft()
 
 
 @dataclass(frozen=True)
 class TheMonitorSearchesLikeTheSuperadmin(
-    Scenario[SeedingSession, ManyPoliciesAndACaller, RetentionPolicyAdapter, Searched]
+    TestScenario[SeedingSession, ManyPoliciesAndACaller, RetentionPolicyAdapter, Searched]
 ):
     @override
     def summary(self) -> str:
@@ -189,21 +189,21 @@ class TheMonitorSearchesLikeTheSuperadmin(
         return "모니터 역할이 필터 없이 조회하면 슈퍼관리자와 같은 응답이 반환된다. 슈퍼관리자 검사는 모니터의 읽기를 허용한다"
 
     @override
-    def given(self) -> Given[SeedingSession, ManyPoliciesAndACaller]:
+    def given(self) -> TestGiven[SeedingSession, ManyPoliciesAndACaller]:
         return TwoPoliciesAndSomeone(role=UserRole.MONITOR)
 
     @override
-    def when(self) -> When[ManyPoliciesAndACaller, RetentionPolicyAdapter, Searched]:
+    def when(self) -> TestWhen[ManyPoliciesAndACaller, RetentionPolicyAdapter, Searched]:
         return SearchingEveryPolicy()
 
     @override
-    def then(self) -> Then[ManyPoliciesAndACaller, Searched]:
+    def then(self) -> TestThen[ManyPoliciesAndACaller, Searched]:
         return TheLaidPoliciesAreLeft()
 
 
 @dataclass(frozen=True)
 class AUserWhoIsNotTheSuperadminMayNotSearch(
-    Scenario[SeedingSession, ManyPoliciesAndACaller, RetentionPolicyAdapter, Searched]
+    TestScenario[SeedingSession, ManyPoliciesAndACaller, RetentionPolicyAdapter, Searched]
 ):
     @override
     def summary(self) -> str:
@@ -214,15 +214,15 @@ class AUserWhoIsNotTheSuperadminMayNotSearch(
         return "슈퍼관리자가 아닌 사용자가 전체 조회를 요청하면 역할 부족으로 거부된다"
 
     @override
-    def given(self) -> Given[SeedingSession, ManyPoliciesAndACaller]:
+    def given(self) -> TestGiven[SeedingSession, ManyPoliciesAndACaller]:
         return TwoPoliciesAndSomeone()
 
     @override
-    def when(self) -> When[ManyPoliciesAndACaller, RetentionPolicyAdapter, Searched]:
+    def when(self) -> TestWhen[ManyPoliciesAndACaller, RetentionPolicyAdapter, Searched]:
         return SearchingEveryPolicy()
 
     @override
-    def then(self) -> Then[ManyPoliciesAndACaller, Searched]:
+    def then(self) -> TestThen[ManyPoliciesAndACaller, Searched]:
         return TheCallIsRefused(InsufficientPrivilege)
 
 

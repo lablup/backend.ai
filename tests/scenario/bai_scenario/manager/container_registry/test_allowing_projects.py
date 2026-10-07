@@ -18,13 +18,13 @@ from ai.backend.manager.errors.resource import ProjectNotFound
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.testutils.scenario_steps import (
     Answered,
-    Configured,
-    Given,
     Same,
-    Scenario,
-    Then,
-    Verdict,
-    When,
+    TestConfigured,
+    TestGiven,
+    TestScenario,
+    TestThen,
+    TestVerdict,
+    TestWhen,
 )
 from bai_scenario.components.answers import TheCallIsRefused
 from bai_scenario.components.container_registry import (
@@ -40,13 +40,13 @@ from bai_scenario.runner.acting import ActingAs
 from bai_scenario.runner.planting import SeedingSession
 from bai_scenario.runner.steps import run_scenario
 
-type AllowedProjectScenario = Scenario[
+type AllowedProjectScenario = TestScenario[
     SeedingSession, ARegistryToAllowAndACaller, ContainerRegistryAdapter, None
 ]
 
 
 @dataclass(frozen=True)
-class ChangingAllowedProjects(When[ARegistryToAllowAndACaller, ContainerRegistryAdapter, None]):
+class ChangingAllowedProjects(TestWhen[ARegistryToAllowAndACaller, ContainerRegistryAdapter, None]):
     change: AllowedProjectChange = field(default_factory=AddProject)
 
     @override
@@ -68,7 +68,7 @@ class ChangingAllowedProjects(When[ARegistryToAllowAndACaller, ContainerRegistry
 
 
 @dataclass(frozen=True)
-class TheCallReturnsNothing(Then[ARegistryToAllowAndACaller, None]):
+class TheCallReturnsNothing(TestThen[ARegistryToAllowAndACaller, None]):
     """반환값 없이 완료되는 호출의 성공 여부를 검사한다."""
 
     @override
@@ -76,7 +76,7 @@ class TheCallReturnsNothing(Then[ARegistryToAllowAndACaller, None]):
         return "반환값이 없고 예외도 발생하지 않는다"
 
     @override
-    def look(self, laid: ARegistryToAllowAndACaller, answered: Answered[None]) -> list[Verdict]:
+    def look(self, laid: ARegistryToAllowAndACaller, answered: Answered[None]) -> list[TestVerdict]:
         if answered.raised is not None:
             return [Same("raised", answered.raised, None)]
         return [Same("response", answered.response, None)]
@@ -84,7 +84,7 @@ class TheCallReturnsNothing(Then[ARegistryToAllowAndACaller, None]):
 
 @dataclass(frozen=True)
 class AddingProjectWithBothScopesGranted(
-    Scenario[SeedingSession, ARegistryToAllowAndACaller, ContainerRegistryAdapter, None]
+    TestScenario[SeedingSession, ARegistryToAllowAndACaller, ContainerRegistryAdapter, None]
 ):
     @override
     def summary(self) -> str:
@@ -98,21 +98,21 @@ class AddingProjectWithBothScopesGranted(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, ARegistryToAllowAndACaller]:
+    def given(self) -> TestGiven[SeedingSession, ARegistryToAllowAndACaller]:
         return ARegistryAndAProjectToAllow()
 
     @override
-    def when(self) -> When[ARegistryToAllowAndACaller, ContainerRegistryAdapter, None]:
+    def when(self) -> TestWhen[ARegistryToAllowAndACaller, ContainerRegistryAdapter, None]:
         return ChangingAllowedProjects()
 
     @override
-    def then(self) -> Then[ARegistryToAllowAndACaller, None]:
+    def then(self) -> TestThen[ARegistryToAllowAndACaller, None]:
         return TheCallReturnsNothing()
 
 
 @dataclass(frozen=True)
 class AddingExistingProjectIsIdempotent(
-    Scenario[SeedingSession, ARegistryToAllowAndACaller, ContainerRegistryAdapter, None]
+    TestScenario[SeedingSession, ARegistryToAllowAndACaller, ContainerRegistryAdapter, None]
 ):
     @override
     def summary(self) -> str:
@@ -126,21 +126,21 @@ class AddingExistingProjectIsIdempotent(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, ARegistryToAllowAndACaller]:
+    def given(self) -> TestGiven[SeedingSession, ARegistryToAllowAndACaller]:
         return ARegistryAndAProjectToAllow(allowed=True)
 
     @override
-    def when(self) -> When[ARegistryToAllowAndACaller, ContainerRegistryAdapter, None]:
+    def when(self) -> TestWhen[ARegistryToAllowAndACaller, ContainerRegistryAdapter, None]:
         return ChangingAllowedProjects()
 
     @override
-    def then(self) -> Then[ARegistryToAllowAndACaller, None]:
+    def then(self) -> TestThen[ARegistryToAllowAndACaller, None]:
         return TheCallReturnsNothing()
 
 
 @dataclass(frozen=True)
 class CreatePermissionIsEnoughToAddAProject(
-    Scenario[SeedingSession, ARegistryToAllowAndACaller, ContainerRegistryAdapter, None]
+    TestScenario[SeedingSession, ARegistryToAllowAndACaller, ContainerRegistryAdapter, None]
 ):
     @override
     def summary(self) -> str:
@@ -151,21 +151,21 @@ class CreatePermissionIsEnoughToAddAProject(
         return "양쪽 스코프에 생성 권한만 받은 사용자는 프로젝트를 허용 목록에 넣을 수 있다"
 
     @override
-    def given(self) -> Given[SeedingSession, ARegistryToAllowAndACaller]:
+    def given(self) -> TestGiven[SeedingSession, ARegistryToAllowAndACaller]:
         return ARegistryAndAProjectToAllow(permissions=(Permission.CREATE,))
 
     @override
-    def when(self) -> When[ARegistryToAllowAndACaller, ContainerRegistryAdapter, None]:
+    def when(self) -> TestWhen[ARegistryToAllowAndACaller, ContainerRegistryAdapter, None]:
         return ChangingAllowedProjects()
 
     @override
-    def then(self) -> Then[ARegistryToAllowAndACaller, None]:
+    def then(self) -> TestThen[ARegistryToAllowAndACaller, None]:
         return TheCallReturnsNothing()
 
 
 @dataclass(frozen=True)
 class SoftDeletePermissionCannotAddAProject(
-    Scenario[SeedingSession, ARegistryToAllowAndACaller, ContainerRegistryAdapter, None]
+    TestScenario[SeedingSession, ARegistryToAllowAndACaller, ContainerRegistryAdapter, None]
 ):
     @override
     def summary(self) -> str:
@@ -176,21 +176,21 @@ class SoftDeletePermissionCannotAddAProject(
         return "양쪽 스코프에 삭제 권한만 받은 사용자가 프로젝트를 추가하면 권한 부족으로 거부된다"
 
     @override
-    def given(self) -> Given[SeedingSession, ARegistryToAllowAndACaller]:
+    def given(self) -> TestGiven[SeedingSession, ARegistryToAllowAndACaller]:
         return ARegistryAndAProjectToAllow(permissions=(Permission.SOFT_DELETE,))
 
     @override
-    def when(self) -> When[ARegistryToAllowAndACaller, ContainerRegistryAdapter, None]:
+    def when(self) -> TestWhen[ARegistryToAllowAndACaller, ContainerRegistryAdapter, None]:
         return ChangingAllowedProjects()
 
     @override
-    def then(self) -> Then[ARegistryToAllowAndACaller, None]:
+    def then(self) -> TestThen[ARegistryToAllowAndACaller, None]:
         return TheCallIsRefused(NotEnoughPermission)
 
 
 @dataclass(frozen=True)
 class RemovingAllowedProject(
-    Scenario[SeedingSession, ARegistryToAllowAndACaller, ContainerRegistryAdapter, None]
+    TestScenario[SeedingSession, ARegistryToAllowAndACaller, ContainerRegistryAdapter, None]
 ):
     @override
     def summary(self) -> str:
@@ -201,21 +201,21 @@ class RemovingAllowedProject(
         return "이미 허용된 프로젝트는 허용 목록에서 뺄 수 있다"
 
     @override
-    def given(self) -> Given[SeedingSession, ARegistryToAllowAndACaller]:
+    def given(self) -> TestGiven[SeedingSession, ARegistryToAllowAndACaller]:
         return ARegistryAndAProjectToAllow(allowed=True)
 
     @override
-    def when(self) -> When[ARegistryToAllowAndACaller, ContainerRegistryAdapter, None]:
+    def when(self) -> TestWhen[ARegistryToAllowAndACaller, ContainerRegistryAdapter, None]:
         return ChangingAllowedProjects(change=RemoveProject())
 
     @override
-    def then(self) -> Then[ARegistryToAllowAndACaller, None]:
+    def then(self) -> TestThen[ARegistryToAllowAndACaller, None]:
         return TheCallReturnsNothing()
 
 
 @dataclass(frozen=True)
 class SoftDeletePermissionIsEnoughToRemoveAProject(
-    Scenario[SeedingSession, ARegistryToAllowAndACaller, ContainerRegistryAdapter, None]
+    TestScenario[SeedingSession, ARegistryToAllowAndACaller, ContainerRegistryAdapter, None]
 ):
     @override
     def summary(self) -> str:
@@ -226,24 +226,24 @@ class SoftDeletePermissionIsEnoughToRemoveAProject(
         return "양쪽 스코프에 삭제 권한만 받은 사용자는 허용 프로젝트를 제거할 수 있다"
 
     @override
-    def given(self) -> Given[SeedingSession, ARegistryToAllowAndACaller]:
+    def given(self) -> TestGiven[SeedingSession, ARegistryToAllowAndACaller]:
         return ARegistryAndAProjectToAllow(
             allowed=True,
             permissions=(Permission.SOFT_DELETE,),
         )
 
     @override
-    def when(self) -> When[ARegistryToAllowAndACaller, ContainerRegistryAdapter, None]:
+    def when(self) -> TestWhen[ARegistryToAllowAndACaller, ContainerRegistryAdapter, None]:
         return ChangingAllowedProjects(change=RemoveProject())
 
     @override
-    def then(self) -> Then[ARegistryToAllowAndACaller, None]:
+    def then(self) -> TestThen[ARegistryToAllowAndACaller, None]:
         return TheCallReturnsNothing()
 
 
 @dataclass(frozen=True)
 class CreatePermissionCannotRemoveAProject(
-    Scenario[SeedingSession, ARegistryToAllowAndACaller, ContainerRegistryAdapter, None]
+    TestScenario[SeedingSession, ARegistryToAllowAndACaller, ContainerRegistryAdapter, None]
 ):
     @override
     def summary(self) -> str:
@@ -254,24 +254,24 @@ class CreatePermissionCannotRemoveAProject(
         return "양쪽 스코프에 생성 권한만 받은 사용자가 프로젝트를 제거하면 권한 부족으로 거부된다"
 
     @override
-    def given(self) -> Given[SeedingSession, ARegistryToAllowAndACaller]:
+    def given(self) -> TestGiven[SeedingSession, ARegistryToAllowAndACaller]:
         return ARegistryAndAProjectToAllow(
             allowed=True,
             permissions=(Permission.CREATE,),
         )
 
     @override
-    def when(self) -> When[ARegistryToAllowAndACaller, ContainerRegistryAdapter, None]:
+    def when(self) -> TestWhen[ARegistryToAllowAndACaller, ContainerRegistryAdapter, None]:
         return ChangingAllowedProjects(change=RemoveProject())
 
     @override
-    def then(self) -> Then[ARegistryToAllowAndACaller, None]:
+    def then(self) -> TestThen[ARegistryToAllowAndACaller, None]:
         return TheCallIsRefused(NotEnoughPermission)
 
 
 @dataclass(frozen=True)
 class MissingProjectIsRefused(
-    Scenario[SeedingSession, ARegistryToAllowAndACaller, ContainerRegistryAdapter, None]
+    TestScenario[SeedingSession, ARegistryToAllowAndACaller, ContainerRegistryAdapter, None]
 ):
     @override
     def summary(self) -> str:
@@ -284,21 +284,21 @@ class MissingProjectIsRefused(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, ARegistryToAllowAndACaller]:
+    def given(self) -> TestGiven[SeedingSession, ARegistryToAllowAndACaller]:
         return ARegistryAndAProjectToAllow(role=UserRole.SUPERADMIN)
 
     @override
-    def when(self) -> When[ARegistryToAllowAndACaller, ContainerRegistryAdapter, None]:
+    def when(self) -> TestWhen[ARegistryToAllowAndACaller, ContainerRegistryAdapter, None]:
         return ChangingAllowedProjects(change=AddMissingProject())
 
     @override
-    def then(self) -> Then[ARegistryToAllowAndACaller, None]:
+    def then(self) -> TestThen[ARegistryToAllowAndACaller, None]:
         return TheCallIsRefused(ProjectNotFound)
 
 
 @dataclass(frozen=True)
 class RemovingUnlinkedProjectIsRefused(
-    Scenario[SeedingSession, ARegistryToAllowAndACaller, ContainerRegistryAdapter, None]
+    TestScenario[SeedingSession, ARegistryToAllowAndACaller, ContainerRegistryAdapter, None]
 ):
     @override
     def summary(self) -> str:
@@ -309,21 +309,21 @@ class RemovingUnlinkedProjectIsRefused(
         return "지정한 프로젝트 중 실제로 허용된 것이 하나도 없으면, 제거할 관계가 없다는 이유로 거부된다"
 
     @override
-    def given(self) -> Given[SeedingSession, ARegistryToAllowAndACaller]:
+    def given(self) -> TestGiven[SeedingSession, ARegistryToAllowAndACaller]:
         return ARegistryAndAProjectToAllow(role=UserRole.SUPERADMIN)
 
     @override
-    def when(self) -> When[ARegistryToAllowAndACaller, ContainerRegistryAdapter, None]:
+    def when(self) -> TestWhen[ARegistryToAllowAndACaller, ContainerRegistryAdapter, None]:
         return ChangingAllowedProjects(change=RemoveProject())
 
     @override
-    def then(self) -> Then[ARegistryToAllowAndACaller, None]:
+    def then(self) -> TestThen[ARegistryToAllowAndACaller, None]:
         return TheCallIsRefused(ContainerRegistryGroupsAssociationNotFound)
 
 
 @dataclass(frozen=True)
 class MissingProjectPermissionIsRefused(
-    Scenario[SeedingSession, ARegistryToAllowAndACaller, ContainerRegistryAdapter, None]
+    TestScenario[SeedingSession, ARegistryToAllowAndACaller, ContainerRegistryAdapter, None]
 ):
     @override
     def summary(self) -> str:
@@ -337,21 +337,21 @@ class MissingProjectPermissionIsRefused(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, ARegistryToAllowAndACaller]:
+    def given(self) -> TestGiven[SeedingSession, ARegistryToAllowAndACaller]:
         return ARegistryAndAProjectToAllow(on_project=False)
 
     @override
-    def when(self) -> When[ARegistryToAllowAndACaller, ContainerRegistryAdapter, None]:
+    def when(self) -> TestWhen[ARegistryToAllowAndACaller, ContainerRegistryAdapter, None]:
         return ChangingAllowedProjects()
 
     @override
-    def then(self) -> Then[ARegistryToAllowAndACaller, None]:
+    def then(self) -> TestThen[ARegistryToAllowAndACaller, None]:
         return TheCallIsRefused(NotEnoughPermission)
 
 
 @dataclass(frozen=True)
 class MissingRegistryPermissionIsRefused(
-    Scenario[SeedingSession, ARegistryToAllowAndACaller, ContainerRegistryAdapter, None]
+    TestScenario[SeedingSession, ARegistryToAllowAndACaller, ContainerRegistryAdapter, None]
 ):
     @override
     def summary(self) -> str:
@@ -365,22 +365,22 @@ class MissingRegistryPermissionIsRefused(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, ARegistryToAllowAndACaller]:
+    def given(self) -> TestGiven[SeedingSession, ARegistryToAllowAndACaller]:
         return ARegistryAndAProjectToAllow(on_registry=False)
 
     @override
-    def when(self) -> When[ARegistryToAllowAndACaller, ContainerRegistryAdapter, None]:
+    def when(self) -> TestWhen[ARegistryToAllowAndACaller, ContainerRegistryAdapter, None]:
         return ChangingAllowedProjects()
 
     @override
-    def then(self) -> Then[ARegistryToAllowAndACaller, None]:
+    def then(self) -> TestThen[ARegistryToAllowAndACaller, None]:
         return TheCallIsRefused(NotEnoughPermission)
 
 
 @dataclass(frozen=True)
 class DisabledEnforcementAllowsProject(
-    Scenario[SeedingSession, ARegistryToAllowAndACaller, ContainerRegistryAdapter, None],
-    Configured,
+    TestScenario[SeedingSession, ARegistryToAllowAndACaller, ContainerRegistryAdapter, None],
+    TestConfigured,
 ):
     @override
     def summary(self) -> str:
@@ -395,15 +395,15 @@ class DisabledEnforcementAllowsProject(
         return {"manager.rbac.enforcement_enabled": False}
 
     @override
-    def given(self) -> Given[SeedingSession, ARegistryToAllowAndACaller]:
+    def given(self) -> TestGiven[SeedingSession, ARegistryToAllowAndACaller]:
         return ARegistryAndAProjectToAllow(on_registry=False, on_project=False)
 
     @override
-    def when(self) -> When[ARegistryToAllowAndACaller, ContainerRegistryAdapter, None]:
+    def when(self) -> TestWhen[ARegistryToAllowAndACaller, ContainerRegistryAdapter, None]:
         return ChangingAllowedProjects()
 
     @override
-    def then(self) -> Then[ARegistryToAllowAndACaller, None]:
+    def then(self) -> TestThen[ARegistryToAllowAndACaller, None]:
         return TheCallReturnsNothing()
 
 

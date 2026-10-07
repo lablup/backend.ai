@@ -32,18 +32,18 @@ from ai.backend.manager.errors.user import KeyPairForbidden
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.testutils.scenario_steps import (
     Answered,
-    Condition,
-    Given,
     Held,
     Refused,
     Same,
     SameAs,
-    Scenario,
     Skipped,
-    Then,
+    TestCondition,
+    TestGiven,
+    TestScenario,
+    TestThen,
+    TestVerdict,
+    TestWhen,
     Told,
-    Verdict,
-    When,
 )
 from bai_scenario.components.answers import TheCallIsRefused
 from bai_scenario.components.domain import WAS_HERE, WrittenByThisRun
@@ -129,7 +129,7 @@ class SomeoneAndTheirKeyPolicy(
 
 
 @dataclass(frozen=True)
-class SomeoneWithKeys(Given[Any, Keyholder]):
+class SomeoneWithKeys(TestGiven[Any, Keyholder]):
     """자기 키를 다룰 사용자 한 명. 권한, 더 가진 키 수, 다른 사람의 키 유무를 고른다."""
 
     permissions: Sequence[Permission] = ()
@@ -177,7 +177,7 @@ async def _my_default_key(adapter: UserAdapter) -> str:
 
 
 @dataclass(frozen=True)
-class Issuing(When[Keyholder, UserAdapter, Answer]):
+class Issuing(TestWhen[Keyholder, UserAdapter, Answer]):
     @override
     def operation(self) -> str:
         return "issue_my_keypair"
@@ -193,7 +193,7 @@ class Issuing(When[Keyholder, UserAdapter, Answer]):
 
 
 @dataclass(frozen=True)
-class RevokingTheExtraKey(When[Keyholder, UserAdapter, Answer]):
+class RevokingTheExtraKey(TestWhen[Keyholder, UserAdapter, Answer]):
     @override
     def operation(self) -> str:
         return "revoke_my_keypair"
@@ -211,7 +211,7 @@ class RevokingTheExtraKey(When[Keyholder, UserAdapter, Answer]):
 
 
 @dataclass(frozen=True)
-class RevokingTheDefaultKey(When[Keyholder, UserAdapter, Answer]):
+class RevokingTheDefaultKey(TestWhen[Keyholder, UserAdapter, Answer]):
     @override
     def operation(self) -> str:
         return "revoke_my_keypair"
@@ -227,7 +227,7 @@ class RevokingTheDefaultKey(When[Keyholder, UserAdapter, Answer]):
 
 
 @dataclass(frozen=True)
-class RevokingAKeyNobodyHolds(When[Keyholder, UserAdapter, Answer]):
+class RevokingAKeyNobodyHolds(TestWhen[Keyholder, UserAdapter, Answer]):
     @override
     def operation(self) -> str:
         return "revoke_my_keypair"
@@ -243,7 +243,7 @@ class RevokingAKeyNobodyHolds(When[Keyholder, UserAdapter, Answer]):
 
 
 @dataclass(frozen=True)
-class TurningOffTheExtraKey(When[Keyholder, UserAdapter, Answer]):
+class TurningOffTheExtraKey(TestWhen[Keyholder, UserAdapter, Answer]):
     @override
     def operation(self) -> str:
         return "update_my_keypair"
@@ -260,7 +260,7 @@ class TurningOffTheExtraKey(When[Keyholder, UserAdapter, Answer]):
 
 
 @dataclass(frozen=True)
-class TurningOffTheDefaultKey(When[Keyholder, UserAdapter, Answer]):
+class TurningOffTheDefaultKey(TestWhen[Keyholder, UserAdapter, Answer]):
     @override
     def operation(self) -> str:
         return "update_my_keypair"
@@ -276,7 +276,7 @@ class TurningOffTheDefaultKey(When[Keyholder, UserAdapter, Answer]):
 
 
 @dataclass(frozen=True)
-class SwitchingToTheExtraKey(When[Keyholder, UserAdapter, Answer]):
+class SwitchingToTheExtraKey(TestWhen[Keyholder, UserAdapter, Answer]):
     @override
     def operation(self) -> str:
         return "switch_default_access_key"
@@ -298,7 +298,7 @@ class SwitchingToTheExtraKey(When[Keyholder, UserAdapter, Answer]):
 
 
 @dataclass(frozen=True)
-class SwitchingToAnExtraKeyWithoutRereading(When[Keyholder, UserAdapter, Answer]):
+class SwitchingToAnExtraKeyWithoutRereading(TestWhen[Keyholder, UserAdapter, Answer]):
     @override
     def operation(self) -> str:
         return "switch_default_access_key"
@@ -316,7 +316,7 @@ class SwitchingToAnExtraKeyWithoutRereading(When[Keyholder, UserAdapter, Answer]
 
 
 @dataclass(frozen=True)
-class SwitchingToSomeoneElsesKey(When[Keyholder, UserAdapter, Answer]):
+class SwitchingToSomeoneElsesKey(TestWhen[Keyholder, UserAdapter, Answer]):
     @override
     def operation(self) -> str:
         return "switch_default_access_key"
@@ -335,7 +335,7 @@ class SwitchingToSomeoneElsesKey(When[Keyholder, UserAdapter, Answer]):
 
 
 @dataclass(frozen=True)
-class SearchingMyKeys(When[Keyholder, UserAdapter, Answer]):
+class SearchingMyKeys(TestWhen[Keyholder, UserAdapter, Answer]):
     @override
     def operation(self) -> str:
         return "search_my_keypairs"
@@ -351,7 +351,7 @@ class SearchingMyKeys(When[Keyholder, UserAdapter, Answer]):
 
 
 @dataclass(frozen=True)
-class IssuingThenSwitchingThenRevoking(When[Keyholder, UserAdapter, Answer]):
+class IssuingThenSwitchingThenRevoking(TestWhen[Keyholder, UserAdapter, Answer]):
     @override
     def operation(self) -> str:
         return "issue_my_keypair"
@@ -377,11 +377,11 @@ class IssuingThenSwitchingThenRevoking(When[Keyholder, UserAdapter, Answer]):
 
 
 @dataclass(frozen=True)
-class At(Verdict):
+class At(TestVerdict):
     """목록 원소 하나를 본 것. 자리 이름 앞에 원소 자리를 붙인다."""
 
     prefix: str
-    inner: Verdict
+    inner: TestVerdict
 
     @override
     def told(self) -> Told:
@@ -392,11 +392,11 @@ class At(Verdict):
         )
 
 
-def _at(prefix: str, verdicts: Sequence[Verdict]) -> list[Verdict]:
+def _at(prefix: str, verdicts: Sequence[TestVerdict]) -> list[TestVerdict]:
     return [At(prefix, one) for one in verdicts]
 
 
-def _default_key(started: datetime, node: KeypairNode, laid: Keyholder) -> list[Verdict]:
+def _default_key(started: datetime, node: KeypairNode, laid: Keyholder) -> list[TestVerdict]:
     written = WrittenByThisRun(started)
     return [
         Skipped("id", "시드가 매번 새로 만든 access key다"),
@@ -422,7 +422,7 @@ def _extra_key(key: KeyPairData, *, is_active: bool = True) -> KeyPairData:
 
 
 @dataclass(frozen=True)
-class TheIssuedKey(Then[Keyholder, Answer]):
+class TheIssuedKey(TestThen[Keyholder, Answer]):
     started: datetime
 
     @override
@@ -430,7 +430,7 @@ class TheIssuedKey(Then[Keyholder, Answer]):
         return "기본 키를 따르는 기본 아닌 새 키와 secret이 온다"
 
     @override
-    def look(self, laid: Keyholder, answered: Answered[Answer]) -> list[Verdict]:
+    def look(self, laid: Keyholder, answered: Answered[Answer]) -> list[TestVerdict]:
         payload = answered.response
         if not isinstance(payload, IssueMyKeypairPayload):
             return [Refused(NotEnoughPermission, answered.raised)]
@@ -449,7 +449,7 @@ class TheIssuedKey(Then[Keyholder, Answer]):
 
 
 @dataclass(frozen=True)
-class OnlyTheDefaultKeyIsLeft(Then[Keyholder, Answer]):
+class OnlyTheDefaultKeyIsLeft(TestThen[Keyholder, Answer]):
     started: datetime
 
     @override
@@ -457,12 +457,12 @@ class OnlyTheDefaultKeyIsLeft(Then[Keyholder, Answer]):
         return "회수에 성공하고, 뒤이은 자기 키 검색에 기본 키만 남는다"
 
     @override
-    def look(self, laid: Keyholder, answered: Answered[Answer]) -> list[Verdict]:
+    def look(self, laid: Keyholder, answered: Answered[Answer]) -> list[TestVerdict]:
         result = answered.response
         if not isinstance(result, Revoked):
             return [Refused(NotEnoughPermission, answered.raised)]
         after = result.after
-        seen: list[Verdict] = [
+        seen: list[TestVerdict] = [
             Same("success", result.success, True),
             Same("after.total_count", after.total_count, 1),
             Same("after.has_next_page", after.has_next_page, False),
@@ -475,7 +475,7 @@ class OnlyTheDefaultKeyIsLeft(Then[Keyholder, Answer]):
 
 
 @dataclass(frozen=True)
-class TheKeyIsOff(Then[Keyholder, Answer]):
+class TheKeyIsOff(TestThen[Keyholder, Answer]):
     started: datetime
 
     @override
@@ -483,7 +483,7 @@ class TheKeyIsOff(Then[Keyholder, Answer]):
         return "활성만 바뀐 키 노드 전체가 온다"
 
     @override
-    def look(self, laid: Keyholder, answered: Answered[Answer]) -> list[Verdict]:
+    def look(self, laid: Keyholder, answered: Answered[Answer]) -> list[TestVerdict]:
         node = answered.response
         if not isinstance(node, KeypairNode):
             return [Refused(NotEnoughPermission, answered.raised)]
@@ -493,7 +493,7 @@ class TheKeyIsOff(Then[Keyholder, Answer]):
 
 
 @dataclass(frozen=True)
-class TheDefaultKeyMoved(Then[Keyholder, Answer]):
+class TheDefaultKeyMoved(TestThen[Keyholder, Answer]):
     started: datetime
 
     @override
@@ -501,7 +501,7 @@ class TheDefaultKeyMoved(Then[Keyholder, Answer]):
         return "전환에 성공하고, 뒤이은 읽기에서 기본 키가 추가한 키다"
 
     @override
-    def look(self, laid: Keyholder, answered: Answered[Answer]) -> list[Verdict]:
+    def look(self, laid: Keyholder, answered: Answered[Answer]) -> list[TestVerdict]:
         result = answered.response
         if not isinstance(result, Switched):
             return [Refused(NotEnoughPermission, answered.raised)]
@@ -519,7 +519,7 @@ class TheDefaultKeyMoved(Then[Keyholder, Answer]):
 
 
 @dataclass(frozen=True)
-class OnlyMyTwoKeys(Then[Keyholder, Answer]):
+class OnlyMyTwoKeys(TestThen[Keyholder, Answer]):
     started: datetime
 
     @override
@@ -527,12 +527,12 @@ class OnlyMyTwoKeys(Then[Keyholder, Answer]):
         return "자기 키 둘만 온다"
 
     @override
-    def look(self, laid: Keyholder, answered: Answered[Answer]) -> list[Verdict]:
+    def look(self, laid: Keyholder, answered: Answered[Answer]) -> list[TestVerdict]:
         page = answered.response
         if not isinstance(page, SearchResult):
             return [Refused(NotEnoughPermission, answered.raised)]
         items: list[KeypairNode] = sorted(page.items, key=lambda one: one.is_default)
-        seen: list[Verdict] = [
+        seen: list[TestVerdict] = [
             Same("total_count", page.total_count, 2),
             Same("has_next_page", page.has_next_page, False),
             Same("has_previous_page", page.has_previous_page, False),
@@ -556,7 +556,7 @@ class OnlyMyTwoKeys(Then[Keyholder, Answer]):
 
 
 @dataclass(frozen=True)
-class NewestFirst(Condition[list[tuple[datetime, UUID]]]):
+class NewestFirst(TestCondition[list[tuple[datetime, UUID]]]):
     """생성 시각 내림차순, 같은 시각이면 field id 오름차순."""
 
     @override
@@ -569,7 +569,7 @@ class NewestFirst(Condition[list[tuple[datetime, UUID]]]):
 
 
 @dataclass(frozen=True)
-class TheFirstTenOfEleven(Then[Keyholder, Answer]):
+class TheFirstTenOfEleven(TestThen[Keyholder, Answer]):
     started: datetime
 
     @override
@@ -577,7 +577,7 @@ class TheFirstTenOfEleven(Then[Keyholder, Answer]):
         return "자기 키 열한 개 중 열 개가 최근순으로 오고 다음 페이지가 있다"
 
     @override
-    def look(self, laid: Keyholder, answered: Answered[Answer]) -> list[Verdict]:
+    def look(self, laid: Keyholder, answered: Answered[Answer]) -> list[TestVerdict]:
         page = answered.response
         if not isinstance(page, SearchResult):
             return [Refused(NotEnoughPermission, answered.raised)]
@@ -609,7 +609,7 @@ class TheFirstTenOfEleven(Then[Keyholder, Answer]):
 
 
 @dataclass(frozen=True)
-class OnlyTheIssuedKeyIsLeft(Then[Keyholder, Answer]):
+class OnlyTheIssuedKeyIsLeft(TestThen[Keyholder, Answer]):
     started: datetime
 
     @override
@@ -617,13 +617,13 @@ class OnlyTheIssuedKeyIsLeft(Then[Keyholder, Answer]):
         return "세 호출이 통과하고 발급한 키 하나만 남는다"
 
     @override
-    def look(self, laid: Keyholder, answered: Answered[Answer]) -> list[Verdict]:
+    def look(self, laid: Keyholder, answered: Answered[Answer]) -> list[TestVerdict]:
         chain = answered.response
         if not isinstance(chain, Chained):
             return [Refused(NotEnoughPermission, answered.raised)]
         after = chain.after
         issued = chain.issued.keypair.access_key
-        seen: list[Verdict] = [
+        seen: list[TestVerdict] = [
             *_at(
                 "issued.",
                 KeypairNodeLook(self.started).generated(
@@ -674,18 +674,18 @@ class OnlyTheIssuedKeyIsLeft(Then[Keyholder, Answer]):
 
 RW = (Permission.READ, Permission.UPDATE)
 
-type Row = Scenario[SeedingSession, Keyholder, UserAdapter, Answer]
+type Row = TestScenario[SeedingSession, Keyholder, UserAdapter, Answer]
 
 
 @dataclass(frozen=True)
-class OwnKeyRow(Scenario[SeedingSession, Keyholder, UserAdapter, Answer]):
+class OwnKeyRow(TestScenario[SeedingSession, Keyholder, UserAdapter, Answer]):
     """표의 한 행. 이름, 보장하는 것, 세 단계를 값으로 받는다."""
 
     name: str
     guarantee: str
     situation: SomeoneWithKeys
-    calling: When[Keyholder, UserAdapter, Answer]
-    seeing: Then[Keyholder, Answer]
+    calling: TestWhen[Keyholder, UserAdapter, Answer]
+    seeing: TestThen[Keyholder, Answer]
 
     @override
     def summary(self) -> str:
@@ -696,15 +696,15 @@ class OwnKeyRow(Scenario[SeedingSession, Keyholder, UserAdapter, Answer]):
         return self.guarantee
 
     @override
-    def given(self) -> Given[SeedingSession, Keyholder]:
+    def given(self) -> TestGiven[SeedingSession, Keyholder]:
         return self.situation
 
     @override
-    def when(self) -> When[Keyholder, UserAdapter, Answer]:
+    def when(self) -> TestWhen[Keyholder, UserAdapter, Answer]:
         return self.calling
 
     @override
-    def then(self) -> Then[Keyholder, Answer]:
+    def then(self) -> TestThen[Keyholder, Answer]:
         return self.seeing
 
 

@@ -15,13 +15,13 @@ from ai.backend.manager.errors.permission import NotEnoughPermission
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.testutils.scenario_steps import (
     Answered,
-    Given,
     Refused,
     Same,
-    Scenario,
-    Then,
-    Verdict,
-    When,
+    TestGiven,
+    TestScenario,
+    TestThen,
+    TestVerdict,
+    TestWhen,
 )
 from bai_scenario.components.answers import MissingResponse
 from bai_scenario.components.domain import (
@@ -34,11 +34,11 @@ from bai_scenario.runner.planting import SeedingSession
 from bai_scenario.runner.steps import run_scenario
 
 type Answers = list[DomainNode | Exception | None]
-type DomainStep = Scenario[SeedingSession, ADomainAndACaller, DomainAdapter, Answers]
+type DomainStep = TestScenario[SeedingSession, ADomainAndACaller, DomainAdapter, Answers]
 
 
 @dataclass(frozen=True)
-class ReadingByIds(When[ADomainAndACaller, DomainAdapter, Answers]):
+class ReadingByIds(TestWhen[ADomainAndACaller, DomainAdapter, Answers]):
     """미리 만든 도메인을 id로 읽는다."""
 
     @override
@@ -56,7 +56,7 @@ class ReadingByIds(When[ADomainAndACaller, DomainAdapter, Answers]):
 
 
 @dataclass(frozen=True)
-class TheOneDomainComesBack(Then[ADomainAndACaller, Answers]):
+class TheOneDomainComesBack(TestThen[ADomainAndACaller, Answers]):
     """물은 자리 하나에 미리 만든 도메인 전체가 온다."""
 
     started: datetime
@@ -66,7 +66,7 @@ class TheOneDomainComesBack(Then[ADomainAndACaller, Answers]):
         return "물은 자리에 미리 만든 도메인 전체가 온다"
 
     @override
-    def look(self, laid: ADomainAndACaller, answered: Answered[Answers]) -> list[Verdict]:
+    def look(self, laid: ADomainAndACaller, answered: Answered[Answers]) -> list[TestVerdict]:
         answers = answered.response
         if answers is None:
             return [MissingResponse(answered.raised)]
@@ -78,7 +78,7 @@ class TheOneDomainComesBack(Then[ADomainAndACaller, Answers]):
 
 
 @dataclass(frozen=True)
-class TheOnePlaceIsRefused(Then[ADomainAndACaller, Answers]):
+class TheOnePlaceIsRefused(TestThen[ADomainAndACaller, Answers]):
     """물은 자리 하나가 이 이름으로 거부된다. 호출 전체는 답한다."""
 
     expected: type[BaseException]
@@ -88,7 +88,7 @@ class TheOnePlaceIsRefused(Then[ADomainAndACaller, Answers]):
         return "물은 자리가 거부된다"
 
     @override
-    def look(self, laid: ADomainAndACaller, answered: Answered[Answers]) -> list[Verdict]:
+    def look(self, laid: ADomainAndACaller, answered: Answered[Answers]) -> list[TestVerdict]:
         answers = answered.response
         if answers is None:
             return [MissingResponse(answered.raised)]
@@ -100,7 +100,9 @@ class TheOnePlaceIsRefused(Then[ADomainAndACaller, Answers]):
 
 
 @dataclass(frozen=True)
-class TheSuperadminReadsById(Scenario[SeedingSession, ADomainAndACaller, DomainAdapter, Answers]):
+class TheSuperadminReadsById(
+    TestScenario[SeedingSession, ADomainAndACaller, DomainAdapter, Answers]
+):
     started: datetime
 
     @override
@@ -112,21 +114,21 @@ class TheSuperadminReadsById(Scenario[SeedingSession, ADomainAndACaller, DomainA
         return "슈퍼관리자가 id로 도메인 여럿을 읽으면, 그 자리에 도메인이 온다"
 
     @override
-    def given(self) -> Given[SeedingSession, ADomainAndACaller]:
+    def given(self) -> TestGiven[SeedingSession, ADomainAndACaller]:
         return ATargetAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
-    def when(self) -> When[ADomainAndACaller, DomainAdapter, Answers]:
+    def when(self) -> TestWhen[ADomainAndACaller, DomainAdapter, Answers]:
         return ReadingByIds()
 
     @override
-    def then(self) -> Then[ADomainAndACaller, Answers]:
+    def then(self) -> TestThen[ADomainAndACaller, Answers]:
         return TheOneDomainComesBack(started=self.started)
 
 
 @dataclass(frozen=True)
 class AUserGrantedNothingMayNotReadById(
-    Scenario[SeedingSession, ADomainAndACaller, DomainAdapter, Answers]
+    TestScenario[SeedingSession, ADomainAndACaller, DomainAdapter, Answers]
 ):
     @override
     def summary(self) -> str:
@@ -137,15 +139,15 @@ class AUserGrantedNothingMayNotReadById(
         return "아무 권한도 받지 않은 사용자가 id로 도메인 여럿을 읽으면, 그 자리가 권한 부족으로 거부된다"
 
     @override
-    def given(self) -> Given[SeedingSession, ADomainAndACaller]:
+    def given(self) -> TestGiven[SeedingSession, ADomainAndACaller]:
         return ATargetAndSomeone()
 
     @override
-    def when(self) -> When[ADomainAndACaller, DomainAdapter, Answers]:
+    def when(self) -> TestWhen[ADomainAndACaller, DomainAdapter, Answers]:
         return ReadingByIds()
 
     @override
-    def then(self) -> Then[ADomainAndACaller, Answers]:
+    def then(self) -> TestThen[ADomainAndACaller, Answers]:
         return TheOnePlaceIsRefused(NotEnoughPermission)
 
 

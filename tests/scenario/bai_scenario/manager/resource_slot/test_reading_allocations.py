@@ -20,7 +20,13 @@ from ai.backend.manager.errors.base.field import FieldNotFoundError
 from ai.backend.manager.errors.common import GenericBadRequest
 from ai.backend.manager.errors.resource_slot import ResourceAllocationNotFound
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.testutils.scenario_steps import Configured, Given, Scenario, Then, When
+from ai.backend.testutils.scenario_steps import (
+    TestConfigured,
+    TestGiven,
+    TestScenario,
+    TestThen,
+    TestWhen,
+)
 from bai_scenario.components.answers import TheCallIsRefused
 from bai_scenario.components.resource_allocation import (
     AKernelAndACaller,
@@ -36,13 +42,13 @@ from bai_scenario.runner.steps import run_scenario
 UNKNOWN_KERNEL = uuid.UUID(int=0)
 UNKNOWN_SLOT = "no-such-slot"
 
-type ReadingStep = Scenario[
+type ReadingStep = TestScenario[
     SeedingSession, AKernelAndACaller, ResourceSlotAdapter, ResourceAllocationNode
 ]
 
 
 @dataclass(frozen=True)
-class ReadingAKernelSlot(When[AKernelAndACaller, ResourceSlotAdapter, ResourceAllocationNode]):
+class ReadingAKernelSlot(TestWhen[AKernelAndACaller, ResourceSlotAdapter, ResourceAllocationNode]):
     """커널 id와 슬롯 이름으로 조회한다. 지정하지 않으면 미리 만들어 둔 커널과 그 첫 슬롯을 쓴다."""
 
     unknown_kernel: bool = False
@@ -71,7 +77,7 @@ class ReadingAKernelSlot(When[AKernelAndACaller, ResourceSlotAdapter, ResourceAl
 
 @dataclass(frozen=True)
 class TheSuperadminReadsAKernelSlot(
-    Scenario[SeedingSession, AKernelAndACaller, ResourceSlotAdapter, ResourceAllocationNode]
+    TestScenario[SeedingSession, AKernelAndACaller, ResourceSlotAdapter, ResourceAllocationNode]
 ):
     @override
     def summary(self) -> str:
@@ -85,21 +91,21 @@ class TheSuperadminReadsAKernelSlot(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, AKernelAndACaller]:
+    def given(self) -> TestGiven[SeedingSession, AKernelAndACaller]:
         return AKernelAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
-    def when(self) -> When[AKernelAndACaller, ResourceSlotAdapter, ResourceAllocationNode]:
+    def when(self) -> TestWhen[AKernelAndACaller, ResourceSlotAdapter, ResourceAllocationNode]:
         return ReadingAKernelSlot()
 
     @override
-    def then(self) -> Then[AKernelAndACaller, ResourceAllocationNode]:
+    def then(self) -> TestThen[AKernelAndACaller, ResourceAllocationNode]:
         return TheAllocationNode()
 
 
 @dataclass(frozen=True)
 class AUserReadingSessionsInTheProjectReadsAKernelSlot(
-    Scenario[SeedingSession, AKernelAndACaller, ResourceSlotAdapter, ResourceAllocationNode]
+    TestScenario[SeedingSession, AKernelAndACaller, ResourceSlotAdapter, ResourceAllocationNode]
 ):
     @override
     def summary(self) -> str:
@@ -113,21 +119,21 @@ class AUserReadingSessionsInTheProjectReadsAKernelSlot(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, AKernelAndACaller]:
+    def given(self) -> TestGiven[SeedingSession, AKernelAndACaller]:
         return AKernelAndSomeone(granted=Granted.THE_PROJECT)
 
     @override
-    def when(self) -> When[AKernelAndACaller, ResourceSlotAdapter, ResourceAllocationNode]:
+    def when(self) -> TestWhen[AKernelAndACaller, ResourceSlotAdapter, ResourceAllocationNode]:
         return ReadingAKernelSlot()
 
     @override
-    def then(self) -> Then[AKernelAndACaller, ResourceAllocationNode]:
+    def then(self) -> TestThen[AKernelAndACaller, ResourceAllocationNode]:
         return TheAllocationNode()
 
 
 @dataclass(frozen=True)
 class AUserGrantedNothingMayNotReadAKernelSlot(
-    Scenario[SeedingSession, AKernelAndACaller, ResourceSlotAdapter, ResourceAllocationNode]
+    TestScenario[SeedingSession, AKernelAndACaller, ResourceSlotAdapter, ResourceAllocationNode]
 ):
     @override
     def summary(self) -> str:
@@ -142,21 +148,21 @@ class AUserGrantedNothingMayNotReadAKernelSlot(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, AKernelAndACaller]:
+    def given(self) -> TestGiven[SeedingSession, AKernelAndACaller]:
         return AKernelAndSomeone()
 
     @override
-    def when(self) -> When[AKernelAndACaller, ResourceSlotAdapter, ResourceAllocationNode]:
+    def when(self) -> TestWhen[AKernelAndACaller, ResourceSlotAdapter, ResourceAllocationNode]:
         return ReadingAKernelSlot()
 
     @override
-    def then(self) -> Then[AKernelAndACaller, ResourceAllocationNode]:
+    def then(self) -> TestThen[AKernelAndACaller, ResourceAllocationNode]:
         return TheCallIsRefused(GenericBadRequest)
 
 
 @dataclass(frozen=True)
 class AKernelIdNothingAnswersToIsNotFound(
-    Scenario[SeedingSession, AKernelAndACaller, ResourceSlotAdapter, ResourceAllocationNode]
+    TestScenario[SeedingSession, AKernelAndACaller, ResourceSlotAdapter, ResourceAllocationNode]
 ):
     @override
     def summary(self) -> str:
@@ -170,21 +176,21 @@ class AKernelIdNothingAnswersToIsNotFound(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, AKernelAndACaller]:
+    def given(self) -> TestGiven[SeedingSession, AKernelAndACaller]:
         return AKernelAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
-    def when(self) -> When[AKernelAndACaller, ResourceSlotAdapter, ResourceAllocationNode]:
+    def when(self) -> TestWhen[AKernelAndACaller, ResourceSlotAdapter, ResourceAllocationNode]:
         return ReadingAKernelSlot(unknown_kernel=True)
 
     @override
-    def then(self) -> Then[AKernelAndACaller, ResourceAllocationNode]:
+    def then(self) -> TestThen[AKernelAndACaller, ResourceAllocationNode]:
         return TheCallIsRefused(FieldNotFoundError)
 
 
 @dataclass(frozen=True)
 class ASlotTheKernelDidNotAskForIsNotFound(
-    Scenario[SeedingSession, AKernelAndACaller, ResourceSlotAdapter, ResourceAllocationNode]
+    TestScenario[SeedingSession, AKernelAndACaller, ResourceSlotAdapter, ResourceAllocationNode]
 ):
     @override
     def summary(self) -> str:
@@ -195,21 +201,21 @@ class ASlotTheKernelDidNotAskForIsNotFound(
         return "슈퍼관리자가 그 커널이 요구하지 않은 슬롯 이름으로 조회하면 대상을 찾을 수 없다는 이유로 거부된다"
 
     @override
-    def given(self) -> Given[SeedingSession, AKernelAndACaller]:
+    def given(self) -> TestGiven[SeedingSession, AKernelAndACaller]:
         return AKernelAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
-    def when(self) -> When[AKernelAndACaller, ResourceSlotAdapter, ResourceAllocationNode]:
+    def when(self) -> TestWhen[AKernelAndACaller, ResourceSlotAdapter, ResourceAllocationNode]:
         return ReadingAKernelSlot(slot=UNKNOWN_SLOT)
 
     @override
-    def then(self) -> Then[AKernelAndACaller, ResourceAllocationNode]:
+    def then(self) -> TestThen[AKernelAndACaller, ResourceAllocationNode]:
         return TheCallIsRefused(ResourceAllocationNotFound)
 
 
 @dataclass(frozen=True)
 class AUserGrantedNothingReadingAnUnknownKernelIsRefusedTheSameWay(
-    Scenario[SeedingSession, AKernelAndACaller, ResourceSlotAdapter, ResourceAllocationNode]
+    TestScenario[SeedingSession, AKernelAndACaller, ResourceSlotAdapter, ResourceAllocationNode]
 ):
     @override
     def summary(self) -> str:
@@ -223,22 +229,22 @@ class AUserGrantedNothingReadingAnUnknownKernelIsRefusedTheSameWay(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, AKernelAndACaller]:
+    def given(self) -> TestGiven[SeedingSession, AKernelAndACaller]:
         return AKernelAndSomeone()
 
     @override
-    def when(self) -> When[AKernelAndACaller, ResourceSlotAdapter, ResourceAllocationNode]:
+    def when(self) -> TestWhen[AKernelAndACaller, ResourceSlotAdapter, ResourceAllocationNode]:
         return ReadingAKernelSlot(unknown_kernel=True)
 
     @override
-    def then(self) -> Then[AKernelAndACaller, ResourceAllocationNode]:
+    def then(self) -> TestThen[AKernelAndACaller, ResourceAllocationNode]:
         return TheCallIsRefused(GenericBadRequest)
 
 
 @dataclass(frozen=True)
 class EnforcementOffLetsAnyoneReadAKernelSlot(
-    Scenario[SeedingSession, AKernelAndACaller, ResourceSlotAdapter, ResourceAllocationNode],
-    Configured,
+    TestScenario[SeedingSession, AKernelAndACaller, ResourceSlotAdapter, ResourceAllocationNode],
+    TestConfigured,
 ):
     @override
     def summary(self) -> str:
@@ -253,15 +259,15 @@ class EnforcementOffLetsAnyoneReadAKernelSlot(
         return {ENFORCEMENT: False}
 
     @override
-    def given(self) -> Given[SeedingSession, AKernelAndACaller]:
+    def given(self) -> TestGiven[SeedingSession, AKernelAndACaller]:
         return AKernelAndSomeone()
 
     @override
-    def when(self) -> When[AKernelAndACaller, ResourceSlotAdapter, ResourceAllocationNode]:
+    def when(self) -> TestWhen[AKernelAndACaller, ResourceSlotAdapter, ResourceAllocationNode]:
         return ReadingAKernelSlot()
 
     @override
-    def then(self) -> Then[AKernelAndACaller, ResourceAllocationNode]:
+    def then(self) -> TestThen[AKernelAndACaller, ResourceAllocationNode]:
         return TheAllocationNode()
 
 

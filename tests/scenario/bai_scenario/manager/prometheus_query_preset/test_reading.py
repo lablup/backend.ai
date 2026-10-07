@@ -19,7 +19,7 @@ from ai.backend.manager.api.adapters.prometheus_query_preset.adapter import (
 )
 from ai.backend.manager.errors.permission import NotEnoughPermission
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.testutils.scenario_steps import Given, Scenario, Then, When
+from ai.backend.testutils.scenario_steps import TestGiven, TestScenario, TestThen, TestWhen
 from bai_scenario.components.answers import TheCallIsRefused
 from bai_scenario.components.prometheus_query_preset import (
     APresetAlone,
@@ -33,16 +33,16 @@ from bai_scenario.runner.acting import ActingAs
 from bai_scenario.runner.planting import SeedingSession
 from bai_scenario.runner.steps import run_scenario
 
-type ReadingStep = Scenario[
+type ReadingStep = TestScenario[
     SeedingSession, APresetAndACaller, PrometheusQueryPresetAdapter, PresetNodeAnswer
 ]
-type NobodyStep = Scenario[
+type NobodyStep = TestScenario[
     SeedingSession, APresetAlone, PrometheusQueryPresetAdapter, PresetNodeAnswer
 ]
 
 
 @dataclass(frozen=True)
-class ReadingById(When[APresetAndACaller, PrometheusQueryPresetAdapter, PresetNodeAnswer]):
+class ReadingById(TestWhen[APresetAndACaller, PrometheusQueryPresetAdapter, PresetNodeAnswer]):
     """id로 조회한다. id를 지정하지 않으면 미리 만들어 둔 프리셋의 id를 쓴다."""
 
     named: UUID | None = None
@@ -67,7 +67,7 @@ class ReadingById(When[APresetAndACaller, PrometheusQueryPresetAdapter, PresetNo
 
 
 @dataclass(frozen=True)
-class ReadingAsNobody(When[APresetAlone, PrometheusQueryPresetAdapter, PresetNodeAnswer]):
+class ReadingAsNobody(TestWhen[APresetAlone, PrometheusQueryPresetAdapter, PresetNodeAnswer]):
     """사용자 컨텍스트 없이 id로 조회한다."""
 
     @override
@@ -88,7 +88,7 @@ class ReadingAsNobody(When[APresetAlone, PrometheusQueryPresetAdapter, PresetNod
 
 @dataclass(frozen=True)
 class AUserGrantedNothingReadsIt(
-    Scenario[SeedingSession, APresetAndACaller, PrometheusQueryPresetAdapter, PresetNodeAnswer]
+    TestScenario[SeedingSession, APresetAndACaller, PrometheusQueryPresetAdapter, PresetNodeAnswer]
 ):
     started: datetime
 
@@ -103,21 +103,21 @@ class AUserGrantedNothingReadsIt(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, APresetAndACaller]:
+    def given(self) -> TestGiven[SeedingSession, APresetAndACaller]:
         return APresetAndSomeone()
 
     @override
-    def when(self) -> When[APresetAndACaller, PrometheusQueryPresetAdapter, PresetNodeAnswer]:
+    def when(self) -> TestWhen[APresetAndACaller, PrometheusQueryPresetAdapter, PresetNodeAnswer]:
         return ReadingById()
 
     @override
-    def then(self) -> Then[APresetAndACaller, PresetNodeAnswer]:
+    def then(self) -> TestThen[APresetAndACaller, PresetNodeAnswer]:
         return ThePresetNode(started=self.started)
 
 
 @dataclass(frozen=True)
 class AnUnknownIdIsNotFound(
-    Scenario[SeedingSession, APresetAndACaller, PrometheusQueryPresetAdapter, PresetNodeAnswer]
+    TestScenario[SeedingSession, APresetAndACaller, PrometheusQueryPresetAdapter, PresetNodeAnswer]
 ):
     @override
     def summary(self) -> str:
@@ -131,21 +131,21 @@ class AnUnknownIdIsNotFound(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, APresetAndACaller]:
+    def given(self) -> TestGiven[SeedingSession, APresetAndACaller]:
         return APresetAndSomeone()
 
     @override
-    def when(self) -> When[APresetAndACaller, PrometheusQueryPresetAdapter, PresetNodeAnswer]:
+    def when(self) -> TestWhen[APresetAndACaller, PrometheusQueryPresetAdapter, PresetNodeAnswer]:
         return ReadingById(named=uuid4())
 
     @override
-    def then(self) -> Then[APresetAndACaller, PresetNodeAnswer]:
+    def then(self) -> TestThen[APresetAndACaller, PresetNodeAnswer]:
         return TheCallIsRefused(NotEnoughPermission)
 
 
 @dataclass(frozen=True)
 class NobodyMayNotRead(
-    Scenario[SeedingSession, APresetAlone, PrometheusQueryPresetAdapter, PresetNodeAnswer]
+    TestScenario[SeedingSession, APresetAlone, PrometheusQueryPresetAdapter, PresetNodeAnswer]
 ):
     @override
     def summary(self) -> str:
@@ -156,15 +156,15 @@ class NobodyMayNotRead(
         return "프리셋 하나가 있고 사용자 컨텍스트 없이 id로 조회하면, 호출자를 알 수 없어 거부된다"
 
     @override
-    def given(self) -> Given[SeedingSession, APresetAlone]:
+    def given(self) -> TestGiven[SeedingSession, APresetAlone]:
         return APresetAndNobody()
 
     @override
-    def when(self) -> When[APresetAlone, PrometheusQueryPresetAdapter, PresetNodeAnswer]:
+    def when(self) -> TestWhen[APresetAlone, PrometheusQueryPresetAdapter, PresetNodeAnswer]:
         return ReadingAsNobody()
 
     @override
-    def then(self) -> Then[APresetAlone, PresetNodeAnswer]:
+    def then(self) -> TestThen[APresetAlone, PresetNodeAnswer]:
         return TheCallIsRefused(UnreachableError)
 
 

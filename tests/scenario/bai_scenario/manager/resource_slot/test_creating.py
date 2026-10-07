@@ -17,7 +17,13 @@ from ai.backend.manager.api.adapters.resource_slot.adapter import ResourceSlotAd
 from ai.backend.manager.errors.auth import InsufficientPrivilege
 from ai.backend.manager.errors.resource_slot import ResourceSlotTypeAlreadyExists
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.testutils.scenario_steps import Configured, Given, Scenario, Then, When
+from ai.backend.testutils.scenario_steps import (
+    TestConfigured,
+    TestGiven,
+    TestScenario,
+    TestThen,
+    TestWhen,
+)
 from bai_scenario.components.answers import TheCallIsRefused
 from bai_scenario.components.resource_slot import (
     ASlotTypeAndACaller,
@@ -32,11 +38,11 @@ from bai_scenario.runner.steps import run_scenario
 MADE = "cuda.shares"
 BINARY_ROUNDED = NumberFormatInfo(binary=True, round_length=2)
 
-type CreatingStep = Scenario[SeedingSession, Any, ResourceSlotAdapter, ResourceSlotTypeNode]
+type CreatingStep = TestScenario[SeedingSession, Any, ResourceSlotAdapter, ResourceSlotTypeNode]
 
 
 @dataclass(frozen=True)
-class Creating(When[ACaller, ResourceSlotAdapter, ResourceSlotTypeNode]):
+class Creating(TestWhen[ACaller, ResourceSlotAdapter, ResourceSlotTypeNode]):
     """슬롯 종류 하나를 생성한다. 응답에 담긴 노드를 꺼내서 준다."""
 
     named: str = MADE
@@ -75,7 +81,9 @@ class Creating(When[ACaller, ResourceSlotAdapter, ResourceSlotTypeNode]):
 
 
 @dataclass(frozen=True)
-class CreatingWithTheLaidName(When[ASlotTypeAndACaller, ResourceSlotAdapter, ResourceSlotTypeNode]):
+class CreatingWithTheLaidName(
+    TestWhen[ASlotTypeAndACaller, ResourceSlotAdapter, ResourceSlotTypeNode]
+):
     """미리 만들어 둔 슬롯 종류와 같은 이름으로 생성한다."""
 
     @override
@@ -101,7 +109,7 @@ class CreatingWithTheLaidName(When[ASlotTypeAndACaller, ResourceSlotAdapter, Res
 
 @dataclass(frozen=True)
 class TheSuperadminMakesOneWithANameAndAKind(
-    Scenario[SeedingSession, ACaller, ResourceSlotAdapter, ResourceSlotTypeNode]
+    TestScenario[SeedingSession, ACaller, ResourceSlotAdapter, ResourceSlotTypeNode]
 ):
     @override
     def summary(self) -> str:
@@ -115,21 +123,21 @@ class TheSuperadminMakesOneWithANameAndAKind(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, ACaller]:
+    def given(self) -> TestGiven[SeedingSession, ACaller]:
         return SomeoneAlone(role=UserRole.SUPERADMIN)
 
     @override
-    def when(self) -> When[ACaller, ResourceSlotAdapter, ResourceSlotTypeNode]:
+    def when(self) -> TestWhen[ACaller, ResourceSlotAdapter, ResourceSlotTypeNode]:
         return Creating()
 
     @override
-    def then(self) -> Then[ACaller, ResourceSlotTypeNode]:
+    def then(self) -> TestThen[ACaller, ResourceSlotTypeNode]:
         return TheNewSlotTypeNode(named=MADE, slot_type=SlotTypes.COUNT)
 
 
 @dataclass(frozen=True)
 class EveryDisplayValueComesBackAsGiven(
-    Scenario[SeedingSession, ACaller, ResourceSlotAdapter, ResourceSlotTypeNode]
+    TestScenario[SeedingSession, ACaller, ResourceSlotAdapter, ResourceSlotTypeNode]
 ):
     @override
     def summary(self) -> str:
@@ -140,15 +148,15 @@ class EveryDisplayValueComesBackAsGiven(
         return "슈퍼관리자가 표시 이름·설명·단위·아이콘·서식·순위까지 지정해 생성하면, 지정한 값이 그대로 담긴 노드가 반환된다"
 
     @override
-    def given(self) -> Given[SeedingSession, ACaller]:
+    def given(self) -> TestGiven[SeedingSession, ACaller]:
         return SomeoneAlone(role=UserRole.SUPERADMIN)
 
     @override
-    def when(self) -> When[ACaller, ResourceSlotAdapter, ResourceSlotTypeNode]:
+    def when(self) -> TestWhen[ACaller, ResourceSlotAdapter, ResourceSlotTypeNode]:
         return Creating(shown=True)
 
     @override
-    def then(self) -> Then[ACaller, ResourceSlotTypeNode]:
+    def then(self) -> TestThen[ACaller, ResourceSlotTypeNode]:
         return TheNewSlotTypeNode(
             named=MADE,
             slot_type=SlotTypes.COUNT,
@@ -165,7 +173,7 @@ class EveryDisplayValueComesBackAsGiven(
 
 @dataclass(frozen=True)
 class EachKindIsAccepted(
-    Scenario[SeedingSession, ACaller, ResourceSlotAdapter, ResourceSlotTypeNode]
+    TestScenario[SeedingSession, ACaller, ResourceSlotAdapter, ResourceSlotTypeNode]
 ):
     slot_type: SlotTypes
 
@@ -178,21 +186,21 @@ class EachKindIsAccepted(
         return f"슈퍼관리자가 {self.slot_type.value} 종류로 생성하면 그 종류가 담긴 노드가 반환된다"
 
     @override
-    def given(self) -> Given[SeedingSession, ACaller]:
+    def given(self) -> TestGiven[SeedingSession, ACaller]:
         return SomeoneAlone(role=UserRole.SUPERADMIN)
 
     @override
-    def when(self) -> When[ACaller, ResourceSlotAdapter, ResourceSlotTypeNode]:
+    def when(self) -> TestWhen[ACaller, ResourceSlotAdapter, ResourceSlotTypeNode]:
         return Creating(slot_type=self.slot_type)
 
     @override
-    def then(self) -> Then[ACaller, ResourceSlotTypeNode]:
+    def then(self) -> TestThen[ACaller, ResourceSlotTypeNode]:
         return TheNewSlotTypeNode(named=MADE, slot_type=self.slot_type)
 
 
 @dataclass(frozen=True)
 class ANameAlreadyTakenIsRefused(
-    Scenario[SeedingSession, ASlotTypeAndACaller, ResourceSlotAdapter, ResourceSlotTypeNode]
+    TestScenario[SeedingSession, ASlotTypeAndACaller, ResourceSlotAdapter, ResourceSlotTypeNode]
 ):
     @override
     def summary(self) -> str:
@@ -207,21 +215,21 @@ class ANameAlreadyTakenIsRefused(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, ASlotTypeAndACaller]:
+    def given(self) -> TestGiven[SeedingSession, ASlotTypeAndACaller]:
         return ASlotTypeAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
-    def when(self) -> When[ASlotTypeAndACaller, ResourceSlotAdapter, ResourceSlotTypeNode]:
+    def when(self) -> TestWhen[ASlotTypeAndACaller, ResourceSlotAdapter, ResourceSlotTypeNode]:
         return CreatingWithTheLaidName()
 
     @override
-    def then(self) -> Then[ASlotTypeAndACaller, ResourceSlotTypeNode]:
+    def then(self) -> TestThen[ASlotTypeAndACaller, ResourceSlotTypeNode]:
         return TheCallIsRefused(ResourceSlotTypeAlreadyExists)
 
 
 @dataclass(frozen=True)
 class AUserWhoIsNotTheSuperadminMayNotCreate(
-    Scenario[SeedingSession, ACaller, ResourceSlotAdapter, ResourceSlotTypeNode]
+    TestScenario[SeedingSession, ACaller, ResourceSlotAdapter, ResourceSlotTypeNode]
 ):
     @override
     def summary(self) -> str:
@@ -232,21 +240,21 @@ class AUserWhoIsNotTheSuperadminMayNotCreate(
         return "슈퍼관리자가 아닌 사용자가 슬롯 종류를 생성하면 역할 부족으로 거부된다"
 
     @override
-    def given(self) -> Given[SeedingSession, ACaller]:
+    def given(self) -> TestGiven[SeedingSession, ACaller]:
         return SomeoneAlone()
 
     @override
-    def when(self) -> When[ACaller, ResourceSlotAdapter, ResourceSlotTypeNode]:
+    def when(self) -> TestWhen[ACaller, ResourceSlotAdapter, ResourceSlotTypeNode]:
         return Creating()
 
     @override
-    def then(self) -> Then[ACaller, ResourceSlotTypeNode]:
+    def then(self) -> TestThen[ACaller, ResourceSlotTypeNode]:
         return TheCallIsRefused(InsufficientPrivilege)
 
 
 @dataclass(frozen=True)
 class EnforcementOffStillNeedsTheSuperadmin(
-    Scenario[SeedingSession, ACaller, ResourceSlotAdapter, ResourceSlotTypeNode], Configured
+    TestScenario[SeedingSession, ACaller, ResourceSlotAdapter, ResourceSlotTypeNode], TestConfigured
 ):
     @override
     def summary(self) -> str:
@@ -261,15 +269,15 @@ class EnforcementOffStillNeedsTheSuperadmin(
         return {ENFORCEMENT: False}
 
     @override
-    def given(self) -> Given[SeedingSession, ACaller]:
+    def given(self) -> TestGiven[SeedingSession, ACaller]:
         return SomeoneAlone()
 
     @override
-    def when(self) -> When[ACaller, ResourceSlotAdapter, ResourceSlotTypeNode]:
+    def when(self) -> TestWhen[ACaller, ResourceSlotAdapter, ResourceSlotTypeNode]:
         return Creating()
 
     @override
-    def then(self) -> Then[ACaller, ResourceSlotTypeNode]:
+    def then(self) -> TestThen[ACaller, ResourceSlotTypeNode]:
         return TheCallIsRefused(InsufficientPrivilege)
 
 

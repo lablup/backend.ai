@@ -18,7 +18,13 @@ from ai.backend.manager.api.adapters.secret.adapter import SecretAdapter
 from ai.backend.manager.data.secret.types import KeyProviderType
 from ai.backend.manager.errors.auth import InsufficientPrivilege
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.testutils.scenario_steps import Configured, Given, Scenario, Then, When
+from ai.backend.testutils.scenario_steps import (
+    TestConfigured,
+    TestGiven,
+    TestScenario,
+    TestThen,
+    TestWhen,
+)
 from bai_scenario.components.answers import TheCallIsRefused
 from bai_scenario.components.secret import (
     CONFIG_KEYS,
@@ -33,11 +39,11 @@ from bai_scenario.runner.planting import SeedingSession
 from bai_scenario.runner.steps import run_scenario
 
 type Reencrypted = AdminReencryptSecretsPayload
-type ReencryptingStep = Scenario[SeedingSession, AKeyringAndACaller, SecretAdapter, Reencrypted]
+type ReencryptingStep = TestScenario[SeedingSession, AKeyringAndACaller, SecretAdapter, Reencrypted]
 
 
 @dataclass(frozen=True)
-class Reencrypting(When[AKeyringAndACaller, SecretAdapter, Reencrypted]):
+class Reencrypting(TestWhen[AKeyringAndACaller, SecretAdapter, Reencrypted]):
     """저장된 비밀 키 전부를 재암호화한다."""
 
     @override
@@ -56,7 +62,7 @@ class Reencrypting(When[AKeyringAndACaller, SecretAdapter, Reencrypted]):
 
 @dataclass(frozen=True)
 class PlaintextSecretsMoveOntoTheConfigKey(
-    Scenario[SeedingSession, AKeyringAndACaller, SecretAdapter, Reencrypted], Configured
+    TestScenario[SeedingSession, AKeyringAndACaller, SecretAdapter, Reencrypted], TestConfigured
 ):
     @override
     def summary(self) -> str:
@@ -74,21 +80,21 @@ class PlaintextSecretsMoveOntoTheConfigKey(
         return {WRITE_PROVIDER: KeyProviderType.CONFIG.value, CONFIG_PROVIDER: CONFIG_KEYS}
 
     @override
-    def given(self) -> Given[SeedingSession, AKeyringAndACaller]:
+    def given(self) -> TestGiven[SeedingSession, AKeyringAndACaller]:
         return UsersHoldingSecrets(role=UserRole.SUPERADMIN, plaintext_besides=1)
 
     @override
-    def when(self) -> When[AKeyringAndACaller, SecretAdapter, Reencrypted]:
+    def when(self) -> TestWhen[AKeyringAndACaller, SecretAdapter, Reencrypted]:
         return Reencrypting()
 
     @override
-    def then(self) -> Then[AKeyringAndACaller, Reencrypted]:
+    def then(self) -> TestThen[AKeyringAndACaller, Reencrypted]:
         return EveryRowIsRewrittenOntoTheWriter(write_provider=KeyProviderType.CONFIG)
 
 
 @dataclass(frozen=True)
 class SecretsAlreadyOnTheKeyAreRewrittenAgain(
-    Scenario[SeedingSession, AKeyringAndACaller, SecretAdapter, Reencrypted], Configured
+    TestScenario[SeedingSession, AKeyringAndACaller, SecretAdapter, Reencrypted], TestConfigured
 ):
     @override
     def summary(self) -> str:
@@ -106,7 +112,7 @@ class SecretsAlreadyOnTheKeyAreRewrittenAgain(
         return {WRITE_PROVIDER: KeyProviderType.CONFIG.value, CONFIG_PROVIDER: CONFIG_KEYS}
 
     @override
-    def given(self) -> Given[SeedingSession, AKeyringAndACaller]:
+    def given(self) -> TestGiven[SeedingSession, AKeyringAndACaller]:
         return UsersHoldingSecrets(
             role=UserRole.SUPERADMIN,
             plaintext_besides=0,
@@ -115,17 +121,17 @@ class SecretsAlreadyOnTheKeyAreRewrittenAgain(
         )
 
     @override
-    def when(self) -> When[AKeyringAndACaller, SecretAdapter, Reencrypted]:
+    def when(self) -> TestWhen[AKeyringAndACaller, SecretAdapter, Reencrypted]:
         return Reencrypting()
 
     @override
-    def then(self) -> Then[AKeyringAndACaller, Reencrypted]:
+    def then(self) -> TestThen[AKeyringAndACaller, Reencrypted]:
         return EveryRowIsRewrittenOntoTheWriter(write_provider=KeyProviderType.CONFIG)
 
 
 @dataclass(frozen=True)
 class APlainWriterRewritesPlaintextAsPlaintext(
-    Scenario[SeedingSession, AKeyringAndACaller, SecretAdapter, Reencrypted]
+    TestScenario[SeedingSession, AKeyringAndACaller, SecretAdapter, Reencrypted]
 ):
     @override
     def summary(self) -> str:
@@ -139,21 +145,21 @@ class APlainWriterRewritesPlaintextAsPlaintext(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, AKeyringAndACaller]:
+    def given(self) -> TestGiven[SeedingSession, AKeyringAndACaller]:
         return UsersHoldingSecrets(role=UserRole.SUPERADMIN, plaintext_besides=1)
 
     @override
-    def when(self) -> When[AKeyringAndACaller, SecretAdapter, Reencrypted]:
+    def when(self) -> TestWhen[AKeyringAndACaller, SecretAdapter, Reencrypted]:
         return Reencrypting()
 
     @override
-    def then(self) -> Then[AKeyringAndACaller, Reencrypted]:
+    def then(self) -> TestThen[AKeyringAndACaller, Reencrypted]:
         return EveryRowIsRewrittenOntoTheWriter(write_provider=KeyProviderType.PLAIN)
 
 
 @dataclass(frozen=True)
 class APlainWriterTurnsEncryptedSecretsBackToPlaintext(
-    Scenario[SeedingSession, AKeyringAndACaller, SecretAdapter, Reencrypted], Configured
+    TestScenario[SeedingSession, AKeyringAndACaller, SecretAdapter, Reencrypted], TestConfigured
 ):
     @override
     def summary(self) -> str:
@@ -171,23 +177,23 @@ class APlainWriterTurnsEncryptedSecretsBackToPlaintext(
         return {WRITE_PROVIDER: KeyProviderType.PLAIN.value, CONFIG_PROVIDER: CONFIG_KEYS}
 
     @override
-    def given(self) -> Given[SeedingSession, AKeyringAndACaller]:
+    def given(self) -> TestGiven[SeedingSession, AKeyringAndACaller]:
         return UsersHoldingSecrets(
             role=UserRole.SUPERADMIN, plaintext_besides=0, caller_encrypted=True
         )
 
     @override
-    def when(self) -> When[AKeyringAndACaller, SecretAdapter, Reencrypted]:
+    def when(self) -> TestWhen[AKeyringAndACaller, SecretAdapter, Reencrypted]:
         return Reencrypting()
 
     @override
-    def then(self) -> Then[AKeyringAndACaller, Reencrypted]:
+    def then(self) -> TestThen[AKeyringAndACaller, Reencrypted]:
         return EveryRowIsRewrittenOntoTheWriter(write_provider=KeyProviderType.PLAIN)
 
 
 @dataclass(frozen=True)
 class TheMonitorMayNotReencrypt(
-    Scenario[SeedingSession, AKeyringAndACaller, SecretAdapter, Reencrypted]
+    TestScenario[SeedingSession, AKeyringAndACaller, SecretAdapter, Reencrypted]
 ):
     @override
     def summary(self) -> str:
@@ -198,21 +204,21 @@ class TheMonitorMayNotReencrypt(
         return "모니터 역할이 재암호화를 실행하면 역할 부족으로 거부된다. 상태는 조회할 수 있지만 재암호화는 쓰기 연산이라 통과하지 못한다"
 
     @override
-    def given(self) -> Given[SeedingSession, AKeyringAndACaller]:
+    def given(self) -> TestGiven[SeedingSession, AKeyringAndACaller]:
         return UsersHoldingSecrets(role=UserRole.MONITOR, plaintext_besides=0)
 
     @override
-    def when(self) -> When[AKeyringAndACaller, SecretAdapter, Reencrypted]:
+    def when(self) -> TestWhen[AKeyringAndACaller, SecretAdapter, Reencrypted]:
         return Reencrypting()
 
     @override
-    def then(self) -> Then[AKeyringAndACaller, Reencrypted]:
+    def then(self) -> TestThen[AKeyringAndACaller, Reencrypted]:
         return TheCallIsRefused(InsufficientPrivilege)
 
 
 @dataclass(frozen=True)
 class AUserWhoIsNotTheSuperadminMayNotReencrypt(
-    Scenario[SeedingSession, AKeyringAndACaller, SecretAdapter, Reencrypted]
+    TestScenario[SeedingSession, AKeyringAndACaller, SecretAdapter, Reencrypted]
 ):
     @override
     def summary(self) -> str:
@@ -223,15 +229,15 @@ class AUserWhoIsNotTheSuperadminMayNotReencrypt(
         return "슈퍼관리자가 아닌 사용자가 재암호화를 실행하면 역할 부족으로 거부된다"
 
     @override
-    def given(self) -> Given[SeedingSession, AKeyringAndACaller]:
+    def given(self) -> TestGiven[SeedingSession, AKeyringAndACaller]:
         return UsersHoldingSecrets(role=UserRole.USER, plaintext_besides=0)
 
     @override
-    def when(self) -> When[AKeyringAndACaller, SecretAdapter, Reencrypted]:
+    def when(self) -> TestWhen[AKeyringAndACaller, SecretAdapter, Reencrypted]:
         return Reencrypting()
 
     @override
-    def then(self) -> Then[AKeyringAndACaller, Reencrypted]:
+    def then(self) -> TestThen[AKeyringAndACaller, Reencrypted]:
         return TheCallIsRefused(InsufficientPrivilege)
 
 

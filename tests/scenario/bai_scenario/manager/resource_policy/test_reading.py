@@ -20,11 +20,11 @@ from ai.backend.manager.errors.base.entity import EntityNotFoundError
 from ai.backend.manager.errors.common import GenericBadRequest
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.testutils.scenario_steps import (
-    Configured,
-    Given,
-    Scenario,
-    Then,
-    When,
+    TestConfigured,
+    TestGiven,
+    TestScenario,
+    TestThen,
+    TestWhen,
 )
 from bai_scenario.components.answers import TheCallIsRefused
 from bai_scenario.components.resource_policy import (
@@ -41,11 +41,11 @@ from bai_scenario.runner.steps import run_scenario
 NOBODY = "nobody"
 ENFORCEMENT = "manager.rbac.enforcement_enabled"
 
-type ReadingStep = Scenario[SeedingSession, APolicyAndACaller[Any], ResourcePolicyAdapter, Any]
+type ReadingStep = TestScenario[SeedingSession, APolicyAndACaller[Any], ResourcePolicyAdapter, Any]
 
 
 @dataclass(frozen=True)
-class ReadingByName(When[APolicyAndACaller[Any], ResourcePolicyAdapter, Any]):
+class ReadingByName(TestWhen[APolicyAndACaller[Any], ResourcePolicyAdapter, Any]):
     """이름으로 조회한다. 이름을 지정하지 않으면 미리 만들어 둔 정책의 이름을 쓴다."""
 
     family: Family[Any, Any]
@@ -67,7 +67,7 @@ class ReadingByName(When[APolicyAndACaller[Any], ResourcePolicyAdapter, Any]):
 
 @dataclass(frozen=True)
 class TheSuperadminReadsItByName(
-    Scenario[SeedingSession, APolicyAndACaller[Any], ResourcePolicyAdapter, Any]
+    TestScenario[SeedingSession, APolicyAndACaller[Any], ResourcePolicyAdapter, Any]
 ):
     family: Family[Any, Any]
     started: datetime
@@ -84,21 +84,21 @@ class TheSuperadminReadsItByName(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, APolicyAndACaller[Any]]:
+    def given(self) -> TestGiven[SeedingSession, APolicyAndACaller[Any]]:
         return APolicyAndSomeone(self.family, role=UserRole.SUPERADMIN)
 
     @override
-    def when(self) -> When[APolicyAndACaller[Any], ResourcePolicyAdapter, Any]:
+    def when(self) -> TestWhen[APolicyAndACaller[Any], ResourcePolicyAdapter, Any]:
         return ReadingByName(self.family)
 
     @override
-    def then(self) -> Then[APolicyAndACaller[Any], Any]:
+    def then(self) -> TestThen[APolicyAndACaller[Any], Any]:
         return ThePolicyNode(self.family, self.started)
 
 
 @dataclass(frozen=True)
 class AUserGrantedNothingMayNotRead(
-    Scenario[SeedingSession, APolicyAndACaller[Any], ResourcePolicyAdapter, Any]
+    TestScenario[SeedingSession, APolicyAndACaller[Any], ResourcePolicyAdapter, Any]
 ):
     family: Family[Any, Any]
 
@@ -114,21 +114,21 @@ class AUserGrantedNothingMayNotRead(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, APolicyAndACaller[Any]]:
+    def given(self) -> TestGiven[SeedingSession, APolicyAndACaller[Any]]:
         return APolicyAndSomeone(self.family)
 
     @override
-    def when(self) -> When[APolicyAndACaller[Any], ResourcePolicyAdapter, Any]:
+    def when(self) -> TestWhen[APolicyAndACaller[Any], ResourcePolicyAdapter, Any]:
         return ReadingByName(self.family)
 
     @override
-    def then(self) -> Then[APolicyAndACaller[Any], Any]:
+    def then(self) -> TestThen[APolicyAndACaller[Any], Any]:
         return TheCallIsRefused(GenericBadRequest)
 
 
 @dataclass(frozen=True)
 class ANameNothingAnswersToIsNotFound(
-    Scenario[SeedingSession, APolicyAndACaller[Any], ResourcePolicyAdapter, Any]
+    TestScenario[SeedingSession, APolicyAndACaller[Any], ResourcePolicyAdapter, Any]
 ):
     family: Family[Any, Any]
 
@@ -144,21 +144,21 @@ class ANameNothingAnswersToIsNotFound(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, APolicyAndACaller[Any]]:
+    def given(self) -> TestGiven[SeedingSession, APolicyAndACaller[Any]]:
         return APolicyAndSomeone(self.family, role=UserRole.SUPERADMIN)
 
     @override
-    def when(self) -> When[APolicyAndACaller[Any], ResourcePolicyAdapter, Any]:
+    def when(self) -> TestWhen[APolicyAndACaller[Any], ResourcePolicyAdapter, Any]:
         return ReadingByName(self.family, named=NOBODY)
 
     @override
-    def then(self) -> Then[APolicyAndACaller[Any], Any]:
+    def then(self) -> TestThen[APolicyAndACaller[Any], Any]:
         return TheCallIsRefused(EntityNotFoundError)
 
 
 @dataclass(frozen=True)
 class EnforcementOffOpensTheRead(
-    Scenario[SeedingSession, APolicyAndACaller[Any], ResourcePolicyAdapter, Any], Configured
+    TestScenario[SeedingSession, APolicyAndACaller[Any], ResourcePolicyAdapter, Any], TestConfigured
 ):
     family: Family[Any, Any]
     started: datetime
@@ -176,15 +176,15 @@ class EnforcementOffOpensTheRead(
         return {ENFORCEMENT: False}
 
     @override
-    def given(self) -> Given[SeedingSession, APolicyAndACaller[Any]]:
+    def given(self) -> TestGiven[SeedingSession, APolicyAndACaller[Any]]:
         return APolicyAndSomeone(self.family)
 
     @override
-    def when(self) -> When[APolicyAndACaller[Any], ResourcePolicyAdapter, Any]:
+    def when(self) -> TestWhen[APolicyAndACaller[Any], ResourcePolicyAdapter, Any]:
         return ReadingByName(self.family)
 
     @override
-    def then(self) -> Then[APolicyAndACaller[Any], Any]:
+    def then(self) -> TestThen[APolicyAndACaller[Any], Any]:
         return ThePolicyNode(self.family, self.started)
 
 
