@@ -2,13 +2,12 @@
 
 from __future__ import annotations
 
-from uuid import UUID
-
 from strawberry import ID, Info
 
 from ai.backend.common.dto.manager.v2.prometheus_query_preset_category.request import (
     SearchCategoriesInput,
 )
+from ai.backend.manager.api.gql.base import parse_uuid
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     gql_root_field,
@@ -31,7 +30,7 @@ async def prometheus_query_preset_category(
     info: Info[StrawberryGQLContext],
     id: ID,
 ) -> CategoryGQL | None:
-    payload = await info.context.adapters.prometheus_query_preset_category.get(UUID(id))
+    payload = await info.context.adapters.prometheus_query_preset_category.get(parse_uuid(id))
     if payload.item is None:
         return None
     return CategoryGQL.from_pydantic(payload.item)
