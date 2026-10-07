@@ -5,10 +5,10 @@ description: what the resource slot adapter guarantees, as scenarios; the name-k
 scope: src/ai/backend/manager/api/adapters/resource_slot
 keywords: [resource slot type, agent resource, kernel allocation, resource overview, scenario, adapter, superadmin, lookup, purge, in use, public read]
 generated:
-  by: Codex/GPT-6
+  by: claude-code/opus-5
   at: 2026-10-07
 updated:
-  by: Codex/GPT-6
+  by: claude-code/opus-5
   at: 2026-10-07
 status: draft
 ---
