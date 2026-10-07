@@ -26,7 +26,7 @@ class GlobalEntityIDCache:
         if missing:
             raise GlobalEntityMissing(f"No global entity is named {', '.join(missing)}.")
         cls._ids = dict(ids)
-        cls._names = {id_: name for name, id_ in ids.items()}
+        cls._names = {entity_id: name for name, entity_id in ids.items()}
 
     @classmethod
     def clear(cls) -> None:
