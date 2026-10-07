@@ -37,3 +37,33 @@ class TestGlobalEntityIDCache:
 
         for name in GlobalEntityName:
             assert global_entity_id(name) == ids[name]
+
+    @pytest.fixture
+    def loaded_ids(self) -> dict[GlobalEntityName, GlobalEntityID]:
+        ids = {name: GlobalEntityID(uuid.uuid4()) for name in GlobalEntityName}
+        GlobalEntityIDCache.fill(ids)
+        return ids
+
+    @pytest.mark.parametrize("name", list(GlobalEntityName), ids=lambda name: name.value)
+    def test_reads_the_name_of_each_id(
+        self, loaded_ids: dict[GlobalEntityName, GlobalEntityID], name: GlobalEntityName
+    ) -> None:
+        assert GlobalEntityIDCache.name_of(loaded_ids[name]) == name
+
+    def test_name_read_before_load_raises(self) -> None:
+        with pytest.raises(GlobalEntityNotLoaded):
+            GlobalEntityIDCache.name_of(GlobalEntityID(uuid.uuid4()))
+
+    def test_name_of_an_unknown_id_raises(
+        self, loaded_ids: dict[GlobalEntityName, GlobalEntityID]
+    ) -> None:
+        with pytest.raises(GlobalEntityMissing):
+            GlobalEntityIDCache.name_of(GlobalEntityID(uuid.uuid4()))
+
+    def test_clear_forgets_the_names(
+        self, loaded_ids: dict[GlobalEntityName, GlobalEntityID]
+    ) -> None:
+        GlobalEntityIDCache.clear()
+
+        with pytest.raises(GlobalEntityNotLoaded):
+            GlobalEntityIDCache.name_of(loaded_ids[GlobalEntityName.GLOBAL])

@@ -25,6 +25,14 @@ class RolePresetRow(LifecycleTimestampsMixin, Base):
             "scope_type",
             "deleted",
         ),
+        # NULLS NOT DISTINCT so presets for every scope of a type, whose scope_id is NULL,
+        # are keyed like any other. Deleted rows keep their name, since restore revives them.
+        sa.UniqueConstraint(
+            "name",
+            "scope_type",
+            "scope_id",
+            postgresql_nulls_not_distinct=True,
+        ),
     )
 
     id: Mapped[RolePresetID] = mapped_column(

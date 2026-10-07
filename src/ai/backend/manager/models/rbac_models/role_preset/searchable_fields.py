@@ -91,6 +91,7 @@ class _RolePresetOwnFields(RowDataConverter[RolePresetRow, RolePresetData]):
             name=self.name.read(row),
             role_name_template=self.role_name_template.read(row),
             scope_type=self.scope_type.read(row),
+            scope_id=self.scope_id.read(row),
             auto_assign=self.auto_assign.read(row),
             deleted=self.deleted.read(row),
             created_at=self.created_at.read(row),

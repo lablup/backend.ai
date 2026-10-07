@@ -26,6 +26,21 @@ class InvalidRoleNameTemplate(EntityError, web.HTTPBadRequest):
         )
 
 
+class RolePresetNameConflict(EntityError, web.HTTPConflict):
+    error_type = "https://api.backend.ai/probs/role-preset-name-conflict"
+    error_title = "A role preset with this name already exists in the same scope."
+
+    _operation: ActionOperationType
+
+    def __init__(self, extra_msg: str | None = None, *, operation: ActionOperationType) -> None:
+        self._operation = operation
+        super().__init__(extra_msg)
+
+    @override
+    def entity_error_code(self) -> EntityErrorCode:
+        return EntityErrorCode(RolePresetEntityType(), self._operation, ErrorDetail.CONFLICT)
+
+
 class RolePresetScopeNotFound(EntityError, web.HTTPNotFound):
     error_type = "https://api.backend.ai/probs/role-preset-scope-not-found"
     error_title = "The scope a role preset names does not exist."
