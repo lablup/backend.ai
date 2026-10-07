@@ -3144,78 +3144,180 @@ class ScheduleDBSource:
             await self._free_allocations_and_release(db_sess, [kernel_id], now)
         return updated
 
-    async def reset_kernels_to_pending_for_sessions(
-        self, session_ids: list[SessionId], reason: str
-    ) -> int:
-        """
-        Reset kernels to PENDING status for the given sessions.
+    async def requeue_sessions_with_history(
+        self,
+        updater: SessionStatusBatchUpdater,
+        histories: Sequence[SessionHistoryToCreate],
+        kernel_reason: KernelLifecycleEventReason,
+        expected_statuses: Mapping[SessionId, SessionStatus],
+    ) -> tuple[int, int]:
+        """Move sessions to the updater's status and reset their kernels in one transaction.
+        Only a session still in its ``expected_statuses`` entry moves (force-terminated stays).
+        Returns ``(updated sessions, reset kernels)``."""
+        if not expected_statuses:
+            return 0, 0
+        async with self._db.begin_session_read_committed() as db_sess:
+            stmt = (
+                sa.update(SessionRow)
+                .where(
+                    sa.tuple_(SessionRow.id, SessionRow.status).in_([
+                        (session_id, status) for session_id, status in expected_statuses.items()
+                    ])
+                )
+                .values(updater.build_values())
+            )
+            for condition in updater.conditions():
+                stmt = stmt.where(condition())
+            updated_ids = [
+                SessionId(row.id) for row in await db_sess.execute(stmt.returning(SessionRow.id))
+            ]
+            if not updated_ids:
+                return 0, 0
+            reset = await self._reset_kernels_to_pending_in_session(
+                db_sess, updated_ids, kernel_reason, updater.status_changed_at
+            )
+            updated_set = set(updated_ids)
+            await self._record_scheduling_history(
+                db_sess,
+                [history for history in histories if history.session_id in updated_set],
+            )
+            return len(updated_ids), reset
 
-        Used when a session goes back to the queue — after exceeding max retries,
-        or after a reschedule teardown. Clears the placement (agent, container),
-        resets the retry count, and restores the ``resource_allocations`` rows to
-        their enqueue-time shape so the next scheduling pass reads the original
-        request again; kernels that already terminated are covered too.
+    async def requeue_sessions_to_pending(
+        self, session_ids: list[SessionId], reason: KernelLifecycleEventReason
+    ) -> list[SessionId]:
+        """Requeue RESCHEDULING sessions whose kernels are all terminal, in one transaction.
 
-        :param session_ids: List of session IDs whose kernels should be reset
-        :param reason: The reason for the reset
-        :return: The number of kernels reset
-        """
+        Returns the IDs moved to PENDING; sessions that left RESCHEDULING or keep a live kernel
+        are left untouched."""
         if not session_ids:
-            return 0
-
-        status_data = {"retries": 0}
-
+            return []
         async with self._db.begin_session_read_committed() as db_sess:
             now = await self._get_db_now_in_session(db_sess)
-            # Release the kernels' holds (prereserved/reserved/used) on their
-            # agents before the placement is cleared.
-            held_kernel_rows = (
+            rows = (
                 await db_sess.execute(
-                    sa.select(KernelRow.id).where(KernelRow.session_id.in_(session_ids))
+                    sa.select(SessionRow.id)
+                    .where(
+                        SessionRow.id.in_(session_ids),
+                        SessionRow.status == SessionStatus.RESCHEDULING,
+                    )
+                    .with_for_update()
                 )
             ).all()
-            await self._free_allocations_and_release(
-                db_sess, [row.id for row in held_kernel_rows], now
+            if not rows:
+                return []
+            locked_ids = [SessionId(row.id) for row in rows]
+            kernel_rows = (
+                await db_sess.execute(
+                    sa.select(KernelRow.session_id, KernelRow.status)
+                    .where(KernelRow.session_id.in_(locked_ids))
+                    .with_for_update()
+                )
+            ).all()
+            still_running = {
+                SessionId(row.session_id)
+                for row in kernel_rows
+                if KernelStatus(row.status) not in KernelStatus.terminal_statuses()
+            }
+            ready_ids = [session_id for session_id in locked_ids if session_id not in still_running]
+            if not ready_ids:
+                return []
+            updater = SessionStatusBatchUpdater(
+                session_ids=ready_ids,
+                to_status=SessionStatus.PENDING,
+                status_changed_at=now,
+                reason=reason,
             )
             stmt = (
-                sa.update(KernelRow)
-                .where(KernelRow.session_id.in_(session_ids))
-                .values(
-                    agent=None,
-                    agent_addr=None,
-                    container_id=None,
-                    status=KernelStatus.PENDING,
-                    status_info=reason,
-                    status_changed=now,
-                    terminated_at=None,
-                    status_data=sql_json_merge(
-                        KernelRow.__table__.c.status_data,
-                        ("scheduler",),
-                        obj=status_data,
-                    ),
-                    status_history=sql_json_merge(
-                        KernelRow.__table__.c.status_history,
-                        (),
-                        {KernelStatus.PENDING.name: now.isoformat()},
-                    ),
-                )
-                .returning(KernelRow.id)
+                sa.update(SessionRow)
+                .where(SessionRow.status == SessionStatus.RESCHEDULING)
+                .values(updater.build_values())
             )
-            kernel_ids = [row.id for row in await db_sess.execute(stmt)]
+            for condition in updater.conditions():
+                stmt = stmt.where(condition())
+            requeued = [
+                SessionId(row.id) for row in await db_sess.execute(stmt.returning(SessionRow.id))
+            ]
+            await self._reset_kernels_to_pending_in_session(db_sess, requeued, reason, now)
+            phase = f"mark_{SessionStatus.PENDING.name.lower()}"
+            await self._record_scheduling_history(
+                db_sess,
+                [
+                    SessionHistoryToCreate(
+                        session_id=SessionID(session_id),
+                        creator=SessionSchedulingHistoryCreator(
+                            phase=phase,
+                            result=SchedulingResult.SUCCESS,
+                            message=f"{phase} success",
+                            from_status=SessionStatus.RESCHEDULING,
+                            to_status=SessionStatus.PENDING,
+                        ),
+                    )
+                    for session_id in requeued
+                ],
+            )
+            return requeued
+
+    async def _reset_kernels_to_pending_in_session(
+        self,
+        db_sess: SASession,
+        session_ids: Sequence[SessionId],
+        reason: str,
+        now: datetime,
+    ) -> int:
+        """Reset the sessions' kernels to PENDING inside the caller's transaction."""
+        if not session_ids:
+            return 0
+        status_data = {"retries": 0}
+        # Release the kernels' holds (prereserved/reserved/used) on their
+        # agents before the placement is cleared.
+        held_kernel_rows = (
             await db_sess.execute(
-                sa.update(ResourceAllocationRow)
-                .where(ResourceAllocationRow.kernel_id.in_(kernel_ids))
-                .values(
-                    prereserved=0,
-                    reserved=0,
-                    prereserved_at=None,
-                    reserved_at=None,
-                    used=None,
-                    used_at=None,
-                    free_at=None,
-                )
+                sa.select(KernelRow.id)
+                .where(KernelRow.session_id.in_(session_ids))
+                .with_for_update()
             )
-            return len(kernel_ids)
+        ).all()
+        await self._free_allocations_and_release(db_sess, [row.id for row in held_kernel_rows], now)
+        stmt = (
+            sa.update(KernelRow)
+            .where(KernelRow.session_id.in_(session_ids))
+            .values(
+                agent=None,
+                agent_addr=None,
+                container_id=None,
+                status=KernelStatus.PENDING,
+                status_info=reason,
+                status_changed=now,
+                terminated_at=None,
+                status_data=sql_json_merge(
+                    KernelRow.__table__.c.status_data,
+                    ("scheduler",),
+                    obj=status_data,
+                ),
+                status_history=sql_json_merge(
+                    KernelRow.__table__.c.status_history,
+                    (),
+                    {KernelStatus.PENDING.name: now.isoformat()},
+                ),
+            )
+            .returning(KernelRow.id)
+        )
+        kernel_ids = [row.id for row in await db_sess.execute(stmt)]
+        await db_sess.execute(
+            sa.update(ResourceAllocationRow)
+            .where(ResourceAllocationRow.kernel_id.in_(kernel_ids))
+            .values(
+                prereserved=0,
+                reserved=0,
+                prereserved_at=None,
+                reserved_at=None,
+                used=None,
+                used_at=None,
+                free_at=None,
+            )
+        )
+        return len(kernel_ids)
 
     async def get_agent_ids_for_sessions(
         self, session_ids: list[SessionId]

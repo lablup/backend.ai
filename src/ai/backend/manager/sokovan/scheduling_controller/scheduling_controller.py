@@ -644,6 +644,22 @@ class SchedulingController:
         log.trace(
             "sessions marked with status", session_count=len(marked_sessions), to_status=to_status
         )
+        await self.broadcast_status_transitions(marked_sessions, to_status, reason)
+        self._operation_metrics.observe_success(
+            operation="mark_sessions_status",
+            count=len(marked_sessions),
+        )
+        return marked_sessions
+
+    async def broadcast_status_transitions(
+        self,
+        session_ids: Sequence[SessionId],
+        to_status: SessionStatus,
+        reason: KernelLifecycleEventReason,
+    ) -> None:
+        """Broadcast that the sessions moved to ``to_status``, for a transition written elsewhere."""
+        if not session_ids:
+            return
         await self._event_producer.broadcast_events_batch([
             SchedulingBroadcastEvent(
                 session_id=session_id,
@@ -651,13 +667,8 @@ class SchedulingController:
                 status_transition=str(to_status),
                 reason=reason,
             )
-            for session_id in marked_sessions
+            for session_id in session_ids
         ])
-        self._operation_metrics.observe_success(
-            operation="mark_sessions_status",
-            count=len(marked_sessions),
-        )
-        return marked_sessions
 
     async def validate_session_spec(self, spec: SessionValidationSpec) -> None:
         # TODO: Refactor to use ValidationRule

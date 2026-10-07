@@ -221,28 +221,6 @@ class KernelStateEngine:
             agent_id, image, error_msg, image_ref, image_id=image_id
         )
 
-    async def reset_kernels_to_pending_for_sessions(
-        self,
-        session_ids: list[SessionId],
-        reason: str,
-    ) -> int:
-        """
-        Reset kernels to PENDING status for the given sessions.
-
-        This is used when sessions exceed max retries and need to be rescheduled.
-        Clears agent assignments and resets status_data for all kernels in the sessions.
-
-        :param session_ids: List of session IDs whose kernels should be reset
-        :param reason: The reason for the reset
-        :return: The number of kernels reset
-        """
-        if not session_ids:
-            return 0
-
-        log.debug("resetting kernels to pending", session_count=len(session_ids), reason=reason)
-
-        return await self._repository.reset_kernels_to_pending_for_sessions(session_ids, reason)
-
     async def update_kernels_to_creating_for_sessions(
         self,
         session_ids: list[SessionId],
