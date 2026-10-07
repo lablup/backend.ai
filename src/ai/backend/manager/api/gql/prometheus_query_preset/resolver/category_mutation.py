@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-from uuid import UUID
-
 from strawberry import ID, Info
 
 from ai.backend.common.dto.manager.v2.prometheus_query_preset_category.request import (
@@ -12,6 +10,7 @@ from ai.backend.common.dto.manager.v2.prometheus_query_preset_category.request i
 from ai.backend.common.dto.manager.v2.prometheus_query_preset_category.response import (
     CreateCategoryGQLPayload as CreateCategoryGQLPayloadDTO,
 )
+from ai.backend.manager.api.gql.base import parse_uuid
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     gql_mutation,
@@ -54,6 +53,6 @@ async def admin_delete_prometheus_query_preset_category(
 ) -> DeleteCategoryPayloadGQL | None:
     check_admin_only()
     result = await info.context.adapters.prometheus_query_preset_category.delete(
-        DeleteCategoryInputDTO(id=UUID(id))
+        DeleteCategoryInputDTO(id=parse_uuid(id))
     )
     return DeleteCategoryPayloadGQL.from_pydantic(result)

@@ -1009,8 +1009,12 @@ class ExtraMountInput(graphene.InputObjectType):  # type: ignore[misc]
         _, raw_vfolder_id = AsyncNode.resolve_global_id(info, self.vfolder_id)
         if not raw_vfolder_id:
             raw_vfolder_id = self.vfolder_id
+        try:
+            vfolder_id = UUID(raw_vfolder_id)
+        except ValueError as e:
+            raise InvalidAPIParameters(f"Invalid id: {self.vfolder_id}") from e
         return ExtraMount(
-            vfolder_id=OptionalState.from_graphql(UUID(raw_vfolder_id)),
+            vfolder_id=OptionalState.from_graphql(vfolder_id),
             mount_destination=OptionalState.from_graphql(self.mount_destination),
             type=OptionalState.from_graphql(self.type),
             permission=OptionalState.from_graphql(self.permission),

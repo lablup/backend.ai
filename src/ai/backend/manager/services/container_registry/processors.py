@@ -1,11 +1,13 @@
+from ai.backend.common.data.entity.container_registry import ContainerRegistryID
 from ai.backend.manager.actions.registry.group import ProcessorGroup
 from ai.backend.manager.actions.v2.bulk.partial_processor import PartialBulkActionProcessor
 from ai.backend.manager.actions.v2.global_scope.processor import (
     AnonymousGlobalActionProcessor,
     GlobalActionProcessor,
 )
+from ai.backend.manager.actions.v2.lookup.processor import LookupActionProcessor
 from ai.backend.manager.actions.v2.membership.processor import MembershipActionProcessor
-from ai.backend.manager.actions.v2.ops.result import BatchOpsResult
+from ai.backend.manager.actions.v2.ops.result import BatchOpsResult, LookupOpsResult
 from ai.backend.manager.data.container_registry.types import ContainerRegistryData
 from ai.backend.manager.services.container_registry.actions.bulk_get import (
     BulkGetContainerRegistriesAction,
@@ -46,6 +48,9 @@ from ai.backend.manager.services.container_registry.actions.load_container_regis
     LoadContainerRegistriesAction,
     LoadContainerRegistriesActionResult,
 )
+from ai.backend.manager.services.container_registry.actions.lookup import (
+    LookupContainerRegistryAction,
+)
 from ai.backend.manager.services.container_registry.actions.read_registry_quota import (
     ReadRegistryQuotaAction,
     ReadRegistryQuotaActionResult,
@@ -73,6 +78,10 @@ from ai.backend.manager.services.container_registry.service import ContainerRegi
 
 
 class ContainerRegistryProcessors:
+    lookup_by_name_and_registry_project: LookupActionProcessor[
+        LookupContainerRegistryAction, LookupOpsResult[ContainerRegistryID]
+    ]
+
     rescan_images: GlobalActionProcessor[RescanImagesAction, RescanImagesActionResult]
     clear_images: GlobalActionProcessor[ClearImagesAction, ClearImagesActionResult]
     load_container_registries: GlobalActionProcessor[
@@ -120,6 +129,7 @@ class ContainerRegistryProcessors:
     def __init__(
         self, group: ProcessorGroup[ContainerRegistryData], service: ContainerRegistryService
     ) -> None:
+        self.lookup_by_name_and_registry_project = group.lookup_ops(LookupContainerRegistryAction)
         self.rescan_images = group.global_scope(RescanImagesAction, service.rescan_images)
         self.clear_images = group.global_scope(ClearImagesAction, service.clear_images)
         self.load_container_registries = group.global_scope(

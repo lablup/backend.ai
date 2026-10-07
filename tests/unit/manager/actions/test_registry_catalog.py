@@ -143,6 +143,9 @@ from ai.backend.manager.services.catalog import load_wiring_catalog
 from ai.backend.manager.services.container_registry.actions.bulk_get import (
     BulkGetContainerRegistriesAction,
 )
+from ai.backend.manager.services.container_registry.actions.lookup import (
+    LookupContainerRegistryAction,
+)
 from ai.backend.manager.services.container_registry.processors import ContainerRegistryProcessors
 from ai.backend.manager.services.deployment.actions.access_token.bulk_delete_access_tokens import (
     BulkDeleteAccessTokensAction,
@@ -899,6 +902,11 @@ def test_container_registry_loader_read_is_a_partial_permission_read() -> None:
         record.action_cls: (record.entity_type, record.kind, record.gate)
         for record in registry.wired_processors()
     }
+    assert recorded[LookupContainerRegistryAction] == (
+        ContainerRegistryEntityType(),
+        ActionKind.LOOKUP,
+        ActionGate.PERMISSION,
+    )
     assert recorded[BulkGetContainerRegistriesAction] == (
         ContainerRegistryEntityType(),
         ActionKind.BULK,
