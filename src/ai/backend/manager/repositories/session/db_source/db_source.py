@@ -46,10 +46,8 @@ from ai.backend.manager.models.image.searchers import (
 from ai.backend.manager.models.kernel.row import KernelRow
 from ai.backend.manager.models.kernel.searchable_fields import KernelSearchableFields
 from ai.backend.manager.models.kernel.searchers import KernelSearcher
-from ai.backend.manager.models.keypair.row import KeyPairRow
 from ai.backend.manager.models.project.row import groups
 from ai.backend.manager.models.resource_group.row import resource_groups
-from ai.backend.manager.models.resource_policy.row import KeyPairResourcePolicyRow
 from ai.backend.manager.models.resource_slot.row import ResourceAllocationRow
 from ai.backend.manager.models.session.row import (
     DEAD_SESSION_STATUSES,
@@ -729,27 +727,6 @@ class SessionDBSource:
             if row is None:
                 raise ImageNotFound(f"Image not found: {image_id}")
             return row
-
-    async def get_keypair_resource_policy(
-        self,
-        access_key: AccessKey,
-    ) -> dict[str, Any]:
-        """Fetch the keypair resource policy dict for the given access key."""
-        async with self._db.begin_readonly_session_read_committed() as db_sess:
-            query = (
-                sa.select(KeyPairResourcePolicyRow)
-                .join(
-                    KeyPairRow,
-                    KeyPairRow.resource_policy == KeyPairResourcePolicyRow.name,
-                )
-                .where(KeyPairRow.access_key == access_key)
-            )
-            row = await db_sess.scalar(query)
-            if row is None:
-                return {}
-            return {
-                "allowed_vfolder_hosts": row.allowed_vfolder_hosts,
-            }
 
     async def get_session_data_by_id(
         self,
