@@ -2,10 +2,8 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 from typing import ClassVar
-from uuid import UUID
 
 from ai.backend.common.data.entity.global_entity import GlobalEntityID, GlobalEntityName
-from ai.backend.common.data.entity.types import EntityType, GlobalEntityType
 from ai.backend.manager.errors.permission import GlobalEntityMissing, GlobalEntityNotLoaded
 
 __all__ = (
@@ -47,14 +45,6 @@ class GlobalEntityIDCache:
         if name is None:
             raise GlobalEntityMissing(f"No global entity has the id {id_}.")
         return name
-
-    @classmethod
-    def name_of_scope(
-        cls, scope_type: EntityType, scope_id: UUID | None
-    ) -> GlobalEntityName | None:
-        if scope_type != GlobalEntityType() or scope_id is None:
-            return None
-        return cls.name_of(GlobalEntityID(scope_id))
 
 
 def global_entity_id(name: GlobalEntityName) -> GlobalEntityID:
