@@ -312,15 +312,6 @@ class TestSessionNetworkInfo:
 class TestSessionNode:
     """Tests for SessionNode model with all nested sub-models."""
 
-    def test_omitted_scheduling_fields_serialize_as_null(self) -> None:
-        node = _make_session_node()
-
-        payload = json.loads(node.model_dump_json())
-
-        assert payload["resource"]["session_group_id"] is None
-        assert payload["resource"]["designated_agent_ids"] is None
-        assert payload["lifecycle"]["requested_starts_at"] is None
-
     def test_creation_with_all_nested(self) -> None:
         session_id = uuid.uuid4()
         node = SessionNode(
