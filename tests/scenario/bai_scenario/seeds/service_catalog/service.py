@@ -17,7 +17,7 @@ from ai.backend.common.types import ServiceCatalogStatus
 from ai.backend.manager.data.service_catalog.types import ServiceCatalogEndpointData
 from ai.backend.manager.models.service_catalog.creators import ServiceCatalogEndpointCreator
 from ai.backend.manager.models.service_catalog.upserters import ServiceCatalogUpserter
-from bai_scenario.seeds.seeder import Naming, SeedField, SeedRow
+from bai_scenario.seeds.seeder import Naming, SeedFieldCreator, SeedRow
 
 VERSION = "26.9.0"
 """The version every laid service reports."""
@@ -121,7 +121,7 @@ class SeedServiceInStatus(SeedRow[ServiceCatalogID]):
 
 
 @dataclass(frozen=True)
-class SeedEndpointOf(SeedField[ServiceCatalogID, ServiceCatalogEndpointData]):
+class SeedEndpointOf(SeedFieldCreator[ServiceCatalogID, ServiceCatalogEndpointData]):
     """One endpoint the service announced."""
 
     role: str = "api"

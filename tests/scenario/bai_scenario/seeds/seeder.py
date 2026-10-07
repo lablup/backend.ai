@@ -15,8 +15,8 @@ Which ops path writes a row follows from the spec's type, so no scenario names a
     GuardedDataUpdater              -> update_data
 
 A field row is written under an owner, so it has its own entry, ``adding``. A
-``SeedField`` runs ``create_field`` for its ``FieldCreator`` and a ``SeedUpsertedField``
-runs ``upsert_field_entity`` for its ``FieldUpserter``.
+``SeedFieldCreator`` runs ``create_field`` for its ``FieldCreator`` and a
+``SeedFieldUpserter`` runs ``upsert_field_entity`` for its ``FieldUpserter``.
 
 Taking a share is an update too, but the settle and the share are one operation, so it
 has its own entry: ``accepting`` runs ``accept_share``.
@@ -147,7 +147,7 @@ class SeedFieldWithNestedRows[A, D: FieldData](ABC):
 
     A monitor that records a scope action writes the record and its scope rows atomically;
     a seed that lays such a record takes that whole write rather than splitting it. Like
-    :class:`SeedField`, the row's name and report line come from the owner it is laid under.
+    :class:`SeedFieldCreator`, the row's name and report line come from the owner it is laid under.
     """
 
     @abstractmethod
@@ -188,7 +188,7 @@ class SeedNest[D](ABC):
         raise NotImplementedError
 
 
-class SeedFieldBase[A, D: FieldData](ABC):
+class SeedField[A, D: FieldData](ABC):
     """A field row written under an owner the scenario already laid.
 
     A field grants nothing of its own and dies with its owner, so it is never laid on
@@ -209,7 +209,7 @@ class SeedFieldBase[A, D: FieldData](ABC):
         raise NotImplementedError
 
 
-class SeedField[A, D: FieldData](SeedFieldBase[A, D]):
+class SeedFieldCreator[A, D: FieldData](SeedField[A, D]):
     """A field row the manager inserts."""
 
     @abstractmethod
@@ -221,7 +221,7 @@ class SeedField[A, D: FieldData](SeedFieldBase[A, D]):
         return await ops.create_field(owner_id, self.seed())
 
 
-class SeedUpsertedField[A, D: FieldData](SeedFieldBase[A, D]):
+class SeedFieldUpserter[A, D: FieldData](SeedField[A, D]):
     """A field row the manager upserts, such as the slot rows an agent reports."""
 
     @abstractmethod
@@ -472,7 +472,7 @@ class Seeder:
             write=project,
         )
 
-    def adding[A, D: FieldData](self, seed: SeedFieldBase[A, D], owner: Laid[A], /) -> Laid[D]:
+    def adding[A, D: FieldData](self, seed: SeedField[A, D], owner: Laid[A], /) -> Laid[D]:
         """Lay one field row under the owner the scenario already laid."""
 
         async def write(ops: SeedOps, values: Sequence[Any]) -> Any:

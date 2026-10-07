@@ -41,7 +41,7 @@
   `adding`, `adding_with_nested`, `linking`, `accepting`, `granting`, `joining` — 외에
   데이터베이스를 건드리지 않는다. `accepting`은 공유 제안을 받는 쪽이 받아들이는 연산을
   통째로 쓴다. `joining`은 사용자를 프로젝트 명부에 올린다. `adding`은 필드 행을 심는다.
-  매니저가 생성하는 행은 `SeedField`, upsert하는 행은 `SeedUpsertedField`로 적는다.
+  매니저가 생성하는 행은 `SeedFieldCreator`, upsert하는 행은 `SeedFieldUpserter`로 적는다.
   `adding_with_nested`는 필드 행과 그것이 소유하는 행(감사 기록과 그 스코프 행처럼)을 한
   쓰기로 심는다. 앞 행을 읽는 seed는 읽는 개수만큼의 입구(`creating_from`,
   `creating_from_two`, `creating_from_three`)를 쓴다.

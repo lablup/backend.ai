@@ -18,7 +18,7 @@ from ai.backend.manager.data.permission.role import RoleData
 from ai.backend.manager.data.permission.types import Permission
 from ai.backend.manager.models.rbac_models.permission.creators import RolePermissionCreator
 from ai.backend.manager.models.rbac_models.role.creators import RoleCreator
-from bai_scenario.seeds.seeder import Naming, SeedField, SeedRowFrom
+from bai_scenario.seeds.seeder import Naming, SeedFieldCreator, SeedRowFrom
 
 
 @dataclass(frozen=True)
@@ -46,7 +46,7 @@ class SeedRole[S](SeedRowFrom[S, RoleData]):
 
 
 @dataclass(frozen=True)
-class SeedPermission(SeedField[RoleData, PermissionData]):
+class SeedPermission(SeedFieldCreator[RoleData, PermissionData]):
     """One operation the role may perform on one entity type."""
 
     entity_type: EntityType

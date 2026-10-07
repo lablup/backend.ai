@@ -24,11 +24,11 @@ from ai.backend.manager.models.audit_log.creators import (
     SingleEntityAuditLogCreator,
 )
 from ai.backend.manager.models.specs.creator import NestedFieldCreator
-from bai_scenario.seeds.seeder import SeedField, SeedFieldWithNestedRows
+from bai_scenario.seeds.seeder import SeedFieldCreator, SeedFieldWithNestedRows
 
 
 @dataclass(frozen=True)
-class SeedAuditRecord[Owner](SeedField[Owner, AuditLogData]):
+class SeedAuditRecord[Owner](SeedFieldCreator[Owner, AuditLogData]):
     """One record of an operation on the entity ``owner_of`` reads off the laid row.
 
     The record's ``triggered_by`` is a user id, or none; the actor axis of a scoped read
