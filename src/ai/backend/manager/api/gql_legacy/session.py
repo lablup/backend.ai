@@ -37,7 +37,7 @@ from ai.backend.common.types import (
     VFolderID,
     VFolderMount,
 )
-from ai.backend.manager.api.gql.base import resolve_global_id
+from ai.backend.manager.api.gql.base import resolve_entity_id, resolve_global_id
 from ai.backend.manager.clients.valkey_client.statistics import KernelStatistics
 from ai.backend.manager.data.permission.permission_defs import ComputeSessionPermission
 from ai.backend.manager.data.permission.permission_defs import (
@@ -46,7 +46,7 @@ from ai.backend.manager.data.permission.permission_defs import (
 from ai.backend.manager.data.resource_slot.types import ResourceAllocationAggregate
 from ai.backend.manager.data.session.types import SessionData, SessionStatus
 from ai.backend.manager.defs import DEFAULT_ROLE
-from ai.backend.manager.errors.api import NotImplementedAPI
+from ai.backend.manager.errors.api import InvalidAPIParameters, NotImplementedAPI
 from ai.backend.manager.errors.resource import DataTransformationFailed
 from ai.backend.manager.idle import ReportInfo
 from ai.backend.manager.models.kernel.row import KernelRow
@@ -326,11 +326,11 @@ class ComputeSessionNode(graphene.ObjectType):  # type: ignore[misc]
         id: str,
     ) -> Self | None:
         graphene_ctx: GraphQueryContext = info.context
-        _, raw_session_id = AsyncNode.resolve_global_id(info, id)
+        session_id = resolve_entity_id(id, SessionID)
         async with graphene_ctx.db.begin_readonly_session() as db_session:
             stmt = (
                 sa.select(SessionRow)
-                .where(SessionRow.id == uuid.UUID(raw_session_id))
+                .where(SessionRow.id == session_id)
                 .options(selectinload(SessionRow.kernels), joinedload(SessionRow.user))
             )
             query_result = await db_session.scalar(stmt)
@@ -741,13 +741,17 @@ class ComputeSessionNode(graphene.ObjectType):  # type: ignore[misc]
         graph_ctx: GraphQueryContext = info.context
         user = graph_ctx.user
         client_ctx = ClientContext(graph_ctx.db, user["domain_name"], user["uuid"], user["role"])
-        _, session_id = id
+        _, raw_session_id = id
         async with graph_ctx.db.connect() as db_conn:
             permission_ctx = await get_permission_ctx(db_conn, client_ctx, scope_id, permission)
             cond = permission_ctx.query_condition
             if cond is None:
                 return None
-            query = sa.select(SessionRow).where(cond & (SessionRow.id == uuid.UUID(session_id)))
+            try:
+                session_id = uuid.UUID(raw_session_id)
+            except ValueError as e:
+                raise InvalidAPIParameters(f"Invalid id: {raw_session_id}") from e
+            query = sa.select(SessionRow).where(cond & (SessionRow.id == session_id))
             query = cls._add_basic_options_to_query(query)
             async with graph_ctx.db.begin_readonly_session(db_conn) as db_session:
                 session_row = await db_session.scalar(query)

@@ -19,6 +19,7 @@ from ai.backend.manager.data.deployment.types import (
 )
 from ai.backend.manager.data.model_serving.types import RoutingData
 from ai.backend.manager.models.routing.row import RoutingRow
+from ai.backend.manager.models.routing.searchable_fields import ReplicaSearchableFields
 from ai.backend.manager.models.specs.creator import FieldCreator
 from ai.backend.manager.models.specs.types import IntegrityErrorCheck
 
@@ -65,4 +66,4 @@ class ReplicaCreator(FieldCreator[DeploymentID, RoutingRow, RoutingData]):
 
     @override
     def to_data(self, row: RoutingRow) -> RoutingData:
-        return row.to_data()
+        return ReplicaSearchableFields.own.to_routing_data(row)

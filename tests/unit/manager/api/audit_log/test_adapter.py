@@ -10,7 +10,15 @@ import pytest
 
 from ai.backend.common.data.entity.audit_log import AuditLogFieldType, AuditLogID
 from ai.backend.common.dto.manager.query import StringFilter
-from ai.backend.common.dto.manager.v2.audit_log.request import AuditLogFilter
+from ai.backend.common.dto.manager.v2.audit_log.request import (
+    AuditLogActionKindFilter,
+    AuditLogFilter,
+    AuditLogOrder,
+)
+from ai.backend.common.dto.manager.v2.audit_log.types import (
+    AuditLogActionKind,
+    AuditLogOrderField,
+)
 from ai.backend.manager.actions.types import ActionKind, ActionOperationType, OperationStatus
 from ai.backend.manager.actions.v2.ops.result import BulkFieldOpsResult
 from ai.backend.manager.api.adapters.audit_log.adapter import AuditLogAdapter
@@ -41,12 +49,34 @@ class TestAuditLogAdapterConvertFilter:
         conditions = _make_adapter()._convert_filter(filter_dto)
         assert len(conditions) == 2
 
+    def test_action_fields_produce_one_condition_each(self) -> None:
+        filter_dto = AuditLogFilter(
+            action_name=StringFilter(equals="get_session"),
+            action_kind=AuditLogActionKindFilter(
+                equals=AuditLogActionKind.LOOKUP,
+                not_in=[AuditLogActionKind.BULK],
+            ),
+            lookup_kind=StringFilter(equals="name"),
+            lookup_key=StringFilter(equals="default"),
+        )
+        conditions = _make_adapter()._convert_filter(filter_dto)
+        assert len(conditions) == 5
 
-def _record() -> AuditLogData:
+
+class TestAuditLogAdapterConvertOrders:
+    @pytest.mark.parametrize(
+        "field", [AuditLogOrderField.ACTION_NAME, AuditLogOrderField.ACTION_KIND]
+    )
+    def test_action_field_produces_one_order(self, field: AuditLogOrderField) -> None:
+        orders = AuditLogAdapter._convert_orders([AuditLogOrder(field=field)])
+        assert len(orders) == 1
+
+
+def _record(action_kind: ActionKind | None = ActionKind.SINGLE_ENTITY) -> AuditLogData:
     return AuditLogData(
         id=AuditLogID(uuid.uuid4()),
         action_id=uuid.uuid4(),
-        action_kind=ActionKind.SINGLE_ENTITY,
+        action_kind=action_kind,
         action_name="get_session",
         entity_type="session",
         operation="get",
@@ -62,6 +92,24 @@ def _record() -> AuditLogData:
         duration=None,
         client_ip=None,
     )
+
+
+class TestAuditLogAdapterDataToNode:
+    def test_carries_action_fields(self) -> None:
+        record = _record(ActionKind.LOOKUP)
+        record.lookup_kind = "name"
+        record.lookup_key = "default"
+
+        node = AuditLogAdapter._data_to_node(record)
+
+        assert node.action_name == "get_session"
+        assert node.action_kind == AuditLogActionKind.LOOKUP
+        assert node.lookup_kind == "name"
+        assert node.lookup_key == "default"
+
+    def test_unrecorded_action_kind_is_null(self) -> None:
+        node = AuditLogAdapter._data_to_node(_record(action_kind=None))
+        assert node.action_kind is None
 
 
 class TestAuditLogAdapterBatchLoad:
