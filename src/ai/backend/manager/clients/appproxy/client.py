@@ -37,7 +37,7 @@ from ai.backend.common.resilience.resilience import Resilience
 from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.errors.appproxy import AppProxyConnectionError, AppProxyResponseError
 
-from .types import CreateEndpointRequestBody
+from .types import CreateEndpointRequestBody, CreateSessionAppTokenRequestBody
 
 log = StructuredLogger(logging.getLogger(__spec__.name))
 
@@ -102,6 +102,29 @@ class AppProxyClient:
             raise AppProxyResponseError(
                 extra_msg=f"Invalid response from AppProxy at {self._address}"
             ) from e
+
+    @appproxy_client_resilience.apply()
+    async def create_session_app_token(
+        self,
+        body: CreateSessionAppTokenRequestBody,
+    ) -> str:
+        """Ask the coordinator to issue a token for an interactive session app."""
+        async with self._client_session.post(
+            "/v2/conf",
+            json=body.model_dump(mode="json"),
+            headers={
+                "Accept": "application/json",
+                "X-BackendAI-Token": self._token,
+            },
+        ) as resp:
+            resp.raise_for_status()
+            payload = await resp.json()
+            token = payload.get("token") if isinstance(payload, dict) else None
+            if not isinstance(token, str):
+                raise AppProxyResponseError(
+                    extra_msg=f"No token in /v2/conf response from AppProxy at {self._address}"
+                )
+            return token
 
     @appproxy_client_resilience.apply()
     async def create_endpoint(

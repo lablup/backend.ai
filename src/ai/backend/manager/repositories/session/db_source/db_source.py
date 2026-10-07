@@ -20,6 +20,7 @@ from ai.backend.common.types import (
     SessionId,
 )
 from ai.backend.manager.data.image.types import ImageData, ImageStatus
+from ai.backend.manager.data.resource.types import ResourceGroupProxyTarget
 from ai.backend.manager.data.resource_slot.types import ResourceAllocationAggregate
 from ai.backend.manager.data.session.types import (
     SessionData,
@@ -354,19 +355,24 @@ class SessionDBSource:
             )
             return await conn.scalar(query)
 
-    async def get_resource_group_wsproxy_addr(
+    async def get_resource_group_proxy_target(
         self,
         resource_group_name: str,
-    ) -> str | None:
+    ) -> ResourceGroupProxyTarget | None:
         async with self._db.begin_readonly() as conn:
             query = (
-                sa.select(resource_groups.c.wsproxy_addr)
+                sa.select(resource_groups.c.wsproxy_addr, resource_groups.c.wsproxy_api_token)
                 .select_from(resource_groups)
                 .where(resource_groups.c.name == resource_group_name)
             )
             result = await conn.execute(query)
             sgroup = result.first()
-            return sgroup.wsproxy_addr if sgroup else None
+            if sgroup is None or not sgroup.wsproxy_addr:
+                return None
+            return ResourceGroupProxyTarget(
+                addr=sgroup.wsproxy_addr,
+                api_token=sgroup.wsproxy_api_token or "",
+            )
 
     async def get_session_by_id(
         self,
