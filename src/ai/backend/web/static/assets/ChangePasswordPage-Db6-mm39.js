@@ -1,0 +1,3 @@
+const __vite__mapDeps=(i,m=__vite__mapDeps,d=(m.f||(m.f=["assets/ChangePasswordView-D9D-kVwj.js","assets/index-BEtVe_s6.js","assets/index-Bo67L5aK.css"])))=>i.map(i=>d[i]);
+import{j as e,eM as o,l as r,i as n,c0 as i,d$ as c}from"./index-BEtVe_s6.js";import{u as l}from"./useApiEndpoint-D5JPMh9x.js";const p=i.lazy(()=>c(()=>import("./ChangePasswordView-D9D-kVwj.js"),__vite__mapDeps([0,1,2]))),x=()=>e.jsxs(e.Fragment,{children:[e.jsx(o,{}),e.jsx(r.Suspense,{fallback:null,children:e.jsx(u,{})})]}),u=()=>{"use memo";const s=n.c(2),a=l();let t;return s[0]!==a?(t=e.jsx(p,{apiEndpoint:a,active:!0}),s[0]=a,s[1]=t):t=s[1],t};export{x as default};
+//# sourceMappingURL=ChangePasswordPage-Db6-mm39.js.map
