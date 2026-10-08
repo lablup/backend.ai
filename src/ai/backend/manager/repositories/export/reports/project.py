@@ -81,7 +81,7 @@ CONTAINER_REGISTRY_JOIN = JoinDef(
         sa.select(sa.literal(1))
         .where(
             sa.and_(
-                _assoc_table.c.group_id == ProjectRow.id,
+                _assoc_table.c.project_id == ProjectRow.id,
                 _assoc_table.c.registry_id == ContainerRegistryRow.id,
             ),
         )
