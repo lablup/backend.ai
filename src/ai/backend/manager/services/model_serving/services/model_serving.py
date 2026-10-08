@@ -428,8 +428,6 @@ class ModelServingService:
 
         # Get user with keypair
         created_user = await self._repository.get_user_with_keypair(action.request_user_id)
-        if not created_user:
-            raise InvalidAPIParameters("User not found")
 
         sudo_session_enabled = action.sudo_session_enabled
 

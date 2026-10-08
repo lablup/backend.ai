@@ -12926,6 +12926,31 @@
             "description": "Filter by local-only status.",
             "title": "Is Local"
           },
+          "customized": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter by whether a session commit made the image.",
+            "title": "Customized"
+          },
+          "creator_id": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/UUIDFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter by the user a customized image was committed for."
+          },
           "type": {
             "anyOf": [
               {
@@ -32592,6 +32617,30 @@
             "default": null,
             "description": "Filter by the deployment replica the session serves"
           },
+          "session_group_id": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/UUIDFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter by the session group the session belongs to"
+          },
+          "requested_starts_at": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DateTimeFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter by the reserved start time requested at creation"
+          },
           "AND": {
             "anyOf": [
               {
@@ -32685,7 +32734,9 @@
           "result",
           "network_type",
           "network_id",
-          "replica_id"
+          "replica_id",
+          "session_group_id",
+          "requested_starts_at"
         ],
         "title": "SessionOrderField",
         "type": "string"

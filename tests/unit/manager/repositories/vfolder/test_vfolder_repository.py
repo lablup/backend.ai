@@ -763,8 +763,6 @@ class TestVfolderRepositoryAllowedVfolderHosts:
 
         assert isinstance(result, VFolderHostPermissionMap)
 
-    # -- get_user_with_keypair_policy_vfolder_hosts --
-
     @pytest.fixture
     async def keypair_policy_with_hosts(
         self,
@@ -815,31 +813,6 @@ class TestVfolderRepositoryAllowedVfolderHosts:
             )
             await db_sess.flush()
         return test_user
-
-    async def test_get_user_with_keypair_policy_vfolder_hosts_success(
-        self,
-        vfolder_repository: VfolderRepository,
-        user_with_active_keypair: uuid.UUID,
-    ) -> None:
-        """Returns email/role and the merged allowed_vfolder_hosts from active keypairs."""
-        result = await vfolder_repository.get_user_with_keypair_policy_vfolder_hosts(
-            user_with_active_keypair
-        )
-        assert result.email == f"test-{user_with_active_keypair.hex[:8]}@example.com"
-        assert result.role == UserRole.USER
-        assert "local:volume1" in result.allowed_vfolder_hosts
-        assert result.allowed_vfolder_hosts["local:volume1"] == {
-            VFolderHostPermission.CREATE,
-            VFolderHostPermission.MODIFY,
-        }
-
-    async def test_get_user_with_keypair_policy_vfolder_hosts_user_not_found(
-        self,
-        vfolder_repository: VfolderRepository,
-    ) -> None:
-        """Unknown user UUID raises UserNotFound."""
-        with pytest.raises(UserNotFound):
-            await vfolder_repository.get_user_with_keypair_policy_vfolder_hosts(uuid.uuid4())
 
     # -- default keypair policy --
 
