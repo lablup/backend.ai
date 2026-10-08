@@ -1,15 +1,20 @@
 from __future__ import annotations
 
+import logging
 import os
-from concurrent.futures import Executor
+import time
 from dataclasses import dataclass
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
-from typing import Final, Self, override
+from typing import Final, override
 
-from ai.backend.common.asyncio import run_in_executor_with_context
 from ai.backend.common.data.entity.storage_volume import StorageVolumeID
-from ai.backend.common.exception import StorageVolumeUnusableError
-from ai.backend.common.storage.volume.abc import AbstractVolumeStatusCheck
+from ai.backend.common.data.storage.types import StorageStatusResult
+from ai.backend.common.exception import BackendAIError, StorageVolumeUnusableError
+from ai.backend.common.storage.abc import AbstractStatusCheck
+from ai.backend.logging.structured import StructuredLogger
+
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 VOLUME_MARKER_FILENAME: Final = ".backend.ai-volume-id"
 
@@ -24,7 +29,7 @@ def _read_mount(mount_path: Path) -> _MountSnapshot:
     """Reads what identifies the mount, blocking in the kernel while it does.
 
     ``statvfs`` is called for that blocking rather than its numbers: a dead network
-    mount hangs here, and the caller's timeout is the only signal there is.
+    mount hangs here, which is the only signal there is that it is dead.
     """
     os.statvfs(mount_path)
     marker_path = mount_path / VOLUME_MARKER_FILENAME
@@ -39,53 +44,55 @@ def _read_mount(mount_path: Path) -> _MountSnapshot:
 class VfsVolumeStatusCheckArgs:
     volume_id: StorageVolumeID
     mount_path: Path
-    executor: Executor
 
 
-class VfsVolumeStatusCheck(AbstractVolumeStatusCheck[None]):
+class VfsVolumeStatusCheck(AbstractStatusCheck[StorageVolumeID]):
     """Whether the one mount a vfs volume is served from is still the mount it started on.
 
-    Compares the device id against the value captured at startup and reads the marker
-    file an operator writes, raising the reason rather than returning a verdict.
+    Compares the device id against the value the first check read and reads the marker
+    file an operator writes.
     """
 
     _volume_id: StorageVolumeID
     _mount_path: Path
-    _executor: Executor
     _baseline: _MountSnapshot | None
+    _latest: StorageStatusResult | None
 
-    def __init__(self, args: VfsVolumeStatusCheckArgs, baseline: _MountSnapshot | None) -> None:
+    def __init__(self, args: VfsVolumeStatusCheckArgs) -> None:
         self._volume_id = args.volume_id
         self._mount_path = args.mount_path
-        self._executor = args.executor
-        self._baseline = baseline
+        self._baseline = None
+        self._latest = None
 
-    @classmethod
-    async def create(cls, args: VfsVolumeStatusCheckArgs) -> Self:
-        """Captures what the mount looks like now, for later checks to compare against.
-
-        A mount that cannot be read yet leaves the baseline unset, so a dead mount
-        reports itself through the probe loop instead of holding up the service.
-        """
-        try:
-            baseline = await run_in_executor_with_context(
-                args.executor, _read_mount, args.mount_path
-            )
-        except OSError:
-            baseline = None
-        return cls(args, baseline)
-
-    @property
     @override
-    def volume_id(self) -> StorageVolumeID:
+    def get_id(self) -> StorageVolumeID:
         return self._volume_id
 
     @override
-    async def check_status(self) -> None:
+    def get_latest(self) -> StorageStatusResult | None:
+        return self._latest
+
+    @override
+    def check_status(self) -> None:
+        started_at = datetime.now(UTC)
+        start_counter = time.perf_counter()
+        error_msg: str | None = None
         try:
-            current = await run_in_executor_with_context(
-                self._executor, _read_mount, self._mount_path
-            )
+            self._verify_mount()
+        except BackendAIError as e:
+            error_msg = e.extra_msg or str(e)
+        except Exception as e:
+            log.exception("volume status check raised", volume_id=str(self._volume_id))
+            error_msg = str(e)
+        self._latest = StorageStatusResult(
+            check_started_at=started_at,
+            duration=timedelta(seconds=time.perf_counter() - start_counter),
+            error_msg=error_msg,
+        )
+
+    def _verify_mount(self) -> None:
+        try:
+            current = _read_mount(self._mount_path)
         except OSError as e:
             raise StorageVolumeUnusableError(
                 extra_msg=f"{self._mount_path} cannot be read: {e}"
