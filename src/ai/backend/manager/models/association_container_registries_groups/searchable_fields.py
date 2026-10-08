@@ -23,7 +23,7 @@ class _AssociationContainerRegistriesGroupsOwnFields(
         UUIDConditions(AssociationContainerRegistriesGroupsRow.id),
         ColumnOrder(AssociationContainerRegistriesGroupsRow.id),
     )
-    group_id = SearchableField(
+    project_id = SearchableField(
         AssociationContainerRegistriesGroupsRow.group_id,
         UUIDConditions(AssociationContainerRegistriesGroupsRow.group_id),
         ColumnOrder(AssociationContainerRegistriesGroupsRow.group_id),
@@ -45,7 +45,7 @@ class _AssociationContainerRegistriesGroupsOwnFields(
     ) -> AssociationContainerRegistriesGroupsData:
         return AssociationContainerRegistriesGroupsData(
             id=self.id.read(row),
-            group_id=self.group_id.read(row),
+            project_id=self.project_id.read(row),
             registry_id=self.registry_id.read(row),
             is_default=self.is_default.read(row),
         )

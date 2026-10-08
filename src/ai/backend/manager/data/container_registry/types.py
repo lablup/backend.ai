@@ -51,6 +51,6 @@ class ImageCommitRegistry:
 @dataclass(frozen=True)
 class AssociationContainerRegistriesGroupsData:
     id: AssociationContainerRegistriesGroupsID
-    group_id: ProjectID
+    project_id: ProjectID
     registry_id: ContainerRegistryID
     is_default: bool
