@@ -96,7 +96,8 @@ class KeyPairRow(LifecycleTimestampsMixin, Base):
     )
 
     # Relationships
-    # Used only by the legacy RBAC builders in models/storage.py.
+    # Used only by the legacy RBAC PermissionContextBuilder in models/storage.py, which only
+    # get_vfolders (vfolder/row.py) reaches, and nothing calls get_vfolders.
     # Delete it together with the legacy RBAC cleanup.
     resource_policy_row: Mapped[KeyPairResourcePolicyRow] = relationship("KeyPairResourcePolicyRow")
     # Used only by the legacy RBAC ResourceGroupPermissionContextBuilder (resource_group/row.py).
