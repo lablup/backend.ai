@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import enum
+from dataclasses import dataclass
 from datetime import datetime, timedelta
 from typing import Final, NewType
 
@@ -108,23 +109,14 @@ class ServiceStorageStatus(enum.StrEnum):
     LOST = "lost"
 
 
-class StorageStatusResult(BackendAISchema):
-    """One status check's outcome, never instantiated itself.
+@dataclass(frozen=True)
+class StorageStatusResult:
+    """One status check's outcome, when it started and how long it took.
 
-    The subclass carries the verdict, so not_checked is the absence of a result rather
-    than one of its values.
+    ``error_msg`` is null exactly when the check found its subject in order, and
+    ``duration`` is null where no check ran to completion to measure one.
     """
 
-    checked_at: datetime
-
-
-class StorageStatusSuccess(StorageStatusResult):
-    """A check that found the subject usable."""
-
-    duration: timedelta
-
-
-class StorageStatusFailure(StorageStatusResult):
-    """A check that found a problem, failed, or did not return in time."""
-
-    detail: str
+    check_started_at: datetime
+    duration: timedelta | None
+    error_msg: str | None
