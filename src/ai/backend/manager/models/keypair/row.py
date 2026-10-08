@@ -91,7 +91,11 @@ class KeyPairRow(LifecycleTimestampsMixin, Base):
     )
 
     # Relationships
+    # Used only by the legacy RBAC builders in models/storage.py.
+    # Delete it together with the legacy RBAC cleanup.
     resource_policy_row: Mapped[KeyPairResourcePolicyRow] = relationship("KeyPairResourcePolicyRow")
+    # Used only by the legacy RBAC ResourceGroupPermissionContextBuilder (resource_group/row.py).
+    # Delete it together with the legacy RBAC cleanup.
     sgroup_for_keypairs_rows: Mapped[list[ResourceGroupForKeypairsRow]] = relationship(
         "ResourceGroupForKeypairsRow",
     )

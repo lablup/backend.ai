@@ -174,13 +174,19 @@ class UserRow(LifecycleTimestampsMixin, Base):
     )
 
     # Relationships
+    # Used only by the legacy RBAC ImagePermissionContextBuilder (image/row.py).
+    # Delete it together with the legacy RBAC cleanup.
     domain: Mapped[DomainRow | None] = relationship(
         "DomainRow", primaryjoin=_get_domain_join_condition
     )
+    # Used only by gql_legacy (resource_policy.py, vfolder.py).
+    # Delete it together with the gql_legacy cleanup.
     resource_policy_row: Mapped[UserResourcePolicyRow] = relationship(
         "UserResourcePolicyRow",
         primaryjoin=_get_resource_policy_join_condition,
     )
+    # Used only by the legacy RBAC builders (resource_group/row.py, models/storage.py).
+    # Delete it together with the legacy RBAC cleanup.
     keypairs: Mapped[list[KeyPairRow]] = relationship(
         "KeyPairRow",
         primaryjoin=_get_keypairs_join_condition,
