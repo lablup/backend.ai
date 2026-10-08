@@ -8,6 +8,7 @@ import logging
 
 from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
+from ai.backend.manager.models.hasher.types import HashInfo
 
 from .base import PasswordHasher
 from .bcrypt import BcryptHasher
@@ -35,3 +36,10 @@ class PasswordHasherFactory:
         if hasher is None:
             raise ValueError(f"Unsupported password hash algorithm: {algorithm}")
         return hasher
+
+
+def compare_to_hashed_password(raw_password: str, hashed_password: str) -> bool:
+    """Compare a raw string password value to hashed password."""
+    hash_info = HashInfo.from_hash_string(hashed_password)
+    hasher = PasswordHasherFactory.get_hasher(hash_info.algorithm)
+    return hasher.verify(raw_password, hash_info)
