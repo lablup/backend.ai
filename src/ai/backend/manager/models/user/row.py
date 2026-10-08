@@ -8,20 +8,15 @@ from typing import (
     TYPE_CHECKING,
     Any,
 )
-from uuid import UUID
 
 import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql as pgsql
-from sqlalchemy.ext.asyncio import AsyncSession as SASession
 from sqlalchemy.orm import (
     Mapped,
     foreign,
-    joinedload,
     mapped_column,
     relationship,
-    selectinload,
 )
-from sqlalchemy.orm.strategy_options import _AbstractLoad
 from sqlalchemy.sql.expression import SQLColumnExpression
 
 from ai.backend.common.data.entity.domain import DomainID
@@ -33,7 +28,6 @@ from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.model_serving.types import UserData as ModelServingUserData
 from ai.backend.manager.data.user.types import UserStatus
 from ai.backend.manager.errors.auth import AuthorizationFailed
-from ai.backend.manager.errors.user import UserNotFound
 from ai.backend.manager.models.base import (
     GUID,
     Base,
@@ -43,12 +37,7 @@ from ai.backend.manager.models.base import (
 from ai.backend.manager.models.hasher.factory import PasswordHasherFactory
 from ai.backend.manager.models.hasher.types import HashInfo, PasswordColumn, PasswordInfo
 from ai.backend.manager.models.mixins.timestamp import LifecycleTimestampsMixin
-from ai.backend.manager.models.types import (
-    QueryCondition,
-    QueryOption,
-    load_related_field,
-)
-from ai.backend.manager.models.utils import ExtendedAsyncSAEngine, execute_with_txn_retry
+from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 
 if TYPE_CHECKING:
     from ai.backend.manager.models.domain.row import DomainRow
@@ -213,81 +202,6 @@ class UserRow(LifecycleTimestampsMixin, Base):
     def scope_name_expr(cls) -> SQLColumnExpression[str]:
         return cls.username
 
-    @classmethod
-    def load_keypairs(cls) -> _AbstractLoad:
-        from ai.backend.manager.models.keypair.row import KeyPairRow
-
-        return selectinload(UserRow.keypairs).options(joinedload(KeyPairRow.resource_policy_row))
-
-    @classmethod
-    def load_resource_policy(cls) -> _AbstractLoad:
-        return joinedload(UserRow.resource_policy_row)
-
-    @classmethod
-    async def query_by_condition(
-        cls,
-        conditions: Sequence[QueryCondition],
-        options: Sequence[QueryOption] = tuple(),
-        *,
-        db: ExtendedAsyncSAEngine,
-    ) -> Sequence[UserRow]:
-        """
-        Query user rows by condition.
-        Args:
-            condition: QueryCondition.
-            options: A sequence of query options.
-            db: Database engine.
-        Returns:
-            A list of UserRow instances that match the condition.
-        Raises:
-            EmptySQLCondition: If condition is empty.
-        """
-        query_stmt = sa.select(UserRow)
-        for cond in conditions:
-            query_stmt = cond(query_stmt)
-
-        for option in options:
-            query_stmt = option(query_stmt)
-
-        async def fetch(db_session: SASession) -> Sequence[UserRow]:
-            return (await db_session.scalars(query_stmt)).all()
-
-        async with db.connect() as db_conn:
-            return await execute_with_txn_retry(
-                fetch,
-                db.begin_readonly_session,
-                db_conn,
-            )
-
-    @classmethod
-    async def get_by_id_with_policies(
-        cls,
-        user_uuid: UUID,
-        *,
-        db: ExtendedAsyncSAEngine,
-    ) -> UserRow:
-        """
-        Query user row by UUID with related policies.
-        Args:
-            user_uuid: User UUID.
-            db: Database engine.
-        Returns:
-            The UserRow instance that matches the UUID.
-        Raises:
-            UserNotFound: If user not found.
-        """
-        rows = await cls.query_by_condition(
-            [by_user_uuid(user_uuid)],
-            [
-                load_related_field(cls.load_keypairs()),
-                load_related_field(cls.load_resource_policy()),
-            ],
-            db=db,
-        )
-        if not rows:
-            raise UserNotFound(f"User with id {user_uuid} not found")
-        return rows[0]
-
     def to_model_serving_user_data(self) -> ModelServingUserData:
         return ModelServingUserData(
             uuid=self.uuid,
@@ -297,39 +211,6 @@ class UserRow(LifecycleTimestampsMixin, Base):
 
 # For compatibility
 users = UserRow.__table__
-
-
-def by_user_uuid(
-    user_uuid: UUID,
-) -> QueryCondition:
-    def _by_user_uuid(
-        query_stmt: sa.sql.Select[Any],
-    ) -> sa.sql.Select[Any]:
-        return query_stmt.where(UserRow.uuid == user_uuid)
-
-    return _by_user_uuid
-
-
-def by_username(
-    username: str,
-) -> QueryCondition:
-    def _by_username(
-        query_stmt: sa.sql.Select[Any],
-    ) -> sa.sql.Select[Any]:
-        return query_stmt.where(UserRow.username == username)
-
-    return _by_username
-
-
-def by_user_email(
-    email: str,
-) -> QueryCondition:
-    def _by_email(
-        query_stmt: sa.sql.Select[Any],
-    ) -> sa.sql.Select[Any]:
-        return query_stmt.where(UserRow.email == email)
-
-    return _by_email
 
 
 def _verify_password(guess: str, hashed: str) -> bool:
