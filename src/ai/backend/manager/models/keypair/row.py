@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 from datetime import datetime
-from typing import TYPE_CHECKING, Final, TypedDict
+from typing import TYPE_CHECKING, Final
 
 import sqlalchemy as sa
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -26,7 +26,6 @@ if TYPE_CHECKING:
 __all__: Sequence[str] = (
     "KEYPAIR_SECRET_KEY_CONTEXT",
     "MAXIMUM_DOTFILE_SIZE",
-    "Dotfile",
     "KeyPairRow",
     "keypairs",
 )
@@ -101,11 +100,3 @@ class KeyPairRow(LifecycleTimestampsMixin, Base):
 # NOTE: Deprecated legacy table reference for backward compatibility.
 # Use KeyPairRow class directly for new code.
 keypairs = KeyPairRow.__table__
-
-
-class Dotfile(TypedDict):
-    data: str
-    path: str
-    perm: str
-
-
