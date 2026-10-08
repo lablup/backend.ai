@@ -625,7 +625,8 @@ class PydanticColumn[TBaseModel: BaseModel](TypeDecorator[TBaseModel]):
     cache_ok = True
 
     def __init__(self, schema: type[TBaseModel], *, exclude_unset: bool = False) -> None:
-        super().__init__()
+        # Without none_as_null, JSONB binds None as the JSON value 'null' instead of SQL NULL.
+        super().__init__(none_as_null=True)
         self._schema = schema
         self._exclude_unset = exclude_unset
 
