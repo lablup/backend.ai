@@ -1,13 +1,15 @@
 from __future__ import annotations
 
 import logging
-import uuid
 from collections.abc import Sequence
 
 import sqlalchemy as sa
 from sqlalchemy.orm import Mapped, mapped_column
 
-from ai.backend.common.data.entity.container_registry import ContainerRegistryID
+from ai.backend.common.data.entity.container_registry import (
+    AssociationContainerRegistriesGroupsID,
+    ContainerRegistryID,
+)
 from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.models.base import GUID, Base
@@ -29,8 +31,11 @@ class AssociationContainerRegistriesGroupsRow(Base):
         sa.UniqueConstraint("registry_id", "group_id", name="uq_registry_id_group_id"),
     )
 
-    id: Mapped[uuid.UUID] = mapped_column(
-        "id", GUID, primary_key=True, server_default=sa.text("uuid_generate_v7()")
+    id: Mapped[AssociationContainerRegistriesGroupsID] = mapped_column(
+        "id",
+        GUID(AssociationContainerRegistriesGroupsID),
+        primary_key=True,
+        server_default=sa.text("uuid_generate_v7()"),
     )
     registry_id: Mapped[ContainerRegistryID] = mapped_column(
         "registry_id",
