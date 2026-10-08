@@ -1,5 +1,6 @@
 from typing import override
 
+from ai.backend.common.data.entity.container_registry import AssociationContainerRegistriesGroupsID
 from ai.backend.manager.data.container_registry.types import (
     AssociationContainerRegistriesGroupsData,
 )
@@ -44,7 +45,7 @@ class _AssociationContainerRegistriesGroupsOwnFields(
         self, row: AssociationContainerRegistriesGroupsRow
     ) -> AssociationContainerRegistriesGroupsData:
         return AssociationContainerRegistriesGroupsData(
-            id=self.id.read(row),
+            id=AssociationContainerRegistriesGroupsID(self.id.read(row)),
             group_id=self.group_id.read(row),
             registry_id=self.registry_id.read(row),
             is_default=self.is_default.read(row),
