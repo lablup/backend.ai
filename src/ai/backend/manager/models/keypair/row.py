@@ -2,14 +2,12 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 from datetime import datetime
-from typing import TYPE_CHECKING, Final, TypedDict
+from typing import TYPE_CHECKING, Final
 
 import sqlalchemy as sa
-from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.sql.expression import false
 
-from ai.backend.common import msgpack
 from ai.backend.common.data.entity.keypair import KeyPairID
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.types import AccessKey
@@ -28,10 +26,8 @@ if TYPE_CHECKING:
 __all__: Sequence[str] = (
     "KEYPAIR_SECRET_KEY_CONTEXT",
     "MAXIMUM_DOTFILE_SIZE",
-    "Dotfile",
     "KeyPairRow",
     "keypairs",
-    "query_owned_dotfiles",
 )
 
 
@@ -109,25 +105,3 @@ class KeyPairRow(LifecycleTimestampsMixin, Base):
 # NOTE: Deprecated legacy table reference for backward compatibility.
 # Use KeyPairRow class directly for new code.
 keypairs = KeyPairRow.__table__
-
-
-class Dotfile(TypedDict):
-    data: str
-    path: str
-    perm: str
-
-
-async def query_owned_dotfiles(
-    conn: SAConnection,
-    access_key: AccessKey,
-) -> tuple[list[Dotfile], int]:
-    query = (
-        sa.select(KeyPairRow.dotfiles)
-        .select_from(KeyPairRow)
-        .where(KeyPairRow.access_key == access_key)
-    )
-    packed_dotfile = (await conn.execute(query)).scalar()
-    if packed_dotfile is None:
-        return [], MAXIMUM_DOTFILE_SIZE
-    rows = msgpack.unpackb(packed_dotfile)
-    return rows, MAXIMUM_DOTFILE_SIZE - len(packed_dotfile)
