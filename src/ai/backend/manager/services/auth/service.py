@@ -50,6 +50,7 @@ from ai.backend.manager.errors.common import (
     RejectedByHook,
 )
 from ai.backend.manager.errors.user import KeyPairNotFound, UserResourcePolicyNotFound
+from ai.backend.manager.models.hasher.factory import compare_to_hashed_password
 from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.keypair.row import (
     KEYPAIR_SECRET_KEY_CONTEXT,
@@ -61,7 +62,6 @@ from ai.backend.manager.models.user.row import (
     INACTIVE_USER_STATUSES,
     UserRole,
     UserStatus,
-    compare_to_hashed_password,
 )
 from ai.backend.manager.repositories.auth.db_source.db_source import ActiveSessionInfo
 from ai.backend.manager.repositories.auth.repository import AuthRepository
