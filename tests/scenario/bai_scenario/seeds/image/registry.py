@@ -34,6 +34,8 @@ class SeedContainerRegistry(SeedRow[ContainerRegistryData]):
 
     @override
     def detail(self) -> str:
+        if self.project is not None:
+            return f"이미지를 가져오는 곳, 프로젝트는 {self.project}"
         return "이미지를 가져오는 곳"
 
     @override

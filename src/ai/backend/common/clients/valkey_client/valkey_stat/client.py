@@ -33,7 +33,7 @@ from ai.backend.common.resilience import (
     RetryPolicy,
 )
 from ai.backend.common.resource.types import TotalResourceData
-from ai.backend.common.types import AccessKey, ValkeyTarget
+from ai.backend.common.types import ValkeyTarget
 from ai.backend.logging.structured import StructuredLogger
 
 log = StructuredLogger(logging.getLogger(__spec__.name))
@@ -1150,7 +1150,7 @@ class ValkeyStatClient:
             return batch.delete(cast(list[str | bytes], keys))
         return batch
 
-    async def invalidate_kernel_related_cache(self, access_keys: list[AccessKey]) -> None:
+    async def invalidate_kernel_related_cache(self) -> None:
         """
         Invalidate all kernel-related caches: resource presets and the
         total resource slots. (Keypair concurrency counters no longer

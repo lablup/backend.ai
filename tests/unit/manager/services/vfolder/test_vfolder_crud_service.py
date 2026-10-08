@@ -17,14 +17,12 @@ from ai.backend.common.data.entity.vfolder import VFolderUUID
 from ai.backend.common.types import (
     QuotaScopeID,
     QuotaScopeType,
-    VFolderHostPermissionMap,
     VFolderMountPolicy,
     VFolderUsageMode,
 )
 from ai.backend.manager.data.project.types import ProjectResourceInfo
 from ai.backend.manager.data.vfolder.dto import UserIdentity
 from ai.backend.manager.data.vfolder.types import (
-    UserWithVFolderHostPermissions,
     VFolderData,
     VFolderOperationStatus,
     VFolderOwnershipType,
@@ -204,13 +202,6 @@ class TestCreateVFolderAction:
         repository: MagicMock,
         project_info: ProjectResourceInfo,
     ) -> None:
-        repository.get_user_with_keypair_policy_vfolder_hosts = AsyncMock(
-            return_value=UserWithVFolderHostPermissions(
-                email="test@example.com",
-                role=UserRole.USER,
-                allowed_vfolder_hosts=VFolderHostPermissionMap(),
-            )
-        )
         repository.get_group_resource_info = AsyncMock(return_value=project_info)
         repository.get_user_resource_info = AsyncMock(return_value=(10, 0, None))
         repository.ensure_host_permission_allowed = AsyncMock()

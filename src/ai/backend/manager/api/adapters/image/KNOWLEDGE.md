@@ -1,15 +1,15 @@
 ---
 name: image-adapter-scenarios
 type: reference
-description: what the image adapter guarantees, as scenarios; its superadmin and image permission checks, and the separate custom-image creator check
+description: what the image adapter guarantees, as scenarios; its superadmin and image permission checks, the separate custom-image creator check, and single-tag scan
 scope: src/ai/backend/manager/api/adapters/image
-keywords: [image, scenario, adapter, superadmin, permission, customized image, alias]
+keywords: [image, scenario, adapter, superadmin, permission, customized image, alias, scan]
 generated:
   by: claude-code/opus-5
   at: 2026-09-11
 status: draft
 ---
-# image 어댑터 — 시나리오
+# 이미지 어댑터는 이미지 요청과 응답을 변환한다
 
 규칙은 상위 디렉터리의 `AGENTS.md`에 있다. 여기 적힌 내용과 실행 결과가 다르면 문장을 먼저
 의심한다.
@@ -37,6 +37,9 @@ status: draft
 | 슈퍼관리자가 필터 없이 검색한다 | 이미지 2개, 호출자는 슈퍼관리자 | 전체 조회 | 이미지 2개가 반환되고 전체 개수는 2 |
 | 이름으로 필터링한다 | 이미지 3개, 호출자는 슈퍼관리자 | 한 이미지의 이름으로 조회 | 해당 이미지 1개만 반환 |
 | 상태로 필터링한다 | `ALIVE` 상태인 이미지와 `DELETED` 상태인 이미지, 호출자는 슈퍼관리자 | `ALIVE` 상태인 이미지 조회 | `ALIVE` 상태인 이미지만 반환 |
+| 커스텀 이미지로 필터링한다 | 호출자가 커밋한 커스텀 이미지와 커스텀 이미지가 아닌 이미지, 호출자는 슈퍼관리자 | 커스텀 이미지 조회 | 커스텀 이미지만 반환되고, 커스텀 여부와 커밋한 사용자로 호출자가 함께 반환 |
+| 커스텀 이미지가 아닌 이미지로 필터링한다 | 호출자가 커밋한 커스텀 이미지와 커스텀 이미지가 아닌 이미지, 호출자는 슈퍼관리자 | 커스텀 이미지가 아닌 이미지 조회 | 커스텀 이미지가 아닌 이미지만 반환되고, 커밋한 사용자는 비어 있음 |
+| 커스텀 이미지를 커밋한 사용자로 필터링한다 | 호출자가 커밋한 커스텀 이미지와 다른 사용자가 커밋한 커스텀 이미지, 호출자는 슈퍼관리자 | 호출자가 커밋한 이미지 조회 | 호출자가 커밋한 이미지만 반환 |
 | 정렬과 오프셋을 함께 지정한다 | 이미지 4개, 호출자는 슈퍼관리자 | 이름 내림차순, 첫 항목 제외, 2개 조회 | 정렬된 결과의 두 번째와 세 번째 항목, 이전 페이지와 다음 페이지가 모두 있음 |
 | 페이지 크기를 생략한다 | 이미지 51개, 호출자는 슈퍼관리자 | 크기 없이 조회 | 50개가 반환되고 다음 페이지가 있음 |
 | 커서만 지정한다 | 이미지 3개, 호출자는 슈퍼관리자 | 크기와 오프셋 없이 커서로 2개 조회 | 앞의 2개가 반환되고 다음 페이지가 있음 |
@@ -164,3 +167,16 @@ soft delete는 이미지 권한 검사가, 별칭 등록은 슈퍼관리자 검�
 
 생략, 비우기, 값 지정을 구분하는 것은 `supported_accelerators` 필드뿐이다. 나머지 필드는 생략과
 값 지정만 받으므로 비우는 시나리오는 `supported_accelerators` 필드에만 둔다.
+
+## 단일 태그 스캔
+
+| 시나리오 | 상황 | 요청 | 결과 |
+|---|---|---|---|
+| 미등록된 이미지를 scan한다 | 레지스트리가 등록되어 있고 태그가 존재한다 | 시스템 관리자가 태그와 아키텍처를 지정해 스캔한다 | 지정한 아키텍처의 이미지 하나를 반환한다 |
+| 이미 등록된 이미지도 scan할 수 있다 | 같은 태그와 아키텍처의 이미지가 이미 등록되어 있다 | 시스템 관리자가 같은 태그와 아키텍처로 스캔한다 | 등록된 이미지를 레지스트리 값으로 갱신해 반환한다 |
+| 일반 사용자는 scan을 실행할 수 없다 | 레지스트리가 등록되어 있다 | 일반 사용자가 태그 하나를 스캔한다 | 권한 부족으로 거부한다 |
+| 이미지에 맞는 registry가 없으면 scan하지 않고 거부한다 | 입력에 맞는 레지스트리가 없다 | 시스템 관리자가 스캔한다 | 레지스트리를 찾을 수 없어 거부한다 |
+| 없는 태그는 성공으로 응답하지 않는다 | 레지스트리에 태그가 없다 | 시스템 관리자가 스캔한다 | 이미지를 찾을 수 없어 거부한다 |
+
+태그 스캔은 기존 스캐너대로 모든 아키텍처를 등록·갱신하고, 응답은 요청한 아키텍처로 제한한다.
+요청한 아키텍처가 없으면 이미지를 찾을 수 없어 거부한다.
