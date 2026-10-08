@@ -349,6 +349,7 @@ class TestExampleUsersGraphOnAMigratedDatabase:
             nodes = list((await db_sess.scalars(sa.select(VirtualEntityRow))).all())
             memberships = list((await db_sess.scalars(sa.select(EntityMembershipRow))).all())
             bindings = list(await db_sess.scalars(sa.select(ScopeBindingRow)))
+            caps = list((await db_sess.scalars(sa.select(EntityMembershipCapRow))).all())
             roster = list((await db_sess.execute(sa.select(association_groups_users))).mappings())
             links = list((await db_sess.execute(sa.select(sgroups_for_domains))).mappings())
             group_ids = set(await db_sess.scalars(sa.select(ProjectRow.id)))
@@ -370,5 +371,7 @@ class TestExampleUsersGraphOnAMigratedDatabase:
         assert all(row.member_entity_id in node_ids for row in memberships)
         assert all(row.virtual_entity_id in node_ids for row in bindings)
         assert all(row.scope_entity_id in node_ids for row in bindings)
+        membership_ids = {row.id for row in memberships}
+        assert caps and all(cap.membership_id in membership_ids for cap in caps)
         assert links and all(row["resource_group_id"] in held["resource_group"] for row in links)
         assert roster and all(row["group_id"] in group_ids for row in roster)

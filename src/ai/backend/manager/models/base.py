@@ -1293,58 +1293,36 @@ async def populate_fixture(
         await provision_fixture_entities(conn, fixture_data.keys())
 
 
-# The rows a fixture declares an id for, keyed by what makes each row the row it is: a
-# database that already holds the row says which id it carries. The fixture's insert is
+# Each table a fixture declares an id for, keyed by what makes each row the row it is: a
+# database that already holds the row says which id it carries, and the fixture's insert is
 # skipped on the conflict, leaving every value naming the fixture's id pointing nowhere.
-_FIXTURE_ROW_KEYS: Final[Mapping[str, tuple[str, Sequence[str]]]] = {
-    "domains": ("id", ("name",)),
-    "scaling_groups": ("id", ("name",)),
-    "groups": ("id", ("name", "domain_name")),
-    "users": ("uuid", ("username", "domain_name")),
-}
+# Ordered by dependency: an entity's row, the node naming it, then an edge between nodes.
+_FIXTURE_ID_KEYS: Final[tuple[tuple[str, str, tuple[str, ...]], ...]] = (
+    ("domains", "id", ("name",)),
+    ("scaling_groups", "id", ("name",)),
+    ("groups", "id", ("name", "domain_name")),
+    ("users", "uuid", ("username", "domain_name")),
+    ("virtual_entities", "id", ("entity_type", "entity_id")),
+    ("entity_memberships", "id", ("virtual_entity_id", "member_entity_id")),
+)
 
 
 async def _reconcile_fixture_ids(
     engine: SAEngine,
     fixture_data: Mapping[str, str | Sequence[dict[str, Any]]],
 ) -> None:
-    """Rewrite the ids a fixture declares to the ids the database holds for the same
-    rows, so a load into a database an earlier release built lands on that database's
-    rows. Nodes go second, keyed by the entity the first rewrite has just put right."""
+    """Rewrite the ids a fixture declares to the ids the database holds for the same rows,
+    so a load into a database an earlier release built lands on that database's rows."""
     async with engine.begin() as conn:
-        _rewrite_fixture_ids(fixture_data, await _held_row_ids(conn, fixture_data))
-        _rewrite_fixture_ids(fixture_data, await _held_node_ids(conn, fixture_data))
-
-
-async def _held_row_ids(
-    conn: AsyncConnection,
-    fixture_data: Mapping[str, str | Sequence[dict[str, Any]]],
-) -> dict[str, Any]:
-    """Each id a fixture declares, against the id the database holds that row under."""
-    remap: dict[str, Any] = {}
-    for table_name, (id_column, key_columns) in _FIXTURE_ROW_KEYS.items():
-        rows = fixture_data.get(table_name)
-        table = metadata.tables.get(table_name)
-        if table is None or isinstance(rows, str) or not rows:
-            continue
-        result = await conn.execute(sa.select(table.c[id_column], *_columns(table, key_columns)))
-        remap.update(_remap_rows(rows, id_column, key_columns, result))
-    return remap
-
-
-async def _held_node_ids(
-    conn: AsyncConnection,
-    fixture_data: Mapping[str, str | Sequence[dict[str, Any]]],
-) -> dict[str, Any]:
-    """Each node id a fixture declares, against the node the database holds for the same
-    entity."""
-    rows = fixture_data.get("virtual_entities")
-    table = metadata.tables.get("virtual_entities")
-    if table is None or isinstance(rows, str) or not rows:
-        return {}
-    key_columns = ("entity_type", "entity_id")
-    result = await conn.execute(sa.select(table.c.id, *_columns(table, key_columns)))
-    return _remap_rows(rows, "id", key_columns, result)
+        for table_name, id_column, key_columns in _FIXTURE_ID_KEYS:
+            rows = fixture_data.get(table_name)
+            table = metadata.tables.get(table_name)
+            if table is None or isinstance(rows, str) or not rows:
+                continue
+            result = await conn.execute(
+                sa.select(table.c[id_column], *_columns(table, key_columns))
+            )
+            _rewrite_fixture_ids(fixture_data, _remap_rows(rows, id_column, key_columns, result))
 
 
 def _columns(table: sa.Table, names: Sequence[str]) -> list[sa.Column[Any]]:
