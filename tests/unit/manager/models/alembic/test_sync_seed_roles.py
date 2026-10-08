@@ -456,8 +456,7 @@ async def seeded_from_fixture(db: ExtendedAsyncSAEngine) -> dict[str, Any]:
                 VirtualEntityRow(
                     id=uuid.UUID(entity["id"]),
                     entity_type=entity["entity_type"],
-                    # The seed's domain node names its domain instead of carrying the id.
-                    entity_id=uuid.UUID(entity.get("entity_id", domain["id"])),
+                    entity_id=uuid.UUID(entity["entity_id"]),
                 )
             )
         await session.flush()
@@ -497,7 +496,7 @@ async def seeded_from_fixture(db: ExtendedAsyncSAEngine) -> dict[str, Any]:
         for user_id, name in held:
             session.add(UserRoleRow(user_id=uuid.UUID(user_id), role_id=roles[name].id))
     instantiated = [
-        (preset, entity.get("entity_id", domain["id"]))
+        (preset, entity["entity_id"])
         for entity in accounts["virtual_entities"]
         for preset in _PRESETS
         if preset.scope_type == entity["entity_type"]

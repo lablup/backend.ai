@@ -48,6 +48,11 @@ _MIGRATED_TABLES: Final = (
     "groups",
 )
 _MIGRATED_ENTITIES: Final = ("domains", "scaling_groups", "users", "groups")
+_POLICY_TABLES: Final = ("user_resource_policies", "project_resource_policies")
+
+#: The `groups` rows the migration mints a row for when the domain lacks one, so a
+#: database an earlier install seeded may hold them under an id of its own.
+_MIGRATED_GROUP_NAME: Final = "model-store"
 
 #: Every table the seed declares.
 _ACCOUNT_TABLES: Final = (
@@ -74,13 +79,7 @@ def seed() -> dict[str, Any]:
 
 @pytest.fixture(scope="module")
 def nodes(seed: dict[str, Any]) -> dict[tuple[str, str], str]:
-    """The node each declared entity id holds. A row that names its entity instead of
-    its id is resolved against the database when the seed is loaded, not here."""
-    return {
-        (row["entity_type"], row["entity_id"]): row["id"]
-        for row in seed["virtual_entities"]
-        if "entity_id" in row
-    }
+    return {(row["entity_type"], row["entity_id"]): row["id"] for row in seed["virtual_entities"]}
 
 
 @pytest.fixture(scope="module")
@@ -109,13 +108,6 @@ def caps(seed: dict[str, Any]) -> dict[str, list[dict[str, Any]]]:
 
 
 class TestExampleUsersGraph:
-    def _domain_node(self, seed: dict[str, Any]) -> str:
-        """The one node of the seed's domain. The row names its domain instead of
-        carrying the id, which the loader resolves against the database."""
-        return str(
-            next(row["id"] for row in seed["virtual_entities"] if row["entity_type"] == "domain")
-        )
-
     def test_every_project_has_a_node(
         self, seed: dict[str, Any], nodes: dict[tuple[str, str], str]
     ) -> None:
@@ -142,7 +134,7 @@ class TestExampleUsersGraph:
     ) -> None:
         for group in seed["groups"]:
             node = nodes[("project", group["id"])]
-            domain = self._domain_node(seed)
+            domain = nodes[("domain", seed["domains"][0]["id"])]
             assert (domain, node) in memberships
             assert (node, domain) in bindings
 
@@ -191,9 +183,10 @@ class TestExampleUsersRoster:
 
 
 class TestExampleUsersScalingGroupReference:
-    """The seed names the default scaling group, which a database that already holds it
-    carries under a UUID of its own. Loading resolves each reference against the row
-    that is there, so `sgroups_for_domains` and the group's node point at it either way."""
+    """The seed declares the default scaling group's id, which a database that already
+    holds the group carries under an id of its own. Loading rewrites the declared id to
+    the one the database holds, so `sgroups_for_domains` and the group's node point at
+    it either way."""
 
     @pytest.fixture
     async def db_engine(
@@ -215,7 +208,7 @@ class TestExampleUsersScalingGroupReference:
     @pytest.fixture
     def scaling_group_seed(self, seed: dict[str, Any]) -> dict[str, Any]:
         """The seed's rows on the scaling group path, read from the file the installer
-        loads. Its own copy: loading resolves a row's aliases in place."""
+        loads. Its own copy: loading rewrites a row's declared ids in place."""
         return copy.deepcopy({
             **{key: seed[key] for key in ("domains", "scaling_groups", "sgroups_for_domains")},
             "virtual_entities": [
@@ -283,8 +276,8 @@ class TestExampleUsersScalingGroupReference:
 
 class TestExampleUsersGraphOnAMigratedDatabase:
     """A database an earlier install seeded holds its accounts, its projects and the
-    graph the migration built for them, the rows the migration made under ids of its own.
-    The seed declares all of them under pinned ids."""
+    graph the migration built for them, under ids that database minted. The seed
+    declares all of them under pinned ids."""
 
     @pytest.fixture
     async def db_engine(
@@ -310,22 +303,35 @@ class TestExampleUsersGraphOnAMigratedDatabase:
             yield global_entity_ids
 
     @pytest.fixture
-    async def migrated(
-        self, db_engine: ExtendedAsyncSAEngine, seed: dict[str, Any]
-    ) -> dict[str, Any]:
-        """The seed's rows on this path, over a database an earlier install made."""
-        return copy.deepcopy({key: seed[key] for key in _ACCOUNT_TABLES})
-
-    @pytest.fixture
     async def migrated_database(
-        self, db_engine: ExtendedAsyncSAEngine, migrated: dict[str, Any]
+        self, db_engine: ExtendedAsyncSAEngine, seed: dict[str, Any]
     ) -> ExtendedAsyncSAEngine:
-        """What the earlier install wrote: its account and project rows, the domain and
-        the scaling group under ids this database minted, and the graph nodes the
-        migration built for them under ids of their own."""
+        """What the earlier install wrote: its account and project rows, the domain, the
+        scaling group and the migration's own `model-store` project under ids this
+        database minted, and the graph nodes the migration built for them. Its users were
+        backfilled to the id its own domain row carries."""
+        earlier = copy.deepcopy({key: seed[key] for key in _MIGRATED_TABLES})
         for table in ("domains", "scaling_groups"):
-            migrated[table][0].pop("id")
-        await populate_fixture(db_engine, {key: migrated[key] for key in _MIGRATED_TABLES})
+            earlier[table][0].pop("id")
+        declared = [group for group in earlier["groups"] if group["name"] != _MIGRATED_GROUP_NAME]
+        # The migration's own row, so it carries no declared id: one insert per shape.
+        minted = [
+            {key: value for key, value in group.items() if key != "id"}
+            for group in earlier["groups"]
+            if group["name"] == _MIGRATED_GROUP_NAME
+        ]
+        await populate_fixture(
+            db_engine,
+            {key: earlier[key] for key in ("domains", "scaling_groups") + _POLICY_TABLES},
+        )
+        async with db_engine.begin() as conn:
+            domain_id = await conn.scalar(
+                sa.select(DomainRow.id).where(DomainRow.name == "default")
+            )
+        for user in earlier["users"]:
+            user["domain_id"] = str(domain_id)
+        await populate_fixture(db_engine, {"users": earlier["users"], "groups": declared})
+        await populate_fixture(db_engine, {"groups": minted})
         async with db_engine.begin() as conn:
             await provision_fixture_entities(conn, _MIGRATED_ENTITIES)
         return db_engine
@@ -333,11 +339,10 @@ class TestExampleUsersGraphOnAMigratedDatabase:
     async def test_the_seed_lands_on_the_rows_and_nodes_the_database_holds(
         self,
         migrated_database: ExtendedAsyncSAEngine,
-        migrated: dict[str, Any],
+        seed: dict[str, Any],
     ) -> None:
         await populate_fixture(
-            migrated_database,
-            {key: rows for key, rows in migrated.items() if key not in _MIGRATED_TABLES},
+            migrated_database, copy.deepcopy({key: seed[key] for key in _ACCOUNT_TABLES})
         )
 
         async with migrated_database.begin_readonly_session() as db_sess:
@@ -345,13 +350,14 @@ class TestExampleUsersGraphOnAMigratedDatabase:
             memberships = list((await db_sess.scalars(sa.select(EntityMembershipRow))).all())
             bindings = list(await db_sess.scalars(sa.select(ScopeBindingRow)))
             roster = list((await db_sess.execute(sa.select(association_groups_users))).mappings())
+            links = list((await db_sess.execute(sa.select(sgroups_for_domains))).mappings())
+            group_ids = set(await db_sess.scalars(sa.select(ProjectRow.id)))
             held: dict[str, set[Any]] = {
                 "domain": set(await db_sess.scalars(sa.select(DomainRow.id))),
                 "resource_group": set(await db_sess.scalars(sa.select(ResourceGroupRow.id))),
-                "project": set(await db_sess.scalars(sa.select(ProjectRow.id))),
+                "project": group_ids,
                 "user": set(await db_sess.scalars(sa.select(UserRow.uuid))),
             }
-            group_ids = held["project"]
 
         node_ids = {node.id for node in nodes}
         assert len({(node.entity_type, node.entity_id) for node in nodes}) == len(nodes)
@@ -364,4 +370,5 @@ class TestExampleUsersGraphOnAMigratedDatabase:
         assert all(row.member_entity_id in node_ids for row in memberships)
         assert all(row.virtual_entity_id in node_ids for row in bindings)
         assert all(row.scope_entity_id in node_ids for row in bindings)
+        assert links and all(row["resource_group_id"] in held["resource_group"] for row in links)
         assert roster and all(row["group_id"] in group_ids for row in roster)

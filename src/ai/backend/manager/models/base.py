@@ -8,6 +8,7 @@ import logging
 import uuid
 from collections.abc import (
     Callable,
+    Iterable,
     Mapping,
     Sequence,
 )
@@ -151,8 +152,6 @@ class FixtureReferenceSpec:
     lookup_table: str
     lookup_match_column: str
     lookup_referenced_column: str
-    #: False where the row carries the alias as a column of its own (`users.domain_name`).
-    pop_alias_column: bool = True
 
 
 FIXTURE_REFERENCE_SPECS: Final[Mapping[str, Sequence[FixtureReferenceSpec]]] = {
@@ -172,51 +171,6 @@ FIXTURE_REFERENCE_SPECS: Final[Mapping[str, Sequence[FixtureReferenceSpec]]] = {
             lookup_table="prometheus_query_preset_categories",
             lookup_match_column="name",
             lookup_referenced_column="id",
-        ),
-    ),
-    # The seed names the default scaling group wherever it references a row a database
-    # may already hold under another UUID: `scaling_groups` is keyed by name, so the
-    # seed's own insert is skipped there and a pinned reference has no row to point at.
-    "sgroups_for_domains": (
-        FixtureReferenceSpec(
-            fixture_alias_column="scaling_group",
-            fixture_fk_column="resource_group_id",
-            lookup_table="scaling_groups",
-            lookup_match_column="name",
-            lookup_referenced_column="id",
-        ),
-        FixtureReferenceSpec(
-            fixture_alias_column="domain",
-            fixture_fk_column="domain_id",
-            lookup_table="domains",
-            lookup_match_column="name",
-            lookup_referenced_column="id",
-        ),
-    ),
-    "virtual_entities": (
-        FixtureReferenceSpec(
-            fixture_alias_column="scaling_group_name",
-            fixture_fk_column="entity_id",
-            lookup_table="scaling_groups",
-            lookup_match_column="name",
-            lookup_referenced_column="id",
-        ),
-        FixtureReferenceSpec(
-            fixture_alias_column="domain_name",
-            fixture_fk_column="entity_id",
-            lookup_table="domains",
-            lookup_match_column="name",
-            lookup_referenced_column="id",
-        ),
-    ),
-    "users": (
-        FixtureReferenceSpec(
-            fixture_alias_column="domain_name",
-            fixture_fk_column="domain_id",
-            lookup_table="domains",
-            lookup_match_column="name",
-            lookup_referenced_column="id",
-            pop_alias_column=False,
         ),
     ),
 }
@@ -1175,7 +1129,9 @@ async def populate_fixture(
 ) -> None:
     ensure_all_tables_registered()
     op_mode = FixtureOpModes(cast(str, fixture_data.get("__mode", "insert")))
-    reconciled = False
+    # Before anything is written: every value a row of this fixture points at is the id
+    # the fixture declares, and the database may hold that row under an id of its own.
+    await _reconcile_fixture_ids(engine, fixture_data)
     for table_name, rows in fixture_data.items():
         if table_name.startswith("__"):
             # skip reserved names like "__mode"
@@ -1184,10 +1140,6 @@ async def populate_fixture(
             raise DataTransformationFailed(
                 f"Invalid fixture data for table {table_name}: expected sequence, got string"
             )
-        # Before the first graph table, while every row it names is already loaded.
-        if not reconciled and table_name in _FIXTURE_GRAPH_ROW_KEYS:
-            await _reconcile_fixture_graph(engine, fixture_data)
-            reconciled = True
 
         table = metadata.tables.get(table_name)
 
@@ -1341,72 +1293,95 @@ async def populate_fixture(
         await provision_fixture_entities(conn, fixture_data.keys())
 
 
-# The graph rows a fixture declares, keyed by what makes each row the row it is. A row
-# an earlier release already put in the graph is held under an id the database minted,
-# so the fixture's pinned insert is skipped and anything naming that id points nowhere.
-_FIXTURE_GRAPH_ROW_KEYS: Final[Mapping[str, Sequence[str]]] = {
-    "virtual_entities": ("entity_type", "entity_id"),
-    "entity_memberships": ("virtual_entity_id", "member_entity_id"),
-    "scope_bindings": ("virtual_entity_id", "scope_entity_id"),
+# The rows a fixture declares an id for, keyed by what makes each row the row it is: a
+# database that already holds the row says which id it carries. The fixture's insert is
+# skipped on the conflict, leaving every value naming the fixture's id pointing nowhere.
+_FIXTURE_ROW_KEYS: Final[Mapping[str, tuple[str, Sequence[str]]]] = {
+    "domains": ("id", ("name",)),
+    "scaling_groups": ("id", ("name",)),
+    "groups": ("id", ("name", "domain_name")),
+    "users": ("uuid", ("username", "domain_name")),
 }
 
-_FIXTURE_GRAPH_TABLES: Final[tuple[str, ...]] = (
-    "virtual_entities",
-    "entity_memberships",
-    "scope_bindings",
-    "entity_membership_caps",
-)
 
-
-async def _reconcile_fixture_graph(
+async def _reconcile_fixture_ids(
     engine: SAEngine,
     fixture_data: Mapping[str, str | Sequence[dict[str, Any]]],
 ) -> None:
-    """Rewrite the graph ids a fixture declares to the ids the database holds for the
-    same rows, so a load into a database whose graph an earlier release built lands on
-    that graph instead of failing on the foreign key of the row it skipped."""
-    graph_rows: dict[str, Sequence[dict[str, Any]]] = {}
-    for table_name in _FIXTURE_GRAPH_TABLES:
-        rows = fixture_data.get(table_name)
-        if not isinstance(rows, str) and rows:
-            graph_rows[table_name] = rows
-    if not graph_rows:
-        return
-
+    """Rewrite the ids a fixture declares to the ids the database holds for the same
+    rows, so a load into a database an earlier release built lands on that database's
+    rows. Nodes go second, keyed by the entity the first rewrite has just put right."""
     async with engine.begin() as conn:
-        for table_name, key_columns in _FIXTURE_GRAPH_ROW_KEYS.items():
-            rows = graph_rows.get(table_name)
-            table = metadata.tables.get(table_name)
-            if not rows or table is None:
-                continue
-            await _resolve_fixture_references(conn, table, rows)
-            if not any(row.get("id") for row in rows):
-                continue
-            key_cols = [table.columns[column] for column in key_columns]
-            id_col = table.columns["id"]
-            result = await conn.execute(sa.select(id_col, *key_cols))
-            # Compared as text: a fixture value is whatever JSON holds, a row's is what
-            # the column's type decorator reads back.
-            held = {_fixture_key(row._mapping, key_cols): row._mapping[id_col] for row in result}
-            remap = {
-                str(row["id"]): held[key]
-                for row in rows
-                if (key := _fixture_key(row, key_columns)) in held
-                and str(held[key]) != str(row["id"])
-            }
-            if remap:
-                _rewrite_fixture_graph_ids(graph_rows, remap)
+        _rewrite_fixture_ids(fixture_data, await _held_row_ids(conn, fixture_data))
+        _rewrite_fixture_ids(fixture_data, await _held_node_ids(conn, fixture_data))
+
+
+async def _held_row_ids(
+    conn: AsyncConnection,
+    fixture_data: Mapping[str, str | Sequence[dict[str, Any]]],
+) -> dict[str, Any]:
+    """Each id a fixture declares, against the id the database holds that row under."""
+    remap: dict[str, Any] = {}
+    for table_name, (id_column, key_columns) in _FIXTURE_ROW_KEYS.items():
+        rows = fixture_data.get(table_name)
+        table = metadata.tables.get(table_name)
+        if table is None or isinstance(rows, str) or not rows:
+            continue
+        result = await conn.execute(sa.select(table.c[id_column], *_columns(table, key_columns)))
+        remap.update(_remap_rows(rows, id_column, key_columns, result))
+    return remap
+
+
+async def _held_node_ids(
+    conn: AsyncConnection,
+    fixture_data: Mapping[str, str | Sequence[dict[str, Any]]],
+) -> dict[str, Any]:
+    """Each node id a fixture declares, against the node the database holds for the same
+    entity."""
+    rows = fixture_data.get("virtual_entities")
+    table = metadata.tables.get("virtual_entities")
+    if table is None or isinstance(rows, str) or not rows:
+        return {}
+    key_columns = ("entity_type", "entity_id")
+    result = await conn.execute(sa.select(table.c.id, *_columns(table, key_columns)))
+    return _remap_rows(rows, "id", key_columns, result)
+
+
+def _columns(table: sa.Table, names: Sequence[str]) -> list[sa.Column[Any]]:
+    return [table.c[name] for name in names]
+
+
+def _remap_rows(
+    rows: Sequence[dict[str, Any]],
+    id_column: str,
+    key_columns: Sequence[str],
+    result: Iterable[Any],
+) -> dict[str, Any]:
+    # Compared as text: a fixture value is whatever JSON holds, a row's is what the
+    # column's type decorator reads back.
+    held = {_fixture_key(row._mapping, key_columns): row._mapping[id_column] for row in result}
+    return {
+        str(row[id_column]): held[key]
+        for row in rows
+        if row.get(id_column) is not None
+        and (key := _fixture_key(row, key_columns)) in held
+        and str(held[key]) != str(row[id_column])
+    }
 
 
 def _fixture_key(row: Mapping[Any, Any], columns: Sequence[Any]) -> tuple[str, ...]:
     return tuple(str(row[column]) for column in columns)
 
 
-def _rewrite_fixture_graph_ids(
-    graph_rows: Mapping[str, Sequence[dict[str, Any]]],
+def _rewrite_fixture_ids(
+    fixture_data: Mapping[str, str | Sequence[dict[str, Any]]],
     remap: Mapping[str, Any],
 ) -> None:
-    for rows in graph_rows.values():
+    if not remap:
+        return
+    for rows in fixture_data.values():
+        if isinstance(rows, str):
+            continue
         for row in rows:
             for column, value in row.items():
                 if isinstance(value, (str, uuid.UUID)) and str(value) in remap:
@@ -1432,9 +1407,7 @@ async def _resolve_fixture_reference(
     # Pop alias column from every row, collecting rows that still need a resolved FK.
     rows_to_resolve: list[tuple[dict[str, Any], str]] = []
     for row in rows:
-        alias_value = row.get(reference_spec.fixture_alias_column)
-        if reference_spec.pop_alias_column:
-            row.pop(reference_spec.fixture_alias_column, None)
+        alias_value = row.pop(reference_spec.fixture_alias_column, None)
         if alias_value is not None and reference_spec.fixture_fk_column not in row:
             rows_to_resolve.append((row, cast(str, alias_value)))
 

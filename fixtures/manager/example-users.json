@@ -46,8 +46,8 @@
     ],
     "sgroups_for_domains": [
         {
-            "scaling_group": "default",
-            "domain": "default"
+            "resource_group_id": "4d1e9b32-90c7-5b32-8f0e-6f470b8ed24a",
+            "domain_id": "b9e676dc-e23e-54c6-b350-e83fba4127e9"
         }
     ],
     "users": [
@@ -62,6 +62,7 @@
             "status": "active",
             "status_info": "admin-requested",
             "domain_name": "default",
+            "domain_id": "b9e676dc-e23e-54c6-b350-e83fba4127e9",
             "resource_policy": "default",
             "role": "superadmin"
         },
@@ -76,6 +77,7 @@
             "status": "active",
             "status_info": "admin-requested",
             "domain_name": "default",
+            "domain_id": "b9e676dc-e23e-54c6-b350-e83fba4127e9",
             "resource_policy": "default",
             "role": "admin"
         },
@@ -90,6 +92,7 @@
             "status": "active",
             "status_info": "admin-requested",
             "domain_name": "default",
+            "domain_id": "b9e676dc-e23e-54c6-b350-e83fba4127e9",
             "resource_policy": "default",
             "role": "user"
         },
@@ -104,6 +107,7 @@
             "status": "active",
             "status_info": "admin-requested",
             "domain_name": "default",
+            "domain_id": "b9e676dc-e23e-54c6-b350-e83fba4127e9",
             "resource_policy": "default",
             "role": "user"
         },
@@ -118,6 +122,7 @@
             "status": "active",
             "status_info": "admin-requested",
             "domain_name": "default",
+            "domain_id": "b9e676dc-e23e-54c6-b350-e83fba4127e9",
             "resource_policy": "default",
             "role": "monitor"
         }
@@ -254,7 +259,7 @@
         {
             "id": "df651a2a-3138-5cbe-b6d4-081ddb8ae04d",
             "entity_type": "domain",
-            "domain_name": "default"
+            "entity_id": "b9e676dc-e23e-54c6-b350-e83fba4127e9"
         },
         {
             "id": "12e8b72e-9dc7-598f-953f-55576c104d19",
@@ -294,7 +299,7 @@
         {
             "id": "7a0f4c2e-3b91-5d6a-9e84-1c5f2b7d9a63",
             "entity_type": "resource_group",
-            "scaling_group_name": "default"
+            "entity_id": "4d1e9b32-90c7-5b32-8f0e-6f470b8ed24a"
         },
         {
             "id": "c17a5bef-8fa9-594d-8f92-6420b478e87e",
