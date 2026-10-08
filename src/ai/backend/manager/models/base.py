@@ -1295,12 +1295,12 @@ async def populate_fixture(
 
 # Each table a fixture declares an id for, keyed by what makes each row the row it is: the
 # database that already holds the row says which id it carries. Ordered by dependency — an
-# entity's row, the node naming it, then an edge between nodes.
+# entity's row, the node naming it, then an edge between nodes. `users` is absent: no path
+# writes one of the seed's usernames under an id it minted.
 _FIXTURE_ID_KEYS: Final[tuple[tuple[str, str, tuple[str, ...]], ...]] = (
     ("domains", "id", ("name",)),
     ("scaling_groups", "id", ("name",)),
     ("groups", "id", ("name", "domain_name")),
-    ("users", "uuid", ("username", "domain_name")),
     ("virtual_entities", "id", ("entity_type", "entity_id")),
     ("entity_memberships", "id", ("virtual_entity_id", "member_entity_id")),
 )
@@ -1350,17 +1350,30 @@ def _fixture_key(row: Mapping[Any, Any], columns: Sequence[Any]) -> tuple[str, .
     return tuple(str(row[column]) for column in columns)
 
 
+def _id_columns(table: sa.Table) -> set[str]:
+    """The columns of a fixture table that can name an id: the ones the table declares a
+    foreign key on, the id it declares itself, and `entity_id` — the entity a graph row
+    attached to `(entity_type, entity_id)` stands for, which carries no foreign key."""
+    names = {column.name for column in table.columns if column.foreign_keys}
+    names |= {id_column for name, id_column, _ in _FIXTURE_ID_KEYS if name == table.name}
+    names.add("entity_id")
+    return names
+
+
 def _rewrite_fixture_ids(
     fixture_data: Mapping[str, str | Sequence[dict[str, Any]]],
     remap: Mapping[str, Any],
 ) -> None:
     if not remap:
         return
-    for rows in fixture_data.values():
-        if isinstance(rows, str):
+    for table_name, rows in fixture_data.items():
+        table = metadata.tables.get(table_name)
+        if table is None or isinstance(rows, str):
             continue
+        columns = _id_columns(table)
         for row in rows:
-            for column, value in row.items():
+            for column in columns & row.keys():
+                value = row[column]
                 if isinstance(value, (str, uuid.UUID)) and str(value) in remap:
                     row[column] = remap[str(value)]
 
