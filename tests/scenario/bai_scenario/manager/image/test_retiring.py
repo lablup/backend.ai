@@ -34,7 +34,7 @@ from bai_scenario.components.image import (
     TheLaidImage,
 )
 from bai_scenario.runner.acting import ActingAs
-from bai_scenario.runner.planting import SeedingSession
+from bai_scenario.runner.planting import TestSeedingSession
 from bai_scenario.runner.steps import run_scenario
 
 
@@ -84,7 +84,7 @@ class RetiringTheAliased(When[AnAliasAndACaller, ImageAdapter, ImageNode]):
 
 @dataclass(frozen=True)
 class PurgingAnswersWithTheRemovedImage(
-    Scenario[SeedingSession, AnImageAndACaller, ImageAdapter, ImageNode]
+    Scenario[TestSeedingSession, AnImageAndACaller, ImageAdapter, ImageNode]
 ):
     @override
     def summary(self) -> str:
@@ -95,7 +95,7 @@ class PurgingAnswersWithTheRemovedImage(
         return "슈퍼관리자가 이미지를 완전 삭제하면 삭제된 이미지가 반환된다"
 
     @override
-    def given(self) -> Given[SeedingSession, AnImageAndACaller]:
+    def given(self) -> Given[TestSeedingSession, AnImageAndACaller]:
         return AnImageAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
@@ -109,7 +109,7 @@ class PurgingAnswersWithTheRemovedImage(
 
 @dataclass(frozen=True)
 class TheMakerOfACustomImageMayPurgeIt(
-    Scenario[SeedingSession, AnImageAndACaller, ImageAdapter, ImageNode]
+    Scenario[TestSeedingSession, AnImageAndACaller, ImageAdapter, ImageNode]
 ):
     @override
     def summary(self) -> str:
@@ -123,7 +123,7 @@ class TheMakerOfACustomImageMayPurgeIt(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, AnImageAndACaller]:
+    def given(self) -> Given[TestSeedingSession, AnImageAndACaller]:
         return AnImageTheCallerMade()
 
     @override
@@ -137,7 +137,7 @@ class TheMakerOfACustomImageMayPurgeIt(
 
 @dataclass(frozen=True)
 class PurgingAnAliasedImageReturnsTheRemovedImage(
-    Scenario[SeedingSession, AnAliasAndACaller, ImageAdapter, ImageNode]
+    Scenario[TestSeedingSession, AnAliasAndACaller, ImageAdapter, ImageNode]
 ):
     @override
     def summary(self) -> str:
@@ -148,7 +148,7 @@ class PurgingAnAliasedImageReturnsTheRemovedImage(
         return "별칭이 등록된 이미지를 완전 삭제하면 삭제된 이미지가 반환된다"
 
     @override
-    def given(self) -> Given[SeedingSession, AnAliasAndACaller]:
+    def given(self) -> Given[TestSeedingSession, AnAliasAndACaller]:
         return AnAliasAndSomeone()
 
     @override
@@ -161,7 +161,9 @@ class PurgingAnAliasedImageReturnsTheRemovedImage(
 
 
 @dataclass(frozen=True)
-class RetiringWhatIsNotThere(Scenario[SeedingSession, AnImageAndACaller, ImageAdapter, ImageNode]):
+class RetiringWhatIsNotThere(
+    Scenario[TestSeedingSession, AnImageAndACaller, ImageAdapter, ImageNode]
+):
     @override
     def summary(self) -> str:
         return "purging-an-id-that-holds-no-image-is-refused"
@@ -171,7 +173,7 @@ class RetiringWhatIsNotThere(Scenario[SeedingSession, AnImageAndACaller, ImageAd
         return "어느 이미지도 가리키지 않는 ID를 완전 삭제하려 하면 대상을 찾을 수 없어 거부된다"
 
     @override
-    def given(self) -> Given[SeedingSession, AnImageAndACaller]:
+    def given(self) -> Given[TestSeedingSession, AnImageAndACaller]:
         return AnImageAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
@@ -185,7 +187,7 @@ class RetiringWhatIsNotThere(Scenario[SeedingSession, AnImageAndACaller, ImageAd
 
 @dataclass(frozen=True)
 class AnUngrantedUserMayNotRetire(
-    Scenario[SeedingSession, AnImageAndACaller, ImageAdapter, ImageNode]
+    Scenario[TestSeedingSession, AnImageAndACaller, ImageAdapter, ImageNode]
 ):
     @override
     def summary(self) -> str:
@@ -196,7 +198,7 @@ class AnUngrantedUserMayNotRetire(
         return "아무 권한도 받지 않은 사용자가 이미지를 완전 삭제하려 하면 권한 부족으로 거부된다"
 
     @override
-    def given(self) -> Given[SeedingSession, AnImageAndACaller]:
+    def given(self) -> Given[TestSeedingSession, AnImageAndACaller]:
         return AnUncustomizedImageAndSomeone(granted=False)
 
     @override
@@ -210,7 +212,7 @@ class AnUngrantedUserMayNotRetire(
 
 @dataclass(frozen=True)
 class AGrantDoesNotSkipTheCreatorCheck(
-    Scenario[SeedingSession, AnImageAndACaller, ImageAdapter, ImageNode]
+    Scenario[TestSeedingSession, AnImageAndACaller, ImageAdapter, ImageNode]
 ):
     @override
     def summary(self) -> str:
@@ -224,7 +226,7 @@ class AGrantDoesNotSkipTheCreatorCheck(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, AnImageAndACaller]:
+    def given(self) -> Given[TestSeedingSession, AnImageAndACaller]:
         return AnUncustomizedImageAndSomeone()
 
     @override

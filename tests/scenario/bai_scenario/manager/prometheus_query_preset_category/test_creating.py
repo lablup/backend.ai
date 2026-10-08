@@ -40,7 +40,7 @@ from bai_scenario.components.prometheus_query_preset_category import (
     TheNewCategoryNode,
 )
 from bai_scenario.runner.acting import ActingAs
-from bai_scenario.runner.planting import SeedingSession
+from bai_scenario.runner.planting import TestSeedingSession
 from bai_scenario.runner.steps import run_scenario
 
 MADE = "cpu"
@@ -48,8 +48,8 @@ FRESH = "새로 만든 카테고리"
 ENFORCEMENT = "manager.rbac.enforcement_enabled"
 
 type Adapter = PrometheusQueryPresetCategoryAdapter
-type CreatingStep = Scenario[SeedingSession, ACallerAlone, Adapter, CategoryNodeAnswer]
-type RepeatingStep = Scenario[SeedingSession, ACategoryAndACaller, Adapter, CategoryNodeAnswer]
+type CreatingStep = Scenario[TestSeedingSession, ACallerAlone, Adapter, CategoryNodeAnswer]
+type RepeatingStep = Scenario[TestSeedingSession, ACategoryAndACaller, Adapter, CategoryNodeAnswer]
 
 
 @dataclass(frozen=True)
@@ -97,7 +97,7 @@ class CreatingUnderTheSameName(When[ACategoryAndACaller, Adapter, CategoryNodeAn
 
 @dataclass(frozen=True)
 class TheNameAloneMakesAWholeNode(
-    Scenario[SeedingSession, ACallerAlone, Adapter, CategoryNodeAnswer]
+    Scenario[TestSeedingSession, ACallerAlone, Adapter, CategoryNodeAnswer]
 ):
     started: datetime
 
@@ -112,7 +112,7 @@ class TheNameAloneMakesAWholeNode(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, ACallerAlone]:
+    def given(self) -> Given[TestSeedingSession, ACallerAlone]:
         return JustSomeone(role=UserRole.SUPERADMIN)
 
     @override
@@ -126,7 +126,7 @@ class TheNameAloneMakesAWholeNode(
 
 @dataclass(frozen=True)
 class TheDescriptionComesBackAsGiven(
-    Scenario[SeedingSession, ACallerAlone, Adapter, CategoryNodeAnswer]
+    Scenario[TestSeedingSession, ACallerAlone, Adapter, CategoryNodeAnswer]
 ):
     started: datetime
 
@@ -139,7 +139,7 @@ class TheDescriptionComesBackAsGiven(
         return "슈퍼관리자가 이름과 설명을 함께 지정해 생성하면, 지정한 값이 그대로 담긴 노드가 반환된다"
 
     @override
-    def given(self) -> Given[SeedingSession, ACallerAlone]:
+    def given(self) -> Given[TestSeedingSession, ACallerAlone]:
         return JustSomeone(role=UserRole.SUPERADMIN)
 
     @override
@@ -153,7 +153,7 @@ class TheDescriptionComesBackAsGiven(
 
 @dataclass(frozen=True)
 class ANameAnotherCategoryHoldsIsRefused(
-    Scenario[SeedingSession, ACategoryAndACaller, Adapter, CategoryNodeAnswer]
+    Scenario[TestSeedingSession, ACategoryAndACaller, Adapter, CategoryNodeAnswer]
 ):
     @override
     def summary(self) -> str:
@@ -167,7 +167,7 @@ class ANameAnotherCategoryHoldsIsRefused(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, ACategoryAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ACategoryAndACaller]:
         return ACategoryAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
@@ -180,7 +180,9 @@ class ANameAnotherCategoryHoldsIsRefused(
 
 
 @dataclass(frozen=True)
-class APlainUserMayNotCreate(Scenario[SeedingSession, ACallerAlone, Adapter, CategoryNodeAnswer]):
+class APlainUserMayNotCreate(
+    Scenario[TestSeedingSession, ACallerAlone, Adapter, CategoryNodeAnswer]
+):
     @override
     def summary(self) -> str:
         return "a-user-who-is-not-the-superadmin-may-not-create-a-category"
@@ -190,7 +192,7 @@ class APlainUserMayNotCreate(Scenario[SeedingSession, ACallerAlone, Adapter, Cat
         return "슈퍼관리자가 아닌 사용자가 카테고리를 생성하려 하면, 역할 부족으로 거부된다"
 
     @override
-    def given(self) -> Given[SeedingSession, ACallerAlone]:
+    def given(self) -> Given[TestSeedingSession, ACallerAlone]:
         return JustSomeone()
 
     @override
@@ -204,7 +206,7 @@ class APlainUserMayNotCreate(Scenario[SeedingSession, ACallerAlone, Adapter, Cat
 
 @dataclass(frozen=True)
 class EnforcementOffChangesNothing(
-    Scenario[SeedingSession, ACallerAlone, Adapter, CategoryNodeAnswer], Configured
+    Scenario[TestSeedingSession, ACallerAlone, Adapter, CategoryNodeAnswer], Configured
 ):
     @override
     def summary(self) -> str:
@@ -219,7 +221,7 @@ class EnforcementOffChangesNothing(
         return {ENFORCEMENT: False}
 
     @override
-    def given(self) -> Given[SeedingSession, ACallerAlone]:
+    def given(self) -> Given[TestSeedingSession, ACallerAlone]:
         return JustSomeone()
 
     @override

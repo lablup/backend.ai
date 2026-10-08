@@ -43,7 +43,7 @@ from bai_scenario.components.prometheus_query_preset import (
     TheNewPresetNode,
 )
 from bai_scenario.runner.acting import ActingAs
-from bai_scenario.runner.planting import SeedingSession
+from bai_scenario.runner.planting import TestSeedingSession
 from bai_scenario.runner.steps import run_scenario
 from bai_scenario.seeds.prometheus_query_preset.preset import METRIC, TEMPLATE
 
@@ -52,10 +52,10 @@ WINDOW = "5m"
 ENFORCEMENT = "manager.rbac.enforcement_enabled"
 
 type CreatingStep = Scenario[
-    SeedingSession, ACatalogAndACaller, PrometheusQueryPresetAdapter, PresetNodeAnswer
+    TestSeedingSession, ACatalogAndACaller, PrometheusQueryPresetAdapter, PresetNodeAnswer
 ]
 type RepeatingStep = Scenario[
-    SeedingSession, APresetAndACaller, PrometheusQueryPresetAdapter, PresetNodeAnswer
+    TestSeedingSession, APresetAndACaller, PrometheusQueryPresetAdapter, PresetNodeAnswer
 ]
 
 
@@ -138,7 +138,7 @@ class CreatingUnderTheSameName(
 
 @dataclass(frozen=True)
 class TheRequiredValuesMakeAWholeNode(
-    Scenario[SeedingSession, ACatalogAndACaller, PrometheusQueryPresetAdapter, PresetNodeAnswer]
+    Scenario[TestSeedingSession, ACatalogAndACaller, PrometheusQueryPresetAdapter, PresetNodeAnswer]
 ):
     started: datetime
 
@@ -154,7 +154,7 @@ class TheRequiredValuesMakeAWholeNode(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, ACatalogAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ACatalogAndACaller]:
         return JustSomeone(role=UserRole.SUPERADMIN)
 
     @override
@@ -168,7 +168,7 @@ class TheRequiredValuesMakeAWholeNode(
 
 @dataclass(frozen=True)
 class FiledUnderACategory(
-    Scenario[SeedingSession, ACatalogAndACaller, PrometheusQueryPresetAdapter, PresetNodeAnswer]
+    Scenario[TestSeedingSession, ACatalogAndACaller, PrometheusQueryPresetAdapter, PresetNodeAnswer]
 ):
     started: datetime
 
@@ -181,7 +181,7 @@ class FiledUnderACategory(
         return "카테고리 하나가 있고 슈퍼관리자가 그 카테고리를 지정해 생성하면, 응답의 카테고리가 그것을 가리킨다"
 
     @override
-    def given(self) -> Given[SeedingSession, ACatalogAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ACatalogAndACaller]:
         return ACategoryAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
@@ -195,7 +195,7 @@ class FiledUnderACategory(
 
 @dataclass(frozen=True)
 class WithAWindow(
-    Scenario[SeedingSession, ACatalogAndACaller, PrometheusQueryPresetAdapter, PresetNodeAnswer]
+    Scenario[TestSeedingSession, ACatalogAndACaller, PrometheusQueryPresetAdapter, PresetNodeAnswer]
 ):
     started: datetime
 
@@ -208,7 +208,7 @@ class WithAWindow(
         return "슈퍼관리자가 시간 창을 함께 지정해 생성하면, 노드에 그 시간 창이 담긴다"
 
     @override
-    def given(self) -> Given[SeedingSession, ACatalogAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ACatalogAndACaller]:
         return JustSomeone(role=UserRole.SUPERADMIN)
 
     @override
@@ -222,7 +222,7 @@ class WithAWindow(
 
 @dataclass(frozen=True)
 class AnUnknownCategoryIsRefused(
-    Scenario[SeedingSession, ACatalogAndACaller, PrometheusQueryPresetAdapter, PresetNodeAnswer]
+    Scenario[TestSeedingSession, ACatalogAndACaller, PrometheusQueryPresetAdapter, PresetNodeAnswer]
 ):
     @override
     def summary(self) -> str:
@@ -236,7 +236,7 @@ class AnUnknownCategoryIsRefused(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, ACatalogAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ACatalogAndACaller]:
         return JustSomeone(role=UserRole.SUPERADMIN)
 
     @override
@@ -250,7 +250,7 @@ class AnUnknownCategoryIsRefused(
 
 @dataclass(frozen=True)
 class TheSameNameIsAllowedTwice(
-    Scenario[SeedingSession, APresetAndACaller, PrometheusQueryPresetAdapter, PresetNodeAnswer]
+    Scenario[TestSeedingSession, APresetAndACaller, PrometheusQueryPresetAdapter, PresetNodeAnswer]
 ):
     started: datetime
 
@@ -266,7 +266,7 @@ class TheSameNameIsAllowedTwice(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, APresetAndACaller]:
+    def given(self) -> Given[TestSeedingSession, APresetAndACaller]:
         return APresetAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
@@ -280,7 +280,7 @@ class TheSameNameIsAllowedTwice(
 
 @dataclass(frozen=True)
 class APlainUserMayNotCreate(
-    Scenario[SeedingSession, ACatalogAndACaller, PrometheusQueryPresetAdapter, PresetNodeAnswer]
+    Scenario[TestSeedingSession, ACatalogAndACaller, PrometheusQueryPresetAdapter, PresetNodeAnswer]
 ):
     @override
     def summary(self) -> str:
@@ -291,7 +291,7 @@ class APlainUserMayNotCreate(
         return "슈퍼관리자가 아닌 사용자가 프리셋을 생성하려 하면, 역할 부족으로 거부된다"
 
     @override
-    def given(self) -> Given[SeedingSession, ACatalogAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ACatalogAndACaller]:
         return JustSomeone()
 
     @override
@@ -305,7 +305,7 @@ class APlainUserMayNotCreate(
 
 @dataclass(frozen=True)
 class AMonitorMayNotCreate(
-    Scenario[SeedingSession, ACatalogAndACaller, PrometheusQueryPresetAdapter, PresetNodeAnswer]
+    Scenario[TestSeedingSession, ACatalogAndACaller, PrometheusQueryPresetAdapter, PresetNodeAnswer]
 ):
     @override
     def summary(self) -> str:
@@ -319,7 +319,7 @@ class AMonitorMayNotCreate(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, ACatalogAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ACatalogAndACaller]:
         return JustSomeone(role=UserRole.MONITOR)
 
     @override
@@ -333,7 +333,9 @@ class AMonitorMayNotCreate(
 
 @dataclass(frozen=True)
 class EnforcementOffChangesNothing(
-    Scenario[SeedingSession, ACatalogAndACaller, PrometheusQueryPresetAdapter, PresetNodeAnswer],
+    Scenario[
+        TestSeedingSession, ACatalogAndACaller, PrometheusQueryPresetAdapter, PresetNodeAnswer
+    ],
     Configured,
 ):
     @override
@@ -349,7 +351,7 @@ class EnforcementOffChangesNothing(
         return {ENFORCEMENT: False}
 
     @override
-    def given(self) -> Given[SeedingSession, ACatalogAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ACatalogAndACaller]:
         return JustSomeone()
 
     @override

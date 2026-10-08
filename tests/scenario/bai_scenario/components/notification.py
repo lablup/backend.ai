@@ -50,10 +50,10 @@ from bai_scenario.seeds.notification.channel import (
     SMTP_USERNAME,
     TO_EMAIL,
     WEBHOOK_URL,
-    SeedEmailChannel,
-    SeedWebhookChannel,
+    TestSeedEmailChannel,
+    TestSeedWebhookChannel,
 )
-from bai_scenario.seeds.notification.rule import TEMPLATE, SeedRuleOf, SeedRuleOfNoChannel
+from bai_scenario.seeds.notification.rule import TEMPLATE, TestSeedRuleOf, TestSeedRuleOfNoChannel
 
 type LoadedChannels = list[NotificationChannelNode | Exception | None]
 type LoadedRules = list[NotificationRuleNode | Exception | None]
@@ -130,8 +130,8 @@ class AChannelARuleAndSomeone(Given[Any, AChannelAndACaller]):
     @override
     async def lay(self, seeding: Any) -> AChannelAndACaller:
         caller = await lay_a_caller(seeding, self.role)
-        channel = await seeding.creating_from(SeedWebhookChannel(), caller)
-        await seeding.creating_from_two(SeedRuleOf(), channel, caller)
+        channel = await seeding.creating_from(TestSeedWebhookChannel(), caller)
+        await seeding.creating_from_two(TestSeedRuleOf(), channel, caller)
         return AChannelAndACaller(seeding.made(channel), seeding.made(caller))
 
 
@@ -148,8 +148,8 @@ class TwoChannelsAndSomeone(Given[Any, ManyChannelsAndACaller]):
     @override
     async def lay(self, seeding: Any) -> ManyChannelsAndACaller:
         caller = await lay_a_caller(seeding, self.role)
-        wanted = await seeding.creating_from(SeedWebhookChannel(name_hint="wanted"), caller)
-        other = await seeding.creating_from(SeedWebhookChannel(name_hint="other"), caller)
+        wanted = await seeding.creating_from(TestSeedWebhookChannel(name_hint="wanted"), caller)
+        other = await seeding.creating_from(TestSeedWebhookChannel(name_hint="other"), caller)
         return ManyChannelsAndACaller(
             laid=(seeding.made(wanted), seeding.made(other)),
             named=seeding.made(wanted),
@@ -170,8 +170,8 @@ class AWebhookAndAnEmailChannel(Given[Any, ManyChannelsAndACaller]):
     @override
     async def lay(self, seeding: Any) -> ManyChannelsAndACaller:
         caller = await lay_a_caller(seeding, self.role)
-        webhook = await seeding.creating_from(SeedWebhookChannel(), caller)
-        email = await seeding.creating_from(SeedEmailChannel(), caller)
+        webhook = await seeding.creating_from(TestSeedWebhookChannel(), caller)
+        email = await seeding.creating_from(TestSeedEmailChannel(), caller)
         return ManyChannelsAndACaller(
             laid=(seeding.made(webhook), seeding.made(email)),
             named=seeding.made(email),
@@ -192,8 +192,8 @@ class AnEnabledAndADisabledChannel(Given[Any, ManyChannelsAndACaller]):
     @override
     async def lay(self, seeding: Any) -> ManyChannelsAndACaller:
         caller = await lay_a_caller(seeding, self.role)
-        active = await seeding.creating_from(SeedWebhookChannel(), caller)
-        await seeding.creating_from(SeedWebhookChannel(enabled=False), caller)
+        active = await seeding.creating_from(TestSeedWebhookChannel(), caller)
+        await seeding.creating_from(TestSeedWebhookChannel(enabled=False), caller)
         return ManyChannelsAndACaller(
             laid=(seeding.made(active),),
             named=seeding.made(active),
@@ -217,9 +217,9 @@ class ARuleAndSomeone(Given[Any, ARuleAndACaller]):
     @override
     async def lay(self, seeding: Any) -> ARuleAndACaller:
         caller = await lay_a_caller(seeding, self.role)
-        channel = await seeding.creating_from(SeedWebhookChannel(), caller)
+        channel = await seeding.creating_from(TestSeedWebhookChannel(), caller)
         rule = await seeding.creating_from_two(
-            SeedRuleOf(
+            TestSeedRuleOf(
                 message_template=self.message_template,
                 description=self.description,
                 enabled=self.enabled,
@@ -243,8 +243,8 @@ class AnOrphanRuleAndSomeone(Given[Any, ARuleAndACaller]):
     @override
     async def lay(self, seeding: Any) -> ARuleAndACaller:
         caller = await lay_a_caller(seeding, self.role)
-        channel = await seeding.creating_from(SeedWebhookChannel(), caller)
-        rule = await seeding.creating_from(SeedRuleOfNoChannel(), caller)
+        channel = await seeding.creating_from(TestSeedWebhookChannel(), caller)
+        rule = await seeding.creating_from(TestSeedRuleOfNoChannel(), caller)
         return ARuleAndACaller(seeding.made(rule), seeding.made(channel), seeding.made(caller))
 
 
@@ -262,10 +262,12 @@ class TwoRulesAndSomeone(Given[Any, ManyRulesAndACaller]):
     @override
     async def lay(self, seeding: Any) -> ManyRulesAndACaller:
         caller = await lay_a_caller(seeding, self.role)
-        channel = await seeding.creating_from(SeedWebhookChannel(), caller)
-        wanted = await seeding.creating_from_two(SeedRuleOf(name_hint="wanted"), channel, caller)
+        channel = await seeding.creating_from(TestSeedWebhookChannel(), caller)
+        wanted = await seeding.creating_from_two(
+            TestSeedRuleOf(name_hint="wanted"), channel, caller
+        )
         other = await seeding.creating_from_two(
-            SeedRuleOf(name_hint="other", rule_type=self.other_rule_type), channel, caller
+            TestSeedRuleOf(name_hint="other", rule_type=self.other_rule_type), channel, caller
         )
         return ManyRulesAndACaller(
             laid=(seeding.made(wanted), seeding.made(other)),
@@ -287,9 +289,9 @@ class AnEnabledAndADisabledRule(Given[Any, ManyRulesAndACaller]):
     @override
     async def lay(self, seeding: Any) -> ManyRulesAndACaller:
         caller = await lay_a_caller(seeding, self.role)
-        channel = await seeding.creating_from(SeedWebhookChannel(), caller)
-        active = await seeding.creating_from_two(SeedRuleOf(), channel, caller)
-        await seeding.creating_from_two(SeedRuleOf(enabled=False), channel, caller)
+        channel = await seeding.creating_from(TestSeedWebhookChannel(), caller)
+        active = await seeding.creating_from_two(TestSeedRuleOf(), channel, caller)
+        await seeding.creating_from_two(TestSeedRuleOf(enabled=False), channel, caller)
         return ManyRulesAndACaller(
             laid=(seeding.made(active),),
             named=seeding.made(active),
@@ -299,14 +301,14 @@ class AnEnabledAndADisabledRule(Given[Any, ManyRulesAndACaller]):
 
 def _channel_seed(
     given: AChannelAndSomeone, name_hint: str
-) -> SeedWebhookChannel | SeedEmailChannel:
+) -> TestSeedWebhookChannel | TestSeedEmailChannel:
     match given.channel_type:
         case NotificationChannelType.WEBHOOK:
-            return SeedWebhookChannel(
+            return TestSeedWebhookChannel(
                 name_hint=name_hint, description=given.description, enabled=given.enabled
             )
         case NotificationChannelType.EMAIL:
-            return SeedEmailChannel(name_hint=name_hint, enabled=given.enabled)
+            return TestSeedEmailChannel(name_hint=name_hint, enabled=given.enabled)
 
 
 # ------------------------------------------------------------------ verdicts

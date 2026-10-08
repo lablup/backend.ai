@@ -49,15 +49,15 @@ from bai_scenario.components.answers import TheCallIsRefused
 from bai_scenario.components.domain import WAS_HERE, WrittenByThisRun
 from bai_scenario.components.user import AGrant, KeypairNodeLook, UserNodeLook
 from bai_scenario.runner.acting import ActingAs
-from bai_scenario.runner.planting import SeedingSession
+from bai_scenario.runner.planting import TestSeedingSession
 from bai_scenario.runner.steps import run_scenario
-from bai_scenario.seeds.domain.domain import SeedDomain
-from bai_scenario.seeds.resource_policy.keypair import SeedKeypairPolicy
-from bai_scenario.seeds.resource_policy.project import SeedProjectPolicy
-from bai_scenario.seeds.resource_policy.user import SeedUserPolicy
-from bai_scenario.seeds.seeder import Laid, Seeder, SeedNest
-from bai_scenario.seeds.user.fields import SeedKeypairOf
-from bai_scenario.seeds.user.user import SeedUserOf
+from bai_scenario.seeds.domain.domain import TestSeedDomain
+from bai_scenario.seeds.resource_policy.keypair import TestSeedKeypairPolicy
+from bai_scenario.seeds.resource_policy.project import TestSeedProjectPolicy
+from bai_scenario.seeds.resource_policy.user import TestSeedUserPolicy
+from bai_scenario.seeds.seeder import Laid, TestSeeder, TestSeedNest
+from bai_scenario.seeds.user.fields import TestSeedKeypairOf
+from bai_scenario.seeds.user.user import TestSeedUserOf
 
 SERVER_RATE_LIMIT = 10000
 """키 행의 요청 한도 기본값. 시드는 한도를 적지 않으므로 컬럼 기본값이 들어간다."""
@@ -108,7 +108,9 @@ type Answer = object
 
 
 @dataclass(frozen=True)
-class SomeoneAndTheirKeyPolicy(SeedNest[tuple[Laid[KeyPairResourcePolicyData], Laid[UserData]]]):
+class SomeoneAndTheirKeyPolicy(
+    TestSeedNest[tuple[Laid[KeyPairResourcePolicyData], Laid[UserData]]]
+):
     """그 도메인의 사용자 한 명과, 그 사람 기본 키가 딛는 키 정책."""
 
     domain: Laid[Any]
@@ -118,11 +120,11 @@ class SomeoneAndTheirKeyPolicy(SeedNest[tuple[Laid[KeyPairResourcePolicyData], L
         return "키 정책을 아는 사용자 한 명 준비"
 
     @override
-    def lay(self, seed: Seeder) -> tuple[Laid[KeyPairResourcePolicyData], Laid[UserData]]:
-        seed.once(SeedProjectPolicy())
-        policy = seed.creating(SeedUserPolicy())
-        key_policy = seed.creating(SeedKeypairPolicy())
-        user = seed.provisioning(SeedUserOf(), self.domain, policy, key_policy)
+    def lay(self, seed: TestSeeder) -> tuple[Laid[KeyPairResourcePolicyData], Laid[UserData]]:
+        seed.once(TestSeedProjectPolicy())
+        policy = seed.creating(TestSeedUserPolicy())
+        key_policy = seed.creating(TestSeedKeypairPolicy())
+        user = seed.provisioning(TestSeedUserOf(), self.domain, policy, key_policy)
         return key_policy, user
 
 
@@ -146,17 +148,17 @@ class SomeoneWithKeys(Given[Any, Keyholder]):
 
     @override
     async def lay(self, seeding: Any) -> Keyholder:
-        domain = await seeding.creating(SeedDomain(name_hint="home", description=WAS_HERE))
+        domain = await seeding.creating(TestSeedDomain(name_hint="home", description=WAS_HERE))
         key_policy, caller = await seeding.within(SomeoneAndTheirKeyPolicy(domain))
         policy_name = seeding.made(key_policy).name
         extra = [
-            await seeding.adding(SeedKeypairOf(resource_policy=policy_name), caller)
+            await seeding.adding(TestSeedKeypairOf(resource_policy=policy_name), caller)
             for _ in range(self.extra_keys)
         ]
         other_key = None
         if self.other_holds_a_key:
             _, other = await seeding.within(SomeoneAndTheirKeyPolicy(domain))
-            other_key = await seeding.adding(SeedKeypairOf(resource_policy=policy_name), other)
+            other_key = await seeding.adding(TestSeedKeypairOf(resource_policy=policy_name), other)
         if self.permissions:
             await seeding.within(AGrant.on_user(caller, caller, *self.permissions))
         return Keyholder(
@@ -672,11 +674,11 @@ class OnlyTheIssuedKeyIsLeft(Then[Keyholder, Answer]):
 
 RW = (Permission.READ, Permission.UPDATE)
 
-type Row = Scenario[SeedingSession, Keyholder, UserAdapter, Answer]
+type Row = Scenario[TestSeedingSession, Keyholder, UserAdapter, Answer]
 
 
 @dataclass(frozen=True)
-class OwnKeyRow(Scenario[SeedingSession, Keyholder, UserAdapter, Answer]):
+class OwnKeyRow(Scenario[TestSeedingSession, Keyholder, UserAdapter, Answer]):
     """표의 한 행. 이름, 보장하는 것, 세 단계를 값으로 받는다."""
 
     name: str
@@ -694,7 +696,7 @@ class OwnKeyRow(Scenario[SeedingSession, Keyholder, UserAdapter, Answer]):
         return self.guarantee
 
     @override
-    def given(self) -> Given[SeedingSession, Keyholder]:
+    def given(self) -> Given[TestSeedingSession, Keyholder]:
         return self.situation
 
     @override

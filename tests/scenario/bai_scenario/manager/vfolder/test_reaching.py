@@ -34,11 +34,11 @@ from bai_scenario.components.vfolder import (
     VFolderNodeLook,
 )
 from bai_scenario.runner.acting import ActingAs
-from bai_scenario.runner.planting import SeedingSession
+from bai_scenario.runner.planting import TestSeedingSession
 from bai_scenario.runner.steps import run_scenario
 
 type Answer = VFolderNode | SearchVFoldersPayload
-type ReachStep = Scenario[SeedingSession, AFolderAndItsReader, VFolderAdapter, Answer]
+type ReachStep = Scenario[TestSeedingSession, AFolderAndItsReader, VFolderAdapter, Answer]
 
 
 @dataclass(frozen=True)
@@ -115,7 +115,7 @@ class TheFolderIsReached(Then[AFolderAndItsReader, Answer]):
 
 @dataclass(frozen=True)
 class AUserReadsTheirOwnFolder(
-    Scenario[SeedingSession, AFolderAndItsReader, VFolderAdapter, Answer]
+    Scenario[TestSeedingSession, AFolderAndItsReader, VFolderAdapter, Answer]
 ):
     started: datetime
 
@@ -131,7 +131,7 @@ class AUserReadsTheirOwnFolder(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, AFolderAndItsReader]:
+    def given(self) -> Given[TestSeedingSession, AFolderAndItsReader]:
         return SomeoneWithAFolderOfTheirOwn(granted=True)
 
     @override
@@ -145,7 +145,7 @@ class AUserReadsTheirOwnFolder(
 
 @dataclass(frozen=True)
 class AUserGrantedNothingMayNotReadTheirOwnFolder(
-    Scenario[SeedingSession, AFolderAndItsReader, VFolderAdapter, Answer]
+    Scenario[TestSeedingSession, AFolderAndItsReader, VFolderAdapter, Answer]
 ):
     @override
     def summary(self) -> str:
@@ -156,7 +156,7 @@ class AUserGrantedNothingMayNotReadTheirOwnFolder(
         return "아무 권한도 받지 않은 사용자가 자기 폴더를 읽으려 하면 권한 부족으로 거부된다"
 
     @override
-    def given(self) -> Given[SeedingSession, AFolderAndItsReader]:
+    def given(self) -> Given[TestSeedingSession, AFolderAndItsReader]:
         return SomeoneWithAFolderOfTheirOwn(granted=False)
 
     @override
@@ -170,7 +170,7 @@ class AUserGrantedNothingMayNotReadTheirOwnFolder(
 
 @dataclass(frozen=True)
 class AProjectRoleListsTheProjectFolder(
-    Scenario[SeedingSession, AFolderAndItsReader, VFolderAdapter, Answer]
+    Scenario[TestSeedingSession, AFolderAndItsReader, VFolderAdapter, Answer]
 ):
     started: datetime
 
@@ -186,7 +186,7 @@ class AProjectRoleListsTheProjectFolder(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, AFolderAndItsReader]:
+    def given(self) -> Given[TestSeedingSession, AFolderAndItsReader]:
         return AProjectFolderAndSomeone(granted=True)
 
     @override
@@ -200,7 +200,7 @@ class AProjectRoleListsTheProjectFolder(
 
 @dataclass(frozen=True)
 class AUserGrantedNothingMayNotListAProjectsFolders(
-    Scenario[SeedingSession, AFolderAndItsReader, VFolderAdapter, Answer]
+    Scenario[TestSeedingSession, AFolderAndItsReader, VFolderAdapter, Answer]
 ):
     @override
     def summary(self) -> str:
@@ -213,7 +213,7 @@ class AUserGrantedNothingMayNotListAProjectsFolders(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, AFolderAndItsReader]:
+    def given(self) -> Given[TestSeedingSession, AFolderAndItsReader]:
         return AProjectFolderAndSomeone(granted=False)
 
     @override
@@ -227,7 +227,7 @@ class AUserGrantedNothingMayNotListAProjectsFolders(
 
 @dataclass(frozen=True)
 class AnAcceptedShareReachesSomeoneElsesFolder(
-    Scenario[SeedingSession, AFolderAndItsReader, VFolderAdapter, Answer]
+    Scenario[TestSeedingSession, AFolderAndItsReader, VFolderAdapter, Answer]
 ):
     started: datetime
 
@@ -240,7 +240,7 @@ class AnAcceptedShareReachesSomeoneElsesFolder(
         return "남의 폴더를 읽기로 공유받아 받아들인 사용자가 그 폴더를 읽으면, 그 폴더가 온다"
 
     @override
-    def given(self) -> Given[SeedingSession, AFolderAndItsReader]:
+    def given(self) -> Given[TestSeedingSession, AFolderAndItsReader]:
         return AFolderOfferedToSomeone(accepted=True)
 
     @override
@@ -254,7 +254,7 @@ class AnAcceptedShareReachesSomeoneElsesFolder(
 
 @dataclass(frozen=True)
 class AnUnansweredOfferDoesNotReachTheFolder(
-    Scenario[SeedingSession, AFolderAndItsReader, VFolderAdapter, Answer]
+    Scenario[TestSeedingSession, AFolderAndItsReader, VFolderAdapter, Answer]
 ):
     @override
     def summary(self) -> str:
@@ -268,7 +268,7 @@ class AnUnansweredOfferDoesNotReachTheFolder(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, AFolderAndItsReader]:
+    def given(self) -> Given[TestSeedingSession, AFolderAndItsReader]:
         return AFolderOfferedToSomeone(accepted=False)
 
     @override

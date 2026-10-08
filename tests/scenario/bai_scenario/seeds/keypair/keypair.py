@@ -12,11 +12,11 @@ from ai.backend.manager.data.keypair.types import KeyPairData, KeyPairSecrets
 from ai.backend.manager.data.user.types import UserData
 from ai.backend.manager.models.keypair.creators import KeypairCreator
 from ai.backend.manager.secret.types import SecretValue
-from bai_scenario.seeds.seeder import SeedField
+from bai_scenario.seeds.seeder import TestSeedFieldCreator
 
 
 @dataclass(frozen=True)
-class SeedKeypair(SeedField[UserData, KeyPairData]):
+class TestSeedKeypair(TestSeedFieldCreator[UserData, KeyPairData]):
     """One more keypair under a user, held to the named policy.
 
     The one made with the user carries the default marker; this one never does, so

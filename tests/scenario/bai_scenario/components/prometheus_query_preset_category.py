@@ -41,7 +41,7 @@ from ai.backend.testutils.scenario_steps import (
 )
 from bai_scenario.components.domain import WrittenByThisRun
 from bai_scenario.components.system import lay_a_public_reader
-from bai_scenario.seeds.prometheus_query_preset_category.category import SeedCategory
+from bai_scenario.seeds.prometheus_query_preset_category.category import TestSeedCategory
 from bai_scenario.seeds.seeder import Laid
 
 type CategoryNodeAnswer = CategoryNode | None
@@ -118,7 +118,7 @@ class ACategoryAndSomeone(Given[Any, ACategoryAndACaller]):
 
     @override
     async def lay(self, seeding: Any) -> ACategoryAndACaller:
-        category = await seeding.creating(SeedCategory())
+        category = await seeding.creating(TestSeedCategory())
         caller = await lay_someone(seeding, self.role)
         return ACategoryAndACaller(category=seeding.made(category), caller=seeding.made(caller))
 
@@ -133,7 +133,7 @@ class ACategoryAndNobody(Given[Any, ACategoryAlone]):
 
     @override
     async def lay(self, seeding: Any) -> ACategoryAlone:
-        category = await seeding.creating(SeedCategory())
+        category = await seeding.creating(TestSeedCategory())
         return ACategoryAlone(category=seeding.made(category))
 
 
@@ -150,9 +150,9 @@ class ManyCategoriesAndSomeone(Given[Any, ManyCategoriesAndACaller]):
 
     @override
     async def lay(self, seeding: Any) -> ManyCategoriesAndACaller:
-        wanted = await seeding.creating(SeedCategory(name_hint="wanted"))
+        wanted = await seeding.creating(TestSeedCategory(name_hint="wanted"))
         others = [
-            await seeding.creating(SeedCategory(name_hint="other")) for _ in range(self.besides)
+            await seeding.creating(TestSeedCategory(name_hint="other")) for _ in range(self.besides)
         ]
         caller = await lay_someone(seeding, self.role)
         return ManyCategoriesAndACaller(

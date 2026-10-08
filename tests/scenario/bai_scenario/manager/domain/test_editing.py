@@ -23,12 +23,12 @@ from bai_scenario.components.domain import (
     TheDomainNode,
 )
 from bai_scenario.runner.acting import ActingAs
-from bai_scenario.runner.planting import SeedingSession
+from bai_scenario.runner.planting import TestSeedingSession
 from bai_scenario.runner.steps import run_scenario
 
 EDITED = "고쳐 쓴 설명"
 
-type DomainStep = Scenario[SeedingSession, ADomainAndACaller, DomainAdapter, DomainNode]
+type DomainStep = Scenario[TestSeedingSession, ADomainAndACaller, DomainAdapter, DomainNode]
 
 
 @dataclass(frozen=True)
@@ -57,7 +57,7 @@ class Editing(When[ADomainAndACaller, DomainAdapter, DomainNode]):
 
 @dataclass(frozen=True)
 class TheDescriptionChangesAndTheNameStays(
-    Scenario[SeedingSession, ADomainAndACaller, DomainAdapter, DomainNode]
+    Scenario[TestSeedingSession, ADomainAndACaller, DomainAdapter, DomainNode]
 ):
     started: datetime
 
@@ -70,7 +70,7 @@ class TheDescriptionChangesAndTheNameStays(
         return "슈퍼관리자가 도메인의 설명만 바꾸면, 설명은 새 값이 되고 이름은 그대로 남는다"
 
     @override
-    def given(self) -> Given[SeedingSession, ADomainAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ADomainAndACaller]:
         return ADomainAndSomeone(role=UserRole.SUPERADMIN, name_hint="editable")
 
     @override
@@ -84,7 +84,7 @@ class TheDescriptionChangesAndTheNameStays(
 
 @dataclass(frozen=True)
 class ClearingTheActiveFlagDeactivates(
-    Scenario[SeedingSession, ADomainAndACaller, DomainAdapter, DomainNode]
+    Scenario[TestSeedingSession, ADomainAndACaller, DomainAdapter, DomainNode]
 ):
     started: datetime
 
@@ -97,7 +97,7 @@ class ClearingTheActiveFlagDeactivates(
         return "활성 플래그를 내리는 수정은 도메인을 비활성으로 만들고, 답이 그 상태를 실어 온다"
 
     @override
-    def given(self) -> Given[SeedingSession, ADomainAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ADomainAndACaller]:
         return ADomainAndSomeone(role=UserRole.SUPERADMIN, name_hint="to-deactivate")
 
     @override
@@ -111,7 +111,7 @@ class ClearingTheActiveFlagDeactivates(
 
 @dataclass(frozen=True)
 class AUserGrantedNothingMayNotEdit(
-    Scenario[SeedingSession, ADomainAndACaller, DomainAdapter, DomainNode]
+    Scenario[TestSeedingSession, ADomainAndACaller, DomainAdapter, DomainNode]
 ):
     @override
     def summary(self) -> str:
@@ -122,7 +122,7 @@ class AUserGrantedNothingMayNotEdit(
         return "아무 권한도 받지 않은 사용자가 도메인을 수정하려 하면 권한 부족으로 거부된다"
 
     @override
-    def given(self) -> Given[SeedingSession, ADomainAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ADomainAndACaller]:
         return ADomainAndSomeone()
 
     @override
@@ -136,7 +136,7 @@ class AUserGrantedNothingMayNotEdit(
 
 @dataclass(frozen=True)
 class ANameNothingAnswersToIsNotFound(
-    Scenario[SeedingSession, ADomainAndACaller, DomainAdapter, DomainNode]
+    Scenario[TestSeedingSession, ADomainAndACaller, DomainAdapter, DomainNode]
 ):
     @override
     def summary(self) -> str:
@@ -147,7 +147,7 @@ class ANameNothingAnswersToIsNotFound(
         return "아무 도메인도 갖지 않은 이름을 수정하려 하면 대상이 없다는 것으로 거부된다"
 
     @override
-    def given(self) -> Given[SeedingSession, ADomainAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ADomainAndACaller]:
         return ADomainAndSomeone(role=UserRole.SUPERADMIN)
 
     @override

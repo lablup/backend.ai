@@ -31,13 +31,15 @@ from bai_scenario.components.deployment import (
     TheDeploymentNode,
 )
 from bai_scenario.runner.acting import ActingAs
-from bai_scenario.runner.planting import SeedingSession
+from bai_scenario.runner.planting import TestSeedingSession
 from bai_scenario.runner.steps import run_scenario
 
 type ReadingStep = Scenario[
-    SeedingSession, ADeploymentAndACaller, DeploymentAdapter, DeploymentNode
+    TestSeedingSession, ADeploymentAndACaller, DeploymentAdapter, DeploymentNode
 ]
-type RevisionStep = Scenario[SeedingSession, ADeploymentAndACaller, DeploymentAdapter, RevisionNode]
+type RevisionStep = Scenario[
+    TestSeedingSession, ADeploymentAndACaller, DeploymentAdapter, RevisionNode
+]
 
 
 @dataclass(frozen=True)
@@ -84,7 +86,7 @@ class ReadingTheCurrentRevision(When[ADeploymentAndACaller, DeploymentAdapter, R
 
 @dataclass(frozen=True)
 class TheGrantedUserReadsIt(
-    Scenario[SeedingSession, ADeploymentAndACaller, DeploymentAdapter, DeploymentNode]
+    Scenario[TestSeedingSession, ADeploymentAndACaller, DeploymentAdapter, DeploymentNode]
 ):
     started: datetime
 
@@ -97,7 +99,7 @@ class TheGrantedUserReadsIt(
         return "배포 하나가 있고 읽기 권한을 받은 사용자가 id로 조회하면, 그 배포가 답으로 온다"
 
     @override
-    def given(self) -> Given[SeedingSession, ADeploymentAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ADeploymentAndACaller]:
         return ADeploymentInThatPlace(granted=(Permission.READ,))
 
     @override
@@ -111,7 +113,7 @@ class TheGrantedUserReadsIt(
 
 @dataclass(frozen=True)
 class AUserGrantedNothingMayNotRead(
-    Scenario[SeedingSession, ADeploymentAndACaller, DeploymentAdapter, DeploymentNode]
+    Scenario[TestSeedingSession, ADeploymentAndACaller, DeploymentAdapter, DeploymentNode]
 ):
     @override
     def summary(self) -> str:
@@ -122,7 +124,7 @@ class AUserGrantedNothingMayNotRead(
         return "같은 배포가 있고 아무 권한도 받지 않은 사용자가 조회하면, 권한 부족으로 거부된다"
 
     @override
-    def given(self) -> Given[SeedingSession, ADeploymentAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ADeploymentAndACaller]:
         return ADeploymentInThatPlace()
 
     @override
@@ -136,7 +138,7 @@ class AUserGrantedNothingMayNotRead(
 
 @dataclass(frozen=True)
 class AnUnknownIdIsRefusedAsPermission(
-    Scenario[SeedingSession, ADeploymentAndACaller, DeploymentAdapter, DeploymentNode]
+    Scenario[TestSeedingSession, ADeploymentAndACaller, DeploymentAdapter, DeploymentNode]
 ):
     @override
     def summary(self) -> str:
@@ -150,7 +152,7 @@ class AnUnknownIdIsRefusedAsPermission(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, ADeploymentAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ADeploymentAndACaller]:
         return ADeploymentInThatPlace(granted=(Permission.READ,))
 
     @override
@@ -164,7 +166,7 @@ class AnUnknownIdIsRefusedAsPermission(
 
 @dataclass(frozen=True)
 class AnUnknownIdIsNotFoundForASuperadmin(
-    Scenario[SeedingSession, ADeploymentAndACaller, DeploymentAdapter, DeploymentNode]
+    Scenario[TestSeedingSession, ADeploymentAndACaller, DeploymentAdapter, DeploymentNode]
 ):
     @override
     def summary(self) -> str:
@@ -178,7 +180,7 @@ class AnUnknownIdIsNotFoundForASuperadmin(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, ADeploymentAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ADeploymentAndACaller]:
         return ADeploymentInThatPlace(role=UserRole.SUPERADMIN)
 
     @override
@@ -192,7 +194,7 @@ class AnUnknownIdIsNotFoundForASuperadmin(
 
 @dataclass(frozen=True)
 class ADeploymentWithNoRevisionHasNoCurrentOne(
-    Scenario[SeedingSession, ADeploymentAndACaller, DeploymentAdapter, RevisionNode]
+    Scenario[TestSeedingSession, ADeploymentAndACaller, DeploymentAdapter, RevisionNode]
 ):
     @override
     def summary(self) -> str:
@@ -206,7 +208,7 @@ class ADeploymentWithNoRevisionHasNoCurrentOne(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, ADeploymentAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ADeploymentAndACaller]:
         return ADeploymentInThatPlace(granted=(Permission.READ,))
 
     @override
@@ -220,7 +222,7 @@ class ADeploymentWithNoRevisionHasNoCurrentOne(
 
 @dataclass(frozen=True)
 class TheSuperadminReadsAnothers(
-    Scenario[SeedingSession, ADeploymentAndACaller, DeploymentAdapter, DeploymentNode]
+    Scenario[TestSeedingSession, ADeploymentAndACaller, DeploymentAdapter, DeploymentNode]
 ):
     started: datetime
 
@@ -236,7 +238,7 @@ class TheSuperadminReadsAnothers(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, ADeploymentAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ADeploymentAndACaller]:
         return AnothersDeploymentAndASuperadmin()
 
     @override

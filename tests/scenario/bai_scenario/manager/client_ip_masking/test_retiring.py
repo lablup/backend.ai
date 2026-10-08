@@ -30,11 +30,11 @@ from bai_scenario.components.client_ip_masking import (
 )
 from bai_scenario.components.system import ENFORCEMENT
 from bai_scenario.runner.acting import ActingAs
-from bai_scenario.runner.planting import SeedingSession
+from bai_scenario.runner.planting import TestSeedingSession
 from bai_scenario.runner.steps import run_scenario
 
 type RetiringStep = Scenario[
-    SeedingSession, AMaskingPolicyAndACaller, ClientIPMaskingAdapter, ClientIPMaskingPolicyNode
+    TestSeedingSession, AMaskingPolicyAndACaller, ClientIPMaskingAdapter, ClientIPMaskingPolicyNode
 ]
 
 
@@ -69,7 +69,10 @@ class Purging(When[AMaskingPolicyAndACaller, ClientIPMaskingAdapter, ClientIPMas
 @dataclass(frozen=True)
 class TheSuperadminPurgesAPolicy(
     Scenario[
-        SeedingSession, AMaskingPolicyAndACaller, ClientIPMaskingAdapter, ClientIPMaskingPolicyNode
+        TestSeedingSession,
+        AMaskingPolicyAndACaller,
+        ClientIPMaskingAdapter,
+        ClientIPMaskingPolicyNode,
     ]
 ):
     started: datetime
@@ -83,7 +86,7 @@ class TheSuperadminPurgesAPolicy(
         return "슈퍼관리자가 정책을 id로 삭제하면 삭제한 정책 전체를 담은 응답이 반환된다"
 
     @override
-    def given(self) -> Given[SeedingSession, AMaskingPolicyAndACaller]:
+    def given(self) -> Given[TestSeedingSession, AMaskingPolicyAndACaller]:
         return AMaskingPolicyAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
@@ -100,7 +103,10 @@ class TheSuperadminPurgesAPolicy(
 @dataclass(frozen=True)
 class AnIdNothingAnswersToIsNotFound(
     Scenario[
-        SeedingSession, AMaskingPolicyAndACaller, ClientIPMaskingAdapter, ClientIPMaskingPolicyNode
+        TestSeedingSession,
+        AMaskingPolicyAndACaller,
+        ClientIPMaskingAdapter,
+        ClientIPMaskingPolicyNode,
     ]
 ):
     @override
@@ -112,7 +118,7 @@ class AnIdNothingAnswersToIsNotFound(
         return "슈퍼관리자가 존재하지 않는 id를 삭제하면 대상을 찾을 수 없다는 이유로 거부된다"
 
     @override
-    def given(self) -> Given[SeedingSession, AMaskingPolicyAndACaller]:
+    def given(self) -> Given[TestSeedingSession, AMaskingPolicyAndACaller]:
         return AMaskingPolicyAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
@@ -129,7 +135,10 @@ class AnIdNothingAnswersToIsNotFound(
 @dataclass(frozen=True)
 class AUserGrantedNothingMayNotPurge(
     Scenario[
-        SeedingSession, AMaskingPolicyAndACaller, ClientIPMaskingAdapter, ClientIPMaskingPolicyNode
+        TestSeedingSession,
+        AMaskingPolicyAndACaller,
+        ClientIPMaskingAdapter,
+        ClientIPMaskingPolicyNode,
     ]
 ):
     @override
@@ -141,7 +150,7 @@ class AUserGrantedNothingMayNotPurge(
         return "아무 권한도 없는 사용자가 정책을 삭제하면 권한 부족으로 거부된다. 등록이 역할 부족으로 거부되는 것과는 다른 검사다"
 
     @override
-    def given(self) -> Given[SeedingSession, AMaskingPolicyAndACaller]:
+    def given(self) -> Given[TestSeedingSession, AMaskingPolicyAndACaller]:
         return AMaskingPolicyAndSomeone()
 
     @override
@@ -158,7 +167,10 @@ class AUserGrantedNothingMayNotPurge(
 @dataclass(frozen=True)
 class AUserGrantedNothingPurgingAnUnknownIdIsRefusedForPermission(
     Scenario[
-        SeedingSession, AMaskingPolicyAndACaller, ClientIPMaskingAdapter, ClientIPMaskingPolicyNode
+        TestSeedingSession,
+        AMaskingPolicyAndACaller,
+        ClientIPMaskingAdapter,
+        ClientIPMaskingPolicyNode,
     ]
 ):
     @override
@@ -175,7 +187,7 @@ class AUserGrantedNothingPurgingAnUnknownIdIsRefusedForPermission(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, AMaskingPolicyAndACaller]:
+    def given(self) -> Given[TestSeedingSession, AMaskingPolicyAndACaller]:
         return AMaskingPolicyAndSomeone()
 
     @override
@@ -192,7 +204,10 @@ class AUserGrantedNothingPurgingAnUnknownIdIsRefusedForPermission(
 @dataclass(frozen=True)
 class EnforcementOffLetsAnyonePurge(
     Scenario[
-        SeedingSession, AMaskingPolicyAndACaller, ClientIPMaskingAdapter, ClientIPMaskingPolicyNode
+        TestSeedingSession,
+        AMaskingPolicyAndACaller,
+        ClientIPMaskingAdapter,
+        ClientIPMaskingPolicyNode,
     ],
     Configured,
 ):
@@ -211,7 +226,7 @@ class EnforcementOffLetsAnyonePurge(
         return {ENFORCEMENT: False}
 
     @override
-    def given(self) -> Given[SeedingSession, AMaskingPolicyAndACaller]:
+    def given(self) -> Given[TestSeedingSession, AMaskingPolicyAndACaller]:
         return AMaskingPolicyAndSomeone()
 
     @override

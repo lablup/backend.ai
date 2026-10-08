@@ -7,11 +7,11 @@ from typing import override
 
 from ai.backend.manager.data.login_client_type.types import LoginClientTypeData
 from ai.backend.manager.models.login_client_type.creators import LoginClientTypeCreator
-from bai_scenario.seeds.seeder import Naming, SeedRow
+from bai_scenario.seeds.seeder import Naming, TestSeedRow
 
 
 @dataclass(frozen=True)
-class SeedLoginClientType(SeedRow[LoginClientTypeData]):
+class TestSeedLoginClientType(TestSeedRow[LoginClientTypeData]):
     """A login client type in the global catalog."""
 
     name_hint: str = "client"

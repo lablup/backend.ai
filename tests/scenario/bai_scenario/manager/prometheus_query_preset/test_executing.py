@@ -47,7 +47,7 @@ from bai_scenario.components.prometheus_query_preset import (
 )
 from bai_scenario.fakes.prometheus import RANGE
 from bai_scenario.runner.acting import ActingAs
-from bai_scenario.runner.planting import SeedingSession
+from bai_scenario.runner.planting import TestSeedingSession
 from bai_scenario.runner.steps import run_scenario
 from bai_scenario.seeds.prometheus_query_preset.preset import EMPTY_WITHOUT_LABELS
 
@@ -57,7 +57,7 @@ ASKED_WINDOW = "30s"
 
 type Result = QueryDefinitionResultInfo
 type ExecutingStep = Scenario[
-    SeedingSession, APresetAndACaller, PrometheusQueryPresetAdapter, Result
+    TestSeedingSession, APresetAndACaller, PrometheusQueryPresetAdapter, Result
 ]
 
 
@@ -106,7 +106,7 @@ class Executing(When[APresetAndACaller, PrometheusQueryPresetAdapter, Result]):
 
 @dataclass(frozen=True)
 class TheSuperadminRunsItWithoutARange(
-    Scenario[SeedingSession, APresetAndACaller, PrometheusQueryPresetAdapter, Result]
+    Scenario[TestSeedingSession, APresetAndACaller, PrometheusQueryPresetAdapter, Result]
 ):
     @override
     def summary(self) -> str:
@@ -120,7 +120,7 @@ class TheSuperadminRunsItWithoutARange(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, APresetAndACaller]:
+    def given(self) -> Given[TestSeedingSession, APresetAndACaller]:
         return APresetAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
@@ -134,7 +134,7 @@ class TheSuperadminRunsItWithoutARange(
 
 @dataclass(frozen=True)
 class RunningOverARangeIsARangeQuery(
-    Scenario[SeedingSession, APresetAndACaller, PrometheusQueryPresetAdapter, Result]
+    Scenario[TestSeedingSession, APresetAndACaller, PrometheusQueryPresetAdapter, Result]
 ):
     @override
     def summary(self) -> str:
@@ -145,7 +145,7 @@ class RunningOverARangeIsARangeQuery(
         return "슈퍼관리자가 시작·끝·간격을 지정해 실행하면, 모의 서버가 범위 질의로 응답한다"
 
     @override
-    def given(self) -> Given[SeedingSession, APresetAndACaller]:
+    def given(self) -> Given[TestSeedingSession, APresetAndACaller]:
         return APresetAndSomeone(role=UserRole.SUPERADMIN, time_window=PRESET_WINDOW)
 
     @override
@@ -161,7 +161,7 @@ class RunningOverARangeIsARangeQuery(
 
 @dataclass(frozen=True)
 class PrometheusRefusingTheQueryIsPassedOn(
-    Scenario[SeedingSession, APresetAndACaller, PrometheusQueryPresetAdapter, Result]
+    Scenario[TestSeedingSession, APresetAndACaller, PrometheusQueryPresetAdapter, Result]
 ):
     @override
     def summary(self) -> str:
@@ -175,7 +175,7 @@ class PrometheusRefusingTheQueryIsPassedOn(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, APresetAndACaller]:
+    def given(self) -> Given[TestSeedingSession, APresetAndACaller]:
         return APresetAndSomeone(role=UserRole.SUPERADMIN, query_template=EMPTY_WITHOUT_LABELS)
 
     @override
@@ -189,7 +189,7 @@ class PrometheusRefusingTheQueryIsPassedOn(
 
 @dataclass(frozen=True)
 class AUserGrantedNothingMayNotRun(
-    Scenario[SeedingSession, APresetAndACaller, PrometheusQueryPresetAdapter, Result]
+    Scenario[TestSeedingSession, APresetAndACaller, PrometheusQueryPresetAdapter, Result]
 ):
     @override
     def summary(self) -> str:
@@ -203,7 +203,7 @@ class AUserGrantedNothingMayNotRun(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, APresetAndACaller]:
+    def given(self) -> Given[TestSeedingSession, APresetAndACaller]:
         return APresetAndSomeone(reading_in_public=False)
 
     @override
@@ -217,7 +217,7 @@ class AUserGrantedNothingMayNotRun(
 
 @dataclass(frozen=True)
 class EnforcementOffLetsAnyoneRun(
-    Scenario[SeedingSession, APresetAndACaller, PrometheusQueryPresetAdapter, Result],
+    Scenario[TestSeedingSession, APresetAndACaller, PrometheusQueryPresetAdapter, Result],
     Configured,
 ):
     @override
@@ -233,7 +233,7 @@ class EnforcementOffLetsAnyoneRun(
         return {ENFORCEMENT: False}
 
     @override
-    def given(self) -> Given[SeedingSession, APresetAndACaller]:
+    def given(self) -> Given[TestSeedingSession, APresetAndACaller]:
         return APresetAndSomeone(time_window=PRESET_WINDOW)
 
     @override
@@ -247,7 +247,7 @@ class EnforcementOffLetsAnyoneRun(
 
 @dataclass(frozen=True)
 class AnUnknownIdIsRefusedAsPermission(
-    Scenario[SeedingSession, APresetAndACaller, PrometheusQueryPresetAdapter, Result]
+    Scenario[TestSeedingSession, APresetAndACaller, PrometheusQueryPresetAdapter, Result]
 ):
     @override
     def summary(self) -> str:
@@ -261,7 +261,7 @@ class AnUnknownIdIsRefusedAsPermission(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, APresetAndACaller]:
+    def given(self) -> Given[TestSeedingSession, APresetAndACaller]:
         return APresetAndSomeone()
 
     @override
@@ -275,7 +275,7 @@ class AnUnknownIdIsRefusedAsPermission(
 
 @dataclass(frozen=True)
 class AnUnknownIdIsNotFoundForASuperadmin(
-    Scenario[SeedingSession, APresetAndACaller, PrometheusQueryPresetAdapter, Result]
+    Scenario[TestSeedingSession, APresetAndACaller, PrometheusQueryPresetAdapter, Result]
 ):
     @override
     def summary(self) -> str:
@@ -289,7 +289,7 @@ class AnUnknownIdIsNotFoundForASuperadmin(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, APresetAndACaller]:
+    def given(self) -> Given[TestSeedingSession, APresetAndACaller]:
         return APresetAndSomeone(role=UserRole.SUPERADMIN)
 
     @override

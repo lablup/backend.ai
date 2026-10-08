@@ -25,11 +25,13 @@ from bai_scenario.components.login_client_type import (
     ManyTypesAndSomeone,
 )
 from bai_scenario.runner.acting import ActingAs
-from bai_scenario.runner.planting import SeedingSession
+from bai_scenario.runner.planting import TestSeedingSession
 from bai_scenario.runner.steps import run_scenario
 
 type Searched = SearchLoginClientTypesPayload
-type SearchingStep = Scenario[SeedingSession, ManyTypesAndACaller, LoginClientTypeAdapter, Searched]
+type SearchingStep = Scenario[
+    TestSeedingSession, ManyTypesAndACaller, LoginClientTypeAdapter, Searched
+]
 
 
 @dataclass(frozen=True)
@@ -52,7 +54,7 @@ class SearchingEveryType(When[ManyTypesAndACaller, LoginClientTypeAdapter, Searc
 
 @dataclass(frozen=True)
 class AUserGrantedNothingCountsEveryType(
-    Scenario[SeedingSession, ManyTypesAndACaller, LoginClientTypeAdapter, Searched]
+    Scenario[TestSeedingSession, ManyTypesAndACaller, LoginClientTypeAdapter, Searched]
 ):
     @override
     def summary(self) -> str:
@@ -63,7 +65,7 @@ class AUserGrantedNothingCountsEveryType(
         return "종류 둘이 있을 때 아무 권한도 없는 사용자가 필터 없이 조회하면 둘 다 집계된다"
 
     @override
-    def given(self) -> Given[SeedingSession, ManyTypesAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ManyTypesAndACaller]:
         return ManyTypesAndSomeone(besides=1)
 
     @override

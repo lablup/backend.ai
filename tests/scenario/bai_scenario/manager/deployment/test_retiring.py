@@ -39,11 +39,11 @@ from bai_scenario.components.deployment import (
     AnothersDeploymentAndASuperadmin,
 )
 from bai_scenario.runner.acting import ActingAs
-from bai_scenario.runner.planting import SeedingSession
+from bai_scenario.runner.planting import TestSeedingSession
 from bai_scenario.runner.steps import run_scenario
 
 type RetiringStep = Scenario[
-    SeedingSession, ADeploymentAndACaller, DeploymentAdapter, DeleteDeploymentPayload
+    TestSeedingSession, ADeploymentAndACaller, DeploymentAdapter, DeleteDeploymentPayload
 ]
 
 
@@ -93,7 +93,7 @@ class TheRetiredOneIsNamed(Then[ADeploymentAndACaller, DeleteDeploymentPayload])
 
 @dataclass(frozen=True)
 class TheGrantedUserRetiresIt(
-    Scenario[SeedingSession, ADeploymentAndACaller, DeploymentAdapter, DeleteDeploymentPayload]
+    Scenario[TestSeedingSession, ADeploymentAndACaller, DeploymentAdapter, DeleteDeploymentPayload]
 ):
     @override
     def summary(self) -> str:
@@ -104,7 +104,7 @@ class TheGrantedUserRetiresIt(
         return "soft-delete 권한을 받은 사용자가 배포를 지우면, 그 배포를 지우기 시작했다고 답한다"
 
     @override
-    def given(self) -> Given[SeedingSession, ADeploymentAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ADeploymentAndACaller]:
         return ADeploymentInThatPlace(granted=(Permission.SOFT_DELETE,))
 
     @override
@@ -118,7 +118,7 @@ class TheGrantedUserRetiresIt(
 
 @dataclass(frozen=True)
 class TheSuperadminRetiresAnothers(
-    Scenario[SeedingSession, ADeploymentAndACaller, DeploymentAdapter, DeleteDeploymentPayload]
+    Scenario[TestSeedingSession, ADeploymentAndACaller, DeploymentAdapter, DeleteDeploymentPayload]
 ):
     @override
     def summary(self) -> str:
@@ -132,7 +132,7 @@ class TheSuperadminRetiresAnothers(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, ADeploymentAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ADeploymentAndACaller]:
         return AnothersDeploymentAndASuperadmin()
 
     @override
@@ -146,7 +146,7 @@ class TheSuperadminRetiresAnothers(
 
 @dataclass(frozen=True)
 class UpdatingIsNotEnoughToRetire(
-    Scenario[SeedingSession, ADeploymentAndACaller, DeploymentAdapter, DeleteDeploymentPayload]
+    Scenario[TestSeedingSession, ADeploymentAndACaller, DeploymentAdapter, DeleteDeploymentPayload]
 ):
     @override
     def summary(self) -> str:
@@ -160,7 +160,7 @@ class UpdatingIsNotEnoughToRetire(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, ADeploymentAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ADeploymentAndACaller]:
         return ADeploymentInThatPlace(granted=(Permission.UPDATE,))
 
     @override
@@ -174,7 +174,7 @@ class UpdatingIsNotEnoughToRetire(
 
 @dataclass(frozen=True)
 class RetiringAnUnknownIdIsNotFoundForASuperadmin(
-    Scenario[SeedingSession, ADeploymentAndACaller, DeploymentAdapter, DeleteDeploymentPayload]
+    Scenario[TestSeedingSession, ADeploymentAndACaller, DeploymentAdapter, DeleteDeploymentPayload]
 ):
     @override
     def summary(self) -> str:
@@ -185,7 +185,7 @@ class RetiringAnUnknownIdIsNotFoundForASuperadmin(
         return "슈퍼관리자가 아무것도 갖지 않은 id를 지우면, 대상이 없다는 것으로 거부된다"
 
     @override
-    def given(self) -> Given[SeedingSession, ADeploymentAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ADeploymentAndACaller]:
         return ADeploymentInThatPlace(role=UserRole.SUPERADMIN)
 
     @override

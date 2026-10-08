@@ -43,22 +43,22 @@ from bai_scenario.components.container_registry import (
     ManyRegistriesAndSomeone,
 )
 from bai_scenario.runner.acting import ActingAs
-from bai_scenario.runner.planting import SeedingSession
+from bai_scenario.runner.planting import TestSeedingSession
 from bai_scenario.runner.steps import run_scenario
 
 type SearchScenario = Scenario[
-    SeedingSession,
+    TestSeedingSession,
     ManyRegistriesAndACaller,
     ContainerRegistryAdapter,
     AdminSearchContainerRegistriesPayload,
 ]
-type SearchGiven = Given[SeedingSession, ManyRegistriesAndACaller]
+type SearchGiven = Given[TestSeedingSession, ManyRegistriesAndACaller]
 type SearchThen = Then[ManyRegistriesAndACaller, AdminSearchContainerRegistriesPayload]
 
 
 class ContainerRegistrySearchScenario(
     Scenario[
-        SeedingSession,
+        TestSeedingSession,
         ManyRegistriesAndACaller,
         ContainerRegistryAdapter,
         AdminSearchContainerRegistriesPayload,

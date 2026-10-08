@@ -16,9 +16,9 @@ from typing import Any
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.testutils.scenario_report import Line, ScenarioRecord
 from ai.backend.testutils.scenario_steps import Answered, Scenario, Told
-from bai_scenario.runner.planting import SeedingSession
-from bai_scenario.seeds.ops import SeedOpsProvider
-from bai_scenario.seeds.seeder import Seeder
+from bai_scenario.runner.planting import TestSeedingSession
+from bai_scenario.seeds.ops import TestSeedOpsProvider
+from bai_scenario.seeds.seeder import TestSeeder
 
 
 def offered_by(adapter: object) -> frozenset[str]:
@@ -54,12 +54,14 @@ class ScenarioRun:
 
 
 async def run_scenario(
-    scenario: Scenario[SeedingSession, Any, Any, Any], adapter: Any, engine: ExtendedAsyncSAEngine
+    scenario: Scenario[TestSeedingSession, Any, Any, Any],
+    adapter: Any,
+    engine: ExtendedAsyncSAEngine,
 ) -> ScenarioRun:
     """세 단계를 순서대로 돌고, 어긋난 것이 있으면 그 자리에서 세운다."""
     given = scenario.given()
-    async with SeedOpsProvider(engine).write_ops() as ops:
-        seeding = SeedingSession(Seeder(), ops)
+    async with TestSeedOpsProvider(engine).write_ops() as ops:
+        seeding = TestSeedingSession(TestSeeder(), ops)
         laid = await given.lay(seeding)
         laid_told = Told(given.describe(), within=seeding.told())
 
@@ -104,7 +106,7 @@ def _flatten(told: Told, *, skip_root: bool = False) -> tuple[Line, ...]:
 
 
 def _record(
-    scenario: Scenario[SeedingSession, Any, Any, Any],
+    scenario: Scenario[TestSeedingSession, Any, Any, Any],
     run: ScenarioRun,
     adapter: Any,
     *,

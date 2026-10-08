@@ -25,10 +25,10 @@ from bai_scenario.components.resource_group import (
 )
 from bai_scenario.components.system import ACaller, SomeoneAlone
 from bai_scenario.runner.acting import ActingAs
-from bai_scenario.runner.planting import SeedingSession
+from bai_scenario.runner.planting import TestSeedingSession
 from bai_scenario.runner.steps import run_scenario
 
-type CreatingStep = Scenario[SeedingSession, Any, ResourceGroupAdapter, ResourceGroupDetailNode]
+type CreatingStep = Scenario[TestSeedingSession, Any, ResourceGroupAdapter, ResourceGroupDetailNode]
 
 
 @dataclass(frozen=True)
@@ -62,7 +62,7 @@ class Creating(When[Any, ResourceGroupAdapter, ResourceGroupDetailNode]):
 
 @dataclass(frozen=True)
 class TheSuperadminMakesAGroup(
-    Scenario[SeedingSession, ACaller, ResourceGroupAdapter, ResourceGroupDetailNode]
+    Scenario[TestSeedingSession, ACaller, ResourceGroupAdapter, ResourceGroupDetailNode]
 ):
     started: datetime
 
@@ -78,7 +78,7 @@ class TheSuperadminMakesAGroup(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, ACaller]:
+    def given(self) -> Given[TestSeedingSession, ACaller]:
         return SomeoneAlone(role=UserRole.SUPERADMIN)
 
     @override
@@ -92,7 +92,7 @@ class TheSuperadminMakesAGroup(
 
 @dataclass(frozen=True)
 class ADefaultGroupIsMade(
-    Scenario[SeedingSession, ACaller, ResourceGroupAdapter, ResourceGroupDetailNode]
+    Scenario[TestSeedingSession, ACaller, ResourceGroupAdapter, ResourceGroupDetailNode]
 ):
     started: datetime
 
@@ -105,7 +105,7 @@ class ADefaultGroupIsMade(
         return "기본 그룹이 없을 때 슈퍼관리자가 기본으로 지정해 만들면 기본인 그룹이 반환된다"
 
     @override
-    def given(self) -> Given[SeedingSession, ACaller]:
+    def given(self) -> Given[TestSeedingSession, ACaller]:
         return SomeoneAlone(role=UserRole.SUPERADMIN)
 
     @override
@@ -119,7 +119,7 @@ class ADefaultGroupIsMade(
 
 @dataclass(frozen=True)
 class ANameAnotherGroupHoldsIsRefused(
-    Scenario[SeedingSession, AGroupAndACaller, ResourceGroupAdapter, ResourceGroupDetailNode]
+    Scenario[TestSeedingSession, AGroupAndACaller, ResourceGroupAdapter, ResourceGroupDetailNode]
 ):
     @override
     def summary(self) -> str:
@@ -130,7 +130,7 @@ class ANameAnotherGroupHoldsIsRefused(
         return "이미 어떤 그룹이 쓰고 있는 이름으로 만들려 하면 이름 중복으로 거부된다"
 
     @override
-    def given(self) -> Given[SeedingSession, AGroupAndACaller]:
+    def given(self) -> Given[TestSeedingSession, AGroupAndACaller]:
         return AGroupAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
@@ -144,7 +144,7 @@ class ANameAnotherGroupHoldsIsRefused(
 
 @dataclass(frozen=True)
 class ASecondDefaultIsRefused(
-    Scenario[SeedingSession, AGroupAndACaller, ResourceGroupAdapter, ResourceGroupDetailNode]
+    Scenario[TestSeedingSession, AGroupAndACaller, ResourceGroupAdapter, ResourceGroupDetailNode]
 ):
     @override
     def summary(self) -> str:
@@ -155,7 +155,7 @@ class ASecondDefaultIsRefused(
         return "기본 그룹이 이미 있을 때 다른 이름으로 또 기본 그룹을 만들려 하면 기본 그룹이 이미 있다는 이유로 거부된다"
 
     @override
-    def given(self) -> Given[SeedingSession, AGroupAndACaller]:
+    def given(self) -> Given[TestSeedingSession, AGroupAndACaller]:
         return AGroupAndSomeone(role=UserRole.SUPERADMIN, is_default=True)
 
     @override
@@ -169,7 +169,7 @@ class ASecondDefaultIsRefused(
 
 @dataclass(frozen=True)
 class AUserWhoIsNotTheSuperadminMayNotCreate(
-    Scenario[SeedingSession, ACaller, ResourceGroupAdapter, ResourceGroupDetailNode]
+    Scenario[TestSeedingSession, ACaller, ResourceGroupAdapter, ResourceGroupDetailNode]
 ):
     @override
     def summary(self) -> str:
@@ -180,7 +180,7 @@ class AUserWhoIsNotTheSuperadminMayNotCreate(
         return "슈퍼관리자가 아닌 사용자가 리소스 그룹을 만들려 하면 역할 부족으로 거부된다"
 
     @override
-    def given(self) -> Given[SeedingSession, ACaller]:
+    def given(self) -> Given[TestSeedingSession, ACaller]:
         return SomeoneAlone()
 
     @override
@@ -194,7 +194,7 @@ class AUserWhoIsNotTheSuperadminMayNotCreate(
 
 @dataclass(frozen=True)
 class TheMonitorMayNotCreate(
-    Scenario[SeedingSession, ACaller, ResourceGroupAdapter, ResourceGroupDetailNode]
+    Scenario[TestSeedingSession, ACaller, ResourceGroupAdapter, ResourceGroupDetailNode]
 ):
     @override
     def summary(self) -> str:
@@ -205,7 +205,7 @@ class TheMonitorMayNotCreate(
         return "모니터가 리소스 그룹을 만들려 하면 역할 부족으로 거부된다. 모니터는 읽기만 통과한다"
 
     @override
-    def given(self) -> Given[SeedingSession, ACaller]:
+    def given(self) -> Given[TestSeedingSession, ACaller]:
         return SomeoneAlone(role=UserRole.MONITOR)
 
     @override

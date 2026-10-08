@@ -26,13 +26,13 @@ from bai_scenario.components.resource_slot import (
 )
 from bai_scenario.components.system import ENFORCEMENT, ACaller, SomeoneAlone
 from bai_scenario.runner.acting import ActingAs
-from bai_scenario.runner.planting import SeedingSession
+from bai_scenario.runner.planting import TestSeedingSession
 from bai_scenario.runner.steps import run_scenario
 
 MADE = "cuda.shares"
 BINARY_ROUNDED = NumberFormatInfo(binary=True, round_length=2)
 
-type CreatingStep = Scenario[SeedingSession, Any, ResourceSlotAdapter, ResourceSlotTypeNode]
+type CreatingStep = Scenario[TestSeedingSession, Any, ResourceSlotAdapter, ResourceSlotTypeNode]
 
 
 @dataclass(frozen=True)
@@ -101,7 +101,7 @@ class CreatingWithTheLaidName(When[ASlotTypeAndACaller, ResourceSlotAdapter, Res
 
 @dataclass(frozen=True)
 class TheSuperadminMakesOneWithANameAndAKind(
-    Scenario[SeedingSession, ACaller, ResourceSlotAdapter, ResourceSlotTypeNode]
+    Scenario[TestSeedingSession, ACaller, ResourceSlotAdapter, ResourceSlotTypeNode]
 ):
     @override
     def summary(self) -> str:
@@ -115,7 +115,7 @@ class TheSuperadminMakesOneWithANameAndAKind(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, ACaller]:
+    def given(self) -> Given[TestSeedingSession, ACaller]:
         return SomeoneAlone(role=UserRole.SUPERADMIN)
 
     @override
@@ -129,7 +129,7 @@ class TheSuperadminMakesOneWithANameAndAKind(
 
 @dataclass(frozen=True)
 class EveryDisplayValueComesBackAsGiven(
-    Scenario[SeedingSession, ACaller, ResourceSlotAdapter, ResourceSlotTypeNode]
+    Scenario[TestSeedingSession, ACaller, ResourceSlotAdapter, ResourceSlotTypeNode]
 ):
     @override
     def summary(self) -> str:
@@ -140,7 +140,7 @@ class EveryDisplayValueComesBackAsGiven(
         return "슈퍼관리자가 표시 이름·설명·단위·아이콘·서식·순위까지 지정해 생성하면, 지정한 값이 그대로 담긴 노드가 반환된다"
 
     @override
-    def given(self) -> Given[SeedingSession, ACaller]:
+    def given(self) -> Given[TestSeedingSession, ACaller]:
         return SomeoneAlone(role=UserRole.SUPERADMIN)
 
     @override
@@ -165,7 +165,7 @@ class EveryDisplayValueComesBackAsGiven(
 
 @dataclass(frozen=True)
 class EachKindIsAccepted(
-    Scenario[SeedingSession, ACaller, ResourceSlotAdapter, ResourceSlotTypeNode]
+    Scenario[TestSeedingSession, ACaller, ResourceSlotAdapter, ResourceSlotTypeNode]
 ):
     slot_type: SlotTypes
 
@@ -178,7 +178,7 @@ class EachKindIsAccepted(
         return f"슈퍼관리자가 {self.slot_type.value} 종류로 생성하면 그 종류가 담긴 노드가 반환된다"
 
     @override
-    def given(self) -> Given[SeedingSession, ACaller]:
+    def given(self) -> Given[TestSeedingSession, ACaller]:
         return SomeoneAlone(role=UserRole.SUPERADMIN)
 
     @override
@@ -192,7 +192,7 @@ class EachKindIsAccepted(
 
 @dataclass(frozen=True)
 class ANameAlreadyTakenIsRefused(
-    Scenario[SeedingSession, ASlotTypeAndACaller, ResourceSlotAdapter, ResourceSlotTypeNode]
+    Scenario[TestSeedingSession, ASlotTypeAndACaller, ResourceSlotAdapter, ResourceSlotTypeNode]
 ):
     @override
     def summary(self) -> str:
@@ -207,7 +207,7 @@ class ANameAlreadyTakenIsRefused(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, ASlotTypeAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ASlotTypeAndACaller]:
         return ASlotTypeAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
@@ -221,7 +221,7 @@ class ANameAlreadyTakenIsRefused(
 
 @dataclass(frozen=True)
 class AUserWhoIsNotTheSuperadminMayNotCreate(
-    Scenario[SeedingSession, ACaller, ResourceSlotAdapter, ResourceSlotTypeNode]
+    Scenario[TestSeedingSession, ACaller, ResourceSlotAdapter, ResourceSlotTypeNode]
 ):
     @override
     def summary(self) -> str:
@@ -232,7 +232,7 @@ class AUserWhoIsNotTheSuperadminMayNotCreate(
         return "슈퍼관리자가 아닌 사용자가 슬롯 종류를 생성하면 역할 부족으로 거부된다"
 
     @override
-    def given(self) -> Given[SeedingSession, ACaller]:
+    def given(self) -> Given[TestSeedingSession, ACaller]:
         return SomeoneAlone()
 
     @override
@@ -246,7 +246,7 @@ class AUserWhoIsNotTheSuperadminMayNotCreate(
 
 @dataclass(frozen=True)
 class EnforcementOffStillNeedsTheSuperadmin(
-    Scenario[SeedingSession, ACaller, ResourceSlotAdapter, ResourceSlotTypeNode], Configured
+    Scenario[TestSeedingSession, ACaller, ResourceSlotAdapter, ResourceSlotTypeNode], Configured
 ):
     @override
     def summary(self) -> str:
@@ -261,7 +261,7 @@ class EnforcementOffStillNeedsTheSuperadmin(
         return {ENFORCEMENT: False}
 
     @override
-    def given(self) -> Given[SeedingSession, ACaller]:
+    def given(self) -> Given[TestSeedingSession, ACaller]:
         return SomeoneAlone()
 
     @override

@@ -39,11 +39,11 @@ from bai_scenario.components.client_ip_masking import (
 )
 from bai_scenario.components.system import ENFORCEMENT, ACaller, SomeoneAlone
 from bai_scenario.runner.acting import ActingAs
-from bai_scenario.runner.planting import SeedingSession
+from bai_scenario.runner.planting import TestSeedingSession
 from bai_scenario.runner.steps import run_scenario
 
 type UpsertingStep = Scenario[
-    SeedingSession, Any, ClientIPMaskingAdapter, ClientIPMaskingPolicyNode
+    TestSeedingSession, Any, ClientIPMaskingAdapter, ClientIPMaskingPolicyNode
 ]
 
 
@@ -119,7 +119,7 @@ class UpsertingTheLaidTargetAgain(
 
 @dataclass(frozen=True)
 class TheSuperadminPutsAPolicyOnATarget(
-    Scenario[SeedingSession, ACaller, ClientIPMaskingAdapter, ClientIPMaskingPolicyNode]
+    Scenario[TestSeedingSession, ACaller, ClientIPMaskingAdapter, ClientIPMaskingPolicyNode]
 ):
     started: datetime
 
@@ -132,7 +132,7 @@ class TheSuperadminPutsAPolicyOnATarget(
         return "정책이 없을 때 슈퍼관리자가 대상·모드·두 접두 길이를 지정해 등록하면 지정한 값이 그대로 담긴 노드가 반환된다"
 
     @override
-    def given(self) -> Given[SeedingSession, ACaller]:
+    def given(self) -> Given[TestSeedingSession, ACaller]:
         return SomeoneAlone(role=UserRole.SUPERADMIN)
 
     @override
@@ -152,7 +152,7 @@ class TheSuperadminPutsAPolicyOnATarget(
 
 @dataclass(frozen=True)
 class OmittedPrefixesStayEmpty(
-    Scenario[SeedingSession, ACaller, ClientIPMaskingAdapter, ClientIPMaskingPolicyNode]
+    Scenario[TestSeedingSession, ACaller, ClientIPMaskingAdapter, ClientIPMaskingPolicyNode]
 ):
     started: datetime
 
@@ -165,7 +165,7 @@ class OmittedPrefixesStayEmpty(
         return "대상과 모드만 지정해 등록하면 두 접두 길이가 비어 있는 노드가 반환된다"
 
     @override
-    def given(self) -> Given[SeedingSession, ACaller]:
+    def given(self) -> Given[TestSeedingSession, ACaller]:
         return SomeoneAlone(role=UserRole.SUPERADMIN)
 
     @override
@@ -186,7 +186,10 @@ class OmittedPrefixesStayEmpty(
 @dataclass(frozen=True)
 class PuttingOnATakenTargetRewritesTheRow(
     Scenario[
-        SeedingSession, AMaskingPolicyAndACaller, ClientIPMaskingAdapter, ClientIPMaskingPolicyNode
+        TestSeedingSession,
+        AMaskingPolicyAndACaller,
+        ClientIPMaskingAdapter,
+        ClientIPMaskingPolicyNode,
     ]
 ):
     started: datetime
@@ -200,7 +203,7 @@ class PuttingOnATakenTargetRewritesTheRow(
         return "이미 정책이 있는 대상에 다른 모드로 등록하면, 새 행이 아니라 같은 id의 행이 새 모드로 바뀐 노드가 반환된다"
 
     @override
-    def given(self) -> Given[SeedingSession, AMaskingPolicyAndACaller]:
+    def given(self) -> Given[TestSeedingSession, AMaskingPolicyAndACaller]:
         return AMaskingPolicyAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
@@ -217,7 +220,10 @@ class PuttingOnATakenTargetRewritesTheRow(
 @dataclass(frozen=True)
 class PuttingAgainWithoutPrefixesClearsThem(
     Scenario[
-        SeedingSession, AMaskingPolicyAndACaller, ClientIPMaskingAdapter, ClientIPMaskingPolicyNode
+        TestSeedingSession,
+        AMaskingPolicyAndACaller,
+        ClientIPMaskingAdapter,
+        ClientIPMaskingPolicyNode,
     ]
 ):
     started: datetime
@@ -234,7 +240,7 @@ class PuttingAgainWithoutPrefixesClearsThem(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, AMaskingPolicyAndACaller]:
+    def given(self) -> Given[TestSeedingSession, AMaskingPolicyAndACaller]:
         return AMaskingPolicyAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
@@ -250,7 +256,7 @@ class PuttingAgainWithoutPrefixesClearsThem(
 
 @dataclass(frozen=True)
 class AUserWhoIsNotTheSuperadminMayNotPut(
-    Scenario[SeedingSession, ACaller, ClientIPMaskingAdapter, ClientIPMaskingPolicyNode]
+    Scenario[TestSeedingSession, ACaller, ClientIPMaskingAdapter, ClientIPMaskingPolicyNode]
 ):
     @override
     def summary(self) -> str:
@@ -261,7 +267,7 @@ class AUserWhoIsNotTheSuperadminMayNotPut(
         return "슈퍼관리자가 아닌 사용자가 정책을 등록하면 역할 부족으로 거부된다"
 
     @override
-    def given(self) -> Given[SeedingSession, ACaller]:
+    def given(self) -> Given[TestSeedingSession, ACaller]:
         return SomeoneAlone()
 
     @override
@@ -275,7 +281,7 @@ class AUserWhoIsNotTheSuperadminMayNotPut(
 
 @dataclass(frozen=True)
 class TheMonitorMayNotPut(
-    Scenario[SeedingSession, ACaller, ClientIPMaskingAdapter, ClientIPMaskingPolicyNode]
+    Scenario[TestSeedingSession, ACaller, ClientIPMaskingAdapter, ClientIPMaskingPolicyNode]
 ):
     @override
     def summary(self) -> str:
@@ -286,7 +292,7 @@ class TheMonitorMayNotPut(
         return "모니터 역할이 정책을 등록하면 역할 부족으로 거부된다. 모니터는 슈퍼관리자 검사에서 읽기만 통과한다"
 
     @override
-    def given(self) -> Given[SeedingSession, ACaller]:
+    def given(self) -> Given[TestSeedingSession, ACaller]:
         return SomeoneAlone(role=UserRole.MONITOR)
 
     @override
@@ -300,7 +306,7 @@ class TheMonitorMayNotPut(
 
 @dataclass(frozen=True)
 class EnforcementOffStillNeedsTheSuperadmin(
-    Scenario[SeedingSession, ACaller, ClientIPMaskingAdapter, ClientIPMaskingPolicyNode],
+    Scenario[TestSeedingSession, ACaller, ClientIPMaskingAdapter, ClientIPMaskingPolicyNode],
     Configured,
 ):
     @override
@@ -316,7 +322,7 @@ class EnforcementOffStillNeedsTheSuperadmin(
         return {ENFORCEMENT: False}
 
     @override
-    def given(self) -> Given[SeedingSession, ACaller]:
+    def given(self) -> Given[TestSeedingSession, ACaller]:
         return SomeoneAlone()
 
     @override

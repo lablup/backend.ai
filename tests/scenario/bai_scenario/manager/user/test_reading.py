@@ -31,9 +31,9 @@ from bai_scenario.components.answers import TheCallIsRefused
 from bai_scenario.components.domain import WAS_HERE, SomeoneOf
 from bai_scenario.components.user import AGrant, UserNodeLook
 from bai_scenario.runner.acting import ActingAs
-from bai_scenario.runner.planting import SeedingSession
+from bai_scenario.runner.planting import TestSeedingSession
 from bai_scenario.runner.steps import run_scenario
-from bai_scenario.seeds.domain.domain import SeedDomain
+from bai_scenario.seeds.domain.domain import TestSeedDomain
 
 type Loaded = list[UserNode | Exception | None]
 type Answer = UserNode | Loaded
@@ -71,7 +71,7 @@ class SomeoneAndAnother(Given[Any, AReaderAndATarget]):
 
     @override
     async def lay(self, seeding: Any) -> AReaderAndATarget:
-        domain = await seeding.creating(SeedDomain(name_hint="home", description=WAS_HERE))
+        domain = await seeding.creating(TestSeedDomain(name_hint="home", description=WAS_HERE))
         target = await seeding.within(SomeoneOf(domain))
         caller = await seeding.within(SomeoneOf(domain, role=self.role))
         if self.granted:
@@ -89,7 +89,7 @@ class SomeoneReadingOneOfTwo(Given[Any, AReaderAndTwoUsers]):
 
     @override
     async def lay(self, seeding: Any) -> AReaderAndTwoUsers:
-        domain = await seeding.creating(SeedDomain(name_hint="home", description=WAS_HERE))
+        domain = await seeding.creating(TestSeedDomain(name_hint="home", description=WAS_HERE))
         readable = await seeding.within(SomeoneOf(domain))
         unreadable = await seeding.within(SomeoneOf(domain))
         caller = await seeding.within(SomeoneOf(domain))
@@ -264,7 +264,9 @@ class AnEmptyList(Then[AReaderAndATarget, Answer]):
 
 
 @dataclass(frozen=True)
-class AGrantedUserReadsAnother(Scenario[SeedingSession, AReaderAndATarget, UserAdapter, Answer]):
+class AGrantedUserReadsAnother(
+    Scenario[TestSeedingSession, AReaderAndATarget, UserAdapter, Answer]
+):
     started: datetime
 
     @override
@@ -279,7 +281,7 @@ class AGrantedUserReadsAnother(Scenario[SeedingSession, AReaderAndATarget, UserA
         )
 
     @override
-    def given(self) -> Given[SeedingSession, AReaderAndATarget]:
+    def given(self) -> Given[TestSeedingSession, AReaderAndATarget]:
         return SomeoneAndAnother(granted=True)
 
     @override
@@ -293,7 +295,7 @@ class AGrantedUserReadsAnother(Scenario[SeedingSession, AReaderAndATarget, UserA
 
 @dataclass(frozen=True)
 class AUserGrantedNothingMayNotReadAnother(
-    Scenario[SeedingSession, AReaderAndATarget, UserAdapter, Answer]
+    Scenario[TestSeedingSession, AReaderAndATarget, UserAdapter, Answer]
 ):
     @override
     def summary(self) -> str:
@@ -304,7 +306,7 @@ class AUserGrantedNothingMayNotReadAnother(
         return "아무 역할도 받지 않은 사용자가 다른 사용자를 읽으려 하면, 엔티티 권한 문이 막는다"
 
     @override
-    def given(self) -> Given[SeedingSession, AReaderAndATarget]:
+    def given(self) -> Given[TestSeedingSession, AReaderAndATarget]:
         return SomeoneAndAnother(granted=False)
 
     @override
@@ -318,7 +320,7 @@ class AUserGrantedNothingMayNotReadAnother(
 
 @dataclass(frozen=True)
 class ABatchLoadAnswersEachElementInOrder(
-    Scenario[SeedingSession, AReaderAndTwoUsers, UserAdapter, Answer]
+    Scenario[TestSeedingSession, AReaderAndTwoUsers, UserAdapter, Answer]
 ):
     started: datetime
 
@@ -334,7 +336,7 @@ class ABatchLoadAnswersEachElementInOrder(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, AReaderAndTwoUsers]:
+    def given(self) -> Given[TestSeedingSession, AReaderAndTwoUsers]:
         return SomeoneReadingOneOfTwo()
 
     @override
@@ -348,7 +350,7 @@ class ABatchLoadAnswersEachElementInOrder(
 
 @dataclass(frozen=True)
 class TheSuperadminBatchLoadLeavesAMissingIdEmpty(
-    Scenario[SeedingSession, AReaderAndATarget, UserAdapter, Answer]
+    Scenario[TestSeedingSession, AReaderAndATarget, UserAdapter, Answer]
 ):
     started: datetime
 
@@ -364,7 +366,7 @@ class TheSuperadminBatchLoadLeavesAMissingIdEmpty(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, AReaderAndATarget]:
+    def given(self) -> Given[TestSeedingSession, AReaderAndATarget]:
         return SomeoneAndAnother(granted=False, role=UserRole.SUPERADMIN)
 
     @override
@@ -378,7 +380,7 @@ class TheSuperadminBatchLoadLeavesAMissingIdEmpty(
 
 @dataclass(frozen=True)
 class ABatchLoadOfNothingAnswersNothing(
-    Scenario[SeedingSession, AReaderAndATarget, UserAdapter, Answer]
+    Scenario[TestSeedingSession, AReaderAndATarget, UserAdapter, Answer]
 ):
     @override
     def summary(self) -> str:
@@ -389,7 +391,7 @@ class ABatchLoadOfNothingAnswersNothing(
         return "권한 없는 사용자가 빈 id 목록을 주면, 어떤 액션도 부르지 않고 빈 목록이 답으로 온다"
 
     @override
-    def given(self) -> Given[SeedingSession, AReaderAndATarget]:
+    def given(self) -> Given[TestSeedingSession, AReaderAndATarget]:
         return SomeoneAndAnother(granted=False)
 
     @override
@@ -401,7 +403,7 @@ class ABatchLoadOfNothingAnswersNothing(
         return AnEmptyList()
 
 
-SCENARIOS: list[Scenario[SeedingSession, Any, UserAdapter, Answer]] = [
+SCENARIOS: list[Scenario[TestSeedingSession, Any, UserAdapter, Answer]] = [
     AGrantedUserReadsAnother(started=datetime.now(UTC)),
     AUserGrantedNothingMayNotReadAnother(),
     ABatchLoadAnswersEachElementInOrder(started=datetime.now(UTC)),
@@ -412,7 +414,7 @@ SCENARIOS: list[Scenario[SeedingSession, Any, UserAdapter, Answer]] = [
 
 @pytest.mark.parametrize("scenario", SCENARIOS, ids=lambda s: s.summary())
 async def test_reading(
-    scenario: Scenario[SeedingSession, Any, UserAdapter, Answer],
+    scenario: Scenario[TestSeedingSession, Any, UserAdapter, Answer],
     adapter: UserAdapter,
     engine: ExtendedAsyncSAEngine,
 ) -> None:

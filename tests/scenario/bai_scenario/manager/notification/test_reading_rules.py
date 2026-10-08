@@ -31,10 +31,10 @@ from bai_scenario.components.notification import (
     TwoRulesAndSomeone,
 )
 from bai_scenario.runner.acting import ActingAs
-from bai_scenario.runner.planting import SeedingSession
+from bai_scenario.runner.planting import TestSeedingSession
 from bai_scenario.runner.steps import run_scenario
 
-type ReadingStep = Scenario[SeedingSession, Any, NotificationAdapter, Any]
+type ReadingStep = Scenario[TestSeedingSession, Any, NotificationAdapter, Any]
 
 
 @dataclass(frozen=True)
@@ -121,7 +121,7 @@ class ReadingNoIds(When[ManyRulesAndACaller, NotificationAdapter, LoadedRules]):
 
 @dataclass(frozen=True)
 class TheSuperadminReadsARule(
-    Scenario[SeedingSession, ARuleAndACaller, NotificationAdapter, NotificationRuleNode]
+    Scenario[TestSeedingSession, ARuleAndACaller, NotificationAdapter, NotificationRuleNode]
 ):
     started: datetime
 
@@ -134,7 +134,7 @@ class TheSuperadminReadsARule(
         return "규칙 하나가 있고 슈퍼관리자가 id로 조회하면, 그 규칙 전체가 반환된다"
 
     @override
-    def given(self) -> Given[SeedingSession, ARuleAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ARuleAndACaller]:
         return ARuleAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
@@ -148,7 +148,7 @@ class TheSuperadminReadsARule(
 
 @dataclass(frozen=True)
 class AUserGrantedNothingMayNotRead(
-    Scenario[SeedingSession, ARuleAndACaller, NotificationAdapter, NotificationRuleNode]
+    Scenario[TestSeedingSession, ARuleAndACaller, NotificationAdapter, NotificationRuleNode]
 ):
     @override
     def summary(self) -> str:
@@ -159,7 +159,7 @@ class AUserGrantedNothingMayNotRead(
         return "아무 권한도 없는 사용자가 id로 조회하면 권한 부족으로 거부된다"
 
     @override
-    def given(self) -> Given[SeedingSession, ARuleAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ARuleAndACaller]:
         return ARuleAndSomeone()
 
     @override
@@ -173,7 +173,7 @@ class AUserGrantedNothingMayNotRead(
 
 @dataclass(frozen=True)
 class TheSuperadminReadingAnUnknownIdIsNotFound(
-    Scenario[SeedingSession, ARuleAndACaller, NotificationAdapter, NotificationRuleNode]
+    Scenario[TestSeedingSession, ARuleAndACaller, NotificationAdapter, NotificationRuleNode]
 ):
     @override
     def summary(self) -> str:
@@ -184,7 +184,7 @@ class TheSuperadminReadingAnUnknownIdIsNotFound(
         return "슈퍼관리자가 존재하지 않는 id로 조회하면 대상을 찾을 수 없다는 이유로 거부된다"
 
     @override
-    def given(self) -> Given[SeedingSession, ARuleAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ARuleAndACaller]:
         return ARuleAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
@@ -198,7 +198,7 @@ class TheSuperadminReadingAnUnknownIdIsNotFound(
 
 @dataclass(frozen=True)
 class TheSuperadminLoadsLaidAndMissing(
-    Scenario[SeedingSession, ManyRulesAndACaller, NotificationAdapter, LoadedRules]
+    Scenario[TestSeedingSession, ManyRulesAndACaller, NotificationAdapter, LoadedRules]
 ):
     started: datetime
 
@@ -214,7 +214,7 @@ class TheSuperadminLoadsLaidAndMissing(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, ManyRulesAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ManyRulesAndACaller]:
         return TwoRulesAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
@@ -228,7 +228,7 @@ class TheSuperadminLoadsLaidAndMissing(
 
 @dataclass(frozen=True)
 class AUserGrantedNothingIsRefusedPerItem(
-    Scenario[SeedingSession, ManyRulesAndACaller, NotificationAdapter, LoadedRules]
+    Scenario[TestSeedingSession, ManyRulesAndACaller, NotificationAdapter, LoadedRules]
 ):
     @override
     def summary(self) -> str:
@@ -242,7 +242,7 @@ class AUserGrantedNothingIsRefusedPerItem(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, ManyRulesAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ManyRulesAndACaller]:
         return TwoRulesAndSomeone()
 
     @override
@@ -256,7 +256,7 @@ class AUserGrantedNothingIsRefusedPerItem(
 
 @dataclass(frozen=True)
 class ABatchLoadOfNothingAnswersNothing(
-    Scenario[SeedingSession, ManyRulesAndACaller, NotificationAdapter, LoadedRules]
+    Scenario[TestSeedingSession, ManyRulesAndACaller, NotificationAdapter, LoadedRules]
 ):
     @override
     def summary(self) -> str:
@@ -267,7 +267,7 @@ class ABatchLoadOfNothingAnswersNothing(
         return "빈 id 목록으로 조회하면 하위 계층을 부르지 않고 빈 응답이 반환된다"
 
     @override
-    def given(self) -> Given[SeedingSession, ManyRulesAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ManyRulesAndACaller]:
         return TwoRulesAndSomeone()
 
     @override

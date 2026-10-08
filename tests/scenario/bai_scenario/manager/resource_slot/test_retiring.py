@@ -33,13 +33,13 @@ from bai_scenario.components.resource_slot import (
 )
 from bai_scenario.components.system import ENFORCEMENT
 from bai_scenario.runner.acting import ActingAs
-from bai_scenario.runner.planting import SeedingSession
+from bai_scenario.runner.planting import TestSeedingSession
 from bai_scenario.runner.steps import run_scenario
 
 UNKNOWN = "no-such-slot"
 
 type Purged = PurgeResourceSlotTypePayload
-type RetiringStep = Scenario[SeedingSession, ASlotTypeAndACaller, ResourceSlotAdapter, Purged]
+type RetiringStep = Scenario[TestSeedingSession, ASlotTypeAndACaller, ResourceSlotAdapter, Purged]
 
 
 @dataclass(frozen=True)
@@ -69,7 +69,7 @@ class Purging(When[ASlotTypeAndACaller, ResourceSlotAdapter, Purged]):
 
 @dataclass(frozen=True)
 class TheSuperadminPurgesASlotType(
-    Scenario[SeedingSession, ASlotTypeAndACaller, ResourceSlotAdapter, Purged]
+    Scenario[TestSeedingSession, ASlotTypeAndACaller, ResourceSlotAdapter, Purged]
 ):
     @override
     def summary(self) -> str:
@@ -80,7 +80,7 @@ class TheSuperadminPurgesASlotType(
         return "아무것도 참조하지 않는 슬롯 종류를 슈퍼관리자가 이름으로 삭제하면 삭제한 이름을 담은 응답이 반환된다"
 
     @override
-    def given(self) -> Given[SeedingSession, ASlotTypeAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ASlotTypeAndACaller]:
         return ASlotTypeAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
@@ -94,7 +94,7 @@ class TheSuperadminPurgesASlotType(
 
 @dataclass(frozen=True)
 class ASlotAKernelStillAsksForMayNotBePurged(
-    Scenario[SeedingSession, ASlotTypeAndACaller, ResourceSlotAdapter, Purged]
+    Scenario[TestSeedingSession, ASlotTypeAndACaller, ResourceSlotAdapter, Purged]
 ):
     @override
     def summary(self) -> str:
@@ -105,7 +105,7 @@ class ASlotAKernelStillAsksForMayNotBePurged(
         return "커널이 아직 할당받은 슬롯 종류를 슈퍼관리자가 삭제하면 아직 사용 중이라는 이유로 거부된다"
 
     @override
-    def given(self) -> Given[SeedingSession, ASlotTypeAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ASlotTypeAndACaller]:
         return ASlotTypeAKernelAsksForAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
@@ -119,7 +119,7 @@ class ASlotAKernelStillAsksForMayNotBePurged(
 
 @dataclass(frozen=True)
 class ASlotARevisionStillUsesMayNotBePurged(
-    Scenario[SeedingSession, ASlotTypeAndACaller, ResourceSlotAdapter, Purged]
+    Scenario[TestSeedingSession, ASlotTypeAndACaller, ResourceSlotAdapter, Purged]
 ):
     @override
     def summary(self) -> str:
@@ -130,7 +130,7 @@ class ASlotARevisionStillUsesMayNotBePurged(
         return "배포 리비전이 아직 사용하는 슬롯 종류를 슈퍼관리자가 삭제하면 아직 사용 중이라는 이유로 거부된다"
 
     @override
-    def given(self) -> Given[SeedingSession, ASlotTypeAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ASlotTypeAndACaller]:
         return ASlotTypeARevisionUsesAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
@@ -144,7 +144,7 @@ class ASlotARevisionStillUsesMayNotBePurged(
 
 @dataclass(frozen=True)
 class ANameNothingAnswersToIsNotFound(
-    Scenario[SeedingSession, ASlotTypeAndACaller, ResourceSlotAdapter, Purged]
+    Scenario[TestSeedingSession, ASlotTypeAndACaller, ResourceSlotAdapter, Purged]
 ):
     @override
     def summary(self) -> str:
@@ -155,7 +155,7 @@ class ANameNothingAnswersToIsNotFound(
         return "슈퍼관리자가 존재하지 않는 이름을 삭제하면 대상을 찾을 수 없다는 이유로 거부된다"
 
     @override
-    def given(self) -> Given[SeedingSession, ASlotTypeAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ASlotTypeAndACaller]:
         return ASlotTypeAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
@@ -169,7 +169,7 @@ class ANameNothingAnswersToIsNotFound(
 
 @dataclass(frozen=True)
 class AUserGrantedNothingMayNotPurge(
-    Scenario[SeedingSession, ASlotTypeAndACaller, ResourceSlotAdapter, Purged]
+    Scenario[TestSeedingSession, ASlotTypeAndACaller, ResourceSlotAdapter, Purged]
 ):
     @override
     def summary(self) -> str:
@@ -183,7 +183,7 @@ class AUserGrantedNothingMayNotPurge(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, ASlotTypeAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ASlotTypeAndACaller]:
         return ASlotTypeAndSomeone()
 
     @override
@@ -197,7 +197,7 @@ class AUserGrantedNothingMayNotPurge(
 
 @dataclass(frozen=True)
 class AUserGrantedNothingPurgingAnUnknownNameIsRefusedByPermission(
-    Scenario[SeedingSession, ASlotTypeAndACaller, ResourceSlotAdapter, Purged]
+    Scenario[TestSeedingSession, ASlotTypeAndACaller, ResourceSlotAdapter, Purged]
 ):
     @override
     def summary(self) -> str:
@@ -211,7 +211,7 @@ class AUserGrantedNothingPurgingAnUnknownNameIsRefusedByPermission(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, ASlotTypeAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ASlotTypeAndACaller]:
         return ASlotTypeAndSomeone()
 
     @override
@@ -225,7 +225,7 @@ class AUserGrantedNothingPurgingAnUnknownNameIsRefusedByPermission(
 
 @dataclass(frozen=True)
 class EnforcementOffLetsAnyonePurge(
-    Scenario[SeedingSession, ASlotTypeAndACaller, ResourceSlotAdapter, Purged], Configured
+    Scenario[TestSeedingSession, ASlotTypeAndACaller, ResourceSlotAdapter, Purged], Configured
 ):
     @override
     def summary(self) -> str:
@@ -240,7 +240,7 @@ class EnforcementOffLetsAnyonePurge(
         return {ENFORCEMENT: False}
 
     @override
-    def given(self) -> Given[SeedingSession, ASlotTypeAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ASlotTypeAndACaller]:
         return ASlotTypeAndSomeone()
 
     @override

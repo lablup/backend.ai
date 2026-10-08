@@ -39,7 +39,7 @@ from bai_scenario.components.system import (
     lay_a_public_reader,
     role_named,
 )
-from bai_scenario.seeds.login_client_type.login_client_type import SeedLoginClientType
+from bai_scenario.seeds.login_client_type.login_client_type import TestSeedLoginClientType
 
 DESCRIBED = "미리 만들어 둔 로그인 클라이언트 종류"
 """시드가 미리 만들어 두는 종류의 설명. 시나리오가 기대값으로 다시 쓰므로 한 곳에 둔다."""
@@ -74,7 +74,7 @@ class ATypeAndSomeone(Given[Any, ATypeAndACaller]):
 
     @override
     async def lay(self, seeding: Any) -> ATypeAndACaller:
-        client_type = await seeding.creating(SeedLoginClientType(description=DESCRIBED))
+        client_type = await seeding.creating(TestSeedLoginClientType(description=DESCRIBED))
         caller = await lay_a_public_reader(seeding, LoginClientTypeEntityType(), self.role)
         return ATypeAndACaller(seeding.made(client_type), seeding.made(caller))
 
@@ -92,9 +92,9 @@ class ManyTypesAndSomeone(Given[Any, ManyTypesAndACaller]):
 
     @override
     async def lay(self, seeding: Any) -> ManyTypesAndACaller:
-        wanted = await seeding.creating(SeedLoginClientType(name_hint="wanted"))
+        wanted = await seeding.creating(TestSeedLoginClientType(name_hint="wanted"))
         others = [
-            await seeding.creating(SeedLoginClientType(name_hint="other"))
+            await seeding.creating(TestSeedLoginClientType(name_hint="other"))
             for _ in range(self.besides)
         ]
         caller = await lay_a_public_reader(seeding, LoginClientTypeEntityType(), self.role)

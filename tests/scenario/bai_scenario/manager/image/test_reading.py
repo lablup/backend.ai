@@ -34,7 +34,7 @@ from bai_scenario.components.image import (
     ManyImagesAndSomeone,
 )
 from bai_scenario.runner.acting import ActingAs
-from bai_scenario.runner.planting import SeedingSession
+from bai_scenario.runner.planting import TestSeedingSession
 from bai_scenario.runner.steps import run_scenario
 
 MISSING_IMAGE = ImageID(uuid.UUID("00000000-0000-0000-0000-0000000000ff"))
@@ -244,7 +244,7 @@ class TheAliasIsRefusedAndTheHoleStays(Then[AnAliasAndACaller, LoadedAliases]):
 
 @dataclass(frozen=True)
 class LoadingKeepsTheOrderAndLeavesHoles(
-    Scenario[SeedingSession, ManyImagesAndACaller, ImageAdapter, LoadedImages]
+    Scenario[TestSeedingSession, ManyImagesAndACaller, ImageAdapter, LoadedImages]
 ):
     @override
     def summary(self) -> str:
@@ -258,7 +258,7 @@ class LoadingKeepsTheOrderAndLeavesHoles(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, ManyImagesAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ManyImagesAndACaller]:
         return ManyImagesAndSomeone()
 
     @override
@@ -272,7 +272,7 @@ class LoadingKeepsTheOrderAndLeavesHoles(
 
 @dataclass(frozen=True)
 class AnEmptyListAsksNothing(
-    Scenario[SeedingSession, ManyImagesAndACaller, ImageAdapter, LoadedImages]
+    Scenario[TestSeedingSession, ManyImagesAndACaller, ImageAdapter, LoadedImages]
 ):
     @override
     def summary(self) -> str:
@@ -283,7 +283,7 @@ class AnEmptyListAsksNothing(
         return "빈 ID 목록으로 조회하면 빈 목록이 반환된다"
 
     @override
-    def given(self) -> Given[SeedingSession, ManyImagesAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ManyImagesAndACaller]:
         return ManyImagesAndSomeone()
 
     @override
@@ -297,7 +297,7 @@ class AnEmptyListAsksNothing(
 
 @dataclass(frozen=True)
 class APlainUserIsRefusedPerElement(
-    Scenario[SeedingSession, ManyImagesAndACaller, ImageAdapter, LoadedImages]
+    Scenario[TestSeedingSession, ManyImagesAndACaller, ImageAdapter, LoadedImages]
 ):
     @override
     def summary(self) -> str:
@@ -311,7 +311,7 @@ class APlainUserIsRefusedPerElement(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, ManyImagesAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ManyImagesAndACaller]:
         return ManyImagesAndSomeone(role=UserRole.USER)
 
     @override
@@ -325,7 +325,7 @@ class APlainUserIsRefusedPerElement(
 
 @dataclass(frozen=True)
 class DuplicateImageIdsKeepBothPositions(
-    Scenario[SeedingSession, ManyImagesAndACaller, ImageAdapter, LoadedImages]
+    Scenario[TestSeedingSession, ManyImagesAndACaller, ImageAdapter, LoadedImages]
 ):
     @override
     def summary(self) -> str:
@@ -336,7 +336,7 @@ class DuplicateImageIdsKeepBothPositions(
         return "같은 이미지 ID를 두 번 조회하면 같은 이미지가 두 위치에 반환된다"
 
     @override
-    def given(self) -> Given[SeedingSession, ManyImagesAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ManyImagesAndACaller]:
         return ManyImagesAndSomeone(count=1)
 
     @override
@@ -350,7 +350,7 @@ class DuplicateImageIdsKeepBothPositions(
 
 @dataclass(frozen=True)
 class LoadingAliasesKeepsTheOrderToo(
-    Scenario[SeedingSession, AnAliasAndACaller, ImageAdapter, LoadedAliases]
+    Scenario[TestSeedingSession, AnAliasAndACaller, ImageAdapter, LoadedAliases]
 ):
     @override
     def summary(self) -> str:
@@ -364,7 +364,7 @@ class LoadingAliasesKeepsTheOrderToo(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, AnAliasAndACaller]:
+    def given(self) -> Given[TestSeedingSession, AnAliasAndACaller]:
         return AnAliasAndSomeone()
 
     @override
@@ -378,7 +378,7 @@ class LoadingAliasesKeepsTheOrderToo(
 
 @dataclass(frozen=True)
 class APlainUserIsRefusedPerAlias(
-    Scenario[SeedingSession, AnAliasAndACaller, ImageAdapter, LoadedAliases]
+    Scenario[TestSeedingSession, AnAliasAndACaller, ImageAdapter, LoadedAliases]
 ):
     @override
     def summary(self) -> str:
@@ -392,7 +392,7 @@ class APlainUserIsRefusedPerAlias(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, AnAliasAndACaller]:
+    def given(self) -> Given[TestSeedingSession, AnAliasAndACaller]:
         return AnAliasAndSomeone(role=UserRole.USER)
 
     @override
@@ -406,7 +406,7 @@ class APlainUserIsRefusedPerAlias(
 
 @dataclass(frozen=True)
 class AnEmptyAliasListAsksNothing(
-    Scenario[SeedingSession, AnAliasAndACaller, ImageAdapter, LoadedAliases]
+    Scenario[TestSeedingSession, AnAliasAndACaller, ImageAdapter, LoadedAliases]
 ):
     @override
     def summary(self) -> str:
@@ -417,7 +417,7 @@ class AnEmptyAliasListAsksNothing(
         return "빈 별칭 ID 목록으로 조회하면 빈 목록이 반환된다"
 
     @override
-    def given(self) -> Given[SeedingSession, AnAliasAndACaller]:
+    def given(self) -> Given[TestSeedingSession, AnAliasAndACaller]:
         return AnAliasAndSomeone()
 
     @override

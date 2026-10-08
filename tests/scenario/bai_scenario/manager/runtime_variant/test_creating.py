@@ -29,13 +29,13 @@ from bai_scenario.components.runtime_variant import (
 )
 from bai_scenario.components.system import ENFORCEMENT, ACaller, SomeoneAlone
 from bai_scenario.runner.acting import ActingAs
-from bai_scenario.runner.planting import SeedingSession
+from bai_scenario.runner.planting import TestSeedingSession
 from bai_scenario.runner.steps import run_scenario
 
 MADE = "vllm"
 DESCRIBED = "새로 지정한 설명"
 
-type CreatingStep = Scenario[SeedingSession, Any, RuntimeVariantAdapter, RuntimeVariantNode]
+type CreatingStep = Scenario[TestSeedingSession, Any, RuntimeVariantAdapter, RuntimeVariantNode]
 
 
 @dataclass(frozen=True)
@@ -85,7 +85,7 @@ class CreatingWithTheLaidName(When[AVariantAndACaller, RuntimeVariantAdapter, Ru
 
 @dataclass(frozen=True)
 class TheSuperadminMakesOneWithANameAlone(
-    Scenario[SeedingSession, ACaller, RuntimeVariantAdapter, RuntimeVariantNode]
+    Scenario[TestSeedingSession, ACaller, RuntimeVariantAdapter, RuntimeVariantNode]
 ):
     started: datetime
 
@@ -101,7 +101,7 @@ class TheSuperadminMakesOneWithANameAlone(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, ACaller]:
+    def given(self) -> Given[TestSeedingSession, ACaller]:
         return SomeoneAlone(role=UserRole.SUPERADMIN)
 
     @override
@@ -115,7 +115,7 @@ class TheSuperadminMakesOneWithANameAlone(
 
 @dataclass(frozen=True)
 class ADescriptionComesBackAsGiven(
-    Scenario[SeedingSession, ACaller, RuntimeVariantAdapter, RuntimeVariantNode]
+    Scenario[TestSeedingSession, ACaller, RuntimeVariantAdapter, RuntimeVariantNode]
 ):
     started: datetime
 
@@ -128,7 +128,7 @@ class ADescriptionComesBackAsGiven(
         return "슈퍼관리자가 이름과 설명을 함께 지정해 생성하면, 지정한 값이 그대로 담긴 노드가 반환된다"
 
     @override
-    def given(self) -> Given[SeedingSession, ACaller]:
+    def given(self) -> Given[TestSeedingSession, ACaller]:
         return SomeoneAlone(role=UserRole.SUPERADMIN)
 
     @override
@@ -142,7 +142,7 @@ class ADescriptionComesBackAsGiven(
 
 @dataclass(frozen=True)
 class ANameAlreadyTakenIsRefused(
-    Scenario[SeedingSession, AVariantAndACaller, RuntimeVariantAdapter, RuntimeVariantNode]
+    Scenario[TestSeedingSession, AVariantAndACaller, RuntimeVariantAdapter, RuntimeVariantNode]
 ):
     @override
     def summary(self) -> str:
@@ -153,7 +153,7 @@ class ANameAlreadyTakenIsRefused(
         return "같은 이름의 변형이 이미 있을 때 그 이름으로 다시 생성하면, 이름 중복으로 거부된다"
 
     @override
-    def given(self) -> Given[SeedingSession, AVariantAndACaller]:
+    def given(self) -> Given[TestSeedingSession, AVariantAndACaller]:
         return AVariantAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
@@ -167,7 +167,7 @@ class ANameAlreadyTakenIsRefused(
 
 @dataclass(frozen=True)
 class AUserWhoIsNotTheSuperadminMayNotCreate(
-    Scenario[SeedingSession, ACaller, RuntimeVariantAdapter, RuntimeVariantNode]
+    Scenario[TestSeedingSession, ACaller, RuntimeVariantAdapter, RuntimeVariantNode]
 ):
     @override
     def summary(self) -> str:
@@ -178,7 +178,7 @@ class AUserWhoIsNotTheSuperadminMayNotCreate(
         return "슈퍼관리자가 아닌 사용자가 변형을 생성하면 역할 부족으로 거부된다"
 
     @override
-    def given(self) -> Given[SeedingSession, ACaller]:
+    def given(self) -> Given[TestSeedingSession, ACaller]:
         return SomeoneAlone()
 
     @override
@@ -192,7 +192,7 @@ class AUserWhoIsNotTheSuperadminMayNotCreate(
 
 @dataclass(frozen=True)
 class EnforcementOffStillNeedsTheSuperadmin(
-    Scenario[SeedingSession, ACaller, RuntimeVariantAdapter, RuntimeVariantNode], Configured
+    Scenario[TestSeedingSession, ACaller, RuntimeVariantAdapter, RuntimeVariantNode], Configured
 ):
     @override
     def summary(self) -> str:
@@ -207,7 +207,7 @@ class EnforcementOffStillNeedsTheSuperadmin(
         return {ENFORCEMENT: False}
 
     @override
-    def given(self) -> Given[SeedingSession, ACaller]:
+    def given(self) -> Given[TestSeedingSession, ACaller]:
         return SomeoneAlone()
 
     @override

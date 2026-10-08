@@ -39,9 +39,9 @@ from bai_scenario.seeds.service_catalog.service import (
     STARTED_UP,
     STATUS_NAMES,
     VERSION,
-    SeedEndpointOf,
-    SeedService,
-    SeedServiceInStatus,
+    TestSeedEndpointOf,
+    TestSeedService,
+    TestSeedServiceInStatus,
 )
 
 GROUP = "manager"
@@ -84,10 +84,10 @@ class ManyServicesAndSomeone(Given[Any, ManyServicesAndACaller]):
 
     @override
     async def lay(self, seeding: Any) -> ManyServicesAndACaller:
-        wanted = await seeding.creating(SeedService(service_group=GROUP, name_hint="wanted"))
-        endpoint = await seeding.adding(SeedEndpointOf(), wanted)
+        wanted = await seeding.creating(TestSeedService(service_group=GROUP, name_hint="wanted"))
+        endpoint = await seeding.adding(TestSeedEndpointOf(), wanted)
         others = [
-            await seeding.creating(SeedService(service_group=GROUP, name_hint="other"))
+            await seeding.creating(TestSeedService(service_group=GROUP, name_hint="other"))
             for _ in range(self.besides)
         ]
         caller = await lay_a_caller(seeding, self.role)
@@ -117,8 +117,10 @@ class ServicesOfTwoGroupsAndSomeone(Given[Any, ManyServicesAndACaller]):
 
     @override
     async def lay(self, seeding: Any) -> ManyServicesAndACaller:
-        wanted = await seeding.creating(SeedService(service_group=GROUP, name_hint="wanted"))
-        other = await seeding.creating(SeedService(service_group=OTHER_GROUP, name_hint="other"))
+        wanted = await seeding.creating(TestSeedService(service_group=GROUP, name_hint="wanted"))
+        other = await seeding.creating(
+            TestSeedService(service_group=OTHER_GROUP, name_hint="other")
+        )
         caller = await lay_a_caller(seeding, self.role)
         first = ALaidService(
             seeding.made(wanted), GROUP, wanted.name, ServiceCatalogStatus.HEALTHY, ()
@@ -144,12 +146,14 @@ class ServicesOfEveryStatusAndSomeone(Given[Any, ManyServicesAndACaller]):
 
     @override
     async def lay(self, seeding: Any) -> ManyServicesAndACaller:
-        healthy = await seeding.creating(SeedService(service_group=GROUP, name_hint="healthy"))
+        healthy = await seeding.creating(TestSeedService(service_group=GROUP, name_hint="healthy"))
         others = [
             (
                 status,
                 await seeding.creating(
-                    SeedServiceInStatus(service_group=GROUP, status=status, name_hint=status.value)
+                    TestSeedServiceInStatus(
+                        service_group=GROUP, status=status, name_hint=status.value
+                    )
                 ),
             )
             for status in ServiceCatalogStatus

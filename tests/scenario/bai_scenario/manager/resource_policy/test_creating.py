@@ -40,13 +40,13 @@ from bai_scenario.components.resource_policy import (
     TheNewPolicyNode,
 )
 from bai_scenario.runner.acting import ActingAs
-from bai_scenario.runner.planting import SeedingSession
+from bai_scenario.runner.planting import TestSeedingSession
 from bai_scenario.runner.steps import run_scenario
 
 FRESH = "fresh-policy"
 ENFORCEMENT = "manager.rbac.enforcement_enabled"
 
-type CreatingStep = Scenario[SeedingSession, APolicyAndACaller[Any], ResourcePolicyAdapter, Any]
+type CreatingStep = Scenario[TestSeedingSession, APolicyAndACaller[Any], ResourcePolicyAdapter, Any]
 
 
 @dataclass(frozen=True)
@@ -74,7 +74,7 @@ class Creating(When[APolicyAndACaller[Any], ResourcePolicyAdapter, Any]):
 
 @dataclass(frozen=True)
 class TheWholeNodeComesBack(
-    Scenario[SeedingSession, APolicyAndACaller[Any], ResourcePolicyAdapter, Any]
+    Scenario[TestSeedingSession, APolicyAndACaller[Any], ResourcePolicyAdapter, Any]
 ):
     family: Family[Any, Any]
     started: datetime
@@ -91,7 +91,7 @@ class TheWholeNodeComesBack(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, APolicyAndACaller[Any]]:
+    def given(self) -> Given[TestSeedingSession, APolicyAndACaller[Any]]:
         return APolicyAndSomeone(self.family, role=UserRole.SUPERADMIN)
 
     @override
@@ -105,7 +105,7 @@ class TheWholeNodeComesBack(
 
 @dataclass(frozen=True)
 class LeavingOptionalsOutLeavesThemEmpty(
-    Scenario[SeedingSession, APolicyAndACaller[Any], ResourcePolicyAdapter, Any]
+    Scenario[TestSeedingSession, APolicyAndACaller[Any], ResourcePolicyAdapter, Any]
 ):
     family: Family[Any, Any]
     ask: Ask
@@ -123,7 +123,7 @@ class LeavingOptionalsOutLeavesThemEmpty(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, APolicyAndACaller[Any]]:
+    def given(self) -> Given[TestSeedingSession, APolicyAndACaller[Any]]:
         return APolicyAndSomeone(self.family, role=UserRole.SUPERADMIN)
 
     @override
@@ -137,7 +137,7 @@ class LeavingOptionalsOutLeavesThemEmpty(
 
 @dataclass(frozen=True)
 class AnUnlimitedSlotIsMarkedUnlimited(
-    Scenario[SeedingSession, APolicyAndACaller[Any], ResourcePolicyAdapter, Any]
+    Scenario[TestSeedingSession, APolicyAndACaller[Any], ResourcePolicyAdapter, Any]
 ):
     started: datetime
 
@@ -153,7 +153,7 @@ class AnUnlimitedSlotIsMarkedUnlimited(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, APolicyAndACaller[Any]]:
+    def given(self) -> Given[TestSeedingSession, APolicyAndACaller[Any]]:
         return APolicyAndSomeone(KEYPAIR, role=UserRole.SUPERADMIN)
 
     @override
@@ -167,7 +167,7 @@ class AnUnlimitedSlotIsMarkedUnlimited(
 
 @dataclass(frozen=True)
 class ANameAnotherPolicyHoldsIsRefused(
-    Scenario[SeedingSession, APolicyAndACaller[Any], ResourcePolicyAdapter, Any]
+    Scenario[TestSeedingSession, APolicyAndACaller[Any], ResourcePolicyAdapter, Any]
 ):
     family: Family[Any, Any]
 
@@ -183,7 +183,7 @@ class ANameAnotherPolicyHoldsIsRefused(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, APolicyAndACaller[Any]]:
+    def given(self) -> Given[TestSeedingSession, APolicyAndACaller[Any]]:
         return APolicyAndSomeone(self.family, role=UserRole.SUPERADMIN)
 
     @override
@@ -197,7 +197,7 @@ class ANameAnotherPolicyHoldsIsRefused(
 
 @dataclass(frozen=True)
 class APriorityCapOutOfRangeIsRefused(
-    Scenario[SeedingSession, APolicyAndACaller[Any], ResourcePolicyAdapter, Any]
+    Scenario[TestSeedingSession, APolicyAndACaller[Any], ResourcePolicyAdapter, Any]
 ):
     @override
     def summary(self) -> str:
@@ -211,7 +211,7 @@ class APriorityCapOutOfRangeIsRefused(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, APolicyAndACaller[Any]]:
+    def given(self) -> Given[TestSeedingSession, APolicyAndACaller[Any]]:
         return APolicyAndSomeone(KEYPAIR, role=UserRole.SUPERADMIN)
 
     @override
@@ -225,7 +225,7 @@ class APriorityCapOutOfRangeIsRefused(
 
 @dataclass(frozen=True)
 class APlainUserMayNotCreate(
-    Scenario[SeedingSession, APolicyAndACaller[Any], ResourcePolicyAdapter, Any]
+    Scenario[TestSeedingSession, APolicyAndACaller[Any], ResourcePolicyAdapter, Any]
 ):
     family: Family[Any, Any]
 
@@ -241,7 +241,7 @@ class APlainUserMayNotCreate(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, APolicyAndACaller[Any]]:
+    def given(self) -> Given[TestSeedingSession, APolicyAndACaller[Any]]:
         return APolicyAndSomeone(self.family)
 
     @override
@@ -255,7 +255,7 @@ class APlainUserMayNotCreate(
 
 @dataclass(frozen=True)
 class AMonitorMayNotCreate(
-    Scenario[SeedingSession, APolicyAndACaller[Any], ResourcePolicyAdapter, Any]
+    Scenario[TestSeedingSession, APolicyAndACaller[Any], ResourcePolicyAdapter, Any]
 ):
     family: Family[Any, Any]
 
@@ -271,7 +271,7 @@ class AMonitorMayNotCreate(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, APolicyAndACaller[Any]]:
+    def given(self) -> Given[TestSeedingSession, APolicyAndACaller[Any]]:
         return APolicyAndSomeone(self.family, role=UserRole.MONITOR)
 
     @override
@@ -285,7 +285,7 @@ class AMonitorMayNotCreate(
 
 @dataclass(frozen=True)
 class EnforcementOffChangesNothing(
-    Scenario[SeedingSession, APolicyAndACaller[Any], ResourcePolicyAdapter, Any], Configured
+    Scenario[TestSeedingSession, APolicyAndACaller[Any], ResourcePolicyAdapter, Any], Configured
 ):
     family: Family[Any, Any]
 
@@ -302,7 +302,7 @@ class EnforcementOffChangesNothing(
         return {ENFORCEMENT: False}
 
     @override
-    def given(self) -> Given[SeedingSession, APolicyAndACaller[Any]]:
+    def given(self) -> Given[TestSeedingSession, APolicyAndACaller[Any]]:
         return APolicyAndSomeone(self.family)
 
     @override

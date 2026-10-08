@@ -60,7 +60,7 @@ from bai_scenario.components.runtime_variant_preset import (
 )
 from bai_scenario.components.system import ENFORCEMENT
 from bai_scenario.runner.acting import ActingAs
-from bai_scenario.runner.planting import SeedingSession
+from bai_scenario.runner.planting import TestSeedingSession
 from bai_scenario.runner.steps import run_scenario
 
 MADE = "max-tokens"
@@ -77,7 +77,7 @@ ARGS_INT = PresetTargetSpec(
 SLIDER = UIOption(ui_type=UIType.SLIDER, slider=SliderOption(min=1, max=8, step=1))
 
 type CreatingStep = Scenario[
-    SeedingSession, Any, RuntimeVariantPresetAdapter, RuntimeVariantPresetNode
+    TestSeedingSession, Any, RuntimeVariantPresetAdapter, RuntimeVariantPresetNode
 ]
 
 
@@ -221,7 +221,10 @@ class TheNextPresetNode(Then[APresetAndACaller, RuntimeVariantPresetNode]):
 @dataclass(frozen=True)
 class TheFirstPresetIsRankedAHundred(
     Scenario[
-        SeedingSession, AVariantAndACaller, RuntimeVariantPresetAdapter, RuntimeVariantPresetNode
+        TestSeedingSession,
+        AVariantAndACaller,
+        RuntimeVariantPresetAdapter,
+        RuntimeVariantPresetNode,
     ]
 ):
     started: datetime
@@ -238,7 +241,7 @@ class TheFirstPresetIsRankedAHundred(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, AVariantAndACaller]:
+    def given(self) -> Given[TestSeedingSession, AVariantAndACaller]:
         return AVariantAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
@@ -255,7 +258,7 @@ class TheFirstPresetIsRankedAHundred(
 @dataclass(frozen=True)
 class TheSecondPresetIsRankedAHundredHigher(
     Scenario[
-        SeedingSession, APresetAndACaller, RuntimeVariantPresetAdapter, RuntimeVariantPresetNode
+        TestSeedingSession, APresetAndACaller, RuntimeVariantPresetAdapter, RuntimeVariantPresetNode
     ]
 ):
     started: datetime
@@ -271,7 +274,7 @@ class TheSecondPresetIsRankedAHundredHigher(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, APresetAndACaller]:
+    def given(self) -> Given[TestSeedingSession, APresetAndACaller]:
         return APresetAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
@@ -288,7 +291,10 @@ class TheSecondPresetIsRankedAHundredHigher(
 @dataclass(frozen=True)
 class FourValuesComeBackAsOneSpec(
     Scenario[
-        SeedingSession, AVariantAndACaller, RuntimeVariantPresetAdapter, RuntimeVariantPresetNode
+        TestSeedingSession,
+        AVariantAndACaller,
+        RuntimeVariantPresetAdapter,
+        RuntimeVariantPresetNode,
     ]
 ):
     started: datetime
@@ -302,7 +308,7 @@ class FourValuesComeBackAsOneSpec(
         return "대상·값 종류·기본값·키를 모두 지정해 생성하면 네 값이 하나의 명세로 묶여 반환된다"
 
     @override
-    def given(self) -> Given[SeedingSession, AVariantAndACaller]:
+    def given(self) -> Given[TestSeedingSession, AVariantAndACaller]:
         return AVariantAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
@@ -319,7 +325,10 @@ class FourValuesComeBackAsOneSpec(
 @dataclass(frozen=True)
 class AUiOptionCarriesItsType(
     Scenario[
-        SeedingSession, AVariantAndACaller, RuntimeVariantPresetAdapter, RuntimeVariantPresetNode
+        TestSeedingSession,
+        AVariantAndACaller,
+        RuntimeVariantPresetAdapter,
+        RuntimeVariantPresetNode,
     ]
 ):
     started: datetime
@@ -333,7 +342,7 @@ class AUiOptionCarriesItsType(
         return "슬라이더 옵션을 추가하여 생성하면 UI 종류를 옵션에서 읽어 응답 노드에 함께 담는다"
 
     @override
-    def given(self) -> Given[SeedingSession, AVariantAndACaller]:
+    def given(self) -> Given[TestSeedingSession, AVariantAndACaller]:
         return AVariantAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
@@ -350,7 +359,7 @@ class AUiOptionCarriesItsType(
 @dataclass(frozen=True)
 class ANameTakenInTheSameVariantIsRefused(
     Scenario[
-        SeedingSession, APresetAndACaller, RuntimeVariantPresetAdapter, RuntimeVariantPresetNode
+        TestSeedingSession, APresetAndACaller, RuntimeVariantPresetAdapter, RuntimeVariantPresetNode
     ]
 ):
     @override
@@ -362,7 +371,7 @@ class ANameTakenInTheSameVariantIsRefused(
         return "같은 변형에 같은 이름의 프리셋을 다시 생성하면 이름이 중복되어 요청이 거부된다"
 
     @override
-    def given(self) -> Given[SeedingSession, APresetAndACaller]:
+    def given(self) -> Given[TestSeedingSession, APresetAndACaller]:
         return APresetAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
@@ -379,7 +388,10 @@ class ANameTakenInTheSameVariantIsRefused(
 @dataclass(frozen=True)
 class TheSameNameIsFreeInAnotherVariant(
     Scenario[
-        SeedingSession, TwoVariantsAndAPreset, RuntimeVariantPresetAdapter, RuntimeVariantPresetNode
+        TestSeedingSession,
+        TwoVariantsAndAPreset,
+        RuntimeVariantPresetAdapter,
+        RuntimeVariantPresetNode,
     ]
 ):
     started: datetime
@@ -393,7 +405,7 @@ class TheSameNameIsFreeInAnotherVariant(
         return "고유성 제약은 변형과 이름의 조합에 적용되므로 다른 변형에는 같은 이름의 프리셋을 생성할 수 있다"
 
     @override
-    def given(self) -> Given[SeedingSession, TwoVariantsAndAPreset]:
+    def given(self) -> Given[TestSeedingSession, TwoVariantsAndAPreset]:
         return TwoVariantsOneWithAPreset(role=UserRole.SUPERADMIN)
 
     @override
@@ -410,7 +422,10 @@ class TheSameNameIsFreeInAnotherVariant(
 @dataclass(frozen=True)
 class AUserWhoIsNotTheSuperadminMayNotCreate(
     Scenario[
-        SeedingSession, AVariantAndACaller, RuntimeVariantPresetAdapter, RuntimeVariantPresetNode
+        TestSeedingSession,
+        AVariantAndACaller,
+        RuntimeVariantPresetAdapter,
+        RuntimeVariantPresetNode,
     ]
 ):
     @override
@@ -422,7 +437,7 @@ class AUserWhoIsNotTheSuperadminMayNotCreate(
         return "슈퍼관리자가 아닌 사용자가 프리셋을 생성하면 역할이 부족하여 요청이 거부된다"
 
     @override
-    def given(self) -> Given[SeedingSession, AVariantAndACaller]:
+    def given(self) -> Given[TestSeedingSession, AVariantAndACaller]:
         return AVariantAndSomeone()
 
     @override
@@ -439,7 +454,10 @@ class AUserWhoIsNotTheSuperadminMayNotCreate(
 @dataclass(frozen=True)
 class EnforcementOffStillNeedsTheSuperadmin(
     Scenario[
-        SeedingSession, AVariantAndACaller, RuntimeVariantPresetAdapter, RuntimeVariantPresetNode
+        TestSeedingSession,
+        AVariantAndACaller,
+        RuntimeVariantPresetAdapter,
+        RuntimeVariantPresetNode,
     ],
     Configured,
 ):
@@ -456,7 +474,7 @@ class EnforcementOffStillNeedsTheSuperadmin(
         return {ENFORCEMENT: False}
 
     @override
-    def given(self) -> Given[SeedingSession, AVariantAndACaller]:
+    def given(self) -> Given[TestSeedingSession, AVariantAndACaller]:
         return AVariantAndSomeone()
 
     @override

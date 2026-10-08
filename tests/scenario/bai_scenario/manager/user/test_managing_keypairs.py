@@ -51,15 +51,15 @@ from bai_scenario.components.answers import TheCallIsRefused
 from bai_scenario.components.domain import WAS_HERE, SomeoneOf, WrittenByThisRun
 from bai_scenario.components.user import AGrant, KeypairNodeLook
 from bai_scenario.runner.acting import ActingAs
-from bai_scenario.runner.planting import SeedingSession
+from bai_scenario.runner.planting import TestSeedingSession
 from bai_scenario.runner.steps import run_scenario
-from bai_scenario.seeds.domain.domain import SeedDomain
-from bai_scenario.seeds.resource_policy.keypair import SeedKeypairPolicy
-from bai_scenario.seeds.resource_policy.project import SeedProjectPolicy
-from bai_scenario.seeds.resource_policy.user import SeedUserPolicy
-from bai_scenario.seeds.seeder import Laid, Seeder, SeedNest
-from bai_scenario.seeds.user.fields import SeedKeypairOf
-from bai_scenario.seeds.user.user import SeedUserOf
+from bai_scenario.seeds.domain.domain import TestSeedDomain
+from bai_scenario.seeds.resource_policy.keypair import TestSeedKeypairPolicy
+from bai_scenario.seeds.resource_policy.project import TestSeedProjectPolicy
+from bai_scenario.seeds.resource_policy.user import TestSeedUserPolicy
+from bai_scenario.seeds.seeder import Laid, TestSeeder, TestSeedNest
+from bai_scenario.seeds.user.fields import TestSeedKeypairOf
+from bai_scenario.seeds.user.user import TestSeedUserOf
 
 type Answer = object
 
@@ -119,12 +119,14 @@ class SomeoneAndAKeyOwner(Given[Any, AKeyOwnerAndACaller]):
 
     @override
     async def lay(self, seeding: Any) -> AKeyOwnerAndACaller:
-        domain = await seeding.creating(SeedDomain(name_hint="home", description=WAS_HERE))
+        domain = await seeding.creating(TestSeedDomain(name_hint="home", description=WAS_HERE))
         target = await seeding.within(SomeoneOf(domain))
         caller = await seeding.within(SomeoneOf(domain))
-        policy = await seeding.creating(SeedKeypairPolicy(name_hint="granted-policy"))
+        policy = await seeding.creating(TestSeedKeypairPolicy(name_hint="granted-policy"))
         extra = (
-            await seeding.adding(SeedKeypairOf(resource_policy=seeding.made(policy).name), target)
+            await seeding.adding(
+                TestSeedKeypairOf(resource_policy=seeding.made(policy).name), target
+            )
             if self.extra
             else None
         )
@@ -145,7 +147,9 @@ class SomeoneAndAKeyOwner(Given[Any, AKeyOwnerAndACaller]):
 
 
 @dataclass(frozen=True)
-class SomeoneUnderTheirOwnPolicy(SeedNest[tuple[Laid[UserData], Laid[KeyPairResourcePolicyData]]]):
+class SomeoneUnderTheirOwnPolicy(
+    TestSeedNest[tuple[Laid[UserData], Laid[KeyPairResourcePolicyData]]]
+):
     """자기만의 키페어 정책으로 만든 사용자 한 명. 정책이 기대값이 되므로 함께 답한다."""
 
     domain: Laid[Any]
@@ -156,11 +160,11 @@ class SomeoneUnderTheirOwnPolicy(SeedNest[tuple[Laid[UserData], Laid[KeyPairReso
         return "자기 키페어 정책을 가진 사용자 한 명 준비"
 
     @override
-    def lay(self, seed: Seeder) -> tuple[Laid[UserData], Laid[KeyPairResourcePolicyData]]:
-        seed.once(SeedProjectPolicy())
-        policy = seed.creating(SeedUserPolicy())
-        key_policy = seed.creating(SeedKeypairPolicy())
-        user = seed.provisioning(SeedUserOf(role=self.role), self.domain, policy, key_policy)
+    def lay(self, seed: TestSeeder) -> tuple[Laid[UserData], Laid[KeyPairResourcePolicyData]]:
+        seed.once(TestSeedProjectPolicy())
+        policy = seed.creating(TestSeedUserPolicy())
+        key_policy = seed.creating(TestSeedKeypairPolicy())
+        user = seed.provisioning(TestSeedUserOf(role=self.role), self.domain, policy, key_policy)
         return user, key_policy
 
 
@@ -182,7 +186,7 @@ class ASuperadminAndTwoUsers(Given[Any, KeysOfEveryone]):
 
     @override
     async def lay(self, seeding: Any) -> KeysOfEveryone:
-        domain = await seeding.creating(SeedDomain(name_hint="home", description=WAS_HERE))
+        domain = await seeding.creating(TestSeedDomain(name_hint="home", description=WAS_HERE))
         first = await seeding.within(SomeoneUnderTheirOwnPolicy(domain))
         second = await seeding.within(SomeoneUnderTheirOwnPolicy(domain))
         caller = await seeding.within(SomeoneUnderTheirOwnPolicy(domain, role=UserRole.SUPERADMIN))
@@ -205,7 +209,7 @@ class SomeoneReadingTheDomain(Given[Any, KeysOfEveryone]):
 
     @override
     async def lay(self, seeding: Any) -> KeysOfEveryone:
-        domain = await seeding.creating(SeedDomain(name_hint="home", description=WAS_HERE))
+        domain = await seeding.creating(TestSeedDomain(name_hint="home", description=WAS_HERE))
         caller = await seeding.within(SomeoneOf(domain))
         await seeding.within(AGrant.on_domain(domain, caller, Permission.READ))
         return KeysOfEveryone(caller=seeding.made(caller), owners=())
@@ -472,11 +476,13 @@ class SearchingKeysOverGQL(When[KeysOfEveryone, UserAdapter, Answer]):
 
 
 @dataclass(frozen=True)
-class SeededKeyLook:
+class TestSeededKeyLook:
     """시드가 심은 키 하나를 통째로 본다.
 
     요청 한도와 시각은 데이터베이스가 채우므로 심은 행의 데이터가 아니라 값과 조건으로 본다.
     """
+
+    __test__ = False
 
     started: datetime
 
@@ -574,7 +580,7 @@ class TheChangedKey(Then[AKeyOwnerAndACaller, Answer]):
         payload = answered.response
         if not isinstance(payload, AdminUpdateKeypairPayload):
             return [Refused(NotEnoughPermission, answered.raised)]
-        return SeededKeyLook(self.started).extra_key(payload.keypair, laid, RATE_LIMIT)
+        return TestSeededKeyLook(self.started).extra_key(payload.keypair, laid, RATE_LIMIT)
 
 
 @dataclass(frozen=True)
@@ -592,7 +598,7 @@ class TheReadKey(Then[AKeyOwnerAndACaller, Answer]):
         node = answered.response
         if not isinstance(node, KeypairNode):
             return [Refused(GenericBadRequest, answered.raised)]
-        return SeededKeyLook(self.started).extra_key(node, laid, SERVER_RATE_LIMIT)
+        return TestSeededKeyLook(self.started).extra_key(node, laid, SERVER_RATE_LIMIT)
 
 
 @dataclass(frozen=True)
@@ -688,7 +694,7 @@ class EveryKeyComes(Then[KeysOfEveryone, Answer]):
             return [Refused(InsufficientPrivilege, answered.raised)]
         nodes = _by_owner(payload.items)
         seen: list[Verdict] = [Same("items.length", len(nodes), len(laid.owners))]
-        look = SeededKeyLook(self.started)
+        look = TestSeededKeyLook(self.started)
         for index, (node, (owner, policy)) in enumerate(
             zip(nodes, _owners_in_order(laid.owners), strict=False)
         ):
@@ -720,7 +726,7 @@ class TheFirstPolicysKeyOnly(Then[KeysOfEveryone, Answer]):
         seen: list[Verdict] = [Same("items.length", len(result.items), 1)]
         if result.items:
             seen.extend(
-                SeededKeyLook(self.started).default_key(
+                TestSeededKeyLook(self.started).default_key(
                     result.items[0], owner, policy, at="items[0]."
                 )
             )
@@ -737,7 +743,7 @@ class TheFirstPolicysKeyOnly(Then[KeysOfEveryone, Answer]):
 
 @dataclass(frozen=True)
 class AUserGrantedUpdateMakesAKeyForAnother(
-    Scenario[SeedingSession, AKeyOwnerAndACaller, UserAdapter, Answer]
+    Scenario[TestSeedingSession, AKeyOwnerAndACaller, UserAdapter, Answer]
 ):
     started: datetime
 
@@ -753,7 +759,7 @@ class AUserGrantedUpdateMakesAKeyForAnother(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, AKeyOwnerAndACaller]:
+    def given(self) -> Given[TestSeedingSession, AKeyOwnerAndACaller]:
         return SomeoneAndAKeyOwner(grant=(Permission.UPDATE,))
 
     @override
@@ -767,7 +773,7 @@ class AUserGrantedUpdateMakesAKeyForAnother(
 
 @dataclass(frozen=True)
 class AUserGrantedNothingMayNotMakeAKeyForAnother(
-    Scenario[SeedingSession, AKeyOwnerAndACaller, UserAdapter, Answer]
+    Scenario[TestSeedingSession, AKeyOwnerAndACaller, UserAdapter, Answer]
 ):
     @override
     def summary(self) -> str:
@@ -778,7 +784,7 @@ class AUserGrantedNothingMayNotMakeAKeyForAnother(
         return "역할 없이 키를 만들려 하면, 엔티티 권한 문이 막는다"
 
     @override
-    def given(self) -> Given[SeedingSession, AKeyOwnerAndACaller]:
+    def given(self) -> Given[TestSeedingSession, AKeyOwnerAndACaller]:
         return SomeoneAndAKeyOwner()
 
     @override
@@ -792,7 +798,7 @@ class AUserGrantedNothingMayNotMakeAKeyForAnother(
 
 @dataclass(frozen=True)
 class AKeyMayNotBeMadeUnderAMissingPolicy(
-    Scenario[SeedingSession, AKeyOwnerAndACaller, UserAdapter, Answer]
+    Scenario[TestSeedingSession, AKeyOwnerAndACaller, UserAdapter, Answer]
 ):
     @override
     def summary(self) -> str:
@@ -803,7 +809,7 @@ class AKeyMayNotBeMadeUnderAMissingPolicy(
         return "권한 받은 사용자가 없는 정책 이름을 주면, 입력 검증이 막는다"
 
     @override
-    def given(self) -> Given[SeedingSession, AKeyOwnerAndACaller]:
+    def given(self) -> Given[TestSeedingSession, AKeyOwnerAndACaller]:
         return SomeoneAndAKeyOwner(grant=(Permission.UPDATE,))
 
     @override
@@ -817,7 +823,7 @@ class AKeyMayNotBeMadeUnderAMissingPolicy(
 
 @dataclass(frozen=True)
 class AGrantedUserChangesOnlyTheRateLimit(
-    Scenario[SeedingSession, AKeyOwnerAndACaller, UserAdapter, Answer]
+    Scenario[TestSeedingSession, AKeyOwnerAndACaller, UserAdapter, Answer]
 ):
     started: datetime
 
@@ -833,7 +839,7 @@ class AGrantedUserChangesOnlyTheRateLimit(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, AKeyOwnerAndACaller]:
+    def given(self) -> Given[TestSeedingSession, AKeyOwnerAndACaller]:
         return SomeoneAndAKeyOwner(grant=(Permission.READ, Permission.UPDATE), extra=True)
 
     @override
@@ -847,7 +853,7 @@ class AGrantedUserChangesOnlyTheRateLimit(
 
 @dataclass(frozen=True)
 class AUserGrantedNothingMayNotChangeAnothersKey(
-    Scenario[SeedingSession, AKeyOwnerAndACaller, UserAdapter, Answer]
+    Scenario[TestSeedingSession, AKeyOwnerAndACaller, UserAdapter, Answer]
 ):
     @override
     def summary(self) -> str:
@@ -858,7 +864,7 @@ class AUserGrantedNothingMayNotChangeAnothersKey(
         return "역할 없이 바꾸려 하면, 소유자 조회 단계가 막는다"
 
     @override
-    def given(self) -> Given[SeedingSession, AKeyOwnerAndACaller]:
+    def given(self) -> Given[TestSeedingSession, AKeyOwnerAndACaller]:
         return SomeoneAndAKeyOwner(extra=True)
 
     @override
@@ -872,7 +878,7 @@ class AUserGrantedNothingMayNotChangeAnothersKey(
 
 @dataclass(frozen=True)
 class AReaderMayNotChangeAnothersKey(
-    Scenario[SeedingSession, AKeyOwnerAndACaller, UserAdapter, Answer]
+    Scenario[TestSeedingSession, AKeyOwnerAndACaller, UserAdapter, Answer]
 ):
     @override
     def summary(self) -> str:
@@ -883,7 +889,7 @@ class AReaderMayNotChangeAnothersKey(
         return "READ만 받고 바꾸려 하면, 엔티티 권한 문이 막는다"
 
     @override
-    def given(self) -> Given[SeedingSession, AKeyOwnerAndACaller]:
+    def given(self) -> Given[TestSeedingSession, AKeyOwnerAndACaller]:
         return SomeoneAndAKeyOwner(grant=(Permission.READ,), extra=True)
 
     @override
@@ -897,7 +903,7 @@ class AReaderMayNotChangeAnothersKey(
 
 @dataclass(frozen=True)
 class AKeyMayNotBeMovedToAMissingPolicy(
-    Scenario[SeedingSession, AKeyOwnerAndACaller, UserAdapter, Answer]
+    Scenario[TestSeedingSession, AKeyOwnerAndACaller, UserAdapter, Answer]
 ):
     @override
     def summary(self) -> str:
@@ -908,7 +914,7 @@ class AKeyMayNotBeMovedToAMissingPolicy(
         return "권한 받은 사용자가 없는 정책 이름을 주면, 입력 검증이 막는다"
 
     @override
-    def given(self) -> Given[SeedingSession, AKeyOwnerAndACaller]:
+    def given(self) -> Given[TestSeedingSession, AKeyOwnerAndACaller]:
         return SomeoneAndAKeyOwner(grant=(Permission.READ, Permission.UPDATE), extra=True)
 
     @override
@@ -922,7 +928,7 @@ class AKeyMayNotBeMovedToAMissingPolicy(
 
 @dataclass(frozen=True)
 class AGrantedUserDeletesAnothersExtraKey(
-    Scenario[SeedingSession, AKeyOwnerAndACaller, UserAdapter, Answer]
+    Scenario[TestSeedingSession, AKeyOwnerAndACaller, UserAdapter, Answer]
 ):
     @override
     def summary(self) -> str:
@@ -933,7 +939,7 @@ class AGrantedUserDeletesAnothersExtraKey(
         return "대상 스코프에서 READ와 UPDATE를 받은 사용자가 지우면, 지운 키의 access key가 답으로 온다"
 
     @override
-    def given(self) -> Given[SeedingSession, AKeyOwnerAndACaller]:
+    def given(self) -> Given[TestSeedingSession, AKeyOwnerAndACaller]:
         return SomeoneAndAKeyOwner(grant=(Permission.READ, Permission.UPDATE), extra=True)
 
     @override
@@ -947,7 +953,7 @@ class AGrantedUserDeletesAnothersExtraKey(
 
 @dataclass(frozen=True)
 class AUserGrantedNothingMayNotDeleteAnothersKey(
-    Scenario[SeedingSession, AKeyOwnerAndACaller, UserAdapter, Answer]
+    Scenario[TestSeedingSession, AKeyOwnerAndACaller, UserAdapter, Answer]
 ):
     @override
     def summary(self) -> str:
@@ -958,7 +964,7 @@ class AUserGrantedNothingMayNotDeleteAnothersKey(
         return "역할 없이 지우려 하면, 소유자 조회 단계가 막는다"
 
     @override
-    def given(self) -> Given[SeedingSession, AKeyOwnerAndACaller]:
+    def given(self) -> Given[TestSeedingSession, AKeyOwnerAndACaller]:
         return SomeoneAndAKeyOwner(extra=True)
 
     @override
@@ -972,7 +978,7 @@ class AUserGrantedNothingMayNotDeleteAnothersKey(
 
 @dataclass(frozen=True)
 class AReaderMayNotDeleteAnothersKey(
-    Scenario[SeedingSession, AKeyOwnerAndACaller, UserAdapter, Answer]
+    Scenario[TestSeedingSession, AKeyOwnerAndACaller, UserAdapter, Answer]
 ):
     @override
     def summary(self) -> str:
@@ -983,7 +989,7 @@ class AReaderMayNotDeleteAnothersKey(
         return "READ만 받고 지우려 하면, 엔티티 권한 문이 막는다"
 
     @override
-    def given(self) -> Given[SeedingSession, AKeyOwnerAndACaller]:
+    def given(self) -> Given[TestSeedingSession, AKeyOwnerAndACaller]:
         return SomeoneAndAKeyOwner(grant=(Permission.READ,), extra=True)
 
     @override
@@ -997,7 +1003,7 @@ class AReaderMayNotDeleteAnothersKey(
 
 @dataclass(frozen=True)
 class AnothersDefaultKeyMayNotBeDeleted(
-    Scenario[SeedingSession, AKeyOwnerAndACaller, UserAdapter, Answer]
+    Scenario[TestSeedingSession, AKeyOwnerAndACaller, UserAdapter, Answer]
 ):
     @override
     def summary(self) -> str:
@@ -1008,7 +1014,7 @@ class AnothersDefaultKeyMayNotBeDeleted(
         return "권한 받은 사용자가 대상의 기본 키를 지우려 하면, 입력 검증이 막는다"
 
     @override
-    def given(self) -> Given[SeedingSession, AKeyOwnerAndACaller]:
+    def given(self) -> Given[TestSeedingSession, AKeyOwnerAndACaller]:
         return SomeoneAndAKeyOwner(grant=(Permission.READ, Permission.UPDATE), helper=True)
 
     @override
@@ -1022,7 +1028,7 @@ class AnothersDefaultKeyMayNotBeDeleted(
 
 @dataclass(frozen=True)
 class AGrantedUserReadsAnothersKey(
-    Scenario[SeedingSession, AKeyOwnerAndACaller, UserAdapter, Answer]
+    Scenario[TestSeedingSession, AKeyOwnerAndACaller, UserAdapter, Answer]
 ):
     started: datetime
 
@@ -1035,7 +1041,7 @@ class AGrantedUserReadsAnothersKey(
         return "대상 스코프에서 READ를 받은 사용자가 읽으면, 그 키 노드 전체가 온다"
 
     @override
-    def given(self) -> Given[SeedingSession, AKeyOwnerAndACaller]:
+    def given(self) -> Given[TestSeedingSession, AKeyOwnerAndACaller]:
         return SomeoneAndAKeyOwner(grant=(Permission.READ,), extra=True)
 
     @override
@@ -1049,7 +1055,7 @@ class AGrantedUserReadsAnothersKey(
 
 @dataclass(frozen=True)
 class AUserGrantedNothingMayNotReadAnothersKey(
-    Scenario[SeedingSession, AKeyOwnerAndACaller, UserAdapter, Answer]
+    Scenario[TestSeedingSession, AKeyOwnerAndACaller, UserAdapter, Answer]
 ):
     @override
     def summary(self) -> str:
@@ -1060,7 +1066,7 @@ class AUserGrantedNothingMayNotReadAnothersKey(
         return "역할 없이 읽으려 하면, 소유자 조회 단계가 막는다"
 
     @override
-    def given(self) -> Given[SeedingSession, AKeyOwnerAndACaller]:
+    def given(self) -> Given[TestSeedingSession, AKeyOwnerAndACaller]:
         return SomeoneAndAKeyOwner(extra=True)
 
     @override
@@ -1074,7 +1080,7 @@ class AUserGrantedNothingMayNotReadAnothersKey(
 
 @dataclass(frozen=True)
 class AGrantedUserRegistersAnothersSSHKey(
-    Scenario[SeedingSession, AKeyOwnerAndACaller, UserAdapter, Answer]
+    Scenario[TestSeedingSession, AKeyOwnerAndACaller, UserAdapter, Answer]
 ):
     @override
     def summary(self) -> str:
@@ -1088,7 +1094,7 @@ class AGrantedUserRegistersAnothersSSHKey(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, AKeyOwnerAndACaller]:
+    def given(self) -> Given[TestSeedingSession, AKeyOwnerAndACaller]:
         return SomeoneAndAKeyOwner(grant=(Permission.READ, Permission.UPDATE), helper=True)
 
     @override
@@ -1102,7 +1108,7 @@ class AGrantedUserRegistersAnothersSSHKey(
 
 @dataclass(frozen=True)
 class AUserGrantedNothingMayNotRegisterAnothersSSHKey(
-    Scenario[SeedingSession, AKeyOwnerAndACaller, UserAdapter, Answer]
+    Scenario[TestSeedingSession, AKeyOwnerAndACaller, UserAdapter, Answer]
 ):
     @override
     def summary(self) -> str:
@@ -1113,7 +1119,7 @@ class AUserGrantedNothingMayNotRegisterAnothersSSHKey(
         return "역할 없이 등록하려 하면, 소유자 조회 단계가 막는다"
 
     @override
-    def given(self) -> Given[SeedingSession, AKeyOwnerAndACaller]:
+    def given(self) -> Given[TestSeedingSession, AKeyOwnerAndACaller]:
         return SomeoneAndAKeyOwner(helper=True)
 
     @override
@@ -1127,7 +1133,7 @@ class AUserGrantedNothingMayNotRegisterAnothersSSHKey(
 
 @dataclass(frozen=True)
 class AReaderMayNotRegisterAnothersSSHKey(
-    Scenario[SeedingSession, AKeyOwnerAndACaller, UserAdapter, Answer]
+    Scenario[TestSeedingSession, AKeyOwnerAndACaller, UserAdapter, Answer]
 ):
     @override
     def summary(self) -> str:
@@ -1138,7 +1144,7 @@ class AReaderMayNotRegisterAnothersSSHKey(
         return "READ만 받고 등록하려 하면, 엔티티 권한 문이 막는다"
 
     @override
-    def given(self) -> Given[SeedingSession, AKeyOwnerAndACaller]:
+    def given(self) -> Given[TestSeedingSession, AKeyOwnerAndACaller]:
         return SomeoneAndAKeyOwner(grant=(Permission.READ,), helper=True)
 
     @override
@@ -1152,7 +1158,7 @@ class AReaderMayNotRegisterAnothersSSHKey(
 
 @dataclass(frozen=True)
 class AGrantedUserClearsAnothersSSHKey(
-    Scenario[SeedingSession, AKeyOwnerAndACaller, UserAdapter, Answer]
+    Scenario[TestSeedingSession, AKeyOwnerAndACaller, UserAdapter, Answer]
 ):
     @override
     def summary(self) -> str:
@@ -1163,7 +1169,7 @@ class AGrantedUserClearsAnothersSSHKey(
         return "대상 스코프에서 READ와 UPDATE를 받은 사용자가 지우면, access key가 오고 공개키가 비워진다"
 
     @override
-    def given(self) -> Given[SeedingSession, AKeyOwnerAndACaller]:
+    def given(self) -> Given[TestSeedingSession, AKeyOwnerAndACaller]:
         return SomeoneAndAKeyOwner(grant=(Permission.READ, Permission.UPDATE), helper=True)
 
     @override
@@ -1177,7 +1183,7 @@ class AGrantedUserClearsAnothersSSHKey(
 
 @dataclass(frozen=True)
 class AUserGrantedNothingMayNotClearAnothersSSHKey(
-    Scenario[SeedingSession, AKeyOwnerAndACaller, UserAdapter, Answer]
+    Scenario[TestSeedingSession, AKeyOwnerAndACaller, UserAdapter, Answer]
 ):
     @override
     def summary(self) -> str:
@@ -1188,7 +1194,7 @@ class AUserGrantedNothingMayNotClearAnothersSSHKey(
         return "역할 없이 지우려 하면, 소유자 조회 단계가 막는다"
 
     @override
-    def given(self) -> Given[SeedingSession, AKeyOwnerAndACaller]:
+    def given(self) -> Given[TestSeedingSession, AKeyOwnerAndACaller]:
         return SomeoneAndAKeyOwner(helper=True)
 
     @override
@@ -1202,7 +1208,7 @@ class AUserGrantedNothingMayNotClearAnothersSSHKey(
 
 @dataclass(frozen=True)
 class AReaderMayNotClearAnothersSSHKey(
-    Scenario[SeedingSession, AKeyOwnerAndACaller, UserAdapter, Answer]
+    Scenario[TestSeedingSession, AKeyOwnerAndACaller, UserAdapter, Answer]
 ):
     @override
     def summary(self) -> str:
@@ -1213,7 +1219,7 @@ class AReaderMayNotClearAnothersSSHKey(
         return "READ만 받고 지우려 하면, 엔티티 권한 문이 막는다"
 
     @override
-    def given(self) -> Given[SeedingSession, AKeyOwnerAndACaller]:
+    def given(self) -> Given[TestSeedingSession, AKeyOwnerAndACaller]:
         return SomeoneAndAKeyOwner(grant=(Permission.READ,), helper=True)
 
     @override
@@ -1227,7 +1233,7 @@ class AReaderMayNotClearAnothersSSHKey(
 
 @dataclass(frozen=True)
 class AGrantedUserReadsAnothersSSHPublicKey(
-    Scenario[SeedingSession, AKeyOwnerAndACaller, UserAdapter, Answer]
+    Scenario[TestSeedingSession, AKeyOwnerAndACaller, UserAdapter, Answer]
 ):
     @override
     def summary(self) -> str:
@@ -1241,7 +1247,7 @@ class AGrantedUserReadsAnothersSSHPublicKey(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, AKeyOwnerAndACaller]:
+    def given(self) -> Given[TestSeedingSession, AKeyOwnerAndACaller]:
         return SomeoneAndAKeyOwner(grant=(Permission.READ,), helper=True)
 
     @override
@@ -1255,7 +1261,7 @@ class AGrantedUserReadsAnothersSSHPublicKey(
 
 @dataclass(frozen=True)
 class AUserGrantedNothingMayNotReadAnothersSSHPublicKey(
-    Scenario[SeedingSession, AKeyOwnerAndACaller, UserAdapter, Answer]
+    Scenario[TestSeedingSession, AKeyOwnerAndACaller, UserAdapter, Answer]
 ):
     @override
     def summary(self) -> str:
@@ -1266,7 +1272,7 @@ class AUserGrantedNothingMayNotReadAnothersSSHPublicKey(
         return "역할 없이 읽으려 하면, 소유자 조회 단계가 막는다"
 
     @override
-    def given(self) -> Given[SeedingSession, AKeyOwnerAndACaller]:
+    def given(self) -> Given[TestSeedingSession, AKeyOwnerAndACaller]:
         return SomeoneAndAKeyOwner(helper=True)
 
     @override
@@ -1279,7 +1285,9 @@ class AUserGrantedNothingMayNotReadAnothersSSHPublicKey(
 
 
 @dataclass(frozen=True)
-class TheSuperadminSearchesEveryKey(Scenario[SeedingSession, KeysOfEveryone, UserAdapter, Answer]):
+class TheSuperadminSearchesEveryKey(
+    Scenario[TestSeedingSession, KeysOfEveryone, UserAdapter, Answer]
+):
     started: datetime
 
     @override
@@ -1294,7 +1302,7 @@ class TheSuperadminSearchesEveryKey(Scenario[SeedingSession, KeysOfEveryone, Use
         )
 
     @override
-    def given(self) -> Given[SeedingSession, KeysOfEveryone]:
+    def given(self) -> Given[TestSeedingSession, KeysOfEveryone]:
         return ASuperadminAndTwoUsers()
 
     @override
@@ -1308,7 +1316,7 @@ class TheSuperadminSearchesEveryKey(Scenario[SeedingSession, KeysOfEveryone, Use
 
 @dataclass(frozen=True)
 class OnlyTheSuperadminMaySearchEveryKey(
-    Scenario[SeedingSession, KeysOfEveryone, UserAdapter, Answer]
+    Scenario[TestSeedingSession, KeysOfEveryone, UserAdapter, Answer]
 ):
     @override
     def summary(self) -> str:
@@ -1319,7 +1327,7 @@ class OnlyTheSuperadminMaySearchEveryKey(
         return "권한 받은 사용자가 키 전체 검색을 하려 하면, 전역 역할 문이 막는다"
 
     @override
-    def given(self) -> Given[SeedingSession, KeysOfEveryone]:
+    def given(self) -> Given[TestSeedingSession, KeysOfEveryone]:
         return SomeoneReadingTheDomain()
 
     @override
@@ -1333,7 +1341,7 @@ class OnlyTheSuperadminMaySearchEveryKey(
 
 @dataclass(frozen=True)
 class TheSuperadminSearchesKeysOfOnePolicy(
-    Scenario[SeedingSession, KeysOfEveryone, UserAdapter, Answer]
+    Scenario[TestSeedingSession, KeysOfEveryone, UserAdapter, Answer]
 ):
     started: datetime
 
@@ -1346,7 +1354,7 @@ class TheSuperadminSearchesKeysOfOnePolicy(
         return "전역 역할이 문인 GQL 키 검색에서 슈퍼관리자가 정책 이름을 주면, 그 정책을 쓰는 키만 온다"
 
     @override
-    def given(self) -> Given[SeedingSession, KeysOfEveryone]:
+    def given(self) -> Given[TestSeedingSession, KeysOfEveryone]:
         return ASuperadminAndTwoUsers()
 
     @override
@@ -1360,7 +1368,7 @@ class TheSuperadminSearchesKeysOfOnePolicy(
 
 @dataclass(frozen=True)
 class OnlyTheSuperadminMaySearchKeysOverGQL(
-    Scenario[SeedingSession, KeysOfEveryone, UserAdapter, Answer]
+    Scenario[TestSeedingSession, KeysOfEveryone, UserAdapter, Answer]
 ):
     @override
     def summary(self) -> str:
@@ -1371,7 +1379,7 @@ class OnlyTheSuperadminMaySearchKeysOverGQL(
         return "권한 받은 사용자가 GQL 키 검색을 하려 하면, 전역 역할 문이 막는다"
 
     @override
-    def given(self) -> Given[SeedingSession, KeysOfEveryone]:
+    def given(self) -> Given[TestSeedingSession, KeysOfEveryone]:
         return SomeoneReadingTheDomain()
 
     @override
@@ -1383,7 +1391,7 @@ class OnlyTheSuperadminMaySearchKeysOverGQL(
         return TheCallIsRefused(InsufficientPrivilege)
 
 
-SCENARIOS: list[Scenario[SeedingSession, Any, UserAdapter, Answer]] = [
+SCENARIOS: list[Scenario[TestSeedingSession, Any, UserAdapter, Answer]] = [
     AUserGrantedUpdateMakesAKeyForAnother(started=datetime.now(UTC)),
     AUserGrantedNothingMayNotMakeAKeyForAnother(),
     AKeyMayNotBeMadeUnderAMissingPolicy(),
@@ -1414,7 +1422,7 @@ SCENARIOS: list[Scenario[SeedingSession, Any, UserAdapter, Answer]] = [
 
 @pytest.mark.parametrize("scenario", SCENARIOS, ids=lambda s: s.summary())
 async def test_managing_keypairs(
-    scenario: Scenario[SeedingSession, Any, UserAdapter, Answer],
+    scenario: Scenario[TestSeedingSession, Any, UserAdapter, Answer],
     adapter: UserAdapter,
     engine: ExtendedAsyncSAEngine,
 ) -> None:

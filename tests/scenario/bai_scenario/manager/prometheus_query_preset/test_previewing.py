@@ -40,7 +40,7 @@ from bai_scenario.components.prometheus_query_preset import (
     TheQueryAnswered,
 )
 from bai_scenario.runner.acting import ActingAs
-from bai_scenario.runner.planting import SeedingSession
+from bai_scenario.runner.planting import TestSeedingSession
 from bai_scenario.runner.steps import run_scenario
 from bai_scenario.seeds.prometheus_query_preset.preset import EMPTY_WITHOUT_LABELS, TEMPLATE
 
@@ -49,7 +49,7 @@ SERVER_WINDOW = "2m"
 
 type Result = QueryDefinitionResultInfo
 type PreviewingStep = Scenario[
-    SeedingSession, ACatalogAndACaller, PrometheusQueryPresetAdapter, Result
+    TestSeedingSession, ACatalogAndACaller, PrometheusQueryPresetAdapter, Result
 ]
 
 
@@ -80,7 +80,7 @@ class Previewing(When[ACatalogAndACaller, PrometheusQueryPresetAdapter, Result])
 
 @dataclass(frozen=True)
 class TheSuperadminPreviewsATemplate(
-    Scenario[SeedingSession, ACatalogAndACaller, PrometheusQueryPresetAdapter, Result],
+    Scenario[TestSeedingSession, ACatalogAndACaller, PrometheusQueryPresetAdapter, Result],
     Configured,
 ):
     @override
@@ -99,7 +99,7 @@ class TheSuperadminPreviewsATemplate(
         return {SERVER_WINDOW_PATH: SERVER_WINDOW}
 
     @override
-    def given(self) -> Given[SeedingSession, ACatalogAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ACatalogAndACaller]:
         return JustSomeone(role=UserRole.SUPERADMIN)
 
     @override
@@ -113,7 +113,7 @@ class TheSuperadminPreviewsATemplate(
 
 @dataclass(frozen=True)
 class PrometheusRefusingTheQueryIsAnEvaluationFailure(
-    Scenario[SeedingSession, ACatalogAndACaller, PrometheusQueryPresetAdapter, Result]
+    Scenario[TestSeedingSession, ACatalogAndACaller, PrometheusQueryPresetAdapter, Result]
 ):
     @override
     def summary(self) -> str:
@@ -127,7 +127,7 @@ class PrometheusRefusingTheQueryIsAnEvaluationFailure(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, ACatalogAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ACatalogAndACaller]:
         return JustSomeone(role=UserRole.SUPERADMIN)
 
     @override
@@ -141,7 +141,7 @@ class PrometheusRefusingTheQueryIsAnEvaluationFailure(
 
 @dataclass(frozen=True)
 class AMonitorPreviewsToo(
-    Scenario[SeedingSession, ACatalogAndACaller, PrometheusQueryPresetAdapter, Result],
+    Scenario[TestSeedingSession, ACatalogAndACaller, PrometheusQueryPresetAdapter, Result],
     Configured,
 ):
     @override
@@ -157,7 +157,7 @@ class AMonitorPreviewsToo(
         return {SERVER_WINDOW_PATH: SERVER_WINDOW}
 
     @override
-    def given(self) -> Given[SeedingSession, ACatalogAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ACatalogAndACaller]:
         return JustSomeone(role=UserRole.MONITOR)
 
     @override
@@ -171,7 +171,7 @@ class AMonitorPreviewsToo(
 
 @dataclass(frozen=True)
 class APlainUserMayNotPreview(
-    Scenario[SeedingSession, ACatalogAndACaller, PrometheusQueryPresetAdapter, Result]
+    Scenario[TestSeedingSession, ACatalogAndACaller, PrometheusQueryPresetAdapter, Result]
 ):
     @override
     def summary(self) -> str:
@@ -182,7 +182,7 @@ class APlainUserMayNotPreview(
         return "슈퍼관리자가 아닌 사용자가 미리 보려 하면, 역할 부족으로 거부된다"
 
     @override
-    def given(self) -> Given[SeedingSession, ACatalogAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ACatalogAndACaller]:
         return JustSomeone()
 
     @override

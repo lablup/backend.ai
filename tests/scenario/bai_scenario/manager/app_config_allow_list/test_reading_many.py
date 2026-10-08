@@ -39,11 +39,13 @@ from bai_scenario.components.app_config_allow_list import (
     TwoEntriesAndSomeone,
 )
 from bai_scenario.runner.acting import ActingAs
-from bai_scenario.runner.planting import SeedingSession
+from bai_scenario.runner.planting import TestSeedingSession
 from bai_scenario.runner.steps import run_scenario
 
 type Loaded = list[AppConfigAllowListNode | Exception | None]
-type LoadingStep = Scenario[SeedingSession, TwoEntriesAndACaller, AppConfigAllowListAdapter, Loaded]
+type LoadingStep = Scenario[
+    TestSeedingSession, TwoEntriesAndACaller, AppConfigAllowListAdapter, Loaded
+]
 
 
 @dataclass(frozen=True)
@@ -183,7 +185,7 @@ class TheDuplicateIdKeepsBothPositions(Then[TwoEntriesAndACaller, Loaded]):
 
 @dataclass(frozen=True)
 class APlainUserIsRefusedPerId(
-    Scenario[SeedingSession, TwoEntriesAndACaller, AppConfigAllowListAdapter, Loaded]
+    Scenario[TestSeedingSession, TwoEntriesAndACaller, AppConfigAllowListAdapter, Loaded]
 ):
     @override
     def summary(self) -> str:
@@ -197,7 +199,7 @@ class APlainUserIsRefusedPerId(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, TwoEntriesAndACaller]:
+    def given(self) -> Given[TestSeedingSession, TwoEntriesAndACaller]:
         return TwoEntriesAndSomeone()
 
     @override
@@ -211,7 +213,7 @@ class APlainUserIsRefusedPerId(
 
 @dataclass(frozen=True)
 class TheSuperadminSeesBoth(
-    Scenario[SeedingSession, TwoEntriesAndACaller, AppConfigAllowListAdapter, Loaded]
+    Scenario[TestSeedingSession, TwoEntriesAndACaller, AppConfigAllowListAdapter, Loaded]
 ):
     @override
     def summary(self) -> str:
@@ -225,7 +227,7 @@ class TheSuperadminSeesBoth(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, TwoEntriesAndACaller]:
+    def given(self) -> Given[TestSeedingSession, TwoEntriesAndACaller]:
         return TwoEntriesAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
@@ -239,7 +241,7 @@ class TheSuperadminSeesBoth(
 
 @dataclass(frozen=True)
 class DuplicateIdsKeepTheirPositions(
-    Scenario[SeedingSession, TwoEntriesAndACaller, AppConfigAllowListAdapter, Loaded]
+    Scenario[TestSeedingSession, TwoEntriesAndACaller, AppConfigAllowListAdapter, Loaded]
 ):
     @override
     def summary(self) -> str:
@@ -250,7 +252,7 @@ class DuplicateIdsKeepTheirPositions(
         return "슈퍼관리자가 같은 allow_list의 ID를 두 번 조회하면, 같은 노드가 두 위치에 반환된다"
 
     @override
-    def given(self) -> Given[SeedingSession, TwoEntriesAndACaller]:
+    def given(self) -> Given[TestSeedingSession, TwoEntriesAndACaller]:
         return TwoEntriesAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
@@ -264,7 +266,7 @@ class DuplicateIdsKeepTheirPositions(
 
 @dataclass(frozen=True)
 class AnEmptyListAnswersEmpty(
-    Scenario[SeedingSession, TwoEntriesAndACaller, AppConfigAllowListAdapter, Loaded]
+    Scenario[TestSeedingSession, TwoEntriesAndACaller, AppConfigAllowListAdapter, Loaded]
 ):
     @override
     def summary(self) -> str:
@@ -275,7 +277,7 @@ class AnEmptyListAnswersEmpty(
         return "빈 ID 목록으로 조회하면 빈 목록이 반환된다"
 
     @override
-    def given(self) -> Given[SeedingSession, TwoEntriesAndACaller]:
+    def given(self) -> Given[TestSeedingSession, TwoEntriesAndACaller]:
         return TwoEntriesAndSomeone()
 
     @override

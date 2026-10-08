@@ -8,11 +8,11 @@ from typing import override
 from ai.backend.manager.data.client_ip.masking import ClientIPMaskingMode, ClientIPMaskingTarget
 from ai.backend.manager.data.client_ip.types import ClientIPMaskingPolicyData
 from ai.backend.manager.models.client_ip_masking.upserters import ClientIPMaskingPolicyUpserter
-from bai_scenario.seeds.seeder import Naming, SeedRow
+from bai_scenario.seeds.seeder import Naming, TestSeedRow
 
 
 @dataclass(frozen=True)
-class SeedClientIPMaskingPolicy(SeedRow[ClientIPMaskingPolicyData]):
+class TestSeedClientIPMaskingPolicy(TestSeedRow[ClientIPMaskingPolicyData]):
     """The one policy of a target. Its name is the target, which the manager fixes."""
 
     target_type: ClientIPMaskingTarget = ClientIPMaskingTarget.DEFAULT

@@ -9,11 +9,11 @@ from typing import override
 from ai.backend.common.data.retention.types import RetentionCategory
 from ai.backend.manager.data.retention.types import RetentionPolicyData
 from ai.backend.manager.models.retention.creators import RetentionPolicyCreator
-from bai_scenario.seeds.seeder import Naming, SeedRow
+from bai_scenario.seeds.seeder import Naming, TestSeedRow
 
 
 @dataclass(frozen=True)
-class SeedRetentionPolicy(SeedRow[RetentionPolicyData]):
+class TestSeedRetentionPolicy(TestSeedRow[RetentionPolicyData]):
     """The one policy of a category. Its name is the category, which the manager fixes."""
 
     category: RetentionCategory = RetentionCategory.LOGS

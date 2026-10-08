@@ -37,11 +37,11 @@ from bai_scenario.components.vfolder import (
     VFolderNodeLook,
 )
 from bai_scenario.runner.acting import ActingAs
-from bai_scenario.runner.planting import SeedingSession
+from bai_scenario.runner.planting import TestSeedingSession
 from bai_scenario.runner.steps import run_scenario
 
 type Answer = list[VFolderNode | Exception | None]
-type LoadStep = Scenario[SeedingSession, Any, VFolderAdapter, Answer]
+type LoadStep = Scenario[TestSeedingSession, Any, VFolderAdapter, Answer]
 
 
 @dataclass(frozen=True)
@@ -243,7 +243,7 @@ class AnEmptyList(Then[AFolderMakerAndTheirDomain, Answer]):
 
 @dataclass(frozen=True)
 class AUserLoadsTheirOwnFolderById(
-    Scenario[SeedingSession, AFolderAndItsReader, VFolderAdapter, Answer]
+    Scenario[TestSeedingSession, AFolderAndItsReader, VFolderAdapter, Answer]
 ):
     started: datetime
 
@@ -259,7 +259,7 @@ class AUserLoadsTheirOwnFolderById(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, AFolderAndItsReader]:
+    def given(self) -> Given[TestSeedingSession, AFolderAndItsReader]:
         return SomeoneWithAFolderOfTheirOwn(granted=True)
 
     @override
@@ -273,7 +273,7 @@ class AUserLoadsTheirOwnFolderById(
 
 @dataclass(frozen=True)
 class AUserGrantedNothingGetsARefusalForTheirOwnFolder(
-    Scenario[SeedingSession, AFolderAndItsReader, VFolderAdapter, Answer]
+    Scenario[TestSeedingSession, AFolderAndItsReader, VFolderAdapter, Answer]
 ):
     @override
     def summary(self) -> str:
@@ -287,7 +287,7 @@ class AUserGrantedNothingGetsARefusalForTheirOwnFolder(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, AFolderAndItsReader]:
+    def given(self) -> Given[TestSeedingSession, AFolderAndItsReader]:
         return SomeoneWithAFolderOfTheirOwn(granted=False)
 
     @override
@@ -301,7 +301,7 @@ class AUserGrantedNothingGetsARefusalForTheirOwnFolder(
 
 @dataclass(frozen=True)
 class ABatchLoadAnswersEachElementInOrder(
-    Scenario[SeedingSession, AReaderAndTwoFolders, VFolderAdapter, Answer]
+    Scenario[TestSeedingSession, AReaderAndTwoFolders, VFolderAdapter, Answer]
 ):
     started: datetime
 
@@ -317,7 +317,7 @@ class ABatchLoadAnswersEachElementInOrder(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, AReaderAndTwoFolders]:
+    def given(self) -> Given[TestSeedingSession, AReaderAndTwoFolders]:
         return SomeoneWithTheirFolderAndAnothers()
 
     @override
@@ -331,7 +331,7 @@ class ABatchLoadAnswersEachElementInOrder(
 
 @dataclass(frozen=True)
 class AnAcceptedShareLoadsSomeoneElsesFolderById(
-    Scenario[SeedingSession, AFolderAndItsReader, VFolderAdapter, Answer]
+    Scenario[TestSeedingSession, AFolderAndItsReader, VFolderAdapter, Answer]
 ):
     started: datetime
 
@@ -347,7 +347,7 @@ class AnAcceptedShareLoadsSomeoneElsesFolderById(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, AFolderAndItsReader]:
+    def given(self) -> Given[TestSeedingSession, AFolderAndItsReader]:
         return AFolderOfferedToSomeone(accepted=True)
 
     @override
@@ -361,7 +361,7 @@ class AnAcceptedShareLoadsSomeoneElsesFolderById(
 
 @dataclass(frozen=True)
 class AnUnansweredOfferGetsARefusalForTheFolder(
-    Scenario[SeedingSession, AFolderAndItsReader, VFolderAdapter, Answer]
+    Scenario[TestSeedingSession, AFolderAndItsReader, VFolderAdapter, Answer]
 ):
     @override
     def summary(self) -> str:
@@ -375,7 +375,7 @@ class AnUnansweredOfferGetsARefusalForTheFolder(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, AFolderAndItsReader]:
+    def given(self) -> Given[TestSeedingSession, AFolderAndItsReader]:
         return AFolderOfferedToSomeone(accepted=False)
 
     @override
@@ -389,7 +389,7 @@ class AnUnansweredOfferGetsARefusalForTheFolder(
 
 @dataclass(frozen=True)
 class TheSuperadminBatchLoadLeavesAMissingIdEmpty(
-    Scenario[SeedingSession, AFolderAndItsReader, VFolderAdapter, Answer]
+    Scenario[TestSeedingSession, AFolderAndItsReader, VFolderAdapter, Answer]
 ):
     started: datetime
 
@@ -405,7 +405,7 @@ class TheSuperadminBatchLoadLeavesAMissingIdEmpty(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, AFolderAndItsReader]:
+    def given(self) -> Given[TestSeedingSession, AFolderAndItsReader]:
         return SomeonesFolderAndTheSuperadmin()
 
     @override
@@ -419,7 +419,7 @@ class TheSuperadminBatchLoadLeavesAMissingIdEmpty(
 
 @dataclass(frozen=True)
 class ABatchLoadOfNothingAnswersNothing(
-    Scenario[SeedingSession, AFolderMakerAndTheirDomain, VFolderAdapter, Answer]
+    Scenario[TestSeedingSession, AFolderMakerAndTheirDomain, VFolderAdapter, Answer]
 ):
     @override
     def summary(self) -> str:
@@ -430,7 +430,7 @@ class ABatchLoadOfNothingAnswersNothing(
         return "아무 권한도 받지 않은 사용자가 빈 id 목록을 주면, 권한 검사 없이 빈 목록이 온다"
 
     @override
-    def given(self) -> Given[SeedingSession, AFolderMakerAndTheirDomain]:
+    def given(self) -> Given[TestSeedingSession, AFolderMakerAndTheirDomain]:
         return SomeoneWithNoGrant()
 
     @override

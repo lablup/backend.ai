@@ -24,12 +24,12 @@ from bai_scenario.components.notification import (
     TheNewRuleNode,
 )
 from bai_scenario.runner.acting import ActingAs
-from bai_scenario.runner.planting import SeedingSession
+from bai_scenario.runner.planting import TestSeedingSession
 from bai_scenario.runner.steps import run_scenario
 from bai_scenario.seeds.notification.rule import TEMPLATE
 
 type CreatingStep = Scenario[
-    SeedingSession, AChannelAndACaller, NotificationAdapter, NotificationRuleNode
+    TestSeedingSession, AChannelAndACaller, NotificationAdapter, NotificationRuleNode
 ]
 
 
@@ -73,7 +73,7 @@ class Creating(When[AChannelAndACaller, NotificationAdapter, NotificationRuleNod
 
 @dataclass(frozen=True)
 class TheSuperadminMakesARule(
-    Scenario[SeedingSession, AChannelAndACaller, NotificationAdapter, NotificationRuleNode]
+    Scenario[TestSeedingSession, AChannelAndACaller, NotificationAdapter, NotificationRuleNode]
 ):
     started: datetime
 
@@ -89,7 +89,7 @@ class TheSuperadminMakesARule(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, AChannelAndACaller]:
+    def given(self) -> Given[TestSeedingSession, AChannelAndACaller]:
         return AChannelAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
@@ -103,7 +103,7 @@ class TheSuperadminMakesARule(
 
 @dataclass(frozen=True)
 class ADisabledRuleIsMade(
-    Scenario[SeedingSession, AChannelAndACaller, NotificationAdapter, NotificationRuleNode]
+    Scenario[TestSeedingSession, AChannelAndACaller, NotificationAdapter, NotificationRuleNode]
 ):
     started: datetime
 
@@ -116,7 +116,7 @@ class ADisabledRuleIsMade(
         return "슈퍼관리자가 비활성으로 지정해 규칙을 만들면 비활성인 규칙이 반환된다"
 
     @override
-    def given(self) -> Given[SeedingSession, AChannelAndACaller]:
+    def given(self) -> Given[TestSeedingSession, AChannelAndACaller]:
         return AChannelAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
@@ -130,7 +130,7 @@ class ADisabledRuleIsMade(
 
 @dataclass(frozen=True)
 class ARulePointingAtNoChannelIsMade(
-    Scenario[SeedingSession, AChannelAndACaller, NotificationAdapter, NotificationRuleNode]
+    Scenario[TestSeedingSession, AChannelAndACaller, NotificationAdapter, NotificationRuleNode]
 ):
     started: datetime
     orphan: UUID
@@ -147,7 +147,7 @@ class ARulePointingAtNoChannelIsMade(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, AChannelAndACaller]:
+    def given(self) -> Given[TestSeedingSession, AChannelAndACaller]:
         return AChannelAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
@@ -161,7 +161,7 @@ class ARulePointingAtNoChannelIsMade(
 
 @dataclass(frozen=True)
 class AUserWhoIsNotTheSuperadminMayNotCreate(
-    Scenario[SeedingSession, AChannelAndACaller, NotificationAdapter, NotificationRuleNode]
+    Scenario[TestSeedingSession, AChannelAndACaller, NotificationAdapter, NotificationRuleNode]
 ):
     @override
     def summary(self) -> str:
@@ -172,7 +172,7 @@ class AUserWhoIsNotTheSuperadminMayNotCreate(
         return "슈퍼관리자가 아닌 사용자가 규칙을 만들려 하면 역할 부족으로 거부된다"
 
     @override
-    def given(self) -> Given[SeedingSession, AChannelAndACaller]:
+    def given(self) -> Given[TestSeedingSession, AChannelAndACaller]:
         return AChannelAndSomeone()
 
     @override
@@ -186,7 +186,7 @@ class AUserWhoIsNotTheSuperadminMayNotCreate(
 
 @dataclass(frozen=True)
 class TheMonitorMayNotCreate(
-    Scenario[SeedingSession, AChannelAndACaller, NotificationAdapter, NotificationRuleNode]
+    Scenario[TestSeedingSession, AChannelAndACaller, NotificationAdapter, NotificationRuleNode]
 ):
     @override
     def summary(self) -> str:
@@ -197,7 +197,7 @@ class TheMonitorMayNotCreate(
         return "모니터가 규칙을 만들려 하면 역할 부족으로 거부된다. 모니터는 읽기만 통과한다"
 
     @override
-    def given(self) -> Given[SeedingSession, AChannelAndACaller]:
+    def given(self) -> Given[TestSeedingSession, AChannelAndACaller]:
         return AChannelAndSomeone(role=UserRole.MONITOR)
 
     @override

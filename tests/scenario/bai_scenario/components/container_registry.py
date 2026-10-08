@@ -39,13 +39,13 @@ from ai.backend.testutils.scenario_steps import (
 )
 from bai_scenario.components.answers import MissingResponse
 from bai_scenario.components.domain import SomeoneOf
-from bai_scenario.runner.planting import SeedingSession
-from bai_scenario.seeds.domain.domain import SeedDomain
-from bai_scenario.seeds.image.registry import AllowProject, SeedContainerRegistry
-from bai_scenario.seeds.project.project import SeedProject
-from bai_scenario.seeds.rbac.role import SeedPermission, SeedRole
-from bai_scenario.seeds.resource_policy.project import SeedProjectPolicy
-from bai_scenario.seeds.seeder import Laid, Seeder, SeedNest
+from bai_scenario.runner.planting import TestSeedingSession
+from bai_scenario.seeds.domain.domain import TestSeedDomain
+from bai_scenario.seeds.image.registry import AllowProject, TestSeedContainerRegistry
+from bai_scenario.seeds.project.project import TestSeedProject
+from bai_scenario.seeds.rbac.role import TestSeedPermission, TestSeedRole
+from bai_scenario.seeds.resource_policy.project import TestSeedProjectPolicy
+from bai_scenario.seeds.seeder import Laid, TestSeeder, TestSeedNest
 
 MISSING_ENTITY_ID = uuid.UUID("00000000-0000-0000-0000-0000000000ff")
 """어떤 행에도 대응하지 않는 ID."""
@@ -81,7 +81,7 @@ class ARegistryToAllowAndACaller:
 
 
 @dataclass(frozen=True)
-class NoRegistryYet(Given[SeedingSession, AProjectAndACaller]):
+class NoRegistryYet(Given[TestSeedingSession, AProjectAndACaller]):
     role: UserRole = UserRole.USER
 
     @override
@@ -89,16 +89,16 @@ class NoRegistryYet(Given[SeedingSession, AProjectAndACaller]):
         return f"레지스트리 없음, 프로젝트 하나, 도메인 하나에 속한 {self.role.value} 한 명"
 
     @override
-    async def lay(self, seeding: SeedingSession) -> AProjectAndACaller:
-        domain = await seeding.creating(SeedDomain(name_hint="home"))
-        policy = await seeding.once(SeedProjectPolicy())
-        project = await seeding.creating_from_two(SeedProject(), domain, policy)
+    async def lay(self, seeding: TestSeedingSession) -> AProjectAndACaller:
+        domain = await seeding.creating(TestSeedDomain(name_hint="home"))
+        policy = await seeding.once(TestSeedProjectPolicy())
+        project = await seeding.creating_from_two(TestSeedProject(), domain, policy)
         caller = await seeding.within(SomeoneOf(domain, role=self.role))
         return AProjectAndACaller(seeding.made(project), seeding.made(caller))
 
 
 @dataclass(frozen=True)
-class ARegistryAndSomeone(Given[SeedingSession, ARegistryAndACaller]):
+class ARegistryAndSomeone(Given[TestSeedingSession, ARegistryAndACaller]):
     role: UserRole = UserRole.USER
     name_hint: str = "host"
     with_project: bool = False
@@ -111,13 +111,13 @@ class ARegistryAndSomeone(Given[SeedingSession, ARegistryAndACaller]):
         return f"레지스트리 하나{project}{allowed}, {self.role.value} 한 명"
 
     @override
-    async def lay(self, seeding: SeedingSession) -> ARegistryAndACaller:
-        domain = await seeding.creating(SeedDomain(name_hint="home"))
-        registry = await seeding.creating(SeedContainerRegistry(name_hint=self.name_hint))
+    async def lay(self, seeding: TestSeedingSession) -> ARegistryAndACaller:
+        domain = await seeding.creating(TestSeedDomain(name_hint="home"))
+        registry = await seeding.creating(TestSeedContainerRegistry(name_hint=self.name_hint))
         project_data: ProjectData | None = None
         if self.with_project or self.allowed:
-            policy = await seeding.once(SeedProjectPolicy())
-            project = await seeding.creating_from_two(SeedProject(), domain, policy)
+            policy = await seeding.once(TestSeedProjectPolicy())
+            project = await seeding.creating_from_two(TestSeedProject(), domain, policy)
             project_data = seeding.made(project)
             if self.allowed:
                 await seeding.linking(AllowProject(), project, registry)
@@ -130,7 +130,7 @@ class ARegistryAndSomeone(Given[SeedingSession, ARegistryAndACaller]):
 
 
 @dataclass(frozen=True)
-class ManyRegistriesAndSomeone(Given[SeedingSession, ManyRegistriesAndACaller]):
+class ManyRegistriesAndSomeone(Given[TestSeedingSession, ManyRegistriesAndACaller]):
     role: UserRole = UserRole.SUPERADMIN
 
     @override
@@ -138,11 +138,11 @@ class ManyRegistriesAndSomeone(Given[SeedingSession, ManyRegistriesAndACaller]):
         return f"레지스트리 2개, {self.role.value} 한 명"
 
     @override
-    async def lay(self, seeding: SeedingSession) -> ManyRegistriesAndACaller:
-        domain = await seeding.creating(SeedDomain(name_hint="home"))
-        wanted = await seeding.creating(SeedContainerRegistry(name_hint="wanted"))
+    async def lay(self, seeding: TestSeedingSession) -> ManyRegistriesAndACaller:
+        domain = await seeding.creating(TestSeedDomain(name_hint="home"))
+        wanted = await seeding.creating(TestSeedContainerRegistry(name_hint="wanted"))
         other = await seeding.creating(
-            SeedContainerRegistry(
+            TestSeedContainerRegistry(
                 name_hint="other",
                 registry_type=ContainerRegistryType.HARBOR2,
                 is_global=False,
@@ -160,7 +160,7 @@ ALLOWING = (Permission.CREATE, Permission.SOFT_DELETE)
 
 
 @dataclass(frozen=True)
-class ARegistryAndAProjectToAllow(Given[SeedingSession, ARegistryToAllowAndACaller]):
+class ARegistryAndAProjectToAllow(Given[TestSeedingSession, ARegistryToAllowAndACaller]):
     """관계 연산은 지정한 스코프 모두에 권한이 있어야 실행된다. 그래서 한쪽에만 권한을 주는 상황이 필요하다."""
 
     role: UserRole = UserRole.USER
@@ -181,11 +181,11 @@ class ARegistryAndAProjectToAllow(Given[SeedingSession, ARegistryToAllowAndACall
         return f"레지스트리 하나, 프로젝트 하나, {holds}인 사용자 한 명{already}"
 
     @override
-    async def lay(self, seeding: SeedingSession) -> ARegistryToAllowAndACaller:
-        domain = await seeding.creating(SeedDomain(name_hint="home"))
-        policy = await seeding.once(SeedProjectPolicy())
-        project = await seeding.creating_from_two(SeedProject(), domain, policy)
-        registry = await seeding.creating(SeedContainerRegistry(name_hint="host"))
+    async def lay(self, seeding: TestSeedingSession) -> ARegistryToAllowAndACaller:
+        domain = await seeding.creating(TestSeedDomain(name_hint="home"))
+        policy = await seeding.once(TestSeedProjectPolicy())
+        project = await seeding.creating_from_two(TestSeedProject(), domain, policy)
+        registry = await seeding.creating(TestSeedContainerRegistry(name_hint="host"))
         if self.allowed:
             await seeding.linking(AllowProject(), project, registry)
         caller = await seeding.within(SomeoneOf(domain, role=self.role))
@@ -219,7 +219,7 @@ class ARegistryAndAProjectToAllow(Given[SeedingSession, ARegistryToAllowAndACall
 
 
 @dataclass(frozen=True)
-class SomeoneAllowingIn[ScopeData](SeedNest[Laid[None]]):
+class SomeoneAllowingIn[ScopeData](TestSeedNest[Laid[None]]):
     """스코프 안에서 레지스트리 허용 목록을 수정할 역할을 사용자에게 부여한다."""
 
     scope: Laid[ScopeData]
@@ -234,10 +234,10 @@ class SomeoneAllowingIn[ScopeData](SeedNest[Laid[None]]):
         return f"{self.name_hint} 권한을 받은 사용자 준비"
 
     @override
-    def lay(self, seed: Seeder) -> Laid[None]:
-        role = seed.creating_from(SeedRole(self.scope_of, name_hint=self.name_hint), self.scope)
+    def lay(self, seed: TestSeeder) -> Laid[None]:
+        role = seed.creating_from(TestSeedRole(self.scope_of, name_hint=self.name_hint), self.scope)
         for allowed in self.permissions:
-            seed.adding(SeedPermission(entity_type=self.entity_type, permission=allowed), role)
+            seed.adding(TestSeedPermission(entity_type=self.entity_type, permission=allowed), role)
         return seed.granting(
             role, self.someone, role_id=lambda r: r.id, user_id=lambda u: UserID(u.id)
         )
@@ -327,7 +327,9 @@ class RegistryTarget(ABC):
 
 
 @dataclass(frozen=True)
-class SeededRegistry(RegistryTarget):
+class TestSeededRegistry(RegistryTarget):
+    __test__ = False
+
     @override
     def says(self) -> str:
         return "미리 만들어 둔 레지스트리"
@@ -372,7 +374,9 @@ class NoProjects(AllowedProjects):
 
 
 @dataclass(frozen=True)
-class SeededProject(AllowedProjects):
+class TestSeededProject(AllowedProjects):
+    __test__ = False
+
     @override
     def says(self) -> str:
         return "미리 만들어 둔 프로젝트를 허용 목록에 넣고"

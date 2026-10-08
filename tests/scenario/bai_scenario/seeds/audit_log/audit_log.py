@@ -24,11 +24,11 @@ from ai.backend.manager.models.audit_log.creators import (
     SingleEntityAuditLogCreator,
 )
 from ai.backend.manager.models.specs.creator import NestedFieldCreator
-from bai_scenario.seeds.seeder import SeedField, SeedFieldWithNestedRows
+from bai_scenario.seeds.seeder import TestSeedFieldCreator, TestSeedFieldWithNestedRows
 
 
 @dataclass(frozen=True)
-class SeedAuditRecord[Owner](SeedField[Owner, AuditLogData]):
+class TestSeedAuditRecord[Owner](TestSeedFieldCreator[Owner, AuditLogData]):
     """One record of an operation on the entity ``owner_of`` reads off the laid row.
 
     The record's ``triggered_by`` is a user id, or none; the actor axis of a scoped read
@@ -72,7 +72,7 @@ class SeedAuditRecord[Owner](SeedField[Owner, AuditLogData]):
 
 
 @dataclass(frozen=True)
-class SeedScopedAuditRecord[Owner](SeedFieldWithNestedRows[Owner, AuditLogData]):
+class TestSeedScopedAuditRecord[Owner](TestSeedFieldWithNestedRows[Owner, AuditLogData]):
     """A scope-action record: written under the entity it affected, tagged with the scopes
     the run covered. A search by one of those scopes finds it through ``audit_log_scopes``,
     not through the record's own entity.

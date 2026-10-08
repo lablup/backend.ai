@@ -26,11 +26,11 @@ from ai.backend.testutils.scenario_steps import (
 from bai_scenario.components.answers import MissingResponse, TheCallIsRefused
 from bai_scenario.components.resource_group import AGroupAndACaller, AGroupAndSomeone
 from bai_scenario.runner.acting import ActingAs
-from bai_scenario.runner.planting import SeedingSession
+from bai_scenario.runner.planting import TestSeedingSession
 from bai_scenario.runner.steps import run_scenario
 
 type LookingUpStep = Scenario[
-    SeedingSession, AGroupAndACaller, ResourceGroupAdapter, ResourceGroupID
+    TestSeedingSession, AGroupAndACaller, ResourceGroupAdapter, ResourceGroupID
 ]
 
 UNKNOWN = "no-such-group"
@@ -75,7 +75,7 @@ class TheGroupsIdComesBack(Then[AGroupAndACaller, ResourceGroupID]):
 
 @dataclass(frozen=True)
 class TheSuperadminLooksUpAName(
-    Scenario[SeedingSession, AGroupAndACaller, ResourceGroupAdapter, ResourceGroupID]
+    Scenario[TestSeedingSession, AGroupAndACaller, ResourceGroupAdapter, ResourceGroupID]
 ):
     @override
     def summary(self) -> str:
@@ -86,7 +86,7 @@ class TheSuperadminLooksUpAName(
         return "슈퍼관리자가 리소스 그룹 이름으로 id를 찾으면, 그 리소스 그룹의 id가 온다"
 
     @override
-    def given(self) -> Given[SeedingSession, AGroupAndACaller]:
+    def given(self) -> Given[TestSeedingSession, AGroupAndACaller]:
         return AGroupAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
@@ -100,7 +100,7 @@ class TheSuperadminLooksUpAName(
 
 @dataclass(frozen=True)
 class AUserGrantedNothingStillLooksUpAName(
-    Scenario[SeedingSession, AGroupAndACaller, ResourceGroupAdapter, ResourceGroupID]
+    Scenario[TestSeedingSession, AGroupAndACaller, ResourceGroupAdapter, ResourceGroupID]
 ):
     @override
     def summary(self) -> str:
@@ -114,7 +114,7 @@ class AUserGrantedNothingStillLooksUpAName(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, AGroupAndACaller]:
+    def given(self) -> Given[TestSeedingSession, AGroupAndACaller]:
         return AGroupAndSomeone()
 
     @override
@@ -128,7 +128,7 @@ class AUserGrantedNothingStillLooksUpAName(
 
 @dataclass(frozen=True)
 class ANameNothingAnswersToIsNotFound(
-    Scenario[SeedingSession, AGroupAndACaller, ResourceGroupAdapter, ResourceGroupID]
+    Scenario[TestSeedingSession, AGroupAndACaller, ResourceGroupAdapter, ResourceGroupID]
 ):
     @override
     def summary(self) -> str:
@@ -139,7 +139,7 @@ class ANameNothingAnswersToIsNotFound(
         return "아무 리소스 그룹도 갖지 않은 이름으로 id를 찾으면 대상이 없다는 것으로 거부된다"
 
     @override
-    def given(self) -> Given[SeedingSession, AGroupAndACaller]:
+    def given(self) -> Given[TestSeedingSession, AGroupAndACaller]:
         return AGroupAndSomeone(role=UserRole.SUPERADMIN)
 
     @override

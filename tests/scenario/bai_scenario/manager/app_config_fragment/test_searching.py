@@ -46,13 +46,13 @@ from bai_scenario.components.app_config_fragment import (
     ManyFragmentsAndACaller,
 )
 from bai_scenario.runner.acting import ActingAs
-from bai_scenario.runner.planting import SeedingSession
+from bai_scenario.runner.planting import TestSeedingSession
 from bai_scenario.runner.steps import run_scenario
 from bai_scenario.seeds.app_config.allow_list import SCOPE_NAMES
 
 type Searched = SearchAppConfigFragmentPayload
 type SearchingStep = Scenario[
-    SeedingSession, ManyFragmentsAndACaller, AppConfigFragmentAdapter, Searched
+    TestSeedingSession, ManyFragmentsAndACaller, AppConfigFragmentAdapter, Searched
 ]
 
 
@@ -182,7 +182,7 @@ class EveryFragmentIsCounted(Then[ManyFragmentsAndACaller, Searched]):
 
 @dataclass(frozen=True)
 class TheGrantedUserCountsTheirOwn(
-    Scenario[SeedingSession, ManyFragmentsAndACaller, AppConfigFragmentAdapter, Searched]
+    Scenario[TestSeedingSession, ManyFragmentsAndACaller, AppConfigFragmentAdapter, Searched]
 ):
     @override
     def summary(self) -> str:
@@ -196,7 +196,7 @@ class TheGrantedUserCountsTheirOwn(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, ManyFragmentsAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ManyFragmentsAndACaller]:
         return FragmentsLaidAcross(mine=2, anothers=1, granted=(Permission.READ,))
 
     @override
@@ -210,7 +210,7 @@ class TheGrantedUserCountsTheirOwn(
 
 @dataclass(frozen=True)
 class AnyoneSignedInSearchesThePublic(
-    Scenario[SeedingSession, ManyFragmentsAndACaller, AppConfigFragmentAdapter, Searched]
+    Scenario[TestSeedingSession, ManyFragmentsAndACaller, AppConfigFragmentAdapter, Searched]
 ):
     @override
     def summary(self) -> str:
@@ -224,7 +224,7 @@ class AnyoneSignedInSearchesThePublic(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, ManyFragmentsAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ManyFragmentsAndACaller]:
         return FragmentsLaidAcross(publics=2, answers=AppConfigScopeType.PUBLIC)
 
     @override
@@ -238,7 +238,7 @@ class AnyoneSignedInSearchesThePublic(
 
 @dataclass(frozen=True)
 class TwoScopesAtOnceAreRefused(
-    Scenario[SeedingSession, ManyFragmentsAndACaller, AppConfigFragmentAdapter, Searched]
+    Scenario[TestSeedingSession, ManyFragmentsAndACaller, AppConfigFragmentAdapter, Searched]
 ):
     @override
     def summary(self) -> str:
@@ -252,7 +252,7 @@ class TwoScopesAtOnceAreRefused(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, ManyFragmentsAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ManyFragmentsAndACaller]:
         return FragmentsLaidAcross(mine=1, granted=(Permission.READ,))
 
     @override
@@ -266,7 +266,7 @@ class TwoScopesAtOnceAreRefused(
 
 @dataclass(frozen=True)
 class AnotherUsersScopeIsRefused(
-    Scenario[SeedingSession, ManyFragmentsAndACaller, AppConfigFragmentAdapter, Searched]
+    Scenario[TestSeedingSession, ManyFragmentsAndACaller, AppConfigFragmentAdapter, Searched]
 ):
     @override
     def summary(self) -> str:
@@ -277,7 +277,7 @@ class AnotherUsersScopeIsRefused(
         return "자기 스코프에만 읽기 권한을 받은 사용자가 다른 사용자를 지정해 검색하면, 권한 부족으로 거부된다"
 
     @override
-    def given(self) -> Given[SeedingSession, ManyFragmentsAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ManyFragmentsAndACaller]:
         return FragmentsLaidAcross(mine=1, anothers=1, answers=None, granted=(Permission.READ,))
 
     @override
@@ -291,7 +291,7 @@ class AnotherUsersScopeIsRefused(
 
 @dataclass(frozen=True)
 class AMissingDomainIsNotFoundForASuperadmin(
-    Scenario[SeedingSession, ManyFragmentsAndACaller, AppConfigFragmentAdapter, Searched]
+    Scenario[TestSeedingSession, ManyFragmentsAndACaller, AppConfigFragmentAdapter, Searched]
 ):
     @override
     def summary(self) -> str:
@@ -302,7 +302,7 @@ class AMissingDomainIsNotFoundForASuperadmin(
         return "슈퍼관리자가 어느 도메인도 아닌 id를 지정해 검색하면, 대상을 찾을 수 없다는 이유로 거부된다"
 
     @override
-    def given(self) -> Given[SeedingSession, ManyFragmentsAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ManyFragmentsAndACaller]:
         return FragmentsLaidAcross(
             answers=AppConfigScopeType.DOMAIN, missing_domain=True, role=UserRole.SUPERADMIN
         )
@@ -318,7 +318,7 @@ class AMissingDomainIsNotFoundForASuperadmin(
 
 @dataclass(frozen=True)
 class TheSuperadminCountsEveryOne(
-    Scenario[SeedingSession, ManyFragmentsAndACaller, AppConfigFragmentAdapter, Searched]
+    Scenario[TestSeedingSession, ManyFragmentsAndACaller, AppConfigFragmentAdapter, Searched]
 ):
     @override
     def summary(self) -> str:
@@ -329,7 +329,7 @@ class TheSuperadminCountsEveryOne(
         return "공개·도메인·사용자 스코프에 조각 넷이 있고 슈퍼관리자가 전체를 검색하면, 넷 다 집계된다. 전체 검색은 슈퍼관리자인지 검사한다"
 
     @override
-    def given(self) -> Given[SeedingSession, ManyFragmentsAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ManyFragmentsAndACaller]:
         return FragmentsLaidAcross(
             mine=2, domains=1, publics=1, answers=None, role=UserRole.SUPERADMIN
         )
@@ -345,7 +345,7 @@ class TheSuperadminCountsEveryOne(
 
 @dataclass(frozen=True)
 class AGrantDoesNotOpenTheGlobalDoor(
-    Scenario[SeedingSession, ManyFragmentsAndACaller, AppConfigFragmentAdapter, Searched]
+    Scenario[TestSeedingSession, ManyFragmentsAndACaller, AppConfigFragmentAdapter, Searched]
 ):
     @override
     def summary(self) -> str:
@@ -359,7 +359,7 @@ class AGrantDoesNotOpenTheGlobalDoor(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, ManyFragmentsAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ManyFragmentsAndACaller]:
         return FragmentsLaidAcross(
             domains=1, answers=AppConfigScopeType.DOMAIN, granted=(Permission.READ,)
         )

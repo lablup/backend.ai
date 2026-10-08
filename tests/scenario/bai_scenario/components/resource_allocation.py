@@ -54,19 +54,19 @@ from bai_scenario.components.deployment_revision import WhatARevisionStandsOn, l
 from bai_scenario.components.domain import WAS_HERE, SomeoneOf
 from bai_scenario.components.resource_slot import ASlotTypeAndACaller
 from bai_scenario.components.system import role_named
-from bai_scenario.seeds.domain.domain import SeedDomain
-from bai_scenario.seeds.image.image import SeedImage
-from bai_scenario.seeds.image.registry import SeedContainerRegistry
-from bai_scenario.seeds.project.project import SeedProject
-from bai_scenario.seeds.rbac.role import SeedPermission, SeedRole
-from bai_scenario.seeds.resource_group.resource_group import SeedResourceGroup
-from bai_scenario.seeds.resource_policy.keypair import SeedKeypairPolicy
-from bai_scenario.seeds.resource_policy.project import SeedProjectPolicy
-from bai_scenario.seeds.resource_slot.slot_type import SeedResourceSlotType
-from bai_scenario.seeds.seeder import Laid, Seeder, SeedNest
-from bai_scenario.seeds.session.kernel import SeedKernelOf
-from bai_scenario.seeds.session.session import SeedSession
-from bai_scenario.seeds.user.fields import SeedKeypairOf
+from bai_scenario.seeds.domain.domain import TestSeedDomain
+from bai_scenario.seeds.image.image import TestSeedImage
+from bai_scenario.seeds.image.registry import TestSeedContainerRegistry
+from bai_scenario.seeds.project.project import TestSeedProject
+from bai_scenario.seeds.rbac.role import TestSeedPermission, TestSeedRole
+from bai_scenario.seeds.resource_group.resource_group import TestSeedResourceGroup
+from bai_scenario.seeds.resource_policy.keypair import TestSeedKeypairPolicy
+from bai_scenario.seeds.resource_policy.project import TestSeedProjectPolicy
+from bai_scenario.seeds.resource_slot.slot_type import TestSeedResourceSlotType
+from bai_scenario.seeds.seeder import Laid, TestSeeder, TestSeedNest
+from bai_scenario.seeds.session.kernel import TestSeedKernelOf
+from bai_scenario.seeds.session.session import TestSeedSession
+from bai_scenario.seeds.user.fields import TestSeedKeypairOf
 
 type Slots = tuple[tuple[str, Decimal], ...]
 """커널이 슬롯마다 요구한 양. 슬롯 이름과 양의 짝이다."""
@@ -113,7 +113,7 @@ class KernelsAndACaller:
 
 
 @dataclass(frozen=True)
-class SomeoneReadingSessionsIn[S](SeedNest[Laid[UserData]]):
+class SomeoneReadingSessionsIn[S](TestSeedNest[Laid[UserData]]):
     """그 스코프에서 세션을 읽을 수 있는 사용자."""
 
     domain: Laid[DomainData]
@@ -126,11 +126,13 @@ class SomeoneReadingSessionsIn[S](SeedNest[Laid[UserData]]):
         return f"{self.where} 범위의 세션 조회 권한을 받은 사용자 준비"
 
     @override
-    def lay(self, seed: Seeder) -> Laid[UserData]:
+    def lay(self, seed: TestSeeder) -> Laid[UserData]:
         someone = seed.within(SomeoneOf(self.domain))
-        role = seed.creating_from(SeedRole(self.scope_of, name_hint="session-reader"), self.scope)
+        role = seed.creating_from(
+            TestSeedRole(self.scope_of, name_hint="session-reader"), self.scope
+        )
         seed.adding(
-            SeedPermission(entity_type=SessionEntityType(), permission=Permission.READ), role
+            TestSeedPermission(entity_type=SessionEntityType(), permission=Permission.READ), role
         )
         seed.granting(role, someone, role_id=lambda r: r.id, user_id=lambda u: UserID(u.id))
         return someone
@@ -152,16 +154,18 @@ class LaidPlace:
 async def lay_a_place(seeding: Any, *, slots: int) -> LaidPlace:
     """커널이 놓일 도메인·프로젝트·리소스 그룹과, 세션을 요청한 사용자와 그 키, 커널이 실행할
     이미지, 커널이 요구할 슬롯 종류를 만든다."""
-    domain = await seeding.creating(SeedDomain(name_hint="home", description=WAS_HERE))
-    policy = await seeding.once(SeedProjectPolicy())
-    project = await seeding.creating_from_two(SeedProject(name_hint="team"), domain, policy)
-    group = await seeding.creating(SeedResourceGroup())
+    domain = await seeding.creating(TestSeedDomain(name_hint="home", description=WAS_HERE))
+    policy = await seeding.once(TestSeedProjectPolicy())
+    project = await seeding.creating_from_two(TestSeedProject(name_hint="team"), domain, policy)
+    group = await seeding.creating(TestSeedResourceGroup())
     owner = await seeding.within(SomeoneOf(domain))
-    key_policy = await seeding.creating(SeedKeypairPolicy())
-    key = await seeding.adding(SeedKeypairOf(resource_policy=seeding.made(key_policy).name), owner)
-    registry = await seeding.creating(SeedContainerRegistry())
-    image = await seeding.creating_from(SeedImage(), registry)
-    slot_types = [await seeding.creating(SeedResourceSlotType()) for _ in range(slots)]
+    key_policy = await seeding.creating(TestSeedKeypairPolicy())
+    key = await seeding.adding(
+        TestSeedKeypairOf(resource_policy=seeding.made(key_policy).name), owner
+    )
+    registry = await seeding.creating(TestSeedContainerRegistry())
+    image = await seeding.creating_from(TestSeedImage(), registry)
+    slot_types = [await seeding.creating(TestSeedResourceSlotType()) for _ in range(slots)]
     return LaidPlace(
         domain=domain,
         project=project,
@@ -183,11 +187,13 @@ def asked_for(seeding: Any, place: LaidPlace) -> Slots:
 async def lay_a_kernel(seeding: Any, place: LaidPlace) -> AKernel:
     """그 자리에 세션 하나와 그 커널을 만든다. 커널은 자리의 슬롯 종류 전부를 요구한다."""
     session = await seeding.creating_from_three(
-        SeedSession(access_key=place.access_key), place.project, place.owner, place.group
+        TestSeedSession(access_key=place.access_key), place.project, place.owner, place.group
     )
     slots = asked_for(seeding, place)
     kernel = await seeding.adding_with_nested(
-        SeedKernelOf(session=seeding.made(session), image=seeding.made(place.image), slots=slots),
+        TestSeedKernelOf(
+            session=seeding.made(session), image=seeding.made(place.image), slots=slots
+        ),
         session,
     )
     return AKernel(session=seeding.made(session), kernel=seeding.made(kernel), slots=slots)

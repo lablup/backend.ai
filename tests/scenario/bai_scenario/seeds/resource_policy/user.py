@@ -7,11 +7,11 @@ from typing import override
 
 from ai.backend.manager.data.resource.types import UserResourcePolicyData
 from ai.backend.manager.models.resource_policy.creators import UserResourcePolicyCreator
-from bai_scenario.seeds.seeder import Naming, SeedRow
+from bai_scenario.seeds.seeder import Naming, TestSeedRow
 
 
 @dataclass(frozen=True)
-class SeedUserPolicy(SeedRow[UserResourcePolicyData]):
+class TestSeedUserPolicy(TestSeedRow[UserResourcePolicyData]):
     """What a user is allowed, as a row of its own rather than a name borrowed from
     somewhere else."""
 
