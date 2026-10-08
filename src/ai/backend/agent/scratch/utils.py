@@ -77,6 +77,18 @@ class StagedRecoveryData:
     def discard(self) -> None:
         self.staged_path.unlink(missing_ok=True)
 
+    async def persist(self) -> None:
+        """Make a committed rename survive a crash by syncing the directory that holds it."""
+        await run_in_executor_with_context(None, _fsync_directory, self.final_path.parent)
+
+
+def _fsync_directory(path: Path) -> None:
+    fd = os.open(path, os.O_RDONLY | os.O_DIRECTORY)
+    try:
+        os.fsync(fd)
+    finally:
+        os.close(fd)
+
 
 class ScratchConfig:
     def __init__(self, config_path: Path) -> None:
@@ -127,6 +139,9 @@ class ScratchConfig:
         try:
             async with aiofiles.open(staged_path, "w") as file:
                 await file.write(serialized)
+                await file.flush()
+                # On disk before `commit()` renames it, so a crash cannot leave a torn record.
+                await run_in_executor_with_context(None, os.fsync, file.fileno())
         except BaseException:
             # BaseException: a cancelled save must not leave its half-written file either.
             staged_path.unlink(missing_ok=True)

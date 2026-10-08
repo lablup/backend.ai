@@ -87,7 +87,9 @@ def kernel_registry_data(
 def mock_config_mgr() -> MagicMock:
     """Mock ScratchConfig manager."""
     mgr = MagicMock()
-    mgr.stage_json_recovery_data = AsyncMock(return_value=MagicMock())
+    staged = MagicMock()
+    staged.persist = AsyncMock()
+    mgr.stage_json_recovery_data = AsyncMock(return_value=staged)
     return mgr
 
 
@@ -209,6 +211,7 @@ class TestSaveKernelRegistry:
         failed on `dictionary changed size during iteration`, in its own save."""
         registered_meanwhile = KernelId(uuid.uuid4())
         staged = MagicMock()
+        staged.persist = AsyncMock()
 
         async def _register_while_saving(_data: object) -> MagicMock:
             kernel_registry_data[registered_meanwhile] = mock_kernel
@@ -227,6 +230,7 @@ class TestSaveKernelRegistry:
             await writer.save_kernel_registry(kernel_registry_data, metadata)
         assert registered_meanwhile in kernel_registry_data
         staged.commit.assert_called_once()
+        staged.persist.assert_awaited_once()
 
     async def test_a_kernel_replaced_under_the_same_id_while_saving_is_not_written(
         self,

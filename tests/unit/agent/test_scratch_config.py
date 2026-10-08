@@ -2,8 +2,9 @@ from __future__ import annotations
 
 import asyncio
 import json
+import os
 import uuid
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Callable
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import cast
@@ -126,6 +127,25 @@ class TestGetKernelResourceSpec:
         assert result.scratch_disk_size == 0
 
 
+class _FsyncRecorder:
+    """Records the path behind every fd it is asked to sync, then syncs it."""
+
+    paths: list[Path]
+    _real: Callable[[int], None]
+
+    def __init__(self, real: Callable[[int], None]) -> None:
+        self.paths: list[Path] = []
+        self._real = real
+
+    def __call__(self, fd: int) -> None:
+        self.paths.append(Path(os.readlink(f"/proc/self/fd/{fd}")))
+        self._real(fd)
+
+
+def _record_fsyncs() -> _FsyncRecorder:
+    return _FsyncRecorder(os.fsync)
+
+
 class TestStageJsonRecoveryData:
     async def test_commit_puts_the_record_in_place_and_leaves_nothing_else(
         self,
@@ -139,6 +159,29 @@ class TestStageJsonRecoveryData:
         data = json.loads((config_path / "recovery.json").read_text())
         assert data["agent_id"] == str(sample_scratch_data.agent_id)
         assert [p.name for p in config_path.iterdir()] == ["recovery.json"]
+
+    async def test_the_staged_file_is_on_disk_before_it_can_be_renamed(
+        self,
+        config: ScratchConfig,
+        sample_scratch_data: KernelRecoveryScratchData,
+    ) -> None:
+        synced = _record_fsyncs()
+        with patch("ai.backend.agent.scratch.utils.os.fsync", synced):
+            staged = await config.stage_json_recovery_data(sample_scratch_data)
+        assert synced.paths == [staged.staged_path]
+
+    async def test_persist_syncs_the_directory_that_holds_the_record(
+        self,
+        config: ScratchConfig,
+        config_path: Path,
+        sample_scratch_data: KernelRecoveryScratchData,
+    ) -> None:
+        staged = await config.stage_json_recovery_data(sample_scratch_data)
+        staged.commit()
+        synced = _record_fsyncs()
+        with patch("ai.backend.agent.scratch.utils.os.fsync", synced):
+            await staged.persist()
+        assert synced.paths == [config_path]
 
     async def test_roundtrip(
         self,

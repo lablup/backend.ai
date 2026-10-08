@@ -84,6 +84,7 @@ class ContainerBasedKernelRegistryWriter(AbstractKernelRegistryWriter):
                 # with no await between the check and the rename.
                 if data.get(kernel_id) is kernel:
                     staged.commit()
+                    await staged.persist()
                 else:
                     staged.discard()
                     log.debug(
