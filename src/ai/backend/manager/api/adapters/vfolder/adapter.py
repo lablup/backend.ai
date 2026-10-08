@@ -466,7 +466,9 @@ class VFolderAdapter(BaseAdapter):
             creator_id=me.user_id,
             user=UserID(me.user_id),
             usage_mode=VFolderUsageMode(input.usage_mode.value),
-            default_mount_permission=VFolderMountPolicy(input.permission.value),
+            default_mount_permission=(
+                None if input.permission is None else VFolderMountPolicy(input.permission.value)
+            ),
             cloneable=input.cloneable,
         )
 
@@ -485,7 +487,9 @@ class VFolderAdapter(BaseAdapter):
             creator_id=me.user_id,
             project=project_id,
             usage_mode=VFolderUsageMode(input.usage_mode.value),
-            default_mount_permission=VFolderMountPolicy(input.permission.value),
+            default_mount_permission=(
+                None if input.permission is None else VFolderMountPolicy(input.permission.value)
+            ),
             cloneable=input.cloneable,
         )
 

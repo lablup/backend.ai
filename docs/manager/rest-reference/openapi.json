@@ -35782,9 +35782,16 @@
             "description": "Usage mode of the vfolder"
           },
           "permission": {
-            "$ref": "#/components/schemas/VFolderPermissionField",
-            "default": "rw",
-            "description": "Default permission of the vfolder"
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/VFolderPermissionField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Default permission of the vfolder. The folder type's default when omitted."
           },
           "project_id": {
             "anyOf": [
@@ -36150,9 +36157,16 @@
             "description": "Usage mode of the cloned vfolder"
           },
           "permission": {
-            "$ref": "#/components/schemas/VFolderPermissionField",
-            "default": "rw",
-            "description": "Permission level of the cloned vfolder"
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/VFolderPermissionField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Permission level of the cloned vfolder. The folder type's default when omitted."
           },
           "cloneable": {
             "default": false,
@@ -36194,9 +36208,16 @@
             "description": "Usage mode of the vfolder"
           },
           "permission": {
-            "$ref": "#/components/schemas/VFolderPermissionField",
-            "default": "rw",
-            "description": "Default permission of the vfolder"
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/VFolderPermissionField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Default permission of the vfolder. The folder type's default when omitted."
           },
           "cloneable": {
             "default": false,
@@ -40976,8 +40997,15 @@
             "default": "general"
           },
           "permission": {
-            "$ref": "#/components/schemas/VFolderPermissionField",
-            "default": "rw"
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/VFolderPermissionField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
           },
           "unmanagedPath": {
             "anyOf": [
@@ -41430,8 +41458,15 @@
             "default": "general"
           },
           "permission": {
-            "$ref": "#/components/schemas/VFolderPermissionField",
-            "default": "rw"
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/VFolderPermissionField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
           }
         },
         "required": [

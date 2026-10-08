@@ -70,9 +70,9 @@ class CreateVFolderInput(BaseRequestModel):
     usage_mode: VFolderUsageMode = Field(
         default=VFolderUsageMode.GENERAL, description="Usage mode of the vfolder"
     )
-    permission: VFolderPermissionField = Field(
-        default=VFolderPermissionField.READ_WRITE,
-        description="Default permission of the vfolder",
+    permission: VFolderPermissionField | None = Field(
+        default=None,
+        description="Default permission of the vfolder. The folder type's default when omitted.",
     )
     project_id: UUID | None = Field(
         default=None, description="Project ID for project-owned vfolder"
@@ -115,9 +115,9 @@ class CreateVFolderInScopeInput(BaseRequestModel):
     usage_mode: VFolderUsageMode = Field(
         default=VFolderUsageMode.GENERAL, description="Usage mode of the vfolder"
     )
-    permission: VFolderPermissionField = Field(
-        default=VFolderPermissionField.READ_WRITE,
-        description="Default permission of the vfolder",
+    permission: VFolderPermissionField | None = Field(
+        default=None,
+        description="Default permission of the vfolder. The folder type's default when omitted.",
     )
     cloneable: bool = Field(default=False, description="Whether the vfolder is cloneable")
 
@@ -250,9 +250,9 @@ class CloneVFolderInput(BaseRequestModel):
     usage_mode: VFolderUsageMode = Field(
         default=VFolderUsageMode.GENERAL, description="Usage mode of the cloned vfolder"
     )
-    permission: VFolderPermissionField = Field(
-        default=VFolderPermissionField.READ_WRITE,
-        description="Permission level of the cloned vfolder",
+    permission: VFolderPermissionField | None = Field(
+        default=None,
+        description="Permission level of the cloned vfolder. The folder type's default when omitted.",
     )
     cloneable: bool = Field(default=False, description="Whether the cloned vfolder is cloneable")
 
