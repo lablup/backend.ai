@@ -56,7 +56,6 @@ from ai.backend.manager.models.user.row import (
     UserRole,
     UserRow,
     UserStatus,
-    check_credential,
     compare_to_hashed_password,
     users,
 )
@@ -391,13 +390,13 @@ class AuthDBSource:
         self,
         conn: sa.ext.asyncio.AsyncConnection,
         row: sa.Row[Any],
-        target_password_info: PasswordInfo,
+        password: str,
     ) -> None:
         """Verify password against stored hash. Raises AuthorizationFailed on mismatch."""
         if row.password is None:
             raise AuthorizationFailed("User credential mismatch.")
         try:
-            if not compare_to_hashed_password(target_password_info.password, row.password):
+            if not compare_to_hashed_password(password, row.password):
                 raise AuthorizationFailed("User credential mismatch.")
         except ValueError:
             raise AuthorizationFailed("User credential mismatch.") from None
@@ -489,7 +488,7 @@ class AuthDBSource:
             if row is None:
                 raise AuthorizationFailed("User credential mismatch.")
 
-            await self._check_password(conn, row, target_password_info)
+            await self._check_password(conn, row, target_password_info.password)
             await self._migrate_password_hash(conn, row, domain_name, email, target_password_info)
 
             # Fetch active sessions for the user within the same connection
@@ -604,12 +603,17 @@ class AuthDBSource:
         password: str,
     ) -> sa.RowMapping:
         """Verify credentials without password migration (for signout, etc.)"""
-        return await check_credential(
-            db=self._db,
-            domain=domain_name,
-            email=email,
-            password=password,
-        )
+        async with self._db.begin_readonly() as conn:
+            result = await conn.execute(
+                sa.select(users)
+                .select_from(users)
+                .where((users.c.email == email) & (users.c.domain_name == domain_name)),
+            )
+            row = result.first()
+            if row is None:
+                raise AuthorizationFailed("User credential mismatch.")
+            await self._check_password(conn, row, password)
+        return row._mapping
 
     @auth_db_source_resilience.apply()
     async def fetch_default_keypair(self, user_uuid: UUID) -> KeyPairData:
