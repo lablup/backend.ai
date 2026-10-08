@@ -272,7 +272,7 @@ class TestImagePermissionContextNonGlobalRegistry:
                     AssociationContainerRegistriesGroupsRow(
                         id=uuid4(),
                         registry_id=registry_id,
-                        group_id=project_id,
+                        project_id=project_id,
                     )
                 )
             await sess.commit()

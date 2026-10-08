@@ -109,7 +109,7 @@ class ContainerRegistryProjectCreator(
     def build_row(
         self, scope: ProjectID, target: ContainerRegistryID
     ) -> AssociationContainerRegistriesGroupsRow:
-        return AssociationContainerRegistriesGroupsRow(registry_id=target, group_id=scope)
+        return AssociationContainerRegistriesGroupsRow(registry_id=target, project_id=scope)
 
     @override
     def integrity_error_checks(self) -> Sequence[IntegrityErrorCheck]:
