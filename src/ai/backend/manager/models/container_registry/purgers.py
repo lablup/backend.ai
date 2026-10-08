@@ -65,7 +65,7 @@ class ContainerRegistryProjectPurger(
     def conditions(self, scope: ProjectID, target: ContainerRegistryID) -> Sequence[QueryCondition]:
         return (
             lambda: AssociationContainerRegistriesGroupsRow.registry_id == target,
-            lambda: AssociationContainerRegistriesGroupsRow.project_id == scope,
+            lambda: AssociationContainerRegistriesGroupsRow.group_id == scope,
         )
 
     @override

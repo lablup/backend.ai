@@ -80,7 +80,7 @@ log = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 def _get_association_container_registries_groups_join_condition() -> sa.ColumnElement[bool]:
-    return ProjectRow.id == foreign(AssociationContainerRegistriesGroupsRow.project_id)
+    return ProjectRow.id == foreign(AssociationContainerRegistriesGroupsRow.group_id)
 
 
 __all__: Sequence[str] = (

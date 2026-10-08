@@ -925,7 +925,7 @@ class ImagePermissionContextBuilder(
                 )[0]
             else:
                 assoc_project_ids = [
-                    assoc.project_id
+                    assoc.group_id
                     for assoc in img_row.registry_row.association_container_registries_groups_rows
                 ]
                 for project_id in assoc_project_ids:
@@ -967,7 +967,7 @@ class ImagePermissionContextBuilder(
             project_ids: list[Any],
         ) -> sa.sql.elements.ColumnElement[Any]:
             return ContainerRegistryRow.association_container_registries_groups_rows.any(
-                AssociationContainerRegistriesGroupsRow.project_id.in_(project_ids)
+                AssociationContainerRegistriesGroupsRow.group_id.in_(project_ids)
             )
 
         return await self._in_project_scopes_by_registry_condition(

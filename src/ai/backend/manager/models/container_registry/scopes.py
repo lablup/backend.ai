@@ -50,7 +50,7 @@ class ProjectContainerRegistryTarget(ContainerRegistryTarget):
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             return ContainerRegistryRow.id.in_(
                 sa.select(AssociationContainerRegistriesGroupsRow.registry_id).where(
-                    AssociationContainerRegistriesGroupsRow.project_id == project_id
+                    AssociationContainerRegistriesGroupsRow.group_id == project_id
                 )
             )
 
