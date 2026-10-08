@@ -182,7 +182,8 @@ class UserRow(LifecycleTimestampsMixin, Base):
         "UserResourcePolicyRow",
         primaryjoin=_get_resource_policy_join_condition,
     )
-    # Used only by the legacy RBAC builders (resource_group/row.py, models/storage.py).
+    # Used only by the legacy RBAC ResourceGroupPermissionContextBuilder (resource_group/row.py)
+    # and PermissionContextBuilder (models/storage.py).
     # Delete it together with the legacy RBAC cleanup.
     keypairs: Mapped[list[KeyPairRow]] = relationship(
         "KeyPairRow",
