@@ -12,8 +12,8 @@ from ai.backend.manager.models.base import SecretColumn
 from ai.backend.manager.models.keypair.row import (
     KEYPAIR_SECRET_KEY_CONTEXT,
     KeyPairRow,
-    generate_keypair_data,
 )
+from ai.backend.manager.repositories.auth.keypair_secrets import generate_keypair_data
 from ai.backend.manager.secret.pool import KeyProviderPool
 from ai.backend.manager.secret.types import EncryptedData, SecretValue
 

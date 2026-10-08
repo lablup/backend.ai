@@ -85,7 +85,6 @@ from ai.backend.manager.models.kernel.row import (
 )
 from ai.backend.manager.models.keypair.row import (
     KeyPairRow,
-    generate_keypair_data,
     keypairs,
 )
 from ai.backend.manager.models.keypair.searchable_fields import KeyPairSearchableFields
@@ -124,6 +123,7 @@ from ai.backend.manager.models.vfolder.row import (
     VFolderRow,
     vfolders,
 )
+from ai.backend.manager.repositories.auth.keypair_secrets import generate_keypair_data
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.repositories.ops.v2.read import V2ReadOps
 from ai.backend.manager.repositories.ops.v2.resource_policy.provider import (
