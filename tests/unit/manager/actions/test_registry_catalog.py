@@ -82,6 +82,7 @@ from ai.backend.manager.data.audit_log.types import AuditLogData
 from ai.backend.manager.data.entity_label.types import EntityLabelData
 from ai.backend.manager.data.image.types import ImageAliasData
 from ai.backend.manager.data.kernel.types import KernelInfo
+from ai.backend.manager.models.audit_log.owner_candidates import AuditLogOwnerCandidates
 from ai.backend.manager.repositories.ops.repository import OpsRepository
 from ai.backend.manager.services.agent.actions.bulk_get import BulkGetAgentsAction
 from ai.backend.manager.services.agent.actions.bulk_load_container_counts import (
@@ -138,9 +139,8 @@ from ai.backend.manager.services.artifact_registry.actions.reservoir.bulk_get im
 )
 from ai.backend.manager.services.artifact_registry.processors import ArtifactRegistryProcessors
 from ai.backend.manager.services.audit_log.actions.bulk_get import BulkGetAuditLogsAction
-from ai.backend.manager.services.audit_log.actions.lookup_owner import (
-    LookupAuditLogOwnerAction,
-    LookupBulkAuditLogOwnerAction,
+from ai.backend.manager.services.audit_log.actions.scoped_search_scopes import (
+    ScopedSearchAuditLogScopesAction,
 )
 from ai.backend.manager.services.audit_log.processors import AuditLogProcessors
 from ai.backend.manager.services.catalog import load_wiring_catalog
@@ -941,14 +941,11 @@ def test_idle_checker_loader_read_is_a_partial_permission_read() -> None:
 
 
 def test_audit_log_loader_read_is_a_partial_field_permission_read() -> None:
-    """The audit log DataLoader reads per named record, checked per entity each is about."""
+    """The audit log DataLoader reads per named record, checked per owner each belongs to."""
     registry = _ops_registry()
     AuditLogProcessors(
-        registry.dangling_lookup_field_group(
-            FieldGroupMeta(AuditLogFieldType()),
-            AuditLogData,
-            LookupAuditLogOwnerAction,
-            LookupBulkAuditLogOwnerAction,
+        registry.dangling_owner_candidates_field_group(
+            FieldGroupMeta(AuditLogFieldType()), AuditLogData, AuditLogOwnerCandidates()
         )
     )
 
@@ -956,20 +953,12 @@ def test_audit_log_loader_read_is_a_partial_field_permission_read() -> None:
         record.action_cls: (record.kind, record.gate) for record in registry.wired_processors()
     }
     assert recorded[BulkGetAuditLogsAction] == (ActionKind.BULK, ActionGate.PERMISSION)
+    assert recorded[ScopedSearchAuditLogScopesAction] == (ActionKind.BULK, ActionGate.PERMISSION)
 
 
-def test_dangling_lookup_field_group_records_its_owner_lookups_under_its_concern() -> None:
-    """Built from a concern, the lookups name that concern; built from the registry,
-    they name the field type, as the entity label wiring always has."""
+def test_dangling_lookup_field_group_records_its_owner_lookups_under_its_field_type() -> None:
+    """Built from the registry, the lookups name the field type."""
     registry = _ops_registry()
-    AuditLogProcessors(
-        registry.concern(ConcernMeta(Concern.VISIBILITY)).dangling_lookup_field_group(
-            FieldGroupMeta(AuditLogFieldType()),
-            AuditLogData,
-            LookupAuditLogOwnerAction,
-            LookupBulkAuditLogOwnerAction,
-        )
-    )
     EntityLabelProcessors(
         registry.dangling_lookup_field_group(
             FieldGroupMeta(EntityLabelFieldType()),
@@ -987,20 +976,26 @@ def test_dangling_lookup_field_group_records_its_owner_lookups_under_its_concern
                 record.kind,
                 record.gate,
             ))
-    assert recorded[LookupAuditLogOwnerAction] == {
-        (Concern.VISIBILITY, ActionKind.LOOKUP, ActionGate.PERMISSION)
-    }
-    # The partial bulk get records its owner lookup public beside the gated one.
-    assert recorded[LookupBulkAuditLogOwnerAction] == {
-        (Concern.VISIBILITY, ActionKind.LOOKUP, ActionGate.PERMISSION),
-        (Concern.VISIBILITY, ActionKind.LOOKUP, ActionGate.PUBLIC),
-    }
     assert recorded[LookupEntityLabelOwnerAction] == {
         (EntityLabelFieldType(), ActionKind.LOOKUP, ActionGate.PERMISSION)
     }
     assert recorded[LookupBulkEntityLabelOwnerAction] == {
         (EntityLabelFieldType(), ActionKind.LOOKUP, ActionGate.PERMISSION)
     }
+
+
+def test_owner_candidates_field_group_records_no_lookup_under_its_concern() -> None:
+    """Owners are read as part of each operation, so nothing is recorded as a lookup."""
+    registry = _ops_registry()
+    AuditLogProcessors(
+        registry.concern(ConcernMeta(Concern.VISIBILITY)).dangling_owner_candidates_field_group(
+            FieldGroupMeta(AuditLogFieldType()), AuditLogData, AuditLogOwnerCandidates()
+        )
+    )
+
+    records = registry.wired_processors()
+    assert [record for record in records if record.kind == ActionKind.LOOKUP] == []
+    assert {record.concern for record in records} == {Concern.VISIBILITY}
 
 
 # An ops-family action wired through a service function, and why the generic service

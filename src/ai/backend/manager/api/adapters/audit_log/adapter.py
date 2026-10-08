@@ -14,32 +14,45 @@ from ai.backend.common.dto.manager.v2.audit_log.request import (
     AuditLogActionKindFilter,
     AuditLogFilter,
     AuditLogOrder,
+    AuditLogScopeFilter,
+    AuditLogScopeOrder,
     AuditLogStatusFilter,
     ScopedSearchAuditLogsInput,
+    SearchAuditLogScopesInput,
 )
 from ai.backend.common.dto.manager.v2.audit_log.response import (
     AuditLogNode,
+    AuditLogScopeEntryNode,
+    SearchAuditLogScopesPayload,
     SearchAuditLogsPayload,
 )
 from ai.backend.common.dto.manager.v2.audit_log.types import (
     AuditLogActionKind,
     AuditLogOrderField,
+    AuditLogScopeOrderField,
     AuditLogStatus,
     OrderDirection,
 )
 from ai.backend.manager.api.adapter_options.pagination.pagination import PaginationSpec
 from ai.backend.manager.api.adapters.base import BaseAdapter
-from ai.backend.manager.data.audit_log.types import AuditLogData
+from ai.backend.manager.data.audit_log.types import AuditLogData, AuditLogScopeData
 from ai.backend.manager.errors.api import InvalidAPIParameters
 from ai.backend.manager.models.audit_log.row import AuditLogRow
+from ai.backend.manager.models.audit_log.scope_row import AuditLogScopeRow
 from ai.backend.manager.models.audit_log.scopes import (
     AuditLogTarget,
     EntityAuditLogTarget,
     ScopeAuditLogTarget,
     TriggeredByAuditLogTarget,
 )
-from ai.backend.manager.models.audit_log.searchable_fields import AuditLogSearchableFields
-from ai.backend.manager.models.audit_log.searchers import AuditLogSearcher
+from ai.backend.manager.models.audit_log.searchable_fields import (
+    AuditLogScopeSearchableFields,
+    AuditLogSearchableFields,
+)
+from ai.backend.manager.models.audit_log.searchers import (
+    AuditLogScopeSearcher,
+    AuditLogSearcher,
+)
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
 from ai.backend.manager.models.condition_utils import combine_conditions_or, negate_conditions
 from ai.backend.manager.models.specs.searcher import GlobalSearcher
@@ -47,12 +60,20 @@ from ai.backend.manager.services.audit_log.actions.bulk_get import BulkGetAuditL
 from ai.backend.manager.services.audit_log.actions.scoped_search import (
     ScopedSearchAuditLogsAction,
 )
+from ai.backend.manager.services.audit_log.actions.scoped_search_scopes import (
+    ScopedSearchAuditLogScopesAction,
+)
 from ai.backend.manager.services.audit_log.actions.search import SearchAuditLogsAction
 from ai.backend.manager.services.audit_log.processors import AuditLogProcessors
 
 _AUDIT_LOG_PAGINATION_SPEC = PaginationSpec(
     forward_order=AuditLogSearchableFields.own.created_at.order.apply(ascending=False),
     cursor_column=AuditLogRow.id,
+)
+
+_AUDIT_LOG_SCOPE_PAGINATION_SPEC = PaginationSpec(
+    forward_order=AuditLogScopeSearchableFields.own.field_id.order.apply(ascending=True),
+    cursor_column=AuditLogScopeRow.id,
 )
 
 
@@ -132,6 +153,34 @@ class AuditLogAdapter(BaseAdapter):
             has_previous_page=action_result.has_previous_page,
         )
 
+    async def search_scopes(
+        self, audit_log_id: AuditLogID, input: SearchAuditLogScopesInput
+    ) -> SearchAuditLogScopesPayload:
+        """Search the scopes one audit log recorded."""
+        conditions = self._convert_scope_filter(input.filter) if input.filter else []
+        orders = self._convert_scope_orders(input.order) if input.order else []
+        searcher = self._build_searcher(
+            AuditLogScopeSearcher,
+            conditions=conditions,
+            orders=orders,
+            pagination_spec=_AUDIT_LOG_SCOPE_PAGINATION_SPEC,
+            first=input.first,
+            after=input.after,
+            last=input.last,
+            before=input.before,
+            limit=input.limit,
+            offset=input.offset,
+        )
+        action_result = await self._audit_log.scoped_search_scopes.run(
+            ScopedSearchAuditLogScopesAction(audit_log_id=audit_log_id, searcher=searcher)
+        )
+        return SearchAuditLogScopesPayload(
+            items=[self._scope_data_to_node(item) for item in action_result.items],
+            total_count=action_result.total_count,
+            has_next_page=action_result.has_next_page,
+            has_previous_page=action_result.has_previous_page,
+        )
+
     @staticmethod
     def _scope_targets(input: ScopedSearchAuditLogsInput) -> list[AuditLogTarget]:
         """The scopes the request names; an entity id that is not one is refused here.
@@ -159,7 +208,8 @@ class AuditLogAdapter(BaseAdapter):
         fields = AuditLogSearchableFields.own
         conditions: list[QueryCondition] = [
             *self.apply_string_filter(f.entity_type, fields.entity_type.filter),
-            *self.apply_string_filter(f.entity_id, fields.target_entity_id.filter),
+            *self.apply_string_filter(f.entity_id, fields.entity_id_text.filter),
+            *self.apply_uuid_filter(f.target_entity_id, fields.target_entity_id.filter),
             *self.apply_string_filter(f.operation, fields.operation.filter),
             *self.apply_string_filter(f.triggered_by, fields.triggered_by.filter),
             *self.apply_uuid_filter(f.acted_as, fields.acted_as.filter),
@@ -240,6 +290,38 @@ class AuditLogAdapter(BaseAdapter):
                     assert_never(o.field)
         return result
 
+    def _convert_scope_filter(self, f: AuditLogScopeFilter) -> list[QueryCondition]:
+        fields = AuditLogScopeSearchableFields.own
+        return [
+            *self.apply_string_filter(f.scope_type, fields.scope_type.filter),
+            *self.apply_uuid_filter(f.scope_id, fields.scope_id.filter),
+        ]
+
+    @staticmethod
+    def _convert_scope_orders(orders: list[AuditLogScopeOrder]) -> list[QueryOrder]:
+        fields = AuditLogScopeSearchableFields.own
+        result: list[QueryOrder] = []
+        for o in orders:
+            ascending = o.direction == OrderDirection.ASC
+            match o.field:
+                case AuditLogScopeOrderField.SCOPE_TYPE:
+                    result.append(fields.scope_type.order.apply(ascending))
+                case AuditLogScopeOrderField.SCOPE_ID:
+                    result.append(fields.scope_id.order.apply(ascending))
+                case _:
+                    assert_never(o.field)
+        return result
+
+    @staticmethod
+    def _scope_data_to_node(data: AuditLogScopeData) -> AuditLogScopeEntryNode:
+        return AuditLogScopeEntryNode(
+            id=data.id,
+            field_id=data.id,
+            audit_log_id=data.audit_log_id,
+            scope_type=data.scope_type,
+            scope_id=data.scope_id,
+        )
+
     @staticmethod
     def _data_to_node(data: AuditLogData) -> AuditLogNode:
         return AuditLogNode(
@@ -254,7 +336,8 @@ class AuditLogAdapter(BaseAdapter):
             lookup_key=data.lookup_key,
             entity_type=data.entity_type,
             operation=data.operation,
-            entity_id=data.target_entity_id,
+            entity_id=str(data.target_entity_id) if data.target_entity_id is not None else None,
+            target_entity_id=data.target_entity_id,
             created_at=data.created_at,
             request_id=data.request_id,
             triggered_by=data.triggered_by,

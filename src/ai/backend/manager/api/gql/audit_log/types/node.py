@@ -10,13 +10,22 @@ from uuid import UUID
 
 import strawberry
 from strawberry import Info
-from strawberry.relay import Connection, Edge, NodeID
+from strawberry.relay import Connection, Edge, NodeID, PageInfo
 
 from ai.backend.common.data.entity.audit_log import AuditLogID
 from ai.backend.common.data.entity.types import EntityType, RuntimeEntityID
 from ai.backend.common.data.entity.user import UserID
+from ai.backend.common.dto.manager.v2.audit_log.request import SearchAuditLogScopesInput
 from ai.backend.common.dto.manager.v2.audit_log.response import AuditLogNode
 from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
+from ai.backend.manager.api.gql.audit_log.types.scope_entry import (
+    AuditLogScopeEntryConnectionGQL,
+    AuditLogScopeEntryEdgeGQL,
+    AuditLogScopeEntryFilterGQL,
+    AuditLogScopeEntryGQL,
+    AuditLogScopeEntryOrderByGQL,
+)
+from ai.backend.manager.api.gql.base import encode_cursor
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     gql_added_field,
@@ -31,6 +40,12 @@ from ai.backend.manager.api.gql.types import StrawberryGQLContext
 if TYPE_CHECKING:
     from ai.backend.manager.api.gql.rbac.types.entity_node import EntityNodeGQL
     from ai.backend.manager.api.gql.user.types.node import UserV2GQL
+
+
+_ENTITY_ID_DEPRECATION = (
+    f"Deprecated since {NEXT_RELEASE_VERSION}. Use `targetEntityId`, which carries the id as "
+    "a UUID."
+)
 
 
 @gql_enum(
@@ -116,7 +131,17 @@ class AuditLogV2GQL(PydanticNodeMixin[AuditLogNode]):
         )
     )
     operation: str = gql_field(description="Operation performed (create, update, delete, etc.).")
-    entity_id: str | None = gql_field(description="ID of the affected entity, if applicable.")
+    entity_id: str | None = gql_field(
+        description="ID of the affected entity, if applicable.",
+        deprecation_reason=_ENTITY_ID_DEPRECATION,
+    )
+    target_entity_id: UUID | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="ID of the affected entity, if applicable.",
+        ),
+        default=None,
+    )
     created_at: datetime = gql_field(description="Timestamp when the audit log was created.")
     request_id: str | None = gql_field(description="Request ID that triggered this operation.")
     triggered_by: str | None = gql_field(
@@ -167,15 +192,62 @@ class AuditLogV2GQL(PydanticNodeMixin[AuditLogNode]):
         ]
         | None
     ):
-        if self.entity_type is None or self.entity_id is None:
-            return None
-        try:
-            entity_uuid = UUID(self.entity_id)
-        except ValueError:
-            # Older rows recorded a name rather than a uuid; those name no node.
+        if self.entity_type is None or self.target_entity_id is None:
             return None
         return await info.context.data_loaders.entity_node_loader.load(
-            RuntimeEntityID(EntityType(self.entity_type), entity_uuid)
+            RuntimeEntityID(EntityType(self.entity_type), self.target_entity_id)
+        )
+
+    @gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description=(
+                "The scopes the logged operation covered. Empty for an action kind that "
+                "records no scope."
+            ),
+        )
+    )  # type: ignore[misc]
+    async def scopes(
+        self,
+        info: Info[StrawberryGQLContext],
+        filter: AuditLogScopeEntryFilterGQL | None = None,
+        order_by: list[AuditLogScopeEntryOrderByGQL] | None = None,
+        before: str | None = None,
+        after: str | None = None,
+        first: int | None = None,
+        last: int | None = None,
+        limit: int | None = None,
+        offset: int | None = None,
+    ) -> AuditLogScopeEntryConnectionGQL:
+        payload = await info.context.adapters.audit_log.search_scopes(
+            AuditLogID(self.field_id),
+            SearchAuditLogScopesInput(
+                filter=filter.to_pydantic() if filter else None,
+                order=[o.to_pydantic() for o in order_by] if order_by else None,
+                first=first,
+                after=after,
+                last=last,
+                before=before,
+                limit=limit,
+                offset=offset,
+            ),
+        )
+        edges = [
+            AuditLogScopeEntryEdgeGQL(
+                node=AuditLogScopeEntryGQL.from_pydantic(item),
+                cursor=encode_cursor(str(item.id)),
+            )
+            for item in payload.items
+        ]
+        return AuditLogScopeEntryConnectionGQL(
+            edges=edges,
+            page_info=PageInfo(
+                has_next_page=payload.has_next_page,
+                has_previous_page=payload.has_previous_page,
+                start_cursor=edges[0].cursor if edges else None,
+                end_cursor=edges[-1].cursor if edges else None,
+            ),
+            count=payload.total_count,
         )
 
     @gql_field(

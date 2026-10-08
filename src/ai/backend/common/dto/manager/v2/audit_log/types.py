@@ -9,6 +9,7 @@ from ai.backend.common.dto.manager.v2.common import OrderDirection
 __all__ = (
     "AuditLogActionKind",
     "AuditLogOrderField",
+    "AuditLogScopeOrderField",
     "AuditLogStatus",
     "OrderDirection",
 )
@@ -45,3 +46,10 @@ class AuditLogOrderField(StrEnum):
     STATUS = "status"
     ACTION_NAME = "action_name"
     ACTION_KIND = "action_kind"
+
+
+class AuditLogScopeOrderField(StrEnum):
+    """Fields available for ordering the scopes of an audit log."""
+
+    SCOPE_TYPE = "scope_type"
+    SCOPE_ID = "scope_id"

@@ -8,21 +8,24 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from ai.backend.common.data.entity.audit_log import AuditLogFieldType, AuditLogID
-from ai.backend.common.dto.manager.query import StringFilter
+from ai.backend.common.data.entity.audit_log import AuditLogFieldType, AuditLogID, AuditLogScopeID
+from ai.backend.common.data.entity.project import ProjectEntityType
+from ai.backend.common.dto.manager.query import StringFilter, UUIDFilter
 from ai.backend.common.dto.manager.v2.audit_log.request import (
     AuditLogActionKindFilter,
     AuditLogFilter,
     AuditLogOrder,
+    AuditLogScopeFilter,
+    SearchAuditLogScopesInput,
 )
 from ai.backend.common.dto.manager.v2.audit_log.types import (
     AuditLogActionKind,
     AuditLogOrderField,
 )
 from ai.backend.manager.actions.types import ActionKind, ActionOperationType, OperationStatus
-from ai.backend.manager.actions.v2.ops.result import BulkFieldOpsResult
+from ai.backend.manager.actions.v2.ops.result import BulkFieldOpsResult, ScopedFieldsOpsResult
 from ai.backend.manager.api.adapters.audit_log.adapter import AuditLogAdapter
-from ai.backend.manager.data.audit_log.types import AuditLogData
+from ai.backend.manager.data.audit_log.types import AuditLogData, AuditLogScopeData
 from ai.backend.manager.errors.base.field import FieldNotFoundError
 from ai.backend.manager.errors.common import GenericForbidden
 
@@ -83,7 +86,7 @@ def _record(action_kind: ActionKind | None = ActionKind.SINGLE_ENTITY) -> AuditL
         created_at=datetime(2026, 1, 1, tzinfo=UTC),
         description="",
         status=OperationStatus.SUCCESS,
-        target_entity_id=str(uuid.uuid4()),
+        target_entity_id=uuid.uuid4(),
         lookup_kind=None,
         lookup_key=None,
         request_id=None,
@@ -185,3 +188,62 @@ class TestAuditLogAdapterBatchLoad:
     ) -> None:
         assert await adapter.batch_load_by_ids([]) == []
         processors.bulk_get.run.assert_not_awaited()
+
+
+class TestAuditLogAdapterSearchScopes:
+    @pytest.fixture
+    def audit_log_id(self) -> AuditLogID:
+        return AuditLogID(uuid.uuid4())
+
+    @pytest.fixture
+    def scope(self, audit_log_id: AuditLogID) -> AuditLogScopeData:
+        return AuditLogScopeData(
+            id=AuditLogScopeID(uuid.uuid4()),
+            audit_log_id=audit_log_id,
+            scope_type=ProjectEntityType(),
+            scope_id=uuid.uuid4(),
+        )
+
+    @pytest.fixture
+    def processors(self, scope: AuditLogScopeData) -> MagicMock:
+        processors = MagicMock()
+        processors.scoped_search_scopes.run = AsyncMock(
+            return_value=ScopedFieldsOpsResult(
+                items=[scope], total_count=1, has_next_page=False, has_previous_page=False
+            )
+        )
+        return processors
+
+    async def test_searches_under_the_named_record(
+        self, processors: MagicMock, audit_log_id: AuditLogID, scope: AuditLogScopeData
+    ) -> None:
+        payload = await AuditLogAdapter(processors).search_scopes(
+            audit_log_id, SearchAuditLogScopesInput()
+        )
+
+        (item,) = payload.items
+        assert (item.id, item.audit_log_id, item.scope_type, item.scope_id) == (
+            scope.id,
+            audit_log_id,
+            "project",
+            scope.scope_id,
+        )
+        assert payload.total_count == 1
+        action = processors.scoped_search_scopes.run.await_args.args[0]
+        assert action.field_id() == audit_log_id
+
+    async def test_filter_becomes_conditions(
+        self, processors: MagicMock, audit_log_id: AuditLogID
+    ) -> None:
+        await AuditLogAdapter(processors).search_scopes(
+            audit_log_id,
+            SearchAuditLogScopesInput(
+                filter=AuditLogScopeFilter(
+                    scope_type=StringFilter(equals="project"),
+                    scope_id=UUIDFilter(equals=uuid.uuid4()),
+                )
+            ),
+        )
+
+        action = processors.scoped_search_scopes.run.await_args.args[0]
+        assert len(action.searcher.conditions) == 2

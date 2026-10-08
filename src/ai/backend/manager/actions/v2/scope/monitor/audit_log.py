@@ -59,8 +59,7 @@ class ScopeActionAuditLogMonitor(ScopeActionMonitor):
         if not self._policy.should_record(action.operation_type(), meta.status):
             return
         nested = [
-            AuditLogScopeCreator(scope_type=str(s.entity_type()), scope_id=s)
-            for s in meta.scope_targets
+            AuditLogScopeCreator(scope_type=s.entity_type(), scope_id=s) for s in meta.scope_targets
         ]
         client_ip = await self._client_ip_masking.mask(
             ClientIPMaskingTarget.AUDIT_LOGS, current_client_ip()

@@ -1475,7 +1475,12 @@ input AuditLogActionKindFilter {
 """Added in 24.09.0. Filter criteria for querying audit logs."""
 input AuditLogFilter {
   entityType: StringFilter = null
-  entityId: StringFilter = null
+
+  """Entity ID filter."""
+  entityId: StringFilter = null @deprecated(reason: "Deprecated since 26.10.0. Use `targetEntityId`, which matches the id as a UUID.")
+
+  """Added in 26.10.0. Entity ID filter."""
+  targetEntityId: UUIDFilter = null
   operation: StringFilter = null
   status: AuditLogStatusFilter = null
   createdAt: DateTimeFilter = null
@@ -1529,6 +1534,81 @@ input AuditLogScope {
 
   """Actor UUIDs (matches audit_logs.triggered_by)."""
   triggeredUser: [UUIDScope!] = null
+}
+
+"""
+Added in 26.10.0. A scope the operation an audit log entry records covered.
+"""
+type AuditLogScopeEntry implements Node {
+  """The Globally Unique ID of this object"""
+  id: ID!
+
+  """UUID of the audit log scope record."""
+  fieldId: UUID!
+
+  """UUID of the audit log the scope belongs to."""
+  auditLogId: UUID!
+
+  """Entity type of the scope."""
+  scopeType: String!
+
+  """ID of the scope entity."""
+  scopeId: UUID!
+
+  """The scope entity. Null when it no longer exists."""
+  entity: EntityNode
+
+  """The audit log the scope belongs to."""
+  auditLog: AuditLogV2
+}
+
+"""Added in 26.10.0. Connection type for the scopes of an audit log."""
+type AuditLogScopeEntryConnection {
+  """Pagination data for this connection"""
+  pageInfo: PageInfo!
+
+  """Contains the nodes in this connection"""
+  edges: [AuditLogScopeEntryEdge!]!
+
+  """Total number of scopes matching the query."""
+  count: Int!
+}
+
+"""An edge in a connection."""
+type AuditLogScopeEntryEdge {
+  """A cursor for use in pagination"""
+  cursor: String!
+
+  """The item at the end of the edge"""
+  node: AuditLogScopeEntry!
+}
+
+"""Added in 26.10.0. Filter for the scopes of an audit log."""
+input AuditLogScopeEntryFilter {
+  """Scope type filter."""
+  scopeType: StringFilter = null
+
+  """Scope ID filter."""
+  scopeId: UUIDFilter = null
+}
+
+"""
+Added in 26.10.0. Ordering specification for the scopes of an audit log.
+"""
+input AuditLogScopeEntryOrderBy {
+  """Field to order by."""
+  field: AuditLogScopeEntryOrderField!
+
+  """Order direction."""
+  direction: OrderDirection! = ASC
+}
+
+"""
+Added in 26.10.0. Fields available for ordering the scopes of an audit log.
+"""
+enum AuditLogScopeEntryOrderField {
+  SCOPE_TYPE
+  SCOPE_ID
 }
 
 """Added in 26.3.0. Status of an audit log entry."""
@@ -1592,7 +1672,10 @@ type AuditLogV2 implements Node {
   operation: String!
 
   """ID of the affected entity, if applicable."""
-  entityId: String
+  entityId: String @deprecated(reason: "Deprecated since 26.10.0. Use `targetEntityId`, which carries the id as a UUID.")
+
+  """Added in 26.10.0. ID of the affected entity, if applicable."""
+  targetEntityId: UUID
 
   """Timestamp when the audit log was created."""
   createdAt: DateTime!
@@ -1626,6 +1709,11 @@ type AuditLogV2 implements Node {
   Added in 26.10.0. The entity the logged operation acted on. Null when the log names no entity, or when the recorded id does not name one that still exists.
   """
   entity: EntityNode
+
+  """
+  Added in 26.10.0. The scopes the logged operation covered. Empty for an action kind that records no scope.
+  """
+  scopes(filter: AuditLogScopeEntryFilter = null, orderBy: [AuditLogScopeEntryOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): AuditLogScopeEntryConnection!
 
   """
   The user who triggered this audit log entry, resolved from triggered_by UUID.
