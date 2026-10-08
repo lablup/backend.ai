@@ -6,8 +6,15 @@ Traefik can be used as a proxy dataplane for AppProxy worker. When enabled, AppP
 - TCP: Without last used time marker
 
 ## Installing traefik
+
+The [Go plugin source](../../third-party-plugins/appproxy-traefik-plugin-go/) is maintained
+in this repository. The Rust/WASM authentication plugin remains in
+[backend.ai-appproxy-worker-traefik](https://github.com/lablup/backend.ai-appproxy-worker-traefik).
+Release packaging and installation still use the existing combined plugin archive.
+
 1. Download traefik binary from [traefik release page](https://github.com/traefik/traefik/releases).
-2. Extract [AppProxy's traefik plugin](https://github.com/lablup/backend.ai-appproxy-worker-traefik) next to the traefik binary. After completed, the folder structure should look like:
+2. Download `appproxy-traefik-plugin.tar.gz` from the [plugin releases](https://github.com/lablup/backend.ai-appproxy-worker-traefik/releases). This archive contains both the Rust/WASM authentication plugin and the Go access-tracking plugin. Extract it next to the Traefik binary. After extraction, the folder structure should look like:
+
 ```bash
 .
 ├── traefik.yml
