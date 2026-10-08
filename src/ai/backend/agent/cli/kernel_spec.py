@@ -87,9 +87,8 @@ class KernelCreateSpec(BaseModel):
 def generate_cluster_ssh_keypair() -> ClusterSSHKeyPair:
     """Generate an ephemeral RSA keypair for the cluster SSH slot.
 
-    Mirrors ``manager/models/keypair/row.py:generate_ssh_keypair`` (which lives
-    in a manager-only layer the agent cannot import). Single-node kernels do not
-    use it, but the manager always sends one, so we do too to keep parity.
+    Mirrors ``ai.backend.common.auth.utils.generate_ssh_keypair``. Single-node
+    kernels do not use it, but the manager always sends one, so we do too to keep parity.
     """
     key = rsa.generate_private_key(
         backend=crypto_default_backend(),
