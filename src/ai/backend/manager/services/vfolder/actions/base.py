@@ -279,7 +279,7 @@ class CloneVFolderAction(VFolderAction):
     target_quota_scope_id: QuotaScopeID | None
     cloneable: bool
     usage_mode: VFolderUsageMode
-    mount_permission: VFolderMountPolicy
+    mount_permission: VFolderMountPolicy | None
 
     @override
     @classmethod
@@ -300,7 +300,7 @@ class CloneVFolderActionResult:
     target_vfolder_name: str
     target_vfolder_host: str
     usage_mode: VFolderUsageMode
-    mount_permission: VFolderMountPolicy
+    mount_permission: VFolderMountPolicy | None
     creator_email: str
     ownership_type: VFolderOwnershipType
     owner_user_uuid: uuid.UUID | None

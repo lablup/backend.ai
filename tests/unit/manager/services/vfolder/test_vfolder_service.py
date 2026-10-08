@@ -6,13 +6,18 @@ from __future__ import annotations
 
 import dataclasses
 import uuid
+from collections.abc import Iterator
 from datetime import UTC, datetime
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 import yarl
 
+from ai.backend.common.contexts.user import with_user
+from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.entity.vfolder import VFolderUUID
+from ai.backend.common.data.permission.types import Permission
+from ai.backend.common.data.user.types import UserData, UserRole
 from ai.backend.common.types import QuotaScopeID, VFolderID, VFolderMountPolicy, VFolderUsageMode
 from ai.backend.manager.data.vfolder.types import (
     ValidatedVFolderInfo,
@@ -30,6 +35,9 @@ from ai.backend.manager.repositories.vfolder.repository import VfolderRepository
 from ai.backend.manager.services.vfolder.actions.base import (
     PurgeVFolderAction,
     PurgeVFolderActionResult,
+)
+from ai.backend.manager.services.vfolder.actions.bulk_load_mount_levels import (
+    BulkLoadVFolderMountLevelsAction,
 )
 from ai.backend.manager.services.vfolder.actions.file import (
     CreateArchiveDownloadSessionAction,
@@ -398,3 +406,145 @@ class TestVFolderServiceGetFolderUsage:
         assert result.vfolder_uuid == sample_vfolder_uuid
         assert result.usage is None
         mock_storage_manager.get_manager_facing_client.assert_not_called()
+
+
+class TestVFolderServiceBulkLoadMountLevels:
+    """The mount level the caller gets on each folder named."""
+
+    @pytest.fixture
+    def caller_id(self) -> uuid.UUID:
+        return uuid.uuid4()
+
+    @pytest.fixture
+    def as_caller(self, caller_id: uuid.UUID) -> Iterator[None]:
+        with with_user(
+            UserData(
+                user_id=caller_id,
+                is_authorized=True,
+                is_admin=False,
+                is_superadmin=False,
+                role=UserRole.USER,
+                domain_name="default",
+                domain_id=DomainID(uuid.uuid4()),
+            )
+        ):
+            yield
+
+    @pytest.fixture
+    def own_check(self) -> MagicMock:
+        return MagicMock()
+
+    @pytest.fixture
+    def vfolder_service(
+        self, mock_vfolder_repository: MagicMock, own_check: MagicMock
+    ) -> VFolderService:
+        return VFolderService(
+            config_provider=MagicMock(),
+            etcd=MagicMock(),
+            storage_manager=MagicMock(),
+            background_task_manager=MagicMock(),
+            vfolder_repository=mock_vfolder_repository,
+            user_repository=MagicMock(),
+            valkey_stat_client=MagicMock(),
+            own_check=own_check,
+        )
+
+    async def _level_of(
+        self,
+        vfolder_service: VFolderService,
+        mock_vfolder_repository: MagicMock,
+        own_check: MagicMock,
+        folder: VFolderData,
+        *,
+        held: Permission = Permission.READ,
+        user_policy: VFolderMountPolicy | None = None,
+    ) -> VFolderMountPolicy | None:
+        own_check.held = AsyncMock(return_value={folder.id: held})
+        mock_vfolder_repository.batch_load_by_ids = AsyncMock(return_value=[folder])
+        mock_vfolder_repository.user_mount_policies_of = AsyncMock(
+            return_value={} if user_policy is None else {folder.id: user_policy}
+        )
+        result = await vfolder_service.bulk_load_mount_levels(
+            BulkLoadVFolderMountLevelsAction(vfolder_ids=[folder.id])
+        )
+        return result.values().get(folder.id)
+
+    @pytest.mark.usefixtures("as_caller")
+    async def test_the_owner_of_a_personal_folder_gets_read_write(
+        self,
+        vfolder_service: VFolderService,
+        mock_vfolder_repository: MagicMock,
+        own_check: MagicMock,
+        sample_vfolder_data: VFolderData,
+        caller_id: uuid.UUID,
+    ) -> None:
+        folder = dataclasses.replace(
+            sample_vfolder_data,
+            user=caller_id,
+            default_mount_permission=VFolderMountPolicy.NONE,
+        )
+
+        level = await self._level_of(
+            vfolder_service, mock_vfolder_repository, own_check, folder, held=Permission.full()
+        )
+
+        assert level == VFolderMountPolicy.READ_WRITE
+
+    @pytest.mark.usefixtures("as_caller")
+    async def test_a_recipient_gets_their_policy_row(
+        self,
+        vfolder_service: VFolderService,
+        mock_vfolder_repository: MagicMock,
+        own_check: MagicMock,
+        sample_vfolder_data: VFolderData,
+    ) -> None:
+        folder = dataclasses.replace(
+            sample_vfolder_data, default_mount_permission=VFolderMountPolicy.NONE
+        )
+
+        level = await self._level_of(
+            vfolder_service,
+            mock_vfolder_repository,
+            own_check,
+            folder,
+            user_policy=VFolderMountPolicy.READ_ONLY,
+        )
+
+        assert level == VFolderMountPolicy.READ_ONLY
+
+    @pytest.mark.usefixtures("as_caller")
+    async def test_read_access_without_a_row_gets_the_folder_default(
+        self,
+        vfolder_service: VFolderService,
+        mock_vfolder_repository: MagicMock,
+        own_check: MagicMock,
+        sample_vfolder_data: VFolderData,
+    ) -> None:
+        folder = dataclasses.replace(
+            sample_vfolder_data, default_mount_permission=VFolderMountPolicy.NONE
+        )
+
+        level = await self._level_of(vfolder_service, mock_vfolder_repository, own_check, folder)
+
+        assert level == VFolderMountPolicy.NONE
+
+    @pytest.mark.usefixtures("as_caller")
+    async def test_a_project_folder_without_a_row_gets_its_read_only_default(
+        self,
+        vfolder_service: VFolderService,
+        mock_vfolder_repository: MagicMock,
+        own_check: MagicMock,
+        sample_vfolder_data: VFolderData,
+    ) -> None:
+        folder = dataclasses.replace(
+            sample_vfolder_data,
+            ownership_type=VFolderOwnershipType.GROUP,
+            user=None,
+            group=uuid.uuid4(),
+            usage_mode=VFolderUsageMode.MODEL,
+            default_mount_permission=VFolderMountPolicy.READ_ONLY,
+        )
+
+        level = await self._level_of(vfolder_service, mock_vfolder_repository, own_check, folder)
+
+        assert level == VFolderMountPolicy.READ_ONLY

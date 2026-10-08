@@ -266,7 +266,9 @@ class VFolderHandler:
         creator: VFolderBaseCreator
         if params.unmanaged_path and ctx.user_role not in (UserRole.ADMIN, UserRole.SUPERADMIN):
             raise Forbidden("Insufficient permission")
-        mount_permission = VFolderMountPolicy(params.permission.value)
+        mount_permission = (
+            None if params.permission is None else VFolderMountPolicy(params.permission.value)
+        )
         if params.group_id is not None:
             project_id = ProjectID(params.group_id)
             project_quota_scope = str(QuotaScopeID(QuotaScopeType.PROJECT, project_id))
@@ -335,13 +337,16 @@ class VFolderHandler:
         # a generic 500 "Internal server error." title.
 
         vfolder = result.vfolder
+        levels = await self._mount_levels([vfolder.id])
         item = VFolderItemField(
             id=vfolder.id.hex,
             name=vfolder.name,
             quota_scope_id=str(vfolder.quota_scope_id),
             host=vfolder.host,
             usage_mode=vfolder.usage_mode,
-            permission=VFolderPermissionField(vfolder.default_mount_permission.value),
+            permission=VFolderPermissionField(
+                levels.get(vfolder.id, VFolderMountPolicy.NONE).value
+            ),
             max_size=0,
             creator=vfolder.creator or ctx.user_email,
             ownership_type=VFolderOwnershipTypeField(vfolder.ownership_type.value),
@@ -1565,6 +1570,9 @@ class VFolderHandler:
     ) -> APIResponse:
         params = body.parsed
         row = vfctx.vfolder_row
+        mount_permission = (
+            None if params.permission is None else VFolderMountPolicy(params.permission.value)
+        )
         log.debug(
             "VFOLDER.CLONE (email:{}, ak:{}, vf:{} (resolved-from:{!r}), "
             "vft:{}, vfh:{}, umod:{}, perm:{})",
@@ -1575,7 +1583,7 @@ class VFolderHandler:
             params.target_name,
             params.target_host,
             params.usage_mode.value,
-            params.permission.value,
+            mount_permission,
         )
 
         result = await self._vfolder.clone_vfolder.run(
@@ -1588,15 +1596,17 @@ class VFolderHandler:
                 target_quota_scope_id=params.target_quota_scope_id,
                 cloneable=params.cloneable,
                 usage_mode=params.usage_mode,
-                mount_permission=VFolderMountPolicy(params.permission.value),
+                mount_permission=mount_permission,
             )
         )
+        target_id = VFolderUUID(result.target_vfolder_id)
+        levels = await self._mount_levels([target_id])
         dto = VFolderCloneInfoDTO(
             id=result.target_vfolder_id.hex,
             name=params.target_name,
             host=result.target_vfolder_host,
             usage_mode=result.usage_mode,
-            permission=VFolderPermissionField(result.mount_permission.value),
+            permission=VFolderPermissionField(levels.get(target_id, VFolderMountPolicy.NONE).value),
             creator=vfctx.user_email,
             ownership_type=VFolderOwnershipTypeField(result.ownership_type.value),
             user=str(result.owner_user_uuid) if result.owner_user_uuid is not None else None,
