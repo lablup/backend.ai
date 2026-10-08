@@ -24,6 +24,7 @@ class SeedContainerRegistry(SeedRow[ContainerRegistryData]):
     name_hint: str = "registry"
     registry_type: ContainerRegistryType = ContainerRegistryType.DOCKER
     is_global: bool = True
+    project: str | None = None
 
     @override
     def kind(self) -> str:
@@ -31,6 +32,8 @@ class SeedContainerRegistry(SeedRow[ContainerRegistryData]):
 
     @override
     def detail(self) -> str:
+        if self.project is not None:
+            return f"이미지를 가져오는 곳, 프로젝트는 {self.project}"
         return "이미지를 가져오는 곳"
 
     @override
@@ -44,6 +47,7 @@ class SeedContainerRegistry(SeedRow[ContainerRegistryData]):
             type=self.registry_type,
             registry_name=name,
             is_global=self.is_global,
+            project=self.project,
         )
 
 

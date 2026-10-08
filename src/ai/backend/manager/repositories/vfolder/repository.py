@@ -37,7 +37,6 @@ from ai.backend.manager.data.permission.id import ScopeId
 from ai.backend.manager.data.project.types import ProjectResourceInfo
 from ai.backend.manager.data.vfolder.dto import UserIdentity
 from ai.backend.manager.data.vfolder.types import (
-    UserWithVFolderHostPermissions,
     ValidatedVFolderInfo,
     VFolderCreation,
     VFolderData,
@@ -307,66 +306,6 @@ class VfolderRepository:
             return None
         allowed_hosts: VFolderHostPermissionMap = row.allowed_vfolder_hosts
         return allowed_hosts
-
-    @vfolder_repository_resilience.apply()
-    async def get_user_with_keypair_policy_vfolder_hosts(
-        self, user_uuid: uuid.UUID
-    ) -> UserWithVFolderHostPermissions:
-        """
-        Load user data together with the merged ``allowed_vfolder_hosts`` from
-        all of the user's active keypair resource policies.
-
-        A user can hold multiple keypairs, each pointing to its own keypair
-        resource policy. This method unions ``allowed_vfolder_hosts`` across
-        every active keypair so that the host-permission check reflects the
-        full set of hosts available to the user (rather than only the default
-        keypair).
-
-        Implementation note: a single LEFT OUTER JOIN is used (instead of an
-        ORM ``selectinload`` on ``UserRow.keypairs``) so that only the columns
-        needed for the host-permission check are loaded. This avoids loading
-        sensitive keypair columns such as ``secret_key`` and
-        ``ssh_private_key``.
-        """
-        async with self._db.begin_readonly_session_read_committed() as db_session:
-            stmt = (
-                sa.select(
-                    UserRow.email,
-                    UserRow.role,
-                    UserRow.domain_name,
-                    keypair_resource_policies.c.allowed_vfolder_hosts,
-                )
-                .select_from(UserRow)
-                .outerjoin(
-                    KeyPairRow,
-                    sa.and_(
-                        KeyPairRow.user == UserRow.uuid,
-                        KeyPairRow.is_active.is_(True),
-                    ),
-                )
-                .outerjoin(
-                    keypair_resource_policies,
-                    keypair_resource_policies.c.name == KeyPairRow.resource_policy,
-                )
-                .where(UserRow.uuid == user_uuid)
-            )
-            rows = (await db_session.execute(stmt)).all()
-            if not rows:
-                raise UserNotFound(f"User with UUID {user_uuid} not found.")
-            email, role, domain_name, _ = rows[0]
-            if role is None or domain_name is None:
-                raise UserNotFound(f"User with UUID {user_uuid} has invalid role or domain data.")
-            merged_hosts = VFolderHostPermissionMap()
-            for row in rows:
-                policy_hosts = row.allowed_vfolder_hosts
-                if policy_hosts is None:
-                    continue
-                merged_hosts = VFolderHostPermissionMap(merged_hosts | policy_hosts)
-            return UserWithVFolderHostPermissions(
-                email=email,
-                role=role,
-                allowed_vfolder_hosts=merged_hosts,
-            )
 
     @vfolder_repository_resilience.apply()
     async def get_max_vfolder_count(

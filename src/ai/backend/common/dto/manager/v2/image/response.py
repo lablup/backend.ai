@@ -10,6 +10,7 @@ from uuid import UUID
 from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseResponseModel
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.dto.manager.pagination import PaginationInfo
 from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 
@@ -37,7 +38,7 @@ __all__ = (
     "ImagePermissionInfoDTO",
     "ImageRequirementsInfoDTO",
     "PurgeImagePayload",
-    "RescanImagesPayload",
+    "ScanImagePayload",
     "SearchImageAliasesPayload",
     "SearchImagesPayload",
     "UpdateImagePayload",
@@ -76,6 +77,16 @@ class ImageNode(BaseResponseModel):
         default=None,
         description="Timestamp of the most recent session created with this image.",
     )
+    customized: bool = Field(
+        description=f"Whether a session commit made this image. Added in {NEXT_RELEASE_VERSION}.",
+    )
+    creator_id: UserID | None = Field(
+        default=None,
+        description=(
+            "The user a customized image was committed for. Null where the image is not "
+            f"customized, or where that user is gone. Added in {NEXT_RELEASE_VERSION}."
+        ),
+    )
     identity: ImageIdentityInfoDTO | None = Field(
         default=None, description="Identity information (name, architecture)."
     )
@@ -100,11 +111,10 @@ class GetImagePayload(BaseResponseModel):
     item: ImageNode = Field(description="Retrieved image")
 
 
-class RescanImagesPayload(BaseResponseModel):
-    """Payload for image rescan result."""
+class ScanImagePayload(BaseResponseModel):
+    """Scanned image matching the requested architecture."""
 
-    item: ImageNode = Field(description="Rescanned image")
-    errors: list[str] = Field(default_factory=list, description="Errors encountered during rescan")
+    item: ImageNode = Field(description="Scanned image matching the requested architecture")
 
 
 class AliasImagePayload(BaseResponseModel):

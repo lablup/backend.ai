@@ -297,6 +297,74 @@ class ImagesWithTwoStatuses(Given[Any, ManyImagesAndACaller]):
 
 
 @dataclass(frozen=True)
+class CustomizedAndUncustomizedImages(Given[Any, ManyImagesAndACaller]):
+    """호출자가 커밋한 커스텀 이미지와 커스텀 이미지가 아닌 이미지, 슈퍼관리자.
+
+    `named`는 커스텀 이미지다.
+    """
+
+    @override
+    def describe(self) -> str:
+        return "호출자가 커밋한 커스텀 이미지 1개와 커스텀 이미지가 아닌 이미지 1개, superadmin 1명"
+
+    @override
+    async def lay(self, seeding: Any) -> ManyImagesAndACaller:
+        domain = await seeding.creating(SeedDomain(name_hint="home"))
+        registry = await seeding.creating(SeedContainerRegistry(name_hint="host"))
+        caller = await seeding.within(SomeoneOf(domain, role=UserRole.SUPERADMIN))
+        made_caller = seeding.made(caller)
+        customized = await seeding.creating_from(
+            SeedImage(name_hint="customized", customized=True, creator_id=UserID(made_caller.id)),
+            registry,
+        )
+        uncustomized = await seeding.creating_from(SeedImage(name_hint="uncustomized"), registry)
+        made_customized = seeding.made(customized)
+        return ManyImagesAndACaller(
+            laid=(made_customized, seeding.made(uncustomized)),
+            named=made_customized,
+            registry=seeding.made(registry),
+            caller=made_caller,
+        )
+
+
+@dataclass(frozen=True)
+class ImagesCommittedForTwoUsers(Given[Any, ManyImagesAndACaller]):
+    """호출자가 커밋한 커스텀 이미지와 다른 사용자가 커밋한 커스텀 이미지, 슈퍼관리자.
+
+    `named`는 호출자가 커밋한 이미지다.
+    """
+
+    @override
+    def describe(self) -> str:
+        return "호출자가 커밋한 커스텀 이미지 1개와 다른 사용자가 커밋한 커스텀 이미지 1개, superadmin 1명"
+
+    @override
+    async def lay(self, seeding: Any) -> ManyImagesAndACaller:
+        domain = await seeding.creating(SeedDomain(name_hint="home"))
+        registry = await seeding.creating(SeedContainerRegistry(name_hint="host"))
+        caller = await seeding.within(SomeoneOf(domain, role=UserRole.SUPERADMIN))
+        other = await seeding.within(SomeoneOf(domain))
+        made_caller = seeding.made(caller)
+        mine = await seeding.creating_from(
+            SeedImage(name_hint="mine", customized=True, creator_id=UserID(made_caller.id)),
+            registry,
+        )
+        theirs = await seeding.creating_from(
+            SeedImage(
+                name_hint="theirs", customized=True, creator_id=UserID(seeding.made(other).id)
+            ),
+            registry,
+        )
+        made_mine = seeding.made(mine)
+        return ManyImagesAndACaller(
+            laid=(made_mine, seeding.made(theirs)),
+            named=made_mine,
+            registry=seeding.made(registry),
+            caller=made_caller,
+        )
+
+
+@dataclass(frozen=True)
 class ImagesInTwoRegistriesAndAPlainUser(Given[Any, ManyImagesAndACaller]):
     """레지스트리 2개에 나뉘어 있는 이미지들과, 한쪽 레지스트리에 권한을 받았거나 받지 않은 사용자.
 
@@ -518,6 +586,15 @@ class TheImageNode(Then[Any, ImageNode]):
             self.resource_limits_gql if self.resource_limits_gql is not None else DEFAULT_LIMITS_GQL
         )
         written = WrittenByThisRun(datetime.now(UTC))
+        creator: Verdict = (
+            Same("creator_id", node.creator_id, None)
+            if image.creator_id is None
+            else Held[UserID | None](
+                "creator_id",
+                node.creator_id,
+                SameAs(image.creator_id, "이미지를 커밋한 사용자의 ID"),
+            )
+        )
         return [
             Held("id", node.id, SameAs(planted, "미리 만들어 둔 이미지의 ID")),
             Same("name", node.name, name),
@@ -544,6 +621,8 @@ class TheImageNode(Then[Any, ImageNode]):
             Same("accelerators", node.accelerators, self.accelerators.named()),
             Same("config_digest", node.config_digest, config_digest),
             Same("is_local", node.is_local, is_local),
+            Same("customized", node.customized, image.customized),
+            creator,
             Held("created_at", node.created_at, written),
             Skipped("last_used_at", "세션이 기록하는 값이라 이 실행에서는 알 수 없다"),
             Same("identity.canonical_name", identity.canonical_name, name),

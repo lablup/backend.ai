@@ -426,6 +426,13 @@ class SessionResourceInfoGQLDTO(BaseResponseModel):
         default=None,
         description="The resource group (scaling group) this session is assigned to.",
     )
+    session_group_id: UUID | None = Field(
+        default=None,
+        description="Placement group ID. Null if the session does not belong to a session group.",
+    )
+    designated_agent_ids: list[str] | None = Field(
+        default=None, description="Agent IDs designated at session creation."
+    )
 
 
 class SessionLifecycleInfoGQLDTO(BaseResponseModel):
@@ -444,7 +451,11 @@ class SessionLifecycleInfoGQLDTO(BaseResponseModel):
         description="Timestamp when the session was terminated. Null if still active.",
     )
     starts_at: datetime | None = Field(
-        default=None, description="Scheduled start time for the session, if applicable."
+        default=None, description="When the session started running. Null until it reaches RUNNING."
+    )
+    requested_starts_at: datetime | None = Field(
+        default=None,
+        description="Reserved start time requested at creation. The scheduler honors it only for batch sessions.",
     )
     batch_timeout: int | None = Field(
         default=None,
