@@ -350,3 +350,106 @@ class TestSaveKernelRegistry:
 
         # Verify save was not called since recovery data was None
         mock_config_mgr.stage_json_recovery_data.assert_not_called()
+
+
+class TestSaveOnlyWhatChanged:
+    """Saves run on every kernel start and stop, and each written record costs two fsyncs:
+    a record this writer already committed for the same kernel object is not written again."""
+
+    async def _save_counting_stages(
+        self,
+        writer: ContainerBasedKernelRegistryWriter,
+        registry: MutableMapping[KernelId, AbstractKernel],
+        metadata: KernelRegistrySaveMetadata,
+        records: list[str],
+    ) -> int:
+        original_stage = ScratchConfig.stage_json_recovery_data
+        staged: list[str] = []
+
+        async def _counting_stage(
+            config: ScratchConfig, data: KernelRecoveryScratchData
+        ) -> StagedRecoveryData:
+            staged.append(data.model_dump_json())
+            return await original_stage(config, data)
+
+        def _record(_data: object) -> KernelRecoveryScratchData:
+            data = MagicMock()
+            data.model_dump_json.return_value = records[0]
+            return cast(KernelRecoveryScratchData, data)
+
+        with (
+            patch.object(writer, "_parse_recovery_data_from_kernel", return_value=MagicMock()),
+            patch.object(
+                KernelRecoveryScratchData, "from_kernel_recovery_data", side_effect=_record
+            ),
+            patch.object(ScratchConfig, "stage_json_recovery_data", new=_counting_stage),
+        ):
+            await writer.save_kernel_registry(registry, metadata)
+        return len(staged)
+
+    @pytest.mark.usefixtures("existing_config_path")
+    async def test_an_unchanged_record_is_not_staged_again(
+        self,
+        writer: ContainerBasedKernelRegistryWriter,
+        kernel_registry_data: MutableMapping[KernelId, AbstractKernel],
+        metadata: KernelRegistrySaveMetadata,
+    ) -> None:
+        records = ['{"v": 1}']
+        assert (
+            await self._save_counting_stages(writer, kernel_registry_data, metadata, records) == 1
+        )
+        assert (
+            await self._save_counting_stages(writer, kernel_registry_data, metadata, records) == 0
+        )
+
+    async def test_a_changed_record_is_written(
+        self,
+        writer: ContainerBasedKernelRegistryWriter,
+        kernel_registry_data: MutableMapping[KernelId, AbstractKernel],
+        metadata: KernelRegistrySaveMetadata,
+        existing_config_path: Path,
+    ) -> None:
+        records = ['{"v": 1}']
+        await self._save_counting_stages(writer, kernel_registry_data, metadata, records)
+        records[0] = '{"v": 2}'
+
+        assert (
+            await self._save_counting_stages(writer, kernel_registry_data, metadata, records) == 1
+        )
+        assert (existing_config_path / "recovery.json").read_text() == '{"v": 2}'
+
+    @pytest.mark.usefixtures("existing_config_path")
+    async def test_a_kernel_replaced_under_the_same_id_is_written(
+        self,
+        writer: ContainerBasedKernelRegistryWriter,
+        kernel_registry_data: MutableMapping[KernelId, AbstractKernel],
+        metadata: KernelRegistrySaveMetadata,
+        mock_kernel: MagicMock,
+    ) -> None:
+        """A restart registers a new object under the same id; an equal record is no proof that
+        the new incarnation's file is in place."""
+        records = ['{"v": 1}']
+        await self._save_counting_stages(writer, kernel_registry_data, metadata, records)
+        kernel_registry_data[mock_kernel.kernel_id] = cast(AbstractKernel, MagicMock())
+
+        assert (
+            await self._save_counting_stages(writer, kernel_registry_data, metadata, records) == 1
+        )
+
+    @pytest.mark.usefixtures("existing_config_path")
+    async def test_a_kernel_gone_from_the_registry_is_forgotten(
+        self,
+        writer: ContainerBasedKernelRegistryWriter,
+        kernel_registry_data: MutableMapping[KernelId, AbstractKernel],
+        metadata: KernelRegistrySaveMetadata,
+        mock_kernel: MagicMock,
+    ) -> None:
+        records = ['{"v": 1}']
+        await self._save_counting_stages(writer, kernel_registry_data, metadata, records)
+        del kernel_registry_data[mock_kernel.kernel_id]
+        await self._save_counting_stages(writer, kernel_registry_data, metadata, records)
+        kernel_registry_data[mock_kernel.kernel_id] = mock_kernel
+
+        assert (
+            await self._save_counting_stages(writer, kernel_registry_data, metadata, records) == 1
+        )

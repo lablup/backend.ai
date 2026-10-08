@@ -23,11 +23,16 @@ log = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 class ContainerBasedKernelRegistryWriter(AbstractKernelRegistryWriter):
+    _scratch_root: Path
+    # Per kernel id, the object and record this writer last committed; an equal pair is skipped.
+    _committed: dict[KernelId, tuple[AbstractKernel, str]]
+
     def __init__(
         self,
         scratch_root: Path,
     ) -> None:
         self._scratch_root = scratch_root
+        self._committed = {}
 
     def _parse_recovery_data_from_kernel(
         self,
@@ -51,6 +56,8 @@ class ContainerBasedKernelRegistryWriter(AbstractKernelRegistryWriter):
         # `data` is the live registry and the loop awaits per kernel; a create or destroy on
         # this node meanwhile would change its size under the iteration.
         snapshot = list(data.items())
+        for gone in self._committed.keys() - {kernel_id for kernel_id, _ in snapshot}:
+            del self._committed[gone]
         for kernel_id, kernel in snapshot:
             config_path = ScratchUtils.get_scratch_kernel_config_dir(self._scratch_root, kernel_id)
             config_mgr = ScratchConfig(config_path)
@@ -77,6 +84,10 @@ class ContainerBasedKernelRegistryWriter(AbstractKernelRegistryWriter):
             recovery_data = KernelRecoveryScratchData.from_kernel_recovery_data(
                 original_recovery_data
             )
+            serialized = recovery_data.model_dump_json()
+            last = self._committed.get(kernel_id)
+            if last is not None and last[0] is kernel and last[1] == serialized:
+                continue
             try:
                 staged = await config_mgr.stage_json_recovery_data(recovery_data)
                 # A restart re-registers the same id with a new kernel object and keeps the
@@ -85,6 +96,7 @@ class ContainerBasedKernelRegistryWriter(AbstractKernelRegistryWriter):
                 if data.get(kernel_id) is kernel:
                     staged.commit()
                     await staged.persist()
+                    self._committed[kernel_id] = (kernel, serialized)
                 else:
                     staged.discard()
                     log.debug(
@@ -92,6 +104,7 @@ class ContainerBasedKernelRegistryWriter(AbstractKernelRegistryWriter):
                         kernel_id=kernel_id,
                     )
             except FileNotFoundError:
+                self._committed.pop(kernel_id, None)
                 log.debug(
                     "kernel registry save skipped, scratch config directory removed",
                     kernel_id=kernel_id,
