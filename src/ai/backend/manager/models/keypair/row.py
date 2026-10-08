@@ -10,18 +10,15 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.sql.expression import false
 
 from ai.backend.common import msgpack
-from ai.backend.common.auth.utils import generate_keypair, generate_ssh_keypair
 from ai.backend.common.data.entity.keypair import KeyPairID
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.types import AccessKey
-from ai.backend.manager.data.keypair.types import KeyPairSecrets
 from ai.backend.manager.models.base import (
     GUID,
     Base,
     SecretColumn,
 )
 from ai.backend.manager.models.mixins.timestamp import LifecycleTimestampsMixin
-from ai.backend.manager.secret.pool import KeyProviderPool
 from ai.backend.manager.secret.types import SecretValue
 
 if TYPE_CHECKING:
@@ -118,17 +115,6 @@ class Dotfile(TypedDict):
     data: str
     path: str
     perm: str
-
-
-async def generate_keypair_data(key_provider_pool: KeyProviderPool) -> KeyPairSecrets:
-    ak, sk = generate_keypair()
-    pubkey, privkey = generate_ssh_keypair()
-    return KeyPairSecrets(
-        access_key=ak,
-        secret_key=await key_provider_pool.encrypt(sk, KEYPAIR_SECRET_KEY_CONTEXT),
-        ssh_public_key=pubkey,
-        ssh_private_key=privkey,
-    )
 
 
 async def query_owned_dotfiles(
