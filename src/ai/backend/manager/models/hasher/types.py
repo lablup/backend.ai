@@ -128,7 +128,6 @@ class PasswordColumn(TypeDecorator[str]):
     """Custom column type that prevents direct password assignment.
 
     Passwords should be set using proper functions that have access to config:
-    - Use check_credential() for login with gradual migration
     - Use explicit UPDATE queries with pre-hashed passwords
 
     This column type is kept for backward compatibility but should not be used
