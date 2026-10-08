@@ -4,10 +4,11 @@
 
 시나리오: 완성
 
-- ops 로 구성 (3)
+- ops 로 구성 (4)
   - admin_search — 대표 성공 ✓ · 대표 실패 ✓
   - batch_load_by_ids — 대표 성공 ✓ · 대표 실패 ✓
   - scoped_search — 대표 성공 ✓ · 대표 실패 ✓
+  - search_scopes — 대표 성공 ✓ · 대표 실패 ✓
 
 **admin_search**
 
@@ -30,6 +31,8 @@
 | [빈 id 목록으로 조회하면, 권한 검사도 거치지 않고 빈 응답이 반환된다](#batch_loading-reading-an-empty-list-answers-empty-without-passing-the-gate) | 성공 |
 | [슈퍼관리자가 있는 id 둘과 없는 id 하나를 한 번에 조회하면, 요청한 순서대로 반환되고 없는 id에 해당하는 항목은 비어 있다](#batch_loading-the-superadmin-reading-present-and-absent-ids-is-answered-in-order-with-a-gap) | 성공 |
 | [한쪽 프로젝트에만 읽기 권한을 받은 사용자가 읽을 수 있는 기록, 읽을 수 없는 기록, 없는 id를 한 번에 조회하면, 요청한 순서대로 기록 전체, 권한 부족, 빈 항목이 반환된다](#batch_loading-a-granted-reader-gets-a-node-a-refusal-and-a-gap-in-order) | 거부 |
+| [기록이 남긴 범위에만 읽기 권한을 받은 사용자가 그 기록과 다른 프로젝트의 기록을 조회하면, 범위로 닿은 기록은 반환되고 다른 기록은 권한 부족으로 응답한다](#batch_loading-a-record-is-read-through-a-scope-it-recorded) | 거부 |
+| [기록을 실행한 사용자에만 읽기 권한을 받은 사용자가 그 기록과 다른 프로젝트의 기록을 조회하면, 실행한 사용자로 닿은 기록은 반환되고 다른 기록은 권한 부족으로 응답한다](#batch_loading-a-record-is-read-through-the-user-who-triggered-it) | 거부 |
 | [읽기 권한이 없는 사용자가 자기에 대한 기록 둘을 id로 조회하면, 항목마다 권한 부족으로 응답한다](#batch_loading-a-user-granted-nothing-is-refused-in-every-slot-even-for-records-about-themselves) | 거부 |
 | [아무 권한도 받지 않은 모니터 역할 사용자가 id 둘을 조회하면, 항목마다 권한 부족으로 응답한다](#batch_loading-the-monitor-role-without-a-grant-is-refused-in-every-slot) | 거부 |
 
@@ -51,6 +54,22 @@
 | [다른 엔티티에 읽기 권한을 받은 사용자가 어느 엔티티도 아닌 id를 지정해 검색하면, 그 id에 부여된 권한이 없어 권한 부족으로 거부된다](#scoped_searching-naming-an-entity-nothing-answers-to-is-refused-as-permission) | 거부 |
 | [한쪽에만 읽기 권한을 받은 사용자가 두 엔티티를 함께 지정해 검색하면, 볼 수 있는 것만 주는 대신 요청 전체가 권한 부족으로 거부된다](#scoped_searching-one-unreadable-entity-among-those-named-refuses-the-whole-read) | 거부 |
 | [모니터 역할 사용자라도 권한 없이 엔티티를 지정해 검색하면, 권한 부족으로 거부된다. 모니터가 통과하는 것은 슈퍼관리자 검사뿐이고 이 검색은 권한 그래프로 보호된다](#scoped_searching-the-monitor-role-without-a-grant-may-not-scope-search) | 거부 |
+
+**search_scopes**
+
+| 시나리오 | 판정 |
+|---|---|
+| [기록이 남긴 범위 하나에만 읽기 권한을 받은 사용자가 검색하면, 그 기록이 남긴 범위가 모두 반환된다](#scope_searching-a-reader-of-one-scope-reads-every-scope-of-the-record) | 성공 |
+| [기록의 대상 엔티티에만 읽기 권한을 받은 사용자가 검색하면, 그 기록의 범위가 반환된다](#scope_searching-a-reader-of-the-entity-a-record-is-about-reads-its-scopes) | 성공 |
+| [기록을 실행한 사용자에만 읽기 권한을 받은 사용자가 검색하면, 그 기록의 범위가 반환된다](#scope_searching-a-reader-of-the-user-who-triggered-a-record-reads-its-scopes) | 성공 |
+| [범위를 남기지 않은 기록을 그 대상에 읽기 권한을 받은 사용자가 검색하면, 빈 페이지가 반환된다](#scope_searching-a-record-that-recorded-no-scope-answers-an-empty-page) | 성공 |
+| [범위 둘을 남긴 기록을 범위 하나의 식별자를 지정해 검색하면, 그 범위만 반환된다](#scope_searching-a-scope-id-filter-narrows-the-answer-to-that-scope) | 성공 |
+| [범위 둘을 남긴 기록을 프로젝트 종류만 지정해 검색하면, 프로젝트 범위만 반환된다](#scope_searching-a-scope-type-filter-narrows-the-answer-to-that-type) | 성공 |
+| [범위 둘을 남긴 기록을 슈퍼관리자가 검색하면, 범위 둘이 반환된다](#scope_searching-the-superadmin-reads-every-scope-a-record-recorded) | 성공 |
+| [권한 검사를 끄면 아무 권한도 없는 사용자도 기록의 범위를 검색할 수 있다](#scope_searching-turning-enforcement-off-reads-the-scopes-without-a-grant) | 성공 |
+| [기록의 소유자를 하나도 읽을 수 없는 사용자가 검색하면, 권한 부족으로 거부된다](#scope_searching-a-user-who-can-read-no-owner-is-refused) | 거부 |
+| [어느 기록에도 해당하지 않는 id로 슈퍼관리자가 검색하면, 찾을 수 없음으로 거부된다](#scope_searching-searching-a-record-that-does-not-exist-is-not-found) | 거부 |
+| [아무 권한도 받지 않은 모니터 역할 사용자가 검색하면, 권한 부족으로 거부된다. 이 검색은 권한 그래프로 보호된다](#scope_searching-the-monitor-role-without-a-grant-is-refused) | 거부 |
 
 ### admin_search
 
@@ -88,6 +107,7 @@ Then
   - operation = 'succeeded'
   - entity_type = 'user'
   - entity_id: 기록의 대상 엔티티와 같다
+  - target_entity_id: 기록의 대상 엔티티와 같다
   - status = <AuditLogStatus.SUCCESS: 'success'>
   - description = 'succeeded was recorded'
   - created_at = datetime.datetime(2026, 1, 2, 0, 0, tzinfo=datetime.timezone.utc)
@@ -137,6 +157,7 @@ Then
   - operation = 'acted-by-me'
   - entity_type = 'user'
   - entity_id: 기록의 대상 엔티티와 같다
+  - target_entity_id: 기록의 대상 엔티티와 같다
   - status = <AuditLogStatus.SUCCESS: 'success'>
   - description = 'acted-by-me was recorded'
   - created_at = datetime.datetime(2026, 1, 2, 0, 0, tzinfo=datetime.timezone.utc)
@@ -219,6 +240,7 @@ Then
   - operation = 'edited'
   - entity_type = 'user'
   - entity_id: 기록의 대상 엔티티와 같다
+  - target_entity_id: 기록의 대상 엔티티와 같다
   - status = <AuditLogStatus.SUCCESS: 'success'>
   - description = 'edited was recorded'
   - created_at = datetime.datetime(2026, 1, 2, 0, 0, tzinfo=datetime.timezone.utc)
@@ -232,6 +254,7 @@ Then
   - operation = 'created'
   - entity_type = 'user'
   - entity_id: 기록의 대상 엔티티와 같다
+  - target_entity_id: 기록의 대상 엔티티와 같다
   - status = <AuditLogStatus.SUCCESS: 'success'>
   - description = 'created was recorded'
   - created_at = datetime.datetime(2026, 1, 1, 0, 0, tzinfo=datetime.timezone.utc)
@@ -275,6 +298,7 @@ Then
   - operation = 'edited'
   - entity_type = 'user'
   - entity_id: 기록의 대상 엔티티와 같다
+  - target_entity_id: 기록의 대상 엔티티와 같다
   - status = <AuditLogStatus.SUCCESS: 'success'>
   - description = 'edited was recorded'
   - created_at = datetime.datetime(2026, 1, 2, 0, 0, tzinfo=datetime.timezone.utc)
@@ -288,6 +312,7 @@ Then
   - operation = 'created'
   - entity_type = 'user'
   - entity_id: 기록의 대상 엔티티와 같다
+  - target_entity_id: 기록의 대상 엔티티와 같다
   - status = <AuditLogStatus.SUCCESS: 'success'>
   - description = 'created was recorded'
   - created_at = datetime.datetime(2026, 1, 1, 0, 0, tzinfo=datetime.timezone.utc)
@@ -465,6 +490,7 @@ Then
   - [0].operation = 'edited'
   - [0].entity_type = 'user'
   - [0].entity_id: 기록의 대상 엔티티와 같다
+  - [0].target_entity_id: 기록의 대상 엔티티와 같다
   - [0].status = <AuditLogStatus.SUCCESS: 'success'>
   - [0].description = 'edited was recorded'
   - [0].created_at = datetime.datetime(2026, 1, 2, 0, 0, tzinfo=datetime.timezone.utc)
@@ -479,6 +505,7 @@ Then
   - [2].operation = 'created'
   - [2].entity_type = 'user'
   - [2].entity_id: 기록의 대상 엔티티와 같다
+  - [2].target_entity_id: 기록의 대상 엔티티와 같다
   - [2].status = <AuditLogStatus.SUCCESS: 'success'>
   - [2].description = 'created was recorded'
   - [2].created_at = datetime.datetime(2026, 1, 1, 0, 0, tzinfo=datetime.timezone.utc)
@@ -524,6 +551,7 @@ Then
   - [0].operation = 'edited'
   - [0].entity_type = 'project'
   - [0].entity_id: 기록의 대상 엔티티와 같다
+  - [0].target_entity_id: 기록의 대상 엔티티와 같다
   - [0].status = <AuditLogStatus.SUCCESS: 'success'>
   - [0].description = 'edited was recorded'
   - [0].created_at = datetime.datetime(2026, 1, 2, 0, 0, tzinfo=datetime.timezone.utc)
@@ -534,6 +562,106 @@ Then
   - [0].triggered_by = None
   - 거부: NotEnoughPermission
   - [2] = None
+
+<a id="batch_loading-a-record-is-read-through-a-scope-it-recorded"></a>
+
+#### [a-record-is-read-through-a-scope-it-recorded](/tests/scenario/bai_scenario/manager/audit_log/test_batch_loading.py) — pass
+
+기록이 남긴 범위에만 읽기 권한을 받은 사용자가 그 기록과 다른 프로젝트의 기록을 조회하면, 범위로 닿은 기록은 반환되고 다른 기록은 권한 부족으로 응답한다
+
+Given
+
+- 한 사용자에 대한 기록이 한 프로젝트를 범위로 남겼고, 다른 프로젝트에 기록 하나가 있으며, 범위 프로젝트에만 읽기 권한을 받은 사용자 한 명
+  - 도메인 home-1
+  - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+  - 프로젝트 team-1
+  - 프로젝트 other-1
+  - 도메인에 속한 사용자 한 명 준비
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+    - 사용자 정책 user-policy-2: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
+    - 일반 사용자 user-2: 자기 키와 개인 프로젝트를 갖는다
+  - 일반 사용자 user-1: 'linked' 기록, 스코프 1개 달림
+  - 프로젝트 other-1: 'created' 기록
+  - 역할 record-reader-1: 이 역할이 앉은 스코프 안에서만 통한다
+  - 역할 record-reader-1: project 전체에 READ 허용
+  - 일반 사용자 user-2: 역할 record-reader-1 보유
+
+When
+
+- AuditLogAdapter.batch_load_by_ids — user-2이 있는 id 둘을 한 번에 조회
+
+Then
+
+- 요청한 순서대로 항목마다 노드, 거부, 또는 빈 항목이 반환된다
+  - length = 2
+  - [0].id: 무시함 — 데이터베이스가 만든다
+  - [0].action_id: 무시함 — 실행마다 새로 생성된다
+  - [0].operation = 'linked'
+  - [0].entity_type = 'user'
+  - [0].entity_id: 기록의 대상 엔티티와 같다
+  - [0].target_entity_id: 기록의 대상 엔티티와 같다
+  - [0].status = <AuditLogStatus.SUCCESS: 'success'>
+  - [0].description = 'linked was recorded'
+  - [0].created_at = datetime.datetime(2026, 1, 2, 0, 0, tzinfo=datetime.timezone.utc)
+  - [0].request_id = None
+  - [0].acted_as = None
+  - [0].duration = None
+  - [0].client_ip = None
+  - [0].triggered_by = None
+  - 거부: NotEnoughPermission
+
+<a id="batch_loading-a-record-is-read-through-the-user-who-triggered-it"></a>
+
+#### [a-record-is-read-through-the-user-who-triggered-it](/tests/scenario/bai_scenario/manager/audit_log/test_batch_loading.py) — pass
+
+기록을 실행한 사용자에만 읽기 권한을 받은 사용자가 그 기록과 다른 프로젝트의 기록을 조회하면, 실행한 사용자로 닿은 기록은 반환되고 다른 기록은 권한 부족으로 응답한다
+
+Given
+
+- 한 프로젝트에 대한 기록을 다른 사용자가 실행했고, 다른 프로젝트에 기록 하나가 있으며, 실행한 사용자에만 읽기 권한을 받은 사용자 한 명
+  - 도메인 home-1
+  - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+  - 프로젝트 team-1
+  - 프로젝트 other-1
+  - 도메인에 속한 사용자 한 명 준비
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+    - 사용자 정책 user-policy-2: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
+    - 일반 사용자 user-2: 자기 키와 개인 프로젝트를 갖는다
+  - 프로젝트 team-1: 'acted-on-a-project' 기록, 실행한 사용자가 정해져 있음
+  - 프로젝트 other-1: 'created' 기록
+  - 역할 record-reader-1: 이 역할이 앉은 스코프 안에서만 통한다
+  - 역할 record-reader-1: user 전체에 READ 허용
+  - 일반 사용자 user-2: 역할 record-reader-1 보유
+
+When
+
+- AuditLogAdapter.batch_load_by_ids — user-2이 있는 id 둘을 한 번에 조회
+
+Then
+
+- 요청한 순서대로 항목마다 노드, 거부, 또는 빈 항목이 반환된다
+  - length = 2
+  - [0].id: 무시함 — 데이터베이스가 만든다
+  - [0].action_id: 무시함 — 실행마다 새로 생성된다
+  - [0].operation = 'acted-on-a-project'
+  - [0].entity_type = 'project'
+  - [0].entity_id: 기록의 대상 엔티티와 같다
+  - [0].target_entity_id: 기록의 대상 엔티티와 같다
+  - [0].status = <AuditLogStatus.SUCCESS: 'success'>
+  - [0].description = 'acted-on-a-project was recorded'
+  - [0].created_at = datetime.datetime(2026, 1, 2, 0, 0, tzinfo=datetime.timezone.utc)
+  - [0].request_id = None
+  - [0].acted_as = None
+  - [0].duration = None
+  - [0].client_ip = None
+  - [0].triggered_by: 실행한 사용자와 같다
+  - 거부: NotEnoughPermission
 
 <a id="batch_loading-a-user-granted-nothing-is-refused-in-every-slot-even-for-records-about-themselves"></a>
 
@@ -635,6 +763,7 @@ Then
   - operation = 'linked'
   - entity_type = 'user'
   - entity_id: 기록의 대상 엔티티와 같다
+  - target_entity_id: 기록의 대상 엔티티와 같다
   - status = <AuditLogStatus.SUCCESS: 'success'>
   - description = 'linked was recorded'
   - created_at = datetime.datetime(2026, 1, 2, 0, 0, tzinfo=datetime.timezone.utc)
@@ -682,6 +811,7 @@ Then
   - operation = 'succeeded'
   - entity_type = 'project'
   - entity_id: 기록의 대상 엔티티와 같다
+  - target_entity_id: 기록의 대상 엔티티와 같다
   - status = <AuditLogStatus.SUCCESS: 'success'>
   - description = 'succeeded was recorded'
   - created_at = datetime.datetime(2026, 1, 2, 0, 0, tzinfo=datetime.timezone.utc)
@@ -734,6 +864,7 @@ Then
   - operation = 'acted-by-me'
   - entity_type = 'user'
   - entity_id: 기록의 대상 엔티티와 같다
+  - target_entity_id: 기록의 대상 엔티티와 같다
   - status = <AuditLogStatus.SUCCESS: 'success'>
   - description = 'acted-by-me was recorded'
   - created_at = datetime.datetime(2026, 1, 2, 0, 0, tzinfo=datetime.timezone.utc)
@@ -782,6 +913,7 @@ Then
   - operation = 'edited'
   - entity_type = 'project'
   - entity_id: 기록의 대상 엔티티와 같다
+  - target_entity_id: 기록의 대상 엔티티와 같다
   - status = <AuditLogStatus.SUCCESS: 'success'>
   - description = 'edited was recorded'
   - created_at = datetime.datetime(2026, 1, 2, 0, 0, tzinfo=datetime.timezone.utc)
@@ -833,6 +965,7 @@ Then
   - operation = 'edited'
   - entity_type = 'project'
   - entity_id: 기록의 대상 엔티티와 같다
+  - target_entity_id: 기록의 대상 엔티티와 같다
   - status = <AuditLogStatus.SUCCESS: 'success'>
   - description = 'edited was recorded'
   - created_at = datetime.datetime(2026, 1, 2, 0, 0, tzinfo=datetime.timezone.utc)
@@ -846,6 +979,7 @@ Then
   - operation = 'created'
   - entity_type = 'project'
   - entity_id: 기록의 대상 엔티티와 같다
+  - target_entity_id: 기록의 대상 엔티티와 같다
   - status = <AuditLogStatus.SUCCESS: 'success'>
   - description = 'created was recorded'
   - created_at = datetime.datetime(2026, 1, 1, 0, 0, tzinfo=datetime.timezone.utc)
@@ -966,6 +1100,7 @@ Then
   - operation = 'edited'
   - entity_type = 'project'
   - entity_id: 기록의 대상 엔티티와 같다
+  - target_entity_id: 기록의 대상 엔티티와 같다
   - status = <AuditLogStatus.SUCCESS: 'success'>
   - description = 'edited was recorded'
   - created_at = datetime.datetime(2026, 1, 2, 0, 0, tzinfo=datetime.timezone.utc)
@@ -1153,6 +1288,462 @@ Given
 When
 
 - AuditLogAdapter.scoped_search — user-1이 엔티티를 지정해 검색
+
+Then
+
+- 거부된다
+  - 거부: NotEnoughPermission
+
+### search_scopes
+
+<a id="scope_searching-a-reader-of-one-scope-reads-every-scope-of-the-record"></a>
+
+#### [a-reader-of-one-scope-reads-every-scope-of-the-record](/tests/scenario/bai_scenario/manager/audit_log/test_scope_searching.py) — pass
+
+기록이 남긴 범위 하나에만 읽기 권한을 받은 사용자가 검색하면, 그 기록이 남긴 범위가 모두 반환된다
+
+Given
+
+- 한 프로젝트에 대한 기록을 다른 사용자가 실행했고 그 기록이 다른 프로젝트와 한 사용자를 범위로 남겼으며, 범위 프로젝트에만 읽기 권한을 받은 사용자 한 명
+  - 도메인 home-1
+  - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+  - 프로젝트 team-1
+  - 프로젝트 other-1
+  - 도메인에 속한 사용자 한 명 준비
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+    - 사용자 정책 user-policy-2: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
+    - 일반 사용자 user-2: 자기 키와 개인 프로젝트를 갖는다
+    - 사용자 정책 user-policy-3: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-3: 동시 세션 5개까지
+    - 일반 사용자 user-3: 자기 키와 개인 프로젝트를 갖는다
+  - 프로젝트 team-1: 'linked' 기록, 스코프 2개 달림
+  - 역할 record-reader-1: 이 역할이 앉은 스코프 안에서만 통한다
+  - 역할 record-reader-1: project 전체에 READ 허용
+  - 일반 사용자 user-3: 역할 record-reader-1 보유
+
+When
+
+- AuditLogAdapter.search_scopes — user-3이 기록 하나의 범위를 검색
+
+Then
+
+- 기록의 범위가 순서대로, 그리고 그것만 반환된다
+  - item_count = 2
+  - total_count = 2
+  - has_next_page = False
+  - has_previous_page = False
+  - [0].id: 무시함 — 데이터베이스가 만든다
+  - [0].field_id: 무시함 — 데이터베이스가 만든다
+  - [0].audit_log_id: 검색한 기록와 같다
+  - [0].scope_type = 'project'
+  - [0].scope_id: 기록이 남긴 범위와 같다
+  - [1].id: 무시함 — 데이터베이스가 만든다
+  - [1].field_id: 무시함 — 데이터베이스가 만든다
+  - [1].audit_log_id: 검색한 기록와 같다
+  - [1].scope_type = 'user'
+  - [1].scope_id: 기록이 남긴 범위와 같다
+
+<a id="scope_searching-a-reader-of-the-entity-a-record-is-about-reads-its-scopes"></a>
+
+#### [a-reader-of-the-entity-a-record-is-about-reads-its-scopes](/tests/scenario/bai_scenario/manager/audit_log/test_scope_searching.py) — pass
+
+기록의 대상 엔티티에만 읽기 권한을 받은 사용자가 검색하면, 그 기록의 범위가 반환된다
+
+Given
+
+- 한 프로젝트에 대한 기록을 다른 사용자가 실행했고 그 기록이 다른 프로젝트와 한 사용자를 범위로 남겼으며, 대상 프로젝트에만 읽기 권한을 받은 사용자 한 명
+  - 도메인 home-1
+  - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+  - 프로젝트 team-1
+  - 프로젝트 other-1
+  - 도메인에 속한 사용자 한 명 준비
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+    - 사용자 정책 user-policy-2: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
+    - 일반 사용자 user-2: 자기 키와 개인 프로젝트를 갖는다
+    - 사용자 정책 user-policy-3: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-3: 동시 세션 5개까지
+    - 일반 사용자 user-3: 자기 키와 개인 프로젝트를 갖는다
+  - 프로젝트 team-1: 'linked' 기록, 스코프 2개 달림
+  - 역할 record-reader-1: 이 역할이 앉은 스코프 안에서만 통한다
+  - 역할 record-reader-1: project 전체에 READ 허용
+  - 일반 사용자 user-3: 역할 record-reader-1 보유
+
+When
+
+- AuditLogAdapter.search_scopes — user-3이 기록 하나의 범위를 검색
+
+Then
+
+- 기록의 범위가 순서대로, 그리고 그것만 반환된다
+  - item_count = 2
+  - total_count = 2
+  - has_next_page = False
+  - has_previous_page = False
+  - [0].id: 무시함 — 데이터베이스가 만든다
+  - [0].field_id: 무시함 — 데이터베이스가 만든다
+  - [0].audit_log_id: 검색한 기록와 같다
+  - [0].scope_type = 'project'
+  - [0].scope_id: 기록이 남긴 범위와 같다
+  - [1].id: 무시함 — 데이터베이스가 만든다
+  - [1].field_id: 무시함 — 데이터베이스가 만든다
+  - [1].audit_log_id: 검색한 기록와 같다
+  - [1].scope_type = 'user'
+  - [1].scope_id: 기록이 남긴 범위와 같다
+
+<a id="scope_searching-a-reader-of-the-user-who-triggered-a-record-reads-its-scopes"></a>
+
+#### [a-reader-of-the-user-who-triggered-a-record-reads-its-scopes](/tests/scenario/bai_scenario/manager/audit_log/test_scope_searching.py) — pass
+
+기록을 실행한 사용자에만 읽기 권한을 받은 사용자가 검색하면, 그 기록의 범위가 반환된다
+
+Given
+
+- 한 프로젝트에 대한 기록을 다른 사용자가 실행했고 그 기록이 다른 프로젝트와 한 사용자를 범위로 남겼으며, 실행한 사용자에만 읽기 권한을 받은 사용자 한 명
+  - 도메인 home-1
+  - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+  - 프로젝트 team-1
+  - 프로젝트 other-1
+  - 도메인에 속한 사용자 한 명 준비
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+    - 사용자 정책 user-policy-2: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
+    - 일반 사용자 user-2: 자기 키와 개인 프로젝트를 갖는다
+    - 사용자 정책 user-policy-3: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-3: 동시 세션 5개까지
+    - 일반 사용자 user-3: 자기 키와 개인 프로젝트를 갖는다
+  - 프로젝트 team-1: 'linked' 기록, 스코프 2개 달림
+  - 역할 record-reader-1: 이 역할이 앉은 스코프 안에서만 통한다
+  - 역할 record-reader-1: user 전체에 READ 허용
+  - 일반 사용자 user-3: 역할 record-reader-1 보유
+
+When
+
+- AuditLogAdapter.search_scopes — user-3이 기록 하나의 범위를 검색
+
+Then
+
+- 기록의 범위가 순서대로, 그리고 그것만 반환된다
+  - item_count = 2
+  - total_count = 2
+  - has_next_page = False
+  - has_previous_page = False
+  - [0].id: 무시함 — 데이터베이스가 만든다
+  - [0].field_id: 무시함 — 데이터베이스가 만든다
+  - [0].audit_log_id: 검색한 기록와 같다
+  - [0].scope_type = 'project'
+  - [0].scope_id: 기록이 남긴 범위와 같다
+  - [1].id: 무시함 — 데이터베이스가 만든다
+  - [1].field_id: 무시함 — 데이터베이스가 만든다
+  - [1].audit_log_id: 검색한 기록와 같다
+  - [1].scope_type = 'user'
+  - [1].scope_id: 기록이 남긴 범위와 같다
+
+<a id="scope_searching-a-record-that-recorded-no-scope-answers-an-empty-page"></a>
+
+#### [a-record-that-recorded-no-scope-answers-an-empty-page](/tests/scenario/bai_scenario/manager/audit_log/test_scope_searching.py) — pass
+
+범위를 남기지 않은 기록을 그 대상에 읽기 권한을 받은 사용자가 검색하면, 빈 페이지가 반환된다
+
+Given
+
+- 범위를 남기지 않은 한 프로젝트의 기록과, 그 프로젝트에 읽기 권한을 받은 사용자 한 명
+  - 도메인 home-1
+  - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+  - 프로젝트 team-1
+  - 프로젝트 team-1: 'succeeded' 기록
+  - 도메인에 속한 사용자 한 명 준비
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+  - 역할 record-reader-1: 이 역할이 앉은 스코프 안에서만 통한다
+  - 역할 record-reader-1: project 전체에 READ 허용
+  - 일반 사용자 user-1: 역할 record-reader-1 보유
+
+When
+
+- AuditLogAdapter.search_scopes — user-1이 기록 하나의 범위를 검색
+
+Then
+
+- 기록의 범위가 순서대로, 그리고 그것만 반환된다
+  - item_count = 0
+  - total_count = 0
+  - has_next_page = False
+  - has_previous_page = False
+
+<a id="scope_searching-a-scope-id-filter-narrows-the-answer-to-that-scope"></a>
+
+#### [a-scope-id-filter-narrows-the-answer-to-that-scope](/tests/scenario/bai_scenario/manager/audit_log/test_scope_searching.py) — pass
+
+범위 둘을 남긴 기록을 범위 하나의 식별자를 지정해 검색하면, 그 범위만 반환된다
+
+Given
+
+- 한 프로젝트에 대한 기록을 다른 사용자가 실행했고 그 기록이 다른 프로젝트와 한 사용자를 범위로 남겼으며, 슈퍼관리자 한 명
+  - 도메인 home-1
+  - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+  - 프로젝트 team-1
+  - 프로젝트 other-1
+  - 도메인에 속한 사용자 한 명 준비
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+    - 사용자 정책 user-policy-2: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
+    - 일반 사용자 user-2: 자기 키와 개인 프로젝트를 갖는다
+    - 사용자 정책 user-policy-3: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-3: 동시 세션 5개까지
+    - 슈퍼관리자 user-3: 자기 키와 개인 프로젝트를 갖는다
+  - 프로젝트 team-1: 'linked' 기록, 스코프 2개 달림
+
+When
+
+- AuditLogAdapter.search_scopes — user-3이 기록 하나의 범위를 범위 하나의 식별자를 지정해 검색
+
+Then
+
+- 기록의 범위가 순서대로, 그리고 그것만 반환된다
+  - item_count = 1
+  - total_count = 1
+  - has_next_page = False
+  - has_previous_page = False
+  - [0].id: 무시함 — 데이터베이스가 만든다
+  - [0].field_id: 무시함 — 데이터베이스가 만든다
+  - [0].audit_log_id: 검색한 기록와 같다
+  - [0].scope_type = 'user'
+  - [0].scope_id: 기록이 남긴 범위와 같다
+
+<a id="scope_searching-a-scope-type-filter-narrows-the-answer-to-that-type"></a>
+
+#### [a-scope-type-filter-narrows-the-answer-to-that-type](/tests/scenario/bai_scenario/manager/audit_log/test_scope_searching.py) — pass
+
+범위 둘을 남긴 기록을 프로젝트 종류만 지정해 검색하면, 프로젝트 범위만 반환된다
+
+Given
+
+- 한 프로젝트에 대한 기록을 다른 사용자가 실행했고 그 기록이 다른 프로젝트와 한 사용자를 범위로 남겼으며, 슈퍼관리자 한 명
+  - 도메인 home-1
+  - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+  - 프로젝트 team-1
+  - 프로젝트 other-1
+  - 도메인에 속한 사용자 한 명 준비
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+    - 사용자 정책 user-policy-2: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
+    - 일반 사용자 user-2: 자기 키와 개인 프로젝트를 갖는다
+    - 사용자 정책 user-policy-3: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-3: 동시 세션 5개까지
+    - 슈퍼관리자 user-3: 자기 키와 개인 프로젝트를 갖는다
+  - 프로젝트 team-1: 'linked' 기록, 스코프 2개 달림
+
+When
+
+- AuditLogAdapter.search_scopes — user-3이 기록 하나의 범위를 프로젝트 종류만 지정해 검색
+
+Then
+
+- 기록의 범위가 순서대로, 그리고 그것만 반환된다
+  - item_count = 1
+  - total_count = 1
+  - has_next_page = False
+  - has_previous_page = False
+  - [0].id: 무시함 — 데이터베이스가 만든다
+  - [0].field_id: 무시함 — 데이터베이스가 만든다
+  - [0].audit_log_id: 검색한 기록와 같다
+  - [0].scope_type = 'project'
+  - [0].scope_id: 기록이 남긴 범위와 같다
+
+<a id="scope_searching-the-superadmin-reads-every-scope-a-record-recorded"></a>
+
+#### [the-superadmin-reads-every-scope-a-record-recorded](/tests/scenario/bai_scenario/manager/audit_log/test_scope_searching.py) — pass
+
+범위 둘을 남긴 기록을 슈퍼관리자가 검색하면, 범위 둘이 반환된다
+
+Given
+
+- 한 프로젝트에 대한 기록을 다른 사용자가 실행했고 그 기록이 다른 프로젝트와 한 사용자를 범위로 남겼으며, 슈퍼관리자 한 명
+  - 도메인 home-1
+  - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+  - 프로젝트 team-1
+  - 프로젝트 other-1
+  - 도메인에 속한 사용자 한 명 준비
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+    - 사용자 정책 user-policy-2: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
+    - 일반 사용자 user-2: 자기 키와 개인 프로젝트를 갖는다
+    - 사용자 정책 user-policy-3: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-3: 동시 세션 5개까지
+    - 슈퍼관리자 user-3: 자기 키와 개인 프로젝트를 갖는다
+  - 프로젝트 team-1: 'linked' 기록, 스코프 2개 달림
+
+When
+
+- AuditLogAdapter.search_scopes — user-3이 기록 하나의 범위를 검색
+
+Then
+
+- 기록의 범위가 순서대로, 그리고 그것만 반환된다
+  - item_count = 2
+  - total_count = 2
+  - has_next_page = False
+  - has_previous_page = False
+  - [0].id: 무시함 — 데이터베이스가 만든다
+  - [0].field_id: 무시함 — 데이터베이스가 만든다
+  - [0].audit_log_id: 검색한 기록와 같다
+  - [0].scope_type = 'project'
+  - [0].scope_id: 기록이 남긴 범위와 같다
+  - [1].id: 무시함 — 데이터베이스가 만든다
+  - [1].field_id: 무시함 — 데이터베이스가 만든다
+  - [1].audit_log_id: 검색한 기록와 같다
+  - [1].scope_type = 'user'
+  - [1].scope_id: 기록이 남긴 범위와 같다
+
+<a id="scope_searching-turning-enforcement-off-reads-the-scopes-without-a-grant"></a>
+
+#### [turning-enforcement-off-reads-the-scopes-without-a-grant](/tests/scenario/bai_scenario/manager/audit_log/test_scope_searching.py) — pass
+
+권한 검사를 끄면 아무 권한도 없는 사용자도 기록의 범위를 검색할 수 있다
+
+Given
+
+- 한 프로젝트에 대한 기록을 다른 사용자가 실행했고 그 기록이 다른 프로젝트와 한 사용자를 범위로 남겼으며, 아무 권한도 없는 사용자 한 명
+  - 도메인 home-1
+  - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+  - 프로젝트 team-1
+  - 프로젝트 other-1
+  - 도메인에 속한 사용자 한 명 준비
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+    - 사용자 정책 user-policy-2: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
+    - 일반 사용자 user-2: 자기 키와 개인 프로젝트를 갖는다
+    - 사용자 정책 user-policy-3: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-3: 동시 세션 5개까지
+    - 일반 사용자 user-3: 자기 키와 개인 프로젝트를 갖는다
+  - 프로젝트 team-1: 'linked' 기록, 스코프 2개 달림
+
+When
+
+- AuditLogAdapter.search_scopes — user-3이 기록 하나의 범위를 검색
+
+Then
+
+- 기록의 범위가 순서대로, 그리고 그것만 반환된다
+  - item_count = 2
+  - total_count = 2
+  - has_next_page = False
+  - has_previous_page = False
+  - [0].id: 무시함 — 데이터베이스가 만든다
+  - [0].field_id: 무시함 — 데이터베이스가 만든다
+  - [0].audit_log_id: 검색한 기록와 같다
+  - [0].scope_type = 'project'
+  - [0].scope_id: 기록이 남긴 범위와 같다
+  - [1].id: 무시함 — 데이터베이스가 만든다
+  - [1].field_id: 무시함 — 데이터베이스가 만든다
+  - [1].audit_log_id: 검색한 기록와 같다
+  - [1].scope_type = 'user'
+  - [1].scope_id: 기록이 남긴 범위와 같다
+
+<a id="scope_searching-a-user-who-can-read-no-owner-is-refused"></a>
+
+#### [a-user-who-can-read-no-owner-is-refused](/tests/scenario/bai_scenario/manager/audit_log/test_scope_searching.py) — pass
+
+기록의 소유자를 하나도 읽을 수 없는 사용자가 검색하면, 권한 부족으로 거부된다
+
+Given
+
+- 한 프로젝트에 대한 기록을 다른 사용자가 실행했고 그 기록이 다른 프로젝트와 한 사용자를 범위로 남겼으며, 아무 권한도 없는 사용자 한 명
+  - 도메인 home-1
+  - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+  - 프로젝트 team-1
+  - 프로젝트 other-1
+  - 도메인에 속한 사용자 한 명 준비
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+    - 사용자 정책 user-policy-2: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
+    - 일반 사용자 user-2: 자기 키와 개인 프로젝트를 갖는다
+    - 사용자 정책 user-policy-3: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-3: 동시 세션 5개까지
+    - 일반 사용자 user-3: 자기 키와 개인 프로젝트를 갖는다
+  - 프로젝트 team-1: 'linked' 기록, 스코프 2개 달림
+
+When
+
+- AuditLogAdapter.search_scopes — user-3이 기록 하나의 범위를 검색
+
+Then
+
+- 거부된다
+  - 거부: NotEnoughPermission
+
+<a id="scope_searching-searching-a-record-that-does-not-exist-is-not-found"></a>
+
+#### [searching-a-record-that-does-not-exist-is-not-found](/tests/scenario/bai_scenario/manager/audit_log/test_scope_searching.py) — pass
+
+어느 기록에도 해당하지 않는 id로 슈퍼관리자가 검색하면, 찾을 수 없음으로 거부된다
+
+Given
+
+- 슈퍼관리자 한 명
+  - 도메인 home-1
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+
+When
+
+- AuditLogAdapter.search_scopes — user-1이 기록 하나의 범위를 검색
+
+Then
+
+- 거부된다
+  - 거부: FieldNotFoundError
+
+<a id="scope_searching-the-monitor-role-without-a-grant-is-refused"></a>
+
+#### [the-monitor-role-without-a-grant-is-refused](/tests/scenario/bai_scenario/manager/audit_log/test_scope_searching.py) — pass
+
+아무 권한도 받지 않은 모니터 역할 사용자가 검색하면, 권한 부족으로 거부된다. 이 검색은 권한 그래프로 보호된다
+
+Given
+
+- 한 프로젝트에 대한 기록을 다른 사용자가 실행했고 그 기록이 다른 프로젝트와 한 사용자를 범위로 남겼으며, 아무 권한도 없는 모니터 역할 사용자 한 명
+  - 도메인 home-1
+  - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+  - 프로젝트 team-1
+  - 프로젝트 other-1
+  - 도메인에 속한 사용자 한 명 준비
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+    - 사용자 정책 user-policy-2: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
+    - 일반 사용자 user-2: 자기 키와 개인 프로젝트를 갖는다
+    - 사용자 정책 user-policy-3: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-3: 동시 세션 5개까지
+    - 모니터 user-3: 자기 키와 개인 프로젝트를 갖는다
+  - 프로젝트 team-1: 'linked' 기록, 스코프 2개 달림
+
+When
+
+- AuditLogAdapter.search_scopes — user-3이 기록 하나의 범위를 검색
 
 Then
 

@@ -1,9 +1,9 @@
 ---
 name: audit-log-adapter-scenarios
 type: reference
-description: what the audit log adapter guarantees, as scenarios; the superadmin role on the whole-table search that a monitor passes, the per-entity read permission on the by-id read that answers each id apart and on the scoped search that refuses the whole page when one named entity is unreadable, the two axes a scope item names (the entity a record is about, the user who triggered it)
+description: what the audit log adapter guarantees, as scenarios; the superadmin role on the whole-table search that a monitor passes, the per-entity read permission on the scoped search that refuses the whole page when one named entity is unreadable, the any-owner read on the by-id read and on the scope search of one record (the entity a record is about, each scope it recorded, the user who triggered it), the two axes a scope item names
 scope: src/ai/backend/manager/api/adapters/audit_log
-keywords: [audit log, scenario, adapter, superadmin, monitor, scoped search, triggered by, entity scope]
+keywords: [audit log, scenario, adapter, superadmin, monitor, scoped search, triggered by, entity scope, owner candidates, search scopes]
 generated:
   by: claude-code/opus-5
   at: 2026-09-11
@@ -16,13 +16,15 @@ status: draft
 
 `audit_log` 엔티티는 소유자가 고정되어 있지 않다. 동작이 실행될 때마다 그 동작이 다룬 엔티티를
 대상으로 한 행씩 자동으로 기록되므로, 기록마다 소유자가 다르고 전역 동작의 기록은 소유자가 없다.
-그래서 이 어댑터에는 쓰기가 없고 전체 검색, 여러 id 조회, 범위 지정 검색뿐이다. 시나리오가 전제하는
+그래서 이 어댑터에는 쓰기가 없고 전체 검색, 여러 id 조회, 범위 지정 검색, 기록 하나의 범위 검색뿐이다.
+시나리오가 전제하는
 기록은 어댑터로 만들 수 없으므로, 기록을 남기는 쓰기 경로로 직접 미리 만들어 둔다.
 
-권한 검사 방식은 둘이다. 전체 검색은 호출한 사용자가 슈퍼관리자인지 검사하고, 읽기이므로 모니터 역할
-사용자도 통과한다. 여러 id 조회와 범위 지정 검색은 기록이 가리키는 엔티티마다 부여된 읽기 권한을
-검사한다. 여러 id 조회는 항목마다 따로 응답하고, 범위 지정 검색은 하나라도 볼 수 없으면 요청 전체를
-거부한다. 두 방식의 거부 이유가 서로 다르므로 짝이 되는 시나리오를 따로 적는다.
+권한 검사 방식은 셋이다. 전체 검색은 호출한 사용자가 슈퍼관리자인지 검사하고, 읽기이므로 모니터 역할
+사용자도 통과한다. 범위 지정 검색은 지정한 엔티티마다 부여된 읽기 권한을 검사하고, 하나라도 볼 수
+없으면 요청 전체를 거부한다. 여러 id 조회와 기록 하나의 범위 검색은 기록의 소유자 중 하나라도 읽을 수
+있는지를 기록마다 검사한다. 기록의 소유자는 기록이 대상으로 한 엔티티, 기록에 남은 범위 엔티티들,
+기록을 실행한 사용자다. 거부 이유가 방식마다 다르므로 짝이 되는 시나리오를 따로 적는다.
 
 범위를 지정하는 방법은 둘이다. 기록의 대상 엔티티로 지정하거나, 기록의 `triggered_by` 사용자로
 지정한다. 엔티티로 지정하면 그 엔티티에 부여된 권한을, 사용자로 지정하면 그 사용자에 부여된 권한을
@@ -58,9 +60,14 @@ status: draft
 | 빈 목록을 준다 | 기록 둘, 권한 없음 | 빈 id 목록 | 빈 응답. 권한 검사도 거치지 않는다 |
 | 모니터 역할 사용자가 권한 없이 조회한다 | 기록 둘, 모니터 역할, 권한 없음 | id 둘을 한 번에 | 항목마다 권한 부족 |
 | 읽기 권한이 없는 사용자가 자기에 대한 기록을 조회한다 | 자기에 대한 기록 둘, 권한 없음 | id 둘을 한 번에 | 항목마다 권한 부족 |
+| 기록이 남긴 범위의 권한으로 조회한다 | 한 사용자에 대한 기록이 한 프로젝트를 범위로 남겼고 다른 프로젝트에 기록 하나, 범위 프로젝트에만 읽기 권한 있음 | 두 기록의 id를 한 번에 | 범위로 닿은 기록은 반환되고 다른 기록은 권한 부족 |
+| 실행한 사용자의 권한으로 조회한다 | 한 프로젝트에 대한 기록을 다른 사용자가 실행했고 다른 프로젝트에 기록 하나, 실행한 사용자에만 읽기 권한 있음 | 두 기록의 id를 한 번에 | 실행한 사용자로 닿은 기록은 반환되고 다른 기록은 권한 부족 |
 
-id마다 그 기록이 가리키는 엔티티에 부여된 읽기 권한을 검사하고, 항목마다 따로 응답한다. 볼 수
-없는 기록은 그 항목만 거부되고 나머지는 반환된다. 범위 지정 검색과 달리 부분 성공이 있다.
+id마다 그 기록의 소유자 중 하나라도 읽을 수 있는지 검사하고, 항목마다 따로 응답한다. 볼 수 없는
+기록은 그 항목만 거부되고 나머지는 반환된다. 범위 지정 검색과 달리 부분 성공이 있다.
+
+기록의 대상 엔티티를 읽을 수 없어도, 기록이 남긴 범위나 기록을 실행한 사용자를 통해 읽을 수 있다.
+범위 지정 검색에서 그 기록이 보이는 조건과 같다.
 
 없는 id는 누가 조회하든 빈 항목이다. 가리키는 엔티티가 없으므로 권한을 검사할 대상이 없다.
 
@@ -106,9 +113,33 @@ id마다 그 기록이 가리키는 엔티티에 부여된 읽기 권한을 검�
 아무것도 지정하지 않은 요청은 시나리오로 두지 않는다. 요청 타입이 이미 거부하므로 어댑터가 보장하는
 것이 아니다.
 
+## 기록 하나의 범위 검색
+
+| 시나리오 | 상황 | 요청 | 결과 |
+|---|---|---|---|
+| 슈퍼관리자가 범위를 검색한다 | 한 프로젝트에 대한 기록을 다른 사용자가 실행했고 그 기록이 다른 프로젝트와 한 사용자를 범위로 남김 | 그 기록의 범위 검색 | 범위 둘이 반환된다 |
+| 범위 하나를 읽을 수 있는 사용자가 검색한다 | 같은 기록, 범위 프로젝트에만 읽기 권한 있음 | 그 기록의 범위 검색 | 범위 둘이 모두 반환된다 |
+| 대상 엔티티를 읽을 수 있는 사용자가 검색한다 | 같은 기록, 대상 프로젝트에만 읽기 권한 있음 | 그 기록의 범위 검색 | 범위 둘이 반환된다 |
+| 실행한 사용자를 읽을 수 있는 사용자가 검색한다 | 같은 기록, 실행한 사용자에만 읽기 권한 있음 | 그 기록의 범위 검색 | 범위 둘이 반환된다 |
+| 범위를 남기지 않은 기록을 검색한다 | 범위 없이 한 프로젝트에 대한 기록, 그 프로젝트에 읽기 권한 있음 | 그 기록의 범위 검색 | 빈 페이지 |
+| 범위 종류 조건으로 검색한다 | 같은 기록, 슈퍼관리자 | 프로젝트 종류만 지정해 검색 | 프로젝트 범위만 반환된다 |
+| 범위 식별자 조건으로 검색한다 | 같은 기록, 슈퍼관리자 | 범위 하나의 식별자를 지정해 검색 | 그 범위만 반환된다 |
+| 소유자를 하나도 읽을 수 없는 사용자가 검색한다 | 같은 기록, 권한 없음 | 그 기록의 범위 검색 | 권한 부족으로 거부 |
+| 모니터 역할 사용자가 권한 없이 검색한다 | 같은 기록, 모니터 역할, 권한 없음 | 그 기록의 범위 검색 | 권한 부족으로 거부 |
+| 없는 기록을 검색한다 | 슈퍼관리자 | 어느 기록에도 해당하지 않는 id로 범위 검색 | 찾을 수 없음으로 거부 |
+| 권한 검사를 끄면 권한 없이도 검색한다 | 같은 기록, 권한 검사 비활성화, 권한 없음 | 그 기록의 범위 검색 | 범위 둘이 반환된다 |
+
+기록을 읽을 수 있으면 그 기록의 범위는 모두 읽는다. 범위 하나를 통해 기록에 닿았더라도, 그 기록에
+남은 다른 범위까지 반환된다. 범위 행에는 권한 검사가 따로 없다.
+
+권한은 여러 id 조회와 같은 기준으로 검사한다. 기록 하나만 지정하므로 부분 성공은 없고, 소유자 중
+아무것도 읽을 수 없으면 요청이 거부된다.
+
+모니터 역할 사용자는 여기서 통과하지 않는다. 전체 검색과 달리 이 검색은 권한 그래프를 검사한다.
+
 ## 아직 적지 않은 것
 
 어느 시나리오도 호출하지 않는 어댑터 호출이다. 실행 결과가 이 목록을 함께 출력한다.
 
-`admin_search`, `batch_load_by_ids`, `scoped_search`는 모두 위에 있다. `batch_load_fields`는 상위 어댑터에서 상속한 제네릭 필드
+`admin_search`, `batch_load_by_ids`, `scoped_search`, `search_scopes`는 모두 위에 있다. `batch_load_fields`는 상위 어댑터에서 상속한 제네릭 필드
 로더로, 이 엔티티가 호출하지 않는다.

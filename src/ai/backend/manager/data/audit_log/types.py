@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta
 
 from ai.backend.common.data.entity.action import ActionID
-from ai.backend.common.data.entity.audit_log import AuditLogID
+from ai.backend.common.data.entity.audit_log import AuditLogID, AuditLogScopeID
 from ai.backend.common.data.entity.types import FieldData
 from ai.backend.manager.actions.types import ActionKind, OperationStatus
 
@@ -27,7 +27,7 @@ class AuditLogData(FieldData):
     created_at: datetime
     description: str
     status: OperationStatus
-    target_entity_id: str | None
+    target_entity_id: uuid.UUID | None
     lookup_kind: str | None
     lookup_key: str | None
     request_id: str | None
@@ -51,6 +51,7 @@ class AuditLogListResult:
 class AuditLogScopeData(FieldData):
     """One scope an audited run covered."""
 
+    id: AuditLogScopeID
     audit_log_id: AuditLogID
     scope_type: str
-    scope_id: str
+    scope_id: uuid.UUID

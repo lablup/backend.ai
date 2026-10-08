@@ -112,6 +112,6 @@ class TestSeedScopedAuditRecord[Owner](TestSeedFieldWithNestedRows[Owner, AuditL
     @override
     def nested(self) -> Sequence[NestedFieldCreator[Any, Any, Any]]:
         return [
-            AuditLogScopeCreator(scope_type=str(scope_type), scope_id=scope_id)
+            AuditLogScopeCreator(scope_type=scope_type, scope_id=scope_id)
             for scope_type, scope_id in self.scopes
         ]

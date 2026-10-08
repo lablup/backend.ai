@@ -39,6 +39,7 @@ from sqlalchemy.types import CHAR, SchemaType, TypeDecorator, TypeEngine, Unicod
 from ai.backend.common import validators as tx
 from ai.backend.common.auth import PublicKey
 from ai.backend.common.data.entity.deployment import DeploymentID
+from ai.backend.common.data.entity.types import EntityType
 from ai.backend.common.exception import InvalidIpAddressValue
 from ai.backend.common.types import (
     AbstractPermission,
@@ -1026,6 +1027,25 @@ class SecretColumn(TypeDecorator[SecretValue]):
         if value is None:
             return None
         return SecretValue.parse(value)
+
+
+class EntityTypeColumn(TypeDecorator[EntityType]):
+    """A string column read back as an :class:`EntityType`."""
+
+    impl = sa.String
+    cache_ok = True
+
+    @override
+    def process_bind_param(self, value: Any | None, _dialect: Dialect) -> str | None:
+        if value is None:
+            return None
+        return str(value)
+
+    @override
+    def process_result_value(self, value: Any | None, _dialect: Dialect) -> EntityType | None:
+        if value is None:
+            return None
+        return EntityType(value)
 
 
 class SlugType(TypeDecorator[str]):

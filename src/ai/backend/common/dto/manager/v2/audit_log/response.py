@@ -14,8 +14,20 @@ from .types import AuditLogActionKind, AuditLogStatus
 
 __all__ = (
     "AuditLogNode",
+    "AuditLogScopeEntryNode",
+    "SearchAuditLogScopesPayload",
     "SearchAuditLogsPayload",
 )
+
+
+class AuditLogScopeEntryNode(BaseResponseModel):
+    """A scope an audited run covered."""
+
+    id: UUID = Field(description="Audit log scope entry ID")
+    field_id: UUID = Field(description="UUID of the audit log scope record.")
+    audit_log_id: UUID = Field(description="ID of the audit log the scope belongs to.")
+    scope_type: str = Field(description="Entity type of the scope.")
+    scope_id: UUID = Field(description="ID of the scope entity.")
 
 
 class AuditLogNode(BaseResponseModel):
@@ -58,7 +70,18 @@ class AuditLogNode(BaseResponseModel):
         ),
     )
     operation: str = Field(description="Operation performed")
-    entity_id: str | None = Field(default=None, description="ID of the affected entity")
+    entity_id: str | None = Field(
+        default=None,
+        description=(
+            f"ID of the affected entity. Deprecated since {NEXT_RELEASE_VERSION}; use "
+            "`target_entity_id`, which carries the id as a UUID."
+        ),
+        deprecated=True,
+    )
+    target_entity_id: UUID | None = Field(
+        default=None,
+        description=f"Added in {NEXT_RELEASE_VERSION}. ID of the affected entity.",
+    )
     created_at: datetime = Field(description="Timestamp when the audit log was created")
     request_id: str | None = Field(default=None, description="Request ID that triggered this")
     triggered_by: str | None = Field(
@@ -88,6 +111,15 @@ class SearchAuditLogsPayload(BaseResponseModel):
     """Payload for audit log search result."""
 
     items: list[AuditLogNode] = Field(description="Audit log list")
+    total_count: int = Field(description="Total count")
+    has_next_page: bool = Field(description="Whether a next page exists")
+    has_previous_page: bool = Field(description="Whether a previous page exists")
+
+
+class SearchAuditLogScopesPayload(BaseResponseModel):
+    """Payload for the scope search of one audit log."""
+
+    items: list[AuditLogScopeEntryNode] = Field(description="Scope list")
     total_count: int = Field(description="Total count")
     has_next_page: bool = Field(description="Whether a next page exists")
     has_previous_page: bool = Field(description="Whether a previous page exists")

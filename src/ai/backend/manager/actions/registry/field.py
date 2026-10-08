@@ -30,11 +30,14 @@ from ai.backend.manager.actions.v2.field.bulk_base import BasePartialBulkFieldAc
 from ai.backend.manager.actions.v2.field.bulk_processor import (
     OwnerBulkLookupProcessor,
     PartialBulkFieldActionProcessor,
+    PartialBulkOwnerCandidatesFieldActionProcessor,
 )
 from ai.backend.manager.actions.v2.field.ops import (
     DeleteFieldOpsAction,
     GetFieldOpsAction,
+    NestedFieldSearchOpsAction,
     PartialBulkGetFieldOpsAction,
+    PartialBulkGetOwnerCandidatesFieldOpsAction,
     PartialBulkPurgeFieldOpsAction,
     PurgeFieldOpsAction,
     RestoreFieldOpsAction,
@@ -42,6 +45,7 @@ from ai.backend.manager.actions.v2.field.ops import (
     UpdateFieldOpsAction,
 )
 from ai.backend.manager.actions.v2.field.processor import (
+    NestedFieldSearchActionProcessor,
     OwnerLookupProcessor,
     SingleFieldActionProcessor,
 )
@@ -79,12 +83,14 @@ from ai.backend.manager.actions.v2.single_entity.processor import (
     SingleEntityActionProcessor,
 )
 from ai.backend.manager.actions.v2.single_entity.validator.base import SingleEntityActionValidator
+from ai.backend.manager.repositories.ops.repository import OpsRepository
 from ai.backend.manager.services.ops.service import (
     BulkOwnedFieldGetService,
     DeleteService,
     FieldAtomicCreateService,
     FieldCreateService,
     FieldGetService,
+    FieldOwnerCandidatesService,
     FieldPartialBulkGetService,
     FieldPartialBulkPurgeService,
     FieldPurgeService,
@@ -527,4 +533,64 @@ class LookupFieldGroup[TFieldData: FieldData](FieldGroup[TFieldData]):
             self._partial_bulk_owner_lookup,
             monitors=(*self._deps.monitors.bulk, *monitors),
             partial_validators=(*self._deps.validators.partial_bulk, *validators),
+        )
+
+
+class OwnerCandidatesFieldGroup[TFieldData: FieldData](FieldGroup[TFieldData]):
+    """The operations that name rows of a field kind belonging to several owners at once.
+
+    Every operation reads the named rows' owners first and reaches a row through any one
+    of them. The owners are declared once, on the group.
+    """
+
+    _owner_candidates: FieldOwnerCandidatesService
+
+    def __init__(
+        self,
+        deps: ProcessorDependencies[Any],
+        records: list[WiredProcessor],
+        concern: str,
+        meta: FieldGroupMeta,
+        owner_entity_type: EntityType,
+        owner_candidates: FieldOwnerCandidatesService,
+    ) -> None:
+        super().__init__(deps, records, concern, meta, owner_entity_type)
+        self._owner_candidates = owner_candidates
+
+    def partial_bulk_get_ops[TAction: PartialBulkGetOwnerCandidatesFieldOpsAction[Any, Any, Any]](
+        self,
+        action_cls: type[TAction],
+        *,
+        validators: Sequence[PartialBulkActionValidator] = (),
+        monitors: Sequence[BulkActionMonitor] = (),
+    ) -> PartialBulkOwnerCandidatesFieldActionProcessor[TAction, TFieldData]:
+        """Read the rows the caller named, each reached through any one of its owners."""
+        self._record(action_cls, ActionKind.BULK, ActionGate.PERMISSION, ActionBacking.GENERIC)
+        return PartialBulkOwnerCandidatesFieldActionProcessor(
+            FieldPartialBulkGetService(self._deps.repository).execute,
+            self._owner_candidates.execute,
+            monitors=(*self._deps.monitors.bulk, *monitors),
+            partial_validators=(*self._deps.validators.partial_bulk, *validators),
+        )
+
+    def nested_field_search_ops[
+        TAction: NestedFieldSearchOpsAction[Any, Any, Any],
+        TNestedData,
+    ](
+        self,
+        action_cls: type[TAction],
+        nested_data_cls: type[TNestedData],
+        *,
+        validators: Sequence[PartialBulkActionValidator] = (),
+        monitors: Sequence[BulkActionMonitor] = (),
+    ) -> NestedFieldSearchActionProcessor[TAction, ScopedFieldsOpsResult[TNestedData]]:
+        """A page of the rows nested under one row of this kind, reached through any one of
+        that row's owners."""
+        self._record(action_cls, ActionKind.BULK, ActionGate.PERMISSION, ActionBacking.GENERIC)
+        nested_repository: OpsRepository[TNestedData] = self._deps.repository
+        return NestedFieldSearchActionProcessor(
+            SearchFieldsService(nested_repository).execute,
+            self._owner_candidates.execute,
+            monitors=(*self._deps.monitors.bulk, *monitors),
+            validators=(*self._deps.validators.partial_bulk, *validators),
         )

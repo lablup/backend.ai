@@ -2526,7 +2526,20 @@
               }
             ],
             "default": null,
-            "description": "Entity ID filter"
+            "deprecated": true,
+            "description": "Entity ID filter. Deprecated since 26.10.0; use `target_entity_id`, which matches the id as a UUID."
+          },
+          "target_entity_id": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/UUIDFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Added in 26.10.0. Entity ID filter."
           },
           "operation": {
             "anyOf": [
@@ -2908,6 +2921,180 @@
           }
         },
         "title": "AdminSearchAuditLogsInput",
+        "type": "object"
+      },
+      "AuditLogScopeFilter": {
+        "description": "Filter for the scopes of an audit log.",
+        "properties": {
+          "scope_type": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/StringFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Scope type filter"
+          },
+          "scope_id": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/UUIDFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Scope ID filter"
+          }
+        },
+        "title": "AuditLogScopeFilter",
+        "type": "object"
+      },
+      "AuditLogScopeOrder": {
+        "description": "Ordering specification for the scopes of an audit log.",
+        "properties": {
+          "field": {
+            "$ref": "#/components/schemas/AuditLogScopeOrderField"
+          },
+          "direction": {
+            "$ref": "#/components/schemas/OrderDirection",
+            "default": "ASC"
+          }
+        },
+        "required": [
+          "field"
+        ],
+        "title": "AuditLogScopeOrder",
+        "type": "object"
+      },
+      "AuditLogScopeOrderField": {
+        "description": "Fields available for ordering the scopes of an audit log.",
+        "enum": [
+          "scope_type",
+          "scope_id"
+        ],
+        "title": "AuditLogScopeOrderField",
+        "type": "string"
+      },
+      "SearchAuditLogScopesInput": {
+        "description": "Input for searching the scopes of one audit log.",
+        "properties": {
+          "filter": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AuditLogScopeFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter criteria"
+          },
+          "order": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/AuditLogScopeOrder"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Sort order",
+            "title": "Order"
+          },
+          "first": {
+            "anyOf": [
+              {
+                "minimum": 1,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Cursor-forward page size",
+            "title": "First"
+          },
+          "after": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Cursor-forward start cursor",
+            "title": "After"
+          },
+          "last": {
+            "anyOf": [
+              {
+                "minimum": 1,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Cursor-backward page size",
+            "title": "Last"
+          },
+          "before": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Cursor-backward end cursor",
+            "title": "Before"
+          },
+          "limit": {
+            "anyOf": [
+              {
+                "minimum": 1,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Offset-based page size",
+            "title": "Limit"
+          },
+          "offset": {
+            "anyOf": [
+              {
+                "minimum": 0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Offset-based page offset",
+            "title": "Offset"
+          }
+        },
+        "title": "SearchAuditLogScopesInput",
         "type": "object"
       },
       "EntityTarget": {
@@ -47666,6 +47853,44 @@
         },
         "parameters": [],
         "description": "Search audit logs with admin scope.\n\n**Preconditions:**\n* Superadmin privilege required.\n"
+      }
+    },
+    "/v2/audit-logs/{audit_log_id}/scopes/search": {
+      "post": {
+        "operationId": "v2/audit-logs.search_audit_log_scopes",
+        "tags": [
+          "v2/audit-logs"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SearchAuditLogScopesInput"
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "audit_log_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "description": "Search the scopes one audit log recorded.\n\n**Preconditions:**\n* User privilege required.\n"
       }
     },
     "/v2/entity-labels": {
