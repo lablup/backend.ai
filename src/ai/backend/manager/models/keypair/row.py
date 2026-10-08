@@ -31,7 +31,6 @@ from ai.backend.manager.secret.types import SecretValue
 if TYPE_CHECKING:
     from ai.backend.manager.models.resource_group.row import ResourceGroupForKeypairsRow
     from ai.backend.manager.models.resource_policy.row import KeyPairResourcePolicyRow
-    from ai.backend.manager.models.user.row import UserRow
 
 __all__: Sequence[str] = (
     "KEYPAIR_SECRET_KEY_CONTEXT",
@@ -111,9 +110,6 @@ class KeyPairRow(LifecycleTimestampsMixin, Base):
     resource_policy_row: Mapped[KeyPairResourcePolicyRow] = relationship("KeyPairResourcePolicyRow")
     sgroup_for_keypairs_rows: Mapped[list[ResourceGroupForKeypairsRow]] = relationship(
         "ResourceGroupForKeypairsRow",
-    )
-    user_row: Mapped[UserRow] = relationship(
-        "UserRow", back_populates="keypairs", foreign_keys=[user]
     )
 
 
