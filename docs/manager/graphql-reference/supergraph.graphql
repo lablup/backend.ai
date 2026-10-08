@@ -5562,8 +5562,10 @@ input CreateVFolderInScopeInput
   """Usage mode of the vfolder."""
   usageMode: VFolderUsageMode! = GENERAL
 
-  """Default mount permission of the vfolder."""
-  permission: VFolderMountPermission! = READ_WRITE
+  """
+  Default mount permission of the vfolder. The folder type's default when omitted.
+  """
+  permission: VFolderMountPermission = null
 
   """Whether the vfolder is cloneable."""
   cloneable: Boolean! = false
@@ -5585,8 +5587,10 @@ input CreateVFolderV2Input
   """Usage mode of the vfolder (general, model, data)."""
   usageMode: String! = "general"
 
-  """Default permission of the vfolder (ro, rw, wd)."""
-  permission: String! = "rw"
+  """
+  Default permission of the vfolder (ro, rw, wd). The folder type's default when omitted.
+  """
+  permission: String = null
 
   """Whether the vfolder is cloneable."""
   cloneable: Boolean! = false
