@@ -1,0 +1,3 @@
+const __vite__mapDeps=(i,m=__vite__mapDeps,d=(m.f||(m.f=["assets/EduAppLauncher-BeAps1Sd.js","assets/index-BEtVe_s6.js","assets/index-Bo67L5aK.css"])))=>i.map(i=>d[i]);
+import{j as s,eM as c,l as p,i,hX as u,c0 as l,d$ as d}from"./index-BEtVe_s6.js";const x=l.lazy(()=>d(()=>import("./EduAppLauncher-BeAps1Sd.js"),__vite__mapDeps([0,1,2]))),j=({sToken:a,extraParams:e})=>s.jsxs(s.Fragment,{children:[s.jsx(c,{}),s.jsx(p.Suspense,{fallback:null,children:s.jsx(m,{sToken:a,extraParams:e})})]}),m=a=>{"use memo";const e=i.c(4),{sToken:n,extraParams:r}=a,o=u();let t;return e[0]!==o||e[1]!==r||e[2]!==n?(t=s.jsx(x,{apiEndpoint:o,active:!0,sToken:n,extraParams:r}),e[0]=o,e[1]=r,e[2]=n,e[3]=t):t=e[3],t};export{j as default};
+//# sourceMappingURL=EduAppLauncherPage-COnATtGN.js.map
