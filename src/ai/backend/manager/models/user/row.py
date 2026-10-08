@@ -33,8 +33,7 @@ from ai.backend.manager.models.base import (
     EnumValueType,
     IPColumn,
 )
-from ai.backend.manager.models.hasher.factory import PasswordHasherFactory
-from ai.backend.manager.models.hasher.types import HashInfo, PasswordColumn
+from ai.backend.manager.models.hasher.types import PasswordColumn
 from ai.backend.manager.models.mixins.timestamp import LifecycleTimestampsMixin
 
 if TYPE_CHECKING:
@@ -52,7 +51,6 @@ __all__: Sequence[str] = (
     "UserRole",  # For compatibility with existing code
     "UserRow",
     "UserStatus",  # For compatibility with existing code
-    "compare_to_hashed_password",
     "users",
 )
 
@@ -206,17 +204,3 @@ class UserRow(LifecycleTimestampsMixin, Base):
 
 # For compatibility
 users = UserRow.__table__
-
-
-def _verify_password(guess: str, hashed: str) -> bool:
-    """Verify a password against a hashed password."""
-    hash_info = HashInfo.from_hash_string(hashed)
-    hasher = PasswordHasherFactory.get_hasher(hash_info.algorithm)
-    return hasher.verify(guess, hash_info)
-
-
-def compare_to_hashed_password(raw_password: str, hashed_password: str) -> bool:
-    """
-    Compare a raw string password value to hashed password.
-    """
-    return _verify_password(raw_password, hashed_password)
