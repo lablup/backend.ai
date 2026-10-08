@@ -71,6 +71,9 @@ from ai.backend.manager.models.vfolder.row import (
     vfolders,
 )
 from ai.backend.manager.models.virtual_entity.queries import user_scope_membership_query
+from ai.backend.manager.services.vfolder.actions.bulk_load_mount_levels import (
+    BulkLoadVFolderMountLevelsAction,
+)
 
 # Re-export for backward compatibility
 __all__ = (
@@ -243,6 +246,34 @@ class VirtualFolderNode(graphene.ObjectType):  # type: ignore[misc]
         except ParserError:
             return cast(datetime, self.created_at)
 
+    async def resolve_permission(self, info: graphene.ResolveInfo) -> str | None:
+        if self.row_id is None:
+            return None
+        graph_ctx: GraphQueryContext = info.context
+        loader = graph_ctx.dataloader_manager.get_loader_by_func(
+            graph_ctx, VirtualFolderNode.batch_load_mount_levels
+        )
+        level: str | None = await loader.load(self.row_id)
+        return level
+
+    @classmethod
+    async def batch_load_mount_levels(
+        cls,
+        graph_ctx: GraphQueryContext,
+        vfolder_ids: Sequence[uuid.UUID],
+    ) -> list[str | None]:
+        """The mount level the caller gets on each folder, null where they get none."""
+        result = await graph_ctx.processors.vfolder.bulk_load_mount_levels.run(
+            BulkLoadVFolderMountLevelsAction(
+                vfolder_ids=[VFolderUUID(vfolder_id) for vfolder_id in vfolder_ids]
+            )
+        )
+        levels = result.values()
+        return [
+            _legacy_permission(levels.get(VFolderUUID(vfolder_id), VFolderMountPolicy.NONE))
+            for vfolder_id in vfolder_ids
+        ]
+
     @classmethod
     def from_row(
         cls,
@@ -264,7 +295,6 @@ class VirtualFolderNode(graphene.ObjectType):  # type: ignore[misc]
             creator=row.creator,
             unmanaged_path=row.unmanaged_path or None,
             usage_mode=row.usage_mode,
-            permission=_legacy_permission(row.default_mount_permission),
             ownership_type=row.ownership_type,
             max_files=row.max_files,
             max_size=row.max_size,  # in B
@@ -869,7 +899,6 @@ class VirtualFolder(graphene.ObjectType):  # type: ignore[misc]
                     domain_name=row.domain_name,
                     unmanaged_path=row.unmanaged_path or None,
                     usage_mode=row.usage_mode,
-                    permission=_legacy_permission(row.default_mount_permission),
                     ownership_type=row.ownership_type,
                     max_files=row.max_files,
                     max_size=row.max_size,  # in MiB
@@ -893,7 +922,6 @@ class VirtualFolder(graphene.ObjectType):  # type: ignore[misc]
                     domain_name=row.domain_name,
                     unmanaged_path=row.unmanaged_path or None,
                     usage_mode=row.usage_mode,
-                    permission=_legacy_permission(row.default_mount_permission),
                     ownership_type=row.ownership_type,
                     max_files=row.max_files,
                     max_size=row.max_size,  # in MiB
@@ -920,7 +948,6 @@ class VirtualFolder(graphene.ObjectType):  # type: ignore[misc]
             creator=row.creator,
             unmanaged_path=row.unmanaged_path or None,
             usage_mode=row.usage_mode,
-            permission=_legacy_permission(row.default_mount_permission),
             ownership_type=row.ownership_type,
             max_files=row.max_files,
             max_size=row.max_size,
@@ -930,6 +957,14 @@ class VirtualFolder(graphene.ObjectType):  # type: ignore[misc]
             status=row.status,
             cur_size=row.cur_size,
         )
+
+    async def resolve_permission(self, info: graphene.ResolveInfo) -> str | None:
+        graph_ctx: GraphQueryContext = info.context
+        loader = graph_ctx.dataloader_manager.get_loader_by_func(
+            graph_ctx, VirtualFolderNode.batch_load_mount_levels
+        )
+        level: str | None = await loader.load(self.id)
+        return level
 
     async def resolve_num_files(self, info: graphene.ResolveInfo) -> int:
         # TODO: measure on-the-fly

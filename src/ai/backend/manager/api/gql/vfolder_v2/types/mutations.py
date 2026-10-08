@@ -134,8 +134,12 @@ class CreateVFolderInputGQL(PydanticInputMixin[CreateInputDTO]):
     usage_mode: str = gql_field(
         default="general", description="Usage mode of the vfolder (general, model, data)."
     )
-    permission: str = gql_field(
-        default="rw", description="Default permission of the vfolder (ro, rw, wd)."
+    permission: str | None = gql_field(
+        default=None,
+        description=(
+            "Default permission of the vfolder (ro, rw, wd). "
+            "The folder type's default when omitted."
+        ),
     )
     cloneable: bool = gql_field(default=False, description="Whether the vfolder is cloneable.")
 
@@ -156,9 +160,11 @@ class CreateVFolderInScopeInputGQL(PydanticInputMixin[CreateInScopeInputDTO]):
     usage_mode: VFolderUsageModeGQL = gql_field(
         default=VFolderUsageModeGQL.GENERAL, description="Usage mode of the vfolder."
     )
-    permission: VFolderMountPermissionGQL = gql_field(
-        default=VFolderMountPermissionGQL.READ_WRITE,
-        description="Default mount permission of the vfolder.",
+    permission: VFolderMountPermissionGQL | None = gql_field(
+        default=None,
+        description=(
+            "Default mount permission of the vfolder. The folder type's default when omitted."
+        ),
     )
     cloneable: bool = gql_field(default=False, description="Whether the vfolder is cloneable.")
 
