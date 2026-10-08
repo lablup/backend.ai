@@ -189,7 +189,6 @@ class UserRow(LifecycleTimestampsMixin, Base):
     )
     keypairs: Mapped[list[KeyPairRow]] = relationship(
         "KeyPairRow",
-        back_populates="user_row",
         primaryjoin=_get_keypairs_join_condition,
         foreign_keys="KeyPairRow.user",
     )
