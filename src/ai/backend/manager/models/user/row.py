@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import ipaddress
-import logging
 from collections.abc import Sequence
 from datetime import datetime
 from typing import (
@@ -23,7 +22,6 @@ from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.types import ReadableCIDR
-from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.model_serving.types import UserData as ModelServingUserData
 from ai.backend.manager.data.user.types import UserStatus
@@ -41,7 +39,6 @@ if TYPE_CHECKING:
     from ai.backend.manager.models.keypair.row import KeyPairRow
     from ai.backend.manager.models.resource_policy.row import UserResourcePolicyRow
 
-log = StructuredLogger(logging.getLogger(__spec__.name))
 
 __all__: Sequence[str] = (
     "ACTIVE_USER_STATUSES",
