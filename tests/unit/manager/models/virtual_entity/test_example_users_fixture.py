@@ -11,6 +11,7 @@ from typing import Any, Final
 
 import pytest
 import sqlalchemy as sa
+from sqlalchemy.ext.asyncio import AsyncConnection
 
 from ai.backend.common.data.entity.resource_group import ResourceGroupEntityType
 from ai.backend.common.data.permission.types import Permission
@@ -274,6 +275,39 @@ class TestExampleUsersScalingGroupReference:
         assert [node.entity_id for node in nodes] == [preexisting_id]
 
 
+async def _add_migrated_roster(conn: AsyncConnection) -> None:
+    """The shares `a91c4e7d0b35` leaves on a domain's model-store project: every user of
+    the domain, a share capped to read. The seed declares the same edges, under pinned
+    ids, so a load that does not reconcile the edge ids fails on the cap's foreign key."""
+    projects = (
+        sa.select(VirtualEntityRow.id)
+        .where(
+            VirtualEntityRow.entity_type == "project",
+            VirtualEntityRow.entity_id.in_(
+                sa.select(ProjectRow.id).where(ProjectRow.name == _MIGRATED_GROUP_NAME)
+            ),
+        )
+        .subquery()
+    )
+    users = sa.select(VirtualEntityRow.id).where(VirtualEntityRow.entity_type == "user").subquery()
+    membership_ids = list(
+        await conn.scalars(
+            sa.insert(EntityMembershipRow)
+            .from_select(
+                ["virtual_entity_id", "member_entity_id", "capped"],
+                sa.select(projects.c.id, users.c.id, sa.literal(True)),
+            )
+            .returning(EntityMembershipRow.id)
+        )
+    )
+    await conn.execute(
+        sa.insert(EntityMembershipCapRow).values([
+            {"membership_id": membership_id, "permission": Permission.READ, "all_fields": True}
+            for membership_id in membership_ids
+        ])
+    )
+
+
 class TestExampleUsersGraphOnAMigratedDatabase:
     """A database an earlier install seeded holds its accounts, its projects and the
     graph the migration built for them, under ids that database minted. The seed
@@ -306,10 +340,10 @@ class TestExampleUsersGraphOnAMigratedDatabase:
     async def migrated_database(
         self, db_engine: ExtendedAsyncSAEngine, seed: dict[str, Any]
     ) -> ExtendedAsyncSAEngine:
-        """What the earlier install wrote: its account and project rows, the domain, the
-        scaling group and the migration's own `model-store` project under ids this
-        database minted, and the graph nodes the migration built for them. Its users were
-        backfilled to the id its own domain row carries."""
+        """What the earlier install wrote: the accounts and projects, the domain, the
+        scaling group and the migration's `model-store` project under ids the database
+        minted, its users backfilled to that domain id, and the graph the migration built
+        for them — the model-store roster included."""
         earlier = copy.deepcopy({key: seed[key] for key in _MIGRATED_TABLES})
         for table in ("domains", "scaling_groups"):
             earlier[table][0].pop("id")
@@ -334,6 +368,7 @@ class TestExampleUsersGraphOnAMigratedDatabase:
         await populate_fixture(db_engine, {"groups": minted})
         async with db_engine.begin() as conn:
             await provision_fixture_entities(conn, _MIGRATED_ENTITIES)
+            await _add_migrated_roster(conn)
         return db_engine
 
     async def test_the_seed_lands_on_the_rows_and_nodes_the_database_holds(

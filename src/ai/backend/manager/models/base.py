@@ -1293,10 +1293,9 @@ async def populate_fixture(
         await provision_fixture_entities(conn, fixture_data.keys())
 
 
-# Each table a fixture declares an id for, keyed by what makes each row the row it is: a
-# database that already holds the row says which id it carries, and the fixture's insert is
-# skipped on the conflict, leaving every value naming the fixture's id pointing nowhere.
-# Ordered by dependency: an entity's row, the node naming it, then an edge between nodes.
+# Each table a fixture declares an id for, keyed by what makes each row the row it is: the
+# database that already holds the row says which id it carries. Ordered by dependency — an
+# entity's row, the node naming it, then an edge between nodes.
 _FIXTURE_ID_KEYS: Final[tuple[tuple[str, str, tuple[str, ...]], ...]] = (
     ("domains", "id", ("name",)),
     ("scaling_groups", "id", ("name",)),
