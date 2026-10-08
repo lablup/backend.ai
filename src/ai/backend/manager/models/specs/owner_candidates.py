@@ -8,7 +8,7 @@ from collections.abc import Sequence
 
 import sqlalchemy as sa
 
-from ai.backend.common.data.entity.types import FieldIdentifier
+from ai.backend.common.data.entity.types import EntityType, FieldIdentifier
 
 __all__ = ("FieldOwnerCandidates",)
 
@@ -22,7 +22,7 @@ class FieldOwnerCandidates[TFieldID: FieldIdentifier](ABC):
     @abstractmethod
     def owners_of(
         self, field_ids: Sequence[TFieldID]
-    ) -> Sequence[sa.sql.Select[tuple[TFieldID, uuid.UUID, str]]]:
-        """One query per kind of owner, each selecting a named row's id, an owner's id and
-        that owner's entity type."""
+    ) -> Sequence[sa.sql.Select[tuple[TFieldID, uuid.UUID, EntityType]]]:
+        """One query per kind of owner; a row is (field row id, owner entity id, owner
+        entity type)."""
         raise NotImplementedError

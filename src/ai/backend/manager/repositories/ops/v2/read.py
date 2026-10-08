@@ -165,7 +165,7 @@ class V2ReadOps(V2GraphReadOpsBase):
         rows = (await self._sess.execute(query)).all()
         owners: dict[FieldIdentifier, list[RuntimeEntityID]] = {}
         for field_id, owner_id, owner_type in rows:
-            owner = RuntimeEntityID(EntityType(owner_type), owner_id)
+            owner = RuntimeEntityID(owner_type, owner_id)
             found = owners.setdefault(field_id, [])
             if owner not in found:
                 found.append(owner)
