@@ -1,7 +1,9 @@
 """Runs the permission-scope drop's pre-checks against a real database.
 
-A folder share granted the invitee's role a row scoped to the folder. Those rows are
-dropped before the check that stops on rows disagreeing with their role's scope.
+A folder share granted the invitee's role a row scoped to the folder, and the session app
+service migration granted a session's creator and its project's admins a row scoped to the
+session. Those rows are dropped before the check that stops on rows disagreeing with their
+role's scope.
 """
 
 from __future__ import annotations
@@ -18,6 +20,7 @@ from ai.backend.manager.data.permission.status import RoleStatus
 from ai.backend.manager.data.permission.types import RoleSource
 from ai.backend.manager.models.alembic.versions.c092d242a027_drop_the_scope_from_permission_rows import (
     drop_folder_share_grants,
+    drop_session_app_service_grants,
     refuse_rows_disagreeing_with_their_role,
 )
 from ai.backend.manager.models.base import GUID
@@ -83,7 +86,11 @@ async def user_role(db: ExtendedAsyncSAEngine) -> tuple[uuid.UUID, uuid.UUID]:
 
 
 async def _grant(
-    db: ExtendedAsyncSAEngine, role_id: uuid.UUID, scope_type: str, scope_id: uuid.UUID
+    db: ExtendedAsyncSAEngine,
+    role_id: uuid.UUID,
+    scope_type: str,
+    scope_id: uuid.UUID,
+    entity_type: str,
 ) -> None:
     async with db.begin() as conn:
         await conn.execute(
@@ -91,7 +98,7 @@ async def _grant(
                 role_id=role_id,
                 scope_type=scope_type,
                 scope_id=str(scope_id),
-                entity_type="vfolder",
+                entity_type=entity_type,
                 permission=1,
             )
         )
@@ -110,6 +117,7 @@ async def _scopes(db: ExtendedAsyncSAEngine, role_id: uuid.UUID) -> set[tuple[st
 async def _drop_and_check(db: ExtendedAsyncSAEngine) -> None:
     async with db.begin() as conn:
         await conn.run_sync(drop_folder_share_grants)
+        await conn.run_sync(drop_session_app_service_grants)
         await conn.run_sync(refuse_rows_disagreeing_with_their_role)
 
 
@@ -119,8 +127,8 @@ class TestDropFolderShareGrants:
     ) -> None:
         role_id, user_id = user_role
         folder_id = uuid.uuid4()
-        await _grant(db, role_id, "user", user_id)
-        await _grant(db, role_id, "vfolder", folder_id)
+        await _grant(db, role_id, "user", user_id, entity_type="vfolder")
+        await _grant(db, role_id, "vfolder", folder_id, entity_type="vfolder")
 
         await _drop_and_check(db)
 
@@ -130,7 +138,31 @@ class TestDropFolderShareGrants:
         self, db: ExtendedAsyncSAEngine, user_role: tuple[uuid.UUID, uuid.UUID]
     ) -> None:
         role_id, _ = user_role
-        await _grant(db, role_id, "project", uuid.uuid4())
+        await _grant(db, role_id, "project", uuid.uuid4(), entity_type="vfolder")
 
         with pytest.raises(RuntimeError):
             await _drop_and_check(db)
+
+
+class TestDropSessionAppServiceGrants:
+    async def test_a_session_grant_goes_and_the_check_passes(
+        self, db: ExtendedAsyncSAEngine, user_role: tuple[uuid.UUID, uuid.UUID]
+    ) -> None:
+        role_id, user_id = user_role
+        session_id = uuid.uuid4()
+        await _grant(db, role_id, "user", user_id, entity_type="vfolder")
+        await _grant(db, role_id, "session", session_id, entity_type="session:app_service")
+
+        await _drop_and_check(db)
+
+        assert await _scopes(db, role_id) == {("user", str(user_id))}
+
+    async def test_a_grant_in_the_role_s_own_scope_stays(
+        self, db: ExtendedAsyncSAEngine, user_role: tuple[uuid.UUID, uuid.UUID]
+    ) -> None:
+        role_id, user_id = user_role
+        await _grant(db, role_id, "user", user_id, entity_type="session:app_service")
+
+        await _drop_and_check(db)
+
+        assert await _scopes(db, role_id) == {("user", str(user_id))}

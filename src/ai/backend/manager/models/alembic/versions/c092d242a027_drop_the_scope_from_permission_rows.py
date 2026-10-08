@@ -7,7 +7,10 @@ unique constraint over them, and keys the rows on ``(role_id, entity_type, permi
 A row naming a scope other than its role's would lose that scope silently, so the
 migration counts those first and stops when it finds any. A folder share granted the
 invitee's role rows scoped to the folder; those are dropped before the count, since the
-share is carried from ``vfolder_permissions`` later in the chain.
+share is carried from ``vfolder_permissions`` later in the chain. ``3632aad9d5d9`` granted
+a session's creator and its project's admins read on that session's app service, scoped to
+the session; those are dropped too, since ``f4a1c9d20b73`` retires the entity type and the
+session answers for it.
 
 Create Date: 2026-09-09
 
@@ -48,6 +51,21 @@ def drop_folder_share_grants(conn: sa.engine.Connection) -> None:
     )
 
 
+def drop_session_app_service_grants(conn: sa.engine.Connection) -> None:
+    """Drop the rows granting read on a session's app service: scoped to the session, on a
+    role sitting in another scope."""
+    conn.execute(
+        sa.text("""
+            DELETE FROM permissions p
+            USING roles r
+            WHERE r.id = p.role_id
+              AND p.entity_type = 'session:app_service'
+              AND (p.scope_type IS DISTINCT FROM r.scope_type
+                   OR p.scope_id IS DISTINCT FROM CAST(r.scope_id AS text))
+        """)
+    )
+
+
 def refuse_rows_disagreeing_with_their_role(conn: sa.engine.Connection) -> None:
     """Stop when a permission row names a scope other than the one its role sits in.
 
@@ -76,6 +94,7 @@ def refuse_rows_disagreeing_with_their_role(conn: sa.engine.Connection) -> None:
 def upgrade() -> None:
     conn = op.get_bind()
     drop_folder_share_grants(conn)
+    drop_session_app_service_grants(conn)
     refuse_rows_disagreeing_with_their_role(conn)
     op.drop_constraint("uq_permissions_role_scope_entity_permission", "permissions", type_="unique")
     op.drop_index("ix_permissions_role_scope", table_name="permissions")
