@@ -620,11 +620,13 @@ def _set_unauthenticated_state(request: web.Request) -> None:
     request["user"] = None
 
 
-#: Statuses whose owner may not authenticate: the account is gone or a purge is
-#: working through it. This is what keeps a soft-deleted user's keypairs from
-#: reaching the API — the delete no longer deactivates them.
+#: Statuses whose owner may not authenticate: the ones login rejects, plus a purge
+#: working through the account. Deactivating or deleting a user leaves its keypairs
+#: active, so this is what keeps them from reaching the API.
 _AUTH_DENIED_USER_STATUSES: Final = frozenset({
+    UserStatus.INACTIVE,
     UserStatus.DELETED,
+    UserStatus.BEFORE_VERIFICATION,
     *UserStatus.purge_in_progress(),
 })
 
