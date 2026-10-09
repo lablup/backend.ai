@@ -1739,7 +1739,22 @@ class ContainerConfig(CommonContainerConfig, OverridableContainerConfig):
     Complete container configuration (common + overridable).
     """
 
-    pass
+    dns: Annotated[
+        list[str] | None,
+        Field(default=None),
+        BackendAIConfigMeta(
+            description=(
+                "DNS nameserver addresses for containers. When empty (the default), the agent "
+                "derives them from the host's resolver configuration, dropping loopback "
+                "nameservers (a container's network namespace cannot reach the host's loopback, "
+                "so a systemd-resolved stub such as 127.0.0.53 is useless inside it) and reading "
+                "the systemd-resolved uplink file instead when one is present. Set this to pin "
+                "specific nameservers, e.g. an internal corporate resolver."
+            ),
+            added_version=NEXT_RELEASE_VERSION,
+            example=ConfigExample(local="", prod='["10.0.0.53", "10.0.0.54"]'),
+        ),
+    ]
 
 
 class ResourceAllocationConfig(BaseConfigSchema):
@@ -2287,6 +2302,17 @@ class AgentGlobalConfig(BaseConfigSchema):
             ),
             added_version="25.12.0",
             composite=CompositeType.FIELD,
+        ),
+    ]
+    cni: Annotated[
+        dict[str, dict[str, Any]] | None,
+        Field(default=None),
+        BackendAIConfigMeta(
+            description=(
+                "Node-local settings of each container-network (CNI) plugin, as one [cni.<plugin>] "
+                "table per plugin. The agent hands them to the plugin and reads none of them."
+            ),
+            added_version=NEXT_RELEASE_VERSION,
         ),
     ]
     plugins: Annotated[

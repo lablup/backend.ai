@@ -45,7 +45,7 @@ from typing import (
     cast,
     override,
 )
-from uuid import UUID
+from uuid import UUID, uuid4
 
 import aiotools
 import attrs
@@ -76,6 +76,15 @@ from ai.backend.agent.metrics.metric import (
     StatTaskObserver,
     SyncContainerLifecycleObserver,
 )
+from ai.backend.agent.network.advert import publish_backend
+from ai.backend.agent.network.cni import (
+    CNI_ARG_KERNEL_ID,
+    CNI_ARG_SESSION_ID,
+    CNI_IFNAME,
+    CniAttachment,
+)
+from ai.backend.agent.network.dns import resolve_container_dns
+from ai.backend.agent.plugin.cni import CniHostContext, CniPluginContext
 from ai.backend.agent.port_pool import PortPool
 from ai.backend.agent.tasks import (
     CleanupReportedKernelsTask,
@@ -299,6 +308,8 @@ DEAD_STATUS_SET = ContainerStatus.dead_set()
 
 COMMIT_STATUS_EXPIRE: Final[int] = 13
 EVENT_DISPATCHER_CONSUMER_GROUP: Final = "agent"
+#: How long a network plugin's STATUS may take before its silence counts as not serving.
+CNI_STATUS_TIMEOUT: Final[float] = 5.0
 STAT_COLLECTION_TIMEOUT: Final[float] = 10 * 60  # 10 minutes
 
 P = ParamSpec("P")
@@ -859,6 +870,7 @@ class AbstractAgent[
 
     stats_monitor: StatsPluginContext  # unused currently
     error_monitor: ErrorPluginContext  # unused in favor of produce_error_event()
+    cni_plugin_ctx: CniPluginContext
 
     background_task_manager: BackgroundTaskManager
 
@@ -867,6 +879,10 @@ class AbstractAgent[
     _ongoing_destruction_tasks: weakref.WeakValueDictionary[KernelId, asyncio.Task[Any]]
     _ongoing_model_service_tasks: set[asyncio.Task[None]]
     _metric_registry: CommonMetricRegistry
+    #: Changes on every start; fences what an earlier run of this agent id advertised.
+    _boot_id: str
+    #: False while the heartbeat is withheld for a `not_serving_reason`.
+    _announcing: bool
 
     # Health monitoring tracking
     _active_pulls: dict[str, PullTaskInfo]  # key: image canonical name
@@ -925,6 +941,8 @@ class AbstractAgent[
         self.etcd = etcd
         self.local_config = local_config
         self.id = AgentId(local_config.agent.defaulted_id)
+        self._boot_id = uuid4().hex
+        self._announcing = True
         self.local_instance_id = generate_local_instance_id(__file__)
         self.agent_class = agent_class
         self.agent_public_key = agent_public_key
@@ -967,6 +985,23 @@ class AbstractAgent[
         """
         self.resource_lock = asyncio.Lock()
         self.registry_lock = asyncio.Lock()
+        # Before any network plugin starts: a plugin's adverts are fenced on this run's boot id.
+        await publish_backend(
+            self.etcd, str(self.id), str(self.local_config.agent.backend), self._boot_id
+        )
+        # The container networks this agent can attach to; before the scan, which GCs them.
+        self.cni_plugin_ctx = CniPluginContext(
+            self.etcd, self.local_config.model_dump(by_alias=True)
+        )
+        await self.cni_plugin_ctx.init(
+            context=CniHostContext(
+                agent_id=str(self.id),
+                boot_id=self._boot_id,
+                runtime_backend=str(self.local_config.agent.backend),
+                etcd=self.etcd,
+                upstream_nameservers=self._container_nameservers,
+            )
+        )
         self.container_lifecycle_queue = asyncio.Queue()
 
         if self.local_config.redis is None:
@@ -1144,6 +1179,8 @@ class AbstractAgent[
         # Stop lifecycle event handler.
         await self.container_lifecycle_queue.put(_sentinel)
         await self.container_lifecycle_handler
+        # After the last lifecycle event: a CLEAN still in flight deletes through the plugins.
+        await self.cni_plugin_ctx.cleanup()
 
         # Notify the gateway.
         await self.anycast_event(AgentTerminatedEvent(reason="shutdown"))
@@ -1260,10 +1297,71 @@ class AbstractAgent[
             log.exception("kernel commit status report failed")
             return
 
+    async def _container_nameservers(self) -> Sequence[str]:
+        dns = await asyncio.to_thread(resolve_container_dns, self.local_config.container.dns or ())
+        return dns.nameservers
+
+    async def not_serving_reason(self) -> str | None:
+        """Why this node must not be offered work right now, or None when it may be.
+
+        A container-network plugin that cannot serve an ADD is one.
+        """
+        for name, plugin in self.cni_plugin_ctx.plugins.items():
+            try:
+                async with asyncio.timeout(CNI_STATUS_TIMEOUT):
+                    status = await plugin.status()
+            except TimeoutError:
+                return (
+                    f"the {name} network plugin did not answer its status in {CNI_STATUS_TIMEOUT}s"
+                )
+            except Exception as e:
+                return f"the {name} network plugin did not answer its status ({e})"
+            if status.not_ready_reason is not None:
+                return f"the {name} network plugin: {status.not_ready_reason}"
+        return None
+
+    async def _gc_container_networks(self) -> None:
+        """Tell each network plugin which containers still exist; it drops what it holds for others."""
+        valid = [
+            CniAttachment(
+                container_id=str(container.id),
+                ifname=CNI_IFNAME,
+                args={
+                    CNI_ARG_SESSION_ID: container.labels[LabelName.SESSION_ID],
+                    CNI_ARG_KERNEL_ID: str(kernel_id),
+                },
+            )
+            for kernel_id, container in await self.enumerate_containers(
+                ACTIVE_STATUS_SET | DEAD_STATUS_SET
+            )
+            if LabelName.SESSION_ID in container.labels
+        ]
+        for name, plugin in self.cni_plugin_ctx.plugins.items():
+            try:
+                await plugin.gc(valid)
+            except Exception:
+                log.exception("network plugin GC failed", plugin=name)
+
     async def heartbeat(self) -> None:
         """
         Send my status information and available kernel images to the manager(s).
+        Withheld, with a restarting event, while `not_serving_reason` gives a reason.
         """
+        reason = await self.not_serving_reason()
+        if reason is not None:
+            if self._announcing:
+                log.warning("not taking work until resolved", reason=reason)
+                try:
+                    await self.anycast_event(AgentTerminatedEvent(reason="agent-restart"))
+                except Exception:
+                    # Still announcing: the next tick sends it again.
+                    log.exception("could not tell the manager this node is not taking work")
+                    return
+                self._announcing = False
+            return
+        if not self._announcing:
+            self._announcing = True
+            log.info("taking work again")
         slot_key_and_units: dict[ResourceSlotName, SlotTypes] = {}
         res_slots: dict[SlotName, Decimal] = {}
         try:
@@ -2256,6 +2354,8 @@ class AbstractAgent[
                         self._iterate_batch_result(kernel_obj.kernel_id),
                     ),
                 )
+        # Before any lifecycle event runs: a CLEAN deletes from a plugin that must know the container.
+        await self._gc_container_networks()
         async with self.registry_lock:
             for kernel_id, container in await self.enumerate_containers(
                 ACTIVE_STATUS_SET | DEAD_STATUS_SET,

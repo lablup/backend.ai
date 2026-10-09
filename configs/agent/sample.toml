@@ -6,6 +6,11 @@
 #
 # Generated using BackendAIConfigMeta annotations.
 
+# Node-local settings of each container-network (CNI) plugin, as one
+# [cni.<plugin>] table per plugin. The agent hands them to the plugin and reads
+# none of them.
+# Added in 26.10.0
+## cni = {}
 
 # Agent-specific configuration including network settings, identity, and
 # operational modes. In multi-agent mode (when 'agents' field is populated),
@@ -374,6 +379,15 @@
   # should not normally be configured manually.
   # Added in 25.12.0
   ## krunner-volumes = { /opt/krunner = "/opt/backend.ai/krunner" }
+  # DNS nameserver addresses for containers. When empty (the default), the agent
+  # derives them from the host's resolver configuration, dropping loopback
+  # nameservers (a container's network namespace cannot reach the host's
+  # loopback, so a systemd-resolved stub such as 127.0.0.53 is useless inside
+  # it) and reading the systemd-resolved uplink file instead when one is
+  # present. Set this to pin specific nameservers, e.g. an internal corporate
+  # resolver.
+  # Added in 26.10.0
+  ## dns = ["10.0.0.53", "10.0.0.54"]
 
 # Resource allocation configuration including CPU, memory, and accelerator
 # device settings. In multi-agent mode (when 'agents' field is populated), this
