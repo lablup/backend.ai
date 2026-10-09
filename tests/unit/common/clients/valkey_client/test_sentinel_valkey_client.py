@@ -340,7 +340,7 @@ class TestMonitoringValkeyClientWithSentinel:
 
     # -- _reconnect --
 
-    async def test_reconnect_disconnects_and_reconnects_both_clients(
+    async def test_reconnect_replaces_both_clients_without_disconnecting_first(
         self,
         monitoring_client: MonitoringValkeyClient,
         mock_sentinel_operation_client: AsyncMock,
@@ -348,24 +348,24 @@ class TestMonitoringValkeyClientWithSentinel:
     ) -> None:
         await monitoring_client._reconnect()
 
-        mock_sentinel_monitor_client.disconnect.assert_called_once()
-        mock_sentinel_operation_client.disconnect.assert_called_once()
-        mock_sentinel_operation_client.connect.assert_called_once()
-        mock_sentinel_monitor_client.connect.assert_called_once()
+        mock_sentinel_operation_client.reconnect.assert_awaited_once()
+        mock_sentinel_monitor_client.reconnect.assert_awaited_once()
+        mock_sentinel_operation_client.disconnect.assert_not_called()
+        mock_sentinel_monitor_client.disconnect.assert_not_called()
 
-    async def test_reconnect_continues_even_if_disconnect_fails(
+    async def test_reconnect_leaves_monitor_client_alone_when_operation_reconnect_fails(
         self,
         monitoring_client: MonitoringValkeyClient,
         mock_sentinel_operation_client: AsyncMock,
         mock_sentinel_monitor_client: AsyncMock,
     ) -> None:
-        mock_sentinel_monitor_client.disconnect.side_effect = ConnectionError("Already closed")
-        mock_sentinel_operation_client.disconnect.side_effect = ConnectionError("Already closed")
+        mock_sentinel_operation_client.reconnect.side_effect = ConnectionError("unreachable")
 
-        await monitoring_client._reconnect()
+        with pytest.raises(ConnectionError):
+            await monitoring_client._reconnect()
 
-        mock_sentinel_operation_client.connect.assert_called_once()
-        mock_sentinel_monitor_client.connect.assert_called_once()
+        mock_sentinel_monitor_client.reconnect.assert_not_called()
+        mock_sentinel_monitor_client.disconnect.assert_not_called()
 
     # -- need_reconnect delegation --
 

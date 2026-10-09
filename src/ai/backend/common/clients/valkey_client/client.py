@@ -41,6 +41,7 @@ _DEFAULT_OPERATION_FAILURE_THRESHOLD: Final[int] = (
     10  # Number of consecutive operation failures before reconnection
 )
 _DEFAULT_MONITOR_INTERVAL: Final[float] = 10.0  # Interval between ping attempts in seconds
+_MAX_RECONNECT_BACKOFF: Final[float] = 60.0  # Cap on the wait between failed reconnect attempts
 
 # Connection error types that indicate a broken Valkey connection
 _VALKEY_CONNECTION_ERRORS: tuple[type[Exception], ...] = (
@@ -121,6 +122,17 @@ class AbstractValkeyClient(ABC):
     @abstractmethod
     async def disconnect(self) -> None:
         pass
+
+    @abstractmethod
+    async def reconnect(self) -> None:
+        """
+        Replace the underlying connection.
+
+        The replacement is created first and the previous connection is closed only
+        after that succeeded, so a failed attempt leaves the previous connection in
+        place instead of leaving the client disconnected.
+        """
+        raise NotImplementedError
 
     @abstractmethod
     async def ping(self) -> None:
@@ -204,6 +216,13 @@ class ValkeyStandaloneClient(AbstractValkeyClient):
         if self._valkey_client:
             await self._valkey_client.close(err_message="ValkeyStandaloneClient is closed.")
             self._valkey_client = None
+
+    @override
+    async def reconnect(self) -> None:
+        previous = self._valkey_client
+        await self._create_valkey_client()
+        if previous is not None:
+            await previous.close(err_message="ValkeyStandaloneClient is reconnected.")
 
     async def _create_valkey_client(self) -> None:
         target_host, target_port = addr_to_hostport_pair(self._target.address)
@@ -337,6 +356,13 @@ class ValkeySentinelClient(AbstractValkeyClient):
         if self._valkey_client:
             await self._valkey_client.close(err_message="ValkeySentinelClient is closed.")
             self._valkey_client = None
+
+    @override
+    async def reconnect(self) -> None:
+        previous = self._valkey_client
+        await self._create_valkey_client()
+        if previous is not None:
+            await previous.close(err_message="ValkeySentinelClient is reconnected.")
 
     async def _create_valkey_client(self) -> None:
         master_address = await self._get_master_address()
@@ -571,6 +597,7 @@ class MonitoringValkeyClient(AbstractValkeyClient):
         self._reconnect_event = asyncio.Event()
         self._monitor_consecutive_failure_count = 0
         self._operation_failure_count = 0
+        self._reconnect_failure_count = 0
         self._closed = False
 
     @override
@@ -588,6 +615,10 @@ class MonitoringValkeyClient(AbstractValkeyClient):
 
         await self._monitor_client.disconnect()
         await self._operation_client.disconnect()
+
+    @override
+    async def reconnect(self) -> None:
+        await self._reconnect()
 
     @override
     async def ping(self) -> None:
@@ -706,7 +737,7 @@ class MonitoringValkeyClient(AbstractValkeyClient):
                     try:
                         await asyncio.wait_for(
                             self._reconnect_event.wait(),
-                            timeout=self._monitor_interval,
+                            timeout=self._reconnect_backoff(),
                         )
                     except TimeoutError:
                         pass
@@ -714,7 +745,12 @@ class MonitoringValkeyClient(AbstractValkeyClient):
                     self._reconnect_event.clear()
                     if reconnect_requested or await self._check_connection():
                         log.info("valkey clients reconnecting")
-                        await self._reconnect()
+                        try:
+                            await self._reconnect()
+                        except Exception:
+                            self._reconnect_failure_count += 1
+                            raise
+                        self._reconnect_failure_count = 0
                 except asyncio.CancelledError:
                     # Normal shutdown - don't log as error
                     raise
@@ -726,18 +762,17 @@ class MonitoringValkeyClient(AbstractValkeyClient):
         finally:
             log.debug("valkey connection monitor stopped", closed=self._closed)
 
+    def _reconnect_backoff(self) -> float:
+        """
+        Wait before the next reconnect attempt: the monitor interval, doubled per
+        consecutive failed attempt and capped, so an unreachable server is not
+        hammered with a new client creation every interval (#15250).
+        """
+        return min(
+            self._monitor_interval * (2.0**self._reconnect_failure_count),
+            _MAX_RECONNECT_BACKOFF,
+        )
+
     async def _reconnect(self) -> None:
-        # Disconnect both clients
-        try:
-            await self._monitor_client.disconnect()
-        except Exception as e:
-            log.warning("valkey monitor client disconnect failed", exc_info=e)
-
-        try:
-            await self._operation_client.disconnect()
-        except Exception as e:
-            log.warning("valkey operation client disconnect failed", exc_info=e)
-
-        # Reconnect both clients
-        await self._operation_client.connect()
-        await self._monitor_client.connect()
+        await self._operation_client.reconnect()
+        await self._monitor_client.reconnect()

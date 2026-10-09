@@ -6,10 +6,13 @@ from collections.abc import AsyncIterator
 from typing import cast
 
 import pytest
+from glide import ClosingError
 
 from ai.backend.common.clients.valkey_client.client import (
+    _MAX_RECONNECT_BACKOFF,
     _VALKEY_CONNECTION_ERRORS,
     MonitoringValkeyClient,
+    ValkeyStandaloneClient,
     create_valkey_client,
 )
 from ai.backend.common.defs import REDIS_STREAM_DB
@@ -81,6 +84,50 @@ class TestMonitoringValkeyClient:
 
         # Should be operational after reconnect
         await monitoring_client.ping()
+
+    async def test_reconnect_closes_previous_client_only_after_replacement(
+        self, monitoring_client: MonitoringValkeyClient
+    ) -> None:
+        operation_client = cast(ValkeyStandaloneClient, monitoring_client._operation_client)
+        previous = operation_client._valkey_client
+        assert previous is not None
+
+        await monitoring_client._reconnect()
+
+        assert operation_client._valkey_client is not previous
+        assert previous._is_closed
+        await monitoring_client.ping()
+
+    async def test_reconnect_keeps_previous_client_when_replacement_fails(
+        self, monitoring_client: MonitoringValkeyClient, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        operation_client = cast(ValkeyStandaloneClient, monitoring_client._operation_client)
+        previous = operation_client._valkey_client
+        assert previous is not None
+
+        async def fail_create() -> None:
+            raise ClosingError("simulated create failure")
+
+        monkeypatch.setattr(operation_client, "_create_valkey_client", fail_create)
+        with pytest.raises(ClosingError):
+            await monitoring_client._reconnect()
+
+        assert operation_client._valkey_client is previous
+        assert not previous._is_closed
+        async with monitoring_client.client() as conn:
+            assert await conn.ping() == b"PONG"
+
+    async def test_reconnect_backoff_doubles_per_failure(
+        self, monitoring_client: MonitoringValkeyClient
+    ) -> None:
+        monitoring_client._monitor_interval = 2.0
+        assert monitoring_client._reconnect_backoff() == 2.0
+
+        monitoring_client._reconnect_failure_count = 3
+        assert monitoring_client._reconnect_backoff() == 16.0
+
+        monitoring_client._reconnect_failure_count = 10
+        assert monitoring_client._reconnect_backoff() == _MAX_RECONNECT_BACKOFF
 
     async def test_monitor_client_separation(
         self, monitoring_client: MonitoringValkeyClient
