@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 import enum
-from datetime import timedelta
+from dataclasses import dataclass
+from datetime import datetime, timedelta
 from typing import Final, NewType
 
 from pydantic import ConfigDict, Field
@@ -106,3 +107,16 @@ class ServiceStorageStatus(enum.StrEnum):
     HEALTHY = "healthy"
     UNHEALTHY = "unhealthy"
     LOST = "lost"
+
+
+@dataclass(frozen=True)
+class StorageStatusResult:
+    """One status check's outcome, when it started and how long it took.
+
+    ``error_msg`` is null exactly when the check found its subject in order, and
+    ``duration`` is null where no check ran to completion to measure one.
+    """
+
+    check_started_at: datetime
+    duration: timedelta | None
+    error_msg: str | None
