@@ -48,6 +48,7 @@ items:
       session_group:                    [read, update, create, soft_delete, hard_delete]
       session_template:                 [read, update, create, soft_delete, hard_delete]
       storage_namespace:                []
+      storage_volume:                   []
       user:                             [read]
       user_resource_policy:             []
       vfolder:                          [read, update, create, soft_delete, hard_delete]

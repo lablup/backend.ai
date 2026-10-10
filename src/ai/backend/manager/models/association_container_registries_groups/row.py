@@ -24,11 +24,11 @@ class AssociationContainerRegistriesGroupsRow(Base):
     __table_args__ = (
         sa.Index(
             "uq_project_default_registry",
-            "group_id",
+            "project_id",
             unique=True,
             postgresql_where=sa.text("is_default"),
         ),
-        sa.UniqueConstraint("registry_id", "group_id", name="uq_registry_id_group_id"),
+        sa.UniqueConstraint("registry_id", "project_id", name="uq_registry_id_project_id"),
     )
 
     id: Mapped[AssociationContainerRegistriesGroupsID] = mapped_column(
@@ -49,13 +49,13 @@ class AssociationContainerRegistriesGroupsRow(Base):
         ),
         nullable=False,
     )
-    group_id: Mapped[ProjectID] = mapped_column(
-        "group_id",
+    project_id: Mapped[ProjectID] = mapped_column(
+        "project_id",
         GUID(ProjectID),
         sa.ForeignKey(
             "groups.id",
             ondelete="CASCADE",
-            name="fk_association_container_registries_groups_group_id",
+            name="fk_association_container_registries_groups_project_id",
         ),
         nullable=False,
     )

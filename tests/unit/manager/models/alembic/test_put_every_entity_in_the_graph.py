@@ -428,7 +428,24 @@ async def db(
     database_connection: ExtendedAsyncSAEngine,
 ) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
     async with with_tables(database_connection, _tables()):
-        yield database_connection
+        # This migration predates the association column rename.
+        async with database_connection.begin() as conn:
+            await conn.execute(
+                sa.text(
+                    "ALTER TABLE association_container_registries_groups "
+                    "RENAME COLUMN project_id TO group_id"
+                )
+            )
+        try:
+            yield database_connection
+        finally:
+            async with database_connection.begin() as conn:
+                await conn.execute(
+                    sa.text(
+                        "ALTER TABLE association_container_registries_groups "
+                        "RENAME COLUMN group_id TO project_id"
+                    )
+                )
 
 
 # -- created_in ---------------------------------------------------------------------------

@@ -24,9 +24,9 @@ class _AssociationContainerRegistriesGroupsOwnFields(
         ColumnOrder(AssociationContainerRegistriesGroupsRow.id),
     )
     project_id = SearchableField(
-        AssociationContainerRegistriesGroupsRow.group_id,
-        UUIDConditions(AssociationContainerRegistriesGroupsRow.group_id),
-        ColumnOrder(AssociationContainerRegistriesGroupsRow.group_id),
+        AssociationContainerRegistriesGroupsRow.project_id,
+        UUIDConditions(AssociationContainerRegistriesGroupsRow.project_id),
+        ColumnOrder(AssociationContainerRegistriesGroupsRow.project_id),
     )
     registry_id = SearchableField(
         AssociationContainerRegistriesGroupsRow.registry_id,

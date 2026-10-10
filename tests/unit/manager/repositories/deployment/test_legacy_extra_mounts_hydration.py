@@ -8,6 +8,7 @@ from unittest.mock import AsyncMock
 import pytest
 import sqlalchemy as sa
 
+from ai.backend.common.config import DefaultModelDefinition
 from ai.backend.common.container_registry import ContainerRegistryType
 from ai.backend.common.data.endpoint.types import EndpointLifecycle
 from ai.backend.common.data.entity.container_registry import ContainerRegistryID
@@ -16,6 +17,7 @@ from ai.backend.common.data.entity.domain import DomainID, DomainName
 from ai.backend.common.data.entity.image import ImageID
 from ai.backend.common.data.entity.replica_group import ReplicaGroupID
 from ai.backend.common.data.entity.session_group import SessionGroupID
+from ai.backend.common.schema.deployment import IntOrPercent, ReplicaGroupRolloutSpec
 from ai.backend.common.types import ClusterMode, MountPermission, ResourceSlot
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.image.types import ImageType
@@ -258,6 +260,7 @@ class TestLegacyExtraMountsHydration:
                     id=rv_uuid,
                     name=f"rv-{suffix}",
                     description="test",
+                    default_model_definition=DefaultModelDefinition(),
                 )
             )
         return rv_uuid
@@ -300,6 +303,10 @@ class TestLegacyExtraMountsHydration:
                     id=ReplicaGroupID(group_id),
                     deployment_id=endpoint_id,
                     current_revision_id=revision_id,
+                    rollout=ReplicaGroupRolloutSpec(
+                        max_surge=IntOrPercent(count=1),
+                        max_unavailable=IntOrPercent(count=0),
+                    ),
                 )
             )
             endpoint.primary_replica_group_id = ReplicaGroupID(group_id)

@@ -848,7 +848,7 @@ class TestProjectExportExecuteStreamingDB:
                 AssociationContainerRegistriesGroupsRow(
                     id=uuid.uuid4(),
                     registry_id=registry_id,
-                    group_id=project_id,
+                    project_id=project_id,
                 )
             )
             await db_sess.commit()
@@ -1117,7 +1117,7 @@ class TestGlobalContainerRegistryExport:
                 AssociationContainerRegistriesGroupsRow(
                     id=uuid.uuid4(),
                     registry_id=scoped_registry_id,
-                    group_id=project_id,
+                    project_id=project_id,
                 )
             )
             await db_sess.commit()
