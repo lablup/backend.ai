@@ -85,6 +85,7 @@ def processors(readable: AgentData, denied: AgentData, denial: GenericForbidden)
                     slot_name="cpu",
                     capacity=Decimal(4),
                     reserved=Decimal(0),
+                    prereserved=Decimal(0),
                     used=Decimal(1),
                 )
             ],

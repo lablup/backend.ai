@@ -114,6 +114,8 @@ class AgentResourceNode(BaseResponseModel):
     capacity: str = Field(
         description="Total hardware resource capacity for this slot on the agent."
     )
+    reserved: str = Field(description="Amount reserved by scheduling for this slot.")
+    prereserved: str = Field(description="Amount reserved in advance by preemption plans.")
     used: str = Field(
         description="Amount of this slot currently consumed by running and scheduled sessions."
     )

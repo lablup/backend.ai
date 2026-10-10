@@ -26511,6 +26511,30 @@
             "default": null,
             "description": "Filter by agent ID."
           },
+          "reserved": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DecimalFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter by reserved amount."
+          },
+          "prereserved": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DecimalFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter by pre-reserved amount."
+          },
           "AND": {
             "anyOf": [
               {
@@ -26588,6 +26612,8 @@
           "agent_id",
           "slot_name",
           "capacity",
+          "reserved",
+          "prereserved",
           "used"
         ],
         "title": "AgentResourceOrderField",

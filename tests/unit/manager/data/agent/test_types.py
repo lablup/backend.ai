@@ -40,6 +40,7 @@ def _resource(slot_name: str, capacity: str, used: str) -> AgentResourceData:
         slot_name=slot_name,
         capacity=Decimal(capacity),
         reserved=Decimal(0),
+        prereserved=Decimal(0),
         used=Decimal(used),
     )
 
