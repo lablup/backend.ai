@@ -87,6 +87,20 @@ class PortPool:
         for p in ports:
             self.release(p)
 
+    def defer(self, port: int) -> None:
+        """Hold back a port the host still holds (TIME_WAIT, an exiting proxy) until its cooldown
+        passes, without claiming it. A port already `discard`ed stays out.
+        """
+        if port not in self._ports:
+            return
+        del self._ports[port]
+        self._ports[port] = monotonic()
+
+    def defer_many(self, ports: Iterable[int]) -> None:
+        """Hold back multiple ports at once. See :meth:`defer`."""
+        for p in ports:
+            self.defer(p)
+
     def discard(self, port: int) -> None:
         """Remove a port from the pool without scheduling reuse.
 

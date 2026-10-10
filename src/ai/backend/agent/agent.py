@@ -49,6 +49,7 @@ from uuid import UUID
 
 import aiotools
 import attrs
+import psutil
 import zmq
 import zmq.asyncio
 from async_timeout import timeout
@@ -2307,12 +2308,40 @@ class AbstractAgent[
                         container_id=container.id,
                     )
 
+        # After the scan above has `discard`ed our live ports.
+        await self._defer_ports_the_host_still_holds()
+
         for computer_name, computer_ctx in self.computers.items():
             log.info(
                 "resource allocations restored",
                 device_name=computer_name,
                 allocations=str(dict(computer_ctx.alloc_map.allocations)),
             )
+
+    async def _defer_ports_the_host_still_holds(self) -> None:
+        """Put the reuse cooldown back on pool ports the host still holds, at startup.
+
+        Best-effort: unreadable sockets are logged, not fatal. The socket scan runs off the loop.
+        """
+        try:
+            conns = await run_in_executor_with_context(None, psutil.net_connections, "tcp")
+            in_use = {conn.laddr.port for conn in conns if conn.laddr}
+        except (psutil.Error, OSError) as e:
+            log.warning(
+                "host sockets unreadable, port pool starts without cooldown",
+                error_repr=repr(e),
+            )
+            return
+        deferred = sorted(in_use & set(self.port_pool.remaining()))
+        if not deferred:
+            return
+        self.port_pool.defer_many(deferred)
+        log.info(
+            "host ports still in use held back for the reuse cooldown",
+            count=len(deferred),
+            first_port=deferred[0],
+            last_port=deferred[-1],
+        )
 
     @abstractmethod
     async def init_kernel_context(
