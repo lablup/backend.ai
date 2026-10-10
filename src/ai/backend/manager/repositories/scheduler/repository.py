@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import logging
 from collections import defaultdict
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from datetime import datetime
 from functools import partial
 from typing import TYPE_CHECKING, Any
@@ -644,11 +644,24 @@ class SchedulerRepository:
         return await self._db_source.get_agent_ids_for_sessions(session_ids)
 
     @scheduler_repository_resilience.apply()
-    async def reset_kernels_to_pending_for_sessions(
-        self, session_ids: list[SessionId], reason: str
-    ) -> int:
-        """Reset kernels to PENDING for the given sessions going back to the queue."""
-        return await self._db_source.reset_kernels_to_pending_for_sessions(session_ids, reason)
+    async def requeue_sessions_with_history(
+        self,
+        updater: SessionStatusBatchUpdater,
+        histories: Sequence[SessionHistoryToCreate],
+        kernel_reason: KernelLifecycleEventReason,
+        expected_statuses: Mapping[SessionId, SessionStatus],
+    ) -> tuple[int, int]:
+        """Move sessions still in their expected status and reset their kernels atomically."""
+        return await self._db_source.requeue_sessions_with_history(
+            updater, histories, kernel_reason, expected_statuses
+        )
+
+    @scheduler_repository_resilience.apply()
+    async def requeue_sessions_to_pending(
+        self, session_ids: list[SessionId], reason: KernelLifecycleEventReason
+    ) -> list[SessionId]:
+        """Reset kernels and move fully torn-down sessions to PENDING atomically."""
+        return await self._db_source.requeue_sessions_to_pending(session_ids, reason)
 
     @scheduler_repository_resilience.apply()
     async def update_kernels_to_creating_for_sessions(

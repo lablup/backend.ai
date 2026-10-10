@@ -12,7 +12,7 @@ import uuid
 from collections.abc import Awaitable, Callable
 from datetime import datetime, timedelta
 from decimal import Decimal
-from typing import cast
+from typing import cast, override
 
 import pytest
 import sqlalchemy as sa
@@ -20,18 +20,24 @@ from dateutil.tz import tzutc
 
 from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.entity.resource_group import ResourceGroupID
+from ai.backend.common.data.entity.session import SessionID
 from ai.backend.common.events.event_types.kernel.types import KernelLifecycleEventReason
+from ai.backend.common.exception import BackendAIError, ErrorCode
 from ai.backend.common.schema.resource_group import PreemptionConfig
-from ai.backend.common.types import AccessKey, PreemptionMode, SessionId
+from ai.backend.common.types import AccessKey, KernelId, PreemptionMode, SessionId
 from ai.backend.manager.data.kernel.types import KernelStatus
-from ai.backend.manager.data.session.types import SessionStatus
+from ai.backend.manager.data.session.types import SchedulingResult, SessionStatus
 from ai.backend.manager.models.kernel.row import KernelRow
 from ai.backend.manager.models.resource_group.row import ResourceGroupOpts, ResourceGroupRow
 from ai.backend.manager.models.resource_slot.row import ResourceAllocationRow
+from ai.backend.manager.models.scheduling_history.creators import SessionSchedulingHistoryCreator
+from ai.backend.manager.models.scheduling_history.row import SessionSchedulingHistoryRow
 from ai.backend.manager.models.session.row import SessionRow
+from ai.backend.manager.models.session.updaters import SessionStatusBatchUpdater
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.ops.v2.reconciler.provider import ReconcileOpsProvider
 from ai.backend.manager.repositories.scheduler.db_source.db_source import ScheduleDBSource
+from ai.backend.manager.repositories.scheduler.types.session import SessionHistoryToCreate
 from ai.backend.testutils.fixtures import DomainFixtureData
 
 from .conftest import create_pending_session_with_kernels
@@ -64,6 +70,36 @@ async def _session_status(db: ExtendedAsyncSAEngine, session_id: SessionId) -> S
             sa.select(SessionRow.status).where(SessionRow.id == session_id)
         )
     return cast(SessionStatus, status)
+
+
+async def _kernel_status_and_agent(
+    db: ExtendedAsyncSAEngine, kernel_id: KernelId
+) -> tuple[KernelStatus, str | None]:
+    async with db.begin_readonly_session() as db_sess:
+        row = (
+            await db_sess.execute(
+                sa.select(KernelRow.status, KernelRow.agent).where(KernelRow.id == kernel_id)
+            )
+        ).one()
+    return KernelStatus(row.status), row.agent
+
+
+async def _history_count(db: ExtendedAsyncSAEngine, session_id: SessionId) -> int:
+    async with db.begin_readonly_session() as db_sess:
+        count = await db_sess.scalar(
+            sa.select(sa.func.count())
+            .select_from(SessionSchedulingHistoryRow)
+            .where(SessionSchedulingHistoryRow.session_id == session_id)
+        )
+    return int(count or 0)
+
+
+class _InjectedHistoryFailure(BackendAIError):
+    """Raised by a patched history writer to force a rollback."""
+
+    @override
+    def error_code(self) -> ErrorCode:
+        return ErrorCode.default()
 
 
 @pytest.fixture
@@ -272,8 +308,58 @@ class TestTerminatePreemptedVictim:
 
 
 class TestRequeueSessionsToPending:
-    """Re-enqueue of a RESCHEDULING session whose kernels are gone: the kernels
-    drop their placement, then the session becomes PENDING."""
+    """Re-enqueue changes session, kernels, and placement in one transaction."""
+
+    @pytest.mark.parametrize(
+        ("session_status", "kernel_status"),
+        [
+            (SessionStatus.RUNNING, KernelStatus.TERMINATED),
+            (SessionStatus.TERMINATED, KernelStatus.TERMINATED),
+            (SessionStatus.RESCHEDULING, KernelStatus.RUNNING),
+        ],
+    )
+    async def test_requeue_refuses_sessions_that_moved_or_still_have_live_kernels(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        test_domain_id: DomainID,
+        test_domain: DomainFixtureData,
+        test_scaling_group_id: ResourceGroupID,
+        test_scaling_group_name: str,
+        test_group_id: uuid.UUID,
+        test_user_uuid: uuid.UUID,
+        test_access_key: AccessKey,
+        test_agent_id: str,
+        resource_slot_types: None,
+        session_status: SessionStatus,
+        kernel_status: KernelStatus,
+    ) -> None:
+        """A session force-terminated (or otherwise moved) after the handler read it
+        as RESCHEDULING is not resurrected, and its kernels keep their placement."""
+        session_id, kernel_ids = await create_pending_session_with_kernels(
+            db_with_cleanup,
+            agent_assignments=[(test_agent_id, Decimal("2"), Decimal("4096"))],
+            domain_id=test_domain_id,
+            domain_name=test_domain.domain_name,
+            resource_group_id=test_scaling_group_id,
+            resource_group_name=test_scaling_group_name,
+            group_id=test_group_id,
+            user_uuid=test_user_uuid,
+            access_key=test_access_key,
+            session_status=session_status,
+            kernel_status=kernel_status,
+            assign_agents=True,
+        )
+
+        requeued = await ScheduleDBSource(
+            db_with_cleanup, ReconcileOpsProvider(db_with_cleanup)
+        ).requeue_sessions_to_pending([session_id], _REASON)
+
+        assert requeued == []
+        assert await _session_status(db_with_cleanup, session_id) == session_status
+        assert await _kernel_status_and_agent(db_with_cleanup, kernel_ids[0]) == (
+            kernel_status,
+            test_agent_id,
+        )
 
     async def test_victim_and_kernels_return_to_pending_with_priorities_kept(
         self,
@@ -309,12 +395,8 @@ class TestRequeueSessionsToPending:
         await _free_allocations(db_with_cleanup, session_id)
 
         db_source = ScheduleDBSource(db_with_cleanup, ReconcileOpsProvider(db_with_cleanup))
-        reset = await db_source.reset_kernels_to_pending_for_sessions([session_id], _REASON)
-        requeued = await db_source.mark_sessions_status(
-            [session_id], SessionStatus.PENDING, _REASON
-        )
+        requeued = await db_source.requeue_sessions_to_pending([session_id], _REASON)
 
-        assert reset == 1
         assert requeued == [session_id]
         async with db_with_cleanup.begin_readonly_session() as db_sess:
             session_row = (
@@ -338,6 +420,50 @@ class TestRequeueSessionsToPending:
         assert kernel_row.status == KernelStatus.PENDING
         assert kernel_row.agent is None
         assert kernel_row.agent_addr is None
+
+    async def test_history_failure_rolls_back_session_and_kernel_changes(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        test_domain_id: DomainID,
+        test_domain: DomainFixtureData,
+        test_scaling_group_id: ResourceGroupID,
+        test_scaling_group_name: str,
+        test_group_id: uuid.UUID,
+        test_user_uuid: uuid.UUID,
+        test_access_key: AccessKey,
+        test_agent_id: str,
+        resource_slot_types: None,
+    ) -> None:
+        session_id, kernel_ids = await create_pending_session_with_kernels(
+            db_with_cleanup,
+            agent_assignments=[(test_agent_id, Decimal("2"), Decimal("4096"))],
+            domain_id=test_domain_id,
+            domain_name=test_domain.domain_name,
+            resource_group_id=test_scaling_group_id,
+            resource_group_name=test_scaling_group_name,
+            group_id=test_group_id,
+            user_uuid=test_user_uuid,
+            access_key=test_access_key,
+            session_status=SessionStatus.RESCHEDULING,
+            kernel_status=KernelStatus.TERMINATED,
+            assign_agents=True,
+        )
+        await _free_allocations(db_with_cleanup, session_id)
+        db_source = ScheduleDBSource(db_with_cleanup, ReconcileOpsProvider(db_with_cleanup))
+
+        async def fail_history(*args: object, **kwargs: object) -> int:
+            raise _InjectedHistoryFailure()
+
+        monkeypatch.setattr(db_source, "_record_scheduling_history", fail_history)
+        with pytest.raises(_InjectedHistoryFailure):
+            await db_source.requeue_sessions_to_pending([session_id], _REASON)
+
+        assert await _session_status(db_with_cleanup, session_id) == SessionStatus.RESCHEDULING
+        assert await _kernel_status_and_agent(db_with_cleanup, kernel_ids[0]) == (
+            KernelStatus.TERMINATED,
+            test_agent_id,
+        )
 
     async def test_freed_allocations_are_restored_to_the_pending_shape(
         self,
@@ -373,7 +499,7 @@ class TestRequeueSessionsToPending:
 
         await ScheduleDBSource(
             db_with_cleanup, ReconcileOpsProvider(db_with_cleanup)
-        ).reset_kernels_to_pending_for_sessions([session_id], _REASON)
+        ).requeue_sessions_to_pending([session_id], _REASON)
 
         async with db_with_cleanup.begin_readonly_session() as db_sess:
             allocations = (
@@ -431,6 +557,135 @@ class TestRequeueSessionsToPending:
 
         assert requeued == []
         assert await _session_status(db_with_cleanup, session_id) == SessionStatus.CANCELLED
+
+
+class TestRequeueSessionsWithHistory:
+    """The coordinator's give-up requeue moves a session only while it is still in the
+    status it was classified in."""
+
+    @pytest.fixture
+    def make_session(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        test_domain_id: DomainID,
+        test_domain: DomainFixtureData,
+        test_scaling_group_id: ResourceGroupID,
+        test_scaling_group_name: str,
+        test_group_id: uuid.UUID,
+        test_user_uuid: uuid.UUID,
+        test_access_key: AccessKey,
+        test_agent_id: str,
+        resource_slot_types: None,
+    ) -> Callable[[SessionStatus, KernelStatus], Awaitable[tuple[SessionId, KernelId]]]:
+        async def _make(
+            session_status: SessionStatus, kernel_status: KernelStatus
+        ) -> tuple[SessionId, KernelId]:
+            session_id, kernel_ids = await create_pending_session_with_kernels(
+                db_with_cleanup,
+                agent_assignments=[(test_agent_id, Decimal("2"), Decimal("4096"))],
+                domain_id=test_domain_id,
+                domain_name=test_domain.domain_name,
+                resource_group_id=test_scaling_group_id,
+                resource_group_name=test_scaling_group_name,
+                group_id=test_group_id,
+                user_uuid=test_user_uuid,
+                access_key=test_access_key,
+                session_status=session_status,
+                kernel_status=kernel_status,
+                assign_agents=True,
+            )
+            return session_id, kernel_ids[0]
+
+        return _make
+
+    @staticmethod
+    async def _requeue(
+        db: ExtendedAsyncSAEngine, expected: dict[SessionId, SessionStatus]
+    ) -> tuple[int, int]:
+        updater = SessionStatusBatchUpdater(
+            session_ids=list(expected),
+            to_status=SessionStatus.PENDING,
+            status_changed_at=datetime.now(tzutc()),
+        )
+        histories = [
+            SessionHistoryToCreate(
+                session_id=SessionID(session_id),
+                creator=SessionSchedulingHistoryCreator(
+                    phase="start-sessions",
+                    result=SchedulingResult.GIVE_UP,
+                    message="start-sessions give_up",
+                    from_status=status,
+                    to_status=SessionStatus.PENDING,
+                ),
+            )
+            for session_id, status in expected.items()
+        ]
+        return await ScheduleDBSource(db, ReconcileOpsProvider(db)).requeue_sessions_with_history(
+            updater,
+            histories,
+            kernel_reason=KernelLifecycleEventReason.EXCEEDED_MAX_RETRIES,
+            expected_statuses=expected,
+        )
+
+    async def test_session_in_its_expected_status_is_requeued_with_its_kernels(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        make_session: Callable[
+            [SessionStatus, KernelStatus], Awaitable[tuple[SessionId, KernelId]]
+        ],
+    ) -> None:
+        session_id, kernel_id = await make_session(SessionStatus.PREPARED, KernelStatus.PREPARED)
+
+        result = await self._requeue(db_with_cleanup, {session_id: SessionStatus.PREPARED})
+
+        assert result == (1, 1)
+        assert await _session_status(db_with_cleanup, session_id) == SessionStatus.PENDING
+        assert await _kernel_status_and_agent(db_with_cleanup, kernel_id) == (
+            KernelStatus.PENDING,
+            None,
+        )
+        assert await _history_count(db_with_cleanup, session_id) == 1
+
+    async def test_session_terminated_after_classification_is_not_resurrected(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        make_session: Callable[
+            [SessionStatus, KernelStatus], Awaitable[tuple[SessionId, KernelId]]
+        ],
+    ) -> None:
+        """Classified as PREPARED, force-terminated before the requeue applies: the
+        session stays TERMINATED, its kernels untouched and no history is written."""
+        session_id, kernel_id = await make_session(
+            SessionStatus.TERMINATED, KernelStatus.TERMINATED
+        )
+
+        result = await self._requeue(db_with_cleanup, {session_id: SessionStatus.PREPARED})
+
+        assert result == (0, 0)
+        assert await _session_status(db_with_cleanup, session_id) == SessionStatus.TERMINATED
+        kernel_status, kernel_agent = await _kernel_status_and_agent(db_with_cleanup, kernel_id)
+        assert kernel_status == KernelStatus.TERMINATED
+        assert kernel_agent is not None
+        assert await _history_count(db_with_cleanup, session_id) == 0
+
+    async def test_only_the_sessions_still_in_place_move_in_a_mixed_batch(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        make_session: Callable[
+            [SessionStatus, KernelStatus], Awaitable[tuple[SessionId, KernelId]]
+        ],
+    ) -> None:
+        kept_id, _ = await make_session(SessionStatus.PREPARED, KernelStatus.PREPARED)
+        gone_id, _ = await make_session(SessionStatus.TERMINATING, KernelStatus.TERMINATING)
+
+        result = await self._requeue(
+            db_with_cleanup,
+            {kept_id: SessionStatus.PREPARED, gone_id: SessionStatus.PREPARED},
+        )
+
+        assert result == (1, 1)
+        assert await _session_status(db_with_cleanup, kept_id) == SessionStatus.PENDING
+        assert await _session_status(db_with_cleanup, gone_id) == SessionStatus.TERMINATING
 
 
 class TestGetResourceGroupPreemptionMode:
