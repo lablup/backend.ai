@@ -8,6 +8,7 @@ import logging
 import uuid
 from collections.abc import (
     Callable,
+    Iterable,
     Mapping,
     Sequence,
 )
@@ -1149,6 +1150,9 @@ async def populate_fixture(
 ) -> None:
     ensure_all_tables_registered()
     op_mode = FixtureOpModes(cast(str, fixture_data.get("__mode", "insert")))
+    # Before anything is written: every value a row of this fixture points at is the id
+    # the fixture declares, and the database may hold that row under an id of its own.
+    await _reconcile_fixture_ids(engine, fixture_data)
     for table_name, rows in fixture_data.items():
         if table_name.startswith("__"):
             # skip reserved names like "__mode"
@@ -1308,6 +1312,91 @@ async def populate_fixture(
 
     async with engine.begin() as conn:
         await provision_fixture_entities(conn, fixture_data.keys())
+
+
+# Each table a fixture declares an id for, keyed by what makes each row the row it is: the
+# database that already holds the row says which id it carries. Ordered by dependency — an
+# entity's row, the node naming it, then an edge between nodes. `users` is absent: no path
+# writes one of the seed's usernames under an id it minted.
+_FIXTURE_ID_KEYS: Final[tuple[tuple[str, str, tuple[str, ...]], ...]] = (
+    ("domains", "id", ("name",)),
+    ("scaling_groups", "id", ("name",)),
+    ("groups", "id", ("name", "domain_name")),
+    ("virtual_entities", "id", ("entity_type", "entity_id")),
+    ("entity_memberships", "id", ("virtual_entity_id", "member_entity_id")),
+)
+
+
+async def _reconcile_fixture_ids(
+    engine: SAEngine,
+    fixture_data: Mapping[str, str | Sequence[dict[str, Any]]],
+) -> None:
+    """Rewrite the ids a fixture declares to the ids the database holds for the same rows,
+    so a load into a database an earlier release built lands on that database's rows."""
+    async with engine.begin() as conn:
+        for table_name, id_column, key_columns in _FIXTURE_ID_KEYS:
+            rows = fixture_data.get(table_name)
+            table = metadata.tables.get(table_name)
+            if table is None or isinstance(rows, str) or not rows:
+                continue
+            result = await conn.execute(
+                sa.select(table.c[id_column], *_columns(table, key_columns))
+            )
+            _rewrite_fixture_ids(fixture_data, _remap_rows(rows, id_column, key_columns, result))
+
+
+def _columns(table: sa.Table, names: Sequence[str]) -> list[sa.Column[Any]]:
+    return [table.c[name] for name in names]
+
+
+def _remap_rows(
+    rows: Sequence[dict[str, Any]],
+    id_column: str,
+    key_columns: Sequence[str],
+    result: Iterable[Any],
+) -> dict[str, Any]:
+    # Compared as text: a fixture value is whatever JSON holds, a row's is what the
+    # column's type decorator reads back.
+    held = {_fixture_key(row._mapping, key_columns): row._mapping[id_column] for row in result}
+    return {
+        str(row[id_column]): held[key]
+        for row in rows
+        if row.get(id_column) is not None
+        and (key := _fixture_key(row, key_columns)) in held
+        and str(held[key]) != str(row[id_column])
+    }
+
+
+def _fixture_key(row: Mapping[Any, Any], columns: Sequence[Any]) -> tuple[str, ...]:
+    return tuple(str(row[column]) for column in columns)
+
+
+def _id_columns(table: sa.Table) -> set[str]:
+    """The columns of a fixture table that can name an id: the ones the table declares a
+    foreign key on, the id it declares itself, and `entity_id` — the entity a graph row
+    attached to `(entity_type, entity_id)` stands for, which carries no foreign key."""
+    names = {column.name for column in table.columns if column.foreign_keys}
+    names |= {id_column for name, id_column, _ in _FIXTURE_ID_KEYS if name == table.name}
+    names.add("entity_id")
+    return names
+
+
+def _rewrite_fixture_ids(
+    fixture_data: Mapping[str, str | Sequence[dict[str, Any]]],
+    remap: Mapping[str, Any],
+) -> None:
+    if not remap:
+        return
+    for table_name, rows in fixture_data.items():
+        table = metadata.tables.get(table_name)
+        if table is None or isinstance(rows, str):
+            continue
+        columns = _id_columns(table)
+        for row in rows:
+            for column in columns & row.keys():
+                value = row[column]
+                if isinstance(value, (str, uuid.UUID)) and str(value) in remap:
+                    row[column] = remap[str(value)]
 
 
 async def _resolve_fixture_references(
