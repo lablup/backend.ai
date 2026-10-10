@@ -11,6 +11,9 @@ sources:
 generated:
   by: claude-code/fable-5
   at: 2026-08-10
+updated:
+  by: claude-code/opus-5.5
+  at: 2026-10-08
 status: stable
 ---
 
@@ -44,7 +47,9 @@ allocation, status collection/reporting — all happens here.
 
 ## State must survive restarts
 
-- The kernel registry is persisted via pickle snapshots plus container-label mirroring and recovered at boot (`kernel_registry/recovery/`).
+- Recovery is per backend (`kernel_registry/recovery/`): the docker agent reads each kernel's `config/recovery.json` out of its scratch, the kubernetes agent reads a pickle snapshot.
+- A snapshot is reconciled against `enumerate_containers()` before anything is written back — a record this runtime has no container for is not a kernel to restore, and writing it re-creates a scratch nothing reclaims.
+- The docker agent no longer writes the pickle. A snapshot an older version left behind is adapted into the scratch records at boot, then renamed to `<name>.migrated` so a downgraded agent does not adapt it again.
 - Any new field that must survive restarts has to be added to the recovery data, not just the in-memory object.
 
 ## The watcher is a separate privileged process
