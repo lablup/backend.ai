@@ -76,7 +76,7 @@ from ai.backend.agent.metrics.metric import (
     StatTaskObserver,
     SyncContainerLifecycleObserver,
 )
-from ai.backend.agent.port_pool import PortPool
+from ai.backend.agent.port_pool import PortPool, ephemeral_overlap
 from ai.backend.agent.tasks import (
     CleanupReportedKernelsTask,
     CollectContainerStatTask,
@@ -959,6 +959,23 @@ class AbstractAgent[
         self._sync_container_lifecycle_observer = SyncContainerLifecycleObserver.instance()
         self._clean_kernel_registry_task = asyncio.create_task(self._clean_kernel_registry_loop())
 
+    async def _warn_if_port_range_is_ephemeral(self) -> None:
+        port_range = self.local_config.container.port_range
+        exposed = await run_in_executor_with_context(None, ephemeral_overlap, port_range)
+        if exposed is None:
+            return
+        # Warned once, from `__ainit__`: the EADDRINUSE it causes is otherwise unattributable.
+        log.warning(
+            "host port range overlaps the kernel's unreserved ephemeral range;"
+            " published ports may fail to bind with EADDRINUSE",
+            first_exposed_port=exposed[0],
+            last_exposed_port=exposed[1],
+            fix=(
+                f"add {port_range[0]}-{port_range[1]} to net.ipv4.ip_local_reserved_ports,"
+                " keeping its current entries (sysctl -w replaces the whole list)"
+            ),
+        )
+
     @override
     async def __ainit__(self) -> None:
         """
@@ -968,6 +985,8 @@ class AbstractAgent[
         self.resource_lock = asyncio.Lock()
         self.registry_lock = asyncio.Lock()
         self.container_lifecycle_queue = asyncio.Queue()
+
+        await self._warn_if_port_range_is_ephemeral()
 
         if self.local_config.redis is None:
             raise ConfigurationError({

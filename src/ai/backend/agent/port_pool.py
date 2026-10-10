@@ -12,11 +12,59 @@ from __future__ import annotations
 
 from collections import OrderedDict
 from collections.abc import Iterable
+from pathlib import Path
 from time import monotonic
+from typing import Final
 
 from ai.backend.agent.errors.resources import PortPoolExhaustedError
 
-__all__ = ("PortPool",)
+__all__ = ("PortPool", "ephemeral_overlap")
+
+#: The kernel's ephemeral source-port range, and the ports reserved out of it.
+_EPHEMERAL_RANGE_PATH: Final = Path("/proc/sys/net/ipv4/ip_local_port_range")
+_RESERVED_PORTS_PATH: Final = Path("/proc/sys/net/ipv4/ip_local_reserved_ports")
+
+
+def _parse_reserved(raw: str) -> set[int]:
+    """`ip_local_reserved_ports` as a set. Comma-separated singles and `a-b` ranges."""
+    reserved: set[int] = set()
+    for part in raw.replace(" ", "").strip().split(","):
+        if not part:
+            continue
+        low, _, high = part.partition("-")
+        try:
+            reserved.update(range(int(low), int(high or low) + 1))
+        except ValueError:
+            continue
+    return reserved
+
+
+def ephemeral_overlap(
+    port_range: tuple[int, int],
+    *,
+    range_path: Path = _EPHEMERAL_RANGE_PATH,
+    reserved_path: Path = _RESERVED_PORTS_PATH,
+) -> tuple[int, int] | None:
+    """First and last port of ``port_range`` the kernel may hand out as an ephemeral source
+    port, so it can be taken before the runtime binds it. None when nothing overlaps or the
+    range is unreadable."""
+    try:
+        bounds = range_path.read_text().split()
+        eph_low, eph_high = int(bounds[0]), int(bounds[-1])
+    except (OSError, ValueError, IndexError):
+        return None
+    lo = max(port_range[0], eph_low)
+    hi = min(port_range[1], eph_high)
+    if lo > hi:
+        return None
+    try:
+        reserved = _parse_reserved(reserved_path.read_text())
+    except OSError:
+        reserved = set()
+    exposed = [p for p in range(lo, hi + 1) if p not in reserved]
+    if not exposed:
+        return None
+    return exposed[0], exposed[-1]
 
 
 class PortPool:
