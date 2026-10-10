@@ -1083,20 +1083,31 @@ class AbstractAgent[
         # Report commit status
         periodic_tasks.append(ReportKernelCommitStatusTask(self))
 
+        # Built here, started in `start_serving`: its heartbeat alone marks the node ALIVE.
         self._local_cron = LocalCron(periodic_tasks)
-        await self._local_cron.start()
 
         loop = current_loop()
         self.container_lifecycle_handler = loop.create_task(self.process_lifecycle_events())
-
-        # Notify the gateway.
-        await self.anycast_event(AgentStartedEvent(reason="self-started"))
 
         # passive events
         evd = self.event_dispatcher
         evd.subscribe(DoVolumeMountEvent, self, handle_volume_mount, name="ag.volume.mount")
         evd.subscribe(DoVolumeUnmountEvent, self, handle_volume_umount, name="ag.volume.umount")
         await self.event_dispatcher.start()
+
+    async def start_serving(self) -> None:
+        """Start the heartbeat and send the started event; both announce the node as ALIVE.
+
+        Call only after every `__ainit__` has finished and the RPC server is handling calls.
+        """
+        if self._local_cron is not None:
+            await self._local_cron.start()
+        await self.anycast_event(AgentStartedEvent(reason="self-started"))
+
+    async def stop_serving(self) -> None:
+        """Stop the heartbeat. Idempotent; separate from `shutdown`, which a failed start skips."""
+        if self._local_cron is not None:
+            await self._local_cron.stop()
 
     async def _make_message_queue(self, stream_redis_target: RedisTarget) -> AbstractMessageQueue:
         """

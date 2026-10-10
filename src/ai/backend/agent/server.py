@@ -321,6 +321,8 @@ class AgentRPCServer(aobject):
     loop: asyncio.AbstractEventLoop
     etcd: AsyncEtcd
     runtime: AgentRuntime
+    #: Whether the RPC transport is serving; `start_serving` refuses until it is.
+    _transport_entered: bool
     rpc_server: Peer
     rpc_addr: str
     agent_addr: str
@@ -390,6 +392,7 @@ class AgentRPCServer(aobject):
             self.rpc_auth_agent_secret_key = None
             auth_handler = None
 
+        self._transport_entered = False
         self.runtime = await AgentRuntime.create_runtime(
             self.local_config,
             self.etcd,
@@ -419,7 +422,8 @@ class AgentRPCServer(aobject):
         for func_name in self.rpc_function_v2.functions:
             self.rpc_server.handle_function(func_name, getattr(self, func_name))
 
-        log.info("rpc server started", rpc_addr=str(rpc_addr))
+        # Not serving yet: the transport is entered in `__aenter__` (see `start_serving`).
+        log.info("rpc handlers registered", rpc_addr=str(rpc_addr))
 
         debug_socket_path = (
             self.local_config.agent_common.ipc_base_path / "agent-registry-snapshot.sock"
@@ -643,6 +647,21 @@ class AgentRPCServer(aobject):
 
     async def __aenter__(self) -> None:
         await self.rpc_server.__aenter__()
+        self._transport_entered = True
+
+    async def start_serving(self) -> None:
+        """Publish readiness only after the RPC transport is serving."""
+        if not self._transport_entered:
+            raise AgentInitializationError(
+                "the agent cannot announce itself before its RPC transport is serving: the"
+                " manager marks a node ALIVE on the announcement and sends it work"
+            )
+        await self.runtime.start_serving()
+
+    async def stop_serving(self) -> None:
+        """Withdraw readiness after a partial or normal shutdown."""
+        self._transport_entered = False
+        await self.runtime.stop_serving()
 
     def mark_stop_signal(self, stop_signal: signal.Signals) -> None:
         self.runtime.mark_stop_signal(stop_signal)
@@ -1576,7 +1595,12 @@ async def agent_server_ctx(
     await site.start()
     log.info("http server started", internal_addr=str(internal_addr))
     async with agent_server:
-        yield agent_server
+        # Announce only once RPC and HTTP both serve; withdraw on any exit, a failed start included.
+        try:
+            await agent_server.start_serving()
+            yield agent_server
+        finally:
+            await agent_server.stop_serving()
 
 
 @asynccontextmanager
