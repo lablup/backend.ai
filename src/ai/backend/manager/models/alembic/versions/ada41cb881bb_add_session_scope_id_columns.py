@@ -22,8 +22,6 @@ depends_on = None
 def upgrade() -> None:
     op.add_column("sessions", sa.Column("domain_id", GUID(), nullable=True))
     op.add_column("sessions", sa.Column("resource_group_id", GUID(), nullable=True))
-    op.create_index("ix_sessions_domain_id", "sessions", ["domain_id"])
-    op.create_index("ix_sessions_resource_group_id", "sessions", ["resource_group_id"])
 
     op.execute(
         sa.text("""
@@ -45,6 +43,8 @@ def upgrade() -> None:
     )
     op.alter_column("sessions", "domain_id", nullable=False)
     op.alter_column("sessions", "resource_group_id", nullable=False)
+    op.create_index("ix_sessions_domain_id", "sessions", ["domain_id"])
+    op.create_index("ix_sessions_resource_group_id", "sessions", ["resource_group_id"])
     op.create_foreign_key(
         op.f("fk_sessions_domain_id_domains"),
         "sessions",
