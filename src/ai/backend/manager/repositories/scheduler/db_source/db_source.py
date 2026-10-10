@@ -87,10 +87,7 @@ from ai.backend.manager.models.agent.row import AgentRow
 from ai.backend.manager.models.domain.row import DomainRow, domains
 from ai.backend.manager.models.image.row import ImageRow
 from ai.backend.manager.models.kernel.creators import KernelCreator
-from ai.backend.manager.models.kernel.row import (
-    USER_RESOURCE_OCCUPYING_KERNEL_STATUSES,
-    KernelRow,
-)
+from ai.backend.manager.models.kernel.row import KernelRow
 from ai.backend.manager.models.kernel.searchable_fields import KernelSearchableFields
 from ai.backend.manager.models.kernel.searchers import KernelSearcher
 from ai.backend.manager.models.keypair.row import KeyPairRow, keypairs
@@ -3873,7 +3870,7 @@ class ScheduleDBSource:
                 .select_from(KernelRow)
                 .where(
                     (KernelRow.access_key == access_key)
-                    & (KernelRow.status.in_(USER_RESOURCE_OCCUPYING_KERNEL_STATUSES))
+                    & (KernelRow.status.in_(KernelStatus.agent_resource_occupying_statuses()))
                 )
             )
 

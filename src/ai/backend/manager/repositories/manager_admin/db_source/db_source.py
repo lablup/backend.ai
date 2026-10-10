@@ -10,9 +10,10 @@ from ai.backend.common.metrics.metric import DomainType, LayerType
 from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPolicy
 from ai.backend.common.resilience.policies.retry import BackoffStrategy, RetryArgs, RetryPolicy
 from ai.backend.common.resilience.resilience import Resilience
+from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.defs import DEFAULT_ROLE
 from ai.backend.manager.models.agent.row import agents
-from ai.backend.manager.models.kernel.row import AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES, kernels
+from ai.backend.manager.models.kernel.row import kernels
 
 if TYPE_CHECKING:
     from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
@@ -51,7 +52,7 @@ class ManagerAdminDBSource:
                 .select_from(kernels)
                 .where(
                     (kernels.c.cluster_role == DEFAULT_ROLE)
-                    & (kernels.c.status.in_(AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES)),
+                    & (kernels.c.status.in_(KernelStatus.agent_resource_occupying_statuses())),
                 )
             )
             result = await db_sess.scalar(query)

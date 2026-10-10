@@ -32,7 +32,11 @@ from ai.backend.common.data.entity.runtime_variant import RuntimeVariantID
 from ai.backend.common.data.entity.session_group import SessionGroupID
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.entity.vfolder import VFolderUUID
-from ai.backend.common.data.filter_specs import UUIDEqualMatchSpec, UUIDInMatchSpec
+from ai.backend.common.data.filter_specs import (
+    StringMatchSpec,
+    UUIDEqualMatchSpec,
+    UUIDInMatchSpec,
+)
 from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.dto.manager.v2.runtime_variant_preset.types import (
     PresetTarget,
@@ -100,6 +104,7 @@ from ai.backend.manager.data.session.creation import (
 )
 from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.data.vfolder.types import VFolderLocation
+from ai.backend.manager.defs import DEFAULT_ROLE
 from ai.backend.manager.errors.deployment import (
     DeploymentHasNoTargetRevision,
     DeploymentRevisionNotFound,
@@ -168,6 +173,8 @@ from ai.backend.manager.models.endpoint.updaters import (
 from ai.backend.manager.models.image.row import ImageRow
 from ai.backend.manager.models.image.searchers import ReferenceImageSearcher
 from ai.backend.manager.models.kernel.row import KernelRow
+from ai.backend.manager.models.kernel.searchable_fields import KernelSearchableFields
+from ai.backend.manager.models.kernel.searchers import KernelSearcher
 from ai.backend.manager.models.keypair.row import keypairs
 from ai.backend.manager.models.project.row import ProjectRow, groups
 from ai.backend.manager.models.replica_group.creators import ReplicaGroupCreator
@@ -2252,27 +2259,47 @@ class DeploymentDBSource:
         if not route_by_session:
             return result_map
 
-        async with self._begin_readonly_session_read_committed() as db_sess:
-            kernels = await KernelRow.batch_load_main_kernels_by_session_id(
-                db_sess, list(route_by_session.keys())
-            )
+        async with self._reconcile_ops.read_ops() as r:
+            kernels = (
+                await r.search_in_global(
+                    KernelSearcher(
+                        pagination=NoPagination(),
+                        conditions=[
+                            KernelSearchableFields.own.session_id.filter.in_(
+                                UUIDInMatchSpec(
+                                    values=[
+                                        uuid.UUID(str(session_id))
+                                        for session_id in route_by_session
+                                    ],
+                                    negated=False,
+                                )
+                            ),
+                            KernelSearchableFields.own.cluster_role.filter.equals(
+                                StringMatchSpec(DEFAULT_ROLE, case_insensitive=False, negated=False)
+                            ),
+                        ],
+                    )
+                )
+            ).items
 
         for kernel in kernels:
-            route = route_by_session.get(kernel.session_id)
-            if route is None or kernel.service_ports is None or not kernel.kernel_host:
+            session_id = SessionId(uuid.UUID(kernel.session.session_id))
+            route = route_by_session.get(session_id)
+            service_ports = kernel.network.service_ports
+            if route is None or service_ports is None or not kernel.network.kernel_host:
                 continue
             # First inference port wins (legacy single-inference-port
             # contract preserved during the row-method removal).
             inference_port = next(
-                (p for p in kernel.service_ports if p.get("is_inference")),
+                (p for p in service_ports if p.get("is_inference")),
                 None,
             )
             if inference_port is None or not inference_port.get("host_ports"):
                 continue
             entry = AppProxyRouteEntry(
-                session_id=kernel.session_id,
+                session_id=session_id,
                 route_id=route.route_id,
-                kernel_host=kernel.kernel_host,
+                kernel_host=kernel.network.kernel_host,
                 kernel_port=inference_port["host_ports"][0],
             )
             result_map.setdefault(uuid.UUID(str(route.deployment_id)), []).append(entry)
