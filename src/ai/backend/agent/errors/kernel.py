@@ -105,3 +105,18 @@ class RunIdNotSetError(BackendAIError, web.HTTPInternalServerError):
             operation=ErrorOperation.EXECUTE,
             error_detail=ErrorDetail.NOT_READY,
         )
+
+
+class KernelRunnerReplyTimeoutError(BackendAIError, web.HTTPGatewayTimeout):
+    """Raised when the kernel runner does not answer a request within its reply bound."""
+
+    error_type = "https://api.backend.ai/probs/agent/kernel-runner-reply-timeout"
+    error_title = "Kernel runner did not reply in time."
+
+    @override
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.KERNEL,
+            operation=ErrorOperation.ACCESS,
+            error_detail=ErrorDetail.TASK_TIMEOUT,
+        )
