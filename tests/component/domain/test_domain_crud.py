@@ -39,10 +39,10 @@ from ai.backend.common.dto.manager.query import StringFilter
 from ai.backend.manager.models.domain.row import domains
 from ai.backend.manager.models.project.row import groups
 from ai.backend.manager.models.resource_group.row import (
-    ResourceGroupOpts,
     resource_groups,
     sgroups_for_domains,
 )
+from ai.backend.manager.models.resource_group.types import ResourceGroupOpts
 
 DomainFactory = Callable[..., Coroutine[Any, Any, CreateDomainResponse]]
 

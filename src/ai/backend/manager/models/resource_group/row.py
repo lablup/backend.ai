@@ -3,9 +3,8 @@ from __future__ import annotations
 import uuid
 from collections.abc import Callable, Container, Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta
+from datetime import datetime
 from typing import (
-    TYPE_CHECKING,
     Any,
     Self,
     cast,
@@ -13,7 +12,6 @@ from typing import (
 )
 
 import sqlalchemy as sa
-from pydantic import ConfigDict, Field, field_serializer
 from sqlalchemy.dialects import postgresql as pgsql
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
 from sqlalchemy.orm import (
@@ -28,12 +26,6 @@ from sqlalchemy.sql.expression import SQLColumnExpression, false, true
 
 from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.entity.resource_group import ResourceGroupID
-from ai.backend.common.schema.resource_group import PreemptionConfig
-from ai.backend.common.types import (
-    AgentSelectionStrategy,
-    BackendAISchema,
-    SessionTypes,
-)
 from ai.backend.manager.data.deployment.types import DeploymentOptions
 from ai.backend.manager.data.permission.permission_defs import ResourceGroupPermission
 from ai.backend.manager.data.resource_group.types import FairShareResourceGroupSpec
@@ -55,72 +47,12 @@ from ai.backend.manager.models.rbac import (
     get_predefined_roles_in_scope,
 )
 from ai.backend.manager.models.rbac.context import ClientContext
+from ai.backend.manager.models.resource_group.types import ResourceGroupOpts
 from ai.backend.manager.models.types import QueryCondition
 from ai.backend.manager.models.user.row import UserRole
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 
-if TYPE_CHECKING:
-    from ai.backend.manager.models.agent.row import AgentRow
-
-__all__: Sequence[str] = (
-    # table defs
-    "resource_groups",
-    "ResourceGroupOpts",
-    "ResourceGroupRow",
-    "sgroups_for_domains",
-    "sgroups_for_groups",
-    "sgroups_for_keypairs",
-)
-
-
-class ResourceGroupOpts(BackendAISchema):
-    model_config = ConfigDict(frozen=True)
-
-    allowed_session_types: list[SessionTypes] = Field(
-        default_factory=lambda: [
-            SessionTypes.INTERACTIVE,
-            SessionTypes.BATCH,
-            SessionTypes.INFERENCE,
-        ]
-    )
-    pending_timeout: timedelta = timedelta(seconds=0)
-    config: dict[str, Any] = Field(default_factory=dict)
-
-    # Scheduler has a dedicated database column to store its name,
-    # but agent selector configuration is stored as a part of the scheduler_opts column.
-    agent_selection_strategy: AgentSelectionStrategy = AgentSelectionStrategy.DISPERSED
-    agent_selector_config: dict[str, Any] = Field(default_factory=dict)
-
-    enforce_spreading_endpoint_replica: bool = False
-    """Deprecated: replaced by the replica group's SessionGroup placement policy (BEP-1064).
-
-    Nothing reads this field — the spreading chain it was meant to drive was
-    already dead code (BA-6135). Existing values were migrated onto each
-    replica group's SessionGroup (``true`` → ``spread`` + ``preferred``,
-    otherwise ``none``). Kept only so persisted ``scheduler_opts`` documents
-    keep round-tripping; the column and API drop in the next major.
-    """
-
-    allow_fractional_resource_fragmentation: bool = True
-    """If set to false, agent will refuse to start kernel when they are forced to fragment fractional resource request"""
-
-    route_cleanup_target_statuses: list[str] = Field(default_factory=lambda: ["unhealthy"])
-    """List of route statuses that should be automatically cleaned up. Valid values: healthy, unhealthy, degraded"""
-
-    preemption: PreemptionConfig = Field(default_factory=PreemptionConfig)
-    """Preemption configuration"""
-
-    @field_serializer("allowed_session_types", mode="plain")
-    def serialize_allowed_session_types(self, value: list[SessionTypes]) -> list[str]:
-        return [item.value for item in value]
-
-    @field_serializer("pending_timeout", mode="plain")
-    def serialize_pending_timeout(self, value: timedelta) -> float:
-        return value.total_seconds()
-
-    @field_serializer("agent_selection_strategy", mode="plain")
-    def serialize_agent_selection_strategy(self, value: AgentSelectionStrategy) -> str:
-        return value.value
+__all__: Sequence[str] = ("ResourceGroupRow",)
 
 
 # When scheduling, we take the union of allowed scaling groups for
@@ -148,6 +80,8 @@ class ResourceGroupForDomainRow(Base):
         # constraint
         sa.UniqueConstraint("resource_group_id", "domain_id", name="uq_sgroup_domain"),
     )
+    # Read only by ResourceGroupPermissionContextBuilder (the legacy RBAC) below.
+    # Delete it with the legacy RBAC.
     sgroup_row: Mapped[ResourceGroupRow] = relationship(
         "ResourceGroupRow",
     )
@@ -179,12 +113,15 @@ class ResourceGroupForProjectRow(Base):
         # constraint
         sa.UniqueConstraint("resource_group_id", "group", name="uq_sgroup_ugroup"),
     )
+    # Read only by ResourceGroupPermissionContextBuilder (the legacy RBAC) below.
+    # Delete it with the legacy RBAC.
     sgroup_row: Mapped[ResourceGroupRow] = relationship(
         "ResourceGroupRow",
     )
 
 
-# For compatibility
+# For compatibility. In src, only gql_legacy (scaling_group.py) uses it.
+# Delete it with the gql_legacy cleanup.
 sgroups_for_groups = ResourceGroupForProjectRow.__table__
 
 
@@ -209,12 +146,15 @@ class ResourceGroupForKeypairsRow(Base):
         # constraint
         sa.UniqueConstraint("resource_group_id", "access_key", name="uq_sgroup_akey"),
     )
+    # Read only by ResourceGroupPermissionContextBuilder (the legacy RBAC) below.
+    # Delete it with the legacy RBAC.
     sgroup_row: Mapped[ResourceGroupRow] = relationship(
         "ResourceGroupRow",
     )
 
 
-# For compatibility
+# For compatibility. In src, only gql_legacy (scaling_group.py) uses it.
+# Delete it with the gql_legacy cleanup.
 sgroups_for_keypairs = ResourceGroupForKeypairsRow.__table__
 
 
@@ -296,11 +236,6 @@ class ResourceGroupRow(CreatedAtMixin, Base):
         default=DefaultSessionOptions,
     )
 
-    agents: Mapped[list[AgentRow]] = relationship(
-        "AgentRow",
-        foreign_keys="[AgentRow.scaling_group]",
-    )
-
     @classmethod
     def scope_id_expr(cls) -> SQLColumnExpression[ResourceGroupID]:
         return cls.id
@@ -309,6 +244,8 @@ class ResourceGroupRow(CreatedAtMixin, Base):
     def scope_name_expr(cls) -> SQLColumnExpression[str]:
         return cls.name
 
+    # Called only by resolve_accessible_scaling_groups in api/gql_legacy/schema.py.
+    # Delete it with gql_legacy.
     @classmethod
     async def list_by_condition(
         cls,
@@ -323,6 +260,8 @@ class ResourceGroupRow(CreatedAtMixin, Base):
             return list((await db_session.scalars(stmt)).all())
 
 
+# Builds the condition list_by_condition takes; api/gql_legacy/schema.py is the only
+# caller. Delete it with gql_legacy.
 def and_names(names: Iterable[str]) -> Callable[..., sa.sql.Select[Any]]:
     return lambda query_stmt: query_stmt.where(ResourceGroupRow.name.in_(names))
 
@@ -331,6 +270,9 @@ def and_names(names: Iterable[str]) -> Callable[..., sa.sql.Select[Any]]:
 resource_groups = ResourceGroupRow.__table__
 
 
+# Everything below serves the legacy RBAC path alone: get_resource_groups is its way in,
+# and its only caller, _ensure_sgroup_permission in api/gql_legacy/domain.py, is called by
+# nothing. Delete the whole block together with gql_legacy.
 @dataclass
 class ResourceGroupModel(RBACModel[ResourceGroupPermission]):
     id: ResourceGroupID
@@ -640,6 +582,7 @@ class ResourceGroupPermissionContextBuilder(
         return MEMBER_PERMISSIONS
 
 
+# Called only by _ensure_sgroup_permission in api/gql_legacy/domain.py.
 async def get_resource_groups(
     target_scope: ScopeType,
     requested_permission: ResourceGroupPermission,

@@ -44,7 +44,8 @@ from ai.backend.manager.models.replica_group_history.searchable_fields import (
 from ai.backend.manager.models.replica_group_history.searchers import (
     ReplicaGroupHistorySearcher,
 )
-from ai.backend.manager.models.resource_group.row import ResourceGroupOpts, ResourceGroupRow
+from ai.backend.manager.models.resource_group.row import ResourceGroupRow
+from ai.backend.manager.models.resource_group.types import ResourceGroupOpts
 from ai.backend.manager.models.resource_policy.row import (
     KeyPairResourcePolicyRow,
     ProjectResourcePolicyRow,
