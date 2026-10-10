@@ -12,6 +12,7 @@ from dataclasses import dataclass
 
 import pytest
 
+from ai.backend.common.config import DefaultModelDefinition
 from ai.backend.common.container_registry import ContainerRegistryType
 from ai.backend.common.data.endpoint.types import EndpointLifecycle
 from ai.backend.common.data.entity.container_registry import ContainerRegistryID
@@ -236,7 +237,11 @@ class TestDeploymentUsage:
             db_sess.add(image)
 
             variants = [
-                RuntimeVariantRow(id=RuntimeVariantID(uuid.uuid4()), name=f"variant-{label}")
+                RuntimeVariantRow(
+                    id=RuntimeVariantID(uuid.uuid4()),
+                    name=f"variant-{label}",
+                    default_model_definition=DefaultModelDefinition(),
+                )
                 for label in ("used", "unused")
             ]
             db_sess.add_all(variants)
