@@ -32,7 +32,12 @@ from ai.backend.common.data.entity.session_group import SessionGroupID
 from ai.backend.common.data.entity.user import UserEntityType, UserID
 from ai.backend.common.data.entity.vfolder import VFolderUUID
 from ai.backend.common.data.model_deployment.types import DeploymentStrategy
-from ai.backend.common.schema.deployment import BlueGreenSpec, IntOrPercent, RollingUpdateSpec
+from ai.backend.common.schema.deployment import (
+    BlueGreenSpec,
+    IntOrPercent,
+    ReplicaGroupRolloutSpec,
+    RollingUpdateSpec,
+)
 from ai.backend.common.types import (
     AccessKey,
     AgentId,
@@ -166,6 +171,10 @@ def attach_primary_replica_group(
         deployment_id=endpoint.id,
         current_revision_id=current_revision_id,
         target_revision_id=target_revision_id,
+        rollout=ReplicaGroupRolloutSpec(
+            max_surge=IntOrPercent(count=1),
+            max_unavailable=IntOrPercent(count=0),
+        ),
     )
     db_sess.add(group)
     endpoint.primary_replica_group_id = ReplicaGroupID(group_id)
@@ -2120,6 +2129,10 @@ class TestDeploymentRevisionOperations:
                     lifecycle=ReplicaGroupLifecycle.DRAINED,
                     desired_current_replica_count=0,
                     desired_target_replica_count=0,
+                    rollout=ReplicaGroupRolloutSpec(
+                        max_surge=IntOrPercent(count=1),
+                        max_unavailable=IntOrPercent(count=0),
+                    ),
                 )
             )
             await db_sess.execute(
@@ -2998,6 +3011,10 @@ class TestRouteOperations:
                     session_group_id=SessionGroupID(uuid.uuid4()),
                     id=group_id,
                     deployment_id=test_endpoint_id,
+                    rollout=ReplicaGroupRolloutSpec(
+                        max_surge=IntOrPercent(count=1),
+                        max_unavailable=IntOrPercent(count=0),
+                    ),
                 )
             )
             await db_sess.commit()

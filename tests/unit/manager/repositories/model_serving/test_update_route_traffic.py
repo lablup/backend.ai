@@ -27,6 +27,7 @@ from ai.backend.common.data.entity.domain import DomainID, DomainName
 from ai.backend.common.data.entity.image import ImageID
 from ai.backend.common.data.entity.replica_group import ReplicaGroupID
 from ai.backend.common.data.entity.session_group import SessionGroupID
+from ai.backend.common.schema.deployment import IntOrPercent, ReplicaGroupRolloutSpec
 from ai.backend.common.types import ResourceSlot
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.deployment.types import RouteStatus
@@ -346,6 +347,10 @@ async def endpoint_with_revision_and_route(
                 id=ReplicaGroupID(group_id),
                 deployment_id=DeploymentID(endpoint_id),
                 current_revision_id=revision_id,
+                rollout=ReplicaGroupRolloutSpec(
+                    max_surge=IntOrPercent(count=1),
+                    max_unavailable=IntOrPercent(count=0),
+                ),
             )
         )
         await sess.flush()
