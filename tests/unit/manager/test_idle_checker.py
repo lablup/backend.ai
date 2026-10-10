@@ -676,6 +676,7 @@ class _UtilizationGracePeriodTestConfig:
     cpu_util_pct: float  # CPU utilization percentage
     threshold_cpu: float  # Required CPU threshold
     threshold_mem: float  # Required memory threshold
+    previous_mem_util: float  # Memory utilization of the sample collected a window ago
     expected_remaining: float  # Expected remaining time
     expected_alive: bool  # Expected should_alive result
 
@@ -707,8 +708,22 @@ class _UtilizationInsufficientTestConfig:
     cpu_util_pct: float  # CPU utilization percentage
     threshold_cpu: float  # Required CPU threshold (%)
     threshold_mem: float  # Required memory threshold (%)
+    previous_mem_util: float  # Memory utilization of the sample collected a window ago
     expected_remaining: float  # Expected remaining time
     expected_alive: bool  # Expected should_alive result
+
+
+@dataclass(frozen=True)
+class _UtilizationPass:
+    at_seconds: int
+    cpu_util_pct: float
+    expected_alive: bool
+
+
+@dataclass(frozen=True)
+class _UtilizationWindowCase:
+    description: str
+    passes: list[_UtilizationPass]
 
 
 class TestUtilizationIdleChecker:
@@ -899,19 +914,18 @@ class TestUtilizationIdleChecker:
         }
         valkey_stat.get_kernel_statistics.return_value = live_stat
 
-        # Mock util_first_collected to simulate that samples have been collected
-        # Set it to time_window seconds ago so do_idle_check becomes True
-        util_first_collected = now.timestamp() - grace_test_config.time_window_seconds
+        # One sample collected a full window ago, so the window is observed and do_idle_check is True
+        window_start = now.timestamp() - grace_test_config.time_window_seconds
 
         async def get_live_data_side_effect(key: str) -> bytes | None:
-            if key.endswith(".util_first_collected"):
-                return str(util_first_collected).encode()
             if key.endswith(".util_last_collected"):
-                # Return a timestamp in the past to pass the interval check
-                return str(util_first_collected).encode()
-            if key.endswith(".util_series"):
-                # Return None to start with empty series
-                return None
+                return str(window_start).encode()
+            if key.endswith(".util_series_v2"):
+                return msgpack.packb({
+                    "observed_since": window_start,
+                    "collected_at": [window_start],
+                    "series": {"mem": [grace_test_config.previous_mem_util]},
+                })
             return None
 
         valkey_live.get_live_data.side_effect = get_live_data_side_effect
@@ -952,6 +966,7 @@ class TestUtilizationIdleChecker:
                 cpu_util_pct=10.0,
                 threshold_cpu=0.0,
                 threshold_mem=0.0,
+                previous_mem_util=60.0,
                 expected_remaining=120.0,
                 expected_alive=True,
             ),
@@ -966,6 +981,7 @@ class TestUtilizationIdleChecker:
                 cpu_util_pct=5.0,
                 threshold_cpu=50.0,
                 threshold_mem=50.0,
+                previous_mem_util=10.0,
                 expected_remaining=-1,
                 expected_alive=False,
             ),
@@ -980,6 +996,7 @@ class TestUtilizationIdleChecker:
                 cpu_util_pct=10.0,
                 threshold_cpu=0.0,
                 threshold_mem=0.0,
+                previous_mem_util=60.0,
                 expected_remaining=-1,
                 expected_alive=True,
             ),
@@ -995,6 +1012,7 @@ class TestUtilizationIdleChecker:
                 cpu_util_pct=5.0,
                 threshold_cpu=50.0,
                 threshold_mem=50.0,
+                previous_mem_util=10.0,
                 expected_remaining=120.0,
                 expected_alive=True,
             ),
@@ -1230,6 +1248,7 @@ class TestUtilizationIdleChecker:
                 cpu_util_pct=5.0,
                 threshold_cpu=50.0,
                 threshold_mem=50.0,
+                previous_mem_util=10.0,
                 expected_remaining=-1,
                 expected_alive=False,
             ),
@@ -1248,14 +1267,18 @@ class TestUtilizationIdleChecker:
     ) -> None:
         """Test utilization with insufficient usage below thresholds (should terminate session)"""
         # Given
-        util_first_collected_time = base_time.timestamp()
+        window_start = base_time.timestamp() + (
+            insufficient_test_config.elapsed_seconds - insufficient_test_config.time_window_seconds
+        )
 
         # Setup side_effect using key inspection
         def mock_get_live_data_side_effect(key: str) -> bytes | None:
-            if ".util_first_collected" in key:
-                return f"{util_first_collected_time:.06f}".encode()
-            if ".util_series" in key:
-                return msgpack.packb({"cpu_util": [], "mem": [], "cuda_util": [], "cuda_mem": []})
+            if ".util_series_v2" in key:
+                return msgpack.packb({
+                    "observed_since": window_start,
+                    "collected_at": [window_start],
+                    "series": {"mem": [insufficient_test_config.previous_mem_util]},
+                })
             if ".utilization_extra" in key:
                 return msgpack.packb({"resources": {}})
             if ".utilization" in key:
@@ -1317,13 +1340,15 @@ class TestUtilizationIdleChecker:
         }
         valkey_stat.get_kernel_statistics.return_value = live_stat
 
-        util_first_collected = now.timestamp() - time_window_seconds
+        window_start = now.timestamp() - time_window_seconds
 
         def get_live_data_side_effect(key: str) -> bytes | None:
-            if ".util_first_collected" in key:
-                return f"{util_first_collected:.06f}".encode()
-            if ".util_series" in key:
-                return msgpack.packb({"cpu_util": [], "mem": []})
+            if ".util_series_v2" in key:
+                return msgpack.packb({
+                    "observed_since": window_start,
+                    "collected_at": [window_start],
+                    "series": {"cpu_util": [None], "mem": [60.0]},
+                })
             if ".utilization_extra" in key:
                 return msgpack.packb({"resources": {}})
             if ".utilization" in key:
@@ -1375,3 +1400,132 @@ class TestUtilizationIdleChecker:
         # Then - session should stay alive because cpu_util is excluded,
         # not treated as 0.0
         assert should_alive is True
+
+    # Test 6: The average covers only samples collected within the time window
+    @pytest.fixture
+    def live_data(self) -> dict[str, bytes]:
+        return {}
+
+    @pytest.fixture
+    async def sample_window_checker(
+        self,
+        live_data: dict[str, bytes],
+        valkey_live: AsyncMock,
+        valkey_stat: AsyncMock,
+        event_producer: AsyncMock,
+    ) -> UtilizationIdleChecker:
+        async def get_live_data(key: str) -> bytes | None:
+            return live_data.get(key)
+
+        async def store_live_data(key: str, value: str | bytes, *, ex: int | None = None) -> None:
+            live_data[key] = value.encode() if isinstance(value, str) else value
+
+        valkey_live.get_live_data.side_effect = get_live_data
+        valkey_live.store_live_data.side_effect = store_live_data
+        checker = UtilizationIdleChecker(
+            IdleCheckerArgs(
+                event_producer=event_producer,
+                redis_live=valkey_live,
+                valkey_stat_client=valkey_stat,
+            )
+        )
+        await checker.populate_config({
+            "initial-grace-period": "0",
+            "resource-thresholds": {"cpu_util": {"average": "40"}},
+            "thresholds-check-operator": "and",
+            "time-window": "60",
+        })
+        return checker
+
+    @pytest.fixture
+    def cpu_kernel_row(
+        self,
+        session_id: SessionId,
+        utilization_kernel_id: KernelId,
+        base_time: datetime,
+    ) -> Any:
+        return mock_row(
+            id=utilization_kernel_id,
+            session_id=session_id,
+            created_at=base_time - timedelta(minutes=10),
+            cluster_size=1,
+            occupied_slots={"cpu": Decimal(1)},
+            requested_slots={"cpu": Decimal(1)},
+        )
+
+    @pytest.mark.parametrize(
+        "case",
+        [
+            _UtilizationWindowCase(
+                description="judged_once_a_full_window_is_collected",
+                passes=[
+                    _UtilizationPass(at_seconds=0, cpu_util_pct=0.0, expected_alive=True),
+                    _UtilizationPass(at_seconds=15, cpu_util_pct=0.0, expected_alive=True),
+                    _UtilizationPass(at_seconds=30, cpu_util_pct=0.0, expected_alive=True),
+                    _UtilizationPass(at_seconds=45, cpu_util_pct=0.0, expected_alive=True),
+                    _UtilizationPass(at_seconds=60, cpu_util_pct=0.0, expected_alive=False),
+                ],
+            ),
+            _UtilizationWindowCase(
+                description="samples_older_than_window_are_not_judged_after_collection_stops",
+                passes=[
+                    _UtilizationPass(at_seconds=0, cpu_util_pct=0.0, expected_alive=True),
+                    _UtilizationPass(at_seconds=15, cpu_util_pct=0.0, expected_alive=True),
+                    _UtilizationPass(at_seconds=30, cpu_util_pct=0.0, expected_alive=True),
+                    _UtilizationPass(at_seconds=200, cpu_util_pct=100.0, expected_alive=True),
+                ],
+            ),
+            _UtilizationWindowCase(
+                description="judged_again_once_a_full_window_is_collected_after_collection_stops",
+                passes=[
+                    _UtilizationPass(at_seconds=0, cpu_util_pct=100.0, expected_alive=True),
+                    _UtilizationPass(at_seconds=15, cpu_util_pct=100.0, expected_alive=True),
+                    _UtilizationPass(at_seconds=30, cpu_util_pct=100.0, expected_alive=True),
+                    _UtilizationPass(at_seconds=200, cpu_util_pct=0.0, expected_alive=True),
+                    _UtilizationPass(at_seconds=215, cpu_util_pct=0.0, expected_alive=True),
+                    _UtilizationPass(at_seconds=230, cpu_util_pct=0.0, expected_alive=True),
+                    _UtilizationPass(at_seconds=245, cpu_util_pct=0.0, expected_alive=True),
+                    _UtilizationPass(at_seconds=260, cpu_util_pct=0.0, expected_alive=False),
+                ],
+            ),
+            _UtilizationWindowCase(
+                description="sparse_samples_are_averaged_over_the_window_only",
+                passes=[
+                    _UtilizationPass(at_seconds=0, cpu_util_pct=100.0, expected_alive=True),
+                    _UtilizationPass(at_seconds=30, cpu_util_pct=100.0, expected_alive=True),
+                    _UtilizationPass(at_seconds=60, cpu_util_pct=100.0, expected_alive=True),
+                    _UtilizationPass(at_seconds=90, cpu_util_pct=100.0, expected_alive=True),
+                    _UtilizationPass(at_seconds=120, cpu_util_pct=0.0, expected_alive=True),
+                    _UtilizationPass(at_seconds=150, cpu_util_pct=0.0, expected_alive=False),
+                ],
+            ),
+        ],
+        ids=lambda case: case.description,
+    )
+    async def test_average_covers_samples_within_time_window(
+        self,
+        case: _UtilizationWindowCase,
+        sample_window_checker: UtilizationIdleChecker,
+        cpu_kernel_row: Any,
+        base_time: datetime,
+        valkey_live: AsyncMock,
+        valkey_stat: AsyncMock,
+        db_connection: AsyncMock,
+        mocker: Any,
+    ) -> None:
+        get_db_now = mocker.patch("ai.backend.manager.idle.get_db_now")
+        alive: list[bool] = []
+        for utilization_pass in case.passes:
+            now = base_time + timedelta(seconds=utilization_pass.at_seconds)
+            valkey_live.get_server_time.return_value = now.timestamp()
+            get_db_now.return_value = now
+            valkey_stat.get_kernel_statistics.return_value = {
+                "cpu_util": {"pct": str(utilization_pass.cpu_util_pct)},
+            }
+            alive.append(
+                await sample_window_checker.check_idleness(
+                    cpu_kernel_row, db_connection, mock_row(idle_timeout=60)
+                )
+            )
+
+        assert alive == [p.expected_alive for p in case.passes]
