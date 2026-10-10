@@ -5,12 +5,14 @@ Request DTOs for container registry DTO v2.
 from __future__ import annotations
 
 from typing import Any, Self
+from urllib.parse import urlparse
 from uuid import UUID
 
 from pydantic import Field, field_validator
 
 from ai.backend.common.api_handlers import BaseRequestModel
 from ai.backend.common.dto.manager.query import StringFilter
+from ai.backend.common.exception import InvalidContainerRegistryURL
 
 from .types import (
     ContainerRegistryOrderField,
@@ -28,6 +30,21 @@ __all__ = (
     "AdminSearchContainerRegistriesInput",
     "UpdateContainerRegistryInput",
 )
+
+
+def _validate_registry_url(url: str) -> str:
+    """Refuse a URL no host can be read out of.
+
+    A URL with no scheme is accepted: the registry clients prepend one themselves.
+    """
+    stripped = url.strip()
+    if not stripped:
+        raise InvalidContainerRegistryURL("url must not be blank")
+    candidate = stripped if stripped.startswith(("http://", "https://")) else f"http://{stripped}"
+    parsed = urlparse(candidate)
+    if not (parsed.scheme and parsed.netloc):
+        raise InvalidContainerRegistryURL(f"url is not a valid registry address: {stripped}")
+    return stripped
 
 
 class AllowedGroupsInput(BaseRequestModel):
@@ -74,10 +91,7 @@ class CreateContainerRegistryInput(BaseRequestModel):
     @field_validator("url", mode="before")
     @classmethod
     def url_strip_and_validate(cls, v: str) -> str:
-        stripped = v.strip()
-        if not stripped:
-            raise ValueError("url must not be blank")
-        return stripped
+        return _validate_registry_url(v)
 
     @field_validator("registry_name", mode="before")
     @classmethod
@@ -124,10 +138,7 @@ class UpdateContainerRegistryInput(BaseRequestModel):
     def url_strip_and_validate(cls, v: str | None) -> str | None:
         if v is None:
             return v
-        stripped = v.strip()
-        if not stripped:
-            raise ValueError("url must not be blank")
-        return stripped
+        return _validate_registry_url(v)
 
     @field_validator("registry_name", mode="before")
     @classmethod

@@ -14,7 +14,11 @@ from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.types import EntityIdentifier
 from ai.backend.manager.data.container_registry.types import ContainerRegistryData
 from ai.backend.manager.data.permission.global_entity import global_entity_id
-from ai.backend.manager.errors.repository import ForeignKeyViolationError
+from ai.backend.manager.errors.container_registry import InvalidContainerRegistryProject
+from ai.backend.manager.errors.repository import (
+    CheckConstraintViolationError,
+    ForeignKeyViolationError,
+)
 from ai.backend.manager.errors.resource import ProjectNotFound
 from ai.backend.manager.models.association_container_registries_groups.row import (
     AssociationContainerRegistriesGroupsRow,
@@ -63,7 +67,16 @@ class ContainerRegistryCreator(EntityCreator[ContainerRegistryRow, ContainerRegi
 
     @override
     def integrity_error_checks(self) -> Sequence[IntegrityErrorCheck]:
-        return ()
+        return (
+            IntegrityErrorCheck(
+                violation_type=CheckConstraintViolationError,
+                constraint_name="ck_container_registries_harbor_project",
+                error=InvalidContainerRegistryProject(
+                    "A Harbor registry needs a project name Harbor accepts:"
+                    " lowercase letters and digits, joined by one of . _ -"
+                ),
+            ),
+        )
 
     @override
     def build_row(self) -> ContainerRegistryRow:
