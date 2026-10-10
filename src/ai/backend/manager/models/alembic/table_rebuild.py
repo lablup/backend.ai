@@ -57,6 +57,8 @@ class TableRebuild:
 
     def create_new_table(self) -> None:
         """Drops the foreign keys pointing at the table and creates an empty copy of it."""
+        # Writes wait until the swap commits instead of landing in the table being dropped.
+        self._conn.execute(sa.text(f"LOCK TABLE {self._table} IN SHARE MODE"))
         self._read_definitions()
         for reference in self._references:
             self._conn.execute(

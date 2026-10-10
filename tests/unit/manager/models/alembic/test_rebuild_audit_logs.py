@@ -15,6 +15,7 @@ import pytest
 import sqlalchemy as sa
 
 from ai.backend.manager.models.alembic.audit_log_rebuild import AuditLogRebuild
+from ai.backend.manager.models.alembic.table_rebuild import TableRebuild
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 
 _SCHEMA: Final[str] = "audit_log_rebuild_probe"
@@ -299,3 +300,23 @@ class TestRebuildFrom26_8:
         async with table_26_8.begin() as conn:
             await conn.execute(sa.text(f"DELETE FROM {_SCHEMA}.audit_logs"))
         assert await _scope_audit_log_ids(table_26_8) == set()
+
+
+class TestTableRebuildLock:
+    async def test_writes_wait_while_rows_are_copied(
+        self, table_26_4: ExtendedAsyncSAEngine
+    ) -> None:
+        async with table_26_4.begin() as rebuilding:
+            await rebuilding.execute(sa.text(f"SET LOCAL search_path TO {_SCHEMA}"))
+            await rebuilding.run_sync(
+                lambda sync_conn: TableRebuild(sync_conn, "audit_logs").create_new_table()
+            )
+            with pytest.raises(sa.exc.DBAPIError, match="lock timeout"):
+                async with table_26_4.begin() as writer:
+                    await writer.execute(sa.text("SET LOCAL lock_timeout = '200ms'"))
+                    await writer.execute(
+                        sa.text(f"DELETE FROM {_SCHEMA}.audit_logs WHERE id = :id").bindparams(
+                            id=_SESSION_CREATE.id
+                        )
+                    )
+            await rebuilding.rollback()
