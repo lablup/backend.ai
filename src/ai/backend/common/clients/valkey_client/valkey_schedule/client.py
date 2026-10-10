@@ -39,6 +39,9 @@ KERNEL_HEALTH_TTL_SEC = 300  # 5 minutes - TTL for kernel health status
 MAX_KERNEL_HEALTH_STALENESS_SEC = 120  # 2 minutes - threshold for kernel health staleness
 AGENT_LAST_CHECK_TTL_SEC = 1200  # 20 minutes - TTL for agent last check timestamp
 ORPHAN_KERNEL_THRESHOLD_SEC = 600  # 10 minutes - threshold for orphan kernel detection
+# TTL of the manager's kernel-sweep mark; longer than the orphan threshold so a slow
+# manager does not read as gone.
+MANAGER_SWEEP_TTL_SEC = ORPHAN_KERNEL_THRESHOLD_SEC * 3
 FORCE_TERMINATED_CLEANUP_TTL_SEC = 1200  # 20 minutes - TTL for force-terminated cleanup queue
 ROUTE_PROBE_TTL_SEC = 3600  # 1 hour - TTL for route probe targets
 ROUTE_HEALTH_STATUS_TTL_SEC = 120  # 2 minutes - TTL for route health status (expiry = DEGRADED)
@@ -192,6 +195,13 @@ class ValkeyScheduleClient:
 
     def _get_route_health_status_key(self, replica_id: ReplicaID) -> str:
         return f"route_health:{replica_id}"
+
+    def _get_manager_sweep_key(self) -> str:
+        """Cluster-wide key holding when the manager's kernel sweep last completed.
+
+        Not per agent: ``agent:last_check`` never advances for an agent whose only kernel is an orphan.
+        """
+        return "manager:kernel_sweep_epoch"
 
     def _get_agent_last_check_key(self, agent_id: AgentId) -> str:
         """
@@ -999,6 +1009,29 @@ class ValkeyScheduleClient:
         return result
 
     # ==================== Agent Last Check Methods ====================
+
+    @valkey_schedule_resilience.apply()
+    async def mark_manager_sweep(self) -> None:
+        """Record that the manager's kernel sweep just completed for every resource group.
+
+        The mark expires; an absent mark tells agents the manager is not sweeping.
+        """
+        current_time = await self._get_redis_time()
+        async with self._client.client() as conn:
+            await conn.set(
+                self._get_manager_sweep_key(),
+                str(current_time),
+                expiry=ExpirySet(ExpiryType.SEC, MANAGER_SWEEP_TTL_SEC),
+            )
+
+    @valkey_schedule_resilience.apply()
+    async def get_manager_sweep_epoch(self) -> int | None:
+        """When the manager's kernel sweep last completed, or None if it has not lately."""
+        async with self._client.client() as conn:
+            result = await conn.get(self._get_manager_sweep_key())
+        if result is None:
+            return None
+        return int(result)
 
     @valkey_schedule_resilience.apply()
     async def get_agent_last_check(self, agent_id: AgentId) -> int | None:
