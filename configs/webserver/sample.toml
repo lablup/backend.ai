@@ -784,7 +784,7 @@
   # Additional labels for service categorization and filtering.
   # Added in 26.3.0
   # Replace <name> with your actual key (e.g., 'default', 'local')
-  [service-discovery.extra-labels.<name>]
+  [service-discovery.extra-labels."<name>"]
 
   # List of endpoints exposed by this service instance.
   # Added in 26.3.0
@@ -809,7 +809,7 @@
     # Additional metadata for the endpoint.
     # Added in 26.3.0
     # Replace <name> with your actual key (e.g., 'default', 'local')
-    [service-discovery.endpoints.metadata.<name>]
+    [service-discovery.endpoints.metadata."<name>"]
 
 # Apollo Router GraphQL gateway configuration for federated schemas.
 # Added in 25.12.0
