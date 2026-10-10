@@ -5,16 +5,18 @@ Add a non-null ``resource_group_id`` column alongside the existing
 and remove orphan rows that cannot be resolved. The name-based lookup
 behavior remains unchanged during this expand phase.
 
+The table is copied into a new one that carries the column, and only rows whose
+names resolve are copied, instead of updating and deleting rows in place.
+
 Revision ID: 710460cca1ed
 Revises: 097389c0853b
 Create Date: 2026-07-14
 
 """
 
-import sqlalchemy as sa
 from alembic import op
 
-from ai.backend.manager.models.base import GUID
+from ai.backend.manager.models.alembic.kernel_usage_record_rebuild import KernelUsageRecordRebuild
 
 revision = "710460cca1ed"
 down_revision = "097389c0853b"
@@ -24,18 +26,9 @@ depends_on = None
 
 
 def upgrade() -> None:
-    op.add_column("kernel_usage_records", sa.Column("resource_group_id", GUID(), nullable=True))
-    op.execute(
-        """
-        UPDATE kernel_usage_records
-        SET resource_group_id = scaling_groups.id
-        FROM scaling_groups
-        WHERE kernel_usage_records.resource_group = scaling_groups.name
-          AND kernel_usage_records.resource_group_id IS NULL
-        """
-    )
-    op.execute("DELETE FROM kernel_usage_records WHERE resource_group_id IS NULL")
-    op.alter_column("kernel_usage_records", "resource_group_id", nullable=False)
+    rebuild = KernelUsageRecordRebuild(op.get_bind())
+    if "resource_group_id" not in rebuild.columns():
+        rebuild.run()
 
 
 def downgrade() -> None:
