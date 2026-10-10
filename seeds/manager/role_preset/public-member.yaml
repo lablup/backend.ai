@@ -49,6 +49,7 @@ items:
       session_group:                    []
       session_template:                 []
       storage_namespace:                []
+      storage_volume:                   []
       user:                             []
       user_resource_policy:             []
       vfolder:                          []
