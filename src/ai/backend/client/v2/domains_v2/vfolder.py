@@ -2,9 +2,16 @@
 
 from __future__ import annotations
 
+from pathlib import Path
 from uuid import UUID
 
+import aiohttp
+from aiotusclient import client as tus
+from yarl import URL
+
+from ai.backend.client.config import DEFAULT_CHUNK_SIZE
 from ai.backend.client.v2.base_domain import BaseDomainClient
+from ai.backend.client.v2.exceptions import map_status_to_exception
 from ai.backend.common.dto.manager.v2.vfolder.request import (
     BulkDeleteVFoldersInput,
     BulkPurgeVFoldersInput,
@@ -110,6 +117,50 @@ class V2VFolderClient(BaseDomainClient):
             request=request,
             response_model=CreateUploadSessionPayload,
         )
+
+    async def upload_file(
+        self,
+        vfolder_id: UUID,
+        file_path: Path,
+        *,
+        dst_path: str | None = None,
+        chunk_size: int = DEFAULT_CHUNK_SIZE,
+    ) -> None:
+        """Create an upload session and stream the file to it over TUS."""
+        request = CreateUploadSessionInput(
+            path=dst_path or file_path.name, size=file_path.stat().st_size
+        )
+        session = await self.create_upload_session(vfolder_id, request)
+        url = URL(session.url).with_query({"token": session.token})
+        with file_path.open("rb") as stream:
+            uploader = tus.TusClient().async_uploader(
+                file_stream=stream,
+                url=str(url),
+                upload_checksum=False,
+                chunk_size=chunk_size,
+            )
+            await uploader.upload()
+
+    async def download_file(
+        self,
+        vfolder_id: UUID,
+        path: str,
+        dest: Path,
+        *,
+        archive: bool = False,
+        chunk_size: int = DEFAULT_CHUNK_SIZE,
+    ) -> None:
+        """Create a download session and stream its content into ``dest``."""
+        request = CreateDownloadSessionInput(path=path, archive=archive)
+        session = await self.create_download_session(vfolder_id, request)
+        url = URL(session.url).with_query({"token": session.token})
+        # ponytail: one GET, no resume; add Range retries if large downloads flake.
+        async with aiohttp.ClientSession() as http, http.get(url) as resp:
+            if resp.status >= 400:
+                raise map_status_to_exception(resp.status, resp.reason or "", await resp.text())
+            with dest.open("wb") as f:
+                async for chunk in resp.content.iter_chunked(chunk_size):
+                    f.write(chunk)
 
     async def admin_search(
         self,
