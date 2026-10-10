@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from datetime import datetime
 from typing import override
+from uuid import UUID
 
 from ai.backend.common.data.entity.role_permission_preset import RolePermissionPresetID
 from ai.backend.common.data.entity.role_preset import RolePresetID
@@ -35,6 +36,7 @@ class RolePresetData(EntityData):
     name: str
     role_name_template: str | None
     scope_type: EntityType
+    scope_id: UUID | None
     auto_assign: bool
     deleted: bool
     created_at: datetime
