@@ -18,7 +18,6 @@ from ai.backend.common.dto.manager.v2.app_config_fragment.request import (
     MyAppConfigFragmentsByNamesInput,
     ScopedAppConfigFragmentsByNamesInput,
 )
-from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import encode_cursor
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
@@ -106,7 +105,7 @@ async def admin_app_config_fragments(
 
 @gql_mutation(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.9.0",
         description=(
             "Upsert many app config fragments at one scope (insert, or replace config on "
             "conflict), with per-item partial success "
@@ -126,7 +125,7 @@ async def scoped_upsert_app_config_fragments(
 
 @gql_mutation(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.9.0",
         description=(
             "Upsert many app config fragments at the current user's own user scope, with "
             "per-item partial success (not in effect yet: still all-or-nothing)."

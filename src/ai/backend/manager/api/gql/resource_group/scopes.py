@@ -13,7 +13,6 @@ from ai.backend.common.dto.manager.v2.resource_group.types import (
     ResourceGroupUsage,
     ResourceGroupUsedBy,
 )
-from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import UUIDScopeGQL
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
@@ -29,7 +28,7 @@ from ai.backend.manager.api.gql.pydantic_compat import PydanticInputMixin
             "Scope for the scoped resource group query. Each list is OR'd internally and "
             "across lists, and every scope named is authorized before the read runs."
         ),
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.9.0",
     ),
     name="ResourceGroupScope",
 )
@@ -50,7 +49,7 @@ class ResourceGroupScopeGQL(PydanticInputMixin[ResourceGroupScope]):
 @gql_pydantic_input(
     BackendAIGQLMeta(
         description="Entities whose use of a resource group narrows the read.",
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.9.0",
     ),
     name="ResourceGroupUsedBy",
 )
@@ -72,7 +71,7 @@ class ResourceGroupUsedByGQL(PydanticInputMixin[ResourceGroupUsedBy]):
             "able to read each listed entity, or the request is refused. Only resource groups "
             "the caller can read are returned, even when a listed entity is tied to others."
         ),
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.9.0",
     ),
     name="ResourceGroupUsage",
 )

@@ -8,7 +8,6 @@ from strawberry import Info
 from ai.backend.common.dto.manager.v2.resource_slot.request import (
     AdminSearchResourceSlotTypesInput,
 )
-from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import encode_cursor
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
@@ -95,7 +94,7 @@ async def resource_slot_types(
 
 @gql_mutation(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.9.0",
         description="Register a new resource slot type (super admin only).",
     )
 )
@@ -112,7 +111,7 @@ async def admin_create_resource_slot_type(
 
 @gql_mutation(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.9.0",
         description="Update a resource slot type by slot name (super admin only).",
     )
 )
@@ -129,7 +128,7 @@ async def admin_update_resource_slot_type(
 
 @gql_mutation(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.9.0",
         description="Remove a resource slot type by slot name (super admin only).",
     )
 )

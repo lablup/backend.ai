@@ -8,7 +8,6 @@ from ai.backend.common.dto.manager.v2.entity_label.response import (
 from ai.backend.common.dto.manager.v2.entity_label.response import (
     UpsertEntityLabelPayload as UpsertEntityLabelPayloadDTO,
 )
-from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     gql_field,
@@ -27,7 +26,7 @@ __all__ = (
 @gql_pydantic_type(
     BackendAIGQLMeta(
         description="Payload returned after putting a label on an entity.",
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.9.0",
     ),
     model=UpsertEntityLabelPayloadDTO,
     name="UpsertEntityLabelPayload",
@@ -39,7 +38,7 @@ class UpsertEntityLabelPayloadGQL(PydanticOutputMixin[UpsertEntityLabelPayloadDT
 @gql_pydantic_type(
     BackendAIGQLMeta(
         description="Payload returned after taking a label off an entity.",
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.9.0",
     ),
     model=PurgeEntityLabelPayloadDTO,
     name="PurgeEntityLabelPayload",

@@ -19,7 +19,7 @@ from sqlalchemy.dialects import postgresql
 from ai.backend.manager.models.base import GUID
 
 # revision identifiers, used by Alembic.
-revision = "f6c9e4a2b730"  # Part of: NEXT_RELEASE_VERSION
+revision = "f6c9e4a2b730"  # Part of: 26.9.0
 down_revision = "e5b8d3f0a129"
 branch_labels = None
 depends_on = None

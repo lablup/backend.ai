@@ -48,7 +48,12 @@ jobs:
           # The pull request's checks only run when its branch is pushed by
           # something other than the workflow's own token.
           token: ${{ secrets.OCTODOG }}
-      - name: Advance NEXT_RELEASE_VERSION on main
+      # The script installs the pinned ruff into a venv of its own.
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.x'
+      - name: Freeze the cut line and advance NEXT_RELEASE_VERSION on main
         # Set the `NEXT_DEV_VERSION` repository variable (e.g. 27.1.0) before
         # cutting the last line of a year, and clear it afterwards.
         env:

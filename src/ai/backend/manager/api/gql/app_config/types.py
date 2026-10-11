@@ -6,7 +6,6 @@ from strawberry.federation.schema_directives import Shareable
 from strawberry.scalars import JSON
 
 from ai.backend.common.dto.manager.v2.app_config.response import AppConfigNode
-from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     gql_field,
@@ -19,7 +18,7 @@ __all__ = ("AppConfigGQL",)
 
 @gql_pydantic_type(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.9.0",
         description=(
             "The merged config for one config name: every fragment visible to the caller, "
             "deep-merged in ascending allow-list rank order."

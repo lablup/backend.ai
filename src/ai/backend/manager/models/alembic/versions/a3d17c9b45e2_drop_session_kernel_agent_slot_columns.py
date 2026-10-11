@@ -18,7 +18,7 @@ from ai.backend.manager.models.base import ResourceSlotColumn
 # revision identifiers, used by Alembic.
 revision = "a3d17c9b45e2"
 down_revision = "c5a91e37d40b"
-# Part of: NEXT_RELEASE_VERSION
+# Part of: 26.9.0
 branch_labels = None
 depends_on = None
 

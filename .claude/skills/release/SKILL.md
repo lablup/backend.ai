@@ -83,7 +83,8 @@ scripts/release.sh --lts {target_version} [webui_version]
 8. Runs quality checks: `pants tailor --check`, `pants check ::` (final and patch releases only; skipped for `a`/`rc`, whose release PR CI runs the same checks)
 9. Commits everything as `release: {target_version}`
 **Advancing NEXT_RELEASE_VERSION:**
-- `release.sh` does not advance it. When an `X.Y.0rc1` release PR merges and cuts `X.Y`, `create-version-branch.yml` opens a `release: bump NEXT_RELEASE_VERSION to X.(Y+1).0` PR against `main`
+- `release.sh` does not advance it. When an `X.Y.0rc1` release PR merges and cuts `X.Y`, `create-version-branch.yml` opens a `release: freeze X.Y.0 and bump NEXT_RELEASE_VERSION to X.(Y+1).0` PR against `main`
+- That PR also freezes `main`'s `NEXT_RELEASE_VERSION` references to `X.Y.0`, the same value the version branch freezes them to at its final release. When it rewrites a migration's `# Part of:` marker, it carries the `allow:migration-edit` label
 - No PR is opened when `main` is already at that version or past it
 - For a year rollover or a sprint skip, set the `NEXT_DEV_VERSION` repository variable (e.g. `27.1.0`) before the rc1 merges, and clear it afterwards
 

@@ -13,7 +13,6 @@ from pydantic import Field
 from ai.backend.common.api_handlers import BaseResponseModel
 from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.dto.manager.pagination import PaginationInfo
-from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.common.types import BackendAISchema
 
 __all__ = (
@@ -68,7 +67,7 @@ class DomainLifecycleInfo(BackendAISchema):
     )
     is_default: bool = Field(
         description=(
-            f"Added in {NEXT_RELEASE_VERSION}. Whether this is the default domain. "
+            "Added in 26.9.0. Whether this is the default domain. "
             "At most one domain carries the marker."
         ),
     )
@@ -87,7 +86,7 @@ class DomainNode(BaseResponseModel):
         description="Domain uuid. The name lives at basic_info.name.",
     )
     entity_id: UUID = Field(
-        description=f"UUID of the domain. Added in {NEXT_RELEASE_VERSION}.",
+        description="UUID of the domain. Added in 26.9.0.",
     )
     basic_info: DomainBasicInfo = Field(
         description="Basic domain information including name and description.",

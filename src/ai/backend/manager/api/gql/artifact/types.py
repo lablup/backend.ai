@@ -96,7 +96,6 @@ from ai.backend.common.dto.manager.v2.artifact.response import (
     SourceInfoDTO,
     UpdateArtifactGQLPayload,
 )
-from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import (
     ByteSize,
     IntFilter,
@@ -259,7 +258,7 @@ class ArtifactFilter(PydanticInputMixin[ArtifactGQLFilterInputDTO]):
 
 
 _ARTIFACT_SIZE_ORDER_DEPRECATION = (
-    f"Deprecated since {NEXT_RELEASE_VERSION}. A size belongs to a revision rather than"
+    "Deprecated since 26.9.0. A size belongs to a revision rather than"
     " the artifact, so this value is not used for ordering. It is removed in the next"
     " release."
 )
@@ -658,7 +657,7 @@ class Artifact(PydanticNodeMixin[ArtifactGQLNode]):
     id: NodeID[str]
     entity_id: uuid.UUID = gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.9.0",
             description="UUID of the artifact.",
         ),
     )
@@ -748,7 +747,7 @@ class ArtifactRevision(PydanticNodeMixin[ArtifactRevisionNode]):
     id: NodeID[str]
     field_id: uuid.UUID = gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.9.0",
             description="UUID of the artifact revision.",
         ),
     )

@@ -50,7 +50,7 @@ class ImageNode(BaseResponseModel):
 
     id: UUID = Field(description="Image ID")
     entity_id: UUID = Field(
-        description=f"UUID of the image. Added in {NEXT_RELEASE_VERSION}.",
+        description="UUID of the image. Added in 26.9.0.",
     )
     name: str = Field(description="Image canonical name")
     image: str = Field(
@@ -172,7 +172,7 @@ class ImageAliasNode(BaseResponseModel):
 
     id: UUID = Field(description="Alias ID.")
     field_id: UUID = Field(
-        description=f"UUID of the image alias. Added in {NEXT_RELEASE_VERSION}.",
+        description="UUID of the image alias. Added in 26.9.0.",
     )
     alias: str = Field(description="Alias string.")
 

@@ -11,7 +11,6 @@ from ai.backend.common.dto.manager.v2.secret.response import (
 from ai.backend.common.dto.manager.v2.secret.response import (
     SecretKeyCount as SecretKeyCountDTO,
 )
-from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     gql_field,
@@ -22,7 +21,7 @@ from ai.backend.manager.api.gql.pydantic_compat import PydanticOutputMixin
 
 @gql_pydantic_type(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.9.0",
         description="How many stored secrets of one column one provider's one key holds.",
     ),
     model=SecretKeyCountDTO,
@@ -39,7 +38,7 @@ class SecretKeyCountGQL(PydanticOutputMixin[SecretKeyCountDTO]):
 
 @gql_pydantic_type(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.9.0",
         description="Which key each stored secret sits on, across every encrypted column.",
     ),
     model=AdminSecretStatusPayloadDTO,
@@ -56,7 +55,7 @@ class AdminSecretStatusPayloadGQL(PydanticOutputMixin[AdminSecretStatusPayloadDT
 
 @gql_pydantic_type(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.9.0",
         description="What one re-encryption pass wrote, and what the columns hold afterwards.",
     ),
     model=AdminReencryptSecretsPayloadDTO,
