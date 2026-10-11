@@ -108,6 +108,7 @@ current, see `AGENTS.md` in this directory.
 
 | Directory | Contents |
 |---|---|
+| `alembic-upgrade-check/` | Seeds a released tag's schema with scenario data, runs the manager `alembic upgrade`, and tabulates the results. Run by a person (`README.md`) |
 | `agent/` | Cross-build recipes for the static binaries bundled into the kernel runner (dropbear, ttyd, tmux, sftp-server, socket-relay, suexec) plus agent-side deployment helpers |
 | `e2e-model-store/` | Numbered end-to-end model-store scenarios, run in order by `run-all.sh` against a live local stack |
 | `storage-proxy/` | `upgrade.sh` (storage migration entry point) and the Ceph test-cluster provisioning under `ceph/` |
