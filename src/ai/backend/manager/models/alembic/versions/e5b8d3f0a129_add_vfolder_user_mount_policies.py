@@ -72,13 +72,16 @@ _ADD_USER_NODES: Final = sa.text(f"""
 """)
 
 # ``rw`` lends what ``wd`` does (BEP-1077 5.7): READ | UPDATE | SOFT_DELETE.
+# ``vfolders.user`` has no FK; an owner no longer in ``users`` is written as NULL, which
+# is what the sharer FK's ON DELETE SET NULL leaves when a sharer is deleted.
 _ADD_ACCEPTED_SHARES: Final = sa.text(f"""
     INSERT INTO entity_shares (
         sharer_user_id, recipient_entity_type, recipient_entity_id,
         target_entity_type, target_entity_id, permission_cap, status
     )
     SELECT DISTINCT ON (r.vfolder, r."user")
-        r.owner, 'user', r."user", 'vfolder', r.vfolder,
+        (SELECT u.uuid FROM users u WHERE u.uuid = r.owner), 'user', r."user", 'vfolder',
+        r.vfolder,
         CASE WHEN r.permission = 'ro' THEN 1 ELSE 11 END, 'accepted'
     FROM ({_LEGACY_ROWS}) r
     WHERE NOT EXISTS (
