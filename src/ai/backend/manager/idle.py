@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import bisect
 import enum
 import logging
 import math
@@ -815,6 +816,48 @@ class UtilizationConfig(BaseConfigModel):
     ]
 
 
+@dataclass
+class _UtilizationSamples:
+    observed_since: float
+    collected_at: list[float]
+    series: dict[str, list[float | None]]
+
+    @classmethod
+    def unpack(cls, raw: bytes) -> _UtilizationSamples:
+        data = msgpack.unpackb(raw, use_list=True)
+        return cls(
+            observed_since=data["observed_since"],
+            collected_at=data["collected_at"],
+            series=data["series"],
+        )
+
+    def pack(self) -> bytes:
+        return msgpack.packb({
+            "observed_since": self.observed_since,
+            "collected_at": self.collected_at,
+            "series": self.series,
+        })
+
+    def drop_before(self, cutoff: float) -> None:
+        start = bisect.bisect_left(self.collected_at, cutoff)
+        self.collected_at = self.collected_at[start:]
+        self.series = {metric_key: values[start:] for metric_key, values in self.series.items()}
+
+    def append(self, collected_at: float, utilizations: Mapping[str, float | None]) -> None:
+        for metric_key in utilizations.keys() - self.series.keys():
+            self.series[metric_key] = [None] * len(self.collected_at)
+        for metric_key, values in self.series.items():
+            values.append(utilizations.get(metric_key))
+        self.collected_at.append(collected_at)
+
+    def averages(self) -> dict[str, float | None]:
+        result: dict[str, float | None] = {}
+        for metric_key, values in self.series.items():
+            filtered = [v for v in values if v is not None]
+            result[metric_key] = sum(filtered) / len(filtered) if filtered else None
+        return result
+
+
 class UtilizationIdleChecker(BaseIdleChecker):
     """
     Checks the idleness of a session by the average utilization of compute devices.
@@ -887,9 +930,6 @@ class UtilizationIdleChecker(BaseIdleChecker):
     def _get_last_collected_key(self, session_id: SessionId) -> str:
         return f"session.{session_id}.util_last_collected"
 
-    def _get_first_collected_key(self, session_id: SessionId) -> str:
-        return f"session.{session_id}.util_first_collected"
-
     @override
     async def check_idleness(
         self,
@@ -912,13 +952,10 @@ class UtilizationIdleChecker(BaseIdleChecker):
         requested_slots = cast(ResourceSlot, kernel.requested_slots)
         excluded_resources: set[str] = set()
 
-        util_series_key = f"session.{session_id}.util_series"
-        util_first_collected_key = self._get_first_collected_key(session_id)
+        util_series_v2_key = f"session.{session_id}.util_series_v2"
         util_last_collected_key = self._get_last_collected_key(session_id)
 
-        # window_size: the length of utilization reports.
-        window_size = int(time_window.total_seconds() / interval)
-        if (window_size <= 0) or (math.isinf(window_size) and window_size > 0):
+        if time_window.total_seconds() < interval:
             return True
 
         # Wait until the time "interval" is passed after the last udpated time.
@@ -930,17 +967,6 @@ class UtilizationIdleChecker(BaseIdleChecker):
         )
         if util_now - util_last_collected < interval:
             return True
-
-        raw_util_first_collected = await self._redis_live.get_live_data(util_first_collected_key)
-        if raw_util_first_collected is None:
-            util_first_collected = util_now
-            await self._redis_live.store_live_data(
-                util_first_collected_key,
-                f"{util_now:.06f}",
-                ex=max(86400, int(self.time_window.total_seconds() * 2)),
-            )
-        else:
-            util_first_collected = float(raw_util_first_collected)
 
         # Report time remaining until the first time window is full as expire time
         db_now: datetime = await get_db_now(dbconn)
@@ -992,42 +1018,22 @@ class UtilizationIdleChecker(BaseIdleChecker):
             return True
 
         # Update utilization time-series data.
-        raw_util_series = await self._redis_live.get_live_data(util_series_key)
-
-        def default_util_series() -> dict[str, list[float | None]]:
-            return {resource: [] for resource in current_utilizations.keys()}
-
-        if raw_util_series is not None:
-            try:
-                raw_data: dict[str, list[float | None]] = msgpack.unpackb(
-                    raw_util_series, use_list=True
-                )
-                util_series: dict[str, list[float | None]] = {
-                    metric_key: v for metric_key, v in raw_data.items()
-                }
-            except TypeError:
-                util_series = default_util_series()
+        window_start = util_now - time_window.total_seconds()
+        raw_util_series_v2 = await self._redis_live.get_live_data(util_series_v2_key)
+        if raw_util_series_v2 is not None:
+            samples = _UtilizationSamples.unpack(raw_util_series_v2)
         else:
-            util_series = default_util_series()
-
-        do_idle_check: bool = True
-
-        for metric_key, util_val in current_utilizations.items():
-            if metric_key not in util_series:
-                util_series[metric_key] = []
-            util_series[metric_key].append(util_val)
-            if len(util_series[metric_key]) > window_size:
-                util_series[metric_key].pop(0)
-            else:
-                do_idle_check = False
-
-        # Do not skip idleness-check if the current time passed the time window
-        if util_now - util_first_collected >= time_window.total_seconds():
-            do_idle_check = True
+            samples = _UtilizationSamples(observed_since=util_now, collected_at=[], series={})
+        samples.drop_before(window_start)
+        if not samples.collected_at:
+            # Nothing was collected within the window, so it must be observed again from now.
+            samples.observed_since = util_now
+        samples.append(util_now, current_utilizations)
+        do_idle_check = samples.observed_since <= window_start
 
         await self._redis_live.store_live_data(
-            util_series_key,
-            msgpack.packb(util_series),
+            util_series_v2_key,
+            samples.pack(),
             ex=max(86400, int(self.time_window.total_seconds() * 2)),
         )
         await self._redis_live.store_live_data(
@@ -1036,13 +1042,7 @@ class UtilizationIdleChecker(BaseIdleChecker):
             ex=max(86400, int(self.time_window.total_seconds() * 2)),
         )
 
-        def _avg(util_list: list[float | None]) -> float | None:
-            filtered = [v for v in util_list if v is not None]
-            if not filtered:
-                return None
-            return sum(filtered) / len(filtered)
-
-        avg_utils: Mapping[str, float | None] = {k: _avg(v) for k, v in util_series.items()}
+        avg_utils: Mapping[str, float | None] = samples.averages()
 
         util_avg_thresholds = UtilizationResourceReport.from_avg_threshold(
             avg_utils, self.resource_thresholds, excluded_resources
