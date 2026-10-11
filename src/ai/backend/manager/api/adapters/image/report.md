@@ -170,7 +170,7 @@ Then
 
 Given
 
-- 호출자가 만든 커스텀 이미지 1개, 그 이미지에 권한 있음
+- 호출자가 커밋한 커스텀 이미지 1개, 호출자 개인 프로젝트에서 이미지 권한 있음
   - 도메인 home-1
   - 컨테이너 레지스트리 host-1: 이미지를 가져오는 곳
   - 도메인에 속한 사용자 한 명 준비
@@ -178,8 +178,8 @@ Given
     - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
     - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
     - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-  - 이미지 image-1: x86_64 이미지, 커스터마이즈된 이미지라 소유자가 있다
-  - 이미지를 다룰 권한을 받은 사용자 준비
+  - 커밋한 이미지 image-1: 커스터마이즈된 이미지라 소유자가 있다, 그 사람의 개인 프로젝트에 속한다
+  - 프로젝트의 이미지를 다룰 권한을 받은 사용자 준비
     - 역할 image-keeper-1: 이 역할이 앉은 스코프 안에서만 통한다
     - 역할 image-keeper-1: image 전체에 READ 허용
     - 역할 image-keeper-1: image 전체에 SOFT_DELETE 허용
@@ -660,6 +660,40 @@ Then
 - 거부된다
   - 거부: NotEnoughPermission
 
+#### [a-user-may-not-forget-a-custom-image-another-user-made](/tests/scenario/bai_scenario/manager/image/test_forgetting.py) — pass
+
+다른 사용자가 커밋한 커스텀 이미지는 그 사람의 개인 프로젝트에 속하므로, 자기 개인 프로젝트에서 권한을 받은 사용자가 소프트 삭제하려 하면 권한 부족으로 거부된다
+
+Given
+
+- 다른 사용자가 커밋한 커스텀 이미지 1개, 호출자는 자기 개인 프로젝트에서만 이미지 권한 있음
+  - 도메인 home-1
+  - 컨테이너 레지스트리 host-1: 이미지를 가져오는 곳
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+    - 사용자 정책 user-policy-2: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
+    - 일반 사용자 user-2: 자기 키와 개인 프로젝트를 갖는다
+  - 커밋한 이미지 image-1: 커스터마이즈된 이미지라 소유자가 있다, 그 사람의 개인 프로젝트에 속한다
+  - 프로젝트의 이미지를 다룰 권한을 받은 사용자 준비
+    - 역할 image-keeper-1: 이 역할이 앉은 스코프 안에서만 통한다
+    - 역할 image-keeper-1: image 전체에 READ 허용
+    - 역할 image-keeper-1: image 전체에 SOFT_DELETE 허용
+    - 역할 image-keeper-1: image 전체에 HARD_DELETE 허용
+    - 일반 사용자 user-2: 역할 image-keeper-1 보유
+
+When
+
+- ImageAdapter.admin_forget — user-2이 image-1 소프트 삭제
+
+Then
+
+- 거부된다
+  - 거부: NotEnoughPermission
+
 #### [an-image-a-purge-is-working-through-cannot-be-reached](/tests/scenario/bai_scenario/manager/image/test_forgetting.py) — pass
 
 완전 삭제 중인 이미지를 소프트 삭제하려 하면 대상을 찾을 수 없어 거부된다. 그 상태의 이미지는 ID로 조회하는 지점에서 보이지 않는다
@@ -902,11 +936,11 @@ Then
 
 #### [the-maker-of-a-custom-image-may-forget-it](/tests/scenario/bai_scenario/manager/image/test_forgetting.py) — pass
 
-자기가 만든 커스텀 이미지에 권한까지 받은 사용자가 그것을 소프트 삭제하면, 이미지 권한과 커스텀 이미지 작성자 검사를 모두 통과해 삭제됨 상태가 반환된다
+자기가 커밋한 커스텀 이미지를 자기 개인 프로젝트의 권한으로 소프트 삭제하면, 이미지가 그 개인 프로젝트에 속하므로 이미지 권한과 커스텀 이미지 작성자 검사를 모두 통과해 삭제됨 상태가 반환된다
 
 Given
 
-- 호출자가 만든 커스텀 이미지 1개, 그 이미지에 권한 있음
+- 호출자가 커밋한 커스텀 이미지 1개, 호출자 개인 프로젝트에서 이미지 권한 있음
   - 도메인 home-1
   - 컨테이너 레지스트리 host-1: 이미지를 가져오는 곳
   - 도메인에 속한 사용자 한 명 준비
@@ -914,8 +948,8 @@ Given
     - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
     - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
     - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-  - 이미지 image-1: x86_64 이미지, 커스터마이즈된 이미지라 소유자가 있다
-  - 이미지를 다룰 권한을 받은 사용자 준비
+  - 커밋한 이미지 image-1: 커스터마이즈된 이미지라 소유자가 있다, 그 사람의 개인 프로젝트에 속한다
+  - 프로젝트의 이미지를 다룰 권한을 받은 사용자 준비
     - 역할 image-keeper-1: 이 역할이 앉은 스코프 안에서만 통한다
     - 역할 image-keeper-1: image 전체에 READ 허용
     - 역할 image-keeper-1: image 전체에 SOFT_DELETE 허용
@@ -1375,11 +1409,11 @@ Then
 
 #### [the-maker-of-a-custom-image-may-purge-it](/tests/scenario/bai_scenario/manager/image/test_retiring.py) — pass
 
-자기가 만든 커스텀 이미지에 권한까지 받은 사용자가 그것을 완전 삭제하면, 이미지 권한과 커스텀 이미지 작성자 검사를 모두 통과해 삭제된 이미지가 반환된다
+자기가 커밋한 커스텀 이미지를 자기 개인 프로젝트의 권한으로 완전 삭제하면, 이미지가 그 개인 프로젝트에 속하므로 이미지 권한과 커스텀 이미지 작성자 검사를 모두 통과해 삭제된 이미지가 반환된다
 
 Given
 
-- 호출자가 만든 커스텀 이미지 1개, 그 이미지에 권한 있음
+- 호출자가 커밋한 커스텀 이미지 1개, 호출자 개인 프로젝트에서 이미지 권한 있음
   - 도메인 home-1
   - 컨테이너 레지스트리 host-1: 이미지를 가져오는 곳
   - 도메인에 속한 사용자 한 명 준비
@@ -1387,8 +1421,8 @@ Given
     - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
     - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
     - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-  - 이미지 image-1: x86_64 이미지, 커스터마이즈된 이미지라 소유자가 있다
-  - 이미지를 다룰 권한을 받은 사용자 준비
+  - 커밋한 이미지 image-1: 커스터마이즈된 이미지라 소유자가 있다, 그 사람의 개인 프로젝트에 속한다
+  - 프로젝트의 이미지를 다룰 권한을 받은 사용자 준비
     - 역할 image-keeper-1: 이 역할이 앉은 스코프 안에서만 통한다
     - 역할 image-keeper-1: image 전체에 READ 허용
     - 역할 image-keeper-1: image 전체에 SOFT_DELETE 허용
