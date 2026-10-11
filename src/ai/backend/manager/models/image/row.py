@@ -164,7 +164,7 @@ class ImageRow(CreatedAtMixin, Base):
         nullable=False,
         server_default=sa.sql.expression.false(),
     )
-    type: Mapped[ImageType] = mapped_column("type", sa.Enum(ImageType), nullable=False)
+    type: Mapped[ImageType] = mapped_column("type", StrEnumType(ImageType), nullable=False)
     accelerators: Mapped[str | None] = mapped_column("accelerators", sa.String, nullable=True)
     labels: Mapped[dict[str, Any]] = mapped_column("labels", sa.JSON, nullable=False, default=dict)
     # Whether a session commit made this image. A kind, not a person: who it was made
