@@ -10,7 +10,6 @@ from ai.backend.common.dto.manager.v2.vfolder.request import (
     PurgeVFolderInput,
     PurgeVFolderOptions,
 )
-from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.decorators import BackendAIGQLMeta, gql_mutation
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.api.gql.vfolder_v2.types.mount_policy import (
@@ -301,7 +300,7 @@ async def bulk_purge_vfolders_v2(
 
 @gql_mutation(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.9.0",
         description=(
             "Set the mount level one user gets on a virtual folder. "
             "Requires UPDATE on the folder; a requester who reaches the folder through a "
@@ -321,7 +320,7 @@ async def set_vfolder_mount_policy(
 
 @gql_mutation(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.9.0",
         description="Take back the mount level one user was given on a virtual folder.",
     ),
     name="unsetVFolderMountPolicy",

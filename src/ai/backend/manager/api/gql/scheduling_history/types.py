@@ -68,7 +68,6 @@ from ai.backend.common.dto.manager.v2.scheduling_history.types import (
     SessionHistoryScopeDTO,
     SubStepResultInfo,
 )
-from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import (
     DateTimeFilter,
     OrderDirection,
@@ -260,7 +259,7 @@ class SessionSchedulingHistory(PydanticNodeMixin[SessionHistoryNode]):
     id: NodeID[str]
     field_id: UUID = gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.9.0",
             description="UUID of the session scheduling history record.",
         ),
     )
@@ -320,7 +319,7 @@ class KernelSchedulingHistoryGQL(PydanticNodeMixin[KernelHistoryNode]):
     id: NodeID[str]
     field_id: UUID = gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.9.0",
             description="UUID of the kernel scheduling history record.",
         ),
     )
@@ -357,7 +356,7 @@ class DeploymentHistory(PydanticNodeMixin[DeploymentHistoryNode]):
     id: NodeID[str]
     field_id: UUID = gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.9.0",
             description="UUID of the deployment history record.",
         ),
     )
@@ -431,7 +430,7 @@ class ReplicaGroupHistoryGQL(PydanticNodeMixin[ReplicaGroupHistoryNode]):
     id: NodeID[str]
     field_id: UUID = gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.9.0",
             description="UUID of the replica group history record.",
         ),
     )
@@ -471,7 +470,7 @@ class RouteHistory(PydanticNodeMixin[RouteHistoryNode]):
     id: NodeID[str]
     field_id: UUID = gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.9.0",
             description="UUID of the route history record.",
         ),
     )

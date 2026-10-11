@@ -9,7 +9,6 @@ from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseResponseModel
 from ai.backend.common.data.app_config.types import AppConfigScopeType
-from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 
 __all__ = (
     "AppConfigAllowListNode",
@@ -25,7 +24,7 @@ class AppConfigAllowListNode(BaseResponseModel):
 
     id: UUID = Field(description="App config allow-list entry UUID.")
     entity_id: UUID = Field(
-        description=f"UUID of the app config allow list. Added in {NEXT_RELEASE_VERSION}.",
+        description="UUID of the app config allow list. Added in 26.9.0.",
     )
     config_name: str = Field(description="Gated config name.")
     scope_type: AppConfigScopeType = Field(description="Scope type the entry permits writes at.")

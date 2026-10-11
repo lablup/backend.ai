@@ -8,7 +8,6 @@ from strawberry.federation import Schema
 from strawberry.schema.config import StrawberryConfig
 from strawberry.types import ExecutionContext
 
-from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.agent.resolver import (
     admin_update_agent_resource_group,
     agent_stats,
@@ -1246,7 +1245,7 @@ schema = CustomizedSchema(
 )
 
 
-@gql_root_field(BackendAIGQLMeta(added_version=NEXT_RELEASE_VERSION, description="Returns 'pong'"))  # type: ignore[misc]
+@gql_root_field(BackendAIGQLMeta(added_version="26.9.0", description="Returns 'pong'"))  # type: ignore[misc]
 async def ping() -> str:
     return "pong"
 

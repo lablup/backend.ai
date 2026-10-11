@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 #
-# Open a pull request advancing `main`'s NEXT_RELEASE_VERSION past the release
-# line an `X.Y.0rc1` release commit cut.
+# Open a pull request that freezes `main`'s NEXT_RELEASE_VERSION references to
+# the release line an `X.Y.0rc1` release commit cut, and advances
+# NEXT_RELEASE_VERSION past that line.
 #
 #   bump-next-release-on-main.sh <commit> [--next <version>] [--dry-run]
 #
@@ -11,8 +12,13 @@
 #     --dry-run         report the decision; push nothing, open nothing
 #
 # Once `X.Y` is cut, every release of that line comes from its version branch,
-# and `main` develops the next one. The commit subject names the release, and
-# the branch is built with plumbing, so neither HEAD nor the worktree is touched.
+# and `main` develops the next one. The references `main` holds at that point
+# ship in `X.Y.0`, so they are frozen to it the way `release.sh` freezes the
+# branch at its final release; the two freezes agree. The rewrite runs on an
+# exported copy of `main`, then `ruff check --fix` and `ruff format` at the
+# version `pants.toml` pins, installed into a scratch venv. The commit subject names the
+# release, and the branch is built with plumbing, so neither HEAD nor the
+# worktree is touched.
 #
 # It exits 0 with the reason when the commit cuts no release line, or when
 # `main` is already at the target or past it. It fails when `--next` is not past
@@ -61,6 +67,7 @@ subject=$(git log -1 --format=%s "$commit")
 cd "$(git rev-parse --show-toplevel)"
 meta=src/ai/backend/common/meta/meta.py
 bump_script="$PWD/scripts/bump_next_release_version.py"
+freeze_script="$PWD/scripts/freeze_release_version.py"
 
 # The same rule `create-version-branch.sh` cuts a line by.
 if [[ ! "$subject" =~ ^release:\ ([0-9]+)\.([0-9]+)\.0rc1( \(#[0-9]+\))?$ ]]; then
@@ -90,11 +97,10 @@ depth=()
 git fetch "${depth[@]}" origin main
 base=$(git rev-parse FETCH_HEAD)
 
-# Ask the script that owns the rewrite, run against a copy of main's file.
+# Ask the scripts that own the rewrites, run against an exported copy of main.
 scratch=$(mktemp -d)
 trap 'rm -rf "$scratch"' EXIT
-mkdir -p "$scratch/$(dirname "$meta")"
-git show "$base:$meta" > "$scratch/$meta"
+git archive "$base" src pyproject.toml pants.toml | tar -x -C "$scratch"
 current=$(cd "$scratch" && python3 "$bump_script" --current)
 
 if [ "$(version_sort "$current" "$target" | tail -n 1)" = "$current" ]; then
@@ -102,26 +108,64 @@ if [ "$(version_sort "$current" "$target" | tail -n 1)" = "$current" ]; then
   exit 0
 fi
 
+# The files the freeze rewrites; the constant's own module keeps the placeholder.
+frozen=()
+while IFS= read -r path; do
+  case "$path" in
+    src/ai/backend/common/meta/meta.py|src/ai/backend/common/meta/__init__.py) ;;
+    *) frozen+=("$path") ;;
+  esac
+done < <(cd "$scratch" && grep -rl --include='*.py' NEXT_RELEASE_VERSION src | sort)
+references=0
+if [ "${#frozen[@]}" -gt 0 ]; then
+  references=$(cd "$scratch" && cat "${frozen[@]}" | grep -c NEXT_RELEASE_VERSION || true)
+fi
+# A frozen `# Part of:` marker rewrites a merged migration, which the migration
+# edit check reports unless the pull request carries its label.
+labels=()
+for path in "${frozen[@]}"; do
+  case "$path" in
+    */alembic/versions/*) labels=(--label allow:migration-edit); break ;;
+  esac
+done
+
 branch="next-release-version/$target"
 # The `release:` prefix keeps this out of the news-fragment check, and the
 # `Backport:` trailer keeps the version off the release branches.
-title="release: bump NEXT_RELEASE_VERSION to $target"
-body="\`$line\` is cut onto its version branch, so \`main\` now develops \`$target\`. This moves \`NEXT_RELEASE_VERSION\` from \`$current\` to \`$target\`.
+title="release: freeze $line and bump NEXT_RELEASE_VERSION to $target"
+body="\`$line\` is cut onto its version branch, so \`main\` now develops \`$target\`. This freezes the NEXT_RELEASE_VERSION references \`main\` holds to \`$line\` ($references lines in ${#frozen[@]} files) and moves \`NEXT_RELEASE_VERSION\` from \`$current\` to \`$target\`.
 
 Backport: none"
 
 if [ "$dry_run" = 1 ]; then
-  echo "Would open '$title' from '$branch' ($current -> $target)."
+  echo "Would open '$title' from '$branch' ($current -> $target, $references lines in ${#frozen[@]} files frozen to $line)."
   exit 0
 fi
 
-(cd "$scratch" && python3 "$bump_script" "$target" > /dev/null)
+ruff_version=$(sed -n '/^\[ruff\]/,/^\[/s/^version = "\(.*\)"$/\1/p' pants.toml)
+venv=$(mktemp -d)
+trap 'rm -rf "$scratch" "$venv"' EXIT
+python3 -m venv "$venv"
+"$venv/bin/pip" install --quiet --disable-pip-version-check "ruff==$ruff_version"
+(
+  cd "$scratch"
+  python3 "$freeze_script" "$line"
+  python3 "$bump_script" "$target" > /dev/null
+  if [ "${#frozen[@]}" -gt 0 ]; then
+    # The pull request's lint job is the gate; a finding left here shows there.
+    "$venv/bin/ruff" check --fix --exit-zero --quiet "${frozen[@]}"
+    "$venv/bin/ruff" format --quiet "${frozen[@]}"
+  fi
+)
 
 index=$(mktemp -u)
 tree=$(
   export GIT_INDEX_FILE="$index"
   git read-tree "$base"
-  git update-index --add --cacheinfo "100644,$(git hash-object -w "$scratch/$meta"),$meta"
+  for path in "$meta" "${frozen[@]}"; do
+    mode=$(git ls-tree "$base" -- "$path" | cut -d' ' -f1)
+    git update-index --cacheinfo "$mode,$(git hash-object -w "$scratch/$path"),$path"
+  done
   git write-tree
 )
 rm -f "$index"
@@ -142,4 +186,4 @@ if [ -n "$existing" ]; then
   echo "Revised the open pull request #$existing."
   exit 0
 fi
-gh pr create --base main --head "$branch" --title "$title" --body "$body"
+gh pr create --base main --head "$branch" --title "$title" --body "$body" "${labels[@]}"

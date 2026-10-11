@@ -11,7 +11,6 @@ from ai.backend.common.dto.manager.v2.deployment.types import (
     ModelMetadataInfoDTO,
     PreStartActionInfoDTO,
 )
-from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 
 
 class RuntimeVariantModelHealthCheckInfo(BaseResponseModel):
@@ -66,7 +65,7 @@ class RuntimeVariantModelDefinitionInfo(BaseResponseModel):
 class RuntimeVariantNode(BaseResponseModel):
     id: UUID = Field(description="ID of the runtime variant.")
     entity_id: UUID = Field(
-        description=f"UUID of the runtime variant. Added in {NEXT_RELEASE_VERSION}.",
+        description="UUID of the runtime variant. Added in 26.9.0.",
     )
     name: str = Field(description="Unique name of the runtime variant.")
     description: str | None = Field(default=None, description="Description.")
@@ -107,13 +106,12 @@ class DeleteRuntimeVariantsPayload(BaseResponseModel):
 
     items: list[RuntimeVariantID] = Field(
         default_factory=list,
-        description=f"Ids of successfully deleted runtime variants. Added in {NEXT_RELEASE_VERSION}.",
+        description="Ids of successfully deleted runtime variants. Added in 26.9.0.",
     )
     failed: list[RuntimeVariantBulkFailureInfo] = Field(
         default_factory=list,
         description=(
-            "Per-item failures, each naming the runtime variant it targeted. "
-            f"Added in {NEXT_RELEASE_VERSION}."
+            "Per-item failures, each naming the runtime variant it targeted. Added in 26.9.0."
         ),
     )
     deleted_count: int = Field(description="Number of runtime variants successfully deleted.")

@@ -16,7 +16,6 @@ from ai.backend.common.api_handlers import BaseResponseModel
 from ai.backend.common.data.entity.idle_checker import IdleCheckerID
 from ai.backend.common.data.entity.session import SessionID
 from ai.backend.common.dto.manager.pagination import PaginationInfo
-from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.common.types import SessionId
 
 __all__ = (
@@ -177,7 +176,7 @@ class SessionNode(BaseResponseModel):
 
     id: UUID = Field(description="Session ID.")
     entity_id: UUID = Field(
-        description=f"UUID of the session. Added in {NEXT_RELEASE_VERSION}.",
+        description="UUID of the session. Added in 26.9.0.",
     )
     image_ids: list[UUID] | None = Field(
         default=None,
@@ -285,36 +284,30 @@ class TerminateSessionsPayload(BaseResponseModel):
 class SessionIdleCheckTargetInfo(BaseResponseModel):
     """One (checker, session) pair an idle-check exclusion or inclusion applied to."""
 
-    checker_id: IdleCheckerID = Field(
-        description=f"Added in {NEXT_RELEASE_VERSION}. Idle checker UUID of the pair."
-    )
-    session_id: SessionID = Field(
-        description=f"Added in {NEXT_RELEASE_VERSION}. Session UUID of the pair."
-    )
+    checker_id: IdleCheckerID = Field(description="Added in 26.9.0. Idle checker UUID of the pair.")
+    session_id: SessionID = Field(description="Added in 26.9.0. Session UUID of the pair.")
 
 
 class ExcludeSessionIdleChecksFailureInfo(BaseResponseModel):
     """Why one pair could not be excluded from idle checks."""
 
     checker_id: IdleCheckerID = Field(
-        description=f"Added in {NEXT_RELEASE_VERSION}. Idle checker of the pair the failure applies to."
+        description="Added in 26.9.0. Idle checker of the pair the failure applies to."
     )
     session_id: SessionID = Field(
-        description=f"Added in {NEXT_RELEASE_VERSION}. Session of the pair the failure applies to."
+        description="Added in 26.9.0. Session of the pair the failure applies to."
     )
-    message: str = Field(
-        description=f"Added in {NEXT_RELEASE_VERSION}. Why the pair was not excluded."
-    )
+    message: str = Field(description="Added in 26.9.0. Why the pair was not excluded.")
 
 
 class ExcludeSessionIdleChecksPayload(BaseResponseModel):
     """Payload for idle-check exclusion with per-pair partial success."""
 
     items: list[SessionIdleCheckTargetInfo] = Field(
-        description=f"Added in {NEXT_RELEASE_VERSION}. Pairs successfully excluded."
+        description="Added in 26.9.0. Pairs successfully excluded."
     )
     failed: list[ExcludeSessionIdleChecksFailureInfo] = Field(
-        description=f"Added in {NEXT_RELEASE_VERSION}. Pairs that could not be excluded."
+        description="Added in 26.9.0. Pairs that could not be excluded."
     )
 
 
@@ -322,24 +315,22 @@ class IncludeSessionIdleChecksFailureInfo(BaseResponseModel):
     """Why one pair could not be included into idle checks."""
 
     checker_id: IdleCheckerID = Field(
-        description=f"Added in {NEXT_RELEASE_VERSION}. Idle checker of the pair the failure applies to."
+        description="Added in 26.9.0. Idle checker of the pair the failure applies to."
     )
     session_id: SessionID = Field(
-        description=f"Added in {NEXT_RELEASE_VERSION}. Session of the pair the failure applies to."
+        description="Added in 26.9.0. Session of the pair the failure applies to."
     )
-    message: str = Field(
-        description=f"Added in {NEXT_RELEASE_VERSION}. Why the pair was not included."
-    )
+    message: str = Field(description="Added in 26.9.0. Why the pair was not included.")
 
 
 class IncludeSessionIdleChecksPayload(BaseResponseModel):
     """Payload for idle-check inclusion with per-pair partial success."""
 
     items: list[SessionIdleCheckTargetInfo] = Field(
-        description=f"Added in {NEXT_RELEASE_VERSION}. Pairs successfully included."
+        description="Added in 26.9.0. Pairs successfully included."
     )
     failed: list[IncludeSessionIdleChecksFailureInfo] = Field(
-        description=f"Added in {NEXT_RELEASE_VERSION}. Pairs that could not be included."
+        description="Added in 26.9.0. Pairs that could not be included."
     )
 
 

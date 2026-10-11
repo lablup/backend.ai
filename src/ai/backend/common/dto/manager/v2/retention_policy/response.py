@@ -7,13 +7,12 @@ from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseResponseModel
 from ai.backend.common.data.retention.types import RetentionCategory
-from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 
 
 class RetentionPolicyNode(BaseResponseModel):
     id: UUID = Field(description="Retention policy ID.")
     entity_id: UUID = Field(
-        description=f"UUID of the retention policy. Added in {NEXT_RELEASE_VERSION}.",
+        description="UUID of the retention policy. Added in 26.9.0.",
     )
     category: RetentionCategory = Field(description="Retention category.")
     retention_period_days: int = Field(description="Retention period in days.")
