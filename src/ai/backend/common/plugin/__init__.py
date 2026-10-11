@@ -16,6 +16,9 @@ from ai.backend.plugin.entrypoint import scan_entrypoints
 
 log = StructuredLogger(logging.getLogger(__spec__.name))
 
+#: The config watcher's retry backoff sleep; tests replace it without patching `asyncio.sleep`.
+_config_retry_sleep = asyncio.sleep
+
 __all__ = (
     "AbstractPlugin",
     "BasePluginContext",
@@ -105,6 +108,12 @@ class BasePluginContext[P: AbstractPlugin]:
     plugin_group: ClassVar[str] = "backendai_XXX_v10"
     allowlist: ClassVar[set[str] | None] = None
     blocklist: ClassVar[set[str] | None] = None
+    #: Backoff before re-reading a configuration that could not be read, doubling to the ceiling.
+    #: Unbounded in count: giving up loses the change.
+    _CONFIG_RETRY_BACKOFF_SEC: ClassVar[float] = 0.5
+    _CONFIG_RETRY_CEILING_SEC: ClassVar[float] = 30.0
+    #: Where the doubling stops, so `2**attempt` cannot overflow.
+    _CONFIG_RETRY_MAX_SHIFT: ClassVar[int] = 8
 
     _config_watchers: WeakSet[asyncio.Task[Any]]
 
@@ -202,10 +211,36 @@ class BasePluginContext[P: AbstractPlugin]:
             f"config/plugins/{self._group_key}/{plugin_name}",
             wait_timeout=0.2,
         ):
+            # Retried until read: the watch event is consumed, so giving up leaves the change
+            # unapplied until a later edit that may never come.
+            attempt = 0
+            while not await self._apply_config(plugin_name):
+                await _config_retry_sleep(
+                    min(
+                        self._CONFIG_RETRY_BACKOFF_SEC * (2**attempt),
+                        self._CONFIG_RETRY_CEILING_SEC,
+                    )
+                )
+                attempt = min(attempt + 1, self._CONFIG_RETRY_MAX_SHIFT)
+
+    async def _apply_config(self, plugin_name: str) -> bool:
+        """Return ``False`` only when the read failed; a plugin refusing the value counts as done."""
+        try:
             new_config = await self.etcd.get_prefix(
                 f"config/plugins/{self._group_key}/{plugin_name}/",
             )
+        except Exception:
+            log.exception("plugin configuration read failed, retrying", plugin_name=plugin_name)
+            return False
+        try:
             await self.plugins[plugin_name].update_plugin_config(new_config)
+        except Exception:
+            # Retrying hands the plugin the same value; ending the watcher would drop every later
+            # change, including the correction.
+            log.exception(
+                "plugin refused configuration update, keeping current one", plugin_name=plugin_name
+            )
+        return True
 
     async def watch_config_changes(self, plugin_name: str) -> None:
         wtask = asyncio.create_task(self._watcher(plugin_name))
