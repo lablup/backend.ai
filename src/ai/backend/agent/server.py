@@ -853,7 +853,8 @@ class AgentRPCServer(aobject):
         # Failures raised by `_create_kernel` are logged in their kernel scope; this logs the rest.
         try:
             agent = self.runtime.get_agent(agent_id)
-            throttle_sema = asyncio.Semaphore(agent.local_config.agent.kernel_creation_concurrency)
+            # The agent's own: `kernel-creation-concurrency` bounds the agent, not one request.
+            throttle_sema = agent.kernel_creation_sema
             session_id = SessionId(UUID(raw_session_id))
             coros = []
             for raw_kernel_id, raw_config in zip(raw_kernel_ids, raw_configs, strict=True):
