@@ -1,0 +1,3 @@
+const __vite__mapDeps=(i,m=__vite__mapDeps,d=(m.f||(m.f=["assets/FolderInvitationResponseModal-pu1LNL99.js","assets/index-B82PWaiZ.js","assets/index-Bo67L5aK.css"])))=>i.map(i=>d[i]);
+import{bv as o,ao as s,j as t,an as a,c0 as i,d$ as r}from"./index-B82PWaiZ.js";const l=i.lazy(()=>r(()=>import("./FolderInvitationResponseModal-pu1LNL99.js"),__vite__mapDeps([0,1,2]))),d=()=>{const[e,n]=o("invitation",s.withOptions({history:"replace"}));return t.jsx(a,{children:t.jsx(l,{open:e==="true",onCancel:()=>{n(null)}})})};export{d as default};
+//# sourceMappingURL=FolderInvitationResponseModalOpener-DzYgpYzh.js.map
