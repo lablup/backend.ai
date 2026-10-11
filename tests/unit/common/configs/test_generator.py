@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import tomllib
 from enum import Enum
 from typing import Annotated
 
@@ -422,6 +423,33 @@ class TestTOMLGenerator:
 
         assert "[inner]" in result
         assert "value" in result
+
+    def test_dict_section_placeholder_is_valid_toml(self) -> None:
+        class NamedConfig(BackendAISchema):
+            value: Annotated[
+                int,
+                Field(default=10),
+                BackendAIConfigMeta(
+                    description="Named value",
+                    added_version="25.1.0",
+                    example=ConfigExample(local="10", prod="100"),
+                ),
+            ]
+
+        class DictConfig(BackendAISchema):
+            named: Annotated[
+                dict[str, NamedConfig],
+                Field(default_factory=dict),
+                BackendAIConfigMeta(
+                    description="Named sections",
+                    added_version="25.1.0",
+                    composite=CompositeType.DICT,
+                ),
+            ]
+
+        result = TOMLGenerator().generate(DictConfig)
+
+        assert tomllib.loads(result)["named"]["<name>"]["value"] == 10
 
     def test_runtime_field_hidden(self) -> None:
         class RuntimeConfig(BackendAISchema):

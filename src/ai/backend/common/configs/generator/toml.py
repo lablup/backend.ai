@@ -233,7 +233,7 @@ class TOMLGenerator:
 
         # For DICT composite type, add a placeholder key
         if field.type_info.composite_type == CompositeType.DICT:
-            section_path = path + [key, "<name>"]
+            section_path = path + [key, '"<name>"']
             lines.append(
                 f"{indent}# Replace <name> with your actual key (e.g., 'default', 'local')"
             )

@@ -564,7 +564,7 @@
   # Additional labels for service categorization and filtering.
   # Added in 26.3.0
   # Replace <name> with your actual key (e.g., 'default', 'local')
-  [service_discovery.extra-labels.<name>]
+  [service_discovery.extra-labels."<name>"]
 
   # List of endpoints exposed by this service instance.
   # Added in 26.3.0
@@ -589,7 +589,7 @@
     # Additional metadata for the endpoint.
     # Added in 26.3.0
     # Replace <name> with your actual key (e.g., 'default', 'local')
-    [service_discovery.endpoints.metadata.<name>]
+    [service_discovery.endpoints.metadata."<name>"]
 
 # etcd connection configuration for distributed coordination. Used for service
 # discovery (if etcd-based) and shared configuration management.
