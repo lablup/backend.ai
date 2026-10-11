@@ -13,7 +13,7 @@ from __future__ import annotations
 
 import uuid
 from collections import defaultdict
-from collections.abc import Mapping, Sequence
+from collections.abc import Iterator, Mapping, Sequence
 from typing import Any
 
 import sqlalchemy as sa
@@ -117,6 +117,15 @@ def _scope_bindings_table() -> sa.Table:
 
 type _Scope = tuple[str, uuid.UUID]
 
+# A statement binds at most this many parameters, so large lists go in batches.
+_MAX_BIND_PARAMS = 32767
+
+
+def _batched[T](items: Sequence[T], params_per_item: int) -> Iterator[Sequence[T]]:
+    size = _MAX_BIND_PARAMS // params_per_item
+    for start in range(0, len(items), size):
+        yield items[start : start + size]
+
 
 def _majority_scopes(conn: Connection) -> dict[uuid.UUID, _Scope]:
     """The scope most of each role's permissions name. A scope id that is not a uuid
@@ -148,40 +157,49 @@ def _nodes(conn: Connection, scopes: set[_Scope]) -> dict[_Scope, uuid.UUID]:
     if not scopes:
         return {}
     nodes = _virtual_entities_table()
-    rows = conn.execute(
-        sa.select(nodes.c.entity_type, nodes.c.entity_id, nodes.c.id).where(
-            sa.tuple_(nodes.c.entity_type, nodes.c.entity_id).in_(list(scopes))
-        )
-    ).all()
-    return {(entity_type, entity_id): node_id for entity_type, entity_id, node_id in rows}
+    found: dict[_Scope, uuid.UUID] = {}
+    for batch in _batched(list(scopes), 2):
+        rows = conn.execute(
+            sa.select(nodes.c.entity_type, nodes.c.entity_id, nodes.c.id).where(
+                sa.tuple_(nodes.c.entity_type, nodes.c.entity_id).in_(batch)
+            )
+        ).all()
+        found.update({
+            (entity_type, entity_id): node_id for entity_type, entity_id, node_id in rows
+        })
+    return found
 
 
 def _remove_roles(conn: Connection, role_ids: Sequence[uuid.UUID]) -> None:
     """Remove the roles with everything attached: grants and permissions go by FK, the
     rest by hand."""
-    if not role_ids:
-        return
-    ids = list(role_ids)
-    ids_text = [str(role_id) for role_id in ids]
     object_permissions = _object_permissions_table()
-    conn.execute(sa.delete(object_permissions).where(object_permissions.c.role_id.in_(ids)))
     assoc = _association_scopes_entities_table()
-    conn.execute(
-        sa.delete(assoc).where(assoc.c.entity_type == "role", assoc.c.entity_id.in_(ids_text))
-    )
     nodes = _virtual_entities_table()
-    conn.execute(sa.delete(nodes).where(nodes.c.entity_type == "role", nodes.c.entity_id.in_(ids)))
     roles = _roles_table()
-    conn.execute(sa.delete(roles).where(roles.c.id.in_(ids)))
+    for ids in _batched(list(role_ids), 1):
+        ids_text = [str(role_id) for role_id in ids]
+        conn.execute(sa.delete(object_permissions).where(object_permissions.c.role_id.in_(ids)))
+        conn.execute(
+            sa.delete(assoc).where(assoc.c.entity_type == "role", assoc.c.entity_id.in_(ids_text))
+        )
+        conn.execute(
+            sa.delete(nodes).where(nodes.c.entity_type == "role", nodes.c.entity_id.in_(ids))
+        )
+        conn.execute(sa.delete(roles).where(roles.c.id.in_(ids)))
 
 
 def _refuse_preset_duplicates(conn: Connection, assigned: Mapping[uuid.UUID, _Scope]) -> None:
     roles = _roles_table()
-    rows = conn.execute(
-        sa.select(roles.c.id, roles.c.role_preset_id).where(
-            roles.c.id.in_(list(assigned)), roles.c.role_preset_id.is_not(None)
-        )
-    ).all()
+    rows = [
+        row
+        for batch in _batched(list(assigned), 1)
+        for row in conn.execute(
+            sa.select(roles.c.id, roles.c.role_preset_id).where(
+                roles.c.id.in_(batch), roles.c.role_preset_id.is_not(None)
+            )
+        ).all()
+    ]
     by_preset_scope: dict[tuple[uuid.UUID, _Scope], list[uuid.UUID]] = defaultdict(list)
     for role_id, preset_id in rows:
         by_preset_scope[(preset_id, assigned[role_id])].append(role_id)
@@ -209,16 +227,19 @@ def _own_roles(
     nodes = _virtual_entities_table()
     memberships = _entity_memberships_table()
     bindings = _scope_bindings_table()
-    conn.execute(
-        pg_insert(nodes)
-        .values([{"entity_type": "role", "entity_id": role_id} for role_id in assigned])
-        .on_conflict_do_nothing(index_elements=["entity_type", "entity_id"])
-    )
+    role_ids = list(assigned)
+    for batch in _batched(role_ids, 2):
+        conn.execute(
+            pg_insert(nodes)
+            .values([{"entity_type": "role", "entity_id": role_id} for role_id in batch])
+            .on_conflict_do_nothing(index_elements=["entity_type", "entity_id"])
+        )
     role_nodes = {
         entity_id: node_id
+        for batch in _batched(role_ids, 1)
         for entity_id, node_id in conn.execute(
             sa.select(nodes.c.entity_id, nodes.c.id).where(
-                nodes.c.entity_type == "role", nodes.c.entity_id.in_(list(assigned))
+                nodes.c.entity_type == "role", nodes.c.entity_id.in_(batch)
             )
         ).all()
     }
@@ -237,35 +258,31 @@ def _own_roles(
         }
         for role_id, scope in assigned.items()
     ]
-    conn.execute(
-        pg_insert(memberships)
-        .values(edges)
-        .on_conflict_do_update(
-            index_elements=["virtual_entity_id", "member_entity_id"], set_={"capped": False}
+    for edge_batch in _batched(edges, 3):
+        conn.execute(
+            pg_insert(memberships)
+            .values(edge_batch)
+            .on_conflict_do_update(
+                index_elements=["virtual_entity_id", "member_entity_id"], set_={"capped": False}
+            )
         )
-    )
-    conn.execute(
-        pg_insert(bindings)
-        .values(
-            [
-                {
-                    "virtual_entity_id": role_nodes[role_id],
-                    "scope_entity_id": role_nodes[role_id],
-                    "permission_cap": None,
-                }
-                for role_id in assigned
-            ]
-            + [
-                {
-                    "virtual_entity_id": role_nodes[role_id],
-                    "scope_entity_id": scope_nodes[scope],
-                    "permission_cap": None,
-                }
-                for role_id, scope in assigned.items()
-            ]
-        )
-        .on_conflict_do_nothing()
-    )
+    scope_bindings = [
+        {
+            "virtual_entity_id": role_nodes[role_id],
+            "scope_entity_id": role_nodes[role_id],
+            "permission_cap": None,
+        }
+        for role_id in assigned
+    ] + [
+        {
+            "virtual_entity_id": role_nodes[role_id],
+            "scope_entity_id": scope_nodes[scope],
+            "permission_cap": None,
+        }
+        for role_id, scope in assigned.items()
+    ]
+    for binding_batch in _batched(scope_bindings, 3):
+        conn.execute(pg_insert(bindings).values(binding_batch).on_conflict_do_nothing())
     conn.execute(
         sa.delete(memberships).where(
             memberships.c.member_entity_id == sa.bindparam("b_role_node"),
