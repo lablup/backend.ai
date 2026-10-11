@@ -16,7 +16,6 @@ from ai.backend.common.dto.manager.v2.resource_group.request import (
     ScopedSearchResourceGroupsInput,
 )
 from ai.backend.common.dto.manager.v2.resource_group.response import DeleteResourceGroupPayload
-from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import encode_cursor
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
@@ -58,7 +57,7 @@ from .types import (
 
 @gql_root_field(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.9.0",
         description=(
             "Page through the resource groups the named scopes reach, combined with OR. "
             "Every scope is authorized before the read runs."
@@ -72,7 +71,7 @@ async def scoped_resource_groups(
         ResourceGroupUsageGQL | None,
         strawberry.argument(
             description=(
-                f"Added in {NEXT_RELEASE_VERSION}. Uses narrowing the result. Each listed "
+                "Added in 26.9.0. Uses narrowing the result. Each listed "
                 "entity must be readable by the caller; resource groups the caller cannot "
                 "read are left out."
             )
@@ -124,7 +123,7 @@ async def admin_resource_groups(
         ResourceGroupUsageGQL | None,
         strawberry.argument(
             description=(
-                f"Added in {NEXT_RELEASE_VERSION}. Uses narrowing the result. Each listed "
+                "Added in 26.9.0. Uses narrowing the result. Each listed "
                 "entity must be readable by the caller; resource groups the caller cannot "
                 "read are left out."
             )

@@ -10,7 +10,6 @@ from ai.backend.common.dto.manager.v2.domain.types import (
     DomainProjectFilter,
     DomainUserFilter,
 )
-from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import (
     DateTimeFilter,
     OrderDirection,
@@ -69,7 +68,7 @@ class DomainV2Filter(PydanticInputMixin[DomainFilter]):
     name: StringFilter | None = None
     id: UUIDFilter | None = gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.9.0",
             description="Filter by domain uuid.",
         ),
         default=None,
@@ -82,7 +81,7 @@ class DomainV2Filter(PydanticInputMixin[DomainFilter]):
         default=None,
         description="Filter by the projects the domain holds.",
         deprecation_reason=(
-            f"Deprecated since {NEXT_RELEASE_VERSION}. A filter on another entity's columns"
+            "Deprecated since 26.9.0. A filter on another entity's columns"
             " cannot check whether the caller may read that row. Search projects first, then"
             " narrow by their domain."
         ),
@@ -91,7 +90,7 @@ class DomainV2Filter(PydanticInputMixin[DomainFilter]):
         default=None,
         description="Filter by the users the domain holds.",
         deprecation_reason=(
-            f"Deprecated since {NEXT_RELEASE_VERSION}. A filter on another entity's columns"
+            "Deprecated since 26.9.0. A filter on another entity's columns"
             " cannot check whether the caller may read that row. Search users first, then"
             " narrow by their domain."
         ),
@@ -102,7 +101,7 @@ class DomainV2Filter(PydanticInputMixin[DomainFilter]):
 
 
 _HELD_ORDER_DEPRECATION_TEMPLATE = (
-    f"Deprecated since {NEXT_RELEASE_VERSION}. A domain holds many {{holds}}, so this order"
+    "Deprecated since 26.9.0. A domain holds many {holds}, so this order"
     " folds them into a single {subject}. Narrow the results with the matching filter instead."
 )
 

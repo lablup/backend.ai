@@ -14,7 +14,7 @@ Create Date: 2026-09-06 12:00:00
 
 """
 
-# Part of: NEXT_RELEASE_VERSION
+# Part of: 26.9.0
 
 from typing import Final
 

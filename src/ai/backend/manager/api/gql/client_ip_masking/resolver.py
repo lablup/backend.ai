@@ -14,7 +14,6 @@ from ai.backend.common.dto.manager.v2.client_ip_masking.types import (
     ClientIPMaskingPolicyOrderField,
 )
 from ai.backend.common.dto.manager.v2.common import OrderDirection
-from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import encode_cursor
 from ai.backend.manager.api.gql.client_ip_masking.types import (
     ClientIPMaskingPolicyConnectionGQL,
@@ -36,7 +35,7 @@ from ai.backend.manager.api.gql.utils import check_admin_only
 
 @gql_root_field(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.9.0",
         description="Read the client IP masking set for every target (superadmin only).",
     )
 )  # type: ignore[misc]
@@ -91,7 +90,7 @@ async def admin_client_ip_masking_policies(
 
 @gql_mutation(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.9.0",
         description="Set the client IP masking one target gets (superadmin only).",
     )
 )
@@ -106,7 +105,7 @@ async def admin_upsert_client_ip_masking_policy(
 
 @gql_mutation(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.9.0",
         description=(
             "Drop one target's client IP masking policy so it falls back to the "
             "default (superadmin only)."

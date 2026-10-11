@@ -16,7 +16,6 @@ from ai.backend.common.dto.manager.v2.role_permission_preset.request import (
     SearchRolePermissionPresetsInput,
 )
 from ai.backend.common.dto.manager.v2.role_preset.response import RolePresetNode
-from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import encode_cursor
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
@@ -49,7 +48,7 @@ class RolePresetGQL(PydanticNodeMixin[RolePresetNode]):
     id: NodeID[str] = gql_field(description="Role preset UUID (primary key).")
     entity_id: UUID = gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.9.0",
             description="UUID of the role preset.",
         ),
     )

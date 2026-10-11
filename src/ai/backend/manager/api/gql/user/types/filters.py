@@ -16,7 +16,6 @@ from ai.backend.common.dto.manager.v2.user.types import (
     UserRoleFilter,
     UserStatusFilter,
 )
-from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import (
     DateTimeFilter,
     IntArrayFilter,
@@ -106,7 +105,7 @@ class UserProjectNestedFilterGQL(PydanticInputMixin[UserProjectFilter]):
 @gql_pydantic_input(
     BackendAIGQLMeta(
         description="Filter users by conditions on the keypairs they own.",
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.9.0",
     ),
     name="UserKeypairNestedFilter",
 )
@@ -137,8 +136,8 @@ class UserKeypairNestedFilterGQL(PydanticInputMixin[KeypairNestedFilter]):
 
 _NESTED_FILTER_DEPRECATION = (
     "Filter by the user's {subject}. Deprecated since "
-    + NEXT_RELEASE_VERSION
-    + ". The condition is evaluated on rows the caller may not be able to read. Use {instead}."
+    "26.9.0"
+    ". The condition is evaluated on rows the caller may not be able to read. Use {instead}."
 )
 
 
@@ -180,7 +179,7 @@ class UserFilterGQL(PydanticInputMixin[UserFilter]):
     domain_name: StringFilter | None = None
     domain_id: UUIDFilter | None = gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.9.0",
             description="Filter by domain ID.",
         ),
         default=None,
@@ -245,21 +244,21 @@ class UserFilterGQL(PydanticInputMixin[UserFilter]):
     created_at: DateTimeFilter | None = None
     modified_at: DateTimeFilter | None = gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.9.0",
             description="Filter by last modification timestamp.",
         ),
         default=None,
     )
     totp_activated_at: NullableDateTimeFilter | None = gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.9.0",
             description="Filter by when TOTP two-factor auth was activated.",
         ),
         default=None,
     )
     keypairs: UserKeypairNestedFilterGQL | None = gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.9.0",
             description="Filter by conditions on the user's keypairs.",
         ),
         default=None,
@@ -283,7 +282,7 @@ class UserFilterGQL(PydanticInputMixin[UserFilter]):
 
 
 _PROJECT_NAME_ORDER_DEPRECATION = (
-    f"Deprecated since {NEXT_RELEASE_VERSION}. A user belongs to many projects, so this"
+    "Deprecated since 26.9.0. A user belongs to many projects, so this"
     " order folds them into a single name. Narrow the results with the `project` filter"
     " instead."
 )
@@ -294,7 +293,7 @@ _PROJECT_NAME_ORDER_DEPRECATION = (
         added_version="26.2.0",
         description=(
             "Fields available for ordering user query results. "
-            f"Added in {NEXT_RELEASE_VERSION}: ENTITY_ID, FULL_NAME, DESCRIPTION, STATUS_INFO, "
+            "Added in 26.9.0: ENTITY_ID, FULL_NAME, DESCRIPTION, STATUS_INFO, "
             "ROLE, DOMAIN_ID, INTEGRATION_NAME, RESOURCE_POLICY, NEED_PASSWORD_CHANGE, TOTP_ACTIVATED, "
             "TOTP_ACTIVATED_AT, SUDO_SESSION_ENABLED, CONTAINER_UID, CONTAINER_MAIN_GID. "
             "Each value orders by the user column of the same name; ENTITY_ID orders by the "

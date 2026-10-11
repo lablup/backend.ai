@@ -11,7 +11,7 @@ from alembic import op
 
 from ai.backend.manager.models.uuid7 import DROP_UUID_GENERATE_V7_DDL, UUID_GENERATE_V7_DDL
 
-# Part of: NEXT_RELEASE_VERSION
+# Part of: 26.9.0
 
 # revision identifiers, used by Alembic.
 revision = "8f3b1c7ad204"

@@ -83,7 +83,6 @@ from ai.backend.common.dto.manager.v2.resource_group.response import (
 from ai.backend.common.dto.manager.v2.resource_group.response import (
     ReplaceResourceGroupDefaultSessionOptionsPayload as ReplaceResourceGroupDefaultSessionOptionsPayloadDTO,
 )
-from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.common.types import PreemptionOrder, PreemptionVictimScope
 from ai.backend.manager.api.gql.base import OrderDirection, StringFilter
 from ai.backend.manager.api.gql.decorators import (
@@ -376,7 +375,7 @@ class ResourceGroupGQL(PydanticNodeMixin[ResourceGroupDetailNode]):
     )
     entity_id: UUID = gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.9.0",
             description="UUID of the resource group.",
         ),
     )
@@ -466,7 +465,7 @@ class ResourceGroupGQL(PydanticNodeMixin[ResourceGroupDetailNode]):
 
     @gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.9.0",
             description="Domains this resource group serves.",
         )
     )  # type: ignore[misc]
@@ -535,7 +534,7 @@ class ResourceGroupGQL(PydanticNodeMixin[ResourceGroupDetailNode]):
 
     @gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.9.0",
             description="Projects this resource group serves.",
         )
     )  # type: ignore[misc]
@@ -607,7 +606,7 @@ class ResourceGroupGQL(PydanticNodeMixin[ResourceGroupDetailNode]):
 
     @gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.9.0",
             description="The labels on this resource group.",
         )
     )  # type: ignore[misc]
@@ -694,7 +693,7 @@ class ResourceGroupFilterGQL(PydanticInputMixin[ResourceGroupFilterDTO]):
     is_default: bool | None = None
     labels: EntityLabelNestedFilterGQL | None = gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.9.0",
             description="Select entities by the labels on them.",
         ),
         default=None,
@@ -841,7 +840,7 @@ class UpdateResourceGroupInput(PydanticInputMixin[UpdateResourceGroupConfigInput
     )
     is_default: bool | None = gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.9.0",
             description=(
                 "Whether this is the default resource group. At most one resource group may"
                 " hold the flag, so setting it to true is rejected while another one holds it;"
@@ -914,7 +913,7 @@ class CreateResourceGroupInputGQL(PydanticInputMixin[CreateResourceGroupInputDTO
     description: str | None = gql_field(default=None, description="Optional description.")
     is_default: bool = gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.9.0",
             description=(
                 "Make this the default resource group. At most one resource group may hold"
                 " the flag, so this is rejected while another one holds it; clear that one first."

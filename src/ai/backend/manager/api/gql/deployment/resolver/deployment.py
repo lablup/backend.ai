@@ -19,7 +19,6 @@ from ai.backend.common.dto.manager.v2.deployment.request import (
 from ai.backend.common.dto.manager.v2.deployment.types import DeploymentScope
 from ai.backend.common.dto.manager.v2.rbac.types import UUIDScope
 from ai.backend.common.exception import UnreachableError
-from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import encode_cursor, parse_uuid, resolve_entity_id
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
@@ -71,7 +70,7 @@ async def admin_deployments(
         DeploymentUsageGQL | None,
         strawberry.argument(
             description=(
-                f"Added in {NEXT_RELEASE_VERSION}. Uses narrowing the result. Each listed "
+                "Added in 26.9.0. Uses narrowing the result. Each listed "
                 "entity must be readable by the caller; deployments the caller cannot "
                 "read are left out."
             )
@@ -119,7 +118,7 @@ async def admin_deployments(
 
 @gql_root_field(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.9.0",
         description=(
             "Page through the deployments the named scopes reach, combined with OR. "
             "Every scope is authorized before the read runs."
@@ -133,7 +132,7 @@ async def scoped_deployments(
         DeploymentUsageGQL | None,
         strawberry.argument(
             description=(
-                f"Added in {NEXT_RELEASE_VERSION}. Uses narrowing the result. Each listed "
+                "Added in 26.9.0. Uses narrowing the result. Each listed "
                 "entity must be readable by the caller; deployments the caller cannot "
                 "read are left out."
             )
@@ -190,7 +189,7 @@ async def project_deployments(
         DeploymentUsageGQL | None,
         strawberry.argument(
             description=(
-                f"Added in {NEXT_RELEASE_VERSION}. Uses narrowing the result. Each listed "
+                "Added in 26.9.0. Uses narrowing the result. Each listed "
                 "entity must be readable by the caller; deployments the caller cannot "
                 "read are left out."
             )
@@ -248,7 +247,7 @@ async def my_deployments(
         DeploymentUsageGQL | None,
         strawberry.argument(
             description=(
-                f"Added in {NEXT_RELEASE_VERSION}. Uses narrowing the result. Each listed "
+                "Added in 26.9.0. Uses narrowing the result. Each listed "
                 "entity must be readable by the caller; deployments the caller cannot "
                 "read are left out."
             )

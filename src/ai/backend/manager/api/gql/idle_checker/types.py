@@ -54,7 +54,6 @@ from ai.backend.common.dto.manager.v2.idle_checker.response import (
 from ai.backend.common.dto.manager.v2.idle_checker.types import (
     CheckerTypeFilter as CheckerTypeFilterDTO,
 )
-from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.common.types import SessionTypes
 from ai.backend.manager.api.gql.base import DateTimeFilter, OrderDirection, StringFilter
 from ai.backend.manager.api.gql.decorators import (
@@ -149,13 +148,13 @@ class UtilizationIdleCheckerThresholdGQL(PydanticOutputMixin[UtilizationThreshol
     threshold: Decimal = gql_field(description="Underutilization threshold.")
     filter_labels: list[MetricLabelEntryGQL] = gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.9.0",
             description="Label filters injected into the preset query.",
         )
     )
     group_labels: list[str] = gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.9.0",
             description="Group-by labels injected into the preset query.",
         )
     )
@@ -218,7 +217,7 @@ class IdleCheckerGQL(PydanticNodeMixin[IdleCheckerNode]):
     )
     entity_id: UUID = gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.9.0",
             description="UUID of the idle checker.",
         ),
     )
@@ -309,14 +308,14 @@ class UtilizationIdleCheckerThresholdInputGQL(PydanticInputMixin[UtilizationThre
     threshold: Decimal = gql_field(description="Underutilization threshold.")
     filter_labels: list[MetricLabelEntryInput] = gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.9.0",
             description="Label filters injected into the preset query.",
         ),
         default_factory=list,
     )
     group_labels: list[str] = gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.9.0",
             description=(
                 "Group-by labels injected into the preset query. "
                 "Per-session mapping requires 'session_id'; when included, the query is "

@@ -35,7 +35,6 @@ from ai.backend.common.dto.manager.v2.deployment.response import (
 from ai.backend.common.dto.manager.v2.deployment.types import (
     AccessTokenOrderField,
 )
-from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import (
     DateTimeFilter,
     OrderDirection,
@@ -66,9 +65,7 @@ class AccessTokenFilter(PydanticInputMixin[AccessTokenFilterDTO]):
     created_at: DateTimeFilter | None = None
 
     field_id: UUIDFilter | None = gql_added_field(
-        BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION, description="Filter by access token ID."
-        ),
+        BackendAIGQLMeta(added_version="26.9.0", description="Filter by access token ID."),
         default=None,
     )
     AND: list[Self] | None = None
@@ -91,7 +88,7 @@ class AccessToken(PydanticNodeMixin[AccessTokenNodeDTO]):
     id: NodeID[str]
     field_id: UUID = gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.9.0",
             description="UUID of the access token.",
         ),
     )

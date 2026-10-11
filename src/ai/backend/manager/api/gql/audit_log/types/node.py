@@ -88,7 +88,7 @@ class AuditLogV2GQL(PydanticNodeMixin[AuditLogNode]):
     id: NodeID[str] = gql_field(description="Unique identifier of the audit log entry (UUID).")
     field_id: UUID = gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.9.0",
             description="UUID of the audit log record.",
         ),
     )
@@ -164,7 +164,7 @@ class AuditLogV2GQL(PydanticNodeMixin[AuditLogNode]):
     status: AuditLogStatusGQL = gql_field(description="Status of the operation.")
     client_ip: str | None = gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.9.0",
             description=(
                 "IP address of the request that produced this record, masked per the client "
                 "IP masking policy. Null when the policy records none, or when the address "
@@ -175,7 +175,7 @@ class AuditLogV2GQL(PydanticNodeMixin[AuditLogNode]):
 
     @gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.9.0",
             description=(
                 "The entity the logged operation acted on. Null when the log names no entity, "
                 "or when the recorded id does not name one that still exists."

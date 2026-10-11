@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from strawberry import Info
 
-from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     gql_mutation,
@@ -20,7 +19,7 @@ from ai.backend.manager.api.gql.utils import check_admin_only
 
 @gql_root_field(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.9.0",
         description=(
             "Report the stored secrets of every encrypted column per key id (admin only). "
             "Requires superadmin privileges."
@@ -37,7 +36,7 @@ async def admin_secret_status(
 
 @gql_mutation(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.9.0",
         description=(
             "Admin encrypts every stored secret again through the configured write provider, "
             "under a fresh data encryption key. The pass runs in chunks and reports the count "

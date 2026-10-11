@@ -12,7 +12,6 @@ from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseResponseModel
 from ai.backend.common.dto.manager.pagination import PaginationInfo
-from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.common.types import BackendAISchema
 
 from .types import UserRole, UserStatus
@@ -55,7 +54,7 @@ class UserDTO(BackendAISchema):
     main_access_key: str | None = Field(
         default=None,
         description=(
-            f"Main access key. Deprecated since {NEXT_RELEASE_VERSION}. Use the keypair's is_default field."
+            "Main access key. Deprecated since 26.9.0. Use the keypair's is_default field."
         ),
         deprecated=True,
     )

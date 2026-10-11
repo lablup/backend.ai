@@ -12,7 +12,6 @@ from ai.backend.common.api_handlers import BaseResponseModel, BaseRootResponseMo
 from ai.backend.common.data.app_config.types import AppConfigScopeType
 from ai.backend.common.data.entity.app_config import AppConfigScopeID
 from ai.backend.common.data.entity.app_config_fragment import AppConfigFragmentID
-from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 
 __all__ = (
     "AppConfigFragmentBulkErrorInfo",
@@ -31,7 +30,7 @@ class AppConfigFragmentNode(BaseResponseModel):
 
     id: AppConfigFragmentID = Field(description="App config fragment id.")
     entity_id: UUID = Field(
-        description=f"UUID of the app config fragment. Added in {NEXT_RELEASE_VERSION}.",
+        description="UUID of the app config fragment. Added in 26.9.0.",
     )
     config_name: str = Field(description="Config name the fragment belongs to.")
     scope_type: AppConfigScopeType = Field(description="Scope the fragment is written at.")
