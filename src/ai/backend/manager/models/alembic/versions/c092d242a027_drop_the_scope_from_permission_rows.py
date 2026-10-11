@@ -10,7 +10,8 @@ invitee's role rows scoped to the folder; those are dropped before the count, si
 share is carried from ``vfolder_permissions`` later in the chain. ``3632aad9d5d9`` granted
 a session's creator and its project's admins read on that session's app service, scoped to
 the session; those are dropped too, since ``f4a1c9d20b73`` retires the entity type and the
-session answers for it.
+session answers for it. So are the rows of a system role ``f4a1c9d20b73`` rewrites or
+removes, and the rows scoped to a user, project or domain that no longer exists.
 
 Create Date: 2026-09-09
 
@@ -29,11 +30,15 @@ branch_labels = None
 depends_on = None
 
 _CHECK_QUERY = """\
--- permission rows naming a scope other than their role's
-SELECT p.id, p.role_id, p.scope_type, p.scope_id, r.scope_type, r.scope_id
+-- permission rows naming a scope other than their role's, per role and scope
+SELECT r.id AS role_id, r.name, r.source, r.scope_type AS role_scope_type,
+       r.scope_id AS role_scope_id, p.scope_type, p.scope_id, count(*) AS row_count,
+       (SELECT count(*) FROM user_roles ur WHERE ur.role_id = r.id) AS holders
 FROM permissions p JOIN roles r ON r.id = p.role_id
 WHERE p.scope_type IS DISTINCT FROM r.scope_type
-   OR p.scope_id IS DISTINCT FROM CAST(r.scope_id AS text);"""
+   OR p.scope_id IS DISTINCT FROM CAST(r.scope_id AS text)
+GROUP BY r.id, r.name, r.source, r.scope_type, r.scope_id, p.scope_type, p.scope_id
+ORDER BY r.name, p.scope_type, p.scope_id;"""
 
 
 def drop_folder_share_grants(conn: sa.engine.Connection) -> None:
@@ -66,6 +71,59 @@ def drop_session_app_service_grants(conn: sa.engine.Connection) -> None:
     )
 
 
+# The presets ``f4a1c9d20b73`` writes; it replaces the permissions of the system roles
+# linked to them and removes the system roles linked to none.
+_REWRITTEN_PRESET_IDS = (
+    "9ebf4f57-9e67-5631-997a-d2d79cc3815f",
+    "22c4db03-24aa-5ff8-b5a9-64b2a2182413",
+    "06057849-3534-546f-b74c-b79d5d3ecf5e",
+    "776c1366-dcf3-5abd-b8de-bc3ad3b759ad",
+)
+
+_UUID_PATTERN = "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+
+
+def drop_rewritten_system_role_grants(conn: sa.engine.Connection) -> None:
+    """Drop the rows naming another scope on a system role that ``f4a1c9d20b73`` rewrites
+    or removes: they do not survive that revision either way."""
+    conn.execute(
+        sa.text("""
+            DELETE FROM permissions p
+            USING roles r
+            WHERE r.id = p.role_id
+              AND r.source = 'system'
+              AND (r.role_preset_id IS NULL
+                   OR CAST(r.role_preset_id AS text) = ANY(:preset_ids))
+              AND (p.scope_type IS DISTINCT FROM r.scope_type
+                   OR p.scope_id IS DISTINCT FROM CAST(r.scope_id AS text))
+        """).bindparams(preset_ids=list(_REWRITTEN_PRESET_IDS))
+    )
+
+
+def drop_grants_on_deleted_scopes(conn: sa.engine.Connection) -> None:
+    """Drop the rows naming another scope that is a user, project or domain no longer in
+    the database, or that is not named by a uuid."""
+    conn.execute(
+        sa.text("""
+            DELETE FROM permissions p
+            USING roles r
+            WHERE r.id = p.role_id
+              AND p.scope_type IN ('user', 'project', 'domain')
+              AND (p.scope_type IS DISTINCT FROM r.scope_type
+                   OR p.scope_id IS DISTINCT FROM CAST(r.scope_id AS text))
+              AND (
+                  p.scope_id !~* :uuid_pattern
+                  OR (p.scope_type = 'user' AND NOT EXISTS (
+                      SELECT 1 FROM users u WHERE CAST(u.uuid AS text) = p.scope_id))
+                  OR (p.scope_type = 'project' AND NOT EXISTS (
+                      SELECT 1 FROM groups g WHERE CAST(g.id AS text) = p.scope_id))
+                  OR (p.scope_type = 'domain' AND NOT EXISTS (
+                      SELECT 1 FROM domains d WHERE CAST(d.id AS text) = p.scope_id))
+              )
+        """).bindparams(uuid_pattern=_UUID_PATTERN)
+    )
+
+
 def refuse_rows_disagreeing_with_their_role(conn: sa.engine.Connection) -> None:
     """Stop when a permission row names a scope other than the one its role sits in.
 
@@ -95,6 +153,8 @@ def upgrade() -> None:
     conn = op.get_bind()
     drop_folder_share_grants(conn)
     drop_session_app_service_grants(conn)
+    drop_rewritten_system_role_grants(conn)
+    drop_grants_on_deleted_scopes(conn)
     refuse_rows_disagreeing_with_their_role(conn)
     op.drop_constraint("uq_permissions_role_scope_entity_permission", "permissions", type_="unique")
     op.drop_index("ix_permissions_role_scope", table_name="permissions")
