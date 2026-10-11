@@ -1713,6 +1713,9 @@ class AbstractAgent[
                 kernel_id=kernel_id,
                 lifecycle_event=event,
             )
+        # The reason may be free text (RPC `status_info`, or a restored `termination_reason`); a
+        # non-enum value would kill the lifecycle task in `_handle_clean_event`.
+        reason = KernelLifecycleEventReason.from_value(reason) or KernelLifecycleEventReason.UNKNOWN
         await self.container_lifecycle_queue.put(
             ContainerLifecycleEvent(
                 kernel_id,
