@@ -17,6 +17,7 @@ from kubernetes_asyncio import config as kube_config
 from kubernetes_asyncio import watch
 
 from ai.backend.agent.errors import KernelRunnerNotInitializedError
+from ai.backend.agent.errors.kernel import KernelRunnerReplyTimeoutError
 from ai.backend.agent.kernel import AbstractCodeRunner, AbstractKernel
 from ai.backend.agent.resources import KernelResourceSpec
 from ai.backend.agent.types import AgentEventData, KernelOwnershipData
@@ -122,6 +123,8 @@ class KubernetesKernel(AbstractKernel):
             try:
                 await runner.feed_and_get_status()
                 break
+            except KernelRunnerReplyTimeoutError:
+                break
             except zmq.error.ZMQError:
                 if retries < 4:
                     retries += 1
@@ -197,7 +200,11 @@ class KubernetesKernel(AbstractKernel):
     async def check_status(self) -> dict[str, Any] | None:
         if self.runner is None:
             raise KernelRunnerNotInitializedError("Kernel runner is not initialized")
-        return await self.runner.feed_and_get_status()
+        try:
+            return await self.runner.feed_and_get_status()
+        except KernelRunnerReplyTimeoutError:
+            # No reply yet is not a failure here: the caller goes on to the retried apps request.
+            return None
 
     @override
     async def get_logs(self) -> dict[str, Any]:
