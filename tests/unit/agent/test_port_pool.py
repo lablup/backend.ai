@@ -1,12 +1,16 @@
 from __future__ import annotations
 
 from collections.abc import Iterator
-from unittest.mock import patch
+from pathlib import Path
+from types import SimpleNamespace
+from typing import Any, cast
+from unittest.mock import Mock, patch
 
 import pytest
 
+from ai.backend.agent.agent import AbstractAgent
 from ai.backend.agent.errors.resources import PortPoolExhaustedError
-from ai.backend.agent.port_pool import PortPool
+from ai.backend.agent.port_pool import PortPool, ephemeral_overlap
 
 
 @pytest.fixture
@@ -159,3 +163,80 @@ class TestRemaining:
         first = pool.acquire()
         pool.release(first)
         assert pool.remaining() == [30001, 30002, first]
+
+
+class TestEphemeralOverlap:
+    """A pool port inside the unreserved ephemeral range may be taken as an outgoing connection's
+    source port before docker-proxy binds it, and the bind fails with EADDRINUSE."""
+
+    @staticmethod
+    def _settings(tmp_path: Path, rng: str, reserved: str) -> tuple[Path, Path]:
+        (tmp_path / "range").write_text(rng)
+        (tmp_path / "reserved").write_text(reserved)
+        return tmp_path / "range", tmp_path / "reserved"
+
+    def test_an_unreserved_range_inside_the_ephemeral_one_is_reported(self, tmp_path: Path) -> None:
+        r, res = self._settings(tmp_path, "32768\t60999\n", "\n")
+        assert ephemeral_overlap((33100, 33600), range_path=r, reserved_path=res) == (33100, 33600)
+
+    def test_reserving_the_whole_range_clears_it(self, tmp_path: Path) -> None:
+        r, res = self._settings(tmp_path, "32768\t60999\n", "33100-33600\n")
+        assert ephemeral_overlap((33100, 33600), range_path=r, reserved_path=res) is None
+
+    def test_only_the_part_left_exposed_is_reported(self, tmp_path: Path) -> None:
+        r, res = self._settings(tmp_path, "32768\t60999\n", "33100-33500\n")
+        assert ephemeral_overlap((33100, 33600), range_path=r, reserved_path=res) == (33501, 33600)
+
+    def test_a_range_partly_inside_reports_only_the_overlap(self, tmp_path: Path) -> None:
+        r, res = self._settings(tmp_path, "32768\t60999\n", "\n")
+        assert ephemeral_overlap((30000, 33000), range_path=r, reserved_path=res) == (32768, 33000)
+
+    def test_a_range_below_the_ephemeral_one_is_not_reported(self, tmp_path: Path) -> None:
+        r, res = self._settings(tmp_path, "32768\t60999\n", "\n")
+        assert ephemeral_overlap((20000, 21000), range_path=r, reserved_path=res) is None
+
+    def test_settings_that_cannot_be_read_are_not_reported(self, tmp_path: Path) -> None:
+        """This only ever warns; a node that cannot be asked is not held back."""
+        missing = tmp_path / "nope"
+        assert ephemeral_overlap((33100, 33600), range_path=missing, reserved_path=missing) is None
+
+    def test_garbage_in_the_range_file_is_not_reported(self, tmp_path: Path) -> None:
+        r, res = self._settings(tmp_path, "garbage\n", "\n")
+        assert ephemeral_overlap((33100, 33600), range_path=r, reserved_path=res) is None
+
+    def test_unreadable_reserved_ports_count_as_none_reserved(self, tmp_path: Path) -> None:
+        r, _ = self._settings(tmp_path, "32768\t60999\n", "")
+        missing = tmp_path / "nope"
+        assert ephemeral_overlap((33100, 33600), range_path=r, reserved_path=missing) == (
+            33100,
+            33600,
+        )
+
+    def test_singles_and_ranges_both_parse(self, tmp_path: Path) -> None:
+        r, res = self._settings(tmp_path, "32768\t60999\n", "33100,33102-33104,33600\n")
+        assert ephemeral_overlap((33100, 33104), range_path=r, reserved_path=res) == (33101, 33101)
+
+
+class TestAgentWarnsOnEphemeralOverlap:
+    @staticmethod
+    async def _warnings(exposed: tuple[int, int] | None) -> Mock:
+        agent = SimpleNamespace(
+            local_config=SimpleNamespace(container=SimpleNamespace(port_range=(33100, 33600)))
+        )
+        log = Mock()
+        with (
+            patch("ai.backend.agent.agent.ephemeral_overlap", return_value=exposed),
+            patch("ai.backend.agent.agent.log", log),
+        ):
+            await AbstractAgent._warn_if_port_range_is_ephemeral(cast(Any, agent))
+        return cast(Mock, log.warning)
+
+    async def test_an_overlap_is_warned_with_the_exposed_span(self) -> None:
+        warning = await self._warnings((33100, 33600))
+        warning.assert_called_once()
+        assert warning.call_args.kwargs["first_exposed_port"] == 33100
+        assert warning.call_args.kwargs["last_exposed_port"] == 33600
+
+    async def test_no_overlap_is_not_warned(self) -> None:
+        warning = await self._warnings(None)
+        warning.assert_not_called()
