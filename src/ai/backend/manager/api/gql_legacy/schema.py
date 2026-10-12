@@ -145,9 +145,11 @@ from ai.backend.manager.models.resource_group.row import (
     ResourceGroupRow,
     and_names,
 )
-from ai.backend.manager.models.vfolder.row import ensure_quota_scope_accessible_by_user
 from ai.backend.manager.models.virtual_entity.queries import user_scope_membership_exists
 from ai.backend.manager.repositories.ops.repository import OpsRepository
+from ai.backend.manager.repositories.vfolder.quota_scope import (
+    ensure_quota_scope_accessible_by_user,
+)
 from ai.backend.manager.secret.pool import KeyProviderPool
 
 from .acl import PredefinedAtomicPermission

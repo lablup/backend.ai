@@ -129,10 +129,10 @@ from ai.backend.manager.models.project.row import (
     association_groups_users,
 )
 from ai.backend.manager.models.resource_group.row import (
-    ResourceGroupOpts,
     resource_groups,
     sgroups_for_domains,
 )
+from ai.backend.manager.models.resource_group.types import ResourceGroupOpts
 from ai.backend.manager.models.resource_policy.row import (
     ProjectResourcePolicyRow,
     UserResourcePolicyRow,
