@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from ai.backend.manager.seed.app_config_definition.seed import AppConfigDefinitionSeed
 from ai.backend.manager.seed.client_ip_masking_policy.seed import ClientIPMaskingPolicySeed
+from ai.backend.manager.seed.container_registry.seed import ContainerRegistrySeed
 from ai.backend.manager.seed.idle_checker.seed import IdleCheckerSeed
 from ai.backend.manager.seed.login_client_type.seed import LoginClientTypeSeed
 from ai.backend.manager.seed.notification_channel.seed import NotificationChannelSeed
@@ -31,4 +32,5 @@ def create_seed_kind_registry() -> SeedKindRegistry:
         SeedKind.NOTIFICATION_CHANNEL: (1, NotificationChannelSeed),
         SeedKind.ROLE_PRESET: (1, RolePresetSeed),
         SeedKind.IDLE_CHECKER: (1, IdleCheckerSeed),
+        SeedKind.CONTAINER_REGISTRY: (1, ContainerRegistrySeed),
     })

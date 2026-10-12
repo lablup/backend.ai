@@ -11,6 +11,7 @@ from sqlalchemy import Table
 from ai.backend.manager.models.app_config_definition.row import AppConfigDefinitionRow
 from ai.backend.manager.models.base import ensure_all_tables_registered
 from ai.backend.manager.models.client_ip_masking.row import ClientIPMaskingPolicyRow
+from ai.backend.manager.models.container_registry.row import ContainerRegistryRow
 from ai.backend.manager.models.entity_label.row import EntityLabelRow
 from ai.backend.manager.models.idle_checker.row import IdleCheckerRow
 from ai.backend.manager.models.login_client_type.row import LoginClientTypeRow
@@ -164,6 +165,28 @@ _IDLE_CHECKERS: list[dict[str, Any]] = [
         },
     },
 ]
+# One global Harbor registry and one registry reachable only from the projects bound to it.
+_CONTAINER_REGISTRIES: list[dict[str, Any]] = [
+    {
+        "id": "0198a5a0-0000-7000-8000-00000000c001",
+        "registry_name": "cr.backend.ai",
+        "url": "https://cr.backend.ai",
+        "type": "harbor2",
+        "project": "stable",
+    },
+    {
+        "id": "0198a5a0-0000-7000-8000-00000000c002",
+        "registry_name": "local",
+        "url": "http://localhost",
+        "type": "local",
+        "project": "stable",
+        "is_global": False,
+        "username": "admin",
+        "password": "secret",
+        "ssl_verify": False,
+        "extra": {"note": "seed"},
+    },
+]
 
 # The tables a seed kind writes, and the graph tables the creation path writes beside them.
 _SEED_TABLES: list[Table | type[HasTable]] = [
@@ -176,6 +199,7 @@ _SEED_TABLES: list[Table | type[HasTable]] = [
     PrometheusQueryPresetCategoryRow,
     NotificationChannelRow,
     IdleCheckerRow,
+    ContainerRegistryRow,
     RolePresetRow,
     RolePermissionPresetRow,
     RoleRow,
@@ -348,6 +372,17 @@ def idle_checker_seed_dir(tmp_path: Path) -> Path:
 @pytest.fixture
 def idle_checker_ids() -> list[str]:
     return [str(checker["id"]) for checker in _IDLE_CHECKERS]
+
+
+@pytest.fixture
+def container_registry_seed_dir(tmp_path: Path) -> Path:
+    """A directory with one `container_registry` seed file."""
+    directory = tmp_path / "container_registry"
+    directory.mkdir()
+    (directory / "registries.yaml").write_text(
+        yaml.safe_dump({"kind": "container_registry", "version": 1, "items": _CONTAINER_REGISTRIES})
+    )
+    return directory
 
 
 @pytest.fixture
