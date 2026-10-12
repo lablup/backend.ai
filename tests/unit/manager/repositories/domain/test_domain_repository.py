@@ -68,9 +68,9 @@ from ai.backend.manager.models.resource_group.purgers import (
 )
 from ai.backend.manager.models.resource_group.row import (
     ResourceGroupForDomainRow,
-    ResourceGroupOpts,
     ResourceGroupRow,
 )
+from ai.backend.manager.models.resource_group.types import ResourceGroupOpts
 from ai.backend.manager.models.resource_policy.row import (
     KeyPairResourcePolicyRow,
     ProjectResourcePolicyRow,
