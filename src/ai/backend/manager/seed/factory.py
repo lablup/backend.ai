@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from ai.backend.manager.seed.app_config_allow_list.seed import AppConfigAllowListSeed
 from ai.backend.manager.seed.app_config_definition.seed import AppConfigDefinitionSeed
 from ai.backend.manager.seed.client_ip_masking_policy.seed import ClientIPMaskingPolicySeed
 from ai.backend.manager.seed.container_registry.seed import ContainerRegistrySeed
@@ -30,6 +31,7 @@ def create_seed_kind_registry() -> SeedKindRegistry:
         SeedKind.STORAGE_BACKEND_TYPE: (1, StorageBackendTypeSeed),
         SeedKind.PROMETHEUS_QUERY_PRESET_CATEGORY: (1, PrometheusQueryPresetCategorySeed),
         SeedKind.APP_CONFIG_DEFINITION: (1, AppConfigDefinitionSeed),
+        SeedKind.APP_CONFIG_ALLOW_LIST: (1, AppConfigAllowListSeed),
         SeedKind.CLIENT_IP_MASKING_POLICY: (1, ClientIPMaskingPolicySeed),
         SeedKind.NOTIFICATION_CHANNEL: (1, NotificationChannelSeed),
         SeedKind.ROLE_PRESET: (1, RolePresetSeed),
