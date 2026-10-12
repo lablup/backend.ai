@@ -242,13 +242,13 @@ class AuthService:
         user, active_sessions = await self._verify_user(action, auth_config, login_client_type_id)
 
         try:
-            post_result = await self._post_check(action, user, auth_config)
+            post_result = await self._post_check(action, user, active_sessions, auth_config)
             if isinstance(post_result, AuthorizeActionResult):
                 return post_result
-            keypair = post_result
+            keypair, live_sessions = post_result
 
             return await self._create_login_session(
-                action, user, keypair, active_sessions, auth_config, login_client_type_id
+                action, user, keypair, live_sessions, auth_config, login_client_type_id
             )
         except (
             AuthorizationFailed,
@@ -303,9 +303,10 @@ class AuthService:
         self,
         action: AuthorizeAction,
         user: RowMapping,
+        active_sessions: list[ActiveSessionInfo],
         auth_config: AuthConfig,
-    ) -> KeyPairData | AuthorizeActionResult:
-        """Step 2: User status checks, keypair lookup, POST_AUTHORIZE hook."""
+    ) -> tuple[KeyPairData, list[ActiveSessionInfo]] | AuthorizeActionResult:
+        """Step 2: User status checks, keypair lookup, POST_AUTHORIZE hook, Valkey cross-check."""
         if user.status == UserStatus.BEFORE_VERIFICATION:
             raise AuthorizationFailed("This account needs email verification.")
         if user.status in INACTIVE_USER_STATUSES:
@@ -335,23 +336,25 @@ class AuthService:
                 authorization_result=None,
             )
 
-        return default_keypair
-
-    async def _live_sessions(
-        self, active_sessions: list[ActiveSessionInfo]
-    ) -> list[ActiveSessionInfo]:
-        """Keep the sessions Valkey still holds and mark the rest expired in the DB."""
+        # Cross-check active sessions with Valkey
+        session_data = await self._valkey_session_client.get_login_sessions([
+            session_info.session_token for session_info in active_sessions
+        ])
         live_sessions: list[ActiveSessionInfo] = []
-        for session_info in active_sessions:
-            if await self._valkey_session_client.get_login_session(session_info.session_token):
+        expired_tokens: list[str] = []
+        for session_info, data in zip(active_sessions, session_data, strict=True):
+            if data:
                 live_sessions.append(session_info)
             else:
-                await self._auth_repository.delete_login_session_by_token(
-                    session_info.session_token,
-                    LoginAttemptResult.EXPIRED,
-                    await self._recorded_client_ip(),
-                )
-        return live_sessions
+                expired_tokens.append(session_info.session_token)
+        if expired_tokens:
+            await self._auth_repository.delete_login_sessions_by_tokens(
+                expired_tokens,
+                LoginAttemptResult.EXPIRED,
+                await self._recorded_client_ip(),
+            )
+
+        return default_keypair, live_sessions
 
     def _enforce_max_concurrent_logins(
         self,
@@ -394,16 +397,19 @@ class AuthService:
         action: AuthorizeAction,
         user: RowMapping,
         keypair: KeyPairData,
-        active_sessions: list[ActiveSessionInfo],
+        live_sessions: list[ActiveSessionInfo],
         auth_config: AuthConfig,
         login_client_type_id: uuid.UUID | None,
     ) -> AuthorizeActionResult:
         """Step 3: Create login session (DB + Valkey), force-invalidate old sessions if needed.
 
         Enforcement uses ``user_resource_policy.max_concurrent_logins``:
-        - None (unlimited): always proceed, without reading ``active_sessions`` from Valkey.
-        - Set: if the live sessions reach the limit and ``action.force`` is True, evict the
+        - None (unlimited): always proceed.
+        - Set: if ``len(live_sessions) >= limit`` and ``action.force`` is True, evict the
           oldest sessions to make room; otherwise raise ``TooManyConcurrentLoginSessions``.
+
+        ``live_sessions`` is already the authoritative active set (cross-checked against
+        Valkey by the caller), so no additional repository count query is needed.
         """
         try:
             user_resource_policy = await self._user_resource_policy_repository.get_by_name(
@@ -414,15 +420,11 @@ class AuthService:
             # If no matching resource policy is found, skip login-session limit enforcement.
             max_concurrent_logins = None
 
-        tokens_to_invalidate: list[str] | None = None
-        if max_concurrent_logins is not None:
-            # Only the cap needs the live set, and building it costs a Valkey read per
-            # active session, which grows with every login the user never logs out of.
-            tokens_to_invalidate = self._enforce_max_concurrent_logins(
-                max_concurrent_logins=max_concurrent_logins,
-                live_sessions=await self._live_sessions(active_sessions),
-                force=action.force,
-            )
+        tokens_to_invalidate = self._enforce_max_concurrent_logins(
+            max_concurrent_logins=max_concurrent_logins,
+            live_sessions=live_sessions,
+            force=action.force,
+        )
 
         # Create-before-destroy: evict old sessions only after the new one is persisted.
         session_result = await self._auth_repository.create_login_session(

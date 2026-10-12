@@ -193,8 +193,9 @@ class AllowCase:
 class TestMaxConcurrentLoginsEnforcement:
     """Tests for the max_concurrent_logins enforcement logic in _create_login_session.
 
-    Enforcement is driven entirely by the active sessions Valkey still holds and
-    ``user_resource_policy.max_concurrent_logins``.  No extra DB count query is issued.
+    Enforcement is driven entirely by ``live_sessions`` (the already-cross-checked active
+    set) and ``user_resource_policy.max_concurrent_logins``.  No extra DB count query is
+    issued.
     """
 
     @pytest.mark.parametrize(
@@ -252,7 +253,7 @@ class TestMaxConcurrentLoginsEnforcement:
                 action=_make_action(force=case.force_evict_oldest),
                 user=_make_mock_user(),
                 keypair=_make_mock_keypair(),
-                active_sessions=_make_live_sessions(case.existing_active_sessions),
+                live_sessions=_make_live_sessions(case.existing_active_sessions),
                 auth_config=_make_auth_config(),
                 login_client_type_id=uuid4(),
             )
@@ -353,7 +354,7 @@ class TestMaxConcurrentLoginsEnforcement:
             action=_make_action(force=case.force_evict_oldest),
             user=_make_mock_user(),
             keypair=_make_mock_keypair(),
-            active_sessions=_make_live_sessions(case.existing_active_sessions),
+            live_sessions=_make_live_sessions(case.existing_active_sessions),
             auth_config=_make_auth_config(),
             login_client_type_id=uuid4(),
         )
