@@ -11,6 +11,7 @@ from sqlalchemy import Table
 from ai.backend.manager.models.app_config_definition.row import AppConfigDefinitionRow
 from ai.backend.manager.models.base import ensure_all_tables_registered
 from ai.backend.manager.models.entity_label.row import EntityLabelRow
+from ai.backend.manager.models.login_client_type.row import LoginClientTypeRow
 from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
 from ai.backend.manager.models.rbac_models.role.row import RoleRow
 from ai.backend.manager.models.rbac_models.role_permission_preset.row import (
@@ -81,11 +82,16 @@ _RESOURCE_SLOT_TYPES: list[dict[str, Any]] = [
         "rank": 200,
     },
 ]
+_LOGIN_CLIENT_TYPES: list[dict[str, Any]] = [
+    {"id": "0198a5a0-0000-7000-8000-00000000c001", "name": "webui", "description": "Web UI"},
+    {"id": "0198a5a0-0000-7000-8000-00000000c002", "name": "cli"},
+]
 
 # The tables a seed kind writes, and the graph tables the creation path writes beside them.
 _SEED_TABLES: list[Table | type[HasTable]] = [
     AppConfigDefinitionRow,
     ResourceSlotTypeRow,
+    LoginClientTypeRow,
     RolePresetRow,
     RolePermissionPresetRow,
     RoleRow,
@@ -158,6 +164,17 @@ def resource_slot_type_seed_dir(tmp_path: Path) -> Path:
     directory.mkdir()
     (directory / "slots.yaml").write_text(
         yaml.safe_dump({"kind": "resource_slot_type", "version": 1, "items": _RESOURCE_SLOT_TYPES})
+    )
+    return directory
+
+
+@pytest.fixture
+def login_client_type_seed_dir(tmp_path: Path) -> Path:
+    """A directory with one `login_client_type` seed file."""
+    directory = tmp_path / "login_client_type"
+    directory.mkdir()
+    (directory / "types.yaml").write_text(
+        yaml.safe_dump({"kind": "login_client_type", "version": 1, "items": _LOGIN_CLIENT_TYPES})
     )
     return directory
 
