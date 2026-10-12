@@ -8,6 +8,7 @@ and actual ZIP stream read/download.
 
 from __future__ import annotations
 
+import asyncio
 import io
 import shutil
 import zipfile
@@ -302,3 +303,33 @@ class TestZipArchiveStreamReader:
 
         with zipfile.ZipFile(io.BytesIO(data)) as zf:
             assert zf.read("large.bin") == large_content
+
+    async def test_read_propagates_producer_error(self, tmp_path: Path) -> None:
+        """
+        Test that read() raises when the zip producer thread fails.
+
+        Scenario:
+        1. Register a file, then delete it before read() is iterated
+        2. Iterate read() with a timeout guard
+        3. Verify the producer's FileNotFoundError reaches the consumer instead of hanging
+        """
+        vanishing = tmp_path / "vanishing.txt"
+        vanishing.write_text("gone soon")
+
+        reader = ZipArchiveStreamReader(tmp_path, filename="broken.zip")
+        reader.add_entries([vanishing])
+        vanishing.unlink()
+
+        async def _consume() -> None:
+            async for _ in reader.read():
+                pass
+
+        with pytest.raises(FileNotFoundError):
+            await asyncio.wait_for(_consume(), timeout=5)
+
+    def test_reader_allows_zip64(self, tmp_path: Path) -> None:
+        """
+        Test that the archive permits ZIP64 extensions for entries over 4 GiB.
+        """
+        reader = ZipArchiveStreamReader(tmp_path)
+        assert reader._zf._allowZip64 is True
