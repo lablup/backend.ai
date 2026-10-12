@@ -12,6 +12,7 @@ from ai.backend.manager.models.app_config_definition.row import AppConfigDefinit
 from ai.backend.manager.models.base import ensure_all_tables_registered
 from ai.backend.manager.models.client_ip_masking.row import ClientIPMaskingPolicyRow
 from ai.backend.manager.models.entity_label.row import EntityLabelRow
+from ai.backend.manager.models.idle_checker.row import IdleCheckerRow
 from ai.backend.manager.models.login_client_type.row import LoginClientTypeRow
 from ai.backend.manager.models.notification.row import NotificationChannelRow
 from ai.backend.manager.models.prometheus_query_preset_category.row import (
@@ -144,6 +145,25 @@ _NOTIFICATION_CHANNELS: list[dict[str, Any]] = [
         "created_by": "f38dea23-50fa-42a0-b5ae-338f5f4693f4",
     },
 ]
+_IDLE_CHECKERS: list[dict[str, Any]] = [
+    {
+        "id": "0198a5a0-0000-7000-8000-00000000f001",
+        "name": "session-lifetime",
+        "description": "Terminates sessions running longer than a day.",
+        "target_session_types": ["interactive", "batch"],
+        "spec": {"type": "session_lifetime", "session_lifetime": {"max_lifetime_seconds": 86400}},
+    },
+    {
+        "id": "0198a5a0-0000-7000-8000-00000000f002",
+        "name": "network-timeout",
+        "target_session_types": ["interactive"],
+        "initial_grace_period_seconds": 300,
+        "spec": {
+            "type": "network_timeout",
+            "network": {"max_network_inactivity_seconds": 3600},
+        },
+    },
+]
 
 # The tables a seed kind writes, and the graph tables the creation path writes beside them.
 _SEED_TABLES: list[Table | type[HasTable]] = [
@@ -155,6 +175,7 @@ _SEED_TABLES: list[Table | type[HasTable]] = [
     StorageBackendTypeRow,
     PrometheusQueryPresetCategoryRow,
     NotificationChannelRow,
+    IdleCheckerRow,
     RolePresetRow,
     RolePermissionPresetRow,
     RoleRow,
@@ -311,6 +332,22 @@ def notification_channel_seed_dir(tmp_path: Path) -> Path:
         })
     )
     return directory
+
+
+@pytest.fixture
+def idle_checker_seed_dir(tmp_path: Path) -> Path:
+    """A directory with one `idle_checker` seed file."""
+    directory = tmp_path / "idle_checker"
+    directory.mkdir()
+    (directory / "checkers.yaml").write_text(
+        yaml.safe_dump({"kind": "idle_checker", "version": 1, "items": _IDLE_CHECKERS})
+    )
+    return directory
+
+
+@pytest.fixture
+def idle_checker_ids() -> list[str]:
+    return [str(checker["id"]) for checker in _IDLE_CHECKERS]
 
 
 @pytest.fixture
