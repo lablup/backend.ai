@@ -13,6 +13,7 @@ from ai.backend.manager.models.app_config_definition.row import AppConfigDefinit
 from ai.backend.manager.models.base import ensure_all_tables_registered
 from ai.backend.manager.models.client_ip_masking.row import ClientIPMaskingPolicyRow
 from ai.backend.manager.models.container_registry.row import ContainerRegistryRow
+from ai.backend.manager.models.domain.row import DomainRow
 from ai.backend.manager.models.entity_label.row import EntityLabelRow
 from ai.backend.manager.models.idle_checker.row import IdleCheckerRow
 from ai.backend.manager.models.login_client_type.row import LoginClientTypeRow
@@ -283,6 +284,23 @@ _VFS_STORAGES: list[dict[str, str]] = [
     },
 ]
 
+# Domain seed files written for the tests, one domain per file.
+_DOMAINS: dict[str, dict[str, Any]] = {
+    "default.yaml": {
+        "id": "0198a5a0-0000-7000-8000-00000000d001",
+        "name": "default",
+        "description": "The default domain",
+        "is_default": True,
+        "total_resource_slots": {"cpu": "8", "mem": "17179869184"},
+        "allowed_vfolder_hosts": {"local:volume1": ["create-vfolder", "mount-in-session"]},
+        "allowed_docker_registries": ["cr.backend.ai"],
+    },
+    "research.yaml": {
+        "id": "0198a5a0-0000-7000-8000-00000000d002",
+        "name": "research",
+    },
+}
+
 # The tables a seed kind writes, and the graph tables the creation path writes beside them.
 _SEED_TABLES: list[Table | type[HasTable]] = [
     AppConfigDefinitionRow,
@@ -300,6 +318,7 @@ _SEED_TABLES: list[Table | type[HasTable]] = [
     ContainerRegistryRow,
     ObjectStorageRow,
     StorageNamespaceRow,
+    DomainRow,
     RolePresetRow,
     RolePermissionPresetRow,
     RoleRow,
@@ -574,3 +593,20 @@ def vfs_storage_seed_dir(tmp_path: Path) -> Path:
 @pytest.fixture
 def domain_admin_id() -> str:
     return str(_ROLES["domain-admin.yaml"]["id"])
+
+
+@pytest.fixture
+def domain_seed_dir(tmp_path: Path) -> Path:
+    """A directory of domain seed files, the shape `seeds/manager/domain/` has."""
+    directory = tmp_path / "domain"
+    directory.mkdir()
+    for file_name, domain in _DOMAINS.items():
+        (directory / file_name).write_text(
+            yaml.safe_dump({"kind": "domain", "version": 1, "items": [domain]})
+        )
+    return directory
+
+
+@pytest.fixture
+def default_domain_id() -> str:
+    return str(_DOMAINS["default.yaml"]["id"])

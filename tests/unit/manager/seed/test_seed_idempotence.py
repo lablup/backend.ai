@@ -49,6 +49,7 @@ _CASES: Final[list[IdempotenceCase]] = [
     IdempotenceCase(SeedKind.OBJECT_STORAGE, "object_storage_seed_dir"),
     IdempotenceCase(SeedKind.STORAGE_NAMESPACE, "storage_namespace_seed_dir"),
     IdempotenceCase(SeedKind.VFS_STORAGE, "vfs_storage_seed_dir"),
+    IdempotenceCase(SeedKind.DOMAIN, "domain_seed_dir"),
 ]
 
 
