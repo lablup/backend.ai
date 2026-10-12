@@ -21,7 +21,6 @@ from ai.backend.manager.secret.types import SecretValue
 
 if TYPE_CHECKING:
     from ai.backend.manager.models.resource_group.row import ResourceGroupForKeypairsRow
-    from ai.backend.manager.models.resource_policy.row import KeyPairResourcePolicyRow
 
 __all__: Sequence[str] = (
     "KEYPAIR_SECRET_KEY_CONTEXT",
@@ -96,10 +95,6 @@ class KeyPairRow(LifecycleTimestampsMixin, Base):
     )
 
     # Relationships
-    # Used only by the legacy RBAC PermissionContextBuilder in models/storage.py, which only
-    # get_vfolders (vfolder/row.py) reaches, and nothing calls get_vfolders.
-    # Delete it together with the legacy RBAC cleanup.
-    resource_policy_row: Mapped[KeyPairResourcePolicyRow] = relationship("KeyPairResourcePolicyRow")
     # Used only by the legacy RBAC ResourceGroupPermissionContextBuilder (resource_group/row.py).
     # Delete it together with the legacy RBAC cleanup.
     sgroup_for_keypairs_rows: Mapped[list[ResourceGroupForKeypairsRow]] = relationship(
