@@ -420,6 +420,36 @@ async def mismatch_present(conn: asyncpg.Connection) -> list[str]:
     return [] if count else ["no mismatched permission rows reached c092d242a027; seed is moot"]
 
 
+async def verify_custom_role_moved(conn: asyncpg.Connection) -> list[str]:
+    """``c092d242a027`` moves the rows naming the second project into a custom role of
+    that project, held by the holders of the original, and loses no grant."""
+    rows = await conn.fetch(
+        """
+        SELECT r.id, r.source, r.auto_assign, r.role_preset_id, r.scope_id,
+               (SELECT count(*) FROM permissions p WHERE p.role_id = r.id) AS perms,
+               (SELECT count(*) FROM user_roles ur WHERE ur.role_id = r.id) AS holders,
+               (SELECT count(*) FROM virtual_entities v
+                 WHERE v.entity_type = 'role' AND v.entity_id = r.id) AS node
+        FROM roles r WHERE r.name = 'custom-ops'
+        """
+    )
+    problems = []
+    if len(rows) != 2:
+        return [f"custom-ops became {len(rows)} role(s), expected 2"]
+    if sum(r["perms"] for r in rows) != 3:
+        problems.append(f"custom-ops holds {sum(r['perms'] for r in rows)} grants, expected 3")
+    for r in rows:
+        if r["source"] != "custom" or r["auto_assign"] or r["role_preset_id"] is not None:
+            problems.append(f"{r['id']} is not an unassigned custom role without a preset")
+        if r["holders"] != 1:
+            problems.append(f"{r['id']} has {r['holders']} holder(s), expected 1")
+        if r["node"] != 1:
+            problems.append(f"{r['id']} is not in the graph")
+    if len({r["scope_id"] for r in rows}) != 2:
+        problems.append("both custom-ops roles sit in the same project")
+    return problems
+
+
 async def verify_custom_role_kept(conn: asyncpg.Connection) -> list[str]:
     count = await conn.fetchval(
         "SELECT count(*) FROM permissions p JOIN roles r ON r.id = p.role_id WHERE r.name = 'custom-ops'"
@@ -684,11 +714,11 @@ SCENARIOS: dict[str, Scenario] = {
         ),
         Scenario(
             "custom_role_on_two_projects",
-            "a custom role granted on two live projects (left to the operator)",
+            "a custom role granted on two live projects (moved into a role of each)",
             seed_custom_role_on_two_projects,
+            verify_custom_role_moved,
             steps=("c7d419b0a58e", "head"),
             checks_after={"c7d419b0a58e": mismatch_present},
-            expect_error="name a scope other than their role's",
             requires=("c092d242a027",),
         ),
         Scenario(
