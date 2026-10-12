@@ -66,7 +66,6 @@ from ai.backend.manager.data.session.types import (
     SessionNetwork,
     SessionStatus,
 )
-from ai.backend.manager.data.user.types import UserData
 from ai.backend.manager.defs import DEFAULT_ROLE
 from ai.backend.manager.errors.kernel import (
     KernelNotFound,
@@ -387,9 +386,9 @@ class SessionRow(CreatedAtMixin, Base):
         nullable=True,
         default=None,
     )
-    # Read by gql_legacy and registry.py. v2 loads it only for the SessionRow handed to registry.py
-    # (SessionDBSource.get_session_validated/get_session_by_id, StreamDBSource.get_streaming_session).
-    # Delete it together with KernelRow.session once those registry.py calls are gone.
+    # Read by gql_legacy, registry.py, services/session/service.py and commit_session.py on rows
+    # from SessionDBSource (get_session_validated, get_session_by_id) and StreamDBSource.
+    # Delete it with KernelRow.session once all of them read kernels by explicit queries.
     kernels: Mapped[list[KernelRow]] = relationship("KernelRow", back_populates="session")
 
     # Resource ownership
@@ -433,7 +432,7 @@ class SessionRow(CreatedAtMixin, Base):
         nullable=True,
     )
     # Loaded only by gql_legacy (session.py, schema.py) and get_session (v1). v2 joins on
-    # user_uuid. Delete it together with the gql_legacy cleanup.
+    # user_uuid. Delete it once both gql_legacy and get_session are gone.
     user: Mapped[UserRow | None] = relationship(
         "UserRow",
         primaryjoin=_get_user_row_join_condition,
@@ -669,7 +668,7 @@ class SessionRow(CreatedAtMixin, Base):
         instance.id = SessionId(session_data.id)
         return instance
 
-    def to_dataclass(self, main_kernel: KernelRow, owner: UserData | None = None) -> SessionData:
+    def to_dataclass(self, main_kernel: KernelRow) -> SessionData:
         return SessionData(
             id=self.id,
             creation_id=self.creation_id,
@@ -716,7 +715,7 @@ class SessionRow(CreatedAtMixin, Base):
             network_type=self.network_type,
             network_id=self.network_id,
             service_ports=str(main_kernel.service_ports) if main_kernel.service_ports else None,
-            owner=owner if owner is not None else None,
+            owner=None,
             replica_id=self.replica_id,
         )
 
@@ -855,13 +854,7 @@ class SessionRow(CreatedAtMixin, Base):
         async with db.connect() as db_conn:
             return await execute_with_txn_retry(fetch, db.begin_readonly_session, db_conn)
 
-    def delegate_ownership(self, user_uuid: UserID, access_key: AccessKey) -> None:
-        self.user_uuid = user_uuid
-        self.access_key = access_key
-        for kernel_row in self.kernels:
-            kernel_row.delegate_ownership(user_uuid, access_key)
-
-    # Used only by get_session and list_sessions. v2 matches in SessionDBSource.
+    # Used only by get_session. v2 matches in SessionDBSource.
     # Delete it together with _build_session_fetch_query and _match_sessions_by_*.
     @classmethod
     async def match_sessions(
@@ -1006,54 +999,6 @@ class SessionRow(CreatedAtMixin, Base):
             ]
             raise TooManySessionsMatched(extra_data={"matches": session_infos})
         return session_list[0]
-
-    @classmethod
-    async def list_sessions(
-        cls,
-        db_session: SASession,
-        session_ids: list[UUID],
-        access_key: AccessKey | None = None,
-        *,
-        allow_stale: bool = False,
-        for_update: bool = False,
-        kernel_loading_strategy: KernelLoadingStrategy = KernelLoadingStrategy.NONE,
-        eager_loading_op: list[Any] | None = None,
-        max_load_count: int | None = None,
-    ) -> Iterable[SessionRow]:
-        _eager_loading_op = eager_loading_op or []
-        match kernel_loading_strategy:
-            case KernelLoadingStrategy.ALL_KERNELS:
-                _eager_loading_op.extend([
-                    noload("*"),
-                    selectinload(SessionRow.kernels).options(
-                        noload("*"),
-                        selectinload(KernelRow.agent_row).noload("*"),
-                    ),
-                ])
-            case KernelLoadingStrategy.MAIN_KERNEL_ONLY:
-                kernel_rel = SessionRow.kernels
-                kernel_rel.and_(KernelRow.cluster_role == DEFAULT_ROLE)
-                _eager_loading_op.extend([
-                    noload("*"),
-                    selectinload(kernel_rel).options(
-                        noload("*"),
-                        selectinload(KernelRow.agent_row).noload("*"),
-                    ),
-                ])
-
-        session_list = await cls.match_sessions(
-            db_session,
-            session_ids,
-            access_key,
-            allow_stale=allow_stale,
-            for_update=for_update,
-            eager_loading_op=_eager_loading_op,
-            max_matches=max_load_count,
-        )
-        try:
-            return session_list
-        except IndexError as e:
-            raise SessionNotFound(f"Session (ids={session_ids}) does not exist.") from e
 
     # Used only by the v1 session paths in registry.py. Delete it together with them.
     @classmethod
