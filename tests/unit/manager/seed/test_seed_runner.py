@@ -12,6 +12,7 @@ import pytest
 import yaml
 
 from ai.backend.manager.errors.repository import (
+    CheckConstraintViolationError,
     ForeignKeyViolationError,
     UniqueConstraintViolationError,
 )
@@ -85,6 +86,10 @@ class FakeRepository(SeedRepository):
         if name == "orphan":
             return SeedWriteItemResult(
                 written=False, error=ForeignKeyViolationError(constraint_name="fk_fake")
+            )
+        if name == "unchecked":
+            return SeedWriteItemResult(
+                written=False, error=CheckConstraintViolationError(constraint_name="ck_fake")
             )
         if name == "taken":
             return SeedWriteItemResult(
@@ -191,6 +196,17 @@ class TestKindValidation:
         other = _write(tmp_path / "c.yaml", "domain", "y")
         plan = planner.plan([first, second, other])
         assert _sources(plan.rejections) == {str(first), str(second)}
+        [batch] = plan.batches
+        assert [file.source for file in batch.files] == [str(other)]
+
+    def test_a_key_stated_twice_in_one_file_skips_the_file(
+        self, planner: SeedPlanner, tmp_path: Path
+    ) -> None:
+        twice = _write(tmp_path / "a.yaml", "domain", "x", "x")
+        other = _write(tmp_path / "b.yaml", "domain", "y")
+        plan = planner.plan([twice, other])
+        assert _sources(plan.rejections) == {str(twice)}
+        assert "is stated 2 times" in plan.rejections[0].reason
         [batch] = plan.batches
         assert [file.source for file in batch.files] == [str(other)]
 
@@ -311,6 +327,16 @@ class TestApply:
         assert results[SeedKind.DOMAIN] == SeedWriteResult(
             succeeded=["x", "z"],
             failed=[SeedItemFailure("orphan", "refers to a missing row (fk_fake)")],
+        )
+
+    async def test_an_item_violating_another_constraint_fails(self, tmp_path: Path) -> None:
+        plan = SeedPlanner(_registry(SeedKind.DOMAIN)).plan([
+            _write(tmp_path / "a.yaml", "domain", "x", "unchecked")
+        ])
+        results = await SeedApplier(FakeRepository()).apply(plan, overwrite=False)
+        assert results[SeedKind.DOMAIN] == SeedWriteResult(
+            succeeded=["x"],
+            failed=[SeedItemFailure("unchecked", "violates a constraint (ck_fake)")],
         )
 
     async def test_an_existing_item_is_kept_and_listed(self, tmp_path: Path) -> None:

@@ -120,12 +120,3 @@ class EntityWithFieldsResult[TData, TFieldData]:
 
     data: TData
     fields: list[TFieldData]
-
-
-@dataclass
-class EntityInsertResult[TData]:
-    """An entity row inserted unless a row already holds its key; ``inserted`` is false
-    where the existing row is answered instead."""
-
-    data: TData
-    inserted: bool

@@ -4,10 +4,7 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import Any
 
-from ai.backend.manager.errors.repository import (
-    ForeignKeyViolationError,
-    UniqueConstraintViolationError,
-)
+from ai.backend.manager.errors.repository import RepositoryIntegrityError
 from ai.backend.manager.models.specs.purger import FieldBatchPurger
 from ai.backend.manager.models.specs.upserter import EntityUpserter, FieldUpserter
 
@@ -27,4 +24,4 @@ class SeedWriteItemResult:
     """Whether a seed item wrote any row, or the constraint that refused it."""
 
     written: bool
-    error: UniqueConstraintViolationError | ForeignKeyViolationError | None = None
+    error: RepositoryIntegrityError | None = None

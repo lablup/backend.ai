@@ -136,15 +136,15 @@ class SeedPlanner:
     def _duplicate_keys(
         self, kind: SeedKindModel, files: Sequence[SeedItems[Any]]
     ) -> list[SeedRejection]:
-        sources_by_key: dict[str, set[str]] = defaultdict(set)
+        sources_by_key: dict[str, list[str]] = defaultdict(list)
         for file in files:
             for item in file.items:
-                sources_by_key[item.key()].add(file.source)
+                sources_by_key[item.key()].append(file.source)
         return [
-            SeedRejection(source, f"{len(sources)} files state {kind.name} {key}")
+            SeedRejection(source, f"{kind.name} {key} is stated {len(sources)} times")
             for key, sources in sorted(sources_by_key.items())
             if len(sources) > 1
-            for source in sorted(sources)
+            for source in sorted(set(sources))
         ]
 
     def _reject(self, plan: SeedPlan, rejection: SeedRejection) -> None:
@@ -215,4 +215,14 @@ class SeedApplier:
                 )
                 result.failed.append(
                     SeedItemFailure(key, f"refers to a missing row ({e.constraint_name})")
+                )
+            case e:
+                log.warning(
+                    "failed a seed item violating a constraint",
+                    seed_kind_name=kind.name,
+                    item_key=key,
+                    constraint_name=e.constraint_name,
+                )
+                result.failed.append(
+                    SeedItemFailure(key, f"violates a constraint ({e.constraint_name})")
                 )
