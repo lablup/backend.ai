@@ -71,11 +71,10 @@ class BaseAdapter(BaseFilterAdapter):
             if or_conditions:
                 conditions.append(combine_conditions_or(or_conditions))
         if f.NOT:
-            not_conditions: list[QueryCondition] = []
             for sub in f.NOT:
-                not_conditions.extend(self._convert_entity_label_filter(sub))
-            if not_conditions:
-                conditions.append(negate_conditions(not_conditions))
+                sub_conditions = self._convert_entity_label_filter(sub)
+                if sub_conditions:
+                    conditions.append(negate_conditions(sub_conditions))
         return conditions
 
     async def batch_load_fields[TAction: BasePartialBulkFieldAction[Any, Any], TData, TNode](
