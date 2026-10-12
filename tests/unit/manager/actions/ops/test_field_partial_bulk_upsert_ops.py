@@ -63,6 +63,11 @@ type Spec = Mapping[uuid.UUID, Labels]
 _TOO_LONG = "k" * 300
 """A key longer than its column, so the row fails at the write."""
 
+_MISSING_OWNER_IS_WRITTEN = pytest.mark.xfail(
+    strict=True,
+    reason="a label upsert under an owner id naming no entity writes the row, as the single upsert does",
+)
+
 
 @dataclass(frozen=True)
 class _PutLabelsAction(
@@ -341,10 +346,15 @@ class TestMulti:
         assert result.items == []
 
     async def test_the_answer_keeps_the_order_asked_in(
-        self, harness: OpsHarness, actors: Actors, projects: list[ProjectID]
+        self,
+        ops_db: ExtendedAsyncSAEngine,
+        harness: OpsHarness,
+        actors: Actors,
+        projects: list[ProjectID],
     ) -> None:
-        """multi-4."""
-        owners = [projects[1], uuid.uuid4(), projects[0]]
+        """multi-4: three seeded owners, named out of creation order."""
+        third = await seed_project(ops_db, actors)
+        owners = [projects[1], third, projects[0]]
 
         with actors.acting_as(Actor.SUPERADMIN):
             result = await _processor(harness).run(
@@ -421,6 +431,30 @@ class TestTarget:
         assert refused.entity_id == _owner(missing)
         assert refused.is_denied
         assert isinstance(refused.error, NotEnoughPermission)
+        assert await _labels(ops_db, missing) == []
+
+    @_MISSING_OWNER_IS_WRITTEN
+    async def test_a_missing_owner_is_a_failed_item_for_a_superadmin(
+        self,
+        ops_db: ExtendedAsyncSAEngine,
+        harness: OpsHarness,
+        actors: Actors,
+        projects: list[ProjectID],
+    ) -> None:
+        """target-4: the gate passes a superadmin without reading the owner, and the row
+        carries no owner key, so nothing refuses the write today."""
+        missing = uuid.uuid4()
+
+        with actors.acting_as(Actor.SUPERADMIN):
+            result = await _processor(harness).run(
+                _put({projects[0]: [("team", "ops")], missing: [("team", "ml")]})
+            )
+
+        written, gone = result.items
+        assert written.error is None
+        assert gone.entity_id == _owner(missing)
+        assert gone.error is not None
+        assert not gone.is_denied
         assert await _labels(ops_db, missing) == []
 
 
