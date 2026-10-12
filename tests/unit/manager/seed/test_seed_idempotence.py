@@ -41,6 +41,7 @@ _CASES: Final[list[IdempotenceCase]] = [
     IdempotenceCase(SeedKind.APP_CONFIG_ALLOW_LIST, "app_config_allow_list_seed_dir"),
     IdempotenceCase(SeedKind.CLIENT_IP_MASKING_POLICY, "client_ip_masking_policy_seed_dir"),
     IdempotenceCase(SeedKind.NOTIFICATION_CHANNEL, "notification_channel_seed_dir"),
+    IdempotenceCase(SeedKind.NOTIFICATION_RULE, "notification_rule_seed_dir"),
     IdempotenceCase(SeedKind.ROLE_PRESET, "role_seed_dir"),
     IdempotenceCase(SeedKind.IDLE_CHECKER, "idle_checker_seed_dir"),
     IdempotenceCase(SeedKind.CONTAINER_REGISTRY, "container_registry_seed_dir"),
