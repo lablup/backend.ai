@@ -72,9 +72,9 @@ class V2SeedWriteOps(V2WriteOps):
         update_values: dict[str, Any] | None,
     ) -> tuple[TRow, bool]:
         """Insert the row, answering it and whether it was written. A row holding its
-        ``index_elements`` is kept, or updated with ``update_values`` when given."""
+        ``index_elements`` is kept, or updated with ``update_values`` when any are given."""
         stmt = pg_insert(row_class).values(insert_values)
-        if update_values is None:
+        if not update_values:
             stmt = stmt.on_conflict_do_nothing(index_elements=index_elements)
         else:
             stmt = stmt.on_conflict_do_update(index_elements=index_elements, set_=update_values)
