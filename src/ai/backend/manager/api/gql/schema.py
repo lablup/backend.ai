@@ -501,6 +501,9 @@ from ai.backend.manager.api.gql.session.resolver.session import (
     session_v2,
     terminate_sessions_v2,
 )
+from ai.backend.manager.api.gql.session_lifecycle_handler.resolver import (
+    admin_session_lifecycle_handlers,
+)
 from ai.backend.manager.api.gql.user.resolver.mutation import (
     admin_bulk_create_users_v2,
     admin_bulk_create_users_with_keypair_v2,
@@ -676,6 +679,7 @@ class Query:
     scoped_resource_groups = scoped_resource_groups
     admin_resource_group_v2 = admin_resource_group_v2
     scheduling_handlers = scheduling_handlers
+    admin_session_lifecycle_handlers = admin_session_lifecycle_handlers
     compute_schedule = compute_schedule
     admin_allowed_resource_groups_for_domain_v2 = admin_allowed_resource_groups_for_domain_v2
     admin_allowed_resource_groups_for_project_v2 = admin_allowed_resource_groups_for_project_v2

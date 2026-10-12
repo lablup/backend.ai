@@ -12429,6 +12429,11 @@ type Query {
   schedulingHandlers: [SchedulingHandlerNode!]
 
   """
+  Added in 26.10.0. List all registered session lifecycle handlers (superadmin only). The returned ``name`` values are valid keys for ``DefaultSessionOptionsInfo.handlerOptions.byHandler``.
+  """
+  adminSessionLifecycleHandlers: [SessionLifecycleHandlerNode!]
+
+  """
   Added in 26.8.0. Compute whether a session could be created on a resource group, without actually provisioning it. Checks each kernel's resource request against the group's agents and returns per-kernel admission outcomes, with hints on what to reduce for kernels that do not fit.
   """
   computeSchedule(input: ComputeScheduleInput!): ComputeSchedulePayload
@@ -16855,6 +16860,21 @@ input SessionIdleCheckTargetInput {
 
   """Session UUID of the pair."""
   sessionId: ID!
+}
+
+"""
+Added in 26.10.0. Metadata for a single registered session lifecycle handler. Surfaces the ``name`` accepted in ``DefaultSessionOptionsInfo.handlerOptions.byHandler``.
+"""
+type SessionLifecycleHandlerNode {
+  """
+  Handler key accepted in the session options' handler_options.by_handler.
+  """
+  name: String!
+
+  """
+  First line of the handler's docstring, if any. Null when the backing class has no docstring.
+  """
+  description: String
 }
 
 """
