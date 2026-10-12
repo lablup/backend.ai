@@ -10,6 +10,7 @@ from ai.backend.manager.seed.idle_checker.seed import IdleCheckerSeed
 from ai.backend.manager.seed.login_client_type.seed import LoginClientTypeSeed
 from ai.backend.manager.seed.notification_channel.seed import NotificationChannelSeed
 from ai.backend.manager.seed.object_storage.seed import ObjectStorageSeed
+from ai.backend.manager.seed.prometheus_query_preset.seed import PrometheusQueryPresetSeed
 from ai.backend.manager.seed.prometheus_query_preset_category.seed import (
     PrometheusQueryPresetCategorySeed,
 )
@@ -30,6 +31,7 @@ def create_seed_kind_registry() -> SeedKindRegistry:
         SeedKind.RETENTION_POLICY: (1, RetentionPolicySeed),
         SeedKind.STORAGE_BACKEND_TYPE: (1, StorageBackendTypeSeed),
         SeedKind.PROMETHEUS_QUERY_PRESET_CATEGORY: (1, PrometheusQueryPresetCategorySeed),
+        SeedKind.PROMETHEUS_QUERY_PRESET: (1, PrometheusQueryPresetSeed),
         SeedKind.APP_CONFIG_DEFINITION: (1, AppConfigDefinitionSeed),
         SeedKind.APP_CONFIG_ALLOW_LIST: (1, AppConfigAllowListSeed),
         SeedKind.CLIENT_IP_MASKING_POLICY: (1, ClientIPMaskingPolicySeed),
