@@ -13,6 +13,9 @@ from ai.backend.manager.models.base import ensure_all_tables_registered
 from ai.backend.manager.models.client_ip_masking.row import ClientIPMaskingPolicyRow
 from ai.backend.manager.models.entity_label.row import EntityLabelRow
 from ai.backend.manager.models.login_client_type.row import LoginClientTypeRow
+from ai.backend.manager.models.prometheus_query_preset_category.row import (
+    PrometheusQueryPresetCategoryRow,
+)
 from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
 from ai.backend.manager.models.rbac_models.role.row import RoleRow
 from ai.backend.manager.models.rbac_models.role_permission_preset.row import (
@@ -111,6 +114,14 @@ _STORAGE_BACKEND_TYPES: dict[str, list[str]] = {
     "vfs": ["vfolder", "metric", "fast-fs-size"],
     "noop": [],
 }
+_PROMETHEUS_QUERY_PRESET_CATEGORIES: list[dict[str, Any]] = [
+    {
+        "id": "0198a5a0-0000-7000-8000-00000000e001",
+        "name": "container",
+        "description": "Container-level utilization metrics",
+    },
+    {"id": "0198a5a0-0000-7000-8000-00000000e002", "name": "vllm-inference"},
+]
 
 # The tables a seed kind writes, and the graph tables the creation path writes beside them.
 _SEED_TABLES: list[Table | type[HasTable]] = [
@@ -120,6 +131,7 @@ _SEED_TABLES: list[Table | type[HasTable]] = [
     RetentionPolicyRow,
     ClientIPMaskingPolicyRow,
     StorageBackendTypeRow,
+    PrometheusQueryPresetCategoryRow,
     RolePresetRow,
     RolePermissionPresetRow,
     RoleRow,
@@ -244,6 +256,21 @@ def storage_backend_type_seed_dir(tmp_path: Path) -> Path:
     ]
     (directory / "types.yaml").write_text(
         yaml.safe_dump({"kind": "storage_backend_type", "version": 1, "items": items})
+    )
+    return directory
+
+
+@pytest.fixture
+def prometheus_query_preset_category_seed_dir(tmp_path: Path) -> Path:
+    """A directory with one `prometheus_query_preset_category` seed file."""
+    directory = tmp_path / "prometheus_query_preset_category"
+    directory.mkdir()
+    (directory / "categories.yaml").write_text(
+        yaml.safe_dump({
+            "kind": "prometheus_query_preset_category",
+            "version": 1,
+            "items": _PROMETHEUS_QUERY_PRESET_CATEGORIES,
+        })
     )
     return directory
 
