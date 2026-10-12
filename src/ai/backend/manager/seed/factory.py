@@ -20,6 +20,7 @@ from ai.backend.manager.seed.resource_slot_type.seed import ResourceSlotTypeSeed
 from ai.backend.manager.seed.retention_policy.seed import RetentionPolicySeed
 from ai.backend.manager.seed.role_preset.seed import RolePresetSeed
 from ai.backend.manager.seed.storage_backend_type.seed import StorageBackendTypeSeed
+from ai.backend.manager.seed.storage_namespace.seed import StorageNamespaceSeed
 from ai.backend.manager.seed.types import SeedKind
 from ai.backend.manager.seed.vfs_storage.seed import VFSStorageSeed
 
@@ -42,5 +43,6 @@ def create_seed_kind_registry() -> SeedKindRegistry:
         SeedKind.IDLE_CHECKER: (1, IdleCheckerSeed),
         SeedKind.CONTAINER_REGISTRY: (1, ContainerRegistrySeed),
         SeedKind.OBJECT_STORAGE: (1, ObjectStorageSeed),
+        SeedKind.STORAGE_NAMESPACE: (1, StorageNamespaceSeed),
         SeedKind.VFS_STORAGE: (1, VFSStorageSeed),
     })
