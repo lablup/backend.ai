@@ -37,7 +37,11 @@ from ai.backend.manager.data.resource_preset.types import ResourcePresetData
 from ai.backend.manager.errors.base.not_found import NotFoundError
 from ai.backend.manager.errors.resource import ResourcePresetNotFound
 from ai.backend.manager.models.clauses import QueryCondition
-from ai.backend.manager.models.condition_utils import combine_conditions_or, negate_conditions
+from ai.backend.manager.models.condition_utils import (
+    combine_conditions_and,
+    combine_conditions_or,
+    negate_conditions,
+)
 from ai.backend.manager.models.resource_preset.creators import ResourcePresetCreator
 from ai.backend.manager.models.resource_preset.row import ResourcePresetRow
 from ai.backend.manager.models.resource_preset.searchable_fields import (
@@ -249,7 +253,9 @@ class ResourcePresetAdapter(BaseAdapter):
         if filter_.OR:
             or_conds: list[QueryCondition] = []
             for sub in filter_.OR:
-                or_conds.extend(self._convert_filter(sub))
+                sub_conditions = self._convert_filter(sub)
+                if sub_conditions:
+                    or_conds.append(combine_conditions_and(sub_conditions))
             if or_conds:
                 conditions.append(combine_conditions_or(or_conds))
         if filter_.NOT:
