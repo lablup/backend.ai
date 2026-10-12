@@ -193,8 +193,9 @@ def generate_api_keypair(_cli_ctx: CLIContext) -> None:
 
     _get_logger().info("generating a manager API keypair")
     keypair = generate_keypair()
-    print(f"Access Key: {keypair.access_key} ({len(keypair.access_key)} bytes)")
-    print(f"Secret Key: {keypair.secret_key} ({len(keypair.secret_key)} bytes)")
+    ak, sk = keypair.access_key, keypair.secret_key
+    print(f"Access Key: {ak} ({len(ak)} bytes)")
+    print(f"Secret Key: {sk} ({len(sk)} bytes)")
 
 
 @main.command()
