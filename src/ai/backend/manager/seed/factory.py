@@ -17,6 +17,11 @@ from ai.backend.manager.seed.prometheus_query_preset_category.seed import (
     PrometheusQueryPresetCategorySeed,
 )
 from ai.backend.manager.seed.registry import SeedKindRegistry
+from ai.backend.manager.seed.resource_policy.seed import (
+    KeyPairResourcePolicySeed,
+    ProjectResourcePolicySeed,
+    UserResourcePolicySeed,
+)
 from ai.backend.manager.seed.resource_slot_type.seed import ResourceSlotTypeSeed
 from ai.backend.manager.seed.retention_policy.seed import RetentionPolicySeed
 from ai.backend.manager.seed.role_preset.seed import RolePresetSeed
@@ -41,6 +46,9 @@ def create_seed_kind_registry() -> SeedKindRegistry:
         SeedKind.NOTIFICATION_CHANNEL: (1, NotificationChannelSeed),
         SeedKind.NOTIFICATION_RULE: (1, NotificationRuleSeed),
         SeedKind.ROLE_PRESET: (1, RolePresetSeed),
+        SeedKind.USER_RESOURCE_POLICY: (1, UserResourcePolicySeed),
+        SeedKind.PROJECT_RESOURCE_POLICY: (1, ProjectResourcePolicySeed),
+        SeedKind.KEYPAIR_RESOURCE_POLICY: (1, KeyPairResourcePolicySeed),
         SeedKind.IDLE_CHECKER: (1, IdleCheckerSeed),
         SeedKind.CONTAINER_REGISTRY: (1, ContainerRegistrySeed),
         SeedKind.OBJECT_STORAGE: (1, ObjectStorageSeed),
