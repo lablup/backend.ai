@@ -235,10 +235,7 @@ class SessionDBSource:
             # MAIN_KERNEL_ONLY loads every kernel as well, the same as SessionRow.get_session.
             options.extend([
                 noload("*"),
-                selectinload(SessionRow.kernels).options(
-                    noload("*"),
-                    selectinload(KernelRow.agent_row).noload("*"),
-                ),
+                selectinload(SessionRow.kernels).options(noload("*")),
             ])
         cond = SessionRow.id == session_id
         if not allow_stale:
