@@ -18,12 +18,9 @@ from ai.backend.manager.actions.registry.types import FieldGroupMeta, ProcessorD
 from ai.backend.manager.actions.v2.validators import ActionValidators as V2ActionValidators
 from ai.backend.manager.api.adapters.audit_log.adapter import AuditLogAdapter
 from ai.backend.manager.data.audit_log.types import AuditLogData
+from ai.backend.manager.models.audit_log.owner_candidates import AuditLogOwnerCandidates
 from ai.backend.manager.repositories.ops.repository import OpsRepository
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
-from ai.backend.manager.services.audit_log.actions.lookup_owner import (
-    LookupAuditLogOwnerAction,
-    LookupBulkAuditLogOwnerAction,
-)
 from ai.backend.manager.services.audit_log.processors import AuditLogProcessors
 
 
@@ -43,11 +40,8 @@ async def adapter(
     )
     return AuditLogAdapter(
         AuditLogProcessors(
-            registry.dangling_lookup_field_group(
-                FieldGroupMeta(AuditLogFieldType()),
-                AuditLogData,
-                LookupAuditLogOwnerAction,
-                LookupBulkAuditLogOwnerAction,
+            registry.dangling_owner_candidates_field_group(
+                FieldGroupMeta(AuditLogFieldType()), AuditLogData, AuditLogOwnerCandidates()
             )
         )
     )

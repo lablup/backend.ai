@@ -30,7 +30,7 @@ from bai_scenario.components.container_registry import (
     ARegistryToAllowAndACaller,
 )
 from bai_scenario.runner.acting import ActingAs
-from bai_scenario.runner.planting import SeedingSession
+from bai_scenario.runner.planting import TestSeedingSession
 from bai_scenario.runner.steps import run_scenario
 
 
@@ -84,7 +84,10 @@ class TheRegistryIsResolved(Then[ARegistryToAllowAndACaller, ContainerRegistryID
 @dataclass(frozen=True)
 class LookupRegistry(
     Scenario[
-        SeedingSession, ARegistryToAllowAndACaller, ContainerRegistryAdapter, ContainerRegistryID
+        TestSeedingSession,
+        ARegistryToAllowAndACaller,
+        ContainerRegistryAdapter,
+        ContainerRegistryID,
     ]
 ):
     readable: bool = True
@@ -109,7 +112,7 @@ class LookupRegistry(
         return "읽기 권한이 없는 사용자의 이름 조회는 대상의 존재 여부를 드러내지 않고 거부된다"
 
     @override
-    def given(self) -> Given[SeedingSession, ARegistryToAllowAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ARegistryToAllowAndACaller]:
         return ARegistryAndAProjectToAllow(
             on_registry=self.readable, on_project=False, permissions=(Permission.READ,)
         )

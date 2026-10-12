@@ -1002,7 +1002,7 @@ class TestCloneVFolderV2Action:
             target_name="cloned-vfolder",
             target_host=None,
             usage_mode="general",
-            permission="rw",
+            permission=VFolderMountPolicy.READ_WRITE,
             cloneable=True,
         )
 

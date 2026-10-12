@@ -24,11 +24,11 @@ from bai_scenario.components.app_config import (
     TheMergedConfigs,
 )
 from bai_scenario.runner.acting import ActingAs
-from bai_scenario.runner.planting import SeedingSession
+from bai_scenario.runner.planting import TestSeedingSession
 from bai_scenario.runner.steps import run_scenario
 
 type ReadingStep = Scenario[
-    SeedingSession, AMergeAndACaller, AppConfigAdapter, GetAppConfigsPayload
+    TestSeedingSession, AMergeAndACaller, AppConfigAdapter, GetAppConfigsPayload
 ]
 
 PUBLIC = {"theme": "light", "menu": {"home": True}}
@@ -62,7 +62,7 @@ class ReadingPublic(When[AMergeAndACaller, AppConfigAdapter, GetAppConfigsPayloa
 
 @dataclass(frozen=True)
 class AnonymousReadsThePublicValueOnly(
-    Scenario[SeedingSession, AMergeAndACaller, AppConfigAdapter, GetAppConfigsPayload]
+    Scenario[TestSeedingSession, AMergeAndACaller, AppConfigAdapter, GetAppConfigsPayload]
 ):
     @override
     def summary(self) -> str:
@@ -76,7 +76,7 @@ class AnonymousReadsThePublicValueOnly(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, AMergeAndACaller]:
+    def given(self) -> Given[TestSeedingSession, AMergeAndACaller]:
         return AConfigLaidAcross(public=PUBLIC, domain=DOMAIN, user=MINE, granted=False)
 
     @override
@@ -90,7 +90,7 @@ class AnonymousReadsThePublicValueOnly(
 
 @dataclass(frozen=True)
 class ANameWithNoPublicFragmentAnswersEmpty(
-    Scenario[SeedingSession, AMergeAndACaller, AppConfigAdapter, GetAppConfigsPayload]
+    Scenario[TestSeedingSession, AMergeAndACaller, AppConfigAdapter, GetAppConfigsPayload]
 ):
     @override
     def summary(self) -> str:
@@ -101,7 +101,7 @@ class ANameWithNoPublicFragmentAnswersEmpty(
         return "사용자 조각만 있는 이름을 로그인 없이 조회하면, 빈 설정이 반환된다"
 
     @override
-    def given(self) -> Given[SeedingSession, AMergeAndACaller]:
+    def given(self) -> Given[TestSeedingSession, AMergeAndACaller]:
         return AConfigLaidAcross(user=MINE, granted=False)
 
     @override
@@ -115,7 +115,7 @@ class ANameWithNoPublicFragmentAnswersEmpty(
 
 @dataclass(frozen=True)
 class AnUnregisteredNameAnswersEmptyToo(
-    Scenario[SeedingSession, AMergeAndACaller, AppConfigAdapter, GetAppConfigsPayload]
+    Scenario[TestSeedingSession, AMergeAndACaller, AppConfigAdapter, GetAppConfigsPayload]
 ):
     @override
     def summary(self) -> str:
@@ -129,7 +129,7 @@ class AnUnregisteredNameAnswersEmptyToo(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, AMergeAndACaller]:
+    def given(self) -> Given[TestSeedingSession, AMergeAndACaller]:
         return AConfigLaidAcross(defined=False, granted=False)
 
     @override
@@ -143,7 +143,7 @@ class AnUnregisteredNameAnswersEmptyToo(
 
 @dataclass(frozen=True)
 class ASignedInUserGetsTheSameAnswer(
-    Scenario[SeedingSession, AMergeAndACaller, AppConfigAdapter, GetAppConfigsPayload]
+    Scenario[TestSeedingSession, AMergeAndACaller, AppConfigAdapter, GetAppConfigsPayload]
 ):
     @override
     def summary(self) -> str:
@@ -157,7 +157,7 @@ class ASignedInUserGetsTheSameAnswer(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, AMergeAndACaller]:
+    def given(self) -> Given[TestSeedingSession, AMergeAndACaller]:
         return AConfigLaidAcross(public=PUBLIC, domain=DOMAIN, user=MINE, granted=False)
 
     @override
@@ -171,7 +171,7 @@ class ASignedInUserGetsTheSameAnswer(
 
 @dataclass(frozen=True)
 class SeveralNamesAnswerInRequestOrder(
-    Scenario[SeedingSession, AMergeAndACaller, AppConfigAdapter, GetAppConfigsPayload]
+    Scenario[TestSeedingSession, AMergeAndACaller, AppConfigAdapter, GetAppConfigsPayload]
 ):
     publics: tuple[Mapping[str, Any], ...] = ({"n": 1}, {"n": 2}, {"n": 3})
 
@@ -184,7 +184,7 @@ class SeveralNamesAnswerInRequestOrder(
         return "이름 셋을 한 번에 로그인 없이 조회하면, 각각의 공개 값이 요청한 순서대로 반환된다"
 
     @override
-    def given(self) -> Given[SeedingSession, AMergeAndACaller]:
+    def given(self) -> Given[TestSeedingSession, AMergeAndACaller]:
         return SeveralConfigsLaid(publics=self.publics, granted=False)
 
     @override

@@ -30,6 +30,7 @@ from ai.backend.manager.models.specs.lookup import (
     FieldOwnerLookup,
     RuntimeFieldOwnerLookup,
 )
+from ai.backend.manager.models.specs.owner_candidates import FieldOwnerCandidates
 from ai.backend.manager.models.specs.querier import (
     BulkEntityQuerier,
     BulkFieldQuerier,
@@ -152,6 +153,22 @@ class V2ReadOps(V2GraphReadOpsBase):
             return {}
         rows = (await self._sess.execute(lookup.build_query(field_ids))).all()
         owners = {row[0]: lookup.owner_of(EntityType(row[2]), row[1]) for row in rows}
+        return {field_id: owners[field_id] for field_id in field_ids if field_id in owners}
+
+    async def read_field_owner_candidates(
+        self, candidates: FieldOwnerCandidates[Any], field_ids: Sequence[FieldIdentifier]
+    ) -> Mapping[FieldIdentifier, Sequence[RuntimeEntityID]]:
+        """Read the owners of each named field row; a row with none is absent."""
+        if not field_ids:
+            return {}
+        query = sa.union_all(*candidates.owners_of(field_ids))
+        rows = (await self._sess.execute(query)).all()
+        owners: dict[FieldIdentifier, list[RuntimeEntityID]] = {}
+        for field_id, owner_id, owner_type in rows:
+            owner = RuntimeEntityID(owner_type, owner_id)
+            found = owners.setdefault(field_id, [])
+            if owner not in found:
+                found.append(owner)
         return {field_id: owners[field_id] for field_id in field_ids if field_id in owners}
 
     async def lookup_field_owner_by_key[TOwnerID: EntityIdentifier](

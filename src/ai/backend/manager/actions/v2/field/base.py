@@ -60,3 +60,28 @@ class BaseRuntimeSingleFieldAction[TFieldID: FieldIdentifier](ABC):
     def to_owner_lookup_action(self) -> LookupRuntimeFieldOwnerOpsAction[TFieldID]:
         """Return the lookup that reads the entity owning this row."""
         raise NotImplementedError
+
+
+class BaseNestedFieldSearchAction[TFieldID: FieldIdentifier](ABC):
+    """Base for searches of the rows nested under one field row.
+
+    The field row's owners come from the group it is wired through; the row is reached
+    when the caller holds the permission on one of them.
+    """
+
+    @classmethod
+    @abstractmethod
+    def operation_type(cls) -> ActionOperationType:
+        """Return the operation that this action performs on the nested rows."""
+        raise NotImplementedError
+
+    @classmethod
+    @abstractmethod
+    def action_name(cls) -> str:
+        """Return the name recorded on audit rows: a lowercase snake_case verb phrase."""
+        raise NotImplementedError
+
+    @abstractmethod
+    def field_id(self) -> TFieldID:
+        """Return the id of the field row the search runs under."""
+        raise NotImplementedError

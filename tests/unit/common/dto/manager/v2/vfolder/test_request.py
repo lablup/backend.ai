@@ -42,7 +42,7 @@ class TestCreateVFolderInput:
         req = CreateVFolderInput(name="test")
         assert req.name == "test"
         assert req.usage_mode == VFolderUsageMode.GENERAL
-        assert req.permission == VFolderPermissionField.READ_WRITE
+        assert req.permission is None
         assert req.host is None
         assert req.project_id is None
         assert req.cloneable is False

@@ -49,8 +49,8 @@ from bai_scenario.components.app_config import (
 )
 from bai_scenario.components.domain import WAS_HERE, SomeoneOf, WrittenByThisRun
 from bai_scenario.seeds.app_config.allow_list import SCOPE_NAMES
-from bai_scenario.seeds.app_config.fragment import SeedFragmentOf, SeedPublicFragment
-from bai_scenario.seeds.domain.domain import SeedDomain
+from bai_scenario.seeds.app_config.fragment import TestSeedFragmentOf, TestSeedPublicFragment
+from bai_scenario.seeds.domain.domain import TestSeedDomain
 from bai_scenario.seeds.seeder import Laid
 
 FRAGMENT = AppConfigFragmentEntityType()
@@ -149,7 +149,7 @@ class MyWritingPlace(Given[Any, AWritingPlace]):
 
     @override
     async def lay(self, seeding: Any) -> AWritingPlace:
-        home = await seeding.creating(SeedDomain(name_hint="home", description=WAS_HERE))
+        home = await seeding.creating(TestSeedDomain(name_hint="home", description=WAS_HERE))
         caller = await seeding.within(
             SomeoneGrantedOnTheirOwn(home, FRAGMENT, granted=self.granted, role=self.role)
         )
@@ -159,7 +159,9 @@ class MyWritingPlace(Given[Any, AWritingPlace]):
         existing: Laid[AppConfigFragmentData] | None = None
         if self.existing is not None:
             existing = await seeding.creating_from_two(
-                SeedFragmentOf(owner_of=user_owner, config=self.existing, name_hint="own-fragment"),
+                TestSeedFragmentOf(
+                    owner_of=user_owner, config=self.existing, name_hint="own-fragment"
+                ),
                 first.entries[AppConfigScopeType.USER],
                 caller,
             )
@@ -224,7 +226,7 @@ class SomewhereToTarget(Given[Any, ATargetAndACaller]):
 
     @override
     async def lay(self, seeding: Any) -> ATargetAndACaller:
-        home = await seeding.creating(SeedDomain(name_hint="home", description=WAS_HERE))
+        home = await seeding.creating(TestSeedDomain(name_hint="home", description=WAS_HERE))
         design = await seeding.within(ADesignOf(allowed=(self.target.kind(),)))
         entry = design.entries[self.target.kind()]
         if self.target == Target.ANOTHER_USER:
@@ -244,20 +246,20 @@ class SomewhereToTarget(Given[Any, ATargetAndACaller]):
                 scope_id = seeding.made(home).id
                 if self.laid is not None:
                     fragment = await seeding.creating_from_two(
-                        SeedFragmentOf(owner_of=domain_owner, config=self.laid), entry, home
+                        TestSeedFragmentOf(owner_of=domain_owner, config=self.laid), entry, home
                     )
             case Target.PUBLIC:
                 scope_id = None
                 if self.laid is not None:
                     fragment = await seeding.creating_from(
-                        SeedPublicFragment(config=self.laid), entry
+                        TestSeedPublicFragment(config=self.laid), entry
                     )
             case Target.ANOTHER_USER:
                 other = await seeding.within(SomeoneOf(home))
                 scope_id = seeding.made(other).id
                 if self.laid is not None:
                     fragment = await seeding.creating_from_two(
-                        SeedFragmentOf(owner_of=user_owner, config=self.laid), entry, other
+                        TestSeedFragmentOf(owner_of=user_owner, config=self.laid), entry, other
                     )
             case Target.NOBODY:
                 scope_id = uuid4()
@@ -369,7 +371,7 @@ class MyFragmentsLaid(Given[Any, AReadingPlace]):
 
     @override
     async def lay(self, seeding: Any) -> AReadingPlace:
-        home = await seeding.creating(SeedDomain(name_hint="home", description=WAS_HERE))
+        home = await seeding.creating(TestSeedDomain(name_hint="home", description=WAS_HERE))
         caller = await seeding.within(
             SomeoneGrantedOnTheirOwn(home, FRAGMENT, granted=self.granted, role=self.role)
         )
@@ -383,7 +385,7 @@ class MyFragmentsLaid(Given[Any, AReadingPlace]):
             names.append(seeding.made(design.definition).config_name)
             if i in self.mine_on:
                 own = await seeding.creating_from_two(
-                    SeedFragmentOf(
+                    TestSeedFragmentOf(
                         owner_of=user_owner, config={"slot": i}, name_hint="own-fragment"
                     ),
                     design.entries[AppConfigScopeType.USER],
@@ -395,7 +397,7 @@ class MyFragmentsLaid(Given[Any, AReadingPlace]):
             if i == 0 and self.anothers is not None:
                 other = await seeding.within(SomeoneOf(home))
                 await seeding.creating_from_two(
-                    SeedFragmentOf(
+                    TestSeedFragmentOf(
                         owner_of=user_owner, config=self.anothers, name_hint="anothers-fragment"
                     ),
                     design.entries[AppConfigScopeType.USER],
@@ -403,7 +405,7 @@ class MyFragmentsLaid(Given[Any, AReadingPlace]):
                 )
             if i == 0 and self.domains is not None:
                 await seeding.creating_from_two(
-                    SeedFragmentOf(
+                    TestSeedFragmentOf(
                         owner_of=domain_owner, config=self.domains, name_hint="domain-fragment"
                     ),
                     design.entries[AppConfigScopeType.DOMAIN],
@@ -530,7 +532,7 @@ class FragmentsLaidAcross(Given[Any, ManyFragmentsAndACaller]):
 
     @override
     async def lay(self, seeding: Any) -> ManyFragmentsAndACaller:
-        home = await seeding.creating(SeedDomain(name_hint="home", description=WAS_HERE))
+        home = await seeding.creating(TestSeedDomain(name_hint="home", description=WAS_HERE))
         if self.answers == AppConfigScopeType.DOMAIN:
             caller = await seeding.within(
                 SomeoneGrantedOn(
@@ -548,7 +550,9 @@ class FragmentsLaidAcross(Given[Any, ManyFragmentsAndACaller]):
                 ADesignOf(allowed=(AppConfigScopeType.USER,), name_hint="mine")
             )
             own = await seeding.creating_from_two(
-                SeedFragmentOf(owner_of=user_owner, config={"mine": i}, name_hint="own-fragment"),
+                TestSeedFragmentOf(
+                    owner_of=user_owner, config={"mine": i}, name_hint="own-fragment"
+                ),
                 design.entries[AppConfigScopeType.USER],
                 caller,
             )
@@ -559,7 +563,7 @@ class FragmentsLaidAcross(Given[Any, ManyFragmentsAndACaller]):
                 ADesignOf(allowed=(AppConfigScopeType.USER,), name_hint="theirs")
             )
             await seeding.creating_from_two(
-                SeedFragmentOf(
+                TestSeedFragmentOf(
                     owner_of=user_owner, config={"theirs": i}, name_hint="anothers-fragment"
                 ),
                 design.entries[AppConfigScopeType.USER],
@@ -570,7 +574,7 @@ class FragmentsLaidAcross(Given[Any, ManyFragmentsAndACaller]):
                 ADesignOf(allowed=(AppConfigScopeType.DOMAIN,), name_hint="domains")
             )
             laid = await seeding.creating_from_two(
-                SeedFragmentOf(
+                TestSeedFragmentOf(
                     owner_of=domain_owner, config={"domains": i}, name_hint="domain-fragment"
                 ),
                 design.entries[AppConfigScopeType.DOMAIN],
@@ -583,7 +587,8 @@ class FragmentsLaidAcross(Given[Any, ManyFragmentsAndACaller]):
                 ADesignOf(allowed=(AppConfigScopeType.PUBLIC,), name_hint="publics")
             )
             laid = await seeding.creating_from(
-                SeedPublicFragment(config={"publics": i}), design.entries[AppConfigScopeType.PUBLIC]
+                TestSeedPublicFragment(config={"publics": i}),
+                design.entries[AppConfigScopeType.PUBLIC],
             )
             if self.answers == AppConfigScopeType.PUBLIC:
                 answering.append(laid)
@@ -675,7 +680,7 @@ class AFragmentAndSomeone(Given[Any, AFragmentAndACaller]):
 
     @override
     async def lay(self, seeding: Any) -> AFragmentAndACaller:
-        home = await seeding.creating(SeedDomain(name_hint="home", description=WAS_HERE))
+        home = await seeding.creating(TestSeedDomain(name_hint="home", description=WAS_HERE))
         caller = await seeding.within(
             SomeoneGrantedOnTheirOwn(home, FRAGMENT, granted=self.granted, role=self.role)
         )
@@ -684,7 +689,7 @@ class AFragmentAndSomeone(Given[Any, AFragmentAndACaller]):
         if self.whose == Whose.MINE:
             design = await seeding.within(ADesignOf(allowed=(AppConfigScopeType.USER,)))
             fragment = await seeding.creating_from_two(
-                SeedFragmentOf(
+                TestSeedFragmentOf(
                     owner_of=user_owner, config={"theme": "mine"}, name_hint="own-fragment"
                 ),
                 design.entries[AppConfigScopeType.USER],
@@ -695,7 +700,7 @@ class AFragmentAndSomeone(Given[Any, AFragmentAndACaller]):
             design = await seeding.within(ADesignOf(allowed=(AppConfigScopeType.USER,)))
             other = await seeding.within(SomeoneOf(home))
             fragment = await seeding.creating_from_two(
-                SeedFragmentOf(
+                TestSeedFragmentOf(
                     owner_of=user_owner, config={"theme": "theirs"}, name_hint="anothers-fragment"
                 ),
                 design.entries[AppConfigScopeType.USER],
@@ -705,7 +710,7 @@ class AFragmentAndSomeone(Given[Any, AFragmentAndACaller]):
         else:
             design = await seeding.within(ADesignOf(allowed=(AppConfigScopeType.PUBLIC,)))
             fragment = await seeding.creating_from(
-                SeedPublicFragment(config={"theme": "public"}),
+                TestSeedPublicFragment(config={"theme": "public"}),
                 design.entries[AppConfigScopeType.PUBLIC],
             )
             owner = None
@@ -773,7 +778,7 @@ class SomeFragmentsAndSomeone(Given[Any, SomeFragmentsAndACaller]):
 
     @override
     async def lay(self, seeding: Any) -> SomeFragmentsAndACaller:
-        home = await seeding.creating(SeedDomain(name_hint="home", description=WAS_HERE))
+        home = await seeding.creating(TestSeedDomain(name_hint="home", description=WAS_HERE))
         caller = await seeding.within(
             SomeoneGrantedOnTheirOwn(home, FRAGMENT, granted=self.granted, role=self.role)
         )
@@ -785,7 +790,7 @@ class SomeFragmentsAndSomeone(Given[Any, SomeFragmentsAndACaller]):
             )
             mine.append(
                 await seeding.creating_from_two(
-                    SeedFragmentOf(
+                    TestSeedFragmentOf(
                         owner_of=user_owner, config={"mine": i}, name_hint="own-fragment"
                     ),
                     design.entries[AppConfigScopeType.USER],
@@ -796,7 +801,7 @@ class SomeFragmentsAndSomeone(Given[Any, SomeFragmentsAndACaller]):
             ADesignOf(allowed=(AppConfigScopeType.USER,), name_hint="theirs")
         )
         theirs = await seeding.creating_from_two(
-            SeedFragmentOf(
+            TestSeedFragmentOf(
                 owner_of=user_owner, config={"theirs": 0}, name_hint="anothers-fragment"
             ),
             design.entries[AppConfigScopeType.USER],

@@ -33,11 +33,11 @@ from bai_scenario.components.resource_policy import (
     Searched,
 )
 from bai_scenario.runner.acting import ActingAs
-from bai_scenario.runner.planting import SeedingSession
+from bai_scenario.runner.planting import TestSeedingSession
 from bai_scenario.runner.steps import run_scenario
 
 type SearchingStep = Scenario[
-    SeedingSession, ManyPoliciesAndACaller[Any], ResourcePolicyAdapter, Searched
+    TestSeedingSession, ManyPoliciesAndACaller[Any], ResourcePolicyAdapter, Searched
 ]
 
 
@@ -128,7 +128,7 @@ class OnlyTheHeldOneIsFound(Then[ManyPoliciesAndACaller[Any], Searched]):
 
 @dataclass(frozen=True)
 class TheSuperadminFindsEveryOne(
-    Scenario[SeedingSession, ManyPoliciesAndACaller[Any], ResourcePolicyAdapter, Searched]
+    Scenario[TestSeedingSession, ManyPoliciesAndACaller[Any], ResourcePolicyAdapter, Searched]
 ):
     family: Family[Any, Any]
 
@@ -144,7 +144,7 @@ class TheSuperadminFindsEveryOne(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, ManyPoliciesAndACaller[Any]]:
+    def given(self) -> Given[TestSeedingSession, ManyPoliciesAndACaller[Any]]:
         return ManyPoliciesAndSomeone(self.family, role=UserRole.SUPERADMIN)
 
     @override
@@ -158,7 +158,7 @@ class TheSuperadminFindsEveryOne(
 
 @dataclass(frozen=True)
 class FilteringByNameLeavesThatOne(
-    Scenario[SeedingSession, ManyPoliciesAndACaller[Any], ResourcePolicyAdapter, Searched]
+    Scenario[TestSeedingSession, ManyPoliciesAndACaller[Any], ResourcePolicyAdapter, Searched]
 ):
     family: Family[Any, Any]
 
@@ -174,7 +174,7 @@ class FilteringByNameLeavesThatOne(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, ManyPoliciesAndACaller[Any]]:
+    def given(self) -> Given[TestSeedingSession, ManyPoliciesAndACaller[Any]]:
         return ManyPoliciesAndSomeone(self.family, role=UserRole.SUPERADMIN)
 
     @override
@@ -188,7 +188,7 @@ class FilteringByNameLeavesThatOne(
 
 @dataclass(frozen=True)
 class FilteringByHolderLeavesTheirs(
-    Scenario[SeedingSession, ManyPoliciesAndACaller[Any], ResourcePolicyAdapter, Searched]
+    Scenario[TestSeedingSession, ManyPoliciesAndACaller[Any], ResourcePolicyAdapter, Searched]
 ):
     @override
     def summary(self) -> str:
@@ -202,7 +202,7 @@ class FilteringByHolderLeavesTheirs(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, ManyPoliciesAndACaller[Any]]:
+    def given(self) -> Given[TestSeedingSession, ManyPoliciesAndACaller[Any]]:
         return ManyPoliciesAndSomeone(KEYPAIR, role=UserRole.SUPERADMIN)
 
     @override
@@ -216,7 +216,7 @@ class FilteringByHolderLeavesTheirs(
 
 @dataclass(frozen=True)
 class AMonitorFindsEveryOne(
-    Scenario[SeedingSession, ManyPoliciesAndACaller[Any], ResourcePolicyAdapter, Searched]
+    Scenario[TestSeedingSession, ManyPoliciesAndACaller[Any], ResourcePolicyAdapter, Searched]
 ):
     family: Family[Any, Any]
 
@@ -232,7 +232,7 @@ class AMonitorFindsEveryOne(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, ManyPoliciesAndACaller[Any]]:
+    def given(self) -> Given[TestSeedingSession, ManyPoliciesAndACaller[Any]]:
         return ManyPoliciesAndSomeone(self.family, role=UserRole.MONITOR)
 
     @override
@@ -246,7 +246,7 @@ class AMonitorFindsEveryOne(
 
 @dataclass(frozen=True)
 class APlainUserMayNotSearch(
-    Scenario[SeedingSession, ManyPoliciesAndACaller[Any], ResourcePolicyAdapter, Searched]
+    Scenario[TestSeedingSession, ManyPoliciesAndACaller[Any], ResourcePolicyAdapter, Searched]
 ):
     family: Family[Any, Any]
 
@@ -259,7 +259,7 @@ class APlainUserMayNotSearch(
         return f"슈퍼관리자가 아닌 사용자가 {self.family.kind} 전체를 검색하려 하면 역할 부족으로 거부된다"
 
     @override
-    def given(self) -> Given[SeedingSession, ManyPoliciesAndACaller[Any]]:
+    def given(self) -> Given[TestSeedingSession, ManyPoliciesAndACaller[Any]]:
         return ManyPoliciesAndSomeone(self.family)
 
     @override

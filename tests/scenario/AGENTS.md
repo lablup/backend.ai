@@ -37,18 +37,19 @@
 
 ## 행을 심는 법
 
-- 행은 src의 write spec으로만 만든다. `Seeder`의 입구 여덟 — `creating`, `provisioning`,
+- 행은 src의 write spec으로만 만든다. `TestSeeder`의 입구 여덟 — `creating`, `provisioning`,
   `adding`, `adding_with_nested`, `linking`, `accepting`, `granting`, `joining` — 외에
   데이터베이스를 건드리지 않는다. `accepting`은 공유 제안을 받는 쪽이 받아들이는 연산을
-  통째로 쓴다. `joining`은 사용자를 프로젝트 명부에 올린다. `adding_with_nested`는
-  필드 행과 그것이 소유하는 행(감사 기록과 그 스코프 행처럼)을 한 쓰기로 심는다. 앞 행을
-  읽는 seed는 읽는 개수만큼의 입구(`creating_from`,
+  통째로 쓴다. `joining`은 사용자를 프로젝트 명부에 올린다. `adding`은 필드 행을 심는다.
+  매니저가 생성하는 행은 `TestSeedFieldCreator`, upsert하는 행은 `TestSeedFieldUpserter`로 적는다.
+  `adding_with_nested`는 필드 행과 그것이 소유하는 행(감사 기록과 그 스코프 행처럼)을 한
+  쓰기로 심는다. 앞 행을 읽는 seed는 읽는 개수만큼의 입구(`creating_from`,
   `creating_from_two`, `creating_from_three`)를 쓴다.
-- seed 하나는 클래스 하나다. `SeedRow` 계열을 구현해 자기가 무엇인지(`kind`), 무엇을
+- seed 하나는 클래스 하나다. `TestSeedRow` 계열을 구현해 자기가 무엇인지(`kind`), 무엇을
   세워두는지(`detail`), 어떤 이름으로 들어가는지(`name`), 무엇을 쓰는지(`seed`)를 답한다.
 - 이름을 매니저가 못박은 행은 `name`이 그 이름을 답한다. 시더가 붙이는 번호를 받지 않는다.
   그 이름은 src에서 읽는다. 테스트가 리터럴로 다시 적지 않는다.
-- 행 여러 개가 한 전제를 이루면 `SeedNest`로 묶는다. `kind`가 무엇을 준비하는지 말하고,
+- 행 여러 개가 한 전제를 이루면 `TestSeedNest`로 묶는다. `kind`가 무엇을 준비하는지 말하고,
   `seed.within`으로 심으면 레포트가 그 묶음 아래로 행들을 들여쓴다. 묶음이 묶음을 딛는 것도
   `within`이다.
 - 한 시나리오에 하나만 있어야 하는 행은 `seed.once`로 심는다. 같음의 기준은 seed의 타입이다.
@@ -75,7 +76,7 @@
 
 - 시나리오 표는 부르는 것 하나를 두고 짝을 세우는 자리다. 셋업 자체가 무엇을 만드는지를
   묻는 테스트는 `seeding` 픽스처로 쓴다.
-- `seeding`은 표와 같은 seed, 같은 `Seeder`, 같은 쓰기 경로를 쓴다. 다른 것은 쓰는 시점뿐이다.
+- `seeding`은 표와 같은 seed, 같은 `TestSeeder`, 같은 쓰기 경로를 쓴다. 다른 것은 쓰는 시점뿐이다.
   픽스처가 답할 때 그 행은 이미 쓰여 있다.
 - 픽스처 하나가 행 하나를 맡고, 딛는 행은 픽스처 인자로 받는다. 선언만 해두고 마지막에 몰아
   쓰지 않는다. 그러면 픽스처가 만들어지는 순서에 기대게 된다.
@@ -84,7 +85,7 @@
 
 ## 표의 모양
 
-- 시나리오 하나는 빌더 함수 하나다. `Seeder`를 받아 자기가 쓸 행을 심고 시나리오를 답한다.
+- 시나리오 하나는 빌더 함수 하나다. `TestSeeder`를 받아 자기가 쓸 행을 심고 시나리오를 답한다.
 - 파라미터 이름은 `scenario`로 고정한다. 레포트가 그 이름으로 행을 집는다.
 - 동작마다 테스트 모듈을 나눈다. 한 모듈에 한 컴포넌트의 한 동작이 산다.
 - 어댑터를 조립하는 픽스처는 그 모듈들의 conftest에 둔다. 컴포넌트를 아는 유일한 자리다.

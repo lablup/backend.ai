@@ -25,16 +25,16 @@ from bai_scenario.components.container_registry import (
     MissingProject,
     NoProjects,
     NoRegistryYet,
-    SeededProject,
+    TestSeededProject,
     TheNewRegistryNode,
     allowed_project_count,
 )
 from bai_scenario.runner.acting import ActingAs
-from bai_scenario.runner.planting import SeedingSession
+from bai_scenario.runner.planting import TestSeedingSession
 from bai_scenario.runner.steps import run_scenario
 
 type CreationScenario = Scenario[
-    SeedingSession, AProjectAndACaller, ContainerRegistryAdapter, ContainerRegistryNode
+    TestSeedingSession, AProjectAndACaller, ContainerRegistryAdapter, ContainerRegistryNode
 ]
 
 
@@ -70,7 +70,9 @@ class Creating(When[AProjectAndACaller, ContainerRegistryAdapter, ContainerRegis
 
 @dataclass(frozen=True)
 class CreatingWithOnlyTheRequiredValues(
-    Scenario[SeedingSession, AProjectAndACaller, ContainerRegistryAdapter, ContainerRegistryNode]
+    Scenario[
+        TestSeedingSession, AProjectAndACaller, ContainerRegistryAdapter, ContainerRegistryNode
+    ]
 ):
     @override
     def summary(self) -> str:
@@ -84,7 +86,7 @@ class CreatingWithOnlyTheRequiredValues(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, AProjectAndACaller]:
+    def given(self) -> Given[TestSeedingSession, AProjectAndACaller]:
         return NoRegistryYet(role=UserRole.SUPERADMIN)
 
     @override
@@ -99,7 +101,9 @@ class CreatingWithOnlyTheRequiredValues(
 
 @dataclass(frozen=True)
 class AllowingAProjectWhileCreating(
-    Scenario[SeedingSession, AProjectAndACaller, ContainerRegistryAdapter, ContainerRegistryNode]
+    Scenario[
+        TestSeedingSession, AProjectAndACaller, ContainerRegistryAdapter, ContainerRegistryNode
+    ]
 ):
     @override
     def summary(self) -> str:
@@ -110,12 +114,12 @@ class AllowingAProjectWhileCreating(
         return "슈퍼관리자가 허용 프로젝트를 함께 지정해 레지스트리를 생성하면 그 관계도 생성된다"
 
     @override
-    def given(self) -> Given[SeedingSession, AProjectAndACaller]:
+    def given(self) -> Given[TestSeedingSession, AProjectAndACaller]:
         return NoRegistryYet(role=UserRole.SUPERADMIN)
 
     @override
     def when(self) -> Creating:
-        return Creating(allowed_projects=SeededProject())
+        return Creating(allowed_projects=TestSeededProject())
 
     @override
     def then(self) -> Then[AProjectAndACaller, ContainerRegistryNode]:
@@ -125,7 +129,9 @@ class AllowingAProjectWhileCreating(
 
 @dataclass(frozen=True)
 class AProjectThatIsNotThereIsRefused(
-    Scenario[SeedingSession, AProjectAndACaller, ContainerRegistryAdapter, ContainerRegistryNode]
+    Scenario[
+        TestSeedingSession, AProjectAndACaller, ContainerRegistryAdapter, ContainerRegistryNode
+    ]
 ):
     @override
     def summary(self) -> str:
@@ -139,7 +145,7 @@ class AProjectThatIsNotThereIsRefused(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, AProjectAndACaller]:
+    def given(self) -> Given[TestSeedingSession, AProjectAndACaller]:
         return NoRegistryYet(role=UserRole.SUPERADMIN)
 
     @override
@@ -153,7 +159,9 @@ class AProjectThatIsNotThereIsRefused(
 
 @dataclass(frozen=True)
 class APlainUserMayNotCreate(
-    Scenario[SeedingSession, AProjectAndACaller, ContainerRegistryAdapter, ContainerRegistryNode]
+    Scenario[
+        TestSeedingSession, AProjectAndACaller, ContainerRegistryAdapter, ContainerRegistryNode
+    ]
 ):
     @override
     def summary(self) -> str:
@@ -167,7 +175,7 @@ class APlainUserMayNotCreate(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, AProjectAndACaller]:
+    def given(self) -> Given[TestSeedingSession, AProjectAndACaller]:
         return NoRegistryYet()
 
     @override

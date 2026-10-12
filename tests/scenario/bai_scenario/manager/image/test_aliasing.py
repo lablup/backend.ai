@@ -41,7 +41,7 @@ from bai_scenario.components.image import (
     TheLaidImage,
 )
 from bai_scenario.runner.acting import ActingAs
-from bai_scenario.runner.planting import SeedingSession
+from bai_scenario.runner.planting import TestSeedingSession
 from bai_scenario.runner.steps import run_scenario
 
 A_NEW_ALIAS = "made-alias"
@@ -163,7 +163,7 @@ class TheRemovedAlias(Then[AnAliasAndACaller, AliasImagePayload]):
 
 @dataclass(frozen=True)
 class AliasingAnswersWithTheAliasAndItsImage(
-    Scenario[SeedingSession, AnImageAndACaller, ImageAdapter, AliasImagePayload]
+    Scenario[TestSeedingSession, AnImageAndACaller, ImageAdapter, AliasImagePayload]
 ):
     @override
     def summary(self) -> str:
@@ -174,7 +174,7 @@ class AliasingAnswersWithTheAliasAndItsImage(
         return "슈퍼관리자가 이미지에 별칭을 등록하면 그 별칭과 가리키는 이미지가 반환된다"
 
     @override
-    def given(self) -> Given[SeedingSession, AnImageAndACaller]:
+    def given(self) -> Given[TestSeedingSession, AnImageAndACaller]:
         return AnImageAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
@@ -188,7 +188,7 @@ class AliasingAnswersWithTheAliasAndItsImage(
 
 @dataclass(frozen=True)
 class DealiasingAnswersWithTheRemovedAlias(
-    Scenario[SeedingSession, AnAliasAndACaller, ImageAdapter, AliasImagePayload]
+    Scenario[TestSeedingSession, AnAliasAndACaller, ImageAdapter, AliasImagePayload]
 ):
     @override
     def summary(self) -> str:
@@ -199,7 +199,7 @@ class DealiasingAnswersWithTheRemovedAlias(
         return "슈퍼관리자가 등록된 별칭을 해제하면 해제된 별칭과 그 이미지가 반환된다"
 
     @override
-    def given(self) -> Given[SeedingSession, AnAliasAndACaller]:
+    def given(self) -> Given[TestSeedingSession, AnAliasAndACaller]:
         return AnAliasAndSomeone()
 
     @override
@@ -213,7 +213,7 @@ class DealiasingAnswersWithTheRemovedAlias(
 
 @dataclass(frozen=True)
 class AliasingWhatIsNotThere(
-    Scenario[SeedingSession, AnImageAndACaller, ImageAdapter, AliasImagePayload]
+    Scenario[TestSeedingSession, AnImageAndACaller, ImageAdapter, AliasImagePayload]
 ):
     @override
     def summary(self) -> str:
@@ -224,7 +224,7 @@ class AliasingWhatIsNotThere(
         return "어느 이미지도 가리키지 않는 ID에 별칭을 등록하려 하면 대상을 찾을 수 없어 거부된다"
 
     @override
-    def given(self) -> Given[SeedingSession, AnImageAndACaller]:
+    def given(self) -> Given[TestSeedingSession, AnImageAndACaller]:
         return AnImageAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
@@ -238,7 +238,7 @@ class AliasingWhatIsNotThere(
 
 @dataclass(frozen=True)
 class AnAliasAnotherImageHolds(
-    Scenario[SeedingSession, AnAliasAndACaller, ImageAdapter, AliasImagePayload]
+    Scenario[TestSeedingSession, AnAliasAndACaller, ImageAdapter, AliasImagePayload]
 ):
     @override
     def summary(self) -> str:
@@ -249,7 +249,7 @@ class AnAliasAnotherImageHolds(
         return "이미 사용 중인 별칭을 등록하려 하면 유니크 제약 위반으로 거부된다"
 
     @override
-    def given(self) -> Given[SeedingSession, AnAliasAndACaller]:
+    def given(self) -> Given[TestSeedingSession, AnAliasAndACaller]:
         return AnAliasAndSomeone()
 
     @override
@@ -263,7 +263,7 @@ class AnAliasAnotherImageHolds(
 
 @dataclass(frozen=True)
 class DealiasingWhatIsNotThere(
-    Scenario[SeedingSession, AnAliasAndACaller, ImageAdapter, AliasImagePayload]
+    Scenario[TestSeedingSession, AnAliasAndACaller, ImageAdapter, AliasImagePayload]
 ):
     @override
     def summary(self) -> str:
@@ -274,7 +274,7 @@ class DealiasingWhatIsNotThere(
         return "어느 이미지도 가리키지 않는 별칭을 해제하려 하면 대상을 찾을 수 없어 거부된다"
 
     @override
-    def given(self) -> Given[SeedingSession, AnAliasAndACaller]:
+    def given(self) -> Given[TestSeedingSession, AnAliasAndACaller]:
         return AnAliasAndSomeone()
 
     @override
@@ -288,7 +288,7 @@ class DealiasingWhatIsNotThere(
 
 @dataclass(frozen=True)
 class TheOwnerStillMayNotAlias(
-    Scenario[SeedingSession, AnImageAndACaller, ImageAdapter, AliasImagePayload]
+    Scenario[TestSeedingSession, AnImageAndACaller, ImageAdapter, AliasImagePayload]
 ):
     @override
     def summary(self) -> str:
@@ -302,7 +302,7 @@ class TheOwnerStillMayNotAlias(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, AnImageAndACaller]:
+    def given(self) -> Given[TestSeedingSession, AnImageAndACaller]:
         return AnImageTheCallerMade()
 
     @override
@@ -316,7 +316,7 @@ class TheOwnerStillMayNotAlias(
 
 @dataclass(frozen=True)
 class APlainUserMayNotDealias(
-    Scenario[SeedingSession, AnAliasAndACaller, ImageAdapter, AliasImagePayload]
+    Scenario[TestSeedingSession, AnAliasAndACaller, ImageAdapter, AliasImagePayload]
 ):
     @override
     def summary(self) -> str:
@@ -327,7 +327,7 @@ class APlainUserMayNotDealias(
         return "슈퍼관리자가 아닌 사용자가 별칭을 해제하려 하면 슈퍼관리자 권한 부족으로 거부된다"
 
     @override
-    def given(self) -> Given[SeedingSession, AnAliasAndACaller]:
+    def given(self) -> Given[TestSeedingSession, AnAliasAndACaller]:
         return AnAliasAndSomeone(role=UserRole.USER)
 
     @override

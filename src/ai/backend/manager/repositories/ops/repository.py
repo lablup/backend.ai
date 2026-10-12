@@ -40,6 +40,7 @@ from ai.backend.manager.models.specs.lookup import (
     FieldOwnerLookup,
     RuntimeFieldOwnerLookup,
 )
+from ai.backend.manager.models.specs.owner_candidates import FieldOwnerCandidates
 from ai.backend.manager.models.specs.purger import (
     EntityBatchPurger,
     FieldBatchPurger,
@@ -192,6 +193,13 @@ class OpsRepository[TData]:
         """Read the polymorphic owning entity of each named field row."""
         async with self._ops.read_ops() as r:
             return await r.lookup_runtime_field_owners(lookup, field_ids)
+
+    async def field_owner_candidates(
+        self, candidates: FieldOwnerCandidates[Any], field_ids: Sequence[FieldIdentifier]
+    ) -> Mapping[FieldIdentifier, Sequence[RuntimeEntityID]]:
+        """Read the owner candidates of each named field row."""
+        async with self._ops.read_ops() as r:
+            return await r.read_field_owner_candidates(candidates, field_ids)
 
     async def runtime_field_owner(
         self, lookup: RuntimeFieldOwnerLookup[Any], field_id: FieldIdentifier

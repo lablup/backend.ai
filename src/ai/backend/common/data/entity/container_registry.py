@@ -1,8 +1,10 @@
-from typing import override
+from typing import NewType, override
+from uuid import UUID
 
 from ai.backend.common.data.entity.types import EntityIdentifier, EntityType, NaturalKey
 
 __all__ = (
+    "AssociationContainerRegistriesGroupsID",
     "ContainerRegistryEntityType",
     "ContainerRegistryID",
     "ContainerRegistryName",
@@ -26,6 +28,9 @@ class ContainerRegistryID(EntityIdentifier):
     @override
     def entity_type(self) -> EntityType:
         return ContainerRegistryEntityType()
+
+
+AssociationContainerRegistriesGroupsID = NewType("AssociationContainerRegistriesGroupsID", UUID)
 
 
 class ContainerRegistryName(NaturalKey):

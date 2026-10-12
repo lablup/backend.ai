@@ -37,12 +37,12 @@ from bai_scenario.components.app_config_fragment import (
     SomeFragmentsAndSomeone,
 )
 from bai_scenario.runner.acting import ActingAs
-from bai_scenario.runner.planting import SeedingSession
+from bai_scenario.runner.planting import TestSeedingSession
 from bai_scenario.runner.steps import run_scenario
 
 type Loaded = list[AppConfigFragmentNode | Exception | None]
 type LoadingStep = Scenario[
-    SeedingSession, SomeFragmentsAndACaller, AppConfigFragmentAdapter, Loaded
+    TestSeedingSession, SomeFragmentsAndACaller, AppConfigFragmentAdapter, Loaded
 ]
 
 
@@ -152,7 +152,7 @@ class NothingIsAnswered(Then[SomeFragmentsAndACaller, Loaded]):
 
 @dataclass(frozen=True)
 class MixedIdsAreAnsweredEach(
-    Scenario[SeedingSession, SomeFragmentsAndACaller, AppConfigFragmentAdapter, Loaded]
+    Scenario[TestSeedingSession, SomeFragmentsAndACaller, AppConfigFragmentAdapter, Loaded]
 ):
     @override
     def summary(self) -> str:
@@ -167,7 +167,7 @@ class MixedIdsAreAnsweredEach(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, SomeFragmentsAndACaller]:
+    def given(self) -> Given[TestSeedingSession, SomeFragmentsAndACaller]:
         return SomeFragmentsAndSomeone(granted=(Permission.READ,))
 
     @override
@@ -181,7 +181,7 @@ class MixedIdsAreAnsweredEach(
 
 @dataclass(frozen=True)
 class TheSuperadminSeesBoth(
-    Scenario[SeedingSession, SomeFragmentsAndACaller, AppConfigFragmentAdapter, Loaded]
+    Scenario[TestSeedingSession, SomeFragmentsAndACaller, AppConfigFragmentAdapter, Loaded]
 ):
     @override
     def summary(self) -> str:
@@ -195,7 +195,7 @@ class TheSuperadminSeesBoth(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, SomeFragmentsAndACaller]:
+    def given(self) -> Given[TestSeedingSession, SomeFragmentsAndACaller]:
         return SomeFragmentsAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
@@ -209,7 +209,7 @@ class TheSuperadminSeesBoth(
 
 @dataclass(frozen=True)
 class AnEmptyListAnswersEmpty(
-    Scenario[SeedingSession, SomeFragmentsAndACaller, AppConfigFragmentAdapter, Loaded]
+    Scenario[TestSeedingSession, SomeFragmentsAndACaller, AppConfigFragmentAdapter, Loaded]
 ):
     @override
     def summary(self) -> str:
@@ -220,7 +220,7 @@ class AnEmptyListAnswersEmpty(
         return "빈 id 목록을 주면 빈 응답이 반환된다. 하위 계층을 호출하지 않는다"
 
     @override
-    def given(self) -> Given[SeedingSession, SomeFragmentsAndACaller]:
+    def given(self) -> Given[TestSeedingSession, SomeFragmentsAndACaller]:
         return SomeFragmentsAndSomeone()
 
     @override

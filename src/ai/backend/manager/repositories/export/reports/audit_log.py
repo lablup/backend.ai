@@ -53,6 +53,7 @@ AUDIT_LOG_FIELDS: list[ExportFieldDef] = [
         description="ID of the affected entity",
         field_type=ExportFieldType.STRING,
         column=AuditLogRow.entity_id,
+        formatter=lambda v: str(v) if v else "",
     ),
     ExportFieldDef(
         key="lookup_kind",

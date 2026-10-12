@@ -33,7 +33,7 @@ from ai.backend.testutils.scenario_steps import (
 )
 from bai_scenario.components.domain import WrittenByThisRun
 from bai_scenario.components.system import KEPT, Kept, lay_a_caller, role_named
-from bai_scenario.seeds.retention_policy.retention_policy import SeedRetentionPolicy
+from bai_scenario.seeds.retention_policy.retention_policy import TestSeedRetentionPolicy
 
 KEPT_DAYS = 30
 """시드가 미리 만들어 두는 정책의 보존 일수."""
@@ -71,7 +71,7 @@ class APolicyAndSomeone(Given[Any, APolicyAndACaller]):
     @override
     async def lay(self, seeding: Any) -> APolicyAndACaller:
         policy = await seeding.creating(
-            SeedRetentionPolicy(
+            TestSeedRetentionPolicy(
                 category=self.category, retention_days=KEPT_DAYS, enabled=self.enabled
             )
         )
@@ -91,8 +91,8 @@ class TwoPoliciesAndSomeone(Given[Any, ManyPoliciesAndACaller]):
 
     @override
     async def lay(self, seeding: Any) -> ManyPoliciesAndACaller:
-        wanted = await seeding.creating(SeedRetentionPolicy(category=RetentionCategory.LOGS))
-        other = await seeding.creating(SeedRetentionPolicy(category=RetentionCategory.LOGIN))
+        wanted = await seeding.creating(TestSeedRetentionPolicy(category=RetentionCategory.LOGS))
+        other = await seeding.creating(TestSeedRetentionPolicy(category=RetentionCategory.LOGIN))
         caller = await lay_a_caller(seeding, self.role)
         return ManyPoliciesAndACaller(
             laid=(seeding.made(wanted), seeding.made(other)),
@@ -113,8 +113,10 @@ class AnActiveAndAnInactivePolicy(Given[Any, ManyPoliciesAndACaller]):
 
     @override
     async def lay(self, seeding: Any) -> ManyPoliciesAndACaller:
-        active = await seeding.creating(SeedRetentionPolicy(category=RetentionCategory.LOGS))
-        await seeding.creating(SeedRetentionPolicy(category=RetentionCategory.LOGIN, enabled=False))
+        active = await seeding.creating(TestSeedRetentionPolicy(category=RetentionCategory.LOGS))
+        await seeding.creating(
+            TestSeedRetentionPolicy(category=RetentionCategory.LOGIN, enabled=False)
+        )
         caller = await lay_a_caller(seeding, self.role)
         return ManyPoliciesAndACaller(
             laid=(seeding.made(active),),

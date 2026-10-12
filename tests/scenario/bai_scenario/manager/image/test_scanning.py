@@ -36,11 +36,11 @@ from bai_scenario.components.domain import SomeoneOf, WrittenByThisRun
 from bai_scenario.components.image import DEFAULT_LIMITS, DEFAULT_LIMITS_GQL, Filled
 from bai_scenario.fakes.container_registry import CONFIG_SIZE, ServedTag, serving
 from bai_scenario.runner.acting import ActingAs
-from bai_scenario.runner.planting import SeedingSession
+from bai_scenario.runner.planting import TestSeedingSession
 from bai_scenario.runner.steps import run_scenario
-from bai_scenario.seeds.domain.domain import SeedDomain
-from bai_scenario.seeds.image.image import SeedTaggedImage
-from bai_scenario.seeds.image.registry import SeedContainerRegistry
+from bai_scenario.seeds.domain.domain import TestSeedDomain
+from bai_scenario.seeds.image.image import TestSeedTaggedImage
+from bai_scenario.seeds.image.registry import TestSeedContainerRegistry
 
 PROJECT = "stable"
 SERVED = ServedTag(repository=f"{PROJECT}/python", tag="latest", architectures=("amd64", "arm64"))
@@ -76,13 +76,15 @@ class ARegistryServingATag(Given[Any, ARegistryAndACaller]):
 
     @override
     async def lay(self, seeding: Any) -> ARegistryAndACaller:
-        domain = await seeding.creating(SeedDomain(name_hint="home"))
-        registry = await seeding.creating(SeedContainerRegistry(name_hint="host", project=PROJECT))
+        domain = await seeding.creating(TestSeedDomain(name_hint="home"))
+        registry = await seeding.creating(
+            TestSeedContainerRegistry(name_hint="host", project=PROJECT)
+        )
         caller = await seeding.within(SomeoneOf(domain, role=self.role))
         registered = None
         if self.already_registered:
             image = await seeding.creating_from(
-                SeedTaggedImage(repository=SERVED.repository, tag=SERVED.tag), registry
+                TestSeedTaggedImage(repository=SERVED.repository, tag=SERVED.tag), registry
             )
             registered = seeding.made(image)
         return ARegistryAndACaller(seeding.made(registry), seeding.made(caller), registered)
@@ -219,7 +221,7 @@ class TheScannedImageNode(Then[ARegistryAndACaller, ImageNode]):
 
 @dataclass(frozen=True)
 class ScanningAnUnregisteredImage(
-    Scenario[SeedingSession, ARegistryAndACaller, ImageAdapter, ImageNode]
+    Scenario[TestSeedingSession, ARegistryAndACaller, ImageAdapter, ImageNode]
 ):
     @override
     def summary(self) -> str:
@@ -233,7 +235,7 @@ class ScanningAnUnregisteredImage(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, ARegistryAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ARegistryAndACaller]:
         return ARegistryServingATag()
 
     @override
@@ -247,7 +249,7 @@ class ScanningAnUnregisteredImage(
 
 @dataclass(frozen=True)
 class ScanningARegisteredImage(
-    Scenario[SeedingSession, ARegistryAndACaller, ImageAdapter, ImageNode]
+    Scenario[TestSeedingSession, ARegistryAndACaller, ImageAdapter, ImageNode]
 ):
     @override
     def summary(self) -> str:
@@ -261,7 +263,7 @@ class ScanningARegisteredImage(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, ARegistryAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ARegistryAndACaller]:
         return ARegistryServingATag(already_registered=True)
 
     @override
@@ -274,7 +276,9 @@ class ScanningARegisteredImage(
 
 
 @dataclass(frozen=True)
-class APlainUserMayNotScan(Scenario[SeedingSession, ARegistryAndACaller, ImageAdapter, ImageNode]):
+class APlainUserMayNotScan(
+    Scenario[TestSeedingSession, ARegistryAndACaller, ImageAdapter, ImageNode]
+):
     @override
     def summary(self) -> str:
         return "a-user-who-is-not-the-superadmin-may-not-scan"
@@ -284,7 +288,7 @@ class APlainUserMayNotScan(Scenario[SeedingSession, ARegistryAndACaller, ImageAd
         return "일반 사용자는 scan을 실행할 수 없어 슈퍼관리자 권한 부족으로 거부된다"
 
     @override
-    def given(self) -> Given[SeedingSession, ARegistryAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ARegistryAndACaller]:
         return ARegistryServingATag(role=UserRole.USER)
 
     @override
@@ -298,7 +302,7 @@ class APlainUserMayNotScan(Scenario[SeedingSession, ARegistryAndACaller, ImageAd
 
 @dataclass(frozen=True)
 class NoRegistryMatchesTheImage(
-    Scenario[SeedingSession, ARegistryAndACaller, ImageAdapter, ImageNode]
+    Scenario[TestSeedingSession, ARegistryAndACaller, ImageAdapter, ImageNode]
 ):
     @override
     def summary(self) -> str:
@@ -312,7 +316,7 @@ class NoRegistryMatchesTheImage(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, ARegistryAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ARegistryAndACaller]:
         return ARegistryServingATag()
 
     @override
@@ -326,7 +330,7 @@ class NoRegistryMatchesTheImage(
 
 @dataclass(frozen=True)
 class AMissingTagIsNotASuccess(
-    Scenario[SeedingSession, ARegistryAndACaller, ImageAdapter, ImageNode]
+    Scenario[TestSeedingSession, ARegistryAndACaller, ImageAdapter, ImageNode]
 ):
     @override
     def summary(self) -> str:
@@ -337,7 +341,7 @@ class AMissingTagIsNotASuccess(
         return "레지스트리에 없는 태그를 scan하면 이미지를 찾을 수 없어 거부된다"
 
     @override
-    def given(self) -> Given[SeedingSession, ARegistryAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ARegistryAndACaller]:
         return ARegistryServingATag()
 
     @override

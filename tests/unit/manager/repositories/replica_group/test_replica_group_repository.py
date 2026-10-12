@@ -330,6 +330,10 @@ class TestReplicaGroupRepository:
                     desired_target_replica_count=0,
                     lifecycle=ReplicaGroupLifecycle.ROLLING,
                     scaling_status=ReplicaGroupScalingStatus.SCALING,
+                    rollout=ReplicaGroupRolloutSpec(
+                        max_surge=IntOrPercent(count=1),
+                        max_unavailable=IntOrPercent(count=0),
+                    ),
                 )
             )
             db_sess.add(
@@ -341,6 +345,10 @@ class TestReplicaGroupRepository:
                     desired_target_replica_count=0,
                     lifecycle=ReplicaGroupLifecycle.STABLE,
                     scaling_status=ReplicaGroupScalingStatus.STABLE,
+                    rollout=ReplicaGroupRolloutSpec(
+                        max_surge=IntOrPercent(count=1),
+                        max_unavailable=IntOrPercent(count=0),
+                    ),
                 )
             )
             await db_sess.commit()
@@ -491,6 +499,10 @@ class TestReplicaGroupRepository:
                     desired_target_replica_count=0,
                     lifecycle=ReplicaGroupLifecycle.STABLE,
                     scaling_status=ReplicaGroupScalingStatus.STABLE,
+                    rollout=ReplicaGroupRolloutSpec(
+                        max_surge=IntOrPercent(count=1),
+                        max_unavailable=IntOrPercent(count=0),
+                    ),
                 )
             )
             for revision_id, route_status, route_traffic_status in route_specs:
@@ -592,6 +604,10 @@ class TestReplicaGroupRepository:
                     desired_target_replica_count=0,
                     lifecycle=ReplicaGroupLifecycle.STABLE,
                     scaling_status=ReplicaGroupScalingStatus.SCALING,
+                    rollout=ReplicaGroupRolloutSpec(
+                        max_surge=IntOrPercent(count=1),
+                        max_unavailable=IntOrPercent(count=0),
+                    ),
                 )
             )
             # Oldest routes are HEALTHY; newer routes are UNHEALTHY/DEGRADED.
@@ -695,6 +711,10 @@ class TestReplicaGroupRepository:
                     desired_target_replica_count=0,
                     lifecycle=ReplicaGroupLifecycle.STABLE,
                     scaling_status=ReplicaGroupScalingStatus.SCALING,
+                    rollout=ReplicaGroupRolloutSpec(
+                        max_surge=IntOrPercent(count=1),
+                        max_unavailable=IntOrPercent(count=0),
+                    ),
                 )
             )
             # All equally healthy -> created_at ascending decides: oldest drains first.
@@ -769,6 +789,10 @@ class TestReplicaGroupRepository:
                     desired_target_replica_count=0,
                     lifecycle=ReplicaGroupLifecycle.STABLE,
                     scaling_status=ReplicaGroupScalingStatus.SCALING,
+                    rollout=ReplicaGroupRolloutSpec(
+                        max_surge=IntOrPercent(count=1),
+                        max_unavailable=IntOrPercent(count=0),
+                    ),
                 )
             )
             # Not-yet-serving PROVISIONING routes must drain before serving RUNNING ones,

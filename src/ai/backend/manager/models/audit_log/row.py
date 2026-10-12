@@ -9,12 +9,14 @@ import sqlalchemy as sa
 from sqlalchemy.orm import Mapped, mapped_column
 
 from ai.backend.common.data.entity.audit_log import AuditLogID
+from ai.backend.common.data.entity.types import EntityType
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.actions.types import ActionKind, OperationStatus
 from ai.backend.manager.models.base import (
     GUID,
     Base,
+    EntityTypeColumn,
     IPAddressColumn,
     StrEnumType,
 )
@@ -41,17 +43,17 @@ class AuditLogRow(Base):
     )
 
     # NULL for a relation operation: it names two scopes and no entity kind.
-    entity_type: Mapped[str | None] = mapped_column(
-        "entity_type", sa.String, index=True, nullable=True
+    entity_type: Mapped[EntityType | None] = mapped_column(
+        "entity_type", EntityTypeColumn(), index=True, nullable=True
     )
     operation: Mapped[str] = mapped_column("operation", sa.String, index=True, nullable=False)
 
     # Declared by v2 actions; legacy rows carry the "entity_type:operation" spec type.
     action_name: Mapped[str] = mapped_column("action_name", sa.String, index=True, nullable=False)
 
-    entity_id: Mapped[str | None] = mapped_column(
+    entity_id: Mapped[uuid.UUID | None] = mapped_column(
         "entity_id",
-        sa.String,
+        GUID(),
         nullable=True,
         index=True,
     )

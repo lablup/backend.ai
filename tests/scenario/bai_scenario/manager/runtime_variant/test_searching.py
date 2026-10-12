@@ -24,14 +24,14 @@ from bai_scenario.components.runtime_variant import (
     TheFirstPageOfVariants,
 )
 from bai_scenario.runner.acting import ActingAs
-from bai_scenario.runner.planting import SeedingSession
+from bai_scenario.runner.planting import TestSeedingSession
 from bai_scenario.runner.steps import run_scenario
 
 DEFAULT_PAGE = 10
 
 type Searched = SearchRuntimeVariantsPayload
 type SearchingStep = Scenario[
-    SeedingSession, ManyVariantsAndACaller, RuntimeVariantAdapter, Searched
+    TestSeedingSession, ManyVariantsAndACaller, RuntimeVariantAdapter, Searched
 ]
 
 
@@ -77,7 +77,7 @@ class SearchingByName(When[ManyVariantsAndACaller, RuntimeVariantAdapter, Search
 
 @dataclass(frozen=True)
 class AUserGrantedNothingCountsEveryVariant(
-    Scenario[SeedingSession, ManyVariantsAndACaller, RuntimeVariantAdapter, Searched]
+    Scenario[TestSeedingSession, ManyVariantsAndACaller, RuntimeVariantAdapter, Searched]
 ):
     @override
     def summary(self) -> str:
@@ -88,7 +88,7 @@ class AUserGrantedNothingCountsEveryVariant(
         return "변형 둘이 있을 때 아무 권한도 없는 사용자가 필터 없이 조회하면 둘 다 집계된다"
 
     @override
-    def given(self) -> Given[SeedingSession, ManyVariantsAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ManyVariantsAndACaller]:
         return ManyVariantsAndSomeone(besides=1)
 
     @override
@@ -102,7 +102,7 @@ class AUserGrantedNothingCountsEveryVariant(
 
 @dataclass(frozen=True)
 class ANameFilterNarrows(
-    Scenario[SeedingSession, ManyVariantsAndACaller, RuntimeVariantAdapter, Searched]
+    Scenario[TestSeedingSession, ManyVariantsAndACaller, RuntimeVariantAdapter, Searched]
 ):
     @override
     def summary(self) -> str:
@@ -113,7 +113,7 @@ class ANameFilterNarrows(
         return "변형 여럿 중 하나의 이름을 필터로 조회하면, 응답에는 그 이름의 변형만 남는다"
 
     @override
-    def given(self) -> Given[SeedingSession, ManyVariantsAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ManyVariantsAndACaller]:
         return ManyVariantsAndSomeone(besides=2)
 
     @override
@@ -127,7 +127,7 @@ class ANameFilterNarrows(
 
 @dataclass(frozen=True)
 class OmittingThePageSizeGivesTen(
-    Scenario[SeedingSession, ManyVariantsAndACaller, RuntimeVariantAdapter, Searched]
+    Scenario[TestSeedingSession, ManyVariantsAndACaller, RuntimeVariantAdapter, Searched]
 ):
     @override
     def summary(self) -> str:
@@ -140,7 +140,7 @@ class OmittingThePageSizeGivesTen(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, ManyVariantsAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ManyVariantsAndACaller]:
         return ManyVariantsAndSomeone(besides=DEFAULT_PAGE)
 
     @override

@@ -30,14 +30,14 @@ from bai_scenario.components.prometheus_query_preset import (
     ThePresetNode,
 )
 from bai_scenario.runner.acting import ActingAs
-from bai_scenario.runner.planting import SeedingSession
+from bai_scenario.runner.planting import TestSeedingSession
 from bai_scenario.runner.steps import run_scenario
 
 type ReadingStep = Scenario[
-    SeedingSession, APresetAndACaller, PrometheusQueryPresetAdapter, PresetNodeAnswer
+    TestSeedingSession, APresetAndACaller, PrometheusQueryPresetAdapter, PresetNodeAnswer
 ]
 type NobodyStep = Scenario[
-    SeedingSession, APresetAlone, PrometheusQueryPresetAdapter, PresetNodeAnswer
+    TestSeedingSession, APresetAlone, PrometheusQueryPresetAdapter, PresetNodeAnswer
 ]
 
 
@@ -88,7 +88,7 @@ class ReadingAsNobody(When[APresetAlone, PrometheusQueryPresetAdapter, PresetNod
 
 @dataclass(frozen=True)
 class AUserGrantedNothingReadsIt(
-    Scenario[SeedingSession, APresetAndACaller, PrometheusQueryPresetAdapter, PresetNodeAnswer]
+    Scenario[TestSeedingSession, APresetAndACaller, PrometheusQueryPresetAdapter, PresetNodeAnswer]
 ):
     started: datetime
 
@@ -103,7 +103,7 @@ class AUserGrantedNothingReadsIt(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, APresetAndACaller]:
+    def given(self) -> Given[TestSeedingSession, APresetAndACaller]:
         return APresetAndSomeone()
 
     @override
@@ -117,7 +117,7 @@ class AUserGrantedNothingReadsIt(
 
 @dataclass(frozen=True)
 class AnUnknownIdIsNotFound(
-    Scenario[SeedingSession, APresetAndACaller, PrometheusQueryPresetAdapter, PresetNodeAnswer]
+    Scenario[TestSeedingSession, APresetAndACaller, PrometheusQueryPresetAdapter, PresetNodeAnswer]
 ):
     @override
     def summary(self) -> str:
@@ -131,7 +131,7 @@ class AnUnknownIdIsNotFound(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, APresetAndACaller]:
+    def given(self) -> Given[TestSeedingSession, APresetAndACaller]:
         return APresetAndSomeone()
 
     @override
@@ -145,7 +145,7 @@ class AnUnknownIdIsNotFound(
 
 @dataclass(frozen=True)
 class NobodyMayNotRead(
-    Scenario[SeedingSession, APresetAlone, PrometheusQueryPresetAdapter, PresetNodeAnswer]
+    Scenario[TestSeedingSession, APresetAlone, PrometheusQueryPresetAdapter, PresetNodeAnswer]
 ):
     @override
     def summary(self) -> str:
@@ -156,7 +156,7 @@ class NobodyMayNotRead(
         return "프리셋 하나가 있고 사용자 컨텍스트 없이 id로 조회하면, 호출자를 알 수 없어 거부된다"
 
     @override
-    def given(self) -> Given[SeedingSession, APresetAlone]:
+    def given(self) -> Given[TestSeedingSession, APresetAlone]:
         return APresetAndNobody()
 
     @override

@@ -293,7 +293,7 @@ class VFolderCloneInfo(NamedTuple):
     target_vfolder_name: str
     target_host: str
     usage_mode: VFolderUsageMode
-    permission: VFolderMountPolicy
+    permission: VFolderMountPolicy | None
     email: str
     user_id: uuid.UUID
     cloneable: bool

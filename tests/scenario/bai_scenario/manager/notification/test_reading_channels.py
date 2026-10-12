@@ -31,10 +31,10 @@ from bai_scenario.components.notification import (
     TwoChannelsAndSomeone,
 )
 from bai_scenario.runner.acting import ActingAs
-from bai_scenario.runner.planting import SeedingSession
+from bai_scenario.runner.planting import TestSeedingSession
 from bai_scenario.runner.steps import run_scenario
 
-type ReadingStep = Scenario[SeedingSession, Any, NotificationAdapter, Any]
+type ReadingStep = Scenario[TestSeedingSession, Any, NotificationAdapter, Any]
 
 
 @dataclass(frozen=True)
@@ -127,7 +127,7 @@ class ReadingNoIds(When[ManyChannelsAndACaller, NotificationAdapter, LoadedChann
 
 @dataclass(frozen=True)
 class TheSuperadminReadsAChannel(
-    Scenario[SeedingSession, AChannelAndACaller, NotificationAdapter, NotificationChannelNode]
+    Scenario[TestSeedingSession, AChannelAndACaller, NotificationAdapter, NotificationChannelNode]
 ):
     started: datetime
 
@@ -140,7 +140,7 @@ class TheSuperadminReadsAChannel(
         return "채널 하나가 있고 슈퍼관리자가 id로 조회하면, 그 채널 전체가 반환된다"
 
     @override
-    def given(self) -> Given[SeedingSession, AChannelAndACaller]:
+    def given(self) -> Given[TestSeedingSession, AChannelAndACaller]:
         return AChannelAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
@@ -154,7 +154,7 @@ class TheSuperadminReadsAChannel(
 
 @dataclass(frozen=True)
 class AUserGrantedNothingMayNotRead(
-    Scenario[SeedingSession, AChannelAndACaller, NotificationAdapter, NotificationChannelNode]
+    Scenario[TestSeedingSession, AChannelAndACaller, NotificationAdapter, NotificationChannelNode]
 ):
     @override
     def summary(self) -> str:
@@ -168,7 +168,7 @@ class AUserGrantedNothingMayNotRead(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, AChannelAndACaller]:
+    def given(self) -> Given[TestSeedingSession, AChannelAndACaller]:
         return AChannelAndSomeone()
 
     @override
@@ -182,7 +182,7 @@ class AUserGrantedNothingMayNotRead(
 
 @dataclass(frozen=True)
 class TheMonitorMayNotRead(
-    Scenario[SeedingSession, AChannelAndACaller, NotificationAdapter, NotificationChannelNode]
+    Scenario[TestSeedingSession, AChannelAndACaller, NotificationAdapter, NotificationChannelNode]
 ):
     @override
     def summary(self) -> str:
@@ -196,7 +196,7 @@ class TheMonitorMayNotRead(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, AChannelAndACaller]:
+    def given(self) -> Given[TestSeedingSession, AChannelAndACaller]:
         return AChannelAndSomeone(role=UserRole.MONITOR)
 
     @override
@@ -210,7 +210,7 @@ class TheMonitorMayNotRead(
 
 @dataclass(frozen=True)
 class TheSuperadminReadingAnUnknownIdIsNotFound(
-    Scenario[SeedingSession, AChannelAndACaller, NotificationAdapter, NotificationChannelNode]
+    Scenario[TestSeedingSession, AChannelAndACaller, NotificationAdapter, NotificationChannelNode]
 ):
     @override
     def summary(self) -> str:
@@ -221,7 +221,7 @@ class TheSuperadminReadingAnUnknownIdIsNotFound(
         return "슈퍼관리자가 존재하지 않는 id로 조회하면 대상을 찾을 수 없다는 이유로 거부된다"
 
     @override
-    def given(self) -> Given[SeedingSession, AChannelAndACaller]:
+    def given(self) -> Given[TestSeedingSession, AChannelAndACaller]:
         return AChannelAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
@@ -235,7 +235,7 @@ class TheSuperadminReadingAnUnknownIdIsNotFound(
 
 @dataclass(frozen=True)
 class AUserGrantedNothingReadingAnUnknownIdIsRefusedForPermission(
-    Scenario[SeedingSession, AChannelAndACaller, NotificationAdapter, NotificationChannelNode]
+    Scenario[TestSeedingSession, AChannelAndACaller, NotificationAdapter, NotificationChannelNode]
 ):
     @override
     def summary(self) -> str:
@@ -249,7 +249,7 @@ class AUserGrantedNothingReadingAnUnknownIdIsRefusedForPermission(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, AChannelAndACaller]:
+    def given(self) -> Given[TestSeedingSession, AChannelAndACaller]:
         return AChannelAndSomeone()
 
     @override
@@ -263,7 +263,7 @@ class AUserGrantedNothingReadingAnUnknownIdIsRefusedForPermission(
 
 @dataclass(frozen=True)
 class TheSuperadminLoadsLaidAndMissing(
-    Scenario[SeedingSession, ManyChannelsAndACaller, NotificationAdapter, LoadedChannels]
+    Scenario[TestSeedingSession, ManyChannelsAndACaller, NotificationAdapter, LoadedChannels]
 ):
     started: datetime
 
@@ -279,7 +279,7 @@ class TheSuperadminLoadsLaidAndMissing(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, ManyChannelsAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ManyChannelsAndACaller]:
         return TwoChannelsAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
@@ -293,7 +293,7 @@ class TheSuperadminLoadsLaidAndMissing(
 
 @dataclass(frozen=True)
 class AUserGrantedNothingIsRefusedPerItem(
-    Scenario[SeedingSession, ManyChannelsAndACaller, NotificationAdapter, LoadedChannels]
+    Scenario[TestSeedingSession, ManyChannelsAndACaller, NotificationAdapter, LoadedChannels]
 ):
     @override
     def summary(self) -> str:
@@ -307,7 +307,7 @@ class AUserGrantedNothingIsRefusedPerItem(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, ManyChannelsAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ManyChannelsAndACaller]:
         return TwoChannelsAndSomeone()
 
     @override
@@ -321,7 +321,7 @@ class AUserGrantedNothingIsRefusedPerItem(
 
 @dataclass(frozen=True)
 class ABatchLoadOfNothingAnswersNothing(
-    Scenario[SeedingSession, ManyChannelsAndACaller, NotificationAdapter, LoadedChannels]
+    Scenario[TestSeedingSession, ManyChannelsAndACaller, NotificationAdapter, LoadedChannels]
 ):
     @override
     def summary(self) -> str:
@@ -332,7 +332,7 @@ class ABatchLoadOfNothingAnswersNothing(
         return "빈 id 목록으로 조회하면 하위 계층을 부르지 않고 빈 응답이 반환된다"
 
     @override
-    def given(self) -> Given[SeedingSession, ManyChannelsAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ManyChannelsAndACaller]:
         return TwoChannelsAndSomeone()
 
     @override
