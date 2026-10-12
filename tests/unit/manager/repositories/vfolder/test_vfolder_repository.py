@@ -56,6 +56,9 @@ from ai.backend.manager.errors.storage import (
 )
 from ai.backend.manager.errors.user import KeyPairNotFound, UserNotFound
 from ai.backend.manager.models.agent.row import AgentRow
+from ai.backend.manager.models.association_container_registries_groups.row import (
+    AssociationContainerRegistriesGroupsRow,
+)
 from ai.backend.manager.models.container_registry.row import ContainerRegistryRow
 from ai.backend.manager.models.deployment_auto_scaling_policy.row import (
     DeploymentAutoScalingPolicyRow,
@@ -78,7 +81,12 @@ from ai.backend.manager.models.rbac_models.permission.permission import Permissi
 from ai.backend.manager.models.rbac_models.role.row import RoleRow
 from ai.backend.manager.models.rbac_models.user_role.row import UserRoleRow
 from ai.backend.manager.models.replica_group.row import ReplicaGroupRow
-from ai.backend.manager.models.resource_group.row import ResourceGroupRow
+from ai.backend.manager.models.resource_group.row import (
+    ResourceGroupForDomainRow,
+    ResourceGroupForKeypairsRow,
+    ResourceGroupForProjectRow,
+    ResourceGroupRow,
+)
 from ai.backend.manager.models.resource_group.types import ResourceGroupOpts
 from ai.backend.manager.models.resource_policy.row import (
     KeyPairResourcePolicyRow,
@@ -2529,6 +2537,7 @@ class TestVfolderRepositoryResourcePolicyReads:
             database_connection,
             [
                 DomainRow,
+                ResourceGroupRow,
                 UserResourcePolicyRow,
                 ProjectResourcePolicyRow,
                 KeyPairResourcePolicyRow,
@@ -2537,6 +2546,11 @@ class TestVfolderRepositoryResourcePolicyReads:
                 UserRow,
                 KeyPairRow,
                 ProjectRow,
+                ResourceGroupForDomainRow,
+                ResourceGroupForProjectRow,
+                ResourceGroupForKeypairsRow,
+                ContainerRegistryRow,
+                AssociationContainerRegistriesGroupsRow,
                 VirtualEntityRow,
                 EntityMembershipRow,
             ],
