@@ -636,6 +636,7 @@ class ModelCardAdapter(BaseAdapter):
             for sub in filter_.OR:
                 sub_conditions = self._convert_filter(sub)
                 if sub_conditions:
+<<<<<<< HEAD
                     or_conds.append(combine_conditions_and(sub_conditions))
             if or_conds:
                 conditions.append(combine_conditions_or(or_conds))
@@ -645,6 +646,16 @@ class ModelCardAdapter(BaseAdapter):
                 not_conds.extend(self._convert_filter(sub))
             if not_conds:
                 conditions.append(negate_conditions(not_conds))
+=======
+                    or_conditions.append(combine_conditions_and(sub_conditions))
+            if or_conditions:
+                conditions.append(combine_conditions_or(or_conditions))
+        if f.NOT:
+            for sub in f.NOT:
+                sub_conditions = self._convert_filter(sub)
+                if sub_conditions:
+                    conditions.append(negate_conditions(sub_conditions))
+>>>>>>> 743740559 (fix(BA-8375): negate each NOT filter item on its own (#15410))
         return conditions
 
     def _convert_orders(self, orders: list[ModelCardOrder]) -> list[QueryOrder]:

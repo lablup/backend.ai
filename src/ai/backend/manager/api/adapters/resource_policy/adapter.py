@@ -735,6 +735,25 @@ class ResourcePolicyAdapter(BaseAdapter):
             cond = self._convert_keypair_nested_filter(filter.keypair)
             if cond is not None:
                 conditions.append(cond)
+<<<<<<< HEAD
+=======
+        if filter.AND:
+            for sub_filter in filter.AND:
+                conditions.extend(self._convert_keypair_filter(sub_filter))
+        if filter.OR:
+            or_conditions: list[QueryCondition] = []
+            for sub_filter in filter.OR:
+                sub_conditions = self._convert_keypair_filter(sub_filter)
+                if sub_conditions:
+                    or_conditions.append(combine_conditions_and(sub_conditions))
+            if or_conditions:
+                conditions.append(combine_conditions_or(or_conditions))
+        if filter.NOT:
+            for sub_filter in filter.NOT:
+                sub_conditions = self._convert_keypair_filter(sub_filter)
+                if sub_conditions:
+                    conditions.append(negate_conditions(sub_conditions))
+>>>>>>> 743740559 (fix(BA-8375): negate each NOT filter item on its own (#15410))
         return conditions
 
     def _convert_keypair_nested_filter(
@@ -801,6 +820,7 @@ class ResourcePolicyAdapter(BaseAdapter):
         if filter.max_session_count_per_model_session is not None:
             cond = self.convert_int_filter(
                 filter.max_session_count_per_model_session,
+<<<<<<< HEAD
                 UserResourcePolicyConditions.by_max_session_count_per_model_session,
             )
             if cond is not None:
@@ -856,6 +876,57 @@ class ResourcePolicyAdapter(BaseAdapter):
             )
             if cond is not None:
                 conditions.append(cond)
+=======
+                fields.max_session_count_per_model_session.filter,
+            ),
+            *self.apply_int_filter(
+                filter.max_customized_image_count, fields.max_customized_image_count.filter
+            ),
+        ]
+        if filter.AND:
+            for sub_filter in filter.AND:
+                conditions.extend(self._convert_user_filter(sub_filter))
+        if filter.OR:
+            or_conditions: list[QueryCondition] = []
+            for sub_filter in filter.OR:
+                sub_conditions = self._convert_user_filter(sub_filter)
+                if sub_conditions:
+                    or_conditions.append(combine_conditions_and(sub_conditions))
+            if or_conditions:
+                conditions.append(combine_conditions_or(or_conditions))
+        if filter.NOT:
+            for sub_filter in filter.NOT:
+                sub_conditions = self._convert_user_filter(sub_filter)
+                if sub_conditions:
+                    conditions.append(negate_conditions(sub_conditions))
+        return conditions
+
+    def _convert_project_filter(self, filter: ProjectResourcePolicyFilter) -> list[QueryCondition]:
+        fields = ProjectResourcePolicySearchableFields.own
+        conditions = [
+            *self.apply_string_filter(filter.name, fields.name.filter),
+            *self.apply_datetime_filter(filter.created_at, fields.created_at.filter),
+            *self.apply_int_filter(filter.max_vfolder_count, fields.max_vfolder_count.filter),
+            *self.apply_int_filter(filter.max_quota_scope_size, fields.max_quota_scope_size.filter),
+            *self.apply_int_filter(filter.max_network_count, fields.max_network_count.filter),
+        ]
+        if filter.AND:
+            for sub_filter in filter.AND:
+                conditions.extend(self._convert_project_filter(sub_filter))
+        if filter.OR:
+            or_conditions: list[QueryCondition] = []
+            for sub_filter in filter.OR:
+                sub_conditions = self._convert_project_filter(sub_filter)
+                if sub_conditions:
+                    or_conditions.append(combine_conditions_and(sub_conditions))
+            if or_conditions:
+                conditions.append(combine_conditions_or(or_conditions))
+        if filter.NOT:
+            for sub_filter in filter.NOT:
+                sub_conditions = self._convert_project_filter(sub_filter)
+                if sub_conditions:
+                    conditions.append(negate_conditions(sub_conditions))
+>>>>>>> 743740559 (fix(BA-8375): negate each NOT filter item on its own (#15410))
         return conditions
 
     # ── Order resolvers ──

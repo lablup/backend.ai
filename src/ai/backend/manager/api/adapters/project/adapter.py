@@ -383,11 +383,10 @@ class ProjectAdapter(BaseAdapter):
                 conditions.append(combine_conditions_or(or_sub_conditions))
 
         if filter.NOT:
-            not_sub_conditions: list[QueryCondition] = []
             for sub_filter in filter.NOT:
-                not_sub_conditions.extend(self._convert_group_filter(sub_filter))
-            if not_sub_conditions:
-                conditions.append(negate_conditions(not_sub_conditions))
+                sub_conditions = self._convert_group_filter(sub_filter)
+                if sub_conditions:
+                    conditions.append(negate_conditions(sub_conditions))
 
         return conditions
 

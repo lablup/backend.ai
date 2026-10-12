@@ -146,6 +146,7 @@ class PrometheusQueryPresetCategoryAdapter(BaseAdapter):
     def _convert_filter(self, filter: CategoryFilter) -> list[QueryCondition]:
         conditions: list[QueryCondition] = []
 
+<<<<<<< HEAD
         if filter.name is not None:
             condition = self.convert_string_filter(
                 filter.name,
@@ -157,6 +158,24 @@ class PrometheusQueryPresetCategoryAdapter(BaseAdapter):
             )
             if condition is not None:
                 conditions.append(condition)
+=======
+        if filter.AND:
+            for sub_filter in filter.AND:
+                conditions.extend(self._convert_filter(sub_filter))
+        if filter.OR:
+            or_conditions: list[QueryCondition] = []
+            for sub_filter in filter.OR:
+                sub_conditions = self._convert_filter(sub_filter)
+                if sub_conditions:
+                    or_conditions.append(combine_conditions_and(sub_conditions))
+            if or_conditions:
+                conditions.append(combine_conditions_or(or_conditions))
+        if filter.NOT:
+            for sub_filter in filter.NOT:
+                sub_conditions = self._convert_filter(sub_filter)
+                if sub_conditions:
+                    conditions.append(negate_conditions(sub_conditions))
+>>>>>>> 743740559 (fix(BA-8375): negate each NOT filter item on its own (#15410))
 
         return conditions
 

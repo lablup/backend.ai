@@ -515,6 +515,14 @@ class DeploymentRevisionPresetAdapter(BaseAdapter):
                     or_conds.append(combine_conditions_and(sub_conditions))
             if or_conds:
                 conditions.append(combine_conditions_or(or_conds))
+<<<<<<< HEAD
+=======
+        if filter_.NOT:
+            for sub in filter_.NOT:
+                sub_conditions = self._convert_filter(sub)
+                if sub_conditions:
+                    conditions.append(negate_conditions(sub_conditions))
+>>>>>>> 743740559 (fix(BA-8375): negate each NOT filter item on its own (#15410))
         return conditions
 
     def _convert_orders(self, orders: list[DeploymentRevisionPresetOrder]) -> list[QueryOrder]:
