@@ -15,6 +15,7 @@ from typing import Any, override
 
 from ai.backend.common.data.entity.container_registry import ContainerRegistryID
 from ai.backend.common.data.entity.image import ImageEntityType
+from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.dto.manager.v2.image.response import ImageNode
@@ -26,6 +27,7 @@ from ai.backend.common.dto.manager.v2.image.types import (
 from ai.backend.manager.data.container_registry.types import ContainerRegistryData
 from ai.backend.manager.data.image.types import ImageAliasData, ImageData, ImageStatus, ImageType
 from ai.backend.manager.data.permission.types import Permission
+from ai.backend.manager.data.project.types import ProjectData
 from ai.backend.manager.data.user.types import UserData
 from ai.backend.manager.defs import INTRINSIC_SLOTS_MIN
 from ai.backend.testutils.scenario_steps import (
@@ -41,7 +43,7 @@ from ai.backend.testutils.scenario_steps import (
 )
 from bai_scenario.components.domain import SomeoneOf, WrittenByThisRun
 from bai_scenario.seeds.domain.domain import TestSeedDomain
-from bai_scenario.seeds.image.image import TestSeedAlias, TestSeedImage
+from bai_scenario.seeds.image.image import TestSeedAlias, TestSeedCommittedImage, TestSeedImage
 from bai_scenario.seeds.image.registry import TestSeedContainerRegistry
 from bai_scenario.seeds.rbac.role import TestSeedPermission, TestSeedRole
 from bai_scenario.seeds.seeder import Laid, TestSeeder, TestSeedNest
@@ -214,9 +216,10 @@ class AnUncustomizedImageAndSomeone(Given[Any, AnImageAndACaller]):
 
 @dataclass(frozen=True)
 class AnImageTheCallerMade(Given[Any, AnImageAndACaller]):
-    """호출자가 만든 커스텀 이미지 1개와, 그 이미지에 대한 권한.
+    """호출자가 커밋한 커스텀 이미지 1개와, 호출자 개인 프로젝트에서의 이미지 권한.
 
-    커스텀 이미지 작성자 검사를 통과하려면 두 조건이 모두 필요하다.
+    커밋한 이미지는 커밋한 사람의 개인 프로젝트에 속한다. 그래서 권한은 레지스트리가 아니라
+    그 개인 프로젝트에서 받는다.
     """
 
     status: ImageStatus = ImageStatus.ALIVE
@@ -224,7 +227,9 @@ class AnImageTheCallerMade(Given[Any, AnImageAndACaller]):
     @override
     def describe(self) -> str:
         marked = "" if self.status is ImageStatus.ALIVE else f", 상태는 {self.status.value}"
-        return f"호출자가 만든 커스텀 이미지 1개{marked}, 그 이미지에 권한 있음"
+        return (
+            f"호출자가 커밋한 커스텀 이미지 1개{marked}, 호출자 개인 프로젝트에서 이미지 권한 있음"
+        )
 
     @override
     async def lay(self, seeding: Any) -> AnImageAndACaller:
@@ -232,12 +237,41 @@ class AnImageTheCallerMade(Given[Any, AnImageAndACaller]):
         registry = await seeding.creating(TestSeedContainerRegistry(name_hint="host"))
         caller = await seeding.within(SomeoneOf(domain))
         made = seeding.made(caller)
-        image = await seeding.creating_from(
-            TestSeedImage(customized=True, creator_id=UserID(made.id), status=self.status),
+        own = await seeding.personal_project_of(caller)
+        image = await seeding.creating_from_two(
+            TestSeedCommittedImage(creator_id=UserID(made.id), status=self.status),
             registry,
+            own,
         )
-        await seeding.within(SomeoneReachingImages(registry, caller))
+        await seeding.within(SomeoneReachingImagesOfProject(own, caller))
         return AnImageAndACaller(seeding.made(image), made)
+
+
+@dataclass(frozen=True)
+class AnImageSomeoneElseMade(Given[Any, AnImageAndACaller]):
+    """다른 사용자가 커밋한 커스텀 이미지 1개와, 호출자 개인 프로젝트에서의 이미지 권한."""
+
+    @override
+    def describe(self) -> str:
+        return (
+            "다른 사용자가 커밋한 커스텀 이미지 1개, "
+            "호출자는 자기 개인 프로젝트에서만 이미지 권한 있음"
+        )
+
+    @override
+    async def lay(self, seeding: Any) -> AnImageAndACaller:
+        domain = await seeding.creating(TestSeedDomain(name_hint="home"))
+        registry = await seeding.creating(TestSeedContainerRegistry(name_hint="host"))
+        maker = await seeding.within(SomeoneOf(domain))
+        image = await seeding.creating_from_two(
+            TestSeedCommittedImage(creator_id=UserID(seeding.made(maker).id)),
+            registry,
+            await seeding.personal_project_of(maker),
+        )
+        caller = await seeding.within(SomeoneOf(domain))
+        own = await seeding.personal_project_of(caller)
+        await seeding.within(SomeoneReachingImagesOfProject(own, caller))
+        return AnImageAndACaller(seeding.made(image), seeding.made(caller))
 
 
 @dataclass(frozen=True)
@@ -505,6 +539,30 @@ class SomeoneReachingImages(TestSeedNest[Laid[None]]):
         role = seed.creating_from(
             TestSeedRole(lambda one: ContainerRegistryID(one.id), name_hint="image-keeper"),
             self.registry,
+        )
+        for allowed in REACHING:
+            seed.adding(TestSeedPermission(entity_type=ImageEntityType(), permission=allowed), role)
+        return seed.granting(
+            role, self.someone, role_id=lambda r: r.id, user_id=lambda u: UserID(u.id)
+        )
+
+
+@dataclass(frozen=True)
+class SomeoneReachingImagesOfProject(TestSeedNest[Laid[None]]):
+    """그 프로젝트에 속한 이미지를 조회·소프트 삭제·완전 삭제할 수 있는 사용자."""
+
+    project: Laid[ProjectData]
+    someone: Laid[UserData]
+
+    @override
+    def kind(self) -> str:
+        return "프로젝트의 이미지를 다룰 권한을 받은 사용자 준비"
+
+    @override
+    def lay(self, seed: TestSeeder) -> Laid[None]:
+        role = seed.creating_from(
+            TestSeedRole(lambda one: ProjectID(one.id), name_hint="image-keeper"),
+            self.project,
         )
         for allowed in REACHING:
             seed.adding(TestSeedPermission(entity_type=ImageEntityType(), permission=allowed), role)

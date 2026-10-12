@@ -1,9 +1,9 @@
 """What a customized image records about the user it was committed for.
 
-Covers what the scan writes — the creator column, and the registry membership a
-customized image shares with every other image — and the two readers that used to parse
-the owner label: the per-user image quota and the availability check a session start
-makes. Also covers scanning a single image in its registry.
+Covers what the scan writes — the creator column and the graph edge to that user's
+personal project — and the two readers that used to parse the owner label: the
+per-user image quota and the availability check a session start makes. Also covers
+scanning a single image in its registry.
 """
 
 from __future__ import annotations
@@ -306,6 +306,7 @@ class TestImageOwnershipGraph:
         tag: str,
         *,
         owner_user_id: UserID | None = None,
+        created_in_project_id: ProjectID | None = None,
         customized: bool | None = None,
         status: ImageStatus = ImageStatus.ALIVE,
     ) -> tuple[ImageID, str]:
@@ -327,6 +328,7 @@ class TestImageOwnershipGraph:
                     status=status,
                     customized=customized if customized is not None else owner_user_id is not None,
                     creator_id=owner_user_id,
+                    created_in_project_id=created_in_project_id,
                 )
             ])
         image_id = created[0].id
@@ -554,15 +556,14 @@ class TestImageOwnershipGraph:
 
     # -- what the scan writes ----------------------------------------------------------
 
-    async def test_a_scanned_customized_image_joins_its_registry_and_no_project(
+    async def test_a_scanned_customized_image_joins_its_personal_project(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         domain_id: DomainID,
         registry_id: ContainerRegistryID,
     ) -> None:
-        """The personal project the owner label names is not a scope the image joins."""
         user_id = await self._create_user(db_with_cleanup, domain_id, "owner@test.io")
-        await self._create_personal_project(db_with_cleanup, user_id, "owner")
+        project_id = await self._create_personal_project(db_with_cleanup, user_id, "owner")
         canonical = f"{REGISTRY_NAME}/{REGISTRY_PROJECT}/python:a"
 
         scanned = await self._commit_rescan(
@@ -573,6 +574,24 @@ class TestImageOwnershipGraph:
 
         assert [(image.customized, image.creator_id) for image in scanned] == [(True, user_id)]
         assert await self._owning_registries(db_with_cleanup, scanned[0].id) == [registry_id]
+        assert await self._owning_projects(db_with_cleanup, scanned[0].id) == [project_id]
+
+    async def test_a_scanned_image_stays_unowned_without_a_personal_project(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        domain_id: DomainID,
+        registry_id: ContainerRegistryID,
+    ) -> None:
+        user_id = await self._create_user(db_with_cleanup, domain_id, "owner@test.io")
+        canonical = f"{REGISTRY_NAME}/{REGISTRY_PROJECT}/python:a"
+
+        scanned = await self._commit_rescan(
+            db_with_cleanup,
+            registry_id,
+            {ImageIdentifier(canonical, "x86_64"): self._scan_payload(user_id)},
+        )
+
+        assert [(image.customized, image.creator_id) for image in scanned] == [(True, user_id)]
         assert await self._owning_projects(db_with_cleanup, scanned[0].id) == []
 
     async def test_rescanning_an_image_on_file_leaves_the_graph_alone(
