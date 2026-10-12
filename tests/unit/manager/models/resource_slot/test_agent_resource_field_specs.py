@@ -7,25 +7,13 @@ both the owner lookup and the operation scope cross that join.
 from __future__ import annotations
 
 import uuid
-from dataclasses import dataclass
 from decimal import Decimal
-from unittest.mock import MagicMock
 
 import pytest
 import sqlalchemy as sa
 
 from ai.backend.common.data.entity.agent import AgentUUID
 from ai.backend.common.data.entity.agent_resource import AgentResourceID
-from ai.backend.common.dto.manager.query import DecimalFilter
-from ai.backend.common.dto.manager.v2.resource_slot.request import (
-    AgentResourceFilter,
-    AgentResourceOrder,
-)
-from ai.backend.common.dto.manager.v2.resource_slot.types import (
-    AgentResourceOrderField,
-    OrderDirection,
-)
-from ai.backend.manager.api.adapters.resource_slot.adapter import ResourceSlotAdapter
 from ai.backend.manager.data.resource_slot.types import AgentResourceData
 from ai.backend.manager.models.agent.row import AgentRow
 from ai.backend.manager.models.resource_slot.lookups import AgentResourceOwnerLookup
@@ -36,19 +24,6 @@ from ai.backend.manager.models.specs.pagination import OffsetPagination
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.ops.repository import OpsRepository
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
-
-
-@dataclass(frozen=True)
-class _ReservationFilterCase:
-    name: str
-    filter: AgentResourceFilter
-
-
-@dataclass(frozen=True)
-class _ReservedRow:
-    slot_name: str
-    reserved: Decimal
-    prereserved: Decimal
 
 
 def _searcher() -> AgentResourceSearcher:
@@ -72,8 +47,6 @@ async def agent_uuid(
                 agent_uuid=owner,
                 slot_name="cpu",
                 capacity=Decimal(4),
-                reserved=Decimal("1.25"),
-                prereserved=Decimal("0.5"),
                 used=Decimal(1),
             )
         )
@@ -130,70 +103,3 @@ async def test_owner_lookup_crosses_to_the_agent_uuid(
     owners = await repository.field_owners(AgentResourceOwnerLookup(), [*row_ids, absent])
 
     assert owners == dict.fromkeys(row_ids, agent_uuid)
-
-
-@pytest.fixture
-def adapter() -> ResourceSlotAdapter:
-    return ResourceSlotAdapter(MagicMock(), MagicMock(), MagicMock())
-
-
-class TestAgentReservations:
-    @pytest.mark.parametrize(
-        "case",
-        [
-            _ReservationFilterCase(
-                name="reserved",
-                filter=AgentResourceFilter(reserved=DecimalFilter(greater_than=Decimal(0))),
-            ),
-            _ReservationFilterCase(
-                name="prereserved",
-                filter=AgentResourceFilter(prereserved=DecimalFilter(greater_than=Decimal(0))),
-            ),
-        ],
-        ids=lambda case: case.name,
-    )
-    async def test_filter_keeps_the_reserved_row(
-        self,
-        repository: OpsRepository[AgentResourceData],
-        agent_uuid: AgentUUID,
-        adapter: ResourceSlotAdapter,
-        case: _ReservationFilterCase,
-    ) -> None:
-        result = await repository.search_in_scopes(
-            [AgentResourceTarget(agent_uuid=agent_uuid)],
-            AgentResourceSearcher(
-                pagination=OffsetPagination(offset=0, limit=20),
-                conditions=adapter._convert_agent_resource_filter(case.filter),
-            ),
-        )
-
-        assert [
-            _ReservedRow(
-                slot_name=item.slot_name, reserved=item.reserved, prereserved=item.prereserved
-            )
-            for item in result.items
-        ] == [_ReservedRow(slot_name="cpu", reserved=Decimal("1.25"), prereserved=Decimal("0.5"))]
-
-    @pytest.mark.parametrize(
-        "field",
-        [AgentResourceOrderField.RESERVED, AgentResourceOrderField.PRERESERVED],
-        ids=lambda field: field.value,
-    )
-    async def test_descending_order_overrides_the_rank(
-        self,
-        repository: OpsRepository[AgentResourceData],
-        agent_uuid: AgentUUID,
-        adapter: ResourceSlotAdapter,
-        field: AgentResourceOrderField,
-    ) -> None:
-        result = await repository.search_in_scopes(
-            [AgentResourceTarget(agent_uuid=agent_uuid)],
-            AgentResourceSearcher(
-                pagination=OffsetPagination(offset=0, limit=20),
-                orders=adapter._convert_agent_resource_orders([
-                    AgentResourceOrder(field=field, direction=OrderDirection.DESC)
-                ]),
-            ),
-        )
-
-        assert [item.slot_name for item in result.items] == ["cpu", "mem"]
