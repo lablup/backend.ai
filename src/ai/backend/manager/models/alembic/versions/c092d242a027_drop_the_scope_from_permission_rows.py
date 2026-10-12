@@ -29,6 +29,7 @@ from __future__ import annotations
 
 import uuid
 from collections.abc import Mapping, Sequence
+from typing import Any
 
 import sqlalchemy as sa
 from alembic import op
@@ -269,7 +270,7 @@ def move_rows_into_roles_of_their_scope(conn: sa.engine.Connection) -> None:
         )
 
 
-def _create_roles(conn: sa.engine.Connection, pairs: Sequence[sa.Row]) -> Sequence[uuid.UUID]:
+def _create_roles(conn: sa.engine.Connection, pairs: Sequence[sa.Row[Any]]) -> Sequence[uuid.UUID]:
     """One custom role per pair, in the scope the pair names, with the name, description
     and status of the pair's role and ``auto_assign`` off. Returns the ids in pair order."""
     roles = _roles_table()
