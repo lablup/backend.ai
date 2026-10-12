@@ -15,7 +15,7 @@ import sqlalchemy as sa
 from alembic import op
 from sqlalchemy.orm import registry, relationship, selectinload, sessionmaker
 
-from ai.backend.common.auth.utils import generate_ssh_keypair
+from ai.backend.common.auth.ssh import generate_ssh_keypair
 from ai.backend.manager.defs import DEFAULT_KEYPAIR_RATE_LIMIT, DEFAULT_KEYPAIR_RESOURCE_POLICY_NAME
 from ai.backend.manager.models.base import GUID, EnumValueType, convention
 
