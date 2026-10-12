@@ -44,6 +44,7 @@ _CASES: Final[list[IdempotenceCase]] = [
     IdempotenceCase(SeedKind.CONTAINER_REGISTRY, "container_registry_seed_dir"),
     IdempotenceCase(SeedKind.STORAGE_BACKEND_TYPE, "storage_backend_type_seed_dir"),
     IdempotenceCase(SeedKind.OBJECT_STORAGE, "object_storage_seed_dir"),
+    IdempotenceCase(SeedKind.VFS_STORAGE, "vfs_storage_seed_dir"),
 ]
 
 

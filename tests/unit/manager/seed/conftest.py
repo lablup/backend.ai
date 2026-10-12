@@ -30,6 +30,7 @@ from ai.backend.manager.models.resource_slot.row import ResourceSlotTypeRow
 from ai.backend.manager.models.retention.row import RetentionPolicyRow
 from ai.backend.manager.models.storage_backend.row import StorageBackendTypeRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.models.vfs_storage.row import VFSStorageRow
 from ai.backend.manager.models.virtual_entity.entity_membership import EntityMembershipRow
 from ai.backend.manager.models.virtual_entity.entity_membership_cap import (
     EntityMembershipCapRow,
@@ -207,6 +208,20 @@ _OBJECT_STORAGES: list[dict[str, Any]] = [
         "endpoint": "http://127.0.0.1:9001",
     },
 ]
+_VFS_STORAGES: list[dict[str, str]] = [
+    {
+        "id": "0198a5a0-0000-7000-8000-00000000b001",
+        "name": "local",
+        "host": "local",
+        "base_path": "/var/lib/backend.ai/vfs",
+    },
+    {
+        "id": "0198a5a0-0000-7000-8000-00000000b002",
+        "name": "shared",
+        "host": "nfs",
+        "base_path": "/mnt/vfs",
+    },
+]
 
 # The tables a seed kind writes, and the graph tables the creation path writes beside them.
 _SEED_TABLES: list[Table | type[HasTable]] = [
@@ -224,6 +239,7 @@ _SEED_TABLES: list[Table | type[HasTable]] = [
     RolePresetRow,
     RolePermissionPresetRow,
     RoleRow,
+    VFSStorageRow,
     PermissionRow,
     VirtualEntityRow,
     ScopeBindingRow,
@@ -413,6 +429,17 @@ def object_storage_seed_dir(tmp_path: Path) -> Path:
     directory.mkdir()
     (directory / "storages.yaml").write_text(
         yaml.safe_dump({"kind": "object_storage", "version": 1, "items": _OBJECT_STORAGES})
+    )
+    return directory
+
+
+@pytest.fixture
+def vfs_storage_seed_dir(tmp_path: Path) -> Path:
+    """A directory with one `vfs_storage` seed file."""
+    directory = tmp_path / "vfs_storage"
+    directory.mkdir()
+    (directory / "storages.yaml").write_text(
+        yaml.safe_dump({"kind": "vfs_storage", "version": 1, "items": _VFS_STORAGES})
     )
     return directory
 
