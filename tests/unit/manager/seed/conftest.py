@@ -8,6 +8,7 @@ import pytest
 import yaml
 from sqlalchemy import Table
 
+from ai.backend.manager.models.app_config_allow_list.row import AppConfigAllowListRow
 from ai.backend.manager.models.app_config_definition.row import AppConfigDefinitionRow
 from ai.backend.manager.models.base import ensure_all_tables_registered
 from ai.backend.manager.models.client_ip_masking.row import ClientIPMaskingPolicyRow
@@ -73,6 +74,11 @@ _ROLES: dict[str, dict[str, Any]] = {
     },
 }
 _APP_CONFIG_DEFINITIONS: list[str] = ["webui", "session_launcher"]
+_APP_CONFIG_ALLOW_LISTS: list[dict[str, Any]] = [
+    {"config_name": "webui", "scope_type": "public"},
+    {"config_name": "webui", "scope_type": "user", "rank": 350},
+    {"config_name": "session_launcher", "scope_type": "domain"},
+]
 _RESOURCE_SLOT_TYPES: list[dict[str, Any]] = [
     {
         "uuid": "eff6619c-a85c-40f4-ae59-608b0f683b4f",
@@ -226,6 +232,7 @@ _VFS_STORAGES: list[dict[str, str]] = [
 # The tables a seed kind writes, and the graph tables the creation path writes beside them.
 _SEED_TABLES: list[Table | type[HasTable]] = [
     AppConfigDefinitionRow,
+    AppConfigAllowListRow,
     ResourceSlotTypeRow,
     LoginClientTypeRow,
     RetentionPolicyRow,
@@ -300,6 +307,20 @@ def app_config_definition_seed_dir(tmp_path: Path) -> Path:
         yaml.safe_dump({"kind": "app_config_definition", "version": 1, "items": items})
     )
     return directory
+
+
+@pytest.fixture
+def app_config_allow_list_seed_dir(app_config_definition_seed_dir: Path) -> Path:
+    """The `app_config_definition` directory plus one `app_config_allow_list` seed file,
+    so the entries' config names are registered first."""
+    (app_config_definition_seed_dir / "allow-list.yaml").write_text(
+        yaml.safe_dump({
+            "kind": "app_config_allow_list",
+            "version": 1,
+            "items": _APP_CONFIG_ALLOW_LISTS,
+        })
+    )
+    return app_config_definition_seed_dir
 
 
 @pytest.fixture
