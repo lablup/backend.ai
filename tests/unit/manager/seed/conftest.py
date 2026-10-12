@@ -19,6 +19,7 @@ from ai.backend.manager.models.rbac_models.role_permission_preset.row import (
 )
 from ai.backend.manager.models.rbac_models.role_preset.row import RolePresetRow
 from ai.backend.manager.models.resource_slot.row import ResourceSlotTypeRow
+from ai.backend.manager.models.retention.row import RetentionPolicyRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.virtual_entity.entity_membership import EntityMembershipRow
 from ai.backend.manager.models.virtual_entity.entity_membership_cap import (
@@ -86,12 +87,27 @@ _LOGIN_CLIENT_TYPES: list[dict[str, Any]] = [
     {"id": "0198a5a0-0000-7000-8000-00000000c001", "name": "webui", "description": "Web UI"},
     {"id": "0198a5a0-0000-7000-8000-00000000c002", "name": "cli"},
 ]
+_RETENTION_POLICIES: list[dict[str, Any]] = [
+    {
+        "id": "0198a5a0-0000-7000-8000-00000000d001",
+        "category": "logs",
+        "retention_period_days": 365,
+        "enabled": False,
+    },
+    {
+        "id": "0198a5a0-0000-7000-8000-00000000d002",
+        "category": "usage_records",
+        "retention_period_days": 90,
+        "enabled": True,
+    },
+]
 
 # The tables a seed kind writes, and the graph tables the creation path writes beside them.
 _SEED_TABLES: list[Table | type[HasTable]] = [
     AppConfigDefinitionRow,
     ResourceSlotTypeRow,
     LoginClientTypeRow,
+    RetentionPolicyRow,
     RolePresetRow,
     RolePermissionPresetRow,
     RoleRow,
@@ -175,6 +191,17 @@ def login_client_type_seed_dir(tmp_path: Path) -> Path:
     directory.mkdir()
     (directory / "types.yaml").write_text(
         yaml.safe_dump({"kind": "login_client_type", "version": 1, "items": _LOGIN_CLIENT_TYPES})
+    )
+    return directory
+
+
+@pytest.fixture
+def retention_policy_seed_dir(tmp_path: Path) -> Path:
+    """A directory with one `retention_policy` seed file."""
+    directory = tmp_path / "retention_policy"
+    directory.mkdir()
+    (directory / "policies.yaml").write_text(
+        yaml.safe_dump({"kind": "retention_policy", "version": 1, "items": _RETENTION_POLICIES})
     )
     return directory
 
