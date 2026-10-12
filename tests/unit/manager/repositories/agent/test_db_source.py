@@ -9,6 +9,9 @@ from ai.backend.common.container_registry import ContainerRegistryType
 from ai.backend.common.data.entity.container_registry import ContainerRegistryID
 from ai.backend.common.types import ImageCanonical, ImageID
 from ai.backend.manager.data.image.types import ImageIdentifier, ImageType
+from ai.backend.manager.models.association_container_registries_groups.row import (
+    AssociationContainerRegistriesGroupsRow,
+)
 from ai.backend.manager.models.container_registry.row import ContainerRegistryRow
 from ai.backend.manager.models.domain.row import DomainRow
 from ai.backend.manager.models.image.row import ImageAliasRow, ImageRow
@@ -46,6 +49,7 @@ class TestImageIdLookups:
                 KeyPairRow,
                 ProjectRow,
                 ContainerRegistryRow,
+                AssociationContainerRegistriesGroupsRow,
                 ImageRow,
                 ImageAliasRow,
             ],
