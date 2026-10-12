@@ -427,6 +427,32 @@ async def verify_custom_role_kept(conn: asyncpg.Connection) -> list[str]:
     return [] if count else ["custom-ops lost all its permissions"]
 
 
+# --- a purged user left on a project roster (3ebcf2c3c959, f4a1c9d20b73) --------------
+
+
+async def seed_purged_user_on_roster(s: Seeder) -> None:
+    """A project roster naming a user the users table no longer holds. The 26.4.9 purge
+    takes the association row with the user, so such a row is left by a purge on an
+    earlier release or by hand."""
+    _require_tables(s, "association_scopes_entities")
+    ids = await _default_ids(s)
+    await s.insert(
+        "association_scopes_entities",
+        scope_type="project",
+        scope_id=str(ids["project"]),
+        entity_type="user",
+        entity_id=str(GHOST_USER),
+    )
+
+
+async def verify_purged_user_off_graph(conn: asyncpg.Connection) -> list[str]:
+    nodes = await conn.fetchval(
+        "SELECT count(*) FROM virtual_entities WHERE entity_type = 'user' AND entity_id = $1",
+        GHOST_USER,
+    )
+    return [] if not nodes else [f"{nodes} graph node(s) stand for a purged user"]
+
+
 # --- other risks found in the survey --------------------------------------------------
 
 
@@ -690,6 +716,15 @@ SCENARIOS: dict[str, Scenario] = {
             checks_after={"c7d419b0a58e": mismatch_present},
             expect_error="name a scope other than their role's",
             requires=("c092d242a027",),
+        ),
+        Scenario(
+            "purged_user_on_project_roster",
+            "a project roster naming a user the users table no longer holds",
+            seed_purged_user_on_roster,
+            verify_purged_user_off_graph,
+            steps=("c58b0d3a9e14", "head"),
+            checks_after={"c58b0d3a9e14": verify_purged_user_off_graph},
+            requires=("3ebcf2c3c959", "f4a1c9d20b73"),
         ),
         Scenario(
             "share_of_deleted_owner",
