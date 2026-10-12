@@ -8,6 +8,7 @@ from ai.backend.manager.seed.container_registry.seed import ContainerRegistrySee
 from ai.backend.manager.seed.idle_checker.seed import IdleCheckerSeed
 from ai.backend.manager.seed.login_client_type.seed import LoginClientTypeSeed
 from ai.backend.manager.seed.notification_channel.seed import NotificationChannelSeed
+from ai.backend.manager.seed.object_storage.seed import ObjectStorageSeed
 from ai.backend.manager.seed.prometheus_query_preset_category.seed import (
     PrometheusQueryPresetCategorySeed,
 )
@@ -33,4 +34,5 @@ def create_seed_kind_registry() -> SeedKindRegistry:
         SeedKind.ROLE_PRESET: (1, RolePresetSeed),
         SeedKind.IDLE_CHECKER: (1, IdleCheckerSeed),
         SeedKind.CONTAINER_REGISTRY: (1, ContainerRegistrySeed),
+        SeedKind.OBJECT_STORAGE: (1, ObjectStorageSeed),
     })
