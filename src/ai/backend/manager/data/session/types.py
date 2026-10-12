@@ -400,7 +400,7 @@ class SessionRoutingInfo:
 class SessionWithKernelsData:
     """A session with its kernels, read by a separate kernel query.
 
-    ``main_kernel`` is the one in the default cluster role; ``session.service_ports`` are its ports.
+    ``main_kernel`` is the one in the default cluster role and carries the service ports.
     """
 
     session: SessionData

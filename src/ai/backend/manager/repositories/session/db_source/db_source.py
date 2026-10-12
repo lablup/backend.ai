@@ -208,7 +208,7 @@ class SessionDBSource:
         if not main_kernels:
             raise MainKernelNotFound(f"Session (id: {session_row.id}) has no main kernel.")
         return SessionWithKernelsData(
-            session=session_row.to_dataclass(main_kernels[0]),
+            session=session_row.to_dataclass(),
             main_kernel=main_kernels[0].to_kernel_info(),
             kernels=[kern.to_kernel_info() for kern in kernel_rows],
         )

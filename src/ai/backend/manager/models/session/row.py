@@ -663,7 +663,7 @@ class SessionRow(CreatedAtMixin, Base):
         instance.id = SessionId(session_data.id)
         return instance
 
-    def to_dataclass(self, main_kernel: KernelRow) -> SessionData:
+    def to_dataclass(self) -> SessionData:
         return SessionData(
             id=self.id,
             creation_id=self.creation_id,
@@ -709,7 +709,8 @@ class SessionRow(CreatedAtMixin, Base):
             last_stat=self.last_stat,
             network_type=self.network_type,
             network_id=self.network_id,
-            service_ports=str(main_kernel.service_ports) if main_kernel.service_ports else None,
+            # service_ports is a kernel column; nothing reads it off a session.
+            service_ports=None,
             owner=None,
             replica_id=self.replica_id,
         )

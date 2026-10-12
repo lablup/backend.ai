@@ -361,7 +361,7 @@ class SessionService:
         )
 
         return CommitSessionActionResult(
-            session_data=session.to_dataclass(session.main_kernel),
+            session_data=session.to_dataclass(),
             commit_result=resp,
         )
 
@@ -378,7 +378,7 @@ class SessionService:
         except AssertionError as e:
             raise InvalidAPIParameters from e
         return CompleteActionResult(
-            session_data=session.to_dataclass(session.main_kernel),
+            session_data=session.to_dataclass(),
             result=resp,
         )
 
@@ -887,9 +887,7 @@ class SessionService:
             await self._error_monitor.capture_exception(context={"user": user_id})
             raise InternalServerError from e
 
-        return DownloadFileActionResult(
-            bytes=result, session_data=session.to_dataclass(session.main_kernel)
-        )
+        return DownloadFileActionResult(bytes=result, session_data=session.to_dataclass())
 
     async def download_files(self, action: DownloadFilesAction) -> DownloadFilesActionResult:
         user_id = action.user_id
@@ -925,7 +923,7 @@ class SessionService:
                 mpwriter.append(tarbytes, headers)
 
             return DownloadFilesActionResult(
-                session_data=session.to_dataclass(session.main_kernel),
+                session_data=session.to_dataclass(),
                 result=mpwriter,
             )
 
@@ -1002,9 +1000,7 @@ class SessionService:
         except BackendAIError:
             raise
 
-        return ExecuteSessionActionResult(
-            result=resp, session_data=session.to_dataclass(session.main_kernel)
-        )
+        return ExecuteSessionActionResult(result=resp, session_data=session.to_dataclass())
 
     async def get_abusing_report(
         self, action: GetAbusingReportAction
@@ -1057,7 +1053,7 @@ class SessionService:
                 resp["result"]["logs"] = kernel_log.decode("utf-8")
                 return GetContainerLogsActionResult(
                     result=resp,
-                    session_data=compute_session.to_dataclass(compute_session.main_kernel),
+                    session_data=compute_session.to_dataclass(),
                 )
 
         registry = self._agent_registry
@@ -1067,7 +1063,7 @@ class SessionService:
         log.debug("returning log from agent")
 
         return GetContainerLogsActionResult(
-            result=resp, session_data=compute_session.to_dataclass(compute_session.main_kernel)
+            result=resp, session_data=compute_session.to_dataclass()
         )
 
     async def get_dependency_graph(
@@ -1201,9 +1197,7 @@ class SessionService:
         )
         await self._agent_registry.interrupt_session(session)
 
-        return InterruptSessionActionResult(
-            result=None, session_data=session.to_dataclass(session.main_kernel)
-        )
+        return InterruptSessionActionResult(result=None, session_data=session.to_dataclass())
 
     async def list_files(self, action: ListFilesAction) -> ListFilesActionResult:
         user_id = action.user_id
@@ -1227,9 +1221,7 @@ class SessionService:
             await self._error_monitor.capture_exception(context={"user": user_id})
             raise InternalServerError from e
 
-        return ListFilesActionResult(
-            result=result, session_data=session.to_dataclass(session.main_kernel)
-        )
+        return ListFilesActionResult(result=result, session_data=session.to_dataclass())
 
     async def match_sessions(self, action: MatchSessionsAction) -> MatchSessionsActionResult:
         id_or_name_prefix = action.id_or_name_prefix
@@ -1273,9 +1265,7 @@ class SessionService:
             kernel_loading_strategy=KernelLoadingStrategy.MAIN_KERNEL_ONLY,
         )
         await self._agent_registry.shutdown_service(session, service_name)
-        return ShutdownServiceActionResult(
-            result=None, session_data=session.to_dataclass(session.main_kernel)
-        )
+        return ShutdownServiceActionResult(result=None, session_data=session.to_dataclass())
 
     async def start_service(self, action: StartServiceAction) -> StartServiceActionResult:
         session_id = action.session_id
@@ -1421,9 +1411,7 @@ class SessionService:
                 log.debug("file received", file_name=file_name, received_bytes=recv_size)
                 ts.create_task(self._agent_registry.upload_file(session, file_name, data))
 
-        return UploadFilesActionResult(
-            result=None, session_data=session.to_dataclass(session.main_kernel)
-        )
+        return UploadFilesActionResult(result=None, session_data=session.to_dataclass())
 
     async def get_session(self, action: GetSessionAction) -> GetSessionActionResult:
         """Get a single session by ID with RBAC validation."""
