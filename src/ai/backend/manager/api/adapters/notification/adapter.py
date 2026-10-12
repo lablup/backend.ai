@@ -68,10 +68,22 @@ from ai.backend.manager.api.adapters.base import BaseAdapter
 from ai.backend.manager.data.notification import NotificationChannelData, NotificationRuleData
 from ai.backend.manager.data.permission.types import RBACElementRef
 from ai.backend.manager.errors.notification import InvalidNotificationSpec
+<<<<<<< HEAD
 from ai.backend.manager.models.notification import NotificationChannelRow, NotificationRuleRow
 from ai.backend.manager.models.notification.conditions import (
     NotificationChannelConditions,
     NotificationRuleConditions,
+=======
+from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
+from ai.backend.manager.models.condition_utils import (
+    combine_conditions_and,
+    combine_conditions_or,
+    negate_conditions,
+)
+from ai.backend.manager.models.notification.creators import (
+    NotificationChannelCreator,
+    NotificationRuleCreator,
+>>>>>>> 5bf2aa3e2 (fix(BA-8371): combine the fields of each OR filter item with AND (#15397))
 )
 from ai.backend.manager.models.notification.orders import (
     NotificationChannelOrders,
@@ -574,7 +586,9 @@ class NotificationAdapter(BaseAdapter):
         if f.OR:
             or_conditions: list[QueryCondition] = []
             for sub in f.OR:
-                or_conditions.extend(NotificationAdapter._convert_channel_filter(sub))
+                sub_conditions = NotificationAdapter._convert_channel_filter(sub)
+                if sub_conditions:
+                    or_conditions.append(combine_conditions_and(sub_conditions))
             if or_conditions:
                 conditions.append(combine_conditions_or(or_conditions))
 
@@ -655,7 +669,9 @@ class NotificationAdapter(BaseAdapter):
         if f.OR:
             or_conditions: list[QueryCondition] = []
             for sub in f.OR:
-                or_conditions.extend(NotificationAdapter._convert_rule_filter(sub))
+                sub_conditions = NotificationAdapter._convert_rule_filter(sub)
+                if sub_conditions:
+                    or_conditions.append(combine_conditions_and(sub_conditions))
             if or_conditions:
                 conditions.append(combine_conditions_or(or_conditions))
 

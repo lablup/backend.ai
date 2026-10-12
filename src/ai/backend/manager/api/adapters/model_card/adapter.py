@@ -60,12 +60,31 @@ from ai.backend.manager.data.deployment.types import (
     DeploymentNetworkSpec,
     ReplicaSpec,
 )
+<<<<<<< HEAD
 from ai.backend.manager.data.model_card.types import ModelCardData, ResourceRequirementEntry
 from ai.backend.manager.data.permission.types import RBACElementRef
 from ai.backend.manager.errors.resource import ModelCardNotFound
 from ai.backend.manager.models.deployment_policy import BlueGreenSpec, RollingUpdateSpec
 from ai.backend.manager.models.model_card.conditions import ModelCardConditions
 from ai.backend.manager.models.model_card.orders import ModelCardOrders
+=======
+from ai.backend.manager.data.model_card.types import (
+    ModelCardData,
+    ModelCardResourceRequirementData,
+    ResourceRequirementEntry,
+)
+from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
+from ai.backend.manager.models.condition_utils import (
+    combine_conditions_and,
+    combine_conditions_or,
+    negate_conditions,
+)
+from ai.backend.manager.models.model_card.creators import ModelCardCreator
+from ai.backend.manager.models.model_card.deprecated_search import (
+    ModelCardDeprecatedSearch,
+)
+from ai.backend.manager.models.model_card.purgers import ModelCardPurger
+>>>>>>> 5bf2aa3e2 (fix(BA-8371): combine the fields of each OR filter item with AND (#15397))
 from ai.backend.manager.models.model_card.row import ModelCardRow
 from ai.backend.manager.repositories.base import (
     QueryCondition,
@@ -630,6 +649,7 @@ class ModelCardAdapter(BaseAdapter):
         if filter_.AND:
             for sub in filter_.AND:
                 conditions.extend(self._convert_filter(sub))
+<<<<<<< HEAD
         if filter_.OR:
             or_conds: list[QueryCondition] = []
             for sub in filter_.OR:
@@ -642,6 +662,22 @@ class ModelCardAdapter(BaseAdapter):
                 not_conds.extend(self._convert_filter(sub))
             if not_conds:
                 conditions.append(negate_conditions(not_conds))
+=======
+        if f.OR:
+            or_conditions: list[QueryCondition] = []
+            for sub in f.OR:
+                sub_conditions = self._convert_filter(sub)
+                if sub_conditions:
+                    or_conditions.append(combine_conditions_and(sub_conditions))
+            if or_conditions:
+                conditions.append(combine_conditions_or(or_conditions))
+        if f.NOT:
+            not_conditions: list[QueryCondition] = []
+            for sub in f.NOT:
+                not_conditions.extend(self._convert_filter(sub))
+            if not_conditions:
+                conditions.append(negate_conditions(not_conditions))
+>>>>>>> 5bf2aa3e2 (fix(BA-8371): combine the fields of each OR filter item with AND (#15397))
         return conditions
 
     def _convert_orders(self, orders: list[ModelCardOrder]) -> list[QueryOrder]:

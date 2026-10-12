@@ -78,6 +78,7 @@ from ai.backend.manager.data.vfolder.types import (
     VFolderOperationStatus,
 )
 from ai.backend.manager.errors.resource import NotAModelVFolder
+<<<<<<< HEAD
 from ai.backend.manager.errors.storage import VFolderNotFound
 from ai.backend.manager.models.deployment_policy import BlueGreenSpec, RollingUpdateSpec
 from ai.backend.manager.models.vfolder import VFolderPermission
@@ -87,6 +88,21 @@ from ai.backend.manager.models.vfolder.orders import (
 )
 from ai.backend.manager.models.vfolder.orders import (
     resolve_order as resolve_vfolder_order,
+=======
+from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
+from ai.backend.manager.models.condition_utils import (
+    combine_conditions_and,
+    combine_conditions_or,
+    negate_conditions,
+)
+from ai.backend.manager.models.scopes import ScopeTarget
+from ai.backend.manager.models.specs.search.usage import UsedBy
+from ai.backend.manager.models.specs.searcher import GlobalSearcher, ScopedSearcher
+from ai.backend.manager.models.vfolder.creators import (
+    PersonalVFolderCreator,
+    ProjectVFolderCreator,
+    VFolderBaseCreator,
+>>>>>>> 5bf2aa3e2 (fix(BA-8371): combine the fields of each OR filter item with AND (#15397))
 )
 from ai.backend.manager.models.vfolder.row import VFolderRow
 from ai.backend.manager.repositories.base import (
@@ -757,7 +773,9 @@ class VFolderAdapter(BaseAdapter):
         if f.OR:
             or_conditions: list[QueryCondition] = []
             for sub in f.OR:
-                or_conditions.extend(self._convert_vfolder_filter(sub))
+                sub_conditions = self._convert_vfolder_filter(sub)
+                if sub_conditions:
+                    or_conditions.append(combine_conditions_and(sub_conditions))
             if or_conditions:
                 conditions.append(combine_conditions_or(or_conditions))
         if f.NOT:

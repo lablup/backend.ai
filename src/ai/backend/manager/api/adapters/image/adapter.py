@@ -49,6 +49,7 @@ from ai.backend.manager.api.adapter_options.pagination.pagination import (
     PaginationSpec,
 )
 from ai.backend.manager.api.adapters.base import BaseAdapter
+<<<<<<< HEAD
 from ai.backend.manager.data.image.types import ImageAliasData, ImageData, ImageStatus
 from ai.backend.manager.models.image import ImageType
 from ai.backend.manager.models.image.conditions import (
@@ -56,6 +57,15 @@ from ai.backend.manager.models.image.conditions import (
     ImageConditions,
 )
 from ai.backend.manager.models.image.orders import ImageAliasOrders, ImageOrders
+=======
+from ai.backend.manager.data.image.types import ImageAliasData, ImageData, ImageType
+from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
+from ai.backend.manager.models.condition_utils import (
+    combine_conditions_and,
+    combine_conditions_or,
+    negate_conditions,
+)
+>>>>>>> 5bf2aa3e2 (fix(BA-8371): combine the fields of each OR filter item with AND (#15397))
 from ai.backend.manager.models.image.row import ImageAliasRow, ImageRow
 from ai.backend.manager.repositories.base import (
     BatchQuerier,
@@ -442,7 +452,9 @@ class ImageAdapter(BaseAdapter):
         if filter.OR:
             or_sub: list[QueryCondition] = []
             for sub_filter in filter.OR:
-                or_sub.extend(self._convert_filter(sub_filter))
+                sub_conditions = self._convert_filter(sub_filter)
+                if sub_conditions:
+                    or_sub.append(combine_conditions_and(sub_conditions))
             if or_sub:
                 conditions.append(combine_conditions_or(or_sub))
 
@@ -487,7 +499,9 @@ class ImageAdapter(BaseAdapter):
         if filter.OR:
             or_sub: list[QueryCondition] = []
             for sub_filter in filter.OR:
-                or_sub.extend(self._convert_alias_filter(sub_filter))
+                sub_conditions = self._convert_alias_filter(sub_filter)
+                if sub_conditions:
+                    or_sub.append(combine_conditions_and(sub_conditions))
             if or_sub:
                 conditions.append(combine_conditions_or(or_sub))
 

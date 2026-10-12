@@ -59,11 +59,22 @@ from ai.backend.manager.data.role_preset.types import (
     RolePermissionPresetData,
     RolePresetData,
 )
+<<<<<<< HEAD
 from ai.backend.manager.models.rbac_models.role_permission_preset.conditions import (
     RolePermissionPresetConditions,
 )
 from ai.backend.manager.models.rbac_models.role_permission_preset.orders import (
     RolePermissionPresetOrders,
+=======
+from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
+from ai.backend.manager.models.condition_utils import (
+    combine_conditions_and,
+    combine_conditions_or,
+    negate_conditions,
+)
+from ai.backend.manager.models.rbac_models.role_permission_preset.creators import (
+    RolePermissionPresetCreator,
+>>>>>>> 5bf2aa3e2 (fix(BA-8371): combine the fields of each OR filter item with AND (#15397))
 )
 from ai.backend.manager.models.rbac_models.role_permission_preset.row import (
     RolePermissionPresetRow,
@@ -395,7 +406,9 @@ class RolePresetAdapter(BaseAdapter):
         if filter_.OR:
             or_conds: list[QueryCondition] = []
             for sub in filter_.OR:
-                or_conds.extend(self._convert_filter(sub))
+                sub_conditions = self._convert_filter(sub)
+                if sub_conditions:
+                    or_conds.append(combine_conditions_and(sub_conditions))
             if or_conds:
                 conditions.append(combine_conditions_or(or_conds))
         if filter_.NOT:
@@ -493,7 +506,9 @@ class RolePresetAdapter(BaseAdapter):
         if filter_.OR:
             or_conds: list[QueryCondition] = []
             for sub in filter_.OR:
-                or_conds.extend(self._convert_permission_filter(sub))
+                sub_conditions = self._convert_permission_filter(sub)
+                if sub_conditions:
+                    or_conds.append(combine_conditions_and(sub_conditions))
             if or_conds:
                 conditions.append(combine_conditions_or(or_conds))
         if filter_.NOT:

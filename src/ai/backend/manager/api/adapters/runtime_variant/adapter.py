@@ -25,9 +25,19 @@ from ai.backend.common.identifier.runtime_variant import RuntimeVariantID
 from ai.backend.manager.api.adapter_options.pagination.pagination import PaginationSpec
 from ai.backend.manager.api.adapters.base import BaseAdapter
 from ai.backend.manager.data.runtime_variant.types import RuntimeVariantData
+<<<<<<< HEAD
 from ai.backend.manager.errors.resource import RuntimeVariantNotFound
 from ai.backend.manager.models.runtime_variant.conditions import RuntimeVariantConditions
 from ai.backend.manager.models.runtime_variant.orders import RuntimeVariantOrders
+=======
+from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
+from ai.backend.manager.models.condition_utils import (
+    combine_conditions_and,
+    combine_conditions_or,
+    negate_conditions,
+)
+from ai.backend.manager.models.runtime_variant.creators import RuntimeVariantCreator
+>>>>>>> 5bf2aa3e2 (fix(BA-8371): combine the fields of each OR filter item with AND (#15397))
 from ai.backend.manager.models.runtime_variant.row import RuntimeVariantRow
 from ai.backend.manager.repositories.base import (
     BatchQuerier,
@@ -201,7 +211,9 @@ class RuntimeVariantAdapter(BaseAdapter):
         if filter_.OR:
             or_conds: list[QueryCondition] = []
             for sub in filter_.OR:
-                or_conds.extend(self._convert_filter(sub))
+                sub_conditions = self._convert_filter(sub)
+                if sub_conditions:
+                    or_conds.append(combine_conditions_and(sub_conditions))
             if or_conds:
                 conditions.append(combine_conditions_or(or_conds))
         if filter_.NOT:

@@ -80,6 +80,7 @@ from ai.backend.manager.data.scaling_group.types import (
     ScalingGroupData,
     SchedulerType,
 )
+<<<<<<< HEAD
 from ai.backend.manager.errors.resource import ScalingGroupNotFound
 from ai.backend.manager.models.scaling_group import ScalingGroupRow
 from ai.backend.manager.models.scaling_group.conditions import ScalingGroupConditions
@@ -91,6 +92,19 @@ from ai.backend.manager.repositories.base import (
     QueryCondition,
     combine_conditions_or,
     negate_conditions,
+=======
+from ai.backend.manager.errors.resource import ResourceGroupNotFound
+from ai.backend.manager.models.clauses import QueryCondition
+from ai.backend.manager.models.condition_utils import (
+    combine_conditions_and,
+    combine_conditions_or,
+    negate_conditions,
+)
+from ai.backend.manager.models.resource_group.creators import (
+    ResourceGroupCreator,
+    ResourceGroupForDomainRelationCreator,
+    ResourceGroupForProjectRelationCreator,
+>>>>>>> 5bf2aa3e2 (fix(BA-8371): combine the fields of each OR filter item with AND (#15397))
 )
 from ai.backend.manager.repositories.base.creator import Creator
 from ai.backend.manager.repositories.base.purger import Purger
@@ -321,7 +335,9 @@ class ResourceGroupAdapter(BaseAdapter):
         if filter_.OR:
             or_conds: list[QueryCondition] = []
             for sub in filter_.OR:
-                or_conds.extend(self._convert_filter(sub))
+                sub_conditions = self._convert_filter(sub)
+                if sub_conditions:
+                    or_conds.append(combine_conditions_and(sub_conditions))
             if or_conds:
                 conditions.append(combine_conditions_or(or_conds))
         if filter_.NOT:

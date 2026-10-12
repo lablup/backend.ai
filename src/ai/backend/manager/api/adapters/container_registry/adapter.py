@@ -26,11 +26,24 @@ from ai.backend.common.dto.manager.v2.container_registry.types import ContainerR
 from ai.backend.manager.api.adapter_options.pagination.pagination import PaginationSpec
 from ai.backend.manager.api.adapters.base import BaseAdapter
 from ai.backend.manager.data.container_registry.types import ContainerRegistryData
+<<<<<<< HEAD
 from ai.backend.manager.models.container_registry import ContainerRegistryRow
 from ai.backend.manager.models.container_registry.conditions import ContainerRegistryConditions
 from ai.backend.manager.models.container_registry.orders import (
     DEFAULT_FORWARD_ORDER,
     resolve_order,
+=======
+from ai.backend.manager.errors.image import ContainerRegistryGroupsAssociationNotFound
+from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
+from ai.backend.manager.models.condition_utils import (
+    combine_conditions_and,
+    combine_conditions_or,
+    negate_conditions,
+)
+from ai.backend.manager.models.container_registry.creators import (
+    ContainerRegistryCreator,
+    ContainerRegistryProjectCreator,
+>>>>>>> 5bf2aa3e2 (fix(BA-8371): combine the fields of each OR filter item with AND (#15397))
 )
 from ai.backend.manager.repositories.base import (
     BatchQuerier,
@@ -227,7 +240,28 @@ class ContainerRegistryAdapter(BaseAdapter):
         if filter.type is not None:
             conditions.extend(self._convert_type_filter(filter.type))
         if filter.is_global is not None:
+<<<<<<< HEAD
             conditions.append(ContainerRegistryConditions.by_is_global(filter.is_global))
+=======
+            conditions.append(fields.is_global.filter.equals(filter.is_global))
+        if filter.AND:
+            for sub_filter in filter.AND:
+                conditions.extend(self._convert_filter(sub_filter))
+        if filter.OR:
+            or_conditions: list[QueryCondition] = []
+            for sub_filter in filter.OR:
+                sub_conditions = self._convert_filter(sub_filter)
+                if sub_conditions:
+                    or_conditions.append(combine_conditions_and(sub_conditions))
+            if or_conditions:
+                conditions.append(combine_conditions_or(or_conditions))
+        if filter.NOT:
+            not_conditions: list[QueryCondition] = []
+            for sub_filter in filter.NOT:
+                not_conditions.extend(self._convert_filter(sub_filter))
+            if not_conditions:
+                conditions.append(negate_conditions(not_conditions))
+>>>>>>> 5bf2aa3e2 (fix(BA-8371): combine the fields of each OR filter item with AND (#15397))
         return conditions
 
     def _convert_string_filter(self, sf: StringFilter) -> QueryCondition | None:
