@@ -41,6 +41,7 @@ _CASES: Final[list[IdempotenceCase]] = [
     IdempotenceCase(SeedKind.NOTIFICATION_CHANNEL, "notification_channel_seed_dir"),
     IdempotenceCase(SeedKind.ROLE_PRESET, "role_seed_dir"),
     IdempotenceCase(SeedKind.IDLE_CHECKER, "idle_checker_seed_dir"),
+    IdempotenceCase(SeedKind.CONTAINER_REGISTRY, "container_registry_seed_dir"),
     IdempotenceCase(SeedKind.STORAGE_BACKEND_TYPE, "storage_backend_type_seed_dir"),
 ]
 
