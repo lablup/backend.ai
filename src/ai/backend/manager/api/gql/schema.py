@@ -957,8 +957,8 @@ schema = CustomizedSchema(
         GQLLoggingExtension,
         GQLMetricExtension,
         GQLValidationExtension,
-        QueryDepthLimiter(max_depth=MAX_QUERY_DEPTH),
-        MaxAliasesLimiter(max_alias_count=MAX_ALIAS_COUNT),
+        lambda: QueryDepthLimiter(max_depth=MAX_QUERY_DEPTH),
+        lambda: MaxAliasesLimiter(max_alias_count=MAX_ALIAS_COUNT),
         GQLExceptionHandlerExtension,
     ],
 )
