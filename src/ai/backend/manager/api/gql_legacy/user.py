@@ -22,8 +22,8 @@ from ai.backend.common.data.entity.domain import DomainID, DomainName
 from ai.backend.common.data.entity.project import ProjectEntityType
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.exception import UserNotFound
-from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.common.types import AccessKey
+from ai.backend.manager.api.gql.base import resolve_entity_id
 from ai.backend.manager.data.user.types import (
     UserData,
 )
@@ -229,7 +229,7 @@ class UserNode(graphene.ObjectType):  # type: ignore[misc]
     async def get_node(cls, info: graphene.ResolveInfo, id: str) -> Self:
         graph_ctx: GraphQueryContext = info.context
 
-        _, user_id = AsyncNode.resolve_global_id(info, id)
+        user_id = resolve_entity_id(id, UserID)
         query = sa.select(UserRow).where(UserRow.uuid == user_id)
         async with graph_ctx.db.begin_readonly_session() as db_session:
             user_row = (await db_session.scalars(query)).first()
@@ -569,12 +569,12 @@ class User(graphene.ObjectType):  # type: ignore[misc]
     sudo_session_enabled = graphene.Boolean()
     main_access_key = graphene.String(
         description=(
-            f"Added in 24.03.0. Deprecated since {NEXT_RELEASE_VERSION}. Use the keypair's is_default field. Used as the default authentication credential for"
+            "Added in 24.03.0. Deprecated since 26.9.0. Use the keypair's is_default field. Used as the default authentication credential for"
             " password-based logins and sets the user's total resource usage limit. User's"
             " main_access_key cannot be deleted, and only super-admin can replace"
             " main_access_key."
         ),
-        deprecation_reason=f"Deprecated since {NEXT_RELEASE_VERSION}. Use the keypair's is_default field.",
+        deprecation_reason="Deprecated since 26.9.0. Use the keypair's is_default field.",
     )
     container_uid = graphene.Int(
         description="Added in 25.2.0. The user ID (UID) assigned to processes running inside the container."

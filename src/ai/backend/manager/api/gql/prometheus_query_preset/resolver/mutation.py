@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-from uuid import UUID
-
 from strawberry import ID, Info
 
 from ai.backend.common.dto.manager.v2.prometheus_query_preset.request import (
@@ -15,6 +13,7 @@ from ai.backend.common.dto.manager.v2.prometheus_query_preset.response import (
 from ai.backend.common.dto.manager.v2.prometheus_query_preset.response import (
     ModifyQueryDefinitionGQLPayload as ModifyQueryDefinitionGQLPayloadDTO,
 )
+from ai.backend.manager.api.gql.base import parse_uuid
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     gql_mutation,
@@ -62,7 +61,7 @@ async def admin_modify_prometheus_query_preset(
 ) -> ModifyQueryDefinitionPayload | None:
     check_admin_only()
     result = await info.context.adapters.prometheus_query_preset.update(
-        UUID(id), input.to_pydantic()
+        parse_uuid(id), input.to_pydantic()
     )
     return ModifyQueryDefinitionPayload.from_pydantic(
         ModifyQueryDefinitionGQLPayloadDTO(preset=result.item)
@@ -78,6 +77,6 @@ async def admin_delete_prometheus_query_preset(
 ) -> DeleteQueryDefinitionPayload | None:
     check_admin_only()
     result = await info.context.adapters.prometheus_query_preset.delete(
-        DeleteQueryDefinitionInputDTO(id=UUID(id))
+        DeleteQueryDefinitionInputDTO(id=parse_uuid(id))
     )
     return DeleteQueryDefinitionPayload.from_pydantic(result)

@@ -10,11 +10,11 @@ from ai.backend.manager.data.domain.types import DomainData
 from ai.backend.manager.data.project.types import ProjectData
 from ai.backend.manager.data.resource.types import ProjectResourcePolicyData
 from ai.backend.manager.models.project.creators import ProjectCreator
-from bai_scenario.seeds.seeder import Naming, SeedRowFromTwo
+from bai_scenario.seeds.seeder import Naming, TestSeedRowFromTwo
 
 
 @dataclass(frozen=True)
-class SeedProject(SeedRowFromTwo[DomainData, ProjectResourcePolicyData, ProjectData]):
+class TestSeedProject(TestSeedRowFromTwo[DomainData, ProjectResourcePolicyData, ProjectData]):
     """A project of the given domain, under the given policy."""
 
     name_hint: str = "project"

@@ -43,11 +43,11 @@ from bai_scenario.components.audit_log import (
     TwoRecordsGlobally,
 )
 from bai_scenario.runner.acting import ActingAs
-from bai_scenario.runner.planting import SeedingSession
+from bai_scenario.runner.planting import TestSeedingSession
 from bai_scenario.runner.steps import run_scenario
 
 type Searched = SearchAuditLogsPayload
-type SearchingStep = Scenario[SeedingSession, RecordsAndACaller, AuditLogAdapter, Searched]
+type SearchingStep = Scenario[TestSeedingSession, RecordsAndACaller, AuditLogAdapter, Searched]
 ENFORCEMENT = "manager.rbac.enforcement_enabled"
 
 
@@ -175,7 +175,7 @@ class SearchingWithBadCursor(When[RecordsAndACaller, AuditLogAdapter, Searched])
 
 @dataclass(frozen=True)
 class TheSuperadminSeesEveryRecord(
-    Scenario[SeedingSession, RecordsAndACaller, AuditLogAdapter, Searched]
+    Scenario[TestSeedingSession, RecordsAndACaller, AuditLogAdapter, Searched]
 ):
     @override
     def summary(self) -> str:
@@ -186,7 +186,7 @@ class TheSuperadminSeesEveryRecord(
         return "기록 둘이 있고 슈퍼관리자가 필터 없이 검색하면, 둘 다 반환되고 최근 것이 먼저다"
 
     @override
-    def given(self) -> Given[SeedingSession, RecordsAndACaller]:
+    def given(self) -> Given[TestSeedingSession, RecordsAndACaller]:
         return TwoRecordsGlobally(role=UserRole.SUPERADMIN)
 
     @override
@@ -200,7 +200,7 @@ class TheSuperadminSeesEveryRecord(
 
 @dataclass(frozen=True)
 class TheMonitorRoleSeesEveryRecord(
-    Scenario[SeedingSession, RecordsAndACaller, AuditLogAdapter, Searched]
+    Scenario[TestSeedingSession, RecordsAndACaller, AuditLogAdapter, Searched]
 ):
     @override
     def summary(self) -> str:
@@ -211,7 +211,7 @@ class TheMonitorRoleSeesEveryRecord(
         return "검색은 읽기 연산이므로 모니터 역할 사용자도 슈퍼관리자 검사를 통과해 슈퍼관리자와 같은 응답을 받는다"
 
     @override
-    def given(self) -> Given[SeedingSession, RecordsAndACaller]:
+    def given(self) -> Given[TestSeedingSession, RecordsAndACaller]:
         return TwoRecordsGlobally(role=UserRole.MONITOR)
 
     @override
@@ -225,7 +225,7 @@ class TheMonitorRoleSeesEveryRecord(
 
 @dataclass(frozen=True)
 class APlainUserMayNotSearch(
-    Scenario[SeedingSession, RecordsAndACaller, AuditLogAdapter, Searched]
+    Scenario[TestSeedingSession, RecordsAndACaller, AuditLogAdapter, Searched]
 ):
     @override
     def summary(self) -> str:
@@ -236,7 +236,7 @@ class APlainUserMayNotSearch(
         return "슈퍼관리자도 모니터도 아닌 사용자가 전체를 검색하면, 역할 부족으로 거부된다"
 
     @override
-    def given(self) -> Given[SeedingSession, RecordsAndACaller]:
+    def given(self) -> Given[TestSeedingSession, RecordsAndACaller]:
         return TwoRecordsGlobally(role=UserRole.USER)
 
     @override
@@ -250,7 +250,7 @@ class APlainUserMayNotSearch(
 
 @dataclass(frozen=True)
 class EnforcementOffStillNeedsTheRole(
-    Scenario[SeedingSession, RecordsAndACaller, AuditLogAdapter, Searched], Configured
+    Scenario[TestSeedingSession, RecordsAndACaller, AuditLogAdapter, Searched], Configured
 ):
     @override
     def summary(self) -> str:
@@ -265,7 +265,7 @@ class EnforcementOffStillNeedsTheRole(
         return {ENFORCEMENT: False}
 
     @override
-    def given(self) -> Given[SeedingSession, RecordsAndACaller]:
+    def given(self) -> Given[TestSeedingSession, RecordsAndACaller]:
         return TwoRecordsGlobally(role=UserRole.USER)
 
     @override
@@ -279,7 +279,7 @@ class EnforcementOffStillNeedsTheRole(
 
 @dataclass(frozen=True)
 class OmittingThePageSizeCapsThePage(
-    Scenario[SeedingSession, RecordsAndACaller, AuditLogAdapter, Searched]
+    Scenario[TestSeedingSession, RecordsAndACaller, AuditLogAdapter, Searched]
 ):
     @override
     def summary(self) -> str:
@@ -292,7 +292,7 @@ class OmittingThePageSizeCapsThePage(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, RecordsAndACaller]:
+    def given(self) -> Given[TestSeedingSession, RecordsAndACaller]:
         return ManyRecordsGlobally(total=11)
 
     @override
@@ -306,7 +306,7 @@ class OmittingThePageSizeCapsThePage(
 
 @dataclass(frozen=True)
 class AStatusFilterNarrowsToSuccess(
-    Scenario[SeedingSession, RecordsAndACaller, AuditLogAdapter, Searched]
+    Scenario[TestSeedingSession, RecordsAndACaller, AuditLogAdapter, Searched]
 ):
     @override
     def summary(self) -> str:
@@ -319,7 +319,7 @@ class AStatusFilterNarrowsToSuccess(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, RecordsAndACaller]:
+    def given(self) -> Given[TestSeedingSession, RecordsAndACaller]:
         return MixedStatusGlobally()
 
     @override
@@ -333,7 +333,7 @@ class AStatusFilterNarrowsToSuccess(
 
 @dataclass(frozen=True)
 class AnActorFilterNarrowsToOneUser(
-    Scenario[SeedingSession, RecordsAndACaller, AuditLogAdapter, Searched]
+    Scenario[TestSeedingSession, RecordsAndACaller, AuditLogAdapter, Searched]
 ):
     @override
     def summary(self) -> str:
@@ -344,7 +344,7 @@ class AnActorFilterNarrowsToOneUser(
         return "두 사용자가 각각 기록을 남겼을 때 한 사용자 필터로 검색하면, 그 사용자가 실행한 기록만 반환된다"
 
     @override
-    def given(self) -> Given[SeedingSession, RecordsAndACaller]:
+    def given(self) -> Given[TestSeedingSession, RecordsAndACaller]:
         return TwoActorsGlobally()
 
     @override
@@ -358,7 +358,7 @@ class AnActorFilterNarrowsToOneUser(
 
 @dataclass(frozen=True)
 class TwoPaginationModesAreRefused(
-    Scenario[SeedingSession, RecordsAndACaller, AuditLogAdapter, Searched]
+    Scenario[TestSeedingSession, RecordsAndACaller, AuditLogAdapter, Searched]
 ):
     @override
     def summary(self) -> str:
@@ -369,7 +369,7 @@ class TwoPaginationModesAreRefused(
         return "오프셋 방식과 커서 방식을 함께 지정해 검색하면, 잘못된 입력으로 거부된다"
 
     @override
-    def given(self) -> Given[SeedingSession, RecordsAndACaller]:
+    def given(self) -> Given[TestSeedingSession, RecordsAndACaller]:
         return TwoRecordsGlobally(role=UserRole.SUPERADMIN)
 
     @override
@@ -383,7 +383,7 @@ class TwoPaginationModesAreRefused(
 
 @dataclass(frozen=True)
 class ABrokenCursorIsRefused(
-    Scenario[SeedingSession, RecordsAndACaller, AuditLogAdapter, Searched]
+    Scenario[TestSeedingSession, RecordsAndACaller, AuditLogAdapter, Searched]
 ):
     @override
     def summary(self) -> str:
@@ -394,7 +394,7 @@ class ABrokenCursorIsRefused(
         return "해석할 수 없는 커서로 검색하면, 잘못된 커서로 거부된다"
 
     @override
-    def given(self) -> Given[SeedingSession, RecordsAndACaller]:
+    def given(self) -> Given[TestSeedingSession, RecordsAndACaller]:
         return TwoRecordsGlobally(role=UserRole.SUPERADMIN)
 
     @override

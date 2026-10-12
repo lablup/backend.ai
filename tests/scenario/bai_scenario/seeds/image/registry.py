@@ -14,16 +14,17 @@ from ai.backend.manager.models.container_registry.creators import (
     ContainerRegistryCreator,
     ContainerRegistryProjectCreator,
 )
-from bai_scenario.seeds.seeder import Naming, SeedLink, SeedRow
+from bai_scenario.seeds.seeder import Naming, TestSeedLink, TestSeedRow
 
 
 @dataclass(frozen=True)
-class SeedContainerRegistry(SeedRow[ContainerRegistryData]):
+class TestSeedContainerRegistry(TestSeedRow[ContainerRegistryData]):
     """A registry. An image joins the one it came from, so it is laid first."""
 
     name_hint: str = "registry"
     registry_type: ContainerRegistryType = ContainerRegistryType.DOCKER
     is_global: bool = True
+    project: str | None = None
 
     @override
     def kind(self) -> str:
@@ -31,6 +32,8 @@ class SeedContainerRegistry(SeedRow[ContainerRegistryData]):
 
     @override
     def detail(self) -> str:
+        if self.project is not None:
+            return f"이미지를 가져오는 곳, 프로젝트는 {self.project}"
         return "이미지를 가져오는 곳"
 
     @override
@@ -44,11 +47,12 @@ class SeedContainerRegistry(SeedRow[ContainerRegistryData]):
             type=self.registry_type,
             registry_name=name,
             is_global=self.is_global,
+            project=self.project,
         )
 
 
 @dataclass(frozen=True)
-class AllowProject(SeedLink[ProjectData, ContainerRegistryData]):
+class AllowProject(TestSeedLink[ProjectData, ContainerRegistryData]):
     @override
     def kind(self) -> str:
         return "을 허용한"

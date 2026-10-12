@@ -7,6 +7,7 @@ from strawberry import Info
 from ai.backend.common.dto.manager.v2.container_registry.request import (
     DeleteContainerRegistryInput,
 )
+from ai.backend.manager.api.gql.base import parse_uuid
 from ai.backend.manager.api.gql.container_registry.mutations import (
     CreateContainerRegistryInputGQL,
     CreateContainerRegistryPayloadGQL,
@@ -63,9 +64,8 @@ async def admin_delete_container_registry_v2(
     id: str,
 ) -> DeleteContainerRegistryPayloadGQL | None:
     check_admin_only()
-    from uuid import UUID
 
     payload = await info.context.adapters.container_registry.admin_delete(
-        DeleteContainerRegistryInput(id=UUID(id))
+        DeleteContainerRegistryInput(id=parse_uuid(id))
     )
     return DeleteContainerRegistryPayloadGQL.from_pydantic(payload)

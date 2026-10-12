@@ -4,7 +4,7 @@ The scenario table declares everything first and writes once at the end. A test 
 seeds through fixtures cannot wait that long: a fixture has to answer with a row that
 is already there, because the fixture beside it may need to read it.
 
-Both go through the same `Seeder` and the same write path. This only moves when the
+Both go through the same `TestSeeder` and the same write path. This only moves when the
 writing happens, and keeps it in one session so the test still sees one transaction.
 """
 
@@ -17,35 +17,37 @@ from ai.backend.manager.data.entity_share.types import EntityShareData
 from ai.backend.manager.data.project.types import ProjectData
 from ai.backend.manager.data.user.types import UserData
 from ai.backend.testutils.scenario_steps import Told
-from bai_scenario.seeds.ops import SeedOps
+from bai_scenario.seeds.ops import TestSeedOps
 from bai_scenario.seeds.seeder import (
     Laid,
-    Seeder,
-    SeedField,
-    SeedFieldWithNestedRows,
-    SeedLink,
-    SeedNest,
-    SeedRow,
-    SeedRowFrom,
-    SeedRowFromThree,
-    SeedRowFromTwo,
-    SeedShareAcceptance,
+    TestSeeder,
+    TestSeedField,
+    TestSeedFieldWithNestedRows,
+    TestSeedLink,
+    TestSeedNest,
+    TestSeedRow,
+    TestSeedRowFrom,
+    TestSeedRowFromThree,
+    TestSeedRowFromTwo,
+    TestSeedShareAcceptance,
     lay,
 )
 
 
-class SeedingSession:
-    """One `Seeder` and one open write session, used together.
+class TestSeedingSession:
+    """One `TestSeeder` and one open write session, used together.
 
     Every entry point mirrors the seeder's own, writes what it declared, and answers the
     same handle. What was written is read back with `made`.
     """
 
-    _seed: Seeder
-    _ops: SeedOps
+    __test__ = False
+
+    _seed: TestSeeder
+    _ops: TestSeedOps
     _made: dict[Laid[Any], Any]
 
-    def __init__(self, seed: Seeder, ops: SeedOps) -> None:
+    def __init__(self, seed: TestSeeder, ops: TestSeedOps) -> None:
         self._seed = seed
         self._ops = ops
         self._made = {}
@@ -85,35 +87,35 @@ class SeedingSession:
         await lay(self._ops, self._seed.declared(), self._made)
         return row
 
-    async def creating[D](self, one: SeedRow[D], /) -> Laid[D]:
+    async def creating[D](self, one: TestSeedRow[D], /) -> Laid[D]:
         return await self._settle(self._seed.creating(one))
 
-    async def creating_from[A, D](self, one: SeedRowFrom[A, D], a: Laid[A], /) -> Laid[D]:
+    async def creating_from[A, D](self, one: TestSeedRowFrom[A, D], a: Laid[A], /) -> Laid[D]:
         return await self._settle(self._seed.creating_from(one, a))
 
     async def creating_from_two[A, B, D](
-        self, one: SeedRowFromTwo[A, B, D], a: Laid[A], b: Laid[B], /
+        self, one: TestSeedRowFromTwo[A, B, D], a: Laid[A], b: Laid[B], /
     ) -> Laid[D]:
         return await self._settle(self._seed.creating_from_two(one, a, b))
 
     async def creating_from_three[A, B, C, D](
-        self, one: SeedRowFromThree[A, B, C, D], a: Laid[A], b: Laid[B], c: Laid[C], /
+        self, one: TestSeedRowFromThree[A, B, C, D], a: Laid[A], b: Laid[B], c: Laid[C], /
     ) -> Laid[D]:
         return await self._settle(self._seed.creating_from_three(one, a, b, c))
 
-    async def once[D](self, one: SeedRow[D], /) -> Laid[D]:
+    async def once[D](self, one: TestSeedRow[D], /) -> Laid[D]:
         return await self._settle(self._seed.once(one))
 
-    async def adding[A, D: FieldData](self, one: SeedField[A, D], owner: Laid[A], /) -> Laid[D]:
+    async def adding[A, D: FieldData](self, one: TestSeedField[A, D], owner: Laid[A], /) -> Laid[D]:
         return await self._settle(self._seed.adding(one, owner))
 
     async def adding_with_nested[A, D: FieldData](
-        self, one: SeedFieldWithNestedRows[A, D], owner: Laid[A], /
+        self, one: TestSeedFieldWithNestedRows[A, D], owner: Laid[A], /
     ) -> Laid[D]:
         return await self._settle(self._seed.adding_with_nested(one, owner))
 
     async def linking[S, T](
-        self, one: SeedLink[S, T], scope: Laid[S], target: Laid[T], /
+        self, one: TestSeedLink[S, T], scope: Laid[S], target: Laid[T], /
     ) -> Laid[None]:
         return await self._settle(self._seed.linking(one, scope, target))
 
@@ -123,7 +125,7 @@ class SeedingSession:
         return row
 
     async def accepting[A](
-        self, one: SeedShareAcceptance[A], offer: Laid[A], /
+        self, one: TestSeedShareAcceptance[A], offer: Laid[A], /
     ) -> Laid[EntityShareData]:
         return await self._settle(self._seed.accepting(one, offer))
 
@@ -149,7 +151,7 @@ class SeedingSession:
             self._seed.joining(project, member, project_id=project_id, user_id=user_id)
         )
 
-    async def within[D](self, nest: SeedNest[D]) -> D:
+    async def within[D](self, nest: TestSeedNest[D]) -> D:
         """Lay what this nest lays, and write all of it."""
         answered = self._seed.within(nest)
         await lay(self._ops, self._seed.declared(), self._made)

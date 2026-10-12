@@ -129,10 +129,10 @@ from ai.backend.manager.models.project.row import (
     association_groups_users,
 )
 from ai.backend.manager.models.resource_group.row import (
-    ResourceGroupOpts,
     resource_groups,
     sgroups_for_domains,
 )
+from ai.backend.manager.models.resource_group.types import ResourceGroupOpts
 from ai.backend.manager.models.resource_policy.row import (
     ProjectResourcePolicyRow,
     UserResourcePolicyRow,
@@ -142,6 +142,11 @@ from ai.backend.manager.models.resource_slot.row import ResourceSlotTypeRow
 from ai.backend.manager.models.resource_slot.types import NumberFormat
 from ai.backend.manager.models.session.row import SessionRow
 from ai.backend.manager.models.session_template.row import SessionTemplateRow
+
+# Nothing under src imports the storage rows yet; name them so the sandbox holds their
+# tables when `schema oneshot` builds the full schema.
+from ai.backend.manager.models.storage_backend.row import StorageBackendRow  # noqa: F401
+from ai.backend.manager.models.storage_volume.row import StorageVolumeRow  # noqa: F401
 from ai.backend.manager.models.user.row import users
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.vfolder.row import vfolders
@@ -445,8 +450,10 @@ def database(
     and install the table schema using alembic.
     """
     db_url = (
-        yarl.URL(f"postgresql+asyncpg://{bootstrap_config.db.addr.host}/{POSTGRES_MAINTENANCE_DB}")
-        .with_port(bootstrap_config.db.addr.port)
+        yarl.URL(
+            f"postgresql+asyncpg://{bootstrap_config.db.addrs[0].host}/{POSTGRES_MAINTENANCE_DB}"
+        )
+        .with_port(bootstrap_config.db.addrs[0].port)
         .with_user(bootstrap_config.db.user)
     )
     if bootstrap_config.db.password is not None:
@@ -573,8 +580,8 @@ async def db_engine(
 ) -> AsyncIterator[SAEngine]:
     """Provide a function-scoped SQLAlchemy async engine connected to the test database."""
     db_url = (
-        yarl.URL(f"postgresql+asyncpg://{bootstrap_config.db.addr.host}/{test_db}")
-        .with_port(bootstrap_config.db.addr.port)
+        yarl.URL(f"postgresql+asyncpg://{bootstrap_config.db.addrs[0].host}/{test_db}")
+        .with_port(bootstrap_config.db.addrs[0].port)
         .with_user(bootstrap_config.db.user)
     )
     if bootstrap_config.db.password is not None:

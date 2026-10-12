@@ -6,7 +6,11 @@ import uuid
 from collections.abc import Sequence
 
 from ai.backend.common.container_registry import AllowedGroupsModel
-from ai.backend.common.data.entity.container_registry import ContainerRegistryID
+from ai.backend.common.data.entity.container_registry import (
+    ContainerRegistryID,
+    ContainerRegistryName,
+    ContainerRegistryProjectName,
+)
 from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.dto.manager.v2.container_registry.request import (
     AdminSearchContainerRegistriesInput,
@@ -33,7 +37,11 @@ from ai.backend.manager.api.adapters.base import BaseAdapter
 from ai.backend.manager.data.container_registry.types import ContainerRegistryData
 from ai.backend.manager.errors.image import ContainerRegistryGroupsAssociationNotFound
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
-from ai.backend.manager.models.condition_utils import combine_conditions_or, negate_conditions
+from ai.backend.manager.models.condition_utils import (
+    combine_conditions_and,
+    combine_conditions_or,
+    negate_conditions,
+)
 from ai.backend.manager.models.container_registry.creators import (
     ContainerRegistryCreator,
     ContainerRegistryProjectCreator,
@@ -58,6 +66,9 @@ from ai.backend.manager.services.container_registry.actions.create_container_reg
 )
 from ai.backend.manager.services.container_registry.actions.delete_container_registry import (
     DeleteContainerRegistryAction,
+)
+from ai.backend.manager.services.container_registry.actions.lookup import (
+    LookupContainerRegistryAction,
 )
 from ai.backend.manager.services.container_registry.actions.search_container_registries import (
     SearchContainerRegistriesAction,
@@ -311,7 +322,9 @@ class ContainerRegistryAdapter(BaseAdapter):
         if filter.OR:
             or_conditions: list[QueryCondition] = []
             for sub_filter in filter.OR:
-                or_conditions.extend(self._convert_filter(sub_filter))
+                sub_conditions = self._convert_filter(sub_filter)
+                if sub_conditions:
+                    or_conditions.append(combine_conditions_and(sub_conditions))
             if or_conditions:
                 conditions.append(combine_conditions_or(or_conditions))
         if filter.NOT:
@@ -378,3 +391,13 @@ class ContainerRegistryAdapter(BaseAdapter):
             is_global=data.is_global,
             extra=data.extra,
         )
+
+    async def lookup_by_name_and_registry_project(
+        self,
+        registry_name: ContainerRegistryName,
+        registry_project_name: ContainerRegistryProjectName | None,
+    ) -> ContainerRegistryID:
+        result = await self._container_registry.lookup_by_name_and_registry_project.run(
+            LookupContainerRegistryAction(registry_name, registry_project_name)
+        )
+        return result.entity_id()

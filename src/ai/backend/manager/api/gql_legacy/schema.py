@@ -145,9 +145,11 @@ from ai.backend.manager.models.resource_group.row import (
     ResourceGroupRow,
     and_names,
 )
-from ai.backend.manager.models.vfolder.row import ensure_quota_scope_accessible_by_user
 from ai.backend.manager.models.virtual_entity.queries import user_scope_membership_exists
 from ai.backend.manager.repositories.ops.repository import OpsRepository
+from ai.backend.manager.repositories.vfolder.quota_scope import (
+    ensure_quota_scope_accessible_by_user,
+)
 from ai.backend.manager.secret.pool import KeyProviderPool
 
 from .acl import PredefinedAtomicPermission
@@ -2662,7 +2664,10 @@ class Query(graphene.ObjectType):  # type: ignore[misc]
             result = result[offset:]
         if after is not None:
             _, raw_session_id = AsyncNode.resolve_global_id(info, after)
-            target_id = uuid.UUID(raw_session_id)
+            try:
+                target_id = uuid.UUID(raw_session_id)
+            except ValueError as e:
+                raise InvalidAPIParameters(f"Invalid cursor value: {after}") from e
             idx = 0
             for idx, session_node in enumerate(result):
                 if session_node.id == target_id:
@@ -2674,7 +2679,10 @@ class Query(graphene.ObjectType):  # type: ignore[misc]
             page_size = first
         if before is not None:
             _, raw_session_id = AsyncNode.resolve_global_id(info, before)
-            target_id = uuid.UUID(raw_session_id)
+            try:
+                target_id = uuid.UUID(raw_session_id)
+            except ValueError as e:
+                raise InvalidAPIParameters(f"Invalid cursor value: {before}") from e
             idx = len(result)
             for idx, session_node in enumerate(result):
                 if session_node.id == target_id:

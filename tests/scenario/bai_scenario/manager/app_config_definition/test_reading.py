@@ -34,11 +34,11 @@ from bai_scenario.components.app_config_definition import (
     TheDefinitionNode,
 )
 from bai_scenario.runner.acting import ActingAs
-from bai_scenario.runner.planting import SeedingSession
+from bai_scenario.runner.planting import TestSeedingSession
 from bai_scenario.runner.steps import run_scenario
 
 type ReadingStep = Scenario[
-    SeedingSession, ADefinitionAndACaller, AppConfigDefinitionAdapter, AppConfigDefinitionNode
+    TestSeedingSession, ADefinitionAndACaller, AppConfigDefinitionAdapter, AppConfigDefinitionNode
 ]
 
 
@@ -69,7 +69,10 @@ class ReadingById(When[ADefinitionAndACaller, AppConfigDefinitionAdapter, AppCon
 @dataclass(frozen=True)
 class TheSuperadminReadsIt(
     Scenario[
-        SeedingSession, ADefinitionAndACaller, AppConfigDefinitionAdapter, AppConfigDefinitionNode
+        TestSeedingSession,
+        ADefinitionAndACaller,
+        AppConfigDefinitionAdapter,
+        AppConfigDefinitionNode,
     ]
 ):
     started: datetime
@@ -83,7 +86,7 @@ class TheSuperadminReadsIt(
         return "설정 정의 하나가 있고 슈퍼관리자가 ID로 조회하면, 그 정의의 모든 필드가 반환된다"
 
     @override
-    def given(self) -> Given[SeedingSession, ADefinitionAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ADefinitionAndACaller]:
         return ADefinitionAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
@@ -100,7 +103,10 @@ class TheSuperadminReadsIt(
 @dataclass(frozen=True)
 class AUserGrantedNothingMayNotRead(
     Scenario[
-        SeedingSession, ADefinitionAndACaller, AppConfigDefinitionAdapter, AppConfigDefinitionNode
+        TestSeedingSession,
+        ADefinitionAndACaller,
+        AppConfigDefinitionAdapter,
+        AppConfigDefinitionNode,
     ]
 ):
     @override
@@ -115,7 +121,7 @@ class AUserGrantedNothingMayNotRead(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, ADefinitionAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ADefinitionAndACaller]:
         return ADefinitionAndSomeone()
 
     @override
@@ -132,7 +138,10 @@ class AUserGrantedNothingMayNotRead(
 @dataclass(frozen=True)
 class AnUnknownIdIsNotFoundForASuperadmin(
     Scenario[
-        SeedingSession, ADefinitionAndACaller, AppConfigDefinitionAdapter, AppConfigDefinitionNode
+        TestSeedingSession,
+        ADefinitionAndACaller,
+        AppConfigDefinitionAdapter,
+        AppConfigDefinitionNode,
     ]
 ):
     @override
@@ -147,7 +156,7 @@ class AnUnknownIdIsNotFoundForASuperadmin(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, ADefinitionAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ADefinitionAndACaller]:
         return ADefinitionAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
@@ -164,7 +173,10 @@ class AnUnknownIdIsNotFoundForASuperadmin(
 @dataclass(frozen=True)
 class EnforcementOffLetsAnyoneRead(
     Scenario[
-        SeedingSession, ADefinitionAndACaller, AppConfigDefinitionAdapter, AppConfigDefinitionNode
+        TestSeedingSession,
+        ADefinitionAndACaller,
+        AppConfigDefinitionAdapter,
+        AppConfigDefinitionNode,
     ],
     Configured,
 ):
@@ -183,7 +195,7 @@ class EnforcementOffLetsAnyoneRead(
         return {ENFORCEMENT: False}
 
     @override
-    def given(self) -> Given[SeedingSession, ADefinitionAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ADefinitionAndACaller]:
         return ADefinitionAndSomeone()
 
     @override

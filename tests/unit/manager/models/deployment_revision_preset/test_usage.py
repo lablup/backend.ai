@@ -12,6 +12,7 @@ from dataclasses import dataclass
 
 import pytest
 
+from ai.backend.common.config import DefaultModelDefinition
 from ai.backend.common.container_registry import ContainerRegistryType
 from ai.backend.common.data.endpoint.types import EndpointLifecycle
 from ai.backend.common.data.entity.container_registry import ContainerRegistryID
@@ -57,7 +58,8 @@ from ai.backend.manager.models.project.row import ProjectRow
 from ai.backend.manager.models.rbac_models.role.row import RoleRow
 from ai.backend.manager.models.rbac_models.user_role.row import UserRoleRow
 from ai.backend.manager.models.replica_group.row import ReplicaGroupRow
-from ai.backend.manager.models.resource_group.row import ResourceGroupOpts, ResourceGroupRow
+from ai.backend.manager.models.resource_group.row import ResourceGroupRow
+from ai.backend.manager.models.resource_group.types import ResourceGroupOpts
 from ai.backend.manager.models.resource_policy.row import (
     KeyPairResourcePolicyRow,
     ProjectResourcePolicyRow,
@@ -236,7 +238,11 @@ class TestDeploymentUsage:
             db_sess.add(image)
 
             variants = [
-                RuntimeVariantRow(id=RuntimeVariantID(uuid.uuid4()), name=f"variant-{label}")
+                RuntimeVariantRow(
+                    id=RuntimeVariantID(uuid.uuid4()),
+                    name=f"variant-{label}",
+                    default_model_definition=DefaultModelDefinition(),
+                )
                 for label in ("used", "unused")
             ]
             db_sess.add_all(variants)

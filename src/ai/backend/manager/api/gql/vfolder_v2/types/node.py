@@ -14,7 +14,6 @@ from ai.backend.common.data.entity.vfolder import VFolderEntityType, VFolderUUID
 from ai.backend.common.dto.manager.v2.model_card.request import SearchModelCardsInput
 from ai.backend.common.dto.manager.v2.model_card.types import ModelCardUsage, ModelCardUses
 from ai.backend.common.dto.manager.v2.vfolder.response import VFolderNode
-from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import encode_cursor
 from ai.backend.manager.api.gql.common_types import BinarySizeInfoGQL
 from ai.backend.manager.api.gql.decorators import (
@@ -69,7 +68,7 @@ class VFolderGQL(PydanticNodeMixin[VFolderNode]):
     id: NodeID[str] = gql_field(description="Unique identifier of the virtual folder.")
     entity_id: UUID = gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.9.0",
             description="UUID of the vfolder.",
         ),
     )
@@ -132,12 +131,11 @@ class VFolderGQL(PydanticNodeMixin[VFolderNode]):
         BackendAIGQLMeta(
             added_version="26.4.4",
             description="Model cards backed by this vfolder.",
-            deprecated_version=NEXT_RELEASE_VERSION,
+            deprecated_version="26.9.0",
             deprecation_hint="a model card search narrowed by `usedBy: { vfolder }`",
         ),
         deprecation_reason=(
-            f"Deprecated since {NEXT_RELEASE_VERSION}. Use a model card search narrowed by "
-            "`usedBy: { vfolder }`."
+            "Deprecated since 26.9.0. Use a model card search narrowed by `usedBy: { vfolder }`."
         ),
     )  # type: ignore[misc]
     async def model_cards(
@@ -184,7 +182,7 @@ class VFolderGQL(PydanticNodeMixin[VFolderNode]):
 
     @gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.9.0",
             description="The labels on this vfolder.",
         )
     )  # type: ignore[misc]
@@ -215,7 +213,7 @@ class VFolderGQL(PydanticNodeMixin[VFolderNode]):
 
     @gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.9.0",
             description="The permission bits the current user holds on this vfolder.",
         )
     )  # type: ignore[misc]

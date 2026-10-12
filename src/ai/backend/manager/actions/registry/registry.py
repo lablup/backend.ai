@@ -6,7 +6,11 @@ from collections.abc import Sequence
 from typing import Any
 
 from ai.backend.common.data.entity.types import EntityData, FieldData, GlobalEntityType
-from ai.backend.manager.actions.registry.field import FieldGroup, LookupFieldGroup
+from ai.backend.manager.actions.registry.field import (
+    FieldGroup,
+    LookupFieldGroup,
+    OwnerCandidatesFieldGroup,
+)
 from ai.backend.manager.actions.registry.group import (
     ProcessorGroup,
 )
@@ -27,8 +31,10 @@ from ai.backend.manager.actions.v2.field.lookup import LookupRuntimeFieldOwnerOp
 from ai.backend.manager.actions.v2.field.processor import OwnerLookupProcessor
 from ai.backend.manager.actions.v2.lookup.bulk_processor import BulkLookupActionProcessor
 from ai.backend.manager.actions.v2.lookup.processor import LookupActionProcessor
+from ai.backend.manager.models.specs.owner_candidates import FieldOwnerCandidates
 from ai.backend.manager.services.ops.service import (
     BulkRuntimeFieldOwnerLookupService,
+    FieldOwnerCandidatesService,
     RuntimeFieldOwnerLookupService,
 )
 
@@ -62,6 +68,22 @@ class ConcernGroups[TData: EntityData]:
         self, meta: FieldGroupMeta, data_cls: type[TFieldData]
     ) -> FieldGroup[TFieldData]:
         return FieldGroup(self._deps, self._records, self._concern, meta, GlobalEntityType())
+
+    def dangling_owner_candidates_field_group[TFieldData: FieldData](
+        self,
+        meta: FieldGroupMeta,
+        data_cls: type[TFieldData],
+        owner_candidates: FieldOwnerCandidates[Any],
+    ) -> OwnerCandidatesFieldGroup[TFieldData]:
+        """The operations over a field kind whose rows each belong to several owners."""
+        return OwnerCandidatesFieldGroup(
+            self._deps,
+            self._records,
+            self._concern,
+            meta,
+            GlobalEntityType(),
+            FieldOwnerCandidatesService(self._deps.repository, owner_candidates),
+        )
 
     def dangling_lookup_field_group[TFieldData: FieldData](
         self,
@@ -146,6 +168,18 @@ class ProcessorRegistry[TData: EntityData]:
         some rows have no owner at all.
         """
         return FieldGroup(self._deps, self._records, meta.field_type, meta, GlobalEntityType())
+
+    def dangling_owner_candidates_field_group[TFieldData: FieldData](
+        self,
+        meta: FieldGroupMeta,
+        data_cls: type[TFieldData],
+        owner_candidates: FieldOwnerCandidates[Any],
+    ) -> OwnerCandidatesFieldGroup[TFieldData]:
+        """:meth:`ConcernGroups.dangling_owner_candidates_field_group` for a field kind that
+        is its own area, which its field type names."""
+        return ConcernGroups(
+            self._deps, self._records, meta.field_type
+        ).dangling_owner_candidates_field_group(meta, data_cls, owner_candidates)
 
     def dangling_lookup_field_group[TFieldData: FieldData](
         self,

@@ -61,7 +61,11 @@ from ai.backend.manager.models.app_config_fragment.upserters import (
     PublicAppConfigFragmentUpserter,
 )
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
-from ai.backend.manager.models.condition_utils import combine_conditions_or, negate_conditions
+from ai.backend.manager.models.condition_utils import (
+    combine_conditions_and,
+    combine_conditions_or,
+    negate_conditions,
+)
 from ai.backend.manager.models.specs.searcher import GlobalSearcher
 from ai.backend.manager.services.app_config.actions.fragment.admin_search import (
     AdminSearchAppConfigFragmentAction,
@@ -399,7 +403,9 @@ class AppConfigFragmentAdapter(BaseAdapter):
         if filter_.OR:
             or_conditions: list[QueryCondition] = []
             for sub_filter in filter_.OR:
-                or_conditions.extend(self._convert_filter(sub_filter))
+                sub_conditions = self._convert_filter(sub_filter)
+                if sub_conditions:
+                    or_conditions.append(combine_conditions_and(sub_conditions))
             if or_conditions:
                 conditions.append(combine_conditions_or(or_conditions))
         if filter_.NOT:

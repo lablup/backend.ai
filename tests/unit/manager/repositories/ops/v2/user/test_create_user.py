@@ -22,7 +22,6 @@ from ai.backend.common.types import AccessKey, ResourceSlot, VFolderHostPermissi
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.keypair.types import KeyPairSecrets
 from ai.backend.manager.data.permission.global_entity import global_entity_id
-from ai.backend.manager.data.permission.seed.loader import RoleSeedLoader
 from ai.backend.manager.models.domain.row import DomainRow
 from ai.backend.manager.models.entity_label.row import EntityLabelRow
 from ai.backend.manager.models.hasher.types import PasswordInfo
@@ -55,6 +54,7 @@ from ai.backend.manager.models.virtual_entity.virtual_entity import VirtualEntit
 from ai.backend.manager.repositories.ops.v2.user.provider import UserOpsProvider
 from ai.backend.manager.repositories.ops.v2.user.write import FullUserCreator
 from ai.backend.manager.secret.types import SecretValue
+from ai.backend.manager.seed.role_preset.role import RoleSeed
 from ai.backend.testutils.db import HasTable, with_tables
 from ai.backend.testutils.fixtures import DomainFixtureData
 
@@ -522,8 +522,14 @@ async def public_role(db: ExtendedAsyncSAEngine) -> RoleID:
 
 @pytest.fixture
 async def declared_user_owner_preset(db: ExtendedAsyncSAEngine) -> uuid.UUID:
-    """The user_owner preset as the seed declaration states it."""
-    [seed] = [seed for seed in RoleSeedLoader().load() if seed.name == "user_owner"]
+    """The user_owner preset, as `seeds/manager/role_preset/` states its header."""
+    seed = RoleSeed.model_validate({
+        "id": "776c1366-dcf3-5abd-b8de-bc3ad3b759ad",
+        "name": "user_owner",
+        "scope_type": "user",
+        "auto_assign": True,
+        "permissions": {},
+    })
     async with db.begin_session() as session:
         session.add(
             RolePresetRow(

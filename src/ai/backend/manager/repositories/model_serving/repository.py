@@ -62,7 +62,7 @@ from ai.backend.manager.data.vfolder.types import VFolderOwnershipType
 from ai.backend.manager.errors.api import InvalidAPIParameters
 from ai.backend.manager.errors.common import GenericForbidden, ServiceUnavailable
 from ai.backend.manager.errors.image import ImageNotFound
-from ai.backend.manager.errors.resource import DatabaseConnectionUnavailable, DomainNotFound
+from ai.backend.manager.errors.resource import DomainNotFound
 from ai.backend.manager.errors.service import AutoScalingRuleNotFound, EndpointNotFound
 from ai.backend.manager.models.deployment_revision.row import DeploymentRevisionRow
 from ai.backend.manager.models.domain.lookups import DomainNameLookup
@@ -77,10 +77,8 @@ from ai.backend.manager.models.endpoint.updaters import (
 from ai.backend.manager.models.image.row import ImageRow
 from ai.backend.manager.models.image.searchable_fields import ImageSearchableFields
 from ai.backend.manager.models.keypair.row import KeyPairRow
-from ai.backend.manager.models.project.row import resolve_group_name_or_id
 from ai.backend.manager.models.resource_group.row import resource_groups
 from ai.backend.manager.models.resource_group.searchers import AllowedResourceGroupsSearch
-from ai.backend.manager.models.resource_policy.row import keypair_resource_policies
 from ai.backend.manager.models.routing.row import RoutingRow
 from ai.backend.manager.models.routing.searchable_fields import ReplicaSearchableFields
 from ai.backend.manager.models.routing.searchers import RoutingDataSearcher
@@ -315,12 +313,22 @@ class ModelServingRepository:
         Get route by ID.
         Returns None if route doesn't exist or doesn't belong to service.
         """
-        async with self._db.begin_readonly_session_read_committed() as session:
-            route = await self._get_route_by_id(session, route_id, load_endpoint=True)
-            if not route or route.endpoint != service_id:
-                return None
-
-            return route.to_data()
+        replica_fields = ReplicaSearchableFields.own
+        async with self._v2_ops.read_ops() as r:
+            result = await r.search_in_global(
+                RoutingDataSearcher(
+                    pagination=NoPagination(),
+                    conditions=[
+                        replica_fields.field_id.filter.equals(
+                            UUIDEqualMatchSpec(value=route_id, negated=False)
+                        ),
+                        replica_fields.deployment_id.filter.equals(
+                            UUIDEqualMatchSpec(value=service_id, negated=False)
+                        ),
+                    ],
+                )
+            )
+        return result.items[0] if result.items else None
 
     @model_serving_repository_resilience.apply()
     async def update_route_traffic(
@@ -335,8 +343,14 @@ class ModelServingRepository:
         Returns updated endpoint data if successful, None if not found.
         """
         async with self._db.begin_session() as session:
-            route = await self._get_route_by_id(session, route_id, load_endpoint=True)
-            if not route or route.endpoint != service_id:
+            route = (
+                await session.execute(
+                    sa.select(RoutingRow.endpoint, RoutingRow.session).where(
+                        RoutingRow.id == route_id
+                    )
+                )
+            ).one_or_none()
+            if route is None or route.endpoint != service_id:
                 return None
 
             query = (
@@ -354,7 +368,7 @@ class ModelServingRepository:
                 load_revisions=True,
             )
             if endpoint is None:
-                raise NoResultFound
+                raise EndpointNotFound
 
             await valkey_live.store_live_data(
                 f"endpoint.{service_id}.session.{route.session}.traffic_ratio",
@@ -456,23 +470,6 @@ class ModelServingRepository:
         except NoResultFound:
             return None
 
-    async def _get_route_by_id(
-        self,
-        session: SASession,
-        route_id: uuid.UUID,
-        load_endpoint: bool = False,
-        load_session: bool = False,
-    ) -> RoutingRow | None:
-        """
-        Private method to get route by ID using an existing session.
-        """
-        try:
-            return await RoutingRow.get(
-                session, route_id, load_endpoint=load_endpoint, load_session=load_session
-            )
-        except NoResultFound:
-            return None
-
     async def _validate_endpoint_access(
         self,
         session: SASession,
@@ -518,32 +515,21 @@ class ModelServingRepository:
             return vfolder_ownership_type
 
     @model_serving_repository_resilience.apply()
-    async def get_user_with_keypair(self, user_id: uuid.UUID) -> Any | None:
+    async def get_user_with_keypair(self, user_id: uuid.UUID) -> UserRow:
         """
         Get the user row joined with one of their keypairs.
         """
         async with self._db.begin_readonly_session_read_committed() as session:
             query = (
-                sa.select(UserRow, KeyPairRow)
+                sa.select(UserRow)
                 .select_from(sa.join(UserRow, KeyPairRow, KeyPairRow.user == UserRow.uuid))
                 .where(UserRow.uuid == user_id)
             )
             result = await session.execute(query)
-            return result.fetchone()
-
-    @model_serving_repository_resilience.apply()
-    async def get_keypair_resource_policy(self, policy_name: str) -> Any | None:
-        """
-        Get keypair resource policy by name.
-        """
-        async with self._db.begin_readonly_session_read_committed() as session:
-            query = (
-                sa.select(keypair_resource_policies)
-                .select_from(keypair_resource_policies)
-                .where(keypair_resource_policies.c.name == policy_name)
-            )
-            result = await session.execute(query)
-            return result.first()
+            user = result.scalar()
+            if user is None:
+                raise InvalidAPIParameters("User not found")
+            return user
 
     @model_serving_repository_resilience.apply()
     async def get_endpoint_for_appproxy_update(self, service_id: uuid.UUID) -> EndpointRow | None:
@@ -552,16 +538,6 @@ class ModelServingRepository:
         """
         async with self._db.begin_readonly_session_read_committed() as session:
             return await self._get_endpoint_by_id(session, service_id, load_routes=True)
-
-    @model_serving_repository_resilience.apply()
-    async def get_route_with_session(self, route_id: uuid.UUID) -> RoutingRow | None:
-        """
-        Get route with endpoint and session data loaded.
-        """
-        async with self._db.begin_readonly_session_read_committed() as session:
-            return await self._get_route_by_id(
-                session, route_id, load_endpoint=True, load_session=True
-            )
 
     @model_serving_repository_resilience.apply()
     async def update_endpoint_replicas(
@@ -689,19 +665,6 @@ class ModelServingRepository:
                 return True
             except AutoScalingRuleNotFound:
                 return False
-
-    @model_serving_repository_resilience.apply()
-    async def resolve_group_id(
-        self, domain_name: str, group_name_or_id: str | uuid.UUID
-    ) -> uuid.UUID | None:
-        """
-        Resolve group name or ID to group ID.
-        """
-        async with self._db.begin_readonly_session_read_committed() as session:
-            conn = await session.connection()
-            if conn is None:
-                raise DatabaseConnectionUnavailable("Database connection is not available")
-            return await resolve_group_name_or_id(conn, domain_name, group_name_or_id)
 
     @model_serving_repository_resilience.apply()
     async def get_image_by_id(self, image_id: uuid.UUID) -> ImageData:

@@ -13,7 +13,6 @@ from strawberry.relay import Connection, Edge, NodeID
 
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.dto.manager.v2.login_history.response import LoginHistoryNode
-from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     gql_added_field,
@@ -60,7 +59,7 @@ class LoginHistoryV2GQL(PydanticNodeMixin[LoginHistoryNode]):
     id: NodeID[str] = gql_field(description="Unique identifier of the login history entry (UUID).")
     field_id: UUID = gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.9.0",
             description="UUID of the login history record.",
         ),
     )
@@ -71,7 +70,7 @@ class LoginHistoryV2GQL(PydanticNodeMixin[LoginHistoryNode]):
     fail_reason: str | None = gql_field(description="Detailed reason for the login failure.")
     client_ip: str | None = gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.9.0",
             description=(
                 "IP address of the request that produced this entry, masked per the client "
                 "IP masking policy. Null when the policy records none, or when the address "

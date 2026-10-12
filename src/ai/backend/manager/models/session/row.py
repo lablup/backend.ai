@@ -562,8 +562,7 @@ class SessionRow(CreatedAtMixin, Base):
     # FK to routings.id with ON DELETE SET NULL: when the replica's route row is
     # deleted, this auto-clears instead of dangling. This forms an intentional
     # nullable cycle with routings.session -> sessions.id; `use_alter` lets
-    # create_all() order the two tables, and the routing/session_row relationship
-    # below pins `foreign_keys` so SQLAlchemy can disambiguate the two FK paths.
+    # create_all() order the two tables.
     replica_id: Mapped[ReplicaID | None] = mapped_column(
         "replica_id",
         GUID(ReplicaID),
@@ -628,6 +627,8 @@ class SessionRow(CreatedAtMixin, Base):
             cluster_mode=session_data.cluster_mode,
             cluster_size=session_data.cluster_size,
             agent_ids=session_data.agent_ids,
+            designated_agent_ids=session_data.designated_agent_ids,
+            session_group_id=session_data.session_group_id,
             scaling_group_name=session_data.resource_group_name,
             target_sgroup_names=session_data.target_sgroup_names,
             domain_name=session_data.domain_name,
@@ -657,6 +658,7 @@ class SessionRow(CreatedAtMixin, Base):
             created_at=session_data.created_at,
             terminated_at=session_data.terminated_at,
             starts_at=session_data.starts_at,
+            requested_starts_at=session_data.requested_starts_at,
         )
         instance.id = SessionId(session_data.id)
         return instance
@@ -673,6 +675,8 @@ class SessionRow(CreatedAtMixin, Base):
             cluster_mode=ClusterMode(self.cluster_mode),
             cluster_size=self.cluster_size,
             agent_ids=self.agent_ids,
+            designated_agent_ids=self.designated_agent_ids,
+            session_group_id=self.session_group_id,
             resource_group_name=self.scaling_group_name,
             target_sgroup_names=self.target_sgroup_names,
             domain_name=self.domain_name,
@@ -693,6 +697,7 @@ class SessionRow(CreatedAtMixin, Base):
             created_at=self.created_at,
             terminated_at=self.terminated_at,
             starts_at=self.starts_at,
+            requested_starts_at=self.requested_starts_at,
             status=self.status,
             status_info=self.status_info,
             status_data=self.status_data,

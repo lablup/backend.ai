@@ -11,7 +11,6 @@ from ai.backend.common.dto.manager.v2.keypair.request import (
 from ai.backend.common.dto.manager.v2.keypair.request import (
     KeypairOrderBy as KeypairOrderByDTO,
 )
-from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import (
     DateTimeFilter,
     OrderDirection,
@@ -45,7 +44,7 @@ class KeypairFilterGQL(PydanticInputMixin[KeypairFilterDTO]):
     is_admin: bool | None = None
     is_default: bool | None = gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.9.0",
             description="Filter keypairs by whether they are their owner's default one.",
         ),
         default=None,

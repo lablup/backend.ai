@@ -153,7 +153,7 @@ auth 7, 필드는 error_log 4, keypair 4, login_session 3, login_history 2다. B
 
 - 사용자 자기 자신의 가상 엔티티가 자기를 소유하고 다스린다(`repositories/ops/v2/graph_write.py:59-74`). 사용자 스코프에 둔 역할이 사용자 권한을 주면 그 사용자에 대한 엔티티 권한 검사와 스코프 권한 검사가 모두 통과한다.
 - 도메인이 사용자를 소유하고 다스린다(`graph_write.py:146-176`). 도메인 스코프에 둔 역할은 그 도메인 사용자 전원에 대해 통한다.
-- 사용자 스코프의 프리셋 역할을 만든다(`repositories/ops/v2/entity_write.py:131,323-360`). 소유자 프리셋은 `auto_assign: false`라 본인에게 자동으로 배정되지 않는다(`data/permission/seed/roles/user-owner.yaml:4,49`).
+- 사용자 스코프의 프리셋 역할을 만든다(`repositories/ops/v2/entity_write.py:131,323-360`). 소유자 프리셋은 `auto_assign: false`라 본인에게 자동으로 배정되지 않는다(`seeds/manager/role_preset/user-owner.yaml:7,52`).
 - 시나리오 템플릿 데이터베이스에는 프리셋 행이 없어서 프리셋 역할이 하나도 생기지 않는다(`entity_write.py:379-380`). 필요한 권한은 역할을 직접 심어 준다.
 
 ## 4. 요청에 없는데 필요한 값

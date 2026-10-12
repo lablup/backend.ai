@@ -22,7 +22,6 @@ from ai.backend.common.dto.manager.v2.client_ip_masking.response import (
 from ai.backend.common.dto.manager.v2.client_ip_masking.response import (
     ClientIPMaskingPolicyPayload as PolicyPayloadDTO,
 )
-from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     PydanticInputMixin,
@@ -39,7 +38,7 @@ from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin, Pydant
 
 @gql_enum(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.9.0",
         description="Which recorded client IP a masking policy governs.",
     ),
     name="ClientIPMaskingTarget",
@@ -52,7 +51,7 @@ class ClientIPMaskingTargetGQL(StrEnum):
 
 @gql_enum(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.9.0",
         description=(
             "Masking applied before a client IP is stored. 'none' keeps the address as "
             "observed, 'truncate' zeroes the host bits — keeping an IPv4 /24 and an "
@@ -69,7 +68,7 @@ class ClientIPMaskingModeGQL(StrEnum):
 
 @gql_enum(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.9.0",
         description="Order fields for client IP masking policies.",
     ),
     name="ClientIPMaskingPolicyOrderField",
@@ -83,7 +82,7 @@ class ClientIPMaskingPolicyOrderFieldGQL(StrEnum):
 
 @gql_node_type(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.9.0",
         description=(
             "The masking one target gets. A target with no policy falls back to the "
             "'default' target, and no default means the address is recorded as observed."
@@ -95,7 +94,7 @@ class ClientIPMaskingPolicyGQL(PydanticNodeMixin[NodeDTO]):
     id: NodeID[str] = gql_field(description="Relay-style global node identifier.")
     entity_id: UUID = gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.9.0",
             description="UUID of the client IP masking policy.",
         ),
     )
@@ -117,7 +116,7 @@ class ClientIPMaskingPolicyGQL(PydanticNodeMixin[NodeDTO]):
 
 @gql_pydantic_input(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.9.0",
         description="Set the masking one target gets, replacing the policy it already has.",
     ),
     name="UpsertClientIPMaskingPolicyInput",
@@ -141,7 +140,7 @@ class UpsertClientIPMaskingPolicyInputGQL(PydanticInputMixin[UpsertInputDTO]):
 
 @gql_pydantic_type(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.9.0",
         description="Payload carrying the settled client IP masking policy.",
     ),
     model=PolicyPayloadDTO,
@@ -156,7 +155,7 @@ ClientIPMaskingPolicyEdgeGQL = Edge[ClientIPMaskingPolicyGQL]
 
 @gql_connection_type(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.9.0",
         description="Paginated list of client IP masking policies.",
     ),
     name="ClientIPMaskingPolicyConnection",
@@ -171,7 +170,7 @@ class ClientIPMaskingPolicyConnectionGQL(Connection[ClientIPMaskingPolicyGQL]):
 
 @gql_pydantic_input(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.9.0",
         description="Filter for client IP masking policies.",
     ),
     name="ClientIPMaskingPolicyFilter",
@@ -187,7 +186,7 @@ class ClientIPMaskingPolicyFilterGQL(PydanticInputMixin[FilterDTO]):
 
 @gql_pydantic_input(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.9.0",
         description="Order specification for client IP masking policies.",
     ),
     name="ClientIPMaskingPolicyOrderBy",

@@ -124,6 +124,7 @@ from ai.backend.manager.data.session.options import (
     ResourceOpts,
 )
 from ai.backend.manager.data.session.types import SessionStatus
+from ai.backend.manager.data.vfolder.types import verify_vfolder_name
 from ai.backend.manager.errors.kernel import handle_session_exception
 from ai.backend.manager.models.agent.row import AgentRow, agents
 from ai.backend.manager.models.domain.row import domains
@@ -149,9 +150,6 @@ from ai.backend.manager.models.session.row import (
     SessionRow,
 )
 from ai.backend.manager.models.user.row import UserRow
-from ai.backend.manager.models.vfolder.row import (
-    verify_vfolder_name,
-)
 from ai.backend.manager.plugin.network import NetworkPluginContext
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.repositories.resource_slot.repository import ResourceSlotRepository
@@ -274,15 +272,19 @@ class AgentRegistry:
         ``"1g"``) for memory-like slots; normalise them to plain decimal
         strings so downstream ``Decimal(quantity)`` calls in the scheduler
         and ``ResourceSlotEntry.to_resource_slot`` keep working unchanged.
+        Zero-quantity slots are dropped.
         """
         if not resources:
             return ()
-        return tuple(
-            ResourceSlotEntry(
-                resource_type=ResourceSlotName(str(k)), quantity=str(parse_quantity(v))
+        entries: list[ResourceSlotEntry] = []
+        for k, v in resources.items():
+            quantity = parse_quantity(v)
+            if quantity == 0:
+                continue
+            entries.append(
+                ResourceSlotEntry(resource_type=ResourceSlotName(str(k)), quantity=str(quantity))
             )
-            for k, v in resources.items()
-        )
+        return tuple(entries)
 
     def __init__(
         self,

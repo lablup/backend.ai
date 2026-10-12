@@ -40,11 +40,11 @@ from ai.backend.testutils.scenario_steps import (
     Verdict,
 )
 from bai_scenario.components.domain import SomeoneOf, WrittenByThisRun
-from bai_scenario.seeds.domain.domain import SeedDomain
-from bai_scenario.seeds.image.image import SeedAlias, SeedImage
-from bai_scenario.seeds.image.registry import SeedContainerRegistry
-from bai_scenario.seeds.rbac.role import SeedPermission, SeedRole
-from bai_scenario.seeds.seeder import Laid, Seeder, SeedNest
+from bai_scenario.seeds.domain.domain import TestSeedDomain
+from bai_scenario.seeds.image.image import TestSeedAlias, TestSeedImage
+from bai_scenario.seeds.image.registry import TestSeedContainerRegistry
+from bai_scenario.seeds.rbac.role import TestSeedPermission, TestSeedRole
+from bai_scenario.seeds.seeder import Laid, TestSeeder, TestSeedNest
 
 NOTHING = uuid.UUID("00000000-0000-0000-0000-0000000000ff")
 """어느 행도 가리키지 않는 ID. 대상이 없을 때 무엇이 반환되는지 확인하려고 지정한다."""
@@ -147,7 +147,7 @@ class AliasesAndACaller:
 
 
 @dataclass(frozen=True)
-class ARegistryWithImages(SeedNest[tuple[ContainerRegistryData, tuple[Laid[ImageData], ...]]]):
+class ARegistryWithImages(TestSeedNest[tuple[ContainerRegistryData, tuple[Laid[ImageData], ...]]]):
     """레지스트리 1개와 그 안의 이미지들. 이미지는 레지스트리에 속해야 만들 수 있다."""
 
     count: int = 1
@@ -157,10 +157,10 @@ class ARegistryWithImages(SeedNest[tuple[ContainerRegistryData, tuple[Laid[Image
         return "이미지를 담을 레지스트리 준비"
 
     @override
-    def lay(self, seed: Seeder) -> tuple[Any, tuple[Laid[ImageData], ...]]:
-        registry = seed.creating(SeedContainerRegistry(name_hint="host"))
+    def lay(self, seed: TestSeeder) -> tuple[Any, tuple[Laid[ImageData], ...]]:
+        registry = seed.creating(TestSeedContainerRegistry(name_hint="host"))
         images = tuple(
-            seed.creating_from(SeedImage(name_hint=f"image-{index}"), registry)
+            seed.creating_from(TestSeedImage(name_hint=f"image-{index}"), registry)
             for index in range(self.count)
         )
         return registry, images
@@ -181,10 +181,10 @@ class AnImageAndSomeone(Given[Any, AnImageAndACaller]):
 
     @override
     async def lay(self, seeding: Any) -> AnImageAndACaller:
-        domain = await seeding.creating(SeedDomain(name_hint="home"))
-        registry = await seeding.creating(SeedContainerRegistry(name_hint="host"))
+        domain = await seeding.creating(TestSeedDomain(name_hint="home"))
+        registry = await seeding.creating(TestSeedContainerRegistry(name_hint="host"))
         image = await seeding.creating_from(
-            SeedImage(status=self.status, accelerators=self.accelerators.named()), registry
+            TestSeedImage(status=self.status, accelerators=self.accelerators.named()), registry
         )
         caller = await seeding.within(SomeoneOf(domain, role=self.role))
         return AnImageAndACaller(seeding.made(image), seeding.made(caller))
@@ -203,9 +203,9 @@ class AnUncustomizedImageAndSomeone(Given[Any, AnImageAndACaller]):
 
     @override
     async def lay(self, seeding: Any) -> AnImageAndACaller:
-        domain = await seeding.creating(SeedDomain(name_hint="home"))
-        registry = await seeding.creating(SeedContainerRegistry(name_hint="host"))
-        image = await seeding.creating_from(SeedImage(), registry)
+        domain = await seeding.creating(TestSeedDomain(name_hint="home"))
+        registry = await seeding.creating(TestSeedContainerRegistry(name_hint="host"))
+        image = await seeding.creating_from(TestSeedImage(), registry)
         caller = await seeding.within(SomeoneOf(domain))
         if self.granted:
             await seeding.within(SomeoneReachingImages(registry, caller))
@@ -228,12 +228,12 @@ class AnImageTheCallerMade(Given[Any, AnImageAndACaller]):
 
     @override
     async def lay(self, seeding: Any) -> AnImageAndACaller:
-        domain = await seeding.creating(SeedDomain(name_hint="home"))
-        registry = await seeding.creating(SeedContainerRegistry(name_hint="host"))
+        domain = await seeding.creating(TestSeedDomain(name_hint="home"))
+        registry = await seeding.creating(TestSeedContainerRegistry(name_hint="host"))
         caller = await seeding.within(SomeoneOf(domain))
         made = seeding.made(caller)
         image = await seeding.creating_from(
-            SeedImage(customized=True, creator_id=UserID(made.id), status=self.status),
+            TestSeedImage(customized=True, creator_id=UserID(made.id), status=self.status),
             registry,
         )
         await seeding.within(SomeoneReachingImages(registry, caller))
@@ -253,10 +253,10 @@ class ManyImagesAndSomeone(Given[Any, ManyImagesAndACaller]):
 
     @override
     async def lay(self, seeding: Any) -> ManyImagesAndACaller:
-        domain = await seeding.creating(SeedDomain(name_hint="home"))
-        registry = await seeding.creating(SeedContainerRegistry(name_hint="host"))
+        domain = await seeding.creating(TestSeedDomain(name_hint="home"))
+        registry = await seeding.creating(TestSeedContainerRegistry(name_hint="host"))
         images = [
-            await seeding.creating_from(SeedImage(name_hint=f"image-{index}"), registry)
+            await seeding.creating_from(TestSeedImage(name_hint=f"image-{index}"), registry)
             for index in range(self.count)
         ]
         caller = await seeding.within(SomeoneOf(domain, role=self.role))
@@ -278,13 +278,13 @@ class ImagesWithTwoStatuses(Given[Any, ManyImagesAndACaller]):
 
     @override
     async def lay(self, seeding: Any) -> ManyImagesAndACaller:
-        domain = await seeding.creating(SeedDomain(name_hint="home"))
-        registry = await seeding.creating(SeedContainerRegistry(name_hint="host"))
+        domain = await seeding.creating(TestSeedDomain(name_hint="home"))
+        registry = await seeding.creating(TestSeedContainerRegistry(name_hint="host"))
         alive = await seeding.creating_from(
-            SeedImage(name_hint="alive", status=ImageStatus.ALIVE), registry
+            TestSeedImage(name_hint="alive", status=ImageStatus.ALIVE), registry
         )
         await seeding.creating_from(
-            SeedImage(name_hint="deleted", status=ImageStatus.DELETED), registry
+            TestSeedImage(name_hint="deleted", status=ImageStatus.DELETED), registry
         )
         caller = await seeding.within(SomeoneOf(domain, role=UserRole.SUPERADMIN))
         made_alive = seeding.made(alive)
@@ -293,6 +293,78 @@ class ImagesWithTwoStatuses(Given[Any, ManyImagesAndACaller]):
             named=made_alive,
             registry=seeding.made(registry),
             caller=seeding.made(caller),
+        )
+
+
+@dataclass(frozen=True)
+class CustomizedAndUncustomizedImages(Given[Any, ManyImagesAndACaller]):
+    """호출자가 커밋한 커스텀 이미지와 커스텀 이미지가 아닌 이미지, 슈퍼관리자.
+
+    `named`는 커스텀 이미지다.
+    """
+
+    @override
+    def describe(self) -> str:
+        return "호출자가 커밋한 커스텀 이미지 1개와 커스텀 이미지가 아닌 이미지 1개, superadmin 1명"
+
+    @override
+    async def lay(self, seeding: Any) -> ManyImagesAndACaller:
+        domain = await seeding.creating(TestSeedDomain(name_hint="home"))
+        registry = await seeding.creating(TestSeedContainerRegistry(name_hint="host"))
+        caller = await seeding.within(SomeoneOf(domain, role=UserRole.SUPERADMIN))
+        made_caller = seeding.made(caller)
+        customized = await seeding.creating_from(
+            TestSeedImage(
+                name_hint="customized", customized=True, creator_id=UserID(made_caller.id)
+            ),
+            registry,
+        )
+        uncustomized = await seeding.creating_from(
+            TestSeedImage(name_hint="uncustomized"), registry
+        )
+        made_customized = seeding.made(customized)
+        return ManyImagesAndACaller(
+            laid=(made_customized, seeding.made(uncustomized)),
+            named=made_customized,
+            registry=seeding.made(registry),
+            caller=made_caller,
+        )
+
+
+@dataclass(frozen=True)
+class ImagesCommittedForTwoUsers(Given[Any, ManyImagesAndACaller]):
+    """호출자가 커밋한 커스텀 이미지와 다른 사용자가 커밋한 커스텀 이미지, 슈퍼관리자.
+
+    `named`는 호출자가 커밋한 이미지다.
+    """
+
+    @override
+    def describe(self) -> str:
+        return "호출자가 커밋한 커스텀 이미지 1개와 다른 사용자가 커밋한 커스텀 이미지 1개, superadmin 1명"
+
+    @override
+    async def lay(self, seeding: Any) -> ManyImagesAndACaller:
+        domain = await seeding.creating(TestSeedDomain(name_hint="home"))
+        registry = await seeding.creating(TestSeedContainerRegistry(name_hint="host"))
+        caller = await seeding.within(SomeoneOf(domain, role=UserRole.SUPERADMIN))
+        other = await seeding.within(SomeoneOf(domain))
+        made_caller = seeding.made(caller)
+        mine = await seeding.creating_from(
+            TestSeedImage(name_hint="mine", customized=True, creator_id=UserID(made_caller.id)),
+            registry,
+        )
+        theirs = await seeding.creating_from(
+            TestSeedImage(
+                name_hint="theirs", customized=True, creator_id=UserID(seeding.made(other).id)
+            ),
+            registry,
+        )
+        made_mine = seeding.made(mine)
+        return ManyImagesAndACaller(
+            laid=(made_mine, seeding.made(theirs)),
+            named=made_mine,
+            registry=seeding.made(registry),
+            caller=made_caller,
         )
 
 
@@ -317,15 +389,15 @@ class ImagesInTwoRegistriesAndAPlainUser(Given[Any, ManyImagesAndACaller]):
 
     @override
     async def lay(self, seeding: Any) -> ManyImagesAndACaller:
-        domain = await seeding.creating(SeedDomain(name_hint="home"))
-        wanted = await seeding.creating(SeedContainerRegistry(name_hint="wanted"))
-        other = await seeding.creating(SeedContainerRegistry(name_hint="other"))
+        domain = await seeding.creating(TestSeedDomain(name_hint="home"))
+        wanted = await seeding.creating(TestSeedContainerRegistry(name_hint="wanted"))
+        other = await seeding.creating(TestSeedContainerRegistry(name_hint="other"))
         here = [
-            await seeding.creating_from(SeedImage(name_hint=f"here-{index}"), wanted)
+            await seeding.creating_from(TestSeedImage(name_hint=f"here-{index}"), wanted)
             for index in range(self.wanted)
         ]
         for index in range(self.elsewhere):
-            await seeding.creating_from(SeedImage(name_hint=f"there-{index}"), other)
+            await seeding.creating_from(TestSeedImage(name_hint=f"there-{index}"), other)
         caller = await seeding.within(SomeoneOf(domain))
         if self.granted:
             await seeding.within(SomeoneReachingImages(wanted, caller))
@@ -349,10 +421,10 @@ class AnAliasAndSomeone(Given[Any, AnAliasAndACaller]):
 
     @override
     async def lay(self, seeding: Any) -> AnAliasAndACaller:
-        domain = await seeding.creating(SeedDomain(name_hint="home"))
-        registry = await seeding.creating(SeedContainerRegistry(name_hint="host"))
-        image = await seeding.creating_from(SeedImage(), registry)
-        alias = await seeding.adding(SeedAlias(), image)
+        domain = await seeding.creating(TestSeedDomain(name_hint="home"))
+        registry = await seeding.creating(TestSeedContainerRegistry(name_hint="host"))
+        image = await seeding.creating_from(TestSeedImage(), registry)
+        alias = await seeding.adding(TestSeedAlias(), image)
         caller = await seeding.within(SomeoneOf(domain, role=self.role))
         return AnAliasAndACaller(
             image=seeding.made(image),
@@ -374,10 +446,10 @@ class AnAliasAndAPlainUser(Given[Any, AnAliasAndACaller]):
 
     @override
     async def lay(self, seeding: Any) -> AnAliasAndACaller:
-        domain = await seeding.creating(SeedDomain(name_hint="home"))
-        registry = await seeding.creating(SeedContainerRegistry(name_hint="host"))
-        image = await seeding.creating_from(SeedImage(), registry)
-        alias = await seeding.adding(SeedAlias(), image)
+        domain = await seeding.creating(TestSeedDomain(name_hint="home"))
+        registry = await seeding.creating(TestSeedContainerRegistry(name_hint="host"))
+        image = await seeding.creating_from(TestSeedImage(), registry)
+        alias = await seeding.adding(TestSeedAlias(), image)
         caller = await seeding.within(SomeoneOf(domain))
         if self.granted:
             await seeding.within(SomeoneReachingImages(registry, caller))
@@ -398,13 +470,13 @@ class AliasesOnTwoImagesAndSomeone(Given[Any, AliasesAndACaller]):
 
     @override
     async def lay(self, seeding: Any) -> AliasesAndACaller:
-        domain = await seeding.creating(SeedDomain(name_hint="home"))
-        registry = await seeding.creating(SeedContainerRegistry(name_hint="host"))
-        wanted = await seeding.creating_from(SeedImage(name_hint="wanted"), registry)
-        other = await seeding.creating_from(SeedImage(name_hint="other"), registry)
-        first = await seeding.adding(SeedAlias(alias="alpha"), wanted)
-        second = await seeding.adding(SeedAlias(alias="zeta"), wanted)
-        await seeding.adding(SeedAlias(alias="middle"), other)
+        domain = await seeding.creating(TestSeedDomain(name_hint="home"))
+        registry = await seeding.creating(TestSeedContainerRegistry(name_hint="host"))
+        wanted = await seeding.creating_from(TestSeedImage(name_hint="wanted"), registry)
+        other = await seeding.creating_from(TestSeedImage(name_hint="other"), registry)
+        first = await seeding.adding(TestSeedAlias(alias="alpha"), wanted)
+        second = await seeding.adding(TestSeedAlias(alias="zeta"), wanted)
+        await seeding.adding(TestSeedAlias(alias="middle"), other)
         caller = await seeding.within(SomeoneOf(domain, role=UserRole.SUPERADMIN))
         return AliasesAndACaller(
             image=seeding.made(wanted),
@@ -414,7 +486,7 @@ class AliasesOnTwoImagesAndSomeone(Given[Any, AliasesAndACaller]):
 
 
 @dataclass(frozen=True)
-class SomeoneReachingImages(SeedNest[Laid[None]]):
+class SomeoneReachingImages(TestSeedNest[Laid[None]]):
     """그 레지스트리 안의 이미지를 조회·소프트 삭제·완전 삭제할 수 있는 사용자.
 
     이미지는 자신을 담은 레지스트리 아래에 만들어진다. 그래서 역할이 놓이는 스코프는
@@ -429,13 +501,13 @@ class SomeoneReachingImages(SeedNest[Laid[None]]):
         return "이미지를 다룰 권한을 받은 사용자 준비"
 
     @override
-    def lay(self, seed: Seeder) -> Laid[None]:
+    def lay(self, seed: TestSeeder) -> Laid[None]:
         role = seed.creating_from(
-            SeedRole(lambda one: ContainerRegistryID(one.id), name_hint="image-keeper"),
+            TestSeedRole(lambda one: ContainerRegistryID(one.id), name_hint="image-keeper"),
             self.registry,
         )
         for allowed in REACHING:
-            seed.adding(SeedPermission(entity_type=ImageEntityType(), permission=allowed), role)
+            seed.adding(TestSeedPermission(entity_type=ImageEntityType(), permission=allowed), role)
         return seed.granting(
             role, self.someone, role_id=lambda r: r.id, user_id=lambda u: UserID(u.id)
         )
@@ -518,6 +590,15 @@ class TheImageNode(Then[Any, ImageNode]):
             self.resource_limits_gql if self.resource_limits_gql is not None else DEFAULT_LIMITS_GQL
         )
         written = WrittenByThisRun(datetime.now(UTC))
+        creator: Verdict = (
+            Same("creator_id", node.creator_id, None)
+            if image.creator_id is None
+            else Held[UserID | None](
+                "creator_id",
+                node.creator_id,
+                SameAs(image.creator_id, "이미지를 커밋한 사용자의 ID"),
+            )
+        )
         return [
             Held("id", node.id, SameAs(planted, "미리 만들어 둔 이미지의 ID")),
             Same("name", node.name, name),
@@ -544,6 +625,8 @@ class TheImageNode(Then[Any, ImageNode]):
             Same("accelerators", node.accelerators, self.accelerators.named()),
             Same("config_digest", node.config_digest, config_digest),
             Same("is_local", node.is_local, is_local),
+            Same("customized", node.customized, image.customized),
+            creator,
             Held("created_at", node.created_at, written),
             Skipped("last_used_at", "세션이 기록하는 값이라 이 실행에서는 알 수 없다"),
             Same("identity.canonical_name", identity.canonical_name, name),

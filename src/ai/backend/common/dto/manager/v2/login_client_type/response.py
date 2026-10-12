@@ -8,7 +8,6 @@ from uuid import UUID
 from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseResponseModel
-from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 
 __all__ = (
     "SearchLoginClientTypesPayload",
@@ -24,7 +23,7 @@ class LoginClientTypeNode(BaseResponseModel):
 
     id: UUID = Field(description="Login client type UUID.")
     entity_id: UUID = Field(
-        description=f"UUID of the login client type. Added in {NEXT_RELEASE_VERSION}.",
+        description="UUID of the login client type. Added in 26.9.0.",
     )
     name: str = Field(description="Unique login client type name.")
     description: str | None = Field(description="Optional description.")

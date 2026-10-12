@@ -10,7 +10,6 @@ python_sources(
         "__init__.py": {"dependencies": [":version"]},
         "api/rest/app.py": {"dependencies": [":vendor"]},
         "cli/dbschema.py": {"dependencies": [":revision-history"]},
-        "data/permission/seed/loader.py": {"dependencies": [":seed-roles"]},
     },
 )
 
@@ -218,10 +217,6 @@ resources(
         "vendor/*",
         "vendor/**/*",
     ],
-)
-resources(
-    name="seed-roles",
-    sources=["data/permission/seed/roles/*.yaml"],
 )
 resources(
     name="revision-history",

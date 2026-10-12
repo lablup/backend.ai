@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import uuid
 from typing import Any, cast
 
 import strawberry
@@ -15,7 +14,7 @@ from ai.backend.common.dto.manager.v2.notification.request import (
     SearchNotificationChannelsInput,
     SearchNotificationRulesInput,
 )
-from ai.backend.manager.api.gql.base import encode_cursor
+from ai.backend.manager.api.gql.base import encode_cursor, parse_uuid
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     gql_connection_type,
@@ -95,7 +94,7 @@ async def admin_notification_channel(
     id: ID, info: Info[StrawberryGQLContext]
 ) -> NotificationChannel | None:
     check_admin_only()
-    result = await info.context.adapters.notification.get_channel(uuid.UUID(id))
+    result = await info.context.adapters.notification.get_channel(parse_uuid(id))
     return NotificationChannel.from_pydantic(result.item)
 
 
@@ -106,7 +105,7 @@ async def admin_notification_channel(
 async def notification_channel(
     id: ID, info: Info[StrawberryGQLContext]
 ) -> NotificationChannel | None:
-    result = await info.context.adapters.notification.get_channel(uuid.UUID(id))
+    result = await info.context.adapters.notification.get_channel(parse_uuid(id))
     return NotificationChannel.from_pydantic(result.item)
 
 
@@ -214,7 +213,7 @@ async def admin_notification_rule(
     id: ID, info: Info[StrawberryGQLContext]
 ) -> NotificationRule | None:
     check_admin_only()
-    result = await info.context.adapters.notification.get_rule(uuid.UUID(id))
+    result = await info.context.adapters.notification.get_rule(parse_uuid(id))
     return NotificationRule.from_pydantic(result.item)
 
 
@@ -223,7 +222,7 @@ async def admin_notification_rule(
     deprecation_reason="Use admin_notification_rule instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.",
 )  # type: ignore[misc]
 async def notification_rule(id: ID, info: Info[StrawberryGQLContext]) -> NotificationRule | None:
-    result = await info.context.adapters.notification.get_rule(uuid.UUID(id))
+    result = await info.context.adapters.notification.get_rule(parse_uuid(id))
     return NotificationRule.from_pydantic(result.item)
 
 
@@ -389,7 +388,7 @@ async def admin_update_notification_channel(
     input: UpdateNotificationChannelInput, info: Info[StrawberryGQLContext]
 ) -> UpdateNotificationChannelPayload | None:
     check_admin_only()
-    channel_id = uuid.UUID(input.id)
+    channel_id = parse_uuid(input.id)
     result = await info.context.adapters.notification.update_channel(
         channel_id, input.to_pydantic()
     )
@@ -403,7 +402,7 @@ async def admin_update_notification_channel(
 async def update_notification_channel(
     input: UpdateNotificationChannelInput, info: Info[StrawberryGQLContext]
 ) -> UpdateNotificationChannelPayload | None:
-    channel_id = uuid.UUID(input.id)
+    channel_id = parse_uuid(input.id)
     result = await info.context.adapters.notification.update_channel(
         channel_id, input.to_pydantic()
     )
@@ -472,7 +471,7 @@ async def admin_update_notification_rule(
     input: UpdateNotificationRuleInput, info: Info[StrawberryGQLContext]
 ) -> UpdateNotificationRulePayload | None:
     check_admin_only()
-    rule_id = uuid.UUID(input.id)
+    rule_id = parse_uuid(input.id)
     result = await info.context.adapters.notification.update_rule(rule_id, input.to_pydantic())
     return UpdateNotificationRulePayload.from_pydantic(result)
 
@@ -484,7 +483,7 @@ async def admin_update_notification_rule(
 async def update_notification_rule(
     input: UpdateNotificationRuleInput, info: Info[StrawberryGQLContext]
 ) -> UpdateNotificationRulePayload | None:
-    rule_id = uuid.UUID(input.id)
+    rule_id = parse_uuid(input.id)
     result = await info.context.adapters.notification.update_rule(rule_id, input.to_pydantic())
     return UpdateNotificationRulePayload.from_pydantic(result)
 

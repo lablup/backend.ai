@@ -232,6 +232,9 @@ class SessionData(EntityData):
 
     # The routing replica (RoutingRow.id) this session serves, if any.
     replica_id: UUID | None = None
+    requested_starts_at: datetime | None = field(default=None, compare=False)
+    session_group_id: SessionGroupID | None = None
+    designated_agent_ids: list[str] | None = None
 
     @override
     def entity_id(self) -> SessionID:
@@ -337,6 +340,8 @@ class SessionEntityData(EntityData):
             name=self.name,
             access_key=self.access_key,
             agent_ids=self.agent_ids,
+            designated_agent_ids=self.designated_agent_ids,
+            session_group_id=self.session_group_id,
             images=self.images,
             image_ids=self.image_ids,
             tag=self.tag,
@@ -351,6 +356,7 @@ class SessionEntityData(EntityData):
             terminated_at=self.terminated_at,
             resource_group_name=self.resource_group_name,
             starts_at=self.starts_at,
+            requested_starts_at=self.requested_starts_at,
             status_info=self.status_info,
             status_data=self.status_data,
             status_history=self.status_history,

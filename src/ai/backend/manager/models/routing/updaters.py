@@ -74,7 +74,7 @@ class ReplicaUpdater(DataUpdater[RoutingRow, RoutingData]):
 
     @override
     def to_data(self, row: RoutingRow) -> RoutingData:
-        return row.to_data()
+        return ReplicaSearchableFields.own.to_routing_data(row)
 
 
 @dataclass
@@ -120,4 +120,4 @@ class ReplicaBatchUpdater(DataBatchUpdater[RoutingRow, RoutingData]):
 
     @override
     def to_data(self, row: RoutingRow) -> RoutingData:
-        return row.to_data()
+        return ReplicaSearchableFields.own.to_routing_data(row)

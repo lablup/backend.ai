@@ -29,12 +29,12 @@ from bai_scenario.components.client_ip_masking import (
     TwoMaskingPoliciesAndSomeone,
 )
 from bai_scenario.runner.acting import ActingAs
-from bai_scenario.runner.planting import SeedingSession
+from bai_scenario.runner.planting import TestSeedingSession
 from bai_scenario.runner.steps import run_scenario
 
 type Searched = AdminSearchClientIPMaskingPoliciesPayload
 type SearchingStep = Scenario[
-    SeedingSession, ManyMaskingPoliciesAndACaller, ClientIPMaskingAdapter, Searched
+    TestSeedingSession, ManyMaskingPoliciesAndACaller, ClientIPMaskingAdapter, Searched
 ]
 
 
@@ -60,7 +60,7 @@ class SearchingEveryPolicy(When[ManyMaskingPoliciesAndACaller, ClientIPMaskingAd
 
 @dataclass(frozen=True)
 class TheSuperadminCountsEveryPolicy(
-    Scenario[SeedingSession, ManyMaskingPoliciesAndACaller, ClientIPMaskingAdapter, Searched]
+    Scenario[TestSeedingSession, ManyMaskingPoliciesAndACaller, ClientIPMaskingAdapter, Searched]
 ):
     @override
     def summary(self) -> str:
@@ -71,7 +71,7 @@ class TheSuperadminCountsEveryPolicy(
         return "대상이 다른 정책 둘이 있을 때 슈퍼관리자가 필터 없이 조회하면 둘 다 집계된다"
 
     @override
-    def given(self) -> Given[SeedingSession, ManyMaskingPoliciesAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ManyMaskingPoliciesAndACaller]:
         return TwoMaskingPoliciesAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
@@ -85,7 +85,7 @@ class TheSuperadminCountsEveryPolicy(
 
 @dataclass(frozen=True)
 class TheMonitorSearchesLikeTheSuperadmin(
-    Scenario[SeedingSession, ManyMaskingPoliciesAndACaller, ClientIPMaskingAdapter, Searched]
+    Scenario[TestSeedingSession, ManyMaskingPoliciesAndACaller, ClientIPMaskingAdapter, Searched]
 ):
     @override
     def summary(self) -> str:
@@ -96,7 +96,7 @@ class TheMonitorSearchesLikeTheSuperadmin(
         return "모니터 역할이 필터 없이 조회하면 슈퍼관리자와 같은 응답이 반환된다. 슈퍼관리자 검사는 모니터의 읽기를 허용한다"
 
     @override
-    def given(self) -> Given[SeedingSession, ManyMaskingPoliciesAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ManyMaskingPoliciesAndACaller]:
         return TwoMaskingPoliciesAndSomeone(role=UserRole.MONITOR)
 
     @override
@@ -110,7 +110,7 @@ class TheMonitorSearchesLikeTheSuperadmin(
 
 @dataclass(frozen=True)
 class AUserWhoIsNotTheSuperadminMayNotSearch(
-    Scenario[SeedingSession, ManyMaskingPoliciesAndACaller, ClientIPMaskingAdapter, Searched]
+    Scenario[TestSeedingSession, ManyMaskingPoliciesAndACaller, ClientIPMaskingAdapter, Searched]
 ):
     @override
     def summary(self) -> str:
@@ -121,7 +121,7 @@ class AUserWhoIsNotTheSuperadminMayNotSearch(
         return "슈퍼관리자가 아닌 사용자가 전체 조회를 요청하면 역할 부족으로 거부된다"
 
     @override
-    def given(self) -> Given[SeedingSession, ManyMaskingPoliciesAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ManyMaskingPoliciesAndACaller]:
         return TwoMaskingPoliciesAndSomeone()
 
     @override

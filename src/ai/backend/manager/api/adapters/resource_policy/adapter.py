@@ -77,7 +77,11 @@ from ai.backend.manager.errors.keypair import KeypairResourcePolicyNotFound
 from ai.backend.manager.errors.resource import ProjectResourcePolicyNotFound
 from ai.backend.manager.errors.user import UserResourcePolicyNotFound
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
-from ai.backend.manager.models.condition_utils import combine_conditions_or, negate_conditions
+from ai.backend.manager.models.condition_utils import (
+    combine_conditions_and,
+    combine_conditions_or,
+    negate_conditions,
+)
 from ai.backend.manager.models.keypair.searchable_fields import KeyPairSearchableFields
 from ai.backend.manager.models.resource_policy.creators import (
     KeyPairResourcePolicyCreator,
@@ -699,7 +703,9 @@ class ResourcePolicyAdapter(BaseAdapter):
         if filter.OR:
             or_conditions: list[QueryCondition] = []
             for sub_filter in filter.OR:
-                or_conditions.extend(self._convert_keypair_filter(sub_filter))
+                sub_conditions = self._convert_keypair_filter(sub_filter)
+                if sub_conditions:
+                    or_conditions.append(combine_conditions_and(sub_conditions))
             if or_conditions:
                 conditions.append(combine_conditions_or(or_conditions))
         if filter.NOT:
@@ -746,7 +752,9 @@ class ResourcePolicyAdapter(BaseAdapter):
         if filter.OR:
             or_conditions: list[QueryCondition] = []
             for sub_filter in filter.OR:
-                or_conditions.extend(self._convert_user_filter(sub_filter))
+                sub_conditions = self._convert_user_filter(sub_filter)
+                if sub_conditions:
+                    or_conditions.append(combine_conditions_and(sub_conditions))
             if or_conditions:
                 conditions.append(combine_conditions_or(or_conditions))
         if filter.NOT:
@@ -772,7 +780,9 @@ class ResourcePolicyAdapter(BaseAdapter):
         if filter.OR:
             or_conditions: list[QueryCondition] = []
             for sub_filter in filter.OR:
-                or_conditions.extend(self._convert_project_filter(sub_filter))
+                sub_conditions = self._convert_project_filter(sub_filter)
+                if sub_conditions:
+                    or_conditions.append(combine_conditions_and(sub_conditions))
             if or_conditions:
                 conditions.append(combine_conditions_or(or_conditions))
         if filter.NOT:

@@ -35,14 +35,14 @@ from bai_scenario.components.service_catalog import (
     TheFirstPageOfServices,
 )
 from bai_scenario.runner.acting import ActingAs
-from bai_scenario.runner.planting import SeedingSession
+from bai_scenario.runner.planting import TestSeedingSession
 from bai_scenario.runner.steps import run_scenario
 
 DEFAULT_PAGE = 10
 
 type Searched = AdminSearchServiceCatalogsPayload
 type SearchingStep = Scenario[
-    SeedingSession, ManyServicesAndACaller, ServiceCatalogAdapter, Searched
+    TestSeedingSession, ManyServicesAndACaller, ServiceCatalogAdapter, Searched
 ]
 
 
@@ -196,7 +196,7 @@ class SearchingByStatusNotIn(When[ManyServicesAndACaller, ServiceCatalogAdapter,
 
 @dataclass(frozen=True)
 class TheSuperadminCountsEveryServiceWithItsEndpoints(
-    Scenario[SeedingSession, ManyServicesAndACaller, ServiceCatalogAdapter, Searched]
+    Scenario[TestSeedingSession, ManyServicesAndACaller, ServiceCatalogAdapter, Searched]
 ):
     started: datetime
 
@@ -212,7 +212,7 @@ class TheSuperadminCountsEveryServiceWithItsEndpoints(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, ManyServicesAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ManyServicesAndACaller]:
         return ManyServicesAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
@@ -226,7 +226,7 @@ class TheSuperadminCountsEveryServiceWithItsEndpoints(
 
 @dataclass(frozen=True)
 class AGroupFilterNarrows(
-    Scenario[SeedingSession, ManyServicesAndACaller, ServiceCatalogAdapter, Searched]
+    Scenario[TestSeedingSession, ManyServicesAndACaller, ServiceCatalogAdapter, Searched]
 ):
     @override
     def summary(self) -> str:
@@ -239,7 +239,7 @@ class AGroupFilterNarrows(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, ManyServicesAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ManyServicesAndACaller]:
         return ServicesOfTwoGroupsAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
@@ -253,7 +253,7 @@ class AGroupFilterNarrows(
 
 @dataclass(frozen=True)
 class AStatusEqualsFilterKeepsThatStatus(
-    Scenario[SeedingSession, ManyServicesAndACaller, ServiceCatalogAdapter, Searched]
+    Scenario[TestSeedingSession, ManyServicesAndACaller, ServiceCatalogAdapter, Searched]
 ):
     @override
     def summary(self) -> str:
@@ -264,7 +264,7 @@ class AStatusEqualsFilterKeepsThatStatus(
         return "상태마다 하나씩 있는 서비스를 비정상과 같은 것으로 걸러 조회하면 비정상 서비스만 반환된다"
 
     @override
-    def given(self) -> Given[SeedingSession, ManyServicesAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ManyServicesAndACaller]:
         return ServicesOfEveryStatusAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
@@ -278,7 +278,7 @@ class AStatusEqualsFilterKeepsThatStatus(
 
 @dataclass(frozen=True)
 class AStatusNotEqualsFilterDropsThatStatus(
-    Scenario[SeedingSession, ManyServicesAndACaller, ServiceCatalogAdapter, Searched]
+    Scenario[TestSeedingSession, ManyServicesAndACaller, ServiceCatalogAdapter, Searched]
 ):
     @override
     def summary(self) -> str:
@@ -292,7 +292,7 @@ class AStatusNotEqualsFilterDropsThatStatus(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, ManyServicesAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ManyServicesAndACaller]:
         return ServicesOfEveryStatusAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
@@ -309,7 +309,7 @@ class AStatusNotEqualsFilterDropsThatStatus(
 
 @dataclass(frozen=True)
 class AStatusInFilterKeepsListedStatuses(
-    Scenario[SeedingSession, ManyServicesAndACaller, ServiceCatalogAdapter, Searched]
+    Scenario[TestSeedingSession, ManyServicesAndACaller, ServiceCatalogAdapter, Searched]
 ):
     @override
     def summary(self) -> str:
@@ -323,7 +323,7 @@ class AStatusInFilterKeepsListedStatuses(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, ManyServicesAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ManyServicesAndACaller]:
         return ServicesOfEveryStatusAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
@@ -343,7 +343,7 @@ class AStatusInFilterKeepsListedStatuses(
 
 @dataclass(frozen=True)
 class AStatusNotInFilterDropsListedStatuses(
-    Scenario[SeedingSession, ManyServicesAndACaller, ServiceCatalogAdapter, Searched]
+    Scenario[TestSeedingSession, ManyServicesAndACaller, ServiceCatalogAdapter, Searched]
 ):
     @override
     def summary(self) -> str:
@@ -357,7 +357,7 @@ class AStatusNotInFilterDropsListedStatuses(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, ManyServicesAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ManyServicesAndACaller]:
         return ServicesOfEveryStatusAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
@@ -374,7 +374,7 @@ class AStatusNotInFilterDropsListedStatuses(
 
 @dataclass(frozen=True)
 class OmittingThePageSizeGivesTen(
-    Scenario[SeedingSession, ManyServicesAndACaller, ServiceCatalogAdapter, Searched]
+    Scenario[TestSeedingSession, ManyServicesAndACaller, ServiceCatalogAdapter, Searched]
 ):
     @override
     def summary(self) -> str:
@@ -385,7 +385,7 @@ class OmittingThePageSizeGivesTen(
         return "서비스 11개가 있을 때 크기 없이 조회하면 10건까지 반환되고 다음 페이지가 있다고 응답한다"
 
     @override
-    def given(self) -> Given[SeedingSession, ManyServicesAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ManyServicesAndACaller]:
         return ManyServicesAndSomeone(role=UserRole.SUPERADMIN, besides=DEFAULT_PAGE)
 
     @override
@@ -399,7 +399,7 @@ class OmittingThePageSizeGivesTen(
 
 @dataclass(frozen=True)
 class TheMonitorSeesWhatTheSuperadminSees(
-    Scenario[SeedingSession, ManyServicesAndACaller, ServiceCatalogAdapter, Searched]
+    Scenario[TestSeedingSession, ManyServicesAndACaller, ServiceCatalogAdapter, Searched]
 ):
     started: datetime
 
@@ -415,7 +415,7 @@ class TheMonitorSeesWhatTheSuperadminSees(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, ManyServicesAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ManyServicesAndACaller]:
         return ManyServicesAndSomeone(role=UserRole.MONITOR)
 
     @override
@@ -429,7 +429,7 @@ class TheMonitorSeesWhatTheSuperadminSees(
 
 @dataclass(frozen=True)
 class AUserWhoIsNotTheSuperadminMayNotSearch(
-    Scenario[SeedingSession, ManyServicesAndACaller, ServiceCatalogAdapter, Searched]
+    Scenario[TestSeedingSession, ManyServicesAndACaller, ServiceCatalogAdapter, Searched]
 ):
     @override
     def summary(self) -> str:
@@ -440,7 +440,7 @@ class AUserWhoIsNotTheSuperadminMayNotSearch(
         return "슈퍼관리자가 아닌 사용자가 전체 조회를 요청하면 역할 부족으로 거부된다"
 
     @override
-    def given(self) -> Given[SeedingSession, ManyServicesAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ManyServicesAndACaller]:
         return ManyServicesAndSomeone()
 
     @override

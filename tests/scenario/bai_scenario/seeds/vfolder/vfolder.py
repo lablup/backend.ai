@@ -19,11 +19,11 @@ from ai.backend.manager.models.vfolder.creators import (
     PersonalVFolderCreator,
     ProjectVFolderCreator,
 )
-from bai_scenario.seeds.seeder import Naming, SeedRowFrom, SeedRowFromTwo
+from bai_scenario.seeds.seeder import Naming, TestSeedRowFrom, TestSeedRowFromTwo
 
 
 @dataclass(frozen=True)
-class SeedPersonalVFolder(SeedRowFrom[UserData, VFolderData]):
+class TestSeedPersonalVFolder(TestSeedRowFrom[UserData, VFolderData]):
     """A ready folder of the given person's own, on the given host."""
 
     host: str
@@ -62,7 +62,7 @@ class SeedPersonalVFolder(SeedRowFrom[UserData, VFolderData]):
 
 
 @dataclass(frozen=True)
-class SeedProjectVFolder(SeedRowFromTwo[ProjectData, UserData, VFolderData]):
+class TestSeedProjectVFolder(TestSeedRowFromTwo[ProjectData, UserData, VFolderData]):
     """A ready folder of the given project, made by the given person, on the given host."""
 
     host: str

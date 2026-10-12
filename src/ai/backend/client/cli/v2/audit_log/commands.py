@@ -54,11 +54,26 @@ def audit_log() -> None:
     help="Filter by acted-as (effective/acting user UUID, exact match).",
 )
 @click.option(
+    "--action-name",
+    type=str,
+    default=None,
+    help="Filter by action name (contains).",
+)
+@click.option(
+    "--action-kind",
+    type=click.Choice(
+        ["single_entity", "bulk", "scope", "relation", "membership", "global", "lookup"],
+        case_sensitive=False,
+    ),
+    default=None,
+    help="Filter by action kind.",
+)
+@click.option(
     "--order-by",
     multiple=True,
     help=(
         "Order by field:direction (e.g., created_at:desc). "
-        "Fields: created_at, entity_type, operation, status."
+        "Fields: created_at, entity_type, operation, status, action_name, action_kind."
     ),
 )
 def search(
@@ -69,24 +84,39 @@ def search(
     status: str | None,
     triggered_by: str | None,
     acted_as: uuid.UUID | None,
+    action_name: str | None,
+    action_kind: str | None,
     order_by: tuple[str, ...],
 ) -> None:
     """Search audit logs."""
     from ai.backend.common.dto.manager.query import StringFilter, UUIDFilter
     from ai.backend.common.dto.manager.v2.audit_log.request import (
         AdminSearchAuditLogsInput,
+        AuditLogActionKindFilter,
         AuditLogFilter,
         AuditLogOrder,
         AuditLogStatusFilter,
     )
     from ai.backend.common.dto.manager.v2.audit_log.types import (
+        AuditLogActionKind,
         AuditLogOrderField,
         AuditLogStatus,
     )
 
     # Build filter only if any filter option is provided
     filter_dto: AuditLogFilter | None = None
-    if any(opt is not None for opt in (entity_type, operation, status, triggered_by, acted_as)):
+    if any(
+        opt is not None
+        for opt in (
+            entity_type,
+            operation,
+            status,
+            triggered_by,
+            acted_as,
+            action_name,
+            action_kind,
+        )
+    ):
         filter_dto = AuditLogFilter(
             entity_type=(StringFilter(contains=entity_type) if entity_type is not None else None),
             operation=StringFilter(contains=operation) if operation is not None else None,
@@ -97,6 +127,12 @@ def search(
                 StringFilter(contains=triggered_by) if triggered_by is not None else None
             ),
             acted_as=(UUIDFilter(equals=acted_as) if acted_as is not None else None),
+            action_name=(StringFilter(contains=action_name) if action_name is not None else None),
+            action_kind=(
+                AuditLogActionKindFilter(equals=AuditLogActionKind(action_kind))
+                if action_kind is not None
+                else None
+            ),
         )
 
     # Build order only if --order-by is provided

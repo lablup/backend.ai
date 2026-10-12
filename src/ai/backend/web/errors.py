@@ -126,6 +126,19 @@ class ProxyTargetUnreachableError(BackendAIError, web.HTTPBadGateway):
         )
 
 
+class SignupDisabledError(BackendAIError, web.HTTPForbidden):
+    error_type = "https://api.backend.ai/probs/webserver/signup-disabled"
+    error_title = "Signup is disabled."
+
+    @override
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.AUTH,
+            operation=ErrorOperation.CREATE,
+            error_detail=ErrorDetail.FORBIDDEN,
+        )
+
+
 class StaticFileNotFoundError(BackendAIError, web.HTTPNotFound):
     error_type = "https://api.backend.ai/probs/generic-not-found"
     error_title = "Not Found"

@@ -35,7 +35,6 @@ from ai.backend.common.types import AccessKey, SessionTypes
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.data.keypair.types import KeyPairSecrets
-from ai.backend.manager.data.permission.seed.loader import RoleSeedLoader
 from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.models.entity_label.row import EntityLabelRow
 from ai.backend.manager.models.hasher.types import PasswordInfo
@@ -57,10 +56,40 @@ from ai.backend.manager.models.virtual_entity.virtual_entity import VirtualEntit
 from ai.backend.manager.repositories.ops.v2.user.provider import UserOpsProvider
 from ai.backend.manager.repositories.ops.v2.user.write import FullUserCreator
 from ai.backend.manager.secret.types import SecretValue
+from ai.backend.manager.seed.role_preset.role import RoleSeed
 from ai.backend.testutils.fixtures import DomainFixtureData
 
 if TYPE_CHECKING:
     from tests.component.conftest import ServerInfo
+
+_USER_OWNER: dict[str, Any] = {
+    "id": "776c1366-dcf3-5abd-b8de-bc3ad3b759ad",
+    "name": "user_owner",
+    "scope_type": "user",
+    "auto_assign": True,
+    "permissions": {
+        "agent": ["read"],
+        "app_config_fragment": ["read", "update", "create", "soft_delete", "hard_delete"],
+        "container_registry": ["read"],
+        "deployment": ["read", "update", "create", "soft_delete", "hard_delete"],
+        "domain": ["read"],
+        "entity_share": ["read", "update", "create", "soft_delete", "hard_delete"],
+        "idle_checker": ["read", "update", "create", "soft_delete", "hard_delete"],
+        "image": ["read", "update", "create", "soft_delete", "hard_delete"],
+        "keypair_resource_policy": ["read"],
+        "network": ["read", "update", "create", "soft_delete", "hard_delete"],
+        "project": ["read"],
+        "resource_group": ["read"],
+        "resource_preset": ["read", "update", "create", "soft_delete", "hard_delete"],
+        "role": ["read"],
+        "session": ["read", "update", "create", "soft_delete", "hard_delete"],
+        "session_group": ["read", "update", "create", "soft_delete", "hard_delete"],
+        "session_template": ["read", "update", "create", "soft_delete", "hard_delete"],
+        "user": ["read", "update", "soft_delete", "hard_delete"],
+        "user_resource_policy": ["read"],
+        "vfolder": ["read", "update", "create", "soft_delete", "hard_delete"],
+    },
+}
 
 _BITS = (
     Permission.READ,
@@ -80,8 +109,8 @@ class _Owner:
 
 @pytest.fixture()
 async def declared_user_owner_preset(db_engine: SAEngine) -> AsyncIterator[uuid.UUID]:
-    """The user_owner preset and its grants as the seed declaration states them."""
-    [seed] = [seed for seed in RoleSeedLoader().load() if seed.name == "user_owner"]
+    """The user_owner preset and its grants, as `seeds/manager/role_preset/` states them."""
+    seed = RoleSeed.model_validate(_USER_OWNER)
     async with db_engine.begin() as conn:
         await conn.execute(
             sa.insert(RolePresetRow.__table__).values(

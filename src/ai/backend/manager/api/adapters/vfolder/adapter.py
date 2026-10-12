@@ -109,7 +109,11 @@ from ai.backend.manager.data.vfolder.types import (
 )
 from ai.backend.manager.errors.resource import NotAModelVFolder
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
-from ai.backend.manager.models.condition_utils import combine_conditions_or, negate_conditions
+from ai.backend.manager.models.condition_utils import (
+    combine_conditions_and,
+    combine_conditions_or,
+    negate_conditions,
+)
 from ai.backend.manager.models.scopes import ScopeTarget
 from ai.backend.manager.models.specs.search.usage import UsedBy
 from ai.backend.manager.models.specs.searcher import GlobalSearcher, ScopedSearcher
@@ -466,7 +470,9 @@ class VFolderAdapter(BaseAdapter):
             creator_id=me.user_id,
             user=UserID(me.user_id),
             usage_mode=VFolderUsageMode(input.usage_mode.value),
-            default_mount_permission=VFolderMountPolicy(input.permission.value),
+            default_mount_permission=(
+                None if input.permission is None else VFolderMountPolicy(input.permission.value)
+            ),
             cloneable=input.cloneable,
         )
 
@@ -485,7 +491,9 @@ class VFolderAdapter(BaseAdapter):
             creator_id=me.user_id,
             project=project_id,
             usage_mode=VFolderUsageMode(input.usage_mode.value),
-            default_mount_permission=VFolderMountPolicy(input.permission.value),
+            default_mount_permission=(
+                None if input.permission is None else VFolderMountPolicy(input.permission.value)
+            ),
             cloneable=input.cloneable,
         )
 
@@ -862,7 +870,9 @@ class VFolderAdapter(BaseAdapter):
         if f.OR:
             or_conditions: list[QueryCondition] = []
             for sub in f.OR:
-                or_conditions.extend(self._convert_vfolder_filter(sub))
+                sub_conditions = self._convert_vfolder_filter(sub)
+                if sub_conditions:
+                    or_conditions.append(combine_conditions_and(sub_conditions))
             if or_conditions:
                 conditions.append(combine_conditions_or(or_conditions))
         if f.NOT:

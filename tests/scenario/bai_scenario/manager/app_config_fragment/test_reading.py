@@ -26,11 +26,11 @@ from bai_scenario.components.app_config_fragment import (
     Whose,
 )
 from bai_scenario.runner.acting import ActingAs
-from bai_scenario.runner.planting import SeedingSession
+from bai_scenario.runner.planting import TestSeedingSession
 from bai_scenario.runner.steps import run_scenario
 
 type ReadingStep = Scenario[
-    SeedingSession, AFragmentAndACaller, AppConfigFragmentAdapter, AppConfigFragmentNode
+    TestSeedingSession, AFragmentAndACaller, AppConfigFragmentAdapter, AppConfigFragmentNode
 ]
 
 
@@ -62,7 +62,9 @@ class ReadingById(When[AFragmentAndACaller, AppConfigFragmentAdapter, AppConfigF
 
 @dataclass(frozen=True)
 class TheGrantedUserReadsTheirOwn(
-    Scenario[SeedingSession, AFragmentAndACaller, AppConfigFragmentAdapter, AppConfigFragmentNode]
+    Scenario[
+        TestSeedingSession, AFragmentAndACaller, AppConfigFragmentAdapter, AppConfigFragmentNode
+    ]
 ):
     started: datetime
 
@@ -75,7 +77,7 @@ class TheGrantedUserReadsTheirOwn(
         return "자기 조각 하나가 있고 자기 스코프에 읽기 권한을 받은 사용자가 id로 조회하면, 그 조각 전체가 반환된다"
 
     @override
-    def given(self) -> Given[SeedingSession, AFragmentAndACaller]:
+    def given(self) -> Given[TestSeedingSession, AFragmentAndACaller]:
         return AFragmentAndSomeone(granted=(Permission.READ,))
 
     @override
@@ -89,7 +91,9 @@ class TheGrantedUserReadsTheirOwn(
 
 @dataclass(frozen=True)
 class AnotherUsersFragmentIsRefused(
-    Scenario[SeedingSession, AFragmentAndACaller, AppConfigFragmentAdapter, AppConfigFragmentNode]
+    Scenario[
+        TestSeedingSession, AFragmentAndACaller, AppConfigFragmentAdapter, AppConfigFragmentNode
+    ]
 ):
     @override
     def summary(self) -> str:
@@ -100,7 +104,7 @@ class AnotherUsersFragmentIsRefused(
         return "다른 사용자의 조각을 자기 스코프에만 읽기 권한을 받은 사용자가 id로 조회하면, 권한 부족으로 거부된다"
 
     @override
-    def given(self) -> Given[SeedingSession, AFragmentAndACaller]:
+    def given(self) -> Given[TestSeedingSession, AFragmentAndACaller]:
         return AFragmentAndSomeone(whose=Whose.ANOTHERS, granted=(Permission.READ,))
 
     @override
@@ -114,7 +118,9 @@ class AnotherUsersFragmentIsRefused(
 
 @dataclass(frozen=True)
 class APublicFragmentIsReadByIdByAnyone(
-    Scenario[SeedingSession, AFragmentAndACaller, AppConfigFragmentAdapter, AppConfigFragmentNode]
+    Scenario[
+        TestSeedingSession, AFragmentAndACaller, AppConfigFragmentAdapter, AppConfigFragmentNode
+    ]
 ):
     started: datetime
 
@@ -127,7 +133,7 @@ class APublicFragmentIsReadByIdByAnyone(
         return "공개 조각을 아무 권한도 없는 사용자가 id로 조회하면, 스코프로 조회할 때와 같이 그 조각 전체가 반환된다"
 
     @override
-    def given(self) -> Given[SeedingSession, AFragmentAndACaller]:
+    def given(self) -> Given[TestSeedingSession, AFragmentAndACaller]:
         return AFragmentAndSomeone(whose=Whose.PUBLIC)
 
     @override
@@ -141,7 +147,9 @@ class APublicFragmentIsReadByIdByAnyone(
 
 @dataclass(frozen=True)
 class AnUnknownIdIsRefusedAsPermission(
-    Scenario[SeedingSession, AFragmentAndACaller, AppConfigFragmentAdapter, AppConfigFragmentNode]
+    Scenario[
+        TestSeedingSession, AFragmentAndACaller, AppConfigFragmentAdapter, AppConfigFragmentNode
+    ]
 ):
     @override
     def summary(self) -> str:
@@ -155,7 +163,7 @@ class AnUnknownIdIsRefusedAsPermission(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, AFragmentAndACaller]:
+    def given(self) -> Given[TestSeedingSession, AFragmentAndACaller]:
         return AFragmentAndSomeone(granted=(Permission.READ,))
 
     @override
@@ -169,7 +177,9 @@ class AnUnknownIdIsRefusedAsPermission(
 
 @dataclass(frozen=True)
 class AnUnknownIdIsNotFoundForASuperadmin(
-    Scenario[SeedingSession, AFragmentAndACaller, AppConfigFragmentAdapter, AppConfigFragmentNode]
+    Scenario[
+        TestSeedingSession, AFragmentAndACaller, AppConfigFragmentAdapter, AppConfigFragmentNode
+    ]
 ):
     @override
     def summary(self) -> str:
@@ -183,7 +193,7 @@ class AnUnknownIdIsNotFoundForASuperadmin(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, AFragmentAndACaller]:
+    def given(self) -> Given[TestSeedingSession, AFragmentAndACaller]:
         return AFragmentAndSomeone(role=UserRole.SUPERADMIN)
 
     @override

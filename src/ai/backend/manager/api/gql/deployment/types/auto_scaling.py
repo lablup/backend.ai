@@ -49,7 +49,6 @@ from ai.backend.common.dto.manager.v2.deployment.response import (
 from ai.backend.common.dto.manager.v2.deployment.types import (
     AutoScalingRuleOrderField,
 )
-from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import (
     DateTimeFilter,
     DecimalFilter,
@@ -89,7 +88,7 @@ class AutoScalingMetricSource(StrEnum):
 @gql_pydantic_input(
     BackendAIGQLMeta(
         description="Filter for the auto-scaling metric source.",
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.9.0",
     ),
     name="AutoScalingMetricSourceFilter",
 )
@@ -119,56 +118,44 @@ class AutoScalingRuleFilter(PydanticInputMixin[AutoScalingRuleFilterDTO]):
     last_triggered_at: NullableDateTimeFilter | None = None
 
     field_id: UUIDFilter | None = gql_added_field(
-        BackendAIGQLMeta(added_version=NEXT_RELEASE_VERSION, description="Filter by rule ID."),
+        BackendAIGQLMeta(added_version="26.9.0", description="Filter by rule ID."),
         default=None,
     )
     metric_source: AutoScalingMetricSourceFilterGQL | None = gql_added_field(
-        BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION, description="Filter by metric source."
-        ),
+        BackendAIGQLMeta(added_version="26.9.0", description="Filter by metric source."),
         default=None,
     )
     metric_name: StringFilter | None = gql_added_field(
-        BackendAIGQLMeta(added_version=NEXT_RELEASE_VERSION, description="Filter by metric name."),
+        BackendAIGQLMeta(added_version="26.9.0", description="Filter by metric name."),
         default=None,
     )
     min_threshold: DecimalFilter | None = gql_added_field(
-        BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION, description="Filter by the scale-down threshold."
-        ),
+        BackendAIGQLMeta(added_version="26.9.0", description="Filter by the scale-down threshold."),
         default=None,
     )
     max_threshold: DecimalFilter | None = gql_added_field(
-        BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION, description="Filter by the scale-up threshold."
-        ),
+        BackendAIGQLMeta(added_version="26.9.0", description="Filter by the scale-up threshold."),
         default=None,
     )
     step_size: IntFilter | None = gql_added_field(
-        BackendAIGQLMeta(added_version=NEXT_RELEASE_VERSION, description="Filter by step size."),
+        BackendAIGQLMeta(added_version="26.9.0", description="Filter by step size."),
         default=None,
     )
     time_window: IntFilter | None = gql_added_field(
-        BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION, description="Filter by the cooldown window."
-        ),
+        BackendAIGQLMeta(added_version="26.9.0", description="Filter by the cooldown window."),
         default=None,
     )
     min_replicas: IntFilter | None = gql_added_field(
-        BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION, description="Filter by the replica floor."
-        ),
+        BackendAIGQLMeta(added_version="26.9.0", description="Filter by the replica floor."),
         default=None,
     )
     max_replicas: IntFilter | None = gql_added_field(
-        BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION, description="Filter by the replica ceiling."
-        ),
+        BackendAIGQLMeta(added_version="26.9.0", description="Filter by the replica ceiling."),
         default=None,
     )
     prometheus_query_preset_id: UUIDFilter | None = gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION, description="Filter by the Prometheus query preset."
+            added_version="26.9.0", description="Filter by the Prometheus query preset."
         ),
         default=None,
     )
@@ -194,7 +181,7 @@ class AutoScalingRule(PydanticNodeMixin[AutoScalingRuleNodeDTO]):
     id: NodeID[str]
     field_id: UUID = gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.9.0",
             description="UUID of the auto scaling rule.",
         ),
     )
