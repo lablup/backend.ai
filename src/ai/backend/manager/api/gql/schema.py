@@ -8,7 +8,6 @@ from strawberry.federation import Schema
 from strawberry.schema.config import StrawberryConfig
 from strawberry.types import ExecutionContext
 
-from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.agent.resolver import (
     admin_update_agent_resource_group,
     agent_stats,
@@ -211,6 +210,7 @@ from ai.backend.manager.api.gql.idle_checker_assignment.resolver import (
 from ai.backend.manager.api.gql.image.resolver import (
     admin_image_aliases,
     admin_images_v2,
+    admin_scan_image,
     container_registry_images_v2,
     image_alias,
     image_scoped_aliases,
@@ -891,6 +891,7 @@ class Query:
 
 @strawberry.type
 class Mutation:
+    admin_scan_image = admin_scan_image
     admin_update_agent_resource_group = admin_update_agent_resource_group
     admin_create_idle_checker = admin_create_idle_checker
     admin_update_idle_checker = admin_update_idle_checker
@@ -1244,7 +1245,7 @@ schema = CustomizedSchema(
 )
 
 
-@gql_root_field(BackendAIGQLMeta(added_version=NEXT_RELEASE_VERSION, description="Returns 'pong'"))  # type: ignore[misc]
+@gql_root_field(BackendAIGQLMeta(added_version="26.9.0", description="Returns 'pong'"))  # type: ignore[misc]
 async def ping() -> str:
     return "pong"
 

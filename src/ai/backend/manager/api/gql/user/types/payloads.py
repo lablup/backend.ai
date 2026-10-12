@@ -50,7 +50,6 @@ from ai.backend.common.dto.manager.v2.user.response import (
 from ai.backend.common.dto.manager.v2.user.response import (
     UpdateUserPayload as UpdateUserPayloadDTO,
 )
-from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     gql_added_field,
@@ -212,7 +211,7 @@ class DeleteUserPayloadGQL:
 
 @gql_pydantic_type(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.9.0",
         description="Payload for single user restore mutation.",
     ),
     model=RestoreUserPayloadDTO,
@@ -300,7 +299,7 @@ class BulkPurgeUsersV2PayloadGQL:
 
     successes: list[UUID] = gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.9.0",
             description=(
                 "UUIDs of the users that were purged, in the order they were requested. "
                 "Together with `failed` this answers for every requested user exactly once."
@@ -310,7 +309,7 @@ class BulkPurgeUsersV2PayloadGQL:
     purged_count: int = gql_added_field(
         BackendAIGQLMeta(
             added_version="26.3.0",
-            deprecated_version=NEXT_RELEASE_VERSION,
+            deprecated_version="26.9.0",
             description="Number of users successfully purged.",
         ),
         deprecation_reason="Use the length of successes.",

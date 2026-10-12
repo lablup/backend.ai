@@ -37,7 +37,7 @@ from bai_scenario.components.system import (
     lay_a_public_reader,
     role_named,
 )
-from bai_scenario.seeds.resource_slot.slot_type import SeedResourceSlotType
+from bai_scenario.seeds.resource_slot.slot_type import TestSeedResourceSlotType
 
 DISPLAYED = "미리 만들어 둔 슬롯"
 """시드가 미리 만들어 두는 슬롯 종류의 표시 이름. 시나리오가 기대값으로 다시 쓰므로 한 곳에 둔다."""
@@ -76,7 +76,7 @@ class ASlotTypeAndSomeone(Given[Any, ASlotTypeAndACaller]):
 
     @override
     async def lay(self, seeding: Any) -> ASlotTypeAndACaller:
-        slot_type = await seeding.creating(SeedResourceSlotType(enabled=self.enabled))
+        slot_type = await seeding.creating(TestSeedResourceSlotType(enabled=self.enabled))
         caller = await lay_a_public_reader(seeding, ResourceSlotTypeEntityType(), self.role)
         return ASlotTypeAndACaller(seeding.made(slot_type), seeding.made(caller))
 
@@ -97,14 +97,14 @@ class ManySlotTypesAndSomeone(Given[Any, ManySlotTypesAndACaller]):
     @override
     async def lay(self, seeding: Any) -> ManySlotTypesAndACaller:
         wanted = await seeding.creating(
-            SeedResourceSlotType(
+            TestSeedResourceSlotType(
                 name_hint="wanted",
                 slot_type=self.named_kind,
                 display_name=self.named_display_name,
             )
         )
         others = [
-            await seeding.creating(SeedResourceSlotType(name_hint="other"))
+            await seeding.creating(TestSeedResourceSlotType(name_hint="other"))
             for _ in range(self.besides)
         ]
         caller = await lay_a_public_reader(seeding, ResourceSlotTypeEntityType(), self.role)

@@ -47,14 +47,14 @@ from bai_scenario.components.deployment_revision import (
     TheRevisionNode,
 )
 from bai_scenario.runner.acting import ActingAs
-from bai_scenario.runner.planting import SeedingSession
+from bai_scenario.runner.planting import TestSeedingSession
 from bai_scenario.runner.steps import run_scenario
 
 MEMORY_ONLY: tuple[tuple[str, Decimal], ...] = tuple(
     one for one in SLOTS if one[0] == str(IntrinsicSlotNames.MEMORY.value)
 )
 
-type AddingStep = Scenario[SeedingSession, RevisionsAndACaller, DeploymentAdapter, RevisionNode]
+type AddingStep = Scenario[TestSeedingSession, RevisionsAndACaller, DeploymentAdapter, RevisionNode]
 
 
 @dataclass(frozen=True)
@@ -136,7 +136,7 @@ class AddingARevision(When[RevisionsAndACaller, DeploymentAdapter, RevisionNode]
 
 @dataclass(frozen=True)
 class TheGrantedUserAddsTheFirst(
-    Scenario[SeedingSession, RevisionsAndACaller, DeploymentAdapter, RevisionNode]
+    Scenario[TestSeedingSession, RevisionsAndACaller, DeploymentAdapter, RevisionNode]
 ):
     started: datetime
 
@@ -152,7 +152,7 @@ class TheGrantedUserAddsTheFirst(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, RevisionsAndACaller]:
+    def given(self) -> Given[TestSeedingSession, RevisionsAndACaller]:
         return ADeploymentToRevise(granted=(Permission.CREATE,))
 
     @override
@@ -166,7 +166,7 @@ class TheGrantedUserAddsTheFirst(
 
 @dataclass(frozen=True)
 class TheNextOneIsNumberedOnePast(
-    Scenario[SeedingSession, RevisionsAndACaller, DeploymentAdapter, RevisionNode]
+    Scenario[TestSeedingSession, RevisionsAndACaller, DeploymentAdapter, RevisionNode]
 ):
     started: datetime
 
@@ -179,7 +179,7 @@ class TheNextOneIsNumberedOnePast(
         return "리비전 하나가 딸린 배포에 리비전을 더하면, 번호 2를 단 리비전이 온다"
 
     @override
-    def given(self) -> Given[SeedingSession, RevisionsAndACaller]:
+    def given(self) -> Given[TestSeedingSession, RevisionsAndACaller]:
         return ADeploymentToRevise(granted=(Permission.CREATE,), revisions=1)
 
     @override
@@ -193,7 +193,7 @@ class TheNextOneIsNumberedOnePast(
 
 @dataclass(frozen=True)
 class LeavingOutResourcesRunsOnOneNodeWithNoSlot(
-    Scenario[SeedingSession, RevisionsAndACaller, DeploymentAdapter, RevisionNode]
+    Scenario[TestSeedingSession, RevisionsAndACaller, DeploymentAdapter, RevisionNode]
 ):
     started: datetime
 
@@ -209,7 +209,7 @@ class LeavingOutResourcesRunsOnOneNodeWithNoSlot(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, RevisionsAndACaller]:
+    def given(self) -> Given[TestSeedingSession, RevisionsAndACaller]:
         return ADeploymentToRevise(granted=(Permission.CREATE,))
 
     @override
@@ -223,7 +223,7 @@ class LeavingOutResourcesRunsOnOneNodeWithNoSlot(
 
 @dataclass(frozen=True)
 class AMountBeyondTheFolderIsRefused(
-    Scenario[SeedingSession, RevisionsAndACaller, DeploymentAdapter, RevisionNode]
+    Scenario[TestSeedingSession, RevisionsAndACaller, DeploymentAdapter, RevisionNode]
 ):
     @override
     def summary(self) -> str:
@@ -237,7 +237,7 @@ class AMountBeyondTheFolderIsRefused(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, RevisionsAndACaller]:
+    def given(self) -> Given[TestSeedingSession, RevisionsAndACaller]:
         return ADeploymentToRevise(granted=(Permission.CREATE,), folder_lent=True)
 
     @override
@@ -251,7 +251,7 @@ class AMountBeyondTheFolderIsRefused(
 
 @dataclass(frozen=True)
 class NoImageAnywhereIsRefused(
-    Scenario[SeedingSession, RevisionsAndACaller, DeploymentAdapter, RevisionNode]
+    Scenario[TestSeedingSession, RevisionsAndACaller, DeploymentAdapter, RevisionNode]
 ):
     @override
     def summary(self) -> str:
@@ -262,7 +262,7 @@ class NoImageAnywhereIsRefused(
         return "프리셋 없이 이미지를 빼고 리비전을 더하면, 입력이 틀렸다는 이유로 거부된다"
 
     @override
-    def given(self) -> Given[SeedingSession, RevisionsAndACaller]:
+    def given(self) -> Given[TestSeedingSession, RevisionsAndACaller]:
         return ADeploymentToRevise(granted=(Permission.CREATE,))
 
     @override
@@ -276,7 +276,7 @@ class NoImageAnywhereIsRefused(
 
 @dataclass(frozen=True)
 class NoRuntimeAnywhereIsRefused(
-    Scenario[SeedingSession, RevisionsAndACaller, DeploymentAdapter, RevisionNode]
+    Scenario[TestSeedingSession, RevisionsAndACaller, DeploymentAdapter, RevisionNode]
 ):
     @override
     def summary(self) -> str:
@@ -287,7 +287,7 @@ class NoRuntimeAnywhereIsRefused(
         return "프리셋 없이 런타임 변형을 빼고 리비전을 더하면, 입력이 틀렸다는 이유로 거부된다"
 
     @override
-    def given(self) -> Given[SeedingSession, RevisionsAndACaller]:
+    def given(self) -> Given[TestSeedingSession, RevisionsAndACaller]:
         return ADeploymentToRevise(granted=(Permission.CREATE,))
 
     @override
@@ -301,7 +301,7 @@ class NoRuntimeAnywhereIsRefused(
 
 @dataclass(frozen=True)
 class NoModelDefinitionAnywhereIsRefused(
-    Scenario[SeedingSession, RevisionsAndACaller, DeploymentAdapter, RevisionNode]
+    Scenario[TestSeedingSession, RevisionsAndACaller, DeploymentAdapter, RevisionNode]
 ):
     @override
     def summary(self) -> str:
@@ -315,7 +315,7 @@ class NoModelDefinitionAnywhereIsRefused(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, RevisionsAndACaller]:
+    def given(self) -> Given[TestSeedingSession, RevisionsAndACaller]:
         return ADeploymentToRevise(granted=(Permission.CREATE,))
 
     @override
@@ -329,7 +329,7 @@ class NoModelDefinitionAnywhereIsRefused(
 
 @dataclass(frozen=True)
 class AMissingRequiredSlotIsRefused(
-    Scenario[SeedingSession, RevisionsAndACaller, DeploymentAdapter, RevisionNode]
+    Scenario[TestSeedingSession, RevisionsAndACaller, DeploymentAdapter, RevisionNode]
 ):
     @override
     def summary(self) -> str:
@@ -343,7 +343,7 @@ class AMissingRequiredSlotIsRefused(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, RevisionsAndACaller]:
+    def given(self) -> Given[TestSeedingSession, RevisionsAndACaller]:
         return ADeploymentToRevise(granted=(Permission.CREATE,), cpu_required=True)
 
     @override
@@ -357,7 +357,7 @@ class AMissingRequiredSlotIsRefused(
 
 @dataclass(frozen=True)
 class AReadGrantDoesNotAdd(
-    Scenario[SeedingSession, RevisionsAndACaller, DeploymentAdapter, RevisionNode]
+    Scenario[TestSeedingSession, RevisionsAndACaller, DeploymentAdapter, RevisionNode]
 ):
     @override
     def summary(self) -> str:
@@ -368,7 +368,7 @@ class AReadGrantDoesNotAdd(
         return "배포 읽기 권한만 받은 사용자가 리비전을 더하면, 권한 부족으로 거부된다"
 
     @override
-    def given(self) -> Given[SeedingSession, RevisionsAndACaller]:
+    def given(self) -> Given[TestSeedingSession, RevisionsAndACaller]:
         return ADeploymentToRevise(granted=(Permission.READ,))
 
     @override
@@ -382,7 +382,7 @@ class AReadGrantDoesNotAdd(
 
 @dataclass(frozen=True)
 class TheSuperadminAddsToAnothers(
-    Scenario[SeedingSession, RevisionsAndACaller, DeploymentAdapter, RevisionNode]
+    Scenario[TestSeedingSession, RevisionsAndACaller, DeploymentAdapter, RevisionNode]
 ):
     started: datetime
 
@@ -398,7 +398,7 @@ class TheSuperadminAddsToAnothers(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, RevisionsAndACaller]:
+    def given(self) -> Given[TestSeedingSession, RevisionsAndACaller]:
         return AnothersDeploymentToRevise()
 
     @override
@@ -412,7 +412,7 @@ class TheSuperadminAddsToAnothers(
 
 @dataclass(frozen=True)
 class AFolderTheCallerMayNotReadIsNotFound(
-    Scenario[SeedingSession, RevisionsAndACaller, DeploymentAdapter, RevisionNode]
+    Scenario[TestSeedingSession, RevisionsAndACaller, DeploymentAdapter, RevisionNode]
 ):
     @override
     def summary(self) -> str:
@@ -426,7 +426,7 @@ class AFolderTheCallerMayNotReadIsNotFound(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, RevisionsAndACaller]:
+    def given(self) -> Given[TestSeedingSession, RevisionsAndACaller]:
         return ADeploymentToRevise(granted=(Permission.CREATE,), folder_readable=False)
 
     @override

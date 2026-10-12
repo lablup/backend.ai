@@ -11,7 +11,6 @@ from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseResponseModel
 from ai.backend.common.dto.manager.v2.fair_share.types import ResourceSlotInfo
-from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 
 from .types import NumberFormatInfo
 
@@ -36,12 +35,12 @@ class ResourceSlotTypeNode(BaseResponseModel):
 
     id: str | None = Field(default=None, description="Node ID (same as slot_name).")
     entity_id: UUID = Field(
-        description=f"UUID of the resource slot type. Added in {NEXT_RELEASE_VERSION}.",
+        description="UUID of the resource slot type. Added in 26.9.0.",
     )
     uuid: UUID = Field(
         description=(
             "Stable UUID identity of the resource slot type. "
-            f"Deprecated since {NEXT_RELEASE_VERSION}. Use entity_id."
+            "Deprecated since 26.9.0. Use entity_id."
         ),
         deprecated=True,
     )
@@ -105,7 +104,7 @@ class AgentResourceNode(BaseResponseModel):
 
     id: str = Field(description="Node ID (format: '{agent_id}:{slot_name}').")
     field_id: UUID = Field(
-        description=f"UUID of the agent resource. Added in {NEXT_RELEASE_VERSION}.",
+        description="UUID of the agent resource. Added in 26.9.0.",
     )
     agent_id: str = Field(description="Agent identifier.")
     slot_name: str = Field(
@@ -133,7 +132,7 @@ class ResourceAllocationNode(BaseResponseModel):
 
     id: str = Field(description="Node ID (format: '{kernel_id}:{slot_name}').")
     field_id: UUID = Field(
-        description=f"UUID of the resource allocation. Added in {NEXT_RELEASE_VERSION}.",
+        description="UUID of the resource allocation. Added in 26.9.0.",
     )
     kernel_id: str = Field(description="Kernel identifier (UUID).")
     slot_name: str = Field(

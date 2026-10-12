@@ -27,13 +27,13 @@ from bai_scenario.components.login_client_type import (
 )
 from bai_scenario.components.system import ENFORCEMENT, ACaller, SomeoneAlone
 from bai_scenario.runner.acting import ActingAs
-from bai_scenario.runner.planting import SeedingSession
+from bai_scenario.runner.planting import TestSeedingSession
 from bai_scenario.runner.steps import run_scenario
 
 MADE = "webui"
 DESCRIBED = "새로 지정한 설명"
 
-type CreatingStep = Scenario[SeedingSession, Any, LoginClientTypeAdapter, LoginClientTypeNode]
+type CreatingStep = Scenario[TestSeedingSession, Any, LoginClientTypeAdapter, LoginClientTypeNode]
 
 
 @dataclass(frozen=True)
@@ -85,7 +85,7 @@ class CreatingWithTheLaidName(When[ATypeAndACaller, LoginClientTypeAdapter, Logi
 
 @dataclass(frozen=True)
 class TheSuperadminMakesOneWithANameAlone(
-    Scenario[SeedingSession, ACaller, LoginClientTypeAdapter, LoginClientTypeNode]
+    Scenario[TestSeedingSession, ACaller, LoginClientTypeAdapter, LoginClientTypeNode]
 ):
     started: datetime
 
@@ -98,7 +98,7 @@ class TheSuperadminMakesOneWithANameAlone(
         return "슈퍼관리자가 이름만 지정해 생성하면 설명이 비어 있는 노드가 반환된다"
 
     @override
-    def given(self) -> Given[SeedingSession, ACaller]:
+    def given(self) -> Given[TestSeedingSession, ACaller]:
         return SomeoneAlone(role=UserRole.SUPERADMIN)
 
     @override
@@ -112,7 +112,7 @@ class TheSuperadminMakesOneWithANameAlone(
 
 @dataclass(frozen=True)
 class ADescriptionComesBackAsGiven(
-    Scenario[SeedingSession, ACaller, LoginClientTypeAdapter, LoginClientTypeNode]
+    Scenario[TestSeedingSession, ACaller, LoginClientTypeAdapter, LoginClientTypeNode]
 ):
     started: datetime
 
@@ -125,7 +125,7 @@ class ADescriptionComesBackAsGiven(
         return "슈퍼관리자가 이름과 설명을 함께 지정해 생성하면 지정한 값이 그대로 담긴 노드가 반환된다"
 
     @override
-    def given(self) -> Given[SeedingSession, ACaller]:
+    def given(self) -> Given[TestSeedingSession, ACaller]:
         return SomeoneAlone(role=UserRole.SUPERADMIN)
 
     @override
@@ -139,7 +139,7 @@ class ADescriptionComesBackAsGiven(
 
 @dataclass(frozen=True)
 class ANameAlreadyTakenIsRefused(
-    Scenario[SeedingSession, ATypeAndACaller, LoginClientTypeAdapter, LoginClientTypeNode]
+    Scenario[TestSeedingSession, ATypeAndACaller, LoginClientTypeAdapter, LoginClientTypeNode]
 ):
     @override
     def summary(self) -> str:
@@ -150,7 +150,7 @@ class ANameAlreadyTakenIsRefused(
         return "같은 이름의 종류가 이미 있을 때 그 이름으로 다시 생성하면, 이름 중복으로 거부된다"
 
     @override
-    def given(self) -> Given[SeedingSession, ATypeAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ATypeAndACaller]:
         return ATypeAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
@@ -164,7 +164,7 @@ class ANameAlreadyTakenIsRefused(
 
 @dataclass(frozen=True)
 class AUserWhoIsNotTheSuperadminMayNotCreate(
-    Scenario[SeedingSession, ACaller, LoginClientTypeAdapter, LoginClientTypeNode]
+    Scenario[TestSeedingSession, ACaller, LoginClientTypeAdapter, LoginClientTypeNode]
 ):
     @override
     def summary(self) -> str:
@@ -175,7 +175,7 @@ class AUserWhoIsNotTheSuperadminMayNotCreate(
         return "슈퍼관리자가 아닌 사용자가 종류를 생성하면 역할 부족으로 거부된다"
 
     @override
-    def given(self) -> Given[SeedingSession, ACaller]:
+    def given(self) -> Given[TestSeedingSession, ACaller]:
         return SomeoneAlone()
 
     @override
@@ -189,7 +189,7 @@ class AUserWhoIsNotTheSuperadminMayNotCreate(
 
 @dataclass(frozen=True)
 class EnforcementOffStillNeedsTheSuperadmin(
-    Scenario[SeedingSession, ACaller, LoginClientTypeAdapter, LoginClientTypeNode], Configured
+    Scenario[TestSeedingSession, ACaller, LoginClientTypeAdapter, LoginClientTypeNode], Configured
 ):
     @override
     def summary(self) -> str:
@@ -204,7 +204,7 @@ class EnforcementOffStillNeedsTheSuperadmin(
         return {ENFORCEMENT: False}
 
     @override
-    def given(self) -> Given[SeedingSession, ACaller]:
+    def given(self) -> Given[TestSeedingSession, ACaller]:
         return SomeoneAlone()
 
     @override

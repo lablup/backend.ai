@@ -10,8 +10,8 @@ NEXT_RELEASE_VERSION = "26.10.0"
 """Placeholder for the next release version.
 
 Used in GQL type decorators for newly added types/fields that have not yet
-been included in a release.  At release time, ``scripts/release.sh`` replaces
-every occurrence of ``NEXT_RELEASE_VERSION`` with the actual version string.
+been included in a release.  When ``X.Y.0rc1`` cuts a version branch, every
+occurrence is frozen to ``X.Y.0`` on ``main`` and, at its final release, on the branch.
 """
 
 __all__ = (

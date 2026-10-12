@@ -44,7 +44,6 @@ from ai.backend.common.dto.manager.v2.app_config_fragment.response import (
 from ai.backend.common.dto.manager.v2.app_config_fragment.types import (
     AppConfigScopeTypeFilter as AppConfigScopeTypeFilterDTO,
 )
-from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import DateTimeFilter, OrderDirection, StringFilter
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
@@ -79,7 +78,7 @@ __all__ = (
 
 @gql_pydantic_input(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.9.0",
         description="One (config_name, config) pair to upsert at the request's scope.",
     ),
     name="AppConfigFragmentUpsertItem",
@@ -108,7 +107,7 @@ class AppConfigScopeRefGQL(PydanticInputMixin[AppConfigScopeRefDTO]):
 
 @gql_pydantic_input(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.9.0",
         description="Upsert many fragments at one scope; the scope is named once for all items.",
     ),
     name="ScopedUpsertAppConfigFragmentsInput",
@@ -124,7 +123,7 @@ class ScopedUpsertAppConfigFragmentsInputGQL(
 
 @gql_pydantic_input(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.9.0",
         description="Upsert many fragments at the current user's own user scope.",
     ),
     name="MyUpsertAppConfigFragmentsInput",
@@ -153,7 +152,7 @@ class AppConfigFragmentGQL(PydanticNodeMixin[AppConfigFragmentNode]):
     )
     entity_id: UUID = gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.9.0",
             description="UUID of the app config fragment.",
         ),
     )
@@ -209,7 +208,7 @@ class AppConfigFragmentConnection(Connection[AppConfigFragmentGQL]):
 
 @gql_pydantic_type(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.9.0",
         description=(
             "One failed item of a partial bulk fragment upsert, named by its config name — "
             "the batch shares one scope, and a rejected insert never had a fragment id."
@@ -225,7 +224,7 @@ class AppConfigFragmentUpsertErrorGQL(PydanticOutputMixin[AppConfigFragmentUpser
 
 @gql_pydantic_type(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.9.0",
         description=(
             "Partial-success payload for a bulk fragment upsert "
             "(not in effect yet: still all-or-nothing)."

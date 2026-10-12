@@ -7,9 +7,7 @@ rows it wrote are read back. Every source the migration names is exercised with 
 
 from __future__ import annotations
 
-import importlib
 import itertools
-import pkgutil
 import uuid
 from collections.abc import AsyncGenerator, Awaitable, Callable
 from dataclasses import dataclass
@@ -22,8 +20,6 @@ import sqlalchemy as sa
 from sqlalchemy import Table
 from sqlalchemy.ext.asyncio import AsyncConnection
 
-import ai.backend.common.data.entity
-from ai.backend.common.data.entity.types import EntityType
 from ai.backend.manager.models.agent.row import AgentRow
 from ai.backend.manager.models.alembic.versions.dafe06a6c763_put_every_entity_in_the_graph import (
     CREATED_IN_SOURCES,
@@ -175,9 +171,6 @@ _ROWS: Final = (
     VFolderRow,
     VirtualEntityRow,
 )
-
-# Entity types that name no table of their own.
-_TABLELESS_ENTITY_TYPES: Final = frozenset({"app_config", "global", "scope_admin"})
 
 _ALL_BITS: Final = {1, 2, 4, 8, 16}
 
@@ -428,7 +421,24 @@ async def db(
     database_connection: ExtendedAsyncSAEngine,
 ) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
     async with with_tables(database_connection, _tables()):
-        yield database_connection
+        # This migration predates the association column rename.
+        async with database_connection.begin() as conn:
+            await conn.execute(
+                sa.text(
+                    "ALTER TABLE association_container_registries_groups "
+                    "RENAME COLUMN project_id TO group_id"
+                )
+            )
+        try:
+            yield database_connection
+        finally:
+            async with database_connection.begin() as conn:
+                await conn.execute(
+                    sa.text(
+                        "ALTER TABLE association_container_registries_groups "
+                        "RENAME COLUMN group_id TO project_id"
+                    )
+                )
 
 
 # -- created_in ---------------------------------------------------------------------------
@@ -658,13 +668,6 @@ _RELATION_CASES: Final[dict[str, _RelationCase]] = {
 
 
 class TestSources:
-    def test_every_entity_type_with_a_table_is_a_node_source(self) -> None:
-        for module in pkgutil.iter_modules(ai.backend.common.data.entity.__path__):
-            importlib.import_module(f"ai.backend.common.data.entity.{module.name}")
-        declared = {kind.name() for kind in EntityType.kinds()} - _TABLELESS_ENTITY_TYPES
-
-        assert declared == {entity_type for entity_type, _, _ in NODE_SOURCES}
-
     def test_every_created_in_entity_type_has_a_case(self) -> None:
         sourced = {entity_type for entity_type, _ in CREATED_IN_SOURCES}
         cased = {

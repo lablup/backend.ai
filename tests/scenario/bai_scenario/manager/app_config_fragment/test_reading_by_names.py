@@ -37,13 +37,13 @@ from bai_scenario.components.app_config_fragment import (
     TheTargetsFragmentByName,
 )
 from bai_scenario.runner.acting import ActingAs
-from bai_scenario.runner.planting import SeedingSession
+from bai_scenario.runner.planting import TestSeedingSession
 from bai_scenario.runner.steps import run_scenario
 from bai_scenario.seeds.app_config.allow_list import SCOPE_NAMES
 
 type ByNames = list[AppConfigFragmentNode | None]
-type MineStep = Scenario[SeedingSession, AReadingPlace, AppConfigFragmentAdapter, ByNames]
-type ScopedStep = Scenario[SeedingSession, ATargetAndACaller, AppConfigFragmentAdapter, ByNames]
+type MineStep = Scenario[TestSeedingSession, AReadingPlace, AppConfigFragmentAdapter, ByNames]
+type ScopedStep = Scenario[TestSeedingSession, ATargetAndACaller, AppConfigFragmentAdapter, ByNames]
 
 
 @dataclass(frozen=True)
@@ -113,7 +113,7 @@ class ReadingElsewhereByName(When[ATargetAndACaller, AppConfigFragmentAdapter, B
 
 @dataclass(frozen=True)
 class EachNameIsAnsweredInOrder(
-    Scenario[SeedingSession, AReadingPlace, AppConfigFragmentAdapter, ByNames]
+    Scenario[TestSeedingSession, AReadingPlace, AppConfigFragmentAdapter, ByNames]
 ):
     @override
     def summary(self) -> str:
@@ -127,7 +127,7 @@ class EachNameIsAnsweredInOrder(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, AReadingPlace]:
+    def given(self) -> Given[TestSeedingSession, AReadingPlace]:
         return MyFragmentsLaid(names=3, mine_on=(0, 2), granted=(Permission.READ,))
 
     @override
@@ -141,7 +141,7 @@ class EachNameIsAnsweredInOrder(
 
 @dataclass(frozen=True)
 class AnotherUsersFragmentStaysOut(
-    Scenario[SeedingSession, AReadingPlace, AppConfigFragmentAdapter, ByNames]
+    Scenario[TestSeedingSession, AReadingPlace, AppConfigFragmentAdapter, ByNames]
 ):
     @override
     def summary(self) -> str:
@@ -152,7 +152,7 @@ class AnotherUsersFragmentStaysOut(
         return "같은 이름에 다른 사용자의 조각이 있어도, 자기 조각을 조회하면 자기 것만 반환된다"
 
     @override
-    def given(self) -> Given[SeedingSession, AReadingPlace]:
+    def given(self) -> Given[TestSeedingSession, AReadingPlace]:
         return MyFragmentsLaid(anothers={"theirs": True}, granted=(Permission.READ,))
 
     @override
@@ -166,7 +166,7 @@ class AnotherUsersFragmentStaysOut(
 
 @dataclass(frozen=True)
 class TheDomainsFragmentStaysOut(
-    Scenario[SeedingSession, AReadingPlace, AppConfigFragmentAdapter, ByNames]
+    Scenario[TestSeedingSession, AReadingPlace, AppConfigFragmentAdapter, ByNames]
 ):
     @override
     def summary(self) -> str:
@@ -180,7 +180,7 @@ class TheDomainsFragmentStaysOut(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, AReadingPlace]:
+    def given(self) -> Given[TestSeedingSession, AReadingPlace]:
         return MyFragmentsLaid(domains={"domains": True}, granted=(Permission.READ,))
 
     @override
@@ -194,7 +194,7 @@ class TheDomainsFragmentStaysOut(
 
 @dataclass(frozen=True)
 class AUserGrantedNothingMayNotReadMine(
-    Scenario[SeedingSession, AReadingPlace, AppConfigFragmentAdapter, ByNames]
+    Scenario[TestSeedingSession, AReadingPlace, AppConfigFragmentAdapter, ByNames]
 ):
     @override
     def summary(self) -> str:
@@ -207,7 +207,7 @@ class AUserGrantedNothingMayNotReadMine(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, AReadingPlace]:
+    def given(self) -> Given[TestSeedingSession, AReadingPlace]:
         return MyFragmentsLaid()
 
     @override
@@ -221,7 +221,7 @@ class AUserGrantedNothingMayNotReadMine(
 
 @dataclass(frozen=True)
 class TheGrantedUserReadsTheDomains(
-    Scenario[SeedingSession, ATargetAndACaller, AppConfigFragmentAdapter, ByNames]
+    Scenario[TestSeedingSession, ATargetAndACaller, AppConfigFragmentAdapter, ByNames]
 ):
     @override
     def summary(self) -> str:
@@ -232,7 +232,7 @@ class TheGrantedUserReadsTheDomains(
         return "도메인 조각이 있고 그 도메인 스코프에 읽기 권한을 받은 사용자가 도메인을 지정해 조회하면, 그 조각이 반환된다"
 
     @override
-    def given(self) -> Given[SeedingSession, ATargetAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ATargetAndACaller]:
         return SomewhereToTarget(
             target=Target.HOME_DOMAIN, laid={"theme": "domain"}, granted=(Permission.READ,)
         )
@@ -248,7 +248,7 @@ class TheGrantedUserReadsTheDomains(
 
 @dataclass(frozen=True)
 class AnyoneSignedInReadsThePublic(
-    Scenario[SeedingSession, ATargetAndACaller, AppConfigFragmentAdapter, ByNames]
+    Scenario[TestSeedingSession, ATargetAndACaller, AppConfigFragmentAdapter, ByNames]
 ):
     @override
     def summary(self) -> str:
@@ -262,7 +262,7 @@ class AnyoneSignedInReadsThePublic(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, ATargetAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ATargetAndACaller]:
         return SomewhereToTarget(target=Target.PUBLIC, laid={"theme": "public"})
 
     @override
@@ -276,7 +276,7 @@ class AnyoneSignedInReadsThePublic(
 
 @dataclass(frozen=True)
 class AnotherUsersScopeIsRefused(
-    Scenario[SeedingSession, ATargetAndACaller, AppConfigFragmentAdapter, ByNames]
+    Scenario[TestSeedingSession, ATargetAndACaller, AppConfigFragmentAdapter, ByNames]
 ):
     @override
     def summary(self) -> str:
@@ -287,7 +287,7 @@ class AnotherUsersScopeIsRefused(
         return "자기 스코프에만 읽기 권한을 받은 사용자가 다른 사용자를 지정해 조회하면, 권한 부족으로 거부된다"
 
     @override
-    def given(self) -> Given[SeedingSession, ATargetAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ATargetAndACaller]:
         return SomewhereToTarget(
             target=Target.ANOTHER_USER, laid={"theme": "theirs"}, granted=(Permission.READ,)
         )
@@ -303,7 +303,7 @@ class AnotherUsersScopeIsRefused(
 
 @dataclass(frozen=True)
 class AMissingDomainIsNotFoundForASuperadmin(
-    Scenario[SeedingSession, ATargetAndACaller, AppConfigFragmentAdapter, ByNames]
+    Scenario[TestSeedingSession, ATargetAndACaller, AppConfigFragmentAdapter, ByNames]
 ):
     @override
     def summary(self) -> str:
@@ -317,7 +317,7 @@ class AMissingDomainIsNotFoundForASuperadmin(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, ATargetAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ATargetAndACaller]:
         return SomewhereToTarget(target=Target.HOME_DOMAIN, role=UserRole.SUPERADMIN)
 
     @override
@@ -331,7 +331,7 @@ class AMissingDomainIsNotFoundForASuperadmin(
 
 @dataclass(frozen=True)
 class AMissingDomainIsRefusedAsPermission(
-    Scenario[SeedingSession, ATargetAndACaller, AppConfigFragmentAdapter, ByNames]
+    Scenario[TestSeedingSession, ATargetAndACaller, AppConfigFragmentAdapter, ByNames]
 ):
     @override
     def summary(self) -> str:
@@ -345,7 +345,7 @@ class AMissingDomainIsRefusedAsPermission(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, ATargetAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ATargetAndACaller]:
         return SomewhereToTarget(target=Target.HOME_DOMAIN, granted=(Permission.READ,))
 
     @override

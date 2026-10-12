@@ -7,7 +7,8 @@ import sqlalchemy as sa
 from sqlalchemy.orm import Mapped, mapped_column
 
 from ai.backend.common.data.entity.audit_log import AuditLogID, AuditLogScopeID
-from ai.backend.manager.models.base import GUID, Base
+from ai.backend.common.data.entity.types import EntityType
+from ai.backend.manager.models.base import GUID, Base, EntityTypeColumn
 
 __all__ = ("AuditLogScopeRow",)
 
@@ -37,18 +38,18 @@ class AuditLogScopeRow(Base):
         nullable=False,
         index=True,
     )
-    scope_type: Mapped[str] = mapped_column("scope_type", sa.String, nullable=False)
-    scope_id: Mapped[str] = mapped_column("scope_id", sa.String, nullable=False)
+    scope_type: Mapped[EntityType] = mapped_column("scope_type", EntityTypeColumn(), nullable=False)
+    scope_id: Mapped[uuid.UUID] = mapped_column("scope_id", GUID(), nullable=False)
 
     def __init__(
         self,
         audit_log_id: AuditLogID,
-        scope_type: str,
-        scope_id: str | uuid.UUID,
+        scope_type: EntityType,
+        scope_id: uuid.UUID,
     ) -> None:
         self.audit_log_id = audit_log_id
         self.scope_type = scope_type
-        self.scope_id = str(scope_id) if isinstance(scope_id, uuid.UUID) else scope_id
+        self.scope_id = scope_id
 
     @override
     def __str__(self) -> str:

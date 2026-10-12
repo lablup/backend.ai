@@ -9,14 +9,16 @@ from typing import Any, override
 
 import sqlalchemy as sa
 
+from ai.backend.common.data.entity.audit_log import AuditLogID
 from ai.backend.common.data.entity.types import EntityIdentifier
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.manager.models.audit_log.row import AuditLogRow
 from ai.backend.manager.models.audit_log.scope_row import AuditLogScopeRow
 from ai.backend.manager.models.clauses import QueryCondition
-from ai.backend.manager.models.scopes import ExistenceCheck, ScopeTarget
+from ai.backend.manager.models.scopes import ExistenceCheck, OperationScope, ScopeTarget
 
 __all__ = (
+    "AuditLogIDScope",
     "AuditLogTarget",
     "EntityAuditLogTarget",
     "ScopeAuditLogTarget",
@@ -53,7 +55,7 @@ class EntityAuditLogTarget(AuditLogTarget):
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             return sa.and_(
                 AuditLogRow.entity_type == owner.entity_type(),
-                AuditLogRow.entity_id == str(owner),
+                AuditLogRow.entity_id == owner,
             )
 
         return inner
@@ -88,7 +90,7 @@ class ScopeAuditLogTarget(AuditLogTarget):
                 sa.and_(
                     AuditLogScopeRow.audit_log_id == AuditLogRow.id,
                     AuditLogScopeRow.scope_type == owner.entity_type(),
-                    AuditLogScopeRow.scope_id == str(owner),
+                    AuditLogScopeRow.scope_id == owner,
                 )
             )
 
@@ -116,6 +118,32 @@ class TriggeredByAuditLogTarget(AuditLogTarget):
 
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             return AuditLogRow.triggered_by == triggered_by
+
+        return inner
+
+    @property
+    @override
+    def existence_checks(self) -> Sequence[ExistenceCheck[Any]]:
+        return ()
+
+
+@dataclass(frozen=True)
+class AuditLogIDScope(OperationScope):
+    """The scope rows of one record.
+
+    Not a :class:`ScopeTarget`: a record is a field row and names no entity to authorize
+    against. The record is authorized through its owner candidates before this bounds
+    the read.
+    """
+
+    audit_log_id: AuditLogID
+
+    @override
+    def to_condition(self) -> QueryCondition:
+        audit_log_id = self.audit_log_id
+
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return AuditLogScopeRow.audit_log_id == audit_log_id
 
         return inner
 

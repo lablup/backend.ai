@@ -41,11 +41,11 @@ from bai_scenario.components.answers import TheCallIsRefused
 from bai_scenario.components.domain import WAS_HERE, SomeoneOf, WrittenByThisRun
 from bai_scenario.components.user import AGrant
 from bai_scenario.runner.acting import ActingAs
-from bai_scenario.runner.planting import SeedingSession
+from bai_scenario.runner.planting import TestSeedingSession
 from bai_scenario.runner.steps import run_scenario
-from bai_scenario.seeds.domain.domain import SeedDomain
+from bai_scenario.seeds.domain.domain import TestSeedDomain
 from bai_scenario.seeds.seeder import Laid
-from bai_scenario.seeds.user.fields import SeedLoginHistoryOf
+from bai_scenario.seeds.user.fields import TestSeedLoginHistoryOf
 
 type Answer = AdminSearchLoginHistoryPayload | MySearchLoginHistoryPayload
 
@@ -62,14 +62,14 @@ class TwoPeopleAndTheirHistory:
 class HistoryLayer:
     """사용자 한 명 아래에 그 사용자 도메인의 성공 기록 하나를 심는다."""
 
-    _seeding: SeedingSession
+    _seeding: TestSeedingSession
 
-    def __init__(self, seeding: SeedingSession) -> None:
+    def __init__(self, seeding: TestSeedingSession) -> None:
         self._seeding = seeding
 
     async def history_of(self, user: Laid[UserData]) -> LoginHistoryData:
         record = await self._seeding.adding(
-            SeedLoginHistoryOf(domain_name=self._seeding.made(user).domain_name), user
+            TestSeedLoginHistoryOf(domain_name=self._seeding.made(user).domain_name), user
         )
         return self._seeding.made(record)
 
@@ -93,7 +93,7 @@ class SomeoneAndAnother(Given[Any, TwoPeopleAndTheirHistory]):
     @override
     async def lay(self, seeding: Any) -> TwoPeopleAndTheirHistory:
         layer = HistoryLayer(seeding)
-        domain = await seeding.creating(SeedDomain(name_hint="home", description=WAS_HERE))
+        domain = await seeding.creating(TestSeedDomain(name_hint="home", description=WAS_HERE))
         caller = await seeding.within(SomeoneOf(domain))
         other = await seeding.within(SomeoneOf(domain))
         caller_history = await layer.history_of(caller)
@@ -114,7 +114,7 @@ class TheSuperadminAndTwoRecords(Given[Any, TwoPeopleAndTheirHistory]):
     @override
     async def lay(self, seeding: Any) -> TwoPeopleAndTheirHistory:
         layer = HistoryLayer(seeding)
-        domain = await seeding.creating(SeedDomain(name_hint="home", description=WAS_HERE))
+        domain = await seeding.creating(TestSeedDomain(name_hint="home", description=WAS_HERE))
         first = await seeding.within(SomeoneOf(domain))
         first_history = await layer.history_of(first)
         second = await seeding.within(SomeoneOf(domain))
@@ -133,7 +133,7 @@ class SomeoneReadingTheDomain(Given[Any, TwoPeopleAndTheirHistory]):
 
     @override
     async def lay(self, seeding: Any) -> TwoPeopleAndTheirHistory:
-        domain = await seeding.creating(SeedDomain(name_hint="home", description=WAS_HERE))
+        domain = await seeding.creating(TestSeedDomain(name_hint="home", description=WAS_HERE))
         caller = await seeding.within(SomeoneOf(domain))
         await seeding.within(AGrant.on_domain(domain, caller, Permission.READ))
         return TwoPeopleAndTheirHistory(seeding.made(caller), None, None)
@@ -258,12 +258,14 @@ class OnlyMyRecord(Then[TwoPeopleAndTheirHistory, Answer]):
         return seen
 
 
-type HistoryStep = Scenario[SeedingSession, TwoPeopleAndTheirHistory, LoginHistoryAdapter, Answer]
+type HistoryStep = Scenario[
+    TestSeedingSession, TwoPeopleAndTheirHistory, LoginHistoryAdapter, Answer
+]
 
 
 @dataclass(frozen=True)
 class TheSuperadminSearchesEveryRecord(
-    Scenario[SeedingSession, TwoPeopleAndTheirHistory, LoginHistoryAdapter, Answer]
+    Scenario[TestSeedingSession, TwoPeopleAndTheirHistory, LoginHistoryAdapter, Answer]
 ):
     started: datetime
 
@@ -279,7 +281,7 @@ class TheSuperadminSearchesEveryRecord(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, TwoPeopleAndTheirHistory]:
+    def given(self) -> Given[TestSeedingSession, TwoPeopleAndTheirHistory]:
         return TheSuperadminAndTwoRecords()
 
     @override
@@ -293,7 +295,7 @@ class TheSuperadminSearchesEveryRecord(
 
 @dataclass(frozen=True)
 class OnlyTheSuperadminSearchesEveryRecord(
-    Scenario[SeedingSession, TwoPeopleAndTheirHistory, LoginHistoryAdapter, Answer]
+    Scenario[TestSeedingSession, TwoPeopleAndTheirHistory, LoginHistoryAdapter, Answer]
 ):
     @override
     def summary(self) -> str:
@@ -304,7 +306,7 @@ class OnlyTheSuperadminSearchesEveryRecord(
         return "권한 받은 사용자가 이력 전체 검색을 하려 하면, 전역 역할 문이 막는다"
 
     @override
-    def given(self) -> Given[SeedingSession, TwoPeopleAndTheirHistory]:
+    def given(self) -> Given[TestSeedingSession, TwoPeopleAndTheirHistory]:
         return SomeoneReadingTheDomain()
 
     @override
@@ -318,7 +320,7 @@ class OnlyTheSuperadminSearchesEveryRecord(
 
 @dataclass(frozen=True)
 class AGrantedUserSearchesOnlyTheirOwnHistory(
-    Scenario[SeedingSession, TwoPeopleAndTheirHistory, LoginHistoryAdapter, Answer]
+    Scenario[TestSeedingSession, TwoPeopleAndTheirHistory, LoginHistoryAdapter, Answer]
 ):
     started: datetime
 
@@ -331,7 +333,7 @@ class AGrantedUserSearchesOnlyTheirOwnHistory(
         return "자기 스코프에서 READ를 받은 사용자가 훑으면, 다른 사용자의 이력은 빠진다"
 
     @override
-    def given(self) -> Given[SeedingSession, TwoPeopleAndTheirHistory]:
+    def given(self) -> Given[TestSeedingSession, TwoPeopleAndTheirHistory]:
         return SomeoneAndAnother(permissions=(Permission.READ,))
 
     @override
@@ -345,7 +347,7 @@ class AGrantedUserSearchesOnlyTheirOwnHistory(
 
 @dataclass(frozen=True)
 class AUserGrantedNothingMayNotSearchTheirHistory(
-    Scenario[SeedingSession, TwoPeopleAndTheirHistory, LoginHistoryAdapter, Answer]
+    Scenario[TestSeedingSession, TwoPeopleAndTheirHistory, LoginHistoryAdapter, Answer]
 ):
     @override
     def summary(self) -> str:
@@ -356,7 +358,7 @@ class AUserGrantedNothingMayNotSearchTheirHistory(
         return "역할 없이 자기 이력을 훑으려 하면, 본인이어도 스코프 권한 문이 막는다"
 
     @override
-    def given(self) -> Given[SeedingSession, TwoPeopleAndTheirHistory]:
+    def given(self) -> Given[TestSeedingSession, TwoPeopleAndTheirHistory]:
         return SomeoneAndAnother(other_has_history=False)
 
     @override

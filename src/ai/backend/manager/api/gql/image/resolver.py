@@ -27,8 +27,10 @@ from ai.backend.common.types import ImageID
 from ai.backend.manager.api.gql.base import encode_cursor, parse_uuid
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
+    gql_mutation,
     gql_root_field,
 )
+from ai.backend.manager.api.gql.image.mutations import ScanImageInputGQL, ScanImagePayloadGQL
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.api.gql.utils import check_admin_only
 
@@ -63,7 +65,7 @@ async def admin_images_v2(
         ImageUsageGQL | None,
         strawberry.argument(
             description=(
-                f"Added in {NEXT_RELEASE_VERSION}. Uses narrowing the result. Each listed "
+                "Added in 26.9.0. Uses narrowing the result. Each listed "
                 "entity must be readable by the caller; images the caller cannot read "
                 "are left out."
             )
@@ -112,7 +114,7 @@ async def admin_images_v2(
 
 @gql_root_field(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.9.0",
         description=(
             "Page through the images the named scopes reach, combined with OR. "
             "Every scope is authorized before the read runs."
@@ -127,7 +129,7 @@ async def scoped_images_v2(
         ImageUsageGQL | None,
         strawberry.argument(
             description=(
-                f"Added in {NEXT_RELEASE_VERSION}. Uses narrowing the result. Each listed "
+                "Added in 26.9.0. Uses narrowing the result. Each listed "
                 "entity must be readable by the caller; images the caller cannot read "
                 "are left out."
             )
@@ -401,3 +403,17 @@ async def image_scoped_aliases(
         end_cursor=edges[-1].cursor if edges else None,
     )
     return ImageV2AliasConnectionGQL(count=payload.total_count, edges=edges, page_info=page_info)
+
+
+@gql_mutation(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Scan one image tag and return the requested architecture, including images not yet registered (superadmin only).",
+    )
+)
+async def admin_scan_image(
+    info: Info[StrawberryGQLContext], input: ScanImageInputGQL
+) -> ScanImagePayloadGQL | None:
+    check_admin_only()
+    payload = await info.context.adapters.image.admin_scan_image(input.to_pydantic())
+    return ScanImagePayloadGQL.from_pydantic(payload)

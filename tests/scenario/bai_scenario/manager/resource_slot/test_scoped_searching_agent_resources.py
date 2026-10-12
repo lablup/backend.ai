@@ -34,12 +34,14 @@ from bai_scenario.components.agent_resource import (
 from bai_scenario.components.answers import NothingIsFound, TheCallIsRefused
 from bai_scenario.components.system import ENFORCEMENT
 from bai_scenario.runner.acting import ActingAs
-from bai_scenario.runner.planting import SeedingSession
+from bai_scenario.runner.planting import TestSeedingSession
 from bai_scenario.runner.steps import run_scenario
 
 type Searched = AdminSearchAgentResourcesPayload
-type OneAgentStep = Scenario[SeedingSession, AnAgentAndACaller, ResourceSlotAdapter, Searched]
-type TwoAgentsStep = Scenario[SeedingSession, TwoAgentsAndACaller, ResourceSlotAdapter, Searched]
+type OneAgentStep = Scenario[TestSeedingSession, AnAgentAndACaller, ResourceSlotAdapter, Searched]
+type TwoAgentsStep = Scenario[
+    TestSeedingSession, TwoAgentsAndACaller, ResourceSlotAdapter, Searched
+]
 
 
 @dataclass(frozen=True)
@@ -96,7 +98,7 @@ class SearchingBothAgents(When[TwoAgentsAndACaller, ResourceSlotAdapter, Searche
 
 @dataclass(frozen=True)
 class AUserReadingAgentsInTheGroupSearchesTheAgent(
-    Scenario[SeedingSession, AnAgentAndACaller, ResourceSlotAdapter, Searched]
+    Scenario[TestSeedingSession, AnAgentAndACaller, ResourceSlotAdapter, Searched]
 ):
     @override
     def summary(self) -> str:
@@ -110,7 +112,7 @@ class AUserReadingAgentsInTheGroupSearchesTheAgent(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, AnAgentAndACaller]:
+    def given(self) -> Given[TestSeedingSession, AnAgentAndACaller]:
         return AnAgentAndSomeone(granted=True)
 
     @override
@@ -124,7 +126,7 @@ class AUserReadingAgentsInTheGroupSearchesTheAgent(
 
 @dataclass(frozen=True)
 class TheSuperadminSearchesTheAgent(
-    Scenario[SeedingSession, AnAgentAndACaller, ResourceSlotAdapter, Searched]
+    Scenario[TestSeedingSession, AnAgentAndACaller, ResourceSlotAdapter, Searched]
 ):
     @override
     def summary(self) -> str:
@@ -135,7 +137,7 @@ class TheSuperadminSearchesTheAgent(
         return "슈퍼관리자가 아직 슬롯을 보고하지 않은 에이전트를 지정해 조회하면 응답이 비어 있다"
 
     @override
-    def given(self) -> Given[SeedingSession, AnAgentAndACaller]:
+    def given(self) -> Given[TestSeedingSession, AnAgentAndACaller]:
         return AnAgentAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
@@ -149,7 +151,7 @@ class TheSuperadminSearchesTheAgent(
 
 @dataclass(frozen=True)
 class AUserGrantedNothingMayNotSearchTheAgent(
-    Scenario[SeedingSession, AnAgentAndACaller, ResourceSlotAdapter, Searched]
+    Scenario[TestSeedingSession, AnAgentAndACaller, ResourceSlotAdapter, Searched]
 ):
     @override
     def summary(self) -> str:
@@ -160,7 +162,7 @@ class AUserGrantedNothingMayNotSearchTheAgent(
         return "아무 권한도 없는 사용자가 에이전트를 지정해 조회하면 권한 부족으로 거부된다"
 
     @override
-    def given(self) -> Given[SeedingSession, AnAgentAndACaller]:
+    def given(self) -> Given[TestSeedingSession, AnAgentAndACaller]:
         return AnAgentAndSomeone()
 
     @override
@@ -174,7 +176,7 @@ class AUserGrantedNothingMayNotSearchTheAgent(
 
 @dataclass(frozen=True)
 class OneAgentTheCallerMayNotReadRefusesTheWholeSearch(
-    Scenario[SeedingSession, TwoAgentsAndACaller, ResourceSlotAdapter, Searched]
+    Scenario[TestSeedingSession, TwoAgentsAndACaller, ResourceSlotAdapter, Searched]
 ):
     @override
     def summary(self) -> str:
@@ -188,7 +190,7 @@ class OneAgentTheCallerMayNotReadRefusesTheWholeSearch(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, TwoAgentsAndACaller]:
+    def given(self) -> Given[TestSeedingSession, TwoAgentsAndACaller]:
         return TwoAgentsAndSomeoneReadingOne()
 
     @override
@@ -202,7 +204,7 @@ class OneAgentTheCallerMayNotReadRefusesTheWholeSearch(
 
 @dataclass(frozen=True)
 class EnforcementOffLetsAnyoneSearchTheAgent(
-    Scenario[SeedingSession, AnAgentAndACaller, ResourceSlotAdapter, Searched], Configured
+    Scenario[TestSeedingSession, AnAgentAndACaller, ResourceSlotAdapter, Searched], Configured
 ):
     @override
     def summary(self) -> str:
@@ -217,7 +219,7 @@ class EnforcementOffLetsAnyoneSearchTheAgent(
         return {ENFORCEMENT: False}
 
     @override
-    def given(self) -> Given[SeedingSession, AnAgentAndACaller]:
+    def given(self) -> Given[TestSeedingSession, AnAgentAndACaller]:
         return AnAgentAndSomeone()
 
     @override

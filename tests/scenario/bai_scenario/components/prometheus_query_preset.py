@@ -49,12 +49,12 @@ from ai.backend.testutils.scenario_steps import (
 from bai_scenario.components.domain import WrittenByThisRun
 from bai_scenario.components.system import lay_a_caller, lay_a_public_reader
 from bai_scenario.fakes.prometheus import ANSWERED_AT, INSTANT
-from bai_scenario.seeds.prometheus_query_preset.category import SeedCategory
+from bai_scenario.seeds.prometheus_query_preset.category import TestSeedCategory
 from bai_scenario.seeds.prometheus_query_preset.preset import (
     METRIC,
     TEMPLATE,
-    SeedPreset,
-    SeedPresetIn,
+    TestSeedPreset,
+    TestSeedPresetIn,
 )
 from bai_scenario.seeds.seeder import Laid
 
@@ -132,7 +132,7 @@ class ACategoryAndSomeone(Given[Any, ACatalogAndACaller]):
 
     @override
     async def lay(self, seeding: Any) -> ACatalogAndACaller:
-        category = await seeding.creating(SeedCategory())
+        category = await seeding.creating(TestSeedCategory())
         caller = await lay_someone(seeding, self.role)
         return ACatalogAndACaller(caller=seeding.made(caller), category=seeding.made(category))
 
@@ -157,7 +157,7 @@ class APresetAndSomeone(Given[Any, APresetAndACaller]):
     @override
     async def lay(self, seeding: Any) -> APresetAndACaller:
         preset = await seeding.creating(
-            SeedPreset(
+            TestSeedPreset(
                 query_template=self.query_template,
                 time_window=self.time_window,
                 filter_labels=self.filter_labels,
@@ -184,9 +184,9 @@ class APresetInOneOfTwoCategories(Given[Any, APresetAndACaller]):
 
     @override
     async def lay(self, seeding: Any) -> APresetAndACaller:
-        home = await seeding.creating(SeedCategory(name_hint="home"))
-        elsewhere = await seeding.creating(SeedCategory(name_hint="elsewhere"))
-        preset = await seeding.creating_from(SeedPresetIn(), home)
+        home = await seeding.creating(TestSeedCategory(name_hint="home"))
+        elsewhere = await seeding.creating(TestSeedCategory(name_hint="elsewhere"))
+        preset = await seeding.creating_from(TestSeedPresetIn(), home)
         caller = await lay_someone(seeding, self.role)
         return APresetAndACaller(
             preset=seeding.made(preset),
@@ -205,7 +205,7 @@ class APresetAndNobody(Given[Any, APresetAlone]):
 
     @override
     async def lay(self, seeding: Any) -> APresetAlone:
-        preset = await seeding.creating(SeedPreset())
+        preset = await seeding.creating(TestSeedPreset())
         return APresetAlone(preset=seeding.made(preset))
 
 
@@ -222,9 +222,9 @@ class ManyPresetsAndSomeone(Given[Any, ManyPresetsAndACaller]):
 
     @override
     async def lay(self, seeding: Any) -> ManyPresetsAndACaller:
-        wanted = await seeding.creating(SeedPreset(name_hint="wanted"))
+        wanted = await seeding.creating(TestSeedPreset(name_hint="wanted"))
         others = [
-            await seeding.creating(SeedPreset(name_hint="other")) for _ in range(self.besides)
+            await seeding.creating(TestSeedPreset(name_hint="other")) for _ in range(self.besides)
         ]
         caller = await lay_someone(seeding, self.role)
         return ManyPresetsAndACaller(
@@ -250,11 +250,15 @@ class PresetsInTwoCategories(Given[Any, ManyPresetsAndACaller]):
 
     @override
     async def lay(self, seeding: Any) -> ManyPresetsAndACaller:
-        wanted = await seeding.creating(SeedCategory(name_hint="wanted"))
-        other = await seeding.creating(SeedCategory(name_hint="other"))
-        first = await seeding.creating_from(SeedPresetIn(SeedPreset(name_hint="wanted")), wanted)
-        second = await seeding.creating_from(SeedPresetIn(SeedPreset(name_hint="beside")), wanted)
-        await seeding.creating_from(SeedPresetIn(SeedPreset(name_hint="elsewhere")), other)
+        wanted = await seeding.creating(TestSeedCategory(name_hint="wanted"))
+        other = await seeding.creating(TestSeedCategory(name_hint="other"))
+        first = await seeding.creating_from(
+            TestSeedPresetIn(TestSeedPreset(name_hint="wanted")), wanted
+        )
+        second = await seeding.creating_from(
+            TestSeedPresetIn(TestSeedPreset(name_hint="beside")), wanted
+        )
+        await seeding.creating_from(TestSeedPresetIn(TestSeedPreset(name_hint="elsewhere")), other)
         caller = await lay_someone(seeding, self.role)
         return ManyPresetsAndACaller(
             laid=(seeding.made(first), seeding.made(second)),

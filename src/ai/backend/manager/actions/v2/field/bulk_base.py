@@ -61,3 +61,34 @@ class BasePartialBulkFieldAction[TFieldID: FieldIdentifier, TOwnerID: EntityIden
     def narrowed_to(self, field_ids: Sequence[TFieldID]) -> Self:
         """Return the same action over ``field_ids``, a subset of what it named."""
         raise NotImplementedError
+
+
+class BasePartialBulkOwnerCandidatesFieldAction[TFieldID: FieldIdentifier](ABC):
+    """Base for actions over an explicit set of field rows that each belong to several
+    owners.
+
+    The owners come from the group the action is wired through; a row is reached when
+    the caller holds the permission on one of them.
+    """
+
+    @classmethod
+    @abstractmethod
+    def operation_type(cls) -> ActionOperationType:
+        """Return the operation that this action performs on the rows."""
+        raise NotImplementedError
+
+    @classmethod
+    @abstractmethod
+    def action_name(cls) -> str:
+        """Return the name recorded on audit rows: a lowercase snake_case verb phrase."""
+        raise NotImplementedError
+
+    @abstractmethod
+    def field_ids(self) -> Sequence[TFieldID]:
+        """Return the ids of the field rows that this action applies to."""
+        raise NotImplementedError
+
+    @abstractmethod
+    def narrowed_to(self, field_ids: Sequence[TFieldID]) -> Self:
+        """Return the same action over ``field_ids``, a subset of what it named."""
+        raise NotImplementedError

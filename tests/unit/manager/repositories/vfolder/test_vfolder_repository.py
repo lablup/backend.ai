@@ -5,6 +5,7 @@ Tests the repository layer with real database operations.
 
 from __future__ import annotations
 
+import dataclasses
 import uuid
 from collections.abc import AsyncGenerator
 from pathlib import PurePosixPath
@@ -96,7 +97,10 @@ from ai.backend.manager.models.user.row import (
     UserStatus,
 )
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.models.vfolder.creators import ProjectVFolderCreator
+from ai.backend.manager.models.vfolder.creators import (
+    PersonalVFolderCreator,
+    ProjectVFolderCreator,
+)
 from ai.backend.manager.models.vfolder.row import (
     VFolderRow,
     VFolderUserMountPolicyRow,
@@ -569,6 +573,120 @@ class TestVfolderRepository:
                 )
             )
 
+    def test_a_personal_folder_made_without_a_level_defaults_to_none(self) -> None:
+        owner = uuid.uuid4()
+        row = PersonalVFolderCreator(
+            name="personal",
+            domain_name="default",
+            quota_scope_id=f"user:{owner}",
+            host="local",
+            creator_id=owner,
+            user=UserID(owner),
+        ).build_row()
+
+        assert row.default_mount_permission == VFolderMountPolicy.NONE
+
+    async def test_a_project_folder_made_without_a_level_defaults_to_read_write(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        vfolder_repository: VfolderRepository,
+        test_domain: DomainFixtureData,
+        test_user: uuid.UUID,
+        test_project_resource_policy_name: str,
+    ) -> None:
+        project = await _add_project(
+            db_with_cleanup, test_domain, test_project_resource_policy_name, ProjectType.GENERAL
+        )
+        creator = dataclasses.replace(
+            self._make_project_vfolder_creator(
+                domain_name=test_domain.domain_name,
+                group_id=project,
+                user_id=test_user,
+                usage_mode=VFolderUsageMode.GENERAL,
+            ),
+            default_mount_permission=None,
+        )
+
+        creation = await vfolder_repository.create_vfolder_with_permission(creator)
+
+        assert creation.vfolder.default_mount_permission == VFolderMountPolicy.READ_WRITE
+
+    async def test_a_model_store_folder_made_without_a_level_defaults_to_read_only(
+        self,
+        vfolder_repository: VfolderRepository,
+        test_domain: DomainFixtureData,
+        test_user: uuid.UUID,
+        test_model_store_group: uuid.UUID,
+    ) -> None:
+        creator = dataclasses.replace(
+            self._make_project_vfolder_creator(
+                domain_name=test_domain.domain_name,
+                group_id=test_model_store_group,
+                user_id=test_user,
+            ),
+            default_mount_permission=None,
+        )
+
+        creation = await vfolder_repository.create_vfolder_with_permission(creator)
+
+        assert creation.vfolder.default_mount_permission == VFolderMountPolicy.READ_ONLY
+
+    async def test_a_named_level_becomes_the_default(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        vfolder_repository: VfolderRepository,
+        test_domain: DomainFixtureData,
+        test_user: uuid.UUID,
+        test_project_resource_policy_name: str,
+    ) -> None:
+        project = await _add_project(
+            db_with_cleanup, test_domain, test_project_resource_policy_name, ProjectType.GENERAL
+        )
+
+        creation = await vfolder_repository.create_vfolder_with_permission(
+            self._make_project_vfolder_creator(
+                domain_name=test_domain.domain_name,
+                group_id=project,
+                user_id=test_user,
+                usage_mode=VFolderUsageMode.GENERAL,
+                permission=VFolderMountPolicy.READ_ONLY,
+            )
+        )
+
+        assert creation.vfolder.default_mount_permission == VFolderMountPolicy.READ_ONLY
+
+
+async def _add_project(
+    db: ExtendedAsyncSAEngine,
+    domain: DomainFixtureData,
+    policy_name: str,
+    project_type: ProjectType,
+) -> uuid.UUID:
+    """A project with the virtual entity the real project-create path provisions."""
+    project_id = uuid.uuid4()
+    async with db.begin_session() as session:
+        session.add(
+            ProjectRow(
+                id=project_id,
+                name=f"project-{project_id.hex[:8]}",
+                domain_name=domain.domain_name,
+                is_active=True,
+                total_resource_slots=ResourceSlot(),
+                allowed_vfolder_hosts={"local": ["create-vfolder"]},
+                resource_policy=policy_name,
+                type=project_type,
+            )
+        )
+        await session.flush()
+        session.add(
+            VirtualEntityRow(
+                id=uuid.uuid4(),
+                entity_type=ProjectEntityType(),
+                entity_id=ProjectID(project_id),
+            )
+        )
+    return project_id
+
 
 async def _set_project_folder_allowance(
     db: ExtendedAsyncSAEngine, policy_name: str, allowance: int
@@ -762,8 +880,6 @@ class TestVfolderRepositoryAllowedVfolderHosts:
 
         assert isinstance(result, VFolderHostPermissionMap)
 
-    # -- get_user_with_keypair_policy_vfolder_hosts --
-
     @pytest.fixture
     async def keypair_policy_with_hosts(
         self,
@@ -814,31 +930,6 @@ class TestVfolderRepositoryAllowedVfolderHosts:
             )
             await db_sess.flush()
         return test_user
-
-    async def test_get_user_with_keypair_policy_vfolder_hosts_success(
-        self,
-        vfolder_repository: VfolderRepository,
-        user_with_active_keypair: uuid.UUID,
-    ) -> None:
-        """Returns email/role and the merged allowed_vfolder_hosts from active keypairs."""
-        result = await vfolder_repository.get_user_with_keypair_policy_vfolder_hosts(
-            user_with_active_keypair
-        )
-        assert result.email == f"test-{user_with_active_keypair.hex[:8]}@example.com"
-        assert result.role == UserRole.USER
-        assert "local:volume1" in result.allowed_vfolder_hosts
-        assert result.allowed_vfolder_hosts["local:volume1"] == {
-            VFolderHostPermission.CREATE,
-            VFolderHostPermission.MODIFY,
-        }
-
-    async def test_get_user_with_keypair_policy_vfolder_hosts_user_not_found(
-        self,
-        vfolder_repository: VfolderRepository,
-    ) -> None:
-        """Unknown user UUID raises UserNotFound."""
-        with pytest.raises(UserNotFound):
-            await vfolder_repository.get_user_with_keypair_policy_vfolder_hosts(uuid.uuid4())
 
     # -- default keypair policy --
 

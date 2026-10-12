@@ -11,12 +11,13 @@
   - batch_load_by_ids — 대표 성공 ✓ · 대표 실패 ✓
   - scoped_search — 대표 성공 ✓ · 대표 실패 ✓
   - scoped_search_aliases — 대표 성공 ✓ · 대표 실패 ✓
-- 직접 구현 (7)
+- 직접 구현 (8)
   - admin_alias — 성공 있음 1 · 실패 있음 3 (global_scope)
   - admin_dealias — 성공 있음 1 · 실패 있음 2 (global_scope)
   - admin_forget — 성공 있음 2 · 실패 있음 5 (single_entity)
   - admin_purge — 성공 있음 3 · 실패 있음 3 (single_entity)
   - admin_restore — 성공 있음 2 · 실패 있음 2 (single_entity)
+  - admin_scan_image — 성공 있음 2 · 실패 있음 3 (global_scope)
   - admin_search_image_aliases — 성공 있음 3 · 실패 있음 1 (global_scope)
   - admin_update — 성공 있음 6 · 실패 있음 2 (global_scope)
 
@@ -25,7 +26,10 @@
 | 시나리오 | 판정 |
 |---|---|
 | [슈퍼관리자가 크기와 오프셋 없이 커서만 지정해 검색하면 지정한 개수만 반환되고 다음 페이지가 있다고 알린다](#searching-a-cursor-alone-answers-the-first-page-and-says-there-is-more) | 성공 |
+| [호출자와 다른 사용자가 각각 커밋한 커스텀 이미지 중 호출자가 커밋한 것으로 검색하면 호출자가 커밋한 이미지만 반환된다](#searching-filtering-images-by-creator-returns-only-images-they-committed) | 성공 |
+| [커스텀 이미지와 커스텀 이미지가 아닌 이미지 중 커스텀 이미지로 검색하면 커스텀 이미지만 커밋한 사용자와 함께 반환된다](#searching-filtering-images-by-customized-returns-only-customized-images) | 성공 |
 | [슈퍼관리자가 한 이미지의 이름으로 검색하면 그 이미지만 반환된다](#searching-filtering-images-by-name-returns-only-the-match) | 성공 |
+| [커스텀 이미지와 커스텀 이미지가 아닌 이미지 중 커스텀 이미지가 아닌 것으로 검색하면 커스텀 이미지가 아닌 이미지만 반환된다](#searching-filtering-images-by-not-customized-returns-only-uncustomized-images) | 성공 |
 | [살아 있는 이미지와 삭제된 이미지 중 살아 있는 상태로 검색하면 해당 이미지만 반환된다](#searching-filtering-images-by-status-returns-only-alive-images) | 성공 |
 | [슈퍼관리자가 페이지 크기를 생략하고 검색하면, 50개까지만 반환되고 다음 페이지가 있다고 알린다](#searching-omitting-the-page-size-answers-with-fifty-and-says-there-is-more) | 성공 |
 | [이름 내림차순으로 정렬하고 첫 항목을 제외하면 두 번째와 세 번째 이미지가 반환된다](#searching-ordering-by-name-and-offsetting-returns-the-middle-page) | 성공 |
@@ -121,6 +125,16 @@
 | [아무 권한도 받지 않은 사용자가 이미지를 복원하려 하면 권한 부족으로 거부된다](#forgetting-a-user-granted-nothing-may-not-restore-an-image) | 거부 |
 | [어느 이미지도 가리키지 않는 ID를 복원하려 하면 대상을 찾을 수 없어 거부된다](#forgetting-restoring-an-id-that-holds-no-image-is-refused) | 거부 |
 
+**admin_scan_image**
+
+| 시나리오 | 판정 |
+|---|---|
+| [슈퍼관리자가 이미 등록된 이미지를 scan하면 새 이미지를 만들지 않고 등록된 이미지를 레지스트리 값으로 갱신해 반환한다](#scanning-scanning-a-registered-image-refreshes-it-from-the-registry) | 성공 |
+| [슈퍼관리자가 미등록된 이미지를 scan하면 요청한 아키텍처의 이미지 하나가 반환된다. scan은 슈퍼관리자 역할이 있어야만 실행된다](#scanning-scanning-an-unregistered-image-registers-the-requested-architecture) | 성공 |
+| [이미지에 맞는 registry가 없으면 scan하지 않고 거부한다. 레지스트리 이름만 주어도 레지스트리 전체를 스캔하지 않는다](#scanning-a-name-no-registry-holds-as-an-image-is-refused-without-a-scan) | 거부 |
+| [레지스트리에 없는 태그를 scan하면 이미지를 찾을 수 없어 거부된다](#scanning-a-tag-the-registry-does-not-hold-is-refused) | 거부 |
+| [일반 사용자는 scan을 실행할 수 없어 슈퍼관리자 권한 부족으로 거부된다](#scanning-a-user-who-is-not-the-superadmin-may-not-scan) | 거부 |
+
 **admin_search_image_aliases**
 
 | 시나리오 | 판정 |
@@ -177,6 +191,74 @@ Then
   - has_next_page = True
   - has_previous_page = False
 
+<a id="searching-filtering-images-by-creator-returns-only-images-they-committed"></a>
+
+#### [filtering-images-by-creator-returns-only-images-they-committed](/tests/scenario/bai_scenario/manager/image/test_searching.py) — pass
+
+호출자와 다른 사용자가 각각 커밋한 커스텀 이미지 중 호출자가 커밋한 것으로 검색하면 호출자가 커밋한 이미지만 반환된다
+
+Given
+
+- 호출자가 커밋한 커스텀 이미지 1개와 다른 사용자가 커밋한 커스텀 이미지 1개, superadmin 1명
+  - 도메인 home-1
+  - 컨테이너 레지스트리 host-1: 이미지를 가져오는 곳
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+    - 사용자 정책 user-policy-2: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
+    - 일반 사용자 user-2: 자기 키와 개인 프로젝트를 갖는다
+  - 이미지 mine-1: x86_64 이미지, 커스터마이즈된 이미지라 소유자가 있다
+  - 이미지 theirs-1: x86_64 이미지, 커스터마이즈된 이미지라 소유자가 있다
+
+When
+
+- ImageAdapter.admin_search — user-1이 자신이 커밋한 이미지로 한 페이지에 50개씩 검색함
+
+Then
+
+- 호출자가 커밋한 이미지만 반환된다
+  - items = ['mine-1']
+  - creator_id: 호출자의 ID와 같다
+  - total_count = 1
+  - has_next_page = False
+  - has_previous_page = False
+
+<a id="searching-filtering-images-by-customized-returns-only-customized-images"></a>
+
+#### [filtering-images-by-customized-returns-only-customized-images](/tests/scenario/bai_scenario/manager/image/test_searching.py) — pass
+
+커스텀 이미지와 커스텀 이미지가 아닌 이미지 중 커스텀 이미지로 검색하면 커스텀 이미지만 커밋한 사용자와 함께 반환된다
+
+Given
+
+- 호출자가 커밋한 커스텀 이미지 1개와 커스텀 이미지가 아닌 이미지 1개, superadmin 1명
+  - 도메인 home-1
+  - 컨테이너 레지스트리 host-1: 이미지를 가져오는 곳
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+  - 이미지 customized-1: x86_64 이미지, 커스터마이즈된 이미지라 소유자가 있다
+  - 이미지 uncustomized-1: x86_64 이미지
+
+When
+
+- ImageAdapter.admin_search — user-1이 커스텀 이미지로 한 페이지에 50개씩 검색함
+
+Then
+
+- 커스텀 이미지만 반환되고, 커밋한 사용자로 호출자가 담긴다
+  - items = ['customized-1']
+  - customized = [True]
+  - creator_id: 호출자의 ID와 같다
+  - total_count = 1
+  - has_next_page = False
+  - has_previous_page = False
+
 <a id="searching-filtering-images-by-name-returns-only-the-match"></a>
 
 #### [filtering-images-by-name-returns-only-the-match](/tests/scenario/bai_scenario/manager/image/test_searching.py) — pass
@@ -205,6 +287,39 @@ Then
 
 - 이름이 일치하는 이미지만 반환된다
   - items = ['image-0-1']
+  - total_count = 1
+  - has_next_page = False
+  - has_previous_page = False
+
+<a id="searching-filtering-images-by-not-customized-returns-only-uncustomized-images"></a>
+
+#### [filtering-images-by-not-customized-returns-only-uncustomized-images](/tests/scenario/bai_scenario/manager/image/test_searching.py) — pass
+
+커스텀 이미지와 커스텀 이미지가 아닌 이미지 중 커스텀 이미지가 아닌 것으로 검색하면 커스텀 이미지가 아닌 이미지만 반환된다
+
+Given
+
+- 호출자가 커밋한 커스텀 이미지 1개와 커스텀 이미지가 아닌 이미지 1개, superadmin 1명
+  - 도메인 home-1
+  - 컨테이너 레지스트리 host-1: 이미지를 가져오는 곳
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+  - 이미지 customized-1: x86_64 이미지, 커스터마이즈된 이미지라 소유자가 있다
+  - 이미지 uncustomized-1: x86_64 이미지
+
+When
+
+- ImageAdapter.admin_search — user-1이 커스텀 이미지가 아닌 것으로 한 페이지에 50개씩 검색함
+
+Then
+
+- 커스텀 이미지가 아닌 이미지만 반환되고, 커밋한 사용자는 비어 있다
+  - items = ['uncustomized-1']
+  - customized = [False]
+  - creator_id = [None]
   - total_count = 1
   - has_next_page = False
   - has_previous_page = False
@@ -1130,6 +1245,8 @@ Then
   - accelerators = None
   - config_digest = 'sha256:000000000000000000000000000000000000000000000000000000000image-1'
   - is_local = False
+  - customized = False
+  - creator_id = None
   - created_at: 이 실행이 쓴 시각
   - last_used_at: 무시함 — 세션이 기록하는 값이라 이 실행에서는 알 수 없다
   - identity.canonical_name = 'image-1'
@@ -1193,6 +1310,8 @@ Then
   - accelerators = None
   - config_digest = 'sha256:000000000000000000000000000000000000000000000000000000000image-1'
   - is_local = False
+  - customized = True
+  - creator_id: 이미지를 커밋한 사용자의 ID와 같다
   - created_at: 이 실행이 쓴 시각
   - last_used_at: 무시함 — 세션이 기록하는 값이라 이 실행에서는 알 수 없다
   - identity.canonical_name = 'image-1'
@@ -1394,6 +1513,8 @@ Then
   - accelerators = None
   - config_digest = 'sha256:000000000000000000000000000000000000000000000000000000000image-1'
   - is_local = False
+  - customized = False
+  - creator_id = None
   - created_at: 이 실행이 쓴 시각
   - last_used_at: 무시함 — 세션이 기록하는 값이라 이 실행에서는 알 수 없다
   - identity.canonical_name = 'image-1'
@@ -1451,6 +1572,8 @@ Then
   - accelerators = None
   - config_digest = 'sha256:000000000000000000000000000000000000000000000000000000000image-1'
   - is_local = False
+  - customized = False
+  - creator_id = None
   - created_at: 이 실행이 쓴 시각
   - last_used_at: 무시함 — 세션이 기록하는 값이라 이 실행에서는 알 수 없다
   - identity.canonical_name = 'image-1'
@@ -1514,6 +1637,8 @@ Then
   - accelerators = None
   - config_digest = 'sha256:000000000000000000000000000000000000000000000000000000000image-1'
   - is_local = False
+  - customized = True
+  - creator_id: 이미지를 커밋한 사용자의 ID와 같다
   - created_at: 이 실행이 쓴 시각
   - last_used_at: 무시함 — 세션이 기록하는 값이라 이 실행에서는 알 수 없다
   - identity.canonical_name = 'image-1'
@@ -1660,6 +1785,8 @@ Then
   - accelerators = None
   - config_digest = 'sha256:000000000000000000000000000000000000000000000000000000000image-1'
   - is_local = False
+  - customized = False
+  - creator_id = None
   - created_at: 이 실행이 쓴 시각
   - last_used_at: 무시함 — 세션이 기록하는 값이라 이 실행에서는 알 수 없다
   - identity.canonical_name = 'image-1'
@@ -1717,6 +1844,8 @@ Then
   - accelerators = None
   - config_digest = 'sha256:000000000000000000000000000000000000000000000000000000000image-1'
   - is_local = False
+  - customized = False
+  - creator_id = None
   - created_at: 이 실행이 쓴 시각
   - last_used_at: 무시함 — 세션이 기록하는 값이라 이 실행에서는 알 수 없다
   - identity.canonical_name = 'image-1'
@@ -1785,6 +1914,199 @@ Then
 
 - 거부된다
   - 거부: ImageNotFound
+
+### admin_scan_image
+
+<a id="scanning-scanning-a-registered-image-refreshes-it-from-the-registry"></a>
+
+#### [scanning-a-registered-image-refreshes-it-from-the-registry](/tests/scenario/bai_scenario/manager/image/test_scanning.py) — pass
+
+슈퍼관리자가 이미 등록된 이미지를 scan하면 새 이미지를 만들지 않고 등록된 이미지를 레지스트리 값으로 갱신해 반환한다
+
+Given
+
+- stable/python:latest 태그를 amd64, arm64로 내놓는 레지스트리 1개, 그 태그로 이미 등록된 x86_64 이미지 1개, superadmin 1명
+  - 도메인 home-1
+  - 컨테이너 레지스트리 host-1: 이미지를 가져오는 곳, 프로젝트는 stable
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+  - 이미지 stable/python:latest: x86_64 이미지, 설정 다이제스트는 sha256:before-scan
+
+When
+
+- ImageAdapter.admin_scan_image — user-1이 stable/python:latest 태그를 x86_64 아키텍처로 스캔
+
+Then
+
+- 요청한 아키텍처로 등록된 이미지 노드가 반환된다
+  - id: 이미 등록된 이미지의 ID와 같다
+  - name = 'host-1/stable/python:latest'
+  - image = 'stable/python'
+  - registry = 'host-1'
+  - registry_id: 미리 만들어 둔 레지스트리의 ID와 같다
+  - project = 'stable'
+  - tag = 'latest'
+  - architecture = 'x86_64'
+  - size_bytes = 10
+  - type = <ImageType.COMPUTE: 'compute'>
+  - status = <ImageStatus.ALIVE: 'ALIVE'>
+  - labels = []
+  - tags = []
+  - resource_limits = [ImageResourceLimitInfo(key='cpu', min='1', max=None), ImageResourceLimitInfo(key='mem', min='1073741824', max=None)]
+  - accelerators = '*'
+  - config_digest = 'sha256:config-amd64'
+  - is_local = False
+  - created_at: 이 실행이 쓴 시각
+  - last_used_at: 무시함 — 세션이 기록하는 값이라 이 실행에서는 알 수 없다
+  - identity.canonical_name = 'host-1/stable/python:latest'
+  - identity.namespace = 'stable/python'
+  - identity.architecture = 'x86_64'
+  - metadata.digest = 'sha256:config-amd64'
+  - metadata.size_bytes = 10
+  - metadata.created_at: 이 실행이 쓴 시각
+  - metadata.last_used_at: 노드의 last_used_at 필드와 같다
+  - metadata.tags = []
+  - metadata.labels = []
+  - metadata.status = <ImageStatus.ALIVE: 'ALIVE'>
+  - requirements.supported_accelerators = ['*']
+  - requirements.resource_limits = [ImageResourceLimitGQLInfo(key='cpu', min='1', max='Infinity'), ImageResourceLimitGQLInfo(key='mem', min='1073741824', max='Infinity')]
+
+<a id="scanning-scanning-an-unregistered-image-registers-the-requested-architecture"></a>
+
+#### [scanning-an-unregistered-image-registers-the-requested-architecture](/tests/scenario/bai_scenario/manager/image/test_scanning.py) — pass
+
+슈퍼관리자가 미등록된 이미지를 scan하면 요청한 아키텍처의 이미지 하나가 반환된다. scan은 슈퍼관리자 역할이 있어야만 실행된다
+
+Given
+
+- stable/python:latest 태그를 amd64, arm64로 내놓는 레지스트리 1개, superadmin 1명
+  - 도메인 home-1
+  - 컨테이너 레지스트리 host-1: 이미지를 가져오는 곳, 프로젝트는 stable
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+
+When
+
+- ImageAdapter.admin_scan_image — user-1이 stable/python:latest 태그를 x86_64 아키텍처로 스캔
+
+Then
+
+- 요청한 아키텍처로 등록된 이미지 노드가 반환된다
+  - id: 무시함 — 스캔이 새로 만든 행이라 데이터베이스가 정한다
+  - name = 'host-1/stable/python:latest'
+  - image = 'stable/python'
+  - registry = 'host-1'
+  - registry_id: 미리 만들어 둔 레지스트리의 ID와 같다
+  - project = 'stable'
+  - tag = 'latest'
+  - architecture = 'x86_64'
+  - size_bytes = 10
+  - type = <ImageType.COMPUTE: 'compute'>
+  - status = <ImageStatus.ALIVE: 'ALIVE'>
+  - labels = []
+  - tags = []
+  - resource_limits = [ImageResourceLimitInfo(key='cpu', min='1', max=None), ImageResourceLimitInfo(key='mem', min='1073741824', max=None)]
+  - accelerators = '*'
+  - config_digest = 'sha256:config-amd64'
+  - is_local = False
+  - created_at: 이 실행이 쓴 시각
+  - last_used_at: 무시함 — 세션이 기록하는 값이라 이 실행에서는 알 수 없다
+  - identity.canonical_name = 'host-1/stable/python:latest'
+  - identity.namespace = 'stable/python'
+  - identity.architecture = 'x86_64'
+  - metadata.digest = 'sha256:config-amd64'
+  - metadata.size_bytes = 10
+  - metadata.created_at: 이 실행이 쓴 시각
+  - metadata.last_used_at: 노드의 last_used_at 필드와 같다
+  - metadata.tags = []
+  - metadata.labels = []
+  - metadata.status = <ImageStatus.ALIVE: 'ALIVE'>
+  - requirements.supported_accelerators = ['*']
+  - requirements.resource_limits = [ImageResourceLimitGQLInfo(key='cpu', min='1', max='Infinity'), ImageResourceLimitGQLInfo(key='mem', min='1073741824', max='Infinity')]
+
+<a id="scanning-a-name-no-registry-holds-as-an-image-is-refused-without-a-scan"></a>
+
+#### [a-name-no-registry-holds-as-an-image-is-refused-without-a-scan](/tests/scenario/bai_scenario/manager/image/test_scanning.py) — pass
+
+이미지에 맞는 registry가 없으면 scan하지 않고 거부한다. 레지스트리 이름만 주어도 레지스트리 전체를 스캔하지 않는다
+
+Given
+
+- stable/python:latest 태그를 amd64, arm64로 내놓는 레지스트리 1개, superadmin 1명
+  - 도메인 home-1
+  - 컨테이너 레지스트리 host-1: 이미지를 가져오는 곳, 프로젝트는 stable
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+
+When
+
+- ImageAdapter.admin_scan_image — user-1이 이미지 없이 레지스트리 이름만 x86_64 아키텍처로 스캔
+
+Then
+
+- 거부된다
+  - 거부: RegistryNotFoundForImage
+
+<a id="scanning-a-tag-the-registry-does-not-hold-is-refused"></a>
+
+#### [a-tag-the-registry-does-not-hold-is-refused](/tests/scenario/bai_scenario/manager/image/test_scanning.py) — pass
+
+레지스트리에 없는 태그를 scan하면 이미지를 찾을 수 없어 거부된다
+
+Given
+
+- stable/python:latest 태그를 amd64, arm64로 내놓는 레지스트리 1개, superadmin 1명
+  - 도메인 home-1
+  - 컨테이너 레지스트리 host-1: 이미지를 가져오는 곳, 프로젝트는 stable
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+
+When
+
+- ImageAdapter.admin_scan_image — user-1이 stable/python:removed 태그를 x86_64 아키텍처로 스캔
+
+Then
+
+- 거부된다
+  - 거부: ImageNotFound
+
+<a id="scanning-a-user-who-is-not-the-superadmin-may-not-scan"></a>
+
+#### [a-user-who-is-not-the-superadmin-may-not-scan](/tests/scenario/bai_scenario/manager/image/test_scanning.py) — pass
+
+일반 사용자는 scan을 실행할 수 없어 슈퍼관리자 권한 부족으로 거부된다
+
+Given
+
+- stable/python:latest 태그를 amd64, arm64로 내놓는 레지스트리 1개, user 1명
+  - 도메인 home-1
+  - 컨테이너 레지스트리 host-1: 이미지를 가져오는 곳, 프로젝트는 stable
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+
+When
+
+- ImageAdapter.admin_scan_image — user-1이 stable/python:latest 태그를 x86_64 아키텍처로 스캔
+
+Then
+
+- 거부된다
+  - 거부: InsufficientPrivilege
 
 ### admin_search_image_aliases
 
@@ -1956,6 +2278,8 @@ Then
   - accelerators = None
   - config_digest = 'sha256:000000000000000000000000000000000000000000000000000000000image-1'
   - is_local = False
+  - customized = False
+  - creator_id = None
   - created_at: 이 실행이 쓴 시각
   - last_used_at: 무시함 — 세션이 기록하는 값이라 이 실행에서는 알 수 없다
   - identity.canonical_name = 'image-1'
@@ -2013,6 +2337,8 @@ Then
   - accelerators = None
   - config_digest = 'sha256:000000000000000000000000000000000000000000000000000000000image-1'
   - is_local = False
+  - customized = False
+  - creator_id = None
   - created_at: 이 실행이 쓴 시각
   - last_used_at: 무시함 — 세션이 기록하는 값이라 이 실행에서는 알 수 없다
   - identity.canonical_name = 'image-1'
@@ -2070,6 +2396,8 @@ Then
   - accelerators = None
   - config_digest = 'sha256:000000000000000000000000000000000000000000000000000000000image-1'
   - is_local = False
+  - customized = False
+  - creator_id = None
   - created_at: 이 실행이 쓴 시각
   - last_used_at: 무시함 — 세션이 기록하는 값이라 이 실행에서는 알 수 없다
   - identity.canonical_name = 'image-1'
@@ -2127,6 +2455,8 @@ Then
   - accelerators = None
   - config_digest = 'sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff'
   - is_local = True
+  - customized = False
+  - creator_id = None
   - created_at: 이 실행이 쓴 시각
   - last_used_at: 무시함 — 세션이 기록하는 값이라 이 실행에서는 알 수 없다
   - identity.canonical_name = 'updated-image'
@@ -2184,6 +2514,8 @@ Then
   - accelerators = None
   - config_digest = 'sha256:000000000000000000000000000000000000000000000000000000000image-1'
   - is_local = False
+  - customized = False
+  - creator_id = None
   - created_at: 이 실행이 쓴 시각
   - last_used_at: 무시함 — 세션이 기록하는 값이라 이 실행에서는 알 수 없다
   - identity.canonical_name = 'image-1'
@@ -2241,6 +2573,8 @@ Then
   - accelerators = 'cuda'
   - config_digest = 'sha256:000000000000000000000000000000000000000000000000000000000image-1'
   - is_local = False
+  - customized = False
+  - creator_id = None
   - created_at: 이 실행이 쓴 시각
   - last_used_at: 무시함 — 세션이 기록하는 값이라 이 실행에서는 알 수 없다
   - identity.canonical_name = 'image-1'

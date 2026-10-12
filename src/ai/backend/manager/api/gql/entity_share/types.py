@@ -37,7 +37,6 @@ from ai.backend.common.dto.manager.v2.entity_share.types import (
     EntityShareSideDTO,
     EntityShareStatusDTO,
 )
-from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import UUIDScopeGQL
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
@@ -54,14 +53,14 @@ from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin, Pydant
 from ai.backend.manager.api.gql.rbac.types.scope import PermissionBitGQL
 
 EntityShareStatusGQL: type[EntityShareStatusDTO] = gql_enum(
-    BackendAIGQLMeta(added_version=NEXT_RELEASE_VERSION, description="Where a share stands."),
+    BackendAIGQLMeta(added_version="26.9.0", description="Where a share stands."),
     EntityShareStatusDTO,
     name="EntityShareStatus",
 )
 
 EntityShareSideGQL: type[EntityShareSideDTO] = gql_enum(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.9.0",
         description="Which side of a share the caller stands on.",
     ),
     EntityShareSideDTO,
@@ -70,9 +69,7 @@ EntityShareSideGQL: type[EntityShareSideDTO] = gql_enum(
 
 
 @gql_enum(
-    BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION, description="Order fields for entity shares."
-    ),
+    BackendAIGQLMeta(added_version="26.9.0", description="Order fields for entity shares."),
     name="EntityShareOrderField",
 )
 class EntityShareOrderFieldGQL(StrEnum):
@@ -83,7 +80,7 @@ class EntityShareOrderFieldGQL(StrEnum):
 
 @gql_node_type(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.9.0",
         description="One entity handed to one scope: offered, taken, or taken back.",
     ),
     name="EntityShare",
@@ -92,7 +89,7 @@ class EntityShareGQL(PydanticNodeMixin[NodeDTO]):
     id: NodeID[str] = gql_field(description="Relay-style global node identifier.")
     entity_id: UUID = gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.9.0",
             description="UUID of the entity share.",
         ),
     )
@@ -122,18 +119,14 @@ class EntityShareGQL(PydanticNodeMixin[NodeDTO]):
 
 
 @gql_connection_type(
-    BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION, description="One entity share within a connection."
-    )
+    BackendAIGQLMeta(added_version="26.9.0", description="One entity share within a connection.")
 )
 class EntityShareEdge(Edge[EntityShareGQL]):
     pass
 
 
 @gql_connection_type(
-    BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION, description="Paginated list of entity shares."
-    )
+    BackendAIGQLMeta(added_version="26.9.0", description="Paginated list of entity shares.")
 )
 class EntityShareConnection(Connection[EntityShareGQL]):
     # Restated so the schema's edge type is the described one above rather than the
@@ -149,7 +142,7 @@ class EntityShareConnection(Connection[EntityShareGQL]):
 
 
 @gql_pydantic_input(
-    BackendAIGQLMeta(added_version=NEXT_RELEASE_VERSION, description="Filter for entity shares."),
+    BackendAIGQLMeta(added_version="26.9.0", description="Filter for entity shares."),
     name="EntityShareFilter",
 )
 class EntityShareFilterGQL(PydanticInputMixin[FilterDTO]):
@@ -161,7 +154,7 @@ class EntityShareFilterGQL(PydanticInputMixin[FilterDTO]):
 
 
 @gql_pydantic_input(
-    BackendAIGQLMeta(added_version=NEXT_RELEASE_VERSION, description="Order specification."),
+    BackendAIGQLMeta(added_version="26.9.0", description="Order specification."),
     name="EntityShareOrderBy",
 )
 class EntityShareOrderByGQL(PydanticInputMixin[OrderByDTO]):
@@ -171,7 +164,7 @@ class EntityShareOrderByGQL(PydanticInputMixin[OrderByDTO]):
 
 @gql_pydantic_input(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.9.0",
         description="One entity whose shares are being read.",
     ),
     name="EntityShareTargetScope",
@@ -183,7 +176,7 @@ class EntityShareTargetScopeGQL(PydanticInputMixin[TargetScopeDTO]):
 
 @gql_pydantic_input(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.9.0",
         description=(
             "Scope for the scoped entity share query. "
             "All items are OR'd; raises an error if every field is empty."
@@ -208,7 +201,7 @@ class EntityShareScopeGQL(PydanticInputMixin[ScopeDTO]):
 
 @gql_pydantic_input(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.9.0",
         description="Who an offer goes to; exactly one of the three.",
     ),
     name="EntityShareRecipientInput",
@@ -224,7 +217,7 @@ class EntityShareRecipientInputGQL(PydanticInputMixin[RecipientInputDTO]):
 
 @gql_pydantic_input(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.9.0",
         description="Create entity share input.",
     ),
     name="CreateEntityShareInput",
@@ -239,7 +232,7 @@ class CreateEntityShareInputGQL(PydanticInputMixin[CreateInputDTO]):
 
 
 @gql_pydantic_type(
-    BackendAIGQLMeta(added_version=NEXT_RELEASE_VERSION, description="Entity share payload."),
+    BackendAIGQLMeta(added_version="26.9.0", description="Entity share payload."),
     model=PayloadDTO,
     name="EntitySharePayload",
 )
@@ -249,7 +242,7 @@ class EntitySharePayloadGQL(PydanticOutputMixin[PayloadDTO]):
 
 @gql_pydantic_input(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.9.0",
         description="Read the shares the caller stands on a side of.",
     ),
     name="MySearchEntitySharesInput",

@@ -67,7 +67,18 @@ class AuditLogActionKindFilterGQL(PydanticInputMixin[AuditLogActionKindFilter]):
 )
 class AuditLogFilterGQL(PydanticInputMixin[AuditLogFilter]):
     entity_type: StringFilter | None = None
-    entity_id: StringFilter | None = None
+    entity_id: StringFilter | None = gql_field(
+        description="Entity ID filter.",
+        default=None,
+        deprecation_reason=(
+            f"Deprecated since {NEXT_RELEASE_VERSION}. Use `targetEntityId`, which matches the id "
+            "as a UUID."
+        ),
+    )
+    target_entity_id: UUIDFilter | None = gql_added_field(
+        BackendAIGQLMeta(added_version=NEXT_RELEASE_VERSION, description="Entity ID filter."),
+        default=None,
+    )
     operation: StringFilter | None = None
     status: AuditLogStatusFilterGQL | None = None
     created_at: DateTimeFilter | None = None

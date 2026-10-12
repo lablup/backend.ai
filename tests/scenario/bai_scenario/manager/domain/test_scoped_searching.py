@@ -27,11 +27,11 @@ from ai.backend.testutils.scenario_steps import (
 from bai_scenario.components.answers import MissingResponse, TheCallIsRefused
 from bai_scenario.components.domain import DomainsOfAGroupAndACaller, DomainsOfAGroupAndSomeone
 from bai_scenario.runner.acting import ActingAs
-from bai_scenario.runner.planting import SeedingSession
+from bai_scenario.runner.planting import TestSeedingSession
 from bai_scenario.runner.steps import run_scenario
 
 type Searched = AdminSearchDomainsPayload
-type DomainStep = Scenario[SeedingSession, DomainsOfAGroupAndACaller, DomainAdapter, Searched]
+type DomainStep = Scenario[TestSeedingSession, DomainsOfAGroupAndACaller, DomainAdapter, Searched]
 
 
 @dataclass(frozen=True)
@@ -83,7 +83,7 @@ class OnlyTheLinkedDomainsAreLeft(Then[DomainsOfAGroupAndACaller, Searched]):
 
 @dataclass(frozen=True)
 class TheSuperadminSearchesInAGroup(
-    Scenario[SeedingSession, DomainsOfAGroupAndACaller, DomainAdapter, Searched]
+    Scenario[TestSeedingSession, DomainsOfAGroupAndACaller, DomainAdapter, Searched]
 ):
     @override
     def summary(self) -> str:
@@ -94,7 +94,7 @@ class TheSuperadminSearchesInAGroup(
         return "슈퍼관리자가 리소스 그룹 범위에서 search 하면, 그 그룹을 쓸 수 있는 도메인만 온다"
 
     @override
-    def given(self) -> Given[SeedingSession, DomainsOfAGroupAndACaller]:
+    def given(self) -> Given[TestSeedingSession, DomainsOfAGroupAndACaller]:
         return DomainsOfAGroupAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
@@ -108,7 +108,7 @@ class TheSuperadminSearchesInAGroup(
 
 @dataclass(frozen=True)
 class AUserReadingInTheGroupSearches(
-    Scenario[SeedingSession, DomainsOfAGroupAndACaller, DomainAdapter, Searched]
+    Scenario[TestSeedingSession, DomainsOfAGroupAndACaller, DomainAdapter, Searched]
 ):
     @override
     def summary(self) -> str:
@@ -122,7 +122,7 @@ class AUserReadingInTheGroupSearches(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, DomainsOfAGroupAndACaller]:
+    def given(self) -> Given[TestSeedingSession, DomainsOfAGroupAndACaller]:
         return DomainsOfAGroupAndSomeone(reading=True)
 
     @override
@@ -136,7 +136,7 @@ class AUserReadingInTheGroupSearches(
 
 @dataclass(frozen=True)
 class AUserGrantedNothingMayNotSearchInTheGroup(
-    Scenario[SeedingSession, DomainsOfAGroupAndACaller, DomainAdapter, Searched]
+    Scenario[TestSeedingSession, DomainsOfAGroupAndACaller, DomainAdapter, Searched]
 ):
     @override
     def summary(self) -> str:
@@ -149,7 +149,7 @@ class AUserGrantedNothingMayNotSearchInTheGroup(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, DomainsOfAGroupAndACaller]:
+    def given(self) -> Given[TestSeedingSession, DomainsOfAGroupAndACaller]:
         return DomainsOfAGroupAndSomeone()
 
     @override

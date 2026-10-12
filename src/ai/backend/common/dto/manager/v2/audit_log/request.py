@@ -9,8 +9,15 @@ from pydantic import Field, model_validator
 from ai.backend.common.api_handlers import BaseRequestModel
 from ai.backend.common.dto.manager.query import DateTimeFilter, StringFilter, UUIDFilter
 from ai.backend.common.dto.manager.v2.rbac.types import EntityTypeScope, UUIDScope
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 
-from .types import AuditLogActionKind, AuditLogOrderField, AuditLogStatus, OrderDirection
+from .types import (
+    AuditLogActionKind,
+    AuditLogOrderField,
+    AuditLogScopeOrderField,
+    AuditLogStatus,
+    OrderDirection,
+)
 
 __all__ = (
     "AdminSearchAuditLogsInput",
@@ -18,8 +25,11 @@ __all__ = (
     "AuditLogFilter",
     "AuditLogOrder",
     "AuditLogScope",
+    "AuditLogScopeFilter",
+    "AuditLogScopeOrder",
     "AuditLogStatusFilter",
     "ScopedSearchAuditLogsInput",
+    "SearchAuditLogScopesInput",
 )
 
 
@@ -55,7 +65,18 @@ class AuditLogFilter(BaseRequestModel):
     """Filter for audit logs."""
 
     entity_type: StringFilter | None = Field(default=None, description="Entity type filter")
-    entity_id: StringFilter | None = Field(default=None, description="Entity ID filter")
+    entity_id: StringFilter | None = Field(
+        default=None,
+        description=(
+            f"Entity ID filter. Deprecated since {NEXT_RELEASE_VERSION}; use "
+            "`target_entity_id`, which matches the id as a UUID."
+        ),
+        deprecated=True,
+    )
+    target_entity_id: UUIDFilter | None = Field(
+        default=None,
+        description=f"Added in {NEXT_RELEASE_VERSION}. Entity ID filter.",
+    )
     operation: StringFilter | None = Field(default=None, description="Operation filter")
     status: AuditLogStatusFilter | None = Field(default=None, description="Status filter")
     triggered_by: StringFilter | None = Field(default=None, description="Triggered-by filter")
@@ -132,6 +153,33 @@ class ScopedSearchAuditLogsInput(BaseRequestModel):
     scope: AuditLogScope = Field(description="Scope (OR across all items)")
     filter: AuditLogFilter | None = Field(default=None, description="Filter criteria")
     order: list[AuditLogOrder] | None = Field(default=None, description="Sort order")
+    first: int | None = Field(default=None, ge=1, description="Cursor-forward page size")
+    after: str | None = Field(default=None, description="Cursor-forward start cursor")
+    last: int | None = Field(default=None, ge=1, description="Cursor-backward page size")
+    before: str | None = Field(default=None, description="Cursor-backward end cursor")
+    limit: int | None = Field(default=None, ge=1, description="Offset-based page size")
+    offset: int | None = Field(default=None, ge=0, description="Offset-based page offset")
+
+
+class AuditLogScopeFilter(BaseRequestModel):
+    """Filter for the scopes of an audit log."""
+
+    scope_type: StringFilter | None = Field(default=None, description="Scope type filter")
+    scope_id: UUIDFilter | None = Field(default=None, description="Scope ID filter")
+
+
+class AuditLogScopeOrder(BaseRequestModel):
+    """Ordering specification for the scopes of an audit log."""
+
+    field: AuditLogScopeOrderField
+    direction: OrderDirection = OrderDirection.ASC
+
+
+class SearchAuditLogScopesInput(BaseRequestModel):
+    """Input for searching the scopes of one audit log."""
+
+    filter: AuditLogScopeFilter | None = Field(default=None, description="Filter criteria")
+    order: list[AuditLogScopeOrder] | None = Field(default=None, description="Sort order")
     first: int | None = Field(default=None, ge=1, description="Cursor-forward page size")
     after: str | None = Field(default=None, description="Cursor-forward start cursor")
     last: int | None = Field(default=None, ge=1, description="Cursor-backward page size")

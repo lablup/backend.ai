@@ -22,20 +22,24 @@ status: draft
 |---|---|---|---|
 | 세션이 하나도 없을 때 슈퍼관리자가 훑는다 | 세션 없음 | 전체 조회 | 비어 있음 |
 | 아무 권한도 받지 않은 사용자가 훑는다 | 권한 없음 | 전체 조회 | 역할 부족으로 거부 |
+| 슈퍼관리자가 세션에 지정한 스케줄링 조건을 읽는다 | 세션 그룹, `designated_agent_ids`, `requested_starts_at`이 있는 세션 | 전체 조회 | 세 값이 저장된 그대로 반환되고 기존 세션 정보도 유지됨 |
+| 슈퍼관리자가 스케줄링 조건을 지정하지 않은 세션을 읽는다 | 세션 그룹, `designated_agent_ids`, `requested_starts_at`이 없는 세션 | 전체 조회 | 세 값이 미설정으로 반환되고 기존 세션 정보도 유지됨 |
 
 필터 없는 전체 조회는 슈퍼관리자 역할로 막힌다. 스코프 권한으로 막히는 조회는 스코프를
 받는 검색이다.
 
 ## 아직 적지 않은 것
 
-`enqueue`가 가장 크다. 스케줄러가 "리소스 슬롯을 제공하는 에이전트가 그 리소스 그룹에
-없다"로 막는데, 에이전트 행은 write spec이 없다. 하트비트로 등록되기 때문이다. 시나리오로
-세우려면 그 경로를 먼저 열어야 한다.
+`designated_agent_ids`가 빈 목록으로 저장된 세션은 빈 목록 그대로 반환해야 한다. 현재 세션 생성
+spec은 빈 목록을 미설정(`None`)으로 저장하므로, 빈 목록이 저장된 기존 행의 조회는 시나리오로 심을 수 없다.
 
-`admin_search_kernels`, `batch_load_by_ids`, `batch_load_fields`,
+조회 시나리오는 세션 생성 spec으로 저장한 세션을 읽는다. `enqueue`를 거치는 생성 요청과
+스케줄러의 리소스 검증은 아직 시나리오로 옮기지 않았다.
+
+`admin_search_kernels`, `batch_load_by_ids`,
 `batch_load_kernels_by_ids`, `batch_resource_allocation_by_kernel`,
 `batch_resource_allocation_by_session`, `compute_schedule`, `enqueue`,
 `exclude_idle_checks`, `get`, `get_logs`, `gql_search_by_project`,
-`include_idle_checks`, `project_search`, `search_kernels_by_agent`,
+`include_idle_checks`, `project_search`, `scoped_search`, `search_kernels_by_agent`,
 `search_kernels_by_session`, `search_sessions_by_agent`, `shutdown_service`,
 `start_service`, `terminate`, `update`.
