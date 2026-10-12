@@ -16,6 +16,7 @@ from ai.backend.manager.models.entity_label.row import EntityLabelRow
 from ai.backend.manager.models.idle_checker.row import IdleCheckerRow
 from ai.backend.manager.models.login_client_type.row import LoginClientTypeRow
 from ai.backend.manager.models.notification.row import NotificationChannelRow
+from ai.backend.manager.models.object_storage.row import ObjectStorageRow
 from ai.backend.manager.models.prometheus_query_preset_category.row import (
     PrometheusQueryPresetCategoryRow,
 )
@@ -187,6 +188,25 @@ _CONTAINER_REGISTRIES: list[dict[str, Any]] = [
         "extra": {"note": "seed"},
     },
 ]
+_OBJECT_STORAGES: list[dict[str, Any]] = [
+    {
+        "id": "0198a5a0-0000-7000-8000-00000000b001",
+        "name": "minio",
+        "host": "storage-proxy",
+        "access_key": "minioadmin",
+        "secret_key": "minioadmin",
+        "endpoint": "http://127.0.0.1:9000",
+        "region": "us-east-1",
+    },
+    {
+        "id": "0198a5a0-0000-7000-8000-00000000b002",
+        "name": "archive",
+        "host": "storage-proxy",
+        "access_key": "archive-key",
+        "secret_key": "archive-secret",
+        "endpoint": "http://127.0.0.1:9001",
+    },
+]
 
 # The tables a seed kind writes, and the graph tables the creation path writes beside them.
 _SEED_TABLES: list[Table | type[HasTable]] = [
@@ -200,6 +220,7 @@ _SEED_TABLES: list[Table | type[HasTable]] = [
     NotificationChannelRow,
     IdleCheckerRow,
     ContainerRegistryRow,
+    ObjectStorageRow,
     RolePresetRow,
     RolePermissionPresetRow,
     RoleRow,
@@ -381,6 +402,17 @@ def container_registry_seed_dir(tmp_path: Path) -> Path:
     directory.mkdir()
     (directory / "registries.yaml").write_text(
         yaml.safe_dump({"kind": "container_registry", "version": 1, "items": _CONTAINER_REGISTRIES})
+    )
+    return directory
+
+
+@pytest.fixture
+def object_storage_seed_dir(tmp_path: Path) -> Path:
+    """A directory with one `object_storage` seed file."""
+    directory = tmp_path / "object_storage"
+    directory.mkdir()
+    (directory / "storages.yaml").write_text(
+        yaml.safe_dump({"kind": "object_storage", "version": 1, "items": _OBJECT_STORAGES})
     )
     return directory
 
