@@ -833,6 +833,15 @@ class TestUntagImageFromRegistry(ImageServiceBaseFixtures):
                 await image_service.untag_image_from_registry(action)
 
 
+class TestUntagImageFromRegistryAction:
+    """Checked against the image it names, not the global scope."""
+
+    def test_untagging_is_checked_against_the_image_it_names(self) -> None:
+        image_id = ImageID(uuid.uuid4())
+
+        assert UntagImageFromRegistryAction(image_id=image_id).entity_id() == image_id
+
+
 class TestClearImageCustomResourceLimit(ImageServiceBaseFixtures):
     """Tests for ImageService.clear_image_custom_resource_limit"""
 

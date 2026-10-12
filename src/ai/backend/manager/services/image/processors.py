@@ -119,7 +119,7 @@ class ImageProcessors:
     update_image_by_id: GlobalActionProcessor[UpdateImageByIdAction, UpdateImageByIdActionResult]
     preload_image: GlobalActionProcessor[PreloadImageAction, PreloadImageActionResult]
     unload_image: GlobalActionProcessor[UnloadImageAction, UnloadImageActionResult]
-    untag_image_from_registry: GlobalActionProcessor[
+    untag_image_from_registry: SingleEntityActionProcessor[
         UntagImageFromRegistryAction, UntagImageFromRegistryActionResult
     ]
     scan_already_registered_image: GlobalActionProcessor[ScanImageAction, ScanImageActionResult]
@@ -194,7 +194,7 @@ class ImageProcessors:
         )
         self.preload_image = group.global_scope(PreloadImageAction, service.preload_image)
         self.unload_image = group.global_scope(UnloadImageAction, service.unload_image)
-        self.untag_image_from_registry = group.global_scope(
+        self.untag_image_from_registry = group.single_entity(
             UntagImageFromRegistryAction, service.untag_image_from_registry
         )
         self.global_scan_image = group.global_scope(
