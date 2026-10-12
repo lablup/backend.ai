@@ -137,9 +137,9 @@ def setup_successful_auth(
 
     The authorize flow calls:
       1. _verify_user: dispatch AUTHORIZE hook, then verify_credential
-      2. _post_check: user status checks, default keypair read, dispatch POST_AUTHORIZE hook,
-         Valkey cross-check of active sessions
-      3. _create_login_session: create_login_session in DB, set_login_session in Valkey
+      2. _post_check: user status checks, default keypair read, dispatch POST_AUTHORIZE hook
+      3. _create_login_session: Valkey cross-check of active sessions when a login cap is set,
+         create_login_session in DB, set_login_session in Valkey
     """
     # Both AUTHORIZE and POST_AUTHORIZE hooks pass
     mock_hook_plugin_ctx.dispatch.return_value = HookResult(
@@ -381,9 +381,20 @@ async def test_authorize_with_valkey_cross_check_cleans_stale_sessions(
     auth_service: AuthService,
     mock_hook_plugin_ctx: MagicMock,
     mock_auth_repository: AsyncMock,
+    mock_user_resource_policy_repository: AsyncMock,
     mock_valkey_session_client: AsyncMock,
 ) -> None:
     """Test that stale sessions (missing from Valkey) are invalidated in DB during cross-check."""
+    # The cross-check runs only under a login cap.
+    mock_user_resource_policy_repository.get_by_name.return_value = UserResourcePolicyData(
+        uuid=UserResourcePolicyUUID(uuid4()),
+        name="default",
+        max_vfolder_count=10,
+        max_quota_scope_size=0,
+        max_session_count_per_model_session=5,
+        max_customized_image_count=3,
+        max_concurrent_logins=5,
+    )
     action = AuthorizeAction(
         type=AuthTokenType.KEYPAIR,
         domain_name="default",
@@ -537,7 +548,7 @@ async def test_create_login_session_does_not_pass_max_concurrent_sessions_to_rep
         ),
         user=_make_mock_user(),
         keypair=_make_mock_keypair(),
-        live_sessions=[],
+        active_sessions=[],
         auth_config=AuthConfig(
             max_password_age=timedelta(days=90),
             password_hash_algorithm=PasswordHashAlgorithm.PBKDF2_SHA256,
