@@ -296,9 +296,14 @@ async def download_directory_as_archive(
         def _consume(
             _loop: asyncio.AbstractEventLoop, iter: Iterator[Any], q: janus.SyncQueue[Any]
         ) -> None:
-            for item in iter:
-                q.put(item)
-            q.put(SENTINEL)
+            # The producer always terminates the queue; otherwise the consumer waits forever.
+            try:
+                for item in iter:
+                    q.put(item)
+            except BaseException as e:
+                q.put(e)
+            else:
+                q.put(SENTINEL)
 
         async def _aiter() -> AsyncGenerator[Any, None]:
             loop = asyncio.get_running_loop()
@@ -307,6 +312,8 @@ async def download_directory_as_archive(
                 fut = loop.run_in_executor(None, lambda: _consume(loop, iter, q.sync_q))
                 while True:
                     item = await q.async_q.get()
+                    if isinstance(item, BaseException):
+                        raise item
                     if item is SENTINEL:
                         break
                     yield item
@@ -320,7 +327,7 @@ async def download_directory_as_archive(
 
     if zip_filename is None:
         zip_filename = file_path.name + ".zip"
-    zf = zipstream.ZipFile(compression=zipstream.ZIP_DEFLATED)
+    zf = zipstream.ZipFile(compression=zipstream.ZIP_DEFLATED, allowZip64=True)
     async for root, dirs, files in _iter2aiter(os.walk(file_path)):
         for file in files:
             zf.write(Path(root) / file, Path(root).relative_to(file_path) / file)
