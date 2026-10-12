@@ -1,9 +1,22 @@
 from __future__ import annotations
 
-from ai.backend.common.auth.utils import generate_keypair, generate_ssh_keypair
+import base64
+import secrets
+
+from ai.backend.common.auth.utils import generate_ssh_keypair
+from ai.backend.common.types import AccessKey, SecretKey
 from ai.backend.manager.data.keypair.types import KeyPairSecrets
 from ai.backend.manager.models.keypair.row import KEYPAIR_SECRET_KEY_CONTEXT
 from ai.backend.manager.secret.pool import KeyProviderPool
+
+
+def generate_keypair() -> tuple[AccessKey, SecretKey]:
+    """
+    AWS-like access key and secret key generation.
+    """
+    ak = "AKIA" + base64.b32encode(secrets.token_bytes(10)).decode("ascii")
+    sk = secrets.token_urlsafe(30)
+    return AccessKey(ak), SecretKey(sk)
 
 
 async def generate_keypair_data(key_provider_pool: KeyProviderPool) -> KeyPairSecrets:
