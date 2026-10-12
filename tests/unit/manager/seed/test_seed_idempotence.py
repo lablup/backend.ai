@@ -36,6 +36,7 @@ _CASES: Final[list[IdempotenceCase]] = [
     IdempotenceCase(
         SeedKind.PROMETHEUS_QUERY_PRESET_CATEGORY, "prometheus_query_preset_category_seed_dir"
     ),
+    IdempotenceCase(SeedKind.PROMETHEUS_QUERY_PRESET, "prometheus_query_preset_seed_dir"),
     IdempotenceCase(SeedKind.APP_CONFIG_DEFINITION, "app_config_definition_seed_dir"),
     IdempotenceCase(SeedKind.APP_CONFIG_ALLOW_LIST, "app_config_allow_list_seed_dir"),
     IdempotenceCase(SeedKind.CLIENT_IP_MASKING_POLICY, "client_ip_masking_policy_seed_dir"),
