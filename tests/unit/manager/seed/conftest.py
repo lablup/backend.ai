@@ -21,6 +21,7 @@ from ai.backend.manager.models.rbac_models.role_permission_preset.row import (
 from ai.backend.manager.models.rbac_models.role_preset.row import RolePresetRow
 from ai.backend.manager.models.resource_slot.row import ResourceSlotTypeRow
 from ai.backend.manager.models.retention.row import RetentionPolicyRow
+from ai.backend.manager.models.storage_backend.row import StorageBackendTypeRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.virtual_entity.entity_membership import EntityMembershipRow
 from ai.backend.manager.models.virtual_entity.entity_membership_cap import (
@@ -106,6 +107,10 @@ _CLIENT_IP_MASKING_POLICIES: list[dict[str, Any]] = [
     {"target_type": "default", "mode": "truncate", "ipv4_prefix": 24, "ipv6_prefix": 48},
     {"target_type": "audit_logs", "mode": "drop"},
 ]
+_STORAGE_BACKEND_TYPES: dict[str, list[str]] = {
+    "vfs": ["vfolder", "metric", "fast-fs-size"],
+    "noop": [],
+}
 
 # The tables a seed kind writes, and the graph tables the creation path writes beside them.
 _SEED_TABLES: list[Table | type[HasTable]] = [
@@ -114,6 +119,7 @@ _SEED_TABLES: list[Table | type[HasTable]] = [
     LoginClientTypeRow,
     RetentionPolicyRow,
     ClientIPMaskingPolicyRow,
+    StorageBackendTypeRow,
     RolePresetRow,
     RolePermissionPresetRow,
     RoleRow,
@@ -223,6 +229,21 @@ def client_ip_masking_policy_seed_dir(tmp_path: Path) -> Path:
             "version": 1,
             "items": _CLIENT_IP_MASKING_POLICIES,
         })
+    )
+    return directory
+
+
+@pytest.fixture
+def storage_backend_type_seed_dir(tmp_path: Path) -> Path:
+    """A directory with one `storage_backend_type` seed file."""
+    directory = tmp_path / "storage_backend_type"
+    directory.mkdir()
+    items = [
+        {"name": name, "capabilities": capabilities}
+        for name, capabilities in _STORAGE_BACKEND_TYPES.items()
+    ]
+    (directory / "types.yaml").write_text(
+        yaml.safe_dump({"kind": "storage_backend_type", "version": 1, "items": items})
     )
     return directory
 

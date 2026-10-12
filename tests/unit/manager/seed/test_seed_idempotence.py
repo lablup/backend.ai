@@ -36,6 +36,7 @@ _CASES: Final[list[IdempotenceCase]] = [
     IdempotenceCase(SeedKind.APP_CONFIG_DEFINITION, "app_config_definition_seed_dir"),
     IdempotenceCase(SeedKind.CLIENT_IP_MASKING_POLICY, "client_ip_masking_policy_seed_dir"),
     IdempotenceCase(SeedKind.ROLE_PRESET, "role_seed_dir"),
+    IdempotenceCase(SeedKind.STORAGE_BACKEND_TYPE, "storage_backend_type_seed_dir"),
 ]
 
 
