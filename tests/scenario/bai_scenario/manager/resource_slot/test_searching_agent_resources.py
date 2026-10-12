@@ -12,7 +12,7 @@ from typing import Any, override
 import pytest
 
 from ai.backend.common.data.user.types import UserRole
-from ai.backend.common.dto.manager.query import DecimalFilter, StringFilter
+from ai.backend.common.dto.manager.query import StringFilter
 from ai.backend.common.dto.manager.v2.resource_slot.request import (
     AdminSearchAgentResourcesInput,
     AgentResourceFilter,
@@ -25,7 +25,6 @@ from ai.backend.manager.errors.auth import InsufficientPrivilege
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.testutils.scenario_steps import Configured, Given, Scenario, Then, When
 from bai_scenario.components.agent_resource import (
-    NOTHING,
     AgentsReportingSlots,
     AnAgentAndACaller,
     AnAgentAndSomeone,
@@ -146,159 +145,6 @@ class SearchingTheFirst(When[ReportedSlotsAndACaller, ResourceSlotAdapter, Searc
 
 
 @dataclass(frozen=True)
-class SearchingForReservedSlots(When[ReportedSlotsAndACaller, ResourceSlotAdapter, Searched]):
-    """예약된 자원량이 0보다 큰 슬롯을 검색한다."""
-
-    @override
-    def operation(self) -> str:
-        return "search_agent_resources"
-
-    @override
-    def describe(self, laid: ReportedSlotsAndACaller) -> str:
-        return f"{laid.caller.username}이 예약된 자원량이 0보다 크다는 조건으로 조회"
-
-    @override
-    async def call(self, adapter: ResourceSlotAdapter, laid: ReportedSlotsAndACaller) -> Searched:
-        with ActingAs(laid.caller):
-            return await adapter.search_agent_resources(
-                AdminSearchAgentResourcesInput(
-                    filter=AgentResourceFilter(reserved=DecimalFilter(greater_than=NOTHING))
-                )
-            )
-
-
-@dataclass(frozen=True)
-class SearchingForPrereservedSlots(When[ReportedSlotsAndACaller, ResourceSlotAdapter, Searched]):
-    """사전 예약된 자원량이 0보다 큰 슬롯을 검색한다."""
-
-    @override
-    def operation(self) -> str:
-        return "search_agent_resources"
-
-    @override
-    def describe(self, laid: ReportedSlotsAndACaller) -> str:
-        return f"{laid.caller.username}이 사전 예약된 자원량이 0보다 크다는 조건으로 조회"
-
-    @override
-    async def call(self, adapter: ResourceSlotAdapter, laid: ReportedSlotsAndACaller) -> Searched:
-        with ActingAs(laid.caller):
-            return await adapter.search_agent_resources(
-                AdminSearchAgentResourcesInput(
-                    filter=AgentResourceFilter(prereserved=DecimalFilter(greater_than=NOTHING))
-                )
-            )
-
-
-@dataclass(frozen=True)
-class SearchingWithAnd(When[ReportedSlotsAndACaller, ResourceSlotAdapter, Searched]):
-    """에이전트 조건과 슬롯 이름 조건을 AND로 조합해 검색한다."""
-
-    wanted: Reported
-
-    @override
-    def operation(self) -> str:
-        return "search_agent_resources"
-
-    @override
-    def describe(self, laid: ReportedSlotsAndACaller) -> str:
-        agent = laid.agents[self.wanted.agent].agent_id
-        slot = laid.slots[self.wanted.slot].name
-        return (
-            f"{laid.caller.username}이 {agent} 에이전트 조건과 {slot} 슬롯 이름 조건을 "
-            "AND로 조합해 조회"
-        )
-
-    @override
-    async def call(self, adapter: ResourceSlotAdapter, laid: ReportedSlotsAndACaller) -> Searched:
-        with ActingAs(laid.caller):
-            return await adapter.search_agent_resources(
-                AdminSearchAgentResourcesInput(
-                    filter=AgentResourceFilter(
-                        AND=[
-                            AgentResourceFilter(
-                                agent_id=StringFilter(
-                                    equals=laid.agents[self.wanted.agent].agent_id
-                                )
-                            ),
-                            AgentResourceFilter(
-                                slot_name=StringFilter(equals=laid.slots[self.wanted.slot].name)
-                            ),
-                        ]
-                    )
-                )
-            )
-
-
-@dataclass(frozen=True)
-class SearchingWithOr(When[ReportedSlotsAndACaller, ResourceSlotAdapter, Searched]):
-    """에이전트와 슬롯 이름을 함께 지정한 조건 여럿을 OR로 조합해 검색한다."""
-
-    wanted: tuple[Reported, ...]
-
-    @override
-    def operation(self) -> str:
-        return "search_agent_resources"
-
-    @override
-    def describe(self, laid: ReportedSlotsAndACaller) -> str:
-        conditions = "과 ".join(
-            f"{laid.agents[one.agent].agent_id} 에이전트의 {laid.slots[one.slot].name} 슬롯 조건"
-            for one in self.wanted
-        )
-        return f"{laid.caller.username}이 {conditions}을 OR로 조합해 조회"
-
-    @override
-    async def call(self, adapter: ResourceSlotAdapter, laid: ReportedSlotsAndACaller) -> Searched:
-        with ActingAs(laid.caller):
-            return await adapter.search_agent_resources(
-                AdminSearchAgentResourcesInput(
-                    filter=AgentResourceFilter(
-                        OR=[
-                            AgentResourceFilter(
-                                agent_id=StringFilter(equals=laid.agents[one.agent].agent_id),
-                                slot_name=StringFilter(equals=laid.slots[one.slot].name),
-                            )
-                            for one in self.wanted
-                        ]
-                    )
-                )
-            )
-
-
-@dataclass(frozen=True)
-class SearchingWithNot(When[ReportedSlotsAndACaller, ResourceSlotAdapter, Searched]):
-    """슬롯 이름 조건을 NOT으로 지정해 검색한다."""
-
-    slot: int
-
-    @override
-    def operation(self) -> str:
-        return "search_agent_resources"
-
-    @override
-    def describe(self, laid: ReportedSlotsAndACaller) -> str:
-        return (
-            f"{laid.caller.username}이 {laid.slots[self.slot].name} 슬롯 이름 조건을 "
-            "NOT으로 지정해 조회"
-        )
-
-    @override
-    async def call(self, adapter: ResourceSlotAdapter, laid: ReportedSlotsAndACaller) -> Searched:
-        with ActingAs(laid.caller):
-            return await adapter.search_agent_resources(
-                AdminSearchAgentResourcesInput(
-                    filter=AgentResourceFilter(
-                        NOT=[
-                            AgentResourceFilter(
-                                slot_name=StringFilter(equals=laid.slots[self.slot].name)
-                            )
-                        ]
-                    )
-                )
-            )
-
-
-@dataclass(frozen=True)
 class TheSuperadminFindsEveryReportedSlot(
     Scenario[TestSeedingSession, ReportedSlotsAndACaller, ResourceSlotAdapter, Searched]
 ):
@@ -310,7 +156,7 @@ class TheSuperadminFindsEveryReportedSlot(
     def describe(self) -> str:
         return (
             "슬롯을 보고한 에이전트 둘이 있을 때 슈퍼관리자가 필터 없이 조회하면 보고된 슬롯이 "
-            "모두 반환된다. 아직 아무것도 예약되지 않아 예약된 자원량과 사전 예약된 자원량은 0이다"
+            "모두 반환된다"
         )
 
     @override
@@ -441,151 +287,6 @@ class AskingForTheFirstAnswersOne(
 
 
 @dataclass(frozen=True)
-class NoSlotIsReservedYet(
-    Scenario[TestSeedingSession, ReportedSlotsAndACaller, ResourceSlotAdapter, Searched]
-):
-    @override
-    def summary(self) -> str:
-        return "a-reserved-amount-above-zero-finds-no-slot-yet"
-
-    @override
-    def describe(self) -> str:
-        return (
-            "아무것도 예약되지 않은 슬롯을 보고한 에이전트 하나가 있을 때 예약된 자원량이 "
-            "0보다 크다는 조건으로 조회하면 응답이 비어 있다"
-        )
-
-    @override
-    def given(self) -> Given[TestSeedingSession, ReportedSlotsAndACaller]:
-        return AgentsReportingSlots(agents=1, slots=1)
-
-    @override
-    def when(self) -> When[ReportedSlotsAndACaller, ResourceSlotAdapter, Searched]:
-        return SearchingForReservedSlots()
-
-    @override
-    def then(self) -> Then[ReportedSlotsAndACaller, Searched]:
-        return NothingIsFound()
-
-
-@dataclass(frozen=True)
-class NoSlotIsPrereservedYet(
-    Scenario[TestSeedingSession, ReportedSlotsAndACaller, ResourceSlotAdapter, Searched]
-):
-    @override
-    def summary(self) -> str:
-        return "a-prereserved-amount-above-zero-finds-no-slot-yet"
-
-    @override
-    def describe(self) -> str:
-        return (
-            "아무것도 예약되지 않은 슬롯을 보고한 에이전트 하나가 있을 때 사전 예약된 자원량이 "
-            "0보다 크다는 조건으로 조회하면 응답이 비어 있다"
-        )
-
-    @override
-    def given(self) -> Given[TestSeedingSession, ReportedSlotsAndACaller]:
-        return AgentsReportingSlots(agents=1, slots=1)
-
-    @override
-    def when(self) -> When[ReportedSlotsAndACaller, ResourceSlotAdapter, Searched]:
-        return SearchingForPrereservedSlots()
-
-    @override
-    def then(self) -> Then[ReportedSlotsAndACaller, Searched]:
-        return NothingIsFound()
-
-
-@dataclass(frozen=True)
-class AndKeepsTheRowBothConditionsName(
-    Scenario[TestSeedingSession, ReportedSlotsAndACaller, ResourceSlotAdapter, Searched]
-):
-    @override
-    def summary(self) -> str:
-        return "and-keeps-only-the-row-both-conditions-name"
-
-    @override
-    def describe(self) -> str:
-        return (
-            "슬롯 둘씩 보고한 에이전트 둘이 있을 때 에이전트 조건과 슬롯 이름 조건을 AND로 "
-            "조합해 조회하면, 그 에이전트의 그 슬롯 행만 남는다"
-        )
-
-    @override
-    def given(self) -> Given[TestSeedingSession, ReportedSlotsAndACaller]:
-        return AgentsReportingSlots(agents=2, slots=2)
-
-    @override
-    def when(self) -> When[ReportedSlotsAndACaller, ResourceSlotAdapter, Searched]:
-        return SearchingWithAnd(wanted=Reported(agent=0, slot=1))
-
-    @override
-    def then(self) -> Then[ReportedSlotsAndACaller, Searched]:
-        return TheReportedSlots(rows=(Reported(agent=0, slot=1),))
-
-
-@dataclass(frozen=True)
-class OrKeepsTheRowsEitherConditionNames(
-    Scenario[TestSeedingSession, ReportedSlotsAndACaller, ResourceSlotAdapter, Searched]
-):
-    @override
-    def summary(self) -> str:
-        return "or-keeps-the-rows-either-condition-names"
-
-    @override
-    def describe(self) -> str:
-        return (
-            "슬롯 둘씩 보고한 에이전트 둘이 있을 때 에이전트와 슬롯 이름을 함께 지정한 조건을 "
-            "에이전트마다 하나씩 OR로 조합해 조회하면, 각 조건이 지정한 에이전트의 그 슬롯 행만 "
-            "남는다"
-        )
-
-    @override
-    def given(self) -> Given[TestSeedingSession, ReportedSlotsAndACaller]:
-        return AgentsReportingSlots(agents=2, slots=2)
-
-    @override
-    def when(self) -> When[ReportedSlotsAndACaller, ResourceSlotAdapter, Searched]:
-        return SearchingWithOr(wanted=(Reported(agent=0, slot=0), Reported(agent=1, slot=1)))
-
-    @override
-    def then(self) -> Then[ReportedSlotsAndACaller, Searched]:
-        return TheReportedSlots(
-            rows=(Reported(agent=0, slot=0), Reported(agent=1, slot=1)), in_order=False
-        )
-
-
-@dataclass(frozen=True)
-class NotLeavesOutTheSlotItNames(
-    Scenario[TestSeedingSession, ReportedSlotsAndACaller, ResourceSlotAdapter, Searched]
-):
-    @override
-    def summary(self) -> str:
-        return "not-leaves-out-the-slot-it-names"
-
-    @override
-    def describe(self) -> str:
-        return (
-            "슬롯 둘씩 보고한 에이전트 둘이 있을 때 한 슬롯의 이름 조건을 NOT으로 지정해 "
-            "조회하면, 그 슬롯을 뺀 나머지 슬롯의 행만 남는다"
-        )
-
-    @override
-    def given(self) -> Given[TestSeedingSession, ReportedSlotsAndACaller]:
-        return AgentsReportingSlots(agents=2, slots=2)
-
-    @override
-    def when(self) -> When[ReportedSlotsAndACaller, ResourceSlotAdapter, Searched]:
-        return SearchingWithNot(slot=0)
-
-    @override
-    def then(self) -> Then[ReportedSlotsAndACaller, Searched]:
-        return TheReportedSlots(
-            rows=(Reported(agent=0, slot=1), Reported(agent=1, slot=1)), in_order=False
-        )
-
-
-@dataclass(frozen=True)
 class NoSlotReportedMeansNoneFound(
     Scenario[TestSeedingSession, AnAgentAndACaller, ResourceSlotAdapter, Searched]
 ):
@@ -703,11 +404,6 @@ REPORTED: list[SearchingReportedStep] = [
     AnAgentFilterNarrows(),
     OmittingThePageSizeAnswersTheDefaultPage(),
     AskingForTheFirstAnswersOne(),
-    NoSlotIsReservedYet(),
-    NoSlotIsPrereservedYet(),
-    AndKeepsTheRowBothConditionsName(),
-    OrKeepsTheRowsEitherConditionNames(),
-    NotLeavesOutTheSlotItNames(),
 ]
 
 

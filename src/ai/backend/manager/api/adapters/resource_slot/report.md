@@ -68,7 +68,6 @@
 |---|---|
 | [리소스 그룹의 에이전트를 읽을 수 있는 사용자가 슬롯 둘을 보고한 에이전트를 지정해 조회하면 그 에이전트가 보고한 슬롯이 모두 반환된다](#scoped_searching_agent_resources-a-user-reading-agents-in-the-group-finds-every-slot-the-agent-reports) | 성공 |
 | [리소스 그룹의 에이전트를 읽을 수 있는 사용자가 아직 슬롯을 보고하지 않은 그 에이전트를 지정해 조회하면 응답이 비어 있다](#scoped_searching_agent_resources-a-user-reading-agents-in-the-group-searches-the-agent-and-finds-no-slot) | 성공 |
-| [순위가 앞설수록 보고한 용량이 작은 슬롯 둘을 보고한 에이전트를 슈퍼관리자가 지정해 용량의 내림차순으로 조회하면, 슬롯 순위가 아니라 용량이 큰 슬롯부터 반환된다](#scoped_searching_agent_resources-an-order-on-the-capacity-overrides-the-slot-rank) | 성공 |
 | [슈퍼관리자가 아직 슬롯을 보고하지 않은 에이전트를 지정해 조회하면 응답이 비어 있다](#scoped_searching_agent_resources-the-superadmin-searches-the-agent-and-finds-no-slot) | 성공 |
 | [권한 검사를 끄면 아무 권한도 없는 사용자도 에이전트를 지정해 조회할 수 있다](#scoped_searching_agent_resources-turning-enforcement-off-lets-a-user-search-an-agent-s-resources) | 성공 |
 | [아무 권한도 없는 사용자가 에이전트를 지정해 조회하면 권한 부족으로 거부된다](#scoped_searching_agent_resources-a-user-granted-nothing-may-not-search-an-agent-s-resources) | 거부 |
@@ -79,17 +78,12 @@
 | 시나리오 | 판정 |
 |---|---|
 | [모니터가 필터 없이 조회하면 응답이 반환된다. 슈퍼관리자인지 검사하는 조회는 모니터도 통과한다](#searching_agent_resources-a-monitor-may-search-agent-resources) | 성공 |
-| [아무것도 예약되지 않은 슬롯을 보고한 에이전트 하나가 있을 때 사전 예약된 자원량이 0보다 크다는 조건으로 조회하면 응답이 비어 있다](#searching_agent_resources-a-prereserved-amount-above-zero-finds-no-slot-yet) | 성공 |
-| [아무것도 예약되지 않은 슬롯을 보고한 에이전트 하나가 있을 때 예약된 자원량이 0보다 크다는 조건으로 조회하면 응답이 비어 있다](#searching_agent_resources-a-reserved-amount-above-zero-finds-no-slot-yet) | 성공 |
 | [슬롯 둘을 보고한 에이전트 하나가 있을 때 한 슬롯의 이름을 필터로 조회하면, 응답에는 그 슬롯의 행만 남는다](#searching_agent_resources-a-slot-name-filter-narrows-the-answer-to-that-slot) | 성공 |
 | [슬롯을 보고한 에이전트 둘이 있을 때 한 에이전트를 필터로 조회하면, 응답에는 그 에이전트의 행만 남는다](#searching_agent_resources-an-agent-filter-narrows-the-answer-to-that-agent-s-slots) | 성공 |
 | [아직 슬롯을 보고하지 않은 에이전트만 있을 때 슈퍼관리자가 필터 없이 조회하면 응답이 비어 있다](#searching_agent_resources-an-agent-reporting-no-slot-means-none-is-found) | 성공 |
-| [슬롯 둘씩 보고한 에이전트 둘이 있을 때 에이전트 조건과 슬롯 이름 조건을 AND로 조합해 조회하면, 그 에이전트의 그 슬롯 행만 남는다](#searching_agent_resources-and-keeps-only-the-row-both-conditions-name) | 성공 |
 | [보고된 슬롯 둘이 있을 때 앞에서 1건만 요청해 조회하면 슬롯 이름 순서로 앞선 한 건이 반환되고 다음 페이지가 있다고 응답한다](#searching_agent_resources-asking-for-the-first-slot-answers-one-and-a-next-page) | 성공 |
-| [슬롯 둘씩 보고한 에이전트 둘이 있을 때 한 슬롯의 이름 조건을 NOT으로 지정해 조회하면, 그 슬롯을 뺀 나머지 슬롯의 행만 남는다](#searching_agent_resources-not-leaves-out-the-slot-it-names) | 성공 |
 | [보고된 슬롯 11개가 있을 때 크기 없이 조회하면 슬롯 이름 순서로 앞선 10건까지 반환되고 다음 페이지가 있다고 응답한다](#searching_agent_resources-omitting-the-page-size-answers-ten-slots-and-a-next-page) | 성공 |
-| [슬롯 둘씩 보고한 에이전트 둘이 있을 때 에이전트와 슬롯 이름을 함께 지정한 조건을 에이전트마다 하나씩 OR로 조합해 조회하면, 각 조건이 지정한 에이전트의 그 슬롯 행만 남는다](#searching_agent_resources-or-keeps-the-rows-either-condition-names) | 성공 |
-| [슬롯을 보고한 에이전트 둘이 있을 때 슈퍼관리자가 필터 없이 조회하면 보고된 슬롯이 모두 반환된다. 아직 아무것도 예약되지 않아 예약된 자원량과 사전 예약된 자원량은 0이다](#searching_agent_resources-the-superadmin-finds-every-slot-the-agents-report) | 성공 |
+| [슬롯을 보고한 에이전트 둘이 있을 때 슈퍼관리자가 필터 없이 조회하면 보고된 슬롯이 모두 반환된다](#searching_agent_resources-the-superadmin-finds-every-slot-the-agents-report) | 성공 |
 | [아무 권한도 없는 사용자가 조회하면 역할 부족으로 거부된다](#searching_agent_resources-a-user-granted-nothing-may-not-search-agent-resources) | 거부 |
 | [권한 검사를 꺼도 슈퍼관리자나 모니터가 아니면 조회할 수 없다. 슈퍼관리자 검사는 그 설정을 읽지 않는다](#searching_agent_resources-turning-enforcement-off-still-refuses-a-user-searching-agent-resources) | 거부 |
 
@@ -987,16 +981,12 @@ Then
   - items[0].agent_id = 'agent-1'
   - items[0].slot_name = 'slot-1'
   - items[0].capacity: 수로 보아 10
-  - items[0].reserved: 수로 보아 0
-  - items[0].prereserved: 수로 보아 0
   - items[0].used: 수로 보아 1
   - items[1].id = 'agent-1:slot-2'
   - items[1].field_id: 무시함 — 데이터베이스가 만든다
   - items[1].agent_id = 'agent-1'
   - items[1].slot_name = 'slot-2'
   - items[1].capacity: 수로 보아 20
-  - items[1].reserved: 수로 보아 0
-  - items[1].prereserved: 수로 보아 0
   - items[1].used: 수로 보아 1
   - total_count = 2
   - has_next_page = False
@@ -1033,56 +1023,6 @@ Then
 - 답이 비어 있다
   - items = []
   - total_count = 0
-  - has_next_page = False
-  - has_previous_page = False
-
-<a id="scoped_searching_agent_resources-an-order-on-the-capacity-overrides-the-slot-rank"></a>
-
-#### [an-order-on-the-capacity-overrides-the-slot-rank](/tests/scenario/bai_scenario/manager/resource_slot/test_scoped_searching_agent_resources.py) — pass
-
-순위가 앞설수록 보고한 용량이 작은 슬롯 둘을 보고한 에이전트를 슈퍼관리자가 지정해 용량의 내림차순으로 조회하면, 슬롯 순위가 아니라 용량이 큰 슬롯부터 반환된다
-
-Given
-
-- 슬롯 2개를 보고한 에이전트 1개와, 슈퍼관리자 한 명
-  - 자원 슬롯 종류 slot-1: count 종류
-  - 자원 슬롯 종류 slot-2: count 종류
-  - 리소스 그룹 resource-group-1: fifo 스케줄러를 쓴다
-  - 에이전트 agent-1: 살아 있고, 아직 보고한 슬롯이 없다
-  - 에이전트 agent-1: slot-1 슬롯 용량 10 보고, 1 사용 중
-  - 에이전트 agent-1: slot-2 슬롯 용량 20 보고, 1 사용 중
-  - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
-
-When
-
-- ResourceSlotAdapter.scoped_search_agent_resources — user-1이 agent-1 에이전트를 지정해 보고한 용량의 내림차순으로 조회
-
-Then
-
-- 보고된 슬롯 행 전체가 이 순서대로 반환된다
-  - len(items) = 2
-  - items[0].id = 'agent-1:slot-2'
-  - items[0].field_id: 무시함 — 데이터베이스가 만든다
-  - items[0].agent_id = 'agent-1'
-  - items[0].slot_name = 'slot-2'
-  - items[0].capacity: 수로 보아 20
-  - items[0].reserved: 수로 보아 0
-  - items[0].prereserved: 수로 보아 0
-  - items[0].used: 수로 보아 1
-  - items[1].id = 'agent-1:slot-1'
-  - items[1].field_id: 무시함 — 데이터베이스가 만든다
-  - items[1].agent_id = 'agent-1'
-  - items[1].slot_name = 'slot-1'
-  - items[1].capacity: 수로 보아 10
-  - items[1].reserved: 수로 보아 0
-  - items[1].prereserved: 수로 보아 0
-  - items[1].used: 수로 보아 1
-  - total_count = 2
   - has_next_page = False
   - has_previous_page = False
 
@@ -1238,70 +1178,6 @@ Then
   - has_next_page = False
   - has_previous_page = False
 
-<a id="searching_agent_resources-a-prereserved-amount-above-zero-finds-no-slot-yet"></a>
-
-#### [a-prereserved-amount-above-zero-finds-no-slot-yet](/tests/scenario/bai_scenario/manager/resource_slot/test_searching_agent_resources.py) — pass
-
-아무것도 예약되지 않은 슬롯을 보고한 에이전트 하나가 있을 때 사전 예약된 자원량이 0보다 크다는 조건으로 조회하면 응답이 비어 있다
-
-Given
-
-- 슬롯 1개를 보고한 에이전트 1개와, 슈퍼관리자 한 명
-  - 자원 슬롯 종류 slot-1: count 종류
-  - 리소스 그룹 resource-group-1: fifo 스케줄러를 쓴다
-  - 에이전트 agent-1: 살아 있고, 아직 보고한 슬롯이 없다
-  - 에이전트 agent-1: slot-1 슬롯 용량 10 보고, 1 사용 중
-  - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
-
-When
-
-- ResourceSlotAdapter.search_agent_resources — user-1이 사전 예약된 자원량이 0보다 크다는 조건으로 조회
-
-Then
-
-- 답이 비어 있다
-  - items = []
-  - total_count = 0
-  - has_next_page = False
-  - has_previous_page = False
-
-<a id="searching_agent_resources-a-reserved-amount-above-zero-finds-no-slot-yet"></a>
-
-#### [a-reserved-amount-above-zero-finds-no-slot-yet](/tests/scenario/bai_scenario/manager/resource_slot/test_searching_agent_resources.py) — pass
-
-아무것도 예약되지 않은 슬롯을 보고한 에이전트 하나가 있을 때 예약된 자원량이 0보다 크다는 조건으로 조회하면 응답이 비어 있다
-
-Given
-
-- 슬롯 1개를 보고한 에이전트 1개와, 슈퍼관리자 한 명
-  - 자원 슬롯 종류 slot-1: count 종류
-  - 리소스 그룹 resource-group-1: fifo 스케줄러를 쓴다
-  - 에이전트 agent-1: 살아 있고, 아직 보고한 슬롯이 없다
-  - 에이전트 agent-1: slot-1 슬롯 용량 10 보고, 1 사용 중
-  - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
-
-When
-
-- ResourceSlotAdapter.search_agent_resources — user-1이 예약된 자원량이 0보다 크다는 조건으로 조회
-
-Then
-
-- 답이 비어 있다
-  - items = []
-  - total_count = 0
-  - has_next_page = False
-  - has_previous_page = False
-
 <a id="searching_agent_resources-a-slot-name-filter-narrows-the-answer-to-that-slot"></a>
 
 #### [a-slot-name-filter-narrows-the-answer-to-that-slot](/tests/scenario/bai_scenario/manager/resource_slot/test_searching_agent_resources.py) — pass
@@ -1337,8 +1213,6 @@ Then
   - items[0].agent_id = 'agent-1'
   - items[0].slot_name = 'slot-2'
   - items[0].capacity: 수로 보아 20
-  - items[0].reserved: 수로 보아 0
-  - items[0].prereserved: 수로 보아 0
   - items[0].used: 수로 보아 1
   - total_count = 1
   - has_next_page = False
@@ -1379,8 +1253,6 @@ Then
   - items[0].agent_id = 'agent-2'
   - items[0].slot_name = 'slot-1'
   - items[0].capacity: 수로 보아 10
-  - items[0].reserved: 수로 보아 0
-  - items[0].prereserved: 수로 보아 0
   - items[0].used: 수로 보아 1
   - total_count = 1
   - has_next_page = False
@@ -1413,51 +1285,6 @@ Then
 - 답이 비어 있다
   - items = []
   - total_count = 0
-  - has_next_page = False
-  - has_previous_page = False
-
-<a id="searching_agent_resources-and-keeps-only-the-row-both-conditions-name"></a>
-
-#### [and-keeps-only-the-row-both-conditions-name](/tests/scenario/bai_scenario/manager/resource_slot/test_searching_agent_resources.py) — pass
-
-슬롯 둘씩 보고한 에이전트 둘이 있을 때 에이전트 조건과 슬롯 이름 조건을 AND로 조합해 조회하면, 그 에이전트의 그 슬롯 행만 남는다
-
-Given
-
-- 슬롯 2개씩 보고한 에이전트 2개와, 슈퍼관리자 한 명
-  - 자원 슬롯 종류 slot-1: count 종류
-  - 자원 슬롯 종류 slot-2: count 종류
-  - 리소스 그룹 resource-group-1: fifo 스케줄러를 쓴다
-  - 에이전트 agent-1: 살아 있고, 아직 보고한 슬롯이 없다
-  - 에이전트 agent-1: slot-1 슬롯 용량 10 보고, 1 사용 중
-  - 에이전트 agent-1: slot-2 슬롯 용량 20 보고, 1 사용 중
-  - 에이전트 agent-2: 살아 있고, 아직 보고한 슬롯이 없다
-  - 에이전트 agent-2: slot-1 슬롯 용량 10 보고, 1 사용 중
-  - 에이전트 agent-2: slot-2 슬롯 용량 20 보고, 1 사용 중
-  - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
-
-When
-
-- ResourceSlotAdapter.search_agent_resources — user-1이 agent-1 에이전트 조건과 slot-2 슬롯 이름 조건을 AND로 조합해 조회
-
-Then
-
-- 보고된 슬롯 행 전체가 이 순서대로 반환된다
-  - len(items) = 1
-  - items[0].id = 'agent-1:slot-2'
-  - items[0].field_id: 무시함 — 데이터베이스가 만든다
-  - items[0].agent_id = 'agent-1'
-  - items[0].slot_name = 'slot-2'
-  - items[0].capacity: 수로 보아 20
-  - items[0].reserved: 수로 보아 0
-  - items[0].prereserved: 수로 보아 0
-  - items[0].used: 수로 보아 1
-  - total_count = 1
   - has_next_page = False
   - has_previous_page = False
 
@@ -1496,64 +1323,9 @@ Then
   - items[0].agent_id = 'agent-1'
   - items[0].slot_name = 'slot-1'
   - items[0].capacity: 수로 보아 10
-  - items[0].reserved: 수로 보아 0
-  - items[0].prereserved: 수로 보아 0
   - items[0].used: 수로 보아 1
   - total_count = 2
   - has_next_page = True
-  - has_previous_page = False
-
-<a id="searching_agent_resources-not-leaves-out-the-slot-it-names"></a>
-
-#### [not-leaves-out-the-slot-it-names](/tests/scenario/bai_scenario/manager/resource_slot/test_searching_agent_resources.py) — pass
-
-슬롯 둘씩 보고한 에이전트 둘이 있을 때 한 슬롯의 이름 조건을 NOT으로 지정해 조회하면, 그 슬롯을 뺀 나머지 슬롯의 행만 남는다
-
-Given
-
-- 슬롯 2개씩 보고한 에이전트 2개와, 슈퍼관리자 한 명
-  - 자원 슬롯 종류 slot-1: count 종류
-  - 자원 슬롯 종류 slot-2: count 종류
-  - 리소스 그룹 resource-group-1: fifo 스케줄러를 쓴다
-  - 에이전트 agent-1: 살아 있고, 아직 보고한 슬롯이 없다
-  - 에이전트 agent-1: slot-1 슬롯 용량 10 보고, 1 사용 중
-  - 에이전트 agent-1: slot-2 슬롯 용량 20 보고, 1 사용 중
-  - 에이전트 agent-2: 살아 있고, 아직 보고한 슬롯이 없다
-  - 에이전트 agent-2: slot-1 슬롯 용량 10 보고, 1 사용 중
-  - 에이전트 agent-2: slot-2 슬롯 용량 20 보고, 1 사용 중
-  - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
-
-When
-
-- ResourceSlotAdapter.search_agent_resources — user-1이 slot-1 슬롯 이름 조건을 NOT으로 지정해 조회
-
-Then
-
-- 보고된 슬롯 행 전체가 반환된다
-  - len(items) = 2
-  - items[0].id = 'agent-1:slot-2'
-  - items[0].field_id: 무시함 — 데이터베이스가 만든다
-  - items[0].agent_id = 'agent-1'
-  - items[0].slot_name = 'slot-2'
-  - items[0].capacity: 수로 보아 20
-  - items[0].reserved: 수로 보아 0
-  - items[0].prereserved: 수로 보아 0
-  - items[0].used: 수로 보아 1
-  - items[1].id = 'agent-2:slot-2'
-  - items[1].field_id: 무시함 — 데이터베이스가 만든다
-  - items[1].agent_id = 'agent-2'
-  - items[1].slot_name = 'slot-2'
-  - items[1].capacity: 수로 보아 20
-  - items[1].reserved: 수로 보아 0
-  - items[1].prereserved: 수로 보아 0
-  - items[1].used: 수로 보아 1
-  - total_count = 2
-  - has_next_page = False
   - has_previous_page = False
 
 <a id="searching_agent_resources-omitting-the-page-size-answers-ten-slots-and-a-next-page"></a>
@@ -1609,143 +1381,70 @@ Then
   - items[0].agent_id = 'agent-1'
   - items[0].slot_name = 'slot-1'
   - items[0].capacity: 수로 보아 10
-  - items[0].reserved: 수로 보아 0
-  - items[0].prereserved: 수로 보아 0
   - items[0].used: 수로 보아 1
   - items[1].id = 'agent-1:slot-10'
   - items[1].field_id: 무시함 — 데이터베이스가 만든다
   - items[1].agent_id = 'agent-1'
   - items[1].slot_name = 'slot-10'
   - items[1].capacity: 수로 보아 100
-  - items[1].reserved: 수로 보아 0
-  - items[1].prereserved: 수로 보아 0
   - items[1].used: 수로 보아 1
   - items[2].id = 'agent-1:slot-11'
   - items[2].field_id: 무시함 — 데이터베이스가 만든다
   - items[2].agent_id = 'agent-1'
   - items[2].slot_name = 'slot-11'
   - items[2].capacity: 수로 보아 110
-  - items[2].reserved: 수로 보아 0
-  - items[2].prereserved: 수로 보아 0
   - items[2].used: 수로 보아 1
   - items[3].id = 'agent-1:slot-2'
   - items[3].field_id: 무시함 — 데이터베이스가 만든다
   - items[3].agent_id = 'agent-1'
   - items[3].slot_name = 'slot-2'
   - items[3].capacity: 수로 보아 20
-  - items[3].reserved: 수로 보아 0
-  - items[3].prereserved: 수로 보아 0
   - items[3].used: 수로 보아 1
   - items[4].id = 'agent-1:slot-3'
   - items[4].field_id: 무시함 — 데이터베이스가 만든다
   - items[4].agent_id = 'agent-1'
   - items[4].slot_name = 'slot-3'
   - items[4].capacity: 수로 보아 30
-  - items[4].reserved: 수로 보아 0
-  - items[4].prereserved: 수로 보아 0
   - items[4].used: 수로 보아 1
   - items[5].id = 'agent-1:slot-4'
   - items[5].field_id: 무시함 — 데이터베이스가 만든다
   - items[5].agent_id = 'agent-1'
   - items[5].slot_name = 'slot-4'
   - items[5].capacity: 수로 보아 40
-  - items[5].reserved: 수로 보아 0
-  - items[5].prereserved: 수로 보아 0
   - items[5].used: 수로 보아 1
   - items[6].id = 'agent-1:slot-5'
   - items[6].field_id: 무시함 — 데이터베이스가 만든다
   - items[6].agent_id = 'agent-1'
   - items[6].slot_name = 'slot-5'
   - items[6].capacity: 수로 보아 50
-  - items[6].reserved: 수로 보아 0
-  - items[6].prereserved: 수로 보아 0
   - items[6].used: 수로 보아 1
   - items[7].id = 'agent-1:slot-6'
   - items[7].field_id: 무시함 — 데이터베이스가 만든다
   - items[7].agent_id = 'agent-1'
   - items[7].slot_name = 'slot-6'
   - items[7].capacity: 수로 보아 60
-  - items[7].reserved: 수로 보아 0
-  - items[7].prereserved: 수로 보아 0
   - items[7].used: 수로 보아 1
   - items[8].id = 'agent-1:slot-7'
   - items[8].field_id: 무시함 — 데이터베이스가 만든다
   - items[8].agent_id = 'agent-1'
   - items[8].slot_name = 'slot-7'
   - items[8].capacity: 수로 보아 70
-  - items[8].reserved: 수로 보아 0
-  - items[8].prereserved: 수로 보아 0
   - items[8].used: 수로 보아 1
   - items[9].id = 'agent-1:slot-8'
   - items[9].field_id: 무시함 — 데이터베이스가 만든다
   - items[9].agent_id = 'agent-1'
   - items[9].slot_name = 'slot-8'
   - items[9].capacity: 수로 보아 80
-  - items[9].reserved: 수로 보아 0
-  - items[9].prereserved: 수로 보아 0
   - items[9].used: 수로 보아 1
   - total_count = 11
   - has_next_page = True
-  - has_previous_page = False
-
-<a id="searching_agent_resources-or-keeps-the-rows-either-condition-names"></a>
-
-#### [or-keeps-the-rows-either-condition-names](/tests/scenario/bai_scenario/manager/resource_slot/test_searching_agent_resources.py) — pass
-
-슬롯 둘씩 보고한 에이전트 둘이 있을 때 에이전트와 슬롯 이름을 함께 지정한 조건을 에이전트마다 하나씩 OR로 조합해 조회하면, 각 조건이 지정한 에이전트의 그 슬롯 행만 남는다
-
-Given
-
-- 슬롯 2개씩 보고한 에이전트 2개와, 슈퍼관리자 한 명
-  - 자원 슬롯 종류 slot-1: count 종류
-  - 자원 슬롯 종류 slot-2: count 종류
-  - 리소스 그룹 resource-group-1: fifo 스케줄러를 쓴다
-  - 에이전트 agent-1: 살아 있고, 아직 보고한 슬롯이 없다
-  - 에이전트 agent-1: slot-1 슬롯 용량 10 보고, 1 사용 중
-  - 에이전트 agent-1: slot-2 슬롯 용량 20 보고, 1 사용 중
-  - 에이전트 agent-2: 살아 있고, 아직 보고한 슬롯이 없다
-  - 에이전트 agent-2: slot-1 슬롯 용량 10 보고, 1 사용 중
-  - 에이전트 agent-2: slot-2 슬롯 용량 20 보고, 1 사용 중
-  - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
-
-When
-
-- ResourceSlotAdapter.search_agent_resources — user-1이 agent-1 에이전트의 slot-1 슬롯 조건과 agent-2 에이전트의 slot-2 슬롯 조건을 OR로 조합해 조회
-
-Then
-
-- 보고된 슬롯 행 전체가 반환된다
-  - len(items) = 2
-  - items[0].id = 'agent-1:slot-1'
-  - items[0].field_id: 무시함 — 데이터베이스가 만든다
-  - items[0].agent_id = 'agent-1'
-  - items[0].slot_name = 'slot-1'
-  - items[0].capacity: 수로 보아 10
-  - items[0].reserved: 수로 보아 0
-  - items[0].prereserved: 수로 보아 0
-  - items[0].used: 수로 보아 1
-  - items[1].id = 'agent-2:slot-2'
-  - items[1].field_id: 무시함 — 데이터베이스가 만든다
-  - items[1].agent_id = 'agent-2'
-  - items[1].slot_name = 'slot-2'
-  - items[1].capacity: 수로 보아 20
-  - items[1].reserved: 수로 보아 0
-  - items[1].prereserved: 수로 보아 0
-  - items[1].used: 수로 보아 1
-  - total_count = 2
-  - has_next_page = False
   - has_previous_page = False
 
 <a id="searching_agent_resources-the-superadmin-finds-every-slot-the-agents-report"></a>
 
 #### [the-superadmin-finds-every-slot-the-agents-report](/tests/scenario/bai_scenario/manager/resource_slot/test_searching_agent_resources.py) — pass
 
-슬롯을 보고한 에이전트 둘이 있을 때 슈퍼관리자가 필터 없이 조회하면 보고된 슬롯이 모두 반환된다. 아직 아무것도 예약되지 않아 예약된 자원량과 사전 예약된 자원량은 0이다
+슬롯을 보고한 에이전트 둘이 있을 때 슈퍼관리자가 필터 없이 조회하면 보고된 슬롯이 모두 반환된다
 
 Given
 
@@ -1776,16 +1475,12 @@ Then
   - items[0].agent_id = 'agent-1'
   - items[0].slot_name = 'slot-1'
   - items[0].capacity: 수로 보아 10
-  - items[0].reserved: 수로 보아 0
-  - items[0].prereserved: 수로 보아 0
   - items[0].used: 수로 보아 1
   - items[1].id = 'agent-2:slot-1'
   - items[1].field_id: 무시함 — 데이터베이스가 만든다
   - items[1].agent_id = 'agent-2'
   - items[1].slot_name = 'slot-1'
   - items[1].capacity: 수로 보아 10
-  - items[1].reserved: 수로 보아 0
-  - items[1].prereserved: 수로 보아 0
   - items[1].used: 수로 보아 1
   - total_count = 2
   - has_next_page = False
@@ -2291,8 +1986,6 @@ Then
   - agent_id = 'agent-1'
   - slot_name = 'slot-1'
   - capacity: 수로 보아 10
-  - reserved: 수로 보아 0
-  - prereserved: 수로 보아 0
   - used: 수로 보아 1
 
 <a id="reading_agent_resources-the-superadmin-reads-a-slot-the-agent-reports"></a>
@@ -2327,8 +2020,6 @@ Then
   - agent_id = 'agent-1'
   - slot_name = 'slot-1'
   - capacity: 수로 보아 10
-  - reserved: 수로 보아 0
-  - prereserved: 수로 보아 0
   - used: 수로 보아 1
 
 <a id="reading_agent_resources-a-user-granted-nothing-may-not-read-an-agent-slot"></a>

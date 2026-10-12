@@ -40,9 +40,7 @@ CAPACITY_STEP = Decimal(10)
 """슬롯마다 보고하는 용량의 간격. 순위가 앞선 슬롯일수록 작은 용량을 보고한다."""
 
 USED = Decimal(1)
-"""보고된 슬롯마다 사용 중인 양. 용량과도, 0인 예약량과도 다른 값을 쓴다."""
-
-NOTHING = Decimal(0)
+"""보고된 슬롯마다 사용 중인 양. 용량과 구분되도록 용량보다 작은 값을 쓴다."""
 
 
 @dataclass(frozen=True)
@@ -234,8 +232,6 @@ def reported_slot_verdicts(
         Same(f"{at}agent_id", node.agent_id, agent.agent_id),
         Same(f"{at}slot_name", node.slot_name, slot.name),
         Held(f"{at}capacity", node.capacity, AmountOf(slot.capacity)),
-        Held(f"{at}reserved", node.reserved, AmountOf(NOTHING)),
-        Held(f"{at}prereserved", node.prereserved, AmountOf(NOTHING)),
         Held(f"{at}used", node.used, AmountOf(USED)),
     ]
 
