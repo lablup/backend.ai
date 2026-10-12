@@ -3,6 +3,7 @@ from typing import Any, Self
 
 from pydantic import Field, model_validator
 
+from ai.backend.common.typed_validators import CommaSeparatedStrList
 from ai.backend.common.types import BackendAISchema
 
 
@@ -90,10 +91,10 @@ class OIDCWebAppConfig(BackendAISchema):
     login_uri: str = Field(
         description="The login page URI to redirect users to.",
     )
-    allowed_redirect_hosts: list[str] | None = Field(
+    allowed_redirect_hosts: CommaSeparatedStrList | None = Field(
         default=None,
         description=(
-            "Hostnames a sign-in may return to, in addition to the login_uri host. "
+            "Comma-separated hostnames a sign-in may return to, in addition to the login_uri host. "
             "When set, a sign-in started from any other host returns to login_uri. "
             "When unset, any return address is accepted."
         ),
