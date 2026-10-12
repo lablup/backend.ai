@@ -40,7 +40,7 @@ from sqlalchemy.ext.asyncio import AsyncSession as SASession
 from sqlalchemy.orm import InstrumentedAttribute
 
 from ai.backend.common.data.endpoint.types import EndpointLifecycle
-from ai.backend.common.types import VFolderID
+from ai.backend.common.types import SessionId, VFolderID
 from ai.backend.manager.errors.storage import VFolderDeletionNotAllowed
 from ai.backend.manager.models.deployment_revision.row import DeploymentRevisionRow
 from ai.backend.manager.models.endpoint.row import EndpointRow
@@ -54,6 +54,7 @@ __all__ = (
     "VFolderReferenceHit",
     "VFOLDER_REFERENCE_CHECKS",
     "find_active_vfolder_references",
+    "get_sessions_by_mounted_folder",
     "vfolder_reference_conflict_checks",
 )
 
@@ -182,3 +183,11 @@ async def find_active_vfolder_references(
                 )
             )
     return hits
+
+
+async def get_sessions_by_mounted_folder(
+    db_session: SASession, vfolder_id: VFolderID
+) -> tuple[SessionId, ...]:
+    """Return the ids of the live sessions the given folder is mounted on."""
+    stmt = sa.select(SessionRow.id).where(_sessions_mounting(vfolder_id))
+    return tuple((await db_session.scalars(stmt)).all())

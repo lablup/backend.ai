@@ -24,6 +24,7 @@ from ai.backend.manager.data.model_card.types import (
     VFolderScanData,
 )
 from ai.backend.manager.data.project.types import ProjectType
+from ai.backend.manager.data.vfolder.types import VFolderOperationStatus
 from ai.backend.manager.errors.resource import (
     InvalidProjectTypeForModelCard,
     ModelCardNotFound,
@@ -46,7 +47,7 @@ from ai.backend.manager.models.session.searchers import LiveSessionsMountingVFol
 from ai.backend.manager.models.specs.creator import FieldToCreate
 from ai.backend.manager.models.specs.pagination import NoPagination
 from ai.backend.manager.models.vfolder.queriers import VFolderQuerier
-from ai.backend.manager.models.vfolder.row import DEAD_VFOLDER_STATUSES, VFolderRow
+from ai.backend.manager.models.vfolder.row import VFolderRow
 from ai.backend.manager.models.vfolder.searchers import VFolderScanTargetSearcher
 from ai.backend.manager.models.vfolder.updaters import VFolderSoftDeleteUpdater
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
@@ -238,7 +239,7 @@ class ModelCardDBSource:
                         lambda: sa.and_(
                             VFolderRow.group == project_id,
                             VFolderRow.usage_mode == VFolderUsageMode.MODEL,
-                            VFolderRow.status.not_in(DEAD_VFOLDER_STATUSES),
+                            VFolderRow.status.not_in(VFolderOperationStatus.dead()),
                         )
                     ],
                     project_id=ProjectID(project_id),

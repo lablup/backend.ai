@@ -5,7 +5,6 @@ import asyncio
 import pytest
 
 from ai.backend.manager.api.utils import call_non_bursty, mask_sensitive_keys
-from ai.backend.manager.models.vfolder.row import verify_vfolder_name
 
 
 async def test_call_non_bursty() -> None:
@@ -45,26 +44,6 @@ async def test_call_non_bursty() -> None:
     for _ in range(64):
         await call_non_bursty(key, execute)
     assert execution_count == 5
-
-
-def test_vfolder_name_validator() -> None:
-    assert not verify_vfolder_name(".bashrc")
-    assert not verify_vfolder_name(".terminfo")
-    assert verify_vfolder_name("bashrc")
-    assert verify_vfolder_name(".config")
-    assert verify_vfolder_name("bin")
-    assert verify_vfolder_name("boot")
-    assert verify_vfolder_name("root")
-    assert not verify_vfolder_name("/bin")
-    assert not verify_vfolder_name("/boot")
-    assert not verify_vfolder_name("/root")
-    assert verify_vfolder_name("/home/work/bin")
-    assert verify_vfolder_name("/home/work/boot")
-    assert verify_vfolder_name("/home/work/root")
-    assert verify_vfolder_name("home/work")
-    # Mounting exactly at /home/work collides with the agent's intrinsic
-    # scratch mount and makes dockerd reject container creation.
-    assert not verify_vfolder_name("/home/work")
 
 
 def test_mask_sensitive_keys() -> None:

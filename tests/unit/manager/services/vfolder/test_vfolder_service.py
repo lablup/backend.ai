@@ -20,10 +20,10 @@ from ai.backend.common.data.permission.types import Permission
 from ai.backend.common.data.user.types import UserData, UserRole
 from ai.backend.common.types import QuotaScopeID, VFolderID, VFolderMountPolicy, VFolderUsageMode
 from ai.backend.manager.data.vfolder.types import (
-    ValidatedVFolderInfo,
     VFolderData,
     VFolderOperationStatus,
     VFolderOwnershipType,
+    VFolderStorageTarget,
     VFolderUsageData,
 )
 from ai.backend.manager.errors.auth import AuthorizationFailed
@@ -192,8 +192,8 @@ class TestVFolderFileServiceCreateArchiveDownload:
         return manager
 
     @pytest.fixture
-    def sample_validated_info(self, sample_vfolder_uuid: uuid.UUID) -> ValidatedVFolderInfo:
-        return ValidatedVFolderInfo(
+    def sample_validated_info(self, sample_vfolder_uuid: uuid.UUID) -> VFolderStorageTarget:
+        return VFolderStorageTarget(
             vfolder_id=VFolderID(
                 quota_scope_id=QuotaScopeID.parse(f"user:{sample_vfolder_uuid}"),
                 folder_id=sample_vfolder_uuid,
@@ -207,7 +207,7 @@ class TestVFolderFileServiceCreateArchiveDownload:
         self,
         mock_config_provider: MagicMock,
         mock_storage_manager: MagicMock,
-        sample_validated_info: ValidatedVFolderInfo,
+        sample_validated_info: VFolderStorageTarget,
     ) -> VFolderFileService:
         mock_vfolder_repo = MagicMock()
         mock_vfolder_repo.get_validated_vfolder_id = AsyncMock(return_value=sample_validated_info)
