@@ -42,6 +42,7 @@ _CASES: Final[list[IdempotenceCase]] = [
     IdempotenceCase(SeedKind.CLIENT_IP_MASKING_POLICY, "client_ip_masking_policy_seed_dir"),
     IdempotenceCase(SeedKind.NOTIFICATION_CHANNEL, "notification_channel_seed_dir"),
     IdempotenceCase(SeedKind.NOTIFICATION_RULE, "notification_rule_seed_dir"),
+    IdempotenceCase(SeedKind.RUNTIME_VARIANT, "runtime_variant_seed_dir"),
     IdempotenceCase(SeedKind.ROLE_PRESET, "role_seed_dir"),
     IdempotenceCase(SeedKind.USER_RESOURCE_POLICY, "resource_policy_seed_dir"),
     IdempotenceCase(SeedKind.PROJECT_RESOURCE_POLICY, "resource_policy_seed_dir"),
