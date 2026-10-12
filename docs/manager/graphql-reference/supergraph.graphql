@@ -14792,9 +14792,19 @@ type Mutation
   upsertEntityLabel(input: UpsertEntityLabelInput!): UpsertEntityLabelPayload @join__field(graph: STRAWBERRY)
 
   """
+  Added in 26.10.0. Set keys on several entities in one call, answering per entity. An entity the caller may not write is one failed item; the rest are written.
+  """
+  partialBulkUpsertEntityLabel(input: PartialBulkUpsertEntityLabelInput!): PartialBulkUpsertEntityLabelPayload @join__field(graph: STRAWBERRY)
+
+  """
   Added in 26.9.0. Take one label off, named by its own id. Which entity answers for it is read from the row before the delete runs.
   """
   purgeEntityLabel(id: ID!): PurgeEntityLabelPayload @join__field(graph: STRAWBERRY)
+
+  """
+  Added in 26.10.0. Take several labels off in one call, each named by its own id and answered for on its own. A label that is gone or on an entity the caller may not write is one failed item; the rest are taken off.
+  """
+  partialBulkPurgeEntityLabel(input: PartialBulkPurgeEntityLabelInput!): PartialBulkPurgeEntityLabelPayload @join__field(graph: STRAWBERRY)
 }
 
 """
@@ -15346,6 +15356,52 @@ interface PaginatedList
 {
   items: [Item]!
   total_count: Int!
+}
+
+"""
+Added in 26.10.0. Input for taking several labels off in one call, each named by its own id.
+"""
+input PartialBulkPurgeEntityLabelInput
+  @join__type(graph: STRAWBERRY)
+{
+  """Ids of the labels to take off."""
+  ids: [UUID!]!
+}
+
+"""
+Added in 26.10.0. Partial-success payload for a bulk label purge, answered per label.
+"""
+type PartialBulkPurgeEntityLabelPayload
+  @join__type(graph: STRAWBERRY)
+{
+  """Ids of the labels taken off."""
+  successes: [UUID!]!
+
+  """Per-label failures, each naming the label it targeted."""
+  failed: [PurgeEntityLabelError!]!
+}
+
+"""
+Added in 26.10.0. Input for putting several keys on several entities in one call. Answered per entity: an entity's keys are written together or refused together.
+"""
+input PartialBulkUpsertEntityLabelInput
+  @join__type(graph: STRAWBERRY)
+{
+  """The labels to put, each naming the entity it goes on."""
+  items: [UpsertEntityLabelInput!]!
+}
+
+"""
+Added in 26.10.0. Partial-success payload for a bulk label upsert, answered per entity.
+"""
+type PartialBulkUpsertEntityLabelPayload
+  @join__type(graph: STRAWBERRY)
+{
+  """The labels put on the entities."""
+  items: [EntityLabel!]!
+
+  """Per-entity failures, each naming the entity and the keys it targeted."""
+  failed: [UpsertEntityLabelError!]!
 }
 
 """Added in 26.3.0. RBAC scoped permission."""
@@ -16880,6 +16936,17 @@ type PurgeDomainPayload
 {
   """Whether the purge was successful."""
   purged: Boolean!
+}
+
+"""Added in 26.10.0. One label a bulk purge could not take off."""
+type PurgeEntityLabelError
+  @join__type(graph: STRAWBERRY)
+{
+  """ID of the label the failed item targeted."""
+  id: UUID!
+
+  """Reason the item failed."""
+  message: String!
 }
 
 """Added in 26.9.0. Payload returned after taking a label off an entity."""
@@ -25520,6 +25587,25 @@ type UpsertDomainFairShareWeightPayload
 {
   """The updated or created domain fair share record."""
   domainFairShare: DomainFairShare!
+}
+
+"""
+Added in 26.10.0. One entity a bulk label upsert could not label, and the keys it was to carry.
+"""
+type UpsertEntityLabelError
+  @join__type(graph: STRAWBERRY)
+{
+  """Type of the entity the failed item targeted."""
+  entityType: String!
+
+  """ID of the entity the failed item targeted."""
+  entityId: UUID!
+
+  """The keys that were to be put on the entity."""
+  keys: [String!]!
+
+  """Reason the item failed."""
+  message: String!
 }
 
 """

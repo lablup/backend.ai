@@ -208,6 +208,12 @@ from ai.backend.manager.services.entity_label.actions.lookup_owner import (
     LookupBulkEntityLabelOwnerAction,
     LookupEntityLabelOwnerAction,
 )
+from ai.backend.manager.services.entity_label.actions.partial_bulk_purge import (
+    PartialBulkPurgeEntityLabelAction,
+)
+from ai.backend.manager.services.entity_label.actions.partial_bulk_upsert import (
+    PartialBulkUpsertEntityLabelAction,
+)
 from ai.backend.manager.services.entity_label.processors import EntityLabelProcessors
 from ai.backend.manager.services.export.actions.get_report import GetReportAction
 from ai.backend.manager.services.export.actions.public_get_report import PublicGetReportAction
@@ -979,9 +985,41 @@ def test_dangling_lookup_field_group_records_its_owner_lookups_under_its_field_t
     assert recorded[LookupEntityLabelOwnerAction] == {
         (EntityLabelFieldType(), ActionKind.LOOKUP, ActionGate.PERMISSION)
     }
+    # The bulk owner lookup is recorded twice: gated, for the group's own bulk reads,
+    # and public, as the step the partial bulk purge runs first.
     assert recorded[LookupBulkEntityLabelOwnerAction] == {
-        (EntityLabelFieldType(), ActionKind.LOOKUP, ActionGate.PERMISSION)
+        (EntityLabelFieldType(), ActionKind.LOOKUP, ActionGate.PERMISSION),
+        (EntityLabelFieldType(), ActionKind.LOOKUP, ActionGate.PUBLIC),
     }
+
+
+def test_entity_label_bulk_writes_are_partial_and_checked_per_owner() -> None:
+    """Both bulk label writes answer per owner, so each is wired bulk-shaped behind
+    the permission gate."""
+    registry = _ops_registry()
+    EntityLabelProcessors(
+        registry.dangling_lookup_field_group(
+            FieldGroupMeta(EntityLabelFieldType()),
+            EntityLabelData,
+            LookupEntityLabelOwnerAction,
+            LookupBulkEntityLabelOwnerAction,
+        )
+    )
+
+    recorded = {
+        record.action_cls: (record.kind, record.gate, record.backing)
+        for record in registry.wired_processors()
+    }
+    assert recorded[PartialBulkUpsertEntityLabelAction] == (
+        ActionKind.BULK,
+        ActionGate.PERMISSION,
+        ActionBacking.GENERIC,
+    )
+    assert recorded[PartialBulkPurgeEntityLabelAction] == (
+        ActionKind.BULK,
+        ActionGate.PERMISSION,
+        ActionBacking.GENERIC,
+    )
 
 
 def test_owner_candidates_field_group_records_no_lookup_under_its_concern() -> None:

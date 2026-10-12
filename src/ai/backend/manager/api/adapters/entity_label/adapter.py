@@ -3,18 +3,24 @@
 from __future__ import annotations
 
 from ai.backend.common.data.entity.entity_label import EntityLabelID, EntityLabelKey
-from ai.backend.common.data.entity.types import RuntimeEntityID
+from ai.backend.common.data.entity.types import EntityIdentifier, RuntimeEntityID
 from ai.backend.common.dto.manager.v2.entity.types import EntityTarget
 from ai.backend.common.dto.manager.v2.entity_label.request import (
     EntityLabelOrder,
     EntityLabelPageInput,
+    PartialBulkPurgeEntityLabelInput,
+    PartialBulkUpsertEntityLabelInput,
     SearchEntityLabelsInput,
     UpsertEntityLabelInput,
 )
 from ai.backend.common.dto.manager.v2.entity_label.response import (
     EntityLabelNode,
+    PartialBulkPurgeEntityLabelPayload,
+    PartialBulkUpsertEntityLabelPayload,
+    PurgeEntityLabelError,
     PurgeEntityLabelPayload,
     SearchEntityLabelsPayload,
+    UpsertEntityLabelError,
     UpsertEntityLabelPayload,
 )
 from ai.backend.common.dto.manager.v2.entity_label.types import (
@@ -25,11 +31,19 @@ from ai.backend.manager.api.adapter_options.pagination.pagination import Paginat
 from ai.backend.manager.api.adapters.base import BaseAdapter
 from ai.backend.manager.api.adapters.entity.types import WiredEntityTypes
 from ai.backend.manager.data.entity_label.types import EntityLabelData
+from ai.backend.manager.errors.base.field import FieldNotFoundError
 from ai.backend.manager.models.clauses import QueryOrder
 from ai.backend.manager.models.entity_label.row import EntityLabelRow
 from ai.backend.manager.models.entity_label.searchable_fields import EntityLabelSearchableFields
 from ai.backend.manager.models.entity_label.searchers import EntityLabelSearcher
 from ai.backend.manager.models.entity_label.upserters import EntityLabelUpserter
+from ai.backend.manager.services.entity_label.actions.partial_bulk_purge import (
+    PartialBulkPurgeEntityLabelAction,
+)
+from ai.backend.manager.services.entity_label.actions.partial_bulk_upsert import (
+    EntityLabelToUpsert,
+    PartialBulkUpsertEntityLabelAction,
+)
 from ai.backend.manager.services.entity_label.actions.purge import PurgeEntityLabelAction
 from ai.backend.manager.services.entity_label.actions.search import SearchEntityLabelsAction
 from ai.backend.manager.services.entity_label.actions.upsert import UpsertEntityLabelAction
@@ -61,6 +75,47 @@ class EntityLabelAdapter(BaseAdapter):
         )
         return UpsertEntityLabelPayload(label=self._data_to_node(action_result.data))
 
+    async def partial_bulk_upsert(
+        self, input: PartialBulkUpsertEntityLabelInput
+    ) -> PartialBulkUpsertEntityLabelPayload:
+        """Set keys on the entities the request names, answering per entity.
+
+        An entity the caller may not write comes back as one failed item carrying every
+        key it was to get. A type nothing is wired for refuses the whole request, as the
+        single upsert does: that is a malformed request, not an entity's outcome.
+        """
+        items = [
+            EntityLabelToUpsert(
+                owner=self._target(item.target),
+                upserter=EntityLabelUpserter(key=EntityLabelKey(item.key), value=item.value),
+            )
+            for item in input.items
+        ]
+        keys_of: dict[EntityIdentifier, list[str]] = {}
+        for item in items:
+            keys_of.setdefault(item.owner, []).append(item.upserter.key)
+        action_result = await self._entity_label.partial_bulk_upsert.run(
+            PartialBulkUpsertEntityLabelAction(items=items)
+        )
+        return PartialBulkUpsertEntityLabelPayload(
+            items=[
+                self._data_to_node(data)
+                for item in action_result.items
+                if item.value is not None
+                for data in item.value
+            ],
+            failed=[
+                UpsertEntityLabelError(
+                    entity_type=item.entity_id.entity_type(),
+                    entity_id=item.entity_id,
+                    keys=keys_of[item.entity_id],
+                    message=str(item.error),
+                )
+                for item in action_result.items
+                if item.error is not None
+            ],
+        )
+
     async def purge(self, label_id: EntityLabelID) -> PurgeEntityLabelPayload:
         """Take one label off, named by its own id.
 
@@ -71,6 +126,37 @@ class EntityLabelAdapter(BaseAdapter):
             PurgeEntityLabelAction(label_id=label_id)
         )
         return PurgeEntityLabelPayload(label=self._data_to_node(action_result.data))
+
+    async def partial_bulk_purge(
+        self, input: PartialBulkPurgeEntityLabelInput
+    ) -> PartialBulkPurgeEntityLabelPayload:
+        """Take several labels off, each named by its own id and answered for on its own.
+
+        A label that is gone and a label on an entity the caller may not write are both
+        one failed item. When no id names a row the run has no owner to check and
+        refuses as a whole; that is folded back into one failed item per id here, so the
+        caller reads one shape whatever it named.
+        """
+        label_ids = list(dict.fromkeys(EntityLabelID(one) for one in input.ids))
+        try:
+            action_result = await self._entity_label.partial_bulk_purge.run(
+                PartialBulkPurgeEntityLabelAction(label_ids=label_ids)
+            )
+        except FieldNotFoundError as e:
+            return PartialBulkPurgeEntityLabelPayload(
+                successes=[],
+                failed=[
+                    PurgeEntityLabelError(id=label_id, message=str(e)) for label_id in label_ids
+                ],
+            )
+        return PartialBulkPurgeEntityLabelPayload(
+            successes=[label_id for label_id in label_ids if label_id in action_result.successes],
+            failed=[
+                PurgeEntityLabelError(id=label_id, message=str(action_result.errors[label_id]))
+                for label_id in label_ids
+                if label_id in action_result.errors
+            ],
+        )
 
     async def search(self, input: SearchEntityLabelsInput) -> SearchEntityLabelsPayload:
         """Read a page of the labels on the entities named, OR'd across them and

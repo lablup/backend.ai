@@ -12,6 +12,8 @@ from pydantic import Field
 from ai.backend.common.api_handlers import APIResponse, BaseRequestModel, BodyParam, PathParam
 from ai.backend.common.data.entity.entity_label import EntityLabelID
 from ai.backend.common.dto.manager.v2.entity_label.request import (
+    PartialBulkPurgeEntityLabelInput,
+    PartialBulkUpsertEntityLabelInput,
     SearchEntityLabelsInput,
     UpsertEntityLabelInput,
 )
@@ -41,12 +43,28 @@ class V2EntityLabelHandler:
         result = await self._adapter.upsert(body.parsed)
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
 
+    async def partial_bulk_upsert_labels(
+        self,
+        body: BodyParam[PartialBulkUpsertEntityLabelInput],
+    ) -> APIResponse:
+        """Set keys on several entities in one call, answering per entity."""
+        result = await self._adapter.partial_bulk_upsert(body.parsed)
+        return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
+
     async def purge_label(
         self,
         path: PathParam[EntityLabelIdPathParam],
     ) -> APIResponse:
         """Take one label off, named by its own id."""
         result = await self._adapter.purge(EntityLabelID(path.parsed.label_id))
+        return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
+
+    async def partial_bulk_purge_labels(
+        self,
+        body: BodyParam[PartialBulkPurgeEntityLabelInput],
+    ) -> APIResponse:
+        """Take several labels off in one call, answering per label."""
+        result = await self._adapter.partial_bulk_purge(body.parsed)
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
 
     async def search_labels(

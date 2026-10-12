@@ -11,8 +11,12 @@ from ai.backend.common.api_handlers import BaseResponseModel
 
 __all__ = (
     "UpsertEntityLabelPayload",
+    "UpsertEntityLabelError",
+    "PartialBulkUpsertEntityLabelPayload",
     "EntityLabelNode",
     "PurgeEntityLabelPayload",
+    "PurgeEntityLabelError",
+    "PartialBulkPurgeEntityLabelPayload",
     "SearchEntityLabelsPayload",
 )
 
@@ -38,10 +42,44 @@ class UpsertEntityLabelPayload(BaseResponseModel):
     label: EntityLabelNode = Field(description="The label put on the entity")
 
 
+class UpsertEntityLabelError(BaseResponseModel):
+    """One entity a bulk upsert could not label, and the keys it was going to carry."""
+
+    entity_type: str = Field(description="Type of the entity the failed item targeted")
+    entity_id: UUID = Field(description="ID of the entity the failed item targeted")
+    keys: list[str] = Field(description="The keys that were to be put on the entity")
+    message: str = Field(description="Reason the item failed")
+
+
+class PartialBulkUpsertEntityLabelPayload(BaseResponseModel):
+    """Partial-success payload for a bulk label upsert, answered per entity."""
+
+    items: list[EntityLabelNode] = Field(description="The labels put on the entities")
+    failed: list[UpsertEntityLabelError] = Field(
+        description="Per-entity failures, each naming the entity and the keys it targeted"
+    )
+
+
 class PurgeEntityLabelPayload(BaseResponseModel):
     """Payload for the label that was removed."""
 
     label: EntityLabelNode = Field(description="The label taken off the entity")
+
+
+class PurgeEntityLabelError(BaseResponseModel):
+    """One label a bulk purge could not take off."""
+
+    id: UUID = Field(description="ID of the label the failed item targeted")
+    message: str = Field(description="Reason the item failed")
+
+
+class PartialBulkPurgeEntityLabelPayload(BaseResponseModel):
+    """Partial-success payload for a bulk label purge, answered per label."""
+
+    successes: list[UUID] = Field(description="Ids of the labels taken off")
+    failed: list[PurgeEntityLabelError] = Field(
+        description="Per-label failures, each naming the label it targeted"
+    )
 
 
 class SearchEntityLabelsPayload(BaseResponseModel):

@@ -2,12 +2,27 @@
 
 from __future__ import annotations
 
+from uuid import UUID
+
+from ai.backend.common.dto.manager.v2.entity_label.response import (
+    PartialBulkPurgeEntityLabelPayload as PartialBulkPurgeEntityLabelPayloadDTO,
+)
+from ai.backend.common.dto.manager.v2.entity_label.response import (
+    PartialBulkUpsertEntityLabelPayload as PartialBulkUpsertEntityLabelPayloadDTO,
+)
+from ai.backend.common.dto.manager.v2.entity_label.response import (
+    PurgeEntityLabelError as PurgeEntityLabelErrorDTO,
+)
 from ai.backend.common.dto.manager.v2.entity_label.response import (
     PurgeEntityLabelPayload as PurgeEntityLabelPayloadDTO,
 )
 from ai.backend.common.dto.manager.v2.entity_label.response import (
+    UpsertEntityLabelError as UpsertEntityLabelErrorDTO,
+)
+from ai.backend.common.dto.manager.v2.entity_label.response import (
     UpsertEntityLabelPayload as UpsertEntityLabelPayloadDTO,
 )
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     gql_field,
@@ -19,7 +34,11 @@ from .node import EntityLabelGQL
 
 __all__ = (
     "PurgeEntityLabelPayloadGQL",
+    "PurgeEntityLabelErrorGQL",
+    "PartialBulkPurgeEntityLabelPayloadGQL",
     "UpsertEntityLabelPayloadGQL",
+    "UpsertEntityLabelErrorGQL",
+    "PartialBulkUpsertEntityLabelPayloadGQL",
 )
 
 
@@ -37,6 +56,38 @@ class UpsertEntityLabelPayloadGQL(PydanticOutputMixin[UpsertEntityLabelPayloadDT
 
 @gql_pydantic_type(
     BackendAIGQLMeta(
+        description="One entity a bulk label upsert could not label, and the keys it was to carry.",
+        added_version=NEXT_RELEASE_VERSION,
+    ),
+    model=UpsertEntityLabelErrorDTO,
+    name="UpsertEntityLabelError",
+)
+class UpsertEntityLabelErrorGQL(PydanticOutputMixin[UpsertEntityLabelErrorDTO]):
+    entity_type: str = gql_field(description="Type of the entity the failed item targeted.")
+    entity_id: UUID = gql_field(description="ID of the entity the failed item targeted.")
+    keys: list[str] = gql_field(description="The keys that were to be put on the entity.")
+    message: str = gql_field(description="Reason the item failed.")
+
+
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        description="Partial-success payload for a bulk label upsert, answered per entity.",
+        added_version=NEXT_RELEASE_VERSION,
+    ),
+    model=PartialBulkUpsertEntityLabelPayloadDTO,
+    name="PartialBulkUpsertEntityLabelPayload",
+)
+class PartialBulkUpsertEntityLabelPayloadGQL(
+    PydanticOutputMixin[PartialBulkUpsertEntityLabelPayloadDTO]
+):
+    items: list[EntityLabelGQL] = gql_field(description="The labels put on the entities.")
+    failed: list[UpsertEntityLabelErrorGQL] = gql_field(
+        description="Per-entity failures, each naming the entity and the keys it targeted."
+    )
+
+
+@gql_pydantic_type(
+    BackendAIGQLMeta(
         description="Payload returned after taking a label off an entity.",
         added_version="26.9.0",
     ),
@@ -45,3 +96,33 @@ class UpsertEntityLabelPayloadGQL(PydanticOutputMixin[UpsertEntityLabelPayloadDT
 )
 class PurgeEntityLabelPayloadGQL(PydanticOutputMixin[PurgeEntityLabelPayloadDTO]):
     label: EntityLabelGQL = gql_field(description="The label taken off the entity.")
+
+
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        description="One label a bulk purge could not take off.",
+        added_version=NEXT_RELEASE_VERSION,
+    ),
+    model=PurgeEntityLabelErrorDTO,
+    name="PurgeEntityLabelError",
+)
+class PurgeEntityLabelErrorGQL(PydanticOutputMixin[PurgeEntityLabelErrorDTO]):
+    id: UUID = gql_field(description="ID of the label the failed item targeted.")
+    message: str = gql_field(description="Reason the item failed.")
+
+
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        description="Partial-success payload for a bulk label purge, answered per label.",
+        added_version=NEXT_RELEASE_VERSION,
+    ),
+    model=PartialBulkPurgeEntityLabelPayloadDTO,
+    name="PartialBulkPurgeEntityLabelPayload",
+)
+class PartialBulkPurgeEntityLabelPayloadGQL(
+    PydanticOutputMixin[PartialBulkPurgeEntityLabelPayloadDTO]
+):
+    successes: list[UUID] = gql_field(description="Ids of the labels taken off.")
+    failed: list[PurgeEntityLabelErrorGQL] = gql_field(
+        description="Per-label failures, each naming the label it targeted."
+    )
