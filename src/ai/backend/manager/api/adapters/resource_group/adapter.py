@@ -90,16 +90,12 @@ from ai.backend.manager.data.resource_group.types import (
 )
 from ai.backend.manager.errors.resource import ResourceGroupNotFound
 from ai.backend.manager.models.clauses import QueryCondition
-<<<<<<< HEAD
-from ai.backend.manager.models.condition_utils import combine_conditions_or, negate_conditions
-from ai.backend.manager.models.resource_group import ResourceGroupRow
-=======
 from ai.backend.manager.models.condition_utils import (
     combine_conditions_and,
     combine_conditions_or,
     negate_conditions,
 )
->>>>>>> 5bf2aa3e (fix(BA-8371): combine the fields of each OR filter item with AND (#15397))
+from ai.backend.manager.models.resource_group import ResourceGroupRow
 from ai.backend.manager.models.resource_group.creators import (
     ResourceGroupCreator,
     ResourceGroupForDomainRelationCreator,

@@ -71,16 +71,12 @@ from ai.backend.manager.api.adapters.base import BaseAdapter
 from ai.backend.manager.data.notification import NotificationChannelData, NotificationRuleData
 from ai.backend.manager.errors.notification import InvalidNotificationSpec
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
-<<<<<<< HEAD
-from ai.backend.manager.models.condition_utils import combine_conditions_or, negate_conditions
-from ai.backend.manager.models.notification import NotificationChannelRow, NotificationRuleRow
-=======
 from ai.backend.manager.models.condition_utils import (
     combine_conditions_and,
     combine_conditions_or,
     negate_conditions,
 )
->>>>>>> 5bf2aa3e (fix(BA-8371): combine the fields of each OR filter item with AND (#15397))
+from ai.backend.manager.models.notification import NotificationChannelRow, NotificationRuleRow
 from ai.backend.manager.models.notification.creators import (
     NotificationChannelCreator,
     NotificationRuleCreator,

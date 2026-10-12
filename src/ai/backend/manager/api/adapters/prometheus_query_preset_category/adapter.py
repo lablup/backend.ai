@@ -31,16 +31,13 @@ from ai.backend.manager.data.prometheus_query_preset_category import (
     PrometheusQueryPresetCategoryData,
 )
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
-<<<<<<< HEAD
-from ai.backend.manager.models.condition_utils import combine_conditions_or, negate_conditions
-from ai.backend.manager.models.prometheus_query_preset_category import (
-    PrometheusQueryPresetCategoryRow,
-=======
 from ai.backend.manager.models.condition_utils import (
     combine_conditions_and,
     combine_conditions_or,
     negate_conditions,
->>>>>>> 5bf2aa3e (fix(BA-8371): combine the fields of each OR filter item with AND (#15397))
+)
+from ai.backend.manager.models.prometheus_query_preset_category import (
+    PrometheusQueryPresetCategoryRow,
 )
 from ai.backend.manager.models.prometheus_query_preset_category.creators import (
     PrometheusQueryPresetCategoryCreator,
