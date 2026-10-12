@@ -12,14 +12,15 @@ the session; those are dropped too, since ``f4a1c9d20b73`` retires the entity ty
 session answers for it. So are the rows of a system role ``f4a1c9d20b73`` rewrites or
 removes, and the rows scoped to a user, project or domain that no longer exists.
 
-Every other row naming another scope moves to a custom role in that scope, held by the
-holders of the role it was on: one new role per ``(role, scope)`` pair, named after the
-original, with the status of the original and ``auto_assign`` off. The new role is custom
-whether the original is custom or preset-linked, so ``uq_roles_preset_scope`` is not
-touched and ``f4a1c9d20b73`` does not rewrite the moved rows. The role is put in the graph
-the way ``a7d2c9e41b58`` does it; a scope node that is missing is created, and
-``dafe06a6c763`` later gives it its edges. The migration counts the rows still naming
-another scope after that and stops when it finds any.
+Every other row naming another user, project or domain moves to a custom role in that
+scope, held by the holders of the role it was on: one new role per ``(role, scope)`` pair,
+named after the original, with the status of the original and ``auto_assign`` off. The new
+role is custom whether the original is custom or preset-linked, so ``uq_roles_preset_scope``
+is not touched and ``f4a1c9d20b73`` does not rewrite the moved rows. The role is put in the
+graph the way ``a7d2c9e41b58`` does it; a scope node that is missing is created, and
+``dafe06a6c763`` later gives it its edges. A role sits in a user, a project or a domain
+only, so a row naming any other kind of scope is not moved. The migration counts the rows
+still naming another scope after that and stops when it finds any.
 
 Create Date: 2026-09-09
 
@@ -207,13 +208,15 @@ def _scope_bindings_table() -> sa.Table:
     )
 
 
-# The pairs of a role and another scope its rows name, in a fixed order. A scope id that
-# is not a uuid names no scope a role can sit in; those rows stay for the check below.
+# The pairs of a role and another scope its rows name, in a fixed order. Only a user, a
+# project or a domain is a scope a role is given here; a row naming anything else, or
+# naming a scope by something other than a uuid, stays for the check below.
 _FOREIGN_SCOPE_PAIRS = """
     SELECT r.id AS role_id, r.name, r.description, r.status, p.scope_type, p.scope_id
     FROM permissions p JOIN roles r ON r.id = p.role_id
     WHERE (p.scope_type IS DISTINCT FROM r.scope_type
            OR p.scope_id IS DISTINCT FROM CAST(r.scope_id AS text))
+      AND p.scope_type IN ('user', 'project', 'domain')
       AND p.scope_id ~* :uuid_pattern
     GROUP BY r.id, r.name, r.description, r.status, p.scope_type, p.scope_id
     ORDER BY r.id, p.scope_type, p.scope_id
@@ -224,9 +227,9 @@ _BATCH_SIZE = 100
 
 
 def move_rows_into_roles_of_their_scope(conn: sa.engine.Connection) -> None:
-    """Move each row naming another scope to a custom role in that scope, held by the
-    holders of the role the row was on. Works on a batch of pairs at a time; a batch
-    moved no longer matches, so the batches run out."""
+    """Move each row naming another user, project or domain to a custom role in that
+    scope, held by the holders of the role the row was on. Works on a batch of pairs at a
+    time; a batch moved no longer matches, so the batches run out."""
     query = sa.text(_FOREIGN_SCOPE_PAIRS).bindparams(
         uuid_pattern=_UUID_PATTERN, batch_size=_BATCH_SIZE
     )
@@ -341,9 +344,10 @@ def refuse_rows_disagreeing_with_their_role(conn: sa.engine.Connection) -> None:
     """Stop when a permission row names a scope other than the one its role sits in.
 
     Dropping the columns would take that scope with them, so the rows are counted while
-    they can still be read. After the move above, only a row whose scope id names no
-    scope a role can sit in is left; what to do with it is a decision for whoever owns
-    the data.
+    they can still be read. After the move above, only a row whose scope is not one a
+    role can sit in is left — a scope that is not a user, a project or a domain, or one
+    named by something other than a uuid; what to do with it is a decision for whoever
+    owns the data.
 
     Once every row agrees with its role, the old unique key — which counts the scope —
     already makes ``(role_id, entity_type, permission)`` unique, so the narrower key the
