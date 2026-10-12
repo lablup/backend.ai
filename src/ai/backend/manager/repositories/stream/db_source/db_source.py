@@ -28,10 +28,7 @@ class StreamDBSource:
                 .where((SessionRow.id == session_id) & (SessionRow.status == SessionStatus.RUNNING))
                 .options(
                     noload("*"),
-                    selectinload(SessionRow.kernels).options(
-                        noload("*"),
-                        selectinload(KernelRow.agent_row).noload("*"),
-                    ),
+                    selectinload(SessionRow.kernels).options(noload("*")),
                 )
                 .execution_options(populate_existing=True)
             )
