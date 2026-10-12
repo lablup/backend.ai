@@ -18,10 +18,13 @@ from ai.backend.manager.actions.registry.types import WiredProcessor
 from ai.backend.manager.actions.types import ActionGate
 from ai.backend.manager.cli.role_fixture import RoleFixture
 from ai.backend.manager.data.permission.global_entity import global_entity_id
+from ai.backend.manager.errors.seed import InvalidSeedDocument
+from ai.backend.manager.seed.factory import create_seed_kind_registry
 from ai.backend.manager.seed.role_preset.check import RoleSeedChecker
 from ai.backend.manager.seed.role_preset.kinds import PermissionKinds
-from ai.backend.manager.seed.role_preset.loader import RoleSeedLoader
-from ai.backend.manager.seed.role_preset.role import RoleSeed
+from ai.backend.manager.seed.role_preset.seed import RolePresetSeed
+from ai.backend.manager.seed.runner import SeedPlanner
+from ai.backend.manager.seed.types import SeedKind
 from ai.backend.manager.services.catalog import load_wiring_catalog
 
 if TYPE_CHECKING:
@@ -111,10 +114,10 @@ class RoleOperations:
     permissions, and shares.
     """
 
-    _seed: RoleSeed
+    _seed: RolePresetSeed
     _catalog: Sequence[WiredProcessor]
 
-    def __init__(self, seed: RoleSeed, catalog: Sequence[WiredProcessor]) -> None:
+    def __init__(self, seed: RolePresetSeed, catalog: Sequence[WiredProcessor]) -> None:
         self._seed = seed
         self._catalog = catalog
 
@@ -149,16 +152,26 @@ class RoleOperations:
         return Verdict.ALLOWED if held.covers(required) else Verdict.DENIED
 
 
-def _load(seeds: Path) -> list[RoleSeed]:
-    return RoleSeedLoader(seeds).load()
+def _load(seeds: Path) -> list[RolePresetSeed]:
+    """The role presets the directory states. A file that cannot be read raises."""
+    read = SeedPlanner(create_seed_kind_registry()).read([seeds])
+    if read.rejections:
+        raise InvalidSeedDocument(
+            "; ".join(f"{rejection.source}: {rejection.reason}" for rejection in read.rejections)
+        )
+    items = read.items(SeedKind.ROLE_PRESET)
+    presets = [item for item in items if isinstance(item, RolePresetSeed)]
+    if len(presets) != len(items):
+        raise InvalidSeedDocument(f"{SeedKind.ROLE_PRESET} is not read as RolePresetSeed")
+    return presets
 
 
-def _column(seed: RoleSeed) -> str:
+def _column(seed: RolePresetSeed) -> str:
     """The role's column header, naming the scope a scoped role is created in."""
     return seed.name if seed.scope is None else f"{seed.name}@{seed.scope}"
 
 
-def _rows(seeds: Sequence[RoleSeed], entity: str | None, granted_only: bool) -> list[str]:
+def _rows(seeds: Sequence[RolePresetSeed], entity: str | None, granted_only: bool) -> list[str]:
     kinds = sorted({kind for seed in seeds for kind in seed.permissions})
     if entity is not None:
         kinds = [kind for kind in kinds if kind == entity]
@@ -359,7 +372,7 @@ def operations(
 _PRESETS_TARGET: Final[Path] = Path("fixtures/manager/example-role-presets.json")
 
 
-def _render(seeds: Sequence[RoleSeed]) -> dict[Path, dict[str, Any]]:
+def _render(seeds: Sequence[RolePresetSeed]) -> dict[Path, dict[str, Any]]:
     return {_PRESETS_TARGET: RoleFixture(seeds).render_presets()}
 
 

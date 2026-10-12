@@ -7,7 +7,6 @@ from __future__ import annotations
 import uuid
 
 import pytest
-from pydantic import ValidationError
 
 from ai.backend.common.data.entity.global_entity import GlobalEntityName
 from ai.backend.common.data.entity.types import EntityType
@@ -15,10 +14,11 @@ from ai.backend.common.data.permission.types import Permission
 from ai.backend.manager.cli.permissions import _render
 from ai.backend.manager.cli.role_fixture import RoleFixture
 from ai.backend.manager.errors.permission import InvalidRoleSeed
+from ai.backend.manager.errors.seed import InvalidSeedDocument
 from ai.backend.manager.models.base import ensure_all_tables_registered, metadata
 from ai.backend.manager.seed.role_preset.check import RoleSeedChecker
 from ai.backend.manager.seed.role_preset.kinds import PermissionKinds
-from ai.backend.manager.seed.role_preset.role import RoleSeed
+from ai.backend.manager.seed.role_preset.seed import RolePresetSeed
 
 
 @pytest.fixture(scope="module")
@@ -27,7 +27,7 @@ def kinds() -> PermissionKinds:
 
 
 @pytest.fixture(scope="module")
-def seeds(kinds: PermissionKinds) -> list[RoleSeed]:
+def seeds(kinds: PermissionKinds) -> list[RolePresetSeed]:
     return [
         _seed(
             "project_admin",
@@ -51,8 +51,8 @@ def _empty(kinds: PermissionKinds) -> dict[str, list[str]]:
     return {kind: [] for kind in kinds.declared()}
 
 
-def _seed(name: str, permissions: dict[str, list[str]]) -> RoleSeed:
-    return RoleSeed.model_validate({
+def _seed(name: str, permissions: dict[str, list[str]]) -> RolePresetSeed:
+    return RolePresetSeed.model_validate({
         "id": str(uuid.uuid5(uuid.NAMESPACE_DNS, name)),
         "name": name,
         "scope_type": "project",
@@ -105,16 +105,16 @@ class TestOperationVocabulary:
         assert seed.permissions["session"] == Permission.READ | Permission.HARD_DELETE
 
     def test_an_unknown_operation_is_refused(self) -> None:
-        with pytest.raises(ValidationError, match="soft-delete"):
+        with pytest.raises(InvalidSeedDocument, match="soft-delete"):
             _seed("admin", {"session": ["soft-delete"]})
 
     def test_a_repeated_operation_is_refused(self) -> None:
-        with pytest.raises(ValidationError, match="stated twice"):
+        with pytest.raises(InvalidSeedDocument, match="stated twice"):
             _seed("admin", {"session": ["read", "read"]})
 
     def test_an_unknown_header_field_is_refused(self) -> None:
-        with pytest.raises(ValidationError):
-            RoleSeed.model_validate({
+        with pytest.raises(InvalidSeedDocument):
+            RolePresetSeed.model_validate({
                 "id": str(uuid.uuid4()),
                 "name": "admin",
                 "scope_type": "project",
@@ -138,20 +138,20 @@ class TestScope:
         }
 
     def test_a_global_role_reads_its_scope_name(self) -> None:
-        seed = RoleSeed.model_validate(self._header("global", scope="public"))
+        seed = RolePresetSeed.model_validate(self._header("global", scope="public"))
         assert seed.scope is GlobalEntityName.PUBLIC
 
     def test_a_global_role_without_a_scope_is_refused(self) -> None:
-        with pytest.raises(ValidationError, match="names its scope"):
-            RoleSeed.model_validate(self._header("global"))
+        with pytest.raises(InvalidSeedDocument, match="names its scope"):
+            RolePresetSeed.model_validate(self._header("global"))
 
     def test_an_unknown_scope_name_is_refused(self) -> None:
-        with pytest.raises(ValidationError):
-            RoleSeed.model_validate(self._header("global", scope="everyone"))
+        with pytest.raises(InvalidSeedDocument):
+            RolePresetSeed.model_validate(self._header("global", scope="everyone"))
 
     def test_a_scope_on_another_type_is_refused(self) -> None:
-        with pytest.raises(ValidationError, match="every project"):
-            RoleSeed.model_validate(self._header("project", scope="public"))
+        with pytest.raises(InvalidSeedDocument, match="every project"):
+            RolePresetSeed.model_validate(self._header("project", scope="public"))
 
 
 class TestChecker:
@@ -186,19 +186,19 @@ class TestChecker:
 class TestFixture:
     """The preset fixture rendered from the role seeds."""
 
-    def test_rendering_twice_is_the_same(self, seeds: list[RoleSeed]) -> None:
+    def test_rendering_twice_is_the_same(self, seeds: list[RolePresetSeed]) -> None:
         assert _render(seeds) == _render(seeds)
 
-    def test_every_permission_row_holds_one_bit(self, seeds: list[RoleSeed]) -> None:
+    def test_every_permission_row_holds_one_bit(self, seeds: list[RolePresetSeed]) -> None:
         for row in RoleFixture(seeds).render_presets()["role_permission_presets"]:
             bit = row["permission"]
             assert bit > 0 and bit & (bit - 1) == 0
 
-    def test_no_preset_is_deleted(self, seeds: list[RoleSeed]) -> None:
+    def test_no_preset_is_deleted(self, seeds: list[RolePresetSeed]) -> None:
         presets = RoleFixture(seeds).render_presets()["role_presets"]
         assert not any(preset["deleted"] for preset in presets)
 
-    def test_every_row_fits_its_table(self, seeds: list[RoleSeed]) -> None:
+    def test_every_row_fits_its_table(self, seeds: list[RolePresetSeed]) -> None:
         """A generated row names the columns its table has, and misses none it needs."""
         ensure_all_tables_registered()
         for rendered in _render(seeds).values():
@@ -219,12 +219,12 @@ class TestFixture:
                     assert not set(row) - columns, f"{name}: {sorted(set(row) - columns)}"
                     assert not needed - set(row), f"{name}: {sorted(needed - set(row))}"
 
-    def test_a_preset_carries_the_id_its_file_states(self, seeds: list[RoleSeed]) -> None:
+    def test_a_preset_carries_the_id_its_file_states(self, seeds: list[RolePresetSeed]) -> None:
         declared = {str(seed.id) for seed in seeds}
         presets = RoleFixture(seeds).render_presets()["role_presets"]
         assert {preset["id"] for preset in presets} == declared
 
-    def test_a_derived_id_is_a_uuid7(self, seeds: list[RoleSeed]) -> None:
+    def test_a_derived_id_is_a_uuid7(self, seeds: list[RolePresetSeed]) -> None:
         """Only the stated preset ids keep the version they were minted with."""
         for row in RoleFixture(seeds).render_presets()["role_permission_presets"]:
             assert uuid.UUID(row["id"]).version == 7, row["id"]

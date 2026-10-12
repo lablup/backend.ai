@@ -26,8 +26,8 @@ from ai.backend.manager.models.virtual_entity.entity_membership_field import (
 )
 from ai.backend.manager.models.virtual_entity.scope_binding import ScopeBindingRow
 from ai.backend.manager.models.virtual_entity.virtual_entity import VirtualEntityRow
-from ai.backend.manager.repositories.ops.repository import OpsRepository
-from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
+from ai.backend.manager.repositories.ops.v2.seed.provider import SeedOpsProvider
+from ai.backend.manager.repositories.seed.repository import SeedRepository
 from ai.backend.manager.seed.role_preset.kinds import PermissionKinds
 from ai.backend.testutils.db import HasTable, with_tables
 
@@ -90,8 +90,8 @@ async def db(
 
 
 @pytest.fixture
-def repository(db: ExtendedAsyncSAEngine) -> OpsRepository[Any]:
-    return OpsRepository(V2DBOpsProvider(db))
+def repository(db: ExtendedAsyncSAEngine) -> SeedRepository:
+    return SeedRepository(SeedOpsProvider(db))
 
 
 @pytest.fixture

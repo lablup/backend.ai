@@ -9,7 +9,7 @@ import yaml
 from click.testing import CliRunner
 
 from ai.backend.manager.cli.seed import cli
-from ai.backend.manager.seed.registry import SeedKindRegistry
+from ai.backend.manager.seed.factory import create_seed_kind_registry
 from ai.backend.manager.seed.role_preset.kinds import PermissionKinds
 from ai.backend.manager.seed.runner import SeedPlanner
 
@@ -33,10 +33,10 @@ def _write(path: Path, *roles: dict[str, Any]) -> Path:
 
 class TestRolePresetKind:
     def test_the_role_files_are_planned_whole(self, role_seed_dir: Path) -> None:
-        plan = SeedPlanner(SeedKindRegistry.default()).plan([role_seed_dir])
+        plan = SeedPlanner(create_seed_kind_registry()).plan([role_seed_dir])
         assert plan.rejections == []
         [batch] = plan.batches
-        assert batch.kind.name() == "role_preset"
+        assert batch.kind.name == "role_preset"
         assert len(batch.items()) == 3
 
     def test_a_member_beyond_its_admin_skips_the_member_file(self, tmp_path: Path) -> None:
@@ -52,7 +52,7 @@ class TestRolePresetKind:
                 {"project": ["read", "update"]},
             ),
         )
-        plan = SeedPlanner(SeedKindRegistry.default()).plan([admin, member])
+        plan = SeedPlanner(create_seed_kind_registry()).plan([admin, member])
         assert [rejection.source for rejection in plan.rejections] == [str(member)]
         [batch] = plan.batches
         assert [file.source for file in batch.files] == [str(admin)]
@@ -61,7 +61,7 @@ class TestRolePresetKind:
         role = _role("lonely", "0198a5a0-0000-7000-8000-000000000003", {})
         del role["permissions"]["project"]
         path = _write(tmp_path / "lonely.yaml", role)
-        plan = SeedPlanner(SeedKindRegistry.default()).plan([path])
+        plan = SeedPlanner(create_seed_kind_registry()).plan([path])
         assert [rejection.source for rejection in plan.rejections] == [str(path)]
         assert "project is not stated" in plan.rejections[0].reason
 

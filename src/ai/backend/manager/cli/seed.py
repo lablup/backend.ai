@@ -3,13 +3,14 @@ from __future__ import annotations
 import asyncio
 import sys
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
 import click
 
 if TYPE_CHECKING:
     from ai.backend.manager.cli.context import CLIContext
     from ai.backend.manager.seed.result import SeedWriteResult
+    from ai.backend.manager.seed.types import SeedKind
 
 
 @click.group()
@@ -24,8 +25,8 @@ def check(paths: tuple[Path, ...]) -> None:
     Validate seed files as `apply` does, writing nothing.
 
     Each path is a seed file or a directory read recursively. A file whose kind is not
-    registered, whose version is not supported, whose items do not fit the kind, or
-    whose kind is applied after a kind with a skipped file in the same run, is reported and fails the command.
+    registered, whose version is not supported, or whose items do not fit the kind, is
+    reported and fails the command.
 
     Examples:
 
@@ -33,12 +34,12 @@ def check(paths: tuple[Path, ...]) -> None:
       $ backend.ai mgr seed check seeds/manager/role_preset
     """
     from ai.backend.cli.types import ExitCode
-    from ai.backend.manager.seed.registry import SeedKindRegistry
+    from ai.backend.manager.seed.factory import create_seed_kind_registry
     from ai.backend.manager.seed.runner import SeedPlanner
 
-    plan = SeedPlanner(SeedKindRegistry.default()).plan(paths)
+    plan = SeedPlanner(create_seed_kind_registry()).plan(paths)
     for batch in plan.batches:
-        print(f"{batch.kind.name()}: {len(batch.files)} files, {len(batch.items())} items")
+        print(f"{batch.kind.name}: {len(batch.files)} files, {len(batch.items())} items")
     if plan.rejections:
         print(f"{len(plan.rejections)} seed files skipped.", file=sys.stderr)
         sys.exit(ExitCode.FAILURE)
@@ -50,11 +51,12 @@ def check(paths: tuple[Path, ...]) -> None:
 @click.pass_obj
 def apply(cli_ctx: CLIContext, paths: tuple[Path, ...], overwrite: bool) -> None:
     """
-    Write seed files into the database, kind by kind in dependency order.
+    Write seed files into the database, kind by kind in the registered order.
 
-    A file failing the checks of `check` is skipped and fails the command. An item that
-    exists is skipped, or upserted with `--overwrite`; an item referring to a missing
-    row fails the command. Both are listed, and the rest are written.
+    A file failing the checks of `check` is skipped and fails the command. A row that
+    exists is kept, or upserted with `--overwrite`; an item colliding on another unique
+    key is skipped, and one referring to a missing row fails the command. Both are
+    listed, and the rest are written.
 
     Examples:
 
@@ -66,20 +68,20 @@ def apply(cli_ctx: CLIContext, paths: tuple[Path, ...], overwrite: bool) -> None
     from ai.backend.manager.models.base import ensure_all_tables_registered
     from ai.backend.manager.repositories.db.engine import connect_database
     from ai.backend.manager.repositories.global_entity.loader import GlobalEntityIDLoader
-    from ai.backend.manager.repositories.ops.repository import OpsRepository
-    from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
-    from ai.backend.manager.seed.registry import SeedKindRegistry
+    from ai.backend.manager.repositories.ops.v2.seed.provider import SeedOpsProvider
+    from ai.backend.manager.repositories.seed.repository import SeedRepository
+    from ai.backend.manager.seed.factory import create_seed_kind_registry
     from ai.backend.manager.seed.runner import SeedApplier, SeedPlanner
 
-    plan = SeedPlanner(SeedKindRegistry.default()).plan(paths)
+    plan = SeedPlanner(create_seed_kind_registry()).plan(paths)
 
-    async def _apply() -> dict[str, SeedWriteResult]:
+    async def _apply() -> dict[SeedKind, SeedWriteResult]:
         bootstrap_config = await cli_ctx.get_bootstrap_config()
         # A standalone CLI process has not imported the full model tree.
         ensure_all_tables_registered()
         async with connect_database(bootstrap_config.db) as db:
             await GlobalEntityIDLoader(db).load()
-            repository: OpsRepository[Any] = OpsRepository(V2DBOpsProvider(db))
+            repository = SeedRepository(SeedOpsProvider(db))
             return await SeedApplier(repository).apply(plan, overwrite)
 
     results = asyncio.run(_apply())
