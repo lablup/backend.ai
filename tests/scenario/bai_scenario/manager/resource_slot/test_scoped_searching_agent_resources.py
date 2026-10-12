@@ -1,4 +1,7 @@
-"""지정한 에이전트의 자원 검색 — 지정한 에이전트마다 권한을 검사하고, 하나라도 못 읽으면 전체를 거부한다."""
+"""지정한 에이전트의 자원 검색 — 지정한 에이전트마다 권한을 검사하고, 하나라도 못 읽으면 전체를 거부한다.
+
+정렬을 지정하지 않으면 슬롯 순위대로, 지정하면 슬롯 순위 대신 그 순서로 반환한다.
+"""
 
 from __future__ import annotations
 
@@ -11,11 +14,16 @@ import pytest
 from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.dto.manager.v2.rbac.types import UUIDScope
 from ai.backend.common.dto.manager.v2.resource_slot.request import (
+    AgentResourceOrder,
     AgentResourceScope,
     ScopedSearchAgentResourcesInput,
 )
 from ai.backend.common.dto.manager.v2.resource_slot.response import (
     AdminSearchAgentResourcesPayload,
+)
+from ai.backend.common.dto.manager.v2.resource_slot.types import (
+    AgentResourceOrderField,
+    OrderDirection,
 )
 from ai.backend.manager.api.adapters.resource_slot.adapter import ResourceSlotAdapter
 from ai.backend.manager.errors.permission import NotEnoughPermission
@@ -122,6 +130,39 @@ class SearchingTheReportingAgent(When[ReportedSlotsAndACaller, ResourceSlotAdapt
 
 
 @dataclass(frozen=True)
+class SearchingTheAgentByCapacityDescending(
+    When[ReportedSlotsAndACaller, ResourceSlotAdapter, Searched]
+):
+    """미리 만들어 둔 에이전트 하나를 지정해, 보고한 용량의 내림차순으로 검색한다."""
+
+    @override
+    def operation(self) -> str:
+        return "scoped_search_agent_resources"
+
+    @override
+    def describe(self, laid: ReportedSlotsAndACaller) -> str:
+        return (
+            f"{laid.caller.username}이 {laid.agents[0].agent_id} 에이전트를 지정해 "
+            "보고한 용량의 내림차순으로 조회"
+        )
+
+    @override
+    async def call(self, adapter: ResourceSlotAdapter, laid: ReportedSlotsAndACaller) -> Searched:
+        with ActingAs(laid.caller):
+            return await adapter.scoped_search_agent_resources(
+                ScopedSearchAgentResourcesInput(
+                    scope=AgentResourceScope(agent=[UUIDScope(value=laid.agents[0].agent_uuid)]),
+                    order=[
+                        AgentResourceOrder(
+                            field=AgentResourceOrderField.CAPACITY,
+                            direction=OrderDirection.DESC,
+                        )
+                    ],
+                )
+            )
+
+
+@dataclass(frozen=True)
 class AUserReadingAgentsInTheGroupFindsEverySlot(
     Scenario[TestSeedingSession, ReportedSlotsAndACaller, ResourceSlotAdapter, Searched]
 ):
@@ -149,6 +190,34 @@ class AUserReadingAgentsInTheGroupFindsEverySlot(
         return TheReportedSlots(
             rows=(Reported(agent=0, slot=0), Reported(agent=0, slot=1)), in_order=False
         )
+
+
+@dataclass(frozen=True)
+class AnOrderOverridesTheSlotRank(
+    Scenario[TestSeedingSession, ReportedSlotsAndACaller, ResourceSlotAdapter, Searched]
+):
+    @override
+    def summary(self) -> str:
+        return "an-order-on-the-capacity-overrides-the-slot-rank"
+
+    @override
+    def describe(self) -> str:
+        return (
+            "순위가 앞설수록 보고한 용량이 작은 슬롯 둘을 보고한 에이전트를 슈퍼관리자가 지정해 "
+            "용량의 내림차순으로 조회하면, 슬롯 순위가 아니라 용량이 큰 슬롯부터 반환된다"
+        )
+
+    @override
+    def given(self) -> Given[TestSeedingSession, ReportedSlotsAndACaller]:
+        return AgentsReportingSlots(agents=1, slots=2)
+
+    @override
+    def when(self) -> When[ReportedSlotsAndACaller, ResourceSlotAdapter, Searched]:
+        return SearchingTheAgentByCapacityDescending()
+
+    @override
+    def then(self) -> Then[ReportedSlotsAndACaller, Searched]:
+        return TheReportedSlots(rows=(Reported(agent=0, slot=1), Reported(agent=0, slot=0)))
 
 
 @dataclass(frozen=True)
@@ -300,6 +369,7 @@ TWO_AGENTS: list[TwoAgentsStep] = [
 
 REPORTED_SLOTS: list[ReportedSlotsStep] = [
     AUserReadingAgentsInTheGroupFindsEverySlot(),
+    AnOrderOverridesTheSlotRank(),
 ]
 
 
