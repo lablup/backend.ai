@@ -17,6 +17,7 @@ from ai.backend.manager.models.rbac_models.role_permission_preset.row import (
     RolePermissionPresetRow,
 )
 from ai.backend.manager.models.rbac_models.role_preset.row import RolePresetRow
+from ai.backend.manager.models.resource_slot.row import ResourceSlotTypeRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.virtual_entity.entity_membership import EntityMembershipRow
 from ai.backend.manager.models.virtual_entity.entity_membership_cap import (
@@ -60,10 +61,31 @@ _ROLES: dict[str, dict[str, Any]] = {
     },
 }
 _APP_CONFIG_DEFINITIONS: list[str] = ["webui", "session_launcher"]
+_RESOURCE_SLOT_TYPES: list[dict[str, Any]] = [
+    {
+        "uuid": "eff6619c-a85c-40f4-ae59-608b0f683b4f",
+        "slot_name": "cpu",
+        "slot_type": "count",
+        "required": True,
+        "display_name": "CPU",
+        "display_unit": "Core",
+        "rank": 100,
+    },
+    {
+        "uuid": "9d1a589e-2a78-491e-97d0-32d2a0079564",
+        "slot_name": "mem",
+        "slot_type": "bytes",
+        "required": True,
+        "display_name": "RAM",
+        "number_format": {"binary": True, "round_length": 0},
+        "rank": 200,
+    },
+]
 
 # The tables a seed kind writes, and the graph tables the creation path writes beside them.
 _SEED_TABLES: list[Table | type[HasTable]] = [
     AppConfigDefinitionRow,
+    ResourceSlotTypeRow,
     RolePresetRow,
     RolePermissionPresetRow,
     RoleRow,
@@ -125,6 +147,17 @@ def app_config_definition_seed_dir(tmp_path: Path) -> Path:
     items = [{"config_name": name} for name in _APP_CONFIG_DEFINITIONS]
     (directory / "definitions.yaml").write_text(
         yaml.safe_dump({"kind": "app_config_definition", "version": 1, "items": items})
+    )
+    return directory
+
+
+@pytest.fixture
+def resource_slot_type_seed_dir(tmp_path: Path) -> Path:
+    """A directory with one `resource_slot_type` seed file."""
+    directory = tmp_path / "resource_slot_type"
+    directory.mkdir()
+    (directory / "slots.yaml").write_text(
+        yaml.safe_dump({"kind": "resource_slot_type", "version": 1, "items": _RESOURCE_SLOT_TYPES})
     )
     return directory
 

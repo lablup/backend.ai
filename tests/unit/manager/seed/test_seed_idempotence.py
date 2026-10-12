@@ -30,6 +30,7 @@ class IdempotenceCase:
 # One case per registered kind. A kind added to the registry fails the test below until
 # it is listed here.
 _CASES: Final[list[IdempotenceCase]] = [
+    IdempotenceCase(SeedKind.RESOURCE_SLOT_TYPE, "resource_slot_type_seed_dir"),
     IdempotenceCase(SeedKind.APP_CONFIG_DEFINITION, "app_config_definition_seed_dir"),
     IdempotenceCase(SeedKind.ROLE_PRESET, "role_seed_dir"),
 ]
