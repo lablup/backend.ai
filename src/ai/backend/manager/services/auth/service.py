@@ -11,7 +11,7 @@ from aiohttp import web
 from sqlalchemy import RowMapping
 
 from ai.backend.common import msgpack
-from ai.backend.common.auth.utils import generate_ssh_keypair
+from ai.backend.common.auth.ssh import generate_ssh_keypair
 from ai.backend.common.clients.valkey_client.valkey_session.client import ValkeySessionClient
 from ai.backend.common.clients.valkey_client.valkey_session.types import (
     LoginSessionData,

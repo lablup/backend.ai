@@ -3,7 +3,7 @@ from __future__ import annotations
 import base64
 import secrets
 
-from ai.backend.common.auth.utils import generate_ssh_keypair
+from ai.backend.common.auth.ssh import generate_ssh_keypair
 from ai.backend.common.types import AccessKey, SecretKey
 from ai.backend.manager.data.keypair.types import KeyPairSecrets
 from ai.backend.manager.models.keypair.row import KEYPAIR_SECRET_KEY_CONTEXT
