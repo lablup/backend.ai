@@ -5,14 +5,14 @@ from __future__ import annotations
 from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Final
+from typing import Final
 
 import pytest
 import sqlalchemy as sa
 
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.repositories.ops.repository import OpsRepository
-from ai.backend.manager.seed.registry import SeedKindRegistry
+from ai.backend.manager.repositories.seed.repository import SeedRepository
+from ai.backend.manager.seed.factory import create_seed_kind_registry
 from ai.backend.manager.seed.runner import SeedApplier, SeedPlanner
 
 # Columns an upsert rewrites without changing what the row states.
@@ -46,7 +46,7 @@ async def _snapshot(
 
 
 def test_every_registered_kind_has_a_case() -> None:
-    registered = {kind.name() for kind in SeedKindRegistry.default().ordered()}
+    registered = {kind.name for kind in create_seed_kind_registry().ordered()}
     assert {case.kind_name for case in _CASES} == registered
 
 
@@ -55,11 +55,11 @@ async def test_applying_again_changes_nothing(
     case: IdempotenceCase,
     request: pytest.FixtureRequest,
     db: ExtendedAsyncSAEngine,
-    repository: OpsRepository[Any],
+    repository: SeedRepository,
     seed_tables: list[sa.Table],
 ) -> None:
     seeds: Path = request.getfixturevalue(case.seeds_fixture)
-    plan = SeedPlanner(SeedKindRegistry.default()).plan([seeds])
+    plan = SeedPlanner(create_seed_kind_registry()).plan([seeds])
     assert plan.rejections == []
     applier = SeedApplier(repository)
 

@@ -10,115 +10,95 @@ from unittest.mock import MagicMock
 
 import pytest
 import yaml
-from pydantic import BaseModel, ConfigDict
 
 from ai.backend.manager.errors.repository import (
     ForeignKeyViolationError,
     UniqueConstraintViolationError,
 )
-from ai.backend.manager.errors.seed import InvalidSeedKindRegistry
-from ai.backend.manager.models.specs.types import EntityWithFieldsResult
-from ai.backend.manager.repositories.ops.repository import OpsRepository
-from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
-from ai.backend.manager.seed.kind import (
-    SeedCreation,
-    SeedFileItems,
-    SeedKind,
+from ai.backend.manager.repositories.ops.v2.seed.provider import SeedOpsProvider
+from ai.backend.manager.repositories.ops.v2.seed.types import SeedWrite, SeedWriteItemResult
+from ai.backend.manager.repositories.seed.repository import SeedRepository
+from ai.backend.manager.seed.base import (
+    SeedItem,
+    SeedItems,
     SeedRejection,
-    SeedUpsert,
 )
 from ai.backend.manager.seed.registry import SeedKindRegistry
 from ai.backend.manager.seed.result import SeedItemFailure, SeedWriteResult
 from ai.backend.manager.seed.runner import SeedApplier, SeedBatch, SeedPlanner
 
 
-class NamedItem(BaseModel):
-    model_config = ConfigDict(extra="forbid", frozen=True)
+class NamedItem(SeedItem):
+    """An item whose specs are the item itself; a file stating one named ``bad`` is
+    refused."""
 
     name: str
 
-
-class FakeKind(SeedKind[NamedItem]):
-    """A kind whose specs are its items, and which refuses the items named ``bad``."""
-
-    _name: str
-    _apply_after: frozenset[str]
-
-    def __init__(self, name: str, apply_after: Sequence[str] = ()) -> None:
-        self._name = name
-        self._apply_after = frozenset(apply_after)
+    @override
+    def key(self) -> str:
+        return self.name
 
     @override
-    def name(self) -> str:
-        return self._name
+    def write(self) -> SeedWrite:
+        return SeedWrite(upserter=cast(Any, self), field_upserters=(), field_purgers=())
 
     @override
-    def versions(self) -> frozenset[int]:
-        return frozenset({1, 2})
-
-    @override
-    def apply_after(self) -> frozenset[str]:
-        return self._apply_after
-
-    @override
-    def schema(self) -> type[NamedItem]:
-        return NamedItem
-
-    @override
-    def key(self, item: NamedItem) -> str:
-        return item.name
-
-    @override
-    def reject(self, files: Sequence[SeedFileItems[NamedItem]]) -> list[SeedRejection]:
+    @classmethod
+    def reject(cls, files: Sequence[SeedItems[NamedItem]]) -> list[SeedRejection]:
         return [
             SeedRejection(file.source, "states bad")
             for file in files
             if any(item.name == "bad" for item in file.items)
         ]
 
-    @override
-    def creation(self, item: NamedItem) -> SeedCreation:
-        return SeedCreation(creator=cast(Any, item), field_creators=())
 
-    @override
-    def upsert(self, item: NamedItem) -> SeedUpsert:
-        return SeedUpsert(upserter=cast(Any, item), field_upserters=(), field_purgers=())
+class OtherItem(NamedItem):
+    """The item model of a second kind."""
 
 
-class FakeRepository(OpsRepository[Any]):
-    """Keeps rows by item name; creating a name already held is a unique conflict, and an
-    item named ``orphan`` refers to a missing row."""
+def _registry(*names: str) -> SeedKindRegistry:
+    """Kinds of :class:`NamedItem` read in version 1, applied in the order named."""
+    return SeedKindRegistry(dict.fromkeys(names, (1, NamedItem)))
+
+
+class FakeRepository(SeedRepository):
+    """Keeps rows by item name. An item named ``orphan`` refers to a missing row, and one
+    named ``taken`` collides with a row on another unique key."""
 
     rows: dict[str, str]
     calls: list[tuple[str, str]]
 
     def __init__(self, rows: Sequence[str] = ()) -> None:
-        super().__init__(MagicMock(spec=V2DBOpsProvider))
+        super().__init__(MagicMock(spec=SeedOpsProvider))
         self.rows = dict.fromkeys(rows, "seeded")
         self.calls = []
 
     @override
-    async def create_entity_with_fields(
-        self, creator: Any, field_creators: Sequence[Any]
-    ) -> EntityWithFieldsResult[Any, Any]:
-        self.calls.append(("create", creator.name))
-        if creator.name == "orphan":
-            raise ForeignKeyViolationError(constraint_name="fk_fake")
-        if creator.name in self.rows:
-            raise UniqueConstraintViolationError(constraint_name="pk_fake")
-        self.rows[creator.name] = "created"
-        return EntityWithFieldsResult(data=creator, fields=[])
+    async def partial_write(
+        self, writes: Sequence[SeedWrite], overwrite: bool
+    ) -> list[SeedWriteItemResult]:
+        return [self._write(cast(NamedItem, write.upserter).name, overwrite) for write in writes]
 
-    @override
-    async def upsert_entity_with_fields(
-        self, upserter: Any, field_upserters: Sequence[Any], field_purgers: Sequence[Any]
-    ) -> EntityWithFieldsResult[Any, Any]:
-        self.calls.append(("upsert", upserter.name))
-        self.rows[upserter.name] = "upserted"
-        return EntityWithFieldsResult(data=upserter, fields=[])
+    def _write(self, name: str, overwrite: bool) -> SeedWriteItemResult:
+        self.calls.append(("upsert" if overwrite else "insert", name))
+        if name == "orphan":
+            return SeedWriteItemResult(
+                written=False, error=ForeignKeyViolationError(constraint_name="fk_fake")
+            )
+        if name == "taken":
+            return SeedWriteItemResult(
+                written=False, error=UniqueConstraintViolationError(constraint_name="uq_fake")
+            )
+        if overwrite:
+            self.rows[name] = "upserted"
+            return SeedWriteItemResult(written=True)
+        if name in self.rows:
+            return SeedWriteItemResult(written=False)
+        self.rows[name] = "inserted"
+        return SeedWriteItemResult(written=True)
 
 
-def _write(path: Path, kind: str, *names: str, version: int = 1) -> Path:
+def _write(path: Path, kind: str, *names: str, version: int = 1, field: str = "name") -> Path:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(
         yaml.safe_dump({"kind": kind, "version": version, "items": [{"name": n} for n in names]})
@@ -137,7 +117,7 @@ def _sources(rejections: Sequence[SeedRejection]) -> set[str]:
 class TestKindValidation:
     @pytest.fixture
     def planner(self) -> SeedPlanner:
-        return SeedPlanner(SeedKindRegistry([FakeKind("alpha")]))
+        return SeedPlanner(_registry("alpha"))
 
     def test_a_valid_file_is_planned(self, planner: SeedPlanner, tmp_path: Path) -> None:
         path = _write(tmp_path / "a.yaml", "alpha", "x", "y")
@@ -215,7 +195,7 @@ class TestPaths:
         _write(tmp_path / "top.yaml", "alpha", "a")
         _write(tmp_path / "nested" / "deeper" / "inner.yml", "alpha", "b")
         (tmp_path / "nested" / "README.md").write_text("not a seed")
-        plan = SeedPlanner(SeedKindRegistry([FakeKind("alpha")])).plan([tmp_path])
+        plan = SeedPlanner(_registry("alpha")).plan([tmp_path])
         assert plan.rejections == []
         [batch] = plan.batches
         assert sorted(_names(batch)) == ["a", "b"]
@@ -227,7 +207,7 @@ class TestPaths:
         (tmp_path / "b.toml").write_text('kind = "alpha"\nversion = 1\n[[items]]\nname = "b"\n')
         _write(tmp_path / "c.yaml", "alpha", "c")
         (tmp_path / "d.txt").write_text("not a seed")
-        plan = SeedPlanner(SeedKindRegistry([FakeKind("alpha")])).plan([tmp_path])
+        plan = SeedPlanner(_registry("alpha")).plan([tmp_path])
         assert plan.rejections == []
         [batch] = plan.batches
         assert sorted(_names(batch)) == ["a", "b", "c"]
@@ -235,91 +215,83 @@ class TestPaths:
     def test_a_named_file_of_no_format_is_skipped(self, tmp_path: Path) -> None:
         path = tmp_path / "seed.txt"
         path.write_text("kind: alpha")
-        plan = SeedPlanner(SeedKindRegistry([FakeKind("alpha")])).plan([path])
+        plan = SeedPlanner(_registry("alpha")).plan([path])
         assert [rejection.source for rejection in plan.rejections] == [str(path)]
 
     def test_a_path_named_twice_is_read_once(self, tmp_path: Path) -> None:
         path = _write(tmp_path / "a.yaml", "alpha", "a")
-        plan = SeedPlanner(SeedKindRegistry([FakeKind("alpha")])).plan([path, tmp_path])
+        plan = SeedPlanner(_registry("alpha")).plan([path, tmp_path])
         assert plan.rejections == []
         [batch] = plan.batches
         assert len(batch.files) == 1
 
 
-class TestDependency:
-    def test_kinds_are_planned_in_dependency_order(self, tmp_path: Path) -> None:
-        registry = SeedKindRegistry([
-            FakeKind("user", apply_after=["domain"]),
-            FakeKind("keypair", apply_after=["user"]),
-            FakeKind("domain"),
-        ])
+class TestOrder:
+    def test_kinds_are_planned_in_registry_order(self, tmp_path: Path) -> None:
         paths = [
             _write(tmp_path / "1.yaml", "keypair", "k"),
             _write(tmp_path / "2.yaml", "user", "u"),
             _write(tmp_path / "3.yaml", "domain", "d"),
         ]
-        plan = SeedPlanner(registry).plan(paths)
-        assert [batch.kind.name() for batch in plan.batches] == ["domain", "user", "keypair"]
+        plan = SeedPlanner(_registry("domain", "user", "keypair")).plan(paths)
+        assert [batch.kind.name for batch in plan.batches] == ["domain", "user", "keypair"]
 
-    def test_a_skipped_dependency_skips_its_dependents(self, tmp_path: Path) -> None:
-        registry = SeedKindRegistry([
-            FakeKind("domain"),
-            FakeKind("user", apply_after=["domain"]),
-            FakeKind("keypair", apply_after=["user"]),
-            FakeKind("unrelated"),
-        ])
-        good_domain = _write(tmp_path / "1.yaml", "domain", "d")
-        bad_domain = _write(tmp_path / "2.yaml", "domain", "bad")
-        user = _write(tmp_path / "3.yaml", "user", "u")
-        keypair = _write(tmp_path / "4.yaml", "keypair", "k")
-        unrelated = _write(tmp_path / "5.yaml", "unrelated", "z")
-        plan = SeedPlanner(registry).plan([good_domain, bad_domain, user, keypair, unrelated])
-        assert _sources(plan.rejections) == {str(bad_domain), str(user), str(keypair)}
-        assert [batch.kind.name() for batch in plan.batches] == ["domain", "unrelated"]
-
-    def test_a_dependency_with_no_files_does_not_skip(self, tmp_path: Path) -> None:
-        registry = SeedKindRegistry([FakeKind("domain"), FakeKind("user", apply_after=["domain"])])
-        plan = SeedPlanner(registry).plan([_write(tmp_path / "1.yaml", "user", "u")])
-        assert plan.rejections == []
-        assert [batch.kind.name() for batch in plan.batches] == ["user"]
-
-    def test_a_version_skip_counts_as_a_skipped_dependency(self, tmp_path: Path) -> None:
-        registry = SeedKindRegistry([FakeKind("domain"), FakeKind("user", apply_after=["domain"])])
-        domain = _write(tmp_path / "1.yaml", "domain", "d", version=9)
+    def test_a_skipped_file_leaves_the_other_kinds_planned(self, tmp_path: Path) -> None:
+        bad_domain = _write(tmp_path / "1.yaml", "domain", "bad")
         user = _write(tmp_path / "2.yaml", "user", "u")
-        plan = SeedPlanner(registry).plan([domain, user])
-        assert _sources(plan.rejections) == {str(domain), str(user)}
+        plan = SeedPlanner(_registry("domain", "user")).plan([bad_domain, user])
+        assert _sources(plan.rejections) == {str(bad_domain)}
+        assert [batch.kind.name for batch in plan.batches] == ["user"]
 
 
-class TestRegistry:
-    def test_a_cycle_is_refused(self) -> None:
-        with pytest.raises(InvalidSeedKindRegistry, match="each applied after the other"):
-            SeedKindRegistry([FakeKind("a", apply_after=["b"]), FakeKind("b", apply_after=["a"])])
+class TestRead:
+    @pytest.fixture
+    def planner(self) -> SeedPlanner:
+        return SeedPlanner(SeedKindRegistry({"alpha": (1, NamedItem), "beta": (1, OtherItem)}))
 
-    def test_an_unregistered_dependency_is_refused(self) -> None:
-        with pytest.raises(InvalidSeedKindRegistry, match="unregistered"):
-            SeedKindRegistry([FakeKind("a", apply_after=["b"])])
+    def test_each_kind_is_read_with_its_own_model(
+        self, planner: SeedPlanner, tmp_path: Path
+    ) -> None:
+        _write(tmp_path / "a.yaml", "alpha", "x")
+        _write(tmp_path / "b.yaml", "beta", "y")
+        read = planner.read([tmp_path])
+        assert read.rejections == []
+        assert [type(item) for item in read.items("alpha")] == [NamedItem]
+        assert [type(item) for item in read.items("beta")] == [OtherItem]
 
-    def test_a_name_registered_twice_is_refused(self) -> None:
-        with pytest.raises(InvalidSeedKindRegistry, match="registered twice"):
-            SeedKindRegistry([FakeKind("a"), FakeKind("a")])
+    def test_the_checks_spanning_a_kind_are_left_to_the_plan(
+        self, planner: SeedPlanner, tmp_path: Path
+    ) -> None:
+        _write(tmp_path / "a.yaml", "alpha", "bad")
+        read = planner.read([tmp_path])
+        assert read.rejections == []
+        assert [item.key() for item in read.items("alpha")] == ["bad"]
+
+    def test_a_file_that_cannot_be_read_is_listed(
+        self, planner: SeedPlanner, tmp_path: Path
+    ) -> None:
+        good = _write(tmp_path / "a.yaml", "alpha", "x")
+        unknown = _write(tmp_path / "b.yaml", "omega", "y")
+        read = planner.read([good, unknown])
+        assert _sources(read.rejections) == {str(unknown)}
+        assert [item.key() for item in read.items("alpha")] == ["x"]
 
 
 class TestApply:
     async def test_items_are_written_in_dependency_order(self, tmp_path: Path) -> None:
-        registry = SeedKindRegistry([FakeKind("user", apply_after=["domain"]), FakeKind("domain")])
         paths = [
             _write(tmp_path / "1.yaml", "user", "u"),
             _write(tmp_path / "2.yaml", "domain", "d"),
         ]
         repository = FakeRepository()
-        await SeedApplier(repository).apply(SeedPlanner(registry).plan(paths), overwrite=False)
-        assert repository.calls == [("create", "d"), ("create", "u")]
+        plan = SeedPlanner(_registry("domain", "user")).plan(paths)
+        await SeedApplier(repository).apply(plan, overwrite=False)
+        assert repository.calls == [("insert", "d"), ("insert", "u")]
 
     async def test_an_item_referring_to_a_missing_row_fails_and_the_rest_are_written(
         self, tmp_path: Path
     ) -> None:
-        plan = SeedPlanner(SeedKindRegistry([FakeKind("alpha")])).plan([
+        plan = SeedPlanner(_registry("alpha")).plan([
             _write(tmp_path / "a.yaml", "alpha", "x", "orphan", "z")
         ])
         repository = FakeRepository()
@@ -329,20 +301,34 @@ class TestApply:
             failed=[SeedItemFailure("orphan", "refers to a missing row (fk_fake)")],
         )
 
-    async def test_a_conflicting_item_is_skipped_and_listed(self, tmp_path: Path) -> None:
-        plan = SeedPlanner(SeedKindRegistry([FakeKind("alpha")])).plan([
+    async def test_an_existing_item_is_kept_and_listed(self, tmp_path: Path) -> None:
+        plan = SeedPlanner(_registry("alpha")).plan([
             _write(tmp_path / "a.yaml", "alpha", "x", "y", "z")
         ])
         repository = FakeRepository(rows=["y"])
         results = await SeedApplier(repository).apply(plan, overwrite=False)
         assert results["alpha"] == SeedWriteResult(
             succeeded=["x", "z"],
-            skipped=[SeedItemFailure("y", "exists (pk_fake)")],
+            skipped=[SeedItemFailure("y", "exists")],
         )
-        assert repository.rows == {"x": "created", "y": "seeded", "z": "created"}
+        assert repository.rows == {"x": "inserted", "y": "seeded", "z": "inserted"}
+
+    @pytest.mark.parametrize("overwrite", [False, True], ids=["insert", "overwrite"])
+    async def test_an_item_colliding_on_another_unique_key_is_skipped(
+        self, tmp_path: Path, overwrite: bool
+    ) -> None:
+        plan = SeedPlanner(_registry("alpha")).plan([
+            _write(tmp_path / "a.yaml", "alpha", "x", "taken")
+        ])
+        repository = FakeRepository()
+        results = await SeedApplier(repository).apply(plan, overwrite=overwrite)
+        assert results["alpha"] == SeedWriteResult(
+            succeeded=["x"],
+            skipped=[SeedItemFailure("taken", "collides with a row (uq_fake)")],
+        )
 
     async def test_overwrite_upserts_every_item(self, tmp_path: Path) -> None:
-        plan = SeedPlanner(SeedKindRegistry([FakeKind("alpha")])).plan([
+        plan = SeedPlanner(_registry("alpha")).plan([
             _write(tmp_path / "a.yaml", "alpha", "x", "y")
         ])
         repository = FakeRepository(rows=["y"])

@@ -7,8 +7,6 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-from pydantic import BaseModel, ValidationError
-
 from ai.backend.common.serde.types import FileFormat
 from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.errors.repository import (
@@ -16,10 +14,16 @@ from ai.backend.manager.errors.repository import (
     UniqueConstraintViolationError,
 )
 from ai.backend.manager.errors.seed import InvalidSeedDocument
-from ai.backend.manager.repositories.ops.repository import OpsRepository
-from ai.backend.manager.seed.document import SeedDocument, SeedDocumentReader
-from ai.backend.manager.seed.kind import SeedFileItems, SeedKind, SeedRejection
-from ai.backend.manager.seed.registry import SeedKindRegistry
+from ai.backend.manager.repositories.ops.v2.seed.types import SeedWriteItemResult
+from ai.backend.manager.repositories.seed.repository import SeedRepository
+from ai.backend.manager.seed.base import (
+    RootSeed,
+    SeedItem,
+    SeedItems,
+    SeedReader,
+    SeedRejection,
+)
+from ai.backend.manager.seed.registry import SeedKindModel, SeedKindRegistry
 from ai.backend.manager.seed.result import SeedItemFailure, SeedWriteResult
 
 log = StructuredLogger(logging.getLogger(__spec__.name))
@@ -29,16 +33,28 @@ log = StructuredLogger(logging.getLogger(__spec__.name))
 class SeedBatch:
     """The accepted files of one kind."""
 
-    kind: SeedKind[Any]
-    files: list[SeedFileItems[Any]]
+    kind: SeedKindModel
+    files: list[SeedItems[Any]]
 
-    def items(self) -> list[BaseModel]:
+    def items(self) -> list[SeedItem]:
         return [item for file in self.files for item in file.items]
 
 
 @dataclass
+class SeedRead:
+    """The items of every file read, each with its kind's model, and the files that could
+    not be read."""
+
+    by_kind: dict[str, list[SeedItems[Any]]] = field(default_factory=lambda: defaultdict(list))
+    rejections: list[SeedRejection] = field(default_factory=list)
+
+    def items(self, kind: str) -> list[SeedItem]:
+        return [item for file in self.by_kind.get(kind, []) for item in file.items]
+
+
+@dataclass
 class SeedPlan:
-    """The batches to write in dependency order, and the files left out."""
+    """The batches to write in the registry's kind order, and the files left out."""
 
     batches: list[SeedBatch] = field(default_factory=list)
     rejections: list[SeedRejection] = field(default_factory=list)
@@ -48,48 +64,42 @@ class SeedPlanner:
     """Reads and validates seed files without touching the database."""
 
     _registry: SeedKindRegistry
-    _reader: SeedDocumentReader
+    _reader: SeedReader
 
     def __init__(self, registry: SeedKindRegistry) -> None:
         self._registry = registry
-        self._reader = SeedDocumentReader()
+        self._reader = SeedReader()
 
-    def plan(self, paths: Sequence[Path]) -> SeedPlan:
-        plan = SeedPlan()
-        by_kind: dict[str, list[SeedFileItems[Any]]] = defaultdict(list)
-        rejected_kinds: set[str] = set()
+    def read(self, paths: Sequence[Path]) -> SeedRead:
+        """Each file's root first, then its items with the model the stated kind is
+        registered with."""
+        read = SeedRead()
         for path in self._collect(paths):
             source = str(path)
             try:
-                document = self._reader.read(path)
-                kind = self._kind_of(document)
+                root = self._reader.read(path)
+                kind = self._kind_of(root)
+                items = self._items(kind, root)
             except InvalidSeedDocument as e:
-                self._reject(plan, SeedRejection(source, str(e)))
+                read.rejections.append(SeedRejection(source, str(e)))
                 continue
-            try:
-                items = self._items(kind, document)
-            except InvalidSeedDocument as e:
-                self._reject(plan, SeedRejection(source, str(e)))
-                rejected_kinds.add(kind.name())
-                continue
-            by_kind[kind.name()].append(SeedFileItems(source, items))
+            read.by_kind[kind.name].append(SeedItems(source, items))
+        return read
+
+    def plan(self, paths: Sequence[Path]) -> SeedPlan:
+        """The files read, less those failing a check spanning the files of their kind."""
+        read = self.read(paths)
+        plan = SeedPlan()
+        for rejection in read.rejections:
+            self._reject(plan, rejection)
         for kind in self._registry.ordered():
-            files = by_kind.get(kind.name())
+            files = read.by_kind.get(kind.name)
             if not files:
                 continue
-            blocked = sorted(kind.apply_after() & rejected_kinds)
-            if blocked:
-                rejected_kinds.add(kind.name())
-                for file in files:
-                    reason = f"applied after {', '.join(blocked)}, which has a skipped file"
-                    self._reject(plan, SeedRejection(file.source, reason))
-                continue
-            rejections = [*self._duplicate_keys(kind, files), *kind.reject(files)]
+            rejections = [*self._duplicate_keys(kind, files), *kind.model.reject(files)]
             for rejection in rejections:
                 self._reject(plan, rejection)
             rejected_sources = {rejection.source for rejection in rejections}
-            if rejected_sources:
-                rejected_kinds.add(kind.name())
             accepted = [file for file in files if file.source not in rejected_sources]
             if accepted:
                 plan.batches.append(SeedBatch(kind, accepted))
@@ -109,33 +119,28 @@ class SeedPlanner:
                 collected[path] = None
         return list(collected)
 
-    def _kind_of(self, document: SeedDocument) -> SeedKind[Any]:
-        kind = self._registry.get(document.kind)
+    def _kind_of(self, root: RootSeed[Any]) -> SeedKindModel:
+        kind = self._registry.get(root.kind)
         if kind is None:
-            raise InvalidSeedDocument(f"{document.kind!r} is not a registered kind")
+            raise InvalidSeedDocument(f"{root.kind!r} is not a registered kind")
         return kind
 
-    def _items(self, kind: SeedKind[Any], document: SeedDocument) -> list[BaseModel]:
-        if document.version not in kind.versions():
+    def _items(self, kind: SeedKindModel, root: RootSeed[Any]) -> list[SeedItem]:
+        if root.version != kind.version:
             raise InvalidSeedDocument(
-                f"{kind.name()} version {document.version} is not supported;"
-                f" one of {sorted(kind.versions())}"
+                f"{kind.name} version {root.version} is not supported; version {kind.version}"
             )
-        schema = kind.schema()
-        try:
-            return [schema.model_validate(item) for item in document.items]
-        except ValidationError as e:
-            raise InvalidSeedDocument(f"an item does not fit {kind.name()}: {e}") from e
+        return [kind.model.model_validate(item) for item in root.items]
 
     def _duplicate_keys(
-        self, kind: SeedKind[Any], files: Sequence[SeedFileItems[Any]]
+        self, kind: SeedKindModel, files: Sequence[SeedItems[Any]]
     ) -> list[SeedRejection]:
         sources_by_key: dict[str, set[str]] = defaultdict(set)
         for file in files:
             for item in file.items:
-                sources_by_key[kind.key(item)].add(file.source)
+                sources_by_key[item.key()].add(file.source)
         return [
-            SeedRejection(source, f"{len(sources)} files state {kind.name()} {key}")
+            SeedRejection(source, f"{len(sources)} files state {kind.name} {key}")
             for key, sources in sorted(sources_by_key.items())
             if len(sources) > 1
             for source in sorted(sources)
@@ -147,63 +152,66 @@ class SeedPlanner:
 
 
 class SeedApplier:
-    """Writes a plan's items kind by kind in order, one transaction per item.
+    """Writes a plan's items kind by kind in order, in one transaction with a savepoint
+    per item.
 
-    An item colliding with a row already there is skipped, and ``overwrite`` upserts it
-    instead; an item referring to a missing row fails. Either leaves the rest written.
+    The entity row and each field row are inserted unless a row holds their key, and
+    ``overwrite`` upserts them instead. An item colliding on another unique key is
+    skipped; an item referring to a missing row fails. Either leaves the rest written.
     """
 
-    _repository: OpsRepository[Any]
+    _repository: SeedRepository
 
-    def __init__(self, repository: OpsRepository[Any]) -> None:
+    def __init__(self, repository: SeedRepository) -> None:
         self._repository = repository
 
     async def apply(self, plan: SeedPlan, overwrite: bool) -> dict[str, SeedWriteResult]:
-        results: dict[str, SeedWriteResult] = {}
-        for batch in plan.batches:
-            kind = batch.kind
-            result = SeedWriteResult()
-            for item in batch.items():
-                key = kind.key(item)
-                try:
-                    await self._write(kind, item, overwrite)
-                except UniqueConstraintViolationError as e:
-                    log.info(
-                        "skipped a seed item that exists",
-                        seed_kind_name=kind.name(),
-                        item_key=key,
-                        constraint_name=e.constraint_name,
-                    )
-                    result.skipped.append(SeedItemFailure(key, f"exists ({e.constraint_name})"))
-                    continue
-                except ForeignKeyViolationError as e:
-                    log.warning(
-                        "failed a seed item referring to a missing row",
-                        seed_kind_name=kind.name(),
-                        item_key=key,
-                        constraint_name=e.constraint_name,
-                    )
-                    result.failed.append(
-                        SeedItemFailure(key, f"refers to a missing row ({e.constraint_name})")
-                    )
-                    continue
-                result.succeeded.append(key)
+        entries = [(batch.kind, item) for batch in plan.batches for item in batch.items()]
+        written = await self._repository.partial_write(
+            [item.write() for _, item in entries], overwrite
+        )
+        results = {batch.kind.name: SeedWriteResult() for batch in plan.batches}
+        for (kind, item), item_result in zip(entries, written, strict=True):
+            self._record(results[kind.name], kind, item.key(), item_result)
+        for name, result in results.items():
             log.info(
                 "applied a seed kind",
-                seed_kind_name=kind.name(),
+                seed_kind_name=name,
                 succeeded_count=len(result.succeeded),
                 skipped_count=len(result.skipped),
                 failed_count=len(result.failed),
             )
-            results[kind.name()] = result
         return results
 
-    async def _write(self, kind: SeedKind[Any], item: BaseModel, overwrite: bool) -> None:
-        if overwrite:
-            upsert = kind.upsert(item)
-            await self._repository.upsert_entity_with_fields(
-                upsert.upserter, upsert.field_upserters, upsert.field_purgers
-            )
-            return
-        creation = kind.creation(item)
-        await self._repository.create_entity_with_fields(creation.creator, creation.field_creators)
+    def _record(
+        self,
+        result: SeedWriteResult,
+        kind: SeedKindModel,
+        key: str,
+        item_result: SeedWriteItemResult,
+    ) -> None:
+        match item_result.error:
+            case None if item_result.written:
+                result.succeeded.append(key)
+            case None:
+                result.skipped.append(SeedItemFailure(key, "exists"))
+            case UniqueConstraintViolationError() as e:
+                log.info(
+                    "skipped a seed item colliding with a row",
+                    seed_kind_name=kind.name,
+                    item_key=key,
+                    constraint_name=e.constraint_name,
+                )
+                result.skipped.append(
+                    SeedItemFailure(key, f"collides with a row ({e.constraint_name})")
+                )
+            case ForeignKeyViolationError() as e:
+                log.warning(
+                    "failed a seed item referring to a missing row",
+                    seed_kind_name=kind.name,
+                    item_key=key,
+                    constraint_name=e.constraint_name,
+                )
+                result.failed.append(
+                    SeedItemFailure(key, f"refers to a missing row ({e.constraint_name})")
+                )

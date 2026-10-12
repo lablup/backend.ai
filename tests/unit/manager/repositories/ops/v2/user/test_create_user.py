@@ -54,7 +54,7 @@ from ai.backend.manager.models.virtual_entity.virtual_entity import VirtualEntit
 from ai.backend.manager.repositories.ops.v2.user.provider import UserOpsProvider
 from ai.backend.manager.repositories.ops.v2.user.write import FullUserCreator
 from ai.backend.manager.secret.types import SecretValue
-from ai.backend.manager.seed.role_preset.role import RoleSeed
+from ai.backend.manager.seed.role_preset.seed import RolePresetSeed
 from ai.backend.testutils.db import HasTable, with_tables
 from ai.backend.testutils.fixtures import DomainFixtureData
 
@@ -523,7 +523,7 @@ async def public_role(db: ExtendedAsyncSAEngine) -> RoleID:
 @pytest.fixture
 async def declared_user_owner_preset(db: ExtendedAsyncSAEngine) -> uuid.UUID:
     """The user_owner preset, as `seeds/manager/role_preset/` states its header."""
-    seed = RoleSeed.model_validate({
+    seed = RolePresetSeed.model_validate({
         "id": "776c1366-dcf3-5abd-b8de-bc3ad3b759ad",
         "name": "user_owner",
         "scope_type": "user",
