@@ -10,6 +10,7 @@ from sqlalchemy import Table
 
 from ai.backend.manager.models.app_config_definition.row import AppConfigDefinitionRow
 from ai.backend.manager.models.base import ensure_all_tables_registered
+from ai.backend.manager.models.client_ip_masking.row import ClientIPMaskingPolicyRow
 from ai.backend.manager.models.entity_label.row import EntityLabelRow
 from ai.backend.manager.models.login_client_type.row import LoginClientTypeRow
 from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
@@ -101,6 +102,10 @@ _RETENTION_POLICIES: list[dict[str, Any]] = [
         "enabled": True,
     },
 ]
+_CLIENT_IP_MASKING_POLICIES: list[dict[str, Any]] = [
+    {"target_type": "default", "mode": "truncate", "ipv4_prefix": 24, "ipv6_prefix": 48},
+    {"target_type": "audit_logs", "mode": "drop"},
+]
 
 # The tables a seed kind writes, and the graph tables the creation path writes beside them.
 _SEED_TABLES: list[Table | type[HasTable]] = [
@@ -108,6 +113,7 @@ _SEED_TABLES: list[Table | type[HasTable]] = [
     ResourceSlotTypeRow,
     LoginClientTypeRow,
     RetentionPolicyRow,
+    ClientIPMaskingPolicyRow,
     RolePresetRow,
     RolePermissionPresetRow,
     RoleRow,
@@ -202,6 +208,21 @@ def retention_policy_seed_dir(tmp_path: Path) -> Path:
     directory.mkdir()
     (directory / "policies.yaml").write_text(
         yaml.safe_dump({"kind": "retention_policy", "version": 1, "items": _RETENTION_POLICIES})
+    )
+    return directory
+
+
+@pytest.fixture
+def client_ip_masking_policy_seed_dir(tmp_path: Path) -> Path:
+    """A directory with one `client_ip_masking_policy` seed file."""
+    directory = tmp_path / "client_ip_masking_policy"
+    directory.mkdir()
+    (directory / "policies.yaml").write_text(
+        yaml.safe_dump({
+            "kind": "client_ip_masking_policy",
+            "version": 1,
+            "items": _CLIENT_IP_MASKING_POLICIES,
+        })
     )
     return directory
 

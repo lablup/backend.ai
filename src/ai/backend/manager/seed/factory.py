@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from ai.backend.manager.seed.app_config_definition.seed import AppConfigDefinitionSeed
+from ai.backend.manager.seed.client_ip_masking_policy.seed import ClientIPMaskingPolicySeed
 from ai.backend.manager.seed.login_client_type.seed import LoginClientTypeSeed
 from ai.backend.manager.seed.registry import SeedKindRegistry
 from ai.backend.manager.seed.resource_slot_type.seed import ResourceSlotTypeSeed
@@ -18,5 +19,6 @@ def create_seed_kind_registry() -> SeedKindRegistry:
         SeedKind.LOGIN_CLIENT_TYPE: (1, LoginClientTypeSeed),
         SeedKind.RETENTION_POLICY: (1, RetentionPolicySeed),
         SeedKind.APP_CONFIG_DEFINITION: (1, AppConfigDefinitionSeed),
+        SeedKind.CLIENT_IP_MASKING_POLICY: (1, ClientIPMaskingPolicySeed),
         SeedKind.ROLE_PRESET: (1, RolePresetSeed),
     })
