@@ -15,8 +15,14 @@ import sqlalchemy as sa
 from dateutil.tz import tzutc
 
 from ai.backend.common.data.endpoint.types import EndpointLifecycle
+from ai.backend.common.data.entity.deployment import DeploymentID
+from ai.backend.common.data.entity.deployment_token import DeploymentTokenID
 from ai.backend.common.data.entity.domain import DomainID
+from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.resource_group import ResourceGroupID
+from ai.backend.common.data.entity.session_group import SessionGroupID
+from ai.backend.common.data.entity.user import UserID
+from ai.backend.common.schema.deployment import IntOrPercent, ReplicaGroupRolloutSpec
 from ai.backend.common.types import (
     AccessKey,
     ClusterMode,
@@ -31,6 +37,10 @@ from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.data.project.types import ProjectType
 from ai.backend.manager.data.secret.types import KeyProviderType
 from ai.backend.manager.data.session.types import SessionStatus
+from ai.backend.manager.data.session_group.types import (
+    SessionGroupPlacementDirection,
+    SessionGroupPlacementEnforcement,
+)
 from ai.backend.manager.models.agent.row import AgentRow
 from ai.backend.manager.models.association_container_registries_groups.row import (
     AssociationContainerRegistriesGroupsRow,
@@ -441,6 +451,39 @@ class TestUserSessionOwnership:
                 )
             )
             await db_sess.flush()
+            token_id = DeploymentTokenID(uuid.uuid4())
+            db_sess.add(
+                EndpointTokenRow(
+                    id=token_id,
+                    token="test-token",
+                    endpoint=DeploymentID(endpoint_id),
+                    domain=scope.domain_name,
+                    project=ProjectID(scope.project_id),
+                    session_owner=UserID(scope.owner.user_uuid),
+                )
+            )
+            session_group_id = SessionGroupID(uuid.uuid4())
+            db_sess.add(
+                SessionGroupRow(
+                    id=session_group_id,
+                    domain_id=scope.domain_id,
+                    project_id=scope.project_id,
+                    owner_user_id=scope.owner.user_uuid,
+                    placement_direction=SessionGroupPlacementDirection.SPREAD,
+                    placement_enforcement=SessionGroupPlacementEnforcement.PREFERRED,
+                )
+            )
+            await db_sess.flush()
+            db_sess.add(
+                ReplicaGroupRow(
+                    deployment_id=DeploymentID(endpoint_id),
+                    session_group_id=session_group_id,
+                    rollout=ReplicaGroupRolloutSpec(
+                        max_surge=IntOrPercent(count=1),
+                        max_unavailable=IntOrPercent(count=0),
+                    ),
+                )
+            )
             for session_id in (live, dead):
                 db_sess.add(
                     RoutingRow(
@@ -466,8 +509,18 @@ class TestUserSessionOwnership:
                     sa.select(RoutingRow.session_owner).where(RoutingRow.endpoint == endpoint_id)
                 )
             )
+            token_owner = await db_sess.scalar(
+                sa.select(EndpointTokenRow.session_owner).where(EndpointTokenRow.id == token_id)
+            )
+            session_group_owner = await db_sess.scalar(
+                sa.select(SessionGroupRow.owner_user_id).where(
+                    SessionGroupRow.id == session_group_id
+                )
+            )
         assert endpoint_owner == scope.other.user_uuid
         assert routing_owners == {scope.other.user_uuid}
+        assert token_owner == scope.other.user_uuid
+        assert session_group_owner == scope.other.user_uuid
         live_session_owner, live_kernel_owners = await self._owners_of(db_with_tables, live)
         assert live_session_owner == scope.other
         assert live_kernel_owners == [scope.other]
