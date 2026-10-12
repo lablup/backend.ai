@@ -25,6 +25,7 @@ from ai.backend.manager.seed.base import (
 )
 from ai.backend.manager.seed.registry import SeedKindModel, SeedKindRegistry
 from ai.backend.manager.seed.result import SeedItemFailure, SeedWriteResult
+from ai.backend.manager.seed.types import SeedKind
 
 log = StructuredLogger(logging.getLogger(__spec__.name))
 
@@ -165,7 +166,7 @@ class SeedApplier:
     def __init__(self, repository: SeedRepository) -> None:
         self._repository = repository
 
-    async def apply(self, plan: SeedPlan, overwrite: bool) -> dict[str, SeedWriteResult]:
+    async def apply(self, plan: SeedPlan, overwrite: bool) -> dict[SeedKind, SeedWriteResult]:
         entries = [(batch.kind, item) for batch in plan.batches for item in batch.items()]
         written = await self._repository.partial_write(
             [item.write() for _, item in entries], overwrite

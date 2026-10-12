@@ -14,6 +14,7 @@ from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.seed.repository import SeedRepository
 from ai.backend.manager.seed.factory import create_seed_kind_registry
 from ai.backend.manager.seed.runner import SeedApplier, SeedPlanner
+from ai.backend.manager.seed.types import SeedKind
 
 # Columns an upsert rewrites without changing what the row states.
 _TIMESTAMPS: Final[frozenset[str]] = frozenset({"created_at", "updated_at"})
@@ -21,7 +22,7 @@ _TIMESTAMPS: Final[frozenset[str]] = frozenset({"created_at", "updated_at"})
 
 @dataclass(frozen=True)
 class IdempotenceCase:
-    kind_name: str
+    kind_name: SeedKind
     # The fixture giving the seed paths for the kind.
     seeds_fixture: str
 
@@ -29,7 +30,7 @@ class IdempotenceCase:
 # One case per registered kind. A kind added to the registry fails the test below until
 # it is listed here.
 _CASES: Final[list[IdempotenceCase]] = [
-    IdempotenceCase("role_preset", "role_seed_dir"),
+    IdempotenceCase(SeedKind.ROLE_PRESET, "role_seed_dir"),
 ]
 
 

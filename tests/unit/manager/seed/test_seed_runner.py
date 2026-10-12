@@ -26,6 +26,7 @@ from ai.backend.manager.seed.base import (
 from ai.backend.manager.seed.registry import SeedKindRegistry
 from ai.backend.manager.seed.result import SeedItemFailure, SeedWriteResult
 from ai.backend.manager.seed.runner import SeedApplier, SeedBatch, SeedPlanner
+from ai.backend.manager.seed.types import SeedKind
 
 
 class NamedItem(SeedItem):
@@ -56,7 +57,7 @@ class OtherItem(NamedItem):
     """The item model of a second kind."""
 
 
-def _registry(*names: str) -> SeedKindRegistry:
+def _registry(*names: SeedKind) -> SeedKindRegistry:
     """Kinds of :class:`NamedItem` read in version 1, applied in the order named."""
     return SeedKindRegistry(dict.fromkeys(names, (1, NamedItem)))
 
@@ -98,10 +99,14 @@ class FakeRepository(SeedRepository):
         return SeedWriteItemResult(written=True)
 
 
-def _write(path: Path, kind: str, *names: str, version: int = 1, field: str = "name") -> Path:
+def _write(path: Path, kind: str, *names: str, version: int = 1) -> Path:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(
-        yaml.safe_dump({"kind": kind, "version": version, "items": [{"name": n} for n in names]})
+        yaml.safe_dump({
+            "kind": str(kind),
+            "version": version,
+            "items": [{"name": n} for n in names],
+        })
     )
     return path
 
@@ -117,10 +122,10 @@ def _sources(rejections: Sequence[SeedRejection]) -> set[str]:
 class TestKindValidation:
     @pytest.fixture
     def planner(self) -> SeedPlanner:
-        return SeedPlanner(_registry("alpha"))
+        return SeedPlanner(_registry(SeedKind.DOMAIN))
 
     def test_a_valid_file_is_planned(self, planner: SeedPlanner, tmp_path: Path) -> None:
-        path = _write(tmp_path / "a.yaml", "alpha", "x", "y")
+        path = _write(tmp_path / "a.yaml", "domain", "x", "y")
         plan = planner.plan([path])
         assert plan.rejections == []
         [batch] = plan.batches
@@ -129,7 +134,7 @@ class TestKindValidation:
     def test_an_unregistered_kind_skips_the_file(
         self, planner: SeedPlanner, tmp_path: Path
     ) -> None:
-        good = _write(tmp_path / "a.yaml", "alpha", "x")
+        good = _write(tmp_path / "a.yaml", "domain", "x")
         unknown = _write(tmp_path / "b.yaml", "omega", "x")
         plan = planner.plan([good, unknown])
         assert _sources(plan.rejections) == {str(unknown)}
@@ -139,7 +144,7 @@ class TestKindValidation:
     def test_an_unsupported_version_skips_the_file(
         self, planner: SeedPlanner, tmp_path: Path
     ) -> None:
-        path = _write(tmp_path / "a.yaml", "alpha", "x", version=3)
+        path = _write(tmp_path / "a.yaml", "domain", "x", version=3)
         plan = planner.plan([path])
         assert _sources(plan.rejections) == {str(path)}
         assert "version 3 is not supported" in plan.rejections[0].reason
@@ -148,9 +153,9 @@ class TestKindValidation:
     def test_an_item_off_the_schema_skips_the_file(
         self, planner: SeedPlanner, tmp_path: Path
     ) -> None:
-        good = _write(tmp_path / "a.yaml", "alpha", "x")
+        good = _write(tmp_path / "a.yaml", "domain", "x")
         broken = tmp_path / "b.yaml"
-        broken.write_text(yaml.safe_dump({"kind": "alpha", "version": 1, "items": [{"no": 1}]}))
+        broken.write_text(yaml.safe_dump({"kind": "domain", "version": 1, "items": [{"no": 1}]}))
         plan = planner.plan([good, broken])
         assert _sources(plan.rejections) == {str(broken)}
         [batch] = plan.batches
@@ -171,8 +176,8 @@ class TestKindValidation:
     def test_the_kind_check_skips_only_the_files_it_names(
         self, planner: SeedPlanner, tmp_path: Path
     ) -> None:
-        good = _write(tmp_path / "a.yaml", "alpha", "x")
-        bad = _write(tmp_path / "b.yaml", "alpha", "bad")
+        good = _write(tmp_path / "a.yaml", "domain", "x")
+        bad = _write(tmp_path / "b.yaml", "domain", "bad")
         plan = planner.plan([good, bad])
         assert _sources(plan.rejections) == {str(bad)}
         [batch] = plan.batches
@@ -181,9 +186,9 @@ class TestKindValidation:
     def test_a_key_stated_by_two_files_skips_both(
         self, planner: SeedPlanner, tmp_path: Path
     ) -> None:
-        first = _write(tmp_path / "a.yaml", "alpha", "x")
-        second = _write(tmp_path / "b.yaml", "alpha", "x")
-        other = _write(tmp_path / "c.yaml", "alpha", "y")
+        first = _write(tmp_path / "a.yaml", "domain", "x")
+        second = _write(tmp_path / "b.yaml", "domain", "x")
+        other = _write(tmp_path / "c.yaml", "domain", "y")
         plan = planner.plan([first, second, other])
         assert _sources(plan.rejections) == {str(first), str(second)}
         [batch] = plan.batches
@@ -192,22 +197,22 @@ class TestKindValidation:
 
 class TestPaths:
     def test_a_directory_is_read_recursively(self, tmp_path: Path) -> None:
-        _write(tmp_path / "top.yaml", "alpha", "a")
-        _write(tmp_path / "nested" / "deeper" / "inner.yml", "alpha", "b")
+        _write(tmp_path / "top.yaml", "domain", "a")
+        _write(tmp_path / "nested" / "deeper" / "inner.yml", "domain", "b")
         (tmp_path / "nested" / "README.md").write_text("not a seed")
-        plan = SeedPlanner(_registry("alpha")).plan([tmp_path])
+        plan = SeedPlanner(_registry(SeedKind.DOMAIN)).plan([tmp_path])
         assert plan.rejections == []
         [batch] = plan.batches
         assert sorted(_names(batch)) == ["a", "b"]
 
     def test_every_readable_format_is_collected(self, tmp_path: Path) -> None:
         (tmp_path / "a.json").write_text(
-            json.dumps({"kind": "alpha", "version": 1, "items": [{"name": "a"}]})
+            json.dumps({"kind": "domain", "version": 1, "items": [{"name": "a"}]})
         )
-        (tmp_path / "b.toml").write_text('kind = "alpha"\nversion = 1\n[[items]]\nname = "b"\n')
-        _write(tmp_path / "c.yaml", "alpha", "c")
+        (tmp_path / "b.toml").write_text('kind = "domain"\nversion = 1\n[[items]]\nname = "b"\n')
+        _write(tmp_path / "c.yaml", "domain", "c")
         (tmp_path / "d.txt").write_text("not a seed")
-        plan = SeedPlanner(_registry("alpha")).plan([tmp_path])
+        plan = SeedPlanner(_registry(SeedKind.DOMAIN)).plan([tmp_path])
         assert plan.rejections == []
         [batch] = plan.batches
         assert sorted(_names(batch)) == ["a", "b", "c"]
@@ -215,99 +220,106 @@ class TestPaths:
     def test_a_named_file_of_no_format_is_skipped(self, tmp_path: Path) -> None:
         path = tmp_path / "seed.txt"
         path.write_text("kind: alpha")
-        plan = SeedPlanner(_registry("alpha")).plan([path])
+        plan = SeedPlanner(_registry(SeedKind.DOMAIN)).plan([path])
         assert [rejection.source for rejection in plan.rejections] == [str(path)]
 
     def test_a_path_named_twice_is_read_once(self, tmp_path: Path) -> None:
-        path = _write(tmp_path / "a.yaml", "alpha", "a")
-        plan = SeedPlanner(_registry("alpha")).plan([path, tmp_path])
+        path = _write(tmp_path / "a.yaml", "domain", "a")
+        plan = SeedPlanner(_registry(SeedKind.DOMAIN)).plan([path, tmp_path])
         assert plan.rejections == []
         [batch] = plan.batches
         assert len(batch.files) == 1
 
 
 class TestOrder:
-    def test_kinds_are_planned_in_registry_order(self, tmp_path: Path) -> None:
+    def test_kinds_are_planned_in_the_order_seed_kind_declares(self, tmp_path: Path) -> None:
         paths = [
-            _write(tmp_path / "1.yaml", "keypair", "k"),
-            _write(tmp_path / "2.yaml", "user", "u"),
-            _write(tmp_path / "3.yaml", "domain", "d"),
+            _write(tmp_path / "1.yaml", SeedKind.PROJECT, "p"),
+            _write(tmp_path / "2.yaml", SeedKind.USER, "u"),
+            _write(tmp_path / "3.yaml", SeedKind.DOMAIN, "d"),
         ]
-        plan = SeedPlanner(_registry("domain", "user", "keypair")).plan(paths)
-        assert [batch.kind.name for batch in plan.batches] == ["domain", "user", "keypair"]
+        registry = _registry(SeedKind.PROJECT, SeedKind.USER, SeedKind.DOMAIN)
+        plan = SeedPlanner(registry).plan(paths)
+        assert [batch.kind.name for batch in plan.batches] == [
+            SeedKind.DOMAIN,
+            SeedKind.USER,
+            SeedKind.PROJECT,
+        ]
 
     def test_a_skipped_file_leaves_the_other_kinds_planned(self, tmp_path: Path) -> None:
-        bad_domain = _write(tmp_path / "1.yaml", "domain", "bad")
-        user = _write(tmp_path / "2.yaml", "user", "u")
-        plan = SeedPlanner(_registry("domain", "user")).plan([bad_domain, user])
+        bad_domain = _write(tmp_path / "1.yaml", SeedKind.DOMAIN, "bad")
+        user = _write(tmp_path / "2.yaml", SeedKind.USER, "u")
+        plan = SeedPlanner(_registry(SeedKind.DOMAIN, SeedKind.USER)).plan([bad_domain, user])
         assert _sources(plan.rejections) == {str(bad_domain)}
-        assert [batch.kind.name for batch in plan.batches] == ["user"]
+        assert [batch.kind.name for batch in plan.batches] == [SeedKind.USER]
 
 
 class TestRead:
     @pytest.fixture
     def planner(self) -> SeedPlanner:
-        return SeedPlanner(SeedKindRegistry({"alpha": (1, NamedItem), "beta": (1, OtherItem)}))
+        return SeedPlanner(
+            SeedKindRegistry({SeedKind.DOMAIN: (1, NamedItem), SeedKind.USER: (1, OtherItem)})
+        )
 
     def test_each_kind_is_read_with_its_own_model(
         self, planner: SeedPlanner, tmp_path: Path
     ) -> None:
-        _write(tmp_path / "a.yaml", "alpha", "x")
-        _write(tmp_path / "b.yaml", "beta", "y")
+        _write(tmp_path / "a.yaml", "domain", "x")
+        _write(tmp_path / "b.yaml", "user", "y")
         read = planner.read([tmp_path])
         assert read.rejections == []
-        assert [type(item) for item in read.items("alpha")] == [NamedItem]
-        assert [type(item) for item in read.items("beta")] == [OtherItem]
+        assert [type(item) for item in read.items(SeedKind.DOMAIN)] == [NamedItem]
+        assert [type(item) for item in read.items(SeedKind.USER)] == [OtherItem]
 
     def test_the_checks_spanning_a_kind_are_left_to_the_plan(
         self, planner: SeedPlanner, tmp_path: Path
     ) -> None:
-        _write(tmp_path / "a.yaml", "alpha", "bad")
+        _write(tmp_path / "a.yaml", "domain", "bad")
         read = planner.read([tmp_path])
         assert read.rejections == []
-        assert [item.key() for item in read.items("alpha")] == ["bad"]
+        assert [item.key() for item in read.items(SeedKind.DOMAIN)] == ["bad"]
 
     def test_a_file_that_cannot_be_read_is_listed(
         self, planner: SeedPlanner, tmp_path: Path
     ) -> None:
-        good = _write(tmp_path / "a.yaml", "alpha", "x")
+        good = _write(tmp_path / "a.yaml", "domain", "x")
         unknown = _write(tmp_path / "b.yaml", "omega", "y")
         read = planner.read([good, unknown])
         assert _sources(read.rejections) == {str(unknown)}
-        assert [item.key() for item in read.items("alpha")] == ["x"]
+        assert [item.key() for item in read.items(SeedKind.DOMAIN)] == ["x"]
 
 
 class TestApply:
-    async def test_items_are_written_in_dependency_order(self, tmp_path: Path) -> None:
+    async def test_items_are_written_in_kind_order(self, tmp_path: Path) -> None:
         paths = [
-            _write(tmp_path / "1.yaml", "user", "u"),
-            _write(tmp_path / "2.yaml", "domain", "d"),
+            _write(tmp_path / "1.yaml", SeedKind.USER, "u"),
+            _write(tmp_path / "2.yaml", SeedKind.DOMAIN, "d"),
         ]
         repository = FakeRepository()
-        plan = SeedPlanner(_registry("domain", "user")).plan(paths)
+        plan = SeedPlanner(_registry(SeedKind.USER, SeedKind.DOMAIN)).plan(paths)
         await SeedApplier(repository).apply(plan, overwrite=False)
         assert repository.calls == [("insert", "d"), ("insert", "u")]
 
     async def test_an_item_referring_to_a_missing_row_fails_and_the_rest_are_written(
         self, tmp_path: Path
     ) -> None:
-        plan = SeedPlanner(_registry("alpha")).plan([
-            _write(tmp_path / "a.yaml", "alpha", "x", "orphan", "z")
+        plan = SeedPlanner(_registry(SeedKind.DOMAIN)).plan([
+            _write(tmp_path / "a.yaml", "domain", "x", "orphan", "z")
         ])
         repository = FakeRepository()
         results = await SeedApplier(repository).apply(plan, overwrite=False)
-        assert results["alpha"] == SeedWriteResult(
+        assert results[SeedKind.DOMAIN] == SeedWriteResult(
             succeeded=["x", "z"],
             failed=[SeedItemFailure("orphan", "refers to a missing row (fk_fake)")],
         )
 
     async def test_an_existing_item_is_kept_and_listed(self, tmp_path: Path) -> None:
-        plan = SeedPlanner(_registry("alpha")).plan([
-            _write(tmp_path / "a.yaml", "alpha", "x", "y", "z")
+        plan = SeedPlanner(_registry(SeedKind.DOMAIN)).plan([
+            _write(tmp_path / "a.yaml", "domain", "x", "y", "z")
         ])
         repository = FakeRepository(rows=["y"])
         results = await SeedApplier(repository).apply(plan, overwrite=False)
-        assert results["alpha"] == SeedWriteResult(
+        assert results[SeedKind.DOMAIN] == SeedWriteResult(
             succeeded=["x", "z"],
             skipped=[SeedItemFailure("y", "exists")],
         )
@@ -317,21 +329,21 @@ class TestApply:
     async def test_an_item_colliding_on_another_unique_key_is_skipped(
         self, tmp_path: Path, overwrite: bool
     ) -> None:
-        plan = SeedPlanner(_registry("alpha")).plan([
-            _write(tmp_path / "a.yaml", "alpha", "x", "taken")
+        plan = SeedPlanner(_registry(SeedKind.DOMAIN)).plan([
+            _write(tmp_path / "a.yaml", "domain", "x", "taken")
         ])
         repository = FakeRepository()
         results = await SeedApplier(repository).apply(plan, overwrite=overwrite)
-        assert results["alpha"] == SeedWriteResult(
+        assert results[SeedKind.DOMAIN] == SeedWriteResult(
             succeeded=["x"],
             skipped=[SeedItemFailure("taken", "collides with a row (uq_fake)")],
         )
 
     async def test_overwrite_upserts_every_item(self, tmp_path: Path) -> None:
-        plan = SeedPlanner(_registry("alpha")).plan([
-            _write(tmp_path / "a.yaml", "alpha", "x", "y")
+        plan = SeedPlanner(_registry(SeedKind.DOMAIN)).plan([
+            _write(tmp_path / "a.yaml", "domain", "x", "y")
         ])
         repository = FakeRepository(rows=["y"])
         results = await SeedApplier(repository).apply(plan, overwrite=True)
-        assert results["alpha"] == SeedWriteResult(succeeded=["x", "y"])
+        assert results[SeedKind.DOMAIN] == SeedWriteResult(succeeded=["x", "y"])
         assert repository.calls == [("upsert", "x"), ("upsert", "y")]

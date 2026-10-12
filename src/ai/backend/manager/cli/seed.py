@@ -10,6 +10,7 @@ import click
 if TYPE_CHECKING:
     from ai.backend.manager.cli.context import CLIContext
     from ai.backend.manager.seed.result import SeedWriteResult
+    from ai.backend.manager.seed.types import SeedKind
 
 
 @click.group()
@@ -74,7 +75,7 @@ def apply(cli_ctx: CLIContext, paths: tuple[Path, ...], overwrite: bool) -> None
 
     plan = SeedPlanner(create_seed_kind_registry()).plan(paths)
 
-    async def _apply() -> dict[str, SeedWriteResult]:
+    async def _apply() -> dict[SeedKind, SeedWriteResult]:
         bootstrap_config = await cli_ctx.get_bootstrap_config()
         # A standalone CLI process has not imported the full model tree.
         ensure_all_tables_registered()

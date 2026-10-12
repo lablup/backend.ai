@@ -24,6 +24,7 @@ from ai.backend.manager.repositories.seed.repository import SeedRepository
 from ai.backend.manager.seed.factory import create_seed_kind_registry
 from ai.backend.manager.seed.role_preset.seed import RolePresetSeed
 from ai.backend.manager.seed.runner import SeedApplier, SeedPlan, SeedPlanner
+from ai.backend.manager.seed.types import SeedKind
 
 
 @pytest.fixture
@@ -102,8 +103,8 @@ class TestApply:
     ) -> None:
         results = await SeedApplier(repository).apply(plan, overwrite=False)
 
-        assert len(results["role_preset"].succeeded) == len(plan.batches[0].items())
-        assert results["role_preset"].skipped == []
+        assert len(results[SeedKind.ROLE_PRESET].succeeded) == len(plan.batches[0].items())
+        assert results[SeedKind.ROLE_PRESET].skipped == []
         fixture = _fixture(plan)
         assert await _presets(db) == {
             row["id"]: (row["name"], row["scope_type"], row["auto_assign"], False)
@@ -142,10 +143,10 @@ class TestApply:
 
         results = await SeedApplier(repository).apply(plan, overwrite=False)
 
-        assert results["role_preset"].succeeded == []
-        assert len(results["role_preset"].skipped) == len(plan.batches[0].items())
+        assert results[SeedKind.ROLE_PRESET].succeeded == []
+        assert len(results[SeedKind.ROLE_PRESET].skipped) == len(plan.batches[0].items())
         assert all(
-            failure.reason.startswith("exists") for failure in results["role_preset"].skipped
+            failure.reason.startswith("exists") for failure in results[SeedKind.ROLE_PRESET].skipped
         )
         assert (await _presets(db))[domain_admin_id][0] == "renamed"
         assert await _permissions(db) == permissions
@@ -173,7 +174,7 @@ class TestApply:
 
         results = await SeedApplier(repository).apply(plan, overwrite=False)
 
-        assert results["role_preset"].succeeded == [domain_admin_id]
+        assert results[SeedKind.ROLE_PRESET].succeeded == [domain_admin_id]
         assert (await _presets(db))[domain_admin_id][0] == "renamed"
         assert await _permissions(db) == permissions
 
@@ -201,7 +202,7 @@ class TestApply:
 
         results = await SeedApplier(repository).apply(plan, overwrite=True)
 
-        assert len(results["role_preset"].succeeded) == len(plan.batches[0].items())
+        assert len(results[SeedKind.ROLE_PRESET].succeeded) == len(plan.batches[0].items())
         assert await _presets(db) == presets
         assert await _permissions(db) == permissions
 
