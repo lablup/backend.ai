@@ -388,7 +388,6 @@ class AuthDBSource:
 
     async def _check_password(
         self,
-        conn: sa.ext.asyncio.AsyncConnection,
         row: sa.Row[Any],
         password: str,
     ) -> None:
@@ -488,7 +487,7 @@ class AuthDBSource:
             if row is None:
                 raise AuthorizationFailed("User credential mismatch.")
 
-            await self._check_password(conn, row, target_password_info.password)
+            await self._check_password(row, target_password_info.password)
             await self._migrate_password_hash(conn, row, domain_name, email, target_password_info)
 
             # Fetch active sessions for the user within the same connection
@@ -612,7 +611,7 @@ class AuthDBSource:
             row = result.first()
             if row is None:
                 raise AuthorizationFailed("User credential mismatch.")
-            await self._check_password(conn, row, password)
+            await self._check_password(row, password)
         return row._mapping
 
     @auth_db_source_resilience.apply()
