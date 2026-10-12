@@ -847,11 +847,13 @@ def _sweep_unknown_types(conn: sa.engine.Connection) -> None:
 
 # Each user on a project's roster. The scope association table's project members were
 # moved to these edges; `association_groups_users` stopped being written before that.
+# `users` is joined because the node of a purged user stands until `bf75b41e80ae`.
 _ROSTER: Final[str] = """
     SELECT p.entity_id AS project_id, u.entity_id AS user_id
     FROM entity_memberships m
     JOIN virtual_entities p ON p.id = m.virtual_entity_id AND p.entity_type = 'project'
     JOIN virtual_entities u ON u.id = m.member_entity_id AND u.entity_type = 'user'
+    JOIN users ON users.uuid = u.entity_id
 """
 
 
