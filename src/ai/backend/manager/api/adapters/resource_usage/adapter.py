@@ -54,6 +54,7 @@ from ai.backend.manager.repositories.base import (
     OffsetPagination,
     QueryCondition,
     QueryOrder,
+    combine_conditions_and,
     combine_conditions_or,
     negate_conditions,
 )
@@ -699,7 +700,9 @@ class ResourceUsageAdapter(BaseAdapter):
         if filter_req.OR:
             or_conditions: list[QueryCondition] = []
             for sub_filter in filter_req.OR:
-                or_conditions.extend(self._convert_domain_filter(sub_filter))
+                sub_conditions = self._convert_domain_filter(sub_filter)
+                if sub_conditions:
+                    or_conditions.append(combine_conditions_and(sub_conditions))
             if or_conditions:
                 conditions.append(combine_conditions_or(or_conditions))
 
@@ -791,7 +794,9 @@ class ResourceUsageAdapter(BaseAdapter):
         if filter_req.OR:
             or_conditions_p: list[QueryCondition] = []
             for sub_filter in filter_req.OR:
-                or_conditions_p.extend(self._convert_project_filter(sub_filter))
+                sub_conditions = self._convert_project_filter(sub_filter)
+                if sub_conditions:
+                    or_conditions_p.append(combine_conditions_and(sub_conditions))
             if or_conditions_p:
                 conditions.append(combine_conditions_or(or_conditions_p))
 
@@ -892,7 +897,9 @@ class ResourceUsageAdapter(BaseAdapter):
         if filter_req.OR:
             or_conditions_u: list[QueryCondition] = []
             for sub_filter in filter_req.OR:
-                or_conditions_u.extend(self._convert_user_filter(sub_filter))
+                sub_conditions = self._convert_user_filter(sub_filter)
+                if sub_conditions:
+                    or_conditions_u.append(combine_conditions_and(sub_conditions))
             if or_conditions_u:
                 conditions.append(combine_conditions_or(or_conditions_u))
 

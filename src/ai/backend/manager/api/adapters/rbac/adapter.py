@@ -222,6 +222,7 @@ from ai.backend.manager.repositories.base import (
     Purger,
     QueryCondition,
     QueryOrder,
+    combine_conditions_and,
     combine_conditions_or,
     negate_conditions,
 )
@@ -1325,7 +1326,9 @@ class RBACAdapter(BaseAdapter):
         if f.OR:
             or_conditions: list[QueryCondition] = []
             for sub in f.OR:
-                or_conditions.extend(self._convert_permission_filter(sub))
+                sub_conditions = self._convert_permission_filter(sub)
+                if sub_conditions:
+                    or_conditions.append(combine_conditions_and(sub_conditions))
             if or_conditions:
                 conditions.append(combine_conditions_or(or_conditions))
         if f.NOT:
@@ -1402,7 +1405,9 @@ class RBACAdapter(BaseAdapter):
         if f.OR:
             or_conditions: list[QueryCondition] = []
             for sub in f.OR:
-                or_conditions.extend(self._convert_role_filter_gql(sub))
+                sub_conditions = self._convert_role_filter_gql(sub)
+                if sub_conditions:
+                    or_conditions.append(combine_conditions_and(sub_conditions))
             if or_conditions:
                 conditions.append(combine_conditions_or(or_conditions))
         if f.NOT:
@@ -1432,7 +1437,9 @@ class RBACAdapter(BaseAdapter):
         if f.OR:
             or_conditions: list[QueryCondition] = []
             for sub in f.OR:
-                or_conditions.extend(self._convert_user_nested_filter(sub))
+                sub_conditions = self._convert_user_nested_filter(sub)
+                if sub_conditions:
+                    or_conditions.append(combine_conditions_and(sub_conditions))
             if or_conditions:
                 conditions.append(combine_conditions_or(or_conditions))
         if f.NOT:
@@ -1514,7 +1521,9 @@ class RBACAdapter(BaseAdapter):
         if f.OR:
             or_conditions: list[QueryCondition] = []
             for sub in f.OR:
-                or_conditions.extend(self._convert_role_nested_filter(sub))
+                sub_conditions = self._convert_role_nested_filter(sub)
+                if sub_conditions:
+                    or_conditions.append(combine_conditions_and(sub_conditions))
             if or_conditions:
                 conditions.append(combine_conditions_or(or_conditions))
         if f.NOT:
@@ -1579,7 +1588,9 @@ class RBACAdapter(BaseAdapter):
         if f.OR:
             or_conditions: list[QueryCondition] = []
             for sub in f.OR:
-                or_conditions.extend(self._convert_permission_nested_filter(sub))
+                sub_conditions = self._convert_permission_nested_filter(sub)
+                if sub_conditions:
+                    or_conditions.append(combine_conditions_and(sub_conditions))
             if or_conditions:
                 conditions.append(combine_conditions_or(or_conditions))
         if f.NOT:
@@ -1632,7 +1643,9 @@ class RBACAdapter(BaseAdapter):
         if f.OR:
             or_conditions: list[QueryCondition] = []
             for sub in f.OR:
-                or_conditions.extend(self._convert_assignment_filter(sub))
+                sub_conditions = self._convert_assignment_filter(sub)
+                if sub_conditions:
+                    or_conditions.append(combine_conditions_and(sub_conditions))
             if or_conditions:
                 conditions.append(combine_conditions_or(or_conditions))
         if f.NOT:
@@ -1685,7 +1698,9 @@ class RBACAdapter(BaseAdapter):
         if f.OR:
             or_conditions: list[QueryCondition] = []
             for sub in f.OR:
-                or_conditions.extend(self._convert_entity_filter(sub))
+                sub_conditions = self._convert_entity_filter(sub)
+                if sub_conditions:
+                    or_conditions.append(combine_conditions_and(sub_conditions))
             if or_conditions:
                 conditions.append(combine_conditions_or(or_conditions))
         if f.NOT:
@@ -1926,7 +1941,9 @@ class RBACAdapter(BaseAdapter):
         if f.OR:
             or_conditions: list[QueryCondition] = []
             for sub in f.OR:
-                or_conditions.extend(self._convert_invitation_filter(sub))
+                sub_conditions = self._convert_invitation_filter(sub)
+                if sub_conditions:
+                    or_conditions.append(combine_conditions_and(sub_conditions))
             if or_conditions:
                 conditions.append(combine_conditions_or(or_conditions))
         if f.NOT:

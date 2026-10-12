@@ -56,6 +56,7 @@ from ai.backend.manager.repositories.base import (
     NoPagination,
     QueryCondition,
     QueryOrder,
+    combine_conditions_and,
     combine_conditions_or,
     negate_conditions,
 )
@@ -375,7 +376,9 @@ class ProjectAdapter(BaseAdapter):
         if filter.OR:
             or_sub_conditions: list[QueryCondition] = []
             for sub_filter in filter.OR:
-                or_sub_conditions.extend(self._convert_group_filter(sub_filter))
+                sub_conditions = self._convert_group_filter(sub_filter)
+                if sub_conditions:
+                    or_sub_conditions.append(combine_conditions_and(sub_conditions))
             if or_sub_conditions:
                 conditions.append(combine_conditions_or(or_sub_conditions))
 

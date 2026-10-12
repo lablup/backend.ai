@@ -87,6 +87,7 @@ from ai.backend.manager.repositories.base import (
     BatchQuerier,
     QueryCondition,
     QueryOrder,
+    combine_conditions_and,
     combine_conditions_or,
 )
 from ai.backend.manager.repositories.base.updater import Updater
@@ -467,7 +468,9 @@ class DeploymentRevisionPresetAdapter(BaseAdapter):
         if filter_.OR:
             or_conds: list[QueryCondition] = []
             for sub in filter_.OR:
-                or_conds.extend(self._convert_allocated_slot_filter(sub))
+                sub_conditions = self._convert_allocated_slot_filter(sub)
+                if sub_conditions:
+                    or_conds.append(combine_conditions_and(sub_conditions))
             if or_conds:
                 conditions.append(combine_conditions_or(or_conds))
         return conditions
@@ -507,7 +510,9 @@ class DeploymentRevisionPresetAdapter(BaseAdapter):
         if filter_.OR:
             or_conds: list[QueryCondition] = []
             for sub in filter_.OR:
-                or_conds.extend(self._convert_filter(sub))
+                sub_conditions = self._convert_filter(sub)
+                if sub_conditions:
+                    or_conds.append(combine_conditions_and(sub_conditions))
             if or_conds:
                 conditions.append(combine_conditions_or(or_conds))
         return conditions

@@ -34,6 +34,7 @@ from ai.backend.manager.repositories.base import (
     OffsetPagination,
     QueryCondition,
     QueryOrder,
+    combine_conditions_and,
     combine_conditions_or,
     negate_conditions,
 )
@@ -201,7 +202,9 @@ class RuntimeVariantAdapter(BaseAdapter):
         if filter_.OR:
             or_conds: list[QueryCondition] = []
             for sub in filter_.OR:
-                or_conds.extend(self._convert_filter(sub))
+                sub_conditions = self._convert_filter(sub)
+                if sub_conditions:
+                    or_conds.append(combine_conditions_and(sub_conditions))
             if or_conds:
                 conditions.append(combine_conditions_or(or_conds))
         if filter_.NOT:

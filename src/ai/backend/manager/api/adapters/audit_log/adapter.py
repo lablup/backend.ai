@@ -33,6 +33,7 @@ from ai.backend.manager.repositories.base import (
     OffsetPagination,
     QueryCondition,
     QueryOrder,
+    combine_conditions_and,
     combine_conditions_or,
     negate_conditions,
 )
@@ -200,7 +201,9 @@ class AuditLogAdapter(BaseAdapter):
         if f.OR:
             or_conditions: list[QueryCondition] = []
             for sub_filter in f.OR:
-                or_conditions.extend(self._convert_filter(sub_filter))
+                sub_conditions = self._convert_filter(sub_filter)
+                if sub_conditions:
+                    or_conditions.append(combine_conditions_and(sub_conditions))
             if or_conditions:
                 conditions.append(combine_conditions_or(or_conditions))
         if f.NOT:

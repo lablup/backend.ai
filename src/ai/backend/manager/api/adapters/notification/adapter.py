@@ -83,6 +83,7 @@ from ai.backend.manager.repositories.base import (
     QueryCondition,
     QueryOrder,
     Updater,
+    combine_conditions_and,
     combine_conditions_or,
     negate_conditions,
 )
@@ -574,7 +575,9 @@ class NotificationAdapter(BaseAdapter):
         if f.OR:
             or_conditions: list[QueryCondition] = []
             for sub in f.OR:
-                or_conditions.extend(NotificationAdapter._convert_channel_filter(sub))
+                sub_conditions = NotificationAdapter._convert_channel_filter(sub)
+                if sub_conditions:
+                    or_conditions.append(combine_conditions_and(sub_conditions))
             if or_conditions:
                 conditions.append(combine_conditions_or(or_conditions))
 
@@ -655,7 +658,9 @@ class NotificationAdapter(BaseAdapter):
         if f.OR:
             or_conditions: list[QueryCondition] = []
             for sub in f.OR:
-                or_conditions.extend(NotificationAdapter._convert_rule_filter(sub))
+                sub_conditions = NotificationAdapter._convert_rule_filter(sub)
+                if sub_conditions:
+                    or_conditions.append(combine_conditions_and(sub_conditions))
             if or_conditions:
                 conditions.append(combine_conditions_or(or_conditions))
 

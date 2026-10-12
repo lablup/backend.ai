@@ -87,6 +87,7 @@ from ai.backend.manager.models.fair_share.row import (
 from ai.backend.manager.repositories.base import (
     QueryCondition,
     QueryOrder,
+    combine_conditions_and,
     combine_conditions_or,
     negate_conditions,
 )
@@ -517,7 +518,9 @@ class FairShareAdapter(BaseAdapter):
         if filter.OR:
             or_conditions: list[QueryCondition] = []
             for sub_filter in filter.OR:
-                or_conditions.extend(self._convert_domain_filter(sub_filter))
+                sub_conditions = self._convert_domain_filter(sub_filter)
+                if sub_conditions:
+                    or_conditions.append(combine_conditions_and(sub_conditions))
             if or_conditions:
                 conditions.append(combine_conditions_or(or_conditions))
         if filter.NOT:
@@ -560,7 +563,9 @@ class FairShareAdapter(BaseAdapter):
         if filter.OR:
             or_conditions: list[QueryCondition] = []
             for sub_filter in filter.OR:
-                or_conditions.extend(self._convert_domain_filter_rg(sub_filter))
+                sub_conditions = self._convert_domain_filter_rg(sub_filter)
+                if sub_conditions:
+                    or_conditions.append(combine_conditions_and(sub_conditions))
             if or_conditions:
                 conditions.append(combine_conditions_or(or_conditions))
         if filter.NOT:
@@ -642,7 +647,9 @@ class FairShareAdapter(BaseAdapter):
         if filter.OR:
             or_conditions: list[QueryCondition] = []
             for sub_filter in filter.OR:
-                or_conditions.extend(self._convert_project_filter(sub_filter))
+                sub_conditions = self._convert_project_filter(sub_filter)
+                if sub_conditions:
+                    or_conditions.append(combine_conditions_and(sub_conditions))
             if or_conditions:
                 conditions.append(combine_conditions_or(or_conditions))
         if filter.NOT:
@@ -692,7 +699,9 @@ class FairShareAdapter(BaseAdapter):
         if filter.OR:
             or_conditions: list[QueryCondition] = []
             for sub_filter in filter.OR:
-                or_conditions.extend(self._convert_project_filter_rg(sub_filter))
+                sub_conditions = self._convert_project_filter_rg(sub_filter)
+                if sub_conditions:
+                    or_conditions.append(combine_conditions_and(sub_conditions))
             if or_conditions:
                 conditions.append(combine_conditions_or(or_conditions))
         if filter.NOT:
@@ -779,7 +788,9 @@ class FairShareAdapter(BaseAdapter):
         if filter.OR:
             or_conditions: list[QueryCondition] = []
             for sub_filter in filter.OR:
-                or_conditions.extend(self._convert_user_filter(sub_filter))
+                sub_conditions = self._convert_user_filter(sub_filter)
+                if sub_conditions:
+                    or_conditions.append(combine_conditions_and(sub_conditions))
             if or_conditions:
                 conditions.append(combine_conditions_or(or_conditions))
         if filter.NOT:
@@ -834,7 +845,9 @@ class FairShareAdapter(BaseAdapter):
         if filter.OR:
             or_conditions: list[QueryCondition] = []
             for sub_filter in filter.OR:
-                or_conditions.extend(self._convert_user_filter_rg(sub_filter))
+                sub_conditions = self._convert_user_filter_rg(sub_filter)
+                if sub_conditions:
+                    or_conditions.append(combine_conditions_and(sub_conditions))
             if or_conditions:
                 conditions.append(combine_conditions_or(or_conditions))
         if filter.NOT:

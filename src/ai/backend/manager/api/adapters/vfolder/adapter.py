@@ -92,6 +92,7 @@ from ai.backend.manager.models.vfolder.row import VFolderRow
 from ai.backend.manager.repositories.base import (
     QueryCondition,
     QueryOrder,
+    combine_conditions_and,
     combine_conditions_or,
     negate_conditions,
 )
@@ -757,7 +758,9 @@ class VFolderAdapter(BaseAdapter):
         if f.OR:
             or_conditions: list[QueryCondition] = []
             for sub in f.OR:
-                or_conditions.extend(self._convert_vfolder_filter(sub))
+                sub_conditions = self._convert_vfolder_filter(sub)
+                if sub_conditions:
+                    or_conditions.append(combine_conditions_and(sub_conditions))
             if or_conditions:
                 conditions.append(combine_conditions_or(or_conditions))
         if f.NOT:
