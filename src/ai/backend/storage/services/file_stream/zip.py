@@ -40,7 +40,7 @@ class ZipArchiveStreamReader(StreamReader):
     def __init__(self, base_path: Path, filename: str = "archive.zip") -> None:
         self._base_path = base_path
         self._filename = filename
-        self._zf = zipstream.ZipFile(compression=zipstream.ZIP_DEFLATED)
+        self._zf = zipstream.ZipFile(compression=zipstream.ZIP_DEFLATED, allowZip64=True)
 
     def add_entries(self, entries: list[Path]) -> None:
         """Register file/directory paths into the zip archive.
@@ -83,12 +83,16 @@ class ZipArchiveStreamReader(StreamReader):
         # Sync-to-async bridge: zipstream.ZipFile is a sync iterable,
         # so we run it in a thread executor and pipe chunks through
         # a janus queue (sync producer → async consumer).
-        q: janus.Queue[bytes | Sentinel] = janus.Queue(maxsize=DEFAULT_INFLIGHT_CHUNKS)
+        q: janus.Queue[bytes | Sentinel | BaseException] = janus.Queue(
+            maxsize=DEFAULT_INFLIGHT_CHUNKS
+        )
         try:
             loop = asyncio.get_running_loop()
             put_chunks = loop.run_in_executor(None, self._produce_chunks, q.sync_q)
             while True:
                 item = await q.async_q.get()
+                if isinstance(item, BaseException):
+                    raise item
                 if isinstance(item, Sentinel):
                     break
                 yield item
@@ -98,10 +102,15 @@ class ZipArchiveStreamReader(StreamReader):
             q.close()
             await q.wait_closed()
 
-    def _produce_chunks(self, q: janus.SyncQueue[bytes | Sentinel]) -> None:
-        for chunk in self._zf:
-            q.put(chunk)
-        q.put(SENTINEL)
+    def _produce_chunks(self, q: janus.SyncQueue[bytes | Sentinel | BaseException]) -> None:
+        # The producer always terminates the queue; otherwise the consumer waits forever.
+        try:
+            for chunk in self._zf:
+                q.put(chunk)
+        except BaseException as e:
+            q.put(e)
+        else:
+            q.put(SENTINEL)
 
     @override
     def content_type(self) -> str | None:
