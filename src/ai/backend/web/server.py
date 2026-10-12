@@ -573,14 +573,6 @@ async def logout_handler(request: web.Request) -> web.Response:
         manager_pool = cast(HealthyEndpointPool, request.app["manager_pool"])
         try:
             async with manager_pool.acquire() as acquired:
-<<<<<<< HEAD
-                async with aiohttp.ClientSession() as http_session:
-                    await http_session.post(
-                        f"{acquired.endpoint}/auth/logout",
-                        json={"session_token": session_token},
-                        ssl=config.api.ssl_verify,
-                    )
-=======
                 api_session = await get_api_session(request, acquired)
                 async with api_session:
                     fill_forwarding_hdrs_to_api_session(request, api_session)
@@ -588,7 +580,6 @@ async def logout_handler(request: web.Request) -> web.Response:
                     rqst.set_json({"session_token": session_token})
                     async with rqst.fetch():
                         pass
->>>>>>> 64968e05 (fix(BA-8378): sign the webserver's manager logout call with the session keypair (#15422))
         except Exception:
             log.exception(
                 "Failed to invalidate login session in Manager DB (token={})", session_token
