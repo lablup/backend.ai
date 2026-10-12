@@ -430,8 +430,7 @@ class AuthService:
         )
 
         if tokens_to_invalidate:
-            for token in tokens_to_invalidate:
-                await self._valkey_session_client.delete_login_session(token)
+            await self._valkey_session_client.delete_login_sessions(tokens_to_invalidate)
             await self._auth_repository.delete_login_sessions_by_tokens(
                 tokens_to_invalidate, LoginAttemptResult.EVICTED, await self._recorded_client_ip()
             )

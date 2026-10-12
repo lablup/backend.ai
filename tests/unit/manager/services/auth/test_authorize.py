@@ -503,7 +503,9 @@ async def test_authorize_force_invalidates_existing_sessions(
     assert "tokens_to_invalidate" not in create_kwargs
 
     # Old session should be deleted from Valkey
-    mock_valkey_session_client.delete_login_session.assert_awaited_once_with("existing_live_token")
+    mock_valkey_session_client.delete_login_sessions.assert_awaited_once_with([
+        "existing_live_token"
+    ])
 
     assert result.authorization_result is not None
     assert result.authorization_result.session_token == "forced_new_token"
