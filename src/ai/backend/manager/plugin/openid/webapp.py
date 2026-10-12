@@ -357,7 +357,10 @@ class OIDCWebAppPlugin(WebappPlugin):
         uri = yarl.URL(candidate)
         if self._config.allowed_redirect_hosts is None:
             return uri
-        allowed_hosts = {login_uri.host, *(h.lower() for h in self._config.allowed_redirect_hosts)}
+        allowed_hosts = {
+            login_uri.host,
+            *(h.strip().lower() for h in self._config.allowed_redirect_hosts),
+        }
         if uri.scheme not in ("http", "https") or uri.host not in allowed_hosts:
             return login_uri
         return uri

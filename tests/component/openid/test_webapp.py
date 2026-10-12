@@ -254,7 +254,8 @@ class TestWebAppLogin:
         mock_oauth2_client: MagicMock,
     ) -> None:
         plugin = OIDCWebAppPlugin(
-            {**plugin_config, "allowed_redirect_hosts": ["guest.example.com"]}, local_config={}
+            {**plugin_config, "allowed_redirect_hosts": "other.example.com, guest.example.com"},
+            local_config={},
         )
         login_request.post = AsyncMock(
             return_value={"redirect_to": "https://guest.example.com/dashboard"}
@@ -290,7 +291,7 @@ class TestWebAppLogin:
         redirect_to: str | None,
     ) -> None:
         plugin = OIDCWebAppPlugin(
-            {**plugin_config, "allowed_redirect_hosts": ["guest.example.com"]}, local_config={}
+            {**plugin_config, "allowed_redirect_hosts": "guest.example.com"}, local_config={}
         )
         post_data = {} if redirect_to is None else {"redirect_to": redirect_to}
         login_request.post = AsyncMock(return_value=post_data)
@@ -380,7 +381,7 @@ class TestWebAppRedirect:
         mock_oauth2_client: MagicMock,
     ) -> None:
         plugin = OIDCWebAppPlugin(
-            {**plugin_config, "allowed_redirect_hosts": ["guest.example.com"]}, local_config={}
+            {**plugin_config, "allowed_redirect_hosts": "guest.example.com"}, local_config={}
         )
         self._set_return_uri(redirect_request, "https://guest.example.com/dashboard")
 
@@ -411,7 +412,7 @@ class TestWebAppRedirect:
         mock_oauth2_client: MagicMock,
     ) -> None:
         plugin = OIDCWebAppPlugin(
-            {**plugin_config, "allowed_redirect_hosts": ["guest.example.com"]}, local_config={}
+            {**plugin_config, "allowed_redirect_hosts": "guest.example.com"}, local_config={}
         )
         self._set_return_uri(redirect_request, "https://evil.example.com/dashboard")
 
