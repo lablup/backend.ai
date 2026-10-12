@@ -6,30 +6,34 @@ from collections.abc import Hashable
 from ai.backend.common.data.storage.types import StorageStatusResult
 
 
-class AbstractStatusCheck[TID: Hashable](metaclass=ABCMeta):
+class AbstractProbeCheck[TID: Hashable](metaclass=ABCMeta):
     """
-    The status check of one storage subject, a volume or a backend appliance, and nothing else.
+    One storage subject's status check, as the probe that runs it sees it.
 
-    It is not an abstraction of the subject: it answers only whether the subject is usable
+    It is not an abstraction of the subject: it observes whether the subject is reachable
     from the service holding it. File operations and appliance management live elsewhere.
     """
 
     @abstractmethod
-    def get_id(self) -> TID:
+    def id(self) -> TID:
         """The operator-assigned id every service declaring this subject writes down."""
-        raise NotImplementedError
-
-    @abstractmethod
-    def get_latest(self) -> StorageStatusResult | None:
-        """What the last check found, None until one has run."""
         raise NotImplementedError
 
     @abstractmethod
     def check_status(self) -> None:
         """
-        Runs the check and records what it found for ``get_latest()`` to answer with.
+        Observes the subject and records what it saw, judging none of it.
 
         Called in a thread of its own, so it blocks rather than awaits, and it raises
-        nothing: a failure is recorded as the result's ``error_msg``.
+        nothing: an observation that failed is recorded in the result instead.
         """
+        raise NotImplementedError
+
+
+class AbstractStatusCheck[TID: Hashable, TResult: StorageStatusResult](AbstractProbeCheck[TID]):
+    """A probe check that keeps its last observation for whoever reports it to read."""
+
+    @abstractmethod
+    def latest(self) -> TResult | None:
+        """What the last check observed, None until one has run."""
         raise NotImplementedError

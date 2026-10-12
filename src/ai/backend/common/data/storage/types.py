@@ -111,12 +111,20 @@ class ServiceStorageStatus(enum.StrEnum):
 
 @dataclass(frozen=True)
 class StorageStatusResult:
-    """One status check's outcome, when it started and how long it took.
+    """What one status check observed, when it started and how long it took.
 
-    ``error_msg`` is null exactly when the check found its subject in order, and
-    ``duration`` is null where no check ran to completion to measure one.
+    ``error_msg`` is null where the observation itself succeeded, which says nothing
+    about whether the subject is in order; reading the observation decides that.
     """
 
     check_started_at: datetime
     duration: timedelta | None
     error_msg: str | None
+
+
+@dataclass(frozen=True)
+class VfsVolumeStatusResult(StorageStatusResult):
+    """What a vfs volume's mount looked like, null where the observation failed."""
+
+    device_id: int | None
+    marker: str | None
