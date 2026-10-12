@@ -1442,52 +1442,13 @@ class RBACAdapter(BaseAdapter):
                 conditions.append(combine_conditions_or(or_conditions))
         if f.NOT:
             for sub in f.NOT:
-<<<<<<< HEAD
-                not_conditions.extend(self._convert_user_nested_filter(sub))
-            if not_conditions:
-                conditions.append(negate_conditions(not_conditions))
+                sub_conditions = self._convert_user_nested_filter(sub)
+                if sub_conditions:
+                    conditions.append(negate_conditions(sub_conditions))
         return conditions
 
     @staticmethod
     def _convert_role_orders_gql(orders: list[RoleOrderByDTO]) -> list[QueryOrder]:
-=======
-                sub_conditions = self._convert_assigned_user_nested_filter(sub)
-                if sub_conditions:
-                    conditions.append(negate_conditions(sub_conditions))
-        return conditions
-
-    def _convert_mapped_scope_nested_filter(
-        self, f: MappedScopeNestedFilterDTO | None
-    ) -> list[QueryCondition]:
-        """The scope a role is registered in sits in the role's own two columns."""
-        if f is None:
-            return []
-        fields = RoleSearchableFields.own
-        conditions = [
-            *self.apply_string_filter(f.scope_type, fields.scope_type.filter),
-            *self.apply_uuid_filter(f.scope_id, fields.scope_id.filter),
-        ]
-        if f.AND:
-            for sub in f.AND:
-                conditions.extend(self._convert_mapped_scope_nested_filter(sub))
-        if f.OR:
-            or_conditions: list[QueryCondition] = []
-            for sub in f.OR:
-                sub_conditions = self._convert_mapped_scope_nested_filter(sub)
-                if sub_conditions:
-                    or_conditions.append(combine_conditions_and(sub_conditions))
-            if or_conditions:
-                conditions.append(combine_conditions_or(or_conditions))
-        if f.NOT:
-            for sub in f.NOT:
-                sub_conditions = self._convert_mapped_scope_nested_filter(sub)
-                if sub_conditions:
-                    conditions.append(negate_conditions(sub_conditions))
-        return conditions
-
-    def _convert_role_orders_gql(self, orders: list[RoleOrderByDTO]) -> list[QueryOrder]:
-        fields = RoleSearchableFields.own
->>>>>>> 743740559 (fix(BA-8375): negate each NOT filter item on its own (#15410))
         result: list[QueryOrder] = []
         for o in orders:
             ascending = o.direction == OrderDirectionV2.ASC
@@ -1737,11 +1698,10 @@ class RBACAdapter(BaseAdapter):
             if or_conditions:
                 conditions.append(combine_conditions_or(or_conditions))
         if f.NOT:
-            not_conditions: list[QueryCondition] = []
             for sub in f.NOT:
-                not_conditions.extend(self._convert_entity_filter(sub))
-            if not_conditions:
-                conditions.append(negate_conditions(not_conditions))
+                sub_conditions = self._convert_entity_filter(sub)
+                if sub_conditions:
+                    conditions.append(negate_conditions(sub_conditions))
         return conditions
 
     @staticmethod
@@ -1980,11 +1940,10 @@ class RBACAdapter(BaseAdapter):
             if or_conditions:
                 conditions.append(combine_conditions_or(or_conditions))
         if f.NOT:
-            not_conditions: list[QueryCondition] = []
             for sub in f.NOT:
-                not_conditions.extend(self._convert_invitation_filter(sub))
-            if not_conditions:
-                conditions.append(negate_conditions(not_conditions))
+                sub_conditions = self._convert_invitation_filter(sub)
+                if sub_conditions:
+                    conditions.append(negate_conditions(sub_conditions))
         return conditions
 
     @staticmethod

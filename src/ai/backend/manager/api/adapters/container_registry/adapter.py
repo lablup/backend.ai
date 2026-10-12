@@ -227,27 +227,7 @@ class ContainerRegistryAdapter(BaseAdapter):
         if filter.type is not None:
             conditions.extend(self._convert_type_filter(filter.type))
         if filter.is_global is not None:
-<<<<<<< HEAD
             conditions.append(ContainerRegistryConditions.by_is_global(filter.is_global))
-=======
-            conditions.append(fields.is_global.filter.equals(filter.is_global))
-        if filter.AND:
-            for sub_filter in filter.AND:
-                conditions.extend(self._convert_filter(sub_filter))
-        if filter.OR:
-            or_conditions: list[QueryCondition] = []
-            for sub_filter in filter.OR:
-                sub_conditions = self._convert_filter(sub_filter)
-                if sub_conditions:
-                    or_conditions.append(combine_conditions_and(sub_conditions))
-            if or_conditions:
-                conditions.append(combine_conditions_or(or_conditions))
-        if filter.NOT:
-            for sub_filter in filter.NOT:
-                sub_conditions = self._convert_filter(sub_filter)
-                if sub_conditions:
-                    conditions.append(negate_conditions(sub_conditions))
->>>>>>> 743740559 (fix(BA-8375): negate each NOT filter item on its own (#15410))
         return conditions
 
     def _convert_string_filter(self, sf: StringFilter) -> QueryCondition | None:

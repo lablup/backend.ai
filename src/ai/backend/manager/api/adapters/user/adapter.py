@@ -1020,28 +1020,16 @@ class UserAdapter(BaseAdapter):
             for sub_filter in filter_req.OR:
                 sub_conditions = self._convert_keypair_filter(sub_filter)
                 if sub_conditions:
-<<<<<<< HEAD
                     or_sub_conditions.append(combine_conditions_and(sub_conditions))
             if or_sub_conditions:
                 conditions.append(combine_conditions_or(or_sub_conditions))
 
         if filter_req.NOT:
-            not_sub_conditions: list[QueryCondition] = []
             for sub_filter in filter_req.NOT:
-                not_sub_conditions.extend(self._convert_keypair_filter(sub_filter))
-            if not_sub_conditions:
-                conditions.append(negate_conditions(not_sub_conditions))
-
-=======
-                    or_conditions.append(combine_conditions_and(sub_conditions))
-            if or_conditions:
-                conditions.append(combine_conditions_or(or_conditions))
-        if f.NOT:
-            for sub in f.NOT:
-                sub_conditions = self._convert_keypair_filter(sub)
+                sub_conditions = self._convert_keypair_filter(sub_filter)
                 if sub_conditions:
                     conditions.append(negate_conditions(sub_conditions))
->>>>>>> 743740559 (fix(BA-8375): negate each NOT filter item on its own (#15410))
+
         return conditions
 
     def _convert_keypair_orders(self, orders: list[KeypairOrderBy]) -> list[QueryOrder]:
@@ -1241,28 +1229,16 @@ class UserAdapter(BaseAdapter):
             for sub_filter in filter_req.OR:
                 sub_conditions = self._convert_gql_filter(sub_filter)
                 if sub_conditions:
-<<<<<<< HEAD
                     or_sub_conditions.append(combine_conditions_and(sub_conditions))
             if or_sub_conditions:
                 conditions.append(combine_conditions_or(or_sub_conditions))
 
         if filter_req.NOT:
-            not_sub_conditions: list[QueryCondition] = []
             for sub_filter in filter_req.NOT:
-                not_sub_conditions.extend(self._convert_gql_filter(sub_filter))
-            if not_sub_conditions:
-                conditions.append(negate_conditions(not_sub_conditions))
-
-=======
-                    or_conditions.append(combine_conditions_and(sub_conditions))
-            if or_conditions:
-                conditions.append(combine_conditions_or(or_conditions))
-        if f.NOT:
-            for sub in f.NOT:
-                sub_conditions = self._convert_user_filter(sub)
+                sub_conditions = self._convert_gql_filter(sub_filter)
                 if sub_conditions:
                     conditions.append(negate_conditions(sub_conditions))
->>>>>>> 743740559 (fix(BA-8375): negate each NOT filter item on its own (#15410))
+
         return conditions
 
     @staticmethod
@@ -1541,11 +1517,10 @@ class UserAdapter(BaseAdapter):
             if or_sub_conditions:
                 conditions.append(combine_conditions_or(or_sub_conditions))
         if filter_req.NOT:
-            not_sub_conditions: list[QueryCondition] = []
             for sub_filter in filter_req.NOT:
-                not_sub_conditions.extend(self._convert_filter(sub_filter))
-            if not_sub_conditions:
-                conditions.append(negate_conditions(not_sub_conditions))
+                sub_conditions = self._convert_filter(sub_filter)
+                if sub_conditions:
+                    conditions.append(negate_conditions(sub_conditions))
 
         return conditions
 
