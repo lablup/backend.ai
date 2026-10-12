@@ -7,7 +7,6 @@ from uuid import UUID
 from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseResponseModel
-from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 
 __all__ = (
     "AdminSearchVFSStoragesPayload",
@@ -23,7 +22,7 @@ class VFSStorageNode(BaseResponseModel):
 
     id: UUID = Field(description="Storage ID")
     entity_id: UUID = Field(
-        description=f"UUID of the VFS storage. Added in {NEXT_RELEASE_VERSION}.",
+        description="UUID of the VFS storage. Added in 26.9.0.",
     )
     name: str = Field(description="Storage name")
     host: str = Field(description="Storage host address")

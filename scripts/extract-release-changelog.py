@@ -16,6 +16,8 @@ from changelog_files import changelog_filename
 
 DEFAULT_REPOSITORY = 'lablup/backend.ai'
 DEFAULT_OUTPUT = 'CHANGELOG_RELEASE.md'
+# GitHub rejects a release body longer than this.
+MAX_BODY_LENGTH = 125000
 
 
 def release_tag(version):
@@ -73,6 +75,13 @@ def main():
                 "\n\n### Full Commit Logs\n\nCheck out [the full commit logs](%s) between release (%s) and (%s).\n"
                 % (commitlog_url, prev_tag, tag)
             )
+            if len(content) > MAX_BODY_LENGTH:
+                print(
+                    f"::error ::The {version} release notes are {len(content)} characters; "
+                    f"GitHub rejects a release body over {MAX_BODY_LENGTH}. Shorten the {version} section of {changelog_name}.",
+                    file=sys.stderr,
+                )
+                sys.exit(1)
             if not args.draft:
                 output_path.write_text(content)
             print("--------")

@@ -35,7 +35,6 @@ from ai.backend.common.dto.manager.v2.agent.types import (
     AgentUsage,
     AgentUsedBy,
 )
-from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.common.types import AgentId
 from ai.backend.manager.api.gql.base import OrderDirection, StringFilter
 from ai.backend.manager.api.gql.decorators import (
@@ -133,7 +132,7 @@ class AgentFilterGQL(PydanticInputMixin[AgentFilter]):
 
     labels: EntityLabelNestedFilterGQL | None = gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.9.0",
             description="Select entities by the labels on them.",
         ),
         default=None,
@@ -147,7 +146,7 @@ class AgentFilterGQL(PydanticInputMixin[AgentFilter]):
 @gql_pydantic_input(
     BackendAIGQLMeta(
         description="Entities whose use of an agent narrows the read.",
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.9.0",
     ),
     name="AgentUsedBy",
 )
@@ -166,7 +165,7 @@ class AgentUsedByGQL(PydanticInputMixin[AgentUsedBy]):
             "read each listed entity, or the request is refused. Only agents the caller can "
             "read are returned, even when a listed entity is tied to others."
         ),
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.9.0",
     ),
     name="AgentUsage",
 )
@@ -399,21 +398,21 @@ class AgentV2GQL(PydanticNodeMixin[AgentNode]):
     id: NodeID[str]
     entity_id: UUID = gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.9.0",
             description="UUID of the agent.",
         ),
     )
     uuid: UUID = gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.9.0",
             description=(
                 "Agent UUID. The agent's primary key is its name, so rows keyed on the "
                 "agent carry this instead."
             ),
-            deprecated_version=NEXT_RELEASE_VERSION,
+            deprecated_version="26.9.0",
             deprecation_hint="entityId",
         ),
-        deprecation_reason=f"Deprecated since {NEXT_RELEASE_VERSION}. Use entityId.",
+        deprecation_reason="Deprecated since 26.9.0. Use entityId.",
     )
     resource_info: AgentResourceGQL = gql_field(
         description="Hardware resource capacity, usage, and availability information. Contains capacity (total), used (occupied by sessions), and free (available) resource slots including CPU cores, memory, accelerators (GPUs, TPUs), and other compute resources."
@@ -436,7 +435,7 @@ class AgentV2GQL(PydanticNodeMixin[AgentNode]):
 
     @gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.9.0",
             description="The labels on this agent.",
         )
     )  # type: ignore[misc]

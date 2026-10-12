@@ -27,11 +27,11 @@ from ai.backend.testutils.scenario_steps import (
 from bai_scenario.components.answers import TheCallIsRefused
 from bai_scenario.components.deployment import ADeploymentAndACaller, ADeploymentInThatPlace
 from bai_scenario.runner.acting import ActingAs
-from bai_scenario.runner.planting import SeedingSession
+from bai_scenario.runner.planting import TestSeedingSession
 from bai_scenario.runner.steps import run_scenario
 
 type SyncingStep = Scenario[
-    SeedingSession, ADeploymentAndACaller, DeploymentAdapter, SyncReplicaPayload
+    TestSeedingSession, ADeploymentAndACaller, DeploymentAdapter, SyncReplicaPayload
 ]
 
 
@@ -77,7 +77,7 @@ class SyncingHasStarted(Then[ADeploymentAndACaller, SyncReplicaPayload]):
 
 @dataclass(frozen=True)
 class TheGrantedUserStartsSyncing(
-    Scenario[SeedingSession, ADeploymentAndACaller, DeploymentAdapter, SyncReplicaPayload]
+    Scenario[TestSeedingSession, ADeploymentAndACaller, DeploymentAdapter, SyncReplicaPayload]
 ):
     @override
     def summary(self) -> str:
@@ -88,7 +88,7 @@ class TheGrantedUserStartsSyncing(
         return "수정 권한을 받은 사용자가 복제 맞추기를 요청하면, 맞추기를 시작했다고 답한다"
 
     @override
-    def given(self) -> Given[SeedingSession, ADeploymentAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ADeploymentAndACaller]:
         return ADeploymentInThatPlace(granted=(Permission.UPDATE,), replica_count=2)
 
     @override
@@ -102,7 +102,7 @@ class TheGrantedUserStartsSyncing(
 
 @dataclass(frozen=True)
 class ReadingIsNotEnoughToSync(
-    Scenario[SeedingSession, ADeploymentAndACaller, DeploymentAdapter, SyncReplicaPayload]
+    Scenario[TestSeedingSession, ADeploymentAndACaller, DeploymentAdapter, SyncReplicaPayload]
 ):
     @override
     def summary(self) -> str:
@@ -113,7 +113,7 @@ class ReadingIsNotEnoughToSync(
         return "읽기 권한만 받은 사용자가 복제 맞추기를 요청하면, 권한 부족으로 거부된다"
 
     @override
-    def given(self) -> Given[SeedingSession, ADeploymentAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ADeploymentAndACaller]:
         return ADeploymentInThatPlace(granted=(Permission.READ,))
 
     @override

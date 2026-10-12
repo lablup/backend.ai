@@ -10,7 +10,6 @@ from uuid import UUID
 from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseResponseModel
-from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 
 from .types import (
     FileEntryType,
@@ -62,7 +61,7 @@ class VFolderNode(BaseResponseModel):
 
     id: UUID = Field(description="Unique identifier of the virtual folder")
     entity_id: UUID = Field(
-        description=f"UUID of the vfolder. Added in {NEXT_RELEASE_VERSION}.",
+        description="UUID of the vfolder. Added in 26.9.0.",
     )
     status: VFolderOperationStatusField = Field(description="Current operation status")
     host: str = Field(description="Storage host where the virtual folder is located")
@@ -103,7 +102,7 @@ class VFolderMountPolicyNode(BaseResponseModel):
 
     id: UUID = Field(description="Mount policy row ID")
     field_id: UUID = Field(
-        description=f"UUID of the vfolder mount policy. Added in {NEXT_RELEASE_VERSION}.",
+        description="UUID of the vfolder mount policy. Added in 26.9.0.",
     )
     vfolder_id: UUID = Field(description="ID of the virtual folder")
     user_id: UUID = Field(description="User the mount level is set for")
@@ -193,7 +192,7 @@ class BulkDeleteVFoldersPayload(BaseResponseModel):
     deleted_count: int = Field(
         description=(
             "Number of virtual folders successfully soft-deleted. "
-            f"Deprecated since {NEXT_RELEASE_VERSION}. Use the length of items."
+            "Deprecated since 26.9.0. Use the length of items."
         ),
         deprecated=True,
     )
@@ -223,7 +222,7 @@ class BulkPurgeVFoldersPayload(BaseResponseModel):
     purged_count: int = Field(
         description=(
             "Number of virtual folders successfully purged. "
-            f"Deprecated since {NEXT_RELEASE_VERSION}. Use the length of successes."
+            "Deprecated since 26.9.0. Use the length of successes."
         ),
         deprecated=True,
     )

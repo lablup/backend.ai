@@ -75,7 +75,7 @@ class VFolderCreateReq(BaseRequestModel):
     name: VFolderName = Field(description="Name of the vfolder")
     folder_host: str | None = Field(default=None, alias="host")
     usage_mode: VFolderUsageMode = Field(default=VFolderUsageMode.GENERAL)
-    permission: VFolderPermissionField = Field(default=VFolderPermissionField.READ_WRITE)
+    permission: VFolderPermissionField | None = Field(default=None)
     unmanaged_path: str | None = Field(default=None, alias="unmanagedPath")
     group_id: uuid.UUID | None = Field(
         default=None,
@@ -163,7 +163,7 @@ class CloneVFolderReq(BaseRequestModel):
     )
     cloneable: bool = Field(default=False, description="Whether the cloned vfolder is cloneable")
     usage_mode: VFolderUsageMode = Field(default=VFolderUsageMode.GENERAL)
-    permission: VFolderPermissionField = Field(default=VFolderPermissionField.READ_WRITE)
+    permission: VFolderPermissionField | None = Field(default=None)
 
     @field_validator("target_quota_scope_id", mode="before")
     @classmethod

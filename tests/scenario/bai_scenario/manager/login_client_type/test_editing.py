@@ -33,12 +33,12 @@ from bai_scenario.components.login_client_type import (
 )
 from bai_scenario.components.system import ENFORCEMENT
 from bai_scenario.runner.acting import ActingAs
-from bai_scenario.runner.planting import SeedingSession
+from bai_scenario.runner.planting import TestSeedingSession
 from bai_scenario.runner.steps import run_scenario
 
 RENAMED = "renamed"
 
-type EditingStep = Scenario[SeedingSession, Any, LoginClientTypeAdapter, LoginClientTypeNode]
+type EditingStep = Scenario[TestSeedingSession, Any, LoginClientTypeAdapter, LoginClientTypeNode]
 
 
 @dataclass(frozen=True)
@@ -104,7 +104,7 @@ class RenamingToAnothersName(
 
 @dataclass(frozen=True)
 class TheNameChangesAndTheDescriptionStays(
-    Scenario[SeedingSession, ATypeAndACaller, LoginClientTypeAdapter, LoginClientTypeNode]
+    Scenario[TestSeedingSession, ATypeAndACaller, LoginClientTypeAdapter, LoginClientTypeNode]
 ):
     started: datetime
 
@@ -117,7 +117,7 @@ class TheNameChangesAndTheDescriptionStays(
         return "슈퍼관리자가 종류의 이름만 바꾸면, 이름은 새 값이 되고 설명은 그대로 유지된다"
 
     @override
-    def given(self) -> Given[SeedingSession, ATypeAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ATypeAndACaller]:
         return ATypeAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
@@ -131,7 +131,7 @@ class TheNameChangesAndTheDescriptionStays(
 
 @dataclass(frozen=True)
 class ClearingTheDescription(
-    Scenario[SeedingSession, ATypeAndACaller, LoginClientTypeAdapter, LoginClientTypeNode]
+    Scenario[TestSeedingSession, ATypeAndACaller, LoginClientTypeAdapter, LoginClientTypeNode]
 ):
     started: datetime
 
@@ -144,7 +144,7 @@ class ClearingTheDescription(
         return "설명이 있는 종류에 설명을 비우는 수정을 하면, 설명이 없어진다"
 
     @override
-    def given(self) -> Given[SeedingSession, ATypeAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ATypeAndACaller]:
         return ATypeAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
@@ -158,7 +158,7 @@ class ClearingTheDescription(
 
 @dataclass(frozen=True)
 class AnEmptyEditChangesNothing(
-    Scenario[SeedingSession, ATypeAndACaller, LoginClientTypeAdapter, LoginClientTypeNode]
+    Scenario[TestSeedingSession, ATypeAndACaller, LoginClientTypeAdapter, LoginClientTypeNode]
 ):
     started: datetime
 
@@ -171,7 +171,7 @@ class AnEmptyEditChangesNothing(
         return "값을 하나도 지정하지 않고 수정하면 아무것도 바뀌지 않은 노드가 반환된다"
 
     @override
-    def given(self) -> Given[SeedingSession, ATypeAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ATypeAndACaller]:
         return ATypeAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
@@ -185,7 +185,7 @@ class AnEmptyEditChangesNothing(
 
 @dataclass(frozen=True)
 class RenamingToATakenNameIsRefused(
-    Scenario[SeedingSession, ManyTypesAndACaller, LoginClientTypeAdapter, LoginClientTypeNode]
+    Scenario[TestSeedingSession, ManyTypesAndACaller, LoginClientTypeAdapter, LoginClientTypeNode]
 ):
     @override
     def summary(self) -> str:
@@ -199,7 +199,7 @@ class RenamingToATakenNameIsRefused(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, ManyTypesAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ManyTypesAndACaller]:
         return ManyTypesAndSomeone(role=UserRole.SUPERADMIN, besides=1)
 
     @override
@@ -213,7 +213,7 @@ class RenamingToATakenNameIsRefused(
 
 @dataclass(frozen=True)
 class TheSuperadminEditingAnUnknownIdIsNotFound(
-    Scenario[SeedingSession, ATypeAndACaller, LoginClientTypeAdapter, LoginClientTypeNode]
+    Scenario[TestSeedingSession, ATypeAndACaller, LoginClientTypeAdapter, LoginClientTypeNode]
 ):
     @override
     def summary(self) -> str:
@@ -224,7 +224,7 @@ class TheSuperadminEditingAnUnknownIdIsNotFound(
         return "슈퍼관리자가 존재하지 않는 id를 수정하면 대상을 찾을 수 없다는 이유로 거부된다"
 
     @override
-    def given(self) -> Given[SeedingSession, ATypeAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ATypeAndACaller]:
         return ATypeAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
@@ -238,7 +238,7 @@ class TheSuperadminEditingAnUnknownIdIsNotFound(
 
 @dataclass(frozen=True)
 class AUserGrantedNothingMayNotEdit(
-    Scenario[SeedingSession, ATypeAndACaller, LoginClientTypeAdapter, LoginClientTypeNode]
+    Scenario[TestSeedingSession, ATypeAndACaller, LoginClientTypeAdapter, LoginClientTypeNode]
 ):
     @override
     def summary(self) -> str:
@@ -252,7 +252,7 @@ class AUserGrantedNothingMayNotEdit(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, ATypeAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ATypeAndACaller]:
         return ATypeAndSomeone()
 
     @override
@@ -266,7 +266,7 @@ class AUserGrantedNothingMayNotEdit(
 
 @dataclass(frozen=True)
 class AUserGrantedNothingEditingAnUnknownIdIsRefusedForPermission(
-    Scenario[SeedingSession, ATypeAndACaller, LoginClientTypeAdapter, LoginClientTypeNode]
+    Scenario[TestSeedingSession, ATypeAndACaller, LoginClientTypeAdapter, LoginClientTypeNode]
 ):
     @override
     def summary(self) -> str:
@@ -280,7 +280,7 @@ class AUserGrantedNothingEditingAnUnknownIdIsRefusedForPermission(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, ATypeAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ATypeAndACaller]:
         return ATypeAndSomeone()
 
     @override
@@ -294,7 +294,7 @@ class AUserGrantedNothingEditingAnUnknownIdIsRefusedForPermission(
 
 @dataclass(frozen=True)
 class EnforcementOffLetsAnyoneEdit(
-    Scenario[SeedingSession, ATypeAndACaller, LoginClientTypeAdapter, LoginClientTypeNode],
+    Scenario[TestSeedingSession, ATypeAndACaller, LoginClientTypeAdapter, LoginClientTypeNode],
     Configured,
 ):
     started: datetime
@@ -312,7 +312,7 @@ class EnforcementOffLetsAnyoneEdit(
         return {ENFORCEMENT: False}
 
     @override
-    def given(self) -> Given[SeedingSession, ATypeAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ATypeAndACaller]:
         return ATypeAndSomeone()
 
     @override

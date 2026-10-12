@@ -28,10 +28,10 @@ from bai_scenario.components.retention_policy import (
 )
 from bai_scenario.components.system import ENFORCEMENT
 from bai_scenario.runner.acting import ActingAs
-from bai_scenario.runner.planting import SeedingSession
+from bai_scenario.runner.planting import TestSeedingSession
 from bai_scenario.runner.steps import run_scenario
 
-type RetiringStep = Scenario[SeedingSession, APolicyAndACaller, RetentionPolicyAdapter, Any]
+type RetiringStep = Scenario[TestSeedingSession, APolicyAndACaller, RetentionPolicyAdapter, Any]
 
 
 @dataclass(frozen=True)
@@ -84,7 +84,7 @@ class Purging(When[APolicyAndACaller, RetentionPolicyAdapter, PurgeRetentionPoli
 @dataclass(frozen=True)
 class TheSuperadminDeletesAPolicy(
     Scenario[
-        SeedingSession, APolicyAndACaller, RetentionPolicyAdapter, DeleteRetentionPolicyPayload
+        TestSeedingSession, APolicyAndACaller, RetentionPolicyAdapter, DeleteRetentionPolicyPayload
     ]
 ):
     @override
@@ -96,7 +96,7 @@ class TheSuperadminDeletesAPolicy(
         return "슈퍼관리자가 정책을 삭제하면 삭제한 정책의 id를 담은 응답이 반환된다"
 
     @override
-    def given(self) -> Given[SeedingSession, APolicyAndACaller]:
+    def given(self) -> Given[TestSeedingSession, APolicyAndACaller]:
         return APolicyAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
@@ -110,7 +110,9 @@ class TheSuperadminDeletesAPolicy(
 
 @dataclass(frozen=True)
 class PurgingIsTheSameHardDelete(
-    Scenario[SeedingSession, APolicyAndACaller, RetentionPolicyAdapter, PurgeRetentionPolicyPayload]
+    Scenario[
+        TestSeedingSession, APolicyAndACaller, RetentionPolicyAdapter, PurgeRetentionPolicyPayload
+    ]
 ):
     @override
     def summary(self) -> str:
@@ -121,7 +123,7 @@ class PurgingIsTheSameHardDelete(
         return "슈퍼관리자가 정책을 완전 삭제하면 삭제와 같은 응답이 반환된다. 둘 다 행을 지우고 soft delete는 없다"
 
     @override
-    def given(self) -> Given[SeedingSession, APolicyAndACaller]:
+    def given(self) -> Given[TestSeedingSession, APolicyAndACaller]:
         return APolicyAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
@@ -136,7 +138,7 @@ class PurgingIsTheSameHardDelete(
 @dataclass(frozen=True)
 class AnIdNothingAnswersToIsNotFound(
     Scenario[
-        SeedingSession, APolicyAndACaller, RetentionPolicyAdapter, DeleteRetentionPolicyPayload
+        TestSeedingSession, APolicyAndACaller, RetentionPolicyAdapter, DeleteRetentionPolicyPayload
     ]
 ):
     @override
@@ -148,7 +150,7 @@ class AnIdNothingAnswersToIsNotFound(
         return "슈퍼관리자가 존재하지 않는 id를 삭제하면 대상을 찾을 수 없다는 이유로 거부된다"
 
     @override
-    def given(self) -> Given[SeedingSession, APolicyAndACaller]:
+    def given(self) -> Given[TestSeedingSession, APolicyAndACaller]:
         return APolicyAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
@@ -163,7 +165,7 @@ class AnIdNothingAnswersToIsNotFound(
 @dataclass(frozen=True)
 class AUserGrantedNothingMayNotDelete(
     Scenario[
-        SeedingSession, APolicyAndACaller, RetentionPolicyAdapter, DeleteRetentionPolicyPayload
+        TestSeedingSession, APolicyAndACaller, RetentionPolicyAdapter, DeleteRetentionPolicyPayload
     ]
 ):
     @override
@@ -175,7 +177,7 @@ class AUserGrantedNothingMayNotDelete(
         return "아무 권한도 없는 사용자가 정책을 삭제하면 권한 부족으로 거부된다"
 
     @override
-    def given(self) -> Given[SeedingSession, APolicyAndACaller]:
+    def given(self) -> Given[TestSeedingSession, APolicyAndACaller]:
         return APolicyAndSomeone()
 
     @override
@@ -189,7 +191,9 @@ class AUserGrantedNothingMayNotDelete(
 
 @dataclass(frozen=True)
 class AUserGrantedNothingMayNotPurge(
-    Scenario[SeedingSession, APolicyAndACaller, RetentionPolicyAdapter, PurgeRetentionPolicyPayload]
+    Scenario[
+        TestSeedingSession, APolicyAndACaller, RetentionPolicyAdapter, PurgeRetentionPolicyPayload
+    ]
 ):
     @override
     def summary(self) -> str:
@@ -200,7 +204,7 @@ class AUserGrantedNothingMayNotPurge(
         return "아무 권한도 없는 사용자가 정책을 완전 삭제하면 권한 부족으로 거부된다"
 
     @override
-    def given(self) -> Given[SeedingSession, APolicyAndACaller]:
+    def given(self) -> Given[TestSeedingSession, APolicyAndACaller]:
         return APolicyAndSomeone()
 
     @override
@@ -215,7 +219,7 @@ class AUserGrantedNothingMayNotPurge(
 @dataclass(frozen=True)
 class EnforcementOffLetsAnyoneDelete(
     Scenario[
-        SeedingSession, APolicyAndACaller, RetentionPolicyAdapter, DeleteRetentionPolicyPayload
+        TestSeedingSession, APolicyAndACaller, RetentionPolicyAdapter, DeleteRetentionPolicyPayload
     ],
     Configured,
 ):
@@ -232,7 +236,7 @@ class EnforcementOffLetsAnyoneDelete(
         return {ENFORCEMENT: False}
 
     @override
-    def given(self) -> Given[SeedingSession, APolicyAndACaller]:
+    def given(self) -> Given[TestSeedingSession, APolicyAndACaller]:
         return APolicyAndSomeone()
 
     @override

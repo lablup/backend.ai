@@ -7,6 +7,10 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
   cancel-in-progress: true
 
+# `contents: read`: only builds the scie packages
+permissions:
+  contents: read
+
 jobs:
 
   build-scies:

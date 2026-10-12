@@ -36,7 +36,7 @@ from bai_scenario.components.resource_policy import (
     Family,
 )
 from bai_scenario.runner.acting import ActingAs
-from bai_scenario.runner.planting import SeedingSession
+from bai_scenario.runner.planting import TestSeedingSession
 from bai_scenario.runner.steps import run_scenario
 
 NOBODY = "nobody"
@@ -50,7 +50,9 @@ class Purged:
     left: int
 
 
-type RetiringStep = Scenario[SeedingSession, APolicyAndACaller[Any], ResourcePolicyAdapter, Purged]
+type RetiringStep = Scenario[
+    TestSeedingSession, APolicyAndACaller[Any], ResourcePolicyAdapter, Purged
+]
 
 
 @dataclass(frozen=True)
@@ -98,7 +100,7 @@ class TheNameIsAnsweredAndGone(Then[APolicyAndACaller[Any], Purged]):
 
 @dataclass(frozen=True)
 class TheSuperadminPurgesAnUnusedPolicy(
-    Scenario[SeedingSession, APolicyAndACaller[Any], ResourcePolicyAdapter, Purged]
+    Scenario[TestSeedingSession, APolicyAndACaller[Any], ResourcePolicyAdapter, Purged]
 ):
     family: Family[Any, Any]
 
@@ -114,7 +116,7 @@ class TheSuperadminPurgesAnUnusedPolicy(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, APolicyAndACaller[Any]]:
+    def given(self) -> Given[TestSeedingSession, APolicyAndACaller[Any]]:
         return APolicyAndSomeone(self.family, role=UserRole.SUPERADMIN)
 
     @override
@@ -128,7 +130,7 @@ class TheSuperadminPurgesAnUnusedPolicy(
 
 @dataclass(frozen=True)
 class APolicyStillHeldIsRefused(
-    Scenario[SeedingSession, APolicyAndACaller[Any], ResourcePolicyAdapter, Purged]
+    Scenario[TestSeedingSession, APolicyAndACaller[Any], ResourcePolicyAdapter, Purged]
 ):
     family: Family[Any, Any]
 
@@ -144,7 +146,7 @@ class APolicyStillHeldIsRefused(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, APolicyAndACaller[Any]]:
+    def given(self) -> Given[TestSeedingSession, APolicyAndACaller[Any]]:
         return AHeldPolicyAndSomeone(self.family)
 
     @override
@@ -158,7 +160,7 @@ class APolicyStillHeldIsRefused(
 
 @dataclass(frozen=True)
 class AUserGrantedNothingMayNotPurge(
-    Scenario[SeedingSession, APolicyAndACaller[Any], ResourcePolicyAdapter, Purged]
+    Scenario[TestSeedingSession, APolicyAndACaller[Any], ResourcePolicyAdapter, Purged]
 ):
     family: Family[Any, Any]
 
@@ -174,7 +176,7 @@ class AUserGrantedNothingMayNotPurge(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, APolicyAndACaller[Any]]:
+    def given(self) -> Given[TestSeedingSession, APolicyAndACaller[Any]]:
         return APolicyAndSomeone(self.family)
 
     @override
@@ -188,7 +190,7 @@ class AUserGrantedNothingMayNotPurge(
 
 @dataclass(frozen=True)
 class ANameNothingAnswersToIsNotFound(
-    Scenario[SeedingSession, APolicyAndACaller[Any], ResourcePolicyAdapter, Purged]
+    Scenario[TestSeedingSession, APolicyAndACaller[Any], ResourcePolicyAdapter, Purged]
 ):
     family: Family[Any, Any]
 
@@ -204,7 +206,7 @@ class ANameNothingAnswersToIsNotFound(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, APolicyAndACaller[Any]]:
+    def given(self) -> Given[TestSeedingSession, APolicyAndACaller[Any]]:
         return APolicyAndSomeone(self.family, role=UserRole.SUPERADMIN)
 
     @override

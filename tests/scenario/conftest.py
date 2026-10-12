@@ -37,9 +37,9 @@ from bai_scenario.db import (
     engine_for,
 )
 from bai_scenario.monitors import ActionRecorder
-from bai_scenario.runner.planting import SeedingSession
-from bai_scenario.seeds.ops import SeedOpsProvider
-from bai_scenario.seeds.seeder import Seeder
+from bai_scenario.runner.planting import TestSeedingSession
+from bai_scenario.seeds.ops import TestSeedOpsProvider
+from bai_scenario.seeds.seeder import TestSeeder
 from bai_scenario.valkey import ScenarioValkey
 
 pytest_plugins = [
@@ -158,16 +158,18 @@ def _note_time(kind: str, seconds: float) -> None:
 
 
 @pytest.fixture
-def seed() -> Seeder:
-    """행을 선언하는 자리. 시나리오 표가 쓰는 것과 같은 `Seeder`다."""
-    return Seeder()
+def seed() -> TestSeeder:
+    """행을 선언하는 자리. 시나리오 표가 쓰는 것과 같은 `TestSeeder`다."""
+    return TestSeeder()
 
 
 @pytest.fixture
-async def seeding(seed: Seeder, engine: ExtendedAsyncSAEngine) -> AsyncIterator[SeedingSession]:
+async def seeding(
+    seed: TestSeeder, engine: ExtendedAsyncSAEngine
+) -> AsyncIterator[TestSeedingSession]:
     """픽스처가 자기 행을 그 자리에서 쓰는 자리.
 
     쓰기 세션 하나를 테스트 내내 열어 두므로, 픽스처가 몇 개로 나뉘어도 한 트랜잭션이다.
     """
-    async with SeedOpsProvider(engine).write_ops() as ops:
-        yield SeedingSession(seed, ops)
+    async with TestSeedOpsProvider(engine).write_ops() as ops:
+        yield TestSeedingSession(seed, ops)

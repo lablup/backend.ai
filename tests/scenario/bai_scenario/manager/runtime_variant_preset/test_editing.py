@@ -32,14 +32,14 @@ from bai_scenario.components.runtime_variant_preset import (
 )
 from bai_scenario.components.system import ENFORCEMENT
 from bai_scenario.runner.acting import ActingAs
-from bai_scenario.runner.planting import SeedingSession
+from bai_scenario.runner.planting import TestSeedingSession
 from bai_scenario.runner.steps import run_scenario
 
 RENAMED = "renamed"
 RERANKED = 7
 
 type EditingStep = Scenario[
-    SeedingSession, APresetAndACaller, RuntimeVariantPresetAdapter, RuntimeVariantPresetNode
+    TestSeedingSession, APresetAndACaller, RuntimeVariantPresetAdapter, RuntimeVariantPresetNode
 ]
 
 
@@ -76,7 +76,7 @@ class Editing(When[APresetAndACaller, RuntimeVariantPresetAdapter, RuntimeVarian
 @dataclass(frozen=True)
 class TheNameChangesAndTheRestStays(
     Scenario[
-        SeedingSession, APresetAndACaller, RuntimeVariantPresetAdapter, RuntimeVariantPresetNode
+        TestSeedingSession, APresetAndACaller, RuntimeVariantPresetAdapter, RuntimeVariantPresetNode
     ]
 ):
     started: datetime
@@ -92,7 +92,7 @@ class TheNameChangesAndTheRestStays(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, APresetAndACaller]:
+    def given(self) -> Given[TestSeedingSession, APresetAndACaller]:
         return APresetAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
@@ -109,7 +109,7 @@ class TheNameChangesAndTheRestStays(
 @dataclass(frozen=True)
 class ClearingTheDescription(
     Scenario[
-        SeedingSession, APresetAndACaller, RuntimeVariantPresetAdapter, RuntimeVariantPresetNode
+        TestSeedingSession, APresetAndACaller, RuntimeVariantPresetAdapter, RuntimeVariantPresetNode
     ]
 ):
     started: datetime
@@ -123,7 +123,7 @@ class ClearingTheDescription(
         return "설명이 있는 프리셋의 설명을 비우면 설명이 없어진다"
 
     @override
-    def given(self) -> Given[SeedingSession, APresetAndACaller]:
+    def given(self) -> Given[TestSeedingSession, APresetAndACaller]:
         return APresetAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
@@ -140,7 +140,7 @@ class ClearingTheDescription(
 @dataclass(frozen=True)
 class RerankingMovesIt(
     Scenario[
-        SeedingSession, APresetAndACaller, RuntimeVariantPresetAdapter, RuntimeVariantPresetNode
+        TestSeedingSession, APresetAndACaller, RuntimeVariantPresetAdapter, RuntimeVariantPresetNode
     ]
 ):
     started: datetime
@@ -154,7 +154,7 @@ class RerankingMovesIt(
         return "슈퍼관리자가 프리셋의 순위를 바꾸면 순위가 변경된 노드가 반환된다"
 
     @override
-    def given(self) -> Given[SeedingSession, APresetAndACaller]:
+    def given(self) -> Given[TestSeedingSession, APresetAndACaller]:
         return APresetAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
@@ -171,7 +171,7 @@ class RerankingMovesIt(
 @dataclass(frozen=True)
 class AnEmptyEditChangesNothing(
     Scenario[
-        SeedingSession, APresetAndACaller, RuntimeVariantPresetAdapter, RuntimeVariantPresetNode
+        TestSeedingSession, APresetAndACaller, RuntimeVariantPresetAdapter, RuntimeVariantPresetNode
     ]
 ):
     started: datetime
@@ -185,7 +185,7 @@ class AnEmptyEditChangesNothing(
         return "변경할 값을 지정하지 않고 수정하면 아무것도 바뀌지 않은 노드가 반환된다"
 
     @override
-    def given(self) -> Given[SeedingSession, APresetAndACaller]:
+    def given(self) -> Given[TestSeedingSession, APresetAndACaller]:
         return APresetAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
@@ -202,7 +202,7 @@ class AnEmptyEditChangesNothing(
 @dataclass(frozen=True)
 class TheSuperadminEditingAnUnknownIdIsNotFound(
     Scenario[
-        SeedingSession, APresetAndACaller, RuntimeVariantPresetAdapter, RuntimeVariantPresetNode
+        TestSeedingSession, APresetAndACaller, RuntimeVariantPresetAdapter, RuntimeVariantPresetNode
     ]
 ):
     @override
@@ -214,7 +214,7 @@ class TheSuperadminEditingAnUnknownIdIsNotFound(
         return "슈퍼관리자가 존재하지 않는 ID를 수정하면 대상을 찾을 수 없어 요청이 거부된다"
 
     @override
-    def given(self) -> Given[SeedingSession, APresetAndACaller]:
+    def given(self) -> Given[TestSeedingSession, APresetAndACaller]:
         return APresetAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
@@ -231,7 +231,7 @@ class TheSuperadminEditingAnUnknownIdIsNotFound(
 @dataclass(frozen=True)
 class AUserGrantedNothingMayNotEdit(
     Scenario[
-        SeedingSession, APresetAndACaller, RuntimeVariantPresetAdapter, RuntimeVariantPresetNode
+        TestSeedingSession, APresetAndACaller, RuntimeVariantPresetAdapter, RuntimeVariantPresetNode
     ]
 ):
     @override
@@ -246,7 +246,7 @@ class AUserGrantedNothingMayNotEdit(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, APresetAndACaller]:
+    def given(self) -> Given[TestSeedingSession, APresetAndACaller]:
         return APresetAndSomeone()
 
     @override
@@ -263,7 +263,7 @@ class AUserGrantedNothingMayNotEdit(
 @dataclass(frozen=True)
 class EnforcementOffLetsAnyoneEdit(
     Scenario[
-        SeedingSession, APresetAndACaller, RuntimeVariantPresetAdapter, RuntimeVariantPresetNode
+        TestSeedingSession, APresetAndACaller, RuntimeVariantPresetAdapter, RuntimeVariantPresetNode
     ],
     Configured,
 ):
@@ -282,7 +282,7 @@ class EnforcementOffLetsAnyoneEdit(
         return {ENFORCEMENT: False}
 
     @override
-    def given(self) -> Given[SeedingSession, APresetAndACaller]:
+    def given(self) -> Given[TestSeedingSession, APresetAndACaller]:
         return APresetAndSomeone()
 
     @override

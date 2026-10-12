@@ -1384,9 +1384,7 @@ class VFolderService:
         # Target quota scope: default to requester's user scope
         target_quota_scope_id = QuotaScopeID(QuotaScopeType.USER, action.user_id)
 
-        # Parse usage_mode and permission from action strings
         usage_mode = VFolderUsageMode(action.usage_mode)
-        mount_permission = VFolderMountPolicy(action.permission)
 
         # Create VFolderCloneInfo for the cloning operation
         vfolder_clone_info = VFolderCloneInfo(
@@ -1398,7 +1396,7 @@ class VFolderService:
             target_vfolder_name=action.target_name,
             target_host=target_folder_host,
             usage_mode=usage_mode,
-            permission=mount_permission,
+            permission=action.permission,
             email=requester_email,
             user_id=action.user_id,
             cloneable=action.cloneable,

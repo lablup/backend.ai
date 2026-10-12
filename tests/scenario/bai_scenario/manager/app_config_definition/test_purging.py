@@ -41,12 +41,12 @@ from bai_scenario.components.app_config_definition import (
     ADefinitionAndSomeone,
 )
 from bai_scenario.runner.acting import ActingAs
-from bai_scenario.runner.planting import SeedingSession
+from bai_scenario.runner.planting import TestSeedingSession
 from bai_scenario.runner.steps import run_scenario
 
 type Purged = PurgeAppConfigDefinitionPayload
 type PurgingStep = Scenario[
-    SeedingSession, ADefinitionAndACaller, AppConfigDefinitionAdapter, Purged
+    TestSeedingSession, ADefinitionAndACaller, AppConfigDefinitionAdapter, Purged
 ]
 
 
@@ -94,7 +94,7 @@ class ThePurgedOneIsNamed(Then[ADefinitionAndACaller, Purged]):
 
 @dataclass(frozen=True)
 class TheSuperadminPurgesIt(
-    Scenario[SeedingSession, ADefinitionAndACaller, AppConfigDefinitionAdapter, Purged]
+    Scenario[TestSeedingSession, ADefinitionAndACaller, AppConfigDefinitionAdapter, Purged]
 ):
     @override
     def summary(self) -> str:
@@ -105,7 +105,7 @@ class TheSuperadminPurgesIt(
         return "종속 행이 없는 설정 정의를 슈퍼관리자가 영구 삭제하면, 삭제한 ID가 반환된다"
 
     @override
-    def given(self) -> Given[SeedingSession, ADefinitionAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ADefinitionAndACaller]:
         return ADefinitionAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
@@ -119,7 +119,7 @@ class TheSuperadminPurgesIt(
 
 @dataclass(frozen=True)
 class EntriesAndFragmentsDoNotBlockIt(
-    Scenario[SeedingSession, ADefinitionAndACaller, AppConfigDefinitionAdapter, Purged]
+    Scenario[TestSeedingSession, ADefinitionAndACaller, AppConfigDefinitionAdapter, Purged]
 ):
     @override
     def summary(self) -> str:
@@ -130,7 +130,7 @@ class EntriesAndFragmentsDoNotBlockIt(
         return "허용 목록 항목과 설정 조각이 딸린 설정 정의를 슈퍼관리자가 영구 삭제하면, 종속 행이 삭제를 막지 않고 정의의 ID가 반환된다"
 
     @override
-    def given(self) -> Given[SeedingSession, ADefinitionAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ADefinitionAndACaller]:
         return ADefinitionAndSomeone(role=UserRole.SUPERADMIN, with_fragment=True)
 
     @override
@@ -144,7 +144,7 @@ class EntriesAndFragmentsDoNotBlockIt(
 
 @dataclass(frozen=True)
 class AUserGrantedNothingMayNotPurge(
-    Scenario[SeedingSession, ADefinitionAndACaller, AppConfigDefinitionAdapter, Purged]
+    Scenario[TestSeedingSession, ADefinitionAndACaller, AppConfigDefinitionAdapter, Purged]
 ):
     @override
     def summary(self) -> str:
@@ -155,7 +155,7 @@ class AUserGrantedNothingMayNotPurge(
         return "같은 설정 정의가 있고 권한이 없는 일반 사용자가 영구 삭제하면, 엔티티 영구 삭제 권한이 없어 거부된다"
 
     @override
-    def given(self) -> Given[SeedingSession, ADefinitionAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ADefinitionAndACaller]:
         return ADefinitionAndSomeone()
 
     @override
@@ -169,7 +169,7 @@ class AUserGrantedNothingMayNotPurge(
 
 @dataclass(frozen=True)
 class AnUnknownIdIsNotFoundForASuperadmin(
-    Scenario[SeedingSession, ADefinitionAndACaller, AppConfigDefinitionAdapter, Purged]
+    Scenario[TestSeedingSession, ADefinitionAndACaller, AppConfigDefinitionAdapter, Purged]
 ):
     @override
     def summary(self) -> str:
@@ -182,7 +182,7 @@ class AnUnknownIdIsNotFoundForASuperadmin(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, ADefinitionAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ADefinitionAndACaller]:
         return ADefinitionAndSomeone(role=UserRole.SUPERADMIN)
 
     @override

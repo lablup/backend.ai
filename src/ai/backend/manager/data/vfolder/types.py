@@ -9,7 +9,6 @@ from typing import Any, override
 from ai.backend.common.data.entity.types import EntityData, EntityIdentifier, FieldData
 from ai.backend.common.data.entity.vfolder import VFolderUUID
 from ai.backend.common.data.entity.vfolder_mount_policy import VFolderMountPolicyID
-from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.dto.manager.field import (
     VFolderOperationStatusField,
     VFolderOwnershipTypeField,
@@ -18,7 +17,6 @@ from ai.backend.common.dto.manager.field import (
 from ai.backend.common.types import (
     CIStrEnum,
     QuotaScopeID,
-    VFolderHostPermissionMap,
     VFolderID,
     VFolderMountPolicy,
     VFolderUsageMode,
@@ -152,19 +150,6 @@ class VFolderOperationStatus(enum.StrEnum):
 
     def to_field(self) -> VFolderOperationStatusField:
         return VFolderOperationStatusField(self)
-
-
-@dataclass(frozen=True)
-class UserWithVFolderHostPermissions:
-    """
-    Minimal user fields paired with the union of ``allowed_vfolder_hosts``
-    across the user's active keypair resource policies. The host permission
-    map is the merged set used for vfolder host-permission validation.
-    """
-
-    email: str
-    role: UserRole
-    allowed_vfolder_hosts: VFolderHostPermissionMap
 
 
 @dataclass

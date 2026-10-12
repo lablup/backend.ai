@@ -32,12 +32,12 @@ from bai_scenario.components.retention_policy import (
     TwoPoliciesAndSomeone,
 )
 from bai_scenario.runner.acting import ActingAs
-from bai_scenario.runner.planting import SeedingSession
+from bai_scenario.runner.planting import TestSeedingSession
 from bai_scenario.runner.steps import run_scenario
 
 type Searched = SearchRetentionPoliciesPayload
 type SearchingStep = Scenario[
-    SeedingSession, ManyPoliciesAndACaller, RetentionPolicyAdapter, Searched
+    TestSeedingSession, ManyPoliciesAndACaller, RetentionPolicyAdapter, Searched
 ]
 
 
@@ -103,7 +103,7 @@ class SearchingTheActiveOnes(When[ManyPoliciesAndACaller, RetentionPolicyAdapter
 
 @dataclass(frozen=True)
 class TheSuperadminCountsEveryPolicy(
-    Scenario[SeedingSession, ManyPoliciesAndACaller, RetentionPolicyAdapter, Searched]
+    Scenario[TestSeedingSession, ManyPoliciesAndACaller, RetentionPolicyAdapter, Searched]
 ):
     @override
     def summary(self) -> str:
@@ -114,7 +114,7 @@ class TheSuperadminCountsEveryPolicy(
         return "카테고리가 다른 정책 둘이 있을 때 슈퍼관리자가 필터 없이 조회하면 둘 다 집계된다"
 
     @override
-    def given(self) -> Given[SeedingSession, ManyPoliciesAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ManyPoliciesAndACaller]:
         return TwoPoliciesAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
@@ -128,7 +128,7 @@ class TheSuperadminCountsEveryPolicy(
 
 @dataclass(frozen=True)
 class ACategoryFilterNarrows(
-    Scenario[SeedingSession, ManyPoliciesAndACaller, RetentionPolicyAdapter, Searched]
+    Scenario[TestSeedingSession, ManyPoliciesAndACaller, RetentionPolicyAdapter, Searched]
 ):
     @override
     def summary(self) -> str:
@@ -139,7 +139,7 @@ class ACategoryFilterNarrows(
         return "카테고리가 다른 정책 여럿 중 하나의 카테고리를 필터로 조회하면 그 카테고리의 정책 하나만 반환된다"
 
     @override
-    def given(self) -> Given[SeedingSession, ManyPoliciesAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ManyPoliciesAndACaller]:
         return TwoPoliciesAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
@@ -153,7 +153,7 @@ class ACategoryFilterNarrows(
 
 @dataclass(frozen=True)
 class AnEnabledFilterKeepsTheActive(
-    Scenario[SeedingSession, ManyPoliciesAndACaller, RetentionPolicyAdapter, Searched]
+    Scenario[TestSeedingSession, ManyPoliciesAndACaller, RetentionPolicyAdapter, Searched]
 ):
     @override
     def summary(self) -> str:
@@ -164,7 +164,7 @@ class AnEnabledFilterKeepsTheActive(
         return "활성과 비활성이 섞여 있을 때 활성 필터로 조회하면 활성인 정책만 반환된다"
 
     @override
-    def given(self) -> Given[SeedingSession, ManyPoliciesAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ManyPoliciesAndACaller]:
         return AnActiveAndAnInactivePolicy(role=UserRole.SUPERADMIN)
 
     @override
@@ -178,7 +178,7 @@ class AnEnabledFilterKeepsTheActive(
 
 @dataclass(frozen=True)
 class TheMonitorSearchesLikeTheSuperadmin(
-    Scenario[SeedingSession, ManyPoliciesAndACaller, RetentionPolicyAdapter, Searched]
+    Scenario[TestSeedingSession, ManyPoliciesAndACaller, RetentionPolicyAdapter, Searched]
 ):
     @override
     def summary(self) -> str:
@@ -189,7 +189,7 @@ class TheMonitorSearchesLikeTheSuperadmin(
         return "모니터 역할이 필터 없이 조회하면 슈퍼관리자와 같은 응답이 반환된다. 슈퍼관리자 검사는 모니터의 읽기를 허용한다"
 
     @override
-    def given(self) -> Given[SeedingSession, ManyPoliciesAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ManyPoliciesAndACaller]:
         return TwoPoliciesAndSomeone(role=UserRole.MONITOR)
 
     @override
@@ -203,7 +203,7 @@ class TheMonitorSearchesLikeTheSuperadmin(
 
 @dataclass(frozen=True)
 class AUserWhoIsNotTheSuperadminMayNotSearch(
-    Scenario[SeedingSession, ManyPoliciesAndACaller, RetentionPolicyAdapter, Searched]
+    Scenario[TestSeedingSession, ManyPoliciesAndACaller, RetentionPolicyAdapter, Searched]
 ):
     @override
     def summary(self) -> str:
@@ -214,7 +214,7 @@ class AUserWhoIsNotTheSuperadminMayNotSearch(
         return "슈퍼관리자가 아닌 사용자가 전체 조회를 요청하면 역할 부족으로 거부된다"
 
     @override
-    def given(self) -> Given[SeedingSession, ManyPoliciesAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ManyPoliciesAndACaller]:
         return TwoPoliciesAndSomeone()
 
     @override

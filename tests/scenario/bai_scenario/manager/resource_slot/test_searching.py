@@ -27,7 +27,7 @@ from bai_scenario.components.resource_slot import (
     TheFirstPageOfSlotTypes,
 )
 from bai_scenario.runner.acting import ActingAs
-from bai_scenario.runner.planting import SeedingSession
+from bai_scenario.runner.planting import TestSeedingSession
 from bai_scenario.runner.steps import run_scenario
 
 DEFAULT_PAGE = 10
@@ -37,7 +37,7 @@ DISTINCT_DISPLAY = "눈에 띄는 슬롯"
 
 type Searched = AdminSearchResourceSlotTypesPayload
 type SearchingStep = Scenario[
-    SeedingSession, ManySlotTypesAndACaller, ResourceSlotAdapter, Searched
+    TestSeedingSession, ManySlotTypesAndACaller, ResourceSlotAdapter, Searched
 ]
 
 
@@ -155,7 +155,7 @@ class SearchingTheFirst(When[ManySlotTypesAndACaller, ResourceSlotAdapter, Searc
 
 @dataclass(frozen=True)
 class AUserGrantedNothingCountsEverySlotType(
-    Scenario[SeedingSession, ManySlotTypesAndACaller, ResourceSlotAdapter, Searched]
+    Scenario[TestSeedingSession, ManySlotTypesAndACaller, ResourceSlotAdapter, Searched]
 ):
     @override
     def summary(self) -> str:
@@ -166,7 +166,7 @@ class AUserGrantedNothingCountsEverySlotType(
         return "슬롯 종류 둘이 있을 때 아무 권한도 없는 사용자가 필터 없이 조회하면 둘 다 집계된다"
 
     @override
-    def given(self) -> Given[SeedingSession, ManySlotTypesAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ManySlotTypesAndACaller]:
         return ManySlotTypesAndSomeone(besides=1)
 
     @override
@@ -180,7 +180,7 @@ class AUserGrantedNothingCountsEverySlotType(
 
 @dataclass(frozen=True)
 class ANameFilterNarrows(
-    Scenario[SeedingSession, ManySlotTypesAndACaller, ResourceSlotAdapter, Searched]
+    Scenario[TestSeedingSession, ManySlotTypesAndACaller, ResourceSlotAdapter, Searched]
 ):
     @override
     def summary(self) -> str:
@@ -193,7 +193,7 @@ class ANameFilterNarrows(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, ManySlotTypesAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ManySlotTypesAndACaller]:
         return ManySlotTypesAndSomeone(besides=2)
 
     @override
@@ -207,7 +207,7 @@ class ANameFilterNarrows(
 
 @dataclass(frozen=True)
 class OmittingThePageSizeGivesTen(
-    Scenario[SeedingSession, ManySlotTypesAndACaller, ResourceSlotAdapter, Searched]
+    Scenario[TestSeedingSession, ManySlotTypesAndACaller, ResourceSlotAdapter, Searched]
 ):
     @override
     def summary(self) -> str:
@@ -218,7 +218,7 @@ class OmittingThePageSizeGivesTen(
         return "슬롯 종류 11개가 있을 때 크기 없이 조회하면 10건까지 반환되고 다음 페이지가 있다고 응답한다"
 
     @override
-    def given(self) -> Given[SeedingSession, ManySlotTypesAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ManySlotTypesAndACaller]:
         return ManySlotTypesAndSomeone(besides=DEFAULT_PAGE)
 
     @override
@@ -232,7 +232,7 @@ class OmittingThePageSizeGivesTen(
 
 @dataclass(frozen=True)
 class AKindFilterNarrows(
-    Scenario[SeedingSession, ManySlotTypesAndACaller, ResourceSlotAdapter, Searched]
+    Scenario[TestSeedingSession, ManySlotTypesAndACaller, ResourceSlotAdapter, Searched]
 ):
     @override
     def summary(self) -> str:
@@ -246,7 +246,7 @@ class AKindFilterNarrows(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, ManySlotTypesAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ManySlotTypesAndACaller]:
         return ManySlotTypesAndSomeone(besides=2, named_kind=SlotTypes.BYTES)
 
     @override
@@ -260,7 +260,7 @@ class AKindFilterNarrows(
 
 @dataclass(frozen=True)
 class ADisplayNameFilterNarrows(
-    Scenario[SeedingSession, ManySlotTypesAndACaller, ResourceSlotAdapter, Searched]
+    Scenario[TestSeedingSession, ManySlotTypesAndACaller, ResourceSlotAdapter, Searched]
 ):
     @override
     def summary(self) -> str:
@@ -274,7 +274,7 @@ class ADisplayNameFilterNarrows(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, ManySlotTypesAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ManySlotTypesAndACaller]:
         return ManySlotTypesAndSomeone(besides=2, named_display_name=DISTINCT_DISPLAY)
 
     @override
@@ -288,7 +288,7 @@ class ADisplayNameFilterNarrows(
 
 @dataclass(frozen=True)
 class AskingForTheFirstOneGivesOne(
-    Scenario[SeedingSession, ManySlotTypesAndACaller, ResourceSlotAdapter, Searched]
+    Scenario[TestSeedingSession, ManySlotTypesAndACaller, ResourceSlotAdapter, Searched]
 ):
     @override
     def summary(self) -> str:
@@ -299,7 +299,7 @@ class AskingForTheFirstOneGivesOne(
         return "슬롯 종류 셋이 있을 때 앞에서 한 건만 청해 조회하면 한 건이 반환되고 다음 페이지가 있다고 응답한다"
 
     @override
-    def given(self) -> Given[SeedingSession, ManySlotTypesAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ManySlotTypesAndACaller]:
         return ManySlotTypesAndSomeone(besides=2)
 
     @override

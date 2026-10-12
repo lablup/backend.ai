@@ -26,6 +26,7 @@ from ai.backend.common.dto.manager.v2.image.request import (
     ImageOrderByInputDTO,
     PurgeImageInput,
     RestoreImageInput,
+    ScanImageInput,
     ScopedSearchImagesInput,
     SearchImageAliasesInput,
     UpdateImageInput,
@@ -42,6 +43,7 @@ from ai.backend.common.dto.manager.v2.image.response import (
     ImageRequirementsInfoDTO,
     PurgeImagePayload,
     RestoreImagePayload,
+    ScanImagePayload,
     ScopedSearchImagesPayload,
     SearchImageAliasesPayload,
     UpdateImagePayload,
@@ -92,6 +94,7 @@ from ai.backend.manager.services.image.actions.dealias_image import DealiasImage
 from ai.backend.manager.services.image.actions.forget_image import ForgetImageByIdAction
 from ai.backend.manager.services.image.actions.purge_images import PurgeImageByIdAction
 from ai.backend.manager.services.image.actions.restore_image import RestoreImageByIdAction
+from ai.backend.manager.services.image.actions.scan_image import GlobalScanImageAction
 from ai.backend.manager.services.image.actions.scoped_search import (
     ScopedSearchImagesAction,
 )
@@ -337,6 +340,12 @@ class ImageAdapter(BaseAdapter):
 
     # ------------------------------------------------------------------ mutations
 
+    async def admin_scan_image(self, input: ScanImageInput) -> ScanImagePayload:
+        result = await self._image.global_scan_image.run(
+            GlobalScanImageAction(canonical=input.canonical, architecture=input.architecture)
+        )
+        return ScanImagePayload(item=self._data_to_dto(result.image))
+
     async def admin_forget(self, input: ForgetImageInput) -> ForgetImagePayload:
         """Forget (soft-delete) an image by ID."""
         result = await self._image.forget_image_by_id.run(
@@ -418,6 +427,8 @@ class ImageAdapter(BaseAdapter):
             *self.apply_string_filter(filter.accelerators, fields.accelerators.filter),
             *self.apply_int_filter(filter.size_bytes, fields.size_bytes.filter),
             *self.apply_bool_filter(filter.is_local, fields.is_local.filter),
+            *self.apply_bool_filter(filter.customized, fields.customized.filter),
+            *self.apply_uuid_filter(filter.creator_id, fields.creator_id.filter),
             *self.apply_enum_filter(filter.type, fields.type.filter),
             *self.apply_datetime_filter(filter.created_at, fields.created_at.filter),
             *self.apply_datetime_filter(filter.last_used, fields.last_used_at.filter),
@@ -582,6 +593,8 @@ class ImageAdapter(BaseAdapter):
             is_local=data.is_local,
             created_at=data.created_at,
             last_used_at=data.last_used_at,
+            customized=data.customized,
+            creator_id=data.creator_id,
             identity=ImageIdentityInfoDTO(
                 canonical_name=str(data.name),
                 namespace=data.image,

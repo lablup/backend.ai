@@ -3,6 +3,7 @@ from dataclasses import dataclass
 from pathlib import Path, PurePath
 from typing import Self, override
 
+from ai.backend.common.data.storage.types import StorageBackendCapability
 from ai.backend.common.dto.storage.field import VFolderMetaField, VolumeMetaField
 from ai.backend.common.dto.storage.path import QuotaScopeKeyPath, VFolderKeyPath
 from ai.backend.common.dto.storage.response import QuotaScopeResponse
@@ -56,7 +57,7 @@ class VolumeMeta(LoggingInternalMeta):
     backend: str
     path: Path
     fsprefix: PurePath | None
-    capabilities: list[str]
+    capabilities: list[StorageBackendCapability]
 
     def to_field(self) -> VolumeMetaField:
         return VolumeMetaField(

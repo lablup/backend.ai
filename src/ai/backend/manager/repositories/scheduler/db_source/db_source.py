@@ -59,7 +59,12 @@ from ai.backend.common.types import (
 )
 from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.data.agent.types import AgentStatus
-from ai.backend.manager.data.dotfile.types import DotfileBundle, DotfileEntry, SSHKeypair
+from ai.backend.manager.data.dotfile.types import (
+    DotfileBundle,
+    DotfileEntries,
+    DotfileEntry,
+    SSHKeypair,
+)
 from ai.backend.manager.data.image.types import ImageIdentifier
 from ai.backend.manager.data.kernel.types import KernelListResult, KernelStatus
 from ai.backend.manager.data.network.types import NetworkData
@@ -85,7 +90,7 @@ from ai.backend.manager.errors.resource_slot import AgentResourceCapacityExceede
 from ai.backend.manager.exceptions import ErrorStatusInfo
 from ai.backend.manager.models.agent.row import AgentRow
 from ai.backend.manager.models.container_registry.row import ContainerRegistryRow
-from ai.backend.manager.models.domain.row import DomainRow, domains, query_domain_dotfiles
+from ai.backend.manager.models.domain.row import DomainRow, domains
 from ai.backend.manager.models.image.row import ImageRow
 from ai.backend.manager.models.kernel.creators import KernelCreator
 from ai.backend.manager.models.kernel.row import (
@@ -96,7 +101,7 @@ from ai.backend.manager.models.kernel.searchable_fields import KernelSearchableF
 from ai.backend.manager.models.kernel.searchers import KernelSearcher
 from ai.backend.manager.models.keypair.row import KeyPairRow, keypairs
 from ai.backend.manager.models.network.row import NetworkRow
-from ai.backend.manager.models.project.row import ProjectRow, query_group_dotfiles
+from ai.backend.manager.models.project.row import ProjectRow
 from ai.backend.manager.models.resource_group.row import ResourceGroupRow
 from ai.backend.manager.models.resource_group.searchers import AllowedResourceGroupsSearch
 from ai.backend.manager.models.resource_policy.row import KeyPairResourcePolicyRow
@@ -2379,15 +2384,21 @@ class ScheduleDBSource:
             )
         seen_paths = {entry.path for entry in ordered_entries}
 
-        group_dotfiles, _ = await query_group_dotfiles(conn, user_scope.group_id)
-        for entry in group_dotfiles:
-            if entry["path"] not in seen_paths:
-                ordered_entries.append(
-                    DotfileEntry(path=entry["path"], perm=entry["perm"], data=entry["data"])
-                )
-                seen_paths.add(entry["path"])
+        packed = await conn.scalar(
+            sa.select(ProjectRow.dotfiles).where(ProjectRow.id == user_scope.group_id)
+        )
+        group_dotfiles = DotfileEntries.unpack(packed).entries if packed is not None else ()
+        for group_entry in group_dotfiles:
+            if group_entry.path not in seen_paths:
+                ordered_entries.append(group_entry)
+                seen_paths.add(group_entry.path)
 
-        domain_dotfiles, _ = await query_domain_dotfiles(conn, user_scope.domain_name)
+        packed_domain_dotfiles = await conn.scalar(
+            sa.select(DomainRow.dotfiles).where(DomainRow.name == user_scope.domain_name)
+        )
+        domain_dotfiles = (
+            msgpack.unpackb(packed_domain_dotfiles) if packed_domain_dotfiles is not None else []
+        )
         for entry in domain_dotfiles:
             if entry["path"] not in seen_paths:
                 ordered_entries.append(

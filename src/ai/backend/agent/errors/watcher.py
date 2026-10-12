@@ -24,3 +24,42 @@ class InvalidWatcherTokenError(BackendAIError, web.HTTPForbidden):
             operation=ErrorOperation.AUTH,
             error_detail=ErrorDetail.FORBIDDEN,
         )
+
+
+class InvalidMountNameError(BackendAIError, web.HTTPBadRequest):
+    error_type = "https://api.backend.ai/probs/agent/invalid-mount-name"
+    error_title = "The volume name must point to a directory under the mount prefix."
+
+    @override
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.WATCHER,
+            operation=ErrorOperation.REQUEST,
+            error_detail=ErrorDetail.INVALID_PARAMETERS,
+        )
+
+
+class VolumeMountFailedError(BackendAIError, web.HTTPInternalServerError):
+    error_type = "https://api.backend.ai/probs/agent/volume-mount-failed"
+    error_title = "Failed to mount the volume."
+
+    @override
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.WATCHER,
+            operation=ErrorOperation.EXECUTE,
+            error_detail=ErrorDetail.INTERNAL_ERROR,
+        )
+
+
+class VolumeUnmountFailedError(BackendAIError, web.HTTPInternalServerError):
+    error_type = "https://api.backend.ai/probs/agent/volume-unmount-failed"
+    error_title = "Failed to unmount the volume."
+
+    @override
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.WATCHER,
+            operation=ErrorOperation.EXECUTE,
+            error_detail=ErrorDetail.INTERNAL_ERROR,
+        )

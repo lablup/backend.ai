@@ -1340,6 +1340,9 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
             },
         }
 
+        if (entrypoint_user := self.local_config.container.entrypoint_user) is not None:
+            container_config["User"] = entrypoint_user
+
         await self._apply_seccomp_profile(container_config)
 
         # merge all container configs generated during prior preparation steps

@@ -232,6 +232,7 @@ as a reference implementation of API clients.
 * `fixtures/`
   - `manager/`, ...: Per-component fixtures for development setup and tests
 * `plugins/`: A directory to place plugins such as accelerators, monitors, etc.
+* `third-party-plugins/`: Backend.AI plugins for third-party software (e.g. AppProxy Traefik Go plugin)
 * `scripts/`: Scripts to assist development workflows
   - `install-dev.sh`: The single-node development setup script from the working copy
 * `stubs/`: Type annotation stub packages written by us

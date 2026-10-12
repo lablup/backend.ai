@@ -40,8 +40,10 @@ from ai.backend.manager.models.specs.lookup import (
     FieldOwnerLookup,
     RuntimeFieldOwnerLookup,
 )
+from ai.backend.manager.models.specs.owner_candidates import FieldOwnerCandidates
 from ai.backend.manager.models.specs.purger import (
     EntityBatchPurger,
+    FieldBatchPurger,
     GuardedEntityPurger,
     GuardedFieldPurger,
 )
@@ -191,6 +193,13 @@ class OpsRepository[TData]:
         """Read the polymorphic owning entity of each named field row."""
         async with self._ops.read_ops() as r:
             return await r.lookup_runtime_field_owners(lookup, field_ids)
+
+    async def field_owner_candidates(
+        self, candidates: FieldOwnerCandidates[Any], field_ids: Sequence[FieldIdentifier]
+    ) -> Mapping[FieldIdentifier, Sequence[RuntimeEntityID]]:
+        """Read the owner candidates of each named field row."""
+        async with self._ops.read_ops() as r:
+            return await r.read_field_owner_candidates(candidates, field_ids)
 
     async def runtime_field_owner(
         self, lookup: RuntimeFieldOwnerLookup[Any], field_id: FieldIdentifier
@@ -481,6 +490,21 @@ class OpsRepository[TData]:
         idempotently. Never absent."""
         async with self._ops.write_ops() as w:
             return await w.upsert_entity(upserter)
+
+    async def upsert_entity_with_fields[TEntityData: EntityData, TFieldData: FieldData](
+        self,
+        upserter: EntityUpserter[Any, TEntityData],
+        field_upserters: Sequence[FieldUpserter[Any, Any, TFieldData]],
+        field_purgers: Sequence[FieldBatchPurger[Any, Any, Any]],
+    ) -> EntityWithFieldsResult[TEntityData, TFieldData]:
+        """Insert or update an entity row, drop the field rows ``field_purgers`` select, then
+        insert or update the field rows ``field_upserters`` state, in one transaction."""
+        async with self._ops.write_ops() as w:
+            data = await w.upsert_entity(upserter)
+            for purger in field_purgers:
+                await w.batch_purge_field_entities(data.entity_id(), purger)
+            fields = await w.atomic_upsert_field_entities(data.entity_id(), field_upserters)
+            return EntityWithFieldsResult(data=data, fields=fields)
 
     async def atomic_upsert_global_entities(
         self, upserters: Sequence[GlobalEntityUpserter[Any, TData]]

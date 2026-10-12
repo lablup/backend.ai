@@ -53,7 +53,7 @@ class VFolderItemToCreate:
     name: str
     folder_host: str | None
     usage_mode: VFolderUsageMode
-    permission: VFolderMountPolicy
+    permission: VFolderMountPolicy | None
     group_id: uuid.UUID | None
     cloneable: bool
     unmanaged_path: str | None
@@ -64,7 +64,9 @@ class VFolderItemToCreate:
             name=request.name,
             folder_host=request.folder_host,
             usage_mode=request.usage_mode,
-            permission=VFolderMountPolicy(request.permission),
+            permission=(
+                None if request.permission is None else VFolderMountPolicy(request.permission)
+            ),
             group_id=request.group_id,
             cloneable=request.cloneable,
             unmanaged_path=request.unmanaged_path,

@@ -42,10 +42,10 @@ from bai_scenario.components.resource_group import (
     TwoGroupsAndSomeone,
 )
 from bai_scenario.runner.acting import ActingAs
-from bai_scenario.runner.planting import SeedingSession
+from bai_scenario.runner.planting import TestSeedingSession
 from bai_scenario.runner.steps import run_scenario
 
-type ReadingStep = Scenario[SeedingSession, Any, ResourceGroupAdapter, Any]
+type ReadingStep = Scenario[TestSeedingSession, Any, ResourceGroupAdapter, Any]
 
 UNKNOWN = "no-such-group"
 
@@ -208,7 +208,7 @@ class ReadingResourceInfo(When[AGroupAndACaller, ResourceGroupAdapter, ResourceI
 
 @dataclass(frozen=True)
 class TheSuperadminReadsAGroup(
-    Scenario[SeedingSession, AGroupAndACaller, ResourceGroupAdapter, ResourceGroupDetailNode]
+    Scenario[TestSeedingSession, AGroupAndACaller, ResourceGroupAdapter, ResourceGroupDetailNode]
 ):
     started: datetime
 
@@ -221,7 +221,7 @@ class TheSuperadminReadsAGroup(
         return "리소스 그룹 하나가 있고 슈퍼관리자가 이름으로 조회하면, 그 그룹 전체가 반환된다"
 
     @override
-    def given(self) -> Given[SeedingSession, AGroupAndACaller]:
+    def given(self) -> Given[TestSeedingSession, AGroupAndACaller]:
         return AGroupAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
@@ -235,7 +235,7 @@ class TheSuperadminReadsAGroup(
 
 @dataclass(frozen=True)
 class AUserGrantedReadOnTheGroupReadsIt(
-    Scenario[SeedingSession, AGroupAndACaller, ResourceGroupAdapter, ResourceGroupDetailNode]
+    Scenario[TestSeedingSession, AGroupAndACaller, ResourceGroupAdapter, ResourceGroupDetailNode]
 ):
     started: datetime
 
@@ -251,7 +251,7 @@ class AUserGrantedReadOnTheGroupReadsIt(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, AGroupAndACaller]:
+    def given(self) -> Given[TestSeedingSession, AGroupAndACaller]:
         return AGroupAndSomeone(granted=Permission.READ)
 
     @override
@@ -265,7 +265,7 @@ class AUserGrantedReadOnTheGroupReadsIt(
 
 @dataclass(frozen=True)
 class AUserGrantedNothingMayNotRead(
-    Scenario[SeedingSession, AGroupAndACaller, ResourceGroupAdapter, ResourceGroupDetailNode]
+    Scenario[TestSeedingSession, AGroupAndACaller, ResourceGroupAdapter, ResourceGroupDetailNode]
 ):
     @override
     def summary(self) -> str:
@@ -276,7 +276,7 @@ class AUserGrantedNothingMayNotRead(
         return "아무 권한도 없는 사용자가 이름으로 조회하면 권한 부족으로 거부된다"
 
     @override
-    def given(self) -> Given[SeedingSession, AGroupAndACaller]:
+    def given(self) -> Given[TestSeedingSession, AGroupAndACaller]:
         return AGroupAndSomeone()
 
     @override
@@ -290,7 +290,7 @@ class AUserGrantedNothingMayNotRead(
 
 @dataclass(frozen=True)
 class TheSuperadminReadingAnUnknownNameIsNotFound(
-    Scenario[SeedingSession, AGroupAndACaller, ResourceGroupAdapter, ResourceGroupDetailNode]
+    Scenario[TestSeedingSession, AGroupAndACaller, ResourceGroupAdapter, ResourceGroupDetailNode]
 ):
     @override
     def summary(self) -> str:
@@ -301,7 +301,7 @@ class TheSuperadminReadingAnUnknownNameIsNotFound(
         return "슈퍼관리자가 존재하지 않는 이름으로 조회하면 대상을 찾을 수 없다는 이유로 거부된다"
 
     @override
-    def given(self) -> Given[SeedingSession, AGroupAndACaller]:
+    def given(self) -> Given[TestSeedingSession, AGroupAndACaller]:
         return AGroupAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
@@ -315,7 +315,7 @@ class TheSuperadminReadingAnUnknownNameIsNotFound(
 
 @dataclass(frozen=True)
 class AUserGrantedNothingReadingAnUnknownNameIsNotFoundToo(
-    Scenario[SeedingSession, AGroupAndACaller, ResourceGroupAdapter, ResourceGroupDetailNode]
+    Scenario[TestSeedingSession, AGroupAndACaller, ResourceGroupAdapter, ResourceGroupDetailNode]
 ):
     @override
     def summary(self) -> str:
@@ -329,7 +329,7 @@ class AUserGrantedNothingReadingAnUnknownNameIsNotFoundToo(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, AGroupAndACaller]:
+    def given(self) -> Given[TestSeedingSession, AGroupAndACaller]:
         return AGroupAndSomeone()
 
     @override
@@ -343,7 +343,7 @@ class AUserGrantedNothingReadingAnUnknownNameIsNotFoundToo(
 
 @dataclass(frozen=True)
 class TheSuperadminLoadsLaidAndMissingIds(
-    Scenario[SeedingSession, ManyGroupsAndACaller, ResourceGroupAdapter, Loaded]
+    Scenario[TestSeedingSession, ManyGroupsAndACaller, ResourceGroupAdapter, Loaded]
 ):
     started: datetime
 
@@ -359,7 +359,7 @@ class TheSuperadminLoadsLaidAndMissingIds(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, ManyGroupsAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ManyGroupsAndACaller]:
         return TwoGroupsAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
@@ -373,7 +373,7 @@ class TheSuperadminLoadsLaidAndMissingIds(
 
 @dataclass(frozen=True)
 class AUserGrantedNothingIsRefusedPerId(
-    Scenario[SeedingSession, ManyGroupsAndACaller, ResourceGroupAdapter, Loaded]
+    Scenario[TestSeedingSession, ManyGroupsAndACaller, ResourceGroupAdapter, Loaded]
 ):
     @override
     def summary(self) -> str:
@@ -384,7 +384,7 @@ class AUserGrantedNothingIsRefusedPerId(
         return "아무 권한도 없는 사용자가 그룹 둘을 id로 한 번에 조회하면, 호출은 거부되지 않고 항목마다 권한 부족 거부가 담긴다"
 
     @override
-    def given(self) -> Given[SeedingSession, ManyGroupsAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ManyGroupsAndACaller]:
         return TwoGroupsAndSomeone()
 
     @override
@@ -398,7 +398,7 @@ class AUserGrantedNothingIsRefusedPerId(
 
 @dataclass(frozen=True)
 class ABatchLoadOfNoIdsAnswersNothing(
-    Scenario[SeedingSession, ManyGroupsAndACaller, ResourceGroupAdapter, Loaded]
+    Scenario[TestSeedingSession, ManyGroupsAndACaller, ResourceGroupAdapter, Loaded]
 ):
     @override
     def summary(self) -> str:
@@ -409,7 +409,7 @@ class ABatchLoadOfNoIdsAnswersNothing(
         return "빈 id 목록으로 조회하면 하위 계층을 부르지 않고 빈 응답이 반환된다"
 
     @override
-    def given(self) -> Given[SeedingSession, ManyGroupsAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ManyGroupsAndACaller]:
         return TwoGroupsAndSomeone()
 
     @override
@@ -423,7 +423,7 @@ class ABatchLoadOfNoIdsAnswersNothing(
 
 @dataclass(frozen=True)
 class TheSuperadminLoadsLaidAndMissingNames(
-    Scenario[SeedingSession, ManyGroupsAndACaller, ResourceGroupAdapter, Loaded]
+    Scenario[TestSeedingSession, ManyGroupsAndACaller, ResourceGroupAdapter, Loaded]
 ):
     started: datetime
 
@@ -439,7 +439,7 @@ class TheSuperadminLoadsLaidAndMissingNames(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, ManyGroupsAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ManyGroupsAndACaller]:
         return TwoGroupsAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
@@ -453,7 +453,7 @@ class TheSuperadminLoadsLaidAndMissingNames(
 
 @dataclass(frozen=True)
 class AUserGrantedNothingIsRefusedPerName(
-    Scenario[SeedingSession, ManyGroupsAndACaller, ResourceGroupAdapter, Loaded]
+    Scenario[TestSeedingSession, ManyGroupsAndACaller, ResourceGroupAdapter, Loaded]
 ):
     @override
     def summary(self) -> str:
@@ -464,7 +464,7 @@ class AUserGrantedNothingIsRefusedPerName(
         return "아무 권한도 없는 사용자가 그룹 둘을 이름으로 한 번에 조회하면, 호출은 거부되지 않고 항목마다 권한 부족 거부가 담긴다"
 
     @override
-    def given(self) -> Given[SeedingSession, ManyGroupsAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ManyGroupsAndACaller]:
         return TwoGroupsAndSomeone()
 
     @override
@@ -478,7 +478,7 @@ class AUserGrantedNothingIsRefusedPerName(
 
 @dataclass(frozen=True)
 class ABatchLoadOfNoNamesAnswersNothing(
-    Scenario[SeedingSession, ManyGroupsAndACaller, ResourceGroupAdapter, Loaded]
+    Scenario[TestSeedingSession, ManyGroupsAndACaller, ResourceGroupAdapter, Loaded]
 ):
     @override
     def summary(self) -> str:
@@ -489,7 +489,7 @@ class ABatchLoadOfNoNamesAnswersNothing(
         return "빈 이름 목록으로 조회하면 하위 계층을 부르지 않고 빈 응답이 반환된다"
 
     @override
-    def given(self) -> Given[SeedingSession, ManyGroupsAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ManyGroupsAndACaller]:
         return TwoGroupsAndSomeone()
 
     @override
@@ -503,7 +503,7 @@ class ABatchLoadOfNoNamesAnswersNothing(
 
 @dataclass(frozen=True)
 class TheSuperadminReadsAnEmptyResourceInfo(
-    Scenario[SeedingSession, AGroupAndACaller, ResourceGroupAdapter, ResourceInfoNode]
+    Scenario[TestSeedingSession, AGroupAndACaller, ResourceGroupAdapter, ResourceInfoNode]
 ):
     @override
     def summary(self) -> str:
@@ -514,7 +514,7 @@ class TheSuperadminReadsAnEmptyResourceInfo(
         return "에이전트가 없는 그룹의 리소스 현황을 슈퍼관리자가 조회하면 용량·사용량·여유가 모두 비어 있다"
 
     @override
-    def given(self) -> Given[SeedingSession, AGroupAndACaller]:
+    def given(self) -> Given[TestSeedingSession, AGroupAndACaller]:
         return AGroupAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
@@ -528,7 +528,7 @@ class TheSuperadminReadsAnEmptyResourceInfo(
 
 @dataclass(frozen=True)
 class AUserGrantedReadReadsTheResourceInfo(
-    Scenario[SeedingSession, AGroupAndACaller, ResourceGroupAdapter, ResourceInfoNode]
+    Scenario[TestSeedingSession, AGroupAndACaller, ResourceGroupAdapter, ResourceInfoNode]
 ):
     @override
     def summary(self) -> str:
@@ -539,7 +539,7 @@ class AUserGrantedReadReadsTheResourceInfo(
         return "그 그룹에 앉힌 역할로 읽기 권한을 받은 사용자가 리소스 현황을 조회하면 슈퍼관리자와 같은 응답을 받는다"
 
     @override
-    def given(self) -> Given[SeedingSession, AGroupAndACaller]:
+    def given(self) -> Given[TestSeedingSession, AGroupAndACaller]:
         return AGroupAndSomeone(granted=Permission.READ)
 
     @override
@@ -553,7 +553,7 @@ class AUserGrantedReadReadsTheResourceInfo(
 
 @dataclass(frozen=True)
 class AUserGrantedNothingMayNotReadTheResourceInfo(
-    Scenario[SeedingSession, AGroupAndACaller, ResourceGroupAdapter, ResourceInfoNode]
+    Scenario[TestSeedingSession, AGroupAndACaller, ResourceGroupAdapter, ResourceInfoNode]
 ):
     @override
     def summary(self) -> str:
@@ -564,7 +564,7 @@ class AUserGrantedNothingMayNotReadTheResourceInfo(
         return "아무 권한도 없는 사용자가 리소스 현황을 조회하면 권한 부족으로 거부된다"
 
     @override
-    def given(self) -> Given[SeedingSession, AGroupAndACaller]:
+    def given(self) -> Given[TestSeedingSession, AGroupAndACaller]:
         return AGroupAndSomeone()
 
     @override
@@ -578,7 +578,7 @@ class AUserGrantedNothingMayNotReadTheResourceInfo(
 
 @dataclass(frozen=True)
 class TheResourceInfoOfAnUnknownNameIsNotFound(
-    Scenario[SeedingSession, AGroupAndACaller, ResourceGroupAdapter, ResourceInfoNode]
+    Scenario[TestSeedingSession, AGroupAndACaller, ResourceGroupAdapter, ResourceInfoNode]
 ):
     @override
     def summary(self) -> str:
@@ -589,7 +589,7 @@ class TheResourceInfoOfAnUnknownNameIsNotFound(
         return "슈퍼관리자가 존재하지 않는 이름의 리소스 현황을 조회하면 대상을 찾을 수 없다는 이유로 거부된다"
 
     @override
-    def given(self) -> Given[SeedingSession, AGroupAndACaller]:
+    def given(self) -> Given[TestSeedingSession, AGroupAndACaller]:
         return AGroupAndSomeone(role=UserRole.SUPERADMIN)
 
     @override

@@ -30,11 +30,13 @@ from bai_scenario.components.notification import (
     TwoRulesAndSomeone,
 )
 from bai_scenario.runner.acting import ActingAs
-from bai_scenario.runner.planting import SeedingSession
+from bai_scenario.runner.planting import TestSeedingSession
 from bai_scenario.runner.steps import run_scenario
 
 type Searched = SearchNotificationRulesPayload
-type SearchingStep = Scenario[SeedingSession, ManyRulesAndACaller, NotificationAdapter, Searched]
+type SearchingStep = Scenario[
+    TestSeedingSession, ManyRulesAndACaller, NotificationAdapter, Searched
+]
 
 
 @dataclass(frozen=True)
@@ -125,7 +127,7 @@ class SearchingTheEnabledOnes(When[ManyRulesAndACaller, NotificationAdapter, Sea
 
 @dataclass(frozen=True)
 class TheSuperadminCountsEveryRule(
-    Scenario[SeedingSession, ManyRulesAndACaller, NotificationAdapter, Searched]
+    Scenario[TestSeedingSession, ManyRulesAndACaller, NotificationAdapter, Searched]
 ):
     @override
     def summary(self) -> str:
@@ -136,7 +138,7 @@ class TheSuperadminCountsEveryRule(
         return "규칙 둘이 있을 때 슈퍼관리자가 필터 없이 조회하면 둘 다 반환된다"
 
     @override
-    def given(self) -> Given[SeedingSession, ManyRulesAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ManyRulesAndACaller]:
         return TwoRulesAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
@@ -150,7 +152,7 @@ class TheSuperadminCountsEveryRule(
 
 @dataclass(frozen=True)
 class ANameFilterNarrows(
-    Scenario[SeedingSession, ManyRulesAndACaller, NotificationAdapter, Searched]
+    Scenario[TestSeedingSession, ManyRulesAndACaller, NotificationAdapter, Searched]
 ):
     @override
     def summary(self) -> str:
@@ -161,7 +163,7 @@ class ANameFilterNarrows(
         return "규칙 둘 중 한쪽 이름을 필터로 조회하면 그 규칙 하나만 반환된다"
 
     @override
-    def given(self) -> Given[SeedingSession, ManyRulesAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ManyRulesAndACaller]:
         return TwoRulesAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
@@ -175,7 +177,7 @@ class ANameFilterNarrows(
 
 @dataclass(frozen=True)
 class ARuleTypeFilterNarrows(
-    Scenario[SeedingSession, ManyRulesAndACaller, NotificationAdapter, Searched]
+    Scenario[TestSeedingSession, ManyRulesAndACaller, NotificationAdapter, Searched]
 ):
     @override
     def summary(self) -> str:
@@ -186,7 +188,7 @@ class ARuleTypeFilterNarrows(
         return "종류가 다른 규칙 둘 중 한쪽 종류를 필터로 조회하면 그 규칙 하나만 반환된다"
 
     @override
-    def given(self) -> Given[SeedingSession, ManyRulesAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ManyRulesAndACaller]:
         return TwoRulesAndSomeone(
             role=UserRole.SUPERADMIN, other_rule_type=NotificationRuleType.SESSION_TERMINATED
         )
@@ -202,7 +204,7 @@ class ARuleTypeFilterNarrows(
 
 @dataclass(frozen=True)
 class AnEnabledFilterNarrows(
-    Scenario[SeedingSession, ManyRulesAndACaller, NotificationAdapter, Searched]
+    Scenario[TestSeedingSession, ManyRulesAndACaller, NotificationAdapter, Searched]
 ):
     @override
     def summary(self) -> str:
@@ -213,7 +215,7 @@ class AnEnabledFilterNarrows(
         return "활성 규칙과 비활성 규칙이 섞여 있을 때 활성 필터로 조회하면 활성인 것만 반환된다"
 
     @override
-    def given(self) -> Given[SeedingSession, ManyRulesAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ManyRulesAndACaller]:
         return AnEnabledAndADisabledRule(role=UserRole.SUPERADMIN)
 
     @override
@@ -227,7 +229,7 @@ class AnEnabledFilterNarrows(
 
 @dataclass(frozen=True)
 class TheMonitorSearchesLikeTheSuperadmin(
-    Scenario[SeedingSession, ManyRulesAndACaller, NotificationAdapter, Searched]
+    Scenario[TestSeedingSession, ManyRulesAndACaller, NotificationAdapter, Searched]
 ):
     @override
     def summary(self) -> str:
@@ -238,7 +240,7 @@ class TheMonitorSearchesLikeTheSuperadmin(
         return "모니터가 필터 없이 조회하면 슈퍼관리자와 같은 응답을 받는다"
 
     @override
-    def given(self) -> Given[SeedingSession, ManyRulesAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ManyRulesAndACaller]:
         return TwoRulesAndSomeone(role=UserRole.MONITOR)
 
     @override
@@ -252,7 +254,7 @@ class TheMonitorSearchesLikeTheSuperadmin(
 
 @dataclass(frozen=True)
 class AUserWhoIsNotTheSuperadminMayNotSearch(
-    Scenario[SeedingSession, ManyRulesAndACaller, NotificationAdapter, Searched]
+    Scenario[TestSeedingSession, ManyRulesAndACaller, NotificationAdapter, Searched]
 ):
     @override
     def summary(self) -> str:
@@ -263,7 +265,7 @@ class AUserWhoIsNotTheSuperadminMayNotSearch(
         return "슈퍼관리자가 아닌 사용자가 필터 없이 조회하면 역할 부족으로 거부된다"
 
     @override
-    def given(self) -> Given[SeedingSession, ManyRulesAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ManyRulesAndACaller]:
         return TwoRulesAndSomeone()
 
     @override

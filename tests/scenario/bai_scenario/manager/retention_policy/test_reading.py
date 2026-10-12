@@ -26,11 +26,11 @@ from bai_scenario.components.retention_policy import (
 )
 from bai_scenario.components.system import ENFORCEMENT
 from bai_scenario.runner.acting import ActingAs
-from bai_scenario.runner.planting import SeedingSession
+from bai_scenario.runner.planting import TestSeedingSession
 from bai_scenario.runner.steps import run_scenario
 
 type ReadingStep = Scenario[
-    SeedingSession, APolicyAndACaller, RetentionPolicyAdapter, RetentionPolicyNode
+    TestSeedingSession, APolicyAndACaller, RetentionPolicyAdapter, RetentionPolicyNode
 ]
 
 
@@ -61,7 +61,7 @@ class ReadingById(When[APolicyAndACaller, RetentionPolicyAdapter, RetentionPolic
 
 @dataclass(frozen=True)
 class TheSuperadminReadsAPolicy(
-    Scenario[SeedingSession, APolicyAndACaller, RetentionPolicyAdapter, RetentionPolicyNode]
+    Scenario[TestSeedingSession, APolicyAndACaller, RetentionPolicyAdapter, RetentionPolicyNode]
 ):
     started: datetime
 
@@ -74,7 +74,7 @@ class TheSuperadminReadsAPolicy(
         return "정책 하나가 있고 슈퍼관리자가 id로 조회하면, 그 정책 전체가 반환된다"
 
     @override
-    def given(self) -> Given[SeedingSession, APolicyAndACaller]:
+    def given(self) -> Given[TestSeedingSession, APolicyAndACaller]:
         return APolicyAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
@@ -88,7 +88,7 @@ class TheSuperadminReadsAPolicy(
 
 @dataclass(frozen=True)
 class AUserGrantedNothingMayNotRead(
-    Scenario[SeedingSession, APolicyAndACaller, RetentionPolicyAdapter, RetentionPolicyNode]
+    Scenario[TestSeedingSession, APolicyAndACaller, RetentionPolicyAdapter, RetentionPolicyNode]
 ):
     @override
     def summary(self) -> str:
@@ -102,7 +102,7 @@ class AUserGrantedNothingMayNotRead(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, APolicyAndACaller]:
+    def given(self) -> Given[TestSeedingSession, APolicyAndACaller]:
         return APolicyAndSomeone()
 
     @override
@@ -116,7 +116,7 @@ class AUserGrantedNothingMayNotRead(
 
 @dataclass(frozen=True)
 class TheSuperadminReadingAnUnknownIdIsNotFound(
-    Scenario[SeedingSession, APolicyAndACaller, RetentionPolicyAdapter, RetentionPolicyNode]
+    Scenario[TestSeedingSession, APolicyAndACaller, RetentionPolicyAdapter, RetentionPolicyNode]
 ):
     @override
     def summary(self) -> str:
@@ -127,7 +127,7 @@ class TheSuperadminReadingAnUnknownIdIsNotFound(
         return "슈퍼관리자가 존재하지 않는 id로 조회하면 대상을 찾을 수 없다는 이유로 거부된다"
 
     @override
-    def given(self) -> Given[SeedingSession, APolicyAndACaller]:
+    def given(self) -> Given[TestSeedingSession, APolicyAndACaller]:
         return APolicyAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
@@ -141,7 +141,7 @@ class TheSuperadminReadingAnUnknownIdIsNotFound(
 
 @dataclass(frozen=True)
 class AUserGrantedNothingReadingAnUnknownIdIsRefusedForPermission(
-    Scenario[SeedingSession, APolicyAndACaller, RetentionPolicyAdapter, RetentionPolicyNode]
+    Scenario[TestSeedingSession, APolicyAndACaller, RetentionPolicyAdapter, RetentionPolicyNode]
 ):
     @override
     def summary(self) -> str:
@@ -155,7 +155,7 @@ class AUserGrantedNothingReadingAnUnknownIdIsRefusedForPermission(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, APolicyAndACaller]:
+    def given(self) -> Given[TestSeedingSession, APolicyAndACaller]:
         return APolicyAndSomeone()
 
     @override
@@ -169,7 +169,7 @@ class AUserGrantedNothingReadingAnUnknownIdIsRefusedForPermission(
 
 @dataclass(frozen=True)
 class EnforcementOffLetsAnyoneRead(
-    Scenario[SeedingSession, APolicyAndACaller, RetentionPolicyAdapter, RetentionPolicyNode],
+    Scenario[TestSeedingSession, APolicyAndACaller, RetentionPolicyAdapter, RetentionPolicyNode],
     Configured,
 ):
     started: datetime
@@ -187,7 +187,7 @@ class EnforcementOffLetsAnyoneRead(
         return {ENFORCEMENT: False}
 
     @override
-    def given(self) -> Given[SeedingSession, APolicyAndACaller]:
+    def given(self) -> Given[TestSeedingSession, APolicyAndACaller]:
         return APolicyAndSomeone()
 
     @override

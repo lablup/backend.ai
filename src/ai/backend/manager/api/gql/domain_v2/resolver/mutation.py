@@ -9,7 +9,6 @@ from ai.backend.common.dto.manager.v2.domain.request import (
     PurgeDomainInput,
     RestoreDomainInput,
 )
-from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     gql_mutation,
@@ -80,7 +79,7 @@ async def admin_delete_domain_v2(
 
 @gql_mutation(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.9.0",
         description="Restore a soft-deleted domain (admin only). Requires superadmin privileges.",
     )
 )

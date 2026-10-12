@@ -10,7 +10,6 @@ from ai.backend.common.dto.manager.v2.entity_label.request import (
     EntityLabelNestedFilter,
     EntityLabelOrder,
 )
-from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import OrderDirection, StringFilter, UUIDFilter
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
@@ -33,7 +32,7 @@ __all__ = (
             "Filter matching a single label. A key and a value given together constrain "
             "the same label rather than two different ones."
         ),
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.9.0",
     ),
     name="EntityLabelFilter",
 )
@@ -55,7 +54,7 @@ class EntityLabelFilterGQL(PydanticInputMixin[EntityLabelFilter]):
             "label at a time; requiring two different labels is two relations combined "
             "by the entity filter's own AND."
         ),
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.9.0",
     ),
     name="EntityLabelNestedFilter",
 )
@@ -69,7 +68,7 @@ class EntityLabelNestedFilterGQL(PydanticInputMixin[EntityLabelNestedFilter]):
 @gql_enum(
     BackendAIGQLMeta(
         description="Fields available for ordering labels.",
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.9.0",
     ),
     name="EntityLabelOrderField",
 )
@@ -82,7 +81,7 @@ class EntityLabelOrderFieldGQL(StrEnum):
 @gql_pydantic_input(
     BackendAIGQLMeta(
         description="Ordering specification for labels.",
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.9.0",
     ),
     name="EntityLabelOrderBy",
 )

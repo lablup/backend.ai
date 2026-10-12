@@ -41,7 +41,6 @@ DEFAULT_ROLE: Final = "main"
 
 PASSWORD_PLACEHOLDER: Final = "*****"
 
-RESERVED_DOTFILES = [".terminfo", ".jupyter", ".ssh", ".ssh/authorized_keys", ".local", ".config"]
 
 # Mapping between vfolder names and their in-container paths.
 VFOLDER_DSTPATHS_MAP = {

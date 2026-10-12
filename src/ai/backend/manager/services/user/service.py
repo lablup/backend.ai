@@ -11,7 +11,11 @@ from ai.backend.common.exception import BackendAIError, InvalidAPIParameters
 from ai.backend.common.types import AccessKey
 from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
-from ai.backend.manager.data.dotfile.types import DotfileEntries, normalize_newlines
+from ai.backend.manager.data.dotfile.types import (
+    DotfileEntries,
+    normalize_newlines,
+    verify_dotfile_name,
+)
 from ai.backend.manager.data.user.types import (
     BulkPurgeError,
     BulkUserPurgeResultData,
@@ -19,7 +23,6 @@ from ai.backend.manager.data.user.types import (
 )
 from ai.backend.manager.errors.storage import DotfileCreationFailed
 from ai.backend.manager.errors.user import UserPurgeFailure
-from ai.backend.manager.models.domain.row import verify_dotfile_name
 from ai.backend.manager.models.keypair.updaters import (
     KeypairBootstrapScriptUpdater,
     KeypairDotfilesUpdater,

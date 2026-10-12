@@ -14,6 +14,15 @@ write specs below, plus the read/update declarations (`querier.py`, `lookup.py`,
 `purger.py`). `repositories/base/` holds read-side infrastructure only; do not
 declare a spec there.
 
+## A seed creator is used by seed application only
+
+- A creator that writes a row under the id a seed file states subclasses the entity's
+  creator as `<Entity>SeedCreator`, in the same `creators.py`.
+- Only the kinds in `manager/seed/` use it. A service, an API or another repository does
+  not; on those paths `server_default` mints the id.
+- It adds the id to its parent creator and nothing else.
+- Precedent: `RolePresetSeedCreator`.
+
 ## A relation is neither an entity nor a field
 
 - A row linking two entities belongs to neither: both own it. It is not a field row,

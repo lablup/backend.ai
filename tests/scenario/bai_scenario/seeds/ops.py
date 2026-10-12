@@ -20,15 +20,15 @@ from ai.backend.manager.repositories.ops.v2.share.write import V2ShareWriteOps
 from ai.backend.manager.repositories.ops.v2.user.write import V2UserWriteOps
 
 
-class SeedOps(V2UserWriteOps, V2ShareWriteOps, V2RelationWriteOps):
+class TestSeedOps(V2UserWriteOps, V2ShareWriteOps, V2RelationWriteOps):
     """The write ops a seed may reach, composed."""
 
 
-class SeedOpsProvider(V2DBOpsProvider):
-    """Hands out :class:`SeedOps` bound to one read-write transaction."""
+class TestSeedOpsProvider(V2DBOpsProvider):
+    """Hands out :class:`TestSeedOps` bound to one read-write transaction."""
 
     @asynccontextmanager
     @override
-    async def write_ops(self) -> AsyncGenerator[SeedOps]:
+    async def write_ops(self) -> AsyncGenerator[TestSeedOps]:
         async with self._db.begin_session_read_committed() as sess:
-            yield SeedOps(sess)
+            yield TestSeedOps(sess)

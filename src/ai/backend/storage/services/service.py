@@ -9,6 +9,7 @@ from typing import Any
 
 from aiohttp import web
 
+from ai.backend.common.data.storage.types import StorageBackendCapability
 from ai.backend.common.events.dispatcher import EventProducer
 from ai.backend.common.events.event_types.vfolder.anycast import (
     VFolderDeletionFailureEvent,
@@ -70,7 +71,7 @@ class VolumeService:
             vfolder_id=vfolder_key.vfolder_id.folder_id,
         )
 
-    async def _get_capabilities(self, volume_id: VolumeID) -> list[str]:
+    async def _get_capabilities(self, volume_id: VolumeID) -> list[StorageBackendCapability]:
         volume = self._volume_pool.get_volume(volume_id)
         return [*await volume.get_capabilities()]
 

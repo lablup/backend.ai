@@ -35,11 +35,11 @@ from bai_scenario.components.app_config_allow_list import (
     TheEntryNode,
 )
 from bai_scenario.runner.acting import ActingAs
-from bai_scenario.runner.planting import SeedingSession
+from bai_scenario.runner.planting import TestSeedingSession
 from bai_scenario.runner.steps import run_scenario
 
 type EditingStep = Scenario[
-    SeedingSession, AnEntryAndACaller, AppConfigAllowListAdapter, AppConfigAllowListNode
+    TestSeedingSession, AnEntryAndACaller, AppConfigAllowListAdapter, AppConfigAllowListNode
 ]
 
 
@@ -79,7 +79,9 @@ class ChangingTheRank(When[AnEntryAndACaller, AppConfigAllowListAdapter, AppConf
 
 @dataclass(frozen=True)
 class TheSuperadminChangesTheRank(
-    Scenario[SeedingSession, AnEntryAndACaller, AppConfigAllowListAdapter, AppConfigAllowListNode]
+    Scenario[
+        TestSeedingSession, AnEntryAndACaller, AppConfigAllowListAdapter, AppConfigAllowListNode
+    ]
 ):
     started: datetime
 
@@ -92,7 +94,7 @@ class TheSuperadminChangesTheRank(
         return "allow_list 하나가 있고 슈퍼관리자가 순위를 바꾸면, 순위만 변경되고 설정 이름과 스코프 유형은 그대로다"
 
     @override
-    def given(self) -> Given[SeedingSession, AnEntryAndACaller]:
+    def given(self) -> Given[TestSeedingSession, AnEntryAndACaller]:
         return AnEntryAndSomeone(opened=AppConfigScopeType.USER, role=UserRole.SUPERADMIN)
 
     @override
@@ -106,7 +108,9 @@ class TheSuperadminChangesTheRank(
 
 @dataclass(frozen=True)
 class AnEmptyEditChangesNothing(
-    Scenario[SeedingSession, AnEntryAndACaller, AppConfigAllowListAdapter, AppConfigAllowListNode]
+    Scenario[
+        TestSeedingSession, AnEntryAndACaller, AppConfigAllowListAdapter, AppConfigAllowListNode
+    ]
 ):
     started: datetime
 
@@ -119,7 +123,7 @@ class AnEmptyEditChangesNothing(
         return "슈퍼관리자가 아무 값도 지정하지 않고 수정하면, 아무것도 바뀌지 않은 노드가 반환된다"
 
     @override
-    def given(self) -> Given[SeedingSession, AnEntryAndACaller]:
+    def given(self) -> Given[TestSeedingSession, AnEntryAndACaller]:
         return AnEntryAndSomeone(opened=AppConfigScopeType.USER, role=UserRole.SUPERADMIN)
 
     @override
@@ -133,7 +137,9 @@ class AnEmptyEditChangesNothing(
 
 @dataclass(frozen=True)
 class AUserGrantedNothingMayNotEdit(
-    Scenario[SeedingSession, AnEntryAndACaller, AppConfigAllowListAdapter, AppConfigAllowListNode]
+    Scenario[
+        TestSeedingSession, AnEntryAndACaller, AppConfigAllowListAdapter, AppConfigAllowListNode
+    ]
 ):
     @override
     def summary(self) -> str:
@@ -146,7 +152,7 @@ class AUserGrantedNothingMayNotEdit(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, AnEntryAndACaller]:
+    def given(self) -> Given[TestSeedingSession, AnEntryAndACaller]:
         return AnEntryAndSomeone(opened=AppConfigScopeType.USER)
 
     @override
@@ -160,7 +166,9 @@ class AUserGrantedNothingMayNotEdit(
 
 @dataclass(frozen=True)
 class AnUnknownIdIsNotFoundForASuperadmin(
-    Scenario[SeedingSession, AnEntryAndACaller, AppConfigAllowListAdapter, AppConfigAllowListNode]
+    Scenario[
+        TestSeedingSession, AnEntryAndACaller, AppConfigAllowListAdapter, AppConfigAllowListNode
+    ]
 ):
     @override
     def summary(self) -> str:
@@ -173,7 +181,7 @@ class AnUnknownIdIsNotFoundForASuperadmin(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, AnEntryAndACaller]:
+    def given(self) -> Given[TestSeedingSession, AnEntryAndACaller]:
         return AnEntryAndSomeone(role=UserRole.SUPERADMIN)
 
     @override

@@ -100,6 +100,8 @@ class SessionOrderField(StrEnum):
     NETWORK_TYPE = "network_type"
     NETWORK_ID = "network_id"
     REPLICA_ID = "replica_id"
+    SESSION_GROUP_ID = "session_group_id"
+    REQUESTED_STARTS_AT = "requested_starts_at"
 
 
 class CreateSessionTypeEnum(StrEnum):

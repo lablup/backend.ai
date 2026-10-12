@@ -30,6 +30,7 @@ from ai.backend.testutils.fixtures import DomainFactory, DomainFixtureData
 pytest_plugins = [
     "ai.backend.testutils.bootstrap",
     "ai.backend.testutils.db_fixtures",
+    "ai.backend.testutils.otel",
 ]
 
 

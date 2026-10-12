@@ -7,11 +7,11 @@ from typing import override
 
 from ai.backend.manager.data.runtime_variant.types import RuntimeVariantData
 from ai.backend.manager.models.runtime_variant.creators import RuntimeVariantCreator
-from bai_scenario.seeds.seeder import Naming, SeedRow
+from bai_scenario.seeds.seeder import Naming, TestSeedRow
 
 
 @dataclass(frozen=True)
-class SeedRuntimeVariant(SeedRow[RuntimeVariantData]):
+class TestSeedRuntimeVariant(TestSeedRow[RuntimeVariantData]):
     """A runtime a revision names.
 
     The write spec stores an empty baseline model definition and takes no say on reading

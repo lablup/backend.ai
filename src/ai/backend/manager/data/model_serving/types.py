@@ -28,6 +28,7 @@ from ai.backend.common.types import (
     MountTypes,
     QuotaScopeID,
     ResourceSlot,
+    SessionId,
     VFolderMount,
 )
 from ai.backend.manager.data.image.types import ImageData
@@ -116,7 +117,7 @@ class EndpointData:
 class RoutingData(FieldData):
     id: uuid.UUID
     endpoint: uuid.UUID
-    session: uuid.UUID | None
+    session: SessionId | None
     status: RouteStatus
     health_status: RouteHealthStatus
     traffic_ratio: float

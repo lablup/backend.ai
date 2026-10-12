@@ -20,7 +20,6 @@ from ai.backend.common.dto.manager.v2.resource_usage.request import (
 from ai.backend.common.dto.manager.v2.resource_usage.response import (
     UserUsageBucketNode,
 )
-from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import (
     DateFilter,
     OrderDirection,
@@ -68,7 +67,7 @@ class UserUsageBucketGQL(PydanticNodeMixin[UserUsageBucketNode]):
     id: NodeID[str]
     field_id: UUID = gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.9.0",
             description="UUID of the usage bucket.",
         ),
     )

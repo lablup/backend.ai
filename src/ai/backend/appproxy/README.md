@@ -154,10 +154,11 @@ Backends handle actual proxy implementation:
 - Minimal overhead
 
 #### Traefik Backend
+
 - Traefik integration
 - Advanced routing rules
 - Middleware chains
-- Enterprise features
+- Both AppProxy plugins are required: the Rust/WASM plugin in [backend.ai-appproxy-worker-traefik](https://github.com/lablup/backend.ai-appproxy-worker-traefik) handles cookie/JWT authentication; the [Go plugin in this repository](../../../../third-party-plugins/appproxy-traefik-plugin-go/) tracks circuit/session access and WebSocket activity.
 - See [Traefik Integration Guide](../../../../docs/app-proxy/traefik-integration.md) for detailed configuration
 
 ### Load Balancing Strategies

@@ -27,7 +27,7 @@ from sqlalchemy.orm import joinedload, selectinload
 from ai.backend.common.config import ModelDefinition, ModelMetadata
 from ai.backend.common.data.entity.project import ProjectEntityType
 from ai.backend.common.data.entity.user import UserEntityType
-from ai.backend.common.data.entity.vfolder import VFolderEntityType
+from ai.backend.common.data.entity.vfolder import VFolderEntityType, VFolderUUID
 from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.exception import ModelDefinitionValidationError, VFolderNotFound
 from ai.backend.common.types import (
@@ -38,6 +38,7 @@ from ai.backend.common.types import (
     VFolderUsageMode,
 )
 from ai.backend.logging.structured import StructuredLogger
+from ai.backend.manager.api.gql.base import resolve_entity_id
 from ai.backend.manager.data.entity_share.types import EntityShareStatus
 from ai.backend.manager.data.permission.permission_defs import (
     VFolderPermission as VFolderRBACPermission,
@@ -70,6 +71,9 @@ from ai.backend.manager.models.vfolder.row import (
     vfolders,
 )
 from ai.backend.manager.models.virtual_entity.queries import user_scope_membership_query
+from ai.backend.manager.services.vfolder.actions.bulk_load_mount_levels import (
+    BulkLoadVFolderMountLevelsAction,
+)
 
 # Re-export for backward compatibility
 __all__ = (
@@ -242,6 +246,34 @@ class VirtualFolderNode(graphene.ObjectType):  # type: ignore[misc]
         except ParserError:
             return cast(datetime, self.created_at)
 
+    async def resolve_permission(self, info: graphene.ResolveInfo) -> str | None:
+        if self.row_id is None:
+            return None
+        graph_ctx: GraphQueryContext = info.context
+        loader = graph_ctx.dataloader_manager.get_loader_by_func(
+            graph_ctx, VirtualFolderNode.batch_load_mount_levels
+        )
+        level: str | None = await loader.load(self.row_id)
+        return level
+
+    @classmethod
+    async def batch_load_mount_levels(
+        cls,
+        graph_ctx: GraphQueryContext,
+        vfolder_ids: Sequence[uuid.UUID],
+    ) -> list[str | None]:
+        """The mount level the caller gets on each folder, null where they get none."""
+        result = await graph_ctx.processors.vfolder.bulk_load_mount_levels.run(
+            BulkLoadVFolderMountLevelsAction(
+                vfolder_ids=[VFolderUUID(vfolder_id) for vfolder_id in vfolder_ids]
+            )
+        )
+        levels = result.values()
+        return [
+            _legacy_permission(levels.get(VFolderUUID(vfolder_id), VFolderMountPolicy.NONE))
+            for vfolder_id in vfolder_ids
+        ]
+
     @classmethod
     def from_row(
         cls,
@@ -263,7 +295,6 @@ class VirtualFolderNode(graphene.ObjectType):  # type: ignore[misc]
             creator=row.creator,
             unmanaged_path=row.unmanaged_path or None,
             usage_mode=row.usage_mode,
-            permission=_legacy_permission(row.default_mount_permission),
             ownership_type=row.ownership_type,
             max_files=row.max_files,
             max_size=row.max_size,  # in B
@@ -304,7 +335,6 @@ class VirtualFolderNode(graphene.ObjectType):  # type: ignore[misc]
         permission: VFolderRBACPermission = VFolderRBACPermission.READ_ATTRIBUTE,
     ) -> Self | None:
         graph_ctx: GraphQueryContext = info.context
-        _, vfolder_row_id = AsyncNode.resolve_global_id(info, id)
         query = sa.select(VFolderRow).options(
             joinedload(VFolderRow.user_row),
             joinedload(VFolderRow.group_row),
@@ -320,7 +350,8 @@ class VirtualFolderNode(graphene.ObjectType):  # type: ignore[misc]
             cond = permission_ctx.query_condition
             if cond is None:
                 return None
-            query = query.where(sa.and_(cond, VFolderRow.id == uuid.UUID(vfolder_row_id)))
+            vfolder_id = resolve_entity_id(id, VFolderUUID)
+            query = query.where(sa.and_(cond, VFolderRow.id == vfolder_id))
             async with graph_ctx.db.begin_readonly_session(db_conn) as db_session:
                 vfolder_row = await db_session.scalar(query)
         if vfolder_row is None:
@@ -721,19 +752,19 @@ class ModelCard(graphene.ObjectType):  # type: ignore[misc]
     async def get_node(cls, info: graphene.ResolveInfo, id: str) -> Self | None:
         graph_ctx: GraphQueryContext = info.context
 
-        _, vfolder_row_id = AsyncNode.resolve_global_id(info, id)
+        vfolder_id = resolve_entity_id(id, VFolderUUID)
         async with graph_ctx.db.begin_readonly_session() as db_session:
             vfolder_row = await VFolderRow.get(
-                db_session, uuid.UUID(vfolder_row_id), load_user=True, load_group=True
+                db_session, vfolder_id, load_user=True, load_group=True
             )
             if vfolder_row.usage_mode != VFolderUsageMode.MODEL:
                 raise ValueError(
                     f"The vfolder is not model. expect: {VFolderUsageMode.MODEL.value}, got:"
-                    f" {vfolder_row.usage_mode.value}. (id: {vfolder_row_id})"
+                    f" {vfolder_row.usage_mode.value}. (id: {vfolder_id})"
                 )
             if vfolder_row.status in DEAD_VFOLDER_STATUSES:
                 raise ValueError(
-                    f"The vfolder is deleted. (id: {vfolder_row_id}, status: {vfolder_row.status})"
+                    f"The vfolder is deleted. (id: {vfolder_id}, status: {vfolder_row.status})"
                 )
         return await cls.from_row(graph_ctx, vfolder_row)
 
@@ -868,7 +899,6 @@ class VirtualFolder(graphene.ObjectType):  # type: ignore[misc]
                     domain_name=row.domain_name,
                     unmanaged_path=row.unmanaged_path or None,
                     usage_mode=row.usage_mode,
-                    permission=_legacy_permission(row.default_mount_permission),
                     ownership_type=row.ownership_type,
                     max_files=row.max_files,
                     max_size=row.max_size,  # in MiB
@@ -892,7 +922,6 @@ class VirtualFolder(graphene.ObjectType):  # type: ignore[misc]
                     domain_name=row.domain_name,
                     unmanaged_path=row.unmanaged_path or None,
                     usage_mode=row.usage_mode,
-                    permission=_legacy_permission(row.default_mount_permission),
                     ownership_type=row.ownership_type,
                     max_files=row.max_files,
                     max_size=row.max_size,  # in MiB
@@ -919,7 +948,6 @@ class VirtualFolder(graphene.ObjectType):  # type: ignore[misc]
             creator=row.creator,
             unmanaged_path=row.unmanaged_path or None,
             usage_mode=row.usage_mode,
-            permission=_legacy_permission(row.default_mount_permission),
             ownership_type=row.ownership_type,
             max_files=row.max_files,
             max_size=row.max_size,
@@ -929,6 +957,14 @@ class VirtualFolder(graphene.ObjectType):  # type: ignore[misc]
             status=row.status,
             cur_size=row.cur_size,
         )
+
+    async def resolve_permission(self, info: graphene.ResolveInfo) -> str | None:
+        graph_ctx: GraphQueryContext = info.context
+        loader = graph_ctx.dataloader_manager.get_loader_by_func(
+            graph_ctx, VirtualFolderNode.batch_load_mount_levels
+        )
+        level: str | None = await loader.load(self.id)
+        return level
 
     async def resolve_num_files(self, info: graphene.ResolveInfo) -> int:
         # TODO: measure on-the-fly

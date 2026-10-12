@@ -5,7 +5,6 @@ from __future__ import annotations
 from ai.backend.common.dto.manager.v2.entity_label.request import (
     UpsertEntityLabelInput as UpsertEntityLabelInputDTO,
 )
-from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     gql_field,
@@ -23,7 +22,7 @@ __all__ = ("UpsertEntityLabelInputGQL",)
             "Input for putting one key on one entity. A key holds one value, so naming a "
             "key the entity already carries replaces that value."
         ),
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.9.0",
     ),
     name="UpsertEntityLabelInput",
 )

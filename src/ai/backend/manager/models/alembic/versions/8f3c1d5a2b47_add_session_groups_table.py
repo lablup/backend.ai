@@ -16,6 +16,11 @@ could turn services that used to deploy fine into placement failures. Their
 existing route sessions join the same group so a running deployment's members
 are visible to the scheduler from the first tick.
 
+``endpoints.session_owner`` has no FK, and a user purge that delegates ownership skips
+non-``created`` deployments, so an owner may be gone. Such a deployment passes to its
+``created_user`` when that user remains; one with neither user nor route is removed, as
+a purge without delegation removes it.
+
 Revision ID: 8f3c1d5a2b47
 Revises: 890490020974
 Create Date: 2026-07-28
@@ -33,6 +38,32 @@ down_revision = "890490020974"
 # Part of: 26.8.0
 branch_labels = None
 depends_on = None
+
+_OWNER_GONE = "NOT EXISTS (SELECT 1 FROM users u WHERE u.uuid = e.session_owner)"
+_CREATOR_LEFT = "EXISTS (SELECT 1 FROM users u WHERE u.uuid = e.created_user)"
+_UNOWNED = f"""
+    SELECT e.id FROM endpoints e
+    WHERE {_OWNER_GONE} AND NOT {_CREATOR_LEFT}
+      AND NOT EXISTS (SELECT 1 FROM routings r WHERE r.endpoint = e.id)
+"""
+
+REASSIGN_TO_CREATOR_SQL = (
+    f"""
+UPDATE endpoint_tokens t SET session_owner = e.created_user
+FROM endpoints e
+WHERE t.endpoint = e.id AND {_OWNER_GONE} AND {_CREATOR_LEFT}
+""",
+    f"""
+UPDATE endpoints e SET session_owner = e.created_user
+WHERE {_OWNER_GONE} AND {_CREATOR_LEFT}
+""",
+)
+
+# Replica groups and policies go with the endpoint by FK cascade.
+REMOVE_UNOWNED_SQL = (
+    f"DELETE FROM endpoint_tokens WHERE endpoint IN ({_UNOWNED})",
+    f"DELETE FROM endpoints WHERE id IN ({_UNOWNED})",
+)
 
 # One session group per existing replica group, in a single statement: the
 # ``new_groups`` CTE holds the generated ids so the INSERT and the UPDATE agree
@@ -141,6 +172,8 @@ def upgrade() -> None:
             ["id"],
         )
 
+    for statement in (*REASSIGN_TO_CREATOR_SQL, *REMOVE_UNOWNED_SQL):
+        op.execute(statement)
     op.execute(BACKFILL_SQL)
     op.alter_column("replica_groups", "session_group_id", nullable=False)
     op.execute(BACKFILL_ROUTE_SESSIONS_SQL)
