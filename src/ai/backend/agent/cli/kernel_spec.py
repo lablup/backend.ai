@@ -18,7 +18,7 @@ from typing import Any
 
 from pydantic import BaseModel, Field
 
-from ai.backend.common.auth.utils import generate_ssh_keypair
+from ai.backend.common.auth.ssh import generate_ssh_keypair
 from ai.backend.common.docker import ImageRef, LabelName
 from ai.backend.common.types import (
     AutoPullBehavior,
