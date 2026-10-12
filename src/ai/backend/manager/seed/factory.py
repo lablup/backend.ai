@@ -26,6 +26,7 @@ from ai.backend.manager.seed.resource_slot_type.seed import ResourceSlotTypeSeed
 from ai.backend.manager.seed.retention_policy.seed import RetentionPolicySeed
 from ai.backend.manager.seed.role_preset.seed import RolePresetSeed
 from ai.backend.manager.seed.runtime_variant.seed import RuntimeVariantSeed
+from ai.backend.manager.seed.runtime_variant_preset.seed import RuntimeVariantPresetSeed
 from ai.backend.manager.seed.storage_backend_type.seed import StorageBackendTypeSeed
 from ai.backend.manager.seed.storage_namespace.seed import StorageNamespaceSeed
 from ai.backend.manager.seed.types import SeedKind
@@ -47,6 +48,7 @@ def create_seed_kind_registry() -> SeedKindRegistry:
         SeedKind.NOTIFICATION_CHANNEL: (1, NotificationChannelSeed),
         SeedKind.NOTIFICATION_RULE: (1, NotificationRuleSeed),
         SeedKind.RUNTIME_VARIANT: (1, RuntimeVariantSeed),
+        SeedKind.RUNTIME_VARIANT_PRESET: (1, RuntimeVariantPresetSeed),
         SeedKind.ROLE_PRESET: (1, RolePresetSeed),
         SeedKind.USER_RESOURCE_POLICY: (1, UserResourcePolicySeed),
         SeedKind.PROJECT_RESOURCE_POLICY: (1, ProjectResourcePolicySeed),
