@@ -166,7 +166,7 @@ auth 7, 필드는 error_log 4, keypair 4, login_session 3, login_history 2다. B
 | 사용자 리소스 정책 | 요청의 기본값 `"default"` | `common/dto/manager/v2/user/request.py:89-92`, `models/user/creators.py:116` |
 | 개인 프로젝트의 리소스 정책 | 코드가 못박은 이름 `"default"` | `models/project/creators.py:66-67` |
 | 개인 프로젝트 이름 | 사용자 이름. 겹치면 `-2`부터 `-999`, 그래도 겹치면 사용자 id | `repositories/ops/v2/user/write.py:175-199` |
-| access key, secret key, SSH 키쌍 | 생성한다. secret은 키 제공자 풀로 암호화한다 | `repositories/auth/keypair_secrets.py:9-17` |
+| access key, secret key, SSH 키쌍 | 생성한다. secret은 키 제공자 풀로 암호화한다 | `common/auth/keypair.py`, `repositories/auth/keypair_secrets.py:10-18` |
 | 기본 키페어의 활성, 관리자 표시 | 사용자 상태가 ACTIVE인지, 역할이 SUPERADMIN이나 ADMIN인지 | `write.py:106-107` |
 | 비밀번호 해시 설정 | 매니저 설정 `auth.password_hash_*` | `adapter.py:491-496` |
 | 도메인 id | 이름으로 조회한다 | `adapter.py:217-220` |
