@@ -44,20 +44,6 @@ from ai.backend.common.dto.manager.v2.resource_usage.types import (
 )
 from ai.backend.manager.api.adapter_options.pagination.pagination import PaginationSpec
 from ai.backend.manager.api.adapters.base import BaseAdapter
-<<<<<<< HEAD
-=======
-from ai.backend.manager.data.resource_usage_history.types import (
-    DomainUsageBucketData,
-    ProjectUsageBucketData,
-    UserUsageBucketData,
-)
-from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
-from ai.backend.manager.models.condition_utils import (
-    combine_conditions_and,
-    combine_conditions_or,
-    negate_conditions,
-)
->>>>>>> 5bf2aa3e2 (fix(BA-8371): combine the fields of each OR filter item with AND (#15397))
 from ai.backend.manager.models.resource_usage_history.row import (
     DomainUsageBucketRow,
     ProjectUsageBucketRow,
@@ -68,6 +54,7 @@ from ai.backend.manager.repositories.base import (
     OffsetPagination,
     QueryCondition,
     QueryOrder,
+    combine_conditions_and,
     combine_conditions_or,
     negate_conditions,
 )

@@ -188,25 +188,8 @@ from ai.backend.manager.data.permission.role import (
 from ai.backend.manager.data.permission.status import RoleStatus as InternalRoleStatus
 from ai.backend.manager.data.permission.types import RBACElementRef
 from ai.backend.manager.data.permission.types import RoleSource as InternalRoleSource
-<<<<<<< HEAD
 from ai.backend.manager.data.role_invitation.types import RoleInvitationData, RoleInvitationState
 from ai.backend.manager.errors.permission import ReplaceRolePermissionRoleIdMismatch
-=======
-from ai.backend.manager.data.permission.virtual_entity import GovernCheckKey
-from ai.backend.manager.errors.base.not_found import NotFoundError
-from ai.backend.manager.errors.permission import (
-    NotEnoughPermission,
-    PermissionAlreadyGranted,
-    ReplaceRolePermissionRoleIdMismatch,
-)
-from ai.backend.manager.errors.repository import RepositoryIntegrityError
-from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
-from ai.backend.manager.models.condition_utils import (
-    combine_conditions_and,
-    combine_conditions_or,
-    negate_conditions,
-)
->>>>>>> 5bf2aa3e2 (fix(BA-8371): combine the fields of each OR filter item with AND (#15397))
 from ai.backend.manager.models.rbac.exceptions import InvalidScope
 from ai.backend.manager.models.rbac_models.association_scopes_entities import (
     AssociationScopesEntitiesRow,
@@ -239,6 +222,7 @@ from ai.backend.manager.repositories.base import (
     Purger,
     QueryCondition,
     QueryOrder,
+    combine_conditions_and,
     combine_conditions_or,
     negate_conditions,
 )
@@ -1453,13 +1437,9 @@ class RBACAdapter(BaseAdapter):
         if f.OR:
             or_conditions: list[QueryCondition] = []
             for sub in f.OR:
-<<<<<<< HEAD
-                or_conditions.extend(self._convert_user_nested_filter(sub))
-=======
-                sub_conditions = self._convert_assigned_user_nested_filter(sub)
+                sub_conditions = self._convert_user_nested_filter(sub)
                 if sub_conditions:
                     or_conditions.append(combine_conditions_and(sub_conditions))
->>>>>>> 5bf2aa3e2 (fix(BA-8371): combine the fields of each OR filter item with AND (#15397))
             if or_conditions:
                 conditions.append(combine_conditions_or(or_conditions))
         if f.NOT:
@@ -1470,43 +1450,8 @@ class RBACAdapter(BaseAdapter):
                 conditions.append(negate_conditions(not_conditions))
         return conditions
 
-<<<<<<< HEAD
     @staticmethod
     def _convert_role_orders_gql(orders: list[RoleOrderByDTO]) -> list[QueryOrder]:
-=======
-    def _convert_mapped_scope_nested_filter(
-        self, f: MappedScopeNestedFilterDTO | None
-    ) -> list[QueryCondition]:
-        """The scope a role is registered in sits in the role's own two columns."""
-        if f is None:
-            return []
-        fields = RoleSearchableFields.own
-        conditions = [
-            *self.apply_string_filter(f.scope_type, fields.scope_type.filter),
-            *self.apply_uuid_filter(f.scope_id, fields.scope_id.filter),
-        ]
-        if f.AND:
-            for sub in f.AND:
-                conditions.extend(self._convert_mapped_scope_nested_filter(sub))
-        if f.OR:
-            or_conditions: list[QueryCondition] = []
-            for sub in f.OR:
-                sub_conditions = self._convert_mapped_scope_nested_filter(sub)
-                if sub_conditions:
-                    or_conditions.append(combine_conditions_and(sub_conditions))
-            if or_conditions:
-                conditions.append(combine_conditions_or(or_conditions))
-        if f.NOT:
-            not_conditions: list[QueryCondition] = []
-            for sub in f.NOT:
-                not_conditions.extend(self._convert_mapped_scope_nested_filter(sub))
-            if not_conditions:
-                conditions.append(negate_conditions(not_conditions))
-        return conditions
-
-    def _convert_role_orders_gql(self, orders: list[RoleOrderByDTO]) -> list[QueryOrder]:
-        fields = RoleSearchableFields.own
->>>>>>> 5bf2aa3e2 (fix(BA-8371): combine the fields of each OR filter item with AND (#15397))
         result: list[QueryOrder] = []
         for o in orders:
             ascending = o.direction == OrderDirectionV2.ASC
@@ -1753,7 +1698,9 @@ class RBACAdapter(BaseAdapter):
         if f.OR:
             or_conditions: list[QueryCondition] = []
             for sub in f.OR:
-                or_conditions.extend(self._convert_entity_filter(sub))
+                sub_conditions = self._convert_entity_filter(sub)
+                if sub_conditions:
+                    or_conditions.append(combine_conditions_and(sub_conditions))
             if or_conditions:
                 conditions.append(combine_conditions_or(or_conditions))
         if f.NOT:
@@ -1994,7 +1941,9 @@ class RBACAdapter(BaseAdapter):
         if f.OR:
             or_conditions: list[QueryCondition] = []
             for sub in f.OR:
-                or_conditions.extend(self._convert_invitation_filter(sub))
+                sub_conditions = self._convert_invitation_filter(sub)
+                if sub_conditions:
+                    or_conditions.append(combine_conditions_and(sub_conditions))
             if or_conditions:
                 conditions.append(combine_conditions_or(or_conditions))
         if f.NOT:

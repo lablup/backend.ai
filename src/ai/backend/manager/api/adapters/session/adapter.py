@@ -89,16 +89,6 @@ from ai.backend.manager.models.kernel.orders import (
 from ai.backend.manager.models.kernel.orders import (
     resolve_order as resolve_kernel_order,
 )
-<<<<<<< HEAD
-=======
-from ai.backend.manager.errors.base.not_found import NotFoundError
-from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
-from ai.backend.manager.models.condition_utils import (
-    combine_conditions_and,
-    combine_conditions_or,
-    negate_conditions,
-)
->>>>>>> 5bf2aa3e2 (fix(BA-8371): combine the fields of each OR filter item with AND (#15397))
 from ai.backend.manager.models.kernel.row import KernelRow
 from ai.backend.manager.models.session.conditions import SessionConditions
 from ai.backend.manager.models.session.orders import (
@@ -114,6 +104,7 @@ from ai.backend.manager.repositories.base import (
     NoPagination,
     QueryCondition,
     QueryOrder,
+    combine_conditions_and,
     combine_conditions_or,
     negate_conditions,
 )

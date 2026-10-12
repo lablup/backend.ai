@@ -45,7 +45,6 @@ from ai.backend.common.exception import UnreachableError
 from ai.backend.manager.api.adapter_options.pagination.pagination import PaginationSpec
 from ai.backend.manager.api.adapters.base import BaseAdapter
 from ai.backend.manager.api.adapters.user.adapter import UserAdapter
-<<<<<<< HEAD
 from ai.backend.manager.data.group.types import GroupData
 from ai.backend.manager.data.group.types import ProjectType as DataProjectType
 from ai.backend.manager.models.domain.conditions import DomainConditions
@@ -57,25 +56,9 @@ from ai.backend.manager.repositories.base import (
     NoPagination,
     QueryCondition,
     QueryOrder,
-    combine_conditions_or,
-    negate_conditions,
-=======
-from ai.backend.manager.data.container_registry.types import ImageCommitRegistry
-from ai.backend.manager.data.project.types import ProjectData
-from ai.backend.manager.data.project.types import ProjectType as DataProjectType
-from ai.backend.manager.data.user.types import UserData, UserStatus
-from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
-from ai.backend.manager.models.condition_utils import (
     combine_conditions_and,
     combine_conditions_or,
     negate_conditions,
-)
-from ai.backend.manager.models.domain.searchable_fields import DomainSearchableFields
-from ai.backend.manager.models.project.creators import ProjectCreator
-from ai.backend.manager.models.project.deprecated_search import (
-    DeprecatedProjectConditions,
-    DeprecatedProjectOrders,
->>>>>>> 5bf2aa3e2 (fix(BA-8371): combine the fields of each OR filter item with AND (#15397))
 )
 from ai.backend.manager.repositories.base.creator import Creator
 from ai.backend.manager.repositories.base.updater import Updater

@@ -63,7 +63,6 @@ from ai.backend.manager.data.fair_share.types import (
     ProjectFairShareData,
     UserFairShareData,
 )
-<<<<<<< HEAD
 from ai.backend.manager.models.fair_share.conditions import (
     DomainFairShareConditions,
     ProjectFairShareConditions,
@@ -79,19 +78,6 @@ from ai.backend.manager.models.fair_share.orders import (
     RGProjectFairShareOrders,
     RGUserFairShareOrders,
     UserFairShareOrders,
-=======
-from ai.backend.manager.data.user.types import UserStatus
-from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
-from ai.backend.manager.models.condition_utils import (
-    combine_conditions_and,
-    combine_conditions_or,
-    negate_conditions,
-)
-from ai.backend.manager.models.fair_share.deprecated_search import (
-    DeprecatedDomainFairShareFields,
-    DeprecatedProjectFairShareFields,
-    DeprecatedUserFairShareFields,
->>>>>>> 5bf2aa3e2 (fix(BA-8371): combine the fields of each OR filter item with AND (#15397))
 )
 from ai.backend.manager.models.fair_share.row import (
     DomainFairShareRow,
@@ -101,6 +87,7 @@ from ai.backend.manager.models.fair_share.row import (
 from ai.backend.manager.repositories.base import (
     QueryCondition,
     QueryOrder,
+    combine_conditions_and,
     combine_conditions_or,
     negate_conditions,
 )

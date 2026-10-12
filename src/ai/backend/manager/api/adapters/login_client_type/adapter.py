@@ -30,21 +30,8 @@ from ai.backend.manager.api.adapter_options.pagination.pagination import (
 )
 from ai.backend.manager.api.adapters.base import BaseAdapter
 from ai.backend.manager.data.login_client_type.types import LoginClientTypeData
-<<<<<<< HEAD
 from ai.backend.manager.models.login_client_type.conditions import LoginClientTypeConditions
 from ai.backend.manager.models.login_client_type.orders import LoginClientTypeOrders
-=======
-from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
-from ai.backend.manager.models.condition_utils import (
-    combine_conditions_and,
-    combine_conditions_or,
-    negate_conditions,
-)
-from ai.backend.manager.models.login_client_type.creators import LoginClientTypeCreator
-from ai.backend.manager.models.login_client_type.deprecated_search import (
-    DeprecatedLoginClientTypeDescriptionConditions,
-)
->>>>>>> 5bf2aa3e2 (fix(BA-8371): combine the fields of each OR filter item with AND (#15397))
 from ai.backend.manager.models.login_client_type.row import LoginClientTypeRow
 from ai.backend.manager.repositories.base import QueryCondition, QueryOrder
 from ai.backend.manager.repositories.base.creator import Creator
@@ -209,7 +196,6 @@ class LoginClientTypeAdapter(BaseAdapter):
     def _convert_filter(self, filter: LoginClientTypeFilter) -> list[QueryCondition]:
         conditions: list[QueryCondition] = []
 
-<<<<<<< HEAD
         if filter.name is not None:
             condition = self.convert_string_filter(
                 filter.name,
@@ -251,24 +237,5 @@ class LoginClientTypeAdapter(BaseAdapter):
             )
             if condition is not None:
                 conditions.append(condition)
-=======
-        if filter.AND:
-            for sub_filter in filter.AND:
-                conditions.extend(self._convert_filter(sub_filter))
-        if filter.OR:
-            or_conditions: list[QueryCondition] = []
-            for sub_filter in filter.OR:
-                sub_conditions = self._convert_filter(sub_filter)
-                if sub_conditions:
-                    or_conditions.append(combine_conditions_and(sub_conditions))
-            if or_conditions:
-                conditions.append(combine_conditions_or(or_conditions))
-        if filter.NOT:
-            not_conditions: list[QueryCondition] = []
-            for sub_filter in filter.NOT:
-                not_conditions.extend(self._convert_filter(sub_filter))
-            if not_conditions:
-                conditions.append(negate_conditions(not_conditions))
->>>>>>> 5bf2aa3e2 (fix(BA-8371): combine the fields of each OR filter item with AND (#15397))
 
         return conditions

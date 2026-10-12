@@ -70,7 +70,6 @@ from ai.backend.manager.models.artifact.orders import (
     TIEBREAKER_ORDER,
     resolve_order,
 )
-<<<<<<< HEAD
 from ai.backend.manager.models.artifact.row import ArtifactRow
 from ai.backend.manager.models.artifact_revision.conditions import ArtifactRevisionConditions
 from ai.backend.manager.models.artifact_revision.orders import ArtifactRevisionOrders
@@ -81,20 +80,11 @@ from ai.backend.manager.repositories.base import (
     OffsetPagination,
     QueryCondition,
     QueryOrder,
-    combine_conditions_or,
-    negate_conditions,
-)
-from ai.backend.manager.repositories.base.updater import Updater
-=======
-from ai.backend.manager.models.artifact_revision.searchers import ArtifactRevisionSearcher
-from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
-from ai.backend.manager.models.condition_utils import (
     combine_conditions_and,
     combine_conditions_or,
     negate_conditions,
 )
-from ai.backend.manager.services.artifact.actions.bulk_get import BulkGetArtifactsAction
->>>>>>> 5bf2aa3e2 (fix(BA-8371): combine the fields of each OR filter item with AND (#15397))
+from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.services.artifact.actions.delegate_scan import (
     DelegateScanArtifactsAction,
     DelegateScanArtifactsActionResult,

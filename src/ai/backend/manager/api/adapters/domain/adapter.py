@@ -28,31 +28,16 @@ from ai.backend.common.dto.manager.v2.domain.response import (
 from ai.backend.common.dto.manager.v2.domain.types import DomainOrderField, OrderDirection
 from ai.backend.manager.api.adapter_options.pagination.pagination import PaginationSpec
 from ai.backend.manager.api.adapters.base import BaseAdapter
-<<<<<<< HEAD
 from ai.backend.manager.data.domain.types import DomainData, UserInfo
 from ai.backend.manager.models.domain.conditions import DomainConditions
 from ai.backend.manager.models.domain.orders import DomainOrders
-=======
-from ai.backend.manager.data.domain.types import DomainData
-from ai.backend.manager.data.user.types import UserStatus
-from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
-from ai.backend.manager.models.condition_utils import (
-    combine_conditions_and,
-    combine_conditions_or,
-    negate_conditions,
-)
-from ai.backend.manager.models.domain.creators import DomainCreator
-from ai.backend.manager.models.domain.deprecated_search import (
-    DeprecatedDomainConditions,
-    DeprecatedDomainOrders,
-)
->>>>>>> 5bf2aa3e2 (fix(BA-8371): combine the fields of each OR filter item with AND (#15397))
 from ai.backend.manager.models.domain.row import DomainRow
 from ai.backend.manager.repositories.base import (
     BatchQuerier,
     NoPagination,
     QueryCondition,
     QueryOrder,
+    combine_conditions_and,
     combine_conditions_or,
     negate_conditions,
 )

@@ -66,23 +66,11 @@ from ai.backend.manager.data.deployment_revision_preset.types import (
 )
 from ai.backend.manager.errors.resource import DeploymentRevisionPresetNotFound
 from ai.backend.manager.models.base import ResourceOptsEntry
-<<<<<<< HEAD
 from ai.backend.manager.models.deployment_revision_preset.conditions import (
     DeploymentRevisionPresetConditions,
 )
 from ai.backend.manager.models.deployment_revision_preset.orders import (
     DeploymentRevisionPresetOrders,
-=======
-from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
-from ai.backend.manager.models.condition_utils import (
-    combine_conditions_and,
-    combine_conditions_or,
-    negate_conditions,
-)
-from ai.backend.manager.models.deployment_revision_preset.creators import (
-    DeploymentPresetCreator,
-    PresetResourceSlotCreator,
->>>>>>> 5bf2aa3e2 (fix(BA-8371): combine the fields of each OR filter item with AND (#15397))
 )
 from ai.backend.manager.models.deployment_revision_preset.row import DeploymentRevisionPresetRow
 from ai.backend.manager.models.resource_slot.conditions import PresetResourceSlotConditions
@@ -99,6 +87,7 @@ from ai.backend.manager.repositories.base import (
     BatchQuerier,
     QueryCondition,
     QueryOrder,
+    combine_conditions_and,
     combine_conditions_or,
 )
 from ai.backend.manager.repositories.base.updater import Updater

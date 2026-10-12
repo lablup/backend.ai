@@ -20,7 +20,6 @@ from ai.backend.manager.api.adapters.base import BaseAdapter
 from ai.backend.manager.data.service_catalog.types import (
     ServiceCatalogData,
 )
-<<<<<<< HEAD
 from ai.backend.manager.models.service_catalog.conditions import ServiceCatalogConditions
 from ai.backend.manager.models.service_catalog.orders import (
     DEFAULT_FORWARD_ORDER,
@@ -32,19 +31,9 @@ from ai.backend.manager.repositories.base import (
     OffsetPagination,
     QueryCondition,
     QueryOrder,
-    combine_conditions_or,
-    negate_conditions,
-=======
-from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
-from ai.backend.manager.models.condition_utils import (
     combine_conditions_and,
     combine_conditions_or,
     negate_conditions,
-)
-from ai.backend.manager.models.service_catalog.row import ServiceCatalogRow
-from ai.backend.manager.models.service_catalog.searchable_fields import (
-    ServiceCatalogSearchableFields,
->>>>>>> 5bf2aa3e2 (fix(BA-8371): combine the fields of each OR filter item with AND (#15397))
 )
 from ai.backend.manager.services.service_catalog.actions.search import (
     SearchServiceCatalogsAction,

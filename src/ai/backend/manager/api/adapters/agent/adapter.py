@@ -27,39 +27,19 @@ from ai.backend.common.types import AgentId
 from ai.backend.manager.api.adapter_options.pagination.pagination import PaginationSpec
 from ai.backend.manager.api.adapters.base import BaseAdapter
 from ai.backend.manager.data.agent.types import AgentDetailData, AgentStatus
-<<<<<<< HEAD
 from ai.backend.manager.models.agent.conditions import AgentConditions
 from ai.backend.manager.models.agent.orders import (
     DEFAULT_BACKWARD_ORDER,
     DEFAULT_FORWARD_ORDER,
     TIEBREAKER_ORDER,
     resolve_order,
-=======
-from ai.backend.manager.data.permission.permission_defs import AgentPermission
-from ai.backend.manager.data.resource_slot.types import AgentResourceData
-from ai.backend.manager.models.agent.row import AgentRow
-from ai.backend.manager.models.agent.searchable_fields import AgentSearchableFields
-from ai.backend.manager.models.agent.searchers import AgentSearcher
-from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
-from ai.backend.manager.models.condition_utils import (
-    combine_conditions_and,
-    combine_conditions_or,
-    negate_conditions,
-)
-from ai.backend.manager.models.resource_slot.searchers import AgentResourceSearcher
-from ai.backend.manager.models.specs.pagination import NoPagination
-from ai.backend.manager.models.specs.search.usage import UsedBy
-from ai.backend.manager.models.specs.searcher import GlobalSearcher
-from ai.backend.manager.services.agent.actions.bulk_get import BulkGetAgentsAction
-from ai.backend.manager.services.agent.actions.bulk_load_container_counts import (
-    BulkLoadContainerCountsAction,
->>>>>>> 5bf2aa3e2 (fix(BA-8371): combine the fields of each OR filter item with AND (#15397))
 )
 from ai.backend.manager.repositories.base import (
     BatchQuerier,
     NoPagination,
     QueryCondition,
     QueryOrder,
+    combine_conditions_and,
     combine_conditions_or,
     negate_conditions,
 )

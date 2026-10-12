@@ -34,23 +34,14 @@ from ai.backend.manager.api.adapter_options.pagination.pagination import Paginat
 from ai.backend.manager.api.adapters.base import BaseAdapter
 from ai.backend.manager.data.resource_preset.types import ResourcePresetData
 from ai.backend.manager.errors.resource import ResourcePresetNotFound
-<<<<<<< HEAD
 from ai.backend.manager.models.resource_preset.conditions import ResourcePresetConditions
 from ai.backend.manager.models.resource_preset.orders import ResourcePresetOrders
-=======
-from ai.backend.manager.models.clauses import QueryCondition
-from ai.backend.manager.models.condition_utils import (
-    combine_conditions_and,
-    combine_conditions_or,
-    negate_conditions,
-)
-from ai.backend.manager.models.resource_preset.creators import ResourcePresetCreator
->>>>>>> 5bf2aa3e2 (fix(BA-8371): combine the fields of each OR filter item with AND (#15397))
 from ai.backend.manager.models.resource_preset.row import ResourcePresetRow
 from ai.backend.manager.repositories.base import (
     BatchQuerier,
     OffsetPagination,
     QueryCondition,
+    combine_conditions_and,
     combine_conditions_or,
     negate_conditions,
 )

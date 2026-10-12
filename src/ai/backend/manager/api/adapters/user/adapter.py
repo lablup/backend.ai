@@ -94,19 +94,9 @@ from ai.backend.common.exception import UnreachableError
 from ai.backend.manager.data.common.types import SearchResult
 from ai.backend.manager.data.keypair.types import KeyPairCreator, KeyPairData
 from ai.backend.manager.data.user.types import UserData, UserStatus
-<<<<<<< HEAD
 from ai.backend.manager.data.user.types import UserStatus as DataUserStatus
 from ai.backend.manager.models.domain.conditions import DomainConditions
 from ai.backend.manager.models.group.conditions import GroupConditions
-=======
-from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
-from ai.backend.manager.models.condition_utils import (
-    combine_conditions_and,
-    combine_conditions_or,
-    negate_conditions,
-)
-from ai.backend.manager.models.domain.searchable_fields import DomainSearchableFields
->>>>>>> 5bf2aa3e2 (fix(BA-8371): combine the fields of each OR filter item with AND (#15397))
 from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.keypair.conditions import KeypairConditions, KeypairOrders
 from ai.backend.manager.models.keypair.row import KeyPairRow
@@ -120,6 +110,7 @@ from ai.backend.manager.repositories.base import (
     OffsetPagination,
     QueryCondition,
     QueryOrder,
+    combine_conditions_and,
     combine_conditions_or,
     negate_conditions,
 )
@@ -1027,7 +1018,9 @@ class UserAdapter(BaseAdapter):
         if filter_req.OR:
             or_sub_conditions: list[QueryCondition] = []
             for sub_filter in filter_req.OR:
-                or_sub_conditions.extend(self._convert_keypair_filter(sub_filter))
+                sub_conditions = self._convert_keypair_filter(sub_filter)
+                if sub_conditions:
+                    or_sub_conditions.append(combine_conditions_and(sub_conditions))
             if or_sub_conditions:
                 conditions.append(combine_conditions_or(or_sub_conditions))
 
@@ -1038,40 +1031,6 @@ class UserAdapter(BaseAdapter):
             if not_sub_conditions:
                 conditions.append(negate_conditions(not_sub_conditions))
 
-<<<<<<< HEAD
-=======
-        Used both by the keypair searches and, through ``keypairs``, to narrow a user
-        search; one instance narrows one row either way.
-        """
-        fields = KeyPairSearchableFields.own
-        conditions = [
-            *self.apply_bool_filter(f.is_active, fields.is_active.filter),
-            *self.apply_bool_filter(f.is_admin, fields.is_admin.filter),
-            *self.apply_bool_filter(f.is_default, fields.is_default.filter),
-            *self.apply_string_filter(f.access_key, fields.access_key.filter),
-            *self.apply_string_filter(f.resource_policy, fields.resource_policy_name.filter),
-            *self.apply_uuid_filter(f.user_id, fields.user_id.filter),
-            *self.apply_datetime_filter(f.created_at, fields.created_at.filter),
-            *self.apply_datetime_filter(f.last_used, fields.last_used.filter),
-        ]
-        if f.AND:
-            for sub in f.AND:
-                conditions.extend(self._convert_keypair_filter(sub))
-        if f.OR:
-            or_conditions: list[QueryCondition] = []
-            for sub in f.OR:
-                sub_conditions = self._convert_keypair_filter(sub)
-                if sub_conditions:
-                    or_conditions.append(combine_conditions_and(sub_conditions))
-            if or_conditions:
-                conditions.append(combine_conditions_or(or_conditions))
-        if f.NOT:
-            not_conditions: list[QueryCondition] = []
-            for sub in f.NOT:
-                not_conditions.extend(self._convert_keypair_filter(sub))
-            if not_conditions:
-                conditions.append(negate_conditions(not_conditions))
->>>>>>> 5bf2aa3e2 (fix(BA-8371): combine the fields of each OR filter item with AND (#15397))
         return conditions
 
     def _convert_keypair_orders(self, orders: list[KeypairOrderBy]) -> list[QueryOrder]:
@@ -1094,7 +1053,6 @@ class UserAdapter(BaseAdapter):
 
     # ------------------------------------------------------------------ GQL filter/order helpers
 
-<<<<<<< HEAD
     def _convert_gql_filter(self, filter_req: UserFilter) -> list[QueryCondition]:
         conditions: list[QueryCondition] = []
 
@@ -1270,7 +1228,9 @@ class UserAdapter(BaseAdapter):
         if filter_req.OR:
             or_sub_conditions: list[QueryCondition] = []
             for sub_filter in filter_req.OR:
-                or_sub_conditions.extend(self._convert_gql_filter(sub_filter))
+                sub_conditions = self._convert_gql_filter(sub_filter)
+                if sub_conditions:
+                    or_sub_conditions.append(combine_conditions_and(sub_conditions))
             if or_sub_conditions:
                 conditions.append(combine_conditions_or(or_sub_conditions))
 
@@ -1281,59 +1241,6 @@ class UserAdapter(BaseAdapter):
             if not_sub_conditions:
                 conditions.append(negate_conditions(not_sub_conditions))
 
-=======
-    def _convert_user_filter(self, f: UserFilter) -> list[QueryCondition]:
-        fields = UserSearchableFields.own
-        conditions = [
-            *self.apply_uuid_filter(f.uuid, fields.uuid.filter),
-            *self.apply_string_filter(f.username, fields.username.filter),
-            *self.apply_string_filter(f.email, fields.email.filter),
-            *self.apply_string_filter(f.full_name, fields.full_name.filter),
-            *self.apply_string_filter(f.description, fields.description.filter),
-            *self.apply_enum_filter(f.status, fields.status.filter),
-            *self.apply_string_filter(f.status_info, fields.status_info.filter),
-            *self.apply_string_filter(f.domain_name, fields.domain_name.filter),
-            *self.apply_uuid_filter(f.domain_id, fields.domain_id.filter),
-            *self.apply_string_filter(f.integration_name, fields.integration_name.filter),
-            *self.apply_string_filter(f.resource_policy, fields.resource_policy.filter),
-            *self.apply_enum_filter(f.role, fields.role.filter),
-            *self.apply_bool_filter(f.need_password_change, fields.need_password_change.filter),
-            *self.apply_bool_filter(f.totp_activated, fields.totp_activated.filter),
-            *self.apply_bool_filter(f.sudo_session_enabled, fields.sudo_session_enabled.filter),
-            *self.apply_int_filter(f.container_uid, fields.container_uid.filter),
-            *self.apply_int_filter(f.container_main_gid, fields.container_main_gid.filter),
-            *self.apply_array_filter(f.container_gids, fields.container_gids.filter),
-            *self.apply_datetime_filter(f.created_at, fields.created_at.filter),
-            *self.apply_datetime_filter(f.modified_at, fields.modified_at.filter),
-            *self.apply_to_many_filter(
-                f.keypairs,
-                UserSearchableFields.nested.keypairs.correlation,
-                self._convert_keypair_filter,
-            ),
-            *self.apply_nullable_datetime_filter(
-                f.totp_activated_at, fields.totp_activated_at.filter
-            ),
-            *self._convert_domain_filter(f.domain),
-            *self._convert_project_filter(f.project),
-        ]
-        if f.AND:
-            for sub in f.AND:
-                conditions.extend(self._convert_user_filter(sub))
-        if f.OR:
-            or_conditions: list[QueryCondition] = []
-            for sub in f.OR:
-                sub_conditions = self._convert_user_filter(sub)
-                if sub_conditions:
-                    or_conditions.append(combine_conditions_and(sub_conditions))
-            if or_conditions:
-                conditions.append(combine_conditions_or(or_conditions))
-        if f.NOT:
-            not_conditions: list[QueryCondition] = []
-            for sub in f.NOT:
-                not_conditions.extend(self._convert_user_filter(sub))
-            if not_conditions:
-                conditions.append(negate_conditions(not_conditions))
->>>>>>> 5bf2aa3e2 (fix(BA-8371): combine the fields of each OR filter item with AND (#15397))
         return conditions
 
     @staticmethod
@@ -1606,7 +1513,9 @@ class UserAdapter(BaseAdapter):
         if filter_req.OR:
             or_sub_conditions: list[QueryCondition] = []
             for sub_filter in filter_req.OR:
-                or_sub_conditions.extend(self._convert_filter(sub_filter))
+                sub_conditions = self._convert_filter(sub_filter)
+                if sub_conditions:
+                    or_sub_conditions.append(combine_conditions_and(sub_conditions))
             if or_sub_conditions:
                 conditions.append(combine_conditions_or(or_sub_conditions))
         if filter_req.NOT:

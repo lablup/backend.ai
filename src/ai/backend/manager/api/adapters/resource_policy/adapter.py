@@ -72,30 +72,8 @@ from ai.backend.manager.data.resource.types import (
     ProjectResourcePolicyData,
     UserResourcePolicyData,
 )
-<<<<<<< HEAD
 from ai.backend.manager.models.keypair.conditions import KeypairConditions
 from ai.backend.manager.models.resource_policy import (
-=======
-from ai.backend.manager.errors.keypair import KeypairResourcePolicyNotFound
-from ai.backend.manager.errors.resource import ProjectResourcePolicyNotFound
-from ai.backend.manager.errors.user import UserResourcePolicyNotFound
-from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
-from ai.backend.manager.models.condition_utils import (
-    combine_conditions_and,
-    combine_conditions_or,
-    negate_conditions,
-)
-from ai.backend.manager.models.keypair.searchable_fields import KeyPairSearchableFields
-from ai.backend.manager.models.resource_policy.creators import (
-    KeyPairResourcePolicyCreator,
-    ProjectResourcePolicyCreator,
-    UserResourcePolicyCreator,
-)
-from ai.backend.manager.models.resource_policy.deprecated_search import (
-    DeprecatedKeyPairResourcePolicyConditions,
-)
-from ai.backend.manager.models.resource_policy.row import (
->>>>>>> 5bf2aa3e2 (fix(BA-8371): combine the fields of each OR filter item with AND (#15397))
     KeyPairResourcePolicyRow,
     ProjectResourcePolicyRow,
     UserResourcePolicyRow,
@@ -757,26 +735,6 @@ class ResourcePolicyAdapter(BaseAdapter):
             cond = self._convert_keypair_nested_filter(filter.keypair)
             if cond is not None:
                 conditions.append(cond)
-<<<<<<< HEAD
-=======
-        if filter.AND:
-            for sub_filter in filter.AND:
-                conditions.extend(self._convert_keypair_filter(sub_filter))
-        if filter.OR:
-            or_conditions: list[QueryCondition] = []
-            for sub_filter in filter.OR:
-                sub_conditions = self._convert_keypair_filter(sub_filter)
-                if sub_conditions:
-                    or_conditions.append(combine_conditions_and(sub_conditions))
-            if or_conditions:
-                conditions.append(combine_conditions_or(or_conditions))
-        if filter.NOT:
-            not_conditions: list[QueryCondition] = []
-            for sub_filter in filter.NOT:
-                not_conditions.extend(self._convert_keypair_filter(sub_filter))
-            if not_conditions:
-                conditions.append(negate_conditions(not_conditions))
->>>>>>> 5bf2aa3e2 (fix(BA-8371): combine the fields of each OR filter item with AND (#15397))
         return conditions
 
     def _convert_keypair_nested_filter(
@@ -843,7 +801,6 @@ class ResourcePolicyAdapter(BaseAdapter):
         if filter.max_session_count_per_model_session is not None:
             cond = self.convert_int_filter(
                 filter.max_session_count_per_model_session,
-<<<<<<< HEAD
                 UserResourcePolicyConditions.by_max_session_count_per_model_session,
             )
             if cond is not None:
@@ -899,59 +856,6 @@ class ResourcePolicyAdapter(BaseAdapter):
             )
             if cond is not None:
                 conditions.append(cond)
-=======
-                fields.max_session_count_per_model_session.filter,
-            ),
-            *self.apply_int_filter(
-                filter.max_customized_image_count, fields.max_customized_image_count.filter
-            ),
-        ]
-        if filter.AND:
-            for sub_filter in filter.AND:
-                conditions.extend(self._convert_user_filter(sub_filter))
-        if filter.OR:
-            or_conditions: list[QueryCondition] = []
-            for sub_filter in filter.OR:
-                sub_conditions = self._convert_user_filter(sub_filter)
-                if sub_conditions:
-                    or_conditions.append(combine_conditions_and(sub_conditions))
-            if or_conditions:
-                conditions.append(combine_conditions_or(or_conditions))
-        if filter.NOT:
-            not_conditions: list[QueryCondition] = []
-            for sub_filter in filter.NOT:
-                not_conditions.extend(self._convert_user_filter(sub_filter))
-            if not_conditions:
-                conditions.append(negate_conditions(not_conditions))
-        return conditions
-
-    def _convert_project_filter(self, filter: ProjectResourcePolicyFilter) -> list[QueryCondition]:
-        fields = ProjectResourcePolicySearchableFields.own
-        conditions = [
-            *self.apply_string_filter(filter.name, fields.name.filter),
-            *self.apply_datetime_filter(filter.created_at, fields.created_at.filter),
-            *self.apply_int_filter(filter.max_vfolder_count, fields.max_vfolder_count.filter),
-            *self.apply_int_filter(filter.max_quota_scope_size, fields.max_quota_scope_size.filter),
-            *self.apply_int_filter(filter.max_network_count, fields.max_network_count.filter),
-        ]
-        if filter.AND:
-            for sub_filter in filter.AND:
-                conditions.extend(self._convert_project_filter(sub_filter))
-        if filter.OR:
-            or_conditions: list[QueryCondition] = []
-            for sub_filter in filter.OR:
-                sub_conditions = self._convert_project_filter(sub_filter)
-                if sub_conditions:
-                    or_conditions.append(combine_conditions_and(sub_conditions))
-            if or_conditions:
-                conditions.append(combine_conditions_or(or_conditions))
-        if filter.NOT:
-            not_conditions: list[QueryCondition] = []
-            for sub_filter in filter.NOT:
-                not_conditions.extend(self._convert_project_filter(sub_filter))
-            if not_conditions:
-                conditions.append(negate_conditions(not_conditions))
->>>>>>> 5bf2aa3e2 (fix(BA-8371): combine the fields of each OR filter item with AND (#15397))
         return conditions
 
     # ── Order resolvers ──
