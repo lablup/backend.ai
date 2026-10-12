@@ -101,6 +101,7 @@ from ai.backend.manager.errors.resource import (
 )
 from ai.backend.manager.errors.storage import VFolderBadRequest
 from ai.backend.manager.idle import IdleCheckerHost
+from ai.backend.manager.models.kernel.row import DEAD_KERNEL_STATUSES
 from ai.backend.manager.models.session.row import (
     DEAD_SESSION_STATUSES,
     PRIVATE_SESSION_TYPES,
@@ -1044,22 +1045,19 @@ class SessionService:
             ),
         )
 
-        if compute_session.status in DEAD_SESSION_STATUSES:
-            if kernel_id is None:
-                # Get logs from the main kernel
-                kernel_id = compute_session.main_kernel.id
-                kernel_log = compute_session.main_kernel.container_log
-            else:
-                # Get logs from the specific kernel
-                kernel_row = compute_session.get_kernel_by_id(kernel_id)
-                kernel_log = kernel_row.container_log
-            if kernel_log is not None:
-                # Get logs from database record
-                log.debug("returning log from database record")
-                resp["result"]["logs"] = kernel_log.decode("utf-8")
-                return GetContainerLogsActionResult(
-                    result=resp, session_data=compute_session.to_dataclass()
-                )
+        kernel = (
+            compute_session.main_kernel
+            if kernel_id is None
+            else compute_session.get_kernel_by_id(kernel_id)
+        )
+        if compute_session.status in DEAD_SESSION_STATUSES or kernel.status in DEAD_KERNEL_STATUSES:
+            # The agent drops a kernel once it terminates, so only the saved log is left.
+            if kernel.container_log is not None:
+                resp["result"]["logs"] = kernel.container_log.decode("utf-8")
+            log.debug("returning log from database record")
+            return GetContainerLogsActionResult(
+                result=resp, session_data=compute_session.to_dataclass()
+            )
 
         registry = self._agent_registry
         resp["result"]["logs"] = await registry.get_logs_from_agent(
