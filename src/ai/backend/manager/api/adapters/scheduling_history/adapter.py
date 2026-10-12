@@ -356,11 +356,10 @@ class SchedulingHistoryAdapter(BaseAdapter):
             if or_conds:
                 conditions.append(combine_conditions_or(or_conds))
         if filter.NOT:
-            not_conds: list[QueryCondition] = []
             for sub in filter.NOT:
-                not_conds.extend(self._convert_session_filter(sub))
-            if not_conds:
-                conditions.append(negate_conditions(not_conds))
+                sub_conditions = self._convert_session_filter(sub)
+                if sub_conditions:
+                    conditions.append(negate_conditions(sub_conditions))
         return conditions
 
     @staticmethod
@@ -495,11 +494,10 @@ class SchedulingHistoryAdapter(BaseAdapter):
             if or_conds:
                 conditions.append(combine_conditions_or(or_conds))
         if filter.NOT:
-            not_conds: list[QueryCondition] = []
             for sub in filter.NOT:
-                not_conds.extend(self._convert_kernel_filter(sub))
-            if not_conds:
-                conditions.append(negate_conditions(not_conds))
+                sub_conditions = self._convert_kernel_filter(sub)
+                if sub_conditions:
+                    conditions.append(negate_conditions(sub_conditions))
         return conditions
 
     @staticmethod
@@ -611,11 +609,10 @@ class SchedulingHistoryAdapter(BaseAdapter):
             if or_conds:
                 conditions.append(combine_conditions_or(or_conds))
         if filter.NOT:
-            not_conds: list[QueryCondition] = []
             for sub in filter.NOT:
-                not_conds.extend(self._convert_deployment_filter(sub))
-            if not_conds:
-                conditions.append(negate_conditions(not_conds))
+                sub_conditions = self._convert_deployment_filter(sub)
+                if sub_conditions:
+                    conditions.append(negate_conditions(sub_conditions))
         return conditions
 
     @staticmethod
@@ -737,11 +734,10 @@ class SchedulingHistoryAdapter(BaseAdapter):
             if or_conds:
                 conditions.append(combine_conditions_or(or_conds))
         if filter.NOT:
-            not_conds: list[QueryCondition] = []
             for sub in filter.NOT:
-                not_conds.extend(self._convert_replica_group_filter(sub))
-            if not_conds:
-                conditions.append(negate_conditions(not_conds))
+                sub_conditions = self._convert_replica_group_filter(sub)
+                if sub_conditions:
+                    conditions.append(negate_conditions(sub_conditions))
         return conditions
 
     @staticmethod
@@ -856,11 +852,10 @@ class SchedulingHistoryAdapter(BaseAdapter):
             if or_conds:
                 conditions.append(combine_conditions_or(or_conds))
         if filter.NOT:
-            not_conds: list[QueryCondition] = []
             for sub in filter.NOT:
-                not_conds.extend(self._convert_route_filter(sub))
-            if not_conds:
-                conditions.append(negate_conditions(not_conds))
+                sub_conditions = self._convert_route_filter(sub)
+                if sub_conditions:
+                    conditions.append(negate_conditions(sub_conditions))
         return conditions
 
     @staticmethod

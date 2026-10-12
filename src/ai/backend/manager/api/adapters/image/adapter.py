@@ -465,11 +465,10 @@ class ImageAdapter(BaseAdapter):
                 conditions.append(combine_conditions_or(or_sub))
 
         if filter.NOT:
-            not_sub: list[QueryCondition] = []
             for sub_filter in filter.NOT:
-                not_sub.extend(self._convert_filter(sub_filter))
-            if not_sub:
-                conditions.append(negate_conditions(not_sub))
+                sub_conditions = self._convert_filter(sub_filter)
+                if sub_conditions:
+                    conditions.append(negate_conditions(sub_conditions))
 
         return conditions
 
@@ -495,11 +494,10 @@ class ImageAdapter(BaseAdapter):
                 conditions.append(combine_conditions_or(or_sub))
 
         if filter.NOT:
-            not_sub: list[QueryCondition] = []
             for sub_filter in filter.NOT:
-                not_sub.extend(self._convert_alias_filter(sub_filter))
-            if not_sub:
-                conditions.append(negate_conditions(not_sub))
+                sub_conditions = self._convert_alias_filter(sub_filter)
+                if sub_conditions:
+                    conditions.append(negate_conditions(sub_conditions))
 
         return conditions
 

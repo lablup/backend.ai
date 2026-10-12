@@ -1058,11 +1058,10 @@ class UserAdapter(BaseAdapter):
             if or_conditions:
                 conditions.append(combine_conditions_or(or_conditions))
         if f.NOT:
-            not_conditions: list[QueryCondition] = []
             for sub in f.NOT:
-                not_conditions.extend(self._convert_keypair_filter(sub))
-            if not_conditions:
-                conditions.append(negate_conditions(not_conditions))
+                sub_conditions = self._convert_keypair_filter(sub)
+                if sub_conditions:
+                    conditions.append(negate_conditions(sub_conditions))
         return conditions
 
     def _convert_keypair_orders(self, orders: list[KeypairOrderBy]) -> list[QueryOrder]:
@@ -1135,11 +1134,10 @@ class UserAdapter(BaseAdapter):
             if or_conditions:
                 conditions.append(combine_conditions_or(or_conditions))
         if f.NOT:
-            not_conditions: list[QueryCondition] = []
             for sub in f.NOT:
-                not_conditions.extend(self._convert_user_filter(sub))
-            if not_conditions:
-                conditions.append(negate_conditions(not_conditions))
+                sub_conditions = self._convert_user_filter(sub)
+                if sub_conditions:
+                    conditions.append(negate_conditions(sub_conditions))
         return conditions
 
     def _convert_domain_filter(self, f: UserDomainFilter | None) -> list[QueryCondition]:

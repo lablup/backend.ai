@@ -548,11 +548,10 @@ class NotificationAdapter(BaseAdapter):
                 conditions.append(combine_conditions_or(or_conditions))
 
         if f.NOT:
-            not_conditions: list[QueryCondition] = []
             for sub in f.NOT:
-                not_conditions.extend(NotificationAdapter._convert_channel_filter(sub))
-            if not_conditions:
-                conditions.append(negate_conditions(not_conditions))
+                sub_conditions = NotificationAdapter._convert_channel_filter(sub)
+                if sub_conditions:
+                    conditions.append(negate_conditions(sub_conditions))
 
         return conditions
 
@@ -629,11 +628,10 @@ class NotificationAdapter(BaseAdapter):
                 conditions.append(combine_conditions_or(or_conditions))
 
         if f.NOT:
-            not_conditions: list[QueryCondition] = []
             for sub in f.NOT:
-                not_conditions.extend(NotificationAdapter._convert_rule_filter(sub))
-            if not_conditions:
-                conditions.append(negate_conditions(not_conditions))
+                sub_conditions = NotificationAdapter._convert_rule_filter(sub)
+                if sub_conditions:
+                    conditions.append(negate_conditions(sub_conditions))
 
         return conditions
 
