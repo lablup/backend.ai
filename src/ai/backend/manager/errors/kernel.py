@@ -311,7 +311,8 @@ OP_EXC = {
 }
 
 
-# Used only by the v1 session paths in registry.py. Delete it together with them.
+# Wraps the kernel RPC calls in registry.py (execute, upload and download, list_files and the
+# rest), which the v2 session service also calls.
 @asynccontextmanager
 async def handle_session_exception(
     op: str,
