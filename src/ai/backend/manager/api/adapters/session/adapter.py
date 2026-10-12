@@ -591,11 +591,10 @@ class SessionAdapter(BaseAdapter):
             if or_conditions:
                 conditions.append(combine_conditions_or(or_conditions))
         if f.NOT:
-            not_conditions: list[QueryCondition] = []
             for sub in f.NOT:
-                not_conditions.extend(self._convert_session_filter(sub))
-            if not_conditions:
-                conditions.append(negate_conditions(not_conditions))
+                sub_conditions = self._convert_session_filter(sub)
+                if sub_conditions:
+                    conditions.append(negate_conditions(sub_conditions))
         return conditions
 
     @staticmethod
@@ -753,11 +752,10 @@ class SessionAdapter(BaseAdapter):
             if or_conditions:
                 conditions.append(combine_conditions_or(or_conditions))
         if f.NOT:
-            not_conditions: list[QueryCondition] = []
             for sub in f.NOT:
-                not_conditions.extend(self._convert_kernel_filter(sub))
-            if not_conditions:
-                conditions.append(negate_conditions(not_conditions))
+                sub_conditions = self._convert_kernel_filter(sub)
+                if sub_conditions:
+                    conditions.append(negate_conditions(sub_conditions))
         return conditions
 
     @staticmethod

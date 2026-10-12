@@ -524,11 +524,10 @@ class FairShareAdapter(BaseAdapter):
             if or_conditions:
                 conditions.append(combine_conditions_or(or_conditions))
         if filter.NOT:
-            not_conditions: list[QueryCondition] = []
             for sub_filter in filter.NOT:
-                not_conditions.extend(self._convert_domain_filter(sub_filter))
-            if not_conditions:
-                conditions.append(negate_conditions(not_conditions))
+                sub_conditions = self._convert_domain_filter(sub_filter)
+                if sub_conditions:
+                    conditions.append(negate_conditions(sub_conditions))
         return conditions
 
     def _convert_domain_filter_rg(self, filter: DomainFairShareFilter) -> list[QueryCondition]:
@@ -569,11 +568,10 @@ class FairShareAdapter(BaseAdapter):
             if or_conditions:
                 conditions.append(combine_conditions_or(or_conditions))
         if filter.NOT:
-            not_conditions: list[QueryCondition] = []
             for sub_filter in filter.NOT:
-                not_conditions.extend(self._convert_domain_filter_rg(sub_filter))
-            if not_conditions:
-                conditions.append(negate_conditions(not_conditions))
+                sub_conditions = self._convert_domain_filter_rg(sub_filter)
+                if sub_conditions:
+                    conditions.append(negate_conditions(sub_conditions))
         return conditions
 
     def _convert_domain_orders(self, orders: list[DomainFairShareOrder]) -> list[QueryOrder]:
@@ -653,11 +651,10 @@ class FairShareAdapter(BaseAdapter):
             if or_conditions:
                 conditions.append(combine_conditions_or(or_conditions))
         if filter.NOT:
-            not_conditions: list[QueryCondition] = []
             for sub_filter in filter.NOT:
-                not_conditions.extend(self._convert_project_filter(sub_filter))
-            if not_conditions:
-                conditions.append(negate_conditions(not_conditions))
+                sub_conditions = self._convert_project_filter(sub_filter)
+                if sub_conditions:
+                    conditions.append(negate_conditions(sub_conditions))
         return conditions
 
     def _convert_project_filter_rg(self, filter: ProjectFairShareFilter) -> list[QueryCondition]:
@@ -705,11 +702,10 @@ class FairShareAdapter(BaseAdapter):
             if or_conditions:
                 conditions.append(combine_conditions_or(or_conditions))
         if filter.NOT:
-            not_conditions: list[QueryCondition] = []
             for sub_filter in filter.NOT:
-                not_conditions.extend(self._convert_project_filter_rg(sub_filter))
-            if not_conditions:
-                conditions.append(negate_conditions(not_conditions))
+                sub_conditions = self._convert_project_filter_rg(sub_filter)
+                if sub_conditions:
+                    conditions.append(negate_conditions(sub_conditions))
         return conditions
 
     def _convert_project_orders(self, orders: list[ProjectFairShareOrder]) -> list[QueryOrder]:
@@ -794,11 +790,10 @@ class FairShareAdapter(BaseAdapter):
             if or_conditions:
                 conditions.append(combine_conditions_or(or_conditions))
         if filter.NOT:
-            not_conditions: list[QueryCondition] = []
             for sub_filter in filter.NOT:
-                not_conditions.extend(self._convert_user_filter(sub_filter))
-            if not_conditions:
-                conditions.append(negate_conditions(not_conditions))
+                sub_conditions = self._convert_user_filter(sub_filter)
+                if sub_conditions:
+                    conditions.append(negate_conditions(sub_conditions))
         return conditions
 
     def _convert_user_filter_rg(self, filter: UserFairShareFilter) -> list[QueryCondition]:
@@ -851,11 +846,10 @@ class FairShareAdapter(BaseAdapter):
             if or_conditions:
                 conditions.append(combine_conditions_or(or_conditions))
         if filter.NOT:
-            not_conditions: list[QueryCondition] = []
             for sub_filter in filter.NOT:
-                not_conditions.extend(self._convert_user_filter_rg(sub_filter))
-            if not_conditions:
-                conditions.append(negate_conditions(not_conditions))
+                sub_conditions = self._convert_user_filter_rg(sub_filter)
+                if sub_conditions:
+                    conditions.append(negate_conditions(sub_conditions))
         return conditions
 
     def _convert_user_orders(self, orders: list[UserFairShareOrder]) -> list[QueryOrder]:
