@@ -41,6 +41,7 @@ from yarl import URL
 
 from ai.backend.client.config import APIConfig
 from ai.backend.client.exceptions import BackendAPIError, BackendClientError
+from ai.backend.client.request import Request
 from ai.backend.client.session import AsyncSession as APISession
 from ai.backend.client.v2.auth import NoAuth
 from ai.backend.client.v2.config import ClientConfig as V2ClientConfig
@@ -101,7 +102,12 @@ from ai.backend.web.ratelimit import manager_proxy_rate_limited
 from ai.backend.web.security import SecurityPolicy, csp_nonce_var, security_policy_middleware
 
 from . import __version__, user_agent
-from .auth import build_forwarding_headers, fill_forwarding_hdrs_to_api_session, get_client_ip
+from .auth import (
+    build_forwarding_headers,
+    fill_forwarding_hdrs_to_api_session,
+    get_api_session,
+    get_client_ip,
+)
 from .errors import (
     AlreadyLoggedInError,
     InvalidAPIConfigurationError,
@@ -560,25 +566,35 @@ async def logout_handler(request: web.Request) -> web.Response:
     stats.active_logout_handlers.add(asyncio.current_task())
     session = await get_session(request)
     session_token = session.identity
-    session.invalidate()
 
-    # Invalidate login session in Manager DB
-    if session_token:
-        config = cast(WebServerUnifiedConfig, request.app["config"])
+    # The manager authenticates /auth/logout, so sign it with the session's keypair
+    # before invalidating the session drops that keypair.
+    if session_token and session.get("authenticated", False):
         manager_pool = cast(HealthyEndpointPool, request.app["manager_pool"])
         try:
             async with manager_pool.acquire() as acquired:
+<<<<<<< HEAD
                 async with aiohttp.ClientSession() as http_session:
                     await http_session.post(
                         f"{acquired.endpoint}/auth/logout",
                         json={"session_token": session_token},
                         ssl=config.api.ssl_verify,
                     )
+=======
+                api_session = await get_api_session(request, acquired)
+                async with api_session:
+                    fill_forwarding_hdrs_to_api_session(request, api_session)
+                    rqst = Request("POST", "/auth/logout")
+                    rqst.set_json({"session_token": session_token})
+                    async with rqst.fetch():
+                        pass
+>>>>>>> 64968e05 (fix(BA-8378): sign the webserver's manager logout call with the session keypair (#15422))
         except Exception:
             log.exception(
                 "Failed to invalidate login session in Manager DB (token={})", session_token
             )
 
+    session.invalidate()
     return web.Response()
 
 
