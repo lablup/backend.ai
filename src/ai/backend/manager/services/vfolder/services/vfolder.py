@@ -1240,10 +1240,14 @@ class VFolderService:
         Very slow: every call is a round-trip to the storage proxy, and the
         measurement cost depends on the storage backend (e.g., a full directory
         walk on vfs). Returns ``usage=None`` for unmanaged vfolders, which have
-        no storage-proxy backing. RBAC is enforced at the processor level.
+        no storage-proxy backing, and for hard-deleted ones, whose storage is gone.
+        RBAC is enforced at the processor level.
         """
         vfolder_data = await self._vfolder_repository.get_by_id(action.vfolder_uuid)
-        if vfolder_data.unmanaged_path:
+        if (
+            vfolder_data.unmanaged_path
+            or vfolder_data.status in VFolderOperationStatus.hard_deleted()
+        ):
             return GetVFolderUsageActionResult(vfolder_uuid=vfolder_data.id, usage=None)
         proxy_name, volume_name = self._storage_manager.get_proxy_and_volume(vfolder_data.host)
         client = self._storage_manager.get_manager_facing_client(proxy_name)
