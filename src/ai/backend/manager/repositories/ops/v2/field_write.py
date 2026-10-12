@@ -19,6 +19,7 @@ from ai.backend.manager.models.specs.creator import (
     NestedFieldToCreate,
 )
 from ai.backend.manager.models.specs.purger import FieldBatchPurger, GuardedFieldPurger
+from ai.backend.manager.models.specs.types import BulkResultWithFailures
 from ai.backend.manager.models.specs.upserter import FieldUpserter
 from ai.backend.manager.repositories.ops.v2.write_base import V2WriteOpsBase
 
@@ -200,3 +201,24 @@ class V2FieldWriteOps(V2WriteOpsBase):
             for upserter in upserters
         ]
         return [upserter.to_data(row) for upserter, row in zip(upserters, rows, strict=True)]
+
+    async def partial_bulk_upsert_field_entities[
+        TOwnerID: EntityIdentifier,
+        TRow: Base,
+        TData: FieldData,
+    ](
+        self, upserters: Mapping[TOwnerID, Sequence[FieldUpserter[TOwnerID, TRow, TData]]]
+    ) -> BulkResultWithFailures[list[TData]]:
+        """Insert-or-update each owner's field rows in that owner's own savepoint,
+        answering per owner; one owner's rows stand or fall together."""
+        successes: dict[EntityIdentifier, list[TData]] = {}
+        errors: dict[EntityIdentifier, Exception] = {}
+        for owner_id, owner_upserters in upserters.items():
+            try:
+                async with self._sess.begin_nested():
+                    successes[owner_id] = await self.atomic_upsert_field_entities(
+                        owner_id, owner_upserters
+                    )
+            except Exception as e:
+                errors[owner_id] = e
+        return BulkResultWithFailures(successes=successes, errors=errors)
