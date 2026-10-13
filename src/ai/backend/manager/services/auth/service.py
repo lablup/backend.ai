@@ -291,14 +291,20 @@ class AuthService:
             )
 
         # Cross-check active sessions with Valkey
+        session_data = await self._valkey_session_client.get_login_sessions([
+            session_info.session_token for session_info in active_sessions
+        ])
         live_sessions: list[ActiveSessionInfo] = []
-        for session_info in active_sessions:
-            if await self._valkey_session_client.get_login_session(session_info.session_token):
+        expired_tokens: list[str] = []
+        for session_info, data in zip(active_sessions, session_data, strict=True):
+            if data:
                 live_sessions.append(session_info)
             else:
-                await self._auth_repository.delete_login_session_by_token(
-                    session_info.session_token, LoginAttemptResult.EXPIRED
-                )
+                expired_tokens.append(session_info.session_token)
+        if expired_tokens:
+            await self._auth_repository.delete_login_sessions_by_tokens(
+                expired_tokens, LoginAttemptResult.EXPIRED
+            )
 
         return main_keypair_row, live_sessions
 
