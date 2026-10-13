@@ -8,6 +8,7 @@ from uuid import UUID
 
 from strawberry import Info
 
+from ai.backend.common.auth.password import PasswordInfo
 from ai.backend.common.contexts.client_ip import current_client_ip
 from ai.backend.common.contexts.user import current_user
 from ai.backend.common.data.entity.domain import DomainID
@@ -55,7 +56,6 @@ from ai.backend.manager.data.user.types import UserStatus
 from ai.backend.manager.errors.api import InvalidAPIParameters
 from ai.backend.manager.errors.auth import InsufficientPrivilege
 from ai.backend.manager.errors.user import UserModificationBadRequest
-from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.user.creators import UserCreator
 from ai.backend.manager.models.user.row import UserRole
 from ai.backend.manager.models.user.updaters import UserUpdater

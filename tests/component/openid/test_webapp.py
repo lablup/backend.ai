@@ -18,7 +18,7 @@ from authlib.integrations.base_client.errors import OAuthError  # pants: no-infe
 from cryptography import x509
 from cryptography.hazmat.primitives.asymmetric import rsa
 
-from ai.backend.manager.models.hasher.types import PasswordInfo
+from ai.backend.common.auth.password import PasswordInfo
 from ai.backend.manager.models.keypair.row import keypairs
 from ai.backend.manager.models.user.row import UserRole, UserRow, UserStatus
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine

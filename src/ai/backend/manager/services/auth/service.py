@@ -11,6 +11,7 @@ from aiohttp import web
 from sqlalchemy import RowMapping
 
 from ai.backend.common import msgpack
+from ai.backend.common.auth.password import PasswordInfo
 from ai.backend.common.auth.ssh import generate_ssh_keypair
 from ai.backend.common.clients.valkey_client.valkey_session.client import ValkeySessionClient
 from ai.backend.common.clients.valkey_client.valkey_session.types import (
@@ -53,7 +54,6 @@ from ai.backend.manager.errors.common import (
 )
 from ai.backend.manager.errors.user import KeyPairNotFound, UserResourcePolicyNotFound
 from ai.backend.manager.models.hasher.factory import compare_to_hashed_password
-from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.keypair.row import KEYPAIR_SECRET_KEY_CONTEXT
 from ai.backend.manager.models.keypair.ssh_key_validator import SSHKeyValidator
 from ai.backend.manager.models.user.creators import UserCreator
