@@ -231,6 +231,28 @@ def repl_spy(mocker: MockerFixture) -> MagicMock:
     return mocker.patch("asyncio.open_connection", side_effect=asyncio.open_connection)
 
 
+class FakeConnect:
+    """An asyncio.open_connection stand-in: refuses `refuse` times (None: always), then delegates."""
+
+    def __init__(self, refuse: int | None = None) -> None:
+        self.refuse = refuse
+        self.calls = 0
+        self.real = asyncio.open_connection
+
+    async def __call__(self, *args: Any, **kwargs: Any) -> Any:
+        self.calls += 1
+        if self.refuse is None or self.calls <= self.refuse:
+            raise ConnectionRefusedError("refused")
+        return await self.real(*args, **kwargs)
+
+
+@pytest.fixture
+def refused(monkeypatch: pytest.MonkeyPatch) -> FakeConnect:
+    fake = FakeConnect()
+    monkeypatch.setattr("asyncio.open_connection", fake)
+    return fake
+
+
 def _handshake_calls(spy: MagicMock) -> list[Any]:
     return [c for c in spy.call_args_list if c.kwargs.get("ssl") is not None]
 
@@ -256,14 +278,14 @@ class TestCheckStatusTls:
         assert await tls_kernel.check_status() == {}
 
     async def test_refused_connection_retries_in_the_window_then_asks_to_try_again(
-        self, tls_kernel: ContainerdKernel, fast_probe: None, repl_spy: MagicMock
+        self, tls_kernel: ContainerdKernel, fast_probe: None, refused: FakeConnect
     ) -> None:
-        _publish(tls_kernel, _unused_port())
+        _publish(tls_kernel, 30001)
 
         with pytest.raises(TryAgain):
             await tls_kernel.check_status()
 
-        assert len(_handshake_calls(repl_spy)) >= 2
+        assert refused.calls >= 2
 
     async def test_server_that_closes_before_the_handshake_asks_to_try_again(
         self, tls_kernel: ContainerdKernel, fast_probe: None
@@ -293,17 +315,31 @@ class TestCheckStatusTls:
         repl_spy.assert_not_called()
 
     async def test_deadline_passing_during_a_call_times_out(
-        self, tls_kernel: ContainerdKernel, monkeypatch: pytest.MonkeyPatch
+        self, tls_kernel: ContainerdKernel, monkeypatch: pytest.MonkeyPatch, refused: FakeConnect
     ) -> None:
         monkeypatch.setattr(kernel_module, "_TLS_RETRY_INTERVAL_SEC", 0.02)
         tls_kernel.launch_plan = dataclasses.replace(
             tls_kernel.launch_plan,
             readiness=TlsConnectReadiness(port_name=TLS_PORT_NAME, timeout_s=0.2),
         )
-        _publish(tls_kernel, _unused_port())
+        _publish(tls_kernel, 30001)
 
         with pytest.raises(ReadinessTimeout):
             await tls_kernel.check_status()
+
+    async def test_call_after_the_deadline_passed_between_calls_does_not_probe(
+        self, tls_kernel: ContainerdKernel, fast_probe: None, refused: FakeConnect
+    ) -> None:
+        _publish(tls_kernel, 30001)
+        with pytest.raises(TryAgain):
+            await tls_kernel.check_status()
+        calls = refused.calls
+        tls_kernel._readiness_deadline = asyncio.get_running_loop().time() - 1
+
+        with pytest.raises(ReadinessTimeout):
+            await tls_kernel.check_status()
+
+        assert refused.calls == calls
 
     def test_readiness_timeout_is_not_retried_by_the_create_loop(self) -> None:
         assert not issubclass(ReadinessTimeout, TryAgain)
@@ -311,23 +347,20 @@ class TestCheckStatusTls:
     async def test_server_starting_late_is_found_by_a_later_call(
         self,
         tls_kernel: ContainerdKernel,
-        tls_context: ssl.SSLContext,
+        tls_server: int,
+        monkeypatch: pytest.MonkeyPatch,
         fast_probe: None,
     ) -> None:
-        port = _unused_port()
-        _publish(tls_kernel, port)
-        for _ in range(2):
+        fake = FakeConnect(refuse=3)
+        monkeypatch.setattr("asyncio.open_connection", fake)
+        monkeypatch.setattr(kernel_module, "_TLS_PROBE_WINDOW_SEC", 0.0)
+        _publish(tls_kernel, tls_server)
+        for _ in range(3):
             with pytest.raises(TryAgain):
                 await tls_kernel.check_status()
-        server = await asyncio.start_server(
-            lambda r, w: w.close(), "127.0.0.1", port, ssl=tls_context
-        )
 
-        try:
-            assert await tls_kernel.check_status() == {}
-        finally:
-            server.close()
-            await server.wait_closed()
+        assert await tls_kernel.check_status() == {}
+        assert fake.calls == 4
 
     async def test_the_repl_port_is_never_touched(
         self,

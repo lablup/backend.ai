@@ -20,6 +20,8 @@ def spec_signature(config: KernelCreationConfig) -> str | None:
     confidential = cast(Mapping[str, Any], config).get("confidential")
     if confidential is None:
         return None
+    if not isinstance(confidential, Mapping):
+        raise SealedSpecMissing("the confidential kernel config is not a mapping")
     signature = confidential.get("signature")
     if not isinstance(signature, str) or not signature or not signature.isascii():
         raise SealedSpecMissing("the confidential kernel config has no signature")
@@ -27,6 +29,7 @@ def spec_signature(config: KernelCreationConfig) -> str | None:
 
 
 def write_spec_jws(path: Path, signature: str) -> None:
+    path.unlink(missing_ok=True)
     path.write_bytes(signature.encode("ascii"))
     path.chmod(_SPEC_JWS_MODE)
 

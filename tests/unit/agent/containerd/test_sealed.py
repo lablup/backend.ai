@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 import stat
 from pathlib import Path
 from typing import Any, cast
@@ -36,11 +37,13 @@ class TestSpecSignature:
             {"signature": 7},
             {"signature": b"a.b.c"},
             {"signature": "a.b.c\u00e9"},
+            "a.b.c",
+            ["a.b.c"],
         ],
-        ids=["absent", "none", "empty", "int", "bytes", "non-ascii"],
+        ids=["absent", "none", "empty", "int", "bytes", "non-ascii", "string", "list"],
     )
     def test_sealed_without_a_usable_signature_is_refused(
-        self, kernel_config: KernelCreationConfig, confidential: dict[str, Any]
+        self, kernel_config: KernelCreationConfig, confidential: Any
     ) -> None:
         with pytest.raises(SealedSpecMissing):
             spec_signature(_config(kernel_config, confidential=confidential))
@@ -49,6 +52,17 @@ class TestSpecSignature:
 class TestWriteSpecJws:
     def test_exact_bytes_and_read_only_mode(self, tmp_path: Path) -> None:
         path = tmp_path / "spec.jws"
+
+        write_spec_jws(path, "aaa.bbb.ccc")
+
+        assert path.read_bytes() == b"aaa.bbb.ccc"
+        assert stat.S_IMODE(path.stat().st_mode) == 0o444
+
+    @pytest.mark.skipif(os.geteuid() == 0, reason="root ignores file modes")
+    def test_existing_read_only_file_is_replaced(self, tmp_path: Path) -> None:
+        path = tmp_path / "spec.jws"
+        path.write_bytes(b"old")
+        path.chmod(0o444)
 
         write_spec_jws(path, "aaa.bbb.ccc")
 

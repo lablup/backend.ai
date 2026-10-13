@@ -30,8 +30,9 @@ log = StructuredLogger(logging.getLogger(__spec__.name))
 REPL_IN_PORT: Final = 2000
 _PROBE_TIMEOUT_SEC: Final = 2.0
 _TLS_CONNECT_TIMEOUT_SEC: Final = 5.0
-# PROVISIONAL: the window and interval of one check_status call; a call can last up to
-# window + connect timeout + interval, so init-timeout-sec must exceed that (20 s).
+# PROVISIONAL: the window and interval of one check_status call, up to about 16 s.
+# The create_kernel loop (init-polling-timeout-sec, init-polling-attempt) must cover the
+# profile's timeout_s, and init-timeout-sec must exceed one call.
 _TLS_PROBE_WINDOW_SEC: Final = 10.0
 _TLS_RETRY_INTERVAL_SEC: Final = 1.0
 
@@ -141,7 +142,7 @@ class ContainerdKernel(AbstractKernel):
             try:
                 async with asyncio.timeout(_TLS_CONNECT_TIMEOUT_SEC):
                     _, writer = await asyncio.open_connection(host, port, ssl=context)
-            except (OSError, ssl.SSLError, asyncio.IncompleteReadError, TimeoutError) as e:
+            except (OSError, asyncio.IncompleteReadError, TimeoutError) as e:
                 log.debug(
                     "tls handshake failed",
                     kernel_id=str(self.kernel_id),
@@ -158,7 +159,7 @@ class ContainerdKernel(AbstractKernel):
                 await asyncio.sleep(min(_TLS_RETRY_INTERVAL_SEC, deadline - now))
                 continue
             writer.close()
-            with contextlib.suppress(OSError, ssl.SSLError):
+            with contextlib.suppress(OSError):
                 await writer.wait_closed()
             return {}
 

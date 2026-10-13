@@ -398,7 +398,10 @@ class TestSealedKernel:
             )
         )
         assert profile.plan_calls[0].base_spec == expected
-        assert all(m["destination"] != "/run/bai/spec.jws" for m in expected["mounts"])
+        assert all(
+            m["destination"] != "/run/bai/spec.jws"
+            for m in profile.plan_calls[0].base_spec["mounts"]
+        )
         assert not (tmp_path / str(ownership_data.kernel_id) / "spec.jws").exists()
 
     async def test_sealed_without_a_signature_fails_before_any_side_effect(
