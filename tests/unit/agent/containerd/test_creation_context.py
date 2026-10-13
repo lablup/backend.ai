@@ -20,8 +20,10 @@ from ai.backend.agent.containerd.agent import (
 from ai.backend.agent.containerd.client import MountSpec
 from ai.backend.agent.containerd.kernel import ContainerdKernel
 from ai.backend.agent.containerd.network import KernelNetwork
-from ai.backend.agent.containerd.profile.base import LaunchPlan, RuntimeOptions
+from ai.backend.agent.containerd.profile.base import GeneratedMountKind, LaunchPlan, RuntimeOptions
+from ai.backend.agent.containerd.profile.runc import RuncProfile
 from ai.backend.agent.containerd.scratch import CONFIG_DIR_LABEL
+from ai.backend.agent.containerd.spec import SpecInput, build_base_spec, build_launch_spec
 from ai.backend.agent.errors import UnsupportedResource
 from ai.backend.agent.errors.containerd import (
     ContainerdImageNotFound,
@@ -29,6 +31,7 @@ from ai.backend.agent.errors.containerd import (
     KernelNetworkSetupFailed,
     KernelVerbNotSupported,
     ProfileSpecRejected,
+    SealedSpecMissing,
 )
 from ai.backend.agent.errors.resources import PortPoolExhaustedError
 from ai.backend.agent.port_pool import PortPool
@@ -280,6 +283,155 @@ class TestPrepareContainer:
         assert profile.plan_calls == []
         runner.failing.clear()
         assert await network.setup(KernelId(uuid.uuid4())) == IPv4Address("172.30.9.2")
+
+
+SPEC_JWS_ENTRY = {
+    "destination": "/run/bai/spec.jws",
+    "type": "bind",
+    "options": ["rbind", "ro", "rprivate"],
+}
+
+
+class TestSealedKernel:
+    @pytest.fixture
+    def sealed_config(self, launch_kernel_config: KernelCreationConfig) -> KernelCreationConfig:
+        return cast(
+            KernelCreationConfig,
+            {**launch_kernel_config, "confidential": {"signature": "aaa.bbb.ccc"}},
+        )
+
+    async def _prepare(
+        self,
+        tmp_path: Path,
+        ownership_data: KernelOwnershipData,
+        config: KernelCreationConfig,
+        launch_plan: LaunchPlan,
+        resource_spec: KernelResourceSpec,
+        computers: dict[DeviceName, ComputerContext],
+        *,
+        runner: FakeCommandRunner | None = None,
+        client: FakeContainerd | None = None,
+    ) -> tuple[ContainerdKernelCreationContext, FakeProfile]:
+        profile = FakeProfile("runc", accepts=True, plan_result=launch_plan)
+        ctx = _make_context(
+            ownership_data,
+            config,
+            profile,
+            scratch_root=tmp_path,
+            computers=computers,
+            runner=runner,
+            client=client,
+        )
+        await ctx.prepare_scratch()
+        await ctx.prepare_container(resource_spec, {}, [], MagicMock())
+        return ctx, profile
+
+    async def test_signature_is_written_and_mounted_read_only(
+        self,
+        tmp_path: Path,
+        ownership_data: KernelOwnershipData,
+        sealed_config: KernelCreationConfig,
+        launch_plan: LaunchPlan,
+        resource_spec: KernelResourceSpec,
+        computers: dict[DeviceName, ComputerContext],
+    ) -> None:
+        _, profile = await self._prepare(
+            tmp_path, ownership_data, sealed_config, launch_plan, resource_spec, computers
+        )
+
+        path = (tmp_path / str(ownership_data.kernel_id)).resolve() / "spec.jws"
+        assert path.read_bytes() == b"aaa.bbb.ccc"
+        assert path.stat().st_mode & 0o777 == 0o444
+        base_spec = profile.plan_calls[0].base_spec
+        assert base_spec["mounts"][-1] == {**SPEC_JWS_ENTRY, "source": str(path)}
+
+    async def test_the_mount_survives_into_the_runc_launch_spec(
+        self,
+        tmp_path: Path,
+        ownership_data: KernelOwnershipData,
+        sealed_config: KernelCreationConfig,
+        launch_plan: LaunchPlan,
+        resource_spec: KernelResourceSpec,
+        computers: dict[DeviceName, ComputerContext],
+    ) -> None:
+        ctx, profile = await self._prepare(
+            tmp_path, ownership_data, sealed_config, launch_plan, resource_spec, computers
+        )
+        launch = profile.plan_calls[0]
+        plan = RuncProfile(10.0).plan(launch)
+
+        spec = build_launch_spec(
+            launch.base_spec,
+            args=[],
+            env=[],
+            mounts=launch.mounts,
+            allowed_mount_kinds=plan.allowed_mount_kinds,
+            spec_patch=plan.spec_patch,
+            cgroups_path="/ns/c",
+        )
+
+        path = (tmp_path / str(ownership_data.kernel_id)).resolve() / "spec.jws"
+        entries = [m for m in spec["mounts"] if m["destination"] == "/run/bai/spec.jws"]
+        assert entries == [{**SPEC_JWS_ENTRY, "source": str(path)}]
+        assert GeneratedMountKind.CONFIG_DIR in plan.allowed_mount_kinds
+
+    async def test_unsealed_kernel_has_no_file_and_an_unchanged_base_spec(
+        self,
+        tmp_path: Path,
+        ownership_data: KernelOwnershipData,
+        launch_kernel_config: KernelCreationConfig,
+        launch_plan: LaunchPlan,
+        resource_spec: KernelResourceSpec,
+        computers: dict[DeviceName, ComputerContext],
+    ) -> None:
+        _, profile = await self._prepare(
+            tmp_path, ownership_data, launch_kernel_config, launch_plan, resource_spec, computers
+        )
+
+        expected = build_base_spec(
+            SpecInput(
+                cwd="/home/work",
+                hostname="main1",
+                cpu_cores=[1, 3],
+                memory_bytes=1073741824,
+                shm_bytes=134217728,
+                netns_path=f"/run/netns/{BRIDGE}-{ownership_data.kernel_id}",
+            )
+        )
+        assert profile.plan_calls[0].base_spec == expected
+        assert all(m["destination"] != "/run/bai/spec.jws" for m in expected["mounts"])
+        assert not (tmp_path / str(ownership_data.kernel_id) / "spec.jws").exists()
+
+    async def test_sealed_without_a_signature_fails_before_any_side_effect(
+        self,
+        tmp_path: Path,
+        ownership_data: KernelOwnershipData,
+        launch_kernel_config: KernelCreationConfig,
+        launch_plan: LaunchPlan,
+        resource_spec: KernelResourceSpec,
+        computers: dict[DeviceName, ComputerContext],
+    ) -> None:
+        config = cast(KernelCreationConfig, {**launch_kernel_config, "confidential": {}})
+        runner = FakeCommandRunner()
+        client = FakeContainerd()
+
+        with pytest.raises(SealedSpecMissing):
+            await self._prepare(
+                tmp_path,
+                ownership_data,
+                config,
+                launch_plan,
+                resource_spec,
+                computers,
+                runner=runner,
+                client=client,
+            )
+
+        assert runner.calls == []
+        assert client.calls == []
+        scratch = tmp_path / str(ownership_data.kernel_id)
+        assert not (scratch / "spec.jws").exists()
+        assert not (scratch / "config" / "environ.txt").exists()
 
 
 class TestCreationContextMembers:
@@ -644,6 +796,7 @@ class TestStartContainer:
         assert (data["stdin_port"], data["stdout_port"]) == (0, 0)
         assert data["kernel_host"] == "127.0.0.1"
         assert data["kernel_ip"] == "172.30.9.2"
+        assert data["published_host"] == "10.0.0.5"
         assert "intrinsic_ports" not in data
         assert not (
             tmp_path / str(ownership_data.kernel_id) / "config" / "intrinsic-ports.json"

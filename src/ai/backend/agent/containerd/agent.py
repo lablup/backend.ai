@@ -58,6 +58,7 @@ from ai.backend.agent.containerd.scratch import (
     write_hosts_file,
     write_resolv_conf,
 )
+from ai.backend.agent.containerd.sealed import spec_jws_mount, spec_signature, write_spec_jws
 from ai.backend.agent.containerd.spec import (
     SpecInput,
     build_base_spec,
@@ -392,6 +393,7 @@ class ContainerdKernelCreationContext(AbstractKernelCreationContext[ContainerdKe
         service_ports: list[ServicePort],
         cluster_info: ClusterInfo,
     ) -> ContainerdKernel:
+        signature = spec_signature(self.kernel_config)  # a sealed kernel without one fails here
         await self._write_config_files(resource_spec, environ)
         extra_caps = (
             ("CAP_SYS_PTRACE",)
@@ -412,6 +414,8 @@ class ContainerdKernelCreationContext(AbstractKernelCreationContext[ContainerdKe
                 extra_caps=extra_caps,
             )
         )
+        if signature is not None:
+            await self._add_spec_jws(signature)
         launch = KernelLaunch(
             kernel_id=self.kernel_id,
             session_id=self.session_id,
@@ -441,6 +445,12 @@ class ContainerdKernelCreationContext(AbstractKernelCreationContext[ContainerdKe
             data={},
             launch_plan=launch_plan,
         )
+
+    async def _add_spec_jws(self, signature: str) -> None:
+        await run_in_executor_with_context(None, write_spec_jws, self._dirs.spec_jws, signature)
+        # Appended to the base spec, not a GeneratedMount: a profile's spec_patch["mounts"] keeps
+        # the base mounts (coco-tdx replaces the list with base mounts + resolver binds).
+        self._base_spec["mounts"].append(spec_jws_mount(self._dirs.spec_jws))
 
     async def _write_config_files(
         self, resource_spec: KernelResourceSpec, environ: Mapping[str, str]
@@ -565,6 +575,7 @@ class ContainerdKernelCreationContext(AbstractKernelCreationContext[ContainerdKe
             "stdout_port": 0,
             "host_ports": host_ports,
             "kernel_ip": str(address),
+            "published_host": self._network.published_host,
         }
 
     def _container_labels(self, host_ports: Sequence[int], address: IPv4Address) -> dict[str, str]:
