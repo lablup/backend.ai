@@ -18,11 +18,11 @@ from sqlalchemy.orm import (
 )
 from sqlalchemy.sql.expression import SQLColumnExpression
 
+from ai.backend.common.auth.password import PasswordHashAlgorithm
 from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.types import ReadableCIDR
-from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.model_serving.types import UserData as ModelServingUserData
 from ai.backend.manager.data.user.types import UserStatus
 from ai.backend.manager.models.base import (

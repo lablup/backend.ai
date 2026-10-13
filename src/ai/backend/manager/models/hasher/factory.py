@@ -6,9 +6,8 @@ from __future__ import annotations
 
 import logging
 
+from ai.backend.common.auth.password import HashInfo, PasswordHashAlgorithm
 from ai.backend.logging.structured import StructuredLogger
-from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
-from ai.backend.manager.models.hasher.types import HashInfo
 
 from .base import PasswordHasher
 from .bcrypt import BcryptHasher

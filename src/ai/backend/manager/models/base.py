@@ -39,6 +39,7 @@ from sqlalchemy.types import CHAR, SchemaType, TypeDecorator, TypeEngine, Unicod
 
 from ai.backend.common import validators as tx
 from ai.backend.common.auth import PublicKey
+from ai.backend.common.auth.password import PasswordHashAlgorithm, PasswordInfo
 from ai.backend.common.data.entity.deployment import DeploymentID
 from ai.backend.common.data.entity.types import EntityType
 from ai.backend.common.exception import InvalidIpAddressValue
@@ -55,11 +56,9 @@ from ai.backend.common.types import (
     VFolderHostPermissionMap,
 )
 from ai.backend.logging.structured import StructuredLogger
-from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.errors.api import InvalidAPIParameters
 from ai.backend.manager.errors.resource import DataTransformationFailed
 from ai.backend.manager.errors.secret import InvalidSecretBinding
-from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.secret.types import SecretValue
 
 if TYPE_CHECKING:
