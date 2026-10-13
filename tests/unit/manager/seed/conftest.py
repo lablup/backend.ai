@@ -18,6 +18,7 @@ from ai.backend.manager.models.deployment_revision_preset.row import DeploymentR
 from ai.backend.manager.models.domain.row import DomainRow
 from ai.backend.manager.models.entity_label.row import EntityLabelRow
 from ai.backend.manager.models.idle_checker.row import IdleCheckerRow
+from ai.backend.manager.models.keypair.row import KeyPairRow
 from ai.backend.manager.models.login_client_type.row import LoginClientTypeRow
 from ai.backend.manager.models.notification.row import NotificationChannelRow, NotificationRuleRow
 from ai.backend.manager.models.object_storage.row import ObjectStorageRow
@@ -486,6 +487,56 @@ _PROJECTS: dict[str, dict[str, Any]] = {
     },
 }
 
+# User seed files written for the tests, one user per file, in the `default` domain under
+# the `default` resource policies. `admin` states every field but `allowed_client_ip`, and two keypairs; `member`
+# leaves the optional ones to their defaults.
+_USERS: dict[str, dict[str, Any]] = {
+    "admin.yaml": {
+        "id": "0198a5a0-0000-7000-8000-00000000f001",
+        "domain_id": "0198a5a0-0000-7000-8000-00000000d001",
+        "email": "admin@example.com",
+        "username": "admin",
+        "password": "admin-password",
+        "need_password_change": True,
+        "full_name": "Admin",
+        "description": "The administrator",
+        "status": "active",
+        "status_info": "seeded",
+        "role": "superadmin",
+        "resource_policy": "default",
+        "sudo_session_enabled": True,
+        "container_uid": 1000,
+        "container_main_gid": 1000,
+        "container_gids": [1000, 1001],
+        "keypairs": [
+            {
+                "access_key": "AKIAADMINDEFAULT0001",
+                "secret_key": "admin-default-secret",
+                "is_admin": True,
+                "is_default": True,
+                "resource_policy": "default",
+                "rate_limit": 30000,
+                "ssh_public_key": "ssh-ed25519 AAAA admin",
+                "ssh_private_key": "-----BEGIN OPENSSH PRIVATE KEY-----",
+            },
+            {
+                "access_key": "AKIAADMINSECOND00002",
+                "secret_key": "admin-second-secret",
+                "is_active": False,
+                "resource_policy": "default",
+            },
+        ],
+    },
+    "member.yaml": {
+        "id": "0198a5a0-0000-7000-8000-00000000f002",
+        "domain_id": "0198a5a0-0000-7000-8000-00000000d001",
+        "email": "member@example.com",
+        "username": "member",
+        "password": "member-password",
+        "resource_policy": "default",
+    },
+}
+
 # Resource preset files written for the tests, one preset per file, both bound to no
 # resource group. `small` states every field; `large` leaves `shared_memory` out.
 _RESOURCE_PRESETS: dict[str, dict[str, Any]] = {
@@ -532,6 +583,7 @@ _SEED_TABLES: list[Table | type[HasTable]] = [
     ProjectResourcePolicyRow,
     KeyPairResourcePolicyRow,
     UserRow,
+    KeyPairRow,
     ProjectRow,
     ResourceGroupRow,
     RoleRow,
@@ -970,3 +1022,29 @@ def resource_preset_seed_dir(tmp_path: Path) -> Path:
 @pytest.fixture
 def small_preset_id() -> str:
     return str(_RESOURCE_PRESETS["small.yaml"]["id"])
+
+
+@pytest.fixture
+def user_seed_dir(tmp_path: Path) -> Path:
+    """A directory of user seed files with the domains and the resource policies they
+    refer to."""
+    directory = tmp_path / "user"
+    directory.mkdir()
+    for file_name, domain in _DOMAINS.items():
+        (directory / f"domain-{file_name}").write_text(
+            yaml.safe_dump({"kind": "domain", "version": 1, "items": [domain]})
+        )
+    for kind in ("user_resource_policy", "keypair_resource_policy"):
+        (directory / f"{kind}.yaml").write_text(
+            yaml.safe_dump({"kind": kind, "version": 1, "items": [_RESOURCE_POLICIES[kind]]})
+        )
+    for file_name, user in _USERS.items():
+        (directory / file_name).write_text(
+            yaml.safe_dump({"kind": "user", "version": 1, "items": [user]})
+        )
+    return directory
+
+
+@pytest.fixture
+def admin_user_id() -> str:
+    return str(_USERS["admin.yaml"]["id"])

@@ -35,6 +35,7 @@ from ai.backend.manager.seed.runtime_variant_preset.seed import RuntimeVariantPr
 from ai.backend.manager.seed.storage_backend_type.seed import StorageBackendTypeSeed
 from ai.backend.manager.seed.storage_namespace.seed import StorageNamespaceSeed
 from ai.backend.manager.seed.types import SeedKind
+from ai.backend.manager.seed.user.seed import UserSeed
 from ai.backend.manager.seed.vfs_storage.seed import VFSStorageSeed
 
 
@@ -64,6 +65,7 @@ def create_seed_kind_registry() -> SeedKindRegistry:
         SeedKind.STORAGE_NAMESPACE: (1, StorageNamespaceSeed),
         SeedKind.VFS_STORAGE: (1, VFSStorageSeed),
         SeedKind.DOMAIN: (1, DomainSeed),
+        SeedKind.USER: (1, UserSeed),
         SeedKind.PROJECT: (1, ProjectSeed),
         SeedKind.DEPLOYMENT_PRESET: (1, DeploymentPresetSeed),
         SeedKind.RESOURCE_GROUP: (1, ResourceGroupSeed),
