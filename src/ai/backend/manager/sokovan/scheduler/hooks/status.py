@@ -23,6 +23,7 @@ from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.errors.agent import AgentNotAllocated
 from ai.backend.manager.errors.common import ServerMisconfiguredError
 from ai.backend.manager.models.network.row import NetworkType
+from ai.backend.manager.network.pairing import resolve_driver_for_agents
 from ai.backend.manager.plugin.network import NetworkPluginContext
 from ai.backend.manager.sokovan.recorder.context import RecorderContext
 from ai.backend.manager.views.sokovan.lifecycle import SessionWithKernels
@@ -170,7 +171,7 @@ class TerminatedTransitionHook(StatusTransitionHook):
                 if cluster_mode == ClusterMode.SINGLE_NODE:
                     await self._destroy_local_network(session, network_id)
                 elif cluster_mode == ClusterMode.MULTI_NODE:
-                    await self._destroy_overlay_network(session_id, network_id)
+                    await self._destroy_overlay_network(session, network_id)
 
     async def _destroy_local_network(self, session: SessionWithKernels, network_id: str) -> None:
         session_id = session.session_info.identity.id
@@ -180,8 +181,14 @@ class TerminatedTransitionHook(StatusTransitionHook):
         async with self._deps.agent_client_pool.acquire(AgentId(agent_id)) as client:
             await client.destroy_local_network(network_id)
 
-    async def _destroy_overlay_network(self, session_id: SessionId, network_id: str) -> None:
-        default_driver = self._deps.config_provider.config.network.inter_container.default_driver
+    async def _destroy_overlay_network(self, session: SessionWithKernels, network_id: str) -> None:
+        # Resolved as the launcher resolved it, so the plugin that created the network destroys it.
+        default_driver = await resolve_driver_for_agents(
+            self._deps.network_plugin_ctx.etcd,
+            sorted({str(k.resource.agent) for k in session.kernel_infos if k.resource.agent}),
+            configured_driver=self._deps.config_provider.config.network.inter_container.default_driver,
+            plugins=self._deps.network_plugin_ctx.plugins,
+        )
         if default_driver is None:
             raise ServerMisconfiguredError("No inter-container network driver is configured.")
         if default_driver not in self._deps.network_plugin_ctx.plugins:

@@ -1,7 +1,7 @@
 from abc import ABCMeta, abstractmethod
 from collections.abc import Mapping
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, ClassVar
 
 from ai.backend.common.plugin import AbstractPlugin, BasePluginContext
 
@@ -13,6 +13,9 @@ class NetworkInfo:
 
 
 class AbstractNetworkManagerPlugin(AbstractPlugin, metaclass=ABCMeta):
+    #: The agent backends whose nodes this driver can network; None leaves pairing unchecked.
+    compatible_backends: ClassVar[frozenset[str] | None] = None
+
     @abstractmethod
     async def create_network(
         self,
