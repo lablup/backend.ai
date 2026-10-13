@@ -33,10 +33,36 @@ _CASES: Final[list[IdempotenceCase]] = [
     IdempotenceCase(SeedKind.RESOURCE_SLOT_TYPE, "resource_slot_type_seed_dir"),
     IdempotenceCase(SeedKind.LOGIN_CLIENT_TYPE, "login_client_type_seed_dir"),
     IdempotenceCase(SeedKind.RETENTION_POLICY, "retention_policy_seed_dir"),
+    IdempotenceCase(
+        SeedKind.PROMETHEUS_QUERY_PRESET_CATEGORY, "prometheus_query_preset_category_seed_dir"
+    ),
+    IdempotenceCase(SeedKind.PROMETHEUS_QUERY_PRESET, "prometheus_query_preset_seed_dir"),
     IdempotenceCase(SeedKind.APP_CONFIG_DEFINITION, "app_config_definition_seed_dir"),
+    IdempotenceCase(SeedKind.APP_CONFIG_ALLOW_LIST, "app_config_allow_list_seed_dir"),
     IdempotenceCase(SeedKind.CLIENT_IP_MASKING_POLICY, "client_ip_masking_policy_seed_dir"),
+    IdempotenceCase(SeedKind.NOTIFICATION_CHANNEL, "notification_channel_seed_dir"),
+    IdempotenceCase(SeedKind.NOTIFICATION_RULE, "notification_rule_seed_dir"),
+    IdempotenceCase(SeedKind.RUNTIME_VARIANT, "runtime_variant_seed_dir"),
+    IdempotenceCase(SeedKind.RUNTIME_VARIANT_PRESET, "runtime_variant_preset_seed_dir"),
     IdempotenceCase(SeedKind.ROLE_PRESET, "role_seed_dir"),
+    IdempotenceCase(SeedKind.USER_RESOURCE_POLICY, "resource_policy_seed_dir"),
+    IdempotenceCase(SeedKind.PROJECT_RESOURCE_POLICY, "resource_policy_seed_dir"),
+    IdempotenceCase(SeedKind.KEYPAIR_RESOURCE_POLICY, "resource_policy_seed_dir"),
+    IdempotenceCase(SeedKind.IDLE_CHECKER, "idle_checker_seed_dir"),
+    IdempotenceCase(SeedKind.CONTAINER_REGISTRY, "container_registry_seed_dir"),
     IdempotenceCase(SeedKind.STORAGE_BACKEND_TYPE, "storage_backend_type_seed_dir"),
+    IdempotenceCase(SeedKind.OBJECT_STORAGE, "object_storage_seed_dir"),
+    IdempotenceCase(SeedKind.STORAGE_NAMESPACE, "storage_namespace_seed_dir"),
+    IdempotenceCase(SeedKind.VFS_STORAGE, "vfs_storage_seed_dir"),
+    IdempotenceCase(SeedKind.DOMAIN, "domain_seed_dir"),
+    IdempotenceCase(SeedKind.USER, "user_seed_dir"),
+    IdempotenceCase(SeedKind.PROJECT, "project_seed_dir"),
+    IdempotenceCase(SeedKind.DEPLOYMENT_PRESET, "deployment_preset_seed_dir"),
+    IdempotenceCase(SeedKind.RESOURCE_GROUP, "resource_group_seed_dir"),
+    IdempotenceCase(SeedKind.APP_CONFIG_FRAGMENT, "app_config_fragment_seed_dir"),
+    IdempotenceCase(SeedKind.RESOURCE_PRESET, "resource_preset_seed_dir"),
+    IdempotenceCase(SeedKind.ROLE, "role_kind_seed_dir"),
+    IdempotenceCase(SeedKind.SESSION_TEMPLATE, "session_template_seed_dir"),
 ]
 
 
@@ -57,15 +83,27 @@ def test_every_registered_kind_has_a_case() -> None:
     assert {case.kind_name for case in _CASES} == registered
 
 
-@pytest.mark.parametrize("case", _CASES, ids=lambda case: case.kind_name)
+@pytest.fixture
+def case(request: pytest.FixtureRequest) -> IdempotenceCase:
+    case: IdempotenceCase = request.param
+    return case
+
+
+@pytest.fixture
+def seeds(request: pytest.FixtureRequest, case: IdempotenceCase) -> Path:
+    """Resolved during setup, outside the test's event loop, so the fixture may be async."""
+    seeds: Path = request.getfixturevalue(case.seeds_fixture)
+    return seeds
+
+
+@pytest.mark.parametrize("case", _CASES, ids=lambda case: case.kind_name, indirect=True)
 async def test_applying_again_changes_nothing(
     case: IdempotenceCase,
-    request: pytest.FixtureRequest,
+    seeds: Path,
     db: ExtendedAsyncSAEngine,
     repository: SeedRepository,
     seed_tables: list[sa.Table],
 ) -> None:
-    seeds: Path = request.getfixturevalue(case.seeds_fixture)
     plan = SeedPlanner(create_seed_kind_registry()).plan([seeds])
     assert plan.rejections == []
     applier = SeedApplier(repository)
