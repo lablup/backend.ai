@@ -75,20 +75,21 @@ _DEFAULT_MOUNTS: Final = (
     },
 )
 
+# Same lists and order as containerd's `oci.WithDefaultSpec`.
 _MASKED_PATHS: Final = (
     "/proc/acpi",
+    "/proc/asound",
     "/proc/kcore",
     "/proc/keys",
     "/proc/latency_stats",
     "/proc/timer_list",
     "/proc/timer_stats",
     "/proc/sched_debug",
-    "/proc/scsi",
     "/sys/firmware",
     "/sys/devices/virtual/powercap",
+    "/proc/scsi",
 )
 _READONLY_PATHS: Final = (
-    "/proc/asound",
     "/proc/bus",
     "/proc/fs",
     "/proc/irq",

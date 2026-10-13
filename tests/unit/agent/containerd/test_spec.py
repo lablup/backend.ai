@@ -88,6 +88,30 @@ class TestBaseSpec:
         assert f"size={1 << 26}" in mounts["/dev/shm"]["options"]
         assert {"/proc", "/dev", "/dev/pts", "/dev/mqueue", "/sys", "/sys/fs/cgroup"} <= set(mounts)
 
+    def test_masked_and_readonly_paths_match_containerd_defaults(self) -> None:
+        linux = build_base_spec(_input())["linux"]
+
+        assert linux["maskedPaths"] == [
+            "/proc/acpi",
+            "/proc/asound",
+            "/proc/kcore",
+            "/proc/keys",
+            "/proc/latency_stats",
+            "/proc/timer_list",
+            "/proc/timer_stats",
+            "/proc/sched_debug",
+            "/sys/firmware",
+            "/sys/devices/virtual/powercap",
+            "/proc/scsi",
+        ]
+        assert linux["readonlyPaths"] == [
+            "/proc/bus",
+            "/proc/fs",
+            "/proc/irq",
+            "/proc/sys",
+            "/proc/sysrq-trigger",
+        ]
+
     def test_default_mounts_come_before_dev_shm_children(self) -> None:
         order = [m["destination"] for m in build_base_spec(_input())["mounts"]]
 
