@@ -93,28 +93,15 @@ class TestStreamService:
         session.main_kernel = kernel
         return session
 
-    @pytest.fixture
-    def mock_main_kernel(self) -> MagicMock:
-        kernel = MagicMock()
-        kernel.id = FAKE_KERNEL_ID
-        kernel.network.kernel_host = "10.0.0.1"
-        kernel.resource.agent_addr = "agent1:6001"
-        kernel.network.repl_in_port = 2000
-        kernel.network.repl_out_port = 2001
-        kernel.network.service_ports = [
-            {"name": "jupyter", "protocol": "http", "container_ports": [8080]}
-        ]
-        return kernel
-
 
 class TestGetStreamingSession(TestStreamService):
     async def test_valid_session_returns_full_info(
         self,
         stream_service: StreamService,
         mock_repository: AsyncMock,
-        mock_main_kernel: MagicMock,
+        mock_session: MagicMock,
     ) -> None:
-        mock_repository.get_streaming_main_kernel.return_value = mock_main_kernel
+        mock_repository.get_streaming_session.return_value = mock_session
         action = GetStreamingSessionAction(session_id=FAKE_SESSION_ID)
 
         result = await stream_service.get_streaming_session(action)
@@ -129,16 +116,16 @@ class TestGetStreamingSession(TestStreamService):
         assert result.service_ports == [
             {"name": "jupyter", "protocol": "http", "container_ports": [8080]}
         ]
-        mock_repository.get_streaming_main_kernel.assert_awaited_once_with(FAKE_SESSION_ID)
+        mock_repository.get_streaming_session.assert_awaited_once_with(FAKE_SESSION_ID)
 
     async def test_no_service_ports_returns_empty_list(
         self,
         stream_service: StreamService,
         mock_repository: AsyncMock,
-        mock_main_kernel: MagicMock,
+        mock_session: MagicMock,
     ) -> None:
-        mock_main_kernel.network.service_ports = None
-        mock_repository.get_streaming_main_kernel.return_value = mock_main_kernel
+        mock_session.main_kernel.service_ports = None
+        mock_repository.get_streaming_session.return_value = mock_session
         action = GetStreamingSessionAction(session_id=FAKE_SESSION_ID)
 
         result = await stream_service.get_streaming_session(action)
@@ -150,7 +137,7 @@ class TestGetStreamingSession(TestStreamService):
         stream_service: StreamService,
         mock_repository: AsyncMock,
     ) -> None:
-        mock_repository.get_streaming_main_kernel.side_effect = SessionNotFound()
+        mock_repository.get_streaming_session.side_effect = SessionNotFound()
         action = GetStreamingSessionAction(session_id=SessionId(uuid.uuid4()))
 
         with pytest.raises(SessionNotFound):
@@ -240,9 +227,9 @@ class TestStartServiceInStream(TestStreamService):
         stream_service: StreamService,
         mock_repository: AsyncMock,
         mock_registry: AsyncMock,
-        mock_main_kernel: MagicMock,
+        mock_session: MagicMock,
     ) -> None:
-        mock_repository.get_streaming_main_kernel.return_value = mock_main_kernel
+        mock_repository.get_streaming_session.return_value = mock_session
         mock_registry.start_service.return_value = {"status": "started"}
         action = StartServiceInStreamAction(
             session_id=SessionId(uuid.uuid4()),
@@ -255,8 +242,8 @@ class TestStartServiceInStream(TestStreamService):
         assert isinstance(result, StartServiceInStreamActionResult)
         assert result.result == {"status": "started"}
         mock_registry.start_service.assert_awaited_once_with(
-            mock_main_kernel.id,
-            mock_main_kernel.resource.agent,
+            mock_session.main_kernel.id,
+            mock_session.main_kernel.agent,
             "jupyter",
             {"port": 8888},
         )
