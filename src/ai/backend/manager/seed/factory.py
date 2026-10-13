@@ -13,6 +13,7 @@ from ai.backend.manager.seed.login_client_type.seed import LoginClientTypeSeed
 from ai.backend.manager.seed.notification_channel.seed import NotificationChannelSeed
 from ai.backend.manager.seed.notification_rule.seed import NotificationRuleSeed
 from ai.backend.manager.seed.object_storage.seed import ObjectStorageSeed
+from ai.backend.manager.seed.project.seed import ProjectSeed
 from ai.backend.manager.seed.prometheus_query_preset.seed import PrometheusQueryPresetSeed
 from ai.backend.manager.seed.prometheus_query_preset_category.seed import (
     PrometheusQueryPresetCategorySeed,
@@ -60,5 +61,6 @@ def create_seed_kind_registry() -> SeedKindRegistry:
         SeedKind.STORAGE_NAMESPACE: (1, StorageNamespaceSeed),
         SeedKind.VFS_STORAGE: (1, VFSStorageSeed),
         SeedKind.DOMAIN: (1, DomainSeed),
+        SeedKind.PROJECT: (1, ProjectSeed),
         SeedKind.DEPLOYMENT_PRESET: (1, DeploymentPresetSeed),
     })

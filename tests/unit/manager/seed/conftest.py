@@ -20,6 +20,7 @@ from ai.backend.manager.models.idle_checker.row import IdleCheckerRow
 from ai.backend.manager.models.login_client_type.row import LoginClientTypeRow
 from ai.backend.manager.models.notification.row import NotificationChannelRow, NotificationRuleRow
 from ai.backend.manager.models.object_storage.row import ObjectStorageRow
+from ai.backend.manager.models.project.row import ProjectRow
 from ai.backend.manager.models.prometheus_query_preset.row import PrometheusQueryPresetRow
 from ai.backend.manager.models.prometheus_query_preset_category.row import (
     PrometheusQueryPresetCategoryRow,
@@ -41,6 +42,7 @@ from ai.backend.manager.models.runtime_variant.row import RuntimeVariantRow
 from ai.backend.manager.models.runtime_variant_preset.row import RuntimeVariantPresetRow
 from ai.backend.manager.models.storage_backend.row import StorageBackendTypeRow
 from ai.backend.manager.models.storage_namespace.row import StorageNamespaceRow
+from ai.backend.manager.models.user.row import UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.vfs_storage.row import VFSStorageRow
 from ai.backend.manager.models.virtual_entity.entity_membership import EntityMembershipRow
@@ -425,6 +427,28 @@ _DEPLOYMENT_PRESETS: dict[str, dict[str, Any]] = {
     },
 }
 
+# Project seed files written for the tests, one project per file, in the `default` domain
+# under the `default` project resource policy.
+_PROJECTS: dict[str, dict[str, Any]] = {
+    "research.yaml": {
+        "id": "0198a5a0-0000-7000-8000-00000000e001",
+        "domain_id": "0198a5a0-0000-7000-8000-00000000d001",
+        "name": "research",
+        "resource_policy": "default",
+        "description": "Research project",
+        "total_resource_slots": {"cpu": "4"},
+        "allowed_vfolder_hosts": {"local:volume1": ["create-vfolder", "mount-in-session"]},
+    },
+    "model-store.yaml": {
+        "id": "0198a5a0-0000-7000-8000-00000000e002",
+        "domain_id": "0198a5a0-0000-7000-8000-00000000d001",
+        "name": "model-store",
+        "type": "model-store",
+        "resource_policy": "default",
+        "description": "Model Store",
+    },
+}
+
 # The tables a seed kind writes, and the graph tables the creation path writes beside them.
 _SEED_TABLES: list[Table | type[HasTable]] = [
     AppConfigDefinitionRow,
@@ -452,6 +476,8 @@ _SEED_TABLES: list[Table | type[HasTable]] = [
     UserResourcePolicyRow,
     ProjectResourcePolicyRow,
     KeyPairResourcePolicyRow,
+    UserRow,
+    ProjectRow,
     RoleRow,
     VFSStorageRow,
     PermissionRow,
@@ -810,3 +836,29 @@ def vllm_small_preset_id() -> str:
 @pytest.fixture
 def minimal_preset_id() -> str:
     return str(_DEPLOYMENT_PRESETS["minimal.yaml"]["id"])
+
+
+@pytest.fixture
+def project_seed_dir(tmp_path: Path) -> Path:
+    """A directory of project seed files with the domain and the project resource policy
+    files they refer to."""
+    directory = tmp_path / "project"
+    directory.mkdir()
+    for file_name, domain in _DOMAINS.items():
+        (directory / f"domain-{file_name}").write_text(
+            yaml.safe_dump({"kind": "domain", "version": 1, "items": [domain]})
+        )
+    for kind in ("user_resource_policy", "project_resource_policy"):
+        (directory / f"{kind}.yaml").write_text(
+            yaml.safe_dump({"kind": kind, "version": 1, "items": [_RESOURCE_POLICIES[kind]]})
+        )
+    for file_name, project in _PROJECTS.items():
+        (directory / file_name).write_text(
+            yaml.safe_dump({"kind": "project", "version": 1, "items": [project]})
+        )
+    return directory
+
+
+@pytest.fixture
+def research_project_id() -> str:
+    return str(_PROJECTS["research.yaml"]["id"])
