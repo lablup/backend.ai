@@ -428,9 +428,7 @@ class TestSealedKernel:
 
         assert runner.calls == []
         assert client.calls == []
-        scratch = tmp_path / str(ownership_data.kernel_id)
-        assert not (scratch / "spec.jws").exists()
-        assert not (scratch / "config" / "environ.txt").exists()
+        assert not (tmp_path / str(ownership_data.kernel_id)).exists()
 
 
 class TestCreationContextMembers:

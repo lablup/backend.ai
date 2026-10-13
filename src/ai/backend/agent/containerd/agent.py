@@ -200,6 +200,7 @@ class ContainerdKernelCreationContext(AbstractKernelCreationContext[ContainerdKe
     _dirs: ScratchDirs
     _generated_mounts: list[GeneratedMount]
     _base_spec: dict[str, Any]
+    _spec_signature: str | None
 
     def __init__(
         self,
@@ -241,6 +242,8 @@ class ContainerdKernelCreationContext(AbstractKernelCreationContext[ContainerdKe
         )
         self._generated_mounts = []
         self._base_spec = {}
+        # Before the scratch dir exists: a sealed kernel without a signature fails here.
+        self._spec_signature = spec_signature(kernel_config)
 
     def _owner(self) -> Owner | None:
         """Who owns the files in the work dir, as the Docker agent decides it."""
@@ -393,7 +396,6 @@ class ContainerdKernelCreationContext(AbstractKernelCreationContext[ContainerdKe
         service_ports: list[ServicePort],
         cluster_info: ClusterInfo,
     ) -> ContainerdKernel:
-        signature = spec_signature(self.kernel_config)  # a sealed kernel without one fails here
         await self._write_config_files(resource_spec, environ)
         extra_caps = (
             ("CAP_SYS_PTRACE",)
@@ -414,8 +416,8 @@ class ContainerdKernelCreationContext(AbstractKernelCreationContext[ContainerdKe
                 extra_caps=extra_caps,
             )
         )
-        if signature is not None:
-            await self._add_spec_jws(signature)
+        if self._spec_signature is not None:
+            await self._add_spec_jws(self._spec_signature)
         launch = KernelLaunch(
             kernel_id=self.kernel_id,
             session_id=self.session_id,
