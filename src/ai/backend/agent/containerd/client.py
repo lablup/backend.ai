@@ -5,7 +5,6 @@ from __future__ import annotations
 import asyncio
 import enum
 import json
-import logging
 from collections.abc import Awaitable, Callable, Mapping, Sequence
 from dataclasses import dataclass, field
 from typing import Any, Final, Protocol
@@ -29,14 +28,12 @@ from ai.backend.agent.containerd._grpcapi.api.services.snapshots.v1 import (
 from ai.backend.agent.containerd._grpcapi.api.services.tasks.v1 import tasks_pb2, tasks_pb2_grpc
 from ai.backend.agent.containerd._grpcapi.api.types import mount_pb2
 from ai.backend.agent.errors.containerd import (
+    ContainerdImageInvalid,
     ContainerdImageNotFound,
     ContainerdOperationFailed,
     ContainerdUnavailableError,
 )
 from ai.backend.common.exception import BackendAIError
-from ai.backend.logging.structured import StructuredLogger
-
-log = StructuredLogger(logging.getLogger(__spec__.name))
 
 NAMESPACE_HEADER: Final = "containerd-namespace"
 SPEC_TYPE_URL: Final = "types.containerd.io/opencontainers/runtime-spec/1/Spec"
@@ -106,6 +103,9 @@ class ContainerdAPI(Protocol):
 
     @property
     def snapshotter(self) -> str: ...
+
+    @property
+    def namespace(self) -> str: ...
 
     @property
     def connected(self) -> bool: ...
@@ -187,6 +187,10 @@ class ContainerdClient:
     @property
     def snapshotter(self) -> str:
         return self._config.snapshotter
+
+    @property
+    def namespace(self) -> str:
+        return self._config.namespace
 
     @property
     def connected(self) -> bool:
@@ -274,6 +278,10 @@ class ContainerdClient:
                 ):
                     buf.extend(resp.data)
         except grpc.aio.AioRpcError as e:
+            if e.code() in _NOT_FOUND:
+                raise ContainerdImageInvalid(
+                    f"the blob {digest} is missing from the content store"
+                ) from e
             raise self._failure(f"read_content({digest})", e) from e
         except TimeoutError as e:
             raise ContainerdOperationFailed(f"read_content({digest}): timed out") from e
@@ -288,7 +296,13 @@ class ContainerdClient:
             snapshots_pb2.PrepareSnapshotRequest(
                 snapshotter=self._config.snapshotter, key=key, parent=parent
             ),
+            tolerate=_NOT_FOUND,
         )
+        if resp is None:
+            raise ContainerdImageNotFound(
+                f"the image is not unpacked for the snapshotter {self._config.snapshotter}"
+                f" (parent snapshot {parent})"
+            )
         return [
             MountSpec(type=m.type, source=m.source, options=tuple(m.options)) for m in resp.mounts
         ]

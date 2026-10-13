@@ -86,8 +86,7 @@ class TestParseImageConfig:
 
 
 class TestResolveImage:
-    async def test_single_manifest_image(self) -> None:
-        fake = FakeContainerd()
+    async def test_single_manifest_image(self, fake: FakeContainerd) -> None:
         fake.add_image("img:1", diff_ids=["sha256:aa", "sha256:bb"], env=["A=1"])
 
         resolved = await resolve_image(fake, "img:1", "x86_64")
@@ -95,8 +94,7 @@ class TestResolveImage:
         assert resolved.chain_id == chain_id(["sha256:aa", "sha256:bb"])
         assert resolved.env == ("A=1",)
 
-    async def test_index_image_follows_the_platform_manifest(self) -> None:
-        fake = FakeContainerd()
+    async def test_index_image_follows_the_platform_manifest(self, fake: FakeContainerd) -> None:
         fake.blobs["sha256:index"] = json.dumps({
             "manifests": [
                 {"digest": "sha256:m-arm", "platform": {"os": "linux", "architecture": "arm64"}},
@@ -117,8 +115,7 @@ class TestResolveImage:
         with pytest.raises(ContainerdImageNotFound):
             await resolve_image(FakeContainerd(), "absent:1", "x86_64")
 
-    async def test_manifest_without_config_is_invalid(self) -> None:
-        fake = FakeContainerd()
+    async def test_manifest_without_config_is_invalid(self, fake: FakeContainerd) -> None:
         fake.blobs["sha256:manifest"] = b"{}"
         fake.images["img:1"] = ImageTarget(
             "sha256:manifest", "application/vnd.oci.image.manifest.v1+json"
@@ -127,8 +124,7 @@ class TestResolveImage:
         with pytest.raises(ContainerdImageInvalid, match="config"):
             await resolve_image(fake, "img:1", "x86_64")
 
-    async def test_non_json_blob_is_invalid(self) -> None:
-        fake = FakeContainerd()
+    async def test_non_json_blob_is_invalid(self, fake: FakeContainerd) -> None:
         fake.blobs["sha256:manifest"] = b"not json"
         fake.images["img:1"] = ImageTarget(
             "sha256:manifest", "application/vnd.oci.image.manifest.v1+json"

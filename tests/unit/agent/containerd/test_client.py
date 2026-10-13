@@ -38,6 +38,7 @@ from ai.backend.agent.containerd.client import (
     TaskState,
 )
 from ai.backend.agent.errors.containerd import (
+    ContainerdImageInvalid,
     ContainerdImageNotFound,
     ContainerdOperationFailed,
     ContainerdUnavailableError,
@@ -99,6 +100,8 @@ class Content(Servicer):
 
     async def Read(self, request: Any, context: Any) -> AsyncIterator[Any]:
         await self.backend.enter(context)
+        if request.digest == "sha256:absent":
+            await context.abort(grpc.StatusCode.NOT_FOUND, "no such blob")
         for chunk in (b"abc", b"def"):
             yield content_pb2.ReadContentResponse(offset=0, data=chunk)
 
@@ -109,6 +112,8 @@ class Snapshots(Servicer):
 
     async def Prepare(self, request: Any, context: Any) -> Any:
         await self.backend.enter(context)
+        if request.parent == "sha256:absent":
+            await context.abort(grpc.StatusCode.NOT_FOUND, "parent snapshot does not exist")
         mount = mount_pb2.Mount(type="overlay", source="overlay", options=["lowerdir=/a"])
         return snapshots_pb2.PrepareSnapshotResponse(mounts=[mount])
 
@@ -221,6 +226,10 @@ class TestImages:
     async def test_streamed_blob_is_joined(self, client: ContainerdClient) -> None:
         assert await client.read_blob("sha256:x") == b"abcdef"
 
+    async def test_missing_blob_is_an_invalid_image(self, client: ContainerdClient) -> None:
+        with pytest.raises(ContainerdImageInvalid):
+            await client.read_blob("sha256:absent")
+
 
 class TestContainers:
     async def test_create_sends_runtime_spec_snapshot_and_labels(
@@ -276,6 +285,12 @@ class TestSnapshots:
         mounts = await client.prepare_snapshot("c1", "sha256:parent")
 
         assert mounts == [MountSpec("overlay", "overlay", ("lowerdir=/a",))]
+
+    async def test_missing_parent_means_the_image_is_not_unpacked(
+        self, client: ContainerdClient
+    ) -> None:
+        with pytest.raises(ContainerdImageNotFound, match="not unpacked"):
+            await client.prepare_snapshot("c1", "sha256:absent")
 
     async def test_remove_of_a_missing_snapshot_is_tolerated(
         self, client: ContainerdClient

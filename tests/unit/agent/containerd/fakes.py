@@ -19,6 +19,7 @@ class FakeContainerd:
     """An in-memory containerd: images, blobs, snapshots, containers and tasks."""
 
     snapshotter: str
+    namespace: str
     images: dict[str, ImageTarget]
     blobs: dict[str, bytes]
     snapshots: dict[str, Sequence[MountSpec]]
@@ -27,12 +28,13 @@ class FakeContainerd:
     tasks: dict[str, TaskInfo]
     calls: list[tuple[str, str]]
     failing: set[str]
-    exits_on_sigint: bool
+    exits_on_sigterm: bool
     closed: bool
     connected: bool
 
-    def __init__(self, *, exits_on_sigint: bool = True) -> None:
+    def __init__(self, *, exits_on_sigterm: bool = True) -> None:
         self.snapshotter = "overlayfs"
+        self.namespace = "fake-ns"
         self.images = {}
         self.blobs = {}
         self.snapshots = {}
@@ -41,7 +43,7 @@ class FakeContainerd:
         self.tasks = {}
         self.calls = []
         self.failing = set()
-        self.exits_on_sigint = exits_on_sigint
+        self.exits_on_sigterm = exits_on_sigterm
         self.closed = False
         self.connected = True
 
@@ -115,7 +117,7 @@ class FakeContainerd:
         self._call(f"kill_task:{signal.Signals(signum).name}", container_id)
         if container_id not in self.tasks:
             return
-        if signum == signal.SIGKILL or self.exits_on_sigint:
+        if signum == signal.SIGKILL or self.exits_on_sigterm:
             self.tasks[container_id] = TaskInfo(pid=1000, state=TaskState.STOPPED, exit_status=137)
 
     async def delete_task(self, container_id: str) -> None:

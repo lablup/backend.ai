@@ -33,9 +33,7 @@ async def _launch(fake: FakeContainerd) -> int:
 
 
 class TestLaunch:
-    async def test_creates_snapshot_container_and_runs_the_task(self) -> None:
-        fake = FakeContainerd()
-
+    async def test_creates_snapshot_container_and_runs_the_task(self, fake: FakeContainerd) -> None:
         pid = await _launch(fake)
 
         assert pid == 1000
@@ -49,8 +47,9 @@ class TestLaunch:
         assert fake.containers[CID].labels == {"k": "v"}
 
     @pytest.mark.parametrize("failing", ["create_container", "create_task", "start_task"])
-    async def test_failure_removes_everything_created(self, failing: str) -> None:
-        fake = FakeContainerd()
+    async def test_failure_removes_everything_created(
+        self, failing: str, fake: FakeContainerd
+    ) -> None:
         fake.failing.add(failing)
 
         with pytest.raises(ContainerdOperationFailed, match=failing):
@@ -60,8 +59,9 @@ class TestLaunch:
         assert fake.containers == {}
         assert fake.tasks == {}
 
-    async def test_failing_cleanup_does_not_hide_the_launch_error(self) -> None:
-        fake = FakeContainerd()
+    async def test_failing_cleanup_does_not_hide_the_launch_error(
+        self, fake: FakeContainerd
+    ) -> None:
         fake.failing.update({"create_task", "remove_snapshot"})
 
         with pytest.raises(ContainerdOperationFailed, match="create_task"):
@@ -69,44 +69,39 @@ class TestLaunch:
 
 
 class TestDestroy:
-    async def test_sigint_stops_the_task_and_deletes_it(self) -> None:
-        fake = FakeContainerd()
+    async def test_sigterm_stops_the_task_and_deletes_it(self, fake: FakeContainerd) -> None:
         await _launch(fake)
 
         assert await destroy_container(fake, CID, grace_sec=1.0) is True
 
-        assert ("kill_task:SIGINT", CID) in fake.calls
+        assert ("kill_task:SIGTERM", CID) in fake.calls
         assert ("kill_task:SIGKILL", CID) not in fake.calls
         assert CID not in fake.tasks
         assert CID in fake.containers  # clean_kernel removes the record
 
     async def test_sigkill_after_the_grace_period(self) -> None:
-        fake = FakeContainerd(exits_on_sigint=False)
+        fake = FakeContainerd(exits_on_sigterm=False)
         await _launch(fake)
 
         assert await destroy_container(fake, CID, grace_sec=0.2) is True
 
         assert [c for c in fake.calls if c[0].startswith("kill_task")] == [
-            ("kill_task:SIGINT", CID),
+            ("kill_task:SIGTERM", CID),
             ("kill_task:SIGKILL", CID),
         ]
         assert CID not in fake.tasks
 
-    async def test_unknown_container_is_not_an_error(self) -> None:
-        fake = FakeContainerd()
-
+    async def test_unknown_container_is_not_an_error(self, fake: FakeContainerd) -> None:
         assert await destroy_container(fake, "absent") is False
 
         assert fake.calls == []
 
-    async def test_container_without_a_task_is_found(self) -> None:
-        fake = FakeContainerd()
+    async def test_container_without_a_task_is_found(self, fake: FakeContainerd) -> None:
         fake.containers[CID] = _record()
 
         assert await destroy_container(fake, CID) is True
 
-    async def test_already_stopped_task_is_only_deleted(self) -> None:
-        fake = FakeContainerd()
+    async def test_already_stopped_task_is_only_deleted(self, fake: FakeContainerd) -> None:
         await _launch(fake)
         await fake.kill_task(CID, 9, all_processes=True)
         fake.calls.clear()
@@ -117,8 +112,7 @@ class TestDestroy:
 
 
 class TestClean:
-    async def test_removes_task_container_and_snapshot(self) -> None:
-        fake = FakeContainerd()
+    async def test_removes_task_container_and_snapshot(self, fake: FakeContainerd) -> None:
         await _launch(fake)
 
         await clean_container(fake, CID)
@@ -128,7 +122,7 @@ class TestClean:
         assert fake.snapshots == {}
 
     async def test_kills_a_running_task_first(self) -> None:
-        fake = FakeContainerd(exits_on_sigint=False)
+        fake = FakeContainerd(exits_on_sigterm=False)
         await _launch(fake)
 
         await clean_container(fake, CID)
@@ -136,16 +130,13 @@ class TestClean:
         assert ("kill_task:SIGKILL", CID) in fake.calls
         assert fake.tasks == {}
 
-    async def test_missing_everything_is_tolerated(self) -> None:
-        fake = FakeContainerd()
-
+    async def test_missing_everything_is_tolerated(self, fake: FakeContainerd) -> None:
         await clean_container(fake, "absent")
         await clean_container(fake, "absent")
 
         assert ("remove_snapshot", "absent") in fake.calls
 
-    async def test_is_idempotent(self) -> None:
-        fake = FakeContainerd()
+    async def test_is_idempotent(self, fake: FakeContainerd) -> None:
         await _launch(fake)
 
         await clean_container(fake, CID)
@@ -153,13 +144,21 @@ class TestClean:
 
         assert fake.containers == {}
 
-    async def test_snapshot_key_comes_from_the_container_record(self) -> None:
-        fake = FakeContainerd()
+    async def test_snapshot_key_comes_from_the_container_record(self, fake: FakeContainerd) -> None:
         fake.containers[CID] = ContainerRecord(
             id=CID, image="i", snapshotter="overlayfs", snapshot_key="other-key"
         )
         fake.snapshots["other-key"] = []
 
         await clean_container(fake, CID)
+
+        assert fake.snapshots == {}
+
+    async def test_explicit_snapshot_key_is_used_when_no_record_exists(
+        self, fake: FakeContainerd
+    ) -> None:
+        fake.snapshots["snap-key"] = []
+
+        await clean_container(fake, CID, snapshot_key="snap-key")
 
         assert fake.snapshots == {}

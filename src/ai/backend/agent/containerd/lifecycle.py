@@ -53,7 +53,8 @@ async def launch_container(
 ) -> int:
     """Prepare the rootfs snapshot, create the container and start its task; returns the PID.
 
-    Whatever was created is removed again when a step fails.
+    Whatever was created is removed again when a step fails. The snapshot is not held by a
+    lease yet (FIXME(containerd-mvp)), so a containerd GC between the steps could collect it.
     """
     rootfs: Sequence[MountSpec] = await client.prepare_snapshot(record.snapshot_key, chain_id)
     try:
@@ -62,7 +63,7 @@ async def launch_container(
         await client.start_task(record.id)
     except BaseException:
         try:
-            await clean_container(client, record.id)
+            await clean_container(client, record.id, snapshot_key=record.snapshot_key)
         except BackendAIError:
             log.exception("cleanup after a failed launch failed", container_id=record.id)
         raise
@@ -75,12 +76,12 @@ async def destroy_container(
     *,
     grace_sec: float = STOP_GRACE_SEC,
 ) -> bool:
-    """Stop the task: SIGINT, then SIGKILL after the grace period. False if nothing was found."""
+    """Stop the task: SIGTERM, then SIGKILL after the grace period. False if nothing was found."""
     task = await client.get_task(container_id)
     if task is None:
         return await client.get_container(container_id) is not None
     if not is_gone(task):
-        await client.kill_task(container_id, signal.SIGINT, all_processes=False)
+        await client.kill_task(container_id, signal.SIGTERM, all_processes=False)
         if not await _wait_gone(client, container_id, grace_sec):
             await client.kill_task(container_id, signal.SIGKILL, all_processes=True)
             if not await _wait_gone(client, container_id, KILL_WAIT_SEC):
@@ -91,8 +92,13 @@ async def destroy_container(
     return True
 
 
-async def clean_container(client: ContainerdAPI, container_id: str) -> None:
-    """Remove the task, the container record and the rootfs snapshot; missing pieces are skipped."""
+async def clean_container(
+    client: ContainerdAPI, container_id: str, *, snapshot_key: str | None = None
+) -> None:
+    """Remove the task, the container record and the rootfs snapshot; missing pieces are skipped.
+
+    The snapshot key is the container record's; `snapshot_key` covers a record not created yet.
+    """
     record = await client.get_container(container_id)
     task = await client.get_task(container_id)
     if task is not None:
@@ -101,4 +107,5 @@ async def clean_container(client: ContainerdAPI, container_id: str) -> None:
             await _wait_gone(client, container_id, KILL_WAIT_SEC)
         await client.delete_task(container_id)
     await client.delete_container(container_id)
-    await client.remove_snapshot(record.snapshot_key if record is not None else container_id)
+    key = record.snapshot_key if record is not None else snapshot_key or container_id
+    await client.remove_snapshot(key)
