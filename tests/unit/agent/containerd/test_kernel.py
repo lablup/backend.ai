@@ -1,22 +1,35 @@
 from __future__ import annotations
 
 import asyncio
+import dataclasses
+import datetime
+import ipaddress
 import socket
+import ssl
 import uuid
-from collections.abc import Awaitable, Callable
+from collections.abc import AsyncIterator, Awaitable, Callable
+from pathlib import Path
 from typing import Any
 from unittest.mock import MagicMock
 
 import pytest
+from cryptography import x509
+from cryptography.hazmat.primitives import hashes, serialization
+from cryptography.hazmat.primitives.asymmetric import ec
+from cryptography.x509.oid import NameOID
 from pytest_mock import MockerFixture
 from tenacity import TryAgain
 
 from ai.backend.agent.containerd import kernel as kernel_module
 from ai.backend.agent.containerd.kernel import ContainerdKernel
-from ai.backend.agent.containerd.profile.base import LaunchPlan
-from ai.backend.agent.errors.containerd import ContainerdOperationFailed, KernelVerbNotSupported
+from ai.backend.agent.containerd.profile.base import LaunchPlan, TlsConnectReadiness
+from ai.backend.agent.errors.containerd import (
+    ContainerdOperationFailed,
+    KernelVerbNotSupported,
+    ReadinessTimeout,
+)
 from ai.backend.agent.types import KernelOwnershipData
-from ai.backend.common.types import KernelId
+from ai.backend.common.types import KernelId, ServicePortProtocols
 
 
 @pytest.fixture
@@ -142,3 +155,234 @@ class TestCheckStatus:
     async def test_missing_kernel_ip_is_a_typed_error(self, kernel: ContainerdKernel) -> None:
         with pytest.raises(ContainerdOperationFailed, match="kernel IP"):
             await kernel.check_status()
+
+
+TLS_PORT_NAME = "8080"
+
+
+def _self_signed_context(tmp_path: Path) -> ssl.SSLContext:
+    key = ec.generate_private_key(ec.SECP256R1())
+    name = x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, "td.example")])
+    now = datetime.datetime.now(datetime.UTC)
+    cert = (
+        x509.CertificateBuilder()
+        .subject_name(name)
+        .issuer_name(name)
+        .public_key(key.public_key())
+        .serial_number(x509.random_serial_number())
+        .not_valid_before(now - datetime.timedelta(minutes=1))
+        .not_valid_after(now + datetime.timedelta(days=1))
+        .add_extension(
+            x509.SubjectAlternativeName([x509.IPAddress(ipaddress.ip_address("127.0.0.1"))]),
+            critical=False,
+        )
+        .sign(key, hashes.SHA256())
+    )
+    cert_path = tmp_path / "cert.pem"
+    key_path = tmp_path / "key.pem"
+    cert_path.write_bytes(cert.public_bytes(serialization.Encoding.PEM))
+    key_path.write_bytes(
+        key.private_bytes(
+            serialization.Encoding.PEM,
+            serialization.PrivateFormat.PKCS8,
+            serialization.NoEncryption(),
+        )
+    )
+    context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+    context.load_cert_chain(cert_path, key_path)
+    return context
+
+
+@pytest.fixture
+def tls_context(tmp_path: Path) -> ssl.SSLContext:
+    return _self_signed_context(tmp_path)
+
+
+@pytest.fixture
+def tls_kernel(kernel: ContainerdKernel, launch_plan: LaunchPlan) -> ContainerdKernel:
+    kernel.launch_plan = dataclasses.replace(
+        launch_plan, readiness=TlsConnectReadiness(port_name=TLS_PORT_NAME, timeout_s=60.0)
+    )
+    kernel.data["published_host"] = "127.0.0.1"
+    kernel.data["kernel_ip"] = "172.30.9.2"
+    return kernel
+
+
+def _publish(kernel: ContainerdKernel, host_port: int | None) -> None:
+    kernel.service_ports = [
+        {
+            "name": TLS_PORT_NAME,
+            "protocol": ServicePortProtocols.HTTP,
+            "container_ports": (8080,),
+            "host_ports": (host_port,),
+            "is_inference": False,
+        }
+    ]
+
+
+@pytest.fixture
+def fast_probe(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(kernel_module, "_TLS_PROBE_WINDOW_SEC", 0.3)
+    monkeypatch.setattr(kernel_module, "_TLS_RETRY_INTERVAL_SEC", 0.05)
+
+
+@pytest.fixture
+def repl_spy(mocker: MockerFixture) -> MagicMock:
+    return mocker.patch("asyncio.open_connection", side_effect=asyncio.open_connection)
+
+
+def _handshake_calls(spy: MagicMock) -> list[Any]:
+    return [c for c in spy.call_args_list if c.kwargs.get("ssl") is not None]
+
+
+@pytest.fixture
+async def tls_server(tls_context: ssl.SSLContext) -> AsyncIterator[int]:
+    server = await asyncio.start_server(lambda r, w: w.close(), "127.0.0.1", 0, ssl=tls_context)
+    try:
+        yield int(server.sockets[0].getsockname()[1])
+    finally:
+        server.close()
+        await server.wait_closed()
+
+
+class TestCheckStatusTls:
+    """The TLS readiness probe: a handshake through the DNAT path of the published port."""
+
+    async def test_handshake_with_a_self_signed_cert_is_ready(
+        self, tls_kernel: ContainerdKernel, tls_server: int
+    ) -> None:
+        _publish(tls_kernel, tls_server)
+
+        assert await tls_kernel.check_status() == {}
+
+    async def test_refused_connection_retries_in_the_window_then_asks_to_try_again(
+        self, tls_kernel: ContainerdKernel, fast_probe: None, repl_spy: MagicMock
+    ) -> None:
+        _publish(tls_kernel, _unused_port())
+
+        with pytest.raises(TryAgain):
+            await tls_kernel.check_status()
+
+        assert len(_handshake_calls(repl_spy)) >= 2
+
+    async def test_server_that_closes_before_the_handshake_asks_to_try_again(
+        self, tls_kernel: ContainerdKernel, fast_probe: None
+    ) -> None:
+        server = await asyncio.start_server(lambda r, w: w.close(), "127.0.0.1", 0)
+        _publish(tls_kernel, server.sockets[0].getsockname()[1])
+
+        try:
+            with pytest.raises(TryAgain):
+                await tls_kernel.check_status()
+        finally:
+            server.close()
+            await server.wait_closed()
+
+    async def test_call_after_the_deadline_times_out_without_probing(
+        self, tls_kernel: ContainerdKernel, tls_server: int, repl_spy: MagicMock
+    ) -> None:
+        tls_kernel.launch_plan = dataclasses.replace(
+            tls_kernel.launch_plan,
+            readiness=TlsConnectReadiness(port_name=TLS_PORT_NAME, timeout_s=0.0),
+        )
+        _publish(tls_kernel, tls_server)
+
+        with pytest.raises(ReadinessTimeout):
+            await tls_kernel.check_status()
+
+        repl_spy.assert_not_called()
+
+    async def test_deadline_passing_during_a_call_times_out(
+        self, tls_kernel: ContainerdKernel, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setattr(kernel_module, "_TLS_RETRY_INTERVAL_SEC", 0.02)
+        tls_kernel.launch_plan = dataclasses.replace(
+            tls_kernel.launch_plan,
+            readiness=TlsConnectReadiness(port_name=TLS_PORT_NAME, timeout_s=0.2),
+        )
+        _publish(tls_kernel, _unused_port())
+
+        with pytest.raises(ReadinessTimeout):
+            await tls_kernel.check_status()
+
+    def test_readiness_timeout_is_not_retried_by_the_create_loop(self) -> None:
+        assert not issubclass(ReadinessTimeout, TryAgain)
+
+    async def test_server_starting_late_is_found_by_a_later_call(
+        self,
+        tls_kernel: ContainerdKernel,
+        tls_context: ssl.SSLContext,
+        fast_probe: None,
+    ) -> None:
+        port = _unused_port()
+        _publish(tls_kernel, port)
+        for _ in range(2):
+            with pytest.raises(TryAgain):
+                await tls_kernel.check_status()
+        server = await asyncio.start_server(
+            lambda r, w: w.close(), "127.0.0.1", port, ssl=tls_context
+        )
+
+        try:
+            assert await tls_kernel.check_status() == {}
+        finally:
+            server.close()
+            await server.wait_closed()
+
+    async def test_the_repl_port_is_never_touched(
+        self,
+        tls_kernel: ContainerdKernel,
+        tls_server: int,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        accepted: list[int] = []
+        repl = await asyncio.start_server(lambda r, w: accepted.append(1), "127.0.0.1", 0)
+        monkeypatch.setattr(kernel_module, "REPL_IN_PORT", repl.sockets[0].getsockname()[1])
+        _publish(tls_kernel, tls_server)
+
+        try:
+            assert await tls_kernel.check_status() == {}
+            assert await tls_kernel.get_service_apps() == {"status": "ok", "data": []}
+            assert await tls_kernel.start_service("jupyter", {}) == {"status": "started"}
+            await asyncio.sleep(0.05)
+        finally:
+            repl.close()
+            await repl.wait_closed()
+        assert accepted == []
+
+    async def test_probes_the_published_host_and_host_port(
+        self, tls_kernel: ContainerdKernel, mocker: MockerFixture, fast_probe: None
+    ) -> None:
+        connect = mocker.patch("asyncio.open_connection", side_effect=OSError("refused"))
+        tls_kernel.data["published_host"] = "10.0.0.5"
+        _publish(tls_kernel, 30001)
+
+        with pytest.raises(TryAgain):
+            await tls_kernel.check_status()
+
+        assert connect.call_args.args == ("10.0.0.5", 30001)
+
+    async def test_missing_service_port_is_a_typed_error(
+        self, tls_kernel: ContainerdKernel
+    ) -> None:
+        tls_kernel.service_ports = []
+
+        with pytest.raises(ContainerdOperationFailed, match="8080"):
+            await tls_kernel.check_status()
+
+    async def test_unpublished_service_port_is_a_typed_error(
+        self, tls_kernel: ContainerdKernel
+    ) -> None:
+        _publish(tls_kernel, None)
+
+        with pytest.raises(ContainerdOperationFailed, match="8080"):
+            await tls_kernel.check_status()
+
+    async def test_missing_published_host_is_a_typed_error(
+        self, tls_kernel: ContainerdKernel
+    ) -> None:
+        _publish(tls_kernel, 30001)
+        del tls_kernel.data["published_host"]
+
+        with pytest.raises(ContainerdOperationFailed, match="published host"):
+            await tls_kernel.check_status()

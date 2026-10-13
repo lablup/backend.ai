@@ -499,3 +499,16 @@ class TestRunCommand:
                 break
             await asyncio.sleep(0.05)
         assert not procs[0].is_running() or procs[0].status() == psutil.STATUS_ZOMBIE
+
+
+class TestPublishedHost:
+    @pytest.mark.parametrize(
+        ("bind_host", "expected"),
+        [("10.0.0.5", "10.0.0.5"), ("", "172.30.9.1"), ("0.0.0.0", "172.30.9.1")],
+    )
+    def test_bind_host_or_the_bridge_gateway(self, bind_host: str, expected: str) -> None:
+        net = KernelNetwork(
+            BR, IPv4Network("172.30.9.0/24"), bind_host, PORT_RANGE, run=FakeCommandRunner()
+        )
+
+        assert net.published_host == expected
