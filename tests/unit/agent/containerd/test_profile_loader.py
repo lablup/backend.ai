@@ -102,6 +102,19 @@ class TestLoadRuntimeProfilesSuccess:
         assert [p.name for p in profiles] == ["a"]
 
 
+class TestTwoMethodProfile:
+    def test_loads_without_prepare(self, mocker: MockerFixture) -> None:
+        mocker.patch(
+            SCAN_TARGET,
+            return_value=[FakeEntryPoint("old", lambda options: DataclassProfile("old"))],
+        )
+
+        profiles = load_runtime_profiles(["old"], {})
+
+        assert [p.name for p in profiles] == ["old"]
+        assert not hasattr(profiles[0], "prepare")
+
+
 class TestLoadRuntimeProfilesException:
     def test_name_not_installed(self, mocker: MockerFixture) -> None:
         mocker.patch(SCAN_TARGET, return_value=[])

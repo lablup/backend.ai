@@ -11,6 +11,7 @@ import pytest
 from pytest_mock import MockerFixture
 from tenacity import TryAgain
 
+from ai.backend.agent.containerd import kernel as kernel_module
 from ai.backend.agent.containerd.kernel import ContainerdKernel
 from ai.backend.agent.containerd.profile.base import LaunchPlan
 from ai.backend.agent.errors.containerd import ContainerdOperationFailed, KernelVerbNotSupported
@@ -103,12 +104,14 @@ def _unused_port() -> int:
 
 
 class TestCheckStatus:
-    """The runc readiness probe: a TCP connect to the REPL-in port."""
+    """The runc readiness probe: a TCP connect to the REPL-in port of the kernel IP."""
 
-    async def test_listening_port_is_ready(self, kernel: ContainerdKernel) -> None:
+    async def test_listening_port_is_ready(
+        self, kernel: ContainerdKernel, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         server = await asyncio.start_server(lambda r, w: w.close(), "127.0.0.1", 0)
-        port = server.sockets[0].getsockname()[1]
-        kernel.data["intrinsic_ports"] = {"replin": port, "replout": port + 1}
+        monkeypatch.setattr(kernel_module, "REPL_IN_PORT", server.sockets[0].getsockname()[1])
+        kernel.data["kernel_ip"] = "127.0.0.1"
 
         try:
             assert await kernel.check_status() == {}
@@ -117,38 +120,25 @@ class TestCheckStatus:
             await server.wait_closed()
 
     async def test_refused_connection_asks_the_create_loop_to_retry(
-        self, kernel: ContainerdKernel
+        self, kernel: ContainerdKernel, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        kernel.data["intrinsic_ports"] = {"replin": _unused_port(), "replout": 1}
+        monkeypatch.setattr(kernel_module, "REPL_IN_PORT", _unused_port())
+        kernel.data["kernel_ip"] = "127.0.0.1"
 
         with pytest.raises(TryAgain):
             await kernel.check_status()
 
-    async def test_ports_survive_a_recreated_kernel_object(
-        self, kernel: ContainerdKernel, ownership_data: KernelOwnershipData, launch_plan: LaunchPlan
+    async def test_probes_the_kernel_ip_on_the_repl_port(
+        self, kernel: ContainerdKernel, mocker: MockerFixture
     ) -> None:
-        server = await asyncio.start_server(lambda r, w: w.close(), "127.0.0.1", 0)
-        port = server.sockets[0].getsockname()[1]
-        persisted = {"intrinsic_ports": {"replin": port, "replout": port + 1}}
-        recreated = ContainerdKernel(
-            ownership_data,
-            "net-1",
-            MagicMock(),
-            1,
-            agent_config={},
-            resource_spec=MagicMock(),
-            service_ports=[],
-            environ={},
-            data=dict(persisted),
-            launch_plan=launch_plan,
-        )
+        connect = mocker.patch("asyncio.open_connection", side_effect=OSError("refused"))
+        kernel.data["kernel_ip"] = "172.30.9.2"
 
-        try:
-            assert await recreated.check_status() == {}
-        finally:
-            server.close()
-            await server.wait_closed()
+        with pytest.raises(TryAgain):
+            await kernel.check_status()
 
-    async def test_missing_ports_is_a_typed_error(self, kernel: ContainerdKernel) -> None:
-        with pytest.raises(ContainerdOperationFailed, match="REPL ports"):
+        connect.assert_called_once_with("172.30.9.2", 2000)
+
+    async def test_missing_kernel_ip_is_a_typed_error(self, kernel: ContainerdKernel) -> None:
+        with pytest.raises(ContainerdOperationFailed, match="kernel IP"):
             await kernel.check_status()

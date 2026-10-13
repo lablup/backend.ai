@@ -12,8 +12,13 @@ from ai.backend.agent.containerd.client import (
     TaskInfo,
     TaskState,
 )
+from ai.backend.agent.containerd.network import CommandResult
 from ai.backend.agent.containerd.profile.base import RuntimeOptions
-from ai.backend.agent.errors.containerd import ContainerdImageNotFound, ContainerdOperationFailed
+from ai.backend.agent.errors.containerd import (
+    ContainerdImageNotFound,
+    ContainerdOperationFailed,
+    KernelNetworkSetupFailed,
+)
 
 
 class FakeContainerd:
@@ -142,3 +147,40 @@ class FakeContainerd:
         self.images[image_ref] = ImageTarget(
             "sha256:manifest", "application/vnd.oci.image.manifest.v1+json"
         )
+
+
+class FakeCommandRunner:
+    """Records host commands and answers from scripted results keyed by argv prefix.
+
+    The longest matching prefix wins; an unscripted command succeeds with empty output.
+    """
+
+    calls: list[tuple[str, ...]]
+    results: dict[tuple[str, ...], CommandResult]
+    failing: set[tuple[str, ...]]
+    _shared: list[tuple[str, str]] | None
+
+    def __init__(self, shared: list[tuple[str, str]] | None = None) -> None:
+        """`shared` also receives ("cmd", argv text), e.g. FakeContainerd.calls, to assert order."""
+        self.calls = []
+        self.results = {}
+        self.failing = set()
+        self._shared = shared
+
+    def script(self, prefix: Sequence[str], stdout: str = "", returncode: int = 0) -> None:
+        self.results[tuple(prefix)] = CommandResult(returncode, stdout, "")
+
+    async def __call__(self, *argv: str, check: bool = True) -> CommandResult:
+        self.calls.append(argv)
+        if self._shared is not None:
+            self._shared.append(("cmd", " ".join(argv)))
+        if any(argv[: len(p)] == p for p in self.failing):
+            raise KernelNetworkSetupFailed(f"{argv}: injected failure")
+        matches = [p for p in self.results if argv[: len(p)] == p]
+        result = self.results[max(matches, key=len)] if matches else CommandResult(0, "", "")
+        if check and result.returncode != 0:
+            raise KernelNetworkSetupFailed(f"{argv}: exit {result.returncode}")
+        return result
+
+    def matching(self, *prefix: str) -> list[tuple[str, ...]]:
+        return [c for c in self.calls if c[: len(prefix)] == prefix]

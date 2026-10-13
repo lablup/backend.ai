@@ -3,6 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
+from pytest_mock import MockerFixture
 
 from ai.backend.agent.containerd import scratch as scratch_module
 from ai.backend.agent.containerd.scratch import (
@@ -12,7 +13,7 @@ from ai.backend.agent.containerd.scratch import (
     write_config_files,
     write_dotfiles,
     write_hosts_file,
-    write_intrinsic_ports,
+    write_resolv_conf,
 )
 
 
@@ -89,15 +90,97 @@ class TestWriteConfigFiles:
 
         assert not (dirs.work / "bootstrap.sh").exists()
 
-    def test_intrinsic_ports_are_written_for_the_kernel_runner(self, tmp_path: Path) -> None:
-        dirs = _dirs(tmp_path)
-        create_scratch(dirs, None, clone_dotfiles=False)
 
-        write_intrinsic_ports(dirs, b'{"replin": 30000, "replout": 30001}')
+class TestWriteResolvConf:
+    @pytest.fixture
+    def resolv(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> tuple[Path, Path]:
+        host, systemd = tmp_path / "host-resolv.conf", tmp_path / "systemd-resolv.conf"
+        monkeypatch.setattr(scratch_module, "_HOST_RESOLV_CONF", host)
+        monkeypatch.setattr(scratch_module, "_SYSTEMD_RESOLV_CONF", systemd)
+        return host, systemd
 
-        assert (dirs.config / "intrinsic-ports.json").read_bytes() == (
-            b'{"replin": 30000, "replout": 30001}'
+    def test_loopback_servers_are_dropped_and_search_options_kept(
+        self, tmp_path: Path, resolv: tuple[Path, Path]
+    ) -> None:
+        host, _ = resolv
+        host.write_text(
+            "# c\nsearch example.com\nnameserver 127.0.0.53\nnameserver 10.0.0.2\n"
+            "nameserver ::1\nnameserver fe80::1%eth0\noptions edns0\n"
         )
+        dirs = _dirs(tmp_path)
+        dirs.root.mkdir()
+
+        write_resolv_conf(dirs)
+
+        assert (
+            dirs.resolv_conf.read_text()
+            == "search example.com\nnameserver 10.0.0.2\noptions edns0\n"
+        )
+
+    def test_metadata_nameserver_is_dropped_and_warns_when_nothing_else_is_left(
+        self, tmp_path: Path, resolv: tuple[Path, Path], mocker: MockerFixture
+    ) -> None:
+        host, _ = resolv
+        host.write_text("nameserver 169.254.169.254\nsearch c.proj.internal\n")
+        warning = mocker.patch.object(scratch_module.log, "warning")
+        dirs = _dirs(tmp_path)
+        dirs.root.mkdir()
+
+        write_resolv_conf(dirs)
+
+        assert dirs.resolv_conf.read_text() == "search c.proj.internal\n"
+        warning.assert_called_once()
+
+    def test_metadata_nameserver_is_dropped_next_to_a_usable_one(
+        self, tmp_path: Path, resolv: tuple[Path, Path], mocker: MockerFixture
+    ) -> None:
+        host, _ = resolv
+        host.write_text("nameserver 169.254.169.254\nnameserver 8.8.8.8\n")
+        warning = mocker.patch.object(scratch_module.log, "warning")
+        dirs = _dirs(tmp_path)
+        dirs.root.mkdir()
+
+        write_resolv_conf(dirs)
+
+        assert dirs.resolv_conf.read_text() == "nameserver 8.8.8.8\n"
+        warning.assert_not_called()
+
+    def test_systemd_upstream_is_used_for_a_stub_only_host(
+        self, tmp_path: Path, resolv: tuple[Path, Path]
+    ) -> None:
+        host, systemd = resolv
+        host.write_text("nameserver 127.0.0.53\n")
+        systemd.write_text("nameserver 192.168.0.1\nsearch lan\n")
+        dirs = _dirs(tmp_path)
+        dirs.root.mkdir()
+
+        write_resolv_conf(dirs)
+
+        assert dirs.resolv_conf.read_text() == "nameserver 192.168.0.1\nsearch lan\n"
+
+    def test_no_usable_server_is_written_without_nameservers_and_warns(
+        self, tmp_path: Path, resolv: tuple[Path, Path], mocker: MockerFixture
+    ) -> None:
+        host, _ = resolv
+        host.write_text("nameserver 127.0.0.1\nsearch lan\n")
+        warning = mocker.patch.object(scratch_module.log, "warning")
+        dirs = _dirs(tmp_path)
+        dirs.root.mkdir()
+
+        write_resolv_conf(dirs)
+
+        assert dirs.resolv_conf.read_text() == "search lan\n"
+        warning.assert_called_once()
+
+    def test_missing_host_file_is_tolerated(
+        self, tmp_path: Path, resolv: tuple[Path, Path]
+    ) -> None:
+        dirs = _dirs(tmp_path)
+        dirs.root.mkdir()
+
+        write_resolv_conf(dirs)
+
+        assert dirs.resolv_conf.read_text() == ""
 
 
 class TestWriteDotfiles:

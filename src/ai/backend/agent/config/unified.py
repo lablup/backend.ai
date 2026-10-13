@@ -2235,6 +2235,50 @@ class ContainerdConfig(BaseConfigSchema):
             example=ConfigExample(local="{}", prod='{"coco-tdx": {"standin-image": "<ref>"}}'),
         ),
     ]
+    bridge_name: Annotated[
+        str,
+        Field(
+            default="bai0",
+            min_length=1,
+            max_length=15,
+            pattern=r"^[A-Za-z0-9][A-Za-z0-9-]*$",
+            validation_alias=AliasChoices("bridge-name", "bridge_name"),
+            serialization_alias="bridge-name",
+        ),
+        BackendAIConfigMeta(
+            description=(
+                "Name of the Linux bridge the kernels of this agent attach to. "
+                "It also prefixes the network namespace and iptables chain names, "
+                "so each agent on a host needs its own name."
+            ),
+            added_version="26.10.0",
+            example=ConfigExample(local="bai0", prod="bai0"),
+        ),
+    ]
+    bridge_subnet: Annotated[
+        ipaddress.IPv4Network,
+        Field(
+            default=ipaddress.IPv4Network("172.30.0.0/24"),
+            validation_alias=AliasChoices("bridge-subnet", "bridge_subnet"),
+            serialization_alias="bridge-subnet",
+        ),
+        BackendAIConfigMeta(
+            description=(
+                "IPv4 subnet of the bridge; the first host address is the gateway and the kernels "
+                "take the following ones. It must overlap no other route on the host, "
+                "and each agent on a host needs its own subnet."
+            ),
+            added_version="26.10.0",
+            example=ConfigExample(local="172.30.0.0/24", prod="172.30.0.0/24"),
+        ),
+    ]
+
+    @field_validator("bridge_subnet", mode="after")
+    @classmethod
+    def _check_bridge_subnet(cls, v: ipaddress.IPv4Network) -> ipaddress.IPv4Network:
+        if v.prefixlen > 30:
+            raise ValueError("bridge-subnet must have a prefix length of 30 or less")
+        return v
 
 
 class AgentGlobalConfig(BaseConfigSchema):

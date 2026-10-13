@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from decimal import Decimal
 from pathlib import Path
+from typing import cast
 
 from ai.backend.agent.containerd.profile.base import (
     GeneratedMountKind,
@@ -9,6 +10,7 @@ from ai.backend.agent.containerd.profile.base import (
     KernelRunnerReadiness,
     RuntimeProfile,
     StdioMode,
+    prepare_kernel_config,
 )
 from ai.backend.agent.containerd.profile.runc import RuncProfile
 from ai.backend.agent.types import KernelOwnershipData
@@ -52,3 +54,18 @@ class TestRuncProfile:
 
     def test_conforms_to_runtime_profile(self) -> None:
         assert isinstance(RuncProfile(1.0), RuntimeProfile)
+
+    async def test_prepare_default_returns_the_config_unchanged(
+        self, kernel_config: KernelCreationConfig
+    ) -> None:
+        assert await RuncProfile(1.0).prepare(kernel_config) is kernel_config
+
+    async def test_prepare_helper_skips_a_profile_without_prepare(
+        self, kernel_config: KernelCreationConfig
+    ) -> None:
+        class TwoMethod:
+            name = "old"
+
+        result = await prepare_kernel_config(cast(RuntimeProfile, TwoMethod()), kernel_config)
+
+        assert result is kernel_config
