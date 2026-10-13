@@ -634,10 +634,16 @@ class AuthService:
         if action.email != action.requester_email:
             raise GenericForbidden("Not the account owner")
         email = action.email
+        auth_config = self._config_provider.config.auth
         await self._auth_repository.check_credential_without_migration(
             action.domain_name,
             email,
-            action.password,
+            PasswordInfo(
+                password=action.password,
+                algorithm=auth_config.password_hash_algorithm,
+                rounds=auth_config.password_hash_rounds,
+                salt_size=auth_config.password_hash_salt_size,
+            ),
         )
         deleted_tokens = await self._auth_repository.delete_user_login_sessions(
             action.user_id,
@@ -670,11 +676,17 @@ class AuthService:
                 success=False,
                 message="new password mismatch",
             )
+        auth_config = self._config_provider.config.auth
         try:
             await self._auth_repository.check_credential_without_migration(
                 domain_name,
                 email,
-                action.old_password,
+                PasswordInfo(
+                    password=action.old_password,
+                    algorithm=auth_config.password_hash_algorithm,
+                    rounds=auth_config.password_hash_rounds,
+                    salt_size=auth_config.password_hash_salt_size,
+                ),
             )
         except AuthorizationFailed as e:
             raise AuthorizationFailed("Old password mismatch") from e
@@ -716,7 +728,12 @@ class AuthService:
         checked_user = await self._auth_repository.check_credential_without_migration(
             action.domain_name,
             action.email,
-            password=action.current_password,
+            PasswordInfo(
+                password=action.current_password,
+                algorithm=auth_config.password_hash_algorithm,
+                rounds=auth_config.password_hash_rounds,
+                salt_size=auth_config.password_hash_salt_size,
+            ),
         )
         new_password = action.new_password
         if compare_to_hashed_password(new_password, checked_user["password"]):
