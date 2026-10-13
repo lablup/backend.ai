@@ -48,12 +48,15 @@ async def create_loop_filesystem(
 async def destroy_loop_filesystem(scratch_root: Path, kernel_id: KernelId) -> None:
     scratch_dir = (scratch_root / f"{kernel_id}").resolve()
     scratch_file = (scratch_root / f"{kernel_id}.img").resolve()
-    umount = await asyncio.create_subprocess_exec("umount", str(scratch_dir))
-    exit_code = await umount.wait()
-    if exit_code != 0:
-        raise RuntimeError("umount failed")
-    await run_in_executor_with_context(None, scratch_file.unlink)
-    await run_in_executor_with_context(None, shutil.rmtree, str(scratch_dir))
+    # Not mounted means an earlier clean already unmounted it; only a live mount needs umount.
+    if await run_in_executor_with_context(None, os.path.ismount, scratch_dir):
+        umount = await asyncio.create_subprocess_exec("umount", str(scratch_dir))
+        exit_code = await umount.wait()
+        if exit_code != 0:
+            raise RuntimeError("umount failed")
+    await run_in_executor_with_context(None, partial(scratch_file.unlink, missing_ok=True))
+    if await run_in_executor_with_context(None, scratch_dir.exists):
+        await run_in_executor_with_context(None, shutil.rmtree, str(scratch_dir))
 
 
 class ScratchUtils:
