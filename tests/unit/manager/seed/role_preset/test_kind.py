@@ -5,12 +5,14 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
+import pytest
 import yaml
 from click.testing import CliRunner
 
 from ai.backend.manager.cli.seed import cli
 from ai.backend.manager.seed.factory import create_seed_kind_registry
 from ai.backend.manager.seed.role_preset.kinds import PermissionKinds
+from ai.backend.manager.seed.role_preset.seed import RolePresetSeed
 from ai.backend.manager.seed.runner import SeedPlanner
 
 
@@ -78,3 +80,25 @@ class TestCheckCommand:
         result = CliRunner().invoke(cli, ["check", str(role_seed_dir), str(unknown)])
         assert result.exit_code != 0
         assert "role_preset: 3 files, 3 items" in result.output
+
+
+class TestRolePresetSeedCheck:
+    def test_an_item_keeping_the_rules_passes(self) -> None:
+        assert (
+            RolePresetSeed.model_validate(
+                _role("member", "0198a5a0-0000-7000-8000-000000000001", {})
+            ).check()
+            == []
+        )
+
+    @pytest.mark.parametrize(
+        "item",
+        [
+            _role("  ", "0198a5a0-0000-7000-8000-000000000001", {}),
+        ],
+        ids=[
+            "blank-name",
+        ],
+    )
+    def test_an_item_breaking_a_rule_fails(self, item: dict[str, Any]) -> None:
+        assert len(RolePresetSeed.model_validate(item).check()) == 1
