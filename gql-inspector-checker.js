@@ -7,7 +7,7 @@ const USAGE_RENAME =
   "The `usedBy` search input became `usage`, which splits the relation into `usedBy` and `uses` so a condition says which side uses which. It was added in this same unreleased cycle and went out in no release tag.";
 // Both service catalog endpoint elements share one reason.
 const SERVICE_CATALOG_ENDPOINTS =
-  "A service catalog node carries only the values of the `service_catalog` table. The endpoints return as a connection on the node, searched within that service catalog. The web UI does not read them.";
+  "A service catalog node carries only the values of the `service_catalog` table. The endpoints will return in a follow-up as a connection on the node, searched within that service catalog. The web UI does not read them.";
 
 const ACCEPTED_REMOVALS = {
   "AccessTokenFilter.token":
