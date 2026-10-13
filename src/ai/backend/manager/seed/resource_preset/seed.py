@@ -8,7 +8,7 @@ from pydantic import Field, field_validator
 
 from ai.backend.common.data.entity.resource_group import ResourceGroupID
 from ai.backend.common.data.entity.resource_preset import ResourcePresetID
-from ai.backend.common.types import BinarySize, ResourceSlot
+from ai.backend.common.types import BinarySize, IntrinsicSlotNames, ResourceSlot
 from ai.backend.manager.models.resource_preset.upserters import ResourcePresetUpserter
 from ai.backend.manager.repositories.ops.v2.seed.types import SeedWrite
 from ai.backend.manager.seed.base import SeedItem, SeedItems, SeedRejection
@@ -55,6 +55,15 @@ class ResourcePresetSeed(SeedItem):
             field_upserters=[],
             field_purgers=[],
         )
+
+    @override
+    def check(self) -> list[str]:
+        """The rule the create API applies to the slots: the intrinsic ones are stated."""
+        intrinsic = [str(name.value) for name in IntrinsicSlotNames]
+        missing = [name for name in intrinsic if name not in self.resource_slots]
+        if missing:
+            return [f"resource_slots leaves out {', '.join(missing)}"]
+        return []
 
     @override
     @classmethod

@@ -14,7 +14,11 @@ from ai.backend.manager.cli.seed import cli
 from ai.backend.manager.errors.seed import InvalidSeedDocument
 from ai.backend.manager.models.resource_policy.upserters import KeyPairResourcePolicyUpserter
 from ai.backend.manager.seed.factory import create_seed_kind_registry
-from ai.backend.manager.seed.resource_policy.seed import KeyPairResourcePolicySeed
+from ai.backend.manager.seed.resource_policy.seed import (
+    KeyPairResourcePolicySeed,
+    ProjectResourcePolicySeed,
+    UserResourcePolicySeed,
+)
 from ai.backend.manager.seed.runner import SeedPlanner
 
 
@@ -143,3 +147,77 @@ class TestCheckCommand:
         assert "user_resource_policy: 1 files, 1 items" in result.output
         assert "project_resource_policy: 1 files, 1 items" in result.output
         assert "keypair_resource_policy: 1 files, 1 items" in result.output
+
+
+class TestKeyPairResourcePolicySeedCheck:
+    def test_an_item_keeping_the_rules_passes(self) -> None:
+        assert (
+            KeyPairResourcePolicySeed.model_validate(
+                _keypair_policy("0198a5a0-0000-7000-8000-000000000001", "shared")
+            ).check()
+            == []
+        )
+
+    @pytest.mark.parametrize(
+        "item",
+        [
+            _keypair_policy("0198a5a0-0000-7000-8000-000000000001", "  "),
+        ],
+        ids=[
+            "blank-name",
+        ],
+    )
+    def test_an_item_breaking_a_rule_fails(self, item: dict[str, Any]) -> None:
+        assert len(KeyPairResourcePolicySeed.model_validate(item).check()) == 1
+
+
+class TestUserResourcePolicySeedCheck:
+    def test_an_item_keeping_the_rules_passes(self) -> None:
+        assert (
+            UserResourcePolicySeed.model_validate({
+                "uuid": "0198a5a0-0000-7000-8000-000000000001",
+                **_ITEMS[0][1],
+            }).check()
+            == []
+        )
+
+    @pytest.mark.parametrize(
+        "item",
+        [
+            {"uuid": "0198a5a0-0000-7000-8000-000000000001", **_ITEMS[0][1], "name": "  "},
+            {
+                "uuid": "0198a5a0-0000-7000-8000-000000000001",
+                **_ITEMS[0][1],
+                "max_concurrent_logins": 0,
+            },
+        ],
+        ids=[
+            "blank-name",
+            "no-login",
+        ],
+    )
+    def test_an_item_breaking_a_rule_fails(self, item: dict[str, Any]) -> None:
+        assert len(UserResourcePolicySeed.model_validate(item).check()) == 1
+
+
+class TestProjectResourcePolicySeedCheck:
+    def test_an_item_keeping_the_rules_passes(self) -> None:
+        assert (
+            ProjectResourcePolicySeed.model_validate({
+                "uuid": "0198a5a0-0000-7000-8000-000000000001",
+                **_ITEMS[1][1],
+            }).check()
+            == []
+        )
+
+    @pytest.mark.parametrize(
+        "item",
+        [
+            {"uuid": "0198a5a0-0000-7000-8000-000000000001", **_ITEMS[1][1], "name": "  "},
+        ],
+        ids=[
+            "blank-name",
+        ],
+    )
+    def test_an_item_breaking_a_rule_fails(self, item: dict[str, Any]) -> None:
+        assert len(ProjectResourcePolicySeed.model_validate(item).check()) == 1

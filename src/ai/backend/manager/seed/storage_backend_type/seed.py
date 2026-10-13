@@ -37,6 +37,10 @@ class StorageBackendTypeSeed(SeedItem):
         )
 
     @override
+    def check(self) -> list[str]:
+        return []
+
+    @override
     @classmethod
     def reject(cls, files: Sequence[SeedItems[StorageBackendTypeSeed]]) -> list[SeedRejection]:
         return []
