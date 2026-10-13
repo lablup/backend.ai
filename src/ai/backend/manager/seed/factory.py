@@ -29,6 +29,7 @@ from ai.backend.manager.seed.resource_policy.seed import (
 from ai.backend.manager.seed.resource_preset.seed import ResourcePresetSeed
 from ai.backend.manager.seed.resource_slot_type.seed import ResourceSlotTypeSeed
 from ai.backend.manager.seed.retention_policy.seed import RetentionPolicySeed
+from ai.backend.manager.seed.role.seed import RoleSeed
 from ai.backend.manager.seed.role_preset.seed import RolePresetSeed
 from ai.backend.manager.seed.runtime_variant.seed import RuntimeVariantSeed
 from ai.backend.manager.seed.runtime_variant_preset.seed import RuntimeVariantPresetSeed
@@ -72,5 +73,6 @@ def create_seed_kind_registry() -> SeedKindRegistry:
         SeedKind.RESOURCE_GROUP: (1, ResourceGroupSeed),
         SeedKind.APP_CONFIG_FRAGMENT: (1, AppConfigFragmentSeed),
         SeedKind.RESOURCE_PRESET: (1, ResourcePresetSeed),
+        SeedKind.ROLE: (1, RoleSeed),
         SeedKind.SESSION_TEMPLATE: (1, SessionTemplateSeed),
     })

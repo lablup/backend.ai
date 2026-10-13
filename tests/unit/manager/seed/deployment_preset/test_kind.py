@@ -80,3 +80,60 @@ class TestCheckCommand:
         result = CliRunner().invoke(cli, ["check", str(deployment_preset_seed_dir)])
         assert result.exit_code == 0, result.output
         assert "deployment_preset: 2 files, 2 items" in result.output
+
+
+class TestDeploymentPresetSeedCheck:
+    def test_an_item_keeping_the_rules_passes(self) -> None:
+        assert DeploymentPresetSeed.model_validate(_REQUIRED).check() == []
+
+    @pytest.mark.parametrize(
+        "item",
+        [
+            _REQUIRED | {"cluster_mode": "mesh"},
+            _REQUIRED | {"cluster_size": 0},
+            _REQUIRED | {"replica_count": -1},
+            _REQUIRED | {"revision_history_limit": -1},
+            _REQUIRED
+            | {
+                "deployment_strategy_spec": {
+                    "max_surge": {"count": 0},
+                    "max_unavailable": {"count": 0},
+                }
+            },
+            _REQUIRED
+            | {
+                "deployment_strategy": "BLUE_GREEN",
+                "deployment_strategy_spec": {"promote_delay_seconds": -1},
+            },
+            _REQUIRED | {"model_definition": {"models": [{"service": {}}, {"service": {}}]}},
+            _REQUIRED | {"model_definition": {"models": [{}]}},
+            _REQUIRED | {"model_definition": {"models": [{"name": "", "service": {}}]}},
+            _REQUIRED
+            | {
+                "model_definition": {
+                    "models": [{"service": {"health_check": {"expected_status_code": 100}}}]
+                }
+            },
+            _REQUIRED
+            | {
+                "model_definition": {
+                    "models": [{"service": {"health_check": {"initial_delay": -1}}}]
+                }
+            },
+        ],
+        ids=[
+            "unknown-cluster-mode",
+            "zero-cluster-size",
+            "negative-replica-count",
+            "negative-revision-history-limit",
+            "rolling-spec-without-progress",
+            "negative-promote-delay",
+            "two-models",
+            "model-without-service",
+            "empty-model-name",
+            "status-code-not-above-100",
+            "negative-initial-delay",
+        ],
+    )
+    def test_an_item_breaking_a_rule_fails(self, item: dict[str, Any]) -> None:
+        assert len(DeploymentPresetSeed.model_validate(item).check()) == 1

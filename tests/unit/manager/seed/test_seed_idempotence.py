@@ -61,6 +61,7 @@ _CASES: Final[list[IdempotenceCase]] = [
     IdempotenceCase(SeedKind.RESOURCE_GROUP, "resource_group_seed_dir"),
     IdempotenceCase(SeedKind.APP_CONFIG_FRAGMENT, "app_config_fragment_seed_dir"),
     IdempotenceCase(SeedKind.RESOURCE_PRESET, "resource_preset_seed_dir"),
+    IdempotenceCase(SeedKind.ROLE, "role_kind_seed_dir"),
     IdempotenceCase(SeedKind.SESSION_TEMPLATE, "session_template_seed_dir"),
 ]
 

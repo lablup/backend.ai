@@ -108,3 +108,24 @@ class TestCheckCommand:
         assert plan.batches == []
         result = CliRunner().invoke(cli, ["check", str(path)])
         assert result.exit_code != 0
+
+
+class TestResourceGroupSeedCheck:
+    def test_an_item_keeping_the_rules_passes(self) -> None:
+        assert ResourceGroupSeed.model_validate(_group()).check() == []
+
+    @pytest.mark.parametrize(
+        "item",
+        [
+            _group(name="  "),
+            _group(scheduler="round-robin"),
+            _group(scheduler_opts={"preemption": {"preemption_min_runtime": -1}}),
+        ],
+        ids=[
+            "blank-name",
+            "unknown-scheduler",
+            "negative-preemption-runtime",
+        ],
+    )
+    def test_an_item_breaking_a_rule_fails(self, item: dict[str, Any]) -> None:
+        assert len(ResourceGroupSeed.model_validate(item).check()) == 1
