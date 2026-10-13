@@ -25,7 +25,13 @@ def register_v2_entity_label_routes(
     registry = RouteRegistry.create("entity-labels", route_deps.cors_options)
 
     registry.add("PUT", "", handler.upsert_label, middlewares=[auth_required])
+    registry.add(
+        "POST", "/bulk-upsert", handler.partial_bulk_upsert_labels, middlewares=[auth_required]
+    )
     registry.add("DELETE", "/{label_id}", handler.purge_label, middlewares=[auth_required])
+    registry.add(
+        "POST", "/bulk-purge", handler.partial_bulk_purge_labels, middlewares=[auth_required]
+    )
     registry.add("POST", "/search", handler.search_labels, middlewares=[auth_required])
 
     return registry

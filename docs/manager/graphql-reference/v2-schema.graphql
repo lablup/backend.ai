@@ -10377,9 +10377,19 @@ type Mutation {
   upsertEntityLabel(input: UpsertEntityLabelInput!): UpsertEntityLabelPayload
 
   """
+  Added in 26.10.0. Set keys on several entities in one call, answering per entity. An entity the caller may not write is one failed item; the rest are written.
+  """
+  partialBulkUpsertEntityLabel(input: PartialBulkUpsertEntityLabelInput!): PartialBulkUpsertEntityLabelPayload
+
+  """
   Added in 26.9.0. Take one label off, named by its own id. Which entity answers for it is read from the row before the delete runs.
   """
   purgeEntityLabel(id: ID!): PurgeEntityLabelPayload
+
+  """
+  Added in 26.10.0. Take several labels off in one call, each named by its own id and answered for on its own. A label that is gone or on an entity the caller may not write is one failed item; the rest are taken off.
+  """
+  partialBulkPurgeEntityLabel(input: PartialBulkPurgeEntityLabelInput!): PartialBulkPurgeEntityLabelPayload
 }
 
 """
@@ -10794,6 +10804,44 @@ type PageInfo @shareable {
 
   """When paginating forwards, the cursor to continue."""
   endCursor: String
+}
+
+"""
+Added in 26.10.0. Input for taking several labels off in one call, each named by its own id.
+"""
+input PartialBulkPurgeEntityLabelInput {
+  """Ids of the labels to take off."""
+  ids: [UUID!]!
+}
+
+"""
+Added in 26.10.0. Partial-success payload for a bulk label purge, answered per label.
+"""
+type PartialBulkPurgeEntityLabelPayload {
+  """Ids of the labels taken off."""
+  successes: [UUID!]!
+
+  """Per-label failures, each naming the label it targeted."""
+  failed: [PurgeEntityLabelError!]!
+}
+
+"""
+Added in 26.10.0. Input for putting several keys on several entities in one call. Answered per entity: an entity's keys are written together or refused together.
+"""
+input PartialBulkUpsertEntityLabelInput {
+  """The labels to put, each naming the entity it goes on."""
+  items: [UpsertEntityLabelInput!]!
+}
+
+"""
+Added in 26.10.0. Partial-success payload for a bulk label upsert, answered per entity.
+"""
+type PartialBulkUpsertEntityLabelPayload {
+  """The labels put on the entities."""
+  items: [EntityLabel!]!
+
+  """Per-item failures, each naming the entity and the key it targeted."""
+  failed: [UpsertEntityLabelError!]!
 }
 
 """Added in 26.3.0. RBAC scoped permission."""
@@ -12104,6 +12152,15 @@ type PurgeAppConfigDefinitionPayload {
 type PurgeDomainPayload {
   """Whether the purge was successful."""
   purged: Boolean!
+}
+
+"""Added in 26.10.0. One label a bulk purge could not take off."""
+type PurgeEntityLabelError {
+  """ID of the label the failed item targeted."""
+  id: UUID!
+
+  """Reason the item failed."""
+  message: String!
 }
 
 """Added in 26.9.0. Payload returned after taking a label off an entity."""
@@ -19078,6 +19135,23 @@ input UpsertDomainFairShareWeightInput {
 type UpsertDomainFairShareWeightPayload {
   """The updated or created domain fair share record."""
   domainFairShare: DomainFairShare!
+}
+
+"""
+Added in 26.10.0. One item of a bulk label upsert that was not written, named as the request named it.
+"""
+type UpsertEntityLabelError {
+  """Type of the entity the failed item targeted."""
+  entityType: String!
+
+  """ID of the entity the failed item targeted."""
+  entityId: UUID!
+
+  """The key that was to be put on the entity."""
+  key: String!
+
+  """Reason the item failed."""
+  message: String!
 }
 
 """
