@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+import asyncio
 import enum
 import logging
-from collections.abc import Iterable, Mapping, Sequence
+from collections.abc import AsyncIterator, Callable, Iterable, Mapping, Sequence
+from contextlib import asynccontextmanager as actxmgr
 from datetime import datetime
 from functools import partial
 from typing import (
@@ -40,6 +42,7 @@ from ai.backend.common.data.entity.session_dependency import SessionDependencyID
 from ai.backend.common.data.entity.session_group import SessionGroupID
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.defs.session import JOB_PRIORITY_DEFAULT, SESSION_PRIORITY_DEFAULT
+from ai.backend.common.exception import BackendAIError
 from ai.backend.common.types import (
     AccessKey,
     ClusterMode,
@@ -66,14 +69,17 @@ from ai.backend.manager.data.session.types import (
     SessionNetwork,
     SessionStatus,
 )
+from ai.backend.manager.data.user.types import UserData
 from ai.backend.manager.defs import DEFAULT_ROLE
 from ai.backend.manager.errors.kernel import (
+    KernelExecutionFailed,
     KernelNotFound,
     MainKernelNotFound,
     SessionNotFound,
     TooManyKernelsFound,
     TooManySessionsMatched,
 )
+from ai.backend.manager.exceptions import AgentError
 from ai.backend.manager.models.base import (
     GUID,
     Base,
@@ -124,6 +130,7 @@ __all__ = (
     "KernelLoadingStrategy",
     "SessionDependencyRow",
     "SessionRow",
+    "handle_session_exception",
 )
 
 log = StructuredLogger(logging.getLogger("ai.backend.manager.models.session"))
@@ -183,6 +190,56 @@ USER_RESOURCE_OCCUPYING_SESSION_STATUSES = tuple(
 )
 
 PRIVATE_SESSION_TYPES = (SessionTypes.SYSTEM,)
+
+OP_EXC = {
+    "execute": KernelExecutionFailed,
+    "shutdown_service": KernelExecutionFailed,
+    "upload_file": KernelExecutionFailed,
+    "download_file": KernelExecutionFailed,
+    "download_single": KernelExecutionFailed,
+    "list_files": KernelExecutionFailed,
+    "get_logs_from_agent": KernelExecutionFailed,
+    "commit_session": KernelExecutionFailed,
+    "commit_session_to_file": KernelExecutionFailed,
+    "trigger_batch_execution": KernelExecutionFailed,
+}
+
+
+# Used only by the v1 session paths in registry.py. Delete it together with them.
+@actxmgr
+async def handle_session_exception(
+    op: str,
+    error_callback: Callable[[], Any] | None = None,
+    cancellation_callback: Callable[[], Any] | None = None,
+) -> AsyncIterator[None]:
+    """Translate per-op exceptions to the corresponding OP_EXC subclass.
+
+    Session status is not touched — sokovan's coordinator reconciles
+    session state from kernel events; error marking is not a manager
+    responsibility.
+    """
+    exc_class = OP_EXC[op]
+    try:
+        yield
+    except TimeoutError:
+        if error_callback:
+            await error_callback()
+        raise exc_class("TIMEOUT") from None
+    except asyncio.CancelledError:
+        if cancellation_callback:
+            await cancellation_callback()
+        raise
+    except AgentError as e:
+        if error_callback:
+            await error_callback()
+        raise exc_class("FAILURE", e) from None
+    except BackendAIError:
+        # silently re-raise to make them handled by gateway http handlers
+        raise
+    except Exception:
+        if error_callback:
+            await error_callback()
+        raise
 
 
 def _build_session_fetch_query(
@@ -386,9 +443,9 @@ class SessionRow(CreatedAtMixin, Base):
         nullable=True,
         default=None,
     )
-    # Read by gql_legacy, registry.py, services/session/service.py and commit_session.py on rows
-    # from SessionDBSource (get_session_validated, get_session_by_id) and StreamDBSource.
-    # Delete it with KernelRow.session once all of them read kernels by explicit queries.
+    # Loaded by gql_legacy, registry.py and the v2 db_sources, and read by main_kernel,
+    # resource_opts and get_kernel_by_id. Delete it together with KernelRow.session
+    # once the v2 services stop reading main_kernel off a SessionRow.
     kernels: Mapped[list[KernelRow]] = relationship("KernelRow", back_populates="session")
 
     # Resource ownership
@@ -663,7 +720,7 @@ class SessionRow(CreatedAtMixin, Base):
         instance.id = SessionId(session_data.id)
         return instance
 
-    def to_dataclass(self) -> SessionData:
+    def to_dataclass(self, owner: UserData | None = None) -> SessionData:
         return SessionData(
             id=self.id,
             creation_id=self.creation_id,
@@ -709,9 +766,10 @@ class SessionRow(CreatedAtMixin, Base):
             last_stat=self.last_stat,
             network_type=self.network_type,
             network_id=self.network_id,
-            # service_ports is a kernel column; nothing reads it off a session.
-            service_ports=None,
-            owner=None,
+            service_ports=str(self.main_kernel.service_ports)
+            if self.main_kernel.service_ports
+            else None,
+            owner=owner if owner is not None else None,
             replica_id=self.replica_id,
         )
 
