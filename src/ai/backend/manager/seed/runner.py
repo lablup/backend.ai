@@ -73,7 +73,7 @@ class SeedPlanner:
 
     def read(self, paths: Sequence[Path]) -> SeedRead:
         """Each file's root first, then its items with the model the stated kind is
-        registered with."""
+        registered with, then each item's own check."""
         read = SeedRead()
         for path in self._collect(paths):
             source = str(path)
@@ -83,6 +83,12 @@ class SeedPlanner:
                 items = self._items(kind, root)
             except InvalidSeedDocument as e:
                 read.rejections.append(SeedRejection(source, str(e)))
+                continue
+            failures = [
+                f"{kind.name} {item.key()}: {reason}" for item in items for reason in item.check()
+            ]
+            if failures:
+                read.rejections.extend(SeedRejection(source, failure) for failure in failures)
                 continue
             read.by_kind[kind.name].append(SeedItems(source, items))
         return read
