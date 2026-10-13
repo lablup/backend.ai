@@ -4,6 +4,7 @@ what it skips."""
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Any
 
 import pytest
 from click.testing import CliRunner
@@ -79,3 +80,29 @@ class TestCheckCommand:
         result = CliRunner().invoke(cli, ["check", str(resource_preset_seed_dir)])
         assert result.exit_code == 0, result.output
         assert "resource_preset: 2 files, 2 items" in result.output
+
+
+class TestResourcePresetSeedCheck:
+    def test_an_item_keeping_the_rules_passes(self) -> None:
+        assert (
+            ResourcePresetSeed.model_validate({
+                "id": _ID,
+                "name": "small",
+                "resource_slots": {"cpu": "1", "mem": "1073741824"},
+            }).check()
+            == []
+        )
+
+    @pytest.mark.parametrize(
+        "item",
+        [
+            {"id": _ID, "name": "small", "resource_slots": {"cpu": "1"}},
+            {"id": _ID, "name": "small", "resource_slots": {"mem": "1073741824"}},
+        ],
+        ids=[
+            "no-mem",
+            "no-cpu",
+        ],
+    )
+    def test_an_item_breaking_a_rule_fails(self, item: dict[str, Any]) -> None:
+        assert len(ResourcePresetSeed.model_validate(item).check()) == 1

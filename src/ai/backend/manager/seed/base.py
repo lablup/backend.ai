@@ -51,6 +51,11 @@ class SeedItem(BackendAISchema, ABC):
     def write(self) -> SeedWrite:
         raise NotImplementedError
 
+    @abstractmethod
+    def check(self) -> list[str]:
+        """The rules of its entity that the item's own values and sub-items break."""
+        raise NotImplementedError
+
     @classmethod
     @abstractmethod
     def reject(cls, files: Sequence[SeedItems[Any]]) -> list[SeedRejection]:

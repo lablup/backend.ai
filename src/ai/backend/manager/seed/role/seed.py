@@ -91,6 +91,13 @@ class RoleSeed(SeedItem):
         )
 
     @override
+    def check(self) -> list[str]:
+        """The rule the create API applies to the name."""
+        if not self.name.strip():
+            return ["name is blank"]
+        return []
+
+    @override
     @classmethod
     def reject(cls, files: Sequence[SeedItems[RoleSeed]]) -> list[SeedRejection]:
         """The files granting on a name that is not an entity type: the column takes any

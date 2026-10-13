@@ -577,13 +577,28 @@ _SESSION_TEMPLATES: dict[str, dict[str, Any]] = {
         "type": "task",
         "name": "python",
         "is_active": True,
-        "template": {"api_version": "6", "kind": "task_template", "spec": {"image": "python"}},
+        "template": {
+            "api_version": "6",
+            "kind": "task_template",
+            "metadata": {"name": "python"},
+            "spec": {"kernel": {"image": "python"}},
+        },
     },
     "cluster.yaml": {
         "id": "0198a5a0-0000-7000-8000-000000001212",
         "user_id": _TEMPLATE_OWNER["uuid"],
         "type": "cluster",
-        "template": {"mode": "single-node", "nodes": []},
+        "template": {
+            "api_version": "6",
+            "kind": "cluster_template",
+            "mode": "single-node",
+            "metadata": {"name": "python"},
+            "spec": {
+                "nodes": [
+                    {"role": "main", "session_template": "0198a5a0-0000-7000-8000-000000001211"}
+                ]
+            },
+        },
     },
 }
 

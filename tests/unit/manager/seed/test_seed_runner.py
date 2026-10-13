@@ -32,7 +32,7 @@ from ai.backend.manager.seed.types import SeedKind
 
 class NamedItem(SeedItem):
     """An item whose specs are the item itself; a file stating one named ``bad`` is
-    refused."""
+    refused, and one named ``unfit`` fails its own check."""
 
     name: str
 
@@ -43,6 +43,10 @@ class NamedItem(SeedItem):
     @override
     def write(self) -> SeedWrite:
         return SeedWrite(upserter=cast(Any, self), field_upserters=(), field_purgers=())
+
+    @override
+    def check(self) -> list[str]:
+        return ["is unfit"] if self.name == "unfit" else []
 
     @override
     @classmethod
@@ -145,6 +149,18 @@ class TestKindValidation:
         assert _sources(plan.rejections) == {str(unknown)}
         assert "not a registered kind" in plan.rejections[0].reason
         assert len(plan.batches) == 1
+
+    def test_an_item_failing_its_check_skips_the_file(
+        self, planner: SeedPlanner, tmp_path: Path
+    ) -> None:
+        good = _write(tmp_path / "a.yaml", "domain", "x")
+        unfit = _write(tmp_path / "b.yaml", "domain", "y", "unfit")
+        plan = planner.plan([good, unfit])
+        assert [(r.source, r.reason) for r in plan.rejections] == [
+            (str(unfit), "domain unfit: is unfit")
+        ]
+        [batch] = plan.batches
+        assert _names(batch) == ["x"]
 
     def test_an_unsupported_version_skips_the_file(
         self, planner: SeedPlanner, tmp_path: Path

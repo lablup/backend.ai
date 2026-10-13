@@ -40,6 +40,10 @@ class RuntimeVariantSeed(SeedItem):
         )
 
     @override
+    def check(self) -> list[str]:
+        return []
+
+    @override
     @classmethod
     def reject(cls, files: Sequence[SeedItems[RuntimeVariantSeed]]) -> list[SeedRejection]:
         return []

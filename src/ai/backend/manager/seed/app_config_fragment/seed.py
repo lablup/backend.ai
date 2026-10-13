@@ -50,6 +50,10 @@ class AppConfigFragmentSeed(SeedItem):
         return SeedWrite(upserter=upserter, field_upserters=[], field_purgers=[])
 
     @override
+    def check(self) -> list[str]:
+        return []
+
+    @override
     @classmethod
     def reject(cls, files: Sequence[SeedItems[AppConfigFragmentSeed]]) -> list[SeedRejection]:
         return []

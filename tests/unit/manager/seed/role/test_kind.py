@@ -133,3 +133,20 @@ class TestCheckCommand:
         path = _write(tmp_path / "bad.yaml", _role(scope_type="global"))
         result = CliRunner().invoke(cli, ["check", str(path)])
         assert result.exit_code != 0
+
+
+class TestRoleSeedCheck:
+    def test_an_item_keeping_the_rules_passes(self) -> None:
+        assert RoleSeed.model_validate(_role()).check() == []
+
+    @pytest.mark.parametrize(
+        "item",
+        [
+            _role(name="  "),
+        ],
+        ids=[
+            "blank-name",
+        ],
+    )
+    def test_an_item_breaking_a_rule_fails(self, item: dict[str, Any]) -> None:
+        assert len(RoleSeed.model_validate(item).check()) == 1

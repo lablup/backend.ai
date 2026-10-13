@@ -155,3 +155,26 @@ class TestCheckCommand:
         path = _write(tmp_path / "bad.yaml", _user(allowed_client_ip=["300.0.0.1"]))
         result = CliRunner().invoke(cli, ["check", str(path)])
         assert result.exit_code != 0
+
+
+class TestUserSeedCheck:
+    def test_an_item_keeping_the_rules_passes(self) -> None:
+        assert UserSeed.model_validate(_user(keypairs=[_keypair(is_default=True)])).check() == []
+
+    @pytest.mark.parametrize(
+        "item",
+        [
+            _user(container_uid=-1),
+            _user(container_main_gid=-1),
+            _user(container_gids=[1000, -1]),
+            _user(keypairs=[_keypair(is_default=True, is_active=False)]),
+        ],
+        ids=[
+            "negative-uid",
+            "negative-main-gid",
+            "negative-gid",
+            "inactive-default-keypair",
+        ],
+    )
+    def test_an_item_breaking_a_rule_fails(self, item: dict[str, Any]) -> None:
+        assert len(UserSeed.model_validate(item).check()) == 1

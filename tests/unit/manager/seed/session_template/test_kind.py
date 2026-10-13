@@ -20,8 +20,16 @@ _ID = "0198a5a0-0000-7000-8000-000000001001"
 _USER_ID = "0198a5a0-0000-7000-8000-000000001002"
 
 
+_TASK_TEMPLATE: dict[str, Any] = {
+    "api_version": "6",
+    "kind": "task_template",
+    "metadata": {"name": "python"},
+    "spec": {"kernel": {"image": "python"}},
+}
+
+
 def _template(**fields: Any) -> dict[str, Any]:
-    return {"id": _ID, "user_id": _USER_ID, "template": {"spec": {}}} | fields
+    return {"id": _ID, "user_id": _USER_ID, "template": _TASK_TEMPLATE} | fields
 
 
 class TestSessionTemplateSeed:
@@ -63,3 +71,33 @@ class TestCheckCommand:
         result = CliRunner().invoke(cli, ["check", str(session_template_files)])
         assert result.exit_code == 0, result.output
         assert "session_template: 2 files, 2 items" in result.output
+
+
+class TestSessionTemplateSeedCheck:
+    def test_an_item_keeping_the_rules_passes(self) -> None:
+        assert SessionTemplateSeed.model_validate(_template()).check() == []
+
+    @pytest.mark.parametrize(
+        "item",
+        [
+            _template(template={**_TASK_TEMPLATE, "spec": {}}),
+            _template(template={k: v for k, v in _TASK_TEMPLATE.items() if k != "metadata"}),
+            _template(
+                type="cluster",
+                template={
+                    "api_version": "6",
+                    "kind": "cluster_template",
+                    "mode": "single-node",
+                    "metadata": {"name": "x"},
+                    "spec": {"nodes": []},
+                },
+            ),
+        ],
+        ids=[
+            "task-without-kernel",
+            "task-without-metadata",
+            "cluster-without-main-node",
+        ],
+    )
+    def test_an_item_breaking_a_rule_fails(self, item: dict[str, Any]) -> None:
+        assert len(SessionTemplateSeed.model_validate(item).check()) == 1

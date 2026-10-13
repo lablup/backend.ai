@@ -59,7 +59,7 @@ def bound_plan(tmp_path: Path, resource_group: str) -> SeedPlan:
     preset = {
         "id": _BOUND_PRESET_ID,
         "name": "gpu-small",
-        "resource_slots": {"cpu": "2", "cuda.shares": "1"},
+        "resource_slots": {"cpu": "2", "mem": "2147483648", "cuda.shares": "1"},
         "resource_group_id": resource_group,
     }
     (directory / "gpu-small.yaml").write_text(
