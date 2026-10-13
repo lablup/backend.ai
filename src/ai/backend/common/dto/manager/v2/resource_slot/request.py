@@ -2,11 +2,14 @@
 
 from __future__ import annotations
 
+from decimal import Decimal
+
 from pydantic import Field, model_validator
 
 from ai.backend.common.api_handlers import BaseRequestModel
 from ai.backend.common.dto.manager.query import DecimalFilter, StringFilter, UUIDFilter
 from ai.backend.common.dto.manager.v2.rbac.types import UUIDScope
+from ai.backend.common.tristate.unset import UNSET, Unset
 from ai.backend.common.types import SlotTypes
 
 from .types import (
@@ -122,6 +125,19 @@ class CreateResourceSlotTypeInput(BaseRequestModel):
         default=None, description="Number formatting rules. Defaults to decimal, no rounding."
     )
     rank: int = Field(default=0, description="Display ordering rank. Lower values appear first.")
+    sealed_launch: bool = Field(
+        default=False,
+        description="Whether a kernel holding this slot must be launched sealed or fail.",
+    )
+    max_per_session: Decimal | None = Field(
+        default=None,
+        ge=0,
+        description="Maximum total amount of this slot one session may request. Null means no limit.",
+    )
+    single_node_only: bool = Field(
+        default=False,
+        description="Whether a session requesting this slot must run on a single node.",
+    )
 
 
 class UpdateResourceSlotTypeInput(BaseRequestModel):
@@ -153,6 +169,22 @@ class UpdateResourceSlotTypeInput(BaseRequestModel):
         default=None, description="Number formatting rules."
     )
     rank: int | None = Field(default=None, description="Display ordering rank.")
+    sealed_launch: bool | None | Unset = Field(
+        default=UNSET,
+        description="Whether a kernel holding this slot must be launched sealed or fail.",
+    )
+    max_per_session: Decimal | None | Unset = Field(
+        default=UNSET,
+        ge=0,
+        description=(
+            "Maximum total amount of this slot one session may request. "
+            "Omit to leave unchanged; null removes the limit."
+        ),
+    )
+    single_node_only: bool | None | Unset = Field(
+        default=UNSET,
+        description="Whether a session requesting this slot must run on a single node.",
+    )
 
 
 class PurgeResourceSlotTypeInput(BaseRequestModel):

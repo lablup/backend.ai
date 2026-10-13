@@ -135,6 +135,9 @@ from ai.backend.manager.sokovan.scheduling_controller.validators.service_port_ru
 from ai.backend.manager.sokovan.scheduling_controller.validators.session_spec_base import (
     SessionSpecValidator,
 )
+from ai.backend.manager.sokovan.scheduling_controller.validators.slot_type_limit_rule import (
+    SlotTypeLimitRule,
+)
 from ai.backend.manager.views.sokovan.scheduling import ComputeScheduleData
 from ai.backend.manager.views.sokovan.session import MarkTerminatingResult
 from ai.backend.manager.views.sokovan.session_creation import SessionSpecContext
@@ -223,6 +226,7 @@ class SchedulingController:
             ContainerLimitRule(),
             ImageSlotTypeRule(),
             RequestedSlotTypeRule(),
+            SlotTypeLimitRule(),
             RequiredResourceSlotRule(),
             ResourceLimitRule(),
             ServicePortRule(),
