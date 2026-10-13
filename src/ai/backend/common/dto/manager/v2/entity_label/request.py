@@ -73,11 +73,8 @@ class UpsertEntityLabelInput(BaseRequestModel):
 
 
 class PartialBulkUpsertEntityLabelInput(BaseRequestModel):
-    """Input for putting several keys on several entities in one call.
-
-    Answered per entity: an entity may appear in several items, and all of its keys are
-    written together or refused together.
-    """
+    """Input for putting several keys on several entities in one call. An entity may
+    appear in several items; its keys are written together or refused together."""
 
     items: list[UpsertEntityLabelInput] = Field(
         min_length=1, description="The labels to put, each naming the entity it goes on"

@@ -23,11 +23,8 @@ class EntityLabelToUpsert:
 class PartialBulkUpsertEntityLabelAction(
     PartialBulkUpsertFieldOpsAction[RuntimeEntityID, EntityLabelRow, EntityLabelData]
 ):
-    """Set keys on the entities the caller named, answering for each entity.
-
-    The answer is per entity, not per key: an entity's keys are written together, so
-    the one thing that can fail a key on its own is the entity it goes on.
-    """
+    """Set keys on the entities the caller named, answering per entity: an entity's
+    keys are written together, so what fails a key is the entity it goes on."""
 
     items: Sequence[EntityLabelToUpsert]
 

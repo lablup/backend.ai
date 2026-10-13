@@ -23,15 +23,9 @@ from ai.backend.manager.services.entity_label.actions.upsert import UpsertEntity
 
 
 class EntityLabelProcessors:
-    """The operations over labels, all straight against ops.
-
-    A label is a field of the entity it is on, so each of these is answered for by that
-    entity: the upserts name it as their target, the removals read it from the row they
-    name, and the search names the entities whose labels it returns. Which kind of
-    entity is not fixed, which is why the group is reached from the registry rather
-    than from an entity's own group. The two bulk writes are partial: each entity is
-    checked on its own and comes back as its own item.
-    """
+    """The operations over labels, all straight against ops and each answered for by
+    the labeled entity. Its kind is a value on the row, which is why the group comes
+    from the registry rather than an entity's own group."""
 
     upsert: SingleEntityActionProcessor[UpsertEntityLabelAction, EntityOpsResult[EntityLabelData]]
     partial_bulk_upsert: PartialBulkActionProcessor[

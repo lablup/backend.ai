@@ -56,7 +56,9 @@ class UpsertEntityLabelPayloadGQL(PydanticOutputMixin[UpsertEntityLabelPayloadDT
 
 @gql_pydantic_type(
     BackendAIGQLMeta(
-        description="One entity a bulk label upsert could not label, and the keys it was to carry.",
+        description=(
+            "One item of a bulk label upsert that was not written, named as the request named it."
+        ),
         added_version=NEXT_RELEASE_VERSION,
     ),
     model=UpsertEntityLabelErrorDTO,
@@ -65,7 +67,7 @@ class UpsertEntityLabelPayloadGQL(PydanticOutputMixin[UpsertEntityLabelPayloadDT
 class UpsertEntityLabelErrorGQL(PydanticOutputMixin[UpsertEntityLabelErrorDTO]):
     entity_type: str = gql_field(description="Type of the entity the failed item targeted.")
     entity_id: UUID = gql_field(description="ID of the entity the failed item targeted.")
-    keys: list[str] = gql_field(description="The keys that were to be put on the entity.")
+    key: str = gql_field(description="The key that was to be put on the entity.")
     message: str = gql_field(description="Reason the item failed.")
 
 
@@ -82,7 +84,7 @@ class PartialBulkUpsertEntityLabelPayloadGQL(
 ):
     items: list[EntityLabelGQL] = gql_field(description="The labels put on the entities.")
     failed: list[UpsertEntityLabelErrorGQL] = gql_field(
-        description="Per-entity failures, each naming the entity and the keys it targeted."
+        description="Per-item failures, each naming the entity and the key it targeted."
     )
 
 

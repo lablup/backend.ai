@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from ai.backend.common.data.entity.entity_label import EntityLabelID, EntityLabelKey
-from ai.backend.common.data.entity.types import EntityIdentifier, RuntimeEntityID
+from ai.backend.common.data.entity.types import RuntimeEntityID
 from ai.backend.common.dto.manager.v2.entity.types import EntityTarget
 from ai.backend.common.dto.manager.v2.entity_label.request import (
     EntityLabelOrder,
@@ -78,12 +78,9 @@ class EntityLabelAdapter(BaseAdapter):
     async def partial_bulk_upsert(
         self, input: PartialBulkUpsertEntityLabelInput
     ) -> PartialBulkUpsertEntityLabelPayload:
-        """Set keys on the entities the request names, answering per entity.
-
-        An entity the caller may not write comes back as one failed item carrying every
-        key it was to get. A type nothing is wired for refuses the whole request, as the
-        single upsert does: that is a malformed request, not an entity's outcome.
-        """
+        """Set keys on the entities the request names, answered per request item; an
+        entity's items share one fate, and a type nothing is wired for refuses the
+        whole request."""
         items = [
             EntityLabelToUpsert(
                 owner=self._target(item.target),
@@ -91,28 +88,26 @@ class EntityLabelAdapter(BaseAdapter):
             )
             for item in input.items
         ]
-        keys_of: dict[EntityIdentifier, list[str]] = {}
-        for item in items:
-            keys_of.setdefault(item.owner, []).append(item.upserter.key)
         action_result = await self._entity_label.partial_bulk_upsert.run(
             PartialBulkUpsertEntityLabelAction(items=items)
         )
+        errors = action_result.errors()
         return PartialBulkUpsertEntityLabelPayload(
             items=[
                 self._data_to_node(data)
-                for item in action_result.items
-                if item.value is not None
-                for data in item.value
+                for answer in action_result.items
+                if answer.value is not None
+                for data in answer.value
             ],
             failed=[
                 UpsertEntityLabelError(
-                    entity_type=item.entity_id.entity_type(),
-                    entity_id=item.entity_id,
-                    keys=keys_of[item.entity_id],
-                    message=str(item.error),
+                    entity_type=item.owner.entity_type(),
+                    entity_id=item.owner,
+                    key=item.upserter.key,
+                    message=str(errors[item.owner]),
                 )
-                for item in action_result.items
-                if item.error is not None
+                for item in items
+                if item.owner in errors
             ],
         )
 
@@ -130,13 +125,9 @@ class EntityLabelAdapter(BaseAdapter):
     async def partial_bulk_purge(
         self, input: PartialBulkPurgeEntityLabelInput
     ) -> PartialBulkPurgeEntityLabelPayload:
-        """Take several labels off, each named by its own id and answered for on its own.
-
-        A label that is gone and a label on an entity the caller may not write are both
-        one failed item. When no id names a row the run has no owner to check and
-        refuses as a whole; that is folded back into one failed item per id here, so the
-        caller reads one shape whatever it named.
-        """
+        """Take several labels off by id, answered per id. A run every id of which names
+        no row is refused below and folded back into one failed item per id here, so
+        the caller reads one shape whatever it named."""
         label_ids = list(dict.fromkeys(EntityLabelID(one) for one in input.ids))
         try:
             action_result = await self._entity_label.partial_bulk_purge.run(

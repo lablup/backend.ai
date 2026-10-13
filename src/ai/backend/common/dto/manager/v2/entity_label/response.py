@@ -43,11 +43,11 @@ class UpsertEntityLabelPayload(BaseResponseModel):
 
 
 class UpsertEntityLabelError(BaseResponseModel):
-    """One entity a bulk upsert could not label, and the keys it was going to carry."""
+    """One item of a bulk upsert that was not written, named as the request named it."""
 
     entity_type: str = Field(description="Type of the entity the failed item targeted")
     entity_id: UUID = Field(description="ID of the entity the failed item targeted")
-    keys: list[str] = Field(description="The keys that were to be put on the entity")
+    key: str = Field(description="The key that was to be put on the entity")
     message: str = Field(description="Reason the item failed")
 
 
@@ -56,7 +56,7 @@ class PartialBulkUpsertEntityLabelPayload(BaseResponseModel):
 
     items: list[EntityLabelNode] = Field(description="The labels put on the entities")
     failed: list[UpsertEntityLabelError] = Field(
-        description="Per-entity failures, each naming the entity and the keys it targeted"
+        description="Per-item failures, each naming the entity and the key it targeted"
     )
 
 

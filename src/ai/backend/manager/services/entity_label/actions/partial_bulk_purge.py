@@ -19,11 +19,8 @@ from ai.backend.manager.services.entity_label.actions.lookup_owner import (
 class PartialBulkPurgeEntityLabelAction(
     PartialBulkPurgeFieldOpsAction[EntityLabelID, RuntimeEntityID, EntityLabelRow, EntityLabelData]
 ):
-    """Take several labels off, each named by its own id and answered for on its own.
-
-    Which entity answers for each is what the bulk owner lookup reads first; a label
-    whose entity the caller may not write is one failed item, not a failed run.
-    """
+    """Take several labels off by id, answering per label; the bulk owner lookup reads
+    which entity answers for each, and a denied entity is one failed item."""
 
     label_ids: Sequence[EntityLabelID]
 
