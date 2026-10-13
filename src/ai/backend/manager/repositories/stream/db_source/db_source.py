@@ -1,9 +1,10 @@
 import sqlalchemy as sa
-from sqlalchemy.orm import noload, selectinload
+from sqlalchemy.orm import joinedload, noload, selectinload
 
 from ai.backend.common.types import SessionId
 from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.errors.kernel import SessionNotFound
+from ai.backend.manager.models.kernel.row import KernelRow
 from ai.backend.manager.models.session.row import SessionRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 
@@ -21,7 +22,11 @@ class StreamDBSource:
                 .where((SessionRow.id == session_id) & (SessionRow.status == SessionStatus.RUNNING))
                 .options(
                     noload("*"),
-                    selectinload(SessionRow.kernels).options(noload("*")),
+                    selectinload(SessionRow.kernels).options(
+                        noload("*"),
+                        selectinload(KernelRow.agent_row).noload("*"),
+                    ),
+                    joinedload(SessionRow.user),
                 )
                 .execution_options(populate_existing=True)
             )
