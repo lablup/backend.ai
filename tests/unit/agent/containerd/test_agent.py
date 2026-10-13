@@ -1,20 +1,28 @@
 from __future__ import annotations
 
+import asyncio
 import uuid
 from decimal import Decimal
+from pathlib import Path
 from typing import Any, cast
-from unittest.mock import MagicMock
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
+from pytest_mock import MockerFixture
 
-from ai.backend.agent.containerd.agent import ContainerdAgent, _kernel_slots
+from ai.backend.agent.config.unified import ContainerdConfig
+from ai.backend.agent.containerd.agent import HOST_PORTS_LABEL, ContainerdAgent, _kernel_slots
+from ai.backend.agent.containerd.client import ContainerRecord, TaskInfo, TaskState
 from ai.backend.agent.containerd.profile.runc import RuncProfile
 from ai.backend.agent.errors.agent import UnsupportedBaseDistroError
 from ai.backend.agent.errors.containerd import KernelVerbNotSupported, ProfileNotApplicable
+from ai.backend.agent.port_pool import PortPool
 from ai.backend.agent.types import KernelOwnershipData
 from ai.backend.common.types import (
+    AgentId,
     AutoPullBehavior,
     ContainerId,
+    ContainerStatus,
     ImageConfig,
     KernelCreationConfig,
     KernelId,
@@ -22,12 +30,13 @@ from ai.backend.common.types import (
 )
 
 from .conftest import FakeProfile
+from .fakes import FakeContainerd
 
 TDX = SlotName("confidential.tdx")
 
 
 @pytest.fixture
-def agent() -> ContainerdAgent:
+def agent(monkeypatch: pytest.MonkeyPatch) -> ContainerdAgent:
     """A bare agent carrying only the attributes the tested methods touch."""
     instance = object.__new__(ContainerdAgent)
     instance._runtime_profiles = []
@@ -36,6 +45,12 @@ def agent() -> ContainerdAgent:
     instance.event_producer = MagicMock()
     instance.local_config = MagicMock()
     instance.computers = {}
+    instance.id = AgentId("i-test")
+    instance.port_pool = PortPool((30000, 30009), cooldown_sec=0)
+    instance.resource_lock = asyncio.Lock()
+    instance._client = FakeContainerd()
+    instance.error_monitor = MagicMock(capture_exception=AsyncMock())
+    monkeypatch.setattr(instance, "reconstruct_resource_usage", AsyncMock())
     return instance
 
 
@@ -144,11 +159,289 @@ class TestContainerdAgentVerbs:
     async def test_restart_store_config_is_a_noop(self, agent: ContainerdAgent) -> None:
         await agent.restart_kernel__store_config(KernelId(uuid.uuid4()), "c", b"")
 
-    async def test_enumerate_containers_is_empty(self, agent: ContainerdAgent) -> None:
+
+OWNER = "i-test"
+
+
+def _add_container(
+    fake: FakeContainerd,
+    container_id: str,
+    *,
+    state: TaskState | None,
+    owner: str = OWNER,
+    kernel_id: uuid.UUID | None = None,
+    session_id: str | None = "session-1",
+    host_ports: str = "30000,30001",
+) -> KernelId:
+    kid = kernel_id or uuid.uuid4()
+    labels = {
+        "ai.backend.owner": owner,
+        "ai.backend.kernel-id": str(kid),
+        HOST_PORTS_LABEL: host_ports,
+    }
+    if session_id is not None:
+        labels["ai.backend.session-id"] = session_id
+    fake.containers[container_id] = ContainerRecord(
+        id=container_id,
+        image="img:1",
+        snapshotter="overlayfs",
+        snapshot_key=container_id,
+        labels=labels,
+    )
+    if state is not None:
+        fake.tasks[container_id] = TaskInfo(pid=1, state=state, exit_status=0)
+    return KernelId(kid)
+
+
+class TestEnumerateContainers:
+    @pytest.fixture
+    def fake(self, agent: ContainerdAgent) -> FakeContainerd:
+        assert isinstance(agent._client, FakeContainerd)
+        return agent._client
+
+    async def test_running_container_is_mapped(
+        self, agent: ContainerdAgent, fake: FakeContainerd
+    ) -> None:
+        kid = _add_container(fake, "c1", state=TaskState.RUNNING)
+
+        [(found_kid, container)] = await agent.enumerate_containers()
+
+        assert found_kid == kid
+        assert container.id == ContainerId("c1")
+        assert container.status == ContainerStatus.RUNNING
+        assert container.image == "img:1"
+        assert container.labels["ai.backend.session-id"] == "session-1"
+        assert [(p.host, p.private_port, p.host_port) for p in container.ports] == [
+            ("127.0.0.1", 30000, 30000),
+            ("127.0.0.1", 30001, 30001),
+        ]
+
+    async def test_stopped_container_is_exited_and_hidden_from_the_active_filter(
+        self, agent: ContainerdAgent, fake: FakeContainerd
+    ) -> None:
+        _add_container(fake, "c1", state=TaskState.STOPPED)
+
+        assert await agent.enumerate_containers() == []
+        [(_, container)] = await agent.enumerate_containers(ContainerStatus.dead_set())
+        assert container.status == ContainerStatus.EXITED
+
+    async def test_container_without_a_task_is_exited(
+        self, agent: ContainerdAgent, fake: FakeContainerd
+    ) -> None:
+        _add_container(fake, "c1", state=None)
+
+        [(_, container)] = await agent.enumerate_containers(ContainerStatus.dead_set())
+
+        assert container.status == ContainerStatus.EXITED
+
+    @pytest.mark.parametrize(
+        ("state", "status"),
+        [
+            (TaskState.CREATED, ContainerStatus.CREATED),
+            (TaskState.PAUSED, ContainerStatus.PAUSED),
+            (TaskState.PAUSING, ContainerStatus.PAUSED),
+            (TaskState.UNKNOWN, ContainerStatus.DEAD),
+        ],
+    )
+    async def test_task_states_map_to_container_statuses(
+        self,
+        agent: ContainerdAgent,
+        fake: FakeContainerd,
+        state: TaskState,
+        status: ContainerStatus,
+    ) -> None:
+        _add_container(fake, "c1", state=state)
+
+        [(_, container)] = await agent.enumerate_containers(frozenset(ContainerStatus))
+
+        assert container.status == status
+
+    async def test_only_own_containers_are_listed(
+        self, agent: ContainerdAgent, fake: FakeContainerd
+    ) -> None:
+        _add_container(fake, "mine", state=TaskState.RUNNING)
+        _add_container(fake, "theirs", state=TaskState.RUNNING, owner="i-other")
+
+        listed = await agent.enumerate_containers()
+
+        assert [c.id for _, c in listed] == [ContainerId("mine")]
+
+    async def test_container_without_a_valid_kernel_id_is_skipped(
+        self, agent: ContainerdAgent, fake: FakeContainerd
+    ) -> None:
+        _add_container(fake, "c1", state=TaskState.RUNNING)
+        fake.containers["c1"] = ContainerRecord(
+            id="c1",
+            image="img:1",
+            snapshotter="overlayfs",
+            snapshot_key="c1",
+            labels={"ai.backend.owner": OWNER, "ai.backend.kernel-id": "not-a-uuid"},
+        )
+
         assert await agent.enumerate_containers() == []
 
-    async def test_destroy_and_clean_kernel_are_noops(self, agent: ContainerdAgent) -> None:
-        kernel_id = KernelId(uuid.uuid4())
+    async def test_container_without_ports_label_has_no_ports(
+        self, agent: ContainerdAgent, fake: FakeContainerd
+    ) -> None:
+        _add_container(fake, "c1", state=TaskState.RUNNING, host_ports="")
 
-        await agent.destroy_kernel(kernel_id, None)
-        await agent.clean_kernel(kernel_id, None, False)
+        [(_, container)] = await agent.enumerate_containers()
+
+        assert container.ports == []
+
+
+class TestDestroyKernel:
+    async def test_without_a_container_id_nothing_happens(self, agent: ContainerdAgent) -> None:
+        await agent.destroy_kernel(KernelId(uuid.uuid4()), None)
+
+        assert cast(FakeContainerd, agent._client).calls == []
+
+    async def test_running_container_is_stopped(self, agent: ContainerdAgent) -> None:
+        fake = cast(FakeContainerd, agent._client)
+        _add_container(fake, "c1", state=TaskState.RUNNING)
+
+        await agent.destroy_kernel(KernelId(uuid.uuid4()), ContainerId("c1"))
+
+        assert ("kill_task:SIGINT", "c1") in fake.calls
+        assert "c1" not in fake.tasks
+
+    async def test_unknown_container_is_tolerated_and_resources_are_reconstructed(
+        self, agent: ContainerdAgent
+    ) -> None:
+        await agent.destroy_kernel(KernelId(uuid.uuid4()), ContainerId("absent"))
+
+        cast(AsyncMock, agent.reconstruct_resource_usage).assert_awaited_once()
+
+    async def test_containerd_error_is_captured_not_raised(self, agent: ContainerdAgent) -> None:
+        fake = cast(FakeContainerd, agent._client)
+        _add_container(fake, "c1", state=TaskState.RUNNING)
+        fake.failing.add("kill_task:SIGINT")
+
+        await agent.destroy_kernel(KernelId(uuid.uuid4()), ContainerId("c1"))
+
+        cast(AsyncMock, agent.error_monitor.capture_exception).assert_awaited_once()
+
+
+class TestCleanKernel:
+    @pytest.fixture
+    def scratch_root(self, agent: ContainerdAgent, tmp_path: Path) -> Path:
+        config = cast(MagicMock, agent.local_config)
+        config.container.scratch_root = tmp_path
+        config.debug.skip_container_deletion = False
+        return tmp_path
+
+    @pytest.fixture
+    def collected(self, agent: ContainerdAgent, monkeypatch: pytest.MonkeyPatch) -> list[bytes]:
+        chunks: list[bytes] = []
+
+        async def collect_logs(kernel_id: KernelId, container_id: str, iterator: Any) -> None:
+            async for chunk in iterator:
+                chunks.append(chunk)
+
+        monkeypatch.setattr(agent, "collect_logs", collect_logs)
+        return chunks
+
+    async def test_works_with_an_empty_kernel_registry(
+        self, agent: ContainerdAgent, scratch_root: Path, collected: list[bytes]
+    ) -> None:
+        fake = cast(FakeContainerd, agent._client)
+        kid = _add_container(fake, "c1", state=TaskState.RUNNING)
+        fake.snapshots["c1"] = []
+        scratch = scratch_root / str(kid)
+        scratch.mkdir()
+        (scratch / "task.log").write_bytes(b"hello\n")
+
+        await agent.clean_kernel(kid, ContainerId("c1"), False)
+
+        assert fake.containers == {} and fake.tasks == {} and fake.snapshots == {}
+        assert not scratch.exists()
+        assert b"".join(collected) == b"hello\n"
+
+    async def test_unknown_container_is_tolerated(
+        self, agent: ContainerdAgent, scratch_root: Path, collected: list[bytes]
+    ) -> None:
+        await agent.clean_kernel(KernelId(uuid.uuid4()), ContainerId("absent"), False)
+
+    async def test_without_a_container_id_only_the_scratch_is_removed(
+        self, agent: ContainerdAgent, scratch_root: Path
+    ) -> None:
+        kid = KernelId(uuid.uuid4())
+        (scratch_root / str(kid)).mkdir()
+
+        await agent.clean_kernel(kid, None, False)
+
+        assert not (scratch_root / str(kid)).exists()
+        assert cast(FakeContainerd, agent._client).calls == []
+
+    async def test_restart_keeps_the_scratch(
+        self, agent: ContainerdAgent, scratch_root: Path, collected: list[bytes]
+    ) -> None:
+        fake = cast(FakeContainerd, agent._client)
+        kid = _add_container(fake, "c1", state=TaskState.STOPPED)
+        (scratch_root / str(kid)).mkdir()
+
+        await agent.clean_kernel(kid, ContainerId("c1"), True)
+
+        assert (scratch_root / str(kid)).exists()
+        assert fake.containers == {}
+
+    async def test_debug_flag_keeps_the_container(
+        self, agent: ContainerdAgent, scratch_root: Path, collected: list[bytes]
+    ) -> None:
+        cast(MagicMock, agent.local_config).debug.skip_container_deletion = True
+        fake = cast(FakeContainerd, agent._client)
+        kid = _add_container(fake, "c1", state=TaskState.STOPPED)
+
+        await agent.clean_kernel(kid, ContainerId("c1"), False)
+
+        assert "c1" in fake.containers
+
+    async def test_containerd_error_does_not_stop_the_scratch_removal(
+        self, agent: ContainerdAgent, scratch_root: Path, collected: list[bytes]
+    ) -> None:
+        fake = cast(FakeContainerd, agent._client)
+        kid = _add_container(fake, "c1", state=TaskState.STOPPED)
+        fake.failing.add("delete_container")
+        (scratch_root / str(kid)).mkdir()
+
+        await agent.clean_kernel(kid, ContainerId("c1"), False)
+
+        assert not (scratch_root / str(kid)).exists()
+
+
+class TestShutdown:
+    async def test_client_is_closed_even_if_the_base_shutdown_fails(
+        self, agent: ContainerdAgent, mocker: MockerFixture
+    ) -> None:
+        mocker.patch(
+            "ai.backend.agent.agent.AbstractAgent.shutdown", side_effect=RuntimeError("boom")
+        )
+
+        with pytest.raises(RuntimeError, match="boom"):
+            await agent.shutdown(MagicMock())
+
+        assert cast(FakeContainerd, agent._client).closed
+
+
+class TestAinit:
+    async def test_client_connects_before_the_base_scan_runs(
+        self, agent: ContainerdAgent, mocker: MockerFixture
+    ) -> None:
+        order: list[str] = []
+        cast(MagicMock, agent.local_config).containerd = ContainerdConfig.model_validate({
+            "namespace": "ns1"
+        })
+        connect = mocker.patch(
+            "ai.backend.agent.containerd.agent.ContainerdClient.connect",
+            new=AsyncMock(side_effect=lambda: order.append("connect")),
+        )
+        mocker.patch(
+            "ai.backend.agent.agent.AbstractAgent.__ainit__",
+            new=AsyncMock(side_effect=lambda: order.append("base")),
+        )
+
+        await agent.__ainit__()
+
+        assert order == ["connect", "base"]
+        connect.assert_awaited_once()
+        assert agent._client.snapshotter == "overlayfs"

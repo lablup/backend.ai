@@ -9,7 +9,7 @@ from ai.backend.common.etcd import AbstractKVStore
 from ai.backend.common.types import DeviceName, SlotName
 
 from .agent import ContainerdAgent
-from .kernel import prepare_krunner_env
+from .krunner import prepare_krunner_env
 from .resources import load_resources, scan_available_resources
 
 
