@@ -1977,6 +1977,22 @@ class KernelCreationResult(TypedDict):
     agent_addr: str
 
 
+class SealedPayload(TypedDict):
+    """User-supplied values handed to the confidential hook; never sent to the agent."""
+
+    schema_version: int
+    environ: Mapping[str, str]
+
+
+class ConfidentialSpec(TypedDict):
+    """Hook-produced material that lets the agent launch a sealed kernel."""
+
+    schema_version: int
+    initdata: str
+    sealed: str
+    signature: str
+
+
 class KernelCreationConfig(TypedDict):
     image: ImageConfig
     kernel_id: str  # the kernel's ID
@@ -2008,6 +2024,7 @@ class KernelCreationConfig(TypedDict):
     scaling_group: str
     agent_addr: str
     endpoint_id: str | None
+    confidential: NotRequired[ConfidentialSpec | None]  # set only for sealed kernels
 
 
 class SessionEnqueueingConfig(TypedDict):

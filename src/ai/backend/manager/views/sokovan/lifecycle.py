@@ -7,6 +7,7 @@ from datetime import datetime
 from typing import Any
 from uuid import UUID
 
+from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.types import (
     AccessKey,
     AgentId,
@@ -82,6 +83,7 @@ class SessionDataForStart:
     user_email: str
     user_name: str
     environ: dict[str, str]
+    domain_id: DomainID
     network_type: NetworkType | None = None
     network_id: str | None = None
 

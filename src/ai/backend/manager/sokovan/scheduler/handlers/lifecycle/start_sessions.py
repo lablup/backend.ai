@@ -139,14 +139,28 @@ class StartSessionsLifecycleHandler(SessionLifecycleHandler):
 
         # Start kernels on agents via Launcher
         # Note: RecorderContext is handled inside Launcher
-        await self._launcher.start_sessions_for_handler(
+        rejected = await self._launcher.start_sessions_for_handler(
             sessions_data.sessions,
             sessions_data.image_configs,
         )
 
-        # Mark all sessions as success for status transition
+        # Hook-rejected sessions fail (coordinator applies retry/give_up); the rest succeed
         for session in sessions:
             session_info = session.session_info
+            rejection = rejected.get(session_info.identity.id)
+            if rejection is not None:
+                result.failures.append(
+                    SessionTransitionInfo(
+                        session_id=session_info.identity.id,
+                        from_status=session_info.lifecycle.status,
+                        reason=KernelLifecycleEventReason.FAILED_TO_START,
+                        message=rejection.extra_msg,
+                        error_code=str(rejection.error_code()),
+                        creation_id=session_info.identity.creation_id,
+                        access_key=AccessKey(session_info.metadata.access_key),
+                    )
+                )
+                continue
             result.successes.append(
                 SessionTransitionInfo(
                     session_id=session_info.identity.id,

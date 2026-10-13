@@ -307,6 +307,7 @@ class ManagerDependencyComposer(DependencyComposer[DependencyInput, DependencyRe
                 agent_client_pool=agents.agent_client_pool,
                 appproxy_client_pool=agents.appproxy_client_pool,
                 network_plugin_ctx=plugins.network_plugin_ctx,
+                hook_plugin_ctx=plugins.hook_plugin_ctx,
                 agent_selector=agent_selector,
                 scheduling_controller=agents.scheduling_controller,
                 deployment_controller=agents.deployment_controller,

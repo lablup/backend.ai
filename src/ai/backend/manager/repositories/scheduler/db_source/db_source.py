@@ -4533,6 +4533,7 @@ class ScheduleDBSource:
                     "environ": session.environ,
                     "cluster_mode": session.cluster_mode,
                     "user_uuid": session.user_uuid,
+                    "domain_id": session.domain_id,
                     "network_type": session.network_type,
                     "network_id": session.network_id,
                     "kernels": [],
@@ -4646,6 +4647,7 @@ class ScheduleDBSource:
                         user_uuid=session_info["user_uuid"],
                         user_email=user_info.email,
                         user_name=user_info.username,
+                        domain_id=session_info["domain_id"],
                         network_type=session_info["network_type"],
                         network_id=session_info["network_id"],
                     )

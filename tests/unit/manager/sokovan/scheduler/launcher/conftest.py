@@ -2,17 +2,20 @@
 
 from __future__ import annotations
 
-from collections.abc import AsyncGenerator
+from collections.abc import AsyncGenerator, Callable
 from contextlib import asynccontextmanager
 from datetime import UTC, datetime
 from decimal import Decimal
+from typing import Any
 from unittest.mock import AsyncMock, MagicMock
 from uuid import UUID, uuid4
 
 import pytest
 
+from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.entity.network import NetworkID
 from ai.backend.common.data.entity.project import ProjectID
+from ai.backend.common.plugin.hook import HookResult, HookResults
 from ai.backend.common.types import (
     AccessKey,
     AgentId,
@@ -23,6 +26,7 @@ from ai.backend.common.types import (
     ResourceSlot,
     SessionId,
     SessionTypes,
+    SlotName,
 )
 from ai.backend.manager.data.network.types import NetworkData
 from ai.backend.manager.models.network.row import NetworkType
@@ -36,6 +40,8 @@ from ai.backend.manager.views.sokovan.lifecycle import (
     SessionDataForPull,
     SessionDataForStart,
 )
+
+_DOMAIN_ID = DomainID(UUID("00000000-0000-0000-0000-0000000000d1"))
 
 # Shared image IDs for linking kernel <-> image config in tests
 _DEFAULT_IMAGE_ID = UUID("00000000-0000-0000-0000-000000000001")
@@ -125,10 +131,21 @@ def mock_valkey_schedule() -> AsyncMock:
 
 
 @pytest.fixture
+def mock_hook_plugin_ctx() -> MagicMock:
+    """Mock HookPluginContext; no hook handles the event by default."""
+    ctx = MagicMock()
+    ctx.dispatch = AsyncMock(
+        return_value=HookResult(status=HookResults.REJECTED, src_plugin=[], result=[])
+    )
+    return ctx
+
+
+@pytest.fixture
 def launcher(
     mock_repository: AsyncMock,
     mock_agent_client_pool: MagicMock,
     mock_network_plugin_ctx: MagicMock,
+    mock_hook_plugin_ctx: MagicMock,
     mock_config_provider: MagicMock,
     mock_valkey_schedule: AsyncMock,
 ) -> SessionLauncher:
@@ -138,6 +155,7 @@ def launcher(
             repository=mock_repository,
             agent_client_pool=mock_agent_client_pool,
             network_plugin_ctx=mock_network_plugin_ctx,
+            hook_plugin_ctx=mock_hook_plugin_ctx,
             config_provider=mock_config_provider,
             valkey_schedule=mock_valkey_schedule,
         )
@@ -156,6 +174,8 @@ def _create_kernel_binding_data(
     image_id: UUID | None = _DEFAULT_IMAGE_ID,
     cluster_role: str = "main",
     cluster_idx: int = 0,
+    requested_slots: ResourceSlot | None = None,
+    internal_data: dict[str, Any] | None = None,
 ) -> KernelBindingData:
     """Create KernelBindingData for tests."""
     return KernelBindingData(
@@ -169,7 +189,8 @@ def _create_kernel_binding_data(
         cluster_idx=cluster_idx,
         local_rank=0,
         cluster_hostname=f"{cluster_role}{cluster_idx}",
-        requested_slots=ResourceSlot({"cpu": Decimal("1"), "mem": Decimal("1024")}),
+        requested_slots=requested_slots
+        or ResourceSlot({"cpu": Decimal("1"), "mem": Decimal("1024")}),
         uid=1000,
         main_gid=1000,
         gids=[1000],
@@ -177,7 +198,7 @@ def _create_kernel_binding_data(
         vfolder_mounts=[],
         bootstrap_script=None,
         startup_command=None,
-        internal_data={},
+        internal_data=internal_data if internal_data is not None else {},
         preopen_ports=[],
         resource_group="default",
     )
@@ -258,6 +279,7 @@ def _create_session_for_start(
     cluster_mode: ClusterMode = ClusterMode.SINGLE_NODE,
     network_type: NetworkType | None = None,
     network_id: str | None = None,
+    environ: dict[str, str] | None = None,
 ) -> SessionDataForStart:
     """Create SessionDataForStart for session start tests."""
     if kernels is None:
@@ -276,7 +298,8 @@ def _create_session_for_start(
         network_type=network_type or NetworkType.VOLATILE,
         network_id=network_id,
         kernels=kernels,
-        environ={},
+        environ=environ or {},
+        domain_id=_DOMAIN_ID,
     )
 
 
@@ -284,6 +307,59 @@ def _create_session_for_start(
 def session_for_start_single_kernel() -> SessionDataForStart:
     """Single session with one kernel for starting."""
     return _create_session_for_start()
+
+
+SEALED_SLOT_NAME = "confidential.tdx"
+INTERNAL_PRIVATE_KEY = "internal-private-key"
+USER_ENVIRON = {"USER_SECRET": "s3cr3t", "PLAIN": "x"}
+
+
+def _create_session_kernel_binding_data(
+    agent_id: AgentId | None = None,
+    sealed: bool = True,
+    image_id: UUID | None = _DEFAULT_IMAGE_ID,
+) -> KernelBindingData:
+    """Create a kernel binding that does (or does not) request the sealed-launch slot."""
+    slots = {"cpu": Decimal("1")}
+    if sealed:
+        slots[SEALED_SLOT_NAME] = Decimal("1")
+    return _create_kernel_binding_data(
+        agent_id=agent_id,
+        image_id=image_id,
+        requested_slots=ResourceSlot(slots),
+        internal_data={
+            "ssh_keypair": {
+                "public_key": "internal-public-key",
+                "private_key": INTERNAL_PRIVATE_KEY,
+            }
+        },
+    )
+
+
+@pytest.fixture
+def session_with_kernels_factory() -> Callable[..., SessionDataForStart]:
+    """Factory building a session (with user environ) from kernel bindings."""
+
+    def _create(*kernels: KernelBindingData) -> SessionDataForStart:
+        return _create_session_for_start(kernels=list(kernels), environ=dict(USER_ENVIRON))
+
+    return _create
+
+
+@pytest.fixture
+def patch_sealed_launch_slots(launcher: SessionLauncher, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Mark the confidential slot as sealed-launch on the launcher."""
+    monkeypatch.setattr(
+        launcher,
+        "_get_sealed_launch_slot_names",
+        AsyncMock(return_value=frozenset({SlotName(SEALED_SLOT_NAME)})),
+    )
+
+
+@pytest.fixture
+def session_kernel_factory() -> Callable[..., KernelBindingData]:
+    """Factory building kernel bindings; sealed by default."""
+    return _create_session_kernel_binding_data
 
 
 @pytest.fixture
