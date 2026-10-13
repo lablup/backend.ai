@@ -28,12 +28,12 @@ from urllib.parse import quote_plus as urlquote
 import jwt as pyjwt
 import pytest
 import sqlalchemy as sa
-from authlib.jose import JsonWebKey  # pants: no-infer-dep
-from authlib.jose import jwt as jose_jwt  # pants: no-infer-dep
 from cryptography import x509
 from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import rsa
 from cryptography.x509.oid import NameOID
+from joserfc import jwt as jose_jwt
+from joserfc.jwk import RSAKey
 from sqlalchemy.ext.asyncio import create_async_engine
 
 from ai.backend.common.data.entity.domain import DomainID
@@ -101,8 +101,7 @@ IDP_ISSUER = "https://idp.example.com"
 @pytest.fixture(scope="session")
 def oidc_rsa_key() -> dict[str, Any]:
     """RSA private key used by the mock IdP to sign ID tokens."""
-    key = JsonWebKey.generate_key("RSA", 2048, is_private=True)
-    key_dict: dict[str, Any] = key.as_dict(is_private=True)
+    key_dict: dict[str, Any] = RSAKey.generate_key(2048).as_dict(private=True)
     key_dict.update({"kid": "test-key-1", "use": "sig", "alg": "RS256"})
     return key_dict
 
@@ -237,8 +236,7 @@ def sign_id_token(oidc_rsa_key: dict[str, Any]) -> Callable[..., str]:
 
     def _sign(claims: dict[str, Any]) -> str:
         header = {"alg": "RS256", "kid": oidc_rsa_key["kid"]}
-        token_bytes = jose_jwt.encode(header, claims, oidc_rsa_key)
-        return token_bytes.decode("utf-8") if isinstance(token_bytes, bytes) else token_bytes
+        return jose_jwt.encode(header, claims, RSAKey.import_key(oidc_rsa_key))
 
     return _sign
 
