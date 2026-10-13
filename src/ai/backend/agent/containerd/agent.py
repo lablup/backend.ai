@@ -43,6 +43,7 @@ from ai.backend.agent.containerd.profile.base import (
     KernelLaunch,
     RuntimeProfile,
     StdioMode,
+    prepare_kernel_config,
 )
 from ai.backend.agent.containerd.profile.loader import load_runtime_profiles, select_profile
 from ai.backend.agent.containerd.profile.runc import RuncProfile
@@ -783,6 +784,7 @@ class ContainerdAgent(
             kernel_id=str(ownership_data.kernel_id),
             profile=profile.name,
         )
+        kernel_config = await prepare_kernel_config(profile, kernel_config)
         distro = await self.resolve_image_distro(kernel_config["image"])
         return ContainerdKernelCreationContext(
             ownership_data,

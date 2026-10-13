@@ -57,7 +57,7 @@ class TlsConnectReadiness:
 class KernelLaunch:
     kernel_id: KernelId
     session_id: SessionId
-    config: KernelCreationConfig  # as received from the manager
+    config: KernelCreationConfig  # after RuntimeProfile.prepare()
     slots: Mapping[SlotName, Decimal]  # the kernel's resource_slots, as seen by accepts()
     devices: Sequence[TranslatedDevice]
     mounts: Sequence[GeneratedMount]
@@ -96,3 +96,22 @@ class RuntimeProfile(Protocol):
     def plan(self, kernel: KernelLaunch) -> LaunchPlan:
         """May raise ProfileSpecRejected."""
         ...
+
+    async def prepare(self, config: KernelCreationConfig) -> KernelCreationConfig:
+        """
+        Do the profile's own async lookups before plan(); return the config plan() will see.
+        Return a new config rather than mutating the argument. Errors propagate unchanged.
+        Only the creation context and plan() see the returned config.
+        """
+        return config
+
+
+async def prepare_kernel_config(
+    profile: RuntimeProfile, config: KernelCreationConfig
+) -> KernelCreationConfig:
+    """Call profile.prepare(); a third-party profile written against the two-method seam is a no-op."""
+    prepare = getattr(profile, "prepare", None)
+    if prepare is None:
+        return config
+    prepared: KernelCreationConfig = await prepare(config)
+    return prepared
