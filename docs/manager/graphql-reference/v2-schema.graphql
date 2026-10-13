@@ -10840,7 +10840,7 @@ type PartialBulkUpsertEntityLabelPayload {
   """The labels put on the entities."""
   items: [EntityLabel!]!
 
-  """Per-entity failures, each naming the entity and the keys it targeted."""
+  """Per-item failures, each naming the entity and the key it targeted."""
   failed: [UpsertEntityLabelError!]!
 }
 
@@ -19138,7 +19138,7 @@ type UpsertDomainFairShareWeightPayload {
 }
 
 """
-Added in 26.10.0. One entity a bulk label upsert could not label, and the keys it was to carry.
+Added in 26.10.0. One item of a bulk label upsert that was not written, named as the request named it.
 """
 type UpsertEntityLabelError {
   """Type of the entity the failed item targeted."""
@@ -19147,8 +19147,8 @@ type UpsertEntityLabelError {
   """ID of the entity the failed item targeted."""
   entityId: UUID!
 
-  """The keys that were to be put on the entity."""
-  keys: [String!]!
+  """The key that was to be put on the entity."""
+  key: String!
 
   """Reason the item failed."""
   message: String!

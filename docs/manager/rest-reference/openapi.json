@@ -3151,7 +3151,7 @@
         "type": "object"
       },
       "PartialBulkUpsertEntityLabelInput": {
-        "description": "Input for putting several keys on several entities in one call.\n\nAnswered per entity: an entity may appear in several items, and all of its keys are\nwritten together or refused together.",
+        "description": "Input for putting several keys on several entities in one call. An entity may\nappear in several items; its keys are written together or refused together.",
         "properties": {
           "items": {
             "description": "The labels to put, each naming the entity it goes on",
