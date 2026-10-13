@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import ipaddress
 import logging
 import urllib.parse
 from collections.abc import Iterable
@@ -8,7 +9,7 @@ from uuid import UUID
 
 import jwt
 from aiohttp import hdrs, web
-from pydantic import AnyUrl, Field
+from pydantic import AnyUrl, Field, field_validator
 
 from ai.backend.appproxy.common.defs import MEDIA_TYPE_HTML, MEDIA_TYPE_JSON
 from ai.backend.appproxy.common.errors import (
@@ -45,12 +46,22 @@ class AddRequestModel(BackendAISchema):
     envs: Annotated[dict[str, str | int | None], Field(default={})]
     args: Annotated[str | None, Field(default=None)]
     open_to_public: Annotated[bool, Field(default=False)]
-    allowed_client_ips: Annotated[str | None, Field(default=None)]
+    allowed_client_ips: Annotated[str | None, Field(default=None, max_length=255)]
     redirect: Annotated[str, Field(default="")]
     no_reuse: Annotated[bool, Field(default=False)]
 
     port: Annotated[int | None, Field(default=None)]
     subdomain: Annotated[str | None, Field(default=None)]
+
+    @field_validator("allowed_client_ips")
+    @classmethod
+    def _check_allowed_client_ips(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        for raw in value.split(","):
+            if entry := raw.strip():
+                ipaddress.ip_network(entry, strict=False)
+        return value
 
 
 class ProxyRequestModel(AddRequestModel):
