@@ -12,6 +12,7 @@ from ai.backend.common.data.storage.types import (
     StorageBackendCapabilities,
     StorageBackendType,
 )
+from ai.backend.manager.data.storage_backend.types import StorageBackendTypeData
 from ai.backend.manager.models.base import (
     GUID,
     Base,
@@ -50,6 +51,15 @@ class StorageBackendTypeRow(LifecycleTimestampsMixin, Base):
         nullable=False,
         server_default=sa.text("'{}'::jsonb"),
     )
+
+    def to_data(self) -> StorageBackendTypeData:
+        return StorageBackendTypeData(
+            id=self.id,
+            name=self.name,
+            capabilities=self.capabilities,
+            created_at=self.created_at,
+            updated_at=self.updated_at,
+        )
 
 
 class StorageBackendRow(LifecycleTimestampsMixin, Base):
