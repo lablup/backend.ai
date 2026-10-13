@@ -405,9 +405,20 @@ class ScheduleCoordinator:
                     ],
                     return_exceptions=True,
                 )
-                self._log_resource_group_failures(resource_group_ids, results)
+                any_failed = self._log_resource_group_failures(resource_group_ids, results)
+                # Agents read the mark as "the manager has seen all its kernels"; a failed
+                # group's live kernels would otherwise read as unknown and be reaped.
+                if schedule_type == ScheduleType.SWEEP_STALE_KERNELS and not any_failed:
+                    await self._mark_manager_sweep()
 
             return True
+
+    async def _mark_manager_sweep(self) -> None:
+        try:
+            await self._valkey_schedule.mark_manager_sweep()
+        except Exception as e:
+            # Not fatal: an agent that misses the mark waits rather than reaping.
+            log.warning("manager kernel sweep mark not recorded", exc_info=e)
 
     async def _process_observer_schedule(
         self,
@@ -491,14 +502,18 @@ class ScheduleCoordinator:
         self,
         resource_group_ids: Sequence[ResourceGroupID],
         results: Sequence[BaseException | None],
-    ) -> None:
+    ) -> bool:
+        """Log each failed resource group and return whether any failed."""
+        any_failed = False
         for resource_group_id, result in zip(resource_group_ids, results, strict=True):
             if isinstance(result, BaseException):
+                any_failed = True
                 log.error(
                     "resource group processing failed",
                     resource_group_id=resource_group_id,
                     exc_info=result,
                 )
+        return any_failed
 
     async def _process_observer_resource_group(
         self,
