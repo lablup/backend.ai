@@ -53,10 +53,9 @@ async def launch_container(
     stdio: str,
     runtime_options: RuntimeOptions | None = None,
 ) -> int:
-    """Prepare the rootfs snapshot, create the container and start its task; returns the PID.
+    """Prepare the snapshot, create the container and start its task; returns the PID.
 
-    Whatever was created is removed again when a step fails. The snapshot is not held by a
-    lease yet (FIXME(containerd-mvp)), so a containerd GC between the steps could collect it.
+    A failed step removes what was created. FIXME(containerd-mvp): no lease holds the snapshot.
     """
     rootfs: Sequence[MountSpec] = await client.prepare_snapshot(record.snapshot_key, chain_id)
     try:

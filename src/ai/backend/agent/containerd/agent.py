@@ -52,6 +52,7 @@ from ai.backend.agent.containerd.scratch import (
     remove_scratch,
     write_config_files,
     write_dotfiles,
+    write_hosts_file,
     write_intrinsic_ports,
 )
 from ai.backend.agent.containerd.spec import (
@@ -278,7 +279,7 @@ class ContainerdKernelCreationContext(AbstractKernelCreationContext[ContainerdKe
                 MountTypes.BIND, self._dirs.config, Path("/home/config"), MountPermission.READ_ONLY
             ),
             Mount(MountTypes.BIND, self._dirs.work, Path("/home/work"), MountPermission.READ_WRITE),
-            *host_system_mounts(),
+            *host_system_mounts(self._dirs.hosts),
         ]
         coredump = self.local_config.debug.coredump
         if coredump.enabled:
@@ -424,6 +425,7 @@ class ContainerdKernelCreationContext(AbstractKernelCreationContext[ContainerdKe
                 owner=owner,
             )
             write_dotfiles(self._dirs, self.internal_data.get("dotfiles", []), owner)
+            write_hosts_file(self._dirs, self.kernel_config["cluster_hostname"])
 
         await run_in_executor_with_context(None, _write)
 
@@ -470,6 +472,8 @@ class ContainerdKernelCreationContext(AbstractKernelCreationContext[ContainerdKe
                 mounts=self._generated_mounts,
                 allowed_mount_kinds=launch_plan.allowed_mount_kinds,
                 spec_patch=launch_plan.spec_patch,
+                # cgroupfs form: the native API passes no runc options, so runc uses cgroupfs.
+                # A profile enabling SystemdCgroup overrides it with spec_patch.
                 cgroups_path=f"/{self._client.namespace}/{container_id}",
             )
             stdio = (

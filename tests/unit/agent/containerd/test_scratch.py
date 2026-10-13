@@ -2,12 +2,16 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
+
+from ai.backend.agent.containerd import scratch as scratch_module
 from ai.backend.agent.containerd.scratch import (
     ScratchDirs,
     create_scratch,
     remove_scratch,
     write_config_files,
     write_dotfiles,
+    write_hosts_file,
     write_intrinsic_ports,
 )
 
@@ -156,6 +160,17 @@ class TestWriteDotfiles:
 
         assert not (tmp_path / "x").exists()
 
+    @pytest.mark.parametrize("path", [".", "", "/home/", "/home/work", ".config/.."])
+    def test_a_path_naming_a_directory_is_skipped_not_fatal(
+        self, tmp_path: Path, path: str
+    ) -> None:
+        dirs = _dirs(tmp_path)
+        create_scratch(dirs, None, clone_dotfiles=False)
+
+        write_dotfiles(dirs, [{"path": path, "data": "x", "perm": "644"}], None)
+
+        assert dirs.work.is_dir()
+
     def test_a_skipped_dotfile_does_not_stop_the_others(self, tmp_path: Path) -> None:
         dirs = _dirs(tmp_path)
         create_scratch(dirs, None, clone_dotfiles=False)
@@ -208,3 +223,41 @@ class TestRemoveScratch:
 
     def test_missing_dir_is_tolerated(self, tmp_path: Path) -> None:
         remove_scratch(tmp_path, "absent")
+
+
+class TestWriteHostsFile:
+    @pytest.fixture
+    def host_hosts(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
+        path = tmp_path / "host-hosts"
+        path.write_text("127.0.0.1 localhost")
+        monkeypatch.setattr(scratch_module, "_HOST_HOSTS_FILE", path)
+        return path
+
+    def test_host_entries_and_the_kernel_hostname(self, tmp_path: Path, host_hosts: Path) -> None:
+        dirs = _dirs(tmp_path / "s")
+        dirs.root.mkdir(parents=True)
+
+        write_hosts_file(dirs, "main1")
+
+        assert dirs.hosts.read_text() == "127.0.0.1 localhost\n127.0.0.1 main1\n"
+        assert dirs.hosts.stat().st_mode & 0o777 == 0o644
+        assert dirs.hosts.parent == dirs.root
+
+    def test_an_invalid_hostname_is_left_out(self, tmp_path: Path, host_hosts: Path) -> None:
+        dirs = _dirs(tmp_path / "s")
+        dirs.root.mkdir(parents=True)
+
+        write_hosts_file(dirs, "bad name\n10.0.0.1 evil")
+
+        assert dirs.hosts.read_text() == "127.0.0.1 localhost\n"
+
+    def test_a_missing_host_file_gives_only_the_kernel_entry(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setattr(scratch_module, "_HOST_HOSTS_FILE", tmp_path / "absent")
+        dirs = _dirs(tmp_path / "s")
+        dirs.root.mkdir(parents=True)
+
+        write_hosts_file(dirs, "main1")
+
+        assert dirs.hosts.read_text() == "127.0.0.1 main1\n"

@@ -15,7 +15,6 @@ _KRUNNER_PREFIXES = ("/opt/kernel", "/opt/backend.ai", "/usr/local/bin/", "/usr/
 _LXCFS_ROOT = Path("/var/lib/lxcfs")
 _HOST_FILES = (
     Path("/etc/resolv.conf"),
-    Path("/etc/hosts"),
     Path("/etc/localtime"),
     Path("/etc/timezone"),
 )
@@ -50,18 +49,19 @@ def to_generated_mounts(mounts: Sequence[Mount]) -> list[GeneratedMount]:
     return generated
 
 
-def host_system_mounts() -> list[Mount]:
-    """Host name resolution and timezone files and lxcfs views, when the host has them.
+def host_system_mounts(hosts_file: Path) -> list[Mount]:
+    """The kernel's hosts file, the host's resolver and timezone files and lxcfs views.
 
     The kernel shares the host network, so the host's resolver config is the right one.
     """
     if platform.system() != "Linux":
         return []
-    mounts = [
+    mounts = [Mount(MountTypes.BIND, hosts_file, Path("/etc/hosts"), MountPermission.READ_ONLY)]
+    mounts.extend(
         Mount(MountTypes.BIND, path, path, MountPermission.READ_ONLY)
         for path in _HOST_FILES
         if path.exists()
-    ]
+    )
     if _LXCFS_ROOT.is_dir():
         mounts.extend(
             Mount(

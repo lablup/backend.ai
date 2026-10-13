@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 import os
+import re
 import shutil
 from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
@@ -19,6 +20,9 @@ from ai.backend.logging.structured import StructuredLogger
 log = StructuredLogger(logging.getLogger(__spec__.name))
 
 TASK_LOG_NAME: Final = "task.log"
+HOSTS_NAME: Final = "hosts"
+_HOST_HOSTS_FILE: Final = Path("/etc/hosts")
+_HOSTNAME_RE: Final = re.compile(r"[A-Za-z0-9]([A-Za-z0-9._-]*[A-Za-z0-9])?")
 CONFIG_DIR_LABEL: Final = "ai.backend.containerd.config-dir"
 _RUNNER_DOTFILES: Final = (".bashrc", ".bash_profile", ".zshrc", ".vimrc", ".tmux.conf")
 _JUPYTER_FILES: Final = {
@@ -39,6 +43,11 @@ class ScratchDirs:
     def for_kernel(cls, scratch_root: Path, kernel_id: str) -> ScratchDirs:
         root = (scratch_root / kernel_id).resolve()
         return cls(root=root, config=root / "config", work=root / "work")
+
+    @property
+    def hosts(self) -> Path:
+        """The kernel's /etc/hosts; it is not under a mounted directory."""
+        return self.root / HOSTS_NAME
 
     @property
     def task_log(self) -> Path:
@@ -88,7 +97,7 @@ def create_scratch(dirs: ScratchDirs, owner: Owner | None, *, clone_dotfiles: bo
 
 
 def _dotfile_target(dirs: ScratchDirs, path: str) -> Path | None:
-    """Where a dotfile goes, or None when it would land outside the kernel's scratch dir."""
+    """Where a dotfile goes, or None when it is outside the kernel's scratch dir or a directory."""
     if path.startswith("/home/"):
         target = dirs.root / "/".join(path.split("/")[2:])
     elif path.startswith("/"):
@@ -96,7 +105,9 @@ def _dotfile_target(dirs: ScratchDirs, path: str) -> Path | None:
     else:
         target = dirs.work / path
     target = target.resolve()
-    return target if target.is_relative_to(dirs.root) else None
+    if target.is_dir() or not target.is_relative_to(dirs.root):
+        return None  # a directory ("." or "") cannot hold the file either
+    return target
 
 
 def write_dotfiles(
@@ -104,12 +115,15 @@ def write_dotfiles(
 ) -> None:
     """Write the user's dotfiles; the ones later in the list take precedence.
 
-    A path that leaves the scratch dir is skipped with a warning.
+    A path that leaves the scratch dir or names a directory is skipped with a warning.
     """
     for dotfile in dotfiles:
         target = _dotfile_target(dirs, dotfile["path"])
         if target is None:
-            log.warning("dotfile outside the scratch dir skipped", dotfile_path=dotfile["path"])
+            log.warning(
+                "dotfile outside the scratch dir or on a directory skipped",
+                dotfile_path=dotfile["path"],
+            )
             continue
         target.parent.mkdir(parents=True, exist_ok=True)
         content = dotfile["data"]
@@ -142,6 +156,22 @@ def write_config_files(
     if bootstrap_script:
         (dirs.work / "bootstrap.sh").write_text(bootstrap_script)
         chown_if_root([dirs.work / "bootstrap.sh"], owner)
+
+
+def write_hosts_file(dirs: ScratchDirs, hostname: str) -> None:
+    """The host's /etc/hosts plus the kernel's own hostname on the loopback address."""
+    try:
+        content = _HOST_HOSTS_FILE.read_text()
+    except FileNotFoundError:
+        content = ""
+    if content and not content.endswith("\n"):
+        content += "\n"
+    if _HOSTNAME_RE.fullmatch(hostname):
+        content += f"127.0.0.1 {hostname}\n"
+    else:
+        log.warning("kernel hostname left out of the hosts file", hostname=hostname)
+    dirs.hosts.write_text(content)
+    dirs.hosts.chmod(0o644)
 
 
 def write_intrinsic_ports(dirs: ScratchDirs, ports: bytes) -> None:
