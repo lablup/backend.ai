@@ -46,6 +46,15 @@ from ai.backend.testutils.fixtures import DomainFixtureData
 _PASSWORD = "test_password"
 
 
+def _password_info(password: str) -> PasswordInfo:
+    return PasswordInfo(
+        password=password,
+        algorithm=PasswordHashAlgorithm.PBKDF2_SHA256,
+        rounds=100_000,
+        salt_size=32,
+    )
+
+
 @dataclass(frozen=True)
 class _Credential:
     domain_name: DomainName
@@ -172,12 +181,7 @@ class TestCheckCredentialWithoutMigration:
             db_with_cleanup,
             domain,
             user_resource_policy_name,
-            PasswordInfo(
-                password=_PASSWORD,
-                algorithm=PasswordHashAlgorithm.PBKDF2_SHA256,
-                rounds=100_000,
-                salt_size=32,
-            ),
+            _password_info(_PASSWORD),
         )
 
     @pytest.fixture
@@ -195,7 +199,7 @@ class TestCheckCredentialWithoutMigration:
         user_with_password: _Credential,
     ) -> None:
         row = await auth_repository.check_credential_without_migration(
-            user_with_password.domain_name, user_with_password.email, _PASSWORD
+            user_with_password.domain_name, user_with_password.email, _password_info(_PASSWORD)
         )
 
         assert row["uuid"] == user_with_password.user_uuid
@@ -208,7 +212,9 @@ class TestCheckCredentialWithoutMigration:
     ) -> None:
         with pytest.raises(AuthorizationFailed):
             await auth_repository.check_credential_without_migration(
-                user_with_password.domain_name, user_with_password.email, "wrong_password"
+                user_with_password.domain_name,
+                user_with_password.email,
+                _password_info("wrong_password"),
             )
 
     async def test_rejects_an_unknown_email(
@@ -218,7 +224,7 @@ class TestCheckCredentialWithoutMigration:
     ) -> None:
         with pytest.raises(AuthorizationFailed):
             await auth_repository.check_credential_without_migration(
-                user_with_password.domain_name, "nobody@example.com", _PASSWORD
+                user_with_password.domain_name, "nobody@example.com", _password_info(_PASSWORD)
             )
 
     async def test_rejects_the_email_under_another_domain(
@@ -229,7 +235,7 @@ class TestCheckCredentialWithoutMigration:
     ) -> None:
         with pytest.raises(AuthorizationFailed):
             await auth_repository.check_credential_without_migration(
-                other_domain.domain_name, user_with_password.email, _PASSWORD
+                other_domain.domain_name, user_with_password.email, _password_info(_PASSWORD)
             )
 
     async def test_rejects_a_user_without_a_password(
@@ -239,5 +245,7 @@ class TestCheckCredentialWithoutMigration:
     ) -> None:
         with pytest.raises(AuthorizationFailed):
             await auth_repository.check_credential_without_migration(
-                user_without_password.domain_name, user_without_password.email, _PASSWORD
+                user_without_password.domain_name,
+                user_without_password.email,
+                _password_info(_PASSWORD),
             )

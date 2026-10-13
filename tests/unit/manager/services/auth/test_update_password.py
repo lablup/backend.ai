@@ -236,11 +236,12 @@ async def test_update_password_repository_call(
     result = await auth_service.update_password(action)
 
     # Verify repository calls
-    mock_auth_repository.check_credential_without_migration.assert_called_once_with(
-        "test-domain",
-        "update@example.com",
-        "old_pass",
+    mock_auth_repository.check_credential_without_migration.assert_called_once()
+    domain_name, email, old_password_info = (
+        mock_auth_repository.check_credential_without_migration.call_args[0]
     )
+    assert (domain_name, email) == ("test-domain", "update@example.com")
+    assert old_password_info.password == "old_pass"
     # Verify password was updated with PasswordInfo
     call_args = mock_auth_repository.update_user_password.call_args
     assert call_args[0][0] == "update@example.com"
