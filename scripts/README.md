@@ -30,7 +30,7 @@ current, see `AGENTS.md` in this directory.
 | `generate-graphql-schema.sh` | Dumps the GraphQL v1/v2 schemas and composes the supergraph | person; `install-dev.sh`, `release.sh`, `refresh-graphql-gateway.sh` |
 | `refresh-graphql-gateway.sh` | Regenerates the schema, copies it to the root, restarts the Apollo Router (`--recreate` to recreate the container so config updates apply) | person |
 | `alembic-rebase.py` | Rebases a migration branch when alembic heads have diverged | person (`src/ai/backend/README.md`) |
-| `codegen/gen_containerd_api.py` | Regenerates the vendored containerd gRPC stubs under `src/ai/backend/agent/containerd/_grpcapi/` from a pinned containerd tag | person |
+| `codegen/gen_containerd_api.py` | Regenerates the vendored containerd gRPC stubs under `src/ai/backend/agent/containerd/_grpcapi/` from containerd `v1.7.27` (vendored `api` module v1.8.0), grpcio-tools 1.74.0 | person |
 | `download-webui-release.sh` | Downloads and unpacks a WebUI bundle into `src/ai/backend/web` | person; `release.sh` |
 | `knowledge/search.py` | Lists or searches `KNOWLEDGE.md` frontmatter across the repository | person; Claude Code (`/knowledge`) |
 

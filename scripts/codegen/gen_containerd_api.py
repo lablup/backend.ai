@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Regenerate the vendored containerd gRPC stubs in `_grpcapi/`; run only to refresh them.
 
-Inputs: the Go module cache at containerd `CONTAINERD_TAG` and gogo/protobuf, or the
-CONTAINERD_PROTO_DIR / GOGO_PROTO_DIR overrides. The hand-written `*.pyi` files are kept.
+Input: a containerd checkout at `CONTAINERD_TAG` (CONTAINERD_PROTO_DIR, default: the Go module
+cache). Its `vendor/` holds the `api` protos (module v1.8.0). Needs grpcio-tools 1.74.0.
 """
 
 from __future__ import annotations
@@ -15,21 +15,27 @@ import sys
 import tempfile
 from pathlib import Path
 
-# Provisional: the reference script was unpinned, so the stubs' source tag is unknown.
 CONTAINERD_TAG = "v1.7.27"
 CONTAINERD_MODULE = f"github.com/containerd/containerd@{CONTAINERD_TAG}"
-GOGO_VERSION_GLOB = "github.com/gogo/protobuf@*"
+VENDORED_API = "vendor/github.com/containerd/containerd/api"
 
 REPO = Path(__file__).resolve().parents[2]
 DEST_PKG = "ai.backend.agent.containerd._grpcapi"
 DEST_DIR = REPO / "src/ai/backend/agent/containerd/_grpcapi"
 PKG_PATH = DEST_PKG.replace(".", "/")
 
-# protoc follows imports, so only the service entry points are listed.
+# Entry points; protoc writes Python only for files it is given, so their imports are added.
 SERVICES = ["containers", "tasks", "images", "snapshots", "content"]
-# Proto trees copied into the stage; `pkg/runtimeoptions` is the 1.7 location of runtimeoptions.v1.
-PROTO_SUBDIRS = ("api", "protobuf", "pkg/runtimeoptions")
+# Proto trees copied into the stage (source dir relative to the checkout -> stage dir);
+# `pkg/runtimeoptions` is the 1.7 location of runtimeoptions.v1.
+PROTO_TREES = {VENDORED_API: "api", "pkg/runtimeoptions": "pkg/runtimeoptions"}
 EXTRA_TARGETS = ["pkg/runtimeoptions/v1/api.proto"]
+PYI_STUB = '''"""Dynamic protoc module; attributes are Any (see scripts/codegen/gen_containerd_api.py)."""
+
+from typing import Any
+
+def __getattr__(name: str) -> Any: ...
+'''
 
 
 def _find_go_mod(glob: str) -> Path:
@@ -42,37 +48,43 @@ def _find_go_mod(glob: str) -> Path:
 
 def _rewrite_proto_imports(text: str) -> str:
     # containerd imports use github.com/... paths, which are not importable Python packages.
-    text = re.sub(
+    return re.sub(
         r'import(\s+weak)?\s+"github\.com/containerd/containerd/(api|protobuf)/',
         lambda m: f'import{m.group(1) or ""} "{PKG_PATH}/{m.group(2)}/',
         text,
     )
-    return text.replace('"gogoproto/gogo.proto"', f'"{PKG_PATH}/gogoproto/gogo.proto"')
+
+
+def _import_closure(stage: Path, roots: list[Path]) -> list[Path]:
+    seen: dict[Path, None] = {}
+    todo = list(roots)
+    while todo:
+        proto = todo.pop()
+        if proto in seen:
+            continue
+        seen[proto] = None
+        for imported in re.findall(r'^import\s+(?:weak\s+)?"([^"]+)";', proto.read_text(), re.M):
+            if (stage / imported).exists():
+                todo.append(stage / imported)
+    return sorted(seen)
 
 
 def main() -> None:
-    cd_proto = Path(
-        os.environ.get("CONTAINERD_PROTO_DIR") or _find_go_mod(CONTAINERD_MODULE)
-    )
-    gogo_proto = Path(os.environ.get("GOGO_PROTO_DIR") or _find_go_mod(GOGO_VERSION_GLOB))
+    cd_proto = Path(os.environ.get("CONTAINERD_PROTO_DIR") or _find_go_mod(CONTAINERD_MODULE))
     print(f"containerd protos: {cd_proto}")
-    print(f"gogo protos:       {gogo_proto}")
 
     with tempfile.TemporaryDirectory() as tmp:
         stage = Path(tmp) / "stage"
         pkg_root = stage / PKG_PATH
-        for sub in PROTO_SUBDIRS:
+        for sub, dest in PROTO_TREES.items():
             for src in (cd_proto / sub).rglob("*.proto"):
-                dst = pkg_root / sub / src.relative_to(cd_proto / sub)
+                dst = pkg_root / dest / src.relative_to(cd_proto / sub)
                 dst.parent.mkdir(parents=True, exist_ok=True)
                 dst.write_text(_rewrite_proto_imports(src.read_text()))
-        (pkg_root / "gogoproto").mkdir(parents=True, exist_ok=True)
-        (pkg_root / "gogoproto/gogo.proto").write_text(
-            _rewrite_proto_imports((gogo_proto / "gogoproto/gogo.proto").read_text())
-        )
 
         targets = [pkg_root / f"api/services/{s}/v1/{s}.proto" for s in SERVICES]
         targets += [pkg_root / t for t in EXTRA_TARGETS]
+        targets = _import_closure(stage, targets)
         out = Path(tmp) / "out"
         out.mkdir()
         cmd = [
@@ -87,14 +99,14 @@ def main() -> None:
             print(res.stderr, file=sys.stderr)
             raise SystemExit("protoc failed")
 
-        # Keep the hand-written .pyi files across regeneration.
-        pyi_keep = {p.relative_to(DEST_DIR): p.read_text() for p in DEST_DIR.rglob("*.pyi")}
         if DEST_DIR.exists():
             shutil.rmtree(DEST_DIR)
         shutil.copytree(out / PKG_PATH, DEST_DIR)
-        for rel, text in pyi_keep.items():
-            if (DEST_DIR / rel.with_suffix(".py")).exists():
-                (DEST_DIR / rel).write_text(text)
+        for grpc_module in DEST_DIR.rglob("*_pb2_grpc.py"):
+            if "Servicer(" not in grpc_module.read_text():  # message-only proto
+                grpc_module.unlink()
+        for module in DEST_DIR.rglob("*_pb2*.py"):
+            module.with_suffix(".pyi").write_text(PYI_STUB)
         for d in [DEST_DIR, *[p for p in DEST_DIR.rglob("*") if p.is_dir()]]:
             init = d / "__init__.py"
             if not init.exists():

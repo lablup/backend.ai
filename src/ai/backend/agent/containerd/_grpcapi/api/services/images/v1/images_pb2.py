@@ -22,14 +22,13 @@ _runtime_version.ValidateProtobufRuntimeVersion(
 _sym_db = _symbol_database.Default()
 
 
-from ai.backend.agent.containerd._grpcapi.gogoproto import gogo_pb2 as ai_dot_backend_dot_agent_dot_containerd_dot___grpcapi_dot_gogoproto_dot_gogo__pb2
 from google.protobuf import empty_pb2 as google_dot_protobuf_dot_empty__pb2
 from google.protobuf import field_mask_pb2 as google_dot_protobuf_dot_field__mask__pb2
 from google.protobuf import timestamp_pb2 as google_dot_protobuf_dot_timestamp__pb2
 from ai.backend.agent.containerd._grpcapi.api.types import descriptor_pb2 as ai_dot_backend_dot_agent_dot_containerd_dot___grpcapi_dot_api_dot_types_dot_descriptor__pb2
 
 
-DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\nHai/backend/agent/containerd/_grpcapi/api/services/images/v1/images.proto\x12\x1d\x63ontainerd.services.images.v1\x1a\x39\x61i/backend/agent/containerd/_grpcapi/gogoproto/gogo.proto\x1a\x1bgoogle/protobuf/empty.proto\x1a google/protobuf/field_mask.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a?ai/backend/agent/containerd/_grpcapi/api/types/descriptor.proto\"\xae\x02\n\x05Image\x12\x0c\n\x04name\x18\x01 \x01(\t\x12@\n\x06labels\x18\x02 \x03(\x0b\x32\x30.containerd.services.images.v1.Image.LabelsEntry\x12\x32\n\x06target\x18\x03 \x01(\x0b\x32\x1c.containerd.types.DescriptorB\x04\xc8\xde\x1f\x00\x12\x38\n\ncreated_at\x18\x07 \x01(\x0b\x32\x1a.google.protobuf.TimestampB\x08\xc8\xde\x1f\x00\x90\xdf\x1f\x01\x12\x38\n\nupdated_at\x18\x08 \x01(\x0b\x32\x1a.google.protobuf.TimestampB\x08\xc8\xde\x1f\x00\x90\xdf\x1f\x01\x1a-\n\x0bLabelsEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\t:\x02\x38\x01\"\x1f\n\x0fGetImageRequest\x12\x0c\n\x04name\x18\x01 \x01(\t\"G\n\x10GetImageResponse\x12\x33\n\x05image\x18\x01 \x01(\x0b\x32$.containerd.services.images.v1.Image\"O\n\x12\x43reateImageRequest\x12\x39\n\x05image\x18\x01 \x01(\x0b\x32$.containerd.services.images.v1.ImageB\x04\xc8\xde\x1f\x00\"P\n\x13\x43reateImageResponse\x12\x39\n\x05image\x18\x01 \x01(\x0b\x32$.containerd.services.images.v1.ImageB\x04\xc8\xde\x1f\x00\"\x80\x01\n\x12UpdateImageRequest\x12\x39\n\x05image\x18\x01 \x01(\x0b\x32$.containerd.services.images.v1.ImageB\x04\xc8\xde\x1f\x00\x12/\n\x0bupdate_mask\x18\x02 \x01(\x0b\x32\x1a.google.protobuf.FieldMask\"P\n\x13UpdateImageResponse\x12\x39\n\x05image\x18\x01 \x01(\x0b\x32$.containerd.services.images.v1.ImageB\x04\xc8\xde\x1f\x00\"$\n\x11ListImagesRequest\x12\x0f\n\x07\x66ilters\x18\x01 \x03(\t\"P\n\x12ListImagesResponse\x12:\n\x06images\x18\x01 \x03(\x0b\x32$.containerd.services.images.v1.ImageB\x04\xc8\xde\x1f\x00\"0\n\x12\x44\x65leteImageRequest\x12\x0c\n\x04name\x18\x01 \x01(\t\x12\x0c\n\x04sync\x18\x02 \x01(\x08\x32\x94\x04\n\x06Images\x12\x66\n\x03Get\x12..containerd.services.images.v1.GetImageRequest\x1a/.containerd.services.images.v1.GetImageResponse\x12k\n\x04List\x12\x30.containerd.services.images.v1.ListImagesRequest\x1a\x31.containerd.services.images.v1.ListImagesResponse\x12o\n\x06\x43reate\x12\x31.containerd.services.images.v1.CreateImageRequest\x1a\x32.containerd.services.images.v1.CreateImageResponse\x12o\n\x06Update\x12\x31.containerd.services.images.v1.UpdateImageRequest\x1a\x32.containerd.services.images.v1.UpdateImageResponse\x12S\n\x06\x44\x65lete\x12\x31.containerd.services.images.v1.DeleteImageRequest\x1a\x16.google.protobuf.EmptyB@Z>github.com/containerd/containerd/api/services/images/v1;imagesX\x00\x62\x06proto3')
+DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\nHai/backend/agent/containerd/_grpcapi/api/services/images/v1/images.proto\x12\x1d\x63ontainerd.services.images.v1\x1a\x1bgoogle/protobuf/empty.proto\x1a google/protobuf/field_mask.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a?ai/backend/agent/containerd/_grpcapi/api/types/descriptor.proto\"\x94\x02\n\x05Image\x12\x0c\n\x04name\x18\x01 \x01(\t\x12@\n\x06labels\x18\x02 \x03(\x0b\x32\x30.containerd.services.images.v1.Image.LabelsEntry\x12,\n\x06target\x18\x03 \x01(\x0b\x32\x1c.containerd.types.Descriptor\x12.\n\ncreated_at\x18\x07 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\x12.\n\nupdated_at\x18\x08 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\x1a-\n\x0bLabelsEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\t:\x02\x38\x01\"\x1f\n\x0fGetImageRequest\x12\x0c\n\x04name\x18\x01 \x01(\t\"G\n\x10GetImageResponse\x12\x33\n\x05image\x18\x01 \x01(\x0b\x32$.containerd.services.images.v1.Image\"\x80\x01\n\x12\x43reateImageRequest\x12\x33\n\x05image\x18\x01 \x01(\x0b\x32$.containerd.services.images.v1.Image\x12\x35\n\x11source_date_epoch\x18\x02 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\"J\n\x13\x43reateImageResponse\x12\x33\n\x05image\x18\x01 \x01(\x0b\x32$.containerd.services.images.v1.Image\"\xb1\x01\n\x12UpdateImageRequest\x12\x33\n\x05image\x18\x01 \x01(\x0b\x32$.containerd.services.images.v1.Image\x12/\n\x0bupdate_mask\x18\x02 \x01(\x0b\x32\x1a.google.protobuf.FieldMask\x12\x35\n\x11source_date_epoch\x18\x03 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\"J\n\x13UpdateImageResponse\x12\x33\n\x05image\x18\x01 \x01(\x0b\x32$.containerd.services.images.v1.Image\"$\n\x11ListImagesRequest\x12\x0f\n\x07\x66ilters\x18\x01 \x03(\t\"J\n\x12ListImagesResponse\x12\x34\n\x06images\x18\x01 \x03(\x0b\x32$.containerd.services.images.v1.Image\"n\n\x12\x44\x65leteImageRequest\x12\x0c\n\x04name\x18\x01 \x01(\t\x12\x0c\n\x04sync\x18\x02 \x01(\x08\x12\x31\n\x06target\x18\x03 \x01(\x0b\x32\x1c.containerd.types.DescriptorH\x00\x88\x01\x01\x42\t\n\x07_target2\x94\x04\n\x06Images\x12\x66\n\x03Get\x12..containerd.services.images.v1.GetImageRequest\x1a/.containerd.services.images.v1.GetImageResponse\x12k\n\x04List\x12\x30.containerd.services.images.v1.ListImagesRequest\x1a\x31.containerd.services.images.v1.ListImagesResponse\x12o\n\x06\x43reate\x12\x31.containerd.services.images.v1.CreateImageRequest\x1a\x32.containerd.services.images.v1.CreateImageResponse\x12o\n\x06Update\x12\x31.containerd.services.images.v1.UpdateImageRequest\x1a\x32.containerd.services.images.v1.UpdateImageResponse\x12S\n\x06\x44\x65lete\x12\x31.containerd.services.images.v1.DeleteImageRequest\x1a\x16.google.protobuf.EmptyB@Z>github.com/containerd/containerd/api/services/images/v1;imagesb\x06proto3')
 
 _globals = globals()
 _builder.BuildMessageAndEnumDescriptors(DESCRIPTOR, _globals)
@@ -39,44 +38,28 @@ if not _descriptor._USE_C_DESCRIPTORS:
   _globals['DESCRIPTOR']._serialized_options = b'Z>github.com/containerd/containerd/api/services/images/v1;images'
   _globals['_IMAGE_LABELSENTRY']._loaded_options = None
   _globals['_IMAGE_LABELSENTRY']._serialized_options = b'8\001'
-  _globals['_IMAGE'].fields_by_name['target']._loaded_options = None
-  _globals['_IMAGE'].fields_by_name['target']._serialized_options = b'\310\336\037\000'
-  _globals['_IMAGE'].fields_by_name['created_at']._loaded_options = None
-  _globals['_IMAGE'].fields_by_name['created_at']._serialized_options = b'\310\336\037\000\220\337\037\001'
-  _globals['_IMAGE'].fields_by_name['updated_at']._loaded_options = None
-  _globals['_IMAGE'].fields_by_name['updated_at']._serialized_options = b'\310\336\037\000\220\337\037\001'
-  _globals['_CREATEIMAGEREQUEST'].fields_by_name['image']._loaded_options = None
-  _globals['_CREATEIMAGEREQUEST'].fields_by_name['image']._serialized_options = b'\310\336\037\000'
-  _globals['_CREATEIMAGERESPONSE'].fields_by_name['image']._loaded_options = None
-  _globals['_CREATEIMAGERESPONSE'].fields_by_name['image']._serialized_options = b'\310\336\037\000'
-  _globals['_UPDATEIMAGEREQUEST'].fields_by_name['image']._loaded_options = None
-  _globals['_UPDATEIMAGEREQUEST'].fields_by_name['image']._serialized_options = b'\310\336\037\000'
-  _globals['_UPDATEIMAGERESPONSE'].fields_by_name['image']._loaded_options = None
-  _globals['_UPDATEIMAGERESPONSE'].fields_by_name['image']._serialized_options = b'\310\336\037\000'
-  _globals['_LISTIMAGESRESPONSE'].fields_by_name['images']._loaded_options = None
-  _globals['_LISTIMAGESRESPONSE'].fields_by_name['images']._serialized_options = b'\310\336\037\000'
-  _globals['_IMAGE']._serialized_start=328
-  _globals['_IMAGE']._serialized_end=630
-  _globals['_IMAGE_LABELSENTRY']._serialized_start=585
-  _globals['_IMAGE_LABELSENTRY']._serialized_end=630
-  _globals['_GETIMAGEREQUEST']._serialized_start=632
-  _globals['_GETIMAGEREQUEST']._serialized_end=663
-  _globals['_GETIMAGERESPONSE']._serialized_start=665
-  _globals['_GETIMAGERESPONSE']._serialized_end=736
-  _globals['_CREATEIMAGEREQUEST']._serialized_start=738
-  _globals['_CREATEIMAGEREQUEST']._serialized_end=817
-  _globals['_CREATEIMAGERESPONSE']._serialized_start=819
-  _globals['_CREATEIMAGERESPONSE']._serialized_end=899
-  _globals['_UPDATEIMAGEREQUEST']._serialized_start=902
-  _globals['_UPDATEIMAGEREQUEST']._serialized_end=1030
-  _globals['_UPDATEIMAGERESPONSE']._serialized_start=1032
-  _globals['_UPDATEIMAGERESPONSE']._serialized_end=1112
-  _globals['_LISTIMAGESREQUEST']._serialized_start=1114
-  _globals['_LISTIMAGESREQUEST']._serialized_end=1150
-  _globals['_LISTIMAGESRESPONSE']._serialized_start=1152
-  _globals['_LISTIMAGESRESPONSE']._serialized_end=1232
-  _globals['_DELETEIMAGEREQUEST']._serialized_start=1234
-  _globals['_DELETEIMAGEREQUEST']._serialized_end=1282
-  _globals['_IMAGES']._serialized_start=1285
-  _globals['_IMAGES']._serialized_end=1817
+  _globals['_IMAGE']._serialized_start=269
+  _globals['_IMAGE']._serialized_end=545
+  _globals['_IMAGE_LABELSENTRY']._serialized_start=500
+  _globals['_IMAGE_LABELSENTRY']._serialized_end=545
+  _globals['_GETIMAGEREQUEST']._serialized_start=547
+  _globals['_GETIMAGEREQUEST']._serialized_end=578
+  _globals['_GETIMAGERESPONSE']._serialized_start=580
+  _globals['_GETIMAGERESPONSE']._serialized_end=651
+  _globals['_CREATEIMAGEREQUEST']._serialized_start=654
+  _globals['_CREATEIMAGEREQUEST']._serialized_end=782
+  _globals['_CREATEIMAGERESPONSE']._serialized_start=784
+  _globals['_CREATEIMAGERESPONSE']._serialized_end=858
+  _globals['_UPDATEIMAGEREQUEST']._serialized_start=861
+  _globals['_UPDATEIMAGEREQUEST']._serialized_end=1038
+  _globals['_UPDATEIMAGERESPONSE']._serialized_start=1040
+  _globals['_UPDATEIMAGERESPONSE']._serialized_end=1114
+  _globals['_LISTIMAGESREQUEST']._serialized_start=1116
+  _globals['_LISTIMAGESREQUEST']._serialized_end=1152
+  _globals['_LISTIMAGESRESPONSE']._serialized_start=1154
+  _globals['_LISTIMAGESRESPONSE']._serialized_end=1228
+  _globals['_DELETEIMAGEREQUEST']._serialized_start=1230
+  _globals['_DELETEIMAGEREQUEST']._serialized_end=1340
+  _globals['_IMAGES']._serialized_start=1343
+  _globals['_IMAGES']._serialized_end=1875
 # @@protoc_insertion_point(module_scope)

@@ -6,7 +6,7 @@ import warnings
 from ai.backend.agent.containerd._grpcapi.api.services.images.v1 import images_pb2 as ai_dot_backend_dot_agent_dot_containerd_dot___grpcapi_dot_api_dot_services_dot_images_dot_v1_dot_images__pb2
 from google.protobuf import empty_pb2 as google_dot_protobuf_dot_empty__pb2
 
-GRPC_GENERATED_VERSION = '1.80.0'
+GRPC_GENERATED_VERSION = '1.74.0'
 GRPC_VERSION = grpc.__version__
 _version_not_supported = False
 
@@ -19,7 +19,7 @@ except ImportError:
 if _version_not_supported:
     raise RuntimeError(
         f'The grpc package installed is at version {GRPC_VERSION},'
-        + ' but the generated code in ai/backend/agent/containerd/_grpcapi/api/services/images/v1/images_pb2_grpc.py depends on'
+        + f' but the generated code in ai/backend/agent/containerd/_grpcapi/api/services/images/v1/images_pb2_grpc.py depends on'
         + f' grpcio>={GRPC_GENERATED_VERSION}.'
         + f' Please upgrade your grpc module to grpcio>={GRPC_GENERATED_VERSION}'
         + f' or downgrade your generated code using grpcio-tools<={GRPC_VERSION}.'

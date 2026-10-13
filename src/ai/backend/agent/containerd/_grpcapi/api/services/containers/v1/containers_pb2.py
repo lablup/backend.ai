@@ -22,14 +22,13 @@ _runtime_version.ValidateProtobufRuntimeVersion(
 _sym_db = _symbol_database.Default()
 
 
-from ai.backend.agent.containerd._grpcapi.gogoproto import gogo_pb2 as ai_dot_backend_dot_agent_dot_containerd_dot___grpcapi_dot_gogoproto_dot_gogo__pb2
 from google.protobuf import any_pb2 as google_dot_protobuf_dot_any__pb2
 from google.protobuf import empty_pb2 as google_dot_protobuf_dot_empty__pb2
 from google.protobuf import field_mask_pb2 as google_dot_protobuf_dot_field__mask__pb2
 from google.protobuf import timestamp_pb2 as google_dot_protobuf_dot_timestamp__pb2
 
 
-DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\nPai/backend/agent/containerd/_grpcapi/api/services/containers/v1/containers.proto\x12!containerd.services.containers.v1\x1a\x39\x61i/backend/agent/containerd/_grpcapi/gogoproto/gogo.proto\x1a\x19google/protobuf/any.proto\x1a\x1bgoogle/protobuf/empty.proto\x1a google/protobuf/field_mask.proto\x1a\x1fgoogle/protobuf/timestamp.proto\"\x8a\x05\n\tContainer\x12\n\n\x02id\x18\x01 \x01(\t\x12H\n\x06labels\x18\x02 \x03(\x0b\x32\x38.containerd.services.containers.v1.Container.LabelsEntry\x12\r\n\x05image\x18\x03 \x01(\t\x12\x45\n\x07runtime\x18\x04 \x01(\x0b\x32\x34.containerd.services.containers.v1.Container.Runtime\x12\"\n\x04spec\x18\x05 \x01(\x0b\x32\x14.google.protobuf.Any\x12\x13\n\x0bsnapshotter\x18\x06 \x01(\t\x12\x14\n\x0csnapshot_key\x18\x07 \x01(\t\x12\x38\n\ncreated_at\x18\x08 \x01(\x0b\x32\x1a.google.protobuf.TimestampB\x08\xc8\xde\x1f\x00\x90\xdf\x1f\x01\x12\x38\n\nupdated_at\x18\t \x01(\x0b\x32\x1a.google.protobuf.TimestampB\x08\xc8\xde\x1f\x00\x90\xdf\x1f\x01\x12V\n\nextensions\x18\n \x03(\x0b\x32<.containerd.services.containers.v1.Container.ExtensionsEntryB\x04\xc8\xde\x1f\x00\x1a-\n\x0bLabelsEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\t:\x02\x38\x01\x1a>\n\x07Runtime\x12\x0c\n\x04name\x18\x01 \x01(\t\x12%\n\x07options\x18\x02 \x01(\x0b\x32\x14.google.protobuf.Any\x1aG\n\x0f\x45xtensionsEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12#\n\x05value\x18\x02 \x01(\x0b\x32\x14.google.protobuf.Any:\x02\x38\x01\"!\n\x13GetContainerRequest\x12\n\n\x02id\x18\x01 \x01(\t\"]\n\x14GetContainerResponse\x12\x45\n\tcontainer\x18\x01 \x01(\x0b\x32,.containerd.services.containers.v1.ContainerB\x04\xc8\xde\x1f\x00\"(\n\x15ListContainersRequest\x12\x0f\n\x07\x66ilters\x18\x01 \x03(\t\"`\n\x16ListContainersResponse\x12\x46\n\ncontainers\x18\x01 \x03(\x0b\x32,.containerd.services.containers.v1.ContainerB\x04\xc8\xde\x1f\x00\"_\n\x16\x43reateContainerRequest\x12\x45\n\tcontainer\x18\x01 \x01(\x0b\x32,.containerd.services.containers.v1.ContainerB\x04\xc8\xde\x1f\x00\"`\n\x17\x43reateContainerResponse\x12\x45\n\tcontainer\x18\x01 \x01(\x0b\x32,.containerd.services.containers.v1.ContainerB\x04\xc8\xde\x1f\x00\"\x90\x01\n\x16UpdateContainerRequest\x12\x45\n\tcontainer\x18\x01 \x01(\x0b\x32,.containerd.services.containers.v1.ContainerB\x04\xc8\xde\x1f\x00\x12/\n\x0bupdate_mask\x18\x02 \x01(\x0b\x32\x1a.google.protobuf.FieldMask\"`\n\x17UpdateContainerResponse\x12\x45\n\tcontainer\x18\x01 \x01(\x0b\x32,.containerd.services.containers.v1.ContainerB\x04\xc8\xde\x1f\x00\"$\n\x16\x44\x65leteContainerRequest\x12\n\n\x02id\x18\x01 \x01(\t\"W\n\x14ListContainerMessage\x12?\n\tcontainer\x18\x01 \x01(\x0b\x32,.containerd.services.containers.v1.Container2\xe4\x05\n\nContainers\x12v\n\x03Get\x12\x36.containerd.services.containers.v1.GetContainerRequest\x1a\x37.containerd.services.containers.v1.GetContainerResponse\x12{\n\x04List\x12\x38.containerd.services.containers.v1.ListContainersRequest\x1a\x39.containerd.services.containers.v1.ListContainersResponse\x12\x81\x01\n\nListStream\x12\x38.containerd.services.containers.v1.ListContainersRequest\x1a\x37.containerd.services.containers.v1.ListContainerMessage0\x01\x12\x7f\n\x06\x43reate\x12\x39.containerd.services.containers.v1.CreateContainerRequest\x1a:.containerd.services.containers.v1.CreateContainerResponse\x12\x7f\n\x06Update\x12\x39.containerd.services.containers.v1.UpdateContainerRequest\x1a:.containerd.services.containers.v1.UpdateContainerResponse\x12[\n\x06\x44\x65lete\x12\x39.containerd.services.containers.v1.DeleteContainerRequest\x1a\x16.google.protobuf.EmptyBHZFgithub.com/containerd/containerd/api/services/containers/v1;containersX\x00\x62\x06proto3')
+DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\nPai/backend/agent/containerd/_grpcapi/api/services/containers/v1/containers.proto\x12!containerd.services.containers.v1\x1a\x19google/protobuf/any.proto\x1a\x1bgoogle/protobuf/empty.proto\x1a google/protobuf/field_mask.proto\x1a\x1fgoogle/protobuf/timestamp.proto\"\x81\x05\n\tContainer\x12\n\n\x02id\x18\x01 \x01(\t\x12H\n\x06labels\x18\x02 \x03(\x0b\x32\x38.containerd.services.containers.v1.Container.LabelsEntry\x12\r\n\x05image\x18\x03 \x01(\t\x12\x45\n\x07runtime\x18\x04 \x01(\x0b\x32\x34.containerd.services.containers.v1.Container.Runtime\x12\"\n\x04spec\x18\x05 \x01(\x0b\x32\x14.google.protobuf.Any\x12\x13\n\x0bsnapshotter\x18\x06 \x01(\t\x12\x14\n\x0csnapshot_key\x18\x07 \x01(\t\x12.\n\ncreated_at\x18\x08 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\x12.\n\nupdated_at\x18\t \x01(\x0b\x32\x1a.google.protobuf.Timestamp\x12P\n\nextensions\x18\n \x03(\x0b\x32<.containerd.services.containers.v1.Container.ExtensionsEntry\x12\x0f\n\x07sandbox\x18\x0b \x01(\t\x1a-\n\x0bLabelsEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\t:\x02\x38\x01\x1a>\n\x07Runtime\x12\x0c\n\x04name\x18\x01 \x01(\t\x12%\n\x07options\x18\x02 \x01(\x0b\x32\x14.google.protobuf.Any\x1aG\n\x0f\x45xtensionsEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12#\n\x05value\x18\x02 \x01(\x0b\x32\x14.google.protobuf.Any:\x02\x38\x01\"!\n\x13GetContainerRequest\x12\n\n\x02id\x18\x01 \x01(\t\"W\n\x14GetContainerResponse\x12?\n\tcontainer\x18\x01 \x01(\x0b\x32,.containerd.services.containers.v1.Container\"(\n\x15ListContainersRequest\x12\x0f\n\x07\x66ilters\x18\x01 \x03(\t\"Z\n\x16ListContainersResponse\x12@\n\ncontainers\x18\x01 \x03(\x0b\x32,.containerd.services.containers.v1.Container\"Y\n\x16\x43reateContainerRequest\x12?\n\tcontainer\x18\x01 \x01(\x0b\x32,.containerd.services.containers.v1.Container\"Z\n\x17\x43reateContainerResponse\x12?\n\tcontainer\x18\x01 \x01(\x0b\x32,.containerd.services.containers.v1.Container\"\x8a\x01\n\x16UpdateContainerRequest\x12?\n\tcontainer\x18\x01 \x01(\x0b\x32,.containerd.services.containers.v1.Container\x12/\n\x0bupdate_mask\x18\x02 \x01(\x0b\x32\x1a.google.protobuf.FieldMask\"Z\n\x17UpdateContainerResponse\x12?\n\tcontainer\x18\x01 \x01(\x0b\x32,.containerd.services.containers.v1.Container\"$\n\x16\x44\x65leteContainerRequest\x12\n\n\x02id\x18\x01 \x01(\t\"W\n\x14ListContainerMessage\x12?\n\tcontainer\x18\x01 \x01(\x0b\x32,.containerd.services.containers.v1.Container2\xe4\x05\n\nContainers\x12v\n\x03Get\x12\x36.containerd.services.containers.v1.GetContainerRequest\x1a\x37.containerd.services.containers.v1.GetContainerResponse\x12{\n\x04List\x12\x38.containerd.services.containers.v1.ListContainersRequest\x1a\x39.containerd.services.containers.v1.ListContainersResponse\x12\x81\x01\n\nListStream\x12\x38.containerd.services.containers.v1.ListContainersRequest\x1a\x37.containerd.services.containers.v1.ListContainerMessage0\x01\x12\x7f\n\x06\x43reate\x12\x39.containerd.services.containers.v1.CreateContainerRequest\x1a:.containerd.services.containers.v1.CreateContainerResponse\x12\x7f\n\x06Update\x12\x39.containerd.services.containers.v1.UpdateContainerRequest\x1a:.containerd.services.containers.v1.UpdateContainerResponse\x12[\n\x06\x44\x65lete\x12\x39.containerd.services.containers.v1.DeleteContainerRequest\x1a\x16.google.protobuf.EmptyBHZFgithub.com/containerd/containerd/api/services/containers/v1;containersb\x06proto3')
 
 _globals = globals()
 _builder.BuildMessageAndEnumDescriptors(DESCRIPTOR, _globals)
@@ -41,52 +40,34 @@ if not _descriptor._USE_C_DESCRIPTORS:
   _globals['_CONTAINER_LABELSENTRY']._serialized_options = b'8\001'
   _globals['_CONTAINER_EXTENSIONSENTRY']._loaded_options = None
   _globals['_CONTAINER_EXTENSIONSENTRY']._serialized_options = b'8\001'
-  _globals['_CONTAINER'].fields_by_name['created_at']._loaded_options = None
-  _globals['_CONTAINER'].fields_by_name['created_at']._serialized_options = b'\310\336\037\000\220\337\037\001'
-  _globals['_CONTAINER'].fields_by_name['updated_at']._loaded_options = None
-  _globals['_CONTAINER'].fields_by_name['updated_at']._serialized_options = b'\310\336\037\000\220\337\037\001'
-  _globals['_CONTAINER'].fields_by_name['extensions']._loaded_options = None
-  _globals['_CONTAINER'].fields_by_name['extensions']._serialized_options = b'\310\336\037\000'
-  _globals['_GETCONTAINERRESPONSE'].fields_by_name['container']._loaded_options = None
-  _globals['_GETCONTAINERRESPONSE'].fields_by_name['container']._serialized_options = b'\310\336\037\000'
-  _globals['_LISTCONTAINERSRESPONSE'].fields_by_name['containers']._loaded_options = None
-  _globals['_LISTCONTAINERSRESPONSE'].fields_by_name['containers']._serialized_options = b'\310\336\037\000'
-  _globals['_CREATECONTAINERREQUEST'].fields_by_name['container']._loaded_options = None
-  _globals['_CREATECONTAINERREQUEST'].fields_by_name['container']._serialized_options = b'\310\336\037\000'
-  _globals['_CREATECONTAINERRESPONSE'].fields_by_name['container']._loaded_options = None
-  _globals['_CREATECONTAINERRESPONSE'].fields_by_name['container']._serialized_options = b'\310\336\037\000'
-  _globals['_UPDATECONTAINERREQUEST'].fields_by_name['container']._loaded_options = None
-  _globals['_UPDATECONTAINERREQUEST'].fields_by_name['container']._serialized_options = b'\310\336\037\000'
-  _globals['_UPDATECONTAINERRESPONSE'].fields_by_name['container']._loaded_options = None
-  _globals['_UPDATECONTAINERRESPONSE'].fields_by_name['container']._serialized_options = b'\310\336\037\000'
-  _globals['_CONTAINER']._serialized_start=302
-  _globals['_CONTAINER']._serialized_end=952
-  _globals['_CONTAINER_LABELSENTRY']._serialized_start=770
-  _globals['_CONTAINER_LABELSENTRY']._serialized_end=815
-  _globals['_CONTAINER_RUNTIME']._serialized_start=817
-  _globals['_CONTAINER_RUNTIME']._serialized_end=879
-  _globals['_CONTAINER_EXTENSIONSENTRY']._serialized_start=881
-  _globals['_CONTAINER_EXTENSIONSENTRY']._serialized_end=952
-  _globals['_GETCONTAINERREQUEST']._serialized_start=954
-  _globals['_GETCONTAINERREQUEST']._serialized_end=987
-  _globals['_GETCONTAINERRESPONSE']._serialized_start=989
-  _globals['_GETCONTAINERRESPONSE']._serialized_end=1082
-  _globals['_LISTCONTAINERSREQUEST']._serialized_start=1084
-  _globals['_LISTCONTAINERSREQUEST']._serialized_end=1124
-  _globals['_LISTCONTAINERSRESPONSE']._serialized_start=1126
-  _globals['_LISTCONTAINERSRESPONSE']._serialized_end=1222
-  _globals['_CREATECONTAINERREQUEST']._serialized_start=1224
-  _globals['_CREATECONTAINERREQUEST']._serialized_end=1319
-  _globals['_CREATECONTAINERRESPONSE']._serialized_start=1321
-  _globals['_CREATECONTAINERRESPONSE']._serialized_end=1417
-  _globals['_UPDATECONTAINERREQUEST']._serialized_start=1420
-  _globals['_UPDATECONTAINERREQUEST']._serialized_end=1564
-  _globals['_UPDATECONTAINERRESPONSE']._serialized_start=1566
-  _globals['_UPDATECONTAINERRESPONSE']._serialized_end=1662
-  _globals['_DELETECONTAINERREQUEST']._serialized_start=1664
-  _globals['_DELETECONTAINERREQUEST']._serialized_end=1700
-  _globals['_LISTCONTAINERMESSAGE']._serialized_start=1702
-  _globals['_LISTCONTAINERMESSAGE']._serialized_end=1789
-  _globals['_CONTAINERS']._serialized_start=1792
-  _globals['_CONTAINERS']._serialized_end=2532
+  _globals['_CONTAINER']._serialized_start=243
+  _globals['_CONTAINER']._serialized_end=884
+  _globals['_CONTAINER_LABELSENTRY']._serialized_start=702
+  _globals['_CONTAINER_LABELSENTRY']._serialized_end=747
+  _globals['_CONTAINER_RUNTIME']._serialized_start=749
+  _globals['_CONTAINER_RUNTIME']._serialized_end=811
+  _globals['_CONTAINER_EXTENSIONSENTRY']._serialized_start=813
+  _globals['_CONTAINER_EXTENSIONSENTRY']._serialized_end=884
+  _globals['_GETCONTAINERREQUEST']._serialized_start=886
+  _globals['_GETCONTAINERREQUEST']._serialized_end=919
+  _globals['_GETCONTAINERRESPONSE']._serialized_start=921
+  _globals['_GETCONTAINERRESPONSE']._serialized_end=1008
+  _globals['_LISTCONTAINERSREQUEST']._serialized_start=1010
+  _globals['_LISTCONTAINERSREQUEST']._serialized_end=1050
+  _globals['_LISTCONTAINERSRESPONSE']._serialized_start=1052
+  _globals['_LISTCONTAINERSRESPONSE']._serialized_end=1142
+  _globals['_CREATECONTAINERREQUEST']._serialized_start=1144
+  _globals['_CREATECONTAINERREQUEST']._serialized_end=1233
+  _globals['_CREATECONTAINERRESPONSE']._serialized_start=1235
+  _globals['_CREATECONTAINERRESPONSE']._serialized_end=1325
+  _globals['_UPDATECONTAINERREQUEST']._serialized_start=1328
+  _globals['_UPDATECONTAINERREQUEST']._serialized_end=1466
+  _globals['_UPDATECONTAINERRESPONSE']._serialized_start=1468
+  _globals['_UPDATECONTAINERRESPONSE']._serialized_end=1558
+  _globals['_DELETECONTAINERREQUEST']._serialized_start=1560
+  _globals['_DELETECONTAINERREQUEST']._serialized_end=1596
+  _globals['_LISTCONTAINERMESSAGE']._serialized_start=1598
+  _globals['_LISTCONTAINERMESSAGE']._serialized_end=1685
+  _globals['_CONTAINERS']._serialized_start=1688
+  _globals['_CONTAINERS']._serialized_end=2428
 # @@protoc_insertion_point(module_scope)

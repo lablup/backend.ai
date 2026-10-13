@@ -22,10 +22,9 @@ _runtime_version.ValidateProtobufRuntimeVersion(
 _sym_db = _symbol_database.Default()
 
 
-from ai.backend.agent.containerd._grpcapi.gogoproto import gogo_pb2 as ai_dot_backend_dot_agent_dot_containerd_dot___grpcapi_dot_gogoproto_dot_gogo__pb2
 
 
-DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n?ai/backend/agent/containerd/_grpcapi/api/types/descriptor.proto\x12\x10\x63ontainerd.types\x1a\x39\x61i/backend/agent/containerd/_grpcapi/gogoproto/gogo.proto\"\xea\x01\n\nDescriptor\x12\x12\n\nmedia_type\x18\x01 \x01(\t\x12\x42\n\x06\x64igest\x18\x02 \x01(\tB2\xc8\xde\x1f\x00\xda\xde\x1f*github.com/opencontainers/go-digest.Digest\x12\x0c\n\x04size\x18\x03 \x01(\x03\x12\x42\n\x0b\x61nnotations\x18\x05 \x03(\x0b\x32-.containerd.types.Descriptor.AnnotationsEntry\x1a\x32\n\x10\x41nnotationsEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\t:\x02\x38\x01\x42\x32Z0github.com/containerd/containerd/api/types;typesX\x00\x62\x06proto3')
+DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n?ai/backend/agent/containerd/_grpcapi/api/types/descriptor.proto\x12\x10\x63ontainerd.types\"\xb6\x01\n\nDescriptor\x12\x12\n\nmedia_type\x18\x01 \x01(\t\x12\x0e\n\x06\x64igest\x18\x02 \x01(\t\x12\x0c\n\x04size\x18\x03 \x01(\x03\x12\x42\n\x0b\x61nnotations\x18\x05 \x03(\x0b\x32-.containerd.types.Descriptor.AnnotationsEntry\x1a\x32\n\x10\x41nnotationsEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\t:\x02\x38\x01\x42\x32Z0github.com/containerd/containerd/api/types;typesb\x06proto3')
 
 _globals = globals()
 _builder.BuildMessageAndEnumDescriptors(DESCRIPTOR, _globals)
@@ -35,10 +34,8 @@ if not _descriptor._USE_C_DESCRIPTORS:
   _globals['DESCRIPTOR']._serialized_options = b'Z0github.com/containerd/containerd/api/types;types'
   _globals['_DESCRIPTOR_ANNOTATIONSENTRY']._loaded_options = None
   _globals['_DESCRIPTOR_ANNOTATIONSENTRY']._serialized_options = b'8\001'
-  _globals['_DESCRIPTOR'].fields_by_name['digest']._loaded_options = None
-  _globals['_DESCRIPTOR'].fields_by_name['digest']._serialized_options = b'\310\336\037\000\332\336\037*github.com/opencontainers/go-digest.Digest'
-  _globals['_DESCRIPTOR']._serialized_start=145
-  _globals['_DESCRIPTOR']._serialized_end=379
-  _globals['_DESCRIPTOR_ANNOTATIONSENTRY']._serialized_start=329
-  _globals['_DESCRIPTOR_ANNOTATIONSENTRY']._serialized_end=379
+  _globals['_DESCRIPTOR']._serialized_start=86
+  _globals['_DESCRIPTOR']._serialized_end=268
+  _globals['_DESCRIPTOR_ANNOTATIONSENTRY']._serialized_start=218
+  _globals['_DESCRIPTOR_ANNOTATIONSENTRY']._serialized_end=268
 # @@protoc_insertion_point(module_scope)
