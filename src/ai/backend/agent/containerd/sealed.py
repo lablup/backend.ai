@@ -1,4 +1,4 @@
-"""The signed launch spec of a sealed kernel (ADR 0064): written by the agent, bound read-only at /run/bai/spec.jws."""
+"""The signed launch spec of a sealed kernel (ADR 0064), bound read-only at /run/bai/spec.jws."""
 
 from __future__ import annotations
 
@@ -21,7 +21,7 @@ def spec_signature(config: KernelCreationConfig) -> str | None:
     if confidential is None:
         return None
     signature = confidential.get("signature")
-    if not isinstance(signature, str) or not signature:
+    if not isinstance(signature, str) or not signature or not signature.isascii():
         raise SealedSpecMissing("the confidential kernel config has no signature")
     return signature
 

@@ -29,8 +29,15 @@ class TestSpecSignature:
 
     @pytest.mark.parametrize(
         "confidential",
-        [{}, {"signature": None}, {"signature": ""}, {"signature": 7}, {"signature": b"a.b.c"}],
-        ids=["absent", "none", "empty", "int", "bytes"],
+        [
+            {},
+            {"signature": None},
+            {"signature": ""},
+            {"signature": 7},
+            {"signature": b"a.b.c"},
+            {"signature": "a.b.c\u00e9"},
+        ],
+        ids=["absent", "none", "empty", "int", "bytes", "non-ascii"],
     )
     def test_sealed_without_a_usable_signature_is_refused(
         self, kernel_config: KernelCreationConfig, confidential: dict[str, Any]

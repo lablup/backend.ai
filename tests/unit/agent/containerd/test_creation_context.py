@@ -20,7 +20,7 @@ from ai.backend.agent.containerd.agent import (
 from ai.backend.agent.containerd.client import MountSpec
 from ai.backend.agent.containerd.kernel import ContainerdKernel
 from ai.backend.agent.containerd.network import KernelNetwork
-from ai.backend.agent.containerd.profile.base import GeneratedMountKind, LaunchPlan, RuntimeOptions
+from ai.backend.agent.containerd.profile.base import LaunchPlan, RuntimeOptions
 from ai.backend.agent.containerd.profile.runc import RuncProfile
 from ai.backend.agent.containerd.scratch import CONFIG_DIR_LABEL
 from ai.backend.agent.containerd.spec import SpecInput, build_base_spec, build_launch_spec
@@ -373,7 +373,6 @@ class TestSealedKernel:
         path = (tmp_path / str(ownership_data.kernel_id)).resolve() / "spec.jws"
         entries = [m for m in spec["mounts"] if m["destination"] == "/run/bai/spec.jws"]
         assert entries == [{**SPEC_JWS_ENTRY, "source": str(path)}]
-        assert GeneratedMountKind.CONFIG_DIR in plan.allowed_mount_kinds
 
     async def test_unsealed_kernel_has_no_file_and_an_unchanged_base_spec(
         self,

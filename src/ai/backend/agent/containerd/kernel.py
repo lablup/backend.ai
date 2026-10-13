@@ -30,7 +30,8 @@ log = StructuredLogger(logging.getLogger(__spec__.name))
 REPL_IN_PORT: Final = 2000
 _PROBE_TIMEOUT_SEC: Final = 2.0
 _TLS_CONNECT_TIMEOUT_SEC: Final = 5.0
-# PROVISIONAL: the window and interval of one check_status call.
+# PROVISIONAL: the window and interval of one check_status call; a call can last up to
+# window + connect timeout + interval, so init-timeout-sec must exceed that (20 s).
 _TLS_PROBE_WINDOW_SEC: Final = 10.0
 _TLS_RETRY_INTERVAL_SEC: Final = 1.0
 
@@ -87,8 +88,8 @@ class ContainerdKernel(AbstractKernel):
         raise KernelVerbNotSupported("create_code_runner")
 
     # FIXME(containerd-mvp): probe only; no kernel status without a code runner.
-    # The runc readiness probe: the kernel runner listens on its REPL port in the kernel netns.
-    # TryAgain makes the create_kernel readiness loop retry.
+    # KernelRunnerReadiness: a TCP connect to the REPL port; TlsConnectReadiness: a TLS handshake
+    # through DNAT. TryAgain makes the create_kernel readiness loop retry.
     @override
     async def check_status(self) -> dict[str, Any] | None:
         readiness = self.launch_plan.readiness
@@ -129,7 +130,7 @@ class ContainerdKernel(AbstractKernel):
             self._readiness_deadline = loop.time() + readiness.timeout_s
         deadline = self._readiness_deadline
         if loop.time() >= deadline:
-            raise ReadinessTimeout
+            raise ReadinessTimeout(f"no TLS handshake on {host}:{port} in {readiness.timeout_s} s")
         window_end = loop.time() + _TLS_PROBE_WINDOW_SEC
         # Readiness proves the handshake only; the TD cert is self-signed (ADR 0049)
         # and appraised by `cc verify` (ADR 0067).
@@ -149,7 +150,9 @@ class ContainerdKernel(AbstractKernel):
                 )
                 now = loop.time()
                 if now >= deadline:
-                    raise ReadinessTimeout from e
+                    raise ReadinessTimeout(
+                        f"no TLS handshake on {host}:{port} in {readiness.timeout_s} s"
+                    ) from e
                 if now >= window_end:
                     raise TryAgain from e
                 await asyncio.sleep(min(_TLS_RETRY_INTERVAL_SEC, deadline - now))
