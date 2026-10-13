@@ -1,18 +1,8 @@
 #!/usr/bin/env python3
-"""Generate the vendored Python gRPC stubs for the native containerd API.
+"""Regenerate the vendored containerd gRPC stubs in `_grpcapi/`; run only to refresh them.
 
-Pinned API: containerd v1.7.x `api/` protos (v1 services containers, tasks, images, snapshots,
-content) and gogo/protobuf `gogoproto/gogo.proto`. The wire format is the same on containerd 2.x.
-The committed stubs were generated with protobuf 6.31.1 / grpcio-tools and need grpcio >= 1.80.
-
-The stubs are generated manually and committed; run this only to refresh them:
-
-    ./py scripts/codegen/gen_containerd_api.py
-
-Inputs come from the Go module cache (`go mod download github.com/containerd/containerd@v1.7.x
-github.com/gogo/protobuf`); override with CONTAINERD_PROTO_DIR / GOGO_PROTO_DIR.
-Output: src/ai/backend/agent/containerd/_grpcapi/ (excluded from ruff and mypy in pyproject.toml).
-The `*.pyi` files beside the modules are hand-written (all attributes are `Any`) and are kept.
+Inputs: the Go module cache at containerd `CONTAINERD_TAG` and gogo/protobuf, or the
+CONTAINERD_PROTO_DIR / GOGO_PROTO_DIR overrides. The hand-written `*.pyi` files are kept.
 """
 
 from __future__ import annotations
@@ -25,7 +15,9 @@ import sys
 import tempfile
 from pathlib import Path
 
-CONTAINERD_VERSION_GLOB = "github.com/containerd/containerd@v1.7.*"
+# Provisional: the reference script was unpinned, so the stubs' source tag is unknown.
+CONTAINERD_TAG = "v1.7.27"
+CONTAINERD_MODULE = f"github.com/containerd/containerd@{CONTAINERD_TAG}"
 GOGO_VERSION_GLOB = "github.com/gogo/protobuf@*"
 
 REPO = Path(__file__).resolve().parents[2]
@@ -57,7 +49,7 @@ def _rewrite_proto_imports(text: str) -> str:
 
 def main() -> None:
     cd_proto = Path(
-        os.environ.get("CONTAINERD_PROTO_DIR") or _find_go_mod(CONTAINERD_VERSION_GLOB)
+        os.environ.get("CONTAINERD_PROTO_DIR") or _find_go_mod(CONTAINERD_MODULE)
     )
     gogo_proto = Path(os.environ.get("GOGO_PROTO_DIR") or _find_go_mod(GOGO_VERSION_GLOB))
     print(f"containerd protos: {cd_proto}")
