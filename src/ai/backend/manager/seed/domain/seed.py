@@ -57,6 +57,10 @@ class DomainSeed(SeedItem):
         )
 
     @override
+    def check(self) -> list[str]:
+        return []
+
+    @override
     @classmethod
     def reject(cls, files: Sequence[SeedItems[DomainSeed]]) -> list[SeedRejection]:
         """None: the constraints on ``domains`` fail an item that repeats a name or a

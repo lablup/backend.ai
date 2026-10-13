@@ -5,9 +5,11 @@ from pathlib import Path
 from typing import Any
 
 import pytest
+import sqlalchemy as sa
 import yaml
 from sqlalchemy import Table
 
+from ai.backend.common.data.entity.user import UserEntityType
 from ai.backend.manager.models.app_config_allow_list.row import AppConfigAllowListRow
 from ai.backend.manager.models.app_config_definition.row import AppConfigDefinitionRow
 from ai.backend.manager.models.app_config_fragment.row import AppConfigFragmentRow
@@ -33,6 +35,7 @@ from ai.backend.manager.models.rbac_models.role_permission_preset.row import (
     RolePermissionPresetRow,
 )
 from ai.backend.manager.models.rbac_models.role_preset.row import RolePresetRow
+from ai.backend.manager.models.rbac_models.user_role.row import UserRoleRow
 from ai.backend.manager.models.resource_group.row import ResourceGroupRow
 from ai.backend.manager.models.resource_policy.row import (
     KeyPairResourcePolicyRow,
@@ -44,6 +47,7 @@ from ai.backend.manager.models.resource_slot.row import PresetResourceSlotRow, R
 from ai.backend.manager.models.retention.row import RetentionPolicyRow
 from ai.backend.manager.models.runtime_variant.row import RuntimeVariantRow
 from ai.backend.manager.models.runtime_variant_preset.row import RuntimeVariantPresetRow
+from ai.backend.manager.models.session_template.row import SessionTemplateRow
 from ai.backend.manager.models.storage_backend.row import StorageBackendTypeRow
 from ai.backend.manager.models.storage_namespace.row import StorageNamespaceRow
 from ai.backend.manager.models.user.row import UserRow
@@ -553,6 +557,74 @@ _RESOURCE_PRESETS: dict[str, dict[str, Any]] = {
     },
 }
 
+# The user the session templates belong to, inserted by `template_owner` so the session
+# template tests do not apply the user kind.
+_TEMPLATE_OWNER: dict[str, Any] = {
+    "uuid": "0198a5a0-0000-7000-8000-000000001201",
+    "username": "owner",
+    "email": "owner@example.com",
+    "domain_id": "0198a5a0-0000-7000-8000-000000001202",
+    "domain_name": "templates",
+    "resource_policy": "templates",
+}
+
+# Session template files written for the tests, one template per file, neither in a
+# project. `task` states every field; `cluster` leaves the optional ones to their defaults.
+_SESSION_TEMPLATES: dict[str, dict[str, Any]] = {
+    "task.yaml": {
+        "id": "0198a5a0-0000-7000-8000-000000001211",
+        "user_id": _TEMPLATE_OWNER["uuid"],
+        "type": "task",
+        "name": "python",
+        "is_active": True,
+        "template": {
+            "api_version": "6",
+            "kind": "task_template",
+            "metadata": {"name": "python"},
+            "spec": {"kernel": {"image": "python"}},
+        },
+    },
+    "cluster.yaml": {
+        "id": "0198a5a0-0000-7000-8000-000000001212",
+        "user_id": _TEMPLATE_OWNER["uuid"],
+        "type": "cluster",
+        "template": {
+            "api_version": "6",
+            "kind": "cluster_template",
+            "mode": "single-node",
+            "metadata": {"name": "python"},
+            "spec": {
+                "nodes": [
+                    {"role": "main", "session_template": "0198a5a0-0000-7000-8000-000000001211"}
+                ]
+            },
+        },
+    },
+}
+
+# Role seed files written for the tests, one role per file. The project role states its
+# permissions, grants `member` and is auto-assigned; the domain role grants `admin`.
+_SCOPED_ROLES: dict[str, dict[str, Any]] = {
+    "research-member.yaml": {
+        "id": "0198a5a0-0000-7000-8000-000000001301",
+        "name": "research_member",
+        "description": "Members of the research project",
+        "scope_type": "project",
+        "scope_id": _PROJECTS["research.yaml"]["id"],
+        "auto_assign": True,
+        "permissions": {"session": ["read", "create"], "vfolder": ["read"]},
+        "users": [_USERS["member.yaml"]["id"]],
+    },
+    "default-auditor.yaml": {
+        "id": "0198a5a0-0000-7000-8000-000000001302",
+        "name": "default_auditor",
+        "scope_type": "domain",
+        "scope_id": _DOMAINS["default.yaml"]["id"],
+        "permissions": {"domain": ["read"]},
+        "users": [_USERS["admin.yaml"]["id"]],
+    },
+}
+
 # The tables a seed kind writes, and the graph tables the creation path writes beside them.
 _SEED_TABLES: list[Table | type[HasTable]] = [
     AppConfigDefinitionRow,
@@ -585,8 +657,10 @@ _SEED_TABLES: list[Table | type[HasTable]] = [
     UserRow,
     KeyPairRow,
     ProjectRow,
+    SessionTemplateRow,
     ResourceGroupRow,
     RoleRow,
+    UserRoleRow,
     VFSStorageRow,
     PermissionRow,
     VirtualEntityRow,
@@ -1048,3 +1122,79 @@ def user_seed_dir(tmp_path: Path) -> Path:
 @pytest.fixture
 def admin_user_id() -> str:
     return str(_USERS["admin.yaml"]["id"])
+
+
+@pytest.fixture
+async def template_owner(db: ExtendedAsyncSAEngine) -> str:
+    """The owner of the session templates in the graph, in the `templates` domain."""
+    owner = _TEMPLATE_OWNER
+    async with db.begin_session() as sess:
+        await sess.execute(
+            sa.insert(DomainRow).values(id=owner["domain_id"], name=owner["domain_name"])
+        )
+        await sess.execute(
+            sa.insert(UserResourcePolicyRow).values(
+                name=owner["resource_policy"],
+                max_vfolder_count=0,
+                max_quota_scope_size=-1,
+                max_session_count_per_model_session=10,
+            )
+        )
+        await sess.execute(sa.insert(UserRow).values(**owner))
+        await sess.execute(
+            sa.insert(VirtualEntityRow).values(
+                entity_type=UserEntityType(), entity_id=owner["uuid"]
+            )
+        )
+    return str(owner["uuid"])
+
+
+@pytest.fixture
+def session_template_files(tmp_path: Path) -> Path:
+    """A directory of session template seed files, the shape `seeds/manager/session_template/`
+    has."""
+    directory = tmp_path / "session_template"
+    directory.mkdir()
+    for file_name, template in _SESSION_TEMPLATES.items():
+        (directory / file_name).write_text(
+            yaml.safe_dump({"kind": "session_template", "version": 1, "items": [template]})
+        )
+    return directory
+
+
+@pytest.fixture
+def session_template_seed_dir(session_template_files: Path, template_owner: str) -> Path:
+    """The session template files, with their owner already written."""
+    return session_template_files
+
+
+@pytest.fixture
+def task_template_id() -> str:
+    return str(_SESSION_TEMPLATES["task.yaml"]["id"])
+
+
+@pytest.fixture
+def role_kind_seed_dir(project_seed_dir: Path) -> Path:
+    """The project directory plus the users and the role files, so the scopes and the
+    users the roles name are written first."""
+    (project_seed_dir / "keypair_resource_policy.yaml").write_text(
+        yaml.safe_dump({
+            "kind": "keypair_resource_policy",
+            "version": 1,
+            "items": [_RESOURCE_POLICIES["keypair_resource_policy"]],
+        })
+    )
+    for file_name, user in _USERS.items():
+        (project_seed_dir / f"user-{file_name}").write_text(
+            yaml.safe_dump({"kind": "user", "version": 1, "items": [user]})
+        )
+    for file_name, role in _SCOPED_ROLES.items():
+        (project_seed_dir / f"role-{file_name}").write_text(
+            yaml.safe_dump({"kind": "role", "version": 1, "items": [role]})
+        )
+    return project_seed_dir
+
+
+@pytest.fixture
+def research_member_role_id() -> str:
+    return str(_SCOPED_ROLES["research-member.yaml"]["id"])

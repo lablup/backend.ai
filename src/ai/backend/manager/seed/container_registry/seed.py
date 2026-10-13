@@ -65,6 +65,13 @@ class ContainerRegistrySeed(SeedItem):
         )
 
     @override
+    def check(self) -> list[str]:
+        """The rule the create API applies to the registry name."""
+        if not self.registry_name.strip():
+            return ["registry_name is blank"]
+        return []
+
+    @override
     @classmethod
     def reject(cls, files: Sequence[SeedItems[ContainerRegistrySeed]]) -> list[SeedRejection]:
         return []

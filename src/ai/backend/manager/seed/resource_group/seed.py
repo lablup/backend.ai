@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
+from datetime import timedelta
 from typing import Any, override
 
 from pydantic import Field
 
 from ai.backend.common.data.entity.resource_group import ResourceGroupID
+from ai.backend.manager.data.resource_group.types import SchedulerType
 from ai.backend.manager.models.resource_group.types import ResourceGroupOpts
 from ai.backend.manager.models.resource_group.upserters import ResourceGroupUpserter
 from ai.backend.manager.repositories.ops.v2.seed.types import SeedWrite
@@ -55,6 +57,19 @@ class ResourceGroupSeed(SeedItem):
             field_upserters=[],
             field_purgers=[],
         )
+
+    @override
+    def check(self) -> list[str]:
+        """The rules the API applies to the name, the scheduler and the preemption runtime."""
+        failures: list[str] = []
+        if not self.name.strip():
+            failures.append("name is blank")
+        schedulers = sorted(scheduler.value for scheduler in SchedulerType)
+        if self.scheduler not in schedulers:
+            failures.append(f"scheduler {self.scheduler!r} is not one of {schedulers}")
+        if self.scheduler_opts.preemption.preemption_min_runtime < timedelta(0):
+            failures.append("scheduler_opts.preemption.preemption_min_runtime is negative")
+        return failures
 
     @override
     @classmethod

@@ -1,0 +1,6 @@
+kind: app_config_definition
+version: 1
+items:
+  - config_name: userConfig
+  - config_name: domainConfig
+  - config_name: publicConfigByDomain
