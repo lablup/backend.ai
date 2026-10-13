@@ -3,7 +3,7 @@ name: agent-container-network
 type: design-rationale
 description: The agent's runtime side of container networking — the CNI plugin contract (ADD, DEL, STATUS, GC) and where the agent calls it, container nameservers, and the container locator a plugin's privileged helper uses
 scope: src/ai/backend/agent/network
-keywords: [AbstractCniPlugin, CniPluginContext, CniHostContext, CniRequest, CniResult, not_serving_reason, publish_backend, resolve_container_dns, ContainerLocator, LiveContainer, build_container_locator]
+keywords: [AbstractCniPlugin, CniPluginContext, allow-cni-plugins, CniHostContext, CniRequest, CniResult, not_serving_reason, publish_backend, resolve_container_dns, ContainerLocator, LiveContainer, build_container_locator]
 sources:
   - src/ai/backend/agent/network/cni.py
   - src/ai/backend/agent/plugin/cni.py
@@ -33,7 +33,7 @@ the network is built is the plugin's; the agent knows it only through `AbstractC
 | `status()` | every heartbeat (`not_serving_reason`) | `not_ready_reason` set while it cannot serve an ADD |
 | `gc(valid)` | agent start, after the container scan, before any lifecycle event | drop what it holds for containers not in `valid` |
 
-- A session's network config names its plugin in `type` (`CNI_TYPE_KEY`). Loaded from entry point group `backendai_network_cni_v1`.
+- A session's network config names its plugin in `type` (`CNI_TYPE_KEY`). Loaded from entry point group `backendai_network_cni_v1`, and only when `agent.allow-cni-plugins` names its package path (`require_explicit_allow`): a loaded plugin gates the heartbeat, so an installed one that is not named is never called.
 - `CniRequest.config` is opaque to the agent. `args` carry the session id, kernel id and cluster hostname; `runtime_config` carries port mappings and controller-assigned addresses.
 - `netns` is always `/proc/<pid>/ns/net`; a DEL has none. A plugin may resolve the netns itself from the runtime rather than trust the path.
 - DEL goes to every loaded plugin: the agent keeps no record of which one attached a container.

@@ -1072,6 +1072,23 @@ class CommonAgentConfig(BaseConfigSchema):
             example=ConfigExample(local="", prod='["ai.backend.network.legacy"]'),
         ),
     ]
+    allow_cni_plugins: Annotated[
+        set[str] | None,
+        Field(
+            default=None,
+            validation_alias=AliasChoices("allow-cni-plugins", "allow_cni_plugins"),
+            serialization_alias="allow-cni-plugins",
+        ),
+        BackendAIConfigMeta(
+            description=(
+                "Container-network (CNI) plugins this agent loads, by package path. A CNI plugin "
+                "is loaded only when named here, even if installed; while loaded, its STATUS "
+                "gates whether this node takes any work."
+            ),
+            added_version=NEXT_RELEASE_VERSION,
+            example=ConfigExample(local="", prod='["ai.backend.network.vxlan"]'),
+        ),
+    ]
     image_commit_path: Annotated[
         AutoDirectoryPath,
         Field(

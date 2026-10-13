@@ -44,6 +44,9 @@ class AbstractCniPlugin(AbstractPlugin, metaclass=ABCMeta):
     plugin never attached.
     """
 
+    #: Loaded only when named in ``agent.allow-cni-plugins``: a loaded plugin gates the heartbeat.
+    require_explicit_allow = True
+
     @abstractmethod
     async def add(self, request: CniRequest) -> CniResult:
         """Attach the container in ``request.netns``; called before its command runs."""

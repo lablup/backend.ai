@@ -1000,7 +1000,8 @@ class AbstractAgent[
                 runtime_backend=str(self.local_config.agent.backend),
                 etcd=self.etcd,
                 upstream_nameservers=self._container_nameservers,
-            )
+            ),
+            allowlist=self.local_config.agent.allow_cni_plugins or set(),
         )
         self.container_lifecycle_queue = asyncio.Queue()
 
