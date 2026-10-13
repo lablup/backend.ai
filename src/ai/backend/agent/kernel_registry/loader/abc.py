@@ -26,3 +26,7 @@ class AbstractKernelRegistryLoader(ABC):
         Returns: The kernel registry (mapping of KernelId to AbstractKernel).
         """
         pass
+
+    async def mark_migrated(self) -> None:
+        """Called once this registry was migrated elsewhere. A source that an older agent
+        version would still read moves itself aside; others do nothing."""
