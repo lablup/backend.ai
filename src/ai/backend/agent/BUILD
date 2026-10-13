@@ -1,6 +1,6 @@
 python_sources(
     name="src",
-    sources=["**/*.py", "!watcher/**/*.py"],
+    sources=["**/*.py", "**/*.pyi", "!watcher/**/*.py"],
     dependencies=[
         "src/ai/backend/runner:src",
         "src/ai/backend/helpers:src",

@@ -1,10 +1,15 @@
 from __future__ import annotations
 
+import asyncio
+import contextlib
 import os
 from collections.abc import Mapping
-from typing import Any, override
+from typing import Any, Final, override
 
-from ai.backend.agent.errors.containerd import KernelVerbNotSupported
+from tenacity import TryAgain
+
+from ai.backend.agent.containerd.profile.base import LaunchPlan
+from ai.backend.agent.errors.containerd import ContainerdOperationFailed, KernelVerbNotSupported
 from ai.backend.agent.kernel import AbstractCodeRunner, AbstractKernel
 from ai.backend.agent.resources import KernelResourceSpec
 from ai.backend.agent.types import AgentEventData, KernelOwnershipData
@@ -13,7 +18,8 @@ from ai.backend.common.dto.agent.response import CodeCompletionResp
 from ai.backend.common.events.dispatcher import EventProducer
 from ai.backend.common.types import CommitStatus, KernelId
 
-from .profile.base import LaunchPlan
+_PROBE_HOST: Final = "127.0.0.1"
+_PROBE_TIMEOUT_SEC: Final = 2.0
 
 
 class ContainerdKernel(AbstractKernel):
@@ -65,10 +71,23 @@ class ContainerdKernel(AbstractKernel):
     ) -> AbstractCodeRunner:
         raise KernelVerbNotSupported("create_code_runner")
 
-    # FIXME(containerd-mvp): the readiness probe needs netns/DNAT; placeholder until it lands
+    # FIXME(containerd-mvp): probe only; no kernel status without a code runner.
+    # The runc readiness probe: the kernel runner listens on its REPL port once it is up.
+    # TryAgain makes the create_kernel readiness loop retry.
     @override
     async def check_status(self) -> dict[str, Any] | None:
-        raise KernelVerbNotSupported("check_status is not implemented yet")
+        ports = self.data.get("intrinsic_ports")
+        if not ports:
+            raise ContainerdOperationFailed("the kernel data has no REPL ports")
+        try:
+            async with asyncio.timeout(_PROBE_TIMEOUT_SEC):
+                _, writer = await asyncio.open_connection(_PROBE_HOST, int(ports["replin"]))
+        except (OSError, TimeoutError) as e:
+            raise TryAgain from e
+        writer.close()
+        with contextlib.suppress(OSError):
+            await writer.wait_closed()
+        return {}
 
     @override
     async def get_completions(self, text: str, opts: Mapping[str, Any]) -> CodeCompletionResp:
@@ -136,9 +155,3 @@ class ContainerdKernel(AbstractKernel):
     @override
     async def notify_event(self, evdata: AgentEventData) -> None:
         raise KernelVerbNotSupported("notify_event")
-
-
-# FIXME(containerd-mvp): no krunner volumes are provisioned; runc kernels cannot mount the
-# kernel runner yet
-async def prepare_krunner_env(_local_config: Mapping[str, Any]) -> Mapping[str, str]:
-    return {}

@@ -3,6 +3,7 @@ from collections.abc import Mapping, MutableMapping
 from decimal import Decimal
 from typing import Any, cast
 
+from ai.backend.agent.containerd.intrinsic import CPUPlugin, MemoryPlugin
 from ai.backend.agent.errors import InitializationError
 from ai.backend.agent.resources import (
     AbstractComputePlugin,
@@ -12,8 +13,6 @@ from ai.backend.agent.resources import (
 from ai.backend.common.etcd import AbstractKVStore
 from ai.backend.common.types import DeviceName, SlotName, SlotTypes
 from ai.backend.logging.structured import StructuredLogger
-
-from .intrinsic import CPUPlugin, MemoryPlugin
 
 log = StructuredLogger(logging.getLogger(__spec__.name))
 

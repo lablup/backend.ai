@@ -48,6 +48,7 @@ class TestRuncProfile:
         assert plan.allowed_mount_kinds == frozenset(GeneratedMountKind)
         assert plan.stdio is StdioMode.LOG_FILE
         assert plan.readiness == KernelRunnerReadiness(timeout_s=7.5)
+        assert plan.runtime_options is None
 
     def test_conforms_to_runtime_profile(self) -> None:
         assert isinstance(RuncProfile(1.0), RuntimeProfile)

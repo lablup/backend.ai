@@ -85,6 +85,8 @@ asyncio_default_fixture_loop_scope = "function"
 [tool.ruff]
 line-length = 100
 src = ["src"]
+# Vendored protoc output; regenerate with scripts/codegen/gen_containerd_api.py.
+extend-exclude = ["src/ai/backend/agent/containerd/_grpcapi"]
 
 [tool.ruff.lint]
 extend-safe-fixes = ["UP030", "UP031", "UP037", "UP040", "UP046", "UP047", "PLC0415"]
@@ -387,6 +389,7 @@ disable_error_code = ["valid-type"]
 # These are external/generated code or low-priority plugins
 [[tool.mypy.overrides]]
 module = [
+    "ai.backend.agent.containerd._grpcapi.*",
     "ai.backend.kernel.vendor.*",
     "ai.backend.accelerator.*",
     "tools.build-macros",

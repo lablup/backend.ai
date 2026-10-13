@@ -18,6 +18,8 @@ from ai.backend.agent.containerd.profile.base import (
 from ai.backend.agent.types import KernelOwnershipData
 from ai.backend.common.types import AgentId, KernelCreationConfig, KernelId, SessionId, SlotName
 
+from .fakes import FakeContainerd
+
 
 class FakeProfile(RuntimeProfile):
     accepts_calls: list[Mapping[SlotName, Decimal]]
@@ -106,3 +108,8 @@ def ownership_data() -> KernelOwnershipData:
 @pytest.fixture
 def builtin() -> FakeProfile:
     return FakeProfile("runc", accepts=True)
+
+
+@pytest.fixture
+def fake() -> FakeContainerd:
+    return FakeContainerd()

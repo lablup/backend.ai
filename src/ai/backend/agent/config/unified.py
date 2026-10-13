@@ -2158,6 +2158,38 @@ class ContainerdConfig(BaseConfigSchema):
     Settings of the containerd backend, read only when the agent backend is `containerd`.
     """
 
+    address: Annotated[
+        str,
+        Field(default="/run/containerd/containerd.sock"),
+        BackendAIConfigMeta(
+            description="Path of the containerd gRPC unix socket.",
+            added_version="26.10.0",
+            example=ConfigExample(
+                local="/run/containerd/containerd.sock", prod="/run/containerd/containerd.sock"
+            ),
+        ),
+    ]
+    namespace: Annotated[
+        str,
+        Field(default="backend-ai"),
+        BackendAIConfigMeta(
+            description=(
+                "containerd namespace holding the kernel containers and the pre-imported images. "
+                "The agent only lists containers of this namespace."
+            ),
+            added_version="26.10.0",
+            example=ConfigExample(local="backend-ai", prod="backend-ai"),
+        ),
+    ]
+    snapshotter: Annotated[
+        str,
+        Field(default="overlayfs"),
+        BackendAIConfigMeta(
+            description="containerd snapshotter that unpacks the images and holds kernel rootfs.",
+            added_version="26.10.0",
+            example=ConfigExample(local="overlayfs", prod="overlayfs"),
+        ),
+    ]
     runtime_profiles: Annotated[
         list[str],
         Field(

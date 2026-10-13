@@ -66,6 +66,14 @@ class KernelLaunch:
 
 
 @dataclass(frozen=True)
+class RuntimeOptions:
+    """A typed runtime options message for Containers.Create, passed through unparsed."""
+
+    type_url: str  # e.g. "runtimeoptions.v1.Options"
+    value: bytes  # the serialized message
+
+
+@dataclass(frozen=True)
 class LaunchPlan:
     runtime_handler: str  # e.g. "io.containerd.runc.v2"
     rootfs_image: str  # image reference the rootfs is unpacked from
@@ -73,6 +81,7 @@ class LaunchPlan:
     allowed_mount_kinds: frozenset[GeneratedMountKind]
     stdio: StdioMode
     readiness: KernelRunnerReadiness | TlsConnectReadiness
+    runtime_options: RuntimeOptions | None = None  # runc: None
 
 
 @runtime_checkable
