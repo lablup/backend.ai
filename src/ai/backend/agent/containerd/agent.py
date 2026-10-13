@@ -396,6 +396,21 @@ class ContainerdKernelCreationContext(AbstractKernelCreationContext[ContainerdKe
         service_ports: list[ServicePort],
         cluster_info: ClusterInfo,
     ) -> ContainerdKernel:
+        try:
+            return await self._prepare_kernel(resource_spec, environ, service_ports)
+        except BaseException:
+            # The kernel is not registered yet, so no clean_kernel removes its scratch dir.
+            await run_in_executor_with_context(
+                None, remove_scratch, self.local_config.container.scratch_root, str(self.kernel_id)
+            )
+            raise
+
+    async def _prepare_kernel(
+        self,
+        resource_spec: KernelResourceSpec,
+        environ: Mapping[str, str],
+        service_ports: list[ServicePort],
+    ) -> ContainerdKernel:
         await self._write_config_files(resource_spec, environ)
         extra_caps = (
             ("CAP_SYS_PTRACE",)

@@ -201,7 +201,7 @@ class TestPrepareContainer:
         assert (config_dir / "environ.txt").read_text() == "A=1\nB=2\n"
         assert "CPU_SHARES=1:1,3:1" in (config_dir / "resource.txt").read_text()
 
-    async def test_profile_rejection_propagates(
+    async def test_profile_rejection_propagates_and_removes_the_scratch_dir(
         self,
         tmp_path: Path,
         ownership_data: KernelOwnershipData,
@@ -221,6 +221,8 @@ class TestPrepareContainer:
 
         with pytest.raises(ProfileSpecRejected):
             await ctx.prepare_container(resource_spec, {}, [], MagicMock())
+
+        assert not (tmp_path / str(ownership_data.kernel_id)).exists()
 
     async def test_netns_exists_before_plan_and_is_removed_when_plan_fails(
         self,
