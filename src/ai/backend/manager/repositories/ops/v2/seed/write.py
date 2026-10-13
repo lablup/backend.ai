@@ -9,8 +9,10 @@ from typing import Any
 import sqlalchemy as sa
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 
-from ai.backend.manager.errors.repository import RepositoryIntegrityError
+from ai.backend.manager.errors.permission import VirtualEntityNotFound
+from ai.backend.manager.errors.repository import ForeignKeyViolationError, RepositoryIntegrityError
 from ai.backend.manager.models.base import Base
+from ai.backend.manager.models.virtual_entity.virtual_entity import VirtualEntityRow
 from ai.backend.manager.repositories.ops.v2.seed.types import SeedWrite, SeedWriteItemResult
 from ai.backend.manager.repositories.ops.v2.write import V2WriteOps
 
@@ -19,7 +21,8 @@ class V2SeedWriteOps(V2WriteOps):
     """The v2 write ops plus the seed item write.
 
     A seed write leaves out the upserters' ``integrity_error_checks``: a violation stays a
-    :class:`RepositoryIntegrityError`, so it fails its own item and no other.
+    :class:`RepositoryIntegrityError`, so it fails its own item and no other. A scope with
+    no virtual entity fails its item as a missing row.
     """
 
     async def partial_write_seed_items(
@@ -34,6 +37,12 @@ class V2SeedWriteOps(V2WriteOps):
                     written = await self._write_seed_item(write, overwrite)
             except RepositoryIntegrityError as e:
                 results.append(SeedWriteItemResult(written=False, error=e))
+                continue
+            except VirtualEntityNotFound as e:
+                missing = ForeignKeyViolationError(
+                    str(e), table_name=VirtualEntityRow.__tablename__
+                )
+                results.append(SeedWriteItemResult(written=False, error=missing))
                 continue
             results.append(SeedWriteItemResult(written=written))
         return results
@@ -72,9 +81,9 @@ class V2SeedWriteOps(V2WriteOps):
         update_values: dict[str, Any] | None,
     ) -> tuple[TRow, bool]:
         """Insert the row, answering it and whether it was written. A row holding its
-        ``index_elements`` is kept, or updated with ``update_values`` when given."""
+        ``index_elements`` is kept, or updated with ``update_values`` when any are given."""
         stmt = pg_insert(row_class).values(insert_values)
-        if update_values is None:
+        if not update_values:
             stmt = stmt.on_conflict_do_nothing(index_elements=index_elements)
         else:
             stmt = stmt.on_conflict_do_update(index_elements=index_elements, set_=update_values)
