@@ -214,44 +214,32 @@ class SessionDBSource:
         id_or_name_prefix: str,
         owner_access_key: AccessKey,
     ) -> list[SessionRow]:
+        """The session of ``owner_access_key`` whose id equals ``id_or_name_prefix``, or
+        else up to 10 of its sessions whose name equals it, newest first."""
         async with self._db.begin_readonly_session_read_committed() as db_sess:
-            return await self._match_sessions(
-                db_sess, id_or_name_prefix, owner_access_key, allow_stale=True
+            try:
+                session_id = uuid.UUID(id_or_name_prefix)
+            except ValueError:
+                pass
+            else:
+                session_row = await db_sess.scalar(
+                    sa.select(SessionRow).where(
+                        (SessionRow.id == session_id) & (SessionRow.access_key == owner_access_key)
+                    )
+                )
+                if session_row is not None:
+                    return [session_row]
+            return list(
+                await db_sess.scalars(
+                    sa.select(SessionRow)
+                    .where(
+                        (SessionRow.name == id_or_name_prefix)
+                        & (SessionRow.access_key == owner_access_key)
+                    )
+                    .order_by(sa.desc(SessionRow.created_at))
+                    .limit(10)
+                )
             )
-
-    @staticmethod
-    async def _match_sessions(
-        db_sess: AsyncSession,
-        id_or_name: str,
-        access_key: AccessKey,
-        *,
-        allow_stale: bool,
-    ) -> list[SessionRow]:
-        """The sessions of ``access_key`` whose id or name equals ``id_or_name``.
-
-        An id match shuts out the name matches; up to 10 name matches come newest first.
-        """
-        id_match: sa.ColumnElement[bool]
-        try:
-            id_match = SessionRow.id == uuid.UUID(id_or_name)
-        except ValueError:
-            id_match = sa.false()
-        rank = sa.case((id_match, 0), else_=1).label("rank")
-        cond = (id_match | (SessionRow.name == id_or_name)) & (SessionRow.access_key == access_key)
-        if not allow_stale:
-            cond = cond & ~SessionRow.status.in_(DEAD_SESSION_STATUSES)
-        query = (
-            sa.select(SessionRow, rank)
-            .where(cond)
-            .order_by(rank, sa.desc(SessionRow.created_at))
-            .limit(10)
-            .execution_options(populate_existing=True)
-        )
-        rows = (await db_sess.execute(query)).all()
-        if not rows:
-            return []
-        best_rank = rows[0].rank
-        return [row.SessionRow for row in rows if row.rank == best_rank]
 
     async def set_session_result(self, session_id: SessionId, success: bool) -> None:
         async def _update() -> None:
@@ -440,30 +428,38 @@ class SessionDBSource:
                 raise SessionNotFound(f"Session not found (id:{session_id})")
 
             if session_name and session_row.access_key is not None:
-                # Check the owner of the target session has any session with the same name
-                matches = await self._match_sessions(
-                    db_session,
-                    session_name,
-                    AccessKey(session_row.access_key),
-                    allow_stale=False,
-                )
-                if len(matches) > 1:
+                # The live sessions of the owner that already carry the name.
+                namesakes = (
+                    await db_session.execute(
+                        sa.select(
+                            SessionRow.id, SessionRow.name, SessionRow.status, SessionRow.created_at
+                        )
+                        .where(
+                            (SessionRow.name == session_name)
+                            & (SessionRow.access_key == session_row.access_key)
+                            & ~SessionRow.status.in_(DEAD_SESSION_STATUSES)
+                        )
+                        .order_by(sa.desc(SessionRow.created_at))
+                        .limit(10)
+                    )
+                ).all()
+                if len(namesakes) > 1:
                     raise TooManySessionsMatched(
                         extra_data={
                             "matches": [
                                 {
-                                    "session_id": sess.id,
-                                    "session_name": sess.name,
-                                    "status": sess.status,
-                                    "created_at": sess.created_at,
+                                    "session_id": namesake.id,
+                                    "session_name": namesake.name,
+                                    "status": namesake.status,
+                                    "created_at": namesake.created_at,
                                 }
-                                for sess in matches
+                                for namesake in namesakes
                             ]
                         }
                     )
-                if matches:
+                if namesakes:
                     raise SessionAlreadyExists(
-                        f"Duplicate session name. Session(id:{matches[0].id}) already has the name"
+                        f"Duplicate session name. Session(id:{namesakes[0].id}) already has the name"
                     )
 
             updated = await V2WriteOps(db_session).update_data(updater)
