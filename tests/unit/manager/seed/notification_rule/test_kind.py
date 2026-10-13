@@ -108,3 +108,20 @@ class TestCheckCommand:
         path = _write(tmp_path / "bad.yaml", _RULE | {"rule_type": "session.paused"})
         result = CliRunner().invoke(cli, ["check", str(path)])
         assert result.exit_code != 0
+
+
+class TestNotificationRuleSeedCheck:
+    def test_an_item_keeping_the_rules_passes(self) -> None:
+        assert NotificationRuleSeed.model_validate(_RULE).check() == []
+
+    @pytest.mark.parametrize(
+        "item",
+        [
+            {**_RULE, "name": "  "},
+        ],
+        ids=[
+            "blank-name",
+        ],
+    )
+    def test_an_item_breaking_a_rule_fails(self, item: dict[str, Any]) -> None:
+        assert len(NotificationRuleSeed.model_validate(item).check()) == 1
