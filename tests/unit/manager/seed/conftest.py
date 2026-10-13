@@ -38,6 +38,7 @@ from ai.backend.manager.models.resource_policy.row import (
     ProjectResourcePolicyRow,
     UserResourcePolicyRow,
 )
+from ai.backend.manager.models.resource_preset.row import ResourcePresetRow
 from ai.backend.manager.models.resource_slot.row import PresetResourceSlotRow, ResourceSlotTypeRow
 from ai.backend.manager.models.retention.row import RetentionPolicyRow
 from ai.backend.manager.models.runtime_variant.row import RuntimeVariantRow
@@ -485,6 +486,22 @@ _PROJECTS: dict[str, dict[str, Any]] = {
     },
 }
 
+# Resource preset files written for the tests, one preset per file, both bound to no
+# resource group. `small` states every field; `large` leaves `shared_memory` out.
+_RESOURCE_PRESETS: dict[str, dict[str, Any]] = {
+    "small.yaml": {
+        "id": "0198a5a0-0000-7000-8000-000000001001",
+        "name": "small",
+        "resource_slots": {"cpu": "1", "mem": "1073741824"},
+        "shared_memory": "64m",
+    },
+    "large.yaml": {
+        "id": "0198a5a0-0000-7000-8000-000000001002",
+        "name": "large",
+        "resource_slots": {"cpu": "8", "mem": "17179869184", "cuda.shares": "1"},
+    },
+}
+
 # The tables a seed kind writes, and the graph tables the creation path writes beside them.
 _SEED_TABLES: list[Table | type[HasTable]] = [
     AppConfigDefinitionRow,
@@ -506,6 +523,7 @@ _SEED_TABLES: list[Table | type[HasTable]] = [
     DomainRow,
     RuntimeVariantRow,
     RuntimeVariantPresetRow,
+    ResourcePresetRow,
     DeploymentRevisionPresetRow,
     PresetResourceSlotRow,
     RolePresetRow,
@@ -934,3 +952,21 @@ def project_seed_dir(tmp_path: Path) -> Path:
 @pytest.fixture
 def research_project_id() -> str:
     return str(_PROJECTS["research.yaml"]["id"])
+
+
+@pytest.fixture
+def resource_preset_seed_dir(tmp_path: Path) -> Path:
+    """A directory of resource preset seed files, the shape `seeds/manager/resource_preset/`
+    has."""
+    directory = tmp_path / "resource_preset"
+    directory.mkdir()
+    for file_name, preset in _RESOURCE_PRESETS.items():
+        (directory / file_name).write_text(
+            yaml.safe_dump({"kind": "resource_preset", "version": 1, "items": [preset]})
+        )
+    return directory
+
+
+@pytest.fixture
+def small_preset_id() -> str:
+    return str(_RESOURCE_PRESETS["small.yaml"]["id"])
