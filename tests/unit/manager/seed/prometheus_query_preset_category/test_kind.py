@@ -91,3 +91,26 @@ class TestCheckCommand:
         path = _write(tmp_path / "bad.yaml", {"id": _ID, "name": ""})
         result = CliRunner().invoke(cli, ["check", str(path)])
         assert result.exit_code != 0
+
+
+class TestPrometheusQueryPresetCategorySeedCheck:
+    def test_an_item_keeping_the_rules_passes(self) -> None:
+        assert (
+            PrometheusQueryPresetCategorySeed.model_validate({
+                "id": _ID,
+                "name": "container",
+            }).check()
+            == []
+        )
+
+    @pytest.mark.parametrize(
+        "item",
+        [
+            {"id": _ID, "name": "  "},
+        ],
+        ids=[
+            "blank-name",
+        ],
+    )
+    def test_an_item_breaking_a_rule_fails(self, item: dict[str, Any]) -> None:
+        assert len(PrometheusQueryPresetCategorySeed.model_validate(item).check()) == 1
