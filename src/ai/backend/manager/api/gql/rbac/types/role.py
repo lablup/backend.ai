@@ -570,6 +570,12 @@ class RoleGQL(PydanticNodeMixin[RoleNode]):
 )
 class RoleAssignmentGQL(PydanticNodeMixin[RoleAssignmentNode]):
     id: NodeID[str]
+    field_id: UUID = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="UUID of the role assignment row.",
+        ),
+    )
     user_id: UUID = gql_field(description="The assigned user ID.")
     role_id: UUID = gql_field(description="The assigned role ID.")
     granted_by: UUID | None = gql_field(description="The user who granted this assignment.")
