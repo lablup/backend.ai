@@ -7,9 +7,11 @@ from collections.abc import Collection
 from datetime import datetime
 
 import sqlalchemy as sa
+from sqlalchemy.dialects import postgresql
 
 from ai.backend.common.data.endpoint.types import EndpointLifecycle, ScalingState
 from ai.backend.common.data.filter_specs import (
+    StringInMatchSpec,
     StringMatchSpec,
     UUIDEqualMatchSpec,
     UUIDInMatchSpec,
@@ -89,7 +91,6 @@ class DeploymentConditions:
 
     by_name_in = staticmethod(make_string_in_factory(EndpointRow.name))
     by_domain_name_in = staticmethod(make_string_in_factory(EndpointRow.domain))
-    by_tag_in = staticmethod(make_string_in_factory(EndpointRow.tag))
     by_url_in = staticmethod(make_string_in_factory(EndpointRow.url))
     by_resource_group_in = staticmethod(make_string_in_factory(EndpointRow.resource_group))
 
@@ -268,9 +269,31 @@ class DeploymentConditions:
     def by_tag_equals(spec: StringMatchSpec) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             if spec.case_insensitive:
-                condition = sa.func.lower(EndpointRow.tag) == spec.value.lower()
+                condition = sa.literal(spec.value.lower()) == sa.any_(
+                    sa.func.string_to_array(sa.func.lower(EndpointRow.tag), ",")
+                )
             else:
-                condition = EndpointRow.tag == spec.value
+                condition = sa.literal(spec.value) == sa.any_(
+                    sa.func.string_to_array(EndpointRow.tag, ",")
+                )
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
+
+        return inner
+
+    @staticmethod
+    def by_tag_in(spec: StringInMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            if spec.case_insensitive:
+                values = [v.lower() for v in spec.values]
+                elements = sa.func.string_to_array(sa.func.lower(EndpointRow.tag), ",")
+            else:
+                values = list(spec.values)
+                elements = sa.func.string_to_array(EndpointRow.tag, ",")
+            condition = elements.bool_op("&&")(
+                sa.cast(postgresql.array(values), postgresql.ARRAY(sa.Text()))
+            )
             if spec.negated:
                 condition = sa.not_(condition)
             return condition
