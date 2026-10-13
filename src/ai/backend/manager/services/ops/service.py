@@ -59,6 +59,7 @@ from ai.backend.manager.actions.v2.ops.base import (
     FieldCreateOpsAction,
     FieldGetOpsAction,
     FieldPartialBulkPurgeOpsAction,
+    FieldPartialBulkUpsertOpsAction,
     FieldPurgeOpsAction,
     FieldUpsertOpsAction,
     GetOpsAction,
@@ -132,6 +133,7 @@ __all__ = (
     "EntityPartialBulkPurgeService",
     "FieldPartialBulkGetService",
     "FieldPartialBulkPurgeService",
+    "FieldPartialBulkUpsertService",
     "GlobalUpsertService",
     "EntityUpsertService",
     "EntityAtomicUpsertService",
@@ -904,6 +906,22 @@ class FieldUpsertService[TData: FieldData]:
         return EntityOpsResult(
             data=await self._repository.upsert_field_entity(action.owner_id(), action.to_upserter())
         )
+
+
+class FieldPartialBulkUpsertService[TData: FieldData]:
+    """Inserts or updates each owner's field rows on conflict, answering for every
+    owner the action named."""
+
+    _repository: OpsRepository[TData]
+
+    def __init__(self, repository: OpsRepository[TData]) -> None:
+        self._repository = repository
+
+    async def execute(
+        self, action: FieldPartialBulkUpsertOpsAction[Any, Any, TData]
+    ) -> PartialBulkResult[list[TData]]:
+        result = await self._repository.partial_bulk_upsert_field_entities(action.to_upserters())
+        return PartialBulkResult(items=_partial_bulk_items(result))
 
 
 class UpdateService[TData]:

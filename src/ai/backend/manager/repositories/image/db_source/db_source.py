@@ -9,7 +9,6 @@ from typing import cast
 import sqlalchemy as sa
 from sqlalchemy.exc import DBAPIError
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
-from sqlalchemy.orm import selectinload
 
 from ai.backend.common.arch import arch_name_aliases
 from ai.backend.common.bgtask.reporter import ProgressReporter
@@ -204,7 +203,8 @@ class ImageDBSource:
         """
         async with self._db.begin_session() as session:
             image_row = await self._get_image_row_for_write(session, image_id, [ImageStatus.ALIVE])
-            await image_row.mark_as_deleted(session)
+            image_row.status = ImageStatus.DELETED
+            await session.flush()
             return ImageSearchableFields.own.to_data(image_row)
 
     async def mark_image_alive_by_id(
@@ -218,7 +218,8 @@ class ImageDBSource:
             image_row = await self._get_image_row_for_write(
                 session, image_id, ImageStatus.restorable()
             )
-            await image_row.mark_as_alive(session)
+            image_row.status = ImageStatus.ALIVE
+            await session.flush()
             return ImageSearchableFields.own.to_data(image_row)
 
     async def fetch_image_by_id(self, image_id: ImageID, load_aliases: bool = False) -> ImageData:
@@ -341,31 +342,6 @@ class ImageDBSource:
             raise AliasImageActionValueError from e
         except DBAPIError as e:
             raise AliasImageActionDBError(str(e)) from e
-
-    async def query_images_by_ids(
-        self,
-        image_ids: list[ImageID],
-        status_filter: list[ImageStatus] | None = None,
-    ) -> dict[ImageID, ImageDataWithDetails]:
-        """
-        Queries images by their IDs with optional status filter.
-        Returns a dictionary mapping ImageID to ImageDataWithDetails.
-        """
-        if not image_ids:
-            return {}
-
-        query = (
-            sa.select(ImageRow)
-            .where(ImageRow.id.in_(image_ids))
-            .options(selectinload(ImageRow.aliases))
-        )
-        if status_filter:
-            query = query.where(ImageRow.status.in_(status_filter))
-
-        async with self._db.begin_readonly_session_read_committed() as session:
-            result = await session.execute(query)
-            image_rows = list(result.scalars().all())
-            return {ImageID(row.id): row.to_detailed_dataclass() for row in image_rows}
 
     async def clear_image_resource_limits_by_id(self, image_id: ImageID) -> ImageData:
         """

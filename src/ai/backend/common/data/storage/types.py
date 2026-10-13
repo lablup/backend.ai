@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 import enum
-from datetime import timedelta
+from dataclasses import dataclass
+from datetime import datetime, timedelta
 from typing import Final, NewType
 
 from pydantic import ConfigDict, Field
@@ -106,3 +107,24 @@ class ServiceStorageStatus(enum.StrEnum):
     HEALTHY = "healthy"
     UNHEALTHY = "unhealthy"
     LOST = "lost"
+
+
+@dataclass(frozen=True)
+class StorageStatusResult:
+    """What one status check observed, when it started and how long it took.
+
+    ``error_msg`` is null where the observation itself succeeded, which says nothing
+    about whether the subject is in order; reading the observation decides that.
+    """
+
+    check_started_at: datetime
+    duration: timedelta | None
+    error_msg: str | None
+
+
+@dataclass(frozen=True)
+class VfsVolumeStatusResult(StorageStatusResult):
+    """What a vfs volume's mount looked like, null where the observation failed."""
+
+    device_id: int | None
+    marker: str | None
