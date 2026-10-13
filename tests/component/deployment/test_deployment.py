@@ -783,6 +783,91 @@ class TestDeploymentAdapterFilter:
         assert payload.total_count == 1
         assert [item.id for item in payload.items] == [target_id]
 
+    @pytest.fixture
+    async def tagged_deployments(
+        self,
+        admin_registry: BackendAIClientRegistry,
+        group_fixture: uuid.UUID,
+        domain_fixture: DomainFixtureData,
+        resource_group_name: ResourceGroupName,
+        deployment_seed_data: tuple[ImageID, VFolderUUID],
+    ) -> dict[str, uuid.UUID]:
+        tag_sets = {
+            "six": ["hi", "hello", "nice", "to", "meet", "you"],
+            "two": ["hello", "hi"],
+            "one": ["meet"],
+        }
+        return {
+            name: await self._create_deployment_with_tags(
+                admin_registry,
+                group_fixture,
+                domain_fixture.domain_name,
+                resource_group_name,
+                deployment_seed_data,
+                tags,
+            )
+            for name, tags in tag_sets.items()
+        }
+
+    async def _search_by_tags(
+        self,
+        deployment_adapter: DeploymentAdapter,
+        admin_user_fixture: UserFixtureData,
+        domain_fixture: DomainFixtureData,
+        tags: StringFilter,
+    ) -> set[uuid.UUID]:
+        with with_user_context(
+            self._admin_user_data(admin_user_fixture.user_uuid, domain_fixture.domain_name)
+        ):
+            payload = await deployment_adapter.scoped_search(
+                ScopedSearchDeploymentsInput(
+                    scope=DeploymentScope(user=[UUIDScope(value=admin_user_fixture.user_uuid)]),
+                    filter=DeploymentFilterV2(tags=tags),
+                    limit=50,
+                ),
+            )
+        return {item.id for item in payload.items}
+
+    @pytest.mark.parametrize(
+        ("tags", "expected"),
+        [
+            (StringFilter(i_equals="meet"), {"six", "one"}),
+            (StringFilter(equals="meet"), {"six", "one"}),
+            (StringFilter(i_equals="MEET"), {"six", "one"}),
+            (StringFilter(equals="MEET"), set()),
+            (StringFilter(in_=["nice", "zzz"]), {"six"}),
+            (StringFilter(i_in=["HI"]), {"six", "two"}),
+            (StringFilter(i_equals="hi,hello,nice,to,meet,you"), set()),
+            (StringFilter(not_equals="meet"), {"two"}),
+            (StringFilter(not_in=["hi", "meet"]), set()),
+        ],
+        ids=[
+            "i_equals_one_tag",
+            "equals_one_tag",
+            "i_equals_ignores_case",
+            "equals_honors_case",
+            "in_matches_any_listed_tag",
+            "i_in_ignores_case",
+            "joined_string_is_not_a_tag",
+            "not_equals_excludes_the_tag",
+            "not_in_excludes_every_listed_tag",
+        ],
+    )
+    async def test_tags_filter_matches_one_tag_of_a_deployment(
+        self,
+        deployment_adapter: DeploymentAdapter,
+        admin_user_fixture: UserFixtureData,
+        domain_fixture: DomainFixtureData,
+        tagged_deployments: dict[str, uuid.UUID],
+        tags: StringFilter,
+        expected: set[str],
+    ) -> None:
+        found = await self._search_by_tags(
+            deployment_adapter, admin_user_fixture, domain_fixture, tags
+        )
+
+        assert found == {tagged_deployments[name] for name in expected}
+
 
 class TestStatusMapping:
     def test_lifecycle_to_status_mapping(self) -> None:
