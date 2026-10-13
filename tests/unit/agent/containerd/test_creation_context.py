@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import dataclasses
 import json
 from collections.abc import Sequence
 from decimal import Decimal
@@ -16,7 +17,7 @@ from ai.backend.agent.containerd.agent import (
 )
 from ai.backend.agent.containerd.client import MountSpec
 from ai.backend.agent.containerd.kernel import ContainerdKernel
-from ai.backend.agent.containerd.profile.base import LaunchPlan
+from ai.backend.agent.containerd.profile.base import LaunchPlan, RuntimeOptions
 from ai.backend.agent.containerd.scratch import CONFIG_DIR_LABEL
 from ai.backend.agent.errors import UnsupportedResource
 from ai.backend.agent.errors.containerd import (
@@ -401,6 +402,34 @@ class TestStartContainer:
         destinations = [m["destination"] for m in spec["mounts"] if m["type"] == "bind"]
         assert {"/home/config", "/home/work"} <= set(destinations)
         assert all(ns["type"] != "network" for ns in spec["linux"]["namespaces"])
+
+    async def test_plan_runtime_options_reach_the_container(
+        self,
+        tmp_path: Path,
+        ownership_data: KernelOwnershipData,
+        launch_kernel_config: KernelCreationConfig,
+        launch_plan: LaunchPlan,
+        resource_spec: KernelResourceSpec,
+        computers: dict[DeviceName, ComputerContext],
+        fake: FakeContainerd,
+    ) -> None:
+        options = RuntimeOptions(type_url="runtimeoptions.v1.Options", value=b"\x12\x03abc")
+        plan = dataclasses.replace(launch_plan, runtime_options=options)
+        pool = PortPool(PORT_RANGE, cooldown_sec=0)
+        ctx, kernel = await self._prepared(
+            tmp_path,
+            ownership_data,
+            launch_kernel_config,
+            plan,
+            resource_spec,
+            computers,
+            fake,
+            pool,
+        )
+
+        data = await ctx.start_container(kernel, [], None, [], MagicMock())
+
+        assert fake.runtime_options[data["container_id"]] == options
 
     async def test_labels_identify_the_kernel_and_its_owner(
         self,

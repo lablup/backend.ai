@@ -8,6 +8,7 @@ from ai.backend.agent.containerd.lifecycle import (
     destroy_container,
     launch_container,
 )
+from ai.backend.agent.containerd.profile.base import RuntimeOptions
 from ai.backend.agent.errors.containerd import ContainerdOperationFailed
 
 from .fakes import FakeContainerd
@@ -33,6 +34,26 @@ async def _launch(fake: FakeContainerd) -> int:
 
 
 class TestLaunch:
+    async def test_runtime_options_reach_create_container(self, fake: FakeContainerd) -> None:
+        options = RuntimeOptions(type_url="t", value=b"v")
+
+        await launch_container(
+            fake,
+            _record(),
+            runtime="io.containerd.kata.v2",
+            chain_id="sha256:aa",
+            spec={},
+            stdio="",
+            runtime_options=options,
+        )
+
+        assert fake.runtime_options[CID] == options
+
+    async def test_runtime_options_default_to_none(self, fake: FakeContainerd) -> None:
+        await _launch(fake)
+
+        assert fake.runtime_options[CID] is None
+
     async def test_creates_snapshot_container_and_runs_the_task(self, fake: FakeContainerd) -> None:
         pid = await _launch(fake)
 

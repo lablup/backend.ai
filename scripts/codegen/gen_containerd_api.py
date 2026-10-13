@@ -27,6 +27,9 @@ PKG_PATH = DEST_PKG.replace(".", "/")
 
 # protoc follows imports, so only the service entry points are listed.
 SERVICES = ["containers", "tasks", "images", "snapshots", "content"]
+# Proto trees copied into the stage; `pkg/runtimeoptions` is the 1.7 location of runtimeoptions.v1.
+PROTO_SUBDIRS = ("api", "protobuf", "pkg/runtimeoptions")
+EXTRA_TARGETS = ["pkg/runtimeoptions/v1/api.proto"]
 
 
 def _find_go_mod(glob: str) -> Path:
@@ -58,7 +61,7 @@ def main() -> None:
     with tempfile.TemporaryDirectory() as tmp:
         stage = Path(tmp) / "stage"
         pkg_root = stage / PKG_PATH
-        for sub in ("api", "protobuf"):
+        for sub in PROTO_SUBDIRS:
             for src in (cd_proto / sub).rglob("*.proto"):
                 dst = pkg_root / sub / src.relative_to(cd_proto / sub)
                 dst.parent.mkdir(parents=True, exist_ok=True)
@@ -69,6 +72,7 @@ def main() -> None:
         )
 
         targets = [pkg_root / f"api/services/{s}/v1/{s}.proto" for s in SERVICES]
+        targets += [pkg_root / t for t in EXTRA_TARGETS]
         out = Path(tmp) / "out"
         out.mkdir()
         cmd = [

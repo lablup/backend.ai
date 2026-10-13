@@ -37,6 +37,7 @@ from ai.backend.agent.containerd.client import (
     MountSpec,
     TaskState,
 )
+from ai.backend.agent.containerd.profile.base import RuntimeOptions
 from ai.backend.agent.errors.containerd import (
     ContainerdImageInvalid,
     ContainerdImageNotFound,
@@ -248,6 +249,33 @@ class TestContainers:
         assert dict(sent.labels) == {"a": "b"}
         assert sent.spec.type_url == SPEC_TYPE_URL
         assert json.loads(sent.spec.value) == {"ociVersion": "1.1.0"}
+
+    async def test_create_without_runtime_options_leaves_the_field_unset(
+        self, client: ContainerdClient, backend: Backend
+    ) -> None:
+        record = ContainerRecord(
+            id="c1", image="img:1", snapshotter="overlayfs", snapshot_key="c1", labels={}
+        )
+
+        await client.create_container(record, "io.containerd.runc.v2", {})
+
+        [sent] = backend.created
+        assert not sent.runtime.HasField("options")
+
+    async def test_create_passes_runtime_options_through(
+        self, client: ContainerdClient, backend: Backend
+    ) -> None:
+        record = ContainerRecord(
+            id="c1", image="img:1", snapshotter="overlayfs", snapshot_key="c1", labels={}
+        )
+        options = RuntimeOptions(type_url="example.v1.Opts", value=b"\x01\x02opaque")
+
+        await client.create_container(record, "io.containerd.kata.v2", {}, options)
+
+        [sent] = backend.created
+        assert sent.runtime.name == "io.containerd.kata.v2"
+        assert sent.runtime.options.type_url == "example.v1.Opts"
+        assert sent.runtime.options.value == b"\x01\x02opaque"
 
     async def test_list_sends_a_label_filter(
         self, client: ContainerdClient, backend: Backend

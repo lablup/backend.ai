@@ -27,6 +27,7 @@ from ai.backend.agent.containerd._grpcapi.api.services.snapshots.v1 import (
 )
 from ai.backend.agent.containerd._grpcapi.api.services.tasks.v1 import tasks_pb2, tasks_pb2_grpc
 from ai.backend.agent.containerd._grpcapi.api.types import mount_pb2
+from ai.backend.agent.containerd.profile.base import RuntimeOptions
 from ai.backend.agent.errors.containerd import (
     ContainerdImageInvalid,
     ContainerdImageNotFound,
@@ -123,7 +124,11 @@ class ContainerdAPI(Protocol):
     async def remove_snapshot(self, key: str) -> None: ...
 
     async def create_container(
-        self, record: ContainerRecord, runtime: str, spec: Mapping[str, Any]
+        self,
+        record: ContainerRecord,
+        runtime: str,
+        spec: Mapping[str, Any],
+        runtime_options: RuntimeOptions | None = None,
     ) -> None: ...
 
     async def get_container(self, container_id: str) -> ContainerRecord | None: ...
@@ -318,12 +323,21 @@ class ContainerdClient:
     # Containers
 
     async def create_container(
-        self, record: ContainerRecord, runtime: str, spec: Mapping[str, Any]
+        self,
+        record: ContainerRecord,
+        runtime: str,
+        spec: Mapping[str, Any],
+        runtime_options: RuntimeOptions | None = None,
     ) -> None:
+        runtime_msg = containers_pb2.Container.Runtime(name=runtime)
+        if runtime_options is not None:
+            runtime_msg.options.CopyFrom(
+                any_pb2.Any(type_url=runtime_options.type_url, value=runtime_options.value)
+            )
         container = containers_pb2.Container(
             id=record.id,
             image=record.image,
-            runtime=containers_pb2.Container.Runtime(name=runtime),
+            runtime=runtime_msg,
             spec=any_pb2.Any(type_url=SPEC_TYPE_URL, value=json.dumps(dict(spec)).encode()),
             snapshotter=record.snapshotter,
             snapshot_key=record.snapshot_key,

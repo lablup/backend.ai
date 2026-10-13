@@ -489,6 +489,7 @@ class ContainerdKernelCreationContext(AbstractKernelCreationContext[ContainerdKe
                 chain_id=image.chain_id,
                 spec=spec,
                 stdio=stdio,
+                runtime_options=launch_plan.runtime_options,
             )
         except BaseException:
             self._port_pool.release_many(host_ports)

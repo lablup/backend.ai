@@ -12,6 +12,7 @@ from ai.backend.agent.containerd.client import (
     TaskInfo,
     TaskState,
 )
+from ai.backend.agent.containerd.profile.base import RuntimeOptions
 from ai.backend.agent.errors.containerd import ContainerdImageNotFound, ContainerdOperationFailed
 
 
@@ -25,6 +26,7 @@ class FakeContainerd:
     snapshots: dict[str, Sequence[MountSpec]]
     containers: dict[str, ContainerRecord]
     specs: dict[str, Mapping[str, Any]]
+    runtime_options: dict[str, RuntimeOptions | None]
     tasks: dict[str, TaskInfo]
     calls: list[tuple[str, str]]
     failing: set[str]
@@ -40,6 +42,7 @@ class FakeContainerd:
         self.snapshots = {}
         self.containers = {}
         self.specs = {}
+        self.runtime_options = {}
         self.tasks = {}
         self.calls = []
         self.failing = set()
@@ -79,9 +82,14 @@ class FakeContainerd:
         self.snapshots.pop(key, None)
 
     async def create_container(
-        self, record: ContainerRecord, runtime: str, spec: Mapping[str, Any]
+        self,
+        record: ContainerRecord,
+        runtime: str,
+        spec: Mapping[str, Any],
+        runtime_options: RuntimeOptions | None = None,
     ) -> None:
         self._call("create_container", record.id)
+        self.runtime_options[record.id] = runtime_options
         self.containers[record.id] = record
         self.specs[record.id] = spec
 

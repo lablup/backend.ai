@@ -15,6 +15,7 @@ from ai.backend.agent.containerd.client import (
     TaskInfo,
     TaskState,
 )
+from ai.backend.agent.containerd.profile.base import RuntimeOptions
 from ai.backend.agent.errors.containerd import ContainerdOperationFailed
 from ai.backend.common.exception import BackendAIError
 from ai.backend.logging.structured import StructuredLogger
@@ -50,6 +51,7 @@ async def launch_container(
     chain_id: str,
     spec: Mapping[str, Any],
     stdio: str,
+    runtime_options: RuntimeOptions | None = None,
 ) -> int:
     """Prepare the rootfs snapshot, create the container and start its task; returns the PID.
 
@@ -58,7 +60,7 @@ async def launch_container(
     """
     rootfs: Sequence[MountSpec] = await client.prepare_snapshot(record.snapshot_key, chain_id)
     try:
-        await client.create_container(record, runtime, spec)
+        await client.create_container(record, runtime, spec, runtime_options)
         pid = await client.create_task(record.id, rootfs, stdio, stdio)
         await client.start_task(record.id)
     except BaseException:
