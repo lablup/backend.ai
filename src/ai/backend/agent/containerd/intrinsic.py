@@ -10,7 +10,8 @@ import psutil
 
 from ai.backend.agent import __version__
 from ai.backend.agent.alloc_map import AllocationStrategy
-from ai.backend.agent.errors import InvalidResourceConfigError
+from ai.backend.agent.containerd.scratch import read_resource_spec
+from ai.backend.agent.errors import InvalidArgumentError, InvalidResourceConfigError
 from ai.backend.agent.resources import (
     AbstractAllocMap,
     AbstractComputeDevice,
@@ -35,6 +36,25 @@ from ai.backend.common.types import (
     SlotName,
     SlotTypes,
 )
+
+
+async def _restore_slot(
+    container: Container,
+    alloc_map: AbstractAllocMap,
+    device_name: DeviceName,
+    slot_name: SlotName,
+) -> None:
+    """Re-apply the kernel's recorded allocation, as the Docker agent does from its records."""
+    if not isinstance(alloc_map, DiscretePropertyAllocMap):
+        raise InvalidArgumentError(
+            f"Expected DiscretePropertyAllocMap, got {type(alloc_map).__name__}"
+        )
+    resource_spec = await read_resource_spec(container.labels)
+    if resource_spec is None:
+        return
+    allocation = resource_spec.allocations.get(device_name, {}).get(slot_name)
+    if allocation:
+        alloc_map.apply_allocation({slot_name: allocation})
 
 
 class CPUDevice(AbstractComputeDevice):
@@ -165,7 +185,7 @@ class CPUPlugin(AbstractComputePlugin):
         container: Container,
         alloc_map: AbstractAllocMap,
     ) -> None:
-        return None
+        await _restore_slot(container, alloc_map, DeviceName("cpu"), SlotName("cpu"))
 
     @override
     async def get_attached_devices(
@@ -318,7 +338,7 @@ class MemoryPlugin(AbstractComputePlugin):
         container: Container,
         alloc_map: AbstractAllocMap,
     ) -> None:
-        return None
+        await _restore_slot(container, alloc_map, DeviceName("mem"), SlotName("mem"))
 
     @override
     async def get_attached_devices(

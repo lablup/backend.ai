@@ -58,7 +58,7 @@ class TestBaseSpec:
     def test_no_limits_without_allocation(self) -> None:
         resources = build_base_spec(_input(cpu_cores=[], memory_bytes=0))["linux"]["resources"]
 
-        assert resources == {}
+        assert resources == {"devices": [{"allow": False, "access": "rwm"}]}
 
     def test_capabilities_match_the_docker_agent(self) -> None:
         caps = build_base_spec(_input(extra_caps=["CAP_SYS_PTRACE"]))["process"]["capabilities"]
@@ -67,6 +67,13 @@ class TestBaseSpec:
         assert "CAP_SYS_NICE" in caps["bounding"]
         assert "CAP_SYS_PTRACE" in caps["permitted"]
         assert "CAP_SYS_ADMIN" not in caps["permitted"]
+
+    def test_no_raw_sockets_or_privileged_ports_on_the_host_network(self) -> None:
+        caps = build_base_spec(_input())["process"]["capabilities"]
+
+        for kind in ("bounding", "effective", "permitted"):
+            assert "CAP_NET_RAW" not in caps[kind]
+            assert "CAP_NET_BIND_SERVICE" not in caps[kind]
 
     def test_runs_as_root_in_the_work_dir(self) -> None:
         process = build_base_spec(_input())["process"]
@@ -105,6 +112,7 @@ class TestLaunchSpec:
             mounts=mounts,
             allowed_mount_kinds=allowed_mount_kinds,
             spec_patch=spec_patch or {},
+            cgroups_path="/ns/c1",
         )
 
     def test_args_and_env(self) -> None:
@@ -113,10 +121,14 @@ class TestLaunchSpec:
         assert spec["process"]["args"] == ["/opt/kernel/entrypoint.sh", "python"]
         assert spec["process"]["env"] == ["A=1"]
 
+    def test_cgroups_path_is_set(self) -> None:
+        assert self._build()["linux"]["cgroupsPath"] == "/ns/c1"
+
     def test_base_spec_is_not_mutated(self) -> None:
         self._build(mounts=[_mount(GeneratedMountKind.KRUNNER, "/opt/kernel/su-exec")])
 
         assert self.base["process"]["args"] == []
+        assert "cgroupsPath" not in self.base["linux"]
         assert all(m["type"] != "bind" for m in self.base["mounts"])
 
     def test_mounts_are_binds_ordered_by_depth(self) -> None:

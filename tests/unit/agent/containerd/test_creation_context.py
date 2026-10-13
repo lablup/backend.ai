@@ -17,6 +17,7 @@ from ai.backend.agent.containerd.agent import (
 from ai.backend.agent.containerd.client import MountSpec
 from ai.backend.agent.containerd.kernel import ContainerdKernel
 from ai.backend.agent.containerd.profile.base import LaunchPlan
+from ai.backend.agent.containerd.scratch import CONFIG_DIR_LABEL
 from ai.backend.agent.errors import UnsupportedResource
 from ai.backend.agent.errors.containerd import (
     ContainerdImageNotFound,
@@ -430,6 +431,36 @@ class TestStartContainer:
         assert labels["ai.backend.session-id"] == str(ownership_data.session_id)
         assert labels["ai.backend.owner"] == str(ownership_data.agent_id)
         assert labels[HOST_PORTS_LABEL] == ",".join(map(str, data["host_ports"]))
+        assert labels[CONFIG_DIR_LABEL] == str(
+            (tmp_path / str(ownership_data.kernel_id)).resolve() / "config"
+        )
+
+    async def test_cgroup_path_is_namespaced_by_container_id(
+        self,
+        tmp_path: Path,
+        ownership_data: KernelOwnershipData,
+        launch_kernel_config: KernelCreationConfig,
+        launch_plan: LaunchPlan,
+        resource_spec: KernelResourceSpec,
+        computers: dict[DeviceName, ComputerContext],
+        fake: FakeContainerd,
+    ) -> None:
+        pool = PortPool(PORT_RANGE, cooldown_sec=0)
+        ctx, kernel = await self._prepared(
+            tmp_path,
+            ownership_data,
+            launch_kernel_config,
+            launch_plan,
+            resource_spec,
+            computers,
+            fake,
+            pool,
+        )
+
+        data = await ctx.start_container(kernel, [], None, [], MagicMock())
+
+        spec = fake.specs[data["container_id"]]
+        assert spec["linux"]["cgroupsPath"] == f"/{fake.namespace}/{data['container_id']}"
 
     async def test_repl_ports_come_from_the_pool_and_reach_the_kernel_runner(
         self,
@@ -455,15 +486,17 @@ class TestStartContainer:
 
         data = await ctx.start_container(kernel, [], None, [], MagicMock())
 
-        replin, replout = data["host_ports"]
-        assert PORT_RANGE[0] <= replin <= PORT_RANGE[1] and replin != replout
-        assert data["intrinsic_ports"] == {"replin": replin, "replout": replout}
+        ports = data["intrinsic_ports"]
+        assert set(ports) == {"replin", "replout", "sshd", "ttyd"}
+        assert len(set(ports.values())) == 4
+        assert all(PORT_RANGE[0] <= p <= PORT_RANGE[1] for p in ports.values())
+        assert data["host_ports"] == list(ports.values())
         assert (data["repl_in_port"], data["repl_out_port"]) == (0, 0)
         assert (data["stdin_port"], data["stdout_port"]) == (0, 0)
         assert data["kernel_host"] == "127.0.0.1"
         written = tmp_path / str(ownership_data.kernel_id) / "config" / "intrinsic-ports.json"
-        assert json.loads(written.read_text()) == {"replin": replin, "replout": replout}
-        assert len(pool) == 10 - 2
+        assert json.loads(written.read_text()) == ports
+        assert len(pool) == 10 - 4
 
     async def test_task_stdio_goes_to_the_scratch_log_file(
         self,

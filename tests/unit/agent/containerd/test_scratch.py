@@ -130,6 +130,72 @@ class TestWriteDotfiles:
 
         assert (dirs.work / ".vimrc").read_text() == "second\n"
 
+    def test_absolute_path_outside_home_is_skipped(self, tmp_path: Path) -> None:
+        dirs = _dirs(tmp_path)
+        create_scratch(dirs, None, clone_dotfiles=False)
+        outside = tmp_path / "host" / "x"
+
+        write_dotfiles(dirs, [{"path": str(outside), "data": "x", "perm": "644"}], None)
+
+        assert not outside.exists()
+
+    def test_home_path_escaping_the_scratch_root_is_skipped(self, tmp_path: Path) -> None:
+        dirs = _dirs(tmp_path)
+        create_scratch(dirs, None, clone_dotfiles=False)
+
+        write_dotfiles(dirs, [{"path": "/home/../../x", "data": "x", "perm": "644"}], None)
+
+        assert not (tmp_path / "x").exists()
+        assert not (tmp_path.parent / "x").exists()
+
+    def test_relative_path_escaping_the_work_dir_is_skipped(self, tmp_path: Path) -> None:
+        dirs = _dirs(tmp_path)
+        create_scratch(dirs, None, clone_dotfiles=False)
+
+        write_dotfiles(dirs, [{"path": "../../x", "data": "x", "perm": "644"}], None)
+
+        assert not (tmp_path / "x").exists()
+
+    def test_a_skipped_dotfile_does_not_stop_the_others(self, tmp_path: Path) -> None:
+        dirs = _dirs(tmp_path)
+        create_scratch(dirs, None, clone_dotfiles=False)
+
+        write_dotfiles(
+            dirs,
+            [
+                {"path": "/etc/x", "data": "bad", "perm": "644"},
+                {"path": ".ok", "data": "ok", "perm": "644"},
+            ],
+            None,
+        )
+
+        assert (dirs.work / ".ok").read_text() == "ok\n"
+
+    def test_chmod_walk_stops_at_the_work_dir(self, tmp_path: Path) -> None:
+        dirs = _dirs(tmp_path)
+        create_scratch(dirs, None, clone_dotfiles=False)
+        dirs.root.chmod(0o751)
+
+        write_dotfiles(dirs, [{"path": "a/b/c", "data": "x", "perm": "600"}], None)
+
+        assert oct((dirs.work / "a" / "b").stat().st_mode & 0o777) == "0o700"
+        assert oct(dirs.work.stat().st_mode & 0o777) == "0o755"
+        assert oct(dirs.root.stat().st_mode & 0o777) == "0o751"
+
+    def test_chmod_walk_outside_the_work_dir_stops_at_the_scratch_root(
+        self, tmp_path: Path
+    ) -> None:
+        dirs = _dirs(tmp_path)
+        create_scratch(dirs, None, clone_dotfiles=False)
+        dirs.root.parent.chmod(0o751)
+        dirs.root.chmod(0o751)
+
+        write_dotfiles(dirs, [{"path": "/home/config/sub/x", "data": "x", "perm": "600"}], None)
+
+        assert (dirs.config / "sub" / "x").is_file()
+        assert oct(dirs.root.parent.stat().st_mode & 0o777) == "0o751"
+        assert oct(dirs.root.stat().st_mode & 0o777) == "0o751"
+
 
 class TestRemoveScratch:
     def test_removes_the_kernel_dir(self, tmp_path: Path) -> None:

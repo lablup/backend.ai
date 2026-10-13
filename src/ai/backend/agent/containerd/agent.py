@@ -21,6 +21,45 @@ from ai.backend.agent.agent import (
     ScanImagesResult,
 )
 from ai.backend.agent.config.unified import AgentUnifiedConfig, ContainerSandboxType
+from ai.backend.agent.containerd.client import (
+    ContainerdAPI,
+    ContainerdClient,
+    ContainerdClientConfig,
+    ContainerRecord,
+    TaskState,
+)
+from ai.backend.agent.containerd.image import resolve_image
+from ai.backend.agent.containerd.kernel import ContainerdKernel
+from ai.backend.agent.containerd.lifecycle import (
+    clean_container,
+    destroy_container,
+    launch_container,
+)
+from ai.backend.agent.containerd.mounts import host_system_mounts, to_generated_mounts
+from ai.backend.agent.containerd.profile.base import (
+    GeneratedMount,
+    KernelLaunch,
+    RuntimeProfile,
+    StdioMode,
+)
+from ai.backend.agent.containerd.profile.loader import load_runtime_profiles, select_profile
+from ai.backend.agent.containerd.profile.runc import RuncProfile
+from ai.backend.agent.containerd.scratch import (
+    CONFIG_DIR_LABEL,
+    Owner,
+    ScratchDirs,
+    create_scratch,
+    remove_scratch,
+    write_config_files,
+    write_dotfiles,
+    write_intrinsic_ports,
+)
+from ai.backend.agent.containerd.spec import (
+    SpecInput,
+    build_base_spec,
+    build_launch_spec,
+    merge_env,
+)
 from ai.backend.agent.errors import UnsupportedResource
 from ai.backend.agent.errors.agent import UnsupportedBaseDistroError
 from ai.backend.agent.errors.containerd import KernelVerbNotSupported
@@ -67,36 +106,13 @@ from ai.backend.common.types import (
 )
 from ai.backend.logging.structured import StructuredLogger
 
-from .client import (
-    ContainerdAPI,
-    ContainerdClient,
-    ContainerdClientConfig,
-    ContainerRecord,
-    TaskState,
-)
-from .image import resolve_image
-from .kernel import ContainerdKernel
-from .lifecycle import clean_container, destroy_container, launch_container
-from .mounts import host_system_mounts, to_generated_mounts
-from .profile.base import GeneratedMount, KernelLaunch, RuntimeProfile, StdioMode
-from .profile.loader import load_runtime_profiles, select_profile
-from .profile.runc import RuncProfile
-from .scratch import (
-    Owner,
-    ScratchDirs,
-    create_scratch,
-    remove_scratch,
-    write_config_files,
-    write_dotfiles,
-    write_intrinsic_ports,
-)
-from .spec import SpecInput, build_base_spec, build_launch_spec, merge_env
-
 log = StructuredLogger(logging.getLogger(__spec__.name))
 
 HOST_PORTS_LABEL: Final = "ai.backend.containerd.host-ports"
 _INTRINSIC_SLOTS: Final = frozenset({SlotName("cpu"), SlotName("mem")})
-_REPL_PORT_COUNT: Final = 2
+# The kernel runner reads these from intrinsic-ports.json; with the host network they are
+# all host ports.
+_INTRINSIC_PORT_NAMES: Final = ("replin", "replout", "sshd", "ttyd")
 _LOG_COLLECT_TIMEOUT_SEC: Final = 60.0
 _LOG_CHUNK_BYTES: Final = 64 * 1024
 _CONTAINER_STATUS: Final[Mapping[TaskState, ContainerStatus]] = {
@@ -116,6 +132,12 @@ def _kernel_slots(kernel_config: KernelCreationConfig) -> Mapping[SlotName, Deci
     }
 
 
+def _refuse_accelerators(device_alloc: Mapping[SlotName, Mapping[DeviceId, Decimal]]) -> None:
+    for slot, alloc in device_alloc.items():
+        if slot not in _INTRINSIC_SLOTS and any(amount > 0 for amount in alloc.values()):
+            raise KernelVerbNotSupported(f"accelerator allocation ({slot})")
+
+
 def _kernel_id_of(record: ContainerRecord) -> KernelId | None:
     try:
         return KernelId(uuid.UUID(record.labels[LabelName.KERNEL_ID]))
@@ -123,13 +145,13 @@ def _kernel_id_of(record: ContainerRecord) -> KernelId | None:
         return None
 
 
+def _host_ports_of(record: ContainerRecord) -> list[int]:
+    return [int(p) for p in record.labels.get(HOST_PORTS_LABEL, "").split(",") if p]
+
+
 def _to_container(record: ContainerRecord, status: ContainerStatus) -> Container:
-    """The kernel shares the host network, so its REPL ports are host ports on 127.0.0.1."""
-    ports = [
-        Port("127.0.0.1", int(p), int(p))
-        for p in record.labels.get(HOST_PORTS_LABEL, "").split(",")
-        if p
-    ]
+    """The kernel shares the host network, so its ports are host ports on 127.0.0.1."""
+    ports = [Port("127.0.0.1", p, p) for p in _host_ports_of(record)]
     return Container(
         id=ContainerId(record.id),
         status=status,
@@ -233,7 +255,8 @@ class ContainerdKernelCreationContext(AbstractKernelCreationContext[ContainerdKe
         resource_opts = self.kernel_config.get("resource_opts", {})
         return resource_spec, resource_opts
 
-    # Only host directories are supported as scratch, whatever container.scratch-type says.
+    # FIXME(containerd-mvp): scratch is always a host directory, whatever container.scratch-type
+    # says (memory and hostfile are not implemented)
     @override
     async def prepare_scratch(self) -> None:
         await run_in_executor_with_context(
@@ -276,7 +299,8 @@ class ContainerdKernelCreationContext(AbstractKernelCreationContext[ContainerdKe
     def protected_services(self) -> Sequence[str]:
         raise KernelVerbNotSupported("protected_services")
 
-    # The runc kernel shares the host network namespace, so there is nothing to apply.
+    # FIXME(containerd-mvp): cluster networking; the runc kernel shares the host network
+    # namespace, so there is nothing to apply and cluster sessions get no inter-kernel hostnames
     @override
     async def apply_network(self, cluster_info: ClusterInfo) -> None:
         return None
@@ -403,13 +427,13 @@ class ContainerdKernelCreationContext(AbstractKernelCreationContext[ContainerdKe
 
         await run_in_executor_with_context(None, _write)
 
-    def _acquire_repl_ports(self) -> list[int]:
-        acquired: list[int] = []
+    def _acquire_intrinsic_ports(self) -> dict[str, int]:
+        acquired: dict[str, int] = {}
         try:
-            for _ in range(_REPL_PORT_COUNT):
-                acquired.append(self._port_pool.acquire())
+            for name in _INTRINSIC_PORT_NAMES:
+                acquired[name] = self._port_pool.acquire()
         except BackendAIError:
-            self._port_pool.release_many(acquired)
+            self._port_pool.release_many(acquired.values())
             raise
         return acquired
 
@@ -418,9 +442,9 @@ class ContainerdKernelCreationContext(AbstractKernelCreationContext[ContainerdKe
             for dev_name, device_alloc in resource_spec.allocations.items():
                 self.computers[dev_name].alloc_map.free(device_alloc)
 
-    # The REPL ports are host ports, as the kernel shares the host network. start_container
-    # returns them in host_ports (released when the kernel is cleaned) and intrinsic_ports;
-    # the four REPL entries stay 0.
+    # The REPL, sshd and ttyd ports are host ports, as the kernel shares the host network.
+    # start_container returns them in host_ports (released when the kernel is cleaned) and
+    # intrinsic_ports; the four REPL entries stay 0.
     @override
     async def start_container(
         self,
@@ -432,8 +456,8 @@ class ContainerdKernelCreationContext(AbstractKernelCreationContext[ContainerdKe
     ) -> Mapping[str, Any]:
         launch_plan = cast(ContainerdKernel, kernel_obj).launch_plan
         container_id = f"{self.kernel_id}-{uuid.uuid4().hex[:8]}"
-        host_ports = self._acquire_repl_ports()
-        intrinsic_ports = {"replin": host_ports[0], "replout": host_ports[1]}
+        intrinsic_ports = self._acquire_intrinsic_ports()
+        host_ports = list(intrinsic_ports.values())
         try:
             image = await resolve_image(self._client, launch_plan.rootfs_image, get_arch_name())
             await run_in_executor_with_context(
@@ -446,6 +470,7 @@ class ContainerdKernelCreationContext(AbstractKernelCreationContext[ContainerdKe
                 mounts=self._generated_mounts,
                 allowed_mount_kinds=launch_plan.allowed_mount_kinds,
                 spec_patch=launch_plan.spec_patch,
+                cgroups_path=f"/{self._client.namespace}/{container_id}",
             )
             stdio = (
                 f"file://{self._dirs.task_log}" if launch_plan.stdio is StdioMode.LOG_FILE else ""
@@ -493,13 +518,8 @@ class ContainerdKernelCreationContext(AbstractKernelCreationContext[ContainerdKe
                 "1" if self.internal_data.get("block_service_ports", False) else "0"
             ),
             HOST_PORTS_LABEL: ",".join(map(str, host_ports)),
+            CONFIG_DIR_LABEL: str(self._dirs.config),
         }
-
-
-def _refuse_accelerators(device_alloc: Mapping[SlotName, Mapping[DeviceId, Decimal]]) -> None:
-    for slot, alloc in device_alloc.items():
-        if slot not in _INTRINSIC_SLOTS and any(amount > 0 for amount in alloc.values()):
-            raise KernelVerbNotSupported(f"accelerator allocation ({slot})")
 
 
 class ContainerdAgent(
@@ -527,7 +547,7 @@ class ContainerdAgent(
             SlotName(s) for s in containerd_config.profile_required_slots
         )
         self._runc_profile = RuncProfile(local_config.kernel_lifecycles.init_timeout_sec)
-        # The base class starts a registry cleanup loop in its __init__; the client must exist by then.
+        # The base class starts a registry cleanup loop in its __init__, which needs the client.
         self._client = ContainerdClient(
             ContainerdClientConfig(
                 address=containerd_config.address,
@@ -717,6 +737,8 @@ class ContainerdAgent(
     ) -> None:
         dirs = ScratchDirs.for_kernel(self.local_config.container.scratch_root, str(kernel_id))
         if container_id is not None:
+            if kernel_id not in self.kernel_registry:
+                await self._release_orphan_ports(container_id)
             await self._collect_task_log(kernel_id, container_id, dirs)
             if not self.local_config.debug.skip_container_deletion:
                 try:
@@ -727,6 +749,20 @@ class ContainerdAgent(
             await run_in_executor_with_context(
                 None, remove_scratch, self.local_config.container.scratch_root, str(kernel_id)
             )
+
+    async def _release_orphan_ports(self, container_id: ContainerId) -> None:
+        """Return the host ports of a container no kernel object owns (left over from a restart).
+
+        The base releases ports of registered kernels only; for those a second release could
+        hand a live port to a new kernel.
+        """
+        try:
+            record = await self._client.get_container(str(container_id))
+        except BackendAIError:
+            log.exception("container lookup failed", container_id=container_id)
+            return
+        if record is not None:
+            self.port_pool.release_many(_host_ports_of(record))
 
     async def _collect_task_log(
         self, kernel_id: KernelId, container_id: ContainerId, dirs: ScratchDirs

@@ -8,6 +8,7 @@ from typing import Any, Final, override
 
 from tenacity import TryAgain
 
+from ai.backend.agent.containerd.profile.base import LaunchPlan
 from ai.backend.agent.errors.containerd import ContainerdOperationFailed, KernelVerbNotSupported
 from ai.backend.agent.kernel import AbstractCodeRunner, AbstractKernel
 from ai.backend.agent.resources import KernelResourceSpec
@@ -16,8 +17,6 @@ from ai.backend.common.docker import ImageRef
 from ai.backend.common.dto.agent.response import CodeCompletionResp
 from ai.backend.common.events.dispatcher import EventProducer
 from ai.backend.common.types import CommitStatus, KernelId
-
-from .profile.base import LaunchPlan
 
 _PROBE_HOST: Final = "127.0.0.1"
 _PROBE_TIMEOUT_SEC: Final = 2.0
@@ -72,6 +71,7 @@ class ContainerdKernel(AbstractKernel):
     ) -> AbstractCodeRunner:
         raise KernelVerbNotSupported("create_code_runner")
 
+    # FIXME(containerd-mvp): probe only; no kernel status without a code runner.
     # The runc readiness probe: the kernel runner listens on its REPL port once it is up.
     # TryAgain makes the create_kernel readiness loop retry.
     @override

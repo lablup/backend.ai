@@ -14,19 +14,18 @@ OCI_VERSION: Final = "1.1.0"
 CPU_PERIOD_US: Final = 100_000
 _RLIM_INFINITY: Final = 2**64 - 1
 
-# Docker's default capability set plus the two the Docker agent adds (IPC_LOCK, SYS_NICE).
+# Docker's default capability set minus NET_RAW and NET_BIND_SERVICE (the kernel shares the
+# host network) plus the two the Docker agent adds (IPC_LOCK, SYS_NICE).
 DEFAULT_CAPABILITIES: Final = (
     "CAP_CHOWN",
     "CAP_DAC_OVERRIDE",
     "CAP_FSETID",
     "CAP_FOWNER",
     "CAP_MKNOD",
-    "CAP_NET_RAW",
     "CAP_SETGID",
     "CAP_SETUID",
     "CAP_SETFCAP",
     "CAP_SETPCAP",
-    "CAP_NET_BIND_SERVICE",
     "CAP_SYS_CHROOT",
     "CAP_KILL",
     "CAP_AUDIT_WRITE",
@@ -86,6 +85,7 @@ _MASKED_PATHS: Final = (
     "/proc/sched_debug",
     "/proc/scsi",
     "/sys/firmware",
+    "/sys/devices/virtual/powercap",
 )
 _READONLY_PATHS: Final = (
     "/proc/asound",
@@ -117,7 +117,7 @@ def _rlimit(name: str, soft: int, hard: int) -> dict[str, Any]:
 
 
 def _resources(inp: SpecInput) -> dict[str, Any]:
-    resources: dict[str, Any] = {}
+    resources: dict[str, Any] = {"devices": [{"allow": False, "access": "rwm"}]}
     if inp.cpu_cores:
         cores = sorted(inp.cpu_cores)
         resources["cpu"] = {
@@ -201,9 +201,11 @@ def build_launch_spec(
     mounts: Sequence[GeneratedMount],
     allowed_mount_kinds: frozenset[GeneratedMountKind],
     spec_patch: Mapping[str, Any],
+    cgroups_path: str,
 ) -> dict[str, Any]:
-    """Add the process args, env and the allowed kernel mounts, then apply the profile's patch."""
+    """Add the process args, env, cgroup path and the allowed kernel mounts, then the patch."""
     spec = copy.deepcopy(dict(base_spec))
+    spec["linux"]["cgroupsPath"] = cgroups_path
     spec["process"]["args"] = list(args)
     spec["process"]["env"] = list(env)
     # Shallower destinations first, so a mount is never hidden by one made before its parent.

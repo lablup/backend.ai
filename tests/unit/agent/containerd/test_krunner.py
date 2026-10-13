@@ -35,45 +35,54 @@ def test_directory_name_carries_version_arch_and_distro(tmp_path: Path) -> None:
     assert krunner_dir(tmp_path, 7, "aarch64", "ubuntu22.04") == tmp_path / "v7.aarch64.ubuntu22.04"
 
 
-def test_extracts_the_archive_and_stamps_the_version(tmp_path: Path, archive: Path) -> None:
-    dest = tmp_path / "krunner" / "v3.x86_64.static-gnu"
+class TestExtractKrunnerEnv:
+    def test_extracts_the_archive_and_stamps_the_version(
+        self, tmp_path: Path, archive: Path
+    ) -> None:
+        dest = tmp_path / "krunner" / "v3.x86_64.static-gnu"
 
-    extract_krunner_env(archive, dest, 3)
+        extract_krunner_env(archive, dest, 3)
 
-    assert (dest / "bin" / "python").read_bytes() == b"#!python"
-    assert (dest / "lib" / "python3.13" / "x.py").read_text() == "x = 1"
-    assert (dest / VERSION_FILE).read_text().strip() == "3"
-    assert (dest / "bin" / "python").stat().st_mode & 0o111
+        assert (dest / "bin" / "python").read_bytes() == b"#!python"
+        assert (dest / "lib" / "python3.13" / "x.py").read_text() == "x = 1"
+        assert (dest / VERSION_FILE).read_text().strip() == "3"
+        assert (dest / "bin" / "python").stat().st_mode & 0o111
 
+    def test_no_temporary_directory_is_left_behind(self, tmp_path: Path, archive: Path) -> None:
+        dest = tmp_path / "krunner" / "v3.x86_64.static-gnu"
 
-def test_no_temporary_directory_is_left_behind(tmp_path: Path, archive: Path) -> None:
-    dest = tmp_path / "krunner" / "v3.x86_64.static-gnu"
+        extract_krunner_env(archive, dest, 3)
 
-    extract_krunner_env(archive, dest, 3)
+        assert [p.name for p in dest.parent.iterdir()] == [dest.name]
 
-    assert [p.name for p in dest.parent.iterdir()] == [dest.name]
+    def test_complete_directory_is_left_alone(self, tmp_path: Path, archive: Path) -> None:
+        dest = tmp_path / "krunner" / "v3.x86_64.static-gnu"
+        extract_krunner_env(archive, dest, 3)
+        (dest / "marker").write_text("keep")
 
+        extract_krunner_env(archive, dest, 3)
 
-def test_complete_directory_is_left_alone(tmp_path: Path, archive: Path) -> None:
-    dest = tmp_path / "krunner" / "v3.x86_64.static-gnu"
-    extract_krunner_env(archive, dest, 3)
-    (dest / "marker").write_text("keep")
+        assert (dest / "marker").read_text() == "keep"
 
-    extract_krunner_env(archive, dest, 3)
+    def test_corrupt_archive_leaves_nothing(self, tmp_path: Path) -> None:
+        broken = tmp_path / "broken.tar.xz"
+        broken.write_bytes(b"not an archive")
+        dest = tmp_path / "krunner" / "v3.x86_64.static-gnu"
 
-    assert (dest / "marker").read_text() == "keep"
+        with pytest.raises(tarfile.TarError):
+            extract_krunner_env(broken, dest, 3)
 
+        assert not dest.exists()
+        assert list(dest.parent.iterdir()) == []
 
-def test_corrupt_archive_leaves_nothing(tmp_path: Path) -> None:
-    broken = tmp_path / "broken.tar.xz"
-    broken.write_bytes(b"not an archive")
-    dest = tmp_path / "krunner" / "v3.x86_64.static-gnu"
+    def test_extracted_root_is_traversable_by_the_kernel_user(
+        self, tmp_path: Path, archive: Path
+    ) -> None:
+        dest = tmp_path / "krunner" / "v3.x86_64.static-gnu"
 
-    with pytest.raises(tarfile.TarError):
-        extract_krunner_env(broken, dest, 3)
+        extract_krunner_env(archive, dest, 3)
 
-    assert not dest.exists()
-    assert list(dest.parent.iterdir()) == []
+        assert oct(dest.stat().st_mode & 0o777) == "0o755"
 
 
 class _FakePlugin:

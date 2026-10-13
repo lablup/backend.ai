@@ -38,6 +38,8 @@ def extract_krunner_env(archive: Path, dest: Path, version: int) -> None:
         with tarfile.open(archive, "r:xz") as tar:
             tar.extractall(tmp, filter="tar")
         (tmp / VERSION_FILE).write_text(f"{version}\n")
+        # mkdtemp creates 0700, but the kernel user must be able to enter /opt/backend.ai.
+        tmp.chmod(0o755)
         try:
             tmp.rename(dest)
         except OSError:

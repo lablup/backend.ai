@@ -49,6 +49,7 @@ def agent(monkeypatch: pytest.MonkeyPatch) -> ContainerdAgent:
     instance.port_pool = PortPool((30000, 30009), cooldown_sec=0)
     instance.resource_lock = asyncio.Lock()
     instance._client = FakeContainerd()
+    instance.kernel_registry = {}
     instance.error_monitor = MagicMock(capture_exception=AsyncMock())
     monkeypatch.setattr(instance, "reconstruct_resource_usage", AsyncMock())
     return instance
@@ -302,7 +303,7 @@ class TestDestroyKernel:
 
         await agent.destroy_kernel(KernelId(uuid.uuid4()), ContainerId("c1"))
 
-        assert ("kill_task:SIGINT", "c1") in fake.calls
+        assert ("kill_task:SIGTERM", "c1") in fake.calls
         assert "c1" not in fake.tasks
 
     async def test_unknown_container_is_tolerated_and_resources_are_reconstructed(
@@ -315,7 +316,7 @@ class TestDestroyKernel:
     async def test_containerd_error_is_captured_not_raised(self, agent: ContainerdAgent) -> None:
         fake = cast(FakeContainerd, agent._client)
         _add_container(fake, "c1", state=TaskState.RUNNING)
-        fake.failing.add("kill_task:SIGINT")
+        fake.failing.add("kill_task:SIGTERM")
 
         await agent.destroy_kernel(KernelId(uuid.uuid4()), ContainerId("c1"))
 
@@ -356,6 +357,31 @@ class TestCleanKernel:
         assert fake.containers == {} and fake.tasks == {} and fake.snapshots == {}
         assert not scratch.exists()
         assert b"".join(collected) == b"hello\n"
+
+    async def test_ports_of_an_unregistered_container_are_returned_to_the_pool(
+        self, agent: ContainerdAgent, scratch_root: Path, collected: list[bytes]
+    ) -> None:
+        fake = cast(FakeContainerd, agent._client)
+        kid = _add_container(fake, "c1", state=TaskState.STOPPED, host_ports="30000,30001")
+        for port in (30000, 30001):
+            agent.port_pool.discard(port)
+
+        await agent.clean_kernel(kid, ContainerId("c1"), False)
+
+        assert agent.port_pool.used_ports() == set()
+
+    async def test_ports_of_a_registered_kernel_are_left_to_the_base(
+        self, agent: ContainerdAgent, scratch_root: Path, collected: list[bytes]
+    ) -> None:
+        fake = cast(FakeContainerd, agent._client)
+        kid = _add_container(fake, "c1", state=TaskState.STOPPED, host_ports="30000,30001")
+        agent.kernel_registry[kid] = MagicMock()
+        for port in (30000, 30001):
+            agent.port_pool.discard(port)
+
+        await agent.clean_kernel(kid, ContainerId("c1"), False)
+
+        assert agent.port_pool.used_ports() == {30000, 30001}
 
     async def test_unknown_container_is_tolerated(
         self, agent: ContainerdAgent, scratch_root: Path, collected: list[bytes]
@@ -421,6 +447,17 @@ class TestShutdown:
             await agent.shutdown(MagicMock())
 
         assert cast(FakeContainerd, agent._client).closed
+
+    async def test_shutdown_after_a_failed_connect_still_closes_the_client(
+        self, agent: ContainerdAgent, mocker: MockerFixture
+    ) -> None:
+        fake = cast(FakeContainerd, agent._client)
+        fake.connected = False
+        mocker.patch("ai.backend.agent.agent.AbstractAgent.shutdown", new=AsyncMock())
+
+        await agent.shutdown(MagicMock())
+
+        assert fake.closed
 
 
 class TestAinit:

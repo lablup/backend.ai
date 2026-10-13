@@ -11,11 +11,15 @@ from importlib.resources import files
 from pathlib import Path
 from typing import Any, Final
 
+import aiofiles
+
+from ai.backend.agent.resources import KernelResourceSpec
 from ai.backend.logging.structured import StructuredLogger
 
 log = StructuredLogger(logging.getLogger(__spec__.name))
 
 TASK_LOG_NAME: Final = "task.log"
+CONFIG_DIR_LABEL: Final = "ai.backend.containerd.config-dir"
 _RUNNER_DOTFILES: Final = (".bashrc", ".bash_profile", ".zshrc", ".vimrc", ".tmux.conf")
 _JUPYTER_FILES: Final = {
     "jupyter-custom.css": "custom.css",
@@ -83,18 +87,30 @@ def create_scratch(dirs: ScratchDirs, owner: Owner | None, *, clone_dotfiles: bo
     chown_if_root(copied, owner)
 
 
+def _dotfile_target(dirs: ScratchDirs, path: str) -> Path | None:
+    """Where a dotfile goes, or None when it would land outside the kernel's scratch dir."""
+    if path.startswith("/home/"):
+        target = dirs.root / "/".join(path.split("/")[2:])
+    elif path.startswith("/"):
+        return None  # the Docker agent writes this on the host; here it is refused
+    else:
+        target = dirs.work / path
+    target = target.resolve()
+    return target if target.is_relative_to(dirs.root) else None
+
+
 def write_dotfiles(
     dirs: ScratchDirs, dotfiles: Sequence[Mapping[str, Any]], owner: Owner | None
 ) -> None:
-    """Write the user's dotfiles; the ones later in the list take precedence."""
+    """Write the user's dotfiles; the ones later in the list take precedence.
+
+    A path that leaves the scratch dir is skipped with a warning.
+    """
     for dotfile in dotfiles:
-        path = dotfile["path"]
-        if path.startswith("/home/"):
-            target = dirs.root / "/".join(path.split("/")[2:])
-        elif path.startswith("/"):
-            target = Path(path)
-        else:
-            target = dirs.work / path
+        target = _dotfile_target(dirs, dotfile["path"])
+        if target is None:
+            log.warning("dotfile outside the scratch dir skipped", dotfile_path=dotfile["path"])
+            continue
         target.parent.mkdir(parents=True, exist_ok=True)
         content = dotfile["data"]
         target.write_text(content if content.endswith("\n") else content + "\n")
@@ -102,8 +118,9 @@ def write_dotfiles(
         dir_perm = perm | ((perm & 0o444) >> 2)  # a directory needs x wherever it has r
         target.chmod(perm)
         touched: list[Path] = [target]
+        base = dirs.work if target.is_relative_to(dirs.work) else dirs.root
         node = target.parent
-        while node != dirs.work and node != node.parent:
+        while node != base and node.is_relative_to(base):
             node.chmod(dir_perm)
             touched.append(node)
             node = node.parent
@@ -130,6 +147,15 @@ def write_config_files(
 def write_intrinsic_ports(dirs: ScratchDirs, ports: bytes) -> None:
     """The REPL ports the kernel runner binds, read from /home/config by the runner."""
     (dirs.config / "intrinsic-ports.json").write_bytes(ports)
+
+
+async def read_resource_spec(labels: Mapping[str, str]) -> KernelResourceSpec | None:
+    """The resource spec a running kernel was created with, from its config dir."""
+    config_dir = labels.get(CONFIG_DIR_LABEL)
+    if not config_dir:
+        return None
+    async with aiofiles.open(Path(config_dir) / "resource.txt") as f:
+        return await KernelResourceSpec.aread_from_file(f)
 
 
 def remove_scratch(scratch_root: Path, kernel_id: str) -> None:

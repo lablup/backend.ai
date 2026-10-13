@@ -1,10 +1,16 @@
 from __future__ import annotations
 
+import platform
 from pathlib import Path
 
 import pytest
 
-from ai.backend.agent.containerd.mounts import classify_mount, to_generated_mounts
+from ai.backend.agent.containerd import mounts as mounts_module
+from ai.backend.agent.containerd.mounts import (
+    classify_mount,
+    host_system_mounts,
+    to_generated_mounts,
+)
 from ai.backend.agent.containerd.profile.base import GeneratedMountKind
 from ai.backend.agent.errors.containerd import KernelVerbNotSupported
 from ai.backend.agent.resources import Mount
@@ -58,3 +64,33 @@ class TestToGeneratedMounts:
     def test_tmpfs_is_refused(self) -> None:
         with pytest.raises(KernelVerbNotSupported, match="mount type"):
             to_generated_mounts([Mount(MountTypes.TMPFS, None, Path("/tmp"))])
+
+
+class TestHostSystemMounts:
+    @pytest.fixture
+    def host_files(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> list[Path]:
+        names = ("resolv.conf", "hosts", "localtime")
+        paths = [tmp_path / n for n in names]
+        for p in paths[:2]:
+            p.write_text("x\n")
+        monkeypatch.setattr(mounts_module, "_HOST_FILES", tuple(paths))
+        monkeypatch.setattr(mounts_module, "_LXCFS_ROOT", tmp_path / "no-lxcfs")
+        monkeypatch.setattr(platform, "system", lambda: "Linux")
+        return paths
+
+    def test_existing_host_files_are_bound_read_only(self, host_files: list[Path]) -> None:
+        mounts = host_system_mounts()
+
+        assert [(m.source, m.target, m.permission) for m in mounts] == [
+            (p, p, MountPermission.READ_ONLY) for p in host_files[:2]
+        ]
+
+    def test_resolver_files_are_part_of_the_default_set(self) -> None:
+        assert {Path("/etc/resolv.conf"), Path("/etc/hosts")} <= set(mounts_module._HOST_FILES)
+
+    def test_nothing_on_a_non_linux_host(
+        self, host_files: list[Path], monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setattr(platform, "system", lambda: "Darwin")
+
+        assert host_system_mounts() == []
