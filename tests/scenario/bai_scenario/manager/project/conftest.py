@@ -31,6 +31,7 @@ from ai.backend.manager.registry import AgentRegistry
 from ai.backend.manager.repositories.domain.repository import DomainRepository
 from ai.backend.manager.repositories.ops.repository import OpsRepository
 from ai.backend.manager.repositories.ops.v2.domain.provider import DomainOpsProvider
+from ai.backend.manager.repositories.ops.v2.project.provider import ProjectOpsProvider
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.repositories.ops.v2.relation.provider import RelationOpsProvider
 from ai.backend.manager.repositories.ops.v2.resource_policy.provider import (
@@ -84,7 +85,7 @@ async def adapter(
     )
     project_repository = ProjectRepository(
         engine,
-        provider,
+        ProjectOpsProvider(engine),
         ResourcePolicyOpsProvider(engine),
         config,
         valkey.stat,
@@ -92,6 +93,7 @@ async def adapter(
     )
     project = ProjectProcessors(
         registry.group(GroupMeta(ProjectEntityType())),
+        registry.concern(ConcernMeta(Concern.ORGANIZATION)).relation_group(),
         ProjectService(
             unwired(StorageSessionManager, "only folder work reaches it"),
             config,

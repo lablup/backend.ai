@@ -738,7 +738,11 @@ def test_entity_data_loader_reads_are_checked_per_entity() -> None:
     ResourceGroupProcessors(registry.group(GroupMeta(ResourceGroupEntityType())), MagicMock())
     DomainProcessors(registry.group(GroupMeta(DomainEntityType())), MagicMock())
     UserProcessors(registry.group(GroupMeta(UserEntityType())), MagicMock())
-    ProjectProcessors(registry.group(GroupMeta(ProjectEntityType())), MagicMock())
+    ProjectProcessors(
+        registry.group(GroupMeta(ProjectEntityType())),
+        registry.concern(ConcernMeta(Concern.ORGANIZATION)).relation_group(),
+        MagicMock(),
+    )
     NotificationProcessors(
         registry.group(GroupMeta(NotificationChannelEntityType())),
         registry.group(GroupMeta(NotificationRuleEntityType())),

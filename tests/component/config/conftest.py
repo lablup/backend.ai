@@ -25,6 +25,8 @@ from ai.backend.common.dto.manager.config import (
 from ai.backend.manager.actions.monitors import ActionMonitors
 from ai.backend.manager.actions.registry.registry import ProcessorRegistry
 from ai.backend.manager.actions.registry.types import (
+    Concern,
+    ConcernMeta,
     GroupMeta,
     ProcessorDependencies,
 )
@@ -43,6 +45,7 @@ from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.domain.repository import DomainRepository
 from ai.backend.manager.repositories.ops.repository import OpsRepository
 from ai.backend.manager.repositories.ops.v2.domain.provider import DomainOpsProvider
+from ai.backend.manager.repositories.ops.v2.project.provider import ProjectOpsProvider
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.repositories.ops.v2.resource_policy.provider import (
     ResourcePolicyOpsProvider,
@@ -97,6 +100,7 @@ def server_module_registries(
     )
     project = ProjectProcessors(
         config_registry.group(GroupMeta(ProjectEntityType())),
+        config_registry.concern(ConcernMeta(Concern.ORGANIZATION)).relation_group(),
         ProjectService(
             MagicMock(),
             MagicMock(),
@@ -104,7 +108,7 @@ def server_module_registries(
             MagicMock(
                 repository=ProjectRepository(
                     database_engine,
-                    v2_ops,
+                    ProjectOpsProvider(database_engine),
                     ResourcePolicyOpsProvider(database_engine),
                     MagicMock(),
                     MagicMock(),

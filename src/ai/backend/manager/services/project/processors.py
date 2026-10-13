@@ -1,5 +1,6 @@
 from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.manager.actions.registry.group import ProcessorGroup
+from ai.backend.manager.actions.registry.relation import RelationGroup
 from ai.backend.manager.actions.v2.bulk.partial_processor import PartialBulkActionProcessor
 from ai.backend.manager.actions.v2.global_scope.processor import GlobalActionProcessor
 from ai.backend.manager.actions.v2.lookup.processor import LookupActionProcessor
@@ -10,6 +11,7 @@ from ai.backend.manager.actions.v2.ops.result import (
     LookupOpsResult,
     ScopedBatchOpsResult,
 )
+from ai.backend.manager.actions.v2.relation.processor import RelationActionProcessor
 from ai.backend.manager.actions.v2.scope.processor import ScopeActionProcessor
 from ai.backend.manager.actions.v2.single_entity.processor import SingleEntityActionProcessor
 from ai.backend.manager.data.project.types import ProjectData
@@ -37,6 +39,10 @@ from ai.backend.manager.services.project.actions.search_projects import (
     GetProjectAction,
     GlobalSearchProjectsAction,
 )
+from ai.backend.manager.services.project.actions.set_default_registry import (
+    SetProjectDefaultRegistryAction,
+    SetProjectDefaultRegistryActionResult,
+)
 from ai.backend.manager.services.project.actions.update_project import (
     UpdateProjectAction,
     UpdateProjectActionResult,
@@ -57,6 +63,9 @@ from ai.backend.manager.services.project.service import ProjectService
 
 
 class ProjectProcessors:
+    set_default_registry: RelationActionProcessor[
+        SetProjectDefaultRegistryAction, SetProjectDefaultRegistryActionResult
+    ]
     lookup: LookupActionProcessor[LookupProjectAction, LookupOpsResult[ProjectID]]
     get_project: SingleEntityActionProcessor[GetProjectAction, EntityOpsResult[ProjectData]]
     bulk_get: PartialBulkActionProcessor[BulkGetProjectsAction, ProjectData]
@@ -84,8 +93,12 @@ class ProjectProcessors:
     def __init__(
         self,
         group: ProcessorGroup[ProjectData],
+        relation_group: RelationGroup,
         group_service: ProjectService,
     ) -> None:
+        self.set_default_registry = relation_group.relation(
+            SetProjectDefaultRegistryAction, group_service.change_default_registry
+        )
         self.lookup = group.public_lookup_ops(LookupProjectAction)
         self.get_project = group.single_get_ops(GetProjectAction)
         self.bulk_get = group.partial_bulk_get_ops(BulkGetProjectsAction)
