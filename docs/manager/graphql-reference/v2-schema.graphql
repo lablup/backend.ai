@@ -3672,6 +3672,21 @@ input CreateResourceSlotTypeInput {
 
   """Display ordering rank. Lower values appear first."""
   rank: Int! = 0
+
+  """
+  Added in 26.10.0. Whether a kernel holding this slot must be launched sealed or fail.
+  """
+  sealedLaunch: Boolean! = false
+
+  """
+  Added in 26.10.0. Maximum total amount of this slot one session may request. Null means no limit.
+  """
+  maxPerSession: Decimal = null
+
+  """
+  Added in 26.10.0. Whether a session requesting this slot must run on a single node.
+  """
+  singleNodeOnly: Boolean! = false
 }
 
 """Added in 26.9.0. Payload for resource slot type registration."""
@@ -14805,6 +14820,21 @@ type ResourceSlotType implements Node {
 
   """Display ordering rank. Lower values appear first."""
   rank: Int!
+
+  """
+  Added in 26.10.0. Whether a kernel holding this slot must be launched sealed or fail.
+  """
+  sealedLaunch: Boolean!
+
+  """
+  Added in 26.10.0. Maximum total amount of this slot one session may request. Null means no limit.
+  """
+  maxPerSession: Decimal
+
+  """
+  Added in 26.10.0. Whether a session requesting this slot must run on a single node.
+  """
+  singleNodeOnly: Boolean!
 }
 
 """
@@ -18836,6 +18866,21 @@ input UpdateResourceSlotTypeInput {
 
   """Display ordering rank."""
   rank: Int = null
+
+  """
+  Added in 26.10.0. Whether a kernel holding this slot must be launched sealed or fail. Omit to leave unchanged.
+  """
+  sealedLaunch: Boolean
+
+  """
+  Added in 26.10.0. Maximum total amount of this slot one session may request. Omit to leave unchanged; null removes the limit.
+  """
+  maxPerSession: Decimal
+
+  """
+  Added in 26.10.0. Whether a session requesting this slot must run on a single node. Omit to leave unchanged.
+  """
+  singleNodeOnly: Boolean
 }
 
 """Added in 26.9.0. Payload for resource slot type update."""
