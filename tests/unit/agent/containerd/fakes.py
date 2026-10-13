@@ -29,6 +29,7 @@ class FakeContainerd:
     failing: set[str]
     exits_on_sigint: bool
     closed: bool
+    connected: bool
 
     def __init__(self, *, exits_on_sigint: bool = True) -> None:
         self.snapshotter = "overlayfs"
@@ -42,6 +43,10 @@ class FakeContainerd:
         self.failing = set()
         self.exits_on_sigint = exits_on_sigint
         self.closed = False
+        self.connected = True
+
+    async def connect(self) -> None:
+        self.connected = True
 
     def _call(self, op: str, key: str = "") -> None:
         self.calls.append((op, key))

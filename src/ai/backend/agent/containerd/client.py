@@ -107,6 +107,11 @@ class ContainerdAPI(Protocol):
     @property
     def snapshotter(self) -> str: ...
 
+    @property
+    def connected(self) -> bool: ...
+
+    async def connect(self) -> None: ...
+
     async def close(self) -> None: ...
 
     async def get_image_target(self, image_ref: str) -> ImageTarget: ...
@@ -182,6 +187,10 @@ class ContainerdClient:
     @property
     def snapshotter(self) -> str:
         return self._config.snapshotter
+
+    @property
+    def connected(self) -> bool:
+        return self._stubs is not None
 
     async def connect(self) -> None:
         if self._channel is not None:

@@ -431,10 +431,8 @@ class TestAinit:
         cast(MagicMock, agent.local_config).containerd = ContainerdConfig.model_validate({
             "namespace": "ns1"
         })
-        connect = mocker.patch(
-            "ai.backend.agent.containerd.agent.ContainerdClient.connect",
-            new=AsyncMock(side_effect=lambda: order.append("connect")),
-        )
+        connect = AsyncMock(side_effect=lambda: order.append("connect"))
+        agent._client = cast(Any, MagicMock(connect=connect))
         mocker.patch(
             "ai.backend.agent.agent.AbstractAgent.__ainit__",
             new=AsyncMock(side_effect=lambda: order.append("base")),
@@ -444,4 +442,10 @@ class TestAinit:
 
         assert order == ["connect", "base"]
         connect.assert_awaited_once()
-        assert agent._client.snapshotter == "overlayfs"
+
+    async def test_enumerate_before_connect_returns_nothing(self, agent: ContainerdAgent) -> None:
+        fake = cast(FakeContainerd, agent._client)
+        fake.connected = False
+
+        assert await agent.enumerate_containers() == []
+        assert fake.calls == []

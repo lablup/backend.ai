@@ -527,20 +527,20 @@ class ContainerdAgent(
             SlotName(s) for s in containerd_config.profile_required_slots
         )
         self._runc_profile = RuncProfile(local_config.kernel_lifecycles.init_timeout_sec)
+        # The base class starts a registry cleanup loop in its __init__; the client must exist by then.
+        self._client = ContainerdClient(
+            ContainerdClientConfig(
+                address=containerd_config.address,
+                namespace=containerd_config.namespace,
+                snapshotter=containerd_config.snapshotter,
+            )
+        )
 
     @override
     async def __ainit__(self) -> None:
-        # The base class scans the running kernels, so the client must exist before it.
+        # The base class scans the running kernels, so the client must be connected before it.
         config = self.local_config.containerd
-        client = ContainerdClient(
-            ContainerdClientConfig(
-                address=config.address,
-                namespace=config.namespace,
-                snapshotter=config.snapshotter,
-            )
-        )
-        await client.connect()
-        self._client = client
+        await self._client.connect()
         log.info("containerd connected", address=config.address, namespace=config.namespace)
         await super().__ainit__()
 
@@ -572,6 +572,9 @@ class ContainerdAgent(
         self,
         status_filter: frozenset[ContainerStatus] = ACTIVE_STATUS_SET,
     ) -> Sequence[tuple[KernelId, Container]]:
+        if not self._client.connected:
+            # The base cleanup loop may run before __ainit__ has connected the client.
+            return []
         records = await self._client.list_containers({
             LabelName.OWNER_AGENT: str(self.id),
             LabelName.KERNEL_ID: "",
