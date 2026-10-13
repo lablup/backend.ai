@@ -85,6 +85,7 @@ def mock_agent_client_pool() -> MagicMock:
     mock_client.create_kernels = AsyncMock(return_value=None)
     mock_client.create_local_network = AsyncMock(return_value=None)
     mock_client.assign_port = AsyncMock(return_value=22000)
+    mock_client.release_port = AsyncMock(return_value=None)
 
     @asynccontextmanager
     async def acquire(agent_id: AgentId) -> AsyncGenerator[AsyncMock, None]:
