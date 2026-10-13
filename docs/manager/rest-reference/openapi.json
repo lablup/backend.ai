@@ -3150,6 +3150,45 @@
         "title": "UpsertEntityLabelInput",
         "type": "object"
       },
+      "PartialBulkUpsertEntityLabelInput": {
+        "description": "Input for putting several keys on several entities in one call.\n\nAnswered per entity: an entity may appear in several items, and all of its keys are\nwritten together or refused together.",
+        "properties": {
+          "items": {
+            "description": "The labels to put, each naming the entity it goes on",
+            "items": {
+              "$ref": "#/components/schemas/UpsertEntityLabelInput"
+            },
+            "minItems": 1,
+            "title": "Items",
+            "type": "array"
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "title": "PartialBulkUpsertEntityLabelInput",
+        "type": "object"
+      },
+      "PartialBulkPurgeEntityLabelInput": {
+        "description": "Input for taking several labels off in one call, each named by its own id.",
+        "properties": {
+          "ids": {
+            "description": "Ids of the labels to take off",
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "minItems": 1,
+            "title": "Ids",
+            "type": "array"
+          }
+        },
+        "required": [
+          "ids"
+        ],
+        "title": "PartialBulkPurgeEntityLabelInput",
+        "type": "object"
+      },
       "EntityLabelOrder": {
         "description": "Ordering specification for labels.",
         "properties": {
@@ -47948,6 +47987,35 @@
         "description": "Set one key on an entity, replacing the value it carries.\n\n**Preconditions:**\n* User privilege required.\n"
       }
     },
+    "/v2/entity-labels/bulk-upsert": {
+      "post": {
+        "operationId": "v2/entity-labels.partial_bulk_upsert_labels",
+        "tags": [
+          "v2/entity-labels"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PartialBulkUpsertEntityLabelInput"
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "description": "Set keys on several entities in one call, answering per entity.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
     "/v2/entity-labels/{label_id}": {
       "delete": {
         "operationId": "v2/entity-labels.purge_label",
@@ -47975,6 +48043,35 @@
           }
         ],
         "description": "Take one label off, named by its own id.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/v2/entity-labels/bulk-purge": {
+      "post": {
+        "operationId": "v2/entity-labels.partial_bulk_purge_labels",
+        "tags": [
+          "v2/entity-labels"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PartialBulkPurgeEntityLabelInput"
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "description": "Take several labels off in one call, answering per label.\n\n**Preconditions:**\n* User privilege required.\n"
       }
     },
     "/v2/entity-labels/search": {
