@@ -116,3 +116,20 @@ class TestCheckCommand:
         path = _write(tmp_path / "bad.yaml", _WEBHOOK | {"channel_type": "email"})
         result = CliRunner().invoke(cli, ["check", str(path)])
         assert result.exit_code != 0
+
+
+class TestNotificationChannelSeedCheck:
+    def test_an_item_keeping_the_rules_passes(self) -> None:
+        assert NotificationChannelSeed.model_validate(_WEBHOOK).check() == []
+
+    @pytest.mark.parametrize(
+        "item",
+        [
+            {**_WEBHOOK, "name": "  "},
+        ],
+        ids=[
+            "blank-name",
+        ],
+    )
+    def test_an_item_breaking_a_rule_fails(self, item: dict[str, Any]) -> None:
+        assert len(NotificationChannelSeed.model_validate(item).check()) == 1
