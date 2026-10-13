@@ -12,10 +12,7 @@ from ai.backend.common.exception import (
     ErrorOperation,
 )
 
-__all__ = (
-    "InvalidSeedDocument",
-    "InvalidSeedKindRegistry",
-)
+__all__ = ("InvalidSeedDocument",)
 
 
 class InvalidSeedDocument(BackendAIError, web.HTTPBadRequest):
@@ -28,17 +25,4 @@ class InvalidSeedDocument(BackendAIError, web.HTTPBadRequest):
             domain=ErrorDomain.DATABASE,
             operation=ErrorOperation.READ,
             error_detail=ErrorDetail.INVALID_PARAMETERS,
-        )
-
-
-class InvalidSeedKindRegistry(BackendAIError, web.HTTPInternalServerError):
-    error_type = "https://api.backend.ai/probs/invalid-seed-kind-registry"
-    error_title = "The seed kinds do not form a dependency order."
-
-    @override
-    def error_code(self) -> ErrorCode:
-        return ErrorCode(
-            domain=ErrorDomain.DATABASE,
-            operation=ErrorOperation.READ,
-            error_detail=ErrorDetail.INTERNAL_ERROR,
         )

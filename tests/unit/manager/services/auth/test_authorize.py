@@ -416,7 +416,7 @@ async def test_authorize_with_valkey_cross_check_cleans_stale_sessions(
     )
 
     # Valkey cross-check: stale session is NOT in Valkey
-    mock_valkey_session_client.get_login_session.return_value = None
+    mock_valkey_session_client.get_login_sessions.return_value = [None]
 
     # create_login_session succeeds (after stale session cleaned up, count < max)
     mock_auth_repository.create_login_session.return_value = LoginSessionCreationResult(
@@ -426,8 +426,8 @@ async def test_authorize_with_valkey_cross_check_cleans_stale_sessions(
     result = await auth_service.authorize(action)
 
     # Stale session should have been invalidated in DB
-    mock_auth_repository.delete_login_session_by_token.assert_awaited_once_with(
-        "stale_token", LoginAttemptResult.EXPIRED, None
+    mock_auth_repository.delete_login_sessions_by_tokens.assert_awaited_once_with(
+        ["stale_token"], LoginAttemptResult.EXPIRED, None
     )
     assert result.authorization_result is not None
     assert result.authorization_result.session_token == "new_session_token"
@@ -485,7 +485,7 @@ async def test_authorize_force_invalidates_existing_sessions(
     )
 
     # Valkey cross-check: session IS live
-    mock_valkey_session_client.get_login_session.return_value = b"session_data"
+    mock_valkey_session_client.get_login_sessions.return_value = [b"session_data"]
 
     # create_login_session succeeds
     mock_auth_repository.create_login_session.return_value = LoginSessionCreationResult(

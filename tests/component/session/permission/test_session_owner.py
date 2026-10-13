@@ -56,7 +56,7 @@ from ai.backend.manager.models.virtual_entity.virtual_entity import VirtualEntit
 from ai.backend.manager.repositories.ops.v2.user.provider import UserOpsProvider
 from ai.backend.manager.repositories.ops.v2.user.write import FullUserCreator
 from ai.backend.manager.secret.types import SecretValue
-from ai.backend.manager.seed.role_preset.role import RoleSeed
+from ai.backend.manager.seed.role_preset.seed import RolePresetSeed
 from ai.backend.testutils.fixtures import DomainFixtureData
 
 if TYPE_CHECKING:
@@ -110,7 +110,7 @@ class _Owner:
 @pytest.fixture()
 async def declared_user_owner_preset(db_engine: SAEngine) -> AsyncIterator[uuid.UUID]:
     """The user_owner preset and its grants, as `seeds/manager/role_preset/` states them."""
-    seed = RoleSeed.model_validate(_USER_OWNER)
+    seed = RolePresetSeed.model_validate(_USER_OWNER)
     async with db_engine.begin() as conn:
         await conn.execute(
             sa.insert(RolePresetRow.__table__).values(

@@ -91,7 +91,7 @@ from ai.backend.manager.repositories.rbac.permission_check_repository import (
     RbacPermissionCheckRepository,
 )
 from ai.backend.manager.secret.types import SecretValue
-from ai.backend.manager.seed.role_preset.role import RoleSeed
+from ai.backend.manager.seed.role_preset.seed import RolePresetSeed
 from ai.backend.manager.services.keypair_resource_policy.processors import (
     KeypairResourcePolicyProcessors,
 )
@@ -242,7 +242,7 @@ def server_module_registries(
 @pytest.fixture()
 async def declared_presets(db_engine: SAEngine) -> AsyncIterator[list[RolePresetID]]:
     """The auto-assigned presets and their grants."""
-    seeds = [RoleSeed.model_validate(declared) for declared in _AUTO_ASSIGNED]
+    seeds = [RolePresetSeed.model_validate(declared) for declared in _AUTO_ASSIGNED]
     async with db_engine.begin() as conn:
         await conn.execute(
             sa.insert(RolePresetRow.__table__).values([

@@ -2,11 +2,13 @@ from __future__ import annotations
 
 import dataclasses
 from collections.abc import Sequence
-from typing import Final
+from typing import TYPE_CHECKING, Final
 
 from ai.backend.common.data.permission.types import Permission
 from ai.backend.manager.seed.role_preset.kinds import PermissionKinds
-from ai.backend.manager.seed.role_preset.role import RoleSeed
+
+if TYPE_CHECKING:
+    from ai.backend.manager.seed.role_preset.seed import RolePresetSeed
 
 # A member role is compared with the admin role whose name shares its prefix.
 _MEMBER_SUFFIX: Final[str] = "_member"
@@ -28,9 +30,9 @@ class RoleSeedChecker:
     """Compares the declaration with the entity types this build defines."""
 
     _kinds: PermissionKinds
-    _seeds: Sequence[RoleSeed]
+    _seeds: Sequence[RolePresetSeed]
 
-    def __init__(self, kinds: PermissionKinds, seeds: Sequence[RoleSeed]) -> None:
+    def __init__(self, kinds: PermissionKinds, seeds: Sequence[RolePresetSeed]) -> None:
         self._kinds = kinds
         self._seeds = seeds
 
@@ -52,7 +54,7 @@ class RoleSeedChecker:
             if count > 1
         ]
 
-    def _states_every_kind(self, seed: RoleSeed) -> list[SeedFinding]:
+    def _states_every_kind(self, seed: RolePresetSeed) -> list[SeedFinding]:
         declared = self._kinds.declared()
         stated = set(seed.permissions)
         findings: list[SeedFinding] = []
