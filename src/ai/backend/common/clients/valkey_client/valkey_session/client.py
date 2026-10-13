@@ -186,6 +186,19 @@ class ValkeySessionClient:
             await conn.delete([f"{SESSION_KEY_PREFIX}{session_token}"])
 
     @valkey_session_resilience.apply()
+    async def delete_login_sessions(self, session_tokens: list[str]) -> None:
+        """
+        Delete login session data for several session tokens in a single batch operation.
+
+        :param session_tokens: The session tokens (prefix is added internally).
+        """
+        if not session_tokens:
+            return
+        keys: list[str | bytes] = [f"{SESSION_KEY_PREFIX}{token}" for token in session_tokens]
+        async with self._client.client() as conn:
+            await conn.delete(keys)
+
+    @valkey_session_resilience.apply()
     async def get_login_history(self, username: str) -> bytes | None:
         """
         Get login failure history for a user.
