@@ -14,27 +14,25 @@ OCI_VERSION: Final = "1.1.0"
 CPU_PERIOD_US: Final = 100_000
 _RLIM_INFINITY: Final = 2**64 - 1
 
-# Docker's default capability set minus NET_RAW and NET_BIND_SERVICE (the kernel shares the
-# host network) plus the two the Docker agent adds (IPC_LOCK, SYS_NICE).
+# Docker's default capability set plus the two the Docker agent adds (IPC_LOCK, SYS_NICE).
 DEFAULT_CAPABILITIES: Final = (
     "CAP_CHOWN",
     "CAP_DAC_OVERRIDE",
     "CAP_FSETID",
     "CAP_FOWNER",
     "CAP_MKNOD",
+    "CAP_NET_RAW",
     "CAP_SETGID",
     "CAP_SETUID",
     "CAP_SETFCAP",
     "CAP_SETPCAP",
+    "CAP_NET_BIND_SERVICE",
     "CAP_SYS_CHROOT",
     "CAP_KILL",
     "CAP_AUDIT_WRITE",
     "CAP_IPC_LOCK",
     "CAP_SYS_NICE",
 )
-
-# No network namespace: the kernel shares the host network.
-_NAMESPACES: Final = ("pid", "ipc", "uts", "mount", "cgroup")
 
 _DEFAULT_MOUNTS: Final = (
     {
@@ -105,6 +103,7 @@ class SpecInput:
     cpu_cores: Sequence[int]  # the cpuset; its length is the CPU quota
     memory_bytes: int
     shm_bytes: int
+    netns_path: str
     extra_caps: Sequence[str] = ()
 
 
@@ -164,7 +163,15 @@ def build_base_spec(inp: SpecInput) -> dict[str, Any]:
         "hostname": inp.hostname,
         "mounts": mounts,
         "linux": {
-            "namespaces": [{"type": ns} for ns in _NAMESPACES],
+            # containerd's default order, then cgroup.
+            "namespaces": [
+                {"type": "pid"},
+                {"type": "ipc"},
+                {"type": "uts"},
+                {"type": "mount"},
+                {"type": "network", "path": inp.netns_path},
+                {"type": "cgroup"},
+            ],
             "resources": _resources(inp),
             "maskedPaths": list(_MASKED_PATHS),
             "readonlyPaths": list(_READONLY_PATHS),

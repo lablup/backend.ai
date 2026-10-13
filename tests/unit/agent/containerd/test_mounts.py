@@ -69,9 +69,9 @@ class TestToGeneratedMounts:
 class TestHostSystemMounts:
     @pytest.fixture
     def host_files(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> list[Path]:
-        names = ("resolv.conf", "timezone", "localtime")
+        names = ("timezone", "localtime")
         paths = [tmp_path / n for n in names]
-        for p in paths[:2]:
+        for p in paths[:1]:
             p.write_text("x\n")
         monkeypatch.setattr(mounts_module, "_HOST_FILES", tuple(paths))
         monkeypatch.setattr(mounts_module, "_LXCFS_ROOT", tmp_path / "no-lxcfs")
@@ -79,19 +79,24 @@ class TestHostSystemMounts:
         return paths
 
     def test_existing_host_files_are_bound_read_only(self, host_files: list[Path]) -> None:
-        mounts = host_system_mounts(Path("/scratch/k/hosts"))
+        mounts = host_system_mounts(Path("/scratch/k/hosts"), Path("/scratch/k/resolv.conf"))
 
         assert [(m.source, m.target, m.permission) for m in mounts] == [
             (Path("/scratch/k/hosts"), Path("/etc/hosts"), MountPermission.READ_ONLY),
-            *[(p, p, MountPermission.READ_ONLY) for p in host_files[:2]],
+            (
+                Path("/scratch/k/resolv.conf"),
+                Path("/etc/resolv.conf"),
+                MountPermission.READ_ONLY,
+            ),
+            *[(p, p, MountPermission.READ_ONLY) for p in host_files[:1]],
         ]
 
-    def test_resolver_file_is_part_of_the_default_set(self) -> None:
-        assert Path("/etc/resolv.conf") in set(mounts_module._HOST_FILES)
+    def test_host_resolver_file_is_not_mounted(self) -> None:
+        assert Path("/etc/resolv.conf") not in set(mounts_module._HOST_FILES)
 
     def test_nothing_on_a_non_linux_host(
         self, host_files: list[Path], monkeypatch: pytest.MonkeyPatch
     ) -> None:
         monkeypatch.setattr(platform, "system", lambda: "Darwin")
 
-        assert host_system_mounts(Path("/scratch/k/hosts")) == []
+        assert host_system_mounts(Path("/scratch/k/hosts"), Path("/scratch/k/resolv.conf")) == []

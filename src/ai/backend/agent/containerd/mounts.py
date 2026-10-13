@@ -14,7 +14,6 @@ from ai.backend.common.types import MountPermission, MountTypes
 _KRUNNER_PREFIXES = ("/opt/kernel", "/opt/backend.ai", "/usr/local/bin/", "/usr/local/share/man/")
 _LXCFS_ROOT = Path("/var/lib/lxcfs")
 _HOST_FILES = (
-    Path("/etc/resolv.conf"),
     Path("/etc/localtime"),
     Path("/etc/timezone"),
 )
@@ -49,14 +48,14 @@ def to_generated_mounts(mounts: Sequence[Mount]) -> list[GeneratedMount]:
     return generated
 
 
-def host_system_mounts(hosts_file: Path) -> list[Mount]:
-    """The kernel's hosts file, the host's resolver and timezone files and lxcfs views.
-
-    The kernel shares the host network, so the host's resolver config is the right one.
-    """
+def host_system_mounts(hosts_file: Path, resolv_conf: Path) -> list[Mount]:
+    """The kernel's hosts and resolv.conf files, the host's timezone files and lxcfs views."""
     if platform.system() != "Linux":
         return []
-    mounts = [Mount(MountTypes.BIND, hosts_file, Path("/etc/hosts"), MountPermission.READ_ONLY)]
+    mounts = [
+        Mount(MountTypes.BIND, hosts_file, Path("/etc/hosts"), MountPermission.READ_ONLY),
+        Mount(MountTypes.BIND, resolv_conf, Path("/etc/resolv.conf"), MountPermission.READ_ONLY),
+    ]
     mounts.extend(
         Mount(MountTypes.BIND, path, path, MountPermission.READ_ONLY)
         for path in _HOST_FILES

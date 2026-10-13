@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import ipaddress
 import logging
 import os
 import re
@@ -21,7 +22,12 @@ log = StructuredLogger(logging.getLogger(__spec__.name))
 
 TASK_LOG_NAME: Final = "task.log"
 HOSTS_NAME: Final = "hosts"
+RESOLV_CONF_NAME: Final = "resolv.conf"
 _HOST_HOSTS_FILE: Final = Path("/etc/hosts")
+_HOST_RESOLV_CONF: Final = Path("/etc/resolv.conf")
+_SYSTEMD_RESOLV_CONF: Final = Path("/run/systemd/resolve/resolv.conf")
+_METADATA_IP: Final = ipaddress.ip_address("169.254.169.254")
+_RESOLV_KEEP_KEYWORDS: Final = ("search", "options", "domain")
 _HOSTNAME_RE: Final = re.compile(r"[A-Za-z0-9]([A-Za-z0-9._-]*[A-Za-z0-9])?")
 CONFIG_DIR_LABEL: Final = "ai.backend.containerd.config-dir"
 _RUNNER_DOTFILES: Final = (".bashrc", ".bash_profile", ".zshrc", ".vimrc", ".tmux.conf")
@@ -48,6 +54,11 @@ class ScratchDirs:
     def hosts(self) -> Path:
         """The kernel's /etc/hosts; it is not under a mounted directory."""
         return self.root / HOSTS_NAME
+
+    @property
+    def resolv_conf(self) -> Path:
+        """The kernel's /etc/resolv.conf; it is not under a mounted directory."""
+        return self.root / RESOLV_CONF_NAME
 
     @property
     def task_log(self) -> Path:
@@ -174,9 +185,49 @@ def write_hosts_file(dirs: ScratchDirs, hostname: str) -> None:
     dirs.hosts.chmod(0o644)
 
 
-def write_intrinsic_ports(dirs: ScratchDirs, ports: bytes) -> None:
-    """The REPL ports the kernel runner binds, read from /home/config by the runner."""
-    (dirs.config / "intrinsic-ports.json").write_bytes(ports)
+def _is_unusable_nameserver(address: str) -> bool:
+    """Loopback, the metadata address (denied on the bridge), non-IP and zoned addresses."""
+    try:
+        ip = ipaddress.ip_address(address)
+    except ValueError:
+        return True
+    return ip.is_loopback or ip == _METADATA_IP
+
+
+def _filter_resolv_conf(text: str) -> tuple[list[str], int]:
+    """The lines worth keeping and the number of usable IPv4 nameservers among them."""
+    kept: list[str] = []
+    nameservers = 0
+    for line in text.splitlines():
+        fields = line.split()
+        if not fields:
+            continue
+        if fields[0] == "nameserver" and len(fields) > 1:
+            address = fields[1]
+            if not _is_unusable_nameserver(address) and ":" not in address:
+                kept.append(f"nameserver {address}")
+                nameservers += 1
+        elif fields[0] in _RESOLV_KEEP_KEYWORDS:
+            kept.append(line.strip())
+    return kept, nameservers
+
+
+def _read_text_or_empty(path: Path) -> str:
+    try:
+        return path.read_text()
+    except OSError:
+        return ""
+
+
+def write_resolv_conf(dirs: ScratchDirs) -> None:
+    """The host's resolver config, or systemd-resolved's upstream one, minus loopback servers."""
+    kept, nameservers = _filter_resolv_conf(_read_text_or_empty(_HOST_RESOLV_CONF))
+    if nameservers == 0 and _SYSTEMD_RESOLV_CONF.exists():
+        kept, nameservers = _filter_resolv_conf(_read_text_or_empty(_SYSTEMD_RESOLV_CONF))
+    if nameservers == 0:
+        log.warning("no usable nameserver for the kernel resolv.conf")
+    dirs.resolv_conf.write_text("".join(f"{line}\n" for line in kept))
+    dirs.resolv_conf.chmod(0o644)
 
 
 async def read_resource_spec(labels: Mapping[str, str]) -> KernelResourceSpec | None:

@@ -27,6 +27,7 @@ def _input(
         cpu_cores=cpu_cores,
         memory_bytes=memory_bytes,
         shm_bytes=1 << 26,
+        netns_path="/run/netns/bai-t-k1",
         extra_caps=extra_caps,
     )
 
@@ -38,12 +39,17 @@ def _mount(kind: GeneratedMountKind, target: str, *, ro: bool = True) -> Generat
 
 
 class TestBaseSpec:
-    def test_shares_the_host_network(self) -> None:
+    def test_namespaces_in_containerd_order_with_the_kernel_netns(self) -> None:
         spec = build_base_spec(_input())
 
-        types = [ns["type"] for ns in spec["linux"]["namespaces"]]
-        assert "network" not in types
-        assert {"pid", "ipc", "uts", "mount"} <= set(types)
+        assert spec["linux"]["namespaces"] == [
+            {"type": "pid"},
+            {"type": "ipc"},
+            {"type": "uts"},
+            {"type": "mount"},
+            {"type": "network", "path": "/run/netns/bai-t-k1"},
+            {"type": "cgroup"},
+        ]
 
     def test_cpu_and_memory_limits(self) -> None:
         resources = build_base_spec(_input())["linux"]["resources"]
@@ -68,12 +74,12 @@ class TestBaseSpec:
         assert "CAP_SYS_PTRACE" in caps["permitted"]
         assert "CAP_SYS_ADMIN" not in caps["permitted"]
 
-    def test_no_raw_sockets_or_privileged_ports_on_the_host_network(self) -> None:
+    def test_raw_sockets_and_privileged_ports_are_allowed_in_the_own_netns(self) -> None:
         caps = build_base_spec(_input())["process"]["capabilities"]
 
         for kind in ("bounding", "effective", "permitted"):
-            assert "CAP_NET_RAW" not in caps[kind]
-            assert "CAP_NET_BIND_SERVICE" not in caps[kind]
+            assert "CAP_NET_RAW" in caps[kind]
+            assert "CAP_NET_BIND_SERVICE" in caps[kind]
 
     def test_runs_as_root_in_the_work_dir(self) -> None:
         process = build_base_spec(_input())["process"]
