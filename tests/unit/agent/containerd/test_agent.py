@@ -49,6 +49,7 @@ def agent(monkeypatch: pytest.MonkeyPatch) -> ContainerdAgent:
     instance.port_pool = PortPool((30000, 30009), cooldown_sec=0)
     instance.resource_lock = asyncio.Lock()
     instance._client = FakeContainerd()
+    instance._orphan_ports = {}
     instance.kernel_registry = {}
     instance.error_monitor = MagicMock(capture_exception=AsyncMock())
     monkeypatch.setattr(instance, "reconstruct_resource_usage", AsyncMock())
@@ -358,17 +359,57 @@ class TestCleanKernel:
         assert not scratch.exists()
         assert b"".join(collected) == b"hello\n"
 
-    async def test_ports_of_an_unregistered_container_are_returned_to_the_pool(
+    async def test_ports_of_a_container_found_at_startup_are_released_once(
+        self,
+        agent: ContainerdAgent,
+        scratch_root: Path,
+        collected: list[bytes],
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        fake = cast(FakeContainerd, agent._client)
+        kid = _add_container(fake, "c1", state=TaskState.RUNNING, host_ports="30000,30001")
+        for port in (30000, 30001):
+            agent.port_pool.discard(port)
+        await agent._record_orphan_ports()
+        released: list[int] = []
+        real_release = agent.port_pool.release_many
+
+        def spy(ports: Any) -> None:
+            ports = list(ports)
+            released.extend(ports)
+            real_release(ports)
+
+        monkeypatch.setattr(agent.port_pool, "release_many", spy)
+
+        await agent.clean_kernel(kid, ContainerId("c1"), False)
+        await agent.clean_kernel(kid, ContainerId("c1"), False)
+
+        assert released == [30000, 30001]
+        assert agent.port_pool.used_ports() == set()
+
+    async def test_ports_of_a_kernel_cleaned_by_the_registry_loop_are_not_released_again(
         self, agent: ContainerdAgent, scratch_root: Path, collected: list[bytes]
     ) -> None:
         fake = cast(FakeContainerd, agent._client)
         kid = _add_container(fake, "c1", state=TaskState.STOPPED, host_ports="30000,30001")
-        for port in (30000, 30001):
-            agent.port_pool.discard(port)
+        # the base released both ports with the registry entry; a new kernel took them
+        in_use = {agent.port_pool.acquire(), agent.port_pool.acquire()}
 
         await agent.clean_kernel(kid, ContainerId("c1"), False)
 
-        assert agent.port_pool.used_ports() == set()
+        assert agent.port_pool.used_ports() == in_use
+
+    async def test_a_container_dead_at_startup_releases_no_ports(
+        self, agent: ContainerdAgent, scratch_root: Path, collected: list[bytes]
+    ) -> None:
+        fake = cast(FakeContainerd, agent._client)
+        kid = _add_container(fake, "c1", state=TaskState.UNKNOWN, host_ports="30000,30001")
+        in_use = {agent.port_pool.acquire(), agent.port_pool.acquire()}
+        await agent._record_orphan_ports()
+
+        await agent.clean_kernel(kid, ContainerId("c1"), False)
+
+        assert agent.port_pool.used_ports() == in_use
 
     async def test_ports_of_a_registered_kernel_are_left_to_the_base(
         self, agent: ContainerdAgent, scratch_root: Path, collected: list[bytes]
@@ -469,7 +510,7 @@ class TestAinit:
             "namespace": "ns1"
         })
         connect = AsyncMock(side_effect=lambda: order.append("connect"))
-        agent._client = cast(Any, MagicMock(connect=connect))
+        agent._client = cast(Any, MagicMock(connect=connect, connected=False))
         mocker.patch(
             "ai.backend.agent.agent.AbstractAgent.__ainit__",
             new=AsyncMock(side_effect=lambda: order.append("base")),

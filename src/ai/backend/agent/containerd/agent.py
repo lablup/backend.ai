@@ -530,6 +530,7 @@ class ContainerdAgent(
     _profile_required_slots: frozenset[SlotName]
     _runc_profile: RuncProfile
     _client: ContainerdAPI
+    _orphan_ports: dict[KernelId, list[int]]
 
     def __init__(
         self,
@@ -548,6 +549,7 @@ class ContainerdAgent(
             SlotName(s) for s in containerd_config.profile_required_slots
         )
         self._runc_profile = RuncProfile(local_config.kernel_lifecycles.init_timeout_sec)
+        self._orphan_ports = {}
         # The base class starts a registry cleanup loop in its __init__, which needs the client.
         self._client = ContainerdClient(
             ContainerdClientConfig(
@@ -563,7 +565,18 @@ class ContainerdAgent(
         config = self.local_config.containerd
         await self._client.connect()
         log.info("containerd connected", address=config.address, namespace=config.namespace)
+        await self._record_orphan_ports()
         await super().__ainit__()
+
+    async def _record_orphan_ports(self) -> None:
+        """Recovery is a stub, so each container found at startup has no kernel object.
+
+        Its ports are returned once, by its clean.
+        """
+        for kernel_id, container in await self.enumerate_containers():
+            self._orphan_ports[kernel_id] = [
+                p.host_port for p in container.ports if p.host_port is not None
+            ]
 
     @override
     async def shutdown(self, stop_signal: signal.Signals) -> None:
@@ -738,8 +751,8 @@ class ContainerdAgent(
     ) -> None:
         dirs = ScratchDirs.for_kernel(self.local_config.container.scratch_root, str(kernel_id))
         if container_id is not None:
-            if kernel_id not in self.kernel_registry:
-                await self._release_orphan_ports(container_id)
+            # Ports of kernels created by this process are released by the base.
+            self.port_pool.release_many(self._orphan_ports.pop(kernel_id, []))
             await self._collect_task_log(kernel_id, container_id, dirs)
             if not self.local_config.debug.skip_container_deletion:
                 try:
@@ -750,20 +763,6 @@ class ContainerdAgent(
             await run_in_executor_with_context(
                 None, remove_scratch, self.local_config.container.scratch_root, str(kernel_id)
             )
-
-    async def _release_orphan_ports(self, container_id: ContainerId) -> None:
-        """Return the host ports of a container no kernel object owns (left over from a restart).
-
-        The base releases ports of registered kernels only; for those a second release could
-        hand a live port to a new kernel.
-        """
-        try:
-            record = await self._client.get_container(str(container_id))
-        except BackendAIError:
-            log.exception("container lookup failed", container_id=container_id)
-            return
-        if record is not None:
-            self.port_pool.release_many(_host_ports_of(record))
 
     async def _collect_task_log(
         self, kernel_id: KernelId, container_id: ContainerId, dirs: ScratchDirs
