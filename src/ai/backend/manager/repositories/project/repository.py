@@ -22,9 +22,9 @@ from ai.backend.manager.data.project.types import ProjectData
 from ai.backend.manager.errors.resource import (
     ProjectNotFound,
 )
-from ai.backend.manager.models.kernel.row import KernelRow
 from ai.backend.manager.models.project.creators import ProjectCreator
 from ai.backend.manager.models.project.updaters import ProjectDotfilesUpdater, ProjectUpdater
+from ai.backend.manager.models.resource_usage import KernelUsageRecord
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.repositories.ops.v2.resource_policy.provider import (
@@ -127,7 +127,7 @@ class ProjectRepository:
         start_date: datetime,
         end_date: datetime,
         project_ids: Sequence[UUID] | None = None,
-    ) -> tuple[list[KernelRow], dict[UUID, ResourceSlot]]:
+    ) -> tuple[list[KernelUsageRecord], dict[UUID, ResourceSlot]]:
         """Fetch the project's kernels with the slots they were allocated."""
         return await self._db_source.fetch_project_resource_usage(start_date, end_date, project_ids)
 
