@@ -389,13 +389,13 @@ class AuthDBSource:
     async def _check_password(
         self,
         row: sa.Row[Any],
-        password: str,
+        target_password_info: PasswordInfo,
     ) -> None:
         """Verify password against stored hash. Raises AuthorizationFailed on mismatch."""
         if row.password is None:
             raise AuthorizationFailed("User credential mismatch.")
         try:
-            if not compare_to_hashed_password(password, row.password):
+            if not compare_to_hashed_password(target_password_info.password, row.password):
                 raise AuthorizationFailed("User credential mismatch.")
         except ValueError:
             raise AuthorizationFailed("User credential mismatch.") from None
@@ -487,7 +487,7 @@ class AuthDBSource:
             if row is None:
                 raise AuthorizationFailed("User credential mismatch.")
 
-            await self._check_password(row, target_password_info.password)
+            await self._check_password(row, target_password_info)
             await self._migrate_password_hash(conn, row, domain_name, email, target_password_info)
 
             # Fetch active sessions for the user within the same connection
@@ -599,7 +599,7 @@ class AuthDBSource:
         self,
         domain_name: str,
         email: str,
-        password: str,
+        target_password_info: PasswordInfo,
     ) -> sa.RowMapping:
         """Verify credentials without password migration (for signout, etc.)"""
         async with self._db.begin_readonly() as conn:
@@ -611,7 +611,7 @@ class AuthDBSource:
             row = result.first()
             if row is None:
                 raise AuthorizationFailed("User credential mismatch.")
-            await self._check_password(row, password)
+            await self._check_password(row, target_password_info)
         return row._mapping
 
     @auth_db_source_resilience.apply()
