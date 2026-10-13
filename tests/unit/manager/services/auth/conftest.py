@@ -6,10 +6,10 @@ from uuid import UUID, uuid4
 
 import pytest
 
+from ai.backend.common.auth.password import PasswordHashAlgorithm
 from ai.backend.common.plugin.hook import HookPluginContext
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.config.unified import AuthConfig, ManagerConfig
-from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.client_ip.masking import ClientIPMasker, ClientIPMaskingMode
 from ai.backend.manager.repositories.client_ip_masking.repository import ClientIPMaskingRepository
 from ai.backend.manager.repositories.project.repository import ProjectRepository

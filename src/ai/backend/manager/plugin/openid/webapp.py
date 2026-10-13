@@ -32,13 +32,13 @@ from cryptography.hazmat.primitives import hashes
 from joserfc import jwt as jose_jwt
 from joserfc.jwk import KeySet
 
+from ai.backend.common.auth.password import PasswordInfo
 from ai.backend.common.cron import LocalCron, PeriodicTask
 from ai.backend.common.data.entity.domain import DomainName
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.api.rest.types import CORSOptions, WebMiddleware
 from ai.backend.manager.models.domain.lookups import DomainNameLookup
-from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.project.lookups import ProjectNameInDomainLookup
 from ai.backend.manager.models.user.creators import UserCreator
 from ai.backend.manager.models.user.lookups import UserEmailLookup

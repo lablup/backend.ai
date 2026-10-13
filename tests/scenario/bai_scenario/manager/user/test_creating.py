@@ -7,19 +7,18 @@ from typing import Any, override
 
 import pytest
 
+from ai.backend.common.auth.password import PasswordHashAlgorithm, PasswordInfo
 from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.dto.manager.v2.user.request import CreateUserInput
 from ai.backend.common.dto.manager.v2.user.types import UserRole as UserRoleDTO
 from ai.backend.common.dto.manager.v2.user.types import UserStatus as UserStatusDTO
 from ai.backend.manager.api.adapters.user.adapter import UserAdapter
-from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.domain.types import DomainData
 from ai.backend.manager.data.permission.types import Permission
 from ai.backend.manager.data.user.types import UserData, UserStatus
 from ai.backend.manager.errors.auth import InsufficientPrivilege
 from ai.backend.manager.errors.base.entity import EntityNotFoundError
 from ai.backend.manager.errors.permission import NotEnoughPermission
-from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.user.creators import UserCreator
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.user.creators import UserCreateSpec

@@ -20,6 +20,7 @@ import pytest
 import sqlalchemy as sa
 import yarl
 
+from ai.backend.common.auth.password import PasswordHashAlgorithm, PasswordInfo
 from ai.backend.common.container_registry import ContainerRegistryType
 from ai.backend.common.data.entity.container_registry import (
     ContainerRegistryEntityType,
@@ -38,7 +39,6 @@ from ai.backend.manager.container_registry.base import (
     all_updates,
     rescan_counts,
 )
-from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.image.types import ImageData, ImageIdentifier, ImageStatus, ImageType
 from ai.backend.manager.data.project.types import ProjectType
 from ai.backend.manager.errors.common import InternalServerError
@@ -49,7 +49,6 @@ from ai.backend.manager.models.association_container_registries_groups.row impor
 )
 from ai.backend.manager.models.container_registry.row import ContainerRegistryRow
 from ai.backend.manager.models.domain.row import DomainRow
-from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.image.creators import ImageCreator
 from ai.backend.manager.models.image.row import ImageAliasRow, ImageRow
 from ai.backend.manager.models.keypair.row import KeyPairRow

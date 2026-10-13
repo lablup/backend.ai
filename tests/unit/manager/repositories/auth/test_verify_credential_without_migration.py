@@ -8,9 +8,9 @@ from dataclasses import dataclass
 
 import pytest
 
+from ai.backend.common.auth.password import PasswordHashAlgorithm, PasswordInfo
 from ai.backend.common.data.entity.domain import DomainID, DomainName
 from ai.backend.common.types import ResourceSlot
-from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.secret.types import KeyProviderType
 from ai.backend.manager.errors.auth import AuthorizationFailed
 from ai.backend.manager.models.association_container_registries_groups.row import (
@@ -18,7 +18,6 @@ from ai.backend.manager.models.association_container_registries_groups.row impor
 )
 from ai.backend.manager.models.container_registry.row import ContainerRegistryRow
 from ai.backend.manager.models.domain.row import DomainRow
-from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.keypair.row import KeyPairRow
 from ai.backend.manager.models.project.row import ProjectRow
 from ai.backend.manager.models.rbac_models.role.row import RoleRow

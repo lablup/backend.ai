@@ -9,9 +9,9 @@ from dataclasses import dataclass
 import pytest
 import sqlalchemy as sa
 
+from ai.backend.common.auth.password import PasswordHashAlgorithm, PasswordInfo
 from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.types import ResourceSlot
-from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.auth.login_session_types import (
     LoginAttemptResult,
     LoginSessionStatus,
@@ -25,7 +25,6 @@ from ai.backend.manager.models.agent.row import AgentRow
 # registry. These rows are reachable via relationships but are not otherwise
 # imported/registered by this test; _ORM_CLUSTER keeps them live.
 from ai.backend.manager.models.domain.row import DomainRow
-from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.keypair.row import KeyPairRow
 from ai.backend.manager.models.login_client_type.row import LoginClientTypeRow
 from ai.backend.manager.models.login_session.row import LoginHistoryRow, LoginSessionRow
