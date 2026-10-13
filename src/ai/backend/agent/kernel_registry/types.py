@@ -58,6 +58,10 @@ class KernelRecoveryData(BackendAISchema):
     repl_out_port: int = Field(
         description="REPL output port number. Should be one of the service ports"
     )
+    repl_host: str | None = Field(
+        default=None,
+        description="Address the REPL ports are dialled at; None means the host's published ports",
+    )
     resource_spec: KernelResourceSpec = Field(description="Resource specifications for the kernel")
     environ: Mapping[str, str] = Field(description="Environment variables for the kernel")
 
@@ -108,6 +112,7 @@ class KernelRecoveryData(BackendAISchema):
             domain_socket_proxies=kernel.data.get("domain_socket_proxies", []),
             repl_in_port=kernel.data["repl_in_port"],
             repl_out_port=kernel.data["repl_out_port"],
+            repl_host=kernel.data.get("repl_host"),
         )
 
     def to_docker_kernel(self) -> DockerKernel:
@@ -126,6 +131,7 @@ class KernelRecoveryData(BackendAISchema):
             data={
                 "repl_in_port": self.repl_in_port,
                 "repl_out_port": self.repl_out_port,
+                "repl_host": self.repl_host,
                 "block_service_ports": self.block_service_ports,
                 "domain_socket_proxies": self.domain_socket_proxies,
             },

@@ -91,6 +91,8 @@ class LabelName(enum.StrEnum):
     ACCELERATORS = "ai.backend.accelerators"
     SERVICE_PORTS = "ai.backend.service-ports"
     BLOCK_SERVICE_PORTS = "ai.backend.internal.block-service-ports"
+    #: ``container_port:host_port,...`` the agent reserved, for runtimes that report none.
+    PUBLISHED_PORTS = "ai.backend.internal.published-ports"
 
     # Identification
     AGENT_ID = "ai.backend.agent-id"
