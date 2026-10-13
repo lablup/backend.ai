@@ -303,6 +303,7 @@ class ReplicaGroupDBSource:
                             replica_group_id=primary_group_id,
                             target_revision_id=TriState.update(setup.target_revision_id),
                             lifecycle=OptionalState.update(ReplicaGroupLifecycle.ROLLING),
+                            rollout=OptionalState.update(setup.spec.rollout),
                         )
                     )
                     target_group_id = primary_group_id

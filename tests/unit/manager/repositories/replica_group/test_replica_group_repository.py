@@ -398,6 +398,67 @@ class TestReplicaGroupRepository:
         assert session_group.placement_direction is SessionGroupPlacementDirection.SPREAD
         assert session_group.placement_enforcement is SessionGroupPlacementEnforcement.PREFERRED
 
+    async def test_setup_target_groups_refreshes_the_reused_primary_group_rollout(
+        self,
+        replica_group_repository: ReplicaGroupRepository,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        test_endpoint_id: DeploymentID,
+    ) -> None:
+        primary_group_id = ReplicaGroupID(uuid.uuid4())
+        async with db_with_cleanup.begin_session() as db_sess:
+            db_sess.add(
+                ReplicaGroupRow(
+                    session_group_id=await _create_session_group(db_sess, test_endpoint_id),
+                    id=primary_group_id,
+                    deployment_id=test_endpoint_id,
+                    desired_current_replica_count=1,
+                    desired_target_replica_count=0,
+                    lifecycle=ReplicaGroupLifecycle.STABLE,
+                    scaling_status=ReplicaGroupScalingStatus.STABLE,
+                    rollout=ReplicaGroupRolloutSpec(
+                        max_surge=IntOrPercent(count=1),
+                        max_unavailable=IntOrPercent(count=0),
+                    ),
+                )
+            )
+            await db_sess.flush()
+            await db_sess.execute(
+                sa.update(EndpointRow)
+                .where(EndpointRow.id == test_endpoint_id)
+                .values(primary_replica_group_id=primary_group_id)
+            )
+        target_revision_id = DeploymentRevisionID(uuid.uuid4())
+        upserted_rollout = ReplicaGroupRolloutSpec(
+            max_surge=IntOrPercent(count=0),
+            max_unavailable=IntOrPercent(count=1),
+        )
+        setup = GroupRolloutSetup(
+            deployment_id=test_endpoint_id,
+            target_revision_id=target_revision_id,
+            spec=TargetGroupSpec(use_primary_group=True, rollout=upserted_rollout),
+            desired_target_replica_count=1,
+        )
+
+        updated = await replica_group_repository.setup_target_groups([setup])
+
+        assert updated == {test_endpoint_id}
+        async with db_with_cleanup.begin_readonly_session() as db_sess:
+            groups = (
+                (
+                    await db_sess.execute(
+                        sa.select(ReplicaGroupRow).where(
+                            ReplicaGroupRow.deployment_id == test_endpoint_id
+                        )
+                    )
+                )
+                .scalars()
+                .all()
+            )
+        assert [group.id for group in groups] == [primary_group_id]
+        assert groups[0].rollout == upserted_rollout
+        assert groups[0].target_revision_id == target_revision_id
+        assert groups[0].lifecycle is ReplicaGroupLifecycle.ROLLING
+
     async def test_search_deploy_scheduling_views_filters_by_lifecycle(
         self,
         replica_group_repository: ReplicaGroupRepository,
