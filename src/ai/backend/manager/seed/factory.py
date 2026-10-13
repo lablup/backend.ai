@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from ai.backend.manager.seed.app_config_allow_list.seed import AppConfigAllowListSeed
 from ai.backend.manager.seed.app_config_definition.seed import AppConfigDefinitionSeed
+from ai.backend.manager.seed.app_config_fragment.seed import AppConfigFragmentSeed
 from ai.backend.manager.seed.client_ip_masking_policy.seed import ClientIPMaskingPolicySeed
 from ai.backend.manager.seed.container_registry.seed import ContainerRegistrySeed
 from ai.backend.manager.seed.deployment_preset.seed import DeploymentPresetSeed
@@ -25,14 +26,18 @@ from ai.backend.manager.seed.resource_policy.seed import (
     ProjectResourcePolicySeed,
     UserResourcePolicySeed,
 )
+from ai.backend.manager.seed.resource_preset.seed import ResourcePresetSeed
 from ai.backend.manager.seed.resource_slot_type.seed import ResourceSlotTypeSeed
 from ai.backend.manager.seed.retention_policy.seed import RetentionPolicySeed
+from ai.backend.manager.seed.role.seed import RoleSeed
 from ai.backend.manager.seed.role_preset.seed import RolePresetSeed
 from ai.backend.manager.seed.runtime_variant.seed import RuntimeVariantSeed
 from ai.backend.manager.seed.runtime_variant_preset.seed import RuntimeVariantPresetSeed
+from ai.backend.manager.seed.session_template.seed import SessionTemplateSeed
 from ai.backend.manager.seed.storage_backend_type.seed import StorageBackendTypeSeed
 from ai.backend.manager.seed.storage_namespace.seed import StorageNamespaceSeed
 from ai.backend.manager.seed.types import SeedKind
+from ai.backend.manager.seed.user.seed import UserSeed
 from ai.backend.manager.seed.vfs_storage.seed import VFSStorageSeed
 
 
@@ -62,7 +67,12 @@ def create_seed_kind_registry() -> SeedKindRegistry:
         SeedKind.STORAGE_NAMESPACE: (1, StorageNamespaceSeed),
         SeedKind.VFS_STORAGE: (1, VFSStorageSeed),
         SeedKind.DOMAIN: (1, DomainSeed),
+        SeedKind.USER: (1, UserSeed),
         SeedKind.PROJECT: (1, ProjectSeed),
         SeedKind.DEPLOYMENT_PRESET: (1, DeploymentPresetSeed),
         SeedKind.RESOURCE_GROUP: (1, ResourceGroupSeed),
+        SeedKind.APP_CONFIG_FRAGMENT: (1, AppConfigFragmentSeed),
+        SeedKind.RESOURCE_PRESET: (1, ResourcePresetSeed),
+        SeedKind.ROLE: (1, RoleSeed),
+        SeedKind.SESSION_TEMPLATE: (1, SessionTemplateSeed),
     })
