@@ -17,6 +17,7 @@ from ai.backend.manager.actions.types import (
     ActionKind,
 )
 from ai.backend.manager.actions.v2.bulk.monitor.base import BulkActionMonitor
+from ai.backend.manager.actions.v2.bulk.partial_processor import PartialBulkActionProcessor
 from ai.backend.manager.actions.v2.bulk.processor import (
     AtomicEntityResultJudge,
     BulkActionProcessor,
@@ -62,6 +63,7 @@ from ai.backend.manager.actions.v2.ops.base import (
     CreateFieldOpsAction,
     GlobalSearcherOpsAction,
     OperationScopeOpsAction,
+    PartialBulkUpsertFieldOpsAction,
     UpsertFieldOpsAction,
 )
 from ai.backend.manager.actions.v2.ops.result import (
@@ -93,6 +95,7 @@ from ai.backend.manager.services.ops.service import (
     FieldOwnerCandidatesService,
     FieldPartialBulkGetService,
     FieldPartialBulkPurgeService,
+    FieldPartialBulkUpsertService,
     FieldPurgeService,
     FieldUpsertService,
     GlobalSearcherService,
@@ -306,6 +309,27 @@ class FieldGroup[TFieldData: FieldData]:
             FieldUpsertService(self._deps.repository).execute,
             monitors=(*self._deps.monitors.single_entity, *monitors),
             validators=(*self._deps.validators.single_entity, *validators),
+        )
+
+    def partial_bulk_upsert_ops[TAction: PartialBulkUpsertFieldOpsAction[Any, Any, Any]](
+        self,
+        action_cls: type[TAction],
+        *,
+        validators: Sequence[PartialBulkActionValidator] = (),
+        monitors: Sequence[BulkActionMonitor] = (),
+    ) -> PartialBulkActionProcessor[TAction, list[TFieldData]]:
+        """Put field rows on the owners the caller named, one permission check per owner.
+
+        The entity counterpart of :meth:`upsert_ops`, bulk-shaped like
+        ``ProcessorGroup.partial_bulk``: the owners are named, so nothing is looked up,
+        and an owner the caller may not write takes its rows out of the run and comes
+        back as a failed item beside the owners that were written.
+        """
+        self._record(action_cls, ActionKind.BULK, ActionGate.PERMISSION, ActionBacking.GENERIC)
+        return PartialBulkActionProcessor(
+            FieldPartialBulkUpsertService(self._deps.repository).execute,
+            monitors=(*self._deps.monitors.bulk, *monitors),
+            partial_validators=(*self._deps.validators.partial_bulk, *validators),
         )
 
 

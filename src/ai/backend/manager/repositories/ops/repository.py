@@ -509,6 +509,13 @@ class OpsRepository[TData]:
         async with self._ops.write_ops() as w:
             return await w.upsert_field_entity(owner_id, upserter)
 
+    async def partial_bulk_upsert_field_entities[TFieldData: FieldData](
+        self, upserters: Mapping[Any, Sequence[FieldUpserter[Any, Any, TFieldData]]]
+    ) -> BulkResultWithFailures[list[TFieldData]]:
+        """Insert or update each owner's field rows independently, answering per owner."""
+        async with self._ops.write_ops() as w:
+            return await w.partial_bulk_upsert_field_entities(upserters)
+
     async def update(self, updater: GuardedDataUpdater[Any, TData]) -> TData:
         """Apply the update, telling a missing row from a refused one.
 
