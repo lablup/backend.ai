@@ -37,6 +37,13 @@ class PrometheusQueryPresetCategorySeed(SeedItem):
         )
 
     @override
+    def check(self) -> list[str]:
+        """The rule the create API applies to the name."""
+        if not self.name.strip():
+            return ["name is blank"]
+        return []
+
+    @override
     @classmethod
     def reject(
         cls, files: Sequence[SeedItems[PrometheusQueryPresetCategorySeed]]
