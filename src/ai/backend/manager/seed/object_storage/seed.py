@@ -43,6 +43,15 @@ class ObjectStorageSeed(SeedItem):
         )
 
     @override
+    def check(self) -> list[str]:
+        """The rules the create API applies to the name."""
+        if not self.name.strip():
+            return ["name is blank"]
+        if len(self.name) > 256:
+            return [f"name is {len(self.name)} characters; at most 256"]
+        return []
+
+    @override
     @classmethod
     def reject(cls, files: Sequence[SeedItems[ObjectStorageSeed]]) -> list[SeedRejection]:
         return []
