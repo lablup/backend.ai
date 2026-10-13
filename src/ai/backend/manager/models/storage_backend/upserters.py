@@ -12,7 +12,7 @@ from ai.backend.common.data.storage.types import (
     StorageBackendType,
 )
 from ai.backend.manager.data.storage_backend.types import StorageBackendTypeData
-from ai.backend.manager.models.specs.created_in import CreatedInGlobal
+from ai.backend.manager.models.specs.created_in import CreatedInPublic
 from ai.backend.manager.models.specs.types import IntegrityErrorCheck
 from ai.backend.manager.models.specs.upserter import EntityUpserter
 from ai.backend.manager.models.storage_backend.row import StorageBackendTypeRow
@@ -22,7 +22,7 @@ __all__ = ("StorageBackendTypeUpserter",)
 
 @dataclass
 class StorageBackendTypeUpserter(
-    CreatedInGlobal[StorageBackendTypeRow],
+    CreatedInPublic[StorageBackendTypeRow],
     EntityUpserter[StorageBackendTypeRow, StorageBackendTypeData],
 ):
     """Upserter for one storage backend implementation.

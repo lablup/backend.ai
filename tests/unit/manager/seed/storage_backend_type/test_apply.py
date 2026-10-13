@@ -8,7 +8,6 @@ import pytest
 import sqlalchemy as sa
 
 from ai.backend.common.data.entity.global_entity import GlobalEntityName
-from ai.backend.common.data.entity.types import GlobalEntityType
 from ai.backend.common.data.storage.types import (
     StorageBackendCapabilities,
     StorageBackendCapability,
@@ -36,14 +35,11 @@ async def _types(db: ExtendedAsyncSAEngine) -> dict[str, tuple[str, frozenset[st
         return {row.name: (str(row.id), row.capabilities.supported) for row in rows}
 
 
-async def _global_members(db: ExtendedAsyncSAEngine) -> set[str]:
-    """The backend types the global node holds as members."""
-    global_node = (
+async def _members_of(db: ExtendedAsyncSAEngine, scope: GlobalEntityName) -> set[str]:
+    """The backend types the scope's node holds as members."""
+    scope_node = (
         sa.select(VirtualEntityRow.id)
-        .where(
-            VirtualEntityRow.entity_type == GlobalEntityType(),
-            VirtualEntityRow.entity_id == global_entity_id(GlobalEntityName.GLOBAL),
-        )
+        .where(VirtualEntityRow.entity_id == global_entity_id(scope))
         .scalar_subquery()
     )
     async with db.begin_readonly() as conn:
@@ -51,7 +47,7 @@ async def _global_members(db: ExtendedAsyncSAEngine) -> set[str]:
             sa.select(VirtualEntityRow.entity_id)
             .join(EntityMembershipRow, EntityMembershipRow.member_entity_id == VirtualEntityRow.id)
             .where(
-                EntityMembershipRow.virtual_entity_id == global_node,
+                EntityMembershipRow.virtual_entity_id == scope_node,
                 VirtualEntityRow.entity_type == "storage_backend_type",
             )
         )
@@ -85,11 +81,16 @@ class TestApply:
             "noop": frozenset(),
         }
 
-    async def test_a_created_type_is_created_in_global(
-        self, db: ExtendedAsyncSAEngine, repository: SeedRepository, plan: SeedPlan
+    @pytest.mark.parametrize("scope", [GlobalEntityName.GLOBAL, GlobalEntityName.PUBLIC])
+    async def test_a_created_type_is_created_in_global_and_public(
+        self,
+        db: ExtendedAsyncSAEngine,
+        repository: SeedRepository,
+        plan: SeedPlan,
+        scope: GlobalEntityName,
     ) -> None:
         await SeedApplier(repository).apply(plan, overwrite=False)
-        assert await _global_members(db) == {row_id for row_id, _ in (await _types(db)).values()}
+        assert await _members_of(db, scope) == {row_id for row_id, _ in (await _types(db)).values()}
 
     async def test_an_existing_type_is_skipped_and_kept(
         self, db: ExtendedAsyncSAEngine, repository: SeedRepository, plan: SeedPlan
@@ -123,4 +124,5 @@ class TestApply:
                 StorageBackendCapability.FAST_FS_SIZE,
             }),
         )
-        assert existing in await _global_members(db)
+        assert existing in await _members_of(db, GlobalEntityName.GLOBAL)
+        assert existing in await _members_of(db, GlobalEntityName.PUBLIC)
