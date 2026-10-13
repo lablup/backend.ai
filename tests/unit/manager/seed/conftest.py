@@ -31,6 +31,7 @@ from ai.backend.manager.models.rbac_models.role_permission_preset.row import (
     RolePermissionPresetRow,
 )
 from ai.backend.manager.models.rbac_models.role_preset.row import RolePresetRow
+from ai.backend.manager.models.resource_group.row import ResourceGroupRow
 from ai.backend.manager.models.resource_policy.row import (
     KeyPairResourcePolicyRow,
     ProjectResourcePolicyRow,
@@ -311,6 +312,30 @@ _DOMAINS: dict[str, dict[str, Any]] = {
     },
 }
 
+# Resource group seed file written for the tests. `default` states every field; `gpu`
+# leaves the optional ones to their defaults.
+_RESOURCE_GROUPS: list[dict[str, Any]] = [
+    {
+        "id": "0198a5a0-0000-7000-8000-00000000e001",
+        "name": "default",
+        "description": "The default resource group",
+        "is_default": True,
+        "wsproxy_addr": "http://127.0.0.1:5050",
+        "wsproxy_api_token": "token",
+        "driver": "static",
+        "driver_opts": {"x": 1},
+        "scheduler": "fifo",
+        "scheduler_opts": {"pending_timeout": 30},
+        "use_host_network": True,
+    },
+    {
+        "id": "0198a5a0-0000-7000-8000-00000000e002",
+        "name": "gpu",
+        "driver": "static",
+        "scheduler": "fifo",
+    },
+]
+
 # Resource policy files written for the tests, one kind per file.
 _RESOURCE_POLICIES: dict[str, dict[str, Any]] = {
     "user_resource_policy": {
@@ -478,6 +503,7 @@ _SEED_TABLES: list[Table | type[HasTable]] = [
     KeyPairResourcePolicyRow,
     UserRow,
     ProjectRow,
+    ResourceGroupRow,
     RoleRow,
     VFSStorageRow,
     PermissionRow,
@@ -767,6 +793,22 @@ def domain_seed_dir(tmp_path: Path) -> Path:
 @pytest.fixture
 def default_domain_id() -> str:
     return str(_DOMAINS["default.yaml"]["id"])
+
+
+@pytest.fixture
+def resource_group_seed_dir(tmp_path: Path) -> Path:
+    """A directory with one `resource_group` seed file."""
+    directory = tmp_path / "resource_group"
+    directory.mkdir()
+    (directory / "resource-groups.yaml").write_text(
+        yaml.safe_dump({"kind": "resource_group", "version": 1, "items": _RESOURCE_GROUPS})
+    )
+    return directory
+
+
+@pytest.fixture
+def default_resource_group_id() -> str:
+    return str(_RESOURCE_GROUPS[0]["id"])
 
 
 @pytest.fixture

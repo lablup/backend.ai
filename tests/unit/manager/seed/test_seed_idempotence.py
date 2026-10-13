@@ -57,6 +57,7 @@ _CASES: Final[list[IdempotenceCase]] = [
     IdempotenceCase(SeedKind.DOMAIN, "domain_seed_dir"),
     IdempotenceCase(SeedKind.PROJECT, "project_seed_dir"),
     IdempotenceCase(SeedKind.DEPLOYMENT_PRESET, "deployment_preset_seed_dir"),
+    IdempotenceCase(SeedKind.RESOURCE_GROUP, "resource_group_seed_dir"),
 ]
 
 

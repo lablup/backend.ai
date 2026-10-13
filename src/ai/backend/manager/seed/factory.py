@@ -19,6 +19,7 @@ from ai.backend.manager.seed.prometheus_query_preset_category.seed import (
     PrometheusQueryPresetCategorySeed,
 )
 from ai.backend.manager.seed.registry import SeedKindRegistry
+from ai.backend.manager.seed.resource_group.seed import ResourceGroupSeed
 from ai.backend.manager.seed.resource_policy.seed import (
     KeyPairResourcePolicySeed,
     ProjectResourcePolicySeed,
@@ -63,4 +64,5 @@ def create_seed_kind_registry() -> SeedKindRegistry:
         SeedKind.DOMAIN: (1, DomainSeed),
         SeedKind.PROJECT: (1, ProjectSeed),
         SeedKind.DEPLOYMENT_PRESET: (1, DeploymentPresetSeed),
+        SeedKind.RESOURCE_GROUP: (1, ResourceGroupSeed),
     })
