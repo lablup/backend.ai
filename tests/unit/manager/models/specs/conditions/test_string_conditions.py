@@ -7,7 +7,10 @@ import sqlalchemy as sa
 
 from ai.backend.common.data.filter_specs import StringInMatchSpec, StringMatchSpec
 from ai.backend.manager.models.clauses import QueryCondition
-from ai.backend.manager.models.specs.conditions.string import StringConditions
+from ai.backend.manager.models.specs.conditions.string import (
+    DelimitedStringConditions,
+    StringConditions,
+)
 
 type Render = Callable[[sa.sql.ClauseElement], str]
 type Operation = Callable[[StringConditions, StringMatchSpec], QueryCondition]
@@ -75,3 +78,79 @@ class TestStringConditionsIn:
         )
 
         assert render(condition()) == expected
+
+
+class TestDelimitedStringConditions:
+    @pytest.mark.parametrize(
+        ("case_insensitive", "negated", "expected"),
+        [
+            (False, False, "'Ab' = ANY (string_to_array(items.name, ','))"),
+            (True, False, "'ab' = ANY (string_to_array(lower(items.name), ','))"),
+            (False, True, "NOT ('Ab' = ANY (string_to_array(items.name, ',')))"),
+            (True, True, "NOT ('ab' = ANY (string_to_array(lower(items.name), ',')))"),
+        ],
+    )
+    def test_equals_matches_one_element(
+        self,
+        items_table: sa.Table,
+        render: Render,
+        case_insensitive: bool,
+        negated: bool,
+        expected: str,
+    ) -> None:
+        condition = DelimitedStringConditions(items_table.c.name).equals(
+            StringMatchSpec("Ab", case_insensitive=case_insensitive, negated=negated)
+        )
+
+        assert render(condition()) == expected
+
+    @pytest.mark.parametrize(
+        ("case_insensitive", "negated", "expected"),
+        [
+            (False, False, "string_to_array(items.name, ',') && CAST(ARRAY['Ab', 'c'] AS TEXT[])"),
+            (
+                True,
+                False,
+                "string_to_array(lower(items.name), ',') && CAST(ARRAY['ab', 'c'] AS TEXT[])",
+            ),
+            (
+                False,
+                True,
+                "NOT (string_to_array(items.name, ',') && CAST(ARRAY['Ab', 'c'] AS TEXT[]))",
+            ),
+            (
+                True,
+                True,
+                "NOT (string_to_array(lower(items.name), ',') && CAST(ARRAY['ab', 'c'] AS TEXT[]))",
+            ),
+        ],
+    )
+    def test_in_matches_any_element(
+        self,
+        items_table: sa.Table,
+        render: Render,
+        case_insensitive: bool,
+        negated: bool,
+        expected: str,
+    ) -> None:
+        condition = DelimitedStringConditions(items_table.c.name).in_(
+            StringInMatchSpec(
+                values=["Ab", "c"], case_insensitive=case_insensitive, negated=negated
+            )
+        )
+
+        assert render(condition()) == expected
+
+    def test_custom_delimiter(self, items_table: sa.Table, render: Render) -> None:
+        condition = DelimitedStringConditions(items_table.c.name, delimiter=";").equals(
+            StringMatchSpec("Ab", case_insensitive=False, negated=False)
+        )
+
+        assert render(condition()) == "'Ab' = ANY (string_to_array(items.name, ';'))"
+
+    def test_contains_runs_on_whole_column(self, items_table: sa.Table, render: Render) -> None:
+        condition = DelimitedStringConditions(items_table.c.name).contains(
+            StringMatchSpec("Ab", case_insensitive=True, negated=False)
+        )
+
+        assert render(condition()) == "items.name ILIKE '%%Ab%%'"
