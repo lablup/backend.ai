@@ -1592,6 +1592,7 @@ class RBACAdapter(BaseAdapter):
     def _assignment_data_to_node(data: AssignedUserData) -> RoleAssignmentNode:
         return RoleAssignmentNode(
             id=data.id,
+            field_id=data.id,
             user_id=data.user_id,
             role_id=data.role_id,
             granted_by=data.granted_by,

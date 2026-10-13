@@ -138,6 +138,9 @@ class RoleAssignmentNode(BaseResponseModel):
     """Node representing a user-role assignment."""
 
     id: UUID = Field(description="Assignment ID")
+    field_id: UUID = Field(
+        description="UUID of the role assignment row. Added in 26.10.0.",
+    )
     user_id: UUID = Field(description="Assigned user ID")
     role_id: UUID = Field(description="Assigned role ID")
     granted_by: UUID | None = Field(default=None, description="User who granted the assignment")
