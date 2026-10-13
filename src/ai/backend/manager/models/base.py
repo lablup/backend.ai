@@ -1077,14 +1077,18 @@ class SlugType(TypeDecorator[str]):
     def coerce_compared_value(self, _op: Any, _value: Any) -> Unicode:
         return Unicode()
 
-    @override
-    def process_bind_param(self, value: Any | None, _dialect: Dialect) -> str | None:
-        if value is None:
-            return value
+    def check(self, value: str) -> None:
+        """Raise :class:`ValueError` unless the value fits the column."""
         try:
             self._tx_slug.check(value)
         except t.DataError as e:
             raise ValueError(e.error, value) from e
+
+    @override
+    def process_bind_param(self, value: Any | None, _dialect: Dialect) -> str | None:
+        if value is None:
+            return value
+        self.check(value)
         return cast(str, value)
 
 
