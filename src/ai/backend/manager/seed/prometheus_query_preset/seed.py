@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from collections.abc import Sequence
 from typing import override
 
@@ -9,6 +10,9 @@ from ai.backend.common.data.entity.prometheus_query_preset import PrometheusQuer
 from ai.backend.common.data.entity.prometheus_query_preset_category import (
     PrometheusQueryPresetCategoryID,
 )
+from ai.backend.common.dto.clients.prometheus.defs import PROMETHEUS_DURATION_PATTERN
+from ai.backend.common.exception import InvalidMetricPresetTemplate
+from ai.backend.manager.clients.prometheus.preset import PromQLTemplateRenderer
 from ai.backend.manager.models.prometheus_query_preset.row import PresetOptions
 from ai.backend.manager.models.prometheus_query_preset.upserters import (
     PrometheusQueryPresetUpserter,
@@ -51,6 +55,25 @@ class PrometheusQueryPresetSeed(SeedItem):
             field_upserters=[],
             field_purgers=[],
         )
+
+    @override
+    def check(self) -> list[str]:
+        """The rules the create API applies to the name, the rank, the window and the
+        template."""
+        failures: list[str] = []
+        if not self.name.strip():
+            failures.append("name is blank")
+        if self.rank < 0:
+            failures.append(f"rank {self.rank} is negative")
+        if self.time_window is not None and not re.fullmatch(
+            PROMETHEUS_DURATION_PATTERN, self.time_window
+        ):
+            failures.append(f"time_window {self.time_window!r} is not a Prometheus duration")
+        try:
+            PromQLTemplateRenderer().validate(self.query_template)
+        except InvalidMetricPresetTemplate as e:
+            failures.append(str(e))
+        return failures
 
     @override
     @classmethod

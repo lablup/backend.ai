@@ -62,6 +62,10 @@ class ProjectSeed(SeedItem):
         )
 
     @override
+    def check(self) -> list[str]:
+        return []
+
+    @override
     @classmethod
     def reject(cls, files: Sequence[SeedItems[ProjectSeed]]) -> list[SeedRejection]:
         """None: the constraints on ``groups`` fail an item that repeats a name in its
