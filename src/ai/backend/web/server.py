@@ -33,6 +33,7 @@ import aiohttp_cors
 import aiotools
 import click
 import jinja2
+import jwt
 import tomli
 import uvloop
 from aiohttp import web
@@ -671,6 +672,15 @@ async def webserver_healthcheck(request: web.Request) -> web.Response:
     return web.json_response(result)
 
 
+def _claimed_user_id(auth_token: str) -> uuid.UUID | None:
+    try:
+        # Skip signature verification only to read the claimed user ID for logging.
+        payload = jwt.decode(auth_token, options={"verify_signature": False})
+        return uuid.UUID(payload["user"])
+    except (jwt.PyJWTError, KeyError, ValueError, TypeError, AttributeError):
+        return None
+
+
 async def token_login_handler(request: web.Request) -> web.Response:
     config = cast(WebServerUnifiedConfig, request.app["config"])
     stats: WebStats = request.app["stats"]
@@ -769,7 +779,9 @@ async def token_login_handler(request: web.Request) -> web.Response:
     except BackendClientError as e:
         raise ProxyTargetUnreachableError(str(e)) from e
     except BackendAPIError as e:
-        log.trace("token login failed: {}", e)
+        log.trace(
+            "token login failed", status=e.status, claimed_user_id=_claimed_user_id(auth_token)
+        )
         result["authenticated"] = False
         result["data"] = {
             "type": e.data.get("type"),
