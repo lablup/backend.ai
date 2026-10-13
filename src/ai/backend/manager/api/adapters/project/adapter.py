@@ -59,7 +59,11 @@ from ai.backend.manager.data.project.types import ProjectData
 from ai.backend.manager.data.project.types import ProjectType as DataProjectType
 from ai.backend.manager.data.user.types import UserData, UserStatus
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
-from ai.backend.manager.models.condition_utils import combine_conditions_or, negate_conditions
+from ai.backend.manager.models.condition_utils import (
+    combine_conditions_and,
+    combine_conditions_or,
+    negate_conditions,
+)
 from ai.backend.manager.models.domain.searchable_fields import DomainSearchableFields
 from ai.backend.manager.models.project.creators import ProjectCreator
 from ai.backend.manager.models.project.deprecated_search import (
@@ -449,16 +453,17 @@ class ProjectAdapter(BaseAdapter):
         if filter.OR:
             or_sub_conditions: list[QueryCondition] = []
             for sub_filter in filter.OR:
-                or_sub_conditions.extend(self._convert_group_filter(sub_filter))
+                sub_conditions = self._convert_group_filter(sub_filter)
+                if sub_conditions:
+                    or_sub_conditions.append(combine_conditions_and(sub_conditions))
             if or_sub_conditions:
                 conditions.append(combine_conditions_or(or_sub_conditions))
 
         if filter.NOT:
-            not_sub_conditions: list[QueryCondition] = []
             for sub_filter in filter.NOT:
-                not_sub_conditions.extend(self._convert_group_filter(sub_filter))
-            if not_sub_conditions:
-                conditions.append(negate_conditions(not_sub_conditions))
+                sub_conditions = self._convert_group_filter(sub_filter)
+                if sub_conditions:
+                    conditions.append(negate_conditions(sub_conditions))
 
         return conditions
 

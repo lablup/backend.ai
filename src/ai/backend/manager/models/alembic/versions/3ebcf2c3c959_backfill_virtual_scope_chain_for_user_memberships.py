@@ -20,6 +20,10 @@ depends_on = None
 
 _UUID_TEXT = "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
 
+# A user purged before its purge removed its association row is no member of anything:
+# the chain is read as the membership of a user, and a row of users is what one is.
+_MEMBER_LIVES = "EXISTS (SELECT 1 FROM users u WHERE u.uuid = CAST(a.entity_id AS uuid))"
+
 
 def upgrade() -> None:
     """Backfill the virtual-scope chain (virtual_scopes, entity_memberships,
@@ -58,6 +62,7 @@ def upgrade() -> None:
     )
     # Pre-rekey rows key a domain scope by its name, so skip anything that is
     # not a UUID: the WHERE filters the association scan before the join casts.
+    # A row naming a user the users table no longer holds is skipped by _MEMBER_LIVES.
     op.execute(
         sa.text(
             f"""
@@ -71,6 +76,7 @@ def upgrade() -> None:
                 AND a.scope_type IN ('domain', 'project')
                 AND a.scope_id ~ '{_UUID_TEXT}'
                 AND a.entity_id ~ '{_UUID_TEXT}'
+                AND {_MEMBER_LIVES}
             ON CONFLICT (virtual_scope_id, entity_type, entity_id) DO NOTHING
             """
         )
@@ -89,6 +95,7 @@ def upgrade() -> None:
                 AND a.scope_type IN ('domain', 'project')
                 AND a.scope_id ~ '{_UUID_TEXT}'
                 AND a.entity_id ~ '{_UUID_TEXT}'
+                AND {_MEMBER_LIVES}
             ON CONFLICT (virtual_scope_id, scope_type, scope_id) DO NOTHING
             """
         )

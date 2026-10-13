@@ -53,7 +53,11 @@ from ai.backend.manager.data.resource_usage_history.types import (
     UserUsageBucketData,
 )
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
-from ai.backend.manager.models.condition_utils import combine_conditions_or, negate_conditions
+from ai.backend.manager.models.condition_utils import (
+    combine_conditions_and,
+    combine_conditions_or,
+    negate_conditions,
+)
 from ai.backend.manager.models.resource_usage_history.row import (
     DomainUsageBucketRow,
     ProjectUsageBucketRow,
@@ -821,16 +825,17 @@ class ResourceUsageAdapter(BaseAdapter):
         if filter_req.OR:
             or_conditions: list[QueryCondition] = []
             for sub_filter in filter_req.OR:
-                or_conditions.extend(self._convert_domain_filter(sub_filter))
+                sub_conditions = self._convert_domain_filter(sub_filter)
+                if sub_conditions:
+                    or_conditions.append(combine_conditions_and(sub_conditions))
             if or_conditions:
                 conditions.append(combine_conditions_or(or_conditions))
 
         if filter_req.NOT:
-            not_conditions: list[QueryCondition] = []
             for sub_filter in filter_req.NOT:
-                not_conditions.extend(self._convert_domain_filter(sub_filter))
-            if not_conditions:
-                conditions.append(negate_conditions(not_conditions))
+                sub_conditions = self._convert_domain_filter(sub_filter)
+                if sub_conditions:
+                    conditions.append(negate_conditions(sub_conditions))
 
         return conditions
 
@@ -898,16 +903,17 @@ class ResourceUsageAdapter(BaseAdapter):
         if filter_req.OR:
             or_conditions_p: list[QueryCondition] = []
             for sub_filter in filter_req.OR:
-                or_conditions_p.extend(self._convert_project_filter(sub_filter))
+                sub_conditions = self._convert_project_filter(sub_filter)
+                if sub_conditions:
+                    or_conditions_p.append(combine_conditions_and(sub_conditions))
             if or_conditions_p:
                 conditions.append(combine_conditions_or(or_conditions_p))
 
         if filter_req.NOT:
-            not_conditions_p: list[QueryCondition] = []
             for sub_filter in filter_req.NOT:
-                not_conditions_p.extend(self._convert_project_filter(sub_filter))
-            if not_conditions_p:
-                conditions.append(negate_conditions(not_conditions_p))
+                sub_conditions = self._convert_project_filter(sub_filter)
+                if sub_conditions:
+                    conditions.append(negate_conditions(sub_conditions))
 
         return conditions
 
@@ -980,16 +986,17 @@ class ResourceUsageAdapter(BaseAdapter):
         if filter_req.OR:
             or_conditions_u: list[QueryCondition] = []
             for sub_filter in filter_req.OR:
-                or_conditions_u.extend(self._convert_user_filter(sub_filter))
+                sub_conditions = self._convert_user_filter(sub_filter)
+                if sub_conditions:
+                    or_conditions_u.append(combine_conditions_and(sub_conditions))
             if or_conditions_u:
                 conditions.append(combine_conditions_or(or_conditions_u))
 
         if filter_req.NOT:
-            not_conditions_u: list[QueryCondition] = []
             for sub_filter in filter_req.NOT:
-                not_conditions_u.extend(self._convert_user_filter(sub_filter))
-            if not_conditions_u:
-                conditions.append(negate_conditions(not_conditions_u))
+                sub_conditions = self._convert_user_filter(sub_filter)
+                if sub_conditions:
+                    conditions.append(negate_conditions(sub_conditions))
 
         return conditions
 

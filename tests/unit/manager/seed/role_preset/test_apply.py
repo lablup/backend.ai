@@ -1,4 +1,4 @@
-"""`mgr seed apply` writes the role files through the role preset creators and upserters."""
+"""`mgr seed apply` writes the role files through the role preset upserters."""
 
 from __future__ import annotations
 
@@ -20,16 +20,16 @@ from ai.backend.manager.models.rbac_models.role_preset.row import RolePresetRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.virtual_entity.entity_membership import EntityMembershipRow
 from ai.backend.manager.models.virtual_entity.virtual_entity import VirtualEntityRow
-from ai.backend.manager.repositories.ops.repository import OpsRepository
-from ai.backend.manager.seed.registry import SeedKindRegistry
-from ai.backend.manager.seed.role_preset.kind import RolePresetSeedKind
-from ai.backend.manager.seed.role_preset.loader import RoleSeedLoader
+from ai.backend.manager.repositories.seed.repository import SeedRepository
+from ai.backend.manager.seed.factory import create_seed_kind_registry
+from ai.backend.manager.seed.role_preset.seed import RolePresetSeed
 from ai.backend.manager.seed.runner import SeedApplier, SeedPlan, SeedPlanner
+from ai.backend.manager.seed.types import SeedKind
 
 
 @pytest.fixture
 def plan(role_seed_dir: Path) -> SeedPlan:
-    return SeedPlanner(SeedKindRegistry.default()).plan([role_seed_dir])
+    return SeedPlanner(create_seed_kind_registry()).plan([role_seed_dir])
 
 
 async def _presets(db: ExtendedAsyncSAEngine) -> dict[str, tuple[str, str, bool, bool]]:
@@ -85,23 +85,27 @@ async def _global_members(db: ExtendedAsyncSAEngine) -> set[str]:
         return {str(row.entity_id) for row in rows}
 
 
-def _fixture(role_seed_dir: Path) -> dict[str, Any]:
-    return RoleFixture(RoleSeedLoader(role_seed_dir).load()).render_presets()
+def _seeds(plan: SeedPlan) -> list[RolePresetSeed]:
+    return [item for item in plan.batches[0].items() if isinstance(item, RolePresetSeed)]
+
+
+def _fixture(plan: SeedPlan) -> dict[str, Any]:
+    return RoleFixture(_seeds(plan)).render_presets()
 
 
 class TestApply:
     async def test_an_empty_database_gets_the_fixture_rows(
         self,
         db: ExtendedAsyncSAEngine,
-        repository: OpsRepository[Any],
+        repository: SeedRepository,
         plan: SeedPlan,
         role_seed_dir: Path,
     ) -> None:
         results = await SeedApplier(repository).apply(plan, overwrite=False)
 
-        assert len(results["role_preset"].succeeded) == len(plan.batches[0].items())
-        assert results["role_preset"].skipped == []
-        fixture = _fixture(role_seed_dir)
+        assert len(results[SeedKind.ROLE_PRESET].succeeded) == len(plan.batches[0].items())
+        assert results[SeedKind.ROLE_PRESET].skipped == []
+        fixture = _fixture(plan)
         assert await _presets(db) == {
             row["id"]: (row["name"], row["scope_type"], row["auto_assign"], False)
             for row in fixture["role_presets"]
@@ -114,19 +118,17 @@ class TestApply:
     async def test_a_created_preset_is_created_in_global(
         self,
         db: ExtendedAsyncSAEngine,
-        repository: OpsRepository[Any],
+        repository: SeedRepository,
         plan: SeedPlan,
         role_seed_dir: Path,
     ) -> None:
         await SeedApplier(repository).apply(plan, overwrite=False)
-        assert await _global_members(db) == {
-            row["id"] for row in _fixture(role_seed_dir)["role_presets"]
-        }
+        assert await _global_members(db) == {row["id"] for row in _fixture(plan)["role_presets"]}
 
     async def test_an_existing_preset_is_skipped_and_listed(
         self,
         db: ExtendedAsyncSAEngine,
-        repository: OpsRepository[Any],
+        repository: SeedRepository,
         plan: SeedPlan,
         domain_admin_id: str,
     ) -> None:
@@ -141,18 +143,45 @@ class TestApply:
 
         results = await SeedApplier(repository).apply(plan, overwrite=False)
 
-        assert results["role_preset"].succeeded == []
-        assert len(results["role_preset"].skipped) == len(plan.batches[0].items())
+        assert results[SeedKind.ROLE_PRESET].succeeded == []
+        assert len(results[SeedKind.ROLE_PRESET].skipped) == len(plan.batches[0].items())
         assert all(
-            failure.reason.startswith("exists") for failure in results["role_preset"].skipped
+            failure.reason.startswith("exists") for failure in results[SeedKind.ROLE_PRESET].skipped
         )
+        assert (await _presets(db))[domain_admin_id][0] == "renamed"
+        assert await _permissions(db) == permissions
+
+    async def test_a_missing_permission_is_inserted_under_an_existing_preset(
+        self,
+        db: ExtendedAsyncSAEngine,
+        repository: SeedRepository,
+        plan: SeedPlan,
+        domain_admin_id: str,
+    ) -> None:
+        await SeedApplier(repository).apply(plan, overwrite=False)
+        permissions = await _permissions(db)
+        async with db.begin_session() as sess:
+            await sess.execute(
+                sa.update(RolePresetRow)
+                .where(RolePresetRow.id == domain_admin_id)
+                .values(name="renamed")
+            )
+            await sess.execute(
+                sa.delete(RolePermissionPresetRow).where(
+                    RolePermissionPresetRow.role_preset_id == domain_admin_id
+                )
+            )
+
+        results = await SeedApplier(repository).apply(plan, overwrite=False)
+
+        assert results[SeedKind.ROLE_PRESET].succeeded == [domain_admin_id]
         assert (await _presets(db))[domain_admin_id][0] == "renamed"
         assert await _permissions(db) == permissions
 
     async def test_overwrite_restores_the_seed_values(
         self,
         db: ExtendedAsyncSAEngine,
-        repository: OpsRepository[Any],
+        repository: SeedRepository,
         plan: SeedPlan,
         domain_admin_id: str,
     ) -> None:
@@ -173,14 +202,14 @@ class TestApply:
 
         results = await SeedApplier(repository).apply(plan, overwrite=True)
 
-        assert len(results["role_preset"].succeeded) == len(plan.batches[0].items())
+        assert len(results[SeedKind.ROLE_PRESET].succeeded) == len(plan.batches[0].items())
         assert await _presets(db) == presets
         assert await _permissions(db) == permissions
 
     async def test_overwrite_rewrites_a_stated_entity_type_to_its_grant(
         self,
         db: ExtendedAsyncSAEngine,
-        repository: OpsRepository[Any],
+        repository: SeedRepository,
         plan: SeedPlan,
         domain_admin_id: str,
     ) -> None:
@@ -206,16 +235,12 @@ class TestApply:
     async def test_overwrite_keeps_an_entity_type_the_seed_leaves_out(
         self,
         db: ExtendedAsyncSAEngine,
-        repository: OpsRepository[Any],
+        repository: SeedRepository,
+        plan: SeedPlan,
         domain_admin_id: str,
-        role_seed_dir: Path,
     ) -> None:
-        [seed] = [
-            seed for seed in RoleSeedLoader(role_seed_dir).load() if str(seed.id) == domain_admin_id
-        ]
-        kind = RolePresetSeedKind()
-        creation = kind.creation(seed)
-        await repository.create_entity_with_fields(creation.creator, creation.field_creators)
+        [seed] = [seed for seed in _seeds(plan) if str(seed.id) == domain_admin_id]
+        await repository.partial_write([seed.write()], overwrite=False)
         async with db.begin_session() as sess:
             await sess.execute(
                 sa.insert(RolePermissionPresetRow).values(
@@ -226,17 +251,14 @@ class TestApply:
             update={"permissions": {"agent": seed.permissions["agent"]}}
         )
 
-        upsert = kind.upsert(stated_agent_only)
-        await repository.upsert_entity_with_fields(
-            upsert.upserter, upsert.field_upserters, upsert.field_purgers
-        )
+        await repository.partial_write([stated_agent_only.write()], overwrite=True)
 
         assert (domain_admin_id, "app_config", 1) in await _permissions(db)
 
     async def test_a_permission_row_is_unique_per_preset_type_and_bit(
         self,
         db: ExtendedAsyncSAEngine,
-        repository: OpsRepository[Any],
+        repository: SeedRepository,
         plan: SeedPlan,
         domain_admin_id: str,
     ) -> None:

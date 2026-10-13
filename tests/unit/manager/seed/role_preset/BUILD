@@ -19,5 +19,6 @@ python_tests(
         "src/ai/backend/manager/models/alembic/versions/c3e8a1f05b27_add_preset_scope_and_public_member_role.py:../../../src",
         "src/ai/backend/manager/models/alembic/versions/a1f6b7c4d902_grant_image_and_project_reads_to_members.py:../../../src",
         "src/ai/backend/manager/models/alembic/versions/b8e0c1f4a276_grant_seed_roles_read_on_their_own_policy.py:../../../src",
+        "src/ai/backend/manager/models/alembic/versions/d6e297fca9ae_grant_user_owners_read_on_app_configs.py:../../../src",
     ],
 )

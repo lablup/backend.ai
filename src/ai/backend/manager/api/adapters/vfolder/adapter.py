@@ -109,7 +109,11 @@ from ai.backend.manager.data.vfolder.types import (
 )
 from ai.backend.manager.errors.resource import NotAModelVFolder
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
-from ai.backend.manager.models.condition_utils import combine_conditions_or, negate_conditions
+from ai.backend.manager.models.condition_utils import (
+    combine_conditions_and,
+    combine_conditions_or,
+    negate_conditions,
+)
 from ai.backend.manager.models.scopes import ScopeTarget
 from ai.backend.manager.models.specs.search.usage import UsedBy
 from ai.backend.manager.models.specs.searcher import GlobalSearcher, ScopedSearcher
@@ -866,15 +870,16 @@ class VFolderAdapter(BaseAdapter):
         if f.OR:
             or_conditions: list[QueryCondition] = []
             for sub in f.OR:
-                or_conditions.extend(self._convert_vfolder_filter(sub))
+                sub_conditions = self._convert_vfolder_filter(sub)
+                if sub_conditions:
+                    or_conditions.append(combine_conditions_and(sub_conditions))
             if or_conditions:
                 conditions.append(combine_conditions_or(or_conditions))
         if f.NOT:
-            not_conditions: list[QueryCondition] = []
             for sub in f.NOT:
-                not_conditions.extend(self._convert_vfolder_filter(sub))
-            if not_conditions:
-                conditions.append(negate_conditions(not_conditions))
+                sub_conditions = self._convert_vfolder_filter(sub)
+                if sub_conditions:
+                    conditions.append(negate_conditions(sub_conditions))
         return conditions
 
     def _convert_vfolder_orders(self, orders: list[VFolderOrder]) -> list[QueryOrder]:

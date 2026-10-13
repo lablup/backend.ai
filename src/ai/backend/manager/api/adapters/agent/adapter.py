@@ -45,7 +45,11 @@ from ai.backend.manager.models.agent.row import AgentRow
 from ai.backend.manager.models.agent.searchable_fields import AgentSearchableFields
 from ai.backend.manager.models.agent.searchers import AgentSearcher
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
-from ai.backend.manager.models.condition_utils import combine_conditions_or, negate_conditions
+from ai.backend.manager.models.condition_utils import (
+    combine_conditions_and,
+    combine_conditions_or,
+    negate_conditions,
+)
 from ai.backend.manager.models.resource_slot.searchers import AgentResourceSearcher
 from ai.backend.manager.models.specs.pagination import NoPagination
 from ai.backend.manager.models.specs.search.usage import UsedBy
@@ -290,15 +294,16 @@ class AgentAdapter(BaseAdapter):
         if f.OR:
             or_conditions: list[QueryCondition] = []
             for sub_filter in f.OR:
-                or_conditions.extend(self._convert_filter(sub_filter))
+                sub_conditions = self._convert_filter(sub_filter)
+                if sub_conditions:
+                    or_conditions.append(combine_conditions_and(sub_conditions))
             if or_conditions:
                 conditions.append(combine_conditions_or(or_conditions))
         if f.NOT:
-            not_conditions: list[QueryCondition] = []
             for sub_filter in f.NOT:
-                not_conditions.extend(self._convert_filter(sub_filter))
-            if not_conditions:
-                conditions.append(negate_conditions(not_conditions))
+                sub_conditions = self._convert_filter(sub_filter)
+                if sub_conditions:
+                    conditions.append(negate_conditions(sub_conditions))
         return conditions
 
     @staticmethod

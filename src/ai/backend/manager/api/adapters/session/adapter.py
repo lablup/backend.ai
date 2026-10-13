@@ -123,7 +123,11 @@ from ai.backend.manager.data.session.types import (
 )
 from ai.backend.manager.errors.base.not_found import NotFoundError
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
-from ai.backend.manager.models.condition_utils import combine_conditions_or, negate_conditions
+from ai.backend.manager.models.condition_utils import (
+    combine_conditions_and,
+    combine_conditions_or,
+    negate_conditions,
+)
 from ai.backend.manager.models.kernel.row import KernelRow
 from ai.backend.manager.models.kernel.searchable_fields import KernelSearchableFields
 from ai.backend.manager.models.kernel.searchers import KernelSearcher
@@ -843,15 +847,16 @@ class SessionAdapter(BaseAdapter):
         if f.OR:
             or_conditions: list[QueryCondition] = []
             for sub in f.OR:
-                or_conditions.extend(self._convert_session_filter(sub))
+                sub_conditions = self._convert_session_filter(sub)
+                if sub_conditions:
+                    or_conditions.append(combine_conditions_and(sub_conditions))
             if or_conditions:
                 conditions.append(combine_conditions_or(or_conditions))
         if f.NOT:
-            not_conditions: list[QueryCondition] = []
             for sub in f.NOT:
-                not_conditions.extend(self._convert_session_filter(sub))
-            if not_conditions:
-                conditions.append(negate_conditions(not_conditions))
+                sub_conditions = self._convert_session_filter(sub)
+                if sub_conditions:
+                    conditions.append(negate_conditions(sub_conditions))
         return conditions
 
     def _convert_session_orders(self, orders: list[SessionOrder]) -> list[QueryOrder]:
@@ -1022,15 +1027,16 @@ class SessionAdapter(BaseAdapter):
         if f.OR:
             or_conditions: list[QueryCondition] = []
             for sub in f.OR:
-                or_conditions.extend(self._convert_kernel_filter(sub))
+                sub_conditions = self._convert_kernel_filter(sub)
+                if sub_conditions:
+                    or_conditions.append(combine_conditions_and(sub_conditions))
             if or_conditions:
                 conditions.append(combine_conditions_or(or_conditions))
         if f.NOT:
-            not_conditions: list[QueryCondition] = []
             for sub in f.NOT:
-                not_conditions.extend(self._convert_kernel_filter(sub))
-            if not_conditions:
-                conditions.append(negate_conditions(not_conditions))
+                sub_conditions = self._convert_kernel_filter(sub)
+                if sub_conditions:
+                    conditions.append(negate_conditions(sub_conditions))
         return conditions
 
     def _convert_kernel_status_filter(self, f: KernelStatusFilter | None) -> list[QueryCondition]:

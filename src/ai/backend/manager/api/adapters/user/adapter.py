@@ -99,7 +99,11 @@ from ai.backend.manager.data.common.types import SearchResult
 from ai.backend.manager.data.keypair.types import KeyPairCreator, KeyPairData
 from ai.backend.manager.data.user.types import UserData, UserStatus
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
-from ai.backend.manager.models.condition_utils import combine_conditions_or, negate_conditions
+from ai.backend.manager.models.condition_utils import (
+    combine_conditions_and,
+    combine_conditions_or,
+    negate_conditions,
+)
 from ai.backend.manager.models.domain.searchable_fields import DomainSearchableFields
 from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.keypair.row import KeyPairRow
@@ -1048,15 +1052,16 @@ class UserAdapter(BaseAdapter):
         if f.OR:
             or_conditions: list[QueryCondition] = []
             for sub in f.OR:
-                or_conditions.extend(self._convert_keypair_filter(sub))
+                sub_conditions = self._convert_keypair_filter(sub)
+                if sub_conditions:
+                    or_conditions.append(combine_conditions_and(sub_conditions))
             if or_conditions:
                 conditions.append(combine_conditions_or(or_conditions))
         if f.NOT:
-            not_conditions: list[QueryCondition] = []
             for sub in f.NOT:
-                not_conditions.extend(self._convert_keypair_filter(sub))
-            if not_conditions:
-                conditions.append(negate_conditions(not_conditions))
+                sub_conditions = self._convert_keypair_filter(sub)
+                if sub_conditions:
+                    conditions.append(negate_conditions(sub_conditions))
         return conditions
 
     def _convert_keypair_orders(self, orders: list[KeypairOrderBy]) -> list[QueryOrder]:
@@ -1123,15 +1128,16 @@ class UserAdapter(BaseAdapter):
         if f.OR:
             or_conditions: list[QueryCondition] = []
             for sub in f.OR:
-                or_conditions.extend(self._convert_user_filter(sub))
+                sub_conditions = self._convert_user_filter(sub)
+                if sub_conditions:
+                    or_conditions.append(combine_conditions_and(sub_conditions))
             if or_conditions:
                 conditions.append(combine_conditions_or(or_conditions))
         if f.NOT:
-            not_conditions: list[QueryCondition] = []
             for sub in f.NOT:
-                not_conditions.extend(self._convert_user_filter(sub))
-            if not_conditions:
-                conditions.append(negate_conditions(not_conditions))
+                sub_conditions = self._convert_user_filter(sub)
+                if sub_conditions:
+                    conditions.append(negate_conditions(sub_conditions))
         return conditions
 
     def _convert_domain_filter(self, f: UserDomainFilter | None) -> list[QueryCondition]:

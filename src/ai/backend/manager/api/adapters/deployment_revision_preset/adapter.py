@@ -75,7 +75,11 @@ from ai.backend.manager.data.deployment_revision_preset.types import (
 )
 from ai.backend.manager.models.base import ResourceOptsEntry
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
-from ai.backend.manager.models.condition_utils import combine_conditions_or, negate_conditions
+from ai.backend.manager.models.condition_utils import (
+    combine_conditions_and,
+    combine_conditions_or,
+    negate_conditions,
+)
 from ai.backend.manager.models.deployment_revision_preset.creators import (
     DeploymentPresetCreator,
     PresetResourceSlotCreator,
@@ -482,7 +486,9 @@ class DeploymentRevisionPresetAdapter(BaseAdapter):
         if filter_.OR:
             or_conds: list[QueryCondition] = []
             for sub in filter_.OR:
-                or_conds.extend(self._convert_allocated_slot_filter(sub))
+                sub_conditions = self._convert_allocated_slot_filter(sub)
+                if sub_conditions:
+                    or_conds.append(combine_conditions_and(sub_conditions))
             if or_conds:
                 conditions.append(combine_conditions_or(or_conds))
         return conditions
@@ -510,15 +516,16 @@ class DeploymentRevisionPresetAdapter(BaseAdapter):
         if filter_.OR:
             or_conds: list[QueryCondition] = []
             for sub in filter_.OR:
-                or_conds.extend(self._convert_filter(sub))
+                sub_conditions = self._convert_filter(sub)
+                if sub_conditions:
+                    or_conds.append(combine_conditions_and(sub_conditions))
             if or_conds:
                 conditions.append(combine_conditions_or(or_conds))
         if filter_.NOT:
-            not_conds: list[QueryCondition] = []
             for sub in filter_.NOT:
-                not_conds.extend(self._convert_filter(sub))
-            if not_conds:
-                conditions.append(negate_conditions(not_conds))
+                sub_conditions = self._convert_filter(sub)
+                if sub_conditions:
+                    conditions.append(negate_conditions(sub_conditions))
         return conditions
 
     def _convert_orders(self, orders: list[DeploymentRevisionPresetOrder]) -> list[QueryOrder]:

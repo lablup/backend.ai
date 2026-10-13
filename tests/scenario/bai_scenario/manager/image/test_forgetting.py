@@ -22,6 +22,7 @@ from bai_scenario.components.image import (
     AnIdThatHoldsNothing,
     AnImageAndACaller,
     AnImageAndSomeone,
+    AnImageSomeoneElseMade,
     AnImageTheCallerMade,
     AnUncustomizedImageAndSomeone,
     Target,
@@ -121,8 +122,9 @@ class TheMakerOfACustomImageMayForgetIt(
     @override
     def describe(self) -> str:
         return (
-            "자기가 만든 커스텀 이미지에 권한까지 받은 사용자가 그것을 소프트 삭제하면, "
-            "이미지 권한과 커스텀 이미지 작성자 검사를 모두 통과해 삭제됨 상태가 반환된다"
+            "자기가 커밋한 커스텀 이미지를 자기 개인 프로젝트의 권한으로 소프트 삭제하면, "
+            "이미지가 그 개인 프로젝트에 속하므로 이미지 권한과 커스텀 이미지 작성자 검사를 "
+            "모두 통과해 삭제됨 상태가 반환된다"
         )
 
     @override
@@ -136,6 +138,34 @@ class TheMakerOfACustomImageMayForgetIt(
     @override
     def then(self) -> Then[AnImageAndACaller, ImageNode]:
         return TheImageNode(status=ImageStatus.DELETED)
+
+
+@dataclass(frozen=True)
+class AnotherUsersCustomImageMayNotBeForgotten(
+    Scenario[TestSeedingSession, AnImageAndACaller, ImageAdapter, ImageNode]
+):
+    @override
+    def summary(self) -> str:
+        return "a-user-may-not-forget-a-custom-image-another-user-made"
+
+    @override
+    def describe(self) -> str:
+        return (
+            "다른 사용자가 커밋한 커스텀 이미지는 그 사람의 개인 프로젝트에 속하므로, "
+            "자기 개인 프로젝트에서 권한을 받은 사용자가 소프트 삭제하려 하면 권한 부족으로 거부된다"
+        )
+
+    @override
+    def given(self) -> Given[TestSeedingSession, AnImageAndACaller]:
+        return AnImageSomeoneElseMade()
+
+    @override
+    def when(self) -> When[AnImageAndACaller, ImageAdapter, ImageNode]:
+        return Forgetting()
+
+    @override
+    def then(self) -> Then[AnImageAndACaller, ImageNode]:
+        return TheCallIsRefused(NotEnoughPermission)
 
 
 @dataclass(frozen=True)
@@ -376,6 +406,7 @@ class AnImageBeingPurgedIsNotVisible(
 SCENARIOS: list[Scenario[TestSeedingSession, AnImageAndACaller, ImageAdapter, ImageNode]] = [
     ForgettingMarksItDeletedAndKeepsTheRow(),
     TheMakerOfACustomImageMayForgetIt(),
+    AnotherUsersCustomImageMayNotBeForgotten(),
     RestoringBringsAForgottenImageBack(),
     RestoringWhatWasNeverForgotten(),
     ForgettingWhatIsNotThere(),

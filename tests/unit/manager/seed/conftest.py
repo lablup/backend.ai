@@ -8,6 +8,7 @@ import pytest
 import yaml
 from sqlalchemy import Table
 
+from ai.backend.manager.models.app_config_definition.row import AppConfigDefinitionRow
 from ai.backend.manager.models.base import ensure_all_tables_registered
 from ai.backend.manager.models.entity_label.row import EntityLabelRow
 from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
@@ -26,8 +27,8 @@ from ai.backend.manager.models.virtual_entity.entity_membership_field import (
 )
 from ai.backend.manager.models.virtual_entity.scope_binding import ScopeBindingRow
 from ai.backend.manager.models.virtual_entity.virtual_entity import VirtualEntityRow
-from ai.backend.manager.repositories.ops.repository import OpsRepository
-from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
+from ai.backend.manager.repositories.ops.v2.seed.provider import SeedOpsProvider
+from ai.backend.manager.repositories.seed.repository import SeedRepository
 from ai.backend.manager.seed.role_preset.kinds import PermissionKinds
 from ai.backend.testutils.db import HasTable, with_tables
 
@@ -58,9 +59,11 @@ _ROLES: dict[str, dict[str, Any]] = {
         "permissions": {"image": ["read"]},
     },
 }
+_APP_CONFIG_DEFINITIONS: list[str] = ["webui", "session_launcher"]
 
 # The tables a seed kind writes, and the graph tables the creation path writes beside them.
 _SEED_TABLES: list[Table | type[HasTable]] = [
+    AppConfigDefinitionRow,
     RolePresetRow,
     RolePermissionPresetRow,
     RoleRow,
@@ -90,8 +93,8 @@ async def db(
 
 
 @pytest.fixture
-def repository(db: ExtendedAsyncSAEngine) -> OpsRepository[Any]:
-    return OpsRepository(V2DBOpsProvider(db))
+def repository(db: ExtendedAsyncSAEngine) -> SeedRepository:
+    return SeedRepository(SeedOpsProvider(db))
 
 
 @pytest.fixture
@@ -111,6 +114,18 @@ def role_seed_dir(tmp_path: Path) -> Path:
         (directory / file_name).write_text(
             yaml.safe_dump({"kind": "role_preset", "version": 1, "items": [item]})
         )
+    return directory
+
+
+@pytest.fixture
+def app_config_definition_seed_dir(tmp_path: Path) -> Path:
+    """A directory with one `app_config_definition` seed file."""
+    directory = tmp_path / "app_config_definition"
+    directory.mkdir()
+    items = [{"config_name": name} for name in _APP_CONFIG_DEFINITIONS]
+    (directory / "definitions.yaml").write_text(
+        yaml.safe_dump({"kind": "app_config_definition", "version": 1, "items": items})
+    )
     return directory
 
 
