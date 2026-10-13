@@ -114,3 +114,20 @@ class TestCheckCommand:
         path = _write(tmp_path / "bad.yaml", _ITEM | {"url": "https://"})
         result = CliRunner().invoke(cli, ["check", str(path)])
         assert result.exit_code != 0
+
+
+class TestContainerRegistrySeedCheck:
+    def test_an_item_keeping_the_rules_passes(self) -> None:
+        assert ContainerRegistrySeed.model_validate(_ITEM).check() == []
+
+    @pytest.mark.parametrize(
+        "item",
+        [
+            {**_ITEM, "registry_name": "  "},
+        ],
+        ids=[
+            "blank-registry-name",
+        ],
+    )
+    def test_an_item_breaking_a_rule_fails(self, item: dict[str, Any]) -> None:
+        assert len(ContainerRegistrySeed.model_validate(item).check()) == 1
