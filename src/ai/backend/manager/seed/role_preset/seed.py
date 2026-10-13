@@ -21,15 +21,7 @@ from ai.backend.manager.repositories.ops.v2.seed.types import SeedWrite
 from ai.backend.manager.seed.base import SeedItem, SeedItems, SeedRejection
 from ai.backend.manager.seed.role_preset.check import RoleSeedChecker
 from ai.backend.manager.seed.role_preset.kinds import PermissionKinds
-
-# The vocabulary a role file writes an operation with, one name per permission bit.
-_OPERATION_NAMES: dict[str, Permission] = {
-    "read": Permission.READ,
-    "update": Permission.UPDATE,
-    "create": Permission.CREATE,
-    "soft_delete": Permission.SOFT_DELETE,
-    "hard_delete": Permission.HARD_DELETE,
-}
+from ai.backend.manager.seed.role_preset.operations import PermissionOperations
 
 
 class RolePresetSeed(SeedItem):
@@ -70,34 +62,7 @@ class RolePresetSeed(SeedItem):
     @model_validator(mode="before")
     @classmethod
     def _read_operations(cls, values: Any) -> Any:
-        if not isinstance(values, dict):
-            return values
-        stated = values.get("permissions")
-        if not isinstance(stated, dict):
-            return values
-        values = dict(values)
-        values["permissions"] = {
-            kind: cls._mask(kind, operations) for kind, operations in stated.items()
-        }
-        return values
-
-    @classmethod
-    def _mask(cls, kind: str, operations: Any) -> Permission:
-        if not isinstance(operations, list):
-            raise ValueError(f"{kind}: expected a list of operations, got {operations!r}")
-        mask = Permission.NONE
-        seen: set[str] = set()
-        for operation in operations:
-            if operation in seen:
-                raise ValueError(f"{kind}: {operation!r} is stated twice")
-            bit = _OPERATION_NAMES.get(operation)
-            if bit is None:
-                raise ValueError(
-                    f"{kind}: {operation!r} is not an operation; one of {sorted(_OPERATION_NAMES)}"
-                )
-            seen.add(operation)
-            mask |= bit
-        return mask
+        return PermissionOperations().read_permissions(values)
 
     def granted(self) -> dict[str, Permission]:
         """The entity types this role is granted at least one operation on."""

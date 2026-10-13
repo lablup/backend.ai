@@ -35,6 +35,7 @@ from ai.backend.manager.models.rbac_models.role_permission_preset.row import (
     RolePermissionPresetRow,
 )
 from ai.backend.manager.models.rbac_models.role_preset.row import RolePresetRow
+from ai.backend.manager.models.rbac_models.user_role.row import UserRoleRow
 from ai.backend.manager.models.resource_group.row import ResourceGroupRow
 from ai.backend.manager.models.resource_policy.row import (
     KeyPairResourcePolicyRow,
@@ -586,6 +587,29 @@ _SESSION_TEMPLATES: dict[str, dict[str, Any]] = {
     },
 }
 
+# Role seed files written for the tests, one role per file. The project role states its
+# permissions, grants `member` and is auto-assigned; the domain role grants `admin`.
+_SCOPED_ROLES: dict[str, dict[str, Any]] = {
+    "research-member.yaml": {
+        "id": "0198a5a0-0000-7000-8000-000000001301",
+        "name": "research_member",
+        "description": "Members of the research project",
+        "scope_type": "project",
+        "scope_id": _PROJECTS["research.yaml"]["id"],
+        "auto_assign": True,
+        "permissions": {"session": ["read", "create"], "vfolder": ["read"]},
+        "users": [_USERS["member.yaml"]["id"]],
+    },
+    "default-auditor.yaml": {
+        "id": "0198a5a0-0000-7000-8000-000000001302",
+        "name": "default_auditor",
+        "scope_type": "domain",
+        "scope_id": _DOMAINS["default.yaml"]["id"],
+        "permissions": {"domain": ["read"]},
+        "users": [_USERS["admin.yaml"]["id"]],
+    },
+}
+
 # The tables a seed kind writes, and the graph tables the creation path writes beside them.
 _SEED_TABLES: list[Table | type[HasTable]] = [
     AppConfigDefinitionRow,
@@ -621,6 +645,7 @@ _SEED_TABLES: list[Table | type[HasTable]] = [
     SessionTemplateRow,
     ResourceGroupRow,
     RoleRow,
+    UserRoleRow,
     VFSStorageRow,
     PermissionRow,
     VirtualEntityRow,
@@ -1131,3 +1156,30 @@ def session_template_seed_dir(session_template_files: Path, template_owner: str)
 @pytest.fixture
 def task_template_id() -> str:
     return str(_SESSION_TEMPLATES["task.yaml"]["id"])
+
+
+@pytest.fixture
+def role_kind_seed_dir(project_seed_dir: Path) -> Path:
+    """The project directory plus the users and the role files, so the scopes and the
+    users the roles name are written first."""
+    (project_seed_dir / "keypair_resource_policy.yaml").write_text(
+        yaml.safe_dump({
+            "kind": "keypair_resource_policy",
+            "version": 1,
+            "items": [_RESOURCE_POLICIES["keypair_resource_policy"]],
+        })
+    )
+    for file_name, user in _USERS.items():
+        (project_seed_dir / f"user-{file_name}").write_text(
+            yaml.safe_dump({"kind": "user", "version": 1, "items": [user]})
+        )
+    for file_name, role in _SCOPED_ROLES.items():
+        (project_seed_dir / f"role-{file_name}").write_text(
+            yaml.safe_dump({"kind": "role", "version": 1, "items": [role]})
+        )
+    return project_seed_dir
+
+
+@pytest.fixture
+def research_member_role_id() -> str:
+    return str(_SCOPED_ROLES["research-member.yaml"]["id"])
