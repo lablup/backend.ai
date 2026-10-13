@@ -65,6 +65,14 @@ async def project(db: ExtendedAsyncSAEngine) -> str:
     return _PROJECT_ID
 
 
+_TASK_TEMPLATE: dict[str, Any] = {
+    "api_version": "6",
+    "kind": "task_template",
+    "metadata": {"name": "python"},
+    "spec": {"kernel": {"image": "python"}},
+}
+
+
 def _plan_of(directory: Path, templates: list[dict[str, Any]]) -> SeedPlan:
     directory.mkdir()
     (directory / "templates.yaml").write_text(
@@ -79,7 +87,7 @@ def project_plan(tmp_path: Path, template_owner: str, project: str) -> SeedPlan:
         "id": _PROJECT_TEMPLATE_ID,
         "user_id": template_owner,
         "project_id": project,
-        "template": {"spec": {}},
+        "template": _TASK_TEMPLATE,
     }
     return _plan_of(tmp_path / "project", [template])
 
@@ -87,8 +95,8 @@ def project_plan(tmp_path: Path, template_owner: str, project: str) -> SeedPlan:
 @pytest.fixture
 def orphan_plan(tmp_path: Path, template_owner: str) -> SeedPlan:
     templates = [
-        {"id": _ORPHAN_TEMPLATE_ID, "user_id": _UNKNOWN_USER_ID, "template": {}},
-        {"id": _PROJECT_TEMPLATE_ID, "user_id": template_owner, "template": {}},
+        {"id": _ORPHAN_TEMPLATE_ID, "user_id": _UNKNOWN_USER_ID, "template": _TASK_TEMPLATE},
+        {"id": _PROJECT_TEMPLATE_ID, "user_id": template_owner, "template": _TASK_TEMPLATE},
     ]
     return _plan_of(tmp_path / "orphan", templates)
 

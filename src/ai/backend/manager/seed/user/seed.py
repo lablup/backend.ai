@@ -137,6 +137,25 @@ class UserSeed(SeedItem):
         )
 
     @override
+    def check(self) -> list[str]:
+        """The rules the create API applies to the container ids and the default keypair."""
+        failures = [
+            f"{name} {value} is negative"
+            for name, value in (
+                ("container_uid", self.container_uid),
+                ("container_main_gid", self.container_main_gid),
+                *(("container_gids", gid) for gid in self.container_gids or []),
+            )
+            if value is not None and value < 0
+        ]
+        failures.extend(
+            f"default keypair {keypair.access_key} is inactive"
+            for keypair in self.keypairs
+            if keypair.is_default and not keypair.is_active
+        )
+        return failures
+
+    @override
     @classmethod
     def reject(cls, files: Sequence[SeedItems[UserSeed]]) -> list[SeedRejection]:
         """The files stating an access key more than once: the keypair upsert keys on it,
