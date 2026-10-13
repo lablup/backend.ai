@@ -45,6 +45,17 @@ def _dead_container(session_id: SessionId) -> Container:
     )
 
 
+def _running_container(session_id: SessionId) -> Container:
+    return Container(
+        id=ContainerId(f"container-{uuid4().hex[:12]}"),
+        status=ContainerStatus.RUNNING,
+        image="python:3.8",
+        labels={LabelName.SESSION_ID: str(session_id)},
+        ports=[],
+        backend_obj=None,
+    )
+
+
 def _tracked_kernel(session_id: SessionId, state: KernelLifecycleStatus) -> MagicMock:
     kernel_obj = MagicMock()
     kernel_obj.session_id = session_id
@@ -132,3 +143,51 @@ class TestSyncContainerLifecycles:
 
         agent.produce_error_event.assert_not_called()
         assert _drain(agent.container_lifecycle_queue) == []
+
+
+class TestAKernelThatStartedDuringTheSync:
+    """The listing is taken before the registry lock. A kernel whose start is handled in between
+    is RUNNING in the registry but absent from that listing, and was cleaned as not found."""
+
+    async def test_a_kernel_whose_container_is_listed_again_is_kept(self) -> None:
+        kernel_id = KernelId(uuid4())
+        session_id = SessionId(uuid4())
+        agent = _make_agent(
+            containers=[],
+            kernel_registry={kernel_id: _tracked_kernel(session_id, KernelLifecycleStatus.RUNNING)},
+        )
+        agent.enumerate_containers = AsyncMock(
+            side_effect=[[], [(kernel_id, _running_container(session_id))]]
+        )
+
+        await AbstractAgent.sync_container_lifecycles(agent)
+
+        assert _drain(agent.container_lifecycle_queue) == []
+        agent.set_container_count.assert_awaited_once_with(1)
+
+    async def test_a_kernel_still_missing_from_the_second_listing_is_cleaned(self) -> None:
+        kernel_id = KernelId(uuid4())
+        session_id = SessionId(uuid4())
+        agent = _make_agent(
+            containers=[],
+            kernel_registry={kernel_id: _tracked_kernel(session_id, KernelLifecycleStatus.RUNNING)},
+        )
+
+        await AbstractAgent.sync_container_lifecycles(agent)
+
+        events = _drain(agent.container_lifecycle_queue)
+        assert [(e.kernel_id, e.reason) for e in events] == [
+            (kernel_id, KernelLifecycleEventReason.CONTAINER_NOT_FOUND)
+        ]
+
+    async def test_nothing_missing_lists_only_once(self) -> None:
+        kernel_id = KernelId(uuid4())
+        session_id = SessionId(uuid4())
+        agent = _make_agent(
+            containers=[(kernel_id, _running_container(session_id))],
+            kernel_registry={kernel_id: _tracked_kernel(session_id, KernelLifecycleStatus.RUNNING)},
+        )
+
+        await AbstractAgent.sync_container_lifecycles(agent)
+
+        assert agent.enumerate_containers.await_count == 1
