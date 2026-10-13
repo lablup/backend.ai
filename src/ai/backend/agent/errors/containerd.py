@@ -73,3 +73,78 @@ class RuntimeProfileLoadError(BackendAIError, web.HTTPInternalServerError):
             operation=ErrorOperation.SETUP,
             error_detail=ErrorDetail.INTERNAL_ERROR,
         )
+
+
+class ContainerdUnavailableError(BackendAIError, web.HTTPServiceUnavailable):
+    """Raised when the containerd socket cannot be used."""
+
+    error_type = "https://api.backend.ai/probs/agent/containerd-unavailable"
+    error_title = "The containerd daemon is unavailable."
+
+    @override
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.AGENT,
+            operation=ErrorOperation.ACCESS,
+            error_detail=ErrorDetail.UNAVAILABLE,
+        )
+
+
+class ContainerdOperationFailed(BackendAIError, web.HTTPInternalServerError):
+    """Raised when a containerd gRPC call fails."""
+
+    error_type = "https://api.backend.ai/probs/agent/containerd-operation-failed"
+    error_title = "A containerd operation failed."
+
+    @override
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.AGENT,
+            operation=ErrorOperation.EXECUTE,
+            error_detail=ErrorDetail.INTERNAL_ERROR,
+        )
+
+
+class ContainerdImageNotFound(BackendAIError, web.HTTPNotFound):
+    """Raised when the image is not in the containerd image store of the namespace."""
+
+    error_type = "https://api.backend.ai/probs/agent/containerd-image-not-found"
+    error_title = "The image is not imported into containerd."
+
+    @override
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.IMAGE,
+            operation=ErrorOperation.READ,
+            error_detail=ErrorDetail.NOT_FOUND,
+        )
+
+
+class ContainerdImageInvalid(BackendAIError, web.HTTPInternalServerError):
+    """Raised when an image in the containerd store has no usable manifest or config."""
+
+    error_type = "https://api.backend.ai/probs/agent/containerd-image-invalid"
+    error_title = "The image in containerd cannot be used."
+
+    @override
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.IMAGE,
+            operation=ErrorOperation.PARSING,
+            error_detail=ErrorDetail.INVALID_DATA_FORMAT,
+        )
+
+
+class KrunnerEnvironmentError(BackendAIError, web.HTTPInternalServerError):
+    """Raised when the kernel runner environment cannot be extracted."""
+
+    error_type = "https://api.backend.ai/probs/agent/krunner-environment-failed"
+    error_title = "The kernel runner environment cannot be prepared."
+
+    @override
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.AGENT,
+            operation=ErrorOperation.SETUP,
+            error_detail=ErrorDetail.INTERNAL_ERROR,
+        )
