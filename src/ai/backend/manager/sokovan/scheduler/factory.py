@@ -65,6 +65,7 @@ from ai.backend.manager.sokovan.scheduler.handlers.maintenance.sweep_sessions im
 )
 from ai.backend.manager.sokovan.scheduler.handlers.observer.base import KernelObserver
 from ai.backend.manager.sokovan.scheduler.handlers.observer.fair_share import FairShareObserver
+from ai.backend.manager.sokovan.scheduler.hooks.registry import HookRegistry
 from ai.backend.manager.sokovan.scheduler.launcher.launcher import (
     SessionLauncher,
     SessionLauncherArgs,
@@ -208,6 +209,7 @@ class CoordinatorHandlersArgs:
     fair_share_calculator: FairShareFactorCalculator
     resource_usage_repository: ResourceUsageHistoryRepository
     fair_share_repository: FairShareRepository
+    hook_registry: HookRegistry
 
 
 def create_coordinator_handlers(args: CoordinatorHandlersArgs) -> CoordinatorHandlers:
@@ -392,5 +394,6 @@ def _create_cleanup_handlers(
             terminator=args.terminator,
             repository=args.repository,
             valkey_schedule=args.valkey_schedule,
+            hook_registry=args.hook_registry,
         ),
     }

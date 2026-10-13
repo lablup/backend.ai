@@ -92,7 +92,7 @@ class LockID(enum.IntEnum):
     LOCKID_SOKOVAN_TARGET_PREPARING = 231  # For operations targeting PREPARING/PULLING sessions
     LOCKID_SOKOVAN_TARGET_CREATING = 232  # For operations targeting CREATING/PREPARED sessions
     LOCKID_SOKOVAN_TARGET_TERMINATING = 233  # For operations targeting TERMINATING sessions
-    LOCKID_SOKOVAN_CLEANUP_FORCE_TERMINATED_TIMER = 234  # Timer for force-terminated cleanup
+    LOCKID_SOKOVAN_CLEANUP_FORCE_TERMINATED = 234  # For force-terminated cleanup
     # Reconciler stage locks
     LOCKID_REPLICA_GROUP_SCALING_RECONCILE = 235  # For replica-group scaling reconcile
     LOCKID_REPLICA_GROUP_ROLLING_RECONCILE = 236  # For replica-group rolling reconcile
