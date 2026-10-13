@@ -3,19 +3,23 @@ from __future__ import annotations
 import asyncio
 import dataclasses
 import uuid
+from collections.abc import Mapping
 from decimal import Decimal
 from ipaddress import IPv4Address, IPv4Network
 from pathlib import Path
-from typing import Any, cast
+from typing import Any, cast, override
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 from pytest_mock import MockerFixture
 
 from ai.backend.agent.config.unified import ContainerdConfig
+from ai.backend.agent.containerd import agent as agent_module
 from ai.backend.agent.containerd.agent import HOST_PORTS_LABEL, ContainerdAgent, _kernel_slots
 from ai.backend.agent.containerd.client import ContainerRecord, TaskInfo, TaskState
 from ai.backend.agent.containerd.network import KernelNetwork
+from ai.backend.agent.containerd.profile.base import KernelLaunch, LaunchPlan, RuntimeProfile
+from ai.backend.agent.containerd.profile.loader import select_profile
 from ai.backend.agent.containerd.profile.runc import RuncProfile
 from ai.backend.agent.errors.agent import UnsupportedBaseDistroError
 from ai.backend.agent.errors.containerd import KernelVerbNotSupported, ProfileNotApplicable
@@ -118,6 +122,120 @@ class TestInitKernelContext:
 
         assert ctx._profile is agent._runc_profile
         assert ctx.distro == "ubuntu22.04"
+
+
+class _PreparingProfile(FakeProfile):
+    events: list[str]
+    _prepared: KernelCreationConfig | None
+    _prepare_error: Exception | None
+    received: list[KernelCreationConfig]
+
+    def __init__(
+        self,
+        events: list[str],
+        *,
+        prepared: KernelCreationConfig | None = None,
+        error: Exception | None = None,
+    ) -> None:
+        super().__init__("coco-tdx", accepts=True)
+        self.events = events
+        self._prepared = prepared
+        self._prepare_error = error
+        self.received = []
+
+    @override
+    async def prepare(self, config: KernelCreationConfig) -> KernelCreationConfig:
+        self.events.append("prepare")
+        self.received.append(config)
+        if self._prepare_error is not None:
+            raise self._prepare_error
+        return self._prepared if self._prepared is not None else config
+
+
+class _TwoMethodProfile:
+    name = "old"
+
+    def accepts(self, slots: Mapping[SlotName, Decimal]) -> bool:
+        return True
+
+    def plan(self, kernel: KernelLaunch) -> LaunchPlan:
+        raise NotImplementedError
+
+
+class TestInitKernelContextPrepare:
+    async def test_prepare_runs_after_select_and_before_the_context(
+        self,
+        agent: ContainerdAgent,
+        monkeypatch: pytest.MonkeyPatch,
+        ownership_data: KernelOwnershipData,
+        kernel_config: KernelCreationConfig,
+    ) -> None:
+        events: list[str] = []
+        profile = _PreparingProfile(events)
+        agent._runtime_profiles = [profile]
+
+        def select(*args: Any, **kwargs: Any) -> RuntimeProfile:
+            events.append("select")
+            return select_profile(*args, **kwargs)
+
+        def context(*args: Any, **kwargs: Any) -> Any:
+            events.append("context")
+            return MagicMock()
+
+        monkeypatch.setattr(agent_module, "select_profile", select)
+        monkeypatch.setattr(agent_module, "ContainerdKernelCreationContext", context)
+
+        await agent.init_kernel_context(ownership_data, MagicMock(), kernel_config)
+
+        assert events == ["select", "prepare", "context"]
+        assert profile.received == [kernel_config]
+
+    async def test_returned_config_reaches_the_context(
+        self,
+        agent: ContainerdAgent,
+        ownership_data: KernelOwnershipData,
+        kernel_config: KernelCreationConfig,
+    ) -> None:
+        image = cast(ImageConfig, {**kernel_config["image"], "repo_digest": "sha256:" + "a" * 64})
+        prepared = cast(KernelCreationConfig, {**kernel_config, "image": image})
+        profile = _PreparingProfile([], prepared=prepared)
+        agent._runtime_profiles = [profile]
+
+        ctx = await agent.init_kernel_context(ownership_data, MagicMock(), kernel_config)
+
+        assert ctx.kernel_config is prepared
+        assert ctx.kernel_config["image"].get("repo_digest") == "sha256:" + "a" * 64
+        assert kernel_config["image"].get("repo_digest") is None
+
+    async def test_prepare_error_propagates_and_no_context_is_built(
+        self,
+        agent: ContainerdAgent,
+        monkeypatch: pytest.MonkeyPatch,
+        ownership_data: KernelOwnershipData,
+        kernel_config: KernelCreationConfig,
+    ) -> None:
+        agent._runtime_profiles = [_PreparingProfile([], error=ProfileNotApplicable("registry"))]
+        context = MagicMock()
+        monkeypatch.setattr(agent_module, "ContainerdKernelCreationContext", context)
+
+        with pytest.raises(ProfileNotApplicable, match="registry"):
+            await agent.init_kernel_context(ownership_data, MagicMock(), kernel_config)
+
+        context.assert_not_called()
+
+    async def test_two_method_profile_still_works(
+        self,
+        agent: ContainerdAgent,
+        ownership_data: KernelOwnershipData,
+        kernel_config: KernelCreationConfig,
+    ) -> None:
+        profile = _TwoMethodProfile()
+        agent._runtime_profiles = [cast(RuntimeProfile, profile)]
+
+        ctx = await agent.init_kernel_context(ownership_data, MagicMock(), kernel_config)
+
+        assert ctx._profile.name == "old"
+        assert ctx.kernel_config is kernel_config
 
 
 class TestKernelSlots:
