@@ -443,13 +443,8 @@ async def test_authorize_with_valkey_cross_check_cleans_stale_sessions(
     result = await auth_service.authorize(action)
 
     # Stale session should have been invalidated in DB
-<<<<<<< HEAD
-    mock_auth_repository.delete_login_session_by_token.assert_awaited_once_with(
-        "stale_token", LoginAttemptResult.EXPIRED
-=======
     mock_auth_repository.delete_login_sessions_by_tokens.assert_awaited_once_with(
-        ["stale_token"], LoginAttemptResult.EXPIRED, None
->>>>>>> f264ef828 (fix(BA-8376): check login sessions against Valkey in one request (#15413))
+        ["stale_token"], LoginAttemptResult.EXPIRED
     )
     assert result.authorization_result is not None
     assert result.authorization_result.session_token == "new_session_token"

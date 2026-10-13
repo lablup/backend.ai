@@ -300,19 +300,11 @@ class AuthService:
             if data:
                 live_sessions.append(session_info)
             else:
-<<<<<<< HEAD
-                await self._auth_repository.delete_login_session_by_token(
-                    session_info.session_token, LoginAttemptResult.EXPIRED
-                )
-=======
                 expired_tokens.append(session_info.session_token)
         if expired_tokens:
             await self._auth_repository.delete_login_sessions_by_tokens(
-                expired_tokens,
-                LoginAttemptResult.EXPIRED,
-                await self._recorded_client_ip(),
+                expired_tokens, LoginAttemptResult.EXPIRED
             )
->>>>>>> f264ef828 (fix(BA-8376): check login sessions against Valkey in one request (#15413))
 
         return main_keypair_row, live_sessions
 
