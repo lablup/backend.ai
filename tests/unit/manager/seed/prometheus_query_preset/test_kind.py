@@ -116,3 +116,28 @@ class TestCheckCommand:
         path = _write(tmp_path / "bad.yaml", {**_ITEM, "name": ""})
         result = CliRunner().invoke(cli, ["check", str(path)])
         assert result.exit_code != 0
+
+
+class TestPrometheusQueryPresetSeedCheck:
+    def test_an_item_keeping_the_rules_passes(self) -> None:
+        assert PrometheusQueryPresetSeed.model_validate(_ITEM).check() == []
+
+    @pytest.mark.parametrize(
+        "item",
+        [
+            {**_ITEM, "name": "  "},
+            {**_ITEM, "rank": -1},
+            {**_ITEM, "time_window": "five minutes"},
+            {**_ITEM, "query_template": "sum(x{{{labels}}})"},
+            {**_ITEM, "query_template": "sum(x{${{ unknown }}})"},
+        ],
+        ids=[
+            "blank-name",
+            "negative-rank",
+            "not-a-duration",
+            "legacy-template",
+            "unknown-variable",
+        ],
+    )
+    def test_an_item_breaking_a_rule_fails(self, item: dict[str, Any]) -> None:
+        assert len(PrometheusQueryPresetSeed.model_validate(item).check()) == 1

@@ -110,6 +110,13 @@ class RolePresetSeed(SeedItem):
         )
 
     @override
+    def check(self) -> list[str]:
+        """The rule the create API applies to the name."""
+        if not self.name.strip():
+            return ["name is blank"]
+        return []
+
+    @override
     @classmethod
     def reject(cls, files: Sequence[SeedItems[RolePresetSeed]]) -> list[SeedRejection]:
         sources_by_name: dict[str, set[str]] = defaultdict(set)

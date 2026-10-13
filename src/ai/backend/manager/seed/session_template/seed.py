@@ -8,7 +8,13 @@ from pydantic import Field
 from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.session_template import SessionTemplateID
 from ai.backend.common.data.entity.user import UserID
-from ai.backend.manager.data.session_template.types import TemplateType
+from ai.backend.common.exception import BackendAIError
+from ai.backend.manager.data.session_template.types import (
+    ClusterTemplate,
+    TaskTemplate,
+    TemplateType,
+)
+from ai.backend.manager.exceptions import InvalidArgument
 from ai.backend.manager.models.session_template.upserters import SessionTemplateUpserter
 from ai.backend.manager.repositories.ops.v2.seed.types import SeedWrite
 from ai.backend.manager.seed.base import SeedItem, SeedItems, SeedRejection
@@ -45,6 +51,17 @@ class SessionTemplateSeed(SeedItem):
             field_upserters=[],
             field_purgers=[],
         )
+
+    @override
+    def check(self) -> list[str]:
+        """The rule the create API applies to the template: it fits the document of its
+        type."""
+        document = TaskTemplate if self.type is TemplateType.TASK else ClusterTemplate
+        try:
+            document.check(self.template)
+        except (BackendAIError, InvalidArgument) as e:
+            return [f"template does not fit a {self.type} template: {e}"]
+        return []
 
     @override
     @classmethod
