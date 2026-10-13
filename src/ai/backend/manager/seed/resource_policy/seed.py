@@ -73,6 +73,13 @@ class KeyPairResourcePolicySeed(SeedItem):
         )
 
     @override
+    def check(self) -> list[str]:
+        """The rule the create API applies to the name."""
+        if not self.name.strip():
+            return ["name is blank"]
+        return []
+
+    @override
     @classmethod
     def reject(cls, files: Sequence[SeedItems[KeyPairResourcePolicySeed]]) -> list[SeedRejection]:
         return []
@@ -110,6 +117,16 @@ class UserResourcePolicySeed(SeedItem):
         )
 
     @override
+    def check(self) -> list[str]:
+        """The rules the create API applies to the name and the login limit."""
+        failures: list[str] = []
+        if not self.name.strip():
+            failures.append("name is blank")
+        if self.max_concurrent_logins is not None and self.max_concurrent_logins < 1:
+            failures.append(f"max_concurrent_logins {self.max_concurrent_logins} is below 1")
+        return failures
+
+    @override
     @classmethod
     def reject(cls, files: Sequence[SeedItems[UserResourcePolicySeed]]) -> list[SeedRejection]:
         return []
@@ -141,6 +158,13 @@ class ProjectResourcePolicySeed(SeedItem):
             field_upserters=[],
             field_purgers=[],
         )
+
+    @override
+    def check(self) -> list[str]:
+        """The rule the create API applies to the name."""
+        if not self.name.strip():
+            return ["name is blank"]
+        return []
 
     @override
     @classmethod

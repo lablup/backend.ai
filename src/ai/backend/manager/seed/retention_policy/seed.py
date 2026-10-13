@@ -40,6 +40,10 @@ class RetentionPolicySeed(SeedItem):
         )
 
     @override
+    def check(self) -> list[str]:
+        return []
+
+    @override
     @classmethod
     def reject(cls, files: Sequence[SeedItems[RetentionPolicySeed]]) -> list[SeedRejection]:
         return []
