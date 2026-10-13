@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from ai.backend.manager.seed.app_config_allow_list.seed import AppConfigAllowListSeed
 from ai.backend.manager.seed.app_config_definition.seed import AppConfigDefinitionSeed
+from ai.backend.manager.seed.app_config_fragment.seed import AppConfigFragmentSeed
 from ai.backend.manager.seed.client_ip_masking_policy.seed import ClientIPMaskingPolicySeed
 from ai.backend.manager.seed.container_registry.seed import ContainerRegistrySeed
 from ai.backend.manager.seed.deployment_preset.seed import DeploymentPresetSeed
@@ -65,4 +66,5 @@ def create_seed_kind_registry() -> SeedKindRegistry:
         SeedKind.PROJECT: (1, ProjectSeed),
         SeedKind.DEPLOYMENT_PRESET: (1, DeploymentPresetSeed),
         SeedKind.RESOURCE_GROUP: (1, ResourceGroupSeed),
+        SeedKind.APP_CONFIG_FRAGMENT: (1, AppConfigFragmentSeed),
     })

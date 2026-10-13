@@ -10,6 +10,7 @@ from sqlalchemy import Table
 
 from ai.backend.manager.models.app_config_allow_list.row import AppConfigAllowListRow
 from ai.backend.manager.models.app_config_definition.row import AppConfigDefinitionRow
+from ai.backend.manager.models.app_config_fragment.row import AppConfigFragmentRow
 from ai.backend.manager.models.base import ensure_all_tables_registered
 from ai.backend.manager.models.client_ip_masking.row import ClientIPMaskingPolicyRow
 from ai.backend.manager.models.container_registry.row import ContainerRegistryRow
@@ -92,6 +93,16 @@ _APP_CONFIG_ALLOW_LISTS: list[dict[str, Any]] = [
     {"config_name": "webui", "scope_type": "public"},
     {"config_name": "webui", "scope_type": "user", "rank": 350},
     {"config_name": "session_launcher", "scope_type": "domain"},
+]
+# Fragments at the `public` scope and at the `default` domain of `_DOMAINS`.
+_APP_CONFIG_FRAGMENTS: list[dict[str, Any]] = [
+    {"config_name": "webui", "scope_type": "public", "config": {"theme": "light"}},
+    {
+        "config_name": "session_launcher",
+        "scope_type": "domain",
+        "scope_id": "0198a5a0-0000-7000-8000-00000000d001",
+        "config": {"default_image": "python:3.13"},
+    },
 ]
 _RESOURCE_SLOT_TYPES: list[dict[str, Any]] = [
     {
@@ -478,6 +489,7 @@ _PROJECTS: dict[str, dict[str, Any]] = {
 _SEED_TABLES: list[Table | type[HasTable]] = [
     AppConfigDefinitionRow,
     AppConfigAllowListRow,
+    AppConfigFragmentRow,
     ResourceSlotTypeRow,
     LoginClientTypeRow,
     RetentionPolicyRow,
@@ -580,6 +592,24 @@ def app_config_allow_list_seed_dir(app_config_definition_seed_dir: Path) -> Path
         })
     )
     return app_config_definition_seed_dir
+
+
+@pytest.fixture
+def app_config_fragment_seed_dir(
+    tmp_path: Path, app_config_allow_list_seed_dir: Path, domain_seed_dir: Path
+) -> Path:
+    """The `app_config_allow_list` and `domain` directories plus one `app_config_fragment`
+    seed file, so the entries and the owning domain are written first."""
+    directory = tmp_path / "app_config_fragment"
+    directory.mkdir()
+    (directory / "fragments.yaml").write_text(
+        yaml.safe_dump({
+            "kind": "app_config_fragment",
+            "version": 1,
+            "items": _APP_CONFIG_FRAGMENTS,
+        })
+    )
+    return tmp_path
 
 
 @pytest.fixture
