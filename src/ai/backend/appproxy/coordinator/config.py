@@ -215,9 +215,8 @@ class DBConfig(BaseSchema):
         BackendAIConfigMeta(
             description=(
                 "Whether to test connections with a lightweight ping before using them. "
-                "Detects stale or disconnected connections at pool checkout and transparently "
-                "reconnects them with clean transaction state, preventing 'SAVEPOINT can only be "
-                "used in transaction blocks' errors after a Postgres connection drop or failover. "
+                "Detects connections closed by the server or the network at pool checkout "
+                "and replaces them. "
                 "Adds a small overhead per checkout but is recommended for production."
             ),
             added_version="26.8.0",
