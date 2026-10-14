@@ -37,6 +37,7 @@ from ai.backend.common.data.entity.session import SessionID
 from ai.backend.common.data.entity.session_group import SessionGroupID
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.filter_specs import UUIDInMatchSpec
+from ai.backend.common.data.system_session_environ.types import SystemSessionEnvironScopeType
 from ai.backend.common.events.event_types.kernel.types import (
     KernelCreationInfo,
     KernelLifecycleEventReason,
@@ -82,6 +83,7 @@ from ai.backend.manager.data.session.types import (
     SessionSchedulingHistoryData,
     SessionStatus,
 )
+from ai.backend.manager.data.system_session_environ.types import SystemSessionEnvironData
 from ai.backend.manager.errors.api import InvalidAPIParameters
 from ai.backend.manager.errors.image import ImageNotFound
 from ai.backend.manager.errors.network import NetworkNotFound
@@ -127,6 +129,7 @@ from ai.backend.manager.models.session.searchers import SessionInfoSearcher, Ses
 from ai.backend.manager.models.session.updaters import SessionStatusBatchUpdater
 from ai.backend.manager.models.session_group.row import SessionGroupRow
 from ai.backend.manager.models.specs.creator import FieldToCreate, NestedFieldToCreate
+from ai.backend.manager.models.system_session_environ.row import SystemSessionEnvironRow
 from ai.backend.manager.models.user.row import UserRow
 from ai.backend.manager.models.utils import (
     ExtendedAsyncSAEngine,
@@ -4611,7 +4614,36 @@ class ScheduleDBSource:
                 user_result = await db_sess.execute(user_query)
                 user_map = {row.uuid: row for row in user_result.fetchall()}
 
-            # 4. Resolve image configs
+            # 4. Query the system session environ rows at each session's scopes
+            system_environ_map: defaultdict[SessionId, list[SystemSessionEnvironData]] = (
+                defaultdict(list)
+            )
+            environ_query = (
+                sa.select(SessionRow.id, SystemSessionEnvironRow)
+                .select_from(SessionRow)
+                .join(
+                    SystemSessionEnvironRow,
+                    sa.or_(
+                        SystemSessionEnvironRow.scope_type == SystemSessionEnvironScopeType.GLOBAL,
+                        sa.and_(
+                            SystemSessionEnvironRow.scope_type
+                            == SystemSessionEnvironScopeType.DOMAIN,
+                            SystemSessionEnvironRow.scope_id == SessionRow.domain_id,
+                        ),
+                        sa.and_(
+                            SystemSessionEnvironRow.scope_type
+                            == SystemSessionEnvironScopeType.PROJECT,
+                            SystemSessionEnvironRow.scope_id == SessionRow.group_id,
+                        ),
+                    ),
+                )
+                .where(SessionRow.id.in_(session_ids))
+            )
+            environ_result = await db_sess.execute(environ_query)
+            for session_id, environ_row in environ_result.tuples():
+                system_environ_map[session_id].append(environ_row.to_data())
+
+            # 5. Resolve image configs
             image_configs = await self._resolve_image_configs(db_sess, unique_images)
 
             # Build SessionDataForStart objects
@@ -4633,6 +4665,7 @@ class ScheduleDBSource:
                         cluster_mode=session_info["cluster_mode"],
                         kernels=session_info["kernels"],
                         environ=session_info.get("environ") or {},
+                        system_environ=system_environ_map.get(session_id, []),
                         user_uuid=session_info["user_uuid"],
                         user_email=user_info.email,
                         user_name=user_info.username,

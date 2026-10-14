@@ -689,6 +689,7 @@ def sessions_for_start_factory() -> Callable[..., SessionsForStartWithImages]:
                 user_email="test@example.com",
                 user_name="test-user",
                 environ={},
+                system_environ=[],
             )
             for s in sessions
         ]

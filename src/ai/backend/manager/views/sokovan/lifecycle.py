@@ -20,6 +20,7 @@ from ai.backend.common.types import (
 from ai.backend.manager.data.kernel.types import KernelInfo, KernelStatus
 from ai.backend.manager.data.network.types import NetworkType
 from ai.backend.manager.data.session.types import SchedulingResult, SessionInfo
+from ai.backend.manager.data.system_session_environ.types import SystemSessionEnvironData
 from ai.backend.manager.defs import DEFAULT_ROLE
 from ai.backend.manager.errors.kernel import MainKernelNotFound, TooManyKernelsFound
 
@@ -82,6 +83,7 @@ class SessionDataForStart:
     user_email: str
     user_name: str
     environ: dict[str, str]
+    system_environ: list[SystemSessionEnvironData]
     network_type: NetworkType | None = None
     network_id: str | None = None
 

@@ -5,7 +5,6 @@ import logging
 from collections import defaultdict
 from collections.abc import Awaitable, Mapping
 from dataclasses import dataclass
-from itertools import groupby
 from typing import Any
 from uuid import UUID
 
@@ -44,6 +43,10 @@ from ai.backend.manager.repositories.scheduler.repository import (
     SchedulerRepository,
 )
 from ai.backend.manager.sokovan.recorder.context import RecorderContext
+from ai.backend.manager.sokovan.scheduler.launcher.session_environ import (
+    build_session_environ,
+    count_cluster_replicas,
+)
 from ai.backend.manager.views.sokovan.config import NetworkSetup
 from ai.backend.manager.views.sokovan.image import ImageConfigData
 from ai.backend.manager.views.sokovan.lifecycle import (
@@ -258,37 +261,8 @@ class SessionLauncher:
             network_setup = await self._setup_network_configuration(session)
             log.debug("ssh connection info mapping: {}", network_setup.cluster_ssh_port_mapping)
 
-            # Setup environment variables - similar to registry.py
-            # Group kernels by cluster role for replica counting
-            keyfunc = lambda k: k.cluster_role
-            replicas = {
-                cluster_role: len(list(group_iterator))
-                for cluster_role, group_iterator in groupby(
-                    sorted(session.kernels, key=keyfunc),
-                    key=keyfunc,
-                )
-            }
-            environ: dict[str, str] = {
-                **session.environ,
-                "BACKENDAI_USER_UUID": str(session.user_uuid),
-                "BACKENDAI_USER_EMAIL": session.user_email,
-                "BACKENDAI_USER_NAME": session.user_name,
-                "BACKENDAI_SESSION_ID": str(session.session_id),
-                "BACKENDAI_SESSION_NAME": str(session.name),
-                "BACKENDAI_CLUSTER_SIZE": str(len(session.kernels)),
-                "BACKENDAI_CLUSTER_REPLICAS": ",".join(f"{k}:{v}" for k, v in replicas.items()),
-                "BACKENDAI_CLUSTER_HOSTS": ",".join(
-                    k.cluster_hostname or f"{k.cluster_role}{k.cluster_idx}"
-                    for k in session.kernels
-                ),
-                "BACKENDAI_ACCESS_KEY": session.access_key,
-                # BACKENDAI_SERVICE_PORTS are set as per-kernel env-vars.
-                "BACKENDAI_PREOPEN_PORTS": (
-                    ",".join(str(port) for port in session.kernels[0].preopen_ports)
-                    if session.kernels and session.kernels[0].preopen_ports
-                    else ""
-                ),
-            }
+            replicas = count_cluster_replicas(session.kernels)
+            environ = build_session_environ(session)
 
             # Group kernels by agent to minimize RPC calls
             kernels_by_agent: defaultdict[AgentId, list[KernelBindingData]] = defaultdict(list)

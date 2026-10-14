@@ -277,6 +277,7 @@ def _create_session_for_start(
         network_id=network_id,
         kernels=kernels,
         environ={},
+        system_environ=[],
     )
 
 

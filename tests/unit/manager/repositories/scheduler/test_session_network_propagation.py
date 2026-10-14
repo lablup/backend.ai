@@ -51,6 +51,7 @@ from ai.backend.manager.models.session.row import SessionRow
 from ai.backend.manager.models.session.searchable_fields import SessionSearchableFields
 from ai.backend.manager.models.session.searchers import SessionSearcher
 from ai.backend.manager.models.specs.pagination import NoPagination
+from ai.backend.manager.models.system_session_environ.row import SystemSessionEnvironRow
 from ai.backend.manager.models.user.row import UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.ops.v2.reconciler.provider import ReconcileOpsProvider
@@ -83,6 +84,7 @@ class TestPersistentNetworkNotRecreated:
                 KernelRow,
                 ResourceSlotTypeRow,
                 ResourceAllocationRow,
+                SystemSessionEnvironRow,
             ],
         ):
             yield database_connection
