@@ -257,6 +257,17 @@ def scheduling_handler() -> None:
 
 @admin.group(
     cls=LazyGroup,
+    import_name=(
+        "ai.backend.client.cli.v2.admin.session_lifecycle_handler:session_lifecycle_handler"
+    ),
+    name="session-lifecycle-handler",
+)
+def session_lifecycle_handler() -> None:
+    """Admin session lifecycle handler commands."""
+
+
+@admin.group(
+    cls=LazyGroup,
     import_name="ai.backend.client.cli.v2.admin.role_preset:role_preset",
     name="role-preset",
 )
