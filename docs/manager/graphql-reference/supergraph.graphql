@@ -452,6 +452,9 @@ input AgentFilter
   @join__type(graph: STRAWBERRY)
 {
   id: StringFilter = null
+
+  """Added in 26.10.0. Filter by agent entity ID."""
+  entityId: UUIDFilter = null
   status: AgentStatusFilter = null
   schedulable: Boolean = null
   scalingGroup: StringFilter = null
@@ -649,6 +652,9 @@ input AgentResourceSlotFilter
 
   """Added in 26.10.0. Filter by pre-reserved amount."""
   prereserved: DecimalFilter = null
+
+  """Added in 26.10.0. Filter by agent resource slot ID."""
+  fieldId: UUIDFilter = null
   AND: [AgentResourceSlotFilter!] = null
   OR: [AgentResourceSlotFilter!] = null
   NOT: [AgentResourceSlotFilter!] = null
@@ -1076,6 +1082,9 @@ input AppConfigAllowListFilter
   """Filter by last update datetime."""
   updatedAt: DateTimeFilter = null
 
+  """Added in 26.10.0. Filter by allow-list entry ID."""
+  entityId: UUIDFilter = null
+
   """Added in 26.7.0. Match all of the given sub-filters."""
   AND: [AppConfigAllowListFilter!] = null
 
@@ -1172,6 +1181,9 @@ input AppConfigDefinitionFilter
 
   """Filter by last update datetime."""
   updatedAt: DateTimeFilter = null
+
+  """Added in 26.10.0. Filter by definition ID."""
+  entityId: UUIDFilter = null
 
   """Added in 26.7.0. Match all of the given sub-filters."""
   AND: [AppConfigDefinitionFilter!] = null
@@ -1277,6 +1289,9 @@ input AppConfigFragmentFilter
 
   """Filter by last update datetime."""
   updatedAt: DateTimeFilter = null
+
+  """Added in 26.10.0. Filter by fragment ID."""
+  entityId: UUIDFilter = null
 
   """Match all of the given sub-filters."""
   AND: [AppConfigFragmentFilter!] = null
@@ -1486,6 +1501,9 @@ input ArtifactFilter
   registry: StringFilter = null
   source: StringFilter = null
   availability: [ArtifactAvailability!] = null
+
+  """Added in 26.10.0. Filter by artifact ID."""
+  entityId: UUIDFilter = null
   AND: [ArtifactFilter!] = null
   OR: [ArtifactFilter!] = null
   NOT: [ArtifactFilter!] = null
@@ -1689,6 +1707,9 @@ input ArtifactRevisionFilter
   """The artifact id field."""
   artifactId: UUIDFilter = null
   size: IntFilter = null
+
+  """Added in 26.10.0. Filter by artifact revision ID."""
+  fieldId: UUIDFilter = null
   AND: [ArtifactRevisionFilter!] = null
   OR: [ArtifactRevisionFilter!] = null
   NOT: [ArtifactRevisionFilter!] = null
@@ -1984,6 +2005,9 @@ input AuditLogFilter
 
   """Added in 26.10.0. Entity ID filter."""
   targetEntityId: UUIDFilter = null
+
+  """Added in 26.10.0. Filter by audit log ID."""
+  fieldId: UUIDFilter = null
   operation: StringFilter = null
   status: AuditLogStatusFilter = null
   createdAt: DateTimeFilter = null
@@ -2170,6 +2194,9 @@ input AuditLogScopeEntryFilter
 
   """Scope ID filter."""
   scopeId: UUIDFilter = null
+
+  """Filter by audit log scope entry ID."""
+  fieldId: UUIDFilter = null
 }
 
 """
@@ -3530,6 +3557,9 @@ input ClientIPMaskingPolicyFilter
 
   """Filter by masking mode."""
   mode: ClientIPMaskingMode = null
+
+  """Added in 26.10.0. Filter by client IP masking policy ID."""
+  entityId: UUIDFilter = null
 }
 
 """Added in 26.9.0. Order specification for client IP masking policies."""
@@ -4160,6 +4190,9 @@ input ContainerRegistryV2Filter
   registryName: StringFilter = null
   type: ContainerRegistryTypeFilter = null
   isGlobal: Boolean = null
+
+  """Added in 26.10.0. Filter by container registry ID."""
+  entityId: UUIDFilter = null
 
   """Added in 26.7.0. Match all of the given sub-filters."""
   AND: [ContainerRegistryV2Filter!] = null
@@ -6715,7 +6748,11 @@ type DeploymentHistoryEdge
 input DeploymentHistoryFilter
   @join__type(graph: STRAWBERRY)
 {
-  id: UUIDFilter = null
+  """Filter by history record ID."""
+  id: UUIDFilter = null @deprecated(reason: "Deprecated since 26.10.0. Use `fieldId`.")
+
+  """Added in 26.10.0. Filter by history record ID."""
+  fieldId: UUIDFilter = null
   deploymentId: UUIDFilter = null
   phase: StringFilter = null
   fromStatus: [String!] = null
@@ -6916,7 +6953,10 @@ input DeploymentRevisionPresetFilter
   @join__type(graph: STRAWBERRY)
 {
   """Added in 26.4.4. Filter by preset ID."""
-  id: UUIDFilter = null
+  id: UUIDFilter = null @deprecated(reason: "Deprecated since 26.10.0. Use `entityId`.")
+
+  """Added in 26.10.0. Filter by preset ID."""
+  entityId: UUIDFilter = null
 
   """Name filter."""
   name: StringFilter = null
@@ -7687,6 +7727,9 @@ input DomainUsageBucketFilter
   """Filter by usage measurement period end date."""
   periodEnd: DateFilter = null
 
+  """Added in 26.10.0. Filter by domain usage bucket ID."""
+  fieldId: UUIDFilter = null
+
   """Combine multiple filters with AND logic. All conditions must match."""
   AND: [DomainUsageBucketFilter!] = null
 
@@ -7832,7 +7875,10 @@ input DomainV2Filter
   name: StringFilter = null
 
   """Added in 26.9.0. Filter by domain uuid."""
-  id: UUIDFilter = null
+  id: UUIDFilter = null @deprecated(reason: "Deprecated since 26.10.0. Use `entityId`.")
+
+  """Added in 26.10.0. Filter by domain ID."""
+  entityId: UUIDFilter = null
   description: StringFilter = null
   isActive: Boolean = null
   createdAt: DateTimeFilter = null
@@ -8318,6 +8364,9 @@ input EntityLabelFilter
   value: StringFilter = null
   entityType: StringFilter = null
   entityId: UUIDFilter = null
+
+  """Added in 26.10.0. Filter by label ID."""
+  fieldId: UUIDFilter = null
   AND: [EntityLabelFilter!] = null
   OR: [EntityLabelFilter!] = null
   NOT: [EntityLabelFilter!] = null
@@ -8531,6 +8580,9 @@ input EntityShareFilter
 
   """Exact address match."""
   recipientEmail: String = null
+
+  """Added in 26.10.0. Filter by entity share ID."""
+  entityId: UUIDFilter = null
 }
 
 """Added in 26.9.0. Order specification."""
@@ -9426,6 +9478,9 @@ input IdleCheckerFilter
   """Update timestamp filter."""
   updatedAt: DateTimeFilter = null
 
+  """Added in 26.10.0. Filter by idle checker ID."""
+  entityId: UUIDFilter = null
+
   """Match all nested filters."""
   AND: [IdleCheckerFilter!] = null
 
@@ -9955,7 +10010,10 @@ input ImageV2Filter
   architecture: StringFilter = null
 
   """Added in 26.4.4. Filter by image UUID."""
-  id: UUIDFilter = null
+  id: UUIDFilter = null @deprecated(reason: "Deprecated since 26.10.0. Use `entityId`.")
+
+  """Added in 26.10.0. Filter by image ID."""
+  entityId: UUIDFilter = null
 
   """Added in 26.4.0. Filter by container registry ID."""
   registryId: UUIDFilter = null
@@ -10508,6 +10566,9 @@ input KernelResourceAllocationFilter
   @join__type(graph: STRAWBERRY)
 {
   slotName: StringFilter = null
+
+  """Added in 26.10.0. Filter by resource allocation ID."""
+  fieldId: UUIDFilter = null
   AND: [KernelResourceAllocationFilter!] = null
   OR: [KernelResourceAllocationFilter!] = null
   NOT: [KernelResourceAllocationFilter!] = null
@@ -10584,7 +10645,11 @@ type KernelSchedulingHistoryEdge
 input KernelSchedulingHistoryFilter
   @join__type(graph: STRAWBERRY)
 {
-  id: UUIDFilter = null
+  """Filter by history record ID."""
+  id: UUIDFilter = null @deprecated(reason: "Deprecated since 26.10.0. Use `fieldId`.")
+
+  """Added in 26.10.0. Filter by history record ID."""
+  fieldId: UUIDFilter = null
   kernelId: UUIDFilter = null
   sessionId: UUIDFilter = null
   phase: StringFilter = null
@@ -10760,7 +10825,11 @@ type KernelV2Edge
 input KernelV2Filter
   @join__type(graph: STRAWBERRY)
 {
-  id: UUIDFilter = null
+  """Filter by kernel ID."""
+  id: UUIDFilter = null @deprecated(reason: "Deprecated since 26.10.0. Use `fieldId`.")
+
+  """Added in 26.10.0. Filter by kernel ID."""
+  fieldId: UUIDFilter = null
   status: KernelV2StatusFilter = null
   sessionId: UUIDFilter = null
   AND: [KernelV2Filter!] = null
@@ -10980,6 +11049,9 @@ input KeypairFilter
   userId: UUIDFilter = null
   createdAt: DateTimeFilter = null
   lastUsed: DateTimeFilter = null
+
+  """Added in 26.10.0. Filter by keypair ID."""
+  fieldId: UUIDFilter = null
   AND: [KeypairFilter!] = null
   OR: [KeypairFilter!] = null
   NOT: [KeypairFilter!] = null
@@ -11177,6 +11249,9 @@ input KeypairResourcePolicyV2Filter
   Added in 26.4.4. Filter policies by their assigned keypairs. A policy matches if at least one of its keypairs satisfies the conditions.
   """
   keypair: KeypairResourcePolicyKeypairNestedFilter = null
+
+  """Added in 26.10.0. Filter by keypair resource policy ID."""
+  entityId: UUIDFilter = null
 
   """Added in 26.7.0. Match all of the given sub-filters."""
   AND: [KeypairResourcePolicyV2Filter!] = null
@@ -11481,6 +11556,9 @@ input LoginClientTypeFilter
   """Filter by last modification datetime."""
   modifiedAt: DateTimeFilter = null
 
+  """Added in 26.10.0. Filter by login client type ID."""
+  entityId: UUIDFilter = null
+
   """Added in 26.7.0. Match all of the given sub-filters."""
   AND: [LoginClientTypeFilter!] = null
 
@@ -11520,6 +11598,9 @@ input LoginHistoryFilter
   domainName: StringFilter = null
   result: LoginHistoryResultFilter = null
   createdAt: DateTimeFilter = null
+
+  """Added in 26.10.0. Filter by login history ID."""
+  fieldId: UUIDFilter = null
   AND: [LoginHistoryFilter!] = null
   OR: [LoginHistoryFilter!] = null
   NOT: [LoginHistoryFilter!] = null
@@ -11630,6 +11711,9 @@ input LoginSessionFilter
   accessKey: StringFilter = null
   createdAt: DateTimeFilter = null
   lastAccessedAt: DateTimeFilter = null
+
+  """Added in 26.10.0. Filter by login session ID."""
+  fieldId: UUIDFilter = null
   AND: [LoginSessionFilter!] = null
   OR: [LoginSessionFilter!] = null
   NOT: [LoginSessionFilter!] = null
@@ -15002,6 +15086,9 @@ input NotificationChannelFilter
   name: StringFilter = null
   channelType: NotificationChannelTypeFilter = null
   enabled: Boolean = null
+
+  """Added in 26.10.0. Filter by channel ID."""
+  entityId: UUIDFilter = null
   AND: [NotificationChannelFilter!] = null
   OR: [NotificationChannelFilter!] = null
   NOT: [NotificationChannelFilter!] = null
@@ -15123,6 +15210,9 @@ input NotificationRuleFilter
   name: StringFilter = null
   ruleType: NotificationRuleTypeFilter = null
   enabled: Boolean = null
+
+  """Added in 26.10.0. Filter by rule ID."""
+  entityId: UUIDFilter = null
   AND: [NotificationRuleFilter!] = null
   OR: [NotificationRuleFilter!] = null
   NOT: [NotificationRuleFilter!] = null
@@ -15506,6 +15596,9 @@ input PermissionFilter
 
   """Scope ID."""
   scopeId: StringFilter = null @deprecated(reason: "Deprecated since 26.9.0. A permission follows the scope of its role; the value is ignored.")
+
+  """Added in 26.10.0. Filter by permission ID."""
+  fieldId: UUIDFilter = null
   AND: [PermissionFilter!] = null
   OR: [PermissionFilter!] = null
   NOT: [PermissionFilter!] = null
@@ -16450,6 +16543,9 @@ input ProjectResourcePolicyV2Filter
   maxQuotaScopeSize: IntFilter = null
   maxNetworkCount: IntFilter = null
 
+  """Added in 26.10.0. Filter by project resource policy ID."""
+  entityId: UUIDFilter = null
+
   """Added in 26.7.0. Match all of the given sub-filters."""
   AND: [ProjectResourcePolicyV2Filter!] = null
 
@@ -16661,6 +16757,9 @@ input ProjectUsageBucketFilter
   """Filter by usage measurement period end date."""
   periodEnd: DateFilter = null
 
+  """Added in 26.10.0. Filter by project usage bucket ID."""
+  fieldId: UUIDFilter = null
+
   """Combine multiple filters with AND logic. All conditions must match."""
   AND: [ProjectUsageBucketFilter!] = null
 
@@ -16814,7 +16913,11 @@ Added in 26.2.0. Filter input for querying projects. Supports filtering by ID, n
 input ProjectV2Filter
   @join__type(graph: STRAWBERRY)
 {
-  id: UUIDFilter = null
+  """Filter by project ID (UUID)."""
+  id: UUIDFilter = null @deprecated(reason: "Deprecated since 26.10.0. Use `entityId`.")
+
+  """Added in 26.10.0. Filter by project ID."""
+  entityId: UUIDFilter = null
   name: StringFilter = null
   domainName: StringFilter = null
 
@@ -18946,6 +19049,9 @@ input QueryDefinitionFilter
   """Added in 26.4.4. Filter by category ID."""
   categoryId: UUIDFilter = null
 
+  """Added in 26.10.0. Filter by query definition ID."""
+  entityId: UUIDFilter = null
+
   """
   Added in 26.4.4. Combine multiple filters with AND logic. All conditions must match.
   """
@@ -19410,7 +19516,11 @@ type ReplicaGroupHistoryEdge
 input ReplicaGroupHistoryFilter
   @join__type(graph: STRAWBERRY)
 {
-  id: UUIDFilter = null
+  """Filter by history record ID."""
+  id: UUIDFilter = null @deprecated(reason: "Deprecated since 26.10.0. Use `fieldId`.")
+
+  """Added in 26.10.0. Filter by history record ID."""
+  fieldId: UUIDFilter = null
   deploymentId: UUIDFilter = null
   category: [ReplicaGroupHistoryCategory!] = null
   phase: StringFilter = null
@@ -19805,6 +19915,9 @@ input ResourceGroupFilter
 
   """Added in 26.9.0. Select entities by the labels on them."""
   labels: EntityLabelNestedFilter = null
+
+  """Added in 26.10.0. Filter by resource group ID."""
+  entityId: UUIDFilter = null
   AND: [ResourceGroupFilter!] = null
   OR: [ResourceGroupFilter!] = null
   NOT: [ResourceGroupFilter!] = null
@@ -20104,6 +20217,9 @@ input ResourcePresetFilter
 {
   name: StringFilter = null
   resourceGroupName: StringFilter = null
+
+  """Added in 26.10.0. Filter by resource preset ID."""
+  entityId: UUIDFilter = null
   AND: [ResourcePresetFilter!] = null
   OR: [ResourcePresetFilter!] = null
   NOT: [ResourcePresetFilter!] = null
@@ -20299,6 +20415,9 @@ input ResourceSlotTypeFilter
   slotName: StringFilter = null
   slotType: StringFilter = null
   displayName: StringFilter = null
+
+  """Added in 26.10.0. Filter by resource slot type ID."""
+  entityId: UUIDFilter = null
   AND: [ResourceSlotTypeFilter!] = null
   OR: [ResourceSlotTypeFilter!] = null
   NOT: [ResourceSlotTypeFilter!] = null
@@ -20495,6 +20614,9 @@ input RetentionPolicyFilter
 
   """Enabled filter."""
   enabled: Boolean = null
+
+  """Added in 26.10.0. Filter by retention policy ID."""
+  entityId: UUIDFilter = null
 }
 
 """Added in 26.8.0. Order specification."""
@@ -20854,6 +20976,9 @@ input RoleFilter
   Added in 26.9.0. Filter by conditions on the role's permission entries.
   """
   permissions: RolePermissionNestedFilter = null
+
+  """Added in 26.10.0. Filter by role ID."""
+  entityId: UUIDFilter = null
   AND: [RoleFilter!] = null
   OR: [RoleFilter!] = null
   NOT: [RoleFilter!] = null
@@ -21157,6 +21282,9 @@ input RolePermissionPresetFilter
   """Filter by creation timestamp."""
   createdAt: DateTimeFilter = null
 
+  """Added in 26.10.0. Filter by role permission preset ID."""
+  fieldId: UUIDFilter = null
+
   """Combine multiple filters with AND logic. All conditions must match."""
   AND: [RolePermissionPresetFilter!] = null
 
@@ -21263,7 +21391,10 @@ input RolePresetFilter
   @join__type(graph: STRAWBERRY)
 {
   """Added in 26.9.0. Filter by role preset ID."""
-  id: UUIDFilter = null
+  id: UUIDFilter = null @deprecated(reason: "Deprecated since 26.10.0. Use `entityId`.")
+
+  """Added in 26.10.0. Filter by role preset ID."""
+  entityId: UUIDFilter = null
 
   """Filter by name."""
   name: StringFilter = null
@@ -21539,6 +21670,9 @@ input RouteFilter
 
   """Route traffic statuses to match."""
   trafficStatus: [RouteTrafficStatus!] = null @deprecated(reason: "Deprecated since 26.9.0. A bare list only asks for membership. Read the same rows through a deployment's `replicas` with `ReplicaFilter`, which also offers equals / notEquals / notIn.")
+
+  """Added in 26.10.0. Filter by route ID."""
+  fieldId: UUIDFilter = null
   AND: [RouteFilter!] = null
   OR: [RouteFilter!] = null
   NOT: [RouteFilter!] = null
@@ -21612,7 +21746,11 @@ type RouteHistoryEdge
 input RouteHistoryFilter
   @join__type(graph: STRAWBERRY)
 {
-  id: UUIDFilter = null
+  """Filter by history record ID."""
+  id: UUIDFilter = null @deprecated(reason: "Deprecated since 26.10.0. Use `fieldId`.")
+
+  """Added in 26.10.0. Filter by history record ID."""
+  fieldId: UUIDFilter = null
   routeId: UUIDFilter = null
   deploymentId: UUIDFilter = null
   phase: StringFilter = null
@@ -21800,6 +21938,9 @@ input RuntimeVariantFilter
 {
   """Name filter."""
   name: StringFilter = null
+
+  """Added in 26.10.0. Filter by runtime variant ID."""
+  entityId: UUIDFilter = null
 
   """Added in 26.7.0. Match all of the given sub-filters."""
   AND: [RuntimeVariantFilter!] = null
@@ -22045,6 +22186,9 @@ input RuntimeVariantPresetFilter
   Added in 26.9.0. Keep only presets valid at this runtime version, that is added_version <= version < deprecated_version. Dot-separated numbers.
   """
   runtimeVersion: String = null
+
+  """Added in 26.10.0. Filter by preset ID."""
+  entityId: UUIDFilter = null
 
   """Added in 26.7.0. Match all of the given sub-filters."""
   AND: [RuntimeVariantPresetFilter!] = null
@@ -22729,6 +22873,9 @@ input ServiceCatalogFilter
   Filter by health status. Supports equals, in, not_equals, and not_in operations.
   """
   status: ServiceCatalogStatusFilter = null
+
+  """Added in 26.10.0. Filter by service ID."""
+  entityId: UUIDFilter = null
   AND: [ServiceCatalogFilter!] = null
   OR: [ServiceCatalogFilter!] = null
   NOT: [ServiceCatalogFilter!] = null
@@ -23086,7 +23233,11 @@ type SessionSchedulingHistoryEdge
 input SessionSchedulingHistoryFilter
   @join__type(graph: STRAWBERRY)
 {
-  id: UUIDFilter = null
+  """Filter by history record ID."""
+  id: UUIDFilter = null @deprecated(reason: "Deprecated since 26.10.0. Use `fieldId`.")
+
+  """Added in 26.10.0. Filter by history record ID."""
+  fieldId: UUIDFilter = null
   sessionId: UUIDFilter = null
   phase: StringFilter = null
   fromStatus: [String!] = null
@@ -23289,7 +23440,11 @@ type SessionV2Edge
 input SessionV2Filter
   @join__type(graph: STRAWBERRY)
 {
-  id: UUIDFilter = null
+  """Filter by session ID."""
+  id: UUIDFilter = null @deprecated(reason: "Deprecated since 26.10.0. Use `entityId`.")
+
+  """Added in 26.10.0. Filter by session ID."""
+  entityId: UUIDFilter = null
   status: SessionV2StatusFilter = null
   name: StringFilter = null
   domainName: StringFilter = null
@@ -26239,6 +26394,9 @@ input UserResourcePolicyV2Filter
   maxSessionCountPerModelSession: IntFilter = null
   maxCustomizedImageCount: IntFilter = null
 
+  """Added in 26.10.0. Filter by user resource policy ID."""
+  entityId: UUIDFilter = null
+
   """Added in 26.7.0. Match all of the given sub-filters."""
   AND: [UserResourcePolicyV2Filter!] = null
 
@@ -26461,6 +26619,9 @@ input UserUsageBucketFilter
   """Filter by usage measurement period end date."""
   periodEnd: DateFilter = null
 
+  """Added in 26.10.0. Filter by user usage bucket ID."""
+  fieldId: UUIDFilter = null
+
   """Combine multiple filters with AND logic. All conditions must match."""
   AND: [UserUsageBucketFilter!] = null
 
@@ -26661,7 +26822,11 @@ Added in 26.2.0. Filter input for querying users. Supports filtering by UUID, us
 input UserV2Filter
   @join__type(graph: STRAWBERRY)
 {
-  uuid: UUIDFilter = null
+  """Filter by user UUID."""
+  uuid: UUIDFilter = null @deprecated(reason: "Deprecated since 26.10.0. Use `entityId`.")
+
+  """Added in 26.10.0. Filter by user ID."""
+  entityId: UUIDFilter = null
   username: StringFilter = null
   email: StringFilter = null
 
@@ -27123,6 +27288,9 @@ input VFolderFilter
 
   """Added in 26.9.0. Select entities by the labels on them."""
   labels: EntityLabelNestedFilter = null
+
+  """Added in 26.10.0. Filter by vfolder ID."""
+  entityId: UUIDFilter = null
   AND: [VFolderFilter!] = null
   OR: [VFolderFilter!] = null
   NOT: [VFolderFilter!] = null

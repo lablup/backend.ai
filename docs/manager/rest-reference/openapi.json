@@ -248,6 +248,18 @@
             "default": null,
             "description": "ID of the labeled entity"
           },
+          "field_id": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/UUIDFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Added in 26.10.0. Filter by label ID"
+          },
           "AND": {
             "anyOf": [
               {
@@ -982,6 +994,18 @@
             "default": null,
             "description": "Filter by last update datetime."
           },
+          "entity_id": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/UUIDFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Added in 26.10.0. Filter by fragment ID."
+          },
           "AND": {
             "anyOf": [
               {
@@ -1540,6 +1564,18 @@
             "default": null,
             "description": "Filter by last update datetime."
           },
+          "entity_id": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/UUIDFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Added in 26.10.0. Filter by allow-list entry ID."
+          },
           "AND": {
             "anyOf": [
               {
@@ -1823,6 +1859,18 @@
             ],
             "default": null,
             "description": "Filter by last update datetime."
+          },
+          "entity_id": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/UUIDFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Added in 26.10.0. Filter by definition ID."
           },
           "AND": {
             "anyOf": [
@@ -2131,6 +2179,18 @@
             ],
             "default": null,
             "description": "Filter by artifact availability."
+          },
+          "entity_id": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/UUIDFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Added in 26.10.0. Filter by artifact ID."
           }
         },
         "title": "ArtifactFilter",
@@ -2541,6 +2601,18 @@
             "default": null,
             "description": "Added in 26.10.0. Entity ID filter."
           },
+          "field_id": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/UUIDFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Added in 26.10.0. Filter by audit log ID."
+          },
           "operation": {
             "anyOf": [
               {
@@ -2949,6 +3021,18 @@
             ],
             "default": null,
             "description": "Scope ID filter"
+          },
+          "field_id": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/UUIDFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter by audit log scope entry ID"
           }
         },
         "title": "AuditLogScopeFilter",
@@ -3384,6 +3468,18 @@
             "default": null,
             "description": "Filter by global accessibility.",
             "title": "Is Global"
+          },
+          "entity_id": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/UUIDFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Added in 26.10.0. Filter by container registry ID."
           },
           "AND": {
             "anyOf": [
@@ -8645,7 +8741,20 @@
               }
             ],
             "default": null,
-            "description": "Filter by preset ID."
+            "deprecated": true,
+            "description": "Deprecated since 26.10.0. Use `entity_id`."
+          },
+          "entity_id": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/UUIDFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Added in 26.10.0. Filter by preset ID."
           },
           "name": {
             "anyOf": [
@@ -12200,6 +12309,18 @@
             ],
             "default": null
           },
+          "entity_id": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/UUIDFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Added in 26.10.0. Filter by idle checker ID."
+          },
           "AND": {
             "anyOf": [
               {
@@ -13005,7 +13126,20 @@
               }
             ],
             "default": null,
-            "description": "Filter by image UUID."
+            "deprecated": true,
+            "description": "Deprecated since 26.10.0. Use `entity_id`."
+          },
+          "entity_id": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/UUIDFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Added in 26.10.0. Filter by image ID."
           },
           "status": {
             "anyOf": [
@@ -14437,6 +14571,18 @@
             ],
             "default": null
           },
+          "field_id": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/UUIDFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Added in 26.10.0. Filter by keypair ID."
+          },
           "AND": {
             "anyOf": [
               {
@@ -15014,6 +15160,18 @@
             "default": null,
             "description": "Filter by last modification datetime."
           },
+          "entity_id": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/UUIDFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Added in 26.10.0. Filter by login client type ID."
+          },
           "AND": {
             "anyOf": [
               {
@@ -15276,6 +15434,18 @@
             ],
             "default": null,
             "description": "Filter by masking mode."
+          },
+          "entity_id": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/UUIDFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Added in 26.10.0. Filter by client IP masking policy ID."
           }
         },
         "title": "ClientIPMaskingPolicyFilter",
@@ -15548,6 +15718,18 @@
             ],
             "default": null,
             "description": "Filter history by created_at datetime"
+          },
+          "field_id": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/UUIDFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Added in 26.10.0. Filter by login history ID."
           },
           "AND": {
             "anyOf": [
@@ -15987,6 +16169,18 @@
             ],
             "default": null,
             "description": "Filter sessions by last_accessed_at datetime"
+          },
+          "field_id": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/UUIDFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Added in 26.10.0. Filter by login session ID."
           },
           "AND": {
             "anyOf": [
@@ -17780,7 +17974,20 @@
               }
             ],
             "default": null,
-            "description": "Filter by project ID (UUID)."
+            "deprecated": true,
+            "description": "Deprecated since 26.10.0. Use `entity_id`."
+          },
+          "entity_id": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/UUIDFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Added in 26.10.0. Filter by project ID."
           },
           "name": {
             "anyOf": [
@@ -18777,6 +18984,18 @@
               }
             ],
             "default": null
+          },
+          "entity_id": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/UUIDFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Added in 26.10.0. Filter by entity share ID."
           }
         },
         "title": "EntityShareFilter",
@@ -19347,6 +19566,18 @@
             "default": null,
             "description": "Filter by creation timestamp."
           },
+          "field_id": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/UUIDFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Added in 26.10.0. Filter by role permission preset ID."
+          },
           "AND": {
             "anyOf": [
               {
@@ -19412,7 +19643,20 @@
               }
             ],
             "default": null,
-            "description": "Filter by role preset ID."
+            "deprecated": true,
+            "description": "Deprecated since 26.10.0. Use `entity_id`."
+          },
+          "entity_id": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/UUIDFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Added in 26.10.0. Filter by role preset ID."
           },
           "name": {
             "anyOf": [
@@ -21050,6 +21294,18 @@
               }
             ],
             "default": null
+          },
+          "field_id": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/UUIDFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Added in 26.10.0. Filter by permission ID."
           },
           "AND": {
             "anyOf": [
@@ -22829,6 +23085,18 @@
             "default": null,
             "description": "Filter by the labels on the entity"
           },
+          "entity_id": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/UUIDFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Added in 26.10.0. Filter by resource group ID."
+          },
           "AND": {
             "anyOf": [
               {
@@ -24503,6 +24771,18 @@
             "default": null,
             "description": "Filter by max scheduling priority."
           },
+          "entity_id": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/UUIDFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Added in 26.10.0. Filter by keypair resource policy ID."
+          },
           "AND": {
             "anyOf": [
               {
@@ -25101,6 +25381,18 @@
             "default": null,
             "description": "Filter by max customized image count."
           },
+          "entity_id": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/UUIDFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Added in 26.10.0. Filter by user resource policy ID."
+          },
           "AND": {
             "anyOf": [
               {
@@ -25484,6 +25776,18 @@
             "default": null,
             "description": "Filter by max network count."
           },
+          "entity_id": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/UUIDFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Added in 26.10.0. Filter by project resource policy ID."
+          },
           "AND": {
             "anyOf": [
               {
@@ -25783,6 +26087,18 @@
             ],
             "default": null,
             "description": "Filter by resource group name."
+          },
+          "entity_id": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/UUIDFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Added in 26.10.0. Filter by resource preset ID."
           },
           "AND": {
             "anyOf": [
@@ -26574,6 +26890,18 @@
             "default": null,
             "description": "Filter by pre-reserved amount."
           },
+          "field_id": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/UUIDFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Added in 26.10.0. Filter by agent resource slot ID."
+          },
           "AND": {
             "anyOf": [
               {
@@ -26895,6 +27223,18 @@
             "default": null,
             "description": "Filter by kernel ID."
           },
+          "field_id": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/UUIDFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Added in 26.10.0. Filter by resource allocation ID."
+          },
           "AND": {
             "anyOf": [
               {
@@ -27161,6 +27501,18 @@
             "default": null,
             "description": "Filter by enabled flag.",
             "title": "Enabled"
+          },
+          "entity_id": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/UUIDFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Added in 26.10.0. Filter by retention policy ID."
           }
         },
         "title": "RetentionPolicyFilter",
@@ -27365,6 +27717,18 @@
               }
             ],
             "default": null
+          },
+          "entity_id": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/UUIDFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Added in 26.10.0. Filter by runtime variant ID."
           },
           "AND": {
             "anyOf": [
@@ -27728,6 +28092,18 @@
             "default": null,
             "description": "Keep only presets valid at this runtime version (added_version <= version < deprecated_version).",
             "title": "Runtime Version"
+          },
+          "entity_id": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/UUIDFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Added in 26.10.0. Filter by preset ID."
           },
           "AND": {
             "anyOf": [
@@ -30257,7 +30633,20 @@
               }
             ],
             "default": null,
-            "description": "Filter by history record ID"
+            "deprecated": true,
+            "description": "Deprecated since 26.10.0. Use `field_id`."
+          },
+          "field_id": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/UUIDFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Added in 26.10.0. Filter by history record ID."
           },
           "kernel_id": {
             "anyOf": [
@@ -31009,7 +31398,20 @@
               }
             ],
             "default": null,
-            "description": "Filter by history record ID"
+            "deprecated": true,
+            "description": "Deprecated since 26.10.0. Use `field_id`."
+          },
+          "field_id": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/UUIDFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Added in 26.10.0. Filter by history record ID."
           },
           "deployment_id": {
             "anyOf": [
@@ -31765,6 +32167,18 @@
             ],
             "default": null,
             "description": "Filter by health status."
+          },
+          "entity_id": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/UUIDFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Added in 26.10.0. Filter by service ID."
           },
           "AND": {
             "anyOf": [
@@ -32570,7 +32984,21 @@
                 "type": "null"
               }
             ],
-            "default": null
+            "default": null,
+            "deprecated": true,
+            "description": "Deprecated since 26.10.0. Use `entity_id`."
+          },
+          "entity_id": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/UUIDFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Added in 26.10.0. Filter by session ID."
           },
           "status": {
             "anyOf": [
@@ -33479,7 +33907,20 @@
               }
             ],
             "default": null,
-            "description": "Filter by kernel ID"
+            "deprecated": true,
+            "description": "Deprecated since 26.10.0. Use `field_id`."
+          },
+          "field_id": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/UUIDFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Added in 26.10.0. Filter by kernel ID."
           },
           "session_id": {
             "anyOf": [
@@ -35391,6 +35832,18 @@
             ],
             "default": null,
             "description": "Filter by the labels on the entity"
+          },
+          "entity_id": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/UUIDFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Added in 26.10.0. Filter by vfolder ID."
           },
           "AND": {
             "anyOf": [

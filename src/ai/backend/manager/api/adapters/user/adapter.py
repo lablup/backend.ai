@@ -1037,6 +1037,7 @@ class UserAdapter(BaseAdapter):
         """
         fields = KeyPairSearchableFields.own
         conditions = [
+            *self.apply_uuid_filter(f.field_id, fields.field_id.filter),
             *self.apply_bool_filter(f.is_active, fields.is_active.filter),
             *self.apply_bool_filter(f.is_admin, fields.is_admin.filter),
             *self.apply_bool_filter(f.is_default, fields.is_default.filter),
@@ -1092,6 +1093,7 @@ class UserAdapter(BaseAdapter):
         fields = UserSearchableFields.own
         conditions = [
             *self.apply_uuid_filter(f.uuid, fields.uuid.filter),
+            *self.apply_uuid_filter(f.entity_id, fields.id.filter),
             *self.apply_string_filter(f.username, fields.username.filter),
             *self.apply_string_filter(f.email, fields.email.filter),
             *self.apply_string_filter(f.full_name, fields.full_name.filter),

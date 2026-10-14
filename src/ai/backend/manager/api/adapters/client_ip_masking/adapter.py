@@ -114,10 +114,9 @@ class ClientIPMaskingAdapter(BaseAdapter):
         )
         return ClientIPMaskingPolicyPayload(policy=self._data_to_node(result.data))
 
-    @staticmethod
-    def _convert_filter(f: ClientIPMaskingPolicyFilter) -> list[QueryCondition]:
+    def _convert_filter(self, f: ClientIPMaskingPolicyFilter) -> list[QueryCondition]:
         fields = ClientIPMaskingPolicySearchableFields.own
-        conditions: list[QueryCondition] = []
+        conditions: list[QueryCondition] = [*self.apply_uuid_filter(f.entity_id, fields.id.filter)]
         if f.target_type is not None:
             conditions.append(
                 fields.target_type.filter.equals(ClientIPMaskingTarget(f.target_type.value))

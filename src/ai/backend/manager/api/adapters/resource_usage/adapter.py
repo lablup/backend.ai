@@ -818,6 +818,13 @@ class ResourceUsageAdapter(BaseAdapter):
                 )
             )
 
+        if filter_req.field_id is not None:
+            conditions.extend(
+                self.apply_uuid_filter(
+                    filter_req.field_id, DomainUsageBucketSearchableFields.own.id.filter
+                )
+            )
+
         if filter_req.AND:
             for sub_filter in filter_req.AND:
                 conditions.extend(self._convert_domain_filter(sub_filter))
@@ -893,6 +900,13 @@ class ResourceUsageAdapter(BaseAdapter):
             conditions.extend(
                 self.apply_date_filter(
                     filter_req.period_end, ProjectUsageBucketSearchableFields.own.period_end.filter
+                )
+            )
+
+        if filter_req.field_id is not None:
+            conditions.extend(
+                self.apply_uuid_filter(
+                    filter_req.field_id, ProjectUsageBucketSearchableFields.own.id.filter
                 )
             )
 
@@ -976,6 +990,13 @@ class ResourceUsageAdapter(BaseAdapter):
             conditions.extend(
                 self.apply_date_filter(
                     filter_req.period_end, UserUsageBucketSearchableFields.own.period_end.filter
+                )
+            )
+
+        if filter_req.field_id is not None:
+            conditions.extend(
+                self.apply_uuid_filter(
+                    filter_req.field_id, UserUsageBucketSearchableFields.own.id.filter
                 )
             )
 

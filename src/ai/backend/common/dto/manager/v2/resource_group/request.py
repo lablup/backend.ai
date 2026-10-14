@@ -12,7 +12,7 @@ from pydantic import Field, field_validator
 
 from ai.backend.common.api_handlers import BaseRequestModel
 from ai.backend.common.data.entity.resource_group import ResourceGroupName
-from ai.backend.common.dto.manager.query import StringFilter
+from ai.backend.common.dto.manager.query import StringFilter, UUIDFilter
 from ai.backend.common.dto.manager.v2.deployment_options import DeploymentOptionsInput
 from ai.backend.common.dto.manager.v2.entity_label.request import EntityLabelNestedFilter
 from ai.backend.common.dto.manager.v2.resource_group.types import (
@@ -23,6 +23,7 @@ from ai.backend.common.dto.manager.v2.resource_group.types import (
     SchedulerTypeDTO,
 )
 from ai.backend.common.dto.manager.v2.session_options import DefaultSessionOptionsInput
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.common.tristate.unset import UNSET, Unset
 from ai.backend.common.types import PreemptionVictimScope
 
@@ -161,6 +162,10 @@ class ResourceGroupFilter(BaseRequestModel):
     )
     labels: EntityLabelNestedFilter | None = Field(
         default=None, description="Filter by the labels on the entity"
+    )
+    entity_id: UUIDFilter | None = Field(
+        default=None,
+        description=f"Added in {NEXT_RELEASE_VERSION}. Filter by resource group ID.",
     )
     AND: list[ResourceGroupFilter] | None = Field(default=None, description="AND conjunction.")
     OR: list[ResourceGroupFilter] | None = Field(default=None, description="OR conjunction.")

@@ -214,6 +214,7 @@ class AuditLogAdapter(BaseAdapter):
             *self.apply_string_filter(f.entity_type, fields.entity_type.filter),
             *self.apply_string_filter(f.entity_id, fields.entity_id_text.filter),
             *self.apply_uuid_filter(f.target_entity_id, fields.target_entity_id.filter),
+            *self.apply_uuid_filter(f.field_id, fields.id.filter),
             *self.apply_string_filter(f.operation, fields.operation.filter),
             *self.apply_string_filter(f.triggered_by, fields.triggered_by.filter),
             *self.apply_uuid_filter(f.acted_as, fields.acted_as.filter),
@@ -300,6 +301,7 @@ class AuditLogAdapter(BaseAdapter):
         return [
             *self.apply_string_filter(f.scope_type, fields.scope_type.filter),
             *self.apply_uuid_filter(f.scope_id, fields.scope_id.filter),
+            *self.apply_uuid_filter(f.field_id, fields.field_id.filter),
         ]
 
     @staticmethod

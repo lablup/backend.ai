@@ -36,6 +36,7 @@ from ai.backend.common.dto.manager.v2.role_permission_preset.response import (
 from ai.backend.common.dto.manager.v2.role_permission_preset.response import (
     RolePermissionPresetNode,
 )
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import (
     DateTimeFilter,
     OrderDirection,
@@ -147,6 +148,13 @@ class RolePermissionPresetFilterGQL(PydanticInputMixin[RolePermissionPresetFilte
     )
     created_at: DateTimeFilter | None = gql_field(
         description="Filter by creation timestamp.", default=None
+    )
+    field_id: UUIDFilter | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="Filter by role permission preset ID.",
+        ),
+        default=None,
     )
     AND: list[Self] | None = gql_field(
         description="Combine multiple filters with AND logic. All conditions must match.",

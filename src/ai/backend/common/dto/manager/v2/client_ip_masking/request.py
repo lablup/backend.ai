@@ -7,7 +7,9 @@ from uuid import UUID
 from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseRequestModel
+from ai.backend.common.dto.manager.query import UUIDFilter
 from ai.backend.common.dto.manager.v2.common import OrderDirection
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 
 from .types import ClientIPMaskingMode, ClientIPMaskingPolicyOrderField, ClientIPMaskingTarget
 
@@ -25,6 +27,10 @@ class ClientIPMaskingPolicyFilter(BaseRequestModel):
         default=None, description="Filter by the governed target."
     )
     mode: ClientIPMaskingMode | None = Field(default=None, description="Filter by masking mode.")
+    entity_id: UUIDFilter | None = Field(
+        default=None,
+        description=f"Added in {NEXT_RELEASE_VERSION}. Filter by client IP masking policy ID.",
+    )
 
 
 class ClientIPMaskingPolicyOrder(BaseRequestModel):

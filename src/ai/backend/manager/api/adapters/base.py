@@ -64,6 +64,7 @@ class BaseAdapter(BaseFilterAdapter):
             *self.apply_string_filter(f.value, fields.value.filter),
             *self.apply_string_filter(f.entity_type, fields.entity_type.filter),
             *self.apply_uuid_filter(f.entity_id, fields.entity_id.filter),
+            *self.apply_uuid_filter(f.field_id, fields.field_id.filter),
         ]
         if f.AND:
             for sub in f.AND:

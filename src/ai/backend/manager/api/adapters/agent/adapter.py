@@ -279,6 +279,7 @@ class AgentAdapter(BaseAdapter):
         fields = AgentSearchableFields.own
         conditions = [
             *self.apply_string_filter(f.id, fields.id.filter),
+            *self.apply_uuid_filter(f.entity_id, fields.uuid.filter),
             *self._convert_status_filter(f.status),
             *self.apply_bool_filter(f.schedulable, fields.schedulable.filter),
             *self.apply_string_filter(f.scaling_group, fields.resource_group.filter),

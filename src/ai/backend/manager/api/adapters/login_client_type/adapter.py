@@ -200,6 +200,7 @@ class LoginClientTypeAdapter(BaseAdapter):
     def _convert_filter(self, filter: LoginClientTypeFilter) -> list[QueryCondition]:
         fields = LoginClientTypeSearchableFields.own
         conditions: list[QueryCondition] = [
+            *self.apply_uuid_filter(filter.entity_id, fields.id.filter),
             *self.apply_string_filter(filter.name, fields.name.filter),
             *self.apply_string_filter(
                 filter.description, DeprecatedLoginClientTypeDescriptionConditions()

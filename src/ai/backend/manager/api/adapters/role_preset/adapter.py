@@ -381,6 +381,7 @@ class RolePresetAdapter(BaseAdapter):
         fields = RolePresetSearchableFields.own
         conditions = [
             *self.apply_uuid_filter(filter_.id, fields.id.filter),
+            *self.apply_uuid_filter(filter_.entity_id, fields.id.filter),
             *self.apply_string_filter(filter_.name, fields.name.filter),
             *self.apply_string_filter(filter_.scope_type, fields.scope_type.filter),
             *self.apply_bool_filter(filter_.auto_assign, fields.auto_assign.filter),
@@ -432,6 +433,7 @@ class RolePresetAdapter(BaseAdapter):
         # is enforced as a base condition by the caller, so it cannot be widened.
         fields = RolePermissionPresetSearchableFields.own
         conditions = [
+            *self.apply_uuid_filter(filter_.field_id, fields.id.filter),
             *self.apply_string_filter(filter_.entity_type, fields.entity_type.filter),
             *self._convert_permission_bit_filter(filter_.permission),
             *self.apply_datetime_filter(filter_.created_at, fields.created_at.filter),

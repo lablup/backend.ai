@@ -56,6 +56,7 @@ from ai.backend.common.dto.manager.v2.deployment.types import (
 from ai.backend.common.dto.manager.v2.deployment_options import DeploymentOptionsInput
 from ai.backend.common.dto.manager.v2.entity_label.request import EntityLabelNestedFilter
 from ai.backend.common.dto.manager.v2.resource_slot.types import ResourceOptsDTOInput
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.common.schema.deployment import IntOrPercent
 from ai.backend.common.tristate.unset import UNSET, Unset
 from ai.backend.common.types import (
@@ -736,6 +737,9 @@ class RouteFilter(BaseRequestModel):
     )
     traffic_status: list[RouteTrafficStatus] | None = Field(
         default=None, description="Traffic status filter"
+    )
+    field_id: UUIDFilter | None = Field(
+        default=None, description=f"Added in {NEXT_RELEASE_VERSION}. Filter by route ID."
     )
     AND: list[RouteFilter] | None = Field(default=None, description="AND conjunction")
     OR: list[RouteFilter] | None = Field(default=None, description="OR conjunction")

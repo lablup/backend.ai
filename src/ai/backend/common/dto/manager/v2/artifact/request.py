@@ -10,6 +10,7 @@ from pydantic import Field, field_validator
 
 from ai.backend.common.api_handlers import BaseRequestModel
 from ai.backend.common.dto.manager.query import IntFilter, StringFilter, UUIDFilter
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.common.tristate.unset import UNSET, Unset
 
 from .types import (
@@ -117,6 +118,10 @@ class ArtifactFilter(BaseRequestModel):
     type: ArtifactTypeFilter | None = Field(default=None, description="Filter by artifact type.")
     availability: ArtifactAvailabilityFilter | None = Field(
         default=None, description="Filter by artifact availability."
+    )
+    entity_id: UUIDFilter | None = Field(
+        default=None,
+        description=f"Added in {NEXT_RELEASE_VERSION}. Filter by artifact ID.",
     )
 
 
@@ -305,6 +310,10 @@ class ArtifactGQLFilterInputDTO(BaseRequestModel):
     registry: StringFilter | None = Field(default=None)
     source: StringFilter | None = Field(default=None)
     availability: list[ArtifactAvailability] | None = Field(default=None)
+    entity_id: UUIDFilter | None = Field(
+        default=None,
+        description=f"Added in {NEXT_RELEASE_VERSION}. Filter by artifact ID.",
+    )
     AND: list[ArtifactGQLFilterInputDTO] | None = Field(default=None)
     OR: list[ArtifactGQLFilterInputDTO] | None = Field(default=None)
     NOT: list[ArtifactGQLFilterInputDTO] | None = Field(default=None)
@@ -347,6 +356,10 @@ class ArtifactRevisionGQLFilterInputDTO(BaseRequestModel):
     version: StringFilter | None = Field(default=None)
     artifact_id: UUIDFilter | None = Field(default=None)
     size: IntFilter | None = Field(default=None)
+    field_id: UUIDFilter | None = Field(
+        default=None,
+        description=f"Added in {NEXT_RELEASE_VERSION}. Filter by artifact revision ID.",
+    )
     AND: list[ArtifactRevisionGQLFilterInputDTO] | None = Field(default=None)
     OR: list[ArtifactRevisionGQLFilterInputDTO] | None = Field(default=None)
     NOT: list[ArtifactRevisionGQLFilterInputDTO] | None = Field(default=None)

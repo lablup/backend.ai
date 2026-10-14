@@ -33,6 +33,8 @@ from ai.backend.common.dto.manager.v2.retention_policy.response import (
 from ai.backend.common.dto.manager.v2.retention_policy.response import (
     UpdateRetentionPolicyPayload as UpdatePayloadDTO,
 )
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
+from ai.backend.manager.api.gql.base import UUIDFilter
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     PydanticInputMixin,
@@ -129,6 +131,12 @@ class RetentionPolicyConnection(Connection[RetentionPolicyGQL]):
 class RetentionPolicyFilterGQL(PydanticInputMixin[FilterDTO]):
     category: RetentionCategoryGQL | None = gql_field(default=None, description="Category filter.")
     enabled: bool | None = gql_field(default=None, description="Enabled filter.")
+    entity_id: UUIDFilter | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION, description="Filter by retention policy ID."
+        ),
+        default=None,
+    )
 
 
 @gql_pydantic_input(

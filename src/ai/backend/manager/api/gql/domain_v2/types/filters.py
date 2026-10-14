@@ -10,6 +10,7 @@ from ai.backend.common.dto.manager.v2.domain.types import (
     DomainProjectFilter,
     DomainUserFilter,
 )
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import (
     DateTimeFilter,
     OrderDirection,
@@ -71,6 +72,11 @@ class DomainV2Filter(PydanticInputMixin[DomainFilter]):
             added_version="26.9.0",
             description="Filter by domain uuid.",
         ),
+        default=None,
+        deprecation_reason=f"Deprecated since {NEXT_RELEASE_VERSION}. Use `entityId`.",
+    )
+    entity_id: UUIDFilter | None = gql_added_field(
+        BackendAIGQLMeta(added_version=NEXT_RELEASE_VERSION, description="Filter by domain ID."),
         default=None,
     )
     description: StringFilter | None = None

@@ -16,6 +16,7 @@ from ai.backend.common.dto.manager.v2.role_permission_preset.types import (
     RolePermissionPresetEntry,
 )
 from ai.backend.common.dto.manager.v2.role_preset.types import RolePresetOrderField, RolePresetUsage
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 
 __all__ = (
     "BulkDeleteRolePresetsInput",
@@ -114,7 +115,15 @@ class RolePresetPermissionNestedFilter(ToManyFilter[RolePermissionPresetFilter])
 class RolePresetFilter(BaseRequestModel):
     """Filter criteria for searching role presets."""
 
-    id: UUIDFilter | None = Field(default=None, description="Filter by role preset ID.")
+    id: UUIDFilter | None = Field(
+        default=None,
+        description=f"Deprecated since {NEXT_RELEASE_VERSION}. Use `entity_id`.",
+        deprecated=True,
+    )
+    entity_id: UUIDFilter | None = Field(
+        default=None,
+        description=f"Added in {NEXT_RELEASE_VERSION}. Filter by role preset ID.",
+    )
     name: StringFilter | None = Field(default=None, description="Filter by name.")
     scope_type: StringFilter | None = Field(default=None, description="Filter by scope type.")
     auto_assign: bool | None = Field(default=None, description="Filter by auto-assign flag.")

@@ -11,6 +11,7 @@ from ai.backend.common.dto.manager.v2.group.types import (
     ProjectTypeFilter,
     ProjectUserFilter,
 )
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import (
     DateTimeFilter,
     OrderDirection,
@@ -85,7 +86,15 @@ class ProjectTypeEnumFilter(PydanticInputMixin[ProjectTypeFilter]):
 class ProjectV2Filter(PydanticInputMixin[ProjectFilter]):
     """Filter for project queries."""
 
-    id: UUIDFilter | None = None
+    id: UUIDFilter | None = gql_field(
+        description="Filter by project ID (UUID).",
+        default=None,
+        deprecation_reason=f"Deprecated since {NEXT_RELEASE_VERSION}. Use `entityId`.",
+    )
+    entity_id: UUIDFilter | None = gql_added_field(
+        BackendAIGQLMeta(added_version=NEXT_RELEASE_VERSION, description="Filter by project ID."),
+        default=None,
+    )
     name: StringFilter | None = None
     domain_name: StringFilter | None = None
     description: StringFilter | None = gql_added_field(

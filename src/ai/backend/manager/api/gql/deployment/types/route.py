@@ -32,9 +32,11 @@ from ai.backend.common.dto.manager.v2.deployment.response import (
 from ai.backend.common.dto.manager.v2.deployment.response import (
     UpdateRouteTrafficStatusPayload as UpdateRouteTrafficStatusPayloadDTO,
 )
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.adapter import PaginationSpec
 from ai.backend.manager.api.gql.base import (
     OrderDirection,
+    UUIDFilter,
     to_global_id,
 )
 from ai.backend.manager.api.gql.decorators import (
@@ -254,6 +256,10 @@ class RouteFilter(PydanticInputMixin[RouteFilterDTO]):
         description="Route traffic statuses to match.",
         default=None,
         deprecation_reason=_ROUTE_STATUS_DEPRECATION,
+    )
+    field_id: UUIDFilter | None = gql_added_field(
+        BackendAIGQLMeta(added_version=NEXT_RELEASE_VERSION, description="Filter by route ID."),
+        default=None,
     )
 
     AND: list[Self] | None = None

@@ -19,6 +19,7 @@ from ai.backend.common.dto.manager.query import (
     UUIDFilter,
 )
 from ai.backend.common.dto.manager.v2.entity_label.request import EntityLabelNestedFilter
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.common.tristate.unset import UNSET, Unset
 
 from .types import (
@@ -89,7 +90,15 @@ class ImageAliasNestedFilterInputDTO(BaseRequestModel):
 class ImageFilterInputDTO(BaseRequestModel):
     """Filter options for images."""
 
-    id: UUIDFilter | None = Field(default=None, description="Filter by image UUID.")
+    id: UUIDFilter | None = Field(
+        default=None,
+        description=f"Deprecated since {NEXT_RELEASE_VERSION}. Use `entity_id`.",
+        deprecated=True,
+    )
+    entity_id: UUIDFilter | None = Field(
+        default=None,
+        description=f"Added in {NEXT_RELEASE_VERSION}. Filter by image ID.",
+    )
     status: ImageStatusFilterInputDTO | None = Field(default=None, description="Filter by status.")
     name: StringFilter | None = Field(default=None, description="Filter by name.")
     architecture: StringFilter | None = Field(default=None, description="Filter by architecture.")

@@ -115,6 +115,9 @@ class AuditLogScopeEntryConnectionGQL(Connection[AuditLogScopeEntryGQL]):
 class AuditLogScopeEntryFilterGQL(PydanticInputMixin[AuditLogScopeFilter]):
     scope_type: StringFilter | None = gql_field(description="Scope type filter.", default=None)
     scope_id: UUIDFilter | None = gql_field(description="Scope ID filter.", default=None)
+    field_id: UUIDFilter | None = gql_field(
+        description="Filter by audit log scope entry ID.", default=None
+    )
 
 
 @gql_enum(

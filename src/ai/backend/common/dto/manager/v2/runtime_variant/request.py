@@ -5,12 +5,13 @@ from uuid import UUID
 from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseRequestModel
-from ai.backend.common.dto.manager.query import StringFilter
+from ai.backend.common.dto.manager.query import StringFilter, UUIDFilter
 from ai.backend.common.dto.manager.v2.common import OrderDirection, String128
 from ai.backend.common.dto.manager.v2.runtime_variant.types import (
     RuntimeVariantOrderField,
     RuntimeVariantUsage,
 )
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.common.tristate.unset import UNSET, Unset
 
 
@@ -40,6 +41,9 @@ class DeleteRuntimeVariantsInput(BaseRequestModel):
 
 class RuntimeVariantFilter(BaseRequestModel):
     name: StringFilter | None = Field(default=None)
+    entity_id: UUIDFilter | None = Field(
+        default=None, description=f"Added in {NEXT_RELEASE_VERSION}. Filter by runtime variant ID."
+    )
     AND: list[RuntimeVariantFilter] | None = Field(default=None)
     OR: list[RuntimeVariantFilter] | None = Field(default=None)
     NOT: list[RuntimeVariantFilter] | None = Field(default=None)

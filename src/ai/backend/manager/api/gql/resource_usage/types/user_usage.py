@@ -20,6 +20,7 @@ from ai.backend.common.dto.manager.v2.resource_usage.request import (
 from ai.backend.common.dto.manager.v2.resource_usage.response import (
     UserUsageBucketNode,
 )
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import (
     DateFilter,
     OrderDirection,
@@ -242,6 +243,12 @@ class UserUsageBucketFilter(PydanticInputMixin[UserUsageBucketFilterDTO], GQLFil
     )
     period_end: DateFilter | None = gql_field(
         description="Filter by usage measurement period end date.", default=None
+    )
+    field_id: UUIDFilter | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION, description="Filter by user usage bucket ID."
+        ),
+        default=None,
     )
 
     AND: list[Self] | None = gql_field(

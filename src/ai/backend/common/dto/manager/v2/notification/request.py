@@ -10,7 +10,8 @@ from uuid import UUID
 from pydantic import Field, field_validator
 
 from ai.backend.common.api_handlers import BaseRequestModel
-from ai.backend.common.dto.manager.query import StringFilter
+from ai.backend.common.dto.manager.query import StringFilter, UUIDFilter
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.common.tristate.unset import UNSET, Unset
 
 from .types import (
@@ -242,6 +243,10 @@ class NotificationChannelFilter(BaseRequestModel):
         default=None, description="Filter by channel type"
     )
     enabled: bool | None = Field(default=None, description="Filter by enabled status")
+    entity_id: UUIDFilter | None = Field(
+        default=None,
+        description=f"Added in {NEXT_RELEASE_VERSION}. Filter by channel ID",
+    )
     AND: list[NotificationChannelFilter] | None = Field(
         default=None, description="Combine with AND logic"
     )
@@ -299,6 +304,10 @@ class NotificationRuleFilter(BaseRequestModel):
         default=None, description="Filter by rule type"
     )
     enabled: bool | None = Field(default=None, description="Filter by enabled status")
+    entity_id: UUIDFilter | None = Field(
+        default=None,
+        description=f"Added in {NEXT_RELEASE_VERSION}. Filter by rule ID",
+    )
     AND: list[NotificationRuleFilter] | None = Field(
         default=None, description="Combine with AND logic"
     )

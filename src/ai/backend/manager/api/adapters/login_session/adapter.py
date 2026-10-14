@@ -151,6 +151,13 @@ class LoginSessionAdapter(BaseAdapter):
 
     def _convert_filter(self, f: LoginSessionFilter) -> list[QueryCondition]:
         conditions: list[QueryCondition] = []
+        if f.field_id is not None:
+            condition = f.field_id.build_query_condition(
+                equals_factory=LoginSessionConditions.by_id_equals,
+                in_factory=LoginSessionConditions.by_id_in,
+            )
+            if condition is not None:
+                conditions.append(condition)
         if f.user_id is not None:
             condition = f.user_id.build_query_condition(
                 equals_factory=LoginSessionConditions.by_user_id_equals,
