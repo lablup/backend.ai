@@ -25,6 +25,17 @@ class RolePresetRow(LifecycleTimestampsMixin, Base):
             "scope_type",
             "deleted",
         ),
+        # One preset name per scope. Soft-deleted rows count too, because restoring
+        # a preset brings it back under its old name.
+        sa.UniqueConstraint(
+            "name",
+            "scope_type",
+            "scope_id",
+            # scope_id is NULL for a preset that applies to every scope of its type.
+            # PostgreSQL treats NULLs as distinct by default, which would let two such
+            # presets share a name.
+            postgresql_nulls_not_distinct=True,
+        ),
     )
 
     id: Mapped[RolePresetID] = mapped_column(
