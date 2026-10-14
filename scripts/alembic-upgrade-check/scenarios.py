@@ -104,10 +104,12 @@ async def _session(s: Seeder, ids: Mapping[str, Any], user: uuid.UUID, **extra: 
 
 
 async def seed_deleted_deployment_owner(s: Seeder) -> None:
-    """Deployments whose owner was deleted: two whose creator is gone too, one whose creator
-    remains, with a token each. ``routings.session_owner`` is a RESTRICT FK, so a deleted
-    owner has no routes left; a live owner's deployment carries a route session for the
-    membership backfill."""
+    """Deployments whose owner was deleted: two whose creator is gone too, one of them
+    still carrying routes, and one whose creator remains, with a token each. A route may
+    only name a live user (``routings.session_owner`` is a RESTRICT FK, so a purge took
+    the deleted owner's own routes), so the routed ghost deployment's routes belong to
+    another user, which is how it dodges the removal; a live owner's deployment carries
+    a route session for the membership backfill."""
     ids = await _default_ids(s)
     # Before 26.4 an endpoint that is not destroyed must name an image.
     image: dict[str, Any] = {}
@@ -123,11 +125,12 @@ async def seed_deleted_deployment_owner(s: Seeder) -> None:
                 )
             )["id"]
         }
-    for name, creator, owner, stage in (
-        ("ghost-ready", GHOST_USER, GHOST_USER, "ready"),
-        ("ghost-destroyed", GHOST_USER, GHOST_USER, "destroyed"),
-        ("ghost-owner-live-creator", ids["user"], GHOST_USER, "ready"),
-        ("live-ready", ids["user"], ids["user"], "ready"),
+    for name, creator, owner, stage, with_routes in (
+        ("ghost-ready", GHOST_USER, GHOST_USER, "ready", False),
+        ("ghost-destroyed", GHOST_USER, GHOST_USER, "destroyed", False),
+        ("ghost-routed", GHOST_USER, GHOST_USER, "ready", True),
+        ("ghost-owner-live-creator", ids["user"], GHOST_USER, "ready", False),
+        ("live-ready", ids["user"], ids["user"], "ready", True),
     ):
         endpoint = await s.insert(
             "endpoints",
@@ -154,16 +157,17 @@ async def seed_deleted_deployment_owner(s: Seeder) -> None:
             domain=ids["domain"],
             project=ids["project"],
         )
-        if owner == GHOST_USER:
+        if not with_routes:
             continue
-        session = await _session(s, ids, owner)
+        route_owner = owner if owner != GHOST_USER else ids["user"]
+        session = await _session(s, ids, route_owner)
         route: dict[str, Any] = {"replica_group_id": group["id"]} if group else {}
         await s.insert(
             "routings",
             id=uuid.uuid4(),
             endpoint=endpoint["id"],
             session=session["id"],
-            session_owner=owner,
+            session_owner=route_owner,
             domain=ids["domain"],
             project=ids["project"],
             **route,
@@ -190,10 +194,17 @@ async def verify_deleted_deployment_owner(conn: asyncpg.Connection) -> list[str]
     ):
         problems.append("ghost-owner-live-creator and its token were not passed to the creator")
     tokens = await conn.fetchval(
-        "SELECT count(*) FROM endpoint_tokens WHERE token IN ('token-ghost-ready', 'token-ghost-destroyed')"
+        "SELECT count(*) FROM endpoint_tokens WHERE token IN"
+        " ('token-ghost-ready', 'token-ghost-destroyed', 'token-ghost-routed')"
     )
     if tokens:
         problems.append(f"{tokens} token(s) of removed deployments left")
+    orphan_routes = await conn.fetchval(
+        "SELECT count(*) FROM routings r"
+        " WHERE NOT EXISTS (SELECT 1 FROM endpoints e WHERE e.id = r.endpoint)"
+    )
+    if orphan_routes:
+        problems.append(f"{orphan_routes} route(s) of removed deployments left")
     orphaned = await conn.fetchval(
         "SELECT count(*) FROM session_groups sg"
         " WHERE NOT EXISTS (SELECT 1 FROM users u WHERE u.uuid = sg.owner_user_id)"
