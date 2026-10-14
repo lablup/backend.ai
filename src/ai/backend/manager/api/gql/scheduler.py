@@ -17,7 +17,6 @@ from ai.backend.common.events.hub.propagators.bypass import AsyncBypassPropagato
 from ai.backend.common.events.types import EventDomain
 from ai.backend.common.types import SessionId
 from ai.backend.logging import BraceStyleAdapter
-from ai.backend.manager.api.gql.base import to_global_id
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     gql_enum,
@@ -26,7 +25,6 @@ from ai.backend.manager.api.gql.decorators import (
     gql_subscription,
 )
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
-from ai.backend.manager.api.gql_legacy.session import ComputeSessionNode
 from ai.backend.manager.errors.kernel import InvalidSessionId
 
 from .session_federation import Session
@@ -78,10 +76,9 @@ class SchedulingBroadcastEventPayloadGQL:
         description="The session ID associated with the replica. This can be null right after replica creation."
     )  # type: ignore[misc]
     async def session(self, info: Info[StrawberryGQLContext]) -> Session | None:
-        session_global_id = to_global_id(
-            ComputeSessionNode, self.session_id, is_target_graphene_object=True
-        )
-        return Session(id=strawberry.ID(session_global_id))
+        # The federated ComputeSessionNode stub is a relay.Node; pass the inner id so
+        # Strawberry re-encodes the same global ID the graphene subgraph expects.
+        return Session(id=strawberry.ID(str(self.session_id)))
 
 
 @gql_subscription(
