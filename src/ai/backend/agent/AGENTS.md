@@ -12,11 +12,11 @@
 - Do NOT make direct Docker/K8s API calls that change container state outside the lifecycle handlers.
 - Put health-check and heartbeat logic in `agent/health/` — do NOT inline it in the main loop.
 
-## Infrastructure implementations (Docker / Kubernetes / Dummy)
+## Infrastructure implementations (Docker / Kubernetes / Dummy / containerd)
 
 - Always check the abstract base classes in `agent/` before implementing.
 - The Dummy implementation must be updated together with Docker/Kubernetes changes.
-- Put new infrastructure-specific code in the corresponding sub-directory (`agent/docker/`, `agent/kubernetes/`, `agent/dummy/`).
+- Put new infrastructure-specific code in the corresponding sub-directory (`agent/docker/`, `agent/kubernetes/`, `agent/dummy/`, `agent/containerd/`).
 
 ## Manager communication
 

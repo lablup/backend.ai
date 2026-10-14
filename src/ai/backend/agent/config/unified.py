@@ -589,7 +589,8 @@ class CommonAgentConfig(BaseConfigSchema):
                 "container orchestration infrastructure. Available options: "
                 "'docker' uses Docker daemon for container management (default for most deployments); "
                 "'kubernetes' uses Kubernetes API for container management in K8s clusters; "
-                "'dummy' is a mock backend for testing without actual containers."
+                "'dummy' is a mock backend for testing without actual containers; "
+                "'containerd' uses containerd's native API, choosing a runtime profile per kernel (runc built in)."
             ),
             added_version="25.12.0",
             example=ConfigExample(local="docker", prod="docker"),
@@ -2152,6 +2153,58 @@ class DockerExtraConfig(BaseConfigSchema):
     ]
 
 
+class ContainerdConfig(BaseConfigSchema):
+    """
+    Settings of the containerd backend, read only when the agent backend is `containerd`.
+    """
+
+    runtime_profiles: Annotated[
+        list[str],
+        Field(
+            default_factory=list,
+            validation_alias=AliasChoices("runtime-profiles", "runtime_profiles"),
+            serialization_alias="runtime-profiles",
+        ),
+        BackendAIConfigMeta(
+            description=(
+                "Runtime profiles to load from the backendai_runtime_profile_v1 entry points, in selection order. "
+                "The first profile whose accepts() is true runs the kernel; otherwise the built-in runc profile does. "
+                "Do not list runc."
+            ),
+            added_version="26.10.0",
+            example=ConfigExample(local="[]", prod='["coco-tdx"]'),
+        ),
+    ]
+    profile_required_slots: Annotated[
+        list[str],
+        Field(
+            default_factory=list,
+            validation_alias=AliasChoices("profile-required-slots", "profile_required_slots"),
+            serialization_alias="profile-required-slots",
+        ),
+        BackendAIConfigMeta(
+            description=(
+                "Resource slots that must never run on the built-in runc profile. "
+                "A kernel holding one of them that no configured profile accepts fails with ProfileNotApplicable."
+            ),
+            added_version="26.10.0",
+            example=ConfigExample(local="[]", prod='["confidential.tdx"]'),
+        ),
+    ]
+    profiles: Annotated[
+        dict[str, dict[str, Any]],
+        Field(default_factory=dict),
+        BackendAIConfigMeta(
+            description=(
+                "Per-profile options, keyed by profile name; "
+                "each table is passed to that profile's entry point."
+            ),
+            added_version="26.10.0",
+            example=ConfigExample(local="{}", prod='{"coco-tdx": {"standin-image": "<ref>"}}'),
+        ),
+    ]
+
+
 class AgentGlobalConfig(BaseConfigSchema):
     """
     Configuration shared across all agents (logging, etcd, API, etc.).
@@ -2364,6 +2417,15 @@ class AgentSpecificConfig(BaseConfigSchema):
             composite=CompositeType.FIELD,
         ),
     ]
+    containerd: Annotated[
+        ContainerdConfig,
+        Field(default_factory=ContainerdConfig),
+        BackendAIConfigMeta(
+            description="containerd backend settings: runtime profiles and the slots that require one.",
+            added_version="26.10.0",
+            composite=CompositeType.FIELD,
+        ),
+    ]
 
     model_config = ConfigDict(
         validate_assignment=True,
@@ -2376,6 +2438,8 @@ class AgentSpecificConfig(BaseConfigSchema):
             case AgentBackend.DOCKER:
                 DockerExtraConfig.model_validate(self.container.model_dump())
             case AgentBackend.DUMMY:
+                pass
+            case AgentBackend.CONTAINERD:
                 pass
 
 
