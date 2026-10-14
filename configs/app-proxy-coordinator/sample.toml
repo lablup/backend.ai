@@ -15,11 +15,10 @@
   # PostgreSQL is supported for storing proxy routing and circuit data.
   # Added in 25.9.0
   type = "postgresql"
-  # The network address (host:port) of the PostgreSQL database server. In local
-  # development, typically points to localhost. In production, should point to
-  # your PostgreSQL server or cluster endpoint.
-  # Added in 25.9.0
-  addr = { host = "db-server", port = 5432 }
+  # Timeout in seconds for connecting to one member of addrs. When it expires,
+  # the next member is tried.
+  # Added in 26.9.0
+  connect_timeout = 5.0
   # The name of the PostgreSQL database to use for the proxy coordinator. This
   # database stores proxy routing rules, circuit states, and session mappings.
   # Ensure this database is created before starting the coordinator.
@@ -46,6 +45,19 @@
   # entirely.
   # Added in 25.9.0
   max_overflow = 128
+
+  # Addresses of the PostgreSQL cluster members. List every member of an HA
+  # cluster, or a single address of a standalone server or a proxy in front of
+  # the cluster.
+  # Added in 26.9.0
+  [[db.addrs]]
+  # Add multiple [[db.addrs]] sections as needed
+    # Hostname or IP address.
+    # Added in 25.13.0
+    host = "db-server"
+    # Port number.
+    # Added in 25.13.0
+    port = 5432
 
 # Redis configuration for the proxy coordinator's internal operations including
 # caching, pub/sub messaging, and distributed locking (when using Redlock).
