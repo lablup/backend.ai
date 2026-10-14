@@ -27,8 +27,7 @@ from ai.backend.manager.actions.v2.bulk.result import PartialBulkEntityResult, P
 from ai.backend.manager.actions.v2.ops.result import BulkLookupOpsResult
 from ai.backend.manager.api.adapters.user.adapter import UserAdapter
 from ai.backend.manager.data.user.types import UserData
-from ai.backend.manager.errors.common import GenericForbidden
-from ai.backend.manager.errors.permission import NotEnoughPermission
+from ai.backend.manager.errors.common import GenericBadRequest, GenericForbidden
 
 
 def _create_user_data(
@@ -150,11 +149,17 @@ class TestBatchLookupByEmails:
         return UserID(uuid4())
 
     @pytest.fixture
-    def processors(self, found_id: UserID) -> MagicMock:
+    def unresolvable(self) -> GenericBadRequest:
+        return GenericBadRequest("Cannot resolve the given user key")
+
+    @pytest.fixture
+    def processors(self, found_id: UserID, unresolvable: GenericBadRequest) -> MagicMock:
         processors = MagicMock()
         processors.bulk_lookup.run = AsyncMock(
             return_value=BulkLookupOpsResult(
-                resolved={"found@example.com": found_id}, key_results=[]
+                resolved={"found@example.com": found_id},
+                failures={"other@example.com": unresolvable},
+                key_results=[],
             )
         )
         return processors
@@ -164,18 +169,22 @@ class TestBatchLookupByEmails:
         return UserAdapter(processors, MagicMock(), MagicMock(), MagicMock())
 
     async def test_answers_per_email_in_one_lookup(
-        self, adapter: UserAdapter, processors: MagicMock, found_id: UserID
+        self,
+        adapter: UserAdapter,
+        processors: MagicMock,
+        found_id: UserID,
+        unresolvable: GenericBadRequest,
     ) -> None:
-        resolved, missing = await adapter.batch_lookup_by_emails([
+        resolved, refused = await adapter.batch_lookup_by_emails([
             "found@example.com",
-            "missing@example.com",
+            "other@example.com",
         ])
 
         assert resolved == found_id
-        assert isinstance(missing, NotEnoughPermission)
+        assert refused is unresolvable
         processors.bulk_lookup.run.assert_awaited_once()
         action = processors.bulk_lookup.run.await_args.args[0]
-        assert list(action.emails) == ["found@example.com", "missing@example.com"]
+        assert list(action.emails) == ["found@example.com", "other@example.com"]
 
     async def test_no_emails_look_up_nothing(
         self, adapter: UserAdapter, processors: MagicMock

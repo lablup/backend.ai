@@ -79,6 +79,9 @@ from ai.backend.manager.actions.v2.lookup.base import BaseLookupAction, BaseLook
 from ai.backend.manager.actions.v2.lookup.bulk_monitor.base import BulkLookupActionMonitor
 from ai.backend.manager.actions.v2.lookup.bulk_processor import BulkLookupActionProcessor
 from ai.backend.manager.actions.v2.lookup.monitor.base import LookupActionMonitor
+from ai.backend.manager.actions.v2.lookup.partial_bulk_processor import (
+    PartialBulkLookupActionProcessor,
+)
 from ai.backend.manager.actions.v2.lookup.processor import (
     LookupActionProcessor,
 )
@@ -523,14 +526,14 @@ class ProcessorGroup[TData: EntityData]:
         action_cls: type[TAction],
         *,
         monitors: Sequence[BulkLookupActionMonitor] = (),
-    ) -> BulkLookupActionProcessor[TAction, BulkLookupOpsResult[Any, Any]]:
-        """Several keys resolved at once, each answered for; the entities they named
-        are then checked together, as a bulk read of them would be."""
+    ) -> PartialBulkLookupActionProcessor[TAction]:
+        """Several keys resolved at once, each answered for; the entity each key named
+        is checked on its own, so a denied key fails alone."""
         self._record(action_cls, ActionKind.LOOKUP, ActionGate.PERMISSION, ActionBacking.GENERIC)
-        return BulkLookupActionProcessor(
+        return PartialBulkLookupActionProcessor(
             BulkLookupService(self._deps.repository).execute,
+            partial_validators=self._deps.validators.partial_bulk,
             monitors=(*self._deps.monitors.bulk_lookup, *monitors),
-            post_validators=self._deps.validators.atomic_bulk,
         )
 
     def public_bulk_lookup_ops[TAction: BulkLookupEntityOpsAction[Any, Any]](

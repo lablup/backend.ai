@@ -106,9 +106,9 @@
 
 | 시나리오 | 판정 |
 |---|---|
-| [아무 역할도 받지 않은 사용자가 다른 사용자의 email 을 찾으면, 그 사용자의 id 가 답으로 온다](#reading-an-email-lookup-answers-the-user-id-without-a-grant) | 성공 |
+| [대상 사용자 스코프에서 사용자 읽기 권한을 받은 사용자가 그 사용자의 email 을 찾으면, 그 사용자의 id 가 답으로 온다](#reading-a-user-granted-read-on-another-user-looks-up-their-id-by-email) | 성공 |
 | [권한 없는 사용자가 빈 email 목록을 주면, 어떤 액션도 부르지 않고 빈 목록이 답으로 온다](#reading-an-email-lookup-of-no-emails-answers-an-empty-list) | 성공 |
-| [권한 없는 사용자가 있는 email 과 없는 email 을 함께 찾으면, 입력 순서대로 사용자 id 와 거부가 온다](#reading-an-email-naming-nobody-is-a-refused-element) | 거부 |
+| [한 사용자에게만 읽기 권한을 받은 사용자가 읽을 수 있는 사용자, 읽을 수 없는 사용자, 없는 email 을 한 번에 찾으면, 첫째는 id, 나머지 둘은 같은 거부가 입력 순서대로 온다](#reading-an-unreadable-user-and-a-missing-email-are-refused-alike) | 거부 |
 
 **UserAdapter.domain_search**
 
@@ -1022,15 +1022,15 @@ Then
 
 ### UserAdapter.batch_lookup_by_emails
 
-<a id="reading-an-email-lookup-answers-the-user-id-without-a-grant"></a>
+<a id="reading-a-user-granted-read-on-another-user-looks-up-their-id-by-email"></a>
 
-#### [an-email-lookup-answers-the-user-id-without-a-grant](/tests/scenario/bai_scenario/manager/user/test_reading.py) — pass
+#### [a-user-granted-read-on-another-user-looks-up-their-id-by-email](/tests/scenario/bai_scenario/manager/user/test_reading.py) — pass
 
-아무 역할도 받지 않은 사용자가 다른 사용자의 email 을 찾으면, 그 사용자의 id 가 답으로 온다
+대상 사용자 스코프에서 사용자 읽기 권한을 받은 사용자가 그 사용자의 email 을 찾으면, 그 사용자의 id 가 답으로 온다
 
 Given
 
-- 도메인 하나와 사용자 둘, 아무도 권한을 받지 않았다
+- 도메인 하나와 사용자 둘, 한 사람은 다른 사람에 대한 사용자 읽기 권한을 받았다
   - 도메인 home-1
   - 도메인에 속한 사용자 한 명 준비
     - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
@@ -1040,6 +1040,10 @@ Given
     - 사용자 정책 user-policy-2: 사용자 한 명당 폴더 10개까지
     - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
     - 일반 사용자 user-2: 자기 키와 개인 프로젝트를 갖는다
+  - 사용자 READ 권한을 준 역할 배정
+    - 역할 user-role-1: 이 역할이 앉은 스코프 안에서만 통한다
+    - 역할 user-role-1: user 전체에 READ 허용
+    - 일반 사용자 user-2: 역할 user-role-1 보유
 
 When
 
@@ -1079,15 +1083,15 @@ Then
 - 빈 목록이 온다
   - loaded = []
 
-<a id="reading-an-email-naming-nobody-is-a-refused-element"></a>
+<a id="reading-an-unreadable-user-and-a-missing-email-are-refused-alike"></a>
 
-#### [an-email-naming-nobody-is-a-refused-element](/tests/scenario/bai_scenario/manager/user/test_reading.py) — pass
+#### [an-unreadable-user-and-a-missing-email-are-refused-alike](/tests/scenario/bai_scenario/manager/user/test_reading.py) — pass
 
-권한 없는 사용자가 있는 email 과 없는 email 을 함께 찾으면, 입력 순서대로 사용자 id 와 거부가 온다
+한 사용자에게만 읽기 권한을 받은 사용자가 읽을 수 있는 사용자, 읽을 수 없는 사용자, 없는 email 을 한 번에 찾으면, 첫째는 id, 나머지 둘은 같은 거부가 입력 순서대로 온다
 
 Given
 
-- 도메인 하나와 사용자 둘, 아무도 권한을 받지 않았다
+- 도메인 하나와 사용자 셋, 부르는 사람은 한 사람에 대한 사용자 읽기 권한만 받았다
   - 도메인 home-1
   - 도메인에 속한 사용자 한 명 준비
     - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
@@ -1097,17 +1101,25 @@ Given
     - 사용자 정책 user-policy-2: 사용자 한 명당 폴더 10개까지
     - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
     - 일반 사용자 user-2: 자기 키와 개인 프로젝트를 갖는다
+    - 사용자 정책 user-policy-3: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-3: 동시 세션 5개까지
+    - 일반 사용자 user-3: 자기 키와 개인 프로젝트를 갖는다
+  - 사용자 READ 권한을 준 역할 배정
+    - 역할 user-role-1: 이 역할이 앉은 스코프 안에서만 통한다
+    - 역할 user-role-1: user 전체에 READ 허용
+    - 일반 사용자 user-3: 역할 user-role-1 보유
 
 When
 
-- UserAdapter.batch_lookup_by_emails — user-2이 user-1의 email 과 없는 email 을 함께 찾음
+- UserAdapter.batch_lookup_by_emails — user-3이 user-1, user-2, 없는 email 순으로 email 을 찾음
 
 Then
 
-- 있는 email 은 사용자 id, 없는 email 자리는 거부가 입력 순서대로 온다
-  - length = 2
-  - [0]: 대상 사용자의 id와 같다
-  - 거부: NotEnoughPermission
+- 읽을 수 있는 사람은 id, 나머지 둘은 같은 거부가 입력 순서대로 온다
+  - length = 3
+  - [0]: 읽을 수 있는 사용자의 id와 같다
+  - 거부: GenericBadRequest
+  - 거부: GenericBadRequest
 
 ### UserAdapter.domain_search
 

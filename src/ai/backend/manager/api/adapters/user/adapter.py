@@ -98,7 +98,6 @@ from ai.backend.common.types import AccessKey, SecretKey
 from ai.backend.manager.data.common.types import SearchResult
 from ai.backend.manager.data.keypair.types import KeyPairCreator, KeyPairData
 from ai.backend.manager.data.user.types import UserData, UserStatus
-from ai.backend.manager.errors.permission import NotEnoughPermission
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
 from ai.backend.manager.models.condition_utils import (
     combine_conditions_and,
@@ -238,18 +237,11 @@ class UserAdapter(BaseAdapter):
         ]
 
     async def batch_lookup_by_emails(self, emails: Sequence[str]) -> list[UserID | Exception]:
-        """The user each email names, for DataLoader use.
-
-        An email naming no user answers the denial the read of a user gives, so the
-        two cannot be told apart.
-        """
+        """The user each email names, for DataLoader use, checked per user."""
         if not emails:
             return []
         lookup = await self._user.bulk_lookup.run(BulkLookupUsersAction(emails=list(emails)))
-        return [
-            lookup.resolved.get(email) or NotEnoughPermission("Cannot resolve the given user key")
-            for email in emails
-        ]
+        return [lookup.resolved.get(email) or lookup.failures[email] for email in emails]
 
     # ------------------------------------------------------------------ GQL search (cursor-based)
 

@@ -65,7 +65,7 @@ def processors(readable: AgentData, denied: AgentData, denial: GenericForbidden)
     processors = MagicMock()
     processors.agent.bulk_lookup.run = AsyncMock(
         return_value=BulkLookupOpsResult(
-            resolved={READABLE: readable.uuid, DENIED: denied.uuid}, key_results=[]
+            resolved={READABLE: readable.uuid, DENIED: denied.uuid}, failures={}, key_results=[]
         )
     )
     processors.agent.bulk_get.run = AsyncMock(

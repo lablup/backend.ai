@@ -852,7 +852,7 @@ def test_entity_data_loader_reads_are_checked_per_entity() -> None:
     assert recorded[BulkLookupUsersAction] == (
         UserEntityType(),
         ActionKind.LOOKUP,
-        ActionGate.PUBLIC,
+        ActionGate.PERMISSION,
     )
     assert recorded[BulkGetProjectsAction] == (
         ProjectEntityType(),

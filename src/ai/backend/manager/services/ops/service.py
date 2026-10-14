@@ -286,7 +286,16 @@ class BulkLookupService:
             )
             for key in keys
         ]
-        return BulkLookupOpsResult(resolved=resolved, key_results=key_results)
+        failures: dict[Any, Exception] = {
+            key: EntityNotFoundError(
+                "No entity matches the given key",
+                entity_type=action.entity_type(),
+                operation=ActionOperationType.LOOKUP,
+            )
+            for key in keys
+            if key not in resolved
+        }
+        return BulkLookupOpsResult(resolved=resolved, failures=failures, key_results=key_results)
 
 
 class FieldOwnerLookupService:
