@@ -128,8 +128,8 @@ from ai.backend.manager.models.user.searchers import UserSearcher
 from ai.backend.manager.models.user.updaters import UserUpdater
 from ai.backend.manager.services.domain.actions.lookup import LookupDomainAction
 from ai.backend.manager.services.user.actions.bulk_get import BulkGetUsersAction
-from ai.backend.manager.services.user.actions.bulk_lookup import BulkLookupUsersAction
 from ai.backend.manager.services.user.actions.bulk_get_keypairs import BulkGetKeypairsAction
+from ai.backend.manager.services.user.actions.bulk_lookup import BulkLookupUsersAction
 from ai.backend.manager.services.user.actions.bulk_lookup_keypairs import BulkLookupKeypairsAction
 from ai.backend.manager.services.user.actions.create_user import (
     BulkCreateUserAction,
