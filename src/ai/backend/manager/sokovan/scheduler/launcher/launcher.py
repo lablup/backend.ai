@@ -3,7 +3,7 @@ from __future__ import annotations
 import asyncio
 import logging
 from collections import defaultdict
-from collections.abc import Awaitable, Mapping
+from collections.abc import Awaitable, Mapping, Sequence
 from dataclasses import dataclass
 from typing import Any
 from uuid import UUID
@@ -32,6 +32,7 @@ from ai.backend.logging.structured import StructuredLogger, with_log_context
 from ai.backend.manager.clients.agent.pool import AgentClientPool
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.dotfile.types import normalize_newlines
+from ai.backend.manager.data.system_session_environ.types import SystemSessionEnvironData
 from ai.backend.manager.defs import START_SESSION_TIMEOUT_SEC
 from ai.backend.manager.exceptions import convert_to_status_data
 from ai.backend.manager.metrics.scheduler import (
@@ -41,6 +42,9 @@ from ai.backend.manager.models.network.row import NetworkType
 from ai.backend.manager.plugin.network import NetworkPluginContext
 from ai.backend.manager.repositories.scheduler.repository import (
     SchedulerRepository,
+)
+from ai.backend.manager.repositories.system_session_environ.repository import (
+    SystemSessionEnvironRepository,
 )
 from ai.backend.manager.sokovan.recorder.context import RecorderContext
 from ai.backend.manager.sokovan.scheduler.launcher.session_environ import (
@@ -61,6 +65,7 @@ log = StructuredLogger(logging.getLogger(__spec__.name))
 @dataclass
 class SessionLauncherArgs:
     repository: SchedulerRepository
+    system_session_environ_repository: SystemSessionEnvironRepository
     agent_client_pool: AgentClientPool
     network_plugin_ctx: NetworkPluginContext
     config_provider: ManagerConfigProvider
@@ -78,6 +83,7 @@ class SessionLauncher:
     """
 
     _repository: SchedulerRepository
+    _system_session_environ_repository: SystemSessionEnvironRepository
     _agent_client_pool: AgentClientPool
     _network_plugin_ctx: NetworkPluginContext
     _config_provider: ManagerConfigProvider
@@ -86,6 +92,7 @@ class SessionLauncher:
 
     def __init__(self, args: SessionLauncherArgs) -> None:
         self._repository = args.repository
+        self._system_session_environ_repository = args.system_session_environ_repository
         self._agent_client_pool = args.agent_client_pool
         self._network_plugin_ctx = args.network_plugin_ctx
         self._config_provider = args.config_provider
@@ -208,11 +215,15 @@ class SessionLauncher:
         :param sessions: List of sessions to start
         :param image_configs: Image configurations indexed by image ID
         """
+        environ_rows = await self._system_session_environ_repository.search_at_scopes(
+            domain_ids={session.domain_id for session in sessions},
+            project_ids={session.project_id for session in sessions},
+        )
 
         async def start_with_timeout(session: SessionDataForStart) -> None:
             with with_log_context(session_id=session.session_id):
                 async with async_timeout.timeout(delay=START_SESSION_TIMEOUT_SEC):
-                    await self._start_single_session(session, image_configs)
+                    await self._start_single_session(session, image_configs, environ_rows)
 
         results = await asyncio.gather(
             *[start_with_timeout(session) for session in sessions],
@@ -230,12 +241,14 @@ class SessionLauncher:
         self,
         session: SessionDataForStart,
         image_configs: dict[UUID, ImageConfigData],
+        environ_rows: Sequence[SystemSessionEnvironData],
     ) -> None:
         """
         Start a single session by creating kernels on agents.
 
         :param session: Session data to start
         :param image_configs: Image configurations indexed by image ID
+        :param environ_rows: System session environ rows for the sessions starting together
         """
         log.debug(
             "session start attempted",
@@ -262,7 +275,7 @@ class SessionLauncher:
             log.debug("ssh connection info mapping: {}", network_setup.cluster_ssh_port_mapping)
 
             replicas = count_cluster_replicas(session.kernels)
-            environ = build_session_environ(session)
+            environ = build_session_environ(session, environ_rows)
 
             # Group kernels by agent to minimize RPC calls
             kernels_by_agent: defaultdict[AgentId, list[KernelBindingData]] = defaultdict(list)

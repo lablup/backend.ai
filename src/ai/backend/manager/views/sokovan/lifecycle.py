@@ -7,6 +7,8 @@ from datetime import datetime
 from typing import Any
 from uuid import UUID
 
+from ai.backend.common.data.entity.domain import DomainID
+from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.types import (
     AccessKey,
     AgentId,
@@ -20,7 +22,6 @@ from ai.backend.common.types import (
 from ai.backend.manager.data.kernel.types import KernelInfo, KernelStatus
 from ai.backend.manager.data.network.types import NetworkType
 from ai.backend.manager.data.session.types import SchedulingResult, SessionInfo
-from ai.backend.manager.data.system_session_environ.types import SystemSessionEnvironData
 from ai.backend.manager.defs import DEFAULT_ROLE
 from ai.backend.manager.errors.kernel import MainKernelNotFound, TooManyKernelsFound
 
@@ -82,8 +83,9 @@ class SessionDataForStart:
     user_uuid: UUID
     user_email: str
     user_name: str
+    domain_id: DomainID
+    project_id: ProjectID
     environ: dict[str, str]
-    system_environ: list[SystemSessionEnvironData]
     network_type: NetworkType | None = None
     network_id: str | None = None
 

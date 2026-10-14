@@ -18,14 +18,18 @@ __all__ = (
 )
 
 
-def build_session_environ(session: SessionDataForStart) -> dict[str, str]:
-    """The session's own environ with the values of its system session environ rows.
+def build_session_environ(
+    session: SessionDataForStart,
+    rows: Sequence[SystemSessionEnvironData],
+) -> dict[str, str]:
+    """The session's environ overlaid with the rows at its global scope, domain and project.
 
-    Among rows sharing a key the most specific scope wins. A ``system`` value overrides the
-    session's own entry under that key, and an ``optional`` value yields to it.
+    Per key the most specific scope wins; a ``system`` value overrides the session's entry
+    and an ``optional`` value yields to it.
     """
+    scopes = (None, session.domain_id, session.project_id)
     injected: dict[str, SystemSessionEnvironData] = {}
-    for row in sorted(session.system_environ, key=_specificity):
+    for row in sorted((row for row in rows if row.scope_id in scopes), key=_specificity):
         injected[row.key] = row
     system: dict[str, str] = {}
     optional: dict[str, str] = {}

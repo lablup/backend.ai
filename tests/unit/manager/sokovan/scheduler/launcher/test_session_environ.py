@@ -28,6 +28,8 @@ _SESSION_ID = SessionId(UUID("6f1c2a0e-0000-4000-8000-000000000001"))
 _USER_UUID = UUID("6f1c2a0e-0000-4000-8000-000000000002")
 _DOMAIN_ID = DomainID(UUID("6f1c2a0e-0000-4000-8000-000000000003"))
 _PROJECT_ID = ProjectID(UUID("6f1c2a0e-0000-4000-8000-000000000004"))
+_OTHER_DOMAIN_ID = DomainID(UUID("6f1c2a0e-0000-4000-8000-000000000005"))
+_OTHER_PROJECT_ID = ProjectID(UUID("6f1c2a0e-0000-4000-8000-000000000006"))
 
 
 @dataclass(frozen=True)
@@ -63,7 +65,6 @@ def _kernel(cluster_role: str, cluster_idx: int, cluster_hostname: str | None) -
 
 @pytest.fixture
 def session(case: _EnvironCase) -> SessionDataForStart:
-    now = datetime.now(UTC)
     return SessionDataForStart(
         session_id=_SESSION_ID,
         creation_id="creation-1",
@@ -75,19 +76,26 @@ def session(case: _EnvironCase) -> SessionDataForStart:
         user_uuid=_USER_UUID,
         user_email="user@example.com",
         user_name="test-user",
+        domain_id=_DOMAIN_ID,
+        project_id=_PROJECT_ID,
         environ=case.user_environ,
-        system_environ=[
-            SystemSessionEnvironData(
-                id=SystemSessionEnvironID(uuid4()),
-                value_source=binding.value_source,
-                key=binding.key,
-                scope_id=binding.scope_id,
-                created_at=now,
-                updated_at=now,
-            )
-            for binding in case.bindings
-        ],
     )
+
+
+@pytest.fixture
+def rows(case: _EnvironCase) -> list[SystemSessionEnvironData]:
+    now = datetime.now(UTC)
+    return [
+        SystemSessionEnvironData(
+            id=SystemSessionEnvironID(uuid4()),
+            value_source=binding.value_source,
+            key=binding.key,
+            scope_id=binding.scope_id,
+            created_at=now,
+            updated_at=now,
+        )
+        for binding in case.bindings
+    ]
 
 
 class TestValueSources:
@@ -148,9 +156,44 @@ class TestValueSources:
         ids=lambda case: case.name,
     )
     def test_injects_the_value_of_the_source(
-        self, case: _EnvironCase, session: SessionDataForStart
+        self,
+        case: _EnvironCase,
+        session: SessionDataForStart,
+        rows: list[SystemSessionEnvironData],
     ) -> None:
-        assert build_session_environ(session) == case.expected
+        assert build_session_environ(session, rows) == case.expected
+
+
+class TestScopeSelection:
+    @pytest.mark.parametrize(
+        "case",
+        [
+            _EnvironCase(
+                name="other_domain_and_project_ignored",
+                bindings=[
+                    _Binding("K", SystemSessionEnvironValueSource.USER_NAME, _OTHER_DOMAIN_ID),
+                    _Binding("L", SystemSessionEnvironValueSource.USER_EMAIL, _OTHER_PROJECT_ID),
+                ],
+                expected={},
+            ),
+            _EnvironCase(
+                name="other_domain_does_not_shadow_global",
+                bindings=[
+                    _Binding("K", SystemSessionEnvironValueSource.SESSION_NAME),
+                    _Binding("K", SystemSessionEnvironValueSource.USER_NAME, _OTHER_DOMAIN_ID),
+                ],
+                expected={"K": "test-session"},
+            ),
+        ],
+        ids=lambda case: case.name,
+    )
+    def test_injects_only_the_rows_at_the_sessions_scopes(
+        self,
+        case: _EnvironCase,
+        session: SessionDataForStart,
+        rows: list[SystemSessionEnvironData],
+    ) -> None:
+        assert build_session_environ(session, rows) == case.expected
 
 
 class TestScopePrecedence:
@@ -194,9 +237,12 @@ class TestScopePrecedence:
         ids=lambda case: case.name,
     )
     def test_the_most_specific_scope_wins(
-        self, case: _EnvironCase, session: SessionDataForStart
+        self,
+        case: _EnvironCase,
+        session: SessionDataForStart,
+        rows: list[SystemSessionEnvironData],
     ) -> None:
-        assert build_session_environ(session) == case.expected
+        assert build_session_environ(session, rows) == case.expected
 
 
 class TestUserEnvironMerge:
@@ -234,6 +280,9 @@ class TestUserEnvironMerge:
         ids=lambda case: case.name,
     )
     def test_merges_with_the_session_environ(
-        self, case: _EnvironCase, session: SessionDataForStart
+        self,
+        case: _EnvironCase,
+        session: SessionDataForStart,
+        rows: list[SystemSessionEnvironData],
     ) -> None:
-        assert build_session_environ(session) == case.expected
+        assert build_session_environ(session, rows) == case.expected

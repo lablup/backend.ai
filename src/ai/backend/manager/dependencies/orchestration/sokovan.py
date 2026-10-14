@@ -35,6 +35,9 @@ from ai.backend.manager.repositories.resource_usage_history.repository import (
 )
 from ai.backend.manager.repositories.runtime_variant.repository import RuntimeVariantRepository
 from ai.backend.manager.repositories.scheduler.repository import SchedulerRepository
+from ai.backend.manager.repositories.system_session_environ.repository import (
+    SystemSessionEnvironRepository,
+)
 from ai.backend.manager.sokovan.deployment.coordinator import DeploymentCoordinator
 from ai.backend.manager.sokovan.deployment.deployment_controller import DeploymentController
 from ai.backend.manager.sokovan.deployment.route.coordinator import RouteCoordinator
@@ -70,6 +73,7 @@ class SokovanOrchestratorInput:
     metric_repository: MetricRepository
     fair_share_repository: FairShareRepository
     resource_usage_repository: ResourceUsageHistoryRepository
+    system_session_environ_repository: SystemSessionEnvironRepository
     config_provider: ManagerConfigProvider
     agent_client_pool: AgentClientPool
     appproxy_client_pool: AppProxyClientPool
@@ -127,6 +131,7 @@ class SokovanOrchestratorDependency(
         scheduler_components = create_default_scheduler_components(
             setup_input.scheduler_repository,
             setup_input.fair_share_repository,
+            setup_input.system_session_environ_repository,
             setup_input.config_provider,
             setup_input.agent_client_pool,
             setup_input.network_plugin_ctx,

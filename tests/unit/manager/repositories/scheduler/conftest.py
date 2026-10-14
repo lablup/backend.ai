@@ -72,7 +72,6 @@ from ai.backend.manager.models.resource_slot.row import (
 from ai.backend.manager.models.scheduling_history.row import SessionSchedulingHistoryRow
 from ai.backend.manager.models.session.row import SessionDependencyRow, SessionRow
 from ai.backend.manager.models.session_group.row import SessionGroupRow
-from ai.backend.manager.models.system_session_environ.row import SystemSessionEnvironRow
 from ai.backend.manager.models.user.row import UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.secret.types import SecretValue
@@ -107,7 +106,6 @@ _SCHEDULER_ROWS: list[type] = [
     AgentResourceRow,
     SessionDependencyRow,
     SessionSchedulingHistoryRow,
-    SystemSessionEnvironRow,
 ]
 
 _AGENT_ADDR = "127.0.0.1:6001"

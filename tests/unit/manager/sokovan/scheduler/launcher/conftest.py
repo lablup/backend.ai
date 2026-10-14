@@ -11,6 +11,7 @@ from uuid import UUID, uuid4
 
 import pytest
 
+from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.entity.network import NetworkID
 from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.types import (
@@ -50,6 +51,13 @@ _PERSISTENT_NETWORK_REF_NAME = "bai-multinode-00000000-0000-0000-0000-0000000000
 # =============================================================================
 # Mock Dependencies
 # =============================================================================
+
+
+@pytest.fixture
+def mock_system_session_environ_repository() -> AsyncMock:
+    repository = AsyncMock()
+    repository.search_at_scopes = AsyncMock(return_value=[])
+    return repository
 
 
 @pytest.fixture
@@ -127,6 +135,7 @@ def mock_valkey_schedule() -> AsyncMock:
 @pytest.fixture
 def launcher(
     mock_repository: AsyncMock,
+    mock_system_session_environ_repository: AsyncMock,
     mock_agent_client_pool: MagicMock,
     mock_network_plugin_ctx: MagicMock,
     mock_config_provider: MagicMock,
@@ -136,6 +145,7 @@ def launcher(
     return SessionLauncher(
         SessionLauncherArgs(
             repository=mock_repository,
+            system_session_environ_repository=mock_system_session_environ_repository,
             agent_client_pool=mock_agent_client_pool,
             network_plugin_ctx=mock_network_plugin_ctx,
             config_provider=mock_config_provider,
@@ -272,12 +282,13 @@ def _create_session_for_start(
         user_uuid=uuid4(),
         user_email="test@example.com",
         user_name="testuser",
+        domain_id=DomainID(uuid4()),
+        project_id=ProjectID(uuid4()),
         cluster_mode=cluster_mode,
         network_type=network_type or NetworkType.VOLATILE,
         network_id=network_id,
         kernels=kernels,
         environ={},
-        system_environ=[],
     )
 
 
