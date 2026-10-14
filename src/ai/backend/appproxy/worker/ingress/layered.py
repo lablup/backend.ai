@@ -30,6 +30,7 @@ class LayeredIngressState(IngressReader):
             try:
                 ingress = await layer.get(frontend_key)
             except IngressNotFoundError:
+                # The key was remembered missing on purpose to skip reading the later layers.
                 return None
             if ingress is None:
                 continue
