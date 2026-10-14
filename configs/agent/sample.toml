@@ -204,7 +204,7 @@
   # plugin is loaded only when named here, even if installed; while loaded, its
   # STATUS gates whether this node takes any work.
   # Added in 26.10.0
-  ## allow-cni-plugins = ["ai.backend.network.vxlan"]
+  ## allow-cni-plugins = ["ai.backend.network.example"]
   # Directory path for storing temporary image commit data. Used when users
   # commit their running containers as new images. Requires sufficient disk
   # space for container filesystem layers.
