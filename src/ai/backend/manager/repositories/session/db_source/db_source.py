@@ -7,7 +7,7 @@ from typing import Any, cast
 
 import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import joinedload, noload, selectinload
+from sqlalchemy.orm import noload, selectinload
 from sqlalchemy.orm.strategy_options import _AbstractLoad
 
 from ai.backend.common.data.entity.session import SessionID
@@ -26,6 +26,7 @@ from ai.backend.manager.data.session.types import (
     SessionData,
     SessionRoutingInfo,
     SessionStatus,
+    SessionWithKernelsData,
 )
 from ai.backend.manager.data.user.types import SessionOwnerContext, UserData
 from ai.backend.manager.defs import DEFAULT_ROLE
@@ -39,6 +40,7 @@ from ai.backend.manager.errors.kernel import (
     TooManyKernelsFound,
     TooManySessionsMatched,
 )
+from ai.backend.manager.models.agent.row import AgentRow
 from ai.backend.manager.models.image.row import ImageRow
 from ai.backend.manager.models.image.searchers import (
     CanonicalImageSearcher,
@@ -175,6 +177,48 @@ class SessionDBSource:
                 eager_loading_op=eager_loading_op or (),
             )
 
+    async def get_session_with_kernels(
+        self,
+        session_id: SessionId,
+        allow_stale: bool = False,
+    ) -> SessionWithKernelsData:
+        async with self._db.begin_readonly_session_read_committed() as db_sess:
+            session_row = await self._session_by_id(
+                db_sess,
+                session_id,
+                kernel_loading_strategy=KernelLoadingStrategy.NONE,
+                allow_stale=allow_stale,
+            )
+            return await self._with_kernels(db_sess, session_row)
+
+    @staticmethod
+    async def _with_kernels(
+        db_sess: AsyncSession, session_row: SessionRow
+    ) -> SessionWithKernelsData:
+        kernel_rows = list(
+            await db_sess.scalars(
+                sa.select(KernelRow).where(KernelRow.session_id == session_row.id)
+            )
+        )
+        main_kernels = [kern for kern in kernel_rows if kern.cluster_role == DEFAULT_ROLE]
+        if len(main_kernels) > 1:
+            raise TooManyKernelsFound(
+                f"Session (id: {session_row.id}) has more than 1 main kernel."
+            )
+        if not main_kernels:
+            raise MainKernelNotFound(f"Session (id: {session_row.id}) has no main kernel.")
+        return SessionWithKernelsData(
+            session=session_row.to_dataclass(),
+            main_kernel=main_kernels[0].to_kernel_info(),
+            kernels=[kern.to_kernel_info() for kern in kernel_rows],
+        )
+
+    async def get_agent_public_host(self, agent_id: AgentId) -> str | None:
+        async with self._db.begin_readonly_session_read_committed() as db_sess:
+            return await db_sess.scalar(
+                sa.select(AgentRow.public_host).where(AgentRow.id == agent_id)
+            )
+
     async def _session_by_id(
         self,
         db_sess: AsyncSession,
@@ -189,12 +233,8 @@ class SessionDBSource:
             # MAIN_KERNEL_ONLY loads every kernel as well, the same as SessionRow.get_session.
             options.extend([
                 noload("*"),
-                selectinload(SessionRow.kernels).options(
-                    noload("*"),
-                    selectinload(KernelRow.agent_row).noload("*"),
-                ),
+                selectinload(SessionRow.kernels).options(noload("*")),
             ])
-        options.append(joinedload(SessionRow.user))
         cond = SessionRow.id == session_id
         if not allow_stale:
             cond = cond & ~SessionRow.status.in_(DEAD_SESSION_STATUSES)
@@ -286,12 +326,12 @@ class SessionDBSource:
         self,
         session_id: SessionId,
         new_name: str,
-    ) -> SessionRow:
+    ) -> SessionData:
         async with self._db.begin_session() as db_sess:
             session_row = await self._session_by_id(
                 db_sess,
                 session_id,
-                kernel_loading_strategy=KernelLoadingStrategy.ALL_KERNELS,
+                kernel_loading_strategy=KernelLoadingStrategy.NONE,
                 allow_stale=False,
             )
             if session_row.status != SessionStatus.RUNNING:
@@ -311,9 +351,14 @@ class SessionDBSource:
                     raise SessionAlreadyExists(f"Session with name '{new_name}' already exists")
 
             session_row.name = new_name
-            for kernel in session_row.kernels:
-                kernel.session_name = new_name
-            return session_row
+            await db_sess.execute(
+                sa.update(KernelRow)
+                .values(session_name=new_name)
+                .where(KernelRow.session_id == session_id)
+            )
+        # Built after the commit, so a session without a main kernel is still renamed.
+        async with self._db.begin_readonly_session_read_committed() as db_sess:
+            return (await self._with_kernels(db_sess, session_row)).session
 
     async def resolve_image(self, reference: str, architecture: str) -> ImageData:
         async with self._ops_provider.read_ops() as r:
@@ -418,7 +463,7 @@ class SessionDBSource:
         self,
         updater: SessionUpdater,
         session_name: str | None = None,
-    ) -> SessionRow | None:
+    ) -> SessionData | None:
         session_id = updater.session_id
 
         async with self._db.begin_session() as db_session:
@@ -473,14 +518,16 @@ class SessionDBSource:
                     .where(KernelRow.session_id == session_id)
                 )
 
-            # Re-fetch with kernels loaded for the return value
-            select_stmt = (
+            session_row = await db_session.scalar(
                 sa.select(SessionRow)
-                .options(selectinload(SessionRow.kernels))
                 .execution_options(populate_existing=True)
                 .where(SessionRow.id == session_id)
             )
-            return cast(SessionRow | None, await db_session.scalar(select_stmt))
+        if session_row is None:
+            return None
+        # Built after the commit, so a session without a main kernel is still updated.
+        async with self._db.begin_readonly_session_read_committed() as db_sess:
+            return (await self._with_kernels(db_sess, session_row)).session
 
     async def query_userinfo(
         self,
@@ -588,20 +635,6 @@ class SessionDBSource:
     ) -> dict[str, list[Any] | str]:
         async with self._db.begin_readonly_session_read_committed() as db_sess:
             return await find_dependency_sessions(session_id, db_sess)
-
-    async def get_session_with_group(
-        self,
-        session_id: SessionId,
-        kernel_loading_strategy: KernelLoadingStrategy = KernelLoadingStrategy.MAIN_KERNEL_ONLY,
-        allow_stale: bool = False,
-    ) -> SessionRow:
-        async with self._db.begin_readonly_session_read_committed() as db_sess:
-            return await self._session_by_id(
-                db_sess,
-                session_id,
-                kernel_loading_strategy=kernel_loading_strategy,
-                allow_stale=allow_stale,
-            )
 
     async def get_session_with_routing_minimal(
         self,
@@ -784,15 +817,10 @@ class SessionDBSource:
     ) -> SessionData:
         """Get session data by session ID."""
         async with self._db.begin_readonly_session() as db_sess:
-            query = (
-                sa.select(SessionRow)
-                .options(selectinload(SessionRow.kernels))
-                .where(SessionRow.id == session_id)
-            )
-            row = await db_sess.scalar(query)
+            row = await db_sess.scalar(sa.select(SessionRow).where(SessionRow.id == session_id))
             if row is None:
                 raise SessionNotFound(f"Session not found: {session_id}")
-            return row.to_dataclass()
+            return (await self._with_kernels(db_sess, row)).session
 
     async def update_image_last_used_at(
         self,
