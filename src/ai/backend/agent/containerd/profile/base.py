@@ -105,6 +105,16 @@ class RuntimeProfile(Protocol):
         """
         return config
 
+    # Provisional name. True: the image carries its own krunner, so core skips the host krunner
+    # mounts and env (and the runner and libbaihook resolution they need) but keeps the
+    # accelerator setup. The image distro is still resolved before the creation context.
+    skips_host_krunner: bool = False
+
+
+def profile_skips_host_krunner(profile: RuntimeProfile) -> bool:
+    """Read profile.skips_host_krunner; a third-party profile without it keeps the host krunner."""
+    return bool(getattr(profile, "skips_host_krunner", False))
+
 
 async def prepare_kernel_config(
     profile: RuntimeProfile, config: KernelCreationConfig

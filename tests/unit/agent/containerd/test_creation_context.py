@@ -12,6 +12,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
+from ai.backend.agent.agent import AbstractKernelCreationContext
 from ai.backend.agent.containerd.agent import (
     HOST_PORTS_LABEL,
     KERNEL_IP_LABEL,
@@ -21,7 +22,9 @@ from ai.backend.agent.containerd.client import MountSpec
 from ai.backend.agent.containerd.kernel import ContainerdKernel
 from ai.backend.agent.containerd.network import KernelNetwork
 from ai.backend.agent.containerd.profile.base import LaunchPlan, RuntimeOptions
+from ai.backend.agent.containerd.profile.runc import RuncProfile
 from ai.backend.agent.containerd.scratch import CONFIG_DIR_LABEL
+from ai.backend.agent.containerd.spec import SpecInput, build_base_spec, build_launch_spec
 from ai.backend.agent.errors import UnsupportedResource
 from ai.backend.agent.errors.containerd import (
     ContainerdImageNotFound,
@@ -29,6 +32,7 @@ from ai.backend.agent.errors.containerd import (
     KernelNetworkSetupFailed,
     KernelVerbNotSupported,
     ProfileSpecRejected,
+    SealedSpecMissing,
 )
 from ai.backend.agent.errors.resources import PortPoolExhaustedError
 from ai.backend.agent.port_pool import PortPool
@@ -39,6 +43,7 @@ from ai.backend.common.types import (
     DeviceName,
     KernelCreationConfig,
     KernelId,
+    MountTypes,
     ResourceSlot,
     ServicePort,
     ServicePortProtocols,
@@ -198,7 +203,7 @@ class TestPrepareContainer:
         assert (config_dir / "environ.txt").read_text() == "A=1\nB=2\n"
         assert "CPU_SHARES=1:1,3:1" in (config_dir / "resource.txt").read_text()
 
-    async def test_profile_rejection_propagates(
+    async def test_profile_rejection_propagates_and_removes_the_scratch_dir(
         self,
         tmp_path: Path,
         ownership_data: KernelOwnershipData,
@@ -218,6 +223,8 @@ class TestPrepareContainer:
 
         with pytest.raises(ProfileSpecRejected):
             await ctx.prepare_container(resource_spec, {}, [], MagicMock())
+
+        assert not (tmp_path / str(ownership_data.kernel_id)).exists()
 
     async def test_netns_exists_before_plan_and_is_removed_when_plan_fails(
         self,
@@ -280,6 +287,155 @@ class TestPrepareContainer:
         assert profile.plan_calls == []
         runner.failing.clear()
         assert await network.setup(KernelId(uuid.uuid4())) == IPv4Address("172.30.9.2")
+
+
+SPEC_JWS_ENTRY = {
+    "destination": "/run/bai/spec.jws",
+    "type": "bind",
+    "options": ["rbind", "ro", "rprivate"],
+}
+
+
+class TestSealedKernel:
+    @pytest.fixture
+    def sealed_config(self, launch_kernel_config: KernelCreationConfig) -> KernelCreationConfig:
+        return cast(
+            KernelCreationConfig,
+            {**launch_kernel_config, "confidential": {"signature": "aaa.bbb.ccc"}},
+        )
+
+    async def _prepare(
+        self,
+        tmp_path: Path,
+        ownership_data: KernelOwnershipData,
+        config: KernelCreationConfig,
+        launch_plan: LaunchPlan,
+        resource_spec: KernelResourceSpec,
+        computers: dict[DeviceName, ComputerContext],
+        *,
+        runner: FakeCommandRunner | None = None,
+        client: FakeContainerd | None = None,
+    ) -> tuple[ContainerdKernelCreationContext, FakeProfile]:
+        profile = FakeProfile("runc", accepts=True, plan_result=launch_plan)
+        ctx = _make_context(
+            ownership_data,
+            config,
+            profile,
+            scratch_root=tmp_path,
+            computers=computers,
+            runner=runner,
+            client=client,
+        )
+        await ctx.prepare_scratch()
+        await ctx.prepare_container(resource_spec, {}, [], MagicMock())
+        return ctx, profile
+
+    async def test_signature_is_written_and_mounted_read_only(
+        self,
+        tmp_path: Path,
+        ownership_data: KernelOwnershipData,
+        sealed_config: KernelCreationConfig,
+        launch_plan: LaunchPlan,
+        resource_spec: KernelResourceSpec,
+        computers: dict[DeviceName, ComputerContext],
+    ) -> None:
+        _, profile = await self._prepare(
+            tmp_path, ownership_data, sealed_config, launch_plan, resource_spec, computers
+        )
+
+        path = (tmp_path / str(ownership_data.kernel_id)).resolve() / "spec.jws"
+        assert path.read_bytes() == b"aaa.bbb.ccc"
+        assert path.stat().st_mode & 0o777 == 0o444
+        base_spec = profile.plan_calls[0].base_spec
+        assert base_spec["mounts"][-1] == {**SPEC_JWS_ENTRY, "source": str(path)}
+
+    async def test_the_mount_survives_into_the_runc_launch_spec(
+        self,
+        tmp_path: Path,
+        ownership_data: KernelOwnershipData,
+        sealed_config: KernelCreationConfig,
+        launch_plan: LaunchPlan,
+        resource_spec: KernelResourceSpec,
+        computers: dict[DeviceName, ComputerContext],
+    ) -> None:
+        ctx, profile = await self._prepare(
+            tmp_path, ownership_data, sealed_config, launch_plan, resource_spec, computers
+        )
+        launch = profile.plan_calls[0]
+        plan = RuncProfile(10.0).plan(launch)
+
+        spec = build_launch_spec(
+            launch.base_spec,
+            args=[],
+            env=[],
+            mounts=launch.mounts,
+            allowed_mount_kinds=plan.allowed_mount_kinds,
+            spec_patch=plan.spec_patch,
+            cgroups_path="/ns/c",
+        )
+
+        path = (tmp_path / str(ownership_data.kernel_id)).resolve() / "spec.jws"
+        entries = [m for m in spec["mounts"] if m["destination"] == "/run/bai/spec.jws"]
+        assert entries == [{**SPEC_JWS_ENTRY, "source": str(path)}]
+
+    async def test_unsealed_kernel_has_no_file_and_an_unchanged_base_spec(
+        self,
+        tmp_path: Path,
+        ownership_data: KernelOwnershipData,
+        launch_kernel_config: KernelCreationConfig,
+        launch_plan: LaunchPlan,
+        resource_spec: KernelResourceSpec,
+        computers: dict[DeviceName, ComputerContext],
+    ) -> None:
+        _, profile = await self._prepare(
+            tmp_path, ownership_data, launch_kernel_config, launch_plan, resource_spec, computers
+        )
+
+        expected = build_base_spec(
+            SpecInput(
+                cwd="/home/work",
+                hostname="main1",
+                cpu_cores=[1, 3],
+                memory_bytes=1073741824,
+                shm_bytes=134217728,
+                netns_path=f"/run/netns/{BRIDGE}-{ownership_data.kernel_id}",
+            )
+        )
+        assert profile.plan_calls[0].base_spec == expected
+        assert all(
+            m["destination"] != "/run/bai/spec.jws"
+            for m in profile.plan_calls[0].base_spec["mounts"]
+        )
+        assert not (tmp_path / str(ownership_data.kernel_id) / "spec.jws").exists()
+
+    async def test_sealed_without_a_signature_fails_before_any_side_effect(
+        self,
+        tmp_path: Path,
+        ownership_data: KernelOwnershipData,
+        launch_kernel_config: KernelCreationConfig,
+        launch_plan: LaunchPlan,
+        resource_spec: KernelResourceSpec,
+        computers: dict[DeviceName, ComputerContext],
+    ) -> None:
+        config = cast(KernelCreationConfig, {**launch_kernel_config, "confidential": {}})
+        runner = FakeCommandRunner()
+        client = FakeContainerd()
+
+        with pytest.raises(SealedSpecMissing):
+            await self._prepare(
+                tmp_path,
+                ownership_data,
+                config,
+                launch_plan,
+                resource_spec,
+                computers,
+                runner=runner,
+                client=client,
+            )
+
+        assert runner.calls == []
+        assert client.calls == []
+        assert not (tmp_path / str(ownership_data.kernel_id)).exists()
 
 
 class TestCreationContextMembers:
@@ -394,6 +550,140 @@ class TestAccelerators:
         alloc = {SlotName("cuda.shares"): {DeviceId("0"): Decimal(0)}}
 
         await ctx.apply_accelerator_allocation(MagicMock(), alloc)
+
+
+class _SkippingProfile(FakeProfile):
+    skips_host_krunner = True
+
+
+class TestMountKrunner:
+    @pytest.fixture
+    def accelerator(self) -> ComputerContext:
+        plugin = MagicMock()
+        return ComputerContext(instance=plugin, devices=[], alloc_map=MagicMock())
+
+    @pytest.fixture
+    def accelerator_spec(self) -> KernelResourceSpec:
+        return KernelResourceSpec(
+            slots=ResourceSlot({"cuda.shares": "1"}),
+            allocations={
+                DeviceName("cuda"): {SlotName("cuda.shares"): {DeviceId("0"): Decimal(1)}},
+            },
+            scratch_disk_size=0,
+        )
+
+    def _context(
+        self,
+        tmp_path: Path,
+        ownership_data: KernelOwnershipData,
+        kernel_config: KernelCreationConfig,
+        profile: FakeProfile,
+        accelerator: ComputerContext,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> tuple[ContainerdKernelCreationContext, AsyncMock]:
+        ctx = _make_context(
+            ownership_data,
+            kernel_config,
+            profile,
+            scratch_root=tmp_path,
+            computers={DeviceName("cuda"): accelerator},
+        )
+        ctx.distro = "debian12"
+        apply = AsyncMock()
+        monkeypatch.setattr(ctx, "apply_accelerator_allocation", apply)
+        monkeypatch.setattr(
+            ctx,
+            "generate_accelerator_mounts",
+            AsyncMock(
+                return_value=[
+                    MagicMock(
+                        mode=MountTypes.BIND,
+                        src_path=Path("/dev/nvidia0"),
+                        dst_path=Path("/dev/nvidia0"),
+                    )
+                ]
+            ),
+        )
+        return ctx, apply
+
+    async def test_default_profile_defers_to_the_base(
+        self,
+        tmp_path: Path,
+        ownership_data: KernelOwnershipData,
+        kernel_config: KernelCreationConfig,
+        accelerator: ComputerContext,
+        accelerator_spec: KernelResourceSpec,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        ctx, apply = self._context(
+            tmp_path,
+            ownership_data,
+            kernel_config,
+            FakeProfile("runc", accepts=True),
+            accelerator,
+            monkeypatch,
+        )
+        base = AsyncMock()
+        monkeypatch.setattr(AbstractKernelCreationContext, "mount_krunner", base)
+        environ: dict[str, str] = {}
+
+        await ctx.mount_krunner(accelerator_spec, environ)
+
+        base.assert_awaited_once_with(accelerator_spec, environ)
+        apply.assert_not_called()
+
+    async def test_skipping_profile_keeps_the_accelerator_part(
+        self,
+        tmp_path: Path,
+        ownership_data: KernelOwnershipData,
+        kernel_config: KernelCreationConfig,
+        accelerator: ComputerContext,
+        accelerator_spec: KernelResourceSpec,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        ctx, apply = self._context(
+            tmp_path,
+            ownership_data,
+            kernel_config,
+            _SkippingProfile("coco-tdx", accepts=True),
+            accelerator,
+            monkeypatch,
+        )
+        environ: dict[str, str] = {}
+
+        await ctx.mount_krunner(accelerator_spec, environ)
+
+        apply.assert_awaited_once_with(
+            accelerator.instance, {SlotName("cuda.shares"): {DeviceId("0"): Decimal(1)}}
+        )
+        assert [str(m.target) for m in accelerator_spec.mounts] == ["/dev/nvidia0"]
+        assert environ == {}
+
+    async def test_profile_without_the_member_defers_to_the_base(
+        self,
+        tmp_path: Path,
+        ownership_data: KernelOwnershipData,
+        kernel_config: KernelCreationConfig,
+        accelerator: ComputerContext,
+        accelerator_spec: KernelResourceSpec,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        ctx, _ = self._context(
+            tmp_path,
+            ownership_data,
+            kernel_config,
+            FakeProfile("old", accepts=True),
+            accelerator,
+            monkeypatch,
+        )
+        ctx._profile = cast(Any, object())  # a profile object without the member at all
+        base = AsyncMock()
+        monkeypatch.setattr(AbstractKernelCreationContext, "mount_krunner", base)
+        environ: dict[str, str] = {}
+
+        await ctx.mount_krunner(accelerator_spec, environ)
+
+        base.assert_awaited_once_with(accelerator_spec, environ)
 
 
 class StdioRecordingContainerd(FakeContainerd):
@@ -644,6 +934,7 @@ class TestStartContainer:
         assert (data["stdin_port"], data["stdout_port"]) == (0, 0)
         assert data["kernel_host"] == "127.0.0.1"
         assert data["kernel_ip"] == "172.30.9.2"
+        assert data["published_host"] == "10.0.0.5"
         assert "intrinsic_ports" not in data
         assert not (
             tmp_path / str(ownership_data.kernel_id) / "config" / "intrinsic-ports.json"
