@@ -20,6 +20,7 @@ class InMemoryIngressState(IngressReader, IngressWriter):
 
     _negative_ttl: float | None
     _ingresses: TTLCache[IngressFrontendKey, Ingress]
+    # get raises IngressNotFoundError for these keys so the layered read skips the later layers.
     _missing_keys: TTLCache[IngressFrontendKey, bool]
 
     def __init__(self, ttl: float | None = None, negative_ttl: float | None = None) -> None:
