@@ -1118,29 +1118,19 @@ class DeploymentRepository:
                     0, current_replica_count + scale_direction * rule.action.step_size
                 )
 
-                # Check min/max limits
-                if (
-                    rule.action.min_replicas is not None
-                    and new_replica_count < rule.action.min_replicas
-                ):
-                    log.debug(
-                        "autoscaling replica count below minimum, rule skipped",
-                        deployment_id=deployment.id,
-                        rule_id=rule.id,
-                        new_replica_count=new_replica_count,
-                        min_replica_count=rule.action.min_replicas,
-                    )
-                    continue
+                # Clamp to min/max limits
+                if rule.action.min_replicas is not None:
+                    new_replica_count = max(new_replica_count, rule.action.min_replicas)
+                if rule.action.max_replicas is not None:
+                    new_replica_count = min(new_replica_count, rule.action.max_replicas)
 
-                if (
-                    rule.action.max_replicas is not None
-                    and new_replica_count > rule.action.max_replicas
-                ):
+                if new_replica_count == current_replica_count:
                     log.debug(
-                        "autoscaling replica count above maximum, rule skipped",
+                        "autoscaling replica count already at limit, rule skipped",
                         deployment_id=deployment.id,
                         rule_id=rule.id,
-                        new_replica_count=new_replica_count,
+                        current_replica_count=current_replica_count,
+                        min_replica_count=rule.action.min_replicas,
                         max_replica_count=rule.action.max_replicas,
                     )
                     continue
