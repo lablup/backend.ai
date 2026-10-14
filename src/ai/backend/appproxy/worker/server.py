@@ -164,6 +164,7 @@ EVENT_DISPATCHER_CONSUMER_GROUP: Final[str] = "appproxy-worker"
 global_subapp_pkgs: Final[list[str]] = [
     ".health",
     ".setup",
+    ".ingress",
 ]
 
 

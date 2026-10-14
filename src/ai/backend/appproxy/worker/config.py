@@ -5,6 +5,7 @@ import os
 import socket
 import sys
 import textwrap
+from enum import StrEnum
 from pathlib import Path
 from pprint import pformat
 from typing import Annotated, Self
@@ -367,6 +368,101 @@ class TraefikConfig(BaseSchema):
             case FrontendMode.WILDCARD_DOMAIN:
                 if self.wildcard_domain is None:
                     raise ValueError("wildcard_domain must be set when frontend_mode = 'wildcard'")
+        return self
+
+
+class IngressLayerType(StrEnum):
+    IN_MEMORY = "in-memory"
+    REDIS = "redis"
+
+
+class IngressInMemoryConfig(BaseSchema):
+    ttl: Annotated[
+        float | None,
+        Field(default=None, gt=0),
+        BackendAIConfigMeta(
+            description=(
+                "Seconds an ingress filled from a later layer is held. "
+                "Unset holds it until removed. Requires a layer after in-memory."
+            ),
+            added_version="26.9.0",
+            example=ConfigExample(local="", prod="60.0"),
+        ),
+    ]
+    negative_ttl: Annotated[
+        float | None,
+        Field(default=None, gt=0, alias="negative-ttl"),
+        BackendAIConfigMeta(
+            description=(
+                "Seconds a key missing from every later layer is remembered as missing. "
+                "Unset does not remember misses. Requires a layer after in-memory."
+            ),
+            added_version="26.9.0",
+            example=ConfigExample(local="", prod="5.0"),
+        ),
+    ]
+
+
+class IngressRedisConfig(BaseSchema):
+    key_prefix: Annotated[
+        str,
+        Field(default="appproxy:ingress", min_length=1, alias="key-prefix"),
+        BackendAIConfigMeta(
+            description=(
+                "Prefix of the Redis keys holding ingresses. "
+                "The connection is the worker's redis config."
+            ),
+            added_version="26.9.0",
+            example=ConfigExample(local="appproxy:ingress", prod="appproxy:ingress"),
+        ),
+    ]
+
+
+class IngressConfig(BaseSchema):
+    layers: Annotated[
+        list[IngressLayerType],
+        Field(default_factory=lambda: [IngressLayerType.IN_MEMORY], min_length=1),
+        BackendAIConfigMeta(
+            description=(
+                "Where the worker reads ingresses, in lookup order. "
+                "in-memory, when present, comes first."
+            ),
+            added_version="26.9.0",
+            example=ConfigExample(local='["in-memory"]', prod='["in-memory", "redis"]'),
+        ),
+    ]
+    in_memory: Annotated[
+        IngressInMemoryConfig,
+        Field(default_factory=IngressInMemoryConfig, alias="in-memory"),
+        BackendAIConfigMeta(
+            description="In-memory layer settings. Read only when layers include in-memory.",
+            added_version="26.9.0",
+            composite=CompositeType.FIELD,
+        ),
+    ]
+    redis: Annotated[
+        IngressRedisConfig,
+        Field(default_factory=IngressRedisConfig),
+        BackendAIConfigMeta(
+            description="Redis layer settings. Read only when layers include redis.",
+            added_version="26.9.0",
+            composite=CompositeType.FIELD,
+        ),
+    ]
+
+    @model_validator(mode="after")
+    def _check_layers(self) -> Self:
+        if len(set(self.layers)) != len(self.layers):
+            raise ValueError("ingress layers must not repeat")
+        if (
+            IngressLayerType.IN_MEMORY in self.layers
+            and self.layers[0] != IngressLayerType.IN_MEMORY
+        ):
+            raise ValueError("the in-memory ingress layer must come first")
+        if self.layers == [IngressLayerType.IN_MEMORY] and (
+            self.in_memory.ttl is not None or self.in_memory.negative_ttl is not None
+        ):
+            raise ValueError("in-memory ttl requires a layer after in-memory")
         return self
 
 
@@ -800,6 +896,16 @@ class ProxyWorkerConfig(BaseSchema):
             ),
             added_version="26.4.5",
             example=ConfigExample(local="[]", prod='["10.0.0.0/8"]'),
+        ),
+    ]
+
+    ingress: Annotated[
+        IngressConfig,
+        Field(default_factory=IngressConfig),
+        BackendAIConfigMeta(
+            description="Where the worker reads the ingresses it serves.",
+            added_version="26.9.0",
+            composite=CompositeType.FIELD,
         ),
     ]
 
