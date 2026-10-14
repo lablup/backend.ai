@@ -1,6 +1,9 @@
 from __future__ import annotations
 
+import pytest
+
 from ai.backend.agent.config.unified import ContainerdConfig
+from ai.backend.common.exception import BackendAISchemaValidationFailed
 
 
 class TestContainerdConfig:
@@ -17,6 +20,7 @@ class TestContainerdConfig:
         assert config.address == "/run/containerd/containerd.sock"
         assert config.namespace == "backend-ai"
         assert config.snapshotter == "overlayfs"
+        assert config.create_task_timeout == 30.0
 
     def test_connection_overrides(self) -> None:
         config = ContainerdConfig.model_validate({
@@ -33,19 +37,28 @@ class TestContainerdConfig:
         config = ContainerdConfig.model_validate({
             "runtime-profiles": ["coco-tdx"],
             "profile-required-slots": ["confidential.tdx"],
+            "create-task-timeout": 1200,
         })
 
         assert config.runtime_profiles == ["coco-tdx"]
         assert config.profile_required_slots == ["confidential.tdx"]
+        assert config.create_task_timeout == 1200.0
 
     def test_snake_keys(self) -> None:
         config = ContainerdConfig.model_validate({
             "runtime_profiles": ["coco-tdx"],
             "profile_required_slots": ["confidential.tdx"],
+            "create_task_timeout": 1200,
         })
 
         assert config.runtime_profiles == ["coco-tdx"]
         assert config.profile_required_slots == ["confidential.tdx"]
+        assert config.create_task_timeout == 1200.0
+
+    @pytest.mark.parametrize("value", [0, -1])
+    def test_create_task_timeout_must_be_positive(self, value: int) -> None:
+        with pytest.raises(BackendAISchemaValidationFailed):
+            ContainerdConfig.model_validate({"create-task-timeout": value})
 
     def test_profiles_nested_table_is_preserved(self) -> None:
         table = {"coco-tdx": {"standin-image": "ref", "nested": {"k": 1}}}

@@ -158,6 +158,10 @@ class Tasks(Servicer):
         self.backend.created.append(request)
         return tasks_pb2.CreateTaskResponse(container_id=request.container_id, pid=4242)
 
+    async def Start(self, request: Any, context: Any) -> Any:
+        await self.backend.enter(context)
+        return tasks_pb2.StartResponse(pid=4242)
+
     async def Get(self, request: Any, context: Any) -> Any:
         await self.backend.enter(context)
         if self.backend.task_state is None:
@@ -367,6 +371,54 @@ class TestTasks:
     ) -> None:
         await client.kill_task("c1", 9, all_processes=True)
         await client.delete_task("c1")
+
+
+class TestCreateTaskTimeout:
+    @staticmethod
+    async def _connect(socket_path: Path, call: float, create: float) -> ContainerdClient:
+        c = ContainerdClient(
+            ContainerdClientConfig(
+                address=str(socket_path),
+                namespace="ns-test",
+                snapshotter="overlayfs",
+                call_timeout=call,
+                create_task_timeout=create,
+            )
+        )
+        await c.connect()
+        return c
+
+    async def test_create_task_outlives_the_call_timeout(
+        self, server: None, socket_path: Path, backend: Backend
+    ) -> None:
+        backend.delay_sec = 1.0
+        c = await self._connect(socket_path, call=0.5, create=5.0)
+        try:
+            assert await c.create_task("c1", [], "file:///log", "file:///log") == 4242
+        finally:
+            await c.close()
+
+    async def test_other_calls_keep_the_call_timeout(
+        self, server: None, socket_path: Path, backend: Backend
+    ) -> None:
+        backend.delay_sec = 1.0
+        c = await self._connect(socket_path, call=0.5, create=5.0)
+        try:
+            with pytest.raises(ContainerdOperationFailed, match="DEADLINE_EXCEEDED"):
+                await c.start_task("c1")
+        finally:
+            await c.close()
+
+    async def test_create_task_times_out_at_its_own_timeout(
+        self, server: None, socket_path: Path, backend: Backend
+    ) -> None:
+        backend.delay_sec = 1.0
+        c = await self._connect(socket_path, call=5.0, create=0.3)
+        try:
+            with pytest.raises(ContainerdOperationFailed, match="create_task: DEADLINE_EXCEEDED"):
+                await c.create_task("c1", [], "file:///log", "file:///log")
+        finally:
+            await c.close()
 
 
 class TestRequestBasics:
