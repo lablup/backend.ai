@@ -2,7 +2,7 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import override
 
-from ai.backend.common.data.entity.bootstrap_script import BootstrapScriptID
+from ai.backend.common.data.entity.bootstrap_script import BootstrapScript, BootstrapScriptID
 from ai.backend.common.data.entity.types import EntityIdentifier
 from ai.backend.manager.data.bootstrap_script.types import BootstrapScriptData
 from ai.backend.manager.models.bootstrap_script.row import BootstrapScriptRow
@@ -14,7 +14,7 @@ from ai.backend.manager.models.specs.types import IntegrityErrorCheck
 class BootstrapScriptCreator(
     FieldCreator[EntityIdentifier, BootstrapScriptRow, BootstrapScriptData]
 ):
-    script: str
+    script: BootstrapScript
     is_default: bool
 
     @override

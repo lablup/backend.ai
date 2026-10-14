@@ -18,6 +18,7 @@ from ai.backend.common.clients.valkey_client.valkey_session.types import (
 )
 from ai.backend.common.contexts.client_ip import current_client_ip
 from ai.backend.common.contexts.user import current_user
+from ai.backend.common.data.entity.bootstrap_script import BootstrapScript
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.user.types import UserData
 from ai.backend.common.dto.manager.auth.types import AuthTokenType
@@ -234,7 +235,9 @@ class AuthService:
             "user": keypair.user_id,
             "resource_policy": keypair.resource_policy_name,
             "dotfiles": keypair.dotfiles,
-            "bootstrap_script": bootstrap_script.script if bootstrap_script is not None else "",
+            "bootstrap_script": (
+                bootstrap_script.script if bootstrap_script is not None else BootstrapScript.empty()
+            ),
         }
 
     async def authorize(self, action: AuthorizeAction) -> AuthorizeActionResult:

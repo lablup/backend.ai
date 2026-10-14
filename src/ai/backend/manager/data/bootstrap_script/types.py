@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 
-from ai.backend.common.data.entity.bootstrap_script import BootstrapScriptID
+from ai.backend.common.data.entity.bootstrap_script import BootstrapScript, BootstrapScriptID
 from ai.backend.common.data.entity.types import FieldData, RuntimeEntityID
 
 
@@ -8,5 +8,5 @@ from ai.backend.common.data.entity.types import FieldData, RuntimeEntityID
 class BootstrapScriptData(FieldData):
     id: BootstrapScriptID
     entity: RuntimeEntityID
-    script: str
+    script: BootstrapScript
     is_default: bool

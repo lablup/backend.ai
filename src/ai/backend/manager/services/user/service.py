@@ -4,6 +4,7 @@ from typing import Any
 from uuid import UUID
 
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
+from ai.backend.common.data.entity.bootstrap_script import BootstrapScript
 from ai.backend.common.data.entity.keypair import KeyPairID
 from ai.backend.common.events.event_types.kernel.types import KernelLifecycleEventReason
 from ai.backend.common.exception import BackendAIError, InvalidAPIParameters
@@ -398,7 +399,7 @@ class UserService:
     ) -> GetDefaultBootstrapScriptActionResult:
         script = await self._user_repository.default_bootstrap_script(action.user_id)
         return GetDefaultBootstrapScriptActionResult(
-            script=script.script if script is not None else ""
+            script=script.script if script is not None else BootstrapScript.empty()
         )
 
     async def update_default_bootstrap_script(

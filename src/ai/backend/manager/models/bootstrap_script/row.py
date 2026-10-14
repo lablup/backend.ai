@@ -4,7 +4,7 @@ import sqlalchemy as sa
 from sqlalchemy.orm import Mapped, mapped_column
 from sqlalchemy.sql.expression import false
 
-from ai.backend.common.data.entity.bootstrap_script import BootstrapScriptID
+from ai.backend.common.data.entity.bootstrap_script import BootstrapScript, BootstrapScriptID
 from ai.backend.common.data.entity.types import EntityType, RuntimeEntityID
 from ai.backend.common.dto.manager.config.types import MAXIMUM_DOTFILE_SIZE
 from ai.backend.manager.data.bootstrap_script.types import BootstrapScriptData
@@ -33,7 +33,7 @@ class BootstrapScriptRow(Base):
     )
     entity_type: Mapped[EntityType] = mapped_column(sa.String(32), nullable=False)
     entity_id: Mapped[UUID] = mapped_column(GUID(), nullable=False)
-    script: Mapped[str] = mapped_column(
+    script: Mapped[BootstrapScript] = mapped_column(
         sa.String(MAXIMUM_DOTFILE_SIZE), nullable=False, server_default=""
     )
     is_default: Mapped[bool] = mapped_column(sa.Boolean, nullable=False, server_default=false())
@@ -42,6 +42,6 @@ class BootstrapScriptRow(Base):
         return BootstrapScriptData(
             id=self.id,
             entity=RuntimeEntityID(self.entity_type, self.entity_id),
-            script=self.script,
+            script=BootstrapScript(self.script),
             is_default=self.is_default,
         )

@@ -35,3 +35,7 @@ class BootstrapScript(str):
     @classmethod
     def from_text(cls, text: str) -> BootstrapScript:
         return cls(re.sub(r"\r\n?", "\n", text).strip())
+
+    @classmethod
+    def empty(cls) -> BootstrapScript:
+        return cls("")

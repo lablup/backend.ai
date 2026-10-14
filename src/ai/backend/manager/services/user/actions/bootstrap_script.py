@@ -35,7 +35,7 @@ class GetDefaultBootstrapScriptAction(BaseSingleEntityAction):
 
 @dataclass(frozen=True)
 class GetDefaultBootstrapScriptActionResult:
-    script: str
+    script: BootstrapScript
 
 
 @dataclass(frozen=True)
