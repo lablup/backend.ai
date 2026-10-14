@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
+from dataclasses import dataclass
 from typing import override
 
 from ai.backend.common import config as common_config
@@ -10,10 +11,22 @@ from ai.backend.common.dependencies import NonMonitorableDependencyProvider
 from ai.backend.common.etcd import AsyncEtcd
 
 
-class RedisConfigDependency(NonMonitorableDependencyProvider[AsyncEtcd, RedisConfig]):
-    """Reads redis configuration from etcd.
+@dataclass(frozen=True)
+class RedisConfigInput:
+    """Input for the redis config stage.
 
-    Matches the behavior in server.py's read_agent_config() (lines 457-473).
+    ``local_redis_config`` is the ``[redis]`` section of the local config, if present.
+    """
+
+    etcd: AsyncEtcd
+    local_redis_config: RedisConfig | None = None
+
+
+class RedisConfigDependency(NonMonitorableDependencyProvider[RedisConfigInput, RedisConfig]):
+    """Provides the redis configuration.
+
+    A ``[redis]`` section in the local config takes precedence; otherwise it is read from etcd,
+    as server.py's read_agent_config() does.
     """
 
     @property
@@ -23,18 +36,21 @@ class RedisConfigDependency(NonMonitorableDependencyProvider[AsyncEtcd, RedisCon
 
     @asynccontextmanager
     @override
-    async def provide(self, setup_input: AsyncEtcd) -> AsyncIterator[RedisConfig]:
-        """Read redis config from etcd.
+    async def provide(self, setup_input: RedisConfigInput) -> AsyncIterator[RedisConfig]:
+        """Provide the redis config from the local config if set, else from etcd.
 
         Args:
-            setup_input: Etcd client
+            setup_input: Etcd client and the optional local redis config
 
         Yields:
-            RedisConfig loaded from etcd
+            RedisConfig from the local config if present, otherwise loaded from etcd
         """
-        # Read redis config from etcd (same as server.py read_agent_config() lines 459-473)
+        if setup_input.local_redis_config is not None:
+            yield setup_input.local_redis_config
+            return
+
         _redis_config = common_config.redis_config_iv.check(
-            await setup_input.get_prefix("config/redis"),
+            await setup_input.etcd.get_prefix("config/redis"),
         )
 
         # Convert HostPortPair to dict format for compatibility

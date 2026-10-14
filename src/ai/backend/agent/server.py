@@ -320,6 +320,7 @@ class AgentRPCServer(aobject):
 
     loop: asyncio.AbstractEventLoop
     etcd: AsyncEtcd
+    _local_redis_config: RedisConfig | None
     runtime: AgentRuntime
     rpc_server: Peer
     rpc_addr: str
@@ -340,6 +341,8 @@ class AgentRPCServer(aobject):
         self.loop = current_loop()
         self.etcd = etcd
         self.local_config = local_config
+        # Captured before read_agent_config() overwrites local_config.redis from etcd.
+        self._local_redis_config = local_config.redis
         self.skip_detect_manager = skip_detect_manager
 
     @override
@@ -564,28 +567,43 @@ class AgentRPCServer(aobject):
         log.info("manager detected")
 
     async def read_agent_config(self) -> None:
-        # Fill up Redis configs from etcd and store as separate attributes
-        self._redis_config = config.redis_config_iv.check(
-            await self.etcd.get_prefix("config/redis"),
-        )
+        # A [redis] section in the local config takes precedence over etcd.
+        if self._local_redis_config is not None:
+            log.info(
+                "redis configured",
+                source="local",
+                redis_config=safe_print_redis_config(self._local_redis_config),
+            )
+        else:
+            etcd_redis_config = config.redis_config_iv.check(
+                await self.etcd.get_prefix("config/redis"),
+            )
 
-        # Update local_config with redis settings
-        # Convert HostPortPair to dict format for compatibility
-        redis_config_dict = self._redis_config.copy()
-        if isinstance(self._redis_config.get("addr"), object):
-            addr = self._redis_config["addr"]
-            if addr is not None:
-                redis_config_dict["addr"] = f"{addr.host}:{addr.port}"
+            # Update local_config with redis settings
+            # Convert HostPortPair to dict format for compatibility
+            redis_config_dict = etcd_redis_config.copy()
+            if isinstance(etcd_redis_config.get("addr"), object):
+                addr = etcd_redis_config["addr"]
+                if addr is not None:
+                    redis_config_dict["addr"] = f"{addr.host}:{addr.port}"
 
-        redis_config = RedisConfig.model_validate(redis_config_dict)
-        log.info("redis configured", redis_config=safe_print_redis_config(redis_config))
-        self.local_config.overwrite(redis=redis_config)
+            redis_config = RedisConfig.model_validate(redis_config_dict)
+            log.info(
+                "redis configured",
+                source="etcd",
+                redis_config=safe_print_redis_config(redis_config),
+            )
+            self.local_config.overwrite(redis=redis_config)
 
         # Fill up vfolder configs from etcd and store as separate attributes
         # TODO: Integrate vfolder_config into local_config
-        self._vfolder_config = config.vfolder_config_iv.check(
-            await self.etcd.get_prefix("volumes"),
-        )
+        # Read only the keys the agent uses; "volumes/" also holds proxy secrets.
+        vfolder_etcd_config = {
+            key: value
+            for key in ("_mount", "_fsprefix")
+            if (value := await self.etcd.get(f"volumes/{key}")) is not None
+        }
+        self._vfolder_config = config.vfolder_config_iv.check(vfolder_etcd_config)
         if self._vfolder_config["mount"] is None:
             log.info("vfolder mount path not configured, assuming storage-proxy")
         else:

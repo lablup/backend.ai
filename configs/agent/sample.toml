@@ -833,6 +833,90 @@
   # Added in 25.12.0
   init-timeout-sec = 120.0
 
+# Redis configuration. Redis is used for inter-agent communication, caching, and
+# pub/sub messaging. If this section is set, it is used as-is and the redis
+# settings in etcd (config/redis) are not read. If omitted, the agent reads them
+# from etcd. Honored from 26.10.0.
+# Added in 25.12.0
+[redis]
+  # Network address and port of the Redis server. Redis is used for distributed
+  # caching and messaging between managers. Set to None when using Sentinel for
+  # high availability.
+  # Added in 25.13.0
+  ## addr = { host = "redis-server", port = 6379 }
+  # Service name for Redis Sentinel. Required when using Redis Sentinel for high
+  # availability. Identifies which service to monitor for failover.
+  # Added in 25.13.0
+  ## service-name = "backend-ai"
+  # Password for authenticating with Redis master. Set to None if Redis doesn't
+  # require authentication. Should be kept secret in production environments.
+  # Added in 25.13.0
+  ## password = "REDIS_PASSWORD"
+  # Password for authenticating with Redis Sentinel nodes. If None, falls back
+  # to the master password. Set explicitly when Sentinel nodes use a different
+  # password than the master.
+  # Added in 26.4.2
+  ## sentinel-password = "REDIS_SENTINEL_PASSWORD"
+  # Timeout in milliseconds for Redis requests. Controls how long operations
+  # wait before timing out. If None, uses the default timeout configured in the
+  # Redis client.
+  # Added in 25.13.0
+  ## request-timeout = 5000
+  # Whether to use TLS for Redis connections.
+  # Added in 25.13.0
+  use_tls = true
+  # Whether to skip TLS certificate verification. Set to True for self-signed
+  # certificates or development environments.
+  # Added in 25.13.0
+  tls_skip_verify = false
+
+  # Configuration for the Redis helper library. Controls timeouts and
+  # reconnection behavior. Adjust based on network conditions and reliability
+  # requirements.
+  # Added in 25.13.0
+  [redis.redis-helper-config]
+    # Timeout in seconds for Redis socket operations. Controls how long
+    # operations wait before timing out. Increase for slow or congested
+    # networks.
+    # Added in 25.13.0
+    socket_timeout = 10.0
+    # Timeout in seconds for establishing Redis connections. Controls how long
+    # connection attempts wait before failing. Shorter values fail faster but
+    # may be too aggressive for some networks.
+    # Added in 25.13.0
+    socket_connect_timeout = 5.0
+    # Time in seconds to wait between reconnection attempts. Controls the
+    # polling frequency when trying to reconnect to Redis. Lower values
+    # reconnect faster but may increase network load.
+    # Added in 25.13.0
+    reconnect_poll_timeout = 1.0
+    # Timeout in seconds to wait for a connection from the blocking connection
+    # pool. Used by BlockingConnectionPool for distributed locking scenarios. If
+    # no connection is available within this time, a timeout error is raised.
+    # Added in 25.13.0
+    connection_ready_timeout = 30.0
+
+  # Optional override configurations for specific Redis contexts. Allows
+  # different Redis settings for different services within Backend.AI. Each key
+  # represents a context name, and the value is a complete Redis configuration.
+  # Added in 25.13.0
+  [redis.override-configs]
+
+  # List of Redis Sentinel addresses for high availability. If provided, the
+  # manager will use Redis Sentinel for automatic failover. When using Sentinel,
+  # the addr field is ignored and service_name is required.
+  # Added in 25.13.0
+  [[redis.sentinel]]
+  # Add multiple [[redis.sentinel]] sections as needed
+    # Host address of the service. Can be a hostname, IP address, or special
+    # addresses like 0.0.0.0 to bind to all interfaces.
+    # Added in 22.03.0
+    host = "redis-sentinel"
+    # Port number of the service. Must be between 1 and 65535. Ports below 1024
+    # require root/admin privileges.
+    # Added in 22.03.0
+    port = 26379
+
 # Configuration overrides for running multiple agents from a single
 # configuration file. Use this field only when defining 2 or more agents;
 # defining only one agent here is redundant. When this field is populated, the
