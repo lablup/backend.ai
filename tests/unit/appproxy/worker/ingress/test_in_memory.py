@@ -10,9 +10,20 @@ from ai.backend.appproxy.worker.errors.ingress import IngressNotFoundError
 from ai.backend.appproxy.worker.ingress.in_memory import InMemoryIngressState
 from ai.backend.common.dto.appproxy.v2.ingress.types import (
     Ingress,
+    IngressAccess,
+    IngressAccessMode,
     IngressAuthority,
+    IngressBackend,
+    IngressBackendID,
+    IngressFrontend,
     IngressFrontendKey,
+    IngressFrontendKind,
+    IngressID,
     IngressKey,
+    IngressProtocol,
+    IngressTargetGroup,
+    IngressTargetGroupID,
+    PortFrontend,
 )
 
 AUTHORITY = IngressAuthority("worker-1")
@@ -47,32 +58,44 @@ def clock() -> Iterator[Mock]:
 
 @pytest.fixture
 def stored_ingress() -> Ingress:
-    return Ingress.model_validate({
-        "id": "ingress-10205",
-        "authority": AUTHORITY,
-        "revision": 5,
-        "frontend": {"kind": "port", "protocol": "http", "port": {"number": 10205}},
-        "access": {"mode": "public", "allowed_client_ips": []},
-        "backend": {
-            "id": "backend-1",
-            "target_groups": [{"id": "group-1", "weight": 1, "targets": []}],
-        },
-    })
+    return Ingress(
+        id=IngressID("ingress-10205"),
+        authority=AUTHORITY,
+        revision=5,
+        frontend=IngressFrontend(
+            kind=IngressFrontendKind.PORT,
+            protocol=IngressProtocol.HTTP,
+            port=PortFrontend(number=10205),
+        ),
+        access=IngressAccess(mode=IngressAccessMode.PUBLIC, allowed_client_ips=[]),
+        backend=IngressBackend(
+            id=IngressBackendID("backend-1"),
+            target_groups=[
+                IngressTargetGroup(id=IngressTargetGroupID("group-1"), weight=1, targets=[])
+            ],
+        ),
+    )
 
 
 @pytest.fixture
 def other_ingress() -> Ingress:
-    return Ingress.model_validate({
-        "id": "ingress-10206",
-        "authority": AUTHORITY,
-        "revision": 0,
-        "frontend": {"kind": "port", "protocol": "http", "port": {"number": 10206}},
-        "access": {"mode": "public", "allowed_client_ips": []},
-        "backend": {
-            "id": "backend-2",
-            "target_groups": [{"id": "group-1", "weight": 1, "targets": []}],
-        },
-    })
+    return Ingress(
+        id=IngressID("ingress-10206"),
+        authority=AUTHORITY,
+        revision=0,
+        frontend=IngressFrontend(
+            kind=IngressFrontendKind.PORT,
+            protocol=IngressProtocol.HTTP,
+            port=PortFrontend(number=10206),
+        ),
+        access=IngressAccess(mode=IngressAccessMode.PUBLIC, allowed_client_ips=[]),
+        backend=IngressBackend(
+            id=IngressBackendID("backend-2"),
+            target_groups=[
+                IngressTargetGroup(id=IngressTargetGroupID("group-1"), weight=1, targets=[])
+            ],
+        ),
+    )
 
 
 @pytest.fixture
