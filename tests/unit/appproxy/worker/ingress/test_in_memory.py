@@ -35,6 +35,14 @@ class _ElapsedCase:
     stored: bool
 
 
+@dataclass(frozen=True)
+class _ApplyUnderTtlCase:
+    applied_after: float
+    applied_revision: int
+    read_after: float
+    read_revision: int
+
+
 @pytest.fixture
 def clock() -> Iterator[Mock]:
     with patch(
@@ -169,28 +177,41 @@ class TestInMemoryIngressState:
     ) -> None:
         clock.return_value = STARTED_AT + case.elapsed
         assert (await expiring_state.get(STORED_KEY) is not None) is case.stored
+        assert (len(await expiring_state.get_all()) == 1) is case.stored
 
-    async def test_get_all_leaves_out_an_expired_ingress(
-        self, expiring_state: InMemoryIngressState, clock: Mock
+    @pytest.mark.parametrize(
+        "case",
+        [
+            _ApplyUnderTtlCase(
+                applied_after=TTL - 10, applied_revision=5, read_after=TTL + 10, read_revision=5
+            ),
+            _ApplyUnderTtlCase(
+                applied_after=TTL - 10, applied_revision=4, read_after=TTL - 10, read_revision=5
+            ),
+            _ApplyUnderTtlCase(
+                applied_after=TTL + 1, applied_revision=4, read_after=TTL + 1, read_revision=4
+            ),
+        ],
+        ids=lambda case: (
+            f"revision-{case.applied_revision}-applied-at-{case.applied_after:g}"
+            f"-read-at-{case.read_after:g}"
+        ),
+    )
+    async def test_apply_restarts_ttl_and_compares_only_unexpired_revisions(
+        self,
+        expiring_state: InMemoryIngressState,
+        clock: Mock,
+        stored_ingress: Ingress,
+        case: _ApplyUnderTtlCase,
     ) -> None:
-        clock.return_value = STARTED_AT + TTL + 1
-        assert await expiring_state.get_all() == []
-
-    async def test_reapplied_ingress_is_stored_for_a_new_ttl(
-        self, expiring_state: InMemoryIngressState, clock: Mock, stored_ingress: Ingress
-    ) -> None:
-        clock.return_value = STARTED_AT + TTL - 10
-        await expiring_state.apply([stored_ingress])
-        clock.return_value = STARTED_AT + TTL + 10
-        assert await expiring_state.get(STORED_KEY) == stored_ingress
-
-    async def test_apply_stores_an_older_revision_once_the_stored_one_expires(
-        self, expiring_state: InMemoryIngressState, clock: Mock, stored_ingress: Ingress
-    ) -> None:
-        clock.return_value = STARTED_AT + TTL + 1
-        older = stored_ingress.model_copy(update={"revision": 4})
-        await expiring_state.apply([older])
-        assert await expiring_state.get(STORED_KEY) == older
+        clock.return_value = STARTED_AT + case.applied_after
+        await expiring_state.apply([
+            stored_ingress.model_copy(update={"revision": case.applied_revision})
+        ])
+        clock.return_value = STARTED_AT + case.read_after
+        read_back_ingress = await expiring_state.get(STORED_KEY)
+        assert read_back_ingress is not None
+        assert read_back_ingress.revision == case.read_revision
 
     async def test_get_raises_for_a_key_remembered_missing(
         self, negative_caching_state: InMemoryIngressState, clock: Mock
