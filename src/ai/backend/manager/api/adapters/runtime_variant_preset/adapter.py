@@ -234,6 +234,7 @@ class RuntimeVariantPresetAdapter(BaseAdapter):
         conditions: list[QueryCondition] = [
             *self.apply_uuid_filter(filter_.runtime_variant_id, fields.runtime_variant_id.filter),
             *self.apply_string_filter(filter_.name, fields.name.filter),
+            *self.apply_uuid_filter(filter_.entity_id, fields.id.filter),
         ]
         if filter_.runtime_version is not None:
             conditions.extend(fields.valid_at_version(filter_.runtime_version))

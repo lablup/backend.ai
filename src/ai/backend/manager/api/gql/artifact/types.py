@@ -96,6 +96,7 @@ from ai.backend.common.dto.manager.v2.artifact.response import (
     SourceInfoDTO,
     UpdateArtifactGQLPayload,
 )
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import (
     ByteSize,
     IntFilter,
@@ -251,6 +252,10 @@ class ArtifactFilter(PydanticInputMixin[ArtifactGQLFilterInputDTO]):
     registry: StringFilter | None = None
     source: StringFilter | None = None
     availability: list[ArtifactAvailability] | None = None
+    entity_id: UUIDFilter | None = gql_added_field(
+        BackendAIGQLMeta(added_version=NEXT_RELEASE_VERSION, description="Filter by artifact ID."),
+        default=None,
+    )
 
     AND: list[Self] | None = None
     OR: list[Self] | None = None
@@ -335,6 +340,12 @@ class ArtifactRevisionFilter(PydanticInputMixin[ArtifactRevisionGQLFilterInputDT
     version: StringFilter | None = None
     artifact_id: UUIDFilter | None = gql_field(description="The artifact id field.", default=None)
     size: IntFilter | None = None
+    field_id: UUIDFilter | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION, description="Filter by artifact revision ID."
+        ),
+        default=None,
+    )
 
     AND: list[Self] | None = None
     OR: list[Self] | None = None

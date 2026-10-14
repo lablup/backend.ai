@@ -21,6 +21,7 @@ from ai.backend.common.dto.manager.v2.common import (
     ResourceSlotEntryInput,
     VFolderHostPermissionEntryInput,
 )
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.common.tristate.unset import UNSET, Unset
 
 from .types import (
@@ -337,6 +338,10 @@ class KeypairResourcePolicyFilter(BaseRequestModel):
     max_priority: IntFilter | None = Field(
         default=None, description="Filter by max scheduling priority."
     )
+    entity_id: UUIDFilter | None = Field(
+        default=None,
+        description=f"Added in {NEXT_RELEASE_VERSION}. Filter by keypair resource policy ID.",
+    )
     AND: list[Self] | None = Field(default=None, description="Match all of the given sub-filters.")
     OR: list[Self] | None = Field(default=None, description="Match any of the given sub-filters.")
     NOT: list[Self] | None = Field(default=None, description="Negate the given sub-filters.")
@@ -362,6 +367,10 @@ class UserResourcePolicyFilter(BaseRequestModel):
     max_customized_image_count: IntFilter | None = Field(
         default=None, description="Filter by max customized image count."
     )
+    entity_id: UUIDFilter | None = Field(
+        default=None,
+        description=f"Added in {NEXT_RELEASE_VERSION}. Filter by user resource policy ID.",
+    )
     AND: list[Self] | None = Field(default=None, description="Match all of the given sub-filters.")
     OR: list[Self] | None = Field(default=None, description="Match any of the given sub-filters.")
     NOT: list[Self] | None = Field(default=None, description="Negate the given sub-filters.")
@@ -380,6 +389,10 @@ class ProjectResourcePolicyFilter(BaseRequestModel):
     )
     max_network_count: IntFilter | None = Field(
         default=None, description="Filter by max network count."
+    )
+    entity_id: UUIDFilter | None = Field(
+        default=None,
+        description=f"Added in {NEXT_RELEASE_VERSION}. Filter by project resource policy ID.",
     )
     AND: list[Self] | None = Field(default=None, description="Match all of the given sub-filters.")
     OR: list[Self] | None = Field(default=None, description="Match any of the given sub-filters.")

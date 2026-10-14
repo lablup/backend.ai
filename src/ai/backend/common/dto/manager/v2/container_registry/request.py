@@ -10,7 +10,8 @@ from uuid import UUID
 from pydantic import Field, field_validator
 
 from ai.backend.common.api_handlers import BaseRequestModel
-from ai.backend.common.dto.manager.query import StringFilter
+from ai.backend.common.dto.manager.query import StringFilter, UUIDFilter
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 
 from .types import (
     ContainerRegistryOrderField,
@@ -154,6 +155,10 @@ class ContainerRegistryFilter(BaseRequestModel):
         default=None, description="Filter by registry type."
     )
     is_global: bool | None = Field(default=None, description="Filter by global accessibility.")
+    entity_id: UUIDFilter | None = Field(
+        default=None,
+        description=f"Added in {NEXT_RELEASE_VERSION}. Filter by container registry ID.",
+    )
     AND: list[Self] | None = Field(default=None, description="Match all of the given sub-filters.")
     OR: list[Self] | None = Field(default=None, description="Match any of the given sub-filters.")
     NOT: list[Self] | None = Field(default=None, description="Negate the given sub-filters.")

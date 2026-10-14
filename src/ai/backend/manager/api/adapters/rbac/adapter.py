@@ -1115,6 +1115,7 @@ class RBACAdapter(BaseAdapter):
     def _convert_permission_filter(self, f: PermissionFilterDTO) -> list[QueryCondition]:
         fields = PermissionSearchableFields.own
         conditions = [
+            *self.apply_uuid_filter(f.field_id, fields.id.filter),
             *self.apply_uuid_filter(f.role_id, fields.role_id.filter),
             *self.apply_string_filter(f.entity_type, fields.entity_type.filter),
             *self.apply_datetime_filter(f.created_at, fields.created_at.filter),
@@ -1157,6 +1158,7 @@ class RBACAdapter(BaseAdapter):
     def _convert_role_filter_gql(self, f: RoleFilterDTO) -> list[QueryCondition]:
         fields = RoleSearchableFields.own
         conditions = [
+            *self.apply_uuid_filter(f.entity_id, fields.id.filter),
             *self.apply_string_filter(f.name, fields.name.filter),
             *self._convert_role_source_filter(f.source, fields.source.filter),
             *self._convert_role_status_filter(f.status, fields.status.filter),

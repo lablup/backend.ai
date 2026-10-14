@@ -692,6 +692,7 @@ class ResourcePolicyAdapter(BaseAdapter):
                 filter.max_pending_session_count, fields.max_pending_session_count.filter
             ),
             *self.apply_int_filter(filter.max_priority, fields.max_priority.filter),
+            *self.apply_uuid_filter(filter.entity_id, fields.uuid.filter),
         ]
         if filter.keypair is not None:
             cond = self._convert_keypair_nested_filter(filter.keypair)
@@ -744,6 +745,7 @@ class ResourcePolicyAdapter(BaseAdapter):
             *self.apply_int_filter(
                 filter.max_customized_image_count, fields.max_customized_image_count.filter
             ),
+            *self.apply_uuid_filter(filter.entity_id, fields.uuid.filter),
         ]
         if filter.AND:
             for sub_filter in filter.AND:
@@ -771,6 +773,7 @@ class ResourcePolicyAdapter(BaseAdapter):
             *self.apply_int_filter(filter.max_vfolder_count, fields.max_vfolder_count.filter),
             *self.apply_int_filter(filter.max_quota_scope_size, fields.max_quota_scope_size.filter),
             *self.apply_int_filter(filter.max_network_count, fields.max_network_count.filter),
+            *self.apply_uuid_filter(filter.entity_id, fields.uuid.filter),
         ]
         if filter.AND:
             for sub_filter in filter.AND:

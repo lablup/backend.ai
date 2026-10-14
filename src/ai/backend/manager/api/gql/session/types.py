@@ -299,7 +299,15 @@ class SessionV2NetworkTypeFilterGQL(PydanticInputMixin[NetworkTypeFilter]):
     name="SessionV2Filter",
 )
 class SessionV2FilterGQL(PydanticInputMixin[SessionFilter]):
-    id: UUIDFilter | None = None
+    id: UUIDFilter | None = gql_field(
+        description="Filter by session ID.",
+        default=None,
+        deprecation_reason=f"Deprecated since {NEXT_RELEASE_VERSION}. Use `entityId`.",
+    )
+    entity_id: UUIDFilter | None = gql_added_field(
+        BackendAIGQLMeta(added_version=NEXT_RELEASE_VERSION, description="Filter by session ID."),
+        default=None,
+    )
     status: SessionV2StatusFilterGQL | None = None
     name: StringFilter | None = None
     domain_name: StringFilter | None = None

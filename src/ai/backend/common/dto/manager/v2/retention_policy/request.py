@@ -5,8 +5,10 @@ from pydantic import Field
 from ai.backend.common.api_handlers import BaseRequestModel
 from ai.backend.common.data.entity.retention_policy import RetentionPolicyID
 from ai.backend.common.data.retention.types import RetentionCategory
+from ai.backend.common.dto.manager.query import UUIDFilter
 from ai.backend.common.dto.manager.v2.common import OrderDirection
 from ai.backend.common.dto.manager.v2.retention_policy.types import RetentionPolicyOrderField
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 
 
 class CreateRetentionPolicyInput(BaseRequestModel):
@@ -35,6 +37,10 @@ class UpdateRetentionPolicyInput(BaseRequestModel):
 class RetentionPolicyFilter(BaseRequestModel):
     category: RetentionCategory | None = Field(default=None, description="Filter by category.")
     enabled: bool | None = Field(default=None, description="Filter by enabled flag.")
+    entity_id: UUIDFilter | None = Field(
+        default=None,
+        description=f"Added in {NEXT_RELEASE_VERSION}. Filter by retention policy ID.",
+    )
 
 
 class RetentionPolicyOrder(BaseRequestModel):

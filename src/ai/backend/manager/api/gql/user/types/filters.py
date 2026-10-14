@@ -16,6 +16,7 @@ from ai.backend.common.dto.manager.v2.user.types import (
     UserRoleFilter,
     UserStatusFilter,
 )
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import (
     DateTimeFilter,
     IntArrayFilter,
@@ -151,7 +152,15 @@ _NESTED_FILTER_DEPRECATION = (
 class UserFilterGQL(PydanticInputMixin[UserFilter]):
     """Filter for user queries."""
 
-    uuid: UUIDFilter | None = None
+    uuid: UUIDFilter | None = gql_field(
+        description="Filter by user UUID.",
+        default=None,
+        deprecation_reason=f"Deprecated since {NEXT_RELEASE_VERSION}. Use `entityId`.",
+    )
+    entity_id: UUIDFilter | None = gql_added_field(
+        BackendAIGQLMeta(added_version=NEXT_RELEASE_VERSION, description="Filter by user ID."),
+        default=None,
+    )
     username: StringFilter | None = None
     email: StringFilter | None = None
     full_name: StringFilter | None = gql_added_field(

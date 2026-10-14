@@ -1804,7 +1804,9 @@ class DeploymentAdapter(BaseAdapter):
 
     def _convert_route_filter(self, f: RouteFilter) -> list[QueryCondition]:
         fields = ReplicaSearchableFields.own
-        conditions: list[QueryCondition] = []
+        conditions: list[QueryCondition] = [
+            *self.apply_uuid_filter(f.field_id, fields.field_id.filter),
+        ]
         if f.status is not None:
             conditions.append(
                 fields.status.filter.in_([ManagerRouteStatus(s.value) for s in f.status])

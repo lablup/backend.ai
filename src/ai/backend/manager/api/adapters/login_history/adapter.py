@@ -117,6 +117,13 @@ class LoginHistoryAdapter(BaseAdapter):
 
     def _convert_filter(self, f: LoginHistoryFilter) -> list[QueryCondition]:
         conditions: list[QueryCondition] = []
+        if f.field_id is not None:
+            condition = f.field_id.build_query_condition(
+                equals_factory=LoginHistoryConditions.by_id_equals,
+                in_factory=LoginHistoryConditions.by_id_in,
+            )
+            if condition is not None:
+                conditions.append(condition)
         if f.domain_name is not None:
             condition = self.convert_string_filter(
                 f.domain_name,

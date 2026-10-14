@@ -18,6 +18,7 @@ from ai.backend.common.dto.manager.v2.domain.types import (
     DomainUserFilter,
     OrderDirection,
 )
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.common.tristate.unset import UNSET, Unset
 
 __all__ = (
@@ -106,7 +107,15 @@ class DomainFilter(BaseRequestModel):
     """Filter criteria for searching domains."""
 
     name: StringFilter | None = Field(default=None, description="Filter by domain name.")
-    id: UUIDFilter | None = Field(default=None, description="Filter by domain uuid.")
+    id: UUIDFilter | None = Field(
+        default=None,
+        description=f"Deprecated since {NEXT_RELEASE_VERSION}. Use `entity_id`.",
+        deprecated=True,
+    )
+    entity_id: UUIDFilter | None = Field(
+        default=None,
+        description=f"Added in {NEXT_RELEASE_VERSION}. Filter by domain ID.",
+    )
     description: StringFilter | None = Field(default=None, description="Filter by description.")
     is_active: bool | None = Field(default=None, description="Filter by active status.")
     created_at: DateTimeFilter | None = Field(default=None, description="Filter by creation time.")

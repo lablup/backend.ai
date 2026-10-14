@@ -55,6 +55,7 @@ from ai.backend.common.dto.manager.v2.runtime_variant_preset.types import (
 from ai.backend.common.dto.manager.v2.runtime_variant_preset.types import (
     UIOption as UIOptionDTO,
 )
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import StringFilter as StringFilterGQL
 from ai.backend.manager.api.gql.base import UUIDFilter as UUIDFilterGQL
 from ai.backend.manager.api.gql.decorators import (
@@ -396,6 +397,10 @@ class RuntimeVariantPresetFilterGQL(PydanticInputMixin[FilterDTO]):
                 "added_version <= version < deprecated_version. Dot-separated numbers."
             ),
         ),
+        default=None,
+    )
+    entity_id: UUIDFilterGQL | None = gql_added_field(
+        BackendAIGQLMeta(added_version=NEXT_RELEASE_VERSION, description="Filter by preset ID."),
         default=None,
     )
     AND: list[Self] | None = gql_added_field(

@@ -15,6 +15,7 @@ from ai.backend.common.dto.manager.v2.runtime_variant_preset.types import (
     RuntimeVariantPresetOrderField,
     UIOption,
 )
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.common.tristate.unset import UNSET, Unset
 
 
@@ -153,6 +154,9 @@ class RuntimeVariantPresetFilter(BaseRequestModel):
             "Keep only presets valid at this runtime version "
             "(added_version <= version < deprecated_version)."
         ),
+    )
+    entity_id: UUIDFilter | None = Field(
+        default=None, description=f"Added in {NEXT_RELEASE_VERSION}. Filter by preset ID."
     )
     AND: list[RuntimeVariantPresetFilter] | None = Field(default=None)
     OR: list[RuntimeVariantPresetFilter] | None = Field(default=None)

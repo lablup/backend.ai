@@ -150,9 +150,10 @@ class RetentionPolicyAdapter(BaseAdapter):
 
     def _convert_filter(self, filter_: RetentionPolicyFilter) -> list[QueryCondition]:
         fields = RetentionPolicySearchableFields.own
-        conditions: list[QueryCondition] = list(
-            self.apply_bool_filter(filter_.enabled, fields.enabled.filter)
-        )
+        conditions: list[QueryCondition] = [
+            *self.apply_bool_filter(filter_.enabled, fields.enabled.filter),
+            *self.apply_uuid_filter(filter_.entity_id, fields.id.filter),
+        ]
         if filter_.category is not None:
             conditions.append(fields.category.filter.equals(filter_.category))
         return conditions

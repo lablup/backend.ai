@@ -70,7 +70,12 @@ from ai.backend.common.dto.manager.v2.resource_slot.types import (
     NumberFormatInput as NumberFormatInputDTO,
 )
 from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
-from ai.backend.manager.api.gql.base import DecimalFilter, OrderDirection, StringFilter
+from ai.backend.manager.api.gql.base import (
+    DecimalFilter,
+    OrderDirection,
+    StringFilter,
+    UUIDFilter,
+)
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     gql_added_field,
@@ -267,6 +272,12 @@ class ResourceSlotTypeFilterGQL(PydanticInputMixin[ResourceSlotTypeFilterDTO]):
     slot_name: StringFilter | None = None
     slot_type: StringFilter | None = None
     display_name: StringFilter | None = None
+    entity_id: UUIDFilter | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION, description="Filter by resource slot type ID."
+        ),
+        default=None,
+    )
 
     AND: list[Self] | None = None
     OR: list[Self] | None = None
@@ -543,6 +554,12 @@ class AgentResourceSlotFilterGQL(PydanticInputMixin[AgentResourceFilterDTO]):
         ),
         default=None,
     )
+    field_id: UUIDFilter | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION, description="Filter by agent resource slot ID."
+        ),
+        default=None,
+    )
 
     AND: list[Self] | None = None
     OR: list[Self] | None = None
@@ -644,6 +661,12 @@ class KernelResourceAllocationOrderFieldGQL(StrEnum):
 )
 class KernelResourceAllocationFilterGQL(PydanticInputMixin[ResourceAllocationFilterDTO]):
     slot_name: StringFilter | None = None
+    field_id: UUIDFilter | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION, description="Filter by resource allocation ID."
+        ),
+        default=None,
+    )
 
     AND: list[Self] | None = None
     OR: list[Self] | None = None

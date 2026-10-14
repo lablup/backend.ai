@@ -106,7 +106,8 @@ from ai.backend.common.dto.manager.v2.notification.types import (
     SMTPConnectionInfo,
     WebhookSpecInfo,
 )
-from ai.backend.manager.api.gql.base import OrderDirection, StringFilter
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
+from ai.backend.manager.api.gql.base import OrderDirection, StringFilter, UUIDFilter
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     PydanticInputMixin,
@@ -332,6 +333,10 @@ class NotificationChannelFilter(PydanticInputMixin[NotificationChannelFilterDTO]
     name: StringFilter | None = None
     channel_type: NotificationChannelTypeFilterGQL | None = None
     enabled: bool | None = None
+    entity_id: UUIDFilter | None = gql_added_field(
+        BackendAIGQLMeta(added_version=NEXT_RELEASE_VERSION, description="Filter by channel ID."),
+        default=None,
+    )
 
     AND: list[Self] | None = None
     OR: list[Self] | None = None
@@ -390,6 +395,10 @@ class NotificationRuleFilter(PydanticInputMixin[NotificationRuleFilterDTO]):
     name: StringFilter | None = None
     rule_type: NotificationRuleTypeFilterGQL | None = None
     enabled: bool | None = None
+    entity_id: UUIDFilter | None = gql_added_field(
+        BackendAIGQLMeta(added_version=NEXT_RELEASE_VERSION, description="Filter by rule ID."),
+        default=None,
+    )
 
     AND: list[Self] | None = None
     OR: list[Self] | None = None

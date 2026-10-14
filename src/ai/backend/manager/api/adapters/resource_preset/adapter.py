@@ -246,6 +246,7 @@ class ResourcePresetAdapter(BaseAdapter):
             *self.apply_string_filter(
                 filter_.resource_group_name, fields.resource_group_name.filter
             ),
+            *self.apply_uuid_filter(filter_.entity_id, fields.id.filter),
         ]
         if filter_.AND:
             for sub in filter_.AND:

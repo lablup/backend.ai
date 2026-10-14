@@ -79,6 +79,10 @@ class AuditLogFilterGQL(PydanticInputMixin[AuditLogFilter]):
         BackendAIGQLMeta(added_version=NEXT_RELEASE_VERSION, description="Entity ID filter."),
         default=None,
     )
+    field_id: UUIDFilter | None = gql_added_field(
+        BackendAIGQLMeta(added_version=NEXT_RELEASE_VERSION, description="Filter by audit log ID."),
+        default=None,
+    )
     operation: StringFilter | None = None
     status: AuditLogStatusFilterGQL | None = None
     created_at: DateTimeFilter | None = None

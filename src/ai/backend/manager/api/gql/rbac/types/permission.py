@@ -99,6 +99,7 @@ from ai.backend.common.dto.manager.v2.rbac.response import (
 from ai.backend.common.dto.manager.v2.rbac.types import (
     PermissionBitFilter as PermissionBitFilterDTO,
 )
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import DateTimeFilter, OrderDirection, StringFilter, UUIDFilter
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
@@ -348,6 +349,12 @@ class PermissionFilter(PydanticInputMixin[PermissionFilterDTO], GQLFilter):
     )
     scope_id: StringFilter | None = gql_field(
         description="Scope ID.", default=None, deprecation_reason=_IGNORED_SCOPE_REASON
+    )
+    field_id: UUIDFilter | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION, description="Filter by permission ID."
+        ),
+        default=None,
     )
     AND: list[Self] | None = None
     OR: list[Self] | None = None

@@ -537,6 +537,7 @@ class ArtifactAdapter(BaseAdapter):
                     DataArtifactAvailability(a.value) for a in filter.availability
                 ])
             )
+        conditions.extend(self.apply_uuid_filter(filter.entity_id, fields.id.filter))
 
         if filter.AND:
             for sub_filter in filter.AND:
@@ -582,6 +583,7 @@ class ArtifactAdapter(BaseAdapter):
         if filter.artifact_id is not None:
             conditions.extend(self.apply_uuid_filter(filter.artifact_id, fields.artifact_id.filter))
         conditions.extend(self.apply_int_filter(filter.size, fields.size.filter))
+        conditions.extend(self.apply_uuid_filter(filter.field_id, fields.field_id.filter))
 
         if filter.AND:
             for sub_filter in filter.AND:
@@ -661,6 +663,7 @@ class ArtifactAdapter(BaseAdapter):
             conditions.extend(self._convert_type_filter(filter.type))
         if filter.availability is not None:
             conditions.extend(self._convert_availability_filter(filter.availability))
+        conditions.extend(self.apply_uuid_filter(filter.entity_id, fields.id.filter))
         return conditions
 
     @staticmethod

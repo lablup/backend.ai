@@ -332,6 +332,7 @@ class SchedulingHistoryAdapter(BaseAdapter):
         fields = SessionSchedulingHistorySearchableFields.own
         conditions = [
             *self.apply_uuid_filter(filter.id, fields.id.filter),
+            *self.apply_uuid_filter(filter.field_id, fields.id.filter),
             *self.apply_uuid_filter(filter.session_id, fields.session_id.filter),
             *self.apply_string_filter(filter.phase, fields.phase.filter),
             *self._status_in(filter.from_status, fields.from_status.filter),
@@ -469,6 +470,7 @@ class SchedulingHistoryAdapter(BaseAdapter):
         fields = KernelSchedulingHistorySearchableFields.own
         conditions = [
             *self.apply_uuid_filter(filter.id, fields.id.filter),
+            *self.apply_uuid_filter(filter.field_id, fields.id.filter),
             *self.apply_uuid_filter(filter.kernel_id, fields.kernel_id.filter),
             *self.apply_uuid_filter(filter.session_id, fields.session_id.filter),
             *self.apply_string_filter(filter.phase, fields.phase.filter),
@@ -585,6 +587,7 @@ class SchedulingHistoryAdapter(BaseAdapter):
         fields = DeploymentHistorySearchableFields.own
         conditions = [
             *self.apply_uuid_filter(filter.id, fields.id.filter),
+            *self.apply_uuid_filter(filter.field_id, fields.id.filter),
             *self.apply_uuid_filter(filter.deployment_id, fields.deployment_id.filter),
             *self.apply_string_filter(filter.phase, fields.phase.filter),
             *self._status_in(filter.from_status, fields.from_status.filter),
@@ -704,6 +707,7 @@ class SchedulingHistoryAdapter(BaseAdapter):
         fields = ReplicaGroupHistorySearchableFields.own
         conditions = [
             *self.apply_uuid_filter(filter.id, fields.id.filter),
+            *self.apply_uuid_filter(filter.field_id, fields.id.filter),
             *self.apply_uuid_filter(filter.deployment_id, fields.deployment_id.filter),
             *self.apply_string_filter(filter.phase, fields.phase.filter),
             *self._status_in(filter.from_status, fields.from_status.filter),
@@ -829,6 +833,7 @@ class SchedulingHistoryAdapter(BaseAdapter):
         fields = RouteHistorySearchableFields.own
         conditions = [
             *self.apply_uuid_filter(filter.id, fields.id.filter),
+            *self.apply_uuid_filter(filter.field_id, fields.id.filter),
             *self.apply_uuid_filter(filter.route_id, fields.route_id.filter),
             *self.apply_uuid_filter(filter.deployment_id, fields.deployment_id.filter),
             *self.apply_string_filter(filter.phase, fields.phase.filter),

@@ -54,8 +54,9 @@ from ai.backend.common.dto.manager.v2.idle_checker.response import (
 from ai.backend.common.dto.manager.v2.idle_checker.types import (
     CheckerTypeFilter as CheckerTypeFilterDTO,
 )
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.common.types import SessionTypes
-from ai.backend.manager.api.gql.base import DateTimeFilter, OrderDirection, StringFilter
+from ai.backend.manager.api.gql.base import DateTimeFilter, OrderDirection, StringFilter, UUIDFilter
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     PydanticInputMixin,
@@ -409,6 +410,12 @@ class IdleCheckerFilterGQL(PydanticInputMixin[IdleCheckerFilterDTO]):
     )
     updated_at: DateTimeFilter | None = gql_field(
         description="Update timestamp filter.",
+        default=None,
+    )
+    entity_id: UUIDFilter | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION, description="Filter by idle checker ID."
+        ),
         default=None,
     )
     AND: list[Self] | None = gql_field(description="Match all nested filters.", default=None)

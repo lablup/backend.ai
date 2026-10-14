@@ -239,6 +239,14 @@ class AppConfigAllowListAdapter(BaseAdapter):
             )
             if condition:
                 conditions.append(condition)
+        if filter_.entity_id:
+            condition = self.convert_uuid_filter(
+                filter_.entity_id,
+                equals_factory=AppConfigAllowListConditions.by_id_equals,
+                in_factory=AppConfigAllowListConditions.by_id_in,
+            )
+            if condition:
+                conditions.append(condition)
         if filter_.AND:
             for sub_filter in filter_.AND:
                 conditions.extend(self._convert_filter(sub_filter))

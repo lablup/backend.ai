@@ -9,6 +9,7 @@ from pydantic import Field
 from ai.backend.common.api_handlers import BaseRequestModel
 from ai.backend.common.dto.manager.query import StringFilter, ToManyFilter, UUIDFilter
 from ai.backend.common.dto.manager.v2.entity.types import EntityTarget
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 
 from .types import EntityLabelOrderField, OrderDirection
 
@@ -35,6 +36,10 @@ class EntityLabelFilter(BaseRequestModel):
     value: StringFilter | None = Field(default=None, description="Label value filter")
     entity_type: StringFilter | None = Field(default=None, description="Type of the labeled entity")
     entity_id: UUIDFilter | None = Field(default=None, description="ID of the labeled entity")
+    field_id: UUIDFilter | None = Field(
+        default=None,
+        description=f"Added in {NEXT_RELEASE_VERSION}. Filter by label ID",
+    )
     AND: list[EntityLabelFilter] | None = Field(
         default=None, description="All conditions must match"
     )

@@ -77,6 +77,10 @@ class AuditLogFilter(BaseRequestModel):
         default=None,
         description=f"Added in {NEXT_RELEASE_VERSION}. Entity ID filter.",
     )
+    field_id: UUIDFilter | None = Field(
+        default=None,
+        description=f"Added in {NEXT_RELEASE_VERSION}. Filter by audit log ID.",
+    )
     operation: StringFilter | None = Field(default=None, description="Operation filter")
     status: AuditLogStatusFilter | None = Field(default=None, description="Status filter")
     triggered_by: StringFilter | None = Field(default=None, description="Triggered-by filter")
@@ -166,6 +170,9 @@ class AuditLogScopeFilter(BaseRequestModel):
 
     scope_type: StringFilter | None = Field(default=None, description="Scope type filter")
     scope_id: UUIDFilter | None = Field(default=None, description="Scope ID filter")
+    field_id: UUIDFilter | None = Field(
+        default=None, description="Filter by audit log scope entry ID"
+    )
 
 
 class AuditLogScopeOrder(BaseRequestModel):

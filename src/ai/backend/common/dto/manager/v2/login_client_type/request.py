@@ -7,12 +7,13 @@ from typing import Self
 from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseRequestModel
-from ai.backend.common.dto.manager.query import DateTimeFilter, StringFilter
+from ai.backend.common.dto.manager.query import DateTimeFilter, StringFilter, UUIDFilter
 from ai.backend.common.dto.manager.v2.common import String64
 from ai.backend.common.dto.manager.v2.login_client_type.types import (
     LoginClientTypeOrderField,
     OrderDirection,
 )
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.common.tristate.unset import UNSET, Unset
 
 __all__ = (
@@ -64,6 +65,10 @@ class LoginClientTypeFilter(BaseRequestModel):
     )
     modified_at: DateTimeFilter | None = Field(
         default=None, description="Filter by last modification datetime."
+    )
+    entity_id: UUIDFilter | None = Field(
+        default=None,
+        description=f"Added in {NEXT_RELEASE_VERSION}. Filter by login client type ID.",
     )
     AND: list[Self] | None = None
     OR: list[Self] | None = None

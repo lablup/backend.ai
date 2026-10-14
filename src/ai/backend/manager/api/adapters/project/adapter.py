@@ -434,6 +434,7 @@ class ProjectAdapter(BaseAdapter):
         fields = ProjectSearchableFields.own
         conditions = [
             *self.apply_uuid_filter(filter.id, fields.id.filter),
+            *self.apply_uuid_filter(filter.entity_id, fields.id.filter),
             *self.apply_string_filter(filter.name, fields.name.filter),
             *self.apply_string_filter(filter.domain_name, fields.domain_name.filter),
             *self.apply_string_filter(filter.description, fields.description.filter),

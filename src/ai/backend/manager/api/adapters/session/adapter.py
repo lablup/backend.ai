@@ -809,6 +809,7 @@ class SessionAdapter(BaseAdapter):
         fields = SessionSearchableFields.own
         conditions = [
             *self.apply_uuid_filter(f.id, fields.id.filter),
+            *self.apply_uuid_filter(f.entity_id, fields.id.filter),
             *self.apply_string_filter(f.name, fields.name.filter),
             *self.apply_string_filter(f.domain_name, fields.domain_name.filter),
             *self.apply_uuid_filter(f.project_id, fields.group_id.filter),
@@ -1018,6 +1019,7 @@ class SessionAdapter(BaseAdapter):
         fields = KernelSearchableFields.own
         conditions: list[QueryCondition] = [
             *self.apply_uuid_filter(f.id, fields.id.filter),
+            *self.apply_uuid_filter(f.field_id, fields.id.filter),
             *self.apply_uuid_filter(f.session_id, fields.session_id.filter),
             *self._convert_kernel_status_filter(f.status),
         ]

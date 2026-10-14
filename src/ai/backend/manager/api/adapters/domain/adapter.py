@@ -257,6 +257,7 @@ class DomainAdapter(BaseAdapter):
         conditions = [
             *self.apply_string_filter(filter.name, fields.name.filter),
             *self.apply_uuid_filter(filter.id, fields.id.filter),
+            *self.apply_uuid_filter(filter.entity_id, fields.id.filter),
             *self.apply_string_filter(filter.description, fields.description.filter),
             *self.apply_bool_filter(filter.is_active, fields.is_active.filter),
             *self.apply_datetime_filter(filter.created_at, fields.created_at.filter),

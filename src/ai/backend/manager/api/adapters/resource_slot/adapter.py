@@ -226,7 +226,10 @@ class ResourceSlotAdapter(BaseAdapter):
 
     def _convert_slot_type_filter(self, filter: ResourceSlotTypeFilter) -> list[QueryCondition]:
         fields = ResourceSlotTypeSearchableFields.own
-        return self.apply_string_filter(filter.slot_name, fields.slot_name.filter)
+        return [
+            *self.apply_string_filter(filter.slot_name, fields.slot_name.filter),
+            *self.apply_uuid_filter(filter.entity_id, fields.uuid.filter),
+        ]
 
     def _convert_slot_type_orders(self, orders: list[ResourceSlotTypeOrder]) -> list[QueryOrder]:
         fields = ResourceSlotTypeSearchableFields.own
@@ -429,6 +432,7 @@ class ResourceSlotAdapter(BaseAdapter):
             *self.apply_string_filter(filter.agent_id, fields.agent_id.filter),
             *self.apply_decimal_filter(filter.reserved, fields.reserved.filter),
             *self.apply_decimal_filter(filter.prereserved, fields.prereserved.filter),
+            *self.apply_uuid_filter(filter.field_id, fields.id.filter),
         ]
         if filter.AND:
             for sub in filter.AND:
@@ -548,6 +552,7 @@ class ResourceSlotAdapter(BaseAdapter):
         return [
             *self.apply_string_filter(filter.slot_name, fields.slot_name.filter),
             *self.apply_uuid_filter(filter.kernel_id, fields.kernel_id.filter),
+            *self.apply_uuid_filter(filter.field_id, fields.id.filter),
         ]
 
     @staticmethod

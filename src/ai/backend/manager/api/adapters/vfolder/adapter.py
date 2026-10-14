@@ -858,6 +858,7 @@ class VFolderAdapter(BaseAdapter):
             *self.apply_enum_filter(f.usage_mode, fields.usage_mode.filter),
             *self.apply_datetime_filter(f.created_at, fields.created_at.filter),
             *self.apply_bool_filter(f.cloneable, fields.cloneable.filter),
+            *self.apply_uuid_filter(f.entity_id, fields.id.filter),
             *self.apply_to_many_filter(
                 f.labels,
                 VFolderSearchableFields.nested.labels.correlation,
