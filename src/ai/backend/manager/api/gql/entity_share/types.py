@@ -130,7 +130,7 @@ class EntityShareGQL(PydanticNodeMixin[NodeDTO]):
 
     @gql_added_field(
         BackendAIGQLMeta(
-            added_version="26.9.0",
+            added_version=NEXT_RELEASE_VERSION,
             description="Who sent the offer, when the caller may read that user.",
         )
     )  # type: ignore[misc]
@@ -150,7 +150,7 @@ class EntityShareGQL(PydanticNodeMixin[NodeDTO]):
 
     @gql_added_field(
         BackendAIGQLMeta(
-            added_version="26.9.0",
+            added_version=NEXT_RELEASE_VERSION,
             description=(
                 "The scope or person the offer goes to, when the caller may read it. "
                 "An address resolves to the user holding it."
@@ -181,7 +181,7 @@ class EntityShareGQL(PydanticNodeMixin[NodeDTO]):
 
     @gql_added_field(
         BackendAIGQLMeta(
-            added_version="26.9.0",
+            added_version=NEXT_RELEASE_VERSION,
             description="The entity being offered, when the caller may read it.",
         )
     )  # type: ignore[misc]

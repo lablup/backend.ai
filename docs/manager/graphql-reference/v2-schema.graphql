@@ -6068,17 +6068,17 @@ type EntityShare implements Node {
   updatedAt: DateTime!
 
   """
-  Added in 26.9.0. Who sent the offer, when the caller may read that user.
+  Added in 26.10.0. Who sent the offer, when the caller may read that user.
   """
   sharer: UserV2
 
   """
-  Added in 26.9.0. The scope or person the offer goes to, when the caller may read it. An address resolves to the user holding it.
+  Added in 26.10.0. The scope or person the offer goes to, when the caller may read it. An address resolves to the user holding it.
   """
   recipientEntity: EntityNode
 
   """
-  Added in 26.9.0. The entity being offered, when the caller may read it.
+  Added in 26.10.0. The entity being offered, when the caller may read it.
   """
   targetEntity: EntityNode
 }
