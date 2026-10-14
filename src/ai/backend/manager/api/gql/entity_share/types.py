@@ -4,6 +4,7 @@ from datetime import datetime
 from enum import StrEnum
 from uuid import UUID
 
+from strawberry import UNSET
 from strawberry.relay import Connection, Edge, NodeID
 
 from ai.backend.common.dto.manager.v2.entity_share.request import (
@@ -208,11 +209,11 @@ class EntityShareScopeGQL(PydanticInputMixin[ScopeDTO]):
     one_of=True,
 )
 class EntityShareRecipientInputGQL(PydanticInputMixin[RecipientInputDTO]):
-    project_id: UUID | None = gql_field(default=None, description="Project the offer goes to.")
+    project_id: UUID | None = gql_field(default=UNSET, description="Project the offer goes to.")
     user_id: UUID | None = gql_field(
-        default=None, description="Person the offer goes to; it lands in their own project."
+        default=UNSET, description="Person the offer goes to; it lands in their own project."
     )
-    email: str | None = gql_field(default=None, description="Address the offer goes to.")
+    email: str | None = gql_field(default=UNSET, description="Address the offer goes to.")
 
 
 @gql_pydantic_input(
