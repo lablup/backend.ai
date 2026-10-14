@@ -15,7 +15,7 @@ from enum import StrEnum
 from typing import Any, Self, override
 from uuid import UUID
 
-from strawberry import Info
+from strawberry import UNSET, Info
 from strawberry.relay import Connection, Edge, NodeID
 
 from ai.backend.common.dto.manager.v2.resource_slot.request import (
@@ -198,6 +198,26 @@ class ResourceSlotTypeGQL(PydanticNodeMixin[ResourceSlotTypeNodeDTO]):
         description="Number formatting rules (binary vs decimal prefix, rounding)."
     )
     rank: int = gql_field(description="Display ordering rank. Lower values appear first.")
+    sealed_launch: bool = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="Whether a kernel holding this slot must be launched sealed or fail.",
+        ),
+    )
+    max_per_session: Decimal | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description=(
+                "Maximum total amount of this slot one session may request. Null means no limit."
+            ),
+        ),
+    )
+    single_node_only: bool = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="Whether a session requesting this slot must run on a single node.",
+        ),
+    )
 
     @classmethod
     @override
@@ -333,6 +353,29 @@ class CreateResourceSlotTypeInputGQL(PydanticInputMixin[CreateResourceSlotTypeIn
     rank: int = gql_field(
         description="Display ordering rank. Lower values appear first.", default=0
     )
+    sealed_launch: bool = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="Whether a kernel holding this slot must be launched sealed or fail.",
+        ),
+        default=False,
+    )
+    max_per_session: Decimal | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description=(
+                "Maximum total amount of this slot one session may request. Null means no limit."
+            ),
+        ),
+        default=None,
+    )
+    single_node_only: bool = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="Whether a session requesting this slot must run on a single node.",
+        ),
+        default=False,
+    )
 
 
 @gql_pydantic_type(
@@ -376,6 +419,36 @@ class UpdateResourceSlotTypeInputGQL(PydanticInputMixin[UpdateResourceSlotTypeIn
         description="Number formatting rules.", default=None
     )
     rank: int | None = gql_field(description="Display ordering rank.", default=None)
+    sealed_launch: bool | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description=(
+                "Whether a kernel holding this slot must be launched sealed or fail. "
+                "Omit to leave unchanged."
+            ),
+        ),
+        default=UNSET,
+    )
+    max_per_session: Decimal | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description=(
+                "Maximum total amount of this slot one session may request. "
+                "Omit to leave unchanged; null removes the limit."
+            ),
+        ),
+        default=UNSET,
+    )
+    single_node_only: bool | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description=(
+                "Whether a session requesting this slot must run on a single node. "
+                "Omit to leave unchanged."
+            ),
+        ),
+        default=UNSET,
+    )
 
 
 @gql_pydantic_type(

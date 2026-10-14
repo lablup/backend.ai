@@ -91,6 +91,9 @@ from ai.backend.manager.sokovan.scheduling_controller.validators.resource_limit_
 from ai.backend.manager.sokovan.scheduling_controller.validators.service_port_rule import (
     ServicePortRule,
 )
+from ai.backend.manager.sokovan.scheduling_controller.validators.slot_type_limit_rule import (
+    SlotTypeLimitRule,
+)
 from ai.backend.manager.views.sokovan.session_creation import (
     GlobalEnqueueInfo,
     ResourceGroupEnqueueInfo,
@@ -153,6 +156,7 @@ def _spec(
     session_type: SessionTypes = SessionTypes.INTERACTIVE,
     vfolder_mounts: tuple[VFolderMount, ...] = (),
     priority: int = 10,
+    cluster_mode: ClusterMode = ClusterMode.SINGLE_NODE,
 ) -> SessionSpec:
     # SessionSpec no longer carries session-level vfolder_mounts — they live
     # per-kernel on KernelSpec.vfolder_mounts. Mirror the supplied mounts onto
@@ -174,7 +178,7 @@ def _spec(
             options=SessionOptions(
                 priority=priority,
                 is_preemptible=True,
-                cluster_mode=ClusterMode.SINGLE_NODE,
+                cluster_mode=cluster_mode,
                 cluster_size=len(kernel_specs),
                 scheduling_target=SchedulingTarget(),
                 kernel_groups=[],
@@ -202,6 +206,8 @@ def _ctx(
     dotfiles: DotfileBundle | None = None,
     pending_session_count: int = 0,
     pending_session_resource_slots: Mapping[ResourceSlotName, Decimal] | None = None,
+    max_per_session: Mapping[ResourceSlotName, Decimal] | None = None,
+    single_node_only: frozenset[ResourceSlotName] | None = None,
 ) -> SessionSpecContext:
     slot_types_val = slot_types or {}
     served = (
@@ -227,6 +233,8 @@ def _ctx(
             slot_type_info=SlotTypeInfo(
                 types=slot_types_val,
                 required=required_slot_names or frozenset(),
+                max_per_session=max_per_session or {},
+                single_node_only=single_node_only or frozenset(),
             ),
         ),
     )
@@ -787,6 +795,100 @@ class TestRequestedSlotTypeRule:
         ))
         ctx = _ctx(slot_types=dict(_RG_BASE))
         RequestedSlotTypeRule().validate(spec, ctx)
+
+
+_TDX = ResourceSlotName("confidential.tdx")
+
+
+def _tdx_kernel(quantity: str | None) -> KernelSpec:
+    resources: tuple[tuple[str, str], ...] = (("cpu", "1"), ("mem", "1073741824"))
+    if quantity is not None:
+        resources = (*resources, ("confidential.tdx", quantity))
+    return _kernel_with_resources(ImageID(uuid.uuid4()), resources=resources)
+
+
+def _tdx_ctx(*, max_per_session: Decimal | None = Decimal(1)) -> SessionSpecContext:
+    return _ctx(
+        slot_types={**_RG_BASE, _TDX: SlotTypes.UNIQUE},
+        max_per_session={_TDX: max_per_session} if max_per_session is not None else None,
+        single_node_only=frozenset({_TDX}),
+    )
+
+
+class TestSlotTypeLimitRule:
+    def test_single_kernel_with_one_passes(self) -> None:
+        SlotTypeLimitRule().validate(_spec((_tdx_kernel("1"),)), _tdx_ctx())
+
+    @pytest.mark.parametrize("quantity", ["2", "0.5"])
+    def test_rejects_unique_amount_other_than_one(self, quantity: str) -> None:
+        with pytest.raises(InvalidAPIParameters, match=r"kernel_specs\[0\]"):
+            SlotTypeLimitRule().validate(
+                _spec((_tdx_kernel(quantity),)), _tdx_ctx(max_per_session=None)
+            )
+
+    def test_rejects_two_kernels_over_max_per_session(self) -> None:
+        spec = _spec((_tdx_kernel("1"), _tdx_kernel("1")))
+        ctx = _ctx(
+            slot_types={**_RG_BASE, _TDX: SlotTypes.UNIQUE},
+            max_per_session={_TDX: Decimal("1.000000")},
+        )
+        with pytest.raises(
+            QuotaExceeded, match=r"kernel_specs\[0, 1\].*'confidential\.tdx'.*limit of 1 "
+        ):
+            SlotTypeLimitRule().validate(spec, ctx)
+
+    def test_unique_amount_error_wins_over_max_per_session(self) -> None:
+        with pytest.raises(InvalidAPIParameters, match=r"kernel_specs\[0\].*exactly 1"):
+            SlotTypeLimitRule().validate(_spec((_tdx_kernel("2"),)), _tdx_ctx())
+
+    def test_rejects_two_kernels_for_single_node_only(self) -> None:
+        spec = _spec((_tdx_kernel("1"), _tdx_kernel("1")))
+        with pytest.raises(
+            InvalidAPIParameters,
+            match=r"kernel_specs\[0, 1\].*'confidential\.tdx'.*but the session has 2 kernels\.",
+        ):
+            SlotTypeLimitRule().validate(spec, _tdx_ctx(max_per_session=None))
+
+    def test_reports_both_conditions_when_both_apply(self) -> None:
+        spec = _spec((_tdx_kernel("1"), _tdx_kernel("1")), cluster_mode=ClusterMode.MULTI_NODE)
+        with pytest.raises(
+            InvalidAPIParameters, match=r"session has 2 kernels and cluster_mode is multi-node"
+        ):
+            SlotTypeLimitRule().validate(spec, _tdx_ctx(max_per_session=None))
+
+    def test_rejects_multi_node_cluster_mode(self) -> None:
+        spec = _spec((_tdx_kernel("1"),), cluster_mode=ClusterMode.MULTI_NODE)
+        with pytest.raises(
+            InvalidAPIParameters,
+            match=r"kernel_specs\[0\].*'confidential\.tdx'.*but cluster_mode is multi-node\.",
+        ):
+            SlotTypeLimitRule().validate(spec, _tdx_ctx())
+
+    def test_passes_when_slot_not_requested(self) -> None:
+        spec = _spec((_tdx_kernel(None), _tdx_kernel("0")), cluster_mode=ClusterMode.MULTI_NODE)
+        SlotTypeLimitRule().validate(spec, _tdx_ctx())
+
+    def test_slot_without_attributes_passes(self) -> None:
+        spec = _spec((_tdx_kernel("1"), _tdx_kernel("1")), cluster_mode=ClusterMode.MULTI_NODE)
+        ctx = _ctx(slot_types={**_RG_BASE, _TDX: SlotTypes.COUNT})
+        SlotTypeLimitRule().validate(spec, ctx)
+
+    def test_quota_message_is_not_scientific_notation(self) -> None:
+        spec = _spec((_tdx_kernel("11"),))
+        ctx = _ctx(
+            slot_types={**_RG_BASE, _TDX: SlotTypes.COUNT},
+            max_per_session={_TDX: Decimal("10.000000")},
+        )
+        with pytest.raises(QuotaExceeded, match=r"request 11 of .*limit of 10 per session"):
+            SlotTypeLimitRule().validate(spec, ctx)
+
+    def test_null_max_per_session_means_no_limit(self) -> None:
+        spec = _spec((_tdx_kernel("1"), _tdx_kernel("1")))
+        ctx = _ctx(
+            slot_types={**_RG_BASE, _TDX: SlotTypes.COUNT},
+            single_node_only=frozenset({ResourceSlotName("other")}),
+        )
+        SlotTypeLimitRule().validate(spec, ctx)
 
 
 class TestRequiredResourceSlotRule:

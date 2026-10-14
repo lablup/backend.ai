@@ -26392,6 +26392,36 @@
             "description": "Display ordering rank. Lower values appear first.",
             "title": "Rank",
             "type": "integer"
+          },
+          "sealed_launch": {
+            "default": false,
+            "description": "Whether a kernel holding this slot must be launched sealed or fail.",
+            "title": "Sealed Launch",
+            "type": "boolean"
+          },
+          "max_per_session": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Maximum total amount of this slot one session may request. Null means no limit.",
+            "title": "Max Per Session"
+          },
+          "single_node_only": {
+            "default": false,
+            "description": "Whether a session requesting this slot must run on a single node.",
+            "title": "Single Node Only",
+            "type": "boolean"
           }
         },
         "required": [
@@ -26515,6 +26545,51 @@
             "default": null,
             "description": "Display ordering rank.",
             "title": "Rank"
+          },
+          "sealed_launch": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Whether a kernel holding this slot must be launched sealed or fail.",
+            "title": "Sealed Launch"
+          },
+          "max_per_session": {
+            "anyOf": [
+              {
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                    "type": "string"
+                  }
+                ],
+                "ge": 0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Maximum total amount of this slot one session may request. Omit to leave unchanged; null removes the limit.",
+            "title": "Max Per Session"
+          },
+          "single_node_only": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Whether a session requesting this slot must run on a single node.",
+            "title": "Single Node Only"
           }
         },
         "required": [

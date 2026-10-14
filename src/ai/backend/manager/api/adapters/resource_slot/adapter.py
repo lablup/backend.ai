@@ -128,7 +128,7 @@ from ai.backend.manager.services.resource_slot.actions.search_resource_allocatio
 )
 from ai.backend.manager.services.resource_slot.actions.update import UpdateResourceSlotTypeAction
 from ai.backend.manager.services.resource_slot.processors import ResourceSlotProcessors
-from ai.backend.manager.types import OptionalState
+from ai.backend.manager.types import OptionalState, TriState
 
 
 @lru_cache(maxsize=1)
@@ -261,6 +261,9 @@ class ResourceSlotAdapter(BaseAdapter):
             display_icon=input.display_icon,
             number_format=self._to_number_format(input.number_format),
             rank=input.rank,
+            sealed_launch=input.sealed_launch,
+            max_per_session=input.max_per_session,
+            single_node_only=input.single_node_only,
         )
         action_result = await self._resource_slot.global_create_resource_slot_type.run(
             CreateResourceSlotTypeAction(creator=creator)
@@ -290,6 +293,9 @@ class ResourceSlotAdapter(BaseAdapter):
                 else OptionalState.nop()
             ),
             rank=OptionalState.from_nullable(input.rank),
+            sealed_launch=OptionalState.from_unset(input.sealed_launch),
+            max_per_session=TriState.from_unset(input.max_per_session),
+            single_node_only=OptionalState.from_unset(input.single_node_only),
         )
         action_result = await self._resource_slot.global_update_resource_slot_type.run(
             UpdateResourceSlotTypeAction(updater=updater)
@@ -340,6 +346,9 @@ class ResourceSlotAdapter(BaseAdapter):
                 round_length=data.number_format.round_length,
             ),
             rank=data.rank,
+            sealed_launch=data.sealed_launch,
+            max_per_session=data.max_per_session,
+            single_node_only=data.single_node_only,
         )
 
     # -------------------------------------------------------------------------

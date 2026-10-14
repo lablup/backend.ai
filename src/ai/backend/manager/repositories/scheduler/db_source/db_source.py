@@ -381,6 +381,8 @@ class ScheduleDBSource:
                 ResourceSlotTypeRow.slot_name,
                 ResourceSlotTypeRow.slot_type,
                 ResourceSlotTypeRow.required,
+                ResourceSlotTypeRow.max_per_session,
+                ResourceSlotTypeRow.single_node_only,
             )
             .where(ResourceSlotTypeRow.enabled.is_(True))
             .order_by(ResourceSlotTypeRow.rank, ResourceSlotTypeRow.slot_name)
@@ -389,6 +391,14 @@ class ScheduleDBSource:
         return SlotTypeInfo(
             types={ResourceSlotName(row.slot_name): SlotTypes(row.slot_type) for row in rows},
             required=frozenset(ResourceSlotName(row.slot_name) for row in rows if row.required),
+            max_per_session={
+                ResourceSlotName(row.slot_name): row.max_per_session
+                for row in rows
+                if row.max_per_session is not None
+            },
+            single_node_only=frozenset(
+                ResourceSlotName(row.slot_name) for row in rows if row.single_node_only
+            ),
         )
 
     async def _fetch_resource_group(
