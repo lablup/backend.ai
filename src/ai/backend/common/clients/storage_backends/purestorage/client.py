@@ -21,7 +21,6 @@ from ai.backend.common.clients.storage_backends.purestorage.dto import (
     PurityListQuery,
     PurityNFSMetric,
     RapidFileEntry,
-    RapidFileEntryType,
     RapidFileStat,
     RapidFileTreeUsage,
 )
@@ -31,6 +30,7 @@ from ai.backend.common.clients.storage_backends.purestorage.exceptions import (
     RapidFileToolkitVersionNotDetectedError,
     UnauthorizedPurityClient,
 )
+from ai.backend.common.clients.storage_backends.purestorage.types import RapidFileEntryType
 from ai.backend.common.json import load_json
 from ai.backend.common.types import BinarySize
 from ai.backend.logging.structured import StructuredLogger

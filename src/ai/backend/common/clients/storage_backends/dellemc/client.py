@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import os
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
@@ -17,18 +16,18 @@ from ai.backend.common.clients.storage_backends.dellemc.dto import (
     OneFSMetadata,
     OneFSNetworkInterface,
     OneFSNodeHardware,
+    OneFSNodeLnns,
     OneFSNodeMetadata,
     OneFSNodeStatus,
     OneFSProtocolStats,
     OneFSQuota,
-    OneFSQuotaThresholds,
-    OneFSQuotaType,
     OneFSSystemStats,
     OneFSUpdateQuotaRequest,
     OneFSUsage,
     OneFSWorkloadStats,
     OneFSWorkloadStatsQuery,
 )
+from ai.backend.common.clients.storage_backends.dellemc.types import OneFSQuotaID
 from ai.backend.common.json import dump_json_str
 
 
@@ -95,10 +94,10 @@ class OneFSClient:
             used_bytes=int(data["storagepools"][0]["usage"]["used_bytes"]),
         )
 
-    async def get_list_lnn(self) -> list[int]:
+    async def get_list_lnn(self) -> OneFSNodeLnns:
         async with self._request("GET", "storagepool/storagepools") as resp:
             data = await resp.json()
-        return [int(lnn) for lnn in data["storagepools"][0]["lnns"]]
+        return OneFSNodeLnns(lnns=[int(lnn) for lnn in data["storagepools"][0]["lnns"]])
 
     async def get_node_hardware_info_by_lnn(self, lnn: int) -> OneFSNodeHardware:
         async with self._request("GET", f"cluster/nodes/{lnn}/hardware") as resp:
@@ -141,7 +140,7 @@ class OneFSClient:
         return [OneFSNetworkInterface.model_validate(item) for item in data["interfaces"]]
 
     async def get_node_metadata(self) -> list[OneFSNodeMetadata]:
-        lnns = await self.get_list_lnn()
+        lnns = (await self.get_list_lnn()).lnns
         return [
             OneFSNodeMetadata(
                 hardware=await self.get_node_hardware_info_by_lnn(lnn),
@@ -184,22 +183,12 @@ class OneFSClient:
             data = await resp.json()
         return [OneFSQuota.model_validate(item) for item in data["quotas"]]
 
-    async def get_quota(self, quota_id: str) -> OneFSQuota:
+    async def get_quota(self, quota_id: OneFSQuotaID) -> OneFSQuota:
         async with self._request("GET", f"quota/quotas/{quota_id}") as resp:
             data = await resp.json()
         return OneFSQuota.model_validate(data["quotas"][0])
 
-    async def create_quota(
-        self,
-        path: os.PathLike[str],
-        type_: OneFSQuotaType,
-        thresholds: OneFSQuotaThresholds,
-    ) -> OneFSCreatedQuota:
-        request = OneFSCreateQuotaRequest(
-            path=os.fsdecode(path),
-            type=type_,
-            thresholds=thresholds,
-        )
+    async def create_quota(self, request: OneFSCreateQuotaRequest) -> OneFSCreatedQuota:
         async with self._request(
             "POST",
             "quota/quotas",
@@ -207,15 +196,14 @@ class OneFSClient:
         ) as resp:
             return OneFSCreatedQuota.model_validate(await resp.json())
 
-    async def delete_quota(self, quota_id: str) -> None:
+    async def delete_quota(self, quota_id: OneFSQuotaID) -> None:
         async with self._request(
             "DELETE",
             f"quota/quotas/{quota_id}",
         ) as _:
             return
 
-    async def update_quota(self, quota_id: str, thresholds: OneFSQuotaThresholds) -> None:
-        request = OneFSUpdateQuotaRequest(thresholds=thresholds)
+    async def update_quota(self, quota_id: OneFSQuotaID, request: OneFSUpdateQuotaRequest) -> None:
         async with self._request(
             "PUT",
             f"quota/quotas/{quota_id}",

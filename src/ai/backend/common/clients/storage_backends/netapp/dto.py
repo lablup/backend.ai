@@ -1,22 +1,17 @@
 from __future__ import annotations
 
-import enum
 from datetime import datetime
 from pathlib import Path
-from typing import Annotated, Any
+from typing import Any
 from uuid import UUID
 
-from pydantic import ConfigDict, Field, PlainSerializer
+from pydantic import ConfigDict, Field
 
+from ai.backend.common.clients.storage_backends.netapp.types import (
+    CommaSeparatedFields,
+    NetAppXCPEntryType,
+)
 from ai.backend.common.types import BackendAISchema
-
-CommaSeparatedFields = Annotated[
-    list[str], PlainSerializer(lambda fields: ",".join(fields), return_type=str)
-]
-
-
-class NetAppJobResponseCode(enum.StrEnum):
-    QUOTA_ALEADY_ENABLED = "5308507"
 
 
 class NetAppJobResult(BackendAISchema):
@@ -100,12 +95,6 @@ class NetAppCluster(BackendAISchema):
     version: str
 
 
-class NetAppXCPEntryType(enum.Enum):
-    FILE = 0
-    DIRECTORY = 1
-    SYMLINK = 2
-
-
 class NetAppXCPStat(BackendAISchema):
     size: int
     owner: str
@@ -159,7 +148,7 @@ class NetAppUpdateQuotaRuleRequest(BackendAISchema):
 class NetAppEnableQuotaRequest(BackendAISchema):
     model_config = ConfigDict(populate_by_name=True)
 
-    quota_enabled: bool = Field(alias="quota.enabled")
+    quota_enabled: bool = Field(default=True, alias="quota.enabled")
 
 
 class NetAppVolumeListQuery(BackendAISchema):
@@ -217,3 +206,16 @@ class NetAppQuotaReportQuery(BackendAISchema):
 
 class NetAppVolumeQoSQuery(BackendAISchema):
     fields: str = "qos"
+
+
+class NetAppQuotaRuleSpace(BackendAISchema):
+    model_config = ConfigDict(extra="allow")
+
+    hard_limit: int | None = None
+
+
+class NetAppQuotaRule(BackendAISchema):
+    model_config = ConfigDict(extra="allow")
+
+    uuid: str
+    space: NetAppQuotaRuleSpace | None = None

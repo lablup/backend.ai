@@ -1,30 +1,22 @@
 from __future__ import annotations
 
-from typing import Any
+import time
 
-from pydantic import ConfigDict
+from pydantic import ConfigDict, Field
 
+from ai.backend.common.clients.storage_backends.weka.types import (
+    WekaQuotaID,
+)
 from ai.backend.common.types import BackendAISchema
 
 
 class WekaQuota(BackendAISchema):
-    quota_id: str
+    quota_id: WekaQuotaID
     inode_id: int
     hard_limit: int | None
     soft_limit: int | None
     grace_seconds: int | None
     used_bytes: int | None
-
-    @classmethod
-    def from_api(cls, quota_id: str, data: dict[str, Any]) -> WekaQuota:
-        return cls.model_validate({
-            "quota_id": quota_id,
-            "inode_id": data["inode_id"],
-            "hard_limit": data["hard_limit_bytes"],
-            "soft_limit": data["soft_limit_bytes"],
-            "grace_seconds": data["grace_seconds"],
-            "used_bytes": data["used_bytes"],
-        })
 
 
 class WekaFs(BackendAISchema):
@@ -43,6 +35,12 @@ class WekaFs(BackendAISchema):
     available_ssd: int
     ssd_budget: int
     total_budget: int
+
+
+class WekaHealthCheck(BackendAISchema):
+    """Raw text body of ``/healthcheck``."""
+
+    status: str
 
 
 class WekaClusterInfo(BackendAISchema):
@@ -88,7 +86,7 @@ class WekaSetQuotaV1Params(BackendAISchema):
 class WekaSetQuotaV1Request(BackendAISchema):
     """JSON-RPC body of the V1 ``set_directory_quota`` call."""
 
-    id: float
+    id: float = Field(default_factory=lambda: time.time() * 1000)
     jsonrpc: str = "2.0"
     method: str = "set_directory_quota"
     params: WekaSetQuotaV1Params

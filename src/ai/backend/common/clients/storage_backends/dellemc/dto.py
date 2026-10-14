@@ -1,20 +1,22 @@
 from __future__ import annotations
 
-import enum
 from typing import Any
 
 from pydantic import ConfigDict, Field
 
+from ai.backend.common.clients.storage_backends.dellemc.types import (
+    OneFSQuotaID,
+    OneFSQuotaType,
+)
 from ai.backend.common.types import BackendAISchema
 
 
-class OneFSQuotaType(enum.StrEnum):
-    DIRECTORY = "directory"
-    USER = "user"
-    GROUP = "group"
-
-
 class OneFSQuotaThresholds(BackendAISchema):
+    hard: int | None = None
+    soft: int | None = None
+
+
+class OneFSReportedQuotaThresholds(BackendAISchema):
     model_config = ConfigDict(extra="allow")
 
     hard: int | None = None
@@ -29,6 +31,10 @@ class OneFSMetadata(BackendAISchema):
 class OneFSUsage(BackendAISchema):
     capacity_bytes: int
     used_bytes: int
+
+
+class OneFSNodeLnns(BackendAISchema):
+    lnns: list[int]
 
 
 class OneFSNodeHardware(BackendAISchema):
@@ -107,13 +113,13 @@ class OneFSQuotaUsage(BackendAISchema):
 class OneFSQuota(BackendAISchema):
     model_config = ConfigDict(extra="allow")
 
-    id: str
-    thresholds: OneFSQuotaThresholds
+    id: OneFSQuotaID
+    thresholds: OneFSReportedQuotaThresholds
     usage: OneFSQuotaUsage
 
 
 class OneFSCreatedQuota(BackendAISchema):
-    id: str
+    id: OneFSQuotaID
 
 
 class OneFSCreateQuotaRequest(BackendAISchema):

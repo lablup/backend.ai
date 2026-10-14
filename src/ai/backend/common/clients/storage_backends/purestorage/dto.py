@@ -1,11 +1,13 @@
 from __future__ import annotations
 
-import enum
 from datetime import datetime
 from pathlib import Path
 
 from pydantic import ConfigDict
 
+from ai.backend.common.clients.storage_backends.purestorage.types import (
+    RapidFileEntryType,
+)
 from ai.backend.common.types import BackendAISchema
 
 
@@ -40,12 +42,6 @@ class PurityNFSMetric(BackendAISchema):
     write_bytes_per_sec: float
     usec_per_read_op: float
     usec_per_write_op: float
-
-
-class RapidFileEntryType(enum.StrEnum):
-    FILE = "file"
-    DIRECTORY = "directory"
-    SYMLINK = "symlink"
 
 
 class RapidFileStat(BackendAISchema):

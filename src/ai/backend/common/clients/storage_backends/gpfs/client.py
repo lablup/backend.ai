@@ -26,12 +26,12 @@ from ai.backend.common.clients.storage_backends.gpfs.dto import (
     GPFSDisk,
     GPFSFilesetQuotasQuery,
     GPFSFilesystem,
+    GPFSHealthCheck,
     GPFSJob,
-    GPFSJobStatus,
     GPFSMetric,
     GPFSMetricQuery,
+    GPFSNode,
     GPFSQuota,
-    GPFSQuotaType,
     GPFSSetQuotaRequest,
     GPFSStoragePoolUsage,
     GPFSSystemHealthState,
@@ -47,6 +47,7 @@ from ai.backend.common.clients.storage_backends.gpfs.exceptions import (
     GPFSServiceError,
     GPFSUnauthorizedError,
 )
+from ai.backend.common.clients.storage_backends.gpfs.types import GPFSJobStatus, GPFSQuotaType
 from ai.backend.logging.structured import StructuredLogger
 
 log = StructuredLogger(logging.getLogger(__spec__.name))
@@ -237,19 +238,7 @@ class GPFSAPIClient:
         log.debug("response: {}", data)
         return [GPFSQuota.model_validate(quota_info) for quota_info in data["quotas"]]
 
-    async def set_quota(
-        self,
-        fs_name: str,
-        fileset_name: str,
-        limit_bytes: int,
-    ) -> None:
-        limit_str = str(int(limit_bytes))
-        request = GPFSSetQuotaRequest(
-            quotaType=GPFSQuotaType.FILESET,
-            objectName=fileset_name,
-            blockSoftLimit=limit_str,
-            blockHardLimit=limit_str,
-        )
+    async def set_quota(self, fs_name: str, request: GPFSSetQuotaRequest) -> None:
         async with self._request(
             "POST",
             f"/filesystems/{fs_name}/quotas",
@@ -259,23 +248,12 @@ class GPFSAPIClient:
         await self._wait_for_job_done([GPFSJob.model_validate(x) for x in data["jobs"]])
 
     async def remove_quota(self, fs_name: str, fileset_name: str) -> None:
-        await self.set_quota(fs_name, fileset_name, 0)
-
-    async def create_fileset(
-        self,
-        fs_name: str,
-        fileset_name: str,
-        path: Path | None = None,
-        owner: str | None = None,
-        permissions: int | None = None,
-        create_directory: bool = True,
-    ) -> None:
-        request = GPFSCreateFilesetRequest(
-            filesetName=fileset_name,
-            owner=owner,
-            permissions=permissions,
-            path=path.as_posix() if path is not None else None,
+        await self.set_quota(
+            fs_name,
+            GPFSSetQuotaRequest(objectName=fileset_name, blockSoftLimit="0", blockHardLimit="0"),
         )
+
+    async def create_fileset(self, fs_name: str, request: GPFSCreateFilesetRequest) -> None:
         try:
             async with self._request(
                 "POST",
@@ -288,7 +266,7 @@ class GPFSAPIClient:
                     )
                 data = await response.json()
         except GPFSConflictError:
-            log.debug("GPFS fileset {} already exists, skipping creation", fileset_name)
+            log.debug("GPFS fileset {} already exists, skipping creation", request.filesetName)
             return
         await self._wait_for_job_done([GPFSJob.model_validate(x) for x in data["jobs"]])
 
@@ -306,14 +284,9 @@ class GPFSAPIClient:
         self,
         source_fs_name: str,
         source_directory: Path,
-        target_fs_name: str,
-        target_directory: Path,
+        request: GPFSCopyFolderRequest,
     ) -> None:
         encoded_source_dir = urllib.parse.urlencode({"": source_directory})[1:]
-        request = GPFSCopyFolderRequest(
-            targetFilesystem=target_fs_name,
-            targetPath=target_directory.as_posix(),
-        )
         async with self._request(
             "PUT",
             f"/filesystems/{source_fs_name}/directoryCopy/{encoded_source_dir}",
@@ -322,9 +295,9 @@ class GPFSAPIClient:
             data = await response.json()
         await self._wait_for_job_done([GPFSJob.model_validate(x) for x in data["jobs"]])
 
-    async def check_health(self) -> str:
+    async def check_health(self) -> GPFSHealthCheck:
         async with self._request("GET", "/healthcheck") as response:
-            return await response.text()
+            return GPFSHealthCheck(text=await response.text())
 
     async def get_cluster_info(self) -> GPFSClusterInfo:
         async with self._request("GET", "/cluster") as response:
@@ -340,10 +313,10 @@ class GPFSAPIClient:
             data = await response.json()
         return GPFSMetric.model_validate(data)
 
-    async def list_nodes(self) -> list[str]:
+    async def list_nodes(self) -> list[GPFSNode]:
         async with self._request("GET", "/nodes") as response:
             data = await response.json()
-        return [x["adminNodeName"] for x in data["nodes"]]
+        return [GPFSNode(adminNodeName=x["adminNodeName"]) for x in data["nodes"]]
 
     async def get_node_health(self, node_name: str) -> list[GPFSSystemHealthState]:
         async with self._request("GET", f"/nodes/{node_name}/health/states") as response:

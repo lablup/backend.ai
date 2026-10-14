@@ -1,10 +1,13 @@
 from __future__ import annotations
 
-import enum
 from typing import Any
 
 from pydantic import ConfigDict, Field
 
+from ai.backend.common.clients.storage_backends.gpfs.types import (
+    GPFSJobStatus,
+    GPFSQuotaType,
+)
 from ai.backend.common.types import BackendAISchema
 
 
@@ -163,14 +166,6 @@ class GPFSJobRequest(BackendAISchema):
     data: Any | None = None
 
 
-class GPFSJobStatus(enum.StrEnum):
-    RUNNING = "RUNNING"
-    CANCELLING = "CANCELLING"
-    CANCELLED = "CANCELLED"
-    COMPLETED = "COMPLETED"
-    FAILED = "FAILED"
-
-
 class GPFSJob(BackendAISchema):
     jobId: int
     status: GPFSJobStatus
@@ -180,12 +175,6 @@ class GPFSJob(BackendAISchema):
     completed: str | None = None
     runtime: int | None = None
     pids: list[int] | None = None
-
-
-class GPFSQuotaType(enum.StrEnum):
-    FILESET = "FILESET"
-    USER = "USR"
-    GROUP = "GRP"
 
 
 class GPFSClusterInfo(BackendAISchema):
@@ -212,7 +201,7 @@ class GPFSMetric(BackendAISchema):
 
 class GPFSSetQuotaRequest(BackendAISchema):
     operationType: str = "setQuota"
-    quotaType: GPFSQuotaType
+    quotaType: GPFSQuotaType = GPFSQuotaType.FILESET
     objectName: str
     blockSoftLimit: str
     blockHardLimit: str
@@ -237,3 +226,11 @@ class GPFSFilesetQuotasQuery(BackendAISchema):
 
 class GPFSMetricQuery(BackendAISchema):
     query: str
+
+
+class GPFSHealthCheck(BackendAISchema):
+    text: str
+
+
+class GPFSNode(BackendAISchema):
+    adminNodeName: str

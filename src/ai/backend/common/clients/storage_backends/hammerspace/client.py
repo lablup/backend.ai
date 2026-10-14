@@ -10,10 +10,11 @@ import aiohttp
 from yarl import URL
 
 from ai.backend.common.clients.storage_backends.hammerspace.dto import (
-    ClusterMetricParams,
-    CreateShareParams,
-    GetShareParams,
+    HammerspaceClusterMetricQuery,
+    HammerspaceCreateShareQuery,
+    HammerspaceCreateShareRequest,
     HammerspaceGetObjectiveQuery,
+    HammerspaceGetShareQuery,
     HammerspaceLoginRequest,
     Metric,
     Objective,
@@ -25,6 +26,7 @@ from ai.backend.common.clients.storage_backends.hammerspace.exceptions import (
     AuthenticationError,
     ShareNotFound,
 )
+from ai.backend.common.clients.storage_backends.hammerspace.types import ObjectType
 from ai.backend.common.exception import (
     BackendAISchemaValidationFailed,
     BaseNFSMountCheckFailed,
@@ -138,52 +140,60 @@ class HammerspaceAPIClient:
 
     async def create_share(
         self,
-        params: CreateShareParams,
+        request: HammerspaceCreateShareRequest,
         retry: int,
         wait_sec: int,
+        *,
+        create_path: bool = True,
+        validate_only: bool = False,
     ) -> SimpleShare:
         session = self._logged_in_session()
+        query = HammerspaceCreateShareQuery(
+            create_path="true" if create_path else "false",
+            validate_only="true" if validate_only else "false",
+        )
         async with session.post(
             self._address / "shares",
-            params=params.query().model_dump(mode="json", by_alias=True),
-            json=params.body().model_dump(mode="json", by_alias=True, exclude_none=True),
+            params=query.model_dump(mode="json", by_alias=True),
+            json=request.model_dump(mode="json", by_alias=True, exclude_none=True),
             ssl=self._ssl_enabled,
         ) as resp:
             resp.raise_for_status()
 
         while retry > 0:
             log.debug(
-                "Retrying to get the created share: {}, remaining retries: {}", params.name, retry
+                "Retrying to get the created share: {}, remaining retries: {}", request.name, retry
             )
-            raw_shares = await self._get_shares(GetShareParams(name=params.name))
+            raw_shares = await self._get_shares(request.name)
             for raw_share in raw_shares:
                 try:
                     share = SimpleShare.model_validate(raw_share)
-                    if share.name == params.name:
+                    if share.name == request.name:
                         await self._check_nfs_export(share.path)
                         return share
                 except BackendAISchemaValidationFailed:
                     continue
             retry -= 1
             await asyncio.sleep(wait_sec)
-        raise ShareNotFound(f"Failed to get the created share: {params.name}")
+        raise ShareNotFound(f"Failed to get the created share: {request.name}")
 
-    async def _get_shares(self, params: GetShareParams) -> list[dict[str, Any]]:
+    async def _get_shares(self, name: str) -> list[dict[str, Any]]:
         session = self._logged_in_session()
+        query = HammerspaceGetShareQuery(spec=f"name=eq={name}")
         async with session.get(
             self._address / "shares",
-            params=params.query().model_dump(mode="json", by_alias=True),
+            params=query.model_dump(mode="json", by_alias=True),
             ssl=self._ssl_enabled,
         ) as resp:
             resp.raise_for_status()
             return cast(list[dict[str, Any]], await resp.json())
 
-    async def get_share(self, params: GetShareParams) -> Share | None:
-        data = await self._get_shares(params)
+    async def get_share(self, name: str) -> Share | None:
+        data = await self._get_shares(name)
         for raw_share in data:
             try:
                 share = Share.model_validate(raw_share)
-                if share.name == params.name:
+                if share.name == name:
                     return share
             except BackendAISchemaValidationFailed:
                 continue
@@ -191,18 +201,18 @@ class HammerspaceAPIClient:
 
     async def poll_share(
         self,
-        params: GetShareParams,
+        name: str,
         retry: int,
         wait_sec: int,
     ) -> Share | None:
         while retry > 0:
-            data = await self._get_shares(params)
+            data = await self._get_shares(name)
             for raw_share in data:
                 try:
                     share = Share.model_validate(raw_share)
                 except BackendAISchemaValidationFailed:
                     continue
-                if share.name == params.name:
+                if share.name == name:
                     return share
             retry -= 1
             await asyncio.sleep(wait_sec)
@@ -236,11 +246,21 @@ class HammerspaceAPIClient:
                 continue
         return sites
 
-    async def get_cluster_metrics(self, params: ClusterMetricParams) -> Metric:
+    async def get_cluster_metrics(
+        self,
+        site_id: uuid.UUID,
+        preceding_duration: str,
+        interval_duration: str,
+        object_type: ObjectType = ObjectType.CLUSTER,
+    ) -> Metric:
         session = self._logged_in_session()
+        query = HammerspaceClusterMetricQuery(
+            precedingDuration=preceding_duration,
+            intervalDuration=interval_duration,
+        )
         async with session.get(
-            self._address / f"metrics/capacity/{params.object_type}/{params.site_id}",
-            params=params.query().model_dump(mode="json", by_alias=True),
+            self._address / f"metrics/capacity/{object_type}/{site_id}",
+            params=query.model_dump(mode="json", by_alias=True),
         ) as resp:
             resp.raise_for_status()
             data = await resp.json()

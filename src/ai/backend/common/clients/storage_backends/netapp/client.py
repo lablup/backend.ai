@@ -23,7 +23,6 @@ from ai.backend.common.clients.storage_backends.netapp.dto import (
     NetAppCreateQTreeRequest,
     NetAppCreateQuotaRuleRequest,
     NetAppEnableQuotaRequest,
-    NetAppJobResponseCode,
     NetAppJobResult,
     NetAppQoSFixedPolicy,
     NetAppQoSPolicy,
@@ -33,8 +32,8 @@ from ai.backend.common.clients.storage_backends.netapp.dto import (
     NetAppQTreeQuery,
     NetAppQuotaConfig,
     NetAppQuotaReportQuery,
+    NetAppQuotaRule,
     NetAppQuotaRuleQuery,
-    NetAppQuotaSpaceLimit,
     NetAppQuotaUsage,
     NetAppSVMInfo,
     NetAppUpdateQuotaRuleRequest,
@@ -47,7 +46,6 @@ from ai.backend.common.clients.storage_backends.netapp.dto import (
     NetAppVolumeQoSQuery,
     NetAppVolumeQuery,
     NetAppXCPEntry,
-    NetAppXCPEntryType,
     NetAppXCPStat,
     NetAppXCPTreeUsage,
 )
@@ -57,6 +55,10 @@ from ai.backend.common.clients.storage_backends.netapp.exceptions import (
     NetAppXCPExecutionError,
     NetAppXCPInvalidPathError,
     NetAppXCPOutputNotAvailableError,
+)
+from ai.backend.common.clients.storage_backends.netapp.types import (
+    NetAppJobResponseCode,
+    NetAppXCPEntryType,
 )
 from ai.backend.common.types import BinarySize
 from ai.backend.logging.structured import StructuredLogger
@@ -92,8 +94,6 @@ class NetAppClientArgs:
     endpoint: str
     user: str
     password: str
-    user_id: int
-    group_id: int
 
 
 class NetAppClient:
@@ -102,16 +102,12 @@ class NetAppClient:
     _endpoint: str
     _user: str
     _password: str
-    _user_id: int
-    _group_id: int
     _session: aiohttp.ClientSession
 
     def __init__(self, args: NetAppClientArgs) -> None:
         self._endpoint = args.endpoint
         self._user = args.user
         self._password = args.password
-        self._user_id = args.user_id
-        self._group_id = args.group_id
         self._session = aiohttp.ClientSession(
             self._endpoint,
             connector=aiohttp.TCPConnector(ssl=False),
@@ -167,7 +163,7 @@ class NetAppClient:
 
     async def list_volumes(
         self, extra_fields: Sequence[str] | None = None
-    ) -> dict[UUID, NetAppVolumeInfo]:
+    ) -> list[NetAppVolumeInfo]:
         async with self.send_request(
             "get",
             "/api/storage/volumes",
@@ -176,11 +172,7 @@ class NetAppClient:
             ).model_dump(mode="json", by_alias=True),
         ) as resp:
             data = await resp.json()
-        items = {}
-        for record in data["records"]:
-            volume_info = _to_volume_info(record)
-            items[volume_info.uuid] = volume_info
-        return items
+        return [_to_volume_info(record) for record in data["records"]]
 
     async def get_volume_by_name(
         self,
@@ -285,45 +277,20 @@ class NetAppClient:
             return _to_qtree_info(data["records"][0])
         raise NetAppQTreeNotFoundError(f"No qtree {name} found in the volume {volume_id}")
 
-    async def create_qtree(
-        self,
-        svm_id: UUID,
-        volume_id: UUID,
-        qtree_name: str,
-    ) -> NetAppJobResult:
+    async def create_qtree(self, request: NetAppCreateQTreeRequest) -> NetAppJobResult:
         async with self.send_request(
             "post",
             "/api/storage/qtrees",
-            data=NetAppCreateQTreeRequest(
-                svm_uuid=svm_id,
-                volume_uuid=volume_id,
-                name=qtree_name,
-                user_id=self._user_id,
-                group_id=self._group_id,
-            ).model_dump(mode="json", by_alias=True),
+            data=request.model_dump(mode="json", by_alias=True),
         ) as resp:
             data = await resp.json()
         return await self.wait_job(data["job"]["uuid"])
 
-    async def set_quota_rule(
-        self,
-        svm_id: UUID,
-        volume_id: UUID,
-        qtree_name: str,
-        config: NetAppQuotaConfig,
-    ) -> NetAppJobResult:
+    async def set_quota_rule(self, request: NetAppCreateQuotaRuleRequest) -> NetAppJobResult:
         async with self.send_request(
             "post",
             "/api/storage/quota/rules",
-            data=NetAppCreateQuotaRuleRequest(
-                svm_uuid=svm_id,
-                volume_uuid=volume_id,
-                qtree_name=qtree_name,
-                space=NetAppQuotaSpaceLimit(
-                    hard_limit=config.limit_bytes,
-                    soft_limit=config.limit_bytes,
-                ),
-            ).model_dump(mode="json", by_alias=True),
+            data=request.model_dump(mode="json", by_alias=True),
         ) as resp:
             data = await resp.json()
         return await self.wait_job(data["job"]["uuid"])
@@ -333,7 +300,7 @@ class NetAppClient:
         svm_id: UUID,
         volume_id: UUID,
         qtree_name: str,
-    ) -> dict[str, Any]:
+    ) -> NetAppQuotaRule:
         async with self.send_request(
             "get",
             "/api/storage/quota/rules",
@@ -348,26 +315,20 @@ class NetAppClient:
             raise NetAppClientError(
                 f"Quota rule not found for the volume {volume_id} and the qtree {qtree_name}"
             )
-        result: dict[str, Any] = data["records"][0]
-        return result
+        return NetAppQuotaRule.model_validate(data["records"][0])
 
     async def update_quota_rule(
         self,
         svm_id: UUID,
         volume_id: UUID,
         qtree_name: str,
-        config: NetAppQuotaConfig,
+        request: NetAppUpdateQuotaRuleRequest,
     ) -> NetAppJobResult:
         record = await self._find_quota_rule(svm_id, volume_id, qtree_name)
         async with self.send_request(
             "patch",
-            f"/api/storage/quota/rules/{record['uuid']}",
-            data=NetAppUpdateQuotaRuleRequest(
-                space=NetAppQuotaSpaceLimit(
-                    hard_limit=config.limit_bytes,
-                    soft_limit=config.limit_bytes,
-                ),
-            ).model_dump(mode="json", by_alias=True),
+            f"/api/storage/quota/rules/{record.uuid}",
+            data=request.model_dump(mode="json", by_alias=True),
         ) as resp:
             data = await resp.json()
         return await self.wait_job(data["job"]["uuid"])
@@ -379,7 +340,11 @@ class NetAppClient:
         qtree_name: str,
     ) -> NetAppQuotaConfig:
         record = await self._find_quota_rule(svm_id, volume_id, qtree_name)
-        return NetAppQuotaConfig(limit_bytes=record["space"]["hard_limit"])
+        if record.space is None or record.space.hard_limit is None:
+            raise NetAppClientError(
+                f"Quota rule has no hard limit for the volume {volume_id} and the qtree {qtree_name}"
+            )
+        return NetAppQuotaConfig(limit_bytes=record.space.hard_limit)
 
     async def delete_quota_rule(
         self,
@@ -390,7 +355,7 @@ class NetAppClient:
         record = await self._find_quota_rule(svm_id, volume_id, qtree_name)
         async with self.send_request(
             "delete",
-            f"/api/storage/quota/rules/{record['uuid']}",
+            f"/api/storage/quota/rules/{record.uuid}",
         ) as resp:
             data = await resp.json()
         return await self.wait_job(data["job"]["uuid"])
@@ -398,14 +363,12 @@ class NetAppClient:
     async def enable_quota(
         self,
         volume_id: UUID,
-        enable: bool = True,
+        request: NetAppEnableQuotaRequest,
     ) -> NetAppJobResult:
         async with self.send_request(
             "patch",
             f"/api/storage/volumes/{volume_id}",
-            data=NetAppEnableQuotaRequest(quota_enabled=enable).model_dump(
-                mode="json", by_alias=True
-            ),
+            data=request.model_dump(mode="json", by_alias=True),
         ) as resp:
             data = await resp.json()
         return await self.wait_job(data["job"]["uuid"])

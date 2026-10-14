@@ -1,19 +1,11 @@
 from __future__ import annotations
 
-import enum
-from typing import NewType
-
 from pydantic import ConfigDict, Field
 
+from ai.backend.common.clients.storage_backends.vast.types import (
+    VASTQuotaID,
+)
 from ai.backend.common.types import BackendAISchema
-
-VASTQuotaID = NewType("VASTQuotaID", str)
-
-
-class APIVersion(enum.StrEnum):
-    V1 = "v1"
-    V2 = "v2"
-    LATEST = "latest"
 
 
 class VASTTokenPair(BackendAISchema):

@@ -8,7 +8,6 @@ from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
-from pathlib import Path
 from typing import Any, Final
 
 import aiohttp
@@ -16,14 +15,12 @@ import jwt
 from yarl import URL
 
 from ai.backend.common.clients.storage_backends.vast.dto import (
-    APIVersion,
     VASTCapacityUsage,
     VASTClusterInfo,
     VASTListQuotasQuery,
     VASTLoginRequest,
     VASTModifyQuotaRequest,
     VASTQuota,
-    VASTQuotaID,
     VASTRefreshTokenRequest,
     VASTSetQuotaRequest,
     VASTTokenPair,
@@ -37,6 +34,7 @@ from ai.backend.common.clients.storage_backends.vast.exceptions import (
     VASTUnauthorizedError,
     VASTUnknownError,
 )
+from ai.backend.common.clients.storage_backends.vast.types import APIVersion, VASTQuotaID
 from ai.backend.logging.structured import StructuredLogger
 
 log = StructuredLogger(logging.getLogger(__spec__.name))
@@ -63,7 +61,6 @@ class VASTAPIClientArgs:
     username: str
     password: str
     api_version: APIVersion
-    storage_base_dir: str
     cluster_info_cache_ttl: float
     ssl_context: ssl.SSLContext | bool = False
     force_login: bool = True
@@ -89,7 +86,6 @@ class VASTAPIClient:
     _username: str
     _password: str
     _ssl_context: ssl.SSLContext | bool
-    _storage_base_dir: Path
     _force_login: bool
     _cache_ttl: float
     _cache: _ClusterInfoCache | None
@@ -102,7 +98,6 @@ class VASTAPIClient:
         self._username = args.username
         self._password = args.password
         self._ssl_context = args.ssl_context
-        self._storage_base_dir = Path(args.storage_base_dir)
         self._force_login = args.force_login
         self._cache_ttl = args.cluster_info_cache_ttl
         self._cache = None
@@ -208,25 +203,8 @@ class VASTAPIClient:
             return None
         return VASTQuota.model_validate(data)
 
-    async def set_quota(
-        self,
-        path: Path,
-        soft_limit: int | None = None,
-        hard_limit: int | None = None,
-        soft_limit_inodes: int | None = None,
-        hard_limit_inodes: int | None = None,
-        grace_period: str | None = None,
-    ) -> VASTQuota:
-        body = VASTSetQuotaRequest(
-            name=str(path),
-            path=str(self._storage_base_dir / path.name),
-            create_dir=False,
-            soft_limit=soft_limit,
-            hard_limit=hard_limit,
-            soft_limit_inodes=soft_limit_inodes,
-            hard_limit_inodes=hard_limit_inodes,
-            grace_period=grace_period,
-        ).model_dump(mode="json", by_alias=True, exclude_none=True)
+    async def set_quota(self, request: VASTSetQuotaRequest) -> VASTQuota:
+        body = request.model_dump(mode="json", by_alias=True, exclude_none=True)
 
         async with self._request(RequestMethod.POST, "quotas/", body) as response:
             data: dict[str, Any] = await response.json()
@@ -248,19 +226,9 @@ class VASTAPIClient:
     async def modify_quota(
         self,
         vast_quota_id: VASTQuotaID,
-        soft_limit: int | None = None,
-        hard_limit: int | None = None,
-        soft_limit_inodes: int | None = None,
-        hard_limit_inodes: int | None = None,
-        grace_period: str | None = None,
+        request: VASTModifyQuotaRequest,
     ) -> VASTQuota:
-        body = VASTModifyQuotaRequest(
-            soft_limit=soft_limit,
-            hard_limit=hard_limit,
-            soft_limit_inodes=soft_limit_inodes,
-            hard_limit_inodes=hard_limit_inodes,
-            grace_period=grace_period,
-        ).model_dump(mode="json", by_alias=True, exclude_none=True)
+        body = request.model_dump(mode="json", by_alias=True, exclude_none=True)
 
         async with self._request(RequestMethod.PATCH, f"quotas/{vast_quota_id}/", body) as response:
             data: dict[str, Any] = await response.json()
