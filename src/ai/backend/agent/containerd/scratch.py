@@ -20,6 +20,7 @@ from ai.backend.logging.structured import StructuredLogger
 log = StructuredLogger(logging.getLogger(__spec__.name))
 
 TASK_LOG_NAME: Final = "task.log"
+TRUSTED_STORE_NAME: Final = "trusted-store.img"
 HOSTS_NAME: Final = "hosts"
 _HOST_HOSTS_FILE: Final = Path("/etc/hosts")
 _HOSTNAME_RE: Final = re.compile(r"[A-Za-z0-9]([A-Za-z0-9._-]*[A-Za-z0-9])?")
@@ -53,6 +54,11 @@ class ScratchDirs:
     def task_log(self) -> Path:
         """Task stdio goes here; it is not mounted into the container."""
         return self.root / TASK_LOG_NAME
+
+    @property
+    def trusted_store(self) -> Path:
+        """The sparse backing file of the trusted storage; it is not mounted either."""
+        return self.root / TRUSTED_STORE_NAME
 
 
 @dataclass(frozen=True)

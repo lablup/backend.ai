@@ -25,11 +25,13 @@ from ai.backend.agent.errors.containerd import (
     ContainerdOperationFailed,
     KernelVerbNotSupported,
     ProfileSpecRejected,
+    TrustedStorageUnavailable,
 )
 from ai.backend.agent.port_pool import PortPool
 from ai.backend.agent.resources import ComputerContext, KernelResourceSpec
 from ai.backend.agent.types import KernelOwnershipData
 from ai.backend.common.types import (
+    BinarySize,
     DeviceId,
     DeviceName,
     KernelCreationConfig,
@@ -38,7 +40,7 @@ from ai.backend.common.types import (
 )
 
 from .conftest import FakeProfile
-from .fakes import FakeContainerd
+from .fakes import FakeContainerd, FakeLosetup
 
 SLOTS = {SlotName("cpu"): Decimal(1), SlotName("mem"): Decimal(1024)}
 PORT_RANGE = (30000, 30009)
@@ -642,3 +644,110 @@ class TestStartContainer:
         assert len(pool) == 10
         assert fake.containers == {}
         assert fake.snapshots == {}
+
+
+class TestTrustedStorage:
+    SIZE = 4 * 2**20
+
+    def _context(
+        self,
+        tmp_path: Path,
+        ownership_data: KernelOwnershipData,
+        kernel_config: KernelCreationConfig,
+        computers: dict[DeviceName, ComputerContext],
+        profile: FakeProfile,
+        enabled: list[str],
+    ) -> ContainerdKernelCreationContext:
+        ctx = _make_context(
+            ownership_data, kernel_config, profile, scratch_root=tmp_path, computers=computers
+        )
+        ctx.local_config.containerd.trusted_storage_profiles = enabled
+        ctx.local_config.containerd.trusted_storage_size = BinarySize(self.SIZE)
+        return ctx
+
+    async def test_enabled_profile_gets_the_loop_device_in_the_launch(
+        self,
+        tmp_path: Path,
+        ownership_data: KernelOwnershipData,
+        launch_kernel_config: KernelCreationConfig,
+        launch_plan: LaunchPlan,
+        resource_spec: KernelResourceSpec,
+        computers: dict[DeviceName, ComputerContext],
+        losetup: FakeLosetup,
+    ) -> None:
+        profile = FakeProfile("coco-tdx", accepts=True, plan_result=launch_plan)
+        ctx = self._context(
+            tmp_path, ownership_data, launch_kernel_config, computers, profile, ["coco-tdx"]
+        )
+
+        await ctx.prepare_scratch()
+        await ctx.prepare_container(resource_spec, {}, [], MagicMock())
+
+        backing = (tmp_path / str(ownership_data.kernel_id)).resolve() / "trusted-store.img"
+        assert backing.stat().st_size == self.SIZE
+        assert losetup.loops == {str(backing): "/dev/loop0"}
+        assert profile.plan_calls[0].trusted_storage_path == Path("/dev/loop0")
+
+    async def test_profile_that_is_not_enabled_gets_none(
+        self,
+        tmp_path: Path,
+        ownership_data: KernelOwnershipData,
+        launch_kernel_config: KernelCreationConfig,
+        launch_plan: LaunchPlan,
+        resource_spec: KernelResourceSpec,
+        computers: dict[DeviceName, ComputerContext],
+        losetup: FakeLosetup,
+    ) -> None:
+        profile = FakeProfile("runc", accepts=True, plan_result=launch_plan)
+        ctx = self._context(
+            tmp_path, ownership_data, launch_kernel_config, computers, profile, ["coco-tdx"]
+        )
+
+        await ctx.prepare_scratch()
+        await ctx.prepare_container(resource_spec, {}, [], MagicMock())
+
+        assert profile.plan_calls[0].trusted_storage_path is None
+        assert losetup.calls == []
+
+    async def test_losetup_failure_fails_the_scratch_preparation(
+        self,
+        tmp_path: Path,
+        ownership_data: KernelOwnershipData,
+        launch_kernel_config: KernelCreationConfig,
+        launch_plan: LaunchPlan,
+        computers: dict[DeviceName, ComputerContext],
+        losetup: FakeLosetup,
+    ) -> None:
+        losetup.failing.add("--find")
+        profile = FakeProfile("coco-tdx", accepts=True, plan_result=launch_plan)
+        ctx = self._context(
+            tmp_path, ownership_data, launch_kernel_config, computers, profile, ["coco-tdx"]
+        )
+
+        with pytest.raises(TrustedStorageUnavailable):
+            await ctx.prepare_scratch()
+
+        assert not (tmp_path / str(ownership_data.kernel_id) / "trusted-store.img").exists()
+
+    async def test_failed_launch_releases_the_loop_device(
+        self,
+        tmp_path: Path,
+        ownership_data: KernelOwnershipData,
+        launch_kernel_config: KernelCreationConfig,
+        launch_plan: LaunchPlan,
+        resource_spec: KernelResourceSpec,
+        computers: dict[DeviceName, ComputerContext],
+        losetup: FakeLosetup,
+    ) -> None:
+        profile = FakeProfile("coco-tdx", accepts=True, plan_result=launch_plan)
+        ctx = self._context(
+            tmp_path, ownership_data, launch_kernel_config, computers, profile, ["coco-tdx"]
+        )
+        await ctx.prepare_scratch()
+        kernel = await ctx.prepare_container(resource_spec, {}, [], MagicMock())
+
+        with pytest.raises(ContainerdImageNotFound):
+            await ctx.start_container(kernel, [], None, [], MagicMock())
+
+        assert losetup.loops == {}
+        assert not (tmp_path / str(ownership_data.kernel_id) / "trusted-store.img").exists()

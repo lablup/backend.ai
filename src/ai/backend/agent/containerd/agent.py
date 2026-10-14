@@ -61,6 +61,10 @@ from ai.backend.agent.containerd.spec import (
     build_launch_spec,
     merge_env,
 )
+from ai.backend.agent.containerd.trusted_storage import (
+    attach_trusted_storage,
+    detach_trusted_storage,
+)
 from ai.backend.agent.errors import UnsupportedResource
 from ai.backend.agent.errors.agent import UnsupportedBaseDistroError
 from ai.backend.agent.errors.containerd import KernelVerbNotSupported
@@ -170,6 +174,7 @@ class ContainerdKernelCreationContext(AbstractKernelCreationContext[ContainerdKe
     _port_pool: PortPool
     _resource_lock: asyncio.Lock
     _dirs: ScratchDirs
+    _trusted_storage: Path | None
     _generated_mounts: list[GeneratedMount]
     _base_spec: dict[str, Any]
 
@@ -208,6 +213,7 @@ class ContainerdKernelCreationContext(AbstractKernelCreationContext[ContainerdKe
         self._dirs = ScratchDirs.for_kernel(
             local_config.container.scratch_root, str(ownership_data.kernel_id)
         )
+        self._trusted_storage = None
         self._generated_mounts = []
         self._base_spec = {}
 
@@ -269,6 +275,12 @@ class ContainerdKernelCreationContext(AbstractKernelCreationContext[ContainerdKe
                 clone_dotfiles=not self.restarting,
             ),
         )
+        config = self.local_config.containerd
+        # PROVISIONAL(trusted-storage): enabled per profile name; the profile gets the loop device
+        if self._profile.name in config.trusted_storage_profiles:
+            self._trusted_storage = await attach_trusted_storage(
+                self._dirs.trusted_store, int(config.trusted_storage_size)
+            )
 
     # Not mirrored from the Docker agent: the agent socket, domain-socket proxies, extra
     # Docker volumes and the memory-scratch /tmp.
@@ -388,7 +400,7 @@ class ContainerdKernelCreationContext(AbstractKernelCreationContext[ContainerdKe
             slots=self._slots,
             devices=(),  # no accelerator is accepted
             mounts=tuple(self._generated_mounts),
-            trusted_storage_path=None,
+            trusted_storage_path=self._trusted_storage,
             base_spec=self._base_spec,
         )
         launch_plan = self._profile.plan(launch)
@@ -498,6 +510,7 @@ class ContainerdKernelCreationContext(AbstractKernelCreationContext[ContainerdKe
         except BaseException:
             self._port_pool.release_many(host_ports)
             await self._free_allocations(kernel_obj.resource_spec)
+            await detach_trusted_storage(self._dirs.trusted_store)
             raise
         container = self.local_config.container
         return {
@@ -764,6 +777,7 @@ class ContainerdAgent(
                 except BackendAIError:
                     log.exception("container delete failed", container_id=container_id)
         if not restarting:
+            await detach_trusted_storage(dirs.trusted_store)
             await run_in_executor_with_context(
                 None, remove_scratch, self.local_config.container.scratch_root, str(kernel_id)
             )
