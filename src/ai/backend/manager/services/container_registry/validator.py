@@ -1,8 +1,7 @@
-"""The registry settings check only api/gql_legacy runs.
+"""The registry settings check api/gql_legacy and `seed/container_registry` run.
 
 The v2 path validates the url in its request DTO and leaves the Harbor project rule to
-`ck_container_registries_harbor_project`, so nothing here is reached from it. gql_legacy
-takes neither route; delete this file together with gql_legacy.
+`ck_container_registries_harbor_project`, so nothing here is reached from it.
 """
 
 from __future__ import annotations
