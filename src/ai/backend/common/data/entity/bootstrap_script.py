@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import re
 from typing import override
 
 from ai.backend.common.data.entity.types import DanglingFieldType, FieldIdentifier, FieldType
@@ -30,11 +29,7 @@ class BootstrapScriptID(FieldIdentifier):
 
 
 class BootstrapScript(str):
-    """Script text with LF line breaks and no surrounding whitespace."""
-
-    @classmethod
-    def from_text(cls, text: str) -> BootstrapScript:
-        return cls(re.sub(r"\r\n?", "\n", text).strip())
+    """The text of a bootstrap script."""
 
     @classmethod
     def empty(cls) -> BootstrapScript:

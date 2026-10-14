@@ -22,9 +22,12 @@ def upgrade() -> None:
         ),
         sa.Column("entity_type", sa.String(32), nullable=False),
         sa.Column("entity_id", postgresql.UUID(), nullable=False),
-        sa.Column("script", sa.String(64 * 1024), nullable=False, server_default=""),
+        sa.Column("script", sa.Text(), nullable=False, server_default=""),
         sa.Column("is_default", sa.Boolean(), nullable=False, server_default=sa.false()),
         sa.PrimaryKeyConstraint("id", name=op.f("pk_bootstrap_scripts")),
+        sa.CheckConstraint(
+            "char_length(script) <= 65536", name=op.f("ck_bootstrap_scripts_script_length")
+        ),
     )
     op.create_index(
         "uq_bootstrap_scripts_is_default",

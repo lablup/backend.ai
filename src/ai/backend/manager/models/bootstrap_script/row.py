@@ -23,6 +23,7 @@ class BootstrapScriptRow(Base):
             unique=True,
             postgresql_where=sa.text("is_default"),
         ),
+        sa.CheckConstraint(f"char_length(script) <= {MAXIMUM_DOTFILE_SIZE}", name="script_length"),
     )
 
     id: Mapped[BootstrapScriptID] = mapped_column(
@@ -33,9 +34,7 @@ class BootstrapScriptRow(Base):
     )
     entity_type: Mapped[EntityType] = mapped_column(sa.String(32), nullable=False)
     entity_id: Mapped[UUID] = mapped_column(GUID(), nullable=False)
-    script: Mapped[BootstrapScript] = mapped_column(
-        sa.String(MAXIMUM_DOTFILE_SIZE), nullable=False, server_default=""
-    )
+    script: Mapped[BootstrapScript] = mapped_column(sa.Text, nullable=False, server_default="")
     is_default: Mapped[bool] = mapped_column(sa.Boolean, nullable=False, server_default=false())
 
     def to_data(self) -> BootstrapScriptData:

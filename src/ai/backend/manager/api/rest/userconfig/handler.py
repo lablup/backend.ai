@@ -33,7 +33,7 @@ from ai.backend.common.dto.manager.config.response import (
 )
 from ai.backend.common.types import AccessKey
 from ai.backend.logging.structured import StructuredLogger
-from ai.backend.manager.data.dotfile.types import DotfileEntries, DotfileEntry
+from ai.backend.manager.data.dotfile.types import DotfileEntries, DotfileEntry, normalize_newlines
 from ai.backend.manager.dto.context import UserContext
 from ai.backend.manager.services.auth.actions.resolve_access_key_scope import (
     PublicResolveAccessKeyScopeAction,
@@ -168,7 +168,7 @@ class UserConfigHandler:
         await self._user.update_default_bootstrap_script.run(
             UpdateDefaultBootstrapScriptAction(
                 user_id=await self._owner(access_key),
-                script=BootstrapScript.from_text(body.parsed.script),
+                script=BootstrapScript(normalize_newlines(body.parsed.script).strip()),
             )
         )
         return APIResponse.build(HTTPStatus.OK, UpdateBootstrapScriptResponse())
