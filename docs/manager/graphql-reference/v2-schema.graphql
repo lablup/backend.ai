@@ -5911,13 +5911,13 @@ type EntitySharePayload {
 """Added in 26.9.0. Who an offer goes to; exactly one of the three."""
 input EntityShareRecipientInput @oneOf {
   """Project the offer goes to."""
-  projectId: UUID = null
+  projectId: UUID
 
   """Person the offer goes to; it lands in their own project."""
-  userId: UUID = null
+  userId: UUID
 
   """Address the offer goes to."""
-  email: String = null
+  email: String
 }
 
 """
