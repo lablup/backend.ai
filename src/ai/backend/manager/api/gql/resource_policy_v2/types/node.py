@@ -259,7 +259,17 @@ class UserResourcePolicyV2GQL(PydanticNodeMixin[UserResourcePolicyNode]):
         node_ids: Iterable[str],
         required: bool = False,
     ) -> Iterable[UserResourcePolicyV2GQL | None]:
-        return await info.context.data_loaders.user_resource_policy_loader.load_many(list(node_ids))
+        loaders = info.context.data_loaders
+        ids = await loaders.user_resource_policy_id_by_name_loader.load_many(list(node_ids))
+        found = [node_id for node_id in ids if node_id is not None]
+        by_id = dict(
+            zip(
+                found,
+                await loaders.user_resource_policy_by_id_loader.load_many(found),
+                strict=True,
+            )
+        )
+        return [by_id[node_id] if node_id is not None else None for node_id in ids]
 
 
 UserResourcePolicyV2Edge = Edge[UserResourcePolicyV2GQL]
@@ -314,9 +324,17 @@ class ProjectResourcePolicyV2GQL(PydanticNodeMixin[ProjectResourcePolicyNode]):
         node_ids: Iterable[str],
         required: bool = False,
     ) -> Iterable[ProjectResourcePolicyV2GQL | None]:
-        return await info.context.data_loaders.project_resource_policy_loader.load_many(
-            list(node_ids)
+        loaders = info.context.data_loaders
+        ids = await loaders.project_resource_policy_id_by_name_loader.load_many(list(node_ids))
+        found = [node_id for node_id in ids if node_id is not None]
+        by_id = dict(
+            zip(
+                found,
+                await loaders.project_resource_policy_by_id_loader.load_many(found),
+                strict=True,
+            )
         )
+        return [by_id[node_id] if node_id is not None else None for node_id in ids]
 
 
 ProjectResourcePolicyV2Edge = Edge[ProjectResourcePolicyV2GQL]

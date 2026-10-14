@@ -66,7 +66,11 @@ from ai.backend.common.data.entity.prometheus_query_preset_category import (
 from ai.backend.common.data.entity.replica import ReplicaID
 from ai.backend.common.data.entity.replica_group_history import ReplicaGroupHistoryID
 from ai.backend.common.data.entity.resource_group import ResourceGroupEntityType, ResourceGroupID
-from ai.backend.common.data.entity.resource_policy import KeyPairResourcePolicyUUID
+from ai.backend.common.data.entity.resource_policy import (
+    KeyPairResourcePolicyUUID,
+    ProjectResourcePolicyUUID,
+    UserResourcePolicyUUID,
+)
 from ai.backend.common.data.entity.resource_preset import ResourcePresetID
 from ai.backend.common.data.entity.retention_policy import RetentionPolicyID
 from ai.backend.common.data.entity.role import RoleEntityType, RoleID
@@ -1257,19 +1261,30 @@ class DataLoaders:
         return DataLoader(load_fn=load_fn)
 
     @cached_property
-    def project_resource_policy_loader(
+    def project_resource_policy_id_by_name_loader(
         self,
-    ) -> DataLoader[str, ProjectResourcePolicyV2GQL | None]:
+    ) -> DataLoader[str, ProjectResourcePolicyUUID | None]:
+        adapter = self._adapters.resource_policy
+
+        async def load_fn(names: list[str]) -> list[ProjectResourcePolicyUUID | None]:
+            return await adapter.bulk_lookup_project_resource_policy_names(names)
+
+        return DataLoader(load_fn=load_fn)
+
+    @cached_property
+    def project_resource_policy_by_id_loader(
+        self,
+    ) -> DataLoader[ProjectResourcePolicyUUID, ProjectResourcePolicyV2GQL | None]:
         adapter = self._adapters.resource_policy
 
         async def load_fn(
-            names: list[str],
+            ids: list[ProjectResourcePolicyUUID],
         ) -> list[ProjectResourcePolicyV2GQL | Exception | None]:
             from ai.backend.manager.api.gql.resource_policy_v2.types.node import (  # pants: no-infer-dep
                 ProjectResourcePolicyV2GQL as PRP,
             )
 
-            dtos = await adapter.batch_load_project_resource_policies_by_names(names)
+            dtos = await adapter.bulk_get_project_resource_policy_ids(ids)
             return [
                 dto if dto is None or isinstance(dto, Exception) else PRP.from_pydantic(dto)
                 for dto in dtos
@@ -1278,19 +1293,30 @@ class DataLoaders:
         return DataLoader(load_fn=load_fn)
 
     @cached_property
-    def user_resource_policy_loader(
+    def user_resource_policy_id_by_name_loader(
         self,
-    ) -> DataLoader[str, UserResourcePolicyV2GQL | None]:
+    ) -> DataLoader[str, UserResourcePolicyUUID | None]:
+        adapter = self._adapters.resource_policy
+
+        async def load_fn(names: list[str]) -> list[UserResourcePolicyUUID | None]:
+            return await adapter.bulk_lookup_user_resource_policy_names(names)
+
+        return DataLoader(load_fn=load_fn)
+
+    @cached_property
+    def user_resource_policy_by_id_loader(
+        self,
+    ) -> DataLoader[UserResourcePolicyUUID, UserResourcePolicyV2GQL | None]:
         adapter = self._adapters.resource_policy
 
         async def load_fn(
-            names: list[str],
+            ids: list[UserResourcePolicyUUID],
         ) -> list[UserResourcePolicyV2GQL | Exception | None]:
             from ai.backend.manager.api.gql.resource_policy_v2.types.node import (  # pants: no-infer-dep
                 UserResourcePolicyV2GQL as URP,
             )
 
-            dtos = await adapter.batch_load_user_resource_policies_by_names(names)
+            dtos = await adapter.bulk_get_user_resource_policy_ids(ids)
             return [
                 dto if dto is None or isinstance(dto, Exception) else URP.from_pydantic(dto)
                 for dto in dtos
