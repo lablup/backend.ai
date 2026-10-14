@@ -25,11 +25,12 @@ from aiohttp import web
 from authlib.common.security import generate_token  # pants: no-infer-dep
 from authlib.integrations.base_client.errors import OAuthError  # pants: no-infer-dep
 from authlib.integrations.httpx_client import AsyncOAuth2Client  # pants: no-infer-dep
-from authlib.jose import jwt as joseJWT  # pants: no-infer-dep
 from authlib.oauth2.rfc7523 import PrivateKeyJWT  # pants: no-infer-dep
 from authlib.oidc.core import CodeIDToken  # pants: no-infer-dep
 from cryptography import x509
 from cryptography.hazmat.primitives import hashes
+from joserfc import jwt as jose_jwt
+from joserfc.jwk import KeySet
 
 from ai.backend.common.cron import LocalCron, PeriodicTask
 from ai.backend.common.data.entity.domain import DomainName
@@ -450,9 +451,11 @@ class OIDCWebAppPlugin(WebappPlugin):
         except httpx.HTTPError as e:
             raise OpenIDProviderUnavailable from e
         try:
-            claims = joseJWT.decode(
-                token["id_token"], request.app["openid.jwks"], claims_cls=CodeIDToken
+            id_token = jose_jwt.decode(
+                token["id_token"],
+                KeySet.import_key_set(request.app["openid.jwks"]),
             )
+            claims = CodeIDToken(id_token.claims, id_token.header)
             claims.validate()
         except Exception as e:
             raise OpenIDAuthenticationFailed from e
