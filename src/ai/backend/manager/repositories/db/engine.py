@@ -12,6 +12,7 @@ import sqlalchemy as sa
 from sqlalchemy.engine import create_engine as _create_engine
 
 from ai.backend.common.db.connector import PrimaryMemberConnector
+from ai.backend.common.db.invalidator import FailedBeginInvalidator
 from ai.backend.common.exception import DatabaseError
 from ai.backend.common.json import ExtendedJSONEncoder
 from ai.backend.logging.structured import StructuredLogger
@@ -99,6 +100,7 @@ async def connect_database(
         ),
         _lock_conn_timeout=int(db_config.lock_conn_timeout),
     )
+    FailedBeginInvalidator().listen(db.sync_engine)
     yield db
     await db.dispose()
 

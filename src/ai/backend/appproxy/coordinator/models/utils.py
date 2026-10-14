@@ -40,6 +40,7 @@ from ai.backend.appproxy.coordinator.config import DBConfig
 from ai.backend.appproxy.coordinator.defs import LockID
 from ai.backend.appproxy.coordinator.errors import TransactionResultError
 from ai.backend.common.db.connector import PrimaryMemberConnector
+from ai.backend.common.db.invalidator import FailedBeginInvalidator
 from ai.backend.common.json import ExtendedJSONEncoder
 from ai.backend.common.types import Sentinel
 from ai.backend.logging.structured import StructuredLogger
@@ -385,6 +386,7 @@ async def connect_database(
             2,
         ),
     )
+    FailedBeginInvalidator().listen(db.sync_engine)
     yield db
     await db.dispose()
 
