@@ -61,6 +61,8 @@ class InMemoryIngressState(IngressReader, IngressWriter):
     async def remove(self, keys: Sequence[IngressKey]) -> None:
         for key in keys:
             self._ingresses.pop(key.frontend_key, None)
+            # remove assumes the key is deleted from every layer, so it is remembered missing.
+            await self.remember_missing(key.frontend_key)
 
     async def remember_missing(self, frontend_key: IngressFrontendKey) -> None:
         if self._negative_ttl is None:

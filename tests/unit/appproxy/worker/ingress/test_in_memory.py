@@ -180,6 +180,15 @@ class TestInMemoryIngressState:
         await state.remove([IngressKey(authority=AUTHORITY, frontend_key=STORED_KEY)])
         assert await state.get(STORED_KEY) is None
 
+    async def test_removed_key_is_remembered_missing(
+        self, negative_caching_state: InMemoryIngressState
+    ) -> None:
+        await negative_caching_state.remove([
+            IngressKey(authority=AUTHORITY, frontend_key=STORED_KEY)
+        ])
+        with pytest.raises(IngressNotFoundError):
+            await negative_caching_state.get(STORED_KEY)
+
     async def test_remove_ignores_a_key_not_stored(
         self, state: InMemoryIngressState, stored_ingress: Ingress
     ) -> None:
