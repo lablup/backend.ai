@@ -2,14 +2,16 @@
 
 from __future__ import annotations
 
+from collections.abc import Iterable
 from datetime import datetime
-from typing import TYPE_CHECKING, Annotated, Any
+from typing import TYPE_CHECKING, Annotated, Any, Self, cast, override
 from uuid import UUID
 
 import strawberry
 from strawberry import Info
 from strawberry.relay import Connection, Edge, NodeID
 
+from ai.backend.common.data.entity.entity_label import EntityLabelID
 from ai.backend.common.data.entity.types import EntityType, RuntimeEntityID
 from ai.backend.common.dto.manager.v2.entity_label.response import EntityLabelNode
 from ai.backend.manager.api.gql.decorators import (
@@ -74,6 +76,20 @@ class EntityLabelGQL(PydanticNodeMixin[EntityLabelNode]):
         return await info.context.data_loaders.entity_node_loader.load(
             RuntimeEntityID(EntityType(self.entity_type), self.entity_id)
         )
+
+    @classmethod
+    @override
+    async def resolve_nodes(  # type: ignore[override]  # Strawberry Node uses AwaitableOrValue overloads incompatible with async def
+        cls,
+        *,
+        info: Info[StrawberryGQLContext],
+        node_ids: Iterable[str],
+        required: bool = False,
+    ) -> Iterable[Self | None]:
+        results = await info.context.data_loaders.entity_label_loader.load_many([
+            EntityLabelID(UUID(nid)) for nid in node_ids
+        ])
+        return cast(list[Self | None], results)
 
 
 EntityLabelEdge = Edge[EntityLabelGQL]

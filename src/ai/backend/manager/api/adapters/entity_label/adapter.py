@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from collections.abc import Sequence
+
 from ai.backend.common.data.entity.entity_label import EntityLabelID, EntityLabelKey
 from ai.backend.common.data.entity.types import RuntimeEntityID
 from ai.backend.common.dto.manager.v2.entity.types import EntityTarget
@@ -37,6 +39,9 @@ from ai.backend.manager.models.entity_label.row import EntityLabelRow
 from ai.backend.manager.models.entity_label.searchable_fields import EntityLabelSearchableFields
 from ai.backend.manager.models.entity_label.searchers import EntityLabelSearcher
 from ai.backend.manager.models.entity_label.upserters import EntityLabelUpserter
+from ai.backend.manager.services.entity_label.actions.partial_bulk_get import (
+    PartialBulkGetEntityLabelAction,
+)
 from ai.backend.manager.services.entity_label.actions.partial_bulk_purge import (
     PartialBulkPurgeEntityLabelAction,
 )
@@ -147,6 +152,19 @@ class EntityLabelAdapter(BaseAdapter):
                 for label_id in label_ids
                 if label_id in action_result.errors
             ],
+        )
+
+    async def batch_load_by_ids(
+        self, ids: Sequence[EntityLabelID]
+    ) -> list[EntityLabelNode | Exception | None]:
+        """Batch load labels for DataLoader use, checked per labeled entity."""
+        if not ids:
+            return []
+        return await self.batch_load_fields(
+            self._entity_label.partial_bulk_get,
+            PartialBulkGetEntityLabelAction(label_ids=ids),
+            ids,
+            self._data_to_node,
         )
 
     async def search(self, input: SearchEntityLabelsInput) -> SearchEntityLabelsPayload:

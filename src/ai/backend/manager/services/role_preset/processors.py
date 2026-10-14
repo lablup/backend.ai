@@ -29,6 +29,9 @@ from ai.backend.manager.services.role_preset.actions.bulk_add_permissions import
     BulkAddRolePermissionPresetsAction,
 )
 from ai.backend.manager.services.role_preset.actions.bulk_get import BulkGetRolePresetsAction
+from ai.backend.manager.services.role_preset.actions.bulk_get_permissions import (
+    BulkGetRolePermissionPresetsAction,
+)
 from ai.backend.manager.services.role_preset.actions.bulk_purge import (
     BulkPurgeRolePresetsAction,
 )
@@ -81,6 +84,9 @@ class RolePresetProcessors:
     search_permission_presets: BulkActionProcessor[
         SearchRolePermissionPresetsAction, ScopedFieldsOpsResult[RolePermissionPresetData]
     ]
+    bulk_get_permissions: PartialBulkFieldActionProcessor[
+        BulkGetRolePermissionPresetsAction, RolePermissionPresetData
+    ]
     bulk_add_permissions: SingleEntityActionProcessor[
         BulkAddRolePermissionPresetsAction, FieldsOpsResult[RolePermissionPresetData]
     ]
@@ -111,6 +117,9 @@ class RolePresetProcessors:
         )
         self.search_permission_presets = permissions.atomic_bulk_scoped_search_ops(
             SearchRolePermissionPresetsAction
+        )
+        self.bulk_get_permissions = permissions.partial_bulk_get_ops(
+            BulkGetRolePermissionPresetsAction
         )
         self.bulk_add_permissions = preset_group.single_entity(
             BulkAddRolePermissionPresetsAction, service.bulk_add_permissions

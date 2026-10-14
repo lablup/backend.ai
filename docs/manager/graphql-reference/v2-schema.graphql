@@ -12408,6 +12408,11 @@ type Query {
   """
   node(id: ID!): Node @override(from: "graphene")
 
+  """
+  Added in 26.10.0. Relay Global Object Identification: resolve Nodes by their global IDs, in the given order. An ID matching no node, or one the caller may not read, is null.
+  """
+  nodes(ids: [ID!]!): [Node]!
+
   """Added in 25.15.0. Get aggregate agent resource statistics"""
   agentStats: AgentStats
 

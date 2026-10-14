@@ -2,14 +2,17 @@
 
 from __future__ import annotations
 
+from collections.abc import Iterable
 from datetime import datetime
 from enum import StrEnum
-from typing import Self
+from typing import Self, override
 from uuid import UUID
 
+from strawberry import Info
 from strawberry.relay import NodeID
 from strawberry.scalars import JSON
 
+from ai.backend.common.data.entity.service_catalog import ServiceCatalogID
 from ai.backend.common.dto.manager.v2.service_catalog.request import (
     ServiceCatalogFilter as ServiceCatalogFilterDTO,
 )
@@ -39,6 +42,7 @@ from ai.backend.manager.api.gql.pydantic_compat import (
     PydanticNodeMixin,
     PydanticOutputMixin,
 )
+from ai.backend.manager.api.gql.types import StrawberryGQLContext
 
 __all__ = (
     "ServiceCatalogEndpointGQL",
@@ -110,6 +114,19 @@ class ServiceCatalogGQL(PydanticNodeMixin[ServiceCatalogNode]):
     endpoints: list[ServiceCatalogEndpointGQL] = gql_field(
         description="Endpoints exposed by this service instance."
     )
+
+    @classmethod
+    @override
+    async def resolve_nodes(  # type: ignore[override]  # Strawberry Node uses AwaitableOrValue overloads incompatible with async def
+        cls,
+        *,
+        info: Info[StrawberryGQLContext],
+        node_ids: Iterable[str],
+        required: bool = False,
+    ) -> Iterable[ServiceCatalogGQL | None]:
+        return await info.context.data_loaders.service_catalog_loader.load_many([
+            ServiceCatalogID(UUID(nid)) for nid in node_ids
+        ])
 
 
 @gql_enum(

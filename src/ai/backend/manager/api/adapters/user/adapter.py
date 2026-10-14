@@ -129,6 +129,8 @@ from ai.backend.manager.models.user.updaters import UserUpdater
 from ai.backend.manager.services.domain.actions.lookup import LookupDomainAction
 from ai.backend.manager.services.user.actions.bulk_get import BulkGetUsersAction
 from ai.backend.manager.services.user.actions.bulk_lookup import BulkLookupUsersAction
+from ai.backend.manager.services.user.actions.bulk_get_keypairs import BulkGetKeypairsAction
+from ai.backend.manager.services.user.actions.bulk_lookup_keypairs import BulkLookupKeypairsAction
 from ai.backend.manager.services.user.actions.create_user import (
     BulkCreateUserAction,
     CreateUserAction,
@@ -242,6 +244,34 @@ class UserAdapter(BaseAdapter):
             return []
         lookup = await self._user.bulk_lookup.run(BulkLookupUsersAction(emails=list(emails)))
         return [lookup.resolved.get(email) or lookup.failures[email] for email in emails]
+
+    async def bulk_lookup_keypair_access_keys(
+        self, access_keys: Sequence[str]
+    ) -> list[KeyPairID | None]:
+        """The id of the keypair each access key names, ``None`` for a key matching none.
+
+        Checks the login only: the read the ids are passed to checks the permission.
+        """
+        if not access_keys:
+            return []
+        keys = [AccessKey(access_key) for access_key in access_keys]
+        lookup = await self._user.bulk_lookup_keypairs.run(
+            BulkLookupKeypairsAction(access_keys=keys)
+        )
+        return [lookup.resolved.get(key) for key in keys]
+
+    async def bulk_get_keypair_ids(
+        self, ids: Sequence[KeyPairID]
+    ) -> list[KeypairNode | Exception | None]:
+        """Batch load keypairs by id for DataLoader use, checked per owning user."""
+        if not ids:
+            return []
+        return await self.batch_load_fields(
+            self._user.bulk_get_keypairs,
+            BulkGetKeypairsAction(ids=list(ids)),
+            ids,
+            self._keypair_data_to_node,
+        )
 
     # ------------------------------------------------------------------ GQL search (cursor-based)
 

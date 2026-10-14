@@ -577,7 +577,7 @@ from .legacy_node_stubs import (
 from .legacy_node_stubs import (
     NetworkNodeStub as _NetworkNodeStub,
 )
-from .node_field import node
+from .node_field import node, nodes
 from .object_storage import (
     create_object_storage,
     delete_object_storage,
@@ -637,8 +637,9 @@ from .vfs_storage import (
 
 @strawberry.type
 class Query:
-    # Relay Global Object Identification entry point (resolves any Node by global ID)
+    # Relay Global Object Identification entry points (resolve Nodes by global ID)
     node = node
+    nodes = nodes
     agent_stats = agent_stats
     agents_v2 = agents_v2
     admin_app_config_allow_list = admin_app_config_allow_list

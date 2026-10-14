@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Sequence
 from datetime import timedelta
 from typing import assert_never
 
@@ -33,6 +34,9 @@ from ai.backend.manager.models.retention.searchable_fields import (
 from ai.backend.manager.models.retention.searchers import RetentionPolicySearcher
 from ai.backend.manager.models.retention.updaters import RetentionPolicyUpdater
 from ai.backend.manager.models.specs.searcher import GlobalSearcher
+from ai.backend.manager.services.retention_policy.actions.bulk_get import (
+    BulkGetRetentionPoliciesAction,
+)
 from ai.backend.manager.services.retention_policy.actions.create import (
     CreateRetentionPolicyAction,
 )
@@ -97,6 +101,20 @@ class RetentionPolicyAdapter(BaseAdapter):
     async def get(self, policy_id: RetentionPolicyID) -> RetentionPolicyNode:
         result = await self._retention_policy.get.run(GetRetentionPolicyAction(policy_id=policy_id))
         return self._data_to_node(result.data)
+
+    async def batch_load_by_ids(
+        self, ids: Sequence[RetentionPolicyID]
+    ) -> list[RetentionPolicyNode | Exception | None]:
+        """Batch load retention policies by id for DataLoader use, one answer per id."""
+        if not ids:
+            return []
+        result = await self._retention_policy.bulk_get.run(BulkGetRetentionPoliciesAction(ids=ids))
+        return [
+            self._data_to_node(item.value)
+            if item.value is not None
+            else self.batch_load_failure(item.error)
+            for item in result.items
+        ]
 
     async def create(
         self,

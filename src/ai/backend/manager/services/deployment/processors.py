@@ -108,6 +108,9 @@ from ai.backend.manager.services.deployment.actions.deployment_policy.get_deploy
     GetDeploymentPolicyAction,
     GetDeploymentPolicyActionResult,
 )
+from ai.backend.manager.services.deployment.actions.deployment_policy.partial_bulk_get_deployment_policies import (
+    PartialBulkGetDeploymentPoliciesAction,
+)
 from ai.backend.manager.services.deployment.actions.deployment_policy.search_deployment_policies import (
     SearchDeploymentPoliciesAction,
 )
@@ -360,6 +363,9 @@ class DeploymentProcessors:
     bulk_get_deployment_policies: BulkActionProcessor[
         BulkGetDeploymentPoliciesAction, OwnedFieldsOpsResult[DeploymentID, DeploymentPolicyData]
     ]
+    partial_bulk_get_deployment_policies: PartialBulkFieldActionProcessor[
+        PartialBulkGetDeploymentPoliciesAction, DeploymentPolicyData
+    ]
 
     global_search_replicas: GlobalActionProcessor[
         GlobalSearchReplicasAction, BatchOpsResult[ModelReplicaData]
@@ -431,6 +437,9 @@ class DeploymentProcessors:
         )
         self.bulk_get_deployment_policies = policies.atomic_bulk_get_ops(
             BulkGetDeploymentPoliciesAction
+        )
+        self.partial_bulk_get_deployment_policies = policies.partial_bulk_get_ops(
+            PartialBulkGetDeploymentPoliciesAction
         )
         self.lookup_auto_scaling_rule_deployment = group.key_owner_lookup_ops(
             LookupAutoScalingRuleDeploymentAction

@@ -2,9 +2,10 @@
 
 from __future__ import annotations
 
+from collections.abc import Iterable
 from datetime import datetime
 from enum import StrEnum
-from typing import TYPE_CHECKING, Annotated, Self
+from typing import TYPE_CHECKING, Annotated, Self, override
 from uuid import UUID
 
 import strawberry
@@ -13,6 +14,7 @@ from strawberry.relay import Connection, Edge, NodeID
 from strawberry.scalars import JSON
 
 from ai.backend.common.config import DEFAULT_SHELL
+from ai.backend.common.data.entity.deployment_preset import DeploymentPresetID
 from ai.backend.common.data.entity.image import ImageID
 from ai.backend.common.data.entity.runtime_variant import RuntimeVariantID
 from ai.backend.common.data.model_deployment.types import DeploymentStrategy
@@ -476,6 +478,19 @@ class DeploymentRevisionPresetGQL(PydanticNodeMixin[NodeDTO]):
             ),
         )
         return [AllocatedResourceSlotGQL.from_pydantic(item) for item in payload.items]
+
+    @classmethod
+    @override
+    async def resolve_nodes(  # type: ignore[override]  # Strawberry Node uses AwaitableOrValue overloads incompatible with async def
+        cls,
+        *,
+        info: Info[StrawberryGQLContext],
+        node_ids: Iterable[str],
+        required: bool = False,
+    ) -> Iterable[DeploymentRevisionPresetGQL | None]:
+        return await info.context.data_loaders.revision_preset_loader.load_many([
+            DeploymentPresetID(UUID(nid)) for nid in node_ids
+        ])
 
 
 DeploymentRevisionPresetEdge = Edge[DeploymentRevisionPresetGQL]

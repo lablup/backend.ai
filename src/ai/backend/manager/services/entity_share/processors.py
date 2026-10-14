@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from ai.backend.manager.actions.registry.group import ProcessorGroup
+from ai.backend.manager.actions.v2.bulk.partial_processor import PartialBulkActionProcessor
 from ai.backend.manager.actions.v2.ops.result import (
     EntityOpsResult,
     ScopedBatchOpsResult,
@@ -18,6 +19,7 @@ from ai.backend.manager.services.entity_share.actions.answer import (
     RevokeEntityShareAction,
     RevokeEntityShareActionResult,
 )
+from ai.backend.manager.services.entity_share.actions.bulk_get import BulkGetEntitySharesAction
 from ai.backend.manager.services.entity_share.actions.create import (
     CreateEntityShareAction,
     CreateEntityShareActionResult,
@@ -38,6 +40,7 @@ class EntityShareProcessors:
 
     create: ScopeActionProcessor[CreateEntityShareAction, CreateEntityShareActionResult]
     get: SingleEntityActionProcessor[GetEntityShareAction, EntityOpsResult[EntityShareData]]
+    bulk_get: PartialBulkActionProcessor[BulkGetEntitySharesAction, EntityShareData]
     search: ScopeActionProcessor[SearchEntitySharesAction, ScopedBatchOpsResult[EntityShareData]]
     accept: ScopeActionProcessor[AcceptEntityShareAction, EntityShareAnswerResult]
     reject: ScopeActionProcessor[RejectEntityShareAction, EntityShareAnswerResult]
@@ -52,6 +55,7 @@ class EntityShareProcessors:
     ) -> None:
         self.create = group.scope(CreateEntityShareAction, service.create)
         self.get = group.single_get_ops(GetEntityShareAction)
+        self.bulk_get = group.partial_bulk_get_ops(BulkGetEntitySharesAction)
         self.search = group.scoped_search_ops(SearchEntitySharesAction)
         self.accept = group.scope(AcceptEntityShareAction, service.accept)
         self.reject = group.scope(RejectEntityShareAction, service.reject)

@@ -6,15 +6,19 @@ import uuid
 from collections.abc import AsyncGenerator
 
 import pytest
+import sqlalchemy as sa
 
-from ai.backend.common.data.entity.audit_log import AuditLogID
+from ai.backend.common.data.entity.audit_log import AuditLogID, AuditLogScopeID
 from ai.backend.common.data.entity.project import ProjectEntityType
 from ai.backend.common.data.entity.session import SessionEntityType
 from ai.backend.common.data.entity.types import EntityType, RuntimeEntityID
 from ai.backend.common.data.entity.user import UserEntityType
 from ai.backend.manager.actions.types import ActionKind, OperationStatus
 from ai.backend.manager.data.audit_log.types import AuditLogData
-from ai.backend.manager.models.audit_log.owner_candidates import AuditLogOwnerCandidates
+from ai.backend.manager.models.audit_log.owner_candidates import (
+    AuditLogOwnerCandidates,
+    AuditLogScopeOwnerCandidates,
+)
 from ai.backend.manager.models.audit_log.row import AuditLogRow
 from ai.backend.manager.models.audit_log.scope_row import AuditLogScopeRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
@@ -125,6 +129,52 @@ class TestAuditLogOwnerCandidates:
     ) -> None:
         candidates = await repository.field_owner_candidates(
             AuditLogOwnerCandidates(), [AuditLogID(uuid.uuid4())]
+        )
+
+        assert candidates == {}
+
+    async def _scope_ids_of(
+        self, db: ExtendedAsyncSAEngine, row_id: AuditLogID
+    ) -> list[AuditLogScopeID]:
+        async with db.begin_readonly_session() as db_sess:
+            result = await db_sess.scalars(
+                sa.select(AuditLogScopeRow.id).where(AuditLogScopeRow.audit_log_id == row_id)
+            )
+            return list(result)
+
+    async def test_a_scope_entry_names_the_owners_of_its_record(
+        self, db_with_cleanup: ExtendedAsyncSAEngine, repository: OpsRepository[AuditLogData]
+    ) -> None:
+        session_id, project_id, user_id = uuid.uuid4(), uuid.uuid4(), uuid.uuid4()
+        other_user_id = uuid.uuid4()
+        row_id = await self._insert_row(
+            db_with_cleanup,
+            action_kind=ActionKind.SCOPE,
+            entity_type=SessionEntityType(),
+            entity_id=session_id,
+            triggered_by=str(user_id),
+            scopes=[(ProjectEntityType(), project_id), (UserEntityType(), other_user_id)],
+        )
+        scope_ids = await self._scope_ids_of(db_with_cleanup, row_id)
+
+        candidates = await repository.field_owner_candidates(
+            AuditLogScopeOwnerCandidates(), scope_ids
+        )
+
+        expected = {
+            RuntimeEntityID(SessionEntityType(), session_id),
+            RuntimeEntityID(ProjectEntityType(), project_id),
+            RuntimeEntityID(UserEntityType(), other_user_id),
+            RuntimeEntityID(UserEntityType(), user_id),
+        }
+        assert len(scope_ids) == 2
+        assert all(set(candidates[scope_id]) == expected for scope_id in scope_ids)
+
+    async def test_an_absent_scope_entry_has_no_candidate(
+        self, db_with_cleanup: ExtendedAsyncSAEngine, repository: OpsRepository[AuditLogData]
+    ) -> None:
+        candidates = await repository.field_owner_candidates(
+            AuditLogScopeOwnerCandidates(), [AuditLogScopeID(uuid.uuid4())]
         )
 
         assert candidates == {}

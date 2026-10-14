@@ -2,8 +2,9 @@
 
 from __future__ import annotations
 
+from collections.abc import Iterable
 from datetime import datetime
-from typing import Any
+from typing import Any, override
 from uuid import UUID
 
 from strawberry import Info
@@ -125,6 +126,19 @@ class RolePresetGQL(PydanticNodeMixin[RolePresetNode]):
             ),
             count=result.total_count,
         )
+
+    @classmethod
+    @override
+    async def resolve_nodes(  # type: ignore[override]  # Strawberry Node uses AwaitableOrValue overloads incompatible with async def
+        cls,
+        *,
+        info: Info[StrawberryGQLContext],
+        node_ids: Iterable[str],
+        required: bool = False,
+    ) -> Iterable[RolePresetGQL | None]:
+        return await info.context.data_loaders.role_preset_loader.load_many([
+            RolePresetID(UUID(nid)) for nid in node_ids
+        ])
 
 
 RolePresetEdge = Edge[RolePresetGQL]

@@ -86,6 +86,8 @@ idle check status and deadline. Of the two ways to expose them, a connection of 
 
 - The v2 schema's root `node(id: ID!): Node` reads every type implementing Node by id. Blocking it means failing
   that lookup, which breaks the Node contract of refetching from the id alone.
+- `DomainFairShare`, `ProjectFairShare` and `UserFairShare` are computed per (resource group, scope) pair and
+  have no row id. `node(id:)` and `nodes(ids:)` answer their ids with `null`, not an error.
 - An `id` visible in the schema gets stored by clients and turns into requests to change rows by id.
 - Node's benefit, client cache normalization, matters little here: relation values are shown inside the parent
   connection and a changed value comes back in the mutation payload.

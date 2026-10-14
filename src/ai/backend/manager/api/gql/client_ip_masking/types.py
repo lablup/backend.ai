@@ -1,12 +1,15 @@
 from __future__ import annotations
 
+from collections.abc import Iterable
 from datetime import datetime
 from enum import StrEnum
-from typing import Any
+from typing import Any, override
 from uuid import UUID
 
+from strawberry import Info
 from strawberry.relay import Connection, Edge, NodeID
 
+from ai.backend.common.data.entity.client_ip_masking import ClientIPMaskingPolicyID
 from ai.backend.common.dto.manager.v2.client_ip_masking.request import (
     AdminUpsertClientIPMaskingPolicyInput as UpsertInputDTO,
 )
@@ -36,6 +39,7 @@ from ai.backend.manager.api.gql.decorators import (
     gql_pydantic_type,
 )
 from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin, PydanticOutputMixin
+from ai.backend.manager.api.gql.types import StrawberryGQLContext
 
 
 @gql_enum(
@@ -114,6 +118,19 @@ class ClientIPMaskingPolicyGQL(PydanticNodeMixin[NodeDTO]):
     )
     created_at: datetime = gql_field(description="Timestamp when the policy was first written.")
     updated_at: datetime = gql_field(description="Timestamp when the policy was last changed.")
+
+    @classmethod
+    @override
+    async def resolve_nodes(  # type: ignore[override]  # Strawberry Node uses AwaitableOrValue overloads incompatible with async def
+        cls,
+        *,
+        info: Info[StrawberryGQLContext],
+        node_ids: Iterable[str],
+        required: bool = False,
+    ) -> Iterable[ClientIPMaskingPolicyGQL | None]:
+        return await info.context.data_loaders.client_ip_masking_policy_loader.load_many([
+            ClientIPMaskingPolicyID(UUID(nid)) for nid in node_ids
+        ])
 
 
 @gql_pydantic_input(

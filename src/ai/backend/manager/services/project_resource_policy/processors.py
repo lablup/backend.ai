@@ -2,10 +2,13 @@ from __future__ import annotations
 
 from ai.backend.common.data.entity.resource_policy import ProjectResourcePolicyUUID
 from ai.backend.manager.actions.registry.group import ProcessorGroup
+from ai.backend.manager.actions.v2.bulk.partial_processor import PartialBulkActionProcessor
 from ai.backend.manager.actions.v2.global_scope.processor import GlobalActionProcessor
+from ai.backend.manager.actions.v2.lookup.bulk_processor import BulkLookupActionProcessor
 from ai.backend.manager.actions.v2.lookup.processor import LookupActionProcessor
 from ai.backend.manager.actions.v2.ops.result import (
     BatchOpsResult,
+    BulkLookupOpsResult,
     CreatedEntityOpsResult,
     EntityOpsResult,
     LookupOpsResult,
@@ -16,6 +19,12 @@ from ai.backend.manager.actions.v2.single_entity.processor import (
     SingleEntityActionProcessor,
 )
 from ai.backend.manager.data.resource.types import ProjectResourcePolicyData
+from ai.backend.manager.services.project_resource_policy.actions.bulk_get import (
+    BulkGetProjectResourcePoliciesAction,
+)
+from ai.backend.manager.services.project_resource_policy.actions.bulk_lookup import (
+    BulkLookupProjectResourcePoliciesAction,
+)
 from ai.backend.manager.services.project_resource_policy.actions.create_project_resource_policy import (
     CreateProjectResourcePolicyAction,
 )
@@ -48,6 +57,12 @@ class ProjectResourcePolicyProcessors:
     lookup: LookupActionProcessor[
         LookupProjectResourcePolicyAction, LookupOpsResult[ProjectResourcePolicyUUID]
     ]
+    bulk_lookup_names: BulkLookupActionProcessor[
+        BulkLookupProjectResourcePoliciesAction, BulkLookupOpsResult[str, ProjectResourcePolicyUUID]
+    ]
+    bulk_get_ids: PartialBulkActionProcessor[
+        BulkGetProjectResourcePoliciesAction, ProjectResourcePolicyData
+    ]
     search: ScopeActionProcessor[
         SearchProjectResourcePoliciesAction, ScopedBatchOpsResult[ProjectResourcePolicyData]
     ]
@@ -67,6 +82,10 @@ class ProjectResourcePolicyProcessors:
     def __init__(self, group: ProcessorGroup[ProjectResourcePolicyData]) -> None:
         self.get = group.single_get_ops(GetProjectResourcePolicyAction)
         self.lookup = group.lookup_ops(LookupProjectResourcePolicyAction)
+        self.bulk_lookup_names = group.public_bulk_lookup_ops(
+            BulkLookupProjectResourcePoliciesAction
+        )
+        self.bulk_get_ids = group.partial_bulk_get_ops(BulkGetProjectResourcePoliciesAction)
         self.search = group.scoped_search_ops(SearchProjectResourcePoliciesAction)
         self.global_search = group.global_searcher_ops(GlobalSearchProjectResourcePoliciesAction)
         self.global_create = group.global_create_ops(CreateProjectResourcePolicyAction)

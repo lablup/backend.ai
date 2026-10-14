@@ -2,8 +2,9 @@
 
 from __future__ import annotations
 
+from collections.abc import Iterable
 from datetime import datetime
-from typing import TYPE_CHECKING, Annotated, Any
+from typing import TYPE_CHECKING, Annotated, Any, override
 from uuid import UUID
 
 import strawberry
@@ -91,6 +92,21 @@ class KeyPairGQL(PydanticNodeMixin[KeypairNode]):
         | None
     ):
         return await info.context.data_loaders.user_loader.load(UserID(self.user_id))
+
+    @classmethod
+    @override
+    async def resolve_nodes(  # type: ignore[override]  # Strawberry Node uses AwaitableOrValue overloads incompatible with async def
+        cls,
+        *,
+        info: Info[StrawberryGQLContext],
+        node_ids: Iterable[str],
+        required: bool = False,
+    ) -> Iterable[KeyPairGQL | None]:
+        loaders = info.context.data_loaders
+        ids = await loaders.keypair_id_by_access_key_loader.load_many(list(node_ids))
+        found = [node_id for node_id in ids if node_id is not None]
+        by_id = dict(zip(found, await loaders.keypair_by_id_loader.load_many(found), strict=True))
+        return [by_id[node_id] if node_id is not None else None for node_id in ids]
 
 
 KeyPairEdge = Edge[KeyPairGQL]

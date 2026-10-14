@@ -6,7 +6,7 @@ import uuid
 from collections.abc import Sequence
 from typing import assert_never
 
-from ai.backend.common.data.entity.audit_log import AuditLogID
+from ai.backend.common.data.entity.audit_log import AuditLogID, AuditLogScopeID
 from ai.backend.common.data.entity.types import EntityType, RuntimeEntityID
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.dto.manager.v2.audit_log.request import (
@@ -61,6 +61,9 @@ from ai.backend.manager.models.condition_utils import (
 )
 from ai.backend.manager.models.specs.searcher import GlobalSearcher
 from ai.backend.manager.services.audit_log.actions.bulk_get import BulkGetAuditLogsAction
+from ai.backend.manager.services.audit_log.actions.bulk_get_scopes import (
+    BulkGetAuditLogScopesAction,
+)
 from ai.backend.manager.services.audit_log.actions.scoped_search import (
     ScopedSearchAuditLogsAction,
 )
@@ -101,6 +104,19 @@ class AuditLogAdapter(BaseAdapter):
             BulkGetAuditLogsAction(ids=audit_log_ids),
             audit_log_ids,
             self._data_to_node,
+        )
+
+    async def batch_load_scopes_by_ids(
+        self, ids: Sequence[AuditLogScopeID]
+    ) -> list[AuditLogScopeEntryNode | Exception | None]:
+        """Batch load scope entries for DataLoader use, checked per owner of each record."""
+        if not ids:
+            return []
+        return await self.batch_load_fields(
+            self._audit_log.bulk_get_scopes,
+            BulkGetAuditLogScopesAction(ids=ids),
+            ids,
+            self._scope_data_to_node,
         )
 
     async def admin_search(self, input: AdminSearchAuditLogsInput) -> SearchAuditLogsPayload:

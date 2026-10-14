@@ -1,13 +1,15 @@
 from __future__ import annotations
 
+from collections.abc import Iterable
 from datetime import datetime
 from enum import StrEnum
-from typing import Self
+from typing import Self, override
 from uuid import UUID
 
-from strawberry import UNSET
+from strawberry import UNSET, Info
 from strawberry.relay import Connection, Edge, NodeID
 
+from ai.backend.common.data.entity.runtime_variant import RuntimeVariantID
 from ai.backend.common.dto.manager.v2.runtime_variant.request import (
     CreateRuntimeVariantInput as CreateRuntimeVariantInputDTO,
 )
@@ -76,6 +78,7 @@ from ai.backend.manager.api.gql.deployment.types.revision import (
     PreStartActionGQL,
 )
 from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin, PydanticOutputMixin
+from ai.backend.manager.api.gql.types import StrawberryGQLContext
 
 
 @gql_enum(
@@ -202,6 +205,19 @@ class RuntimeVariantGQL(PydanticNodeMixin[RuntimeVariantNodeDTO]):
     updated_at: datetime | None = gql_field(
         description="Timestamp of the last modification to this runtime variant."
     )
+
+    @classmethod
+    @override
+    async def resolve_nodes(  # type: ignore[override]  # Strawberry Node uses AwaitableOrValue overloads incompatible with async def
+        cls,
+        *,
+        info: Info[StrawberryGQLContext],
+        node_ids: Iterable[str],
+        required: bool = False,
+    ) -> Iterable[RuntimeVariantGQL | None]:
+        return await info.context.data_loaders.runtime_variant_loader.load_many([
+            RuntimeVariantID(UUID(nid)) for nid in node_ids
+        ])
 
 
 RuntimeVariantEdge = Edge[RuntimeVariantGQL]

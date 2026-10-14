@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from functools import lru_cache
 from typing import assert_never
 
+from ai.backend.common.data.entity.service_catalog import ServiceCatalogID
 from ai.backend.common.dto.manager.query import StringFilter
 from ai.backend.common.dto.manager.v2.service_catalog.request import (
     AdminSearchServiceCatalogsInput,
@@ -38,6 +40,9 @@ from ai.backend.manager.models.service_catalog.searchable_fields import (
 )
 from ai.backend.manager.models.service_catalog.searchers import ServiceCatalogSearcher
 from ai.backend.manager.models.specs.searcher import GlobalSearcher
+from ai.backend.manager.services.service_catalog.actions.bulk_get import (
+    BulkGetServiceCatalogsAction,
+)
 from ai.backend.manager.services.service_catalog.actions.search import (
     SearchServiceCatalogsAction,
 )
@@ -59,6 +64,20 @@ class ServiceCatalogAdapter(BaseAdapter):
 
     def __init__(self, service_catalog: ServiceCatalogProcessors) -> None:
         self._service_catalog = service_catalog
+
+    async def batch_load_by_ids(
+        self, ids: Sequence[ServiceCatalogID]
+    ) -> list[ServiceCatalogNode | Exception | None]:
+        """Batch load service catalog entries by id for DataLoader use, one answer per id."""
+        if not ids:
+            return []
+        result = await self._service_catalog.bulk_get.run(BulkGetServiceCatalogsAction(ids=ids))
+        return [
+            self._data_to_dto(item.value)
+            if item.value is not None
+            else self.batch_load_failure(item.error)
+            for item in result.items
+        ]
 
     async def admin_search(
         self,

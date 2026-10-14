@@ -2,13 +2,15 @@
 
 from __future__ import annotations
 
+from collections.abc import Iterable
 from datetime import datetime
-from typing import Any
+from typing import Any, override
 from uuid import UUID
 
 from strawberry import Info
 from strawberry.relay import Connection, Edge, NodeID
 
+from ai.backend.common.data.entity.prometheus_query_preset import PrometheusQueryPresetID
 from ai.backend.common.data.entity.prometheus_query_preset_category import (
     PrometheusQueryPresetCategoryID,
 )
@@ -75,6 +77,19 @@ class QueryDefinitionGQL(PydanticNodeMixin[QueryDefinitionNode]):
         return await info.context.data_loaders.category_loader.load(
             PrometheusQueryPresetCategoryID(self.category_id)
         )
+
+    @classmethod
+    @override
+    async def resolve_nodes(  # type: ignore[override]  # Strawberry Node uses AwaitableOrValue overloads incompatible with async def
+        cls,
+        *,
+        info: Info[StrawberryGQLContext],
+        node_ids: Iterable[str],
+        required: bool = False,
+    ) -> Iterable[QueryDefinitionGQL | None]:
+        return await info.context.data_loaders.query_definition_loader.load_many([
+            PrometheusQueryPresetID(UUID(nid)) for nid in node_ids
+        ])
 
 
 QueryDefinitionEdge = Edge[QueryDefinitionGQL]
