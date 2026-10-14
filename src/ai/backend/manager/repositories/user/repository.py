@@ -22,6 +22,7 @@ from ai.backend.common.types import AccessKey, SlotName
 from ai.backend.common.utils import nmget
 from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
+from ai.backend.manager.data.bootstrap_script.types import BootstrapScriptData
 from ai.backend.manager.data.keypair.types import GeneratedKeyPairData, KeyPairCreator, KeyPairData
 from ai.backend.manager.data.user.types import (
     BulkUserCreateResultData,
@@ -30,7 +31,10 @@ from ai.backend.manager.data.user.types import (
     UserData,
     UserSearchResult,
 )
+from ai.backend.manager.errors.bootstrap_script import DefaultBootstrapScriptNotFound
 from ai.backend.manager.errors.user import KeyPairNotFound
+from ai.backend.manager.models.bootstrap_script.queriers import BootstrapScriptQuerier
+from ai.backend.manager.models.bootstrap_script.updaters import DefaultBootstrapScriptUpdater
 from ai.backend.manager.models.keypair.creators import KeypairCreator
 from ai.backend.manager.models.keypair.purgers import NonDefaultKeypairPurger
 from ai.backend.manager.models.keypair.queriers import DefaultKeypairQuerier
@@ -89,6 +93,26 @@ class UserRepository:
         self._v2_ops = v2_ops_provider
         self._policy_ops = policy_ops_provider
         self._key_provider_pool = key_provider_pool
+
+    @user_repository_resilience.apply()
+    async def default_bootstrap_script(self, user_id: UserID) -> BootstrapScriptData | None:
+        async with self._v2_ops.read_ops() as r:
+            scripts = await r.query_owned_fields(
+                BootstrapScriptQuerier(entity_type=user_id.entity_type()), [user_id]
+            )
+            return scripts.get(user_id)
+
+    @user_repository_resilience.apply()
+    async def update_default_bootstrap_script(
+        self, updater: DefaultBootstrapScriptUpdater
+    ) -> BootstrapScriptData:
+        async with self._v2_ops.write_ops() as w:
+            updated = await w.batch_update_in_global(updater)
+        if not updated:
+            raise DefaultBootstrapScriptNotFound(
+                f"{updater.entity} has no default bootstrap script"
+            )
+        return updated[0]
 
     @user_repository_resilience.apply()
     async def default_access_key(self, user_id: UserID) -> AccessKey | None:

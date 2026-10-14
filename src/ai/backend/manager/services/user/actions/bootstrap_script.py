@@ -1,23 +1,22 @@
-"""Actions for the bootstrap script a keypair carries."""
+"""Actions for a user's default bootstrap script."""
 
 from __future__ import annotations
 
 from dataclasses import dataclass
 from typing import override
 
+from ai.backend.common.data.entity.bootstrap_script import BootstrapScript
 from ai.backend.common.data.entity.types import EntityIdentifier
 from ai.backend.common.data.entity.user import UserID
-from ai.backend.common.types import AccessKey
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.actions.v2.single_entity.base import BaseSingleEntityAction
 
 
 @dataclass(frozen=True)
-class GetBootstrapScriptAction(BaseSingleEntityAction):
-    """Read the bootstrap script a keypair carries."""
+class GetDefaultBootstrapScriptAction(BaseSingleEntityAction):
+    """Read the user's default bootstrap script."""
 
     user_id: UserID
-    access_key: AccessKey
 
     @override
     def entity_id(self) -> EntityIdentifier:
@@ -35,17 +34,16 @@ class GetBootstrapScriptAction(BaseSingleEntityAction):
 
 
 @dataclass(frozen=True)
-class GetBootstrapScriptActionResult:
+class GetDefaultBootstrapScriptActionResult:
     script: str
 
 
 @dataclass(frozen=True)
-class UpdateBootstrapScriptAction(BaseSingleEntityAction):
-    """Rewrite the bootstrap script a keypair carries."""
+class UpdateDefaultBootstrapScriptAction(BaseSingleEntityAction):
+    """Rewrite the script of the user's default bootstrap script."""
 
     user_id: UserID
-    access_key: AccessKey
-    script: str
+    script: BootstrapScript
 
     @override
     def entity_id(self) -> EntityIdentifier:
@@ -63,5 +61,5 @@ class UpdateBootstrapScriptAction(BaseSingleEntityAction):
 
 
 @dataclass(frozen=True)
-class UpdateBootstrapScriptActionResult:
+class UpdateDefaultBootstrapScriptActionResult:
     pass

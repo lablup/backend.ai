@@ -54,6 +54,7 @@ from ai.backend.manager.errors.user import (
     UserNotFound,
     UserPurgeInProgress,
 )
+from ai.backend.manager.models.bootstrap_script.purgers import BootstrapScriptPurger
 from ai.backend.manager.models.domain.row import DomainRow
 from ai.backend.manager.models.endpoint.purgers import UserEndpointPurger
 from ai.backend.manager.models.endpoint.row import EndpointRow
@@ -404,6 +405,7 @@ class UserDBSource:
         async with self._v2_ops.write_ops() as w:
             await w.batch_purge_field_entities(user_id, UserErrorLogPurger())
             await w.batch_purge_field_entities(user_id, UserKeyPairPurger())
+            await w.batch_purge_field_entities(user_id, BootstrapScriptPurger())
             await w.batch_purge_field_entities(user_id, UserGroupAssociationPurger())
             # Placement groups the user still owns: their deployments were either
             # delegated (the groups moved with them) or deleted by now.

@@ -215,7 +215,10 @@ class AuthService:
         return await self._key_provider_pool.decrypt(keypair.secret_key, KEYPAIR_SECRET_KEY_CONTEXT)
 
     async def _keypair_hook_payload(self, keypair: KeyPairData) -> dict[str, object]:
-        """The keypair columns POST_AUTHORIZE hands to its plugins."""
+        """The legacy keypair payload, with its user's bootstrap script."""
+        bootstrap_script = await self._user_repository.default_bootstrap_script(
+            UserID(keypair.user_id)
+        )
         return {
             "access_key": keypair.access_key,
             "secret_key": await self._secret_key_of(keypair),
@@ -231,7 +234,7 @@ class AuthService:
             "user": keypair.user_id,
             "resource_policy": keypair.resource_policy_name,
             "dotfiles": keypair.dotfiles,
-            "bootstrap_script": keypair.bootstrap_script,
+            "bootstrap_script": bootstrap_script.script if bootstrap_script is not None else "",
         }
 
     async def authorize(self, action: AuthorizeAction) -> AuthorizeActionResult:

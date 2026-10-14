@@ -12,6 +12,8 @@ keywords:
 sources:
   - src/ai/backend/manager/services/user/processors.py
   - src/ai/backend/manager/models/keypair
+  - src/ai/backend/manager/models/user
+  - src/ai/backend/manager/models/bootstrap_script
 generated:
   by: claude-code/opus-5
   at: 2026-08-19
@@ -31,10 +33,11 @@ access key reads the owning user through the key owner lookup first, and the ope
 that follows names the user. Every write is an UPDATE — adding and removing a keypair
 row is a change to that user.
 
-## Dotfiles and the bootstrap script are columns of the keypair row
+## Bootstrap scripts and dotfiles
 
-They are `keypairs.dotfiles` and `keypairs.bootstrap_script`, and the same
-`DotfileEntries` that answers for the domain and the project answers here.
+- `bootstrap_scripts` holds scripts per `(entity_type, entity_id)`; at most one per entity is `is_default`.
+- The API and session creation use the user's default script. Reading one that is missing answers an empty script; updating it answers not found.
+- Dotfiles stay on `keypairs.dotfiles`.
 
 ## The operations that keep a service
 
