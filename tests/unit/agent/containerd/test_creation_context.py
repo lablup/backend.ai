@@ -12,6 +12,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
+from ai.backend.agent.agent import AbstractKernelCreationContext
 from ai.backend.agent.containerd.agent import (
     HOST_PORTS_LABEL,
     KERNEL_IP_LABEL,
@@ -42,6 +43,7 @@ from ai.backend.common.types import (
     DeviceName,
     KernelCreationConfig,
     KernelId,
+    MountTypes,
     ResourceSlot,
     ServicePort,
     ServicePortProtocols,
@@ -548,6 +550,140 @@ class TestAccelerators:
         alloc = {SlotName("cuda.shares"): {DeviceId("0"): Decimal(0)}}
 
         await ctx.apply_accelerator_allocation(MagicMock(), alloc)
+
+
+class _SkippingProfile(FakeProfile):
+    skips_host_krunner = True
+
+
+class TestMountKrunner:
+    @pytest.fixture
+    def accelerator(self) -> ComputerContext:
+        plugin = MagicMock()
+        return ComputerContext(instance=plugin, devices=[], alloc_map=MagicMock())
+
+    @pytest.fixture
+    def accelerator_spec(self) -> KernelResourceSpec:
+        return KernelResourceSpec(
+            slots=ResourceSlot({"cuda.shares": "1"}),
+            allocations={
+                DeviceName("cuda"): {SlotName("cuda.shares"): {DeviceId("0"): Decimal(1)}},
+            },
+            scratch_disk_size=0,
+        )
+
+    def _context(
+        self,
+        tmp_path: Path,
+        ownership_data: KernelOwnershipData,
+        kernel_config: KernelCreationConfig,
+        profile: FakeProfile,
+        accelerator: ComputerContext,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> tuple[ContainerdKernelCreationContext, AsyncMock]:
+        ctx = _make_context(
+            ownership_data,
+            kernel_config,
+            profile,
+            scratch_root=tmp_path,
+            computers={DeviceName("cuda"): accelerator},
+        )
+        ctx.distro = "debian12"
+        apply = AsyncMock()
+        monkeypatch.setattr(ctx, "apply_accelerator_allocation", apply)
+        monkeypatch.setattr(
+            ctx,
+            "generate_accelerator_mounts",
+            AsyncMock(
+                return_value=[
+                    MagicMock(
+                        mode=MountTypes.BIND,
+                        src_path=Path("/dev/nvidia0"),
+                        dst_path=Path("/dev/nvidia0"),
+                    )
+                ]
+            ),
+        )
+        return ctx, apply
+
+    async def test_default_profile_defers_to_the_base(
+        self,
+        tmp_path: Path,
+        ownership_data: KernelOwnershipData,
+        kernel_config: KernelCreationConfig,
+        accelerator: ComputerContext,
+        accelerator_spec: KernelResourceSpec,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        ctx, apply = self._context(
+            tmp_path,
+            ownership_data,
+            kernel_config,
+            FakeProfile("runc", accepts=True),
+            accelerator,
+            monkeypatch,
+        )
+        base = AsyncMock()
+        monkeypatch.setattr(AbstractKernelCreationContext, "mount_krunner", base)
+        environ: dict[str, str] = {}
+
+        await ctx.mount_krunner(accelerator_spec, environ)
+
+        base.assert_awaited_once_with(accelerator_spec, environ)
+        apply.assert_not_called()
+
+    async def test_skipping_profile_keeps_the_accelerator_part(
+        self,
+        tmp_path: Path,
+        ownership_data: KernelOwnershipData,
+        kernel_config: KernelCreationConfig,
+        accelerator: ComputerContext,
+        accelerator_spec: KernelResourceSpec,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        ctx, apply = self._context(
+            tmp_path,
+            ownership_data,
+            kernel_config,
+            _SkippingProfile("coco-tdx", accepts=True),
+            accelerator,
+            monkeypatch,
+        )
+        environ: dict[str, str] = {}
+
+        await ctx.mount_krunner(accelerator_spec, environ)
+
+        apply.assert_awaited_once_with(
+            accelerator.instance, {SlotName("cuda.shares"): {DeviceId("0"): Decimal(1)}}
+        )
+        assert [str(m.target) for m in accelerator_spec.mounts] == ["/dev/nvidia0"]
+        assert environ == {}
+
+    async def test_profile_without_the_member_defers_to_the_base(
+        self,
+        tmp_path: Path,
+        ownership_data: KernelOwnershipData,
+        kernel_config: KernelCreationConfig,
+        accelerator: ComputerContext,
+        accelerator_spec: KernelResourceSpec,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        ctx, _ = self._context(
+            tmp_path,
+            ownership_data,
+            kernel_config,
+            FakeProfile("old", accepts=True),
+            accelerator,
+            monkeypatch,
+        )
+        ctx._profile = cast(Any, object())  # a profile object without the member at all
+        base = AsyncMock()
+        monkeypatch.setattr(AbstractKernelCreationContext, "mount_krunner", base)
+        environ: dict[str, str] = {}
+
+        await ctx.mount_krunner(accelerator_spec, environ)
+
+        base.assert_awaited_once_with(accelerator_spec, environ)
 
 
 class StdioRecordingContainerd(FakeContainerd):

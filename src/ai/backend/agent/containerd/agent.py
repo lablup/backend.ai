@@ -4,7 +4,7 @@ import asyncio
 import logging
 import signal
 import uuid
-from collections.abc import AsyncGenerator, Mapping, Sequence
+from collections.abc import AsyncGenerator, Mapping, MutableMapping, Sequence
 from decimal import Decimal
 from functools import partial
 from importlib.resources import files
@@ -44,6 +44,7 @@ from ai.backend.agent.containerd.profile.base import (
     RuntimeProfile,
     StdioMode,
     prepare_kernel_config,
+    profile_skips_host_krunner,
 )
 from ai.backend.agent.containerd.profile.loader import load_runtime_profiles, select_profile
 from ai.backend.agent.containerd.profile.runc import RuncProfile
@@ -366,6 +367,32 @@ class ContainerdKernelCreationContext(AbstractKernelCreationContext[ContainerdKe
     ) -> list[MountInfo]:
         _refuse_accelerators(device_alloc)
         return []
+
+    @override
+    async def mount_krunner(
+        self,
+        resource_spec: KernelResourceSpec,
+        environ: MutableMapping[str, str],
+    ) -> None:
+        if not profile_skips_host_krunner(self._profile):
+            await super().mount_krunner(resource_spec, environ)
+            return
+        # The image carries its own krunner: skip the host runner and libbaihook resolution,
+        # but keep the accelerator allocation and mounts that the base does in the same step.
+        # Plugin hooks and LD_PRELOAD are skipped too: they chain onto the host libbaihook preload.
+        for device_view in resource_spec.device_list:
+            computer_ctx = self.computers[device_view.device]
+            alloc = {device_view.slot: device_view.device_alloc}
+            await self.apply_accelerator_allocation(computer_ctx.instance, alloc)
+            for mount_info in await self.generate_accelerator_mounts(computer_ctx.instance, alloc):
+                resource_spec.mounts.append(
+                    self.get_runner_mount(
+                        mount_info.mode,
+                        mount_info.src_path,
+                        mount_info.dst_path.as_posix(),
+                        MountPermission.READ_ONLY,
+                    )
+                )
 
     @override
     def resolve_krunner_filepath(self, filename: str) -> Path:

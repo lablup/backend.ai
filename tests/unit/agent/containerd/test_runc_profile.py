@@ -11,6 +11,7 @@ from ai.backend.agent.containerd.profile.base import (
     RuntimeProfile,
     StdioMode,
     prepare_kernel_config,
+    profile_skips_host_krunner,
 )
 from ai.backend.agent.containerd.profile.runc import RuncProfile
 from ai.backend.agent.types import KernelOwnershipData
@@ -54,6 +55,15 @@ class TestRuncProfile:
 
     def test_conforms_to_runtime_profile(self) -> None:
         assert isinstance(RuncProfile(1.0), RuntimeProfile)
+
+    def test_does_not_skip_the_host_krunner(self) -> None:
+        assert RuncProfile(1.0).skips_host_krunner is False
+
+    def test_skip_helper_defaults_to_false_for_a_profile_without_the_member(self) -> None:
+        class TwoMethod:
+            name = "old"
+
+        assert profile_skips_host_krunner(cast(RuntimeProfile, TwoMethod())) is False
 
     async def test_prepare_default_returns_the_config_unchanged(
         self, kernel_config: KernelCreationConfig
