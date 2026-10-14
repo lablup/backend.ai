@@ -42,6 +42,27 @@ class AgentConnectionUnavailable(BackendAIError, web.HTTPServiceUnavailable):
         )
 
 
+class AgentNetworkSetupFailed(BackendAIError, web.HTTPServiceUnavailable):
+    """Raised when an agent fails its part of a session's network setup."""
+
+    error_type = "https://api.backend.ai/probs/agent-network-setup-failed"
+    error_title = "Agent failed to set up the session network."
+
+    agent_id: AgentId
+
+    def __init__(self, agent_id: AgentId, failure_reason: str) -> None:
+        self.agent_id = agent_id
+        super().__init__(f"Agent {agent_id} failed to set up the session network: {failure_reason}")
+
+    @override
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.AGENT,
+            operation=ErrorOperation.SETUP,
+            error_detail=ErrorDetail.UNAVAILABLE,
+        )
+
+
 class AgentAlreadyExited(EntityError, web.HTTPConflict):
     """Raised when an exit is recorded for an agent already in a terminal status."""
 
