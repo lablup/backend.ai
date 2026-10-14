@@ -2,11 +2,15 @@ from __future__ import annotations
 
 from datetime import datetime
 from enum import StrEnum
+from typing import TYPE_CHECKING, Annotated
 from uuid import UUID
 
-from strawberry import UNSET
+import strawberry
+from strawberry import UNSET, Info
 from strawberry.relay import Connection, Edge, NodeID
 
+from ai.backend.common.data.entity.types import EntityType, RuntimeEntityID
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.dto.manager.v2.entity_share.request import (
     CreateEntityShareInput as CreateInputDTO,
 )
@@ -53,6 +57,11 @@ from ai.backend.manager.api.gql.decorators import (
 )
 from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin, PydanticOutputMixin
 from ai.backend.manager.api.gql.rbac.types.scope import PermissionBitGQL
+from ai.backend.manager.api.gql.types import StrawberryGQLContext
+
+if TYPE_CHECKING:
+    from ai.backend.manager.api.gql.rbac.types.entity_node import EntityNodeGQL
+    from ai.backend.manager.api.gql.user.types.node import UserV2GQL
 
 EntityShareStatusGQL: type[EntityShareStatusDTO] = gql_enum(
     BackendAIGQLMeta(added_version="26.9.0", description="Where a share stands."),
@@ -118,6 +127,77 @@ class EntityShareGQL(PydanticNodeMixin[NodeDTO]):
     )
     created_at: datetime = gql_field(description="When the offer was made.")
     updated_at: datetime = gql_field(description="When it was last written.")
+
+    @gql_added_field(
+        BackendAIGQLMeta(
+            added_version="26.9.0",
+            description="Who sent the offer, when the caller may read that user.",
+        )
+    )  # type: ignore[misc]
+    async def sharer(
+        self,
+        info: Info[StrawberryGQLContext],
+    ) -> (
+        Annotated[
+            UserV2GQL,
+            strawberry.lazy("ai.backend.manager.api.gql.user.types.node"),
+        ]
+        | None
+    ):
+        if self.sharer_user_id is None:
+            return None
+        return await info.context.data_loaders.user_loader.load(UserID(self.sharer_user_id))
+
+    @gql_added_field(
+        BackendAIGQLMeta(
+            added_version="26.9.0",
+            description=(
+                "The scope or person the offer goes to, when the caller may read it. "
+                "An address resolves to the user holding it."
+            ),
+        )
+    )  # type: ignore[misc]
+    async def recipient_entity(
+        self,
+        info: Info[StrawberryGQLContext],
+    ) -> (
+        Annotated[
+            EntityNodeGQL,
+            strawberry.lazy("ai.backend.manager.api.gql.rbac.types.entity_node"),
+        ]
+        | None
+    ):
+        data_loaders = info.context.data_loaders
+        if self.recipient_entity_type is not None and self.recipient_entity_id is not None:
+            return await data_loaders.entity_node_loader.load(
+                RuntimeEntityID(
+                    EntityType.from_name(self.recipient_entity_type), self.recipient_entity_id
+                )
+            )
+        if self.recipient_email is None:
+            return None
+        user_id = await data_loaders.user_id_by_email_loader.load(self.recipient_email)
+        return await data_loaders.user_loader.load(user_id)
+
+    @gql_added_field(
+        BackendAIGQLMeta(
+            added_version="26.9.0",
+            description="The entity being offered, when the caller may read it.",
+        )
+    )  # type: ignore[misc]
+    async def target_entity(
+        self,
+        info: Info[StrawberryGQLContext],
+    ) -> (
+        Annotated[
+            EntityNodeGQL,
+            strawberry.lazy("ai.backend.manager.api.gql.rbac.types.entity_node"),
+        ]
+        | None
+    ):
+        return await info.context.data_loaders.entity_node_loader.load(
+            RuntimeEntityID(EntityType.from_name(self.target_entity_type), self.target_entity_id)
+        )
 
 
 @gql_connection_type(

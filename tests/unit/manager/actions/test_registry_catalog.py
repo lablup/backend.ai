@@ -302,6 +302,7 @@ from ai.backend.manager.services.session.resource_allocation.processors import (
     ResourceAllocationProcessors,
 )
 from ai.backend.manager.services.user.actions.bulk_get import BulkGetUsersAction
+from ai.backend.manager.services.user.actions.bulk_lookup import BulkLookupUsersAction
 from ai.backend.manager.services.user.processors import UserProcessors
 from ai.backend.manager.services.vfolder.actions.bulk_get import BulkGetVFoldersAction
 from ai.backend.manager.services.vfolder.actions.storage_ops import PublicListAllowedTypesAction
@@ -847,6 +848,11 @@ def test_entity_data_loader_reads_are_checked_per_entity() -> None:
         UserEntityType(),
         ActionKind.BULK,
         ActionGate.PERMISSION,
+    )
+    assert recorded[BulkLookupUsersAction] == (
+        UserEntityType(),
+        ActionKind.LOOKUP,
+        ActionGate.PUBLIC,
     )
     assert recorded[BulkGetProjectsAction] == (
         ProjectEntityType(),

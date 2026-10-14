@@ -824,6 +824,15 @@ class DataLoaders:
         return DataLoader(load_fn=load_fn)
 
     @cached_property
+    def user_id_by_email_loader(self) -> DataLoader[str, UserID]:
+        adapter = self._adapters.user
+
+        async def load_fn(emails: list[str]) -> list[UserID | Exception]:
+            return await adapter.batch_lookup_by_emails(emails)
+
+        return DataLoader(load_fn=load_fn)
+
+    @cached_property
     def domain_id_by_name_loader(
         self,
     ) -> DataLoader[str, DomainID | None]:

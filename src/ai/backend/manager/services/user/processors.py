@@ -8,9 +8,11 @@ from ai.backend.manager.actions.v2.bulk.partial_processor import PartialBulkActi
 from ai.backend.manager.actions.v2.bulk.processor import BulkActionProcessor
 from ai.backend.manager.actions.v2.field.processor import SingleFieldActionProcessor
 from ai.backend.manager.actions.v2.global_scope.processor import GlobalActionProcessor
+from ai.backend.manager.actions.v2.lookup.bulk_processor import BulkLookupActionProcessor
 from ai.backend.manager.actions.v2.lookup.processor import LookupActionProcessor
 from ai.backend.manager.actions.v2.ops.result import (
     BatchOpsResult,
+    BulkLookupOpsResult,
     FieldKeyLookupOpsResult,
     FieldOwnerLookupOpsResult,
     LookupOpsResult,
@@ -34,6 +36,7 @@ from ai.backend.manager.services.user.actions.bootstrap_script import (
     UpdateBootstrapScriptActionResult,
 )
 from ai.backend.manager.services.user.actions.bulk_get import BulkGetUsersAction
+from ai.backend.manager.services.user.actions.bulk_lookup import BulkLookupUsersAction
 from ai.backend.manager.services.user.actions.create_keypair_dotfile import (
     CreateKeypairDotfileAction,
     CreateKeypairDotfileActionResult,
@@ -126,6 +129,7 @@ from ai.backend.manager.services.user.service import UserService
 
 class UserProcessors:
     lookup: LookupActionProcessor[LookupUserAction, LookupOpsResult[UserID]]
+    bulk_lookup: BulkLookupActionProcessor[BulkLookupUsersAction, BulkLookupOpsResult[str, UserID]]
     lookup_keypair_owner: LookupActionProcessor[
         LookupKeypairOwnerByAccessKeyAction, FieldOwnerLookupOpsResult
     ]
@@ -196,6 +200,7 @@ class UserProcessors:
         user_service: UserService,
     ) -> None:
         self.lookup = group.lookup_ops(LookupUserAction)
+        self.bulk_lookup = group.public_bulk_lookup_ops(BulkLookupUsersAction)
         self.lookup_keypair_owner = group.key_owner_lookup_ops(LookupKeypairOwnerByAccessKeyAction)
         self.bulk_get = group.partial_bulk_get_ops(BulkGetUsersAction)
         self.global_search = group.global_searcher_ops(GlobalSearchUsersAction)
