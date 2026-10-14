@@ -102,6 +102,7 @@ __all__ = (
     "DeviceId",
     "DeviceModelInfo",
     "DeviceName",
+    "EndpointProtocol",
     "HandlerForUnknownSlotName",
     "HardwareMetadata",
     "HostPID",
@@ -307,6 +308,13 @@ class Sentinel(enum.Enum):
 class QueueSentinel(enum.Enum):
     CLOSED = 0
     TIMEOUT = 1
+
+
+class EndpointProtocol(enum.StrEnum):
+    """Proxy protocol of a model-service endpoint circuit (wire values ``http`` / ``tcp``)."""
+
+    HTTP = "http"
+    TCP = "tcp"
 
 
 class CIStrEnum(enum.StrEnum):
