@@ -249,8 +249,8 @@ async def default_bootstrap_scripts(
     async with db_engine.begin() as conn:
         await conn.execute(
             sa.insert(BootstrapScriptRow).from_select(
-                ["entity_type", "entity_id", "is_default"],
-                sa.select(sa.literal(UserEntityType()), UserRow.uuid, sa.true()),
+                ["entity_type", "entity_id", "script", "is_default"],
+                sa.select(sa.literal(UserEntityType()), UserRow.uuid, sa.literal(""), sa.true()),
             )
         )
     try:

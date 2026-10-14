@@ -22,7 +22,7 @@ def upgrade() -> None:
         ),
         sa.Column("entity_type", sa.String(32), nullable=False),
         sa.Column("entity_id", postgresql.UUID(), nullable=False),
-        sa.Column("script", sa.Text(), nullable=False, server_default=""),
+        sa.Column("script", sa.Text(), nullable=False),
         sa.Column("is_default", sa.Boolean(), nullable=False, server_default=sa.false()),
         sa.PrimaryKeyConstraint("id", name=op.f("pk_bootstrap_scripts")),
         sa.CheckConstraint(
@@ -40,7 +40,7 @@ def upgrade() -> None:
         sa.text("""
         INSERT INTO bootstrap_scripts (entity_type, entity_id, script, is_default)
         SELECT 'user', k."user", k.bootstrap_script, k.is_default
-        FROM keypairs AS k
+        FROM keypairs AS k WHERE k.bootstrap_script <> ''
     """)
     )
     op.drop_column("keypairs", "bootstrap_script")
