@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import dataclasses
 import logging
 import signal
 import uuid
@@ -12,6 +13,7 @@ from io import StringIO
 from pathlib import Path
 from typing import Any, Final, cast, override
 
+import aiodocker
 import aiofiles
 
 from ai.backend.agent.agent import (
@@ -28,6 +30,12 @@ from ai.backend.agent.containerd.client import (
     ContainerRecord,
     TaskState,
 )
+from ai.backend.agent.containerd.hostconfig import (
+    HostConfigTranslation,
+    apply_to_spec,
+    merge_translations,
+    translate_fragment,
+)
 from ai.backend.agent.containerd.image import resolve_image
 from ai.backend.agent.containerd.kernel import ContainerdKernel
 from ai.backend.agent.containerd.lifecycle import (
@@ -38,6 +46,7 @@ from ai.backend.agent.containerd.lifecycle import (
 from ai.backend.agent.containerd.mounts import host_system_mounts, to_generated_mounts
 from ai.backend.agent.containerd.profile.base import (
     GeneratedMount,
+    GeneratedMountKind,
     KernelLaunch,
     RuntimeProfile,
     StdioMode,
@@ -110,7 +119,6 @@ from ai.backend.logging.structured import StructuredLogger
 log = StructuredLogger(logging.getLogger(__spec__.name))
 
 HOST_PORTS_LABEL: Final = "ai.backend.containerd.host-ports"
-_INTRINSIC_SLOTS: Final = frozenset({SlotName("cpu"), SlotName("mem")})
 # The kernel runner reads these from intrinsic-ports.json; with the host network they are
 # all host ports.
 _INTRINSIC_PORT_NAMES: Final = ("replin", "replout", "sshd", "ttyd")
@@ -125,18 +133,14 @@ _CONTAINER_STATUS: Final[Mapping[TaskState, ContainerStatus]] = {
     TaskState.UNKNOWN: ContainerStatus.DEAD,
 }
 _DEFAULT_SHM_BYTES: Final = 64 * 2**20
+# FIXME(containerd-mvp): no Docker client; in-tree plugins ignore the argument
+_NO_DOCKER: Final = cast(aiodocker.Docker, None)
 
 
 def _kernel_slots(kernel_config: KernelCreationConfig) -> Mapping[SlotName, Decimal]:
     return {
         SlotName(k): v for k, v in ResourceSlot.from_json(kernel_config["resource_slots"]).items()
     }
-
-
-def _refuse_accelerators(device_alloc: Mapping[SlotName, Mapping[DeviceId, Decimal]]) -> None:
-    for slot, alloc in device_alloc.items():
-        if slot not in _INTRINSIC_SLOTS and any(amount > 0 for amount in alloc.values()):
-            raise KernelVerbNotSupported(f"accelerator allocation ({slot})")
 
 
 def _kernel_id_of(record: ContainerRecord) -> KernelId | None:
@@ -172,6 +176,9 @@ class ContainerdKernelCreationContext(AbstractKernelCreationContext[ContainerdKe
     _dirs: ScratchDirs
     _generated_mounts: list[GeneratedMount]
     _base_spec: dict[str, Any]
+    _host_configs: list[tuple[str, HostConfigTranslation]]
+    _host_config: HostConfigTranslation
+    _accelerator_targets: set[str]
 
     def __init__(
         self,
@@ -210,6 +217,17 @@ class ContainerdKernelCreationContext(AbstractKernelCreationContext[ContainerdKe
         )
         self._generated_mounts = []
         self._base_spec = {}
+        self._host_configs = []
+        self._host_config = HostConfigTranslation()
+        self._accelerator_targets = set()
+
+    async def _remove_scratch(self) -> None:
+        await run_in_executor_with_context(
+            None,
+            remove_scratch,
+            self.local_config.container.scratch_root,
+            str(self.kernel_id),
+        )
 
     def _owner(self) -> Owner | None:
         """Who owns the files in the work dir, as the Docker agent decides it."""
@@ -313,16 +331,35 @@ class ContainerdKernelCreationContext(AbstractKernelCreationContext[ContainerdKe
 
     @override
     async def process_mounts(self, mounts: Sequence[Mount]) -> None:
-        self._generated_mounts = to_generated_mounts(mounts)
+        # Mounts at a plugin's mount targets are ACCELERATOR kind, not vfolders.
+        self._generated_mounts = [
+            dataclasses.replace(mount, kind=GeneratedMountKind.ACCELERATOR)
+            if mount.target in self._accelerator_targets
+            else mount
+            for mount in to_generated_mounts(mounts)
+        ]
 
-    # cpu and mem are applied through the spec resources; any other device is refused.
+    # Each plugin's Docker container fragment is translated; cpu and mem return none and are
+    # applied through the spec resources.
     @override
     async def apply_accelerator_allocation(
         self,
         computer: AbstractComputePlugin,
         device_alloc: Mapping[SlotName, Mapping[DeviceId, Decimal]],
     ) -> None:
-        _refuse_accelerators(device_alloc)
+        try:
+            fragment = await computer.generate_docker_args(_NO_DOCKER, device_alloc)
+            name = str(computer.key)
+            translation = await run_in_executor_with_context(
+                None, partial(translate_fragment, name, fragment)
+            )
+            host_configs = [*self._host_configs, (name, translation)]
+            self._host_config = merge_translations(host_configs)
+            self._host_configs = host_configs
+        except BaseException:
+            # The kernel is not registered yet, so no clean_kernel removes its scratch dir.
+            await self._remove_scratch()
+            raise
 
     @override
     async def generate_accelerator_mounts(
@@ -330,8 +367,13 @@ class ContainerdKernelCreationContext(AbstractKernelCreationContext[ContainerdKe
         computer: AbstractComputePlugin,
         device_alloc: Mapping[SlotName, Mapping[DeviceId, Decimal]],
     ) -> list[MountInfo]:
-        _refuse_accelerators(device_alloc)
-        return []
+        src_path = self._dirs.config / str(computer.key)
+        await run_in_executor_with_context(
+            None, partial(src_path.mkdir, parents=True, exist_ok=True)
+        )
+        mounts = await computer.generate_mounts(src_path, device_alloc)
+        self._accelerator_targets.update(str(mount.dst_path) for mount in mounts)
+        return mounts
 
     @override
     def resolve_krunner_filepath(self, filename: str) -> Path:
@@ -362,6 +404,7 @@ class ContainerdKernelCreationContext(AbstractKernelCreationContext[ContainerdKe
         service_ports: list[ServicePort],
         cluster_info: ClusterInfo,
     ) -> ContainerdKernel:
+        environ = {**environ, **dict(self._host_config.env)}
         await self._write_config_files(resource_spec, environ)
         extra_caps = (
             ("CAP_SYS_PTRACE",)
@@ -381,12 +424,13 @@ class ContainerdKernelCreationContext(AbstractKernelCreationContext[ContainerdKe
                 extra_caps=extra_caps,
             )
         )
+        self._base_spec = apply_to_spec(self._base_spec, self._host_config)
         launch = KernelLaunch(
             kernel_id=self.kernel_id,
             session_id=self.session_id,
             config=self.kernel_config,
             slots=self._slots,
-            devices=(),  # no accelerator is accepted
+            devices=self._host_config.translated_devices,
             mounts=tuple(self._generated_mounts),
             trusted_storage_path=None,
             base_spec=self._base_spec,
