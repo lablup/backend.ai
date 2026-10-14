@@ -1086,7 +1086,7 @@ class CommonAgentConfig(BaseConfigSchema):
                 "gates whether this node takes any work."
             ),
             added_version=NEXT_RELEASE_VERSION,
-            example=ConfigExample(local="", prod='["ai.backend.network.vxlan"]'),
+            example=ConfigExample(local="", prod='["ai.backend.network.example"]'),
         ),
     ]
     image_commit_path: Annotated[
