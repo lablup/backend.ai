@@ -859,9 +859,9 @@ class VfolderRepository:
             await w.unshare(await self._landing_project(w, user_id), [target])
 
     def _invitation_query(self) -> sa.Select[Any]:
-        """Open vfolder offers with the folder offered, the sharer's email and name, and
-        the mount level the invitee is set to get: their policy row, or the folder's
-        default when none stands."""
+        """Open vfolder offers with the folder offered, the sharer's email and name, the
+        invitee's email, and the mount level the invitee is set to get: their policy row,
+        or the folder's default when none stands."""
         invitee = UserRow.__table__.alias("invitee")
         return (
             sa.select(
@@ -869,6 +869,7 @@ class VfolderRepository:
                 VFolderRow,
                 UserRow.email,
                 UserRow.username,
+                invitee.c.email,
                 sa.func.coalesce(
                     VFolderUserMountPolicyRow.permission, VFolderRow.default_mount_permission
                 ),
@@ -901,6 +902,7 @@ class VfolderRepository:
         share_row: EntityShareRow,
         inviter_email: str | None,
         inviter_username: str | None,
+        invitee_email: str | None,
         permission: VFolderMountPolicy,
     ) -> VFolderInvitationData:
         return VFolderInvitationData(
@@ -908,7 +910,7 @@ class VfolderRepository:
             vfolder=share_row.target_entity_id,
             inviter=inviter_email or "",
             inviter_username=inviter_username,
-            invitee=share_row.recipient_email or "",
+            invitee=share_row.recipient_email or invitee_email or "",
             permission=permission,
             created_at=share_row.created_at,
             modified_at=share_row.updated_at,
@@ -1286,9 +1288,13 @@ class VfolderRepository:
             row = (await session.execute(query)).one_or_none()
             if row is None:
                 return None
-            share_row, _, inviter_email, inviter_username, permission = row
+            share_row, _, inviter_email, inviter_username, invitee_email, permission = row
             return self._invitation_data(
-                share_row, inviter_email, inviter_username, VFolderMountPolicy(permission)
+                share_row,
+                inviter_email,
+                inviter_username,
+                invitee_email,
+                VFolderMountPolicy(permission),
             )
 
     @vfolder_repository_resilience.apply()
@@ -1415,11 +1421,22 @@ class VfolderRepository:
             return [
                 (
                     self._invitation_data(
-                        share_row, inviter_email, inviter_username, VFolderMountPolicy(permission)
+                        share_row,
+                        inviter_email,
+                        inviter_username,
+                        invitee_email,
+                        VFolderMountPolicy(permission),
                     ),
                     self._vfolder_row_to_data(vfolder_row),
                 )
-                for share_row, vfolder_row, inviter_email, inviter_username, permission in result
+                for (
+                    share_row,
+                    vfolder_row,
+                    inviter_email,
+                    inviter_username,
+                    invitee_email,
+                    permission,
+                ) in result
             ]
 
     @vfolder_repository_resilience.apply()
@@ -1436,11 +1453,22 @@ class VfolderRepository:
             return [
                 (
                     self._invitation_data(
-                        share_row, inviter_email, inviter_username, VFolderMountPolicy(permission)
+                        share_row,
+                        inviter_email,
+                        inviter_username,
+                        invitee_email,
+                        VFolderMountPolicy(permission),
                     ),
                     self._vfolder_row_to_data(vfolder_row),
                 )
-                for share_row, vfolder_row, inviter_email, inviter_username, permission in result
+                for (
+                    share_row,
+                    vfolder_row,
+                    inviter_email,
+                    inviter_username,
+                    invitee_email,
+                    permission,
+                ) in result
             ]
 
     @vfolder_repository_resilience.apply()
