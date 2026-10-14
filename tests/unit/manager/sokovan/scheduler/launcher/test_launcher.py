@@ -8,6 +8,7 @@ Test Scenarios:
 - SC-LA-009 ~ SC-LA-015: Network Setup
 - SC-LA-024: Partial agent failure
 - SC-LA-016 ~ SC-LA-023: Sealed Kernel Creation (PRE_CREATE_KERNEL hook)
+- SC-LA-025 ~ SC-LA-026: Sealed-launch slot lookup (fail-closed, none sealed)
 """
 
 from __future__ import annotations
@@ -29,6 +30,7 @@ from ai.backend.common.types import (
     SessionId,
 )
 from ai.backend.manager.errors.common import RejectedByHook
+from ai.backend.manager.errors.resource import DatabaseConnectionUnavailable
 from ai.backend.manager.sokovan.recorder.context import RecorderContext
 from ai.backend.manager.sokovan.scheduler.launcher.launcher import SessionLauncher
 from ai.backend.manager.views.sokovan.image import ImageConfigData
@@ -909,3 +911,67 @@ class TestSessionLauncherSealedKernel:
             session,
             image_config_default,
         )
+
+
+# =============================================================================
+# TestSessionLauncherSealedSlotLookup (SC-LA-025 ~ SC-LA-026)
+# =============================================================================
+
+
+class TestSessionLauncherSealedSlotLookup:
+    """Tests for reading the sealed-launch slot types from the repository."""
+
+    async def test_slot_lookup_failure_fails_closed(
+        self,
+        launcher: SessionLauncher,
+        mock_repository: AsyncMock,
+        mock_agent_client_pool: MagicMock,
+        mock_hook_plugin_ctx: MagicMock,
+        session_with_kernels_factory: Callable[..., SessionDataForStart],
+        session_kernel_factory: Callable[..., KernelBindingData],
+        image_config_default: dict[UUID, ImageConfigData],
+    ) -> None:
+        """SC-LA-025: A failed slot lookup never sends the kernel, sealed or not.
+
+        Given: Repository failing to read the sealed-launch slot types
+        When: A session is started
+        Then: No hook dispatch, no create_kernels RPC, the error is recorded once
+        """
+        # Arrange
+        mock_repository.get_sealed_launch_slot_names.side_effect = DatabaseConnectionUnavailable()
+        session = session_with_kernels_factory(session_kernel_factory())
+
+        # Act
+        with RecorderContext.scope("test", entity_ids=[session.session_id]):
+            await launcher.start_sessions_for_handler([session], image_config_default)
+
+        # Assert
+        mock_hook_plugin_ctx.dispatch.assert_not_awaited()
+        mock_agent_client_pool._mock_client.create_kernels.assert_not_awaited()
+        mock_repository.update_session_error_info.assert_awaited_once()
+
+    async def test_no_sealed_slot_in_repository_skips_hook(
+        self,
+        launcher: SessionLauncher,
+        mock_repository: AsyncMock,
+        mock_hook_plugin_ctx: MagicMock,
+        session_with_kernels_factory: Callable[..., SessionDataForStart],
+        session_kernel_factory: Callable[..., KernelBindingData],
+        image_config_default: dict[UUID, ImageConfigData],
+    ) -> None:
+        """SC-LA-026: Without any sealed-launch slot type no kernel is sealed.
+
+        Given: Repository reporting no sealed-launch slot type
+        When: A kernel requesting the confidential slot is started
+        Then: Hook is not dispatched
+        """
+        # Arrange
+        mock_repository.get_sealed_launch_slot_names.return_value = frozenset()
+        session = session_with_kernels_factory(session_kernel_factory())
+
+        # Act
+        with RecorderContext.scope("test", entity_ids=[session.session_id]):
+            await launcher.start_sessions_for_handler([session], image_config_default)
+
+        # Assert
+        mock_hook_plugin_ctx.dispatch.assert_not_awaited()

@@ -398,7 +398,7 @@ class SessionLauncher:
             for img_id, img_cfg in image_configs.items():
                 image_configs_by_id[img_id] = img_cfg.to_image_config(auto_pull)
 
-            sealed_slot_names = await self._get_sealed_launch_slot_names()
+            sealed_slot_names = await self._repository.get_sealed_launch_slot_names()
 
             # Build the kernel creation request of each agent (no RPC is sent here)
             async def build_agent_request(
@@ -590,11 +590,6 @@ class SessionLauncher:
             await self._repository.update_session_error_info(session.session_id, error_info)
             if isinstance(e, RejectedByHook):
                 raise
-
-    async def _get_sealed_launch_slot_names(self) -> frozenset[SlotName]:
-        # Provisional: will read resource_slot_types.sealed_launch once the
-        # slot-type attribute change lands.
-        return frozenset()
 
     async def _seal_kernel_configs(
         self,

@@ -64,6 +64,7 @@ def mock_repository() -> AsyncMock:
     repository = AsyncMock()
     repository.update_session_error_info = AsyncMock(return_value=None)
     repository.update_session_network_id = AsyncMock(return_value=None)
+    repository.get_sealed_launch_slot_names = AsyncMock(return_value=frozenset())
 
     persistent_network = NetworkData(
         id=_PERSISTENT_NETWORK_ID,
@@ -347,13 +348,11 @@ def session_with_kernels_factory() -> Callable[..., SessionDataForStart]:
 
 
 @pytest.fixture
-def patch_sealed_launch_slots(launcher: SessionLauncher, monkeypatch: pytest.MonkeyPatch) -> None:
-    """Mark the confidential slot as sealed-launch on the launcher."""
-    monkeypatch.setattr(
-        launcher,
-        "_get_sealed_launch_slot_names",
-        AsyncMock(return_value=frozenset({SlotName(SEALED_SLOT_NAME)})),
-    )
+def patch_sealed_launch_slots(mock_repository: AsyncMock) -> None:
+    """Mark the confidential slot as sealed-launch in the repository."""
+    mock_repository.get_sealed_launch_slot_names.return_value = frozenset({
+        SlotName(SEALED_SLOT_NAME)
+    })
 
 
 @pytest.fixture

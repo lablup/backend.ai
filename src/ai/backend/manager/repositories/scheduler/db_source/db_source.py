@@ -55,6 +55,7 @@ from ai.backend.common.types import (
     ResourceSlotEntry,
     SessionId,
     SessionTypes,
+    SlotName,
     SlotTypes,
 )
 from ai.backend.logging.structured import StructuredLogger
@@ -3906,6 +3907,23 @@ class ScheduleDBSource:
             sftp_count = sftp_result.scalar() or 0
 
             return KeypairConcurrencyData(regular_count=regular_count, sftp_count=sftp_count)
+
+    async def get_sealed_launch_slot_names(self) -> frozenset[SlotName]:
+        """
+        Fetch the slot types whose kernels are launched sealed.
+
+        Disabled slot types are deliberately included: ``enabled`` only makes validators
+        skip a slot, so filtering on it here would let a sealed slot launch unsealed.
+
+        :return: Names of the slot types with ``sealed_launch`` set
+        """
+        async with self._db.begin_readonly_session_read_committed() as db_sess:
+            rows = await db_sess.scalars(
+                sa.select(ResourceSlotTypeRow.slot_name).where(
+                    ResourceSlotTypeRow.sealed_launch.is_(True),
+                )
+            )
+            return frozenset(SlotName(name) for name in rows)
 
     async def get_attached_network(self, network_id: NetworkID) -> NetworkData:
         """
