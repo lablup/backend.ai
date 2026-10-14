@@ -31,7 +31,9 @@ class TestDatabaseProvider:
         # Create DB config for testing
         db_config = DBConfig(
             type=DBType.POSTGRESQL,
-            addr=HostPortPair(host=db_addr.host, port=db_addr.port),
+            addr=None,
+            addrs=[HostPortPair(host=db_addr.host, port=db_addr.port)],
+            connect_timeout=10.0,
             name="testing",
             user="postgres",
             password="develove",
