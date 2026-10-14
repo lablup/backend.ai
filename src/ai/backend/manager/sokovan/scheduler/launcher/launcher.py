@@ -43,6 +43,10 @@ from ai.backend.manager.metrics.scheduler import (
     SchedulerPhaseMetricObserver,
 )
 from ai.backend.manager.models.network.row import NetworkType
+from ai.backend.manager.network.pairing import (
+    require_members_can_serve_driver,
+    resolve_driver_for_agents,
+)
 from ai.backend.manager.plugin.network import NetworkPluginContext
 from ai.backend.manager.repositories.scheduler.repository import (
     SchedulerRepository,
@@ -58,6 +62,15 @@ from ai.backend.manager.views.sokovan.lifecycle import (
 )
 
 log = StructuredLogger(logging.getLogger(__spec__.name))
+
+
+def cluster_hostname_of(kernel: KernelBindingData) -> str:
+    """The kernel's ``cluster_hostname``, else ``<role><idx>``.
+
+    The one derivation for the env vars and a network plugin's endpoints: drift between them sends
+    a kernel's own name to loopback.
+    """
+    return kernel.cluster_hostname or f"{kernel.cluster_role}{kernel.cluster_idx}"
 
 
 @dataclass
@@ -353,8 +366,7 @@ class SessionLauncher:
                 "BACKENDAI_CLUSTER_SIZE": str(len(session.kernels)),
                 "BACKENDAI_CLUSTER_REPLICAS": ",".join(f"{k}:{v}" for k, v in replicas.items()),
                 "BACKENDAI_CLUSTER_HOSTS": ",".join(
-                    k.cluster_hostname or f"{k.cluster_role}{k.cluster_idx}"
-                    for k in session.kernels
+                    cluster_hostname_of(k) for k in session.kernels
                 ),
                 "BACKENDAI_ACCESS_KEY": session.access_key,
                 # BACKENDAI_SERVICE_PORTS are set as per-kernel env-vars.
@@ -413,7 +425,7 @@ class SessionLauncher:
                     cluster_role = k.cluster_role
                     cluster_idx = k.cluster_idx
                     local_rank = k.local_rank
-                    cluster_hostname = k.cluster_hostname or f"{cluster_role}{cluster_idx}"
+                    cluster_hostname = cluster_hostname_of(k)
 
                     # Build proper KernelCreationConfig matching registry.py format
                     kernel_config: KernelCreationConfig = {
@@ -466,6 +478,8 @@ class SessionLauncher:
                         "agent_addr": k.agent_addr or "",
                         "scaling_group": k.resource_group,
                         "endpoint_id": None,  # For inference endpoints
+                        # The address the network plugin assigned this kernel, if it assigns any.
+                        "cluster_network_ip": network_setup.endpoint_ips.get(kernel_id_str),
                     }
                     kernel_configs.append(kernel_config)
 
@@ -583,6 +597,7 @@ class SessionLauncher:
         network_name: str | None = None
         network_config: dict[str, Any] = {}
         cluster_ssh_port_mapping: ClusterSSHPortMapping | None = None
+        endpoint_ips: dict[str, str] = {}
 
         network_type = session.network_type or NetworkType.VOLATILE
 
@@ -614,11 +629,27 @@ class SessionLauncher:
                     "network_name": network_name,
                 }
             elif session.cluster_mode == ClusterMode.MULTI_NODE:
-                # Create overlay network for multi-node sessions
-                driver = self._config_provider.config.network.inter_container.default_driver
+                member_agents = sorted({
+                    str(kernel.agent_id) for kernel in session.kernels if kernel.agent_id
+                })
+                # The member agents' runtime limits the drivers; the configured default picks
+                # among them and is the fallback for agents that published no backend.
+                configured = self._config_provider.config.network.inter_container.default_driver
+                driver = await resolve_driver_for_agents(
+                    self._network_plugin_ctx.etcd,
+                    member_agents,
+                    configured_driver=configured,
+                    plugins=self._network_plugin_ctx.plugins,
+                )
                 if driver is None:
                     raise ServerMisconfiguredError(
                         "No inter-container network driver is configured."
+                    )
+                if driver != configured:
+                    log.info(
+                        "cluster-network driver chosen by the member agents' backend",
+                        driver=driver,
+                        configured_driver=configured,
                     )
 
                 # Check if plugin is available
@@ -635,11 +666,34 @@ class SessionLauncher:
                     )
 
                 network_plugin = self._network_plugin_ctx.plugins[driver]
+                await require_members_can_serve_driver(
+                    self._network_plugin_ctx.etcd, driver, network_plugin, member_agents
+                )
+                # Member agents and one endpoint per kernel let a plugin admit the session's nodes
+                # and assign each kernel an address; the Swarm overlay plugin ignores them.
+                # container_id is the kernel id, which the agent keys its endpoint on.
+                endpoints = [
+                    {
+                        "container_id": str(kernel.kernel_id),
+                        "agent_id": str(kernel.agent_id),
+                        # So the plugin's cluster name resolver can answer this kernel's hostname.
+                        "cluster_hostname": cluster_hostname_of(kernel),
+                    }
+                    for kernel in session.kernels
+                    if kernel.agent_id
+                ]
                 try:
                     network_info = await network_plugin.create_network(
-                        identifier=str(session.session_id)
+                        identifier=str(session.session_id),
+                        options={
+                            "member_agents": member_agents,
+                            "endpoints": endpoints,
+                        },
                     )
                     network_config = dict(network_info.options)
+                    # endpoint_ips is a launcher-only side channel (per-kernel), not part of
+                    # the cluster-wide network_config broadcast to every agent.
+                    endpoint_ips = dict(network_config.pop("endpoint_ips", {}))
                     network_name = network_info.network_id
                 except Exception:
                     log.exception("inter-container network creation failed", driver_name=driver)
@@ -685,6 +739,7 @@ class SessionLauncher:
             network_name=network_name,
             network_config=network_config,
             cluster_ssh_port_mapping=cluster_ssh_port_mapping,
+            endpoint_ips=endpoint_ips,
         )
 
     async def _create_cluster_ssh_keypair(self) -> ClusterSSHKeyPair:

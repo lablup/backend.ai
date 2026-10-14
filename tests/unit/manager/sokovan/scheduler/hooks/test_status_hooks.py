@@ -14,6 +14,7 @@ from uuid import uuid4
 
 import pytest
 
+from ai.backend.common.network.keys import agent_backend_key
 from ai.backend.common.types import AgentId, ClusterMode, SessionId
 from ai.backend.manager.errors.common import ServerMisconfiguredError
 from ai.backend.manager.models.network.row import NetworkType
@@ -24,6 +25,7 @@ from ai.backend.manager.sokovan.scheduler.hooks.status import (
     TerminatedTransitionHook,
 )
 from ai.backend.manager.sokovan.scheduler.recorder.context import SessionRecorderContext
+from ai.backend.testutils.in_memory_etcd import InMemoryEtcd
 
 
 class TestTerminatedTransitionHookNetworkCleanup:
@@ -50,6 +52,7 @@ class TestTerminatedTransitionHookNetworkCleanup:
     def network_plugin_ctx(self, network_plugin: AsyncMock) -> MagicMock:
         ctx = MagicMock()
         ctx.plugins = {"overlay": network_plugin}
+        ctx.etcd = InMemoryEtcd({})
         return ctx
 
     @pytest.fixture
@@ -113,6 +116,7 @@ class TestTerminatedTransitionHookNetworkCleanup:
         session.session_info.network.network_id = network_id
         session.session_info.resource.cluster_mode = ClusterMode.MULTI_NODE.name
         session.main_kernel.resource.agent = None
+        session.kernel_infos = []
         return session
 
     @pytest.fixture
@@ -142,6 +146,30 @@ class TestTerminatedTransitionHookNetworkCleanup:
 
         network_plugin.destroy_network.assert_awaited_once_with(network_id="net-123")
         agent_client.destroy_local_network.assert_not_awaited()
+
+    async def test_multinode_destroys_through_the_driver_the_launcher_resolved(
+        self,
+        hook: TerminatedTransitionHook,
+        multi_node_session: MagicMock,
+        network_plugin_ctx: MagicMock,
+        config_provider: MagicMock,
+    ) -> None:
+        # The launcher picks the driver from the members' backend; teardown must pick the same.
+        cni_plugin = AsyncMock()
+        cni_plugin.compatible_backends = frozenset({"containerd"})
+        overlay_plugin = AsyncMock()
+        overlay_plugin.compatible_backends = frozenset({"docker"})
+        network_plugin_ctx.plugins = {"overlay": overlay_plugin, "cni": cni_plugin}
+        network_plugin_ctx.etcd = InMemoryEtcd({agent_backend_key("agent-1"): "containerd"})
+        config_provider.config.network.inter_container.default_driver = "overlay"
+        kernel = MagicMock()
+        kernel.resource.agent = "agent-1"
+        multi_node_session.kernel_infos = [kernel]
+
+        await hook.execute(multi_node_session)
+
+        cni_plugin.destroy_network.assert_awaited_once_with(network_id="net-123")
+        network_plugin_ctx.plugins["overlay"].destroy_network.assert_not_awaited()
 
     async def test_singlenode_volatile_destroys_local_network(
         self,

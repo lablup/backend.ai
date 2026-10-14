@@ -22,6 +22,8 @@ class OverlayNetworkError(RuntimeError):
 
 
 class OverlayNetworkPlugin(AbstractNetworkManagerPlugin):
+    compatible_backends = frozenset({"docker"})
+
     docker: aiodocker.Docker
 
     def __init__(self, plugin_config: Mapping[str, Any], local_config: Mapping[str, Any]) -> None:

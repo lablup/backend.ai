@@ -19,6 +19,7 @@ from uuid import UUID
 import pytest
 from callosum.rpc import RPCUserError
 
+from ai.backend.common.network.keys import agent_backend_key
 from ai.backend.common.types import AgentId, AutoPullBehavior
 from ai.backend.manager.errors.agent import AgentConnectionUnavailable
 from ai.backend.manager.errors.common import ServerMisconfiguredError
@@ -32,6 +33,7 @@ from ai.backend.manager.views.sokovan.lifecycle import (
     SessionDataForPull,
     SessionDataForStart,
 )
+from ai.backend.testutils.in_memory_etcd import InMemoryEtcd
 
 
 async def _never_returns(*args: Any, **kwargs: Any) -> Any:
@@ -765,6 +767,63 @@ class TestSessionLauncherNetworkSetup:
         # Assert - Network plugin was used
         network_plugin = mock_network_plugin_ctx.plugins["overlay"]
         network_plugin.create_network.assert_awaited()
+
+    async def test_multi_node_refuses_a_member_the_driver_does_not_declare(
+        self,
+        launcher: SessionLauncher,
+        mock_network_plugin_ctx: MagicMock,
+        session_for_start_multi_node: SessionDataForStart,
+        image_config_default: dict[UUID, ImageConfigData],
+    ) -> None:
+        network_plugin = mock_network_plugin_ctx.plugins["overlay"]
+        network_plugin.compatible_backends = frozenset({"docker"})
+        mock_network_plugin_ctx.etcd = InMemoryEtcd({
+            agent_backend_key("agent-1"): "containerd",
+            agent_backend_key("agent-2"): "containerd",
+        })
+        session_ids = [session_for_start_multi_node.session_id]
+        with RecorderContext.scope("test", entity_ids=session_ids):
+            failed = await launcher.start_sessions_for_handler(
+                [session_for_start_multi_node],
+                image_config_default,
+            )
+
+        assert "NetworkBackendMismatch" in failed[session_for_start_multi_node.session_id].message
+        network_plugin.create_network.assert_not_awaited()
+
+    async def test_multi_node_gives_each_kernel_the_address_its_plugin_assigned(
+        self,
+        launcher: SessionLauncher,
+        mock_agent_client_pool: MagicMock,
+        mock_network_plugin_ctx: MagicMock,
+        session_for_start_multi_node: SessionDataForStart,
+        image_config_default: dict[UUID, ImageConfigData],
+    ) -> None:
+        kernels = session_for_start_multi_node.kernels
+        addresses = {str(k.kernel_id): f"10.128.0.{i + 1}" for i, k in enumerate(kernels)}
+        network_plugin = mock_network_plugin_ctx.plugins["overlay"]
+        network_plugin.create_network.return_value.options = {
+            "type": "example",
+            "endpoint_ips": addresses,
+        }
+        session_ids = [session_for_start_multi_node.session_id]
+        with RecorderContext.scope("test", entity_ids=session_ids):
+            await launcher.start_sessions_for_handler(
+                [session_for_start_multi_node], image_config_default
+            )
+
+        options = network_plugin.create_network.await_args.kwargs["options"]
+        assert options["member_agents"] == ["agent-1", "agent-2"]
+        assert [(e["container_id"], e["cluster_hostname"]) for e in options["endpoints"]] == [
+            (str(k.kernel_id), f"{k.cluster_role}{k.cluster_idx}") for k in kernels
+        ]
+        sent: dict[str, str | None] = {}
+        for call in mock_agent_client_pool._mock_client.create_kernels.call_args_list:
+            # The session-wide config every agent gets carries no per-kernel addresses.
+            assert call.args[3]["network_config"] == {"type": "example"}
+            for config in call.args[2]:
+                sent[config["environ"]["BACKENDAI_KERNEL_ID"]] = config["cluster_network_ip"]
+        assert sent == addresses
 
     async def test_host_network_with_ssh_port_mapping(
         self,
