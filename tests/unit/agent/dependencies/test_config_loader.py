@@ -14,8 +14,12 @@ from ai.backend.logging.types import LogLevel
 
 
 class TestAgentConfigLoaderDependency:
-    async def test_config_loader_loads_valid_config(self, tmp_path: Path) -> None:
+    async def test_config_loader_loads_valid_config(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         """Test that config loader can load a valid config file."""
+        # BACKEND_NAMESPACE overrides the file and the manager suite sets it process-wide.
+        monkeypatch.delenv("BACKEND_NAMESPACE", raising=False)
         config_path = tmp_path / "agent.toml"
         config_path.write_text("""
 [agent]
