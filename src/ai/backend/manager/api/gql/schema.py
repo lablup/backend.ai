@@ -914,8 +914,8 @@ class Subscription:
 
 
 # Per-request cost ceilings applied to every schema below.
-MAX_QUERY_DEPTH = 20
-MAX_ALIAS_COUNT = 20
+MAX_QUERY_DEPTH = 50
+MAX_ALIAS_COUNT = 50
 
 
 class CustomizedSchema(Schema):
