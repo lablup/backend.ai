@@ -1,4 +1,4 @@
-"""사용자 읽기 — 하나를 읽을 때와 여럿을 한 번에 읽을 때."""
+"""사용자 읽기 — 하나를 읽을 때, 여럿을 한 번에 읽을 때, email 로 찾을 때."""
 
 from __future__ import annotations
 
@@ -15,13 +15,16 @@ from ai.backend.common.dto.manager.v2.user.response import UserNode
 from ai.backend.manager.api.adapters.user.adapter import UserAdapter
 from ai.backend.manager.data.permission.types import Permission
 from ai.backend.manager.data.user.types import UserData
+from ai.backend.manager.errors.common import GenericBadRequest
 from ai.backend.manager.errors.permission import NotEnoughPermission
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.testutils.scenario_steps import (
     Answered,
     Given,
+    Held,
     Refused,
     Same,
+    SameAs,
     Scenario,
     Then,
     Verdict,
@@ -36,7 +39,8 @@ from bai_scenario.runner.steps import run_scenario
 from bai_scenario.seeds.domain.domain import TestSeedDomain
 
 type Loaded = list[UserNode | Exception | None]
-type Answer = UserNode | Loaded
+type LookedUp = list[UserID | Exception]
+type Answer = UserNode | Loaded | LookedUp
 
 
 @dataclass(frozen=True)
@@ -180,6 +184,67 @@ class LoadingNothing(When[AReaderAndATarget, UserAdapter, Answer]):
 
 
 @dataclass(frozen=True)
+class LookingUpTheTarget(When[AReaderAndATarget, UserAdapter, Answer]):
+    """상대 사용자를 email 로 찾는다."""
+
+    @override
+    def operation(self) -> str:
+        return "batch_lookup_by_emails"
+
+    @override
+    def describe(self, laid: AReaderAndATarget) -> str:
+        return f"{laid.caller.username}이 {laid.target.username}의 email 로 찾음"
+
+    @override
+    async def call(self, adapter: UserAdapter, laid: AReaderAndATarget) -> Answer:
+        with ActingAs(laid.caller):
+            return await adapter.batch_lookup_by_emails([laid.target.email])
+
+
+@dataclass(frozen=True)
+class LookingUpReadableUnreadableAndMissing(When[AReaderAndTwoUsers, UserAdapter, Answer]):
+    """읽을 수 있는 사람, 읽을 수 없는 사람, 없는 email 순으로 한 번에 찾는다."""
+
+    @override
+    def operation(self) -> str:
+        return "batch_lookup_by_emails"
+
+    @override
+    def describe(self, laid: AReaderAndTwoUsers) -> str:
+        return (
+            f"{laid.caller.username}이 {laid.readable.username}, "
+            f"{laid.unreadable.username}, 없는 email 순으로 email 을 찾음"
+        )
+
+    @override
+    async def call(self, adapter: UserAdapter, laid: AReaderAndTwoUsers) -> Answer:
+        with ActingAs(laid.caller):
+            return await adapter.batch_lookup_by_emails([
+                laid.readable.email,
+                laid.unreadable.email,
+                f"{uuid4()}@nowhere.invalid",
+            ])
+
+
+@dataclass(frozen=True)
+class LookingUpNothing(When[AReaderAndATarget, UserAdapter, Answer]):
+    """빈 email 목록으로 찾는다."""
+
+    @override
+    def operation(self) -> str:
+        return "batch_lookup_by_emails"
+
+    @override
+    def describe(self, laid: AReaderAndATarget) -> str:
+        return f"{laid.caller.username}이 빈 목록으로 email 을 찾음"
+
+    @override
+    async def call(self, adapter: UserAdapter, laid: AReaderAndATarget) -> Answer:
+        with ActingAs(laid.caller):
+            return await adapter.batch_lookup_by_emails([])
+
+
+@dataclass(frozen=True)
 class TheTargetNode(Then[AReaderAndATarget, Answer]):
     """읽힌 사용자 노드가 통째로 온다."""
 
@@ -261,6 +326,51 @@ class AnEmptyList(Then[AReaderAndATarget, Answer]):
         if answered.raised is not None:
             return [Same("raised", type(answered.raised).__name__, None)]
         return [Same("loaded", answered.response, [])]
+
+
+@dataclass(frozen=True)
+class TheTargetId(Then[AReaderAndATarget, Answer]):
+    """찾은 사용자의 id 하나가 온다."""
+
+    @override
+    def says(self) -> str:
+        return "찾은 사용자의 id 가 온다"
+
+    @override
+    def look(self, laid: AReaderAndATarget, answered: Answered[Answer]) -> list[Verdict]:
+        found = answered.response
+        if not isinstance(found, list):
+            return [Same("raised", type(answered.raised).__name__, None)]
+        return [
+            Same("length", len(found), 1),
+            Held[object](
+                "[0]", found[0], SameAs[object](UserID(laid.target.id), "대상 사용자의 id")
+            ),
+        ]
+
+
+@dataclass(frozen=True)
+class TheReadableIdThenTwoRefusals(Then[AReaderAndTwoUsers, Answer]):
+    """읽을 수 있는 사람은 id, 읽을 수 없는 사람과 없는 email 은 같은 거부가 온다."""
+
+    @override
+    def says(self) -> str:
+        return "읽을 수 있는 사람은 id, 나머지 둘은 같은 거부가 입력 순서대로 온다"
+
+    @override
+    def look(self, laid: AReaderAndTwoUsers, answered: Answered[Answer]) -> list[Verdict]:
+        found = answered.response
+        if not isinstance(found, list):
+            return [Same("raised", type(answered.raised).__name__, None)]
+        first, second, third = found
+        return [
+            Same("length", len(found), 3),
+            Held[object](
+                "[0]", first, SameAs[object](UserID(laid.readable.id), "읽을 수 있는 사용자의 id")
+            ),
+            Refused(GenericBadRequest, second if isinstance(second, Exception) else None),
+            Refused(GenericBadRequest, third if isinstance(third, Exception) else None),
+        ]
 
 
 @dataclass(frozen=True)
@@ -403,12 +513,98 @@ class ABatchLoadOfNothingAnswersNothing(
         return AnEmptyList()
 
 
+@dataclass(frozen=True)
+class AGrantedUserLooksUpAnotherByEmail(
+    Scenario[TestSeedingSession, AReaderAndATarget, UserAdapter, Answer]
+):
+    @override
+    def summary(self) -> str:
+        return "a-user-granted-read-on-another-user-looks-up-their-id-by-email"
+
+    @override
+    def describe(self) -> str:
+        return (
+            "대상 사용자 스코프에서 사용자 읽기 권한을 받은 사용자가 그 사용자의 email 을 찾으면, "
+            "그 사용자의 id 가 답으로 온다"
+        )
+
+    @override
+    def given(self) -> Given[TestSeedingSession, AReaderAndATarget]:
+        return SomeoneAndAnother(granted=True)
+
+    @override
+    def when(self) -> When[AReaderAndATarget, UserAdapter, Answer]:
+        return LookingUpTheTarget()
+
+    @override
+    def then(self) -> Then[AReaderAndATarget, Answer]:
+        return TheTargetId()
+
+
+@dataclass(frozen=True)
+class AnUnreadableUserAndAMissingEmailAreRefusedAlike(
+    Scenario[TestSeedingSession, AReaderAndTwoUsers, UserAdapter, Answer]
+):
+    @override
+    def summary(self) -> str:
+        return "an-unreadable-user-and-a-missing-email-are-refused-alike"
+
+    @override
+    def describe(self) -> str:
+        return (
+            "한 사용자에게만 읽기 권한을 받은 사용자가 읽을 수 있는 사용자, 읽을 수 없는 사용자, "
+            "없는 email 을 한 번에 찾으면, 첫째는 id, 나머지 둘은 같은 거부가 입력 순서대로 온다"
+        )
+
+    @override
+    def given(self) -> Given[TestSeedingSession, AReaderAndTwoUsers]:
+        return SomeoneReadingOneOfTwo()
+
+    @override
+    def when(self) -> When[AReaderAndTwoUsers, UserAdapter, Answer]:
+        return LookingUpReadableUnreadableAndMissing()
+
+    @override
+    def then(self) -> Then[AReaderAndTwoUsers, Answer]:
+        return TheReadableIdThenTwoRefusals()
+
+
+@dataclass(frozen=True)
+class AnEmailLookupOfNothingAnswersNothing(
+    Scenario[TestSeedingSession, AReaderAndATarget, UserAdapter, Answer]
+):
+    @override
+    def summary(self) -> str:
+        return "an-email-lookup-of-no-emails-answers-an-empty-list"
+
+    @override
+    def describe(self) -> str:
+        return (
+            "권한 없는 사용자가 빈 email 목록을 주면, 어떤 액션도 부르지 않고 빈 목록이 답으로 온다"
+        )
+
+    @override
+    def given(self) -> Given[TestSeedingSession, AReaderAndATarget]:
+        return SomeoneAndAnother(granted=False)
+
+    @override
+    def when(self) -> When[AReaderAndATarget, UserAdapter, Answer]:
+        return LookingUpNothing()
+
+    @override
+    def then(self) -> Then[AReaderAndATarget, Answer]:
+        return AnEmptyList()
+
+
 SCENARIOS: list[Scenario[TestSeedingSession, Any, UserAdapter, Answer]] = [
     AGrantedUserReadsAnother(started=datetime.now(UTC)),
     AUserGrantedNothingMayNotReadAnother(),
     ABatchLoadAnswersEachElementInOrder(started=datetime.now(UTC)),
     TheSuperadminBatchLoadLeavesAMissingIdEmpty(started=datetime.now(UTC)),
     ABatchLoadOfNothingAnswersNothing(),
+    AGrantedUserLooksUpAnotherByEmail(),
+    AnUnreadableUserAndAMissingEmailAreRefusedAlike(),
+    AnEmailLookupOfNothingAnswersNothing(),
 ]
 
 

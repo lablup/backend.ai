@@ -128,6 +128,7 @@ from ai.backend.manager.models.user.searchers import UserSearcher
 from ai.backend.manager.models.user.updaters import UserUpdater
 from ai.backend.manager.services.domain.actions.lookup import LookupDomainAction
 from ai.backend.manager.services.user.actions.bulk_get import BulkGetUsersAction
+from ai.backend.manager.services.user.actions.bulk_lookup import BulkLookupUsersAction
 from ai.backend.manager.services.user.actions.create_user import (
     BulkCreateUserAction,
     CreateUserAction,
@@ -234,6 +235,13 @@ class UserAdapter(BaseAdapter):
             next(nodes) if item.value is not None else self.batch_load_failure(item.error)
             for item in result.items
         ]
+
+    async def batch_lookup_by_emails(self, emails: Sequence[str]) -> list[UserID | Exception]:
+        """The user each email names, for DataLoader use, checked per user."""
+        if not emails:
+            return []
+        lookup = await self._user.bulk_lookup.run(BulkLookupUsersAction(emails=list(emails)))
+        return [lookup.resolved.get(email) or lookup.failures[email] for email in emails]
 
     # ------------------------------------------------------------------ GQL search (cursor-based)
 
