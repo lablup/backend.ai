@@ -16,6 +16,27 @@ Changes
 
 <!-- towncrier release notes start -->
 
+## 26.4.13 (2026-10-14)
+
+### Fixes
+* Make the Redis MQ consumer read its streams from `RedisMQArgs.db` instead of always reading `REDIS_STREAM_DB` ([#15252](https://github.com/lablup/backend.ai/issues/15252))
+* Answer a malformed id given to a GraphQL query or mutation with an invalid-parameters error instead of an internal error ([#15257](https://github.com/lablup/backend.ai/issues/15257))
+* Fix GraphQL type mismatch when querying default deployment handler options for resource groups ([#15268](https://github.com/lablup/backend.ai/issues/15268))
+* Answer an `imageNodes` cursor whose id is not a UUID with an invalid-cursor error instead of an internal error ([#15272](https://github.com/lablup/backend.ai/issues/15272))
+* Fix the `start_command` normalization migration failing on deployment revisions whose model definition is a JSON `null` ([#15333](https://github.com/lablup/backend.ai/issues/15333))
+* Switch the shipped systemd units and the package-install docs from `Restart=on-failure` to `Restart=always`, because a service whose worker child crashes still exits 0 and was never restarted. ([#15343](https://github.com/lablup/backend.ai/issues/15343))
+* Fix search filters so that an `OR` item setting several fields matches only when all of them match, instead of when any one does. ([#15397](https://github.com/lablup/backend.ai/issues/15397))
+* Fix search filters so that `NOT` with several items excludes rows matching any of them, instead of only rows matching all of them. ([#15410](https://github.com/lablup/backend.ai/issues/15410))
+* Stop logins from slowing down as a user piles up login sessions without logging out, by checking all of that user's sessions against Valkey in one request instead of one request per session ([#15413](https://github.com/lablup/backend.ai/issues/15413))
+* Fix the storage-proxy folder ZIP download hanging forever and holding the folder's path list in worker memory when the zip producer thread fails, and enable ZIP64 so folders with files over 4 GiB can be downloaded ([#15423](https://github.com/lablup/backend.ai/issues/15423))
+* Fix the deployment `tags` filter (`equals`, `in` and their variants) to match a single tag of a comma-joined tag column. ([#15425](https://github.com/lablup/backend.ai/issues/15425))
+* Speed up a forced login that evicts many login sessions, by deleting their Valkey session keys in one request instead of one request per session ([#15429](https://github.com/lablup/backend.ai/issues/15429))
+* Reject non-IP and non-CIDR entries in app proxy allowed_client_ips at save time instead of silently lifting the IP restriction ([#15520](https://github.com/lablup/backend.ai/issues/15520))
+
+### External Dependency Updates
+* Upgrade `strawberry-graphql` to 0.327.7 to address GHSA-pfvf-fwfp-25mp and GHSA-m952-2w3f-6r8h ([#15378](https://github.com/lablup/backend.ai/issues/15378))
+
+
 ## 26.4.12 (2026-10-02)
 
 ### Fixes
