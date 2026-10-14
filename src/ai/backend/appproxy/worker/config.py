@@ -40,7 +40,12 @@ from ai.backend.common.configs import (
     ServiceDiscoveryConfig,
 )
 from ai.backend.common.exception import BackendAISchemaValidationFailed
-from ai.backend.common.meta import BackendAIConfigMeta, CompositeType, ConfigExample
+from ai.backend.common.meta import (
+    NEXT_RELEASE_VERSION,
+    BackendAIConfigMeta,
+    CompositeType,
+    ConfigExample,
+)
 from ai.backend.common.typed_validators import AutoDirectoryPath
 from ai.backend.common.types import ServiceDiscoveryType
 from ai.backend.logging import LogLevel
@@ -385,7 +390,7 @@ class IngressInMemoryConfig(BaseSchema):
                 "Seconds an ingress filled from a later layer is held. "
                 "Unset holds it until removed. Requires a layer after in-memory."
             ),
-            added_version="26.9.0",
+            added_version=NEXT_RELEASE_VERSION,
             example=ConfigExample(local="", prod="60.0"),
         ),
     ]
@@ -397,7 +402,7 @@ class IngressInMemoryConfig(BaseSchema):
                 "Seconds a key missing from every later layer is remembered as missing. "
                 "Unset does not remember misses. Requires a layer after in-memory."
             ),
-            added_version="26.9.0",
+            added_version=NEXT_RELEASE_VERSION,
             example=ConfigExample(local="", prod="5.0"),
         ),
     ]
@@ -412,7 +417,7 @@ class IngressRedisConfig(BaseSchema):
                 "Prefix of the Redis keys holding ingresses. "
                 "The connection is the worker's redis config."
             ),
-            added_version="26.9.0",
+            added_version=NEXT_RELEASE_VERSION,
             example=ConfigExample(local="appproxy:ingress", prod="appproxy:ingress"),
         ),
     ]
@@ -427,7 +432,7 @@ class IngressConfig(BaseSchema):
                 "Where the worker reads ingresses, in lookup order. "
                 "in-memory, when present, comes first."
             ),
-            added_version="26.9.0",
+            added_version=NEXT_RELEASE_VERSION,
             example=ConfigExample(local='["in-memory"]', prod='["in-memory", "redis"]'),
         ),
     ]
@@ -436,7 +441,7 @@ class IngressConfig(BaseSchema):
         Field(default_factory=IngressInMemoryConfig, alias="in-memory"),
         BackendAIConfigMeta(
             description="In-memory layer settings. Read only when layers include in-memory.",
-            added_version="26.9.0",
+            added_version=NEXT_RELEASE_VERSION,
             composite=CompositeType.FIELD,
         ),
     ]
@@ -445,7 +450,7 @@ class IngressConfig(BaseSchema):
         Field(default_factory=IngressRedisConfig),
         BackendAIConfigMeta(
             description="Redis layer settings. Read only when layers include redis.",
-            added_version="26.9.0",
+            added_version=NEXT_RELEASE_VERSION,
             composite=CompositeType.FIELD,
         ),
     ]
@@ -904,7 +909,7 @@ class ProxyWorkerConfig(BaseSchema):
         Field(default_factory=IngressConfig),
         BackendAIConfigMeta(
             description="Where the worker reads the ingresses it serves.",
-            added_version="26.9.0",
+            added_version=NEXT_RELEASE_VERSION,
             composite=CompositeType.FIELD,
         ),
     ]
