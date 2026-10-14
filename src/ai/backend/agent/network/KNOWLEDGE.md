@@ -1,9 +1,9 @@
 ---
 name: agent-container-network
 type: design-rationale
-description: The agent's runtime side of container networking — the CNI plugin contract (ADD, DEL, STATUS, GC) and where the agent calls it, container nameservers, and the container locator a plugin's privileged helper uses
+description: The agent's runtime side of container networking — the CNI plugin contract (ADD, DEL, STATUS, GC) and where the agent calls it, the start gate a Docker container waits at for its ADD, container nameservers, and the container locator a plugin's privileged helper uses
 scope: src/ai/backend/agent/network
-keywords: [AbstractCniPlugin, CniPluginContext, allow-cni-plugins, CniHostContext, CniRequest, CniResult, not_serving_reason, publish_backend, resolve_container_dns, ContainerLocator, LiveContainer, build_container_locator]
+keywords: [AbstractCniPlugin, CniPluginContext, allow-cni-plugins, CniHostContext, CniRequest, CniResult, not_serving_reason, publish_backend, resolve_container_dns, ContainerLocator, LiveContainer, build_container_locator, stage_gate, apply_gate, wait_gated_pid, repl_host, PUBLISHED_PORTS, cluster_network_ip]
 sources:
   - src/ai/backend/agent/network/cni.py
   - src/ai/backend/agent/plugin/cni.py
@@ -12,10 +12,13 @@ sources:
   - src/ai/backend/agent/network/locator.py
   - src/ai/backend/agent/network/locator_builder.py
   - src/ai/backend/agent/docker/locator.py
+  - src/ai/backend/agent/gate.py
+  - src/ai/backend/agent/docker/gate.py
+  - src/ai/backend/agent/docker/agent.py
   - src/ai/backend/agent/types.py
 generated:
   by: claude-code/opus-5.5
-  at: 2026-10-09
+  at: 2026-10-13
 status: stable
 ---
 
@@ -28,7 +31,7 @@ the network is built is the plugin's; the agent knows it only through `AbstractC
 
 | Verb | When the agent calls it | Plugin's promise |
 |---|---|---|
-| `add(CniRequest)` | the container exists, before its command runs | attach it; return its addresses and nameservers (`CniResult`) |
+| `add(CniRequest)` | the container is parked at its start gate, before its command runs | attach it; return its addresses and nameservers (`CniResult`) |
 | `delete(CniRequest)` | `clean_kernel`, before the container is removed | give back what the ADD took; idempotent; ignore containers it never attached |
 | `status()` | every heartbeat (`not_serving_reason`) | `not_ready_reason` set while it cannot serve an ADD |
 | `gc(valid)` | agent start, after the container scan, before any lifecycle event | drop what it holds for containers not in `valid` |
@@ -40,6 +43,23 @@ the network is built is the plugin's; the agent knows it only through `AbstractC
 - GC runs before the queued START/CLEAN events: a CLEAN is a DEL, and the plugin must know the container by then.
 - `init` gets `CniHostContext` (agent id, boot id, runtime backend, etcd, upstream nameservers). Node-local settings come from `[cni.<plugin>]` in the agent config, which the agent never reads.
 - The agent publishes its boot id, then its runtime backend (`advert.py`), before any plugin starts: a plugin's adverts are fenced on that boot id.
+
+## Two-phase start gate (`gate.py`, `docker/gate.py`)
+
+- Docker execs the command at start (`docker create` gives no PID or netns), so a CNI-attached container starts behind a gate: the wrapper writes `ready`, blocks on the `go` FIFO, then execs in place, so the attached PID is the user's PID.
+- `apply_gate` keeps the image entrypoint after the wrapper: replacing it dropped `/opt/kernel/entrypoint.sh` and the runner ran as root. The wrapper follows whichever of `EntryPoint` (the Docker backend) or `Entrypoint` (the API) is present.
+- `signal_go` is non-blocking: a blocking FIFO open in an executor thread parks forever when the container never reached the gate.
+- `wait_ready` waits for the marker, never a transient setup PID; `failure` is polled so an immediate death reports as broken, not slow.
+- The gate is released whether the ADD succeeds or not: a container parked forever has no timeout and no message.
+
+## Docker on a CNI network (`docker/agent.py`)
+
+- A session whose network config has a `type` runs `NetworkMode: none` and is ADDed by that plugin; a plugin this agent has not loaded fails the create with `CniPluginNotInstalled`. A config without `type` is Docker's own, unchanged.
+- `args` carry the session id, kernel id and cluster hostname; `runtime_config` carries the service `port_mappings` and the controller-assigned `ips` (`kernel_config["cluster_network_ip"]`).
+- The container gets a bind-mounted `resolv.conf`, rewritten after the ADD to put the result's nameservers first.
+- The REPL ports are dialled at the result's first IP (`repl_host`, kept in the recovery record), never forwarded; only service ports go into `port_mappings`. An ADD with no IP fails the create.
+- Docker reports no ports for a `none` container, so on a CNI container the reserved ones ride the `ai.backend.internal.published-ports` label; `container_from_docker_container` reads it when Docker reports none, which keeps the port pool right across restarts.
+- The ADD runs in `_provision_started_container`, so a failed attach is a failed create with a container to destroy.
 
 ## Withholding the heartbeat
 

@@ -63,6 +63,7 @@ from ai.backend.agent.errors import (
     UnsupportedResource,
 )
 from ai.backend.agent.errors.agent import ImagePullFailedError
+from ai.backend.agent.errors.network import CniPluginNotInstalled
 from ai.backend.agent.errors.resources import PortPoolExhaustedError
 from ai.backend.agent.etcd import AgentEtcdClientView
 from ai.backend.agent.fs import create_scratch_filesystem, destroy_scratch_filesystem
@@ -84,11 +85,18 @@ from ai.backend.agent.kernel_registry.recovery.docker_recovery import (
 )
 from ai.backend.agent.kernel_registry.writer.types import KernelRegistrySaveMetadata
 from ai.backend.agent.network.cni import (
+    CNI_ARG_CLUSTER_HOSTNAME,
     CNI_ARG_KERNEL_ID,
     CNI_ARG_SESSION_ID,
     CNI_IFNAME,
+    CNI_TYPE_KEY,
+    CniPortMapping,
     CniRequest,
+    CniRuntimeConfig,
+    netns_path_for_pid,
 )
+from ai.backend.agent.network.dns import resolve_container_dns
+from ai.backend.agent.plugin.cni import AbstractCniPlugin, CniPluginContext
 from ai.backend.agent.plugin.network import (
     ContainerNetworkCapability,
     ContainerNetworkInfo,
@@ -177,6 +185,7 @@ from ai.backend.common.types import (
 from ai.backend.logging.formatter import pretty
 from ai.backend.logging.structured import StructuredLogger
 
+from .gate import apply_gate, release_gate, stage_gate, wait_gated_pid
 from .kernel import DockerKernel
 from .utils import PersistentServiceContainer
 
@@ -375,6 +384,13 @@ def container_from_docker_container(src: DockerContainer) -> Container:
             host_ip = host_ports[0]["HostIp"]
             host_port = int(host_ports[0]["HostPort"])
         ports.append(Port(host_ip, private_port, host_port))
+    published = (src["Config"]["Labels"] or {}).get(LabelName.PUBLISHED_PORTS)
+    if published and not any(port.host_port for port in ports):
+        # A `none` container (CNI-attached): its plugin forwards these, Docker publishes nothing.
+        ports = []
+        for pair in published.split(","):
+            container_port, _, host_port_text = pair.partition(":")
+            ports.append(Port("0.0.0.0", int(container_port), int(host_port_text)))
     return Container(
         id=ContainerId(src.id),
         status=src["State"]["Status"],
@@ -429,6 +445,15 @@ class DockerPurgeImageReq:
     noprune: bool
 
 
+#: Docker's network mode for a container its CNI plugin attaches; it starts with only ``lo``.
+NO_NETWORK_MODE: Final = "none"
+
+#: The kernel runner's control channel, dialled at a CNI-attached container's own address.
+_REPL_IN_PORT: Final = 2000
+_REPL_OUT_PORT: Final = 2001
+_REPL_PORTS: Final = frozenset({_REPL_IN_PORT, _REPL_OUT_PORT})
+
+
 class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
     scratch_dir: Path
     tmp_dir: Path
@@ -443,6 +468,17 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
     cluster_ssh_port_mapping: ClusterSSHPortMapping | None
     gwbridge_subnet: str | None
     _seccomp_profile_as_path: bool
+    #: The agent's CNI plugins, shared with it: sessions outlive kernels.
+    _cni_plugin_ctx: CniPluginContext
+    #: The plugin attaching this kernel, set in apply_network; it puts the container behind the
+    #: start gate. None: Docker networks the container itself.
+    _cni_plugin: AbstractCniPlugin | None
+    #: The session's network config, as the plugin receives it.
+    _cni_config: Mapping[str, Any]
+    #: The host ports the plugin forwards to the container.
+    _cni_port_mappings: tuple[CniPortMapping, ...]
+    #: The container's address from the ADD; the agent dials the repl there.
+    _container_ip: str | None
 
     network_plugin_ctx: NetworkPluginContext
 
@@ -459,6 +495,7 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
         agent_sockpath: Path,
         resource_lock: asyncio.Lock,
         network_plugin_ctx: NetworkPluginContext,
+        cni_plugin_ctx: CniPluginContext,
         restarting: bool = False,
         cluster_ssh_port_mapping: ClusterSSHPortMapping | None = None,
         gwbridge_subnet: str | None = None,
@@ -494,6 +531,11 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
         self.cluster_ssh_port_mapping = cluster_ssh_port_mapping
         self._seccomp_profile_as_path = seccomp_profile_as_path
         self.gwbridge_subnet = gwbridge_subnet
+        self._cni_plugin_ctx = cni_plugin_ctx
+        self._cni_plugin = None
+        self._cni_config = {}
+        self._cni_port_mappings = ()
+        self._container_ip = None
 
         self.network_plugin_ctx = network_plugin_ctx
 
@@ -817,8 +859,91 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
             opts=opts,
         )
 
+    @property
+    def _gate_dir(self) -> Path:
+        """Where this kernel's start gate lives: the config dir, not the user's work dir."""
+        return self.config_dir / "gate"
+
+    def _session_resolv_conf(self) -> Path:
+        """The resolv.conf this kernel gets, bind-mounted over the image's."""
+        return self.config_dir / "resolv.conf"
+
+    def _write_session_resolv_conf(self, nameservers: Sequence[str] = ()) -> None:
+        """Write the kernel's resolver list, with the network's own nameservers first.
+
+        Rewritten in place: the file is bind-mounted, so the container sees it on its next lookup.
+        """
+        resolv = resolve_container_dns(self.local_config.container.dns or ())
+        resolv.nameservers = [*nameservers, *resolv.nameservers]
+        self._session_resolv_conf().write_text(resolv.render())
+
+    def _cni_request(self, cid: str, *, netns: str) -> CniRequest:
+        """The ADD of this kernel's container, as its CNI plugin receives it."""
+        return CniRequest(
+            container_id=cid,
+            netns=netns,
+            ifname=CNI_IFNAME,
+            config=self._cni_config,
+            args={
+                CNI_ARG_SESSION_ID: str(self.kernel_config["session_id"]),
+                CNI_ARG_KERNEL_ID: str(self.kernel_id),
+                CNI_ARG_CLUSTER_HOSTNAME: str(self.kernel_config["cluster_hostname"]),
+            },
+            runtime_config=CniRuntimeConfig(
+                port_mappings=self._cni_port_mappings,
+                ips=(
+                    (ip,)
+                    if (ip := self.kernel_config.get("cluster_network_ip")) is not None
+                    else ()
+                ),
+            ),
+        )
+
+    async def _attach_container_network(
+        self, container: DockerContainer, cid: str, plugin: AbstractCniPlugin
+    ) -> None:
+        """ADD the gated container to its network, then let its command run.
+
+        The gate is always released: a container parked forever has no timeout and no message.
+        """
+        try:
+            task_pid = await wait_gated_pid(container, self._gate_dir)
+            result = await plugin.add(self._cni_request(cid, netns=netns_path_for_pid(task_pid)))
+            self._container_ip = result.primary_ip
+            if self._container_ip is None:
+                raise ContainerCreationError(
+                    container_id=ContainerId(cid),
+                    message="the network plugin's ADD yielded no address for the container",
+                )
+            self._write_session_resolv_conf(result.dns.nameservers)
+        finally:
+            await asyncio.to_thread(release_gate, self._gate_dir)
+
     @override
     async def apply_network(self, cluster_info: ClusterInfo) -> None:
+        network_config = cluster_info["network_config"]
+        if network_config.get(CNI_TYPE_KEY) is not None:
+            # The container starts with no network and waits at a gate until its CNI plugin has
+            # attached it by PID.
+            cni_plugin = self._cni_plugin_ctx.plugin_of(network_config)
+            if cni_plugin is None:
+                raise CniPluginNotInstalled(
+                    f"session {self.kernel_config['session_id']} needs the"
+                    f" {network_config[CNI_TYPE_KEY]!r} network plugin, which this agent has not"
+                    " loaded"
+                )
+            self._cni_plugin = cni_plugin
+            self._cni_config = dict(network_config)
+            self.container_configs.append({
+                "HostConfig": {
+                    "NetworkMode": NO_NETWORK_MODE,
+                    # Docker's own resolv.conf is useless for a `none` container: bind ours (the
+                    # network's nameservers are prepended after the ADD).
+                    "Binds": [f"{self._session_resolv_conf()}:/etc/resolv.conf:rw"],
+                },
+            })
+            self._write_session_resolv_conf()
+            return
         # FIXME: find out way to inect network ID to kernel resource spec
         match cluster_info["network_config"].get("mode"):
             case "bridge":
@@ -1237,6 +1362,11 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
 
         The caller turns anything raised here into a `ContainerCreationError` naming the container.
         """
+        if self._cni_plugin is not None:
+            # Parked: namespaces and PID final, command not started. The only window to attach;
+            # racing the runner's init surfaces as a rendezvous hang.
+            await self._attach_container_network(container, cid, self._cni_plugin)
+
         if self.internal_data.get("sudo_session_enabled", False):
             exec = await container.exec(
                 [
@@ -1371,6 +1501,14 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
                     ],
                 )
 
+        if self._cni_plugin is not None:
+            # Services only: the repl is dialled at the container's own address (see DockerKernel).
+            self._cni_port_mappings = tuple(
+                CniPortMapping(host_port=hp, container_port=cp)
+                for hp, cp in zip(host_ports, exposed_ports, strict=True)
+                if cp not in _REPL_PORTS
+            )
+
         if self.image_ref.is_local:
             image = self.image_ref.short
         else:
@@ -1484,6 +1622,16 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
                 for dev_name, device_alloc in resource_spec.allocations.items():
                     self.computers[dev_name].alloc_map.free(device_alloc)
 
+        if self._cni_plugin is not None:
+            # Docker reports no ports for a `none` container; a restart reads them here.
+            container_config["Labels"][LabelName.PUBLISHED_PORTS] = ",".join(
+                f"{cp}:{hp}" for cp, hp in zip(exposed_ports, host_ports, strict=True)
+            )
+            # Park the entrypoint at the start gate so the container is attached before its
+            # command runs (see docker/gate.py).
+            stage_gate(self._gate_dir)
+            apply_gate(container_config, self._gate_dir)
+
         # We are all set! Create and start the container.
         async with closing_async(Docker()) as docker:
             container: DockerContainer | None = None
@@ -1561,7 +1709,21 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
             created_host_ports: tuple[int, ...]
             repl_in_port = 0
             repl_out_port = 0
-            if container_network_info:
+            if self._cni_plugin is not None:
+                # Docker publishes nothing for a `none` container: the ADD forwarded the host
+                # ports to the container's address.
+                kernel_host = str(advertised_kernel_host or container_bind_host)
+                session_ports = dict(zip(exposed_ports, host_ports, strict=True))
+                # The container's own repl ports, dialled at its LOCAL address (see repl_host).
+                repl_in_port, repl_out_port = _REPL_IN_PORT, _REPL_OUT_PORT
+                stdin_port = 0  # legacy
+                stdout_port = 0  # legacy
+                for sport in service_ports:
+                    sport["host_ports"] = tuple(
+                        session_ports[cport] for cport in sport["container_ports"]
+                    )
+                created_host_ports = tuple(host_ports)
+            elif container_network_info:
                 kernel_host = container_network_info.container_host
                 port_map = container_network_info.services
                 if "replin" not in port_map or "replout" not in port_map:
@@ -1618,6 +1780,8 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
         return {
             "container_id": container._id,
             "kernel_host": kernel_host,
+            # A CNI-attached container's address, where the agent dials the repl; else loopback.
+            "repl_host": self._container_ip if self._cni_plugin is not None else None,
             "repl_in_port": repl_in_port,
             "repl_out_port": repl_out_port,
             "stdin_port": stdin_port,  # legacy
@@ -2296,6 +2460,7 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
             self.agent_sockpath,
             self.resource_lock,
             self.network_plugin_ctx,
+            self.cni_plugin_ctx,
             restarting=restarting,
             cluster_ssh_port_mapping=cluster_ssh_port_mapping,
             gwbridge_subnet=self.gwbridge_subnet,

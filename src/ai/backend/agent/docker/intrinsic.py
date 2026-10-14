@@ -871,7 +871,8 @@ class MemoryPlugin(AbstractComputePlugin):
                     io_write_bytes += item["value"]
             net_rx_bytes = 0
             net_tx_bytes = 0
-            for name, stat in ret["networks"].items():
+            # A `none` container (attached by a CNI plugin) has no `networks` in its stats.
+            for stat in ret.get("networks", {}).values():
                 net_rx_bytes += stat["rx_bytes"]
                 net_tx_bytes += stat["tx_bytes"]
             scratch_sz = await run_in_executor_with_context(None, get_scratch_size, container_id)

@@ -5,7 +5,7 @@ from collections.abc import Generator
 from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import Any, override
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -242,6 +242,32 @@ class TestMemoryPluginDockerClientLifecycle(BaseDockerIntrinsicTest):
         with patch("ai.backend.agent.docker.intrinsic.Docker") as mock_docker_cls:
             await memory_plugin.gather_container_measures(memory_cgroup_context, container_ids)
             mock_docker_cls.assert_not_called()
+
+
+class TestMemoryPluginApiStatsOfANoneModeContainer(BaseDockerIntrinsicTest):
+    """A container on `NetworkMode: none` (attached by a CNI plugin) reports no `networks`."""
+
+    @override
+    @pytest.fixture
+    def docker_stats_response(self) -> dict[str, Any]:
+        return {
+            "memory_stats": {"usage": 100, "limit": 1000},
+            "blkio_stats": {"io_service_bytes_recursive": [{"op": "Read", "value": 7}]},
+        }
+
+    async def test_its_memory_and_io_are_still_measured(
+        self,
+        docker_stat_context: MagicMock,
+        mock_fetch_api_stats: MagicMock,
+    ) -> None:
+        plugin = MemoryPlugin.__new__(MemoryPlugin)
+        plugin._docker = AsyncMock()
+        measures = await plugin.gather_container_measures(docker_stat_context, ["cid-1"])
+
+        by_key = {str(m.key): m.per_container for m in measures}
+        assert by_key["mem"]["cid-1"].value == 100
+        assert by_key["io_read"]["cid-1"].value == 7
+        assert by_key["net_rx"]["cid-1"].value == 0
 
 
 class TestMemoryPluginContainerPidValidation(BaseDockerIntrinsicTest):

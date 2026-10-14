@@ -33,6 +33,7 @@ class KernelRecoveryScratchData(BackendAISchema):
     service_ports: list[ServicePort]
     repl_in_port: int
     repl_out_port: int
+    repl_host: str | None = None
 
     @classmethod
     def from_kernel_recovery_data(
@@ -54,6 +55,7 @@ class KernelRecoveryScratchData(BackendAISchema):
             service_ports=data.service_ports,
             repl_in_port=data.repl_in_port,
             repl_out_port=data.repl_out_port,
+            repl_host=data.repl_host,
         )
 
     def to_kernel_recovery_data(
@@ -76,6 +78,7 @@ class KernelRecoveryScratchData(BackendAISchema):
             service_ports=self.service_ports,
             repl_in_port=self.repl_in_port,
             repl_out_port=self.repl_out_port,
+            repl_host=self.repl_host,
             resource_spec=resource_spec,
             environ=environ,
         )
