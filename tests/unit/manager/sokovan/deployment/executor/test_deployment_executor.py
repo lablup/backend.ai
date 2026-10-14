@@ -11,10 +11,15 @@ Test Scenarios:
 
 from __future__ import annotations
 
+from types import SimpleNamespace
+from typing import cast
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
+from ai.backend.common.config import ModelDefinition
+from ai.backend.common.types import EndpointProtocol
+from ai.backend.manager.data.deployment.types import DeploymentInfo
 from ai.backend.manager.data.resource.types import ResourceGroupProxyTarget
 from ai.backend.manager.sokovan.deployment.executor import DeploymentExecutor
 from ai.backend.manager.sokovan.deployment.recorder.context import DeploymentRecorderContext
@@ -305,3 +310,72 @@ class TestCalculateDesiredReplicas:
         # Critical: no desired-replica write. That is what was previously
         # flipping the deployment into SCALING and wedging it.
         mock_deployment_repo.update_desired_replicas_bulk.assert_not_awaited()
+
+
+# =============================================================================
+# TestBuildEndpointItem (service.protocol -> AppProxy endpoint item)
+# =============================================================================
+
+
+class TestBuildEndpointItem:
+    """``_build_endpoint_item`` carries ``service.protocol`` to the coordinator item."""
+
+    @staticmethod
+    def _deployment_with(
+        ready_deployment: DeploymentWithHistory, model_definition: ModelDefinition | None
+    ) -> DeploymentInfo:
+        deployment = ready_deployment.deployment_info
+        assert deployment.current_revision is not None
+        revision = cast(MagicMock, deployment.current_revision)
+        revision.model_definition = model_definition
+        return deployment
+
+    @staticmethod
+    def _definition(service: dict[str, object]) -> ModelDefinition:
+        return ModelDefinition.model_validate({
+            "models": [{"name": "m", "model_path": "/m", "service": {"port": 8080, **service}}]
+        })
+
+    @pytest.mark.parametrize(
+        ("service", "expected"),
+        [
+            ({}, EndpointProtocol.HTTP),
+            ({"protocol": "http"}, EndpointProtocol.HTTP),
+            ({"protocol": "tcp"}, EndpointProtocol.TCP),
+        ],
+    )
+    async def test_protocol_from_model_definition(
+        self,
+        deployment_executor: DeploymentExecutor,
+        ready_deployment: DeploymentWithHistory,
+        service: dict[str, object],
+        expected: EndpointProtocol,
+    ) -> None:
+        deployment = self._deployment_with(ready_deployment, self._definition(service))
+        assert deployment.current_revision is not None
+        cast(
+            AsyncMock, deployment_executor._runtime_variant_repo
+        ).get_by_id.return_value = SimpleNamespace(name="custom")
+
+        item = await deployment_executor._build_endpoint_item(
+            deployment, deployment.current_revision.id
+        )
+
+        assert item.protocol is expected
+
+    async def test_protocol_defaults_to_http_without_model_definition(
+        self,
+        deployment_executor: DeploymentExecutor,
+        ready_deployment: DeploymentWithHistory,
+    ) -> None:
+        deployment = self._deployment_with(ready_deployment, None)
+        assert deployment.current_revision is not None
+        cast(
+            AsyncMock, deployment_executor._runtime_variant_repo
+        ).get_by_id.return_value = SimpleNamespace(name="custom")
+
+        item = await deployment_executor._build_endpoint_item(
+            deployment, deployment.current_revision.id
+        )
+
+        assert item.protocol is EndpointProtocol.HTTP

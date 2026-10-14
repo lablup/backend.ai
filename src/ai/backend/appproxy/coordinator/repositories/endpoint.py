@@ -39,7 +39,10 @@ from ai.backend.appproxy.common.types import (
     RouteInfo,
     SessionConfig,
 )
-from ai.backend.appproxy.coordinator.errors import InvalidURLError
+from ai.backend.appproxy.coordinator.errors import (
+    EndpointProtocolMismatchError,
+    InvalidURLError,
+)
 from ai.backend.appproxy.coordinator.models import Circuit, Endpoint, Worker
 from ai.backend.appproxy.coordinator.models.utils import ExtendedAsyncSAEngine
 from ai.backend.appproxy.coordinator.models.worker import add_circuit
@@ -281,10 +284,11 @@ class EndpointRepository:
                         route_id=entry.route_id,
                         kernel_host=entry.kernel_host,
                         kernel_port=entry.kernel_port,
-                        # Inference circuits are always HTTP; manager does
-                        # not push traffic_ratio yet (planned), so the
-                        # legacy default keeps every route equal-weighted.
-                        protocol=ProxyProtocol.HTTP,
+                        # Routes follow the circuit's protocol (the endpoint's
+                        # stored protocol, http by default); manager does not
+                        # push traffic_ratio yet (planned), so the legacy
+                        # default keeps every route equal-weighted.
+                        protocol=circuit.protocol,
                         traffic_ratio=1.0,
                     )
                     for entry in item.routes
@@ -388,10 +392,11 @@ class EndpointRepository:
                             route_id=entry.route_id,
                             kernel_host=entry.kernel_host,
                             kernel_port=entry.kernel_port,
-                            # Inference circuits are always HTTP; manager does
-                            # not push traffic_ratio yet (planned), so the
-                            # legacy default keeps every route equal-weighted.
-                            protocol=ProxyProtocol.HTTP,
+                            # Routes follow the circuit's protocol (the endpoint's
+                            # stored protocol, http by default); manager does not
+                            # push traffic_ratio yet (planned), so the legacy
+                            # default keeps every route equal-weighted.
+                            protocol=circuit.protocol,
                             traffic_ratio=1.0,
                         )
                     )
@@ -584,17 +589,31 @@ class EndpointRepository:
     ) -> SyncedEndpoint:
         health_check_config = item.health_check
         health_check_enabled = health_check_config is not None
+        requested_protocol = ProxyProtocol(item.protocol.value)
 
         # Upsert endpoint row using the bulk-fetched snapshot.
         endpoint = endpoints_by_id.get(item.deployment_id)
         if endpoint is not None:
             endpoint.health_check_enabled = health_check_enabled
             endpoint.health_check_config = health_check_config
+            existing_circuit = circuits_by_endpoint.get(item.deployment_id)
+            if existing_circuit is None:
+                # The circuit is about to be created, so the stored protocol
+                # may still follow the request.
+                endpoint.protocol = requested_protocol
+            elif existing_circuit.protocol != requested_protocol:
+                # A circuit's protocol is fixed once created; changing it needs
+                # the endpoint to be deleted and re-created.
+                raise EndpointProtocolMismatchError(
+                    f"endpoint {item.deployment_id} has a {existing_circuit.protocol} circuit; "
+                    f"requested {requested_protocol}"
+                )
         else:
             endpoint = Endpoint.create(
                 endpoint_id=item.deployment_id,
                 health_check_enabled=health_check_enabled,
                 health_check_config=health_check_config,
+                protocol=requested_protocol,
             )
             sess.add(endpoint)
             endpoints_by_id[item.deployment_id] = endpoint
@@ -622,7 +641,7 @@ class EndpointRepository:
                 worker_id,
                 preferred_port,
                 preferred_subdomain,
-            ) = await self._match_worker_for_existing_url(sess, url)
+            ) = await self._match_worker_for_existing_url(sess, url, endpoint.protocol)
 
         # Translate common-DTO tag shapes into coordinator-internal
         # ones expected by ``add_circuit`` (they differ only in field
@@ -636,7 +655,10 @@ class EndpointRepository:
             session_cfg,
             endpoint_cfg,
             item.service_name,
-            ProxyProtocol.HTTP,
+            # A ``tcp`` endpoint needs a ``(tcp, port)`` worker that lists
+            # ``inference`` in its accepted_traffics; worker selection already
+            # filters on both.
+            endpoint.protocol,
             AppMode.INFERENCE,
             [],
             open_to_public=item.open_to_public,
@@ -660,6 +682,7 @@ class EndpointRepository:
         self,
         sess: SASession,
         existing_url: URL,
+        protocol: ProxyProtocol,
     ) -> tuple[UUID | None, int | None, str | None]:
         """Resolve ``existing_url`` to ``(worker_id, preferred_port, preferred_subdomain)``.
 
@@ -673,6 +696,7 @@ class EndpointRepository:
             Worker.accepted_traffics.contains([AppMode.INFERENCE])
             & (Worker.frontend_mode == FrontendMode.WILDCARD_DOMAIN)
             & (Worker.wildcard_domain == domain)
+            & (Worker.protocol == protocol)
         )
         result = await sess.execute(query)
         wildcard_match = result.scalar()
@@ -686,6 +710,7 @@ class EndpointRepository:
             Worker.accepted_traffics.contains([AppMode.INFERENCE])
             & (Worker.frontend_mode == FrontendMode.PORT)
             & (Worker.hostname == existing_url.host)
+            & (Worker.protocol == protocol)
         )
         result = await sess.execute(query)
         worker_candidates = result.scalars().all()

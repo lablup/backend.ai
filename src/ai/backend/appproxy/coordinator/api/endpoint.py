@@ -48,7 +48,7 @@ from ai.backend.common.dto.appproxy_coordinator.v2.endpoint.types import (
     SessionTagsModel,
     TagsModel,
 )
-from ai.backend.common.types import BackendAISchema
+from ai.backend.common.types import BackendAISchema, EndpointProtocol
 
 from .types import StubResponseModel
 from .utils import auth_required
@@ -101,6 +101,21 @@ class EndpointCreationRequestModel(BackendAISchema):
         ),
     ] = None
 
+    protocol: Annotated[
+        EndpointProtocol,
+        Field(
+            default=EndpointProtocol.HTTP,
+            description=textwrap.dedent(
+                """
+                Proxy protocol of the endpoint's circuit. `http` (default) is the regular
+                HTTP inference path. `tcp` passes bytes through (TLS terminates inside the
+                replica) and needs a `(tcp, port)` worker with `inference` in its
+                accepted_traffics.
+                """
+            ),
+        ),
+    ] = EndpointProtocol.HTTP
+
 
 class EndpointCreationResponseModel(BackendAISchema):
     success: bool
@@ -122,6 +137,7 @@ def _request_model_to_item(
         ),
         open_to_public=params.open_to_public,
         health_check=params.health_check,
+        protocol=params.protocol,
     )
 
 
