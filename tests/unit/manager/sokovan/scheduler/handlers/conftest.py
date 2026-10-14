@@ -379,7 +379,7 @@ def mock_repository() -> AsyncMock:
         return_value=SessionsForStartWithImages(sessions=[], image_configs={})
     )
     repository.get_terminating_sessions_by_ids = AsyncMock(return_value=[])
-    repository.reset_kernels_to_pending_for_sessions = AsyncMock(return_value=0)
+    repository.requeue_sessions_to_pending = AsyncMock(return_value=[])
     repository.get_resource_group_preemption_mode = AsyncMock(return_value=PreemptionMode.TERMINATE)
     return repository
 
@@ -390,6 +390,7 @@ def mock_scheduling_controller() -> AsyncMock:
     controller = AsyncMock()
     controller.mark_sessions_for_termination = AsyncMock(return_value=None)
     controller.mark_sessions_status = AsyncMock(return_value=[])
+    controller.broadcast_status_transitions = AsyncMock(return_value=None)
     controller.mark_scheduling_needed = AsyncMock(return_value=None)
     return controller
 
