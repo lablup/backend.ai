@@ -1,4 +1,4 @@
-.TH ALL-SMI 1 "October 2026" "all-smi 0.27.0" "User Commands"
+.TH ALL-SMI 1 "October 11, 2026" "all-smi 0.27.1" "User Commands"
 .SH NAME
 all-smi \- Command-line utility for monitoring GPU hardware
 .SH SYNOPSIS
@@ -87,6 +87,9 @@ Display version information
 .B \-i, \-\-interval \fISECONDS\fR
 The interval in seconds at which to update the hardware information.
 Default: 1 second (Apple Silicon) or 2 seconds (others)
+.TP
+.B \-\-hide\-storage
+Hide storage rows in the TUI while continuing to collect storage data.
 .SS View Mode Options (Remote Monitoring)
 .TP
 .B \-\-hosts \fIURL\fR...
@@ -110,6 +113,9 @@ If not specified, uses adaptive interval based on node count:
 .IP \(bu 3
 101+ remote nodes: 6 seconds
 .RE
+.TP
+.B \-\-hide\-storage
+Hide storage rows in the TUI while continuing to collect storage data. This also applies to replay; API metrics, snapshots, and recordings remain unchanged.
 .SS API Mode Options
 .TP
 .B \-p, \-\-port \fIPORT\fR
@@ -574,6 +580,9 @@ Access metrics via Unix socket:
 Monitor local hardware with custom interval:
 .B all-smi local --interval 5
 .TP
+Hide storage rows in the local TUI:
+.B all-smi local --hide-storage
+.TP
 Monitor remote hosts (requires API endpoints):
 .B all-smi view --hosts http://node1:9090 http://node2:9090
 .TP
@@ -588,6 +597,9 @@ Monitor hosts from file:
 .TP
 Monitor remote cluster with custom interval:
 .B all-smi view --hostfile hosts.csv --interval 10
+.TP
+Hide storage rows on remote host tabs:
+.B all-smi view --hosts http://node1:9090 --hide-storage
 .SH FILES
 .TP
 .I hosts.csv
