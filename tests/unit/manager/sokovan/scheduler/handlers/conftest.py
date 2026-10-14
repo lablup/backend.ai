@@ -10,6 +10,7 @@ from uuid import uuid4
 import pytest
 from dateutil.tz import tzutc
 
+from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.entity.resource_group import ResourceGroupID
 from ai.backend.common.events.event_types.kernel.types import KernelLifecycleEventReason
 from ai.backend.common.types import (
@@ -354,7 +355,7 @@ def mock_launcher() -> AsyncMock:
     """Mock SessionLauncher for CheckPrecondition and StartSessions handlers."""
     launcher = AsyncMock()
     launcher.trigger_image_pulling = AsyncMock(return_value=None)
-    launcher.start_sessions_for_handler = AsyncMock(return_value=None)
+    launcher.start_sessions_for_handler = AsyncMock(return_value={})
     return launcher
 
 
@@ -689,6 +690,7 @@ def sessions_for_start_factory() -> Callable[..., SessionsForStartWithImages]:
                 user_email="test@example.com",
                 user_name="test-user",
                 environ={},
+                domain_id=DomainID(uuid4()),
             )
             for s in sessions
         ]
