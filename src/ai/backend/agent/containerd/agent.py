@@ -374,9 +374,10 @@ class ContainerdKernelCreationContext(AbstractKernelCreationContext[ContainerdKe
         cluster_info: ClusterInfo,
     ) -> ContainerdKernel:
         try:
-            return await self._build_kernel(resource_spec, environ, service_ports)
+            return await self._prepare_kernel(resource_spec, environ, service_ports)
         except BaseException:
-            # Any scratch removal on this failure path must go through _release_scratch.
+            # The kernel is not registered yet, so no clean_kernel removes its scratch dir
+            # or detaches its loop device.
             await self._release_scratch()
             raise
 
@@ -384,7 +385,7 @@ class ContainerdKernelCreationContext(AbstractKernelCreationContext[ContainerdKe
         await release_scratch(self.local_config.container.scratch_root, str(self.kernel_id))
         self._trusted_storage = None
 
-    async def _build_kernel(
+    async def _prepare_kernel(
         self,
         resource_spec: KernelResourceSpec,
         environ: Mapping[str, str],
