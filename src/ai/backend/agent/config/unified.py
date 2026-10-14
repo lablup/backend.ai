@@ -2190,6 +2190,26 @@ class ContainerdConfig(BaseConfigSchema):
             example=ConfigExample(local="overlayfs", prod="overlayfs"),
         ),
     ]
+    create_task_timeout: Annotated[
+        float,
+        Field(
+            default=30.0,
+            gt=0,
+            validation_alias=AliasChoices("create-task-timeout", "create_task_timeout"),
+            serialization_alias="create-task-timeout",
+        ),
+        BackendAIConfigMeta(
+            description=(
+                "PROVISIONAL. Timeout in seconds of the containerd CreateTask call; "
+                "other calls keep 30 seconds. "
+                "A runtime pulling the image inside the guest (Kata guest pull) "
+                "pulls within this call; "
+                "keep it under the manager's 30-minute session start limit."
+            ),
+            added_version="26.10.0",
+            example=ConfigExample(local="30.0", prod="1200.0"),
+        ),
+    ]
     runtime_profiles: Annotated[
         list[str],
         Field(

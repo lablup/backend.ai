@@ -68,6 +68,7 @@ class ContainerdClientConfig:
     namespace: str
     snapshotter: str
     call_timeout: float = DEFAULT_CALL_TIMEOUT
+    create_task_timeout: float = DEFAULT_CALL_TIMEOUT
 
 
 @dataclass(frozen=True)
@@ -247,11 +248,14 @@ class ContainerdClient:
         request: Any,
         *,
         tolerate: frozenset[grpc.StatusCode] = frozenset(),
+        rpc_timeout: float | None = None,
     ) -> Any:
         """Call a unary RPC; a tolerated status code returns None."""
         try:
             return await method(
-                request, metadata=self._metadata(), timeout=self._config.call_timeout
+                request,
+                metadata=self._metadata(),
+                timeout=self._config.call_timeout if rpc_timeout is None else rpc_timeout,
             )
         except grpc.aio.AioRpcError as e:
             if e.code() in tolerate:
@@ -402,6 +406,7 @@ class ContainerdClient:
                 stdout=stdout,
                 stderr=stderr,
             ),
+            rpc_timeout=self._config.create_task_timeout,
         )
         return int(resp.pid)
 

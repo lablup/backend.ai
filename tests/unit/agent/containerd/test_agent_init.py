@@ -9,6 +9,7 @@ from pytest_mock import MockerFixture
 from ai.backend.agent.agent import AbstractAgent
 from ai.backend.agent.config.unified import AgentUnifiedConfig, ContainerdConfig
 from ai.backend.agent.containerd.agent import ContainerdAgent
+from ai.backend.agent.containerd.client import ContainerdClient
 from ai.backend.agent.errors.containerd import RuntimeProfileLoadError
 from ai.backend.common.types import KernelCreationConfig, SlotName
 
@@ -73,6 +74,17 @@ class TestContainerdAgentInit:
 
         launch = MagicMock(config=kernel_config)
         assert agent._runc_profile.plan(launch).readiness.timeout_s == 7.5
+
+    def test_create_task_timeout_reaches_the_client(
+        self, mocker: MockerFixture, base_init: MagicMock
+    ) -> None:
+        mocker.patch(LOAD_TARGET, return_value=[])
+
+        agent = _new_agent(_local_config({"create-task-timeout": 1200}))
+
+        client = agent._client
+        assert isinstance(client, ContainerdClient)
+        assert client._config.create_task_timeout == 1200.0
 
     def test_base_init_receives_the_remaining_arguments(
         self, mocker: MockerFixture, base_init: MagicMock
