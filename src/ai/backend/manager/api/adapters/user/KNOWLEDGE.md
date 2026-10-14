@@ -30,6 +30,7 @@ auth 7, 필드는 error_log 4, keypair 4, login_session 3, login_history 2다. B
 |---|---|---|---|---|---|
 | resolve_domain_id | 217 | — | `DomainID` | 도메인 이름 | `LookupDomainAction` |
 | batch_load_by_ids | 224 | — | `list[UserNode \| Exception \| None]` | 사용자 id 목록 | `BulkGetUsersAction` |
+| batch_lookup_by_emails | 240 | — | `list[UserID \| Exception]` | email 목록 | `BulkLookupUsersAction` |
 | gql_admin_search | 240 | `AdminSearchUsersInput` | `AdminSearchUsersPayload` | — | `GlobalSearchUsersAction` |
 | gql_search_by_domain | 267 | `AdminSearchUsersInput` | `AdminSearchUsersPayload` | 도메인 이름 | `LookupDomainAction`, `ScopedSearchUsersAction` |
 | gql_search_by_project | 300 | `AdminSearchUsersInput` | `AdminSearchUsersPayload` | 프로젝트 id | `ScopedSearchUsersAction` |
@@ -112,6 +113,7 @@ auth 7, 필드는 error_log 4, keypair 4, login_session 3, login_history 2다. B
 |---|---|---|---|
 | resolve_domain_id | 인증만 | — | 없는 이름은 `EntityNotFoundError` (`repositories/ops/repository.py:127-132`). 사용자 시나리오가 아니라 9절에 행이 없다(10절) |
 | batch_load_by_ids | 엔티티 권한, 원소마다 | 각 사용자에 READ | 원소 단위. 4절 아래 표 |
+| batch_lookup_by_emails | 인증만 (`public_bulk_lookup_ops`) | — | 없는 email 은 `NotEnoughPermission` 원소. 권한은 이어서 id 를 읽는 `batch_load_by_ids` 가 본다. 이 메서드만으로는 있는 email 과 없는 email 이 갈리지만, 둘을 잇는 GQL DataLoader 에서는 읽을 수 없는 사용자와 같은 거부가 된다 |
 | gql_admin_search, admin_search | 전역 역할 | — | `InsufficientPrivilege` |
 | role_search | 전역 역할 | — | `InsufficientPrivilege`. 이름과 달리 스코프 검색이 아니라 전역 검색에 역할 조건을 붙인다(`adapter.py:469-470`) |
 | gql_search_by_domain, domain_search | 인증(도메인 이름 조회) → 스코프 권한 | 도메인 스코프에 사용자 READ | `EntityNotFoundError`, `NotEnoughPermission` |
@@ -298,6 +300,9 @@ auth 7, 필드는 error_log 4, keypair 4, login_session 3, login_history 2다. B
 | 일괄 읽기는 원소마다 노드와 거부를 입력 순서대로 답한다 | 한 사용자에게만 READ를 받은 사용자가 읽을 수 있는 사용자, 읽을 수 없는 사용자, 없는 id를 한 번에 요청하면, 입력 순서대로 원소별 결과가 온다 | 권한 받은 사용자 | 도메인 하나, 사용자 둘, 행위자 하나, 첫 사용자 스코프에 READ를 준 역할을 행위자에게 | 원소 표 참고 |
 | 슈퍼관리자의 일괄 읽기에서 없는 id는 비어 온다 | 슈퍼관리자가 있는 id와 없는 id를 함께 요청하면, 권한 문을 지나 없는 원소 자리에 빈 값이 온다 | 슈퍼관리자 | 도메인 하나, 사용자 하나 | 있는 id는 노드, 없는 id는 None |
 | 빈 목록으로 일괄 읽기를 하면 빈 목록이 온다 | 권한 없는 사용자가 빈 id 목록을 주면, 어떤 액션도 부르지 않고 빈 목록이 답으로 온다 | 권한 없는 사용자 | 도메인 하나, 행위자 하나 | 빈 목록 |
+| email 로 찾으면 권한 없이도 사용자 id 가 온다 | 아무 역할도 받지 않은 사용자가 다른 사용자의 email 을 찾으면, 그 사용자의 id 가 답으로 온다 | 권한 없는 사용자 | 도메인 하나, 대상 사용자 하나, 행위자 하나 | 대상 사용자 id |
+| 없는 email 은 거부 원소로 온다 | 권한 없는 사용자가 있는 email 과 없는 email 을 함께 찾으면, 입력 순서대로 사용자 id 와 거부가 온다 | 권한 없는 사용자 | 도메인 하나, 대상 사용자 하나, 행위자 하나 | 대상 사용자 id, `NotEnoughPermission` 예외 원소 |
+| 빈 목록으로 email 을 찾으면 빈 목록이 온다 | 권한 없는 사용자가 빈 email 목록을 주면, 어떤 액션도 부르지 않고 빈 목록이 답으로 온다 | 권한 없는 사용자 | 도메인 하나, 행위자 하나 | 빈 목록 |
 
 일괄 읽기 원소 표 (권한 받은 사용자 행):
 

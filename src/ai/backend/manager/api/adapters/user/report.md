@@ -2,9 +2,9 @@
 
 [무엇을 보장하는가](/src/ai/backend/manager/api/adapters/user/KNOWLEDGE.md) · [어댑터](/src/ai/backend/manager/api/adapters/user/adapter.py)
 
-시나리오: 미완 4 / 43
+시나리오: 미완 4 / 44
 
-- ops 로 구성 (18)
+- ops 로 구성 (19)
   - LoginHistoryAdapter.admin_search — 대표 성공 ✓ · 대표 실패 ✓
   - LoginHistoryAdapter.my_search — 대표 성공 ✓ · 대표 실패 ✓
   - LoginSessionAdapter.admin_search — 대표 성공 ✓ · 대표 실패 ✓
@@ -12,6 +12,7 @@
   - UserAdapter.admin_search — 대표 성공 ✓ · 대표 실패 ✓
   - UserAdapter.admin_search_keypairs — 대표 성공 ✓ · 대표 실패 ✓
   - UserAdapter.batch_load_by_ids — 대표 성공 ✓ · 대표 실패 ✓
+  - UserAdapter.batch_lookup_by_emails — 대표 성공 ✓ · 대표 실패 ✓
   - UserAdapter.domain_search — 대표 성공 ✓ · 대표 실패 ✓
   - UserAdapter.gql_admin_search — 대표 성공 ✓ · 대표 실패 ✓
   - UserAdapter.gql_admin_search_keypairs — 대표 성공 ✓ · 대표 실패 ✓
@@ -100,6 +101,14 @@
 | [권한 없는 사용자가 빈 id 목록을 주면, 어떤 액션도 부르지 않고 빈 목록이 답으로 온다](#reading-a-batch-load-of-no-ids-answers-an-empty-list) | 성공 |
 | [슈퍼관리자가 있는 id와 없는 id를 함께 요청하면, 권한 문을 지나 없는 원소 자리에 빈 값이 온다](#reading-the-superadmin-batch-load-leaves-a-missing-id-empty) | 성공 |
 | [한 사용자에게만 읽기 권한을 받은 사용자가 읽을 수 있는 사용자, 읽을 수 없는 사용자, 없는 id를 한 번에 요청하면, 입력 순서대로 원소별 결과가 온다](#reading-a-batch-load-answers-a-node-or-a-refusal-for-each-id-in-order) | 거부 |
+
+**UserAdapter.batch_lookup_by_emails**
+
+| 시나리오 | 판정 |
+|---|---|
+| [아무 역할도 받지 않은 사용자가 다른 사용자의 email 을 찾으면, 그 사용자의 id 가 답으로 온다](#reading-an-email-lookup-answers-the-user-id-without-a-grant) | 성공 |
+| [권한 없는 사용자가 빈 email 목록을 주면, 어떤 액션도 부르지 않고 빈 목록이 답으로 온다](#reading-an-email-lookup-of-no-emails-answers-an-empty-list) | 성공 |
+| [권한 없는 사용자가 있는 email 과 없는 email 을 함께 찾으면, 입력 순서대로 사용자 id 와 거부가 온다](#reading-an-email-naming-nobody-is-a-refused-element) | 거부 |
 
 **UserAdapter.domain_search**
 
@@ -1009,6 +1018,95 @@ Then
   - [0].timestamps.created_at: 이 실행이 쓴 시각
   - [0].timestamps.modified_at: 이 실행이 쓴 시각
   - 거부: NotEnoughPermission
+  - 거부: NotEnoughPermission
+
+### UserAdapter.batch_lookup_by_emails
+
+<a id="reading-an-email-lookup-answers-the-user-id-without-a-grant"></a>
+
+#### [an-email-lookup-answers-the-user-id-without-a-grant](/tests/scenario/bai_scenario/manager/user/test_reading.py) — pass
+
+아무 역할도 받지 않은 사용자가 다른 사용자의 email 을 찾으면, 그 사용자의 id 가 답으로 온다
+
+Given
+
+- 도메인 하나와 사용자 둘, 아무도 권한을 받지 않았다
+  - 도메인 home-1
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+    - 사용자 정책 user-policy-2: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
+    - 일반 사용자 user-2: 자기 키와 개인 프로젝트를 갖는다
+
+When
+
+- UserAdapter.batch_lookup_by_emails — user-2이 user-1의 email 로 찾음
+
+Then
+
+- 찾은 사용자의 id 가 온다
+  - length = 1
+  - [0]: 대상 사용자의 id와 같다
+
+<a id="reading-an-email-lookup-of-no-emails-answers-an-empty-list"></a>
+
+#### [an-email-lookup-of-no-emails-answers-an-empty-list](/tests/scenario/bai_scenario/manager/user/test_reading.py) — pass
+
+권한 없는 사용자가 빈 email 목록을 주면, 어떤 액션도 부르지 않고 빈 목록이 답으로 온다
+
+Given
+
+- 도메인 하나와 사용자 둘, 아무도 권한을 받지 않았다
+  - 도메인 home-1
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+    - 사용자 정책 user-policy-2: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
+    - 일반 사용자 user-2: 자기 키와 개인 프로젝트를 갖는다
+
+When
+
+- UserAdapter.batch_lookup_by_emails — user-2이 빈 목록으로 email 을 찾음
+
+Then
+
+- 빈 목록이 온다
+  - loaded = []
+
+<a id="reading-an-email-naming-nobody-is-a-refused-element"></a>
+
+#### [an-email-naming-nobody-is-a-refused-element](/tests/scenario/bai_scenario/manager/user/test_reading.py) — pass
+
+권한 없는 사용자가 있는 email 과 없는 email 을 함께 찾으면, 입력 순서대로 사용자 id 와 거부가 온다
+
+Given
+
+- 도메인 하나와 사용자 둘, 아무도 권한을 받지 않았다
+  - 도메인 home-1
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+    - 사용자 정책 user-policy-2: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
+    - 일반 사용자 user-2: 자기 키와 개인 프로젝트를 갖는다
+
+When
+
+- UserAdapter.batch_lookup_by_emails — user-2이 user-1의 email 과 없는 email 을 함께 찾음
+
+Then
+
+- 있는 email 은 사용자 id, 없는 email 자리는 거부가 입력 순서대로 온다
+  - length = 2
+  - [0]: 대상 사용자의 id와 같다
   - 거부: NotEnoughPermission
 
 ### UserAdapter.domain_search
