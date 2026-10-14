@@ -15,19 +15,19 @@ from ai.backend.common.dto.appproxy.v2.ingress.types import Ingress, IngressFron
 class InMemoryIngressState(IngressReader, IngressWriter):
     """Ingresses held in the worker process, keyed by frontend key.
 
-    An apply older than the held revision is skipped, so a late write never undoes a newer one.
+    An apply older than the stored revision is skipped, so a late write never undoes a newer one.
     """
 
     _negative_ttl: float | None
-    _held: TTLCache[IngressFrontendKey, Ingress]
-    _missing: TTLCache[IngressFrontendKey, bool]
+    _ingresses: TTLCache[IngressFrontendKey, Ingress]
+    _missing_keys: TTLCache[IngressFrontendKey, bool]
 
     def __init__(self, ttl: float | None = None, negative_ttl: float | None = None) -> None:
         self._negative_ttl = negative_ttl
-        self._held = TTLCache(
+        self._ingresses = TTLCache(
             maxsize=math.inf, ttl=ttl if ttl is not None else math.inf, timer=monotonic
         )
-        self._missing = TTLCache(
+        self._missing_keys = TTLCache(
             maxsize=math.inf,
             ttl=negative_ttl if negative_ttl is not None else math.inf,
             timer=monotonic,
@@ -35,39 +35,39 @@ class InMemoryIngressState(IngressReader, IngressWriter):
 
     @override
     async def get(self, frontend_key: IngressFrontendKey) -> Ingress | None:
-        ingress = self._held.get(frontend_key)
+        ingress = self._ingresses.get(frontend_key)
         if ingress is not None:
             return ingress
-        if frontend_key in self._missing:
+        if frontend_key in self._missing_keys:
             raise IngressNotFoundError(f"frontend {frontend_key} is remembered missing")
         return None
 
     @override
     async def get_all(self) -> list[Ingress]:
-        return list(self._held.values())
+        return list(self._ingresses.values())
 
     @override
     async def apply(self, ingresses: Sequence[Ingress]) -> None:
         for ingress in ingresses:
             frontend_key = ingress.frontend.key()
-            held = self._held.get(frontend_key)
-            if held is not None and ingress.revision < held.revision:
+            stored_ingress = self._ingresses.get(frontend_key)
+            if stored_ingress is not None and ingress.revision < stored_ingress.revision:
                 continue
-            self._held[frontend_key] = ingress
-            self._missing.pop(frontend_key, None)
+            self._ingresses[frontend_key] = ingress
+            self._missing_keys.pop(frontend_key, None)
 
     @override
     async def remove(self, keys: Sequence[IngressKey]) -> None:
         for key in keys:
-            self._held.pop(key.frontend_key, None)
+            self._ingresses.pop(key.frontend_key, None)
 
     async def remember_missing(self, frontend_key: IngressFrontendKey) -> None:
         if self._negative_ttl is None:
             return
-        self._missing[frontend_key] = True
+        self._missing_keys[frontend_key] = True
 
     @override
     async def replace_all(self, ingresses: Sequence[Ingress]) -> None:
-        self._held.clear()
-        self._held.update({ingress.frontend.key(): ingress for ingress in ingresses})
-        self._missing.clear()
+        self._ingresses.clear()
+        self._ingresses.update({ingress.frontend.key(): ingress for ingress in ingresses})
+        self._missing_keys.clear()
