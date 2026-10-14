@@ -454,6 +454,19 @@ class TestCleanKernel:
         assert losetup.loops == {}
         assert not backing.parent.exists()
 
+    async def test_scratch_is_kept_when_the_trusted_storage_cannot_be_detached(
+        self, agent: ContainerdAgent, scratch_root: Path, losetup: FakeLosetup
+    ) -> None:
+        kid = KernelId(uuid.uuid4())
+        backing = (scratch_root / str(kid)).resolve() / "trusted-store.img"
+        backing.parent.mkdir()
+        await attach_trusted_storage(backing, 2**20)
+        losetup.failing.add("--detach")
+
+        await agent.clean_kernel(kid, None, False)
+
+        assert backing.exists()
+
     async def test_restart_keeps_the_scratch(
         self, agent: ContainerdAgent, scratch_root: Path, collected: list[bytes]
     ) -> None:

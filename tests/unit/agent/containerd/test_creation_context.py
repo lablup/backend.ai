@@ -750,4 +750,27 @@ class TestTrustedStorage:
             await ctx.start_container(kernel, [], None, [], MagicMock())
 
         assert losetup.loops == {}
-        assert not (tmp_path / str(ownership_data.kernel_id) / "trusted-store.img").exists()
+        assert not (tmp_path / str(ownership_data.kernel_id)).exists()
+
+    async def test_plan_failure_releases_the_loop_device_and_the_scratch(
+        self,
+        tmp_path: Path,
+        ownership_data: KernelOwnershipData,
+        launch_kernel_config: KernelCreationConfig,
+        resource_spec: KernelResourceSpec,
+        computers: dict[DeviceName, ComputerContext],
+        losetup: FakeLosetup,
+    ) -> None:
+        profile = FakeProfile(
+            "coco-tdx", accepts=True, plan_error=ProfileSpecRejected("not a block device")
+        )
+        ctx = self._context(
+            tmp_path, ownership_data, launch_kernel_config, computers, profile, ["coco-tdx"]
+        )
+        await ctx.prepare_scratch()
+
+        with pytest.raises(ProfileSpecRejected):
+            await ctx.prepare_container(resource_spec, {}, [], MagicMock())
+
+        assert losetup.loops == {}
+        assert not (tmp_path / str(ownership_data.kernel_id)).exists()

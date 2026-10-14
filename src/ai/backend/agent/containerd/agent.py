@@ -49,7 +49,6 @@ from ai.backend.agent.containerd.scratch import (
     Owner,
     ScratchDirs,
     create_scratch,
-    remove_scratch,
     write_config_files,
     write_dotfiles,
     write_hosts_file,
@@ -63,7 +62,7 @@ from ai.backend.agent.containerd.spec import (
 )
 from ai.backend.agent.containerd.trusted_storage import (
     attach_trusted_storage,
-    detach_trusted_storage,
+    release_scratch,
 )
 from ai.backend.agent.errors import UnsupportedResource
 from ai.backend.agent.errors.agent import UnsupportedBaseDistroError
@@ -374,6 +373,23 @@ class ContainerdKernelCreationContext(AbstractKernelCreationContext[ContainerdKe
         service_ports: list[ServicePort],
         cluster_info: ClusterInfo,
     ) -> ContainerdKernel:
+        try:
+            return await self._build_kernel(resource_spec, environ, service_ports)
+        except BaseException:
+            # Any scratch removal on this failure path must go through _release_scratch.
+            await self._release_scratch()
+            raise
+
+    async def _release_scratch(self) -> None:
+        await release_scratch(self.local_config.container.scratch_root, str(self.kernel_id))
+        self._trusted_storage = None
+
+    async def _build_kernel(
+        self,
+        resource_spec: KernelResourceSpec,
+        environ: Mapping[str, str],
+        service_ports: list[ServicePort],
+    ) -> ContainerdKernel:
         await self._write_config_files(resource_spec, environ)
         extra_caps = (
             ("CAP_SYS_PTRACE",)
@@ -510,7 +526,7 @@ class ContainerdKernelCreationContext(AbstractKernelCreationContext[ContainerdKe
         except BaseException:
             self._port_pool.release_many(host_ports)
             await self._free_allocations(kernel_obj.resource_spec)
-            await detach_trusted_storage(self._dirs.trusted_store)
+            await self._release_scratch()
             raise
         container = self.local_config.container
         return {
@@ -777,10 +793,7 @@ class ContainerdAgent(
                 except BackendAIError:
                     log.exception("container delete failed", container_id=container_id)
         if not restarting:
-            await detach_trusted_storage(dirs.trusted_store)
-            await run_in_executor_with_context(
-                None, remove_scratch, self.local_config.container.scratch_root, str(kernel_id)
-            )
+            await release_scratch(self.local_config.container.scratch_root, str(kernel_id))
 
     async def _collect_task_log(
         self, kernel_id: KernelId, container_id: ContainerId, dirs: ScratchDirs

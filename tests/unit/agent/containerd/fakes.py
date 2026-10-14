@@ -161,7 +161,7 @@ class FakeLosetup:
         self._argv = ()
 
     async def __call__(self, *argv: str, **kwargs: Any) -> FakeLosetup:
-        assert argv[0] == "losetup"
+        assert argv[0] == "/sbin/losetup"
         self.calls.append(argv[1:])
         self._argv = argv[1:]
         return self
