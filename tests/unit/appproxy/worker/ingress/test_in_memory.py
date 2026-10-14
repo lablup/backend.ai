@@ -24,19 +24,13 @@ NEGATIVE_TTL = 5.0
 
 
 @dataclass(frozen=True)
-class _RevisionCase:
-    incoming_revision: int
-    stored_revision: int
-
-
-@dataclass(frozen=True)
 class _ElapsedCase:
     elapsed: float
     stored: bool
 
 
 @dataclass(frozen=True)
-class _ApplyUnderTtlCase:
+class _ApplyCase:
     applied_after: float
     applied_revision: int
     read_after: float
@@ -122,19 +116,36 @@ class TestInMemoryIngressState:
     @pytest.mark.parametrize(
         "case",
         [
-            _RevisionCase(incoming_revision=6, stored_revision=6),
-            _RevisionCase(incoming_revision=5, stored_revision=5),
-            _RevisionCase(incoming_revision=4, stored_revision=5),
+            _ApplyCase(applied_after=10, applied_revision=6, read_after=10, read_revision=6),
+            _ApplyCase(applied_after=10, applied_revision=5, read_after=10, read_revision=5),
+            _ApplyCase(applied_after=10, applied_revision=4, read_after=10, read_revision=5),
+            _ApplyCase(
+                applied_after=TTL - 10, applied_revision=5, read_after=TTL + 10, read_revision=5
+            ),
+            _ApplyCase(
+                applied_after=TTL + 1, applied_revision=4, read_after=TTL + 1, read_revision=4
+            ),
         ],
-        ids=lambda case: f"incoming-{case.incoming_revision}",
+        ids=lambda case: (
+            f"revision-{case.applied_revision}-applied-at-{case.applied_after:g}"
+            f"-read-at-{case.read_after:g}"
+        ),
     )
-    async def test_apply_never_overwrites_a_newer_revision(
-        self, state: InMemoryIngressState, stored_ingress: Ingress, case: _RevisionCase
+    async def test_apply_stores_unless_a_newer_revision_is_still_stored(
+        self,
+        expiring_state: InMemoryIngressState,
+        clock: Mock,
+        stored_ingress: Ingress,
+        case: _ApplyCase,
     ) -> None:
-        await state.apply([stored_ingress.model_copy(update={"revision": case.incoming_revision})])
-        read_back_ingress = await state.get(STORED_KEY)
+        clock.return_value = STARTED_AT + case.applied_after
+        await expiring_state.apply([
+            stored_ingress.model_copy(update={"revision": case.applied_revision})
+        ])
+        clock.return_value = STARTED_AT + case.read_after
+        read_back_ingress = await expiring_state.get(STORED_KEY)
         assert read_back_ingress is not None
-        assert read_back_ingress.revision == case.stored_revision
+        assert read_back_ingress.revision == case.read_revision
 
     async def test_apply_stores_a_new_key(
         self, state: InMemoryIngressState, other_ingress: Ingress
@@ -178,40 +189,6 @@ class TestInMemoryIngressState:
         clock.return_value = STARTED_AT + case.elapsed
         assert (await expiring_state.get(STORED_KEY) is not None) is case.stored
         assert (len(await expiring_state.get_all()) == 1) is case.stored
-
-    @pytest.mark.parametrize(
-        "case",
-        [
-            _ApplyUnderTtlCase(
-                applied_after=TTL - 10, applied_revision=5, read_after=TTL + 10, read_revision=5
-            ),
-            _ApplyUnderTtlCase(
-                applied_after=TTL - 10, applied_revision=4, read_after=TTL - 10, read_revision=5
-            ),
-            _ApplyUnderTtlCase(
-                applied_after=TTL + 1, applied_revision=4, read_after=TTL + 1, read_revision=4
-            ),
-        ],
-        ids=lambda case: (
-            f"revision-{case.applied_revision}-applied-at-{case.applied_after:g}"
-            f"-read-at-{case.read_after:g}"
-        ),
-    )
-    async def test_apply_restarts_ttl_and_compares_only_unexpired_revisions(
-        self,
-        expiring_state: InMemoryIngressState,
-        clock: Mock,
-        stored_ingress: Ingress,
-        case: _ApplyUnderTtlCase,
-    ) -> None:
-        clock.return_value = STARTED_AT + case.applied_after
-        await expiring_state.apply([
-            stored_ingress.model_copy(update={"revision": case.applied_revision})
-        ])
-        clock.return_value = STARTED_AT + case.read_after
-        read_back_ingress = await expiring_state.get(STORED_KEY)
-        assert read_back_ingress is not None
-        assert read_back_ingress.revision == case.read_revision
 
     async def test_get_raises_for_a_key_remembered_missing(
         self, negative_caching_state: InMemoryIngressState, clock: Mock
