@@ -110,6 +110,9 @@ class ServiceCatalogAdapter(BaseAdapter):
                 conditions.append(condition)
         if filter.status is not None:
             conditions.extend(self._convert_status_filter(filter.status))
+        conditions.extend(
+            self.apply_uuid_filter(filter.entity_id, ServiceCatalogSearchableFields.own.id.filter)
+        )
         if filter.AND:
             for sub in filter.AND:
                 conditions.extend(self._convert_filter(sub))

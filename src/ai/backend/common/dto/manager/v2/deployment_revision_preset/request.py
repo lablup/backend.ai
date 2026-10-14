@@ -29,6 +29,7 @@ from ai.backend.common.dto.manager.v2.deployment_revision_preset.types import (
     DeploymentRevisionPresetUsage,
 )
 from ai.backend.common.dto.manager.v2.resource_slot.types import ResourceOptsEntryDTO
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.common.tristate.unset import UNSET, Unset
 
 
@@ -282,7 +283,14 @@ class UpdateDeploymentRevisionPresetInput(BaseRequestModel):
 
 
 class DeploymentRevisionPresetFilter(BaseRequestModel):
-    id: UUIDFilter | None = Field(default=None, description="Filter by preset ID.")
+    id: UUIDFilter | None = Field(
+        default=None,
+        description=f"Deprecated since {NEXT_RELEASE_VERSION}. Use `entity_id`.",
+        deprecated=True,
+    )
+    entity_id: UUIDFilter | None = Field(
+        default=None, description=f"Added in {NEXT_RELEASE_VERSION}. Filter by preset ID."
+    )
     name: StringFilter | None = Field(default=None)
     runtime_variant_id: UUIDFilter | None = Field(default=None)
     AND: list[DeploymentRevisionPresetFilter] | None = Field(default=None)

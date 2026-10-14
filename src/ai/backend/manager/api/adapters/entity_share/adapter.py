@@ -286,7 +286,9 @@ class EntityShareAdapter(BaseAdapter):
 
     def _convert_filter(self, filter: EntityShareFilter) -> list[QueryCondition]:
         fields = EntityShareSearchableFields.own
-        conditions: list[QueryCondition] = []
+        conditions: list[QueryCondition] = [
+            *self.apply_uuid_filter(filter.entity_id, fields.id.filter)
+        ]
         if filter.status is not None:
             if filter.status.equals is not None:
                 conditions.append(

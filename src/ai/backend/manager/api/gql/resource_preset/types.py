@@ -34,7 +34,8 @@ from ai.backend.common.dto.manager.v2.resource_preset.response import (
 from ai.backend.common.dto.manager.v2.resource_preset.response import (
     UpdateResourcePresetPayload as UpdateResourcePresetPayloadDTO,
 )
-from ai.backend.manager.api.gql.base import OrderDirection, StringFilter
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
+from ai.backend.manager.api.gql.base import OrderDirection, StringFilter, UUIDFilter
 from ai.backend.manager.api.gql.common_types import (
     BinarySizeInfoGQL,
     BinarySizeInputGQL,
@@ -144,6 +145,12 @@ class ResourcePresetGQL(PydanticNodeMixin[ResourcePresetNode]):
 class ResourcePresetFilterGQL(PydanticInputMixin[ResourcePresetFilterDTO]):
     name: StringFilter | None = None
     resource_group_name: StringFilter | None = None
+    entity_id: UUIDFilter | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION, description="Filter by resource preset ID."
+        ),
+        default=None,
+    )
 
     AND: list[Self] | None = None
     OR: list[Self] | None = None

@@ -35,8 +35,9 @@ from ai.backend.common.dto.manager.v2.agent.types import (
     AgentUsage,
     AgentUsedBy,
 )
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.common.types import AgentId
-from ai.backend.manager.api.gql.base import OrderDirection, StringFilter
+from ai.backend.manager.api.gql.base import OrderDirection, StringFilter, UUIDFilter
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     gql_added_field,
@@ -126,6 +127,12 @@ class AgentStatusFilterGQL(PydanticInputMixin[AgentStatusFilter]):
 )
 class AgentFilterGQL(PydanticInputMixin[AgentFilter]):
     id: StringFilter | None = None
+    entity_id: UUIDFilter | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION, description="Filter by agent entity ID."
+        ),
+        default=None,
+    )
     status: AgentStatusFilterGQL | None = None
     schedulable: bool | None = None
     scaling_group: StringFilter | None = None

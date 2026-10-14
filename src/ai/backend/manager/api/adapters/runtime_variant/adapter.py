@@ -220,6 +220,7 @@ class RuntimeVariantAdapter(BaseAdapter):
         fields = RuntimeVariantSearchableFields.own
         conditions: list[QueryCondition] = [
             *self.apply_string_filter(filter_.name, fields.name.filter),
+            *self.apply_uuid_filter(filter_.entity_id, fields.id.filter),
         ]
         if filter_.AND:
             for sub in filter_.AND:

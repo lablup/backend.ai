@@ -286,6 +286,7 @@ class IdleCheckerAdapter(BaseAdapter):
             *self.apply_string_filter(filter_.name, fields.name.filter),
             *self.apply_datetime_filter(filter_.created_at, fields.created_at.filter),
             *self.apply_datetime_filter(filter_.updated_at, fields.updated_at.filter),
+            *self.apply_uuid_filter(filter_.entity_id, fields.id.filter),
         ]
         if filter_.checker_type is not None:
             if filter_.checker_type.equals is not None:

@@ -655,6 +655,11 @@ class ImageV2FilterGQL(PydanticInputMixin[ImageFilterInputDTO], GQLFilter):
     id: UUIDFilter | None = gql_added_field(
         BackendAIGQLMeta(added_version="26.4.4", description="Filter by image UUID."),
         default=None,
+        deprecation_reason=f"Deprecated since {NEXT_RELEASE_VERSION}. Use `entityId`.",
+    )
+    entity_id: UUIDFilter | None = gql_added_field(
+        BackendAIGQLMeta(added_version=NEXT_RELEASE_VERSION, description="Filter by image ID."),
+        default=None,
     )
     registry_id: UUIDFilter | None = gql_added_field(
         BackendAIGQLMeta(added_version="26.4.0", description="Filter by container registry ID."),

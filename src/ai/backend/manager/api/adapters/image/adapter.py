@@ -419,6 +419,7 @@ class ImageAdapter(BaseAdapter):
         alias_fields = ImageAliasSearchableFields.own
         conditions = [
             *self.apply_uuid_filter(filter.id, fields.id.filter),
+            *self.apply_uuid_filter(filter.entity_id, fields.id.filter),
             *self.apply_string_filter(filter.name, fields.name.filter),
             *self.apply_string_filter(filter.architecture, fields.architecture.filter),
             *self.apply_uuid_filter(filter.registry_id, fields.registry_id.filter),

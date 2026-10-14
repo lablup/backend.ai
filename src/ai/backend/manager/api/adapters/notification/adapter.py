@@ -534,6 +534,14 @@ class NotificationAdapter(BaseAdapter):
         if f.enabled is not None:
             conditions.append(fields.enabled.filter.equals(f.enabled))
 
+        if f.entity_id:
+            cond = f.entity_id.build_query_condition(
+                equals_factory=fields.id.filter.equals,
+                in_factory=fields.id.filter.in_,
+            )
+            if cond:
+                conditions.append(cond)
+
         if f.AND:
             for sub in f.AND:
                 conditions.extend(NotificationAdapter._convert_channel_filter(sub))
@@ -613,6 +621,14 @@ class NotificationAdapter(BaseAdapter):
 
         if f.enabled is not None:
             conditions.append(fields.enabled.filter.equals(f.enabled))
+
+        if f.entity_id:
+            cond = f.entity_id.build_query_condition(
+                equals_factory=fields.id.filter.equals,
+                in_factory=fields.id.filter.in_,
+            )
+            if cond:
+                conditions.append(cond)
 
         if f.AND:
             for sub in f.AND:

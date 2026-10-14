@@ -17,6 +17,7 @@ from ai.backend.common.dto.manager.query import (
     ToManyFilter,
     UUIDFilter,
 )
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.common.tristate.unset import UNSET, Unset
 
 from .types import (
@@ -312,6 +313,10 @@ class PermissionFilter(BaseRequestModel):
         default=None, description="Filter by the permission bit the entry grants."
     )
     created_at: DateTimeFilter | None = None
+    field_id: UUIDFilter | None = Field(
+        default=None,
+        description=f"Added in {NEXT_RELEASE_VERSION}. Filter by permission ID.",
+    )
     AND: list[PermissionFilter] | None = None
     OR: list[PermissionFilter] | None = None
     NOT: list[PermissionFilter] | None = None
@@ -345,6 +350,10 @@ class RoleFilter(BaseRequestModel):
     mapped_scope: MappedScopeNestedFilter | None = None
     permissions: RolePermissionNestedFilter | None = Field(
         default=None, description="Filter by conditions on the role's permission entries."
+    )
+    entity_id: UUIDFilter | None = Field(
+        default=None,
+        description=f"Added in {NEXT_RELEASE_VERSION}. Filter by role ID.",
     )
     AND: list[RoleFilter] | None = None
     OR: list[RoleFilter] | None = None

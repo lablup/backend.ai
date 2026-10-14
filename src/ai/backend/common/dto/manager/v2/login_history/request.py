@@ -5,7 +5,8 @@ from __future__ import annotations
 from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseRequestModel
-from ai.backend.common.dto.manager.query import DateTimeFilter, StringFilter
+from ai.backend.common.dto.manager.query import DateTimeFilter, StringFilter, UUIDFilter
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 
 from .types import LoginAttemptResult, LoginHistoryOrderField, OrderDirection
 
@@ -42,6 +43,10 @@ class LoginHistoryFilter(BaseRequestModel):
     )
     created_at: DateTimeFilter | None = Field(
         default=None, description="Filter history by created_at datetime"
+    )
+    field_id: UUIDFilter | None = Field(
+        default=None,
+        description=f"Added in {NEXT_RELEASE_VERSION}. Filter by login history ID.",
     )
     AND: list[LoginHistoryFilter] | None = Field(
         default=None, description="All conditions must match"

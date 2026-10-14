@@ -26,6 +26,7 @@ from ai.backend.common.dto.manager.v2.kernel.response import (
 from ai.backend.common.dto.manager.v2.kernel.types import (
     KernelStatusFilter,
 )
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.common.types import AgentId, KernelId, SessionTypes
 from ai.backend.manager.api.gql.base import OrderDirection, UUIDFilter
 from ai.backend.manager.api.gql.decorators import (
@@ -131,7 +132,15 @@ class KernelV2StatusFilterGQL(PydanticInputMixin[KernelStatusFilter]):
     name="KernelV2Filter",
 )
 class KernelV2FilterGQL(PydanticInputMixin[KernelFilter]):
-    id: UUIDFilter | None = None
+    id: UUIDFilter | None = gql_field(
+        description="Filter by kernel ID.",
+        default=None,
+        deprecation_reason=f"Deprecated since {NEXT_RELEASE_VERSION}. Use `fieldId`.",
+    )
+    field_id: UUIDFilter | None = gql_added_field(
+        BackendAIGQLMeta(added_version=NEXT_RELEASE_VERSION, description="Filter by kernel ID."),
+        default=None,
+    )
     status: KernelV2StatusFilterGQL | None = None
     session_id: UUIDFilter | None = None
 

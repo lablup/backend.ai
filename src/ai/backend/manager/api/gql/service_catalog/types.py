@@ -23,7 +23,8 @@ from ai.backend.common.dto.manager.v2.service_catalog.types import (
 from ai.backend.common.dto.manager.v2.service_catalog.types import (
     ServiceCatalogStatusFilter as ServiceCatalogStatusFilterDTO,
 )
-from ai.backend.manager.api.gql.base import OrderDirection, StringFilter
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
+from ai.backend.manager.api.gql.base import OrderDirection, StringFilter, UUIDFilter
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     gql_added_field,
@@ -170,6 +171,10 @@ class ServiceCatalogFilterGQL(PydanticInputMixin[ServiceCatalogFilterDTO]):
     )
     status: ServiceCatalogStatusFilterGQL | None = gql_field(
         description="Filter by health status. Supports equals, in, not_equals, and not_in operations.",
+        default=None,
+    )
+    entity_id: UUIDFilter | None = gql_added_field(
+        BackendAIGQLMeta(added_version=NEXT_RELEASE_VERSION, description="Filter by service ID."),
         default=None,
     )
     AND: list[Self] | None = None

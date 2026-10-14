@@ -57,7 +57,9 @@ from ai.backend.common.dto.manager.v2.runtime_variant.types import (
     RuntimeVariantUsage,
     RuntimeVariantUsedBy,
 )
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import StringFilter as StringFilterGQL
+from ai.backend.manager.api.gql.base import UUIDFilter as UUIDFilterGQL
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     PydanticInputMixin,
@@ -222,6 +224,12 @@ class RuntimeVariantConnection(Connection[RuntimeVariantGQL]):
 )
 class RuntimeVariantFilterGQL(PydanticInputMixin[RuntimeVariantFilterDTO]):
     name: StringFilterGQL | None = gql_field(default=None, description="Name filter.")
+    entity_id: UUIDFilterGQL | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION, description="Filter by runtime variant ID."
+        ),
+        default=None,
+    )
     AND: list[Self] | None = gql_added_field(
         BackendAIGQLMeta(added_version="26.7.0", description="Match all of the given sub-filters."),
         default=None,

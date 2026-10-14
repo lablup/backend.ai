@@ -285,6 +285,7 @@ class PrometheusQueryPresetAdapter(BaseAdapter):
         conditions: list[QueryCondition] = [
             *self.apply_string_filter(filter.name, fields.name.filter),
             *self.apply_uuid_filter(filter.category_id, fields.category_id.filter),
+            *self.apply_uuid_filter(filter.entity_id, fields.id.filter),
         ]
 
         if filter.AND:

@@ -22,6 +22,8 @@ from ai.backend.common.dto.manager.v2.client_ip_masking.response import (
 from ai.backend.common.dto.manager.v2.client_ip_masking.response import (
     ClientIPMaskingPolicyPayload as PolicyPayloadDTO,
 )
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
+from ai.backend.manager.api.gql.base import UUIDFilter
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     PydanticInputMixin,
@@ -181,6 +183,13 @@ class ClientIPMaskingPolicyFilterGQL(PydanticInputMixin[FilterDTO]):
     )
     mode: ClientIPMaskingModeGQL | None = gql_field(
         default=None, description="Filter by masking mode."
+    )
+    entity_id: UUIDFilter | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="Filter by client IP masking policy ID.",
+        ),
+        default=None,
     )
 
 

@@ -13,6 +13,7 @@ from pydantic import Field, NonNegativeInt, field_validator
 from ai.backend.common.api_handlers import BaseRequestModel
 from ai.backend.common.dto.clients.prometheus.defs import PROMETHEUS_DURATION_PATTERN
 from ai.backend.common.dto.manager.query import StringFilter, UUIDFilter
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.common.tristate.unset import UNSET, Unset
 
 from .types import OrderDirection, QueryDefinitionOrderField
@@ -163,6 +164,10 @@ class QueryDefinitionFilter(BaseRequestModel):
 
     name: StringFilter | None = Field(default=None, description="Filter by name")
     category_id: UUIDFilter | None = Field(default=None, description="Filter by category ID")
+    entity_id: UUIDFilter | None = Field(
+        default=None,
+        description=f"Added in {NEXT_RELEASE_VERSION}. Filter by query definition ID",
+    )
     AND: list[QueryDefinitionFilter] | None = Field(
         default=None, description="AND logical combinator."
     )

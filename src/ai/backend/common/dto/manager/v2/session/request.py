@@ -42,6 +42,7 @@ from ai.backend.common.dto.manager.v2.session.types import (
     SessionUsage,
 )
 from ai.backend.common.dto.manager.v2.session_options.types import AgentSelectionPolicyEnum
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 
 __all__ = (
     "AdminSearchSessionsInput",
@@ -102,7 +103,14 @@ class SessionIdPathParam(BaseRequestModel):
 class SessionFilter(BaseRequestModel):
     """Filter criteria for session listing."""
 
-    id: UUIDFilter | None = None
+    id: UUIDFilter | None = Field(
+        default=None,
+        description=f"Deprecated since {NEXT_RELEASE_VERSION}. Use `entity_id`.",
+        deprecated=True,
+    )
+    entity_id: UUIDFilter | None = Field(
+        default=None, description=f"Added in {NEXT_RELEASE_VERSION}. Filter by session ID."
+    )
     status: SessionStatusFilter | None = None
     name: StringFilter | None = None
     domain_name: StringFilter | None = None

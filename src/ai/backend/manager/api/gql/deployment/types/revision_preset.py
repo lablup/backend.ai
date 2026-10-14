@@ -101,6 +101,7 @@ from ai.backend.common.dto.manager.v2.deployment_revision_preset.types import (
     PresetModelDefinitionInfoDTO,
     PresetModelServiceConfigInfoDTO,
 )
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import StringFilter as StringFilterGQL
 from ai.backend.manager.api.gql.base import UUIDFilter as UUIDFilterGQL
 from ai.backend.manager.api.gql.common.types import (
@@ -520,6 +521,11 @@ class RuntimeVariantPresetValueEntryInputGQL(PydanticInputMixin[PresetValueInput
 class DeploymentRevisionPresetFilterGQL(PydanticInputMixin[FilterDTO]):
     id: UUIDFilterGQL | None = gql_added_field(
         BackendAIGQLMeta(added_version="26.4.4", description="Filter by preset ID."),
+        default=None,
+        deprecation_reason=f"Deprecated since {NEXT_RELEASE_VERSION}. Use `entityId`.",
+    )
+    entity_id: UUIDFilterGQL | None = gql_added_field(
+        BackendAIGQLMeta(added_version=NEXT_RELEASE_VERSION, description="Filter by preset ID."),
         default=None,
     )
     name: StringFilterGQL | None = gql_field(default=None, description="Name filter.")

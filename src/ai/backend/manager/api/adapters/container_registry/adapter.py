@@ -311,6 +311,7 @@ class ContainerRegistryAdapter(BaseAdapter):
         fields = ContainerRegistrySearchableFields.own
         conditions: list[QueryCondition] = [
             *self.apply_string_filter(filter.registry_name, fields.registry_name.filter),
+            *self.apply_uuid_filter(filter.entity_id, fields.id.filter),
         ]
         if filter.type is not None:
             conditions.extend(self._convert_type_filter(filter.type))

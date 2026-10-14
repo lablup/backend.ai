@@ -13,6 +13,7 @@ from ai.backend.common.dto.manager.v2.role_permission_preset.types import (
     RolePermissionPresetEntry,
     RolePermissionPresetOrderField,
 )
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 
 __all__ = (
     "BulkAddRolePermissionPresetsInput",
@@ -58,6 +59,10 @@ class RolePermissionPresetFilter(BaseRequestModel):
     )
     created_at: DateTimeFilter | None = Field(
         default=None, description="Filter by creation timestamp."
+    )
+    field_id: UUIDFilter | None = Field(
+        default=None,
+        description=f"Added in {NEXT_RELEASE_VERSION}. Filter by role permission preset ID.",
     )
     AND: list[RolePermissionPresetFilter] | None = Field(
         default=None, description="AND conjunction."

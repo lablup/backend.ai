@@ -68,6 +68,7 @@ from ai.backend.common.dto.manager.v2.scheduling_history.types import (
     SessionHistoryScopeDTO,
     SubStepResultInfo,
 )
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import (
     DateTimeFilter,
     OrderDirection,
@@ -659,7 +660,17 @@ class SchedulingResultFilterGQL(PydanticInputMixin[SchedulingResultFilterDTO]):
     name="SessionSchedulingHistoryFilter",
 )
 class SessionSchedulingHistoryFilter(PydanticInputMixin[SessionHistoryFilterDTO]):
-    id: UUIDFilter | None = None
+    id: UUIDFilter | None = gql_field(
+        description="Filter by history record ID.",
+        default=None,
+        deprecation_reason=f"Deprecated since {NEXT_RELEASE_VERSION}. Use `fieldId`.",
+    )
+    field_id: UUIDFilter | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION, description="Filter by history record ID."
+        ),
+        default=None,
+    )
     session_id: UUIDFilter | None = None
     phase: StringFilter | None = None
     from_status: list[str] | None = None
@@ -690,7 +701,17 @@ class SessionSchedulingHistoryOrderBy(PydanticInputMixin[SessionHistoryOrderDTO]
     name="KernelSchedulingHistoryFilter",
 )
 class KernelSchedulingHistoryFilterGQL(PydanticInputMixin[KernelHistoryFilterDTO]):
-    id: UUIDFilter | None = None
+    id: UUIDFilter | None = gql_field(
+        description="Filter by history record ID.",
+        default=None,
+        deprecation_reason=f"Deprecated since {NEXT_RELEASE_VERSION}. Use `fieldId`.",
+    )
+    field_id: UUIDFilter | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION, description="Filter by history record ID."
+        ),
+        default=None,
+    )
     kernel_id: UUIDFilter | None = None
     session_id: UUIDFilter | None = None
     phase: StringFilter | None = None
@@ -723,7 +744,17 @@ class KernelSchedulingHistoryOrderByGQL(PydanticInputMixin[KernelHistoryOrderDTO
     name="DeploymentHistoryFilter",
 )
 class DeploymentHistoryFilter(PydanticInputMixin[DeploymentHistoryFilterDTO]):
-    id: UUIDFilter | None = None
+    id: UUIDFilter | None = gql_field(
+        description="Filter by history record ID.",
+        default=None,
+        deprecation_reason=f"Deprecated since {NEXT_RELEASE_VERSION}. Use `fieldId`.",
+    )
+    field_id: UUIDFilter | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION, description="Filter by history record ID."
+        ),
+        default=None,
+    )
     deployment_id: UUIDFilter | None = None
     phase: StringFilter | None = None
     from_status: list[str] | None = None
@@ -757,7 +788,17 @@ class DeploymentHistoryOrderBy(PydanticInputMixin[DeploymentHistoryOrderDTO]):
     name="ReplicaGroupHistoryFilter",
 )
 class ReplicaGroupHistoryFilterGQL(PydanticInputMixin[ReplicaGroupHistoryFilterDTO]):
-    id: UUIDFilter | None = None
+    id: UUIDFilter | None = gql_field(
+        description="Filter by history record ID.",
+        default=None,
+        deprecation_reason=f"Deprecated since {NEXT_RELEASE_VERSION}. Use `fieldId`.",
+    )
+    field_id: UUIDFilter | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION, description="Filter by history record ID."
+        ),
+        default=None,
+    )
     deployment_id: UUIDFilter | None = None
     category: list[ReplicaGroupHistoryCategoryGQL] | None = None
     phase: StringFilter | None = None
@@ -790,7 +831,17 @@ class ReplicaGroupHistoryOrderByGQL(PydanticInputMixin[ReplicaGroupHistoryOrderD
     name="RouteHistoryFilter",
 )
 class RouteHistoryFilter(PydanticInputMixin[RouteHistoryFilterDTO]):
-    id: UUIDFilter | None = None
+    id: UUIDFilter | None = gql_field(
+        description="Filter by history record ID.",
+        default=None,
+        deprecation_reason=f"Deprecated since {NEXT_RELEASE_VERSION}. Use `fieldId`.",
+    )
+    field_id: UUIDFilter | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION, description="Filter by history record ID."
+        ),
+        default=None,
+    )
     route_id: UUIDFilter | None = None
     deployment_id: UUIDFilter | None = None
     phase: StringFilter | None = None
