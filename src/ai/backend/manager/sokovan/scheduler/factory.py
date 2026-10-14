@@ -16,6 +16,9 @@ from ai.backend.manager.repositories.resource_usage_history.repository import (
     ResourceUsageHistoryRepository,
 )
 from ai.backend.manager.repositories.scheduler.repository import SchedulerRepository
+from ai.backend.manager.repositories.system_session_environ.repository import (
+    SystemSessionEnvironRepository,
+)
 from ai.backend.manager.sokovan.scheduler.types import ScheduleType
 
 if TYPE_CHECKING:
@@ -101,6 +104,7 @@ from ai.backend.manager.views.sokovan.result import PromotionSpec
 def create_default_scheduler_components(
     repository: SchedulerRepository,
     fair_share_repository: FairShareRepository,
+    system_session_environ_repository: SystemSessionEnvironRepository,
     config_provider: ManagerConfigProvider,
     agent_client_pool: AgentClientPool,
     network_plugin_ctx: NetworkPluginContext,
@@ -113,6 +117,7 @@ def create_default_scheduler_components(
     Args:
         repository: The repository for accessing system data
         fair_share_repository: The fair share repository for sequencing
+        system_session_environ_repository: The repository of the values injected into sessions
         config_provider: The manager configuration provider
         agent_client_pool: Pool for managing agent clients
         network_plugin_ctx: Network plugin context for network management
@@ -147,6 +152,7 @@ def create_default_scheduler_components(
     launcher = SessionLauncher(
         SessionLauncherArgs(
             repository=repository,
+            system_session_environ_repository=system_session_environ_repository,
             agent_client_pool=agent_client_pool,
             network_plugin_ctx=network_plugin_ctx,
             config_provider=config_provider,

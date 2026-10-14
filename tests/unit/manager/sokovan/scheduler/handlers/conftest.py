@@ -10,6 +10,8 @@ from uuid import uuid4
 import pytest
 from dateutil.tz import tzutc
 
+from ai.backend.common.data.entity.domain import DomainID
+from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.resource_group import ResourceGroupID
 from ai.backend.common.events.event_types.kernel.types import KernelLifecycleEventReason
 from ai.backend.common.types import (
@@ -688,6 +690,8 @@ def sessions_for_start_factory() -> Callable[..., SessionsForStartWithImages]:
                 user_uuid=s.session_info.metadata.user_uuid,
                 user_email="test@example.com",
                 user_name="test-user",
+                domain_id=DomainID(uuid4()),
+                project_id=ProjectID(uuid4()),
                 environ={},
             )
             for s in sessions

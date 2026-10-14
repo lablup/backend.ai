@@ -45,6 +45,16 @@ class SystemSessionEnvironScopeType(enum.StrEnum):
             case SystemSessionEnvironScopeType.PROJECT:
                 return ProjectID(scope_id)
 
+    def specificity(self) -> int:
+        """The rank among rows sharing a key; the highest one is injected."""
+        match self:
+            case SystemSessionEnvironScopeType.GLOBAL:
+                return 0
+            case SystemSessionEnvironScopeType.DOMAIN:
+                return 1
+            case SystemSessionEnvironScopeType.PROJECT:
+                return 2
+
 
 class SystemSessionEnvironSourceKind(enum.StrEnum):
     """``system`` values win over the session's own environ; ``optional`` ones lose to it."""
