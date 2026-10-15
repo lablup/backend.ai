@@ -510,8 +510,8 @@ class Circuit(SerializableCircuit):
             case ProxyProtocol.TCP:
                 protocol = IngressProtocol.TCP
             case _:
-                raise UnreachableError(
-                    f"a worker circuit never carries the {self.protocol} protocol"
+                raise InvalidCircuitDataError(
+                    f"A worker circuit cannot carry the {self.protocol} protocol"
                 )
         match self.frontend:
             case PortFrontendInfo(port=port):
