@@ -176,6 +176,12 @@ class TestInMemoryIngressState:
         await state.apply([other_ingress])
         assert await state.get(OTHER_KEY) == other_ingress
 
+    async def test_keep_stores_a_later_layers_hit(
+        self, state: InMemoryIngressState, other_ingress: Ingress
+    ) -> None:
+        await state.keep(other_ingress)
+        assert await state.get(OTHER_KEY) == other_ingress
+
     async def test_remove_drops_the_key(self, state: InMemoryIngressState) -> None:
         await state.remove([IngressKey(authority=AUTHORITY, frontend_key=STORED_KEY)])
         assert await state.get(STORED_KEY) is None

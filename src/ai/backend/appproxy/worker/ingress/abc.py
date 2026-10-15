@@ -17,6 +17,12 @@ class IngressReader(ABC):
         """Every ingress of the worker's authority."""
         raise NotImplementedError
 
+    async def keep(self, ingress: Ingress) -> None:
+        """A later layer's hit; layers that cache override this."""
+
+    async def remember_missing(self, frontend_key: IngressFrontendKey) -> None:
+        """A miss in every layer; layers that cache override this."""
+
 
 class IngressWriter(ABC):
     @abstractmethod

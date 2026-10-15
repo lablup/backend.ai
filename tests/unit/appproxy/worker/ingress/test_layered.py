@@ -64,17 +64,22 @@ def redis() -> AsyncMock:
 
 @pytest.fixture
 def layered(memory: InMemoryIngressState, redis: AsyncMock) -> LayeredIngressState:
-    return LayeredIngressState(memory=memory, redis=redis)
+    return LayeredIngressState([memory, redis])
 
 
 @pytest.fixture
 def redis_only(redis: AsyncMock) -> LayeredIngressState:
-    return LayeredIngressState(memory=None, redis=redis)
+    return LayeredIngressState([redis])
 
 
 @pytest.fixture
 def memory_only(memory: InMemoryIngressState) -> LayeredIngressState:
-    return LayeredIngressState(memory=memory, redis=None)
+    return LayeredIngressState([memory])
+
+
+@pytest.fixture
+def redis_first(memory: InMemoryIngressState, redis: AsyncMock) -> LayeredIngressState:
+    return LayeredIngressState([redis, memory])
 
 
 @pytest.fixture
@@ -136,6 +141,13 @@ class TestLayeredIngressState:
         self, memory_only: LayeredIngressState
     ) -> None:
         assert await memory_only.get(FRONTEND_KEY) is None
+
+    @pytest.mark.usefixtures("ingress_in_memory")
+    async def test_redis_first_reads_memory_after_a_redis_miss(
+        self, redis_first: LayeredIngressState, redis: AsyncMock, ingress: Ingress
+    ) -> None:
+        assert await redis_first.get(FRONTEND_KEY) == ingress
+        redis.get.assert_awaited_once_with(FRONTEND_KEY)
 
     @pytest.mark.usefixtures("ingress_in_redis")
     async def test_get_all_returns_the_last_layers_set(
