@@ -472,8 +472,8 @@ class Circuit(SerializableCircuit):
                     )
                 case _:
                     raise UnreachableError("a circuit holds only interactive or inference app info")
-        # Circuits have no target groups, so every route is a target of a single group.
-        # TODO: Replace the fixed id once target groups are stored as their own entity.
+        # TODO: Replace the fixed ids once ingresses and target groups are stored as their own
+        # entities. Circuits have no target groups, so every route is a target of a single group.
         target_group = IngressTargetGroup(
             id=IngressTargetGroupID(str(UUID(int=0))),
             weight=1,
@@ -487,12 +487,14 @@ class Circuit(SerializableCircuit):
             ],
         )
         return Ingress(
-            id=IngressID(str(self.id)),
+            id=IngressID(str(UUID(int=0))),
             authority=authority,
             revision=revision,
             frontend=frontend,
             access=access,
-            backend=IngressBackend(id=IngressBackendID(str(self.id)), target_groups=[target_group]),
+            backend=IngressBackend(
+                id=IngressBackendID(str(UUID(int=0))), target_groups=[target_group]
+            ),
         )
 
     def to_ingress_frontend(self) -> IngressFrontend:

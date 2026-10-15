@@ -165,7 +165,7 @@ def frontend_case_circuit(
 async def ingress_in_memory(memory: InMemoryIngressState) -> None:
     await memory.apply([
         Ingress(
-            id=IngressID(str(CIRCUIT_ID)),
+            id=IngressID(str(UUID(int=0))),
             authority=AUTHORITY,
             revision=0,
             frontend=IngressFrontend(
@@ -175,9 +175,11 @@ async def ingress_in_memory(memory: InMemoryIngressState) -> None:
             ),
             access=IngressAccess(mode=IngressAccessMode.PUBLIC, allowed_client_ips=[]),
             backend=IngressBackend(
-                id=IngressBackendID(str(CIRCUIT_ID)),
+                id=IngressBackendID(str(UUID(int=0))),
                 target_groups=[
-                    IngressTargetGroup(id=IngressTargetGroupID("group-1"), weight=1, targets=[])
+                    IngressTargetGroup(
+                        id=IngressTargetGroupID(str(UUID(int=0))), weight=1, targets=[]
+                    )
                 ],
             ),
         )
@@ -259,13 +261,12 @@ class TestLegacyCircuitIngressSync:
         assert stored_ingress is not None
         assert stored_ingress.frontend.kind == frontend_case.kind
 
-    async def test_apply_keeps_the_circuit_id_users_and_allowed_networks(
+    async def test_apply_keeps_the_circuit_users_and_allowed_networks(
         self, sync: LegacyCircuitIngressSync, memory: InMemoryIngressState, circuit: Circuit
     ) -> None:
         await sync.apply(circuit, circuit.route_info)
         stored_ingress = await memory.get(PORT_KEY)
         assert stored_ingress is not None
-        assert stored_ingress.id == str(CIRCUIT_ID)
         assert stored_ingress.access.users is not None
         assert stored_ingress.access.users.allowed_user_ids == [USER_ID]
         assert stored_ingress.access.allowed_client_ips == [
@@ -329,7 +330,7 @@ class TestLegacyCircuitIngressSync:
         routeless_circuit: Circuit,
     ) -> None:
         await sync.replace_all([circuit, routeless_circuit])
-        assert {ingress.id for ingress in await memory.get_all()} == {
-            str(circuit.id),
-            str(routeless_circuit.id),
+        assert {ingress.frontend.key() for ingress in await memory.get_all()} == {
+            circuit.to_ingress_frontend().key(),
+            routeless_circuit.to_ingress_frontend().key(),
         }
