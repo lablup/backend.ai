@@ -1237,7 +1237,7 @@ class HostNetworkPlugin(AbstractNetworkAgentPlugin[DockerKernel]):
         port_map = self._map_host_network_ports(kernel, ports)
         intrinsic_ports = {
             name: next(iter(port_map[name].values()))
-            for name in ("replin", "replout", "sshd", "ttyd")
+            for name in ("replin", "replout", "sshd", "ttyd", "etty")
             if name in port_map
         }
 

@@ -2828,6 +2828,13 @@ class AbstractAgent[
                         "host_ports": (None,),
                         "is_inference": False,
                     })
+                    service_ports.append({
+                        "name": "etty",
+                        "protocol": ServicePortProtocols.HTTP,
+                        "container_ports": (7682,),
+                        "host_ports": (None,),
+                        "is_inference": False,
+                    })
 
                     model_definition: ModelDefinition | None = None
                     # Read model config

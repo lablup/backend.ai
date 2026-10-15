@@ -1156,7 +1156,7 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
             case ResourceGroupType.COMPUTE:
                 return ()
             case ResourceGroupType.STORAGE:
-                return ("ttyd",)
+                return ("ttyd", "etty")
 
     async def _apply_seccomp_profile(self, container_config: MutableMapping[str, Any]) -> None:
         default_seccomp_path = self.resolve_krunner_filepath("runner/default-seccomp.json")
