@@ -446,9 +446,7 @@ class Circuit(SerializableCircuit):
     def prometheus_metric_label(self) -> dict[str, str]:
         return {"protocol": self.protocol.name}
 
-    def to_ingress(
-        self, authority: IngressAuthority, revision: int, routes: Sequence[RouteInfo]
-    ) -> Ingress:
+    def to_ingress(self, authority: IngressAuthority, routes: Sequence[RouteInfo]) -> Ingress:
         frontend = self.to_ingress_frontend()
         allowed_client_ips = [ip_network(cidr) for cidr in self.ip_validator.ranges]
         # The worker authenticates http only, so other protocols stay public as they are today.
@@ -491,7 +489,8 @@ class Circuit(SerializableCircuit):
             # TODO: Use the ingress id once ingresses are stored as their own entity.
             id=IngressID(str(UUID(int=0))),
             authority=authority,
-            revision=revision,
+            # TODO: Use the manager's revision once ingresses are stored as their own entity.
+            revision=0,
             frontend=frontend,
             access=access,
             backend=IngressBackend(
