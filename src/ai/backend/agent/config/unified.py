@@ -2252,6 +2252,7 @@ class ContainerdConfig(BaseConfigSchema):
             example=ConfigExample(local="[]", prod='["coco-tdx"]'),
         ),
     ]
+    # PROVISIONAL(trusted-storage): fixed size until manager-side sizing (W-10)
     trusted_storage_size: Annotated[
         BinarySizeField,
         Field(
@@ -2263,9 +2264,8 @@ class ContainerdConfig(BaseConfigSchema):
             description=(
                 "Apparent size of each kernel's trusted storage backing file. "
                 "The file is sparse, so host disk is used only as the kernel writes to it. "
-                "The guest formats it (LUKS2 with dm-integrity) at about 1.1 s/GiB, so the guest kernel "
-                "cmdline must carry one fixed agent.cdh_api_timeout large enough for the largest store. "
-                "The Kata create_container_timeout must cover the format and the image pull, e.g. 1800 s."
+                "Larger stores take longer to format in the guest; the 64G default already needs "
+                "agent.cdh_api_timeout above the stock 50 s."
             ),
             added_version="26.10.0",
             example=ConfigExample(local="64G", prod="64G"),
