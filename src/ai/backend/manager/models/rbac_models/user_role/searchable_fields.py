@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import override
 
-from ai.backend.manager.data.permission.role import AssignedUserData, UserRoleAssignmentData
+from ai.backend.manager.data.permission.role import AssignedUserData
 from ai.backend.manager.models.rbac_models.user_role.row import UserRoleRow
 from ai.backend.manager.models.specs.conditions.datetime import DateTimeConditions
 from ai.backend.manager.models.specs.conditions.uuid import UUIDConditions
@@ -50,15 +50,6 @@ class _RoleAssignmentOwnFields(RowDataConverter[UserRoleRow, AssignedUserData]):
             role_id=self.role_id.read(row),
             granted_by=self.granted_by.read(row),
             granted_at=self.granted_at.read(row),
-        )
-
-    def to_assignment_data(self, row: UserRoleRow) -> UserRoleAssignmentData:
-        """The same row under the shape a write answers with, which omits the moment."""
-        return UserRoleAssignmentData(
-            id=self.id.read(row),
-            user_id=self.user_id.read(row),
-            role_id=self.role_id.read(row),
-            granted_by=self.granted_by.read(row),
         )
 
 

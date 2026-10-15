@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import uuid
+from datetime import UTC, datetime
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -11,10 +12,10 @@ from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.role import RoleID
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.manager.data.permission.role import (
+    AssignedUserData,
     BulkRoleAssignmentResultData,
     ProjectRoleCount,
     RoleRevocationResult,
-    UserRoleAssignmentData,
     UserRoleAssignmentInput,
     UserRoleRevocationInput,
 )
@@ -58,12 +59,21 @@ class TestAssignRoleWithProject:
         user_id = uuid.uuid4()
         role_id = uuid.uuid4()
         project_id = uuid.uuid4()
-        mock_repository.assign_role.return_value = UserRoleAssignmentData(
-            id=uuid.uuid4(), user_id=user_id, role_id=role_id
+        mock_repository.assign_role.return_value = AssignedUserData(
+            id=uuid.uuid4(),
+            user_id=UserID(user_id),
+            role_id=RoleID(role_id),
+            granted_by=None,
+            granted_at=datetime.now(tz=UTC),
         )
 
         action = AssignRoleAction(
-            input=UserRoleAssignmentInput(user_id=user_id, role_id=role_id, project_id=project_id)
+            input=UserRoleAssignmentInput(
+                user_id=UserID(user_id),
+                role_id=RoleID(role_id),
+                granted_by=UserID(uuid.uuid4()),
+                project_id=ProjectID(project_id),
+            )
         )
         await service.assign_role(action)
 
@@ -80,11 +90,19 @@ class TestAssignRoleWithProject:
     ) -> None:
         user_id = uuid.uuid4()
         role_id = uuid.uuid4()
-        mock_repository.assign_role.return_value = UserRoleAssignmentData(
-            id=uuid.uuid4(), user_id=user_id, role_id=role_id
+        mock_repository.assign_role.return_value = AssignedUserData(
+            id=uuid.uuid4(),
+            user_id=UserID(user_id),
+            role_id=RoleID(role_id),
+            granted_by=None,
+            granted_at=datetime.now(tz=UTC),
         )
 
-        action = AssignRoleAction(input=UserRoleAssignmentInput(user_id=user_id, role_id=role_id))
+        action = AssignRoleAction(
+            input=UserRoleAssignmentInput(
+                user_id=UserID(user_id), role_id=RoleID(role_id), granted_by=UserID(uuid.uuid4())
+            )
+        )
         await service.assign_role(action)
 
         mock_roster_repository.join_member.assert_not_called()
@@ -101,11 +119,21 @@ class TestRevokeRoleWithProject:
         role_id = uuid.uuid4()
         project_id = uuid.uuid4()
         mock_repository.revoke_role.return_value = RoleRevocationResult(
-            user_role_id=uuid.uuid4(),
-            project_remaining_roles=[ProjectRoleCount(project_id=project_id, remaining_count=0)],
+            revoked=AssignedUserData(
+                id=uuid.uuid4(),
+                user_id=UserID(user_id),
+                role_id=RoleID(role_id),
+                granted_by=None,
+                granted_at=datetime.now(tz=UTC),
+            ),
+            project_remaining_roles=[
+                ProjectRoleCount(project_id=ProjectID(project_id), remaining_count=0)
+            ],
         )
 
-        action = RevokeRoleAction(input=UserRoleRevocationInput(user_id=user_id, role_id=role_id))
+        action = RevokeRoleAction(
+            input=UserRoleRevocationInput(user_id=UserID(user_id), role_id=RoleID(role_id))
+        )
         await service.revoke_role(action)
 
         mock_roster_repository.leave_member.assert_called_once_with(
@@ -122,11 +150,21 @@ class TestRevokeRoleWithProject:
         role_id = uuid.uuid4()
         project_id = uuid.uuid4()
         mock_repository.revoke_role.return_value = RoleRevocationResult(
-            user_role_id=uuid.uuid4(),
-            project_remaining_roles=[ProjectRoleCount(project_id=project_id, remaining_count=1)],
+            revoked=AssignedUserData(
+                id=uuid.uuid4(),
+                user_id=UserID(user_id),
+                role_id=RoleID(role_id),
+                granted_by=None,
+                granted_at=datetime.now(tz=UTC),
+            ),
+            project_remaining_roles=[
+                ProjectRoleCount(project_id=ProjectID(project_id), remaining_count=1)
+            ],
         )
 
-        action = RevokeRoleAction(input=UserRoleRevocationInput(user_id=user_id, role_id=role_id))
+        action = RevokeRoleAction(
+            input=UserRoleRevocationInput(user_id=UserID(user_id), role_id=RoleID(role_id))
+        )
         await service.revoke_role(action)
 
         mock_roster_repository.leave_member.assert_not_called()
@@ -140,10 +178,18 @@ class TestRevokeRoleWithProject:
         user_id = uuid.uuid4()
         role_id = uuid.uuid4()
         mock_repository.revoke_role.return_value = RoleRevocationResult(
-            user_role_id=uuid.uuid4(),
+            revoked=AssignedUserData(
+                id=uuid.uuid4(),
+                user_id=UserID(user_id),
+                role_id=RoleID(role_id),
+                granted_by=None,
+                granted_at=datetime.now(tz=UTC),
+            ),
         )
 
-        action = RevokeRoleAction(input=UserRoleRevocationInput(user_id=user_id, role_id=role_id))
+        action = RevokeRoleAction(
+            input=UserRoleRevocationInput(user_id=UserID(user_id), role_id=RoleID(role_id))
+        )
         await service.revoke_role(action)
 
         mock_roster_repository.leave_member.assert_not_called()
@@ -161,7 +207,13 @@ class TestBulkAssignRoleWithProject:
         project_id = uuid.uuid4()
         mock_repository.bulk_assign_role.return_value = BulkRoleAssignmentResultData(
             successes=[
-                UserRoleAssignmentData(id=uuid.uuid4(), user_id=uid, role_id=role_id)
+                AssignedUserData(
+                    id=uuid.uuid4(),
+                    user_id=UserID(uid),
+                    role_id=RoleID(role_id),
+                    granted_by=None,
+                    granted_at=datetime.now(tz=UTC),
+                )
                 for uid in user_ids
             ],
             failures=[],
@@ -170,7 +222,8 @@ class TestBulkAssignRoleWithProject:
         action = BulkAssignRoleAction(
             role_id=RoleID(role_id),
             user_ids=[UserID(uid) for uid in user_ids],
-            project_id=project_id,
+            granted_by=UserID(uuid.uuid4()),
+            project_id=ProjectID(project_id),
         )
         await service.bulk_assign_role(action)
 
@@ -188,14 +241,22 @@ class TestBulkAssignRoleWithProject:
         user_ids = [uuid.uuid4(), uuid.uuid4()]
         mock_repository.bulk_assign_role.return_value = BulkRoleAssignmentResultData(
             successes=[
-                UserRoleAssignmentData(id=uuid.uuid4(), user_id=uid, role_id=role_id)
+                AssignedUserData(
+                    id=uuid.uuid4(),
+                    user_id=UserID(uid),
+                    role_id=RoleID(role_id),
+                    granted_by=None,
+                    granted_at=datetime.now(tz=UTC),
+                )
                 for uid in user_ids
             ],
             failures=[],
         )
 
         action = BulkAssignRoleAction(
-            role_id=RoleID(role_id), user_ids=[UserID(uid) for uid in user_ids]
+            role_id=RoleID(role_id),
+            user_ids=[UserID(uid) for uid in user_ids],
+            granted_by=UserID(uuid.uuid4()),
         )
         await service.bulk_assign_role(action)
 
