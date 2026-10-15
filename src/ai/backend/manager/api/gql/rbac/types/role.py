@@ -1003,9 +1003,9 @@ class BulkAssignRolePayloadGQL(PydanticOutputMixin[BulkAssignRoleResultPayloadDT
         description="List of successfully created role assignments."
     )
     failed: list[BulkAssignRoleErrorGQL] = gql_field(
-        description="List of errors for users that failed to be assigned.",
-        deprecation_reason=(
-            "Always empty. A user already holding the role keeps it; every other refusal raises."
+        description=(
+            "Users already holding the role, whose assignments are left as they stand. "
+            "Every other refusal raises."
         ),
     )
 

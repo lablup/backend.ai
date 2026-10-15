@@ -163,9 +163,9 @@ the name is identical to the single form, with no pluralisation —
 `myScopePermissions` / `myAtomicBulkScopePermissions`.
 
 **Where the existing surface stands**: 22 payloads carry a `failed` or an `errors` field
-and the names say nothing about which behaviour they have. 17 are genuinely partial.
-4 are atomic with a channel that is always empty — `BulkAddRolePermissionPresetsPayload`,
-`BulkAssignRolePayload`, `ReplaceRolePermissionsPayload`, `UpsertAppConfigFragmentsPayload`.
+and the names say nothing about which behaviour they have. 18 are genuinely partial.
+3 are atomic with a channel that is always empty — `BulkAddRolePermissionPresetsPayload`,
+`ReplaceRolePermissionsPayload`, `UpsertAppConfigFragmentsPayload`.
 The remaining one, `ScanProjectModelCardsV2Payload`, reports a scan summary in `errors`
 rather than a per-item channel. Renaming the 22 is breaking, so this states the policy
 and the migration is judged separately.

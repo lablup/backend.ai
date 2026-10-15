@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from collections import defaultdict
 from collections.abc import Mapping, Sequence
-from datetime import UTC, datetime
 from functools import lru_cache
 from uuid import UUID
 
@@ -25,6 +24,7 @@ from ai.backend.common.data.permission.types import Permission
 from ai.backend.common.dto.manager.v2.rbac import (
     BulkAddRolePermissionFailureInfo,
     BulkAddRolePermissionsPayload,
+    BulkAssignRoleFailureInfo,
     BulkAssignRoleResultPayload,
     BulkRemoveRolePermissionFailureInfo,
     BulkRemoveRolePermissionsPayload,
@@ -150,9 +150,7 @@ from ai.backend.manager.data.permission.role import (
     BulkUserRoleRevocationInput,
     RoleData,
     RoleDetailData,
-    UserRoleAssignmentData,
     UserRoleAssignmentInput,
-    UserRoleRevocationData,
     UserRoleRevocationInput,
 )
 from ai.backend.manager.data.permission.status import RoleStatus as InternalRoleStatus
@@ -895,24 +893,21 @@ class RBACAdapter(BaseAdapter):
     # ------------------------------------------------------------------ assign_role / revoke_role
 
     async def assign_role(self, input: AssignRoleInputDTO) -> RoleAssignmentNode:
-        """Assign a role to a user."""
+        """Assign a role to a user, granted by the current authenticated user."""
+        me = current_user()
+        if me is None:
+            raise UnreachableError("User context is not available")
         action_result = await self._rbac.assign_role.run(
             AssignRoleAction(
                 input=UserRoleAssignmentInput(
                     user_id=input.user_id,
                     role_id=input.role_id,
+                    granted_by=UserID(me.user_id),
                     project_id=input.project_id,
                 )
             )
         )
-        data: UserRoleAssignmentData = action_result.data
-        return RoleAssignmentNode(
-            id=data.id,
-            user_id=data.user_id,
-            role_id=data.role_id,
-            granted_by=data.granted_by,
-            granted_at=datetime.now(tz=UTC),
-        )
+        return self._assignment_data_to_node(action_result.data)
 
     async def revoke_role(self, input: RevokeRoleInputDTO) -> RoleAssignmentNode:
         """Revoke a role from a user."""
@@ -921,40 +916,31 @@ class RBACAdapter(BaseAdapter):
                 input=UserRoleRevocationInput(user_id=input.user_id, role_id=input.role_id)
             )
         )
-        data: UserRoleRevocationData = action_result.data
-        return RoleAssignmentNode(
-            id=data.user_role_id,
-            user_id=data.user_id,
-            role_id=data.role_id,
-            granted_by=None,
-            granted_at=datetime.now(tz=UTC),
-        )
+        return self._assignment_data_to_node(action_result.data)
 
     # ------------------------------------------------------------------ bulk_assign_role / bulk_revoke_role
 
     async def bulk_assign_role(self, input: BulkAssignRoleInputDTO) -> BulkAssignRoleResultPayload:
-        """Bulk-assign a role to multiple users."""
+        """Bulk-assign a role to multiple users, granted by the current authenticated user.
+        A user already holding the role is reported in `failed`."""
+        me = current_user()
+        if me is None:
+            raise UnreachableError("User context is not available")
         action_result = await self._rbac.bulk_assign_role.run(
             BulkAssignRoleAction(
-                role_id=RoleID(input.role_id),
-                user_ids=[UserID(uid) for uid in input.user_ids],
+                role_id=input.role_id,
+                user_ids=input.user_ids,
+                granted_by=UserID(me.user_id),
                 project_id=input.project_id,
             )
         )
         result: BulkRoleAssignmentResultData = action_result.data
-        now = datetime.now(tz=UTC)
         return BulkAssignRoleResultPayload(
-            assigned=[
-                RoleAssignmentNode(
-                    id=s.id,
-                    user_id=s.user_id,
-                    role_id=s.role_id,
-                    granted_by=s.granted_by,
-                    granted_at=now,
-                )
-                for s in result.successes
+            assigned=[self._assignment_data_to_node(s) for s in result.successes],
+            failed=[
+                BulkAssignRoleFailureInfo(user_id=f.user_id, message=f.message)
+                for f in result.failures
             ],
-            failed=[],
         )
 
     async def bulk_add_role_permissions(
@@ -1065,18 +1051,8 @@ class RBACAdapter(BaseAdapter):
             )
         )
         result: BulkRoleRevocationResultData = action_result.data
-        now = datetime.now(tz=UTC)
         return BulkRevokeRoleResultPayload(
-            revoked=[
-                RoleAssignmentNode(
-                    id=s.user_role_id,
-                    user_id=s.user_id,
-                    role_id=s.role_id,
-                    granted_by=None,
-                    granted_at=now,
-                )
-                for s in result.successes
-            ],
+            revoked=[self._assignment_data_to_node(s) for s in result.successes],
             failed=[
                 BulkRevokeRoleFailureInfo(user_id=f.user_id, message=f.message)
                 for f in result.failures

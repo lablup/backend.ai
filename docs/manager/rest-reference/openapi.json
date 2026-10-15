@@ -39487,20 +39487,6 @@
             "format": "uuid",
             "title": "Role Id",
             "type": "string"
-          },
-          "granted_by": {
-            "anyOf": [
-              {
-                "format": "uuid",
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "description": "User ID who granted this role assignment",
-            "title": "Granted By"
           }
         },
         "required": [

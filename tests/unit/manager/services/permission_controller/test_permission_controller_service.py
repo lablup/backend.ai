@@ -172,7 +172,7 @@ class TestSearchUsersAssignedToRole:
         service: PermissionControllerService,
         mock_repository: MagicMock,
     ) -> None:
-        granted_by = uuid.uuid4()
+        granted_by = UserID(uuid.uuid4())
         user_data = AssignedUserData(
             id=uuid.uuid4(),
             user_id=UserID(uuid.uuid4()),
