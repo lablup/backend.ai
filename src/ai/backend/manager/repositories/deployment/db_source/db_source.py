@@ -12,11 +12,10 @@ from typing import Any, cast
 
 import sqlalchemy as sa
 from sqlalchemy.engine import CursorResult
-from sqlalchemy.exc import NoResultFound
 from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
 from sqlalchemy.ext.asyncio import async_sessionmaker
-from sqlalchemy.orm import aliased, contains_eager, selectinload
+from sqlalchemy.orm import aliased, contains_eager, selectinload, with_expression
 
 from ai.backend.common.config import ModelHealthCheck
 from ai.backend.common.data.endpoint.types import EndpointLifecycle
@@ -158,6 +157,7 @@ from ai.backend.manager.models.endpoint.searchers import (
     DeploymentAccessTokenSearcher,
     DeploymentIDSearcher,
     DeploymentInfoSearcher,
+    current_revision_id_subquery,
 )
 from ai.backend.manager.models.endpoint.updaters import (
     DeploymentRolloutClearUpdater,
@@ -452,8 +452,9 @@ class DeploymentDBSource:
                 sa.select(EndpointRow)
                 .where(EndpointRow.id == endpoint_id)
                 .options(
-                    selectinload(EndpointRow.primary_replica_group_row),
-                    selectinload(EndpointRow.target_replica_group_row),
+                    with_expression(
+                        EndpointRow.current_revision_id, current_revision_id_subquery()
+                    ),
                     selectinload(EndpointRow.deployment_policy),
                 )
             )
@@ -878,7 +879,18 @@ class DeploymentDBSource:
             if not endpoint:
                 raise EndpointNotFound(f"Endpoint {endpoint_id} not found")
 
-            row = EndpointAutoScalingRuleRow.from_creator(endpoint_id=endpoint_id, creator=creator)
+            row = EndpointAutoScalingRuleRow(
+                endpoint=endpoint_id,
+                metric_source=creator.condition.metric_source,
+                metric_name=creator.condition.metric_name,
+                min_threshold=creator.condition.scale_down_threshold,
+                max_threshold=creator.condition.scale_up_threshold,
+                step_size=creator.action.step_size,
+                cooldown_seconds=creator.action.cooldown_seconds,
+                min_replicas=creator.action.min_replicas,
+                max_replicas=creator.action.max_replicas,
+                prometheus_query_preset_id=creator.condition.prometheus_query_preset_id,
+            )
             db_sess.add(row)
             await db_sess.flush()
             return row.to_autoscaling_rule()
@@ -970,7 +982,18 @@ class DeploymentDBSource:
             if not endpoint:
                 raise EndpointNotFound(f"Endpoint {creator.model_deployment_id} not found")
 
-            row = EndpointAutoScalingRuleRow.from_model_deployment_creator(creator)
+            row = EndpointAutoScalingRuleRow(
+                endpoint=creator.model_deployment_id,
+                metric_source=creator.metric_source,
+                metric_name=creator.metric_name,
+                min_threshold=creator.min_threshold,
+                max_threshold=creator.max_threshold,
+                step_size=creator.step_size,
+                cooldown_seconds=creator.time_window,
+                min_replicas=creator.min_replicas,
+                max_replicas=creator.max_replicas,
+                prometheus_query_preset_id=creator.prometheus_query_preset_id,
+            )
             db_sess.add(row)
             await db_sess.flush()
             return AutoScalingRuleSearchableFields.own.to_data(row)
@@ -991,7 +1014,8 @@ class DeploymentDBSource:
             if not row:
                 raise AutoScalingRuleNotFound(f"Autoscaling rule {rule_id} not found")
 
-            row.apply_model_deployment_modifier(modifier)
+            for column_name, value in modifier.fields_to_update().items():
+                setattr(row, column_name, value)
             await db_sess.flush()
             return AutoScalingRuleSearchableFields.own.to_data(row)
 
@@ -2299,24 +2323,31 @@ class DeploymentDBSource:
 
         Returns exactly what is persisted on the active revision's
         ``model_definition`` — the merge result from variant baseline,
-        preset, yaml, and user overrides. ``_find_active_revision`` falls
-        back to ``deploying_revision`` while the initial rollout has not
-        completed, so AppProxy picks up the health-check config of the
-        spec being deployed. No vfolder re-reads at runtime.
+        preset, yaml, and user overrides. The active revision falls back to
+        the deploying revision while the initial rollout has not completed,
+        so AppProxy picks up the health-check config of the spec being
+        deployed. No vfolder re-reads at runtime.
         """
         async with self._begin_readonly_session_read_committed() as db_sess:
-            try:
-                endpoint = await EndpointRow.get(
-                    db_sess,
-                    endpoint_id,
-                    load_revisions=True,
+            endpoint = await db_sess.get(EndpointRow, endpoint_id)
+            if endpoint is None:
+                raise EndpointNotFound(str(endpoint_id))
+            current_revision_ids = sa.select(ReplicaGroupRow.current_revision_id).where(
+                ReplicaGroupRow.id == endpoint.primary_replica_group_id
+            )
+            # The current revision wins; the deploying one stands in until it is set.
+            model_definition = await db_sess.scalar(
+                sa.select(DeploymentRevisionRow.model_definition)
+                .where(
+                    DeploymentRevisionRow.id.in_(current_revision_ids)
+                    | (DeploymentRevisionRow.id == endpoint.deploying_revision_id)
                 )
-            except NoResultFound as e:
-                raise EndpointNotFound(str(endpoint_id)) from e
-            active_rev = endpoint._find_active_revision()
-            if active_rev is None or active_rev.model_definition is None:
+                .order_by(sa.case((DeploymentRevisionRow.id.in_(current_revision_ids), 0), else_=1))
+                .limit(1)
+            )
+            if model_definition is None:
                 return None
-            return active_rev.model_definition.health_check_config()
+            return model_definition.health_check_config()
 
     async def vfolder_mount_policy_inputs(
         self, user_id: UserID, vfolder_ids: Sequence[VFolderUUID]

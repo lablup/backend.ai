@@ -57,13 +57,14 @@ from ai.backend.manager.errors.user import (
 from ai.backend.manager.models.bootstrap_script.purgers import BootstrapScriptPurger
 from ai.backend.manager.models.domain.row import DomainRow
 from ai.backend.manager.models.endpoint.purgers import UserEndpointPurger
-from ai.backend.manager.models.endpoint.row import EndpointRow
+from ai.backend.manager.models.endpoint.row import EndpointRow, EndpointTokenRow
 from ai.backend.manager.models.entity_share.purgers import EntitySharePendingOfferBatchPurger
 from ai.backend.manager.models.entity_share.row import EntityShareRow
 from ai.backend.manager.models.entity_share.updaters import EntityShareRevokeUpdater
 from ai.backend.manager.models.kernel.row import (
     AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES,
     RESOURCE_USAGE_KERNEL_STATUSES,
+    KernelRow,
     kernels,
 )
 from ai.backend.manager.models.keypair.row import (
@@ -73,17 +74,21 @@ from ai.backend.manager.models.keypair.row import (
 )
 from ai.backend.manager.models.keypair.searchable_fields import KeyPairSearchableFields
 from ai.backend.manager.models.project.lookups import PersonalProjectOfUserLookup
+from ai.backend.manager.models.replica_group.row import ReplicaGroupRow
 from ai.backend.manager.models.resource_policy.row import (
     KeyPairResourcePolicyRow,
     UserResourcePolicyRow,
 )
 from ai.backend.manager.models.resource_slot.aggregates import kernel_allocated_slots_expr
+from ai.backend.manager.models.routing.row import RoutingRow
 from ai.backend.manager.models.session.row import (
     AGENT_RESOURCE_OCCUPYING_SESSION_STATUSES,
+    DEAD_SESSION_STATUSES,
     SessionRow,
     by_status,
     by_user_id,
 )
+from ai.backend.manager.models.session_group.row import SessionGroupRow
 from ai.backend.manager.models.types import QueryCondition, QueryOption, join_by_related_field
 from ai.backend.manager.models.user.creators import UserCreator
 from ai.backend.manager.models.user.purgers import (
@@ -462,9 +467,66 @@ class UserDBSource:
                 raise KeyPairNotFound(
                     f"User {target_user_uuid} has no default keypair to delegate endpoints to."
                 )
-            await EndpointRow.delegate_endpoint_ownership(
+            await self._delegate_endpoint_ownership(
                 session, user_uuid, UserID(target_user_uuid), default_access_key
             )
+
+    async def _delegate_endpoint_ownership(
+        self,
+        session: SASession,
+        owner_user_uuid: UUID,
+        target_user_uuid: UserID,
+        target_access_key: AccessKey,
+    ) -> None:
+        endpoint_ids = sa.select(EndpointRow.id).where(
+            (EndpointRow.session_owner == owner_user_uuid)
+            & (EndpointRow.lifecycle_stage == EndpointLifecycle.CREATED)
+        )
+        # The placement groups of the delegated replica groups follow their
+        # members: a group's members all belong to its owner (BEP-1064).
+        await session.execute(
+            sa.update(SessionGroupRow)
+            .where(
+                SessionGroupRow.id.in_(
+                    sa.select(ReplicaGroupRow.session_group_id).where(
+                        ReplicaGroupRow.deployment_id.in_(endpoint_ids)
+                    )
+                )
+            )
+            .values(owner_user_id=target_user_uuid)
+        )
+        await session.execute(
+            sa.update(EndpointTokenRow)
+            .where(EndpointTokenRow.endpoint.in_(endpoint_ids))
+            .values(session_owner=target_user_uuid)
+        )
+        await session.execute(
+            sa.update(RoutingRow)
+            .where(RoutingRow.endpoint.in_(endpoint_ids))
+            .values(session_owner=target_user_uuid)
+        )
+        live_session_ids = sa.select(SessionRow.id).where(
+            SessionRow.id.in_(
+                sa.select(RoutingRow.session).where(RoutingRow.endpoint.in_(endpoint_ids))
+            )
+            & SessionRow.status.not_in(DEAD_SESSION_STATUSES)
+        )
+        await session.execute(
+            sa.update(KernelRow)
+            .where(KernelRow.session_id.in_(live_session_ids))
+            .values(user_uuid=target_user_uuid, access_key=target_access_key)
+        )
+        await session.execute(
+            sa.update(SessionRow)
+            .where(SessionRow.id.in_(live_session_ids))
+            .values(user_uuid=target_user_uuid, access_key=target_access_key)
+        )
+        # Last, since the statements above select the endpoints by their owner.
+        await session.execute(
+            sa.update(EndpointRow)
+            .where(EndpointRow.id.in_(endpoint_ids))
+            .values(session_owner=target_user_uuid)
+        )
 
     async def delete_endpoints(
         self,
