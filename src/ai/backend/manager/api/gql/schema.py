@@ -189,6 +189,7 @@ from ai.backend.manager.api.gql.fair_share.resolver.domain import (
     admin_domain_fair_share,
     admin_domain_fair_shares,
     admin_upsert_domain_fair_share_weight,
+    atomic_bulk_upsert_domain_fair_share_weights,
     bulk_upsert_domain_fair_share_weight,
     domain_fair_share,
     domain_fair_shares,
@@ -201,6 +202,7 @@ from ai.backend.manager.api.gql.fair_share.resolver.project import (
     admin_project_fair_share,
     admin_project_fair_shares,
     admin_upsert_project_fair_share_weight,
+    atomic_bulk_upsert_project_fair_share_weights,
     bulk_upsert_project_fair_share_weight,
     project_fair_share,
     project_fair_shares,
@@ -213,6 +215,7 @@ from ai.backend.manager.api.gql.fair_share.resolver.user import (
     admin_upsert_user_fair_share_weight,
     admin_user_fair_share,
     admin_user_fair_shares,
+    atomic_bulk_upsert_user_fair_share_weights,
     bulk_upsert_user_fair_share_weight,
     rg_user_fair_share,
     rg_user_fair_shares,
@@ -1148,7 +1151,14 @@ class Mutation:
     delete_access_token = delete_access_token
     activate_deployment_revision = activate_deployment_revision
     update_route_traffic_status = update_route_traffic_status
-    # Fair Share - Admin APIs
+    # Fair Share
+    upsert_domain_fair_share_weight = upsert_domain_fair_share_weight
+    upsert_project_fair_share_weight = upsert_project_fair_share_weight
+    upsert_user_fair_share_weight = upsert_user_fair_share_weight
+    atomic_bulk_upsert_domain_fair_share_weights = atomic_bulk_upsert_domain_fair_share_weights
+    atomic_bulk_upsert_project_fair_share_weights = atomic_bulk_upsert_project_fair_share_weights
+    atomic_bulk_upsert_user_fair_share_weights = atomic_bulk_upsert_user_fair_share_weights
+    # Fair Share - Admin APIs (deprecated)
     admin_upsert_domain_fair_share_weight = admin_upsert_domain_fair_share_weight
     admin_upsert_project_fair_share_weight = admin_upsert_project_fair_share_weight
     admin_upsert_user_fair_share_weight = admin_upsert_user_fair_share_weight
@@ -1156,9 +1166,6 @@ class Mutation:
     admin_bulk_upsert_project_fair_share_weight = admin_bulk_upsert_project_fair_share_weight
     admin_bulk_upsert_user_fair_share_weight = admin_bulk_upsert_user_fair_share_weight
     # Fair Share - Legacy (deprecated)
-    upsert_domain_fair_share_weight = upsert_domain_fair_share_weight
-    upsert_project_fair_share_weight = upsert_project_fair_share_weight
-    upsert_user_fair_share_weight = upsert_user_fair_share_weight
     bulk_upsert_domain_fair_share_weight = bulk_upsert_domain_fair_share_weight
     bulk_upsert_project_fair_share_weight = bulk_upsert_project_fair_share_weight
     bulk_upsert_user_fair_share_weight = bulk_upsert_user_fair_share_weight

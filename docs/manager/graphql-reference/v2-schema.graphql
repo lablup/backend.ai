@@ -10048,64 +10048,79 @@ type Mutation {
   updateRouteTrafficStatus(input: UpdateRouteTrafficStatusInput!): UpdateRouteTrafficStatusPayload
 
   """
+  Added in 26.1.0. Upsert domain fair share weight. Creates a new record if it doesn't exist, or updates the weight if it does
+  """
+  upsertDomainFairShareWeight(input: UpsertDomainFairShareWeightInput!): UpsertDomainFairShareWeightPayload
+
+  """
+  Added in 26.1.0. Upsert project fair share weight. Creates a new record if it doesn't exist, or updates the weight if it does
+  """
+  upsertProjectFairShareWeight(input: UpsertProjectFairShareWeightInput!): UpsertProjectFairShareWeightPayload
+
+  """
+  Added in 26.1.0. Upsert user fair share weight. Creates a new record if it doesn't exist, or updates the weight if it does
+  """
+  upsertUserFairShareWeight(input: UpsertUserFairShareWeightInput!): UpsertUserFairShareWeightPayload
+
+  """
+  Added in 26.10.0. Upsert several domain fair share weights in one transaction. Creates new records if they don't exist, or updates weights if they do
+  """
+  atomicBulkUpsertDomainFairShareWeights(input: BulkUpsertDomainFairShareWeightInput!): BulkUpsertDomainFairShareWeightPayload
+
+  """
+  Added in 26.10.0. Upsert several project fair share weights in one transaction. Creates new records if they don't exist, or updates weights if they do
+  """
+  atomicBulkUpsertProjectFairShareWeights(input: BulkUpsertProjectFairShareWeightInput!): BulkUpsertProjectFairShareWeightPayload
+
+  """
+  Added in 26.10.0. Upsert several user fair share weights in one transaction. Creates new records if they don't exist, or updates weights if they do
+  """
+  atomicBulkUpsertUserFairShareWeights(input: BulkUpsertUserFairShareWeightInput!): BulkUpsertUserFairShareWeightPayload
+
+  """
   Added in 26.2.0. Upsert domain fair share weight (admin only). Creates a new record if it doesn't exist, or updates the weight if it does
   """
-  adminUpsertDomainFairShareWeight(input: UpsertDomainFairShareWeightInput!): UpsertDomainFairShareWeightPayload
+  adminUpsertDomainFairShareWeight(input: UpsertDomainFairShareWeightInput!): UpsertDomainFairShareWeightPayload @deprecated(reason: "Deprecated since 26.10.0. Use `upsertDomainFairShareWeight`.")
 
   """
   Added in 26.2.0. Upsert project fair share weight (admin only). Creates a new record if it doesn't exist, or updates the weight if it does
   """
-  adminUpsertProjectFairShareWeight(input: UpsertProjectFairShareWeightInput!): UpsertProjectFairShareWeightPayload
+  adminUpsertProjectFairShareWeight(input: UpsertProjectFairShareWeightInput!): UpsertProjectFairShareWeightPayload @deprecated(reason: "Deprecated since 26.10.0. Use `upsertProjectFairShareWeight`.")
 
   """
   Added in 26.2.0. Upsert user fair share weight (admin only). Creates a new record if it doesn't exist, or updates the weight if it does
   """
-  adminUpsertUserFairShareWeight(input: UpsertUserFairShareWeightInput!): UpsertUserFairShareWeightPayload
+  adminUpsertUserFairShareWeight(input: UpsertUserFairShareWeightInput!): UpsertUserFairShareWeightPayload @deprecated(reason: "Deprecated since 26.10.0. Use `upsertUserFairShareWeight`.")
 
   """
   Added in 26.2.0. Bulk upsert domain fair share weights (admin only). Creates new records if they don't exist, or updates weights if they do
   """
-  adminBulkUpsertDomainFairShareWeight(input: BulkUpsertDomainFairShareWeightInput!): BulkUpsertDomainFairShareWeightPayload
+  adminBulkUpsertDomainFairShareWeight(input: BulkUpsertDomainFairShareWeightInput!): BulkUpsertDomainFairShareWeightPayload @deprecated(reason: "Deprecated since 26.10.0. Use `atomicBulkUpsertDomainFairShareWeights`.")
 
   """
   Added in 26.2.0. Bulk upsert project fair share weights (admin only). Creates new records if they don't exist, or updates weights if they do
   """
-  adminBulkUpsertProjectFairShareWeight(input: BulkUpsertProjectFairShareWeightInput!): BulkUpsertProjectFairShareWeightPayload
+  adminBulkUpsertProjectFairShareWeight(input: BulkUpsertProjectFairShareWeightInput!): BulkUpsertProjectFairShareWeightPayload @deprecated(reason: "Deprecated since 26.10.0. Use `atomicBulkUpsertProjectFairShareWeights`.")
 
   """
   Added in 26.2.0. Bulk upsert user fair share weights (admin only). Creates new records if they don't exist, or updates weights if they do
   """
-  adminBulkUpsertUserFairShareWeight(input: BulkUpsertUserFairShareWeightInput!): BulkUpsertUserFairShareWeightPayload
-
-  """
-  Added in 26.1.0. Upsert domain fair share weight (superadmin only). Creates a new record if it doesn't exist, or updates the weight if it does
-  """
-  upsertDomainFairShareWeight(input: UpsertDomainFairShareWeightInput!): UpsertDomainFairShareWeightPayload @deprecated(reason: "Use admin_upsert_domain_fair_share_weight instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.")
-
-  """
-  Added in 26.1.0. Upsert project fair share weight (superadmin only). Creates a new record if it doesn't exist, or updates the weight if it does
-  """
-  upsertProjectFairShareWeight(input: UpsertProjectFairShareWeightInput!): UpsertProjectFairShareWeightPayload @deprecated(reason: "Use admin_upsert_project_fair_share_weight instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.")
-
-  """
-  Added in 26.1.0. Upsert user fair share weight (superadmin only). Creates a new record if it doesn't exist, or updates the weight if it does
-  """
-  upsertUserFairShareWeight(input: UpsertUserFairShareWeightInput!): UpsertUserFairShareWeightPayload @deprecated(reason: "Use admin_upsert_user_fair_share_weight instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.")
+  adminBulkUpsertUserFairShareWeight(input: BulkUpsertUserFairShareWeightInput!): BulkUpsertUserFairShareWeightPayload @deprecated(reason: "Deprecated since 26.10.0. Use `atomicBulkUpsertUserFairShareWeights`.")
 
   """
   Added in 26.1.0. Bulk upsert domain fair share weights (superadmin only). Creates new records if they don't exist, or updates weights if they do
   """
-  bulkUpsertDomainFairShareWeight(input: BulkUpsertDomainFairShareWeightInput!): BulkUpsertDomainFairShareWeightPayload @deprecated(reason: "Use admin_bulk_upsert_domain_fair_share_weight instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.")
+  bulkUpsertDomainFairShareWeight(input: BulkUpsertDomainFairShareWeightInput!): BulkUpsertDomainFairShareWeightPayload @deprecated(reason: "Deprecated since 26.10.0. Use `atomicBulkUpsertDomainFairShareWeights`.")
 
   """
   Added in 26.1.0. Bulk upsert project fair share weights (superadmin only). Creates new records if they don't exist, or updates weights if they do
   """
-  bulkUpsertProjectFairShareWeight(input: BulkUpsertProjectFairShareWeightInput!): BulkUpsertProjectFairShareWeightPayload @deprecated(reason: "Use admin_bulk_upsert_project_fair_share_weight instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.")
+  bulkUpsertProjectFairShareWeight(input: BulkUpsertProjectFairShareWeightInput!): BulkUpsertProjectFairShareWeightPayload @deprecated(reason: "Deprecated since 26.10.0. Use `atomicBulkUpsertProjectFairShareWeights`.")
 
   """
   Added in 26.1.0. Bulk upsert user fair share weights (superadmin only). Creates new records if they don't exist, or updates weights if they do
   """
-  bulkUpsertUserFairShareWeight(input: BulkUpsertUserFairShareWeightInput!): BulkUpsertUserFairShareWeightPayload @deprecated(reason: "Use admin_bulk_upsert_user_fair_share_weight instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.")
+  bulkUpsertUserFairShareWeight(input: BulkUpsertUserFairShareWeightInput!): BulkUpsertUserFairShareWeightPayload @deprecated(reason: "Deprecated since 26.10.0. Use `atomicBulkUpsertUserFairShareWeights`.")
 
   """
   Added in 26.2.0. Update fair share configuration for a resource group (admin only). Only provided fields are updated; others retain their existing values. Resource weights are validated against capacity - only resource types available in the scaling group's capacity can be specified.

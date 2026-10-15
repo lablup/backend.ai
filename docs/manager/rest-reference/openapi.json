@@ -52964,7 +52964,7 @@
     },
     "/v2/fair-share/domains/upsert": {
       "post": {
-        "operationId": "v2/fair-share.admin_upsert_domain",
+        "operationId": "v2/fair-share.upsert_domain",
         "tags": [
           "v2/fair-share"
         ],
@@ -52988,7 +52988,36 @@
           }
         },
         "parameters": [],
-        "description": "Upsert a domain fair share weight.\n\n**Preconditions:**\n* Superadmin privilege required.\n"
+        "description": "Upsert a domain fair share weight.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/v2/fair-share/domains/atomic-bulk-upsert": {
+      "post": {
+        "operationId": "v2/fair-share.atomic_bulk_upsert_domain",
+        "tags": [
+          "v2/fair-share"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BulkUpsertDomainFairShareWeightInput"
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "description": "Upsert several domain fair share weights in one transaction.\n\n**Preconditions:**\n* User privilege required.\n"
       }
     },
     "/v2/fair-share/domains/bulk-upsert": {
@@ -53017,7 +53046,7 @@
           }
         },
         "parameters": [],
-        "description": "Bulk upsert domain fair share weights.\n\n**Preconditions:**\n* Superadmin privilege required.\n"
+        "description": "Deprecated. Use `POST /v2/fair-share/domains/atomic-bulk-upsert`.\n\n**Preconditions:**\n* Superadmin privilege required.\n"
       }
     },
     "/v2/fair-share/projects/get": {
@@ -53080,7 +53109,7 @@
     },
     "/v2/fair-share/projects/upsert": {
       "post": {
-        "operationId": "v2/fair-share.admin_upsert_project",
+        "operationId": "v2/fair-share.upsert_project",
         "tags": [
           "v2/fair-share"
         ],
@@ -53104,7 +53133,36 @@
           }
         },
         "parameters": [],
-        "description": "Upsert a project fair share weight.\n\n**Preconditions:**\n* Superadmin privilege required.\n"
+        "description": "Upsert a project fair share weight.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/v2/fair-share/projects/atomic-bulk-upsert": {
+      "post": {
+        "operationId": "v2/fair-share.atomic_bulk_upsert_project",
+        "tags": [
+          "v2/fair-share"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BulkUpsertProjectFairShareWeightInput"
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "description": "Upsert several project fair share weights in one transaction.\n\n**Preconditions:**\n* User privilege required.\n"
       }
     },
     "/v2/fair-share/projects/bulk-upsert": {
@@ -53133,7 +53191,7 @@
           }
         },
         "parameters": [],
-        "description": "Bulk upsert project fair share weights.\n\n**Preconditions:**\n* Superadmin privilege required.\n"
+        "description": "Deprecated. Use `POST /v2/fair-share/projects/atomic-bulk-upsert`.\n\n**Preconditions:**\n* Superadmin privilege required.\n"
       }
     },
     "/v2/fair-share/users/get": {
@@ -53196,7 +53254,7 @@
     },
     "/v2/fair-share/users/upsert": {
       "post": {
-        "operationId": "v2/fair-share.admin_upsert_user",
+        "operationId": "v2/fair-share.upsert_user",
         "tags": [
           "v2/fair-share"
         ],
@@ -53220,7 +53278,36 @@
           }
         },
         "parameters": [],
-        "description": "Upsert a user fair share weight.\n\n**Preconditions:**\n* Superadmin privilege required.\n"
+        "description": "Upsert a user fair share weight.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/v2/fair-share/users/atomic-bulk-upsert": {
+      "post": {
+        "operationId": "v2/fair-share.atomic_bulk_upsert_user",
+        "tags": [
+          "v2/fair-share"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BulkUpsertUserFairShareWeightInput"
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "description": "Upsert several user fair share weights in one transaction.\n\n**Preconditions:**\n* User privilege required.\n"
       }
     },
     "/v2/fair-share/users/bulk-upsert": {
@@ -53249,7 +53336,7 @@
           }
         },
         "parameters": [],
-        "description": "Bulk upsert user fair share weights.\n\n**Preconditions:**\n* Superadmin privilege required.\n"
+        "description": "Deprecated. Use `POST /v2/fair-share/users/atomic-bulk-upsert`.\n\n**Preconditions:**\n* Superadmin privilege required.\n"
       }
     },
     "/v2/huggingface-registries": {
