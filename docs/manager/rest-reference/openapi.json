@@ -14302,103 +14302,9 @@
         "title": "AdminSearchImageAliasesInput",
         "type": "object"
       },
-      "ForgetImageInput": {
-        "description": "Input for forgetting (soft-deleting) an image.",
+      "UpdateImageBody": {
+        "description": "Fields to update on an image. All fields optional -- only provided fields will be updated.",
         "properties": {
-          "image_id": {
-            "description": "ID of the image to forget",
-            "format": "uuid",
-            "title": "Image Id",
-            "type": "string"
-          }
-        },
-        "required": [
-          "image_id"
-        ],
-        "title": "ForgetImageInput",
-        "type": "object"
-      },
-      "RestoreImageInput": {
-        "description": "Input for restoring a forgotten (soft-deleted) image.",
-        "properties": {
-          "image_id": {
-            "description": "ID of the image to restore",
-            "format": "uuid",
-            "title": "Image Id",
-            "type": "string"
-          }
-        },
-        "required": [
-          "image_id"
-        ],
-        "title": "RestoreImageInput",
-        "type": "object"
-      },
-      "PurgeImageInput": {
-        "description": "Input for purging (hard-deleting) an image.",
-        "properties": {
-          "image_id": {
-            "description": "ID of the image to purge",
-            "format": "uuid",
-            "title": "Image Id",
-            "type": "string"
-          }
-        },
-        "required": [
-          "image_id"
-        ],
-        "title": "PurgeImageInput",
-        "type": "object"
-      },
-      "AliasImageInput": {
-        "description": "Input for creating an image alias.",
-        "properties": {
-          "image_id": {
-            "description": "ID of the image to alias",
-            "format": "uuid",
-            "title": "Image Id",
-            "type": "string"
-          },
-          "alias": {
-            "description": "Alias name to assign",
-            "maxLength": 256,
-            "minLength": 1,
-            "title": "Alias",
-            "type": "string"
-          }
-        },
-        "required": [
-          "image_id",
-          "alias"
-        ],
-        "title": "AliasImageInput",
-        "type": "object"
-      },
-      "DealiasImageInput": {
-        "description": "Input for removing an image alias.",
-        "properties": {
-          "alias": {
-            "description": "Alias name to remove",
-            "minLength": 1,
-            "title": "Alias",
-            "type": "string"
-          }
-        },
-        "required": [
-          "alias"
-        ],
-        "title": "DealiasImageInput",
-        "type": "object"
-      },
-      "UpdateImageInput": {
-        "description": "Input for updating an image by ID. All fields optional -- only provided fields will be updated.",
-        "properties": {
-          "image_id": {
-            "description": "ID of the image to update.",
-            "format": "uuid",
-            "title": "Image Id",
-            "type": "string"
-          },
           "name": {
             "anyOf": [
               {
@@ -14546,6 +14452,325 @@
             ],
             "description": "Updated resource limits dict. Omit to leave unchanged.",
             "title": "Resource Limits"
+          }
+        },
+        "title": "UpdateImageBody",
+        "type": "object"
+      },
+      "NonEmptyList_PartialBulkUpdateImageItemInput_": {
+        "items": {
+          "$ref": "#/components/schemas/PartialBulkUpdateImageItemInput"
+        },
+        "minItems": 1,
+        "type": "array"
+      },
+      "PartialBulkUpdateImageItemInput": {
+        "description": "One image of a partial bulk update and the fields to update on it.",
+        "properties": {
+          "id": {
+            "description": "ID of the image to update.",
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "input": {
+            "$ref": "#/components/schemas/UpdateImageBody",
+            "description": "Fields to update on the image."
+          }
+        },
+        "required": [
+          "id",
+          "input"
+        ],
+        "title": "PartialBulkUpdateImageItemInput",
+        "type": "object"
+      },
+      "PartialBulkUpdateImagesInput": {
+        "description": "Input for updating several images, each answered for separately.",
+        "properties": {
+          "items": {
+            "$ref": "#/components/schemas/NonEmptyList_PartialBulkUpdateImageItemInput_",
+            "description": "The images to update, each with its fields."
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "title": "PartialBulkUpdateImagesInput",
+        "type": "object"
+      },
+      "PartialBulkDeleteImagesInput": {
+        "description": "Input for forgetting several images, each answered for separately.",
+        "properties": {
+          "ids": {
+            "$ref": "#/components/schemas/NonEmptyList_UUID_",
+            "description": "IDs of the images to forget."
+          }
+        },
+        "required": [
+          "ids"
+        ],
+        "title": "PartialBulkDeleteImagesInput",
+        "type": "object"
+      },
+      "PartialBulkRestoreImagesInput": {
+        "description": "Input for restoring several forgotten images, each answered for separately.",
+        "properties": {
+          "ids": {
+            "$ref": "#/components/schemas/NonEmptyList_UUID_",
+            "description": "IDs of the images to restore."
+          }
+        },
+        "required": [
+          "ids"
+        ],
+        "title": "PartialBulkRestoreImagesInput",
+        "type": "object"
+      },
+      "PurgeImageInput": {
+        "description": "Input for purging (hard-deleting) an image.",
+        "properties": {
+          "image_id": {
+            "description": "ID of the image to purge",
+            "format": "uuid",
+            "title": "Image Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "image_id"
+        ],
+        "title": "PurgeImageInput",
+        "type": "object"
+      },
+      "AliasImageInput": {
+        "description": "Input for creating an image alias.",
+        "properties": {
+          "image_id": {
+            "description": "ID of the image to alias",
+            "format": "uuid",
+            "title": "Image Id",
+            "type": "string"
+          },
+          "alias": {
+            "description": "Alias name to assign",
+            "maxLength": 256,
+            "minLength": 1,
+            "title": "Alias",
+            "type": "string"
+          }
+        },
+        "required": [
+          "image_id",
+          "alias"
+        ],
+        "title": "AliasImageInput",
+        "type": "object"
+      },
+      "DealiasImageInput": {
+        "description": "Input for removing an image alias.",
+        "properties": {
+          "alias": {
+            "description": "Alias name to remove",
+            "minLength": 1,
+            "title": "Alias",
+            "type": "string"
+          }
+        },
+        "required": [
+          "alias"
+        ],
+        "title": "DealiasImageInput",
+        "type": "object"
+      },
+      "ForgetImageInput": {
+        "description": "Input for forgetting (soft-deleting) an image.",
+        "properties": {
+          "image_id": {
+            "description": "ID of the image to forget",
+            "format": "uuid",
+            "title": "Image Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "image_id"
+        ],
+        "title": "ForgetImageInput",
+        "type": "object"
+      },
+      "RestoreImageInput": {
+        "description": "Input for restoring a forgotten (soft-deleted) image.",
+        "properties": {
+          "image_id": {
+            "description": "ID of the image to restore",
+            "format": "uuid",
+            "title": "Image Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "image_id"
+        ],
+        "title": "RestoreImageInput",
+        "type": "object"
+      },
+      "UpdateImageInput": {
+        "description": "Input for updating an image by ID, carrying the image ID in the body.",
+        "properties": {
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Updated canonical name. Omit to leave unchanged.",
+            "title": "Name"
+          },
+          "registry": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Updated registry hostname. Omit to leave unchanged.",
+            "title": "Registry"
+          },
+          "image": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Updated namespace/path within registry. Omit to leave unchanged.",
+            "title": "Image"
+          },
+          "tag": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Updated image tag. Omit to leave unchanged.",
+            "title": "Tag"
+          },
+          "architecture": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Updated CPU architecture. Omit to leave unchanged.",
+            "title": "Architecture"
+          },
+          "is_local": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Updated local-only status. Omit to leave unchanged.",
+            "title": "Is Local"
+          },
+          "size_bytes": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Updated image size in bytes. Omit to leave unchanged.",
+            "title": "Size Bytes"
+          },
+          "type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Updated image type (compute, system, service). Omit to leave unchanged.",
+            "title": "Type"
+          },
+          "config_digest": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Updated config digest. Omit to leave unchanged.",
+            "title": "Config Digest"
+          },
+          "labels": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "type": "string"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Updated labels dict. Omit to leave unchanged.",
+            "title": "Labels"
+          },
+          "supported_accelerators": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Updated accelerator string. Omit to leave unchanged; null clears.",
+            "title": "Supported Accelerators"
+          },
+          "resource_limits": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Updated resource limits dict. Omit to leave unchanged.",
+            "title": "Resource Limits"
+          },
+          "image_id": {
+            "description": "ID of the image to update.",
+            "format": "uuid",
+            "title": "Image Id",
+            "type": "string"
           }
         },
         "required": [
@@ -51711,9 +51936,9 @@
         "description": "Search image aliases with admin scope.\n\n**Preconditions:**\n* Superadmin privilege required.\n"
       }
     },
-    "/v2/images/forget": {
-      "post": {
-        "operationId": "v2/images.admin_forget",
+    "/v2/images/{image_id}": {
+      "patch": {
+        "operationId": "v2/images.update",
         "tags": [
           "v2/images"
         ],
@@ -51731,18 +51956,85 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/ForgetImageInput"
+                "$ref": "#/components/schemas/UpdateImageBody"
               }
             }
           }
         },
-        "parameters": [],
-        "description": "Forget (soft-delete) an image.\n\n**Preconditions:**\n* Superadmin privilege required.\n"
+        "parameters": [
+          {
+            "name": "image_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "description": "Update an image.\n\n**Preconditions:**\n* User privilege required.\n"
       }
     },
-    "/v2/images/restore": {
+    "/v2/images/{image_id}/delete": {
       "post": {
-        "operationId": "v2/images.admin_restore",
+        "operationId": "v2/images.delete",
+        "tags": [
+          "v2/images"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "image_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "description": "Forget (soft-delete) an image.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/v2/images/{image_id}/restore": {
+      "post": {
+        "operationId": "v2/images.restore",
+        "tags": [
+          "v2/images"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "image_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "description": "Restore a forgotten (soft-deleted) image.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/v2/images/partial-bulk-update": {
+      "post": {
+        "operationId": "v2/images.partial_bulk_update",
         "tags": [
           "v2/images"
         ],
@@ -51760,13 +52052,71 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/RestoreImageInput"
+                "$ref": "#/components/schemas/PartialBulkUpdateImagesInput"
               }
             }
           }
         },
         "parameters": [],
-        "description": "Restore a forgotten (soft-deleted) image.\n\n**Preconditions:**\n* Superadmin privilege required.\n"
+        "description": "Update several images, answering for each one.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/v2/images/partial-bulk-delete": {
+      "post": {
+        "operationId": "v2/images.partial_bulk_delete",
+        "tags": [
+          "v2/images"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PartialBulkDeleteImagesInput"
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "description": "Forget several images, answering for each one.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/v2/images/partial-bulk-restore": {
+      "post": {
+        "operationId": "v2/images.partial_bulk_restore",
+        "tags": [
+          "v2/images"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PartialBulkRestoreImagesInput"
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "description": "Restore several forgotten images, answering for each one.\n\n**Preconditions:**\n* User privilege required.\n"
       }
     },
     "/v2/images/purge": {
@@ -51856,6 +52206,64 @@
         "description": "Remove an image alias.\n\n**Preconditions:**\n* Superadmin privilege required.\n"
       }
     },
+    "/v2/images/forget": {
+      "post": {
+        "operationId": "v2/images.admin_forget",
+        "tags": [
+          "v2/images"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ForgetImageInput"
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "description": "Deprecated. Use `POST /v2/images/{image_id}/delete`.\n\n**Preconditions:**\n* Superadmin privilege required.\n"
+      }
+    },
+    "/v2/images/restore": {
+      "post": {
+        "operationId": "v2/images.admin_restore",
+        "tags": [
+          "v2/images"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RestoreImageInput"
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "description": "Deprecated. Use `POST /v2/images/{image_id}/restore`.\n\n**Preconditions:**\n* Superadmin privilege required.\n"
+      }
+    },
     "/v2/images": {
       "patch": {
         "operationId": "v2/images.admin_update",
@@ -51882,7 +52290,7 @@
           }
         },
         "parameters": [],
-        "description": "Update an image by ID.\n\n**Preconditions:**\n* Superadmin privilege required.\n"
+        "description": "Deprecated. Use `PATCH /v2/images/{image_id}`.\n\n**Preconditions:**\n* Superadmin privilege required.\n"
       }
     },
     "/v2/keypairs/my/search": {

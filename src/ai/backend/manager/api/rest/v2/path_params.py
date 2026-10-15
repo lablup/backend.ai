@@ -145,3 +145,7 @@ class IdleCheckerAssignmentIdPathParam(BaseRequestModel):
 
 class SlotNamePathParam(BaseRequestModel):
     slot_name: str = Field(description="Resource slot name")
+
+
+class ImageIdPathParam(BaseRequestModel):
+    image_id: UUID = Field(description="Image ID")

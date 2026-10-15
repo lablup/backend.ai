@@ -6287,6 +6287,14 @@ type DeleteHuggingFaceRegistryPayload
   id: UUID!
 }
 
+"""Added in 26.10.0. Forgotten image."""
+type DeleteImagePayload
+  @join__type(graph: STRAWBERRY)
+{
+  """Forgotten image."""
+  item: ImageV2!
+}
+
 type DeleteKeyPair
   @join__type(graph: GRAPHENE)
 {
@@ -13971,6 +13979,28 @@ type Mutation
   adminScanImage(input: ScanImageInput!): ScanImagePayload @join__field(graph: STRAWBERRY)
 
   """
+  Added in 26.10.0. Update an image. Only provided fields will be updated.
+  """
+  updateImage(id: UUID!, input: UpdateImageInput!): UpdateImagePayload! @join__field(graph: STRAWBERRY)
+
+  """Added in 26.10.0. Forget (soft-delete) an image."""
+  deleteImage(id: UUID!): DeleteImagePayload! @join__field(graph: STRAWBERRY)
+
+  """Added in 26.10.0. Restore a forgotten image."""
+  restoreImage(id: UUID!): RestoreImagePayload! @join__field(graph: STRAWBERRY)
+
+  """Added in 26.10.0. Update several images, answering for each one."""
+  partialBulkUpdateImages(input: PartialBulkUpdateImagesInput!): PartialBulkImagesPayload! @join__field(graph: STRAWBERRY)
+
+  """Added in 26.10.0. Forget several images, answering for each one."""
+  partialBulkDeleteImages(input: PartialBulkDeleteImagesInput!): PartialBulkImagesPayload! @join__field(graph: STRAWBERRY)
+
+  """
+  Added in 26.10.0. Restore several forgotten images, answering for each one.
+  """
+  partialBulkRestoreImages(input: PartialBulkRestoreImagesInput!): PartialBulkImagesPayload! @join__field(graph: STRAWBERRY)
+
+  """
   Added in 26.8.0. Change the resource group of an agent (superadmin only). Sessions still running on the agent under the old resource group are cleaned up per the given policy; without force, the change is rejected with a conflict error when such sessions exist.
   """
   adminUpdateAgentResourceGroup(input: UpdateAgentResourceGroupInput!): UpdateAgentResourceGroupPayload @join__field(graph: STRAWBERRY)
@@ -15602,6 +15632,16 @@ input PartialBulkDeleteDomainsInput
 }
 
 """
+Added in 26.10.0. Input for forgetting several images, each answered for separately.
+"""
+input PartialBulkDeleteImagesInput
+  @join__type(graph: STRAWBERRY)
+{
+  """IDs of the images to forget."""
+  ids: [UUID!]!
+}
+
+"""
 Added in 26.10.0. Input for soft-deleting several projects, each answered for separately.
 """
 input PartialBulkDeleteProjectsInput
@@ -15658,6 +15698,19 @@ type PartialBulkFailure
 }
 
 """
+Added in 26.10.0. Result of a partial bulk image operation: the images processed and the ones that failed.
+"""
+type PartialBulkImagesPayload
+  @join__type(graph: STRAWBERRY)
+{
+  """The images processed, as they now stand."""
+  successes: [ImageV2!]!
+
+  """The images not processed, each with the reason."""
+  failed: [PartialBulkFailure!]!
+}
+
+"""
 Added in 26.10.0. Result of a partial bulk project operation: the projects processed and the ones that failed.
 """
 type PartialBulkProjectsPayload
@@ -15710,6 +15763,16 @@ input PartialBulkRestoreDomainsInput
   @join__type(graph: STRAWBERRY)
 {
   """IDs of the domains to restore."""
+  ids: [UUID!]!
+}
+
+"""
+Added in 26.10.0. Input for restoring several forgotten images, each answered for separately.
+"""
+input PartialBulkRestoreImagesInput
+  @join__type(graph: STRAWBERRY)
+{
+  """IDs of the images to restore."""
   ids: [UUID!]!
 }
 
@@ -15777,6 +15840,29 @@ input PartialBulkUpdateDomainsInput
 {
   """The domains to update, each with its fields."""
   items: [PartialBulkUpdateDomainItemInput!]!
+}
+
+"""
+Added in 26.10.0. One image of a partial bulk update and the fields to update on it.
+"""
+input PartialBulkUpdateImageItemInput
+  @join__type(graph: STRAWBERRY)
+{
+  """ID of the image to update."""
+  id: UUID!
+
+  """Fields to update on the image."""
+  input: UpdateImageInput!
+}
+
+"""
+Added in 26.10.0. Input for updating several images, each answered for separately.
+"""
+input PartialBulkUpdateImagesInput
+  @join__type(graph: STRAWBERRY)
+{
+  """The images to update, each with its fields."""
+  items: [PartialBulkUpdateImageItemInput!]!
 }
 
 """
@@ -20903,6 +20989,14 @@ type RestoreDomainPayload
   restored: Boolean!
 }
 
+"""Added in 26.10.0. Restored image."""
+type RestoreImagePayload
+  @join__type(graph: STRAWBERRY)
+{
+  """Restored image."""
+  item: ImageV2!
+}
+
 """Added in 26.9.0. Payload for project restore mutation."""
 type RestoreProjectPayload
   @join__type(graph: STRAWBERRY)
@@ -25180,6 +25274,55 @@ type UpdateIdleCheckerPayload
 {
   """Updated idle checker."""
   idleChecker: IdleChecker!
+}
+
+"""Added in 26.10.0. Fields to update on an image. All fields optional."""
+input UpdateImageInput
+  @join__type(graph: STRAWBERRY)
+{
+  """Updated canonical name."""
+  name: String
+
+  """Updated registry hostname."""
+  registry: String
+
+  """Updated namespace/path within registry."""
+  image: String
+
+  """Updated image tag."""
+  tag: String
+
+  """Updated CPU architecture."""
+  architecture: String
+
+  """Updated local-only status."""
+  isLocal: Boolean
+
+  """Updated image size in bytes."""
+  sizeBytes: Int
+
+  """Updated image type (compute, system, service)."""
+  type: String
+
+  """Updated config digest."""
+  configDigest: String
+
+  """Updated labels dict."""
+  labels: JSON
+
+  """Updated accelerator string. Null clears."""
+  supportedAccelerators: String
+
+  """Updated resource limits dict."""
+  resourceLimits: JSON
+}
+
+"""Added in 26.10.0. Updated image."""
+type UpdateImagePayload
+  @join__type(graph: STRAWBERRY)
+{
+  """Updated image."""
+  item: ImageV2!
 }
 
 """

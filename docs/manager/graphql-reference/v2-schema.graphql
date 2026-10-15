@@ -4454,6 +4454,12 @@ type DeleteHuggingFaceRegistryPayload {
   id: UUID!
 }
 
+"""Added in 26.10.0. Forgotten image."""
+type DeleteImagePayload {
+  """Forgotten image."""
+  item: ImageV2!
+}
+
 """Added in 26.4.2. Payload for keypair resource policy deletion."""
 type DeleteKeypairResourcePolicyPayload {
   """Name of the deleted policy."""
@@ -9556,6 +9562,28 @@ type Mutation {
   adminScanImage(input: ScanImageInput!): ScanImagePayload
 
   """
+  Added in 26.10.0. Update an image. Only provided fields will be updated.
+  """
+  updateImage(id: UUID!, input: UpdateImageInput!): UpdateImagePayload!
+
+  """Added in 26.10.0. Forget (soft-delete) an image."""
+  deleteImage(id: UUID!): DeleteImagePayload!
+
+  """Added in 26.10.0. Restore a forgotten image."""
+  restoreImage(id: UUID!): RestoreImagePayload!
+
+  """Added in 26.10.0. Update several images, answering for each one."""
+  partialBulkUpdateImages(input: PartialBulkUpdateImagesInput!): PartialBulkImagesPayload!
+
+  """Added in 26.10.0. Forget several images, answering for each one."""
+  partialBulkDeleteImages(input: PartialBulkDeleteImagesInput!): PartialBulkImagesPayload!
+
+  """
+  Added in 26.10.0. Restore several forgotten images, answering for each one.
+  """
+  partialBulkRestoreImages(input: PartialBulkRestoreImagesInput!): PartialBulkImagesPayload!
+
+  """
   Added in 26.8.0. Change the resource group of an agent (superadmin only). Sessions still running on the agent under the old resource group are cleaned up per the given policy; without force, the change is rejected with a conflict error when such sessions exist.
   """
   adminUpdateAgentResourceGroup(input: UpdateAgentResourceGroupInput!): UpdateAgentResourceGroupPayload
@@ -11048,6 +11076,14 @@ input PartialBulkDeleteDomainsInput {
 }
 
 """
+Added in 26.10.0. Input for forgetting several images, each answered for separately.
+"""
+input PartialBulkDeleteImagesInput {
+  """IDs of the images to forget."""
+  ids: [UUID!]!
+}
+
+"""
 Added in 26.10.0. Input for soft-deleting several projects, each answered for separately.
 """
 input PartialBulkDeleteProjectsInput {
@@ -11094,6 +11130,17 @@ type PartialBulkFailure {
 }
 
 """
+Added in 26.10.0. Result of a partial bulk image operation: the images processed and the ones that failed.
+"""
+type PartialBulkImagesPayload {
+  """The images processed, as they now stand."""
+  successes: [ImageV2!]!
+
+  """The images not processed, each with the reason."""
+  failed: [PartialBulkFailure!]!
+}
+
+"""
 Added in 26.10.0. Result of a partial bulk project operation: the projects processed and the ones that failed.
 """
 type PartialBulkProjectsPayload {
@@ -11136,6 +11183,14 @@ Added in 26.10.0. Input for restoring several soft-deleted domains, each answere
 """
 input PartialBulkRestoreDomainsInput {
   """IDs of the domains to restore."""
+  ids: [UUID!]!
+}
+
+"""
+Added in 26.10.0. Input for restoring several forgotten images, each answered for separately.
+"""
+input PartialBulkRestoreImagesInput {
+  """IDs of the images to restore."""
   ids: [UUID!]!
 }
 
@@ -11191,6 +11246,25 @@ Added in 26.10.0. Input for updating several domains, each answered for separate
 input PartialBulkUpdateDomainsInput {
   """The domains to update, each with its fields."""
   items: [PartialBulkUpdateDomainItemInput!]!
+}
+
+"""
+Added in 26.10.0. One image of a partial bulk update and the fields to update on it.
+"""
+input PartialBulkUpdateImageItemInput {
+  """ID of the image to update."""
+  id: UUID!
+
+  """Fields to update on the image."""
+  input: UpdateImageInput!
+}
+
+"""
+Added in 26.10.0. Input for updating several images, each answered for separately.
+"""
+input PartialBulkUpdateImagesInput {
+  """The images to update, each with its fields."""
+  items: [PartialBulkUpdateImageItemInput!]!
 }
 
 """
@@ -15379,6 +15453,12 @@ type RestoreDomainPayload {
   restored: Boolean!
 }
 
+"""Added in 26.10.0. Restored image."""
+type RestoreImagePayload {
+  """Restored image."""
+  item: ImageV2!
+}
+
 """Added in 26.9.0. Payload for project restore mutation."""
 type RestoreProjectPayload {
   """Whether the restore was successful."""
@@ -18794,6 +18874,51 @@ Added in 26.8.0. Returns the idle checker after an update is applied. The node r
 type UpdateIdleCheckerPayload {
   """Updated idle checker."""
   idleChecker: IdleChecker!
+}
+
+"""Added in 26.10.0. Fields to update on an image. All fields optional."""
+input UpdateImageInput {
+  """Updated canonical name."""
+  name: String
+
+  """Updated registry hostname."""
+  registry: String
+
+  """Updated namespace/path within registry."""
+  image: String
+
+  """Updated image tag."""
+  tag: String
+
+  """Updated CPU architecture."""
+  architecture: String
+
+  """Updated local-only status."""
+  isLocal: Boolean
+
+  """Updated image size in bytes."""
+  sizeBytes: Int
+
+  """Updated image type (compute, system, service)."""
+  type: String
+
+  """Updated config digest."""
+  configDigest: String
+
+  """Updated labels dict."""
+  labels: JSON
+
+  """Updated accelerator string. Null clears."""
+  supportedAccelerators: String
+
+  """Updated resource limits dict."""
+  resourceLimits: JSON
+}
+
+"""Added in 26.10.0. Updated image."""
+type UpdateImagePayload {
+  """Updated image."""
+  item: ImageV2!
 }
 
 """

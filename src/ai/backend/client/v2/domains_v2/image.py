@@ -2,22 +2,32 @@
 
 from __future__ import annotations
 
+from uuid import UUID
+
 from ai.backend.client.v2.base_domain import BaseDomainClient
+from ai.backend.common.dto.manager.v2.common import PartialBulkPayload
 from ai.backend.common.dto.manager.v2.image.request import (
     AdminSearchImageAliasesInput,
     AdminSearchImagesInput,
     AliasImageInput,
     DealiasImageInput,
     ForgetImageInput,
+    PartialBulkDeleteImagesInput,
+    PartialBulkRestoreImagesInput,
+    PartialBulkUpdateImagesInput,
     PurgeImageInput,
+    UpdateImageBody,
     UpdateImageInput,
 )
 from ai.backend.common.dto.manager.v2.image.response import (
     AdminSearchImageAliasesPayload,
     AdminSearchImagesPayload,
     AliasImagePayload,
+    DeleteImagePayload,
     ForgetImagePayload,
+    ImageNode,
     PurgeImagePayload,
+    RestoreImagePayload,
     ScopedSearchImagesPayload,
     UpdateImagePayload,
 )
@@ -64,8 +74,66 @@ class V2ImageClient(BaseDomainClient):
             response_model=AdminSearchImageAliasesPayload,
         )
 
-    async def admin_forget(self, request: ForgetImageInput) -> ForgetImagePayload:
+    async def update(self, image_id: UUID, request: UpdateImageBody) -> UpdateImagePayload:
+        """Update an image."""
+        return await self._client.typed_request(
+            "PATCH",
+            f"{_PATH}/{image_id}",
+            request=request,
+            response_model=UpdateImagePayload,
+        )
+
+    async def delete(self, image_id: UUID) -> DeleteImagePayload:
         """Forget (soft-delete) an image."""
+        return await self._client.typed_request(
+            "POST",
+            f"{_PATH}/{image_id}/delete",
+            response_model=DeleteImagePayload,
+        )
+
+    async def restore(self, image_id: UUID) -> RestoreImagePayload:
+        """Restore a forgotten (soft-deleted) image."""
+        return await self._client.typed_request(
+            "POST",
+            f"{_PATH}/{image_id}/restore",
+            response_model=RestoreImagePayload,
+        )
+
+    async def partial_bulk_update(
+        self, request: PartialBulkUpdateImagesInput
+    ) -> PartialBulkPayload[ImageNode]:
+        """Update several images, answering for each one."""
+        return await self._client.typed_request(
+            "POST",
+            f"{_PATH}/partial-bulk-update",
+            request=request,
+            response_model=PartialBulkPayload[ImageNode],
+        )
+
+    async def partial_bulk_delete(
+        self, request: PartialBulkDeleteImagesInput
+    ) -> PartialBulkPayload[ImageNode]:
+        """Forget several images, answering for each one."""
+        return await self._client.typed_request(
+            "POST",
+            f"{_PATH}/partial-bulk-delete",
+            request=request,
+            response_model=PartialBulkPayload[ImageNode],
+        )
+
+    async def partial_bulk_restore(
+        self, request: PartialBulkRestoreImagesInput
+    ) -> PartialBulkPayload[ImageNode]:
+        """Restore several forgotten images, answering for each one."""
+        return await self._client.typed_request(
+            "POST",
+            f"{_PATH}/partial-bulk-restore",
+            request=request,
+            response_model=PartialBulkPayload[ImageNode],
+        )
+
+    async def admin_forget(self, request: ForgetImageInput) -> ForgetImagePayload:
+        """Deprecated. Use :meth:`delete`."""
         return await self._client.typed_request(
             "POST",
             f"{_PATH}/forget",
@@ -101,7 +169,7 @@ class V2ImageClient(BaseDomainClient):
         )
 
     async def admin_update(self, request: UpdateImageInput) -> UpdateImagePayload:
-        """Update an image by ID (superadmin only)."""
+        """Deprecated. Use :meth:`update`."""
         return await self._client.typed_request(
             "PATCH",
             _PATH,

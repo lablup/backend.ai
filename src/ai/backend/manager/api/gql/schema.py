@@ -220,11 +220,17 @@ from ai.backend.manager.api.gql.image.resolver import (
     admin_images_v2,
     admin_scan_image,
     container_registry_images_v2,
+    delete_image,
     image_alias,
     image_scoped_aliases,
     image_v2,
     my_images_v2,
+    partial_bulk_delete_images,
+    partial_bulk_restore_images,
+    partial_bulk_update_images,
+    restore_image,
     scoped_images_v2,
+    update_image,
 )
 from ai.backend.manager.api.gql.kernel.resolver.kernel import (
     admin_kernels_v2,
@@ -927,6 +933,12 @@ class Query:
 @strawberry.type
 class Mutation:
     admin_scan_image = admin_scan_image
+    update_image = update_image
+    delete_image = delete_image
+    restore_image = restore_image
+    partial_bulk_update_images = partial_bulk_update_images
+    partial_bulk_delete_images = partial_bulk_delete_images
+    partial_bulk_restore_images = partial_bulk_restore_images
     admin_update_agent_resource_group = admin_update_agent_resource_group
     admin_create_idle_checker = admin_create_idle_checker
     admin_update_idle_checker = admin_update_idle_checker

@@ -59,10 +59,6 @@ from ai.backend.manager.services.image.actions.purge_images import (
     PurgeImagesAction,
     PurgeImagesActionResult,
 )
-from ai.backend.manager.services.image.actions.restore_image import (
-    RestoreImageByIdAction,
-    RestoreImageByIdActionResult,
-)
 from ai.backend.manager.services.image.actions.scan_image import (
     GlobalScanImageAction,
     GlobalScanImageActionResult,
@@ -93,10 +89,6 @@ from ai.backend.manager.services.image.actions.update_image import (
     UpdateImageAction,
     UpdateImageActionResult,
     UpdateImageActionUnknownImageReferenceError,
-)
-from ai.backend.manager.services.image.actions.update_image_by_id import (
-    UpdateImageByIdAction,
-    UpdateImageByIdActionResult,
 )
 
 log = StructuredLogger(logging.getLogger(__spec__.name))
@@ -189,19 +181,6 @@ class ImageService:
         data = await self._image_repository.soft_delete_image_by_id(action.image_id)
         return ForgetImageByIdActionResult(image=data)
 
-    async def restore_image_by_id(
-        self, action: RestoreImageByIdAction
-    ) -> RestoreImageByIdActionResult:
-        # Regular users need ownership validation
-        user = current_user()
-        is_superadmin = user is not None and user.role == UserRole.SUPERADMIN
-        if not is_superadmin and user is not None:
-            await self._validate_image_ownership(
-                action.image_id, UserID(user.user_id), ImageStatus.restorable()
-            )
-        data = await self._image_repository.restore_image_by_id(action.image_id)
-        return RestoreImageByIdActionResult(image=data)
-
     async def alias_image(self, action: AliasImageAction) -> AliasImageActionResult:
         """
         Deprecated. Use alias_image_by_id instead.
@@ -237,13 +216,6 @@ class ImageService:
             raise UpdateImageActionUnknownImageReferenceError from e
 
         return UpdateImageActionResult(image=updated_image_data)
-
-    async def update_image_by_id(
-        self, action: UpdateImageByIdAction
-    ) -> UpdateImageByIdActionResult:
-        updater = ImageUpdater(image_id=action.image_id, update=action.update)
-        updated_image_data = await self._image_repository.update_image_properties(updater)
-        return UpdateImageByIdActionResult(image=updated_image_data)
 
     async def purge_image_by_id(self, action: PurgeImageByIdAction) -> PurgeImageByIdActionResult:
         # Regular users need ownership validation
