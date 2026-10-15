@@ -7,6 +7,7 @@ from typing import Any
 from unittest.mock import MagicMock
 
 import pytest
+import sqlalchemy as sa
 from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
 
 from ai.backend.client.v2.registry import BackendAIClientRegistry
@@ -39,6 +40,8 @@ from ai.backend.manager.api.rest.userconfig.handler import UserConfigHandler
 from ai.backend.manager.api.rest.userconfig.registry import register_userconfig_routes
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.secret.types import KeyProviderType
+from ai.backend.manager.models.bootstrap_script.row import BootstrapScriptRow
+from ai.backend.manager.models.user.row import UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.domain.repository import DomainRepository
 from ai.backend.manager.repositories.ops.repository import OpsRepository
@@ -234,3 +237,24 @@ async def domain_dotfile_factory(
             )
         except Exception:
             pass
+
+
+@pytest.fixture()
+async def default_bootstrap_scripts(
+    db_engine: SAEngine,
+    admin_registry: BackendAIClientRegistry,
+    user_registry: BackendAIClientRegistry,
+) -> AsyncIterator[None]:
+    """Give every user an empty default bootstrap script."""
+    async with db_engine.begin() as conn:
+        await conn.execute(
+            sa.insert(BootstrapScriptRow).from_select(
+                ["entity_type", "entity_id", "script", "is_default"],
+                sa.select(sa.literal(UserEntityType()), UserRow.uuid, sa.literal(""), sa.true()),
+            )
+        )
+    try:
+        yield
+    finally:
+        async with db_engine.begin() as conn:
+            await conn.execute(sa.delete(BootstrapScriptRow))

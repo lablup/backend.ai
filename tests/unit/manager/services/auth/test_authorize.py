@@ -122,6 +122,7 @@ def _make_mock_keypair(
 ) -> MagicMock:
     """The keypair data the repository answers a default-keypair read with."""
     mock_keypair = MagicMock()
+    mock_keypair.user_id = _DEFAULT_USER_UUID
     mock_keypair.access_key = access_key
     mock_keypair.secret_key = SecretValue(secret_key)
     return mock_keypair

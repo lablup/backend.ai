@@ -119,7 +119,6 @@ class TestCreateUser:
             ssh_public_key=None,
             ssh_private_key=None,
             dotfiles=b"",
-            bootstrap_script="",
         )
 
     @pytest.fixture

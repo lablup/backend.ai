@@ -11,6 +11,7 @@ from http import HTTPStatus
 from typing import Final
 
 from ai.backend.common.api_handlers import APIResponse, BodyParam, QueryParam
+from ai.backend.common.data.entity.bootstrap_script import BootstrapScript
 from ai.backend.common.data.entity.keypair import KeyPairID
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.dto.manager.config.request import (
@@ -32,15 +33,15 @@ from ai.backend.common.dto.manager.config.response import (
 )
 from ai.backend.common.types import AccessKey
 from ai.backend.logging.structured import StructuredLogger
-from ai.backend.manager.data.dotfile.types import DotfileEntries, DotfileEntry
+from ai.backend.manager.data.dotfile.types import DotfileEntries, DotfileEntry, normalize_newlines
 from ai.backend.manager.dto.context import UserContext
 from ai.backend.manager.services.auth.actions.resolve_access_key_scope import (
     PublicResolveAccessKeyScopeAction,
 )
 from ai.backend.manager.services.auth.processors import AuthProcessors
 from ai.backend.manager.services.user.actions.bootstrap_script import (
-    GetBootstrapScriptAction,
-    UpdateBootstrapScriptAction,
+    GetDefaultBootstrapScriptAction,
+    UpdateDefaultBootstrapScriptAction,
 )
 from ai.backend.manager.services.user.actions.create_keypair_dotfile import (
     CreateKeypairDotfileAction,
@@ -164,11 +165,10 @@ class UserConfigHandler:
         ctx: UserContext,
     ) -> APIResponse:
         access_key = AccessKey(ctx.access_key)
-        await self._user.update_bootstrap_script.run(
-            UpdateBootstrapScriptAction(
+        await self._user.update_default_bootstrap_script.run(
+            UpdateDefaultBootstrapScriptAction(
                 user_id=await self._owner(access_key),
-                access_key=access_key,
-                script=body.parsed.script,
+                script=BootstrapScript(normalize_newlines(body.parsed.script).strip()),
             )
         )
         return APIResponse.build(HTTPStatus.OK, UpdateBootstrapScriptResponse())
@@ -178,7 +178,8 @@ class UserConfigHandler:
         ctx: UserContext,
     ) -> APIResponse:
         access_key = AccessKey(ctx.access_key)
-        result = await self._user.get_bootstrap_script.run(
-            GetBootstrapScriptAction(user_id=await self._owner(access_key), access_key=access_key)
+        owner_user_id = await self._owner(access_key)
+        result = await self._user.get_default_bootstrap_script.run(
+            GetDefaultBootstrapScriptAction(user_id=owner_user_id)
         )
         return APIResponse.build(HTTPStatus.OK, GetBootstrapScriptResponse(root=result.script))

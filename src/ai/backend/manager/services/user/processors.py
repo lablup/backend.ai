@@ -35,10 +35,10 @@ from ai.backend.manager.services.user.actions.admin_month_stats import (
     AdminMonthStatsActionResult,
 )
 from ai.backend.manager.services.user.actions.bootstrap_script import (
-    GetBootstrapScriptAction,
-    GetBootstrapScriptActionResult,
-    UpdateBootstrapScriptAction,
-    UpdateBootstrapScriptActionResult,
+    GetDefaultBootstrapScriptAction,
+    GetDefaultBootstrapScriptActionResult,
+    UpdateDefaultBootstrapScriptAction,
+    UpdateDefaultBootstrapScriptActionResult,
 )
 from ai.backend.manager.services.user.actions.bulk_get import BulkGetUsersAction
 from ai.backend.manager.services.user.actions.bulk_get_keypairs import BulkGetKeypairsAction
@@ -198,11 +198,11 @@ class UserProcessors:
     delete_dotfile: SingleEntityActionProcessor[
         DeleteKeypairDotfileAction, DeleteKeypairDotfileActionResult
     ]
-    get_bootstrap_script: SingleEntityActionProcessor[
-        GetBootstrapScriptAction, GetBootstrapScriptActionResult
+    get_default_bootstrap_script: SingleEntityActionProcessor[
+        GetDefaultBootstrapScriptAction, GetDefaultBootstrapScriptActionResult
     ]
-    update_bootstrap_script: SingleEntityActionProcessor[
-        UpdateBootstrapScriptAction, UpdateBootstrapScriptActionResult
+    update_default_bootstrap_script: SingleEntityActionProcessor[
+        UpdateDefaultBootstrapScriptAction, UpdateDefaultBootstrapScriptActionResult
     ]
 
     def __init__(
@@ -264,11 +264,11 @@ class UserProcessors:
         self.delete_dotfile = group.single_entity(
             DeleteKeypairDotfileAction, user_service.delete_dotfile
         )
-        self.get_bootstrap_script = group.single_entity(
-            GetBootstrapScriptAction, user_service.get_bootstrap_script
+        self.get_default_bootstrap_script = group.single_entity(
+            GetDefaultBootstrapScriptAction, user_service.get_default_bootstrap_script
         )
-        self.update_bootstrap_script = group.single_entity(
-            UpdateBootstrapScriptAction, user_service.update_bootstrap_script
+        self.update_default_bootstrap_script = group.single_entity(
+            UpdateDefaultBootstrapScriptAction, user_service.update_default_bootstrap_script
         )
 
         self.keypair_group = group.field_group(

@@ -39,7 +39,6 @@ __all__: Sequence[str] = (
     "Dotfile",
     "KeyPairRow",
     "keypairs",
-    "query_bootstrap_script",
     "query_owned_dotfiles",
 )
 
@@ -106,9 +105,6 @@ class KeyPairRow(LifecycleTimestampsMixin, Base):
     # dotfiles column, \x90 means empty list in msgpack
     dotfiles: Mapped[bytes] = mapped_column(
         "dotfiles", sa.LargeBinary(length=MAXIMUM_DOTFILE_SIZE), nullable=False, default=b"\x90"
-    )
-    bootstrap_script: Mapped[str] = mapped_column(
-        "bootstrap_script", sa.String(length=MAXIMUM_DOTFILE_SIZE), nullable=False, default=""
     )
 
     # Relationships
@@ -193,18 +189,3 @@ async def query_owned_dotfiles(
         return [], MAXIMUM_DOTFILE_SIZE
     rows = msgpack.unpackb(packed_dotfile)
     return rows, MAXIMUM_DOTFILE_SIZE - len(packed_dotfile)
-
-
-async def query_bootstrap_script(
-    conn: SAConnection,
-    access_key: AccessKey,
-) -> tuple[str, int]:
-    query = (
-        sa.select(KeyPairRow.bootstrap_script)
-        .select_from(KeyPairRow)
-        .where(KeyPairRow.access_key == access_key)
-    )
-    script = (await conn.execute(query)).scalar()
-    if script is None:
-        return "", MAXIMUM_DOTFILE_SIZE
-    return script, MAXIMUM_DOTFILE_SIZE - len(script)

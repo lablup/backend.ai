@@ -55,40 +55,6 @@ class KeypairDotfilesUpdater(DataUpdater[KeyPairRow, KeyPairData]):
 
 
 @dataclass
-class KeypairBootstrapScriptUpdater(DataUpdater[KeyPairRow, KeyPairData]):
-    """Replaces the bootstrap script a keypair carries."""
-
-    keypair_id: KeyPairID
-    script: str
-
-    @property
-    @override
-    def row_class(self) -> type[KeyPairRow]:
-        return KeyPairRow
-
-    @override
-    def target_id_column(self) -> InstrumentedAttribute[Any]:
-        return KeyPairRow.id
-
-    @override
-    def target_id_value(self) -> KeyPairID:
-        return self.keypair_id
-
-    @override
-    def build_values(self) -> dict[str, Any]:
-        return {"bootstrap_script": self.script}
-
-    @property
-    @override
-    def integrity_error_checks(self) -> Sequence[IntegrityErrorCheck]:
-        return ()
-
-    @override
-    def to_data(self, row: KeyPairRow) -> KeyPairData:
-        return KeyPairSearchableFields.own.to_data(row)
-
-
-@dataclass
 class KeypairUpdater(GuardedDataUpdater[KeyPairRow, KeyPairData]):
     """Writes a keypair's settings, declining to deactivate the key its user
     authorizes with.

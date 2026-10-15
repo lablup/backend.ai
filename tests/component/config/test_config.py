@@ -221,6 +221,7 @@ class TestUserDotfileDelete:
 # ---------------------------------------------------------------------------
 
 
+@pytest.mark.usefixtures("default_bootstrap_scripts")
 class TestBootstrapScript:
     async def test_get_bootstrap_script_default_empty(
         self,
@@ -272,6 +273,14 @@ class TestBootstrapScript:
             # Cleanup
             await admin_registry.config.update_bootstrap_script(
                 UpdateBootstrapScriptRequest(script="")
+            )
+
+
+class TestBootstrapScriptWithoutDefault:
+    async def test_update_answers_not_found(self, admin_registry: BackendAIClientRegistry) -> None:
+        with pytest.raises(NotFoundError):
+            await admin_registry.config.update_bootstrap_script(
+                UpdateBootstrapScriptRequest(script="echo admin")
             )
 
 
