@@ -533,14 +533,6 @@ class ModelServingRepository:
             return user
 
     @model_serving_repository_resilience.apply()
-    async def get_endpoint_for_appproxy_update(self, service_id: uuid.UUID) -> EndpointRow | None:
-        """
-        Get endpoint with routes loaded for AppProxy updates.
-        """
-        async with self._db.begin_readonly_session_read_committed() as session:
-            return await self._get_endpoint_by_id(session, service_id, load_routes=True)
-
-    @model_serving_repository_resilience.apply()
     async def update_endpoint_replicas(
         self,
         endpoint_id: uuid.UUID,

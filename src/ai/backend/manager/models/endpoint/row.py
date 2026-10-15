@@ -3,7 +3,6 @@ from __future__ import annotations
 import logging
 import uuid
 from collections.abc import (
-    Collection,
     Iterable,
     Sequence,
 )
@@ -22,7 +21,6 @@ from sqlalchemy.exc import NoResultFound
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import (
     Mapped,
-    contains_eager,
     foreign,
     mapped_column,
     relationship,
@@ -443,60 +441,6 @@ class EndpointRow(Base):
             query = query.filter(EndpointRow.session_owner == user_uuid)
         result = await session.execute(query)
         return list(result.scalars().all())
-
-    @classmethod
-    async def batch_load(
-        cls,
-        session: AsyncSession,
-        endpoint_ids: Sequence[DeploymentID],
-        domain: str | None = None,
-        project: UUID | None = None,
-        user_uuid: UUID | None = None,
-        load_routes: bool = False,
-        load_tokens: bool = False,
-        load_created_user: bool = False,
-        load_session_owner: bool = False,
-        load_revisions: bool = False,
-        status_filter: Iterable[EndpointLifecycle] = frozenset([EndpointLifecycle.CREATED]),
-    ) -> Sequence[EndpointRow]:
-        from ai.backend.manager.models.deployment_revision.row import DeploymentRevisionRow
-
-        query = (
-            sa.select(EndpointRow)
-            .order_by(sa.desc(EndpointRow.created_at))
-            .filter(
-                EndpointRow.lifecycle_stage.in_(status_filter) & EndpointRow.id.in_(endpoint_ids)
-            )
-        )
-        if load_routes:
-            query = query.options(selectinload(EndpointRow.routings))
-        if load_tokens:
-            query = query.options(selectinload(EndpointRow.tokens))
-        if load_created_user:
-            query = query.options(selectinload(EndpointRow.created_user_row))
-        if load_session_owner:
-            query = query.options(selectinload(EndpointRow.session_owner_row))
-        if load_revisions:
-            query = query.options(
-                # Revision-resolution helpers (``_find_current_revision`` /
-                # ``_find_active_revision``) read the group-sourced
-                # current/deploying revision relationships, so load only those
-                # two revision rows — not the full revision history.
-                selectinload(EndpointRow.current_revision_row).selectinload(
-                    DeploymentRevisionRow.image_row
-                ),
-                selectinload(EndpointRow.deploying_revision_row).selectinload(
-                    DeploymentRevisionRow.image_row
-                ),
-            )
-        if project:
-            query = query.filter(EndpointRow.project == project)
-        if domain:
-            query = query.filter(EndpointRow.domain == domain)
-        if user_uuid:
-            query = query.filter(EndpointRow.session_owner == user_uuid)
-        result = await session.execute(query)
-        return result.scalars().all()
 
     async def create_auto_scaling_rule(
         self,
@@ -930,24 +874,6 @@ class EndpointAutoScalingRuleRow(Base):
     )
 
     endpoint_row: Mapped[EndpointRow] = relationship("EndpointRow", lazy="joined")
-
-    @classmethod
-    async def list(
-        cls,
-        session: AsyncSession,
-        endpoint_status_filter: Collection[EndpointLifecycle] = frozenset([
-            EndpointLifecycle.CREATED
-        ]),
-    ) -> Sequence[EndpointAutoScalingRuleRow]:
-        query = sa.select(EndpointAutoScalingRuleRow)
-        if endpoint_status_filter:
-            query = (
-                query.join(EndpointAutoScalingRuleRow.endpoint_row)
-                .filter(EndpointRow.lifecycle_stage.in_(endpoint_status_filter))
-                .options(contains_eager(EndpointAutoScalingRuleRow.endpoint_row))
-            )
-        result = await session.execute(query)
-        return result.scalars().all()
 
     @classmethod
     async def get(
