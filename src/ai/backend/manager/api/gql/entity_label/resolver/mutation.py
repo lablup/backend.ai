@@ -51,6 +51,26 @@ async def upsert_entity_label(
         added_version=NEXT_RELEASE_VERSION,
     )
 )
+async def partial_bulk_upsert_entity_labels(
+    info: Info[StrawberryGQLContext],
+    input: PartialBulkUpsertEntityLabelInputGQL,
+) -> PartialBulkUpsertEntityLabelPayloadGQL | None:
+    payload = await info.context.adapters.entity_label.partial_bulk_upsert(input.to_pydantic())
+    return PartialBulkUpsertEntityLabelPayloadGQL.from_pydantic(payload)
+
+
+@gql_mutation(
+    BackendAIGQLMeta(
+        description=(
+            "Set keys on several entities in one call, answering per entity. An entity "
+            "the caller may not write is one failed item; the rest are written."
+        ),
+        added_version=NEXT_RELEASE_VERSION,
+    ),
+    deprecation_reason=(
+        f"Deprecated since {NEXT_RELEASE_VERSION}. Use `partialBulkUpsertEntityLabels`."
+    ),
+)
 async def partial_bulk_upsert_entity_label(
     info: Info[StrawberryGQLContext],
     input: PartialBulkUpsertEntityLabelInputGQL,
@@ -85,6 +105,27 @@ async def purge_entity_label(
         ),
         added_version=NEXT_RELEASE_VERSION,
     )
+)
+async def partial_bulk_purge_entity_labels(
+    info: Info[StrawberryGQLContext],
+    input: PartialBulkPurgeEntityLabelInputGQL,
+) -> PartialBulkPurgeEntityLabelPayloadGQL | None:
+    payload = await info.context.adapters.entity_label.partial_bulk_purge(input.to_pydantic())
+    return PartialBulkPurgeEntityLabelPayloadGQL.from_pydantic(payload)
+
+
+@gql_mutation(
+    BackendAIGQLMeta(
+        description=(
+            "Take several labels off in one call, each named by its own id and answered "
+            "for on its own. A label that is gone or on an entity the caller may not "
+            "write is one failed item; the rest are taken off."
+        ),
+        added_version=NEXT_RELEASE_VERSION,
+    ),
+    deprecation_reason=(
+        f"Deprecated since {NEXT_RELEASE_VERSION}. Use `partialBulkPurgeEntityLabels`."
+    ),
 )
 async def partial_bulk_purge_entity_label(
     info: Info[StrawberryGQLContext],

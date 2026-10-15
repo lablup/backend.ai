@@ -50990,7 +50990,7 @@
         "description": "Set one key on an entity, replacing the value it carries.\n\n**Preconditions:**\n* User privilege required.\n"
       }
     },
-    "/v2/entity-labels/bulk-upsert": {
+    "/v2/entity-labels/partial-bulk-upsert": {
       "post": {
         "operationId": "v2/entity-labels.partial_bulk_upsert_labels",
         "tags": [
@@ -51048,7 +51048,7 @@
         "description": "Take one label off, named by its own id.\n\n**Preconditions:**\n* User privilege required.\n"
       }
     },
-    "/v2/entity-labels/bulk-purge": {
+    "/v2/entity-labels/partial-bulk-purge": {
       "post": {
         "operationId": "v2/entity-labels.partial_bulk_purge_labels",
         "tags": [
@@ -51104,6 +51104,64 @@
         },
         "parameters": [],
         "description": "Read the labels on the entities named.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/v2/entity-labels/bulk-upsert": {
+      "post": {
+        "operationId": "v2/entity-labels.bulk_upsert_labels",
+        "tags": [
+          "v2/entity-labels"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PartialBulkUpsertEntityLabelInput"
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "description": "Deprecated. Use `POST /v2/entity-labels/partial-bulk-upsert`.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/v2/entity-labels/bulk-purge": {
+      "post": {
+        "operationId": "v2/entity-labels.bulk_purge_labels",
+        "tags": [
+          "v2/entity-labels"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PartialBulkPurgeEntityLabelInput"
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "description": "Deprecated. Use `POST /v2/entity-labels/partial-bulk-purge`.\n\n**Preconditions:**\n* User privilege required.\n"
       }
     },
     "/v2/container-registries/search": {

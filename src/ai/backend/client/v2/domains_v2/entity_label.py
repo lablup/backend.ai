@@ -40,7 +40,7 @@ class V2EntityLabelClient(BaseDomainClient):
         """Set keys on several entities in one call, answering per entity."""
         return await self._client.typed_request(
             "POST",
-            f"{_PATH}/bulk-upsert",
+            f"{_PATH}/partial-bulk-upsert",
             request=request,
             response_model=PartialBulkUpsertEntityLabelPayload,
         )
@@ -59,7 +59,7 @@ class V2EntityLabelClient(BaseDomainClient):
         """Take several labels off in one call, answering per label."""
         return await self._client.typed_request(
             "POST",
-            f"{_PATH}/bulk-purge",
+            f"{_PATH}/partial-bulk-purge",
             request=request,
             response_model=PartialBulkPurgeEntityLabelPayload,
         )
