@@ -41,6 +41,7 @@ from ai.backend.common.dto.appproxy.v2.ingress.types import (
     IngressFrontend,
     IngressFrontendKind,
     IngressID,
+    IngressKey,
     IngressProtocol,
     IngressTarget,
     IngressTargetGroup,
@@ -76,7 +77,6 @@ from .errors import InvalidCircuitDataError, InvalidFrontendTypeError
 
 if TYPE_CHECKING:
     from ai.backend.appproxy.worker.ingress.factory import IngressState
-    from ai.backend.appproxy.worker.ingress.legacy_circuit_sync import LegacyCircuitIngressSync
 
     from .config import ServerConfig
     from .proxy.frontend.base import BaseFrontend
@@ -352,7 +352,6 @@ class RootContext:
     metrics: WorkerMetricRegistry
     health_probe: HealthProbe
     ingress_state: IngressState
-    legacy_circuit_ingress_sync: LegacyCircuitIngressSync | None
 
 
 type CleanupContext = Callable[["RootContext"], AbstractAsyncContextManager[None]]
@@ -499,6 +498,9 @@ class Circuit(SerializableCircuit):
                 target_groups=[target_group],
             ),
         )
+
+    def to_ingress_key(self, authority: IngressAuthority) -> IngressKey:
+        return IngressKey(authority=authority, frontend_key=self.to_ingress_frontend().key())
 
     def to_ingress_frontend(self) -> IngressFrontend:
         match self.protocol:

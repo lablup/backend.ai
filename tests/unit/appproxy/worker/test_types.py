@@ -14,26 +14,18 @@ from ai.backend.appproxy.common.types import (
     RouteInfo,
     SerializableCircuit,
 )
-from ai.backend.appproxy.worker.ingress.in_memory import InMemoryIngressState
-from ai.backend.appproxy.worker.ingress.legacy_circuit_sync import LegacyCircuitIngressSync
+from ai.backend.appproxy.worker.errors.circuit import InvalidCircuitDataError
 from ai.backend.appproxy.worker.types import Circuit
 from ai.backend.common.dto.appproxy.v2.ingress.types import (
-    Ingress,
-    IngressAccess,
     IngressAccessMode,
     IngressAuthority,
-    IngressBackend,
-    IngressBackendID,
-    IngressFrontend,
     IngressFrontendKey,
     IngressFrontendKind,
-    IngressID,
-    IngressProtocol,
+    IngressKey,
     IngressTarget,
     IngressTargetGroup,
     IngressTargetGroupID,
     IngressTargetID,
-    PortFrontend,
 )
 
 AUTHORITY = IngressAuthority("worker-1")
@@ -43,7 +35,6 @@ USER_ID = UUID("33333333-3333-3333-3333-333333333333")
 ENDPOINT_ID = UUID("44444444-4444-4444-4444-444444444444")
 ROUTE_ID = UUID("55555555-5555-5555-5555-555555555555")
 SESSION_ID = UUID("66666666-6666-6666-6666-666666666666")
-PORT_KEY = IngressFrontendKey("10205")
 CREATED_AT = datetime(2026, 1, 1, tzinfo=UTC)
 
 
@@ -65,16 +56,6 @@ class _FrontendCase:
 
 
 @pytest.fixture
-def memory() -> InMemoryIngressState:
-    return InMemoryIngressState()
-
-
-@pytest.fixture
-def sync(memory: InMemoryIngressState) -> LegacyCircuitIngressSync:
-    return LegacyCircuitIngressSync(memory, AUTHORITY)
-
-
-@pytest.fixture
 def route() -> RouteInfo:
     return RouteInfo(
         route_id=ROUTE_ID,
@@ -83,13 +64,8 @@ def route() -> RouteInfo:
         kernel_host="10.0.0.5",
         kernel_port=8000,
         protocol=ProxyProtocol.HTTP,
-        traffic_ratio=0.7,
+        traffic_ratio=1.0,
     )
-
-
-@pytest.fixture
-def moved_route(route: RouteInfo) -> RouteInfo:
-    return route.model_copy(update={"kernel_host": "10.0.0.6"})
 
 
 @pytest.fixture
@@ -120,13 +96,6 @@ def serialized_circuit(route: RouteInfo) -> SerializableCircuit:
 @pytest.fixture
 def circuit(serialized_circuit: SerializableCircuit) -> Circuit:
     return Circuit.from_serialized_circuit(serialized_circuit)
-
-
-@pytest.fixture
-def moved_circuit(serialized_circuit: SerializableCircuit, moved_route: RouteInfo) -> Circuit:
-    return Circuit.from_serialized_circuit(
-        serialized_circuit.model_copy(update={"route_info": [moved_route]})
-    )
 
 
 @pytest.fixture
@@ -167,31 +136,15 @@ def frontend_case_circuit(
 
 
 @pytest.fixture
-async def ingress_in_memory(memory: InMemoryIngressState) -> None:
-    await memory.apply([
-        Ingress(
-            id=IngressID(str(UUID(int=0))),
-            authority=AUTHORITY,
-            revision=0,
-            frontend=IngressFrontend(
-                kind=IngressFrontendKind.PORT,
-                protocol=IngressProtocol.HTTP,
-                port=PortFrontend(number=10205),
-            ),
-            access=IngressAccess(mode=IngressAccessMode.PUBLIC, allowed_client_ips=[]),
-            backend=IngressBackend(
-                id=IngressBackendID(str(UUID(int=0))),
-                target_groups=[
-                    IngressTargetGroup(
-                        id=IngressTargetGroupID(str(UUID(int=0))), weight=1, targets=[]
-                    )
-                ],
-            ),
-        )
-    ])
+def unsupported_protocol_circuit(
+    unsupported_protocol: ProxyProtocol, serialized_circuit: SerializableCircuit
+) -> Circuit:
+    return Circuit.from_serialized_circuit(
+        serialized_circuit.model_copy(update={"protocol": unsupported_protocol})
+    )
 
 
-class TestLegacyCircuitIngressSync:
+class TestCircuit:
     @pytest.mark.parametrize(
         "access_case",
         [
@@ -222,17 +175,10 @@ class TestLegacyCircuitIngressSync:
         ],
         ids=lambda case: f"{case.app_mode}-{case.protocol}-public-{case.open_to_public}",
     )
-    async def test_upsert_circuits_maps_the_circuit_access(
-        self,
-        sync: LegacyCircuitIngressSync,
-        memory: InMemoryIngressState,
-        access_case: _AccessCase,
-        access_case_circuit: Circuit,
+    def test_to_ingress_maps_the_circuit_access(
+        self, access_case: _AccessCase, access_case_circuit: Circuit
     ) -> None:
-        await sync.upsert_circuits([access_case_circuit])
-        stored_ingress = await memory.get(PORT_KEY)
-        assert stored_ingress is not None
-        assert stored_ingress.access.mode == access_case.access_mode
+        assert access_case_circuit.to_ingress(AUTHORITY).access.mode == access_case.access_mode
 
     @pytest.mark.parametrize(
         "frontend_case",
@@ -254,38 +200,39 @@ class TestLegacyCircuitIngressSync:
         ],
         ids=lambda case: case.frontend_mode.value,
     )
-    async def test_upsert_circuits_keys_the_ingress_by_the_circuit_frontend(
-        self,
-        sync: LegacyCircuitIngressSync,
-        memory: InMemoryIngressState,
-        frontend_case: _FrontendCase,
-        frontend_case_circuit: Circuit,
+    def test_to_ingress_frontend_keys_by_the_circuit_frontend(
+        self, frontend_case: _FrontendCase, frontend_case_circuit: Circuit
     ) -> None:
-        await sync.upsert_circuits([frontend_case_circuit])
-        stored_ingress = await memory.get(frontend_case.frontend_key)
-        assert stored_ingress is not None
-        assert stored_ingress.frontend.kind == frontend_case.kind
+        ingress_frontend = frontend_case_circuit.to_ingress_frontend()
+        assert ingress_frontend.kind == frontend_case.kind
+        assert ingress_frontend.key() == frontend_case.frontend_key
 
-    async def test_upsert_circuits_keeps_the_circuit_users_and_allowed_networks(
-        self, sync: LegacyCircuitIngressSync, memory: InMemoryIngressState, circuit: Circuit
+    @pytest.mark.parametrize(
+        "unsupported_protocol",
+        [ProxyProtocol.PREOPEN, ProxyProtocol.GRPC, ProxyProtocol.VNC, ProxyProtocol.RDP],
+        ids=lambda protocol: protocol.value,
+    )
+    def test_to_ingress_frontend_rejects_a_protocol_a_worker_does_not_serve(
+        self, unsupported_protocol_circuit: Circuit
     ) -> None:
-        await sync.upsert_circuits([circuit])
-        stored_ingress = await memory.get(PORT_KEY)
-        assert stored_ingress is not None
-        assert stored_ingress.access.users is not None
-        assert stored_ingress.access.users.allowed_user_ids == [USER_ID]
-        assert stored_ingress.access.allowed_client_ips == [
+        with pytest.raises(InvalidCircuitDataError):
+            unsupported_protocol_circuit.to_ingress_frontend()
+
+    def test_to_ingress_keeps_the_circuit_users_and_allowed_networks(
+        self, circuit: Circuit
+    ) -> None:
+        ingress = circuit.to_ingress(AUTHORITY)
+        assert ingress.access.users is not None
+        assert ingress.access.users.allowed_user_ids == [USER_ID]
+        assert ingress.access.allowed_client_ips == [
             ip_network("10.0.0.0/8"),
             ip_network("192.168.0.1/32"),
         ]
 
-    async def test_upsert_circuits_carries_every_route_as_a_target_of_one_group(
-        self, sync: LegacyCircuitIngressSync, memory: InMemoryIngressState, circuit: Circuit
+    def test_to_ingress_carries_every_route_as_a_target_of_one_group(
+        self, circuit: Circuit
     ) -> None:
-        await sync.upsert_circuits([circuit])
-        stored_ingress = await memory.get(PORT_KEY)
-        assert stored_ingress is not None
-        assert stored_ingress.backend.target_groups == [
+        assert circuit.to_ingress(AUTHORITY).backend.target_groups == [
             IngressTargetGroup(
                 id=IngressTargetGroupID(str(UUID(int=0))),
                 weight=1,
@@ -295,37 +242,15 @@ class TestLegacyCircuitIngressSync:
             )
         ]
 
-    async def test_a_later_event_for_the_circuit_is_stored_over_an_earlier_one(
-        self,
-        sync: LegacyCircuitIngressSync,
-        memory: InMemoryIngressState,
-        circuit: Circuit,
-        moved_circuit: Circuit,
+    def test_to_ingress_without_routes_holds_a_group_with_no_targets(
+        self, routeless_circuit: Circuit
     ) -> None:
-        await sync.upsert_circuits([circuit])
-        await sync.upsert_circuits([moved_circuit])
-        stored_ingress = await memory.get(PORT_KEY)
-        assert stored_ingress is not None
-        assert [
-            target.host
-            for group in stored_ingress.backend.target_groups
-            for target in group.targets
-        ] == ["10.0.0.6"]
+        target_groups = routeless_circuit.to_ingress(AUTHORITY).backend.target_groups
+        assert [group.targets for group in target_groups] == [[]]
 
-    async def test_upsert_circuits_without_routes_keeps_the_ingress_with_no_targets(
-        self,
-        sync: LegacyCircuitIngressSync,
-        memory: InMemoryIngressState,
-        routeless_circuit: Circuit,
+    def test_to_ingress_key_pairs_the_authority_with_the_frontend_key(
+        self, circuit: Circuit
     ) -> None:
-        await sync.upsert_circuits([routeless_circuit])
-        stored_ingress = await memory.get(PORT_KEY)
-        assert stored_ingress is not None
-        assert [group.targets for group in stored_ingress.backend.target_groups] == [[]]
-
-    @pytest.mark.usefixtures("ingress_in_memory")
-    async def test_remove_circuits_drops_the_ingress_of_the_circuit(
-        self, sync: LegacyCircuitIngressSync, memory: InMemoryIngressState, circuit: Circuit
-    ) -> None:
-        await sync.remove_circuits([circuit])
-        assert await memory.get(PORT_KEY) is None
+        assert circuit.to_ingress_key(AUTHORITY) == IngressKey(
+            authority=AUTHORITY, frontend_key=IngressFrontendKey("10205")
+        )

@@ -75,7 +75,6 @@ from ai.backend.appproxy.common.utils import (
     mime_match,
 )
 from ai.backend.appproxy.worker.ingress.factory import IngressStateFactory
-from ai.backend.appproxy.worker.ingress.legacy_circuit_sync import LegacyCircuitIngressSync
 from ai.backend.common.clients.http_client.client_pool import (
     ClientPool,
     tcp_client_session_factory,
@@ -327,14 +326,11 @@ async def redis_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
 
 @asynccontextmanager
 async def ingress_state_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
-    authority = IngressAuthority(root_ctx.local_config.proxy_worker.authority)
     root_ctx.ingress_state = IngressStateFactory(
-        root_ctx.local_config.proxy_worker.ingress, authority, root_ctx.valkey_live
+        root_ctx.local_config.proxy_worker.ingress,
+        IngressAuthority(root_ctx.local_config.proxy_worker.authority),
+        root_ctx.valkey_live,
     ).create()
-    writer = root_ctx.ingress_state.writer
-    root_ctx.legacy_circuit_ingress_sync = (
-        LegacyCircuitIngressSync(writer, authority) if writer is not None else None
-    )
     yield
 
 
@@ -507,9 +503,11 @@ async def worker_registration_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     circuits = await list_worker_circuits(root_ctx, str(uuid.uuid4()))
     for circuit in circuits:
         await root_ctx.proxy_frontend.register_circuit(circuit, circuit.route_info)
-    # Upserted rather than replaced, so circuits from events handled meanwhile are kept.
-    if root_ctx.legacy_circuit_ingress_sync is not None:
-        await root_ctx.legacy_circuit_ingress_sync.upsert_circuits(circuits)
+    # Applied rather than replaced, so circuits from events handled meanwhile are kept.
+    ingress_writer = root_ctx.ingress_state.writer
+    if ingress_writer is not None:
+        ingress_authority = IngressAuthority(root_ctx.local_config.proxy_worker.authority)
+        await ingress_writer.apply([circuit.to_ingress(ingress_authority) for circuit in circuits])
 
     cron = LocalCron([WorkerHeartbeatTask(root_ctx)])
     await cron.start()
@@ -704,7 +702,8 @@ async def handle_proxy_route_event(
     if event.target_worker_authority != context.local_config.proxy_worker.authority:
         return
 
-    sync = context.legacy_circuit_ingress_sync
+    ingress_writer = context.ingress_state.writer
+    ingress_authority = IngressAuthority(context.local_config.proxy_worker.authority)
     match event:
         case AppProxyCircuitCreatedEvent():
             log.debug("circuits created: {}", [str(c.id) for c in event.circuits])
@@ -713,8 +712,10 @@ async def handle_proxy_route_event(
                 await context.proxy_frontend.register_circuit(
                     created_circuit, created_circuit.route_info
                 )
-            if sync is not None:
-                await sync.upsert_circuits(created_circuits)
+            if ingress_writer is not None:
+                await ingress_writer.apply([
+                    circuit.to_ingress(ingress_authority) for circuit in created_circuits
+                ])
             await context.event_producer.broadcast_event(
                 AppProxyWorkerCircuitAddedEvent(
                     target_worker_authority=context.local_config.proxy_worker.authority,
@@ -729,15 +730,17 @@ async def handle_proxy_route_event(
             held_circuit = context.proxy_frontend.circuits.get(
                 context.proxy_frontend.get_circuit_key(updated_circuit)
             )
-            if sync is not None and held_circuit is not None:
-                await sync.upsert_circuits([held_circuit])
+            if ingress_writer is not None and held_circuit is not None:
+                await ingress_writer.apply([held_circuit.to_ingress(ingress_authority)])
         case AppProxyCircuitRemovedEvent():
             log.debug("circuits removed: {}", [str(c.id) for c in event.circuits])
             removed_circuits = [Circuit.from_serialized_circuit(c) for c in event.circuits]
             for removed_circuit in removed_circuits:
                 await context.proxy_frontend.break_circuit(removed_circuit)
-            if sync is not None:
-                await sync.remove_circuits(removed_circuits)
+            if ingress_writer is not None:
+                await ingress_writer.remove([
+                    circuit.to_ingress_key(ingress_authority) for circuit in removed_circuits
+                ])
 
 
 async def on_prepare(_request: web.Request, response: web.StreamResponse) -> None:
