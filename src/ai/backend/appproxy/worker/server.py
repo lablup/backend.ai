@@ -74,7 +74,7 @@ from ai.backend.appproxy.common.utils import (
     ensure_json_serializable,
     mime_match,
 )
-from ai.backend.appproxy.worker.ingress.circuit import CircuitIngressSync
+from ai.backend.appproxy.worker.ingress.circuit import LegacyCircuitIngressSync
 from ai.backend.appproxy.worker.ingress.factory import IngressStateFactory
 from ai.backend.common.clients.http_client.client_pool import (
     ClientPool,
@@ -332,8 +332,8 @@ async def ingress_state_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
         root_ctx.local_config.proxy_worker.ingress, authority, root_ctx.valkey_live
     ).create()
     writer = root_ctx.ingress_state.writer
-    root_ctx.circuit_ingress_sync = (
-        CircuitIngressSync(writer, authority) if writer is not None else None
+    root_ctx.legacy_circuit_ingress_sync = (
+        LegacyCircuitIngressSync(writer, authority) if writer is not None else None
     )
     yield
 
@@ -507,8 +507,8 @@ async def worker_registration_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     circuits = await list_worker_circuits(root_ctx, str(uuid.uuid4()))
     for circuit in circuits:
         await root_ctx.proxy_frontend.register_circuit(circuit, circuit.route_info)
-    if root_ctx.circuit_ingress_sync is not None:
-        await root_ctx.circuit_ingress_sync.replace_all(circuits)
+    if root_ctx.legacy_circuit_ingress_sync is not None:
+        await root_ctx.legacy_circuit_ingress_sync.replace_all(circuits)
 
     cron = LocalCron([WorkerHeartbeatTask(root_ctx)])
     await cron.start()
@@ -703,7 +703,7 @@ async def handle_proxy_route_event(
     if event.target_worker_authority != context.local_config.proxy_worker.authority:
         return
 
-    sync = context.circuit_ingress_sync
+    sync = context.legacy_circuit_ingress_sync
     match event:
         case AppProxyCircuitCreatedEvent():
             log.debug("circuits created: {}", [str(c.id) for c in event.circuits])

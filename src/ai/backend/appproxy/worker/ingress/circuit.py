@@ -9,7 +9,7 @@ from ai.backend.appproxy.worker.types import Circuit
 from ai.backend.common.dto.appproxy.v2.ingress.types import IngressAuthority, IngressKey
 
 
-class CircuitIngressSync:
+class LegacyCircuitIngressSync:
     """Writes the Ingress of each circuit the legacy circuit events carry to the in-memory state.
 
     Temporary: remove it together with the legacy circuit events. A circuit without routes has

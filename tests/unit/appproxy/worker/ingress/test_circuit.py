@@ -14,7 +14,7 @@ from ai.backend.appproxy.common.types import (
     RouteInfo,
     SerializableCircuit,
 )
-from ai.backend.appproxy.worker.ingress.circuit import CircuitIngressSync
+from ai.backend.appproxy.worker.ingress.circuit import LegacyCircuitIngressSync
 from ai.backend.appproxy.worker.ingress.in_memory import InMemoryIngressState
 from ai.backend.appproxy.worker.types import Circuit
 from ai.backend.common.dto.appproxy.v2.ingress.types import (
@@ -70,8 +70,8 @@ def memory() -> InMemoryIngressState:
 
 
 @pytest.fixture
-def sync(memory: InMemoryIngressState) -> CircuitIngressSync:
-    return CircuitIngressSync(memory, AUTHORITY)
+def sync(memory: InMemoryIngressState) -> LegacyCircuitIngressSync:
+    return LegacyCircuitIngressSync(memory, AUTHORITY)
 
 
 @pytest.fixture
@@ -184,7 +184,7 @@ async def ingress_in_memory(memory: InMemoryIngressState) -> None:
     ])
 
 
-class TestCircuitIngressSync:
+class TestLegacyCircuitIngressSync:
     @pytest.mark.parametrize(
         "access_case",
         [
@@ -217,7 +217,7 @@ class TestCircuitIngressSync:
     )
     async def test_apply_maps_the_circuit_access(
         self,
-        sync: CircuitIngressSync,
+        sync: LegacyCircuitIngressSync,
         memory: InMemoryIngressState,
         access_case: _AccessCase,
         access_case_circuit: Circuit,
@@ -249,7 +249,7 @@ class TestCircuitIngressSync:
     )
     async def test_apply_keys_the_ingress_by_the_circuit_frontend(
         self,
-        sync: CircuitIngressSync,
+        sync: LegacyCircuitIngressSync,
         memory: InMemoryIngressState,
         frontend_case: _FrontendCase,
         frontend_case_circuit: Circuit,
@@ -260,7 +260,7 @@ class TestCircuitIngressSync:
         assert stored_ingress.frontend.kind == frontend_case.kind
 
     async def test_apply_keeps_the_circuit_id_users_and_allowed_networks(
-        self, sync: CircuitIngressSync, memory: InMemoryIngressState, circuit: Circuit
+        self, sync: LegacyCircuitIngressSync, memory: InMemoryIngressState, circuit: Circuit
     ) -> None:
         await sync.apply(circuit, circuit.route_info)
         stored_ingress = await memory.get(PORT_KEY)
@@ -274,7 +274,7 @@ class TestCircuitIngressSync:
         ]
 
     async def test_apply_carries_each_route_as_a_weighted_target_group(
-        self, sync: CircuitIngressSync, memory: InMemoryIngressState, circuit: Circuit
+        self, sync: LegacyCircuitIngressSync, memory: InMemoryIngressState, circuit: Circuit
     ) -> None:
         await sync.apply(circuit, circuit.route_info)
         stored_ingress = await memory.get(PORT_KEY)
@@ -291,7 +291,7 @@ class TestCircuitIngressSync:
 
     async def test_a_later_event_for_the_circuit_is_stored_over_an_earlier_one(
         self,
-        sync: CircuitIngressSync,
+        sync: LegacyCircuitIngressSync,
         memory: InMemoryIngressState,
         circuit: Circuit,
         moved_route: RouteInfo,
@@ -308,21 +308,21 @@ class TestCircuitIngressSync:
 
     @pytest.mark.usefixtures("ingress_in_memory")
     async def test_apply_without_routes_removes_the_ingress(
-        self, sync: CircuitIngressSync, memory: InMemoryIngressState, circuit: Circuit
+        self, sync: LegacyCircuitIngressSync, memory: InMemoryIngressState, circuit: Circuit
     ) -> None:
         await sync.apply(circuit, [])
         assert await memory.get(PORT_KEY) is None
 
     @pytest.mark.usefixtures("ingress_in_memory")
     async def test_remove_drops_the_ingress_of_the_circuit(
-        self, sync: CircuitIngressSync, memory: InMemoryIngressState, circuit: Circuit
+        self, sync: LegacyCircuitIngressSync, memory: InMemoryIngressState, circuit: Circuit
     ) -> None:
         await sync.remove([circuit])
         assert await memory.get(PORT_KEY) is None
 
     async def test_replace_all_holds_only_the_circuits_with_routes(
         self,
-        sync: CircuitIngressSync,
+        sync: LegacyCircuitIngressSync,
         memory: InMemoryIngressState,
         circuit: Circuit,
         routeless_circuit: Circuit,
