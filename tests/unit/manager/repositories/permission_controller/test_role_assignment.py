@@ -10,7 +10,7 @@ import sqlalchemy as sa
 
 from ai.backend.common.data.entity.domain import DomainEntityType, DomainID, DomainName
 from ai.backend.common.data.entity.project import ProjectEntityType, ProjectID
-from ai.backend.common.data.entity.role import RoleEntityType
+from ai.backend.common.data.entity.role import RoleEntityType, RoleID
 from ai.backend.common.data.entity.user import UserEntityType, UserID
 from ai.backend.common.types import ResourceSlot, VFolderHostPermissionMap
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
@@ -314,10 +314,14 @@ class TestRoleAssignment:
     ) -> None:
         """Revoking the only project-scoped role returns remaining_count=0."""
         await perm_db_source.assign_role(
-            UserRoleAssignmentInput(user_id=user_1, role_id=project_scoped_role)
+            UserRoleAssignmentInput(
+                user_id=UserID(user_1),
+                role_id=RoleID(project_scoped_role),
+                granted_by=UserID(user_1),
+            )
         )
         result = await perm_db_source.revoke_role(
-            UserRoleRevocationInput(user_id=user_1, role_id=project_scoped_role)
+            UserRoleRevocationInput(user_id=UserID(user_1), role_id=RoleID(project_scoped_role))
         )
 
         assert len(result.project_remaining_roles) == 1
@@ -334,13 +338,21 @@ class TestRoleAssignment:
     ) -> None:
         """Revoking one role when another exists returns remaining_count=1."""
         await perm_db_source.assign_role(
-            UserRoleAssignmentInput(user_id=user_1, role_id=project_scoped_role)
+            UserRoleAssignmentInput(
+                user_id=UserID(user_1),
+                role_id=RoleID(project_scoped_role),
+                granted_by=UserID(user_1),
+            )
         )
         await perm_db_source.assign_role(
-            UserRoleAssignmentInput(user_id=user_1, role_id=second_project_scoped_role)
+            UserRoleAssignmentInput(
+                user_id=UserID(user_1),
+                role_id=RoleID(second_project_scoped_role),
+                granted_by=UserID(user_1),
+            )
         )
         result = await perm_db_source.revoke_role(
-            UserRoleRevocationInput(user_id=user_1, role_id=project_scoped_role)
+            UserRoleRevocationInput(user_id=UserID(user_1), role_id=RoleID(project_scoped_role))
         )
 
         assert len(result.project_remaining_roles) == 1
@@ -355,10 +367,12 @@ class TestRoleAssignment:
     ) -> None:
         """Revoking a non-project-scoped role returns empty project_remaining."""
         await perm_db_source.assign_role(
-            UserRoleAssignmentInput(user_id=user_1, role_id=domain_role)
+            UserRoleAssignmentInput(
+                user_id=UserID(user_1), role_id=RoleID(domain_role), granted_by=UserID(user_1)
+            )
         )
         result = await perm_db_source.revoke_role(
-            UserRoleRevocationInput(user_id=user_1, role_id=domain_role)
+            UserRoleRevocationInput(user_id=UserID(user_1), role_id=RoleID(domain_role))
         )
         assert result.project_remaining_roles == []
 
