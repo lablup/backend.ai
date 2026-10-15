@@ -9,11 +9,18 @@ from strawberry import ID, UNSET, Info
 from strawberry.relay import Connection, Edge, NodeID
 
 from ai.backend.common.data.entity.vfs_storage import VFSStorageID
+from ai.backend.common.dto.manager.v2.common import PartialBulkPayload
 from ai.backend.common.dto.manager.v2.vfs_storage.request import (
     CreateVFSStorageInput as CreateVFSStorageInputDTO,
 )
 from ai.backend.common.dto.manager.v2.vfs_storage.request import (
     DeleteVFSStorageInput as DeleteVFSStorageInputDTO,
+)
+from ai.backend.common.dto.manager.v2.vfs_storage.request import (
+    PartialBulkPurgeVFSStoragesInput as PartialBulkPurgeVFSStoragesInputDTO,
+)
+from ai.backend.common.dto.manager.v2.vfs_storage.request import (
+    PartialBulkUpdateVFSStoragesInput as PartialBulkUpdateVFSStoragesInputDTO,
 )
 from ai.backend.common.dto.manager.v2.vfs_storage.request import (
     UpdateVFSStorageInput as UpdateVFSStorageInputDTO,
@@ -25,12 +32,17 @@ from ai.backend.common.dto.manager.v2.vfs_storage.response import (
     DeleteVFSStoragePayload as DeleteVFSStoragePayloadDTO,
 )
 from ai.backend.common.dto.manager.v2.vfs_storage.response import (
+    PurgeVFSStoragePayload as PurgeVFSStoragePayloadDTO,
+)
+from ai.backend.common.dto.manager.v2.vfs_storage.response import (
     UpdateVFSStoragePayload as UpdateVFSStoragePayloadDTO,
 )
 from ai.backend.common.dto.manager.v2.vfs_storage.response import (
     VFSStorageNode,
 )
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import encode_cursor, parse_uuid
+from ai.backend.manager.api.gql.common_types import PartialBulkFailureGQL
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     gql_added_field,
@@ -156,6 +168,34 @@ class DeleteVFSStorageInput(PydanticInputMixin[DeleteVFSStorageInputDTO]):
     id: ID
 
 
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Input for updating several VFS storages, each answered for separately.",
+    ),
+    name="PartialBulkUpdateVFSStoragesInput",
+)
+class PartialBulkUpdateVFSStoragesInputGQL(
+    PydanticInputMixin[PartialBulkUpdateVFSStoragesInputDTO]
+):
+    items: list[UpdateVFSStorageInput] = gql_field(
+        description="The VFS storages to update, each with its ID and fields."
+    )
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description=(
+            "Input for permanently purging several VFS storages, each answered for separately."
+        ),
+    ),
+    name="PartialBulkPurgeVFSStoragesInput",
+)
+class PartialBulkPurgeVFSStoragesInputGQL(PydanticInputMixin[PartialBulkPurgeVFSStoragesInputDTO]):
+    ids: list[UUID] = gql_field(description="IDs of the VFS storages to purge.")
+
+
 @gql_pydantic_type(
     BackendAIGQLMeta(
         added_version="25.16.0",
@@ -192,6 +232,38 @@ class DeleteVFSStoragePayload(PydanticOutputMixin[DeleteVFSStoragePayloadDTO]):
     id: UUID = gql_field(description="ID of the deleted VFS storage")
 
 
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Payload for VFS storage permanent purge.",
+    ),
+    model=PurgeVFSStoragePayloadDTO,
+    name="PurgeVFSStoragePayload",
+)
+class PurgeVFSStoragePayloadGQL(PydanticOutputMixin[PurgeVFSStoragePayloadDTO]):
+    id: UUID = gql_field(description="ID of the purged VFS storage.")
+
+
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description=(
+            "Result of a partial bulk VFS storage operation: the VFS storages processed and the "
+            "ones that failed."
+        ),
+    ),
+    model=PartialBulkPayload[VFSStorageNode],
+    name="PartialBulkVFSStoragesPayload",
+)
+class PartialBulkVFSStoragesPayloadGQL(PydanticOutputMixin[PartialBulkPayload[VFSStorageNode]]):
+    successes: list[VFSStorage] = gql_field(
+        description="The VFS storages processed, as they now stand."
+    )
+    failed: list[PartialBulkFailureGQL] = gql_field(
+        description="The VFS storages not processed, each with the reason."
+    )
+
+
 @gql_mutation(
     BackendAIGQLMeta(added_version="25.16.0", description="Create a new VFS storage"),
     name="createVFSStorage",
@@ -210,16 +282,60 @@ async def create_vfs_storage(
 async def update_vfs_storage(
     input: UpdateVFSStorageInput, info: Info[StrawberryGQLContext]
 ) -> UpdateVFSStoragePayload | None:
-    result = await info.context.adapters.vfs_storage.update(input.to_pydantic())
+    dto = input.to_pydantic()
+    result = await info.context.adapters.vfs_storage.update(VFSStorageID(dto.id), dto)
     return UpdateVFSStoragePayload(vfs_storage=VFSStorage.from_pydantic(result.vfs_storage))
 
 
 @gql_mutation(
     BackendAIGQLMeta(added_version="25.16.0", description="Delete a VFS storage"),
     name="deleteVFSStorage",
+    deprecation_reason=f"Deprecated since {NEXT_RELEASE_VERSION}. Use `purgeVFSStorage`.",
 )
 async def delete_vfs_storage(
     input: DeleteVFSStorageInput, info: Info[StrawberryGQLContext]
 ) -> DeleteVFSStoragePayload | None:
-    result = await info.context.adapters.vfs_storage.delete(input.to_pydantic())
-    return DeleteVFSStoragePayload.from_pydantic(result)
+    dto = input.to_pydantic()
+    purged = await info.context.adapters.vfs_storage.purge(VFSStorageID(dto.id))
+    return DeleteVFSStoragePayload.from_pydantic(DeleteVFSStoragePayloadDTO(id=purged.id))
+
+
+@gql_mutation(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION, description="Permanently remove a VFS storage."
+    ),
+    name="purgeVFSStorage",
+)
+async def purge_vfs_storage(
+    id: UUID, info: Info[StrawberryGQLContext]
+) -> PurgeVFSStoragePayloadGQL:
+    payload = await info.context.adapters.vfs_storage.purge(VFSStorageID(id))
+    return PurgeVFSStoragePayloadGQL.from_pydantic(payload)
+
+
+@gql_mutation(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Update several VFS storages, answering for each one.",
+    ),
+    name="partialBulkUpdateVFSStorages",
+)
+async def partial_bulk_update_vfs_storages(
+    input: PartialBulkUpdateVFSStoragesInputGQL, info: Info[StrawberryGQLContext]
+) -> PartialBulkVFSStoragesPayloadGQL:
+    payload = await info.context.adapters.vfs_storage.partial_bulk_update(input.to_pydantic())
+    return PartialBulkVFSStoragesPayloadGQL.from_pydantic(payload)
+
+
+@gql_mutation(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Permanently remove several VFS storages, answering for each one.",
+    ),
+    name="partialBulkPurgeVFSStorages",
+)
+async def partial_bulk_purge_vfs_storages(
+    input: PartialBulkPurgeVFSStoragesInputGQL, info: Info[StrawberryGQLContext]
+) -> PartialBulkVFSStoragesPayloadGQL:
+    payload = await info.context.adapters.vfs_storage.partial_bulk_purge(input.to_pydantic())
+    return PartialBulkVFSStoragesPayloadGQL.from_pydantic(payload)

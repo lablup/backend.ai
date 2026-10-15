@@ -18488,6 +18488,41 @@
         "title": "AdminSearchObjectStoragesInput",
         "type": "object"
       },
+      "NonEmptyList_UpdateObjectStorageInput_": {
+        "items": {
+          "$ref": "#/components/schemas/UpdateObjectStorageInput"
+        },
+        "minItems": 1,
+        "type": "array"
+      },
+      "PartialBulkUpdateObjectStoragesInput": {
+        "description": "Input for updating several object storages, each answered for separately.",
+        "properties": {
+          "items": {
+            "$ref": "#/components/schemas/NonEmptyList_UpdateObjectStorageInput_",
+            "description": "The object storages to update, each with its ID and fields."
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "title": "PartialBulkUpdateObjectStoragesInput",
+        "type": "object"
+      },
+      "PartialBulkPurgeObjectStoragesInput": {
+        "description": "Input for permanently purging several object storages, each answered for separately.",
+        "properties": {
+          "ids": {
+            "$ref": "#/components/schemas/NonEmptyList_UUID_",
+            "description": "IDs of the object storages to purge."
+          }
+        },
+        "required": [
+          "ids"
+        ],
+        "title": "PartialBulkPurgeObjectStoragesInput",
+        "type": "object"
+      },
       "DeleteObjectStorageInput": {
         "description": "Input for deleting an object storage.",
         "properties": {
@@ -38408,6 +38443,41 @@
         "title": "AdminSearchVFSStoragesInput",
         "type": "object"
       },
+      "NonEmptyList_UpdateVFSStorageInput_": {
+        "items": {
+          "$ref": "#/components/schemas/UpdateVFSStorageInput"
+        },
+        "minItems": 1,
+        "type": "array"
+      },
+      "PartialBulkUpdateVFSStoragesInput": {
+        "description": "Input for updating several VFS storages, each answered for separately.",
+        "properties": {
+          "items": {
+            "$ref": "#/components/schemas/NonEmptyList_UpdateVFSStorageInput_",
+            "description": "The VFS storages to update, each with its ID and fields."
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "title": "PartialBulkUpdateVFSStoragesInput",
+        "type": "object"
+      },
+      "PartialBulkPurgeVFSStoragesInput": {
+        "description": "Input for permanently purging several VFS storages, each answered for separately.",
+        "properties": {
+          "ids": {
+            "$ref": "#/components/schemas/NonEmptyList_UUID_",
+            "description": "IDs of the VFS storages to purge."
+          }
+        },
+        "required": [
+          "ids"
+        ],
+        "title": "PartialBulkPurgeVFSStoragesInput",
+        "type": "object"
+      },
       "DeleteVFSStorageInput": {
         "description": "Input for deleting a VFS storage.",
         "properties": {
@@ -54642,7 +54712,34 @@
             }
           }
         ],
-        "description": "Update an existing object storage.\n\n**Preconditions:**\n* Superadmin privilege required.\n"
+        "description": "Update an existing object storage. The path ID wins over the ID in the body.\n\n**Preconditions:**\n* User privilege required.\n"
+      },
+      "delete": {
+        "operationId": "v2/object-storages.purge",
+        "tags": [
+          "v2/object-storages"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "storage_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "description": "Permanently remove an object storage.\n\n**Preconditions:**\n* User privilege required.\n"
       }
     },
     "/v2/object-storages/search": {
@@ -54674,6 +54771,64 @@
         "description": "Search object storages with admin scope.\n\n**Preconditions:**\n* Superadmin privilege required.\n"
       }
     },
+    "/v2/object-storages/partial-bulk-update": {
+      "post": {
+        "operationId": "v2/object-storages.partial_bulk_update",
+        "tags": [
+          "v2/object-storages"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PartialBulkUpdateObjectStoragesInput"
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "description": "Update several object storages, answering for each one.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/v2/object-storages/partial-bulk-purge": {
+      "post": {
+        "operationId": "v2/object-storages.partial_bulk_purge",
+        "tags": [
+          "v2/object-storages"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PartialBulkPurgeObjectStoragesInput"
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "description": "Permanently remove several object storages, answering for each one.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
     "/v2/object-storages/delete": {
       "post": {
         "operationId": "v2/object-storages.delete",
@@ -54700,7 +54855,7 @@
           }
         },
         "parameters": [],
-        "description": "Delete an object storage.\n\n**Preconditions:**\n* Superadmin privilege required.\n"
+        "description": "Deprecated. Use `DELETE /v2/object-storages/{storage_id}`.\n\n**Preconditions:**\n* Superadmin privilege required.\n"
       }
     },
     "/v2/projects/{project_id}": {
@@ -62995,7 +63150,34 @@
             }
           }
         ],
-        "description": "Update an existing VFS storage.\n\n**Preconditions:**\n* Superadmin privilege required.\n"
+        "description": "Update an existing VFS storage. The path ID wins over the ID in the body.\n\n**Preconditions:**\n* User privilege required.\n"
+      },
+      "delete": {
+        "operationId": "v2/vfs-storages.purge",
+        "tags": [
+          "v2/vfs-storages"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "storage_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "description": "Permanently remove a VFS storage.\n\n**Preconditions:**\n* User privilege required.\n"
       }
     },
     "/v2/vfs-storages/search": {
@@ -63027,6 +63209,64 @@
         "description": "Search VFS storages with pagination.\n\n**Preconditions:**\n* Superadmin privilege required.\n"
       }
     },
+    "/v2/vfs-storages/partial-bulk-update": {
+      "post": {
+        "operationId": "v2/vfs-storages.partial_bulk_update",
+        "tags": [
+          "v2/vfs-storages"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PartialBulkUpdateVFSStoragesInput"
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "description": "Update several VFS storages, answering for each one.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/v2/vfs-storages/partial-bulk-purge": {
+      "post": {
+        "operationId": "v2/vfs-storages.partial_bulk_purge",
+        "tags": [
+          "v2/vfs-storages"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PartialBulkPurgeVFSStoragesInput"
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "description": "Permanently remove several VFS storages, answering for each one.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
     "/v2/vfs-storages/delete": {
       "post": {
         "operationId": "v2/vfs-storages.delete",
@@ -63053,7 +63293,7 @@
           }
         },
         "parameters": [],
-        "description": "Delete a VFS storage.\n\n**Preconditions:**\n* Superadmin privilege required.\n"
+        "description": "Deprecated. Use `DELETE /v2/vfs-storages/{storage_id}`.\n\n**Preconditions:**\n* Superadmin privilege required.\n"
       }
     },
     "/v2/export/reports": {

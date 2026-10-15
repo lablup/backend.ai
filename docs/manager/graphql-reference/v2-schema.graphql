@@ -9873,7 +9873,20 @@ type Mutation {
   deleteAutoScalingRule(input: DeleteAutoScalingRuleInput!): DeleteAutoScalingRulePayload
 
   """Added in 25.14.0. Delete an object storage."""
-  deleteObjectStorage(input: DeleteObjectStorageInput!): DeleteObjectStoragePayload
+  deleteObjectStorage(input: DeleteObjectStorageInput!): DeleteObjectStoragePayload @deprecated(reason: "Deprecated since 26.10.0. Use `purgeObjectStorage`.")
+
+  """Added in 26.10.0. Permanently remove an object storage."""
+  purgeObjectStorage(id: UUID!): PurgeObjectStoragePayload!
+
+  """
+  Added in 26.10.0. Update several object storages, answering for each one.
+  """
+  partialBulkUpdateObjectStorages(input: PartialBulkUpdateObjectStoragesInput!): PartialBulkObjectStoragesPayload!
+
+  """
+  Added in 26.10.0. Permanently remove several object storages, answering for each one.
+  """
+  partialBulkPurgeObjectStorages(input: PartialBulkPurgeObjectStoragesInput!): PartialBulkObjectStoragesPayload!
 
   """Added in 25.16.0. Create a new VFS storage"""
   createVFSStorage(input: CreateVFSStorageInput!): CreateVFSStoragePayload
@@ -9882,7 +9895,18 @@ type Mutation {
   updateVFSStorage(input: UpdateVFSStorageInput!): UpdateVFSStoragePayload
 
   """Added in 25.16.0. Delete a VFS storage"""
-  deleteVFSStorage(input: DeleteVFSStorageInput!): DeleteVFSStoragePayload
+  deleteVFSStorage(input: DeleteVFSStorageInput!): DeleteVFSStoragePayload @deprecated(reason: "Deprecated since 26.10.0. Use `purgeVFSStorage`.")
+
+  """Added in 26.10.0. Permanently remove a VFS storage."""
+  purgeVFSStorage(id: UUID!): PurgeVFSStoragePayload!
+
+  """Added in 26.10.0. Update several VFS storages, answering for each one."""
+  partialBulkUpdateVFSStorages(input: PartialBulkUpdateVFSStoragesInput!): PartialBulkVFSStoragesPayload!
+
+  """
+  Added in 26.10.0. Permanently remove several VFS storages, answering for each one.
+  """
+  partialBulkPurgeVFSStorages(input: PartialBulkPurgeVFSStoragesInput!): PartialBulkVFSStoragesPayload!
 
   """Added in 25.15.0. Registers a new namespace within a storage"""
   registerStorageNamespace(input: RegisterStorageNamespaceInput!): RegisterStorageNamespacePayload
@@ -11400,6 +11424,17 @@ type PartialBulkNotificationRulesPayload {
 }
 
 """
+Added in 26.10.0. Result of a partial bulk object storage operation: the object storages processed and the ones that failed.
+"""
+type PartialBulkObjectStoragesPayload {
+  """The object storages processed, as they now stand."""
+  successes: [ObjectStorage!]!
+
+  """The object storages not processed, each with the reason."""
+  failed: [PartialBulkFailure!]!
+}
+
+"""
 Added in 26.10.0. Result of a partial bulk project resource policy operation: the policies processed and the ones that failed.
 """
 type PartialBulkProjectResourcePoliciesPayload {
@@ -11465,6 +11500,14 @@ input PartialBulkPurgeNotificationRulesInput {
 }
 
 """
+Added in 26.10.0. Input for permanently purging several object storages, each answered for separately.
+"""
+input PartialBulkPurgeObjectStoragesInput {
+  """IDs of the object storages to purge."""
+  ids: [UUID!]!
+}
+
+"""
 Added in 26.10.0. Input for purging several project resource policies, each answered for separately.
 """
 input PartialBulkPurgeProjectResourcePoliciesInput {
@@ -11509,6 +11552,14 @@ Added in 26.10.0. Input for purging several user resource policies, each answere
 """
 input PartialBulkPurgeUserResourcePoliciesInput {
   """IDs of the user resource policies to purge."""
+  ids: [UUID!]!
+}
+
+"""
+Added in 26.10.0. Input for permanently purging several VFS storages, each answered for separately.
+"""
+input PartialBulkPurgeVFSStoragesInput {
+  """IDs of the VFS storages to purge."""
   ids: [UUID!]!
 }
 
@@ -11753,6 +11804,14 @@ input PartialBulkUpdateNotificationRulesInput {
 }
 
 """
+Added in 26.10.0. Input for updating several object storages, each answered for separately.
+"""
+input PartialBulkUpdateObjectStoragesInput {
+  """The object storages to update, each with its ID and fields."""
+  items: [UpdateObjectStorageInput!]!
+}
+
+"""
 Added in 26.10.0. One project of a partial bulk update and the fields to update on it.
 """
 input PartialBulkUpdateProjectItemInput {
@@ -11892,6 +11951,14 @@ input PartialBulkUpdateUserResourcePolicyItemInput {
 }
 
 """
+Added in 26.10.0. Input for updating several VFS storages, each answered for separately.
+"""
+input PartialBulkUpdateVFSStoragesInput {
+  """The VFS storages to update, each with its ID and fields."""
+  items: [UpdateVFSStorageInput!]!
+}
+
+"""
 Added in 26.10.0. One vfolder of a partial bulk update and the fields to update on it.
 """
 input PartialBulkUpdateVFolderItemInput {
@@ -11937,6 +12004,17 @@ type PartialBulkUserResourcePoliciesPayload {
   successes: [UserResourcePolicyV2!]!
 
   """The policies not processed, each with the reason."""
+  failed: [PartialBulkFailure!]!
+}
+
+"""
+Added in 26.10.0. Result of a partial bulk VFS storage operation: the VFS storages processed and the ones that failed.
+"""
+type PartialBulkVFSStoragesPayload {
+  """The VFS storages processed, as they now stand."""
+  successes: [VFSStorage!]!
+
+  """The VFS storages not processed, each with the reason."""
   failed: [PartialBulkFailure!]!
 }
 
@@ -13329,6 +13407,12 @@ type PurgeNotificationRulePayload {
   id: UUID!
 }
 
+"""Added in 26.10.0. Payload for object storage permanent purge."""
+type PurgeObjectStoragePayload {
+  """ID of the purged object storage."""
+  id: UUID!
+}
+
 """Added in 26.4.2. Payload for project permanent deletion mutation."""
 type PurgeProjectPayload {
   """Whether the purge was successful."""
@@ -13396,6 +13480,12 @@ input PurgeUserV2Options {
 type PurgeUserV2Payload {
   """Whether the purge was successful."""
   success: Boolean!
+}
+
+"""Added in 26.10.0. Payload for VFS storage permanent purge."""
+type PurgeVFSStoragePayload {
+  """ID of the purged VFS storage."""
+  id: UUID!
 }
 
 """Added in 26.4.4. Optional behavior flags for vfolder purge operations."""

@@ -14296,7 +14296,20 @@ type Mutation
   deleteAutoScalingRule(input: DeleteAutoScalingRuleInput!): DeleteAutoScalingRulePayload @join__field(graph: STRAWBERRY)
 
   """Added in 25.14.0. Delete an object storage."""
-  deleteObjectStorage(input: DeleteObjectStorageInput!): DeleteObjectStoragePayload @join__field(graph: STRAWBERRY)
+  deleteObjectStorage(input: DeleteObjectStorageInput!): DeleteObjectStoragePayload @join__field(graph: STRAWBERRY) @deprecated(reason: "Deprecated since 26.10.0. Use `purgeObjectStorage`.")
+
+  """Added in 26.10.0. Permanently remove an object storage."""
+  purgeObjectStorage(id: UUID!): PurgeObjectStoragePayload! @join__field(graph: STRAWBERRY)
+
+  """
+  Added in 26.10.0. Update several object storages, answering for each one.
+  """
+  partialBulkUpdateObjectStorages(input: PartialBulkUpdateObjectStoragesInput!): PartialBulkObjectStoragesPayload! @join__field(graph: STRAWBERRY)
+
+  """
+  Added in 26.10.0. Permanently remove several object storages, answering for each one.
+  """
+  partialBulkPurgeObjectStorages(input: PartialBulkPurgeObjectStoragesInput!): PartialBulkObjectStoragesPayload! @join__field(graph: STRAWBERRY)
 
   """Added in 25.16.0. Create a new VFS storage"""
   createVFSStorage(input: CreateVFSStorageInput!): CreateVFSStoragePayload @join__field(graph: STRAWBERRY)
@@ -14305,7 +14318,18 @@ type Mutation
   updateVFSStorage(input: UpdateVFSStorageInput!): UpdateVFSStoragePayload @join__field(graph: STRAWBERRY)
 
   """Added in 25.16.0. Delete a VFS storage"""
-  deleteVFSStorage(input: DeleteVFSStorageInput!): DeleteVFSStoragePayload @join__field(graph: STRAWBERRY)
+  deleteVFSStorage(input: DeleteVFSStorageInput!): DeleteVFSStoragePayload @join__field(graph: STRAWBERRY) @deprecated(reason: "Deprecated since 26.10.0. Use `purgeVFSStorage`.")
+
+  """Added in 26.10.0. Permanently remove a VFS storage."""
+  purgeVFSStorage(id: UUID!): PurgeVFSStoragePayload! @join__field(graph: STRAWBERRY)
+
+  """Added in 26.10.0. Update several VFS storages, answering for each one."""
+  partialBulkUpdateVFSStorages(input: PartialBulkUpdateVFSStoragesInput!): PartialBulkVFSStoragesPayload! @join__field(graph: STRAWBERRY)
+
+  """
+  Added in 26.10.0. Permanently remove several VFS storages, answering for each one.
+  """
+  partialBulkPurgeVFSStorages(input: PartialBulkPurgeVFSStoragesInput!): PartialBulkVFSStoragesPayload! @join__field(graph: STRAWBERRY)
 
   """Added in 25.15.0. Registers a new namespace within a storage"""
   registerStorageNamespace(input: RegisterStorageNamespaceInput!): RegisterStorageNamespacePayload @join__field(graph: STRAWBERRY)
@@ -15988,6 +16012,19 @@ type PartialBulkNotificationRulesPayload
 }
 
 """
+Added in 26.10.0. Result of a partial bulk object storage operation: the object storages processed and the ones that failed.
+"""
+type PartialBulkObjectStoragesPayload
+  @join__type(graph: STRAWBERRY)
+{
+  """The object storages processed, as they now stand."""
+  successes: [ObjectStorage!]!
+
+  """The object storages not processed, each with the reason."""
+  failed: [PartialBulkFailure!]!
+}
+
+"""
 Added in 26.10.0. Result of a partial bulk project resource policy operation: the policies processed and the ones that failed.
 """
 type PartialBulkProjectResourcePoliciesPayload
@@ -16067,6 +16104,16 @@ input PartialBulkPurgeNotificationRulesInput
 }
 
 """
+Added in 26.10.0. Input for permanently purging several object storages, each answered for separately.
+"""
+input PartialBulkPurgeObjectStoragesInput
+  @join__type(graph: STRAWBERRY)
+{
+  """IDs of the object storages to purge."""
+  ids: [UUID!]!
+}
+
+"""
 Added in 26.10.0. Input for purging several project resource policies, each answered for separately.
 """
 input PartialBulkPurgeProjectResourcePoliciesInput
@@ -16123,6 +16170,16 @@ input PartialBulkPurgeUserResourcePoliciesInput
   @join__type(graph: STRAWBERRY)
 {
   """IDs of the user resource policies to purge."""
+  ids: [UUID!]!
+}
+
+"""
+Added in 26.10.0. Input for permanently purging several VFS storages, each answered for separately.
+"""
+input PartialBulkPurgeVFSStoragesInput
+  @join__type(graph: STRAWBERRY)
+{
+  """IDs of the VFS storages to purge."""
   ids: [UUID!]!
 }
 
@@ -16415,6 +16472,16 @@ input PartialBulkUpdateNotificationRulesInput
 }
 
 """
+Added in 26.10.0. Input for updating several object storages, each answered for separately.
+"""
+input PartialBulkUpdateObjectStoragesInput
+  @join__type(graph: STRAWBERRY)
+{
+  """The object storages to update, each with its ID and fields."""
+  items: [UpdateObjectStorageInput!]!
+}
+
+"""
 Added in 26.10.0. One project of a partial bulk update and the fields to update on it.
 """
 input PartialBulkUpdateProjectItemInput
@@ -16605,6 +16672,16 @@ input PartialBulkUpdateVFoldersInput
 }
 
 """
+Added in 26.10.0. Input for updating several VFS storages, each answered for separately.
+"""
+input PartialBulkUpdateVFSStoragesInput
+  @join__type(graph: STRAWBERRY)
+{
+  """The VFS storages to update, each with its ID and fields."""
+  items: [UpdateVFSStorageInput!]!
+}
+
+"""
 Added in 26.10.0. Input for putting several keys on several entities in one call. Answered per entity: an entity's keys are written together or refused together.
 """
 input PartialBulkUpsertEntityLabelInput
@@ -16650,6 +16727,19 @@ type PartialBulkVFoldersPayload
   successes: [VFolder!]!
 
   """The vfolders not processed, each with the reason."""
+  failed: [PartialBulkFailure!]!
+}
+
+"""
+Added in 26.10.0. Result of a partial bulk VFS storage operation: the VFS storages processed and the ones that failed.
+"""
+type PartialBulkVFSStoragesPayload
+  @join__type(graph: STRAWBERRY)
+{
+  """The VFS storages processed, as they now stand."""
+  successes: [VFSStorage!]!
+
+  """The VFS storages not processed, each with the reason."""
   failed: [PartialBulkFailure!]!
 }
 
@@ -18330,6 +18420,14 @@ type PurgeNotificationRulePayload
   id: UUID!
 }
 
+"""Added in 26.10.0. Payload for object storage permanent purge."""
+type PurgeObjectStoragePayload
+  @join__type(graph: STRAWBERRY)
+{
+  """ID of the purged object storage."""
+  id: UUID!
+}
+
 """Added in 26.4.2. Payload for project permanent deletion mutation."""
 type PurgeProjectPayload
   @join__type(graph: STRAWBERRY)
@@ -18473,6 +18571,14 @@ type PurgeVFolderV2Payload
   @join__type(graph: STRAWBERRY)
 {
   """ID of the purged virtual folder."""
+  id: UUID!
+}
+
+"""Added in 26.10.0. Payload for VFS storage permanent purge."""
+type PurgeVFSStoragePayload
+  @join__type(graph: STRAWBERRY)
+{
+  """ID of the purged VFS storage."""
   id: UUID!
 }
 

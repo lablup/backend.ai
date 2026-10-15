@@ -664,6 +664,9 @@ from .object_storage import (
     get_presigned_upload_url,
     object_storage,
     object_storages,
+    partial_bulk_purge_object_storages,
+    partial_bulk_update_object_storages,
+    purge_object_storage,
     update_object_storage,
 )
 from .project import Project as _ProjectStub
@@ -708,6 +711,9 @@ from .vfolder import VFolder as _VFolderStub
 from .vfs_storage import (
     create_vfs_storage,
     delete_vfs_storage,
+    partial_bulk_purge_vfs_storages,
+    partial_bulk_update_vfs_storages,
+    purge_vfs_storage,
     update_vfs_storage,
     vfs_storage,
     vfs_storages,
@@ -1052,9 +1058,15 @@ class Mutation:
     update_auto_scaling_rule = update_auto_scaling_rule
     delete_auto_scaling_rule = delete_auto_scaling_rule
     delete_object_storage = delete_object_storage
+    purge_object_storage = purge_object_storage
+    partial_bulk_update_object_storages = partial_bulk_update_object_storages
+    partial_bulk_purge_object_storages = partial_bulk_purge_object_storages
     create_vfs_storage = create_vfs_storage
     update_vfs_storage = update_vfs_storage
     delete_vfs_storage = delete_vfs_storage
+    purge_vfs_storage = purge_vfs_storage
+    partial_bulk_update_vfs_storages = partial_bulk_update_vfs_storages
+    partial_bulk_purge_vfs_storages = partial_bulk_purge_vfs_storages
     register_storage_namespace = register_storage_namespace
     unregister_storage_namespace = unregister_storage_namespace
     create_huggingface_registry = create_huggingface_registry
