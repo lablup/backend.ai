@@ -3,7 +3,7 @@ from __future__ import annotations
 import itertools
 from collections.abc import Iterator, Mapping, Sequence
 from ipaddress import ip_network
-from typing import Final, assert_never
+from typing import Final
 
 from ai.backend.appproxy.common.types import ProxyProtocol, RouteInfo
 from ai.backend.appproxy.worker.ingress.abc import IngressWriter
@@ -35,6 +35,7 @@ from ai.backend.common.dto.appproxy.v2.ingress.types import (
     PortFrontend,
     WildcardFrontend,
 )
+from ai.backend.common.exception import UnreachableError
 
 _INGRESS_PROTOCOLS: Final[Mapping[ProxyProtocol, IngressProtocol]] = {
     ProxyProtocol.HTTP: IngressProtocol.HTTP,
@@ -103,7 +104,7 @@ class CircuitIngressSync:
                         token=IngressTokenAccess(),
                     )
                 case _:
-                    assert_never(circuit.app_info)
+                    raise UnreachableError("a circuit holds only interactive or inference app info")
         target_groups = []
         for route in routes:
             target_id = str(route.route_id or route.session_id)
