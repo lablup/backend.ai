@@ -4,10 +4,11 @@ import asyncio
 import dataclasses
 import enum
 import time
-from collections.abc import Callable, Mapping
+from collections.abc import Callable, Mapping, Sequence
 from contextlib import AbstractAsyncContextManager
 from dataclasses import dataclass
 from decimal import Decimal
+from ipaddress import ip_network
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -24,12 +25,35 @@ import prometheus_client
 from ai.backend.appproxy.common.types import (
     AppMode,
     FrontendMode,
+    ProxyProtocol,
+    RouteInfo,
     SerializableCircuit,
 )
 from ai.backend.common.clients.http_client.client_pool import ClientPool
 from ai.backend.common.clients.valkey_client.valkey_live.client import ValkeyLiveClient
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
+from ai.backend.common.dto.appproxy.v2.ingress.types import (
+    Ingress,
+    IngressAccess,
+    IngressAccessMode,
+    IngressAuthority,
+    IngressBackend,
+    IngressBackendID,
+    IngressFrontend,
+    IngressFrontendKind,
+    IngressID,
+    IngressProtocol,
+    IngressTarget,
+    IngressTargetGroup,
+    IngressTargetGroupID,
+    IngressTargetID,
+    IngressTokenAccess,
+    IngressUserAccess,
+    PortFrontend,
+    WildcardFrontend,
+)
 from ai.backend.common.events.dispatcher import EventDispatcher, EventProducer
+from ai.backend.common.exception import UnreachableError
 from ai.backend.common.health_checker.probe import HealthProbe
 from ai.backend.common.metrics.metric import (
     APIMetricObserver,
@@ -357,6 +381,17 @@ class InferenceAppInfo:
     runtime_variant: RuntimeVariant | None
 
 
+_INGRESS_PROTOCOLS: Final[Mapping[ProxyProtocol, IngressProtocol]] = {
+    ProxyProtocol.HTTP: IngressProtocol.HTTP,
+    ProxyProtocol.PREOPEN: IngressProtocol.HTTP,
+    ProxyProtocol.HTTP2: IngressProtocol.HTTP2,
+    ProxyProtocol.GRPC: IngressProtocol.HTTP2,
+    ProxyProtocol.TCP: IngressProtocol.TCP,
+    ProxyProtocol.VNC: IngressProtocol.TCP,
+    ProxyProtocol.RDP: IngressProtocol.TCP,
+}
+
+
 class Circuit(SerializableCircuit):
     frontend: PortFrontendInfo | SubdomainFrontendInfo
 
@@ -421,6 +456,71 @@ class Circuit(SerializableCircuit):
     @property
     def prometheus_metric_label(self) -> dict[str, str]:
         return {"protocol": self.protocol.name}
+
+    def to_ingress(
+        self, authority: IngressAuthority, revision: int, routes: Sequence[RouteInfo]
+    ) -> Ingress:
+        frontend = self.to_ingress_frontend()
+        allowed_client_ips = [ip_network(cidr) for cidr in self.ip_validator.ranges]
+        # The worker authenticates http only, so other protocols stay public as they are today.
+        if self.open_to_public or frontend.protocol != IngressProtocol.HTTP:
+            access = IngressAccess(
+                mode=IngressAccessMode.PUBLIC, allowed_client_ips=allowed_client_ips
+            )
+        else:
+            match self.app_info:
+                case InteractiveAppInfo(user_id=user_id):
+                    access = IngressAccess(
+                        mode=IngressAccessMode.USER,
+                        allowed_client_ips=allowed_client_ips,
+                        users=IngressUserAccess(allowed_user_ids=[user_id]),
+                    )
+                case InferenceAppInfo():
+                    access = IngressAccess(
+                        mode=IngressAccessMode.TOKEN,
+                        allowed_client_ips=allowed_client_ips,
+                        token=IngressTokenAccess(),
+                    )
+                case _:
+                    raise UnreachableError("a circuit holds only interactive or inference app info")
+        target_groups = []
+        for route in routes:
+            target_id = str(route.route_id or route.session_id)
+            target_groups.append(
+                IngressTargetGroup(
+                    id=IngressTargetGroupID(target_id),
+                    weight=round(route.traffic_ratio * 100),
+                    targets=[
+                        IngressTarget(
+                            id=IngressTargetID(target_id),
+                            host=route.current_kernel_host,
+                            port=route.kernel_port,
+                        )
+                    ],
+                )
+            )
+        return Ingress(
+            id=IngressID(str(self.id)),
+            authority=authority,
+            revision=revision,
+            frontend=frontend,
+            access=access,
+            backend=IngressBackend(id=IngressBackendID(str(self.id)), target_groups=target_groups),
+        )
+
+    def to_ingress_frontend(self) -> IngressFrontend:
+        protocol = _INGRESS_PROTOCOLS[self.protocol]
+        match self.frontend:
+            case PortFrontendInfo(port=port):
+                return IngressFrontend(
+                    kind=IngressFrontendKind.PORT, protocol=protocol, port=PortFrontend(number=port)
+                )
+            case SubdomainFrontendInfo(subdomain=subdomain):
+                return IngressFrontend(
+                    kind=IngressFrontendKind.WILDCARD,
+                    protocol=protocol,
+                    wildcard=WildcardFrontend(subdomain=subdomain),
+                )
 
 
 class MetricTypes(enum.Enum):
