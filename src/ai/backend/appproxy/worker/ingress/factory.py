@@ -34,6 +34,7 @@ class IngressStateFactory:
 
     def create(self) -> IngressState:
         readers: list[IngressReader] = []
+        in_memory: InMemoryIngressState | None = None
         writer: ValidatingIngressWriter | None = None
         for layer_type in self._config.layers:
             match layer_type:
@@ -45,7 +46,7 @@ class IngressStateFactory:
                     readers.append(self._redis())
         if not readers:
             raise InvalidConfigError("No ingress layer is configured")
-        return IngressState(reader=LayeredIngressState(readers), writer=writer)
+        return IngressState(reader=LayeredIngressState(readers, in_memory=in_memory), writer=writer)
 
     def _in_memory(self) -> InMemoryIngressState:
         return InMemoryIngressState(

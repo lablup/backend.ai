@@ -86,3 +86,18 @@ class IngressNotFoundError(BackendAIError, web.HTTPNotFound):
             operation=ErrorOperation.READ,
             error_detail=ErrorDetail.NOT_FOUND,
         )
+
+
+class IngressNotRegisteredError(BackendAIError, web.HTTPNotFound):
+    """Raised for a frontend key no layer holds and that was not removed within negative-ttl."""
+
+    error_type = "https://api.backend.ai/probs/appproxy-worker/ingress-not-registered"
+    error_title = "No ingress is registered for this frontend."
+
+    @override
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.APPPROXY,
+            operation=ErrorOperation.READ,
+            error_detail=ErrorDetail.NOT_FOUND,
+        )
