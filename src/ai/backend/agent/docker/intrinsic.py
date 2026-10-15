@@ -1192,20 +1192,17 @@ class HostNetworkPlugin(AbstractNetworkAgentPlugin[DockerKernel]):
     async def prepare_port_forward(
         self, kernel: DockerKernel, bind_host: str, ports: Iterable[tuple[int, int]], **kwargs: Any
     ) -> None:
-        host_ports = [p[0] for p in ports]
         scratch_dir = (
             self.local_config["container"]["scratch-root"] / str(kernel.kernel_id)
         ).resolve()
         config_dir: Path = scratch_dir / "config"
 
+        port_map = self._map_host_network_ports(kernel, ports)
         intrinsic_ports = {
-            "replin": host_ports[0],
-            "replout": host_ports[1],
+            name: next(iter(port_map[name].values()))
+            for name in ("replin", "replout", "sshd", "ttyd")
+            if name in port_map
         }
-        for index, port_info in enumerate(kernel.service_ports):
-            port_name = port_info["name"]
-            if port_name in ("sshd", "ttyd"):
-                intrinsic_ports[port_name] = host_ports[index + 2]
 
         await current_loop().run_in_executor(
             None,
@@ -1215,18 +1212,21 @@ class HostNetworkPlugin(AbstractNetworkAgentPlugin[DockerKernel]):
     async def expose_ports(
         self, kernel: DockerKernel, bind_host: str, ports: Iterable[tuple[int, int]], **kwargs: Any
     ) -> ContainerNetworkInfo:
-        host_ports = [p[0] for p in ports]
+        return ContainerNetworkInfo(bind_host, self._map_host_network_ports(kernel, ports))
 
-        intrinsic_ports = {
-            "replin": host_ports[0],
-            "replout": host_ports[1],
+    def _map_host_network_ports(
+        self, kernel: DockerKernel, ports: Iterable[tuple[int, int]]
+    ) -> Mapping[str, Mapping[int, int]]:
+        """Map each service name to `{container port: host port}` from `(host port, container port)` pairs."""
+        host_port_by_container_port = {
+            container_port: host_port for host_port, container_port in ports
         }
-        for index, port_info in enumerate(kernel.service_ports):
-            port_name = port_info["name"]
-            if port_name in ("sshd", "ttyd"):
-                intrinsic_ports[port_name] = host_ports[index + 2]
-
-        return ContainerNetworkInfo(
-            bind_host,
-            {service_name: {port: port} for service_name, port in intrinsic_ports.items()},
-        )
+        port_map = {
+            "replin": {2000: host_port_by_container_port[2000]},
+            "replout": {2001: host_port_by_container_port[2001]},
+        }
+        for sport in kernel.service_ports:
+            port_map[sport["name"]] = {
+                cport: host_port_by_container_port[cport] for cport in sport["container_ports"]
+            }
+        return port_map
