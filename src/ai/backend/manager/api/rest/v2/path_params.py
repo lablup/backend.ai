@@ -14,6 +14,10 @@ class DomainNamePathParam(BaseRequestModel):
     domain_name: str = Field(description="Domain name")
 
 
+class DomainIdPathParam(BaseRequestModel):
+    domain_id: UUID = Field(description="Domain ID")
+
+
 class UserIdPathParam(BaseRequestModel):
     user_id: UUID = Field(description="User UUID")
 

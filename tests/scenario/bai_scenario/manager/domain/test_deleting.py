@@ -8,11 +8,7 @@ from typing import override
 import pytest
 
 from ai.backend.common.data.user.types import UserRole
-from ai.backend.common.dto.manager.v2.domain.request import (
-    DeleteDomainInput,
-    PurgeDomainInput,
-    RestoreDomainInput,
-)
+from ai.backend.common.dto.manager.v2.domain.request import PurgeDomainInput
 from ai.backend.common.dto.manager.v2.domain.response import (
     DeleteDomainPayload,
     PurgeDomainPayload,
@@ -64,7 +60,7 @@ class SoftDeleting(When[ADomainAndACaller, DomainAdapter, Deleted]):
     @override
     async def call(self, adapter: DomainAdapter, laid: ADomainAndACaller) -> Deleted:
         with ActingAs(laid.caller):
-            return await adapter.delete(DeleteDomainInput(name=self.named or laid.domain.name))
+            return await adapter.delete(await adapter.lookup_name(self.named or laid.domain.name))
 
 
 @dataclass(frozen=True)
@@ -82,8 +78,8 @@ class SoftDeletingThenRestoring(When[ADomainAndACaller, DomainAdapter, Deleted])
     @override
     async def call(self, adapter: DomainAdapter, laid: ADomainAndACaller) -> Deleted:
         with ActingAs(laid.caller):
-            await adapter.delete(DeleteDomainInput(name=laid.domain.name))
-            return await adapter.restore(RestoreDomainInput(name=laid.domain.name))
+            await adapter.delete(await adapter.lookup_name(laid.domain.name))
+            return await adapter.restore(await adapter.lookup_name(laid.domain.name))
 
 
 @dataclass(frozen=True)
@@ -101,8 +97,8 @@ class SoftDeletingTwice(When[ADomainAndACaller, DomainAdapter, Deleted]):
     @override
     async def call(self, adapter: DomainAdapter, laid: ADomainAndACaller) -> Deleted:
         with ActingAs(laid.caller):
-            await adapter.delete(DeleteDomainInput(name=laid.domain.name))
-            return await adapter.delete(DeleteDomainInput(name=laid.domain.name))
+            await adapter.delete(await adapter.lookup_name(laid.domain.name))
+            return await adapter.delete(await adapter.lookup_name(laid.domain.name))
 
 
 @dataclass(frozen=True)
@@ -120,7 +116,7 @@ class Restoring(When[ADomainAndACaller, DomainAdapter, Deleted]):
     @override
     async def call(self, adapter: DomainAdapter, laid: ADomainAndACaller) -> Deleted:
         with ActingAs(laid.caller):
-            return await adapter.restore(RestoreDomainInput(name=laid.domain.name))
+            return await adapter.restore(await adapter.lookup_name(laid.domain.name))
 
 
 @dataclass(frozen=True)

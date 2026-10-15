@@ -7,14 +7,16 @@ from typing import assert_never
 
 from ai.backend.common.data.entity.domain import DomainID, DomainName
 from ai.backend.common.data.entity.resource_group import ResourceGroupID
+from ai.backend.common.dto.manager.v2.common import PartialBulkFailure, PartialBulkPayload
 from ai.backend.common.dto.manager.v2.domain.request import (
     AdminSearchDomainsInput,
     CreateDomainInput,
-    DeleteDomainInput,
     DomainFilter,
     DomainOrder,
+    PartialBulkDeleteDomainsInput,
+    PartialBulkRestoreDomainsInput,
+    PartialBulkUpdateDomainsInput,
     PurgeDomainInput,
-    RestoreDomainInput,
     ScopedSearchDomainsInput,
     UpdateDomainInput,
 )
@@ -35,6 +37,7 @@ from ai.backend.common.dto.manager.v2.domain.types import (
     DomainUserFilter,
     OrderDirection,
 )
+from ai.backend.manager.actions.v2.bulk.result import PartialBulkResult
 from ai.backend.manager.api.adapter_options.pagination.pagination import PaginationSpec
 from ai.backend.manager.api.adapters.base import BaseAdapter
 from ai.backend.manager.data.domain.types import DomainData
@@ -70,6 +73,15 @@ from ai.backend.manager.services.domain.actions.create_domain import CreateDomai
 from ai.backend.manager.services.domain.actions.delete_domain import DeleteDomainAction
 from ai.backend.manager.services.domain.actions.get import GetDomainAction
 from ai.backend.manager.services.domain.actions.lookup import LookupDomainAction
+from ai.backend.manager.services.domain.actions.partial_bulk_delete_domains import (
+    PartialBulkDeleteDomainsAction,
+)
+from ai.backend.manager.services.domain.actions.partial_bulk_restore_domains import (
+    PartialBulkRestoreDomainsAction,
+)
+from ai.backend.manager.services.domain.actions.partial_bulk_update_domains import (
+    PartialBulkUpdateDomainsAction,
+)
 from ai.backend.manager.services.domain.actions.purge_domain import PurgeDomainAction
 from ai.backend.manager.services.domain.actions.restore_domain import RestoreDomainAction
 from ai.backend.manager.services.domain.actions.scoped_search import (
@@ -215,33 +227,24 @@ class DomainAdapter(BaseAdapter):
         )
         return DomainPayload(domain=self._domain_data_to_node(result.data))
 
-    async def update(self, domain_name: str, input: UpdateDomainInput) -> DomainPayload:
-        """Update an existing domain (superadmin only)."""
-        updater = DomainUpdater(
-            domain_id=await self.lookup_name(domain_name),
-            description=TriState.from_unset(input.description),
-            is_active=OptionalState.from_unset(input.is_active),
-            allowed_docker_registries=OptionalState.from_unset(input.allowed_docker_registries),
-            integration_name=TriState.from_unset(input.integration_name),
+    async def update(self, domain_id: DomainID, input: UpdateDomainInput) -> DomainPayload:
+        """Update an existing domain."""
+        result = await self._domain.update.run(
+            UpdateDomainAction(updater=self._to_updater(domain_id, input))
         )
-        result = await self._domain.update.run(UpdateDomainAction(updater=updater))
         return DomainPayload(domain=self._domain_data_to_node(result.data))
 
-    async def delete(self, input: DeleteDomainInput) -> DeleteDomainPayload:
-        """Soft-delete a domain (superadmin only)."""
+    async def delete(self, domain_id: DomainID) -> DeleteDomainPayload:
+        """Soft-delete a domain."""
         await self._domain.delete.run(
-            DeleteDomainAction(
-                updater=DomainSoftDeleteUpdater(domain_id=await self.lookup_name(input.name)),
-            )
+            DeleteDomainAction(updater=DomainSoftDeleteUpdater(domain_id=domain_id))
         )
         return DeleteDomainPayload(deleted=True)
 
-    async def restore(self, input: RestoreDomainInput) -> RestoreDomainPayload:
-        """Restore a soft-deleted domain (superadmin only)."""
+    async def restore(self, domain_id: DomainID) -> RestoreDomainPayload:
+        """Restore a soft-deleted domain."""
         await self._domain.restore.run(
-            RestoreDomainAction(
-                updater=DomainRestoreUpdater(domain_id=await self.lookup_name(input.name)),
-            )
+            RestoreDomainAction(updater=DomainRestoreUpdater(domain_id=domain_id))
         )
         return RestoreDomainPayload(restored=True)
 
@@ -251,6 +254,60 @@ class DomainAdapter(BaseAdapter):
             PurgeDomainAction(domain_id=await self.lookup_name(input.name), name=input.name)
         )
         return PurgeDomainPayload(purged=True)
+
+    async def partial_bulk_update(
+        self, input: PartialBulkUpdateDomainsInput
+    ) -> PartialBulkPayload[DomainNode]:
+        """Update several domains, answering for each one."""
+        result = await self._domain.partial_bulk_update.run(
+            PartialBulkUpdateDomainsAction(
+                updaters=[self._to_updater(DomainID(item.id), item.input) for item in input.items]
+            )
+        )
+        return self._to_partial_bulk_payload(result)
+
+    async def partial_bulk_delete(
+        self, input: PartialBulkDeleteDomainsInput
+    ) -> PartialBulkPayload[DomainNode]:
+        """Soft-delete several domains, answering for each one."""
+        result = await self._domain.partial_bulk_delete.run(
+            PartialBulkDeleteDomainsAction(ids=[DomainID(domain_id) for domain_id in input.ids])
+        )
+        return self._to_partial_bulk_payload(result)
+
+    async def partial_bulk_restore(
+        self, input: PartialBulkRestoreDomainsInput
+    ) -> PartialBulkPayload[DomainNode]:
+        """Restore several soft-deleted domains, answering for each one."""
+        result = await self._domain.partial_bulk_restore.run(
+            PartialBulkRestoreDomainsAction(ids=[DomainID(domain_id) for domain_id in input.ids])
+        )
+        return self._to_partial_bulk_payload(result)
+
+    def _to_updater(self, domain_id: DomainID, input: UpdateDomainInput) -> DomainUpdater:
+        return DomainUpdater(
+            domain_id=domain_id,
+            description=TriState.from_unset(input.description),
+            is_active=OptionalState.from_unset(input.is_active),
+            allowed_docker_registries=OptionalState.from_unset(input.allowed_docker_registries),
+            integration_name=TriState.from_unset(input.integration_name),
+        )
+
+    def _to_partial_bulk_payload(
+        self, result: PartialBulkResult[DomainData]
+    ) -> PartialBulkPayload[DomainNode]:
+        return PartialBulkPayload[DomainNode](
+            successes=[
+                self._domain_data_to_node(item.value)
+                for item in result.items
+                if item.value is not None
+            ],
+            failed=[
+                PartialBulkFailure(id=item.entity_id, message=str(item.error))
+                for item in result.items
+                if item.error is not None
+            ],
+        )
 
     def _convert_domain_filter(self, filter: DomainFilter) -> list[QueryCondition]:
         fields = DomainSearchableFields.own

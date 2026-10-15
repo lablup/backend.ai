@@ -9,7 +9,6 @@ from typing import override
 import pytest
 
 from ai.backend.common.data.user.types import UserRole
-from ai.backend.common.dto.manager.v2.domain.request import DeleteDomainInput
 from ai.backend.common.dto.manager.v2.domain.response import DomainNode
 from ai.backend.manager.api.adapters.domain.adapter import DomainAdapter
 from ai.backend.manager.errors.base.entity import EntityNotFoundError
@@ -65,7 +64,7 @@ class SoftDeletingThenReading(When[ADomainAndACaller, DomainAdapter, DomainNode]
     @override
     async def call(self, adapter: DomainAdapter, laid: ADomainAndACaller) -> DomainNode:
         with ActingAs(laid.caller):
-            await adapter.delete(DeleteDomainInput(name=laid.domain.name))
+            await adapter.delete(await adapter.lookup_name(laid.domain.name))
             return await adapter.get(laid.domain.name)
 
 

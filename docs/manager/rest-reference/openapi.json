@@ -10719,7 +10719,8 @@
                 "type": "null"
               }
             ],
-            "description": "Updated active status. Omit to leave unchanged.",
+            "deprecated": true,
+            "description": "Deprecated since 26.10.0. Use the domain delete and restore operations. Updated active status. Omit to leave unchanged.",
             "title": "Is Active"
           },
           "allowed_docker_registries": {
@@ -10753,6 +10754,99 @@
         "title": "UpdateDomainInput",
         "type": "object"
       },
+      "NonEmptyList_PartialBulkUpdateDomainItemInput_": {
+        "items": {
+          "$ref": "#/components/schemas/PartialBulkUpdateDomainItemInput"
+        },
+        "minItems": 1,
+        "type": "array"
+      },
+      "PartialBulkUpdateDomainItemInput": {
+        "description": "One domain of a partial bulk update and the fields to update on it.",
+        "properties": {
+          "id": {
+            "description": "ID of the domain to update.",
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "input": {
+            "$ref": "#/components/schemas/UpdateDomainInput",
+            "description": "Fields to update on the domain."
+          }
+        },
+        "required": [
+          "id",
+          "input"
+        ],
+        "title": "PartialBulkUpdateDomainItemInput",
+        "type": "object"
+      },
+      "PartialBulkUpdateDomainsInput": {
+        "description": "Input for updating several domains, each answered for separately.",
+        "properties": {
+          "items": {
+            "$ref": "#/components/schemas/NonEmptyList_PartialBulkUpdateDomainItemInput_",
+            "description": "The domains to update, each with its fields."
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "title": "PartialBulkUpdateDomainsInput",
+        "type": "object"
+      },
+      "NonEmptyList_UUID_": {
+        "items": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "minItems": 1,
+        "type": "array"
+      },
+      "PartialBulkDeleteDomainsInput": {
+        "description": "Input for soft-deleting several domains, each answered for separately.",
+        "properties": {
+          "ids": {
+            "$ref": "#/components/schemas/NonEmptyList_UUID_",
+            "description": "IDs of the domains to soft-delete."
+          }
+        },
+        "required": [
+          "ids"
+        ],
+        "title": "PartialBulkDeleteDomainsInput",
+        "type": "object"
+      },
+      "PartialBulkRestoreDomainsInput": {
+        "description": "Input for restoring several soft-deleted domains, each answered for separately.",
+        "properties": {
+          "ids": {
+            "$ref": "#/components/schemas/NonEmptyList_UUID_",
+            "description": "IDs of the domains to restore."
+          }
+        },
+        "required": [
+          "ids"
+        ],
+        "title": "PartialBulkRestoreDomainsInput",
+        "type": "object"
+      },
+      "PurgeDomainInput": {
+        "description": "Input for permanently purging a domain and all associated data.",
+        "properties": {
+          "name": {
+            "description": "Name of the domain to permanently purge.",
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "title": "PurgeDomainInput",
+        "type": "object"
+      },
       "DeleteDomainInput": {
         "description": "Input for soft-deleting a domain.",
         "properties": {
@@ -10781,21 +10875,6 @@
           "name"
         ],
         "title": "RestoreDomainInput",
-        "type": "object"
-      },
-      "PurgeDomainInput": {
-        "description": "Input for permanently purging a domain and all associated data.",
-        "properties": {
-          "name": {
-            "description": "Name of the domain to permanently purge.",
-            "title": "Name",
-            "type": "string"
-          }
-        },
-        "required": [
-          "name"
-        ],
-        "title": "PurgeDomainInput",
         "type": "object"
       },
       "GetDomainFairShareInput": {
@@ -50092,7 +50171,7 @@
             }
           }
         ],
-        "description": "Update a domain (superadmin only).\n\n**Preconditions:**\n* Superadmin privilege required.\n"
+        "description": "Deprecated. Use `PATCH /v2/domains/{domain_id}`.\n\n**Preconditions:**\n* Superadmin privilege required.\n"
       }
     },
     "/v2/domains/search": {
@@ -50182,9 +50261,9 @@
         "description": "Create a new domain (superadmin only).\n\n**Preconditions:**\n* Superadmin privilege required.\n"
       }
     },
-    "/v2/domains/delete": {
-      "post": {
-        "operationId": "v2/domains.admin_delete",
+    "/v2/domains/{domain_id}": {
+      "patch": {
+        "operationId": "v2/domains.update",
         "tags": [
           "v2/domains"
         ],
@@ -50202,18 +50281,85 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/DeleteDomainInput"
+                "$ref": "#/components/schemas/UpdateDomainInput"
               }
             }
           }
         },
-        "parameters": [],
-        "description": "Soft-delete a domain (superadmin only).\n\n**Preconditions:**\n* Superadmin privilege required.\n"
+        "parameters": [
+          {
+            "name": "domain_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "description": "Update a domain.\n\n**Preconditions:**\n* User privilege required.\n"
       }
     },
-    "/v2/domains/restore": {
+    "/v2/domains/{domain_id}/delete": {
       "post": {
-        "operationId": "v2/domains.admin_restore",
+        "operationId": "v2/domains.delete",
+        "tags": [
+          "v2/domains"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "domain_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "description": "Soft-delete a domain.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/v2/domains/{domain_id}/restore": {
+      "post": {
+        "operationId": "v2/domains.restore",
+        "tags": [
+          "v2/domains"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "domain_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "description": "Restore a soft-deleted domain.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/v2/domains/partial-bulk-update": {
+      "post": {
+        "operationId": "v2/domains.partial_bulk_update",
         "tags": [
           "v2/domains"
         ],
@@ -50231,13 +50377,71 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/RestoreDomainInput"
+                "$ref": "#/components/schemas/PartialBulkUpdateDomainsInput"
               }
             }
           }
         },
         "parameters": [],
-        "description": "Restore a soft-deleted domain (superadmin only).\n\n**Preconditions:**\n* Superadmin privilege required.\n"
+        "description": "Update several domains, answering for each one.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/v2/domains/partial-bulk-delete": {
+      "post": {
+        "operationId": "v2/domains.partial_bulk_delete",
+        "tags": [
+          "v2/domains"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PartialBulkDeleteDomainsInput"
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "description": "Soft-delete several domains, answering for each one.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/v2/domains/partial-bulk-restore": {
+      "post": {
+        "operationId": "v2/domains.partial_bulk_restore",
+        "tags": [
+          "v2/domains"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PartialBulkRestoreDomainsInput"
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "description": "Restore several soft-deleted domains, answering for each one.\n\n**Preconditions:**\n* User privilege required.\n"
       }
     },
     "/v2/domains/purge": {
@@ -50267,6 +50471,64 @@
         },
         "parameters": [],
         "description": "Permanently purge a domain (superadmin only).\n\n**Preconditions:**\n* Superadmin privilege required.\n"
+      }
+    },
+    "/v2/domains/delete": {
+      "post": {
+        "operationId": "v2/domains.admin_delete",
+        "tags": [
+          "v2/domains"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DeleteDomainInput"
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "description": "Deprecated. Use `POST /v2/domains/{domain_id}/delete`.\n\n**Preconditions:**\n* Superadmin privilege required.\n"
+      }
+    },
+    "/v2/domains/restore": {
+      "post": {
+        "operationId": "v2/domains.admin_restore",
+        "tags": [
+          "v2/domains"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RestoreDomainInput"
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "description": "Deprecated. Use `POST /v2/domains/{domain_id}/restore`.\n\n**Preconditions:**\n* Superadmin privilege required.\n"
       }
     },
     "/v2/entity-types": {

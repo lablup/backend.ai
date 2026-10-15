@@ -11,7 +11,6 @@ from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.dto.manager.query import StringFilter
 from ai.backend.common.dto.manager.v2.domain.request import (
     AdminSearchDomainsInput,
-    DeleteDomainInput,
     DomainFilter,
 )
 from ai.backend.common.dto.manager.v2.domain.response import AdminSearchDomainsPayload
@@ -96,7 +95,7 @@ class SoftDeletingOneThenSearching(When[ManyDomainsAndACaller, DomainAdapter, Se
     @override
     async def call(self, adapter: DomainAdapter, laid: ManyDomainsAndACaller) -> Searched:
         with ActingAs(laid.caller):
-            await adapter.delete(DeleteDomainInput(name=laid.named.name))
+            await adapter.delete(await adapter.lookup_name(laid.named.name))
             return await adapter.global_search(AdminSearchDomainsInput())
 
 

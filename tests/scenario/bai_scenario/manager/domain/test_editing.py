@@ -51,7 +51,9 @@ class Editing(When[ADomainAndACaller, DomainAdapter, DomainNode]):
     @override
     async def call(self, adapter: DomainAdapter, laid: ADomainAndACaller) -> DomainNode:
         with ActingAs(laid.caller):
-            payload = await adapter.update(self.named or laid.domain.name, self.asked)
+            payload = await adapter.update(
+                await adapter.lookup_name(self.named or laid.domain.name), self.asked
+            )
         return payload.domain
 
 

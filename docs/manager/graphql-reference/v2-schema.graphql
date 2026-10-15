@@ -9962,22 +9962,44 @@ type Mutation {
   """
   Added in 26.4.2. Update a domain (admin only). Requires superadmin privileges. Only provided fields will be updated.
   """
-  adminUpdateDomainV2(domainName: String!, input: UpdateDomainInput!): DomainPayload
+  adminUpdateDomainV2(domainName: String!, input: UpdateDomainInput!): DomainPayload @deprecated(reason: "Deprecated since 26.10.0. Use `updateDomainV2`.")
 
   """
   Added in 26.4.2. Soft-delete a domain (admin only). Requires superadmin privileges.
   """
-  adminDeleteDomainV2(domainName: String!): DeleteDomainPayload
+  adminDeleteDomainV2(domainName: String!): DeleteDomainPayload @deprecated(reason: "Deprecated since 26.10.0. Use `deleteDomainV2`.")
 
   """
   Added in 26.9.0. Restore a soft-deleted domain (admin only). Requires superadmin privileges.
   """
-  adminRestoreDomainV2(domainName: String!): RestoreDomainPayload
+  adminRestoreDomainV2(domainName: String!): RestoreDomainPayload @deprecated(reason: "Deprecated since 26.10.0. Use `restoreDomainV2`.")
 
   """
   Added in 26.4.2. Permanently purge a domain and all associated data (admin only). Requires superadmin privileges.
   """
   adminPurgeDomainV2(domainName: String!): PurgeDomainPayload
+
+  """
+  Added in 26.10.0. Update a domain. Only provided fields will be updated.
+  """
+  updateDomainV2(id: UUID!, input: UpdateDomainInput!): DomainPayload!
+
+  """Added in 26.10.0. Soft-delete a domain."""
+  deleteDomainV2(id: UUID!): DeleteDomainPayload!
+
+  """Added in 26.10.0. Restore a soft-deleted domain."""
+  restoreDomainV2(id: UUID!): RestoreDomainPayload!
+
+  """Added in 26.10.0. Update several domains, answering for each one."""
+  partialBulkUpdateDomainsV2(input: PartialBulkUpdateDomainsInput!): PartialBulkDomainsPayload!
+
+  """Added in 26.10.0. Soft-delete several domains, answering for each one."""
+  partialBulkDeleteDomainsV2(input: PartialBulkDeleteDomainsInput!): PartialBulkDomainsPayload!
+
+  """
+  Added in 26.10.0. Restore several soft-deleted domains, answering for each one.
+  """
+  partialBulkRestoreDomainsV2(input: PartialBulkRestoreDomainsInput!): PartialBulkDomainsPayload!
 
   """
   Added in 26.4.2. Create a new project (admin only). Requires superadmin privileges.
@@ -10914,6 +10936,36 @@ type PageInfo @shareable {
 }
 
 """
+Added in 26.10.0. Input for soft-deleting several domains, each answered for separately.
+"""
+input PartialBulkDeleteDomainsInput {
+  """IDs of the domains to soft-delete."""
+  ids: [UUID!]!
+}
+
+"""
+Added in 26.10.0. Result of a partial bulk domain operation: the domains processed and the ones that failed.
+"""
+type PartialBulkDomainsPayload {
+  """The domains processed, as they now stand."""
+  successes: [DomainV2!]!
+
+  """The domains not processed, each with the reason."""
+  failed: [PartialBulkFailure!]!
+}
+
+"""
+Added in 26.10.0. One entity a partial bulk operation named and did not process.
+"""
+type PartialBulkFailure {
+  """ID of the entity the failed item named."""
+  id: UUID!
+
+  """Reason the item failed."""
+  message: String!
+}
+
+"""
 Added in 26.10.0. Input for taking several labels off in one call, each named by its own id.
 """
 input PartialBulkPurgeEntityLabelInput {
@@ -10930,6 +10982,33 @@ type PartialBulkPurgeEntityLabelPayload {
 
   """Per-label failures, each naming the label it targeted."""
   failed: [PurgeEntityLabelError!]!
+}
+
+"""
+Added in 26.10.0. Input for restoring several soft-deleted domains, each answered for separately.
+"""
+input PartialBulkRestoreDomainsInput {
+  """IDs of the domains to restore."""
+  ids: [UUID!]!
+}
+
+"""
+Added in 26.10.0. One domain of a partial bulk update and the fields to update on it.
+"""
+input PartialBulkUpdateDomainItemInput {
+  """ID of the domain to update."""
+  id: UUID!
+
+  """Fields to update on the domain."""
+  input: UpdateDomainInput!
+}
+
+"""
+Added in 26.10.0. Input for updating several domains, each answered for separately.
+"""
+input PartialBulkUpdateDomainsInput {
+  """The domains to update, each with its fields."""
+  items: [PartialBulkUpdateDomainItemInput!]!
 }
 
 """
@@ -18386,7 +18465,7 @@ input UpdateDomainInput {
   description: String
 
   """Updated active status."""
-  isActive: Boolean
+  isActive: Boolean @deprecated(reason: "Deprecated since 26.10.0. Use `deleteDomainV2` or `restoreDomainV2`.")
 
   """New allowed Docker registry URLs."""
   allowedDockerRegistries: [String!]
