@@ -3,7 +3,7 @@ from typing import override
 
 import strawberry
 from graphql import GraphQLError
-from strawberry.extensions import MaxAliasesLimiter, QueryDepthLimiter
+from strawberry.extensions import QueryDepthLimiter
 from strawberry.federation import Schema
 from strawberry.schema.config import StrawberryConfig
 from strawberry.types import ExecutionContext
@@ -158,6 +158,7 @@ from ai.backend.manager.api.gql.entity_share.resolver import (
 )
 from ai.backend.manager.api.gql.extensions.exception_handler import GQLExceptionHandlerExtension
 from ai.backend.manager.api.gql.extensions.logging_ext import GQLLoggingExtension
+from ai.backend.manager.api.gql.extensions.max_aliases import GQLMaxAliasesExtension
 from ai.backend.manager.api.gql.extensions.metric import GQLMetricExtension
 from ai.backend.manager.api.gql.extensions.validation import GQLValidationExtension
 from ai.backend.manager.api.gql.fair_share.resolver.domain import (
@@ -1244,7 +1245,7 @@ schema = CustomizedSchema(
         GQLMetricExtension,
         GQLValidationExtension,
         lambda: QueryDepthLimiter(max_depth=MAX_QUERY_DEPTH),
-        lambda: MaxAliasesLimiter(max_alias_count=MAX_ALIAS_COUNT),
+        lambda: GQLMaxAliasesExtension(max_alias_count=MAX_ALIAS_COUNT),
         GQLExceptionHandlerExtension,
     ],
 )
@@ -1281,7 +1282,7 @@ public_schema = Schema(
         GQLMetricExtension,
         GQLValidationExtension,
         lambda: QueryDepthLimiter(max_depth=MAX_QUERY_DEPTH),
-        lambda: MaxAliasesLimiter(max_alias_count=MAX_ALIAS_COUNT),
+        lambda: GQLMaxAliasesExtension(max_alias_count=MAX_ALIAS_COUNT),
         GQLExceptionHandlerExtension,
     ],
 )
