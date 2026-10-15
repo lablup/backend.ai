@@ -2,11 +2,12 @@
 
 [무엇을 보장하는가](/src/ai/backend/manager/api/adapters/audit_log/KNOWLEDGE.md) · [어댑터](/src/ai/backend/manager/api/adapters/audit_log/adapter.py)
 
-시나리오: 완성
+시나리오: 미완 1 / 5
 
-- ops 로 구성 (4)
+- ops 로 구성 (5)
   - admin_search — 대표 성공 ✓ · 대표 실패 ✓
   - batch_load_by_ids — 대표 성공 ✓ · 대표 실패 ✓
+  - batch_load_scopes_by_ids — 대표 성공 ✗ · 대표 실패 ✗ — SCENARIO-GAP
   - scoped_search — 대표 성공 ✓ · 대표 실패 ✓
   - search_scopes — 대표 성공 ✓ · 대표 실패 ✓
 
