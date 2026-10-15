@@ -9,9 +9,6 @@ from __future__ import annotations
 
 from typing import Any
 
-from ai.backend.common.data.entity.project import ProjectID
-from ai.backend.common.data.entity.user import UserID
-from ai.backend.manager.data.permission.role import UserRoleRevocationData
 from ai.backend.manager.repositories.permission_controller.repository import (
     PermissionControllerRepository,
 )
@@ -172,9 +169,7 @@ class RbacRoleService:
         When project_id is provided, also binds the user to the project.
         """
         if action.input.project_id is not None:
-            await self._roster_repository.join_member(
-                ProjectID(action.input.project_id), UserID(action.input.user_id)
-            )
+            await self._roster_repository.join_member(action.input.project_id, action.input.user_id)
         data = await self._repository.assign_role(action.input)
         return AssignRoleActionResult(data=data)
 
@@ -187,16 +182,8 @@ class RbacRoleService:
         result = await self._repository.revoke_role(action.input)
         for prc in result.project_remaining_roles:
             if prc.remaining_count == 0:
-                await self._roster_repository.leave_member(
-                    ProjectID(prc.project_id), UserID(action.input.user_id)
-                )
-        return RevokeRoleActionResult(
-            data=UserRoleRevocationData(
-                user_role_id=result.user_role_id,
-                user_id=action.input.user_id,
-                role_id=action.input.role_id,
-            )
-        )
+                await self._roster_repository.leave_member(prc.project_id, action.input.user_id)
+        return RevokeRoleActionResult(data=result.revoked)
 
     async def bulk_assign_role(self, action: BulkAssignRoleAction) -> BulkAssignRoleActionResult:
         """Assigns a role to multiple users.
@@ -205,7 +192,7 @@ class RbacRoleService:
         """
         if action.project_id is not None:
             for user_id in action.user_ids:
-                await self._roster_repository.join_member(ProjectID(action.project_id), user_id)
+                await self._roster_repository.join_member(action.project_id, user_id)
         data = await self._repository.bulk_assign_role(
             action.role_id, action.user_ids, action.granted_by
         )

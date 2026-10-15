@@ -2778,8 +2778,10 @@ type BulkAssignRolePayload
   """List of successfully created role assignments."""
   assigned: [RoleAssignment!]!
 
-  """List of errors for users that failed to be assigned."""
-  failed: [BulkAssignRoleError!]! @deprecated(reason: "Always empty. A user already holding the role keeps it; every other refusal raises.")
+  """
+  Users already holding the role, whose assignments are left as they stand. Every other refusal raises.
+  """
+  failed: [BulkAssignRoleError!]!
 }
 
 """

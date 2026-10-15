@@ -5,6 +5,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from typing import override
 
+from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.role import RoleID
 from ai.backend.common.data.entity.role_preset import RolePresetID
 from ai.backend.common.data.entity.types import (
@@ -57,7 +58,7 @@ class AssignedUserData(FieldData):
     id: uuid.UUID
     user_id: UserID
     role_id: RoleID
-    granted_by: uuid.UUID | None
+    granted_by: UserID | None
     granted_at: datetime
 
 
@@ -88,18 +89,10 @@ class UserRoleAssignmentInput:
     Input to create a new user-role association.
     """
 
-    user_id: uuid.UUID
-    role_id: uuid.UUID
-    granted_by: uuid.UUID | None = None
-    project_id: uuid.UUID | None = None
-
-
-@dataclass(frozen=True)
-class UserRoleAssignmentData:
-    id: uuid.UUID
-    user_id: uuid.UUID
-    role_id: uuid.UUID
-    granted_by: uuid.UUID | None = None
+    user_id: UserID
+    role_id: RoleID
+    granted_by: UserID
+    project_id: ProjectID | None = None
 
 
 @dataclass(frozen=True)
@@ -108,15 +101,15 @@ class UserRoleRevocationInput:
     Input to revoke a user-role association.
     """
 
-    user_id: uuid.UUID
-    role_id: uuid.UUID
+    user_id: UserID
+    role_id: RoleID
 
 
 @dataclass(frozen=True)
 class ProjectRoleCount:
     """Number of roles a user still holds in a project after revocation."""
 
-    project_id: uuid.UUID
+    project_id: ProjectID
     remaining_count: int
 
 
@@ -124,31 +117,15 @@ class ProjectRoleCount:
 class RoleRevocationResult:
     """Result of revoking a role from a user."""
 
-    user_role_id: uuid.UUID
+    revoked: AssignedUserData
     project_remaining_roles: list[ProjectRoleCount] = field(default_factory=list)
-
-
-@dataclass(frozen=True)
-class UserRoleRevocationData:
-    user_role_id: uuid.UUID
-    user_id: uuid.UUID
-    role_id: uuid.UUID
-
-
-@dataclass(frozen=True)
-class BulkUserRoleAssignmentInput:
-    """Input for bulk assigning a role to multiple users."""
-
-    role_id: uuid.UUID
-    user_ids: list[uuid.UUID]
-    granted_by: uuid.UUID | None = None
 
 
 @dataclass(frozen=True)
 class BulkRoleAssignmentFailure:
     """Failure information for a single user in bulk role assignment."""
 
-    user_id: uuid.UUID
+    user_id: UserID
     message: str
 
 
@@ -156,7 +133,7 @@ class BulkRoleAssignmentFailure:
 class BulkRoleAssignmentResultData:
     """Result of bulk role assignment."""
 
-    successes: list[UserRoleAssignmentData] = field(default_factory=list)
+    successes: list[AssignedUserData] = field(default_factory=list)
     failures: list[BulkRoleAssignmentFailure] = field(default_factory=list)
 
 
@@ -164,15 +141,15 @@ class BulkRoleAssignmentResultData:
 class BulkUserRoleRevocationInput:
     """Input for bulk revoking a role from multiple users."""
 
-    role_id: uuid.UUID
-    user_ids: list[uuid.UUID]
+    role_id: RoleID
+    user_ids: list[UserID]
 
 
 @dataclass(frozen=True)
 class BulkRoleRevocationFailure:
     """Failure information for a single user in bulk role revocation."""
 
-    user_id: uuid.UUID
+    user_id: UserID
     message: str
 
 
@@ -180,7 +157,7 @@ class BulkRoleRevocationFailure:
 class BulkRoleRevocationResultData:
     """Result of bulk role revocation."""
 
-    successes: list[UserRoleRevocationData] = field(default_factory=list)
+    successes: list[AssignedUserData] = field(default_factory=list)
     failures: list[BulkRoleRevocationFailure] = field(default_factory=list)
 
 

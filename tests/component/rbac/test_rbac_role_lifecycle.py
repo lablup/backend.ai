@@ -8,6 +8,8 @@ import pytest
 
 from ai.backend.client.v2.exceptions import NotFoundError
 from ai.backend.client.v2.registry import BackendAIClientRegistry
+from ai.backend.common.data.entity.role import RoleID
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.dto.manager.query import StringFilter
 from ai.backend.common.dto.manager.rbac.request import (
     AssignRoleRequest,
@@ -54,8 +56,8 @@ class TestRBACRoleLifecycle:
         # 2. Assign role to user
         assign_result = await admin_registry.rbac.assign_role(
             AssignRoleRequest(
-                user_id=admin_user_fixture.user_uuid,
-                role_id=role_id,
+                user_id=UserID(admin_user_fixture.user_uuid),
+                role_id=RoleID(role_id),
             )
         )
         assert isinstance(assign_result, AssignRoleResponse)
@@ -75,8 +77,8 @@ class TestRBACRoleLifecycle:
         # 4. Revoke role
         revoke_result = await admin_registry.rbac.revoke_role(
             RevokeRoleRequest(
-                user_id=admin_user_fixture.user_uuid,
-                role_id=role_id,
+                user_id=UserID(admin_user_fixture.user_uuid),
+                role_id=RoleID(role_id),
             )
         )
         assert isinstance(revoke_result, RevokeRoleResponse)
@@ -197,8 +199,8 @@ class TestRoleAssignmentAudit:
 
         await admin_registry.rbac.assign_role(
             AssignRoleRequest(
-                user_id=admin_user_fixture.user_uuid,
-                role_id=role_id,
+                user_id=UserID(admin_user_fixture.user_uuid),
+                role_id=RoleID(role_id),
             )
         )
 
@@ -208,13 +210,14 @@ class TestRoleAssignmentAudit:
         )
         assert result.pagination.total >= 1
         user_entry = next(u for u in result.users if u.user_id == admin_user_fixture.user_uuid)
+        assert user_entry.granted_by == admin_user_fixture.user_uuid
         assert user_entry.granted_at is not None
 
         # Cleanup
         await admin_registry.rbac.revoke_role(
             RevokeRoleRequest(
-                user_id=admin_user_fixture.user_uuid,
-                role_id=role_id,
+                user_id=UserID(admin_user_fixture.user_uuid),
+                role_id=RoleID(role_id),
             )
         )
 
@@ -229,14 +232,14 @@ class TestRoleAssignmentAudit:
 
         await admin_registry.rbac.assign_role(
             AssignRoleRequest(
-                user_id=admin_user_fixture.user_uuid,
-                role_id=role_a.role.id,
+                user_id=UserID(admin_user_fixture.user_uuid),
+                role_id=RoleID(role_a.role.id),
             )
         )
         await admin_registry.rbac.assign_role(
             AssignRoleRequest(
-                user_id=admin_user_fixture.user_uuid,
-                role_id=role_b.role.id,
+                user_id=UserID(admin_user_fixture.user_uuid),
+                role_id=RoleID(role_b.role.id),
             )
         )
 
@@ -253,14 +256,14 @@ class TestRoleAssignmentAudit:
         # Cleanup
         await admin_registry.rbac.revoke_role(
             RevokeRoleRequest(
-                user_id=admin_user_fixture.user_uuid,
-                role_id=role_a.role.id,
+                user_id=UserID(admin_user_fixture.user_uuid),
+                role_id=RoleID(role_a.role.id),
             )
         )
         await admin_registry.rbac.revoke_role(
             RevokeRoleRequest(
-                user_id=admin_user_fixture.user_uuid,
-                role_id=role_b.role.id,
+                user_id=UserID(admin_user_fixture.user_uuid),
+                role_id=RoleID(role_b.role.id),
             )
         )
 
@@ -347,8 +350,8 @@ class TestRoleSearchPagination:
         with pytest.raises(Exception):
             await admin_registry.rbac.revoke_role(
                 RevokeRoleRequest(
-                    user_id=uuid.uuid4(),
-                    role_id=created.role.id,
+                    user_id=UserID(uuid.uuid4()),
+                    role_id=RoleID(created.role.id),
                 )
             )
 

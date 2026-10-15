@@ -9,7 +9,10 @@ from uuid import UUID
 from pydantic import Field, field_validator, model_validator
 
 from ai.backend.common.api_handlers import BaseRequestModel
+from ai.backend.common.data.entity.project import ProjectID
+from ai.backend.common.data.entity.role import RoleID
 from ai.backend.common.data.entity.types import DeclaredEntityType
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.permission.types import Permission
 from ai.backend.common.dto.manager.query import (
     DateTimeFilter,
@@ -199,9 +202,9 @@ class DeletePermissionInput(BaseRequestModel):
 class AssignRoleInput(BaseRequestModel):
     """Input for assigning a role to a user."""
 
-    user_id: UUID = Field(description="User ID to assign the role to")
-    role_id: UUID = Field(description="Role ID to assign")
-    project_id: UUID | None = Field(
+    user_id: UserID = Field(description="User ID to assign the role to")
+    role_id: RoleID = Field(description="Role ID to assign")
+    project_id: ProjectID | None = Field(
         default=None,
         description="When provided, also add the user to this project",
     )
@@ -210,16 +213,16 @@ class AssignRoleInput(BaseRequestModel):
 class RevokeRoleInput(BaseRequestModel):
     """Input for revoking a role from a user."""
 
-    user_id: UUID = Field(description="User ID to revoke the role from")
-    role_id: UUID = Field(description="Role ID to revoke")
+    user_id: UserID = Field(description="User ID to revoke the role from")
+    role_id: RoleID = Field(description="Role ID to revoke")
 
 
 class BulkAssignRoleInput(BaseRequestModel):
     """Input for bulk assigning a role to multiple users."""
 
-    role_id: UUID = Field(description="Role ID to assign")
-    user_ids: list[UUID] = Field(description="List of user IDs to assign the role to")
-    project_id: UUID | None = Field(
+    role_id: RoleID = Field(description="Role ID to assign")
+    user_ids: list[UserID] = Field(description="List of user IDs to assign the role to")
+    project_id: ProjectID | None = Field(
         default=None,
         description="When provided, also add the users to this project",
     )
@@ -228,8 +231,8 @@ class BulkAssignRoleInput(BaseRequestModel):
 class BulkRevokeRoleInput(BaseRequestModel):
     """Input for bulk revoking a role from multiple users."""
 
-    role_id: UUID = Field(description="Role ID to revoke")
-    user_ids: list[UUID] = Field(description="List of user IDs to revoke the role from")
+    role_id: RoleID = Field(description="Role ID to revoke")
+    user_ids: list[UserID] = Field(description="List of user IDs to revoke the role from")
 
 
 class BulkAddRolePermissionsInput(BaseRequestModel):
