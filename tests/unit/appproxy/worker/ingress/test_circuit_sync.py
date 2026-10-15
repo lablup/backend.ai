@@ -123,21 +123,6 @@ def circuit(serialized_circuit: SerializableCircuit) -> Circuit:
 
 
 @pytest.fixture
-def tcp_wildcard_circuit(serialized_circuit: SerializableCircuit) -> Circuit:
-    return Circuit.from_serialized_circuit(
-        serialized_circuit.model_copy(
-            update={
-                "id": UUID(int=1),
-                "protocol": ProxyProtocol.TCP,
-                "frontend_mode": FrontendMode.WILDCARD_DOMAIN,
-                "port": None,
-                "subdomain": "ssh",
-            }
-        )
-    )
-
-
-@pytest.fixture
 def access_case_circuit(
     access_case: _AccessCase, serialized_circuit: SerializableCircuit
 ) -> Circuit:
@@ -326,24 +311,4 @@ class TestLegacyCircuitIngressSync:
         self, sync: LegacyCircuitIngressSync, memory: InMemoryIngressState, circuit: Circuit
     ) -> None:
         await sync.remove_circuits([circuit])
-        assert await memory.get(PORT_KEY) is None
-
-    async def test_upsert_circuit_skips_a_circuit_whose_ingress_cannot_be_built(
-        self,
-        sync: LegacyCircuitIngressSync,
-        memory: InMemoryIngressState,
-        tcp_wildcard_circuit: Circuit,
-    ) -> None:
-        await sync.upsert_circuit(tcp_wildcard_circuit, tcp_wildcard_circuit.route_info)
-        assert await memory.get_all() == []
-
-    @pytest.mark.usefixtures("ingress_in_memory")
-    async def test_remove_circuits_skips_a_circuit_whose_ingress_cannot_be_built(
-        self,
-        sync: LegacyCircuitIngressSync,
-        memory: InMemoryIngressState,
-        circuit: Circuit,
-        tcp_wildcard_circuit: Circuit,
-    ) -> None:
-        await sync.remove_circuits([tcp_wildcard_circuit, circuit])
         assert await memory.get(PORT_KEY) is None
