@@ -15241,15 +15241,33 @@ type Mutation
   leaveEntityShare(id: UUID!): EntitySharePayload @join__field(graph: STRAWBERRY)
 
   """Added in 26.8.0. Update a retention policy (superadmin only)."""
-  adminUpdateRetentionPolicy(input: UpdateRetentionPolicyInput!): UpdateRetentionPolicyPayload @join__field(graph: STRAWBERRY)
+  adminUpdateRetentionPolicy(input: UpdateRetentionPolicyInput!): UpdateRetentionPolicyPayload @join__field(graph: STRAWBERRY) @deprecated(reason: "Deprecated since 26.10.0. Use `updateRetentionPolicy`.")
 
   """Added in 26.8.0. Delete a retention policy (superadmin only)."""
-  adminDeleteRetentionPolicy(id: UUID!): DeleteRetentionPolicyPayload @join__field(graph: STRAWBERRY)
+  adminDeleteRetentionPolicy(id: UUID!): DeleteRetentionPolicyPayload @join__field(graph: STRAWBERRY) @deprecated(reason: "Deprecated since 26.10.0. Use `purgeRetentionPolicy`.")
 
   """
   Added in 26.8.0. Purge (permanently remove) a retention policy (superadmin only).
   """
-  adminPurgeRetentionPolicy(id: UUID!): PurgeRetentionPolicyPayload @join__field(graph: STRAWBERRY)
+  adminPurgeRetentionPolicy(id: UUID!): PurgeRetentionPolicyPayload @join__field(graph: STRAWBERRY) @deprecated(reason: "Deprecated since 26.10.0. Use `purgeRetentionPolicy`.")
+
+  """
+  Added in 26.10.0. Update a retention policy. Only provided fields will be updated.
+  """
+  updateRetentionPolicy(input: UpdateRetentionPolicyInput!): UpdateRetentionPolicyPayload! @join__field(graph: STRAWBERRY)
+
+  """Added in 26.10.0. Purge (permanently remove) a retention policy."""
+  purgeRetentionPolicy(id: UUID!): PurgeRetentionPolicyPayload! @join__field(graph: STRAWBERRY)
+
+  """
+  Added in 26.10.0. Update several retention policies, answering for each one.
+  """
+  partialBulkUpdateRetentionPolicies(input: PartialBulkUpdateRetentionPoliciesInput!): PartialBulkRetentionPoliciesPayload! @join__field(graph: STRAWBERRY)
+
+  """
+  Added in 26.10.0. Purge several retention policies, answering for each one.
+  """
+  partialBulkPurgeRetentionPolicies(input: PartialBulkPurgeRetentionPoliciesInput!): PartialBulkRetentionPoliciesPayload! @join__field(graph: STRAWBERRY)
 
   """Added in 26.4.2. Create a runtime variant preset (superadmin only)."""
   adminCreateRuntimeVariantPreset(input: CreateRuntimeVariantPresetInput!): CreateRuntimeVariantPresetPayload @join__field(graph: STRAWBERRY)
@@ -16480,6 +16498,16 @@ input PartialBulkPurgeResourcePresetsInput
 }
 
 """
+Added in 26.10.0. Input for purging several retention policies, each answered for separately.
+"""
+input PartialBulkPurgeRetentionPoliciesInput
+  @join__type(graph: STRAWBERRY)
+{
+  """IDs of the retention policies to purge."""
+  ids: [UUID!]!
+}
+
+"""
 Added in 26.10.0. Input for purging several role presets, each answered for separately.
 """
 input PartialBulkPurgeRolePresetsInput
@@ -16669,6 +16697,19 @@ input PartialBulkRestoreVFoldersInput
 {
   """IDs of the vfolders to restore."""
   ids: [UUID!]!
+}
+
+"""
+Added in 26.10.0. Result of a partial bulk retention policy operation: the policies processed and the ones that failed.
+"""
+type PartialBulkRetentionPoliciesPayload
+  @join__type(graph: STRAWBERRY)
+{
+  """The retention policies processed, as they now stand."""
+  successes: [RetentionPolicy!]!
+
+  """The retention policies not processed, each with the reason."""
+  failed: [PartialBulkFailure!]!
 }
 
 """
@@ -17123,6 +17164,16 @@ input PartialBulkUpdateResourcePresetsInput
 {
   """The resource presets to update, each with its fields."""
   items: [PartialBulkUpdateResourcePresetItemInput!]!
+}
+
+"""
+Added in 26.10.0. Input for updating several retention policies, each answered for separately.
+"""
+input PartialBulkUpdateRetentionPoliciesInput
+  @join__type(graph: STRAWBERRY)
+{
+  """The retention policies to update, each with its ID and fields."""
+  items: [UpdateRetentionPolicyInput!]!
 }
 
 """

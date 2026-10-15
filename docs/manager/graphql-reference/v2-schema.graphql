@@ -10818,15 +10818,33 @@ type Mutation {
   leaveEntityShare(id: UUID!): EntitySharePayload
 
   """Added in 26.8.0. Update a retention policy (superadmin only)."""
-  adminUpdateRetentionPolicy(input: UpdateRetentionPolicyInput!): UpdateRetentionPolicyPayload
+  adminUpdateRetentionPolicy(input: UpdateRetentionPolicyInput!): UpdateRetentionPolicyPayload @deprecated(reason: "Deprecated since 26.10.0. Use `updateRetentionPolicy`.")
 
   """Added in 26.8.0. Delete a retention policy (superadmin only)."""
-  adminDeleteRetentionPolicy(id: UUID!): DeleteRetentionPolicyPayload
+  adminDeleteRetentionPolicy(id: UUID!): DeleteRetentionPolicyPayload @deprecated(reason: "Deprecated since 26.10.0. Use `purgeRetentionPolicy`.")
 
   """
   Added in 26.8.0. Purge (permanently remove) a retention policy (superadmin only).
   """
-  adminPurgeRetentionPolicy(id: UUID!): PurgeRetentionPolicyPayload
+  adminPurgeRetentionPolicy(id: UUID!): PurgeRetentionPolicyPayload @deprecated(reason: "Deprecated since 26.10.0. Use `purgeRetentionPolicy`.")
+
+  """
+  Added in 26.10.0. Update a retention policy. Only provided fields will be updated.
+  """
+  updateRetentionPolicy(input: UpdateRetentionPolicyInput!): UpdateRetentionPolicyPayload!
+
+  """Added in 26.10.0. Purge (permanently remove) a retention policy."""
+  purgeRetentionPolicy(id: UUID!): PurgeRetentionPolicyPayload!
+
+  """
+  Added in 26.10.0. Update several retention policies, answering for each one.
+  """
+  partialBulkUpdateRetentionPolicies(input: PartialBulkUpdateRetentionPoliciesInput!): PartialBulkRetentionPoliciesPayload!
+
+  """
+  Added in 26.10.0. Purge several retention policies, answering for each one.
+  """
+  partialBulkPurgeRetentionPolicies(input: PartialBulkPurgeRetentionPoliciesInput!): PartialBulkRetentionPoliciesPayload!
 
   """Added in 26.4.2. Create a runtime variant preset (superadmin only)."""
   adminCreateRuntimeVariantPreset(input: CreateRuntimeVariantPresetInput!): CreateRuntimeVariantPresetPayload
@@ -11836,6 +11854,14 @@ input PartialBulkPurgeResourcePresetsInput {
 }
 
 """
+Added in 26.10.0. Input for purging several retention policies, each answered for separately.
+"""
+input PartialBulkPurgeRetentionPoliciesInput {
+  """IDs of the retention policies to purge."""
+  ids: [UUID!]!
+}
+
+"""
 Added in 26.10.0. Input for purging several role presets, each answered for separately.
 """
 input PartialBulkPurgeRolePresetsInput {
@@ -11989,6 +12015,17 @@ Added in 26.10.0. Input for restoring several soft-deleted vfolders, each answer
 input PartialBulkRestoreVFoldersInput {
   """IDs of the vfolders to restore."""
   ids: [UUID!]!
+}
+
+"""
+Added in 26.10.0. Result of a partial bulk retention policy operation: the policies processed and the ones that failed.
+"""
+type PartialBulkRetentionPoliciesPayload {
+  """The retention policies processed, as they now stand."""
+  successes: [RetentionPolicy!]!
+
+  """The retention policies not processed, each with the reason."""
+  failed: [PartialBulkFailure!]!
 }
 
 """
@@ -12369,6 +12406,14 @@ Added in 26.10.0. Input for updating several resource presets, each answered for
 input PartialBulkUpdateResourcePresetsInput {
   """The resource presets to update, each with its fields."""
   items: [PartialBulkUpdateResourcePresetItemInput!]!
+}
+
+"""
+Added in 26.10.0. Input for updating several retention policies, each answered for separately.
+"""
+input PartialBulkUpdateRetentionPoliciesInput {
+  """The retention policies to update, each with its ID and fields."""
+  items: [UpdateRetentionPolicyInput!]!
 }
 
 """

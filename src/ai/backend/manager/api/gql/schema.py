@@ -530,6 +530,10 @@ from ai.backend.manager.api.gql.retention_policy.resolver import (
     admin_retention_policies,
     admin_retention_policy,
     admin_update_retention_policy,
+    partial_bulk_purge_retention_policies,
+    partial_bulk_update_retention_policies,
+    purge_retention_policy,
+    update_retention_policy,
 )
 from ai.backend.manager.api.gql.role_preset.resolver.mutation import (
     admin_bulk_add_role_preset_permissions,
@@ -1365,6 +1369,10 @@ class Mutation:
     admin_update_retention_policy = admin_update_retention_policy
     admin_delete_retention_policy = admin_delete_retention_policy
     admin_purge_retention_policy = admin_purge_retention_policy
+    update_retention_policy = update_retention_policy
+    purge_retention_policy = purge_retention_policy
+    partial_bulk_update_retention_policies = partial_bulk_update_retention_policies
+    partial_bulk_purge_retention_policies = partial_bulk_purge_retention_policies
     # Runtime Variant Preset mutations
     admin_create_runtime_variant_preset = admin_create_runtime_variant_preset
     admin_update_runtime_variant_preset = admin_update_runtime_variant_preset

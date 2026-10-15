@@ -29374,6 +29374,49 @@
         "title": "UpdateRetentionPolicyInput",
         "type": "object"
       },
+      "NonEmptyList_UpdateRetentionPolicyInput_": {
+        "items": {
+          "$ref": "#/components/schemas/UpdateRetentionPolicyInput"
+        },
+        "minItems": 1,
+        "type": "array"
+      },
+      "PartialBulkUpdateRetentionPoliciesInput": {
+        "description": "Input for updating several retention policies, each answered for separately.",
+        "properties": {
+          "items": {
+            "$ref": "#/components/schemas/NonEmptyList_UpdateRetentionPolicyInput_",
+            "description": "The retention policies to update, each with its ID and fields."
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "title": "PartialBulkUpdateRetentionPoliciesInput",
+        "type": "object"
+      },
+      "NonEmptyList_RetentionPolicyID_": {
+        "items": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "minItems": 1,
+        "type": "array"
+      },
+      "PartialBulkPurgeRetentionPoliciesInput": {
+        "description": "Input for purging several retention policies, each answered for separately.",
+        "properties": {
+          "ids": {
+            "$ref": "#/components/schemas/NonEmptyList_RetentionPolicyID_",
+            "description": "IDs of the retention policies to purge."
+          }
+        },
+        "required": [
+          "ids"
+        ],
+        "title": "PartialBulkPurgeRetentionPoliciesInput",
+        "type": "object"
+      },
       "RuntimeVariantFilter": {
         "properties": {
           "name": {
@@ -60849,7 +60892,7 @@
         "description": "\n**Preconditions:**\n* Superadmin privilege required.\n"
       },
       "patch": {
-        "operationId": "v2/retention-policies.admin_update",
+        "operationId": "v2/retention-policies.update",
         "tags": [
           "v2/retention-policies"
         ],
@@ -60882,10 +60925,10 @@
             }
           }
         ],
-        "description": "\n**Preconditions:**\n* Superadmin privilege required.\n"
+        "description": "Update a retention policy.\n\n**Preconditions:**\n* User privilege required.\n"
       },
       "delete": {
-        "operationId": "v2/retention-policies.admin_delete",
+        "operationId": "v2/retention-policies.purge",
         "tags": [
           "v2/retention-policies"
         ],
@@ -60909,7 +60952,65 @@
             }
           }
         ],
-        "description": "\n**Preconditions:**\n* Superadmin privilege required.\n"
+        "description": "Purge (permanently remove) a retention policy.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/v2/retention-policies/partial-bulk-update": {
+      "post": {
+        "operationId": "v2/retention-policies.partial_bulk_update",
+        "tags": [
+          "v2/retention-policies"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PartialBulkUpdateRetentionPoliciesInput"
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "description": "Update several retention policies, answering for each one.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/v2/retention-policies/partial-bulk-purge": {
+      "post": {
+        "operationId": "v2/retention-policies.partial_bulk_purge",
+        "tags": [
+          "v2/retention-policies"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PartialBulkPurgeRetentionPoliciesInput"
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "description": "Purge several retention policies, answering for each one.\n\n**Preconditions:**\n* User privilege required.\n"
       }
     },
     "/v2/retention-policies/{policy_id}/purge": {
@@ -60938,7 +61039,7 @@
             }
           }
         ],
-        "description": "\n**Preconditions:**\n* Superadmin privilege required.\n"
+        "description": "Deprecated. Use `DELETE /v2/retention-policies/{policy_id}`.\n\n**Preconditions:**\n* Superadmin privilege required.\n"
       }
     },
     "/v2/runtime-variants/search": {
