@@ -307,6 +307,21 @@ class TestLegacyCircuitIngressSync:
             for target in group.targets
         ] == ["10.0.0.6"]
 
+    async def test_each_ingress_numbers_its_own_changes(
+        self,
+        sync: LegacyCircuitIngressSync,
+        memory: InMemoryIngressState,
+        circuit: Circuit,
+        routeless_circuit: Circuit,
+    ) -> None:
+        await sync.apply(circuit, circuit.route_info)
+        await sync.apply(circuit, circuit.route_info)
+        await sync.apply(routeless_circuit, routeless_circuit.route_info)
+        assert {ingress.frontend.key(): ingress.revision for ingress in await memory.get_all()} == {
+            circuit.to_ingress_frontend().key(): 1,
+            routeless_circuit.to_ingress_frontend().key(): 0,
+        }
+
     async def test_apply_without_routes_keeps_the_ingress_with_no_targets(
         self, sync: LegacyCircuitIngressSync, memory: InMemoryIngressState, circuit: Circuit
     ) -> None:
