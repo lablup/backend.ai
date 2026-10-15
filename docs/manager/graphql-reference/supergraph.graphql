@@ -15260,15 +15260,31 @@ type Mutation
   adminCreateModelCardV2(input: CreateModelCardV2Input!): CreateModelCardPayload @join__field(graph: STRAWBERRY)
 
   """Added in 26.4.2. Update a model card (admin only)."""
-  adminUpdateModelCardV2(input: UpdateModelCardV2Input!): UpdateModelCardPayload @join__field(graph: STRAWBERRY)
+  adminUpdateModelCardV2(input: UpdateModelCardV2Input!): UpdateModelCardPayload @join__field(graph: STRAWBERRY) @deprecated(reason: "Deprecated since 26.10.0. Use `updateModelCardV2`.")
 
   """Added in 26.4.2. Delete a model card (admin only)."""
-  adminDeleteModelCardV2(id: UUID!, options: DeleteModelCardV2Options = null): DeleteModelCardPayload @join__field(graph: STRAWBERRY)
+  adminDeleteModelCardV2(id: UUID!, options: DeleteModelCardV2Options = null): DeleteModelCardPayload @join__field(graph: STRAWBERRY) @deprecated(reason: "Deprecated since 26.10.0. Use `purgeModelCardV2`.")
 
   """
   Added in 26.4.4. Bulk-delete model cards (admin only) with per-card partial-failure reporting.
   """
-  adminBulkDeleteModelCardsV2(input: BulkDeleteModelCardsV2Input!): BulkDeleteModelCardsV2Payload @join__field(graph: STRAWBERRY)
+  adminBulkDeleteModelCardsV2(input: BulkDeleteModelCardsV2Input!): BulkDeleteModelCardsV2Payload @join__field(graph: STRAWBERRY) @deprecated(reason: "Deprecated since 26.10.0. Use `partialBulkPurgeModelCardsV2`.")
+
+  """
+  Added in 26.10.0. Update a model card. Only provided fields will be updated.
+  """
+  updateModelCardV2(input: UpdateModelCardV2Input!): UpdateModelCardPayload! @join__field(graph: STRAWBERRY)
+
+  """
+  Added in 26.10.0. Purge a model card. The options decide whether its vfolder is moved to the trash.
+  """
+  purgeModelCardV2(id: UUID!, options: DeleteModelCardV2Options = null): DeleteModelCardPayload! @join__field(graph: STRAWBERRY)
+
+  """Added in 26.10.0. Update several model cards, answering for each one."""
+  partialBulkUpdateModelCardsV2(input: PartialBulkUpdateModelCardsInput!): PartialBulkModelCardsPayload! @join__field(graph: STRAWBERRY)
+
+  """Added in 26.10.0. Purge several model cards, answering for each one."""
+  partialBulkPurgeModelCardsV2(input: PartialBulkPurgeModelCardsInput!): PartialBulkModelCardsPayload! @join__field(graph: STRAWBERRY)
 
   """
   Added in 26.4.2. Scan a MODEL_STORE project and upsert model cards from vfolder model-definition.yaml files.
@@ -16117,6 +16133,19 @@ type PartialBulkKeypairResourcePoliciesPayload
 }
 
 """
+Added in 26.10.0. Result of a partial bulk model card operation: the model cards processed and the ones that failed.
+"""
+type PartialBulkModelCardsPayload
+  @join__type(graph: STRAWBERRY)
+{
+  """The model cards processed, as they now stand."""
+  successes: [ModelCardV2!]!
+
+  """The model cards not processed, each with the reason."""
+  failed: [PartialBulkFailure!]!
+}
+
+"""
 Added in 26.10.0. Result of a partial bulk notification channel operation: the channels processed and the ones that failed.
 """
 type PartialBulkNotificationChannelsPayload
@@ -16255,6 +16284,19 @@ input PartialBulkPurgeKeypairResourcePoliciesInput
 {
   """IDs of the keypair resource policies to purge."""
   ids: [UUID!]!
+}
+
+"""
+Added in 26.10.0. Input for purging several model cards, each answered for separately.
+"""
+input PartialBulkPurgeModelCardsInput
+  @join__type(graph: STRAWBERRY)
+{
+  """IDs of the model cards to purge."""
+  ids: [UUID!]!
+
+  """Options for the purge."""
+  options: DeleteModelCardV2Options = null
 }
 
 """
@@ -16740,6 +16782,16 @@ input PartialBulkUpdateKeypairResourcePolicyItemInput
 
   """Fields to update on the policy."""
   input: UpdateKeypairResourcePolicyInput!
+}
+
+"""
+Added in 26.10.0. Input for updating several model cards, each answered for separately.
+"""
+input PartialBulkUpdateModelCardsInput
+  @join__type(graph: STRAWBERRY)
+{
+  """The model cards to update, each with its ID and fields."""
+  items: [UpdateModelCardV2Input!]!
 }
 
 """

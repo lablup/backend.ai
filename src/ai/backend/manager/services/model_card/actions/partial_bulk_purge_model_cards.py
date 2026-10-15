@@ -9,13 +9,9 @@ from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.actions.v2.bulk.base import BasePartialBulkAction
 
 
-@dataclass
-class BulkDeleteModelCardAction(BasePartialBulkAction):
-    """Delete the named model cards, answering for each one.
-
-    ``PURGE`` because the row is removed rather than marked deleted, which is also
-    what the cascade behind ``options`` acts on.
-    """
+@dataclass(frozen=True)
+class PartialBulkPurgeModelCardsAction(BasePartialBulkAction):
+    """Remove the named model cards, answering for each one."""
 
     ids: Sequence[ModelCardID]
     options: DeleteModelCardOptions
@@ -23,7 +19,7 @@ class BulkDeleteModelCardAction(BasePartialBulkAction):
     @override
     @classmethod
     def action_name(cls) -> str:
-        return "bulk_delete_model_card"
+        return "partial_bulk_purge_model_cards"
 
     @override
     @classmethod

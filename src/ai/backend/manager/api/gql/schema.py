@@ -290,9 +290,13 @@ from ai.backend.manager.api.gql.model_card.resolver import (
     model_card_available_presets,
     model_card_v2,
     my_model_cards_v2,
+    partial_bulk_purge_model_cards_v2,
+    partial_bulk_update_model_cards_v2,
     project_model_cards_v2,
+    purge_model_card_v2,
     scan_project_model_cards_v2,
     scoped_model_cards_v2,
+    update_model_card_v2,
 )
 from ai.backend.manager.api.gql.notification.resolver import (
     admin_create_notification_channel,
@@ -1364,6 +1368,10 @@ class Mutation:
     admin_update_model_card_v2 = admin_update_model_card_v2
     admin_delete_model_card_v2 = admin_delete_model_card_v2
     admin_bulk_delete_model_cards_v2 = admin_bulk_delete_model_cards_v2
+    update_model_card_v2 = update_model_card_v2
+    purge_model_card_v2 = purge_model_card_v2
+    partial_bulk_update_model_cards_v2 = partial_bulk_update_model_cards_v2
+    partial_bulk_purge_model_cards_v2 = partial_bulk_purge_model_cards_v2
     scan_project_model_cards_v2 = scan_project_model_cards_v2
     deploy_model_card_v2 = deploy_model_card_v2
     # VFolder V2 mutations

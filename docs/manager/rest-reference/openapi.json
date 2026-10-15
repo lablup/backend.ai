@@ -31616,6 +31616,27 @@
         "title": "UpdateModelCardInput",
         "type": "object"
       },
+      "NonEmptyList_UpdateModelCardInput_": {
+        "items": {
+          "$ref": "#/components/schemas/UpdateModelCardInput"
+        },
+        "minItems": 1,
+        "type": "array"
+      },
+      "PartialBulkUpdateModelCardsInput": {
+        "description": "Input for updating several model cards, each answered for separately.",
+        "properties": {
+          "items": {
+            "$ref": "#/components/schemas/NonEmptyList_UpdateModelCardInput_",
+            "description": "The model cards to update, each with its ID and fields."
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "title": "PartialBulkUpdateModelCardsInput",
+        "type": "object"
+      },
       "DeleteModelCardOptions": {
         "description": "Options for the model card delete operation.",
         "properties": {
@@ -31627,6 +31648,32 @@
           }
         },
         "title": "DeleteModelCardOptions",
+        "type": "object"
+      },
+      "PartialBulkPurgeModelCardsInput": {
+        "description": "Input for purging several model cards, each answered for separately.",
+        "properties": {
+          "ids": {
+            "$ref": "#/components/schemas/NonEmptyList_UUID_",
+            "description": "IDs of the model cards to purge."
+          },
+          "options": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DeleteModelCardOptions"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Options for the purge."
+          }
+        },
+        "required": [
+          "ids"
+        ],
+        "title": "PartialBulkPurgeModelCardsInput",
         "type": "object"
       },
       "BulkDeleteModelCardsInput": {
@@ -61369,10 +61416,10 @@
             }
           }
         ],
-        "description": "\n**Preconditions:**\n* Superadmin privilege required.\n"
+        "description": "Update a model card.\n\n**Preconditions:**\n* User privilege required.\n"
       },
       "delete": {
-        "operationId": "v2/model-cards.delete",
+        "operationId": "v2/model-cards.purge",
         "tags": [
           "v2/model-cards"
         ],
@@ -61407,7 +61454,65 @@
             }
           }
         ],
-        "description": "\n**Preconditions:**\n* Superadmin privilege required.\n"
+        "description": "Purge a model card.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/v2/model-cards/partial-bulk-update": {
+      "post": {
+        "operationId": "v2/model-cards.partial_bulk_update",
+        "tags": [
+          "v2/model-cards"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PartialBulkUpdateModelCardsInput"
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "description": "Update several model cards, answering for each one.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/v2/model-cards/partial-bulk-purge": {
+      "post": {
+        "operationId": "v2/model-cards.partial_bulk_purge",
+        "tags": [
+          "v2/model-cards"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PartialBulkPurgeModelCardsInput"
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "description": "Purge several model cards, answering for each one.\n\n**Preconditions:**\n* User privilege required.\n"
       }
     },
     "/v2/model-cards/bulk-delete": {
@@ -61436,7 +61541,7 @@
           }
         },
         "parameters": [],
-        "description": "\n**Preconditions:**\n* Superadmin privilege required.\n"
+        "description": "Deprecated. Use `POST /v2/model-cards/partial-bulk-purge`.\n\n**Preconditions:**\n* Superadmin privilege required.\n"
       }
     },
     "/v2/model-cards/projects/{project_id}/scan": {
