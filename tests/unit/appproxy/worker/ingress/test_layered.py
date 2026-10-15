@@ -64,12 +64,17 @@ def redis() -> AsyncMock:
 
 @pytest.fixture
 def layered(memory: InMemoryIngressState, redis: AsyncMock) -> LayeredIngressState:
-    return LayeredIngressState([memory, redis])
+    return LayeredIngressState(memory=memory, redis=redis)
 
 
 @pytest.fixture
 def redis_only(redis: AsyncMock) -> LayeredIngressState:
-    return LayeredIngressState([redis])
+    return LayeredIngressState(memory=None, redis=redis)
+
+
+@pytest.fixture
+def memory_only(memory: InMemoryIngressState) -> LayeredIngressState:
+    return LayeredIngressState(memory=memory, redis=None)
 
 
 @pytest.fixture
@@ -126,6 +131,11 @@ class TestLayeredIngressState:
         self, redis_only: LayeredIngressState
     ) -> None:
         assert await redis_only.get(FRONTEND_KEY) is None
+
+    async def test_miss_without_a_redis_layer_reads_as_none(
+        self, memory_only: LayeredIngressState
+    ) -> None:
+        assert await memory_only.get(FRONTEND_KEY) is None
 
     @pytest.mark.usefixtures("ingress_in_redis")
     async def test_get_all_returns_the_last_layers_set(
