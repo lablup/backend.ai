@@ -210,12 +210,15 @@ from ai.backend.manager.api.gql.fair_share.resolver.user import (
 from ai.backend.manager.api.gql.idle_checker.resolver import (
     admin_create_idle_checker,
     admin_idle_checkers,
+    admin_partial_bulk_purge_idle_checkers,
     admin_purge_idle_checker,
     admin_update_idle_checker,
 )
 from ai.backend.manager.api.gql.idle_checker_assignment.resolver import (
     admin_create_idle_checker_assignment,
     admin_idle_checker_assignments,
+    partial_bulk_purge_idle_checker_assignments,
+    partial_bulk_update_idle_checker_assignments,
     purge_idle_checker_assignment,
     scoped_idle_checker_assignments,
     update_idle_checker_assignment,
@@ -1010,9 +1013,12 @@ class Mutation:
     admin_create_idle_checker = admin_create_idle_checker
     admin_update_idle_checker = admin_update_idle_checker
     admin_purge_idle_checker = admin_purge_idle_checker
+    admin_partial_bulk_purge_idle_checkers = admin_partial_bulk_purge_idle_checkers
     admin_create_idle_checker_assignment = admin_create_idle_checker_assignment
     update_idle_checker_assignment = update_idle_checker_assignment
     purge_idle_checker_assignment = purge_idle_checker_assignment
+    partial_bulk_update_idle_checker_assignments = partial_bulk_update_idle_checker_assignments
+    partial_bulk_purge_idle_checker_assignments = partial_bulk_purge_idle_checker_assignments
     admin_create_resource_slot_type = admin_create_resource_slot_type
     admin_update_resource_slot_type = admin_update_resource_slot_type
     admin_purge_resource_slot_type = admin_purge_resource_slot_type

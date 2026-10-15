@@ -12849,6 +12849,28 @@
         "title": "UpdateIdleCheckerInput",
         "type": "object"
       },
+      "NonEmptyList_IdleCheckerID_": {
+        "items": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "minItems": 1,
+        "type": "array"
+      },
+      "PartialBulkPurgeIdleCheckersInput": {
+        "description": "Input for purging several idle checkers, each answered for separately.",
+        "properties": {
+          "ids": {
+            "$ref": "#/components/schemas/NonEmptyList_IdleCheckerID_",
+            "description": "IDs of the idle checkers to purge."
+          }
+        },
+        "required": [
+          "ids"
+        ],
+        "title": "PartialBulkPurgeIdleCheckersInput",
+        "type": "object"
+      },
       "IdleCheckerScopeRefDTO": {
         "description": "A typed (scope_type, scope_id) pair referencing one scope.",
         "properties": {
@@ -13343,6 +13365,49 @@
           "enabled"
         ],
         "title": "UpdateIdleCheckerAssignmentInput",
+        "type": "object"
+      },
+      "NonEmptyList_UpdateIdleCheckerAssignmentInput_": {
+        "items": {
+          "$ref": "#/components/schemas/UpdateIdleCheckerAssignmentInput"
+        },
+        "minItems": 1,
+        "type": "array"
+      },
+      "PartialBulkUpdateIdleCheckerAssignmentsInput": {
+        "description": "Input for updating several idle checker assignments, each answered for separately.",
+        "properties": {
+          "items": {
+            "$ref": "#/components/schemas/NonEmptyList_UpdateIdleCheckerAssignmentInput_",
+            "description": "The assignments to update, each with its new enabled state."
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "title": "PartialBulkUpdateIdleCheckerAssignmentsInput",
+        "type": "object"
+      },
+      "NonEmptyList_NewType_": {
+        "items": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "minItems": 1,
+        "type": "array"
+      },
+      "PartialBulkPurgeIdleCheckerAssignmentsInput": {
+        "description": "Input for purging several idle checker assignments, each answered for separately.",
+        "properties": {
+          "ids": {
+            "$ref": "#/components/schemas/NonEmptyList_NewType_",
+            "description": "IDs of the idle checker assignments to purge."
+          }
+        },
+        "required": [
+          "ids"
+        ],
+        "title": "PartialBulkPurgeIdleCheckerAssignmentsInput",
         "type": "object"
       },
       "ImageAliasNestedFilterInputDTO": {
@@ -53077,6 +53142,35 @@
         "description": "\n**Preconditions:**\n* Superadmin privilege required.\n"
       }
     },
+    "/v2/idle-checkers/partial-bulk-purge": {
+      "post": {
+        "operationId": "v2/idle-checkers.admin_partial_bulk_purge",
+        "tags": [
+          "v2/idle-checkers"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PartialBulkPurgeIdleCheckersInput"
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "description": "Purge several idle checkers, answering for each one.\n\n**Preconditions:**\n* Superadmin privilege required.\n"
+      }
+    },
     "/v2/idle-checker-assignments/": {
       "post": {
         "operationId": "v2/idle-checker-assignments.admin_create",
@@ -53227,6 +53321,64 @@
           }
         ],
         "description": "Permanently remove an idle checker assignment by id.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/v2/idle-checker-assignments/partial-bulk-update": {
+      "post": {
+        "operationId": "v2/idle-checker-assignments.partial_bulk_update",
+        "tags": [
+          "v2/idle-checker-assignments"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PartialBulkUpdateIdleCheckerAssignmentsInput"
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "description": "Update several idle checker assignments' enabled state, answering for each one.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/v2/idle-checker-assignments/partial-bulk-purge": {
+      "post": {
+        "operationId": "v2/idle-checker-assignments.partial_bulk_purge",
+        "tags": [
+          "v2/idle-checker-assignments"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PartialBulkPurgeIdleCheckerAssignmentsInput"
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "description": "Permanently remove several idle checker assignments, answering for each one.\n\n**Preconditions:**\n* User privilege required.\n"
       }
     },
     "/v2/images/search": {

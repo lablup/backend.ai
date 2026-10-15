@@ -14049,6 +14049,11 @@ type Mutation
   adminPurgeIdleChecker(input: PurgeIdleCheckerInput!): PurgeIdleCheckerPayload! @join__field(graph: STRAWBERRY)
 
   """
+  Added in 26.10.0. Permanently removes several global idle checkers, answering for each one (super admin only).
+  """
+  adminPartialBulkPurgeIdleCheckers(input: PartialBulkPurgeIdleCheckersInput!): PartialBulkIdleCheckersPayload! @join__field(graph: STRAWBERRY)
+
+  """
   Added in 26.8.0. Binds a global idle checker to a scope (super admin only).
   """
   adminCreateIdleCheckerAssignment(input: CreateIdleCheckerAssignmentInput!): CreateIdleCheckerAssignmentPayload! @join__field(graph: STRAWBERRY)
@@ -14062,6 +14067,16 @@ type Mutation
   Added in 26.8.0. Permanently removes an idle checker assignment. Requires permission on the assignment's scope (subject to RBAC).
   """
   purgeIdleCheckerAssignment(input: PurgeIdleCheckerAssignmentInput!): PurgeIdleCheckerAssignmentPayload! @join__field(graph: STRAWBERRY)
+
+  """
+  Added in 26.10.0. Updates several idle checker assignments' enabled state, answering for each one. Each item requires permission on its assignment's scope (subject to RBAC).
+  """
+  partialBulkUpdateIdleCheckerAssignments(input: PartialBulkUpdateIdleCheckerAssignmentsInput!): PartialBulkIdleCheckerAssignmentsPayload! @join__field(graph: STRAWBERRY)
+
+  """
+  Added in 26.10.0. Permanently removes several idle checker assignments, answering for each one. Each item requires permission on its assignment's scope (subject to RBAC).
+  """
+  partialBulkPurgeIdleCheckerAssignments(input: PartialBulkPurgeIdleCheckerAssignmentsInput!): PartialBulkIdleCheckerAssignmentsPayload! @join__field(graph: STRAWBERRY)
 
   """Added in 26.9.0. Register a new resource slot type (super admin only)."""
   adminCreateResourceSlotType(input: CreateResourceSlotTypeInput!): CreateResourceSlotTypePayload @join__field(graph: STRAWBERRY)
@@ -16050,6 +16065,32 @@ type PartialBulkFailure
 }
 
 """
+Added in 26.10.0. Result of a partial bulk idle checker assignment operation: the assignments processed and the ones that failed.
+"""
+type PartialBulkIdleCheckerAssignmentsPayload
+  @join__type(graph: STRAWBERRY)
+{
+  """The assignments processed, as they stood when processed."""
+  successes: [IdleCheckerAssignment!]!
+
+  """The assignments not processed, each with the reason."""
+  failed: [PartialBulkFailure!]!
+}
+
+"""
+Added in 26.10.0. Result of a partial bulk idle checker operation: the idle checkers processed and the ones that failed.
+"""
+type PartialBulkIdleCheckersPayload
+  @join__type(graph: STRAWBERRY)
+{
+  """The idle checkers processed, as they stood when processed."""
+  successes: [IdleChecker!]!
+
+  """The idle checkers not processed, each with the reason."""
+  failed: [PartialBulkFailure!]!
+}
+
+"""
 Added in 26.10.0. Result of a partial bulk image operation: the images processed and the ones that failed.
 """
 type PartialBulkImagesPayload
@@ -16184,6 +16225,26 @@ type PartialBulkPurgeHuggingFaceRegistriesPayload
 
   """The registries not purged, each with the reason."""
   failed: [PartialBulkFailure!]!
+}
+
+"""
+Added in 26.10.0. Input for purging several idle checker assignments, each answered for separately.
+"""
+input PartialBulkPurgeIdleCheckerAssignmentsInput
+  @join__type(graph: STRAWBERRY)
+{
+  """IDs of the idle checker assignments to purge."""
+  ids: [UUID!]!
+}
+
+"""
+Added in 26.10.0. Input for purging several idle checkers, each answered for separately.
+"""
+input PartialBulkPurgeIdleCheckersInput
+  @join__type(graph: STRAWBERRY)
+{
+  """IDs of the idle checkers to purge."""
+  ids: [UUID!]!
 }
 
 """
@@ -16623,6 +16684,16 @@ input PartialBulkUpdateHuggingFaceRegistryItemInput
 
   """Fields to update on the registry."""
   input: UpdateHuggingFaceRegistryBodyInput!
+}
+
+"""
+Added in 26.10.0. Input for updating several idle checker assignments, each answered for separately.
+"""
+input PartialBulkUpdateIdleCheckerAssignmentsInput
+  @join__type(graph: STRAWBERRY)
+{
+  """The assignments to update, each with its new enabled state."""
+  items: [UpdateIdleCheckerAssignmentInput!]!
 }
 
 """
