@@ -350,6 +350,8 @@ from ai.backend.manager.api.gql.project_v2.resolver.query import (
 from ai.backend.manager.api.gql.prometheus_query_preset.resolver.category_mutation import (
     admin_create_prometheus_query_preset_category,
     admin_delete_prometheus_query_preset_category,
+    partial_bulk_purge_prometheus_query_preset_categories,
+    purge_prometheus_query_preset_category,
 )
 from ai.backend.manager.api.gql.prometheus_query_preset.resolver.category_query import (
     prometheus_query_preset_categories,
@@ -359,6 +361,10 @@ from ai.backend.manager.api.gql.prometheus_query_preset.resolver.mutation import
     admin_create_prometheus_query_preset,
     admin_delete_prometheus_query_preset,
     admin_modify_prometheus_query_preset,
+    partial_bulk_purge_prometheus_query_presets,
+    partial_bulk_update_prometheus_query_presets,
+    purge_prometheus_query_preset,
+    update_prometheus_query_preset,
 )
 from ai.backend.manager.api.gql.prometheus_query_preset.resolver.query import (
     admin_preview_prometheus_query_preset,
@@ -1183,9 +1189,17 @@ class Mutation:
     admin_create_prometheus_query_preset = admin_create_prometheus_query_preset
     admin_modify_prometheus_query_preset = admin_modify_prometheus_query_preset
     admin_delete_prometheus_query_preset = admin_delete_prometheus_query_preset
+    update_prometheus_query_preset = update_prometheus_query_preset
+    purge_prometheus_query_preset = purge_prometheus_query_preset
+    partial_bulk_update_prometheus_query_presets = partial_bulk_update_prometheus_query_presets
+    partial_bulk_purge_prometheus_query_presets = partial_bulk_purge_prometheus_query_presets
     # Prometheus Query Preset Category - Admin APIs
     admin_create_prometheus_query_preset_category = admin_create_prometheus_query_preset_category
     admin_delete_prometheus_query_preset_category = admin_delete_prometheus_query_preset_category
+    purge_prometheus_query_preset_category = purge_prometheus_query_preset_category
+    partial_bulk_purge_prometheus_query_preset_categories = (
+        partial_bulk_purge_prometheus_query_preset_categories
+    )
     # Role Preset - Admin APIs
     admin_create_role_preset = admin_create_role_preset
     admin_update_role_preset = admin_update_role_preset

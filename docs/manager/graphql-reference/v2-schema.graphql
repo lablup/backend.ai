@@ -10313,16 +10313,42 @@ type Mutation {
   adminCreatePrometheusQueryPreset(input: CreateQueryDefinitionInput!): CreateQueryDefinitionPayload
 
   """Added in 26.3.0. Modify an existing query definition (admin only)."""
-  adminModifyPrometheusQueryPreset(id: ID!, input: ModifyQueryDefinitionInput!): ModifyQueryDefinitionPayload
+  adminModifyPrometheusQueryPreset(id: ID!, input: ModifyQueryDefinitionInput!): ModifyQueryDefinitionPayload @deprecated(reason: "Deprecated since 26.10.0. Use `updatePrometheusQueryPreset`.")
 
   """Added in 26.3.0. Delete a query definition (admin only)"""
-  adminDeletePrometheusQueryPreset(id: ID!): DeleteQueryDefinitionPayload
+  adminDeletePrometheusQueryPreset(id: ID!): DeleteQueryDefinitionPayload @deprecated(reason: "Deprecated since 26.10.0. Use `purgePrometheusQueryPreset`.")
+
+  """
+  Added in 26.10.0. Update a query definition. Only provided fields will be updated.
+  """
+  updatePrometheusQueryPreset(id: UUID!, input: ModifyQueryDefinitionInput!): ModifyQueryDefinitionPayload!
+
+  """Added in 26.10.0. Permanently remove a query definition."""
+  purgePrometheusQueryPreset(id: UUID!): DeleteQueryDefinitionPayload!
+
+  """
+  Added in 26.10.0. Update several query definitions, answering for each one.
+  """
+  partialBulkUpdatePrometheusQueryPresets(input: PartialBulkUpdateQueryDefinitionsInput!): PartialBulkQueryDefinitionsPayload!
+
+  """
+  Added in 26.10.0. Permanently remove several query definitions, answering for each one.
+  """
+  partialBulkPurgePrometheusQueryPresets(input: PartialBulkPurgeQueryDefinitionsInput!): PartialBulkQueryDefinitionsPayload!
 
   """Added in 26.3.0. Create a new query preset category (admin only)."""
   adminCreatePrometheusQueryPresetCategory(input: CreateCategoryInput!): CreateCategoryPayload
 
   """Added in 26.3.0. Delete a query preset category (admin only)."""
-  adminDeletePrometheusQueryPresetCategory(id: ID!): DeleteCategoryPayload
+  adminDeletePrometheusQueryPresetCategory(id: ID!): DeleteCategoryPayload @deprecated(reason: "Deprecated since 26.10.0. Use `purgePrometheusQueryPresetCategory`.")
+
+  """Added in 26.10.0. Permanently remove a query preset category."""
+  purgePrometheusQueryPresetCategory(id: UUID!): DeleteCategoryPayload!
+
+  """
+  Added in 26.10.0. Permanently remove several query preset categories, answering for each one.
+  """
+  partialBulkPurgePrometheusQueryPresetCategories(input: PartialBulkPurgeQueryPresetCategoriesInput!): PartialBulkQueryPresetCategoriesPayload!
 
   """Added in 26.4.4. Create a new role preset (admin only)."""
   adminCreateRolePreset(input: CreateRolePresetInput!): CreateRolePresetPayload
@@ -11516,6 +11542,22 @@ input PartialBulkPurgeProjectResourcePoliciesInput {
 }
 
 """
+Added in 26.10.0. Input for purging several query definitions, each answered for separately.
+"""
+input PartialBulkPurgeQueryDefinitionsInput {
+  """IDs of the query definitions to purge."""
+  ids: [UUID!]!
+}
+
+"""
+Added in 26.10.0. Input for purging several query preset categories, each answered for separately.
+"""
+input PartialBulkPurgeQueryPresetCategoriesInput {
+  """IDs of the categories to purge."""
+  ids: [UUID!]!
+}
+
+"""
 Added in 26.10.0. Input for purging several resource groups, each answered for separately.
 """
 input PartialBulkPurgeResourceGroupsInput {
@@ -11561,6 +11603,28 @@ Added in 26.10.0. Input for permanently purging several VFS storages, each answe
 input PartialBulkPurgeVFSStoragesInput {
   """IDs of the VFS storages to purge."""
   ids: [UUID!]!
+}
+
+"""
+Added in 26.10.0. Result of a partial bulk query definition operation: the query definitions processed and the ones that failed.
+"""
+type PartialBulkQueryDefinitionsPayload {
+  """The query definitions processed, as they now stand."""
+  successes: [QueryDefinition!]!
+
+  """The query definitions not processed, each with the reason."""
+  failed: [PartialBulkFailure!]!
+}
+
+"""
+Added in 26.10.0. Result of a partial bulk query preset category operation: the categories processed and the ones that failed.
+"""
+type PartialBulkQueryPresetCategoriesPayload {
+  """The categories processed, as they now stand."""
+  successes: [QueryPresetCategory!]!
+
+  """The categories not processed, each with the reason."""
+  failed: [PartialBulkFailure!]!
 }
 
 """
@@ -11847,6 +11911,25 @@ Added in 26.10.0. Input for updating several projects, each answered for separat
 input PartialBulkUpdateProjectsInput {
   """The projects to update, each with its fields."""
   items: [PartialBulkUpdateProjectItemInput!]!
+}
+
+"""
+Added in 26.10.0. One query definition of a partial bulk update and the fields to update on it.
+"""
+input PartialBulkUpdateQueryDefinitionItemInput {
+  """ID of the query definition to update."""
+  id: UUID!
+
+  """Fields to update on the query definition."""
+  input: ModifyQueryDefinitionInput!
+}
+
+"""
+Added in 26.10.0. Input for updating several query definitions, each answered for separately.
+"""
+input PartialBulkUpdateQueryDefinitionsInput {
+  """The query definitions to update, each with its fields."""
+  items: [PartialBulkUpdateQueryDefinitionItemInput!]!
 }
 
 """

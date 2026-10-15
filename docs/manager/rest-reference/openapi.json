@@ -21581,6 +21581,62 @@
         "title": "ExecuteQueryDefinitionInput",
         "type": "object"
       },
+      "NonEmptyList_PartialBulkUpdateQueryDefinitionItemInput_": {
+        "items": {
+          "$ref": "#/components/schemas/PartialBulkUpdateQueryDefinitionItemInput"
+        },
+        "minItems": 1,
+        "type": "array"
+      },
+      "PartialBulkUpdateQueryDefinitionItemInput": {
+        "description": "One query definition of a partial bulk update and the fields to update on it.",
+        "properties": {
+          "id": {
+            "description": "ID of the query definition to update.",
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "input": {
+            "$ref": "#/components/schemas/ModifyQueryDefinitionInput",
+            "description": "Fields to update on the query definition."
+          }
+        },
+        "required": [
+          "id",
+          "input"
+        ],
+        "title": "PartialBulkUpdateQueryDefinitionItemInput",
+        "type": "object"
+      },
+      "PartialBulkUpdateQueryDefinitionsInput": {
+        "description": "Input for updating several query definitions, each answered for separately.",
+        "properties": {
+          "items": {
+            "$ref": "#/components/schemas/NonEmptyList_PartialBulkUpdateQueryDefinitionItemInput_",
+            "description": "The query definitions to update, each with its fields."
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "title": "PartialBulkUpdateQueryDefinitionsInput",
+        "type": "object"
+      },
+      "PartialBulkPurgeQueryDefinitionsInput": {
+        "description": "Input for purging several query definitions, each answered for separately.",
+        "properties": {
+          "ids": {
+            "$ref": "#/components/schemas/NonEmptyList_UUID_",
+            "description": "IDs of the query definitions to purge."
+          }
+        },
+        "required": [
+          "ids"
+        ],
+        "title": "PartialBulkPurgeQueryDefinitionsInput",
+        "type": "object"
+      },
       "DeleteQueryDefinitionInput": {
         "description": "Input for deleting a prometheus query definition.",
         "properties": {
@@ -21835,6 +21891,20 @@
           }
         },
         "title": "SearchCategoriesInput",
+        "type": "object"
+      },
+      "PartialBulkPurgeQueryPresetCategoriesInput": {
+        "description": "Input for purging several categories, each answered for separately.",
+        "properties": {
+          "ids": {
+            "$ref": "#/components/schemas/NonEmptyList_UUID_",
+            "description": "IDs of the categories to purge."
+          }
+        },
+        "required": [
+          "ids"
+        ],
+        "title": "PartialBulkPurgeQueryPresetCategoriesInput",
         "type": "object"
       },
       "DeleteCategoryInput": {
@@ -56271,7 +56341,34 @@
             }
           }
         ],
-        "description": "Update an existing query definition.\n\n**Preconditions:**\n* Superadmin privilege required.\n"
+        "description": "Update an existing query definition.\n\n**Preconditions:**\n* User privilege required.\n"
+      },
+      "delete": {
+        "operationId": "v2/prometheus-query-presets.purge",
+        "tags": [
+          "v2/prometheus-query-presets"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "preset_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "description": "Permanently remove a query definition.\n\n**Preconditions:**\n* User privilege required.\n"
       }
     },
     "/v2/prometheus-query-presets/{preset_id}/execute": {
@@ -56312,6 +56409,64 @@
         "description": "Execute a prometheus query definition.\n\n**Preconditions:**\n* User privilege required.\n"
       }
     },
+    "/v2/prometheus-query-presets/partial-bulk-update": {
+      "post": {
+        "operationId": "v2/prometheus-query-presets.partial_bulk_update",
+        "tags": [
+          "v2/prometheus-query-presets"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PartialBulkUpdateQueryDefinitionsInput"
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "description": "Update several query definitions, answering for each one.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/v2/prometheus-query-presets/partial-bulk-purge": {
+      "post": {
+        "operationId": "v2/prometheus-query-presets.partial_bulk_purge",
+        "tags": [
+          "v2/prometheus-query-presets"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PartialBulkPurgeQueryDefinitionsInput"
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "description": "Permanently remove several query definitions, answering for each one.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
     "/v2/prometheus-query-presets/delete": {
       "post": {
         "operationId": "v2/prometheus-query-presets.delete",
@@ -56338,7 +56493,7 @@
           }
         },
         "parameters": [],
-        "description": "Delete a query definition by ID.\n\n**Preconditions:**\n* Superadmin privilege required.\n"
+        "description": "Deprecated. Use `DELETE /v2/prometheus-query-presets/{preset_id}`.\n\n**Preconditions:**\n* Superadmin privilege required.\n"
       }
     },
     "/v2/prometheus-query-preset-categories": {
@@ -56426,6 +56581,62 @@
           }
         ],
         "description": "Get a single category by ID.\n\n**Preconditions:**\n* User privilege required.\n"
+      },
+      "delete": {
+        "operationId": "v2/prometheus-query-preset-categories.purge",
+        "tags": [
+          "v2/prometheus-query-preset-categories"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "category_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "description": "Permanently remove a category.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/v2/prometheus-query-preset-categories/partial-bulk-purge": {
+      "post": {
+        "operationId": "v2/prometheus-query-preset-categories.partial_bulk_purge",
+        "tags": [
+          "v2/prometheus-query-preset-categories"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PartialBulkPurgeQueryPresetCategoriesInput"
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "description": "Permanently remove several categories, answering for each one.\n\n**Preconditions:**\n* User privilege required.\n"
       }
     },
     "/v2/prometheus-query-preset-categories/delete": {
@@ -56454,7 +56665,7 @@
           }
         },
         "parameters": [],
-        "description": "Delete a category by ID.\n\n**Preconditions:**\n* Superadmin privilege required.\n"
+        "description": "Deprecated. Use `DELETE /v2/prometheus-query-preset-categories/{category_id}`.\n\n**Preconditions:**\n* Superadmin privilege required.\n"
       }
     },
     "/v2/rbac/roles": {
