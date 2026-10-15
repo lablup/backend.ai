@@ -31,20 +31,23 @@ class LayeredIngressState(IngressReader):
 
     @override
     async def get(self, frontend_key: IngressFrontendKey) -> Ingress | None:
-        if self._memory is None:
-            return await self._redis.get(frontend_key) if self._redis is not None else None
+        if self._memory is not None:
+            try:
+                ingress = await self._memory.get(frontend_key)
+            except IngressNotFoundError:
+                # The key was remembered missing on purpose to skip reading Redis.
+                return None
+            if ingress is not None:
+                return ingress
+        return await self._read_redis(frontend_key)
 
-        try:
-            ingress = await self._memory.get(frontend_key)
-        except IngressNotFoundError:
-            # The key was remembered missing on purpose to skip reading Redis.
-            return None
-        if ingress is not None:
-            return ingress
+    async def _read_redis(self, frontend_key: IngressFrontendKey) -> Ingress | None:
+        """Reads a key memory cannot answer from Redis and records the outcome in memory."""
         if self._redis is None:
             return None
-
         ingress = await self._redis.get(frontend_key)
+        if self._memory is None:
+            return ingress
         if ingress is None:
             await self._memory.remember_missing(frontend_key)
         else:
