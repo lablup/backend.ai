@@ -113,6 +113,7 @@ from ai.backend.manager.services.deployment.processors import DeploymentProcesso
 from ai.backend.manager.services.model_card.actions.bulk_delete import (
     BulkDeleteModelCardAction,
 )
+from ai.backend.manager.services.model_card.actions.bulk_get import BulkGetModelCardsAction
 from ai.backend.manager.services.model_card.actions.create import CreateModelCardAction
 from ai.backend.manager.services.model_card.actions.delete import DeleteModelCardAction
 from ai.backend.manager.services.model_card.actions.get import GetModelCardAction
@@ -325,6 +326,23 @@ class ModelCardAdapter(BaseAdapter):
             GetModelCardAction(model_card_id=ModelCardID(card_id))
         )
         return (await self._nodes_with_min_resources([result.data]))[0]
+
+    async def batch_load_by_ids(
+        self, ids: Sequence[ModelCardID]
+    ) -> list[ModelCardNode | Exception | None]:
+        """Batch load model cards by id for DataLoader use, one answer per id."""
+        if not ids:
+            return []
+        result = await self._model_card.bulk_get.run(BulkGetModelCardsAction(ids=ids))
+        by_card = await self.min_resources([
+            item.value.id for item in result.items if item.value is not None
+        ])
+        return [
+            self._data_to_node(item.value, by_card.get(item.value.id))
+            if item.value is not None
+            else self.batch_load_failure(item.error)
+            for item in result.items
+        ]
 
     async def create(
         self,

@@ -7,6 +7,8 @@ What these tests pin down:
   of them keeps what it held.
 - The batch is all-or-nothing: a row the database refuses takes the earlier ones
   with it.
+- An insert if absent writes the rows not there yet and leaves a row already there as
+  it stands; an upsert with no update values does the same.
 """
 
 from __future__ import annotations
@@ -108,6 +110,15 @@ class _RefusedUpserter(_SlotUpserter):
         return values
 
 
+@dataclass(frozen=True)
+class _KeepingUpserter(_SlotUpserter):
+    """Takes no update values, so a row already there keeps what it holds."""
+
+    @override
+    def build_update_values(self) -> dict[str, Any]:
+        return {}
+
+
 @pytest.fixture
 async def database(
     database_connection: ExtendedAsyncSAEngine,
@@ -185,3 +196,54 @@ class TestAtomicUpsertFieldEntities:
                 )
 
         assert await _rows(database) == []
+
+
+class TestAtomicInsertFieldEntitiesIfAbsent:
+    async def test_writes_the_rows_not_there_yet(
+        self, database: ExtendedAsyncSAEngine, provider: V2DBOpsProvider, owner: _OwnerID
+    ) -> None:
+        async with provider.write_ops() as w:
+            await w.atomic_upsert_field_entities(
+                owner, [_SlotUpserter(slot_name="cpu", capacity=4)]
+            )
+        async with provider.write_ops() as w:
+            items = await w.atomic_insert_field_entities_if_absent(
+                owner,
+                [
+                    _SlotUpserter(slot_name="cpu", capacity=16),
+                    _SlotUpserter(slot_name="mem", capacity=8),
+                ],
+            )
+
+        assert items == [False, True]
+        assert [row.capacity for row in await _rows(database)] == [4, 8]
+
+    async def test_is_all_or_nothing(
+        self, database: ExtendedAsyncSAEngine, provider: V2DBOpsProvider, owner: _OwnerID
+    ) -> None:
+        with pytest.raises(RepositoryIntegrityError):
+            async with provider.write_ops() as w:
+                await w.atomic_insert_field_entities_if_absent(
+                    owner,
+                    [
+                        _SlotUpserter(slot_name="cpu", capacity=4),
+                        _RefusedUpserter(slot_name="mem", capacity=8),
+                    ],
+                )
+
+        assert await _rows(database) == []
+
+
+class TestUpsertWithNoUpdateValues:
+    async def test_leaves_a_row_already_there_as_it_stands(
+        self, database: ExtendedAsyncSAEngine, provider: V2DBOpsProvider, owner: _OwnerID
+    ) -> None:
+        async with provider.write_ops() as w:
+            await w.upsert_field_entity(owner, _SlotUpserter(slot_name="cpu", capacity=4))
+        async with provider.write_ops() as w:
+            data = await w.upsert_field_entity(
+                owner, _KeepingUpserter(slot_name="cpu", capacity=16)
+            )
+
+        assert data.capacity == 4
+        assert [row.capacity for row in await _rows(database)] == [4]

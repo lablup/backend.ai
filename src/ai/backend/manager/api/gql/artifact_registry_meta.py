@@ -1,10 +1,10 @@
 from __future__ import annotations
 
 import uuid
-from collections.abc import Sequence
-from typing import Any, Self
+from collections.abc import Iterable, Sequence
+from typing import Any, Self, override
 
-from strawberry import ID
+from strawberry import ID, Info
 from strawberry.relay import Connection, Edge, NodeID
 
 from ai.backend.common.data.artifact.types import ArtifactRegistryType
@@ -88,6 +88,18 @@ class ArtifactRegistryMeta(PydanticNodeMixin[ArtifactRegistryGQLNode]):
                 )
             )
         return registries
+
+    @classmethod
+    @override
+    async def resolve_nodes(  # type: ignore[override]  # Strawberry Node uses AwaitableOrValue overloads incompatible with async def
+        cls,
+        *,
+        info: Info[StrawberryGQLContext],
+        node_ids: Iterable[str],
+        required: bool = False,
+    ) -> Iterable[ArtifactRegistryMeta | None]:
+        """No read path loads a registry meta by its own row id."""
+        return [None for _ in node_ids]
 
 
 ArtifactRegistryMetaEdge = Edge[ArtifactRegistryMeta]

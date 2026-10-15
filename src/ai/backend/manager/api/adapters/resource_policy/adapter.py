@@ -5,11 +5,17 @@ Unified adapter handling keypair, user, and project resource policies.
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from decimal import Decimal
 from typing import Any
 
 from ai.backend.common.contexts.user import current_user
 from ai.backend.common.data.entity.project import ProjectID
+from ai.backend.common.data.entity.resource_policy import (
+    KeyPairResourcePolicyUUID,
+    ProjectResourcePolicyUUID,
+    UserResourcePolicyUUID,
+)
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.dto.manager.v2.common import (
     ResourceLimitEntryInfo,
@@ -118,6 +124,12 @@ from ai.backend.manager.models.resource_policy.updaters import (
 )
 from ai.backend.manager.models.specs.pagination import NoPagination
 from ai.backend.manager.models.specs.searcher import GlobalSearcher, ScopedSearcher
+from ai.backend.manager.services.keypair_resource_policy.actions.bulk_get import (
+    BulkGetKeypairResourcePoliciesAction,
+)
+from ai.backend.manager.services.keypair_resource_policy.actions.bulk_lookup import (
+    BulkLookupKeypairResourcePoliciesAction,
+)
 from ai.backend.manager.services.keypair_resource_policy.actions.create_keypair_resource_policy import (
     CreateKeyPairResourcePolicyAction,
 )
@@ -142,6 +154,12 @@ from ai.backend.manager.services.keypair_resource_policy.actions.update_keypair_
 from ai.backend.manager.services.keypair_resource_policy.processors import (
     KeypairResourcePolicyProcessors,
 )
+from ai.backend.manager.services.project_resource_policy.actions.bulk_get import (
+    BulkGetProjectResourcePoliciesAction,
+)
+from ai.backend.manager.services.project_resource_policy.actions.bulk_lookup import (
+    BulkLookupProjectResourcePoliciesAction,
+)
 from ai.backend.manager.services.project_resource_policy.actions.create_project_resource_policy import (
     CreateProjectResourcePolicyAction,
 )
@@ -165,6 +183,12 @@ from ai.backend.manager.services.project_resource_policy.actions.update_project_
 )
 from ai.backend.manager.services.project_resource_policy.processors import (
     ProjectResourcePolicyProcessors,
+)
+from ai.backend.manager.services.user_resource_policy.actions.bulk_get import (
+    BulkGetUserResourcePoliciesAction,
+)
+from ai.backend.manager.services.user_resource_policy.actions.bulk_lookup import (
+    BulkLookupUserResourcePoliciesAction,
 )
 from ai.backend.manager.services.user_resource_policy.actions.create_user_resource_policy import (
     CreateUserResourcePolicyAction,
@@ -231,6 +255,36 @@ class ResourcePolicyAdapter(BaseAdapter):
             GetKeyPairResourcePolicyAction(policy_id=resolved.entity_id())
         )
         return self._keypair_policy_data_to_node(result.data)
+
+    async def bulk_lookup_keypair_resource_policy_names(
+        self, names: Sequence[str]
+    ) -> list[KeyPairResourcePolicyUUID | None]:
+        """The id of the keypair resource policy each name names, ``None`` for a name matching none.
+
+        Checks the login only: the read the ids are passed to checks the permission.
+        """
+        if not names:
+            return []
+        lookup = await self._keypair_resource_policy.bulk_lookup_names.run(
+            BulkLookupKeypairResourcePoliciesAction(names=names)
+        )
+        return [lookup.resolved.get(name) for name in names]
+
+    async def bulk_get_keypair_resource_policy_ids(
+        self, ids: Sequence[KeyPairResourcePolicyUUID]
+    ) -> list[KeypairResourcePolicyNode | Exception | None]:
+        """Batch load keypair resource policies by id for DataLoader use."""
+        if not ids:
+            return []
+        result = await self._keypair_resource_policy.bulk_get_ids.run(
+            BulkGetKeypairResourcePoliciesAction(ids=list(ids))
+        )
+        return [
+            self._keypair_policy_data_to_node(item.value)
+            if item.value is not None
+            else self.batch_load_failure(item.error)
+            for item in result.items
+        ]
 
     async def admin_search_keypair_resource_policies(
         self,
@@ -360,6 +414,36 @@ class ResourcePolicyAdapter(BaseAdapter):
         )
         return self._user_policy_data_to_node(result.data)
 
+    async def bulk_lookup_user_resource_policy_names(
+        self, names: Sequence[str]
+    ) -> list[UserResourcePolicyUUID | None]:
+        """The id of the user resource policy each name names, ``None`` for a name matching none.
+
+        Checks the login only: the read the ids are passed to checks the permission.
+        """
+        if not names:
+            return []
+        lookup = await self._user_resource_policy.bulk_lookup_names.run(
+            BulkLookupUserResourcePoliciesAction(names=names)
+        )
+        return [lookup.resolved.get(name) for name in names]
+
+    async def bulk_get_user_resource_policy_ids(
+        self, ids: Sequence[UserResourcePolicyUUID]
+    ) -> list[UserResourcePolicyNode | Exception | None]:
+        """Batch load user resource policies by id for DataLoader use."""
+        if not ids:
+            return []
+        result = await self._user_resource_policy.bulk_get_ids.run(
+            BulkGetUserResourcePoliciesAction(ids=list(ids))
+        )
+        return [
+            self._user_policy_data_to_node(item.value)
+            if item.value is not None
+            else self.batch_load_failure(item.error)
+            for item in result.items
+        ]
+
     async def admin_search_user_resource_policies(
         self,
         input: AdminSearchUserResourcePoliciesInput,
@@ -467,6 +551,36 @@ class ResourcePolicyAdapter(BaseAdapter):
             GetProjectResourcePolicyAction(policy_id=resolved.entity_id())
         )
         return self._project_policy_data_to_node(result.data)
+
+    async def bulk_lookup_project_resource_policy_names(
+        self, names: Sequence[str]
+    ) -> list[ProjectResourcePolicyUUID | None]:
+        """The id of the project resource policy each name names, ``None`` for a name matching none.
+
+        Checks the login only: the read the ids are passed to checks the permission.
+        """
+        if not names:
+            return []
+        lookup = await self._project_resource_policy.bulk_lookup_names.run(
+            BulkLookupProjectResourcePoliciesAction(names=names)
+        )
+        return [lookup.resolved.get(name) for name in names]
+
+    async def bulk_get_project_resource_policy_ids(
+        self, ids: Sequence[ProjectResourcePolicyUUID]
+    ) -> list[ProjectResourcePolicyNode | Exception | None]:
+        """Batch load project resource policies by id for DataLoader use."""
+        if not ids:
+            return []
+        result = await self._project_resource_policy.bulk_get_ids.run(
+            BulkGetProjectResourcePoliciesAction(ids=list(ids))
+        )
+        return [
+            self._project_policy_data_to_node(item.value)
+            if item.value is not None
+            else self.batch_load_failure(item.error)
+            for item in result.items
+        ]
 
     async def admin_search_project_resource_policies(
         self,

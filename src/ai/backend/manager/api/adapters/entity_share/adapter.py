@@ -58,6 +58,7 @@ from ai.backend.manager.services.entity_share.actions.answer import (
     RejectEntityShareAction,
     RevokeEntityShareAction,
 )
+from ai.backend.manager.services.entity_share.actions.bulk_get import BulkGetEntitySharesAction
 from ai.backend.manager.services.entity_share.actions.create import (
     CreateEntityShareAction,
 )
@@ -116,6 +117,20 @@ class EntityShareAdapter(BaseAdapter):
     async def get(self, share_id: EntityShareID) -> EntitySharePayload:
         result = await self._entity_share.get.run(GetEntityShareAction(share_id=share_id))
         return EntitySharePayload(share=self._to_node(result.data))
+
+    async def batch_load_by_ids(
+        self, ids: Sequence[EntityShareID]
+    ) -> list[EntityShareNode | Exception | None]:
+        """Batch load entity shares by id for DataLoader use, one answer per id."""
+        if not ids:
+            return []
+        result = await self._entity_share.bulk_get.run(BulkGetEntitySharesAction(ids=ids))
+        return [
+            self._to_node(item.value)
+            if item.value is not None
+            else self.batch_load_failure(item.error)
+            for item in result.items
+        ]
 
     async def accept(self, share_id: EntityShareID) -> EntitySharePayload:
         me = current_user()

@@ -11,6 +11,9 @@ from ai.backend.manager.actions.v2.ops.result import (
 )
 from ai.backend.manager.actions.v2.single_entity.processor import SingleEntityActionProcessor
 from ai.backend.manager.data.entity_label.types import EntityLabelData
+from ai.backend.manager.services.entity_label.actions.partial_bulk_get import (
+    PartialBulkGetEntityLabelAction,
+)
 from ai.backend.manager.services.entity_label.actions.partial_bulk_purge import (
     PartialBulkPurgeEntityLabelAction,
 )
@@ -36,6 +39,9 @@ class EntityLabelProcessors:
         PartialBulkPurgeEntityLabelAction, EntityLabelData
     ]
     search: BulkActionProcessor[SearchEntityLabelsAction, ScopedFieldsOpsResult[EntityLabelData]]
+    partial_bulk_get: PartialBulkFieldActionProcessor[
+        PartialBulkGetEntityLabelAction, EntityLabelData
+    ]
 
     def __init__(self, group: LookupFieldGroup[EntityLabelData]) -> None:
         self.upsert = group.upsert_ops(UpsertEntityLabelAction)
@@ -43,3 +49,4 @@ class EntityLabelProcessors:
         self.purge = group.runtime_purge_ops(PurgeEntityLabelAction)
         self.partial_bulk_purge = group.partial_bulk_purge_ops(PartialBulkPurgeEntityLabelAction)
         self.search = group.atomic_bulk_scoped_search_ops(SearchEntityLabelsAction)
+        self.partial_bulk_get = group.partial_bulk_get_ops(PartialBulkGetEntityLabelAction)

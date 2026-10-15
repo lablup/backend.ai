@@ -747,6 +747,20 @@ class Artifact(PydanticNodeMixin[ArtifactGQLNode]):
             page_info=page_info,
         )
 
+    @classmethod
+    @override
+    async def resolve_nodes(  # type: ignore[override]  # Strawberry Node uses AwaitableOrValue overloads incompatible with async def
+        cls,
+        *,
+        info: Info[StrawberryGQLContext],
+        node_ids: Iterable[str],
+        required: bool = False,
+    ) -> Iterable[Self | None]:
+        results = await info.context.data_loaders.artifact_loader.load_many([
+            ArtifactID(uuid.UUID(nid)) for nid in node_ids
+        ])
+        return cast(list[Self | None], results)
+
 
 @gql_node_type(
     BackendAIGQLMeta(

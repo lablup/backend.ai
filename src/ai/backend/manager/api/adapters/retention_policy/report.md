@@ -2,9 +2,10 @@
 
 [무엇을 보장하는가](/src/ai/backend/manager/api/adapters/retention_policy/KNOWLEDGE.md) · [어댑터](/src/ai/backend/manager/api/adapters/retention_policy/adapter.py)
 
-시나리오: 완성
+시나리오: 미완 1 / 7
 
-- ops 로 구성 (6)
+- ops 로 구성 (7)
+  - batch_load_by_ids — 대표 성공 ✗ · 대표 실패 ✗ — SCENARIO-GAP
   - create — 대표 성공 ✓ · 대표 실패 ✓
   - delete — 대표 성공 ✓ · 대표 실패 ✓
   - get — 대표 성공 ✓ · 대표 실패 ✓

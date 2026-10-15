@@ -53,7 +53,11 @@ from ai.backend.manager.actions.v2.bulk.validator.base import (
     PartialBulkActionValidator,
 )
 from ai.backend.manager.actions.v2.field.bulk_base import BaseBulkFieldAction
-from ai.backend.manager.actions.v2.field.bulk_lookup import LookupBulkFieldOwnerOpsAction
+from ai.backend.manager.actions.v2.field.bulk_lookup import (
+    BulkFieldKeyLookupOpsResult,
+    LookupBulkFieldByKeyOpsAction,
+    LookupBulkFieldOwnerOpsAction,
+)
 from ai.backend.manager.actions.v2.field.bulk_processor import (
     AtomicFieldResultJudge,
     BulkFieldActionProcessor,
@@ -156,6 +160,7 @@ from ai.backend.manager.errors.common import ServerMisconfiguredError
 from ai.backend.manager.services.ops.service import (
     BatchPurgeService,
     BatchUpdateService,
+    BulkFieldKeyLookupService,
     BulkFieldOwnerLookupService,
     BulkLookupService,
     DeleteService,
@@ -588,6 +593,23 @@ class ProcessorGroup[TData: EntityData]:
             monitors=(*self._deps.monitors.lookup, *monitors),
             validators=self._deps.validators.lookup,
             post_validators=self._deps.validators.single_entity,
+        )
+
+    def public_bulk_key_field_lookup_ops[TAction: LookupBulkFieldByKeyOpsAction[Any, Any, Any]](
+        self,
+        action_cls: type[TAction],
+        *,
+        monitors: Sequence[BulkLookupActionMonitor] = (),
+    ) -> BulkLookupActionProcessor[TAction, BulkFieldKeyLookupOpsResult[Any, Any]]:
+        """The field rows several keys name, refusing nothing past authentication.
+
+        Wired only before a partial field read: that read checks each row's owner, so a
+        denied key fails as its own item instead of refusing the batch.
+        """
+        self._record(action_cls, ActionKind.LOOKUP, ActionGate.PUBLIC, ActionBacking.GENERIC)
+        return BulkLookupActionProcessor(
+            BulkFieldKeyLookupService(self._deps.repository).execute,
+            monitors=(*self._deps.monitors.bulk_lookup, *monitors),
         )
 
     def field_group[TFieldData: FieldData](

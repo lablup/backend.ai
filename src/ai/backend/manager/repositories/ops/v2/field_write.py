@@ -202,6 +202,35 @@ class V2FieldWriteOps(V2WriteOpsBase):
         ]
         return [upserter.to_data(row) for upserter, row in zip(upserters, rows, strict=True)]
 
+    async def insert_field_entity_if_absent[
+        TOwnerID: EntityIdentifier,
+        TRow: Base,
+        TData: FieldData,
+    ](self, owner_id: TOwnerID, upserter: FieldUpserter[TOwnerID, TRow, TData]) -> bool:
+        """Insert a field row under the owner's settled identifier unless a row holds its
+        conflict key, answering whether it was inserted; a row already there is left as
+        it stands."""
+        inserted = await self._insert_row_if_absent(
+            upserter.row_class(),
+            upserter.index_elements(),
+            upserter.build_insert_values(owner_id),
+            upserter.integrity_error_checks(),
+        )
+        return inserted is not None
+
+    async def atomic_insert_field_entities_if_absent[
+        TOwnerID: EntityIdentifier,
+        TRow: Base,
+        TData: FieldData,
+    ](
+        self, owner_id: TOwnerID, upserters: Sequence[FieldUpserter[TOwnerID, TRow, TData]]
+    ) -> list[bool]:
+        """:meth:`insert_field_entity_if_absent` for every row of one owner, all or
+        nothing."""
+        return [
+            await self.insert_field_entity_if_absent(owner_id, upserter) for upserter in upserters
+        ]
+
     async def partial_bulk_upsert_field_entities[
         TOwnerID: EntityIdentifier,
         TRow: Base,

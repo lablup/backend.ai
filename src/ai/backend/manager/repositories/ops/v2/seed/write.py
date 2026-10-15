@@ -4,14 +4,11 @@ savepoint per item."""
 from __future__ import annotations
 
 from collections.abc import Sequence
-from typing import Any
 
-import sqlalchemy as sa
-from sqlalchemy.dialects.postgresql import insert as pg_insert
-
+from ai.backend.common.data.entity.role import RoleID
+from ai.backend.common.exception import BackendAIError
 from ai.backend.manager.errors.permission import VirtualEntityNotFound
 from ai.backend.manager.errors.repository import ForeignKeyViolationError, RepositoryIntegrityError
-from ai.backend.manager.models.base import Base
 from ai.backend.manager.models.virtual_entity.virtual_entity import VirtualEntityRow
 from ai.backend.manager.repositories.ops.v2.seed.types import SeedWrite, SeedWriteItemResult
 from ai.backend.manager.repositories.ops.v2.write import V2WriteOps
@@ -20,9 +17,9 @@ from ai.backend.manager.repositories.ops.v2.write import V2WriteOps
 class V2SeedWriteOps(V2WriteOps):
     """The v2 write ops plus the seed item write.
 
-    A seed write leaves out the upserters' ``integrity_error_checks``: a violation stays a
-    :class:`RepositoryIntegrityError`, so it fails its own item and no other. A scope with
-    no virtual entity fails its item as a missing row.
+    A violation a spec maps to a domain error is answered as the violation it was mapped
+    from, so it fails its own item and no other. A scope with no virtual entity fails its
+    item as a missing row.
     """
 
     async def partial_write_seed_items(
@@ -44,56 +41,39 @@ class V2SeedWriteOps(V2WriteOps):
                 )
                 results.append(SeedWriteItemResult(written=False, error=missing))
                 continue
+            except BackendAIError as e:
+                if not isinstance(e.__cause__, RepositoryIntegrityError):
+                    raise
+                results.append(SeedWriteItemResult(written=False, error=e.__cause__))
+                continue
             results.append(SeedWriteItemResult(written=written))
         return results
 
     async def _write_seed_item(self, write: SeedWrite, overwrite: bool) -> bool:
-        """Whether any row was written. A field row is written under an entity that was
-        already there as well."""
-        upserter = write.upserter
-        row, written = await self._write_row(
-            upserter.row_class(),
-            upserter.index_elements(),
-            upserter.build_insert_values(),
-            upserter.build_update_values() if overwrite else None,
-        )
-        entity = upserter.entity_id(row)
-        await self._provision([entity])
-        await self._created_in(upserter.created_in(row), entity)
+        """Whether any row was written: inserted, or under an overwrite updated with the
+        values its spec states. A field row is written under an entity that was already
+        there as well."""
+        entity = await self.insert_entity_if_absent(write.upserter)
+        written = entity.inserted
+        if overwrite and not entity.inserted:
+            await self.upsert_entity(write.upserter)
+            written = bool(write.upserter.build_update_values())
         if overwrite:
             for purger in write.field_purgers:
-                await self.batch_purge_field_entities(entity, purger)
-        for field_upserter in write.field_upserters:
-            _, field_written = await self._write_row(
-                field_upserter.row_class(),
-                field_upserter.index_elements(),
-                field_upserter.build_insert_values(entity),
-                field_upserter.build_update_values() if overwrite else None,
-            )
-            written = written or field_written
-        return written
-
-    async def _write_row[TRow: Base](
-        self,
-        row_class: type[TRow],
-        index_elements: list[str],
-        insert_values: dict[str, Any],
-        update_values: dict[str, Any] | None,
-    ) -> tuple[TRow, bool]:
-        """Insert the row, answering it and whether it was written. A row holding its
-        ``index_elements`` is kept, or updated with ``update_values`` when any are given."""
-        stmt = pg_insert(row_class).values(insert_values)
-        if not update_values:
-            stmt = stmt.on_conflict_do_nothing(index_elements=index_elements)
-        else:
-            stmt = stmt.on_conflict_do_update(index_elements=index_elements, set_=update_values)
-        try:
-            row = (await self._sess.scalars(stmt.returning(row_class))).one_or_none()
-        except sa.exc.IntegrityError as e:
-            raise self._parse_integrity_error(e) from e
-        if row is not None:
-            return row, True
-        existing = sa.select(row_class).where(
-            *(getattr(row_class, column) == insert_values[column] for column in index_elements)
+                await self.batch_purge_field_entities(entity.entity_id, purger)
+        inserted = await self.atomic_insert_field_entities_if_absent(
+            entity.entity_id, write.field_upserters
         )
-        return (await self._sess.scalars(existing)).one(), False
+        written = written or any(inserted)
+        standing = [
+            upserter
+            for upserter, is_new in zip(write.field_upserters, inserted, strict=True)
+            if not is_new
+        ]
+        if overwrite and standing:
+            await self.atomic_upsert_field_entities(entity.entity_id, standing)
+            written = written or any(upserter.build_update_values() for upserter in standing)
+        for user_id in write.granted_users:
+            granted = await self.grant_roles(user_id, [RoleID(entity.entity_id)])
+            written = written or any(granted)
+        return written

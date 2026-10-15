@@ -2,10 +2,11 @@
 
 from __future__ import annotations
 
+from collections.abc import Iterable
 from datetime import datetime
 from decimal import Decimal
 from enum import StrEnum
-from typing import TYPE_CHECKING, Annotated, Any, Self
+from typing import TYPE_CHECKING, Annotated, Any, Self, override
 
 import strawberry
 from strawberry import Info
@@ -127,6 +128,18 @@ class DomainFairShareGQL(PydanticNodeMixin[DomainFairShareNode]):
         | None
     ):
         return await info.context.data_loaders.resource_group_loader.load(self.resource_group_name)
+
+    @classmethod
+    @override
+    async def resolve_nodes(  # type: ignore[override]  # Strawberry Node uses AwaitableOrValue overloads incompatible with async def
+        cls,
+        *,
+        info: Info[StrawberryGQLContext],
+        node_ids: Iterable[str],
+        required: bool = False,
+    ) -> Iterable[DomainFairShareGQL | None]:
+        """A fair share is computed per resource group and scope, with no row to read by id."""
+        return [None for _ in node_ids]
 
 
 DomainFairShareEdge = Edge[DomainFairShareGQL]

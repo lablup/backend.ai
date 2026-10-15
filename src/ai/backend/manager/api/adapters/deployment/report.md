@@ -2,9 +2,9 @@
 
 [무엇을 보장하는가](/src/ai/backend/manager/api/adapters/deployment/KNOWLEDGE.md) · [어댑터](/src/ai/backend/manager/api/adapters/deployment/adapter.py)
 
-시나리오: 미완 29 / 43
+시나리오: 미완 30 / 44
 
-- ops 로 구성 (21)
+- ops 로 구성 (22)
   - admin_search — 대표 성공 ✓ · 대표 실패 ✓
   - admin_search_replicas — 대표 성공 ✗ · 대표 실패 ✗ — SCENARIO-GAP
   - admin_search_revisions — 대표 성공 ✓ · 대표 실패 ✓
@@ -12,6 +12,7 @@
   - batch_load_auto_scaling_rules_by_ids — 대표 성공 ✗ · 대표 실패 ✗ — SCENARIO-GAP
   - batch_load_by_ids — 대표 성공 ✗ · 대표 실패 ✗ — SCENARIO-GAP
   - batch_load_policies_by_endpoint_ids — 대표 성공 ✗ · 대표 실패 ✗ — SCENARIO-GAP
+  - batch_load_policies_by_ids — 대표 성공 ✗ · 대표 실패 ✗ — SCENARIO-GAP
   - batch_load_replicas_by_ids — 대표 성공 ✗ · 대표 실패 ✗ — SCENARIO-GAP
   - batch_load_revisions_by_ids — 대표 성공 ✓ · 대표 실패 ✗ — SCENARIO-GAP
   - batch_load_routes_by_ids — 대표 성공 ✗ · 대표 실패 ✗ — SCENARIO-GAP

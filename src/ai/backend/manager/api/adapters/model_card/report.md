@@ -2,10 +2,11 @@
 
 [무엇을 보장하는가](/src/ai/backend/manager/api/adapters/model_card/KNOWLEDGE.md) · [어댑터](/src/ai/backend/manager/api/adapters/model_card/adapter.py)
 
-시나리오: 미완 12 / 13
+시나리오: 미완 13 / 14
 
-- ops 로 구성 (7)
+- ops 로 구성 (8)
   - admin_search — 대표 성공 ✓ · 대표 실패 ✓
+  - batch_load_by_ids — 대표 성공 ✗ · 대표 실패 ✗ — SCENARIO-GAP
   - create — 대표 성공 ✗ · 대표 실패 ✗ — SCENARIO-GAP
   - get — 대표 성공 ✗ · 대표 실패 ✗ — SCENARIO-GAP
   - min_resources — 대표 성공 ✗ · 대표 실패 ✗ — SCENARIO-GAP

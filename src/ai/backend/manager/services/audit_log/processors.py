@@ -10,6 +10,9 @@ from ai.backend.manager.actions.v2.global_scope.processor import GlobalActionPro
 from ai.backend.manager.actions.v2.ops.result import BatchOpsResult, ScopedFieldsOpsResult
 from ai.backend.manager.data.audit_log.types import AuditLogData, AuditLogScopeData
 from ai.backend.manager.services.audit_log.actions.bulk_get import BulkGetAuditLogsAction
+from ai.backend.manager.services.audit_log.actions.bulk_get_scopes import (
+    BulkGetAuditLogScopesAction,
+)
 from ai.backend.manager.services.audit_log.actions.scoped_search import (
     ScopedSearchAuditLogsAction,
 )
@@ -37,11 +40,19 @@ class AuditLogProcessors:
     scoped_search_scopes: NestedFieldSearchActionProcessor[
         ScopedSearchAuditLogScopesAction, ScopedFieldsOpsResult[AuditLogScopeData]
     ]
+    bulk_get_scopes: PartialBulkOwnerCandidatesFieldActionProcessor[
+        BulkGetAuditLogScopesAction, AuditLogScopeData
+    ]
 
-    def __init__(self, group: OwnerCandidatesFieldGroup[AuditLogData]) -> None:
+    def __init__(
+        self,
+        group: OwnerCandidatesFieldGroup[AuditLogData],
+        scope_group: OwnerCandidatesFieldGroup[AuditLogScopeData],
+    ) -> None:
         self.global_search = group.global_searcher_ops(SearchAuditLogsAction)
         self.scoped_search = group.atomic_bulk_scoped_search_ops(ScopedSearchAuditLogsAction)
         self.bulk_get = group.partial_bulk_get_ops(BulkGetAuditLogsAction)
         self.scoped_search_scopes = group.nested_field_search_ops(
             ScopedSearchAuditLogScopesAction, AuditLogScopeData
         )
+        self.bulk_get_scopes = scope_group.partial_bulk_get_ops(BulkGetAuditLogScopesAction)

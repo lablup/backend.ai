@@ -22,7 +22,7 @@ from ai.backend.common.data.entity.agent import AgentEntityType
 from ai.backend.common.data.entity.artifact import ArtifactEntityType
 from ai.backend.common.data.entity.artifact_registry import ArtifactRegistryEntityType
 from ai.backend.common.data.entity.artifact_revision import ArtifactRevisionFieldType
-from ai.backend.common.data.entity.audit_log import AuditLogFieldType
+from ai.backend.common.data.entity.audit_log import AuditLogFieldType, AuditLogScopeFieldType
 from ai.backend.common.data.entity.container_registry import ContainerRegistryEntityType
 from ai.backend.common.data.entity.deployment import DeploymentEntityType
 from ai.backend.common.data.entity.deployment_preset import DeploymentPresetEntityType
@@ -78,11 +78,14 @@ from ai.backend.manager.actions.v2.scope.base import BaseScopeAction
 from ai.backend.manager.actions.v2.single_entity.base import BaseSingleEntityAction
 from ai.backend.manager.actions.v2.validators import ActionValidators
 from ai.backend.manager.data.artifact.types import ArtifactRevisionData
-from ai.backend.manager.data.audit_log.types import AuditLogData
+from ai.backend.manager.data.audit_log.types import AuditLogData, AuditLogScopeData
 from ai.backend.manager.data.entity_label.types import EntityLabelData
 from ai.backend.manager.data.image.types import ImageAliasData
 from ai.backend.manager.data.kernel.types import KernelInfo
-from ai.backend.manager.models.audit_log.owner_candidates import AuditLogOwnerCandidates
+from ai.backend.manager.models.audit_log.owner_candidates import (
+    AuditLogOwnerCandidates,
+    AuditLogScopeOwnerCandidates,
+)
 from ai.backend.manager.repositories.ops.repository import OpsRepository
 from ai.backend.manager.services.agent.actions.bulk_get import BulkGetAgentsAction
 from ai.backend.manager.services.agent.actions.bulk_load_container_counts import (
@@ -139,6 +142,9 @@ from ai.backend.manager.services.artifact_registry.actions.reservoir.bulk_get im
 )
 from ai.backend.manager.services.artifact_registry.processors import ArtifactRegistryProcessors
 from ai.backend.manager.services.audit_log.actions.bulk_get import BulkGetAuditLogsAction
+from ai.backend.manager.services.audit_log.actions.bulk_get_scopes import (
+    BulkGetAuditLogScopesAction,
+)
 from ai.backend.manager.services.audit_log.actions.scoped_search_scopes import (
     ScopedSearchAuditLogScopesAction,
 )
@@ -166,6 +172,9 @@ from ai.backend.manager.services.deployment.actions.auto_scaling_rule.bulk_get_a
 from ai.backend.manager.services.deployment.actions.bulk_get import BulkGetDeploymentsAction
 from ai.backend.manager.services.deployment.actions.deployment_policy.bulk_get_deployment_policies import (
     BulkGetDeploymentPoliciesAction,
+)
+from ai.backend.manager.services.deployment.actions.deployment_policy.partial_bulk_get_deployment_policies import (
+    PartialBulkGetDeploymentPoliciesAction,
 )
 from ai.backend.manager.services.deployment.actions.lookup_owner import (
     LookupBulkAutoScalingRuleOwnerAction,
@@ -272,6 +281,9 @@ from ai.backend.manager.services.scheduling_history.actions.bulk_get_deployment_
 )
 from ai.backend.manager.services.scheduling_history.actions.bulk_get_kernel_histories import (
     BulkGetKernelHistoriesAction,
+)
+from ai.backend.manager.services.scheduling_history.actions.bulk_get_replica_group_histories import (
+    BulkGetReplicaGroupHistoriesAction,
 )
 from ai.backend.manager.services.scheduling_history.actions.bulk_get_route_histories import (
     BulkGetRouteHistoriesAction,
@@ -679,8 +691,10 @@ def test_field_data_loader_reads_are_partial_permission_reads() -> None:
     assert recorded[BulkGetAccessTokensAction] == partial
     assert recorded[BulkGetAutoScalingRulesAction] == partial
     assert recorded[BulkGetDeploymentPoliciesAction] == partial
+    assert recorded[PartialBulkGetDeploymentPoliciesAction] == partial
     assert recorded[BulkGetDeploymentHistoriesAction] == partial
     assert recorded[BulkGetRouteHistoriesAction] == partial
+    assert recorded[BulkGetReplicaGroupHistoriesAction] == partial
     assert recorded[BulkGetSessionHistoriesAction] == (
         SessionEntityType(),
         ActionKind.BULK,
@@ -958,7 +972,12 @@ def test_audit_log_loader_read_is_a_partial_field_permission_read() -> None:
     AuditLogProcessors(
         registry.dangling_owner_candidates_field_group(
             FieldGroupMeta(AuditLogFieldType()), AuditLogData, AuditLogOwnerCandidates()
-        )
+        ),
+        registry.dangling_owner_candidates_field_group(
+            FieldGroupMeta(AuditLogScopeFieldType()),
+            AuditLogScopeData,
+            AuditLogScopeOwnerCandidates(),
+        ),
     )
 
     recorded = {
@@ -966,6 +985,7 @@ def test_audit_log_loader_read_is_a_partial_field_permission_read() -> None:
     }
     assert recorded[BulkGetAuditLogsAction] == (ActionKind.BULK, ActionGate.PERMISSION)
     assert recorded[ScopedSearchAuditLogScopesAction] == (ActionKind.BULK, ActionGate.PERMISSION)
+    assert recorded[BulkGetAuditLogScopesAction] == (ActionKind.BULK, ActionGate.PERMISSION)
 
 
 def test_dangling_lookup_field_group_records_its_owner_lookups_under_its_field_type() -> None:
@@ -1034,7 +1054,12 @@ def test_owner_candidates_field_group_records_no_lookup_under_its_concern() -> N
     AuditLogProcessors(
         registry.concern(ConcernMeta(Concern.VISIBILITY)).dangling_owner_candidates_field_group(
             FieldGroupMeta(AuditLogFieldType()), AuditLogData, AuditLogOwnerCandidates()
-        )
+        ),
+        registry.concern(ConcernMeta(Concern.VISIBILITY)).dangling_owner_candidates_field_group(
+            FieldGroupMeta(AuditLogScopeFieldType()),
+            AuditLogScopeData,
+            AuditLogScopeOwnerCandidates(),
+        ),
     )
 
     records = registry.wired_processors()

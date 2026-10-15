@@ -2,10 +2,13 @@ from __future__ import annotations
 
 from ai.backend.common.data.entity.resource_policy import KeyPairResourcePolicyUUID
 from ai.backend.manager.actions.registry.group import ProcessorGroup
+from ai.backend.manager.actions.v2.bulk.partial_processor import PartialBulkActionProcessor
 from ai.backend.manager.actions.v2.global_scope.processor import GlobalActionProcessor
+from ai.backend.manager.actions.v2.lookup.bulk_processor import BulkLookupActionProcessor
 from ai.backend.manager.actions.v2.lookup.processor import LookupActionProcessor
 from ai.backend.manager.actions.v2.ops.result import (
     BatchOpsResult,
+    BulkLookupOpsResult,
     CreatedEntityOpsResult,
     EntityOpsResult,
     LookupOpsResult,
@@ -16,6 +19,12 @@ from ai.backend.manager.actions.v2.single_entity.processor import (
     SingleEntityActionProcessor,
 )
 from ai.backend.manager.data.resource.types import KeyPairResourcePolicyData
+from ai.backend.manager.services.keypair_resource_policy.actions.bulk_get import (
+    BulkGetKeypairResourcePoliciesAction,
+)
+from ai.backend.manager.services.keypair_resource_policy.actions.bulk_lookup import (
+    BulkLookupKeypairResourcePoliciesAction,
+)
 from ai.backend.manager.services.keypair_resource_policy.actions.create_keypair_resource_policy import (
     CreateKeyPairResourcePolicyAction,
 )
@@ -48,6 +57,12 @@ class KeypairResourcePolicyProcessors:
     lookup: LookupActionProcessor[
         LookupKeypairResourcePolicyAction, LookupOpsResult[KeyPairResourcePolicyUUID]
     ]
+    bulk_lookup_names: BulkLookupActionProcessor[
+        BulkLookupKeypairResourcePoliciesAction, BulkLookupOpsResult[str, KeyPairResourcePolicyUUID]
+    ]
+    bulk_get_ids: PartialBulkActionProcessor[
+        BulkGetKeypairResourcePoliciesAction, KeyPairResourcePolicyData
+    ]
     search: ScopeActionProcessor[
         SearchKeypairResourcePoliciesAction, ScopedBatchOpsResult[KeyPairResourcePolicyData]
     ]
@@ -67,6 +82,10 @@ class KeypairResourcePolicyProcessors:
     def __init__(self, group: ProcessorGroup[KeyPairResourcePolicyData]) -> None:
         self.get = group.single_get_ops(GetKeyPairResourcePolicyAction)
         self.lookup = group.lookup_ops(LookupKeypairResourcePolicyAction)
+        self.bulk_lookup_names = group.public_bulk_lookup_ops(
+            BulkLookupKeypairResourcePoliciesAction
+        )
+        self.bulk_get_ids = group.partial_bulk_get_ops(BulkGetKeypairResourcePoliciesAction)
         self.search = group.scoped_search_ops(SearchKeypairResourcePoliciesAction)
         self.global_search = group.global_searcher_ops(GlobalSearchKeypairResourcePoliciesAction)
         self.global_create = group.global_create_ops(CreateKeyPairResourcePolicyAction)

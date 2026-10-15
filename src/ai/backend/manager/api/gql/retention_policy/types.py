@@ -1,11 +1,15 @@
 from __future__ import annotations
 
+from collections.abc import Iterable
 from datetime import datetime
 from enum import StrEnum
+from typing import override
 from uuid import UUID
 
+from strawberry import Info
 from strawberry.relay import Connection, Edge, NodeID
 
+from ai.backend.common.data.entity.retention_policy import RetentionPolicyID
 from ai.backend.common.dto.manager.v2.retention_policy.request import (
     CreateRetentionPolicyInput as CreateInputDTO,
 )
@@ -47,6 +51,7 @@ from ai.backend.manager.api.gql.decorators import (
     gql_pydantic_type,
 )
 from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin, PydanticOutputMixin
+from ai.backend.manager.api.gql.types import StrawberryGQLContext
 
 
 @gql_enum(
@@ -105,6 +110,19 @@ class RetentionPolicyGQL(PydanticNodeMixin[NodeDTO]):
     )
     created_at: datetime = gql_field(description="Timestamp when this policy was created.")
     updated_at: datetime = gql_field(description="Timestamp of the last modification.")
+
+    @classmethod
+    @override
+    async def resolve_nodes(  # type: ignore[override]  # Strawberry Node uses AwaitableOrValue overloads incompatible with async def
+        cls,
+        *,
+        info: Info[StrawberryGQLContext],
+        node_ids: Iterable[str],
+        required: bool = False,
+    ) -> Iterable[RetentionPolicyGQL | None]:
+        return await info.context.data_loaders.retention_policy_loader.load_many([
+            RetentionPolicyID(UUID(nid)) for nid in node_ids
+        ])
 
 
 RetentionPolicyEdge = Edge[RetentionPolicyGQL]

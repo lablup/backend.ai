@@ -7,8 +7,9 @@ from collections.abc import Sequence
 from typing import override
 
 import sqlalchemy as sa
+from sqlalchemy.orm import aliased
 
-from ai.backend.common.data.entity.audit_log import AuditLogID
+from ai.backend.common.data.entity.audit_log import AuditLogID, AuditLogScopeID
 from ai.backend.common.data.entity.types import EntityType
 from ai.backend.common.data.entity.user import UserEntityType
 from ai.backend.manager.models.audit_log.row import AuditLogRow
@@ -16,7 +17,7 @@ from ai.backend.manager.models.audit_log.scope_row import AuditLogScopeRow
 from ai.backend.manager.models.base import GUID, EntityTypeColumn
 from ai.backend.manager.models.specs.owner_candidates import FieldOwnerCandidates
 
-__all__ = ("AuditLogOwnerCandidates",)
+__all__ = ("AuditLogOwnerCandidates", "AuditLogScopeOwnerCandidates")
 
 _UUID_PATTERN = "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
 
@@ -51,5 +52,46 @@ class AuditLogOwnerCandidates(FieldOwnerCandidates[AuditLogID]):
         ).where(
             AuditLogRow.id.in_(field_ids),
             AuditLogRow.triggered_by.op("~")(_UUID_PATTERN),
+        )
+        return [entity, scopes, triggered_by]
+
+
+class AuditLogScopeOwnerCandidates(FieldOwnerCandidates[AuditLogScopeID]):
+    """The owners of the record a scope entry sits under."""
+
+    @override
+    def owners_of(
+        self, field_ids: Sequence[AuditLogScopeID]
+    ) -> Sequence[sa.sql.Select[tuple[AuditLogScopeID, uuid.UUID, EntityType]]]:
+        recorded_scope = aliased(AuditLogScopeRow)
+        entity = (
+            sa.select(
+                AuditLogScopeRow.id,
+                sa.type_coerce(AuditLogRow.entity_id, GUID[uuid.UUID]()),
+                sa.type_coerce(AuditLogRow.entity_type, EntityTypeColumn()),
+            )
+            .join(AuditLogRow, AuditLogRow.id == AuditLogScopeRow.audit_log_id)
+            .where(
+                AuditLogScopeRow.id.in_(field_ids),
+                AuditLogRow.entity_id.is_not(None),
+                AuditLogRow.entity_type.is_not(None),
+            )
+        )
+        scopes = (
+            sa.select(AuditLogScopeRow.id, recorded_scope.scope_id, recorded_scope.scope_type)
+            .join(recorded_scope, recorded_scope.audit_log_id == AuditLogScopeRow.audit_log_id)
+            .where(AuditLogScopeRow.id.in_(field_ids))
+        )
+        triggered_by = (
+            sa.select(
+                AuditLogScopeRow.id,
+                sa.cast(AuditLogRow.triggered_by, GUID[uuid.UUID]()),
+                sa.literal(UserEntityType(), EntityTypeColumn()),
+            )
+            .join(AuditLogRow, AuditLogRow.id == AuditLogScopeRow.audit_log_id)
+            .where(
+                AuditLogScopeRow.id.in_(field_ids),
+                AuditLogRow.triggered_by.op("~")(_UUID_PATTERN),
+            )
         )
         return [entity, scopes, triggered_by]
