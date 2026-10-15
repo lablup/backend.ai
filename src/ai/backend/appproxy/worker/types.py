@@ -76,8 +76,8 @@ from ai.backend.common.types import (
 from .errors import InvalidCircuitDataError, InvalidFrontendTypeError
 
 if TYPE_CHECKING:
-    from ai.backend.appproxy.worker.ingress.circuit import LegacyCircuitIngressSync
     from ai.backend.appproxy.worker.ingress.factory import IngressState
+    from ai.backend.appproxy.worker.ingress.legacy_circuit_sync import LegacyCircuitIngressSync
 
     from .config import ServerConfig
     from .proxy.frontend.base import BaseFrontend

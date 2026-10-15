@@ -14,8 +14,8 @@ from ai.backend.appproxy.common.types import (
     RouteInfo,
     SerializableCircuit,
 )
-from ai.backend.appproxy.worker.ingress.circuit import LegacyCircuitIngressSync
 from ai.backend.appproxy.worker.ingress.in_memory import InMemoryIngressState
+from ai.backend.appproxy.worker.ingress.legacy_circuit_sync import LegacyCircuitIngressSync
 from ai.backend.appproxy.worker.types import Circuit
 from ai.backend.common.dto.appproxy.v2.ingress.types import (
     Ingress,

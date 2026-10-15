@@ -74,8 +74,8 @@ from ai.backend.appproxy.common.utils import (
     ensure_json_serializable,
     mime_match,
 )
-from ai.backend.appproxy.worker.ingress.circuit import LegacyCircuitIngressSync
 from ai.backend.appproxy.worker.ingress.factory import IngressStateFactory
+from ai.backend.appproxy.worker.ingress.legacy_circuit_sync import LegacyCircuitIngressSync
 from ai.backend.common.clients.http_client.client_pool import (
     ClientPool,
     tcp_client_session_factory,
