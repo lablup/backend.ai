@@ -139,7 +139,7 @@ class TestRebelPluginIdentity:
 
 
 class TestRebelDeviceEnumeration:
-    async def test_lists_only_rebel_devices(
+    async def test_lists_only_rebel100_devices(
         self, plugin: Rebel100Plugin, patched_stats: None
     ) -> None:
         devices = await plugin.list_devices()
