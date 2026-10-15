@@ -503,6 +503,11 @@ from ai.backend.manager.api.gql.session.resolver.session import (
     session_v2,
     terminate_sessions_v2,
 )
+from ai.backend.manager.api.gql.session_group.resolver import (
+    admin_session_groups,
+    scoped_session_groups,
+    session_group,
+)
 from ai.backend.manager.api.gql.user.resolver.mutation import (
     admin_bulk_create_users_v2,
     admin_bulk_create_users_with_keypair_v2,
@@ -722,6 +727,9 @@ class Query:
     scoped_sessions_v2 = scoped_sessions_v2
     my_sessions_v2 = my_sessions_v2
     session_v2 = session_v2
+    session_group = session_group
+    admin_session_groups = admin_session_groups
+    scoped_session_groups = scoped_session_groups
     project_deployments = project_deployments
     scoped_deployments = scoped_deployments
     my_deployments = my_deployments
