@@ -5,10 +5,14 @@ import fnmatch
 import itertools
 import logging
 import math
-import operator
 from abc import ABCMeta, abstractmethod
 from collections import defaultdict
+<<<<<<< HEAD
 from collections.abc import Iterable, Mapping, MutableMapping, Sequence
+=======
+from collections.abc import Collection, Iterable, Mapping, MutableMapping, Sequence
+from dataclasses import dataclass
+>>>>>>> 3440d3839 (fix(BA-8499): stop fGPU overbooking and fragmentation on multi-NUMA agents (#15636))
 from decimal import ROUND_DOWN, Decimal
 from typing import (
     TYPE_CHECKING,
@@ -53,6 +57,44 @@ class DeviceSlotInfo:
     slot_type: SlotTypes
     slot_name: SlotName
     amount: Decimal
+
+
+# A device paired with its current allocation for a single resource slot.
+type DeviceAlloc = tuple[DeviceId, Decimal]
+
+# The per-device allocation amounts of a single resource slot.
+type SlotAllocation = dict[DeviceId, Decimal]
+
+
+@dataclass(frozen=True)
+class DeviceClusters:
+    """
+    The devices usable for a single resource slot, grouped by NUMA node: one primary
+    set per node and one secondary set for the rest.  Each set holds the current
+    allocation per device, sorted by the allocatable amount in descending order.
+    """
+
+    primary_sets: Sequence[Sequence[DeviceAlloc]]
+    secondary_set: Sequence[DeviceAlloc]
+
+
+@dataclass(frozen=True)
+class AllocCandidate:
+    """
+    An allocation of a single resource slot, with the criteria used to rank it
+    against the other candidates.
+    """
+
+    allocation: SlotAllocation
+    evenness: Decimal
+    n_devices: int
+    fragmentation: int
+    numa_local: int
+
+    @property
+    def rank(self) -> tuple[Decimal, int, int, int]:
+        # every element is higher-is-better
+        return (self.evenness, -self.n_devices, -self.fragmentation, self.numa_local)
 
 
 def distribute[T](num_items: int, groups: Sequence[T]) -> Mapping[T, int]:
@@ -125,18 +167,37 @@ class AbstractAllocMap(metaclass=ABCMeta):
                 bufs.append(f"  {device_id}: {alloc}")
         return "\n".join(bufs)
 
+    def _get_allocatable(self, dev_alloc: DeviceAlloc) -> Decimal:
+        dev_id, current_alloc = dev_alloc
+        return self.device_slots[dev_id].amount - current_alloc
+
+    def _sort_by_allocatable(
+        self, slot_name: SlotName, device_set: Iterable[AbstractComputeDevice]
+    ) -> list[DeviceAlloc]:
+        device_ids = {d.device_id for d in device_set}
+        return sorted(
+            (
+                (device_id, alloc)
+                for device_id, alloc in self.allocations[slot_name].items()
+                if device_id in device_ids
+            ),
+            key=self._get_allocatable,
+            reverse=True,
+        )
+
     @final
-    def get_current_allocations(
+    def _get_device_clusters(
         self, affinity_hint: AffinityHint | None, slot_name: SlotName
-    ) -> Sequence[tuple[DeviceId, Decimal]]:
+    ) -> DeviceClusters:
         device_name = DeviceName(slot_name.partition(".")[0])
 
         if affinity_hint is None:  # for legacy
-            return sorted(
+            legacy_dev_allocs = sorted(
                 self.allocations[slot_name].items(),  # k: slot_name, v: per-device alloc
-                key=lambda pair: self.device_slots[pair[0]].amount - pair[1],
+                key=self._get_allocatable,
                 reverse=True,
             )
+            return DeviceClusters(primary_sets=[legacy_dev_allocs], secondary_set=[])
 
         # Use the affinity hint to reorder the device sets to prioritize allocation.
         if not affinity_hint.devices:
@@ -167,7 +228,7 @@ class AbstractAllocMap(metaclass=ABCMeta):
                 device.device_name for device in affinity_hint.affinity_map.nodes.keys()
             }
             raise ConfigurationError({
-                "AbstractAllocMap.get_current_allocation()": (
+                "AbstractAllocMap._get_device_clusters()": (
                     f"No suitable devices found "
                     f"(searched: {device_name}, found: {', '.join(detected_device_names)})"
                 )
@@ -183,40 +244,34 @@ class AbstractAllocMap(metaclass=ABCMeta):
             ),
         )
 
-        def convert_to_sorted_dev_alloc(
-            device_set: Iterable[AbstractComputeDevice],
-        ) -> list[tuple[DeviceId, Decimal]]:
-            device_ids = {d.device_id for d in device_set}
-            return sorted(
-                (
-                    (device_id, alloc)
-                    for device_id, alloc in self.allocations[slot_name].items()
-                    if device_id in device_ids
-                ),
-                key=lambda pair: self.device_slots[pair[0]].amount - pair[1],
-                reverse=True,
-            )
-
         # Inside each device cluster, let it prefer the devices with most remaining capacity.
-        primary_sorted_dev_allocs = [
-            convert_to_sorted_dev_alloc(primary_set) for primary_set in primary_sets
-        ]
-        secondary_sorted_dev_alloc = convert_to_sorted_dev_alloc(secondary_set)
+        return DeviceClusters(
+            primary_sets=[
+                self._sort_by_allocatable(slot_name, primary_set) for primary_set in primary_sets
+            ],
+            secondary_set=self._sort_by_allocatable(slot_name, secondary_set),
+        )
+
+    @final
+    def get_current_allocations(
+        self, affinity_hint: AffinityHint | None, slot_name: SlotName
+    ) -> Sequence[DeviceAlloc]:
+        clusters = self._get_device_clusters(affinity_hint, slot_name)
+        if affinity_hint is None:  # for legacy
+            return [*itertools.chain(*clusters.primary_sets)]
 
         if not affinity_hint.devices:  # first-allocated device
             match affinity_hint.policy:
                 case AffinityPolicy.PREFER_SINGLE_NODE:
-                    return [
-                        *itertools.chain(*primary_sorted_dev_allocs)
-                    ] + secondary_sorted_dev_alloc
+                    return [*itertools.chain(*clusters.primary_sets)] + [*clusters.secondary_set]
                 case AffinityPolicy.INTERLEAVED:
-                    return [
-                        *more_itertools.interleave_longest(*primary_sorted_dev_allocs)
-                    ] + secondary_sorted_dev_alloc
+                    return [*more_itertools.interleave_longest(*clusters.primary_sets)] + [
+                        *clusters.secondary_set
+                    ]
         else:
-            return [
-                *more_itertools.interleave_longest(*primary_sorted_dev_allocs)
-            ] + secondary_sorted_dev_alloc
+            return [*more_itertools.interleave_longest(*clusters.primary_sets)] + [
+                *clusters.secondary_set
+            ]
 
     @final
     def update_affinity_hint(
@@ -342,9 +397,9 @@ class DiscretePropertyAllocMap(AbstractAllocMap):
         affinity_hint: AffinityHint | None = None,
         context_tag: str | None = None,
     ) -> Mapping[SlotName, Mapping[DeviceId, Decimal]]:
-        allocation: dict[SlotName, dict[DeviceId, Decimal]] = {}
+        allocation: dict[SlotName, SlotAllocation] = {}
         for slot_name, requested_alloc in requested_slots.items():
-            slot_allocation: dict[DeviceId, Decimal] = {}
+            slot_allocation: SlotAllocation = {}
             sorted_dev_allocs = self.get_current_allocations(affinity_hint, slot_name)
             if log_alloc_map:
                 log.debug(
@@ -395,7 +450,7 @@ class DiscretePropertyAllocMap(AbstractAllocMap):
         affinity_hint: AffinityHint | None = None,
         context_tag: str | None = None,
     ) -> Mapping[SlotName, Mapping[DeviceId, Decimal]]:
-        allocation: dict[SlotName, dict[DeviceId, Decimal]] = {}
+        allocation: dict[SlotName, SlotAllocation] = {}
 
         for slot_name, requested_alloc in requested_slots.items():
             new_alloc: MutableMapping[DeviceId, Decimal] = defaultdict(Decimal)
@@ -544,9 +599,9 @@ class FractionAllocMap(AbstractAllocMap):
             min_memory=min_memory,
             allow_slot_fragmentation=allow_resource_fragmentation,
         )
-        actual_alloc_map: dict[SlotName, dict[DeviceId, Decimal]] = {}
+        actual_alloc_map: dict[SlotName, SlotAllocation] = {}
         for slot_name, alloc in calculated_alloc_map.items():
-            actual_alloc: dict[DeviceId, Decimal] = {}
+            actual_alloc: SlotAllocation = {}
             for dev_id, val in alloc.items():
                 self.allocations[slot_name][dev_id] = round_down(
                     self.allocations[slot_name][dev_id], self.quantum_size
@@ -634,9 +689,9 @@ class FractionAllocMap(AbstractAllocMap):
         min_memory: Decimal = Decimal(0.01),
         allow_slot_fragmentation: bool = True,
     ) -> Mapping[SlotName, Mapping[DeviceId, Decimal]]:
-        allocation: dict[SlotName, dict[DeviceId, Decimal]] = {}
+        allocation: dict[SlotName, SlotAllocation] = {}
         for slot_name, alloc in requested_slots.items():
-            slot_allocation: dict[DeviceId, Decimal] = {}
+            slot_allocation: SlotAllocation = {}
 
             # fill up starting from the most free devices
             sorted_dev_allocs = self.get_current_allocations(affinity_hint, slot_name)
@@ -695,6 +750,189 @@ class FractionAllocMap(AbstractAllocMap):
             self.update_affinity_hint(slot_allocation, affinity_hint)
         return allocation
 
+    def _measure_evenness(self, allocation: SlotAllocation) -> Decimal:
+        # higher value means more even with 0 being the highest value
+        alloc_arr = sorted([allocation[dev_id] for dev_id in allocation])
+        evenness_score = Decimal(0).quantize(self.digits)
+        for idx in range(len(alloc_arr) - 1):
+            evenness_score += abs(alloc_arr[idx + 1] - alloc_arr[idx])
+        return -evenness_score
+
+    def _measure_fragmentation(
+        self,
+        allocation: SlotAllocation,
+        min_memory: Decimal,
+    ) -> int:
+        # higher value means more fragmented
+        # i.e. the number of unusable resources is higher
+        fragmentation_arr = [
+            self.device_slots[dev_id].amount - allocation[dev_id] for dev_id in allocation
+        ]
+        return sum(
+            self.digits < v.quantize(self.digits) < min_memory.quantize(self.digits)
+            for v in fragmentation_arr
+        )
+
+    def _make_alloc_candidate(
+        self,
+        allocation: SlotAllocation,
+        min_memory: Decimal,
+        numa_local: int,
+    ) -> AllocCandidate:
+        return AllocCandidate(
+            allocation=allocation,
+            evenness=self._measure_evenness(allocation),
+            n_devices=len(allocation),
+            fragmentation=self._measure_fragmentation(allocation, min_memory),
+            numa_local=numa_local,
+        )
+
+    def _distribute_evenly(
+        self,
+        dev_allocs: Sequence[DeviceAlloc],
+        remaining_alloc: Decimal,
+        allocation: SlotAllocation,
+    ) -> None:
+        # evenly distributes remaining_alloc across dev_allocs
+        n_devices = len(dev_allocs)
+        if n_devices == 0:
+            return
+        dev_allocation = (remaining_alloc / n_devices).quantize(self.digits, rounding=ROUND_DOWN)
+        for dev_id, _ in dev_allocs:
+            allocation[dev_id] = dev_allocation
+
+        # need to take care of decimals
+        remainder = round(remaining_alloc * self.powers - dev_allocation * n_devices * self.powers)
+        for idx in range(remainder):
+            dev_id, _ = dev_allocs[idx]
+            allocation[dev_id] += self.digits
+
+    def _allocate_across_devices(
+        self,
+        dev_allocs: Sequence[DeviceAlloc],
+        remaining_alloc: Decimal,
+    ) -> SlotAllocation:
+        # allocates remaining_alloc across multiple devices i.e. dev_allocs
+        # all devices in dev_allocs are being used
+        slot_allocation: SlotAllocation = {}
+        # A device that cannot hold an even share takes its whole allocatable amount,
+        # and the shortage is redistributed over the remaining devices.
+        # Never hand a device more than it can hold, regardless of the input order.
+        pending = list(dev_allocs)
+        while pending:
+            dev_alloc = min(pending, key=self._get_allocatable)
+            allocatable = self._get_allocatable(dev_alloc)
+            # if the remaining_alloc can be allocated to evenly among remaining devices
+            if allocatable >= remaining_alloc / len(pending):
+                break
+            dev_id = dev_alloc[0]
+            slot_allocation[dev_id] = allocatable.quantize(self.digits)
+            remaining_alloc -= allocatable
+            pending = [pair for pair in pending if pair[0] != dev_id]
+
+        self._distribute_evenly(pending, remaining_alloc, slot_allocation)
+
+        return slot_allocation
+
+    def _sort_usable_devices(
+        self, dev_allocs: Sequence[DeviceAlloc], min_memory: Decimal
+    ) -> list[DeviceAlloc]:
+        """
+        Drop the devices whose remaining resource is under min_memory and order the rest
+        by the allocatable amount in descending order, which the allocation search requires.
+        The incoming order, which reflects the affinity hint, is kept among the devices
+        having the same allocatable amount.
+        """
+        return sorted(
+            (pair for pair in dev_allocs if self._get_allocatable(pair) >= min_memory),
+            key=self._get_allocatable,
+            reverse=True,
+        )
+
+    def _fit_in_one_device(
+        self, sorted_dev_allocs: Sequence[DeviceAlloc], remaining_alloc: Decimal
+    ) -> SlotAllocation | None:
+        """
+        Allocate remaining_alloc on the single device with the tightest fit,
+        or None when no single device can hold it.
+        """
+        for dev_alloc in sorted_dev_allocs[::-1]:
+            if remaining_alloc <= self._get_allocatable(dev_alloc):
+                return {dev_alloc[0]: remaining_alloc.quantize(self.digits)}
+        return None
+
+    def _search_best_allocation(
+        self,
+        dev_allocs: Sequence[DeviceAlloc],
+        remaining_alloc: Decimal,
+        min_memory: Decimal,
+        numa_local: int,
+    ) -> AllocCandidate | None:
+        """
+        Find the best way to distribute remaining_alloc across the given device set,
+        or None when the device set cannot hold it.
+        """
+        sorted_dev_allocs = self._sort_usable_devices(dev_allocs, min_memory)
+        if not sorted_dev_allocs:
+            return None
+        total_allocatable = sum(map(self._get_allocatable, sorted_dev_allocs), start=Decimal(0))
+        if total_allocatable.quantize(self.digits) < remaining_alloc.quantize(self.digits):
+            return None
+
+        # calculate the minimum number of required devices
+        n_devices, allocated = 0, Decimal(0)
+        for dev_alloc in sorted_dev_allocs:
+            n_devices += 1
+            allocated += self._get_allocatable(dev_alloc)
+            if allocated.quantize(self.digits) >= remaining_alloc.quantize(self.digits):
+                break
+        # need to check from using minimum number of devices to using all devices
+        # evenness must be non-decreasing with the increase of window size
+        best_alloc_candidate_arr: list[AllocCandidate] = []
+        for n_dev in range(n_devices, len(sorted_dev_allocs) + 1):
+            allocatable = sum(
+                map(self._get_allocatable, sorted_dev_allocs[:n_dev]),
+                start=Decimal(0),
+            )
+            # choose the best allocation from all possible allocation candidates
+            alloc_candidate = self._make_alloc_candidate(
+                self._allocate_across_devices(sorted_dev_allocs[:n_dev], remaining_alloc),
+                min_memory,
+                numa_local,
+            )
+            max_evenness = alloc_candidate.evenness
+            # three criteria to decide allocation are
+            # eveness, number of resources used, and amount of fragmentatino
+            alloc_candidate_arr = [alloc_candidate]
+            for idx in range(1, len(sorted_dev_allocs) - n_dev + 1):
+                # update amount of allocatable space
+                allocatable -= self._get_allocatable(sorted_dev_allocs[idx - 1])
+                allocatable += self._get_allocatable(sorted_dev_allocs[idx + n_dev - 1])
+                # break if not enough resource
+                if allocatable.quantize(self.digits) < remaining_alloc.quantize(self.digits):
+                    break
+                alloc_candidate = self._make_alloc_candidate(
+                    self._allocate_across_devices(
+                        sorted_dev_allocs[idx : idx + n_dev], remaining_alloc
+                    ),
+                    min_memory,
+                    numa_local,
+                )
+                # evenness gets worse (or same at best) as the allocatable gets smaller
+                if alloc_candidate.evenness < max_evenness:
+                    break
+                alloc_candidate_arr.append(alloc_candidate)
+            # since evenness is the same, sort by fragmentation (low is good)
+            best_alloc_candidate_arr.append(
+                sorted(alloc_candidate_arr, key=lambda candidate: -candidate.n_devices)[-1],
+            )
+            # there is no need to look at more devices if the desired evenness is achieved
+            if max_evenness.quantize(self.digits) == self.digits:
+                best_alloc_candidate_arr = best_alloc_candidate_arr[-1:]
+                break
+        # choose the best allocation with the three criteria
+        return sorted(best_alloc_candidate_arr, key=lambda candidate: candidate.rank)[-1]
+
     def _allocate_evenly(
         self,
         requested_slots: Mapping[SlotName, Decimal],
@@ -704,84 +942,11 @@ class FractionAllocMap(AbstractAllocMap):
         min_memory: Decimal = Decimal(0.01),
         allow_slot_fragmentation: bool = True,
     ) -> Mapping[SlotName, Mapping[DeviceId, Decimal]]:
-        # higher value means more even with 0 being the highest value
-        def measure_evenness(
-            alloc_map: Mapping[DeviceId, Decimal],
-        ) -> Decimal:
-            alloc_arr = sorted([alloc_map[dev_id] for dev_id in alloc_map])
-            evenness_score = Decimal(0).quantize(self.digits)
-            for idx in range(len(alloc_arr) - 1):
-                evenness_score += abs(alloc_arr[idx + 1] - alloc_arr[idx])
-            return -evenness_score
-
-        # higher value means more fragmented
-        # i.e. the number of unusable resources is higher
-        def measure_fragmentation(
-            allocation: Mapping[DeviceId, Decimal],
-            min_memory: Decimal,
-        ) -> int:
-            fragmentation_arr = [
-                self.device_slots[dev_id].amount - allocation[dev_id] for dev_id in allocation
-            ]
-            return sum(
-                self.digits < v.quantize(self.digits) < min_memory.quantize(self.digits)
-                for v in fragmentation_arr
-            )
-
-        # evenly distributes remaining_alloc across dev_allocs
-        def distribute_evenly(
-            dev_allocs: list[tuple[DeviceId, Decimal]],
-            remaining_alloc: Decimal,
-            allocation: dict[DeviceId, Decimal],
-        ) -> None:
-            n_devices = len(dev_allocs)
-            if n_devices == 0:
-                return
-            dev_allocation = (remaining_alloc / n_devices).quantize(
-                self.digits, rounding=ROUND_DOWN
-            )
-            for dev_id, _ in dev_allocs:
-                allocation[dev_id] = dev_allocation
-
-            # need to take care of decimals
-            remainder = round(
-                remaining_alloc * self.powers - dev_allocation * n_devices * self.powers
-            )
-            for idx in range(remainder):
-                dev_id, _ = dev_allocs[idx]
-                allocation[dev_id] += self.digits
-
-        # allocates remaining_alloc across multiple devices i.e. dev_allocs
-        # all devices in dev_allocs are being used
-        def allocate_across_devices(
-            dev_allocs: list[tuple[DeviceId, Decimal]],
-            remaining_alloc: Decimal,
-            _slot_name: SlotName,
-        ) -> dict[DeviceId, Decimal]:
-            slot_allocation: dict[DeviceId, Decimal] = {}
-            n_devices = len(dev_allocs)
-            idx = n_devices - 1  # check from the device with smallest allocatable resource
-            while n_devices > 0:
-                dev_id, current_alloc = dev_allocs[idx]
-                allocatable = self.device_slots[dev_id].amount - current_alloc
-                # if the remaining_alloc can be allocated to evenly among remaining devices
-                if allocatable >= remaining_alloc / n_devices:
-                    break
-                slot_allocation[dev_id] = allocatable.quantize(self.digits)
-                remaining_alloc -= allocatable
-                idx -= 1
-                n_devices -= 1
-
-            if n_devices > 0:
-                distribute_evenly(dev_allocs[:n_devices], remaining_alloc, slot_allocation)
-
-            return slot_allocation
-
         min_memory = min_memory.quantize(self.digits)
-        allocation: dict[SlotName, dict[DeviceId, Decimal]] = {}
+        allocation: dict[SlotName, SlotAllocation] = {}
         for slot_name, alloc in requested_slots.items():
-            slot_allocation: dict[DeviceId, Decimal] = {}
             remaining_alloc = Decimal(alloc).normalize()
+            clusters = self._get_device_clusters(affinity_hint, slot_name)
             sorted_dev_allocs = self.get_current_allocations(affinity_hint, slot_name)
             if not allow_slot_fragmentation:
                 self.ensure_slot_not_fragmented(
@@ -791,126 +956,50 @@ class FractionAllocMap(AbstractAllocMap):
                     context_tag=context_tag,
                 )
 
-            # do not consider devices whose remaining resource under min_memory
-            sorted_dev_allocs = list(
-                filter(
-                    lambda pair: self.device_slots[pair[0]].amount - pair[1] >= min_memory,
-                    sorted_dev_allocs,
-                )
-            )
-
             if log_alloc_map:
                 log.debug("FractionAllocMap(EVENLY): allocating {} {}", slot_name, alloc)
                 log.debug("FractionAllocMap(EVENLY): current-alloc: {!r}", sorted_dev_allocs)
 
-            # check if there is enough resource for allocation
-            total_allocatable = Decimal(0)
-            for dev_id, current_alloc in sorted_dev_allocs:
-                current_alloc = self.allocations[slot_name][dev_id]
-                total_allocatable += self.device_slots[dev_id].amount - current_alloc
-            if total_allocatable.quantize(self.digits) < remaining_alloc.quantize(self.digits):
-                raise InsufficientResource(
-                    "FractionAllocMap: insufficient allocatable amount!",
-                    context_tag=context_tag,
-                    slot_name=slot_name,
-                    requested_alloc=alloc,
-                    total_allocatable=total_allocatable,
-                    allocation=allocation,
-                )
+            usable_dev_allocs = self._sort_usable_devices(sorted_dev_allocs, min_memory)
+            slot_allocation = self._fit_in_one_device(usable_dev_allocs, remaining_alloc)
+            if slot_allocation is None:
+                # The allocation has to span devices.  Prefer the one confined to a single
+                # device cluster (NUMA node), and let it span the clusters only when that is
+                # the better packing.  The numa_local rank also keeps the preference order
+                # between the clusters.
+                n_clusters = len(clusters.primary_sets)
+                alloc_candidates = [
+                    candidate
+                    for candidate in (
+                        *(
+                            self._search_best_allocation(
+                                primary_set, remaining_alloc, min_memory, n_clusters - idx
+                            )
+                            for idx, primary_set in enumerate(clusters.primary_sets)
+                        ),
+                        self._search_best_allocation(
+                            usable_dev_allocs, remaining_alloc, min_memory, 0
+                        ),
+                    )
+                    if candidate is not None
+                ]
+                if not alloc_candidates:
+                    total_allocatable = sum(
+                        map(self._get_allocatable, usable_dev_allocs), start=Decimal(0)
+                    )
+                    raise InsufficientResource(
+                        "FractionAllocMap: insufficient allocatable amount!",
+                        context_tag=context_tag,
+                        slot_name=slot_name,
+                        requested_alloc=alloc,
+                        total_allocatable=total_allocatable,
+                        allocation=allocation,
+                    )
+                # choose the best allocation, breaking the tie with the NUMA locality
+                slot_allocation = max(
+                    alloc_candidates, key=lambda candidate: candidate.rank
+                ).allocation
 
-            # allocate resources
-            if (
-                remaining_alloc
-                <= self.device_slots[sorted_dev_allocs[0][0]].amount - sorted_dev_allocs[0][1]
-            ):
-                # if remaining_alloc fits in one device
-                for dev_id, current_alloc in sorted_dev_allocs[::-1]:
-                    allocatable = self.device_slots[dev_id].amount - current_alloc
-                    if remaining_alloc <= allocatable:
-                        slot_allocation[dev_id] = remaining_alloc.quantize(self.digits)
-                        break
-            else:
-                # need to distribute across devices
-                # calculate the minimum number of required devices
-                n_devices, allocated = 0, Decimal(0)
-                for dev_id, current_alloc in sorted_dev_allocs:
-                    n_devices += 1
-                    allocated += self.device_slots[dev_id].amount - current_alloc
-                    if allocated.quantize(self.digits) >= remaining_alloc.quantize(self.digits):
-                        break
-                # need to check from using minimum number of devices to using all devices
-                # evenness must be non-decreasing with the increase of window size
-                best_alloc_candidate_arr = []
-                for n_dev in range(n_devices, len(sorted_dev_allocs) + 1):
-                    allocatable = sum(
-                        map(
-                            lambda x: self.device_slots[x[0]].amount - x[1],
-                            sorted_dev_allocs[:n_dev],
-                        ),
-                        start=Decimal(0),
-                    )
-                    # choose the best allocation from all possible allocation candidates
-                    alloc_candidate = allocate_across_devices(
-                        sorted_dev_allocs[:n_dev],
-                        remaining_alloc,
-                        slot_name,
-                    )
-                    max_evenness = measure_evenness(alloc_candidate)
-                    # three criteria to decide allocation are
-                    # eveness, number of resources used, and amount of fragmentatino
-                    alloc_candidate_arr = [
-                        (
-                            alloc_candidate,
-                            max_evenness,
-                            -len(alloc_candidate),
-                            -measure_fragmentation(alloc_candidate, min_memory),
-                        ),
-                    ]
-                    for idx in range(1, len(sorted_dev_allocs) - n_dev + 1):
-                        # update amount of allocatable space
-                        allocatable -= (
-                            self.device_slots[sorted_dev_allocs[idx - 1][0]].amount
-                            - sorted_dev_allocs[idx - 1][1]
-                        )
-                        allocatable += (
-                            self.device_slots[sorted_dev_allocs[idx + n_dev - 1][0]].amount
-                            - sorted_dev_allocs[idx + n_dev - 1][1]
-                        )
-                        # break if not enough resource
-                        if allocatable.quantize(self.digits) < remaining_alloc.quantize(
-                            self.digits
-                        ):
-                            break
-                        alloc_candidate = allocate_across_devices(
-                            sorted_dev_allocs[idx : idx + n_dev],
-                            remaining_alloc,
-                            slot_name,
-                        )
-                        # evenness gets worse (or same at best) as the allocatable gets smaller
-                        evenness_score = measure_evenness(alloc_candidate)
-                        if evenness_score < max_evenness:
-                            break
-                        alloc_candidate_arr.append(
-                            (
-                                alloc_candidate,
-                                evenness_score,
-                                -len(alloc_candidate),
-                                -measure_fragmentation(alloc_candidate, min_memory),
-                            ),
-                        )
-                    # since evenness is the same, sort by fragmentation (low is good)
-                    best_alloc_candidate_arr.append(
-                        sorted(alloc_candidate_arr, key=lambda x: x[2])[-1],
-                    )
-                    # there is no need to look at more devices if the desired evenness is achieved
-                    if max_evenness.quantize(self.digits) == self.digits:
-                        best_alloc_candidate_arr = best_alloc_candidate_arr[-1:]
-                        break
-                # choose the best allocation with the three criteria
-                slot_allocation = sorted(
-                    best_alloc_candidate_arr,
-                    key=operator.itemgetter(1, 2, 3),
-                )[-1][0]
             allocation[slot_name] = slot_allocation
             for dev_id, value in slot_allocation.items():
                 self.allocations[slot_name][dev_id] += value

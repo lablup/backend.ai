@@ -1,7 +1,8 @@
 from __future__ import annotations
 
+import random
 from collections import defaultdict
-from collections.abc import MutableMapping, Sequence
+from collections.abc import Mapping, MutableMapping, Sequence
 from decimal import Decimal
 from pprint import pprint
 from typing import Any
@@ -15,6 +16,7 @@ from ai.backend.agent.alloc_map import (
     DiscretePropertyAllocMap,
     FractionAllocMap,
 )
+from ai.backend.agent.errors import FractionalResourceFragmented, InsufficientResource
 from ai.backend.agent.resources import AbstractComputeDevice
 from ai.backend.common.exception import ConfigurationError
 from ai.backend.common.types import DeviceId, DeviceName, SlotName, SlotTypes
@@ -844,3 +846,191 @@ def test_affinity_map_secondary_allocation_simulated_with_multiple_capacity(
         assert cpu_alloc_per_node[0] == Decimal(8)
         assert cpu_alloc_per_node[1] == Decimal(9)
         assert cpu_alloc_per_node[2] == Decimal(9)
+
+
+CUDA_SLOT = SlotName("cuda.shares")
+
+
+def _build_cuda_devices(numa_nodes: Sequence[int]) -> list[AbstractComputeDevice]:
+    return [
+        DummyDevice(
+            DeviceId(str(idx)), "", 0, 1, numa_node=numa_node, device_name=DeviceName("cuda")
+        )
+        for idx, numa_node in enumerate(numa_nodes)
+    ]
+
+
+def _build_cuda_alloc_map(
+    devices: Sequence[AbstractComputeDevice],
+    current_allocations: Sequence[str],
+) -> FractionAllocMap:
+    alloc_map = FractionAllocMap(
+        device_slots={
+            device.device_id: DeviceSlotInfo(SlotTypes.COUNT, CUDA_SLOT, Decimal(1))
+            for device in devices
+        },
+        allocation_strategy=AllocationStrategy.EVENLY,
+    )
+    for device, current_alloc in zip(devices, current_allocations, strict=True):
+        alloc_map.allocations[CUDA_SLOT][device.device_id] = Decimal(current_alloc)
+    return alloc_map
+
+
+def _assert_within_device_capacity(alloc_map: FractionAllocMap) -> None:
+    for dev_id, alloc in alloc_map.allocations[CUDA_SLOT].items():
+        assert Decimal(0) <= alloc <= alloc_map.device_slots[dev_id].amount
+
+
+@pytest.mark.parametrize(
+    "affinity_policy", [AffinityPolicy.INTERLEAVED, AffinityPolicy.PREFER_SINGLE_NODE]
+)
+def test_fraction_alloc_map_even_prefers_whole_devices_on_two_numa_nodes(
+    affinity_policy: AffinityPolicy,
+) -> None:
+    # The GPU 0 and 3 are entirely free and belong to the same NUMA node,
+    # so the 2 fGPU request must take them instead of splitting over the used ones.
+    devices = _build_cuda_devices([0, 0, 0, 0, 1, 1, 1, 1])
+    alloc_map = _build_cuda_alloc_map(devices, ["0", "0.5", "1.0", "0", "0.5", "1.0", "1.0", "0.6"])
+    affinity_map = AffinityMap.build(devices)
+
+    result = alloc_map.allocate(
+        {CUDA_SLOT: Decimal("2")},
+        affinity_hint=AffinityHint(None, affinity_map, affinity_policy),
+    )
+
+    assert result[CUDA_SLOT] == {
+        DeviceId("0"): Decimal("1.00"),
+        DeviceId("3"): Decimal("1.00"),
+    }
+    _assert_within_device_capacity(alloc_map)
+
+
+def test_fraction_alloc_map_even_keeps_multi_device_allocation_in_one_numa_node() -> None:
+    devices = _build_cuda_devices([0, 0, 1, 1])
+    alloc_map = _build_cuda_alloc_map(devices, ["0", "0", "0", "0"])
+    affinity_map = AffinityMap.build(devices)
+
+    result = alloc_map.allocate(
+        {CUDA_SLOT: Decimal("2")},
+        affinity_hint=AffinityHint(None, affinity_map, AffinityPolicy.INTERLEAVED),
+    )
+
+    assert len(result[CUDA_SLOT]) == 2
+    used_numa_nodes = {
+        device.numa_node for device in devices if device.device_id in result[CUDA_SLOT]
+    }
+    assert len(used_numa_nodes) == 1
+
+
+def test_fraction_alloc_map_even_fits_in_one_device_across_numa_nodes() -> None:
+    # The preferred NUMA node has no device that can hold the request alone,
+    # while the other node has an entirely free one.
+    devices = _build_cuda_devices([0, 0, 1, 1])
+    alloc_map = _build_cuda_alloc_map(devices, ["0.45", "0.45", "0", "1.0"])
+    affinity_map = AffinityMap.build(devices)
+
+    result = alloc_map.allocate(
+        {CUDA_SLOT: Decimal("1")},
+        affinity_hint=AffinityHint(None, affinity_map, AffinityPolicy.INTERLEAVED),
+    )
+
+    assert result[CUDA_SLOT] == {DeviceId("2"): Decimal("1.00")}
+    _assert_within_device_capacity(alloc_map)
+
+
+def test_fraction_alloc_map_even_raises_when_allocatable_is_insufficient() -> None:
+    devices = _build_cuda_devices([0, 0, 1, 1])
+    alloc_map = _build_cuda_alloc_map(devices, ["0.5", "0.5", "0.5", "0.5"])
+    affinity_map = AffinityMap.build(devices)
+
+    with pytest.raises(InsufficientResource):
+        alloc_map.allocate(
+            {CUDA_SLOT: Decimal("3")},
+            affinity_hint=AffinityHint(None, affinity_map, AffinityPolicy.INTERLEAVED),
+        )
+
+
+def test_fraction_alloc_map_even_raises_when_fragmentation_is_disallowed() -> None:
+    devices = _build_cuda_devices([0, 0, 1, 1])
+    alloc_map = _build_cuda_alloc_map(devices, ["0.8", "0.8", "0.8", "0.8"])
+    affinity_map = AffinityMap.build(devices)
+
+    with pytest.raises(FractionalResourceFragmented):
+        alloc_map.allocate(
+            {CUDA_SLOT: Decimal("0.4")},
+            affinity_hint=AffinityHint(None, affinity_map, AffinityPolicy.INTERLEAVED),
+            allow_resource_fragmentation=False,
+        )
+
+
+def test_fraction_alloc_map_even_skips_devices_under_min_memory() -> None:
+    devices = _build_cuda_devices([0, 0, 1, 1])
+    alloc_map = _build_cuda_alloc_map(devices, ["0.95", "0", "0", "0"])
+    affinity_map = AffinityMap.build(devices)
+
+    alloc_map.allocate(
+        {CUDA_SLOT: Decimal("2")},
+        affinity_hint=AffinityHint(None, affinity_map, AffinityPolicy.INTERLEAVED),
+        min_memory=Decimal("0.1"),
+    )
+
+    assert alloc_map.allocations[CUDA_SLOT][DeviceId("0")] == Decimal("0.95")
+    _assert_within_device_capacity(alloc_map)
+
+
+def test_fraction_alloc_map_even_on_single_numa_node_is_unchanged() -> None:
+    devices = _build_cuda_devices([0, 0, 0, 0, 0, 0, 0, 0])
+    alloc_map = _build_cuda_alloc_map(devices, ["0", "0.5", "1.0", "0", "0.5", "1.0", "1.0", "0.6"])
+    affinity_map = AffinityMap.build(devices)
+
+    result = alloc_map.allocate(
+        {CUDA_SLOT: Decimal("2")},
+        affinity_hint=AffinityHint(None, affinity_map, AffinityPolicy.INTERLEAVED),
+    )
+
+    assert result[CUDA_SLOT] == {
+        DeviceId("0"): Decimal("1.00"),
+        DeviceId("3"): Decimal("1.00"),
+    }
+
+
+def test_fraction_alloc_map_even_free_restores_the_initial_state() -> None:
+    devices = _build_cuda_devices([0, 0, 1, 1])
+    alloc_map = _build_cuda_alloc_map(devices, ["0", "0", "0", "0"])
+    affinity_map = AffinityMap.build(devices)
+
+    result = alloc_map.allocate(
+        {CUDA_SLOT: Decimal("2.5")},
+        affinity_hint=AffinityHint(None, affinity_map, AffinityPolicy.INTERLEAVED),
+    )
+    alloc_map.free(result)
+
+    for device in devices:
+        assert alloc_map.allocations[CUDA_SLOT][device.device_id] == Decimal(0)
+
+
+def test_fraction_alloc_map_even_never_exceeds_device_capacity() -> None:
+    rng = random.Random(42)
+    for _ in range(200):
+        numa_node_count = rng.choice([1, 2, 4])
+        device_count = rng.choice([4, 8, 16])
+        devices = _build_cuda_devices([idx % numa_node_count for idx in range(device_count)])
+        affinity_map = AffinityMap.build(devices)
+        alloc_map = _build_cuda_alloc_map(devices, ["0"] * device_count)
+        affinity_policy = rng.choice(list(AffinityPolicy))
+        live_allocations: list[Mapping[SlotName, Mapping[DeviceId, Decimal]]] = []
+        for _ in range(40):
+            if live_allocations and rng.random() < 0.35:
+                alloc_map.free(live_allocations.pop(rng.randrange(len(live_allocations))))
+                continue
+            requested = Decimal(rng.choice(["0.1", "0.5", "0.6", "1", "1.5", "2", "2.5", "3"]))
+            try:
+                result = alloc_map.allocate(
+                    {CUDA_SLOT: requested},
+                    affinity_hint=AffinityHint(None, affinity_map, affinity_policy),
+                )
+            except InsufficientResource:
+                continue
+            assert sum(result[CUDA_SLOT].values()) == requested
+            _assert_within_device_capacity(alloc_map)
+            live_allocations.append(result)
