@@ -19,7 +19,6 @@ import sqlalchemy as sa
 from dateutil.tz import tzutc
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
 
-from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
 from ai.backend.common.data.entity.agent import AgentUUID
 from ai.backend.common.data.entity.domain import DomainID, DomainName
 from ai.backend.common.data.entity.resource_group import ResourceGroupID
@@ -36,7 +35,6 @@ from ai.backend.common.types import (
     SlotName,
     SlotQuantity,
     SlotTypes,
-    ValkeyTarget,
 )
 from ai.backend.manager.data.agent.types import AgentStatus
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
@@ -581,39 +579,14 @@ class TestCheckPresetsOccupiedSlots:
         return mock
 
     @pytest.fixture
-    async def valkey_stat_client(
-        self,
-        redis_container: tuple[str, tuple[str, int]],
-    ) -> AsyncGenerator[ValkeyStatClient, None]:
-        """Create ValkeyStatClient with real Redis container"""
-        _, redis_addr = redis_container
-
-        valkey_target = ValkeyTarget(
-            addr=f"{redis_addr[0]}:{redis_addr[1]}",
-        )
-
-        client = await ValkeyStatClient.create(
-            valkey_target=valkey_target,
-            db_id=0,
-            human_readable_name="test-valkey-stat-preset",
-        )
-
-        try:
-            yield client
-        finally:
-            await client.close()
-
-    @pytest.fixture
     async def repository(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        valkey_stat_client: ValkeyStatClient,
         mock_config_provider: MagicMock,
     ) -> AsyncGenerator[ResourcePresetRepository, None]:
-        """Create ResourcePresetRepository instance with real cache"""
+        """Create ResourcePresetRepository instance"""
         repo = ResourcePresetRepository(
             db=db_with_cleanup,
-            valkey_stat=valkey_stat_client,
             config_provider=mock_config_provider,
             v2_ops_provider=ShareOpsProvider(db_with_cleanup),
         )
@@ -636,7 +609,6 @@ class TestCheckPresetsOccupiedSlots:
         """
         Test that RUNNING kernels contribute to occupied slots.
         Expected: available_slots - RUNNING kernel's occupied_slots
-        Tests both DB source and cache layer (cache miss → DB fetch).
         """
         async with db_with_cleanup.begin_session() as db_sess:
             # Create session and kernel with RUNNING status
@@ -715,7 +687,7 @@ class TestCheckPresetsOccupiedSlots:
                 )
             await db_sess.flush()
 
-        # Test: Repository.check_presets should calculate from kernel (cache miss → DB)
+        # Test: Repository.check_presets should calculate from kernel
         # Get group name for the API call
         async with db_with_cleanup.begin_readonly_session() as db_sess:
             group_result = await db_sess.execute(
@@ -768,7 +740,6 @@ class TestCheckPresetsOccupiedSlots:
     ) -> None:
         """
         Test that TERMINATING kernels also contribute to occupied slots.
-        Tests Repository layer with cache miss → DB fetch.
         """
         async with db_with_cleanup.begin_session() as db_sess:
             # Create session and kernel with TERMINATING status
@@ -897,7 +868,6 @@ class TestCheckPresetsOccupiedSlots:
     ) -> None:
         """
         Test that PENDING kernels DO NOT contribute to occupied slots.
-        Tests Repository layer with cache miss → DB fetch.
         """
         async with db_with_cleanup.begin_session() as db_sess:
             # Create session and kernel with PENDING status
@@ -1018,7 +988,6 @@ class TestCheckPresetsOccupiedSlots:
         """
         Test that Repository.check_presets ignores AgentRow.occupied_slots (cached value)
         and calculates from actual kernel states even when cached value is wrong.
-        Tests Repository layer with cache miss → DB fetch.
         """
         # Create agent with WRONG cached occupied_slots
         agent_id = AgentId(f"agent-wrong-cache-{uuid.uuid4().hex[:8]}")
@@ -1499,39 +1468,14 @@ class TestCheckPresetsZeroValues:
         return mock
 
     @pytest.fixture
-    async def valkey_stat_client(
-        self,
-        redis_container: tuple[str, tuple[str, int]],
-    ) -> AsyncGenerator[ValkeyStatClient, None]:
-        """Create ValkeyStatClient with real Redis container."""
-        _, redis_addr = redis_container
-
-        valkey_target = ValkeyTarget(
-            addr=f"{redis_addr[0]}:{redis_addr[1]}",
-        )
-
-        client = await ValkeyStatClient.create(
-            valkey_target=valkey_target,
-            db_id=0,
-            human_readable_name="test-valkey-stat-zero",
-        )
-
-        try:
-            yield client
-        finally:
-            await client.close()
-
-    @pytest.fixture
     async def repository(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        valkey_stat_client: ValkeyStatClient,
         mock_config_provider: MagicMock,
     ) -> AsyncGenerator[ResourcePresetRepository, None]:
         """Create ResourcePresetRepository instance with real cache."""
         repo = ResourcePresetRepository(
             db=db_with_cleanup,
-            valkey_stat=valkey_stat_client,
             config_provider=mock_config_provider,
             v2_ops_provider=ShareOpsProvider(db_with_cleanup),
         )

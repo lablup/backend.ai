@@ -127,11 +127,10 @@ def etcd_config_processors(
 def resource_preset_processors(
     database_engine: ExtendedAsyncSAEngine,
     config_provider: ManagerConfigProvider,
-    valkey_clients: ValkeyClients,
     processor_registry: ProcessorRegistry[Any],
 ) -> ResourcePresetProcessors:
     repo = ResourcePresetRepository(
-        database_engine, valkey_clients.stat, config_provider, ShareOpsProvider(database_engine)
+        database_engine, config_provider, ShareOpsProvider(database_engine)
     )
     service = ResourcePresetService(repo)
     return ResourcePresetProcessors(
