@@ -52,6 +52,9 @@ from ai.backend.common.types import (
 from .errors import InvalidCircuitDataError, InvalidFrontendTypeError
 
 if TYPE_CHECKING:
+    from ai.backend.appproxy.worker.ingress.circuit import CircuitIngressSync
+    from ai.backend.appproxy.worker.ingress.factory import IngressState
+
     from .config import ServerConfig
     from .proxy.frontend.base import BaseFrontend
 
@@ -325,6 +328,8 @@ class RootContext:
     cors_options: dict[str, aiohttp_cors.ResourceOptions]
     metrics: WorkerMetricRegistry
     health_probe: HealthProbe
+    ingress_state: IngressState
+    circuit_ingress_sync: CircuitIngressSync | None
 
 
 type CleanupContext = Callable[["RootContext"], AbstractAsyncContextManager[None]]
