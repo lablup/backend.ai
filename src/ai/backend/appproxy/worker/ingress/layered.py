@@ -3,6 +3,7 @@ from __future__ import annotations
 from collections.abc import Sequence
 from typing import override
 
+from ai.backend.appproxy.worker.errors.ingress import IngressNotFoundError
 from ai.backend.appproxy.worker.ingress.abc import IngressReader
 from ai.backend.appproxy.worker.ingress.in_memory import InMemoryIngressState
 from ai.backend.appproxy.worker.ingress.redis import RedisIngressState
@@ -12,7 +13,7 @@ from ai.backend.common.dto.appproxy.v2.ingress.types import Ingress, IngressFron
 class LayeredIngressState(IngressReader):
     """Reads the in-memory layer in front of Redis; a Redis hit is applied to memory.
 
-    A key memory knows missing raises IngressNotFoundError; one no layer holds reads as None.
+    A key memory knows missing, or one no layer holds, reads as None.
     """
 
     _memory: InMemoryIngressState | None
@@ -30,16 +31,17 @@ class LayeredIngressState(IngressReader):
 
     @override
     async def get(self, frontend_key: IngressFrontendKey) -> Ingress | None:
-        ingress = await self._read_in_memory(frontend_key)
+        try:
+            ingress = await self._read_in_memory(frontend_key)
+        except IngressNotFoundError:
+            # The key was remembered missing on purpose to skip reading Redis.
+            return None
         if ingress is not None:
             return ingress
         return await self._read_redis(frontend_key)
 
     async def _read_in_memory(self, frontend_key: IngressFrontendKey) -> Ingress | None:
-        """Reads memory.
-
-        A key remembered missing on purpose raises IngressNotFoundError so Redis is not read.
-        """
+        """Reads memory; a key it remembers missing raises IngressNotFoundError."""
         if self._memory is None:
             return None
         return await self._memory.get(frontend_key)
