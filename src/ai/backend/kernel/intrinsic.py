@@ -192,8 +192,8 @@ async def prepare_ttyd_service(service_info: Mapping[str, Any]) -> tuple[list[st
     command = [f"/bin/{shell}"]
     if shell != "ash":  # Currently prebuilt tmux in Alpine-based containers is not supported.
         command += ["-c", f"export SHELL=/bin/{shell}; /opt/kernel/tmux -2 attach"]
-    # A session created before etty keeps its saved ttyd mount when restarted.
-    # TODO: drop this and the ttyd binaries once a restart rebuilds the runner mounts.
+    # Both are mounted and etty goes first. A session created before etty has only
+    # ttyd, since a restart reuses its saved mounts.
     if not Path("/opt/kernel/etty").exists():
         return ["/opt/kernel/ttyd", "-W", "-p", str(service_info["port"]), *command], {}
     # etty joins positional arguments with spaces and re-splits them, so the command
