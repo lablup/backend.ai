@@ -22021,7 +22021,8 @@
                 "type": "null"
               }
             ],
-            "description": "Updated role status. Omit to leave unchanged.",
+            "deprecated": true,
+            "description": "Deprecated since 26.10.0. Use the role delete and restore operations. Accepted and ignored.",
             "title": "Status"
           },
           "auto_assign": {
@@ -22038,6 +22039,90 @@
           }
         },
         "title": "UpdateRoleInput",
+        "type": "object"
+      },
+      "NonEmptyList_PartialBulkUpdateRoleItemInput_": {
+        "items": {
+          "$ref": "#/components/schemas/PartialBulkUpdateRoleItemInput"
+        },
+        "minItems": 1,
+        "type": "array"
+      },
+      "PartialBulkUpdateRoleItemInput": {
+        "description": "One role of a partial bulk update and the fields to update on it.",
+        "properties": {
+          "id": {
+            "description": "ID of the role to update.",
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "input": {
+            "$ref": "#/components/schemas/UpdateRoleInput",
+            "description": "Fields to update on the role."
+          }
+        },
+        "required": [
+          "id",
+          "input"
+        ],
+        "title": "PartialBulkUpdateRoleItemInput",
+        "type": "object"
+      },
+      "PartialBulkUpdateRolesInput": {
+        "description": "Input for updating several roles, each answered for separately.",
+        "properties": {
+          "items": {
+            "$ref": "#/components/schemas/NonEmptyList_PartialBulkUpdateRoleItemInput_",
+            "description": "The roles to update, each with its fields."
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "title": "PartialBulkUpdateRolesInput",
+        "type": "object"
+      },
+      "PartialBulkDeleteRolesInput": {
+        "description": "Input for soft-deleting several roles, each answered for separately.",
+        "properties": {
+          "ids": {
+            "$ref": "#/components/schemas/NonEmptyList_UUID_",
+            "description": "IDs of the roles to soft-delete."
+          }
+        },
+        "required": [
+          "ids"
+        ],
+        "title": "PartialBulkDeleteRolesInput",
+        "type": "object"
+      },
+      "PartialBulkRestoreRolesInput": {
+        "description": "Input for restoring several soft-deleted roles, each answered for separately.",
+        "properties": {
+          "ids": {
+            "$ref": "#/components/schemas/NonEmptyList_UUID_",
+            "description": "IDs of the roles to restore."
+          }
+        },
+        "required": [
+          "ids"
+        ],
+        "title": "PartialBulkRestoreRolesInput",
+        "type": "object"
+      },
+      "PartialBulkPurgeRolesInput": {
+        "description": "Input for permanently removing several roles, each answered for separately.",
+        "properties": {
+          "ids": {
+            "$ref": "#/components/schemas/NonEmptyList_UUID_",
+            "description": "IDs of the roles to purge."
+          }
+        },
+        "required": [
+          "ids"
+        ],
+        "title": "PartialBulkPurgeRolesInput",
         "type": "object"
       },
       "DeleteRoleInput": {
@@ -54674,12 +54759,213 @@
             }
           }
         ],
-        "description": "Update an existing role.\n\n**Preconditions:**\n* Superadmin privilege required.\n"
+        "description": "Update an existing role.\n\n**Preconditions:**\n* User privilege required.\n"
+      },
+      "delete": {
+        "operationId": "v2/rbac.purge_role",
+        "tags": [
+          "v2/rbac"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "role_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "description": "Hard-delete a role from the database.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/v2/rbac/roles/{role_id}/delete": {
+      "post": {
+        "operationId": "v2/rbac.delete_role",
+        "tags": [
+          "v2/rbac"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "role_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "description": "Soft-delete a role (marks status as DELETED).\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/v2/rbac/roles/{role_id}/restore": {
+      "post": {
+        "operationId": "v2/rbac.restore_role",
+        "tags": [
+          "v2/rbac"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "role_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "description": "Restore a soft-deleted role (marks status as ACTIVE).\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/v2/rbac/roles/partial-bulk-update": {
+      "post": {
+        "operationId": "v2/rbac.partial_bulk_update_roles",
+        "tags": [
+          "v2/rbac"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PartialBulkUpdateRolesInput"
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "description": "Update several roles, answering for each one.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/v2/rbac/roles/partial-bulk-delete": {
+      "post": {
+        "operationId": "v2/rbac.partial_bulk_delete_roles",
+        "tags": [
+          "v2/rbac"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PartialBulkDeleteRolesInput"
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "description": "Soft-delete several roles, answering for each one.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/v2/rbac/roles/partial-bulk-restore": {
+      "post": {
+        "operationId": "v2/rbac.partial_bulk_restore_roles",
+        "tags": [
+          "v2/rbac"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PartialBulkRestoreRolesInput"
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "description": "Restore several soft-deleted roles, answering for each one.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/v2/rbac/roles/partial-bulk-purge": {
+      "post": {
+        "operationId": "v2/rbac.partial_bulk_purge_roles",
+        "tags": [
+          "v2/rbac"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PartialBulkPurgeRolesInput"
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "description": "Permanently remove several roles, answering for each one.\n\n**Preconditions:**\n* User privilege required.\n"
       }
     },
     "/v2/rbac/roles/delete": {
       "post": {
-        "operationId": "v2/rbac.delete_role",
+        "operationId": "v2/rbac.admin_delete_role",
         "tags": [
           "v2/rbac"
         ],
@@ -54703,12 +54989,12 @@
           }
         },
         "parameters": [],
-        "description": "Soft-delete a role (marks status as DELETED).\n\n**Preconditions:**\n* Superadmin privilege required.\n"
+        "description": "Deprecated. Use `POST /v2/rbac/roles/{role_id}/delete`.\n\n**Preconditions:**\n* Superadmin privilege required.\n"
       }
     },
     "/v2/rbac/roles/purge": {
       "post": {
-        "operationId": "v2/rbac.purge_role",
+        "operationId": "v2/rbac.admin_purge_role",
         "tags": [
           "v2/rbac"
         ],
@@ -54732,7 +55018,7 @@
           }
         },
         "parameters": [],
-        "description": "Hard-delete a role from the database.\n\n**Preconditions:**\n* Superadmin privilege required.\n"
+        "description": "Deprecated. Use `DELETE /v2/rbac/roles/{role_id}`.\n\n**Preconditions:**\n* Superadmin privilege required.\n"
       }
     },
     "/v2/rbac/roles/my/search": {

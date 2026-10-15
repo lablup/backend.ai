@@ -359,9 +359,13 @@ from ai.backend.manager.api.gql.rbac.resolver.permission import (
     admin_update_permission,
     my_atomic_bulk_scope_permissions,
     my_scope_permissions,
+    partial_bulk_add_role_permissions,
+    partial_bulk_remove_role_permissions,
+    purge_permission,
     rbac_entity_operation_combinations,
     rbac_permission_matrix,
     rbac_scope_entity_combinations,
+    update_permission,
 )
 from ai.backend.manager.api.gql.rbac.resolver.role import (
     admin_assign_role,
@@ -375,9 +379,21 @@ from ai.backend.manager.api.gql.rbac.resolver.role import (
     admin_role_assignments,
     admin_roles,
     admin_update_role,
+    assign_role,
+    delete_role,
     my_roles,
     my_roles_v2,
+    partial_bulk_assign_roles,
+    partial_bulk_delete_roles,
+    partial_bulk_purge_roles,
+    partial_bulk_restore_roles,
+    partial_bulk_revoke_roles,
+    partial_bulk_update_roles,
     project_roles,
+    purge_role,
+    restore_role,
+    revoke_role,
+    update_role,
 )
 from ai.backend.manager.api.gql.resource_allocation.resolver import (
     admin_domain_resource_allocation_v2,
@@ -1112,6 +1128,22 @@ class Mutation:
     admin_bulk_add_role_permissions = admin_bulk_add_role_permissions
     admin_bulk_remove_role_permissions = admin_bulk_remove_role_permissions
     admin_replace_role_permissions = admin_replace_role_permissions
+    update_role = update_role
+    delete_role = delete_role
+    restore_role = restore_role
+    purge_role = purge_role
+    partial_bulk_update_roles = partial_bulk_update_roles
+    partial_bulk_delete_roles = partial_bulk_delete_roles
+    partial_bulk_restore_roles = partial_bulk_restore_roles
+    partial_bulk_purge_roles = partial_bulk_purge_roles
+    update_permission = update_permission
+    purge_permission = purge_permission
+    partial_bulk_add_role_permissions = partial_bulk_add_role_permissions
+    partial_bulk_remove_role_permissions = partial_bulk_remove_role_permissions
+    assign_role = assign_role
+    revoke_role = revoke_role
+    partial_bulk_assign_roles = partial_bulk_assign_roles
+    partial_bulk_revoke_roles = partial_bulk_revoke_roles
     create_role_invitation = create_role_invitation
     accept_role_invitation = accept_role_invitation
     reject_role_invitation = reject_role_invitation

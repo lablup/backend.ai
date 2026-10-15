@@ -45,6 +45,7 @@ __all__ = (
     "PurgeRolePayload",
     "ReplaceRolePermissionFailureInfo",
     "ReplaceRolePermissionsPayload",
+    "RestoreRolePayload",
     "RoleAssignmentNode",
     "RoleNode",
     "ScopeEntityCombinationInfo",
@@ -103,6 +104,12 @@ class DeleteRolePayload(BaseResponseModel):
     """Payload for role soft-deletion mutation result."""
 
     id: UUID = Field(description="ID of the deleted role")
+
+
+class RestoreRolePayload(BaseResponseModel):
+    """Payload for role restore mutation result."""
+
+    id: UUID = Field(description="ID of the restored role")
 
 
 class PurgeRolePayload(BaseResponseModel):

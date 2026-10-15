@@ -14633,49 +14633,109 @@ type Mutation
   adminCreateRole(input: CreateRoleInput!): Role @join__field(graph: STRAWBERRY)
 
   """Added in 26.3.0. Update an existing role (admin only)."""
-  adminUpdateRole(input: UpdateRoleInput!): Role @join__field(graph: STRAWBERRY)
+  adminUpdateRole(input: UpdateRoleInput!): Role @join__field(graph: STRAWBERRY) @deprecated(reason: "Deprecated since 26.10.0. Use `updateRole`.")
 
   """Added in 26.3.0. Soft-delete a role (admin only)."""
-  adminDeleteRole(input: DeleteRoleInput!): DeleteRolePayload @join__field(graph: STRAWBERRY)
+  adminDeleteRole(input: DeleteRoleInput!): DeleteRolePayload @join__field(graph: STRAWBERRY) @deprecated(reason: "Deprecated since 26.10.0. Use `deleteRole`.")
 
   """Added in 26.3.0. Permanently remove a role (admin only)."""
-  adminPurgeRole(input: PurgeRoleInput!): PurgeRolePayload @join__field(graph: STRAWBERRY)
+  adminPurgeRole(input: PurgeRoleInput!): PurgeRolePayload @join__field(graph: STRAWBERRY) @deprecated(reason: "Deprecated since 26.10.0. Use `purgeRole`.")
 
   """Added in 26.3.0. Create a scoped permission (admin only)."""
   adminCreatePermission(input: CreatePermissionInput!): Permission @join__field(graph: STRAWBERRY)
 
   """Added in 26.3.0. Update a scoped permission (admin only)."""
-  adminUpdatePermission(input: UpdatePermissionInput!): Permission @join__field(graph: STRAWBERRY)
+  adminUpdatePermission(input: UpdatePermissionInput!): Permission @join__field(graph: STRAWBERRY) @deprecated(reason: "Deprecated since 26.10.0. Use `updatePermission`.")
 
   """Added in 26.3.0. Delete a scoped permission (admin only)."""
-  adminDeletePermission(input: DeletePermissionInput!): DeletePermissionPayload @join__field(graph: STRAWBERRY)
+  adminDeletePermission(input: DeletePermissionInput!): DeletePermissionPayload @join__field(graph: STRAWBERRY) @deprecated(reason: "Deprecated since 26.10.0. Use `purgePermission`.")
 
   """Added in 26.3.0. Assign a role to a user (admin only)."""
-  adminAssignRole(input: AssignRoleInput!): RoleAssignment @join__field(graph: STRAWBERRY)
+  adminAssignRole(input: AssignRoleInput!): RoleAssignment @join__field(graph: STRAWBERRY) @deprecated(reason: "Deprecated since 26.10.0. Use `assignRole`.")
 
   """Added in 26.3.0. Revoke a role from a user (admin only)."""
-  adminRevokeRole(input: RevokeRoleInput!): RoleAssignment @join__field(graph: STRAWBERRY)
+  adminRevokeRole(input: RevokeRoleInput!): RoleAssignment @join__field(graph: STRAWBERRY) @deprecated(reason: "Deprecated since 26.10.0. Use `revokeRole`.")
 
   """Added in 26.3.0. Bulk assign a role to multiple users (admin only)."""
-  adminBulkAssignRole(input: BulkAssignRoleInput!): BulkAssignRolePayload @join__field(graph: STRAWBERRY)
+  adminBulkAssignRole(input: BulkAssignRoleInput!): BulkAssignRolePayload @join__field(graph: STRAWBERRY) @deprecated(reason: "Deprecated since 26.10.0. Use `partialBulkAssignRoles`.")
 
   """Added in 26.3.0. Bulk revoke a role from multiple users (admin only)."""
-  adminBulkRevokeRole(input: BulkRevokeRoleInput!): BulkRevokeRolePayload @join__field(graph: STRAWBERRY)
+  adminBulkRevokeRole(input: BulkRevokeRoleInput!): BulkRevokeRolePayload @join__field(graph: STRAWBERRY) @deprecated(reason: "Deprecated since 26.10.0. Use `partialBulkRevokeRoles`.")
 
   """
   Added in 26.4.4. Bulk-insert scoped permission rows across one or more roles (admin only).
   """
-  adminBulkAddRolePermissions(input: BulkAddRolePermissionsInput!): BulkAddRolePermissionsPayload @join__field(graph: STRAWBERRY)
+  adminBulkAddRolePermissions(input: BulkAddRolePermissionsInput!): BulkAddRolePermissionsPayload @join__field(graph: STRAWBERRY) @deprecated(reason: "Deprecated since 26.10.0. Use `partialBulkAddRolePermissions`.")
 
   """
   Added in 26.4.4. Bulk-delete permission rows by primary key (admin only).
   """
-  adminBulkRemoveRolePermissions(input: BulkRemoveRolePermissionsInput!): BulkRemoveRolePermissionsPayload @join__field(graph: STRAWBERRY)
+  adminBulkRemoveRolePermissions(input: BulkRemoveRolePermissionsInput!): BulkRemoveRolePermissionsPayload @join__field(graph: STRAWBERRY) @deprecated(reason: "Deprecated since 26.10.0. Use `partialBulkRemoveRolePermissions`.")
 
   """
   Added in 26.4.4. Replace one role's entire scoped-permission set (admin only).
   """
   adminReplaceRolePermissions(input: ReplaceRolePermissionsInput!): ReplaceRolePermissionsPayload @join__field(graph: STRAWBERRY)
+
+  """Added in 26.10.0. Update a role. Only provided fields will be updated."""
+  updateRole(id: UUID!, input: UpdateRoleInput!): Role! @join__field(graph: STRAWBERRY)
+
+  """Added in 26.10.0. Soft-delete a role."""
+  deleteRole(id: UUID!): DeleteRolePayload! @join__field(graph: STRAWBERRY)
+
+  """Added in 26.10.0. Restore a soft-deleted role."""
+  restoreRole(id: UUID!): RestoreRolePayload! @join__field(graph: STRAWBERRY)
+
+  """Added in 26.10.0. Permanently remove a role."""
+  purgeRole(id: UUID!): PurgeRolePayload! @join__field(graph: STRAWBERRY)
+
+  """Added in 26.10.0. Update several roles, answering for each one."""
+  partialBulkUpdateRoles(input: PartialBulkUpdateRolesInput!): PartialBulkRolesPayload! @join__field(graph: STRAWBERRY)
+
+  """Added in 26.10.0. Soft-delete several roles, answering for each one."""
+  partialBulkDeleteRoles(input: PartialBulkDeleteRolesInput!): PartialBulkRolesPayload! @join__field(graph: STRAWBERRY)
+
+  """
+  Added in 26.10.0. Restore several soft-deleted roles, answering for each one.
+  """
+  partialBulkRestoreRoles(input: PartialBulkRestoreRolesInput!): PartialBulkRolesPayload! @join__field(graph: STRAWBERRY)
+
+  """
+  Added in 26.10.0. Permanently remove several roles, answering for each one.
+  """
+  partialBulkPurgeRoles(input: PartialBulkPurgeRolesInput!): PartialBulkRolesPayload! @join__field(graph: STRAWBERRY)
+
+  """Added in 26.10.0. Update a scoped permission."""
+  updatePermission(input: UpdatePermissionInput!): Permission! @join__field(graph: STRAWBERRY)
+
+  """Added in 26.10.0. Permanently remove a scoped permission."""
+  purgePermission(id: UUID!): DeletePermissionPayload! @join__field(graph: STRAWBERRY)
+
+  """
+  Added in 26.10.0. Insert scoped permission rows across one or more roles, answering for each one.
+  """
+  partialBulkAddRolePermissions(input: BulkAddRolePermissionsInput!): BulkAddRolePermissionsPayload! @join__field(graph: STRAWBERRY)
+
+  """
+  Added in 26.10.0. Remove permission rows by primary key, answering for each one.
+  """
+  partialBulkRemoveRolePermissions(input: BulkRemoveRolePermissionsInput!): BulkRemoveRolePermissionsPayload! @join__field(graph: STRAWBERRY)
+
+  """Added in 26.10.0. Assign a role to a user."""
+  assignRole(input: AssignRoleInput!): RoleAssignment! @join__field(graph: STRAWBERRY)
+
+  """Added in 26.10.0. Revoke a role from a user."""
+  revokeRole(input: RevokeRoleInput!): RoleAssignment! @join__field(graph: STRAWBERRY)
+
+  """
+  Added in 26.10.0. Assign a role to several users, answering for each one.
+  """
+  partialBulkAssignRoles(input: BulkAssignRoleInput!): BulkAssignRolePayload! @join__field(graph: STRAWBERRY)
+
+  """
+  Added in 26.10.0. Revoke a role from several users, answering for each one.
+  """
+  partialBulkRevokeRoles(input: BulkRevokeRoleInput!): BulkRevokeRolePayload! @join__field(graph: STRAWBERRY)
 
   """
   Added in 26.4.4. Create role invitations by email. Deprecated since 26.9.0.
@@ -15552,6 +15612,16 @@ input PartialBulkDeleteProjectsInput
 }
 
 """
+Added in 26.10.0. Input for soft-deleting several roles, each answered for separately.
+"""
+input PartialBulkDeleteRolesInput
+  @join__type(graph: STRAWBERRY)
+{
+  """IDs of the roles to soft-delete."""
+  ids: [UUID!]!
+}
+
+"""
 Added in 26.10.0. Input for soft-deleting several vfolders, each answered for separately.
 """
 input PartialBulkDeleteVFoldersInput
@@ -15624,6 +15694,16 @@ type PartialBulkPurgeEntityLabelPayload
 }
 
 """
+Added in 26.10.0. Input for permanently removing several roles, each answered for separately.
+"""
+input PartialBulkPurgeRolesInput
+  @join__type(graph: STRAWBERRY)
+{
+  """IDs of the roles to purge."""
+  ids: [UUID!]!
+}
+
+"""
 Added in 26.10.0. Input for restoring several soft-deleted domains, each answered for separately.
 """
 input PartialBulkRestoreDomainsInput
@@ -15644,6 +15724,16 @@ input PartialBulkRestoreProjectsInput
 }
 
 """
+Added in 26.10.0. Input for restoring several soft-deleted roles, each answered for separately.
+"""
+input PartialBulkRestoreRolesInput
+  @join__type(graph: STRAWBERRY)
+{
+  """IDs of the roles to restore."""
+  ids: [UUID!]!
+}
+
+"""
 Added in 26.10.0. Input for restoring several soft-deleted vfolders, each answered for separately.
 """
 input PartialBulkRestoreVFoldersInput
@@ -15651,6 +15741,19 @@ input PartialBulkRestoreVFoldersInput
 {
   """IDs of the vfolders to restore."""
   ids: [UUID!]!
+}
+
+"""
+Added in 26.10.0. Result of a partial bulk role operation: the roles processed and the ones that failed.
+"""
+type PartialBulkRolesPayload
+  @join__type(graph: STRAWBERRY)
+{
+  """The roles processed, as they now stand."""
+  successes: [Role!]!
+
+  """The roles not processed, each with the reason."""
+  failed: [PartialBulkFailure!]!
 }
 
 """
@@ -15697,6 +15800,29 @@ input PartialBulkUpdateProjectsInput
 {
   """The projects to update, each with its fields."""
   items: [PartialBulkUpdateProjectItemInput!]!
+}
+
+"""
+Added in 26.10.0. One role of a partial bulk update and the fields to update on it.
+"""
+input PartialBulkUpdateRoleItemInput
+  @join__type(graph: STRAWBERRY)
+{
+  """ID of the role to update."""
+  id: UUID!
+
+  """Fields to update on the role."""
+  input: UpdateRoleInput!
+}
+
+"""
+Added in 26.10.0. Input for updating several roles, each answered for separately.
+"""
+input PartialBulkUpdateRolesInput
+  @join__type(graph: STRAWBERRY)
+{
+  """The roles to update, each with its fields."""
+  items: [PartialBulkUpdateRoleItemInput!]!
 }
 
 """
@@ -20785,6 +20911,14 @@ type RestoreProjectPayload
   restored: Boolean!
 }
 
+"""Added in 26.10.0. Payload for restore role mutation."""
+type RestoreRolePayload
+  @join__type(graph: STRAWBERRY)
+{
+  """ID of the restored role."""
+  id: UUID!
+}
+
 """Added in 26.9.0. Payload for single user restore mutation."""
 type RestoreUserV2Payload
   @join__type(graph: STRAWBERRY)
@@ -25707,10 +25841,13 @@ type UpdateRetentionPolicyPayload
 input UpdateRoleInput
   @join__type(graph: STRAWBERRY)
 {
-  id: UUID!
+  """ID of the role to update. Required by `adminUpdateRole`."""
+  id: UUID @deprecated(reason: "Deprecated since 26.10.0. Pass the role ID as the `id` argument of `updateRole`.")
   name: String
   description: String
-  status: RoleStatus
+
+  """Accepted and ignored."""
+  status: RoleStatus @deprecated(reason: "Deprecated since 26.10.0. Use `deleteRole` or `restoreRole`.")
 
   """
   Added in 26.4.4. Updated value for the `auto_assign` flag. When true, the role is automatically granted to a user when the user is added to a scope this role is registered in.
