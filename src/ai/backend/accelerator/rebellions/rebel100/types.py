@@ -2,10 +2,10 @@ from ai.backend.accelerator.rebellions.common.atom_api import ATOMDeviceStat
 from ai.backend.accelerator.rebellions.common.types import AbstractATOMDevice
 from ai.backend.common.types import DeviceId
 
-__all__ = ("RebelDevice",)
+__all__ = ("Rebel100Device",)
 
 
-class RebelDevice(AbstractATOMDevice):
+class Rebel100Device(AbstractATOMDevice):
     model_name: str
     serial: DeviceId
     device_number: int
@@ -28,7 +28,7 @@ class RebelDevice(AbstractATOMDevice):
 
     def __str__(self) -> str:
         return (
-            f"RebelDevice <{self.hw_location}, Memory {self.memory_size}, NUMA Node"
+            f"Rebel100Device <{self.hw_location}, Memory {self.memory_size}, NUMA Node"
             f" #{self.numa_node}>"
         )
 

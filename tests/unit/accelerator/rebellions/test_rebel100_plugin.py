@@ -16,7 +16,7 @@ from ai.backend.accelerator.rebellions.atom_max.plugin import ATOMMaxPlugin
 from ai.backend.accelerator.rebellions.atom_plus.plugin import ATOMPlusPlugin
 from ai.backend.accelerator.rebellions.common.atom_api import ATOMAPI, ATOMStat, LibraryError
 from ai.backend.accelerator.rebellions.common.plugin import AbstractATOMPlugin
-from ai.backend.accelerator.rebellions.rebel.plugin import RebelPlugin
+from ai.backend.accelerator.rebellions.rebel100.plugin import Rebel100Plugin
 from ai.backend.agent.resources import AbstractComputeDevice
 from ai.backend.common.types import DeviceId, SlotName
 
@@ -94,8 +94,8 @@ def smi_json_text() -> str:
 
 
 @pytest.fixture
-def plugin() -> RebelPlugin:
-    plugin = RebelPlugin.__new__(RebelPlugin)
+def plugin() -> Rebel100Plugin:
+    plugin = Rebel100Plugin.__new__(Rebel100Plugin)
     plugin.plugin_config = {}
     plugin.enabled = True
     plugin.device_mask = []
@@ -117,11 +117,11 @@ def patched_stats(smi_json_text: str) -> Iterator[None]:
 
 
 class TestRebelPluginIdentity:
-    def test_key_slot_and_config_name(self, plugin: RebelPlugin) -> None:
-        assert plugin.key == "rebel"
-        assert plugin.slot_types == ((SlotName("rebel.device"), "count"),)
-        assert plugin.exclusive_slot_types == {"rebel.device"}
-        assert plugin.config_name == "rebel"
+    def test_key_slot_and_config_name(self, plugin: Rebel100Plugin) -> None:
+        assert plugin.key == "rebel100"
+        assert plugin.slot_types == ((SlotName("rebel100.device"), "count"),)
+        assert plugin.exclusive_slot_types == {"rebel100.device"}
+        assert plugin.config_name == "rebel100"
         assert plugin.executable_names == ("rbln-smi", "rbln-stat")
         assert plugin.stat_args == ("-j",)
 
@@ -134,12 +134,14 @@ class TestRebelPluginIdentity:
         assert ATOMPlusPlugin.cdi_device_id == "rebellions.ai/npu=runtime"
         assert ATOMPlusPlugin.device_ids_env_var == "ATOM_GLOBAL_DEVICE_IDS"
 
-    def test_metadata(self, plugin: RebelPlugin) -> None:
-        assert plugin.get_metadata()["slot_name"] == "rebel.device"
+    def test_metadata(self, plugin: Rebel100Plugin) -> None:
+        assert plugin.get_metadata()["slot_name"] == "rebel100.device"
 
 
 class TestRebelDeviceEnumeration:
-    async def test_lists_only_rebel_devices(self, plugin: RebelPlugin, patched_stats: None) -> None:
+    async def test_lists_only_rebel_devices(
+        self, plugin: Rebel100Plugin, patched_stats: None
+    ) -> None:
         devices = await plugin.list_devices()
         assert [d.device_id for d in devices] == ["rbln0", "rbln1"]
         assert all(isinstance(d, AbstractComputeDevice) for d in devices)
@@ -148,38 +150,38 @@ class TestRebelDeviceEnumeration:
         assert devices[0].model_name == "RBLN-CR03"
 
     async def test_available_slots_counts_whole_cards(
-        self, plugin: RebelPlugin, patched_stats: None
+        self, plugin: Rebel100Plugin, patched_stats: None
     ) -> None:
-        assert await plugin.available_slots() == {SlotName("rebel.device"): Decimal(2)}
+        assert await plugin.available_slots() == {SlotName("rebel100.device"): Decimal(2)}
 
     async def test_unknown_device_name_is_logged_once(
-        self, plugin: RebelPlugin, patched_stats: None
+        self, plugin: Rebel100Plugin, patched_stats: None
     ) -> None:
-        with patch("ai.backend.accelerator.rebellions.rebel.plugin.log") as mock_log:
+        with patch("ai.backend.accelerator.rebellions.rebel100.plugin.log") as mock_log:
             await plugin._list_devices()
             await plugin._list_devices()
         assert mock_log.warning.call_count == 1
         assert mock_log.warning.call_args.kwargs["device_name"] == "RBLN-CA22"
 
     async def test_configured_device_names_override_prefix(
-        self, plugin: RebelPlugin, patched_stats: None
+        self, plugin: Rebel100Plugin, patched_stats: None
     ) -> None:
         plugin.atom_config["general"]["device_names"] = ["RBLN-CA22"]
         devices = await plugin._list_devices()
         assert [d.device_id for d in devices] == ["rbln2"]
 
-    async def test_device_files(self, plugin: RebelPlugin, patched_stats: None) -> None:
+    async def test_device_files(self, plugin: Rebel100Plugin, patched_stats: None) -> None:
         device = (await plugin.list_devices())[1]
         assert list(await plugin.list_device_files(device)) == ["/dev/rbln1"]
 
 
 class TestRebelContainerArgs:
     async def test_generate_docker_args_whole_card(
-        self, plugin: RebelPlugin, patched_stats: None
+        self, plugin: Rebel100Plugin, patched_stats: None
     ) -> None:
         args = await plugin.generate_docker_args(
             AsyncMock(),
-            {SlotName("rebel.device"): {DeviceId("rbln1"): Decimal(1)}},
+            {SlotName("rebel100.device"): {DeviceId("rbln1"): Decimal(1)}},
         )
         host_config = args["HostConfig"]
         assert host_config["Devices"] == [
@@ -192,26 +194,26 @@ class TestRebelContainerArgs:
         assert host_config["DeviceRequests"][0]["DeviceIDs"] == ["rebellions.ai/npu=runtime"]
         assert "IPC_LOCK" in host_config["CapAdd"]
 
-    async def test_configured_cdi_id(self, plugin: RebelPlugin, patched_stats: None) -> None:
-        plugin.cdi_device_id = "rebellions.ai/rebel=runtime"
+    async def test_configured_cdi_id(self, plugin: Rebel100Plugin, patched_stats: None) -> None:
+        plugin.cdi_device_id = "rebellions.ai/rebel100=runtime"
         args = await plugin.generate_docker_args(
             AsyncMock(),
-            {SlotName("rebel.device"): {DeviceId("rbln0"): Decimal(1)}},
+            {SlotName("rebel100.device"): {DeviceId("rbln0"): Decimal(1)}},
         )
         assert args["HostConfig"]["DeviceRequests"][0]["DeviceIDs"] == [
-            "rebellions.ai/rebel=runtime"
+            "rebellions.ai/rebel100=runtime"
         ]
 
-    async def test_default_env_var(self, plugin: RebelPlugin) -> None:
+    async def test_default_env_var(self, plugin: Rebel100Plugin) -> None:
         data = await plugin.generate_resource_data({
-            SlotName("rebel.device"): {DeviceId("rbln3"): Decimal(1)},
+            SlotName("rebel100.device"): {DeviceId("rbln3"): Decimal(1)},
         })
         assert data == {"ATOM_GLOBAL_DEVICE_IDS": "0:rbln3"}
 
-    async def test_configured_env_var(self, plugin: RebelPlugin) -> None:
+    async def test_configured_env_var(self, plugin: Rebel100Plugin) -> None:
         plugin.device_ids_env_var = "REBEL_GLOBAL_DEVICE_IDS"
         data = await plugin.generate_resource_data({
-            SlotName("rebel.device"): {
+            SlotName("rebel100.device"): {
                 DeviceId("rbln1"): Decimal(1),
                 DeviceId("rbln0"): Decimal(1),
             },
@@ -283,9 +285,9 @@ class TestConfigName:
             (ATOMPlugin, "atom"),
             (ATOMPlusPlugin, "atom"),
             (ATOMMaxPlugin, "atom"),
-            (RebelPlugin, "rebel"),
+            (Rebel100Plugin, "rebel100"),
         ],
-        ids=["atom", "atom-plus", "atom-max", "rebel"],
+        ids=["atom", "atom-plus", "atom-max", "rebel100"],
     )
     async def test_init_reads_own_config_file(
         self, plugin_cls: type[AbstractATOMPlugin[Any]], expected: str
@@ -307,13 +309,13 @@ class TestConfigName:
         assert plugin.enabled
 
     async def test_device_names_must_be_a_list(self) -> None:
-        plugin = RebelPlugin.__new__(RebelPlugin)
+        plugin = Rebel100Plugin.__new__(Rebel100Plugin)
         plugin.plugin_config = {}
         raw_cfg = {"general": {"rbln_stat_path": None, "device_names": "RBLN-CR03"}}
         with (
             patch(
                 "ai.backend.accelerator.rebellions.common.plugin.config.read_from_file",
-                return_value=(raw_cfg, Path("/etc/rebel.toml")),
+                return_value=(raw_cfg, Path("/etc/rebel100.toml")),
             ),
             pytest.raises(t.DataError),
         ):
