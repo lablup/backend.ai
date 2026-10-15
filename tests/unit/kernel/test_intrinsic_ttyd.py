@@ -9,18 +9,25 @@ import pytest
 
 from ai.backend.kernel.intrinsic import prepare_ttyd_service
 
+_ETTY = "/opt/kernel/etty"
+
 
 class TestPrepareTtydService:
-    """Tests for prepare_ttyd_service() building the etty command line."""
+    """Tests for prepare_ttyd_service() building the terminal command line."""
 
     @pytest.fixture
     def bash_only(self) -> Generator[None, None, None]:
-        with patch.object(Path, "exists", lambda self: str(self) == "/bin/bash"):
+        with patch.object(Path, "exists", lambda self: str(self) in ("/bin/bash", _ETTY)):
             yield
 
     @pytest.fixture
     def ash_only(self) -> Generator[None, None, None]:
-        with patch.object(Path, "exists", lambda self: str(self) == "/bin/ash"):
+        with patch.object(Path, "exists", lambda self: str(self) in ("/bin/ash", _ETTY)):
+            yield
+
+    @pytest.fixture
+    def bash_without_etty(self) -> Generator[None, None, None]:
+        with patch.object(Path, "exists", lambda self: str(self) == "/bin/bash"):
             yield
 
     async def test_shell_script_survives_etty_command_parsing(self, bash_only: None) -> None:
@@ -40,3 +47,16 @@ class TestPrepareTtydService:
         cmdargs, _env = await prepare_ttyd_service({"port": 7681})
 
         assert cmdargs[cmdargs.index("--command") + 1] == "/bin/ash"
+
+    async def test_falls_back_to_ttyd_without_etty_mount(self, bash_without_etty: None) -> None:
+        cmdargs, _env = await prepare_ttyd_service({"port": 7681})
+
+        assert cmdargs == [
+            "/opt/kernel/ttyd",
+            "-W",
+            "-p",
+            "7681",
+            "/bin/bash",
+            "-c",
+            "export SHELL=/bin/bash; /opt/kernel/tmux -2 attach",
+        ]
