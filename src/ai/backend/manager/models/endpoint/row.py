@@ -244,18 +244,18 @@ class EndpointRow(Base):
         default=DeploymentOptions,
     )
 
-    # Read by gql_legacy (api/gql_legacy/endpoint.py) and to_data. Delete once to_data
-    # stops reading relationships; the pair RoutingRow.endpoint_row stays (D-6).
+    # Read only by gql_legacy (endpoint.py, through to_data).
+    # Delete it together with the gql_legacy cleanup.
     routings: Mapped[list[RoutingRow]] = relationship("RoutingRow", back_populates="endpoint_row")
-    # Read only by gql_legacy (api/gql_legacy/endpoint.py) and to_data. Delete once
-    # to_data stops reading relationships.
+    # Read only by gql_legacy (endpoint.py, through to_data).
+    # Delete it together with the gql_legacy cleanup.
     created_user_row: Mapped[UserRow | None] = relationship(
         "UserRow",
         foreign_keys=[created_user],
         primaryjoin=_get_created_user_row_join_condition,
     )
-    # Read only by gql_legacy (api/gql_legacy/endpoint.py) and to_data; v2 readers join
-    # UserRow explicitly. Delete once to_data stops reading relationships.
+    # Read only by gql_legacy (endpoint.py, through to_data).
+    # Delete it together with the gql_legacy cleanup.
     session_owner_row: Mapped[UserRow | None] = relationship(
         "UserRow",
         foreign_keys=[session_owner],
@@ -265,14 +265,8 @@ class EndpointRow(Base):
     # The primary replica group's current revision. Filled only where the query passes
     # with_expression(current_revision_id_subquery()); None otherwise.
     current_revision_id: Mapped[DeploymentRevisionID | None] = query_expression()
-    # Sourced from the replica groups: the current revision is the primary
-    # group's ``current_revision_id`` and the deploying revision is the
-    # target group's ``target_revision_id`` (``None`` when no rollout is in
-    # progress). Joined through ``replica_groups`` so existing consumers
-    # (``to_deployment_info`` and the ``selectinload`` paths) are unchanged.
-    # current_revision_row and deploying_revision_row are read by DeploymentSearcher,
-    # DeploymentInfoSearcher, the deployment db_source, to_deployment_info and to_data.
-    # Deleted by the story that moves those to subqueries (B-3).
+    # current_revision_row and deploying_revision_row are read only by gql_legacy (endpoint.py,
+    # EndpointRow.get, list_endpoint, to_data). Delete them with the gql_legacy cleanup.
     current_revision_row: Mapped[DeploymentRevisionRow | None] = relationship(
         "DeploymentRevisionRow",
         secondary="replica_groups",
@@ -431,21 +425,10 @@ class EndpointRow(Base):
         """
         return self.current_revision_row or self.deploying_revision_row
 
+    # Read only by gql_legacy (endpoint.py); v2 builds EndpointData in ModelServingRepository.
+    # Delete it together with the gql_legacy cleanup.
     def to_data(self) -> EndpointData:
-        """Convert to EndpointData.
-
-        Requires ``current_revision_row`` / ``deploying_revision_row`` and
-        their ``image_row`` to be eagerly loaded via selectinload for
-        revision field population.
-        ``_find_active_revision`` prefers ``current_revision`` and falls
-        back to ``deploying_revision`` so the projection reflects the
-        spec currently being deployed during the initial DEPLOYING
-        phase. When neither pointer is set (PENDING endpoint without a
-        revision yet, or leftover orphan data), revision-derived fields
-        degrade to ``None`` / sentinel defaults and
-        ``runtime_variant_id`` stays ``None``; legacy response surfaces
-        render that as the historical blank state.
-        """
+        """Convert to EndpointData from the eagerly loaded relationships."""
         current_rev = self._find_active_revision()
         return EndpointData(
             id=self.id,
