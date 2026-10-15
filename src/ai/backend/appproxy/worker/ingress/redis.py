@@ -10,7 +10,6 @@ from ai.backend.common.dto.appproxy.v2.ingress.types import (
     IngressFrontendKey,
     IngressRedisKey,
 )
-from ai.backend.common.exception import GenericNotImplementedError
 
 
 class RedisIngressState(IngressReader):
@@ -29,10 +28,14 @@ class RedisIngressState(IngressReader):
 
     @override
     async def get(self, frontend_key: IngressFrontendKey) -> Ingress | None:
-        # Read IngressRedisKey.of(authority, key) and validate it as Ingress.
-        raise GenericNotImplementedError
+        value = await self._client.get_live_data(self._key.of(self._authority, frontend_key))
+        if value is None:
+            return None
+        return Ingress.model_validate_json(value)
 
     @override
     async def get_all(self) -> list[Ingress]:
-        # Scan IngressRedisKey.pattern(authority) and validate each value.
-        raise GenericNotImplementedError
+        redis_keys = await self._client.scan_keys(self._key.pattern(self._authority))
+        values = await self._client.get_multiple_live_data(redis_keys)
+        # A key deleted between the scan and the read comes back as None.
+        return [Ingress.model_validate_json(value) for value in values if value is not None]
