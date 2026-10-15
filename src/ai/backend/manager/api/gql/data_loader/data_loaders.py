@@ -84,6 +84,7 @@ from ai.backend.common.data.entity.runtime_variant_preset import (
 )
 from ai.backend.common.data.entity.service_catalog import ServiceCatalogID
 from ai.backend.common.data.entity.session import SessionEntityType, SessionID
+from ai.backend.common.data.entity.session_group import SessionGroupID
 from ai.backend.common.data.entity.session_scheduling_history import SessionSchedulingHistoryID
 from ai.backend.common.data.entity.storage_namespace import (
     StorageNamespaceEntityType,
@@ -243,6 +244,9 @@ if TYPE_CHECKING:
         ServiceCatalogGQL,
     )
     from ai.backend.manager.api.gql.session.types import SessionV2GQL  # pants: no-infer-dep
+    from ai.backend.manager.api.gql.session_group.types import (  # pants: no-infer-dep
+        SessionGroupGQL,
+    )
     from ai.backend.manager.api.gql.storage_namespace import (  # pants: no-infer-dep
         StorageNamespace,
     )
@@ -860,6 +864,25 @@ class DataLoaders:
             dtos = await adapter.batch_load_by_ids(session_ids)
             return [
                 dto if dto is None or isinstance(dto, Exception) else SG.from_pydantic(dto)
+                for dto in dtos
+            ]
+
+        return DataLoader(load_fn=load_fn)
+
+    @cached_property
+    def session_group_loader(
+        self,
+    ) -> DataLoader[SessionGroupID, SessionGroupGQL | None]:
+        adapter = self._adapters.session_group
+
+        async def load_fn(ids: list[SessionGroupID]) -> list[SessionGroupGQL | Exception | None]:
+            from ai.backend.manager.api.gql.session_group.types import (  # pants: no-infer-dep
+                SessionGroupGQL as SGG,
+            )
+
+            dtos = await adapter.bulk_get_ids(ids)
+            return [
+                dto if dto is None or isinstance(dto, Exception) else SGG.from_pydantic(dto)
                 for dto in dtos
             ]
 
