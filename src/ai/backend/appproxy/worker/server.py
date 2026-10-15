@@ -74,6 +74,7 @@ from ai.backend.appproxy.common.utils import (
     ensure_json_serializable,
     mime_match,
 )
+from ai.backend.appproxy.worker.api.ingress import create_app as create_ingress_app
 from ai.backend.appproxy.worker.ingress.factory import IngressStateFactory
 from ai.backend.common.clients.http_client.client_pool import (
     ClientPool,
@@ -166,7 +167,6 @@ EVENT_DISPATCHER_CONSUMER_GROUP: Final[str] = "appproxy-worker"
 global_subapp_pkgs: Final[list[str]] = [
     ".health",
     ".setup",
-    ".ingress",
 ]
 
 
@@ -332,6 +332,21 @@ async def ingress_state_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
         root_ctx.valkey_live,
     ).create()
     yield
+
+
+@asynccontextmanager
+async def internal_api_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
+    bind_addr = root_ctx.local_config.proxy_worker.internal_api_bind_addr
+    if bind_addr is None:
+        yield
+        return
+    runner = web.AppRunner(build_internal_app(root_ctx), access_log_class=BackendAIAccessLogger)
+    await runner.setup()
+    await web.TCPSite(runner, str(bind_addr.host), bind_addr.port).start()
+    try:
+        yield
+    finally:
+        await runner.cleanup()
 
 
 @asynccontextmanager
@@ -790,6 +805,18 @@ def init_subapp(pkg_name: str, root_app: web.Application, create_subapp: AppCrea
     _init_subapp(pkg_name, root_app, subapp, global_middlewares)
 
 
+def build_internal_app(root_ctx: RootContext) -> web.Application:
+    app = web.Application(
+        middlewares=[request_context_aware_middleware, exception_middleware, api_middleware]
+    )
+    app["_root.context"] = root_ctx
+    app.on_response_prepare.append(on_prepare)
+    with importlib.resources.as_file(importlib.resources.files("ai.backend.appproxy.common")) as f:
+        aiohttp_jinja2.setup(app, loader=jinja2.FileSystemLoader(f / "templates"))
+    app.add_subapp("/v2/ingress", create_ingress_app(root_ctx))
+    return app
+
+
 def build_root_app(
     pidx: int,
     local_config: ServerConfig,
@@ -834,6 +861,7 @@ def build_root_app(
                 proxy_frontend_ctx,
                 redis_ctx,
                 ingress_state_ctx,
+                internal_api_ctx,
                 http_client_pool_ctx,
                 health_probe_ctx,
                 service_discovery_ctx,
@@ -844,6 +872,7 @@ def build_root_app(
                 proxy_frontend_ctx,
                 redis_ctx,
                 ingress_state_ctx,
+                internal_api_ctx,
                 http_client_pool_ctx,
                 event_dispatcher_ctx,
                 event_handler_ctx,
