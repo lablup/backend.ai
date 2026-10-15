@@ -4,6 +4,7 @@ from unittest.mock import AsyncMock
 
 import pytest
 
+from ai.backend.appproxy.worker.errors.ingress import IngressNotFoundError
 from ai.backend.appproxy.worker.ingress.in_memory import InMemoryIngressState
 from ai.backend.appproxy.worker.ingress.layered import LayeredIngressState
 from ai.backend.appproxy.worker.ingress.redis import RedisIngressState
@@ -117,14 +118,16 @@ class TestLayeredIngressState:
         self, layered: LayeredIngressState, redis: AsyncMock
     ) -> None:
         await layered.get(FRONTEND_KEY)
-        assert await layered.get(FRONTEND_KEY) is None
+        with pytest.raises(IngressNotFoundError):
+            await layered.get(FRONTEND_KEY)
         redis.get.assert_awaited_once_with(FRONTEND_KEY)
 
     @pytest.mark.usefixtures("key_remembered_missing")
-    async def test_key_known_missing_reads_as_none_without_reading_redis(
+    async def test_key_known_missing_raises_without_reading_redis(
         self, layered: LayeredIngressState, redis: AsyncMock
     ) -> None:
-        assert await layered.get(FRONTEND_KEY) is None
+        with pytest.raises(IngressNotFoundError):
+            await layered.get(FRONTEND_KEY)
         redis.get.assert_not_awaited()
 
     async def test_miss_without_a_memory_layer_reads_as_none(
