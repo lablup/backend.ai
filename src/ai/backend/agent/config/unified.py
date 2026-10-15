@@ -2235,6 +2235,42 @@ class ContainerdConfig(BaseConfigSchema):
             example=ConfigExample(local="{}", prod='{"coco-tdx": {"standin-image": "<ref>"}}'),
         ),
     ]
+    trusted_storage_profiles: Annotated[
+        list[str],
+        Field(
+            default_factory=list,
+            validation_alias=AliasChoices("trusted-storage-profiles", "trusted_storage_profiles"),
+            serialization_alias="trusted-storage-profiles",
+        ),
+        BackendAIConfigMeta(
+            description=(
+                "Names of runtime profiles whose kernels get a trusted storage: "
+                "a sparse backing file attached as a loop device, whose path the profile receives "
+                "as trusted_storage_path. Kernels of other profiles get none."
+            ),
+            added_version="26.10.0",
+            example=ConfigExample(local="[]", prod='["coco-tdx"]'),
+        ),
+    ]
+    # PROVISIONAL(trusted-storage): fixed size until manager-side sizing (W-10)
+    trusted_storage_size: Annotated[
+        BinarySizeField,
+        Field(
+            default=BinarySize.finite_from_str("64G"),
+            validation_alias=AliasChoices("trusted-storage-size", "trusted_storage_size"),
+            serialization_alias="trusted-storage-size",
+        ),
+        BackendAIConfigMeta(
+            description=(
+                "Apparent size of each kernel's trusted storage backing file. "
+                "The file is sparse, so host disk is used only as the kernel writes to it. "
+                "Larger stores take longer to format in the guest; the 64G default already needs "
+                "agent.cdh_api_timeout above the stock 50 s."
+            ),
+            added_version="26.10.0",
+            example=ConfigExample(local="64G", prod="64G"),
+        ),
+    ]
 
 
 class AgentGlobalConfig(BaseConfigSchema):

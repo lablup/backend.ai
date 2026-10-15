@@ -142,3 +142,45 @@ class FakeContainerd:
         self.images[image_ref] = ImageTarget(
             "sha256:manifest", "application/vnd.oci.image.manifest.v1+json"
         )
+
+
+class FakeLosetup:
+    """Stands in for the losetup binary: associations of backing files with loop devices."""
+
+    calls: list[tuple[str, ...]]
+    loops: dict[str, str]
+    failing: set[str]
+    returncode: int
+    _argv: tuple[str, ...]
+
+    def __init__(self) -> None:
+        self.calls = []
+        self.loops = {}
+        self.failing = set()
+        self.returncode = 0
+        self._argv = ()
+
+    async def __call__(self, *argv: str, **kwargs: Any) -> FakeLosetup:
+        assert argv[0] == "/sbin/losetup"
+        self.calls.append(argv[1:])
+        self._argv = argv[1:]
+        return self
+
+    async def communicate(self) -> tuple[bytes, bytes]:
+        argv = self._argv
+        if argv[0] in self.failing:
+            self.returncode = 1
+            return b"", b"injected failure"
+        self.returncode = 0
+        if argv[0] == "--find":
+            loop = f"/dev/loop{len(self.loops)}"
+            self.loops[argv[-1]] = loop
+            return loop.encode() + b"\n", b""
+        if argv[0] == "--detach":
+            self.loops = {k: v for k, v in self.loops.items() if v != argv[1]}
+            return b"", b""
+        return self.loops.get(argv[-1], "").encode() + b"\n", b""
+
+    @property
+    def verbs(self) -> list[str]:
+        return [c[0] for c in self.calls]

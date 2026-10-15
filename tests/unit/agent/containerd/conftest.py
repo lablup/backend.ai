@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import uuid
 from collections.abc import Mapping
 from decimal import Decimal
@@ -18,7 +19,7 @@ from ai.backend.agent.containerd.profile.base import (
 from ai.backend.agent.types import KernelOwnershipData
 from ai.backend.common.types import AgentId, KernelCreationConfig, KernelId, SessionId, SlotName
 
-from .fakes import FakeContainerd
+from .fakes import FakeContainerd, FakeLosetup
 
 
 class FakeProfile(RuntimeProfile):
@@ -113,3 +114,10 @@ def builtin() -> FakeProfile:
 @pytest.fixture
 def fake() -> FakeContainerd:
     return FakeContainerd()
+
+
+@pytest.fixture
+def losetup(monkeypatch: pytest.MonkeyPatch) -> FakeLosetup:
+    fake = FakeLosetup()
+    monkeypatch.setattr(asyncio, "create_subprocess_exec", fake)
+    return fake
