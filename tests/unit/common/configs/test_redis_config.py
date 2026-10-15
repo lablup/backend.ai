@@ -17,17 +17,23 @@ class TestUsernameRequiresPassword:
         })
         assert config.username == "agent"
 
-    def test_username_without_password_is_rejected(self) -> None:
+    @pytest.mark.parametrize("password", [{}, {"password": None}, {"password": ""}])
+    def test_username_without_password_is_rejected(self, password: dict[str, str | None]) -> None:
         with pytest.raises(BackendAISchemaValidationFailed, match="requires `password`"):
-            SingleRedisConfig.model_validate({"addr": ADDR, "username": "agent"})
+            SingleRedisConfig.model_validate({"addr": ADDR, "username": "agent", **password})
 
-    def test_username_without_password_is_rejected_in_override_configs(self) -> None:
+    @pytest.mark.parametrize("password", [{}, {"password": None}, {"password": ""}])
+    def test_username_without_password_is_rejected_in_override_configs(
+        self, password: dict[str, str | None]
+    ) -> None:
         with pytest.raises(BackendAISchemaValidationFailed, match="requires `password`"):
             RedisConfig.model_validate({
                 "addr": ADDR,
                 "username": "agent",
                 "password": "pw",
-                "override-configs": {"stream": {"addr": ADDR, "username": "stream-agent"}},
+                "override-configs": {
+                    "stream": {"addr": ADDR, "username": "stream-agent", **password}
+                },
             })
 
     def test_username_with_password_is_accepted_in_override_configs(self) -> None:

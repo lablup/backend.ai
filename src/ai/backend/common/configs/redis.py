@@ -270,8 +270,8 @@ class SingleRedisConfig(BackendAISchema):
 
     @model_validator(mode="after")
     def _validate_username_requires_password(self) -> Self:
-        if self.username is not None and self.password is None:
-            raise ValueError("`username` requires `password` to be set.")
+        if self.username and not self.password:
+            raise ValueError("`username` requires `password` to be set to a non-empty value.")
         return self
 
     @field_serializer("addr")
