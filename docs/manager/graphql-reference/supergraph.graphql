@@ -6113,6 +6113,16 @@ type DeleteAccessTokenPayload
 }
 
 """
+Added in 26.10.0. Payload for artifact soft-delete. Returns the soft-deleted artifact.
+"""
+type DeleteArtifactPayload
+  @join__type(graph: STRAWBERRY)
+{
+  """The soft-deleted artifact."""
+  artifact: Artifact!
+}
+
+"""
 Added in 24.09.0. Input for soft-deleting artifacts from the system.
 
 Marks artifacts as deleted without permanently removing them.
@@ -14106,12 +14116,31 @@ type Mutation
   """
   Added in 25.15.0. Soft-delete artifacts from the system. Marks artifacts as deleted without permanently removing them. Deleted artifacts can be restored using the restore_artifacts mutation
   """
-  deleteArtifacts(input: DeleteArtifactsInput!): DeleteArtifactsPayload @join__field(graph: STRAWBERRY)
+  deleteArtifacts(input: DeleteArtifactsInput!): DeleteArtifactsPayload @join__field(graph: STRAWBERRY) @deprecated(reason: "Deprecated since 26.10.0. Use `partialBulkDeleteArtifacts`.")
 
   """
   Added in 25.15.0. Restore previously deleted artifacts. Reverses the soft-delete operation, making the artifacts available again for use in the system
   """
-  restoreArtifacts(input: RestoreArtifactsInput!): RestoreArtifactsPayload @join__field(graph: STRAWBERRY)
+  restoreArtifacts(input: RestoreArtifactsInput!): RestoreArtifactsPayload @join__field(graph: STRAWBERRY) @deprecated(reason: "Deprecated since 26.10.0. Use `partialBulkRestoreArtifacts`.")
+
+  """Added in 26.10.0. Soft-delete an artifact."""
+  deleteArtifact(id: UUID!): DeleteArtifactPayload! @join__field(graph: STRAWBERRY)
+
+  """Added in 26.10.0. Restore a soft-deleted artifact."""
+  restoreArtifact(id: UUID!): RestoreArtifactPayload! @join__field(graph: STRAWBERRY)
+
+  """Added in 26.10.0. Update several artifacts, answering for each one."""
+  partialBulkUpdateArtifacts(input: PartialBulkUpdateArtifactsInput!): PartialBulkArtifactsPayload! @join__field(graph: STRAWBERRY)
+
+  """
+  Added in 26.10.0. Soft-delete several artifacts, answering for each one.
+  """
+  partialBulkDeleteArtifacts(input: PartialBulkDeleteArtifactsInput!): PartialBulkArtifactsPayload! @join__field(graph: STRAWBERRY)
+
+  """
+  Added in 26.10.0. Restore several soft-deleted artifacts, answering for each one.
+  """
+  partialBulkRestoreArtifacts(input: PartialBulkRestoreArtifactsInput!): PartialBulkArtifactsPayload! @join__field(graph: STRAWBERRY)
 
   """
   Added in 25.14.0. Clean up stored artifact revision data to free storage space. Removes the downloaded files for the specified artifact revisions and transitions them back to SCANNED status. The metadata remains, allowing the artifacts to be re-imported later if needed. Use this operation to manage storage usage by removing unused artifacts
@@ -15720,6 +15749,29 @@ interface PaginatedList
 }
 
 """
+Added in 26.10.0. Result of a partial bulk artifact operation: the artifacts processed and the ones that failed.
+"""
+type PartialBulkArtifactsPayload
+  @join__type(graph: STRAWBERRY)
+{
+  """The artifacts processed, as they now stand."""
+  successes: [Artifact!]!
+
+  """The artifacts not processed, each with the reason."""
+  failed: [PartialBulkFailure!]!
+}
+
+"""
+Added in 26.10.0. Input for soft-deleting several artifacts, each answered for separately.
+"""
+input PartialBulkDeleteArtifactsInput
+  @join__type(graph: STRAWBERRY)
+{
+  """IDs of the artifacts to soft-delete."""
+  ids: [UUID!]!
+}
+
+"""
 Added in 26.10.0. Input for soft-deleting several domains, each answered for separately.
 """
 input PartialBulkDeleteDomainsInput
@@ -15980,6 +16032,16 @@ type PartialBulkResourcePresetsPayload
 }
 
 """
+Added in 26.10.0. Input for restoring several soft-deleted artifacts, each answered for separately.
+"""
+input PartialBulkRestoreArtifactsInput
+  @join__type(graph: STRAWBERRY)
+{
+  """IDs of the artifacts to restore."""
+  ids: [UUID!]!
+}
+
+"""
 Added in 26.10.0. Input for restoring several soft-deleted domains, each answered for separately.
 """
 input PartialBulkRestoreDomainsInput
@@ -16040,6 +16102,16 @@ type PartialBulkRolesPayload
 
   """The roles not processed, each with the reason."""
   failed: [PartialBulkFailure!]!
+}
+
+"""
+Added in 26.10.0. Input for updating several artifacts, each answered for separately.
+"""
+input PartialBulkUpdateArtifactsInput
+  @join__type(graph: STRAWBERRY)
+{
+  """The artifacts to update, each with its ID and fields."""
+  items: [UpdateArtifactInput!]!
 }
 
 """
@@ -21372,6 +21444,16 @@ input ResourceWeightEntryInput
   Weight multiplier for this resource type in fair share calculations. Higher weight means this resource contributes more to the normalized usage. Set to null to remove this resource type (revert to default weight 1.0). Example: 0.001 for memory (bytes) to normalize against CPU cores.
   """
   weight: Decimal = null
+}
+
+"""
+Added in 26.10.0. Payload for artifact restore. Returns the restored artifact.
+"""
+type RestoreArtifactPayload
+  @join__type(graph: STRAWBERRY)
+{
+  """The restored artifact."""
+  artifact: Artifact!
 }
 
 """

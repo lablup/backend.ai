@@ -50,9 +50,14 @@ from ai.backend.manager.api.gql.artifact.resolver import (
     cleanup_artifact_revisions,
     delegate_import_artifacts,
     delegate_scan_artifacts,
+    delete_artifact,
     delete_artifacts,
     import_artifacts,
+    partial_bulk_delete_artifacts,
+    partial_bulk_restore_artifacts,
+    partial_bulk_update_artifacts,
     reject_artifact_revision,
+    restore_artifact,
     restore_artifacts,
     scan_artifact_models,
     scan_artifacts,
@@ -984,6 +989,11 @@ class Mutation:
     update_artifact = update_artifact
     delete_artifacts = delete_artifacts
     restore_artifacts = restore_artifacts
+    delete_artifact = delete_artifact
+    restore_artifact = restore_artifact
+    partial_bulk_update_artifacts = partial_bulk_update_artifacts
+    partial_bulk_delete_artifacts = partial_bulk_delete_artifacts
+    partial_bulk_restore_artifacts = partial_bulk_restore_artifacts
     cleanup_artifact_revisions = cleanup_artifact_revisions
     cancel_import_artifact = cancel_import_artifact
     # Container Registry V2 APIs

@@ -2446,6 +2446,84 @@
         "title": "UpdateArtifactInput",
         "type": "object"
       },
+      "NonEmptyList_PartialBulkUpdateArtifactItemInput_": {
+        "items": {
+          "$ref": "#/components/schemas/PartialBulkUpdateArtifactItemInput"
+        },
+        "minItems": 1,
+        "type": "array"
+      },
+      "PartialBulkUpdateArtifactItemInput": {
+        "description": "One artifact of a partial bulk update and the fields to update on it.",
+        "properties": {
+          "id": {
+            "description": "ID of the artifact to update.",
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "input": {
+            "$ref": "#/components/schemas/UpdateArtifactInput",
+            "description": "Fields to update on the artifact."
+          }
+        },
+        "required": [
+          "id",
+          "input"
+        ],
+        "title": "PartialBulkUpdateArtifactItemInput",
+        "type": "object"
+      },
+      "PartialBulkUpdateArtifactsInput": {
+        "description": "Input for updating several artifacts, each answered for separately.",
+        "properties": {
+          "items": {
+            "$ref": "#/components/schemas/NonEmptyList_PartialBulkUpdateArtifactItemInput_",
+            "description": "The artifacts to update, each with its fields."
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "title": "PartialBulkUpdateArtifactsInput",
+        "type": "object"
+      },
+      "NonEmptyList_UUID_": {
+        "items": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "minItems": 1,
+        "type": "array"
+      },
+      "PartialBulkDeleteArtifactsInput": {
+        "description": "Input for soft-deleting several artifacts, each answered for separately.",
+        "properties": {
+          "ids": {
+            "$ref": "#/components/schemas/NonEmptyList_UUID_",
+            "description": "IDs of the artifacts to soft-delete."
+          }
+        },
+        "required": [
+          "ids"
+        ],
+        "title": "PartialBulkDeleteArtifactsInput",
+        "type": "object"
+      },
+      "PartialBulkRestoreArtifactsInput": {
+        "description": "Input for restoring several soft-deleted artifacts, each answered for separately.",
+        "properties": {
+          "ids": {
+            "$ref": "#/components/schemas/NonEmptyList_UUID_",
+            "description": "IDs of the artifacts to restore."
+          }
+        },
+        "required": [
+          "ids"
+        ],
+        "title": "PartialBulkRestoreArtifactsInput",
+        "type": "object"
+      },
       "DeleteArtifactsInput": {
         "description": "Input for deleting multiple artifacts by ID.",
         "properties": {
@@ -10795,14 +10873,6 @@
         ],
         "title": "PartialBulkUpdateDomainsInput",
         "type": "object"
-      },
-      "NonEmptyList_UUID_": {
-        "items": {
-          "format": "uuid",
-          "type": "string"
-        },
-        "minItems": 1,
-        "type": "array"
       },
       "PartialBulkDeleteDomainsInput": {
         "description": "Input for soft-deleting several domains, each answered for separately.",
@@ -49125,12 +49195,157 @@
             }
           }
         ],
-        "description": "Update artifact metadata.\n\n**Preconditions:**\n* Superadmin privilege required.\n"
+        "description": "Update artifact metadata.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/v2/artifacts/{artifact_id}/delete": {
+      "post": {
+        "operationId": "v2/artifacts.delete",
+        "tags": [
+          "v2/artifacts"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "artifact_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "description": "Soft-delete an artifact.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/v2/artifacts/{artifact_id}/restore": {
+      "post": {
+        "operationId": "v2/artifacts.restore",
+        "tags": [
+          "v2/artifacts"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "artifact_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "description": "Restore a soft-deleted artifact.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/v2/artifacts/partial-bulk-update": {
+      "post": {
+        "operationId": "v2/artifacts.partial_bulk_update",
+        "tags": [
+          "v2/artifacts"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PartialBulkUpdateArtifactsInput"
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "description": "Update several artifacts, answering for each one.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/v2/artifacts/partial-bulk-delete": {
+      "post": {
+        "operationId": "v2/artifacts.partial_bulk_delete",
+        "tags": [
+          "v2/artifacts"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PartialBulkDeleteArtifactsInput"
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "description": "Soft-delete several artifacts, answering for each one.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/v2/artifacts/partial-bulk-restore": {
+      "post": {
+        "operationId": "v2/artifacts.partial_bulk_restore",
+        "tags": [
+          "v2/artifacts"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PartialBulkRestoreArtifactsInput"
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "description": "Restore several soft-deleted artifacts, answering for each one.\n\n**Preconditions:**\n* User privilege required.\n"
       }
     },
     "/v2/artifacts/delete": {
       "post": {
-        "operationId": "v2/artifacts.delete",
+        "operationId": "v2/artifacts.delete_artifacts",
         "tags": [
           "v2/artifacts"
         ],
@@ -49154,12 +49369,12 @@
           }
         },
         "parameters": [],
-        "description": "Delete multiple artifacts by ID.\n\n**Preconditions:**\n* Superadmin privilege required.\n"
+        "description": "Deprecated. Use `POST /v2/artifacts/partial-bulk-delete`.\n\n**Preconditions:**\n* Superadmin privilege required.\n"
       }
     },
     "/v2/artifacts/restore": {
       "post": {
-        "operationId": "v2/artifacts.restore",
+        "operationId": "v2/artifacts.restore_artifacts",
         "tags": [
           "v2/artifacts"
         ],
@@ -49183,7 +49398,7 @@
           }
         },
         "parameters": [],
-        "description": "Restore previously deleted artifacts.\n\n**Preconditions:**\n* Superadmin privilege required.\n"
+        "description": "Deprecated. Use `POST /v2/artifacts/partial-bulk-restore`.\n\n**Preconditions:**\n* Superadmin privilege required.\n"
       }
     },
     "/v2/artifacts/revisions/{revision_id}": {
