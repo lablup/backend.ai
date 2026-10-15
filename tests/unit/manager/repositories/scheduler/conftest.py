@@ -50,6 +50,7 @@ from ai.backend.manager.data.user.types import UserStatus
 from ai.backend.manager.models.agent.row import AgentRow
 from ai.backend.manager.models.container_registry.row import ContainerRegistryRow
 from ai.backend.manager.models.domain.row import DomainRow
+from ai.backend.manager.models.dotfile.row import DotfileRow
 from ai.backend.manager.models.image.row import ImageRow
 from ai.backend.manager.models.kernel.row import KernelRow
 from ai.backend.manager.models.keypair.row import KeyPairRow
@@ -92,6 +93,7 @@ _SCHEDULER_ROWS: list[type] = [
     RoleRow,
     UserRoleRow,
     UserRow,
+    DotfileRow,
     KeyPairRow,
     ProjectRow,
     EntityFieldRow,

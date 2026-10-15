@@ -3,7 +3,7 @@ from __future__ import annotations
 import secrets
 import uuid
 from collections.abc import AsyncIterator, Callable, Coroutine
-from typing import Any
+from typing import Any, Protocol
 from unittest.mock import MagicMock
 
 import pytest
@@ -13,7 +13,8 @@ from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
 from ai.backend.client.v2.registry import BackendAIClientRegistry
 from ai.backend.common.data.entity.domain import DomainEntityType
 from ai.backend.common.data.entity.project import ProjectEntityType
-from ai.backend.common.data.entity.user import UserEntityType
+from ai.backend.common.data.entity.user import UserEntityType, UserID
+from ai.backend.common.data.permission.types import Permission
 from ai.backend.common.dto.manager.config import (
     CreateDomainDotfileRequest,
     CreateDotfileResponse,
@@ -29,7 +30,8 @@ from ai.backend.manager.actions.registry.types import (
     GroupMeta,
     ProcessorDependencies,
 )
-from ai.backend.manager.actions.v2.validators import ActionValidators
+from ai.backend.manager.actions.validators.build import build_action_validators
+from ai.backend.manager.api.adapters.user.config import UserConfigAdapter
 from ai.backend.manager.api.rest.domainconfig.handler import DomainConfigHandler
 from ai.backend.manager.api.rest.domainconfig.registry import register_domainconfig_routes
 from ai.backend.manager.api.rest.groupconfig.handler import GroupConfigHandler
@@ -39,34 +41,78 @@ from ai.backend.manager.api.rest.types import RouteDeps
 from ai.backend.manager.api.rest.userconfig.handler import UserConfigHandler
 from ai.backend.manager.api.rest.userconfig.registry import register_userconfig_routes
 from ai.backend.manager.config.provider import ManagerConfigProvider
+from ai.backend.manager.data.permission.status import RoleStatus
 from ai.backend.manager.data.secret.types import KeyProviderType
 from ai.backend.manager.models.bootstrap_script.row import BootstrapScriptRow
+from ai.backend.manager.models.dotfile.row import DotfileRow
+from ai.backend.manager.models.keypair.row import KeyPairRow
+from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
+from ai.backend.manager.models.rbac_models.role.row import RoleRow
+from ai.backend.manager.models.rbac_models.user_role.row import UserRoleRow
 from ai.backend.manager.models.user.row import UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.domain.repository import DomainRepository
 from ai.backend.manager.repositories.ops.repository import OpsRepository
 from ai.backend.manager.repositories.ops.v2.domain.provider import DomainOpsProvider
+from ai.backend.manager.repositories.ops.v2.permission.provider import PermissionOpsProvider
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.repositories.ops.v2.resource_policy.provider import (
     ResourcePolicyOpsProvider,
 )
 from ai.backend.manager.repositories.ops.v2.share.provider import ShareOpsProvider
+from ai.backend.manager.repositories.ops.v2.user.provider import UserOpsProvider
 from ai.backend.manager.repositories.project.repository import ProjectRepository
+from ai.backend.manager.repositories.rbac.permission_check_repository import (
+    RbacPermissionCheckRepository,
+)
 from ai.backend.manager.repositories.user.repository import UserRepository
 from ai.backend.manager.secret.pool import KeyProviderPool
-from ai.backend.manager.services.auth.processors import AuthProcessors
+from ai.backend.manager.secret.types import SecretValue
 from ai.backend.manager.services.domain.processors import DomainProcessors
 from ai.backend.manager.services.domain.service import DomainService
 from ai.backend.manager.services.project.processors import ProjectProcessors
 from ai.backend.manager.services.project.service import ProjectService
 from ai.backend.manager.services.user.processors import UserProcessors
 from ai.backend.manager.services.user.service import UserService
-from ai.backend.testutils.action_validators import build_global_gate
 from ai.backend.testutils.fixtures import DomainFixtureData
+from ai.backend.testutils.virtual_entity import VirtualEntitySeeder
+
+
+class UserFixture(Protocol):
+    user_uuid: UserID
+
 
 UserDotfileFactory = Callable[..., Coroutine[Any, Any, CreateDotfileResponse]]
 GroupDotfileFactory = Callable[..., Coroutine[Any, Any, CreateDotfileResponse]]
 DomainDotfileFactory = Callable[..., Coroutine[Any, Any, CreateDotfileResponse]]
+
+
+@pytest.fixture(autouse=True)
+async def user_permission_scope(
+    database_engine: ExtendedAsyncSAEngine,
+    regular_user_fixture: UserFixture,
+) -> None:
+    async with database_engine.begin_session() as session:
+        await VirtualEntitySeeder().provision(
+            session, UserEntityType(), regular_user_fixture.user_uuid
+        )
+        role = RoleRow(
+            name=f"user-self-{regular_user_fixture.user_uuid}",
+            status=RoleStatus.ACTIVE,
+            scope_type=UserEntityType(),
+            scope_id=regular_user_fixture.user_uuid,
+        )
+        session.add(role)
+        await session.flush()
+        session.add_all([
+            PermissionRow(
+                role_id=role.id,
+                entity_type=UserEntityType(),
+                permission=permission,
+            )
+            for permission in (Permission.READ, Permission.UPDATE)
+        ])
+        session.add(UserRoleRow(user_id=regular_user_fixture.user_uuid, role_id=role.id))
 
 
 @pytest.fixture()
@@ -77,8 +123,11 @@ def config_registry(
     return ProcessorRegistry(
         ProcessorDependencies(
             monitors=ActionMonitors(),
-            validators=ActionValidators(
-                global_scope=[build_global_gate(database_engine, config_provider)]
+            validators=build_action_validators(
+                RbacPermissionCheckRepository(
+                    PermissionOpsProvider(database_engine), config_provider
+                ),
+                config_provider,
             ),
             repository=OpsRepository(V2DBOpsProvider(database_engine)),
         )
@@ -88,7 +137,6 @@ def config_registry(
 @pytest.fixture()
 def server_module_registries(
     route_deps: RouteDeps,
-    auth_processors: AuthProcessors,
     database_engine: ExtendedAsyncSAEngine,
     config_registry: ProcessorRegistry[Any],
 ) -> list[RouteRegistry]:
@@ -128,6 +176,7 @@ def server_module_registries(
                 ShareOpsProvider(database_engine),
                 ResourcePolicyOpsProvider(database_engine),
                 KeyProviderPool(providers=[], write_provider_type=KeyProviderType.PLAIN),
+                user_ops_provider=UserOpsProvider(database_engine),
             ),
             MagicMock(),
         ),
@@ -135,7 +184,7 @@ def server_module_registries(
     return [
         register_groupconfig_routes(GroupConfigHandler(project=project), route_deps),
         register_userconfig_routes(
-            UserConfigHandler(auth=auth_processors, user=user),
+            UserConfigHandler(user=user, user_config=UserConfigAdapter(user)),
             route_deps,
         ),
         register_domainconfig_routes(DomainConfigHandler(domain=domain), route_deps),
@@ -145,9 +194,10 @@ def server_module_registries(
 @pytest.fixture()
 async def user_dotfile_factory(
     admin_registry: BackendAIClientRegistry,
-    db_engine: SAEngine,
+    database_engine: ExtendedAsyncSAEngine,
+    admin_user_fixture: UserFixture,
 ) -> AsyncIterator[UserDotfileFactory]:
-    """Factory fixture that creates user dotfiles via SDK and deletes on teardown."""
+    """Create through HTTP, seed the default flag, and delete on teardown."""
     created_paths: list[str] = []
 
     async def _create(**overrides: Any) -> CreateDotfileResponse:
@@ -159,6 +209,19 @@ async def user_dotfile_factory(
         }
         params.update(overrides)
         result = await admin_registry.config.create_user_dotfile(CreateUserDotfileRequest(**params))
+        async with database_engine.begin_session() as session:
+            dotfile_id = await session.scalar(
+                sa.select(DotfileRow.id).where(
+                    DotfileRow.entity_type == UserEntityType(),
+                    DotfileRow.entity_id == admin_user_fixture.user_uuid,
+                    DotfileRow.path == params["path"],
+                )
+            )
+        assert dotfile_id is not None
+        async with database_engine.begin() as conn:
+            await conn.execute(
+                sa.update(DotfileRow).where(DotfileRow.id == dotfile_id).values(is_default=True)
+            )
         created_paths.append(params["path"])
         return result
 
@@ -258,3 +321,52 @@ async def default_bootstrap_scripts(
     finally:
         async with db_engine.begin() as conn:
             await conn.execute(sa.delete(BootstrapScriptRow))
+
+
+@pytest.fixture
+async def non_default_user_access_key(
+    db_engine: SAEngine,
+    regular_user_fixture: UserFixture,
+    resource_policy_fixture: str,
+) -> AsyncIterator[str]:
+    access_key = f"AKTEST{secrets.token_hex(7).upper()}"
+    async with db_engine.begin() as conn:
+        await conn.execute(
+            sa.insert(KeyPairRow).values(
+                access_key=access_key,
+                secret_key=SecretValue(secrets.token_hex(20)),
+                user=regular_user_fixture.user_uuid,
+                is_active=True,
+                is_admin=False,
+                resource_policy=resource_policy_fixture,
+                rate_limit=30000,
+            )
+        )
+        await conn.execute(
+            sa.insert(DotfileRow).values(
+                entity_type=UserEntityType(),
+                entity_id=regular_user_fixture.user_uuid,
+                path=".shared-user",
+                perm="600",
+                data="user",
+                is_default=True,
+            )
+        )
+    yield access_key
+    async with db_engine.begin() as conn:
+        await conn.execute(sa.delete(KeyPairRow).where(KeyPairRow.access_key == access_key))
+
+
+@pytest.fixture
+async def admin_access_key(
+    db_engine: SAEngine,
+    admin_user_fixture: UserFixture,
+) -> str:
+    async with db_engine.begin() as conn:
+        key = await conn.scalar(
+            sa.select(KeyPairRow.access_key).where(
+                KeyPairRow.user == admin_user_fixture.user_uuid, KeyPairRow.is_default
+            )
+        )
+    assert key is not None
+    return key

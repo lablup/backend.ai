@@ -5,13 +5,19 @@ Shared between Client SDK and Manager API.
 
 from __future__ import annotations
 
+from typing import Self
 from uuid import UUID
 
-from pydantic import AliasChoices, Field
+from pydantic import AliasChoices, Field, field_validator, model_validator
 
+from ai.backend.common import msgpack
 from ai.backend.common.api_handlers import BaseRequestModel
-
-from .types import MAXIMUM_DOTFILE_SIZE, DotfilePermission
+from ai.backend.common.dto.manager.config.types import (
+    MAXIMUM_DOTFILE_SIZE,
+    RESERVED_DOTFILES,
+    DotfilePermission,
+)
+from ai.backend.common.exception import InvalidAPIParameters
 
 __all__ = (
     # User config
@@ -50,6 +56,20 @@ class CreateUserDotfileRequest(BaseRequestModel):
         default=None,
         description="Access key of the target user (for superadmin delegation)",
     )
+
+    @field_validator("path")
+    @classmethod
+    def validate_path(cls, value: str) -> str:
+        if value in RESERVED_DOTFILES:
+            raise InvalidAPIParameters("dotfile path is reserved for internal operations.")
+        return value
+
+    @model_validator(mode="after")
+    def validate_serialized_size(self) -> Self:
+        packed = msgpack.packb([{"path": self.path, "perm": self.permission, "data": self.data}])
+        if len(packed) > MAXIMUM_DOTFILE_SIZE:
+            raise InvalidAPIParameters("No leftover space for dotfile storage")
+        return self
 
 
 class GetUserDotfileRequest(BaseRequestModel):

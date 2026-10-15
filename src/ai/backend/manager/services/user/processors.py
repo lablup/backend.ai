@@ -54,13 +54,21 @@ from ai.backend.manager.services.user.actions.create_user import (
     CreateUserAction,
     CreateUserActionResult,
 )
-from ai.backend.manager.services.user.actions.delete_keypair_dotfile import (
-    DeleteKeypairDotfileAction,
-    DeleteKeypairDotfileActionResult,
+from ai.backend.manager.services.user.actions.delete_default_dotfile import (
+    DeleteDefaultDotfileAction,
+    DeleteDefaultDotfileActionResult,
 )
 from ai.backend.manager.services.user.actions.delete_user import (
     DeleteUserAction,
     DeleteUserActionResult,
+)
+from ai.backend.manager.services.user.actions.get_dotfile import (
+    GetDotfileAction,
+    GetDotfileActionResult,
+)
+from ai.backend.manager.services.user.actions.get_dotfiles import (
+    GetUserDotfilesAction,
+    GetUserDotfilesActionResult,
 )
 from ai.backend.manager.services.user.actions.get_user import (
     GetUserAction,
@@ -112,9 +120,9 @@ from ai.backend.manager.services.user.actions.scoped_search import (
     ScopedSearchUsersAction,
 )
 from ai.backend.manager.services.user.actions.search_users import GlobalSearchUsersAction
-from ai.backend.manager.services.user.actions.update_keypair_dotfile import (
-    UpdateKeypairDotfileAction,
-    UpdateKeypairDotfileActionResult,
+from ai.backend.manager.services.user.actions.update_default_dotfile import (
+    UpdateDefaultDotfileAction,
+    UpdateDefaultDotfileActionResult,
 )
 from ai.backend.manager.services.user.actions.update_user import (
     BulkUpdateUserAction,
@@ -147,6 +155,10 @@ class UserProcessors:
     scoped_search: ScopeActionProcessor[ScopedSearchUsersAction, ScopedBatchOpsResult[UserData]]
     create_user: ScopeActionProcessor[CreateUserAction, CreateUserActionResult]
     get_user: SingleEntityActionProcessor[GetUserAction, GetUserActionResult]
+    get_dotfile: SingleEntityActionProcessor[GetDotfileAction, GetDotfileActionResult]
+    get_default_dotfiles: SingleEntityActionProcessor[
+        GetUserDotfilesAction, GetUserDotfilesActionResult
+    ]
     update_user: SingleEntityActionProcessor[UpdateUserAction, UpdateUserActionResult]
     delete_user: SingleEntityActionProcessor[DeleteUserAction, DeleteUserActionResult]
     restore_user: SingleEntityActionProcessor[RestoreUserAction, RestoreUserActionResult]
@@ -192,11 +204,11 @@ class UserProcessors:
     create_dotfile: SingleEntityActionProcessor[
         CreateKeypairDotfileAction, CreateKeypairDotfileActionResult
     ]
-    update_dotfile: SingleEntityActionProcessor[
-        UpdateKeypairDotfileAction, UpdateKeypairDotfileActionResult
+    update_default_dotfile: SingleEntityActionProcessor[
+        UpdateDefaultDotfileAction, UpdateDefaultDotfileActionResult
     ]
-    delete_dotfile: SingleEntityActionProcessor[
-        DeleteKeypairDotfileAction, DeleteKeypairDotfileActionResult
+    delete_default_dotfile: SingleEntityActionProcessor[
+        DeleteDefaultDotfileAction, DeleteDefaultDotfileActionResult
     ]
     get_default_bootstrap_script: SingleEntityActionProcessor[
         GetDefaultBootstrapScriptAction, GetDefaultBootstrapScriptActionResult
@@ -218,6 +230,10 @@ class UserProcessors:
         self.scoped_search = group.scoped_search_ops(ScopedSearchUsersAction)
         self.create_user = group.scope(CreateUserAction, user_service.create_user)
         self.get_user = group.single_entity(GetUserAction, user_service.get_user)
+        self.get_dotfile = group.single_entity(GetDotfileAction, user_service.get_dotfile)
+        self.get_default_dotfiles = group.single_entity(
+            GetUserDotfilesAction, user_service.get_default_dotfiles
+        )
         self.update_user = group.single_entity(UpdateUserAction, user_service.update_user)
         self.delete_user = group.single_entity(DeleteUserAction, user_service.delete_user)
         self.restore_user = group.single_entity(RestoreUserAction, user_service.restore_user)
@@ -258,11 +274,11 @@ class UserProcessors:
         self.create_dotfile = group.single_entity(
             CreateKeypairDotfileAction, user_service.create_dotfile
         )
-        self.update_dotfile = group.single_entity(
-            UpdateKeypairDotfileAction, user_service.update_dotfile
+        self.update_default_dotfile = group.single_entity(
+            UpdateDefaultDotfileAction, user_service.update_default_dotfile
         )
-        self.delete_dotfile = group.single_entity(
-            DeleteKeypairDotfileAction, user_service.delete_dotfile
+        self.delete_default_dotfile = group.single_entity(
+            DeleteDefaultDotfileAction, user_service.delete_default_dotfile
         )
         self.get_default_bootstrap_script = group.single_entity(
             GetDefaultBootstrapScriptAction, user_service.get_default_bootstrap_script

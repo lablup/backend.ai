@@ -233,8 +233,8 @@ def build_api_routes(
         config_provider=config_provider,
     )
     userconfig_handler = UserConfigHandler(
-        auth=processors.auth,
         user=processors.user,
+        user_config=adapters.user_config,
     )
     vfolder_handler = VFolderHandler(
         auth=processors.auth,

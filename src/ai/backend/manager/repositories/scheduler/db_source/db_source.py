@@ -35,7 +35,7 @@ from ai.backend.common.data.entity.resource_group import (
 from ai.backend.common.data.entity.resource_slot import ResourceSlotName
 from ai.backend.common.data.entity.session import SessionID
 from ai.backend.common.data.entity.session_group import SessionGroupID
-from ai.backend.common.data.entity.user import UserID
+from ai.backend.common.data.entity.user import UserEntityType, UserID
 from ai.backend.common.data.filter_specs import UUIDInMatchSpec
 from ai.backend.common.events.event_types.kernel.types import (
     KernelCreationInfo,
@@ -91,6 +91,7 @@ from ai.backend.manager.exceptions import ErrorStatusInfo
 from ai.backend.manager.models.agent.row import AgentRow
 from ai.backend.manager.models.container_registry.row import ContainerRegistryRow
 from ai.backend.manager.models.domain.row import DomainRow, domains
+from ai.backend.manager.models.dotfile.row import DotfileRow
 from ai.backend.manager.models.image.row import ImageRow
 from ai.backend.manager.models.kernel.creators import KernelCreator
 from ai.backend.manager.models.kernel.row import (
@@ -2342,39 +2343,31 @@ class ScheduleDBSource:
         user_scope: UserScope,
         access_key: AccessKey,
     ) -> DotfileBundle:
-        """Read SSH keypair + keypair/group/domain dotfiles for a user.
-
-        Ports the read-side of the legacy ``prepare_dotfiles`` helper
-        (``models/dotfile.py`` — removed) into the repository layer so
-        the query does not live in ``models/``. The conflict check
-        against resolved vfolder mounts is owned by the validator rule
-        :class:`DotfileVFolderConflictRule`; this method only fetches.
-
-        Returns a typed :class:`DotfileBundle` with an ordered dotfile
-        sequence (keypair > group > domain, with duplicate paths dropped
-        and reversed so higher-priority entries overwrite on conflict)
-        and an optional :class:`SSHKeypair`. The agent-facing JSONB dict
-        is rendered by :meth:`DotfileBundle.to_internal_data` at the
-        preparer boundary.
-        """
+        """Read the keypair owner's dotfiles and SSH keys, then merge project/domain dotfiles."""
         conn = cast(SAConnection, db_sess.bind)
-
         row = (
             await conn.execute(
                 sa.select(
                     keypairs.c.ssh_public_key,
                     keypairs.c.ssh_private_key,
-                    keypairs.c.dotfiles,
+                    keypairs.c.user,
                 ).where(keypairs.c.access_key == access_key)
             )
         ).first()
         if row is None:
             return DotfileBundle()
 
-        keypair_dotfiles = list(msgpack.unpackb(row.dotfiles))
-        ordered_entries: list[DotfileEntry] = [
-            DotfileEntry(path=entry["path"], perm=entry["perm"], data=entry["data"])
-            for entry in keypair_dotfiles
+        user_dotfiles = await conn.execute(
+            sa.select(DotfileRow.path, DotfileRow.perm, DotfileRow.data)
+            .where(
+                DotfileRow.entity_type == UserEntityType(),
+                DotfileRow.entity_id == row.user,
+                DotfileRow.is_default,
+            )
+            .order_by(DotfileRow.id)
+        )
+        ordered_entries = [
+            DotfileEntry(entry.path, entry.perm, entry.data) for entry in user_dotfiles
         ]
         ssh_keypair: SSHKeypair | None = None
         if row.ssh_public_key and row.ssh_private_key:
