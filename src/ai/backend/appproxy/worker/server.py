@@ -507,8 +507,9 @@ async def worker_registration_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     circuits = await list_worker_circuits(root_ctx, str(uuid.uuid4()))
     for circuit in circuits:
         await root_ctx.proxy_frontend.register_circuit(circuit, circuit.route_info)
-    if root_ctx.legacy_circuit_ingress_sync is not None:
-        await root_ctx.legacy_circuit_ingress_sync.replace_all(circuits)
+        # Applied rather than replaced, so circuits from events handled meanwhile are kept.
+        if root_ctx.legacy_circuit_ingress_sync is not None:
+            await root_ctx.legacy_circuit_ingress_sync.apply(circuit, circuit.route_info)
 
     cron = LocalCron([WorkerHeartbeatTask(root_ctx)])
     await cron.start()

@@ -123,15 +123,6 @@ def circuit(serialized_circuit: SerializableCircuit) -> Circuit:
 
 
 @pytest.fixture
-def routeless_circuit(serialized_circuit: SerializableCircuit) -> Circuit:
-    return Circuit.from_serialized_circuit(
-        serialized_circuit.model_copy(
-            update={"id": UUID(int=1), "port": 10206, "route_info": [], "session_ids": []}
-        )
-    )
-
-
-@pytest.fixture
 def access_case_circuit(
     access_case: _AccessCase, serialized_circuit: SerializableCircuit
 ) -> Circuit:
@@ -321,16 +312,3 @@ class TestLegacyCircuitIngressSync:
     ) -> None:
         await sync.remove([circuit])
         assert await memory.get(PORT_KEY) is None
-
-    async def test_replace_all_holds_every_circuit_including_one_without_routes(
-        self,
-        sync: LegacyCircuitIngressSync,
-        memory: InMemoryIngressState,
-        circuit: Circuit,
-        routeless_circuit: Circuit,
-    ) -> None:
-        await sync.replace_all([circuit, routeless_circuit])
-        assert {ingress.frontend.key() for ingress in await memory.get_all()} == {
-            circuit.to_ingress_frontend().key(),
-            routeless_circuit.to_ingress_frontend().key(),
-        }

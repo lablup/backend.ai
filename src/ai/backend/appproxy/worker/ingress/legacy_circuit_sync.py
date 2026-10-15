@@ -21,11 +21,6 @@ class LegacyCircuitIngressSync:
         self._writer = writer
         self._authority = authority
 
-    async def replace_all(self, circuits: Sequence[Circuit]) -> None:
-        await self._writer.replace_all([
-            circuit.to_ingress(self._authority, circuit.route_info) for circuit in circuits
-        ])
-
     async def apply(self, circuit: Circuit, routes: Sequence[RouteInfo]) -> None:
         await self._writer.apply([circuit.to_ingress(self._authority, routes)])
 
