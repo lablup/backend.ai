@@ -15,7 +15,7 @@ from sqlalchemy.engine import CursorResult
 from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
 from sqlalchemy.ext.asyncio import async_sessionmaker
-from sqlalchemy.orm import aliased, contains_eager, selectinload
+from sqlalchemy.orm import aliased, contains_eager, selectinload, with_expression
 
 from ai.backend.common.config import ModelHealthCheck
 from ai.backend.common.data.endpoint.types import EndpointLifecycle
@@ -157,6 +157,7 @@ from ai.backend.manager.models.endpoint.searchers import (
     DeploymentAccessTokenSearcher,
     DeploymentIDSearcher,
     DeploymentInfoSearcher,
+    current_revision_id_subquery,
 )
 from ai.backend.manager.models.endpoint.updaters import (
     DeploymentRolloutClearUpdater,
@@ -451,8 +452,9 @@ class DeploymentDBSource:
                 sa.select(EndpointRow)
                 .where(EndpointRow.id == endpoint_id)
                 .options(
-                    selectinload(EndpointRow.primary_replica_group_row),
-                    selectinload(EndpointRow.target_replica_group_row),
+                    with_expression(
+                        EndpointRow.current_revision_id, current_revision_id_subquery()
+                    ),
                     selectinload(EndpointRow.deployment_policy),
                 )
             )

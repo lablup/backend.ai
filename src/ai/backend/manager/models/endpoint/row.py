@@ -22,6 +22,7 @@ from sqlalchemy.orm import (
     Mapped,
     foreign,
     mapped_column,
+    query_expression,
     relationship,
     selectinload,
 )
@@ -82,7 +83,6 @@ from ai.backend.manager.models.routing.searchable_fields import ReplicaSearchabl
 if TYPE_CHECKING:
     from ai.backend.manager.models.deployment_policy.row import DeploymentPolicyRow
     from ai.backend.manager.models.deployment_revision.row import DeploymentRevisionRow
-    from ai.backend.manager.models.replica_group.row import ReplicaGroupRow
     from ai.backend.manager.models.routing.row import RoutingRow
     from ai.backend.manager.models.user.row import UserRow
 
@@ -97,22 +97,10 @@ __all__ = (
 log = StructuredLogger(logging.getLogger(__spec__.name))
 
 
-def _get_endpoint_tokens_join_condition() -> Any:
-    from ai.backend.manager.models.endpoint.row import EndpointTokenRow
-
-    return foreign(EndpointTokenRow.endpoint) == EndpointRow.id
-
-
 def _get_primary_replica_group_join_condition() -> sa.ColumnElement[bool]:
     from ai.backend.manager.models.replica_group.row import ReplicaGroupRow
 
     return foreign(EndpointRow.primary_replica_group_id) == ReplicaGroupRow.id
-
-
-def _get_target_replica_group_join_condition() -> sa.ColumnElement[bool]:
-    from ai.backend.manager.models.replica_group.row import ReplicaGroupRow
-
-    return foreign(EndpointRow.target_replica_group_id) == ReplicaGroupRow.id
 
 
 def _get_current_revision_secondaryjoin() -> sa.ColumnElement[bool]:
@@ -144,10 +132,6 @@ def _get_session_owner_row_join_condition() -> Any:
     from ai.backend.manager.models.user.row import UserRow
 
     return foreign(EndpointRow.session_owner) == UserRow.uuid
-
-
-def _get_endpoint_token_endpoint_row_join_condition() -> Any:
-    return foreign(EndpointTokenRow.endpoint) == EndpointRow.id
 
 
 class EndpointRow(Base):
@@ -265,40 +249,35 @@ class EndpointRow(Base):
         default=DeploymentOptions,
     )
 
+    # Read by gql_legacy (api/gql_legacy/endpoint.py) and to_data. Delete once to_data
+    # stops reading relationships; the pair RoutingRow.endpoint_row stays (D-6).
     routings: Mapped[list[RoutingRow]] = relationship("RoutingRow", back_populates="endpoint_row")
-    tokens: Mapped[list[EndpointTokenRow]] = relationship(
-        "EndpointTokenRow",
-        back_populates="endpoint_row",
-        primaryjoin=_get_endpoint_tokens_join_condition,
-    )
+    # Read only by gql_legacy (api/gql_legacy/endpoint.py) and to_data. Delete once
+    # to_data stops reading relationships.
     created_user_row: Mapped[UserRow | None] = relationship(
         "UserRow",
         foreign_keys=[created_user],
         primaryjoin=_get_created_user_row_join_condition,
     )
+    # Read only by gql_legacy (api/gql_legacy/endpoint.py) and to_data; v2 readers join
+    # UserRow explicitly. Delete once to_data stops reading relationships.
     session_owner_row: Mapped[UserRow | None] = relationship(
         "UserRow",
         foreign_keys=[session_owner],
         primaryjoin=_get_session_owner_row_join_condition,
     )
 
-    primary_replica_group_row: Mapped[ReplicaGroupRow | None] = relationship(
-        "ReplicaGroupRow",
-        primaryjoin=_get_primary_replica_group_join_condition,
-        viewonly=True,
-        uselist=False,
-    )
-    target_replica_group_row: Mapped[ReplicaGroupRow | None] = relationship(
-        "ReplicaGroupRow",
-        primaryjoin=_get_target_replica_group_join_condition,
-        viewonly=True,
-        uselist=False,
-    )
+    # The primary replica group's current revision. Filled only where the query passes
+    # with_expression(current_revision_id_subquery()); None otherwise.
+    current_revision_id: Mapped[DeploymentRevisionID | None] = query_expression()
     # Sourced from the replica groups: the current revision is the primary
     # group's ``current_revision_id`` and the deploying revision is the
     # target group's ``target_revision_id`` (``None`` when no rollout is in
     # progress). Joined through ``replica_groups`` so existing consumers
     # (``to_deployment_info`` and the ``selectinload`` paths) are unchanged.
+    # current_revision_row and deploying_revision_row are read by DeploymentSearcher,
+    # DeploymentInfoSearcher, the deployment db_source, to_deployment_info and to_data.
+    # Deleted by the story that moves those to subqueries (B-3).
     current_revision_row: Mapped[DeploymentRevisionRow | None] = relationship(
         "DeploymentRevisionRow",
         secondary="replica_groups",
@@ -314,6 +293,8 @@ class EndpointRow(Base):
         uselist=False,
     )
 
+    # Read by DeploymentSearcher, DeploymentInfoSearcher, the deployment db_source and
+    # to_deployment_info. Deleted by the story that moves those to subqueries (B-3).
     deployment_policy: Mapped[DeploymentPolicyRow | None] = relationship(
         "DeploymentPolicyRow",
         primaryjoin=_get_deployment_policy_join_condition,
@@ -343,7 +324,6 @@ class EndpointRow(Base):
         project: UUID | None = None,
         user_uuid: UUID | None = None,
         load_routes: bool = False,
-        load_tokens: bool = False,
         load_created_user: bool = False,
         load_session_owner: bool = False,
         load_revisions: bool = False,
@@ -356,8 +336,6 @@ class EndpointRow(Base):
         query = sa.select(EndpointRow).filter(EndpointRow.id == endpoint_id)
         if load_routes:
             query = query.options(selectinload(EndpointRow.routings))
-        if load_tokens:
-            query = query.options(selectinload(EndpointRow.tokens))
         if load_created_user:
             query = query.options(selectinload(EndpointRow.created_user_row))
         if load_session_owner:
@@ -397,7 +375,6 @@ class EndpointRow(Base):
         project: UUID | None = None,
         user_uuid: UUID | None = None,
         load_routes: bool = False,
-        load_tokens: bool = False,
         load_created_user: bool = False,
         load_session_owner: bool = False,
         load_revisions: bool = False,
@@ -412,8 +389,6 @@ class EndpointRow(Base):
         )
         if load_routes:
             query = query.options(selectinload(EndpointRow.routings))
-        if load_tokens:
-            query = query.options(selectinload(EndpointRow.tokens))
         if load_created_user:
             query = query.options(selectinload(EndpointRow.created_user_row))
         if load_session_owner:
@@ -439,15 +414,6 @@ class EndpointRow(Base):
             query = query.filter(EndpointRow.session_owner == user_uuid)
         result = await session.execute(query)
         return list(result.scalars().all())
-
-    @property
-    def current_revision_id(self) -> DeploymentRevisionID | None:
-        """Active revision id, sourced from the primary replica group.
-
-        Requires ``primary_replica_group_row`` to be eagerly loaded.
-        """
-        group = self.primary_replica_group_row
-        return group.current_revision_id if group is not None else None
 
     def _find_current_revision(self) -> DeploymentRevisionRow | None:
         """Active revision row, sourced from the primary replica group.
@@ -585,8 +551,8 @@ class EndpointRow(Base):
     def to_modern_deployment_info(self) -> DeploymentInfo:
         """Lightweight DeploymentInfo carrying only the revision *ids* (sourced
         from the replica groups), without loading the full revision rows. Used
-        by the modern (v2) read path, which only needs the ids. Requires the
-        replica-group relationships to be eagerly loaded.
+        by the modern (v2) read path, which only needs the ids. Requires
+        ``current_revision_id`` to be filled with ``with_expression``.
         """
         return self._build_deployment_info(
             current_revision_id=self.current_revision_id,
@@ -701,13 +667,6 @@ class EndpointTokenRow(Base):
         "created_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False
     )
 
-    endpoint_row: Mapped[EndpointRow | None] = relationship(
-        "EndpointRow",
-        back_populates="tokens",
-        foreign_keys=[endpoint],
-        primaryjoin=_get_endpoint_token_endpoint_row_join_condition,
-    )
-
     def __init__(
         self,
         id: DeploymentTokenID,
@@ -737,15 +696,12 @@ class EndpointTokenRow(Base):
         domain: str | None = None,
         project: UUID | None = None,
         user_uuid: UUID | None = None,
-        load_endpoint: bool = False,
     ) -> Sequence[EndpointTokenRow]:
         query = (
             sa.select(EndpointTokenRow)
             .filter(EndpointTokenRow.endpoint == endpoint_id)
             .order_by(sa.desc(EndpointTokenRow.created_at))
         )
-        if load_endpoint:
-            query = query.options(selectinload(EndpointTokenRow.endpoint_row))
         if project:
             query = query.filter(EndpointTokenRow.project == project)
         if domain:
@@ -766,11 +722,8 @@ class EndpointTokenRow(Base):
         domain: str | None = None,
         project: UUID | None = None,
         user_uuid: UUID | None = None,
-        load_endpoint: bool = False,
     ) -> EndpointTokenRow:
         query = sa.select(EndpointTokenRow).filter(EndpointTokenRow.token == token)
-        if load_endpoint:
-            query = query.options(selectinload(EndpointTokenRow.endpoint_row))
         if project:
             query = query.filter(EndpointTokenRow.project == project)
         if domain:
@@ -848,6 +801,8 @@ class EndpointAutoScalingRuleRow(Base):
         nullable=False,
     )
 
+    # Read only by gql_legacy (endpoint.py).
+    # Delete it together with the gql_legacy cleanup.
     endpoint_row: Mapped[EndpointRow] = relationship("EndpointRow", lazy="joined")
 
     # Read only by gql_legacy (endpoint.py), which passes load_endpoint.
