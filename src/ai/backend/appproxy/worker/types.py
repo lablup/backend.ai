@@ -479,7 +479,8 @@ class Circuit(SerializableCircuit):
             weight=1,
             targets=[
                 IngressTarget(
-                    id=IngressTargetID(str(route.route_id or route.session_id)),
+                    # TODO: Use the target id once targets are stored as their own entity.
+                    id=IngressTargetID(str(UUID(int=0))),
                     host=route.current_kernel_host,
                     port=route.kernel_port,
                 )

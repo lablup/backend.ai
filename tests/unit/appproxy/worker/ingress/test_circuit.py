@@ -285,7 +285,7 @@ class TestLegacyCircuitIngressSync:
                 id=IngressTargetGroupID(str(UUID(int=0))),
                 weight=1,
                 targets=[
-                    IngressTarget(id=IngressTargetID(str(ROUTE_ID)), host="10.0.0.5", port=8000)
+                    IngressTarget(id=IngressTargetID(str(UUID(int=0))), host="10.0.0.5", port=8000)
                 ],
             )
         ]
