@@ -281,7 +281,7 @@ class TestLegacyCircuitIngressSync:
         assert stored_ingress is not None
         assert stored_ingress.backend.target_groups == [
             IngressTargetGroup(
-                id=IngressTargetGroupID(str(CIRCUIT_ID)),
+                id=IngressTargetGroupID(str(UUID(int=0))),
                 weight=1,
                 targets=[
                     IngressTarget(id=IngressTargetID(str(ROUTE_ID)), host="10.0.0.5", port=8000)
