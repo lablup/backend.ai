@@ -56,6 +56,8 @@ _atom_config_iv = t.Dict({
         t.Key("rbln_stat_path"): t.Null | t.String,
         t.Key("enforce_singular_numa_affinity", default=False): t.Null | t.Bool,
         t.Key("enable_rsd", default=True): t.Null | t.Bool,
+        t.Key("cdi_device_id", default=None): t.Null | t.String,
+        t.Key("device_ids_env_var", default=None): t.Null | t.String,
     }).allow_extra("*"),
 }).allow_extra("*")
 
@@ -73,6 +75,15 @@ class AbstractATOMPlugin[TATOMDevice: AbstractATOMDevice](AbstractComputePlugin,
     enabled: bool = True
     atom_config: Any
 
+    # Name of the TOML config file read at init (`<config_name>.toml`).
+    config_name: str = "atom"
+    # Executables looked up in PATH when `rbln_stat_path` is not configured, in order.
+    executable_names: Sequence[str] = ("rbln-stat",)
+    # CDI device id requested for the container runtime; overridable in config.
+    cdi_device_id: str = "rebellions.ai/npu=runtime"
+    # Container env var carrying "local:global" device ids; overridable in config.
+    device_ids_env_var: str = "ATOM_GLOBAL_DEVICE_IDS"
+
     _rbln_stat_path: str
     _all_devices: list[TATOMDevice] | None
     _enable_rsd: bool
@@ -86,12 +97,21 @@ class AbstractATOMPlugin[TATOMDevice: AbstractATOMDevice](AbstractComputePlugin,
                 *map(lambda dev_id: DeviceId(dev_id), raw_device_mask.split(",")),
             ]
 
-        raw_cfg, cfg_src_path = config.read_from_file(None, "atom")
+        raw_cfg, cfg_src_path = config.read_from_file(None, self.config_name)
         self.atom_config = _atom_config_iv.check(raw_cfg)
         log.info("device config loaded", plugin_name=self.key, config_path=str(cfg_src_path))
-        _rbln_stat_path = self.atom_config["general"]["rbln_stat_path"] or shutil.which("rbln-stat")
+        general_cfg = self.atom_config["general"]
+        self.cdi_device_id = general_cfg["cdi_device_id"] or type(self).cdi_device_id
+        self.device_ids_env_var = general_cfg["device_ids_env_var"] or type(self).device_ids_env_var
+        _rbln_stat_path = general_cfg["rbln_stat_path"] or next(
+            (p for name in self.executable_names if (p := shutil.which(name))), None
+        )
         if _rbln_stat_path is None:
-            log.error("accelerator disabled: rbln-stat executable not found", plugin_name=self.key)
+            log.error(
+                "accelerator disabled: rbln executable not found",
+                plugin_name=self.key,
+                searched=list(self.executable_names),
+            )
             self.enabled = False
             return
         self._rbln_stat_path = _rbln_stat_path
@@ -350,7 +370,7 @@ class AbstractATOMPlugin[TATOMDevice: AbstractATOMDevice](AbstractComputePlugin,
                     {
                         "Driver": "cdi",
                         "Count": 0,
-                        "DeviceIDs": ["rebellions.ai/npu=runtime"],
+                        "DeviceIDs": [self.cdi_device_id],
                         "Capabilities": None,
                     }
                 ],
@@ -430,7 +450,7 @@ class AbstractATOMPlugin[TATOMDevice: AbstractATOMDevice](AbstractComputePlugin,
                 if alloc > 0:
                     active_device_id_set.add(dev_id)
         active_device_ids = sorted(active_device_id_set, key=lambda v: int(v.replace("rbln", "")))
-        data["ATOM_GLOBAL_DEVICE_IDS"] = ",".join(
+        data[self.device_ids_env_var] = ",".join(
             f"{local_idx}:{global_id}" for local_idx, global_id in enumerate(active_device_ids)
         )
         return data
