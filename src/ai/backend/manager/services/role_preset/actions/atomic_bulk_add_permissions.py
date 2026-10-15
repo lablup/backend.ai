@@ -17,7 +17,7 @@ from ai.backend.manager.models.rbac_models.role_permission_preset.row import (
 
 
 @dataclass
-class BulkAddRolePermissionPresetsAction(
+class AtomicBulkAddRolePresetPermissionsAction(
     AtomicCreateFieldOpsAction[RolePresetID, RolePermissionPresetRow, RolePermissionPresetData]
 ):
     """Add permission entries to one preset, all or none.
@@ -33,7 +33,7 @@ class BulkAddRolePermissionPresetsAction(
     @override
     @classmethod
     def action_name(cls) -> str:
-        return "bulk_add_role_permission_presets"
+        return "atomic_bulk_add_role_preset_permissions"
 
     @override
     def entity_id(self) -> EntityIdentifier:

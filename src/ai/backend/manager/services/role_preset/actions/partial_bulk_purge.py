@@ -6,7 +6,7 @@ from typing import Self, override
 
 from ai.backend.common.data.entity.role_preset import RolePresetID
 from ai.backend.common.data.entity.types import EntityIdentifier
-from ai.backend.manager.actions.v2.ops.base import PartialBulkPurgeGlobalEntityOpsAction
+from ai.backend.manager.actions.v2.ops.base import PartialBulkPurgeEntityOpsAction
 from ai.backend.manager.data.role_preset.types import RolePresetData
 from ai.backend.manager.models.rbac_models.role_preset.purgers import RolePresetPurger
 from ai.backend.manager.models.rbac_models.role_preset.row import (
@@ -15,8 +15,8 @@ from ai.backend.manager.models.rbac_models.role_preset.row import (
 
 
 @dataclass
-class BulkPurgeRolePresetsAction(
-    PartialBulkPurgeGlobalEntityOpsAction[RolePresetRow, RolePresetData]
+class PartialBulkPurgeRolePresetsAction(
+    PartialBulkPurgeEntityOpsAction[RolePresetRow, RolePresetData]
 ):
     """Remove the named presets for good, answering for each one."""
 
@@ -25,7 +25,7 @@ class BulkPurgeRolePresetsAction(
     @override
     @classmethod
     def action_name(cls) -> str:
-        return "bulk_purge_role_presets"
+        return "partial_bulk_purge_role_presets"
 
     @override
     def entity_ids(self) -> Sequence[EntityIdentifier]:

@@ -22,7 +22,7 @@ from ai.backend.manager.services.role_preset.actions.lookup_permission_owner imp
 
 
 @dataclass
-class BulkRemoveRolePermissionPresetsAction(
+class PartialBulkRemoveRolePresetPermissionsAction(
     PartialBulkPurgeFieldOpsAction[
         RolePermissionPresetID,
         RolePresetID,
@@ -41,7 +41,7 @@ class BulkRemoveRolePermissionPresetsAction(
     @override
     @classmethod
     def action_name(cls) -> str:
-        return "bulk_remove_role_permission_presets"
+        return "partial_bulk_remove_role_preset_permissions"
 
     @override
     def field_ids(self) -> Sequence[RolePermissionPresetID]:

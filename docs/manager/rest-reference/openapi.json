@@ -20670,80 +20670,32 @@
         "title": "SearchRolePresetsInput",
         "type": "object"
       },
-      "BulkDeleteRolePresetsInput": {
-        "description": "Input for bulk-soft-deleting role presets (sets ``deleted = true``).",
-        "properties": {
-          "role_preset_ids": {
-            "description": "Role preset UUIDs to soft-delete.",
-            "items": {
-              "format": "uuid",
-              "type": "string"
-            },
-            "title": "Role Preset Ids",
-            "type": "array"
-          }
+      "NonEmptyList_PartialBulkUpdateRolePresetItemInput_": {
+        "items": {
+          "$ref": "#/components/schemas/PartialBulkUpdateRolePresetItemInput"
         },
-        "required": [
-          "role_preset_ids"
-        ],
-        "title": "BulkDeleteRolePresetsInput",
-        "type": "object"
+        "minItems": 1,
+        "type": "array"
       },
-      "BulkRestoreRolePresetsInput": {
-        "description": "Input for bulk-restoring soft-deleted role presets (sets ``deleted = false``).",
+      "PartialBulkUpdateRolePresetItemInput": {
+        "description": "One role preset of a partial bulk update and the fields to update on it.",
         "properties": {
-          "role_preset_ids": {
-            "description": "Role preset UUIDs to restore.",
-            "items": {
-              "format": "uuid",
-              "type": "string"
-            },
-            "title": "Role Preset Ids",
-            "type": "array"
+          "id": {
+            "description": "ID of the role preset to update.",
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "input": {
+            "$ref": "#/components/schemas/UpdateRolePresetBody",
+            "description": "Fields to update on the role preset."
           }
         },
         "required": [
-          "role_preset_ids"
+          "id",
+          "input"
         ],
-        "title": "BulkRestoreRolePresetsInput",
-        "type": "object"
-      },
-      "BulkPurgeRolePresetsInput": {
-        "description": "Input for bulk-hard-deleting role presets. Cascades to their permission entries.",
-        "properties": {
-          "role_preset_ids": {
-            "description": "Role preset UUIDs to purge.",
-            "items": {
-              "format": "uuid",
-              "type": "string"
-            },
-            "title": "Role Preset Ids",
-            "type": "array"
-          }
-        },
-        "required": [
-          "role_preset_ids"
-        ],
-        "title": "BulkPurgeRolePresetsInput",
-        "type": "object"
-      },
-      "BulkRemoveRolePermissionPresetsInput": {
-        "description": "Input for bulk-deleting role_permission_presets rows by primary key.",
-        "properties": {
-          "permission_preset_ids": {
-            "description": "role_permission_presets row IDs to delete.",
-            "items": {
-              "format": "uuid",
-              "type": "string"
-            },
-            "title": "Permission Preset Ids",
-            "type": "array"
-          }
-        },
-        "required": [
-          "permission_preset_ids"
-        ],
-        "title": "BulkRemoveRolePermissionPresetsInput",
+        "title": "PartialBulkUpdateRolePresetItemInput",
         "type": "object"
       },
       "UpdateRolePresetBody": {
@@ -20779,6 +20731,81 @@
           }
         },
         "title": "UpdateRolePresetBody",
+        "type": "object"
+      },
+      "PartialBulkUpdateRolePresetsInput": {
+        "description": "Input for updating several role presets, each answered for separately.",
+        "properties": {
+          "items": {
+            "$ref": "#/components/schemas/NonEmptyList_PartialBulkUpdateRolePresetItemInput_",
+            "description": "The role presets to update, each with its fields."
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "title": "PartialBulkUpdateRolePresetsInput",
+        "type": "object"
+      },
+      "PartialBulkDeleteRolePresetsInput": {
+        "description": "Input for soft-deleting several role presets, each answered for separately.",
+        "properties": {
+          "ids": {
+            "$ref": "#/components/schemas/NonEmptyList_UUID_",
+            "description": "IDs of the role presets to soft-delete."
+          }
+        },
+        "required": [
+          "ids"
+        ],
+        "title": "PartialBulkDeleteRolePresetsInput",
+        "type": "object"
+      },
+      "PartialBulkRestoreRolePresetsInput": {
+        "description": "Input for restoring several soft-deleted role presets, each answered for separately.",
+        "properties": {
+          "ids": {
+            "$ref": "#/components/schemas/NonEmptyList_UUID_",
+            "description": "IDs of the role presets to restore."
+          }
+        },
+        "required": [
+          "ids"
+        ],
+        "title": "PartialBulkRestoreRolePresetsInput",
+        "type": "object"
+      },
+      "PartialBulkPurgeRolePresetsInput": {
+        "description": "Input for purging several role presets, each answered for separately.",
+        "properties": {
+          "ids": {
+            "$ref": "#/components/schemas/NonEmptyList_UUID_",
+            "description": "IDs of the role presets to purge."
+          }
+        },
+        "required": [
+          "ids"
+        ],
+        "title": "PartialBulkPurgeRolePresetsInput",
+        "type": "object"
+      },
+      "BulkRemoveRolePermissionPresetsInput": {
+        "description": "Input for bulk-deleting role_permission_presets rows by primary key.",
+        "properties": {
+          "permission_preset_ids": {
+            "description": "role_permission_presets row IDs to delete.",
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "title": "Permission Preset Ids",
+            "type": "array"
+          }
+        },
+        "required": [
+          "permission_preset_ids"
+        ],
+        "title": "BulkRemoveRolePermissionPresetsInput",
         "type": "object"
       },
       "RolePermissionPresetOrder": {
@@ -20939,6 +20966,63 @@
           "permissions"
         ],
         "title": "BulkAddRolePermissionPresetsInput",
+        "type": "object"
+      },
+      "BulkDeleteRolePresetsInput": {
+        "description": "Input for bulk-soft-deleting role presets (sets ``deleted = true``).",
+        "properties": {
+          "role_preset_ids": {
+            "description": "Role preset UUIDs to soft-delete.",
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "title": "Role Preset Ids",
+            "type": "array"
+          }
+        },
+        "required": [
+          "role_preset_ids"
+        ],
+        "title": "BulkDeleteRolePresetsInput",
+        "type": "object"
+      },
+      "BulkRestoreRolePresetsInput": {
+        "description": "Input for bulk-restoring soft-deleted role presets (sets ``deleted = false``).",
+        "properties": {
+          "role_preset_ids": {
+            "description": "Role preset UUIDs to restore.",
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "title": "Role Preset Ids",
+            "type": "array"
+          }
+        },
+        "required": [
+          "role_preset_ids"
+        ],
+        "title": "BulkRestoreRolePresetsInput",
+        "type": "object"
+      },
+      "BulkPurgeRolePresetsInput": {
+        "description": "Input for bulk-hard-deleting role presets. Cascades to their permission entries.",
+        "properties": {
+          "role_preset_ids": {
+            "description": "Role preset UUIDs to purge.",
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "title": "Role Preset Ids",
+            "type": "array"
+          }
+        },
+        "required": [
+          "role_preset_ids"
+        ],
+        "title": "BulkPurgeRolePresetsInput",
         "type": "object"
       },
       "CreateQueryDefinitionOptionsInput": {
@@ -55425,9 +55509,9 @@
         "description": "Search role presets (superadmin only).\n\n**Preconditions:**\n* Superadmin privilege required.\n"
       }
     },
-    "/v2/role-presets/bulk-delete": {
+    "/v2/role-presets/partial-bulk-update": {
       "post": {
-        "operationId": "v2/role-presets.bulk_delete",
+        "operationId": "v2/role-presets.partial_bulk_update",
         "tags": [
           "v2/role-presets"
         ],
@@ -55445,18 +55529,18 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/BulkDeleteRolePresetsInput"
+                "$ref": "#/components/schemas/PartialBulkUpdateRolePresetsInput"
               }
             }
           }
         },
         "parameters": [],
-        "description": "Soft-delete role presets (sets ``deleted = true``).\n\n**Preconditions:**\n* Superadmin privilege required.\n"
+        "description": "Update several role presets, answering for each one.\n\n**Preconditions:**\n* User privilege required.\n"
       }
     },
-    "/v2/role-presets/bulk-restore": {
+    "/v2/role-presets/partial-bulk-delete": {
       "post": {
-        "operationId": "v2/role-presets.bulk_restore",
+        "operationId": "v2/role-presets.partial_bulk_delete",
         "tags": [
           "v2/role-presets"
         ],
@@ -55474,18 +55558,18 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/BulkRestoreRolePresetsInput"
+                "$ref": "#/components/schemas/PartialBulkDeleteRolePresetsInput"
               }
             }
           }
         },
         "parameters": [],
-        "description": "Restore soft-deleted role presets (sets ``deleted = false``).\n\n**Preconditions:**\n* Superadmin privilege required.\n"
+        "description": "Soft-delete several role presets, answering for each one.\n\n**Preconditions:**\n* User privilege required.\n"
       }
     },
-    "/v2/role-presets/bulk-purge": {
+    "/v2/role-presets/partial-bulk-restore": {
       "post": {
-        "operationId": "v2/role-presets.bulk_purge",
+        "operationId": "v2/role-presets.partial_bulk_restore",
         "tags": [
           "v2/role-presets"
         ],
@@ -55503,13 +55587,42 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/BulkPurgeRolePresetsInput"
+                "$ref": "#/components/schemas/PartialBulkRestoreRolePresetsInput"
               }
             }
           }
         },
         "parameters": [],
-        "description": "Hard-delete role presets, cascading to their permission entries.\n\n**Preconditions:**\n* Superadmin privilege required.\n"
+        "description": "Restore several soft-deleted role presets, answering for each one.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/v2/role-presets/partial-bulk-purge": {
+      "post": {
+        "operationId": "v2/role-presets.partial_bulk_purge",
+        "tags": [
+          "v2/role-presets"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PartialBulkPurgeRolePresetsInput"
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "description": "Purge several role presets, answering for each one.\n\n**Preconditions:**\n* User privilege required.\n"
       }
     },
     "/v2/role-presets/permissions/remove": {
@@ -55603,7 +55716,92 @@
             }
           }
         ],
-        "description": "Update a role preset's metadata. The ``deleted`` flag cannot be mutated here.\n\nThe preset ID comes from the URL path; the adapter merges it with the body.\n\n\n**Preconditions:**\n* Superadmin privilege required.\n"
+        "description": "Update a role preset's metadata. The ``deleted`` flag cannot be mutated here.\n\n**Preconditions:**\n* User privilege required.\n"
+      },
+      "delete": {
+        "operationId": "v2/role-presets.purge",
+        "tags": [
+          "v2/role-presets"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "role_preset_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "description": "Purge a role preset, cascading to its permission entries.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/v2/role-presets/{role_preset_id}/delete": {
+      "post": {
+        "operationId": "v2/role-presets.delete",
+        "tags": [
+          "v2/role-presets"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "role_preset_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "description": "Soft-delete a role preset.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/v2/role-presets/{role_preset_id}/restore": {
+      "post": {
+        "operationId": "v2/role-presets.restore",
+        "tags": [
+          "v2/role-presets"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "role_preset_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "description": "Restore a soft-deleted role preset.\n\n**Preconditions:**\n* User privilege required.\n"
       }
     },
     "/v2/role-presets/{role_preset_id}/permissions/search": {
@@ -55680,6 +55878,93 @@
           }
         ],
         "description": "Bulk-add permission entries to an existing role preset.\n\n**Preconditions:**\n* Superadmin privilege required.\n"
+      }
+    },
+    "/v2/role-presets/bulk-delete": {
+      "post": {
+        "operationId": "v2/role-presets.bulk_delete",
+        "tags": [
+          "v2/role-presets"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BulkDeleteRolePresetsInput"
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "description": "Deprecated. Use `POST /v2/role-presets/partial-bulk-delete`.\n\n**Preconditions:**\n* Superadmin privilege required.\n"
+      }
+    },
+    "/v2/role-presets/bulk-restore": {
+      "post": {
+        "operationId": "v2/role-presets.bulk_restore",
+        "tags": [
+          "v2/role-presets"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BulkRestoreRolePresetsInput"
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "description": "Deprecated. Use `POST /v2/role-presets/partial-bulk-restore`.\n\n**Preconditions:**\n* Superadmin privilege required.\n"
+      }
+    },
+    "/v2/role-presets/bulk-purge": {
+      "post": {
+        "operationId": "v2/role-presets.bulk_purge",
+        "tags": [
+          "v2/role-presets"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BulkPurgeRolePresetsInput"
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "description": "Deprecated. Use `POST /v2/role-presets/partial-bulk-purge`.\n\n**Preconditions:**\n* Superadmin privilege required.\n"
       }
     },
     "/v2/prometheus-query-presets": {

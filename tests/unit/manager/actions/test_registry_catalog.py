@@ -267,13 +267,13 @@ from ai.backend.manager.services.resource_preset.actions.list_presets import (
     ListResourcePresetsAction,
 )
 from ai.backend.manager.services.resource_preset.processors import ResourcePresetProcessors
-from ai.backend.manager.services.role_preset.actions.bulk_add_permissions import (
-    BulkAddRolePermissionPresetsAction,
-)
-from ai.backend.manager.services.role_preset.actions.bulk_remove_permissions import (
-    BulkRemoveRolePermissionPresetsAction,
+from ai.backend.manager.services.role_preset.actions.atomic_bulk_add_permissions import (
+    AtomicBulkAddRolePresetPermissionsAction,
 )
 from ai.backend.manager.services.role_preset.actions.create import CreateRolePresetAction
+from ai.backend.manager.services.role_preset.actions.partial_bulk_remove_permissions import (
+    PartialBulkRemoveRolePresetPermissionsAction,
+)
 from ai.backend.manager.services.role_preset.actions.update import UpdateRolePresetAction
 from ai.backend.manager.services.runtime_variant.actions.purge import PurgeRuntimeVariantAction
 from ai.backend.manager.services.scheduling_history.actions.bulk_get_deployment_histories import (
@@ -1083,8 +1083,8 @@ _OPS_ACTIONS_WIRED_TO_A_SERVICE: dict[type[Any], str] = {
     CreatePresetAction: "validates the query template before insert",
     CreateRolePresetAction: "validates that the role name template renders",
     UpdateRolePresetAction: "validates the template and re-syncs the derived roles",
-    BulkAddRolePermissionPresetsAction: "re-syncs the derived roles in the same transaction",
-    BulkRemoveRolePermissionPresetsAction: "re-syncs the derived roles in the same transaction",
+    AtomicBulkAddRolePresetPermissionsAction: "re-syncs the derived roles in the same transaction",
+    PartialBulkRemoveRolePresetPermissionsAction: "re-syncs the derived roles in the same transaction",
 }
 
 

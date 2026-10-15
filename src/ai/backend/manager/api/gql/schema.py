@@ -519,6 +519,16 @@ from ai.backend.manager.api.gql.role_preset.resolver.mutation import (
     admin_purge_role_presets,
     admin_restore_role_presets,
     admin_update_role_preset,
+    atomic_bulk_add_role_preset_permissions,
+    delete_role_preset,
+    partial_bulk_delete_role_presets,
+    partial_bulk_purge_role_presets,
+    partial_bulk_remove_role_preset_permissions,
+    partial_bulk_restore_role_presets,
+    partial_bulk_update_role_presets,
+    purge_role_preset,
+    restore_role_preset,
+    update_role_preset,
 )
 from ai.backend.manager.api.gql.role_preset.resolver.query import (
     admin_role_preset,
@@ -1172,6 +1182,16 @@ class Mutation:
     admin_purge_role_presets = admin_purge_role_presets
     admin_bulk_add_role_preset_permissions = admin_bulk_add_role_preset_permissions
     admin_bulk_remove_role_preset_permissions = admin_bulk_remove_role_preset_permissions
+    update_role_preset = update_role_preset
+    delete_role_preset = delete_role_preset
+    restore_role_preset = restore_role_preset
+    purge_role_preset = purge_role_preset
+    partial_bulk_update_role_presets = partial_bulk_update_role_presets
+    partial_bulk_delete_role_presets = partial_bulk_delete_role_presets
+    partial_bulk_restore_role_presets = partial_bulk_restore_role_presets
+    partial_bulk_purge_role_presets = partial_bulk_purge_role_presets
+    atomic_bulk_add_role_preset_permissions = atomic_bulk_add_role_preset_permissions
+    partial_bulk_remove_role_preset_permissions = partial_bulk_remove_role_preset_permissions
     # RBAC Admin APIs
     admin_create_role = admin_create_role
     admin_update_role = admin_update_role

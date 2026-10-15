@@ -1481,6 +1481,14 @@ input AssignRoleInput {
   projectId: UUID
 }
 
+"""
+Added in 26.10.0. Payload returned after adding permission entries to a role preset, all or none.
+"""
+type AtomicBulkAddRolePresetPermissionsPayload {
+  """Permission entries that were added."""
+  items: [RolePermissionPreset!]!
+}
+
 """Added in 26.10.0. Shape of the action that wrote an audit log entry."""
 enum AuditLogActionKind {
   SINGLE_ENTITY
@@ -4596,6 +4604,12 @@ input DeleteRoleInput {
 type DeleteRolePayload {
   """ID of the deleted role."""
   id: UUID!
+}
+
+"""Added in 26.10.0. Payload returned after soft-deleting a role preset."""
+type DeleteRolePresetPayload {
+  """Soft-deleted role preset."""
+  rolePreset: RolePreset!
 }
 
 """Added in 26.4.2. Payload for runtime variant deletion."""
@@ -10292,26 +10306,68 @@ type Mutation {
   """
   Added in 26.4.4. Update an existing role preset's metadata (admin only).
   """
-  adminUpdateRolePreset(input: UpdateRolePresetInput!): UpdateRolePresetPayload
+  adminUpdateRolePreset(input: UpdateRolePresetInput!): UpdateRolePresetPayload @deprecated(reason: "Deprecated since 26.10.0. Use `updateRolePreset`.")
 
   """Added in 26.4.4. Bulk-soft-delete role presets (admin only)."""
-  adminDeleteRolePresets(input: BulkDeleteRolePresetsInput!): BulkDeleteRolePresetsPayload
+  adminDeleteRolePresets(input: BulkDeleteRolePresetsInput!): BulkDeleteRolePresetsPayload @deprecated(reason: "Deprecated since 26.10.0. Use `partialBulkDeleteRolePresets`.")
 
   """Added in 26.4.4. Bulk-restore soft-deleted role presets (admin only)."""
-  adminRestoreRolePresets(input: BulkRestoreRolePresetsInput!): BulkRestoreRolePresetsPayload
+  adminRestoreRolePresets(input: BulkRestoreRolePresetsInput!): BulkRestoreRolePresetsPayload @deprecated(reason: "Deprecated since 26.10.0. Use `partialBulkRestoreRolePresets`.")
 
   """Added in 26.4.4. Bulk-hard-delete role presets (admin only)."""
-  adminPurgeRolePresets(input: BulkPurgeRolePresetsInput!): BulkPurgeRolePresetsPayload
+  adminPurgeRolePresets(input: BulkPurgeRolePresetsInput!): BulkPurgeRolePresetsPayload @deprecated(reason: "Deprecated since 26.10.0. Use `partialBulkPurgeRolePresets`.")
 
   """
   Added in 26.4.4. Bulk-add permission entries to an existing role preset (admin only).
   """
-  adminBulkAddRolePresetPermissions(input: BulkAddRolePermissionPresetsInput!): BulkAddRolePermissionPresetsPayload
+  adminBulkAddRolePresetPermissions(input: BulkAddRolePermissionPresetsInput!): BulkAddRolePermissionPresetsPayload @deprecated(reason: "Deprecated since 26.10.0. Use `atomicBulkAddRolePresetPermissions`.")
 
   """
   Added in 26.4.4. Bulk-remove permission entries from a role preset (admin only).
   """
-  adminBulkRemoveRolePresetPermissions(input: BulkRemoveRolePermissionPresetsInput!): BulkRemoveRolePermissionPresetsPayload
+  adminBulkRemoveRolePresetPermissions(input: BulkRemoveRolePermissionPresetsInput!): BulkRemoveRolePermissionPresetsPayload @deprecated(reason: "Deprecated since 26.10.0. Use `partialBulkRemoveRolePresetPermissions`.")
+
+  """
+  Added in 26.10.0. Update a role preset's metadata. Only provided fields will be updated.
+  """
+  updateRolePreset(id: UUID!, input: UpdateRolePresetBodyInput!): UpdateRolePresetPayload!
+
+  """Added in 26.10.0. Soft-delete a role preset."""
+  deleteRolePreset(id: UUID!): DeleteRolePresetPayload!
+
+  """Added in 26.10.0. Restore a soft-deleted role preset."""
+  restoreRolePreset(id: UUID!): RestoreRolePresetPayload!
+
+  """
+  Added in 26.10.0. Purge a role preset together with its permission entries.
+  """
+  purgeRolePreset(id: UUID!): PurgeRolePresetPayload!
+
+  """Added in 26.10.0. Update several role presets, answering for each one."""
+  partialBulkUpdateRolePresets(input: PartialBulkUpdateRolePresetsInput!): PartialBulkRolePresetsPayload!
+
+  """
+  Added in 26.10.0. Soft-delete several role presets, answering for each one.
+  """
+  partialBulkDeleteRolePresets(input: PartialBulkDeleteRolePresetsInput!): PartialBulkRolePresetsPayload!
+
+  """
+  Added in 26.10.0. Restore several soft-deleted role presets, answering for each one.
+  """
+  partialBulkRestoreRolePresets(input: PartialBulkRestoreRolePresetsInput!): PartialBulkRolePresetsPayload!
+
+  """Added in 26.10.0. Purge several role presets, answering for each one."""
+  partialBulkPurgeRolePresets(input: PartialBulkPurgeRolePresetsInput!): PartialBulkRolePresetsPayload!
+
+  """
+  Added in 26.10.0. Add permission entries to an existing role preset, all or none.
+  """
+  atomicBulkAddRolePresetPermissions(input: BulkAddRolePermissionPresetsInput!): AtomicBulkAddRolePresetPermissionsPayload!
+
+  """
+  Added in 26.10.0. Remove several role preset permission entries, answering for each one.
+  """
+  partialBulkRemoveRolePresetPermissions(input: PartialBulkRemoveRolePresetPermissionsInput!): PartialBulkRolePresetPermissionsPayload!
 
   """Added in 26.3.0. Create a new role (admin only)."""
   adminCreateRole(input: CreateRoleInput!): Role
@@ -11254,6 +11310,14 @@ input PartialBulkDeleteProjectsInput {
 }
 
 """
+Added in 26.10.0. Input for soft-deleting several role presets, each answered for separately.
+"""
+input PartialBulkDeleteRolePresetsInput {
+  """IDs of the role presets to soft-delete."""
+  ids: [UUID!]!
+}
+
+"""
 Added in 26.10.0. Input for soft-deleting several roles, each answered for separately.
 """
 input PartialBulkDeleteRolesInput {
@@ -11425,6 +11489,14 @@ input PartialBulkPurgeResourcePresetsInput {
 }
 
 """
+Added in 26.10.0. Input for purging several role presets, each answered for separately.
+"""
+input PartialBulkPurgeRolePresetsInput {
+  """IDs of the role presets to purge."""
+  ids: [UUID!]!
+}
+
+"""
 Added in 26.10.0. Input for permanently removing several roles, each answered for separately.
 """
 input PartialBulkPurgeRolesInput {
@@ -11437,6 +11509,14 @@ Added in 26.10.0. Input for purging several user resource policies, each answere
 """
 input PartialBulkPurgeUserResourcePoliciesInput {
   """IDs of the user resource policies to purge."""
+  ids: [UUID!]!
+}
+
+"""
+Added in 26.10.0. Input for removing several role preset permission entries, each answered for separately.
+"""
+input PartialBulkRemoveRolePresetPermissionsInput {
+  """IDs of the permission entries to remove."""
   ids: [UUID!]!
 }
 
@@ -11495,6 +11575,14 @@ input PartialBulkRestoreProjectsInput {
 }
 
 """
+Added in 26.10.0. Input for restoring several soft-deleted role presets, each answered for separately.
+"""
+input PartialBulkRestoreRolePresetsInput {
+  """IDs of the role presets to restore."""
+  ids: [UUID!]!
+}
+
+"""
 Added in 26.10.0. Input for restoring several soft-deleted roles, each answered for separately.
 """
 input PartialBulkRestoreRolesInput {
@@ -11508,6 +11596,28 @@ Added in 26.10.0. Input for restoring several soft-deleted vfolders, each answer
 input PartialBulkRestoreVFoldersInput {
   """IDs of the vfolders to restore."""
   ids: [UUID!]!
+}
+
+"""
+Added in 26.10.0. Result of a partial bulk role preset permission operation: the entries processed and the ones that failed.
+"""
+type PartialBulkRolePresetPermissionsPayload {
+  """The permission entries processed, as they stood."""
+  successes: [RolePermissionPreset!]!
+
+  """The permission entries not processed, each with the reason."""
+  failed: [PartialBulkFailure!]!
+}
+
+"""
+Added in 26.10.0. Result of a partial bulk role preset operation: the role presets processed and the ones that failed.
+"""
+type PartialBulkRolePresetsPayload {
+  """The role presets processed, as they now stand."""
+  successes: [RolePreset!]!
+
+  """The role presets not processed, each with the reason."""
+  failed: [PartialBulkFailure!]!
 }
 
 """
@@ -11733,6 +11843,25 @@ input PartialBulkUpdateRoleItemInput {
 
   """Fields to update on the role."""
   input: UpdateRoleInput!
+}
+
+"""
+Added in 26.10.0. One role preset of a partial bulk update and the fields to update on it.
+"""
+input PartialBulkUpdateRolePresetItemInput {
+  """ID of the role preset to update."""
+  id: UUID!
+
+  """Fields to update on the role preset."""
+  input: UpdateRolePresetBodyInput!
+}
+
+"""
+Added in 26.10.0. Input for updating several role presets, each answered for separately.
+"""
+input PartialBulkUpdateRolePresetsInput {
+  """The role presets to update, each with its fields."""
+  items: [PartialBulkUpdateRolePresetItemInput!]!
 }
 
 """
@@ -13233,6 +13362,12 @@ input PurgeRoleInput {
 type PurgeRolePayload {
   """ID of the purged role."""
   id: UUID!
+}
+
+"""Added in 26.10.0. Payload returned after purging a role preset."""
+type PurgeRolePresetPayload {
+  """Purged role preset, as it stood."""
+  rolePreset: RolePreset!
 }
 
 """
@@ -15957,6 +16092,12 @@ type RestoreProjectPayload {
 type RestoreRolePayload {
   """ID of the restored role."""
   id: UUID!
+}
+
+"""Added in 26.10.0. Payload returned after restoring a role preset."""
+type RestoreRolePresetPayload {
+  """Restored role preset."""
+  rolePreset: RolePreset!
 }
 
 """Added in 26.9.0. Payload for single user restore mutation."""
@@ -20038,6 +20179,19 @@ input UpdateRoleInput {
 
   """
   Added in 26.4.4. Updated value for the `auto_assign` flag. When true, the role is automatically granted to a user when the user is added to a scope this role is registered in.
+  """
+  autoAssign: Boolean
+}
+
+"""
+Added in 26.10.0. Fields to update on a role preset. Permission entries are managed via the dedicated add/remove mutations; the `deleted` flag via delete/restore mutations.
+"""
+input UpdateRolePresetBodyInput {
+  """Updated name."""
+  name: String
+
+  """
+  Updated default value for the `auto_assign` flag of instantiated roles.
   """
   autoAssign: Boolean
 }
