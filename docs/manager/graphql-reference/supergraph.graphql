@@ -14793,10 +14793,10 @@ type Mutation
   """
   Added in 26.4.2. Update a keypair resource policy (admin only). Only provided fields will be updated.
   """
-  adminUpdateKeypairResourcePolicyV2(name: String!, input: UpdateKeypairResourcePolicyInput!): UpdateKeypairResourcePolicyPayload @join__field(graph: STRAWBERRY)
+  adminUpdateKeypairResourcePolicyV2(name: String!, input: UpdateKeypairResourcePolicyInput!): UpdateKeypairResourcePolicyPayload @join__field(graph: STRAWBERRY) @deprecated(reason: "Deprecated since 26.10.0. Use `updateKeypairResourcePolicyV2`.")
 
   """Added in 26.4.2. Delete a keypair resource policy (admin only)."""
-  adminDeleteKeypairResourcePolicyV2(name: String!): DeleteKeypairResourcePolicyPayload @join__field(graph: STRAWBERRY)
+  adminDeleteKeypairResourcePolicyV2(name: String!): DeleteKeypairResourcePolicyPayload @join__field(graph: STRAWBERRY) @deprecated(reason: "Deprecated since 26.10.0. Use `purgeKeypairResourcePolicyV2`.")
 
   """Added in 26.4.2. Create a new user resource policy (admin only)."""
   adminCreateUserResourcePolicyV2(input: CreateUserResourcePolicyInputV2!): CreateUserResourcePolicyPayload @join__field(graph: STRAWBERRY)
@@ -14804,10 +14804,10 @@ type Mutation
   """
   Added in 26.4.2. Update a user resource policy (admin only). Only provided fields will be updated.
   """
-  adminUpdateUserResourcePolicyV2(name: String!, input: UpdateUserResourcePolicyInput!): UpdateUserResourcePolicyPayload @join__field(graph: STRAWBERRY)
+  adminUpdateUserResourcePolicyV2(name: String!, input: UpdateUserResourcePolicyInput!): UpdateUserResourcePolicyPayload @join__field(graph: STRAWBERRY) @deprecated(reason: "Deprecated since 26.10.0. Use `updateUserResourcePolicyV2`.")
 
   """Added in 26.4.2. Delete a user resource policy (admin only)."""
-  adminDeleteUserResourcePolicyV2(name: String!): DeleteUserResourcePolicyPayload @join__field(graph: STRAWBERRY)
+  adminDeleteUserResourcePolicyV2(name: String!): DeleteUserResourcePolicyPayload @join__field(graph: STRAWBERRY) @deprecated(reason: "Deprecated since 26.10.0. Use `purgeUserResourcePolicyV2`.")
 
   """Added in 26.4.2. Create a new project resource policy (admin only)."""
   adminCreateProjectResourcePolicyV2(input: CreateProjectResourcePolicyInputV2!): CreateProjectResourcePolicyPayload @join__field(graph: STRAWBERRY)
@@ -14815,10 +14815,64 @@ type Mutation
   """
   Added in 26.4.2. Update a project resource policy (admin only). Only provided fields will be updated.
   """
-  adminUpdateProjectResourcePolicyV2(name: String!, input: UpdateProjectResourcePolicyInput!): UpdateProjectResourcePolicyPayload @join__field(graph: STRAWBERRY)
+  adminUpdateProjectResourcePolicyV2(name: String!, input: UpdateProjectResourcePolicyInput!): UpdateProjectResourcePolicyPayload @join__field(graph: STRAWBERRY) @deprecated(reason: "Deprecated since 26.10.0. Use `updateProjectResourcePolicyV2`.")
 
   """Added in 26.4.2. Delete a project resource policy (admin only)."""
-  adminDeleteProjectResourcePolicyV2(name: String!): DeleteProjectResourcePolicyPayload @join__field(graph: STRAWBERRY)
+  adminDeleteProjectResourcePolicyV2(name: String!): DeleteProjectResourcePolicyPayload @join__field(graph: STRAWBERRY) @deprecated(reason: "Deprecated since 26.10.0. Use `purgeProjectResourcePolicyV2`.")
+
+  """
+  Added in 26.10.0. Update a keypair resource policy. Only provided fields will be updated.
+  """
+  updateKeypairResourcePolicyV2(id: UUID!, input: UpdateKeypairResourcePolicyInput!): UpdateKeypairResourcePolicyPayload! @join__field(graph: STRAWBERRY)
+
+  """Added in 26.10.0. Permanently remove a keypair resource policy."""
+  purgeKeypairResourcePolicyV2(id: UUID!): DeleteKeypairResourcePolicyPayload! @join__field(graph: STRAWBERRY)
+
+  """
+  Added in 26.10.0. Update several keypair resource policies, answering for each one.
+  """
+  partialBulkUpdateKeypairResourcePoliciesV2(input: PartialBulkUpdateKeypairResourcePoliciesInput!): PartialBulkKeypairResourcePoliciesPayload! @join__field(graph: STRAWBERRY)
+
+  """
+  Added in 26.10.0. Permanently remove several keypair resource policies, answering for each one.
+  """
+  partialBulkPurgeKeypairResourcePoliciesV2(input: PartialBulkPurgeKeypairResourcePoliciesInput!): PartialBulkKeypairResourcePoliciesPayload! @join__field(graph: STRAWBERRY)
+
+  """
+  Added in 26.10.0. Update a user resource policy. Only provided fields will be updated.
+  """
+  updateUserResourcePolicyV2(id: UUID!, input: UpdateUserResourcePolicyInput!): UpdateUserResourcePolicyPayload! @join__field(graph: STRAWBERRY)
+
+  """Added in 26.10.0. Permanently remove a user resource policy."""
+  purgeUserResourcePolicyV2(id: UUID!): DeleteUserResourcePolicyPayload! @join__field(graph: STRAWBERRY)
+
+  """
+  Added in 26.10.0. Update several user resource policies, answering for each one.
+  """
+  partialBulkUpdateUserResourcePoliciesV2(input: PartialBulkUpdateUserResourcePoliciesInput!): PartialBulkUserResourcePoliciesPayload! @join__field(graph: STRAWBERRY)
+
+  """
+  Added in 26.10.0. Permanently remove several user resource policies, answering for each one.
+  """
+  partialBulkPurgeUserResourcePoliciesV2(input: PartialBulkPurgeUserResourcePoliciesInput!): PartialBulkUserResourcePoliciesPayload! @join__field(graph: STRAWBERRY)
+
+  """
+  Added in 26.10.0. Update a project resource policy. Only provided fields will be updated.
+  """
+  updateProjectResourcePolicyV2(id: UUID!, input: UpdateProjectResourcePolicyInput!): UpdateProjectResourcePolicyPayload! @join__field(graph: STRAWBERRY)
+
+  """Added in 26.10.0. Permanently remove a project resource policy."""
+  purgeProjectResourcePolicyV2(id: UUID!): DeleteProjectResourcePolicyPayload! @join__field(graph: STRAWBERRY)
+
+  """
+  Added in 26.10.0. Update several project resource policies, answering for each one.
+  """
+  partialBulkUpdateProjectResourcePoliciesV2(input: PartialBulkUpdateProjectResourcePoliciesInput!): PartialBulkProjectResourcePoliciesPayload! @join__field(graph: STRAWBERRY)
+
+  """
+  Added in 26.10.0. Permanently remove several project resource policies, answering for each one.
+  """
+  partialBulkPurgeProjectResourcePoliciesV2(input: PartialBulkPurgeProjectResourcePoliciesInput!): PartialBulkProjectResourcePoliciesPayload! @join__field(graph: STRAWBERRY)
 
   """Added in 26.4.2. Create a new resource preset (admin only)."""
   adminCreateResourcePresetV2(input: CreateResourcePresetV2Input!): CreateResourcePresetPayload @join__field(graph: STRAWBERRY)
@@ -15711,6 +15765,32 @@ type PartialBulkImagesPayload
 }
 
 """
+Added in 26.10.0. Result of a partial bulk keypair resource policy operation: the policies processed and the ones that failed.
+"""
+type PartialBulkKeypairResourcePoliciesPayload
+  @join__type(graph: STRAWBERRY)
+{
+  """The policies processed, as they now stand."""
+  successes: [KeypairResourcePolicyV2!]!
+
+  """The policies not processed, each with the reason."""
+  failed: [PartialBulkFailure!]!
+}
+
+"""
+Added in 26.10.0. Result of a partial bulk project resource policy operation: the policies processed and the ones that failed.
+"""
+type PartialBulkProjectResourcePoliciesPayload
+  @join__type(graph: STRAWBERRY)
+{
+  """The policies processed, as they now stand."""
+  successes: [ProjectResourcePolicyV2!]!
+
+  """The policies not processed, each with the reason."""
+  failed: [PartialBulkFailure!]!
+}
+
+"""
 Added in 26.10.0. Result of a partial bulk project operation: the projects processed and the ones that failed.
 """
 type PartialBulkProjectsPayload
@@ -15747,12 +15827,42 @@ type PartialBulkPurgeEntityLabelPayload
 }
 
 """
+Added in 26.10.0. Input for purging several keypair resource policies, each answered for separately.
+"""
+input PartialBulkPurgeKeypairResourcePoliciesInput
+  @join__type(graph: STRAWBERRY)
+{
+  """IDs of the keypair resource policies to purge."""
+  ids: [UUID!]!
+}
+
+"""
+Added in 26.10.0. Input for purging several project resource policies, each answered for separately.
+"""
+input PartialBulkPurgeProjectResourcePoliciesInput
+  @join__type(graph: STRAWBERRY)
+{
+  """IDs of the project resource policies to purge."""
+  ids: [UUID!]!
+}
+
+"""
 Added in 26.10.0. Input for permanently removing several roles, each answered for separately.
 """
 input PartialBulkPurgeRolesInput
   @join__type(graph: STRAWBERRY)
 {
   """IDs of the roles to purge."""
+  ids: [UUID!]!
+}
+
+"""
+Added in 26.10.0. Input for purging several user resource policies, each answered for separately.
+"""
+input PartialBulkPurgeUserResourcePoliciesInput
+  @join__type(graph: STRAWBERRY)
+{
+  """IDs of the user resource policies to purge."""
   ids: [UUID!]!
 }
 
@@ -15866,6 +15976,29 @@ input PartialBulkUpdateImagesInput
 }
 
 """
+Added in 26.10.0. Input for updating several keypair resource policies, each answered for separately.
+"""
+input PartialBulkUpdateKeypairResourcePoliciesInput
+  @join__type(graph: STRAWBERRY)
+{
+  """The keypair resource policies to update, each with its fields."""
+  items: [PartialBulkUpdateKeypairResourcePolicyItemInput!]!
+}
+
+"""
+Added in 26.10.0. One keypair resource policy of a partial bulk update and the fields to update on it.
+"""
+input PartialBulkUpdateKeypairResourcePolicyItemInput
+  @join__type(graph: STRAWBERRY)
+{
+  """ID of the keypair resource policy to update."""
+  id: UUID!
+
+  """Fields to update on the policy."""
+  input: UpdateKeypairResourcePolicyInput!
+}
+
+"""
 Added in 26.10.0. One project of a partial bulk update and the fields to update on it.
 """
 input PartialBulkUpdateProjectItemInput
@@ -15876,6 +16009,29 @@ input PartialBulkUpdateProjectItemInput
 
   """Fields to update on the project."""
   input: UpdateProjectInput!
+}
+
+"""
+Added in 26.10.0. Input for updating several project resource policies, each answered for separately.
+"""
+input PartialBulkUpdateProjectResourcePoliciesInput
+  @join__type(graph: STRAWBERRY)
+{
+  """The project resource policies to update, each with its fields."""
+  items: [PartialBulkUpdateProjectResourcePolicyItemInput!]!
+}
+
+"""
+Added in 26.10.0. One project resource policy of a partial bulk update and the fields to update on it.
+"""
+input PartialBulkUpdateProjectResourcePolicyItemInput
+  @join__type(graph: STRAWBERRY)
+{
+  """ID of the project resource policy to update."""
+  id: UUID!
+
+  """Fields to update on the policy."""
+  input: UpdateProjectResourcePolicyInput!
 }
 
 """
@@ -15909,6 +16065,29 @@ input PartialBulkUpdateRolesInput
 {
   """The roles to update, each with its fields."""
   items: [PartialBulkUpdateRoleItemInput!]!
+}
+
+"""
+Added in 26.10.0. Input for updating several user resource policies, each answered for separately.
+"""
+input PartialBulkUpdateUserResourcePoliciesInput
+  @join__type(graph: STRAWBERRY)
+{
+  """The user resource policies to update, each with its fields."""
+  items: [PartialBulkUpdateUserResourcePolicyItemInput!]!
+}
+
+"""
+Added in 26.10.0. One user resource policy of a partial bulk update and the fields to update on it.
+"""
+input PartialBulkUpdateUserResourcePolicyItemInput
+  @join__type(graph: STRAWBERRY)
+{
+  """ID of the user resource policy to update."""
+  id: UUID!
+
+  """Fields to update on the policy."""
+  input: UpdateUserResourcePolicyInput!
 }
 
 """
@@ -15955,6 +16134,19 @@ type PartialBulkUpsertEntityLabelPayload
 
   """Per-item failures, each naming the entity and the key it targeted."""
   failed: [UpsertEntityLabelError!]!
+}
+
+"""
+Added in 26.10.0. Result of a partial bulk user resource policy operation: the policies processed and the ones that failed.
+"""
+type PartialBulkUserResourcePoliciesPayload
+  @join__type(graph: STRAWBERRY)
+{
+  """The policies processed, as they now stand."""
+  successes: [UserResourcePolicyV2!]!
+
+  """The policies not processed, each with the reason."""
+  failed: [PartialBulkFailure!]!
 }
 
 """

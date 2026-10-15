@@ -441,6 +441,18 @@ from ai.backend.manager.api.gql.resource_policy_v2.resolver.mutation import (
     admin_update_keypair_resource_policy_v2,
     admin_update_project_resource_policy_v2,
     admin_update_user_resource_policy_v2,
+    partial_bulk_purge_keypair_resource_policies_v2,
+    partial_bulk_purge_project_resource_policies_v2,
+    partial_bulk_purge_user_resource_policies_v2,
+    partial_bulk_update_keypair_resource_policies_v2,
+    partial_bulk_update_project_resource_policies_v2,
+    partial_bulk_update_user_resource_policies_v2,
+    purge_keypair_resource_policy_v2,
+    purge_project_resource_policy_v2,
+    purge_user_resource_policy_v2,
+    update_keypair_resource_policy_v2,
+    update_project_resource_policy_v2,
+    update_user_resource_policy_v2,
 )
 from ai.backend.manager.api.gql.resource_policy_v2.resolver.query import (
     admin_keypair_resource_policies_v2,
@@ -1170,6 +1182,26 @@ class Mutation:
     admin_create_project_resource_policy_v2 = admin_create_project_resource_policy_v2
     admin_update_project_resource_policy_v2 = admin_update_project_resource_policy_v2
     admin_delete_project_resource_policy_v2 = admin_delete_project_resource_policy_v2
+    update_keypair_resource_policy_v2 = update_keypair_resource_policy_v2
+    purge_keypair_resource_policy_v2 = purge_keypair_resource_policy_v2
+    partial_bulk_update_keypair_resource_policies_v2 = (
+        partial_bulk_update_keypair_resource_policies_v2
+    )
+    partial_bulk_purge_keypair_resource_policies_v2 = (
+        partial_bulk_purge_keypair_resource_policies_v2
+    )
+    update_user_resource_policy_v2 = update_user_resource_policy_v2
+    purge_user_resource_policy_v2 = purge_user_resource_policy_v2
+    partial_bulk_update_user_resource_policies_v2 = partial_bulk_update_user_resource_policies_v2
+    partial_bulk_purge_user_resource_policies_v2 = partial_bulk_purge_user_resource_policies_v2
+    update_project_resource_policy_v2 = update_project_resource_policy_v2
+    purge_project_resource_policy_v2 = purge_project_resource_policy_v2
+    partial_bulk_update_project_resource_policies_v2 = (
+        partial_bulk_update_project_resource_policies_v2
+    )
+    partial_bulk_purge_project_resource_policies_v2 = (
+        partial_bulk_purge_project_resource_policies_v2
+    )
     # Resource Preset V2 APIs
     admin_create_resource_preset_v2 = admin_create_resource_preset_v2
     admin_update_resource_preset_v2 = admin_update_resource_preset_v2

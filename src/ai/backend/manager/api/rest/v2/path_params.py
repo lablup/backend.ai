@@ -70,6 +70,10 @@ class ResourcePolicyNamePathParam(BaseRequestModel):
     name: str = Field(description="Resource policy name")
 
 
+class ResourcePolicyIdPathParam(BaseRequestModel):
+    policy_id: UUID = Field(description="Resource policy ID")
+
+
 class ChannelIdPathParam(BaseRequestModel):
     channel_id: UUID = Field(description="Channel UUID")
 

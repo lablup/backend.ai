@@ -37,6 +37,12 @@ from ai.backend.manager.services.project_resource_policy.actions.global_search_p
 from ai.backend.manager.services.project_resource_policy.actions.lookup import (
     LookupProjectResourcePolicyAction,
 )
+from ai.backend.manager.services.project_resource_policy.actions.partial_bulk_purge_project_resource_policies import (
+    PartialBulkPurgeProjectResourcePoliciesAction,
+)
+from ai.backend.manager.services.project_resource_policy.actions.partial_bulk_update_project_resource_policies import (
+    PartialBulkUpdateProjectResourcePoliciesAction,
+)
 from ai.backend.manager.services.project_resource_policy.actions.purge_project_resource_policy import (
     PurgeProjectResourcePolicyAction,
 )
@@ -78,6 +84,12 @@ class ProjectResourcePolicyProcessors:
     purge: SingleEntityActionProcessor[
         PurgeProjectResourcePolicyAction, EntityOpsResult[ProjectResourcePolicyData]
     ]
+    partial_bulk_update: PartialBulkActionProcessor[
+        PartialBulkUpdateProjectResourcePoliciesAction, ProjectResourcePolicyData
+    ]
+    partial_bulk_purge: PartialBulkActionProcessor[
+        PartialBulkPurgeProjectResourcePoliciesAction, ProjectResourcePolicyData
+    ]
 
     def __init__(self, group: ProcessorGroup[ProjectResourcePolicyData]) -> None:
         self.get = group.single_get_ops(GetProjectResourcePolicyAction)
@@ -91,3 +103,9 @@ class ProjectResourcePolicyProcessors:
         self.global_create = group.global_create_ops(CreateProjectResourcePolicyAction)
         self.update = group.single_update_ops(UpdateProjectResourcePolicyAction)
         self.purge = group.entity_purge_ops(PurgeProjectResourcePolicyAction)
+        self.partial_bulk_update = group.partial_bulk_update_ops(
+            PartialBulkUpdateProjectResourcePoliciesAction
+        )
+        self.partial_bulk_purge = group.entity_partial_bulk_purge_ops(
+            PartialBulkPurgeProjectResourcePoliciesAction
+        )

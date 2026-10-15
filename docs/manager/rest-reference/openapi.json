@@ -25754,6 +25754,62 @@
         "title": "UpdateKeypairResourcePolicyInput",
         "type": "object"
       },
+      "NonEmptyList_PartialBulkUpdateKeypairResourcePolicyItemInput_": {
+        "items": {
+          "$ref": "#/components/schemas/PartialBulkUpdateKeypairResourcePolicyItemInput"
+        },
+        "minItems": 1,
+        "type": "array"
+      },
+      "PartialBulkUpdateKeypairResourcePolicyItemInput": {
+        "description": "One keypair resource policy of a partial bulk update and the fields to update on it.",
+        "properties": {
+          "id": {
+            "description": "ID of the keypair resource policy to update.",
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "input": {
+            "$ref": "#/components/schemas/UpdateKeypairResourcePolicyInput",
+            "description": "Fields to update on the policy."
+          }
+        },
+        "required": [
+          "id",
+          "input"
+        ],
+        "title": "PartialBulkUpdateKeypairResourcePolicyItemInput",
+        "type": "object"
+      },
+      "PartialBulkUpdateKeypairResourcePoliciesInput": {
+        "description": "Input for updating several keypair resource policies, each answered for separately.",
+        "properties": {
+          "items": {
+            "$ref": "#/components/schemas/NonEmptyList_PartialBulkUpdateKeypairResourcePolicyItemInput_",
+            "description": "The keypair resource policies to update, each with its fields."
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "title": "PartialBulkUpdateKeypairResourcePoliciesInput",
+        "type": "object"
+      },
+      "PartialBulkPurgeKeypairResourcePoliciesInput": {
+        "description": "Input for purging several keypair resource policies, each answered for separately.",
+        "properties": {
+          "ids": {
+            "$ref": "#/components/schemas/NonEmptyList_UUID_",
+            "description": "IDs of the keypair resource policies to purge."
+          }
+        },
+        "required": [
+          "ids"
+        ],
+        "title": "PartialBulkPurgeKeypairResourcePoliciesInput",
+        "type": "object"
+      },
       "UserResourcePolicyFilter": {
         "description": "Filter for user resource policy search.",
         "properties": {
@@ -26173,6 +26229,62 @@
         "title": "UpdateUserResourcePolicyInput",
         "type": "object"
       },
+      "NonEmptyList_PartialBulkUpdateUserResourcePolicyItemInput_": {
+        "items": {
+          "$ref": "#/components/schemas/PartialBulkUpdateUserResourcePolicyItemInput"
+        },
+        "minItems": 1,
+        "type": "array"
+      },
+      "PartialBulkUpdateUserResourcePolicyItemInput": {
+        "description": "One user resource policy of a partial bulk update and the fields to update on it.",
+        "properties": {
+          "id": {
+            "description": "ID of the user resource policy to update.",
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "input": {
+            "$ref": "#/components/schemas/UpdateUserResourcePolicyInput",
+            "description": "Fields to update on the policy."
+          }
+        },
+        "required": [
+          "id",
+          "input"
+        ],
+        "title": "PartialBulkUpdateUserResourcePolicyItemInput",
+        "type": "object"
+      },
+      "PartialBulkUpdateUserResourcePoliciesInput": {
+        "description": "Input for updating several user resource policies, each answered for separately.",
+        "properties": {
+          "items": {
+            "$ref": "#/components/schemas/NonEmptyList_PartialBulkUpdateUserResourcePolicyItemInput_",
+            "description": "The user resource policies to update, each with its fields."
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "title": "PartialBulkUpdateUserResourcePoliciesInput",
+        "type": "object"
+      },
+      "PartialBulkPurgeUserResourcePoliciesInput": {
+        "description": "Input for purging several user resource policies, each answered for separately.",
+        "properties": {
+          "ids": {
+            "$ref": "#/components/schemas/NonEmptyList_UUID_",
+            "description": "IDs of the user resource policies to purge."
+          }
+        },
+        "required": [
+          "ids"
+        ],
+        "title": "PartialBulkPurgeUserResourcePoliciesInput",
+        "type": "object"
+      },
       "ProjectResourcePolicyFilter": {
         "description": "Filter for project resource policy search.",
         "properties": {
@@ -26519,6 +26631,62 @@
           }
         },
         "title": "UpdateProjectResourcePolicyInput",
+        "type": "object"
+      },
+      "NonEmptyList_PartialBulkUpdateProjectResourcePolicyItemInput_": {
+        "items": {
+          "$ref": "#/components/schemas/PartialBulkUpdateProjectResourcePolicyItemInput"
+        },
+        "minItems": 1,
+        "type": "array"
+      },
+      "PartialBulkUpdateProjectResourcePolicyItemInput": {
+        "description": "One project resource policy of a partial bulk update and the fields to update on it.",
+        "properties": {
+          "id": {
+            "description": "ID of the project resource policy to update.",
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "input": {
+            "$ref": "#/components/schemas/UpdateProjectResourcePolicyInput",
+            "description": "Fields to update on the policy."
+          }
+        },
+        "required": [
+          "id",
+          "input"
+        ],
+        "title": "PartialBulkUpdateProjectResourcePolicyItemInput",
+        "type": "object"
+      },
+      "PartialBulkUpdateProjectResourcePoliciesInput": {
+        "description": "Input for updating several project resource policies, each answered for separately.",
+        "properties": {
+          "items": {
+            "$ref": "#/components/schemas/NonEmptyList_PartialBulkUpdateProjectResourcePolicyItemInput_",
+            "description": "The project resource policies to update, each with its fields."
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "title": "PartialBulkUpdateProjectResourcePoliciesInput",
+        "type": "object"
+      },
+      "PartialBulkPurgeProjectResourcePoliciesInput": {
+        "description": "Input for purging several project resource policies, each answered for separately.",
+        "properties": {
+          "ids": {
+            "$ref": "#/components/schemas/NonEmptyList_UUID_",
+            "description": "IDs of the project resource policies to purge."
+          }
+        },
+        "required": [
+          "ids"
+        ],
+        "title": "PartialBulkPurgeProjectResourcePoliciesInput",
         "type": "object"
       },
       "ResourcePresetFilter": {
@@ -56919,7 +57087,7 @@
             }
           }
         ],
-        "description": "\n**Preconditions:**\n* Superadmin privilege required.\n"
+        "description": "Deprecated. Use `PATCH /v2/resource-policies/keypair/{policy_id}`.\n\n**Preconditions:**\n* Superadmin privilege required.\n"
       },
       "delete": {
         "operationId": "v2/resource-policies.admin_delete_keypair_resource_policy",
@@ -56946,7 +57114,7 @@
             }
           }
         ],
-        "description": "\n**Preconditions:**\n* Superadmin privilege required.\n"
+        "description": "Deprecated. Use `DELETE /v2/resource-policies/keypair/{policy_id}`.\n\n**Preconditions:**\n* Superadmin privilege required.\n"
       }
     },
     "/v2/resource-policies/keypair/search": {
@@ -57005,6 +57173,129 @@
         },
         "parameters": [],
         "description": "\n**Preconditions:**\n* Superadmin privilege required.\n"
+      }
+    },
+    "/v2/resource-policies/keypair/{policy_id}": {
+      "patch": {
+        "operationId": "v2/resource-policies.update_keypair_resource_policy",
+        "tags": [
+          "v2/resource-policies"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateKeypairResourcePolicyInput"
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "policy_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "description": "Update a keypair resource policy.\n\n**Preconditions:**\n* User privilege required.\n"
+      },
+      "delete": {
+        "operationId": "v2/resource-policies.purge_keypair_resource_policy",
+        "tags": [
+          "v2/resource-policies"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "policy_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "description": "Permanently remove a keypair resource policy.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/v2/resource-policies/keypair/partial-bulk-update": {
+      "post": {
+        "operationId": "v2/resource-policies.partial_bulk_update_keypair_resource_policies",
+        "tags": [
+          "v2/resource-policies"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PartialBulkUpdateKeypairResourcePoliciesInput"
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "description": "Update several keypair resource policies, answering for each one.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/v2/resource-policies/keypair/partial-bulk-purge": {
+      "post": {
+        "operationId": "v2/resource-policies.partial_bulk_purge_keypair_resource_policies",
+        "tags": [
+          "v2/resource-policies"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PartialBulkPurgeKeypairResourcePoliciesInput"
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "description": "Permanently remove several keypair resource policies, answering for each one.\n\n**Preconditions:**\n* User privilege required.\n"
       }
     },
     "/v2/resource-policies/keypair/my": {
@@ -57089,7 +57380,7 @@
             }
           }
         ],
-        "description": "\n**Preconditions:**\n* Superadmin privilege required.\n"
+        "description": "Deprecated. Use `PATCH /v2/resource-policies/user/{policy_id}`.\n\n**Preconditions:**\n* Superadmin privilege required.\n"
       },
       "delete": {
         "operationId": "v2/resource-policies.admin_delete_user_resource_policy",
@@ -57116,7 +57407,7 @@
             }
           }
         ],
-        "description": "\n**Preconditions:**\n* Superadmin privilege required.\n"
+        "description": "Deprecated. Use `DELETE /v2/resource-policies/user/{policy_id}`.\n\n**Preconditions:**\n* Superadmin privilege required.\n"
       }
     },
     "/v2/resource-policies/user/search": {
@@ -57175,6 +57466,129 @@
         },
         "parameters": [],
         "description": "\n**Preconditions:**\n* Superadmin privilege required.\n"
+      }
+    },
+    "/v2/resource-policies/user/{policy_id}": {
+      "patch": {
+        "operationId": "v2/resource-policies.update_user_resource_policy",
+        "tags": [
+          "v2/resource-policies"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateUserResourcePolicyInput"
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "policy_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "description": "Update a user resource policy.\n\n**Preconditions:**\n* User privilege required.\n"
+      },
+      "delete": {
+        "operationId": "v2/resource-policies.purge_user_resource_policy",
+        "tags": [
+          "v2/resource-policies"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "policy_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "description": "Permanently remove a user resource policy.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/v2/resource-policies/user/partial-bulk-update": {
+      "post": {
+        "operationId": "v2/resource-policies.partial_bulk_update_user_resource_policies",
+        "tags": [
+          "v2/resource-policies"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PartialBulkUpdateUserResourcePoliciesInput"
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "description": "Update several user resource policies, answering for each one.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/v2/resource-policies/user/partial-bulk-purge": {
+      "post": {
+        "operationId": "v2/resource-policies.partial_bulk_purge_user_resource_policies",
+        "tags": [
+          "v2/resource-policies"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PartialBulkPurgeUserResourcePoliciesInput"
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "description": "Permanently remove several user resource policies, answering for each one.\n\n**Preconditions:**\n* User privilege required.\n"
       }
     },
     "/v2/resource-policies/user/my": {
@@ -57259,7 +57673,7 @@
             }
           }
         ],
-        "description": "\n**Preconditions:**\n* Superadmin privilege required.\n"
+        "description": "Deprecated. Use `PATCH /v2/resource-policies/project/{policy_id}`.\n\n**Preconditions:**\n* Superadmin privilege required.\n"
       },
       "delete": {
         "operationId": "v2/resource-policies.admin_delete_project_resource_policy",
@@ -57286,7 +57700,7 @@
             }
           }
         ],
-        "description": "\n**Preconditions:**\n* Superadmin privilege required.\n"
+        "description": "Deprecated. Use `DELETE /v2/resource-policies/project/{policy_id}`.\n\n**Preconditions:**\n* Superadmin privilege required.\n"
       }
     },
     "/v2/resource-policies/project/search": {
@@ -57345,6 +57759,129 @@
         },
         "parameters": [],
         "description": "\n**Preconditions:**\n* Superadmin privilege required.\n"
+      }
+    },
+    "/v2/resource-policies/project/{policy_id}": {
+      "patch": {
+        "operationId": "v2/resource-policies.update_project_resource_policy",
+        "tags": [
+          "v2/resource-policies"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateProjectResourcePolicyInput"
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "policy_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "description": "Update a project resource policy.\n\n**Preconditions:**\n* User privilege required.\n"
+      },
+      "delete": {
+        "operationId": "v2/resource-policies.purge_project_resource_policy",
+        "tags": [
+          "v2/resource-policies"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "policy_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "description": "Permanently remove a project resource policy.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/v2/resource-policies/project/partial-bulk-update": {
+      "post": {
+        "operationId": "v2/resource-policies.partial_bulk_update_project_resource_policies",
+        "tags": [
+          "v2/resource-policies"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PartialBulkUpdateProjectResourcePoliciesInput"
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "description": "Update several project resource policies, answering for each one.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/v2/resource-policies/project/partial-bulk-purge": {
+      "post": {
+        "operationId": "v2/resource-policies.partial_bulk_purge_project_resource_policies",
+        "tags": [
+          "v2/resource-policies"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PartialBulkPurgeProjectResourcePoliciesInput"
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "description": "Permanently remove several project resource policies, answering for each one.\n\n**Preconditions:**\n* User privilege required.\n"
       }
     },
     "/v2/resource-policies/project/projects/{project_id}": {

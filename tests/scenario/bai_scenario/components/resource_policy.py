@@ -28,6 +28,7 @@ from ai.backend.common.defs.session import SESSION_PRIORITY_MAX
 from ai.backend.common.dto.manager.query import StringFilter, UUIDFilter
 from ai.backend.common.dto.manager.v2.common import (
     BinarySizeInput,
+    PartialBulkPayload,
     ResourceSlotEntryInput,
     VFolderHostPermissionEntryInput,
 )
@@ -38,11 +39,17 @@ from ai.backend.common.dto.manager.v2.resource_policy.request import (
     CreateKeypairResourcePolicyInput,
     CreateProjectResourcePolicyInput,
     CreateUserResourcePolicyInput,
-    DeleteKeypairResourcePolicyInput,
-    DeleteProjectResourcePolicyInput,
-    DeleteUserResourcePolicyInput,
     KeypairResourcePolicyFilter,
     KeypairResourcePolicyKeypairNestedFilter,
+    PartialBulkPurgeKeypairResourcePoliciesInput,
+    PartialBulkPurgeProjectResourcePoliciesInput,
+    PartialBulkPurgeUserResourcePoliciesInput,
+    PartialBulkUpdateKeypairResourcePoliciesInput,
+    PartialBulkUpdateKeypairResourcePolicyItemInput,
+    PartialBulkUpdateProjectResourcePoliciesInput,
+    PartialBulkUpdateProjectResourcePolicyItemInput,
+    PartialBulkUpdateUserResourcePoliciesInput,
+    PartialBulkUpdateUserResourcePolicyItemInput,
     ProjectResourcePolicyFilter,
     UpdateKeypairResourcePolicyInput,
     UpdateProjectResourcePolicyInput,
@@ -73,16 +80,18 @@ from ai.backend.manager.data.resource.types import (
 from ai.backend.manager.data.user.types import UserData
 from ai.backend.manager.errors.auth import InsufficientPrivilege
 from ai.backend.manager.errors.base.entity import EntityNotFoundError
+from ai.backend.manager.errors.permission import NotEnoughPermission
 from ai.backend.testutils.scenario_steps import (
     Answered,
     Given,
     Held,
     Refused,
     Same,
+    SameAs,
     Then,
     Verdict,
 )
-from bai_scenario.components.domain import WAS_HERE, WrittenByThisRun
+from bai_scenario.components.domain import WAS_HERE, Mentions, WrittenByThisRun
 from bai_scenario.seeds.domain.domain import TestSeedDomain
 from bai_scenario.seeds.keypair.keypair import TestSeedKeypair
 from bai_scenario.seeds.rbac.role import TestSeedPermission, TestSeedRole
@@ -112,7 +121,9 @@ class Calls:
     read: str
     search: str
     update: str
-    delete: str
+    purge: str
+    partial_bulk_update: str
+    partial_bulk_purge: str
 
 
 @dataclass(frozen=True)
@@ -227,21 +238,38 @@ class Family[PolicyData, PolicyNode](ABC):
 
     @abstractmethod
     async def update(self, adapter: ResourcePolicyAdapter, name: str, asked: Any) -> PolicyNode:
+        """이름으로 id 를 찾고, 그 id 로 수정한다."""
         raise NotImplementedError
 
     @abstractmethod
-    async def delete(self, adapter: ResourcePolicyAdapter, name: str) -> str:
+    async def purge(self, adapter: ResourcePolicyAdapter, name: str) -> str:
+        """이름으로 id 를 찾고, 그 id 로 삭제한다. 삭제한 이름을 답한다."""
         raise NotImplementedError
 
-    def verdicts(self, node: Any, wanted: Mapping[str, Any], started: datetime) -> list[Verdict]:
+    @abstractmethod
+    async def partial_bulk_update(
+        self, adapter: ResourcePolicyAdapter, ids: list[UUID], asked: Any
+    ) -> PartialBulkPayload[Any]:
+        """같은 수정을 여러 정책에 한 번에 건다."""
+        raise NotImplementedError
+
+    @abstractmethod
+    async def partial_bulk_purge(
+        self, adapter: ResourcePolicyAdapter, ids: list[UUID]
+    ) -> PartialBulkPayload[Any]:
+        raise NotImplementedError
+
+    def verdicts(
+        self, node: Any, wanted: Mapping[str, Any], started: datetime, prefix: str = ""
+    ) -> list[Verdict]:
         """응답의 모든 필드를 검사한다. 이름은 id 필드에도 그대로 담긴다."""
         got = self.view(node)
         out: list[Verdict] = [
-            Same("id", node.id, wanted["name"]),
-            Same("name", node.name, wanted["name"]),
-            Held("created_at", node.created_at, WrittenByThisRun(started)),
+            Same(f"{prefix}id", node.id, wanted["name"]),
+            Same(f"{prefix}name", node.name, wanted["name"]),
+            Held(f"{prefix}created_at", node.created_at, WrittenByThisRun(started)),
         ]
-        out.extend(Same(one, got[one], wanted[one]) for one in self.fields)
+        out.extend(Same(f"{prefix}{one}", got[one], wanted[one]) for one in self.fields)
         return out
 
 
@@ -290,8 +318,10 @@ class ProjectPolicies(Family[ProjectResourcePolicyData, ProjectResourcePolicyNod
             create="admin_create_project_resource_policy",
             read="admin_get_project_resource_policy",
             search="admin_search_project_resource_policies",
-            update="admin_update_project_resource_policy",
-            delete="admin_delete_project_resource_policy",
+            update="update_project_resource_policy",
+            purge="purge_project_resource_policy",
+            partial_bulk_update="partial_bulk_update_project_resource_policies",
+            partial_bulk_purge="partial_bulk_purge_project_resource_policies",
         )
 
     @property
@@ -393,15 +423,36 @@ class ProjectPolicies(Family[ProjectResourcePolicyData, ProjectResourcePolicyNod
     async def update(
         self, adapter: ResourcePolicyAdapter, name: str, asked: Any
     ) -> ProjectResourcePolicyNode:
-        payload = await adapter.admin_update_project_resource_policy(name, asked)
+        policy_id = await adapter.lookup_project_resource_policy(name)
+        payload = await adapter.update_project_resource_policy(policy_id, asked)
         return payload.project_resource_policy
 
     @override
-    async def delete(self, adapter: ResourcePolicyAdapter, name: str) -> str:
-        payload = await adapter.admin_delete_project_resource_policy(
-            DeleteProjectResourcePolicyInput(name=name)
-        )
+    async def purge(self, adapter: ResourcePolicyAdapter, name: str) -> str:
+        policy_id = await adapter.lookup_project_resource_policy(name)
+        payload = await adapter.purge_project_resource_policy(policy_id)
         return payload.name
+
+    @override
+    async def partial_bulk_update(
+        self, adapter: ResourcePolicyAdapter, ids: list[UUID], asked: Any
+    ) -> PartialBulkPayload[ProjectResourcePolicyNode]:
+        return await adapter.partial_bulk_update_project_resource_policies(
+            PartialBulkUpdateProjectResourcePoliciesInput(
+                items=[
+                    PartialBulkUpdateProjectResourcePolicyItemInput(id=policy_id, input=asked)
+                    for policy_id in ids
+                ]
+            )
+        )
+
+    @override
+    async def partial_bulk_purge(
+        self, adapter: ResourcePolicyAdapter, ids: list[UUID]
+    ) -> PartialBulkPayload[ProjectResourcePolicyNode]:
+        return await adapter.partial_bulk_purge_project_resource_policies(
+            PartialBulkPurgeProjectResourcePoliciesInput(ids=ids)
+        )
 
 
 class KeypairPolicies(OwnFamily[KeyPairResourcePolicyData, KeypairResourcePolicyNode]):
@@ -427,8 +478,10 @@ class KeypairPolicies(OwnFamily[KeyPairResourcePolicyData, KeypairResourcePolicy
             create="admin_create_keypair_resource_policy",
             read="admin_get_keypair_resource_policy",
             search="admin_search_keypair_resource_policies",
-            update="admin_update_keypair_resource_policy",
-            delete="admin_delete_keypair_resource_policy",
+            update="update_keypair_resource_policy",
+            purge="purge_keypair_resource_policy",
+            partial_bulk_update="partial_bulk_update_keypair_resource_policies",
+            partial_bulk_purge="partial_bulk_purge_keypair_resource_policies",
         )
 
     @property
@@ -675,15 +728,36 @@ class KeypairPolicies(OwnFamily[KeyPairResourcePolicyData, KeypairResourcePolicy
     async def update(
         self, adapter: ResourcePolicyAdapter, name: str, asked: Any
     ) -> KeypairResourcePolicyNode:
-        payload = await adapter.admin_update_keypair_resource_policy(name, asked)
+        policy_id = await adapter.lookup_keypair_resource_policy(name)
+        payload = await adapter.update_keypair_resource_policy(policy_id, asked)
         return payload.keypair_resource_policy
 
     @override
-    async def delete(self, adapter: ResourcePolicyAdapter, name: str) -> str:
-        payload = await adapter.admin_delete_keypair_resource_policy(
-            DeleteKeypairResourcePolicyInput(name=name)
-        )
+    async def purge(self, adapter: ResourcePolicyAdapter, name: str) -> str:
+        policy_id = await adapter.lookup_keypair_resource_policy(name)
+        payload = await adapter.purge_keypair_resource_policy(policy_id)
         return payload.name
+
+    @override
+    async def partial_bulk_update(
+        self, adapter: ResourcePolicyAdapter, ids: list[UUID], asked: Any
+    ) -> PartialBulkPayload[KeypairResourcePolicyNode]:
+        return await adapter.partial_bulk_update_keypair_resource_policies(
+            PartialBulkUpdateKeypairResourcePoliciesInput(
+                items=[
+                    PartialBulkUpdateKeypairResourcePolicyItemInput(id=policy_id, input=asked)
+                    for policy_id in ids
+                ]
+            )
+        )
+
+    @override
+    async def partial_bulk_purge(
+        self, adapter: ResourcePolicyAdapter, ids: list[UUID]
+    ) -> PartialBulkPayload[KeypairResourcePolicyNode]:
+        return await adapter.partial_bulk_purge_keypair_resource_policies(
+            PartialBulkPurgeKeypairResourcePoliciesInput(ids=ids)
+        )
 
     @override
     async def read_mine(self, adapter: ResourcePolicyAdapter) -> KeypairResourcePolicyNode:
@@ -713,8 +787,10 @@ class UserPolicies(OwnFamily[UserResourcePolicyData, UserResourcePolicyNode]):
             create="admin_create_user_resource_policy",
             read="admin_get_user_resource_policy",
             search="admin_search_user_resource_policies",
-            update="admin_update_user_resource_policy",
-            delete="admin_delete_user_resource_policy",
+            update="update_user_resource_policy",
+            purge="purge_user_resource_policy",
+            partial_bulk_update="partial_bulk_update_user_resource_policies",
+            partial_bulk_purge="partial_bulk_purge_user_resource_policies",
         )
 
     @property
@@ -849,15 +925,36 @@ class UserPolicies(OwnFamily[UserResourcePolicyData, UserResourcePolicyNode]):
     async def update(
         self, adapter: ResourcePolicyAdapter, name: str, asked: Any
     ) -> UserResourcePolicyNode:
-        payload = await adapter.admin_update_user_resource_policy(name, asked)
+        policy_id = await adapter.lookup_user_resource_policy(name)
+        payload = await adapter.update_user_resource_policy(policy_id, asked)
         return payload.user_resource_policy
 
     @override
-    async def delete(self, adapter: ResourcePolicyAdapter, name: str) -> str:
-        payload = await adapter.admin_delete_user_resource_policy(
-            DeleteUserResourcePolicyInput(name=name)
-        )
+    async def purge(self, adapter: ResourcePolicyAdapter, name: str) -> str:
+        policy_id = await adapter.lookup_user_resource_policy(name)
+        payload = await adapter.purge_user_resource_policy(policy_id)
         return payload.name
+
+    @override
+    async def partial_bulk_update(
+        self, adapter: ResourcePolicyAdapter, ids: list[UUID], asked: Any
+    ) -> PartialBulkPayload[UserResourcePolicyNode]:
+        return await adapter.partial_bulk_update_user_resource_policies(
+            PartialBulkUpdateUserResourcePoliciesInput(
+                items=[
+                    PartialBulkUpdateUserResourcePolicyItemInput(id=policy_id, input=asked)
+                    for policy_id in ids
+                ]
+            )
+        )
+
+    @override
+    async def partial_bulk_purge(
+        self, adapter: ResourcePolicyAdapter, ids: list[UUID]
+    ) -> PartialBulkPayload[UserResourcePolicyNode]:
+        return await adapter.partial_bulk_purge_user_resource_policies(
+            PartialBulkPurgeUserResourcePoliciesInput(ids=ids)
+        )
 
     @override
     async def read_mine(self, adapter: ResourcePolicyAdapter) -> UserResourcePolicyNode:
@@ -891,6 +988,22 @@ class ManyPoliciesAndACaller[PolicyData]:
     named: PolicyData
     held: PolicyData
     caller: UserData
+
+
+@dataclass(frozen=True)
+class SeveralPoliciesAndACaller[PolicyData]:
+    """한 번에 다룰 정책 여럿과, 그것을 호출할 사용자.
+
+    ``held``는 대상 중 호출자에게 할당된 정책이고, 있으면 ``targets``의 맨 앞에 있다.
+    """
+
+    targets: tuple[PolicyData, ...]
+    held: PolicyData | None
+    caller: UserData
+
+    def unused(self) -> tuple[PolicyData, ...]:
+        """대상 중 아무도 사용하지 않는 정책들."""
+        return self.targets if self.held is None else self.targets[1:]
 
 
 @dataclass(frozen=True)
@@ -1027,6 +1140,35 @@ class ManyPoliciesAndSomeone(Given[Any, ManyPoliciesAndACaller[Any]]):
             laid=tuple(seeding.made(one) for one in [held, wanted, *others]),
             named=seeding.made(wanted),
             held=seeding.made(held),
+            caller=seeding.made(holder.user),
+        )
+
+
+@dataclass(frozen=True)
+class SeveralPoliciesAndSomeone(Given[Any, SeveralPoliciesAndACaller[Any]]):
+    """아무도 사용하지 않는 정책 여럿과 사용자 한 명. ``with_held``이면 그 사용자에게 할당된 정책도 대상에 넣는다."""
+
+    family: Family[Any, Any]
+    role: UserRole = UserRole.USER
+    unused: int = 2
+    with_held: bool = False
+
+    @override
+    def describe(self) -> str:
+        said = f"아무도 사용하지 않는 {self.family.kind} {self.unused}개와, {self.role.value} 한 명"
+        if self.with_held:
+            return f"{said}, 그 사용자에게 할당된 {self.family.kind}도 대상에 넣음"
+        return said
+
+    @override
+    async def lay(self, seeding: Any) -> SeveralPoliciesAndACaller[Any]:
+        holder = await lay_a_holder(seeding, role=self.role)
+        unused = [await seeding.creating(self.family.seed("target")) for _ in range(self.unused)]
+        held = seeding.made(self.family.own_of(holder)) if self.with_held else None
+        made = tuple(seeding.made(one) for one in unused)
+        return SeveralPoliciesAndACaller(
+            targets=made if held is None else (held, *made),
+            held=held,
             caller=seeding.made(holder.user),
         )
 
@@ -1188,3 +1330,119 @@ class OnlyTheNamedOneIsFound(Then[ManyPoliciesAndACaller[Any], Searched]):
             Same("items", [one.name for one in payload.items], [laid.named.name]),
             Same("total_count", payload.total_count, 1),
         ]
+
+
+@dataclass(frozen=True)
+class EveryUnusedTargetIsProcessed(Then[SeveralPoliciesAndACaller[Any], PartialBulkPayload[Any]]):
+    """아무도 사용하지 않는 대상이 모두 처리된 목록에 온다. 기대값은 미리 만들어 둔 데이터에서 읽는다.
+
+    ``changed``는 수정이 바꿔야 하는 필드다. ``missing``이 있으면 그 id 가, 대상 중 할당된
+    정책이 있으면 그 정책이 실패 목록에 온다.
+    """
+
+    family: Family[Any, Any]
+    started: datetime
+    changed: Mapping[str, Any] = field(default_factory=dict)
+    missing: UUID | None = None
+
+    @override
+    def says(self) -> str:
+        if self.missing is not None:
+            return (
+                f"대상 {self.family.kind}이 모두 처리된 목록에 오고, 없는 id 는 대상이 없다는 "
+                "이유로 실패 목록에 온다"
+            )
+        return f"대상 {self.family.kind}이 모두 처리된 목록에 오고, 실패한 것은 없다"
+
+    @override
+    def look(
+        self, laid: SeveralPoliciesAndACaller[Any], answered: Answered[PartialBulkPayload[Any]]
+    ) -> list[Verdict]:
+        payload = answered.response
+        if payload is None:
+            return [Refused(NotEnoughPermission, answered.raised)]
+        targets = laid.unused()
+        verdicts: list[Verdict] = [Same("successes count", len(payload.successes), len(targets))]
+        for i, (node, policy) in enumerate(zip(payload.successes, targets, strict=False)):
+            wanted = {**self.family.seeded_view(policy), **self.changed}
+            verdicts += self.family.verdicts(node, wanted, self.started, prefix=f"successes[{i}].")
+        if self.missing is None:
+            return [*verdicts, Same("failed", payload.failed, [])]
+        verdicts.append(Same("failed count", len(payload.failed), 1))
+        for failure in payload.failed:
+            verdicts += [
+                Held[UUID]("failed[0].id", failure.id, SameAs(self.missing, "요청에 넣은 없는 id")),
+                Held("failed[0].message", failure.message, Mentions("not found")),
+            ]
+        return verdicts
+
+
+@dataclass(frozen=True)
+class OnlyTheHeldOneFails(Then[SeveralPoliciesAndACaller[Any], PartialBulkPayload[Any]]):
+    """아무도 사용하지 않는 대상은 처리된 목록에, 아직 할당된 정책은 실패 목록에 온다."""
+
+    family: Family[Any, Any]
+    started: datetime
+    reason: str
+
+    @override
+    def says(self) -> str:
+        return (
+            f"아무도 사용하지 않는 {self.family.kind}은 처리된 목록에 오고, 아직 할당된 것은 "
+            "참조 중이라는 이유로 실패 목록에 온다"
+        )
+
+    @override
+    def look(
+        self, laid: SeveralPoliciesAndACaller[Any], answered: Answered[PartialBulkPayload[Any]]
+    ) -> list[Verdict]:
+        payload = answered.response
+        if payload is None or laid.held is None:
+            return [Refused(NotEnoughPermission, answered.raised)]
+        targets = laid.unused()
+        verdicts: list[Verdict] = [Same("successes count", len(payload.successes), len(targets))]
+        for i, (node, policy) in enumerate(zip(payload.successes, targets, strict=False)):
+            verdicts += self.family.verdicts(
+                node, self.family.seeded_view(policy), self.started, prefix=f"successes[{i}]."
+            )
+        verdicts.append(Same("failed count", len(payload.failed), 1))
+        for failure in payload.failed:
+            verdicts += [
+                Held[UUID](
+                    "failed[0].id",
+                    failure.id,
+                    SameAs(laid.held.uuid, "호출자에게 할당된 정책의 id"),
+                ),
+                Held("failed[0].message", failure.message, Mentions(self.reason)),
+            ]
+        return verdicts
+
+
+@dataclass(frozen=True)
+class NoTargetIsProcessed(Then[SeveralPoliciesAndACaller[Any], PartialBulkPayload[Any]]):
+    """처리된 정책 없이, 대상이 모두 같은 이유로 실패 목록에 온다."""
+
+    family: Family[Any, Any]
+    reason: str
+
+    @override
+    def says(self) -> str:
+        return f"처리된 {self.family.kind} 없이 대상이 모두 실패 목록에 온다"
+
+    @override
+    def look(
+        self, laid: SeveralPoliciesAndACaller[Any], answered: Answered[PartialBulkPayload[Any]]
+    ) -> list[Verdict]:
+        payload = answered.response
+        if payload is None:
+            return [Refused(NotEnoughPermission, answered.raised)]
+        verdicts: list[Verdict] = [
+            Same("successes", payload.successes, []),
+            Same("failed count", len(payload.failed), len(laid.targets)),
+        ]
+        for i, (failure, policy) in enumerate(zip(payload.failed, laid.targets, strict=False)):
+            verdicts += [
+                Held[UUID](f"failed[{i}].id", failure.id, SameAs(policy.uuid, "대상 정책의 id")),
+                Held(f"failed[{i}].message", failure.message, Mentions(self.reason)),
+            ]
+        return verdicts
