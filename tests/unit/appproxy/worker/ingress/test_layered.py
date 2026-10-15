@@ -64,17 +64,17 @@ def redis() -> AsyncMock:
 
 @pytest.fixture
 def layered(memory: InMemoryIngressState, redis: AsyncMock) -> LayeredIngressState:
-    return LayeredIngressState(memory=memory, redis=redis)
+    return LayeredIngressState([memory, redis])
 
 
 @pytest.fixture
 def redis_only(redis: AsyncMock) -> LayeredIngressState:
-    return LayeredIngressState(memory=None, redis=redis)
+    return LayeredIngressState([redis])
 
 
 @pytest.fixture
 def memory_only(memory: InMemoryIngressState) -> LayeredIngressState:
-    return LayeredIngressState(memory=memory, redis=None)
+    return LayeredIngressState([memory])
 
 
 @pytest.fixture

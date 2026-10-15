@@ -1,68 +1,53 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
-from typing import override
+from typing import cast, override
 
 from ai.backend.appproxy.worker.errors.ingress import IngressNotFoundError
 from ai.backend.appproxy.worker.ingress.abc import IngressReader
 from ai.backend.appproxy.worker.ingress.in_memory import InMemoryIngressState
-from ai.backend.appproxy.worker.ingress.redis import RedisIngressState
 from ai.backend.common.dto.appproxy.v2.ingress.types import Ingress, IngressFrontendKey
 
 
 class LayeredIngressState(IngressReader):
-    """Reads the in-memory layer in front of Redis; a Redis hit is applied to memory.
+    """Reads the layers in order; a later layer's hit is cached in the in-memory layer.
 
     A key memory knows missing, or one no layer holds, reads as None.
     """
 
-    _memory: InMemoryIngressState | None
-    _redis: RedisIngressState | None
+    _layers: list[IngressReader]
 
-    def __init__(
-        self, memory: InMemoryIngressState | None, redis: RedisIngressState | None
-    ) -> None:
-        self._memory = memory
-        self._redis = redis
+    def __init__(self, layers: Sequence[IngressReader]) -> None:
+        self._layers = list(layers)
 
     @property
     def layers(self) -> Sequence[IngressReader]:
-        return tuple(layer for layer in (self._memory, self._redis) if layer is not None)
+        return tuple(self._layers)
 
     @override
     async def get(self, frontend_key: IngressFrontendKey) -> Ingress | None:
+        in_memory = self._in_memory()
         try:
-            ingress = await self._read_in_memory(frontend_key)
-            if ingress is not None:
+            for index, layer in enumerate(self._layers):
+                ingress = await layer.get(frontend_key)
+                if ingress is None:
+                    continue
+                if in_memory is not None and index > 0:
+                    await in_memory.apply([ingress])
                 return ingress
-            return await self._read_redis(frontend_key)
+            if in_memory is not None:
+                await in_memory.remember_missing(frontend_key)
+            return None
         except IngressNotFoundError:
-            # The key was remembered missing on purpose to skip reading Redis.
+            # The key was remembered missing on purpose to skip reading the later layers.
             return None
-
-    async def _read_in_memory(self, frontend_key: IngressFrontendKey) -> Ingress | None:
-        """Reads memory; a key it remembers missing raises IngressNotFoundError."""
-        if self._memory is None:
-            return None
-        return await self._memory.get(frontend_key)
-
-    async def _read_redis(self, frontend_key: IngressFrontendKey) -> Ingress | None:
-        """Reads a key memory cannot answer from Redis and records the outcome in memory."""
-        if self._redis is None:
-            return None
-        ingress = await self._redis.get(frontend_key)
-        if self._memory is None:
-            return ingress
-        if ingress is None:
-            await self._memory.remember_missing(frontend_key)
-        else:
-            await self._memory.apply([ingress])
-        return ingress
 
     @override
     async def get_all(self) -> list[Ingress]:
-        if self._redis is not None:
-            return await self._redis.get_all()
-        if self._memory is not None:
-            return await self._memory.get_all()
-        return []
+        return await self._layers[-1].get_all()
+
+    def _in_memory(self) -> InMemoryIngressState | None:
+        # The config puts the in-memory layer first whenever a later layer follows it.
+        if len(self._layers) < 2:
+            return None
+        return cast(InMemoryIngressState, self._layers[0])
