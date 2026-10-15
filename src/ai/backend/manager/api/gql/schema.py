@@ -97,10 +97,15 @@ from ai.backend.manager.api.gql.decorators import BackendAIGQLMeta, gql_root_fie
 from ai.backend.manager.api.gql.deployment.resolver.access_token import (
     create_access_token,
     delete_access_token,
+    partial_bulk_purge_access_tokens,
+    purge_access_token,
 )
 from ai.backend.manager.api.gql.deployment.resolver.auto_scaling import (
     create_auto_scaling_rule,
     delete_auto_scaling_rule,
+    partial_bulk_purge_auto_scaling_rules,
+    partial_bulk_update_auto_scaling_rules,
+    purge_auto_scaling_rule,
     update_auto_scaling_rule,
 )
 from ai.backend.manager.api.gql.deployment.resolver.deployment import (
@@ -136,6 +141,10 @@ from ai.backend.manager.api.gql.deployment.resolver.revision_preset import (
     admin_update_deployment_revision_preset,
     deployment_revision_preset,
     deployment_revision_presets,
+    partial_bulk_purge_deployment_revision_presets,
+    partial_bulk_update_deployment_revision_presets,
+    purge_deployment_revision_preset,
+    update_deployment_revision_preset,
 )
 from ai.backend.manager.api.gql.deployment.resolver.route import (
     route,
@@ -1119,6 +1128,9 @@ class Mutation:
     create_auto_scaling_rule = create_auto_scaling_rule
     update_auto_scaling_rule = update_auto_scaling_rule
     delete_auto_scaling_rule = delete_auto_scaling_rule
+    purge_auto_scaling_rule = purge_auto_scaling_rule
+    partial_bulk_update_auto_scaling_rules = partial_bulk_update_auto_scaling_rules
+    partial_bulk_purge_auto_scaling_rules = partial_bulk_purge_auto_scaling_rules
     delete_object_storage = delete_object_storage
     purge_object_storage = purge_object_storage
     partial_bulk_update_object_storages = partial_bulk_update_object_storages
@@ -1149,6 +1161,8 @@ class Mutation:
     reject_artifact_revision = reject_artifact_revision
     create_access_token = create_access_token
     delete_access_token = delete_access_token
+    purge_access_token = purge_access_token
+    partial_bulk_purge_access_tokens = partial_bulk_purge_access_tokens
     activate_deployment_revision = activate_deployment_revision
     update_route_traffic_status = update_route_traffic_status
     # Fair Share
@@ -1412,6 +1426,12 @@ class Mutation:
     admin_create_deployment_revision_preset = admin_create_deployment_revision_preset
     admin_update_deployment_revision_preset = admin_update_deployment_revision_preset
     admin_delete_deployment_revision_preset = admin_delete_deployment_revision_preset
+    update_deployment_revision_preset = update_deployment_revision_preset
+    purge_deployment_revision_preset = purge_deployment_revision_preset
+    partial_bulk_update_deployment_revision_presets = (
+        partial_bulk_update_deployment_revision_presets
+    )
+    partial_bulk_purge_deployment_revision_presets = partial_bulk_purge_deployment_revision_presets
     # Model Card mutations
     admin_create_model_card_v2 = admin_create_model_card_v2
     admin_update_model_card_v2 = admin_update_model_card_v2

@@ -8074,6 +8074,20 @@
         "title": "SearchAccessTokensInput",
         "type": "object"
       },
+      "PartialBulkPurgeAccessTokensInput": {
+        "description": "Input for permanently removing several access tokens, each answered for separately.",
+        "properties": {
+          "ids": {
+            "$ref": "#/components/schemas/NonEmptyList_UUID_",
+            "description": "IDs of the access tokens to purge."
+          }
+        },
+        "required": [
+          "ids"
+        ],
+        "title": "PartialBulkPurgeAccessTokensInput",
+        "type": "object"
+      },
       "DeleteAccessTokenInput": {
         "description": "Input for deleting an access token.",
         "properties": {
@@ -8728,6 +8742,41 @@
           "id"
         ],
         "title": "UpdateAutoScalingRuleInput",
+        "type": "object"
+      },
+      "NonEmptyList_UpdateAutoScalingRuleInput_": {
+        "items": {
+          "$ref": "#/components/schemas/UpdateAutoScalingRuleInput"
+        },
+        "minItems": 1,
+        "type": "array"
+      },
+      "PartialBulkUpdateAutoScalingRulesInput": {
+        "description": "Input for updating several auto-scaling rules, each answered for separately.",
+        "properties": {
+          "items": {
+            "$ref": "#/components/schemas/NonEmptyList_UpdateAutoScalingRuleInput_",
+            "description": "The rules to update, each naming its rule by `id`."
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "title": "PartialBulkUpdateAutoScalingRulesInput",
+        "type": "object"
+      },
+      "PartialBulkPurgeAutoScalingRulesInput": {
+        "description": "Input for permanently removing several auto-scaling rules, each answered for separately.",
+        "properties": {
+          "ids": {
+            "$ref": "#/components/schemas/NonEmptyList_UUID_",
+            "description": "IDs of the auto-scaling rules to purge."
+          }
+        },
+        "required": [
+          "ids"
+        ],
+        "title": "PartialBulkPurgeAutoScalingRulesInput",
         "type": "object"
       },
       "DeleteAutoScalingRuleInput": {
@@ -10376,6 +10425,41 @@
           "id"
         ],
         "title": "UpdateDeploymentRevisionPresetInput",
+        "type": "object"
+      },
+      "NonEmptyList_UpdateDeploymentRevisionPresetInput_": {
+        "items": {
+          "$ref": "#/components/schemas/UpdateDeploymentRevisionPresetInput"
+        },
+        "minItems": 1,
+        "type": "array"
+      },
+      "PartialBulkUpdateDeploymentRevisionPresetsInput": {
+        "description": "Input for updating several presets, each answered for separately.",
+        "properties": {
+          "items": {
+            "$ref": "#/components/schemas/NonEmptyList_UpdateDeploymentRevisionPresetInput_",
+            "description": "The presets to update, each naming its preset by `id`."
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "title": "PartialBulkUpdateDeploymentRevisionPresetsInput",
+        "type": "object"
+      },
+      "PartialBulkPurgeDeploymentRevisionPresetsInput": {
+        "description": "Input for permanently removing several presets, each answered for separately.",
+        "properties": {
+          "ids": {
+            "$ref": "#/components/schemas/NonEmptyList_UUID_",
+            "description": "IDs of the presets to purge."
+          }
+        },
+        "required": [
+          "ids"
+        ],
+        "title": "PartialBulkPurgeDeploymentRevisionPresetsInput",
         "type": "object"
       },
       "DomainFilter": {
@@ -51937,6 +52021,62 @@
           }
         ],
         "description": "Get an access token by ID.\n\n**Preconditions:**\n* User privilege required.\n"
+      },
+      "delete": {
+        "operationId": "v2/deployments.purge_access_token",
+        "tags": [
+          "v2/deployments"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "token_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "description": "Permanently remove an access token.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/v2/deployments/access-tokens/partial-bulk-purge": {
+      "post": {
+        "operationId": "v2/deployments.partial_bulk_purge_access_tokens",
+        "tags": [
+          "v2/deployments"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PartialBulkPurgeAccessTokensInput"
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "description": "Permanently remove several access tokens, answering for each one.\n\n**Preconditions:**\n* User privilege required.\n"
       }
     },
     "/v2/deployments/access-tokens/delete": {
@@ -51965,7 +52105,7 @@
           }
         },
         "parameters": [],
-        "description": "Delete an access token.\n\n**Preconditions:**\n* User privilege required.\n"
+        "description": "Deprecated. Use `DELETE /v2/deployments/access-tokens/{token_id}`.\n\n**Preconditions:**\n* User privilege required.\n"
       }
     },
     "/v2/deployments/access-tokens/bulk-delete": {
@@ -51994,7 +52134,7 @@
           }
         },
         "parameters": [],
-        "description": "Bulk delete access tokens.\n\n**Preconditions:**\n* User privilege required.\n"
+        "description": "Deprecated. Use `POST /v2/deployments/access-tokens/partial-bulk-purge`.\n\n**Preconditions:**\n* User privilege required.\n"
       }
     },
     "/v2/deployments/auto-scaling-rules": {
@@ -52092,7 +52232,7 @@
         ],
         "description": "Retrieve a single auto-scaling rule by ID.\n\n**Preconditions:**\n* User privilege required.\n"
       },
-      "put": {
+      "patch": {
         "operationId": "v2/deployments.update_auto_scaling_rule",
         "tags": [
           "v2/deployments"
@@ -52126,7 +52266,128 @@
             }
           }
         ],
-        "description": "Update an auto-scaling rule.\n\n**Preconditions:**\n* User privilege required.\n"
+        "description": "Update an auto-scaling rule. The path names the rule.\n\n**Preconditions:**\n* User privilege required.\n"
+      },
+      "delete": {
+        "operationId": "v2/deployments.purge_auto_scaling_rule",
+        "tags": [
+          "v2/deployments"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "rule_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "description": "Permanently remove an auto-scaling rule.\n\n**Preconditions:**\n* User privilege required.\n"
+      },
+      "put": {
+        "operationId": "v2/deployments.update_auto_scaling_rule.2",
+        "tags": [
+          "v2/deployments"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateAutoScalingRuleInput"
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "rule_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "description": "Update an auto-scaling rule. The path names the rule.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/v2/deployments/auto-scaling-rules/partial-bulk-update": {
+      "post": {
+        "operationId": "v2/deployments.partial_bulk_update_auto_scaling_rules",
+        "tags": [
+          "v2/deployments"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PartialBulkUpdateAutoScalingRulesInput"
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "description": "Update several auto-scaling rules, answering for each one.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/v2/deployments/auto-scaling-rules/partial-bulk-purge": {
+      "post": {
+        "operationId": "v2/deployments.partial_bulk_purge_auto_scaling_rules",
+        "tags": [
+          "v2/deployments"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PartialBulkPurgeAutoScalingRulesInput"
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "description": "Permanently remove several auto-scaling rules, answering for each one.\n\n**Preconditions:**\n* User privilege required.\n"
       }
     },
     "/v2/deployments/auto-scaling-rules/delete": {
@@ -52155,7 +52416,7 @@
           }
         },
         "parameters": [],
-        "description": "Delete an auto-scaling rule.\n\n**Preconditions:**\n* User privilege required.\n"
+        "description": "Deprecated. Use `DELETE /v2/deployments/auto-scaling-rules/{rule_id}`.\n\n**Preconditions:**\n* User privilege required.\n"
       }
     },
     "/v2/deployments/auto-scaling-rules/bulk-delete": {
@@ -52184,7 +52445,7 @@
           }
         },
         "parameters": [],
-        "description": "Bulk delete auto-scaling rules.\n\n**Preconditions:**\n* User privilege required.\n"
+        "description": "Deprecated. Use `POST /v2/deployments/auto-scaling-rules/partial-bulk-purge`.\n\n**Preconditions:**\n* User privilege required.\n"
       }
     },
     "/v2/deployments/policies/{deployment_id}": {
@@ -52394,10 +52655,10 @@
             }
           }
         ],
-        "description": "\n**Preconditions:**\n* Superadmin privilege required.\n"
+        "description": "\n**Preconditions:**\n* User privilege required.\n"
       },
       "delete": {
-        "operationId": "v2/deployments/revision-presets.delete",
+        "operationId": "v2/deployments/revision-presets.purge",
         "tags": [
           "v2/deployments/revision-presets"
         ],
@@ -52421,7 +52682,65 @@
             }
           }
         ],
-        "description": "\n**Preconditions:**\n* Superadmin privilege required.\n"
+        "description": "\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/v2/deployments/revision-presets/partial-bulk-update": {
+      "post": {
+        "operationId": "v2/deployments/revision-presets.partial_bulk_update",
+        "tags": [
+          "v2/deployments/revision-presets"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PartialBulkUpdateDeploymentRevisionPresetsInput"
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "description": "Update several presets, answering for each one.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/v2/deployments/revision-presets/partial-bulk-purge": {
+      "post": {
+        "operationId": "v2/deployments/revision-presets.partial_bulk_purge",
+        "tags": [
+          "v2/deployments/revision-presets"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PartialBulkPurgeDeploymentRevisionPresetsInput"
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "description": "Permanently remove several presets, answering for each one.\n\n**Preconditions:**\n* User privilege required.\n"
       }
     },
     "/v2/deployments/revision-presets/{preset_id}/resource-slots/search": {
