@@ -16,6 +16,7 @@ from ai.backend.common.contexts.user import current_user
 from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.replica import ReplicaID
 from ai.backend.common.data.entity.session import SessionEntityType, SessionID
+from ai.backend.common.data.entity.session_group import SessionGroupID
 from ai.backend.common.data.entity.types import RuntimeEntityID
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.dto.manager.v2.common import PartialBulkPayload
@@ -148,6 +149,7 @@ from ai.backend.manager.errors.user import UserNotFound
 
 if TYPE_CHECKING:
     from ai.backend.manager.api.gql.deployment.types.replica import ModelReplica
+    from ai.backend.manager.api.gql.session_group.types import SessionGroupGQL
 
 
 @gql_enum(
@@ -834,6 +836,30 @@ class SessionV2GQL(PydanticNodeMixin[SessionNode]):
             return None
         return await info.context.data_loaders.replica_loader.load(
             ReplicaID(UUID(str(self.replica_id)))
+        )
+
+    @gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description=(
+                "The session group whose placement policy this session follows. Null when the "
+                "session belongs to no group or to a group a deployment's replica group holds."
+            ),
+        )
+    )  # type: ignore[misc]
+    async def session_group(
+        self, info: Info[StrawberryGQLContext]
+    ) -> (
+        Annotated[
+            SessionGroupGQL,
+            strawberry.lazy("ai.backend.manager.api.gql.session_group.types"),
+        ]
+        | None
+    ):
+        if self.resource.session_group_id is None:
+            return None
+        return await info.context.data_loaders.session_group_loader.load(
+            SessionGroupID(self.resource.session_group_id)
         )
 
     @gql_added_field(
