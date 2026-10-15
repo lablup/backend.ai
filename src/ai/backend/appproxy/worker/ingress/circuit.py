@@ -10,9 +10,10 @@ from ai.backend.common.dto.appproxy.v2.ingress.types import IngressAuthority, In
 
 
 class CircuitIngressSync:
-    """Writes the Ingress of each circuit the existing circuit events carry to the in-memory state.
+    """Writes the Ingress of each circuit the legacy circuit events carry to the in-memory state.
 
-    A circuit without routes has no target group to carry, so its Ingress is removed instead.
+    Temporary: remove it together with the legacy circuit events. A circuit without routes has
+    no target group to carry, so its Ingress is removed instead.
     """
 
     _writer: IngressWriter
