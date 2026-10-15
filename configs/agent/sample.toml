@@ -293,6 +293,12 @@
   # file permissions on mounted volumes.
   # Added in 25.12.0
   kernel-gid = "1000"
+  # User the kernel container entrypoint starts as, as the container runtime's
+  # User field ("uid", "uid:gid" or a name). None lets the container runtime
+  # decide. Agent-wide: it does not follow the per-user container_uid, so the
+  # two can conflict.
+  # Added in 26.10.0
+  ## entrypoint-user = "0:0"
   # Range of host ports allocated to containers for network services. Format is
   # [start, end] inclusive. Containers get ports from this range for SSH,
   # Jupyter, and other services. In multi-agent mode, ensure non-overlapping
