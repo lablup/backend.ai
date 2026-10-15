@@ -16,6 +16,15 @@ Changes
 
 <!-- towncrier release notes start -->
 
+## 26.4.14 (2026-10-15)
+
+### Fixes
+* Raise the GraphQL query depth and alias count caps to 50. ([#15610](https://github.com/lablup/backend.ai/issues/15610))
+* Fix Relay `node(id:)` failing with `Relay Node "<T>" not found in schema` for all GraphQL v2 (Strawberry) types, which broke Relay refetch queries in the WebUI ([#15626](https://github.com/lablup/backend.ai/issues/15626))
+* Fix the fGPU overbooking and fragmentation when allocating fractional GPUs on an agent with multiple NUMA nodes. ([#15636](https://github.com/lablup/backend.ai/issues/15636))
+* Fix session creation failing with `KeyError: 2000` on the agent when the resource group uses host network mode ([#15648](https://github.com/lablup/backend.ai/issues/15648))
+
+
 ## 26.4.13 (2026-10-14)
 
 ### Fixes
