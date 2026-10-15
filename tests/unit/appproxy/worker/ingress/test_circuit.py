@@ -273,7 +273,7 @@ class TestLegacyCircuitIngressSync:
             ip_network("192.168.0.1/32"),
         ]
 
-    async def test_apply_carries_each_route_as_a_weighted_target_group(
+    async def test_apply_carries_every_route_as_a_target_of_one_group(
         self, sync: LegacyCircuitIngressSync, memory: InMemoryIngressState, circuit: Circuit
     ) -> None:
         await sync.apply(circuit, circuit.route_info)
@@ -281,8 +281,8 @@ class TestLegacyCircuitIngressSync:
         assert stored_ingress is not None
         assert stored_ingress.backend.target_groups == [
             IngressTargetGroup(
-                id=IngressTargetGroupID(str(ROUTE_ID)),
-                weight=70,
+                id=IngressTargetGroupID(str(CIRCUIT_ID)),
+                weight=1,
                 targets=[
                     IngressTarget(id=IngressTargetID(str(ROUTE_ID)), host="10.0.0.5", port=8000)
                 ],
@@ -306,12 +306,13 @@ class TestLegacyCircuitIngressSync:
             for target in group.targets
         ] == ["10.0.0.6"]
 
-    @pytest.mark.usefixtures("ingress_in_memory")
-    async def test_apply_without_routes_removes_the_ingress(
+    async def test_apply_without_routes_keeps_the_ingress_with_no_targets(
         self, sync: LegacyCircuitIngressSync, memory: InMemoryIngressState, circuit: Circuit
     ) -> None:
         await sync.apply(circuit, [])
-        assert await memory.get(PORT_KEY) is None
+        stored_ingress = await memory.get(PORT_KEY)
+        assert stored_ingress is not None
+        assert [group.targets for group in stored_ingress.backend.target_groups] == [[]]
 
     @pytest.mark.usefixtures("ingress_in_memory")
     async def test_remove_drops_the_ingress_of_the_circuit(
@@ -320,7 +321,7 @@ class TestLegacyCircuitIngressSync:
         await sync.remove([circuit])
         assert await memory.get(PORT_KEY) is None
 
-    async def test_replace_all_holds_only_the_circuits_with_routes(
+    async def test_replace_all_holds_every_circuit_including_one_without_routes(
         self,
         sync: LegacyCircuitIngressSync,
         memory: InMemoryIngressState,
@@ -328,4 +329,7 @@ class TestLegacyCircuitIngressSync:
         routeless_circuit: Circuit,
     ) -> None:
         await sync.replace_all([circuit, routeless_circuit])
-        assert [ingress.id for ingress in await memory.get_all()] == [str(CIRCUIT_ID)]
+        assert {ingress.id for ingress in await memory.get_all()} == {
+            str(circuit.id),
+            str(routeless_circuit.id),
+        }

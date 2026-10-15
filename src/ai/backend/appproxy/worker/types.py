@@ -472,29 +472,26 @@ class Circuit(SerializableCircuit):
                     )
                 case _:
                     raise UnreachableError("a circuit holds only interactive or inference app info")
-        target_groups = []
-        for route in routes:
-            target_id = str(route.route_id or route.session_id)
-            target_groups.append(
-                IngressTargetGroup(
-                    id=IngressTargetGroupID(target_id),
-                    weight=round(route.traffic_ratio * 100),
-                    targets=[
-                        IngressTarget(
-                            id=IngressTargetID(target_id),
-                            host=route.current_kernel_host,
-                            port=route.kernel_port,
-                        )
-                    ],
+        # Circuits have no target groups, so every route is a target of a single group.
+        target_group = IngressTargetGroup(
+            id=IngressTargetGroupID(str(self.id)),
+            weight=1,
+            targets=[
+                IngressTarget(
+                    id=IngressTargetID(str(route.route_id or route.session_id)),
+                    host=route.current_kernel_host,
+                    port=route.kernel_port,
                 )
-            )
+                for route in routes
+            ],
+        )
         return Ingress(
             id=IngressID(str(self.id)),
             authority=authority,
             revision=revision,
             frontend=frontend,
             access=access,
-            backend=IngressBackend(id=IngressBackendID(str(self.id)), target_groups=target_groups),
+            backend=IngressBackend(id=IngressBackendID(str(self.id)), target_groups=[target_group]),
         )
 
     def to_ingress_frontend(self) -> IngressFrontend:

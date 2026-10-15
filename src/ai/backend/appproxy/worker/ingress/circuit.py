@@ -12,8 +12,7 @@ from ai.backend.common.dto.appproxy.v2.ingress.types import IngressAuthority, In
 class LegacyCircuitIngressSync:
     """Writes the Ingress of each circuit the legacy circuit events carry to the in-memory state.
 
-    Temporary: remove it together with the legacy circuit events. A circuit without routes has
-    no target group to carry, so its Ingress is removed instead.
+    Temporary: remove it together with the legacy circuit events.
     """
 
     _writer: IngressWriter
@@ -30,16 +29,12 @@ class LegacyCircuitIngressSync:
         await self._writer.replace_all([
             circuit.to_ingress(self._authority, next(self._revisions), circuit.route_info)
             for circuit in circuits
-            if circuit.route_info
         ])
 
     async def apply(self, circuit: Circuit, routes: Sequence[RouteInfo]) -> None:
-        if routes:
-            await self._writer.apply([
-                circuit.to_ingress(self._authority, next(self._revisions), routes)
-            ])
-        else:
-            await self.remove([circuit])
+        await self._writer.apply([
+            circuit.to_ingress(self._authority, next(self._revisions), routes)
+        ])
 
     async def remove(self, circuits: Sequence[Circuit]) -> None:
         await self._writer.remove([
