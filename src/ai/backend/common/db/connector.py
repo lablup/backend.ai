@@ -6,9 +6,9 @@ from typing import Any
 
 import asyncpg
 
-from ai.backend.logging.structured import StructuredLogger
+from ai.backend.logging import BraceStyleAdapter
 
-log = StructuredLogger(logging.getLogger(__spec__.name))
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
 class PrimaryMemberConnector:
@@ -56,14 +56,14 @@ class PrimaryMemberConnector:
                     **self._connect_kwargs,
                 )
             except (OSError, asyncpg.PostgresError) as e:
-                log.warning("database member connection failed", addr=addr, failure_reason=repr(e))
+                log.warning("database member connection failed (addr:{}, reason:{!r})", addr, e)
                 last_error = e
                 continue
             try:
                 in_hot_standby = await self._in_hot_standby(conn)
             except (OSError, asyncpg.PostgresError) as e:
                 conn.terminate()
-                log.warning("database member connection failed", addr=addr, failure_reason=repr(e))
+                log.warning("database member connection failed (addr:{}, reason:{!r})", addr, e)
                 last_error = e
                 continue
             except BaseException:
@@ -73,7 +73,7 @@ class PrimaryMemberConnector:
                 self._start = index
                 return conn
             conn.terminate()
-            log.warning("database member is in hot standby", addr=addr)
+            log.warning("database member is in hot standby (addr:{})", addr)
         if last_error is not None:
             raise last_error
         raise asyncpg.TargetServerAttributeNotMatched("None of the cluster members is a primary")
