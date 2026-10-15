@@ -29570,6 +29570,41 @@
         "title": "UpdateRuntimeVariantInput",
         "type": "object"
       },
+      "NonEmptyList_UpdateRuntimeVariantInput_": {
+        "items": {
+          "$ref": "#/components/schemas/UpdateRuntimeVariantInput"
+        },
+        "minItems": 1,
+        "type": "array"
+      },
+      "PartialBulkUpdateRuntimeVariantsInput": {
+        "description": "Input for updating several runtime variants, each answered for separately.",
+        "properties": {
+          "items": {
+            "$ref": "#/components/schemas/NonEmptyList_UpdateRuntimeVariantInput_",
+            "description": "The runtime variants to update, each with its fields."
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "title": "PartialBulkUpdateRuntimeVariantsInput",
+        "type": "object"
+      },
+      "PartialBulkPurgeRuntimeVariantsInput": {
+        "description": "Input for purging several runtime variants, each answered for separately.",
+        "properties": {
+          "ids": {
+            "$ref": "#/components/schemas/NonEmptyList_UUID_",
+            "description": "IDs of the runtime variants to purge."
+          }
+        },
+        "required": [
+          "ids"
+        ],
+        "title": "PartialBulkPurgeRuntimeVariantsInput",
+        "type": "object"
+      },
       "DeleteRuntimeVariantsInput": {
         "description": "Input for deleting multiple runtime variants.",
         "properties": {
@@ -30345,6 +30380,41 @@
           "id"
         ],
         "title": "UpdateRuntimeVariantPresetInput",
+        "type": "object"
+      },
+      "NonEmptyList_UpdateRuntimeVariantPresetInput_": {
+        "items": {
+          "$ref": "#/components/schemas/UpdateRuntimeVariantPresetInput"
+        },
+        "minItems": 1,
+        "type": "array"
+      },
+      "PartialBulkUpdateRuntimeVariantPresetsInput": {
+        "description": "Input for updating several runtime variant presets, each answered for separately.",
+        "properties": {
+          "items": {
+            "$ref": "#/components/schemas/NonEmptyList_UpdateRuntimeVariantPresetInput_",
+            "description": "The presets to update, each with its fields."
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "title": "PartialBulkUpdateRuntimeVariantPresetsInput",
+        "type": "object"
+      },
+      "PartialBulkPurgeRuntimeVariantPresetsInput": {
+        "description": "Input for purging several runtime variant presets, each answered for separately.",
+        "properties": {
+          "ids": {
+            "$ref": "#/components/schemas/NonEmptyList_UUID_",
+            "description": "IDs of the presets to purge."
+          }
+        },
+        "required": [
+          "ids"
+        ],
+        "title": "PartialBulkPurgeRuntimeVariantPresetsInput",
         "type": "object"
       },
       "ModelCardFilter": {
@@ -60606,10 +60676,10 @@
             }
           }
         ],
-        "description": "\n**Preconditions:**\n* Superadmin privilege required.\n"
+        "description": "\n**Preconditions:**\n* User privilege required.\n"
       },
       "delete": {
-        "operationId": "v2/runtime-variants.delete",
+        "operationId": "v2/runtime-variants.purge",
         "tags": [
           "v2/runtime-variants"
         ],
@@ -60633,7 +60703,65 @@
             }
           }
         ],
-        "description": "\n**Preconditions:**\n* Superadmin privilege required.\n"
+        "description": "Purge a runtime variant with the presets in its catalog.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/v2/runtime-variants/partial-bulk-update": {
+      "post": {
+        "operationId": "v2/runtime-variants.partial_bulk_update",
+        "tags": [
+          "v2/runtime-variants"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PartialBulkUpdateRuntimeVariantsInput"
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "description": "Update several runtime variants, answering for each one.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/v2/runtime-variants/partial-bulk-purge": {
+      "post": {
+        "operationId": "v2/runtime-variants.partial_bulk_purge",
+        "tags": [
+          "v2/runtime-variants"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PartialBulkPurgeRuntimeVariantsInput"
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "description": "Purge several runtime variants with their presets, answering for each one.\n\n**Preconditions:**\n* User privilege required.\n"
       }
     },
     "/v2/runtime-variants/delete": {
@@ -60662,7 +60790,7 @@
           }
         },
         "parameters": [],
-        "description": "\n**Preconditions:**\n* Superadmin privilege required.\n"
+        "description": "Deprecated. Use `POST /v2/runtime-variants/partial-bulk-purge`.\n\n**Preconditions:**\n* Superadmin privilege required.\n"
       }
     },
     "/v2/runtime-variant-presets/search": {
@@ -60785,10 +60913,10 @@
             }
           }
         ],
-        "description": "\n**Preconditions:**\n* Superadmin privilege required.\n"
+        "description": "\n**Preconditions:**\n* User privilege required.\n"
       },
       "delete": {
-        "operationId": "v2/runtime-variant-presets.delete",
+        "operationId": "v2/runtime-variant-presets.purge",
         "tags": [
           "v2/runtime-variant-presets"
         ],
@@ -60812,7 +60940,65 @@
             }
           }
         ],
-        "description": "\n**Preconditions:**\n* Superadmin privilege required.\n"
+        "description": "Purge a runtime variant preset.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/v2/runtime-variant-presets/partial-bulk-update": {
+      "post": {
+        "operationId": "v2/runtime-variant-presets.partial_bulk_update",
+        "tags": [
+          "v2/runtime-variant-presets"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PartialBulkUpdateRuntimeVariantPresetsInput"
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "description": "Update several runtime variant presets, answering for each one.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/v2/runtime-variant-presets/partial-bulk-purge": {
+      "post": {
+        "operationId": "v2/runtime-variant-presets.partial_bulk_purge",
+        "tags": [
+          "v2/runtime-variant-presets"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PartialBulkPurgeRuntimeVariantPresetsInput"
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "description": "Purge several runtime variant presets, answering for each one.\n\n**Preconditions:**\n* User privilege required.\n"
       }
     },
     "/v2/model-cards/search": {

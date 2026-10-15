@@ -545,15 +545,23 @@ from ai.backend.manager.api.gql.runtime_variant.resolver import (
     admin_delete_runtime_variant,
     admin_delete_runtime_variants,
     admin_update_runtime_variant,
+    partial_bulk_purge_runtime_variants,
+    partial_bulk_update_runtime_variants,
+    purge_runtime_variant,
     runtime_variant,
     runtime_variants,
+    update_runtime_variant,
 )
 from ai.backend.manager.api.gql.runtime_variant_preset.resolver import (
     admin_create_runtime_variant_preset,
     admin_delete_runtime_variant_preset,
     admin_update_runtime_variant_preset,
+    partial_bulk_purge_runtime_variant_presets,
+    partial_bulk_update_runtime_variant_presets,
+    purge_runtime_variant_preset,
     runtime_variant_preset,
     runtime_variant_presets,
+    update_runtime_variant_preset,
 )
 from ai.backend.manager.api.gql.scheduling_handler.resolver import scheduling_handlers
 from ai.backend.manager.api.gql.scheduling_history.resolver import (
@@ -1315,6 +1323,10 @@ class Mutation:
     admin_update_runtime_variant = admin_update_runtime_variant
     admin_delete_runtime_variant = admin_delete_runtime_variant
     admin_delete_runtime_variants = admin_delete_runtime_variants
+    update_runtime_variant = update_runtime_variant
+    purge_runtime_variant = purge_runtime_variant
+    partial_bulk_update_runtime_variants = partial_bulk_update_runtime_variants
+    partial_bulk_purge_runtime_variants = partial_bulk_purge_runtime_variants
     # Client IP Masking mutations
     admin_upsert_client_ip_masking_policy = admin_upsert_client_ip_masking_policy
     admin_purge_client_ip_masking_policy = admin_purge_client_ip_masking_policy
@@ -1333,6 +1345,10 @@ class Mutation:
     admin_create_runtime_variant_preset = admin_create_runtime_variant_preset
     admin_update_runtime_variant_preset = admin_update_runtime_variant_preset
     admin_delete_runtime_variant_preset = admin_delete_runtime_variant_preset
+    update_runtime_variant_preset = update_runtime_variant_preset
+    purge_runtime_variant_preset = purge_runtime_variant_preset
+    partial_bulk_update_runtime_variant_presets = partial_bulk_update_runtime_variant_presets
+    partial_bulk_purge_runtime_variant_presets = partial_bulk_purge_runtime_variant_presets
     # Deployment Revision Preset mutations
     admin_create_deployment_revision_preset = admin_create_deployment_revision_preset
     admin_update_deployment_revision_preset = admin_update_deployment_revision_preset

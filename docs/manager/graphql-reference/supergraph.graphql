@@ -15133,13 +15133,33 @@ type Mutation
   adminCreateRuntimeVariant(input: CreateRuntimeVariantInput!): CreateRuntimeVariantPayload @join__field(graph: STRAWBERRY)
 
   """Added in 26.4.2. Update a runtime variant (superadmin only)."""
-  adminUpdateRuntimeVariant(input: UpdateRuntimeVariantInput!): UpdateRuntimeVariantPayload @join__field(graph: STRAWBERRY)
+  adminUpdateRuntimeVariant(input: UpdateRuntimeVariantInput!): UpdateRuntimeVariantPayload @join__field(graph: STRAWBERRY) @deprecated(reason: "Deprecated since 26.10.0. Use `updateRuntimeVariant`.")
 
   """Added in 26.4.2. Delete a runtime variant (superadmin only)."""
-  adminDeleteRuntimeVariant(id: UUID!): DeleteRuntimeVariantPayload @join__field(graph: STRAWBERRY)
+  adminDeleteRuntimeVariant(id: UUID!): DeleteRuntimeVariantPayload @join__field(graph: STRAWBERRY) @deprecated(reason: "Deprecated since 26.10.0. Use `purgeRuntimeVariant`.")
 
   """Added in 26.4.2. Delete multiple runtime variants (superadmin only)."""
-  adminDeleteRuntimeVariants(input: DeleteRuntimeVariantsInput!): DeleteRuntimeVariantsPayload @join__field(graph: STRAWBERRY)
+  adminDeleteRuntimeVariants(input: DeleteRuntimeVariantsInput!): DeleteRuntimeVariantsPayload @join__field(graph: STRAWBERRY) @deprecated(reason: "Deprecated since 26.10.0. Use `partialBulkPurgeRuntimeVariants`.")
+
+  """
+  Added in 26.10.0. Update a runtime variant. Only provided fields will be updated.
+  """
+  updateRuntimeVariant(input: UpdateRuntimeVariantInput!): UpdateRuntimeVariantPayload! @join__field(graph: STRAWBERRY)
+
+  """
+  Added in 26.10.0. Purge a runtime variant with the presets in its catalog.
+  """
+  purgeRuntimeVariant(id: UUID!): DeleteRuntimeVariantPayload! @join__field(graph: STRAWBERRY)
+
+  """
+  Added in 26.10.0. Update several runtime variants, answering for each one.
+  """
+  partialBulkUpdateRuntimeVariants(input: PartialBulkUpdateRuntimeVariantsInput!): PartialBulkRuntimeVariantsPayload! @join__field(graph: STRAWBERRY)
+
+  """
+  Added in 26.10.0. Purge several runtime variants with their presets, answering for each one.
+  """
+  partialBulkPurgeRuntimeVariants(input: PartialBulkPurgeRuntimeVariantsInput!): PartialBulkRuntimeVariantsPayload! @join__field(graph: STRAWBERRY)
 
   """
   Added in 26.9.0. Set the client IP masking one target gets (superadmin only).
@@ -15189,10 +15209,28 @@ type Mutation
   adminCreateRuntimeVariantPreset(input: CreateRuntimeVariantPresetInput!): CreateRuntimeVariantPresetPayload @join__field(graph: STRAWBERRY)
 
   """Added in 26.4.2. Update a runtime variant preset (superadmin only)."""
-  adminUpdateRuntimeVariantPreset(input: UpdateRuntimeVariantPresetInput!): UpdateRuntimeVariantPresetPayload @join__field(graph: STRAWBERRY)
+  adminUpdateRuntimeVariantPreset(input: UpdateRuntimeVariantPresetInput!): UpdateRuntimeVariantPresetPayload @join__field(graph: STRAWBERRY) @deprecated(reason: "Deprecated since 26.10.0. Use `updateRuntimeVariantPreset`.")
 
   """Added in 26.4.2. Delete a runtime variant preset (superadmin only)."""
-  adminDeleteRuntimeVariantPreset(id: UUID!): DeleteRuntimeVariantPresetPayload @join__field(graph: STRAWBERRY)
+  adminDeleteRuntimeVariantPreset(id: UUID!): DeleteRuntimeVariantPresetPayload @join__field(graph: STRAWBERRY) @deprecated(reason: "Deprecated since 26.10.0. Use `purgeRuntimeVariantPreset`.")
+
+  """
+  Added in 26.10.0. Update a runtime variant preset. Only provided fields will be updated.
+  """
+  updateRuntimeVariantPreset(input: UpdateRuntimeVariantPresetInput!): UpdateRuntimeVariantPresetPayload! @join__field(graph: STRAWBERRY)
+
+  """Added in 26.10.0. Purge a runtime variant preset."""
+  purgeRuntimeVariantPreset(id: UUID!): DeleteRuntimeVariantPresetPayload! @join__field(graph: STRAWBERRY)
+
+  """
+  Added in 26.10.0. Update several runtime variant presets, answering for each one.
+  """
+  partialBulkUpdateRuntimeVariantPresets(input: PartialBulkUpdateRuntimeVariantPresetsInput!): PartialBulkRuntimeVariantPresetsPayload! @join__field(graph: STRAWBERRY)
+
+  """
+  Added in 26.10.0. Purge several runtime variant presets, answering for each one.
+  """
+  partialBulkPurgeRuntimeVariantPresets(input: PartialBulkPurgeRuntimeVariantPresetsInput!): PartialBulkRuntimeVariantPresetsPayload! @join__field(graph: STRAWBERRY)
 
   """Added in 26.4.2. Create a deployment revision preset (admin only)."""
   adminCreateDeploymentRevisionPreset(input: CreateDeploymentRevisionPresetInput!): CreateDeploymentRevisionPresetPayload @join__field(graph: STRAWBERRY)
@@ -16282,6 +16320,26 @@ input PartialBulkPurgeRolesInput
 }
 
 """
+Added in 26.10.0. Input for purging several runtime variant presets, each answered for separately.
+"""
+input PartialBulkPurgeRuntimeVariantPresetsInput
+  @join__type(graph: STRAWBERRY)
+{
+  """IDs of the presets to purge."""
+  ids: [UUID!]!
+}
+
+"""
+Added in 26.10.0. Input for purging several runtime variants, each answered for separately.
+"""
+input PartialBulkPurgeRuntimeVariantsInput
+  @join__type(graph: STRAWBERRY)
+{
+  """IDs of the runtime variants to purge."""
+  ids: [UUID!]!
+}
+
+"""
 Added in 26.10.0. Input for purging several user resource policies, each answered for separately.
 """
 input PartialBulkPurgeUserResourcePoliciesInput
@@ -16469,6 +16527,32 @@ type PartialBulkRolesPayload
   successes: [Role!]!
 
   """The roles not processed, each with the reason."""
+  failed: [PartialBulkFailure!]!
+}
+
+"""
+Added in 26.10.0. Result of a partial bulk runtime variant preset operation: the presets processed and the ones that failed.
+"""
+type PartialBulkRuntimeVariantPresetsPayload
+  @join__type(graph: STRAWBERRY)
+{
+  """The presets processed, as they stood when processed."""
+  successes: [RuntimeVariantPreset!]!
+
+  """The presets not processed, each with the reason."""
+  failed: [PartialBulkFailure!]!
+}
+
+"""
+Added in 26.10.0. Result of a partial bulk runtime variant operation: the runtime variants processed and the ones that failed.
+"""
+type PartialBulkRuntimeVariantsPayload
+  @join__type(graph: STRAWBERRY)
+{
+  """The runtime variants processed, as they stood when processed."""
+  successes: [RuntimeVariant!]!
+
+  """The runtime variants not processed, each with the reason."""
   failed: [PartialBulkFailure!]!
 }
 
@@ -16862,6 +16946,26 @@ input PartialBulkUpdateRolesInput
 {
   """The roles to update, each with its fields."""
   items: [PartialBulkUpdateRoleItemInput!]!
+}
+
+"""
+Added in 26.10.0. Input for updating several runtime variant presets, each answered for separately.
+"""
+input PartialBulkUpdateRuntimeVariantPresetsInput
+  @join__type(graph: STRAWBERRY)
+{
+  """The presets to update, each with its fields."""
+  items: [UpdateRuntimeVariantPresetInput!]!
+}
+
+"""
+Added in 26.10.0. Input for updating several runtime variants, each answered for separately.
+"""
+input PartialBulkUpdateRuntimeVariantsInput
+  @join__type(graph: STRAWBERRY)
+{
+  """The runtime variants to update, each with its fields."""
+  items: [UpdateRuntimeVariantInput!]!
 }
 
 """

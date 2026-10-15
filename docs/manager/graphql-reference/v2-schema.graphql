@@ -10710,13 +10710,33 @@ type Mutation {
   adminCreateRuntimeVariant(input: CreateRuntimeVariantInput!): CreateRuntimeVariantPayload
 
   """Added in 26.4.2. Update a runtime variant (superadmin only)."""
-  adminUpdateRuntimeVariant(input: UpdateRuntimeVariantInput!): UpdateRuntimeVariantPayload
+  adminUpdateRuntimeVariant(input: UpdateRuntimeVariantInput!): UpdateRuntimeVariantPayload @deprecated(reason: "Deprecated since 26.10.0. Use `updateRuntimeVariant`.")
 
   """Added in 26.4.2. Delete a runtime variant (superadmin only)."""
-  adminDeleteRuntimeVariant(id: UUID!): DeleteRuntimeVariantPayload
+  adminDeleteRuntimeVariant(id: UUID!): DeleteRuntimeVariantPayload @deprecated(reason: "Deprecated since 26.10.0. Use `purgeRuntimeVariant`.")
 
   """Added in 26.4.2. Delete multiple runtime variants (superadmin only)."""
-  adminDeleteRuntimeVariants(input: DeleteRuntimeVariantsInput!): DeleteRuntimeVariantsPayload
+  adminDeleteRuntimeVariants(input: DeleteRuntimeVariantsInput!): DeleteRuntimeVariantsPayload @deprecated(reason: "Deprecated since 26.10.0. Use `partialBulkPurgeRuntimeVariants`.")
+
+  """
+  Added in 26.10.0. Update a runtime variant. Only provided fields will be updated.
+  """
+  updateRuntimeVariant(input: UpdateRuntimeVariantInput!): UpdateRuntimeVariantPayload!
+
+  """
+  Added in 26.10.0. Purge a runtime variant with the presets in its catalog.
+  """
+  purgeRuntimeVariant(id: UUID!): DeleteRuntimeVariantPayload!
+
+  """
+  Added in 26.10.0. Update several runtime variants, answering for each one.
+  """
+  partialBulkUpdateRuntimeVariants(input: PartialBulkUpdateRuntimeVariantsInput!): PartialBulkRuntimeVariantsPayload!
+
+  """
+  Added in 26.10.0. Purge several runtime variants with their presets, answering for each one.
+  """
+  partialBulkPurgeRuntimeVariants(input: PartialBulkPurgeRuntimeVariantsInput!): PartialBulkRuntimeVariantsPayload!
 
   """
   Added in 26.9.0. Set the client IP masking one target gets (superadmin only).
@@ -10766,10 +10786,28 @@ type Mutation {
   adminCreateRuntimeVariantPreset(input: CreateRuntimeVariantPresetInput!): CreateRuntimeVariantPresetPayload
 
   """Added in 26.4.2. Update a runtime variant preset (superadmin only)."""
-  adminUpdateRuntimeVariantPreset(input: UpdateRuntimeVariantPresetInput!): UpdateRuntimeVariantPresetPayload
+  adminUpdateRuntimeVariantPreset(input: UpdateRuntimeVariantPresetInput!): UpdateRuntimeVariantPresetPayload @deprecated(reason: "Deprecated since 26.10.0. Use `updateRuntimeVariantPreset`.")
 
   """Added in 26.4.2. Delete a runtime variant preset (superadmin only)."""
-  adminDeleteRuntimeVariantPreset(id: UUID!): DeleteRuntimeVariantPresetPayload
+  adminDeleteRuntimeVariantPreset(id: UUID!): DeleteRuntimeVariantPresetPayload @deprecated(reason: "Deprecated since 26.10.0. Use `purgeRuntimeVariantPreset`.")
+
+  """
+  Added in 26.10.0. Update a runtime variant preset. Only provided fields will be updated.
+  """
+  updateRuntimeVariantPreset(input: UpdateRuntimeVariantPresetInput!): UpdateRuntimeVariantPresetPayload!
+
+  """Added in 26.10.0. Purge a runtime variant preset."""
+  purgeRuntimeVariantPreset(id: UUID!): DeleteRuntimeVariantPresetPayload!
+
+  """
+  Added in 26.10.0. Update several runtime variant presets, answering for each one.
+  """
+  partialBulkUpdateRuntimeVariantPresets(input: PartialBulkUpdateRuntimeVariantPresetsInput!): PartialBulkRuntimeVariantPresetsPayload!
+
+  """
+  Added in 26.10.0. Purge several runtime variant presets, answering for each one.
+  """
+  partialBulkPurgeRuntimeVariantPresets(input: PartialBulkPurgeRuntimeVariantPresetsInput!): PartialBulkRuntimeVariantPresetsPayload!
 
   """Added in 26.4.2. Create a deployment revision preset (admin only)."""
   adminCreateDeploymentRevisionPreset(input: CreateDeploymentRevisionPresetInput!): CreateDeploymentRevisionPresetPayload
@@ -11654,6 +11692,22 @@ input PartialBulkPurgeRolesInput {
 }
 
 """
+Added in 26.10.0. Input for purging several runtime variant presets, each answered for separately.
+"""
+input PartialBulkPurgeRuntimeVariantPresetsInput {
+  """IDs of the presets to purge."""
+  ids: [UUID!]!
+}
+
+"""
+Added in 26.10.0. Input for purging several runtime variants, each answered for separately.
+"""
+input PartialBulkPurgeRuntimeVariantsInput {
+  """IDs of the runtime variants to purge."""
+  ids: [UUID!]!
+}
+
+"""
 Added in 26.10.0. Input for purging several user resource policies, each answered for separately.
 """
 input PartialBulkPurgeUserResourcePoliciesInput {
@@ -11807,6 +11861,28 @@ type PartialBulkRolesPayload {
   successes: [Role!]!
 
   """The roles not processed, each with the reason."""
+  failed: [PartialBulkFailure!]!
+}
+
+"""
+Added in 26.10.0. Result of a partial bulk runtime variant preset operation: the presets processed and the ones that failed.
+"""
+type PartialBulkRuntimeVariantPresetsPayload {
+  """The presets processed, as they stood when processed."""
+  successes: [RuntimeVariantPreset!]!
+
+  """The presets not processed, each with the reason."""
+  failed: [PartialBulkFailure!]!
+}
+
+"""
+Added in 26.10.0. Result of a partial bulk runtime variant operation: the runtime variants processed and the ones that failed.
+"""
+type PartialBulkRuntimeVariantsPayload {
+  """The runtime variants processed, as they stood when processed."""
+  successes: [RuntimeVariant!]!
+
+  """The runtime variants not processed, each with the reason."""
   failed: [PartialBulkFailure!]!
 }
 
@@ -12136,6 +12212,22 @@ Added in 26.10.0. Input for updating several roles, each answered for separately
 input PartialBulkUpdateRolesInput {
   """The roles to update, each with its fields."""
   items: [PartialBulkUpdateRoleItemInput!]!
+}
+
+"""
+Added in 26.10.0. Input for updating several runtime variant presets, each answered for separately.
+"""
+input PartialBulkUpdateRuntimeVariantPresetsInput {
+  """The presets to update, each with its fields."""
+  items: [UpdateRuntimeVariantPresetInput!]!
+}
+
+"""
+Added in 26.10.0. Input for updating several runtime variants, each answered for separately.
+"""
+input PartialBulkUpdateRuntimeVariantsInput {
+  """The runtime variants to update, each with its fields."""
+  items: [UpdateRuntimeVariantInput!]!
 }
 
 """
