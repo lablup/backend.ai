@@ -12094,12 +12094,89 @@
       "UpdateHuggingFaceRegistryInput": {
         "description": "Input for updating a HuggingFace registry.",
         "properties": {
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Updated registry name",
+            "title": "Name"
+          },
+          "url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Updated HuggingFace Hub URL",
+            "title": "Url"
+          },
+          "token": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Updated access token",
+            "title": "Token"
+          },
           "id": {
             "description": "Registry ID to update",
             "format": "uuid",
             "title": "Id",
             "type": "string"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "title": "UpdateHuggingFaceRegistryInput",
+        "type": "object"
+      },
+      "NonEmptyList_PartialBulkUpdateHuggingFaceRegistryItemInput_": {
+        "items": {
+          "$ref": "#/components/schemas/PartialBulkUpdateHuggingFaceRegistryItemInput"
+        },
+        "minItems": 1,
+        "type": "array"
+      },
+      "PartialBulkUpdateHuggingFaceRegistryItemInput": {
+        "description": "One HuggingFace registry of a partial bulk update and the fields to update on it.",
+        "properties": {
+          "id": {
+            "description": "ID of the registry to update.",
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
           },
+          "input": {
+            "$ref": "#/components/schemas/UpdateHuggingFaceRegistryBody",
+            "description": "Fields to update on the registry."
+          }
+        },
+        "required": [
+          "id",
+          "input"
+        ],
+        "title": "PartialBulkUpdateHuggingFaceRegistryItemInput",
+        "type": "object"
+      },
+      "UpdateHuggingFaceRegistryBody": {
+        "description": "Fields to update on a HuggingFace registry.",
+        "properties": {
           "name": {
             "anyOf": [
               {
@@ -12140,10 +12217,35 @@
             "title": "Token"
           }
         },
+        "title": "UpdateHuggingFaceRegistryBody",
+        "type": "object"
+      },
+      "PartialBulkUpdateHuggingFaceRegistriesInput": {
+        "description": "Input for updating several HuggingFace registries, each answered for separately.",
+        "properties": {
+          "items": {
+            "$ref": "#/components/schemas/NonEmptyList_PartialBulkUpdateHuggingFaceRegistryItemInput_",
+            "description": "The registries to update, each with its fields."
+          }
+        },
         "required": [
-          "id"
+          "items"
         ],
-        "title": "UpdateHuggingFaceRegistryInput",
+        "title": "PartialBulkUpdateHuggingFaceRegistriesInput",
+        "type": "object"
+      },
+      "PartialBulkPurgeHuggingFaceRegistriesInput": {
+        "description": "Input for purging several HuggingFace registries, each answered for separately.",
+        "properties": {
+          "ids": {
+            "$ref": "#/components/schemas/NonEmptyList_UUID_",
+            "description": "IDs of the registries to purge."
+          }
+        },
+        "required": [
+          "ids"
+        ],
+        "title": "PartialBulkPurgeHuggingFaceRegistriesInput",
         "type": "object"
       },
       "DeleteHuggingFaceRegistryInput": {
@@ -23758,12 +23860,115 @@
       "UpdateReservoirRegistryInput": {
         "description": "Input for updating a Reservoir registry.",
         "properties": {
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Updated registry name",
+            "title": "Name"
+          },
+          "endpoint": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Updated endpoint URL",
+            "title": "Endpoint"
+          },
+          "access_key": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Updated access key",
+            "title": "Access Key"
+          },
+          "secret_key": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Updated secret key",
+            "title": "Secret Key"
+          },
+          "api_version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Updated API version",
+            "title": "Api Version"
+          },
           "id": {
             "description": "Registry ID to update",
             "format": "uuid",
             "title": "Id",
             "type": "string"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "title": "UpdateReservoirRegistryInput",
+        "type": "object"
+      },
+      "NonEmptyList_PartialBulkUpdateReservoirRegistryItemInput_": {
+        "items": {
+          "$ref": "#/components/schemas/PartialBulkUpdateReservoirRegistryItemInput"
+        },
+        "minItems": 1,
+        "type": "array"
+      },
+      "PartialBulkUpdateReservoirRegistryItemInput": {
+        "description": "One Reservoir registry of a partial bulk update and the fields to update on it.",
+        "properties": {
+          "id": {
+            "description": "ID of the registry to update.",
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
           },
+          "input": {
+            "$ref": "#/components/schemas/UpdateReservoirRegistryBody",
+            "description": "Fields to update on the registry."
+          }
+        },
+        "required": [
+          "id",
+          "input"
+        ],
+        "title": "PartialBulkUpdateReservoirRegistryItemInput",
+        "type": "object"
+      },
+      "UpdateReservoirRegistryBody": {
+        "description": "Fields to update on a Reservoir registry.",
+        "properties": {
           "name": {
             "anyOf": [
               {
@@ -23830,10 +24035,35 @@
             "title": "Api Version"
           }
         },
+        "title": "UpdateReservoirRegistryBody",
+        "type": "object"
+      },
+      "PartialBulkUpdateReservoirRegistriesInput": {
+        "description": "Input for updating several Reservoir registries, each answered for separately.",
+        "properties": {
+          "items": {
+            "$ref": "#/components/schemas/NonEmptyList_PartialBulkUpdateReservoirRegistryItemInput_",
+            "description": "The registries to update, each with its fields."
+          }
+        },
         "required": [
-          "id"
+          "items"
         ],
-        "title": "UpdateReservoirRegistryInput",
+        "title": "PartialBulkUpdateReservoirRegistriesInput",
+        "type": "object"
+      },
+      "PartialBulkPurgeReservoirRegistriesInput": {
+        "description": "Input for purging several Reservoir registries, each answered for separately.",
+        "properties": {
+          "ids": {
+            "$ref": "#/components/schemas/NonEmptyList_UUID_",
+            "description": "IDs of the registries to purge."
+          }
+        },
+        "required": [
+          "ids"
+        ],
+        "title": "PartialBulkPurgeReservoirRegistriesInput",
         "type": "object"
       },
       "DeleteReservoirRegistryInput": {
@@ -52538,6 +52768,91 @@
           }
         ],
         "description": "Update an existing HuggingFace registry.\n\n**Preconditions:**\n* Superadmin privilege required.\n"
+      },
+      "delete": {
+        "operationId": "v2/huggingface-registries.purge",
+        "tags": [
+          "v2/huggingface-registries"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "registry_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "description": "Permanently delete a HuggingFace registry.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/v2/huggingface-registries/partial-bulk-update": {
+      "post": {
+        "operationId": "v2/huggingface-registries.partial_bulk_update",
+        "tags": [
+          "v2/huggingface-registries"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PartialBulkUpdateHuggingFaceRegistriesInput"
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "description": "Update several HuggingFace registries, answering for each one.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/v2/huggingface-registries/partial-bulk-purge": {
+      "post": {
+        "operationId": "v2/huggingface-registries.partial_bulk_purge",
+        "tags": [
+          "v2/huggingface-registries"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PartialBulkPurgeHuggingFaceRegistriesInput"
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "description": "Permanently delete several HuggingFace registries, answering for each one.\n\n**Preconditions:**\n* User privilege required.\n"
       }
     },
     "/v2/huggingface-registries/delete": {
@@ -52566,7 +52881,7 @@
           }
         },
         "parameters": [],
-        "description": "Delete a HuggingFace registry.\n\n**Preconditions:**\n* Superadmin privilege required.\n"
+        "description": "Deprecated. Use `DELETE /v2/huggingface-registries/{registry_id}`.\n\n**Preconditions:**\n* Superadmin privilege required.\n"
       }
     },
     "/v2/idle-checkers/": {
@@ -57633,6 +57948,91 @@
           }
         ],
         "description": "Update an existing Reservoir registry.\n\n**Preconditions:**\n* Superadmin privilege required.\n"
+      },
+      "delete": {
+        "operationId": "v2/reservoir-registries.purge",
+        "tags": [
+          "v2/reservoir-registries"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "registry_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "description": "Permanently delete a Reservoir registry.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/v2/reservoir-registries/partial-bulk-update": {
+      "post": {
+        "operationId": "v2/reservoir-registries.partial_bulk_update",
+        "tags": [
+          "v2/reservoir-registries"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PartialBulkUpdateReservoirRegistriesInput"
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "description": "Update several Reservoir registries, answering for each one.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/v2/reservoir-registries/partial-bulk-purge": {
+      "post": {
+        "operationId": "v2/reservoir-registries.partial_bulk_purge",
+        "tags": [
+          "v2/reservoir-registries"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PartialBulkPurgeReservoirRegistriesInput"
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "description": "Permanently delete several Reservoir registries, answering for each one.\n\n**Preconditions:**\n* User privilege required.\n"
       }
     },
     "/v2/reservoir-registries/delete": {
@@ -57661,7 +58061,7 @@
           }
         },
         "parameters": [],
-        "description": "Delete a Reservoir registry.\n\n**Preconditions:**\n* Superadmin privilege required.\n"
+        "description": "Deprecated. Use `DELETE /v2/reservoir-registries/{registry_id}`.\n\n**Preconditions:**\n* Superadmin privilege required.\n"
       }
     },
     "/v2/resource-allocation/keypair/my": {

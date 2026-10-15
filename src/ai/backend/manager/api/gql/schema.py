@@ -647,6 +647,9 @@ from .huggingface_registry import (
     delete_huggingface_registry,
     huggingface_registries,
     huggingface_registry,
+    partial_bulk_purge_huggingface_registries,
+    partial_bulk_update_huggingface_registries,
+    purge_huggingface_registry,
     update_huggingface_registry,
 )
 from .image_federation import Image as _ImageStub
@@ -690,6 +693,9 @@ from .rbac.resolver.role_invitation import (
 from .reservoir_registry import (
     create_reservoir_registry,
     delete_reservoir_registry,
+    partial_bulk_purge_reservoir_registries,
+    partial_bulk_update_reservoir_registries,
+    purge_reservoir_registry,
     reservoir_registries,
     reservoir_registry,
     update_reservoir_registry,
@@ -1078,9 +1084,15 @@ class Mutation:
     create_huggingface_registry = create_huggingface_registry
     update_huggingface_registry = update_huggingface_registry
     delete_huggingface_registry = delete_huggingface_registry
+    purge_huggingface_registry = purge_huggingface_registry
+    partial_bulk_update_huggingface_registries = partial_bulk_update_huggingface_registries
+    partial_bulk_purge_huggingface_registries = partial_bulk_purge_huggingface_registries
     create_reservoir_registry = create_reservoir_registry
     update_reservoir_registry = update_reservoir_registry
     delete_reservoir_registry = delete_reservoir_registry
+    purge_reservoir_registry = purge_reservoir_registry
+    partial_bulk_update_reservoir_registries = partial_bulk_update_reservoir_registries
+    partial_bulk_purge_reservoir_registries = partial_bulk_purge_reservoir_registries
     get_presigned_download_url = get_presigned_download_url
     get_presigned_upload_url = get_presigned_upload_url
     approve_artifact_revision = approve_artifact_revision

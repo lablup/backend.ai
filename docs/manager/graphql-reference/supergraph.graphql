@@ -14344,7 +14344,20 @@ type Mutation
   updateHuggingfaceRegistry(input: UpdateHuggingFaceRegistryInput!): UpdateHuggingFaceRegistryPayload @join__field(graph: STRAWBERRY)
 
   """Added in 25.14.0. Delete huggingface registry."""
-  deleteHuggingfaceRegistry(input: DeleteHuggingFaceRegistryInput!): DeleteHuggingFaceRegistryPayload @join__field(graph: STRAWBERRY)
+  deleteHuggingfaceRegistry(input: DeleteHuggingFaceRegistryInput!): DeleteHuggingFaceRegistryPayload @join__field(graph: STRAWBERRY) @deprecated(reason: "Deprecated since 26.10.0. Use `purgeHuggingfaceRegistry`.")
+
+  """Added in 26.10.0. Permanently delete a HuggingFace registry."""
+  purgeHuggingfaceRegistry(id: UUID!): PurgeHuggingFaceRegistryPayload! @join__field(graph: STRAWBERRY)
+
+  """
+  Added in 26.10.0. Update several HuggingFace registries, answering for each one.
+  """
+  partialBulkUpdateHuggingfaceRegistries(input: PartialBulkUpdateHuggingFaceRegistriesInput!): PartialBulkUpdateHuggingFaceRegistriesPayload! @join__field(graph: STRAWBERRY)
+
+  """
+  Added in 26.10.0. Permanently delete several HuggingFace registries, answering for each one.
+  """
+  partialBulkPurgeHuggingfaceRegistries(input: PartialBulkPurgeHuggingFaceRegistriesInput!): PartialBulkPurgeHuggingFaceRegistriesPayload! @join__field(graph: STRAWBERRY)
 
   """Added in 25.14.0. Create reservoir registry."""
   createReservoirRegistry(input: CreateReservoirRegistryInput!): CreateReservoirRegistryPayload @join__field(graph: STRAWBERRY)
@@ -14353,7 +14366,20 @@ type Mutation
   updateReservoirRegistry(input: UpdateReservoirRegistryInput!): UpdateReservoirRegistryPayload @join__field(graph: STRAWBERRY)
 
   """Added in 25.14.0. Delete reservoir registry."""
-  deleteReservoirRegistry(input: DeleteReservoirRegistryInput!): DeleteReservoirRegistryPayload @join__field(graph: STRAWBERRY)
+  deleteReservoirRegistry(input: DeleteReservoirRegistryInput!): DeleteReservoirRegistryPayload @join__field(graph: STRAWBERRY) @deprecated(reason: "Deprecated since 26.10.0. Use `purgeReservoirRegistry`.")
+
+  """Added in 26.10.0. Permanently delete a Reservoir registry."""
+  purgeReservoirRegistry(id: UUID!): PurgeReservoirRegistryPayload! @join__field(graph: STRAWBERRY)
+
+  """
+  Added in 26.10.0. Update several Reservoir registries, answering for each one.
+  """
+  partialBulkUpdateReservoirRegistries(input: PartialBulkUpdateReservoirRegistriesInput!): PartialBulkUpdateReservoirRegistriesPayload! @join__field(graph: STRAWBERRY)
+
+  """
+  Added in 26.10.0. Permanently delete several Reservoir registries, answering for each one.
+  """
+  partialBulkPurgeReservoirRegistries(input: PartialBulkPurgeReservoirRegistriesInput!): PartialBulkPurgeReservoirRegistriesPayload! @join__field(graph: STRAWBERRY)
 
   """Added in 25.14.0. Get a presigned download URL."""
   getPresignedDownloadUrl(input: GetPresignedDownloadURLInput!): GetPresignedDownloadURLPayload @join__field(graph: STRAWBERRY)
@@ -16100,6 +16126,29 @@ type PartialBulkPurgeEntityLabelPayload
 }
 
 """
+Added in 26.10.0. Input for purging several HuggingFace registries, each answered for separately.
+"""
+input PartialBulkPurgeHuggingFaceRegistriesInput
+  @join__type(graph: STRAWBERRY)
+{
+  """IDs of the registries to purge."""
+  ids: [UUID!]!
+}
+
+"""
+Added in 26.10.0. Result of a partial bulk HuggingFace registry purge: the registries purged and the ones that failed.
+"""
+type PartialBulkPurgeHuggingFaceRegistriesPayload
+  @join__type(graph: STRAWBERRY)
+{
+  """The registries purged."""
+  successes: [PurgeHuggingFaceRegistryPayload!]!
+
+  """The registries not purged, each with the reason."""
+  failed: [PartialBulkFailure!]!
+}
+
+"""
 Added in 26.10.0. Input for purging several keypair resource policies, each answered for separately.
 """
 input PartialBulkPurgeKeypairResourcePoliciesInput
@@ -16167,6 +16216,29 @@ input PartialBulkPurgeQueryPresetCategoriesInput
 {
   """IDs of the categories to purge."""
   ids: [UUID!]!
+}
+
+"""
+Added in 26.10.0. Input for purging several Reservoir registries, each answered for separately.
+"""
+input PartialBulkPurgeReservoirRegistriesInput
+  @join__type(graph: STRAWBERRY)
+{
+  """IDs of the registries to purge."""
+  ids: [UUID!]!
+}
+
+"""
+Added in 26.10.0. Result of a partial bulk Reservoir registry purge: the registries purged and the ones that failed.
+"""
+type PartialBulkPurgeReservoirRegistriesPayload
+  @join__type(graph: STRAWBERRY)
+{
+  """The registries purged."""
+  successes: [PurgeReservoirRegistryPayload!]!
+
+  """The registries not purged, each with the reason."""
+  failed: [PartialBulkFailure!]!
 }
 
 """
@@ -16434,6 +16506,42 @@ input PartialBulkUpdateDomainsInput
 }
 
 """
+Added in 26.10.0. Input for updating several HuggingFace registries, each answered for separately.
+"""
+input PartialBulkUpdateHuggingFaceRegistriesInput
+  @join__type(graph: STRAWBERRY)
+{
+  """The registries to update, each with its fields."""
+  items: [PartialBulkUpdateHuggingFaceRegistryItemInput!]!
+}
+
+"""
+Added in 26.10.0. Result of a partial bulk HuggingFace registry update: the registries updated and the ones that failed.
+"""
+type PartialBulkUpdateHuggingFaceRegistriesPayload
+  @join__type(graph: STRAWBERRY)
+{
+  """The registries updated, as they now stand."""
+  successes: [HuggingFaceRegistry!]!
+
+  """The registries not updated, each with the reason."""
+  failed: [PartialBulkFailure!]!
+}
+
+"""
+Added in 26.10.0. One HuggingFace registry of a partial bulk update and the fields to update on it.
+"""
+input PartialBulkUpdateHuggingFaceRegistryItemInput
+  @join__type(graph: STRAWBERRY)
+{
+  """ID of the registry to update."""
+  id: UUID!
+
+  """Fields to update on the registry."""
+  input: UpdateHuggingFaceRegistryBodyInput!
+}
+
+"""
 Added in 26.10.0. One image of a partial bulk update and the fields to update on it.
 """
 input PartialBulkUpdateImageItemInput
@@ -16620,6 +16728,42 @@ input PartialBulkUpdateQueryDefinitionsInput
 {
   """The query definitions to update, each with its fields."""
   items: [PartialBulkUpdateQueryDefinitionItemInput!]!
+}
+
+"""
+Added in 26.10.0. Input for updating several Reservoir registries, each answered for separately.
+"""
+input PartialBulkUpdateReservoirRegistriesInput
+  @join__type(graph: STRAWBERRY)
+{
+  """The registries to update, each with its fields."""
+  items: [PartialBulkUpdateReservoirRegistryItemInput!]!
+}
+
+"""
+Added in 26.10.0. Result of a partial bulk Reservoir registry update: the registries updated and the ones that failed.
+"""
+type PartialBulkUpdateReservoirRegistriesPayload
+  @join__type(graph: STRAWBERRY)
+{
+  """The registries updated, as they now stand."""
+  successes: [ReservoirRegistry!]!
+
+  """The registries not updated, each with the reason."""
+  failed: [PartialBulkFailure!]!
+}
+
+"""
+Added in 26.10.0. One Reservoir registry of a partial bulk update and the fields to update on it.
+"""
+input PartialBulkUpdateReservoirRegistryItemInput
+  @join__type(graph: STRAWBERRY)
+{
+  """ID of the registry to update."""
+  id: UUID!
+
+  """Fields to update on the registry."""
+  input: UpdateReservoirRegistryBodyInput!
 }
 
 """
@@ -18418,6 +18562,14 @@ type PurgeGroup
   msg: String
 }
 
+"""Added in 26.10.0. Payload for purging a HuggingFace registry."""
+type PurgeHuggingFaceRegistryPayload
+  @join__type(graph: STRAWBERRY)
+{
+  """ID of the purged HuggingFace registry."""
+  id: UUID!
+}
+
 """Added in 26.8.0. Identifies the idle checker assignment to purge."""
 input PurgeIdleCheckerAssignmentInput
   @join__type(graph: STRAWBERRY)
@@ -18529,6 +18681,14 @@ type PurgeProjectPayload
 {
   """Whether the purge was successful."""
   purged: Boolean!
+}
+
+"""Added in 26.10.0. Payload for purging a Reservoir registry."""
+type PurgeReservoirRegistryPayload
+  @join__type(graph: STRAWBERRY)
+{
+  """ID of the purged Reservoir registry."""
+  id: UUID!
 }
 
 """Added in 26.9.0. Input for removing a resource slot type."""
@@ -26124,6 +26284,20 @@ input UpdateDomainInput
   integrationName: String
 }
 
+"""Added in 26.10.0. Fields to update on a HuggingFace registry."""
+input UpdateHuggingFaceRegistryBodyInput
+  @join__type(graph: STRAWBERRY)
+{
+  """New registry name."""
+  name: String
+
+  """New HuggingFace Hub URL."""
+  url: String
+
+  """New access token."""
+  token: String
+}
+
 """Added in 25.14.0. """
 input UpdateHuggingFaceRegistryInput
   @join__type(graph: STRAWBERRY)
@@ -26701,6 +26875,26 @@ type UpdateProjectResourcePolicyPayload
 {
   """The updated project resource policy."""
   projectResourcePolicy: ProjectResourcePolicyV2!
+}
+
+"""Added in 26.10.0. Fields to update on a Reservoir registry."""
+input UpdateReservoirRegistryBodyInput
+  @join__type(graph: STRAWBERRY)
+{
+  """New registry name."""
+  name: String
+
+  """New endpoint URL."""
+  endpoint: String
+
+  """New access key."""
+  accessKey: String
+
+  """New secret key."""
+  secretKey: String
+
+  """New API version."""
+  apiVersion: String
 }
 
 """Added in 25.14.0. """
