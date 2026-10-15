@@ -14099,7 +14099,17 @@ type Mutation
   """
   Added in 26.9.0. Remove a resource slot type by slot name (super admin only).
   """
-  adminPurgeResourceSlotType(input: PurgeResourceSlotTypeInput!): PurgeResourceSlotTypePayload @join__field(graph: STRAWBERRY)
+  adminPurgeResourceSlotType(input: PurgeResourceSlotTypeInput!): PurgeResourceSlotTypePayload @join__field(graph: STRAWBERRY) @deprecated(reason: "Deprecated since 26.10.0. Use `purgeResourceSlotType`.")
+
+  """
+  Added in 26.10.0. Remove a resource slot type, refusing while anything still references it.
+  """
+  purgeResourceSlotType(id: UUID!): PurgeResourceSlotTypePayload! @join__field(graph: STRAWBERRY)
+
+  """
+  Added in 26.10.0. Remove several resource slot types, answering for each one.
+  """
+  partialBulkPurgeResourceSlotTypes(input: PartialBulkPurgeResourceSlotTypesInput!): PartialBulkResourceSlotTypesPayload! @join__field(graph: STRAWBERRY)
 
   """
   Added in 26.7.0. Register a new app config allow-list entry (super admin only).
@@ -14238,7 +14248,15 @@ type Mutation
   adminUpdateContainerRegistryV2(input: UpdateContainerRegistryInput!): UpdateContainerRegistryPayload @join__field(graph: STRAWBERRY)
 
   """Added in 26.4.2. Delete a container registry (admin only)."""
-  adminDeleteContainerRegistryV2(id: String!): DeleteContainerRegistryPayload @join__field(graph: STRAWBERRY)
+  adminDeleteContainerRegistryV2(id: String!): DeleteContainerRegistryPayload @join__field(graph: STRAWBERRY) @deprecated(reason: "Deprecated since 26.10.0. Use `adminPurgeContainerRegistryV2`.")
+
+  """Added in 26.10.0. Purge a container registry (admin only)."""
+  adminPurgeContainerRegistryV2(id: UUID!): PurgeContainerRegistryPayload! @join__field(graph: STRAWBERRY)
+
+  """
+  Added in 26.10.0. Purge several container registries (admin only), answering for each one.
+  """
+  adminPartialBulkPurgeContainerRegistriesV2(input: PartialBulkPurgeContainerRegistriesInput!): PartialBulkContainerRegistriesPayload! @join__field(graph: STRAWBERRY)
 
   """Added in 25.16.0. Create model deployment."""
   createModelDeployment(input: CreateDeploymentInput!): CreateDeploymentPayload @join__field(graph: STRAWBERRY)
@@ -16225,6 +16243,19 @@ type PartialBulkClientIPMaskingPoliciesPayload
 }
 
 """
+Added in 26.10.0. Result of a partial bulk container registry operation: the registries processed and the ones that failed.
+"""
+type PartialBulkContainerRegistriesPayload
+  @join__type(graph: STRAWBERRY)
+{
+  """The container registries processed, as they stood."""
+  successes: [ContainerRegistryV2!]!
+
+  """The container registries not processed, each with the reason."""
+  failed: [PartialBulkFailure!]!
+}
+
+"""
 Added in 26.10.0. Input for soft-deleting several artifacts, each answered for separately.
 """
 input PartialBulkDeleteArtifactsInput
@@ -16537,6 +16568,16 @@ input PartialBulkPurgeClientIPMaskingPoliciesInput
 }
 
 """
+Added in 26.10.0. Input for purging several container registries, each answered for separately.
+"""
+input PartialBulkPurgeContainerRegistriesInput
+  @join__type(graph: STRAWBERRY)
+{
+  """IDs of the container registries to purge."""
+  ids: [UUID!]!
+}
+
+"""
 Added in 26.10.0. Input for permanently removing several presets, each answered for separately.
 """
 input PartialBulkPurgeDeploymentRevisionPresetsInput
@@ -16749,6 +16790,16 @@ input PartialBulkPurgeResourcePresetsInput
 }
 
 """
+Added in 26.10.0. Input for purging several resource slot types, each answered for separately.
+"""
+input PartialBulkPurgeResourceSlotTypesInput
+  @join__type(graph: STRAWBERRY)
+{
+  """IDs of the resource slot types to purge."""
+  ids: [UUID!]!
+}
+
+"""
 Added in 26.10.0. Input for purging several retention policies, each answered for separately.
 """
 input PartialBulkPurgeRetentionPoliciesInput
@@ -16877,6 +16928,19 @@ type PartialBulkResourcePresetsPayload
   successes: [ResourcePresetV2!]!
 
   """The resource presets not processed, each with the reason."""
+  failed: [PartialBulkFailure!]!
+}
+
+"""
+Added in 26.10.0. Result of a partial bulk resource slot type operation: the slot types processed and the ones that failed.
+"""
+type PartialBulkResourceSlotTypesPayload
+  @join__type(graph: STRAWBERRY)
+{
+  """The resource slot types processed, as they stood."""
+  successes: [ResourceSlotType!]!
+
+  """The resource slot types not processed, each with the reason."""
   failed: [PartialBulkFailure!]!
 }
 
@@ -19198,6 +19262,14 @@ type PurgeAppConfigFragmentPayload
   @join__type(graph: STRAWBERRY)
 {
   """Id of the purged app config fragment."""
+  id: UUID!
+}
+
+"""Added in 26.10.0. Payload for container registry purge."""
+type PurgeContainerRegistryPayload
+  @join__type(graph: STRAWBERRY)
+{
+  """ID of the purged registry."""
   id: UUID!
 }
 

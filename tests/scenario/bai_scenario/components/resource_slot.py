@@ -128,21 +128,22 @@ def slot_type_verdicts(
     display_icon: str,
     number_format: NumberFormatInfo,
     rank: int,
+    at: str = "",
 ) -> list[Verdict]:
     """Every place of one slot type node. The id is the name, so it is seen and the uuid is not."""
     return [
-        Same("id", node.id, named),
-        Skipped("uuid", "데이터베이스가 만든다"),
-        Same("slot_name", node.slot_name, named),
-        Same("slot_type", node.slot_type, slot_type.value),
-        Same("required", node.required, required),
-        Same("enabled", node.enabled, enabled),
-        Same("display_name", node.display_name, display_name),
-        Same("description", node.description, description),
-        Same("display_unit", node.display_unit, display_unit),
-        Same("display_icon", node.display_icon, display_icon),
-        Same("number_format", node.number_format, number_format),
-        Same("rank", node.rank, rank),
+        Same(f"{at}id", node.id, named),
+        Skipped(f"{at}uuid", "데이터베이스가 만든다"),
+        Same(f"{at}slot_name", node.slot_name, named),
+        Same(f"{at}slot_type", node.slot_type, slot_type.value),
+        Same(f"{at}required", node.required, required),
+        Same(f"{at}enabled", node.enabled, enabled),
+        Same(f"{at}display_name", node.display_name, display_name),
+        Same(f"{at}description", node.description, description),
+        Same(f"{at}display_unit", node.display_unit, display_unit),
+        Same(f"{at}display_icon", node.display_icon, display_icon),
+        Same(f"{at}number_format", node.number_format, number_format),
+        Same(f"{at}rank", node.rank, rank),
     ]
 
 

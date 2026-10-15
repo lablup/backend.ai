@@ -88,6 +88,8 @@ from ai.backend.manager.api.gql.client_ip_masking.resolver import (
 from ai.backend.manager.api.gql.container_registry.resolver.mutation import (
     admin_create_container_registry_v2,
     admin_delete_container_registry_v2,
+    admin_partial_bulk_purge_container_registries_v2,
+    admin_purge_container_registry_v2,
     admin_update_container_registry_v2,
 )
 from ai.backend.manager.api.gql.container_registry.resolver.query import (
@@ -754,6 +756,8 @@ from .resource_slot.resolver import (
     admin_create_resource_slot_type,
     admin_purge_resource_slot_type,
     admin_update_resource_slot_type,
+    partial_bulk_purge_resource_slot_types,
+    purge_resource_slot_type,
     resource_slot_type,
     resource_slot_types,
 )
@@ -1060,6 +1064,8 @@ class Mutation:
     admin_create_resource_slot_type = admin_create_resource_slot_type
     admin_update_resource_slot_type = admin_update_resource_slot_type
     admin_purge_resource_slot_type = admin_purge_resource_slot_type
+    purge_resource_slot_type = purge_resource_slot_type
+    partial_bulk_purge_resource_slot_types = partial_bulk_purge_resource_slot_types
     admin_create_app_config_allow_list = admin_create_app_config_allow_list
     admin_purge_app_config_allow_list = admin_purge_app_config_allow_list
     admin_update_app_config_allow_list = admin_update_app_config_allow_list
@@ -1092,6 +1098,10 @@ class Mutation:
     admin_create_container_registry_v2 = admin_create_container_registry_v2
     admin_update_container_registry_v2 = admin_update_container_registry_v2
     admin_delete_container_registry_v2 = admin_delete_container_registry_v2
+    admin_purge_container_registry_v2 = admin_purge_container_registry_v2
+    admin_partial_bulk_purge_container_registries_v2 = (
+        admin_partial_bulk_purge_container_registries_v2
+    )
     create_model_deployment = create_model_deployment
     update_model_deployment = update_model_deployment
     delete_model_deployment = delete_model_deployment

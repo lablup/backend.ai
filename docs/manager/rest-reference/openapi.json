@@ -4192,6 +4192,20 @@
         "title": "UpdateContainerRegistryInput",
         "type": "object"
       },
+      "PartialBulkPurgeContainerRegistriesInput": {
+        "description": "Input for purging several container registries, each answered for separately.",
+        "properties": {
+          "ids": {
+            "$ref": "#/components/schemas/NonEmptyList_UUID_",
+            "description": "IDs of the container registries to purge."
+          }
+        },
+        "required": [
+          "ids"
+        ],
+        "title": "PartialBulkPurgeContainerRegistriesInput",
+        "type": "object"
+      },
       "DeleteContainerRegistryInput": {
         "description": "Input for deleting a container registry.",
         "properties": {
@@ -28663,6 +28677,20 @@
         "title": "UpdateResourceSlotTypeInput",
         "type": "object"
       },
+      "PartialBulkPurgeResourceSlotTypesInput": {
+        "description": "Input for purging several resource slot types, each answered for separately.",
+        "properties": {
+          "ids": {
+            "$ref": "#/components/schemas/NonEmptyList_UUID_",
+            "description": "IDs of the resource slot types to purge."
+          }
+        },
+        "required": [
+          "ids"
+        ],
+        "title": "PartialBulkPurgeResourceSlotTypesInput",
+        "type": "object"
+      },
       "AgentResourceFilter": {
         "description": "Filter conditions for agent resource search.",
         "properties": {
@@ -51163,6 +51191,64 @@
         "description": "Update an existing container registry (superadmin only).\n\n**Preconditions:**\n* Superadmin privilege required.\n"
       }
     },
+    "/v2/container-registries/{registry_id}": {
+      "delete": {
+        "operationId": "v2/container-registries.admin_purge",
+        "tags": [
+          "v2/container-registries"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "registry_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "description": "Purge a container registry (superadmin only).\n\n**Preconditions:**\n* Superadmin privilege required.\n"
+      }
+    },
+    "/v2/container-registries/partial-bulk-purge": {
+      "post": {
+        "operationId": "v2/container-registries.admin_partial_bulk_purge",
+        "tags": [
+          "v2/container-registries"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PartialBulkPurgeContainerRegistriesInput"
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "description": "Purge several container registries (superadmin only), answering for each one.\n\n**Preconditions:**\n* Superadmin privilege required.\n"
+      }
+    },
     "/v2/container-registries/delete": {
       "post": {
         "operationId": "v2/container-registries.admin_delete",
@@ -51189,7 +51275,7 @@
           }
         },
         "parameters": [],
-        "description": "Delete a container registry (superadmin only). Hard delete via Purger.\n\n**Preconditions:**\n* Superadmin privilege required.\n"
+        "description": "Deprecated. Use `DELETE /v2/container-registries/{registry_id}`.\n\n**Preconditions:**\n* Superadmin privilege required.\n"
       }
     },
     "/v2/deployments/": {
@@ -61451,7 +61537,65 @@
             }
           }
         ],
-        "description": "Remove a resource slot type by slot name (superadmin only).\n\n**Preconditions:**\n* Superadmin privilege required.\n"
+        "description": "Deprecated. Use `DELETE /v2/resource-slots/slot-types/{slot_type_id}`.\n\n**Preconditions:**\n* Superadmin privilege required.\n"
+      }
+    },
+    "/v2/resource-slots/slot-types/{slot_type_id}": {
+      "delete": {
+        "operationId": "v2/resource-slots.purge_slot_type",
+        "tags": [
+          "v2/resource-slots"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "slot_type_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "description": "Remove a resource slot type, refusing while anything still references it.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/v2/resource-slots/slot-types/partial-bulk-purge": {
+      "post": {
+        "operationId": "v2/resource-slots.partial_bulk_purge_slot_types",
+        "tags": [
+          "v2/resource-slots"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PartialBulkPurgeResourceSlotTypesInput"
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "description": "Remove several resource slot types, answering for each one.\n\n**Preconditions:**\n* User privilege required.\n"
       }
     },
     "/v2/resource-slots/agent-resources/scoped/search": {
