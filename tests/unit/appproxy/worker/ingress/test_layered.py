@@ -1,9 +1,11 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
 from unittest.mock import AsyncMock
 
 import pytest
 
+from ai.backend.appproxy.worker.ingress.abc import IngressReader
 from ai.backend.appproxy.worker.ingress.in_memory import InMemoryIngressState
 from ai.backend.appproxy.worker.ingress.layered import LayeredIngressState
 from ai.backend.appproxy.worker.ingress.redis import RedisIngressState
@@ -26,6 +28,11 @@ from ai.backend.common.dto.appproxy.v2.ingress.types import (
 
 FRONTEND_KEY = IngressFrontendKey("10205")
 NEGATIVE_TTL = 5.0
+
+
+@dataclass(frozen=True)
+class _LayersCase:
+    layers: list[str]
 
 
 @pytest.fixture
@@ -68,13 +75,12 @@ def layered(memory: InMemoryIngressState, redis: AsyncMock) -> LayeredIngressSta
 
 
 @pytest.fixture
-def redis_only(redis: AsyncMock) -> LayeredIngressState:
-    return LayeredIngressState([redis])
-
-
-@pytest.fixture
-def memory_only(memory: InMemoryIngressState) -> LayeredIngressState:
-    return LayeredIngressState([memory])
+def configured_layered(
+    request: pytest.FixtureRequest, memory: InMemoryIngressState, redis: AsyncMock
+) -> LayeredIngressState:
+    layers_by_name: dict[str, IngressReader] = {"in-memory": memory, "redis": redis}
+    case: _LayersCase = request.param
+    return LayeredIngressState([layers_by_name[name] for name in case.layers])
 
 
 @pytest.fixture
@@ -108,10 +114,20 @@ class TestLayeredIngressState:
         assert await layered.get(FRONTEND_KEY) == ingress
         assert await memory.get(FRONTEND_KEY) == ingress
 
+    @pytest.mark.parametrize(
+        "configured_layered",
+        [
+            _LayersCase(layers=["in-memory"]),
+            _LayersCase(layers=["redis"]),
+            _LayersCase(layers=["in-memory", "redis"]),
+        ],
+        ids=lambda case: "+".join(case.layers),
+        indirect=True,
+    )
     async def test_get_returns_none_when_every_layer_misses(
-        self, layered: LayeredIngressState
+        self, configured_layered: LayeredIngressState
     ) -> None:
-        assert await layered.get(FRONTEND_KEY) is None
+        assert await configured_layered.get(FRONTEND_KEY) is None
 
     async def test_miss_in_every_layer_skips_redis_on_the_next_get(
         self, layered: LayeredIngressState, redis: AsyncMock
@@ -126,16 +142,6 @@ class TestLayeredIngressState:
     ) -> None:
         assert await layered.get(FRONTEND_KEY) is None
         redis.get.assert_not_awaited()
-
-    async def test_miss_without_a_memory_layer_reads_as_none(
-        self, redis_only: LayeredIngressState
-    ) -> None:
-        assert await redis_only.get(FRONTEND_KEY) is None
-
-    async def test_miss_without_a_redis_layer_reads_as_none(
-        self, memory_only: LayeredIngressState
-    ) -> None:
-        assert await memory_only.get(FRONTEND_KEY) is None
 
     @pytest.mark.usefixtures("ingress_in_redis")
     async def test_get_all_returns_the_last_layers_set(
