@@ -56,10 +56,13 @@ from ai.backend.common.dto.manager.v2.deployment.request import (
     ReplicaFilter,
     ReplicaHealthStatusFilter,
     ReplicaNestedFilter,
+    ScopedSearchDeploymentsInput,
 )
 from ai.backend.common.dto.manager.v2.deployment.request import (
     DeploymentFilter as DeploymentFilterV2,
 )
+from ai.backend.common.dto.manager.v2.deployment.types import DeploymentScope
+from ai.backend.common.dto.manager.v2.rbac.types import UUIDScope
 from ai.backend.common.types import ClusterMode
 from ai.backend.manager.api.adapters.deployment.adapter import DeploymentAdapter
 from ai.backend.manager.data.deployment.types import (
@@ -816,7 +819,7 @@ class TestDeploymentAdapterFilter:
         domain_fixture: DomainFixtureData,
         tags: StringFilter,
     ) -> set[uuid.UUID]:
-        with with_user_context(
+        with with_user(
             self._admin_user_data(admin_user_fixture.user_uuid, domain_fixture.domain_name)
         ):
             payload = await deployment_adapter.scoped_search(
