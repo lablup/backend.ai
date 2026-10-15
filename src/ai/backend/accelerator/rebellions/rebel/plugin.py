@@ -1,5 +1,6 @@
 import logging
 from collections.abc import Iterable, Sequence
+from typing import Any
 
 from ai.backend.accelerator.rebellions.common.atom_api import ATOMAPI
 from ai.backend.accelerator.rebellions.common.plugin import AbstractATOMPlugin
@@ -30,9 +31,15 @@ class RebelPlugin(AbstractATOMPlugin[RebelDevice]):
     exclusive_slot_types: set[str] = {"rebel.device"}
     config_name = "rebel"
     executable_names: Sequence[str] = ("rbln-smi", "rbln-stat")
+    # TODO(rebel100): confirm the `rbln-smi` JSON flags on the node (checklist step 5).
+    stat_args: Sequence[str] = ("-j",)
 
     _all_devices: list[RebelDevice] | None
     _unknown_device_names: set[str]
+
+    async def init(self, context: Any = None) -> None:
+        self._unknown_device_names = set()
+        await super().init(context)
 
     def _is_valid_device_name(self, name: str) -> bool:
         configured = self.atom_config["general"].get("device_names")
@@ -41,9 +48,7 @@ class RebelPlugin(AbstractATOMPlugin[RebelDevice]):
         return name.startswith(DEFAULT_DEVICE_NAME_PREFIXES)
 
     async def _list_devices(self) -> list[RebelDevice]:
-        if not hasattr(self, "_unknown_device_names"):
-            self._unknown_device_names = set()
-        stats = await ATOMAPI.get_stats(self._rbln_stat_path)
+        stats = await ATOMAPI.get_stats(self._rbln_stat_path, self.stat_args)
         devices: list[RebelDevice] = []
         for device_info in stats.devices:
             if not self._is_valid_device_name(device_info.name):
@@ -58,7 +63,7 @@ class RebelPlugin(AbstractATOMPlugin[RebelDevice]):
                 continue
             devices.append(
                 RebelDevice(
-                    model_name=f"RBLN {device_info.name}",
+                    model_name=device_info.name,
                     device_name=self.key,
                     serial=DeviceId(device_info.uuid),
                     device_id=device_info.device,
@@ -82,7 +87,7 @@ class RebelPlugin(AbstractATOMPlugin[RebelDevice]):
         device_indexes = [
             d.rbln_stat_info.npu for d in live_devices if d.device_id in assigned_device_ids
         ]
-        return await ATOMAPI.create_group(self._rbln_stat_path, device_indexes)
+        return await ATOMAPI.create_group(self._rbln_stat_path, device_indexes, self.stat_args)
 
     async def list_device_files(self, device: RebelDevice) -> Iterable[str]:
         return [f"/dev/{device.rbln_stat_info.device}"]

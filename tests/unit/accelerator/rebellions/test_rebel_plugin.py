@@ -5,10 +5,14 @@ import stat
 from collections.abc import Iterator
 from decimal import Decimal
 from pathlib import Path
+from typing import Any
 from unittest.mock import AsyncMock, patch
 
 import pytest
+import trafaret as t
 
+from ai.backend.accelerator.rebellions.atom.plugin import ATOMPlugin
+from ai.backend.accelerator.rebellions.atom_max.plugin import ATOMMaxPlugin
 from ai.backend.accelerator.rebellions.atom_plus.plugin import ATOMPlusPlugin
 from ai.backend.accelerator.rebellions.common.atom_api import ATOMAPI, ATOMStat, LibraryError
 from ai.backend.accelerator.rebellions.common.plugin import AbstractATOMPlugin
@@ -98,6 +102,7 @@ def plugin() -> RebelPlugin:
     plugin._rbln_stat_path = "/usr/bin/rbln-smi"
     plugin._all_devices = None
     plugin._enable_rsd = False
+    plugin._unknown_device_names = set()
     plugin.atom_config = {
         "general": {"enforce_singular_numa_affinity": False, "enable_rsd": False},
     }
@@ -118,12 +123,14 @@ class TestRebelPluginIdentity:
         assert plugin.exclusive_slot_types == {"rebel.device"}
         assert plugin.config_name == "rebel"
         assert plugin.executable_names == ("rbln-smi", "rbln-stat")
+        assert plugin.stat_args == ("-j",)
 
     def test_atom_plugins_keep_their_config_name_and_defaults(self) -> None:
         # Regression check for the shared base class.
         assert AbstractATOMPlugin.config_name == "atom"
         assert ATOMPlusPlugin.config_name == "atom"
         assert ATOMPlusPlugin.executable_names == ("rbln-stat",)
+        assert ATOMPlusPlugin.stat_args == ("-g", "-j")
         assert ATOMPlusPlugin.cdi_device_id == "rebellions.ai/npu=runtime"
         assert ATOMPlusPlugin.device_ids_env_var == "ATOM_GLOBAL_DEVICE_IDS"
 
@@ -138,7 +145,7 @@ class TestRebelDeviceEnumeration:
         assert all(isinstance(d, AbstractComputeDevice) for d in devices)
         assert devices[0].memory_size == 144 * 1024**3
         assert devices[1].numa_node == 1
-        assert devices[0].model_name == "RBLN RBLN-CR03"
+        assert devices[0].model_name == "RBLN-CR03"
 
     async def test_available_slots_counts_whole_cards(
         self, plugin: RebelPlugin, patched_stats: None
@@ -219,16 +226,28 @@ class TestATOMAPIToolHandling:
         path.write_text(smi_json_text)
         return path
 
-    async def test_rbln_smi_json_flags_and_parsing(self, tmp_path: Path, payload: Path) -> None:
+    async def test_custom_stat_args_and_parsing(self, tmp_path: Path, payload: Path) -> None:
         tool = _make_tool(tmp_path, "rbln-smi", f'echo "$@" > {tmp_path}/args; cat {payload}')
-        stats = await ATOMAPI.get_stats(tool)
+        stats = await ATOMAPI.get_stats(tool, ("-j",))
         assert stats.KMD_version == "3.2.2"
         assert len(stats.devices) == 3
         assert (tmp_path / "args").read_text().strip() == "-j"
 
-    async def test_rbln_stat_keeps_group_flag(self, tmp_path: Path, payload: Path) -> None:
-        tool = _make_tool(tmp_path, "rbln-stat", f'echo "$@" > {tmp_path}/args; cat {payload}')
+    async def test_default_stat_args_ignore_binary_name(
+        self, tmp_path: Path, payload: Path
+    ) -> None:
+        tool = _make_tool(tmp_path, "rbln-smi", f'echo "$@" > {tmp_path}/args; cat {payload}')
         await ATOMAPI.get_stats(tool)
+        assert (tmp_path / "args").read_text().strip() == "-g -j"
+
+    async def test_atom_plugin_with_rbln_smi_named_binary_keeps_group_flag(
+        self, tmp_path: Path, payload: Path
+    ) -> None:
+        tool = _make_tool(tmp_path, "rbln-smi", f'echo "$@" > {tmp_path}/args; cat {payload}')
+        atom_plus = ATOMPlusPlugin.__new__(ATOMPlusPlugin)
+        atom_plus._rbln_stat_path = tool
+        devices = await atom_plus._list_devices()
+        assert [d.device_id for d in devices] == ["rbln2"]
         assert (tmp_path / "args").read_text().strip() == "-g -j"
 
     async def test_stderr_warning_with_zero_exit_is_not_fatal(
@@ -243,8 +262,59 @@ class TestATOMAPIToolHandling:
         with pytest.raises(LibraryError, match="exit code 3"):
             await ATOMAPI.get_stats(tool)
 
+    async def test_group_command_stderr_is_fatal(self, tmp_path: Path, payload: Path) -> None:
+        tool = _make_tool(
+            tmp_path, "rbln-smi", f'case "$1" in group) echo bad >&2;; *) cat {payload};; esac'
+        )
+        with pytest.raises(LibraryError):
+            await ATOMAPI.create_group(tool, [0, 1])
+
     async def test_create_group_picks_free_id(self, tmp_path: Path, payload: Path) -> None:
         tool = _make_tool(tmp_path, "rbln-smi", f'echo "$@" >> {tmp_path}/args; cat {payload}')
         group_id = await ATOMAPI.create_group(tool, [0, 1])
         assert group_id == 1
         assert "group -c 1 -a 0,1" in (tmp_path / "args").read_text()
+
+
+class TestConfigName:
+    @pytest.mark.parametrize(
+        ("plugin_cls", "expected"),
+        [
+            (ATOMPlugin, "atom"),
+            (ATOMPlusPlugin, "atom"),
+            (ATOMMaxPlugin, "atom"),
+            (RebelPlugin, "rebel"),
+        ],
+        ids=["atom", "atom-plus", "atom-max", "rebel"],
+    )
+    async def test_init_reads_own_config_file(
+        self, plugin_cls: type[AbstractATOMPlugin[Any]], expected: str
+    ) -> None:
+        plugin = plugin_cls.__new__(plugin_cls)
+        plugin.plugin_config = {}
+        raw_cfg = {"general": {"rbln_stat_path": None}}
+        with (
+            patch(
+                "ai.backend.accelerator.rebellions.common.plugin.config.read_from_file",
+                return_value=(raw_cfg, Path("/etc/x.toml")),
+            ) as read_from_file,
+            patch("ai.backend.accelerator.rebellions.common.plugin.shutil.which") as which,
+            patch.object(plugin_cls, "list_devices", AsyncMock(return_value=[])),
+        ):
+            which.return_value = "/usr/bin/rbln-tool"
+            await plugin.init()
+        read_from_file.assert_called_once_with(None, expected)
+        assert plugin.enabled
+
+    async def test_device_names_must_be_a_list(self) -> None:
+        plugin = RebelPlugin.__new__(RebelPlugin)
+        plugin.plugin_config = {}
+        raw_cfg = {"general": {"rbln_stat_path": None, "device_names": "RBLN-CR03"}}
+        with (
+            patch(
+                "ai.backend.accelerator.rebellions.common.plugin.config.read_from_file",
+                return_value=(raw_cfg, Path("/etc/rebel.toml")),
+            ),
+            pytest.raises(t.DataError),
+        ):
+            await plugin.init()

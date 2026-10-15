@@ -15,7 +15,7 @@ from aiodocker import Docker
 
 from ai.backend.accelerator.rebellions import __version__
 
-from .atom_api import ATOMAPI, ATOMDeviceStat, LibraryError
+from .atom_api import ATOMAPI, DEFAULT_STAT_ARGS, ATOMDeviceStat, LibraryError
 from .types import AbstractATOMDevice
 
 try:
@@ -56,6 +56,7 @@ _atom_config_iv = t.Dict({
         t.Key("rbln_stat_path"): t.Null | t.String,
         t.Key("enforce_singular_numa_affinity", default=False): t.Null | t.Bool,
         t.Key("enable_rsd", default=True): t.Null | t.Bool,
+        t.Key("device_names", default=None): t.Null | t.List(t.String),
         t.Key("cdi_device_id", default=None): t.Null | t.String,
         t.Key("device_ids_env_var", default=None): t.Null | t.String,
     }).allow_extra("*"),
@@ -79,6 +80,8 @@ class AbstractATOMPlugin[TATOMDevice: AbstractATOMDevice](AbstractComputePlugin,
     config_name: str = "atom"
     # Executables looked up in PATH when `rbln_stat_path` is not configured, in order.
     executable_names: Sequence[str] = ("rbln-stat",)
+    # Arguments of the stat tool that print the device list as JSON.
+    stat_args: Sequence[str] = DEFAULT_STAT_ARGS
     # CDI device id requested for the container runtime; overridable in config.
     cdi_device_id: str = "rebellions.ai/npu=runtime"
     # Container env var carrying "local:global" device ids; overridable in config.
@@ -164,7 +167,7 @@ class AbstractATOMPlugin[TATOMDevice: AbstractATOMDevice](AbstractComputePlugin,
 
         stat_prefix = self.key.replace("-", "_")
 
-        stats = await ATOMAPI.get_stats(self._rbln_stat_path)
+        stats = await ATOMAPI.get_stats(self._rbln_stat_path, self.stat_args)
         if self.enabled:
             for device in await self.list_devices():
                 device_id = device.device_id
@@ -222,7 +225,7 @@ class AbstractATOMPlugin[TATOMDevice: AbstractATOMDevice](AbstractComputePlugin,
 
             # rbln-stat returns all devices
             # filtering devices relevant to actual containers is necessary
-            stats = await ATOMAPI.get_stats(self._rbln_stat_path)
+            stats = await ATOMAPI.get_stats(self._rbln_stat_path, self.stat_args)
             device_stats_by_device_filename: dict[str, ATOMDeviceStat] = {}
             for device_stat in stats.devices:
                 device_filename = "/dev/" + device_stat.device
