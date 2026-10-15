@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
-from typing import cast, override
+from typing import override
 
 from ai.backend.appproxy.worker.errors.ingress import IngressNotFoundError
 from ai.backend.appproxy.worker.ingress.abc import IngressReader
@@ -49,7 +49,6 @@ class LayeredIngressState(IngressReader):
         return await self._layers[-1].get_all()
 
     def _in_memory(self) -> InMemoryIngressState | None:
-        # The config puts the in-memory layer first whenever a later layer follows it.
-        if len(self._layers) < 2:
-            return None
-        return cast(InMemoryIngressState, self._layers[0])
+        # The config puts the in-memory layer first whenever it is configured.
+        first_layer = self._layers[0]
+        return first_layer if isinstance(first_layer, InMemoryIngressState) else None
