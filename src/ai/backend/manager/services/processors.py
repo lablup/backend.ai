@@ -267,6 +267,8 @@ if TYPE_CHECKING:
         ResourceAllocationService,
     )
     from ai.backend.manager.services.session.service import SessionService
+    from ai.backend.manager.services.session_group.processors import SessionGroupProcessors
+    from ai.backend.manager.services.session_group.service import SessionGroupService
     from ai.backend.manager.services.storage_namespace.processors import (
         StorageNamespaceProcessors,
     )
@@ -375,6 +377,7 @@ class Services:
     vfolder_sharing: VFolderSharingService
     vfolder_mount_policy: VFolderMountPolicyService
     session: SessionService
+    session_group: SessionGroupService
     manager_admin: ManagerAdminService
     secret: SecretService
     prometheus_query_preset: PrometheusQueryPresetService
@@ -441,6 +444,7 @@ class Processors:
     vfolder_mount_policy: VFolderMountPolicyProcessors
     vfolder_file: VFolderFileProcessors
     session: SessionProcessors
+    session_group: SessionGroupProcessors
     container_registry: ContainerRegistryProcessors
     keypair_resource_policy: KeypairResourcePolicyProcessors
     manager_admin: ManagerAdminProcessors

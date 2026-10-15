@@ -40,6 +40,7 @@ from ai.backend.common.data.entity.project import ProjectEntityType
 from ai.backend.common.data.entity.resource_group import ResourceGroupEntityType
 from ai.backend.common.data.entity.resource_preset import ResourcePresetEntityType
 from ai.backend.common.data.entity.session import SessionEntityType
+from ai.backend.common.data.entity.session_group import SessionGroupEntityType
 from ai.backend.common.data.entity.types import GlobalEntityType
 from ai.backend.common.data.entity.user import UserEntityType
 from ai.backend.common.data.entity.vfolder import VFolderEntityType
@@ -313,6 +314,8 @@ from ai.backend.manager.services.session.processors import SessionProcessors
 from ai.backend.manager.services.session.resource_allocation.processors import (
     ResourceAllocationProcessors,
 )
+from ai.backend.manager.services.session_group.actions.bulk_get import BulkGetSessionGroupsAction
+from ai.backend.manager.services.session_group.processors import SessionGroupProcessors
 from ai.backend.manager.services.user.actions.bulk_get import BulkGetUsersAction
 from ai.backend.manager.services.user.actions.bulk_lookup import BulkLookupUsersAction
 from ai.backend.manager.services.user.processors import UserProcessors
@@ -753,13 +756,14 @@ def test_session_and_kernel_data_loader_reads_are_checked_per_session() -> None:
 
 
 def test_entity_data_loader_reads_are_checked_per_entity() -> None:
-    """The resource group, notification, artifact, domain, user and project DataLoaders
-    read per named entity."""
+    """The resource group, notification, artifact, domain, user, project and session group
+    DataLoaders read per named entity."""
     registry = _ops_registry()
     ResourceGroupProcessors(registry.group(GroupMeta(ResourceGroupEntityType())), MagicMock())
     DomainProcessors(registry.group(GroupMeta(DomainEntityType())), MagicMock())
     UserProcessors(registry.group(GroupMeta(UserEntityType())), MagicMock())
     ProjectProcessors(registry.group(GroupMeta(ProjectEntityType())), MagicMock())
+    SessionGroupProcessors(registry.group(GroupMeta(SessionGroupEntityType())), MagicMock())
     NotificationProcessors(
         registry.group(GroupMeta(NotificationChannelEntityType())),
         registry.group(GroupMeta(NotificationRuleEntityType())),
@@ -870,6 +874,11 @@ def test_entity_data_loader_reads_are_checked_per_entity() -> None:
     )
     assert recorded[BulkGetProjectsAction] == (
         ProjectEntityType(),
+        ActionKind.BULK,
+        ActionGate.PERMISSION,
+    )
+    assert recorded[BulkGetSessionGroupsAction] == (
+        SessionGroupEntityType(),
         ActionKind.BULK,
         ActionGate.PERMISSION,
     )

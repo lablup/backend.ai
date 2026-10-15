@@ -55,6 +55,7 @@ from ai.backend.common.data.entity.runtime_variant_preset import RuntimeVariantP
 from ai.backend.common.data.entity.secret import SecretFieldType
 from ai.backend.common.data.entity.service_catalog import ServiceCatalogEntityType
 from ai.backend.common.data.entity.session import SessionEntityType
+from ai.backend.common.data.entity.session_group import SessionGroupEntityType
 from ai.backend.common.data.entity.session_template import SessionTemplateEntityType
 from ai.backend.common.data.entity.storage_namespace import StorageNamespaceEntityType
 from ai.backend.common.data.entity.types import GlobalEntityType
@@ -256,6 +257,8 @@ from ai.backend.manager.services.session.resource_allocation.service import (
     ResourceAllocationService,
 )
 from ai.backend.manager.services.session.service import SessionService, SessionServiceArgs
+from ai.backend.manager.services.session_group.processors import SessionGroupProcessors
+from ai.backend.manager.services.session_group.service import SessionGroupService
 from ai.backend.manager.services.storage_namespace.processors import StorageNamespaceProcessors
 from ai.backend.manager.services.stream.processors import StreamProcessors
 from ai.backend.manager.services.stream.service import StreamService
@@ -363,6 +366,7 @@ def create_services(args: ServiceArgs, action_registry: ProcessorRegistry[Any]) 
             repositories.vfolder.repository,
             repositories.rbac.permission_check,
         ),
+        session_group=SessionGroupService(OpsRepository(repositories.v2_ops_provider)),
         session=SessionService(
             SessionServiceArgs(
                 agent_registry=args.agent_registry,
@@ -668,6 +672,10 @@ def create_processors(
         ),
         vfolder_mount_policy=VFolderMountPolicyProcessors(
             vfolder_groups.group(GroupMeta(VFolderEntityType())), services.vfolder_mount_policy
+        ),
+        session_group=SessionGroupProcessors(
+            session_groups.group(GroupMeta(SessionGroupEntityType())),
+            services.session_group,
         ),
         session=SessionProcessors(
             session_groups.group(GroupMeta(SessionEntityType())),
