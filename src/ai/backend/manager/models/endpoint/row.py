@@ -39,7 +39,6 @@ from ai.backend.common.data.entity.replica_group import ReplicaGroupID
 from ai.backend.common.data.entity.runtime_variant import RuntimeVariantID
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.types import (
-    AccessKey,
     AutoScalingMetricComparator,
     AutoScalingMetricSource,
     ClusterMode,
@@ -526,52 +525,6 @@ class EndpointRow(Base):
         session.add(row)
         return row
 
-    @staticmethod
-    async def delegate_endpoint_ownership(
-        db_session: AsyncSession,
-        owner_user_uuid: UUID,
-        target_user_uuid: UserID,
-        target_access_key: AccessKey,
-    ) -> None:
-        from ai.backend.manager.models.replica_group.row import ReplicaGroupRow
-        from ai.backend.manager.models.session.row import KernelLoadingStrategy, SessionRow
-        from ai.backend.manager.models.session_group.row import SessionGroupRow
-
-        endpoint_rows = await EndpointRow.list_endpoint(
-            db_session,
-            user_uuid=owner_user_uuid,
-            load_session_owner=True,
-            load_routes=True,
-            load_tokens=True,
-        )
-        session_ids: list[UUID] = []
-        for row in endpoint_rows:
-            row.session_owner = target_user_uuid
-            for token_row in row.tokens:
-                token_row.delegate_ownership(target_user_uuid)
-            for routing_row in row.routings:
-                routing_row.session_owner = target_user_uuid
-                if routing_row.session is not None:
-                    session_ids.append(routing_row.session)
-        session_rows = await SessionRow.list_sessions(
-            db_session, session_ids, kernel_loading_strategy=KernelLoadingStrategy.ALL_KERNELS
-        )
-        for session_row in session_rows:
-            session_row.delegate_ownership(target_user_uuid, target_access_key)
-        # The placement groups of the delegated replica groups follow their
-        # members: a group's members all belong to its owner (BEP-1064).
-        await db_session.execute(
-            sa.update(SessionGroupRow)
-            .where(
-                SessionGroupRow.id.in_(
-                    sa.select(ReplicaGroupRow.session_group_id).where(
-                        ReplicaGroupRow.deployment_id.in_([row.id for row in endpoint_rows])
-                    )
-                )
-            )
-            .values(owner_user_id=target_user_uuid)
-        )
-
     @property
     def current_revision_id(self) -> DeploymentRevisionID | None:
         """Active revision id, sourced from the primary replica group.
@@ -910,9 +863,6 @@ class EndpointTokenRow(Base):
         if not row:
             raise NoResultFound
         return row
-
-    def delegate_ownership(self, user_uuid: UserID) -> None:
-        self.session_owner = user_uuid
 
     def to_dataclass(self) -> EndpointTokenData:
         return EndpointTokenData(
