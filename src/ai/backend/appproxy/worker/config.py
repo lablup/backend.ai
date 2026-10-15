@@ -428,10 +428,7 @@ class IngressConfig(BaseSchema):
         list[IngressLayerType],
         Field(default_factory=lambda: [IngressLayerType.IN_MEMORY], min_length=1),
         BackendAIConfigMeta(
-            description=(
-                "Where the worker reads ingresses, in lookup order. "
-                "in-memory, when present, comes first."
-            ),
+            description="Where the worker reads ingresses, in lookup order.",
             added_version=NEXT_RELEASE_VERSION,
             example=ConfigExample(local='["in-memory"]', prod='["in-memory", "redis"]'),
         ),
@@ -459,12 +456,7 @@ class IngressConfig(BaseSchema):
     def _check_layers(self) -> Self:
         if len(set(self.layers)) != len(self.layers):
             raise ValueError("ingress layers must not repeat")
-        if (
-            IngressLayerType.IN_MEMORY in self.layers
-            and self.layers[0] != IngressLayerType.IN_MEMORY
-        ):
-            raise ValueError("the in-memory ingress layer must come first")
-        if self.layers == [IngressLayerType.IN_MEMORY] and (
+        if self.layers[-1] == IngressLayerType.IN_MEMORY and (
             self.in_memory.ttl is not None or self.in_memory.negative_ttl is not None
         ):
             raise ValueError("in-memory ttl requires a layer after in-memory")

@@ -61,7 +61,7 @@ class TestIngressConfig:
 
     @pytest.mark.parametrize(
         "layers",
-        [["in-memory"], ["in-memory", "redis"], ["redis"]],
+        [["in-memory"], ["in-memory", "redis"], ["redis"], ["redis", "in-memory"]],
     )
     def test_supported_layers_are_accepted(self, layers: list[str]) -> None:
         config = IngressConfig.model_validate({"layers": layers})
@@ -74,10 +74,6 @@ class TestIngressConfig:
     def test_repeated_layer_is_rejected(self) -> None:
         with pytest.raises(BackendAISchemaValidationFailed):
             IngressConfig.model_validate({"layers": ["in-memory", "in-memory"]})
-
-    def test_in_memory_after_redis_is_rejected(self) -> None:
-        with pytest.raises(BackendAISchemaValidationFailed):
-            IngressConfig.model_validate({"layers": ["redis", "in-memory"]})
 
     def test_unknown_layer_is_rejected(self) -> None:
         with pytest.raises(BackendAISchemaValidationFailed):
@@ -101,9 +97,12 @@ class TestIngressConfig:
         assert config.in_memory.negative_ttl == 5.0
 
     @pytest.mark.parametrize("ttl_key", ["ttl", "negative-ttl"])
-    def test_in_memory_ttl_without_later_layer_is_rejected(self, ttl_key: str) -> None:
+    @pytest.mark.parametrize("layers", [["in-memory"], ["redis", "in-memory"]])
+    def test_in_memory_ttl_without_later_layer_is_rejected(
+        self, ttl_key: str, layers: list[str]
+    ) -> None:
         with pytest.raises(BackendAISchemaValidationFailed):
-            IngressConfig.model_validate({"layers": ["in-memory"], "in-memory": {ttl_key: 60.0}})
+            IngressConfig.model_validate({"layers": layers, "in-memory": {ttl_key: 60.0}})
 
     def test_non_positive_ttl_is_rejected(self) -> None:
         with pytest.raises(BackendAISchemaValidationFailed):
