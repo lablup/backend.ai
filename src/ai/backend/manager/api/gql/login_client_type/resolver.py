@@ -11,6 +11,10 @@ from ai.backend.common.dto.manager.defs import DEFAULT_PAGE_LIMIT
 from ai.backend.common.dto.manager.v2.login_client_type.request import (
     SearchLoginClientTypesInput,
 )
+from ai.backend.common.dto.manager.v2.login_client_type.response import (
+    DeleteLoginClientTypePayload,
+)
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import encode_cursor
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
@@ -29,6 +33,10 @@ from .types import (
     LoginClientTypeFilterGQL,
     LoginClientTypeGQL,
     LoginClientTypeOrderByGQL,
+    PartialBulkLoginClientTypesPayloadGQL,
+    PartialBulkPurgeLoginClientTypesInputGQL,
+    PartialBulkUpdateLoginClientTypesInputGQL,
+    PurgeLoginClientTypePayloadGQL,
     UpdateLoginClientTypeInputGQL,
     UpdateLoginClientTypePayloadGQL,
 )
@@ -105,9 +113,67 @@ async def admin_create_login_client_type(
 
 @gql_mutation(
     BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Update a login client type. Only provided fields will be updated.",
+    )
+)
+async def update_login_client_type(
+    info: Info[StrawberryGQLContext],
+    id: UUID,
+    input: UpdateLoginClientTypeInputGQL,
+) -> UpdateLoginClientTypePayloadGQL:
+    payload = await info.context.adapters.login_client_type.update(id, input.to_pydantic())
+    return UpdateLoginClientTypePayloadGQL.from_pydantic(payload)
+
+
+@gql_mutation(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Permanently remove a login client type.",
+    )
+)
+async def purge_login_client_type(
+    info: Info[StrawberryGQLContext],
+    id: UUID,
+) -> PurgeLoginClientTypePayloadGQL:
+    payload = await info.context.adapters.login_client_type.purge(id)
+    return PurgeLoginClientTypePayloadGQL.from_pydantic(payload)
+
+
+@gql_mutation(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Update several login client types, answering for each one.",
+    )
+)
+async def partial_bulk_update_login_client_types(
+    info: Info[StrawberryGQLContext],
+    input: PartialBulkUpdateLoginClientTypesInputGQL,
+) -> PartialBulkLoginClientTypesPayloadGQL:
+    payload = await info.context.adapters.login_client_type.partial_bulk_update(input.to_pydantic())
+    return PartialBulkLoginClientTypesPayloadGQL.from_pydantic(payload)
+
+
+@gql_mutation(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Permanently remove several login client types, answering for each one.",
+    )
+)
+async def partial_bulk_purge_login_client_types(
+    info: Info[StrawberryGQLContext],
+    input: PartialBulkPurgeLoginClientTypesInputGQL,
+) -> PartialBulkLoginClientTypesPayloadGQL:
+    payload = await info.context.adapters.login_client_type.partial_bulk_purge(input.to_pydantic())
+    return PartialBulkLoginClientTypesPayloadGQL.from_pydantic(payload)
+
+
+@gql_mutation(
+    BackendAIGQLMeta(
         added_version="26.4.2",
         description="Update a login client type (super admin only).",
-    )
+    ),
+    deprecation_reason=f"Deprecated since {NEXT_RELEASE_VERSION}. Use `updateLoginClientType`.",
 )
 async def admin_update_login_client_type(
     info: Info[StrawberryGQLContext],
@@ -115,7 +181,7 @@ async def admin_update_login_client_type(
     input: UpdateLoginClientTypeInputGQL,
 ) -> UpdateLoginClientTypePayloadGQL | None:
     check_admin_only()
-    payload = await info.context.adapters.login_client_type.admin_update(id, input.to_pydantic())
+    payload = await info.context.adapters.login_client_type.update(id, input.to_pydantic())
     return UpdateLoginClientTypePayloadGQL.from_pydantic(payload)
 
 
@@ -123,12 +189,15 @@ async def admin_update_login_client_type(
     BackendAIGQLMeta(
         added_version="26.4.2",
         description="Delete a login client type (super admin only).",
-    )
+    ),
+    deprecation_reason=f"Deprecated since {NEXT_RELEASE_VERSION}. Use `purgeLoginClientType`.",
 )
 async def admin_delete_login_client_type(
     info: Info[StrawberryGQLContext],
     id: UUID,
 ) -> DeleteLoginClientTypePayloadGQL | None:
     check_admin_only()
-    payload = await info.context.adapters.login_client_type.admin_delete(id)
-    return DeleteLoginClientTypePayloadGQL.from_pydantic(payload)
+    payload = await info.context.adapters.login_client_type.purge(id)
+    return DeleteLoginClientTypePayloadGQL.from_pydantic(
+        DeleteLoginClientTypePayload(id=payload.id)
+    )

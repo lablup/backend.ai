@@ -71,6 +71,9 @@ from ai.backend.manager.api.gql.client_ip_masking.resolver import (
     admin_client_ip_masking_policies,
     admin_purge_client_ip_masking_policy,
     admin_upsert_client_ip_masking_policy,
+    partial_bulk_purge_client_ip_masking_policies,
+    purge_client_ip_masking_policy,
+    upsert_client_ip_masking_policy,
 )
 from ai.backend.manager.api.gql.container_registry.resolver.mutation import (
     admin_create_container_registry_v2,
@@ -268,6 +271,10 @@ from ai.backend.manager.api.gql.login_client_type.resolver import (
     admin_update_login_client_type,
     login_client_type,
     login_client_types,
+    partial_bulk_purge_login_client_types,
+    partial_bulk_update_login_client_types,
+    purge_login_client_type,
+    update_login_client_type,
 )
 from ai.backend.manager.api.gql.login_history.resolver.query import (
     admin_login_history_v2,
@@ -1325,6 +1332,10 @@ class Mutation:
     admin_create_login_client_type = admin_create_login_client_type
     admin_update_login_client_type = admin_update_login_client_type
     admin_delete_login_client_type = admin_delete_login_client_type
+    update_login_client_type = update_login_client_type
+    purge_login_client_type = purge_login_client_type
+    partial_bulk_update_login_client_types = partial_bulk_update_login_client_types
+    partial_bulk_purge_login_client_types = partial_bulk_purge_login_client_types
     # App Config Definition mutations
     admin_create_app_config_definition = admin_create_app_config_definition
     admin_purge_app_config_definition = admin_purge_app_config_definition
@@ -1340,6 +1351,9 @@ class Mutation:
     # Client IP Masking mutations
     admin_upsert_client_ip_masking_policy = admin_upsert_client_ip_masking_policy
     admin_purge_client_ip_masking_policy = admin_purge_client_ip_masking_policy
+    upsert_client_ip_masking_policy = upsert_client_ip_masking_policy
+    purge_client_ip_masking_policy = purge_client_ip_masking_policy
+    partial_bulk_purge_client_ip_masking_policies = partial_bulk_purge_client_ip_masking_policies
     # Retention Policy mutations
     admin_create_retention_policy = admin_create_retention_policy
     create_entity_share = create_entity_share

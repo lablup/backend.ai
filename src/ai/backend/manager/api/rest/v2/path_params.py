@@ -98,6 +98,10 @@ class LoginClientTypeIdPathParam(BaseRequestModel):
     login_client_type_id: UUID = Field(description="Login client type UUID")
 
 
+class ClientIPMaskingPolicyIdPathParam(BaseRequestModel):
+    policy_id: UUID = Field(description="Client IP masking policy UUID")
+
+
 class AppConfigAllowListIdPathParam(BaseRequestModel):
     app_config_allow_list_id: UUID = Field(description="App config allow-list entry UUID")
 

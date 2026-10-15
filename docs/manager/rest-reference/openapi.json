@@ -15941,6 +15941,62 @@
         "title": "UpdateLoginClientTypeInput",
         "type": "object"
       },
+      "NonEmptyList_PartialBulkUpdateLoginClientTypeItemInput_": {
+        "items": {
+          "$ref": "#/components/schemas/PartialBulkUpdateLoginClientTypeItemInput"
+        },
+        "minItems": 1,
+        "type": "array"
+      },
+      "PartialBulkUpdateLoginClientTypeItemInput": {
+        "description": "One login client type of a partial bulk update and the fields to update on it.",
+        "properties": {
+          "id": {
+            "description": "ID of the login client type to update.",
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "input": {
+            "$ref": "#/components/schemas/UpdateLoginClientTypeInput",
+            "description": "Fields to update on the login client type."
+          }
+        },
+        "required": [
+          "id",
+          "input"
+        ],
+        "title": "PartialBulkUpdateLoginClientTypeItemInput",
+        "type": "object"
+      },
+      "PartialBulkUpdateLoginClientTypesInput": {
+        "description": "Input for updating several login client types, each answered for separately.",
+        "properties": {
+          "items": {
+            "$ref": "#/components/schemas/NonEmptyList_PartialBulkUpdateLoginClientTypeItemInput_",
+            "description": "The login client types to update, each with its fields."
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "title": "PartialBulkUpdateLoginClientTypesInput",
+        "type": "object"
+      },
+      "PartialBulkPurgeLoginClientTypesInput": {
+        "description": "Input for purging several login client types, each answered for separately.",
+        "properties": {
+          "ids": {
+            "$ref": "#/components/schemas/NonEmptyList_UUID_",
+            "description": "IDs of the login client types to purge."
+          }
+        },
+        "required": [
+          "ids"
+        ],
+        "title": "PartialBulkPurgeLoginClientTypesInput",
+        "type": "object"
+      },
       "ClientIPMaskingMode": {
         "enum": [
           "none",
@@ -16184,6 +16240,20 @@
           "mode"
         ],
         "title": "AdminUpsertClientIPMaskingPolicyInput",
+        "type": "object"
+      },
+      "PartialBulkPurgeClientIPMaskingPoliciesInput": {
+        "description": "Input for dropping several policies, each answered for separately.",
+        "properties": {
+          "ids": {
+            "$ref": "#/components/schemas/NonEmptyList_UUID_",
+            "description": "IDs of the policies to drop."
+          }
+        },
+        "required": [
+          "ids"
+        ],
+        "title": "PartialBulkPurgeClientIPMaskingPoliciesInput",
         "type": "object"
       },
       "AdminPurgeClientIPMaskingPolicyInput": {
@@ -54350,7 +54420,7 @@
         "description": "Get a login client type by id (authenticated users).\n\n**Preconditions:**\n* User privilege required.\n"
       },
       "patch": {
-        "operationId": "v2/login-client-types.admin_update",
+        "operationId": "v2/login-client-types.update",
         "tags": [
           "v2/login-client-types"
         ],
@@ -54383,10 +54453,10 @@
             }
           }
         ],
-        "description": "Update a login client type (superadmin only).\n\n**Preconditions:**\n* Superadmin privilege required.\n"
+        "description": "Update a login client type.\n\n**Preconditions:**\n* User privilege required.\n"
       },
       "delete": {
-        "operationId": "v2/login-client-types.admin_delete",
+        "operationId": "v2/login-client-types.purge",
         "tags": [
           "v2/login-client-types"
         ],
@@ -54410,7 +54480,65 @@
             }
           }
         ],
-        "description": "Delete a login client type (superadmin only).\n\n**Preconditions:**\n* Superadmin privilege required.\n"
+        "description": "Permanently remove a login client type.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/v2/login-client-types/partial-bulk-update": {
+      "post": {
+        "operationId": "v2/login-client-types.partial_bulk_update",
+        "tags": [
+          "v2/login-client-types"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PartialBulkUpdateLoginClientTypesInput"
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "description": "Update several login client types, answering for each one.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/v2/login-client-types/partial-bulk-purge": {
+      "post": {
+        "operationId": "v2/login-client-types.partial_bulk_purge",
+        "tags": [
+          "v2/login-client-types"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PartialBulkPurgeLoginClientTypesInput"
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "description": "Permanently remove several login client types, answering for each one.\n\n**Preconditions:**\n* User privilege required.\n"
       }
     },
     "/v2/client-ip-masking-policies/search": {
@@ -54444,7 +54572,7 @@
     },
     "/v2/client-ip-masking-policies/upsert": {
       "post": {
-        "operationId": "v2/client-ip-masking-policies.admin_upsert",
+        "operationId": "v2/client-ip-masking-policies.upsert",
         "tags": [
           "v2/client-ip-masking-policies"
         ],
@@ -54468,7 +54596,65 @@
           }
         },
         "parameters": [],
-        "description": "Set the masking one target gets.\n\n**Preconditions:**\n* Superadmin privilege required.\n"
+        "description": "Set the masking one target gets.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/v2/client-ip-masking-policies/{policy_id}": {
+      "delete": {
+        "operationId": "v2/client-ip-masking-policies.purge",
+        "tags": [
+          "v2/client-ip-masking-policies"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "policy_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "description": "Drop one target's policy so it falls back to the default.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/v2/client-ip-masking-policies/partial-bulk-purge": {
+      "post": {
+        "operationId": "v2/client-ip-masking-policies.partial_bulk_purge",
+        "tags": [
+          "v2/client-ip-masking-policies"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PartialBulkPurgeClientIPMaskingPoliciesInput"
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "description": "Drop several policies, answering for each one.\n\n**Preconditions:**\n* User privilege required.\n"
       }
     },
     "/v2/client-ip-masking-policies/purge": {
@@ -54497,7 +54683,7 @@
           }
         },
         "parameters": [],
-        "description": "Drop one target's policy so it falls back to the default.\n\n**Preconditions:**\n* Superadmin privilege required.\n"
+        "description": "Deprecated. Use `DELETE /v2/client-ip-masking-policies/{policy_id}`.\n\n**Preconditions:**\n* Superadmin privilege required.\n"
       }
     },
     "/v2/secrets/reencrypt": {

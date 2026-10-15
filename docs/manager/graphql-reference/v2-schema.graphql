@@ -10706,10 +10706,28 @@ type Mutation {
   adminCreateLoginClientType(input: CreateLoginClientTypeInput!): CreateLoginClientTypePayload
 
   """Added in 26.4.2. Update a login client type (super admin only)."""
-  adminUpdateLoginClientType(id: UUID!, input: UpdateLoginClientTypeInput!): UpdateLoginClientTypePayload
+  adminUpdateLoginClientType(id: UUID!, input: UpdateLoginClientTypeInput!): UpdateLoginClientTypePayload @deprecated(reason: "Deprecated since 26.10.0. Use `updateLoginClientType`.")
 
   """Added in 26.4.2. Delete a login client type (super admin only)."""
-  adminDeleteLoginClientType(id: UUID!): DeleteLoginClientTypePayload
+  adminDeleteLoginClientType(id: UUID!): DeleteLoginClientTypePayload @deprecated(reason: "Deprecated since 26.10.0. Use `purgeLoginClientType`.")
+
+  """
+  Added in 26.10.0. Update a login client type. Only provided fields will be updated.
+  """
+  updateLoginClientType(id: UUID!, input: UpdateLoginClientTypeInput!): UpdateLoginClientTypePayload!
+
+  """Added in 26.10.0. Permanently remove a login client type."""
+  purgeLoginClientType(id: UUID!): PurgeLoginClientTypePayload!
+
+  """
+  Added in 26.10.0. Update several login client types, answering for each one.
+  """
+  partialBulkUpdateLoginClientTypes(input: PartialBulkUpdateLoginClientTypesInput!): PartialBulkLoginClientTypesPayload!
+
+  """
+  Added in 26.10.0. Permanently remove several login client types, answering for each one.
+  """
+  partialBulkPurgeLoginClientTypes(input: PartialBulkPurgeLoginClientTypesInput!): PartialBulkLoginClientTypesPayload!
 
   """
   Added in 26.7.0. Register a new app config definition (super admin only).
@@ -10756,12 +10774,25 @@ type Mutation {
   """
   Added in 26.9.0. Set the client IP masking one target gets (superadmin only).
   """
-  adminUpsertClientIpMaskingPolicy(input: UpsertClientIPMaskingPolicyInput!): ClientIPMaskingPolicyPayload
+  adminUpsertClientIpMaskingPolicy(input: UpsertClientIPMaskingPolicyInput!): ClientIPMaskingPolicyPayload @deprecated(reason: "Deprecated since 26.10.0. Use `upsertClientIpMaskingPolicy`.")
 
   """
   Added in 26.9.0. Drop one target's client IP masking policy so it falls back to the default (superadmin only).
   """
-  adminPurgeClientIpMaskingPolicy(id: UUID!): ClientIPMaskingPolicyPayload
+  adminPurgeClientIpMaskingPolicy(id: UUID!): ClientIPMaskingPolicyPayload @deprecated(reason: "Deprecated since 26.10.0. Use `purgeClientIpMaskingPolicy`.")
+
+  """Added in 26.10.0. Set the client IP masking one target gets."""
+  upsertClientIpMaskingPolicy(input: UpsertClientIPMaskingPolicyInput!): ClientIPMaskingPolicyPayload!
+
+  """
+  Added in 26.10.0. Drop one target's client IP masking policy so it falls back to the default.
+  """
+  purgeClientIpMaskingPolicy(id: UUID!): ClientIPMaskingPolicyPayload!
+
+  """
+  Added in 26.10.0. Drop several client IP masking policies, answering for each one.
+  """
+  partialBulkPurgeClientIpMaskingPolicies(input: PartialBulkPurgeClientIPMaskingPoliciesInput!): PartialBulkClientIPMaskingPoliciesPayload!
 
   """Added in 26.8.0. Create a retention policy (superadmin only)."""
   adminCreateRetentionPolicy(input: CreateRetentionPolicyInput!): CreateRetentionPolicyPayload
@@ -11423,6 +11454,17 @@ type PartialBulkArtifactsPayload {
 }
 
 """
+Added in 26.10.0. Result of a partial bulk client IP masking policy operation: the policies processed and the ones that failed.
+"""
+type PartialBulkClientIPMaskingPoliciesPayload {
+  """The policies processed, as they were left."""
+  successes: [ClientIPMaskingPolicy!]!
+
+  """The policies not processed, each with the reason."""
+  failed: [PartialBulkFailure!]!
+}
+
+"""
 Added in 26.10.0. Input for soft-deleting several artifacts, each answered for separately.
 """
 input PartialBulkDeleteArtifactsInput {
@@ -11545,6 +11587,17 @@ type PartialBulkKeypairResourcePoliciesPayload {
 }
 
 """
+Added in 26.10.0. Result of a partial bulk login client type operation: the login client types processed and the ones that failed.
+"""
+type PartialBulkLoginClientTypesPayload {
+  """The login client types processed, as they were left."""
+  successes: [LoginClientType!]!
+
+  """The login client types not processed, each with the reason."""
+  failed: [PartialBulkFailure!]!
+}
+
+"""
 Added in 26.10.0. Result of a partial bulk model card operation: the model cards processed and the ones that failed.
 """
 type PartialBulkModelCardsPayload {
@@ -11611,6 +11664,14 @@ type PartialBulkProjectsPayload {
 }
 
 """
+Added in 26.10.0. Input for dropping several client IP masking policies, each answered for separately.
+"""
+input PartialBulkPurgeClientIPMaskingPoliciesInput {
+  """IDs of the policies to drop."""
+  ids: [UUID!]!
+}
+
+"""
 Added in 26.10.0. Input for taking several labels off in one call, each named by its own id.
 """
 input PartialBulkPurgeEntityLabelInput {
@@ -11669,6 +11730,14 @@ Added in 26.10.0. Input for purging several keypair resource policies, each answ
 """
 input PartialBulkPurgeKeypairResourcePoliciesInput {
   """IDs of the keypair resource policies to purge."""
+  ids: [UUID!]!
+}
+
+"""
+Added in 26.10.0. Input for purging several login client types, each answered for separately.
+"""
+input PartialBulkPurgeLoginClientTypesInput {
+  """IDs of the login client types to purge."""
   ids: [UUID!]!
 }
 
@@ -12078,6 +12147,25 @@ input PartialBulkUpdateKeypairResourcePolicyItemInput {
 
   """Fields to update on the policy."""
   input: UpdateKeypairResourcePolicyInput!
+}
+
+"""
+Added in 26.10.0. One login client type of a partial bulk update and the fields to update on it.
+"""
+input PartialBulkUpdateLoginClientTypeItemInput {
+  """ID of the login client type to update."""
+  id: UUID!
+
+  """Fields to update on the login client type."""
+  input: UpdateLoginClientTypeInput!
+}
+
+"""
+Added in 26.10.0. Input for updating several login client types, each answered for separately.
+"""
+input PartialBulkUpdateLoginClientTypesInput {
+  """The login client types to update, each with its fields."""
+  items: [PartialBulkUpdateLoginClientTypeItemInput!]!
 }
 
 """
@@ -13804,6 +13892,12 @@ Added in 26.8.0. Confirms that an idle checker was permanently removed. The retu
 """
 type PurgeIdleCheckerPayload {
   """Purged idle checker ID."""
+  id: UUID!
+}
+
+"""Added in 26.10.0. Payload for login client type purge."""
+type PurgeLoginClientTypePayload {
+  """UUID of the purged login client type."""
   id: UUID!
 }
 
