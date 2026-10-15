@@ -26,13 +26,13 @@ class LegacyCircuitIngressSync:
         self._writer = writer
         self._authority = authority
 
-    async def apply(self, circuit: Circuit, routes: Sequence[RouteInfo]) -> None:
+    async def upsert_circuit(self, circuit: Circuit, routes: Sequence[RouteInfo]) -> None:
         try:
             await self._writer.apply([circuit.to_ingress(self._authority, routes)])
         except Exception:
-            log.exception("failed to apply the circuit ingress", circuit_id=circuit.id)
+            log.exception("failed to upsert the circuit ingress", circuit_id=circuit.id)
 
-    async def remove(self, circuits: Sequence[Circuit]) -> None:
+    async def remove_circuits(self, circuits: Sequence[Circuit]) -> None:
         for circuit in circuits:
             try:
                 await self._writer.remove([

@@ -507,9 +507,9 @@ async def worker_registration_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     circuits = await list_worker_circuits(root_ctx, str(uuid.uuid4()))
     for circuit in circuits:
         await root_ctx.proxy_frontend.register_circuit(circuit, circuit.route_info)
-        # Applied rather than replaced, so circuits from events handled meanwhile are kept.
+        # Upserted rather than replaced, so circuits from events handled meanwhile are kept.
         if root_ctx.legacy_circuit_ingress_sync is not None:
-            await root_ctx.legacy_circuit_ingress_sync.apply(circuit, circuit.route_info)
+            await root_ctx.legacy_circuit_ingress_sync.upsert_circuit(circuit, circuit.route_info)
 
     cron = LocalCron([WorkerHeartbeatTask(root_ctx)])
     await cron.start()
@@ -714,7 +714,7 @@ async def handle_proxy_route_event(
                     created_circuit, serialized_circuit.route_info
                 )
                 if sync is not None:
-                    await sync.apply(created_circuit, serialized_circuit.route_info)
+                    await sync.upsert_circuit(created_circuit, serialized_circuit.route_info)
             await context.event_producer.broadcast_event(
                 AppProxyWorkerCircuitAddedEvent(
                     target_worker_authority=context.local_config.proxy_worker.authority,
@@ -728,14 +728,14 @@ async def handle_proxy_route_event(
             # The frontend skips updates for a circuit it does not hold; so does the state.
             circuit_key = context.proxy_frontend.get_circuit_key(updated_circuit)
             if sync is not None and circuit_key in context.proxy_frontend.circuits:
-                await sync.apply(updated_circuit, event.routes)
+                await sync.upsert_circuit(updated_circuit, event.routes)
         case AppProxyCircuitRemovedEvent():
             log.debug("circuits removed: {}", [str(c.id) for c in event.circuits])
             removed_circuits = [Circuit.from_serialized_circuit(c) for c in event.circuits]
             for removed_circuit in removed_circuits:
                 await context.proxy_frontend.break_circuit(removed_circuit)
             if sync is not None:
-                await sync.remove(removed_circuits)
+                await sync.remove_circuits(removed_circuits)
 
 
 async def on_prepare(_request: web.Request, response: web.StreamResponse) -> None:
