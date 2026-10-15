@@ -36394,17 +36394,12 @@
         "title": "ScopedSearchSessionsInput",
         "type": "object"
       },
-      "TerminateSessionsInput": {
-        "description": "Input for terminating one or more sessions.",
+      "PartialBulkTerminateSessionsInput": {
+        "description": "Input for terminating several sessions, each answered for separately.",
         "properties": {
-          "session_ids": {
-            "description": "Session UUIDs to terminate.",
-            "items": {
-              "format": "uuid",
-              "type": "string"
-            },
-            "title": "Session Ids",
-            "type": "array"
+          "ids": {
+            "$ref": "#/components/schemas/NonEmptyList_UUID_",
+            "description": "IDs of the sessions to terminate."
           },
           "forced": {
             "default": false,
@@ -36414,9 +36409,9 @@
           }
         },
         "required": [
-          "session_ids"
+          "ids"
         ],
-        "title": "TerminateSessionsInput",
+        "title": "PartialBulkTerminateSessionsInput",
         "type": "object"
       },
       "SessionIdleCheckTargetInput": {
@@ -36602,6 +36597,31 @@
           }
         },
         "title": "UpdateSessionInput",
+        "type": "object"
+      },
+      "TerminateSessionsInput": {
+        "description": "Input for terminating one or more sessions.",
+        "properties": {
+          "session_ids": {
+            "description": "Session UUIDs to terminate.",
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "title": "Session Ids",
+            "type": "array"
+          },
+          "forced": {
+            "default": false,
+            "description": "Force-terminate without waiting for cleanup.",
+            "title": "Forced",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "session_ids"
+        ],
+        "title": "TerminateSessionsInput",
         "type": "object"
       },
       "RegisterStorageNamespaceInput": {
@@ -63496,9 +63516,9 @@
         "description": "Search sessions within a project.\n\n**Preconditions:**\n* User privilege required.\n"
       }
     },
-    "/v2/sessions/terminate": {
+    "/v2/sessions/partial-bulk-terminate": {
       "post": {
-        "operationId": "v2/sessions.terminate",
+        "operationId": "v2/sessions.partial_bulk_terminate",
         "tags": [
           "v2/sessions"
         ],
@@ -63516,13 +63536,13 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/TerminateSessionsInput"
+                "$ref": "#/components/schemas/PartialBulkTerminateSessionsInput"
               }
             }
           }
         },
         "parameters": [],
-        "description": "Terminate one or more sessions.\n\n**Preconditions:**\n* User privilege required.\n"
+        "description": "Terminate several sessions, answering for each one.\n\n**Preconditions:**\n* User privilege required.\n"
       }
     },
     "/v2/sessions/exclude-idle-checks": {
@@ -63705,6 +63725,35 @@
           }
         ],
         "description": "Get container logs for a session.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/v2/sessions/terminate": {
+      "post": {
+        "operationId": "v2/sessions.terminate",
+        "tags": [
+          "v2/sessions"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TerminateSessionsInput"
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "description": "Deprecated. Use `POST /v2/sessions/partial-bulk-terminate`.\n\n**Preconditions:**\n* User privilege required.\n"
       }
     },
     "/v2/storage-hosts/my/permissions": {

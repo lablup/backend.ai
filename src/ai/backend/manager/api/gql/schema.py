@@ -627,6 +627,7 @@ from ai.backend.manager.api.gql.session.resolver.session import (
     exclude_session_idle_checks,
     include_session_idle_checks,
     my_sessions_v2,
+    partial_bulk_terminate_sessions_v2,
     project_sessions_v2,
     scoped_sessions_v2,
     session_v2,
@@ -1468,6 +1469,7 @@ class Mutation:
     # Session V2 mutations
     enqueue_session = enqueue_session
     terminate_sessions_v2 = terminate_sessions_v2
+    partial_bulk_terminate_sessions_v2 = partial_bulk_terminate_sessions_v2
     exclude_session_idle_checks = exclude_session_idle_checks
     include_session_idle_checks = include_session_idle_checks
     # Entity Label mutations

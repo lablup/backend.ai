@@ -11115,7 +11115,10 @@ type Mutation {
   """
   Added in 26.4.4. Terminate one or more sessions by ID. Per-session RBAC permission is enforced by the bulk validator; any denial fails the whole request.
   """
-  terminateSessionsV2(sessionIds: [ID!]!, forced: Boolean! = false): TerminateSessionsPayload
+  terminateSessionsV2(sessionIds: [ID!]!, forced: Boolean! = false): TerminateSessionsPayload @deprecated(reason: "Deprecated since 26.10.0. Use `partialBulkTerminateSessionsV2`.")
+
+  """Added in 26.10.0. Terminate several sessions, answering for each one."""
+  partialBulkTerminateSessionsV2(input: PartialBulkTerminateSessionsInput!): PartialBulkTerminateSessionsPayload!
 
   """
   Added in 26.9.0. Exclude checker-session pairs from idle checks. Per-session RBAC permission is enforced by the bulk validator; any denial fails the whole request.
@@ -12302,6 +12305,28 @@ type PartialBulkRuntimeVariantsPayload {
   successes: [RuntimeVariant!]!
 
   """The runtime variants not processed, each with the reason."""
+  failed: [PartialBulkFailure!]!
+}
+
+"""
+Added in 26.10.0. Input for terminating several sessions, each answered for separately.
+"""
+input PartialBulkTerminateSessionsInput {
+  """IDs of the sessions to terminate."""
+  ids: [UUID!]!
+
+  """Force-terminate without waiting for cleanup."""
+  forced: Boolean! = false
+}
+
+"""
+Added in 26.10.0. Result of a partial bulk session termination: the sessions processed, each with the state it ended in, and the ones that failed.
+"""
+type PartialBulkTerminateSessionsPayload {
+  """The sessions processed, each with the state it ended in."""
+  successes: [SessionTerminationInfo!]!
+
+  """The sessions not processed, each with the reason."""
   failed: [PartialBulkFailure!]!
 }
 
@@ -19171,6 +19196,25 @@ input SessionSearchScope {
 
   """Users whose sessions are being read."""
   user: [UUIDScope!] = null
+}
+
+"""Added in 26.10.0. What a termination request did to one session."""
+type SessionTerminationInfo {
+  """ID of the session."""
+  id: UUID!
+
+  """
+  State the session ended in: cancelled, terminating, force-terminated, or skipped.
+  """
+  status: SessionTerminationStatus!
+}
+
+"""Added in 26.10.0. What a termination request did to one session."""
+enum SessionTerminationStatus {
+  CANCELLED
+  TERMINATING
+  FORCE_TERMINATED
+  SKIPPED
 }
 
 enum SessionTypes {
