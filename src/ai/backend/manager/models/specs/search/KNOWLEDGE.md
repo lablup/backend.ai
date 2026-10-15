@@ -314,7 +314,7 @@ The tables below state, for each entity package under `models/`, which scopes it
 | `entity_share` | The entity the offer is attached to | The receiving user or project | n/a | `RecipientUserEntityShareTarget`, `RecipientProjectEntityShareTarget`, `OwningEntityShareTarget` | None |
 | `rbac_models/role` | The scope the role is placed in | Users holding the role | n/a | `ScopedRoleTarget`, `HeldRoleTarget` | None |
 | `network` | project | None | n/a | None | No search. `ProjectNetworkTarget`, `DomainNetworkTarget` |
-| `session_group` | project, user | None | n/a | None | No search. `ProjectSessionGroupTarget`, `UserSessionGroupTarget`, `DomainSessionGroupTarget` |
+| `session_group` | project, user | None | n/a | `DomainSessionGroupTarget`, `ProjectSessionGroupTarget`, `UserSessionGroupTarget` | None. Every Target leaves out the groups a replica group holds |
 | `session_template` | user, project (optional) | None | n/a | None | No search. `UserSessionTemplateTarget`, `ProjectSessionTemplateTarget`, `DomainSessionTemplateTarget` |
 
 ### Entities owned by global
