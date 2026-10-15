@@ -64,11 +64,6 @@ class InMemoryIngressState(IngressReader, IngressWriter):
             # remove assumes the key is deleted from every layer, so it is remembered missing.
             await self.remember_missing(key.frontend_key)
 
-    @override
-    async def keep(self, ingress: Ingress) -> None:
-        await self.apply([ingress])
-
-    @override
     async def remember_missing(self, frontend_key: IngressFrontendKey) -> None:
         if self._negative_ttl is None:
             return

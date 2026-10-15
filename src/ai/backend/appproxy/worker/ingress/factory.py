@@ -3,7 +3,6 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from ai.backend.appproxy.worker.config import IngressConfig, IngressLayerType
-from ai.backend.appproxy.worker.ingress.abc import IngressReader
 from ai.backend.appproxy.worker.ingress.in_memory import InMemoryIngressState
 from ai.backend.appproxy.worker.ingress.layered import LayeredIngressState
 from ai.backend.appproxy.worker.ingress.redis import RedisIngressState
@@ -33,19 +32,21 @@ class IngressStateFactory:
         self._valkey_client = valkey_client
 
     def create(self) -> IngressState:
-        readers: list[IngressReader] = []
+        in_memory: InMemoryIngressState | None = None
+        redis: RedisIngressState | None = None
         writer: ValidatingIngressWriter | None = None
         for layer_type in self._config.layers:
             match layer_type:
                 case IngressLayerType.IN_MEMORY:
                     in_memory = self._in_memory()
-                    readers.append(in_memory)
                     writer = ValidatingIngressWriter(in_memory, self._authority)
                 case IngressLayerType.REDIS:
-                    readers.append(self._redis())
-        if not readers:
+                    redis = self._redis()
+        if in_memory is None and redis is None:
             raise InvalidConfigError("No ingress layer is configured")
-        return IngressState(reader=LayeredIngressState(readers), writer=writer)
+        return IngressState(
+            reader=LayeredIngressState(memory=in_memory, redis=redis), writer=writer
+        )
 
     def _in_memory(self) -> InMemoryIngressState:
         return InMemoryIngressState(
