@@ -399,8 +399,9 @@ class IngressInMemoryConfig(BaseSchema):
         Field(default=None, gt=0, alias="negative-ttl"),
         BackendAIConfigMeta(
             description=(
-                "Seconds a key missing from every later layer is remembered as missing. "
-                "Unset does not remember misses. Requires a layer after in-memory."
+                "Seconds a removed key is remembered as missing, so lookups right after the "
+                "removal skip the later layers. Unset does not remember removals. "
+                "Requires a layer after in-memory."
             ),
             added_version=NEXT_RELEASE_VERSION,
             example=ConfigExample(local="", prod="5.0"),
