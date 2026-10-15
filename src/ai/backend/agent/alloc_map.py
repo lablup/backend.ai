@@ -7,12 +7,8 @@ import logging
 import math
 from abc import ABCMeta, abstractmethod
 from collections import defaultdict
-<<<<<<< HEAD
 from collections.abc import Iterable, Mapping, MutableMapping, Sequence
-=======
-from collections.abc import Collection, Iterable, Mapping, MutableMapping, Sequence
 from dataclasses import dataclass
->>>>>>> 3440d3839 (fix(BA-8499): stop fGPU overbooking and fragmentation on multi-NUMA agents (#15636))
 from decimal import ROUND_DOWN, Decimal
 from typing import (
     TYPE_CHECKING,
