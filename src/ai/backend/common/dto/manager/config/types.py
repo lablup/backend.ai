@@ -15,6 +15,15 @@ __all__ = (
 
 MAXIMUM_DOTFILE_SIZE = 64 * 1024
 
+RESERVED_DOTFILES = frozenset({
+    ".terminfo",
+    ".jupyter",
+    ".ssh",
+    ".ssh/authorized_keys",
+    ".local",
+    ".config",
+})
+
 DotfilePermission = Annotated[
     str,
     Field(

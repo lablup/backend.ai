@@ -77,6 +77,7 @@ from ai.backend.manager.repositories.ops.v2.resource_policy.provider import (
     ResourcePolicyOpsProvider,
 )
 from ai.backend.manager.repositories.ops.v2.share.provider import ShareOpsProvider
+from ai.backend.manager.repositories.ops.v2.user.provider import UserOpsProvider
 from ai.backend.manager.repositories.rbac.permission_check_repository import (
     RbacPermissionCheckRepository,
 )
@@ -151,6 +152,7 @@ def vfolder_processors(
         ShareOpsProvider(database_engine),
         ResourcePolicyOpsProvider(database_engine),
         KeyProviderPool(providers=[], write_provider_type=KeyProviderType.PLAIN),
+        user_ops_provider=UserOpsProvider(database_engine),
     )
     # The registry here runs no RBAC validator, so the own check answers as enforcement off.
     rbac_off = MagicMock(spec=ManagerConfigProvider)
@@ -184,6 +186,7 @@ def vfolder_file_processors(
         ShareOpsProvider(database_engine),
         ResourcePolicyOpsProvider(database_engine),
         KeyProviderPool(providers=[], write_provider_type=KeyProviderType.PLAIN),
+        user_ops_provider=UserOpsProvider(database_engine),
     )
     service = VFolderFileService(
         config_provider=config_provider,
@@ -207,6 +210,7 @@ def vfolder_invite_processors(
         ShareOpsProvider(database_engine),
         ResourcePolicyOpsProvider(database_engine),
         KeyProviderPool(providers=[], write_provider_type=KeyProviderType.PLAIN),
+        user_ops_provider=UserOpsProvider(database_engine),
     )
     service = VFolderInviteService(
         config_provider=config_provider,
@@ -231,6 +235,7 @@ def vfolder_sharing_processors(
         ShareOpsProvider(database_engine),
         ResourcePolicyOpsProvider(database_engine),
         KeyProviderPool(providers=[], write_provider_type=KeyProviderType.PLAIN),
+        user_ops_provider=UserOpsProvider(database_engine),
     )
     service = VFolderSharingService(
         config_provider=config_provider,
@@ -253,6 +258,7 @@ def user_processors(
         ShareOpsProvider(database_engine),
         ResourcePolicyOpsProvider(database_engine),
         KeyProviderPool(providers=[], write_provider_type=KeyProviderType.PLAIN),
+        user_ops_provider=UserOpsProvider(database_engine),
     )
     service = UserService(
         storage_manager=MagicMock(spec=StorageSessionManager),

@@ -5,23 +5,18 @@ from typing import override
 
 from ai.backend.common.data.entity.types import EntityIdentifier
 from ai.backend.common.data.entity.user import UserID
-from ai.backend.common.types import AccessKey
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.actions.v2.single_entity.base import BaseSingleEntityAction
 from ai.backend.manager.data.dotfile.types import DotfileEntry
+from ai.backend.manager.models.dotfile.creators import DotfileEntryCreator
 
 
 @dataclass(frozen=True)
 class CreateKeypairDotfileAction(BaseSingleEntityAction):
-    """Add one dotfile to a keypair.
-
-    A dotfile is a column of the keypair row, which belongs to a user, so the
-    operation is answered for by that user.
-    """
+    """Add a dotfile in the user's configuration."""
 
     user_id: UserID
-    access_key: AccessKey
-    entry: DotfileEntry
+    creator: DotfileEntryCreator
 
     @override
     def entity_id(self) -> EntityIdentifier:

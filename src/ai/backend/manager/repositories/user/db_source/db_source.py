@@ -56,6 +56,7 @@ from ai.backend.manager.errors.user import (
 )
 from ai.backend.manager.models.bootstrap_script.purgers import BootstrapScriptPurger
 from ai.backend.manager.models.domain.row import DomainRow
+from ai.backend.manager.models.dotfile.purgers import DotfilePurger
 from ai.backend.manager.models.endpoint.purgers import UserEndpointPurger
 from ai.backend.manager.models.endpoint.row import EndpointRow, EndpointTokenRow
 from ai.backend.manager.models.entity_share.purgers import EntitySharePendingOfferBatchPurger
@@ -141,12 +142,13 @@ class UserDBSource:
         share_ops_provider: ShareOpsProvider,
         policy_ops_provider: ResourcePolicyOpsProvider,
         key_provider_pool: KeyProviderPool,
+        user_ops_provider: UserOpsProvider,
     ) -> None:
         self._db = db
         self._v2_ops = v2_ops_provider
         self._share_ops = share_ops_provider
         self._policy_ops = policy_ops_provider
-        self._user_ops_provider = UserOpsProvider(db)
+        self._user_ops_provider = user_ops_provider
         self._key_provider_pool = key_provider_pool
 
     async def get_user_by_uuid(self, user_uuid: UUID) -> UserData:
@@ -423,10 +425,12 @@ class UserDBSource:
         """
         user_id = UserID(user_uuid)
         await self._revoke_shared_vfolders(user_uuid)
-        async with self._v2_ops.write_ops() as w:
+        async with self._user_ops_provider.write_ops() as w:
             await w.batch_purge_field_entities(user_id, UserErrorLogPurger())
             await w.batch_purge_field_entities(user_id, UserKeyPairPurger())
             await w.batch_purge_field_entities(user_id, BootstrapScriptPurger())
+            await w.lock_user(user_id)
+            await w.batch_purge_field_entities(user_id, DotfilePurger())
             await w.batch_purge_field_entities(user_id, UserGroupAssociationPurger())
             # Placement groups the user still owns: their deployments were either
             # delegated (the groups moved with them) or deleted by now.

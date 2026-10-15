@@ -330,6 +330,7 @@ from ai.backend.manager.services.session_group.actions.bulk_get import BulkGetSe
 from ai.backend.manager.services.session_group.processors import SessionGroupProcessors
 from ai.backend.manager.services.user.actions.bulk_get import BulkGetUsersAction
 from ai.backend.manager.services.user.actions.bulk_lookup import BulkLookupUsersAction
+from ai.backend.manager.services.user.actions.get_dotfiles import GetUserDotfilesAction
 from ai.backend.manager.services.user.processors import UserProcessors
 from ai.backend.manager.services.vfolder.actions.bulk_get import BulkGetVFoldersAction
 from ai.backend.manager.services.vfolder.actions.storage_ops import PublicListAllowedTypesAction
@@ -825,6 +826,11 @@ def test_entity_data_loader_reads_are_checked_per_entity() -> None:
         record.action_cls: (record.entity_type, record.kind, record.gate)
         for record in registry.wired_processors()
     }
+    assert recorded[GetUserDotfilesAction] == (
+        UserEntityType(),
+        ActionKind.SINGLE_ENTITY,
+        ActionGate.PERMISSION,
+    )
     assert recorded[BulkGetDeploymentsAction] == (
         DeploymentEntityType(),
         ActionKind.BULK,

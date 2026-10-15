@@ -11,6 +11,7 @@ from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.config.unified import AuthConfig, ManagerConfig
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.client_ip.masking import ClientIPMasker, ClientIPMaskingMode
+from ai.backend.manager.data.dotfile.types import DotfileEntries
 from ai.backend.manager.repositories.client_ip_masking.repository import ClientIPMaskingRepository
 from ai.backend.manager.repositories.project.repository import ProjectRepository
 from ai.backend.manager.repositories.user.repository import UserRepository
@@ -37,7 +38,10 @@ def mock_config_provider() -> MagicMock:
 
 @pytest.fixture
 def mock_user_repository() -> AsyncMock:
-    return AsyncMock(spec=UserRepository)
+    repo = AsyncMock(spec=UserRepository)
+    repo.get_default_dotfiles.return_value = DotfileEntries()
+    repo.default_bootstrap_script.return_value = None
+    return repo
 
 
 @pytest.fixture
