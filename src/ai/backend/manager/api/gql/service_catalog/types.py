@@ -42,6 +42,11 @@ from ai.backend.manager.api.gql.pydantic_compat import (
     PydanticNodeMixin,
     PydanticOutputMixin,
 )
+from ai.backend.manager.api.gql.storage_volume.types import (
+    StorageVolumeServiceHoldingFilterGQL,
+    StorageVolumeServiceHoldingListGQL,
+    StorageVolumeServiceHoldingOrderByGQL,
+)
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 
 __all__ = (
@@ -114,6 +119,22 @@ class ServiceCatalogGQL(PydanticNodeMixin[ServiceCatalogNode]):
     endpoints: list[ServiceCatalogEndpointGQL] = gql_field(
         description="Endpoints exposed by this service instance."
     )
+
+    @gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="The storage volumes this service holds.",
+        )
+    )  # type: ignore[misc]
+    async def storage_volume_holdings(
+        self,
+        info: Info[StrawberryGQLContext],
+        filter: StorageVolumeServiceHoldingFilterGQL | None = None,
+        order_by: list[StorageVolumeServiceHoldingOrderByGQL] | None = None,
+        limit: int | None = None,
+        offset: int | None = None,
+    ) -> StorageVolumeServiceHoldingListGQL | None:
+        raise NotImplementedError
 
     @classmethod
     @override
