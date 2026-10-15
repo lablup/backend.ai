@@ -155,6 +155,10 @@ class IdleCheckerAssignmentIdPathParam(BaseRequestModel):
     idle_checker_assignment_id: UUID = Field(description="Idle checker assignment UUID")
 
 
+class SessionGroupIdPathParam(BaseRequestModel):
+    session_group_id: UUID = Field(description="Session group UUID")
+
+
 class SlotNamePathParam(BaseRequestModel):
     slot_name: str = Field(description="Resource slot name")
 
