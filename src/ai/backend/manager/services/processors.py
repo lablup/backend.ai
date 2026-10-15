@@ -257,6 +257,9 @@ if TYPE_CHECKING:
     from ai.backend.manager.services.service_catalog.processors import (
         ServiceCatalogProcessors,
     )
+    from ai.backend.manager.services.service_catalog.service import (
+        ServiceCatalogService,
+    )
     from ai.backend.manager.services.session.processors import (
         SessionProcessors,
     )
@@ -386,6 +389,7 @@ class Services:
     runtime_variant_preset: RuntimeVariantPresetService
     deployment_revision_preset: DeploymentPresetService
     model_card: ModelCardService
+    service_catalog: ServiceCatalogService
     resource_group: ResourceGroupService
     metric: MetricService
     model_serving: ModelServingService

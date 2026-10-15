@@ -1,8 +1,9 @@
 from __future__ import annotations
 
+from collections.abc import Iterable
 from datetime import datetime
 from enum import StrEnum
-from typing import TYPE_CHECKING, Annotated, Self
+from typing import TYPE_CHECKING, Annotated, Self, override
 from uuid import UUID
 
 import strawberry
@@ -10,6 +11,7 @@ from strawberry import Info
 from strawberry.relay import Connection, Edge, NodeID
 
 from ai.backend.common.data.entity.runtime_variant import RuntimeVariantID
+from ai.backend.common.data.entity.runtime_variant_preset import RuntimeVariantPresetID
 from ai.backend.common.dto.manager.v2.runtime_variant_preset.request import (
     CreateRuntimeVariantPresetInput as CreateInputDTO,
 )
@@ -361,6 +363,19 @@ class RuntimeVariantPresetGQL(PydanticNodeMixin[NodeDTO]):
         return await info.context.data_loaders.runtime_variant_loader.load(
             RuntimeVariantID(self.runtime_variant_id)
         )
+
+    @classmethod
+    @override
+    async def resolve_nodes(  # type: ignore[override]  # Strawberry Node uses AwaitableOrValue overloads incompatible with async def
+        cls,
+        *,
+        info: Info[StrawberryGQLContext],
+        node_ids: Iterable[str],
+        required: bool = False,
+    ) -> Iterable[RuntimeVariantPresetGQL | None]:
+        return await info.context.data_loaders.runtime_variant_preset_loader.load_many([
+            RuntimeVariantPresetID(UUID(nid)) for nid in node_ids
+        ])
 
 
 RuntimeVariantPresetEdge = Edge[RuntimeVariantPresetGQL]

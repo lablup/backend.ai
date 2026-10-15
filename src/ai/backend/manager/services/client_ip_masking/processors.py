@@ -1,10 +1,14 @@
 from __future__ import annotations
 
 from ai.backend.manager.actions.registry.group import ProcessorGroup
+from ai.backend.manager.actions.v2.bulk.partial_processor import PartialBulkActionProcessor
 from ai.backend.manager.actions.v2.global_scope.processor import GlobalActionProcessor
 from ai.backend.manager.actions.v2.ops.result import BatchOpsResult, EntityOpsResult
 from ai.backend.manager.actions.v2.single_entity.processor import SingleEntityActionProcessor
 from ai.backend.manager.data.client_ip.types import ClientIPMaskingPolicyData
+from ai.backend.manager.services.client_ip_masking.actions.bulk_get import (
+    BulkGetClientIPMaskingPoliciesAction,
+)
 from ai.backend.manager.services.client_ip_masking.actions.purge import (
     PurgeClientIPMaskingPolicyAction,
 )
@@ -22,6 +26,9 @@ class ClientIPMaskingProcessors:
     global_search: GlobalActionProcessor[
         SearchClientIPMaskingPoliciesAction, BatchOpsResult[ClientIPMaskingPolicyData]
     ]
+    bulk_get: PartialBulkActionProcessor[
+        BulkGetClientIPMaskingPoliciesAction, ClientIPMaskingPolicyData
+    ]
     global_upsert: GlobalActionProcessor[
         UpsertClientIPMaskingPolicyAction, EntityOpsResult[ClientIPMaskingPolicyData]
     ]
@@ -31,5 +38,6 @@ class ClientIPMaskingProcessors:
 
     def __init__(self, group: ProcessorGroup[ClientIPMaskingPolicyData]) -> None:
         self.global_search = group.global_searcher_ops(SearchClientIPMaskingPoliciesAction)
+        self.bulk_get = group.partial_bulk_get_ops(BulkGetClientIPMaskingPoliciesAction)
         self.global_upsert = group.global_upsert_ops(UpsertClientIPMaskingPolicyAction)
         self.purge = group.entity_purge_ops(PurgeClientIPMaskingPolicyAction)

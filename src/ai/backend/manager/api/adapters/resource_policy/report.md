@@ -2,9 +2,9 @@
 
 [무엇을 보장하는가](/src/ai/backend/manager/api/adapters/resource_policy/KNOWLEDGE.md) · [어댑터](/src/ai/backend/manager/api/adapters/resource_policy/adapter.py)
 
-시나리오: 미완 1 / 18
+시나리오: 미완 7 / 24
 
-- ops 로 구성 (18)
+- ops 로 구성 (24)
   - admin_create_keypair_resource_policy — 대표 성공 ✓ · 대표 실패 ✓
   - admin_create_project_resource_policy — 대표 성공 ✓ · 대표 실패 ✓
   - admin_create_user_resource_policy — 대표 성공 ✓ · 대표 실패 ✓
@@ -20,6 +20,12 @@
   - admin_update_keypair_resource_policy — 대표 성공 ✓ · 대표 실패 ✓
   - admin_update_project_resource_policy — 대표 성공 ✓ · 대표 실패 ✓
   - admin_update_user_resource_policy — 대표 성공 ✓ · 대표 실패 ✓
+  - bulk_get_keypair_resource_policy_ids — 대표 성공 ✗ · 대표 실패 ✗ — SCENARIO-GAP
+  - bulk_get_project_resource_policy_ids — 대표 성공 ✗ · 대표 실패 ✗ — SCENARIO-GAP
+  - bulk_get_user_resource_policy_ids — 대표 성공 ✗ · 대표 실패 ✗ — SCENARIO-GAP
+  - bulk_lookup_keypair_resource_policy_names — 대표 성공 ✗ · 대표 실패 ✗ — SCENARIO-GAP
+  - bulk_lookup_project_resource_policy_names — 대표 성공 ✗ · 대표 실패 ✗ — SCENARIO-GAP
+  - bulk_lookup_user_resource_policy_names — 대표 성공 ✗ · 대표 실패 ✗ — SCENARIO-GAP
   - get_my_keypair_resource_policy — 대표 성공 ✓ · 대표 실패 ✓
   - get_my_user_resource_policy — 대표 성공 ✓ · 대표 실패 ✓
   - get_project_resource_policy — 대표 성공 ✗ · 대표 실패 ✗ — SCENARIO-GAP

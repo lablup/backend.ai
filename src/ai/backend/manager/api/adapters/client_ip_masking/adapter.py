@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from typing import assert_never
 
 from ai.backend.common.data.entity.client_ip_masking import ClientIPMaskingPolicyID
@@ -37,6 +38,9 @@ from ai.backend.manager.models.client_ip_masking.searchable_fields import (
 )
 from ai.backend.manager.models.client_ip_masking.searchers import ClientIPMaskingPolicySearcher
 from ai.backend.manager.models.specs.searcher import GlobalSearcher
+from ai.backend.manager.services.client_ip_masking.actions.bulk_get import (
+    BulkGetClientIPMaskingPoliciesAction,
+)
 from ai.backend.manager.services.client_ip_masking.actions.purge import (
     PurgeClientIPMaskingPolicyAction,
 )
@@ -65,6 +69,22 @@ class ClientIPMaskingAdapter(BaseAdapter):
 
     def __init__(self, client_ip_masking: ClientIPMaskingProcessors) -> None:
         self._client_ip_masking = client_ip_masking
+
+    async def batch_load_by_ids(
+        self, ids: Sequence[ClientIPMaskingPolicyID]
+    ) -> list[ClientIPMaskingPolicyNode | Exception | None]:
+        """Batch load client IP masking policies by id for DataLoader use, one answer per id."""
+        if not ids:
+            return []
+        result = await self._client_ip_masking.bulk_get.run(
+            BulkGetClientIPMaskingPoliciesAction(ids=ids)
+        )
+        return [
+            self._data_to_node(item.value)
+            if item.value is not None
+            else self.batch_load_failure(item.error)
+            for item in result.items
+        ]
 
     async def admin_search(
         self, input: AdminSearchClientIPMaskingPoliciesInput

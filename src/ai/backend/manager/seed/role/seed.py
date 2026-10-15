@@ -17,8 +17,6 @@ from ai.backend.manager.models.rbac_models.permission.purgers import (
 )
 from ai.backend.manager.models.rbac_models.permission.upserters import RolePermissionUpserter
 from ai.backend.manager.models.rbac_models.role.upserters import RoleUpserter
-from ai.backend.manager.models.rbac_models.user_role.upserters import UserRoleUpserter
-from ai.backend.manager.models.specs.upserter import FieldUpserter
 from ai.backend.manager.repositories.ops.v2.seed.types import SeedWrite
 from ai.backend.manager.seed.base import SeedItem, SeedItems, SeedRejection
 from ai.backend.manager.seed.role_preset.kinds import PermissionKinds
@@ -62,12 +60,6 @@ class RoleSeed(SeedItem):
     def write(self) -> SeedWrite:
         """The role, one permission row per granted bit, its grants, and under an
         overwrite the permission rows on a stated entity type that the grant leaves out."""
-        field_upserters: list[FieldUpserter[Any, Any, Any]] = [
-            RolePermissionUpserter(entity_type=EntityType(entity_type), permission=bit)
-            for entity_type, mask in sorted(self.permissions.items())
-            for bit in mask
-        ]
-        field_upserters.extend(UserRoleUpserter(user_id=user_id) for user_id in self.users)
         return SeedWrite(
             upserter=RoleUpserter(
                 id=self.id,
@@ -77,7 +69,11 @@ class RoleSeed(SeedItem):
                 role_preset_id=self.role_preset_id,
                 auto_assign=self.auto_assign,
             ),
-            field_upserters=field_upserters,
+            field_upserters=[
+                RolePermissionUpserter(entity_type=EntityType(entity_type), permission=bit)
+                for entity_type, mask in sorted(self.permissions.items())
+                for bit in mask
+            ],
             field_purgers=[
                 RolePermissionUngrantedPurger(
                     grants={
@@ -88,6 +84,7 @@ class RoleSeed(SeedItem):
             ]
             if self.permissions
             else [],
+            granted_users=self.users,
         )
 
     @override

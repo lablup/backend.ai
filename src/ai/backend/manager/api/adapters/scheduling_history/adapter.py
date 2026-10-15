@@ -11,6 +11,7 @@ from ai.backend.common.data.entity.deployment_history import DeploymentHistoryID
 from ai.backend.common.data.entity.kernel import KernelID
 from ai.backend.common.data.entity.kernel_scheduling_history import KernelSchedulingHistoryID
 from ai.backend.common.data.entity.replica import ReplicaID
+from ai.backend.common.data.entity.replica_group_history import ReplicaGroupHistoryID
 from ai.backend.common.data.entity.route_history import RouteHistoryID
 from ai.backend.common.data.entity.session import SessionID
 from ai.backend.common.data.entity.session_scheduling_history import SessionSchedulingHistoryID
@@ -129,6 +130,9 @@ from ai.backend.manager.services.scheduling_history.actions.bulk_get_deployment_
 )
 from ai.backend.manager.services.scheduling_history.actions.bulk_get_kernel_histories import (
     BulkGetKernelHistoriesAction,
+)
+from ai.backend.manager.services.scheduling_history.actions.bulk_get_replica_group_histories import (
+    BulkGetReplicaGroupHistoriesAction,
 )
 from ai.backend.manager.services.scheduling_history.actions.bulk_get_route_histories import (
     BulkGetRouteHistoriesAction,
@@ -270,6 +274,20 @@ class SchedulingHistoryAdapter(BaseAdapter):
             BulkGetRouteHistoriesAction(ids=history_ids),
             history_ids,
             self._route_data_to_dto,
+        )
+
+    async def batch_load_replica_group_histories_by_ids(
+        self, ids: Sequence[ReplicaGroupHistoryID]
+    ) -> list[ReplicaGroupHistoryNode | Exception | None]:
+        """Batch load replica-group histories for DataLoader use, checked per deployment."""
+        if not ids:
+            return []
+        history_ids = [ReplicaGroupHistoryID(history_id) for history_id in ids]
+        return await self.batch_load_fields(
+            self._scheduling_history.bulk_get_replica_group_histories,
+            BulkGetReplicaGroupHistoriesAction(ids=history_ids),
+            history_ids,
+            self._replica_group_data_to_dto,
         )
 
     # ========== Session History ==========

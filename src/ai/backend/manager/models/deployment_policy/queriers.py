@@ -13,7 +13,7 @@ from ai.backend.manager.models.deployment_policy.row import DeploymentPolicyRow
 from ai.backend.manager.models.deployment_policy.searchable_fields import (
     DeploymentPolicySearchableFields,
 )
-from ai.backend.manager.models.specs.querier import OwnedFieldQuerier
+from ai.backend.manager.models.specs.querier import BulkFieldQuerier, OwnedFieldQuerier
 
 
 class DeploymentPolicyByDeploymentQuerier(
@@ -28,6 +28,22 @@ class DeploymentPolicyByDeploymentQuerier(
     @override
     def owner_id_column(self) -> InstrumentedAttribute[Any]:
         return DeploymentPolicyRow.endpoint
+
+    @override
+    def to_data(self, row: DeploymentPolicyRow) -> DeploymentPolicyData:
+        return DeploymentPolicySearchableFields.own.to_data(row)
+
+
+class BulkDeploymentPolicyQuerier(BulkFieldQuerier[DeploymentPolicyRow, DeploymentPolicyData]):
+    """The deployment policy rows the caller named."""
+
+    @override
+    def row_class(self) -> type[DeploymentPolicyRow]:
+        return DeploymentPolicyRow
+
+    @override
+    def target_id_column(self) -> InstrumentedAttribute[Any]:
+        return DeploymentPolicyRow.id
 
     @override
     def to_data(self, row: DeploymentPolicyRow) -> DeploymentPolicyData:

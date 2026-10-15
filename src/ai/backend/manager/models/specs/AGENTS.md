@@ -21,9 +21,8 @@ declare a spec there.
 - Its specs are `RelationCreator` / `RelationLifecycleUpdater` / `RelationPurger`
   (`relation.py`), and they name the pair rather than a row id — a relation row's id
   never leaves the layer that wrote it.
-- Create inserts a new row only. A pair already linked, switched off or not, is a
-  unique violation the spec's `integrity_error_checks` maps to a domain error;
-  switching it back on is the restore updater's.
+- Create inserts a new pair only. A pair already linked, switched off or not, is left
+  as it stands and answered `False`; switching it back on is the restore updater's.
 - Switching off / restoring (`RelationLifecycleUpdater`) writes the row's lifecycle
   column alone. What each side reads of the other stays, so a relation switched off is
   still listed on both sides and can be switched back on. Only purge removes access.
@@ -50,6 +49,15 @@ The roots are deliberately unrelated. Do NOT extract a common base across them
 or type any function against "any creator/purger" — the absence of a common supertype
 is the enforcement. Reuse execution logic through ops-layer helpers that take plain
 values (`row_class`, `pk_value`, ...).
+
+## An upsert and an insert if absent differ in the row alone
+
+- The graph writes (provision, `created_in`, a relation's govern and share) run whether
+  the row was inserted or already there. Running them again changes nothing.
+- A row already there is left as it stands by `*_if_absent` and updated with the update
+  values by an upsert. With no update values an upsert leaves it as well.
+- Do NOT put a column that decides an edge (one `created_in` reads, a relation's pair)
+  in the update values. Changing it keeps the old edge and adds the new one.
 
 ## A single-row write carries its guard on the root
 

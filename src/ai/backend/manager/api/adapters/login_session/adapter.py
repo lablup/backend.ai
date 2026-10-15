@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from collections.abc import Sequence
+
 from ai.backend.common.contexts.user import current_user
 from ai.backend.common.data.entity.login_session import LoginSessionID
 from ai.backend.common.data.entity.user import UserID
@@ -41,6 +43,9 @@ from ai.backend.manager.models.login_session.row import LoginSessionRow
 from ai.backend.manager.models.login_session.searchers import LoginSessionSearcher
 from ai.backend.manager.models.specs.searcher import GlobalSearcher
 from ai.backend.manager.repositories.auth.options import LoginSessionConditions, LoginSessionOrders
+from ai.backend.manager.services.auth.actions.bulk_get_login_sessions import (
+    BulkGetLoginSessionsAction,
+)
 from ai.backend.manager.services.auth.actions.revoke_login_session import (
     GlobalRevokeLoginSessionAction,
     RevokeLoginSessionAction,
@@ -148,6 +153,19 @@ class LoginSessionAdapter(BaseAdapter):
             GlobalUnblockUserAction(username=input.username)
         )
         return UnblockUserPayload(success=action_result.success)
+
+    async def batch_load_by_ids(
+        self, ids: Sequence[LoginSessionID]
+    ) -> list[LoginSessionNode | Exception | None]:
+        """Batch load login sessions by id for DataLoader use, checked per owning user."""
+        if not ids:
+            return []
+        return await self.batch_load_fields(
+            self._auth.bulk_get_login_sessions,
+            BulkGetLoginSessionsAction(ids=ids),
+            ids,
+            self._data_to_node,
+        )
 
     def _convert_filter(self, f: LoginSessionFilter) -> list[QueryCondition]:
         conditions: list[QueryCondition] = []

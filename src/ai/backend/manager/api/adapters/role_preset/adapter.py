@@ -89,6 +89,9 @@ from ai.backend.manager.services.role_preset.actions.bulk_add_permissions import
     BulkAddRolePermissionPresetsAction,
 )
 from ai.backend.manager.services.role_preset.actions.bulk_get import BulkGetRolePresetsAction
+from ai.backend.manager.services.role_preset.actions.bulk_get_permissions import (
+    BulkGetRolePermissionPresetsAction,
+)
 from ai.backend.manager.services.role_preset.actions.bulk_purge import (
     BulkPurgeRolePresetsAction,
 )
@@ -174,6 +177,19 @@ class RolePresetAdapter(BaseAdapter):
             else self.batch_load_failure(item.error)
             for item in result.items
         ]
+
+    async def batch_load_permissions_by_ids(
+        self, ids: Sequence[RolePermissionPresetID]
+    ) -> list[RolePermissionPresetNode | Exception | None]:
+        """Batch load preset permission entries for DataLoader use, checked per preset."""
+        if not ids:
+            return []
+        return await self.batch_load_fields(
+            self._role_preset.bulk_get_permissions,
+            BulkGetRolePermissionPresetsAction(ids=ids),
+            ids,
+            self._permission_data_to_node,
+        )
 
     def _usage(self, usage: RolePresetUsage | None) -> list[UsedBy]:
         """The uses the request named, each of which the caller must be able to read."""

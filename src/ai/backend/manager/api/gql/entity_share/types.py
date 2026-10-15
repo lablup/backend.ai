@@ -1,14 +1,16 @@
 from __future__ import annotations
 
+from collections.abc import Iterable
 from datetime import datetime
 from enum import StrEnum
-from typing import TYPE_CHECKING, Annotated
+from typing import TYPE_CHECKING, Annotated, override
 from uuid import UUID
 
 import strawberry
 from strawberry import UNSET, Info
 from strawberry.relay import Connection, Edge, NodeID
 
+from ai.backend.common.data.entity.entity_share import EntityShareID
 from ai.backend.common.data.entity.types import EntityType, RuntimeEntityID
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.dto.manager.v2.entity_share.request import (
@@ -198,6 +200,19 @@ class EntityShareGQL(PydanticNodeMixin[NodeDTO]):
         return await info.context.data_loaders.entity_node_loader.load(
             RuntimeEntityID(EntityType.from_name(self.target_entity_type), self.target_entity_id)
         )
+
+    @classmethod
+    @override
+    async def resolve_nodes(  # type: ignore[override]  # Strawberry Node uses AwaitableOrValue overloads incompatible with async def
+        cls,
+        *,
+        info: Info[StrawberryGQLContext],
+        node_ids: Iterable[str],
+        required: bool = False,
+    ) -> Iterable[EntityShareGQL | None]:
+        return await info.context.data_loaders.entity_share_loader.load_many([
+            EntityShareID(UUID(nid)) for nid in node_ids
+        ])
 
 
 @gql_connection_type(

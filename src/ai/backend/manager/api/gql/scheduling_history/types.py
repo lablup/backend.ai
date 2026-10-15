@@ -15,6 +15,7 @@ from strawberry.relay import NodeID
 from ai.backend.common.data.entity.deployment import DeploymentID
 from ai.backend.common.data.entity.deployment_history import DeploymentHistoryID
 from ai.backend.common.data.entity.kernel_scheduling_history import KernelSchedulingHistoryID
+from ai.backend.common.data.entity.replica_group_history import ReplicaGroupHistoryID
 from ai.backend.common.data.entity.route_history import RouteHistoryID
 from ai.backend.common.data.entity.session import SessionID
 from ai.backend.common.data.entity.session_scheduling_history import (
@@ -427,7 +428,6 @@ class DeploymentHistory(PydanticNodeMixin[DeploymentHistoryNode]):
     name="ReplicaGroupHistory",
 )
 class ReplicaGroupHistoryGQL(PydanticNodeMixin[ReplicaGroupHistoryNode]):
-    # No resolve_nodes: these rows are reached through the owning deployment.
     id: NodeID[str]
     field_id: UUID = gql_added_field(
         BackendAIGQLMeta(
@@ -464,6 +464,20 @@ class ReplicaGroupHistoryGQL(PydanticNodeMixin[ReplicaGroupHistoryNode]):
         return await info.context.data_loaders.deployment_loader.load(
             DeploymentID(UUID(str(self.deployment_id)))
         )
+
+    @classmethod
+    @override
+    async def resolve_nodes(  # type: ignore[override]  # Strawberry Node uses AwaitableOrValue overloads incompatible with async def
+        cls,
+        *,
+        info: Info[StrawberryGQLContext],
+        node_ids: Iterable[str],
+        required: bool = False,
+    ) -> Iterable[Self | None]:
+        results = await info.context.data_loaders.replica_group_history_loader.load_many([
+            ReplicaGroupHistoryID(UUID(nid)) for nid in node_ids
+        ])
+        return cast(list[Self | None], results)
 
 
 @gql_node_type(BackendAIGQLMeta(added_version="26.3.0", description="Route history record."))

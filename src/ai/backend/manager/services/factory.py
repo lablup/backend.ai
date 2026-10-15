@@ -8,7 +8,7 @@ from ai.backend.common.data.entity.app_config_fragment import AppConfigFragmentE
 from ai.backend.common.data.entity.artifact import ArtifactEntityType
 from ai.backend.common.data.entity.artifact_registry import ArtifactRegistryEntityType
 from ai.backend.common.data.entity.artifact_revision import ArtifactRevisionFieldType
-from ai.backend.common.data.entity.audit_log import AuditLogFieldType
+from ai.backend.common.data.entity.audit_log import AuditLogFieldType, AuditLogScopeFieldType
 from ai.backend.common.data.entity.client_ip_masking import ClientIPMaskingPolicyEntityType
 from ai.backend.common.data.entity.container_registry import ContainerRegistryEntityType
 from ai.backend.common.data.entity.deployment import DeploymentEntityType
@@ -78,7 +78,7 @@ from ai.backend.manager.actions.registry.types import (
 from ai.backend.manager.actions.v2.bulk.validator.rbac import BulkOwnCheck
 from ai.backend.manager.clients.prometheus.preset import PromQLTemplateRenderer
 from ai.backend.manager.data.artifact.types import ArtifactRevisionData
-from ai.backend.manager.data.audit_log.types import AuditLogData
+from ai.backend.manager.data.audit_log.types import AuditLogData, AuditLogScopeData
 from ai.backend.manager.data.entity_label.types import EntityLabelData
 from ai.backend.manager.data.fair_share.types import (
     DomainFairShareData,
@@ -93,7 +93,10 @@ from ai.backend.manager.data.resource_usage_history.types import (
     UserUsageBucketData,
 )
 from ai.backend.manager.data.secret.types import SecretFieldData
-from ai.backend.manager.models.audit_log.owner_candidates import AuditLogOwnerCandidates
+from ai.backend.manager.models.audit_log.owner_candidates import (
+    AuditLogOwnerCandidates,
+    AuditLogScopeOwnerCandidates,
+)
 from ai.backend.manager.repositories.ops.repository import OpsRepository
 from ai.backend.manager.repositories.resource_allocation.repository import (
     ResourceAllocationRepository,
@@ -238,6 +241,7 @@ from ai.backend.manager.services.scheduling_history.service import SchedulingHis
 from ai.backend.manager.services.secret.processors import SecretProcessors
 from ai.backend.manager.services.secret.service import SecretService
 from ai.backend.manager.services.service_catalog.processors import ServiceCatalogProcessors
+from ai.backend.manager.services.service_catalog.service import ServiceCatalogService
 from ai.backend.manager.services.session.actions.lookup_bulk_kernel_owner import (
     LookupBulkKernelOwnerAction,
 )
@@ -417,6 +421,7 @@ def create_services(args: ServiceArgs, action_registry: ProcessorRegistry[Any]) 
         deployment_revision_preset=DeploymentPresetService(
             repositories.deployment_revision_preset.repository,
         ),
+        service_catalog=ServiceCatalogService(repositories.service_catalog.repository),
         model_card=ModelCardService(
             repositories.model_card.repository,
             args.storage_manager,
@@ -830,7 +835,12 @@ def create_processors(
         audit_log=AuditLogProcessors(
             visibility_groups.dangling_owner_candidates_field_group(
                 FieldGroupMeta(AuditLogFieldType()), AuditLogData, AuditLogOwnerCandidates()
-            )
+            ),
+            visibility_groups.dangling_owner_candidates_field_group(
+                FieldGroupMeta(AuditLogScopeFieldType()),
+                AuditLogScopeData,
+                AuditLogScopeOwnerCandidates(),
+            ),
         ),
         entity_label=EntityLabelProcessors(
             registry.dangling_lookup_field_group(
@@ -851,7 +861,7 @@ def create_processors(
             services.scheduling_history,
         ),
         service_catalog=ServiceCatalogProcessors(
-            system_groups.group(GroupMeta(ServiceCatalogEntityType()))
+            system_groups.group(GroupMeta(ServiceCatalogEntityType())), services.service_catalog
         ),
         template=TemplateProcessors(
             session_groups.group(GroupMeta(SessionTemplateEntityType())), services.template

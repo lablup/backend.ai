@@ -1,14 +1,16 @@
 from __future__ import annotations
 
+from collections.abc import Iterable
 from datetime import datetime
 from enum import StrEnum
-from typing import TYPE_CHECKING, Annotated, Self
+from typing import TYPE_CHECKING, Annotated, Self, override
 from uuid import UUID
 
 import strawberry
 from strawberry import UNSET, Info
 from strawberry.relay import Connection, Edge, NodeID
 
+from ai.backend.common.data.entity.model_card import ModelCardID
 from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.entity.vfolder import VFolderUUID
@@ -375,6 +377,19 @@ class ModelCardGQL(PydanticNodeMixin[NodeDTO]):
             UUID(self.id), search_input
         )
         return build_preset_connection(result)
+
+    @classmethod
+    @override
+    async def resolve_nodes(  # type: ignore[override]  # Strawberry Node uses AwaitableOrValue overloads incompatible with async def
+        cls,
+        *,
+        info: Info[StrawberryGQLContext],
+        node_ids: Iterable[str],
+        required: bool = False,
+    ) -> Iterable[ModelCardGQL | None]:
+        return await info.context.data_loaders.model_card_loader.load_many([
+            ModelCardID(UUID(nid)) for nid in node_ids
+        ])
 
 
 ModelCardV2Edge = Edge[ModelCardGQL]

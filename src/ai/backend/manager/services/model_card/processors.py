@@ -26,6 +26,7 @@ from ai.backend.manager.data.model_card.types import (
 from ai.backend.manager.services.model_card.actions.bulk_delete import (
     BulkDeleteModelCardAction,
 )
+from ai.backend.manager.services.model_card.actions.bulk_get import BulkGetModelCardsAction
 from ai.backend.manager.services.model_card.actions.create import CreateModelCardAction
 from ai.backend.manager.services.model_card.actions.delete import (
     DeleteModelCardAction,
@@ -65,6 +66,7 @@ class ModelCardProcessors:
     delete: SingleEntityActionProcessor[DeleteModelCardAction, DeleteModelCardActionResult]
     bulk_delete: PartialBulkActionProcessor[BulkDeleteModelCardAction, ModelCardID]
     get: SingleEntityActionProcessor[GetModelCardAction, EntityOpsResult[ModelCardData]]
+    bulk_get: PartialBulkActionProcessor[BulkGetModelCardsAction, ModelCardData]
     global_search: GlobalActionProcessor[
         GlobalSearchModelCardsAction, BatchOpsResult[ModelCardData]
     ]
@@ -83,6 +85,7 @@ class ModelCardProcessors:
         self.delete = group.single_entity(DeleteModelCardAction, service.delete)
         self.bulk_delete = group.partial_bulk(BulkDeleteModelCardAction, service.bulk_delete)
         self.get = group.single_get_ops(GetModelCardAction)
+        self.bulk_get = group.partial_bulk_get_ops(BulkGetModelCardsAction)
         self.global_search = group.global_searcher_ops(GlobalSearchModelCardsAction)
         self.scoped_search = group.scoped_search_ops(ScopedSearchModelCardsAction)
         self.scan = group.global_scope(ScanProjectModelCardsAction, service.scan)

@@ -7,14 +7,17 @@ permission mutations.
 
 from __future__ import annotations
 
+from collections.abc import Iterable
 from datetime import datetime
 from enum import Enum
-from typing import Any, Self
+from typing import Any, Self, cast, override
 from uuid import UUID
 
 import strawberry
+from strawberry import Info
 from strawberry.relay import Connection, Edge, NodeID
 
+from ai.backend.common.data.entity.role_permission_preset import RolePermissionPresetID
 from ai.backend.common.dto.manager.v2.role_permission_preset.request import (
     RolePermissionPresetFilter as RolePermissionPresetFilterDTO,
 )
@@ -64,6 +67,7 @@ from ai.backend.manager.api.gql.rbac.types.permission import (
     PermissionBitFilterGQL,
 )
 from ai.backend.manager.api.gql.rbac.types.scope import PermissionBitGQL
+from ai.backend.manager.api.gql.types import StrawberryGQLContext
 
 _REMOVED_OPERATION_REASON = "Deprecated since 26.9.0. Use `permission`; this field is always null."
 
@@ -96,6 +100,20 @@ class RolePermissionPresetGQL(PydanticNodeMixin[RolePermissionPresetNode]):
     )  # type: ignore[misc]
     def operation(self) -> OperationTypeGQL | None:
         return None
+
+    @classmethod
+    @override
+    async def resolve_nodes(  # type: ignore[override]  # Strawberry Node uses AwaitableOrValue overloads incompatible with async def
+        cls,
+        *,
+        info: Info[StrawberryGQLContext],
+        node_ids: Iterable[str],
+        required: bool = False,
+    ) -> Iterable[Self | None]:
+        results = await info.context.data_loaders.role_permission_preset_loader.load_many([
+            RolePermissionPresetID(UUID(nid)) for nid in node_ids
+        ])
+        return cast(list[Self | None], results)
 
 
 RolePermissionPresetEdge = Edge[RolePermissionPresetGQL]

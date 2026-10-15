@@ -24,6 +24,7 @@ from ai.backend.manager.models.clauses import QueryCondition
 from ai.backend.manager.models.scopes import OperationScope
 from ai.backend.manager.models.specs.lookup import (
     BulkDataLookup,
+    BulkFieldKeyLookup,
     DataLookup,
     FieldKeyLookup,
     FieldOwnerKeyLookup,
@@ -197,6 +198,19 @@ class V2ReadOps(V2GraphReadOpsBase):
                 "A field row key matched more than one row, so it is not a key."
             )
         return lookup.to_field_id(rows[0][0]), lookup.to_entity_id(rows[0][1])
+
+    async def lookup_fields_by_keys[TKey, TFieldID: FieldIdentifier, TOwnerID: EntityIdentifier](
+        self, lookup: BulkFieldKeyLookup[TKey, TFieldID, TOwnerID], keys: Sequence[TKey]
+    ) -> Mapping[TKey, tuple[TFieldID, TOwnerID]]:
+        """Read the field row each key names and its owner; a key matching no row is
+        absent."""
+        if not keys:
+            return {}
+        rows = (await self._sess.execute(lookup.build_query(keys))).all()
+        resolved = {
+            row[0]: (lookup.to_field_id(row[1]), lookup.to_entity_id(row[2])) for row in rows
+        }
+        return {key: resolved[key] for key in keys if key in resolved}
 
     async def query_owned_fields[TOwnerID: EntityIdentifier, TRow: Base, TData: FieldData](
         self,

@@ -23,6 +23,7 @@ from ai.backend.common.config import (
 from ai.backend.common.data.endpoint.types import EndpointLifecycle
 from ai.backend.common.data.entity.auto_scaling_rule import AutoScalingRuleID
 from ai.backend.common.data.entity.deployment import DeploymentID
+from ai.backend.common.data.entity.deployment_policy import DeploymentPolicyID
 from ai.backend.common.data.entity.deployment_preset import DeploymentPresetID
 from ai.backend.common.data.entity.deployment_revision import DeploymentRevisionID
 from ai.backend.common.data.entity.deployment_token import DeploymentTokenID
@@ -322,6 +323,9 @@ from ai.backend.manager.services.deployment.actions.deployment_policy.bulk_get_d
 )
 from ai.backend.manager.services.deployment.actions.deployment_policy.get_deployment_policy import (
     GetDeploymentPolicyAction,
+)
+from ai.backend.manager.services.deployment.actions.deployment_policy.partial_bulk_get_deployment_policies import (
+    PartialBulkGetDeploymentPoliciesAction,
 )
 from ai.backend.manager.services.deployment.actions.deployment_policy.search_deployment_policies import (
     SearchDeploymentPoliciesAction,
@@ -1612,6 +1616,20 @@ class DeploymentAdapter(BaseAdapter):
             BulkGetAutoScalingRulesAction(ids=ids),
             ids,
             self._auto_scaling_rule_data_to_dto,
+        )
+
+    async def batch_load_policies_by_ids(
+        self, ids: Sequence[DeploymentPolicyID]
+    ) -> list[DeploymentPolicyNode | Exception | None]:
+        """Batch load deployment policies for DataLoader use, checked per deployment."""
+        if not ids:
+            return []
+        policy_ids = [DeploymentPolicyID(policy_id) for policy_id in ids]
+        return await self.batch_load_fields(
+            self._deployment.partial_bulk_get_deployment_policies,
+            PartialBulkGetDeploymentPoliciesAction(ids=policy_ids),
+            policy_ids,
+            self._policy_data_to_dto,
         )
 
     async def batch_load_policies_by_endpoint_ids(

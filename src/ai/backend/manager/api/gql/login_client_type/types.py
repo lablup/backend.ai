@@ -2,13 +2,15 @@
 
 from __future__ import annotations
 
+from collections.abc import Iterable
 from enum import StrEnum
-from typing import Any, Self
+from typing import Any, Self, override
 from uuid import UUID
 
-from strawberry import UNSET
+from strawberry import UNSET, Info
 from strawberry.relay import Connection, Edge, NodeID
 
+from ai.backend.common.data.entity.login_client_type import LoginClientTypeID
 from ai.backend.common.dto.manager.v2.login_client_type.request import (
     CreateLoginClientTypeInput as CreateLoginClientTypeInputDTO,
 )
@@ -47,6 +49,7 @@ from ai.backend.manager.api.gql.decorators import (
     gql_pydantic_type,
 )
 from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin, PydanticOutputMixin
+from ai.backend.manager.api.gql.types import StrawberryGQLContext
 
 __all__ = (
     "CreateLoginClientTypeInputGQL",
@@ -87,6 +90,19 @@ class LoginClientTypeGQL(PydanticNodeMixin[LoginClientTypeNode]):
     )
     name: str = gql_field(description="Unique login client type name (e.g. 'core', 'webui').")
     description: str | None = gql_field(description="Optional administrator-facing description.")
+
+    @classmethod
+    @override
+    async def resolve_nodes(  # type: ignore[override]  # Strawberry Node uses AwaitableOrValue overloads incompatible with async def
+        cls,
+        *,
+        info: Info[StrawberryGQLContext],
+        node_ids: Iterable[str],
+        required: bool = False,
+    ) -> Iterable[LoginClientTypeGQL | None]:
+        return await info.context.data_loaders.login_client_type_loader.load_many([
+            LoginClientTypeID(UUID(nid)) for nid in node_ids
+        ])
 
 
 LoginClientTypeEdge = Edge[LoginClientTypeGQL]

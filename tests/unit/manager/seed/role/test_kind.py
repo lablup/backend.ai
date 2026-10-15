@@ -13,7 +13,6 @@ from ai.backend.manager.cli.seed import cli
 from ai.backend.manager.data.permission.types import Permission
 from ai.backend.manager.errors.seed import InvalidSeedDocument
 from ai.backend.manager.models.rbac_models.permission.upserters import RolePermissionUpserter
-from ai.backend.manager.models.rbac_models.user_role.upserters import UserRoleUpserter
 from ai.backend.manager.seed.factory import create_seed_kind_registry
 from ai.backend.manager.seed.role.seed import RoleSeed
 from ai.backend.manager.seed.runner import SeedPlanner
@@ -46,6 +45,7 @@ class TestRoleSeed:
         assert (seed.auto_assign, seed.role_preset_id) == (False, None)
         assert write.field_upserters == []
         assert write.field_purgers == []
+        assert write.granted_users == []
 
     def test_operations_are_read_into_one_permission_row_per_bit(self) -> None:
         seed = RoleSeed.model_validate(_role(permissions={"session": ["read", "create"]}))
@@ -58,19 +58,11 @@ class TestRoleSeed:
 
     def test_each_user_is_granted_the_role(self) -> None:
         seed = RoleSeed.model_validate(_role(users=[_USER_ID]))
-        assert [
-            str(upserter.user_id)
-            for upserter in seed.write().field_upserters
-            if isinstance(upserter, UserRoleUpserter)
-        ] == [_USER_ID]
+        assert [str(user_id) for user_id in seed.write().granted_users] == [_USER_ID]
 
     def test_insert_only_columns_are_not_rewritten_by_an_overwrite(self) -> None:
         update = RoleSeed.model_validate(_role()).write().upserter.build_update_values()
         assert {"id", "scope_type", "scope_id", "role_preset_id", "source"}.isdisjoint(update)
-
-    def test_a_grant_is_not_rewritten_by_an_overwrite(self) -> None:
-        [upserter] = RoleSeed.model_validate(_role(users=[_USER_ID])).write().field_upserters
-        assert upserter.build_update_values() == {}
 
     @pytest.mark.parametrize(
         "values",

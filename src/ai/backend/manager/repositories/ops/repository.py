@@ -34,6 +34,7 @@ from ai.backend.manager.models.specs.creator import (
 )
 from ai.backend.manager.models.specs.lookup import (
     BulkDataLookup,
+    BulkFieldKeyLookup,
     DataLookup,
     FieldKeyLookup,
     FieldOwnerKeyLookup,
@@ -249,6 +250,14 @@ class OpsRepository[TData]:
                 operation=ActionOperationType.LOOKUP,
             )
         return resolved
+
+    async def fields_by_keys[TKey, TFieldID: FieldIdentifier, TOwnerID: EntityIdentifier](
+        self, lookup: BulkFieldKeyLookup[TKey, TFieldID, TOwnerID], keys: Sequence[TKey]
+    ) -> Mapping[TKey, tuple[TFieldID, TOwnerID]]:
+        """Resolve several keys into the field rows they name and their owners; a key
+        naming nothing is absent."""
+        async with self._ops.read_ops() as r:
+            return await r.lookup_fields_by_keys(lookup, keys)
 
     async def search_in_scopes(
         self,

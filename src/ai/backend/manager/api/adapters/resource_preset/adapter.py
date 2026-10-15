@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from decimal import Decimal
 from typing import Any
 from uuid import UUID
@@ -52,6 +53,9 @@ from ai.backend.manager.models.resource_preset.updaters import ResourcePresetUpd
 from ai.backend.manager.models.specs.searcher import GlobalSearcher
 from ai.backend.manager.services.resource_group.actions.lookup import LookupResourceGroupAction
 from ai.backend.manager.services.resource_group.processors import ResourceGroupProcessors
+from ai.backend.manager.services.resource_preset.actions.bulk_get import (
+    BulkGetResourcePresetsAction,
+)
 from ai.backend.manager.services.resource_preset.actions.create_preset import (
     CreateResourcePresetAction,
 )
@@ -168,6 +172,20 @@ class ResourcePresetAdapter(BaseAdapter):
             # preset's own error before and keeps doing so.
             raise ResourcePresetNotFound() from e
         return self._data_to_node(result.data)
+
+    async def batch_load_by_ids(
+        self, ids: Sequence[ResourcePresetID]
+    ) -> list[ResourcePresetNode | Exception | None]:
+        """Batch load resource presets by id for DataLoader use, one answer per id."""
+        if not ids:
+            return []
+        result = await self._resource_preset.bulk_get.run(BulkGetResourcePresetsAction(ids=ids))
+        return [
+            self._data_to_node(item.value)
+            if item.value is not None
+            else self.batch_load_failure(item.error)
+            for item in result.items
+        ]
 
     async def create(
         self,

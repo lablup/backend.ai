@@ -2,14 +2,16 @@
 
 from __future__ import annotations
 
+from collections.abc import Iterable
 from enum import StrEnum
-from typing import TYPE_CHECKING, Annotated, Any, Self
+from typing import TYPE_CHECKING, Annotated, Any, Self, override
 from uuid import UUID
 
 import strawberry
 from strawberry import Info
 from strawberry.relay import Connection, Edge, NodeID
 
+from ai.backend.common.data.entity.resource_preset import ResourcePresetID
 from ai.backend.common.dto.manager.v2.resource_preset.request import (
     CreateResourcePresetInput as CreateResourcePresetInputDTO,
 )
@@ -133,6 +135,19 @@ class ResourcePresetGQL(PydanticNodeMixin[ResourcePresetNode]):
         if self.resource_group_name is None:
             return None
         return await info.context.data_loaders.resource_group_loader.load(self.resource_group_name)
+
+    @classmethod
+    @override
+    async def resolve_nodes(  # type: ignore[override]  # Strawberry Node uses AwaitableOrValue overloads incompatible with async def
+        cls,
+        *,
+        info: Info[StrawberryGQLContext],
+        node_ids: Iterable[str],
+        required: bool = False,
+    ) -> Iterable[ResourcePresetGQL | None]:
+        return await info.context.data_loaders.resource_preset_loader.load_many([
+            ResourcePresetID(UUID(nid)) for nid in node_ids
+        ])
 
 
 # Filter and OrderBy types

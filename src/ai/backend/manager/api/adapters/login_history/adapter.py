@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
+from collections.abc import Sequence
+
 from ai.backend.common.contexts.user import current_user
+from ai.backend.common.data.entity.login_history import LoginHistoryID
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.dto.manager.v2.login_history.request import (
     AdminSearchLoginHistoryInput,
@@ -35,6 +38,9 @@ from ai.backend.manager.models.login_session.row import LoginHistoryRow
 from ai.backend.manager.models.login_session.searchers import LoginHistorySearcher
 from ai.backend.manager.models.specs.searcher import GlobalSearcher
 from ai.backend.manager.repositories.auth.options import LoginHistoryConditions, LoginHistoryOrders
+from ai.backend.manager.services.auth.actions.bulk_get_login_history import (
+    BulkGetLoginHistoryAction,
+)
 from ai.backend.manager.services.auth.actions.search_login_history import (
     GlobalSearchLoginHistoryAction,
     SearchLoginHistoryAction,
@@ -113,6 +119,19 @@ class LoginHistoryAdapter(BaseAdapter):
             total_count=action_result.total_count,
             has_next_page=action_result.has_next_page,
             has_previous_page=action_result.has_previous_page,
+        )
+
+    async def batch_load_by_ids(
+        self, ids: Sequence[LoginHistoryID]
+    ) -> list[LoginHistoryNode | Exception | None]:
+        """Batch load login history rows by id for DataLoader use, checked per owning user."""
+        if not ids:
+            return []
+        return await self.batch_load_fields(
+            self._auth.bulk_get_login_history,
+            BulkGetLoginHistoryAction(ids=ids),
+            ids,
+            self._data_to_node,
         )
 
     def _convert_filter(self, f: LoginHistoryFilter) -> list[QueryCondition]:

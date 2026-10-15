@@ -2,17 +2,21 @@
 
 [무엇을 보장하는가](/src/ai/backend/manager/api/adapters/user/KNOWLEDGE.md) · [어댑터](/src/ai/backend/manager/api/adapters/user/adapter.py)
 
-시나리오: 미완 4 / 44
+시나리오: 미완 8 / 48
 
-- ops 로 구성 (19)
+- ops 로 구성 (23)
   - LoginHistoryAdapter.admin_search — 대표 성공 ✓ · 대표 실패 ✓
+  - LoginHistoryAdapter.batch_load_by_ids — 대표 성공 ✗ · 대표 실패 ✗ — SCENARIO-GAP
   - LoginHistoryAdapter.my_search — 대표 성공 ✓ · 대표 실패 ✓
   - LoginSessionAdapter.admin_search — 대표 성공 ✓ · 대표 실패 ✓
+  - LoginSessionAdapter.batch_load_by_ids — 대표 성공 ✗ · 대표 실패 ✗ — SCENARIO-GAP
   - LoginSessionAdapter.my_search — 대표 성공 ✓ · 대표 실패 ✓
   - UserAdapter.admin_search — 대표 성공 ✓ · 대표 실패 ✓
   - UserAdapter.admin_search_keypairs — 대표 성공 ✓ · 대표 실패 ✓
   - UserAdapter.batch_load_by_ids — 대표 성공 ✓ · 대표 실패 ✓
   - UserAdapter.batch_lookup_by_emails — 대표 성공 ✓ · 대표 실패 ✓
+  - UserAdapter.bulk_get_keypair_ids — 대표 성공 ✗ · 대표 실패 ✗ — SCENARIO-GAP
+  - UserAdapter.bulk_lookup_keypair_access_keys — 대표 성공 ✗ · 대표 실패 ✗ — SCENARIO-GAP
   - UserAdapter.domain_search — 대표 성공 ✓ · 대표 실패 ✓
   - UserAdapter.gql_admin_search — 대표 성공 ✓ · 대표 실패 ✓
   - UserAdapter.gql_admin_search_keypairs — 대표 성공 ✓ · 대표 실패 ✓

@@ -28,7 +28,9 @@ from ai.backend.manager.actions.v2.bulk.result import (
     PartialBulkResult,
 )
 from ai.backend.manager.actions.v2.field.bulk_lookup import (
+    BulkFieldKeyLookupOpsResult,
     BulkFieldOwnerLookupOpsResult,
+    LookupBulkFieldByKeyOpsAction,
     LookupBulkFieldOwnerOpsAction,
     LookupBulkRuntimeFieldOwnerOpsAction,
 )
@@ -339,6 +341,38 @@ class FieldKeyLookupService:
     async def execute(self, action: FieldKeyLookupOpsAction[Any, Any]) -> FieldKeyLookupOpsResult:
         field_id, owner_entity_id = await self._repository.field_by_key(action.to_field_lookup())
         return FieldKeyLookupOpsResult(field_id=field_id, owner_entity_id=owner_entity_id)
+
+
+class BulkFieldKeyLookupService:
+    """Reads the field rows the keys an action names, answering per key on the owner."""
+
+    _repository: OpsRepository[Any]
+
+    def __init__(self, repository: OpsRepository[Any]) -> None:
+        self._repository = repository
+
+    async def execute(
+        self, action: LookupBulkFieldByKeyOpsAction[Any, Any, Any]
+    ) -> BulkFieldKeyLookupOpsResult[Any, Any]:
+        keys = action.keys()
+        resolved = await self._repository.fields_by_keys(action.to_field_lookup(), keys)
+        found = ActionRunStatus.success()
+        key_results = [
+            BulkLookupKeyResult(
+                key=action.to_lookup_key(key),
+                status=found.status if key in resolved else OperationStatus.ERROR,
+                description=found.description
+                if key in resolved
+                else "No field row matches the given key.",
+                error_code=None,
+                entity_id=resolved[key][1] if key in resolved else None,
+            )
+            for key in keys
+        ]
+        return BulkFieldKeyLookupOpsResult(
+            resolved={key: field_id for key, (field_id, _) in resolved.items()},
+            key_results=key_results,
+        )
 
 
 class RuntimeFieldOwnerLookupService:

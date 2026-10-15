@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from uuid import UUID
 
 from ai.backend.common.data.entity.login_client_type import LoginClientTypeID
@@ -48,6 +49,9 @@ from ai.backend.manager.models.login_client_type.searchable_fields import (
 from ai.backend.manager.models.login_client_type.searchers import LoginClientTypeSearcher
 from ai.backend.manager.models.login_client_type.updaters import LoginClientTypeUpdater
 from ai.backend.manager.models.specs.searcher import ScopedSearcher
+from ai.backend.manager.services.login_client_type.actions.bulk_get import (
+    BulkGetLoginClientTypesAction,
+)
 from ai.backend.manager.services.login_client_type.actions.create import (
     CreateLoginClientTypeAction,
 )
@@ -116,6 +120,20 @@ class LoginClientTypeAdapter(BaseAdapter):
             GetLoginClientTypeAction(id=LoginClientTypeID(type_id))
         )
         return self._data_to_node(action_result.data)
+
+    async def batch_load_by_ids(
+        self, ids: Sequence[LoginClientTypeID]
+    ) -> list[LoginClientTypeNode | Exception | None]:
+        """Batch load login client types by id for DataLoader use, one answer per id."""
+        if not ids:
+            return []
+        result = await self._login_client_type.bulk_get.run(BulkGetLoginClientTypesAction(ids=ids))
+        return [
+            self._data_to_node(item.value)
+            if item.value is not None
+            else self.batch_load_failure(item.error)
+            for item in result.items
+        ]
 
     async def search(self, input: SearchLoginClientTypesInput) -> SearchLoginClientTypesPayload:
         """Search login client types, by cursor or by offset as the request names."""
