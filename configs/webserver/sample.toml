@@ -498,7 +498,7 @@
   # Added in 26.4.4
   health-check-interval = 10.0
   # Consecutive probe (or caller-reported) failures required before an endpoint
-  # flips from healthy to unhealthy.
+  # flips from healthy to unhealthy. A 503 probe excludes it immediately.
   # Added in 26.4.4
   health-check-failure-threshold = 3
   # Seconds the unhealthy_since timestamp is retained after an endpoint is
@@ -837,7 +837,8 @@
   # Added in 26.4.4
   health-check-interval = 10.0
   # Consecutive probe (or caller-reported) failures required before an Apollo
-  # Router endpoint flips from healthy to unhealthy.
+  # Router endpoint flips from healthy to unhealthy. A 503 probe excludes it
+  # immediately.
   # Added in 26.4.4
   health-check-failure-threshold = 3
   # Seconds the unhealthy_since timestamp is retained after an Apollo Router
