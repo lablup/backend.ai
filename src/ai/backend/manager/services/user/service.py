@@ -103,6 +103,10 @@ from ai.backend.manager.services.user.actions.user_month_stats import (
     UserMonthStatsAction,
     UserMonthStatsActionResult,
 )
+from ai.backend.manager.services.user.bootstrap_script.actions.switch_default import (
+    SwitchDefaultBootstrapScriptAction,
+    SwitchDefaultBootstrapScriptActionResult,
+)
 from ai.backend.manager.sokovan.scheduling_controller.scheduling_controller import (
     SchedulingController,
 )
@@ -409,6 +413,12 @@ class UserService:
             DefaultBootstrapScriptUpdater(entity=action.user_id, script=action.script)
         )
         return UpdateDefaultBootstrapScriptActionResult()
+
+    async def switch_default_bootstrap_script(
+        self, action: SwitchDefaultBootstrapScriptAction
+    ) -> SwitchDefaultBootstrapScriptActionResult:
+        script = await self._user_repository.switch_default_bootstrap_script(action.script_id)
+        return SwitchDefaultBootstrapScriptActionResult(script=script)
 
     async def _read_dotfiles(self, access_key: AccessKey) -> tuple[KeyPairID, DotfileEntries]:
         """The keypair's id alongside its entries, so the write keys on the row it read."""

@@ -9,9 +9,10 @@ from ai.backend.common.data.entity.types import EntityType, RuntimeEntityID
 from ai.backend.common.dto.manager.config.types import MAXIMUM_DOTFILE_SIZE
 from ai.backend.manager.data.bootstrap_script.types import BootstrapScriptData
 from ai.backend.manager.models.base import GUID, Base
+from ai.backend.manager.models.mixins.timestamp import LifecycleTimestampsMixin
 
 
-class BootstrapScriptRow(Base):
+class BootstrapScriptRow(LifecycleTimestampsMixin, Base):
     """A bootstrap script set on an entity; at most one per entity is the default."""
 
     __tablename__ = "bootstrap_scripts"
@@ -43,4 +44,6 @@ class BootstrapScriptRow(Base):
             entity=RuntimeEntityID(self.entity_type, self.entity_id),
             script=BootstrapScript(self.script),
             is_default=self.is_default,
+            created_at=self.created_at,
+            updated_at=self.updated_at,
         )

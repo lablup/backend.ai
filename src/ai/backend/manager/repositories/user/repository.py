@@ -11,6 +11,7 @@ import msgpack
 from dateutil.tz import tzutc
 
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
+from ai.backend.common.data.entity.bootstrap_script import BootstrapScriptID
 from ai.backend.common.data.entity.keypair import KeyPairID
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.exception import BackendAIError
@@ -31,10 +32,21 @@ from ai.backend.manager.data.user.types import (
     UserData,
     UserSearchResult,
 )
-from ai.backend.manager.errors.bootstrap_script import DefaultBootstrapScriptNotFound
+from ai.backend.manager.errors.bootstrap_script import (
+    BootstrapScriptNotFound,
+    DefaultBootstrapScriptNotFound,
+)
 from ai.backend.manager.errors.user import KeyPairNotFound
-from ai.backend.manager.models.bootstrap_script.queriers import BootstrapScriptQuerier
-from ai.backend.manager.models.bootstrap_script.updaters import DefaultBootstrapScriptUpdater
+from ai.backend.manager.models.bootstrap_script.queriers import (
+    BootstrapScriptByIdQuerier,
+    BootstrapScriptQuerier,
+)
+from ai.backend.manager.models.bootstrap_script.scopes import UserBootstrapScriptTarget
+from ai.backend.manager.models.bootstrap_script.updaters import (
+    ClearDefaultBootstrapScriptUpdater,
+    DefaultBootstrapScriptUpdater,
+    MarkDefaultBootstrapScriptUpdater,
+)
 from ai.backend.manager.models.keypair.creators import KeypairCreator
 from ai.backend.manager.models.keypair.purgers import NonDefaultKeypairPurger
 from ai.backend.manager.models.keypair.queriers import DefaultKeypairQuerier
@@ -113,6 +125,25 @@ class UserRepository:
                 f"{updater.entity} has no default bootstrap script"
             )
         return updated[0]
+
+    @user_repository_resilience.apply()
+    async def switch_default_bootstrap_script(
+        self, script_id: BootstrapScriptID
+    ) -> BootstrapScriptData:
+        """Move the default mark among the user's scripts onto ``script_id``. Clearing
+        the previous mark needs its own statement: the partial unique index allows one."""
+        async with self._v2_ops.write_ops() as w:
+            target = await w.query_field_data(BootstrapScriptByIdQuerier(script_id=script_id))
+            if target is None:
+                raise BootstrapScriptNotFound(f"Bootstrap script {script_id} not found")
+            await w.batch_update_in_scopes(
+                [UserBootstrapScriptTarget(user_id=target.entity)],
+                ClearDefaultBootstrapScriptUpdater(),
+            )
+            marked = await w.update_data(MarkDefaultBootstrapScriptUpdater(script_id=script_id))
+            if marked is None:
+                raise BootstrapScriptNotFound(f"Bootstrap script {script_id} not found")
+            return marked
 
     @user_repository_resilience.apply()
     async def default_access_key(self, user_id: UserID) -> AccessKey | None:
