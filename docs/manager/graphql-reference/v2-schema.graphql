@@ -10461,10 +10461,28 @@ type Mutation {
   adminCreateResourcePresetV2(input: CreateResourcePresetV2Input!): CreateResourcePresetPayload
 
   """Added in 26.4.2. Update a resource preset (admin only)."""
-  adminUpdateResourcePresetV2(input: UpdateResourcePresetV2Input!): UpdateResourcePresetPayload
+  adminUpdateResourcePresetV2(input: UpdateResourcePresetV2Input!): UpdateResourcePresetPayload @deprecated(reason: "Deprecated since 26.10.0. Use `updateResourcePresetV2`.")
 
   """Added in 26.4.2. Delete a resource preset (admin only)."""
-  adminDeleteResourcePresetV2(id: UUID!): DeleteResourcePresetPayload
+  adminDeleteResourcePresetV2(id: UUID!): DeleteResourcePresetPayload @deprecated(reason: "Deprecated since 26.10.0. Use `purgeResourcePresetV2`.")
+
+  """
+  Added in 26.10.0. Update a resource preset. Only provided fields will be updated.
+  """
+  updateResourcePresetV2(input: UpdateResourcePresetV2Input!): UpdateResourcePresetPayload!
+
+  """Added in 26.10.0. Permanently delete a resource preset."""
+  purgeResourcePresetV2(id: UUID!): DeleteResourcePresetPayload!
+
+  """
+  Added in 26.10.0. Update several resource presets, answering for each one.
+  """
+  partialBulkUpdateResourcePresetsV2(input: PartialBulkUpdateResourcePresetsInput!): PartialBulkResourcePresetsPayload!
+
+  """
+  Added in 26.10.0. Permanently delete several resource presets, answering for each one.
+  """
+  partialBulkPurgeResourcePresetsV2(input: PartialBulkPurgeResourcePresetsInput!): PartialBulkResourcePresetsPayload!
 
   """Added in 26.4.2. Create a new login client type (super admin only)."""
   adminCreateLoginClientType(input: CreateLoginClientTypeInput!): CreateLoginClientTypePayload
@@ -11263,6 +11281,14 @@ input PartialBulkPurgeProjectResourcePoliciesInput {
 }
 
 """
+Added in 26.10.0. Input for permanently deleting several resource presets, each answered for separately.
+"""
+input PartialBulkPurgeResourcePresetsInput {
+  """UUIDs of the resource presets to purge."""
+  ids: [UUID!]!
+}
+
+"""
 Added in 26.10.0. Input for permanently removing several roles, each answered for separately.
 """
 input PartialBulkPurgeRolesInput {
@@ -11276,6 +11302,17 @@ Added in 26.10.0. Input for purging several user resource policies, each answere
 input PartialBulkPurgeUserResourcePoliciesInput {
   """IDs of the user resource policies to purge."""
   ids: [UUID!]!
+}
+
+"""
+Added in 26.10.0. Result of a partial bulk resource preset operation: the resource presets processed and the ones that failed.
+"""
+type PartialBulkResourcePresetsPayload {
+  """The resource presets processed, as they stood when processed."""
+  successes: [ResourcePresetV2!]!
+
+  """The resource presets not processed, each with the reason."""
+  failed: [PartialBulkFailure!]!
 }
 
 """
@@ -11422,6 +11459,31 @@ Added in 26.10.0. Input for updating several projects, each answered for separat
 input PartialBulkUpdateProjectsInput {
   """The projects to update, each with its fields."""
   items: [PartialBulkUpdateProjectItemInput!]!
+}
+
+"""
+Added in 26.10.0. One resource preset of a partial bulk update and the fields to update on it.
+"""
+input PartialBulkUpdateResourcePresetItemInput {
+  """UUID of the resource preset to update."""
+  id: UUID!
+
+  """Updated name."""
+  name: String
+
+  """Updated resource slot allocations."""
+  resourceSlots: [ResourceSlotEntryInput!]
+
+  """Updated shared memory. Use null to clear."""
+  sharedMemory: BinarySizeInput
+}
+
+"""
+Added in 26.10.0. Input for updating several resource presets, each answered for separately.
+"""
+input PartialBulkUpdateResourcePresetsInput {
+  """The resource presets to update, each with its fields."""
+  items: [PartialBulkUpdateResourcePresetItemInput!]!
 }
 
 """

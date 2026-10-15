@@ -471,6 +471,10 @@ from ai.backend.manager.api.gql.resource_preset.resolver import (
     admin_resource_preset_v2,
     admin_resource_presets_v2,
     admin_update_resource_preset_v2,
+    partial_bulk_purge_resource_presets_v2,
+    partial_bulk_update_resource_presets_v2,
+    purge_resource_preset_v2,
+    update_resource_preset_v2,
 )
 from ai.backend.manager.api.gql.resource_usage.resolver.domain_usage import (
     admin_domain_usage_buckets,
@@ -1206,6 +1210,10 @@ class Mutation:
     admin_create_resource_preset_v2 = admin_create_resource_preset_v2
     admin_update_resource_preset_v2 = admin_update_resource_preset_v2
     admin_delete_resource_preset_v2 = admin_delete_resource_preset_v2
+    update_resource_preset_v2 = update_resource_preset_v2
+    purge_resource_preset_v2 = purge_resource_preset_v2
+    partial_bulk_update_resource_presets_v2 = partial_bulk_update_resource_presets_v2
+    partial_bulk_purge_resource_presets_v2 = partial_bulk_purge_resource_presets_v2
     # Login Client Type mutations
     admin_create_login_client_type = admin_create_login_client_type
     admin_update_login_client_type = admin_update_login_client_type

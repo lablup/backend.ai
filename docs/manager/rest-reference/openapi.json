@@ -27047,6 +27047,96 @@
         "title": "UpdateResourcePresetInput",
         "type": "object"
       },
+      "NonEmptyList_PartialBulkUpdateResourcePresetItemInput_": {
+        "items": {
+          "$ref": "#/components/schemas/PartialBulkUpdateResourcePresetItemInput"
+        },
+        "minItems": 1,
+        "type": "array"
+      },
+      "PartialBulkUpdateResourcePresetItemInput": {
+        "description": "One resource preset of a partial bulk update and the fields to update on it.",
+        "properties": {
+          "id": {
+            "description": "UUID of the resource preset to update.",
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Updated name. Omit to leave unchanged.",
+            "title": "Name"
+          },
+          "resource_slots": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/ResourceSlotEntryInput"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Updated resource slot allocations. Omit to leave unchanged.",
+            "title": "Resource Slots"
+          },
+          "shared_memory": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/BinarySizeInput"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Updated shared memory. Omit to leave unchanged; null clears.",
+            "title": "Shared Memory"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "title": "PartialBulkUpdateResourcePresetItemInput",
+        "type": "object"
+      },
+      "PartialBulkUpdateResourcePresetsInput": {
+        "description": "Input for updating several resource presets, each answered for separately.",
+        "properties": {
+          "items": {
+            "$ref": "#/components/schemas/NonEmptyList_PartialBulkUpdateResourcePresetItemInput_",
+            "description": "The resource presets to update, each with its fields."
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "title": "PartialBulkUpdateResourcePresetsInput",
+        "type": "object"
+      },
+      "PartialBulkPurgeResourcePresetsInput": {
+        "description": "Input for permanently deleting several resource presets, each answered for separately.",
+        "properties": {
+          "ids": {
+            "$ref": "#/components/schemas/NonEmptyList_UUID_",
+            "description": "UUIDs of the resource presets to purge."
+          }
+        },
+        "required": [
+          "ids"
+        ],
+        "title": "PartialBulkPurgeResourcePresetsInput",
+        "type": "object"
+      },
       "ResourceSlotTypeFilter": {
         "description": "Filter conditions for resource slot types.",
         "properties": {
@@ -58033,10 +58123,10 @@
             }
           }
         ],
-        "description": "Update an existing resource preset.\n\n**Preconditions:**\n* Superadmin privilege required.\n"
+        "description": "Update an existing resource preset.\n\n**Preconditions:**\n* User privilege required.\n"
       },
       "delete": {
-        "operationId": "v2/resource-presets.delete",
+        "operationId": "v2/resource-presets.purge",
         "tags": [
           "v2/resource-presets"
         ],
@@ -58060,7 +58150,65 @@
             }
           }
         ],
-        "description": "Delete a resource preset by ID.\n\n**Preconditions:**\n* Superadmin privilege required.\n"
+        "description": "Permanently delete a resource preset by ID.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/v2/resource-presets/partial-bulk-update": {
+      "post": {
+        "operationId": "v2/resource-presets.partial_bulk_update",
+        "tags": [
+          "v2/resource-presets"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PartialBulkUpdateResourcePresetsInput"
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "description": "Update several resource presets, answering for each one.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/v2/resource-presets/partial-bulk-purge": {
+      "post": {
+        "operationId": "v2/resource-presets.partial_bulk_purge",
+        "tags": [
+          "v2/resource-presets"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PartialBulkPurgeResourcePresetsInput"
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "description": "Permanently delete several resource presets, answering for each one.\n\n**Preconditions:**\n* User privilege required.\n"
       }
     },
     "/v2/resource-slots/slot-types/search": {
