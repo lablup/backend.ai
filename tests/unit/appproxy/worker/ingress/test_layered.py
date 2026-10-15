@@ -5,6 +5,7 @@ from unittest.mock import AsyncMock
 
 import pytest
 
+from ai.backend.appproxy.worker.errors.ingress import IngressNotRegisteredError
 from ai.backend.appproxy.worker.ingress.abc import IngressReader
 from ai.backend.appproxy.worker.ingress.in_memory import InMemoryIngressState
 from ai.backend.appproxy.worker.ingress.layered import LayeredIngressState
@@ -20,12 +21,14 @@ from ai.backend.common.dto.appproxy.v2.ingress.types import (
     IngressFrontendKey,
     IngressFrontendKind,
     IngressID,
+    IngressKey,
     IngressProtocol,
     IngressTargetGroup,
     IngressTargetGroupID,
     PortFrontend,
 )
 
+AUTHORITY = IngressAuthority("worker-1")
 FRONTEND_KEY = IngressFrontendKey("10205")
 NEGATIVE_TTL = 5.0
 
@@ -39,7 +42,7 @@ class _LayersCase:
 def ingress() -> Ingress:
     return Ingress(
         id=IngressID("ingress-10205"),
-        authority=IngressAuthority("worker-1"),
+        authority=AUTHORITY,
         revision=5,
         frontend=IngressFrontend(
             kind=IngressFrontendKind.PORT,
@@ -98,8 +101,9 @@ def ingress_in_redis(redis: AsyncMock, ingress: Ingress) -> None:
 
 
 @pytest.fixture
-async def key_remembered_missing(memory: InMemoryIngressState) -> None:
-    await memory.remember_missing(FRONTEND_KEY)
+async def key_removed(memory: InMemoryIngressState, ingress: Ingress) -> None:
+    await memory.apply([ingress])
+    await memory.remove([IngressKey(authority=AUTHORITY, frontend_key=FRONTEND_KEY)])
 
 
 class TestLayeredIngressState:
@@ -139,20 +143,22 @@ class TestLayeredIngressState:
         ids=lambda case: "+".join(case.layers),
         indirect=True,
     )
-    async def test_get_returns_none_when_every_layer_misses(
+    async def test_key_no_layer_holds_raises_not_registered(
         self, configured_layered: LayeredIngressState
     ) -> None:
-        assert await configured_layered.get(FRONTEND_KEY) is None
+        with pytest.raises(IngressNotRegisteredError):
+            await configured_layered.get(FRONTEND_KEY)
 
-    async def test_miss_in_every_layer_skips_redis_on_the_next_get(
+    async def test_key_no_layer_holds_is_read_from_redis_again(
         self, layered: LayeredIngressState, redis: AsyncMock
     ) -> None:
-        await layered.get(FRONTEND_KEY)
-        assert await layered.get(FRONTEND_KEY) is None
-        redis.get.assert_awaited_once_with(FRONTEND_KEY)
+        for _ in range(2):
+            with pytest.raises(IngressNotRegisteredError):
+                await layered.get(FRONTEND_KEY)
+        assert redis.get.await_count == 2
 
-    @pytest.mark.usefixtures("key_remembered_missing")
-    async def test_key_known_missing_reads_as_none_without_reading_redis(
+    @pytest.mark.usefixtures("key_removed")
+    async def test_key_removed_within_negative_ttl_reads_as_none_without_reading_redis(
         self, layered: LayeredIngressState, redis: AsyncMock
     ) -> None:
         assert await layered.get(FRONTEND_KEY) is None

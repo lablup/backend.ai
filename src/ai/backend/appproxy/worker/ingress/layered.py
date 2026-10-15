@@ -3,7 +3,10 @@ from __future__ import annotations
 from collections.abc import Sequence
 from typing import override
 
-from ai.backend.appproxy.worker.errors.ingress import IngressNotFoundError
+from ai.backend.appproxy.worker.errors.ingress import (
+    IngressNotFoundError,
+    IngressNotRegisteredError,
+)
 from ai.backend.appproxy.worker.ingress.abc import IngressReader
 from ai.backend.appproxy.worker.ingress.in_memory import InMemoryIngressState
 from ai.backend.common.dto.appproxy.v2.ingress.types import Ingress, IngressFrontendKey
@@ -12,7 +15,8 @@ from ai.backend.common.dto.appproxy.v2.ingress.types import Ingress, IngressFron
 class LayeredIngressState(IngressReader):
     """Reads the layers in order; a hit from another layer is written to the given in-memory state.
 
-    A key memory knows missing, or one no layer holds, reads as None.
+    A key removed within negative-ttl reads as None; one no layer holds raises
+    IngressNotRegisteredError.
     """
 
     _layers: list[IngressReader]
@@ -39,12 +43,10 @@ class LayeredIngressState(IngressReader):
                     # Cache another layer's hit in memory so the next read stops at memory.
                     await self._in_memory.apply([ingress])
                 return ingress
-            if self._in_memory is not None:
-                # Remember a key no layer holds so the next read skips the later layers.
-                await self._in_memory.remember_missing(frontend_key)
-            return None
+            # Requests keep reaching a key that is gone and no longer remembered; surface it.
+            raise IngressNotRegisteredError(f"no layer holds frontend {frontend_key}")
         except IngressNotFoundError:
-            # The key was remembered missing on purpose to skip reading the later layers.
+            # The key was remembered missing on removal to skip reading the later layers.
             return None
 
     @override
