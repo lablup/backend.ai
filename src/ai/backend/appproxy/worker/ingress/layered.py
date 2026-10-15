@@ -33,9 +33,11 @@ class LayeredIngressState(IngressReader):
                 if ingress is None:
                     continue
                 if in_memory is not None and index > 0:
+                    # Cache a later layer's hit in memory so the next read stops at memory.
                     await in_memory.apply([ingress])
                 return ingress
             if in_memory is not None:
+                # Remember a key no layer holds so the next read skips the later layers.
                 await in_memory.remember_missing(frontend_key)
             return None
         except IngressNotFoundError:
