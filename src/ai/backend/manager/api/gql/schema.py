@@ -436,10 +436,14 @@ from ai.backend.manager.api.gql.resource_group.resolver import (
     admin_update_allowed_resource_groups_for_project_v2,
     admin_update_resource_group,
     admin_update_resource_group_fair_share_spec,
+    partial_bulk_purge_resource_groups,
+    partial_bulk_update_resource_groups,
+    purge_resource_group_v2,
     replace_resource_group_default_deployment_options,
     replace_resource_group_default_session_options,
     resource_groups,
     scoped_resource_groups,
+    update_resource_group,
     update_resource_group_fair_share_spec,
 )
 from ai.backend.manager.api.gql.resource_policy_v2.resolver.mutation import (
@@ -1076,6 +1080,10 @@ class Mutation:
     admin_update_resource_group = admin_update_resource_group
     admin_create_resource_group_v2 = admin_create_resource_group_v2
     admin_delete_resource_group_v2 = admin_delete_resource_group_v2
+    update_resource_group = update_resource_group
+    purge_resource_group_v2 = purge_resource_group_v2
+    partial_bulk_update_resource_groups = partial_bulk_update_resource_groups
+    partial_bulk_purge_resource_groups = partial_bulk_purge_resource_groups
     admin_update_allowed_resource_groups_for_domain_v2 = (
         admin_update_allowed_resource_groups_for_domain_v2
     )

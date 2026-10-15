@@ -24384,6 +24384,99 @@
         "title": "CreateResourceGroupInput",
         "type": "object"
       },
+      "NonEmptyList_PartialBulkUpdateResourceGroupItemInput_": {
+        "items": {
+          "$ref": "#/components/schemas/PartialBulkUpdateResourceGroupItemInput"
+        },
+        "minItems": 1,
+        "type": "array"
+      },
+      "PartialBulkUpdateResourceGroupItemInput": {
+        "description": "One resource group of a partial bulk update and the fields to update on it.",
+        "properties": {
+          "id": {
+            "description": "ID of the resource group to update.",
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "input": {
+            "$ref": "#/components/schemas/UpdateResourceGroupInput",
+            "description": "Fields to update on the resource group."
+          }
+        },
+        "required": [
+          "id",
+          "input"
+        ],
+        "title": "PartialBulkUpdateResourceGroupItemInput",
+        "type": "object"
+      },
+      "PreemptionConfigInputDTO": {
+        "description": "Input for preemption configuration.",
+        "properties": {
+          "enabled": {
+            "default": false,
+            "description": "Whether preemption is enabled for this resource group (opt-in).",
+            "title": "Enabled",
+            "type": "boolean"
+          },
+          "preemptible_priority": {
+            "default": 5,
+            "description": "Sessions with priority <= this value are eligible for preemption.",
+            "title": "Preemptible Priority",
+            "type": "integer"
+          },
+          "order": {
+            "default": "oldest",
+            "description": "Tie-breaking order for same-priority sessions (oldest/newest).",
+            "title": "Order",
+            "type": "string"
+          },
+          "mode": {
+            "default": "terminate",
+            "description": "How to preempt sessions (terminate/reschedule).",
+            "title": "Mode",
+            "type": "string"
+          },
+          "preemption_min_runtime": {
+            "default": 0.0,
+            "description": "Minimum session runtime in seconds before it becomes preemptible (0 = disabled).",
+            "minimum": 0.0,
+            "title": "Preemption Min Runtime",
+            "type": "number"
+          },
+          "victim_scope": {
+            "$ref": "#/components/schemas/PreemptionVictimScope",
+            "default": "user",
+            "description": "Scope preemption victims are drawn from (user/project/domain/resource-group). Default is user."
+          }
+        },
+        "title": "PreemptionConfigInputDTO",
+        "type": "object"
+      },
+      "PreemptionVictimScope": {
+        "description": "Which sessions may become preemption victims for a pending session.\n\nUSER limits victims to the pending session's own sessions;\nPROJECT/DOMAIN widen to sessions of the same project/domain;\nRESOURCE_GROUP allows any session in the resource group.",
+        "enum": [
+          "user",
+          "project",
+          "domain",
+          "resource-group"
+        ],
+        "title": "PreemptionVictimScope",
+        "type": "string"
+      },
+      "SchedulerTypeDTO": {
+        "description": "Scheduler type for resource group.",
+        "enum": [
+          "fifo",
+          "lifo",
+          "drf",
+          "fair-share"
+        ],
+        "title": "SchedulerTypeDTO",
+        "type": "string"
+      },
       "UpdateResourceGroupInput": {
         "description": "Input for updating a resource group. All fields optional for partial update.",
         "properties": {
@@ -24484,9 +24577,109 @@
             ],
             "description": "Updated resource policy name. Omit to leave unchanged; null clears.",
             "title": "Resource Policy"
+          },
+          "is_public": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Whether the resource group is public. Omit to leave unchanged.",
+            "title": "Is Public"
+          },
+          "app_proxy_addr": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "App proxy address. Omit to leave unchanged; null clears.",
+            "title": "App Proxy Addr"
+          },
+          "appproxy_api_token": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "App proxy API token. Omit to leave unchanged; null clears.",
+            "title": "Appproxy Api Token"
+          },
+          "use_host_network": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Whether to use host network mode. Omit to leave unchanged.",
+            "title": "Use Host Network"
+          },
+          "scheduler_type": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SchedulerTypeDTO"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Scheduler type value (fifo/lifo/drf/fair-share). Omit to leave unchanged.",
+            "title": "Scheduler Type"
+          },
+          "preemption": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PreemptionConfigInputDTO"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Preemption configuration. Omit to leave unchanged.",
+            "title": "Preemption"
           }
         },
         "title": "UpdateResourceGroupInput",
+        "type": "object"
+      },
+      "PartialBulkUpdateResourceGroupsInput": {
+        "description": "Input for updating several resource groups, each answered for separately.",
+        "properties": {
+          "items": {
+            "$ref": "#/components/schemas/NonEmptyList_PartialBulkUpdateResourceGroupItemInput_",
+            "description": "The resource groups to update, each with its fields."
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "title": "PartialBulkUpdateResourceGroupsInput",
+        "type": "object"
+      },
+      "PartialBulkPurgeResourceGroupsInput": {
+        "description": "Input for purging several resource groups, each answered for separately.",
+        "properties": {
+          "ids": {
+            "$ref": "#/components/schemas/NonEmptyList_UUID_",
+            "description": "IDs of the resource groups to purge."
+          }
+        },
+        "required": [
+          "ids"
+        ],
+        "title": "PartialBulkPurgeResourceGroupsInput",
         "type": "object"
       },
       "ResourceWeightEntryInput": {
@@ -24602,71 +24795,6 @@
         ],
         "title": "UpdateResourceGroupFairShareSpecInput",
         "type": "object"
-      },
-      "PreemptionConfigInputDTO": {
-        "description": "Input for preemption configuration.",
-        "properties": {
-          "enabled": {
-            "default": false,
-            "description": "Whether preemption is enabled for this resource group (opt-in).",
-            "title": "Enabled",
-            "type": "boolean"
-          },
-          "preemptible_priority": {
-            "default": 5,
-            "description": "Sessions with priority <= this value are eligible for preemption.",
-            "title": "Preemptible Priority",
-            "type": "integer"
-          },
-          "order": {
-            "default": "oldest",
-            "description": "Tie-breaking order for same-priority sessions (oldest/newest).",
-            "title": "Order",
-            "type": "string"
-          },
-          "mode": {
-            "default": "terminate",
-            "description": "How to preempt sessions (terminate/reschedule).",
-            "title": "Mode",
-            "type": "string"
-          },
-          "preemption_min_runtime": {
-            "default": 0.0,
-            "description": "Minimum session runtime in seconds before it becomes preemptible (0 = disabled).",
-            "minimum": 0.0,
-            "title": "Preemption Min Runtime",
-            "type": "number"
-          },
-          "victim_scope": {
-            "$ref": "#/components/schemas/PreemptionVictimScope",
-            "default": "user",
-            "description": "Scope preemption victims are drawn from (user/project/domain/resource-group). Default is user."
-          }
-        },
-        "title": "PreemptionConfigInputDTO",
-        "type": "object"
-      },
-      "PreemptionVictimScope": {
-        "description": "Which sessions may become preemption victims for a pending session.\n\nUSER limits victims to the pending session's own sessions;\nPROJECT/DOMAIN widen to sessions of the same project/domain;\nRESOURCE_GROUP allows any session in the resource group.",
-        "enum": [
-          "user",
-          "project",
-          "domain",
-          "resource-group"
-        ],
-        "title": "PreemptionVictimScope",
-        "type": "string"
-      },
-      "SchedulerTypeDTO": {
-        "description": "Scheduler type for resource group.",
-        "enum": [
-          "fifo",
-          "lifo",
-          "drf",
-          "fair-share"
-        ],
-        "title": "SchedulerTypeDTO",
-        "type": "string"
       },
       "UpdateResourceGroupConfigInput": {
         "description": "Input for updating resource group configuration via GQL (all fields optional).",
@@ -57166,6 +57294,129 @@
         "description": "Create a new resource group.\n\n**Preconditions:**\n* Superadmin privilege required.\n"
       }
     },
+    "/v2/resource-groups/partial-bulk-update": {
+      "post": {
+        "operationId": "v2/resource-groups.partial_bulk_update",
+        "tags": [
+          "v2/resource-groups"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PartialBulkUpdateResourceGroupsInput"
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "description": "Update several resource groups, answering for each one.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/v2/resource-groups/partial-bulk-purge": {
+      "post": {
+        "operationId": "v2/resource-groups.partial_bulk_purge",
+        "tags": [
+          "v2/resource-groups"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PartialBulkPurgeResourceGroupsInput"
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "description": "Purge several resource groups, answering for each one.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/v2/resource-groups/{resource_group_id}": {
+      "patch": {
+        "operationId": "v2/resource-groups.update",
+        "tags": [
+          "v2/resource-groups"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateResourceGroupInput"
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "resource_group_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "description": "Update a resource group.\n\n**Preconditions:**\n* User privilege required.\n"
+      },
+      "delete": {
+        "operationId": "v2/resource-groups.purge",
+        "tags": [
+          "v2/resource-groups"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "resource_group_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "description": "Purge a resource group.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
     "/v2/resource-groups/{name}": {
       "get": {
         "operationId": "v2/resource-groups.get",
@@ -57195,7 +57446,7 @@
         "description": "Retrieve a single resource group by name.\n\n**Preconditions:**\n* Superadmin privilege required.\n"
       },
       "patch": {
-        "operationId": "v2/resource-groups.update",
+        "operationId": "v2/resource-groups.admin_update",
         "tags": [
           "v2/resource-groups"
         ],
@@ -57228,10 +57479,10 @@
             }
           }
         ],
-        "description": "Update an existing resource group.\n\n**Preconditions:**\n* Superadmin privilege required.\n"
+        "description": "Deprecated. Use `PATCH /v2/resource-groups/{resource_group_id}`.\n\n**Preconditions:**\n* Superadmin privilege required.\n"
       },
       "delete": {
-        "operationId": "v2/resource-groups.delete",
+        "operationId": "v2/resource-groups.admin_delete",
         "tags": [
           "v2/resource-groups"
         ],
@@ -57255,7 +57506,7 @@
             }
           }
         ],
-        "description": "Purge a resource group by name.\n\n**Preconditions:**\n* Superadmin privilege required.\n"
+        "description": "Deprecated. Use `DELETE /v2/resource-groups/{resource_group_id}`.\n\n**Preconditions:**\n* Superadmin privilege required.\n"
       }
     },
     "/v2/resource-groups/{name}/resource-info": {

@@ -66,6 +66,10 @@ class ResourceGroupNamePathParam(BaseRequestModel):
     name: str = Field(description="Resource group name")
 
 
+class ResourceGroupIdPathParam(BaseRequestModel):
+    resource_group_id: UUID = Field(description="Resource group ID")
+
+
 class ResourcePolicyNamePathParam(BaseRequestModel):
     name: str = Field(description="Resource policy name")
 
