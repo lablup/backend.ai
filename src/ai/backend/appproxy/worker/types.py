@@ -381,17 +381,6 @@ class InferenceAppInfo:
     runtime_variant: RuntimeVariant | None
 
 
-_INGRESS_PROTOCOLS: Final[Mapping[ProxyProtocol, IngressProtocol]] = {
-    ProxyProtocol.HTTP: IngressProtocol.HTTP,
-    ProxyProtocol.PREOPEN: IngressProtocol.HTTP,
-    ProxyProtocol.HTTP2: IngressProtocol.HTTP2,
-    ProxyProtocol.GRPC: IngressProtocol.HTTP2,
-    ProxyProtocol.TCP: IngressProtocol.TCP,
-    ProxyProtocol.VNC: IngressProtocol.TCP,
-    ProxyProtocol.RDP: IngressProtocol.TCP,
-}
-
-
 class Circuit(SerializableCircuit):
     frontend: PortFrontendInfo | SubdomainFrontendInfo
 
@@ -509,7 +498,17 @@ class Circuit(SerializableCircuit):
         )
 
     def to_ingress_frontend(self) -> IngressFrontend:
-        protocol = _INGRESS_PROTOCOLS[self.protocol]
+        match self.protocol:
+            case ProxyProtocol.HTTP:
+                protocol = IngressProtocol.HTTP
+            case ProxyProtocol.HTTP2:
+                protocol = IngressProtocol.HTTP2
+            case ProxyProtocol.TCP:
+                protocol = IngressProtocol.TCP
+            case _:
+                raise UnreachableError(
+                    f"a worker circuit never carries the {self.protocol} protocol"
+                )
         match self.frontend:
             case PortFrontendInfo(port=port):
                 return IngressFrontend(
