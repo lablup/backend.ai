@@ -1949,6 +1949,16 @@ type AtomicBulkAddRolePresetPermissionsPayload
   items: [RolePermissionPreset!]!
 }
 
+"""
+Added in 26.10.0. Payload for an all-or-nothing upsert of many fragments at one scope.
+"""
+type AtomicBulkUpsertAppConfigFragmentsPayload
+  @join__type(graph: STRAWBERRY)
+{
+  """The upserted app config fragments."""
+  items: [AppConfigFragment!]!
+}
+
 """Added in 26.10.0. Shape of the action that wrote an audit log entry."""
 enum AuditLogActionKind
   @join__type(graph: STRAWBERRY)
@@ -14099,22 +14109,58 @@ type Mutation
   """
   Added in 26.7.0. Purge an app config allow-list entry by id (super admin only).
   """
-  adminPurgeAppConfigAllowList(input: PurgeAppConfigAllowListInput!): PurgeAppConfigAllowListPayload @join__field(graph: STRAWBERRY)
+  adminPurgeAppConfigAllowList(input: PurgeAppConfigAllowListInput!): PurgeAppConfigAllowListPayload @join__field(graph: STRAWBERRY) @deprecated(reason: "Deprecated since 26.10.0. Use `purgeAppConfigAllowList`.")
 
   """
   Added in 26.8.0. Update an app config allow-list entry's rank by id (super admin only).
   """
-  adminUpdateAppConfigAllowList(input: UpdateAppConfigAllowListInput!): UpdateAppConfigAllowListPayload @join__field(graph: STRAWBERRY)
+  adminUpdateAppConfigAllowList(input: UpdateAppConfigAllowListInput!): UpdateAppConfigAllowListPayload @join__field(graph: STRAWBERRY) @deprecated(reason: "Deprecated since 26.10.0. Use `updateAppConfigAllowList`.")
 
   """
   Added in 26.9.0. Upsert many app config fragments at one scope (insert, or replace config on conflict), with per-item partial success (not in effect yet: still all-or-nothing).
   """
-  scopedUpsertAppConfigFragments(input: ScopedUpsertAppConfigFragmentsInput!): UpsertAppConfigFragmentsPayload! @join__field(graph: STRAWBERRY)
+  scopedUpsertAppConfigFragments(input: ScopedUpsertAppConfigFragmentsInput!): UpsertAppConfigFragmentsPayload! @join__field(graph: STRAWBERRY) @deprecated(reason: "Deprecated since 26.10.0. Use `scopedAtomicBulkUpsertAppConfigFragments`.")
 
   """
   Added in 26.9.0. Upsert many app config fragments at the current user's own user scope, with per-item partial success (not in effect yet: still all-or-nothing).
   """
-  myUpsertAppConfigFragments(input: MyUpsertAppConfigFragmentsInput!): UpsertAppConfigFragmentsPayload! @join__field(graph: STRAWBERRY)
+  myUpsertAppConfigFragments(input: MyUpsertAppConfigFragmentsInput!): UpsertAppConfigFragmentsPayload! @join__field(graph: STRAWBERRY) @deprecated(reason: "Deprecated since 26.10.0. Use `myAtomicBulkUpsertAppConfigFragments`.")
+
+  """Added in 26.10.0. Update an app config allow-list entry's rank by id."""
+  updateAppConfigAllowList(input: UpdateAppConfigAllowListInput!): UpdateAppConfigAllowListPayload! @join__field(graph: STRAWBERRY)
+
+  """
+  Added in 26.10.0. Purge an app config allow-list entry by id, with the fragments it admits.
+  """
+  purgeAppConfigAllowList(input: PurgeAppConfigAllowListInput!): PurgeAppConfigAllowListPayload! @join__field(graph: STRAWBERRY)
+
+  """
+  Added in 26.10.0. Update several app config allow-list entries, answering for each one.
+  """
+  partialBulkUpdateAppConfigAllowLists(input: PartialBulkUpdateAppConfigAllowListsInput!): PartialBulkAppConfigAllowListsPayload! @join__field(graph: STRAWBERRY)
+
+  """
+  Added in 26.10.0. Purge several app config allow-list entries, answering for each one.
+  """
+  partialBulkPurgeAppConfigAllowLists(input: PartialBulkPurgeAppConfigAllowListsInput!): PartialBulkAppConfigAllowListsPayload! @join__field(graph: STRAWBERRY)
+
+  """
+  Added in 26.10.0. Upsert many app config fragments at one scope (insert, or replace config on conflict), all or none.
+  """
+  scopedAtomicBulkUpsertAppConfigFragments(input: ScopedUpsertAppConfigFragmentsInput!): AtomicBulkUpsertAppConfigFragmentsPayload! @join__field(graph: STRAWBERRY)
+
+  """
+  Added in 26.10.0. Upsert many app config fragments at the current user's own user scope, all or none.
+  """
+  myAtomicBulkUpsertAppConfigFragments(input: MyUpsertAppConfigFragmentsInput!): AtomicBulkUpsertAppConfigFragmentsPayload! @join__field(graph: STRAWBERRY)
+
+  """Added in 26.10.0. Purge an app config fragment by id."""
+  purgeAppConfigFragment(id: UUID!): PurgeAppConfigFragmentPayload! @join__field(graph: STRAWBERRY)
+
+  """
+  Added in 26.10.0. Purge several app config fragments, answering for each one.
+  """
+  partialBulkPurgeAppConfigFragments(input: PartialBulkPurgeAppConfigFragmentsInput!): PartialBulkAppConfigFragmentsPayload! @join__field(graph: STRAWBERRY)
 
   """
   Added in 25.14.0. Scan external registries to discover available artifacts. Searches HuggingFace or Reservoir registries for artifacts matching the specified criteria and registers them in the system with SCANNED status. The artifacts become available for import but are not downloaded until explicitly imported. This is the first step in the artifact workflow: Scan → Import → Use
@@ -15160,7 +15206,17 @@ type Mutation
   """
   Added in 26.7.0. Purge an app config definition by id (super admin only).
   """
-  adminPurgeAppConfigDefinition(input: PurgeAppConfigDefinitionInput!): PurgeAppConfigDefinitionPayload @join__field(graph: STRAWBERRY)
+  adminPurgeAppConfigDefinition(input: PurgeAppConfigDefinitionInput!): PurgeAppConfigDefinitionPayload @join__field(graph: STRAWBERRY) @deprecated(reason: "Deprecated since 26.10.0. Use `purgeAppConfigDefinition`.")
+
+  """
+  Added in 26.10.0. Purge an app config definition by id, with the allow-list entries and fragments under it.
+  """
+  purgeAppConfigDefinition(input: PurgeAppConfigDefinitionInput!): PurgeAppConfigDefinitionPayload! @join__field(graph: STRAWBERRY)
+
+  """
+  Added in 26.10.0. Purge several app config definitions, answering for each one.
+  """
+  partialBulkPurgeAppConfigDefinitions(input: PartialBulkPurgeAppConfigDefinitionsInput!): PartialBulkAppConfigDefinitionsPayload! @join__field(graph: STRAWBERRY)
 
   """Added in 26.4.2. Create a new runtime variant (superadmin only)."""
   adminCreateRuntimeVariant(input: CreateRuntimeVariantInput!): CreateRuntimeVariantPayload @join__field(graph: STRAWBERRY)
@@ -16021,6 +16077,45 @@ interface PaginatedList
 }
 
 """
+Added in 26.10.0. Result of a partial bulk allow-list operation: the entries processed and the ones that failed.
+"""
+type PartialBulkAppConfigAllowListsPayload
+  @join__type(graph: STRAWBERRY)
+{
+  """The allow-list entries processed, as they stood when processed."""
+  successes: [AppConfigAllowList!]!
+
+  """The allow-list entries not processed, each with the reason."""
+  failed: [PartialBulkFailure!]!
+}
+
+"""
+Added in 26.10.0. Result of a partial bulk app config definition operation: the definitions processed and the ones that failed.
+"""
+type PartialBulkAppConfigDefinitionsPayload
+  @join__type(graph: STRAWBERRY)
+{
+  """The app config definitions processed, as they stood when processed."""
+  successes: [AppConfigDefinition!]!
+
+  """The app config definitions not processed, each with the reason."""
+  failed: [PartialBulkFailure!]!
+}
+
+"""
+Added in 26.10.0. Result of a partial bulk fragment operation: the fragments processed and the ones that failed.
+"""
+type PartialBulkAppConfigFragmentsPayload
+  @join__type(graph: STRAWBERRY)
+{
+  """The fragments processed, as they stood when processed."""
+  successes: [AppConfigFragment!]!
+
+  """The fragments not processed, each with the reason."""
+  failed: [PartialBulkFailure!]!
+}
+
+"""
 Added in 26.10.0. Result of a partial bulk artifact operation: the artifacts processed and the ones that failed.
 """
 type PartialBulkArtifactsPayload
@@ -16283,6 +16378,36 @@ type PartialBulkProjectsPayload
 
   """The projects not processed, each with the reason."""
   failed: [PartialBulkFailure!]!
+}
+
+"""
+Added in 26.10.0. Input for purging several allow-list entries, each answered for separately.
+"""
+input PartialBulkPurgeAppConfigAllowListsInput
+  @join__type(graph: STRAWBERRY)
+{
+  """IDs of the allow-list entries to purge."""
+  ids: [UUID!]!
+}
+
+"""
+Added in 26.10.0. Input for purging several app config definitions, each answered for separately.
+"""
+input PartialBulkPurgeAppConfigDefinitionsInput
+  @join__type(graph: STRAWBERRY)
+{
+  """IDs of the app config definitions to purge."""
+  ids: [UUID!]!
+}
+
+"""
+Added in 26.10.0. Input for purging several fragments, each answered for separately.
+"""
+input PartialBulkPurgeAppConfigFragmentsInput
+  @join__type(graph: STRAWBERRY)
+{
+  """IDs of the fragments to purge."""
+  ids: [UUID!]!
 }
 
 """
@@ -16775,6 +16900,16 @@ type PartialBulkRuntimeVariantsPayload
 
   """The runtime variants not processed, each with the reason."""
   failed: [PartialBulkFailure!]!
+}
+
+"""
+Added in 26.10.0. Input for updating several allow-list entries, each answered for separately.
+"""
+input PartialBulkUpdateAppConfigAllowListsInput
+  @join__type(graph: STRAWBERRY)
+{
+  """The allow-list entries to update, each with its id and fields."""
+  items: [UpdateAppConfigAllowListInput!]!
 }
 
 """
@@ -18883,6 +19018,14 @@ type PurgeAppConfigDefinitionPayload
   @join__type(graph: STRAWBERRY)
 {
   """UUID of the purged app config definition."""
+  id: UUID!
+}
+
+"""Added in 26.10.0. Payload for app config fragment purge."""
+type PurgeAppConfigFragmentPayload
+  @join__type(graph: STRAWBERRY)
+{
+  """Id of the purged app config fragment."""
   id: UUID!
 }
 

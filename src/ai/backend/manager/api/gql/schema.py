@@ -23,19 +23,29 @@ from ai.backend.manager.api.gql.app_config_allow_list.resolver import (
     admin_create_app_config_allow_list,
     admin_purge_app_config_allow_list,
     admin_update_app_config_allow_list,
+    partial_bulk_purge_app_config_allow_lists,
+    partial_bulk_update_app_config_allow_lists,
+    purge_app_config_allow_list,
+    update_app_config_allow_list,
 )
 from ai.backend.manager.api.gql.app_config_definition.resolver import (
     admin_app_config_definition,
     admin_app_config_definitions,
     admin_create_app_config_definition,
     admin_purge_app_config_definition,
+    partial_bulk_purge_app_config_definitions,
+    purge_app_config_definition,
 )
 from ai.backend.manager.api.gql.app_config_fragment.resolver import (
     admin_app_config_fragments,
     app_config_fragment,
     my_app_config_fragments_by_names,
+    my_atomic_bulk_upsert_app_config_fragments,
     my_upsert_app_config_fragments,
+    partial_bulk_purge_app_config_fragments,
+    purge_app_config_fragment,
     scoped_app_config_fragments_by_names,
+    scoped_atomic_bulk_upsert_app_config_fragments,
     scoped_upsert_app_config_fragments,
 )
 from ai.backend.manager.api.gql.artifact.resolver import (
@@ -1042,6 +1052,14 @@ class Mutation:
     admin_update_app_config_allow_list = admin_update_app_config_allow_list
     scoped_upsert_app_config_fragments = scoped_upsert_app_config_fragments
     my_upsert_app_config_fragments = my_upsert_app_config_fragments
+    update_app_config_allow_list = update_app_config_allow_list
+    purge_app_config_allow_list = purge_app_config_allow_list
+    partial_bulk_update_app_config_allow_lists = partial_bulk_update_app_config_allow_lists
+    partial_bulk_purge_app_config_allow_lists = partial_bulk_purge_app_config_allow_lists
+    scoped_atomic_bulk_upsert_app_config_fragments = scoped_atomic_bulk_upsert_app_config_fragments
+    my_atomic_bulk_upsert_app_config_fragments = my_atomic_bulk_upsert_app_config_fragments
+    purge_app_config_fragment = purge_app_config_fragment
+    partial_bulk_purge_app_config_fragments = partial_bulk_purge_app_config_fragments
     scan_artifacts = scan_artifacts
     scan_artifact_models = scan_artifact_models
     import_artifacts = import_artifacts
@@ -1343,6 +1361,8 @@ class Mutation:
     # App Config Definition mutations
     admin_create_app_config_definition = admin_create_app_config_definition
     admin_purge_app_config_definition = admin_purge_app_config_definition
+    purge_app_config_definition = purge_app_config_definition
+    partial_bulk_purge_app_config_definitions = partial_bulk_purge_app_config_definitions
     # Runtime Variant mutations
     admin_create_runtime_variant = admin_create_runtime_variant
     admin_update_runtime_variant = admin_update_runtime_variant
