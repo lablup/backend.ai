@@ -9746,10 +9746,10 @@ type Mutation {
   adminCreateNotificationChannel(input: CreateNotificationChannelInput!): CreateNotificationChannelPayload
 
   """Added in 26.4.2. Update a notification channel (admin only)"""
-  adminUpdateNotificationChannel(input: UpdateNotificationChannelInput!): UpdateNotificationChannelPayload
+  adminUpdateNotificationChannel(input: UpdateNotificationChannelInput!): UpdateNotificationChannelPayload @deprecated(reason: "Deprecated since 26.10.0. Use `updateNotificationChannel`.")
 
   """Added in 26.4.2. Delete a notification channel (admin only)"""
-  adminDeleteNotificationChannel(input: DeleteNotificationChannelInput!): DeleteNotificationChannelPayload
+  adminDeleteNotificationChannel(input: DeleteNotificationChannelInput!): DeleteNotificationChannelPayload @deprecated(reason: "Deprecated since 26.10.0. Use `purgeNotificationChannel`.")
 
   """Added in 26.4.2. Validate a notification channel (admin only)"""
   adminValidateNotificationChannel(input: ValidateNotificationChannelInput!): ValidateNotificationChannelPayload
@@ -9758,22 +9758,51 @@ type Mutation {
   adminCreateNotificationRule(input: CreateNotificationRuleInput!): CreateNotificationRulePayload
 
   """Added in 26.4.2. Update a notification rule (admin only)"""
-  adminUpdateNotificationRule(input: UpdateNotificationRuleInput!): UpdateNotificationRulePayload
+  adminUpdateNotificationRule(input: UpdateNotificationRuleInput!): UpdateNotificationRulePayload @deprecated(reason: "Deprecated since 26.10.0. Use `updateNotificationRule`.")
 
   """Added in 26.4.2. Delete a notification rule (admin only)"""
-  adminDeleteNotificationRule(input: DeleteNotificationRuleInput!): DeleteNotificationRulePayload
+  adminDeleteNotificationRule(input: DeleteNotificationRuleInput!): DeleteNotificationRulePayload @deprecated(reason: "Deprecated since 26.10.0. Use `purgeNotificationRule`.")
 
   """Added in 26.4.2. Validate a notification rule (admin only)"""
   adminValidateNotificationRule(input: ValidateNotificationRuleInput!): ValidateNotificationRulePayload
 
+  """Added in 26.4.2. Update a notification channel"""
+  updateNotificationChannel(input: UpdateNotificationChannelInput!): UpdateNotificationChannelPayload
+
+  """Added in 26.4.2. Update a notification rule"""
+  updateNotificationRule(input: UpdateNotificationRuleInput!): UpdateNotificationRulePayload
+
+  """Added in 26.10.0. Permanently remove a notification channel."""
+  purgeNotificationChannel(id: UUID!): PurgeNotificationChannelPayload!
+
+  """Added in 26.10.0. Permanently remove a notification rule."""
+  purgeNotificationRule(id: UUID!): PurgeNotificationRulePayload!
+
+  """
+  Added in 26.10.0. Update several notification channels, answering for each one.
+  """
+  partialBulkUpdateNotificationChannels(input: PartialBulkUpdateNotificationChannelsInput!): PartialBulkNotificationChannelsPayload!
+
+  """
+  Added in 26.10.0. Permanently remove several notification channels, answering for each one.
+  """
+  partialBulkPurgeNotificationChannels(input: PartialBulkPurgeNotificationChannelsInput!): PartialBulkNotificationChannelsPayload!
+
+  """
+  Added in 26.10.0. Update several notification rules, answering for each one.
+  """
+  partialBulkUpdateNotificationRules(input: PartialBulkUpdateNotificationRulesInput!): PartialBulkNotificationRulesPayload!
+
+  """
+  Added in 26.10.0. Permanently remove several notification rules, answering for each one.
+  """
+  partialBulkPurgeNotificationRules(input: PartialBulkPurgeNotificationRulesInput!): PartialBulkNotificationRulesPayload!
+
   """Added in 26.4.2. Create a new notification channel"""
   createNotificationChannel(input: CreateNotificationChannelInput!): CreateNotificationChannelPayload @deprecated(reason: "Use admin_create_notification_channel instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.")
 
-  """Added in 26.4.2. Update a notification channel"""
-  updateNotificationChannel(input: UpdateNotificationChannelInput!): UpdateNotificationChannelPayload @deprecated(reason: "Use admin_update_notification_channel instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.")
-
   """Added in 26.4.2. Delete a notification channel"""
-  deleteNotificationChannel(input: DeleteNotificationChannelInput!): DeleteNotificationChannelPayload @deprecated(reason: "Use admin_delete_notification_channel instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.")
+  deleteNotificationChannel(input: DeleteNotificationChannelInput!): DeleteNotificationChannelPayload @deprecated(reason: "Deprecated since 26.10.0. Use `purgeNotificationChannel`.")
 
   """Added in 26.4.2. Validate a notification channel"""
   validateNotificationChannel(input: ValidateNotificationChannelInput!): ValidateNotificationChannelPayload @deprecated(reason: "Use admin_validate_notification_channel instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.")
@@ -9781,11 +9810,8 @@ type Mutation {
   """Added in 26.4.2. Create a new notification rule"""
   createNotificationRule(input: CreateNotificationRuleInput!): CreateNotificationRulePayload @deprecated(reason: "Use admin_create_notification_rule instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.")
 
-  """Added in 26.4.2. Update a notification rule"""
-  updateNotificationRule(input: UpdateNotificationRuleInput!): UpdateNotificationRulePayload @deprecated(reason: "Use admin_update_notification_rule instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.")
-
   """Added in 26.4.2. Delete a notification rule"""
-  deleteNotificationRule(input: DeleteNotificationRuleInput!): DeleteNotificationRulePayload @deprecated(reason: "Use admin_delete_notification_rule instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.")
+  deleteNotificationRule(input: DeleteNotificationRuleInput!): DeleteNotificationRulePayload @deprecated(reason: "Deprecated since 26.10.0. Use `purgeNotificationRule`.")
 
   """Added in 26.4.2. Validate a notification rule"""
   validateNotificationRule(input: ValidateNotificationRuleInput!): ValidateNotificationRulePayload @deprecated(reason: "Use admin_validate_notification_rule instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.")
@@ -11224,6 +11250,28 @@ type PartialBulkKeypairResourcePoliciesPayload {
 }
 
 """
+Added in 26.10.0. Result of a partial bulk notification channel operation: the channels processed and the ones that failed.
+"""
+type PartialBulkNotificationChannelsPayload {
+  """The channels processed."""
+  successes: [NotificationChannel!]!
+
+  """The channels not processed, each with the reason."""
+  failed: [PartialBulkFailure!]!
+}
+
+"""
+Added in 26.10.0. Result of a partial bulk notification rule operation: the rules processed and the ones that failed.
+"""
+type PartialBulkNotificationRulesPayload {
+  """The rules processed."""
+  successes: [NotificationRule!]!
+
+  """The rules not processed, each with the reason."""
+  failed: [PartialBulkFailure!]!
+}
+
+"""
 Added in 26.10.0. Result of a partial bulk project resource policy operation: the policies processed and the ones that failed.
 """
 type PartialBulkProjectResourcePoliciesPayload {
@@ -11269,6 +11317,22 @@ Added in 26.10.0. Input for purging several keypair resource policies, each answ
 """
 input PartialBulkPurgeKeypairResourcePoliciesInput {
   """IDs of the keypair resource policies to purge."""
+  ids: [UUID!]!
+}
+
+"""
+Added in 26.10.0. Input for purging several notification channels, each answered for separately.
+"""
+input PartialBulkPurgeNotificationChannelsInput {
+  """IDs of the channels to purge."""
+  ids: [UUID!]!
+}
+
+"""
+Added in 26.10.0. Input for purging several notification rules, each answered for separately.
+"""
+input PartialBulkPurgeNotificationRulesInput {
+  """IDs of the rules to purge."""
   ids: [UUID!]!
 }
 
@@ -11421,6 +11485,62 @@ input PartialBulkUpdateKeypairResourcePolicyItemInput {
 
   """Fields to update on the policy."""
   input: UpdateKeypairResourcePolicyInput!
+}
+
+"""
+Added in 26.10.0. One notification channel of a partial bulk update and the fields to update on it.
+"""
+input PartialBulkUpdateNotificationChannelItemInput {
+  """ID of the channel to update."""
+  id: UUID!
+
+  """Updated channel name."""
+  name: String
+
+  """Updated channel description. Omit to leave unchanged; null clears."""
+  description: String
+
+  """Updated channel specification."""
+  spec: NotificationChannelSpecInput
+
+  """Updated enabled status."""
+  enabled: Boolean
+}
+
+"""
+Added in 26.10.0. Input for updating several notification channels, each answered for separately.
+"""
+input PartialBulkUpdateNotificationChannelsInput {
+  """The channels to update, each with its fields."""
+  items: [PartialBulkUpdateNotificationChannelItemInput!]!
+}
+
+"""
+Added in 26.10.0. One notification rule of a partial bulk update and the fields to update on it.
+"""
+input PartialBulkUpdateNotificationRuleItemInput {
+  """ID of the rule to update."""
+  id: UUID!
+
+  """Updated rule name."""
+  name: String
+
+  """Updated rule description. Omit to leave unchanged; null clears."""
+  description: String
+
+  """Updated message template (max 64KB)."""
+  messageTemplate: String
+
+  """Updated enabled status."""
+  enabled: Boolean
+}
+
+"""
+Added in 26.10.0. Input for updating several notification rules, each answered for separately.
+"""
+input PartialBulkUpdateNotificationRulesInput {
+  """The rules to update, each with its fields."""
+  items: [PartialBulkUpdateNotificationRuleItemInput!]!
 }
 
 """
@@ -12947,6 +13067,18 @@ Added in 26.8.0. Confirms that an idle checker was permanently removed. The retu
 """
 type PurgeIdleCheckerPayload {
   """Purged idle checker ID."""
+  id: UUID!
+}
+
+"""Added in 26.10.0. Payload for notification channel purge."""
+type PurgeNotificationChannelPayload {
+  """ID of the purged notification channel."""
+  id: UUID!
+}
+
+"""Added in 26.10.0. Payload for notification rule purge."""
+type PurgeNotificationRulePayload {
+  """ID of the purged notification rule."""
   id: UUID!
 }
 

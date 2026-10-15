@@ -14,6 +14,7 @@ from uuid import UUID
 
 from ai.backend.common.data.notification import NotificationChannelType, NotificationRuleType
 from ai.backend.common.data.user.types import UserRole
+from ai.backend.common.dto.manager.v2.common import PartialBulkPayload
 from ai.backend.common.dto.manager.v2.notification.response import (
     NotificationChannelNode,
     NotificationRuleNode,
@@ -41,7 +42,7 @@ from ai.backend.testutils.scenario_steps import (
     Then,
     Verdict,
 )
-from bai_scenario.components.domain import WrittenByThisRun
+from bai_scenario.components.domain import Mentions, WrittenByThisRun
 from bai_scenario.components.system import KEPT, Kept, lay_a_caller, role_named
 from bai_scenario.seeds.notification.channel import (
     FROM_EMAIL,
@@ -868,3 +869,139 @@ class TheRenderedMessage(Then[ARuleAndACaller, ValidateNotificationRulePayload])
         if payload is None:
             return [Refused(EntityNotFoundError, answered.raised)]
         return [Same("message", payload.message, self.rendered)]
+
+
+@dataclass(frozen=True)
+class TheChannelsComeBack(
+    Then[ManyChannelsAndACaller, PartialBulkPayload[NotificationChannelNode]]
+):
+    """미리 만들어 둔 채널이 모두 처리된 목록에 온다. ``missing``이 있으면 그 id 만 실패 목록에 온다."""
+
+    started: datetime
+    described: str | None | Kept = KEPT
+    missing: UUID | None = None
+
+    @override
+    def says(self) -> str:
+        if self.missing is None:
+            return "미리 만들어 둔 채널이 모두 처리된 목록에 오고, 실패한 것은 없다"
+        return (
+            "미리 만들어 둔 채널이 모두 처리된 목록에 오고, 없는 id 는 대상이 없다는 이유로 "
+            "실패 목록에 온다"
+        )
+
+    @override
+    def look(
+        self,
+        laid: ManyChannelsAndACaller,
+        answered: Answered[PartialBulkPayload[NotificationChannelNode]],
+    ) -> list[Verdict]:
+        payload = answered.response
+        if payload is None:
+            return [Refused(NotEnoughPermission, answered.raised)]
+        written = WrittenByThisRun(self.started)
+        verdicts: list[Verdict] = [Same("successes count", len(payload.successes), len(laid.laid))]
+        for i, (node, seed) in enumerate(zip(payload.successes, laid.laid, strict=False)):
+            verdicts += channel_verdicts(
+                f"successes[{i}].",
+                node,
+                name=seed.name,
+                description=(
+                    seed.description if isinstance(self.described, Kept) else self.described
+                ),
+                channel_type=seed.channel_type,
+                url=WEBHOOK_URL,
+                enabled=seed.enabled,
+                created_by=seed.created_by,
+                written=written,
+            )
+        return verdicts + failed_verdicts(payload, self.missing)
+
+
+@dataclass(frozen=True)
+class TheRulesComeBack(Then[ManyRulesAndACaller, PartialBulkPayload[NotificationRuleNode]]):
+    """미리 만들어 둔 규칙이 모두 처리된 목록에 온다. ``missing``이 있으면 그 id 만 실패 목록에 온다."""
+
+    started: datetime
+    described: str | None | Kept = KEPT
+    missing: UUID | None = None
+
+    @override
+    def says(self) -> str:
+        if self.missing is None:
+            return "미리 만들어 둔 규칙이 모두 처리된 목록에 오고, 실패한 것은 없다"
+        return (
+            "미리 만들어 둔 규칙이 모두 처리된 목록에 오고, 없는 id 는 대상이 없다는 이유로 "
+            "실패 목록에 온다"
+        )
+
+    @override
+    def look(
+        self,
+        laid: ManyRulesAndACaller,
+        answered: Answered[PartialBulkPayload[NotificationRuleNode]],
+    ) -> list[Verdict]:
+        payload = answered.response
+        if payload is None:
+            return [Refused(NotEnoughPermission, answered.raised)]
+        written = WrittenByThisRun(self.started)
+        verdicts: list[Verdict] = [Same("successes count", len(payload.successes), len(laid.laid))]
+        for i, (node, seed) in enumerate(zip(payload.successes, laid.laid, strict=False)):
+            verdicts += rule_verdicts(
+                f"successes[{i}].",
+                node,
+                name=seed.name,
+                description=(
+                    seed.description if isinstance(self.described, Kept) else self.described
+                ),
+                rule_type=seed.rule_type,
+                channel_id=seed.channel_id,
+                message_template=seed.message_template,
+                enabled=seed.enabled,
+                created_by=seed.created_by,
+                written=written,
+            )
+        return verdicts + failed_verdicts(payload, self.missing)
+
+
+def failed_verdicts(payload: PartialBulkPayload[Any], missing: UUID | None) -> list[Verdict]:
+    """The failed list of a partial bulk answer: empty, or the one id nothing answers to."""
+    if missing is None:
+        return [Same("failed", payload.failed, [])]
+    verdicts: list[Verdict] = [Same("failed count", len(payload.failed), 1)]
+    for failure in payload.failed:
+        verdicts += [
+            Held[UUID]("failed[0].id", failure.id, SameAs(missing, "요청에 넣은 없는 id")),
+            Held("failed[0].message", failure.message, Mentions("not found")),
+        ]
+    return verdicts
+
+
+@dataclass(frozen=True)
+class NothingIsProcessed(Then[Any, PartialBulkPayload[Any]]):
+    """처리된 것 없이, 미리 만들어 둔 것이 모두 같은 이유로 실패 목록에 온다."""
+
+    reason: str
+
+    @override
+    def says(self) -> str:
+        return "처리된 것 없이 미리 만들어 둔 것이 모두 실패 목록에 온다"
+
+    @override
+    def look(self, laid: Any, answered: Answered[PartialBulkPayload[Any]]) -> list[Verdict]:
+        payload = answered.response
+        if payload is None:
+            return [Refused(NotEnoughPermission, answered.raised)]
+        targets = laid.laid
+        verdicts: list[Verdict] = [
+            Same("successes", payload.successes, []),
+            Same("failed count", len(payload.failed), len(targets)),
+        ]
+        for i, (failure, seed) in enumerate(zip(payload.failed, targets, strict=False)):
+            verdicts += [
+                Held[UUID](
+                    f"failed[{i}].id", failure.id, SameAs(seed.id, "미리 만들어 둔 것의 id")
+                ),
+                Held(f"failed[{i}].message", failure.message, Mentions(self.reason)),
+            ]
+        return verdicts

@@ -309,6 +309,12 @@ from ai.backend.manager.api.gql.notification.resolver import (
     notification_rule_type_schema,
     notification_rule_types,
     notification_rules,
+    partial_bulk_purge_notification_channels,
+    partial_bulk_purge_notification_rules,
+    partial_bulk_update_notification_channels,
+    partial_bulk_update_notification_rules,
+    purge_notification_channel,
+    purge_notification_rule,
     update_notification_channel,
     update_notification_rule,
     validate_notification_channel,
@@ -1000,13 +1006,20 @@ class Mutation:
     admin_update_notification_rule = admin_update_notification_rule
     admin_delete_notification_rule = admin_delete_notification_rule
     admin_validate_notification_rule = admin_validate_notification_rule
+    # Notification
+    update_notification_channel = update_notification_channel
+    update_notification_rule = update_notification_rule
+    purge_notification_channel = purge_notification_channel
+    purge_notification_rule = purge_notification_rule
+    partial_bulk_update_notification_channels = partial_bulk_update_notification_channels
+    partial_bulk_purge_notification_channels = partial_bulk_purge_notification_channels
+    partial_bulk_update_notification_rules = partial_bulk_update_notification_rules
+    partial_bulk_purge_notification_rules = partial_bulk_purge_notification_rules
     # Notification - Legacy (deprecated)
     create_notification_channel = create_notification_channel
-    update_notification_channel = update_notification_channel
     delete_notification_channel = delete_notification_channel
     validate_notification_channel = validate_notification_channel
     create_notification_rule = create_notification_rule
-    update_notification_rule = update_notification_rule
     delete_notification_rule = delete_notification_rule
     validate_notification_rule = validate_notification_rule
     create_object_storage = create_object_storage

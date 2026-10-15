@@ -17209,11 +17209,66 @@
         "title": "UpdateNotificationChannelInput",
         "type": "object"
       },
-      "DeleteNotificationChannelInput": {
-        "description": "Input for deleting a notification channel.",
+      "NonEmptyList_PartialBulkUpdateNotificationChannelItemInput_": {
+        "items": {
+          "$ref": "#/components/schemas/PartialBulkUpdateNotificationChannelItemInput"
+        },
+        "minItems": 1,
+        "type": "array"
+      },
+      "PartialBulkUpdateNotificationChannelItemInput": {
+        "description": "One notification channel of a partial bulk update and the fields to update on it.",
         "properties": {
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Updated channel name",
+            "title": "Name"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Updated channel description. Omit to leave unchanged; null clears.",
+            "title": "Description"
+          },
+          "spec": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/NotificationChannelSpecInputDTO"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Updated channel specification",
+            "title": "Spec"
+          },
+          "enabled": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Updated enabled status",
+            "title": "Enabled"
+          },
           "id": {
-            "description": "Channel ID to delete",
+            "description": "ID of the channel to update.",
             "format": "uuid",
             "title": "Id",
             "type": "string"
@@ -17222,7 +17277,35 @@
         "required": [
           "id"
         ],
-        "title": "DeleteNotificationChannelInput",
+        "title": "PartialBulkUpdateNotificationChannelItemInput",
+        "type": "object"
+      },
+      "PartialBulkUpdateNotificationChannelsInput": {
+        "description": "Input for updating several notification channels, each answered for separately.",
+        "properties": {
+          "items": {
+            "$ref": "#/components/schemas/NonEmptyList_PartialBulkUpdateNotificationChannelItemInput_",
+            "description": "The channels to update, each with its fields."
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "title": "PartialBulkUpdateNotificationChannelsInput",
+        "type": "object"
+      },
+      "PartialBulkPurgeNotificationChannelsInput": {
+        "description": "Input for purging several notification channels, each answered for separately.",
+        "properties": {
+          "ids": {
+            "$ref": "#/components/schemas/NonEmptyList_UUID_",
+            "description": "IDs of the channels to purge."
+          }
+        },
+        "required": [
+          "ids"
+        ],
+        "title": "PartialBulkPurgeNotificationChannelsInput",
         "type": "object"
       },
       "NotificationChannelFilter": {
@@ -17493,6 +17576,22 @@
         "title": "ValidateNotificationChannelInput",
         "type": "object"
       },
+      "DeleteNotificationChannelInput": {
+        "description": "Input for deleting a notification channel.",
+        "properties": {
+          "id": {
+            "description": "Channel ID to delete",
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "title": "DeleteNotificationChannelInput",
+        "type": "object"
+      },
       "NotificationRuleTypeDTO": {
         "description": "Notification rule type enum for DTO layer.",
         "enum": [
@@ -17615,11 +17714,67 @@
         "title": "UpdateNotificationRuleInput",
         "type": "object"
       },
-      "DeleteNotificationRuleInput": {
-        "description": "Input for deleting a notification rule.",
+      "NonEmptyList_PartialBulkUpdateNotificationRuleItemInput_": {
+        "items": {
+          "$ref": "#/components/schemas/PartialBulkUpdateNotificationRuleItemInput"
+        },
+        "minItems": 1,
+        "type": "array"
+      },
+      "PartialBulkUpdateNotificationRuleItemInput": {
+        "description": "One notification rule of a partial bulk update and the fields to update on it.",
         "properties": {
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Updated rule name",
+            "title": "Name"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Updated rule description. Omit to leave unchanged; null clears.",
+            "title": "Description"
+          },
+          "message_template": {
+            "anyOf": [
+              {
+                "maxLength": 65536,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Updated message template (max 64KB)",
+            "title": "Message Template"
+          },
+          "enabled": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Updated enabled status",
+            "title": "Enabled"
+          },
           "id": {
-            "description": "Rule ID to delete",
+            "description": "ID of the rule to update.",
             "format": "uuid",
             "title": "Id",
             "type": "string"
@@ -17628,7 +17783,35 @@
         "required": [
           "id"
         ],
-        "title": "DeleteNotificationRuleInput",
+        "title": "PartialBulkUpdateNotificationRuleItemInput",
+        "type": "object"
+      },
+      "PartialBulkUpdateNotificationRulesInput": {
+        "description": "Input for updating several notification rules, each answered for separately.",
+        "properties": {
+          "items": {
+            "$ref": "#/components/schemas/NonEmptyList_PartialBulkUpdateNotificationRuleItemInput_",
+            "description": "The rules to update, each with its fields."
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "title": "PartialBulkUpdateNotificationRulesInput",
+        "type": "object"
+      },
+      "PartialBulkPurgeNotificationRulesInput": {
+        "description": "Input for purging several notification rules, each answered for separately.",
+        "properties": {
+          "ids": {
+            "$ref": "#/components/schemas/NonEmptyList_UUID_",
+            "description": "IDs of the rules to purge."
+          }
+        },
+        "required": [
+          "ids"
+        ],
+        "title": "PartialBulkPurgeNotificationRulesInput",
         "type": "object"
       },
       "NotificationRuleFilter": {
@@ -17904,6 +18087,22 @@
           "id"
         ],
         "title": "ValidateNotificationRuleInput",
+        "type": "object"
+      },
+      "DeleteNotificationRuleInput": {
+        "description": "Input for deleting a notification rule.",
+        "properties": {
+          "id": {
+            "description": "Rule ID to delete",
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "title": "DeleteNotificationRuleInput",
         "type": "object"
       },
       "CreateObjectStorageInput": {
@@ -53484,12 +53683,39 @@
             }
           }
         ],
-        "description": "Update an existing notification channel.\n\n**Preconditions:**\n* Superadmin privilege required.\n"
+        "description": "Update an existing notification channel.\n\n**Preconditions:**\n* User privilege required.\n"
+      },
+      "delete": {
+        "operationId": "v2/notifications.purge_channel",
+        "tags": [
+          "v2/notifications"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "channel_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "description": "Permanently remove a notification channel.\n\n**Preconditions:**\n* User privilege required.\n"
       }
     },
-    "/v2/notifications/channels/delete": {
+    "/v2/notifications/channels/partial-bulk-update": {
       "post": {
-        "operationId": "v2/notifications.delete_channel",
+        "operationId": "v2/notifications.partial_bulk_update_channels",
         "tags": [
           "v2/notifications"
         ],
@@ -53507,13 +53733,42 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/DeleteNotificationChannelInput"
+                "$ref": "#/components/schemas/PartialBulkUpdateNotificationChannelsInput"
               }
             }
           }
         },
         "parameters": [],
-        "description": "Delete a notification channel.\n\n**Preconditions:**\n* Superadmin privilege required.\n"
+        "description": "Update several notification channels, answering for each one.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/v2/notifications/channels/partial-bulk-purge": {
+      "post": {
+        "operationId": "v2/notifications.partial_bulk_purge_channels",
+        "tags": [
+          "v2/notifications"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PartialBulkPurgeNotificationChannelsInput"
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "description": "Permanently remove several notification channels, answering for each one.\n\n**Preconditions:**\n* User privilege required.\n"
       }
     },
     "/v2/notifications/channels/search": {
@@ -53572,6 +53827,35 @@
         },
         "parameters": [],
         "description": "Validate a notification channel by sending a test message.\n\n**Preconditions:**\n* Superadmin privilege required.\n"
+      }
+    },
+    "/v2/notifications/channels/delete": {
+      "post": {
+        "operationId": "v2/notifications.delete_channel",
+        "tags": [
+          "v2/notifications"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DeleteNotificationChannelInput"
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "description": "Deprecated. Use `DELETE /v2/notifications/channels/{channel_id}`.\n\n**Preconditions:**\n* Superadmin privilege required.\n"
       }
     },
     "/v2/notifications/rules": {
@@ -53665,12 +53949,39 @@
             }
           }
         ],
-        "description": "Update an existing notification rule.\n\n**Preconditions:**\n* Superadmin privilege required.\n"
+        "description": "Update an existing notification rule.\n\n**Preconditions:**\n* User privilege required.\n"
+      },
+      "delete": {
+        "operationId": "v2/notifications.purge_rule",
+        "tags": [
+          "v2/notifications"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "rule_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "description": "Permanently remove a notification rule.\n\n**Preconditions:**\n* User privilege required.\n"
       }
     },
-    "/v2/notifications/rules/delete": {
+    "/v2/notifications/rules/partial-bulk-update": {
       "post": {
-        "operationId": "v2/notifications.delete_rule",
+        "operationId": "v2/notifications.partial_bulk_update_rules",
         "tags": [
           "v2/notifications"
         ],
@@ -53688,13 +53999,42 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/DeleteNotificationRuleInput"
+                "$ref": "#/components/schemas/PartialBulkUpdateNotificationRulesInput"
               }
             }
           }
         },
         "parameters": [],
-        "description": "Delete a notification rule.\n\n**Preconditions:**\n* Superadmin privilege required.\n"
+        "description": "Update several notification rules, answering for each one.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/v2/notifications/rules/partial-bulk-purge": {
+      "post": {
+        "operationId": "v2/notifications.partial_bulk_purge_rules",
+        "tags": [
+          "v2/notifications"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PartialBulkPurgeNotificationRulesInput"
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "description": "Permanently remove several notification rules, answering for each one.\n\n**Preconditions:**\n* User privilege required.\n"
       }
     },
     "/v2/notifications/rules/search": {
@@ -53753,6 +54093,35 @@
         },
         "parameters": [],
         "description": "Validate a notification rule by rendering its template with test data.\n\n**Preconditions:**\n* Superadmin privilege required.\n"
+      }
+    },
+    "/v2/notifications/rules/delete": {
+      "post": {
+        "operationId": "v2/notifications.delete_rule",
+        "tags": [
+          "v2/notifications"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DeleteNotificationRuleInput"
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "description": "Deprecated. Use `DELETE /v2/notifications/rules/{rule_id}`.\n\n**Preconditions:**\n* Superadmin privilege required.\n"
       }
     },
     "/v2/object-storages": {

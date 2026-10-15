@@ -14163,10 +14163,10 @@ type Mutation
   adminCreateNotificationChannel(input: CreateNotificationChannelInput!): CreateNotificationChannelPayload @join__field(graph: STRAWBERRY)
 
   """Added in 26.4.2. Update a notification channel (admin only)"""
-  adminUpdateNotificationChannel(input: UpdateNotificationChannelInput!): UpdateNotificationChannelPayload @join__field(graph: STRAWBERRY)
+  adminUpdateNotificationChannel(input: UpdateNotificationChannelInput!): UpdateNotificationChannelPayload @join__field(graph: STRAWBERRY) @deprecated(reason: "Deprecated since 26.10.0. Use `updateNotificationChannel`.")
 
   """Added in 26.4.2. Delete a notification channel (admin only)"""
-  adminDeleteNotificationChannel(input: DeleteNotificationChannelInput!): DeleteNotificationChannelPayload @join__field(graph: STRAWBERRY)
+  adminDeleteNotificationChannel(input: DeleteNotificationChannelInput!): DeleteNotificationChannelPayload @join__field(graph: STRAWBERRY) @deprecated(reason: "Deprecated since 26.10.0. Use `purgeNotificationChannel`.")
 
   """Added in 26.4.2. Validate a notification channel (admin only)"""
   adminValidateNotificationChannel(input: ValidateNotificationChannelInput!): ValidateNotificationChannelPayload @join__field(graph: STRAWBERRY)
@@ -14175,22 +14175,51 @@ type Mutation
   adminCreateNotificationRule(input: CreateNotificationRuleInput!): CreateNotificationRulePayload @join__field(graph: STRAWBERRY)
 
   """Added in 26.4.2. Update a notification rule (admin only)"""
-  adminUpdateNotificationRule(input: UpdateNotificationRuleInput!): UpdateNotificationRulePayload @join__field(graph: STRAWBERRY)
+  adminUpdateNotificationRule(input: UpdateNotificationRuleInput!): UpdateNotificationRulePayload @join__field(graph: STRAWBERRY) @deprecated(reason: "Deprecated since 26.10.0. Use `updateNotificationRule`.")
 
   """Added in 26.4.2. Delete a notification rule (admin only)"""
-  adminDeleteNotificationRule(input: DeleteNotificationRuleInput!): DeleteNotificationRulePayload @join__field(graph: STRAWBERRY)
+  adminDeleteNotificationRule(input: DeleteNotificationRuleInput!): DeleteNotificationRulePayload @join__field(graph: STRAWBERRY) @deprecated(reason: "Deprecated since 26.10.0. Use `purgeNotificationRule`.")
 
   """Added in 26.4.2. Validate a notification rule (admin only)"""
   adminValidateNotificationRule(input: ValidateNotificationRuleInput!): ValidateNotificationRulePayload @join__field(graph: STRAWBERRY)
 
+  """Added in 26.4.2. Update a notification channel"""
+  updateNotificationChannel(input: UpdateNotificationChannelInput!): UpdateNotificationChannelPayload @join__field(graph: STRAWBERRY)
+
+  """Added in 26.4.2. Update a notification rule"""
+  updateNotificationRule(input: UpdateNotificationRuleInput!): UpdateNotificationRulePayload @join__field(graph: STRAWBERRY)
+
+  """Added in 26.10.0. Permanently remove a notification channel."""
+  purgeNotificationChannel(id: UUID!): PurgeNotificationChannelPayload! @join__field(graph: STRAWBERRY)
+
+  """Added in 26.10.0. Permanently remove a notification rule."""
+  purgeNotificationRule(id: UUID!): PurgeNotificationRulePayload! @join__field(graph: STRAWBERRY)
+
+  """
+  Added in 26.10.0. Update several notification channels, answering for each one.
+  """
+  partialBulkUpdateNotificationChannels(input: PartialBulkUpdateNotificationChannelsInput!): PartialBulkNotificationChannelsPayload! @join__field(graph: STRAWBERRY)
+
+  """
+  Added in 26.10.0. Permanently remove several notification channels, answering for each one.
+  """
+  partialBulkPurgeNotificationChannels(input: PartialBulkPurgeNotificationChannelsInput!): PartialBulkNotificationChannelsPayload! @join__field(graph: STRAWBERRY)
+
+  """
+  Added in 26.10.0. Update several notification rules, answering for each one.
+  """
+  partialBulkUpdateNotificationRules(input: PartialBulkUpdateNotificationRulesInput!): PartialBulkNotificationRulesPayload! @join__field(graph: STRAWBERRY)
+
+  """
+  Added in 26.10.0. Permanently remove several notification rules, answering for each one.
+  """
+  partialBulkPurgeNotificationRules(input: PartialBulkPurgeNotificationRulesInput!): PartialBulkNotificationRulesPayload! @join__field(graph: STRAWBERRY)
+
   """Added in 26.4.2. Create a new notification channel"""
   createNotificationChannel(input: CreateNotificationChannelInput!): CreateNotificationChannelPayload @join__field(graph: STRAWBERRY) @deprecated(reason: "Use admin_create_notification_channel instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.")
 
-  """Added in 26.4.2. Update a notification channel"""
-  updateNotificationChannel(input: UpdateNotificationChannelInput!): UpdateNotificationChannelPayload @join__field(graph: STRAWBERRY) @deprecated(reason: "Use admin_update_notification_channel instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.")
-
   """Added in 26.4.2. Delete a notification channel"""
-  deleteNotificationChannel(input: DeleteNotificationChannelInput!): DeleteNotificationChannelPayload @join__field(graph: STRAWBERRY) @deprecated(reason: "Use admin_delete_notification_channel instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.")
+  deleteNotificationChannel(input: DeleteNotificationChannelInput!): DeleteNotificationChannelPayload @join__field(graph: STRAWBERRY) @deprecated(reason: "Deprecated since 26.10.0. Use `purgeNotificationChannel`.")
 
   """Added in 26.4.2. Validate a notification channel"""
   validateNotificationChannel(input: ValidateNotificationChannelInput!): ValidateNotificationChannelPayload @join__field(graph: STRAWBERRY) @deprecated(reason: "Use admin_validate_notification_channel instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.")
@@ -14198,11 +14227,8 @@ type Mutation
   """Added in 26.4.2. Create a new notification rule"""
   createNotificationRule(input: CreateNotificationRuleInput!): CreateNotificationRulePayload @join__field(graph: STRAWBERRY) @deprecated(reason: "Use admin_create_notification_rule instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.")
 
-  """Added in 26.4.2. Update a notification rule"""
-  updateNotificationRule(input: UpdateNotificationRuleInput!): UpdateNotificationRulePayload @join__field(graph: STRAWBERRY) @deprecated(reason: "Use admin_update_notification_rule instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.")
-
   """Added in 26.4.2. Delete a notification rule"""
-  deleteNotificationRule(input: DeleteNotificationRuleInput!): DeleteNotificationRulePayload @join__field(graph: STRAWBERRY) @deprecated(reason: "Use admin_delete_notification_rule instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.")
+  deleteNotificationRule(input: DeleteNotificationRuleInput!): DeleteNotificationRulePayload @join__field(graph: STRAWBERRY) @deprecated(reason: "Deprecated since 26.10.0. Use `purgeNotificationRule`.")
 
   """Added in 26.4.2. Validate a notification rule"""
   validateNotificationRule(input: ValidateNotificationRuleInput!): ValidateNotificationRulePayload @join__field(graph: STRAWBERRY) @deprecated(reason: "Use admin_validate_notification_rule instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.")
@@ -15796,6 +15822,32 @@ type PartialBulkKeypairResourcePoliciesPayload
 }
 
 """
+Added in 26.10.0. Result of a partial bulk notification channel operation: the channels processed and the ones that failed.
+"""
+type PartialBulkNotificationChannelsPayload
+  @join__type(graph: STRAWBERRY)
+{
+  """The channels processed."""
+  successes: [NotificationChannel!]!
+
+  """The channels not processed, each with the reason."""
+  failed: [PartialBulkFailure!]!
+}
+
+"""
+Added in 26.10.0. Result of a partial bulk notification rule operation: the rules processed and the ones that failed.
+"""
+type PartialBulkNotificationRulesPayload
+  @join__type(graph: STRAWBERRY)
+{
+  """The rules processed."""
+  successes: [NotificationRule!]!
+
+  """The rules not processed, each with the reason."""
+  failed: [PartialBulkFailure!]!
+}
+
+"""
 Added in 26.10.0. Result of a partial bulk project resource policy operation: the policies processed and the ones that failed.
 """
 type PartialBulkProjectResourcePoliciesPayload
@@ -15851,6 +15903,26 @@ input PartialBulkPurgeKeypairResourcePoliciesInput
   @join__type(graph: STRAWBERRY)
 {
   """IDs of the keypair resource policies to purge."""
+  ids: [UUID!]!
+}
+
+"""
+Added in 26.10.0. Input for purging several notification channels, each answered for separately.
+"""
+input PartialBulkPurgeNotificationChannelsInput
+  @join__type(graph: STRAWBERRY)
+{
+  """IDs of the channels to purge."""
+  ids: [UUID!]!
+}
+
+"""
+Added in 26.10.0. Input for purging several notification rules, each answered for separately.
+"""
+input PartialBulkPurgeNotificationRulesInput
+  @join__type(graph: STRAWBERRY)
+{
+  """IDs of the rules to purge."""
   ids: [UUID!]!
 }
 
@@ -16037,6 +16109,70 @@ input PartialBulkUpdateKeypairResourcePolicyItemInput
 
   """Fields to update on the policy."""
   input: UpdateKeypairResourcePolicyInput!
+}
+
+"""
+Added in 26.10.0. One notification channel of a partial bulk update and the fields to update on it.
+"""
+input PartialBulkUpdateNotificationChannelItemInput
+  @join__type(graph: STRAWBERRY)
+{
+  """ID of the channel to update."""
+  id: UUID!
+
+  """Updated channel name."""
+  name: String
+
+  """Updated channel description. Omit to leave unchanged; null clears."""
+  description: String
+
+  """Updated channel specification."""
+  spec: NotificationChannelSpecInput
+
+  """Updated enabled status."""
+  enabled: Boolean
+}
+
+"""
+Added in 26.10.0. Input for updating several notification channels, each answered for separately.
+"""
+input PartialBulkUpdateNotificationChannelsInput
+  @join__type(graph: STRAWBERRY)
+{
+  """The channels to update, each with its fields."""
+  items: [PartialBulkUpdateNotificationChannelItemInput!]!
+}
+
+"""
+Added in 26.10.0. One notification rule of a partial bulk update and the fields to update on it.
+"""
+input PartialBulkUpdateNotificationRuleItemInput
+  @join__type(graph: STRAWBERRY)
+{
+  """ID of the rule to update."""
+  id: UUID!
+
+  """Updated rule name."""
+  name: String
+
+  """Updated rule description. Omit to leave unchanged; null clears."""
+  description: String
+
+  """Updated message template (max 64KB)."""
+  messageTemplate: String
+
+  """Updated enabled status."""
+  enabled: Boolean
+}
+
+"""
+Added in 26.10.0. Input for updating several notification rules, each answered for separately.
+"""
+input PartialBulkUpdateNotificationRulesInput
+  @join__type(graph: STRAWBERRY)
+{
+  """The rules to update, each with its fields."""
+  items: [PartialBulkUpdateNotificationRuleItemInput!]!
 }
 
 """
@@ -17891,6 +18027,22 @@ type PurgeImagesPayload
   @join__type(graph: GRAPHENE)
 {
   task_id: String
+}
+
+"""Added in 26.10.0. Payload for notification channel purge."""
+type PurgeNotificationChannelPayload
+  @join__type(graph: STRAWBERRY)
+{
+  """ID of the purged notification channel."""
+  id: UUID!
+}
+
+"""Added in 26.10.0. Payload for notification rule purge."""
+type PurgeNotificationRulePayload
+  @join__type(graph: STRAWBERRY)
+{
+  """ID of the purged notification rule."""
+  id: UUID!
 }
 
 """Added in 26.4.2. Payload for project permanent deletion mutation."""
