@@ -132,6 +132,11 @@ from ai.backend.manager.api.gql.session_options.types import (
     DefaultSessionOptionsInfoGQL,
     DefaultSessionOptionsInputGQL,
 )
+from ai.backend.manager.api.gql.storage_volume.types import (
+    ResourceGroupVolumeOfferFilterGQL,
+    ResourceGroupVolumeOfferListGQL,
+    ResourceGroupVolumeOfferOrderByGQL,
+)
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 
 __all__ = (
@@ -665,6 +670,22 @@ class ResourceGroupGQL(PydanticNodeMixin[ResourceGroupDetailNode]):
             limit=limit,
             offset=offset,
         )
+
+    @gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="The storage volumes offered to this resource group.",
+        )
+    )  # type: ignore[misc]
+    async def storage_volume_offers(
+        self,
+        info: Info[StrawberryGQLContext],
+        filter: ResourceGroupVolumeOfferFilterGQL | None = None,
+        order_by: list[ResourceGroupVolumeOfferOrderByGQL] | None = None,
+        limit: int | None = None,
+        offset: int | None = None,
+    ) -> ResourceGroupVolumeOfferListGQL | None:
+        raise NotImplementedError
 
 
 ResourceGroupEdge = Edge[ResourceGroupGQL]

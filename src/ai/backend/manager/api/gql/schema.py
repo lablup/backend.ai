@@ -637,6 +637,14 @@ from ai.backend.manager.api.gql.session.resolver.session import (
     session_v2,
     terminate_sessions_v2,
 )
+from ai.backend.manager.api.gql.storage_volume.resolver import (
+    admin_purge_resource_group_volume_offer,
+    admin_purge_storage_volume,
+    admin_storage_volume,
+    admin_storage_volumes,
+    admin_update_storage_volume,
+    admin_upsert_resource_group_volume_offer,
+)
 from ai.backend.manager.api.gql.user.resolver.mutation import (
     admin_bulk_create_users_v2,
     admin_bulk_create_users_with_keypair_v2,
@@ -837,6 +845,8 @@ class Query:
     admin_allowed_domains_for_resource_group_v2 = admin_allowed_domains_for_resource_group_v2
     admin_allowed_projects_for_resource_group_v2 = admin_allowed_projects_for_resource_group_v2
     admin_service_catalogs = admin_service_catalogs
+    admin_storage_volume = admin_storage_volume
+    admin_storage_volumes = admin_storage_volumes
     admin_session_scheduling_histories = admin_session_scheduling_histories
     admin_kernel_scheduling_histories = admin_kernel_scheduling_histories
     admin_deployments = admin_deployments
@@ -1286,6 +1296,10 @@ class Mutation:
     purge_prometheus_query_preset = purge_prometheus_query_preset
     partial_bulk_update_prometheus_query_presets = partial_bulk_update_prometheus_query_presets
     partial_bulk_purge_prometheus_query_presets = partial_bulk_purge_prometheus_query_presets
+    admin_update_storage_volume = admin_update_storage_volume
+    admin_purge_storage_volume = admin_purge_storage_volume
+    admin_upsert_resource_group_volume_offer = admin_upsert_resource_group_volume_offer
+    admin_purge_resource_group_volume_offer = admin_purge_resource_group_volume_offer
     # Prometheus Query Preset Category - Admin APIs
     admin_create_prometheus_query_preset_category = admin_create_prometheus_query_preset_category
     admin_delete_prometheus_query_preset_category = admin_delete_prometheus_query_preset_category
