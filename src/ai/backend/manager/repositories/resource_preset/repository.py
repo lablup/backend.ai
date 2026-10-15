@@ -8,7 +8,6 @@ from uuid import UUID
 
 import trafaret as t
 
-from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
 from ai.backend.common.data.entity.resource_preset import ResourcePresetID
 from ai.backend.common.exception import BackendAIError
 from ai.backend.common.metrics.metric import DomainType, LayerType
@@ -29,10 +28,8 @@ from ai.backend.manager.models.resource_preset.updaters import (
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.ops.v2.share.provider import ShareOpsProvider
 
-from .cache_source.cache_source import ResourcePresetCacheSource
 from .db_source.db_source import ResourcePresetDBSource
 from .types import CheckPresetsResult
-from .utils import suppress_with_log
 
 log = StructuredLogger(logging.getLogger(__spec__.name))
 
@@ -55,21 +52,18 @@ resource_preset_repository_resilience = Resilience(
 
 
 class ResourcePresetRepository:
-    """Repository that orchestrates between DB and cache sources for resource preset operations."""
+    """Repository for resource preset operations."""
 
     _db_source: ResourcePresetDBSource
-    _cache_source: ResourcePresetCacheSource
     _config_provider: ManagerConfigProvider
 
     def __init__(
         self,
         db: ExtendedAsyncSAEngine,
-        valkey_stat: ValkeyStatClient,
         config_provider: ManagerConfigProvider,
         v2_ops_provider: ShareOpsProvider,
     ) -> None:
         self._db_source = ResourcePresetDBSource(db, v2_ops_provider)
-        self._cache_source = ResourcePresetCacheSource(valkey_stat)
         self._config_provider = config_provider
 
     @resource_preset_repository_resilience.apply()
@@ -78,12 +72,7 @@ class ResourcePresetRepository:
         Creates a new resource preset.
         Raises ResourcePresetConflict if a preset with the same name and scaling group already exists.
         """
-        preset = await self._db_source.create_preset(creator)
-        with suppress_with_log(
-            [Exception], message="Failed to invalidate cache after preset creation"
-        ):
-            await self._cache_source.invalidate_all_presets()
-        return preset
+        return await self._db_source.create_preset(creator)
 
     @resource_preset_repository_resilience.apply()
     async def get_preset_by_id(self, preset_id: UUID) -> ResourcePresetData:
@@ -91,17 +80,7 @@ class ResourcePresetRepository:
         Gets a resource preset by ID.
         Raises ResourcePresetNotFound if the preset doesn't exist.
         """
-        # Try cache first
-        with suppress_with_log([Exception], message=f"Failed to get preset {preset_id} from cache"):
-            preset = await self._cache_source.get_preset_by_id(preset_id)
-            if preset:
-                return preset
-
-        # Fallback to DB
-        preset = await self._db_source.get_preset_by_id(preset_id)
-        with suppress_with_log([Exception], message=f"Failed to cache preset {preset_id}"):
-            await self._cache_source.set_preset(preset)
-        return preset
+        return await self._db_source.get_preset_by_id(preset_id)
 
     @resource_preset_repository_resilience.apply()
     async def get_preset_by_name(self, name: str) -> ResourcePresetData:
@@ -109,17 +88,7 @@ class ResourcePresetRepository:
         Gets a resource preset by name.
         Raises ResourcePresetNotFound if the preset doesn't exist.
         """
-        # Try cache first
-        with suppress_with_log([Exception], message=f"Failed to get preset '{name}' from cache"):
-            preset = await self._cache_source.get_preset_by_name(name)
-            if preset:
-                return preset
-
-        # Fallback to DB
-        preset = await self._db_source.get_preset_by_name(name)
-        with suppress_with_log([Exception], message=f"Failed to cache preset '{name}'"):
-            await self._cache_source.set_preset(preset)
-        return preset
+        return await self._db_source.get_preset_by_name(name)
 
     @resource_preset_repository_resilience.apply()
     async def get_preset_by_id_or_name(
@@ -138,12 +107,7 @@ class ResourcePresetRepository:
         Modifies an existing resource preset.
         Raises ResourcePresetNotFound if the preset doesn't exist.
         """
-        preset = await self._db_source.update_preset(updater)
-        with suppress_with_log(
-            [Exception], message="Failed to invalidate cache after preset modification"
-        ):
-            await self._cache_source.invalidate_preset(updater.preset_id, None)
-        return preset
+        return await self._db_source.update_preset(updater)
 
     @resource_preset_repository_resilience.apply()
     async def set_preset_resource_group(
@@ -153,12 +117,7 @@ class ResourcePresetRepository:
         scope or out of it.
         Raises ResourcePresetNotFound if the preset doesn't exist.
         """
-        preset = await self._db_source.set_preset_resource_group(updater)
-        with suppress_with_log(
-            [Exception], message="Failed to invalidate cache after preset modification"
-        ):
-            await self._cache_source.invalidate_preset(updater.preset_id, None)
-        return preset
+        return await self._db_source.set_preset_resource_group(updater)
 
     @resource_preset_repository_resilience.apply()
     async def delete_preset_validated(self, preset_id: ResourcePresetID) -> ResourcePresetData:
@@ -167,12 +126,7 @@ class ResourcePresetRepository:
         Returns the deleted preset data.
         Raises ResourcePresetNotFound if the preset doesn't exist.
         """
-        preset = await self._db_source.delete_preset(preset_id)
-        with suppress_with_log(
-            [Exception], message="Failed to invalidate cache after preset deletion"
-        ):
-            await self._cache_source.invalidate_preset(preset_id, None)
-        return preset
+        return await self._db_source.delete_preset(preset_id)
 
     @resource_preset_repository_resilience.apply()
     async def list_presets(
@@ -182,20 +136,7 @@ class ResourcePresetRepository:
         Lists all resource presets.
         If scaling_group_name is provided, returns presets for that scaling group and global presets.
         """
-        # Try cache first
-        with suppress_with_log([Exception], message="Failed to get preset list from cache"):
-            presets = await self._cache_source.get_preset_list(resource_group_name)
-            if presets is not None:
-                return presets
-
-        # Fallback to DB
-        presets = await self._db_source.list_presets(resource_group_name)
-
-        # Cache the result
-        with suppress_with_log([Exception], message="Failed to cache preset list"):
-            await self._cache_source.set_preset_list(presets, resource_group_name)
-
-        return presets
+        return await self._db_source.list_presets(resource_group_name)
 
     @resource_preset_repository_resilience.apply()
     async def known_slot_types(self) -> Mapping[SlotName, SlotTypes]:

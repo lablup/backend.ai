@@ -527,7 +527,6 @@ class LayerType(enum.StrEnum):
 
     # Cache Source layers
     AGENT_CACHE_SOURCE = "agent_cache_source"
-    RESOURCE_PRESET_CACHE_SOURCE = "resource_preset_cache_source"
     SCHEDULE_CACHE_SOURCE = "schedule_cache_source"
     SCHEDULER_CACHE_SOURCE = "scheduler_cache_source"
 

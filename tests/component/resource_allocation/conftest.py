@@ -39,7 +39,6 @@ from ai.backend.manager.api.rest.v2.resource_allocation.registry import (
 )
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.secret.types import KeyProviderType
-from ai.backend.manager.dependencies.infrastructure.redis import ValkeyClients
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.domain.repository import DomainRepository
 from ai.backend.manager.repositories.ops.v2.domain.provider import DomainOpsProvider
@@ -74,7 +73,6 @@ from ai.backend.manager.services.user.service import UserService
 def resource_allocation_processors(
     database_engine: ExtendedAsyncSAEngine,
     config_provider: ManagerConfigProvider,
-    valkey_clients: ValkeyClients,
     processor_registry: ProcessorRegistry[Any],
 ) -> ResourceAllocationProcessors:
     """Build real resource allocation processors with real DB and config."""
@@ -84,7 +82,6 @@ def resource_allocation_processors(
     )
     rp_repo = ResourcePresetRepository(
         db=database_engine,
-        valkey_stat=valkey_clients.stat,
         config_provider=config_provider,
         v2_ops_provider=ShareOpsProvider(database_engine),
     )
