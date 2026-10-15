@@ -63,7 +63,7 @@ from ai.backend.manager.errors.api import InvalidAPIParameters
 from ai.backend.manager.errors.common import GenericForbidden, ServiceUnavailable
 from ai.backend.manager.errors.image import ImageNotFound
 from ai.backend.manager.errors.resource import DomainNotFound
-from ai.backend.manager.errors.service import AutoScalingRuleNotFound, EndpointNotFound
+from ai.backend.manager.errors.service import EndpointNotFound
 from ai.backend.manager.models.deployment_revision.row import DeploymentRevisionRow
 from ai.backend.manager.models.domain.lookups import DomainNameLookup
 from ai.backend.manager.models.endpoint.creators import EndpointTokenCreator
@@ -179,21 +179,20 @@ class ModelServingRepository:
         """
         async with self._db.begin_readonly_session_read_committed() as session:
             stmt = (
-                sa.select(EndpointRow)
+                sa.select(EndpointRow.session_owner, EndpointRow.domain, UserRow.role)
+                .outerjoin(UserRow, UserRow.uuid == EndpointRow.session_owner)
                 .where(EndpointRow.id == endpoint_id)
-                .options(selectinload(EndpointRow.session_owner_row))
             )
             result = await session.execute(stmt)
-            endpoint_row = result.scalar_one_or_none()
-            if endpoint_row is None:
+            row = result.first()
+            if row is None:
                 return None
+            session_owner_id, domain, session_owner_role = row
 
             return EndpointAccessValidationData(
-                session_owner_id=endpoint_row.session_owner,
-                session_owner_role=(
-                    endpoint_row.session_owner_row.role if endpoint_row.session_owner_row else None
-                ),
-                domain=endpoint_row.domain,
+                session_owner_id=session_owner_id,
+                session_owner_role=session_owner_role,
+                domain=domain,
             )
 
     @model_serving_repository_resilience.apply()
@@ -460,16 +459,22 @@ class ModelServingRepository:
         """
         Private method to get endpoint by ID using an existing session.
         """
-        try:
-            return await EndpointRow.get(
-                session,
-                endpoint_id,
-                load_routes=load_routes,
-                load_session_owner=load_session_owner,
-                load_revisions=load_revisions,
+        query = sa.select(EndpointRow).where(EndpointRow.id == endpoint_id)
+        if load_routes:
+            query = query.options(selectinload(EndpointRow.routings))
+        if load_session_owner:
+            query = query.options(selectinload(EndpointRow.session_owner_row))
+        if load_revisions:
+            query = query.options(
+                selectinload(EndpointRow.current_revision_row).selectinload(
+                    DeploymentRevisionRow.image_row
+                ),
+                selectinload(EndpointRow.deploying_revision_row).selectinload(
+                    DeploymentRevisionRow.image_row
+                ),
             )
-        except NoResultFound:
-            return None
+        endpoint: EndpointRow | None = await session.scalar(query)
+        return endpoint
 
     async def _validate_endpoint_access(
         self,
@@ -565,11 +570,10 @@ class ModelServingRepository:
         Returns None if rule doesn't exist.
         """
         async with self._db.begin_readonly_session_read_committed() as session:
-            try:
-                rule = await EndpointAutoScalingRuleRow.get(session, rule_id, load_endpoint=True)
-                return rule.to_data()
-            except AutoScalingRuleNotFound:
+            rule = await session.get(EndpointAutoScalingRuleRow, rule_id)
+            if rule is None:
                 return None
+            return rule.to_data()
 
     @model_serving_repository_resilience.apply()
     async def create_auto_scaling_rule(
@@ -606,17 +610,19 @@ class ModelServingRepository:
                 max_threshold_val = Decimal(str(threshold))
             else:
                 min_threshold_val = Decimal(str(threshold))
-            rule = await endpoint.create_auto_scaling_rule(
-                session,
-                metric_source,
-                metric_name,
-                min_threshold_val,
-                max_threshold_val,
-                step_size,
+            rule = EndpointAutoScalingRuleRow(
+                endpoint=endpoint.id,
+                metric_source=metric_source,
+                metric_name=metric_name,
+                min_threshold=min_threshold_val,
+                max_threshold=max_threshold_val,
+                step_size=step_size,
                 cooldown_seconds=cooldown_seconds,
                 min_replicas=min_replicas,
                 max_replicas=max_replicas,
             )
+            session.add(rule)
+            await session.flush()
             return rule.to_data()
 
     @model_serving_repository_resilience.apply()
@@ -631,12 +637,18 @@ class ModelServingRepository:
         rule_id = uuid.UUID(str(updater.rule_id))
 
         async with self._db.begin_readonly_session() as session:
-            try:
-                # Validate lifecycle stage before update
-                rule = await EndpointAutoScalingRuleRow.get(session, rule_id, load_endpoint=True)
-            except AutoScalingRuleNotFound:
+            # Validate lifecycle stage before update
+            lifecycle_stage = await session.scalar(
+                sa.select(EndpointRow.lifecycle_stage)
+                .join(
+                    EndpointAutoScalingRuleRow,
+                    EndpointAutoScalingRuleRow.endpoint == EndpointRow.id,
+                )
+                .where(EndpointAutoScalingRuleRow.id == rule_id)
+            )
+            if lifecycle_stage is None:
                 return None
-            if rule.endpoint_row.lifecycle_stage in EndpointLifecycle.inactive_states():
+            if lifecycle_stage in EndpointLifecycle.inactive_states():
                 return None
 
         async with self._v2_ops.write_ops() as w:
@@ -652,12 +664,11 @@ class ModelServingRepository:
         Returns True if deleted, False if not found.
         """
         async with self._db.begin_session() as session:
-            try:
-                rule = await EndpointAutoScalingRuleRow.get(session, rule_id, load_endpoint=True)
-                await session.delete(rule)
-                return True
-            except AutoScalingRuleNotFound:
+            rule = await session.get(EndpointAutoScalingRuleRow, rule_id)
+            if rule is None:
                 return False
+            await session.delete(rule)
+            return True
 
     @model_serving_repository_resilience.apply()
     async def get_session_by_id(
@@ -705,30 +716,28 @@ class ModelServingRepository:
 
         async def _do_mutate() -> MutationResult:
             async with self._db.begin_session() as db_session:
-                try:
-                    endpoint_row = await EndpointRow.get(
-                        db_session,
-                        deployment_id,
-                        load_session_owner=True,
-                        load_revisions=True,
-                        load_routes=True,
-                    )
-                    user_data = current_user()
-                    if user_data is None:
-                        raise GenericForbidden("User context not available.")
-                    match user_data.role:
-                        case UserRole.SUPERADMIN:
-                            pass
-                        case UserRole.ADMIN:
-                            domain_name = user_data.domain_name
-                            if endpoint_row.domain != domain_name:
-                                raise EndpointNotFound
-                        case _:
-                            user_id = user_data.user_id
-                            if endpoint_row.session_owner != user_id:
-                                raise EndpointNotFound
-                except NoResultFound as e:
-                    raise EndpointNotFound from e
+                endpoint_row = await self._get_endpoint_by_id(
+                    db_session,
+                    deployment_id,
+                    load_revisions=True,
+                    load_routes=True,
+                )
+                if endpoint_row is None:
+                    raise EndpointNotFound
+                user_data = current_user()
+                if user_data is None:
+                    raise GenericForbidden("User context not available.")
+                match user_data.role:
+                    case UserRole.SUPERADMIN:
+                        pass
+                    case UserRole.ADMIN:
+                        domain_name = user_data.domain_name
+                        if endpoint_row.domain != domain_name:
+                            raise EndpointNotFound
+                    case _:
+                        user_id = user_data.user_id
+                        if endpoint_row.session_owner != user_id:
+                            raise EndpointNotFound
 
                 if endpoint_row.lifecycle_stage in (
                     EndpointLifecycle.DESTROYING,
@@ -740,7 +749,7 @@ class ModelServingRepository:
                 for column, value in updater.build_values().items():
                     setattr(endpoint_row, column, value)
 
-                session_owner = endpoint_row.session_owner_row
+                session_owner = await db_session.get(UserRow, endpoint_row.session_owner)
                 if session_owner is None:
                     raise InvalidAPIParameters("Session owner not found for endpoint")
                 if session_owner.role is None:
@@ -765,13 +774,22 @@ class ModelServingRepository:
                 await db_session.commit()
 
                 # Reload with revisions for to_data()
-                endpoint_row = await EndpointRow.get(
-                    db_session,
-                    endpoint_row.id,
-                    load_revisions=True,
-                    load_created_user=True,
-                    load_session_owner=True,
+                endpoint_row = await db_session.scalar(
+                    sa.select(EndpointRow)
+                    .where(EndpointRow.id == endpoint_row.id)
+                    .options(
+                        selectinload(EndpointRow.created_user_row),
+                        selectinload(EndpointRow.session_owner_row),
+                        selectinload(EndpointRow.current_revision_row).selectinload(
+                            DeploymentRevisionRow.image_row
+                        ),
+                        selectinload(EndpointRow.deploying_revision_row).selectinload(
+                            DeploymentRevisionRow.image_row
+                        ),
+                    )
                 )
+                if endpoint_row is None:
+                    raise EndpointNotFound
                 return MutationResult(
                     success=True,
                     message="success",

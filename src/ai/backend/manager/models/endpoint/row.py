@@ -11,9 +11,8 @@ from decimal import Decimal
 from typing import (
     TYPE_CHECKING,
     Any,
-    Self,
 )
-from uuid import UUID, uuid4
+from uuid import UUID
 
 import sqlalchemy as sa
 import yarl
@@ -47,11 +46,6 @@ from ai.backend.manager.data.deployment.scale import (
     AutoScalingAction,
     AutoScalingCondition,
     AutoScalingRule,
-    AutoScalingRuleCreator,
-    ModelDeploymentAutoScalingRuleCreator,
-)
-from ai.backend.manager.data.deployment.scale_modifier import (
-    ModelDeploymentAutoScalingRuleModifier,
 )
 from ai.backend.manager.data.deployment.types import (
     DeploymentInfo,
@@ -338,6 +332,8 @@ class EndpointRow(Base):
             values["destroyed_at"] = sa.func.now()
         return values
 
+    # Read only by gql_legacy (endpoint.py); v2 queries EndpointRow directly.
+    # Delete it together with the gql_legacy cleanup.
     @classmethod
     async def get(
         cls,
@@ -391,6 +387,8 @@ class EndpointRow(Base):
             raise NoResultFound
         return row
 
+    # Read only by gql_legacy (endpoint.py).
+    # Delete it together with the gql_legacy cleanup.
     @classmethod
     async def list_endpoint(
         cls,
@@ -441,33 +439,6 @@ class EndpointRow(Base):
             query = query.filter(EndpointRow.session_owner == user_uuid)
         result = await session.execute(query)
         return list(result.scalars().all())
-
-    async def create_auto_scaling_rule(
-        self,
-        session: AsyncSession,
-        metric_source: AutoScalingMetricSource,
-        metric_name: str,
-        min_threshold: Decimal | None,
-        max_threshold: Decimal | None,
-        step_size: int,
-        cooldown_seconds: int = 300,
-        min_replicas: int | None = None,
-        max_replicas: int | None = None,
-    ) -> EndpointAutoScalingRuleRow:
-        row = EndpointAutoScalingRuleRow(
-            id=uuid4(),
-            endpoint=self.id,
-            metric_source=metric_source,
-            metric_name=metric_name,
-            min_threshold=min_threshold,
-            max_threshold=max_threshold,
-            step_size=step_size,
-            cooldown_seconds=cooldown_seconds,
-            min_replicas=min_replicas,
-            max_replicas=max_replicas,
-        )
-        session.add(row)
-        return row
 
     @property
     def current_revision_id(self) -> DeploymentRevisionID | None:
@@ -755,6 +726,8 @@ class EndpointTokenRow(Base):
         self.session_owner = session_owner
         self.expires_at = expires_at
 
+    # Read only by gql_legacy (endpoint.py); v2 reads tokens through the deployment
+    # db_source. Delete it together with the gql_legacy cleanup.
     @classmethod
     async def list(
         cls,
@@ -782,6 +755,8 @@ class EndpointTokenRow(Base):
         result = await session.execute(query)
         return result.scalars().all()
 
+    # Read only by gql_legacy (endpoint.py); v2 reads tokens through the deployment
+    # db_source. Delete it together with the gql_legacy cleanup.
     @classmethod
     async def get(
         cls,
@@ -875,6 +850,8 @@ class EndpointAutoScalingRuleRow(Base):
 
     endpoint_row: Mapped[EndpointRow] = relationship("EndpointRow", lazy="joined")
 
+    # Read only by gql_legacy (endpoint.py), which passes load_endpoint.
+    # Delete it together with the gql_legacy cleanup.
     @classmethod
     async def get(
         cls, session: AsyncSession, id: UUID, load_endpoint: bool = False
@@ -913,22 +890,6 @@ class EndpointAutoScalingRuleRow(Base):
             endpoint=self.endpoint,
         )
 
-    @classmethod
-    def from_creator(cls, endpoint_id: UUID, creator: AutoScalingRuleCreator) -> Self:
-        return cls(
-            id=uuid4(),
-            endpoint=endpoint_id,
-            metric_source=creator.condition.metric_source,
-            metric_name=creator.condition.metric_name,
-            min_threshold=creator.condition.scale_down_threshold,
-            max_threshold=creator.condition.scale_up_threshold,
-            step_size=creator.action.step_size,
-            cooldown_seconds=creator.action.cooldown_seconds,
-            min_replicas=creator.action.min_replicas,
-            max_replicas=creator.action.max_replicas,
-            prometheus_query_preset_id=creator.condition.prometheus_query_preset_id,
-        )
-
     def to_autoscaling_rule(self) -> AutoScalingRule:
         return AutoScalingRule(
             id=self.id,
@@ -948,36 +909,3 @@ class EndpointAutoScalingRuleRow(Base):
             created_at=self.created_at,
             last_triggered_at=self.last_triggered_at,
         )
-
-    # New type conversion methods for Model Deployment
-
-    @classmethod
-    def from_model_deployment_creator(cls, creator: ModelDeploymentAutoScalingRuleCreator) -> Self:
-        """Create from ModelDeploymentAutoScalingRuleCreator (new type)."""
-        return cls(
-            id=uuid4(),
-            endpoint=creator.model_deployment_id,
-            metric_source=creator.metric_source,
-            metric_name=creator.metric_name,
-            min_threshold=creator.min_threshold,
-            max_threshold=creator.max_threshold,
-            step_size=creator.step_size,
-            cooldown_seconds=creator.time_window,
-            min_replicas=creator.min_replicas,
-            max_replicas=creator.max_replicas,
-            prometheus_query_preset_id=creator.prometheus_query_preset_id,
-        )
-
-    def apply_model_deployment_modifier(
-        self, modifier: ModelDeploymentAutoScalingRuleModifier
-    ) -> None:
-        """Apply ModelDeploymentAutoScalingRuleModifier to update fields.
-
-        Uses fields_to_update() which honours both OptionalState (NOP/UPDATE)
-        and TriState (NOP/UPDATE/NULLIFY). Dict keys match DB column names so
-        each entry can be applied directly via setattr, preserving NULLIFY
-        semantics for nullable columns (min/max_threshold, min/max_replicas,
-        prometheus_query_preset_id).
-        """
-        for column_name, value in modifier.fields_to_update().items():
-            setattr(self, column_name, value)
