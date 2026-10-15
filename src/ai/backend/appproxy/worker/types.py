@@ -4,7 +4,7 @@ import asyncio
 import dataclasses
 import enum
 import time
-from collections.abc import Callable, Mapping, Sequence
+from collections.abc import Callable, Mapping
 from contextlib import AbstractAsyncContextManager
 from dataclasses import dataclass
 from decimal import Decimal
@@ -26,7 +26,6 @@ from ai.backend.appproxy.common.types import (
     AppMode,
     FrontendMode,
     ProxyProtocol,
-    RouteInfo,
     SerializableCircuit,
 )
 from ai.backend.common.clients.http_client.client_pool import ClientPool
@@ -446,7 +445,7 @@ class Circuit(SerializableCircuit):
     def prometheus_metric_label(self) -> dict[str, str]:
         return {"protocol": self.protocol.name}
 
-    def to_ingress(self, authority: IngressAuthority, routes: Sequence[RouteInfo]) -> Ingress:
+    def to_ingress(self, authority: IngressAuthority) -> Ingress:
         frontend = self.to_ingress_frontend()
         allowed_client_ips = [ip_network(cidr) for cidr in self.ip_validator.ranges]
         # The worker authenticates http only, so other protocols stay public as they are today.
@@ -483,7 +482,7 @@ class Circuit(SerializableCircuit):
                     host=route.current_kernel_host,
                     port=route.kernel_port,
                 )
-                for route in routes
+                for route in self.route_info
             ],
         )
         return Ingress(

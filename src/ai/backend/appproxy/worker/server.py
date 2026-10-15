@@ -507,9 +507,9 @@ async def worker_registration_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     circuits = await list_worker_circuits(root_ctx, str(uuid.uuid4()))
     for circuit in circuits:
         await root_ctx.proxy_frontend.register_circuit(circuit, circuit.route_info)
-        # Upserted rather than replaced, so circuits from events handled meanwhile are kept.
-        if root_ctx.legacy_circuit_ingress_sync is not None:
-            await root_ctx.legacy_circuit_ingress_sync.upsert_circuit(circuit, circuit.route_info)
+    # Upserted rather than replaced, so circuits from events handled meanwhile are kept.
+    if root_ctx.legacy_circuit_ingress_sync is not None:
+        await root_ctx.legacy_circuit_ingress_sync.upsert_circuits(circuits)
 
     cron = LocalCron([WorkerHeartbeatTask(root_ctx)])
     await cron.start()
@@ -708,13 +708,13 @@ async def handle_proxy_route_event(
     match event:
         case AppProxyCircuitCreatedEvent():
             log.debug("circuits created: {}", [str(c.id) for c in event.circuits])
-            for serialized_circuit in event.circuits:
-                created_circuit = Circuit.from_serialized_circuit(serialized_circuit)
+            created_circuits = [Circuit.from_serialized_circuit(c) for c in event.circuits]
+            for created_circuit in created_circuits:
                 await context.proxy_frontend.register_circuit(
-                    created_circuit, serialized_circuit.route_info
+                    created_circuit, created_circuit.route_info
                 )
-                if sync is not None:
-                    await sync.upsert_circuit(created_circuit, serialized_circuit.route_info)
+            if sync is not None:
+                await sync.upsert_circuits(created_circuits)
             await context.event_producer.broadcast_event(
                 AppProxyWorkerCircuitAddedEvent(
                     target_worker_authority=context.local_config.proxy_worker.authority,
@@ -725,10 +725,12 @@ async def handle_proxy_route_event(
             log.debug("circuit routes updated: {}", event.circuit.id)
             updated_circuit = Circuit.from_serialized_circuit(event.circuit)
             await context.proxy_frontend.update_circuit_route_info(updated_circuit, event.routes)
-            # The frontend skips updates for a circuit it does not hold; so does the state.
-            circuit_key = context.proxy_frontend.get_circuit_key(updated_circuit)
-            if sync is not None and circuit_key in context.proxy_frontend.circuits:
-                await sync.upsert_circuit(updated_circuit, event.routes)
+            # The frontend stores the new routes on the circuit it holds and skips one it does not.
+            held_circuit = context.proxy_frontend.circuits.get(
+                context.proxy_frontend.get_circuit_key(updated_circuit)
+            )
+            if sync is not None and held_circuit is not None:
+                await sync.upsert_circuits([held_circuit])
         case AppProxyCircuitRemovedEvent():
             log.debug("circuits removed: {}", [str(c.id) for c in event.circuits])
             removed_circuits = [Circuit.from_serialized_circuit(c) for c in event.circuits]

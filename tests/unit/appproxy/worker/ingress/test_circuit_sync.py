@@ -123,6 +123,20 @@ def circuit(serialized_circuit: SerializableCircuit) -> Circuit:
 
 
 @pytest.fixture
+def moved_circuit(serialized_circuit: SerializableCircuit, moved_route: RouteInfo) -> Circuit:
+    return Circuit.from_serialized_circuit(
+        serialized_circuit.model_copy(update={"route_info": [moved_route]})
+    )
+
+
+@pytest.fixture
+def routeless_circuit(serialized_circuit: SerializableCircuit) -> Circuit:
+    return Circuit.from_serialized_circuit(
+        serialized_circuit.model_copy(update={"route_info": [], "session_ids": []})
+    )
+
+
+@pytest.fixture
 def access_case_circuit(
     access_case: _AccessCase, serialized_circuit: SerializableCircuit
 ) -> Circuit:
@@ -208,14 +222,14 @@ class TestLegacyCircuitIngressSync:
         ],
         ids=lambda case: f"{case.app_mode}-{case.protocol}-public-{case.open_to_public}",
     )
-    async def test_upsert_circuit_maps_the_circuit_access(
+    async def test_upsert_circuits_maps_the_circuit_access(
         self,
         sync: LegacyCircuitIngressSync,
         memory: InMemoryIngressState,
         access_case: _AccessCase,
         access_case_circuit: Circuit,
     ) -> None:
-        await sync.upsert_circuit(access_case_circuit, access_case_circuit.route_info)
+        await sync.upsert_circuits([access_case_circuit])
         stored_ingress = await memory.get(PORT_KEY)
         assert stored_ingress is not None
         assert stored_ingress.access.mode == access_case.access_mode
@@ -240,22 +254,22 @@ class TestLegacyCircuitIngressSync:
         ],
         ids=lambda case: case.frontend_mode.value,
     )
-    async def test_upsert_circuit_keys_the_ingress_by_the_circuit_frontend(
+    async def test_upsert_circuits_keys_the_ingress_by_the_circuit_frontend(
         self,
         sync: LegacyCircuitIngressSync,
         memory: InMemoryIngressState,
         frontend_case: _FrontendCase,
         frontend_case_circuit: Circuit,
     ) -> None:
-        await sync.upsert_circuit(frontend_case_circuit, frontend_case_circuit.route_info)
+        await sync.upsert_circuits([frontend_case_circuit])
         stored_ingress = await memory.get(frontend_case.frontend_key)
         assert stored_ingress is not None
         assert stored_ingress.frontend.kind == frontend_case.kind
 
-    async def test_upsert_circuit_keeps_the_circuit_users_and_allowed_networks(
+    async def test_upsert_circuits_keeps_the_circuit_users_and_allowed_networks(
         self, sync: LegacyCircuitIngressSync, memory: InMemoryIngressState, circuit: Circuit
     ) -> None:
-        await sync.upsert_circuit(circuit, circuit.route_info)
+        await sync.upsert_circuits([circuit])
         stored_ingress = await memory.get(PORT_KEY)
         assert stored_ingress is not None
         assert stored_ingress.access.users is not None
@@ -265,10 +279,10 @@ class TestLegacyCircuitIngressSync:
             ip_network("192.168.0.1/32"),
         ]
 
-    async def test_upsert_circuit_carries_every_route_as_a_target_of_one_group(
+    async def test_upsert_circuits_carries_every_route_as_a_target_of_one_group(
         self, sync: LegacyCircuitIngressSync, memory: InMemoryIngressState, circuit: Circuit
     ) -> None:
-        await sync.upsert_circuit(circuit, circuit.route_info)
+        await sync.upsert_circuits([circuit])
         stored_ingress = await memory.get(PORT_KEY)
         assert stored_ingress is not None
         assert stored_ingress.backend.target_groups == [
@@ -286,10 +300,10 @@ class TestLegacyCircuitIngressSync:
         sync: LegacyCircuitIngressSync,
         memory: InMemoryIngressState,
         circuit: Circuit,
-        moved_route: RouteInfo,
+        moved_circuit: Circuit,
     ) -> None:
-        await sync.upsert_circuit(circuit, circuit.route_info)
-        await sync.upsert_circuit(circuit, [moved_route])
+        await sync.upsert_circuits([circuit])
+        await sync.upsert_circuits([moved_circuit])
         stored_ingress = await memory.get(PORT_KEY)
         assert stored_ingress is not None
         assert [
@@ -298,10 +312,13 @@ class TestLegacyCircuitIngressSync:
             for target in group.targets
         ] == ["10.0.0.6"]
 
-    async def test_upsert_circuit_without_routes_keeps_the_ingress_with_no_targets(
-        self, sync: LegacyCircuitIngressSync, memory: InMemoryIngressState, circuit: Circuit
+    async def test_upsert_circuits_without_routes_keeps_the_ingress_with_no_targets(
+        self,
+        sync: LegacyCircuitIngressSync,
+        memory: InMemoryIngressState,
+        routeless_circuit: Circuit,
     ) -> None:
-        await sync.upsert_circuit(circuit, [])
+        await sync.upsert_circuits([routeless_circuit])
         stored_ingress = await memory.get(PORT_KEY)
         assert stored_ingress is not None
         assert [group.targets for group in stored_ingress.backend.target_groups] == [[]]

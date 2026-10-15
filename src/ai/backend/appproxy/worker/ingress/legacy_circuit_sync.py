@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 
-from ai.backend.appproxy.common.types import RouteInfo
 from ai.backend.appproxy.worker.ingress.abc import IngressWriter
 from ai.backend.appproxy.worker.types import Circuit
 from ai.backend.common.dto.appproxy.v2.ingress.types import IngressAuthority, IngressKey
@@ -21,8 +20,8 @@ class LegacyCircuitIngressSync:
         self._writer = writer
         self._authority = authority
 
-    async def upsert_circuit(self, circuit: Circuit, routes: Sequence[RouteInfo]) -> None:
-        await self._writer.apply([circuit.to_ingress(self._authority, routes)])
+    async def upsert_circuits(self, circuits: Sequence[Circuit]) -> None:
+        await self._writer.apply([circuit.to_ingress(self._authority) for circuit in circuits])
 
     async def remove_circuits(self, circuits: Sequence[Circuit]) -> None:
         await self._writer.remove([
