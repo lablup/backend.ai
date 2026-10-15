@@ -474,6 +474,7 @@ class Circuit(SerializableCircuit):
         target_group = IngressTargetGroup(
             # TODO: Use the target group id once target groups are stored as their own entity.
             id=IngressTargetGroupID(str(UUID(int=0))),
+            # TODO: Use the target group weight once target groups are stored as their own entity.
             weight=1,
             targets=[
                 IngressTarget(
