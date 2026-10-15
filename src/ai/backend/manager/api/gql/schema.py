@@ -314,7 +314,13 @@ from ai.backend.manager.api.gql.project_v2.resolver.mutation import (
     admin_purge_project_v2,
     admin_restore_project_v2,
     admin_update_project_v2,
+    delete_project_v2,
+    partial_bulk_delete_projects_v2,
+    partial_bulk_restore_projects_v2,
+    partial_bulk_update_projects_v2,
+    restore_project_v2,
     unassign_users_from_project_v2,
+    update_project_v2,
 )
 from ai.backend.manager.api.gql.project_v2.resolver.query import (
     admin_projects_v2,
@@ -1035,6 +1041,12 @@ class Mutation:
     admin_delete_project_v2 = admin_delete_project_v2
     admin_purge_project_v2 = admin_purge_project_v2
     admin_restore_project_v2 = admin_restore_project_v2
+    update_project_v2 = update_project_v2
+    delete_project_v2 = delete_project_v2
+    restore_project_v2 = restore_project_v2
+    partial_bulk_update_projects_v2 = partial_bulk_update_projects_v2
+    partial_bulk_delete_projects_v2 = partial_bulk_delete_projects_v2
+    partial_bulk_restore_projects_v2 = partial_bulk_restore_projects_v2
     unassign_users_from_project_v2 = unassign_users_from_project_v2
     # User V2 APIs
     admin_create_user_v2 = admin_create_user_v2

@@ -18799,7 +18799,8 @@
                 "type": "null"
               }
             ],
-            "description": "Updated active status. Omit to leave unchanged.",
+            "deprecated": true,
+            "description": "Deprecated since 26.10.0. Use the project delete and restore operations. Updated active status. Omit to leave unchanged.",
             "title": "Is Active"
           },
           "integration_name": {
@@ -18830,36 +18831,74 @@
         "title": "UpdateProjectInput",
         "type": "object"
       },
-      "DeleteProjectInput": {
-        "description": "Input for soft-deleting a group.",
+      "NonEmptyList_PartialBulkUpdateProjectItemInput_": {
+        "items": {
+          "$ref": "#/components/schemas/PartialBulkUpdateProjectItemInput"
+        },
+        "minItems": 1,
+        "type": "array"
+      },
+      "PartialBulkUpdateProjectItemInput": {
+        "description": "One project of a partial bulk update and the fields to update on it.",
         "properties": {
-          "group_id": {
-            "description": "UUID of the group to soft-delete.",
+          "id": {
+            "description": "ID of the project to update.",
             "format": "uuid",
-            "title": "Group Id",
+            "title": "Id",
             "type": "string"
+          },
+          "input": {
+            "$ref": "#/components/schemas/UpdateProjectInput",
+            "description": "Fields to update on the project."
           }
         },
         "required": [
-          "group_id"
+          "id",
+          "input"
         ],
-        "title": "DeleteProjectInput",
+        "title": "PartialBulkUpdateProjectItemInput",
         "type": "object"
       },
-      "RestoreProjectInput": {
-        "description": "Input for restoring a soft-deleted group.",
+      "PartialBulkUpdateProjectsInput": {
+        "description": "Input for updating several projects, each answered for separately.",
         "properties": {
-          "group_id": {
-            "description": "UUID of the group to restore.",
-            "format": "uuid",
-            "title": "Group Id",
-            "type": "string"
+          "items": {
+            "$ref": "#/components/schemas/NonEmptyList_PartialBulkUpdateProjectItemInput_",
+            "description": "The projects to update, each with its fields."
           }
         },
         "required": [
-          "group_id"
+          "items"
         ],
-        "title": "RestoreProjectInput",
+        "title": "PartialBulkUpdateProjectsInput",
+        "type": "object"
+      },
+      "PartialBulkDeleteProjectsInput": {
+        "description": "Input for soft-deleting several projects, each answered for separately.",
+        "properties": {
+          "ids": {
+            "$ref": "#/components/schemas/NonEmptyList_UUID_",
+            "description": "IDs of the projects to soft-delete."
+          }
+        },
+        "required": [
+          "ids"
+        ],
+        "title": "PartialBulkDeleteProjectsInput",
+        "type": "object"
+      },
+      "PartialBulkRestoreProjectsInput": {
+        "description": "Input for restoring several soft-deleted projects, each answered for separately.",
+        "properties": {
+          "ids": {
+            "$ref": "#/components/schemas/NonEmptyList_UUID_",
+            "description": "IDs of the projects to restore."
+          }
+        },
+        "required": [
+          "ids"
+        ],
+        "title": "PartialBulkRestoreProjectsInput",
         "type": "object"
       },
       "PurgeProjectInput": {
@@ -18921,6 +18960,38 @@
           "user_ids"
         ],
         "title": "UnassignUsersFromProjectInput",
+        "type": "object"
+      },
+      "DeleteProjectInput": {
+        "description": "Input for soft-deleting a group.",
+        "properties": {
+          "group_id": {
+            "description": "UUID of the group to soft-delete.",
+            "format": "uuid",
+            "title": "Group Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "group_id"
+        ],
+        "title": "DeleteProjectInput",
+        "type": "object"
+      },
+      "RestoreProjectInput": {
+        "description": "Input for restoring a soft-deleted group.",
+        "properties": {
+          "group_id": {
+            "description": "UUID of the group to restore.",
+            "format": "uuid",
+            "title": "Group Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "group_id"
+        ],
+        "title": "RestoreProjectInput",
         "type": "object"
       },
       "EntityShareRecipientInput": {
@@ -53001,7 +53072,7 @@
         "description": "Retrieve a single project by UUID.\n\n**Preconditions:**\n* User privilege required.\n"
       },
       "patch": {
-        "operationId": "v2/projects.admin_update",
+        "operationId": "v2/projects.update",
         "tags": [
           "v2/projects"
         ],
@@ -53034,7 +53105,7 @@
             }
           }
         ],
-        "description": "Update a project (superadmin only).\n\n**Preconditions:**\n* Superadmin privilege required.\n"
+        "description": "Update a project.\n\n**Preconditions:**\n* User privilege required.\n"
       }
     },
     "/v2/projects/search": {
@@ -53153,9 +53224,9 @@
         "description": "Create a new project (superadmin only).\n\n**Preconditions:**\n* Superadmin privilege required.\n"
       }
     },
-    "/v2/projects/delete": {
+    "/v2/projects/{project_id}/delete": {
       "post": {
-        "operationId": "v2/projects.admin_delete",
+        "operationId": "v2/projects.delete",
         "tags": [
           "v2/projects"
         ],
@@ -53169,22 +53240,51 @@
             "TokenAuth": []
           }
         ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/DeleteProjectInput"
-              }
+        "parameters": [
+          {
+            "name": "project_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
             }
           }
-        },
-        "parameters": [],
-        "description": "Soft-delete a project (superadmin only).\n\n**Preconditions:**\n* Superadmin privilege required.\n"
+        ],
+        "description": "Soft-delete a project.\n\n**Preconditions:**\n* User privilege required.\n"
       }
     },
-    "/v2/projects/restore": {
+    "/v2/projects/{project_id}/restore": {
       "post": {
-        "operationId": "v2/projects.admin_restore",
+        "operationId": "v2/projects.restore",
+        "tags": [
+          "v2/projects"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "project_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "description": "Restore a soft-deleted project.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/v2/projects/partial-bulk-update": {
+      "post": {
+        "operationId": "v2/projects.partial_bulk_update",
         "tags": [
           "v2/projects"
         ],
@@ -53202,13 +53302,71 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/RestoreProjectInput"
+                "$ref": "#/components/schemas/PartialBulkUpdateProjectsInput"
               }
             }
           }
         },
         "parameters": [],
-        "description": "Restore a soft-deleted project (superadmin only).\n\n**Preconditions:**\n* Superadmin privilege required.\n"
+        "description": "Update several projects, answering for each one.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/v2/projects/partial-bulk-delete": {
+      "post": {
+        "operationId": "v2/projects.partial_bulk_delete",
+        "tags": [
+          "v2/projects"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PartialBulkDeleteProjectsInput"
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "description": "Soft-delete several projects, answering for each one.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/v2/projects/partial-bulk-restore": {
+      "post": {
+        "operationId": "v2/projects.partial_bulk_restore",
+        "tags": [
+          "v2/projects"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PartialBulkRestoreProjectsInput"
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "description": "Restore several soft-deleted projects, answering for each one.\n\n**Preconditions:**\n* User privilege required.\n"
       }
     },
     "/v2/projects/purge": {
@@ -53314,6 +53472,64 @@
           }
         ],
         "description": "Unassign users from a project.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/v2/projects/delete": {
+      "post": {
+        "operationId": "v2/projects.admin_delete",
+        "tags": [
+          "v2/projects"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DeleteProjectInput"
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "description": "Deprecated. Use `POST /v2/projects/{project_id}/delete`.\n\n**Preconditions:**\n* Superadmin privilege required.\n"
+      }
+    },
+    "/v2/projects/restore": {
+      "post": {
+        "operationId": "v2/projects.admin_restore",
+        "tags": [
+          "v2/projects"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RestoreProjectInput"
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "description": "Deprecated. Use `POST /v2/projects/{project_id}/restore`.\n\n**Preconditions:**\n* Superadmin privilege required.\n"
       }
     },
     "/v2/entity-shares": {

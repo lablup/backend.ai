@@ -14424,12 +14424,12 @@ type Mutation
   """
   Added in 26.4.2. Update a project (admin only). Requires superadmin privileges. Only provided fields will be updated.
   """
-  adminUpdateProjectV2(projectId: UUID!, input: UpdateProjectInput!): ProjectPayload @join__field(graph: STRAWBERRY)
+  adminUpdateProjectV2(projectId: UUID!, input: UpdateProjectInput!): ProjectPayload @join__field(graph: STRAWBERRY) @deprecated(reason: "Deprecated since 26.10.0. Use `updateProjectV2`.")
 
   """
   Added in 26.4.2. Soft-delete a project (admin only). Requires superadmin privileges.
   """
-  adminDeleteProjectV2(projectId: UUID!): DeleteProjectPayload @join__field(graph: STRAWBERRY)
+  adminDeleteProjectV2(projectId: UUID!): DeleteProjectPayload @join__field(graph: STRAWBERRY) @deprecated(reason: "Deprecated since 26.10.0. Use `deleteProjectV2`.")
 
   """
   Added in 26.4.2. Permanently purge a project and all associated data (admin only). Requires superadmin privileges.
@@ -14439,7 +14439,31 @@ type Mutation
   """
   Added in 26.9.0. Restore a soft-deleted project (admin only). Requires superadmin privileges.
   """
-  adminRestoreProjectV2(projectId: UUID!): RestoreProjectPayload @join__field(graph: STRAWBERRY)
+  adminRestoreProjectV2(projectId: UUID!): RestoreProjectPayload @join__field(graph: STRAWBERRY) @deprecated(reason: "Deprecated since 26.10.0. Use `restoreProjectV2`.")
+
+  """
+  Added in 26.10.0. Update a project. Only provided fields will be updated.
+  """
+  updateProjectV2(id: UUID!, input: UpdateProjectInput!): ProjectPayload! @join__field(graph: STRAWBERRY)
+
+  """Added in 26.10.0. Soft-delete a project."""
+  deleteProjectV2(id: UUID!): DeleteProjectPayload! @join__field(graph: STRAWBERRY)
+
+  """Added in 26.10.0. Restore a soft-deleted project."""
+  restoreProjectV2(id: UUID!): RestoreProjectPayload! @join__field(graph: STRAWBERRY)
+
+  """Added in 26.10.0. Update several projects, answering for each one."""
+  partialBulkUpdateProjectsV2(input: PartialBulkUpdateProjectsInput!): PartialBulkProjectsPayload! @join__field(graph: STRAWBERRY)
+
+  """
+  Added in 26.10.0. Soft-delete several projects, answering for each one.
+  """
+  partialBulkDeleteProjectsV2(input: PartialBulkDeleteProjectsInput!): PartialBulkProjectsPayload! @join__field(graph: STRAWBERRY)
+
+  """
+  Added in 26.10.0. Restore several soft-deleted projects, answering for each one.
+  """
+  partialBulkRestoreProjectsV2(input: PartialBulkRestoreProjectsInput!): PartialBulkProjectsPayload! @join__field(graph: STRAWBERRY)
 
   """
   Added in 26.4.2. Unassign users from a project. RBAC validates project admin permission.
@@ -15498,6 +15522,16 @@ input PartialBulkDeleteDomainsInput
 }
 
 """
+Added in 26.10.0. Input for soft-deleting several projects, each answered for separately.
+"""
+input PartialBulkDeleteProjectsInput
+  @join__type(graph: STRAWBERRY)
+{
+  """IDs of the projects to soft-delete."""
+  ids: [UUID!]!
+}
+
+"""
 Added in 26.10.0. Result of a partial bulk domain operation: the domains processed and the ones that failed.
 """
 type PartialBulkDomainsPayload
@@ -15521,6 +15555,19 @@ type PartialBulkFailure
 
   """Reason the item failed."""
   message: String!
+}
+
+"""
+Added in 26.10.0. Result of a partial bulk project operation: the projects processed and the ones that failed.
+"""
+type PartialBulkProjectsPayload
+  @join__type(graph: STRAWBERRY)
+{
+  """The projects processed, as they now stand."""
+  successes: [ProjectV2!]!
+
+  """The projects not processed, each with the reason."""
+  failed: [PartialBulkFailure!]!
 }
 
 """
@@ -15557,6 +15604,16 @@ input PartialBulkRestoreDomainsInput
 }
 
 """
+Added in 26.10.0. Input for restoring several soft-deleted projects, each answered for separately.
+"""
+input PartialBulkRestoreProjectsInput
+  @join__type(graph: STRAWBERRY)
+{
+  """IDs of the projects to restore."""
+  ids: [UUID!]!
+}
+
+"""
 Added in 26.10.0. One domain of a partial bulk update and the fields to update on it.
 """
 input PartialBulkUpdateDomainItemInput
@@ -15577,6 +15634,29 @@ input PartialBulkUpdateDomainsInput
 {
   """The domains to update, each with its fields."""
   items: [PartialBulkUpdateDomainItemInput!]!
+}
+
+"""
+Added in 26.10.0. One project of a partial bulk update and the fields to update on it.
+"""
+input PartialBulkUpdateProjectItemInput
+  @join__type(graph: STRAWBERRY)
+{
+  """ID of the project to update."""
+  id: UUID!
+
+  """Fields to update on the project."""
+  input: UpdateProjectInput!
+}
+
+"""
+Added in 26.10.0. Input for updating several projects, each answered for separately.
+"""
+input PartialBulkUpdateProjectsInput
+  @join__type(graph: STRAWBERRY)
+{
+  """The projects to update, each with its fields."""
+  items: [PartialBulkUpdateProjectItemInput!]!
 }
 
 """
@@ -25311,7 +25391,7 @@ input UpdateProjectInput
   description: String
 
   """Updated active status."""
-  isActive: Boolean
+  isActive: Boolean @deprecated(reason: "Deprecated since 26.10.0. Use `deleteProjectV2` or `restoreProjectV2`.")
 
   """New external integration identifier."""
   integrationName: String
