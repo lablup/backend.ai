@@ -19,7 +19,6 @@ from ai.backend.manager.api.adapters.app_config_fragment.adapter import (
 from ai.backend.manager.api.adapters.artifact.adapter import ArtifactAdapter
 from ai.backend.manager.api.adapters.artifact_registry.adapter import ArtifactRegistryAdapter
 from ai.backend.manager.api.adapters.audit_log.adapter import AuditLogAdapter
-from ai.backend.manager.api.adapters.bootstrap_script.adapter import BootstrapScriptAdapter
 from ai.backend.manager.api.adapters.client_ip_masking.adapter import ClientIPMaskingAdapter
 from ai.backend.manager.api.adapters.container_registry.adapter import ContainerRegistryAdapter
 from ai.backend.manager.api.adapters.deployment.adapter import DeploymentAdapter
@@ -103,7 +102,6 @@ class Adapters:
         artifact: ArtifactAdapter,
         artifact_registry: ArtifactRegistryAdapter,
         audit_log: AuditLogAdapter,
-        bootstrap_script: BootstrapScriptAdapter,
         entity: EntityAdapter,
         entity_label: EntityLabelAdapter,
         container_registry: ContainerRegistryAdapter,
@@ -157,7 +155,6 @@ class Adapters:
         self.artifact = artifact
         self.artifact_registry = artifact_registry
         self.audit_log = audit_log
-        self.bootstrap_script = bootstrap_script
         self.entity = entity
         self.entity_label = entity_label
         self.container_registry = container_registry
@@ -237,7 +234,6 @@ class Adapters:
             artifact=ArtifactAdapter(processors.artifact),
             artifact_registry=ArtifactRegistryAdapter(processors.artifact_registry),
             audit_log=AuditLogAdapter(processors.audit_log),
-            bootstrap_script=BootstrapScriptAdapter(processors.user.bootstrap_script),
             entity=EntityAdapter(entity_types),
             entity_label=EntityLabelAdapter(processors.entity_label, entity_types),
             container_registry=ContainerRegistryAdapter(
