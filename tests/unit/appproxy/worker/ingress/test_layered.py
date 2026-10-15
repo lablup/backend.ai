@@ -71,7 +71,7 @@ def redis() -> AsyncMock:
 
 @pytest.fixture
 def layered(memory: InMemoryIngressState, redis: AsyncMock) -> LayeredIngressState:
-    return LayeredIngressState([memory, redis])
+    return LayeredIngressState([memory, redis], in_memory=memory)
 
 
 @pytest.fixture
@@ -80,7 +80,10 @@ def configured_layered(
 ) -> LayeredIngressState:
     layers_by_name: dict[str, IngressReader] = {"in-memory": memory, "redis": redis}
     case: _LayersCase = request.param
-    return LayeredIngressState([layers_by_name[name] for name in case.layers])
+    return LayeredIngressState(
+        [layers_by_name[name] for name in case.layers],
+        in_memory=memory if "in-memory" in case.layers else None,
+    )
 
 
 @pytest.fixture
@@ -107,11 +110,23 @@ class TestLayeredIngressState:
         assert await layered.get(FRONTEND_KEY) == ingress
         redis.get.assert_not_awaited()
 
+    @pytest.mark.parametrize(
+        "configured_layered",
+        [
+            _LayersCase(layers=["in-memory", "redis"]),
+            _LayersCase(layers=["redis", "in-memory"]),
+        ],
+        ids=lambda case: "+".join(case.layers),
+        indirect=True,
+    )
     @pytest.mark.usefixtures("ingress_in_redis")
-    async def test_get_fills_memory_with_a_redis_hit(
-        self, layered: LayeredIngressState, memory: InMemoryIngressState, ingress: Ingress
+    async def test_get_writes_a_redis_hit_to_memory(
+        self,
+        configured_layered: LayeredIngressState,
+        memory: InMemoryIngressState,
+        ingress: Ingress,
     ) -> None:
-        assert await layered.get(FRONTEND_KEY) == ingress
+        assert await configured_layered.get(FRONTEND_KEY) == ingress
         assert await memory.get(FRONTEND_KEY) == ingress
 
     @pytest.mark.parametrize(

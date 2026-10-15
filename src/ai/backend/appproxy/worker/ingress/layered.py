@@ -10,15 +10,19 @@ from ai.backend.common.dto.appproxy.v2.ingress.types import Ingress, IngressFron
 
 
 class LayeredIngressState(IngressReader):
-    """Reads the layers in order; a later layer's hit is cached in the in-memory layer.
+    """Reads the layers in order; a hit from another layer is written to the given in-memory state.
 
     A key memory knows missing, or one no layer holds, reads as None.
     """
 
     _layers: list[IngressReader]
+    _in_memory: InMemoryIngressState | None
 
-    def __init__(self, layers: Sequence[IngressReader]) -> None:
+    def __init__(
+        self, layers: Sequence[IngressReader], in_memory: InMemoryIngressState | None
+    ) -> None:
         self._layers = list(layers)
+        self._in_memory = in_memory
 
     @property
     def layers(self) -> Sequence[IngressReader]:
@@ -26,19 +30,18 @@ class LayeredIngressState(IngressReader):
 
     @override
     async def get(self, frontend_key: IngressFrontendKey) -> Ingress | None:
-        in_memory = self._in_memory()
         try:
-            for index, layer in enumerate(self._layers):
+            for layer in self._layers:
                 ingress = await layer.get(frontend_key)
                 if ingress is None:
                     continue
-                if in_memory is not None and index > 0:
-                    # Cache a later layer's hit in memory so the next read stops at memory.
-                    await in_memory.apply([ingress])
+                if self._in_memory is not None and layer is not self._in_memory:
+                    # Cache another layer's hit in memory so the next read stops at memory.
+                    await self._in_memory.apply([ingress])
                 return ingress
-            if in_memory is not None:
+            if self._in_memory is not None:
                 # Remember a key no layer holds so the next read skips the later layers.
-                await in_memory.remember_missing(frontend_key)
+                await self._in_memory.remember_missing(frontend_key)
             return None
         except IngressNotFoundError:
             # The key was remembered missing on purpose to skip reading the later layers.
@@ -47,8 +50,3 @@ class LayeredIngressState(IngressReader):
     @override
     async def get_all(self) -> list[Ingress]:
         return await self._layers[-1].get_all()
-
-    def _in_memory(self) -> InMemoryIngressState | None:
-        # The config puts the in-memory layer first whenever it is configured.
-        first_layer = self._layers[0]
-        return first_layer if isinstance(first_layer, InMemoryIngressState) else None
