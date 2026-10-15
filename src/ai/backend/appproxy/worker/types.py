@@ -521,6 +521,8 @@ class Circuit(SerializableCircuit):
                     protocol=protocol,
                     wildcard=WildcardFrontend(subdomain=subdomain),
                 )
+            case _:
+                raise UnreachableError("a circuit holds only a port or subdomain frontend")
 
 
 class MetricTypes(enum.Enum):
