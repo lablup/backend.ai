@@ -546,10 +546,14 @@ from ai.backend.manager.api.gql.vfolder_v2.resolver.mutation import (
     create_vfolder_v2,
     delete_vfolder_v2,
     deploy_vfolder_v2,
+    partial_bulk_delete_vfolders_v2,
+    partial_bulk_restore_vfolders_v2,
+    partial_bulk_update_vfolders_v2,
     purge_vfolder_v2,
     restore_vfolder_v2,
     set_vfolder_mount_policy,
     unset_vfolder_mount_policy,
+    update_vfolder_v2,
     vfolder_create_download_session_v2,
     vfolder_create_upload_session_v2,
     vfolder_delete_files_v2,
@@ -1173,6 +1177,10 @@ class Mutation:
     delete_vfolder_v2 = delete_vfolder_v2
     purge_vfolder_v2 = purge_vfolder_v2
     restore_vfolder_v2 = restore_vfolder_v2
+    update_vfolder_v2 = update_vfolder_v2
+    partial_bulk_update_vfolders_v2 = partial_bulk_update_vfolders_v2
+    partial_bulk_delete_vfolders_v2 = partial_bulk_delete_vfolders_v2
+    partial_bulk_restore_vfolders_v2 = partial_bulk_restore_vfolders_v2
     set_vfolder_mount_policy = set_vfolder_mount_policy
     unset_vfolder_mount_policy = unset_vfolder_mount_policy
     deploy_vfolder_v2 = deploy_vfolder_v2

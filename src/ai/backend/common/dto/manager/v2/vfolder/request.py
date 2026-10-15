@@ -12,6 +12,7 @@ from pydantic import Field, field_validator, model_validator
 from ai.backend.common.api_handlers import BaseRequestModel
 from ai.backend.common.data.entity.deployment_preset import DeploymentPresetID
 from ai.backend.common.dto.manager.query import DateTimeFilter, StringFilter, UUIDFilter
+from ai.backend.common.dto.manager.v2.common import NonEmptyList
 from ai.backend.common.dto.manager.v2.deployment.request import DeploymentStrategyInput
 from ai.backend.common.dto.manager.v2.entity_label.request import EntityLabelNestedFilter
 from ai.backend.common.dto.manager.v2.vfolder.types import VFolderScope, VFolderUsage
@@ -46,6 +47,10 @@ __all__ = (
     "ListFilesInput",
     "MkdirInput",
     "MoveFileInput",
+    "PartialBulkDeleteVFoldersInput",
+    "PartialBulkRestoreVFoldersInput",
+    "PartialBulkUpdateVFolderItemInput",
+    "PartialBulkUpdateVFoldersInput",
     "PurgeVFolderInput",
     "PurgeVFolderOptions",
     "RenameFileInput",
@@ -234,6 +239,33 @@ class RestoreVFolderInput(BaseRequestModel):
     """Input for restoring a virtual folder from trash."""
 
     id: UUID = Field(description="VFolder ID to restore")
+
+
+class PartialBulkUpdateVFolderItemInput(BaseRequestModel):
+    """One vfolder of a partial bulk update and the fields to update on it."""
+
+    id: UUID = Field(description="ID of the vfolder to update.")
+    input: UpdateVFolderInput = Field(description="Fields to update on the vfolder.")
+
+
+class PartialBulkUpdateVFoldersInput(BaseRequestModel):
+    """Input for updating several vfolders, each answered for separately."""
+
+    items: NonEmptyList[PartialBulkUpdateVFolderItemInput] = Field(
+        description="The vfolders to update, each with its fields."
+    )
+
+
+class PartialBulkDeleteVFoldersInput(BaseRequestModel):
+    """Input for soft-deleting several vfolders, each answered for separately."""
+
+    ids: NonEmptyList[UUID] = Field(description="IDs of the vfolders to soft-delete.")
+
+
+class PartialBulkRestoreVFoldersInput(BaseRequestModel):
+    """Input for restoring several soft-deleted vfolders, each answered for separately."""
+
+    ids: NonEmptyList[UUID] = Field(description="IDs of the vfolders to restore.")
 
 
 class CloneVFolderInput(BaseRequestModel):

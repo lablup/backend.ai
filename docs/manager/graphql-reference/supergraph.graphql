@@ -14876,6 +14876,26 @@ type Mutation
   restoreVFolder(vfolderId: UUID!): RestoreVFolderPayload @join__field(graph: STRAWBERRY)
 
   """
+  Added in 26.10.0. Update a virtual folder. Only provided fields will be updated.
+  """
+  updateVfolderV2(vfolderId: UUID!, input: UpdateVFolderV2Input!): UpdateVFolderV2Payload! @join__field(graph: STRAWBERRY)
+
+  """
+  Added in 26.10.0. Update several virtual folders, answering for each one.
+  """
+  partialBulkUpdateVfoldersV2(input: PartialBulkUpdateVFoldersInput!): PartialBulkVFoldersPayload! @join__field(graph: STRAWBERRY)
+
+  """
+  Added in 26.10.0. Soft-delete several virtual folders, answering for each one.
+  """
+  partialBulkDeleteVfoldersV2(input: PartialBulkDeleteVFoldersInput!): PartialBulkVFoldersPayload! @join__field(graph: STRAWBERRY)
+
+  """
+  Added in 26.10.0. Restore several soft-deleted virtual folders, answering for each one.
+  """
+  partialBulkRestoreVfoldersV2(input: PartialBulkRestoreVFoldersInput!): PartialBulkVFoldersPayload! @join__field(graph: STRAWBERRY)
+
+  """
   Added in 26.9.0. Set the mount level one user gets on a virtual folder. Requires UPDATE on the folder; a requester who reaches the folder through a share may not hand out more than they mount at.
   """
   setVFolderMountPolicy(vfolderId: UUID!, input: SetVFolderMountPolicyInput!): SetVFolderMountPolicyPayload @join__field(graph: STRAWBERRY)
@@ -14889,7 +14909,7 @@ type Mutation
   deployVfolderV2(vfolderId: UUID!, input: DeployVFolderV2Input!): DeployVFolderV2Payload @join__field(graph: STRAWBERRY)
 
   """Added in 26.4.2. Soft-delete multiple virtual folders."""
-  bulkDeleteVfoldersV2(input: BulkDeleteVFoldersV2Input!): BulkDeleteVFoldersV2Payload @join__field(graph: STRAWBERRY)
+  bulkDeleteVfoldersV2(input: BulkDeleteVFoldersV2Input!): BulkDeleteVFoldersV2Payload @join__field(graph: STRAWBERRY) @deprecated(reason: "Deprecated since 26.10.0. Use `partialBulkDeleteVfoldersV2`.")
 
   """Added in 26.4.2. Permanently purge multiple virtual folders."""
   bulkPurgeVfoldersV2(input: BulkPurgeVFoldersV2Input!): BulkPurgeVFoldersV2Payload @join__field(graph: STRAWBERRY)
@@ -15532,6 +15552,16 @@ input PartialBulkDeleteProjectsInput
 }
 
 """
+Added in 26.10.0. Input for soft-deleting several vfolders, each answered for separately.
+"""
+input PartialBulkDeleteVFoldersInput
+  @join__type(graph: STRAWBERRY)
+{
+  """IDs of the vfolders to soft-delete."""
+  ids: [UUID!]!
+}
+
+"""
 Added in 26.10.0. Result of a partial bulk domain operation: the domains processed and the ones that failed.
 """
 type PartialBulkDomainsPayload
@@ -15614,6 +15644,16 @@ input PartialBulkRestoreProjectsInput
 }
 
 """
+Added in 26.10.0. Input for restoring several soft-deleted vfolders, each answered for separately.
+"""
+input PartialBulkRestoreVFoldersInput
+  @join__type(graph: STRAWBERRY)
+{
+  """IDs of the vfolders to restore."""
+  ids: [UUID!]!
+}
+
+"""
 Added in 26.10.0. One domain of a partial bulk update and the fields to update on it.
 """
 input PartialBulkUpdateDomainItemInput
@@ -15660,6 +15700,29 @@ input PartialBulkUpdateProjectsInput
 }
 
 """
+Added in 26.10.0. One vfolder of a partial bulk update and the fields to update on it.
+"""
+input PartialBulkUpdateVFolderItemInput
+  @join__type(graph: STRAWBERRY)
+{
+  """ID of the vfolder to update."""
+  id: UUID!
+
+  """Fields to update on the vfolder."""
+  input: UpdateVFolderV2Input!
+}
+
+"""
+Added in 26.10.0. Input for updating several vfolders, each answered for separately.
+"""
+input PartialBulkUpdateVFoldersInput
+  @join__type(graph: STRAWBERRY)
+{
+  """The vfolders to update, each with its fields."""
+  items: [PartialBulkUpdateVFolderItemInput!]!
+}
+
+"""
 Added in 26.10.0. Input for putting several keys on several entities in one call. Answered per entity: an entity's keys are written together or refused together.
 """
 input PartialBulkUpsertEntityLabelInput
@@ -15680,6 +15743,19 @@ type PartialBulkUpsertEntityLabelPayload
 
   """Per-item failures, each naming the entity and the key it targeted."""
   failed: [UpsertEntityLabelError!]!
+}
+
+"""
+Added in 26.10.0. Result of a partial bulk vfolder operation: the vfolders processed and the ones that failed.
+"""
+type PartialBulkVFoldersPayload
+  @join__type(graph: STRAWBERRY)
+{
+  """The vfolders processed, as they now stand."""
+  successes: [VFolder!]!
+
+  """The vfolders not processed, each with the reason."""
+  failed: [PartialBulkFailure!]!
 }
 
 """Added in 26.3.0. RBAC scoped permission."""
@@ -25859,6 +25935,30 @@ type UpdateUserV2Payload
 {
   """The updated user."""
   user: UserV2!
+}
+
+"""
+Added in 26.10.0. Input for updating a virtual folder. Only provided fields are updated.
+"""
+input UpdateVFolderV2Input
+  @join__type(graph: STRAWBERRY)
+{
+  """New vfolder name."""
+  name: String
+
+  """New cloneable setting."""
+  cloneable: Boolean
+
+  """New default mount permission."""
+  permission: VFolderMountPermission
+}
+
+"""Added in 26.10.0. Payload returned after updating a virtual folder."""
+type UpdateVFolderV2Payload
+  @join__type(graph: STRAWBERRY)
+{
+  """The updated virtual folder."""
+  vfolder: VFolder!
 }
 
 """Added in 25.16.0. Input for updating VFS storage"""

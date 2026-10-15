@@ -64,6 +64,15 @@ from ai.backend.manager.services.vfolder.actions.lookup import (
     LookupVFolderAction,
     LookupVFolderActionResult,
 )
+from ai.backend.manager.services.vfolder.actions.partial_bulk_delete_vfolders import (
+    PartialBulkDeleteVFoldersAction,
+)
+from ai.backend.manager.services.vfolder.actions.partial_bulk_restore_vfolders import (
+    PartialBulkRestoreVFoldersAction,
+)
+from ai.backend.manager.services.vfolder.actions.partial_bulk_update_vfolders import (
+    PartialBulkUpdateVFoldersAction,
+)
 from ai.backend.manager.services.vfolder.actions.scoped_search import (
     ScopedSearchVFoldersAction,
 )
@@ -186,6 +195,9 @@ class VFolderProcessors:
     delete_v2: SingleEntityActionProcessor[DeleteVFolderV2Action, DeleteVFolderV2ActionResult]
     purge_v2: SingleEntityActionProcessor[PurgeVFolderV2Action, PurgeVFolderV2ActionResult]
     clone_v2: SingleEntityActionProcessor[CloneVFolderV2Action, CloneVFolderV2ActionResult]
+    partial_bulk_update: PartialBulkActionProcessor[PartialBulkUpdateVFoldersAction, VFolderData]
+    partial_bulk_delete: PartialBulkActionProcessor[PartialBulkDeleteVFoldersAction, VFolderData]
+    partial_bulk_restore: PartialBulkActionProcessor[PartialBulkRestoreVFoldersAction, VFolderData]
 
     def __init__(self, group: ProcessorGroup[VFolderData], service: VFolderService) -> None:
         # Scope actions with RBAC validation
@@ -266,3 +278,12 @@ class VFolderProcessors:
         self.delete_v2 = group.single_entity(DeleteVFolderV2Action, service.delete_v2)
         self.purge_v2 = group.single_entity(PurgeVFolderV2Action, service.purge_v2)
         self.clone_v2 = group.single_entity(CloneVFolderV2Action, service.clone_v2)
+        self.partial_bulk_update = group.partial_bulk(
+            PartialBulkUpdateVFoldersAction, service.partial_bulk_update
+        )
+        self.partial_bulk_delete = group.partial_bulk(
+            PartialBulkDeleteVFoldersAction, service.partial_bulk_delete
+        )
+        self.partial_bulk_restore = group.partial_bulk(
+            PartialBulkRestoreVFoldersAction, service.partial_bulk_restore
+        )

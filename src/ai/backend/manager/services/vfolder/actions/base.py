@@ -133,6 +133,7 @@ class UpdateVFolderAttributeAction(VFolderAction):
 @dataclass
 class UpdateVFolderAttributeActionResult:
     vfolder_uuid: uuid.UUID
+    vfolder: VFolderData
 
 
 @dataclass

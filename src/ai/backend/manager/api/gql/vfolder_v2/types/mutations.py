@@ -4,6 +4,9 @@ from __future__ import annotations
 
 from uuid import UUID
 
+from strawberry import UNSET
+
+from ai.backend.common.dto.manager.v2.common import PartialBulkPayload
 from ai.backend.common.dto.manager.v2.vfolder.request import (
     BulkDeleteVFoldersInput as BulkDeleteInputDTO,
 )
@@ -41,7 +44,22 @@ from ai.backend.common.dto.manager.v2.vfolder.request import (
     MoveFileInput as MoveFileInputDTO,
 )
 from ai.backend.common.dto.manager.v2.vfolder.request import (
+    PartialBulkDeleteVFoldersInput as PartialBulkDeleteInputDTO,
+)
+from ai.backend.common.dto.manager.v2.vfolder.request import (
+    PartialBulkRestoreVFoldersInput as PartialBulkRestoreInputDTO,
+)
+from ai.backend.common.dto.manager.v2.vfolder.request import (
+    PartialBulkUpdateVFolderItemInput as PartialBulkUpdateItemInputDTO,
+)
+from ai.backend.common.dto.manager.v2.vfolder.request import (
+    PartialBulkUpdateVFoldersInput as PartialBulkUpdateInputDTO,
+)
+from ai.backend.common.dto.manager.v2.vfolder.request import (
     PurgeVFolderOptions as PurgeVFolderOptionsDTO,
+)
+from ai.backend.common.dto.manager.v2.vfolder.request import (
+    UpdateVFolderInput as UpdateInputDTO,
 )
 from ai.backend.common.dto.manager.v2.vfolder.response import (
     BulkDeleteVFoldersPayload as BulkDeletePayloadDTO,
@@ -94,6 +112,14 @@ from ai.backend.common.dto.manager.v2.vfolder.response import (
 from ai.backend.common.dto.manager.v2.vfolder.response import (
     RestoreVFolderPayload as RestorePayloadDTO,
 )
+from ai.backend.common.dto.manager.v2.vfolder.response import (
+    UpdateVFolderPayload as UpdatePayloadDTO,
+)
+from ai.backend.common.dto.manager.v2.vfolder.response import (
+    VFolderNode,
+)
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
+from ai.backend.manager.api.gql.common_types import PartialBulkFailureGQL
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     PydanticInputMixin,
@@ -166,6 +192,21 @@ class CreateVFolderInScopeInputGQL(PydanticInputMixin[CreateInScopeInputDTO]):
         ),
     )
     cloneable: bool = gql_field(default=False, description="Whether the vfolder is cloneable.")
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Input for updating a virtual folder. Only provided fields are updated.",
+    ),
+    name="UpdateVFolderV2Input",
+)
+class UpdateVFolderInputGQL(PydanticInputMixin[UpdateInputDTO]):
+    name: str | None = gql_field(default=UNSET, description="New vfolder name.")
+    cloneable: bool | None = gql_field(default=UNSET, description="New cloneable setting.")
+    permission: VFolderMountPermissionGQL | None = gql_field(
+        default=UNSET, description="New default mount permission."
+    )
 
 
 @gql_pydantic_input(
@@ -297,6 +338,18 @@ class FileEntryNodeGQL(PydanticOutputMixin[FileEntryNodeDTO]):
 )
 class CreateVFolderPayloadGQL(PydanticOutputMixin[CreatePayloadDTO]):
     vfolder: VFolderGQL = gql_field(description="The created virtual folder.")
+
+
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Payload returned after updating a virtual folder.",
+    ),
+    model=UpdatePayloadDTO,
+    name="UpdateVFolderV2Payload",
+)
+class UpdateVFolderPayloadGQL(PydanticOutputMixin[UpdatePayloadDTO]):
+    vfolder: VFolderGQL = gql_field(description="The updated virtual folder.")
 
 
 @gql_pydantic_type(
@@ -624,3 +677,74 @@ class DeployVFolderInputGQL(PydanticInputMixin[DeployInputDTO]):
 class DeployVFolderPayloadGQL(PydanticOutputMixin[DeployPayloadDTO]):
     deployment_id: UUID = gql_field(description="ID of the created deployment.")
     deployment_name: str = gql_field(description="Name of the created deployment.")
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="One vfolder of a partial bulk update and the fields to update on it.",
+    ),
+    name="PartialBulkUpdateVFolderItemInput",
+)
+class PartialBulkUpdateVFolderItemInputGQL(PydanticInputMixin[PartialBulkUpdateItemInputDTO]):
+    id: UUID = gql_field(description="ID of the vfolder to update.")
+    input: UpdateVFolderInputGQL = gql_field(description="Fields to update on the vfolder.")
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Input for updating several vfolders, each answered for separately.",
+    ),
+    name="PartialBulkUpdateVFoldersInput",
+)
+class PartialBulkUpdateVFoldersInputGQL(PydanticInputMixin[PartialBulkUpdateInputDTO]):
+    items: list[PartialBulkUpdateVFolderItemInputGQL] = gql_field(
+        description="The vfolders to update, each with its fields."
+    )
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Input for soft-deleting several vfolders, each answered for separately.",
+    ),
+    name="PartialBulkDeleteVFoldersInput",
+)
+class PartialBulkDeleteVFoldersInputGQL(PydanticInputMixin[PartialBulkDeleteInputDTO]):
+    ids: list[UUID] = gql_field(description="IDs of the vfolders to soft-delete.")
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description=(
+            "Input for restoring several soft-deleted vfolders, each answered for separately."
+        ),
+    ),
+    name="PartialBulkRestoreVFoldersInput",
+)
+class PartialBulkRestoreVFoldersInputGQL(PydanticInputMixin[PartialBulkRestoreInputDTO]):
+    ids: list[UUID] = gql_field(description="IDs of the vfolders to restore.")
+
+
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description=(
+            "Result of a partial bulk vfolder operation: the vfolders processed and the ones "
+            "that failed."
+        ),
+    ),
+    model=PartialBulkPayload[VFolderNode],
+    name="PartialBulkVFoldersPayload",
+)
+class PartialBulkVFoldersPayloadGQL(PydanticOutputMixin[PartialBulkPayload[VFolderNode]]):
+    """Payload for partial bulk vfolder mutations."""
+
+    successes: list[VFolderGQL] = gql_field(
+        description="The vfolders processed, as they now stand."
+    )
+    failed: list[PartialBulkFailureGQL] = gql_field(
+        description="The vfolders not processed, each with the reason."
+    )

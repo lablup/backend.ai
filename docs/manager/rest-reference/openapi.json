@@ -36710,6 +36710,49 @@
         "title": "CreateUploadSessionInput",
         "type": "object"
       },
+      "UpdateVFolderInput": {
+        "description": "Input for updating a virtual folder.",
+        "properties": {
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Updated vfolder name. Omit to leave unchanged.",
+            "title": "Name"
+          },
+          "cloneable": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Updated cloneable setting. Omit to leave unchanged.",
+            "title": "Cloneable"
+          },
+          "permission": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/VFolderPermissionField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Updated permission level. Omit to leave unchanged.",
+            "title": "Permission"
+          }
+        },
+        "title": "UpdateVFolderInput",
+        "type": "object"
+      },
       "PurgeVFolderOptions": {
         "description": "Optional behavior flags for vfolder purge operations.\n\nWrapped as a nested object so future flags can be added without\nflattening the input shape further.",
         "properties": {
@@ -37087,23 +37130,74 @@
         "title": "CreateVFolderInScopeInput",
         "type": "object"
       },
-      "BulkDeleteVFoldersInput": {
-        "description": "Input for soft-deleting multiple virtual folders.",
+      "NonEmptyList_PartialBulkUpdateVFolderItemInput_": {
+        "items": {
+          "$ref": "#/components/schemas/PartialBulkUpdateVFolderItemInput"
+        },
+        "minItems": 1,
+        "type": "array"
+      },
+      "PartialBulkUpdateVFolderItemInput": {
+        "description": "One vfolder of a partial bulk update and the fields to update on it.",
+        "properties": {
+          "id": {
+            "description": "ID of the vfolder to update.",
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "input": {
+            "$ref": "#/components/schemas/UpdateVFolderInput",
+            "description": "Fields to update on the vfolder."
+          }
+        },
+        "required": [
+          "id",
+          "input"
+        ],
+        "title": "PartialBulkUpdateVFolderItemInput",
+        "type": "object"
+      },
+      "PartialBulkUpdateVFoldersInput": {
+        "description": "Input for updating several vfolders, each answered for separately.",
+        "properties": {
+          "items": {
+            "$ref": "#/components/schemas/NonEmptyList_PartialBulkUpdateVFolderItemInput_",
+            "description": "The vfolders to update, each with its fields."
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "title": "PartialBulkUpdateVFoldersInput",
+        "type": "object"
+      },
+      "PartialBulkDeleteVFoldersInput": {
+        "description": "Input for soft-deleting several vfolders, each answered for separately.",
         "properties": {
           "ids": {
-            "description": "List of VFolder UUIDs to soft-delete.",
-            "items": {
-              "format": "uuid",
-              "type": "string"
-            },
-            "title": "Ids",
-            "type": "array"
+            "$ref": "#/components/schemas/NonEmptyList_UUID_",
+            "description": "IDs of the vfolders to soft-delete."
           }
         },
         "required": [
           "ids"
         ],
-        "title": "BulkDeleteVFoldersInput",
+        "title": "PartialBulkDeleteVFoldersInput",
+        "type": "object"
+      },
+      "PartialBulkRestoreVFoldersInput": {
+        "description": "Input for restoring several soft-deleted vfolders, each answered for separately.",
+        "properties": {
+          "ids": {
+            "$ref": "#/components/schemas/NonEmptyList_UUID_",
+            "description": "IDs of the vfolders to restore."
+          }
+        },
+        "required": [
+          "ids"
+        ],
+        "title": "PartialBulkRestoreVFoldersInput",
         "type": "object"
       },
       "BulkPurgeVFoldersInput": {
@@ -37127,6 +37221,25 @@
           "ids"
         ],
         "title": "BulkPurgeVFoldersInput",
+        "type": "object"
+      },
+      "BulkDeleteVFoldersInput": {
+        "description": "Input for soft-deleting multiple virtual folders.",
+        "properties": {
+          "ids": {
+            "description": "List of VFolder UUIDs to soft-delete.",
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "title": "Ids",
+            "type": "array"
+          }
+        },
+        "required": [
+          "ids"
+        ],
+        "title": "BulkDeleteVFoldersInput",
         "type": "object"
       },
       "CreateVFSStorageInput": {
@@ -59563,7 +59676,72 @@
         ],
         "description": "Get a vfolder by ID.\n\n**Preconditions:**\n* User privilege required.\n"
       },
+      "patch": {
+        "operationId": "v2/vfolders.update",
+        "tags": [
+          "v2/vfolders"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateVFolderInput"
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "vfolder_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "description": "Update a vfolder's name and options.\n\n**Preconditions:**\n* User privilege required.\n"
+      },
       "delete": {
+        "operationId": "v2/vfolders.deprecated_delete",
+        "tags": [
+          "v2/vfolders"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "vfolder_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "description": "Deprecated. Use `POST /v2/vfolders/{vfolder_id}/delete`.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/v2/vfolders/{vfolder_id}/delete": {
+      "post": {
         "operationId": "v2/vfolders.delete",
         "tags": [
           "v2/vfolders"
@@ -60064,9 +60242,9 @@
         "description": "Create a vfolder owned by a project. Scope comes from the URL path.\n\n**Preconditions:**\n* User privilege required.\n"
       }
     },
-    "/v2/vfolders/delete": {
+    "/v2/vfolders/partial-bulk-update": {
       "post": {
-        "operationId": "v2/vfolders.bulk_delete",
+        "operationId": "v2/vfolders.partial_bulk_update",
         "tags": [
           "v2/vfolders"
         ],
@@ -60084,13 +60262,71 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/BulkDeleteVFoldersInput"
+                "$ref": "#/components/schemas/PartialBulkUpdateVFoldersInput"
               }
             }
           }
         },
         "parameters": [],
-        "description": "Soft-delete multiple vfolders.\n\n**Preconditions:**\n* User privilege required.\n"
+        "description": "Update several vfolders, answering for each one.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/v2/vfolders/partial-bulk-delete": {
+      "post": {
+        "operationId": "v2/vfolders.partial_bulk_delete",
+        "tags": [
+          "v2/vfolders"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PartialBulkDeleteVFoldersInput"
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "description": "Soft-delete several vfolders, answering for each one.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/v2/vfolders/partial-bulk-restore": {
+      "post": {
+        "operationId": "v2/vfolders.partial_bulk_restore",
+        "tags": [
+          "v2/vfolders"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PartialBulkRestoreVFoldersInput"
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "description": "Restore several soft-deleted vfolders, answering for each one.\n\n**Preconditions:**\n* User privilege required.\n"
       }
     },
     "/v2/vfolders/purge": {
@@ -60120,6 +60356,35 @@
         },
         "parameters": [],
         "description": "Permanently purge multiple vfolders, optionally cascading linked model cards.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/v2/vfolders/delete": {
+      "post": {
+        "operationId": "v2/vfolders.bulk_delete",
+        "tags": [
+          "v2/vfolders"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BulkDeleteVFoldersInput"
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "description": "Deprecated. Use `POST /v2/vfolders/partial-bulk-delete`.\n\n**Preconditions:**\n* User privilege required.\n"
       }
     },
     "/v2/vfs-storages": {
