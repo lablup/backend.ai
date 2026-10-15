@@ -15,7 +15,7 @@ from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeySta
 from ai.backend.common.data.entity.resource_group import ResourceGroupEntityType, ResourceGroupID
 from ai.backend.common.data.entity.resource_preset import ResourcePresetID
 from ai.backend.common.typed_validators import HostPortPair as HostPortPairModel
-from ai.backend.common.types import AccessKey, BinarySize, ResourceSlot, ValkeyTarget
+from ai.backend.common.types import BinarySize, ResourceSlot, ValkeyTarget
 from ai.backend.manager.data.resource_preset.types import ResourcePresetData
 from ai.backend.manager.models.agent.row import AgentRow
 from ai.backend.manager.models.container_registry.row import ContainerRegistryRow
@@ -274,30 +274,10 @@ class TestResourcePresetCacheInvalidation:
         await cache_source.set_preset_list([preset1], resource_group=None)
         await cache_source.set_preset_list([preset2], resource_group="test-group")
 
-        # Cache check data (simulating check_presets cache)
-        test_check_data = b'{"allowed": true}'
-        test_access_key = AccessKey("test-access-key")
-        await cache_source.set_check_presets_data(
-            access_key=test_access_key,
-            group="test-group",
-            domain="test-domain",
-            resource_group=None,
-            data=test_check_data,
-        )
-
         # Verify caches exist
         assert await cache_source.get_preset_by_id(preset1.id) is not None
         assert await cache_source.get_preset_by_name(preset1.name) is not None
         assert await cache_source.get_preset_list(resource_group=None) is not None
-        assert (
-            await cache_source.get_check_presets_data(
-                access_key=test_access_key,
-                group="test-group",
-                domain="test-domain",
-                resource_group=None,
-            )
-            is not None
-        )
 
         # Invalidate all presets
         await cache_source.invalidate_all_presets()
@@ -309,15 +289,6 @@ class TestResourcePresetCacheInvalidation:
         assert await cache_source.get_preset_by_name(preset2.name) is None
         assert await cache_source.get_preset_list(resource_group=None) is None
         assert await cache_source.get_preset_list(resource_group="test-group") is None
-        assert (
-            await cache_source.get_check_presets_data(
-                access_key=test_access_key,
-                group="test-group",
-                domain="test-domain",
-                resource_group=None,
-            )
-            is None
-        )
 
     async def test_invalidate_all_presets_handles_no_keys(
         self,
@@ -349,20 +320,11 @@ class TestResourcePresetCacheInvalidation:
         )
         await valkey_stat.set_resource_preset_list(None, test_data, expire_sec=60)
         await valkey_stat.set_resource_preset_list("test-group", test_data, expire_sec=60)
-        await valkey_stat.set_resource_preset_check_data(
-            "test-key", "test-group", "test-domain", None, test_data, expire_sec=60
-        )
 
         # Verify entries exist
         assert await valkey_stat.get_resource_preset_by_id("test-id-1") is not None
         assert await valkey_stat.get_resource_preset_by_name("test-name-1") is not None
         assert await valkey_stat.get_resource_preset_list(None) is not None
-        assert (
-            await valkey_stat.get_resource_preset_check_data(
-                "test-key", "test-group", "test-domain", None
-            )
-            is not None
-        )
 
         # Invalidate all
         await valkey_stat.invalidate_all_resource_presets()
@@ -374,9 +336,3 @@ class TestResourcePresetCacheInvalidation:
         assert await valkey_stat.get_resource_preset_by_name("test-name-2") is None
         assert await valkey_stat.get_resource_preset_list(None) is None
         assert await valkey_stat.get_resource_preset_list("test-group") is None
-        assert (
-            await valkey_stat.get_resource_preset_check_data(
-                "test-key", "test-group", "test-domain", None
-            )
-            is None
-        )

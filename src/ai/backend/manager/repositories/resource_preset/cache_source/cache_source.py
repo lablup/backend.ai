@@ -7,7 +7,6 @@ from uuid import UUID
 
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
 from ai.backend.common.json import dump_json, load_json
-from ai.backend.common.types import AccessKey
 from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.data.resource_preset.types import ResourcePresetData
 
@@ -83,44 +82,13 @@ class ResourcePresetCacheSource:
             resource_group, serialized, expire_sec=CACHE_TTL
         )
 
-    async def get_check_presets_data(
-        self,
-        access_key: AccessKey,
-        group: str,
-        domain: str,
-        resource_group: str | None = None,
-    ) -> bytes | None:
-        """
-        Get cached check presets data as JSON string.
-        Returns the raw JSON string to avoid complex deserialization.
-        """
-        return await self._valkey_stat.get_resource_preset_check_data(
-            str(access_key), group, domain, resource_group
-        )
-
-    async def set_check_presets_data(
-        self,
-        access_key: AccessKey,
-        group: str,
-        domain: str,
-        resource_group: str | None,
-        data: bytes,
-    ) -> None:
-        """
-        Cache check presets data as JSON string.
-        Takes pre-serialized JSON string to avoid double serialization.
-        """
-        await self._valkey_stat.set_resource_preset_check_data(
-            str(access_key), group, domain, resource_group, data, expire_sec=CACHE_TTL
-        )
-
     async def invalidate_preset(
         self, preset_id: UUID | None = None, name: str | None = None
     ) -> None:
         """
         Invalidate a cached preset.
         Note: Since we can't scan for patterns, we only delete the specific keys we know.
-        Check presets and lists will expire naturally with TTL.
+        Lists will expire naturally with TTL.
         """
         await self._valkey_stat.delete_resource_preset(str(preset_id) if preset_id else None, name)
 

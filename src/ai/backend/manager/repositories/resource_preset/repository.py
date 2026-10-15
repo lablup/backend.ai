@@ -205,7 +205,6 @@ class ResourcePresetRepository:
         return await self._db_source.known_slot_types()
 
     @resource_preset_repository_resilience.apply()
-    @resource_preset_repository_resilience.apply()
     async def check_presets(
         self,
         access_key: AccessKey,
@@ -218,26 +217,6 @@ class ResourcePresetRepository:
         """
         Check resource presets availability and resource limits.
         """
-        # Try to get from cache first
-        with suppress_with_log([Exception], message="Failed to get check presets data from cache"):
-            cached_data = await self._cache_source.get_check_presets_data(
-                access_key, group_name, domain_name, resource_group
-            )
-            if cached_data:
-                log.trace(
-                    "check presets cache hit",
-                    access_key=access_key,
-                    project_name=group_name,
-                    domain_name=domain_name,
-                )
-                return CheckPresetsResult.from_cache(cached_data)
-        log.trace(
-            "check presets cache miss",
-            access_key=access_key,
-            project_name=group_name,
-            domain_name=domain_name,
-        )
-
         known_slot_types = await self._db_source.known_slot_types()
         group_resource_visibility = await self._config_provider.legacy_etcd_config_loader.get_raw(
             "config/api/resources/group_resource_visibility"
@@ -270,7 +249,7 @@ class ResourcePresetRepository:
             group_occupied = db_data.keypair_data.group_occupied
             group_remaining = db_data.keypair_data.group_remaining
 
-        result = CheckPresetsResult(
+        return CheckPresetsResult(
             presets=db_data.presets,
             keypair_limits=db_data.keypair_data.limits,
             keypair_using=db_data.keypair_data.occupied,
@@ -281,16 +260,3 @@ class ResourcePresetRepository:
             resource_group_remaining=db_data.keypair_data.resource_group_remaining,
             resource_groups=db_data.per_sgroup_data,
         )
-
-        # Cache the result
-        with suppress_with_log([Exception], message="Failed to cache check presets data"):
-            cache_data = result.to_cache()
-            await self._cache_source.set_check_presets_data(
-                access_key,
-                group_name,
-                domain_name,
-                resource_group,
-                cache_data,
-            )
-
-        return result

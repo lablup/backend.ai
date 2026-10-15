@@ -13,6 +13,7 @@ from glide import (
     Batch,
     ExpirySet,
     ExpiryType,
+    TEncodable,
 )
 from msgpack.exceptions import ExtraData, UnpackException
 
@@ -62,7 +63,6 @@ _MANAGER_STATUS_PREFIX: Final[str] = "manager.status"
 _INFERENCE_PREFIX: Final[str] = "inference"
 _COMPUTER_METADATA_KEY: Final[str] = "computer.metadata"
 _TOTAL_RESOURCE_SLOTS_KEY: Final[str] = "system.total_resource_slots"
-_RESOURCE_PRESET_CHECK_INDEX_KEY: Final[str] = "resource_preset:check:_index_"
 
 
 class ValkeyStatClient:
@@ -586,12 +586,6 @@ class ValkeyStatClient:
         """Generate resource preset list key."""
         return f"resource_preset:list:{scaling_group or '_global_'}"
 
-    def _get_resource_preset_check_key(
-        self, access_key: str, group: str, domain: str, scaling_group: str | None = None
-    ) -> str:
-        """Generate resource preset check key."""
-        return f"resource_preset:check:{access_key}:{group}:{domain}:{scaling_group or '_any_'}"
-
     @valkey_stat_resilience.apply()
     async def get_resource_preset_by_id(self, preset_id: str) -> bytes | None:
         """
@@ -625,23 +619,6 @@ class ValkeyStatClient:
         :return: The cached data, or None if not found.
         """
         key = self._get_resource_preset_list_key(scaling_group)
-        async with self._client.client() as conn:
-            return await conn.get(key)
-
-    @valkey_stat_resilience.apply()
-    async def get_resource_preset_check_data(
-        self, access_key: str, group: str, domain: str, scaling_group: str | None = None
-    ) -> bytes | None:
-        """
-        Get cached resource preset check data.
-
-        :param access_key: The access key.
-        :param group: The group name.
-        :param domain: The domain name.
-        :param scaling_group: The scaling group name.
-        :return: The cached data, or None if not found.
-        """
-        key = self._get_resource_preset_check_key(access_key, group, domain, scaling_group)
         async with self._client.client() as conn:
             return await conn.get(key)
 
@@ -690,38 +667,6 @@ class ValkeyStatClient:
             )
 
     @valkey_stat_resilience.apply()
-    async def set_resource_preset_check_data(
-        self,
-        access_key: str,
-        group: str,
-        domain: str,
-        scaling_group: str | None,
-        value: bytes,
-        expire_sec: int = 60,
-    ) -> None:
-        """
-        Cache resource preset check data.
-
-        :param access_key: The access key.
-        :param group: The group name.
-        :param domain: The domain name.
-        :param value: The data to cache.
-        :param scaling_group: The scaling group name.
-        :param expire_sec: Expiration time in seconds (default 60).
-        """
-        key = self._get_resource_preset_check_key(access_key, group, domain, scaling_group)
-        batch = self._create_batch()
-        batch.set(
-            key=key,
-            value=value,
-            expiry=ExpirySet(ExpiryType.SEC, expire_sec),
-        )
-        batch.sadd(_RESOURCE_PRESET_CHECK_INDEX_KEY, [key])
-        batch.expire(_RESOURCE_PRESET_CHECK_INDEX_KEY, expire_sec)
-        async with self._client.client() as conn:
-            await conn.exec(batch, raise_on_error=True)
-
-    @valkey_stat_resilience.apply()
     async def delete_resource_preset(
         self, preset_id: str | None = None, name: str | None = None
     ) -> int:
@@ -747,28 +692,23 @@ class ValkeyStatClient:
     async def invalidate_all_resource_presets(self) -> None:
         """
         Invalidate all resource preset caches by scanning and deleting all preset-related keys.
-        This includes keys for ID, name, list, and check data.
+        This includes keys for ID, name, and list.
         """
         # Scan for all preset-related keys
         patterns = [
             "resource_preset:id:*",
             "resource_preset:name:*",
             "resource_preset:list:*",
-            "resource_preset:check:*",
         ]
 
-        all_keys: list[bytes] = []
+        all_keys: list[TEncodable] = []
         for pattern in patterns:
             keys = await self._keys(pattern)
             all_keys.extend(keys)
 
-        # Delete all keys in batch, including the check index SET
         if all_keys:
-            batch = self._create_batch()
-            batch = self._invalidate_resource_presets(batch, all_keys)
-            batch.delete([_RESOURCE_PRESET_CHECK_INDEX_KEY])
             async with self._client.client() as conn:
-                await conn.exec(batch, raise_on_error=True)
+                await conn.delete(all_keys)
 
     # TODO: Remove this too generalized methods
     @valkey_stat_resilience.apply()
@@ -1136,38 +1076,12 @@ class ValkeyStatClient:
                 expiry=ExpirySet(ExpiryType.SEC, ttl_seconds),
             )
 
-    def _invalidate_total_resource_slots(self, batch: Batch) -> Batch:
-        """
-        Invalidate (delete) the total resource slots cache.
-        """
-        return batch.delete([_TOTAL_RESOURCE_SLOTS_KEY])
-
-    def _invalidate_resource_presets(self, batch: Batch, keys: list[bytes]) -> Batch:
-        """
-        Invalidate (delete) all resource preset check caches.
-        """
-        if keys:
-            return batch.delete(cast(list[str | bytes], keys))
-        return batch
-
     async def invalidate_kernel_related_cache(self) -> None:
         """
-        Invalidate all kernel-related caches: resource presets and the
-        total resource slots. (Keypair concurrency counters no longer
-        exist; concurrency is counted from the database.)
+        Invalidate caches derived from kernel occupancy: the total resource slots.
         """
-
         async with self._client.client() as conn:
-            # Use the index SET to look up tracked keys instead of SCAN over the entire keyspace.
-            resource_preset_keys = list(await conn.smembers(_RESOURCE_PRESET_CHECK_INDEX_KEY))
-
-            batch = self._create_batch()
-            batch = self._invalidate_resource_presets(batch, resource_preset_keys)
-            if resource_preset_keys:
-                batch.delete([_RESOURCE_PRESET_CHECK_INDEX_KEY])
-            batch = self._invalidate_total_resource_slots(batch)
-
-            await conn.exec(batch, raise_on_error=True)
+            await conn.delete([_TOTAL_RESOURCE_SLOTS_KEY])
 
     @valkey_stat_resilience.apply()
     async def config_get(self, parameters: Sequence[str]) -> dict[bytes, bytes]:
