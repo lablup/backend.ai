@@ -2255,17 +2255,20 @@ class ContainerdConfig(BaseConfigSchema):
     trusted_storage_size: Annotated[
         BinarySizeField,
         Field(
-            default=BinarySize.finite_from_str("128G"),
+            default=BinarySize.finite_from_str("64G"),
             validation_alias=AliasChoices("trusted-storage-size", "trusted_storage_size"),
             serialization_alias="trusted-storage-size",
         ),
         BackendAIConfigMeta(
             description=(
                 "Apparent size of each kernel's trusted storage backing file. "
-                "The file is sparse, so host disk is used only as the kernel writes to it."
+                "The file is sparse, so host disk is used only as the kernel writes to it. "
+                "The guest formats it (LUKS2 with dm-integrity) at about 1.1 s/GiB, so the guest kernel "
+                "cmdline must carry one fixed agent.cdh_api_timeout large enough for the largest store. "
+                "The Kata create_container_timeout must cover the format and the image pull, e.g. 1800 s."
             ),
             added_version="26.10.0",
-            example=ConfigExample(local="128G", prod="128G"),
+            example=ConfigExample(local="64G", prod="64G"),
         ),
     ]
 
