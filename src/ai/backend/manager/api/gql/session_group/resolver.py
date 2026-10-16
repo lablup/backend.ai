@@ -1,4 +1,4 @@
-"""Session group GraphQL query resolvers."""
+"""Session group GraphQL query and mutation resolvers."""
 
 from __future__ import annotations
 
@@ -17,8 +17,14 @@ from ai.backend.common.dto.manager.v2.session_group.response import (
 )
 from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import encode_cursor
-from ai.backend.manager.api.gql.decorators import BackendAIGQLMeta, gql_root_field
+from ai.backend.manager.api.gql.decorators import (
+    BackendAIGQLMeta,
+    gql_mutation,
+    gql_root_field,
+)
 from ai.backend.manager.api.gql.session_group.types import (
+    PurgeSessionGroupInputGQL,
+    PurgeSessionGroupPayloadGQL,
     SessionGroupConnectionGQL,
     SessionGroupEdgeGQL,
     SessionGroupFilterGQL,
@@ -119,6 +125,23 @@ async def scoped_session_groups(
         )
     )
     return _build_connection(payload)
+
+
+@gql_mutation(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description=(
+            "Permanently remove a session group. Its member sessions remain with their group "
+            "cleared. A group a deployment's replica group holds is not found."
+        ),
+    )
+)
+async def purge_session_group(
+    info: Info[StrawberryGQLContext],
+    input: PurgeSessionGroupInputGQL,
+) -> PurgeSessionGroupPayloadGQL:
+    payload = await info.context.adapters.session_group.purge(input.to_pydantic())
+    return PurgeSessionGroupPayloadGQL.from_pydantic(payload)
 
 
 def _build_connection(payload: AdminSearchSessionGroupsPayload) -> SessionGroupConnectionGQL:
