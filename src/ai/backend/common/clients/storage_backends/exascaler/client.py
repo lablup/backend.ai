@@ -8,13 +8,13 @@ import subprocess
 from collections.abc import Sequence
 from pathlib import Path
 
-from ai.backend.common.clients.storage_backends.exascaler.dto import (
-    LustreProjectQuota,
-    LustreServerConnection,
-)
 from ai.backend.common.clients.storage_backends.exascaler.exceptions import (
     EXAScalerCommandFailedError,
     EXAScalerCommandStdoutNotAvailableError,
+)
+from ai.backend.common.dto.clients.storage_backends.exascaler.response import (
+    LustreProjectQuota,
+    LustreServerConnection,
 )
 from ai.backend.logging.structured import StructuredLogger
 

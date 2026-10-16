@@ -9,24 +9,28 @@ from typing import Any, Final, cast
 import aiohttp
 from yarl import URL
 
-from ai.backend.common.clients.storage_backends.hammerspace.dto import (
+from ai.backend.common.clients.storage_backends.hammerspace.exceptions import (
+    AuthenticationError,
+    ShareNotFound,
+)
+from ai.backend.common.dto.clients.storage_backends.hammerspace.request import (
     HammerspaceClusterMetricQuery,
     HammerspaceCreateShareQuery,
     HammerspaceCreateShareRequest,
     HammerspaceGetObjectiveQuery,
     HammerspaceGetShareQuery,
     HammerspaceLoginRequest,
+)
+from ai.backend.common.dto.clients.storage_backends.hammerspace.response import (
     Metric,
     Objective,
     Share,
     SimpleShare,
     Site,
 )
-from ai.backend.common.clients.storage_backends.hammerspace.exceptions import (
-    AuthenticationError,
-    ShareNotFound,
+from ai.backend.common.dto.clients.storage_backends.hammerspace.types import (
+    ObjectType,
 )
-from ai.backend.common.clients.storage_backends.hammerspace.types import ObjectType
 from ai.backend.common.exception import (
     BackendAISchemaValidationFailed,
     BaseNFSMountCheckFailed,

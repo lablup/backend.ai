@@ -15,22 +15,26 @@ from typing import Any, ClassVar, Final, override
 import aiohttp
 from yarl import URL
 
-from ai.backend.common.clients.storage_backends.purestorage.dto import (
-    PurityArrayMetadata,
-    PurityFileSystemUsage,
-    PurityListQuery,
-    PurityNFSMetric,
-    RapidFileEntry,
-    RapidFileStat,
-    RapidFileTreeUsage,
-)
 from ai.backend.common.clients.storage_backends.purestorage.exceptions import (
     PureStorageCommandFailedError,
     PureStorageStdoutNotAvailableError,
     RapidFileToolkitVersionNotDetectedError,
     UnauthorizedPurityClient,
 )
-from ai.backend.common.clients.storage_backends.purestorage.types import RapidFileEntryType
+from ai.backend.common.dto.clients.storage_backends.purestorage.request import (
+    PurityListQuery,
+)
+from ai.backend.common.dto.clients.storage_backends.purestorage.response import (
+    PurityArrayMetadata,
+    PurityFileSystemUsage,
+    PurityNFSMetric,
+    RapidFileEntry,
+    RapidFileStat,
+    RapidFileTreeUsage,
+)
+from ai.backend.common.dto.clients.storage_backends.purestorage.types import (
+    RapidFileEntryType,
+)
 from ai.backend.common.json import load_json
 from ai.backend.common.types import BinarySize
 from ai.backend.logging.structured import StructuredLogger

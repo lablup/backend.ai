@@ -4,9 +4,8 @@ from typing import Any
 
 from pydantic import ConfigDict, Field
 
-from ai.backend.common.clients.storage_backends.dellemc.types import (
+from ai.backend.common.dto.clients.storage_backends.dellemc.types import (
     OneFSQuotaID,
-    OneFSQuotaType,
 )
 from ai.backend.common.types import BackendAISchema
 
@@ -120,20 +119,3 @@ class OneFSQuota(BackendAISchema):
 
 class OneFSCreatedQuota(BackendAISchema):
     id: OneFSQuotaID
-
-
-class OneFSCreateQuotaRequest(BackendAISchema):
-    path: str
-    type: OneFSQuotaType
-    include_snapshots: bool = False
-    thresholds: OneFSQuotaThresholds
-    thresholds_on: str = "fslogicalsize"
-    enforced: bool = True
-
-
-class OneFSUpdateQuotaRequest(BackendAISchema):
-    thresholds: OneFSQuotaThresholds
-
-
-class OneFSWorkloadStatsQuery(BackendAISchema):
-    system_names: str | None = None

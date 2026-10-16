@@ -14,17 +14,6 @@ import aiohttp
 import jwt
 from yarl import URL
 
-from ai.backend.common.clients.storage_backends.vast.dto import (
-    VASTCapacityUsage,
-    VASTClusterInfo,
-    VASTListQuotasQuery,
-    VASTLoginRequest,
-    VASTModifyQuotaRequest,
-    VASTQuota,
-    VASTRefreshTokenRequest,
-    VASTSetQuotaRequest,
-    VASTTokenPair,
-)
 from ai.backend.common.clients.storage_backends.vast.exceptions import (
     VASTAPIError,
     VASTCapacityNotFoundError,
@@ -34,7 +23,23 @@ from ai.backend.common.clients.storage_backends.vast.exceptions import (
     VASTUnauthorizedError,
     VASTUnknownError,
 )
-from ai.backend.common.clients.storage_backends.vast.types import APIVersion, VASTQuotaID
+from ai.backend.common.dto.clients.storage_backends.vast.request import (
+    VASTListQuotasQuery,
+    VASTLoginRequest,
+    VASTModifyQuotaRequest,
+    VASTRefreshTokenRequest,
+    VASTSetQuotaRequest,
+)
+from ai.backend.common.dto.clients.storage_backends.vast.response import (
+    VASTCapacityUsage,
+    VASTClusterInfo,
+    VASTQuota,
+    VASTTokenPair,
+)
+from ai.backend.common.dto.clients.storage_backends.vast.types import (
+    APIVersion,
+    VASTQuotaID,
+)
 from ai.backend.logging.structured import StructuredLogger
 
 log = StructuredLogger(logging.getLogger(__spec__.name))

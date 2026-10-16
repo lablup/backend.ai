@@ -7,11 +7,15 @@ from typing import Any
 
 import aiohttp
 
-from ai.backend.common.clients.storage_backends.dellemc.dto import (
+from ai.backend.common.dto.clients.storage_backends.dellemc.request import (
+    OneFSCreateQuotaRequest,
+    OneFSUpdateQuotaRequest,
+    OneFSWorkloadStatsQuery,
+)
+from ai.backend.common.dto.clients.storage_backends.dellemc.response import (
     OneFSClusterConfig,
     OneFSClusterMetadata,
     OneFSCreatedQuota,
-    OneFSCreateQuotaRequest,
     OneFSDriveStats,
     OneFSMetadata,
     OneFSNetworkInterface,
@@ -22,12 +26,12 @@ from ai.backend.common.clients.storage_backends.dellemc.dto import (
     OneFSProtocolStats,
     OneFSQuota,
     OneFSSystemStats,
-    OneFSUpdateQuotaRequest,
     OneFSUsage,
     OneFSWorkloadStats,
-    OneFSWorkloadStatsQuery,
 )
-from ai.backend.common.clients.storage_backends.dellemc.types import OneFSQuotaID
+from ai.backend.common.dto.clients.storage_backends.dellemc.types import (
+    OneFSQuotaID,
+)
 from ai.backend.common.json import dump_json_str
 
 

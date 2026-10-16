@@ -13,25 +13,29 @@ from typing import Any, Final
 import aiohttp
 from aiohttp import web
 
-from ai.backend.common.clients.storage_backends.weka.dto import (
-    WekaClusterInfo,
-    WekaFs,
-    WekaGetMetricQuery,
-    WekaHealthCheck,
-    WekaLoginRequest,
-    WekaMetrics,
-    WekaQuota,
-    WekaRefreshLoginRequest,
-    WekaSetQuotaRequest,
-    WekaSetQuotaV1Request,
-)
 from ai.backend.common.clients.storage_backends.weka.exceptions import (
     WekaAPIError,
     WekaInvalidBodyError,
     WekaNotFoundError,
     WekaUnauthorizedError,
 )
-from ai.backend.common.clients.storage_backends.weka.types import WekaQuotaID
+from ai.backend.common.dto.clients.storage_backends.weka.request import (
+    WekaGetMetricQuery,
+    WekaLoginRequest,
+    WekaRefreshLoginRequest,
+    WekaSetQuotaRequest,
+    WekaSetQuotaV1Request,
+)
+from ai.backend.common.dto.clients.storage_backends.weka.response import (
+    WekaClusterInfo,
+    WekaFs,
+    WekaHealthCheck,
+    WekaMetrics,
+    WekaQuota,
+)
+from ai.backend.common.dto.clients.storage_backends.weka.types import (
+    WekaQuotaID,
+)
 from ai.backend.common.json import dump_json_str
 
 _SUPPORTED_METHODS: Final = frozenset({"GET", "POST", "PUT", "PATCH", "DELETE"})

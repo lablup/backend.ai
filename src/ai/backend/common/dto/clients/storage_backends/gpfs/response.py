@@ -4,9 +4,8 @@ from typing import Any
 
 from pydantic import ConfigDict, Field
 
-from ai.backend.common.clients.storage_backends.gpfs.types import (
+from ai.backend.common.dto.clients.storage_backends.gpfs.types import (
     GPFSJobStatus,
-    GPFSQuotaType,
 )
 from ai.backend.common.types import BackendAISchema
 
@@ -197,35 +196,6 @@ class GPFSMetric(BackendAISchema):
     model_config = ConfigDict(extra="allow")
 
     performanceData: GPFSPerfmonData | None = None
-
-
-class GPFSSetQuotaRequest(BackendAISchema):
-    operationType: str = "setQuota"
-    quotaType: GPFSQuotaType = GPFSQuotaType.FILESET
-    objectName: str
-    blockSoftLimit: str
-    blockHardLimit: str
-
-
-class GPFSCreateFilesetRequest(BackendAISchema):
-    filesetName: str
-    owner: str | None = None
-    permissions: int | None = None
-    path: str | None = None
-
-
-class GPFSCopyFolderRequest(BackendAISchema):
-    targetFilesystem: str
-    targetFileset: str = "fset1"
-    targetPath: str
-
-
-class GPFSFilesetQuotasQuery(BackendAISchema):
-    filter: str
-
-
-class GPFSMetricQuery(BackendAISchema):
-    query: str
 
 
 class GPFSHealthCheck(BackendAISchema):

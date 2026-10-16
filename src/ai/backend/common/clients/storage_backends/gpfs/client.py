@@ -19,23 +19,6 @@ from tenacity import (
     wait_fixed,
 )
 
-from ai.backend.common.clients.storage_backends.gpfs.dto import (
-    GPFSClusterInfo,
-    GPFSCopyFolderRequest,
-    GPFSCreateFilesetRequest,
-    GPFSDisk,
-    GPFSFilesetQuotasQuery,
-    GPFSFilesystem,
-    GPFSHealthCheck,
-    GPFSJob,
-    GPFSMetric,
-    GPFSMetricQuery,
-    GPFSNode,
-    GPFSQuota,
-    GPFSSetQuotaRequest,
-    GPFSStoragePoolUsage,
-    GPFSSystemHealthState,
-)
 from ai.backend.common.clients.storage_backends.gpfs.exceptions import (
     GPFSConflictError,
     GPFSForbiddenError,
@@ -47,7 +30,29 @@ from ai.backend.common.clients.storage_backends.gpfs.exceptions import (
     GPFSServiceError,
     GPFSUnauthorizedError,
 )
-from ai.backend.common.clients.storage_backends.gpfs.types import GPFSJobStatus, GPFSQuotaType
+from ai.backend.common.dto.clients.storage_backends.gpfs.request import (
+    GPFSCopyFolderRequest,
+    GPFSCreateFilesetRequest,
+    GPFSFilesetQuotasQuery,
+    GPFSMetricQuery,
+    GPFSSetQuotaRequest,
+)
+from ai.backend.common.dto.clients.storage_backends.gpfs.response import (
+    GPFSClusterInfo,
+    GPFSDisk,
+    GPFSFilesystem,
+    GPFSHealthCheck,
+    GPFSJob,
+    GPFSMetric,
+    GPFSNode,
+    GPFSQuota,
+    GPFSStoragePoolUsage,
+    GPFSSystemHealthState,
+)
+from ai.backend.common.dto.clients.storage_backends.gpfs.types import (
+    GPFSJobStatus,
+    GPFSQuotaType,
+)
 from ai.backend.logging.structured import StructuredLogger
 
 log = StructuredLogger(logging.getLogger(__spec__.name))

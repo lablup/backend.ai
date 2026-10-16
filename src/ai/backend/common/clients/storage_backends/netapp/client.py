@@ -18,37 +18,6 @@ from uuid import UUID
 
 import aiohttp
 
-from ai.backend.common.clients.storage_backends.netapp.dto import (
-    NetAppCluster,
-    NetAppCreateQTreeRequest,
-    NetAppCreateQuotaRuleRequest,
-    NetAppEnableQuotaRequest,
-    NetAppJobResult,
-    NetAppQoSFixedPolicy,
-    NetAppQoSPolicy,
-    NetAppQTreeByNameQuery,
-    NetAppQTreeInfo,
-    NetAppQTreeListQuery,
-    NetAppQTreeQuery,
-    NetAppQuotaConfig,
-    NetAppQuotaReportQuery,
-    NetAppQuotaRule,
-    NetAppQuotaRuleQuery,
-    NetAppQuotaUsage,
-    NetAppSVMInfo,
-    NetAppUpdateQuotaRuleRequest,
-    NetAppVolumeByNameQuery,
-    NetAppVolumeInfo,
-    NetAppVolumeListQuery,
-    NetAppVolumeMetric,
-    NetAppVolumeMetricQuery,
-    NetAppVolumeQoS,
-    NetAppVolumeQoSQuery,
-    NetAppVolumeQuery,
-    NetAppXCPEntry,
-    NetAppXCPStat,
-    NetAppXCPTreeUsage,
-)
 from ai.backend.common.clients.storage_backends.netapp.exceptions import (
     NetAppClientError,
     NetAppQTreeNotFoundError,
@@ -56,7 +25,40 @@ from ai.backend.common.clients.storage_backends.netapp.exceptions import (
     NetAppXCPInvalidPathError,
     NetAppXCPOutputNotAvailableError,
 )
-from ai.backend.common.clients.storage_backends.netapp.types import (
+from ai.backend.common.dto.clients.storage_backends.netapp.request import (
+    NetAppCreateQTreeRequest,
+    NetAppCreateQuotaRuleRequest,
+    NetAppEnableQuotaRequest,
+    NetAppQTreeByNameQuery,
+    NetAppQTreeListQuery,
+    NetAppQTreeQuery,
+    NetAppQuotaReportQuery,
+    NetAppQuotaRuleQuery,
+    NetAppUpdateQuotaRuleRequest,
+    NetAppVolumeByNameQuery,
+    NetAppVolumeListQuery,
+    NetAppVolumeMetricQuery,
+    NetAppVolumeQoSQuery,
+    NetAppVolumeQuery,
+)
+from ai.backend.common.dto.clients.storage_backends.netapp.response import (
+    NetAppCluster,
+    NetAppJobResult,
+    NetAppQoSFixedPolicy,
+    NetAppQoSPolicy,
+    NetAppQTreeInfo,
+    NetAppQuotaConfig,
+    NetAppQuotaRule,
+    NetAppQuotaUsage,
+    NetAppSVMInfo,
+    NetAppVolumeInfo,
+    NetAppVolumeMetric,
+    NetAppVolumeQoS,
+    NetAppXCPEntry,
+    NetAppXCPStat,
+    NetAppXCPTreeUsage,
+)
+from ai.backend.common.dto.clients.storage_backends.netapp.types import (
     NetAppJobResponseCode,
     NetAppXCPEntryType,
 )

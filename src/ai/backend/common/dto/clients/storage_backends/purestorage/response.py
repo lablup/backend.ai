@@ -5,17 +5,10 @@ from pathlib import Path
 
 from pydantic import ConfigDict
 
-from ai.backend.common.clients.storage_backends.purestorage.types import (
+from ai.backend.common.dto.clients.storage_backends.purestorage.types import (
     RapidFileEntryType,
 )
 from ai.backend.common.types import BackendAISchema
-
-
-class PurityListQuery(BackendAISchema):
-    names: str | None = None
-    protocol: str | None = None
-    items_returned: int = 10
-    token: str = ""
 
 
 class PurityArrayMetadata(BackendAISchema):

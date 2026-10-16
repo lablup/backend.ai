@@ -1,11 +1,10 @@
 from __future__ import annotations
 
-from typing import Literal
 from uuid import UUID
 
-from pydantic import ConfigDict, Field
+from pydantic import ConfigDict
 
-from ai.backend.common.clients.storage_backends.hammerspace.types import (
+from ai.backend.common.dto.clients.storage_backends.hammerspace.types import (
     ObjectType,
     Priority,
     ShareLifecycle,
@@ -148,34 +147,3 @@ class Metric(BackendAISchema):
     model_config = ConfigDict(extra="allow")
 
     series: list[MetricSeries]
-
-
-class HammerspaceLoginRequest(BackendAISchema):
-    username: str
-    password: str
-
-
-class HammerspaceCreateShareRequest(BackendAISchema):
-    name: str
-    path: str
-    shareSizeLimit: int | None = None
-
-
-class HammerspaceCreateShareQuery(BackendAISchema):
-    model_config = ConfigDict(validate_by_name=True)
-
-    create_path: Literal["true", "false"] = Field(alias="create-path")
-    validate_only: Literal["true", "false"] = Field(alias="validate-only")
-
-
-class HammerspaceGetShareQuery(BackendAISchema):
-    spec: str
-
-
-class HammerspaceGetObjectiveQuery(BackendAISchema):
-    spec: str
-
-
-class HammerspaceClusterMetricQuery(BackendAISchema):
-    precedingDuration: str
-    intervalDuration: str
