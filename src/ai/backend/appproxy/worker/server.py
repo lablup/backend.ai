@@ -333,6 +333,7 @@ async def http_client_pool_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     proxy_worker_config = root_ctx.local_config.proxy_worker
     cleanup_interval = proxy_worker_config.client_pool_cleanup_interval
 
+    # This pool serves the coordinator only, so the setting applies pool-wide.
     root_ctx.http_client_pool = ClientPool(
         partial(
             tcp_client_session_factory,
