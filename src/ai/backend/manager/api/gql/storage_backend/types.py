@@ -65,6 +65,7 @@ from ai.backend.manager.api.gql.types import StrawberryGQLContext
 
 __all__ = (
     "DeleteStorageBackendPayloadGQL",
+    "StorageBackendEdgeGQL",
     "PurgeStorageBackendPayloadGQL",
     "RestoreStorageBackendPayloadGQL",
     "UpdateStorageBackendPayloadGQL",
@@ -216,7 +217,15 @@ class StorageBackendGQL(PydanticNodeMixin[StorageBackendNode]):
         raise NotImplementedError
 
 
-StorageBackendEdgeGQL = Edge[StorageBackendGQL]
+@gql_connection_type(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="One storage backend within a connection.",
+    ),
+    name="StorageBackendEdge",
+)
+class StorageBackendEdgeGQL(Edge[StorageBackendGQL]):
+    pass
 
 
 @gql_connection_type(
@@ -227,6 +236,11 @@ StorageBackendEdgeGQL = Edge[StorageBackendGQL]
     name="StorageBackendConnection",
 )
 class StorageBackendConnectionGQL(Connection[StorageBackendGQL]):
+    # Restated so the schema's edge type is the described one above rather than the
+    # one Strawberry would generate from the generic, which carries no version.
+    edges: list[StorageBackendEdgeGQL] = gql_field(  # type: ignore[assignment]
+        description="Contains the nodes in this connection."
+    )
     count: int = gql_field(description="Total number of storage backends matching the query.")
 
     def __init__(self, *args: Any, count: int, **kwargs: Any) -> None:

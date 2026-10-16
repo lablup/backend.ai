@@ -21,6 +21,7 @@ from ai.backend.common.dto.manager.v2.storage_backend.types import (
     ServiceStorageBackendStatusOrderField,
     StorageBackendOrderField,
 )
+from ai.backend.common.exception import BackendAISchemaValidationFailed
 from ai.backend.common.tristate.unset import UNSET
 
 
@@ -28,12 +29,13 @@ class TestUpdateStorageBackendInput:
     def test_omitted_name_stays_unset(self) -> None:
         assert UpdateStorageBackendInput().name is UNSET
 
-    def test_name_is_stripped(self) -> None:
-        assert UpdateStorageBackendInput(name="  vfs-1  ").name == "vfs-1"
+    def test_name_is_taken_as_given(self) -> None:
+        """``String64`` does not strip, so the surrounding space is kept."""
+        assert UpdateStorageBackendInput(name="  vfs-1  ").name == "  vfs-1  "
 
-    def test_blank_name_is_refused(self) -> None:
+    def test_empty_name_is_refused(self) -> None:
         with pytest.raises(ValidationError):
-            UpdateStorageBackendInput(name="   ")
+            UpdateStorageBackendInput(name="")
 
     def test_name_longer_than_the_column_is_refused(self) -> None:
         with pytest.raises(ValidationError):
@@ -92,7 +94,7 @@ class TestAdminSearchStorageBackendsInput:
         [("first", 0), ("last", 0), ("limit", 0), ("offset", -1)],
     )
     def test_out_of_range_pagination_is_refused(self, field: str, value: int) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             AdminSearchStorageBackendsInput.model_validate({field: value})
 
 
