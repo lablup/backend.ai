@@ -13,7 +13,6 @@ from dateutil.tz import tzutc
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
 from ai.backend.common.data.entity.keypair import KeyPairID
 from ai.backend.common.data.entity.user import UserID
-from ai.backend.common.dto.manager.config.types import MAXIMUM_DOTFILE_SIZE
 from ai.backend.common.exception import BackendAIError
 from ai.backend.common.metrics.metric import DomainType, LayerType
 from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPolicy
@@ -34,15 +33,16 @@ from ai.backend.manager.data.user.types import (
     UserSearchResult,
 )
 from ai.backend.manager.errors.bootstrap_script import DefaultBootstrapScriptNotFound
-from ai.backend.manager.errors.storage import DotfileCreationFailed, DotfileNotFound
+from ai.backend.manager.errors.storage import DotfileNotFound
 from ai.backend.manager.errors.user import KeyPairNotFound
 from ai.backend.manager.models.bootstrap_script.queriers import BootstrapScriptQuerier
 from ai.backend.manager.models.bootstrap_script.updaters import DefaultBootstrapScriptUpdater
 from ai.backend.manager.models.dotfile.conditions import DotfileConditions
 from ai.backend.manager.models.dotfile.creators import DotfileEntryCreator
+from ai.backend.manager.models.dotfile.orders import DotfileOrders
 from ai.backend.manager.models.dotfile.purgers import DefaultDotfilePurger, DotfileEntryPurger
 from ai.backend.manager.models.dotfile.queriers import DotfileQuerier
-from ai.backend.manager.models.dotfile.row import DotfileRow
+from ai.backend.manager.models.dotfile.scopes import UserDotfileTarget
 from ai.backend.manager.models.dotfile.searchers import DotfileSearcher
 from ai.backend.manager.models.dotfile.updaters import DefaultDotfileUpdater, DotfileEntryUpdater
 from ai.backend.manager.models.keypair.creators import KeypairCreator
@@ -376,6 +376,19 @@ class UserRepository:
             return dotfile
 
     @user_repository_resilience.apply()
+    async def search_user_scoped_dotfiles(
+        self, user_id: UserID, searcher: DotfileSearcher
+    ) -> list[DotfileData]:
+        async with self._v2_ops.read_ops() as ops:
+            result = await ops.search_with_scopes([UserDotfileTarget(user_id)], searcher)
+            return result.items
+
+    @user_repository_resilience.apply()
+    async def count_dotfiles(self, user_id: UserID) -> int:
+        async with self._user_ops.write_ops() as ops:
+            return await ops.count_dotfiles(user_id)
+
+    @user_repository_resilience.apply()
     async def get_default_dotfiles(self, user_id: UserID) -> DotfileEntries:
         async with self._v2_ops.read_ops() as ops:
             return await self._default_dotfiles(ops, user_id)
@@ -395,12 +408,6 @@ class UserRepository:
         async with self._user_ops.write_ops() as ops:
             await ops.lock_user(user_id)
             entries = updater.apply(await self._default_dotfiles(ops, user_id), path)
-            packed = msgpack.packb(
-                [{"path": e.path, "perm": e.perm, "data": e.data} for e in entries.entries],
-                use_bin_type=True,
-            )
-            if len(packed) > MAXIMUM_DOTFILE_SIZE:
-                raise DotfileCreationFailed("No leftover space for dotfile storage")
             await ops.batch_update_in_global(
                 DefaultDotfileUpdater(entity=user_id, path=path, updater=updater)
             )
@@ -417,16 +424,14 @@ class UserRepository:
             return entries
 
     async def _default_dotfiles(self, ops: V2ReadOps, user_id: UserID) -> DotfileEntries:
-        result = await ops.search_in_global(
+        result = await ops.search_with_scopes(
+            [UserDotfileTarget(user_id)],
             DotfileSearcher(
                 pagination=NoPagination(),
-                conditions=[
-                    DotfileConditions.by_entity(user_id),
-                    DotfileConditions.by_is_default(True),
-                ],
+                conditions=[DotfileConditions.by_is_default(True)],
                 # Migrated rows share created_at; id keeps their original order.
-                orders=[DotfileRow.created_at.asc(), DotfileRow.id.asc()],
-            )
+                orders=[DotfileOrders.created_at(), DotfileOrders.id()],
+            ),
         )
         return DotfileEntries(
             tuple(DotfileEntry(row.path, row.perm, row.data) for row in result.items)

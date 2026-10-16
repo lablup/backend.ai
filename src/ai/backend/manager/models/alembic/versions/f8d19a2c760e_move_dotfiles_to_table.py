@@ -34,15 +34,24 @@ def _batched_rows(
 
 
 def _unpack_dotfiles(rows: Iterator[RowMapping]) -> Iterator[dict[str, Any]]:
+    """Strip NUL, which text cannot hold."""
     for owner, owner_keys in groupby(rows, key=lambda row: row["owner"]):
         files: dict[tuple[str, str, str], bool] = {}
         for keypair in owner_keys:
             if not keypair["dotfiles"]:
                 continue
             for entry in msgpack.unpackb(keypair["dotfiles"], raw=False):
-                key = (entry["path"], entry["perm"], entry["data"])
+                path, perm, data = (
+                    entry[field].replace("\x00", "") for field in ("path", "perm", "data")
+                )
+                key = (path, perm, data)
                 files[key] = files.get(key, False) or keypair["is_default"]
+        default_paths: set[str] = set()
         for (path, perm, data), is_default in files.items():
+            # Stripping NUL can merge two default paths; the later one becomes a variant.
+            is_default = is_default and path not in default_paths
+            if is_default:
+                default_paths.add(path)
             yield {
                 "entity_type": "user",
                 "entity_id": owner,

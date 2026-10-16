@@ -29,6 +29,8 @@ from ai.backend.manager.data.user.types import UserData
 from ai.backend.manager.errors.resource import DomainNotFound
 from ai.backend.manager.errors.user import UserNotFound
 from ai.backend.manager.models.domain.row import DomainRow
+from ai.backend.manager.models.dotfile.conditions import DotfileConditions
+from ai.backend.manager.models.dotfile.row import DotfileRow
 from ai.backend.manager.models.keypair.creators import DefaultKeypairCreator
 from ai.backend.manager.models.project.creators import ProjectCreator
 from ai.backend.manager.models.project.row import ProjectRow, ProjectType
@@ -81,6 +83,15 @@ class V2UserWriteOps(V2RosterWriteOps, V2ResourcePolicyWriteOps):
         )
         if owner is None:
             raise UserNotFound(str(user_id))
+
+    async def count_dotfiles(self, user_id: UserID) -> int:
+        """Every dotfile row the user owns, variants included."""
+        count = await self._sess.scalar(
+            sa.select(sa.func.count())
+            .select_from(DotfileRow)
+            .where(DotfileConditions.by_entity(user_id)())
+        )
+        return count or 0
 
     async def user_exists(self, email: str, username: str) -> bool:
         """Whether an account already holds either name."""

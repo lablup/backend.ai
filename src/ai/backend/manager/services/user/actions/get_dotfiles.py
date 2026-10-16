@@ -5,12 +5,16 @@ from ai.backend.common.data.entity.types import EntityIdentifier
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.actions.v2.single_entity.base import BaseSingleEntityAction
-from ai.backend.manager.data.dotfile.types import DotfileEntries
+from ai.backend.manager.data.dotfile.types import DotfileData
+from ai.backend.manager.models.dotfile.searchers import DotfileSearcher
 
 
 @dataclass(frozen=True)
 class GetUserDotfilesAction(BaseSingleEntityAction):
+    """The user's dotfiles the searcher selects; the user bounds the search, not the searcher."""
+
     user_id: UserID
+    searcher: DotfileSearcher
 
     @override
     def entity_id(self) -> EntityIdentifier:
@@ -29,4 +33,4 @@ class GetUserDotfilesAction(BaseSingleEntityAction):
 
 @dataclass(frozen=True)
 class GetUserDotfilesActionResult:
-    dotfiles: DotfileEntries
+    dotfiles: list[DotfileData]
