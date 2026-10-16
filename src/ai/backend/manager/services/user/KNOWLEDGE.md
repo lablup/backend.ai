@@ -14,6 +14,7 @@ sources:
   - src/ai/backend/manager/models/keypair
   - src/ai/backend/manager/models/user
   - src/ai/backend/manager/models/bootstrap_script
+  - src/ai/backend/manager/services/user/bootstrap_script
 generated:
   by: claude-code/opus-5
   at: 2026-08-19
@@ -36,7 +37,16 @@ row is a change to that user.
 ## Bootstrap scripts and dotfiles
 
 - `bootstrap_scripts` holds scripts per `(entity_type, entity_id)`; at most one per entity is `is_default`.
-- The API and session creation use the user's default script. Reading one that is missing answers an empty script; updating it answers not found.
+- Session creation and the legacy API use the user's default script, or the oldest one (`created_at`) when none is the default. With no script at all they use an empty one. The legacy update rewrites the default only and answers not found without one.
+- `processors.bootstrap_script` is a field group of the user: a script named by id reads its user through the owner lookup, and that user answers for the operation. A script set on another kind of entity resolves to no owner, so it is not found here.
+
+| Operation | Rule | Why |
+|---|---|---|
+| create | Always non-default | The default moves only through switch-default |
+| switch-default | Clears the old mark, then sets the new one, in one transaction | The partial unique index allows one default per user |
+| purge | Refused on the default | Same as the default keypair: switch the default first |
+| unset default | Not offered | Same as the default keypair |
+
 - Dotfiles stay on `keypairs.dotfiles`.
 
 ## The operations that keep a service
