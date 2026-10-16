@@ -5,6 +5,8 @@ Shared between Client SDK and Manager API.
 
 from __future__ import annotations
 
+from uuid import UUID
+
 from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseRequestModel
@@ -24,6 +26,7 @@ from ai.backend.common.dto.manager.v2.session_group.types import (
 
 __all__ = (
     "AdminSearchSessionGroupsInput",
+    "PurgeSessionGroupInput",
     "ScopedSearchSessionGroupsInput",
     "SessionGroupFilter",
     "SessionGroupOrder",
@@ -112,3 +115,9 @@ class AdminSearchSessionGroupsInput(BaseRequestModel):
     before: str | None = Field(default=None, description="Cursor pagination: before cursor.")
     limit: int | None = Field(default=None, description="Offset pagination: maximum items.")
     offset: int | None = Field(default=None, description="Offset pagination: number to skip.")
+
+
+class PurgeSessionGroupInput(BaseRequestModel):
+    """Input for removing a session group; its member sessions stay with their group cleared."""
+
+    id: UUID = Field(description="ID of the session group to purge.")
