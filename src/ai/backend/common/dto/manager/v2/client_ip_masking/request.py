@@ -8,7 +8,7 @@ from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseRequestModel
 from ai.backend.common.dto.manager.query import UUIDFilter
-from ai.backend.common.dto.manager.v2.common import OrderDirection
+from ai.backend.common.dto.manager.v2.common import NonEmptyList, OrderDirection
 from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 
 from .types import ClientIPMaskingMode, ClientIPMaskingPolicyOrderField, ClientIPMaskingTarget
@@ -19,6 +19,7 @@ __all__ = (
     "AdminUpsertClientIPMaskingPolicyInput",
     "ClientIPMaskingPolicyFilter",
     "ClientIPMaskingPolicyOrder",
+    "PartialBulkPurgeClientIPMaskingPoliciesInput",
 )
 
 
@@ -78,3 +79,9 @@ class AdminPurgeClientIPMaskingPolicyInput(BaseRequestModel):
     """Drop one target's policy so it falls back to the default."""
 
     id: UUID = Field(description="Policy ID")
+
+
+class PartialBulkPurgeClientIPMaskingPoliciesInput(BaseRequestModel):
+    """Input for dropping several policies, each answered for separately."""
+
+    ids: NonEmptyList[UUID] = Field(description="IDs of the policies to drop.")

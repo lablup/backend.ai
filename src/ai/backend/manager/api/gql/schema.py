@@ -23,19 +23,29 @@ from ai.backend.manager.api.gql.app_config_allow_list.resolver import (
     admin_create_app_config_allow_list,
     admin_purge_app_config_allow_list,
     admin_update_app_config_allow_list,
+    partial_bulk_purge_app_config_allow_lists,
+    partial_bulk_update_app_config_allow_lists,
+    purge_app_config_allow_list,
+    update_app_config_allow_list,
 )
 from ai.backend.manager.api.gql.app_config_definition.resolver import (
     admin_app_config_definition,
     admin_app_config_definitions,
     admin_create_app_config_definition,
     admin_purge_app_config_definition,
+    partial_bulk_purge_app_config_definitions,
+    purge_app_config_definition,
 )
 from ai.backend.manager.api.gql.app_config_fragment.resolver import (
     admin_app_config_fragments,
     app_config_fragment,
     my_app_config_fragments_by_names,
+    my_atomic_bulk_upsert_app_config_fragments,
     my_upsert_app_config_fragments,
+    partial_bulk_purge_app_config_fragments,
+    purge_app_config_fragment,
     scoped_app_config_fragments_by_names,
+    scoped_atomic_bulk_upsert_app_config_fragments,
     scoped_upsert_app_config_fragments,
 )
 from ai.backend.manager.api.gql.artifact.resolver import (
@@ -71,10 +81,15 @@ from ai.backend.manager.api.gql.client_ip_masking.resolver import (
     admin_client_ip_masking_policies,
     admin_purge_client_ip_masking_policy,
     admin_upsert_client_ip_masking_policy,
+    partial_bulk_purge_client_ip_masking_policies,
+    purge_client_ip_masking_policy,
+    upsert_client_ip_masking_policy,
 )
 from ai.backend.manager.api.gql.container_registry.resolver.mutation import (
     admin_create_container_registry_v2,
     admin_delete_container_registry_v2,
+    admin_partial_bulk_purge_container_registries_v2,
+    admin_purge_container_registry_v2,
     admin_update_container_registry_v2,
 )
 from ai.backend.manager.api.gql.container_registry.resolver.query import (
@@ -84,10 +99,15 @@ from ai.backend.manager.api.gql.decorators import BackendAIGQLMeta, gql_root_fie
 from ai.backend.manager.api.gql.deployment.resolver.access_token import (
     create_access_token,
     delete_access_token,
+    partial_bulk_purge_access_tokens,
+    purge_access_token,
 )
 from ai.backend.manager.api.gql.deployment.resolver.auto_scaling import (
     create_auto_scaling_rule,
     delete_auto_scaling_rule,
+    partial_bulk_purge_auto_scaling_rules,
+    partial_bulk_update_auto_scaling_rules,
+    purge_auto_scaling_rule,
     update_auto_scaling_rule,
 )
 from ai.backend.manager.api.gql.deployment.resolver.deployment import (
@@ -123,6 +143,10 @@ from ai.backend.manager.api.gql.deployment.resolver.revision_preset import (
     admin_update_deployment_revision_preset,
     deployment_revision_preset,
     deployment_revision_presets,
+    partial_bulk_purge_deployment_revision_presets,
+    partial_bulk_update_deployment_revision_presets,
+    purge_deployment_revision_preset,
+    update_deployment_revision_preset,
 )
 from ai.backend.manager.api.gql.deployment.resolver.route import (
     route,
@@ -151,7 +175,9 @@ from ai.backend.manager.api.gql.domain_v2.resolver.query import (
 from ai.backend.manager.api.gql.entity.resolver.query import entity_types
 from ai.backend.manager.api.gql.entity_label.resolver.mutation import (
     partial_bulk_purge_entity_label,
+    partial_bulk_purge_entity_labels,
     partial_bulk_upsert_entity_label,
+    partial_bulk_upsert_entity_labels,
     purge_entity_label,
     upsert_entity_label,
 )
@@ -176,6 +202,7 @@ from ai.backend.manager.api.gql.fair_share.resolver.domain import (
     admin_domain_fair_share,
     admin_domain_fair_shares,
     admin_upsert_domain_fair_share_weight,
+    atomic_bulk_upsert_domain_fair_share_weights,
     bulk_upsert_domain_fair_share_weight,
     domain_fair_share,
     domain_fair_shares,
@@ -188,6 +215,7 @@ from ai.backend.manager.api.gql.fair_share.resolver.project import (
     admin_project_fair_share,
     admin_project_fair_shares,
     admin_upsert_project_fair_share_weight,
+    atomic_bulk_upsert_project_fair_share_weights,
     bulk_upsert_project_fair_share_weight,
     project_fair_share,
     project_fair_shares,
@@ -200,6 +228,7 @@ from ai.backend.manager.api.gql.fair_share.resolver.user import (
     admin_upsert_user_fair_share_weight,
     admin_user_fair_share,
     admin_user_fair_shares,
+    atomic_bulk_upsert_user_fair_share_weights,
     bulk_upsert_user_fair_share_weight,
     rg_user_fair_share,
     rg_user_fair_shares,
@@ -268,6 +297,10 @@ from ai.backend.manager.api.gql.login_client_type.resolver import (
     admin_update_login_client_type,
     login_client_type,
     login_client_types,
+    partial_bulk_purge_login_client_types,
+    partial_bulk_update_login_client_types,
+    purge_login_client_type,
+    update_login_client_type,
 )
 from ai.backend.manager.api.gql.login_history.resolver.query import (
     admin_login_history_v2,
@@ -290,9 +323,13 @@ from ai.backend.manager.api.gql.model_card.resolver import (
     model_card_available_presets,
     model_card_v2,
     my_model_cards_v2,
+    partial_bulk_purge_model_cards_v2,
+    partial_bulk_update_model_cards_v2,
     project_model_cards_v2,
+    purge_model_card_v2,
     scan_project_model_cards_v2,
     scoped_model_cards_v2,
+    update_model_card_v2,
 )
 from ai.backend.manager.api.gql.notification.resolver import (
     admin_create_notification_channel,
@@ -519,6 +556,10 @@ from ai.backend.manager.api.gql.retention_policy.resolver import (
     admin_retention_policies,
     admin_retention_policy,
     admin_update_retention_policy,
+    partial_bulk_purge_retention_policies,
+    partial_bulk_update_retention_policies,
+    purge_retention_policy,
+    update_retention_policy,
 )
 from ai.backend.manager.api.gql.role_preset.resolver.mutation import (
     admin_bulk_add_role_preset_permissions,
@@ -590,6 +631,7 @@ from ai.backend.manager.api.gql.session.resolver.session import (
     exclude_session_idle_checks,
     include_session_idle_checks,
     my_sessions_v2,
+    partial_bulk_terminate_sessions_v2,
     project_sessions_v2,
     scoped_sessions_v2,
     session_v2,
@@ -716,6 +758,8 @@ from .resource_slot.resolver import (
     admin_create_resource_slot_type,
     admin_purge_resource_slot_type,
     admin_update_resource_slot_type,
+    partial_bulk_purge_resource_slot_types,
+    purge_resource_slot_type,
     resource_slot_type,
     resource_slot_types,
 )
@@ -1022,11 +1066,21 @@ class Mutation:
     admin_create_resource_slot_type = admin_create_resource_slot_type
     admin_update_resource_slot_type = admin_update_resource_slot_type
     admin_purge_resource_slot_type = admin_purge_resource_slot_type
+    purge_resource_slot_type = purge_resource_slot_type
+    partial_bulk_purge_resource_slot_types = partial_bulk_purge_resource_slot_types
     admin_create_app_config_allow_list = admin_create_app_config_allow_list
     admin_purge_app_config_allow_list = admin_purge_app_config_allow_list
     admin_update_app_config_allow_list = admin_update_app_config_allow_list
     scoped_upsert_app_config_fragments = scoped_upsert_app_config_fragments
     my_upsert_app_config_fragments = my_upsert_app_config_fragments
+    update_app_config_allow_list = update_app_config_allow_list
+    purge_app_config_allow_list = purge_app_config_allow_list
+    partial_bulk_update_app_config_allow_lists = partial_bulk_update_app_config_allow_lists
+    partial_bulk_purge_app_config_allow_lists = partial_bulk_purge_app_config_allow_lists
+    scoped_atomic_bulk_upsert_app_config_fragments = scoped_atomic_bulk_upsert_app_config_fragments
+    my_atomic_bulk_upsert_app_config_fragments = my_atomic_bulk_upsert_app_config_fragments
+    purge_app_config_fragment = purge_app_config_fragment
+    partial_bulk_purge_app_config_fragments = partial_bulk_purge_app_config_fragments
     scan_artifacts = scan_artifacts
     scan_artifact_models = scan_artifact_models
     import_artifacts = import_artifacts
@@ -1046,6 +1100,10 @@ class Mutation:
     admin_create_container_registry_v2 = admin_create_container_registry_v2
     admin_update_container_registry_v2 = admin_update_container_registry_v2
     admin_delete_container_registry_v2 = admin_delete_container_registry_v2
+    admin_purge_container_registry_v2 = admin_purge_container_registry_v2
+    admin_partial_bulk_purge_container_registries_v2 = (
+        admin_partial_bulk_purge_container_registries_v2
+    )
     create_model_deployment = create_model_deployment
     update_model_deployment = update_model_deployment
     delete_model_deployment = delete_model_deployment
@@ -1083,6 +1141,9 @@ class Mutation:
     create_auto_scaling_rule = create_auto_scaling_rule
     update_auto_scaling_rule = update_auto_scaling_rule
     delete_auto_scaling_rule = delete_auto_scaling_rule
+    purge_auto_scaling_rule = purge_auto_scaling_rule
+    partial_bulk_update_auto_scaling_rules = partial_bulk_update_auto_scaling_rules
+    partial_bulk_purge_auto_scaling_rules = partial_bulk_purge_auto_scaling_rules
     delete_object_storage = delete_object_storage
     purge_object_storage = purge_object_storage
     partial_bulk_update_object_storages = partial_bulk_update_object_storages
@@ -1113,9 +1174,18 @@ class Mutation:
     reject_artifact_revision = reject_artifact_revision
     create_access_token = create_access_token
     delete_access_token = delete_access_token
+    purge_access_token = purge_access_token
+    partial_bulk_purge_access_tokens = partial_bulk_purge_access_tokens
     activate_deployment_revision = activate_deployment_revision
     update_route_traffic_status = update_route_traffic_status
-    # Fair Share - Admin APIs
+    # Fair Share
+    upsert_domain_fair_share_weight = upsert_domain_fair_share_weight
+    upsert_project_fair_share_weight = upsert_project_fair_share_weight
+    upsert_user_fair_share_weight = upsert_user_fair_share_weight
+    atomic_bulk_upsert_domain_fair_share_weights = atomic_bulk_upsert_domain_fair_share_weights
+    atomic_bulk_upsert_project_fair_share_weights = atomic_bulk_upsert_project_fair_share_weights
+    atomic_bulk_upsert_user_fair_share_weights = atomic_bulk_upsert_user_fair_share_weights
+    # Fair Share - Admin APIs (deprecated)
     admin_upsert_domain_fair_share_weight = admin_upsert_domain_fair_share_weight
     admin_upsert_project_fair_share_weight = admin_upsert_project_fair_share_weight
     admin_upsert_user_fair_share_weight = admin_upsert_user_fair_share_weight
@@ -1123,9 +1193,6 @@ class Mutation:
     admin_bulk_upsert_project_fair_share_weight = admin_bulk_upsert_project_fair_share_weight
     admin_bulk_upsert_user_fair_share_weight = admin_bulk_upsert_user_fair_share_weight
     # Fair Share - Legacy (deprecated)
-    upsert_domain_fair_share_weight = upsert_domain_fair_share_weight
-    upsert_project_fair_share_weight = upsert_project_fair_share_weight
-    upsert_user_fair_share_weight = upsert_user_fair_share_weight
     bulk_upsert_domain_fair_share_weight = bulk_upsert_domain_fair_share_weight
     bulk_upsert_project_fair_share_weight = bulk_upsert_project_fair_share_weight
     bulk_upsert_user_fair_share_weight = bulk_upsert_user_fair_share_weight
@@ -1321,9 +1388,15 @@ class Mutation:
     admin_create_login_client_type = admin_create_login_client_type
     admin_update_login_client_type = admin_update_login_client_type
     admin_delete_login_client_type = admin_delete_login_client_type
+    update_login_client_type = update_login_client_type
+    purge_login_client_type = purge_login_client_type
+    partial_bulk_update_login_client_types = partial_bulk_update_login_client_types
+    partial_bulk_purge_login_client_types = partial_bulk_purge_login_client_types
     # App Config Definition mutations
     admin_create_app_config_definition = admin_create_app_config_definition
     admin_purge_app_config_definition = admin_purge_app_config_definition
+    purge_app_config_definition = purge_app_config_definition
+    partial_bulk_purge_app_config_definitions = partial_bulk_purge_app_config_definitions
     # Runtime Variant mutations
     admin_create_runtime_variant = admin_create_runtime_variant
     admin_update_runtime_variant = admin_update_runtime_variant
@@ -1336,6 +1409,9 @@ class Mutation:
     # Client IP Masking mutations
     admin_upsert_client_ip_masking_policy = admin_upsert_client_ip_masking_policy
     admin_purge_client_ip_masking_policy = admin_purge_client_ip_masking_policy
+    upsert_client_ip_masking_policy = upsert_client_ip_masking_policy
+    purge_client_ip_masking_policy = purge_client_ip_masking_policy
+    partial_bulk_purge_client_ip_masking_policies = partial_bulk_purge_client_ip_masking_policies
     # Retention Policy mutations
     admin_create_retention_policy = admin_create_retention_policy
     create_entity_share = create_entity_share
@@ -1347,6 +1423,10 @@ class Mutation:
     admin_update_retention_policy = admin_update_retention_policy
     admin_delete_retention_policy = admin_delete_retention_policy
     admin_purge_retention_policy = admin_purge_retention_policy
+    update_retention_policy = update_retention_policy
+    purge_retention_policy = purge_retention_policy
+    partial_bulk_update_retention_policies = partial_bulk_update_retention_policies
+    partial_bulk_purge_retention_policies = partial_bulk_purge_retention_policies
     # Runtime Variant Preset mutations
     admin_create_runtime_variant_preset = admin_create_runtime_variant_preset
     admin_update_runtime_variant_preset = admin_update_runtime_variant_preset
@@ -1359,11 +1439,21 @@ class Mutation:
     admin_create_deployment_revision_preset = admin_create_deployment_revision_preset
     admin_update_deployment_revision_preset = admin_update_deployment_revision_preset
     admin_delete_deployment_revision_preset = admin_delete_deployment_revision_preset
+    update_deployment_revision_preset = update_deployment_revision_preset
+    purge_deployment_revision_preset = purge_deployment_revision_preset
+    partial_bulk_update_deployment_revision_presets = (
+        partial_bulk_update_deployment_revision_presets
+    )
+    partial_bulk_purge_deployment_revision_presets = partial_bulk_purge_deployment_revision_presets
     # Model Card mutations
     admin_create_model_card_v2 = admin_create_model_card_v2
     admin_update_model_card_v2 = admin_update_model_card_v2
     admin_delete_model_card_v2 = admin_delete_model_card_v2
     admin_bulk_delete_model_cards_v2 = admin_bulk_delete_model_cards_v2
+    update_model_card_v2 = update_model_card_v2
+    purge_model_card_v2 = purge_model_card_v2
+    partial_bulk_update_model_cards_v2 = partial_bulk_update_model_cards_v2
+    partial_bulk_purge_model_cards_v2 = partial_bulk_purge_model_cards_v2
     scan_project_model_cards_v2 = scan_project_model_cards_v2
     deploy_model_card_v2 = deploy_model_card_v2
     # VFolder V2 mutations
@@ -1391,12 +1481,15 @@ class Mutation:
     # Session V2 mutations
     enqueue_session = enqueue_session
     terminate_sessions_v2 = terminate_sessions_v2
+    partial_bulk_terminate_sessions_v2 = partial_bulk_terminate_sessions_v2
     exclude_session_idle_checks = exclude_session_idle_checks
     include_session_idle_checks = include_session_idle_checks
     # Entity Label mutations
     upsert_entity_label = upsert_entity_label
-    partial_bulk_upsert_entity_label = partial_bulk_upsert_entity_label
+    partial_bulk_upsert_entity_labels = partial_bulk_upsert_entity_labels
     purge_entity_label = purge_entity_label
+    partial_bulk_purge_entity_labels = partial_bulk_purge_entity_labels
+    partial_bulk_upsert_entity_label = partial_bulk_upsert_entity_label
     partial_bulk_purge_entity_label = partial_bulk_purge_entity_label
 
 

@@ -11,6 +11,7 @@ from ai.backend.common.dto.manager.v2.fair_share.request import (
     GetDomainFairShareInput,
     SearchDomainFairSharesInput,
 )
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import encode_cursor
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
@@ -249,6 +250,41 @@ async def domain_fair_shares(
     )
 
 
+# Mutations
+
+
+@gql_mutation(
+    BackendAIGQLMeta(
+        added_version="26.1.0",
+        description="Upsert domain fair share weight. Creates a new record if it doesn't exist, or updates the weight if it does",
+    )
+)
+async def upsert_domain_fair_share_weight(
+    info: Info[StrawberryGQLContext],
+    input: UpsertDomainFairShareWeightInput,
+) -> UpsertDomainFairShareWeightPayload | None:
+    """Upsert domain fair share weight."""
+    result = await info.context.adapters.fair_share.upsert_domain(input.to_pydantic())
+    return UpsertDomainFairShareWeightPayload(
+        domain_fair_share=DomainFairShareGQL.from_pydantic(result.domain_fair_share)
+    )
+
+
+@gql_mutation(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Upsert several domain fair share weights in one transaction. Creates new records if they don't exist, or updates weights if they do",
+    )
+)
+async def atomic_bulk_upsert_domain_fair_share_weights(
+    info: Info[StrawberryGQLContext],
+    input: BulkUpsertDomainFairShareWeightInput,
+) -> BulkUpsertDomainFairShareWeightPayload | None:
+    """Upsert several domain fair share weights in one transaction."""
+    result = await info.context.adapters.fair_share.atomic_bulk_upsert_domain(input.to_pydantic())
+    return BulkUpsertDomainFairShareWeightPayload.from_pydantic(result)
+
+
 # Admin Mutations
 
 
@@ -256,7 +292,8 @@ async def domain_fair_shares(
     BackendAIGQLMeta(
         added_version="26.2.0",
         description="Upsert domain fair share weight (admin only). Creates a new record if it doesn't exist, or updates the weight if it does",
-    )
+    ),
+    deprecation_reason=f"Deprecated since {NEXT_RELEASE_VERSION}. Use `upsertDomainFairShareWeight`.",
 )
 async def admin_upsert_domain_fair_share_weight(
     info: Info[StrawberryGQLContext],
@@ -275,7 +312,8 @@ async def admin_upsert_domain_fair_share_weight(
     BackendAIGQLMeta(
         added_version="26.2.0",
         description="Bulk upsert domain fair share weights (admin only). Creates new records if they don't exist, or updates weights if they do",
-    )
+    ),
+    deprecation_reason=f"Deprecated since {NEXT_RELEASE_VERSION}. Use `atomicBulkUpsertDomainFairShareWeights`.",
 )
 async def admin_bulk_upsert_domain_fair_share_weight(
     info: Info[StrawberryGQLContext],
@@ -284,7 +322,7 @@ async def admin_bulk_upsert_domain_fair_share_weight(
     """Bulk upsert domain fair share weights (admin only)."""
     check_admin_only()
 
-    result = await info.context.adapters.fair_share.bulk_upsert_domain(input.to_pydantic())
+    result = await info.context.adapters.fair_share.atomic_bulk_upsert_domain(input.to_pydantic())
     return BulkUpsertDomainFairShareWeightPayload.from_pydantic(result)
 
 
@@ -294,31 +332,9 @@ async def admin_bulk_upsert_domain_fair_share_weight(
 @gql_mutation(
     BackendAIGQLMeta(
         added_version="26.1.0",
-        description="Upsert domain fair share weight (superadmin only). Creates a new record if it doesn't exist, or updates the weight if it does",
-    ),
-    deprecation_reason="Use admin_upsert_domain_fair_share_weight instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.",
-)
-async def upsert_domain_fair_share_weight(
-    info: Info[StrawberryGQLContext],
-    input: UpsertDomainFairShareWeightInput,
-) -> UpsertDomainFairShareWeightPayload | None:
-    """Upsert domain fair share weight."""
-    me = current_user()
-    if me is None or not me.is_superadmin:
-        raise web.HTTPForbidden(reason="Only superadmin can modify fair share data.")
-
-    result = await info.context.adapters.fair_share.upsert_domain(input.to_pydantic())
-    return UpsertDomainFairShareWeightPayload(
-        domain_fair_share=DomainFairShareGQL.from_pydantic(result.domain_fair_share)
-    )
-
-
-@gql_mutation(
-    BackendAIGQLMeta(
-        added_version="26.1.0",
         description="Bulk upsert domain fair share weights (superadmin only). Creates new records if they don't exist, or updates weights if they do",
     ),
-    deprecation_reason="Use admin_bulk_upsert_domain_fair_share_weight instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.",
+    deprecation_reason=f"Deprecated since {NEXT_RELEASE_VERSION}. Use `atomicBulkUpsertDomainFairShareWeights`.",
 )
 async def bulk_upsert_domain_fair_share_weight(
     info: Info[StrawberryGQLContext],
@@ -329,5 +345,5 @@ async def bulk_upsert_domain_fair_share_weight(
     if me is None or not me.is_superadmin:
         raise web.HTTPForbidden(reason="Only superadmin can modify fair share data.")
 
-    result = await info.context.adapters.fair_share.bulk_upsert_domain(input.to_pydantic())
+    result = await info.context.adapters.fair_share.atomic_bulk_upsert_domain(input.to_pydantic())
     return BulkUpsertDomainFairShareWeightPayload.from_pydantic(result)
