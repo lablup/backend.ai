@@ -1289,6 +1289,7 @@ class ComputeSession(graphene.ObjectType):  # type: ignore[misc]
         domain_name: str | None = None,
         group_id: uuid.UUID | None = None,
         access_key: str | None = None,
+        user_id: uuid.UUID | None = None,
         status: str | SessionStatus | None = None,
         filter: str | None = None,
     ) -> int:
@@ -1310,6 +1311,8 @@ class ComputeSession(graphene.ObjectType):  # type: ignore[misc]
             query = query.where(SessionRow.group_id == group_id)
         if access_key is not None:
             query = query.where(SessionRow.access_key == access_key)
+        if user_id is not None:
+            query = query.where(SessionRow.user_uuid == user_id)
         if status_list is not None:
             query = query.where(SessionRow.status.in_(status_list))
         if filter is not None:
@@ -1329,6 +1332,7 @@ class ComputeSession(graphene.ObjectType):  # type: ignore[misc]
         domain_name: str | None = None,
         group_id: uuid.UUID | None = None,
         access_key: str | None = None,
+        user_id: uuid.UUID | None = None,
         status: str | SessionStatus | None = None,
         filter: str | None = None,
         order: str | None = None,
@@ -1363,6 +1367,8 @@ class ComputeSession(graphene.ObjectType):  # type: ignore[misc]
             query = query.where(SessionRow.group_id == group_id)
         if access_key is not None:
             query = query.where(SessionRow.access_key == access_key)
+        if user_id is not None:
+            query = query.where(SessionRow.user_uuid == user_id)
         if status_list is not None:
             query = query.where(SessionRow.status.in_(status_list))
         if filter is not None:
@@ -1385,6 +1391,7 @@ class ComputeSession(graphene.ObjectType):  # type: ignore[misc]
         *,
         domain_name: str | None = None,
         access_key: str | None = None,
+        user_id: uuid.UUID | None = None,
     ) -> Sequence[ComputeSession | None]:
         j = sa.join(SessionRow, ProjectRow, SessionRow.group_id == ProjectRow.id).join(
             UserRow, SessionRow.user_uuid == UserRow.uuid
@@ -1404,6 +1411,8 @@ class ComputeSession(graphene.ObjectType):  # type: ignore[misc]
             query = query.where(SessionRow.domain_name == domain_name)
         if access_key is not None:
             query = query.where(SessionRow.access_key == access_key)
+        if user_id is not None:
+            query = query.where(SessionRow.user_uuid == user_id)
         async with ctx.db.begin_readonly_session() as db_sess:
             rows = (await db_sess.execute(query)).all()
             objs_per_key: dict[SessionId, ComputeSession | None] = dict.fromkeys(session_ids)
