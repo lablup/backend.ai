@@ -10473,6 +10473,11 @@ type Mutation {
   includeSessionIdleChecks(input: IncludeSessionIdleChecksInput!): IncludeSessionIdleChecksPayload
 
   """
+  Added in 26.10.0. Permanently remove a session group. Its member sessions remain with their group cleared. A group a deployment's replica group holds is not found.
+  """
+  purgeSessionGroup(input: PurgeSessionGroupInput!): PurgeSessionGroupPayload!
+
+  """
   Added in 26.9.0. Set one key on an entity, replacing the value it carries. Reachable by any caller RBAC authorizes to write the entity.
   """
   upsertEntityLabel(input: UpsertEntityLabelInput!): UpsertEntityLabelPayload
@@ -12349,6 +12354,20 @@ input PurgeRoleInput {
 """Added in 26.3.0. Payload for purge role mutation."""
 type PurgeRolePayload {
   """ID of the purged role."""
+  id: UUID!
+}
+
+"""Added in 26.10.0. Identifies the session group to purge."""
+input PurgeSessionGroupInput {
+  """ID of the session group to purge."""
+  id: UUID!
+}
+
+"""
+Added in 26.10.0. Names the session group removed. Its member sessions remain.
+"""
+type PurgeSessionGroupPayload {
+  """ID of the purged session group."""
   id: UUID!
 }
 

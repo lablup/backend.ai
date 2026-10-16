@@ -2,7 +2,8 @@
 
 Two projects with a user-made group each, a deployment's group in the first, and another
 user's group in the second. The caller is the owner only when the grant sits in the owner's
-own scope, so what the caller reaches comes from the grant.
+own scope, so what the caller reaches comes from the grant. The purge lays one project
+instead: a user-made group with member sessions beside a deployment's group.
 """
 
 from __future__ import annotations
@@ -26,6 +27,7 @@ from ai.backend.common.dto.manager.v2.session_group.types import (
 from ai.backend.manager.data.domain.types import DomainData
 from ai.backend.manager.data.permission.types import Permission
 from ai.backend.manager.data.project.types import ProjectData
+from ai.backend.manager.data.session.types import SessionEntityData
 from ai.backend.manager.data.session_group.types import SessionGroupData
 from ai.backend.manager.data.user.types import UserData
 from ai.backend.testutils.scenario_steps import (
@@ -43,13 +45,16 @@ from bai_scenario.seeds.domain.domain import TestSeedDomain
 from bai_scenario.seeds.project.project import TestSeedProject
 from bai_scenario.seeds.rbac.role import TestSeedPermission, TestSeedRole
 from bai_scenario.seeds.resource_group.resource_group import TestSeedResourceGroup
+from bai_scenario.seeds.resource_policy.keypair import TestSeedKeypairPolicy
 from bai_scenario.seeds.resource_policy.project import TestSeedProjectPolicy
 from bai_scenario.seeds.seeder import Laid, TestSeeder, TestSeedNest
+from bai_scenario.seeds.session.session import TestSeedSessionInGroup
 from bai_scenario.seeds.session_group.session_group import (
     TestSeedDeploymentSessionGroup,
     TestSeedPrimaryReplicaGroupOf,
     TestSeedSessionGroup,
 )
+from bai_scenario.seeds.user.fields import TestSeedKeypairOf
 
 
 class GrantedIn(enum.Enum):
@@ -242,6 +247,124 @@ class SessionGroupsInTwoProjects(Given[Any, SessionGroupsAndACaller]):
             elsewhere_group=seeding.made(elsewhere_group),
             strangers_group=seeding.made(strangers_group),
             caller=seeding.made(caller),
+        )
+
+
+class OwnerGrant(enum.Enum):
+    """그룹들을 만든 사람이 자기 스코프에서 받은 세션 그룹 권한."""
+
+    NOTHING = "없음"
+    READ = "읽기"
+    HARD_DELETE = "영구 삭제"
+
+    def permission(self) -> Permission | None:
+        match self:
+            case OwnerGrant.NOTHING:
+                return None
+            case OwnerGrant.READ:
+                return Permission.READ
+            case OwnerGrant.HARD_DELETE:
+                return Permission.HARD_DELETE
+
+
+@dataclass(frozen=True)
+class AGroupWithMembersAndItsOwner:
+    """멤버 세션이 있는 사용자 그룹과 배포의 그룹, 그리고 둘을 만든 사람."""
+
+    project: ProjectData
+    owner: UserData
+    users_group: SessionGroupData
+    """사용자가 만든 그룹. 멤버 세션 둘을 갖는다."""
+    deployment_group: SessionGroupData
+    """같은 프로젝트의 배포가 가진 그룹."""
+    members: tuple[SessionEntityData, ...]
+
+
+@dataclass(frozen=True)
+class SomeoneGrantedOnTheirOwnSessionGroups(TestSeedNest[Laid[UserData]]):
+    """자기 스코프에서 세션 그룹에 정해진 권한 하나를 받은 사용자."""
+
+    domain: Laid[DomainData]
+    permission: Permission
+
+    @override
+    def kind(self) -> str:
+        return "자기 스코프에서 세션 그룹 권한 하나를 받은 사용자 준비"
+
+    @override
+    def lay(self, seed: TestSeeder) -> Laid[UserData]:
+        someone = seed.within(SomeoneOf(self.domain))
+        own = seed.creating_from(
+            TestSeedRole(lambda u: UserID(u.id), name_hint="session-group-owner"), someone
+        )
+        seed.adding(
+            TestSeedPermission(entity_type=SessionGroupEntityType(), permission=self.permission),
+            own,
+        )
+        seed.granting(own, someone, role_id=lambda r: r.id, user_id=lambda u: UserID(u.id))
+        return someone
+
+
+@dataclass(frozen=True)
+class AUsersGroupWithMembers(Given[Any, AGroupWithMembersAndItsOwner]):
+    """한 프로젝트에 멤버 세션 둘을 가진 사용자 그룹과 배포의 그룹, 둘을 만든 사람."""
+
+    granted: OwnerGrant
+
+    @override
+    def describe(self) -> str:
+        laid = "한 프로젝트에 멤버 세션 둘을 가진 사용자 그룹과 배포의 그룹"
+        if self.granted is OwnerGrant.NOTHING:
+            return f"{laid}, 그리고 아무 권한도 받지 않은 그룹들을 만든 사용자"
+        return (
+            f"{laid}, 그리고 자기 스코프에서 세션 그룹 {self.granted.value} 권한을 받은 "
+            "그룹들을 만든 사용자"
+        )
+
+    @override
+    async def lay(self, seeding: Any) -> AGroupWithMembersAndItsOwner:
+        domain = await seeding.creating(TestSeedDomain(name_hint="home", description=WAS_HERE))
+        policy = await seeding.once(TestSeedProjectPolicy())
+        project = await seeding.creating_from_two(TestSeedProject(name_hint="team"), domain, policy)
+        resource_group = await seeding.creating(TestSeedResourceGroup())
+        permission = self.granted.permission()
+        owner: Laid[UserData]
+        if permission is None:
+            owner = await seeding.within(SomeoneOf(domain))
+        else:
+            owner = await seeding.within(SomeoneGrantedOnTheirOwnSessionGroups(domain, permission))
+        key_policy = await seeding.creating(TestSeedKeypairPolicy())
+        key = await seeding.adding(
+            TestSeedKeypairOf(resource_policy=seeding.made(key_policy).name), owner
+        )
+
+        users_group = await seeding.creating_from_two(TestSeedSessionGroup(), project, owner)
+        members = [
+            await seeding.creating_from_three(
+                TestSeedSessionInGroup(
+                    access_key=seeding.made(key).access_key,
+                    session_group_id=seeding.made(users_group).id,
+                ),
+                project,
+                owner,
+                resource_group,
+            )
+            for _ in range(2)
+        ]
+        deployment = await seeding.creating_from_three(
+            TestSeedDeployment(), project, resource_group, owner
+        )
+        deployment_group = await seeding.creating_from(TestSeedDeploymentSessionGroup(), deployment)
+        await seeding.adding(
+            TestSeedPrimaryReplicaGroupOf(session_group_id=seeding.made(deployment_group).id),
+            deployment,
+        )
+        return AGroupWithMembersAndItsOwner(
+            project=seeding.made(project),
+            owner=seeding.made(owner),
+            users_group=seeding.made(users_group),
+            deployment_group=seeding.made(deployment_group),
+            members=tuple(seeding.made(member) for member in members),
         )
 
 

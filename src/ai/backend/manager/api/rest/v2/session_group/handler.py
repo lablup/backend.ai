@@ -9,6 +9,7 @@ from ai.backend.common.api_handlers import APIResponse, BodyParam, PathParam
 from ai.backend.common.data.entity.session_group import SessionGroupID
 from ai.backend.common.dto.manager.v2.session_group.request import (
     AdminSearchSessionGroupsInput,
+    PurgeSessionGroupInput,
     ScopedSearchSessionGroupsInput,
 )
 from ai.backend.manager.api.rest.v2.path_params import SessionGroupIdPathParam
@@ -18,7 +19,7 @@ if TYPE_CHECKING:
 
 
 class V2SessionGroupHandler:
-    """REST v2 handler for session group reads."""
+    """REST v2 handler for session group reads and the purge."""
 
     def __init__(self, *, adapter: SessionGroupAdapter) -> None:
         self._adapter = adapter
@@ -45,4 +46,12 @@ class V2SessionGroupHandler:
     ) -> APIResponse:
         """Search the session groups the named scopes reach, combined with OR."""
         result = await self._adapter.scoped_search(body.parsed)
+        return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
+
+    async def purge(
+        self,
+        path: PathParam[SessionGroupIdPathParam],
+    ) -> APIResponse:
+        """Remove a session group; its member sessions stay with their group cleared."""
+        result = await self._adapter.purge(PurgeSessionGroupInput(id=path.parsed.session_group_id))
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
