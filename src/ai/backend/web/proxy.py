@@ -328,13 +328,14 @@ async def _run_proxy_request(
     except BackendClientError as e:
         log.warning("upstream connection failed", exc_info=True, handler_name=log_prefix)
         raise ProxyTargetUnreachableError() from e
-    except ClientConnectionError:
-        log.warning(
-            "connection closed during proxying",
-            handler_name=log_prefix,
-            request_method=frontend_rqst.method,
-            request_path=path,
-        )
+    except ClientConnectionError as e:
+        if not is_client_disconnect(frontend_rqst, e):
+            log.warning(
+                "connection closed during proxying",
+                handler_name=log_prefix,
+                request_method=frontend_rqst.method,
+                request_path=path,
+            )
         raise
     except NoHealthyEndpointError as e:
         raise ManagerConnectionUnavailable(extra_msg=e.extra_msg) from e
