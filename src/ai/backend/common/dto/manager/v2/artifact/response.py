@@ -44,6 +44,7 @@ __all__ = (
     "CleanupRevisionsPayload",
     "DelegateImportArtifactsGQLPayload",
     "DelegateScanArtifactsGQLPayload",
+    "DeleteArtifactPayload",
     "DeleteArtifactsGQLPayload",
     "DeleteArtifactsPayload",
     "GetRevisionDownloadProgressPayload",
@@ -53,6 +54,7 @@ __all__ = (
     "ImportArtifactsPayload",
     "RejectArtifactGQLPayload",
     "RejectRevisionPayload",
+    "RestoreArtifactPayload",
     "RestoreArtifactsGQLPayload",
     "ScanArtifactsGQLPayload",
     "ScanArtifactModelsGQLPayload",
@@ -118,6 +120,18 @@ class UpdateArtifactPayload(BaseResponseModel):
     """Payload for artifact update mutation result."""
 
     artifact: ArtifactNode = Field(description="Updated artifact")
+
+
+class DeleteArtifactPayload(BaseResponseModel):
+    """Payload for artifact soft-delete result."""
+
+    artifact: ArtifactNode = Field(description="Soft-deleted artifact")
+
+
+class RestoreArtifactPayload(BaseResponseModel):
+    """Payload for artifact restore result."""
+
+    artifact: ArtifactNode = Field(description="Restored artifact")
 
 
 class ImportArtifactsPayload(BaseResponseModel):

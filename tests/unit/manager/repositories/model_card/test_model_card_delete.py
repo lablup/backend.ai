@@ -479,7 +479,7 @@ class TestModelCardDelete:
             DeleteModelCardOptions(delete_associated_vfolder=False),
         )
 
-        assert set(result.successes) == {valid_a.id, valid_b.id}
+        assert {card.id for card in result.successes} == {valid_a.id, valid_b.id}
         assert [failure.card_id for failure in result.failures] == [missing_id]
 
         async with db_with_cleanup.begin_readonly_session() as session:
@@ -516,7 +516,7 @@ class TestModelCardDelete:
             DeleteModelCardOptions(delete_associated_vfolder=True),
         )
 
-        assert set(result.successes) == {free_card.id}
+        assert {card.id for card in result.successes} == {free_card.id}
         assert [failure.card_id for failure in result.failures] == [mounted_card.id]
 
         async with db_with_cleanup.begin_readonly_session() as session:

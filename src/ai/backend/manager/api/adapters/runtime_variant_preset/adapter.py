@@ -6,8 +6,11 @@ from uuid import UUID
 from ai.backend.common.data.entity.runtime_variant import RuntimeVariantID
 from ai.backend.common.data.entity.runtime_variant_preset import RuntimeVariantPresetID
 from ai.backend.common.data.filter_specs import UUIDInMatchSpec
+from ai.backend.common.dto.manager.v2.common import PartialBulkFailure, PartialBulkPayload
 from ai.backend.common.dto.manager.v2.runtime_variant_preset.request import (
     CreateRuntimeVariantPresetInput,
+    PartialBulkPurgeRuntimeVariantPresetsInput,
+    PartialBulkUpdateRuntimeVariantPresetsInput,
     RuntimeVariantPresetFilter,
     RuntimeVariantPresetOrder,
     SearchRuntimeVariantPresetsInput,
@@ -31,6 +34,7 @@ from ai.backend.common.dto.manager.v2.runtime_variant_preset.types import (
     UIOption,
     UIType,
 )
+from ai.backend.manager.actions.v2.bulk.result import PartialBulkResult
 from ai.backend.manager.api.adapter_options.pagination.pagination import PaginationSpec
 from ai.backend.manager.api.adapters.base import BaseAdapter
 from ai.backend.manager.data.runtime_variant_preset.types import (
@@ -66,6 +70,12 @@ from ai.backend.manager.services.runtime_variant_preset.actions.create import (
 )
 from ai.backend.manager.services.runtime_variant_preset.actions.get import (
     GetRuntimeVariantPresetAction,
+)
+from ai.backend.manager.services.runtime_variant_preset.actions.partial_bulk_purge import (
+    PartialBulkPurgeRuntimeVariantPresetsAction,
+)
+from ai.backend.manager.services.runtime_variant_preset.actions.partial_bulk_update import (
+    PartialBulkUpdateRuntimeVariantPresetsAction,
 )
 from ai.backend.manager.services.runtime_variant_preset.actions.purge import (
     PurgeRuntimeVariantPresetAction,
@@ -193,7 +203,42 @@ class RuntimeVariantPresetAdapter(BaseAdapter):
         self,
         input: UpdateRuntimeVariantPresetInput,
     ) -> UpdateRuntimeVariantPresetPayload:
-        updater = RuntimeVariantPresetUpdater(
+        result = await self._runtime_variant_preset.update.run(
+            UpdateRuntimeVariantPresetAction(updater=self._to_updater(input))
+        )
+        return UpdateRuntimeVariantPresetPayload(preset=self._data_to_node(result.preset))
+
+    async def purge(self, preset_id: UUID) -> DeleteRuntimeVariantPresetPayload:
+        """Purge a runtime variant preset."""
+        result = await self._runtime_variant_preset.purge.run(
+            PurgeRuntimeVariantPresetAction(id=RuntimeVariantPresetID(preset_id))
+        )
+        return DeleteRuntimeVariantPresetPayload(id=result.data.id)
+
+    async def partial_bulk_update(
+        self, input: PartialBulkUpdateRuntimeVariantPresetsInput
+    ) -> PartialBulkPayload[RuntimeVariantPresetNode]:
+        """Update several runtime variant presets, answering for each one."""
+        result = await self._runtime_variant_preset.partial_bulk_update.run(
+            PartialBulkUpdateRuntimeVariantPresetsAction(
+                updaters=[self._to_updater(item) for item in input.items]
+            )
+        )
+        return self._to_partial_bulk_payload(result)
+
+    async def partial_bulk_purge(
+        self, input: PartialBulkPurgeRuntimeVariantPresetsInput
+    ) -> PartialBulkPayload[RuntimeVariantPresetNode]:
+        """Purge several runtime variant presets, answering for each one."""
+        result = await self._runtime_variant_preset.partial_bulk_purge.run(
+            PartialBulkPurgeRuntimeVariantPresetsAction(
+                ids=[RuntimeVariantPresetID(preset_id) for preset_id in input.ids]
+            )
+        )
+        return self._to_partial_bulk_payload(result)
+
+    def _to_updater(self, input: UpdateRuntimeVariantPresetInput) -> RuntimeVariantPresetUpdater:
+        return RuntimeVariantPresetUpdater(
             preset_id=RuntimeVariantPresetID(input.id),
             name=OptionalState.from_unset(input.name),
             description=TriState.from_unset(input.description),
@@ -209,16 +254,20 @@ class RuntimeVariantPresetAdapter(BaseAdapter):
             display_name=TriState.from_unset(input.display_name),
             ui_option=TriState.from_unset(input.ui_option),
         )
-        result = await self._runtime_variant_preset.update.run(
-            UpdateRuntimeVariantPresetAction(updater=updater)
-        )
-        return UpdateRuntimeVariantPresetPayload(preset=self._data_to_node(result.preset))
 
-    async def delete(self, preset_id: UUID) -> DeleteRuntimeVariantPresetPayload:
-        result = await self._runtime_variant_preset.purge.run(
-            PurgeRuntimeVariantPresetAction(id=RuntimeVariantPresetID(preset_id))
+    def _to_partial_bulk_payload(
+        self, result: PartialBulkResult[RuntimeVariantPresetData]
+    ) -> PartialBulkPayload[RuntimeVariantPresetNode]:
+        return PartialBulkPayload[RuntimeVariantPresetNode](
+            successes=[
+                self._data_to_node(item.value) for item in result.items if item.value is not None
+            ],
+            failed=[
+                PartialBulkFailure(id=item.entity_id, message=str(item.error))
+                for item in result.items
+                if item.error is not None
+            ],
         )
-        return DeleteRuntimeVariantPresetPayload(id=result.data.id)
 
     def _scoped_search(
         self, searcher: RuntimeVariantPresetSearcher

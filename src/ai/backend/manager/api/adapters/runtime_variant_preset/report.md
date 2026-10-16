@@ -2,15 +2,17 @@
 
 [무엇을 보장하는가](/src/ai/backend/manager/api/adapters/runtime_variant_preset/KNOWLEDGE.md) · [어댑터](/src/ai/backend/manager/api/adapters/runtime_variant_preset/adapter.py)
 
-시나리오: 미완 2 / 6
+시나리오: 미완 4 / 8
 
-- ops 로 구성 (5)
+- ops 로 구성 (6)
   - batch_load_by_ids — 대표 성공 ✓ · 대표 실패 ✗ — SCENARIO-GAP
   - create — 대표 성공 ✓ · 대표 실패 ✓
-  - delete — 대표 성공 ✓ · 대표 실패 ✓
   - get — 대표 성공 ✓ · 대표 실패 ✓
+  - partial_bulk_purge — 대표 성공 ✓ · 대표 실패 ✗ — SCENARIO-GAP
+  - purge — 대표 성공 ✓ · 대표 실패 ✓
   - search — 대표 성공 ✓ · 대표 실패 ✗ — SCENARIO-GAP
-- 직접 구현 (1)
+- 직접 구현 (2)
+  - partial_bulk_update — 성공 있음 2 · 실패 없음 (partial_bulk) — SCENARIO-GAP
   - update — 성공 있음 5 · 실패 있음 2 (single_entity)
 
 **batch_load_by_ids**
@@ -33,7 +35,21 @@
 | [슈퍼관리자가 아닌 사용자가 프리셋을 생성하면 역할이 부족하여 요청이 거부된다](#creating-a-user-who-is-not-the-superadmin-may-not-create-a-preset) | 거부 |
 | [권한 검사를 꺼도 슈퍼관리자가 아니면 프리셋을 생성할 수 없다](#creating-turning-enforcement-off-does-not-let-a-user-create-a-preset) | 거부 |
 
-**delete**
+**get**
+
+| 시나리오 | 판정 |
+|---|---|
+| [아무 권한도 없는 사용자가 ID로 조회해도 해당 프리셋 전체가 반환된다. 이 조회는 인증 여부만 확인한다](#reading-a-user-granted-nothing-reads-a-preset-by-id) | 성공 |
+| [존재하지 않는 id로 조회하면 거부된다. 권한을 물을 대상이 없으므로, 없는 것인지 닿지 못하는 것인지는 응답으로 드러나지 않는다](#reading-reading-a-preset-id-nothing-answers-to-is-refused) | 거부 |
+
+**partial_bulk_purge**
+
+| 시나리오 | 판정 |
+|---|---|
+| [아무 권한도 없는 사용자가 프리셋 여럿을 한 번에 purge 하려 하면, purge 된 것 없이 모두 권한이 없다는 이유로 실패 목록에 온다](#partial_bulk_purging-a-user-granted-nothing-purges-none-of-several-presets) | 성공 |
+| [슈퍼관리자가 프리셋 둘과 없는 id 하나를 한 번에 purge 하면, 둘은 purge 되기 전 모습으로 처리된 목록에 오고 없는 id 는 실패 목록에 온다](#partial_bulk_purging-purging-several-presets-answers-for-the-missing-one) | 성공 |
+
+**purge**
 
 | 시나리오 | 판정 |
 |---|---|
@@ -41,13 +57,6 @@
 | [권한 검사를 끄면 아무 권한도 없는 사용자도 프리셋을 삭제할 수 있다](#retiring-turning-enforcement-off-lets-a-user-delete-a-preset) | 성공 |
 | [아무 권한도 없는 사용자가 프리셋을 삭제하면 권한이 부족하여 요청이 거부된다](#retiring-a-user-granted-nothing-may-not-delete-a-preset) | 거부 |
 | [슈퍼관리자가 존재하지 않는 ID를 삭제하면 대상을 찾을 수 없어 요청이 거부된다](#retiring-deleting-a-preset-id-nothing-answers-to-is-not-found) | 거부 |
-
-**get**
-
-| 시나리오 | 판정 |
-|---|---|
-| [아무 권한도 없는 사용자가 ID로 조회해도 해당 프리셋 전체가 반환된다. 이 조회는 인증 여부만 확인한다](#reading-a-user-granted-nothing-reads-a-preset-by-id) | 성공 |
-| [존재하지 않는 id로 조회하면 거부된다. 권한을 물을 대상이 없으므로, 없는 것인지 닿지 못하는 것인지는 응답으로 드러나지 않는다](#reading-reading-a-preset-id-nothing-answers-to-is-refused) | 거부 |
 
 **search**
 
@@ -57,6 +66,13 @@
 | [프리셋이 두 변형에 나뉘어 있을 때 한 변형을 필터로 조회하면 해당 변형의 프리셋만 반환된다](#searching-a-variant-filter-narrows-the-answer-to-that-variants-presets) | 성공 |
 | [추가 버전과 폐기 버전이 서로 다른 프리셋을 버전 필터로 조회하면 추가 버전 이상이고 폐기 버전 미만인 프리셋만 반환된다. 값이 비어 있는 쪽에는 제한이 없다](#searching-a-version-filter-keeps-only-the-presets-valid-at-that-version) | 성공 |
 | [프리셋이 11개 있을 때 페이지 크기를 생략하면 10건을 반환하고 다음 페이지가 있음을 표시한다](#searching-omitting-the-page-size-answers-ten-presets-and-a-next-page) | 성공 |
+
+**partial_bulk_update**
+
+| 시나리오 | 판정 |
+|---|---|
+| [아무 권한도 없는 사용자가 프리셋 여럿을 한 번에 고치려 하면, 고쳐진 것 없이 모두 권한이 없다는 이유로 실패 목록에 온다](#partial_bulk_editing-a-user-granted-nothing-edits-none-of-several-presets) | 성공 |
+| [슈퍼관리자가 프리셋 여럿의 설명을 한 번에 바꾸면, 모두 새 설명으로 오고 실패한 것은 없다](#partial_bulk_editing-the-superadmin-edits-several-presets-at-once) | 성공 |
 
 **update**
 
@@ -482,132 +498,6 @@ Then
 - 거부된다
   - 거부: InsufficientPrivilege
 
-### delete
-
-<a id="retiring-the-superadmin-deletes-a-preset"></a>
-
-#### [the-superadmin-deletes-a-preset](/tests/scenario/bai_scenario/manager/runtime_variant_preset/test_retiring.py) — pass
-
-슈퍼관리자가 프리셋을 삭제하면 삭제한 프리셋의 ID를 담은 응답이 반환된다
-
-Given
-
-- 변형 하나와 해당 변형의 프리셋 하나, 그리고 슈퍼관리자 한 명
-  - 런타임 변형 runtime-1: 기본 모델 정의가 비어 있고, 모델 폴더의 설정 파일을 읽지 않는다
-  - 런타임 변형 프리셋 preset-1: 대상 env, 값 종류 str
-  - 도메인 home-1
-  - public 에서 runtime_variant_preset 조회 권한을 받은 사용자 준비
-    - 도메인에 속한 사용자 한 명 준비
-      - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-      - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
-    - 역할 public-reader-1: 이 역할이 앉은 스코프 안에서만 통한다
-    - 역할 public-reader-1: runtime_variant_preset 전체에 READ 허용
-    - 슈퍼관리자 user-1: 역할 public-reader-1 보유
-
-When
-
-- RuntimeVariantPresetAdapter.delete — user-1의 삭제 요청 — 대상: preset-1
-
-Then
-
-- 삭제한 프리셋의 ID가 반환된다
-  - id: 미리 만들어 둔 프리셋의 식별자와 같다
-
-<a id="retiring-turning-enforcement-off-lets-a-user-delete-a-preset"></a>
-
-#### [turning-enforcement-off-lets-a-user-delete-a-preset](/tests/scenario/bai_scenario/manager/runtime_variant_preset/test_retiring.py) — pass
-
-권한 검사를 끄면 아무 권한도 없는 사용자도 프리셋을 삭제할 수 있다
-
-Given
-
-- 변형 하나와 해당 변형의 프리셋 하나, 그리고 일반 사용자 한 명
-  - 런타임 변형 runtime-1: 기본 모델 정의가 비어 있고, 모델 폴더의 설정 파일을 읽지 않는다
-  - 런타임 변형 프리셋 preset-1: 대상 env, 값 종류 str
-  - 도메인 home-1
-  - public 에서 runtime_variant_preset 조회 권한을 받은 사용자 준비
-    - 도메인에 속한 사용자 한 명 준비
-      - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-      - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-    - 역할 public-reader-1: 이 역할이 앉은 스코프 안에서만 통한다
-    - 역할 public-reader-1: runtime_variant_preset 전체에 READ 허용
-    - 일반 사용자 user-1: 역할 public-reader-1 보유
-
-When
-
-- RuntimeVariantPresetAdapter.delete — user-1의 삭제 요청 — 대상: preset-1
-
-Then
-
-- 삭제한 프리셋의 ID가 반환된다
-  - id: 미리 만들어 둔 프리셋의 식별자와 같다
-
-<a id="retiring-a-user-granted-nothing-may-not-delete-a-preset"></a>
-
-#### [a-user-granted-nothing-may-not-delete-a-preset](/tests/scenario/bai_scenario/manager/runtime_variant_preset/test_retiring.py) — pass
-
-아무 권한도 없는 사용자가 프리셋을 삭제하면 권한이 부족하여 요청이 거부된다
-
-Given
-
-- 변형 하나와 해당 변형의 프리셋 하나, 그리고 일반 사용자 한 명
-  - 런타임 변형 runtime-1: 기본 모델 정의가 비어 있고, 모델 폴더의 설정 파일을 읽지 않는다
-  - 런타임 변형 프리셋 preset-1: 대상 env, 값 종류 str
-  - 도메인 home-1
-  - public 에서 runtime_variant_preset 조회 권한을 받은 사용자 준비
-    - 도메인에 속한 사용자 한 명 준비
-      - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-      - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-    - 역할 public-reader-1: 이 역할이 앉은 스코프 안에서만 통한다
-    - 역할 public-reader-1: runtime_variant_preset 전체에 READ 허용
-    - 일반 사용자 user-1: 역할 public-reader-1 보유
-
-When
-
-- RuntimeVariantPresetAdapter.delete — user-1의 삭제 요청 — 대상: preset-1
-
-Then
-
-- 거부된다
-  - 거부: NotEnoughPermission
-
-<a id="retiring-deleting-a-preset-id-nothing-answers-to-is-not-found"></a>
-
-#### [deleting-a-preset-id-nothing-answers-to-is-not-found](/tests/scenario/bai_scenario/manager/runtime_variant_preset/test_retiring.py) — pass
-
-슈퍼관리자가 존재하지 않는 ID를 삭제하면 대상을 찾을 수 없어 요청이 거부된다
-
-Given
-
-- 변형 하나와 해당 변형의 프리셋 하나, 그리고 슈퍼관리자 한 명
-  - 런타임 변형 runtime-1: 기본 모델 정의가 비어 있고, 모델 폴더의 설정 파일을 읽지 않는다
-  - 런타임 변형 프리셋 preset-1: 대상 env, 값 종류 str
-  - 도메인 home-1
-  - public 에서 runtime_variant_preset 조회 권한을 받은 사용자 준비
-    - 도메인에 속한 사용자 한 명 준비
-      - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-      - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
-    - 역할 public-reader-1: 이 역할이 앉은 스코프 안에서만 통한다
-    - 역할 public-reader-1: runtime_variant_preset 전체에 READ 허용
-    - 슈퍼관리자 user-1: 역할 public-reader-1 보유
-
-When
-
-- RuntimeVariantPresetAdapter.delete — user-1의 삭제 요청 — 대상: 존재하지 않는 ID
-
-Then
-
-- 거부된다
-  - 거부: EntityNotFoundError
-
 ### get
 
 <a id="reading-a-user-granted-nothing-reads-a-preset-by-id"></a>
@@ -685,6 +575,236 @@ Then
 
 - 거부된다
   - 거부: NotEnoughPermission
+
+### partial_bulk_purge
+
+<a id="partial_bulk_purging-a-user-granted-nothing-purges-none-of-several-presets"></a>
+
+#### [a-user-granted-nothing-purges-none-of-several-presets](/tests/scenario/bai_scenario/manager/runtime_variant_preset/test_partial_bulk_purging.py) — pass
+
+아무 권한도 없는 사용자가 프리셋 여럿을 한 번에 purge 하려 하면, purge 된 것 없이 모두 권한이 없다는 이유로 실패 목록에 온다
+
+Given
+
+- 한 변형의 프리셋 2개와 일반 사용자 한 명
+  - 런타임 변형 runtime-1: 기본 모델 정의가 비어 있고, 모델 폴더의 설정 파일을 읽지 않는다
+  - 런타임 변형 프리셋 preset-1: 대상 env, 값 종류 str
+  - 런타임 변형 프리셋 preset-2: 대상 env, 값 종류 str
+  - 도메인 home-1
+  - public 에서 runtime_variant_preset 조회 권한을 받은 사용자 준비
+    - 도메인에 속한 사용자 한 명 준비
+      - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+      - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+    - 역할 public-reader-1: 이 역할이 앉은 스코프 안에서만 통한다
+    - 역할 public-reader-1: runtime_variant_preset 전체에 READ 허용
+    - 일반 사용자 user-1: 역할 public-reader-1 보유
+
+When
+
+- RuntimeVariantPresetAdapter.partial_bulk_purge — user-1이 프리셋 2개를 한 번에 purge 함
+
+Then
+
+- 처리된 프리셋 없이 미리 만들어 둔 프리셋이 모두 실패 목록에 온다
+  - successes = []
+  - failed count = 2
+  - failed[0].id: 미리 만들어 둔 프리셋의 id와 같다
+  - failed[0].message: 'Insufficient permission'를 담은 이유
+  - failed[1].id: 미리 만들어 둔 프리셋의 id와 같다
+  - failed[1].message: 'Insufficient permission'를 담은 이유
+
+<a id="partial_bulk_purging-purging-several-presets-answers-for-the-missing-one"></a>
+
+#### [purging-several-presets-answers-for-the-missing-one](/tests/scenario/bai_scenario/manager/runtime_variant_preset/test_partial_bulk_purging.py) — pass
+
+슈퍼관리자가 프리셋 둘과 없는 id 하나를 한 번에 purge 하면, 둘은 purge 되기 전 모습으로 처리된 목록에 오고 없는 id 는 실패 목록에 온다
+
+Given
+
+- 한 변형의 프리셋 2개와 슈퍼관리자 한 명
+  - 런타임 변형 runtime-1: 기본 모델 정의가 비어 있고, 모델 폴더의 설정 파일을 읽지 않는다
+  - 런타임 변형 프리셋 preset-1: 대상 env, 값 종류 str
+  - 런타임 변형 프리셋 preset-2: 대상 env, 값 종류 str
+  - 도메인 home-1
+  - public 에서 runtime_variant_preset 조회 권한을 받은 사용자 준비
+    - 도메인에 속한 사용자 한 명 준비
+      - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+      - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+    - 역할 public-reader-1: 이 역할이 앉은 스코프 안에서만 통한다
+    - 역할 public-reader-1: runtime_variant_preset 전체에 READ 허용
+    - 슈퍼관리자 user-1: 역할 public-reader-1 보유
+
+When
+
+- RuntimeVariantPresetAdapter.partial_bulk_purge — user-1이 프리셋 2개 와 없는 id 하나를 한 번에 purge 함
+
+Then
+
+- 미리 만들어 둔 프리셋이 모두 처리된 목록에 오고, 없는 id 는 실패 목록에 온다
+  - successes count = 2
+  - successes[0].id: 무시함 — 데이터베이스가 만든다
+  - successes[0].runtime_variant_id: 미리 만들어 둔 변형의 식별자와 같다
+  - successes[0].name = 'preset-1'
+  - successes[0].description = '미리 만들어 둔 프리셋'
+  - successes[0].rank = 100
+  - successes[0].target_spec = PresetTargetSpec(preset_target=<PresetTarget.ENV: 'env'>, value_type=<PresetValueType.STR: 'str'>, default_value=None, key='PRESET_KEY')
+  - successes[0].required = False
+  - successes[0].added_version = None
+  - successes[0].deprecated_version = None
+  - successes[0].category = None
+  - successes[0].ui_type = None
+  - successes[0].display_name = None
+  - successes[0].ui_option = None
+  - successes[0].created_at: 이 실행이 쓴 시각
+  - successes[0].updated_at: 이 실행이 쓴 시각
+  - successes[1].id: 무시함 — 데이터베이스가 만든다
+  - successes[1].runtime_variant_id: 미리 만들어 둔 변형의 식별자와 같다
+  - successes[1].name = 'preset-2'
+  - successes[1].description = '미리 만들어 둔 프리셋'
+  - successes[1].rank = 200
+  - successes[1].target_spec = PresetTargetSpec(preset_target=<PresetTarget.ENV: 'env'>, value_type=<PresetValueType.STR: 'str'>, default_value=None, key='PRESET_KEY')
+  - successes[1].required = False
+  - successes[1].added_version = None
+  - successes[1].deprecated_version = None
+  - successes[1].category = None
+  - successes[1].ui_type = None
+  - successes[1].display_name = None
+  - successes[1].ui_option = None
+  - successes[1].created_at: 이 실행이 쓴 시각
+  - successes[1].updated_at: 이 실행이 쓴 시각
+  - failed count = 1
+  - failed[0].id: 요청에 넣은 없는 id와 같다
+  - failed[0].message: 무시함 — 이유는 문자열로 오고, 문자열은 바뀌어도 되는 값이다
+
+### purge
+
+<a id="retiring-the-superadmin-deletes-a-preset"></a>
+
+#### [the-superadmin-deletes-a-preset](/tests/scenario/bai_scenario/manager/runtime_variant_preset/test_retiring.py) — pass
+
+슈퍼관리자가 프리셋을 삭제하면 삭제한 프리셋의 ID를 담은 응답이 반환된다
+
+Given
+
+- 변형 하나와 해당 변형의 프리셋 하나, 그리고 슈퍼관리자 한 명
+  - 런타임 변형 runtime-1: 기본 모델 정의가 비어 있고, 모델 폴더의 설정 파일을 읽지 않는다
+  - 런타임 변형 프리셋 preset-1: 대상 env, 값 종류 str
+  - 도메인 home-1
+  - public 에서 runtime_variant_preset 조회 권한을 받은 사용자 준비
+    - 도메인에 속한 사용자 한 명 준비
+      - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+      - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+    - 역할 public-reader-1: 이 역할이 앉은 스코프 안에서만 통한다
+    - 역할 public-reader-1: runtime_variant_preset 전체에 READ 허용
+    - 슈퍼관리자 user-1: 역할 public-reader-1 보유
+
+When
+
+- RuntimeVariantPresetAdapter.purge — user-1의 삭제 요청 — 대상: preset-1
+
+Then
+
+- 삭제한 프리셋의 ID가 반환된다
+  - id: 미리 만들어 둔 프리셋의 식별자와 같다
+
+<a id="retiring-turning-enforcement-off-lets-a-user-delete-a-preset"></a>
+
+#### [turning-enforcement-off-lets-a-user-delete-a-preset](/tests/scenario/bai_scenario/manager/runtime_variant_preset/test_retiring.py) — pass
+
+권한 검사를 끄면 아무 권한도 없는 사용자도 프리셋을 삭제할 수 있다
+
+Given
+
+- 변형 하나와 해당 변형의 프리셋 하나, 그리고 일반 사용자 한 명
+  - 런타임 변형 runtime-1: 기본 모델 정의가 비어 있고, 모델 폴더의 설정 파일을 읽지 않는다
+  - 런타임 변형 프리셋 preset-1: 대상 env, 값 종류 str
+  - 도메인 home-1
+  - public 에서 runtime_variant_preset 조회 권한을 받은 사용자 준비
+    - 도메인에 속한 사용자 한 명 준비
+      - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+      - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+    - 역할 public-reader-1: 이 역할이 앉은 스코프 안에서만 통한다
+    - 역할 public-reader-1: runtime_variant_preset 전체에 READ 허용
+    - 일반 사용자 user-1: 역할 public-reader-1 보유
+
+When
+
+- RuntimeVariantPresetAdapter.purge — user-1의 삭제 요청 — 대상: preset-1
+
+Then
+
+- 삭제한 프리셋의 ID가 반환된다
+  - id: 미리 만들어 둔 프리셋의 식별자와 같다
+
+<a id="retiring-a-user-granted-nothing-may-not-delete-a-preset"></a>
+
+#### [a-user-granted-nothing-may-not-delete-a-preset](/tests/scenario/bai_scenario/manager/runtime_variant_preset/test_retiring.py) — pass
+
+아무 권한도 없는 사용자가 프리셋을 삭제하면 권한이 부족하여 요청이 거부된다
+
+Given
+
+- 변형 하나와 해당 변형의 프리셋 하나, 그리고 일반 사용자 한 명
+  - 런타임 변형 runtime-1: 기본 모델 정의가 비어 있고, 모델 폴더의 설정 파일을 읽지 않는다
+  - 런타임 변형 프리셋 preset-1: 대상 env, 값 종류 str
+  - 도메인 home-1
+  - public 에서 runtime_variant_preset 조회 권한을 받은 사용자 준비
+    - 도메인에 속한 사용자 한 명 준비
+      - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+      - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+    - 역할 public-reader-1: 이 역할이 앉은 스코프 안에서만 통한다
+    - 역할 public-reader-1: runtime_variant_preset 전체에 READ 허용
+    - 일반 사용자 user-1: 역할 public-reader-1 보유
+
+When
+
+- RuntimeVariantPresetAdapter.purge — user-1의 삭제 요청 — 대상: preset-1
+
+Then
+
+- 거부된다
+  - 거부: NotEnoughPermission
+
+<a id="retiring-deleting-a-preset-id-nothing-answers-to-is-not-found"></a>
+
+#### [deleting-a-preset-id-nothing-answers-to-is-not-found](/tests/scenario/bai_scenario/manager/runtime_variant_preset/test_retiring.py) — pass
+
+슈퍼관리자가 존재하지 않는 ID를 삭제하면 대상을 찾을 수 없어 요청이 거부된다
+
+Given
+
+- 변형 하나와 해당 변형의 프리셋 하나, 그리고 슈퍼관리자 한 명
+  - 런타임 변형 runtime-1: 기본 모델 정의가 비어 있고, 모델 폴더의 설정 파일을 읽지 않는다
+  - 런타임 변형 프리셋 preset-1: 대상 env, 값 종류 str
+  - 도메인 home-1
+  - public 에서 runtime_variant_preset 조회 권한을 받은 사용자 준비
+    - 도메인에 속한 사용자 한 명 준비
+      - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+      - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+    - 역할 public-reader-1: 이 역할이 앉은 스코프 안에서만 통한다
+    - 역할 public-reader-1: runtime_variant_preset 전체에 READ 허용
+    - 슈퍼관리자 user-1: 역할 public-reader-1 보유
+
+When
+
+- RuntimeVariantPresetAdapter.purge — user-1의 삭제 요청 — 대상: 존재하지 않는 ID
+
+Then
+
+- 거부된다
+  - 거부: EntityNotFoundError
 
 ### search
 
@@ -841,6 +961,108 @@ Then
   - total_count = 11
   - has_next_page = True
   - has_previous_page = False
+
+### partial_bulk_update
+
+<a id="partial_bulk_editing-a-user-granted-nothing-edits-none-of-several-presets"></a>
+
+#### [a-user-granted-nothing-edits-none-of-several-presets](/tests/scenario/bai_scenario/manager/runtime_variant_preset/test_partial_bulk_editing.py) — pass
+
+아무 권한도 없는 사용자가 프리셋 여럿을 한 번에 고치려 하면, 고쳐진 것 없이 모두 권한이 없다는 이유로 실패 목록에 온다
+
+Given
+
+- 한 변형의 프리셋 2개와 일반 사용자 한 명
+  - 런타임 변형 runtime-1: 기본 모델 정의가 비어 있고, 모델 폴더의 설정 파일을 읽지 않는다
+  - 런타임 변형 프리셋 preset-1: 대상 env, 값 종류 str
+  - 런타임 변형 프리셋 preset-2: 대상 env, 값 종류 str
+  - 도메인 home-1
+  - public 에서 runtime_variant_preset 조회 권한을 받은 사용자 준비
+    - 도메인에 속한 사용자 한 명 준비
+      - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+      - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+    - 역할 public-reader-1: 이 역할이 앉은 스코프 안에서만 통한다
+    - 역할 public-reader-1: runtime_variant_preset 전체에 READ 허용
+    - 일반 사용자 user-1: 역할 public-reader-1 보유
+
+When
+
+- RuntimeVariantPresetAdapter.partial_bulk_update — user-1이 프리셋 2개의 설명을 한 번에 고침
+
+Then
+
+- 처리된 프리셋 없이 미리 만들어 둔 프리셋이 모두 실패 목록에 온다
+  - successes = []
+  - failed count = 2
+  - failed[0].id: 미리 만들어 둔 프리셋의 id와 같다
+  - failed[0].message: 'Insufficient permission'를 담은 이유
+  - failed[1].id: 미리 만들어 둔 프리셋의 id와 같다
+  - failed[1].message: 'Insufficient permission'를 담은 이유
+
+<a id="partial_bulk_editing-the-superadmin-edits-several-presets-at-once"></a>
+
+#### [the-superadmin-edits-several-presets-at-once](/tests/scenario/bai_scenario/manager/runtime_variant_preset/test_partial_bulk_editing.py) — pass
+
+슈퍼관리자가 프리셋 여럿의 설명을 한 번에 바꾸면, 모두 새 설명으로 오고 실패한 것은 없다
+
+Given
+
+- 한 변형의 프리셋 2개와 슈퍼관리자 한 명
+  - 런타임 변형 runtime-1: 기본 모델 정의가 비어 있고, 모델 폴더의 설정 파일을 읽지 않는다
+  - 런타임 변형 프리셋 preset-1: 대상 env, 값 종류 str
+  - 런타임 변형 프리셋 preset-2: 대상 env, 값 종류 str
+  - 도메인 home-1
+  - public 에서 runtime_variant_preset 조회 권한을 받은 사용자 준비
+    - 도메인에 속한 사용자 한 명 준비
+      - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+      - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+    - 역할 public-reader-1: 이 역할이 앉은 스코프 안에서만 통한다
+    - 역할 public-reader-1: runtime_variant_preset 전체에 READ 허용
+    - 슈퍼관리자 user-1: 역할 public-reader-1 보유
+
+When
+
+- RuntimeVariantPresetAdapter.partial_bulk_update — user-1이 프리셋 2개의 설명을 한 번에 고침
+
+Then
+
+- 미리 만들어 둔 프리셋이 모두 처리된 목록에 오고, 실패한 것은 없다
+  - successes count = 2
+  - successes[0].id: 무시함 — 데이터베이스가 만든다
+  - successes[0].runtime_variant_id: 미리 만들어 둔 변형의 식별자와 같다
+  - successes[0].name = 'preset-1'
+  - successes[0].description = '한 번에 고친 설명'
+  - successes[0].rank = 100
+  - successes[0].target_spec = PresetTargetSpec(preset_target=<PresetTarget.ENV: 'env'>, value_type=<PresetValueType.STR: 'str'>, default_value=None, key='PRESET_KEY')
+  - successes[0].required = False
+  - successes[0].added_version = None
+  - successes[0].deprecated_version = None
+  - successes[0].category = None
+  - successes[0].ui_type = None
+  - successes[0].display_name = None
+  - successes[0].ui_option = None
+  - successes[0].created_at: 이 실행이 쓴 시각
+  - successes[0].updated_at: 이 실행이 쓴 시각
+  - successes[1].id: 무시함 — 데이터베이스가 만든다
+  - successes[1].runtime_variant_id: 미리 만들어 둔 변형의 식별자와 같다
+  - successes[1].name = 'preset-2'
+  - successes[1].description = '한 번에 고친 설명'
+  - successes[1].rank = 200
+  - successes[1].target_spec = PresetTargetSpec(preset_target=<PresetTarget.ENV: 'env'>, value_type=<PresetValueType.STR: 'str'>, default_value=None, key='PRESET_KEY')
+  - successes[1].required = False
+  - successes[1].added_version = None
+  - successes[1].deprecated_version = None
+  - successes[1].category = None
+  - successes[1].ui_type = None
+  - successes[1].display_name = None
+  - successes[1].ui_option = None
+  - successes[1].created_at: 이 실행이 쓴 시각
+  - successes[1].updated_at: 이 실행이 쓴 시각
+  - failed = []
 
 ### update
 

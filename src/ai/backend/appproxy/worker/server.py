@@ -102,6 +102,7 @@ from ai.backend.common.message_queue.queue import AbstractMessageQueue
 from ai.backend.common.message_queue.redis_queue import RedisMQArgs, RedisQueue
 from ai.backend.common.metrics.http import build_api_metric_middleware
 from ai.backend.common.metrics.multiprocess_setup import cleanup_prometheus_multiprocess_dir
+from ai.backend.common.middlewares.exception import client_closed_response, is_client_disconnect
 from ai.backend.common.middlewares.request_id import REQUEST_ID_HEADER
 from ai.backend.common.msgpack import DEFAULT_PACK_OPTS, DEFAULT_UNPACK_OPTS
 from ai.backend.common.networking import force_threaded_dns_resolver
@@ -237,6 +238,13 @@ async def exception_middleware(
         log.debug("request cancelled ({} {})", request.method, request.rel_url)
         raise e
     except Exception as e:
+        if is_client_disconnect(request, e):
+            log.trace(
+                "client disconnected while writing the response",
+                http_method=request.method,
+                route_path=str(request.rel_url),
+            )
+            return client_closed_response()
         log.exception("uncaught exception in HTTP request handlers")
         if root_ctx.local_config.debug.enabled:
             raise InternalServerError(traceback.format_exc()) from e

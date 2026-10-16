@@ -2,15 +2,18 @@
 
 [무엇을 보장하는가](/src/ai/backend/manager/api/adapters/domain/KNOWLEDGE.md) · [어댑터](/src/ai/backend/manager/api/adapters/domain/adapter.py)
 
-시나리오: 완성
+시나리오: 미완 3 / 14
 
-- ops 로 구성 (9)
+- ops 로 구성 (12)
   - bulk_get_ids — 대표 성공 ✓ · 대표 실패 ✓
   - bulk_lookup_names — 대표 성공 ✓ · 대표 실패 ✓
   - delete — 대표 성공 ✓ · 대표 실패 ✓
   - get — 대표 성공 ✓ · 대표 실패 ✓
   - global_search — 대표 성공 ✓ · 대표 실패 ✓
   - lookup_name — 대표 성공 ✓ · 대표 실패 ✓
+  - partial_bulk_delete — 대표 성공 ✓ · 대표 실패 ✗ — SCENARIO-GAP
+  - partial_bulk_restore — 대표 성공 ✓ · 대표 실패 ✗ — SCENARIO-GAP
+  - partial_bulk_update — 대표 성공 ✓ · 대표 실패 ✗ — SCENARIO-GAP
   - restore — 대표 성공 ✓ · 대표 실패 ✓
   - scoped_search — 대표 성공 ✓ · 대표 실패 ✓
   - update — 대표 성공 ✓ · 대표 실패 ✓
@@ -67,6 +70,26 @@
 | [아무 권한도 받지 않은 사용자도 도메인 이름으로 id를 찾을 수 있다. 이 호출은 인증만 보고, 권한은 그 id를 받는 호출이 본다](#looking_up-a-user-granted-nothing-still-looks-up-a-domain-by-name) | 성공 |
 | [슈퍼관리자가 도메인 이름으로 id를 찾으면, 그 도메인의 id가 온다](#looking_up-the-superadmin-looks-up-a-domain-by-name) | 성공 |
 | [아무 도메인도 갖지 않은 이름으로 id를 찾으면 대상이 없다는 것으로 거부된다](#looking_up-looking-up-a-name-nothing-answers-to-is-not-found) | 거부 |
+
+**partial_bulk_delete**
+
+| 시나리오 | 판정 |
+|---|---|
+| [아무 권한도 받지 않은 사용자가 도메인 여럿을 한 번에 soft delete 하려 하면, soft delete 된 것 없이 모두 권한이 없다는 이유로 실패 목록에 온다](#partial_bulk_deleting-a-user-granted-nothing-soft-deletes-none-of-several-domains) | 성공 |
+| [활성 도메인 둘과 없는 id 하나를 한 번에 soft delete 하면, 둘은 비활성으로 오고 없는 id 는 대상이 없다는 이유로 실패 목록에 온다](#partial_bulk_deleting-soft-deleting-several-answers-for-the-missing-one) | 성공 |
+
+**partial_bulk_restore**
+
+| 시나리오 | 판정 |
+|---|---|
+| [soft delete 된 도메인 여럿을 한 번에 restore 하면, 모두 활성으로 온다](#partial_bulk_deleting-restoring-several-brings-them-back) | 성공 |
+
+**partial_bulk_update**
+
+| 시나리오 | 판정 |
+|---|---|
+| [아무 권한도 받지 않은 사용자가 도메인 여럿을 한 번에 고치려 하면, 고쳐진 것 없이 모두 권한이 없다는 이유로 실패 목록에 온다](#partial_bulk_editing-a-user-granted-nothing-edits-none-of-several-domains) | 성공 |
+| [슈퍼관리자가 도메인 여럿의 설명을 한 번에 바꾸면, 모두 새 설명으로 오고 실패한 것은 없다](#partial_bulk_editing-the-superadmin-edits-several-domains-at-once) | 성공 |
 
 **restore**
 
@@ -688,6 +711,222 @@ Then
 
 - 거부된다
   - 거부: EntityNotFoundError
+
+### partial_bulk_delete
+
+<a id="partial_bulk_deleting-a-user-granted-nothing-soft-deletes-none-of-several-domains"></a>
+
+#### [a-user-granted-nothing-soft-deletes-none-of-several-domains](/tests/scenario/bai_scenario/manager/domain/test_partial_bulk_deleting.py) — pass
+
+아무 권한도 받지 않은 사용자가 도메인 여럿을 한 번에 soft delete 하려 하면, soft delete 된 것 없이 모두 권한이 없다는 이유로 실패 목록에 온다
+
+Given
+
+- 도메인 3개와, 그중 하나에 속한 user 한 명
+  - 도메인 home-1
+  - 도메인 wanted-1
+  - 도메인 other-1
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+
+When
+
+- DomainAdapter.partial_bulk_delete — user-1이 도메인 2개를 한 번에 soft delete 함
+
+Then
+
+- 처리된 도메인 없이 대상이 모두 실패 목록에 온다
+  - successes = []
+  - failed count = 2
+  - failed[0].id: 대상 도메인의 id와 같다
+  - failed[0].message: 'Insufficient permission'를 담은 이유
+  - failed[1].id: 대상 도메인의 id와 같다
+  - failed[1].message: 'Insufficient permission'를 담은 이유
+
+<a id="partial_bulk_deleting-soft-deleting-several-answers-for-the-missing-one"></a>
+
+#### [soft-deleting-several-answers-for-the-missing-one](/tests/scenario/bai_scenario/manager/domain/test_partial_bulk_deleting.py) — pass
+
+활성 도메인 둘과 없는 id 하나를 한 번에 soft delete 하면, 둘은 비활성으로 오고 없는 id 는 대상이 없다는 이유로 실패 목록에 온다
+
+Given
+
+- 도메인 3개와, 그중 하나에 속한 superadmin 한 명
+  - 도메인 home-1
+  - 도메인 wanted-1
+  - 도메인 other-1
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+
+When
+
+- DomainAdapter.partial_bulk_delete — user-1이 도메인 2개 와 없는 id 하나를 한 번에 soft delete 함
+
+Then
+
+- 대상 도메인이 모두 비활성으로 오고, 없는 id 는 대상이 없다는 이유로 실패 목록에 온다
+  - successes count = 2
+  - successes[0].name = 'wanted-1'
+  - successes[0].description = '이미 있던 도메인'
+  - successes[0].integration_name = None
+  - successes[0].allowed_docker_registries = []
+  - successes[0].is_active = False
+  - successes[0].is_default = False
+  - successes[0].id: 무시함 — 데이터베이스가 만든다
+  - successes[0].entity_id: 미리 만든 도메인의 id와 같다
+  - successes[0].created_at: 이 실행이 쓴 시각
+  - successes[0].modified_at: 이 실행이 쓴 시각
+  - successes[1].name = 'other-1'
+  - successes[1].description = '이미 있던 도메인'
+  - successes[1].integration_name = None
+  - successes[1].allowed_docker_registries = []
+  - successes[1].is_active = False
+  - successes[1].is_default = False
+  - successes[1].id: 무시함 — 데이터베이스가 만든다
+  - successes[1].entity_id: 미리 만든 도메인의 id와 같다
+  - successes[1].created_at: 이 실행이 쓴 시각
+  - successes[1].modified_at: 이 실행이 쓴 시각
+  - failed count = 1
+  - failed[0].id: 요청에 넣은 없는 id와 같다
+  - failed[0].message: 'not found'를 담은 이유
+
+### partial_bulk_restore
+
+<a id="partial_bulk_deleting-restoring-several-brings-them-back"></a>
+
+#### [restoring-several-brings-them-back](/tests/scenario/bai_scenario/manager/domain/test_partial_bulk_deleting.py) — pass
+
+soft delete 된 도메인 여럿을 한 번에 restore 하면, 모두 활성으로 온다
+
+Given
+
+- 도메인 3개와, 그중 하나에 속한 superadmin 한 명
+  - 도메인 home-1
+  - 도메인 wanted-1
+  - 도메인 other-1
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+
+When
+
+- DomainAdapter.partial_bulk_restore — user-1이 도메인 2개를 한 번에 soft delete 했다가 한 번에 restore 함
+
+Then
+
+- 대상 도메인이 모두 활성으로 오고, 실패한 것은 없다
+  - successes count = 2
+  - successes[0].name = 'wanted-1'
+  - successes[0].description = '이미 있던 도메인'
+  - successes[0].integration_name = None
+  - successes[0].allowed_docker_registries = []
+  - successes[0].is_active = True
+  - successes[0].is_default = False
+  - successes[0].id: 무시함 — 데이터베이스가 만든다
+  - successes[0].entity_id: 미리 만든 도메인의 id와 같다
+  - successes[0].created_at: 이 실행이 쓴 시각
+  - successes[0].modified_at: 이 실행이 쓴 시각
+  - successes[1].name = 'other-1'
+  - successes[1].description = '이미 있던 도메인'
+  - successes[1].integration_name = None
+  - successes[1].allowed_docker_registries = []
+  - successes[1].is_active = True
+  - successes[1].is_default = False
+  - successes[1].id: 무시함 — 데이터베이스가 만든다
+  - successes[1].entity_id: 미리 만든 도메인의 id와 같다
+  - successes[1].created_at: 이 실행이 쓴 시각
+  - successes[1].modified_at: 이 실행이 쓴 시각
+  - failed = []
+
+### partial_bulk_update
+
+<a id="partial_bulk_editing-a-user-granted-nothing-edits-none-of-several-domains"></a>
+
+#### [a-user-granted-nothing-edits-none-of-several-domains](/tests/scenario/bai_scenario/manager/domain/test_partial_bulk_editing.py) — pass
+
+아무 권한도 받지 않은 사용자가 도메인 여럿을 한 번에 고치려 하면, 고쳐진 것 없이 모두 권한이 없다는 이유로 실패 목록에 온다
+
+Given
+
+- 도메인 3개와, 그중 하나에 속한 user 한 명
+  - 도메인 home-1
+  - 도메인 wanted-1
+  - 도메인 other-1
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+
+When
+
+- DomainAdapter.partial_bulk_update — user-1이 도메인 2개의 설명을 한 번에 고침
+
+Then
+
+- 처리된 도메인 없이 대상이 모두 실패 목록에 온다
+  - successes = []
+  - failed count = 2
+  - failed[0].id: 대상 도메인의 id와 같다
+  - failed[0].message: 'Insufficient permission'를 담은 이유
+  - failed[1].id: 대상 도메인의 id와 같다
+  - failed[1].message: 'Insufficient permission'를 담은 이유
+
+<a id="partial_bulk_editing-the-superadmin-edits-several-domains-at-once"></a>
+
+#### [the-superadmin-edits-several-domains-at-once](/tests/scenario/bai_scenario/manager/domain/test_partial_bulk_editing.py) — pass
+
+슈퍼관리자가 도메인 여럿의 설명을 한 번에 바꾸면, 모두 새 설명으로 오고 실패한 것은 없다
+
+Given
+
+- 도메인 3개와, 그중 하나에 속한 superadmin 한 명
+  - 도메인 home-1
+  - 도메인 wanted-1
+  - 도메인 other-1
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+
+When
+
+- DomainAdapter.partial_bulk_update — user-1이 도메인 2개의 설명을 한 번에 고침
+
+Then
+
+- 대상 도메인이 모두 새 설명으로 오고, 실패한 것은 없다
+  - successes count = 2
+  - failed = []
+  - successes[0].name = 'wanted-1'
+  - successes[0].description = '한 번에 고친 설명'
+  - successes[0].integration_name = None
+  - successes[0].allowed_docker_registries = []
+  - successes[0].is_active = True
+  - successes[0].is_default = False
+  - successes[0].id: 무시함 — 데이터베이스가 만든다
+  - successes[0].entity_id: 미리 만든 도메인의 id와 같다
+  - successes[0].created_at: 이 실행이 쓴 시각
+  - successes[0].modified_at: 이 실행이 쓴 시각
+  - successes[1].name = 'other-1'
+  - successes[1].description = '한 번에 고친 설명'
+  - successes[1].integration_name = None
+  - successes[1].allowed_docker_registries = []
+  - successes[1].is_active = True
+  - successes[1].is_default = False
+  - successes[1].id: 무시함 — 데이터베이스가 만든다
+  - successes[1].entity_id: 미리 만든 도메인의 id와 같다
+  - successes[1].created_at: 이 실행이 쓴 시각
+  - successes[1].modified_at: 이 실행이 쓴 시각
 
 ### restore
 

@@ -27,6 +27,7 @@ __all__ = (
     "AdminSearchImageAliasesPayload",
     "AdminSearchImagesPayload",
     "AliasImagePayload",
+    "DeleteImagePayload",
     "ForgetImagePayload",
     "RestoreImagePayload",
     "ScopedSearchImagesPayload",
@@ -129,6 +130,12 @@ class ForgetImagePayload(BaseResponseModel):
     """Payload for image forget (soft-delete) result."""
 
     item: ImageNode = Field(description="Forgotten image")
+
+
+class DeleteImagePayload(BaseResponseModel):
+    """Payload for image soft-delete result."""
+
+    item: ImageNode = Field(description="Soft-deleted image")
 
 
 class RestoreImagePayload(BaseResponseModel):

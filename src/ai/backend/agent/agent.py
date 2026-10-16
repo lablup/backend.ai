@@ -638,6 +638,7 @@ class AbstractKernelCreationContext[KernelObjectType: AbstractKernel](aobject):
         mount_static_binary(f"dropbearmulti.{arch}.bin", "/opt/kernel/dropbearmulti")
         mount_static_binary(f"sftp-server.{arch}.bin", "/opt/kernel/sftp-server")
         mount_static_binary(f"tmux.{arch}.bin", "/opt/kernel/tmux")
+        mount_static_binary(f"etty.{arch}.bin", "/opt/kernel/etty")
         mount_static_binary(f"ttyd_linux.{arch}.bin", "/opt/kernel/ttyd")
         mount_static_binary("yank.sh", "/opt/kernel/yank.sh")
         mount_static_binary(f"all-smi.{arch}.bin", "/usr/local/bin/all-smi")
@@ -2824,6 +2825,13 @@ class AbstractAgent[
                         "name": "ttyd",
                         "protocol": ServicePortProtocols.HTTP,
                         "container_ports": (7681,),
+                        "host_ports": (None,),
+                        "is_inference": False,
+                    })
+                    service_ports.append({
+                        "name": "etty",
+                        "protocol": ServicePortProtocols.HTTP,
+                        "container_ports": (7682,),
                         "host_ports": (None,),
                         "is_inference": False,
                     })

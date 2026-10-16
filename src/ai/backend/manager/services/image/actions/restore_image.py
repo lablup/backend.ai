@@ -1,14 +1,22 @@
 from dataclasses import dataclass
 from typing import override
 
-from ai.backend.manager.actions.types import ActionOperationType
+from ai.backend.common.data.entity.types import EntityIdentifier
+from ai.backend.manager.actions.v2.ops.base import RestoreSingleEntityOpsAction
 from ai.backend.manager.data.image.types import ImageData
-from ai.backend.manager.services.image.actions.base import ImageSingleEntityAction
+from ai.backend.manager.models.image.row import ImageRow
+from ai.backend.manager.models.image.updaters import ImageRestoreUpdater
 
 
-@dataclass
-class RestoreImageByIdAction(ImageSingleEntityAction):
+@dataclass(frozen=True)
+class RestoreImageByIdAction(RestoreSingleEntityOpsAction[ImageRow, ImageData]):
     """Put one forgotten image back in service."""
+
+    updater: ImageRestoreUpdater
+
+    @override
+    def entity_id(self) -> EntityIdentifier:
+        return self.updater.image_id
 
     @override
     @classmethod
@@ -16,11 +24,5 @@ class RestoreImageByIdAction(ImageSingleEntityAction):
         return "restore_image_by_id"
 
     @override
-    @classmethod
-    def operation_type(cls) -> ActionOperationType:
-        return ActionOperationType.RESTORE
-
-
-@dataclass
-class RestoreImageByIdActionResult:
-    image: ImageData
+    def to_updater(self) -> ImageRestoreUpdater:
+        return self.updater

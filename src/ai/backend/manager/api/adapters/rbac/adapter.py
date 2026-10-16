@@ -21,6 +21,7 @@ from ai.backend.common.data.entity.types import (
 from ai.backend.common.data.entity.user import UserEntityType, UserID
 from ai.backend.common.data.filter_specs import UUIDInMatchSpec
 from ai.backend.common.data.permission.types import Permission
+from ai.backend.common.dto.manager.v2.common import PartialBulkFailure, PartialBulkPayload
 from ai.backend.common.dto.manager.v2.rbac import (
     BulkAddRolePermissionFailureInfo,
     BulkAddRolePermissionsPayload,
@@ -53,6 +54,10 @@ from ai.backend.common.dto.manager.v2.rbac.request import (
     AdminSearchPermissionsGQLInput,
     MyAtomicBulkScopePermissionsInput,
     MyScopePermissionsInput,
+    PartialBulkDeleteRolesInput,
+    PartialBulkPurgeRolesInput,
+    PartialBulkRestoreRolesInput,
+    PartialBulkUpdateRolesInput,
     PermissionTarget,
     SearchRoleAssignmentsInput,
     SearchRolesInput,
@@ -120,6 +125,7 @@ from ai.backend.common.dto.manager.v2.rbac.request import (
 from ai.backend.common.dto.manager.v2.rbac.response import (
     MyAtomicBulkScopePermissionsPayload,
     MyScopePermissionsPayload,
+    RestoreRolePayload,
     ScopeEntityPermission,
 )
 from ai.backend.common.dto.manager.v2.rbac.types import (
@@ -138,6 +144,7 @@ from ai.backend.common.dto.manager.v2.rbac.types import (
     RoleStatusFilter as RoleStatusFilterDTO,
 )
 from ai.backend.common.exception import UnreachableError
+from ai.backend.manager.actions.v2.bulk.result import PartialBulkResult
 from ai.backend.manager.api.adapter_options.pagination.pagination import PaginationSpec
 from ai.backend.manager.api.adapters.base import BaseAdapter
 from ai.backend.manager.data.common.types import SearchResult
@@ -191,7 +198,11 @@ from ai.backend.manager.models.rbac_models.role.searchable_fields import (
     RoleSearchableFields,
 )
 from ai.backend.manager.models.rbac_models.role.searchers import RoleSearcher
-from ai.backend.manager.models.rbac_models.role.updaters import RoleSoftDeleteUpdater, RoleUpdater
+from ai.backend.manager.models.rbac_models.role.updaters import (
+    RoleRestoreUpdater,
+    RoleSoftDeleteUpdater,
+    RoleUpdater,
+)
 from ai.backend.manager.models.rbac_models.user_role.deprecated_search import (
     DeprecatedRoleAssignmentConditions,
 )
@@ -241,9 +252,24 @@ from ai.backend.manager.services.permission_contoller.actions.get_permission_mat
 from ai.backend.manager.services.permission_contoller.actions.get_role_detail import (
     GetRoleDetailAction,
 )
+from ai.backend.manager.services.permission_contoller.actions.partial_bulk_delete_roles import (
+    PartialBulkDeleteRolesAction,
+)
+from ai.backend.manager.services.permission_contoller.actions.partial_bulk_purge_roles import (
+    PartialBulkPurgeRolesAction,
+)
+from ai.backend.manager.services.permission_contoller.actions.partial_bulk_restore_roles import (
+    PartialBulkRestoreRolesAction,
+)
+from ai.backend.manager.services.permission_contoller.actions.partial_bulk_update_roles import (
+    PartialBulkUpdateRolesAction,
+)
 from ai.backend.manager.services.permission_contoller.actions.purge_role import PurgeRoleAction
 from ai.backend.manager.services.permission_contoller.actions.replace_role_permissions import (
     ReplaceRolePermissionsAction,
+)
+from ai.backend.manager.services.permission_contoller.actions.restore_role import (
+    RestoreRoleAction,
 )
 from ai.backend.manager.services.permission_contoller.actions.search_my_role_assignments import (
     ScopedSearchRoleAssignmentsAction,
@@ -847,6 +873,15 @@ class RBACAdapter(BaseAdapter):
         )
         return DeleteRolePayload(id=result.data.id)
 
+    # ------------------------------------------------------------------ restore
+
+    async def restore(self, role_id: UUID) -> RestoreRolePayload:
+        """Restore a soft-deleted role (marks status as ACTIVE)."""
+        result = await self._permission_controller.restore_role.run(
+            RestoreRoleAction(updater=RoleRestoreUpdater(role_id=RoleID(role_id)))
+        )
+        return RestoreRolePayload(id=result.data.id)
+
     # ------------------------------------------------------------------ purge
 
     async def purge(self, role_id: UUID) -> PurgeRolePayload:
@@ -856,9 +891,65 @@ class RBACAdapter(BaseAdapter):
         )
         return PurgeRolePayload(id=result.data.id)
 
-    # ------------------------------------------------------------------ delete_permission
+    # ------------------------------------------------------------------ partial bulk
 
-    async def delete_permission(self, permission_id: UUID) -> DeletePermissionPayloadDTO:
+    async def partial_bulk_update(
+        self, input: PartialBulkUpdateRolesInput
+    ) -> PartialBulkPayload[RoleNode]:
+        """Update several roles, answering for each one."""
+        result = await self._permission_controller.partial_bulk_update_roles.run(
+            PartialBulkUpdateRolesAction(
+                updaters=[self._build_updater(item.id, item.input) for item in input.items]
+            )
+        )
+        return self._to_partial_bulk_payload(result)
+
+    async def partial_bulk_delete(
+        self, input: PartialBulkDeleteRolesInput
+    ) -> PartialBulkPayload[RoleNode]:
+        """Soft-delete several roles, answering for each one."""
+        result = await self._permission_controller.partial_bulk_delete_roles.run(
+            PartialBulkDeleteRolesAction(ids=[RoleID(role_id) for role_id in input.ids])
+        )
+        return self._to_partial_bulk_payload(result)
+
+    async def partial_bulk_restore(
+        self, input: PartialBulkRestoreRolesInput
+    ) -> PartialBulkPayload[RoleNode]:
+        """Restore several soft-deleted roles, answering for each one."""
+        result = await self._permission_controller.partial_bulk_restore_roles.run(
+            PartialBulkRestoreRolesAction(ids=[RoleID(role_id) for role_id in input.ids])
+        )
+        return self._to_partial_bulk_payload(result)
+
+    async def partial_bulk_purge(
+        self, input: PartialBulkPurgeRolesInput
+    ) -> PartialBulkPayload[RoleNode]:
+        """Permanently remove several roles, answering for each one."""
+        result = await self._permission_controller.partial_bulk_purge_roles.run(
+            PartialBulkPurgeRolesAction(ids=[RoleID(role_id) for role_id in input.ids])
+        )
+        return self._to_partial_bulk_payload(result)
+
+    def _to_partial_bulk_payload(
+        self, result: PartialBulkResult[RoleData]
+    ) -> PartialBulkPayload[RoleNode]:
+        return PartialBulkPayload[RoleNode](
+            successes=[
+                self._role_data_to_node(item.value)
+                for item in result.items
+                if item.value is not None
+            ],
+            failed=[
+                PartialBulkFailure(id=item.entity_id, message=str(item.error))
+                for item in result.items
+                if item.error is not None
+            ],
+        )
+
+    # ------------------------------------------------------------------ purge_permission
+
+    async def purge_permission(self, permission_id: UUID) -> DeletePermissionPayloadDTO:
         """Hard-delete a scoped permission."""
         await self._permission_controller.delete_permission.run(
             DeletePermissionAction(permission_id=PermissionID(permission_id))

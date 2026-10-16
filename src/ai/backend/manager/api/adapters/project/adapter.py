@@ -10,15 +10,17 @@ from ai.backend.common.data.entity.domain import DomainID, DomainName
 from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.role import RoleID
 from ai.backend.common.data.entity.user import UserID
+from ai.backend.common.dto.manager.v2.common import PartialBulkFailure, PartialBulkPayload
 from ai.backend.common.dto.manager.v2.group.request import (
     AdminSearchProjectsInput,
     AssignUsersToProjectInput,
     CreateProjectInput,
-    DeleteProjectInput,
+    PartialBulkDeleteProjectsInput,
+    PartialBulkRestoreProjectsInput,
+    PartialBulkUpdateProjectsInput,
     ProjectFilter,
     ProjectOrder,
     PurgeProjectInput,
-    RestoreProjectInput,
     ScopedSearchProjectsInput,
     UnassignUsersFromProjectInput,
     UpdateProjectInput,
@@ -51,6 +53,7 @@ from ai.backend.common.dto.manager.v2.group.types import (
 from ai.backend.common.dto.manager.v2.user.response import UserNode
 from ai.backend.common.exception import UnreachableError
 from ai.backend.common.types import AccessKey
+from ai.backend.manager.actions.v2.bulk.result import PartialBulkResult
 from ai.backend.manager.api.adapter_options.pagination.pagination import PaginationSpec
 from ai.backend.manager.api.adapters.base import BaseAdapter
 from ai.backend.manager.api.adapters.user.adapter import UserAdapter
@@ -90,6 +93,15 @@ from ai.backend.manager.services.domain.processors import DomainProcessors
 from ai.backend.manager.services.project.actions.bulk_get import BulkGetProjectsAction
 from ai.backend.manager.services.project.actions.create_project import CreateProjectAction
 from ai.backend.manager.services.project.actions.delete_project import DeleteProjectAction
+from ai.backend.manager.services.project.actions.partial_bulk_delete_projects import (
+    PartialBulkDeleteProjectsAction,
+)
+from ai.backend.manager.services.project.actions.partial_bulk_restore_projects import (
+    PartialBulkRestoreProjectsAction,
+)
+from ai.backend.manager.services.project.actions.partial_bulk_update_projects import (
+    PartialBulkUpdateProjectsAction,
+)
 from ai.backend.manager.services.project.actions.purge_project import PurgeProjectAction
 from ai.backend.manager.services.project.actions.restore_project import RestoreProjectAction
 from ai.backend.manager.services.project.actions.scoped_search import (
@@ -232,36 +244,85 @@ class ProjectAdapter(BaseAdapter):
         )
         return ProjectPayload(project=self._group_data_to_node(result.data))
 
-    async def admin_update(self, project_id: UUID, input: UpdateProjectInput) -> ProjectPayload:
-        """Update an existing project (superadmin only)."""
-        updater = ProjectUpdater(
-            project_id=ProjectID(project_id),
+    async def update(self, project_id: ProjectID, input: UpdateProjectInput) -> ProjectPayload:
+        """Update an existing project."""
+        result = await self._project.update_project.run(
+            UpdateProjectAction(updater=self._to_updater(project_id, input))
+        )
+        if result.data is None:
+            raise UnreachableError("modify_group must return data")
+        return ProjectPayload(project=self._group_data_to_node(result.data))
+
+    async def delete(self, project_id: ProjectID) -> DeleteProjectPayload:
+        """Soft-delete a project."""
+        await self._project.delete_project.run(
+            DeleteProjectAction(updater=ProjectSoftDeleteUpdater(project_id=project_id))
+        )
+        return DeleteProjectPayload(deleted=True)
+
+    async def restore(self, project_id: ProjectID) -> RestoreProjectPayload:
+        """Restore a soft-deleted project."""
+        await self._project.restore_project.run(
+            RestoreProjectAction(updater=ProjectRestoreUpdater(project_id=project_id))
+        )
+        return RestoreProjectPayload(restored=True)
+
+    async def partial_bulk_update(
+        self, input: PartialBulkUpdateProjectsInput
+    ) -> PartialBulkPayload[ProjectNode]:
+        """Update several projects, answering for each one."""
+        result = await self._project.partial_bulk_update.run(
+            PartialBulkUpdateProjectsAction(
+                updaters=[self._to_updater(ProjectID(item.id), item.input) for item in input.items]
+            )
+        )
+        return self._to_partial_bulk_payload(result)
+
+    async def partial_bulk_delete(
+        self, input: PartialBulkDeleteProjectsInput
+    ) -> PartialBulkPayload[ProjectNode]:
+        """Soft-delete several projects, answering for each one."""
+        result = await self._project.partial_bulk_delete.run(
+            PartialBulkDeleteProjectsAction(ids=[ProjectID(project_id) for project_id in input.ids])
+        )
+        return self._to_partial_bulk_payload(result)
+
+    async def partial_bulk_restore(
+        self, input: PartialBulkRestoreProjectsInput
+    ) -> PartialBulkPayload[ProjectNode]:
+        """Restore several soft-deleted projects, answering for each one."""
+        result = await self._project.partial_bulk_restore.run(
+            PartialBulkRestoreProjectsAction(
+                ids=[ProjectID(project_id) for project_id in input.ids]
+            )
+        )
+        return self._to_partial_bulk_payload(result)
+
+    def _to_updater(self, project_id: ProjectID, input: UpdateProjectInput) -> ProjectUpdater:
+        return ProjectUpdater(
+            project_id=project_id,
             name=OptionalState.from_unset(input.name),
             description=TriState.from_unset(input.description),
             is_active=OptionalState.from_unset(input.is_active),
             integration_name=TriState.from_unset(input.integration_name),
             resource_policy=OptionalState.from_unset(input.resource_policy),
         )
-        result = await self._project.update_project.run(UpdateProjectAction(updater=updater))
-        if result.data is None:
-            raise UnreachableError("modify_group must return data")
-        return ProjectPayload(project=self._group_data_to_node(result.data))
 
-    async def admin_delete(self, input: DeleteProjectInput) -> DeleteProjectPayload:
-        """Soft-delete a project (superadmin only)."""
-        project_id = ProjectID(input.group_id)
-        await self._project.delete_project.run(
-            DeleteProjectAction(updater=ProjectSoftDeleteUpdater(project_id=project_id))
+    def _to_partial_bulk_payload(
+        self, result: PartialBulkResult[ProjectData]
+    ) -> PartialBulkPayload[ProjectNode]:
+        return PartialBulkPayload[ProjectNode](
+            successes=[
+                self._group_data_to_node(item.value)
+                for item in result.items
+                if item.value is not None
+            ],
+            failed=[
+                PartialBulkFailure(id=item.entity_id, message=str(item.error))
+                for item in result.items
+                if item.error is not None
+            ],
         )
-        return DeleteProjectPayload(deleted=True)
-
-    async def admin_restore(self, input: RestoreProjectInput) -> RestoreProjectPayload:
-        """Restore a soft-deleted project (superadmin only)."""
-        project_id = ProjectID(input.group_id)
-        await self._project.restore_project.run(
-            RestoreProjectAction(updater=ProjectRestoreUpdater(project_id=project_id))
-        )
-        return RestoreProjectPayload(restored=True)
 
     async def admin_purge(self, input: PurgeProjectInput) -> PurgeProjectPayload:
         """Permanently purge a project (superadmin only)."""

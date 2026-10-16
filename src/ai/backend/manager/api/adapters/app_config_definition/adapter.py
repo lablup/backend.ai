@@ -10,6 +10,7 @@ from ai.backend.common.dto.manager.v2.app_config_definition.request import (
     AppConfigDefinitionFilter,
     AppConfigDefinitionOrder,
     CreateAppConfigDefinitionInput,
+    PartialBulkPurgeAppConfigDefinitionsInput,
     PurgeAppConfigDefinitionInput,
     SearchAppConfigDefinitionsInput,
 )
@@ -22,7 +23,12 @@ from ai.backend.common.dto.manager.v2.app_config_definition.response import (
 from ai.backend.common.dto.manager.v2.app_config_definition.types import (
     AppConfigDefinitionOrderField,
 )
-from ai.backend.common.dto.manager.v2.common import OrderDirection
+from ai.backend.common.dto.manager.v2.common import (
+    OrderDirection,
+    PartialBulkFailure,
+    PartialBulkPayload,
+)
+from ai.backend.manager.actions.v2.bulk.result import PartialBulkResult
 from ai.backend.manager.api.adapter_options.pagination.pagination import PaginationSpec
 from ai.backend.manager.api.adapters.base import BaseAdapter
 from ai.backend.manager.data.app_config.types import AppConfigDefinitionData
@@ -55,6 +61,9 @@ from ai.backend.manager.services.app_config.actions.definition.create import (
 )
 from ai.backend.manager.services.app_config.actions.definition.get import (
     GetAppConfigDefinitionAction,
+)
+from ai.backend.manager.services.app_config.actions.definition.partial_bulk_purge import (
+    PartialBulkPurgeAppConfigDefinitionsAction,
 )
 from ai.backend.manager.services.app_config.actions.definition.purge import (
     PurgeAppConfigDefinitionAction,
@@ -145,13 +154,37 @@ class AppConfigDefinitionAdapter(BaseAdapter):
             has_previous_page=action_result.has_previous_page,
         )
 
-    async def admin_purge(
-        self, input: PurgeAppConfigDefinitionInput
-    ) -> PurgeAppConfigDefinitionPayload:
+    async def purge(self, input: PurgeAppConfigDefinitionInput) -> PurgeAppConfigDefinitionPayload:
+        """Purge a config name with the allow-list entries and fragments under it."""
         action_result = await self._app_config.definition_purge.run(
             PurgeAppConfigDefinitionAction(definition_id=AppConfigDefinitionID(input.id))
         )
         return PurgeAppConfigDefinitionPayload(id=action_result.data.id)
+
+    async def partial_bulk_purge(
+        self, input: PartialBulkPurgeAppConfigDefinitionsInput
+    ) -> PartialBulkPayload[AppConfigDefinitionNode]:
+        """Purge several config names with what lies under them, answering for each one."""
+        result = await self._app_config.definition_partial_bulk_purge.run(
+            PartialBulkPurgeAppConfigDefinitionsAction(
+                ids=[AppConfigDefinitionID(definition_id) for definition_id in input.ids]
+            )
+        )
+        return self._to_partial_bulk_payload(result)
+
+    def _to_partial_bulk_payload(
+        self, result: PartialBulkResult[AppConfigDefinitionData]
+    ) -> PartialBulkPayload[AppConfigDefinitionNode]:
+        return PartialBulkPayload[AppConfigDefinitionNode](
+            successes=[
+                self._data_to_node(item.value) for item in result.items if item.value is not None
+            ],
+            failed=[
+                PartialBulkFailure(id=item.entity_id, message=str(item.error))
+                for item in result.items
+                if item.error is not None
+            ],
+        )
 
     @staticmethod
     def _data_to_node(data: AppConfigDefinitionData) -> AppConfigDefinitionNode:

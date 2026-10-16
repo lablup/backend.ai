@@ -8,8 +8,9 @@ from typing import Any, override
 
 import pytest
 
+from ai.backend.common.data.entity.image import ImageID
 from ai.backend.common.data.user.types import UserRole
-from ai.backend.common.dto.manager.v2.image.request import UpdateImageInput
+from ai.backend.common.dto.manager.v2.image.request import UpdateImageBody
 from ai.backend.common.dto.manager.v2.image.response import ImageNode
 from ai.backend.common.dto.manager.v2.image.types import (
     ImageResourceLimitGQLInfo,
@@ -17,8 +18,8 @@ from ai.backend.common.dto.manager.v2.image.types import (
 )
 from ai.backend.manager.api.adapters.image.adapter import ImageAdapter
 from ai.backend.manager.data.image.types import ImageType
-from ai.backend.manager.errors.auth import InsufficientPrivilege
-from ai.backend.manager.errors.image import ImageNotFound
+from ai.backend.manager.errors.base.entity import EntityNotFoundError
+from ai.backend.manager.errors.permission import NotEnoughPermission
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.testutils.scenario_steps import (
     Given,
@@ -93,7 +94,7 @@ class Editing(When[AnImageAndACaller, ImageAdapter, ImageNode]):
 
     @override
     def operation(self) -> str:
-        return "admin_update"
+        return "update"
 
     @override
     def describe(self, laid: AnImageAndACaller) -> str:
@@ -113,14 +114,14 @@ class Editing(When[AnImageAndACaller, ImageAdapter, ImageNode]):
     @override
     async def call(self, adapter: ImageAdapter, laid: AnImageAndACaller) -> ImageNode:
         target = self.at.id_of(laid)
-        asked: dict[str, Any] = {"image_id": target}
+        asked: dict[str, Any] = {}
         if self.tag is not None:
             asked["tag"] = self.tag
         if self.accelerators is not None:
             asked["supported_accelerators"] = self.accelerators.named()
         asked.update(self.updates)
         with ActingAs(laid.caller):
-            payload = await adapter.admin_update(UpdateImageInput(**asked))
+            payload = await adapter.update(ImageID(target), UpdateImageBody(**asked))
         return payload.item
 
 
@@ -317,20 +318,20 @@ class EditingWhatIsNotThere(
 
     @override
     def then(self) -> Then[AnImageAndACaller, ImageNode]:
-        return TheCallIsRefused(ImageNotFound)
+        return TheCallIsRefused(EntityNotFoundError)
 
 
 @dataclass(frozen=True)
-class APlainUserMayNotEdit(
+class AUserGrantedNothingMayNotEdit(
     Scenario[TestSeedingSession, AnImageAndACaller, ImageAdapter, ImageNode]
 ):
     @override
     def summary(self) -> str:
-        return "a-user-who-is-not-the-superadmin-may-not-edit-an-image"
+        return "a-user-granted-nothing-may-not-edit-an-image"
 
     @override
     def describe(self) -> str:
-        return "슈퍼관리자가 아닌 사용자가 이미지를 수정하려 하면 슈퍼관리자 권한 부족으로 거부된다"
+        return "아무 권한도 받지 않은 사용자가 이미지를 수정하려 하면 권한 부족으로 거부된다"
 
     @override
     def given(self) -> Given[TestSeedingSession, AnImageAndACaller]:
@@ -342,7 +343,7 @@ class APlainUserMayNotEdit(
 
     @override
     def then(self) -> Then[AnImageAndACaller, ImageNode]:
-        return TheCallIsRefused(InsufficientPrivilege)
+        return TheCallIsRefused(NotEnoughPermission)
 
 
 SCENARIOS: list[Any] = [
@@ -353,7 +354,7 @@ SCENARIOS: list[Any] = [
     ChangingTheRemainingScalarFields(),
     ChangingLabelsAndResourceLimits(),
     EditingWhatIsNotThere(),
-    APlainUserMayNotEdit(),
+    AUserGrantedNothingMayNotEdit(),
 ]
 
 

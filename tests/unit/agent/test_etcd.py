@@ -261,6 +261,57 @@ class TestReplaceOperation:
         assert await agent_etcd_view.get(key) == initial_val
 
 
+class TestConditionalWrites:
+    async def test_put_if_absent_writes_into_the_agent_scope(
+        self,
+        agent_etcd_view: AgentEtcdClientView,
+    ) -> None:
+        scope = ConfigScopes.NODE
+
+        assert await agent_etcd_view.put_if_absent("test/cas/new", "first", scope=scope)
+        assert not await agent_etcd_view.put_if_absent("test/cas/new", "second", scope=scope)
+        assert await agent_etcd_view.get("test/cas/new", scope=scope) == "first"
+
+    async def test_compare_and_put_reads_guards_in_the_same_scope(
+        self,
+        agent_etcd_view: AgentEtcdClientView,
+    ) -> None:
+        scope = ConfigScopes.NODE
+        await agent_etcd_view.put("test/cas/owner", "run-1", scope=scope)
+
+        assert await agent_etcd_view.compare_and_put(
+            "test/cas/target",
+            "v1",
+            expected=None,
+            guards={"test/cas/owner": "run-1"},
+            scope=scope,
+        )
+        assert not await agent_etcd_view.compare_and_put(
+            "test/cas/target",
+            "v2",
+            expected="v1",
+            guards={"test/cas/owner": "run-2"},
+            scope=scope,
+        )
+        assert await agent_etcd_view.get("test/cas/target", scope=scope) == "v1"
+
+    async def test_conditional_deletes_remove_only_the_expected_value(
+        self,
+        agent_etcd_view: AgentEtcdClientView,
+    ) -> None:
+        scope = ConfigScopes.NODE
+        await agent_etcd_view.put("test/cas/a", "mine", scope=scope)
+        await agent_etcd_view.put("test/cas/b", "mine", scope=scope)
+
+        assert not await agent_etcd_view.delete_if_value("test/cas/a", "theirs", scope=scope)
+        assert await agent_etcd_view.delete_if_value("test/cas/a", "mine", scope=scope)
+        assert await agent_etcd_view.compare_and_delete(
+            "test/cas/b", "mine", guards={"test/cas/a": None}, scope=scope
+        )
+        assert await agent_etcd_view.get("test/cas/a", scope=scope) is None
+        assert await agent_etcd_view.get("test/cas/b", scope=scope) is None
+
+
 class TestDeleteOperations:
     async def test_delete(
         self,

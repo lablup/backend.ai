@@ -2,7 +2,7 @@
 
 [무엇을 보장하는가](/src/ai/backend/manager/api/adapters/deployment/KNOWLEDGE.md) · [어댑터](/src/ai/backend/manager/api/adapters/deployment/adapter.py)
 
-시나리오: 미완 30 / 44
+시나리오: 미완 33 / 47
 
 - ops 로 구성 (22)
   - admin_search — 대표 성공 ✓ · 대표 실패 ✓
@@ -29,7 +29,7 @@
   - search_rules — 대표 성공 ✗ · 대표 실패 ✗ — SCENARIO-GAP
 - ops + 직접 구현 (1)
   - get_current_revision — 성공 없음 · 실패 있음 1 (get_ops, single_entity) — SCENARIO-GAP
-- 직접 구현 (21)
+- 직접 구현 (24)
   - activate_revision — 성공 없음 · 실패 없음 (single_entity) — SCENARIO-GAP
   - add_revision — 성공 있음 4 · 실패 있음 7 (single_entity)
   - admin_refresh_deployment_revisions — 성공 없음 · 실패 없음 (global_scope) — SCENARIO-GAP
@@ -39,11 +39,14 @@
   - create_access_token — 성공 없음 · 실패 없음 (single_entity) — SCENARIO-GAP
   - create_rule — 성공 없음 · 실패 없음 (single_entity) — SCENARIO-GAP
   - delete — 성공 있음 2 · 실패 있음 2 (single_entity)
-  - delete_access_token — 성공 없음 · 실패 없음 (single_field) — SCENARIO-GAP
-  - delete_rule — 성공 없음 · 실패 없음 (single_entity) — SCENARIO-GAP
   - get — 성공 있음 2 · 실패 있음 3 (single_entity)
   - get_policy — 성공 없음 · 실패 없음 (single_entity) — SCENARIO-GAP
   - get_rule — 성공 없음 · 실패 없음 (single_entity) — SCENARIO-GAP
+  - partial_bulk_purge_access_tokens — 성공 있음 2 · 실패 없음 (partial_bulk_field) — SCENARIO-GAP
+  - partial_bulk_purge_rules — 성공 있음 3 · 실패 없음 (partial_bulk_field) — SCENARIO-GAP
+  - partial_bulk_update_rules — 성공 있음 2 · 실패 없음 (partial_bulk_field) — SCENARIO-GAP
+  - purge_access_token — 성공 없음 · 실패 없음 (single_field) — SCENARIO-GAP
+  - purge_rule — 성공 없음 · 실패 없음 (single_entity) — SCENARIO-GAP
   - replace_options — 성공 있음 2 · 실패 있음 3 (single_entity)
   - search_revision_resource_slots — 성공 있음 1 · 실패 있음 1 (single_field)
   - sync_replicas — 성공 있음 1 · 실패 있음 1 (single_entity)
@@ -154,6 +157,28 @@
 | [같은 배포가 있고 아무 권한도 받지 않은 사용자가 조회하면, 권한 부족으로 거부된다](#reading-a-user-granted-nothing-may-not-read-a-deployment) | 거부 |
 | [슈퍼관리자가 아무것도 갖지 않은 id로 조회하면, 대상이 없다는 것으로 거부된다. 권한 검사를 지나가는 사람만 이 답을 본다](#reading-an-id-nothing-answers-to-is-not-found-for-a-superadmin) | 거부 |
 | [읽기 권한을 받은 사용자가 아무것도 갖지 않은 id로 조회하면, 대상이 없다는 것이 아니라 권한 부족으로 거부된다. 없는 행에는 걸린 권한도 없기 때문이다](#reading-an-id-nothing-answers-to-is-refused-as-permission-for-a-plain-user) | 거부 |
+
+**partial_bulk_purge_access_tokens**
+
+| 시나리오 | 판정 |
+|---|---|
+| [아무 권한도 받지 않은 사용자가 토큰 여럿을 한 번에 purge 하려 하면, purge 된 것 없이 모두 권한이 없다는 이유로 실패 목록에 온다](#partial_bulk_access_tokens-a-user-granted-nothing-purges-none-of-several-tokens) | 성공 |
+| [배포 영구 삭제 권한을 받은 사용자가 토큰 둘과 없는 id 하나를 한 번에 purge 하면, 둘은 처리된 목록에 오고 없는 id 는 대상이 없다는 이유로 실패 목록에 온다](#partial_bulk_access_tokens-purging-several-tokens-answers-for-the-missing-one) | 성공 |
+
+**partial_bulk_purge_rules**
+
+| 시나리오 | 판정 |
+|---|---|
+| [배포 수정 권한만 받은 사용자가 규칙 여럿을 한 번에 purge 하려 하면, purge 된 것 없이 모두 권한이 없다는 이유로 실패 목록에 온다](#partial_bulk_auto_scaling_rules-a-deployment-editor-purges-none-of-several-rules) | 성공 |
+| [아무 권한도 받지 않은 사용자가 규칙 여럿을 한 번에 purge 하려 하면, purge 된 것 없이 모두 권한이 없다는 이유로 실패 목록에 온다](#partial_bulk_auto_scaling_rules-a-user-granted-nothing-purges-none-of-several-rules) | 성공 |
+| [배포 영구 삭제 권한을 받은 사용자가 규칙 둘과 없는 id 하나를 한 번에 purge 하면, 둘은 purge 되기 전 모습으로 오고 없는 id 는 대상이 없다는 이유로 실패 목록에 온다](#partial_bulk_auto_scaling_rules-purging-several-rules-answers-for-the-missing-one) | 성공 |
+
+**partial_bulk_update_rules**
+
+| 시나리오 | 판정 |
+|---|---|
+| [배포 수정 권한을 받은 사용자가 규칙 여럿의 지표 이름을 한 번에 바꾸면, 모두 새 이름으로 오고 실패한 것은 없다](#partial_bulk_auto_scaling_rules-a-deployment-editor-edits-several-rules-at-once) | 성공 |
+| [아무 권한도 받지 않은 사용자가 규칙 여럿을 한 번에 고치려 하면, 고쳐진 것 없이 모두 권한이 없다는 이유로 실패 목록에 온다](#partial_bulk_auto_scaling_rules-a-user-granted-nothing-edits-none-of-several-rules) | 성공 |
 
 **replace_options**
 
@@ -2079,6 +2104,278 @@ Then
 
 - 거부된다
   - 거부: NotEnoughPermission
+
+### partial_bulk_purge_access_tokens
+
+<a id="partial_bulk_access_tokens-a-user-granted-nothing-purges-none-of-several-tokens"></a>
+
+#### [a-user-granted-nothing-purges-none-of-several-tokens](/tests/scenario/bai_scenario/manager/deployment/test_partial_bulk_access_tokens.py) — pass
+
+아무 권한도 받지 않은 사용자가 토큰 여럿을 한 번에 purge 하려 하면, purge 된 것 없이 모두 권한이 없다는 이유로 실패 목록에 온다
+
+Given
+
+- 접근 토큰 2개가 걸린 배포 하나와, 아무 배포 권한도 받지 않은 사용자 한 명
+  - 도메인 home-1
+  - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+  - 프로젝트 team-1
+  - 리소스 그룹 resource-group-1: fifo 스케줄러를 쓴다
+  - 배포 권한을 하나도 받지 않은 사용자 준비
+    - 도메인에 속한 사용자 한 명 준비
+      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+      - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+  - 배포 deployment-1: 복제를 1개 두려 한다, 아직 리비전이 없다
+  - 배포 deployment-1: 접근 토큰 하나를 갖는다
+  - 배포 deployment-1: 접근 토큰 하나를 갖는다
+
+When
+
+- DeploymentAdapter.partial_bulk_purge_access_tokens — user-1이 토큰 2개를 한 번에 purge 함
+
+Then
+
+- 처리된 토큰 없이 토큰이 모두 실패 목록에 온다
+  - successes = []
+  - failed count = 2
+  - failed[0].id: 심은 토큰의 id와 같다
+  - failed[0].message: 'Insufficient permission'를 담은 이유
+  - failed[1].id: 심은 토큰의 id와 같다
+  - failed[1].message: 'Insufficient permission'를 담은 이유
+
+<a id="partial_bulk_access_tokens-purging-several-tokens-answers-for-the-missing-one"></a>
+
+#### [purging-several-tokens-answers-for-the-missing-one](/tests/scenario/bai_scenario/manager/deployment/test_partial_bulk_access_tokens.py) — pass
+
+배포 영구 삭제 권한을 받은 사용자가 토큰 둘과 없는 id 하나를 한 번에 purge 하면, 둘은 처리된 목록에 오고 없는 id 는 대상이 없다는 이유로 실패 목록에 온다
+
+Given
+
+- 접근 토큰 2개가 걸린 배포 하나와, 배포에 HARD_DELETE 권한을 받은 사용자 한 명
+  - 도메인 home-1
+  - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+  - 프로젝트 team-1
+  - 리소스 그룹 resource-group-1: fifo 스케줄러를 쓴다
+  - 배포에 HARD_DELETE 권한을 받은 사용자 준비
+    - 도메인에 속한 사용자 한 명 준비
+      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+      - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+    - 역할 deployment-user-1: 이 역할이 앉은 스코프 안에서만 통한다
+    - 역할 deployment-user-1: deployment 전체에 HARD_DELETE 허용
+    - 일반 사용자 user-1: 역할 deployment-user-1 보유
+  - 배포 deployment-1: 복제를 1개 두려 한다, 아직 리비전이 없다
+  - 배포 deployment-1: 접근 토큰 하나를 갖는다
+  - 배포 deployment-1: 접근 토큰 하나를 갖는다
+
+When
+
+- DeploymentAdapter.partial_bulk_purge_access_tokens — user-1이 토큰 2개 와 없는 id 하나를 한 번에 purge 함
+
+Then
+
+- 토큰이 모두 처리된 목록에 오고, 없는 id 는 대상이 없다는 이유로 실패 목록에 온다
+  - successes count = 2
+  - successes[0].id: 심은 토큰의 id와 같다
+  - successes[1].id: 심은 토큰의 id와 같다
+  - failed count = 1
+  - failed[0].id: 요청에 넣은 없는 id와 같다
+  - failed[0].message: 'not found'를 담은 이유
+
+### partial_bulk_purge_rules
+
+<a id="partial_bulk_auto_scaling_rules-a-deployment-editor-purges-none-of-several-rules"></a>
+
+#### [a-deployment-editor-purges-none-of-several-rules](/tests/scenario/bai_scenario/manager/deployment/test_partial_bulk_auto_scaling_rules.py) — pass
+
+배포 수정 권한만 받은 사용자가 규칙 여럿을 한 번에 purge 하려 하면, purge 된 것 없이 모두 권한이 없다는 이유로 실패 목록에 온다
+
+Given
+
+- 자동 스케일링 규칙 2개가 걸린 배포 하나와, 배포에 UPDATE 권한을 받은 사용자 한 명
+  - 도메인 home-1
+  - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+  - 프로젝트 team-1
+  - 리소스 그룹 resource-group-1: fifo 스케줄러를 쓴다
+  - 배포에 UPDATE 권한을 받은 사용자 준비
+    - 도메인에 속한 사용자 한 명 준비
+      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+      - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+    - 역할 deployment-user-1: 이 역할이 앉은 스코프 안에서만 통한다
+    - 역할 deployment-user-1: deployment 전체에 UPDATE 허용
+    - 일반 사용자 user-1: 역할 deployment-user-1 보유
+  - 배포 deployment-1: 복제를 1개 두려 한다, 아직 리비전이 없다
+  - 배포 deployment-1: 자동 스케일링 규칙 하나를 갖는다
+  - 배포 deployment-1: 자동 스케일링 규칙 하나를 갖는다
+
+When
+
+- DeploymentAdapter.partial_bulk_purge_rules — user-1이 규칙 2개를 한 번에 purge 함
+
+Then
+
+- 처리된 규칙 없이 규칙이 모두 실패 목록에 온다
+  - successes = []
+  - failed count = 2
+  - failed[0].id: 심은 규칙의 id와 같다
+  - failed[0].message: 'Insufficient permission'를 담은 이유
+  - failed[1].id: 심은 규칙의 id와 같다
+  - failed[1].message: 'Insufficient permission'를 담은 이유
+
+<a id="partial_bulk_auto_scaling_rules-a-user-granted-nothing-purges-none-of-several-rules"></a>
+
+#### [a-user-granted-nothing-purges-none-of-several-rules](/tests/scenario/bai_scenario/manager/deployment/test_partial_bulk_auto_scaling_rules.py) — pass
+
+아무 권한도 받지 않은 사용자가 규칙 여럿을 한 번에 purge 하려 하면, purge 된 것 없이 모두 권한이 없다는 이유로 실패 목록에 온다
+
+Given
+
+- 자동 스케일링 규칙 2개가 걸린 배포 하나와, 아무 배포 권한도 받지 않은 사용자 한 명
+  - 도메인 home-1
+  - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+  - 프로젝트 team-1
+  - 리소스 그룹 resource-group-1: fifo 스케줄러를 쓴다
+  - 배포 권한을 하나도 받지 않은 사용자 준비
+    - 도메인에 속한 사용자 한 명 준비
+      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+      - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+  - 배포 deployment-1: 복제를 1개 두려 한다, 아직 리비전이 없다
+  - 배포 deployment-1: 자동 스케일링 규칙 하나를 갖는다
+  - 배포 deployment-1: 자동 스케일링 규칙 하나를 갖는다
+
+When
+
+- DeploymentAdapter.partial_bulk_purge_rules — user-1이 규칙 2개를 한 번에 purge 함
+
+Then
+
+- 처리된 규칙 없이 규칙이 모두 실패 목록에 온다
+  - successes = []
+  - failed count = 2
+  - failed[0].id: 심은 규칙의 id와 같다
+  - failed[0].message: 'Insufficient permission'를 담은 이유
+  - failed[1].id: 심은 규칙의 id와 같다
+  - failed[1].message: 'Insufficient permission'를 담은 이유
+
+<a id="partial_bulk_auto_scaling_rules-purging-several-rules-answers-for-the-missing-one"></a>
+
+#### [purging-several-rules-answers-for-the-missing-one](/tests/scenario/bai_scenario/manager/deployment/test_partial_bulk_auto_scaling_rules.py) — pass
+
+배포 영구 삭제 권한을 받은 사용자가 규칙 둘과 없는 id 하나를 한 번에 purge 하면, 둘은 purge 되기 전 모습으로 오고 없는 id 는 대상이 없다는 이유로 실패 목록에 온다
+
+Given
+
+- 자동 스케일링 규칙 2개가 걸린 배포 하나와, 배포에 HARD_DELETE 권한을 받은 사용자 한 명
+  - 도메인 home-1
+  - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+  - 프로젝트 team-1
+  - 리소스 그룹 resource-group-1: fifo 스케줄러를 쓴다
+  - 배포에 HARD_DELETE 권한을 받은 사용자 준비
+    - 도메인에 속한 사용자 한 명 준비
+      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+      - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+    - 역할 deployment-user-1: 이 역할이 앉은 스코프 안에서만 통한다
+    - 역할 deployment-user-1: deployment 전체에 HARD_DELETE 허용
+    - 일반 사용자 user-1: 역할 deployment-user-1 보유
+  - 배포 deployment-1: 복제를 1개 두려 한다, 아직 리비전이 없다
+  - 배포 deployment-1: 자동 스케일링 규칙 하나를 갖는다
+  - 배포 deployment-1: 자동 스케일링 규칙 하나를 갖는다
+
+When
+
+- DeploymentAdapter.partial_bulk_purge_rules — user-1이 규칙 2개 와 없는 id 하나를 한 번에 purge 함
+
+Then
+
+- 규칙이 모두 지표 이름 'cpu_util'으로 오고, 없는 id 는 대상이 없다는 이유로 실패 목록에 온다
+  - successes count = 2
+  - successes[0].id: 심은 규칙의 id와 같다
+  - successes[0].metric_name = 'cpu_util'
+  - successes[1].id: 심은 규칙의 id와 같다
+  - successes[1].metric_name = 'cpu_util'
+  - failed count = 1
+  - failed[0].id: 요청에 넣은 없는 id와 같다
+  - failed[0].message: 'not found'를 담은 이유
+
+### partial_bulk_update_rules
+
+<a id="partial_bulk_auto_scaling_rules-a-deployment-editor-edits-several-rules-at-once"></a>
+
+#### [a-deployment-editor-edits-several-rules-at-once](/tests/scenario/bai_scenario/manager/deployment/test_partial_bulk_auto_scaling_rules.py) — pass
+
+배포 수정 권한을 받은 사용자가 규칙 여럿의 지표 이름을 한 번에 바꾸면, 모두 새 이름으로 오고 실패한 것은 없다
+
+Given
+
+- 자동 스케일링 규칙 2개가 걸린 배포 하나와, 배포에 UPDATE 권한을 받은 사용자 한 명
+  - 도메인 home-1
+  - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+  - 프로젝트 team-1
+  - 리소스 그룹 resource-group-1: fifo 스케줄러를 쓴다
+  - 배포에 UPDATE 권한을 받은 사용자 준비
+    - 도메인에 속한 사용자 한 명 준비
+      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+      - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+    - 역할 deployment-user-1: 이 역할이 앉은 스코프 안에서만 통한다
+    - 역할 deployment-user-1: deployment 전체에 UPDATE 허용
+    - 일반 사용자 user-1: 역할 deployment-user-1 보유
+  - 배포 deployment-1: 복제를 1개 두려 한다, 아직 리비전이 없다
+  - 배포 deployment-1: 자동 스케일링 규칙 하나를 갖는다
+  - 배포 deployment-1: 자동 스케일링 규칙 하나를 갖는다
+
+When
+
+- DeploymentAdapter.partial_bulk_update_rules — user-1이 규칙 2개의 지표 이름을 한 번에 고침
+
+Then
+
+- 규칙이 모두 지표 이름 'memory_util'으로 오고, 실패한 것은 없다
+  - successes count = 2
+  - successes[0].id: 심은 규칙의 id와 같다
+  - successes[0].metric_name = 'memory_util'
+  - successes[1].id: 심은 규칙의 id와 같다
+  - successes[1].metric_name = 'memory_util'
+  - failed = []
+
+<a id="partial_bulk_auto_scaling_rules-a-user-granted-nothing-edits-none-of-several-rules"></a>
+
+#### [a-user-granted-nothing-edits-none-of-several-rules](/tests/scenario/bai_scenario/manager/deployment/test_partial_bulk_auto_scaling_rules.py) — pass
+
+아무 권한도 받지 않은 사용자가 규칙 여럿을 한 번에 고치려 하면, 고쳐진 것 없이 모두 권한이 없다는 이유로 실패 목록에 온다
+
+Given
+
+- 자동 스케일링 규칙 2개가 걸린 배포 하나와, 아무 배포 권한도 받지 않은 사용자 한 명
+  - 도메인 home-1
+  - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+  - 프로젝트 team-1
+  - 리소스 그룹 resource-group-1: fifo 스케줄러를 쓴다
+  - 배포 권한을 하나도 받지 않은 사용자 준비
+    - 도메인에 속한 사용자 한 명 준비
+      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+      - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+  - 배포 deployment-1: 복제를 1개 두려 한다, 아직 리비전이 없다
+  - 배포 deployment-1: 자동 스케일링 규칙 하나를 갖는다
+  - 배포 deployment-1: 자동 스케일링 규칙 하나를 갖는다
+
+When
+
+- DeploymentAdapter.partial_bulk_update_rules — user-1이 규칙 2개의 지표 이름을 한 번에 고침
+
+Then
+
+- 처리된 규칙 없이 규칙이 모두 실패 목록에 온다
+  - successes = []
+  - failed count = 2
+  - failed[0].id: 심은 규칙의 id와 같다
+  - failed[0].message: 'Insufficient permission'를 담은 이유
+  - failed[1].id: 심은 규칙의 id와 같다
+  - failed[1].message: 'Insufficient permission'를 담은 이유
 
 ### replace_options
 

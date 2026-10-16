@@ -1,7 +1,9 @@
 import uuid
+from collections.abc import Sequence
 
 from ai.backend.common.data.artifact.types import ArtifactRegistryType
 from ai.backend.common.data.entity.artifact_registry import ArtifactRegistryID
+from ai.backend.common.data.entity.types import EntityIdentifier
 from ai.backend.common.exception import BackendAIError
 from ai.backend.common.metrics.metric import DomainType, LayerType
 from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPolicy
@@ -22,6 +24,7 @@ from ai.backend.manager.models.huggingface_registry.creators import HuggingFaceR
 from ai.backend.manager.models.huggingface_registry.purgers import HuggingFaceRegistryPurger
 from ai.backend.manager.models.huggingface_registry.searchers import HuggingFaceRegistrySearcher
 from ai.backend.manager.models.huggingface_registry.updaters import HuggingFaceRegistryUpdater
+from ai.backend.manager.models.specs.types import BulkResultWithFailures
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.huggingface_registry.db_source.db_source import (
     HuggingFaceDBSource,
@@ -120,6 +123,57 @@ class HuggingFaceRepository:
                     f"HuggingFace registry with ID {registry_id} not found"
                 )
             return deleted_id
+
+    @huggingface_registry_repository_resilience.apply()
+    async def partial_bulk_update(
+        self,
+        items: Sequence[tuple[HuggingFaceRegistryUpdater, ArtifactRegistryModifierMeta]],
+    ) -> BulkResultWithFailures[HuggingFaceRegistryData]:
+        """Edit each named HuggingFace registry and its name in its own savepoint."""
+        successes: dict[EntityIdentifier, HuggingFaceRegistryData] = {}
+        errors: dict[EntityIdentifier, Exception] = {}
+        async with self._registry_ops.write_ops() as w:
+            for updater, meta in items:
+                try:
+                    async with w.savepoint() as sp:
+                        data = await sp.update_registry(
+                            updater,
+                            ArtifactRegistryMetaUpdater(
+                                registry_id=updater.registry_id, name=meta.name
+                            ),
+                        )
+                        if data is None:
+                            raise ArtifactRegistryNotFoundError(
+                                f"HuggingFace registry with ID {updater.registry_id} not found"
+                            )
+                        successes[updater.registry_id] = data
+                except Exception as e:
+                    errors[updater.registry_id] = e
+        return BulkResultWithFailures(successes=successes, errors=errors)
+
+    @huggingface_registry_repository_resilience.apply()
+    async def partial_bulk_purge(
+        self, registry_ids: Sequence[ArtifactRegistryID]
+    ) -> BulkResultWithFailures[ArtifactRegistryID]:
+        """Remove each named HuggingFace registry, the row naming it, and the node it was, in
+        its own savepoint."""
+        successes: dict[EntityIdentifier, ArtifactRegistryID] = {}
+        errors: dict[EntityIdentifier, Exception] = {}
+        async with self._registry_ops.write_ops() as w:
+            for registry_id in registry_ids:
+                try:
+                    async with w.savepoint() as sp:
+                        deleted_id = await sp.purge_registry(
+                            HuggingFaceRegistryPurger(registry_id=registry_id)
+                        )
+                        if deleted_id is None:
+                            raise ArtifactRegistryNotFoundError(
+                                f"HuggingFace registry with ID {registry_id} not found"
+                            )
+                        successes[registry_id] = deleted_id
+                except Exception as e:
+                    errors[registry_id] = e
+        return BulkResultWithFailures(successes=successes, errors=errors)
 
     @huggingface_registry_repository_resilience.apply()
     async def get_registries_by_ids(

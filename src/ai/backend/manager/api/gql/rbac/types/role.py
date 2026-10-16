@@ -17,6 +17,7 @@ from ai.backend.common.data.entity.role import RoleID
 from ai.backend.common.data.entity.role_preset import RolePresetID
 from ai.backend.common.data.entity.types import EntityType, RuntimeEntityID
 from ai.backend.common.data.entity.user import UserID
+from ai.backend.common.dto.manager.v2.common import PartialBulkPayload
 from ai.backend.common.dto.manager.v2.rbac.request import (
     AdminSearchPermissionsGQLInput,
     SearchRoleAssignmentsInput,
@@ -38,6 +39,21 @@ from ai.backend.common.dto.manager.v2.rbac.request import (
 )
 from ai.backend.common.dto.manager.v2.rbac.request import (
     MappedScopeNestedFilter as MappedScopeNestedFilterDTO,
+)
+from ai.backend.common.dto.manager.v2.rbac.request import (
+    PartialBulkDeleteRolesInput as PartialBulkDeleteRolesInputDTO,
+)
+from ai.backend.common.dto.manager.v2.rbac.request import (
+    PartialBulkPurgeRolesInput as PartialBulkPurgeRolesInputDTO,
+)
+from ai.backend.common.dto.manager.v2.rbac.request import (
+    PartialBulkRestoreRolesInput as PartialBulkRestoreRolesInputDTO,
+)
+from ai.backend.common.dto.manager.v2.rbac.request import (
+    PartialBulkUpdateRoleItemInput as PartialBulkUpdateRoleItemInputDTO,
+)
+from ai.backend.common.dto.manager.v2.rbac.request import (
+    PartialBulkUpdateRolesInput as PartialBulkUpdateRolesInputDTO,
 )
 from ai.backend.common.dto.manager.v2.rbac.request import (
     PurgeRoleInput as PurgeRoleInputDTO,
@@ -91,6 +107,9 @@ from ai.backend.common.dto.manager.v2.rbac.response import (
     PurgeRolePayload as PurgeRolePayloadDTO,
 )
 from ai.backend.common.dto.manager.v2.rbac.response import (
+    RestoreRolePayload as RestoreRolePayloadDTO,
+)
+from ai.backend.common.dto.manager.v2.rbac.response import (
     RoleAssignmentNode,
     RoleNode,
 )
@@ -106,6 +125,7 @@ from ai.backend.common.dto.manager.v2.rbac.types import (
 )
 from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import OrderDirection, StringFilter, UUIDFilter, encode_cursor
+from ai.backend.manager.api.gql.common_types import PartialBulkFailureGQL
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     PydanticInputMixin,
@@ -887,10 +907,23 @@ class CreateRoleInput(PydanticInputMixin[CreateRoleInputDTO]):
     BackendAIGQLMeta(description="Input for updating a role", added_version="26.3.0"),
 )
 class UpdateRoleInput(PydanticInputMixin[UpdateRoleInputDTO]):
-    id: UUID
+    id: UUID | None = gql_field(
+        description="ID of the role to update. Required by `adminUpdateRole`.",
+        default=UNSET,
+        deprecation_reason=(
+            f"Deprecated since {NEXT_RELEASE_VERSION}. Pass the role ID as the `id` argument "
+            "of `updateRole`."
+        ),
+    )
     name: str | None = UNSET
     description: str | None = UNSET
-    status: RoleStatusGQL | None = UNSET
+    status: RoleStatusGQL | None = gql_field(
+        description="Accepted and ignored.",
+        default=UNSET,
+        deprecation_reason=(
+            f"Deprecated since {NEXT_RELEASE_VERSION}. Use `deleteRole` or `restoreRole`."
+        ),
+    )
     auto_assign: bool | None = gql_added_field(
         BackendAIGQLMeta(
             added_version="26.4.4",
@@ -957,6 +990,64 @@ class PurgeRoleInput(PydanticInputMixin[PurgeRoleInputDTO]):
     id: UUID
 
 
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="One role of a partial bulk update and the fields to update on it.",
+    ),
+    name="PartialBulkUpdateRoleItemInput",
+)
+class PartialBulkUpdateRoleItemInputGQL(PydanticInputMixin[PartialBulkUpdateRoleItemInputDTO]):
+    id: UUID = gql_field(description="ID of the role to update.")
+    input: UpdateRoleInput = gql_field(description="Fields to update on the role.")
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Input for updating several roles, each answered for separately.",
+    ),
+    name="PartialBulkUpdateRolesInput",
+)
+class PartialBulkUpdateRolesInputGQL(PydanticInputMixin[PartialBulkUpdateRolesInputDTO]):
+    items: list[PartialBulkUpdateRoleItemInputGQL] = gql_field(
+        description="The roles to update, each with its fields."
+    )
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Input for soft-deleting several roles, each answered for separately.",
+    ),
+    name="PartialBulkDeleteRolesInput",
+)
+class PartialBulkDeleteRolesInputGQL(PydanticInputMixin[PartialBulkDeleteRolesInputDTO]):
+    ids: list[UUID] = gql_field(description="IDs of the roles to soft-delete.")
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Input for restoring several soft-deleted roles, each answered for separately.",
+    ),
+    name="PartialBulkRestoreRolesInput",
+)
+class PartialBulkRestoreRolesInputGQL(PydanticInputMixin[PartialBulkRestoreRolesInputDTO]):
+    ids: list[UUID] = gql_field(description="IDs of the roles to restore.")
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description=("Input for permanently removing several roles, each answered for separately."),
+    ),
+    name="PartialBulkPurgeRolesInput",
+)
+class PartialBulkPurgeRolesInputGQL(PydanticInputMixin[PartialBulkPurgeRolesInputDTO]):
+    ids: list[UUID] = gql_field(description="IDs of the roles to purge.")
+
+
 # ==================== Payload Types ====================
 
 
@@ -976,6 +1067,36 @@ class DeleteRolePayload(PydanticOutputMixin[DeleteRolePayloadDTO]):
 )
 class PurgeRolePayload(PydanticOutputMixin[PurgeRolePayloadDTO]):
     id: UUID = gql_field(description="ID of the purged role.")
+
+
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION, description="Payload for restore role mutation."
+    ),
+    model=RestoreRolePayloadDTO,
+    name="RestoreRolePayload",
+)
+class RestoreRolePayload(PydanticOutputMixin[RestoreRolePayloadDTO]):
+    id: UUID = gql_field(description="ID of the restored role.")
+
+
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description=(
+            "Result of a partial bulk role operation: the roles processed and the ones that failed."
+        ),
+    ),
+    model=PartialBulkPayload[RoleNode],
+    name="PartialBulkRolesPayload",
+)
+class PartialBulkRolesPayloadGQL(PydanticOutputMixin[PartialBulkPayload[RoleNode]]):
+    """Payload for partial bulk role mutations."""
+
+    successes: list[RoleGQL] = gql_field(description="The roles processed, as they now stand.")
+    failed: list[PartialBulkFailureGQL] = gql_field(
+        description="The roles not processed, each with the reason."
+    )
 
 
 @gql_pydantic_type(

@@ -18,6 +18,7 @@ from ai.backend.common.data.entity.image import ImageEntityType
 from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.user.types import UserRole
+from ai.backend.common.dto.manager.v2.common import PartialBulkPayload
 from ai.backend.common.dto.manager.v2.image.response import ImageNode
 from ai.backend.common.dto.manager.v2.image.types import (
     ImageLabelInfo,
@@ -30,18 +31,20 @@ from ai.backend.manager.data.permission.types import Permission
 from ai.backend.manager.data.project.types import ProjectData
 from ai.backend.manager.data.user.types import UserData
 from ai.backend.manager.defs import INTRINSIC_SLOTS_MIN
+from ai.backend.manager.errors.permission import NotEnoughPermission
 from ai.backend.testutils.scenario_steps import (
     Answered,
     Condition,
     Given,
     Held,
+    Refused,
     Same,
     SameAs,
     Skipped,
     Then,
     Verdict,
 )
-from bai_scenario.components.domain import SomeoneOf, WrittenByThisRun
+from bai_scenario.components.domain import Mentions, SomeoneOf, WrittenByThisRun
 from bai_scenario.seeds.domain.domain import TestSeedDomain
 from bai_scenario.seeds.image.image import TestSeedAlias, TestSeedCommittedImage, TestSeedImage
 from bai_scenario.seeds.image.registry import TestSeedContainerRegistry
@@ -716,6 +719,84 @@ class TheImageNode(Then[Any, ImageNode]):
                 resource_limits_gql,
             ),
         ]
+
+
+@dataclass(frozen=True)
+class EveryImageComesBack(Then[ManyImagesAndACaller, PartialBulkPayload[ImageNode]]):
+    """대상 이미지가 모두 처리된 목록에 온다. `missing`이 있으면 그 id 만 실패 목록에 온다."""
+
+    status: ImageStatus = ImageStatus.ALIVE
+    tag: str | None = None
+    missing: uuid.UUID | None = None
+
+    @override
+    def says(self) -> str:
+        if self.missing is None:
+            return f"대상 이미지가 모두 {self.status.value} 상태로 오고, 실패한 것은 없다"
+        return (
+            f"대상 이미지가 모두 {self.status.value} 상태로 오고, "
+            "없는 id 는 대상이 없다는 이유로 실패 목록에 온다"
+        )
+
+    @override
+    def look(
+        self,
+        laid: ManyImagesAndACaller,
+        answered: Answered[PartialBulkPayload[ImageNode]],
+    ) -> list[Verdict]:
+        payload = answered.response
+        if payload is None:
+            return [Refused(NotEnoughPermission, answered.raised)]
+        node_look = TheImageNode(status=self.status, tag=self.tag)
+        verdicts: list[Verdict] = [Same("successes count", len(payload.successes), len(laid.laid))]
+        for node, image in zip(payload.successes, laid.laid, strict=False):
+            verdicts += node_look.look(
+                AnImageAndACaller(image, laid.caller), Answered(response=node)
+            )
+        if self.missing is None:
+            return [*verdicts, Same("failed", payload.failed, [])]
+        verdicts.append(Same("failed count", len(payload.failed), 1))
+        for failure in payload.failed:
+            verdicts += [
+                Held[uuid.UUID](
+                    "failed[0].id", failure.id, SameAs(self.missing, "요청에 넣은 없는 id")
+                ),
+                Held("failed[0].message", failure.message, Mentions("not found")),
+            ]
+        return verdicts
+
+
+@dataclass(frozen=True)
+class NoImageIsProcessed(Then[ManyImagesAndACaller, PartialBulkPayload[ImageNode]]):
+    """처리된 이미지 없이, 대상이 모두 같은 이유로 실패 목록에 온다."""
+
+    reason: str
+
+    @override
+    def says(self) -> str:
+        return "처리된 이미지 없이 대상이 모두 실패 목록에 온다"
+
+    @override
+    def look(
+        self,
+        laid: ManyImagesAndACaller,
+        answered: Answered[PartialBulkPayload[ImageNode]],
+    ) -> list[Verdict]:
+        payload = answered.response
+        if payload is None:
+            return [Refused(NotEnoughPermission, answered.raised)]
+        verdicts: list[Verdict] = [
+            Same("successes", payload.successes, []),
+            Same("failed count", len(payload.failed), len(laid.laid)),
+        ]
+        for i, (failure, image) in enumerate(zip(payload.failed, laid.laid, strict=False)):
+            verdicts += [
+                Held[uuid.UUID](
+                    f"failed[{i}].id", failure.id, SameAs(image.id, "대상 이미지의 id")
+                ),
+                Held(f"failed[{i}].message", failure.message, Mentions(self.reason)),
+            ]
+        return verdicts
 
 
 class Target(ABC):
