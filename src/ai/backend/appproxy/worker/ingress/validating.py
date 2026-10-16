@@ -31,10 +31,6 @@ class ValidatingIngressWriter(IngressWriter):
         self._authority = authority
         self._lock = asyncio.Lock()
 
-    @property
-    def authority(self) -> IngressAuthority:
-        return self._authority
-
     @override
     async def apply(self, ingresses: Sequence[Ingress]) -> None:
         self._check_authority([ingress.authority for ingress in ingresses])
