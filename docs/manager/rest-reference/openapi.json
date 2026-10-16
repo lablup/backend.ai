@@ -36652,6 +36652,620 @@
         "title": "TerminateSessionsInput",
         "type": "object"
       },
+      "SessionGroupFilter": {
+        "description": "Filter for session groups.\n\nGroups marked deleted are left out unless the top-level filter gives ``deleted_at``.\nA ``deleted_at`` inside ``AND``/``OR``/``NOT`` does not lift that default.",
+        "properties": {
+          "entity_id": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/UUIDFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter by session group ID."
+          },
+          "domain_id": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/UUIDFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter by domain ID."
+          },
+          "project_id": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/UUIDFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter by project ID."
+          },
+          "owner_user_id": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/UUIDFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter by the ID of the owning user."
+          },
+          "placement_direction": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SessionGroupPlacementDirectionFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter by placement direction."
+          },
+          "placement_enforcement": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SessionGroupPlacementEnforcementFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter by placement enforcement."
+          },
+          "created_at": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DateTimeFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter by creation time."
+          },
+          "deleted_at": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/NullableDateTimeFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter by deletion time. Setting it on the top-level filter includes the groups marked deleted; inside AND, OR or NOT it does not."
+          },
+          "AND": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/SessionGroupFilter"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "AND logical combinator.",
+            "title": "And"
+          },
+          "OR": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/SessionGroupFilter"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "OR logical combinator.",
+            "title": "Or"
+          },
+          "NOT": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/SessionGroupFilter"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "NOT logical combinator.",
+            "title": "Not"
+          }
+        },
+        "title": "SessionGroupFilter",
+        "type": "object"
+      },
+      "SessionGroupOrder": {
+        "description": "Order specification for session groups.",
+        "properties": {
+          "field": {
+            "$ref": "#/components/schemas/SessionGroupOrderField",
+            "description": "Field to order by."
+          },
+          "direction": {
+            "$ref": "#/components/schemas/OrderDirection",
+            "default": "ASC",
+            "description": "Order direction."
+          }
+        },
+        "required": [
+          "field"
+        ],
+        "title": "SessionGroupOrder",
+        "type": "object"
+      },
+      "SessionGroupOrderField": {
+        "description": "Fields available for ordering session groups.",
+        "enum": [
+          "placement_direction",
+          "placement_enforcement",
+          "created_at",
+          "deleted_at"
+        ],
+        "title": "SessionGroupOrderField",
+        "type": "string"
+      },
+      "SessionGroupPlacementDirectionEnum": {
+        "description": "How the member sessions of a group sit relative to each other, per agent.",
+        "enum": [
+          "spread",
+          "pack",
+          "none"
+        ],
+        "title": "SessionGroupPlacementDirectionEnum",
+        "type": "string"
+      },
+      "SessionGroupPlacementDirectionFilter": {
+        "description": "Filter for the placement direction of a session group.",
+        "properties": {
+          "equals": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SessionGroupPlacementDirectionEnum"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Exact match."
+          },
+          "in": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/SessionGroupPlacementDirectionEnum"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Match any of the provided values.",
+            "title": "In"
+          },
+          "not_equals": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SessionGroupPlacementDirectionEnum"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Exclude an exact match."
+          },
+          "not_in": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/SessionGroupPlacementDirectionEnum"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Exclude any of the provided values.",
+            "title": "Not In"
+          }
+        },
+        "title": "SessionGroupPlacementDirectionFilter",
+        "type": "object"
+      },
+      "SessionGroupPlacementEnforcementEnum": {
+        "description": "How hard the placement direction is enforced when it cannot be satisfied.",
+        "enum": [
+          "preferred",
+          "strict"
+        ],
+        "title": "SessionGroupPlacementEnforcementEnum",
+        "type": "string"
+      },
+      "SessionGroupPlacementEnforcementFilter": {
+        "description": "Filter for the placement enforcement of a session group.",
+        "properties": {
+          "equals": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SessionGroupPlacementEnforcementEnum"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Exact match."
+          },
+          "in": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/SessionGroupPlacementEnforcementEnum"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Match any of the provided values.",
+            "title": "In"
+          },
+          "not_equals": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SessionGroupPlacementEnforcementEnum"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Exclude an exact match."
+          },
+          "not_in": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/SessionGroupPlacementEnforcementEnum"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Exclude any of the provided values.",
+            "title": "Not In"
+          }
+        },
+        "title": "SessionGroupPlacementEnforcementFilter",
+        "type": "object"
+      },
+      "AdminSearchSessionGroupsInput": {
+        "description": "Input for searching every session group (superadmin).",
+        "properties": {
+          "filter": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SessionGroupFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter conditions."
+          },
+          "order": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/SessionGroupOrder"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Order specifications.",
+            "title": "Order"
+          },
+          "first": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Cursor pagination: number of items.",
+            "title": "First"
+          },
+          "after": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Cursor pagination: after cursor.",
+            "title": "After"
+          },
+          "last": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Cursor pagination: last N items.",
+            "title": "Last"
+          },
+          "before": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Cursor pagination: before cursor.",
+            "title": "Before"
+          },
+          "limit": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Offset pagination: maximum items.",
+            "title": "Limit"
+          },
+          "offset": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Offset pagination: number to skip.",
+            "title": "Offset"
+          }
+        },
+        "title": "AdminSearchSessionGroupsInput",
+        "type": "object"
+      },
+      "SessionGroupScope": {
+        "description": "Scope for the scoped session group query.\n\nEach list is OR'd internally and across lists; at least one must be given.",
+        "properties": {
+          "domain": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/UUIDScope"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Domains whose session groups are being read",
+            "title": "Domain"
+          },
+          "project": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/UUIDScope"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Projects whose session groups are being read",
+            "title": "Project"
+          },
+          "user": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/UUIDScope"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Users whose session groups are being read",
+            "title": "User"
+          }
+        },
+        "title": "SessionGroupScope",
+        "type": "object"
+      },
+      "ScopedSearchSessionGroupsInput": {
+        "description": "Input for searching session groups within scopes.",
+        "properties": {
+          "scope": {
+            "$ref": "#/components/schemas/SessionGroupScope",
+            "description": "Scope (OR across all items)."
+          },
+          "filter": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SessionGroupFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter conditions."
+          },
+          "order": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/SessionGroupOrder"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Order specifications.",
+            "title": "Order"
+          },
+          "first": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Cursor pagination: number of items.",
+            "title": "First"
+          },
+          "after": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Cursor pagination: after cursor.",
+            "title": "After"
+          },
+          "last": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Cursor pagination: last N items.",
+            "title": "Last"
+          },
+          "before": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Cursor pagination: before cursor.",
+            "title": "Before"
+          },
+          "limit": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Offset pagination: maximum items.",
+            "title": "Limit"
+          },
+          "offset": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Offset pagination: number to skip.",
+            "title": "Offset"
+          }
+        },
+        "required": [
+          "scope"
+        ],
+        "title": "ScopedSearchSessionGroupsInput",
+        "type": "object"
+      },
       "RegisterStorageNamespaceInput": {
         "description": "Input for registering a storage namespace.",
         "properties": {
@@ -63956,6 +64570,93 @@
         },
         "parameters": [],
         "description": "Deprecated. Use `POST /v2/sessions/partial-bulk-terminate`.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/v2/session-groups/{session_group_id}": {
+      "get": {
+        "operationId": "v2/session-groups.get",
+        "tags": [
+          "v2/session-groups"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "session_group_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "description": "Retrieve a single session group by id.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/v2/session-groups/search": {
+      "post": {
+        "operationId": "v2/session-groups.admin_search",
+        "tags": [
+          "v2/session-groups"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AdminSearchSessionGroupsInput"
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "description": "Search every session group, deployment groups included (superadmin only).\n\n**Preconditions:**\n* Superadmin privilege required.\n"
+      }
+    },
+    "/v2/session-groups/scoped/search": {
+      "post": {
+        "operationId": "v2/session-groups.scoped_search",
+        "tags": [
+          "v2/session-groups"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ScopedSearchSessionGroupsInput"
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "description": "Search the session groups the named scopes reach, combined with OR.\n\n**Preconditions:**\n* User privilege required.\n"
       }
     },
     "/v2/storage-hosts/my/permissions": {

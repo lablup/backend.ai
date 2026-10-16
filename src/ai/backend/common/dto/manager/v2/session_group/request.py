@@ -27,7 +27,17 @@ __all__ = (
     "ScopedSearchSessionGroupsInput",
     "SessionGroupFilter",
     "SessionGroupOrder",
+    "SessionGroupPlacementDirectionFilter",
+    "SessionGroupPlacementEnforcementFilter",
 )
+
+
+class SessionGroupPlacementDirectionFilter(EnumFilter[SessionGroupPlacementDirectionEnum]):
+    """Filter for the placement direction of a session group."""
+
+
+class SessionGroupPlacementEnforcementFilter(EnumFilter[SessionGroupPlacementEnforcementEnum]):
+    """Filter for the placement enforcement of a session group."""
 
 
 class SessionGroupFilter(BaseRequestModel):
@@ -43,10 +53,10 @@ class SessionGroupFilter(BaseRequestModel):
     owner_user_id: UUIDFilter | None = Field(
         default=None, description="Filter by the ID of the owning user."
     )
-    placement_direction: EnumFilter[SessionGroupPlacementDirectionEnum] | None = Field(
+    placement_direction: SessionGroupPlacementDirectionFilter | None = Field(
         default=None, description="Filter by placement direction."
     )
-    placement_enforcement: EnumFilter[SessionGroupPlacementEnforcementEnum] | None = Field(
+    placement_enforcement: SessionGroupPlacementEnforcementFilter | None = Field(
         default=None, description="Filter by placement enforcement."
     )
     created_at: DateTimeFilter | None = Field(default=None, description="Filter by creation time.")
