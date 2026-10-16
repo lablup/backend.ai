@@ -14,6 +14,7 @@ from ai.backend.manager.services.session_group.actions.get import GetSessionGrou
 from ai.backend.manager.services.session_group.actions.global_search import (
     GlobalSearchSessionGroupsAction,
 )
+from ai.backend.manager.services.session_group.actions.purge import PurgeSessionGroupAction
 from ai.backend.manager.services.session_group.actions.scoped_search import (
     ScopedSearchSessionGroupsAction,
 )
@@ -32,6 +33,7 @@ class SessionGroupProcessors:
     scoped_search: ScopeActionProcessor[
         ScopedSearchSessionGroupsAction, ScopedBatchOpsResult[SessionGroupData]
     ]
+    purge: SingleEntityActionProcessor[PurgeSessionGroupAction, EntityOpsResult[SessionGroupData]]
 
     def __init__(
         self,
@@ -42,3 +44,4 @@ class SessionGroupProcessors:
         self.bulk_get_ids = group.partial_bulk(BulkGetSessionGroupsAction, service.bulk_get_ids)
         self.global_search = group.global_searcher_ops(GlobalSearchSessionGroupsAction)
         self.scoped_search = group.scoped_search_ops(ScopedSearchSessionGroupsAction)
+        self.purge = group.entity_purge_ops(PurgeSessionGroupAction)
