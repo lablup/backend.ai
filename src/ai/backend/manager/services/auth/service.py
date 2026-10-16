@@ -10,6 +10,7 @@ from typing import Any, cast
 from aiohttp import web
 from sqlalchemy import RowMapping
 
+from ai.backend.common import msgpack
 from ai.backend.common.clients.valkey_client.valkey_session.client import ValkeySessionClient
 from ai.backend.common.clients.valkey_client.valkey_session.types import (
     LoginSessionData,
@@ -235,7 +236,10 @@ class AuthService:
             "ssh_private_key": keypair.ssh_private_key,
             "user": keypair.user_id,
             "resource_policy": keypair.resource_policy_name,
-            "dotfiles": dotfiles.pack(),
+            # Rows carry no aggregate size limit, so pack without DotfileEntries.pack()'s.
+            "dotfiles": msgpack.packb([
+                {"path": e.path, "perm": e.perm, "data": e.data} for e in dotfiles.entries
+            ]),
             "bootstrap_script": (
                 bootstrap_script.script if bootstrap_script is not None else BootstrapScript.empty()
             ),

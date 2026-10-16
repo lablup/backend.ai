@@ -16,9 +16,12 @@ from ai.backend.manager.dto.user_config_input import (
 )
 from ai.backend.manager.models.dotfile.conditions import DotfileConditions
 from ai.backend.manager.models.dotfile.creators import DotfileEntryCreator
+from ai.backend.manager.models.dotfile.orders import DotfileOrders
 from ai.backend.manager.models.dotfile.purgers import DotfileEntryPurger
 from ai.backend.manager.models.dotfile.queriers import DotfileQuerier
+from ai.backend.manager.models.dotfile.searchers import DotfileSearcher
 from ai.backend.manager.models.dotfile.updaters import DotfileEntryUpdater
+from ai.backend.manager.models.specs.pagination import NoPagination
 from ai.backend.manager.services.user.actions.create_keypair_dotfile import (
     CreateKeypairDotfileAction,
 )
@@ -67,10 +70,18 @@ class UserConfigAdapter:
         return GetDotfileResponse(path=entry.path, perm=entry.perm, data=entry.data)
 
     async def get_default_dotfiles(self, user_id: UserID) -> list[DotfileListItem]:
-        result = await self._user.get_default_dotfiles.run(GetUserDotfilesAction(user_id=user_id))
+        result = await self._user.get_default_dotfiles.run(
+            GetUserDotfilesAction(
+                user_id=user_id,
+                searcher=DotfileSearcher(
+                    pagination=NoPagination(),
+                    conditions=[DotfileConditions.by_is_default(True)],
+                    orders=[DotfileOrders.created_at(), DotfileOrders.id()],
+                ),
+            )
+        )
         return [
-            DotfileListItem(path=e.path, permission=e.perm, data=e.data)
-            for e in result.dotfiles.entries
+            DotfileListItem(path=d.path, permission=d.perm, data=d.data) for d in result.dotfiles
         ]
 
     async def update_default_dotfile(

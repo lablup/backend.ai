@@ -9,11 +9,13 @@ from ai.backend.common.events.event_types.kernel.types import KernelLifecycleEve
 from ai.backend.common.exception import BackendAIError
 from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
+from ai.backend.manager.data.dotfile.types import MAXIMUM_DOTFILE_COUNT
 from ai.backend.manager.data.user.types import (
     BulkPurgeError,
     BulkUserPurgeResultData,
     UserInfoContext,
 )
+from ai.backend.manager.errors.storage import DotfileCreationFailed
 from ai.backend.manager.errors.user import UserPurgeFailure
 from ai.backend.manager.models.bootstrap_script.updaters import DefaultBootstrapScriptUpdater
 from ai.backend.manager.registry import AgentRegistry
@@ -370,6 +372,10 @@ class UserService:
     async def create_dotfile(
         self, action: CreateKeypairDotfileAction
     ) -> CreateKeypairDotfileActionResult:
+        # Variants count too, so creation cannot grow a user's storage without bound.
+        count = await self._user_repository.count_dotfiles(action.user_id)
+        if count >= MAXIMUM_DOTFILE_COUNT:
+            raise DotfileCreationFailed("Dotfile creation limit reached")
         entries = await self._user_repository.create_dotfile(action.user_id, action.creator)
         return CreateKeypairDotfileActionResult(entries=entries.entries)
 
@@ -410,5 +416,7 @@ class UserService:
     async def get_default_dotfiles(
         self, action: GetUserDotfilesAction
     ) -> GetUserDotfilesActionResult:
-        entries = await self._user_repository.get_default_dotfiles(action.user_id)
-        return GetUserDotfilesActionResult(dotfiles=entries)
+        dotfiles = await self._user_repository.search_user_scoped_dotfiles(
+            action.user_id, action.searcher
+        )
+        return GetUserDotfilesActionResult(dotfiles=dotfiles)
