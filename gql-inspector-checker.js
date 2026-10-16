@@ -56,6 +56,7 @@ module.exports = (props) => {
     typeIsNew(typeName) ||
     oldTypes[typeName].getFields()[fieldName] === undefined;
 
+  // NON_BREAKING changes are dropped: each would only add a notice annotation on the PR diff.
   return changes.map((change) => {
     // Allowed version notations: 'XX.XX.X', 'XX.X.X'
     const deprecateNotationRegex = /Deprecated since (\d{2}\.\d{1,2}\.\d{1})/;
@@ -144,6 +145,6 @@ module.exports = (props) => {
       }
     }
     return change;
-  });
+  }).filter((change) => change.criticality.level !== "NON_BREAKING");
 };
 // TODO: update the rule to check for the version number in the description.
