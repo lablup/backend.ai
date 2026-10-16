@@ -4657,6 +4657,14 @@ type DeleteRuntimeVariantsPayload {
   deletedCount: Int!
 }
 
+"""
+Added in 26.10.0. Payload returned after withdrawing a storage backend from new use.
+"""
+type DeleteStorageBackendPayload {
+  """ID of the withdrawn storage backend."""
+  id: UUID!
+}
+
 """Added in 26.4.2. Payload for user resource policy deletion."""
 type DeleteUserResourcePolicyPayload {
   """Name of the deleted policy."""
@@ -10478,6 +10486,24 @@ type Mutation {
   """
   partialBulkPurgePrometheusQueryPresets(input: PartialBulkPurgeQueryDefinitionsInput!): PartialBulkQueryDefinitionsPayload!
 
+  """Added in 26.10.0. Rename one storage backend. Admin only."""
+  adminUpdateStorageBackend(id: ID!, input: UpdateStorageBackendInput!): UpdateStorageBackendPayload
+
+  """
+  Added in 26.10.0. Remove one storage backend from the catalog. Refused while a volume still sits on it. Admin only.
+  """
+  adminPurgeStorageBackend(id: ID!): PurgeStorageBackendPayload
+
+  """
+  Added in 26.10.0. Withhold one storage backend from new use. The volumes already on it keep working and the backend still answers get and search. Admin only.
+  """
+  adminDeleteStorageBackend(id: ID!): DeleteStorageBackendPayload
+
+  """
+  Added in 26.10.0. Take one withdrawn storage backend back into use. Admin only.
+  """
+  adminRestoreStorageBackend(id: ID!): RestoreStorageBackendPayload
+
   """Added in 26.3.0. Create a new query preset category (admin only)."""
   adminCreatePrometheusQueryPresetCategory(input: CreateCategoryInput!): CreateCategoryPayload
 
@@ -14363,6 +14389,12 @@ type PurgeRolePresetPayload {
   rolePreset: RolePreset!
 }
 
+"""Added in 26.10.0. Payload returned after purging a storage backend."""
+type PurgeStorageBackendPayload {
+  """ID of the purged storage backend."""
+  id: UUID!
+}
+
 """
 Added in 26.2.0. Input for permanently deleting a user and all associated data. This action is irreversible.
 """
@@ -14654,6 +14686,14 @@ type Query {
 
   """Added in 26.3.0. Query service catalog entries. Admin only."""
   adminServiceCatalogs(filter: ServiceCatalogFilter = null, orderBy: [ServiceCatalogOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): [ServiceCatalog!]
+
+  """Added in 26.10.0. Read one storage backend. Admin only."""
+  adminStorageBackend(id: ID!): StorageBackend
+
+  """
+  Added in 26.10.0. Page through the registered storage backends. Admin only.
+  """
+  adminStorageBackends(filter: StorageBackendFilter = null, orderBy: [StorageBackendOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): StorageBackendConnection
 
   """Added in 26.4.2. List session scheduling history (admin only)"""
   adminSessionSchedulingHistories(filter: SessionSchedulingHistoryFilter = null, orderBy: [SessionSchedulingHistoryOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): SessionSchedulingHistoryConnection
@@ -17099,6 +17139,14 @@ type RestoreRolePresetPayload {
   rolePreset: RolePreset!
 }
 
+"""
+Added in 26.10.0. Payload returned after restoring a withdrawn storage backend.
+"""
+type RestoreStorageBackendPayload {
+  """ID of the restored storage backend."""
+  id: UUID!
+}
+
 """Added in 26.9.0. Payload for single user restore mutation."""
 type RestoreUserV2Payload {
   """Whether the restore was successful."""
@@ -18949,6 +18997,11 @@ type ServiceCatalog implements Node {
 
   """Endpoints exposed by this service instance."""
   endpoints: [ServiceCatalogEndpoint!]!
+
+  """
+  Added in 26.10.0. What this service reports about the storage backends it reaches.
+  """
+  storageBackendStatuses(filter: ServiceStorageBackendStatusFilter = null, orderBy: [ServiceStorageBackendStatusOrderBy!] = null, limit: Int = null, offset: Int = null): ServiceStorageBackendStatusList
 }
 
 """Added in 26.3.0. An endpoint exposed by a service instance."""
@@ -19067,6 +19120,80 @@ Added in 26.2.0. A collection of exposed service ports. Each entry defines a ser
 type ServicePorts {
   """List of service port entries."""
   entries: [ServicePortEntry!]!
+}
+
+"""Added in 26.10.0. A storage backend as one service last reported it."""
+type ServiceStorageBackendStatus {
+  """ID of the reporting service."""
+  serviceCatalogId: UUID!
+
+  """ID of the reported storage backend."""
+  storageBackendId: UUID!
+
+  """When the reporting service last checked the backend."""
+  statusCheckedAt: DateTime
+
+  """Creation timestamp."""
+  createdAt: DateTime!
+
+  """Last update timestamp."""
+  updatedAt: DateTime!
+}
+
+"""
+Added in 26.10.0. Filter for the per-service status rows of the backends.
+"""
+input ServiceStorageBackendStatusFilter {
+  """Filter by the reporting service's ID."""
+  serviceCatalogId: UUIDFilter = null
+
+  """Filter by the reported backend's ID."""
+  storageBackendId: UUIDFilter = null
+
+  """Combine multiple filters with AND logic."""
+  AND: [ServiceStorageBackendStatusFilter!] = null
+
+  """Combine multiple filters with OR logic."""
+  OR: [ServiceStorageBackendStatusFilter!] = null
+
+  """Negate the given filters."""
+  NOT: [ServiceStorageBackendStatusFilter!] = null
+}
+
+"""
+Added in 26.10.0. A page of the per-service status rows. Paged by limit and offset: a status row carries no id of its own to put in a cursor.
+"""
+type ServiceStorageBackendStatusList {
+  """The status rows read."""
+  items: [ServiceStorageBackendStatus!]!
+
+  """Total number of matching status rows."""
+  totalCount: Int!
+
+  """Whether more rows follow this page."""
+  hasNextPage: Boolean!
+
+  """Whether more rows precede this page."""
+  hasPreviousPage: Boolean!
+}
+
+"""Added in 26.10.0. Specifies ordering for the per-service status rows."""
+input ServiceStorageBackendStatusOrderBy {
+  """The field to order by."""
+  field: ServiceStorageBackendStatusOrderField!
+
+  """Sort direction."""
+  direction: OrderDirection! = ASC
+}
+
+"""
+Added in 26.10.0. Fields available for ordering the per-service status rows.
+"""
+enum ServiceStorageBackendStatusOrderField {
+  SERVICE_CATALOG_ID
+  STORAGE_BACKEND_ID
+  STATUS_CHECKED_AT
+  UPDATED_AT
 }
 
 """
@@ -19790,6 +19917,90 @@ type SourceInfo {
 
   """URL of the registry or source."""
   url: String
+}
+
+"""
+Added in 26.10.0. A storage appliance a service can reach. How it is reached is the holding service's own configuration and is never returned.
+"""
+type StorageBackend implements Node {
+  """The Globally Unique ID of this object"""
+  id: ID!
+
+  """UUID of the storage backend."""
+  entityId: UUID!
+
+  """Storage backend name."""
+  name: String!
+
+  """ID of the backend implementation serving this appliance."""
+  storageBackendTypeId: UUID!
+
+  """Creation timestamp."""
+  createdAt: DateTime!
+
+  """Last update timestamp."""
+  updatedAt: DateTime!
+
+  """What the services report about this backend, one row per service."""
+  serviceStatuses(filter: ServiceStorageBackendStatusFilter = null, orderBy: [ServiceStorageBackendStatusOrderBy!] = null, limit: Int = null, offset: Int = null): ServiceStorageBackendStatusList
+}
+
+"""Added in 26.10.0. Paginated connection for storage backends."""
+type StorageBackendConnection {
+  """Pagination data for this connection"""
+  pageInfo: PageInfo!
+
+  """Contains the nodes in this connection."""
+  edges: [StorageBackendEdge!]!
+
+  """Total number of storage backends matching the query."""
+  count: Int!
+}
+
+"""Added in 26.10.0. One storage backend within a connection."""
+type StorageBackendEdge {
+  """A cursor for use in pagination"""
+  cursor: String!
+
+  """The item at the end of the edge"""
+  node: StorageBackend!
+}
+
+"""Added in 26.10.0. Filter for storage backend queries."""
+input StorageBackendFilter {
+  """Filter by backend ID."""
+  entityId: UUIDFilter = null
+
+  """Filter by backend name."""
+  name: StringFilter = null
+
+  """Filter by the backend implementation's ID."""
+  storageBackendTypeId: UUIDFilter = null
+
+  """Combine multiple filters with AND logic."""
+  AND: [StorageBackendFilter!] = null
+
+  """Combine multiple filters with OR logic."""
+  OR: [StorageBackendFilter!] = null
+
+  """Negate the given filters."""
+  NOT: [StorageBackendFilter!] = null
+}
+
+"""Added in 26.10.0. Specifies ordering for storage backend queries."""
+input StorageBackendOrderBy {
+  """The field to order by."""
+  field: StorageBackendOrderField!
+
+  """Sort direction."""
+  direction: OrderDirection! = ASC
+}
+
+"""Added in 26.10.0. Fields available for ordering storage backends."""
+enum StorageBackendOrderField {
+  NAME
+  CREATED_AT
+  UPDATED_AT
 }
 
 """
@@ -21350,6 +21561,20 @@ input UpdateRuntimeVariantPresetInput {
 type UpdateRuntimeVariantPresetPayload {
   """The updated preset."""
   preset: RuntimeVariantPreset!
+}
+
+"""
+Added in 26.10.0. Input for updating the metadata an administrator owns on a backend.
+"""
+input UpdateStorageBackendInput {
+  """Updated backend name."""
+  name: String
+}
+
+"""Added in 26.10.0. Payload returned after updating a storage backend."""
+type UpdateStorageBackendPayload {
+  """The updated storage backend."""
+  item: StorageBackend!
 }
 
 """

@@ -6596,6 +6596,16 @@ type DeleteScalingGroup
 }
 
 """
+Added in 26.10.0. Payload returned after withdrawing a storage backend from new use.
+"""
+type DeleteStorageBackendPayload
+  @join__type(graph: STRAWBERRY)
+{
+  """ID of the withdrawn storage backend."""
+  id: UUID!
+}
+
+"""
 Instead of really deleting user, just mark the account as deleted status.
 
 All related keypairs will also be inactivated.
@@ -14903,6 +14913,24 @@ type Mutation
   """
   partialBulkPurgePrometheusQueryPresets(input: PartialBulkPurgeQueryDefinitionsInput!): PartialBulkQueryDefinitionsPayload! @join__field(graph: STRAWBERRY)
 
+  """Added in 26.10.0. Rename one storage backend. Admin only."""
+  adminUpdateStorageBackend(id: ID!, input: UpdateStorageBackendInput!): UpdateStorageBackendPayload @join__field(graph: STRAWBERRY)
+
+  """
+  Added in 26.10.0. Remove one storage backend from the catalog. Refused while a volume still sits on it. Admin only.
+  """
+  adminPurgeStorageBackend(id: ID!): PurgeStorageBackendPayload @join__field(graph: STRAWBERRY)
+
+  """
+  Added in 26.10.0. Withhold one storage backend from new use. The volumes already on it keep working and the backend still answers get and search. Admin only.
+  """
+  adminDeleteStorageBackend(id: ID!): DeleteStorageBackendPayload @join__field(graph: STRAWBERRY)
+
+  """
+  Added in 26.10.0. Take one withdrawn storage backend back into use. Admin only.
+  """
+  adminRestoreStorageBackend(id: ID!): RestoreStorageBackendPayload @join__field(graph: STRAWBERRY)
+
   """Added in 26.3.0. Create a new query preset category (admin only)."""
   adminCreatePrometheusQueryPresetCategory(input: CreateCategoryInput!): CreateCategoryPayload @join__field(graph: STRAWBERRY)
 
@@ -19524,6 +19552,14 @@ type PurgeRolePresetPayload
   rolePreset: RolePreset!
 }
 
+"""Added in 26.10.0. Payload returned after purging a storage backend."""
+type PurgeStorageBackendPayload
+  @join__type(graph: STRAWBERRY)
+{
+  """ID of the purged storage backend."""
+  id: UUID!
+}
+
 """
 Delete user as well as all user-related DB informations such as keypairs, kernels, etc.
 
@@ -20236,6 +20272,14 @@ type Query
 
   """Added in 26.3.0. Query service catalog entries. Admin only."""
   adminServiceCatalogs(filter: ServiceCatalogFilter = null, orderBy: [ServiceCatalogOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): [ServiceCatalog!] @join__field(graph: STRAWBERRY)
+
+  """Added in 26.10.0. Read one storage backend. Admin only."""
+  adminStorageBackend(id: ID!): StorageBackend @join__field(graph: STRAWBERRY)
+
+  """
+  Added in 26.10.0. Page through the registered storage backends. Admin only.
+  """
+  adminStorageBackends(filter: StorageBackendFilter = null, orderBy: [StorageBackendOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): StorageBackendConnection @join__field(graph: STRAWBERRY)
 
   """Added in 26.4.2. List session scheduling history (admin only)"""
   adminSessionSchedulingHistories(filter: SessionSchedulingHistoryFilter = null, orderBy: [SessionSchedulingHistoryOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): SessionSchedulingHistoryConnection @join__field(graph: STRAWBERRY)
@@ -22885,6 +22929,16 @@ type RestoreRolePresetPayload
   rolePreset: RolePreset!
 }
 
+"""
+Added in 26.10.0. Payload returned after restoring a withdrawn storage backend.
+"""
+type RestoreStorageBackendPayload
+  @join__type(graph: STRAWBERRY)
+{
+  """ID of the restored storage backend."""
+  id: UUID!
+}
+
 """Added in 26.9.0. Payload for single user restore mutation."""
 type RestoreUserV2Payload
   @join__type(graph: STRAWBERRY)
@@ -25204,6 +25258,11 @@ type ServiceCatalog implements Node
 
   """Endpoints exposed by this service instance."""
   endpoints: [ServiceCatalogEndpoint!]!
+
+  """
+  Added in 26.10.0. What this service reports about the storage backends it reaches.
+  """
+  storageBackendStatuses(filter: ServiceStorageBackendStatusFilter = null, orderBy: [ServiceStorageBackendStatusOrderBy!] = null, limit: Int = null, offset: Int = null): ServiceStorageBackendStatusList
 }
 
 """Added in 26.3.0. An endpoint exposed by a service instance."""
@@ -25387,6 +25446,90 @@ type ServicePorts
 {
   """List of service port entries."""
   entries: [ServicePortEntry!]!
+}
+
+"""Added in 26.10.0. A storage backend as one service last reported it."""
+type ServiceStorageBackendStatus
+  @join__type(graph: STRAWBERRY)
+{
+  """ID of the reporting service."""
+  serviceCatalogId: UUID!
+
+  """ID of the reported storage backend."""
+  storageBackendId: UUID!
+
+  """When the reporting service last checked the backend."""
+  statusCheckedAt: DateTime
+
+  """Creation timestamp."""
+  createdAt: DateTime!
+
+  """Last update timestamp."""
+  updatedAt: DateTime!
+}
+
+"""
+Added in 26.10.0. Filter for the per-service status rows of the backends.
+"""
+input ServiceStorageBackendStatusFilter
+  @join__type(graph: STRAWBERRY)
+{
+  """Filter by the reporting service's ID."""
+  serviceCatalogId: UUIDFilter = null
+
+  """Filter by the reported backend's ID."""
+  storageBackendId: UUIDFilter = null
+
+  """Combine multiple filters with AND logic."""
+  AND: [ServiceStorageBackendStatusFilter!] = null
+
+  """Combine multiple filters with OR logic."""
+  OR: [ServiceStorageBackendStatusFilter!] = null
+
+  """Negate the given filters."""
+  NOT: [ServiceStorageBackendStatusFilter!] = null
+}
+
+"""
+Added in 26.10.0. A page of the per-service status rows. Paged by limit and offset: a status row carries no id of its own to put in a cursor.
+"""
+type ServiceStorageBackendStatusList
+  @join__type(graph: STRAWBERRY)
+{
+  """The status rows read."""
+  items: [ServiceStorageBackendStatus!]!
+
+  """Total number of matching status rows."""
+  totalCount: Int!
+
+  """Whether more rows follow this page."""
+  hasNextPage: Boolean!
+
+  """Whether more rows precede this page."""
+  hasPreviousPage: Boolean!
+}
+
+"""Added in 26.10.0. Specifies ordering for the per-service status rows."""
+input ServiceStorageBackendStatusOrderBy
+  @join__type(graph: STRAWBERRY)
+{
+  """The field to order by."""
+  field: ServiceStorageBackendStatusOrderField!
+
+  """Sort direction."""
+  direction: OrderDirection! = ASC
+}
+
+"""
+Added in 26.10.0. Fields available for ordering the per-service status rows.
+"""
+enum ServiceStorageBackendStatusOrderField
+  @join__type(graph: STRAWBERRY)
+{
+  SERVICE_CATALOG_ID @join__enumValue(graph: STRAWBERRY)
+  STORAGE_BACKEND_ID @join__enumValue(graph: STRAWBERRY)
+  STATUS_CHECKED_AT @join__enumValue(graph: STRAWBERRY)
+  UPDATED_AT @join__enumValue(graph: STRAWBERRY)
 }
 
 """
@@ -26278,6 +26421,103 @@ type SSHKeypairNode
 
   """PEM-encoded SSH public key, or null if none is registered."""
   sshPublicKey: String
+}
+
+"""
+Added in 26.10.0. A storage appliance a service can reach. How it is reached is the holding service's own configuration and is never returned.
+"""
+type StorageBackend implements Node
+  @join__implements(graph: STRAWBERRY, interface: "Node")
+  @join__type(graph: STRAWBERRY)
+{
+  """The Globally Unique ID of this object"""
+  id: ID!
+
+  """UUID of the storage backend."""
+  entityId: UUID!
+
+  """Storage backend name."""
+  name: String!
+
+  """ID of the backend implementation serving this appliance."""
+  storageBackendTypeId: UUID!
+
+  """Creation timestamp."""
+  createdAt: DateTime!
+
+  """Last update timestamp."""
+  updatedAt: DateTime!
+
+  """What the services report about this backend, one row per service."""
+  serviceStatuses(filter: ServiceStorageBackendStatusFilter = null, orderBy: [ServiceStorageBackendStatusOrderBy!] = null, limit: Int = null, offset: Int = null): ServiceStorageBackendStatusList
+}
+
+"""Added in 26.10.0. Paginated connection for storage backends."""
+type StorageBackendConnection
+  @join__type(graph: STRAWBERRY)
+{
+  """Pagination data for this connection"""
+  pageInfo: PageInfo!
+
+  """Contains the nodes in this connection."""
+  edges: [StorageBackendEdge!]!
+
+  """Total number of storage backends matching the query."""
+  count: Int!
+}
+
+"""Added in 26.10.0. One storage backend within a connection."""
+type StorageBackendEdge
+  @join__type(graph: STRAWBERRY)
+{
+  """A cursor for use in pagination"""
+  cursor: String!
+
+  """The item at the end of the edge"""
+  node: StorageBackend!
+}
+
+"""Added in 26.10.0. Filter for storage backend queries."""
+input StorageBackendFilter
+  @join__type(graph: STRAWBERRY)
+{
+  """Filter by backend ID."""
+  entityId: UUIDFilter = null
+
+  """Filter by backend name."""
+  name: StringFilter = null
+
+  """Filter by the backend implementation's ID."""
+  storageBackendTypeId: UUIDFilter = null
+
+  """Combine multiple filters with AND logic."""
+  AND: [StorageBackendFilter!] = null
+
+  """Combine multiple filters with OR logic."""
+  OR: [StorageBackendFilter!] = null
+
+  """Negate the given filters."""
+  NOT: [StorageBackendFilter!] = null
+}
+
+"""Added in 26.10.0. Specifies ordering for storage backend queries."""
+input StorageBackendOrderBy
+  @join__type(graph: STRAWBERRY)
+{
+  """The field to order by."""
+  field: StorageBackendOrderField!
+
+  """Sort direction."""
+  direction: OrderDirection! = ASC
+}
+
+"""Added in 26.10.0. Fields available for ordering storage backends."""
+enum StorageBackendOrderField
+  @join__type(graph: STRAWBERRY)
+{
+  NAME @join__enumValue(graph: STRAWBERRY)
+  CREATED_AT @join__enumValue(graph: STRAWBERRY)
+  UPDATED_AT @join__enumValue(graph: STRAWBERRY)
 }
 
 """
@@ -28102,6 +28342,24 @@ type UpdateRuntimeVariantPresetPayload
 {
   """The updated preset."""
   preset: RuntimeVariantPreset!
+}
+
+"""
+Added in 26.10.0. Input for updating the metadata an administrator owns on a backend.
+"""
+input UpdateStorageBackendInput
+  @join__type(graph: STRAWBERRY)
+{
+  """Updated backend name."""
+  name: String
+}
+
+"""Added in 26.10.0. Payload returned after updating a storage backend."""
+type UpdateStorageBackendPayload
+  @join__type(graph: STRAWBERRY)
+{
+  """The updated storage backend."""
+  item: StorageBackend!
 }
 
 """
