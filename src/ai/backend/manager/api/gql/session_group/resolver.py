@@ -31,6 +31,8 @@ from ai.backend.manager.api.gql.session_group.types import (
     SessionGroupGQL,
     SessionGroupOrderByGQL,
     SessionGroupScopeGQL,
+    UpdateSessionGroupInputGQL,
+    UpdateSessionGroupPayloadGQL,
 )
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.api.gql.utils import check_admin_only
@@ -125,6 +127,24 @@ async def scoped_session_groups(
         )
     )
     return _build_connection(payload)
+
+
+@gql_mutation(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description=(
+            "Change a session group's placement direction and enforcement. Members placed "
+            "afterwards follow the new policy; a group a deployment's replica group holds "
+            "is not found."
+        ),
+    )
+)
+async def update_session_group(
+    info: Info[StrawberryGQLContext],
+    input: UpdateSessionGroupInputGQL,
+) -> UpdateSessionGroupPayloadGQL:
+    payload = await info.context.adapters.session_group.update(input.to_pydantic())
+    return UpdateSessionGroupPayloadGQL.from_pydantic(payload)
 
 
 @gql_mutation(
