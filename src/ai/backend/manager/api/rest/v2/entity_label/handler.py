@@ -51,6 +51,14 @@ class V2EntityLabelHandler:
         result = await self._adapter.partial_bulk_upsert(body.parsed)
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
 
+    async def bulk_upsert_labels(
+        self,
+        body: BodyParam[PartialBulkUpsertEntityLabelInput],
+    ) -> APIResponse:
+        """Deprecated. Use `POST /v2/entity-labels/partial-bulk-upsert`."""
+        result = await self._adapter.partial_bulk_upsert(body.parsed)
+        return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
+
     async def purge_label(
         self,
         path: PathParam[EntityLabelIdPathParam],
@@ -64,6 +72,14 @@ class V2EntityLabelHandler:
         body: BodyParam[PartialBulkPurgeEntityLabelInput],
     ) -> APIResponse:
         """Take several labels off in one call, answering per label."""
+        result = await self._adapter.partial_bulk_purge(body.parsed)
+        return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
+
+    async def bulk_purge_labels(
+        self,
+        body: BodyParam[PartialBulkPurgeEntityLabelInput],
+    ) -> APIResponse:
+        """Deprecated. Use `POST /v2/entity-labels/partial-bulk-purge`."""
         result = await self._adapter.partial_bulk_purge(body.parsed)
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
 

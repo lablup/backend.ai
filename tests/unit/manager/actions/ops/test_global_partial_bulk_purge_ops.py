@@ -687,8 +687,8 @@ class TestConflict:
             result = await processor.run(
                 _PurgeAction(
                     purgers=[
-                        ResourceSlotTypePurger(slot_name="free.device", slot_type_id=free),
-                        ResourceSlotTypePurger(slot_name="cuda.device", slot_type_id=reported),
+                        ResourceSlotTypePurger(slot_type_id=free),
+                        ResourceSlotTypePurger(slot_type_id=reported),
                     ]
                 )
             )

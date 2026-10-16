@@ -8,6 +8,8 @@ from pydantic import Field
 from ai.backend.common.api_handlers import APIResponse, BaseRequestModel, BodyParam, PathParam
 from ai.backend.common.dto.manager.v2.deployment_revision_preset.request import (
     CreateDeploymentRevisionPresetInput,
+    PartialBulkPurgeDeploymentRevisionPresetsInput,
+    PartialBulkUpdateDeploymentRevisionPresetsInput,
     SearchDeploymentRevisionPresetsInput,
     UpdateDeploymentRevisionPresetInput,
 )
@@ -57,11 +59,27 @@ class V2DeploymentRevisionPresetHandler:
         result = await self._adapter.update(merged)
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
 
-    async def delete(
+    async def purge(
         self,
         path: PathParam[PresetIdPathParam],
     ) -> APIResponse:
-        result = await self._adapter.delete(path.parsed.preset_id)
+        result = await self._adapter.purge(path.parsed.preset_id)
+        return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
+
+    async def partial_bulk_update(
+        self,
+        body: BodyParam[PartialBulkUpdateDeploymentRevisionPresetsInput],
+    ) -> APIResponse:
+        """Update several presets, answering for each one."""
+        result = await self._adapter.partial_bulk_update(body.parsed)
+        return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
+
+    async def partial_bulk_purge(
+        self,
+        body: BodyParam[PartialBulkPurgeDeploymentRevisionPresetsInput],
+    ) -> APIResponse:
+        """Permanently remove several presets, answering for each one."""
+        result = await self._adapter.partial_bulk_purge(body.parsed)
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
 
     async def search_resource_slots(

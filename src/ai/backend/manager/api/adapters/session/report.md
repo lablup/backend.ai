@@ -2,7 +2,7 @@
 
 [무엇을 보장하는가](/src/ai/backend/manager/api/adapters/session/KNOWLEDGE.md) · [어댑터](/src/ai/backend/manager/api/adapters/session/adapter.py)
 
-시나리오: 미완 21 / 22
+시나리오: 미완 21 / 23
 
 - ops + 직접 구현 (10)
   - admin_search — 성공 있음 3 · 실패 있음 1 (global_searcher_ops, partial_bulk)
@@ -15,7 +15,7 @@
   - search_kernels_by_agent — 성공 없음 · 실패 없음 (atomic_bulk_field, global_searcher_ops) — SCENARIO-GAP
   - search_kernels_by_session — 성공 없음 · 실패 없음 (atomic_bulk_field, atomic_bulk_scoped_search_ops) — SCENARIO-GAP
   - search_sessions_by_agent — 성공 없음 · 실패 없음 (global_searcher_ops, partial_bulk) — SCENARIO-GAP
-- 직접 구현 (12)
+- 직접 구현 (13)
   - batch_resource_allocation_by_kernel — 성공 없음 · 실패 없음 (atomic_bulk_field) — SCENARIO-GAP
   - batch_resource_allocation_by_session — 성공 없음 · 실패 없음 (partial_bulk) — SCENARIO-GAP
   - compute_schedule — 성공 없음 · 실패 없음 (single_entity) — SCENARIO-GAP
@@ -24,9 +24,10 @@
   - get — 성공 없음 · 실패 없음 (partial_bulk, single_entity) — SCENARIO-GAP
   - get_logs — 성공 없음 · 실패 없음 (single_entity) — SCENARIO-GAP
   - include_idle_checks — 성공 없음 · 실패 없음 (legacy_partial_bulk) — SCENARIO-GAP
+  - partial_bulk_terminate — 성공 있음 3 · 실패 없음 (partial_bulk) — SCENARIO-GAP
   - shutdown_service — 성공 없음 · 실패 없음 (single_entity) — SCENARIO-GAP
   - start_service — 성공 없음 · 실패 없음 (single_entity) — SCENARIO-GAP
-  - terminate — 성공 없음 · 실패 없음 (partial_bulk) — SCENARIO-GAP
+  - terminate — 성공 있음 1 · 실패 있음 1 (partial_bulk)
   - update — 성공 없음 · 실패 없음 (partial_bulk, single_entity) — SCENARIO-GAP
 
 **admin_search**
@@ -37,6 +38,21 @@
 | [슈퍼관리자가 지정된 세션 스케줄링 조건을 읽으면 기존 세션 정보와 함께 유지된다](#searching_details-session-scheduling-conditions-are-preserved-when-configured) | 성공 |
 | [슈퍼관리자가 미설정인 세션 스케줄링 조건을 읽으면 기존 세션 정보와 함께 유지된다](#searching_details-session-scheduling-conditions-are-preserved-when-unset) | 성공 |
 | [필터 없는 전체 조회는 슈퍼관리자 역할로만 열리므로, 아무 권한도 받지 않은 사용자는 역할 부족으로 거부된다](#session-a-user-granted-nothing-may-not-search-sessions) | 거부 |
+
+**partial_bulk_terminate**
+
+| 시나리오 | 판정 |
+|---|---|
+| [아무 권한도 받지 않은 사용자가 대기 세션을 종료하려 하면, 종료된 것 없이 권한이 없다는 이유로 실패 목록에 온다](#partial_bulk_terminating-a-user-granted-nothing-terminates-none) | 성공 |
+| [프로젝트 범위에서 세션 soft delete 권한을 받은 사용자가 그 프로젝트의 대기 세션을 종료하면, 취소됨으로 처리된 목록에 온다](#partial_bulk_terminating-a-user-granted-session-soft-delete-in-the-project-terminates-its-session) | 성공 |
+| [슈퍼관리자가 대기 세션과 없는 id 하나를 한 번에 종료하면, 대기 세션은 취소됨, 없는 id 는 건너뜀으로 처리된 목록에 온다](#partial_bulk_terminating-terminating-several-skips-the-missing-one) | 성공 |
+
+**terminate**
+
+| 시나리오 | 판정 |
+|---|---|
+| [슈퍼관리자가 대기 세션을 종료하면, 취소된 목록에 온다](#terminating-a-superadmin-terminates-a-pending-session) | 성공 |
+| [아무 권한도 받지 않은 사용자가 대기 세션을 종료하려 하면, 호출 전체가 거부된다](#terminating-a-user-granted-nothing-may-not-terminate) | 거부 |
 
 ### admin_search
 
@@ -171,4 +187,203 @@ Then
 
 - 거부된다
   - 거부: InsufficientPrivilege
+
+### partial_bulk_terminate
+
+<a id="partial_bulk_terminating-a-user-granted-nothing-terminates-none"></a>
+
+#### [a-user-granted-nothing-terminates-none](/tests/scenario/bai_scenario/manager/session/test_partial_bulk_terminating.py) — pass
+
+아무 권한도 받지 않은 사용자가 대기 세션을 종료하려 하면, 종료된 것 없이 권한이 없다는 이유로 실패 목록에 온다
+
+Given
+
+- 대기 세션 하나와 아무 권한도 받지 않은 일반 사용자 한 명
+  - 도메인 home-1
+  - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+  - 프로젝트 team-1
+  - 리소스 그룹 resource-group-1: fifo 스케줄러를 쓴다
+  - 도메인에 속한 사용자 한 명 준비
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+    - 사용자 정책 user-policy-2: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-3: 동시 세션 5개까지
+    - 일반 사용자 user-2: 자기 키와 개인 프로젝트를 갖는다
+  - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
+  - 일반 사용자 user-1: 기본이 아닌 활성 키 하나를 더 갖는다
+  - 컨테이너 레지스트리 registry-1: 이미지를 가져오는 곳
+  - 이미지 image-1: x86_64 이미지
+  - 세션 session-1: 스케줄링을 기다리고 있다
+
+When
+
+- SessionAdapter.partial_bulk_terminate — user-2이 대기 세션를 한 번에 종료함
+
+Then
+
+- 종료된 세션 없이 대상이 권한이 없다는 이유로 실패 목록에 온다
+  - successes = []
+  - failed count = 1
+  - failed[0].id: 대기 세션의 id와 같다
+  - failed[0].message: 'Insufficient permission'를 담은 이유
+
+<a id="partial_bulk_terminating-a-user-granted-session-soft-delete-in-the-project-terminates-its-session"></a>
+
+#### [a-user-granted-session-soft-delete-in-the-project-terminates-its-session](/tests/scenario/bai_scenario/manager/session/test_partial_bulk_terminating.py) — pass
+
+프로젝트 범위에서 세션 soft delete 권한을 받은 사용자가 그 프로젝트의 대기 세션을 종료하면, 취소됨으로 처리된 목록에 온다
+
+Given
+
+- 대기 세션 하나와 그 프로젝트 범위에서 세션 soft delete 권한을 받은 일반 사용자 한 명
+  - 도메인 home-1
+  - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+  - 프로젝트 team-1
+  - 리소스 그룹 resource-group-1: fifo 스케줄러를 쓴다
+  - 도메인에 속한 사용자 한 명 준비
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+  - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
+  - 일반 사용자 user-1: 기본이 아닌 활성 키 하나를 더 갖는다
+  - 컨테이너 레지스트리 registry-1: 이미지를 가져오는 곳
+  - 이미지 image-1: x86_64 이미지
+  - 세션 session-1: 스케줄링을 기다리고 있다
+  - 프로젝트 범위의 세션 soft delete 권한을 받은 사용자 준비
+    - 도메인에 속한 사용자 한 명 준비
+      - 사용자 정책 user-policy-2: 사용자 한 명당 폴더 10개까지
+      - 키페어 정책 keypair-policy-3: 동시 세션 5개까지
+      - 일반 사용자 user-2: 자기 키와 개인 프로젝트를 갖는다
+    - 역할 session-terminator-1: 이 역할이 앉은 스코프 안에서만 통한다
+    - 역할 session-terminator-1: session 전체에 SOFT_DELETE 허용
+    - 일반 사용자 user-2: 역할 session-terminator-1 보유
+
+When
+
+- SessionAdapter.partial_bulk_terminate — user-2이 대기 세션를 한 번에 종료함
+
+Then
+
+- 대기 세션이 취소됨으로 처리된 목록에 오고, 실패한 것은 없다
+  - successes count = 1
+  - failed = []
+  - successes[0].id: 대기 세션의 id와 같다
+  - successes[0].status = <SessionTerminationStatusEnum.CANCELLED: 'cancelled'>
+
+<a id="partial_bulk_terminating-terminating-several-skips-the-missing-one"></a>
+
+#### [terminating-several-skips-the-missing-one](/tests/scenario/bai_scenario/manager/session/test_partial_bulk_terminating.py) — pass
+
+슈퍼관리자가 대기 세션과 없는 id 하나를 한 번에 종료하면, 대기 세션은 취소됨, 없는 id 는 건너뜀으로 처리된 목록에 온다
+
+Given
+
+- 대기 세션 하나와 슈퍼관리자 한 명
+  - 도메인 home-1
+  - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+  - 프로젝트 team-1
+  - 리소스 그룹 resource-group-1: fifo 스케줄러를 쓴다
+  - 도메인에 속한 사용자 한 명 준비
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+    - 사용자 정책 user-policy-2: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-3: 동시 세션 5개까지
+    - 슈퍼관리자 user-2: 자기 키와 개인 프로젝트를 갖는다
+  - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
+  - 일반 사용자 user-1: 기본이 아닌 활성 키 하나를 더 갖는다
+  - 컨테이너 레지스트리 registry-1: 이미지를 가져오는 곳
+  - 이미지 image-1: x86_64 이미지
+  - 세션 session-1: 스케줄링을 기다리고 있다
+
+When
+
+- SessionAdapter.partial_bulk_terminate — user-2이 대기 세션와 없는 id 하나를 한 번에 종료함
+
+Then
+
+- 대기 세션은 취소됨, 없는 id 는 건너뜀으로 처리된 목록에 오고, 실패한 것은 없다
+  - successes count = 2
+  - failed = []
+  - successes[0].id: 대기 세션의 id와 같다
+  - successes[0].status = <SessionTerminationStatusEnum.CANCELLED: 'cancelled'>
+  - successes[1].id: 요청에 넣은 없는 id와 같다
+  - successes[1].status = <SessionTerminationStatusEnum.SKIPPED: 'skipped'>
+
+### terminate
+
+<a id="terminating-a-superadmin-terminates-a-pending-session"></a>
+
+#### [a-superadmin-terminates-a-pending-session](/tests/scenario/bai_scenario/manager/session/test_terminating.py) — pass
+
+슈퍼관리자가 대기 세션을 종료하면, 취소된 목록에 온다
+
+Given
+
+- 대기 세션 하나와 슈퍼관리자 한 명
+  - 도메인 home-1
+  - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+  - 프로젝트 team-1
+  - 리소스 그룹 resource-group-1: fifo 스케줄러를 쓴다
+  - 도메인에 속한 사용자 한 명 준비
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+    - 사용자 정책 user-policy-2: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-3: 동시 세션 5개까지
+    - 슈퍼관리자 user-2: 자기 키와 개인 프로젝트를 갖는다
+  - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
+  - 일반 사용자 user-1: 기본이 아닌 활성 키 하나를 더 갖는다
+  - 컨테이너 레지스트리 registry-1: 이미지를 가져오는 곳
+  - 이미지 image-1: x86_64 이미지
+  - 세션 session-1: 스케줄링을 기다리고 있다
+
+When
+
+- SessionAdapter.terminate — user-2이 대기 세션을 종료함
+
+Then
+
+- 대기 세션이 취소된 목록에 오고, 나머지 목록은 비어 있다
+  - cancelled count = 1
+  - terminating = []
+  - force_terminated = []
+  - skipped = []
+  - cancelled[0]: 대기 세션의 id와 같다
+
+<a id="terminating-a-user-granted-nothing-may-not-terminate"></a>
+
+#### [a-user-granted-nothing-may-not-terminate](/tests/scenario/bai_scenario/manager/session/test_terminating.py) — pass
+
+아무 권한도 받지 않은 사용자가 대기 세션을 종료하려 하면, 호출 전체가 거부된다
+
+Given
+
+- 대기 세션 하나와 아무 권한도 받지 않은 일반 사용자 한 명
+  - 도메인 home-1
+  - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+  - 프로젝트 team-1
+  - 리소스 그룹 resource-group-1: fifo 스케줄러를 쓴다
+  - 도메인에 속한 사용자 한 명 준비
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+    - 사용자 정책 user-policy-2: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-3: 동시 세션 5개까지
+    - 일반 사용자 user-2: 자기 키와 개인 프로젝트를 갖는다
+  - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
+  - 일반 사용자 user-1: 기본이 아닌 활성 키 하나를 더 갖는다
+  - 컨테이너 레지스트리 registry-1: 이미지를 가져오는 곳
+  - 이미지 image-1: x86_64 이미지
+  - 세션 session-1: 스케줄링을 기다리고 있다
+
+When
+
+- SessionAdapter.terminate — user-2이 대기 세션을 종료함
+
+Then
+
+- 거부된다
+  - 거부: NotEnoughPermission
 
