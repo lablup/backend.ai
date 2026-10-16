@@ -2,10 +2,13 @@
 
 from __future__ import annotations
 
+from uuid import UUID
+
 from pydantic import Field, model_validator
 
 from ai.backend.common.api_handlers import BaseRequestModel
 from ai.backend.common.dto.manager.query import DecimalFilter, StringFilter, UUIDFilter
+from ai.backend.common.dto.manager.v2.common import NonEmptyList
 from ai.backend.common.dto.manager.v2.rbac.types import UUIDScope
 from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.common.types import SlotTypes
@@ -30,6 +33,7 @@ __all__ = (
     "AllocatedResourceSlotFilter",
     "AllocatedResourceSlotOrder",
     "CreateResourceSlotTypeInput",
+    "PartialBulkPurgeResourceSlotTypesInput",
     "PurgeResourceSlotTypeInput",
     "ResourceAllocationFilter",
     "ResourceAllocationOrder",
@@ -164,6 +168,12 @@ class PurgeResourceSlotTypeInput(BaseRequestModel):
     """Input for removing a resource slot type."""
 
     slot_name: str = Field(description="Slot name identifying the slot type to remove.")
+
+
+class PartialBulkPurgeResourceSlotTypesInput(BaseRequestModel):
+    """Input for purging several resource slot types, each answered for separately."""
+
+    ids: NonEmptyList[UUID] = Field(description="IDs of the resource slot types to purge.")
 
 
 # ========== AgentResource ==========

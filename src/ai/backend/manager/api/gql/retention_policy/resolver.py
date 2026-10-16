@@ -12,13 +12,20 @@ from ai.backend.common.dto.manager.v2.retention_policy.request import (
     RetentionPolicyOrder,
     SearchRetentionPoliciesInput,
 )
+from ai.backend.common.dto.manager.v2.retention_policy.response import (
+    DeleteRetentionPolicyPayload,
+)
 from ai.backend.common.dto.manager.v2.retention_policy.types import RetentionPolicyOrderField
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import encode_cursor
 from ai.backend.manager.api.gql.decorators import BackendAIGQLMeta, gql_mutation, gql_root_field
 from ai.backend.manager.api.gql.retention_policy.types import (
     CreateRetentionPolicyInputGQL,
     CreateRetentionPolicyPayloadGQL,
     DeleteRetentionPolicyPayloadGQL,
+    PartialBulkPurgeRetentionPoliciesInputGQL,
+    PartialBulkRetentionPoliciesPayloadGQL,
+    PartialBulkUpdateRetentionPoliciesInputGQL,
     PurgeRetentionPolicyPayloadGQL,
     RetentionPolicyConnection,
     RetentionPolicyEdge,
@@ -125,9 +132,66 @@ async def admin_create_retention_policy(
 
 @gql_mutation(
     BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Update a retention policy. Only provided fields will be updated.",
+    )
+)
+async def update_retention_policy(
+    info: Info[StrawberryGQLContext],
+    input: UpdateRetentionPolicyInputGQL,
+) -> UpdateRetentionPolicyPayloadGQL:
+    payload = await info.context.adapters.retention_policy.update(input.to_pydantic())
+    return UpdateRetentionPolicyPayloadGQL.from_pydantic(payload)
+
+
+@gql_mutation(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Purge (permanently remove) a retention policy.",
+    )
+)
+async def purge_retention_policy(
+    info: Info[StrawberryGQLContext],
+    id: UUID,
+) -> PurgeRetentionPolicyPayloadGQL:
+    payload = await info.context.adapters.retention_policy.purge(RetentionPolicyID(id))
+    return PurgeRetentionPolicyPayloadGQL.from_pydantic(payload)
+
+
+@gql_mutation(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Update several retention policies, answering for each one.",
+    )
+)
+async def partial_bulk_update_retention_policies(
+    info: Info[StrawberryGQLContext],
+    input: PartialBulkUpdateRetentionPoliciesInputGQL,
+) -> PartialBulkRetentionPoliciesPayloadGQL:
+    payload = await info.context.adapters.retention_policy.partial_bulk_update(input.to_pydantic())
+    return PartialBulkRetentionPoliciesPayloadGQL.from_pydantic(payload)
+
+
+@gql_mutation(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Purge several retention policies, answering for each one.",
+    )
+)
+async def partial_bulk_purge_retention_policies(
+    info: Info[StrawberryGQLContext],
+    input: PartialBulkPurgeRetentionPoliciesInputGQL,
+) -> PartialBulkRetentionPoliciesPayloadGQL:
+    payload = await info.context.adapters.retention_policy.partial_bulk_purge(input.to_pydantic())
+    return PartialBulkRetentionPoliciesPayloadGQL.from_pydantic(payload)
+
+
+@gql_mutation(
+    BackendAIGQLMeta(
         added_version="26.8.0",
         description="Update a retention policy (superadmin only).",
-    )
+    ),
+    deprecation_reason=f"Deprecated since {NEXT_RELEASE_VERSION}. Use `updateRetentionPolicy`.",
 )
 async def admin_update_retention_policy(
     info: Info[StrawberryGQLContext],
@@ -143,22 +207,26 @@ async def admin_update_retention_policy(
     BackendAIGQLMeta(
         added_version="26.8.0",
         description="Delete a retention policy (superadmin only).",
-    )
+    ),
+    deprecation_reason=f"Deprecated since {NEXT_RELEASE_VERSION}. Use `purgeRetentionPolicy`.",
 )
 async def admin_delete_retention_policy(
     info: Info[StrawberryGQLContext],
     id: UUID,
 ) -> DeleteRetentionPolicyPayloadGQL | None:
     check_admin_only()
-    payload = await info.context.adapters.retention_policy.delete(RetentionPolicyID(id))
-    return DeleteRetentionPolicyPayloadGQL.from_pydantic(payload)
+    payload = await info.context.adapters.retention_policy.purge(RetentionPolicyID(id))
+    return DeleteRetentionPolicyPayloadGQL.from_pydantic(
+        DeleteRetentionPolicyPayload(id=payload.id)
+    )
 
 
 @gql_mutation(
     BackendAIGQLMeta(
         added_version="26.8.0",
         description="Purge (permanently remove) a retention policy (superadmin only).",
-    )
+    ),
+    deprecation_reason=f"Deprecated since {NEXT_RELEASE_VERSION}. Use `purgeRetentionPolicy`.",
 )
 async def admin_purge_retention_policy(
     info: Info[StrawberryGQLContext],

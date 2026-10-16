@@ -274,7 +274,7 @@ class TestConflict:
             slot_type_id = slot.uuid
             await sess.commit()
         action = PurgeResourceSlotTypeAction(
-            purger=ResourceSlotTypePurger(slot_name="cuda.device", slot_type_id=slot_type_id)
+            purger=ResourceSlotTypePurger(slot_type_id=slot_type_id)
         )
         processor = harness.group(ResourceSlotTypeEntityType()).entity_purge_ops(
             PurgeResourceSlotTypeAction

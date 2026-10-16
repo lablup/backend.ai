@@ -39,6 +39,19 @@ def register_v2_container_registry_routes(
         middlewares=[superadmin_required],
     )
     registry.add(
+        "DELETE",
+        "/{registry_id}",
+        handler.admin_purge,
+        middlewares=[superadmin_required],
+    )
+    registry.add(
+        "POST",
+        "/partial-bulk-purge",
+        handler.admin_partial_bulk_purge,
+        middlewares=[superadmin_required],
+    )
+    # Deprecated since NEXT_RELEASE_VERSION.
+    registry.add(
         "POST",
         "/delete",
         handler.admin_delete,

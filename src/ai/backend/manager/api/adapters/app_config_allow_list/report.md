@@ -2,16 +2,18 @@
 
 [무엇을 보장하는가](/src/ai/backend/manager/api/adapters/app_config_allow_list/KNOWLEDGE.md) · [어댑터](/src/ai/backend/manager/api/adapters/app_config_allow_list/adapter.py)
 
-시나리오: 완성
+시나리오: 미완 2 / 8
 
-- ops 로 구성 (5)
+- ops 로 구성 (6)
   - admin_create — 대표 성공 ✓ · 대표 실패 ✓
   - admin_get — 대표 성공 ✓ · 대표 실패 ✓
   - admin_search — 대표 성공 ✓ · 대표 실패 ✓
-  - admin_update — 대표 성공 ✓ · 대표 실패 ✓
   - batch_load_by_ids — 대표 성공 ✓ · 대표 실패 ✓
-- 직접 구현 (1)
-  - admin_purge — 성공 있음 2 · 실패 있음 2 (single_entity)
+  - partial_bulk_update — 대표 성공 ✓ · 대표 실패 ✗ — SCENARIO-GAP
+  - update — 대표 성공 ✓ · 대표 실패 ✓
+- 직접 구현 (2)
+  - partial_bulk_purge — 성공 있음 2 · 실패 없음 (partial_bulk) — SCENARIO-GAP
+  - purge — 성공 있음 2 · 실패 있음 2 (single_entity)
 
 **admin_create**
 
@@ -43,15 +45,6 @@
 | [설정 이름 둘에 allow_list 넷이 있고 슈퍼관리자가 필터 없이 검색하면, 네 allow_list가 모두 반환된다](#searching-the-superadmin-counts-every-entry) | 성공 |
 | [일반 사용자가 allow_list를 검색하면, 슈퍼관리자 권한이 없어 거부된다](#searching-a-user-who-is-not-the-superadmin-may-not-search-entries) | 거부 |
 
-**admin_update**
-
-| 시나리오 | 판정 |
-|---|---|
-| [슈퍼관리자가 아무 값도 지정하지 않고 수정하면, 아무것도 바뀌지 않은 노드가 반환된다](#editing-an-edit-carrying-no-value-changes-nothing) | 성공 |
-| [allow_list 하나가 있고 슈퍼관리자가 순위를 바꾸면, 순위만 변경되고 설정 이름과 스코프 유형은 그대로다](#editing-the-superadmin-changes-an-entrys-rank) | 성공 |
-| [같은 allow_list를 권한이 없는 일반 사용자가 수정하면, 엔티티 수정 권한이 없어 거부된다](#editing-a-user-who-is-not-the-superadmin-may-not-change-a-rank) | 거부 |
-| [슈퍼관리자가 존재하지 않는 ID의 순위를 수정하면, 대상을 찾을 수 없다는 이유로 거부된다](#editing-an-id-nothing-answers-to-is-not-found-for-a-superadmin) | 거부 |
-
 **batch_load_by_ids**
 
 | 시나리오 | 판정 |
@@ -61,7 +54,30 @@
 | [슈퍼관리자가 allow_list 둘과 없는 ID 하나를 함께 조회하면, 입력 순서대로 노드 둘과 None이 반환된다](#reading_many-the-superadmin-reads-both-and-a-missing-id-comes-back-empty) | 성공 |
 | [권한이 없는 일반 사용자가 allow_list 둘과 없는 ID 하나를 함께 조회하면, 각 입력 위치에 엔티티 읽기 권한 오류가 반환된다](#reading_many-a-user-who-is-not-the-superadmin-is-refused-per-id) | 거부 |
 
-**admin_purge**
+**partial_bulk_update**
+
+| 시나리오 | 판정 |
+|---|---|
+| [권한이 없는 일반 사용자가 allow_list 둘의 순위를 한 번에 바꾸려 하면, 바뀐 것 없이 둘 다 권한이 없다는 이유로 실패 목록에 온다](#partial_bulk_editing-a-user-granted-nothing-reranks-none-of-several-entries) | 성공 |
+| [슈퍼관리자가 allow_list 둘의 순위를 한 번에 바꾸면, 둘 다 새 순위로 오고 실패한 것은 없다](#partial_bulk_editing-the-superadmin-reranks-several-entries-at-once) | 성공 |
+
+**update**
+
+| 시나리오 | 판정 |
+|---|---|
+| [슈퍼관리자가 아무 값도 지정하지 않고 수정하면, 아무것도 바뀌지 않은 노드가 반환된다](#editing-an-edit-carrying-no-value-changes-nothing) | 성공 |
+| [allow_list 하나가 있고 슈퍼관리자가 순위를 바꾸면, 순위만 변경되고 설정 이름과 스코프 유형은 그대로다](#editing-the-superadmin-changes-an-entrys-rank) | 성공 |
+| [같은 allow_list를 권한이 없는 일반 사용자가 수정하면, 엔티티 수정 권한이 없어 거부된다](#editing-a-user-who-is-not-the-superadmin-may-not-change-a-rank) | 거부 |
+| [슈퍼관리자가 존재하지 않는 ID의 순위를 수정하면, 대상을 찾을 수 없다는 이유로 거부된다](#editing-an-id-nothing-answers-to-is-not-found-for-a-superadmin) | 거부 |
+
+**partial_bulk_purge**
+
+| 시나리오 | 판정 |
+|---|---|
+| [권한이 없는 일반 사용자가 allow_list 둘을 한 번에 영구 삭제하려 하면, 삭제된 것 없이 둘 다 권한이 없다는 이유로 실패 목록에 온다](#partial_bulk_purging-a-user-granted-nothing-purges-none-of-several-entries) | 성공 |
+| [슈퍼관리자가 allow_list 둘과 존재하지 않는 ID를 한 번에 영구 삭제하면, 둘은 처리된 목록에 오고 없는 ID는 대상이 없다는 이유로 실패 목록에 온다](#partial_bulk_purging-purging-several-answers-for-the-missing-one) | 성공 |
+
+**purge**
 
 | 시나리오 | 판정 |
 |---|---|
@@ -521,126 +537,6 @@ Then
 - 거부된다
   - 거부: InsufficientPrivilege
 
-### admin_update
-
-<a id="editing-an-edit-carrying-no-value-changes-nothing"></a>
-
-#### [an-edit-carrying-no-value-changes-nothing](/tests/scenario/bai_scenario/manager/app_config_allow_list/test_editing.py) — pass
-
-슈퍼관리자가 아무 값도 지정하지 않고 수정하면, 아무것도 바뀌지 않은 노드가 반환된다
-
-Given
-
-- 사용자 스코프 유형의 allow_list 하나와 슈퍼관리자 한 명
-  - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
-  - 설정 정의 config-1: 이 이름의 설정이 등록돼 있다
-  - 허용 목록 항목 entry-1: 사용자 스코프에서 이 이름의 설정을 지정할 수 있다, 순위는 그 스코프 종류의 기본값
-
-When
-
-- AppConfigAllowListAdapter.admin_update — user-1이 config-1의 allow_list 수정 (빈 요청)
-
-Then
-
-- 준비한 allow_list의 모든 필드가 반환된다
-  - id: 준비한 ID와 같다
-  - config_name = 'config-1'
-  - scope_type = <AppConfigScopeType.USER: 'user'>
-  - rank = 300
-  - created_at: 이 실행이 쓴 시각
-  - updated_at: 이 실행이 쓴 시각
-
-<a id="editing-the-superadmin-changes-an-entrys-rank"></a>
-
-#### [the-superadmin-changes-an-entrys-rank](/tests/scenario/bai_scenario/manager/app_config_allow_list/test_editing.py) — pass
-
-allow_list 하나가 있고 슈퍼관리자가 순위를 바꾸면, 순위만 변경되고 설정 이름과 스코프 유형은 그대로다
-
-Given
-
-- 사용자 스코프 유형의 allow_list 하나와 슈퍼관리자 한 명
-  - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
-  - 설정 정의 config-1: 이 이름의 설정이 등록돼 있다
-  - 허용 목록 항목 entry-1: 사용자 스코프에서 이 이름의 설정을 지정할 수 있다, 순위는 그 스코프 종류의 기본값
-
-When
-
-- AppConfigAllowListAdapter.admin_update — user-1이 config-1의 allow_list 수정 (순위 150(으)로 변경)
-
-Then
-
-- 준비한 allow_list의 모든 필드가 반환된다
-  - id: 준비한 ID와 같다
-  - config_name = 'config-1'
-  - scope_type = <AppConfigScopeType.USER: 'user'>
-  - rank = 150
-  - created_at: 이 실행이 쓴 시각
-  - updated_at: 이 실행이 쓴 시각
-
-<a id="editing-a-user-who-is-not-the-superadmin-may-not-change-a-rank"></a>
-
-#### [a-user-who-is-not-the-superadmin-may-not-change-a-rank](/tests/scenario/bai_scenario/manager/app_config_allow_list/test_editing.py) — pass
-
-같은 allow_list를 권한이 없는 일반 사용자가 수정하면, 엔티티 수정 권한이 없어 거부된다
-
-Given
-
-- 사용자 스코프 유형의 allow_list 하나와 권한이 없는 일반 사용자 한 명
-  - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-  - 설정 정의 config-1: 이 이름의 설정이 등록돼 있다
-  - 허용 목록 항목 entry-1: 사용자 스코프에서 이 이름의 설정을 지정할 수 있다, 순위는 그 스코프 종류의 기본값
-
-When
-
-- AppConfigAllowListAdapter.admin_update — user-1이 config-1의 allow_list 수정 (순위 150(으)로 변경)
-
-Then
-
-- 거부된다
-  - 거부: NotEnoughPermission
-
-<a id="editing-an-id-nothing-answers-to-is-not-found-for-a-superadmin"></a>
-
-#### [an-id-nothing-answers-to-is-not-found-for-a-superadmin](/tests/scenario/bai_scenario/manager/app_config_allow_list/test_editing.py) — pass
-
-슈퍼관리자가 존재하지 않는 ID의 순위를 수정하면, 대상을 찾을 수 없다는 이유로 거부된다
-
-Given
-
-- 공개 스코프 유형의 allow_list 하나와 슈퍼관리자 한 명
-  - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
-  - 설정 정의 config-1: 이 이름의 설정이 등록돼 있다
-  - 허용 목록 항목 entry-1: 공개 스코프에서 이 이름의 설정을 지정할 수 있다, 순위는 그 스코프 종류의 기본값
-
-When
-
-- AppConfigAllowListAdapter.admin_update — user-1이 존재하지 않는 ID 수정 (순위 150(으)로 변경)
-
-Then
-
-- 거부된다
-  - 거부: EntityNotFoundError
-
 ### batch_load_by_ids
 
 <a id="reading_many-an-empty-id-list-answers-empty"></a>
@@ -763,7 +659,267 @@ Then
   - 거부: NotEnoughPermission
   - 거부: NotEnoughPermission
 
-### admin_purge
+### partial_bulk_update
+
+<a id="partial_bulk_editing-a-user-granted-nothing-reranks-none-of-several-entries"></a>
+
+#### [a-user-granted-nothing-reranks-none-of-several-entries](/tests/scenario/bai_scenario/manager/app_config_allow_list/test_partial_bulk_editing.py) — pass
+
+권한이 없는 일반 사용자가 allow_list 둘의 순위를 한 번에 바꾸려 하면, 바뀐 것 없이 둘 다 권한이 없다는 이유로 실패 목록에 온다
+
+Given
+
+- 한 설정 이름의 PUBLIC·USER allow_list와 권한이 없는 일반 사용자 한 명
+  - 도메인 home-1
+  - 설정 정의 config-1: 이 이름의 설정이 등록돼 있다
+  - 허용 목록 항목 first-1: 공개 스코프에서 이 이름의 설정을 지정할 수 있다, 순위는 그 스코프 종류의 기본값
+  - 허용 목록 항목 second-1: 사용자 스코프에서 이 이름의 설정을 지정할 수 있다, 순위는 그 스코프 종류의 기본값
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+
+When
+
+- AppConfigAllowListAdapter.partial_bulk_update — user-1이 allow_list 둘의 순위를 한 번에 150(으)로 변경
+
+Then
+
+- 처리된 allow_list 없이 둘 다 권한이 없다는 이유로 실패 목록에 온다
+  - successes = []
+  - failed count = 2
+  - failed[0].id: 준비한 ID와 같다
+  - failed[0].message: 'Insufficient permission'를 담은 이유
+  - failed[1].id: 준비한 ID와 같다
+  - failed[1].message: 'Insufficient permission'를 담은 이유
+
+<a id="partial_bulk_editing-the-superadmin-reranks-several-entries-at-once"></a>
+
+#### [the-superadmin-reranks-several-entries-at-once](/tests/scenario/bai_scenario/manager/app_config_allow_list/test_partial_bulk_editing.py) — pass
+
+슈퍼관리자가 allow_list 둘의 순위를 한 번에 바꾸면, 둘 다 새 순위로 오고 실패한 것은 없다
+
+Given
+
+- 한 설정 이름의 PUBLIC·USER allow_list와 슈퍼관리자 한 명
+  - 도메인 home-1
+  - 설정 정의 config-1: 이 이름의 설정이 등록돼 있다
+  - 허용 목록 항목 first-1: 공개 스코프에서 이 이름의 설정을 지정할 수 있다, 순위는 그 스코프 종류의 기본값
+  - 허용 목록 항목 second-1: 사용자 스코프에서 이 이름의 설정을 지정할 수 있다, 순위는 그 스코프 종류의 기본값
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+
+When
+
+- AppConfigAllowListAdapter.partial_bulk_update — user-1이 allow_list 둘의 순위를 한 번에 150(으)로 변경
+
+Then
+
+- allow_list 둘이 모두 새 순위로 오고, 실패한 것은 없다
+  - successes count = 2
+  - failed = []
+  - successes[0].id: 준비한 ID와 같다
+  - successes[0].config_name = 'config-1'
+  - successes[0].scope_type = <AppConfigScopeType.PUBLIC: 'public'>
+  - successes[0].rank = 150
+  - successes[0].updated_at: 이 실행이 쓴 시각
+  - successes[1].id: 준비한 ID와 같다
+  - successes[1].config_name = 'config-1'
+  - successes[1].scope_type = <AppConfigScopeType.USER: 'user'>
+  - successes[1].rank = 150
+  - successes[1].updated_at: 이 실행이 쓴 시각
+
+### update
+
+<a id="editing-an-edit-carrying-no-value-changes-nothing"></a>
+
+#### [an-edit-carrying-no-value-changes-nothing](/tests/scenario/bai_scenario/manager/app_config_allow_list/test_editing.py) — pass
+
+슈퍼관리자가 아무 값도 지정하지 않고 수정하면, 아무것도 바뀌지 않은 노드가 반환된다
+
+Given
+
+- 사용자 스코프 유형의 allow_list 하나와 슈퍼관리자 한 명
+  - 도메인 home-1
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+  - 설정 정의 config-1: 이 이름의 설정이 등록돼 있다
+  - 허용 목록 항목 entry-1: 사용자 스코프에서 이 이름의 설정을 지정할 수 있다, 순위는 그 스코프 종류의 기본값
+
+When
+
+- AppConfigAllowListAdapter.update — user-1이 config-1의 allow_list 수정 (빈 요청)
+
+Then
+
+- 준비한 allow_list의 모든 필드가 반환된다
+  - id: 준비한 ID와 같다
+  - config_name = 'config-1'
+  - scope_type = <AppConfigScopeType.USER: 'user'>
+  - rank = 300
+  - created_at: 이 실행이 쓴 시각
+  - updated_at: 이 실행이 쓴 시각
+
+<a id="editing-the-superadmin-changes-an-entrys-rank"></a>
+
+#### [the-superadmin-changes-an-entrys-rank](/tests/scenario/bai_scenario/manager/app_config_allow_list/test_editing.py) — pass
+
+allow_list 하나가 있고 슈퍼관리자가 순위를 바꾸면, 순위만 변경되고 설정 이름과 스코프 유형은 그대로다
+
+Given
+
+- 사용자 스코프 유형의 allow_list 하나와 슈퍼관리자 한 명
+  - 도메인 home-1
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+  - 설정 정의 config-1: 이 이름의 설정이 등록돼 있다
+  - 허용 목록 항목 entry-1: 사용자 스코프에서 이 이름의 설정을 지정할 수 있다, 순위는 그 스코프 종류의 기본값
+
+When
+
+- AppConfigAllowListAdapter.update — user-1이 config-1의 allow_list 수정 (순위 150(으)로 변경)
+
+Then
+
+- 준비한 allow_list의 모든 필드가 반환된다
+  - id: 준비한 ID와 같다
+  - config_name = 'config-1'
+  - scope_type = <AppConfigScopeType.USER: 'user'>
+  - rank = 150
+  - created_at: 이 실행이 쓴 시각
+  - updated_at: 이 실행이 쓴 시각
+
+<a id="editing-a-user-who-is-not-the-superadmin-may-not-change-a-rank"></a>
+
+#### [a-user-who-is-not-the-superadmin-may-not-change-a-rank](/tests/scenario/bai_scenario/manager/app_config_allow_list/test_editing.py) — pass
+
+같은 allow_list를 권한이 없는 일반 사용자가 수정하면, 엔티티 수정 권한이 없어 거부된다
+
+Given
+
+- 사용자 스코프 유형의 allow_list 하나와 권한이 없는 일반 사용자 한 명
+  - 도메인 home-1
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+  - 설정 정의 config-1: 이 이름의 설정이 등록돼 있다
+  - 허용 목록 항목 entry-1: 사용자 스코프에서 이 이름의 설정을 지정할 수 있다, 순위는 그 스코프 종류의 기본값
+
+When
+
+- AppConfigAllowListAdapter.update — user-1이 config-1의 allow_list 수정 (순위 150(으)로 변경)
+
+Then
+
+- 거부된다
+  - 거부: NotEnoughPermission
+
+<a id="editing-an-id-nothing-answers-to-is-not-found-for-a-superadmin"></a>
+
+#### [an-id-nothing-answers-to-is-not-found-for-a-superadmin](/tests/scenario/bai_scenario/manager/app_config_allow_list/test_editing.py) — pass
+
+슈퍼관리자가 존재하지 않는 ID의 순위를 수정하면, 대상을 찾을 수 없다는 이유로 거부된다
+
+Given
+
+- 공개 스코프 유형의 allow_list 하나와 슈퍼관리자 한 명
+  - 도메인 home-1
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+  - 설정 정의 config-1: 이 이름의 설정이 등록돼 있다
+  - 허용 목록 항목 entry-1: 공개 스코프에서 이 이름의 설정을 지정할 수 있다, 순위는 그 스코프 종류의 기본값
+
+When
+
+- AppConfigAllowListAdapter.update — user-1이 존재하지 않는 ID 수정 (순위 150(으)로 변경)
+
+Then
+
+- 거부된다
+  - 거부: EntityNotFoundError
+
+### partial_bulk_purge
+
+<a id="partial_bulk_purging-a-user-granted-nothing-purges-none-of-several-entries"></a>
+
+#### [a-user-granted-nothing-purges-none-of-several-entries](/tests/scenario/bai_scenario/manager/app_config_allow_list/test_partial_bulk_purging.py) — pass
+
+권한이 없는 일반 사용자가 allow_list 둘을 한 번에 영구 삭제하려 하면, 삭제된 것 없이 둘 다 권한이 없다는 이유로 실패 목록에 온다
+
+Given
+
+- 한 설정 이름의 PUBLIC·USER allow_list와 권한이 없는 일반 사용자 한 명
+  - 도메인 home-1
+  - 설정 정의 config-1: 이 이름의 설정이 등록돼 있다
+  - 허용 목록 항목 first-1: 공개 스코프에서 이 이름의 설정을 지정할 수 있다, 순위는 그 스코프 종류의 기본값
+  - 허용 목록 항목 second-1: 사용자 스코프에서 이 이름의 설정을 지정할 수 있다, 순위는 그 스코프 종류의 기본값
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+
+When
+
+- AppConfigAllowListAdapter.partial_bulk_purge — user-1이 allow_list 둘를 한 번에 영구 삭제
+
+Then
+
+- 처리된 allow_list 없이 둘 다 권한이 없다는 이유로 실패 목록에 온다
+  - successes = []
+  - failed count = 2
+  - failed[0].id: 준비한 ID와 같다
+  - failed[0].message: 'Insufficient permission'를 담은 이유
+  - failed[1].id: 준비한 ID와 같다
+  - failed[1].message: 'Insufficient permission'를 담은 이유
+
+<a id="partial_bulk_purging-purging-several-answers-for-the-missing-one"></a>
+
+#### [purging-several-answers-for-the-missing-one](/tests/scenario/bai_scenario/manager/app_config_allow_list/test_partial_bulk_purging.py) — pass
+
+슈퍼관리자가 allow_list 둘과 존재하지 않는 ID를 한 번에 영구 삭제하면, 둘은 처리된 목록에 오고 없는 ID는 대상이 없다는 이유로 실패 목록에 온다
+
+Given
+
+- 한 설정 이름의 PUBLIC·USER allow_list와 슈퍼관리자 한 명
+  - 도메인 home-1
+  - 설정 정의 config-1: 이 이름의 설정이 등록돼 있다
+  - 허용 목록 항목 first-1: 공개 스코프에서 이 이름의 설정을 지정할 수 있다, 순위는 그 스코프 종류의 기본값
+  - 허용 목록 항목 second-1: 사용자 스코프에서 이 이름의 설정을 지정할 수 있다, 순위는 그 스코프 종류의 기본값
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+
+When
+
+- AppConfigAllowListAdapter.partial_bulk_purge — user-1이 allow_list 둘와 존재하지 않는 ID를 한 번에 영구 삭제
+
+Then
+
+- allow_list 둘은 처리된 목록에, 없는 ID는 대상이 없다는 이유로 실패 목록에 온다
+  - successes: 준비한 ID 둘와 같다
+  - failed count = 1
+  - failed[0].id: 요청에 넣은 없는 ID와 같다
+  - failed[0].message: 'not found'를 담은 이유
+
+### purge
 
 <a id="purging-an-entry-holding-a-fragment-is-still-purged"></a>
 
@@ -786,7 +942,7 @@ Given
 
 When
 
-- AppConfigAllowListAdapter.admin_purge — user-1이 config-1의 allow_list 영구 삭제
+- AppConfigAllowListAdapter.purge — user-1이 config-1의 allow_list 영구 삭제
 
 Then
 
@@ -813,7 +969,7 @@ Given
 
 When
 
-- AppConfigAllowListAdapter.admin_purge — user-1이 config-1의 allow_list 영구 삭제
+- AppConfigAllowListAdapter.purge — user-1이 config-1의 allow_list 영구 삭제
 
 Then
 
@@ -840,7 +996,7 @@ Given
 
 When
 
-- AppConfigAllowListAdapter.admin_purge — user-1이 config-1의 allow_list 영구 삭제
+- AppConfigAllowListAdapter.purge — user-1이 config-1의 allow_list 영구 삭제
 
 Then
 
@@ -867,7 +1023,7 @@ Given
 
 When
 
-- AppConfigAllowListAdapter.admin_purge — user-1이 존재하지 않는 ID 영구 삭제
+- AppConfigAllowListAdapter.purge — user-1이 존재하지 않는 ID 영구 삭제
 
 Then
 

@@ -8,6 +8,7 @@ from uuid import UUID
 from ai.backend.client.v2.base_domain import BaseDomainClient
 from ai.backend.common.dto.manager.v2.app_config_definition.request import (
     CreateAppConfigDefinitionInput,
+    PartialBulkPurgeAppConfigDefinitionsInput,
     SearchAppConfigDefinitionsInput,
 )
 from ai.backend.common.dto.manager.v2.app_config_definition.response import (
@@ -16,6 +17,7 @@ from ai.backend.common.dto.manager.v2.app_config_definition.response import (
     PurgeAppConfigDefinitionPayload,
     SearchAppConfigDefinitionsPayload,
 )
+from ai.backend.common.dto.manager.v2.common import PartialBulkPayload
 
 _PATH: Final = "/v2/app-config-definitions"
 
@@ -60,11 +62,34 @@ class V2AppConfigDefinitionClient(BaseDomainClient):
             response_model=AppConfigDefinitionNode,
         )
 
+    async def purge(
+        self,
+        app_config_definition_id: UUID,
+    ) -> PurgeAppConfigDefinitionPayload:
+        """Purge an app config definition by ID, with the allow-list entries and fragments
+        under it."""
+        return await self._client.typed_request(
+            "DELETE",
+            f"{_PATH}/{app_config_definition_id}",
+            response_model=PurgeAppConfigDefinitionPayload,
+        )
+
+    async def partial_bulk_purge(
+        self, request: PartialBulkPurgeAppConfigDefinitionsInput
+    ) -> PartialBulkPayload[AppConfigDefinitionNode]:
+        """Purge several app config definitions, answering for each one."""
+        return await self._client.typed_request(
+            "POST",
+            f"{_PATH}/partial-bulk-purge",
+            request=request,
+            response_model=PartialBulkPayload[AppConfigDefinitionNode],
+        )
+
     async def admin_purge(
         self,
         app_config_definition_id: UUID,
     ) -> PurgeAppConfigDefinitionPayload:
-        """Purge an app config definition by ID (superadmin only)."""
+        """Deprecated. Use :meth:`purge`."""
         return await self._client.typed_request(
             "DELETE",
             f"{_PATH}/{app_config_definition_id}",

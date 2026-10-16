@@ -1,9 +1,14 @@
 from __future__ import annotations
 
+from ai.backend.common.exception import BackendAIError
+from ai.backend.manager.actions.v2.bulk.result import PartialBulkEntityResult, PartialBulkResult
 from ai.backend.manager.actions.v2.ops.result import EntityOpsResult
 from ai.backend.manager.data.deployment_revision_preset.types import DeploymentRevisionPresetData
 from ai.backend.manager.repositories.deployment_revision_preset.repository import (
     DeploymentPresetRepository,
+)
+from ai.backend.manager.services.deployment_revision_preset.actions.partial_bulk_update import (
+    PartialBulkUpdateDeploymentPresetsAction,
 )
 from ai.backend.manager.services.deployment_revision_preset.actions.update import (
     UpdateDeploymentPresetAction,
@@ -29,3 +34,17 @@ class DeploymentPresetService:
     ) -> EntityOpsResult[DeploymentRevisionPresetData]:
         data = await self._repository.update(action.to_updater(), action.slot_creators)
         return EntityOpsResult(data=data)
+
+    async def partial_bulk_update(
+        self, action: PartialBulkUpdateDeploymentPresetsAction
+    ) -> PartialBulkResult[DeploymentRevisionPresetData]:
+        """Apply each update in its own transaction, answering for every preset."""
+        items: list[PartialBulkEntityResult[DeploymentRevisionPresetData]] = []
+        for update in action.updates:
+            try:
+                data = await self._repository.update(update.to_updater(), update.slot_creators)
+            except BackendAIError as e:
+                items.append(PartialBulkEntityResult.failed(update.preset_id, e))
+            else:
+                items.append(PartialBulkEntityResult.succeeded(update.preset_id, data))
+        return PartialBulkResult(items=items)

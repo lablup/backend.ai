@@ -12,6 +12,8 @@ from ai.backend.common.dto.manager.v2.app_config_allow_list.request import (
     AppConfigAllowListFilter,
     AppConfigAllowListOrder,
     CreateAppConfigAllowListInput,
+    PartialBulkPurgeAppConfigAllowListsInput,
+    PartialBulkUpdateAppConfigAllowListsInput,
     PurgeAppConfigAllowListInput,
     SearchAppConfigAllowListInput,
     UpdateAppConfigAllowListInput,
@@ -27,7 +29,12 @@ from ai.backend.common.dto.manager.v2.app_config_allow_list.types import (
     AppConfigAllowListOrderField,
     AppConfigScopeTypeFilter,
 )
-from ai.backend.common.dto.manager.v2.common import OrderDirection
+from ai.backend.common.dto.manager.v2.common import (
+    OrderDirection,
+    PartialBulkFailure,
+    PartialBulkPayload,
+)
+from ai.backend.manager.actions.v2.bulk.result import PartialBulkResult
 from ai.backend.manager.api.adapter_options.pagination.pagination import PaginationSpec
 from ai.backend.manager.api.adapters.base import BaseAdapter
 from ai.backend.manager.data.app_config.types import (
@@ -71,6 +78,12 @@ from ai.backend.manager.services.app_config.actions.allow_list.create import (
 )
 from ai.backend.manager.services.app_config.actions.allow_list.get import (
     GetAppConfigAllowListAction,
+)
+from ai.backend.manager.services.app_config.actions.allow_list.partial_bulk_purge import (
+    PartialBulkPurgeAppConfigAllowListsAction,
+)
+from ai.backend.manager.services.app_config.actions.allow_list.partial_bulk_update import (
+    PartialBulkUpdateAppConfigAllowListsAction,
 )
 from ai.backend.manager.services.app_config.actions.allow_list.purge import (
     PurgeAppConfigAllowListAction,
@@ -171,30 +184,66 @@ class AppConfigAllowListAdapter(BaseAdapter):
             has_previous_page=action_result.has_previous_page,
         )
 
-    async def admin_update(
-        self, input: UpdateAppConfigAllowListInput
-    ) -> UpdateAppConfigAllowListPayload:
-        updater = AppConfigAllowListUpdater(
-            allow_list_id=AppConfigAllowListID(input.id),
-            rank=(
-                OptionalState.update(input.rank) if input.rank is not None else OptionalState.nop()
-            ),
-        )
+    async def update(self, input: UpdateAppConfigAllowListInput) -> UpdateAppConfigAllowListPayload:
+        """Update an allow-list entry's rank."""
         action_result = await self._app_config.allow_list_update.run(
-            UpdateAppConfigAllowListAction(updater=updater)
+            UpdateAppConfigAllowListAction(updater=self._to_updater(input))
         )
         return UpdateAppConfigAllowListPayload(
             app_config_allow_list=self._data_to_node(action_result.data),
         )
 
-    async def admin_purge(
-        self, input: PurgeAppConfigAllowListInput
-    ) -> PurgeAppConfigAllowListPayload:
+    async def purge(self, input: PurgeAppConfigAllowListInput) -> PurgeAppConfigAllowListPayload:
+        """Purge an allow-list entry with the fragments it admits."""
         purger = AppConfigAllowListPurger(allow_list_id=AppConfigAllowListID(input.id))
         action_result = await self._app_config.allow_list_purge.run(
             PurgeAppConfigAllowListAction(purger=purger)
         )
         return PurgeAppConfigAllowListPayload(id=action_result.data.id)
+
+    async def partial_bulk_update(
+        self, input: PartialBulkUpdateAppConfigAllowListsInput
+    ) -> PartialBulkPayload[AppConfigAllowListNode]:
+        """Update several allow-list entries, answering for each one."""
+        result = await self._app_config.allow_list_partial_bulk_update.run(
+            PartialBulkUpdateAppConfigAllowListsAction(
+                updaters=[self._to_updater(item) for item in input.items]
+            )
+        )
+        return self._to_partial_bulk_payload(result)
+
+    async def partial_bulk_purge(
+        self, input: PartialBulkPurgeAppConfigAllowListsInput
+    ) -> PartialBulkPayload[AppConfigAllowListNode]:
+        """Purge several allow-list entries with their fragments, answering for each one."""
+        result = await self._app_config.allow_list_partial_bulk_purge.run(
+            PartialBulkPurgeAppConfigAllowListsAction(
+                ids=[AppConfigAllowListID(allow_list_id) for allow_list_id in input.ids]
+            )
+        )
+        return self._to_partial_bulk_payload(result)
+
+    def _to_updater(self, input: UpdateAppConfigAllowListInput) -> AppConfigAllowListUpdater:
+        return AppConfigAllowListUpdater(
+            allow_list_id=AppConfigAllowListID(input.id),
+            rank=(
+                OptionalState.update(input.rank) if input.rank is not None else OptionalState.nop()
+            ),
+        )
+
+    def _to_partial_bulk_payload(
+        self, result: PartialBulkResult[AppConfigAllowListData]
+    ) -> PartialBulkPayload[AppConfigAllowListNode]:
+        return PartialBulkPayload[AppConfigAllowListNode](
+            successes=[
+                self._data_to_node(item.value) for item in result.items if item.value is not None
+            ],
+            failed=[
+                PartialBulkFailure(id=item.entity_id, message=str(item.error))
+                for item in result.items
+                if item.error is not None
+            ],
+        )
 
     @staticmethod
     def _data_to_node(data: AppConfigAllowListData) -> AppConfigAllowListNode:
