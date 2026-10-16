@@ -1,4 +1,4 @@
-"""Session group GraphQL query resolvers."""
+"""Session group GraphQL query and mutation resolvers."""
 
 from __future__ import annotations
 
@@ -17,7 +17,11 @@ from ai.backend.common.dto.manager.v2.session_group.response import (
 )
 from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import encode_cursor
-from ai.backend.manager.api.gql.decorators import BackendAIGQLMeta, gql_root_field
+from ai.backend.manager.api.gql.decorators import (
+    BackendAIGQLMeta,
+    gql_mutation,
+    gql_root_field,
+)
 from ai.backend.manager.api.gql.session_group.types import (
     SessionGroupConnectionGQL,
     SessionGroupEdgeGQL,
@@ -25,6 +29,8 @@ from ai.backend.manager.api.gql.session_group.types import (
     SessionGroupGQL,
     SessionGroupOrderByGQL,
     SessionGroupScopeGQL,
+    UpdateSessionGroupInputGQL,
+    UpdateSessionGroupPayloadGQL,
 )
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.api.gql.utils import check_admin_only
@@ -119,6 +125,24 @@ async def scoped_session_groups(
         )
     )
     return _build_connection(payload)
+
+
+@gql_mutation(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description=(
+            "Change a session group's placement direction and enforcement. Members placed "
+            "afterwards follow the new policy; a group a deployment's replica group holds "
+            "is not found."
+        ),
+    )
+)
+async def update_session_group(
+    info: Info[StrawberryGQLContext],
+    input: UpdateSessionGroupInputGQL,
+) -> UpdateSessionGroupPayloadGQL:
+    payload = await info.context.adapters.session_group.update(input.to_pydantic())
+    return UpdateSessionGroupPayloadGQL.from_pydantic(payload)
 
 
 def _build_connection(payload: AdminSearchSessionGroupsPayload) -> SessionGroupConnectionGQL:

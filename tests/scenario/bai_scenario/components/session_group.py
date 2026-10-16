@@ -52,8 +52,30 @@ from bai_scenario.seeds.session_group.session_group import (
 )
 
 
+class Granting(enum.Enum):
+    """부르는 사람이 받은 세션 그룹 권한."""
+
+    READ = "읽기"
+    UPDATE = "수정"
+
+    def permission(self) -> Permission:
+        match self:
+            case Granting.READ:
+                return Permission.READ
+            case Granting.UPDATE:
+                return Permission.UPDATE
+
+    def project_role_hint(self) -> str:
+        """프로젝트에 앉는 역할의 이름 힌트."""
+        match self:
+            case Granting.READ:
+                return "session-group-reader"
+            case Granting.UPDATE:
+                return "session-group-updater"
+
+
 class GrantedIn(enum.Enum):
-    """부르는 사람이 세션 그룹 읽기 권한을 받은 곳."""
+    """부르는 사람이 세션 그룹 권한을 받은 곳."""
 
     NOWHERE = "아무 데서도"
     THE_PROJECT = "그룹들이 있는 프로젝트에서"
@@ -90,28 +112,31 @@ class SessionGroupsAndACaller:
 
 
 @dataclass(frozen=True)
-class SomeoneReadingSessionGroups(TestSeedNest[Laid[UserData]]):
-    """그 프로젝트에서 세션 그룹을 읽을 수 있는 사용자.
+class SomeoneGrantedOnSessionGroups(TestSeedNest[Laid[UserData]]):
+    """그 프로젝트에서 세션 그룹 권한을 받은 사용자.
 
     그룹은 프로젝트 스코프에 생기므로 역할도 거기 앉는다.
     """
 
     domain: Laid[DomainData]
     project: Laid[ProjectData]
+    granting: Granting = Granting.READ
 
     @override
     def kind(self) -> str:
-        return "프로젝트에서 세션 그룹 읽기 권한을 받은 사용자 준비"
+        return f"프로젝트에서 세션 그룹 {self.granting.value} 권한을 받은 사용자 준비"
 
     @override
     def lay(self, seed: TestSeeder) -> Laid[UserData]:
         someone = seed.within(SomeoneOf(self.domain))
         role = seed.creating_from(
-            TestSeedRole(lambda p: ProjectID(p.id), name_hint="session-group-reader"),
+            TestSeedRole(lambda p: ProjectID(p.id), name_hint=self.granting.project_role_hint()),
             self.project,
         )
         seed.adding(
-            TestSeedPermission(entity_type=SessionGroupEntityType(), permission=Permission.READ),
+            TestSeedPermission(
+                entity_type=SessionGroupEntityType(), permission=self.granting.permission()
+            ),
             role,
         )
         seed.granting(role, someone, role_id=lambda r: r.id, user_id=lambda u: UserID(u.id))
@@ -119,21 +144,24 @@ class SomeoneReadingSessionGroups(TestSeedNest[Laid[UserData]]):
 
 
 @dataclass(frozen=True)
-class SomeoneReadingTheirOwnSessionGroups(TestSeedNest[Laid[UserData]]):
-    """자기 스코프에서 세션 그룹을 읽을 수 있는 사용자.
+class SomeoneGrantedOnTheirOwnSessionGroups(TestSeedNest[Laid[UserData]]):
+    """자기 스코프에서 세션 그룹 권한을 받은 사용자.
 
     그룹은 만든 사람의 스코프에도 생기므로 역할이 거기 앉는다. ``also_in``이 있으면 그
-    프로젝트에서도 읽을 수 있다.
+    프로젝트에서도 같은 권한을 받는다.
     """
 
     domain: Laid[DomainData]
     also_in: Laid[ProjectData] | None = None
+    granting: Granting = Granting.READ
 
     @override
     def kind(self) -> str:
         if self.also_in is None:
-            return "자기 스코프에서 세션 그룹 읽기 권한을 받은 사용자 준비"
-        return "자기 스코프와 한 프로젝트에서 세션 그룹 읽기 권한을 받은 사용자 준비"
+            return f"자기 스코프에서 세션 그룹 {self.granting.value} 권한을 받은 사용자 준비"
+        return (
+            f"자기 스코프와 한 프로젝트에서 세션 그룹 {self.granting.value} 권한을 받은 사용자 준비"
+        )
 
     @override
     def lay(self, seed: TestSeeder) -> Laid[UserData]:
@@ -142,18 +170,22 @@ class SomeoneReadingTheirOwnSessionGroups(TestSeedNest[Laid[UserData]]):
             TestSeedRole(lambda u: UserID(u.id), name_hint="session-group-owner"), someone
         )
         seed.adding(
-            TestSeedPermission(entity_type=SessionGroupEntityType(), permission=Permission.READ),
+            TestSeedPermission(
+                entity_type=SessionGroupEntityType(), permission=self.granting.permission()
+            ),
             own,
         )
         seed.granting(own, someone, role_id=lambda r: r.id, user_id=lambda u: UserID(u.id))
         if self.also_in is not None:
             in_project = seed.creating_from(
-                TestSeedRole(lambda p: ProjectID(p.id), name_hint="session-group-reader"),
+                TestSeedRole(
+                    lambda p: ProjectID(p.id), name_hint=self.granting.project_role_hint()
+                ),
                 self.also_in,
             )
             seed.adding(
                 TestSeedPermission(
-                    entity_type=SessionGroupEntityType(), permission=Permission.READ
+                    entity_type=SessionGroupEntityType(), permission=self.granting.permission()
                 ),
                 in_project,
             )
@@ -171,6 +203,7 @@ class SessionGroupsInTwoProjects(Given[Any, SessionGroupsAndACaller]):
     """
 
     granted_in: GrantedIn = GrantedIn.NOWHERE
+    granting: Granting = Granting.READ
     role: UserRole = UserRole.USER
 
     @override
@@ -181,14 +214,14 @@ class SessionGroupsInTwoProjects(Given[Any, SessionGroupsAndACaller]):
         )
         if self.granted_in.is_the_owner():
             return (
-                f"{laid}, 그리고 {self.granted_in.value} 세션 그룹 읽기 권한을 받은 "
-                "그룹들을 만든 사용자"
+                f"{laid}, 그리고 {self.granted_in.value} 세션 그룹 {self.granting.value} "
+                "권한을 받은 그룹들을 만든 사용자"
             )
         who = "슈퍼관리자" if self.role is UserRole.SUPERADMIN else "사용자"
         if self.granted_in is GrantedIn.NOWHERE:
             reach = "아무 권한도 받지 않은"
         else:
-            reach = f"{self.granted_in.value} 세션 그룹 읽기 권한을 받은"
+            reach = f"{self.granted_in.value} 세션 그룹 {self.granting.value} 권한을 받은"
         return f"{laid}, 그리고 {reach} {who} 한 명"
 
     @override
@@ -201,10 +234,14 @@ class SessionGroupsInTwoProjects(Given[Any, SessionGroupsAndACaller]):
         owner: Laid[UserData]
         match self.granted_in:
             case GrantedIn.THEIR_OWN:
-                owner = await seeding.within(SomeoneReadingTheirOwnSessionGroups(domain))
+                owner = await seeding.within(
+                    SomeoneGrantedOnTheirOwnSessionGroups(domain, granting=self.granting)
+                )
             case GrantedIn.THEIR_OWN_AND_THE_OTHER_PROJECT:
                 owner = await seeding.within(
-                    SomeoneReadingTheirOwnSessionGroups(domain, also_in=other)
+                    SomeoneGrantedOnTheirOwnSessionGroups(
+                        domain, also_in=other, granting=self.granting
+                    )
                 )
             case GrantedIn.NOWHERE | GrantedIn.THE_PROJECT | GrantedIn.THE_OTHER_PROJECT:
                 owner = await seeding.within(SomeoneOf(domain))
@@ -227,9 +264,13 @@ class SessionGroupsInTwoProjects(Given[Any, SessionGroupsAndACaller]):
             case GrantedIn.NOWHERE:
                 caller = await seeding.within(SomeoneOf(domain, role=self.role))
             case GrantedIn.THE_PROJECT:
-                caller = await seeding.within(SomeoneReadingSessionGroups(domain, project))
+                caller = await seeding.within(
+                    SomeoneGrantedOnSessionGroups(domain, project, self.granting)
+                )
             case GrantedIn.THE_OTHER_PROJECT:
-                caller = await seeding.within(SomeoneReadingSessionGroups(domain, other))
+                caller = await seeding.within(
+                    SomeoneGrantedOnSessionGroups(domain, other, self.granting)
+                )
             case GrantedIn.THEIR_OWN | GrantedIn.THEIR_OWN_AND_THE_OTHER_PROJECT:
                 caller = owner
         return SessionGroupsAndACaller(
@@ -263,9 +304,14 @@ class TheseGroups(Condition[Collection[UUID]]):
 
 @dataclass(frozen=True)
 class UsersGroupLook:
-    """사용자가 만든 그룹의 노드가 어떤 값으로 와야 하는지."""
+    """사용자가 만든 그룹의 노드가 어떤 값으로 와야 하는지.
+
+    배치 정책은 심은 값이 기본이고, 정책을 바꾼 행은 바뀐 값을 넘긴다.
+    """
 
     started: datetime
+    direction: SessionGroupPlacementDirectionEnum = SessionGroupPlacementDirectionEnum.PACK
+    enforcement: SessionGroupPlacementEnforcementEnum = SessionGroupPlacementEnforcementEnum.STRICT
 
     def verdicts(
         self, prefix: str, node: SessionGroupNode, laid: SessionGroupsAndACaller
@@ -291,12 +337,12 @@ class UsersGroupLook:
             Same(
                 f"{prefix}placement_direction",
                 node.placement_direction,
-                SessionGroupPlacementDirectionEnum.PACK,
+                self.direction,
             ),
             Same(
                 f"{prefix}placement_enforcement",
                 node.placement_enforcement,
-                SessionGroupPlacementEnforcementEnum.STRICT,
+                self.enforcement,
             ),
             Held(f"{prefix}created_at", node.created_at, WrittenByThisRun(self.started)),
             Same(f"{prefix}deleted_at", node.deleted_at, None),
