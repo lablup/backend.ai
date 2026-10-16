@@ -3,7 +3,7 @@ name: session-group-adapter-scenarios
 type: reference
 description: what the session group adapter guarantees, as scenarios; the tests in tests/scenario/bai_scenario/manager/session_group match these one for one
 scope: src/ai/backend/manager/api/adapters/session_group
-keywords: [session_group, scenario, adapter, rbac, bulk_get_ids, scoped_search, deployment]
+keywords: [session_group, scenario, adapter, rbac, bulk_get_ids, scoped_search, update, deployment]
 generated:
   by: claude-code/opus-5.5
   at: 2026-10-15
@@ -14,11 +14,12 @@ status: draft
 규칙은 상위 디렉터리의 `AGENTS.md`에 있다. 여기 적힌 것과 실행 결과가 어긋나면 문장을 먼저
 의심한다.
 
-세션 그룹은 프로젝트와 소유자 아래에 생긴다. 그래서 개별 그룹을 읽는 문은 권한 그래프가
-지키고, 전체 검색은 전역 superadmin 역할이 지킨다.
+세션 그룹은 프로젝트와 소유자 아래에 생긴다. 그래서 개별 그룹을 읽고 고치는 문은 권한
+그래프가 지키고, 전체 검색은 전역 superadmin 역할이 지킨다.
 
 배포가 replica group을 만들 때 함께 생기는 그룹은 배포와 함께 관리된다. 사용자에게 내놓는
-호출(하나 읽기, 여럿 읽기, 스코프 검색)은 이 그룹을 권한이 있어도 없는 것으로 답한다.
+호출(하나 읽기, 여럿 읽기, 스코프 검색, 배치 정책 바꾸기)은 이 그룹을 권한이 있어도 없는 것으로
+답한다.
 전체 검색만 이 그룹을 함께 보여준다.
 
 공통 계약(대상 존재, 일괄 구성, 페이지)은 프레임워크 계약 테스트가 확인한다. 여기에는 연산마다
@@ -74,6 +75,22 @@ status: draft
 
 스코프 여럿은 OR로 합친다. 마지막 줄에서 자기가 만든 첫 프로젝트의 그룹은 사용자 스코프로만,
 다른 사용자의 그룹은 프로젝트 스코프로만 닿는다. 그래서 둘 다 나와야 합친 것이다.
+
+## 배치 정책 바꾸기
+
+| 시나리오 | 상황 | 요청 | 결과 |
+|---|---|---|---|
+| 그룹을 만든 사용자가 두 항목을 모두 바꾼다 | 자기가 만든 그룹, 자기 스코프에서 세션 그룹 수정 권한을 받은 그 사용자 | 방향을 퍼뜨리기로, 강제 수준을 선호로 바꾼다 | 두 항목이 바뀐 그 그룹 |
+| 그룹을 만든 사용자가 방향만 바꾼다 | 같은 그룹, 같은 사용자 | 방향만 퍼뜨리기로 바꾼다 | 방향만 바뀌고 강제 수준은 그대로인 그 그룹 |
+| 읽기 권한만 받은 사용자가 바꾼다 | 같은 그룹, 자기 스코프에서 세션 그룹 읽기 권한만 받은 그룹을 만든 사용자 | 두 항목을 바꾼다 | 권한 부족으로 거부 |
+| 그룹을 만든 사용자가 배포의 그룹을 바꾼다 | 배포의 replica group이 가진 그룹, 자기 스코프에서 세션 그룹 수정 권한을 받은 그룹을 만든 사용자 | 두 항목을 바꾼다 | 대상 없음으로 거부 |
+
+- 권한 줄의 짝은 같은 사람, 같은 스코프에서 받은 권한만 다르다. 읽기로는 바꿀 수 없다.
+- 배포의 그룹은 만든 사용자의 스코프에도 생긴다. 그래서 수정 권한이 있어도 거부 이유가 권한이
+  아니라 대상 없음이어야 한다.
+- 바꿀 수 있는 항목은 배치 방향과 강제 수준 둘뿐이다. 둘 다 빼고 부르면 요청 형식에서 거부된다.
+- 바뀐 정책은 이후 배치되는 멤버부터 따른다. 스케줄러가 배치할 때마다 그룹 정책을 읽기
+  때문이고, 이미 배치된 멤버는 옮기지 않는다.
 
 ## 아직 적지 않은 것
 
