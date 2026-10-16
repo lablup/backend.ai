@@ -16,6 +16,17 @@ Changes
 
 <!-- towncrier release notes start -->
 
+## 26.4.15 (2026-10-16)
+
+### Features
+* Accept the PostgreSQL cluster members as `db.addrs` and connect the manager to the primary with a connect timeout per member ([#15186](https://github.com/lablup/backend.ai/issues/15186))
+
+### Fixes
+* Add `pool_pre_ping` and `pool_recycle` to the appproxy-coordinator database engine so a dropped/stale pooled Postgres connection is transparently reconnected at checkout instead of poisoning the pool with `SAVEPOINT can only be used in transaction blocks` errors until a restart. ([#12507](https://github.com/lablup/backend.ai/issues/12507))
+* Keep the App Proxy coordinator connected to the PostgreSQL primary across a Patroni switchover by accepting the cluster members as `db.addrs` and discarding a pooled connection whose transaction failed to start ([#15605](https://github.com/lablup/backend.ai/issues/15605))
+* Log a client disconnect during response streaming at trace level instead of an error-level traceback and a 500 in the webserver, storage-proxy, manager, and app-proxy servers ([#15746](https://github.com/lablup/backend.ai/issues/15746))
+
+
 ## 26.4.14 (2026-10-15)
 
 ### Fixes
