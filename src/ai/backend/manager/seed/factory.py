@@ -22,6 +22,11 @@ from ai.backend.manager.seed.prometheus_query_preset_category.seed import (
 )
 from ai.backend.manager.seed.registry import SeedKindRegistry
 from ai.backend.manager.seed.resource_group.seed import ResourceGroupSeed
+from ai.backend.manager.seed.resource_group_allow.seed import (
+    ResourceGroupForDomainSeed,
+    ResourceGroupForKeypairSeed,
+    ResourceGroupForProjectSeed,
+)
 from ai.backend.manager.seed.resource_policy.seed import (
     KeyPairResourcePolicySeed,
     ProjectResourcePolicySeed,
@@ -77,4 +82,7 @@ def create_seed_kind_registry() -> SeedKindRegistry:
         SeedKind.ROLE: (1, RoleSeed),
         SeedKind.SESSION_TEMPLATE: (1, SessionTemplateSeed),
         SeedKind.PROJECT_MEMBER: (1, ProjectMemberSeed),
+        SeedKind.RESOURCE_GROUP_FOR_DOMAIN: (1, ResourceGroupForDomainSeed),
+        SeedKind.RESOURCE_GROUP_FOR_PROJECT: (1, ResourceGroupForProjectSeed),
+        SeedKind.RESOURCE_GROUP_FOR_KEYPAIR: (1, ResourceGroupForKeypairSeed),
     })

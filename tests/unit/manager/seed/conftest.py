@@ -36,7 +36,12 @@ from ai.backend.manager.models.rbac_models.role_permission_preset.row import (
 )
 from ai.backend.manager.models.rbac_models.role_preset.row import RolePresetRow
 from ai.backend.manager.models.rbac_models.user_role.row import UserRoleRow
-from ai.backend.manager.models.resource_group.row import ResourceGroupRow
+from ai.backend.manager.models.resource_group.row import (
+    ResourceGroupForDomainRow,
+    ResourceGroupForKeypairsRow,
+    ResourceGroupForProjectRow,
+    ResourceGroupRow,
+)
 from ai.backend.manager.models.resource_policy.row import (
     KeyPairResourcePolicyRow,
     ProjectResourcePolicyRow,
@@ -666,6 +671,9 @@ _SEED_TABLES: list[Table | type[HasTable]] = [
     ProjectRow,
     SessionTemplateRow,
     ResourceGroupRow,
+    ResourceGroupForDomainRow,
+    ResourceGroupForProjectRow,
+    ResourceGroupForKeypairsRow,
     RoleRow,
     UserRoleRow,
     VFSStorageRow,
@@ -1198,6 +1206,50 @@ def role_kind_seed_dir(project_seed_dir: Path) -> Path:
     for file_name, role in _SCOPED_ROLES.items():
         (project_seed_dir / f"role-{file_name}").write_text(
             yaml.safe_dump({"kind": "role", "version": 1, "items": [role]})
+        )
+    return project_seed_dir
+
+
+@pytest.fixture
+def resource_group_allow_seed_dir(project_seed_dir: Path) -> Path:
+    """The project directory plus the users, the resource groups and one file per resource
+    group allow kind, linking each to the `default` resource group."""
+    (project_seed_dir / "keypair_resource_policy.yaml").write_text(
+        yaml.safe_dump({
+            "kind": "keypair_resource_policy",
+            "version": 1,
+            "items": [_RESOURCE_POLICIES["keypair_resource_policy"]],
+        })
+    )
+    for file_name, user in _USERS.items():
+        (project_seed_dir / f"user-{file_name}").write_text(
+            yaml.safe_dump({"kind": "user", "version": 1, "items": [user]})
+        )
+    (project_seed_dir / "resource-groups.yaml").write_text(
+        yaml.safe_dump({"kind": "resource_group", "version": 1, "items": _RESOURCE_GROUPS})
+    )
+    resource_group_id = _RESOURCE_GROUPS[0]["id"]
+    admin = _USERS["admin.yaml"]
+    allows: dict[str, list[dict[str, Any]]] = {
+        "resource_group_for_domain": [
+            {"domain_id": domain["id"], "resource_group_id": resource_group_id}
+            for domain in _DOMAINS.values()
+        ],
+        "resource_group_for_project": [
+            {"project_id": _PROJECTS["research.yaml"]["id"], "resource_group_id": resource_group_id}
+        ],
+        "resource_group_for_keypair": [
+            {
+                "access_key": keypair["access_key"],
+                "user_id": admin["id"],
+                "resource_group_id": resource_group_id,
+            }
+            for keypair in admin["keypairs"]
+        ],
+    }
+    for kind, items in allows.items():
+        (project_seed_dir / f"{kind}.yaml").write_text(
+            yaml.safe_dump({"kind": kind, "version": 1, "items": items})
         )
     return project_seed_dir
 
