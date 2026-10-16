@@ -28,24 +28,24 @@ from ai.backend.manager.api.gql.storage_volume.types import (
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 
 __all__ = (
-    "admin_delete_storage_volume",
-    "admin_purge_resource_group_volume_offer",
-    "admin_purge_storage_volume",
-    "admin_restore_storage_volume",
-    "admin_upsert_resource_group_volume_offer",
-    "admin_storage_volume",
-    "admin_storage_volumes",
-    "admin_update_storage_volume",
+    "delete_storage_volume",
+    "purge_resource_group_volume_offer",
+    "purge_storage_volume",
+    "restore_storage_volume",
+    "storage_volume",
+    "storage_volumes",
+    "update_storage_volume",
+    "upsert_resource_group_volume_offer",
 )
 
 
 @gql_root_field(
     BackendAIGQLMeta(
         added_version=NEXT_RELEASE_VERSION,
-        description="Read one storage volume. Admin only.",
+        description="Read one storage volume.",
     )
 )  # type: ignore[misc]
-async def admin_storage_volume(
+async def storage_volume(
     info: Info[StrawberryGQLContext],
     id: ID,
 ) -> StorageVolumeGQL | None:
@@ -55,10 +55,10 @@ async def admin_storage_volume(
 @gql_root_field(
     BackendAIGQLMeta(
         added_version=NEXT_RELEASE_VERSION,
-        description="Page through the declared storage volumes. Admin only.",
+        description="Page through the declared storage volumes.",
     )
 )  # type: ignore[misc]
-async def admin_storage_volumes(
+async def storage_volumes(
     info: Info[StrawberryGQLContext],
     filter: StorageVolumeFilterGQL | None = None,
     order_by: list[StorageVolumeOrderByGQL] | None = None,
@@ -76,12 +76,11 @@ async def admin_storage_volumes(
     BackendAIGQLMeta(
         added_version=NEXT_RELEASE_VERSION,
         description=(
-            "Retune one storage volume: its name, its usage exposure and its stale"
-            " threshold. Admin only."
+            "Retune one storage volume: its name, its usage exposure and its stale threshold."
         ),
     )
 )
-async def admin_update_storage_volume(
+async def update_storage_volume(
     info: Info[StrawberryGQLContext],
     id: ID,
     input: UpdateStorageVolumeInputGQL,
@@ -94,11 +93,11 @@ async def admin_update_storage_volume(
         added_version=NEXT_RELEASE_VERSION,
         description=(
             "Remove one storage volume from the catalog. Refused while a folder sits on"
-            " it or a resource group is offered it. Admin only."
+            " it or a resource group is offered it."
         ),
     )
 )
-async def admin_purge_storage_volume(
+async def purge_storage_volume(
     info: Info[StrawberryGQLContext],
     id: ID,
 ) -> PurgeStorageVolumePayloadGQL | None:
@@ -110,11 +109,11 @@ async def admin_purge_storage_volume(
         added_version=NEXT_RELEASE_VERSION,
         description=(
             "Offer one volume to one resource group, or retune the offer. Offering a volume"
-            " already offered rewrites the flags it carries. Admin only."
+            " already offered rewrites the flags it carries."
         ),
     )
 )
-async def admin_upsert_resource_group_volume_offer(
+async def upsert_resource_group_volume_offer(
     info: Info[StrawberryGQLContext],
     input: UpsertResourceGroupVolumeOfferInputGQL,
 ) -> UpsertResourceGroupVolumeOfferPayloadGQL | None:
@@ -126,11 +125,11 @@ async def admin_upsert_resource_group_volume_offer(
         added_version=NEXT_RELEASE_VERSION,
         description=(
             "Withdraw one volume from one resource group. The volume and the folders on it"
-            " stay; only the offer goes. Admin only."
+            " stay; only the offer goes."
         ),
     )
 )
-async def admin_purge_resource_group_volume_offer(
+async def purge_resource_group_volume_offer(
     info: Info[StrawberryGQLContext],
     input: PurgeResourceGroupVolumeOfferInputGQL,
 ) -> PurgeResourceGroupVolumeOfferPayloadGQL | None:
@@ -142,11 +141,11 @@ async def admin_purge_resource_group_volume_offer(
         added_version=NEXT_RELEASE_VERSION,
         description=(
             "Withhold one storage volume from new use. The folders already on it keep"
-            " working and the volume still answers get and search. Admin only."
+            " working and the volume still answers get and search."
         ),
     )
 )
-async def admin_delete_storage_volume(
+async def delete_storage_volume(
     info: Info[StrawberryGQLContext],
     id: ID,
 ) -> DeleteStorageVolumePayloadGQL | None:
@@ -156,10 +155,10 @@ async def admin_delete_storage_volume(
 @gql_mutation(
     BackendAIGQLMeta(
         added_version=NEXT_RELEASE_VERSION,
-        description="Take one withdrawn storage volume back into use. Admin only.",
+        description="Take one withdrawn storage volume back into use.",
     )
 )
-async def admin_restore_storage_volume(
+async def restore_storage_volume(
     info: Info[StrawberryGQLContext],
     id: ID,
 ) -> RestoreStorageVolumePayloadGQL | None:
