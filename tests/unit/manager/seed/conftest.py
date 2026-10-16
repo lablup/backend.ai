@@ -13,6 +13,9 @@ from ai.backend.common.data.entity.user import UserEntityType
 from ai.backend.manager.models.app_config_allow_list.row import AppConfigAllowListRow
 from ai.backend.manager.models.app_config_definition.row import AppConfigDefinitionRow
 from ai.backend.manager.models.app_config_fragment.row import AppConfigFragmentRow
+from ai.backend.manager.models.association_container_registries_groups.row import (
+    AssociationContainerRegistriesGroupsRow,
+)
 from ai.backend.manager.models.base import ensure_all_tables_registered
 from ai.backend.manager.models.client_ip_masking.row import ClientIPMaskingPolicyRow
 from ai.backend.manager.models.container_registry.row import ContainerRegistryRow
@@ -669,6 +672,7 @@ _SEED_TABLES: list[Table | type[HasTable]] = [
     UserRow,
     KeyPairRow,
     ProjectRow,
+    AssociationContainerRegistriesGroupsRow,
     SessionTemplateRow,
     ResourceGroupRow,
     ResourceGroupForDomainRow,
@@ -927,6 +931,24 @@ def container_registry_seed_dir(tmp_path: Path) -> Path:
         yaml.safe_dump({"kind": "container_registry", "version": 1, "items": _CONTAINER_REGISTRIES})
     )
     return directory
+
+
+@pytest.fixture
+def container_registry_project_seed_dir(project_seed_dir: Path) -> Path:
+    """The project directory plus the registries and the projects allowed on them, the
+    research project taking the first registry as its default."""
+    (project_seed_dir / "registries.yaml").write_text(
+        yaml.safe_dump({"kind": "container_registry", "version": 1, "items": _CONTAINER_REGISTRIES})
+    )
+    research = _PROJECTS["research.yaml"]["id"]
+    allowed = [
+        {"registry_id": _CONTAINER_REGISTRIES[0]["id"], "project_id": research, "is_default": True},
+        {"registry_id": _CONTAINER_REGISTRIES[1]["id"], "project_id": research},
+    ]
+    (project_seed_dir / "allowed-registries.yaml").write_text(
+        yaml.safe_dump({"kind": "container_registry_project", "version": 1, "items": allowed})
+    )
+    return project_seed_dir
 
 
 @pytest.fixture
