@@ -9,7 +9,7 @@ from ai.backend.common.data.entity.domain import DomainEntityType
 from ai.backend.common.data.entity.project import ProjectEntityType
 from ai.backend.common.data.entity.resource_group import ResourceGroupEntityType
 from ai.backend.manager.actions.registry.registry import ProcessorRegistry
-from ai.backend.manager.actions.registry.types import GroupMeta
+from ai.backend.manager.actions.registry.types import Concern, ConcernMeta, GroupMeta
 from ai.backend.manager.api.rest.resource_group.handler import ResourceGroupHandler
 from ai.backend.manager.api.rest.resource_group.registry import register_resource_group_routes
 from ai.backend.manager.api.rest.routing import RouteRegistry
@@ -19,6 +19,7 @@ from ai.backend.manager.dependencies.infrastructure.redis import ValkeyClients
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.domain.repository import DomainRepository
 from ai.backend.manager.repositories.ops.v2.domain.provider import DomainOpsProvider
+from ai.backend.manager.repositories.ops.v2.project.provider import ProjectOpsProvider
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.repositories.ops.v2.resource_policy.provider import (
     ResourcePolicyOpsProvider,
@@ -68,7 +69,7 @@ def project_processors(
     repositories = ProjectRepositories(
         repository=ProjectRepository(
             database_engine,
-            V2DBOpsProvider(database_engine),
+            ProjectOpsProvider(database_engine),
             ResourcePolicyOpsProvider(database_engine),
             config_provider,
             valkey_clients.stat,
@@ -76,7 +77,11 @@ def project_processors(
         )
     )
     service = ProjectService(storage_manager, config_provider, valkey_clients.stat, repositories)
-    return ProjectProcessors(processor_registry.group(GroupMeta(ProjectEntityType())), service)
+    return ProjectProcessors(
+        processor_registry.group(GroupMeta(ProjectEntityType())),
+        processor_registry.concern(ConcernMeta(Concern.ORGANIZATION)).relation_group(),
+        service,
+    )
 
 
 @pytest.fixture()

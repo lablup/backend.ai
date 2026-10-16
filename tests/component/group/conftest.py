@@ -38,7 +38,7 @@ from ai.backend.manager.models.virtual_entity.virtual_entity import VirtualEntit
 from ai.backend.manager.repositories.container_registry.repository import (
     ContainerRegistryRepository,
 )
-from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
+from ai.backend.manager.repositories.ops.v2.project.provider import ProjectOpsProvider
 from ai.backend.manager.repositories.ops.v2.resource_policy.provider import (
     ResourcePolicyOpsProvider,
 )
@@ -147,7 +147,7 @@ def group_repository(
     """Provide a ProjectRepository backed by the real test database."""
     return ProjectRepository(
         db=database_engine,
-        v2_ops_provider=V2DBOpsProvider(database_engine),
+        project_ops_provider=ProjectOpsProvider(database_engine),
         policy_ops_provider=ResourcePolicyOpsProvider(database_engine),
         config_provider=config_provider,
         valkey_stat_client=valkey_clients.stat,

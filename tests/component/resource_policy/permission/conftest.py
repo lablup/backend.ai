@@ -80,6 +80,7 @@ from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.virtual_entity.virtual_entity import VirtualEntityRow
 from ai.backend.manager.repositories.ops.repository import OpsRepository
 from ai.backend.manager.repositories.ops.v2.permission.provider import PermissionOpsProvider
+from ai.backend.manager.repositories.ops.v2.project.provider import ProjectOpsProvider
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.repositories.ops.v2.resource_policy.provider import (
     ResourcePolicyOpsProvider,
@@ -290,7 +291,7 @@ async def seeded_project(
     presets call for."""
     repository = ProjectRepository(
         database_engine,
-        V2DBOpsProvider(database_engine),
+        ProjectOpsProvider(database_engine),
         ResourcePolicyOpsProvider(database_engine),
         MagicMock(),
         MagicMock(),

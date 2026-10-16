@@ -1,6 +1,9 @@
 from dataclasses import dataclass
 from typing import Self
 
+from ai.backend.manager.repositories.ops.v2.project.provider import (
+    ProjectOpsProvider,
+)
 from ai.backend.manager.repositories.ops.v2.resource_policy.provider import (
     ResourcePolicyOpsProvider,
 )
@@ -16,7 +19,7 @@ class ProjectRepositories:
     def create(cls, args: RepositoryArgs) -> Self:
         repository = ProjectRepository(
             args.db,
-            args.v2_ops_provider,
+            ProjectOpsProvider(args.db),
             ResourcePolicyOpsProvider(args.db),
             args.config_provider,
             args.valkey_stat_client,

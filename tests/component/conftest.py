@@ -166,6 +166,7 @@ from ai.backend.manager.repositories.db.engine import (
 )
 from ai.backend.manager.repositories.global_entity.loader import GlobalEntityIDLoader
 from ai.backend.manager.repositories.ops.repository import OpsRepository
+from ai.backend.manager.repositories.ops.v2.project.provider import ProjectOpsProvider
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.repositories.ops.v2.resource_policy.provider import (
     ResourcePolicyOpsProvider,
@@ -1542,7 +1543,7 @@ def auth_processors(
     )
     group_repository = ProjectRepository(
         database_engine,
-        V2DBOpsProvider(database_engine),
+        ProjectOpsProvider(database_engine),
         ResourcePolicyOpsProvider(database_engine),
         config_provider,
         valkey_clients.stat,

@@ -23,12 +23,17 @@ from ai.backend.manager.data.project.types import ProjectData
 from ai.backend.manager.errors.resource import (
     ProjectNotFound,
 )
+from ai.backend.manager.models.association_container_registries_groups.updaters import (
+    ProjectDefaultRegistryUpdater,
+)
 from ai.backend.manager.models.kernel.row import KernelRow
 from ai.backend.manager.models.project.creators import ProjectCreator
 from ai.backend.manager.models.project.updaters import ProjectDotfilesUpdater, ProjectUpdater
 from ai.backend.manager.models.specs.types import BulkResultWithFailures
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
+from ai.backend.manager.repositories.ops.v2.project.provider import (
+    ProjectOpsProvider,
+)
 from ai.backend.manager.repositories.ops.v2.resource_policy.provider import (
     ResourcePolicyOpsProvider,
 )
@@ -54,7 +59,7 @@ project_repository_resilience = Resilience(
 
 class ProjectRepository:
     _db_source: ProjectDBSource
-    _v2_ops: V2DBOpsProvider
+    _project_ops: ProjectOpsProvider
     _policy_ops: ResourcePolicyOpsProvider
     _config_provider: ManagerConfigProvider
     _valkey_stat_client: ValkeyStatClient
@@ -63,18 +68,22 @@ class ProjectRepository:
     def __init__(
         self,
         db: ExtendedAsyncSAEngine,
-        v2_ops_provider: V2DBOpsProvider,
+        project_ops_provider: ProjectOpsProvider,
         policy_ops_provider: ResourcePolicyOpsProvider,
         config_provider: ManagerConfigProvider,
         valkey_stat_client: ValkeyStatClient,
         storage_manager: StorageSessionManager,
     ) -> None:
-        self._db_source = ProjectDBSource(db, v2_ops_provider)
-        self._v2_ops = v2_ops_provider
+        self._db_source = ProjectDBSource(db, project_ops_provider)
+        self._project_ops = project_ops_provider
         self._policy_ops = policy_ops_provider
         self._config_provider = config_provider
         self._valkey_stat_client = valkey_stat_client
         self._storage_manager = storage_manager
+
+    async def update_default_registry(self, updater: ProjectDefaultRegistryUpdater) -> None:
+        async with self._project_ops.write_ops() as ops:
+            await ops.update_default_registry_flags(updater)
 
     @project_repository_resilience.apply()
     async def create_project(self, creator: ProjectCreator) -> ProjectData:
@@ -122,7 +131,7 @@ class ProjectRepository:
     @project_repository_resilience.apply()
     async def update_dotfiles(self, updater: ProjectDotfilesUpdater) -> ProjectData:
         """Replace a project's packed dotfile entries."""
-        async with self._v2_ops.write_ops() as w:
+        async with self._project_ops.write_ops() as w:
             data = await w.update_data(updater)
             if data is None:
                 raise ProjectNotFound(f"Project not found: {updater.target_id_value()}")

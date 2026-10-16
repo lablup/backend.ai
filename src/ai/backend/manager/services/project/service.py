@@ -19,6 +19,9 @@ from ai.backend.manager.clients.storage_proxy.session_manager import StorageSess
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.dotfile.types import DotfileEntries, verify_dotfile_name
 from ai.backend.manager.data.project.types import ProjectData
+from ai.backend.manager.models.association_container_registries_groups.updaters import (
+    ProjectDefaultRegistryUpdater,
+)
 from ai.backend.manager.models.project.updaters import ProjectDotfilesUpdater
 from ai.backend.manager.models.resource_usage import (
     ProjectResourceUsage,
@@ -42,6 +45,10 @@ from ai.backend.manager.services.project.actions.partial_bulk_update_projects im
 from ai.backend.manager.services.project.actions.purge_project import (
     PurgeProjectAction,
     PurgeProjectActionResult,
+)
+from ai.backend.manager.services.project.actions.set_default_registry import (
+    SetProjectDefaultRegistryAction,
+    SetProjectDefaultRegistryActionResult,
 )
 from ai.backend.manager.services.project.actions.update_project import (
     UpdateProjectAction,
@@ -80,6 +87,19 @@ class ProjectService:
         self._config_provider = config_provider
         self._valkey_stat_client = valkey_stat_client
         self._group_repository = group_repositories.repository
+
+    async def change_default_registry(
+        self,
+        action: SetProjectDefaultRegistryAction,
+    ) -> SetProjectDefaultRegistryActionResult:
+        await self._group_repository.update_default_registry(
+            ProjectDefaultRegistryUpdater(
+                project_id=action.project_id,
+                previous_registry_id=action.previous_registry_id,
+                registry_id=action.registry_id,
+            ),
+        )
+        return SetProjectDefaultRegistryActionResult(action.registry_id)
 
     async def create_project(
         self, action: CreateProjectAction

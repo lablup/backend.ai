@@ -19,6 +19,8 @@ from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.types import ResourceSlot
 from ai.backend.manager.actions.registry.registry import ProcessorRegistry
 from ai.backend.manager.actions.registry.types import (
+    Concern,
+    ConcernMeta,
     GroupMeta,
 )
 from ai.backend.manager.actions.v2.bulk.validator.rbac import BulkOwnCheck
@@ -41,6 +43,7 @@ from ai.backend.manager.repositories.container_registry.repository import (
     ContainerRegistryRepository,
 )
 from ai.backend.manager.repositories.ops.v2.permission.provider import PermissionOpsProvider
+from ai.backend.manager.repositories.ops.v2.project.provider import ProjectOpsProvider
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.repositories.ops.v2.reconciler.provider import ReconcileOpsProvider
 from ai.backend.manager.repositories.ops.v2.resource_policy.provider import (
@@ -180,7 +183,7 @@ def project_processors(
 ) -> ProjectProcessors:
     group_repo = ProjectRepository(
         database_engine,
-        V2DBOpsProvider(database_engine),
+        ProjectOpsProvider(database_engine),
         ResourcePolicyOpsProvider(database_engine),
         config_provider,
         valkey_clients.stat,
@@ -188,7 +191,11 @@ def project_processors(
     )
     group_repos = ProjectRepositories(repository=group_repo)
     service = ProjectService(storage_manager, config_provider, valkey_clients.stat, group_repos)
-    return ProjectProcessors(processor_registry.group(GroupMeta(ProjectEntityType())), service)
+    return ProjectProcessors(
+        processor_registry.group(GroupMeta(ProjectEntityType())),
+        processor_registry.concern(ConcernMeta(Concern.ORGANIZATION)).relation_group(),
+        service,
+    )
 
 
 @pytest.fixture()

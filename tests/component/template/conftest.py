@@ -10,7 +10,7 @@ from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
 from ai.backend.common.data.entity.project import ProjectEntityType
 from ai.backend.common.data.entity.session_template import SessionTemplateEntityType
 from ai.backend.manager.actions.registry.registry import ProcessorRegistry
-from ai.backend.manager.actions.registry.types import GroupMeta
+from ai.backend.manager.actions.registry.types import Concern, ConcernMeta, GroupMeta
 from ai.backend.manager.api.rest.cluster_template.handler import ClusterTemplateHandler
 from ai.backend.manager.api.rest.cluster_template.registry import register_cluster_template_routes
 from ai.backend.manager.api.rest.routing import RouteRegistry
@@ -23,7 +23,7 @@ from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.dependencies.infrastructure.redis import ValkeyClients
 from ai.backend.manager.models.project.row import ProjectRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
+from ai.backend.manager.repositories.ops.v2.project.provider import ProjectOpsProvider
 from ai.backend.manager.repositories.ops.v2.resource_policy.provider import (
     ResourcePolicyOpsProvider,
 )
@@ -58,7 +58,7 @@ def project_processors(
 ) -> ProjectProcessors:
     group_repo = ProjectRepository(
         database_engine,
-        V2DBOpsProvider(database_engine),
+        ProjectOpsProvider(database_engine),
         ResourcePolicyOpsProvider(database_engine),
         config_provider,
         valkey_clients.stat,
@@ -66,7 +66,11 @@ def project_processors(
     )
     group_repos = ProjectRepositories(repository=group_repo)
     service = ProjectService(storage_manager, config_provider, valkey_clients.stat, group_repos)
-    return ProjectProcessors(processor_registry.group(GroupMeta(ProjectEntityType())), service)
+    return ProjectProcessors(
+        processor_registry.group(GroupMeta(ProjectEntityType())),
+        processor_registry.concern(ConcernMeta(Concern.ORGANIZATION)).relation_group(),
+        service,
+    )
 
 
 @pytest.fixture()
