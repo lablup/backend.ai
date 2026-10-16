@@ -25491,14 +25491,14 @@ type SessionGroupConnection
   """Pagination data for this connection"""
   pageInfo: PageInfo!
 
-  """Contains the nodes in this connection."""
+  """Contains the nodes in this connection"""
   edges: [SessionGroupEdge!]!
 
   """Total number of session groups matching the query."""
   count: Int!
 }
 
-"""Added in 26.10.0. One session group within a connection."""
+"""An edge in a connection."""
 type SessionGroupEdge
   @join__type(graph: STRAWBERRY)
 {
