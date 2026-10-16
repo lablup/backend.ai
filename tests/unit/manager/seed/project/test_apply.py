@@ -86,6 +86,7 @@ async def runtime_project_id(
                 resource_policy="default",
             )
         )
+        await w.restate_project_resource_policy_share(ProjectID(data.id))
     return ProjectID(data.id)
 
 

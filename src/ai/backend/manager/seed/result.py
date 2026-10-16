@@ -5,7 +5,7 @@ from dataclasses import dataclass, field
 
 @dataclass(frozen=True)
 class SeedItemFailure:
-    """A seed item left unwritten, and the constraint that refused it."""
+    """A seed item left unwritten, and why."""
 
     key: str
     reason: str
@@ -15,7 +15,8 @@ class SeedItemFailure:
 class SeedWriteResult:
     """The items of one kind written, skipped and failed.
 
-    ``skipped`` collides with a row already there; ``failed`` refers to a row that is not.
+    ``skipped`` collides with a row already there; ``failed`` refers to a row that is not,
+    or is refused by a rule.
     """
 
     succeeded: list[str] = field(default_factory=list)

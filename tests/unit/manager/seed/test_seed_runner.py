@@ -16,13 +16,20 @@ from ai.backend.manager.errors.repository import (
     ForeignKeyViolationError,
     UniqueConstraintViolationError,
 )
+from ai.backend.manager.errors.resource import PersonalProjectMemberAdditionError
+from ai.backend.manager.errors.seed import SeedKindOutOfOrder
 from ai.backend.manager.repositories.ops.v2.seed.provider import SeedOpsProvider
-from ai.backend.manager.repositories.ops.v2.seed.types import SeedWrite, SeedWriteItemResult
+from ai.backend.manager.repositories.ops.v2.seed.types import (
+    SeedItemWrite,
+    SeedWrite,
+    SeedWriteItemResult,
+)
 from ai.backend.manager.repositories.seed.repository import SeedRepository
 from ai.backend.manager.seed.base import (
     SeedItem,
     SeedItems,
     SeedRejection,
+    SeedRelationItem,
 )
 from ai.backend.manager.seed.registry import SeedKindRegistry
 from ai.backend.manager.seed.result import SeedItemFailure, SeedWriteResult
@@ -62,14 +69,19 @@ class OtherItem(NamedItem):
     """The item model of a second kind."""
 
 
+class RelationItem(NamedItem, SeedRelationItem):
+    """The item model of a relation kind."""
+
+
 def _registry(*names: SeedKind) -> SeedKindRegistry:
     """Kinds of :class:`NamedItem` read in version 1, applied in the order named."""
     return SeedKindRegistry(dict.fromkeys(names, (1, NamedItem)))
 
 
 class FakeRepository(SeedRepository):
-    """Keeps rows by item name. An item named ``orphan`` refers to a missing row, and one
-    named ``taken`` collides with a row on another unique key."""
+    """Keeps rows by item name. An item named ``orphan`` refers to a missing row, one
+    named ``taken`` collides with a row on another unique key, and one named ``refused``
+    is refused by a rule."""
 
     rows: dict[str, str]
     calls: list[tuple[str, str]]
@@ -81,9 +93,12 @@ class FakeRepository(SeedRepository):
 
     @override
     async def partial_write(
-        self, writes: Sequence[SeedWrite], overwrite: bool
+        self, writes: Sequence[SeedItemWrite], overwrite: bool
     ) -> list[SeedWriteItemResult]:
-        return [self._write(cast(NamedItem, write.upserter).name, overwrite) for write in writes]
+        return [
+            self._write(cast(NamedItem, cast(SeedWrite, write).upserter).name, overwrite)
+            for write in writes
+        ]
 
     def _write(self, name: str, overwrite: bool) -> SeedWriteItemResult:
         self.calls.append(("upsert" if overwrite else "insert", name))
@@ -94,6 +109,10 @@ class FakeRepository(SeedRepository):
         if name == "unchecked":
             return SeedWriteItemResult(
                 written=False, error=CheckConstraintViolationError(constraint_name="ck_fake")
+            )
+        if name == "refused":
+            return SeedWriteItemResult(
+                written=False, error=PersonalProjectMemberAdditionError("personal")
             )
         if name == "taken":
             return SeedWriteItemResult(
@@ -286,6 +305,27 @@ class TestOrder:
         assert [batch.kind.name for batch in plan.batches] == [SeedKind.USER]
 
 
+class TestRelationKindOrder:
+    def test_a_relation_kind_after_every_entity_kind_is_registered(self) -> None:
+        registry = SeedKindRegistry({
+            SeedKind.DOMAIN: (1, NamedItem),
+            SeedKind.USER: (1, OtherItem),
+            SeedKind.SESSION_TEMPLATE: (1, RelationItem),
+        })
+        assert [kind.name for kind in registry.ordered()] == [
+            SeedKind.DOMAIN,
+            SeedKind.USER,
+            SeedKind.SESSION_TEMPLATE,
+        ]
+
+    def test_a_relation_kind_before_an_entity_kind_is_refused(self) -> None:
+        with pytest.raises(SeedKindOutOfOrder):
+            SeedKindRegistry({
+                SeedKind.DOMAIN: (1, RelationItem),
+                SeedKind.USER: (1, NamedItem),
+            })
+
+
 class TestRead:
     @pytest.fixture
     def planner(self) -> SeedPlanner:
@@ -353,6 +393,21 @@ class TestApply:
         assert results[SeedKind.DOMAIN] == SeedWriteResult(
             succeeded=["x"],
             failed=[SeedItemFailure("unchecked", "violates a constraint (ck_fake)")],
+        )
+
+    async def test_an_item_refused_by_a_rule_fails(self, tmp_path: Path) -> None:
+        plan = SeedPlanner(_registry(SeedKind.DOMAIN)).plan([
+            _write(tmp_path / "a.yaml", "domain", "x", "refused")
+        ])
+        results = await SeedApplier(FakeRepository()).apply(plan, overwrite=False)
+        assert results[SeedKind.DOMAIN] == SeedWriteResult(
+            succeeded=["x"],
+            failed=[
+                SeedItemFailure(
+                    "refused",
+                    "refused: Personal project takes no members beyond its owner. (personal)",
+                )
+            ],
         )
 
     async def test_an_existing_item_is_kept_and_listed(self, tmp_path: Path) -> None:

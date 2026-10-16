@@ -54,9 +54,10 @@ def apply(cli_ctx: CLIContext, paths: tuple[Path, ...], overwrite: bool) -> None
     Write seed files into the database, kind by kind in the registered order.
 
     A file failing the checks of `check` is skipped and fails the command. A row that
-    exists is kept, or upserted with `--overwrite`; an item colliding on another unique
-    key is skipped, and one referring to a missing row fails the command. Both are
-    listed, and the rest are written.
+    exists is kept, or upserted with `--overwrite`; a relation is added and never
+    removed. An item colliding on another unique key is skipped, and one referring to a
+    missing row or refused by a rule fails the command. Both are listed, and the rest
+    are written.
 
     Examples:
 
