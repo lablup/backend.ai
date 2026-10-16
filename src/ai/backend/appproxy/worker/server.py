@@ -101,11 +101,7 @@ from ai.backend.common.message_queue.queue import AbstractMessageQueue
 from ai.backend.common.message_queue.redis_queue import RedisMQArgs, RedisQueue
 from ai.backend.common.metrics.http import build_api_metric_middleware
 from ai.backend.common.metrics.multiprocess_setup import cleanup_prometheus_multiprocess_dir
-<<<<<<< HEAD
-=======
 from ai.backend.common.middlewares.exception import client_closed_response, is_client_disconnect
-from ai.backend.common.middlewares.request_id import REQUEST_ID_HEADER
->>>>>>> 7ab98e95 (fix(BA-8553): log client disconnects while streaming a response at trace (#15746))
 from ai.backend.common.msgpack import DEFAULT_PACK_OPTS, DEFAULT_UNPACK_OPTS
 from ai.backend.common.networking import force_threaded_dns_resolver
 from ai.backend.common.service_discovery.event_publisher import ServiceDiscoveryEventPublisher
@@ -237,18 +233,14 @@ async def exception_middleware(
         log.debug("Request cancelled ({0} {1})", request.method, request.rel_url)
         raise e
     except Exception as e:
-<<<<<<< HEAD
-        log.exception("Uncaught exception in HTTP request handlers {0!r}", e)
-=======
         if is_client_disconnect(request, e):
             log.trace(
-                "client disconnected while writing the response",
-                http_method=request.method,
-                route_path=str(request.rel_url),
+                "Client disconnected while writing the response ({0} {1})",
+                request.method,
+                request.rel_url,
             )
             return client_closed_response()
-        log.exception("uncaught exception in HTTP request handlers")
->>>>>>> 7ab98e95 (fix(BA-8553): log client disconnects while streaming a response at trace (#15746))
+        log.exception("Uncaught exception in HTTP request handlers {0!r}", e)
         if root_ctx.local_config.debug.enabled:
             raise InternalServerError(traceback.format_exc()) from e
         raise InternalServerError() from e

@@ -46,23 +46,10 @@ async def general_exception_middleware(
             )
         raise
     except ConnectionError as e:
-<<<<<<< HEAD
-        log.warning("Connection error inside handlers ({} {}): {}", method, endpoint, e)
-=======
         if is_client_disconnect(request, e):
-            log.trace(
-                "client disconnected while writing the response",
-                http_method=method,
-                endpoint=endpoint,
-            )
+            log.trace("Client disconnected while writing the response ({} {})", method, endpoint)
             return client_closed_response()
-        log.warning(
-            "connection error inside handlers",
-            exc_info=e,
-            http_method=method,
-            endpoint=endpoint,
-        )
->>>>>>> 7ab98e95 (fix(BA-8553): log client disconnects while streaming a response at trace (#15746))
+        log.warning("Connection error inside handlers ({} {}): {}", method, endpoint, e)
         raise
     except asyncio.CancelledError:
         # The server is closing or the client has disconnected in the middle of
