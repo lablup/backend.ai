@@ -43,9 +43,9 @@ from ai.backend.manager.api.gql.pydantic_compat import (
     PydanticOutputMixin,
 )
 from ai.backend.manager.api.gql.storage_volume.types import (
-    StorageVolumeServiceHoldingFilterGQL,
-    StorageVolumeServiceHoldingListGQL,
-    StorageVolumeServiceHoldingOrderByGQL,
+    StorageVolumeServiceAttachmentConnectionGQL,
+    StorageVolumeServiceAttachmentFilterGQL,
+    StorageVolumeServiceAttachmentOrderByGQL,
 )
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 
@@ -123,17 +123,21 @@ class ServiceCatalogGQL(PydanticNodeMixin[ServiceCatalogNode]):
     @gql_added_field(
         BackendAIGQLMeta(
             added_version=NEXT_RELEASE_VERSION,
-            description="The storage volumes this service holds.",
+            description="The storage volumes attached to this service.",
         )
     )  # type: ignore[misc]
-    async def storage_volume_holdings(
+    async def storage_volume_attachments(
         self,
         info: Info[StrawberryGQLContext],
-        filter: StorageVolumeServiceHoldingFilterGQL | None = None,
-        order_by: list[StorageVolumeServiceHoldingOrderByGQL] | None = None,
+        filter: StorageVolumeServiceAttachmentFilterGQL | None = None,
+        order_by: list[StorageVolumeServiceAttachmentOrderByGQL] | None = None,
+        before: str | None = None,
+        after: str | None = None,
+        first: int | None = None,
+        last: int | None = None,
         limit: int | None = None,
         offset: int | None = None,
-    ) -> StorageVolumeServiceHoldingListGQL | None:
+    ) -> StorageVolumeServiceAttachmentConnectionGQL | None:
         raise NotImplementedError
 
     @classmethod

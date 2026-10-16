@@ -12,60 +12,38 @@ from strawberry import UNSET, Info
 from strawberry.relay import Connection, Edge, NodeID
 
 from ai.backend.common.dto.manager.v2.storage_volume.request import (
-    PurgeResourceGroupVolumeOfferInput as PurgeResourceGroupVolumeOfferInputDTO,
-)
-from ai.backend.common.dto.manager.v2.storage_volume.request import (
-    ResourceGroupVolumeOfferFilter as ResourceGroupVolumeOfferFilterDTO,
-)
-from ai.backend.common.dto.manager.v2.storage_volume.request import (
-    ResourceGroupVolumeOfferOrder as ResourceGroupVolumeOfferOrderDTO,
-)
-from ai.backend.common.dto.manager.v2.storage_volume.request import (
     StorageVolumeFilter as StorageVolumeFilterDTO,
 )
 from ai.backend.common.dto.manager.v2.storage_volume.request import (
     StorageVolumeOrder as StorageVolumeOrderDTO,
 )
 from ai.backend.common.dto.manager.v2.storage_volume.request import (
-    StorageVolumeServiceHoldingFilter as StorageVolumeServiceHoldingFilterDTO,
+    StorageVolumeScope,
 )
 from ai.backend.common.dto.manager.v2.storage_volume.request import (
-    StorageVolumeServiceHoldingOrder as StorageVolumeServiceHoldingOrderDTO,
+    StorageVolumeServiceAttachmentFilter as StorageVolumeServiceAttachmentFilterDTO,
+)
+from ai.backend.common.dto.manager.v2.storage_volume.request import (
+    StorageVolumeServiceAttachmentOrder as StorageVolumeServiceAttachmentOrderDTO,
 )
 from ai.backend.common.dto.manager.v2.storage_volume.request import (
     UpdateStorageVolumeInput as UpdateStorageVolumeInputDTO,
-)
-from ai.backend.common.dto.manager.v2.storage_volume.request import (
-    UpsertResourceGroupVolumeOfferInput as UpsertResourceGroupVolumeOfferInputDTO,
 )
 from ai.backend.common.dto.manager.v2.storage_volume.response import (
     DeleteStorageVolumePayload as DeleteStorageVolumePayloadDTO,
 )
 from ai.backend.common.dto.manager.v2.storage_volume.response import (
-    PurgeResourceGroupVolumeOfferPayload as PurgeResourceGroupVolumeOfferPayloadDTO,
-)
-from ai.backend.common.dto.manager.v2.storage_volume.response import (
     PurgeStorageVolumePayload as PurgeStorageVolumePayloadDTO,
-)
-from ai.backend.common.dto.manager.v2.storage_volume.response import (
-    ResourceGroupVolumeOfferNode,
-    StorageVolumeNode,
-    StorageVolumeServiceHoldingNode,
 )
 from ai.backend.common.dto.manager.v2.storage_volume.response import (
     RestoreStorageVolumePayload as RestoreStorageVolumePayloadDTO,
 )
 from ai.backend.common.dto.manager.v2.storage_volume.response import (
-    SearchResourceGroupVolumeOffersPayload as SearchResourceGroupVolumeOffersPayloadDTO,
-)
-from ai.backend.common.dto.manager.v2.storage_volume.response import (
-    SearchStorageVolumeServiceHoldingsPayload as SearchStorageVolumeServiceHoldingsPayloadDTO,
+    StorageVolumeNode,
+    StorageVolumeServiceAttachmentNode,
 )
 from ai.backend.common.dto.manager.v2.storage_volume.response import (
     UpdateStorageVolumePayload as UpdateStorageVolumePayloadDTO,
-)
-from ai.backend.common.dto.manager.v2.storage_volume.response import (
-    UpsertResourceGroupVolumeOfferPayload as UpsertResourceGroupVolumeOfferPayloadDTO,
 )
 from ai.backend.common.dto.manager.v2.storage_volume.types import (
     StorageVolumeUsageExposureInfo,
@@ -74,7 +52,12 @@ from ai.backend.common.dto.manager.v2.storage_volume.types import (
     StorageVolumeUsageExposureInput as StorageVolumeUsageExposureInputDTO,
 )
 from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
-from ai.backend.manager.api.gql.base import OrderDirection, StringFilter, UUIDFilter
+from ai.backend.manager.api.gql.base import (
+    OrderDirection,
+    StringFilter,
+    UUIDFilter,
+    UUIDScopeGQL,
+)
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     gql_connection_type,
@@ -93,29 +76,22 @@ from ai.backend.manager.api.gql.types import StrawberryGQLContext
 
 __all__ = (
     "DeleteStorageVolumePayloadGQL",
-    "StorageVolumeEdgeGQL",
-    "PurgeResourceGroupVolumeOfferInputGQL",
-    "PurgeResourceGroupVolumeOfferPayloadGQL",
     "PurgeStorageVolumePayloadGQL",
     "RestoreStorageVolumePayloadGQL",
-    "UpsertResourceGroupVolumeOfferInputGQL",
-    "UpsertResourceGroupVolumeOfferPayloadGQL",
-    "UpdateStorageVolumePayloadGQL",
-    "ResourceGroupVolumeOfferFilterGQL",
-    "ResourceGroupVolumeOfferGQL",
-    "ResourceGroupVolumeOfferListGQL",
-    "ResourceGroupVolumeOfferOrderByGQL",
     "StorageVolumeConnectionGQL",
     "StorageVolumeEdgeGQL",
     "StorageVolumeFilterGQL",
     "StorageVolumeGQL",
     "StorageVolumeOrderByGQL",
-    "StorageVolumeServiceHoldingFilterGQL",
-    "StorageVolumeServiceHoldingGQL",
-    "StorageVolumeServiceHoldingListGQL",
-    "StorageVolumeServiceHoldingOrderByGQL",
+    "StorageVolumeScopeGQL",
+    "StorageVolumeServiceAttachmentConnectionGQL",
+    "StorageVolumeServiceAttachmentEdgeGQL",
+    "StorageVolumeServiceAttachmentFilterGQL",
+    "StorageVolumeServiceAttachmentGQL",
+    "StorageVolumeServiceAttachmentOrderByGQL",
     "StorageVolumeUsageFieldGQL",
     "UpdateStorageVolumeInputGQL",
+    "UpdateStorageVolumePayloadGQL",
 )
 
 
@@ -159,52 +135,104 @@ class StorageVolumeUsageExposureInputGQL(PydanticInputMixin[StorageVolumeUsageEx
     )
 
 
-@gql_pydantic_type(
+@gql_pydantic_input(
     BackendAIGQLMeta(
         added_version=NEXT_RELEASE_VERSION,
-        description="A storage volume as one service holds it.",
+        description=(
+            "The scopes a storage volume read is answered for. Each list is OR'd internally"
+            " and across lists, and every scope named is authorized before the read runs."
+        ),
     ),
-    model=StorageVolumeServiceHoldingNode,
-    name="StorageVolumeServiceHolding",
+    name="StorageVolumeScope",
 )
-class StorageVolumeServiceHoldingGQL(PydanticOutputMixin[StorageVolumeServiceHoldingNode]):
-    service_catalog_id: UUID = gql_field(description="ID of the holding service.")
-    storage_volume_id: UUID = gql_field(description="ID of the held volume.")
+class StorageVolumeScopeGQL(PydanticInputMixin[StorageVolumeScope]):
+    domain: list[UUIDScopeGQL] | None = gql_field(
+        default=None, description="Domains whose storage volumes are being read."
+    )
+    project: list[UUIDScopeGQL] | None = gql_field(
+        default=None, description="Projects whose storage volumes are being read."
+    )
+    user: list[UUIDScopeGQL] | None = gql_field(
+        default=None, description="Users whose storage volumes are being read."
+    )
+    storage_backend: list[UUIDScopeGQL] | None = gql_field(
+        default=None, description="Storage backends whose volumes are being read."
+    )
+
+
+@gql_node_type(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description=(
+            "A storage volume as one service has it attached. The volume and the service are"
+            " the attachment's immutable identity."
+        ),
+    ),
+    name="StorageVolumeServiceAttachment",
+)
+class StorageVolumeServiceAttachmentGQL(PydanticNodeMixin[StorageVolumeServiceAttachmentNode]):
+    id: NodeID[str] = gql_field(description="Relay-style global node ID.")
+    service_catalog_id: UUID = gql_field(description="ID of the service the volume is attached to.")
+    storage_volume_id: UUID = gql_field(description="ID of the attached volume.")
     status_checked_at: datetime | None = gql_field(
-        description="When the holding service last checked the volume."
+        description="When the service last checked the volume."
     )
     created_at: datetime = gql_field(description="Creation timestamp.")
     updated_at: datetime = gql_field(description="Last update timestamp.")
 
+    @classmethod
+    @override
+    async def resolve_nodes(  # type: ignore[override]  # Strawberry Node uses AwaitableOrValue overloads incompatible with async def
+        cls,
+        *,
+        info: Info[StrawberryGQLContext],
+        node_ids: Iterable[str],
+        required: bool = False,
+    ) -> Iterable[StorageVolumeServiceAttachmentGQL | None]:
+        raise NotImplementedError
 
-@gql_pydantic_type(
+
+@gql_connection_type(
     BackendAIGQLMeta(
         added_version=NEXT_RELEASE_VERSION,
-        description=(
-            "A page of the per-service holdings. Paged by limit and offset: a holding"
-            " carries no id of its own to put in a cursor."
-        ),
+        description="One storage volume service attachment within a connection.",
     ),
-    model=SearchStorageVolumeServiceHoldingsPayloadDTO,
-    name="StorageVolumeServiceHoldingList",
+    name="StorageVolumeServiceAttachmentEdge",
 )
-class StorageVolumeServiceHoldingListGQL(
-    PydanticOutputMixin[SearchStorageVolumeServiceHoldingsPayloadDTO]
-):
-    items: list[StorageVolumeServiceHoldingGQL] = gql_field(description="The holdings read.")
-    total_count: int = gql_field(description="Total number of matching holdings.")
-    has_next_page: bool = gql_field(description="Whether more rows follow this page.")
-    has_previous_page: bool = gql_field(description="Whether more rows precede this page.")
+class StorageVolumeServiceAttachmentEdgeGQL(Edge[StorageVolumeServiceAttachmentGQL]):
+    pass
+
+
+@gql_connection_type(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Paginated connection for the storage volume service attachments.",
+    ),
+    name="StorageVolumeServiceAttachmentConnection",
+)
+class StorageVolumeServiceAttachmentConnectionGQL(Connection[StorageVolumeServiceAttachmentGQL]):
+    # Restated so the schema's edge type is the described one above rather than the
+    # one Strawberry would generate from the generic, which carries no version.
+    edges: list[StorageVolumeServiceAttachmentEdgeGQL] = gql_field(  # type: ignore[assignment]
+        description="Contains the nodes in this connection."
+    )
+    count: int = gql_field(
+        description="Total number of storage volume service attachments matching the query."
+    )
+
+    def __init__(self, *args: Any, count: int, **kwargs: Any) -> None:
+        super().__init__(*args, **kwargs)
+        self.count = count
 
 
 @gql_enum(
     BackendAIGQLMeta(
         added_version=NEXT_RELEASE_VERSION,
-        description="Fields available for ordering the per-service holdings.",
+        description="Fields available for ordering the storage volume service attachments.",
     ),
-    name="StorageVolumeServiceHoldingOrderField",
+    name="StorageVolumeServiceAttachmentOrderField",
 )
-class StorageVolumeServiceHoldingOrderFieldGQL(StrEnum):
+class StorageVolumeServiceAttachmentOrderFieldGQL(StrEnum):
     SERVICE_CATALOG_ID = "service_catalog_id"
     STORAGE_VOLUME_ID = "storage_volume_id"
     STATUS_CHECKED_AT = "status_checked_at"
@@ -214,14 +242,14 @@ class StorageVolumeServiceHoldingOrderFieldGQL(StrEnum):
 @gql_pydantic_input(
     BackendAIGQLMeta(
         added_version=NEXT_RELEASE_VERSION,
-        description="Specifies ordering for the per-service holdings.",
+        description="Specifies ordering for the storage volume service attachments.",
     ),
-    name="StorageVolumeServiceHoldingOrderBy",
+    name="StorageVolumeServiceAttachmentOrderBy",
 )
-class StorageVolumeServiceHoldingOrderByGQL(
-    PydanticInputMixin[StorageVolumeServiceHoldingOrderDTO]
+class StorageVolumeServiceAttachmentOrderByGQL(
+    PydanticInputMixin[StorageVolumeServiceAttachmentOrderDTO]
 ):
-    field: StorageVolumeServiceHoldingOrderFieldGQL = gql_field(
+    field: StorageVolumeServiceAttachmentOrderFieldGQL = gql_field(
         description="The field to order by."
     )
     direction: OrderDirection = gql_field(description="Sort direction.", default=OrderDirection.ASC)
@@ -230,110 +258,18 @@ class StorageVolumeServiceHoldingOrderByGQL(
 @gql_pydantic_input(
     BackendAIGQLMeta(
         added_version=NEXT_RELEASE_VERSION,
-        description="Filter for the per-service holdings of the volumes.",
+        description="Filter for the storage volume service attachments.",
     ),
-    name="StorageVolumeServiceHoldingFilter",
+    name="StorageVolumeServiceAttachmentFilter",
 )
-class StorageVolumeServiceHoldingFilterGQL(
-    PydanticInputMixin[StorageVolumeServiceHoldingFilterDTO]
+class StorageVolumeServiceAttachmentFilterGQL(
+    PydanticInputMixin[StorageVolumeServiceAttachmentFilterDTO]
 ):
     service_catalog_id: UUIDFilter | None = gql_field(
-        description="Filter by the holding service's ID.", default=None
+        description="Filter by the service the volume is attached to.", default=None
     )
     storage_volume_id: UUIDFilter | None = gql_field(
-        description="Filter by the held volume's ID.", default=None
-    )
-    AND: list[Self] | None = gql_field(
-        description="Combine multiple filters with AND logic.", default=None
-    )
-    OR: list[Self] | None = gql_field(
-        description="Combine multiple filters with OR logic.", default=None
-    )
-    NOT: list[Self] | None = gql_field(description="Negate the given filters.", default=None)
-
-
-@gql_pydantic_type(
-    BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
-        description="A storage volume offered to a resource group.",
-    ),
-    model=ResourceGroupVolumeOfferNode,
-    name="ResourceGroupVolumeOffer",
-)
-class ResourceGroupVolumeOfferGQL(PydanticOutputMixin[ResourceGroupVolumeOfferNode]):
-    resource_group_id: UUID = gql_field(description="ID of the resource group offered to.")
-    storage_volume_id: UUID = gql_field(description="ID of the offered volume.")
-    enabled: bool = gql_field(description="Whether the offer is enabled.")
-    is_default: bool = gql_field(description="Whether the offer is the resource group's default.")
-    created_at: datetime = gql_field(description="Creation timestamp.")
-    updated_at: datetime = gql_field(description="Last update timestamp.")
-
-
-@gql_pydantic_type(
-    BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
-        description=(
-            "A page of the offers to resource groups. Paged by limit and offset: an offer"
-            " carries no id of its own to put in a cursor."
-        ),
-    ),
-    model=SearchResourceGroupVolumeOffersPayloadDTO,
-    name="ResourceGroupVolumeOfferList",
-)
-class ResourceGroupVolumeOfferListGQL(
-    PydanticOutputMixin[SearchResourceGroupVolumeOffersPayloadDTO]
-):
-    items: list[ResourceGroupVolumeOfferGQL] = gql_field(description="The offers read.")
-    total_count: int = gql_field(description="Total number of matching offers.")
-    has_next_page: bool = gql_field(description="Whether more rows follow this page.")
-    has_previous_page: bool = gql_field(description="Whether more rows precede this page.")
-
-
-@gql_enum(
-    BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
-        description="Fields available for ordering the offers to resource groups.",
-    ),
-    name="ResourceGroupVolumeOfferOrderField",
-)
-class ResourceGroupVolumeOfferOrderFieldGQL(StrEnum):
-    RESOURCE_GROUP_ID = "resource_group_id"
-    STORAGE_VOLUME_ID = "storage_volume_id"
-    IS_DEFAULT = "is_default"
-    UPDATED_AT = "updated_at"
-
-
-@gql_pydantic_input(
-    BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
-        description="Specifies ordering for the offers to resource groups.",
-    ),
-    name="ResourceGroupVolumeOfferOrderBy",
-)
-class ResourceGroupVolumeOfferOrderByGQL(PydanticInputMixin[ResourceGroupVolumeOfferOrderDTO]):
-    field: ResourceGroupVolumeOfferOrderFieldGQL = gql_field(description="The field to order by.")
-    direction: OrderDirection = gql_field(description="Sort direction.", default=OrderDirection.ASC)
-
-
-@gql_pydantic_input(
-    BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
-        description="Filter for the offers of the volumes to resource groups.",
-    ),
-    name="ResourceGroupVolumeOfferFilter",
-)
-class ResourceGroupVolumeOfferFilterGQL(PydanticInputMixin[ResourceGroupVolumeOfferFilterDTO]):
-    resource_group_id: UUIDFilter | None = gql_field(
-        description="Filter by the resource group offered to.", default=None
-    )
-    storage_volume_id: UUIDFilter | None = gql_field(
-        description="Filter by the offered volume's ID.", default=None
-    )
-    enabled: bool | None = gql_field(
-        description="Filter by whether the offer is enabled.", default=None
-    )
-    is_default: bool | None = gql_field(
-        description="Filter by whether the offer is the resource group's default.", default=None
+        description="Filter by the attached volume's ID.", default=None
     )
     AND: list[Self] | None = gql_field(
         description="Combine multiple filters with AND logic.", default=None
@@ -367,26 +303,21 @@ class StorageVolumeGQL(PydanticNodeMixin[StorageVolumeNode]):
     created_at: datetime = gql_field(description="Creation timestamp.")
     updated_at: datetime = gql_field(description="Last update timestamp.")
 
-    @gql_field(description="Which services hold this volume, one row per service.")  # type: ignore[misc]
-    async def service_holdings(
+    @gql_field(  # type: ignore[misc]
+        description="Which services have this volume attached, one row per service."
+    )
+    async def service_attachments(
         self,
         info: Info[StrawberryGQLContext],
-        filter: StorageVolumeServiceHoldingFilterGQL | None = None,
-        order_by: list[StorageVolumeServiceHoldingOrderByGQL] | None = None,
+        filter: StorageVolumeServiceAttachmentFilterGQL | None = None,
+        order_by: list[StorageVolumeServiceAttachmentOrderByGQL] | None = None,
+        before: str | None = None,
+        after: str | None = None,
+        first: int | None = None,
+        last: int | None = None,
         limit: int | None = None,
         offset: int | None = None,
-    ) -> StorageVolumeServiceHoldingListGQL | None:
-        raise NotImplementedError
-
-    @gql_field(description="Which resource groups this volume is offered to.")  # type: ignore[misc]
-    async def resource_group_offers(
-        self,
-        info: Info[StrawberryGQLContext],
-        filter: ResourceGroupVolumeOfferFilterGQL | None = None,
-        order_by: list[ResourceGroupVolumeOfferOrderByGQL] | None = None,
-        limit: int | None = None,
-        offset: int | None = None,
-    ) -> ResourceGroupVolumeOfferListGQL | None:
+    ) -> StorageVolumeServiceAttachmentConnectionGQL | None:
         raise NotImplementedError
 
     @classmethod
@@ -518,78 +449,6 @@ class PurgeStorageVolumePayloadGQL(PydanticOutputMixin[PurgeStorageVolumePayload
 )
 class UpdateStorageVolumePayloadGQL(PydanticOutputMixin[UpdateStorageVolumePayloadDTO]):
     item: StorageVolumeGQL = gql_field(description="The updated storage volume.")
-
-
-@gql_pydantic_input(
-    BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
-        description=(
-            "Input for offering a volume to a resource group, or for retuning an offer."
-            " The pair is the key, so offering a volume already offered rewrites the flags"
-            " it carries."
-        ),
-    ),
-    name="UpsertResourceGroupVolumeOfferInput",
-)
-class UpsertResourceGroupVolumeOfferInputGQL(
-    PydanticInputMixin[UpsertResourceGroupVolumeOfferInputDTO]
-):
-    resource_group_id: UUID = gql_field(description="The resource group the volume is offered to.")
-    storage_volume_id: UUID = gql_field(description="The volume being offered.")
-    enabled: bool | None = gql_field(
-        description="Whether the offer is enabled. Defaults to true on a new offer.",
-        default=UNSET,
-    )
-    is_default: bool | None = gql_field(
-        description=(
-            "Whether the offer is the resource group's default. Defaults to false on a new"
-            " offer. At most one offer per resource group may be the default."
-        ),
-        default=UNSET,
-    )
-
-
-@gql_pydantic_type(
-    BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
-        description="Payload returned after offering a volume to a resource group.",
-    ),
-    model=UpsertResourceGroupVolumeOfferPayloadDTO,
-    name="UpsertResourceGroupVolumeOfferPayload",
-)
-class UpsertResourceGroupVolumeOfferPayloadGQL(
-    PydanticOutputMixin[UpsertResourceGroupVolumeOfferPayloadDTO]
-):
-    item: ResourceGroupVolumeOfferGQL = gql_field(description="The offer written.")
-
-
-@gql_pydantic_input(
-    BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
-        description="Input for withdrawing a volume from a resource group.",
-    ),
-    name="PurgeResourceGroupVolumeOfferInput",
-)
-class PurgeResourceGroupVolumeOfferInputGQL(
-    PydanticInputMixin[PurgeResourceGroupVolumeOfferInputDTO]
-):
-    resource_group_id: UUID = gql_field(description="The resource group the volume was offered to.")
-    storage_volume_id: UUID = gql_field(description="The volume being withdrawn.")
-
-
-@gql_pydantic_type(
-    BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
-        description="Payload returned after withdrawing a volume from a resource group.",
-    ),
-    model=PurgeResourceGroupVolumeOfferPayloadDTO,
-    name="PurgeResourceGroupVolumeOfferPayload",
-)
-class PurgeResourceGroupVolumeOfferPayloadGQL(
-    PydanticOutputMixin[PurgeResourceGroupVolumeOfferPayloadDTO]
-):
-    resource_group_id: UUID = gql_field(description="The resource group the volume was offered to.")
-    storage_volume_id: UUID = gql_field(description="The volume withdrawn.")
 
 
 @gql_pydantic_type(

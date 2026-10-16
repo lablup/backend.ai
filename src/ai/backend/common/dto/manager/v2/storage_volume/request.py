@@ -4,35 +4,29 @@ Request DTOs for Storage Volume DTO v2.
 
 from __future__ import annotations
 
-from uuid import UUID
-
-from pydantic import Field
+from pydantic import Field, model_validator
 
 from ai.backend.common.api_handlers import BaseRequestModel
 from ai.backend.common.dto.manager.query import StringFilter, UUIDFilter
 from ai.backend.common.dto.manager.v2.common import String64
+from ai.backend.common.dto.manager.v2.rbac.types import UUIDScope
 from ai.backend.common.tristate.unset import UNSET, Unset
 
 from .types import (
     OrderDirection,
-    ResourceGroupVolumeOfferOrderField,
     StorageVolumeOrderField,
-    StorageVolumeServiceHoldingOrderField,
+    StorageVolumeServiceAttachmentOrderField,
     StorageVolumeUsageExposureInput,
 )
 
 __all__ = (
     "AdminSearchStorageVolumesInput",
-    "PurgeResourceGroupVolumeOfferInput",
-    "UpsertResourceGroupVolumeOfferInput",
-    "ResourceGroupVolumeOfferFilter",
-    "ResourceGroupVolumeOfferOrder",
-    "SearchResourceGroupVolumeOffersInput",
-    "SearchStorageVolumeServiceHoldingsInput",
+    "ScopedSearchStorageVolumesInput",
     "StorageVolumeFilter",
     "StorageVolumeOrder",
-    "StorageVolumeServiceHoldingFilter",
-    "StorageVolumeServiceHoldingOrder",
+    "StorageVolumeScope",
+    "StorageVolumeServiceAttachmentFilter",
+    "StorageVolumeServiceAttachmentOrder",
     "UpdateStorageVolumeInput",
 )
 
@@ -66,14 +60,60 @@ class StorageVolumeOrder(BaseRequestModel):
     direction: OrderDirection = Field(default=OrderDirection.ASC, description="Order direction.")
 
 
+class StorageVolumeScope(BaseRequestModel):
+    """Scope for a storage volume search.
+
+    Each list is OR'd internally and across lists. Raises an error if every field is
+    empty.
+    """
+
+    domain: list[UUIDScope] | None = Field(
+        default=None, description="Domains whose storage volumes are being read"
+    )
+    project: list[UUIDScope] | None = Field(
+        default=None, description="Projects whose storage volumes are being read"
+    )
+    user: list[UUIDScope] | None = Field(
+        default=None, description="Users whose storage volumes are being read"
+    )
+    storage_backend: list[UUIDScope] | None = Field(
+        default=None, description="Storage backends whose volumes are being read"
+    )
+
+    @model_validator(mode="after")
+    def _require_non_empty(self) -> StorageVolumeScope:
+        if not self.domain and not self.project and not self.user and not self.storage_backend:
+            raise ValueError(
+                "StorageVolumeScope requires a non-empty value for 'domain', 'project', "
+                "'user' or 'storage_backend'"
+            )
+        return self
+
+
 class AdminSearchStorageVolumesInput(BaseRequestModel):
-    """Input for searching storage volumes.
+    """Input for an administrator's storage volume search over the whole system.
 
     Supports two pagination modes (mutually exclusive):
     - Cursor-based: first/after (forward) or last/before (backward)
     - Offset-based: limit/offset
     """
 
+    filter: StorageVolumeFilter | None = Field(default=None, description="Filter conditions.")
+    order: list[StorageVolumeOrder] | None = Field(
+        default=None, description="Order specifications."
+    )
+    first: int | None = Field(default=None, ge=1, description="Number of items from the start.")
+    after: str | None = Field(default=None, description="Cursor to paginate forward from.")
+    last: int | None = Field(default=None, ge=1, description="Number of items from the end.")
+    before: str | None = Field(default=None, description="Cursor to paginate backward from.")
+    limit: int | None = Field(default=None, ge=1, description="Maximum number of items to return.")
+    offset: int | None = Field(default=None, ge=0, description="Number of items to skip.")
+
+
+class ScopedSearchStorageVolumesInput(BaseRequestModel):
+    """Input for searching the storage volumes the named scopes reach."""
+
+    scope: StorageVolumeScope = Field(description="Scope (OR across all items).")
     filter: StorageVolumeFilter | None = Field(default=None, description="Filter conditions.")
     order: list[StorageVolumeOrder] | None = Field(
         default=None, description="Order specifications."
@@ -107,129 +147,31 @@ class UpdateStorageVolumeInput(BaseRequestModel):
     )
 
 
-class StorageVolumeServiceHoldingFilter(BaseRequestModel):
-    """Filter conditions for the per-service holdings of a volume."""
+class StorageVolumeServiceAttachmentFilter(BaseRequestModel):
+    """Filter conditions for the storage volume service attachments."""
 
     service_catalog_id: UUIDFilter | None = Field(
-        default=None, description="Filter by the holding service's ID."
+        default=None, description="Filter by the service the volume is attached to."
     )
     storage_volume_id: UUIDFilter | None = Field(
-        default=None, description="Filter by the held volume's ID."
+        default=None, description="Filter by the attached volume's ID."
     )
-    AND: list[StorageVolumeServiceHoldingFilter] | None = Field(
+    AND: list[StorageVolumeServiceAttachmentFilter] | None = Field(
         default=None, description="Logical AND of multiple filter conditions."
     )
-    OR: list[StorageVolumeServiceHoldingFilter] | None = Field(
+    OR: list[StorageVolumeServiceAttachmentFilter] | None = Field(
         default=None, description="Logical OR of multiple filter conditions."
     )
-    NOT: list[StorageVolumeServiceHoldingFilter] | None = Field(
+    NOT: list[StorageVolumeServiceAttachmentFilter] | None = Field(
         default=None, description="Logical NOT of filter conditions."
     )
 
 
-StorageVolumeServiceHoldingFilter.model_rebuild()
+StorageVolumeServiceAttachmentFilter.model_rebuild()
 
 
-class StorageVolumeServiceHoldingOrder(BaseRequestModel):
-    """Order specification for the per-service holdings of a volume."""
+class StorageVolumeServiceAttachmentOrder(BaseRequestModel):
+    """Order specification for the storage volume service attachments."""
 
-    field: StorageVolumeServiceHoldingOrderField = Field(description="Field to order by.")
+    field: StorageVolumeServiceAttachmentOrderField = Field(description="Field to order by.")
     direction: OrderDirection = Field(default=OrderDirection.ASC, description="Order direction.")
-
-
-class SearchStorageVolumeServiceHoldingsInput(BaseRequestModel):
-    """Input for searching which services hold which volumes."""
-
-    filter: StorageVolumeServiceHoldingFilter | None = Field(
-        default=None, description="Filter conditions."
-    )
-    order: list[StorageVolumeServiceHoldingOrder] | None = Field(
-        default=None, description="Order specifications."
-    )
-    first: int | None = Field(default=None, ge=1, description="Number of items from the start.")
-    after: str | None = Field(default=None, description="Cursor to paginate forward from.")
-    last: int | None = Field(default=None, ge=1, description="Number of items from the end.")
-    before: str | None = Field(default=None, description="Cursor to paginate backward from.")
-    limit: int | None = Field(default=None, ge=1, description="Maximum number of items to return.")
-    offset: int | None = Field(default=None, ge=0, description="Number of items to skip.")
-
-
-class ResourceGroupVolumeOfferFilter(BaseRequestModel):
-    """Filter conditions for the offers of a volume to resource groups."""
-
-    resource_group_id: UUIDFilter | None = Field(
-        default=None, description="Filter by the resource group offered to."
-    )
-    storage_volume_id: UUIDFilter | None = Field(
-        default=None, description="Filter by the offered volume's ID."
-    )
-    enabled: bool | None = Field(
-        default=None, description="Filter by whether the offer is enabled."
-    )
-    is_default: bool | None = Field(
-        default=None, description="Filter by whether the offer is the resource group's default."
-    )
-    AND: list[ResourceGroupVolumeOfferFilter] | None = Field(
-        default=None, description="Logical AND of multiple filter conditions."
-    )
-    OR: list[ResourceGroupVolumeOfferFilter] | None = Field(
-        default=None, description="Logical OR of multiple filter conditions."
-    )
-    NOT: list[ResourceGroupVolumeOfferFilter] | None = Field(
-        default=None, description="Logical NOT of filter conditions."
-    )
-
-
-ResourceGroupVolumeOfferFilter.model_rebuild()
-
-
-class ResourceGroupVolumeOfferOrder(BaseRequestModel):
-    """Order specification for the offers of a volume to resource groups."""
-
-    field: ResourceGroupVolumeOfferOrderField = Field(description="Field to order by.")
-    direction: OrderDirection = Field(default=OrderDirection.ASC, description="Order direction.")
-
-
-class SearchResourceGroupVolumeOffersInput(BaseRequestModel):
-    """Input for searching which volumes are offered to which resource groups."""
-
-    filter: ResourceGroupVolumeOfferFilter | None = Field(
-        default=None, description="Filter conditions."
-    )
-    order: list[ResourceGroupVolumeOfferOrder] | None = Field(
-        default=None, description="Order specifications."
-    )
-    first: int | None = Field(default=None, ge=1, description="Number of items from the start.")
-    after: str | None = Field(default=None, description="Cursor to paginate forward from.")
-    last: int | None = Field(default=None, ge=1, description="Number of items from the end.")
-    before: str | None = Field(default=None, description="Cursor to paginate backward from.")
-    limit: int | None = Field(default=None, ge=1, description="Maximum number of items to return.")
-    offset: int | None = Field(default=None, ge=0, description="Number of items to skip.")
-
-
-class UpsertResourceGroupVolumeOfferInput(BaseRequestModel):
-    """Input for offering a volume to a resource group, or for retuning an offer.
-
-    The pair is the key: offering a volume already offered rewrites the flags it
-    carries. At most one offer per resource group may be the default.
-    """
-
-    resource_group_id: UUID = Field(description="The resource group the volume is offered to.")
-    storage_volume_id: UUID = Field(description="The volume being offered.")
-    enabled: bool | None | Unset = Field(
-        default=UNSET,
-        description="Whether the offer is enabled. Defaults to true on a new offer.",
-    )
-    is_default: bool | None | Unset = Field(
-        default=UNSET,
-        description=(
-            "Whether the offer is the resource group's default. Defaults to false on a new offer."
-        ),
-    )
-
-
-class PurgeResourceGroupVolumeOfferInput(BaseRequestModel):
-    """Input for withdrawing a volume from a resource group."""
-
-    resource_group_id: UUID = Field(description="The resource group the volume was offered to.")
-    storage_volume_id: UUID = Field(description="The volume being withdrawn.")
