@@ -18,6 +18,7 @@ from ai.backend.common.data.entity.deployment_preset import DeploymentPresetID
 from ai.backend.common.data.entity.image import ImageID
 from ai.backend.common.data.entity.runtime_variant import RuntimeVariantID
 from ai.backend.common.data.model_deployment.types import DeploymentStrategy
+from ai.backend.common.dto.manager.v2.common import PartialBulkPayload
 from ai.backend.common.dto.manager.v2.deployment.request import (
     DeploymentStrategyInput as DeploymentStrategyInputDTO,
 )
@@ -32,6 +33,12 @@ from ai.backend.common.dto.manager.v2.deployment_revision_preset.request import 
 )
 from ai.backend.common.dto.manager.v2.deployment_revision_preset.request import (
     DeploymentRevisionPresetOrder as OrderDTO,
+)
+from ai.backend.common.dto.manager.v2.deployment_revision_preset.request import (
+    PartialBulkPurgeDeploymentRevisionPresetsInput as PartialBulkPurgeInputDTO,
+)
+from ai.backend.common.dto.manager.v2.deployment_revision_preset.request import (
+    PartialBulkUpdateDeploymentRevisionPresetsInput as PartialBulkUpdateInputDTO,
 )
 from ai.backend.common.dto.manager.v2.deployment_revision_preset.request import (
     PresetModelConfigInput as PresetModelConfigInputDTO,
@@ -112,7 +119,10 @@ from ai.backend.manager.api.gql.common.types import (
     ResourceOptsEntryInput,
 )
 from ai.backend.manager.api.gql.common.types import ResourceOptsEntryGQL as ResourceOptsEntryInfoGQL
-from ai.backend.manager.api.gql.common_types import ResourceSlotEntryInputGQL
+from ai.backend.manager.api.gql.common_types import (
+    PartialBulkFailureGQL,
+    ResourceSlotEntryInputGQL,
+)
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     PydanticInputMixin,
@@ -1199,3 +1209,51 @@ class UpdateDeploymentRevisionPresetPayloadGQL(PydanticOutputMixin[UpdatePayload
 )
 class DeleteDeploymentRevisionPresetPayloadGQL(PydanticOutputMixin[DeletePayloadDTO]):
     id: UUID = gql_field(description="ID of the deleted preset.")
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Input for updating several presets, each answered for separately.",
+    ),
+    name="PartialBulkUpdateDeploymentRevisionPresetsInput",
+)
+class PartialBulkUpdateDeploymentRevisionPresetsInputGQL(
+    PydanticInputMixin[PartialBulkUpdateInputDTO]
+):
+    items: list[UpdateDeploymentRevisionPresetInputGQL] = gql_field(
+        description="The presets to update, each naming its preset by `id`."
+    )
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Input for permanently removing several presets, each answered for separately.",
+    ),
+    name="PartialBulkPurgeDeploymentRevisionPresetsInput",
+)
+class PartialBulkPurgeDeploymentRevisionPresetsInputGQL(
+    PydanticInputMixin[PartialBulkPurgeInputDTO]
+):
+    ids: list[UUID] = gql_field(description="IDs of the presets to purge.")
+
+
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description=(
+            "Result of a partial bulk preset operation: the presets processed and the ones "
+            "that failed."
+        ),
+    ),
+    model=PartialBulkPayload[NodeDTO],
+    name="PartialBulkDeploymentRevisionPresetsPayload",
+)
+class PartialBulkDeploymentRevisionPresetsPayloadGQL(
+    PydanticOutputMixin[PartialBulkPayload[NodeDTO]]
+):
+    successes: list[DeploymentRevisionPresetGQL] = gql_field(description="The presets processed.")
+    failed: list[PartialBulkFailureGQL] = gql_field(
+        description="The presets not processed, each with the reason."
+    )

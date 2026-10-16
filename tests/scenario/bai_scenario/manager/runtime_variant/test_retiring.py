@@ -51,7 +51,7 @@ class Deleting(When[AVariantAndACaller, RuntimeVariantAdapter, DeleteRuntimeVari
 
     @override
     def operation(self) -> str:
-        return "delete"
+        return "purge"
 
     @override
     def describe(self, laid: AVariantAndACaller) -> str:
@@ -63,7 +63,7 @@ class Deleting(When[AVariantAndACaller, RuntimeVariantAdapter, DeleteRuntimeVari
         self, adapter: RuntimeVariantAdapter, laid: AVariantAndACaller
     ) -> DeleteRuntimeVariantPayload:
         with ActingAs(laid.caller):
-            return await adapter.delete(uuid4() if self.unknown else laid.variant.id)
+            return await adapter.purge(uuid4() if self.unknown else laid.variant.id)
 
 
 @dataclass(frozen=True)

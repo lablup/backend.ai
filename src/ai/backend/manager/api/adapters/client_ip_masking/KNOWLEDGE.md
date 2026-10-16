@@ -1,12 +1,15 @@
 ---
 name: client-ip-masking-adapter-scenarios
 type: reference
-description: what the client IP masking adapter guarantees, as scenarios; one policy per target set by an upsert that replaces the row whole, the superadmin role on upsert and search against the entity gate on purge, no single read
+description: what the client IP masking adapter guarantees, as scenarios; one policy per target set by an upsert that replaces the row whole, the superadmin role on upsert and search against the entity gate on purge, single and partial bulk, no single read
 scope: src/ai/backend/manager/api/adapters/client_ip_masking
 keywords: [client ip masking, scenario, adapter, superadmin, monitor, upsert, target, purge]
 generated:
   by: claude-code/opus-5
   at: 2026-09-11
+updated:
+  by: claude-code/opus-5
+  at: 2026-10-16
 status: draft
 ---
 # client_ip_masking 어댑터 — 시나리오
@@ -14,7 +17,7 @@ status: draft
 규칙은 상위 디렉터리의 `AGENTS.md`에 있다. 여기 적힌 내용과 실행 결과가 어긋나면 이 문서 쪽을 먼저
 의심한다.
 
-어댑터가 제공하는 호출은 `admin_upsert`, `admin_search`, `admin_purge` 셋이다. `id`로 하나를 조회하는
+어댑터가 제공하는 호출은 `upsert`, `admin_search`, `purge`, `partial_bulk_purge` 넷이다. `id`로 하나를 조회하는
 호출은 없다.
 
 정책 행은 `target_type` 하나당 하나만 존재한다(`client_ip_masking_policies`의 unique 제약).
@@ -26,14 +29,15 @@ status: draft
 
 | 호출 | 검사 | 통과하는 호출자 | 거부 예외 |
 |---|---|---|---|
-| `admin_upsert` | 슈퍼관리자 여부 | 슈퍼관리자 | `InsufficientPrivilege` |
+| `upsert` | 슈퍼관리자 여부 | 슈퍼관리자 | `InsufficientPrivilege` |
 | `admin_search` | 슈퍼관리자 여부 | 슈퍼관리자, 모니터 | `InsufficientPrivilege` |
-| `admin_purge` | 그 정책에 대한 엔티티 권한 | 슈퍼관리자 | `NotEnoughPermission` |
+| `purge` | 그 정책에 대한 엔티티 권한 | 슈퍼관리자 | `NotEnoughPermission` |
+| `partial_bulk_purge` | 정책마다 엔티티 권한 | 슈퍼관리자 | 정책마다 실패 목록에 권한 부족 이유 |
 
-정책은 어느 스코프에도 속하지 않으므로 `admin_purge`의 엔티티 권한을 부여받을 방법이 없다. 그래서
-`admin_purge`를 통과하는 호출자도 결국 슈퍼관리자뿐이다.
+정책은 어느 스코프에도 속하지 않으므로 `purge`의 엔티티 권한을 부여받을 방법이 없다. 그래서
+`purge`를 통과하는 호출자도 결국 슈퍼관리자뿐이다.
 
-## Upsert (`admin_upsert`)
+## Upsert (`upsert`)
 
 | 시나리오 | 상황 | 요청 | 결과 |
 |---|---|---|---|
@@ -73,7 +77,7 @@ upsert는 기존 행과 병합하지 않고 보낸 값으로 행을 통째로 �
 모니터 역할은 슈퍼관리자 검사에서 읽기 호출만 통과한다. "모니터 역할이 전체를 조회한다"(통과)와
 "모니터 역할이 upsert한다"(거부)가 그 차이를 보여 준다.
 
-## 완전 삭제 (`admin_purge`)
+## 완전 삭제 (`purge`)
 
 | 시나리오 | 상황 | 요청 | 결과 |
 |---|---|---|---|
@@ -83,7 +87,7 @@ upsert는 기존 행과 병합하지 않고 보낸 값으로 행을 통째로 �
 | 일반 사용자가 존재하지 않는 `id`를 완전 삭제한다 | 정책 하나가 있다. 호출자는 아무 권한도 없는 일반 사용자 | 존재하지 않는 `id`로 purge | `EntityNotFoundError`가 아니라 `NotEnoughPermission`으로 거부 |
 | 권한 검사를 끄면 일반 사용자도 완전 삭제할 수 있다 | 권한 검사 비활성화. 정책 하나가 있고, 호출자는 아무 권한도 없는 일반 사용자 | 그 정책의 `id`로 purge | 완전 삭제된 정책의 필드를 그대로 담은 응답 |
 
-`admin_upsert`, `admin_search`, `admin_purge` 중 `id`를 받는 것은 `admin_purge`뿐이다. upsert는 `target_type`으로 행을 찾고 purge는
+`upsert`, `admin_search`, `purge` 중 `id`를 받는 것은 `purge`뿐이다. upsert는 `target_type`으로 행을 찾고 purge는
 `id`로 찾으므로, 완전 삭제할 `id`는 upsert 응답이나 검색 결과에서 읽어 와야 한다. 하나를 조회하는 호출이 없어
 `id`를 알아도 그 행을 다시 확인하는 방법은 검색뿐이다.
 
@@ -93,9 +97,19 @@ upsert는 기존 행과 병합하지 않고 보낸 값으로 행을 통째로 �
 
 soft delete는 없다.
 
+## 여럿 완전 삭제 (`partial_bulk_purge`)
+
+| 시나리오 | 상황 | 요청 | 결과 |
+|---|---|---|---|
+| 슈퍼관리자가 둘과 없는 `id` 하나를 한 번에 완전 삭제한다 | `target_type`이 `default`, `login_history`인 정책 둘이 있다. 호출자는 슈퍼관리자 | 셋 purge | 둘은 지워지기 전 필드 그대로 처리된 목록에 오고, 없는 `id`는 대상 없음 이유로 실패 목록에 온다 |
+| 일반 사용자가 여럿을 완전 삭제한다 | 같은 정책 둘. 호출자는 아무 권한도 없는 일반 사용자 | 둘 purge | 지워진 것 없이 둘 다 권한 부족 이유로 실패 목록에 온다 |
+
+여럿 연산은 호출 전체를 거부하지 않는다. 처리한 정책은 처리된 목록에, 처리하지 못한 것은 `id`와
+이유를 실패 목록에 싣는다.
+
 ## 아직 적지 않은 것
 
-없다. 어댑터가 제공하는 `admin_upsert`, `admin_search`, `admin_purge`가 모두 위에 있다.
+없다. 어댑터가 제공하는 `upsert`, `admin_search`, `purge`, `partial_bulk_purge`가 모두 위에 있다.
 
 리포트에 함께 포함되는 `batch_load_fields`는 모든 어댑터가 상속받는 공용 메서드이지 이 엔티티의
 호출이 아니라서 시나리오를 두지 않는다.

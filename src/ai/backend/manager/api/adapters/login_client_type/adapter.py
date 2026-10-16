@@ -7,17 +7,20 @@ from uuid import UUID
 
 from ai.backend.common.data.entity.login_client_type import LoginClientTypeID
 from ai.backend.common.dto.manager.defs import DEFAULT_PAGE_LIMIT
+from ai.backend.common.dto.manager.v2.common import PartialBulkFailure, PartialBulkPayload
 from ai.backend.common.dto.manager.v2.login_client_type.request import (
     CreateLoginClientTypeInput,
     LoginClientTypeFilter,
     LoginClientTypeOrder,
+    PartialBulkPurgeLoginClientTypesInput,
+    PartialBulkUpdateLoginClientTypesInput,
     SearchLoginClientTypesInput,
     UpdateLoginClientTypeInput,
 )
 from ai.backend.common.dto.manager.v2.login_client_type.response import (
     CreateLoginClientTypePayload,
-    DeleteLoginClientTypePayload,
     LoginClientTypeNode,
+    PurgeLoginClientTypePayload,
     SearchLoginClientTypesPayload,
     UpdateLoginClientTypePayload,
 )
@@ -25,6 +28,7 @@ from ai.backend.common.dto.manager.v2.login_client_type.types import (
     LoginClientTypeOrderField,
     OrderDirection,
 )
+from ai.backend.manager.actions.v2.bulk.result import PartialBulkResult
 from ai.backend.manager.api.adapter_options.pagination.pagination import (
     PaginationOptions,
     PaginationSpec,
@@ -57,6 +61,12 @@ from ai.backend.manager.services.login_client_type.actions.create import (
 )
 from ai.backend.manager.services.login_client_type.actions.get import (
     GetLoginClientTypeAction,
+)
+from ai.backend.manager.services.login_client_type.actions.partial_bulk_purge import (
+    PartialBulkPurgeLoginClientTypesAction,
+)
+from ai.backend.manager.services.login_client_type.actions.partial_bulk_update import (
+    PartialBulkUpdateLoginClientTypesAction,
 )
 from ai.backend.manager.services.login_client_type.actions.purge import (
     PurgeLoginClientTypeAction,
@@ -192,28 +202,74 @@ class LoginClientTypeAdapter(BaseAdapter):
             login_client_type=self._data_to_node(action_result.data),
         )
 
-    async def admin_update(
+    # --- Write methods ---
+
+    async def update(
         self, type_id: UUID, input: UpdateLoginClientTypeInput
     ) -> UpdateLoginClientTypePayload:
-        updater = LoginClientTypeUpdater(
-            login_client_type_id=LoginClientTypeID(type_id),
-            name=OptionalState.from_unset(input.name),
-            description=TriState.from_unset(input.description),
-        )
+        """Update a login client type."""
         action_result = await self._login_client_type.update.run(
-            UpdateLoginClientTypeAction(updater=updater)
+            UpdateLoginClientTypeAction(updater=self._to_updater(LoginClientTypeID(type_id), input))
         )
         return UpdateLoginClientTypePayload(
             login_client_type=self._data_to_node(action_result.data),
         )
 
-    async def admin_delete(self, type_id: UUID) -> DeleteLoginClientTypePayload:
+    async def purge(self, type_id: UUID) -> PurgeLoginClientTypePayload:
+        """Permanently remove a login client type."""
         action_result = await self._login_client_type.purge.run(
             PurgeLoginClientTypeAction(id=type_id)
         )
-        return DeleteLoginClientTypePayload(id=action_result.data.id)
+        return PurgeLoginClientTypePayload(id=action_result.data.id)
+
+    async def partial_bulk_update(
+        self, input: PartialBulkUpdateLoginClientTypesInput
+    ) -> PartialBulkPayload[LoginClientTypeNode]:
+        """Update several login client types, answering for each one."""
+        result = await self._login_client_type.partial_bulk_update.run(
+            PartialBulkUpdateLoginClientTypesAction(
+                updaters=[
+                    self._to_updater(LoginClientTypeID(item.id), item.input) for item in input.items
+                ]
+            )
+        )
+        return self._to_partial_bulk_payload(result)
+
+    async def partial_bulk_purge(
+        self, input: PartialBulkPurgeLoginClientTypesInput
+    ) -> PartialBulkPayload[LoginClientTypeNode]:
+        """Permanently remove several login client types, answering for each one."""
+        result = await self._login_client_type.partial_bulk_purge.run(
+            PartialBulkPurgeLoginClientTypesAction(
+                ids=[LoginClientTypeID(type_id) for type_id in input.ids]
+            )
+        )
+        return self._to_partial_bulk_payload(result)
 
     # --- Private helpers ---
+
+    def _to_updater(
+        self, type_id: LoginClientTypeID, input: UpdateLoginClientTypeInput
+    ) -> LoginClientTypeUpdater:
+        return LoginClientTypeUpdater(
+            login_client_type_id=type_id,
+            name=OptionalState.from_unset(input.name),
+            description=TriState.from_unset(input.description),
+        )
+
+    def _to_partial_bulk_payload(
+        self, result: PartialBulkResult[LoginClientTypeData]
+    ) -> PartialBulkPayload[LoginClientTypeNode]:
+        return PartialBulkPayload[LoginClientTypeNode](
+            successes=[
+                self._data_to_node(item.value) for item in result.items if item.value is not None
+            ],
+            failed=[
+                PartialBulkFailure(id=item.entity_id, message=str(item.error))
+                for item in result.items
+                if item.error is not None
+            ],
+        )
 
     def _convert_filter(self, filter: LoginClientTypeFilter) -> list[QueryCondition]:
         fields = LoginClientTypeSearchableFields.own

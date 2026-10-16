@@ -14,13 +14,16 @@ from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from typing import override
 
+from ai.backend.manager.repositories.ops.v2.artifact_registry.write import (
+    ArtifactRegistryWriteOps,
+)
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.repositories.ops.v2.relation.write import V2RelationWriteOps
 from ai.backend.manager.repositories.ops.v2.share.write import V2ShareWriteOps
 from ai.backend.manager.repositories.ops.v2.user.write import V2UserWriteOps
 
 
-class TestSeedOps(V2UserWriteOps, V2ShareWriteOps, V2RelationWriteOps):
+class TestSeedOps(V2UserWriteOps, V2ShareWriteOps, V2RelationWriteOps, ArtifactRegistryWriteOps):
     """The write ops a seed may reach, composed."""
 
 

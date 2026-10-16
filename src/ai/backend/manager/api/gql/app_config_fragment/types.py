@@ -30,6 +30,9 @@ from ai.backend.common.dto.manager.v2.app_config_fragment.request import (
     MyUpsertAppConfigFragmentsInput as MyUpsertAppConfigFragmentsInputDTO,
 )
 from ai.backend.common.dto.manager.v2.app_config_fragment.request import (
+    PartialBulkPurgeAppConfigFragmentsInput as PartialBulkPurgeAppConfigFragmentsInputDTO,
+)
+from ai.backend.common.dto.manager.v2.app_config_fragment.request import (
     ScopedUpsertAppConfigFragmentsInput as ScopedUpsertAppConfigFragmentsInputDTO,
 )
 from ai.backend.common.dto.manager.v2.app_config_fragment.response import (
@@ -39,13 +42,21 @@ from ai.backend.common.dto.manager.v2.app_config_fragment.response import (
     AppConfigFragmentUpsertErrorInfo as AppConfigFragmentUpsertErrorInfoDTO,
 )
 from ai.backend.common.dto.manager.v2.app_config_fragment.response import (
+    AtomicBulkUpsertAppConfigFragmentsPayload as AtomicBulkUpsertAppConfigFragmentsPayloadDTO,
+)
+from ai.backend.common.dto.manager.v2.app_config_fragment.response import (
+    PurgeAppConfigFragmentPayload as PurgeAppConfigFragmentPayloadDTO,
+)
+from ai.backend.common.dto.manager.v2.app_config_fragment.response import (
     UpsertAppConfigFragmentsPayload as UpsertAppConfigFragmentsPayloadDTO,
 )
 from ai.backend.common.dto.manager.v2.app_config_fragment.types import (
     AppConfigScopeTypeFilter as AppConfigScopeTypeFilterDTO,
 )
+from ai.backend.common.dto.manager.v2.common import PartialBulkPayload
 from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import DateTimeFilter, OrderDirection, StringFilter, UUIDFilter
+from ai.backend.manager.api.gql.common_types import PartialBulkFailureGQL
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     PydanticInputMixin,
@@ -71,7 +82,11 @@ __all__ = (
     "AppConfigFragmentUpsertItemGQL",
     "AppConfigScopeRefGQL",
     "AppConfigScopeTypeFilterGQL",
+    "AtomicBulkUpsertAppConfigFragmentsPayloadGQL",
     "MyUpsertAppConfigFragmentsInputGQL",
+    "PartialBulkAppConfigFragmentsPayloadGQL",
+    "PartialBulkPurgeAppConfigFragmentsInputGQL",
+    "PurgeAppConfigFragmentPayloadGQL",
     "ScopedUpsertAppConfigFragmentsInputGQL",
     "UpsertAppConfigFragmentsPayloadGQL",
 )
@@ -238,6 +253,69 @@ class UpsertAppConfigFragmentsPayloadGQL(PydanticOutputMixin[UpsertAppConfigFrag
     items: list[AppConfigFragmentGQL] = gql_field(description="The upserted app config fragments.")
     failed: list[AppConfigFragmentUpsertErrorGQL] = gql_field(
         description="Per-item failures, each naming the config name it targeted."
+    )
+
+
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Payload for an all-or-nothing upsert of many fragments at one scope.",
+    ),
+    model=AtomicBulkUpsertAppConfigFragmentsPayloadDTO,
+    name="AtomicBulkUpsertAppConfigFragmentsPayload",
+)
+class AtomicBulkUpsertAppConfigFragmentsPayloadGQL(
+    PydanticOutputMixin[AtomicBulkUpsertAppConfigFragmentsPayloadDTO]
+):
+    items: list[AppConfigFragmentGQL] = gql_field(description="The upserted app config fragments.")
+
+
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Payload for app config fragment purge.",
+    ),
+    model=PurgeAppConfigFragmentPayloadDTO,
+    name="PurgeAppConfigFragmentPayload",
+)
+class PurgeAppConfigFragmentPayloadGQL(PydanticOutputMixin[PurgeAppConfigFragmentPayloadDTO]):
+    id: UUID = gql_field(description="Id of the purged app config fragment.")
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Input for purging several fragments, each answered for separately.",
+    ),
+    name="PartialBulkPurgeAppConfigFragmentsInput",
+)
+class PartialBulkPurgeAppConfigFragmentsInputGQL(
+    PydanticInputMixin[PartialBulkPurgeAppConfigFragmentsInputDTO]
+):
+    ids: list[UUID] = gql_field(description="IDs of the fragments to purge.")
+
+
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description=(
+            "Result of a partial bulk fragment operation: the fragments processed and the ones "
+            "that failed."
+        ),
+    ),
+    model=PartialBulkPayload[AppConfigFragmentNode],
+    name="PartialBulkAppConfigFragmentsPayload",
+)
+class PartialBulkAppConfigFragmentsPayloadGQL(
+    PydanticOutputMixin[PartialBulkPayload[AppConfigFragmentNode]]
+):
+    """Payload for partial bulk fragment mutations."""
+
+    successes: list[AppConfigFragmentGQL] = gql_field(
+        description="The fragments processed, as they stood when processed."
+    )
+    failed: list[PartialBulkFailureGQL] = gql_field(
+        description="The fragments not processed, each with the reason."
     )
 
 
