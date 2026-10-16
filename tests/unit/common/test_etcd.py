@@ -37,6 +37,85 @@ async def test_basic_crud(etcd: AsyncEtcd) -> None:
     assert len(vp) == 0
 
 
+async def test_put_if_absent_has_one_winner_on_real_etcd(etcd: AsyncEtcd) -> None:
+    results = await asyncio.gather(*(etcd.put_if_absent("cas/key", str(i)) for i in range(16)))
+
+    assert results.count(True) == 1
+    assert await etcd.get("cas/key", scope=ConfigScopes.GLOBAL) in {str(i) for i in range(16)}
+
+
+async def test_compare_and_put_checks_target_and_guards_atomically(etcd: AsyncEtcd) -> None:
+    await etcd.put("cas/target", "old")
+    await etcd.put("cas/guard", "generation-1")
+
+    assert await etcd.compare_and_put(
+        "cas/target",
+        "new",
+        expected="old",
+        guards={"cas/guard": "generation-1", "cas/absent": None},
+    )
+    await etcd.put("cas/guard", "generation-2")
+
+    assert not await etcd.compare_and_put(
+        "cas/target",
+        "wrong",
+        expected="new",
+        guards={"cas/guard": "generation-1"},
+    )
+    assert await etcd.get("cas/target", scope=ConfigScopes.GLOBAL) == "new"
+
+
+async def test_compare_and_delete_preserves_a_value_when_a_guard_moves(etcd: AsyncEtcd) -> None:
+    await etcd.put("cas/claim", "owner-1")
+    await etcd.put("cas/guard", "generation-2")
+
+    assert not await etcd.compare_and_delete(
+        "cas/claim",
+        "owner-1",
+        guards={"cas/guard": "generation-1"},
+    )
+    assert await etcd.get("cas/claim", scope=ConfigScopes.GLOBAL) == "owner-1"
+
+
+async def test_delete_if_value_leaves_a_key_that_moved_on(etcd: AsyncEtcd) -> None:
+    await etcd.put("cas/claim", "owner-2")
+
+    assert not await etcd.delete_if_value("cas/claim", "owner-1")
+    assert await etcd.get("cas/claim", scope=ConfigScopes.GLOBAL) == "owner-2"
+    assert await etcd.delete_if_value("cas/claim", "owner-2")
+    assert await etcd.get("cas/claim", scope=ConfigScopes.GLOBAL) is None
+
+
+async def test_iter_prefix_reads_one_revision(etcd: AsyncEtcd) -> None:
+    for index in range(7):
+        await etcd.put(f"listed/{index}", f"value-{index}")
+
+    iterator = etcd.iter_prefix("listed")
+    first = [await anext(iterator), await anext(iterator)]
+    await etcd.put("listed/9", "written-after-the-read")
+    rest = [item async for item in iterator]
+
+    assert first + rest == [(f"listed/{index}", f"value-{index}") for index in range(7)]
+
+
+async def test_iter_prefix_reads_a_key_whose_value_is_empty(etcd: AsyncEtcd) -> None:
+    await etcd.put("listed/empty", "")
+    await etcd.put("listed/filled", "value")
+
+    items = [item async for item in etcd.iter_prefix("listed")]
+
+    assert items == [("listed/empty", ""), ("listed/filled", "value")]
+
+
+async def test_iter_prefix_keeps_scope_prefixes_internal(etcd: AsyncEtcd) -> None:
+    await etcd.put("listed/global", "global", scope=ConfigScopes.GLOBAL)
+    await etcd.put("listed/node", "node", scope=ConfigScopes.NODE)
+
+    items = [item async for item in etcd.iter_prefix("listed", scope=ConfigScopes.GLOBAL)]
+
+    assert items == [("listed/global", "global")]
+
+
 async def test_quote_for_put_prefix(etcd: AsyncEtcd) -> None:
     await etcd.put_prefix(
         "data",

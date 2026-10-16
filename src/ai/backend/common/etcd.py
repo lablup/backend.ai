@@ -214,6 +214,53 @@ class AbstractKVStore(ABC):
         pass
 
     @abstractmethod
+    async def put_if_absent(
+        self,
+        key: str,
+        val: str,
+        *,
+        scope: ConfigScopes = ConfigScopes.GLOBAL,
+        scope_prefix_map: Mapping[ConfigScopes, str] | None = None,
+    ) -> bool:
+        pass
+
+    @abstractmethod
+    async def compare_and_put(
+        self,
+        key: str,
+        val: str,
+        *,
+        expected: str | None,
+        guards: Mapping[str, str | None],
+        scope: ConfigScopes = ConfigScopes.GLOBAL,
+        scope_prefix_map: Mapping[ConfigScopes, str] | None = None,
+    ) -> bool:
+        pass
+
+    @abstractmethod
+    async def compare_and_delete(
+        self,
+        key: str,
+        expected: str,
+        *,
+        guards: Mapping[str, str | None],
+        scope: ConfigScopes = ConfigScopes.GLOBAL,
+        scope_prefix_map: Mapping[ConfigScopes, str] | None = None,
+    ) -> bool:
+        pass
+
+    @abstractmethod
+    async def delete_if_value(
+        self,
+        key: str,
+        expected: str,
+        *,
+        scope: ConfigScopes = ConfigScopes.GLOBAL,
+        scope_prefix_map: Mapping[ConfigScopes, str] | None = None,
+    ) -> bool:
+        pass
+
+    @abstractmethod
     async def delete(
         self,
         key: str,
@@ -671,6 +718,25 @@ class AsyncEtcd(AbstractKVStore):
         ]
         return ChainMap(*configs)
 
+    async def iter_prefix(
+        self,
+        key_prefix: str,
+        *,
+        scope: ConfigScopes = ConfigScopes.GLOBAL,
+        scope_prefix_map: Mapping[ConfigScopes, str] | None = None,
+    ) -> AsyncGenerator[tuple[str, str], None]:
+        """Every key under one scope's prefix with its raw value, in key order, from one read."""
+        scope_prefix = _slash(self._merge_scope_prefix_map(scope_prefix_map)[scope])
+        mangled_prefix = self._mangle_key(f"{scope_prefix}{key_prefix}")
+        async with self.etcd.connect() as communicator:
+            values = await communicator.get_prefix(mangled_prefix.encode(self.encoding))
+        pairs = sorted(
+            (self._demangle_key(bytes(k).decode(self.encoding)), bytes(v).decode(self.encoding))
+            for k, v in values
+        )
+        for key, value in pairs:
+            yield key.removeprefix(scope_prefix), value
+
     # for legacy
     get_prefix_dict = get_prefix
 
@@ -700,6 +766,132 @@ class AsyncEtcd(AbstractKVStore):
                 .and_then([
                     TxnOp.put(mangled_key.encode(self.encoding), new_val.encode(self.encoding))
                 ])
+                .or_else([])
+            )
+
+            return cast(bool, result.succeeded())
+
+    def _holds(self, mangled_key: str, value: str | None) -> Compare:
+        """The condition that ``mangled_key`` holds ``value``; ``None`` means it is absent."""
+        if value is None:
+            return Compare.create_revision(mangled_key.encode(self.encoding), CompareOp.EQUAL, 0)
+        return Compare.value(
+            mangled_key.encode(self.encoding), CompareOp.EQUAL, value.encode(self.encoding)
+        )
+
+    @override
+    async def put_if_absent(
+        self,
+        key: str,
+        val: str,
+        *,
+        scope: ConfigScopes = ConfigScopes.GLOBAL,
+        scope_prefix_map: Mapping[ConfigScopes, str] | None = None,
+    ) -> bool:
+        """Atomically put a single key only if it does not exist yet.
+
+        :return: ``True`` if this call created the key, ``False`` if it already existed."""
+        scope_prefix = self._merge_scope_prefix_map(scope_prefix_map)[scope]
+        mangled_key = self._mangle_key(f"{_slash(scope_prefix)}{key}")
+
+        async with self.etcd.connect() as communicator:
+            result = await communicator.txn(
+                EtcdTransactionAction()
+                .when([self._holds(mangled_key, None)])
+                .and_then([TxnOp.put(mangled_key.encode(self.encoding), val.encode(self.encoding))])
+                .or_else([])
+            )
+
+            return cast(bool, result.succeeded())
+
+    @override
+    async def compare_and_put(
+        self,
+        key: str,
+        val: str,
+        *,
+        expected: str | None,
+        guards: Mapping[str, str | None],
+        scope: ConfigScopes = ConfigScopes.GLOBAL,
+        scope_prefix_map: Mapping[ConfigScopes, str] | None = None,
+    ) -> bool:
+        """Atomically write ``key`` if it holds ``expected`` (``None``: absent) and every guard
+        key holds its given bytes (``None``: absent). Guards are only read, e.g. the owning record.
+
+        :return: ``True`` if the write landed, ``False`` if any condition failed."""
+        scope_prefix = self._merge_scope_prefix_map(scope_prefix_map)[scope]
+        mangled_key = self._mangle_key(f"{_slash(scope_prefix)}{key}")
+
+        conditions = [self._holds(mangled_key, expected)]
+        conditions.extend(
+            self._holds(self._mangle_key(f"{_slash(scope_prefix)}{guard_key}"), guard_val)
+            for guard_key, guard_val in guards.items()
+        )
+
+        async with self.etcd.connect() as communicator:
+            result = await communicator.txn(
+                EtcdTransactionAction()
+                .when(conditions)
+                .and_then([TxnOp.put(mangled_key.encode(self.encoding), val.encode(self.encoding))])
+                .or_else([])
+            )
+
+            return cast(bool, result.succeeded())
+
+    @override
+    async def compare_and_delete(
+        self,
+        key: str,
+        expected: str,
+        *,
+        guards: Mapping[str, str | None],
+        scope: ConfigScopes = ConfigScopes.GLOBAL,
+        scope_prefix_map: Mapping[ConfigScopes, str] | None = None,
+    ) -> bool:
+        """Atomically delete ``key`` if it holds ``expected`` and every guard key holds its given
+        bytes (``None``: absent). The delete counterpart of :meth:`compare_and_put`.
+
+        :return: ``True`` if this call deleted the key, ``False`` if any condition failed."""
+        scope_prefix = self._merge_scope_prefix_map(scope_prefix_map)[scope]
+        mangled_key = self._mangle_key(f"{_slash(scope_prefix)}{key}")
+
+        conditions = [self._holds(mangled_key, expected)]
+        conditions.extend(
+            self._holds(self._mangle_key(f"{_slash(scope_prefix)}{guard_key}"), guard_val)
+            for guard_key, guard_val in guards.items()
+        )
+
+        async with self.etcd.connect() as communicator:
+            result = await communicator.txn(
+                EtcdTransactionAction()
+                .when(conditions)
+                .and_then([TxnOp.delete(mangled_key.encode(self.encoding))])
+                .or_else([])
+            )
+
+            return cast(bool, result.succeeded())
+
+    @override
+    async def delete_if_value(
+        self,
+        key: str,
+        expected: str,
+        *,
+        scope: ConfigScopes = ConfigScopes.GLOBAL,
+        scope_prefix_map: Mapping[ConfigScopes, str] | None = None,
+    ) -> bool:
+        """Atomically delete a single key only if it still holds ``expected``.
+
+        :return: ``True`` if this call deleted the key, ``False`` if it held something else
+            (or nothing)."""
+        scope_prefix = self._merge_scope_prefix_map(scope_prefix_map)[scope]
+        mangled_key = self._mangle_key(f"{_slash(scope_prefix)}{key}")
+
+        async with self.etcd.connect() as communicator:
+            result = await communicator.txn(
+                EtcdTransactionAction()
+                .when([self._holds(mangled_key, expected)])
+                .and_then([TxnOp.delete(mangled_key.encode(self.encoding))])
                 .or_else([])
             )
 
