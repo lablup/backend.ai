@@ -7,14 +7,14 @@
 - ops 로 구성 (10)
   - admin_search — 대표 성공 ✓ · 대표 실패 ✓
   - batch_load_by_ids — 대표 성공 ✓ · 대표 실패 ✓
-  - bulk_purge — 대표 성공 ✓ · 대표 실패 ✗ — SCENARIO-GAP
   - get — 대표 성공 ✓ · 대표 실패 ✓
   - my_app_config_fragments_by_names — 대표 성공 ✓ · 대표 실패 ✓
-  - my_upsert_app_config_fragments — 대표 성공 ✓ · 대표 실패 ✓
+  - my_atomic_bulk_upsert — 대표 성공 ✓ · 대표 실패 ✓
+  - partial_bulk_purge — 대표 성공 ✓ · 대표 실패 ✗ — SCENARIO-GAP
   - purge — 대표 성공 ✓ · 대표 실패 ✓
   - scoped_app_config_fragments_by_names — 대표 성공 ✓ · 대표 실패 ✓
+  - scoped_atomic_bulk_upsert — 대표 성공 ✓ · 대표 실패 ✓
   - scoped_search — 대표 성공 ✓ · 대표 실패 ✓
-  - scoped_upsert_app_config_fragments — 대표 성공 ✓ · 대표 실패 ✓
 
 **admin_search**
 
@@ -30,13 +30,6 @@
 | [빈 id 목록을 주면 빈 응답이 반환된다. 하위 계층을 호출하지 않는다](#reading_many-an-empty-id-list-answers-empty-without-calling-anything) | 성공 |
 | [슈퍼관리자가 조각 둘과 없는 id 하나를 한 번에 조회하면, 둘은 노드로 반환되고 없는 id에 해당하는 항목은 비어 있다. 권한 검사를 통과하는 사용자만 빈 항목을 본다](#reading_many-the-superadmin-reads-both-and-a-missing-id-comes-back-empty) | 성공 |
 | [자기 스코프에만 읽기 권한을 받은 사용자가 자기 조각, 다른 사용자의 조각, 없는 id를 한 번에 조회하면, 목록 순서대로 자기 것은 노드, 남의 것과 없는 id는 그 항목만 권한 부족으로 거부된다](#reading_many-mine-anothers-and-a-missing-id-are-each-answered-in-order-for-a-plain-user) | 거부 |
-
-**bulk_purge**
-
-| 시나리오 | 판정 |
-|---|---|
-| [자기 스코프에만 삭제 권한을 받은 사용자가 자기 조각 둘, 다른 사용자의 조각, 없는 id를 한 번에 삭제하면, 자기 둘은 삭제된 목록에, 남의 것과 없는 id는 실패 목록에 이유와 함께 반환된다](#purging-mine-anothers-and-a-missing-id-are-each-answered-for-a-plain-user) | 성공 |
-| [슈퍼관리자가 조각 둘과 없는 id 하나를 한 번에 삭제하면, 둘은 삭제된 목록에, 없는 id는 실패 목록에 반환된다](#purging-the-superadmin-purges-both-and-a-missing-id-fails-alone) | 성공 |
 
 **get**
 
@@ -56,7 +49,7 @@
 | [사용자 스코프에 허용된 이름 셋 중 둘에 자기 조각이 있고 읽기 권한을 받은 사용자가 셋을 조회하면, 세 항목이 요청 순서대로 반환되고 조각이 없는 항목은 비어 있다](#reading_by_names-three-names-answer-a-fragment-or-an-empty-slot-each-in-request-order) | 성공 |
 | [자기 조각이 있어도 아무 권한도 없는 사용자가 이름으로 조회하면, 권한 부족으로 거부된다](#reading_by_names-a-user-granted-nothing-may-not-read-their-own-fragments) | 거부 |
 
-**my_upsert_app_config_fragments**
+**my_atomic_bulk_upsert**
 
 | 시나리오 | 판정 |
 |---|---|
@@ -69,6 +62,13 @@
 | [자기 스코프에 생성 권한만 있고 수정 권한이 없는 사용자가 쓰면, 권한 부족으로 거부된다. 쓰기는 생성과 수정 권한 둘 다를 요구한다](#writing-a-user-granted-create-alone-may-not-write) | 거부 |
 | [사용자 종류에 허용된 이름에 아무 권한도 없는 사용자가 쓰면, 권한 부족으로 거부된다](#writing-a-user-granted-nothing-may-not-write-their-own-fragment) | 거부 |
 | [허용된 이름과 허용되지 않은 이름을 함께 쓰면, 쓰기 허용 안 됨으로 거부된다. 쓰기는 전부 아니면 전무다](#writing-one-name-not-opened-to-the-user-kind-refuses-the-whole-write) | 거부 |
+
+**partial_bulk_purge**
+
+| 시나리오 | 판정 |
+|---|---|
+| [자기 스코프에만 삭제 권한을 받은 사용자가 자기 조각 둘, 다른 사용자의 조각, 없는 id를 한 번에 삭제하면, 자기 둘은 삭제된 목록에, 남의 것과 없는 id는 실패 목록에 이유와 함께 반환된다](#purging-mine-anothers-and-a-missing-id-are-each-answered-for-a-plain-user) | 성공 |
+| [슈퍼관리자가 조각 둘과 없는 id 하나를 한 번에 삭제하면, 둘은 삭제된 목록에, 없는 id는 실패 목록에 반환된다](#purging-the-superadmin-purges-both-and-a-missing-id-fails-alone) | 성공 |
 
 **purge**
 
@@ -89,17 +89,7 @@
 | [자기 도메인에 읽기 권한을 받은 사용자가 어느 도메인도 아닌 id를 지정해 조회하면, 대상 없음이 아니라 권한 부족으로 거부된다](#reading_by_names-a-domain-nothing-answers-to-is-refused-as-permission-for-a-plain-user) | 거부 |
 | [자기 스코프에만 읽기 권한을 받은 사용자가 다른 사용자를 지정해 조회하면, 권한 부족으로 거부된다](#reading_by_names-a-user-granted-read-on-their-own-scope-may-not-read-another-users) | 거부 |
 
-**scoped_search**
-
-| 시나리오 | 판정 |
-|---|---|
-| [공개 조각 둘이 있고 아무 권한도 없는 사용자가 공개 스코프를 지정해 검색하면, 둘 다 집계된다. 공개 조각에는 보호할 스코프가 없다](#searching-anyone-signed-in-searches-the-public-scope) | 성공 |
-| [자기 조각 둘과 다른 사용자의 조각 하나가 있고 자기 스코프에 읽기 권한을 받은 사용자가 자기 스코프를 검색하면, 자기 조각 둘만 집계된다](#searching-searching-my-own-scope-counts-only-my-fragments) | 성공 |
-| [슈퍼관리자가 어느 도메인도 아닌 id를 지정해 검색하면, 대상을 찾을 수 없다는 이유로 거부된다](#searching-a-domain-nothing-answers-to-is-not-found-for-a-superadmin) | 거부 |
-| [자기 스코프에만 읽기 권한을 받은 사용자가 다른 사용자를 지정해 검색하면, 권한 부족으로 거부된다](#searching-a-user-granted-read-on-their-own-scope-may-not-search-another-users) | 거부 |
-| [읽기 권한을 받은 사용자가 도메인과 사용자를 함께 지정해 검색하면, 잘못된 입력으로 거부된다. 이 검색은 한 스코프에서만 실행된다](#searching-naming-two-scopes-at-once-is-refused-as-bad-input) | 거부 |
-
-**scoped_upsert_app_config_fragments**
+**scoped_atomic_bulk_upsert**
 
 | 시나리오 | 판정 |
 |---|---|
@@ -109,6 +99,16 @@
 | [자기 도메인 스코프에 쓰기 권한을 받았어도 슈퍼관리자가 아닌 사용자가 공개 스코프를 지정해 쓰면, 역할 부족으로 거부된다. 공개 조각에는 대응하는 스코프가 없다](#writing-a-user-who-is-not-the-superadmin-may-not-write-a-public-fragment) | 거부 |
 | [슈퍼관리자가 어느 사용자도 아닌 id를 소유자로 지정해 쓰면, 소유자 없음으로 거부된다. 소유자가 있는지는 권한 그래프에서 확인한다](#writing-the-superadmin-naming-an-owner-nothing-answers-to-is-refused) | 거부 |
 | [권한 검사를 꺼도 슈퍼관리자가 아니면 공개 조각을 쓸 수 없다](#writing-turning-enforcement-off-still-does-not-let-a-user-write-a-public-fragment) | 거부 |
+
+**scoped_search**
+
+| 시나리오 | 판정 |
+|---|---|
+| [공개 조각 둘이 있고 아무 권한도 없는 사용자가 공개 스코프를 지정해 검색하면, 둘 다 집계된다. 공개 조각에는 보호할 스코프가 없다](#searching-anyone-signed-in-searches-the-public-scope) | 성공 |
+| [자기 조각 둘과 다른 사용자의 조각 하나가 있고 자기 스코프에 읽기 권한을 받은 사용자가 자기 스코프를 검색하면, 자기 조각 둘만 집계된다](#searching-searching-my-own-scope-counts-only-my-fragments) | 성공 |
+| [슈퍼관리자가 어느 도메인도 아닌 id를 지정해 검색하면, 대상을 찾을 수 없다는 이유로 거부된다](#searching-a-domain-nothing-answers-to-is-not-found-for-a-superadmin) | 거부 |
+| [자기 스코프에만 읽기 권한을 받은 사용자가 다른 사용자를 지정해 검색하면, 권한 부족으로 거부된다](#searching-a-user-granted-read-on-their-own-scope-may-not-search-another-users) | 거부 |
+| [읽기 권한을 받은 사용자가 도메인과 사용자를 함께 지정해 검색하면, 잘못된 입력으로 거부된다. 이 검색은 한 스코프에서만 실행된다](#searching-naming-two-scopes-at-once-is-refused-as-bad-input) | 거부 |
 
 ### admin_search
 
@@ -310,93 +310,6 @@ Then
   - items[0].id: 미리 만들어 둔 자기 조각와 같다
   - 거부: NotEnoughPermission
   - 거부: NotEnoughPermission
-
-### bulk_purge
-
-<a id="purging-mine-anothers-and-a-missing-id-are-each-answered-for-a-plain-user"></a>
-
-#### [mine-anothers-and-a-missing-id-are-each-answered-for-a-plain-user](/tests/scenario/bai_scenario/manager/app_config_fragment/test_purging.py) — pass
-
-자기 스코프에만 삭제 권한을 받은 사용자가 자기 조각 둘, 다른 사용자의 조각, 없는 id를 한 번에 삭제하면, 자기 둘은 삭제된 목록에, 남의 것과 없는 id는 실패 목록에 이유와 함께 반환된다
-
-Given
-
-- 자기 조각 2개와 다른 사용자의 조각 하나, 그리고 자기 스코프에서 설정 조각에 대한 HARD_DELETE 권한을 받은 사용자 한 명
-  - 도메인 home-1
-  - 자기 스코프에서 설정 조각에 대한 HARD_DELETE 권한을 받은 사용자 준비
-    - 도메인에 속한 사용자 한 명 준비
-      - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-      - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-    - 역할 own-scope-1: 이 역할이 앉은 스코프 안에서만 통한다
-    - 역할 own-scope-1: app_config_fragment 전체에 HARD_DELETE 허용
-    - 일반 사용자 user-1: 역할 own-scope-1 보유
-  - 도메인에 속한 사용자 한 명 준비
-    - 사용자 정책 user-policy-2: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
-    - 일반 사용자 user-2: 자기 키와 개인 프로젝트를 갖는다
-  - 사용자 스코프에 허용된 설정 이름 준비
-    - 설정 정의 mine-1: 이 이름의 설정이 등록돼 있다
-    - 허용 목록 항목 entry-1: 사용자 스코프에서 이 이름의 설정을 지정할 수 있다, 순위는 그 스코프 종류의 기본값
-    - 설정 정의 mine-2: 이 이름의 설정이 등록돼 있다
-    - 허용 목록 항목 entry-2: 사용자 스코프에서 이 이름의 설정을 지정할 수 있다, 순위는 그 스코프 종류의 기본값
-    - 설정 정의 theirs-1: 이 이름의 설정이 등록돼 있다
-    - 허용 목록 항목 entry-3: 사용자 스코프에서 이 이름의 설정을 지정할 수 있다, 순위는 그 스코프 종류의 기본값
-  - 설정 조각 own-fragment-1: 값 {'mine': 0}
-  - 설정 조각 own-fragment-2: 값 {'mine': 1}
-  - 설정 조각 anothers-fragment-1: 값 {'theirs': 0}
-
-When
-
-- AppConfigFragmentAdapter.bulk_purge — user-1이 자기 조각 2개, 다른 사용자의 조각, 존재하지 않는 id를 한 번에 삭제
-
-Then
-
-- 자기 것은 삭제된 목록에, 남의 것과 없는 id는 실패 목록에 반환된다
-  - items: 미리 만들어 둔 자기 조각들와 같다
-  - failed = 2
-  - failed[0].id: 미리 만들어 둔 남의 조각와 같다
-  - failed[*].message: 무시함 — 이유는 문자열로 오고, 문자열은 바뀌어도 되는 값이다
-
-<a id="purging-the-superadmin-purges-both-and-a-missing-id-fails-alone"></a>
-
-#### [the-superadmin-purges-both-and-a-missing-id-fails-alone](/tests/scenario/bai_scenario/manager/app_config_fragment/test_purging.py) — pass
-
-슈퍼관리자가 조각 둘과 없는 id 하나를 한 번에 삭제하면, 둘은 삭제된 목록에, 없는 id는 실패 목록에 반환된다
-
-Given
-
-- 자기 조각 1개와 다른 사용자의 조각 하나, 그리고 슈퍼관리자 한 명
-  - 도메인 home-1
-  - 설정 조각 권한이 하나도 없는 사용자 준비
-    - 도메인에 속한 사용자 한 명 준비
-      - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-      - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
-  - 도메인에 속한 사용자 한 명 준비
-    - 사용자 정책 user-policy-2: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
-    - 일반 사용자 user-2: 자기 키와 개인 프로젝트를 갖는다
-  - 사용자 스코프에 허용된 설정 이름 준비
-    - 설정 정의 mine-1: 이 이름의 설정이 등록돼 있다
-    - 허용 목록 항목 entry-1: 사용자 스코프에서 이 이름의 설정을 지정할 수 있다, 순위는 그 스코프 종류의 기본값
-    - 설정 정의 theirs-1: 이 이름의 설정이 등록돼 있다
-    - 허용 목록 항목 entry-2: 사용자 스코프에서 이 이름의 설정을 지정할 수 있다, 순위는 그 스코프 종류의 기본값
-  - 설정 조각 own-fragment-1: 값 {'mine': 0}
-  - 설정 조각 anothers-fragment-1: 값 {'theirs': 0}
-
-When
-
-- AppConfigFragmentAdapter.bulk_purge — user-1이 자기 조각 1개, 다른 사용자의 조각, 존재하지 않는 id를 한 번에 삭제
-
-Then
-
-- 있는 둘은 삭제된 목록에, 없는 id는 실패 목록에 반환된다
-  - items: 미리 만들어 둔 조각들와 같다
-  - failed = 1
-  - failed[*].message: 무시함 — 이유는 문자열로 오고, 문자열은 바뀌어도 되는 값이다
 
 ### get
 
@@ -691,7 +604,7 @@ Then
 - 거부된다
   - 거부: NotEnoughPermission
 
-### my_upsert_app_config_fragments
+### my_atomic_bulk_upsert
 
 <a id="writing-a-user-granted-write-writes-their-first-own-fragment"></a>
 
@@ -719,13 +632,12 @@ Given
 
 When
 
-- AppConfigFragmentAdapter.my_upsert_app_config_fragments — user-1이 config-1에 자기 조각 쓰기
+- AppConfigFragmentAdapter.my_atomic_bulk_upsert — user-1이 config-1에 자기 조각 쓰기
 
 Then
 
 - 쓴 설정 조각 전체가 요청 순서대로 반환된다
   - items = 1
-  - failed = []
   - items[0].id: 무시함 — 데이터베이스가 만든다
   - items[0].config_name: 요청한 이름와 같다
   - items[0].scope_type = <AppConfigScopeType.USER: 'user'>
@@ -762,13 +674,12 @@ Given
 
 When
 
-- AppConfigFragmentAdapter.my_upsert_app_config_fragments — user-1이 config-1, opened-1에 자기 조각 쓰기
+- AppConfigFragmentAdapter.my_atomic_bulk_upsert — user-1이 config-1, opened-1에 자기 조각 쓰기
 
 Then
 
 - 쓴 설정 조각 전체가 요청 순서대로 반환된다
   - items = 2
-  - failed = []
   - items[0].id: 무시함 — 데이터베이스가 만든다
   - items[0].config_name: 요청한 이름와 같다
   - items[0].scope_type = <AppConfigScopeType.USER: 'user'>
@@ -806,13 +717,12 @@ Given
 
 When
 
-- AppConfigFragmentAdapter.my_upsert_app_config_fragments — user-1이 config-1에 자기 조각 쓰기
+- AppConfigFragmentAdapter.my_atomic_bulk_upsert — user-1이 config-1에 자기 조각 쓰기
 
 Then
 
 - 쓴 설정 조각 전체가 요청 순서대로 반환된다
   - items = 1
-  - failed = []
   - items[0].id: 무시함 — 데이터베이스가 만든다
   - items[0].config_name: 요청한 이름와 같다
   - items[0].scope_type = <AppConfigScopeType.USER: 'user'>
@@ -848,13 +758,12 @@ Given
 
 When
 
-- AppConfigFragmentAdapter.my_upsert_app_config_fragments — user-1이 config-1에 자기 조각 쓰기
+- AppConfigFragmentAdapter.my_atomic_bulk_upsert — user-1이 config-1에 자기 조각 쓰기
 
 Then
 
 - 쓴 설정 조각 전체가 요청 순서대로 반환된다
   - items = 1
-  - failed = []
   - items[0].id: 이미 있던 조각와 같다
   - items[0].config_name: 요청한 이름와 같다
   - items[0].scope_type = <AppConfigScopeType.USER: 'user'>
@@ -886,7 +795,7 @@ Given
 
 When
 
-- AppConfigFragmentAdapter.my_upsert_app_config_fragments — user-1이 unregistered에 자기 조각 쓰기
+- AppConfigFragmentAdapter.my_atomic_bulk_upsert — user-1이 unregistered에 자기 조각 쓰기
 
 Then
 
@@ -919,7 +828,7 @@ Given
 
 When
 
-- AppConfigFragmentAdapter.my_upsert_app_config_fragments — user-1이 config-1에 자기 조각 쓰기
+- AppConfigFragmentAdapter.my_atomic_bulk_upsert — user-1이 config-1에 자기 조각 쓰기
 
 Then
 
@@ -951,7 +860,7 @@ Given
 
 When
 
-- AppConfigFragmentAdapter.my_upsert_app_config_fragments — user-1이 config-1에 자기 조각 쓰기
+- AppConfigFragmentAdapter.my_atomic_bulk_upsert — user-1이 config-1에 자기 조각 쓰기
 
 Then
 
@@ -980,7 +889,7 @@ Given
 
 When
 
-- AppConfigFragmentAdapter.my_upsert_app_config_fragments — user-1이 config-1에 자기 조각 쓰기
+- AppConfigFragmentAdapter.my_atomic_bulk_upsert — user-1이 config-1에 자기 조각 쓰기
 
 Then
 
@@ -1015,12 +924,99 @@ Given
 
 When
 
-- AppConfigFragmentAdapter.my_upsert_app_config_fragments — user-1이 config-1, unopened-1에 자기 조각 쓰기
+- AppConfigFragmentAdapter.my_atomic_bulk_upsert — user-1이 config-1, unopened-1에 자기 조각 쓰기
 
 Then
 
 - 거부된다
   - 거부: AppConfigFragmentWriteNotAllowed
+
+### partial_bulk_purge
+
+<a id="purging-mine-anothers-and-a-missing-id-are-each-answered-for-a-plain-user"></a>
+
+#### [mine-anothers-and-a-missing-id-are-each-answered-for-a-plain-user](/tests/scenario/bai_scenario/manager/app_config_fragment/test_purging.py) — pass
+
+자기 스코프에만 삭제 권한을 받은 사용자가 자기 조각 둘, 다른 사용자의 조각, 없는 id를 한 번에 삭제하면, 자기 둘은 삭제된 목록에, 남의 것과 없는 id는 실패 목록에 이유와 함께 반환된다
+
+Given
+
+- 자기 조각 2개와 다른 사용자의 조각 하나, 그리고 자기 스코프에서 설정 조각에 대한 HARD_DELETE 권한을 받은 사용자 한 명
+  - 도메인 home-1
+  - 자기 스코프에서 설정 조각에 대한 HARD_DELETE 권한을 받은 사용자 준비
+    - 도메인에 속한 사용자 한 명 준비
+      - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+      - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+    - 역할 own-scope-1: 이 역할이 앉은 스코프 안에서만 통한다
+    - 역할 own-scope-1: app_config_fragment 전체에 HARD_DELETE 허용
+    - 일반 사용자 user-1: 역할 own-scope-1 보유
+  - 도메인에 속한 사용자 한 명 준비
+    - 사용자 정책 user-policy-2: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
+    - 일반 사용자 user-2: 자기 키와 개인 프로젝트를 갖는다
+  - 사용자 스코프에 허용된 설정 이름 준비
+    - 설정 정의 mine-1: 이 이름의 설정이 등록돼 있다
+    - 허용 목록 항목 entry-1: 사용자 스코프에서 이 이름의 설정을 지정할 수 있다, 순위는 그 스코프 종류의 기본값
+    - 설정 정의 mine-2: 이 이름의 설정이 등록돼 있다
+    - 허용 목록 항목 entry-2: 사용자 스코프에서 이 이름의 설정을 지정할 수 있다, 순위는 그 스코프 종류의 기본값
+    - 설정 정의 theirs-1: 이 이름의 설정이 등록돼 있다
+    - 허용 목록 항목 entry-3: 사용자 스코프에서 이 이름의 설정을 지정할 수 있다, 순위는 그 스코프 종류의 기본값
+  - 설정 조각 own-fragment-1: 값 {'mine': 0}
+  - 설정 조각 own-fragment-2: 값 {'mine': 1}
+  - 설정 조각 anothers-fragment-1: 값 {'theirs': 0}
+
+When
+
+- AppConfigFragmentAdapter.partial_bulk_purge — user-1이 자기 조각 2개, 다른 사용자의 조각, 존재하지 않는 id를 한 번에 삭제
+
+Then
+
+- 자기 것은 삭제된 목록에, 남의 것과 없는 id는 실패 목록에 반환된다
+  - successes: 미리 만들어 둔 자기 조각들와 같다
+  - failed = 2
+  - failed[0].id: 미리 만들어 둔 남의 조각와 같다
+  - failed[*].message: 무시함 — 이유는 문자열로 오고, 문자열은 바뀌어도 되는 값이다
+
+<a id="purging-the-superadmin-purges-both-and-a-missing-id-fails-alone"></a>
+
+#### [the-superadmin-purges-both-and-a-missing-id-fails-alone](/tests/scenario/bai_scenario/manager/app_config_fragment/test_purging.py) — pass
+
+슈퍼관리자가 조각 둘과 없는 id 하나를 한 번에 삭제하면, 둘은 삭제된 목록에, 없는 id는 실패 목록에 반환된다
+
+Given
+
+- 자기 조각 1개와 다른 사용자의 조각 하나, 그리고 슈퍼관리자 한 명
+  - 도메인 home-1
+  - 설정 조각 권한이 하나도 없는 사용자 준비
+    - 도메인에 속한 사용자 한 명 준비
+      - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+      - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+  - 도메인에 속한 사용자 한 명 준비
+    - 사용자 정책 user-policy-2: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
+    - 일반 사용자 user-2: 자기 키와 개인 프로젝트를 갖는다
+  - 사용자 스코프에 허용된 설정 이름 준비
+    - 설정 정의 mine-1: 이 이름의 설정이 등록돼 있다
+    - 허용 목록 항목 entry-1: 사용자 스코프에서 이 이름의 설정을 지정할 수 있다, 순위는 그 스코프 종류의 기본값
+    - 설정 정의 theirs-1: 이 이름의 설정이 등록돼 있다
+    - 허용 목록 항목 entry-2: 사용자 스코프에서 이 이름의 설정을 지정할 수 있다, 순위는 그 스코프 종류의 기본값
+  - 설정 조각 own-fragment-1: 값 {'mine': 0}
+  - 설정 조각 anothers-fragment-1: 값 {'theirs': 0}
+
+When
+
+- AppConfigFragmentAdapter.partial_bulk_purge — user-1이 자기 조각 1개, 다른 사용자의 조각, 존재하지 않는 id를 한 번에 삭제
+
+Then
+
+- 있는 둘은 삭제된 목록에, 없는 id는 실패 목록에 반환된다
+  - successes: 미리 만들어 둔 조각들와 같다
+  - failed = 1
+  - failed[*].message: 무시함 — 이유는 문자열로 오고, 문자열은 바뀌어도 되는 값이다
 
 ### purge
 
@@ -1328,6 +1324,212 @@ Then
 - 거부된다
   - 거부: NotEnoughPermission
 
+### scoped_atomic_bulk_upsert
+
+<a id="writing-a-user-granted-write-on-the-domain-writes-a-domain-fragment"></a>
+
+#### [a-user-granted-write-on-the-domain-writes-a-domain-fragment](/tests/scenario/bai_scenario/manager/app_config_fragment/test_writing.py) — pass
+
+자기 도메인 스코프에 쓰기 권한을 받은 사용자가 도메인을 지정해 쓰면, 스코프 종류는 도메인이고 소유자는 그 도메인이다
+
+Given
+
+- 자기 도메인에 허용된 설정 이름 하나, 그리고 자기 도메인에서 설정 조각에 대한 CREATE, UPDATE 권한을 받은 사용자 한 명
+  - 도메인 home-1
+  - 도메인 스코프에 허용된 설정 이름 준비
+    - 설정 정의 config-1: 이 이름의 설정이 등록돼 있다
+    - 허용 목록 항목 entry-1: 도메인 스코프에서 이 이름의 설정을 지정할 수 있다, 순위는 그 스코프 종류의 기본값
+  - 도메인 home-1에서 설정 조각에 대한 CREATE, UPDATE 권한을 받은 사용자 준비
+    - 도메인에 속한 사용자 한 명 준비
+      - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+      - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+    - 역할 seated-1: 이 역할이 앉은 스코프 안에서만 통한다
+    - 역할 seated-1: app_config_fragment 전체에 CREATE 허용
+    - 역할 seated-1: app_config_fragment 전체에 UPDATE 허용
+    - 일반 사용자 user-1: 역할 seated-1 보유
+
+When
+
+- AppConfigFragmentAdapter.scoped_atomic_bulk_upsert — user-1이 도메인 스코프를 지정해 config-1에 조각 쓰기
+
+Then
+
+- 쓴 설정 조각 전체가 요청 순서대로 반환된다
+  - items = 1
+  - items[0].id: 무시함 — 데이터베이스가 만든다
+  - items[0].config_name: 요청한 이름와 같다
+  - items[0].scope_type = <AppConfigScopeType.DOMAIN: 'domain'>
+  - items[0].scope_id: 지정한 소유자와 같다
+  - items[0].config = {'theme': 'light', 'menu': {'home': True}}
+  - items[0].created_at: 이 실행이 쓴 시각
+  - items[0].updated_at: 이 실행이 쓴 시각
+
+<a id="writing-the-superadmin-writes-a-public-fragment-owned-by-no-one"></a>
+
+#### [the-superadmin-writes-a-public-fragment-owned-by-no-one](/tests/scenario/bai_scenario/manager/app_config_fragment/test_writing.py) — pass
+
+슈퍼관리자가 공개 스코프를 지정해 쓰면, 스코프 종류는 공개이고 소유자 필드는 비어 있다. 공개 쓰기는 슈퍼관리자인지 검사한다
+
+Given
+
+- 공개 스코프에 허용된 설정 이름 하나, 그리고 슈퍼관리자 한 명
+  - 도메인 home-1
+  - 공개 스코프에 허용된 설정 이름 준비
+    - 설정 정의 config-1: 이 이름의 설정이 등록돼 있다
+    - 허용 목록 항목 entry-1: 공개 스코프에서 이 이름의 설정을 지정할 수 있다, 순위는 그 스코프 종류의 기본값
+  - 설정 조각 권한이 하나도 없는 사용자 준비
+    - 도메인에 속한 사용자 한 명 준비
+      - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+      - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+
+When
+
+- AppConfigFragmentAdapter.scoped_atomic_bulk_upsert — user-1이 공개 스코프를 지정해 config-1에 조각 쓰기
+
+Then
+
+- 쓴 설정 조각 전체가 요청 순서대로 반환된다
+  - items = 1
+  - items[0].id: 무시함 — 데이터베이스가 만든다
+  - items[0].config_name: 요청한 이름와 같다
+  - items[0].scope_type = <AppConfigScopeType.PUBLIC: 'public'>
+  - items[0].scope_id: 소유자 없음와 같다
+  - items[0].config = {'theme': 'light', 'menu': {'home': True}}
+  - items[0].created_at: 이 실행이 쓴 시각
+  - items[0].updated_at: 이 실행이 쓴 시각
+
+<a id="writing-a-user-granted-write-on-their-own-scope-may-not-write-at-another-users"></a>
+
+#### [a-user-granted-write-on-their-own-scope-may-not-write-at-another-users](/tests/scenario/bai_scenario/manager/app_config_fragment/test_writing.py) — pass
+
+자기 스코프에만 쓰기 권한을 받은 사용자가 다른 사용자를 지정해 쓰면, 권한 부족으로 거부된다
+
+Given
+
+- 다른 사용자에 허용된 설정 이름 하나, 그리고 자기 스코프에서 설정 조각에 대한 CREATE, UPDATE 권한을 받은 사용자 한 명
+  - 도메인 home-1
+  - 사용자 스코프에 허용된 설정 이름 준비
+    - 설정 정의 config-1: 이 이름의 설정이 등록돼 있다
+    - 허용 목록 항목 entry-1: 사용자 스코프에서 이 이름의 설정을 지정할 수 있다, 순위는 그 스코프 종류의 기본값
+  - 자기 스코프에서 설정 조각에 대한 CREATE, UPDATE 권한을 받은 사용자 준비
+    - 도메인에 속한 사용자 한 명 준비
+      - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+      - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+    - 역할 own-scope-1: 이 역할이 앉은 스코프 안에서만 통한다
+    - 역할 own-scope-1: app_config_fragment 전체에 CREATE 허용
+    - 역할 own-scope-1: app_config_fragment 전체에 UPDATE 허용
+    - 일반 사용자 user-1: 역할 own-scope-1 보유
+  - 도메인에 속한 사용자 한 명 준비
+    - 사용자 정책 user-policy-2: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
+    - 일반 사용자 user-2: 자기 키와 개인 프로젝트를 갖는다
+
+When
+
+- AppConfigFragmentAdapter.scoped_atomic_bulk_upsert — user-1이 사용자 스코프를 지정해 config-1에 조각 쓰기
+
+Then
+
+- 거부된다
+  - 거부: NotEnoughPermission
+
+<a id="writing-a-user-who-is-not-the-superadmin-may-not-write-a-public-fragment"></a>
+
+#### [a-user-who-is-not-the-superadmin-may-not-write-a-public-fragment](/tests/scenario/bai_scenario/manager/app_config_fragment/test_writing.py) — pass
+
+자기 도메인 스코프에 쓰기 권한을 받았어도 슈퍼관리자가 아닌 사용자가 공개 스코프를 지정해 쓰면, 역할 부족으로 거부된다. 공개 조각에는 대응하는 스코프가 없다
+
+Given
+
+- 공개 스코프에 허용된 설정 이름 하나, 그리고 자기 도메인에서 설정 조각에 대한 CREATE, UPDATE 권한을 받은 사용자 한 명
+  - 도메인 home-1
+  - 공개 스코프에 허용된 설정 이름 준비
+    - 설정 정의 config-1: 이 이름의 설정이 등록돼 있다
+    - 허용 목록 항목 entry-1: 공개 스코프에서 이 이름의 설정을 지정할 수 있다, 순위는 그 스코프 종류의 기본값
+  - 도메인 home-1에서 설정 조각에 대한 CREATE, UPDATE 권한을 받은 사용자 준비
+    - 도메인에 속한 사용자 한 명 준비
+      - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+      - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+    - 역할 seated-1: 이 역할이 앉은 스코프 안에서만 통한다
+    - 역할 seated-1: app_config_fragment 전체에 CREATE 허용
+    - 역할 seated-1: app_config_fragment 전체에 UPDATE 허용
+    - 일반 사용자 user-1: 역할 seated-1 보유
+
+When
+
+- AppConfigFragmentAdapter.scoped_atomic_bulk_upsert — user-1이 공개 스코프를 지정해 config-1에 조각 쓰기
+
+Then
+
+- 거부된다
+  - 거부: InsufficientPrivilege
+
+<a id="writing-the-superadmin-naming-an-owner-nothing-answers-to-is-refused"></a>
+
+#### [the-superadmin-naming-an-owner-nothing-answers-to-is-refused](/tests/scenario/bai_scenario/manager/app_config_fragment/test_writing.py) — pass
+
+슈퍼관리자가 어느 사용자도 아닌 id를 소유자로 지정해 쓰면, 소유자 없음으로 거부된다. 소유자가 있는지는 권한 그래프에서 확인한다
+
+Given
+
+- 어느 사용자도 아닌 id에 허용된 설정 이름 하나, 그리고 슈퍼관리자 한 명
+  - 도메인 home-1
+  - 사용자 스코프에 허용된 설정 이름 준비
+    - 설정 정의 config-1: 이 이름의 설정이 등록돼 있다
+    - 허용 목록 항목 entry-1: 사용자 스코프에서 이 이름의 설정을 지정할 수 있다, 순위는 그 스코프 종류의 기본값
+  - 설정 조각 권한이 하나도 없는 사용자 준비
+    - 도메인에 속한 사용자 한 명 준비
+      - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+      - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+
+When
+
+- AppConfigFragmentAdapter.scoped_atomic_bulk_upsert — user-1이 사용자 스코프를 지정해 config-1에 조각 쓰기
+
+Then
+
+- 거부된다
+  - 거부: VirtualEntityNotFound
+
+<a id="writing-turning-enforcement-off-still-does-not-let-a-user-write-a-public-fragment"></a>
+
+#### [turning-enforcement-off-still-does-not-let-a-user-write-a-public-fragment](/tests/scenario/bai_scenario/manager/app_config_fragment/test_writing.py) — pass
+
+권한 검사를 꺼도 슈퍼관리자가 아니면 공개 조각을 쓸 수 없다
+
+Given
+
+- 공개 스코프에 허용된 설정 이름 하나, 그리고 설정 조각 권한이 하나도 없는 사용자 한 명
+  - 도메인 home-1
+  - 공개 스코프에 허용된 설정 이름 준비
+    - 설정 정의 config-1: 이 이름의 설정이 등록돼 있다
+    - 허용 목록 항목 entry-1: 공개 스코프에서 이 이름의 설정을 지정할 수 있다, 순위는 그 스코프 종류의 기본값
+  - 설정 조각 권한이 하나도 없는 사용자 준비
+    - 도메인에 속한 사용자 한 명 준비
+      - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+      - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+
+When
+
+- AppConfigFragmentAdapter.scoped_atomic_bulk_upsert — user-1이 공개 스코프를 지정해 config-1에 조각 쓰기
+
+Then
+
+- 거부된다
+  - 거부: InsufficientPrivilege
+
 ### scoped_search
 
 <a id="searching-anyone-signed-in-searches-the-public-scope"></a>
@@ -1510,212 +1712,4 @@ Then
 
 - 거부된다
   - 거부: InvalidAPIParameters
-
-### scoped_upsert_app_config_fragments
-
-<a id="writing-a-user-granted-write-on-the-domain-writes-a-domain-fragment"></a>
-
-#### [a-user-granted-write-on-the-domain-writes-a-domain-fragment](/tests/scenario/bai_scenario/manager/app_config_fragment/test_writing.py) — pass
-
-자기 도메인 스코프에 쓰기 권한을 받은 사용자가 도메인을 지정해 쓰면, 스코프 종류는 도메인이고 소유자는 그 도메인이다
-
-Given
-
-- 자기 도메인에 허용된 설정 이름 하나, 그리고 자기 도메인에서 설정 조각에 대한 CREATE, UPDATE 권한을 받은 사용자 한 명
-  - 도메인 home-1
-  - 도메인 스코프에 허용된 설정 이름 준비
-    - 설정 정의 config-1: 이 이름의 설정이 등록돼 있다
-    - 허용 목록 항목 entry-1: 도메인 스코프에서 이 이름의 설정을 지정할 수 있다, 순위는 그 스코프 종류의 기본값
-  - 도메인 home-1에서 설정 조각에 대한 CREATE, UPDATE 권한을 받은 사용자 준비
-    - 도메인에 속한 사용자 한 명 준비
-      - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-      - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-    - 역할 seated-1: 이 역할이 앉은 스코프 안에서만 통한다
-    - 역할 seated-1: app_config_fragment 전체에 CREATE 허용
-    - 역할 seated-1: app_config_fragment 전체에 UPDATE 허용
-    - 일반 사용자 user-1: 역할 seated-1 보유
-
-When
-
-- AppConfigFragmentAdapter.scoped_upsert_app_config_fragments — user-1이 도메인 스코프를 지정해 config-1에 조각 쓰기
-
-Then
-
-- 쓴 설정 조각 전체가 요청 순서대로 반환된다
-  - items = 1
-  - failed = []
-  - items[0].id: 무시함 — 데이터베이스가 만든다
-  - items[0].config_name: 요청한 이름와 같다
-  - items[0].scope_type = <AppConfigScopeType.DOMAIN: 'domain'>
-  - items[0].scope_id: 지정한 소유자와 같다
-  - items[0].config = {'theme': 'light', 'menu': {'home': True}}
-  - items[0].created_at: 이 실행이 쓴 시각
-  - items[0].updated_at: 이 실행이 쓴 시각
-
-<a id="writing-the-superadmin-writes-a-public-fragment-owned-by-no-one"></a>
-
-#### [the-superadmin-writes-a-public-fragment-owned-by-no-one](/tests/scenario/bai_scenario/manager/app_config_fragment/test_writing.py) — pass
-
-슈퍼관리자가 공개 스코프를 지정해 쓰면, 스코프 종류는 공개이고 소유자 필드는 비어 있다. 공개 쓰기는 슈퍼관리자인지 검사한다
-
-Given
-
-- 공개 스코프에 허용된 설정 이름 하나, 그리고 슈퍼관리자 한 명
-  - 도메인 home-1
-  - 공개 스코프에 허용된 설정 이름 준비
-    - 설정 정의 config-1: 이 이름의 설정이 등록돼 있다
-    - 허용 목록 항목 entry-1: 공개 스코프에서 이 이름의 설정을 지정할 수 있다, 순위는 그 스코프 종류의 기본값
-  - 설정 조각 권한이 하나도 없는 사용자 준비
-    - 도메인에 속한 사용자 한 명 준비
-      - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-      - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
-
-When
-
-- AppConfigFragmentAdapter.scoped_upsert_app_config_fragments — user-1이 공개 스코프를 지정해 config-1에 조각 쓰기
-
-Then
-
-- 쓴 설정 조각 전체가 요청 순서대로 반환된다
-  - items = 1
-  - failed = []
-  - items[0].id: 무시함 — 데이터베이스가 만든다
-  - items[0].config_name: 요청한 이름와 같다
-  - items[0].scope_type = <AppConfigScopeType.PUBLIC: 'public'>
-  - items[0].scope_id: 소유자 없음와 같다
-  - items[0].config = {'theme': 'light', 'menu': {'home': True}}
-  - items[0].created_at: 이 실행이 쓴 시각
-  - items[0].updated_at: 이 실행이 쓴 시각
-
-<a id="writing-a-user-granted-write-on-their-own-scope-may-not-write-at-another-users"></a>
-
-#### [a-user-granted-write-on-their-own-scope-may-not-write-at-another-users](/tests/scenario/bai_scenario/manager/app_config_fragment/test_writing.py) — pass
-
-자기 스코프에만 쓰기 권한을 받은 사용자가 다른 사용자를 지정해 쓰면, 권한 부족으로 거부된다
-
-Given
-
-- 다른 사용자에 허용된 설정 이름 하나, 그리고 자기 스코프에서 설정 조각에 대한 CREATE, UPDATE 권한을 받은 사용자 한 명
-  - 도메인 home-1
-  - 사용자 스코프에 허용된 설정 이름 준비
-    - 설정 정의 config-1: 이 이름의 설정이 등록돼 있다
-    - 허용 목록 항목 entry-1: 사용자 스코프에서 이 이름의 설정을 지정할 수 있다, 순위는 그 스코프 종류의 기본값
-  - 자기 스코프에서 설정 조각에 대한 CREATE, UPDATE 권한을 받은 사용자 준비
-    - 도메인에 속한 사용자 한 명 준비
-      - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-      - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-    - 역할 own-scope-1: 이 역할이 앉은 스코프 안에서만 통한다
-    - 역할 own-scope-1: app_config_fragment 전체에 CREATE 허용
-    - 역할 own-scope-1: app_config_fragment 전체에 UPDATE 허용
-    - 일반 사용자 user-1: 역할 own-scope-1 보유
-  - 도메인에 속한 사용자 한 명 준비
-    - 사용자 정책 user-policy-2: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
-    - 일반 사용자 user-2: 자기 키와 개인 프로젝트를 갖는다
-
-When
-
-- AppConfigFragmentAdapter.scoped_upsert_app_config_fragments — user-1이 사용자 스코프를 지정해 config-1에 조각 쓰기
-
-Then
-
-- 거부된다
-  - 거부: NotEnoughPermission
-
-<a id="writing-a-user-who-is-not-the-superadmin-may-not-write-a-public-fragment"></a>
-
-#### [a-user-who-is-not-the-superadmin-may-not-write-a-public-fragment](/tests/scenario/bai_scenario/manager/app_config_fragment/test_writing.py) — pass
-
-자기 도메인 스코프에 쓰기 권한을 받았어도 슈퍼관리자가 아닌 사용자가 공개 스코프를 지정해 쓰면, 역할 부족으로 거부된다. 공개 조각에는 대응하는 스코프가 없다
-
-Given
-
-- 공개 스코프에 허용된 설정 이름 하나, 그리고 자기 도메인에서 설정 조각에 대한 CREATE, UPDATE 권한을 받은 사용자 한 명
-  - 도메인 home-1
-  - 공개 스코프에 허용된 설정 이름 준비
-    - 설정 정의 config-1: 이 이름의 설정이 등록돼 있다
-    - 허용 목록 항목 entry-1: 공개 스코프에서 이 이름의 설정을 지정할 수 있다, 순위는 그 스코프 종류의 기본값
-  - 도메인 home-1에서 설정 조각에 대한 CREATE, UPDATE 권한을 받은 사용자 준비
-    - 도메인에 속한 사용자 한 명 준비
-      - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-      - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-    - 역할 seated-1: 이 역할이 앉은 스코프 안에서만 통한다
-    - 역할 seated-1: app_config_fragment 전체에 CREATE 허용
-    - 역할 seated-1: app_config_fragment 전체에 UPDATE 허용
-    - 일반 사용자 user-1: 역할 seated-1 보유
-
-When
-
-- AppConfigFragmentAdapter.scoped_upsert_app_config_fragments — user-1이 공개 스코프를 지정해 config-1에 조각 쓰기
-
-Then
-
-- 거부된다
-  - 거부: InsufficientPrivilege
-
-<a id="writing-the-superadmin-naming-an-owner-nothing-answers-to-is-refused"></a>
-
-#### [the-superadmin-naming-an-owner-nothing-answers-to-is-refused](/tests/scenario/bai_scenario/manager/app_config_fragment/test_writing.py) — pass
-
-슈퍼관리자가 어느 사용자도 아닌 id를 소유자로 지정해 쓰면, 소유자 없음으로 거부된다. 소유자가 있는지는 권한 그래프에서 확인한다
-
-Given
-
-- 어느 사용자도 아닌 id에 허용된 설정 이름 하나, 그리고 슈퍼관리자 한 명
-  - 도메인 home-1
-  - 사용자 스코프에 허용된 설정 이름 준비
-    - 설정 정의 config-1: 이 이름의 설정이 등록돼 있다
-    - 허용 목록 항목 entry-1: 사용자 스코프에서 이 이름의 설정을 지정할 수 있다, 순위는 그 스코프 종류의 기본값
-  - 설정 조각 권한이 하나도 없는 사용자 준비
-    - 도메인에 속한 사용자 한 명 준비
-      - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-      - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
-
-When
-
-- AppConfigFragmentAdapter.scoped_upsert_app_config_fragments — user-1이 사용자 스코프를 지정해 config-1에 조각 쓰기
-
-Then
-
-- 거부된다
-  - 거부: VirtualEntityNotFound
-
-<a id="writing-turning-enforcement-off-still-does-not-let-a-user-write-a-public-fragment"></a>
-
-#### [turning-enforcement-off-still-does-not-let-a-user-write-a-public-fragment](/tests/scenario/bai_scenario/manager/app_config_fragment/test_writing.py) — pass
-
-권한 검사를 꺼도 슈퍼관리자가 아니면 공개 조각을 쓸 수 없다
-
-Given
-
-- 공개 스코프에 허용된 설정 이름 하나, 그리고 설정 조각 권한이 하나도 없는 사용자 한 명
-  - 도메인 home-1
-  - 공개 스코프에 허용된 설정 이름 준비
-    - 설정 정의 config-1: 이 이름의 설정이 등록돼 있다
-    - 허용 목록 항목 entry-1: 공개 스코프에서 이 이름의 설정을 지정할 수 있다, 순위는 그 스코프 종류의 기본값
-  - 설정 조각 권한이 하나도 없는 사용자 준비
-    - 도메인에 속한 사용자 한 명 준비
-      - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-      - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-
-When
-
-- AppConfigFragmentAdapter.scoped_upsert_app_config_fragments — user-1이 공개 스코프를 지정해 config-1에 조각 쓰기
-
-Then
-
-- 거부된다
-  - 거부: InsufficientPrivilege
 

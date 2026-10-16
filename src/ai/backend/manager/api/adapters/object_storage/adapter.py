@@ -10,27 +10,30 @@ from uuid import UUID
 from ai.backend.common.data.entity.artifact_revision import ArtifactRevisionID
 from ai.backend.common.data.entity.object_storage import ObjectStorageID
 from ai.backend.common.dto.manager.defs import DEFAULT_PAGE_LIMIT
+from ai.backend.common.dto.manager.v2.common import PartialBulkFailure, PartialBulkPayload
 from ai.backend.common.dto.manager.v2.object_storage.request import (
     AdminSearchObjectStoragesInput,
     CreateObjectStorageInput,
-    DeleteObjectStorageInput,
     ObjectStorageFilter,
     ObjectStorageOrder,
+    PartialBulkPurgeObjectStoragesInput,
+    PartialBulkUpdateObjectStoragesInput,
     UpdateObjectStorageInput,
 )
 from ai.backend.common.dto.manager.v2.object_storage.response import (
     AdminSearchObjectStoragesPayload,
     CreateObjectStoragePayload,
-    DeleteObjectStoragePayload,
     ObjectStorageNode,
     PresignedDownloadURLPayload,
     PresignedUploadURLPayload,
+    PurgeObjectStoragePayload,
     UpdateObjectStoragePayload,
 )
 from ai.backend.common.dto.manager.v2.object_storage.types import (
     ObjectStorageOrderField,
     OrderDirection,
 )
+from ai.backend.manager.actions.v2.bulk.result import PartialBulkResult
 from ai.backend.manager.api.adapters.base import BaseAdapter
 from ai.backend.manager.data.object_storage.types import ObjectStorageData
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
@@ -52,6 +55,12 @@ from ai.backend.manager.services.object_storage.actions.get_download_presigned_u
 )
 from ai.backend.manager.services.object_storage.actions.get_upload_presigned_url import (
     GetUploadPresignedURLAction,
+)
+from ai.backend.manager.services.object_storage.actions.partial_bulk_purge_object_storages import (
+    PartialBulkPurgeObjectStoragesAction,
+)
+from ai.backend.manager.services.object_storage.actions.partial_bulk_update_object_storages import (
+    PartialBulkUpdateObjectStoragesAction,
 )
 from ai.backend.manager.services.object_storage.actions.purge import PurgeObjectStorageAction
 from ai.backend.manager.services.object_storage.actions.search import SearchObjectStoragesAction
@@ -178,10 +187,49 @@ class ObjectStorageAdapter(BaseAdapter):
         )
         return CreateObjectStoragePayload(object_storage=self._data_to_dto(action_result.data))
 
-    async def update(self, input: UpdateObjectStorageInput) -> UpdateObjectStoragePayload:
-        """Update an existing object storage."""
-        updater = ObjectStorageUpdater(
-            storage_id=ObjectStorageID(input.id),
+    async def update(
+        self, storage_id: ObjectStorageID, input: UpdateObjectStorageInput
+    ) -> UpdateObjectStoragePayload:
+        """Update an existing object storage. The ID the input carries is not read."""
+        action_result = await self._object_storage.update.run(
+            UpdateObjectStorageAction(updater=self._to_updater(storage_id, input))
+        )
+        return UpdateObjectStoragePayload(object_storage=self._data_to_dto(action_result.data))
+
+    async def purge(self, storage_id: ObjectStorageID) -> PurgeObjectStoragePayload:
+        """Permanently remove an object storage."""
+        action_result = await self._object_storage.purge.run(
+            PurgeObjectStorageAction(storage_id=storage_id)
+        )
+        return PurgeObjectStoragePayload(id=action_result.data.id)
+
+    async def partial_bulk_update(
+        self, input: PartialBulkUpdateObjectStoragesInput
+    ) -> PartialBulkPayload[ObjectStorageNode]:
+        """Update several object storages, answering for each one."""
+        result = await self._object_storage.partial_bulk_update.run(
+            PartialBulkUpdateObjectStoragesAction(
+                updaters=[self._to_updater(ObjectStorageID(item.id), item) for item in input.items]
+            )
+        )
+        return self._to_partial_bulk_payload(result)
+
+    async def partial_bulk_purge(
+        self, input: PartialBulkPurgeObjectStoragesInput
+    ) -> PartialBulkPayload[ObjectStorageNode]:
+        """Permanently remove several object storages, answering for each one."""
+        result = await self._object_storage.partial_bulk_purge.run(
+            PartialBulkPurgeObjectStoragesAction(
+                ids=[ObjectStorageID(storage_id) for storage_id in input.ids]
+            )
+        )
+        return self._to_partial_bulk_payload(result)
+
+    def _to_updater(
+        self, storage_id: ObjectStorageID, input: UpdateObjectStorageInput
+    ) -> ObjectStorageUpdater:
+        return ObjectStorageUpdater(
+            storage_id=storage_id,
             name=OptionalState.from_unset(input.name),
             host=OptionalState.from_unset(input.host),
             access_key=OptionalState.from_unset(input.access_key),
@@ -189,17 +237,20 @@ class ObjectStorageAdapter(BaseAdapter):
             endpoint=OptionalState.from_unset(input.endpoint),
             region=TriState.from_unset(input.region),
         )
-        action_result = await self._object_storage.update.run(
-            UpdateObjectStorageAction(updater=updater)
-        )
-        return UpdateObjectStoragePayload(object_storage=self._data_to_dto(action_result.data))
 
-    async def delete(self, input: DeleteObjectStorageInput) -> DeleteObjectStoragePayload:
-        """Delete an object storage."""
-        action_result = await self._object_storage.purge.run(
-            PurgeObjectStorageAction(storage_id=input.id)
+    def _to_partial_bulk_payload(
+        self, result: PartialBulkResult[ObjectStorageData]
+    ) -> PartialBulkPayload[ObjectStorageNode]:
+        return PartialBulkPayload[ObjectStorageNode](
+            successes=[
+                self._data_to_dto(item.value) for item in result.items if item.value is not None
+            ],
+            failed=[
+                PartialBulkFailure(id=item.entity_id, message=str(item.error))
+                for item in result.items
+                if item.error is not None
+            ],
         )
-        return DeleteObjectStoragePayload(id=action_result.data.id)
 
     async def get_presigned_download_url(
         self,

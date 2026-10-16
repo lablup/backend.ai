@@ -1,26 +1,35 @@
 ---
 name: idle-checker-adapter-scenarios
 type: reference
-description: TODO - what the idle checker adapter guarantees, as scenarios; nobody has written these yet
+description: what the idle checker adapter guarantees, as scenarios; the tests in tests/scenario/bai_scenario/manager/idle_checker match these one for one
 scope: src/ai/backend/manager/api/adapters/idle_checker
-keywords: [idle checker, scenario, adapter, todo]
+keywords: [idle checker, scenario, adapter, superadmin, partial bulk, purge]
 generated:
   by: claude-code/opus-5
-  at: 2026-09-10
+  at: 2026-10-16
 status: draft
 ---
 # idle_checker 어댑터 — 시나리오
 
-TODO. 아직 아무도 적지 않았다.
+규칙은 상위 디렉터리의 `AGENTS.md`에 있다. 여기 적힌 것과 실행 결과가 어긋나면 문장을 먼저
+의심한다.
 
-규칙은 상위 디렉터리의 `AGENTS.md`에 있다. 이 파일이 이 모양으로 남아 있는 동안, 이 엔티티는
-시나리오 테스트가 없다.
+유휴 검사기는 전역 카탈로그에 있고 어느 스코프에도 속하지 않는다. 쓰기는 전역 superadmin 역할이
+지킨다.
 
-## 적는 법
+## 여럿 purge
 
-1. `adapter.py`가 내놓는 호출을 전부 훑는다.
-2. 호출마다 무엇을 보장하는지 한 문장으로 적는다. 권한이 있는 경우와 없는 경우를 짝으로 둔다.
-3. 동작별로 표를 나눈다. 각 줄은 상황, 요청, 결과 셋을 갖는다.
-4. 어느 시나리오도 부르지 않는 호출은 "아직 적지 않은 것"에 남긴다.
+| 시나리오 | 상황 | 요청 | 결과 |
+|---|---|---|---|
+| 슈퍼관리자가 둘과 없는 id 하나를 한 번에 purge 한다 | 검사기 둘이 있음 | 셋 purge | 둘은 지운 검사기로 오고, 없는 id 는 대상 없음 이유로 실패 목록에 옴 |
+| 아무 권한도 받지 않은 사용자가 여럿을 purge 한다 | 같은 검사기 둘 | 둘 purge | 지운 것 없이 둘 다 권한 부족 이유로 실패 목록에 옴 |
 
-먼저 적힌 것을 보려면 `../domain/KNOWLEDGE.md`를 참고한다.
+여럿 purge 는 호출 전체를 거부하지 않는다. 지운 검사기는 처리된 목록에, 지우지 못한 것은 id 와
+이유를 실패 목록에 싣는다.
+
+## 아직 적지 않은 것
+
+어느 시나리오도 부르지 않는 어댑터 호출이다. 실행 결과가 이 목록을 함께 낸다.
+
+`admin_create`, `admin_update`, `admin_purge`, `admin_search`, `batch_load_by_ids`,
+`batch_load_fields`.

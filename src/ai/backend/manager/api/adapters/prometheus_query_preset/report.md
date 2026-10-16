@@ -2,17 +2,19 @@
 
 [무엇을 보장하는가](/src/ai/backend/manager/api/adapters/prometheus_query_preset/KNOWLEDGE.md) · [어댑터](/src/ai/backend/manager/api/adapters/prometheus_query_preset/adapter.py)
 
-시나리오: 미완 1 / 8
+시나리오: 미완 3 / 10
 
-- ops 로 구성 (4)
+- ops 로 구성 (5)
   - batch_load_by_ids — 대표 성공 ✓ · 대표 실패 ✗ — SCENARIO-GAP
-  - delete — 대표 성공 ✓ · 대표 실패 ✓
   - get — 대표 성공 ✓ · 대표 실패 ✓
+  - partial_bulk_purge — 대표 성공 ✓ · 대표 실패 ✗ — SCENARIO-GAP
+  - purge — 대표 성공 ✓ · 대표 실패 ✓
   - search — 대표 성공 ✓ · 대표 실패 ✓
-- 직접 구현 (4)
+- 직접 구현 (5)
   - admin_preview — 성공 있음 2 · 실패 있음 2 (global_scope)
   - create — 성공 있음 4 · 실패 있음 4 (global_scope)
   - execute_preset — 성공 있음 3 · 실패 있음 4 (single_entity)
+  - partial_bulk_update — 성공 있음 3 · 실패 없음 (partial_bulk) — SCENARIO-GAP
   - update — 성공 있음 6 · 실패 있음 3 (single_entity)
 
 **batch_load_by_ids**
@@ -22,15 +24,6 @@
 | [프리셋이 있어도 빈 id 목록으로 조회하면, 빈 응답이 반환된다](#loading-loading-an-empty-id-list-answers-an-empty-list) | 성공 |
 | [프리셋 둘과 없는 id 하나를 섞어 한 번에 조회하면, 있는 둘은 노드로 없는 하나는 빈 항목으로 반환되고 순서가 요청한 순서와 같다](#loading-loading-laid-ids-and-an-unknown-one-answers-in-order-with-a-gap) | 성공 |
 
-**delete**
-
-| 시나리오 | 판정 |
-|---|---|
-| [프리셋 하나가 있고 슈퍼관리자가 삭제하면, 삭제한 id를 담은 응답이 반환된다](#purging-the-superadmin-removes-a-preset) | 성공 |
-| [권한 검사를 끄면 아무 권한도 없는 사용자도 프리셋을 삭제할 수 있다](#purging-turning-enforcement-off-lets-a-user-remove-a-preset) | 성공 |
-| [같은 프리셋이 있고 아무 권한도 없는 사용자가 삭제하면, 권한 부족으로 거부된다](#purging-a-user-granted-nothing-may-not-remove-a-preset) | 거부 |
-| [슈퍼관리자가 존재하지 않는 id를 삭제하면, 대상을 찾을 수 없다는 이유로 거부된다](#purging-removing-an-id-nothing-answers-to-is-not-found-for-a-superadmin) | 거부 |
-
 **get**
 
 | 시나리오 | 판정 |
@@ -38,6 +31,22 @@
 | [프리셋 하나가 있고 아무 권한도 없는 사용자가 id로 조회하면, 그 프리셋 전체가 반환된다](#reading-a-user-granted-nothing-reads-a-preset-by-id) | 성공 |
 | [프리셋 하나가 있고 사용자 컨텍스트 없이 id로 조회하면, 호출자를 알 수 없어 거부된다](#reading-a-call-carrying-no-user-may-not-read-a-preset) | 거부 |
 | [public 에서 읽을 수 있는 사용자가 존재하지 않는 id로 조회하면 거부된다. 권한을 물을 대상이 없으므로, 없는 것인지 닿지 못하는 것인지는 응답으로 드러나지 않는다](#reading-an-id-nothing-answers-to-is-refused) | 거부 |
+
+**partial_bulk_purge**
+
+| 시나리오 | 판정 |
+|---|---|
+| [아무 권한도 받지 않은 사용자가 프리셋 여럿을 한 번에 purge 하려 하면, 지워진 것 없이 모두 권한이 없다는 이유로 실패 목록에 온다](#partial_bulk_purging-a-user-granted-nothing-purges-none-of-several-presets) | 성공 |
+| [슈퍼관리자가 프리셋 둘과 없는 id 하나를 한 번에 purge 하면, 둘은 지워지기 전 모습으로 오고 없는 id 는 대상이 없다는 이유로 실패 목록에 온다](#partial_bulk_purging-purging-several-presets-answers-for-the-missing-one) | 성공 |
+
+**purge**
+
+| 시나리오 | 판정 |
+|---|---|
+| [프리셋 하나가 있고 슈퍼관리자가 삭제하면, 삭제한 id를 담은 응답이 반환된다](#purging-the-superadmin-removes-a-preset) | 성공 |
+| [권한 검사를 끄면 아무 권한도 없는 사용자도 프리셋을 삭제할 수 있다](#purging-turning-enforcement-off-lets-a-user-remove-a-preset) | 성공 |
+| [같은 프리셋이 있고 아무 권한도 없는 사용자가 삭제하면, 권한 부족으로 거부된다](#purging-a-user-granted-nothing-may-not-remove-a-preset) | 거부 |
+| [슈퍼관리자가 존재하지 않는 id를 삭제하면, 대상을 찾을 수 없다는 이유로 거부된다](#purging-removing-an-id-nothing-answers-to-is-not-found-for-a-superadmin) | 거부 |
 
 **search**
 
@@ -82,6 +91,14 @@
 | [아무 권한도 없는 사용자가 프리셋을 실행하면 권한 부족으로 거부된다. 실행은 조회와 같은 권한을 묻는다](#executing-a-user-granted-nothing-may-not-run-a-preset) | 거부 |
 | [슈퍼관리자가 존재하지 않는 id로 실행하면, 대상을 찾을 수 없다는 이유로 거부된다. 실행은 서비스가 프리셋을 직접 읽어서 내는 오류라 수정과 삭제의 대상 없음과 종류가 다르다](#executing-running-an-id-nothing-answers-to-is-not-found-for-a-superadmin) | 거부 |
 | [아무 권한도 없는 사용자가 존재하지 않는 id로 실행하면, 대상 없음이 아니라 권한 부족으로 거부된다. 없는 행에는 부여된 권한도 없기 때문이다](#executing-running-an-id-nothing-answers-to-is-refused-as-permission-for-a-plain-user) | 거부 |
+
+**partial_bulk_update**
+
+| 시나리오 | 판정 |
+|---|---|
+| [슈퍼관리자가 프리셋 여럿을 한 번에 고치며 하나에 잘못된 템플릿을 주면, 그 하나만 템플릿 검사의 이유로 실패 목록에 오고 나머지는 고쳐진다](#partial_bulk_editing-a-broken-template-fails-only-the-preset-it-was-meant-for) | 성공 |
+| [아무 권한도 받지 않은 사용자가 프리셋 여럿을 한 번에 고치려 하면, 고쳐진 것 없이 모두 권한이 없다는 이유로 실패 목록에 온다](#partial_bulk_editing-a-user-granted-nothing-edits-none-of-several-presets) | 성공 |
+| [슈퍼관리자가 프리셋 여럿의 설명을 한 번에 바꾸면, 모두 새 설명으로 오고 실패한 것은 없다](#partial_bulk_editing-the-superadmin-edits-several-presets-at-once) | 성공 |
 
 **update**
 
@@ -162,128 +179,6 @@ Then
   - [0]: 1번째로 요청한 id의 프리셋 전체와 같다
   - [1]: 2번째로 요청한 id의 프리셋 전체와 같다
   - [2] = None
-
-### delete
-
-<a id="purging-the-superadmin-removes-a-preset"></a>
-
-#### [the-superadmin-removes-a-preset](/tests/scenario/bai_scenario/manager/prometheus_query_preset/test_purging.py) — pass
-
-프리셋 하나가 있고 슈퍼관리자가 삭제하면, 삭제한 id를 담은 응답이 반환된다
-
-Given
-
-- 이미 있는 프리셋 하나와, 프리셋을 읽을 수 있는 superadmin 한 명
-  - 질의 프리셋 preset-1
-  - 도메인 home-1
-  - public 에서 prometheus_query_preset 조회 권한을 받은 사용자 준비
-    - 도메인에 속한 사용자 한 명 준비
-      - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-      - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
-    - 역할 public-reader-1: 이 역할이 앉은 스코프 안에서만 통한다
-    - 역할 public-reader-1: prometheus_query_preset 전체에 READ 허용
-    - 슈퍼관리자 user-1: 역할 public-reader-1 보유
-
-When
-
-- PrometheusQueryPresetAdapter.delete — user-1이 preset-1 삭제
-
-Then
-
-- 삭제한 프리셋을 응답한다
-  - id: 미리 만들어 둔 프리셋와 같다
-
-<a id="purging-turning-enforcement-off-lets-a-user-remove-a-preset"></a>
-
-#### [turning-enforcement-off-lets-a-user-remove-a-preset](/tests/scenario/bai_scenario/manager/prometheus_query_preset/test_purging.py) — pass
-
-권한 검사를 끄면 아무 권한도 없는 사용자도 프리셋을 삭제할 수 있다
-
-Given
-
-- 이미 있는 프리셋 하나와, 프리셋을 읽을 수 있는 user 한 명
-  - 질의 프리셋 preset-1
-  - 도메인 home-1
-  - public 에서 prometheus_query_preset 조회 권한을 받은 사용자 준비
-    - 도메인에 속한 사용자 한 명 준비
-      - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-      - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-    - 역할 public-reader-1: 이 역할이 앉은 스코프 안에서만 통한다
-    - 역할 public-reader-1: prometheus_query_preset 전체에 READ 허용
-    - 일반 사용자 user-1: 역할 public-reader-1 보유
-
-When
-
-- PrometheusQueryPresetAdapter.delete — user-1이 preset-1 삭제
-
-Then
-
-- 삭제한 프리셋을 응답한다
-  - id: 미리 만들어 둔 프리셋와 같다
-
-<a id="purging-a-user-granted-nothing-may-not-remove-a-preset"></a>
-
-#### [a-user-granted-nothing-may-not-remove-a-preset](/tests/scenario/bai_scenario/manager/prometheus_query_preset/test_purging.py) — pass
-
-같은 프리셋이 있고 아무 권한도 없는 사용자가 삭제하면, 권한 부족으로 거부된다
-
-Given
-
-- 이미 있는 프리셋 하나와, 프리셋을 읽을 수 있는 user 한 명
-  - 질의 프리셋 preset-1
-  - 도메인 home-1
-  - public 에서 prometheus_query_preset 조회 권한을 받은 사용자 준비
-    - 도메인에 속한 사용자 한 명 준비
-      - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-      - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-    - 역할 public-reader-1: 이 역할이 앉은 스코프 안에서만 통한다
-    - 역할 public-reader-1: prometheus_query_preset 전체에 READ 허용
-    - 일반 사용자 user-1: 역할 public-reader-1 보유
-
-When
-
-- PrometheusQueryPresetAdapter.delete — user-1이 preset-1 삭제
-
-Then
-
-- 거부된다
-  - 거부: NotEnoughPermission
-
-<a id="purging-removing-an-id-nothing-answers-to-is-not-found-for-a-superadmin"></a>
-
-#### [removing-an-id-nothing-answers-to-is-not-found-for-a-superadmin](/tests/scenario/bai_scenario/manager/prometheus_query_preset/test_purging.py) — pass
-
-슈퍼관리자가 존재하지 않는 id를 삭제하면, 대상을 찾을 수 없다는 이유로 거부된다
-
-Given
-
-- 이미 있는 프리셋 하나와, 프리셋을 읽을 수 있는 superadmin 한 명
-  - 질의 프리셋 preset-1
-  - 도메인 home-1
-  - public 에서 prometheus_query_preset 조회 권한을 받은 사용자 준비
-    - 도메인에 속한 사용자 한 명 준비
-      - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-      - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
-    - 역할 public-reader-1: 이 역할이 앉은 스코프 안에서만 통한다
-    - 역할 public-reader-1: prometheus_query_preset 전체에 READ 허용
-    - 슈퍼관리자 user-1: 역할 public-reader-1 보유
-
-When
-
-- PrometheusQueryPresetAdapter.delete — user-1이 존재하지 않는 id 삭제
-
-Then
-
-- 거부된다
-  - 거부: EntityNotFoundError
 
 ### get
 
@@ -377,6 +272,202 @@ Then
 
 - 거부된다
   - 거부: NotEnoughPermission
+
+### partial_bulk_purge
+
+<a id="partial_bulk_purging-a-user-granted-nothing-purges-none-of-several-presets"></a>
+
+#### [a-user-granted-nothing-purges-none-of-several-presets](/tests/scenario/bai_scenario/manager/prometheus_query_preset/test_partial_bulk_purging.py) — pass
+
+아무 권한도 받지 않은 사용자가 프리셋 여럿을 한 번에 purge 하려 하면, 지워진 것 없이 모두 권한이 없다는 이유로 실패 목록에 온다
+
+Given
+
+- 프리셋 2개와, user 한 명
+  - 질의 프리셋 wanted-1
+  - 질의 프리셋 other-1
+  - 도메인 home-1
+  - public 에서 prometheus_query_preset 조회 권한을 받은 사용자 준비
+    - 도메인에 속한 사용자 한 명 준비
+      - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+      - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+    - 역할 public-reader-1: 이 역할이 앉은 스코프 안에서만 통한다
+    - 역할 public-reader-1: prometheus_query_preset 전체에 READ 허용
+    - 일반 사용자 user-1: 역할 public-reader-1 보유
+
+When
+
+- PrometheusQueryPresetAdapter.partial_bulk_purge — user-1이 프리셋 2개를 한 번에 purge 함
+
+Then
+
+- 처리된 프리셋 없이 대상이 모두 실패 목록에 온다
+  - successes = []
+  - failed count = 2
+  - failed[0].id: 대상 프리셋의 id와 같다
+  - failed[0].message: 'Insufficient permission'를 담은 이유
+  - failed[1].id: 대상 프리셋의 id와 같다
+  - failed[1].message: 'Insufficient permission'를 담은 이유
+
+<a id="partial_bulk_purging-purging-several-presets-answers-for-the-missing-one"></a>
+
+#### [purging-several-presets-answers-for-the-missing-one](/tests/scenario/bai_scenario/manager/prometheus_query_preset/test_partial_bulk_purging.py) — pass
+
+슈퍼관리자가 프리셋 둘과 없는 id 하나를 한 번에 purge 하면, 둘은 지워지기 전 모습으로 오고 없는 id 는 대상이 없다는 이유로 실패 목록에 온다
+
+Given
+
+- 프리셋 2개와, superadmin 한 명
+  - 질의 프리셋 wanted-1
+  - 질의 프리셋 other-1
+  - 도메인 home-1
+  - public 에서 prometheus_query_preset 조회 권한을 받은 사용자 준비
+    - 도메인에 속한 사용자 한 명 준비
+      - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+      - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+    - 역할 public-reader-1: 이 역할이 앉은 스코프 안에서만 통한다
+    - 역할 public-reader-1: prometheus_query_preset 전체에 READ 허용
+    - 슈퍼관리자 user-1: 역할 public-reader-1 보유
+
+When
+
+- PrometheusQueryPresetAdapter.partial_bulk_purge — user-1이 프리셋 2개 와 없는 id 하나를 한 번에 purge 함
+
+Then
+
+- 대상 프리셋이 모두 지워지기 전 모습으로 오고, 없는 id 는 대상이 없다는 이유로 실패 목록에 온다
+  - successes count = 2
+  - failed count = 1
+  - successes[0]: 대상 프리셋 전체와 같다
+  - successes[1]: 대상 프리셋 전체와 같다
+  - failed[0].id: 요청에 넣은 없는 id와 같다
+  - failed[0].message: 'not found'를 담은 이유
+
+### purge
+
+<a id="purging-the-superadmin-removes-a-preset"></a>
+
+#### [the-superadmin-removes-a-preset](/tests/scenario/bai_scenario/manager/prometheus_query_preset/test_purging.py) — pass
+
+프리셋 하나가 있고 슈퍼관리자가 삭제하면, 삭제한 id를 담은 응답이 반환된다
+
+Given
+
+- 이미 있는 프리셋 하나와, 프리셋을 읽을 수 있는 superadmin 한 명
+  - 질의 프리셋 preset-1
+  - 도메인 home-1
+  - public 에서 prometheus_query_preset 조회 권한을 받은 사용자 준비
+    - 도메인에 속한 사용자 한 명 준비
+      - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+      - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+    - 역할 public-reader-1: 이 역할이 앉은 스코프 안에서만 통한다
+    - 역할 public-reader-1: prometheus_query_preset 전체에 READ 허용
+    - 슈퍼관리자 user-1: 역할 public-reader-1 보유
+
+When
+
+- PrometheusQueryPresetAdapter.purge — user-1이 preset-1 삭제
+
+Then
+
+- 삭제한 프리셋을 응답한다
+  - id: 미리 만들어 둔 프리셋와 같다
+
+<a id="purging-turning-enforcement-off-lets-a-user-remove-a-preset"></a>
+
+#### [turning-enforcement-off-lets-a-user-remove-a-preset](/tests/scenario/bai_scenario/manager/prometheus_query_preset/test_purging.py) — pass
+
+권한 검사를 끄면 아무 권한도 없는 사용자도 프리셋을 삭제할 수 있다
+
+Given
+
+- 이미 있는 프리셋 하나와, 프리셋을 읽을 수 있는 user 한 명
+  - 질의 프리셋 preset-1
+  - 도메인 home-1
+  - public 에서 prometheus_query_preset 조회 권한을 받은 사용자 준비
+    - 도메인에 속한 사용자 한 명 준비
+      - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+      - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+    - 역할 public-reader-1: 이 역할이 앉은 스코프 안에서만 통한다
+    - 역할 public-reader-1: prometheus_query_preset 전체에 READ 허용
+    - 일반 사용자 user-1: 역할 public-reader-1 보유
+
+When
+
+- PrometheusQueryPresetAdapter.purge — user-1이 preset-1 삭제
+
+Then
+
+- 삭제한 프리셋을 응답한다
+  - id: 미리 만들어 둔 프리셋와 같다
+
+<a id="purging-a-user-granted-nothing-may-not-remove-a-preset"></a>
+
+#### [a-user-granted-nothing-may-not-remove-a-preset](/tests/scenario/bai_scenario/manager/prometheus_query_preset/test_purging.py) — pass
+
+같은 프리셋이 있고 아무 권한도 없는 사용자가 삭제하면, 권한 부족으로 거부된다
+
+Given
+
+- 이미 있는 프리셋 하나와, 프리셋을 읽을 수 있는 user 한 명
+  - 질의 프리셋 preset-1
+  - 도메인 home-1
+  - public 에서 prometheus_query_preset 조회 권한을 받은 사용자 준비
+    - 도메인에 속한 사용자 한 명 준비
+      - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+      - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+    - 역할 public-reader-1: 이 역할이 앉은 스코프 안에서만 통한다
+    - 역할 public-reader-1: prometheus_query_preset 전체에 READ 허용
+    - 일반 사용자 user-1: 역할 public-reader-1 보유
+
+When
+
+- PrometheusQueryPresetAdapter.purge — user-1이 preset-1 삭제
+
+Then
+
+- 거부된다
+  - 거부: NotEnoughPermission
+
+<a id="purging-removing-an-id-nothing-answers-to-is-not-found-for-a-superadmin"></a>
+
+#### [removing-an-id-nothing-answers-to-is-not-found-for-a-superadmin](/tests/scenario/bai_scenario/manager/prometheus_query_preset/test_purging.py) — pass
+
+슈퍼관리자가 존재하지 않는 id를 삭제하면, 대상을 찾을 수 없다는 이유로 거부된다
+
+Given
+
+- 이미 있는 프리셋 하나와, 프리셋을 읽을 수 있는 superadmin 한 명
+  - 질의 프리셋 preset-1
+  - 도메인 home-1
+  - public 에서 prometheus_query_preset 조회 권한을 받은 사용자 준비
+    - 도메인에 속한 사용자 한 명 준비
+      - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+      - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+    - 역할 public-reader-1: 이 역할이 앉은 스코프 안에서만 통한다
+    - 역할 public-reader-1: prometheus_query_preset 전체에 READ 허용
+    - 슈퍼관리자 user-1: 역할 public-reader-1 보유
+
+When
+
+- PrometheusQueryPresetAdapter.purge — user-1이 존재하지 않는 id 삭제
+
+Then
+
+- 거부된다
+  - 거부: EntityNotFoundError
 
 ### search
 
@@ -1164,6 +1255,116 @@ Then
 
 - 거부된다
   - 거부: NotEnoughPermission
+
+### partial_bulk_update
+
+<a id="partial_bulk_editing-a-broken-template-fails-only-the-preset-it-was-meant-for"></a>
+
+#### [a-broken-template-fails-only-the-preset-it-was-meant-for](/tests/scenario/bai_scenario/manager/prometheus_query_preset/test_partial_bulk_editing.py) — pass
+
+슈퍼관리자가 프리셋 여럿을 한 번에 고치며 하나에 잘못된 템플릿을 주면, 그 하나만 템플릿 검사의 이유로 실패 목록에 오고 나머지는 고쳐진다
+
+Given
+
+- 프리셋 2개와, superadmin 한 명
+  - 질의 프리셋 wanted-1
+  - 질의 프리셋 other-1
+  - 도메인 home-1
+  - public 에서 prometheus_query_preset 조회 권한을 받은 사용자 준비
+    - 도메인에 속한 사용자 한 명 준비
+      - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+      - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+    - 역할 public-reader-1: 이 역할이 앉은 스코프 안에서만 통한다
+    - 역할 public-reader-1: prometheus_query_preset 전체에 READ 허용
+    - 슈퍼관리자 user-1: 역할 public-reader-1 보유
+
+When
+
+- PrometheusQueryPresetAdapter.partial_bulk_update — user-1이 프리셋 2개의 설명을 한 번에 고침, 첫째는 템플릿도 잘못된 값으로
+
+Then
+
+- 템플릿이 잘못된 첫째는 그 이유로 실패 목록에 오고, 나머지는 새 설명으로 처리된 목록에 온다
+  - successes count = 1
+  - successes[0]: 새 설명을 실은 대상 프리셋 전체와 같다
+  - successes[0].updated_at: 이 실행이 쓴 시각
+  - failed count = 1
+  - failed[0].id: 첫째 프리셋의 id와 같다
+  - failed[0].message: 'Unsupported template variable'를 담은 이유
+
+<a id="partial_bulk_editing-a-user-granted-nothing-edits-none-of-several-presets"></a>
+
+#### [a-user-granted-nothing-edits-none-of-several-presets](/tests/scenario/bai_scenario/manager/prometheus_query_preset/test_partial_bulk_editing.py) — pass
+
+아무 권한도 받지 않은 사용자가 프리셋 여럿을 한 번에 고치려 하면, 고쳐진 것 없이 모두 권한이 없다는 이유로 실패 목록에 온다
+
+Given
+
+- 프리셋 2개와, user 한 명
+  - 질의 프리셋 wanted-1
+  - 질의 프리셋 other-1
+  - 도메인 home-1
+  - public 에서 prometheus_query_preset 조회 권한을 받은 사용자 준비
+    - 도메인에 속한 사용자 한 명 준비
+      - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+      - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+    - 역할 public-reader-1: 이 역할이 앉은 스코프 안에서만 통한다
+    - 역할 public-reader-1: prometheus_query_preset 전체에 READ 허용
+    - 일반 사용자 user-1: 역할 public-reader-1 보유
+
+When
+
+- PrometheusQueryPresetAdapter.partial_bulk_update — user-1이 프리셋 2개의 설명을 한 번에 고침
+
+Then
+
+- 처리된 프리셋 없이 대상이 모두 실패 목록에 온다
+  - successes = []
+  - failed count = 2
+  - failed[0].id: 대상 프리셋의 id와 같다
+  - failed[0].message: 'Insufficient permission'를 담은 이유
+  - failed[1].id: 대상 프리셋의 id와 같다
+  - failed[1].message: 'Insufficient permission'를 담은 이유
+
+<a id="partial_bulk_editing-the-superadmin-edits-several-presets-at-once"></a>
+
+#### [the-superadmin-edits-several-presets-at-once](/tests/scenario/bai_scenario/manager/prometheus_query_preset/test_partial_bulk_editing.py) — pass
+
+슈퍼관리자가 프리셋 여럿의 설명을 한 번에 바꾸면, 모두 새 설명으로 오고 실패한 것은 없다
+
+Given
+
+- 프리셋 2개와, superadmin 한 명
+  - 질의 프리셋 wanted-1
+  - 질의 프리셋 other-1
+  - 도메인 home-1
+  - public 에서 prometheus_query_preset 조회 권한을 받은 사용자 준비
+    - 도메인에 속한 사용자 한 명 준비
+      - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+      - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+    - 역할 public-reader-1: 이 역할이 앉은 스코프 안에서만 통한다
+    - 역할 public-reader-1: prometheus_query_preset 전체에 READ 허용
+    - 슈퍼관리자 user-1: 역할 public-reader-1 보유
+
+When
+
+- PrometheusQueryPresetAdapter.partial_bulk_update — user-1이 프리셋 2개의 설명을 한 번에 고침
+
+Then
+
+- 대상 프리셋이 모두 새 설명으로 오고, 실패한 것은 없다
+  - successes count = 2
+  - successes[0]: 새 설명을 실은 대상 프리셋 전체와 같다
+  - successes[0].updated_at: 이 실행이 쓴 시각
+  - successes[1]: 새 설명을 실은 대상 프리셋 전체와 같다
+  - successes[1].updated_at: 이 실행이 쓴 시각
+  - failed = []
 
 ### update
 

@@ -1,9 +1,9 @@
 ---
 name: deployment-adapter-scenarios
 type: reference
-description: what the deployment adapter guarantees, as scenarios; the deployment's own calls and its revisions are written here, the other field rows are not yet
+description: what the deployment adapter guarantees, as scenarios; the deployment's own calls, its revisions and the partial bulk writes of its auto-scaling rules and access tokens are written here, the other field rows are not yet
 scope: src/ai/backend/manager/api/adapters/deployment
-keywords: [deployment, scenario, adapter, rbac, project, revision]
+keywords: [deployment, scenario, adapter, rbac, project, revision, auto-scaling rule, access token, partial bulk]
 generated:
   by: claude-code/opus-5
   at: 2026-09-11
@@ -245,6 +245,41 @@ id와 볼 수 없는 id를 한 가지로 거부한다. 모든 검사를 지나�
 자원 슬롯 훑기는 리비전 하나를 가리키는데도 전역 역할이 지킨다. 그 리비전을 읽을 수 있는
 사람이 슬롯은 못 본다는 뜻이라, 짝을 두어 못박는다.
 
+## 자동 확장 규칙
+
+규칙은 deployment가 소유하는 행이다. 수정은 소유 deployment의 수정 권한을, purge 는 단건과 여럿
+모두 영구 삭제 권한을 요구한다.
+
+### 여럿 수정하기
+
+| 시나리오 | 상황 | 요청 | 결과 |
+|---|---|---|---|
+| 수정 권한을 받은 사용자가 여럿의 지표 이름을 한 번에 바꾼다 | 규칙 둘이 걸린 deployment, 수정 권한 있음 | 둘의 지표 이름 수정 | 둘 다 새 지표 이름으로 오고 실패한 것은 없음 |
+| 아무 권한도 받지 않은 사용자가 여럿을 수정한다 | 같은 규칙 둘 | 둘의 지표 이름 수정 | 수정된 것 없이 둘 다 권한 부족 이유로 실패 목록에 옴 |
+
+### 여럿 purge
+
+| 시나리오 | 상황 | 요청 | 결과 |
+|---|---|---|---|
+| 영구 삭제 권한을 받은 사용자가 둘과 없는 id 하나를 한 번에 purge 한다 | 규칙 둘이 걸린 deployment, 영구 삭제 권한 있음 | 셋 purge | 둘은 purge 되기 전 모습으로 오고, 없는 id 는 대상 없음 이유로 실패 목록에 옴 |
+| 아무 권한도 받지 않은 사용자가 여럿을 purge 한다 | 같은 규칙 둘 | 둘 purge | purge 된 것 없이 둘 다 권한 부족 이유로 실패 목록에 옴 |
+| 수정 권한만 받은 사용자가 여럿을 purge 한다 | 같은 규칙 둘, 수정 권한 있음 | 둘 purge | purge 된 것 없이 둘 다 권한 부족 이유로 실패 목록에 옴 |
+
+## 접근 토큰
+
+토큰은 deployment가 소유하는 행이다. purge 는 단건과 여럿 모두 소유 deployment의 영구 삭제 권한을
+요구한다.
+
+### 여럿 purge
+
+| 시나리오 | 상황 | 요청 | 결과 |
+|---|---|---|---|
+| 영구 삭제 권한을 받은 사용자가 둘과 없는 id 하나를 한 번에 purge 한다 | 토큰 둘이 걸린 deployment, 영구 삭제 권한 있음 | 셋 purge | 둘은 처리된 목록에 오고, 없는 id 는 대상 없음 이유로 실패 목록에 옴 |
+| 아무 권한도 받지 않은 사용자가 여럿을 purge 한다 | 같은 토큰 둘 | 둘 purge | purge 된 것 없이 둘 다 권한 부족 이유로 실패 목록에 옴 |
+
+여럿 연산은 호출 전체를 거부하지 않는다. 처리한 행은 처리된 목록에, 처리하지 못한 것은 id 와
+이유를 실패 목록에 싣는다.
+
 ## 아직 적지 않은 것
 
 어느 시나리오도 부르지 않는 어댑터 호출이다. 실행 결과가 이 목록을 함께 낸다.
@@ -253,9 +288,9 @@ deployment가 소유하는 행의 호출은 필드마다 절을 따로 둘 때 �
 
 - 복제본과 경로: `get_replica`, `search_replicas`, `admin_search_replicas`, `search_routes`,
   `update_route_traffic`, `batch_load_replicas_by_ids`, `batch_load_routes_by_ids`
-- 접근 토큰: `create_access_token`, `get_access_token`, `delete_access_token`,
+- 접근 토큰: `create_access_token`, `get_access_token`, `purge_access_token`,
   `search_access_tokens`, `bulk_delete_access_tokens`, `batch_load_access_tokens_by_ids`
 - 배포 정책: `get_policy`, `upsert_policy`, `search_policies`,
   `batch_load_policies_by_endpoint_ids`
-- 자동 확장 규칙: `create_rule`, `get_rule`, `update_rule`, `delete_rule`, `search_rules`,
+- 자동 확장 규칙: `create_rule`, `get_rule`, `update_rule`, `purge_rule`, `search_rules`,
   `bulk_delete_rules`, `batch_load_auto_scaling_rules_by_ids`

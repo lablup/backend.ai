@@ -7,7 +7,7 @@ from pydantic import Field, model_validator
 
 from ai.backend.common.api_handlers import BaseRequestModel
 from ai.backend.common.dto.manager.query import StringFilter, UUIDFilter
-from ai.backend.common.dto.manager.v2.common import OrderDirection, SemVersion
+from ai.backend.common.dto.manager.v2.common import NonEmptyList, OrderDirection, SemVersion
 from ai.backend.common.dto.manager.v2.runtime_variant_preset.types import (
     VALUE_TYPE_VALIDATORS,
     PresetTarget,
@@ -143,6 +143,20 @@ class UpdateRuntimeVariantPresetInput(BaseRequestModel):
                 f"default_value '{self.default_value}' is not a valid {self.value_type}: {e}"
             ) from e
         return self
+
+
+class PartialBulkUpdateRuntimeVariantPresetsInput(BaseRequestModel):
+    """Input for updating several runtime variant presets, each answered for separately."""
+
+    items: NonEmptyList[UpdateRuntimeVariantPresetInput] = Field(
+        description="The presets to update, each with its fields."
+    )
+
+
+class PartialBulkPurgeRuntimeVariantPresetsInput(BaseRequestModel):
+    """Input for purging several runtime variant presets, each answered for separately."""
+
+    ids: NonEmptyList[UUID] = Field(description="IDs of the presets to purge.")
 
 
 class RuntimeVariantPresetFilter(BaseRequestModel):
