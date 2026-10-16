@@ -1492,6 +1492,10 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
                     access_mode="a",
                 ) as writer:
                     await writer.write(f"CID={cid}\n")
+                for dev_name, device_alloc in resource_spec.allocations.items():
+                    await self.computers[dev_name].instance.on_container_created(
+                        ContainerId(cid), device_alloc
+                    )
 
             except asyncio.CancelledError as e:
                 if container is not None:
@@ -2409,6 +2413,9 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
                         except OSError:
                             pass
 
+            if kernel_obj is not None and container_id is not None:
+                await self._notify_container_destroyed(container_id, kernel_obj.resource_spec)
+
             if not self.local_config.debug.skip_container_deletion and container_id is not None:
                 container = docker.containers.container(container_id)
                 try:
@@ -2442,6 +2449,24 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
                                 f"Network plugin {kernel.network_driver} not loaded!"
                             ) from e
                         await plugin.leave_network(kernel)
+
+    async def _notify_container_destroyed(
+        self,
+        container_id: ContainerId,
+        resource_spec: KernelResourceSpec,
+    ) -> None:
+        for dev_name, device_alloc in resource_spec.allocations.items():
+            computer = self.computers.get(dev_name)
+            if computer is None:
+                continue
+            try:
+                await computer.instance.on_container_destroyed(container_id, device_alloc)
+            except Exception:
+                log.exception(
+                    "compute plugin container cleanup failed",
+                    container_id=container_id,
+                    plugin_name=str(dev_name),
+                )
 
     @override
     async def create_local_network(self, network_name: str) -> None:

@@ -46,6 +46,7 @@ from ai.backend.common.types import (
     AcceleratorMetadata,
     AgentId,
     BinarySize,
+    ContainerId,
     DeviceId,
     DeviceModelInfo,
     DeviceName,
@@ -194,7 +195,8 @@ class KernelResourceSpec:
                 pieces = []
                 for dev_id, alloc in per_device_alloc.items():
                     if known_slot_types.get(slot_name, "count") == "bytes":
-                        pieces.append(f"{dev_id}:{BinarySize(alloc):s}")
+                        # A plain byte count, since the BinarySize string rounds the value.
+                        pieces.append(f"{dev_id}:{int(alloc)}")
                     else:
                         pieces.append(f"{dev_id}:{alloc}")
                 alloc_str = ",".join(pieces)
@@ -483,6 +485,26 @@ class AbstractComputePlugin(AbstractPlugin, metaclass=ABCMeta):
 
     async def get_node_hwinfo(self) -> HardwareMetadata:
         raise NotImplementedError
+
+    async def on_container_created(
+        self,
+        container_id: ContainerId,
+        device_alloc: DeviceAllocation,
+    ) -> None:
+        """
+        Called after the container is created and before it starts. Raising aborts the start.
+        """
+        return
+
+    async def on_container_destroyed(
+        self,
+        container_id: ContainerId,
+        device_alloc: DeviceAllocation,
+    ) -> None:
+        """
+        Called after the container has stopped and before it is deleted. Errors are logged.
+        """
+        return
 
     @abstractmethod
     async def get_docker_networks(
