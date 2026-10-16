@@ -8,16 +8,16 @@ import aiohttp
 import pytest
 from pytest import FixtureRequest
 
-from ai.backend.storage.errors import ExternalStorageServiceError
-from ai.backend.storage.volumes.gpfs.exceptions import (
+from ai.backend.common.clients.storage_backends.gpfs.client import _handle_response
+from ai.backend.common.clients.storage_backends.gpfs.exceptions import (
     GPFSConflictError,
     GPFSForbiddenError,
     GPFSInternalError,
     GPFSInvalidBodyError,
     GPFSNotFoundError,
+    GPFSServiceError,
     GPFSUnauthorizedError,
 )
-from ai.backend.storage.volumes.gpfs.gpfs_client import base_response_handler
 
 
 @dataclasses.dataclass(frozen=True)
@@ -29,8 +29,8 @@ class StatusErrorCase:
     expected_exc: type[Exception]
 
 
-class TestBaseResponseHandler:
-    """Tests for base_response_handler HTTP status code handling."""
+class TestHandleResponse:
+    """Tests for _handle_response HTTP status code handling."""
 
     @pytest.fixture
     async def mock_response(self, request: FixtureRequest) -> MagicMock:
@@ -63,10 +63,10 @@ class TestBaseResponseHandler:
             StatusErrorCase(
                 422, {"status": {"code": 422, "message": "Unprocessable"}}, GPFSInternalError
             ),
-            StatusErrorCase(500, {"error": "server error"}, ExternalStorageServiceError),
+            StatusErrorCase(500, {"error": "server error"}, GPFSServiceError),
         ],
         indirect=True,
     )
     async def test_error_status_raises_correct_exception(self, mock_response: MagicMock) -> None:
         with pytest.raises(mock_response.case.expected_exc):
-            await base_response_handler(mock_response)
+            await _handle_response(mock_response)
