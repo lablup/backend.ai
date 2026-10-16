@@ -16924,7 +16924,8 @@
               }
             ],
             "default": null,
-            "description": "Access key filter"
+            "deprecated": true,
+            "description": "Access key filter. Deprecated since 26.10.0. Use `user_id`"
           },
           "created_at": {
             "anyOf": [
@@ -35198,7 +35199,8 @@
               }
             ],
             "default": null,
-            "description": "Filter by the access key the session was created with"
+            "deprecated": true,
+            "description": "Filter by the access key the session was created with. Deprecated since 26.10.0. Use `user_uuid`"
           },
           "tag": {
             "anyOf": [
