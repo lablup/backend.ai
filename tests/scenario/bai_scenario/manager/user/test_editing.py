@@ -11,14 +11,18 @@ import pytest
 from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.user.types import UserRole
-from ai.backend.common.dto.manager.v2.user.request import SearchUsersRequest, UpdateUserInput
+from ai.backend.common.dto.manager.v2.user.request import (
+    BulkUpdateUserItemInput,
+    BulkUpdateUsersInput,
+    SearchUsersRequest,
+    UpdateUserInput,
+)
 from ai.backend.common.dto.manager.v2.user.response import (
     BulkUpdateUsersPayload,
     SearchUsersPayload,
     UpdateMyAllowedClientIPPayload,
     UserNode,
 )
-from ai.backend.common.types import AccessKey
 from ai.backend.manager.api.adapters.user.adapter import UserAdapter
 from ai.backend.manager.data.keypair.types import KeyPairData
 from ai.backend.manager.data.permission.types import Permission
@@ -30,10 +34,9 @@ from ai.backend.manager.errors.user import UserModificationBadRequest
 from ai.backend.manager.models.user.updaters import UserUpdater
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.services.user.actions.update_user import (
-    BulkUpdateUserAction,
     UpdateUserAction,
 )
-from ai.backend.manager.types import OptionalState, TriState
+from ai.backend.manager.types import TriState
 from ai.backend.testutils.scenario_steps import (
     Answered,
     Given,
@@ -390,7 +393,7 @@ class BulkRenamingOneAndCollidingAnother(When[AnEdit, UserAdapter, Answer]):
 
     @override
     def operation(self) -> str:
-        return "bulk_modify_users"
+        return "bulk_update_users"
 
     @override
     def describe(self, laid: AnEdit) -> str:
@@ -401,17 +404,19 @@ class BulkRenamingOneAndCollidingAnother(When[AnEdit, UserAdapter, Answer]):
 
     @override
     async def call(self, adapter: UserAdapter, laid: AnEdit) -> Answer:
-        action = BulkUpdateUserAction(
-            items=[
-                UserUpdater(user_id=UserID(laid.target.id), full_name=TriState.update(RENAMED)),
-                UserUpdater(
-                    user_id=UserID(laid.others[1].id),
-                    username=OptionalState.update(laid.others[0].username),
+        input = BulkUpdateUsersInput(
+            users=[
+                BulkUpdateUserItemInput(
+                    user_id=laid.target.id, input=UpdateUserInput(full_name=RENAMED)
+                ),
+                BulkUpdateUserItemInput(
+                    user_id=laid.others[1].id,
+                    input=UpdateUserInput(username=laid.others[0].username),
                 ),
             ]
         )
         with ActingAs(laid.caller):
-            return await adapter.bulk_modify_users(action, {})
+            return await adapter.bulk_update_users(input)
 
 
 @dataclass(frozen=True)
@@ -420,7 +425,7 @@ class BulkRenamingWithSomeoneElsesKey(When[AnEdit, UserAdapter, Answer]):
 
     @override
     def operation(self) -> str:
-        return "bulk_modify_users"
+        return "bulk_update_users"
 
     @override
     def describe(self, laid: AnEdit) -> str:
@@ -432,13 +437,18 @@ class BulkRenamingWithSomeoneElsesKey(When[AnEdit, UserAdapter, Answer]):
     @override
     async def call(self, adapter: UserAdapter, laid: AnEdit) -> Answer:
         assert laid.extra_key is not None
-        action = BulkUpdateUserAction(
-            items=[UserUpdater(user_id=UserID(laid.target.id), full_name=TriState.update(RENAMED))]
+        input = BulkUpdateUsersInput(
+            users=[
+                BulkUpdateUserItemInput(
+                    user_id=laid.target.id,
+                    input=UpdateUserInput(
+                        full_name=RENAMED, main_access_key=str(laid.extra_key.access_key)
+                    ),
+                )
+            ]
         )
         with ActingAs(laid.caller):
-            return await adapter.bulk_modify_users(
-                action, {UserID(laid.target.id): AccessKey(str(laid.extra_key.access_key))}
-            )
+            return await adapter.bulk_update_users(input)
 
 
 @dataclass(frozen=True)

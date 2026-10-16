@@ -50,6 +50,7 @@ from ai.backend.manager.services.user.actions.keypair_ops import (
     SwitchDefaultAccessKeyAction,
 )
 from ai.backend.manager.services.user.actions.purge_user import PurgeUserAction
+from ai.backend.manager.services.user.actions.restore_user import RestoreUserAction
 from ai.backend.manager.services.user.actions.search_users import GlobalSearchUsersAction
 from ai.backend.manager.services.user.actions.update_user import UpdateUserAction
 from ai.backend.manager.types import OptionalState
@@ -205,21 +206,47 @@ class UserHandler:
                 salt_size=self._config_provider.config.auth.password_hash_salt_size,
             )
 
+        user_id = UserID(path.parsed.user_id)
+        requested = (
+            ManagerUserStatus(body.parsed.status.value) if body.parsed.status is not None else None
+        )
+        current = (
+            ManagerUserStatus(
+                (await self._user.get_user.run(GetUserAction(user_id=user_id))).user.status
+            )
+            if requested is not None
+            else None
+        )
+        if requested is not None and current is not None and requested.restores_from(current):
+            await self._user.restore_user.run(RestoreUserAction(user_id=user_id))
         updater = self._adapter.build_updater(
-            body.parsed, UserID(path.parsed.user_id), password_info
+            body.parsed,
+            user_id,
+            password_info,
+            status=(
+                requested
+                if requested is not None
+                and current is not None
+                and requested.is_updater_value_from(current)
+                else None
+            ),
         )
 
         action_result = await self._user.update_user.run(UpdateUserAction(updater=updater))
+        data = action_result.data
 
         if body.parsed.main_access_key is not None:
             await self._user.switch_default_access_key.run(
                 SwitchDefaultAccessKeyAction(
-                    user_id=UserID(path.parsed.user_id),
+                    user_id=user_id,
                     access_key=AccessKey(body.parsed.main_access_key),
                 )
             )
+        if requested is not None and current is not None and requested.deletes_from(current):
+            await self._user.delete_user.run(DeleteUserAction(user_id=user_id))
+            data = (await self._user.get_user.run(GetUserAction(user_id=user_id))).user
 
-        resp = UpdateUserResponse(user=await self._user_dto(action_result.data))
+        resp = UpdateUserResponse(user=await self._user_dto(data))
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=resp)
 
     # ------------------------------------------------------------------

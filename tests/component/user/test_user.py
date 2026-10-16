@@ -347,6 +347,31 @@ class TestUserUpdate:
                 UpdateUserRequest(full_name="Denied"),
             )
 
+    async def test_admin_updates_status_to_deleted_soft_deletes(
+        self,
+        admin_registry: BackendAIClientRegistry,
+        target_user: CreateUserResponse,
+    ) -> None:
+        result = await admin_registry.user.update(
+            target_user.user.id,
+            UpdateUserRequest(status=UserStatus.DELETED, full_name="Before Delete"),
+        )
+        assert result.user.status == UserStatus.DELETED
+        assert result.user.full_name == "Before Delete"
+
+    async def test_admin_updates_deleted_user_to_active_restores(
+        self,
+        admin_registry: BackendAIClientRegistry,
+        target_user: CreateUserResponse,
+    ) -> None:
+        await admin_registry.user.delete(DeleteUserRequest(user_id=target_user.user.id))
+        result = await admin_registry.user.update(
+            target_user.user.id,
+            UpdateUserRequest(status=UserStatus.ACTIVE, full_name="After Restore"),
+        )
+        assert result.user.status == UserStatus.ACTIVE
+        assert result.user.full_name == "After Restore"
+
 
 class TestUserDelete:
     async def test_admin_soft_deletes_user(

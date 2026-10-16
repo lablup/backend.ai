@@ -295,8 +295,7 @@ class UserDBSource:
 
         # Get current user data for validation (by UUID)
         current_user = await self._get_user_by_uuid_with_session(session, user_id)
-        if current_user.status in UserStatus.purge_in_progress():
-            raise UserPurgeInProgress(f"User is being purged: {user_id}")
+        await self._raise_failing_guard(session, updater)
 
         # Check if new username is already taken by another user
         new_username = updater.username.optional_value()
@@ -332,11 +331,15 @@ class UserDBSource:
         if status is not None and status != current_user.status:
             to_update["status_info"] = "admin-requested"
         update_query = (
-            sa.update(users).where(users.c.uuid == user_id).values(to_update).returning(users)
+            sa.update(users)
+            .where(users.c.uuid == user_id, *[g.condition() for g in updater.guard_checks()])
+            .values(to_update)
+            .returning(users)
         )
         result = await session.execute(update_query)
         updated_user = result.first()
         if not updated_user:
+            await self._raise_failing_guard(session, updater)
             raise UserModificationFailure("Failed to update user")
 
         # Handle role changes
@@ -353,6 +356,19 @@ class UserDBSource:
             )
         await self._restate_user_policy_shares(UserID(updated_user.uuid))
         return UserData.from_row(updated_user)
+
+    async def _raise_failing_guard(self, session: SASession, updater: UserUpdater) -> None:
+        """Raise the first guard of ``updater`` the user's current row fails."""
+        guards = updater.guard_checks()
+        stmt = sa.select(*[g.condition().label(f"guard_{i}") for i, g in enumerate(guards)]).where(
+            users.c.uuid == updater.user_id
+        )
+        row = (await session.execute(stmt)).mappings().first()
+        if row is None:
+            return
+        for i, guard in enumerate(guards):
+            if not row[f"guard_{i}"]:
+                raise guard.error
 
     async def update_user_by_uuid_validated(self, updater: UserUpdater) -> UserData:
         """Update user by UUID with validation and handle role/group changes."""

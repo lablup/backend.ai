@@ -140,7 +140,11 @@ class UpdateUserInput(BaseRequestModel):
     )
     status: UserStatus | None | Unset = Field(
         default=UNSET,
-        description="New account status. Omit to leave unchanged.",
+        description=(
+            "New account status, ACTIVE or INACTIVE. Omit to leave unchanged. "
+            f"DELETED is deprecated since {NEXT_RELEASE_VERSION}: it is handled as a user "
+            "delete, and ACTIVE on a deleted user as a user restore."
+        ),
     )
     role: UserRole | None | Unset = Field(
         default=UNSET,

@@ -28155,7 +28155,9 @@ input UpdateUserV2Input
   """New description."""
   description: String
 
-  """New account status."""
+  """
+  New account status, ACTIVE or INACTIVE. DELETED is deprecated since 26.10.0: it is handled as `adminDeleteUserV2`, and ACTIVE on a deleted user as `adminRestoreUserV2`.
+  """
   status: UserStatusV2
 
   """New user role."""

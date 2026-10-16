@@ -31,10 +31,10 @@
 - ops + 직접 구현 (6)
   - UserAdapter.bulk_create_users — 성공 없음 · 실패 있음 1 (atomic_bulk_get_ops, global_scope) — SCENARIO-GAP
   - UserAdapter.bulk_create_users_with_keypair — 성공 없음 · 실패 있음 1 (atomic_bulk_get_ops, global_scope) — SCENARIO-GAP
-  - UserAdapter.bulk_modify_users — 성공 있음 2 · 실패 있음 1 (atomic_bulk_get_ops, global_scope, single_entity)
+  - UserAdapter.bulk_update_users — 성공 있음 3 · 실패 있음 1 (atomic_bulk_get_ops, global_scope, partial_bulk_get_ops, single_entity)
   - UserAdapter.create_user — 성공 없음 · 실패 있음 2 (atomic_bulk_get_ops, scope) — SCENARIO-GAP
   - UserAdapter.get — 성공 있음 1 · 실패 있음 1 (atomic_bulk_get_ops, single_entity)
-  - UserAdapter.update_user_by_id — 성공 있음 3 · 실패 있음 2 (atomic_bulk_get_ops, single_entity)
+  - UserAdapter.update_user_by_id — 성공 있음 5 · 실패 있음 6 (atomic_bulk_get_ops, single_entity)
 - 직접 구현 (19)
   - LoginSessionAdapter.admin_revoke — 성공 있음 1 · 실패 있음 2 (global_scope)
   - LoginSessionAdapter.admin_unblock_user — 성공 있음 2 · 실패 있음 1 (global_scope)
@@ -200,10 +200,11 @@
 |---|---|
 | [권한 받은 사용자가 이 일괄 생성을 하려 하면, 전역 역할 문이 막는다](#creating-a-user-who-is-not-the-superadmin-may-not-bulk-create-users-with-keypairs) | 거부 |
 
-**UserAdapter.bulk_modify_users**
+**UserAdapter.bulk_update_users**
 
 | 시나리오 | 판정 |
 |---|---|
+| [슈퍼관리자가 일괄 수정으로 활성 사용자에 DELETED, 삭제 상태 사용자에 ACTIVE, 다른 삭제 상태 사용자에 전체 이름을 주면, 둘은 물리고 되살린 뒤 수정 목록에, 하나는 실패로 담긴다](#retiring-a-bulk-edit-deletes-and-restores-per-item-and-refuses-a-deleted-user-edit) | 성공 |
 | [슈퍼관리자가 일괄 수정과 함께 남의 키로 기본 키 전환을 주면, 그 사용자는 수정 목록에서 빠지고 실패로 담긴다](#editing-a-bulk-edit-whose-default-key-switch-fails-reports-that-user-as-failed) | 성공 |
 | [전역 역할이 문인 일괄 수정에서 슈퍼관리자가 있는 사용자와 이름이 겹치게 바꾸는 사용자를 함께 주면, 하나는 수정되고 하나는 사용자 id와 함께 실패로 담긴다](#editing-the-superadmin-bulk-edit-answers-the-updated-and-the-failed-apart) | 성공 |
 | [도메인 스코프에서 UPDATE를 받은 사용자라도 일괄 수정을 하려 하면, 전역 역할 문이 막는다](#editing-a-user-who-is-not-the-superadmin-may-not-bulk-edit-users) | 거부 |
@@ -227,10 +228,16 @@
 | 시나리오 | 판정 |
 |---|---|
 | [대상 사용자 스코프에서 UPDATE와 READ를 받은 사용자가 전체 이름만 주면, 전체 이름만 바뀐 노드가 온다](#editing-a-user-granted-update-changing-only-the-full-name-leaves-the-rest) | 성공 |
+| [대상 사용자 스코프에서 SOFT_DELETE와 READ를 받은 사용자가 삭제 상태 사용자에 수정으로 ACTIVE를 주면, 되살리기와 같이 활성이 된다](#retiring-an-edit-to-active-on-a-deleted-user-restores-the-user) | 성공 |
+| [대상 사용자 스코프에서 SOFT_DELETE와 READ를 받은 사용자가 수정으로 DELETED를 주면, 물리기와 같이 삭제 상태가 된다](#retiring-an-edit-to-deleted-soft-deletes-the-user) | 성공 |
 | [권한 받은 사용자가 대상 사용자의 다른 키를 기본 키로 주면, 수정이 반영된 뒤 기본 키가 옮겨간 노드가 온다](#editing-naming-a-default-key-in-an-edit-moves-the-default-to-it) | 성공 |
 | [권한 받은 사용자가 소속 프로젝트 자리에 빈 값을 주면, 소속을 건드리지 않고 나머지 수정만 반영된다](#editing-null-project-ids-in-an-edit-leave-the-membership-as-it-is) | 성공 |
 | [역할을 받지 않은 사용자가 수정하려 하면, 엔티티 권한 문이 막는다](#editing-a-user-granted-nothing-may-not-edit-another-user) | 거부 |
 | [권한 받은 사용자가 이미 쓰이는 사용자 이름을 주면, 입력 검증이 막는다](#editing-a-username-another-user-holds-may-not-be-taken) | 거부 |
+| [대상 사용자 스코프에서 UPDATE와 READ를 받은 사용자가 삭제 상태 사용자의 전체 이름을 고치면, 삭제된 사용자라 막힌다](#retiring-an-edit-of-another-field-on-a-deleted-user-is-refused) | 거부 |
+| [대상 사용자 스코프에서 UPDATE와 READ를 받은 사용자가 수정으로 BEFORE_VERIFICATION을 주면, 입력 검증이 막는다](#retiring-an-edit-to-a-status-other-than-active-or-inactive-is-refused) | 거부 |
+| [대상 사용자 스코프에서 UPDATE와 READ만 받은 사용자가 수정으로 DELETED를 주면, 물리기의 엔티티 권한 문이 막는다](#retiring-an-edit-to-deleted-is-refused-without-soft-delete) | 거부 |
+| [삭제 상태 사용자에 수정으로 DELETED만 주면, 아무것도 바뀌지 않고 그 사용자가 온다](#retiring-an-edit-to-deleted-on-a-deleted-user-changes-nothing) | 거부 |
 
 **LoginSessionAdapter.admin_revoke**
 
@@ -2091,7 +2098,88 @@ Then
 - 거부된다
   - 거부: InsufficientPrivilege
 
-### UserAdapter.bulk_modify_users
+### UserAdapter.bulk_update_users
+
+<a id="retiring-a-bulk-edit-deletes-and-restores-per-item-and-refuses-a-deleted-user-edit"></a>
+
+#### [a-bulk-edit-deletes-and-restores-per-item-and-refuses-a-deleted-user-edit](/tests/scenario/bai_scenario/manager/user/test_retiring.py) — pass
+
+슈퍼관리자가 일괄 수정으로 활성 사용자에 DELETED, 삭제 상태 사용자에 ACTIVE, 다른 삭제 상태 사용자에 전체 이름을 주면, 둘은 물리고 되살린 뒤 수정 목록에, 하나는 실패로 담긴다
+
+Given
+
+- 도메인 하나와 슈퍼관리자 하나, 활성 사용자 하나, 삭제 상태 사용자 둘
+  - 도메인 home-1
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+    - 사용자 정책 user-policy-4: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-4: 동시 세션 5개까지
+    - 슈퍼관리자 user-4: 자기 키와 개인 프로젝트를 갖는다
+  - 도메인에 속한 deleted 상태 사용자 한 명 준비
+    - 사용자 정책 user-policy-2: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
+    - 일반 사용자 user-2: 상태 deleted, 자기 키와 개인 프로젝트를 갖는다
+    - 사용자 정책 user-policy-3: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-3: 동시 세션 5개까지
+    - 일반 사용자 user-3: 상태 deleted, 자기 키와 개인 프로젝트를 갖는다
+
+When
+
+- UserAdapter.bulk_update_users — user-4이 user-1에 DELETED, user-2에 ACTIVE, user-3에 전체 이름을 일괄 수정으로 줌
+
+Then
+
+- 물린 사용자와 되살린 사용자가 수정 목록에, 나머지 하나가 실패 목록에 온다
+  - updated_users.id: DELETED와 ACTIVE를 준 사용자와 같다
+  - failed.user_id: 삭제 상태에서 전체 이름만 고친 사용자와 같다
+  - failed.message: 무시함 — 예외 문장은 바뀌어도 되는 값이다
+  - updated_users[물린 사용자].id: 심은 사용자와 같다
+  - updated_users[물린 사용자].basic_info.username = 'user-1'
+  - updated_users[물린 사용자].basic_info.email = 'user-1@scenario.local'
+  - updated_users[물린 사용자].basic_info.full_name = None
+  - updated_users[물린 사용자].basic_info.description = None
+  - updated_users[물린 사용자].basic_info.integration_name = None
+  - updated_users[물린 사용자].status.status = 'deleted'
+  - updated_users[물린 사용자].status.status_info = 'admin-requested'
+  - updated_users[물린 사용자].status.need_password_change = False
+  - updated_users[물린 사용자].organization.domain_name = 'home-1'
+  - updated_users[물린 사용자].organization.role = 'user'
+  - updated_users[물린 사용자].organization.resource_policy = 'user-policy-1'
+  - updated_users[물린 사용자].organization.main_access_key: 그 사용자의 기본 키가 채워져 있다
+  - updated_users[물린 사용자].security.allowed_client_ip = None
+  - updated_users[물린 사용자].security.totp_activated = False
+  - updated_users[물린 사용자].security.totp_activated_at = None
+  - updated_users[물린 사용자].security.sudo_session_enabled = False
+  - updated_users[물린 사용자].container.container_uid = None
+  - updated_users[물린 사용자].container.container_main_gid = None
+  - updated_users[물린 사용자].container.container_gids = None
+  - updated_users[물린 사용자].timestamps.created_at: 이 실행이 쓴 시각
+  - updated_users[물린 사용자].timestamps.modified_at: 이 실행이 쓴 시각
+  - updated_users[되살린 사용자].id: 심은 사용자와 같다
+  - updated_users[되살린 사용자].basic_info.username = 'user-2'
+  - updated_users[되살린 사용자].basic_info.email = 'user-2@scenario.local'
+  - updated_users[되살린 사용자].basic_info.full_name = None
+  - updated_users[되살린 사용자].basic_info.description = None
+  - updated_users[되살린 사용자].basic_info.integration_name = None
+  - updated_users[되살린 사용자].status.status = 'active'
+  - updated_users[되살린 사용자].status.status_info = 'admin-requested'
+  - updated_users[되살린 사용자].status.need_password_change = False
+  - updated_users[되살린 사용자].organization.domain_name = 'home-1'
+  - updated_users[되살린 사용자].organization.role = 'user'
+  - updated_users[되살린 사용자].organization.resource_policy = 'user-policy-2'
+  - updated_users[되살린 사용자].organization.main_access_key: 활성 기본 키가 없어 비어 있다
+  - updated_users[되살린 사용자].security.allowed_client_ip = None
+  - updated_users[되살린 사용자].security.totp_activated = False
+  - updated_users[되살린 사용자].security.totp_activated_at = None
+  - updated_users[되살린 사용자].security.sudo_session_enabled = False
+  - updated_users[되살린 사용자].container.container_uid = None
+  - updated_users[되살린 사용자].container.container_main_gid = None
+  - updated_users[되살린 사용자].container.container_gids = None
+  - updated_users[되살린 사용자].timestamps.created_at: 이 실행이 쓴 시각
+  - updated_users[되살린 사용자].timestamps.modified_at: 이 실행이 쓴 시각
 
 <a id="editing-a-bulk-edit-whose-default-key-switch-fails-reports-that-user-as-failed"></a>
 
@@ -2122,7 +2210,7 @@ Given
 
 When
 
-- UserAdapter.bulk_modify_users — user-3이 user-1을 일괄 수정하며 user-2의 키로 기본 키를 옮김
+- UserAdapter.bulk_update_users — user-3이 user-1을 일괄 수정하며 user-2의 키로 기본 키를 옮김
 
 Then
 
@@ -2162,7 +2250,7 @@ Given
 
 When
 
-- UserAdapter.bulk_modify_users — user-4이 user-1의 전체 이름을 바꾸고 user-3의 이름을 user-2로 일괄 수정
+- UserAdapter.bulk_update_users — user-4이 user-1의 전체 이름을 바꾸고 user-3의 이름을 user-2로 일괄 수정
 
 Then
 
@@ -2228,7 +2316,7 @@ Given
 
 When
 
-- UserAdapter.bulk_modify_users — user-4이 user-1의 전체 이름을 바꾸고 user-3의 이름을 user-2로 일괄 수정
+- UserAdapter.bulk_update_users — user-4이 user-1의 전체 이름을 바꾸고 user-3의 이름을 user-2로 일괄 수정
 
 Then
 
@@ -2418,6 +2506,115 @@ Then
   - basic_info.integration_name = None
   - status.status = 'active'
   - status.status_info = None
+  - status.need_password_change = False
+  - organization.domain_name = 'home-1'
+  - organization.role = 'user'
+  - organization.resource_policy = 'user-policy-1'
+  - organization.main_access_key: 그 사용자의 기본 키가 채워져 있다
+  - security.allowed_client_ip = None
+  - security.totp_activated = False
+  - security.totp_activated_at = None
+  - security.sudo_session_enabled = False
+  - container.container_uid = None
+  - container.container_main_gid = None
+  - container.container_gids = None
+  - timestamps.created_at: 이 실행이 쓴 시각
+  - timestamps.modified_at: 이 실행이 쓴 시각
+
+<a id="retiring-an-edit-to-active-on-a-deleted-user-restores-the-user"></a>
+
+#### [an-edit-to-active-on-a-deleted-user-restores-the-user](/tests/scenario/bai_scenario/manager/user/test_retiring.py) — pass
+
+대상 사용자 스코프에서 SOFT_DELETE와 READ를 받은 사용자가 삭제 상태 사용자에 수정으로 ACTIVE를 주면, 되살리기와 같이 활성이 된다
+
+Given
+
+- 도메인 하나와 대상 deleted 상태 사용자 하나, 부르는 사람 하나, 부르는 사람은 대상에 대한 사용자 SOFT_DELETE, READ 권한을 받았다
+  - 도메인 home-1
+  - 도메인에 속한 deleted 상태 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 상태 deleted, 자기 키와 개인 프로젝트를 갖는다
+  - 도메인에 속한 사용자 한 명 준비
+    - 사용자 정책 user-policy-2: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
+    - 일반 사용자 user-2: 자기 키와 개인 프로젝트를 갖는다
+  - 사용자 SOFT_DELETE, READ 권한을 준 역할 배정
+    - 역할 user-role-1: 이 역할이 앉은 스코프 안에서만 통한다
+    - 역할 user-role-1: user 전체에 SOFT_DELETE 허용
+    - 역할 user-role-1: user 전체에 READ 허용
+    - 일반 사용자 user-2: 역할 user-role-1 보유
+
+When
+
+- UserAdapter.update_user_by_id — user-2이 user-1의 상태에 ACTIVE를 줌
+
+Then
+
+- active 상태의 사용자 전체가 온다
+  - id: 심은 사용자와 같다
+  - basic_info.username = 'user-1'
+  - basic_info.email = 'user-1@scenario.local'
+  - basic_info.full_name = None
+  - basic_info.description = None
+  - basic_info.integration_name = None
+  - status.status = 'active'
+  - status.status_info = 'admin-requested'
+  - status.need_password_change = False
+  - organization.domain_name = 'home-1'
+  - organization.role = 'user'
+  - organization.resource_policy = 'user-policy-1'
+  - organization.main_access_key: 활성 기본 키가 없어 비어 있다
+  - security.allowed_client_ip = None
+  - security.totp_activated = False
+  - security.totp_activated_at = None
+  - security.sudo_session_enabled = False
+  - container.container_uid = None
+  - container.container_main_gid = None
+  - container.container_gids = None
+  - timestamps.created_at: 이 실행이 쓴 시각
+  - timestamps.modified_at: 이 실행이 쓴 시각
+
+<a id="retiring-an-edit-to-deleted-soft-deletes-the-user"></a>
+
+#### [an-edit-to-deleted-soft-deletes-the-user](/tests/scenario/bai_scenario/manager/user/test_retiring.py) — pass
+
+대상 사용자 스코프에서 SOFT_DELETE와 READ를 받은 사용자가 수정으로 DELETED를 주면, 물리기와 같이 삭제 상태가 된다
+
+Given
+
+- 도메인 하나와 대상 사용자 하나, 부르는 사람 하나, 부르는 사람은 대상에 대한 사용자 SOFT_DELETE, READ 권한을 받았다
+  - 도메인 home-1
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+    - 사용자 정책 user-policy-2: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
+    - 일반 사용자 user-2: 자기 키와 개인 프로젝트를 갖는다
+  - 사용자 SOFT_DELETE, READ 권한을 준 역할 배정
+    - 역할 user-role-1: 이 역할이 앉은 스코프 안에서만 통한다
+    - 역할 user-role-1: user 전체에 SOFT_DELETE 허용
+    - 역할 user-role-1: user 전체에 READ 허용
+    - 일반 사용자 user-2: 역할 user-role-1 보유
+
+When
+
+- UserAdapter.update_user_by_id — user-2이 user-1의 상태에 DELETED를 줌
+
+Then
+
+- deleted 상태의 사용자 전체가 온다
+  - id: 심은 사용자와 같다
+  - basic_info.username = 'user-1'
+  - basic_info.email = 'user-1@scenario.local'
+  - basic_info.full_name = None
+  - basic_info.description = None
+  - basic_info.integration_name = None
+  - status.status = 'deleted'
+  - status.status_info = 'admin-requested'
   - status.need_password_change = False
   - organization.domain_name = 'home-1'
   - organization.role = 'user'
@@ -2623,6 +2820,140 @@ Then
 
 - 거부된다
   - 거부: UserModificationBadRequest
+
+<a id="retiring-an-edit-of-another-field-on-a-deleted-user-is-refused"></a>
+
+#### [an-edit-of-another-field-on-a-deleted-user-is-refused](/tests/scenario/bai_scenario/manager/user/test_retiring.py) — pass
+
+대상 사용자 스코프에서 UPDATE와 READ를 받은 사용자가 삭제 상태 사용자의 전체 이름을 고치면, 삭제된 사용자라 막힌다
+
+Given
+
+- 도메인 하나와 대상 deleted 상태 사용자 하나, 부르는 사람 하나, 부르는 사람은 대상에 대한 사용자 UPDATE, READ 권한을 받았다
+  - 도메인 home-1
+  - 도메인에 속한 deleted 상태 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 상태 deleted, 자기 키와 개인 프로젝트를 갖는다
+  - 도메인에 속한 사용자 한 명 준비
+    - 사용자 정책 user-policy-2: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
+    - 일반 사용자 user-2: 자기 키와 개인 프로젝트를 갖는다
+  - 사용자 UPDATE, READ 권한을 준 역할 배정
+    - 역할 user-role-1: 이 역할이 앉은 스코프 안에서만 통한다
+    - 역할 user-role-1: user 전체에 UPDATE 허용
+    - 역할 user-role-1: user 전체에 READ 허용
+    - 일반 사용자 user-2: 역할 user-role-1 보유
+
+When
+
+- UserAdapter.update_user_by_id — user-2이 user-1의 전체 이름을 바꿈
+
+Then
+
+- 거부된다
+  - 거부: UserDeleted
+
+<a id="retiring-an-edit-to-a-status-other-than-active-or-inactive-is-refused"></a>
+
+#### [an-edit-to-a-status-other-than-active-or-inactive-is-refused](/tests/scenario/bai_scenario/manager/user/test_retiring.py) — pass
+
+대상 사용자 스코프에서 UPDATE와 READ를 받은 사용자가 수정으로 BEFORE_VERIFICATION을 주면, 입력 검증이 막는다
+
+Given
+
+- 도메인 하나와 대상 사용자 하나, 부르는 사람 하나, 부르는 사람은 대상에 대한 사용자 UPDATE, READ 권한을 받았다
+  - 도메인 home-1
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+    - 사용자 정책 user-policy-2: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
+    - 일반 사용자 user-2: 자기 키와 개인 프로젝트를 갖는다
+  - 사용자 UPDATE, READ 권한을 준 역할 배정
+    - 역할 user-role-1: 이 역할이 앉은 스코프 안에서만 통한다
+    - 역할 user-role-1: user 전체에 UPDATE 허용
+    - 역할 user-role-1: user 전체에 READ 허용
+    - 일반 사용자 user-2: 역할 user-role-1 보유
+
+When
+
+- UserAdapter.update_user_by_id — user-2이 user-1의 상태에 BEFORE_VERIFICATION을 줌
+
+Then
+
+- 거부된다
+  - 거부: UserModificationBadRequest
+
+<a id="retiring-an-edit-to-deleted-is-refused-without-soft-delete"></a>
+
+#### [an-edit-to-deleted-is-refused-without-soft-delete](/tests/scenario/bai_scenario/manager/user/test_retiring.py) — pass
+
+대상 사용자 스코프에서 UPDATE와 READ만 받은 사용자가 수정으로 DELETED를 주면, 물리기의 엔티티 권한 문이 막는다
+
+Given
+
+- 도메인 하나와 대상 사용자 하나, 부르는 사람 하나, 부르는 사람은 대상에 대한 사용자 UPDATE, READ 권한을 받았다
+  - 도메인 home-1
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+    - 사용자 정책 user-policy-2: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
+    - 일반 사용자 user-2: 자기 키와 개인 프로젝트를 갖는다
+  - 사용자 UPDATE, READ 권한을 준 역할 배정
+    - 역할 user-role-1: 이 역할이 앉은 스코프 안에서만 통한다
+    - 역할 user-role-1: user 전체에 UPDATE 허용
+    - 역할 user-role-1: user 전체에 READ 허용
+    - 일반 사용자 user-2: 역할 user-role-1 보유
+
+When
+
+- UserAdapter.update_user_by_id — user-2이 user-1의 상태에 DELETED를 줌
+
+Then
+
+- 거부된다
+  - 거부: NotEnoughPermission
+
+<a id="retiring-an-edit-to-deleted-on-a-deleted-user-changes-nothing"></a>
+
+#### [an-edit-to-deleted-on-a-deleted-user-changes-nothing](/tests/scenario/bai_scenario/manager/user/test_retiring.py) — pass
+
+삭제 상태 사용자에 수정으로 DELETED만 주면, 아무것도 바뀌지 않고 그 사용자가 온다
+
+Given
+
+- 도메인 하나와 대상 deleted 상태 사용자 하나, 부르는 사람 하나, 부르는 사람은 대상에 대한 사용자 SOFT_DELETE, READ 권한을 받았다
+  - 도메인 home-1
+  - 도메인에 속한 deleted 상태 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 상태 deleted, 자기 키와 개인 프로젝트를 갖는다
+  - 도메인에 속한 사용자 한 명 준비
+    - 사용자 정책 user-policy-2: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
+    - 일반 사용자 user-2: 자기 키와 개인 프로젝트를 갖는다
+  - 사용자 SOFT_DELETE, READ 권한을 준 역할 배정
+    - 역할 user-role-1: 이 역할이 앉은 스코프 안에서만 통한다
+    - 역할 user-role-1: user 전체에 SOFT_DELETE 허용
+    - 역할 user-role-1: user 전체에 READ 허용
+    - 일반 사용자 user-2: 역할 user-role-1 보유
+
+When
+
+- UserAdapter.update_user_by_id — user-2이 user-1의 상태에 DELETED를 줌
+
+Then
+
+- 삭제 상태 그대로인 사용자 전체가 온다
+  - 거부: NotEnoughPermission
 
 ### LoginSessionAdapter.admin_revoke
 
