@@ -221,7 +221,33 @@ class ResourceSlotAdapter(BaseAdapter):
 
     def _convert_slot_type_filter(self, filter: ResourceSlotTypeFilter) -> list[QueryCondition]:
         fields = ResourceSlotTypeSearchableFields.own
+<<<<<<< HEAD
         return self.apply_string_filter(filter.slot_name, fields.slot_name.filter)
+=======
+        conditions = [
+            *self.apply_string_filter(filter.slot_name, fields.slot_name.filter),
+            *self.apply_uuid_filter(filter.entity_id, fields.uuid.filter),
+            *self.apply_string_filter(filter.slot_type, fields.slot_type.filter),
+            *self.apply_string_filter(filter.display_name, fields.display_name.filter),
+        ]
+        if filter.AND:
+            for sub in filter.AND:
+                conditions.extend(self._convert_slot_type_filter(sub))
+        if filter.OR:
+            or_groups: list[QueryCondition] = []
+            for sub in filter.OR:
+                sub_conditions = self._convert_slot_type_filter(sub)
+                if sub_conditions:
+                    or_groups.append(combine_conditions_and(sub_conditions))
+            if or_groups:
+                conditions.append(combine_conditions_or(or_groups))
+        if filter.NOT:
+            for sub in filter.NOT:
+                sub_conditions = self._convert_slot_type_filter(sub)
+                if sub_conditions:
+                    conditions.append(negate_conditions(sub_conditions))
+        return conditions
+>>>>>>> 9ede7fb4 (fix(BA-8446): apply every declared field and AND/OR/NOT in three v2 filters (#15757))
 
     def _convert_slot_type_orders(self, orders: list[ResourceSlotTypeOrder]) -> list[QueryOrder]:
         fields = ResourceSlotTypeSearchableFields.own
@@ -515,10 +541,27 @@ class ResourceSlotAdapter(BaseAdapter):
         self, filter: ResourceAllocationFilter
     ) -> list[QueryCondition]:
         fields = ResourceAllocationSearchableFields.own
-        return [
+        conditions = [
             *self.apply_string_filter(filter.slot_name, fields.slot_name.filter),
             *self.apply_uuid_filter(filter.kernel_id, fields.kernel_id.filter),
         ]
+        if filter.AND:
+            for sub in filter.AND:
+                conditions.extend(self._convert_resource_allocation_filter(sub))
+        if filter.OR:
+            or_groups: list[QueryCondition] = []
+            for sub in filter.OR:
+                sub_conditions = self._convert_resource_allocation_filter(sub)
+                if sub_conditions:
+                    or_groups.append(combine_conditions_and(sub_conditions))
+            if or_groups:
+                conditions.append(combine_conditions_or(or_groups))
+        if filter.NOT:
+            for sub in filter.NOT:
+                sub_conditions = self._convert_resource_allocation_filter(sub)
+                if sub_conditions:
+                    conditions.append(negate_conditions(sub_conditions))
+        return conditions
 
     @staticmethod
     def _convert_resource_allocation_orders(
