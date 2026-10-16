@@ -22,6 +22,7 @@ __all__ = (
     "SessionOrderField",
     "SessionResultEnum",
     "SessionStatusEnum",
+    "SessionTerminationStatusEnum",
     "SessionResultFilter",
     "SessionStatusFilter",
     "SessionTypeEnum",
@@ -52,6 +53,15 @@ class SessionStatusEnum(StrEnum):
     TERMINATED = "TERMINATED"
     ERROR = "ERROR"
     CANCELLED = "CANCELLED"
+
+
+class SessionTerminationStatusEnum(StrEnum):
+    """What a termination request did to one session."""
+
+    CANCELLED = "cancelled"
+    TERMINATING = "terminating"
+    FORCE_TERMINATED = "force-terminated"
+    SKIPPED = "skipped"
 
 
 class SessionTypeEnum(StrEnum):

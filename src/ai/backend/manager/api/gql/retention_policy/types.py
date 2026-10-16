@@ -10,8 +10,15 @@ from strawberry import Info
 from strawberry.relay import Connection, Edge, NodeID
 
 from ai.backend.common.data.entity.retention_policy import RetentionPolicyID
+from ai.backend.common.dto.manager.v2.common import PartialBulkPayload
 from ai.backend.common.dto.manager.v2.retention_policy.request import (
     CreateRetentionPolicyInput as CreateInputDTO,
+)
+from ai.backend.common.dto.manager.v2.retention_policy.request import (
+    PartialBulkPurgeRetentionPoliciesInput as PartialBulkPurgeInputDTO,
+)
+from ai.backend.common.dto.manager.v2.retention_policy.request import (
+    PartialBulkUpdateRetentionPoliciesInput as PartialBulkUpdateInputDTO,
 )
 from ai.backend.common.dto.manager.v2.retention_policy.request import (
     RetentionPolicyFilter as FilterDTO,
@@ -39,6 +46,7 @@ from ai.backend.common.dto.manager.v2.retention_policy.response import (
 )
 from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import UUIDFilter
+from ai.backend.manager.api.gql.common_types import PartialBulkFailureGQL
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     PydanticInputMixin,
@@ -191,6 +199,30 @@ class UpdateRetentionPolicyInputGQL(PydanticInputMixin[UpdateInputDTO]):
     enabled: bool | None = gql_field(default=None, description="Toggle enabled.")
 
 
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Input for updating several retention policies, each answered for separately.",
+    ),
+    name="PartialBulkUpdateRetentionPoliciesInput",
+)
+class PartialBulkUpdateRetentionPoliciesInputGQL(PydanticInputMixin[PartialBulkUpdateInputDTO]):
+    items: list[UpdateRetentionPolicyInputGQL] = gql_field(
+        description="The retention policies to update, each with its ID and fields."
+    )
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Input for purging several retention policies, each answered for separately.",
+    ),
+    name="PartialBulkPurgeRetentionPoliciesInput",
+)
+class PartialBulkPurgeRetentionPoliciesInputGQL(PydanticInputMixin[PartialBulkPurgeInputDTO]):
+    ids: list[UUID] = gql_field(description="IDs of the retention policies to purge.")
+
+
 @gql_pydantic_type(
     BackendAIGQLMeta(added_version="26.8.0", description="Create retention policy payload."),
     model=CreatePayloadDTO,
@@ -225,3 +257,25 @@ class DeleteRetentionPolicyPayloadGQL(PydanticOutputMixin[DeletePayloadDTO]):
 )
 class PurgeRetentionPolicyPayloadGQL(PydanticOutputMixin[PurgePayloadDTO]):
     id: UUID = gql_field(description="ID of the purged retention policy.")
+
+
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description=(
+            "Result of a partial bulk retention policy operation: the policies processed and "
+            "the ones that failed."
+        ),
+    ),
+    model=PartialBulkPayload[NodeDTO],
+    name="PartialBulkRetentionPoliciesPayload",
+)
+class PartialBulkRetentionPoliciesPayloadGQL(PydanticOutputMixin[PartialBulkPayload[NodeDTO]]):
+    """Payload for partial bulk retention policy mutations."""
+
+    successes: list[RetentionPolicyGQL] = gql_field(
+        description="The retention policies processed, as they now stand."
+    )
+    failed: list[PartialBulkFailureGQL] = gql_field(
+        description="The retention policies not processed, each with the reason."
+    )

@@ -31,7 +31,10 @@ def build_v2_routes(
     from .app_config.handler import V2AppConfigHandler
     from .app_config.registry import register_v2_app_config_routes
     from .app_config_allow_list.handler import V2AppConfigAllowListHandler
-    from .app_config_allow_list.registry import register_v2_app_config_allow_list_routes
+    from .app_config_allow_list.registry import (
+        register_v2_app_config_allow_list_routes,
+        register_v2_app_config_allow_lists_routes,
+    )
     from .app_config_definition.handler import V2AppConfigDefinitionHandler
     from .app_config_definition.registry import register_v2_app_config_definition_routes
     from .app_config_fragment.handler import V2AppConfigFragmentHandler
@@ -219,6 +222,9 @@ def build_v2_routes(
     )
     v2_reg.add_subregistry(
         register_v2_app_config_allow_list_routes(app_config_allow_list_handler, route_deps)
+    )
+    v2_reg.add_subregistry(
+        register_v2_app_config_allow_lists_routes(app_config_allow_list_handler, route_deps)
     )
     v2_reg.add_subregistry(
         register_v2_app_config_definition_routes(app_config_definition_handler, route_deps)

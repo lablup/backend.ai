@@ -56,7 +56,7 @@ class Upserting(When[ACaller, ClientIPMaskingAdapter, ClientIPMaskingPolicyNode]
 
     @override
     def operation(self) -> str:
-        return "admin_upsert"
+        return "upsert"
 
     @override
     def describe(self, laid: ACaller) -> str:
@@ -68,7 +68,7 @@ class Upserting(When[ACaller, ClientIPMaskingAdapter, ClientIPMaskingPolicyNode]
         self, adapter: ClientIPMaskingAdapter, laid: ACaller
     ) -> ClientIPMaskingPolicyNode:
         with ActingAs(laid.caller):
-            payload = await adapter.admin_upsert(
+            payload = await adapter.upsert(
                 AdminUpsertClientIPMaskingPolicyInput(
                     target_type=TargetInput.DEFAULT,
                     mode=ModeInput.TRUNCATE,
@@ -91,7 +91,7 @@ class UpsertingTheLaidTargetAgain(
 
     @override
     def operation(self) -> str:
-        return "admin_upsert"
+        return "upsert"
 
     @override
     def describe(self, laid: AMaskingPolicyAndACaller) -> str:
@@ -106,7 +106,7 @@ class UpsertingTheLaidTargetAgain(
         self, adapter: ClientIPMaskingAdapter, laid: AMaskingPolicyAndACaller
     ) -> ClientIPMaskingPolicyNode:
         with ActingAs(laid.caller):
-            payload = await adapter.admin_upsert(
+            payload = await adapter.upsert(
                 AdminUpsertClientIPMaskingPolicyInput(
                     target_type=TargetInput(laid.policy.target_type.value),
                     mode=ModeInput(self.mode.value),

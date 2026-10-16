@@ -58,7 +58,7 @@ class Purging(When[ADefinitionAndACaller, AppConfigDefinitionAdapter, Purged]):
 
     @override
     def operation(self) -> str:
-        return "admin_purge"
+        return "purge"
 
     @override
     def describe(self, laid: ADefinitionAndACaller) -> str:
@@ -71,7 +71,7 @@ class Purging(When[ADefinitionAndACaller, AppConfigDefinitionAdapter, Purged]):
     ) -> Purged:
         wanted = self.other if self.other is not None else laid.definition.id
         with ActingAs(laid.caller):
-            return await adapter.admin_purge(PurgeAppConfigDefinitionInput(id=wanted))
+            return await adapter.purge(PurgeAppConfigDefinitionInput(id=wanted))
 
 
 @dataclass(frozen=True)
