@@ -16,11 +16,13 @@ from ai.backend.common.dto.manager.v2.session_group.request import (
     ScopedSearchSessionGroupsInput,
     SessionGroupFilter,
     SessionGroupOrder,
+    UpdateSessionGroupInput,
 )
 from ai.backend.common.dto.manager.v2.session_group.response import (
     AdminSearchSessionGroupsPayload,
     PurgeSessionGroupPayload,
     SessionGroupNode,
+    UpdateSessionGroupPayload,
 )
 from ai.backend.common.dto.manager.v2.session_group.types import (
     SessionGroupOrderField,
@@ -30,7 +32,11 @@ from ai.backend.common.dto.manager.v2.session_group.types import (
 from ai.backend.manager.actions.v2.ops.result import BatchOpsResult
 from ai.backend.manager.api.adapter_options.pagination.pagination import PaginationSpec
 from ai.backend.manager.api.adapters.base import BaseAdapter
-from ai.backend.manager.data.session_group.types import SessionGroupData
+from ai.backend.manager.data.session_group.types import (
+    SessionGroupData,
+    SessionGroupPlacementDirection,
+    SessionGroupPlacementEnforcement,
+)
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
 from ai.backend.manager.models.condition_utils import (
     combine_conditions_and,
@@ -46,6 +52,7 @@ from ai.backend.manager.models.session_group.scopes import (
 )
 from ai.backend.manager.models.session_group.searchable_fields import SessionGroupSearchableFields
 from ai.backend.manager.models.session_group.searchers import SessionGroupSearcher
+from ai.backend.manager.models.session_group.updaters import SessionGroupUpdater
 from ai.backend.manager.models.specs.searcher import GlobalSearcher, ScopedSearcher
 from ai.backend.manager.services.session_group.actions.bulk_get import BulkGetSessionGroupsAction
 from ai.backend.manager.services.session_group.actions.get import GetSessionGroupAction
@@ -56,7 +63,9 @@ from ai.backend.manager.services.session_group.actions.purge import PurgeSession
 from ai.backend.manager.services.session_group.actions.scoped_search import (
     ScopedSearchSessionGroupsAction,
 )
+from ai.backend.manager.services.session_group.actions.update import UpdateSessionGroupAction
 from ai.backend.manager.services.session_group.processors import SessionGroupProcessors
+from ai.backend.manager.types import OptionalState
 
 __all__ = ("SessionGroupAdapter",)
 
@@ -67,7 +76,7 @@ _SESSION_GROUP_PAGINATION_SPEC = PaginationSpec(
 
 
 class SessionGroupAdapter(BaseAdapter):
-    """Adapter for session group reads and the purge."""
+    """Adapter for session group reads, placement policy updates and the purge."""
 
     _session_group: SessionGroupProcessors
 
@@ -162,6 +171,24 @@ class SessionGroupAdapter(BaseAdapter):
             PurgeSessionGroupAction(purger=SessionGroupPurger(group_id=SessionGroupID(input.id)))
         )
         return PurgeSessionGroupPayload(entity_id=result.data.id)
+
+    async def update(self, input: UpdateSessionGroupInput) -> UpdateSessionGroupPayload:
+        """Change a session group's placement direction and enforcement."""
+        updater = SessionGroupUpdater(
+            group_id=SessionGroupID(input.id),
+            placement_direction=(
+                OptionalState.update(SessionGroupPlacementDirection(input.placement_direction))
+                if isinstance(input.placement_direction, SessionGroupPlacementDirectionEnum)
+                else OptionalState[SessionGroupPlacementDirection].nop()
+            ),
+            placement_enforcement=(
+                OptionalState.update(SessionGroupPlacementEnforcement(input.placement_enforcement))
+                if isinstance(input.placement_enforcement, SessionGroupPlacementEnforcementEnum)
+                else OptionalState[SessionGroupPlacementEnforcement].nop()
+            ),
+        )
+        result = await self._session_group.update.run(UpdateSessionGroupAction(updater=updater))
+        return UpdateSessionGroupPayload(session_group=self._data_to_node(result.data))
 
     def _search_conditions(self, filter: SessionGroupFilter | None) -> list[QueryCondition]:
         """The filter's conditions; groups marked deleted are left out unless the top-level
