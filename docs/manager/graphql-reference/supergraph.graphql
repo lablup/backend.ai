@@ -22357,7 +22357,7 @@ type ResourceGroupStatus
   isPublic: Boolean!
 
   """
-  Whether this is the default resource group. At most one resource group is the default at a time; an agent registering for the first time without a resolvable resource group name falls back to it.
+  Added in 26.8.0. Whether this is the default resource group. At most one resource group is the default at a time; an agent registering for the first time without a resolvable resource group name falls back to it.
   """
   isDefault: Boolean!
 }
