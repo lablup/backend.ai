@@ -5,9 +5,10 @@ from __future__ import annotations
 from collections.abc import Iterable
 from datetime import datetime
 from enum import StrEnum
-from typing import Any, Self, override
+from typing import TYPE_CHECKING, Annotated, Any, Self, override
 from uuid import UUID
 
+import strawberry
 from strawberry import UNSET, Info
 from strawberry.relay import Connection, Edge, NodeID
 
@@ -37,6 +38,9 @@ from ai.backend.common.dto.manager.v2.storage_volume.response import (
 )
 from ai.backend.common.dto.manager.v2.storage_volume.response import (
     RestoreStorageVolumePayload as RestoreStorageVolumePayloadDTO,
+)
+from ai.backend.common.dto.manager.v2.storage_volume.response import (
+    SearchStorageVolumeServiceAttachmentsPayload as SearchStorageVolumeServiceAttachmentsPayloadDTO,
 )
 from ai.backend.common.dto.manager.v2.storage_volume.response import (
     StorageVolumeNode,
@@ -74,6 +78,9 @@ from ai.backend.manager.api.gql.pydantic_compat import (
 )
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 
+if TYPE_CHECKING:
+    from ai.backend.manager.api.gql.service_catalog.types import ServiceCatalogGQL
+
 __all__ = (
     "DeleteStorageVolumePayloadGQL",
     "PurgeStorageVolumePayloadGQL",
@@ -84,10 +91,9 @@ __all__ = (
     "StorageVolumeGQL",
     "StorageVolumeOrderByGQL",
     "StorageVolumeScopeGQL",
-    "StorageVolumeServiceAttachmentConnectionGQL",
-    "StorageVolumeServiceAttachmentEdgeGQL",
     "StorageVolumeServiceAttachmentFilterGQL",
     "StorageVolumeServiceAttachmentGQL",
+    "StorageVolumeServiceAttachmentListGQL",
     "StorageVolumeServiceAttachmentOrderByGQL",
     "StorageVolumeUsageFieldGQL",
     "UpdateStorageVolumeInputGQL",
@@ -160,18 +166,15 @@ class StorageVolumeScopeGQL(PydanticInputMixin[StorageVolumeScope]):
     )
 
 
-@gql_node_type(
+@gql_pydantic_type(
     BackendAIGQLMeta(
         added_version=NEXT_RELEASE_VERSION,
-        description=(
-            "A storage volume as one service has it attached. The volume and the service are"
-            " the attachment's immutable identity."
-        ),
+        description="A storage volume as one service has it attached.",
     ),
+    model=StorageVolumeServiceAttachmentNode,
     name="StorageVolumeServiceAttachment",
 )
-class StorageVolumeServiceAttachmentGQL(PydanticNodeMixin[StorageVolumeServiceAttachmentNode]):
-    id: NodeID[str] = gql_field(description="Relay-style global node ID.")
+class StorageVolumeServiceAttachmentGQL(PydanticOutputMixin[StorageVolumeServiceAttachmentNode]):
     service_catalog_id: UUID = gql_field(description="ID of the service the volume is attached to.")
     storage_volume_id: UUID = gql_field(description="ID of the attached volume.")
     status_checked_at: datetime | None = gql_field(
@@ -180,49 +183,53 @@ class StorageVolumeServiceAttachmentGQL(PydanticNodeMixin[StorageVolumeServiceAt
     created_at: datetime = gql_field(description="Creation timestamp.")
     updated_at: datetime = gql_field(description="Last update timestamp.")
 
-    @classmethod
-    @override
-    async def resolve_nodes(  # type: ignore[override]  # Strawberry Node uses AwaitableOrValue overloads incompatible with async def
-        cls,
-        *,
-        info: Info[StrawberryGQLContext],
-        node_ids: Iterable[str],
-        required: bool = False,
-    ) -> Iterable[StorageVolumeServiceAttachmentGQL | None]:
+    @gql_field(description="The volume attached.")  # type: ignore[misc]
+    async def storage_volume(
+        self, info: Info[StrawberryGQLContext]
+    ) -> (
+        Annotated[
+            StorageVolumeGQL,
+            strawberry.lazy("ai.backend.manager.api.gql.storage_volume.types"),
+        ]
+        | None
+    ):
+        raise NotImplementedError
+
+    @gql_field(description="The service the volume is attached to.")  # type: ignore[misc]
+    async def service_catalog(
+        self, info: Info[StrawberryGQLContext]
+    ) -> (
+        Annotated[
+            ServiceCatalogGQL,
+            strawberry.lazy("ai.backend.manager.api.gql.service_catalog.types"),
+        ]
+        | None
+    ):
         raise NotImplementedError
 
 
-@gql_connection_type(
+@gql_pydantic_type(
     BackendAIGQLMeta(
         added_version=NEXT_RELEASE_VERSION,
-        description="One storage volume service attachment within a connection.",
+        description=(
+            "A page of the storage volume service attachments. Paged by limit and offset:"
+            " an attachment is keyed by its pair and carries no id of its own."
+        ),
     ),
-    name="StorageVolumeServiceAttachmentEdge",
+    model=SearchStorageVolumeServiceAttachmentsPayloadDTO,
+    name="StorageVolumeServiceAttachmentList",
 )
-class StorageVolumeServiceAttachmentEdgeGQL(Edge[StorageVolumeServiceAttachmentGQL]):
-    pass
-
-
-@gql_connection_type(
-    BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
-        description="Paginated connection for the storage volume service attachments.",
-    ),
-    name="StorageVolumeServiceAttachmentConnection",
-)
-class StorageVolumeServiceAttachmentConnectionGQL(Connection[StorageVolumeServiceAttachmentGQL]):
-    # Restated so the schema's edge type is the described one above rather than the
-    # one Strawberry would generate from the generic, which carries no version.
-    edges: list[StorageVolumeServiceAttachmentEdgeGQL] = gql_field(  # type: ignore[assignment]
-        description="Contains the nodes in this connection."
+class StorageVolumeServiceAttachmentListGQL(
+    PydanticOutputMixin[SearchStorageVolumeServiceAttachmentsPayloadDTO]
+):
+    items: list[StorageVolumeServiceAttachmentGQL] = gql_field(
+        description="The storage volume service attachments read."
     )
-    count: int = gql_field(
-        description="Total number of storage volume service attachments matching the query."
+    total_count: int = gql_field(
+        description="Total number of matching storage volume service attachments."
     )
-
-    def __init__(self, *args: Any, count: int, **kwargs: Any) -> None:
-        super().__init__(*args, **kwargs)
-        self.count = count
+    has_next_page: bool = gql_field(description="Whether more rows follow this page.")
+    has_previous_page: bool = gql_field(description="Whether more rows precede this page.")
 
 
 @gql_enum(
@@ -311,13 +318,9 @@ class StorageVolumeGQL(PydanticNodeMixin[StorageVolumeNode]):
         info: Info[StrawberryGQLContext],
         filter: StorageVolumeServiceAttachmentFilterGQL | None = None,
         order_by: list[StorageVolumeServiceAttachmentOrderByGQL] | None = None,
-        before: str | None = None,
-        after: str | None = None,
-        first: int | None = None,
-        last: int | None = None,
         limit: int | None = None,
         offset: int | None = None,
-    ) -> StorageVolumeServiceAttachmentConnectionGQL | None:
+    ) -> StorageVolumeServiceAttachmentListGQL | None:
         raise NotImplementedError
 
     @classmethod

@@ -43,8 +43,8 @@ from ai.backend.manager.api.gql.pydantic_compat import (
     PydanticOutputMixin,
 )
 from ai.backend.manager.api.gql.storage_volume.types import (
-    StorageVolumeServiceAttachmentConnectionGQL,
     StorageVolumeServiceAttachmentFilterGQL,
+    StorageVolumeServiceAttachmentListGQL,
     StorageVolumeServiceAttachmentOrderByGQL,
 )
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
@@ -131,13 +131,9 @@ class ServiceCatalogGQL(PydanticNodeMixin[ServiceCatalogNode]):
         info: Info[StrawberryGQLContext],
         filter: StorageVolumeServiceAttachmentFilterGQL | None = None,
         order_by: list[StorageVolumeServiceAttachmentOrderByGQL] | None = None,
-        before: str | None = None,
-        after: str | None = None,
-        first: int | None = None,
-        last: int | None = None,
         limit: int | None = None,
         offset: int | None = None,
-    ) -> StorageVolumeServiceAttachmentConnectionGQL | None:
+    ) -> StorageVolumeServiceAttachmentListGQL | None:
         raise NotImplementedError
 
     @classmethod
