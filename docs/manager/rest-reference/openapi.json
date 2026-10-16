@@ -23111,7 +23111,7 @@
               }
             ],
             "deprecated": true,
-            "description": "Deprecated since 26.10.0. Use the role delete and restore operations. Accepted and ignored.",
+            "description": "Deprecated since 26.10.0. Use the role delete and restore operations. DELETED is handled as delete, ACTIVE on a deleted role as restore; other values are ignored.",
             "title": "Status"
           },
           "auto_assign": {
@@ -37472,7 +37472,7 @@
                 "type": "null"
               }
             ],
-            "description": "New account status. Omit to leave unchanged.",
+            "description": "New account status, ACTIVE or INACTIVE. Omit to leave unchanged. DELETED is deprecated since 26.10.0: it is handled as a user delete, and ACTIVE on a deleted user as a user restore.",
             "title": "Status"
           },
           "role": {

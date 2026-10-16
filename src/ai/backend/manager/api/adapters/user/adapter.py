@@ -44,6 +44,7 @@ from ai.backend.common.dto.manager.v2.keypair.response import (
 )
 from ai.backend.common.dto.manager.v2.user.request import (
     AdminSearchUsersInput,
+    BulkUpdateUsersInput,
     CreateUserInput,
     DeleteUserInput,
     PurgeUserInput,
@@ -93,11 +94,12 @@ from ai.backend.common.dto.manager.v2.user.types import (
     UserStatus as UserStatusDTO,
 )
 from ai.backend.common.exception import UnreachableError
-from ai.backend.common.tristate.unset import Unset
+from ai.backend.common.tristate.unset import UNSET, Unset
 from ai.backend.common.types import AccessKey, SecretKey
 from ai.backend.manager.data.common.types import SearchResult
 from ai.backend.manager.data.keypair.types import KeyPairCreator, KeyPairData
 from ai.backend.manager.data.user.types import UserData, UserStatus
+from ai.backend.manager.errors.user import UserNotFound
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
 from ai.backend.manager.models.condition_utils import (
     combine_conditions_and,
@@ -591,9 +593,63 @@ class UserAdapter(BaseAdapter):
         )
 
     async def update_user_by_id(self, user_id: UUID, input: UpdateUserInput) -> UpdateUserPayload:
-        """Update a user by UUID."""
-        updater = UserUpdater(
-            user_id=UserID(user_id),
+        """Update a user by UUID.
+
+        ``status=DELETED`` soft-deletes after the other fields; ``status=ACTIVE`` on a
+        deleted user restores before them.
+        """
+        target = UserID(user_id)
+        current_status = None
+        if self._needs_current_status(input):
+            current = await self._user.get_user.run(GetUserAction(user_id=target))
+            current_status = UserStatus(current.user.status)
+        delete, restore, input = self._split_soft_delete_status(input, current_status)
+        if restore:
+            await self._user.restore_user.run(RestoreUserAction(user_id=target))
+        data: UserData | None = None
+        if not (delete or restore) or self._has_update_fields(input):
+            result = await self._user.update_user.run(
+                UpdateUserAction(updater=self._build_user_updater(target, input))
+            )
+            data = result.data
+        if not isinstance(input.main_access_key, Unset) and input.main_access_key is not None:
+            await self.switch_default_access_key(target, AccessKey(input.main_access_key))
+        if delete:
+            await self._user.delete_user.run(DeleteUserAction(user_id=target))
+        if data is None or delete:
+            data = (await self._user.get_user.run(GetUserAction(user_id=target))).user
+        return UpdateUserPayload(user=await self._user_node(data))
+
+    def _needs_current_status(self, input: UpdateUserInput) -> bool:
+        return input.status in (UserStatusDTO.DELETED, UserStatusDTO.ACTIVE)
+
+    def _split_soft_delete_status(
+        self, input: UpdateUserInput, current_status: UserStatus | None
+    ) -> tuple[bool, bool, UpdateUserInput]:
+        """Split a deprecated soft delete ``status`` off the update input.
+
+        Returns whether to delete, whether to restore, and the input left for the updater.
+        """
+        if current_status is None or isinstance(input.status, Unset) or input.status is None:
+            return False, False, input
+        requested = UserStatus(input.status)
+        rest = (
+            input
+            if requested.is_updater_value_from(current_status)
+            else input.model_copy(update={"status": UNSET})
+        )
+        return requested.deletes_from(current_status), requested.restores_from(current_status), rest
+
+    def _has_update_fields(self, input: UpdateUserInput) -> bool:
+        return any(
+            not isinstance(getattr(input, name), Unset)
+            for name in UpdateUserInput.model_fields
+            if name != "main_access_key"
+        )
+
+    def _build_user_updater(self, user_id: UserID, input: UpdateUserInput) -> UserUpdater:
+        return UserUpdater(
+            user_id=user_id,
             username=OptionalState.from_unset(input.username),
             password=(
                 OptionalState.nop()
@@ -634,10 +690,6 @@ class UserAdapter(BaseAdapter):
                 else OptionalState.update([str(gid) for gid in input.group_ids])
             ),
         )
-        result = await self._user.update_user.run(UpdateUserAction(updater=updater))
-        if not isinstance(input.main_access_key, Unset) and input.main_access_key is not None:
-            await self.switch_default_access_key(UserID(user_id), AccessKey(input.main_access_key))
-        return UpdateUserPayload(user=await self._user_node(result.data))
 
     async def delete_user_by_id(self, input: DeleteUserInput) -> DeleteUserPayload:
         """Soft-delete a user by UUID."""
@@ -719,35 +771,85 @@ class UserAdapter(BaseAdapter):
         ]
         return BulkCreateUsersWithKeypairPayload(created=created, failed=failed)
 
-    async def bulk_modify_users(
-        self,
-        action: BulkUpdateUserAction,
-        default_key_switches: Mapping[UserID, AccessKey],
-    ) -> BulkUpdateUsersPayload:
-        """Bulk-modify users. Each item's transformation is the caller's responsibility.
+    async def bulk_update_users(self, input: BulkUpdateUsersInput) -> BulkUpdateUsersPayload:
+        """Update users item by item, answering each failure in ``failed``.
 
-        A switch runs only for a user whose own update went through, and a switch that
-        fails turns that user into a failure instead of aborting the whole batch.
+        Each item takes the soft delete ``status`` as :meth:`update_user_by_id` does.
+        A key switch or a delete runs only for a user whose update went through.
         """
-        result = await self._user.bulk_modify_users.run(action)
-        failed = [
-            BulkUpdateUserV2Error(
-                user_id=action.items[error.index].user_id,
-                message=str(error.exception),
-            )
-            for error in result.data.failures
-        ]
+        failed: list[BulkUpdateUserV2Error] = []
+        current_statuses = await self._current_statuses([
+            item.user_id for item in input.users if self._needs_current_status(item.input)
+        ])
+        to_delete: set[UserID] = set()
+        to_reload: list[UserID] = []
+        updaters: list[UserUpdater] = []
+        rest_inputs: dict[UserID, UpdateUserInput] = {}
+        for item in input.users:
+            user_id = UserID(item.user_id)
+            try:
+                current = current_statuses.get(user_id)
+                if isinstance(current, Exception):
+                    raise current
+                delete, restore, rest = self._split_soft_delete_status(item.input, current)
+                if restore:
+                    await self._user.restore_user.run(RestoreUserAction(user_id=user_id))
+                if delete:
+                    to_delete.add(user_id)
+                if not (delete or restore) or self._has_update_fields(rest):
+                    updaters.append(self._build_user_updater(user_id, rest))
+                    rest_inputs[user_id] = rest
+                else:
+                    to_reload.append(user_id)
+            except Exception as e:
+                failed.append(BulkUpdateUserV2Error(user_id=user_id, message=str(e)))
         updated: list[UserData] = []
-        for user in result.data.successes:
-            access_key = default_key_switches.get(UserID(user.id))
-            if access_key is not None:
+        if updaters:
+            result = await self._user.bulk_modify_users.run(BulkUpdateUserAction(items=updaters))
+            failed.extend(
+                BulkUpdateUserV2Error(
+                    user_id=updaters[error.index].user_id, message=str(error.exception)
+                )
+                for error in result.data.failures
+            )
+            for user in result.data.successes:
+                user_id = UserID(user.id)
+                main_access_key = rest_inputs[user_id].main_access_key
                 try:
-                    await self.switch_default_access_key(UserID(user.id), access_key)
+                    if not isinstance(main_access_key, Unset) and main_access_key is not None:
+                        await self.switch_default_access_key(user_id, AccessKey(main_access_key))
                 except Exception as e:
-                    failed.append(BulkUpdateUserV2Error(user_id=user.id, message=str(e)))
+                    failed.append(BulkUpdateUserV2Error(user_id=user_id, message=str(e)))
+                    to_delete.discard(user_id)
                     continue
-            updated.append(user)
+                if user_id in to_delete:
+                    to_reload.append(user_id)
+                else:
+                    updated.append(user)
+        for user_id in to_reload:
+            try:
+                if user_id in to_delete:
+                    await self._user.delete_user.run(DeleteUserAction(user_id=user_id))
+                updated.append((await self._user.get_user.run(GetUserAction(user_id=user_id))).user)
+            except Exception as e:
+                failed.append(BulkUpdateUserV2Error(user_id=user_id, message=str(e)))
         return BulkUpdateUsersPayload(updated_users=await self._user_nodes(updated), failed=failed)
+
+    async def _current_statuses(
+        self, user_ids: Sequence[UUID]
+    ) -> Mapping[UserID, UserStatus | Exception]:
+        if not user_ids:
+            return {}
+        ids = [UserID(user_id) for user_id in user_ids]
+        result = await self._user.bulk_get.run(BulkGetUsersAction(ids=ids))
+        return {
+            user_id: (
+                UserStatus(item.value.status)
+                if item.value is not None
+                else item.error or UserNotFound(f"User with UUID {user_id} not found.")
+            )
+            for user_id, item in zip(ids, result.items, strict=True)
+        }
 
     async def bulk_purge_users(self, action: BulkPurgeUserAction) -> BulkPurgeUsersPayload:
         """Bulk-purge users permanently."""

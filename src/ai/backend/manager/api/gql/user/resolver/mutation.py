@@ -17,8 +17,7 @@ from ai.backend.common.dto.manager.v2.user.request import (
     RestoreUserInput,
 )
 from ai.backend.common.exception import InvalidIpAddressValue, UnreachableError
-from ai.backend.common.tristate.unset import Unset
-from ai.backend.common.types import AccessKey, ReadableCIDR
+from ai.backend.common.types import ReadableCIDR
 from ai.backend.manager.api.adapters.user.adapter import UserAdapter
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
@@ -63,7 +62,6 @@ from ai.backend.manager.services.user.actions.create_user import (
 )
 from ai.backend.manager.services.user.actions.purge_user import BulkPurgeUserAction
 from ai.backend.manager.services.user.actions.update_user import (
-    BulkUpdateUserAction,
     UpdateUserAction,
 )
 from ai.backend.manager.types import OptionalState, TriState
@@ -264,62 +262,7 @@ async def admin_bulk_update_users_v2(
         BulkUpdateUsersPayloadGQL with updated users and failures.
     """
     check_admin_only()
-    ctx = info.context
-    auth_config = ctx.config_provider.config.auth
-
-    items: list[UserUpdater] = []
-    default_key_switches: dict[UserID, AccessKey] = {}
-    for user_item in input.users:
-        dto = user_item.input.to_pydantic()
-
-        updater = UserUpdater(
-            user_id=UserID(user_item.user_id),
-            username=OptionalState.from_unset(dto.username),
-            password=(
-                OptionalState.nop()
-                if isinstance(dto.password, Unset) or dto.password is None
-                else OptionalState.update(
-                    PasswordInfo(
-                        password=dto.password,
-                        algorithm=auth_config.password_hash_algorithm,
-                        rounds=auth_config.password_hash_rounds,
-                        salt_size=auth_config.password_hash_salt_size,
-                    )
-                )
-            ),
-            need_password_change=OptionalState.from_unset(dto.need_password_change),
-            full_name=TriState.from_unset(dto.full_name),
-            description=TriState.from_unset(dto.description),
-            status=(
-                OptionalState.nop()
-                if isinstance(dto.status, Unset) or dto.status is None
-                else OptionalState.update(UserStatus(dto.status))
-            ),
-            domain_name=OptionalState.from_unset(dto.domain_name),
-            role=(
-                OptionalState.nop()
-                if isinstance(dto.role, Unset) or dto.role is None
-                else OptionalState.update(UserRole(dto.role))
-            ),
-            allowed_client_ip=TriState.from_unset(dto.allowed_client_ip),
-            resource_policy=OptionalState.from_unset(dto.resource_policy),
-            sudo_session_enabled=OptionalState.from_unset(dto.sudo_session_enabled),
-            container_uid=TriState.from_unset(dto.container_uid),
-            container_main_gid=TriState.from_unset(dto.container_main_gid),
-            container_gids=TriState.from_unset(dto.container_gids),
-            group_ids=(
-                OptionalState.nop()
-                if isinstance(dto.group_ids, Unset) or dto.group_ids is None
-                else OptionalState.update([str(gid) for gid in dto.group_ids])
-            ),
-        )
-
-        if not isinstance(dto.main_access_key, Unset) and dto.main_access_key is not None:
-            default_key_switches[UserID(user_item.user_id)] = AccessKey(dto.main_access_key)
-        items.append(updater)
-
-    action = BulkUpdateUserAction(items=items)
-    payload = await ctx.adapters.user.bulk_modify_users(action, default_key_switches)
+    payload = await info.context.adapters.user.bulk_update_users(input.to_pydantic())
     return BulkUpdateUsersV2PayloadGQL.from_pydantic(payload)
 
 

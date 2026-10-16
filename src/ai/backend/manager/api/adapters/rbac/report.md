@@ -76,6 +76,7 @@
 | 시나리오 | 판정 |
 |---|---|
 | [아무 권한도 받지 않은 사용자가 역할 여럿을 한 번에 고치려 하면, 고쳐진 것 없이 모두 권한이 없다는 이유로 실패 목록에 온다](#partial_bulk_editing-a-user-granted-nothing-edits-none-of-several-roles) | 성공 |
+| [soft delete 된 역할 여럿의 status 를 한 번에 ACTIVE 로 고치면, restore 되어 모두 활성으로 온다](#partial_bulk_editing-editing-status-to-active-restores-several-roles) | 성공 |
 | [슈퍼관리자가 역할 여럿의 설명을 한 번에 바꾸면, 모두 새 설명으로 오고 실패한 것은 없다](#partial_bulk_editing-the-superadmin-edits-several-roles-at-once) | 성공 |
 
 **purge**
@@ -96,6 +97,7 @@
 
 | 시나리오 | 판정 |
 |---|---|
+| [슈퍼관리자가 역할의 status 를 DELETED 로 고치면, soft delete 되어 삭제 상태로 온다](#editing-editing-status-to-deleted-soft-deletes-the-role) | 성공 |
 | [슈퍼관리자가 역할의 설명을 바꾸면, 새 설명을 실은 역할 전체가 온다](#editing-the-superadmin-edits-a-role) | 성공 |
 | [아무 권한도 받지 않은 사용자는 역할을 수정할 수 없다](#editing-a-user-granted-nothing-may-not-edit-a-role) | 거부 |
 
@@ -429,6 +431,61 @@ Then
   - failed[1].id: 대상 역할의 id와 같다
   - failed[1].message: 'Insufficient permission'를 담은 이유
 
+<a id="partial_bulk_editing-editing-status-to-active-restores-several-roles"></a>
+
+#### [editing-status-to-active-restores-several-roles](/tests/scenario/bai_scenario/manager/rbac/test_partial_bulk_editing.py) — pass
+
+soft delete 된 역할 여럿의 status 를 한 번에 ACTIVE 로 고치면, restore 되어 모두 활성으로 온다
+
+Given
+
+- 한 도메인에 둔 커스텀 역할 2개와, 다른 도메인에 사는 superadmin 한 명
+  - 도메인 home-1
+  - 도메인 target-1
+  - 역할 role-1: 이 역할이 앉은 스코프 안에서만 통한다
+  - 역할 role-2: 이 역할이 앉은 스코프 안에서만 통한다
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+
+When
+
+- RBACAdapter.partial_bulk_update — user-1이 역할 2개를 한 번에 soft delete 했다가 status 를 ACTIVE 로 한 번에 고침
+
+Then
+
+- 역할이 모두 활성으로 오고, 실패한 것은 없다
+  - successes count = 2
+  - failed = []
+  - successes[0].name = 'role-1'
+  - successes[0].description = None
+  - successes[0].source = <RoleSourceDTO.CUSTOM: 'custom'>
+  - successes[0].status = <RoleStatusDTO.ACTIVE: 'active'>
+  - successes[0].auto_assign = False
+  - successes[0].scope_type = 'domain'
+  - successes[0].scope_id: 역할을 둔 도메인의 id와 같다
+  - successes[0].role_preset_id = None
+  - successes[0].id: 무시함 — 데이터베이스가 만든다
+  - successes[0].entity_id: 미리 만든 역할의 id와 같다
+  - successes[0].created_at: 이 실행이 쓴 시각
+  - successes[0].updated_at: 이 실행이 쓴 시각
+  - successes[0].deleted_at = None
+  - successes[1].name = 'role-2'
+  - successes[1].description = None
+  - successes[1].source = <RoleSourceDTO.CUSTOM: 'custom'>
+  - successes[1].status = <RoleStatusDTO.ACTIVE: 'active'>
+  - successes[1].auto_assign = False
+  - successes[1].scope_type = 'domain'
+  - successes[1].scope_id: 역할을 둔 도메인의 id와 같다
+  - successes[1].role_preset_id = None
+  - successes[1].id: 무시함 — 데이터베이스가 만든다
+  - successes[1].entity_id: 미리 만든 역할의 id와 같다
+  - successes[1].created_at: 이 실행이 쓴 시각
+  - successes[1].updated_at: 이 실행이 쓴 시각
+  - successes[1].deleted_at = None
+
 <a id="partial_bulk_editing-the-superadmin-edits-several-roles-at-once"></a>
 
 #### [the-superadmin-edits-several-roles-at-once](/tests/scenario/bai_scenario/manager/rbac/test_partial_bulk_editing.py) — pass
@@ -597,6 +654,45 @@ Then
   - 거부: NotEnoughPermission
 
 ### update
+
+<a id="editing-editing-status-to-deleted-soft-deletes-the-role"></a>
+
+#### [editing-status-to-deleted-soft-deletes-the-role](/tests/scenario/bai_scenario/manager/rbac/test_editing.py) — pass
+
+슈퍼관리자가 역할의 status 를 DELETED 로 고치면, soft delete 되어 삭제 상태로 온다
+
+Given
+
+- 한 도메인에 둔 커스텀 역할 1개와, 다른 도메인에 사는 superadmin 한 명
+  - 도메인 home-1
+  - 도메인 target-1
+  - 역할 role-1: 이 역할이 앉은 스코프 안에서만 통한다
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+
+When
+
+- RBACAdapter.update — user-1이 role-1의 status 를 DELETED 로 고침
+
+Then
+
+- 삭제 상태의 역할 전체가 온다
+  - name = 'role-1'
+  - description = None
+  - source = <RoleSourceDTO.CUSTOM: 'custom'>
+  - status = <RoleStatusDTO.DELETED: 'deleted'>
+  - auto_assign = False
+  - scope_type = 'domain'
+  - scope_id: 역할을 둔 도메인의 id와 같다
+  - role_preset_id = None
+  - id: 무시함 — 데이터베이스가 만든다
+  - entity_id: 미리 만든 역할의 id와 같다
+  - created_at: 이 실행이 쓴 시각
+  - updated_at: 이 실행이 쓴 시각
+  - deleted_at: 이 실행이 쓴 시각
 
 <a id="editing-the-superadmin-edits-a-role"></a>
 

@@ -60,6 +60,7 @@ from ai.backend.manager.services.user.actions.create_user import (
 from ai.backend.manager.services.user.actions.delete_user import (
     DeleteUserAction,
 )
+from ai.backend.manager.services.user.actions.get_user import GetUserAction
 from ai.backend.manager.services.user.actions.keypair_ops import (
     GetDefaultKeypairsAction,
     SwitchDefaultAccessKeyAction,
@@ -67,6 +68,7 @@ from ai.backend.manager.services.user.actions.keypair_ops import (
 from ai.backend.manager.services.user.actions.purge_user import (
     PurgeUserAction,
 )
+from ai.backend.manager.services.user.actions.restore_user import RestoreUserAction
 from ai.backend.manager.services.user.actions.update_user import (
     UpdateUserAction,
     UpdateUserActionResult,
@@ -984,7 +986,9 @@ class ModifyUserInput(graphene.InputObjectType):  # type: ignore[misc]
         description="Added in 25.2.0. Supplementary group IDs assigned to processes running inside the container.",
     )
 
-    def to_action(self, user_id: UserID, graph_ctx: GraphQueryContext) -> UpdateUserAction:
+    def to_action(
+        self, user_id: UserID, graph_ctx: GraphQueryContext, status: UserStatus | None
+    ) -> UpdateUserAction:
         # Create PasswordInfo if password is being changed
         password_state = OptionalState[PasswordInfo].nop()
         if self.password is not Undefined and self.password is not None:
@@ -1015,11 +1019,7 @@ class ModifyUserInput(graphene.InputObjectType):  # type: ignore[misc]
             is_active=OptionalState[bool].from_graphql(
                 self.is_active,
             ),
-            status=OptionalState[UserStatus].from_graphql(
-                self.status
-                if (self.status is Undefined or self.status is None)
-                else UserStatus(self.status),
-            ),
+            status=OptionalState.nop() if status is None else OptionalState.update(status),
             domain_name=OptionalState[str].from_graphql(
                 self.domain_name,
             ),
@@ -1147,15 +1147,34 @@ class ModifyUser(graphene.Mutation):  # type: ignore[misc]
         validate_user_mutation_props(props)
 
         user_data = await graph_ctx.user_repository.get_by_email_validated(email)
-        action: UpdateUserAction = props.to_action(UserID(user_data.id), graph_ctx)
+        user_id = UserID(user_data.id)
+        current = UserStatus(user_data.status)
+        requested = (
+            None if props.status is Undefined or props.status is None else UserStatus(props.status)
+        )
+        if requested is not None and requested.restores_from(current):
+            await graph_ctx.processors.user.restore_user.run(RestoreUserAction(user_id=user_id))
+        action: UpdateUserAction = props.to_action(
+            user_id,
+            graph_ctx,
+            requested
+            if requested is not None and requested.is_updater_value_from(current)
+            else None,
+        )
         res: UpdateUserActionResult = await graph_ctx.processors.user.update_user.run(action)
+        data = res.data
         if props.main_access_key is not Undefined and props.main_access_key is not None:
             await graph_ctx.processors.user.switch_default_access_key.run(
                 SwitchDefaultAccessKeyAction(
-                    user_id=UserID(user_data.id),
+                    user_id=user_id,
                     access_key=AccessKey(props.main_access_key),
                 )
             )
+        if requested is not None and requested.deletes_from(current):
+            await graph_ctx.processors.user.delete_user.run(DeleteUserAction(user_id=user_id))
+            data = (
+                await graph_ctx.processors.user.get_user.run(GetUserAction(user_id=user_id))
+            ).user
 
         designated = await graph_ctx.processors.user.get_default_keypairs.run(
             GetDefaultKeypairsAction(user_ids=[UserID(user_data.id)])
@@ -1164,7 +1183,7 @@ class ModifyUser(graphene.Mutation):  # type: ignore[misc]
         return cls(
             ok=True,
             msg="success",
-            user=User.from_dto(res.data, main_access_key.access_key if main_access_key else None),
+            user=User.from_dto(data, main_access_key.access_key if main_access_key else None),
         )
 
 
