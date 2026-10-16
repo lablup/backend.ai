@@ -14,13 +14,15 @@ from ai.backend.common.dto.manager.v2.app_config_allow_list.types import (
     AppConfigAllowListOrderField,
     AppConfigScopeTypeFilter,
 )
-from ai.backend.common.dto.manager.v2.common import OrderDirection
+from ai.backend.common.dto.manager.v2.common import NonEmptyList, OrderDirection
 from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 
 __all__ = (
     "AppConfigAllowListFilter",
     "AppConfigAllowListOrder",
     "CreateAppConfigAllowListInput",
+    "PartialBulkPurgeAppConfigAllowListsInput",
+    "PartialBulkUpdateAppConfigAllowListsInput",
     "PurgeAppConfigAllowListInput",
     "SearchAppConfigAllowListInput",
     "UpdateAppConfigAllowListInput",
@@ -68,6 +70,20 @@ class PurgeAppConfigAllowListInput(BaseRequestModel):
     """Input for purging an app config allow-list entry."""
 
     id: UUID = Field(description="App config allow-list entry id to purge.")
+
+
+class PartialBulkUpdateAppConfigAllowListsInput(BaseRequestModel):
+    """Input for updating several allow-list entries, each answered for separately."""
+
+    items: NonEmptyList[UpdateAppConfigAllowListInput] = Field(
+        description="The allow-list entries to update, each with its id and fields."
+    )
+
+
+class PartialBulkPurgeAppConfigAllowListsInput(BaseRequestModel):
+    """Input for purging several allow-list entries, each answered for separately."""
+
+    ids: NonEmptyList[UUID] = Field(description="IDs of the allow-list entries to purge.")
 
 
 class AppConfigAllowListFilter(BaseRequestModel):

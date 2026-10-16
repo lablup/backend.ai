@@ -53,7 +53,7 @@ class V2FairShareHandler:
         result = await self._adapter.search_domain(body.parsed)
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
 
-    async def admin_upsert_domain(
+    async def upsert_domain(
         self,
         body: BodyParam[UpsertDomainFairShareWeightInput],
     ) -> APIResponse:
@@ -61,12 +61,20 @@ class V2FairShareHandler:
         result = await self._adapter.upsert_domain(body.parsed)
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
 
+    async def atomic_bulk_upsert_domain(
+        self,
+        body: BodyParam[BulkUpsertDomainFairShareWeightInput],
+    ) -> APIResponse:
+        """Upsert several domain fair share weights in one transaction."""
+        result = await self._adapter.atomic_bulk_upsert_domain(body.parsed)
+        return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
+
     async def admin_bulk_upsert_domain(
         self,
         body: BodyParam[BulkUpsertDomainFairShareWeightInput],
     ) -> APIResponse:
-        """Bulk upsert domain fair share weights."""
-        result = await self._adapter.bulk_upsert_domain(body.parsed)
+        """Deprecated. Use `POST /v2/fair-share/domains/atomic-bulk-upsert`."""
+        result = await self._adapter.atomic_bulk_upsert_domain(body.parsed)
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
 
     # ========== Project Fair Share ==========
@@ -87,7 +95,7 @@ class V2FairShareHandler:
         result = await self._adapter.search_project(body.parsed)
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
 
-    async def admin_upsert_project(
+    async def upsert_project(
         self,
         body: BodyParam[UpsertProjectFairShareWeightInput],
     ) -> APIResponse:
@@ -95,12 +103,20 @@ class V2FairShareHandler:
         result = await self._adapter.upsert_project(body.parsed)
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
 
+    async def atomic_bulk_upsert_project(
+        self,
+        body: BodyParam[BulkUpsertProjectFairShareWeightInput],
+    ) -> APIResponse:
+        """Upsert several project fair share weights in one transaction."""
+        result = await self._adapter.atomic_bulk_upsert_project(body.parsed)
+        return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
+
     async def admin_bulk_upsert_project(
         self,
         body: BodyParam[BulkUpsertProjectFairShareWeightInput],
     ) -> APIResponse:
-        """Bulk upsert project fair share weights."""
-        result = await self._adapter.bulk_upsert_project(body.parsed)
+        """Deprecated. Use `POST /v2/fair-share/projects/atomic-bulk-upsert`."""
+        result = await self._adapter.atomic_bulk_upsert_project(body.parsed)
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
 
     # ========== User Fair Share ==========
@@ -121,7 +137,7 @@ class V2FairShareHandler:
         result = await self._adapter.search_user(body.parsed)
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
 
-    async def admin_upsert_user(
+    async def upsert_user(
         self,
         body: BodyParam[UpsertUserFairShareWeightInput],
     ) -> APIResponse:
@@ -129,10 +145,18 @@ class V2FairShareHandler:
         result = await self._adapter.upsert_user(body.parsed)
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
 
+    async def atomic_bulk_upsert_user(
+        self,
+        body: BodyParam[BulkUpsertUserFairShareWeightInput],
+    ) -> APIResponse:
+        """Upsert several user fair share weights in one transaction."""
+        result = await self._adapter.atomic_bulk_upsert_user(body.parsed)
+        return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
+
     async def admin_bulk_upsert_user(
         self,
         body: BodyParam[BulkUpsertUserFairShareWeightInput],
     ) -> APIResponse:
-        """Bulk upsert user fair share weights."""
-        result = await self._adapter.bulk_upsert_user(body.parsed)
+        """Deprecated. Use `POST /v2/fair-share/users/atomic-bulk-upsert`."""
+        result = await self._adapter.atomic_bulk_upsert_user(body.parsed)
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)

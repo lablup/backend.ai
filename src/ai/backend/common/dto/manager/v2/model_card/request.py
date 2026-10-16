@@ -15,7 +15,7 @@ from ai.backend.common.dto.manager.query import (
     ToManyFilter,
     UUIDFilter,
 )
-from ai.backend.common.dto.manager.v2.common import OrderDirection
+from ai.backend.common.dto.manager.v2.common import NonEmptyList, OrderDirection
 from ai.backend.common.dto.manager.v2.deployment.request import DeploymentStrategyInput
 from ai.backend.common.dto.manager.v2.model_card.types import (
     ModelCardAccessLevel,
@@ -241,6 +241,24 @@ class BulkDeleteModelCardsInput(BaseRequestModel):
     options: DeleteModelCardOptions | None = Field(
         default=None,
         description="Options for the delete operation.",
+    )
+
+
+class PartialBulkUpdateModelCardsInput(BaseRequestModel):
+    """Input for updating several model cards, each answered for separately."""
+
+    items: NonEmptyList[UpdateModelCardInput] = Field(
+        description="The model cards to update, each with its ID and fields."
+    )
+
+
+class PartialBulkPurgeModelCardsInput(BaseRequestModel):
+    """Input for purging several model cards, each answered for separately."""
+
+    ids: NonEmptyList[UUID] = Field(description="IDs of the model cards to purge.")
+    options: DeleteModelCardOptions | None = Field(
+        default=None,
+        description="Options for the purge.",
     )
 
 

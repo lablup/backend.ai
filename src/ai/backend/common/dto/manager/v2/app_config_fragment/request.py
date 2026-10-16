@@ -15,7 +15,7 @@ from ai.backend.common.dto.manager.v2.app_config_fragment.types import (
     AppConfigFragmentOrderField,
     AppConfigScopeTypeFilter,
 )
-from ai.backend.common.dto.manager.v2.common import OrderDirection
+from ai.backend.common.dto.manager.v2.common import NonEmptyList, OrderDirection
 from ai.backend.common.dto.manager.v2.rbac.types import UUIDScope
 from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 
@@ -29,6 +29,7 @@ __all__ = (
     "BulkPurgeAppConfigFragmentInput",
     "MyAppConfigFragmentsByNamesInput",
     "MyUpsertAppConfigFragmentsInput",
+    "PartialBulkPurgeAppConfigFragmentsInput",
     "ScopedAppConfigFragmentsByNamesInput",
     "ScopedSearchAppConfigFragmentInput",
     "ScopedUpsertAppConfigFragmentsInput",
@@ -112,6 +113,12 @@ class BulkPurgeAppConfigFragmentInput(BaseRequestModel):
     """Input for purging many fragments (per-item partial success)."""
 
     ids: list[AppConfigFragmentID] = Field(min_length=1, description="Fragment ids to purge.")
+
+
+class PartialBulkPurgeAppConfigFragmentsInput(BaseRequestModel):
+    """Input for purging several fragments, each answered for separately."""
+
+    ids: NonEmptyList[AppConfigFragmentID] = Field(description="IDs of the fragments to purge.")
 
 
 class AppConfigFragmentFilter(BaseRequestModel):

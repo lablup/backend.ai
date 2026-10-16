@@ -32,6 +32,7 @@ from ai.backend.manager.data.deployment.types import (
     ExecutionSpec,
     LegacyDeploymentData,
     ModelDeploymentAccessTokenData,
+    ModelDeploymentAutoScalingRuleData,
     ModelDeploymentData,
     ModelDeploymentMetadataInfo,
     ModelRevisionData,
@@ -41,7 +42,11 @@ from ai.backend.manager.data.deployment.types import (
     RevisionRefreshResult,
 )
 from ai.backend.manager.errors.api import InvalidAPIParameters
-from ai.backend.manager.errors.service import EndpointTokenNotFound, RoutingNotFound
+from ai.backend.manager.errors.service import (
+    AutoScalingRuleNotFound,
+    EndpointTokenNotFound,
+    RoutingNotFound,
+)
 from ai.backend.manager.errors.user import UserNotFound
 from ai.backend.manager.models.endpoint.creators import EndpointTokenCreator
 from ai.backend.manager.models.endpoint.searchable_fields import DeploymentSearchableFields
@@ -79,6 +84,12 @@ from ai.backend.manager.services.deployment.actions.auto_scaling_rule.delete_aut
 from ai.backend.manager.services.deployment.actions.auto_scaling_rule.get_auto_scaling_rule import (
     GetAutoScalingRuleAction,
     GetAutoScalingRuleActionResult,
+)
+from ai.backend.manager.services.deployment.actions.auto_scaling_rule.partial_bulk_purge_auto_scaling_rules import (
+    PartialBulkPurgeAutoScalingRulesAction,
+)
+from ai.backend.manager.services.deployment.actions.auto_scaling_rule.partial_bulk_update_auto_scaling_rules import (
+    PartialBulkUpdateAutoScalingRulesAction,
 )
 from ai.backend.manager.services.deployment.actions.auto_scaling_rule.update_auto_scaling_rule import (
     UpdateAutoScalingRuleAction,
@@ -761,6 +772,45 @@ class DeploymentService:
                 for deployment_id, rule_ids in by_deployment.items()
             ]
         )
+
+    async def partial_bulk_update_auto_scaling_rules(
+        self, action: PartialBulkUpdateAutoScalingRulesAction
+    ) -> BulkFieldOpsResult[ModelDeploymentAutoScalingRuleData]:
+        """Update each named rule in its own transaction, answering for every one."""
+        successes: dict[FieldIdentifier, ModelDeploymentAutoScalingRuleData] = {}
+        errors: dict[FieldIdentifier, Exception] = {}
+        for rule_id, modifier in action.modifiers.items():
+            try:
+                successes[
+                    rule_id
+                ] = await self._deployment_repository.update_model_deployment_autoscaling_rule(
+                    rule_id, modifier
+                )
+            except BackendAIError as e:
+                errors[rule_id] = e
+        return BulkFieldOpsResult(successes=successes, errors=errors)
+
+    async def partial_bulk_purge_auto_scaling_rules(
+        self, action: PartialBulkPurgeAutoScalingRulesAction
+    ) -> BulkFieldOpsResult[ModelDeploymentAutoScalingRuleData]:
+        """Delete the named rules, answering for every one with the rule as it stood."""
+        found: dict[FieldIdentifier, ModelDeploymentAutoScalingRuleData] = {}
+        errors: dict[FieldIdentifier, Exception] = {}
+        for rule_id in action.rule_ids:
+            try:
+                found[
+                    rule_id
+                ] = await self._deployment_repository.get_model_deployment_autoscaling_rule(rule_id)
+            except BackendAIError as e:
+                errors[rule_id] = e
+        deleted = set(await self._deployment_repository.bulk_delete_autoscaling_rules(list(found)))
+        successes: dict[FieldIdentifier, ModelDeploymentAutoScalingRuleData] = {}
+        for found_id, data in found.items():
+            if found_id in deleted:
+                successes[found_id] = data
+            else:
+                errors[found_id] = AutoScalingRuleNotFound(f"Autoscaling rule {found_id} not found")
+        return BulkFieldOpsResult(successes=successes, errors=errors)
 
     # ========== Access Token ==========
 

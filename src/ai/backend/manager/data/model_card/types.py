@@ -72,7 +72,7 @@ class BulkModelCardDeleteFailure:
 class BulkModelCardDeleteResultData:
     """Result of bulk model card delete operation, with partial-failure support."""
 
-    successes: list[UUID]
+    successes: list[ModelCardData]
     failures: list[BulkModelCardDeleteFailure]
 
 

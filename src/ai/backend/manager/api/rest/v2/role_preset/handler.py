@@ -17,6 +17,10 @@ from ai.backend.common.dto.manager.v2.role_preset.request import (
     BulkPurgeRolePresetsInput,
     BulkRestoreRolePresetsInput,
     CreateRolePresetInput,
+    PartialBulkDeleteRolePresetsInput,
+    PartialBulkPurgeRolePresetsInput,
+    PartialBulkRestoreRolePresetsInput,
+    PartialBulkUpdateRolePresetsInput,
     SearchRolePresetsInput,
     UpdateRolePresetBody,
 )
@@ -68,18 +72,71 @@ class V2RolePresetHandler:
         path: PathParam[RolePresetIdPathParam],
         body: BodyParam[UpdateRolePresetBody],
     ) -> APIResponse:
-        """Update a role preset's metadata. The ``deleted`` flag cannot be mutated here.
+        """Update a role preset's metadata. The ``deleted`` flag cannot be mutated here."""
+        result = await self._adapter.update(path.parsed.role_preset_id, body.parsed)
+        return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
 
-        The preset ID comes from the URL path; the adapter merges it with the body.
-        """
-        result = await self._adapter.update_from_body(path.parsed.role_preset_id, body.parsed)
+    async def delete(
+        self,
+        path: PathParam[RolePresetIdPathParam],
+    ) -> APIResponse:
+        """Soft-delete a role preset."""
+        result = await self._adapter.delete(path.parsed.role_preset_id)
+        return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
+
+    async def restore(
+        self,
+        path: PathParam[RolePresetIdPathParam],
+    ) -> APIResponse:
+        """Restore a soft-deleted role preset."""
+        result = await self._adapter.restore(path.parsed.role_preset_id)
+        return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
+
+    async def purge(
+        self,
+        path: PathParam[RolePresetIdPathParam],
+    ) -> APIResponse:
+        """Purge a role preset, cascading to its permission entries."""
+        result = await self._adapter.purge(path.parsed.role_preset_id)
+        return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
+
+    async def partial_bulk_update(
+        self,
+        body: BodyParam[PartialBulkUpdateRolePresetsInput],
+    ) -> APIResponse:
+        """Update several role presets, answering for each one."""
+        result = await self._adapter.partial_bulk_update(body.parsed)
+        return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
+
+    async def partial_bulk_delete(
+        self,
+        body: BodyParam[PartialBulkDeleteRolePresetsInput],
+    ) -> APIResponse:
+        """Soft-delete several role presets, answering for each one."""
+        result = await self._adapter.partial_bulk_delete(body.parsed)
+        return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
+
+    async def partial_bulk_restore(
+        self,
+        body: BodyParam[PartialBulkRestoreRolePresetsInput],
+    ) -> APIResponse:
+        """Restore several soft-deleted role presets, answering for each one."""
+        result = await self._adapter.partial_bulk_restore(body.parsed)
+        return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
+
+    async def partial_bulk_purge(
+        self,
+        body: BodyParam[PartialBulkPurgeRolePresetsInput],
+    ) -> APIResponse:
+        """Purge several role presets, answering for each one."""
+        result = await self._adapter.partial_bulk_purge(body.parsed)
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
 
     async def bulk_delete(
         self,
         body: BodyParam[BulkDeleteRolePresetsInput],
     ) -> APIResponse:
-        """Soft-delete role presets (sets ``deleted = true``)."""
+        """Deprecated. Use `POST /v2/role-presets/partial-bulk-delete`."""
         result = await self._adapter.bulk_delete(body.parsed)
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
 
@@ -87,7 +144,7 @@ class V2RolePresetHandler:
         self,
         body: BodyParam[BulkRestoreRolePresetsInput],
     ) -> APIResponse:
-        """Restore soft-deleted role presets (sets ``deleted = false``)."""
+        """Deprecated. Use `POST /v2/role-presets/partial-bulk-restore`."""
         result = await self._adapter.bulk_restore(body.parsed)
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
 
@@ -95,7 +152,7 @@ class V2RolePresetHandler:
         self,
         body: BodyParam[BulkPurgeRolePresetsInput],
     ) -> APIResponse:
-        """Hard-delete role presets, cascading to their permission entries."""
+        """Deprecated. Use `POST /v2/role-presets/partial-bulk-purge`."""
         result = await self._adapter.bulk_purge(body.parsed)
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
 

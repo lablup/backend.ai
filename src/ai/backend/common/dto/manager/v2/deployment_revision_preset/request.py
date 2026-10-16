@@ -17,6 +17,7 @@ from ai.backend.common.data.entity.runtime_variant import RuntimeVariantID
 from ai.backend.common.dto.manager.query import StringFilter, UUIDFilter
 from ai.backend.common.dto.manager.v2.common import (
     EnvironmentVariableEntryInput,
+    NonEmptyList,
     OrderDirection,
     ResourceSlotEntryInput,
 )
@@ -280,6 +281,20 @@ class UpdateDeploymentRevisionPresetInput(BaseRequestModel):
     replica_count: int | None | Unset = Field(default=UNSET, ge=0)
     revision_history_limit: int | None | Unset = Field(default=UNSET, ge=0)
     deployment_strategy: DeploymentStrategyInput | None | Unset = Field(default=UNSET)
+
+
+class PartialBulkUpdateDeploymentRevisionPresetsInput(BaseRequestModel):
+    """Input for updating several presets, each answered for separately."""
+
+    items: NonEmptyList[UpdateDeploymentRevisionPresetInput] = Field(
+        description="The presets to update, each naming its preset by `id`."
+    )
+
+
+class PartialBulkPurgeDeploymentRevisionPresetsInput(BaseRequestModel):
+    """Input for permanently removing several presets, each answered for separately."""
+
+    ids: NonEmptyList[UUID] = Field(description="IDs of the presets to purge.")
 
 
 class DeploymentRevisionPresetFilter(BaseRequestModel):

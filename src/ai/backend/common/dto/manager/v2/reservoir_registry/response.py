@@ -12,6 +12,7 @@ __all__ = (
     "AdminSearchReservoirRegistriesPayload",
     "CreateReservoirRegistryPayload",
     "DeleteReservoirRegistryPayload",
+    "PurgeReservoirRegistryPayload",
     "ReservoirRegistryNode",
     "UpdateReservoirRegistryPayload",
 )
@@ -47,6 +48,12 @@ class DeleteReservoirRegistryPayload(BaseResponseModel):
     """Payload for Reservoir registry deletion mutation result."""
 
     id: UUID = Field(description="ID of the deleted Reservoir registry")
+
+
+class PurgeReservoirRegistryPayload(BaseResponseModel):
+    """Payload for Reservoir registry purge result."""
+
+    id: UUID = Field(description="ID of the purged Reservoir registry")
 
 
 class AdminSearchReservoirRegistriesPayload(BaseResponseModel):

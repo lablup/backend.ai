@@ -6,6 +6,8 @@ import uuid
 import jinja2
 import jinja2.sandbox
 
+from ai.backend.common.data.entity.types import EntityIdentifier
+from ai.backend.manager.actions.v2.bulk.result import PartialBulkEntityResult, PartialBulkResult
 from ai.backend.manager.actions.v2.ops.result import (
     BulkFieldOpsResult,
     CreatedEntityWithFieldsOpsResult,
@@ -18,15 +20,19 @@ from ai.backend.manager.data.role_preset.types import (
     RolePresetData,
 )
 from ai.backend.manager.errors.role_preset import InvalidRoleNameTemplate
+from ai.backend.manager.models.rbac_models.role_preset.updaters import RolePresetUpdater
 from ai.backend.manager.repositories.ops.repository import OpsRepository
 from ai.backend.manager.repositories.role_preset.repository import RolePresetRepository
-from ai.backend.manager.services.role_preset.actions.bulk_add_permissions import (
-    BulkAddRolePermissionPresetsAction,
-)
-from ai.backend.manager.services.role_preset.actions.bulk_remove_permissions import (
-    BulkRemoveRolePermissionPresetsAction,
+from ai.backend.manager.services.role_preset.actions.atomic_bulk_add_permissions import (
+    AtomicBulkAddRolePresetPermissionsAction,
 )
 from ai.backend.manager.services.role_preset.actions.create import CreateRolePresetAction
+from ai.backend.manager.services.role_preset.actions.partial_bulk_remove_permissions import (
+    PartialBulkRemoveRolePresetPermissionsAction,
+)
+from ai.backend.manager.services.role_preset.actions.partial_bulk_update import (
+    PartialBulkUpdateRolePresetsAction,
+)
 from ai.backend.manager.services.role_preset.actions.update import UpdateRolePresetAction
 
 __all__ = ("RolePresetService",)
@@ -36,8 +42,8 @@ class RolePresetService:
     """The writes that settle a preset's ``role_name_template`` and the ones that
     carry over to the roles instantiated from the preset.
 
-    Create validates the template. Update, add and remove permissions go through
-    :class:`RolePresetRepository`, which re-derives the preset's roles in the same
+    Create validates the template. Update, partial bulk update, add and remove
+    permissions go through :class:`RolePresetRepository`, which re-derives the preset's roles in the same
     transaction. Every other operation of this domain runs straight against ops.
     """
 
@@ -69,8 +75,37 @@ class RolePresetService:
             self._reject_unrenderable(template.value())
         return EntityOpsResult(data=await self._preset_repository.update(action.to_updater()))
 
-    async def bulk_add_permissions(
-        self, action: BulkAddRolePermissionPresetsAction
+    async def partial_bulk_update(
+        self, action: PartialBulkUpdateRolePresetsAction
+    ) -> PartialBulkResult[RolePresetData]:
+        errors: dict[EntityIdentifier, Exception] = {}
+        renderable: list[RolePresetUpdater] = []
+        for updater in action.updaters:
+            template = updater.role_name_template
+            try:
+                if template.is_update():
+                    self._reject_unrenderable(template.value())
+            except InvalidRoleNameTemplate as e:
+                errors[updater.preset_id] = e
+                continue
+            renderable.append(updater)
+        result = await self._preset_repository.partial_bulk_update(renderable)
+        errors.update(result.errors)
+        return PartialBulkResult(
+            items=[
+                PartialBulkEntityResult[RolePresetData].succeeded(
+                    updater.preset_id, result.successes[updater.preset_id]
+                )
+                if updater.preset_id in result.successes
+                else PartialBulkEntityResult[RolePresetData].failed(
+                    updater.preset_id, errors[updater.preset_id]
+                )
+                for updater in action.updaters
+            ]
+        )
+
+    async def atomic_bulk_add_permissions(
+        self, action: AtomicBulkAddRolePresetPermissionsAction
     ) -> FieldsOpsResult[RolePermissionPresetData]:
         return FieldsOpsResult(
             items=await self._preset_repository.add_permissions(
@@ -78,8 +113,8 @@ class RolePresetService:
             )
         )
 
-    async def bulk_remove_permissions(
-        self, action: BulkRemoveRolePermissionPresetsAction
+    async def partial_bulk_remove_permissions(
+        self, action: PartialBulkRemoveRolePresetPermissionsAction
     ) -> BulkFieldOpsResult[RolePermissionPresetData]:
         return await self._preset_repository.remove_permissions(action.to_purgers())
 

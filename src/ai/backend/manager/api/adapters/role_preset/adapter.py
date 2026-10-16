@@ -11,16 +11,22 @@ from collections.abc import Sequence
 from ai.backend.common.data.entity.role import RoleID
 from ai.backend.common.data.entity.role_permission_preset import RolePermissionPresetID
 from ai.backend.common.data.entity.role_preset import RolePresetID
-from ai.backend.common.dto.manager.v2.common import OrderDirection
+from ai.backend.common.dto.manager.v2.common import (
+    OrderDirection,
+    PartialBulkFailure,
+    PartialBulkPayload,
+)
 from ai.backend.common.dto.manager.v2.rbac.types import PermissionBitDTO, PermissionBitFilter
 from ai.backend.common.dto.manager.v2.role_permission_preset.request import (
     BulkAddRolePermissionPresetsInput,
     BulkRemoveRolePermissionPresetsInput,
+    PartialBulkRemoveRolePresetPermissionsInput,
     RolePermissionPresetFilter,
     RolePermissionPresetOrder,
     SearchRolePermissionPresetsInput,
 )
 from ai.backend.common.dto.manager.v2.role_permission_preset.response import (
+    AtomicBulkAddRolePresetPermissionsPayload,
     BulkAddRolePermissionPresetsPayload,
     BulkRemoveRolePermissionPresetsPayload,
     BulkRolePermissionPresetFailureInfo,
@@ -35,11 +41,14 @@ from ai.backend.common.dto.manager.v2.role_preset.request import (
     BulkPurgeRolePresetsInput,
     BulkRestoreRolePresetsInput,
     CreateRolePresetInput,
+    PartialBulkDeleteRolePresetsInput,
+    PartialBulkPurgeRolePresetsInput,
+    PartialBulkRestoreRolePresetsInput,
+    PartialBulkUpdateRolePresetsInput,
     RolePresetFilter,
     RolePresetOrder,
     SearchRolePresetsInput,
     UpdateRolePresetBody,
-    UpdateRolePresetInput,
 )
 from ai.backend.common.dto.manager.v2.role_preset.response import (
     BulkDeleteRolePresetsPayload,
@@ -47,11 +56,15 @@ from ai.backend.common.dto.manager.v2.role_preset.response import (
     BulkRestoreRolePresetsPayload,
     BulkRolePresetFailureInfo,
     CreateRolePresetPayload,
+    DeleteRolePresetPayload,
+    PurgeRolePresetPayload,
+    RestoreRolePresetPayload,
     RolePresetNode,
     SearchRolePresetsPayload,
     UpdateRolePresetPayload,
 )
 from ai.backend.common.dto.manager.v2.role_preset.types import RolePresetOrderField, RolePresetUsage
+from ai.backend.manager.actions.v2.bulk.result import PartialBulkResult
 from ai.backend.manager.api.adapter_options.pagination.pagination import PaginationSpec
 from ai.backend.manager.api.adapters.base import BaseAdapter
 from ai.backend.manager.data.role_preset.types import (
@@ -82,26 +95,40 @@ from ai.backend.manager.models.rbac_models.role_preset.searchers import (
     RolePermissionPresetSearcher,
     RolePresetSearcher,
 )
-from ai.backend.manager.models.rbac_models.role_preset.updaters import RolePresetUpdater
+from ai.backend.manager.models.rbac_models.role_preset.updaters import (
+    RolePresetRestoreUpdater,
+    RolePresetSoftDeleteUpdater,
+    RolePresetUpdater,
+)
 from ai.backend.manager.models.specs.search.usage import UsedBy
 from ai.backend.manager.models.specs.searcher import GlobalSearcher
-from ai.backend.manager.services.role_preset.actions.bulk_add_permissions import (
-    BulkAddRolePermissionPresetsAction,
+from ai.backend.manager.services.role_preset.actions.atomic_bulk_add_permissions import (
+    AtomicBulkAddRolePresetPermissionsAction,
 )
 from ai.backend.manager.services.role_preset.actions.bulk_get import BulkGetRolePresetsAction
 from ai.backend.manager.services.role_preset.actions.bulk_get_permissions import (
     BulkGetRolePermissionPresetsAction,
 )
-from ai.backend.manager.services.role_preset.actions.bulk_purge import (
-    BulkPurgeRolePresetsAction,
-)
-from ai.backend.manager.services.role_preset.actions.bulk_remove_permissions import (
-    BulkRemoveRolePermissionPresetsAction,
-)
 from ai.backend.manager.services.role_preset.actions.create import CreateRolePresetAction
-from ai.backend.manager.services.role_preset.actions.delete import BulkDeleteRolePresetsAction
+from ai.backend.manager.services.role_preset.actions.delete import DeleteRolePresetAction
 from ai.backend.manager.services.role_preset.actions.get import GetRolePresetAction
-from ai.backend.manager.services.role_preset.actions.restore import BulkRestoreRolePresetsAction
+from ai.backend.manager.services.role_preset.actions.partial_bulk_delete import (
+    PartialBulkDeleteRolePresetsAction,
+)
+from ai.backend.manager.services.role_preset.actions.partial_bulk_purge import (
+    PartialBulkPurgeRolePresetsAction,
+)
+from ai.backend.manager.services.role_preset.actions.partial_bulk_remove_permissions import (
+    PartialBulkRemoveRolePresetPermissionsAction,
+)
+from ai.backend.manager.services.role_preset.actions.partial_bulk_restore import (
+    PartialBulkRestoreRolePresetsAction,
+)
+from ai.backend.manager.services.role_preset.actions.partial_bulk_update import (
+    PartialBulkUpdateRolePresetsAction,
+)
+from ai.backend.manager.services.role_preset.actions.purge import PurgeRolePresetAction
+from ai.backend.manager.services.role_preset.actions.restore import RestoreRolePresetAction
 from ai.backend.manager.services.role_preset.actions.search import SearchRolePresetsAction
 from ai.backend.manager.services.role_preset.actions.search_permission_presets import (
     SearchRolePermissionPresetsAction,
@@ -231,92 +258,110 @@ class RolePresetAdapter(BaseAdapter):
             has_previous_page=result.has_previous_page,
         )
 
-    async def update(self, input: UpdateRolePresetInput) -> UpdateRolePresetPayload:
+    async def update(
+        self, role_preset_id: RolePresetID, input: UpdateRolePresetBody
+    ) -> UpdateRolePresetPayload:
         """Update an existing role preset's metadata."""
-        updater = RolePresetUpdater(
-            preset_id=input.role_preset_id,
-            name=(
-                OptionalState.update(input.name) if input.name is not None else OptionalState.nop()
-            ),
-            auto_assign=(
-                OptionalState.update(input.auto_assign)
-                if input.auto_assign is not None
-                else OptionalState.nop()
-            ),
+        result = await self._role_preset.update.run(
+            UpdateRolePresetAction(updater=self._to_updater(role_preset_id, input))
         )
-        result = await self._role_preset.update.run(UpdateRolePresetAction(updater=updater))
         return UpdateRolePresetPayload(role_preset=self._data_to_node(result.data))
 
-    async def update_from_body(
-        self, role_preset_id: RolePresetID, body: UpdateRolePresetBody
-    ) -> UpdateRolePresetPayload:
-        """Update a role preset whose ID is carried separately from the body.
+    async def delete(self, role_preset_id: RolePresetID) -> DeleteRolePresetPayload:
+        """Soft-delete a role preset."""
+        result = await self._role_preset.delete.run(
+            DeleteRolePresetAction(updater=RolePresetSoftDeleteUpdater(preset_id=role_preset_id))
+        )
+        return DeleteRolePresetPayload(role_preset=self._data_to_node(result.data))
 
-        Used by the REST handler, where the preset ID comes from the URL path
-        while the body only carries the mutable metadata.
-        """
-        return await self.update(
-            UpdateRolePresetInput(
-                role_preset_id=role_preset_id,
-                name=body.name,
-                auto_assign=body.auto_assign,
+    async def restore(self, role_preset_id: RolePresetID) -> RestoreRolePresetPayload:
+        """Restore a soft-deleted role preset."""
+        result = await self._role_preset.restore.run(
+            RestoreRolePresetAction(updater=RolePresetRestoreUpdater(preset_id=role_preset_id))
+        )
+        return RestoreRolePresetPayload(role_preset=self._data_to_node(result.data))
+
+    async def purge(self, role_preset_id: RolePresetID) -> PurgeRolePresetPayload:
+        """Purge a role preset together with its permission entries."""
+        result = await self._role_preset.purge.run(PurgeRolePresetAction(preset_id=role_preset_id))
+        return PurgeRolePresetPayload(role_preset=self._data_to_node(result.data))
+
+    async def partial_bulk_update(
+        self, input: PartialBulkUpdateRolePresetsInput
+    ) -> PartialBulkPayload[RolePresetNode]:
+        """Update several role presets, answering for each one."""
+        result = await self._role_preset.partial_bulk_update.run(
+            PartialBulkUpdateRolePresetsAction(
+                updaters=[
+                    self._to_updater(RolePresetID(item.id), item.input) for item in input.items
+                ]
             )
         )
+        return self._to_partial_bulk_payload(result)
+
+    async def partial_bulk_delete(
+        self, input: PartialBulkDeleteRolePresetsInput
+    ) -> PartialBulkPayload[RolePresetNode]:
+        """Soft-delete several role presets, answering for each one."""
+        result = await self._role_preset.partial_bulk_delete.run(
+            PartialBulkDeleteRolePresetsAction(
+                ids=[RolePresetID(preset_id) for preset_id in input.ids]
+            )
+        )
+        return self._to_partial_bulk_payload(result)
+
+    async def partial_bulk_restore(
+        self, input: PartialBulkRestoreRolePresetsInput
+    ) -> PartialBulkPayload[RolePresetNode]:
+        """Restore several soft-deleted role presets, answering for each one."""
+        result = await self._role_preset.partial_bulk_restore.run(
+            PartialBulkRestoreRolePresetsAction(
+                ids=[RolePresetID(preset_id) for preset_id in input.ids]
+            )
+        )
+        return self._to_partial_bulk_payload(result)
+
+    async def partial_bulk_purge(
+        self, input: PartialBulkPurgeRolePresetsInput
+    ) -> PartialBulkPayload[RolePresetNode]:
+        """Purge several role presets, answering for each one."""
+        result = await self._role_preset.partial_bulk_purge.run(
+            PartialBulkPurgeRolePresetsAction(
+                ids=[RolePresetID(preset_id) for preset_id in input.ids]
+            )
+        )
+        return self._to_partial_bulk_payload(result)
 
     async def bulk_delete(self, input: BulkDeleteRolePresetsInput) -> BulkDeleteRolePresetsPayload:
-        """Bulk-soft-delete role presets."""
-        result = await self._role_preset.bulk_delete.run(
-            BulkDeleteRolePresetsAction(ids=input.role_preset_ids)
+        """Same as :meth:`partial_bulk_delete`, in the payload shape of the old bulk API."""
+        result = await self._role_preset.partial_bulk_delete.run(
+            PartialBulkDeleteRolePresetsAction(ids=input.role_preset_ids)
         )
+        payload = self._to_partial_bulk_payload(result)
         return BulkDeleteRolePresetsPayload(
-            items=[
-                self._data_to_node(item.value) for item in result.items if item.value is not None
-            ],
-            failed=[
-                BulkRolePresetFailureInfo(
-                    role_preset_id=RolePresetID(item.entity_id), message=str(item.error)
-                )
-                for item in result.items
-                if item.error is not None
-            ],
+            items=payload.successes, failed=self._to_bulk_failures(payload)
         )
 
     async def bulk_restore(
         self, input: BulkRestoreRolePresetsInput
     ) -> BulkRestoreRolePresetsPayload:
-        """Bulk-restore soft-deleted role presets."""
-        result = await self._role_preset.bulk_restore.run(
-            BulkRestoreRolePresetsAction(ids=input.role_preset_ids)
+        """Same as :meth:`partial_bulk_restore`, in the payload shape of the old bulk API."""
+        result = await self._role_preset.partial_bulk_restore.run(
+            PartialBulkRestoreRolePresetsAction(ids=input.role_preset_ids)
         )
+        payload = self._to_partial_bulk_payload(result)
         return BulkRestoreRolePresetsPayload(
-            items=[
-                self._data_to_node(item.value) for item in result.items if item.value is not None
-            ],
-            failed=[
-                BulkRolePresetFailureInfo(
-                    role_preset_id=RolePresetID(item.entity_id), message=str(item.error)
-                )
-                for item in result.items
-                if item.error is not None
-            ],
+            items=payload.successes, failed=self._to_bulk_failures(payload)
         )
 
     async def bulk_purge(self, input: BulkPurgeRolePresetsInput) -> BulkPurgeRolePresetsPayload:
-        """Bulk-hard-delete role presets."""
-        result = await self._role_preset.bulk_purge.run(
-            BulkPurgeRolePresetsAction(ids=input.role_preset_ids)
+        """Same as :meth:`partial_bulk_purge`, in the payload shape of the old bulk API."""
+        result = await self._role_preset.partial_bulk_purge.run(
+            PartialBulkPurgeRolePresetsAction(ids=input.role_preset_ids)
         )
+        payload = self._to_partial_bulk_payload(result)
         return BulkPurgeRolePresetsPayload(
-            items=[
-                self._data_to_node(item.value) for item in result.items if item.value is not None
-            ],
-            failed=[
-                BulkRolePresetFailureInfo(
-                    role_preset_id=RolePresetID(item.entity_id), message=str(item.error)
-                )
-                for item in result.items
-                if item.error is not None
-            ],
+            items=payload.successes, failed=self._to_bulk_failures(payload)
         )
 
     async def search_permission_presets(
@@ -353,12 +398,12 @@ class RolePresetAdapter(BaseAdapter):
             has_previous_page=result.has_previous_page,
         )
 
-    async def bulk_add_permissions(
+    async def atomic_bulk_add_permissions(
         self,
         role_preset_id: RolePresetID,
         input: BulkAddRolePermissionPresetsInput,
-    ) -> BulkAddRolePermissionPresetsPayload:
-        """Bulk-add permission entries to an existing role preset."""
+    ) -> AtomicBulkAddRolePresetPermissionsPayload:
+        """Add permission entries to an existing role preset, all or none."""
         creators = [
             RolePermissionPresetCreator(
                 entity_type=entry.entity_type,
@@ -366,21 +411,45 @@ class RolePresetAdapter(BaseAdapter):
             )
             for entry in input.permissions
         ]
-        result = await self._role_preset.bulk_add_permissions.run(
-            BulkAddRolePermissionPresetsAction(preset_id=role_preset_id, creators=creators)
+        result = await self._role_preset.atomic_bulk_add_permissions.run(
+            AtomicBulkAddRolePresetPermissionsAction(preset_id=role_preset_id, creators=creators)
         )
-        # The write is atomic: every entry landed, or the run raised and nothing did.
-        return BulkAddRolePermissionPresetsPayload(
-            items=[self._permission_data_to_node(d) for d in result.items],
-            failed=[],
+        return AtomicBulkAddRolePresetPermissionsPayload(
+            items=[self._permission_data_to_node(d) for d in result.items]
+        )
+
+    async def bulk_add_permissions(
+        self,
+        role_preset_id: RolePresetID,
+        input: BulkAddRolePermissionPresetsInput,
+    ) -> BulkAddRolePermissionPresetsPayload:
+        """Same as :meth:`atomic_bulk_add_permissions`, in the payload shape of the old bulk API."""
+        payload = await self.atomic_bulk_add_permissions(role_preset_id, input)
+        return BulkAddRolePermissionPresetsPayload(items=payload.items, failed=[])
+
+    async def partial_bulk_remove_permissions(
+        self, input: PartialBulkRemoveRolePresetPermissionsInput
+    ) -> PartialBulkPayload[RolePermissionPresetNode]:
+        """Remove several permission entries, answering for each one."""
+        result = await self._role_preset.partial_bulk_remove_permissions.run(
+            PartialBulkRemoveRolePresetPermissionsAction(
+                ids=[RolePermissionPresetID(entry_id) for entry_id in input.ids]
+            )
+        )
+        return PartialBulkPayload[RolePermissionPresetNode](
+            successes=[self._permission_data_to_node(d) for d in result.successes.values()],
+            failed=[
+                PartialBulkFailure(id=permission_id, message=str(exception))
+                for permission_id, exception in result.errors.items()
+            ],
         )
 
     async def bulk_remove_permissions(
         self, input: BulkRemoveRolePermissionPresetsInput
     ) -> BulkRemoveRolePermissionPresetsPayload:
-        """Bulk-remove permission entries from a role preset."""
-        result = await self._role_preset.bulk_remove_permissions.run(
-            BulkRemoveRolePermissionPresetsAction(ids=input.permission_preset_ids)
+        """Same as :meth:`partial_bulk_remove_permissions`, in the payload shape of the old bulk API."""
+        result = await self._role_preset.partial_bulk_remove_permissions.run(
+            PartialBulkRemoveRolePresetPermissionsAction(ids=input.permission_preset_ids)
         )
         return BulkRemoveRolePermissionPresetsPayload(
             items=[self._permission_data_to_node(d) for d in result.successes.values()],
@@ -392,6 +461,45 @@ class RolePresetAdapter(BaseAdapter):
                 for permission_id, exception in result.errors.items()
             ],
         )
+
+    def _to_updater(
+        self, role_preset_id: RolePresetID, input: UpdateRolePresetBody
+    ) -> RolePresetUpdater:
+        return RolePresetUpdater(
+            preset_id=role_preset_id,
+            name=(
+                OptionalState.update(input.name) if input.name is not None else OptionalState.nop()
+            ),
+            auto_assign=(
+                OptionalState.update(input.auto_assign)
+                if input.auto_assign is not None
+                else OptionalState.nop()
+            ),
+        )
+
+    def _to_partial_bulk_payload(
+        self, result: PartialBulkResult[RolePresetData]
+    ) -> PartialBulkPayload[RolePresetNode]:
+        return PartialBulkPayload[RolePresetNode](
+            successes=[
+                self._data_to_node(item.value) for item in result.items if item.value is not None
+            ],
+            failed=[
+                PartialBulkFailure(id=item.entity_id, message=str(item.error))
+                for item in result.items
+                if item.error is not None
+            ],
+        )
+
+    def _to_bulk_failures(
+        self, payload: PartialBulkPayload[RolePresetNode]
+    ) -> list[BulkRolePresetFailureInfo]:
+        return [
+            BulkRolePresetFailureInfo(
+                role_preset_id=RolePresetID(failure.id), message=failure.message
+            )
+            for failure in payload.failed
+        ]
 
     def _convert_filter(self, filter_: RolePresetFilter) -> list[QueryCondition]:
         fields = RolePresetSearchableFields.own

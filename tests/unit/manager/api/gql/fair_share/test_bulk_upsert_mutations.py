@@ -62,11 +62,11 @@ def create_mock_info_with_adapters(
     """Create mock strawberry.Info with adapter mocks."""
     info = MagicMock()
     if bulk_upsert_domain:
-        info.context.adapters.fair_share.bulk_upsert_domain = bulk_upsert_domain
+        info.context.adapters.fair_share.atomic_bulk_upsert_domain = bulk_upsert_domain
     if bulk_upsert_project:
-        info.context.adapters.fair_share.bulk_upsert_project = bulk_upsert_project
+        info.context.adapters.fair_share.atomic_bulk_upsert_project = bulk_upsert_project
     if bulk_upsert_user:
-        info.context.adapters.fair_share.bulk_upsert_user = bulk_upsert_user
+        info.context.adapters.fair_share.atomic_bulk_upsert_user = bulk_upsert_user
     return info
 
 

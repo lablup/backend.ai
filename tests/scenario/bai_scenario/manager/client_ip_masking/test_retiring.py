@@ -46,7 +46,7 @@ class Purging(When[AMaskingPolicyAndACaller, ClientIPMaskingAdapter, ClientIPMas
 
     @override
     def operation(self) -> str:
-        return "admin_purge"
+        return "purge"
 
     @override
     def describe(self, laid: AMaskingPolicyAndACaller) -> str:
@@ -60,7 +60,7 @@ class Purging(When[AMaskingPolicyAndACaller, ClientIPMaskingAdapter, ClientIPMas
         self, adapter: ClientIPMaskingAdapter, laid: AMaskingPolicyAndACaller
     ) -> ClientIPMaskingPolicyNode:
         with ActingAs(laid.caller):
-            payload = await adapter.admin_purge(
+            payload = await adapter.purge(
                 ClientIPMaskingPolicyID(uuid4()) if self.unknown else laid.policy.id
             )
         return payload.policy

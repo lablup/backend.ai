@@ -85,6 +85,12 @@ from ai.backend.manager.services.deployment.actions.auto_scaling_rule.get_auto_s
 from ai.backend.manager.services.deployment.actions.auto_scaling_rule.global_search_auto_scaling_rules import (
     GlobalSearchAutoScalingRulesAction,
 )
+from ai.backend.manager.services.deployment.actions.auto_scaling_rule.partial_bulk_purge_auto_scaling_rules import (
+    PartialBulkPurgeAutoScalingRulesAction,
+)
+from ai.backend.manager.services.deployment.actions.auto_scaling_rule.partial_bulk_update_auto_scaling_rules import (
+    PartialBulkUpdateAutoScalingRulesAction,
+)
 from ai.backend.manager.services.deployment.actions.auto_scaling_rule.search_auto_scaling_rules import (
     SearchAutoScalingRulesAction,
 )
@@ -321,6 +327,12 @@ class DeploymentProcessors:
     bulk_delete_auto_scaling_rules: PartialBulkActionProcessor[
         BulkDeleteAutoScalingRulesAction, list[UUID]
     ]
+    partial_bulk_update_auto_scaling_rules: PartialBulkFieldActionProcessor[
+        PartialBulkUpdateAutoScalingRulesAction, ModelDeploymentAutoScalingRuleData
+    ]
+    partial_bulk_purge_auto_scaling_rules: PartialBulkFieldActionProcessor[
+        PartialBulkPurgeAutoScalingRulesAction, ModelDeploymentAutoScalingRuleData
+    ]
     search_auto_scaling_rules: BulkActionProcessor[
         SearchAutoScalingRulesAction, ScopedFieldsOpsResult[ModelDeploymentAutoScalingRuleData]
     ]
@@ -526,6 +538,14 @@ class DeploymentProcessors:
         )
         self.bulk_delete_auto_scaling_rules = group.partial_bulk(
             BulkDeleteAutoScalingRulesAction, service.bulk_delete_auto_scaling_rules
+        )
+        self.partial_bulk_update_auto_scaling_rules = auto_scaling_rules.partial_bulk_field(
+            PartialBulkUpdateAutoScalingRulesAction,
+            service.partial_bulk_update_auto_scaling_rules,
+        )
+        self.partial_bulk_purge_auto_scaling_rules = auto_scaling_rules.partial_bulk_field(
+            PartialBulkPurgeAutoScalingRulesAction,
+            service.partial_bulk_purge_auto_scaling_rules,
         )
         self.search_auto_scaling_rules = auto_scaling_rules.atomic_bulk_scoped_search_ops(
             SearchAutoScalingRulesAction
