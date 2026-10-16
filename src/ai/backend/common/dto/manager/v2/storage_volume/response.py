@@ -133,10 +133,10 @@ class PurgeResourceGroupVolumeOfferPayload(BaseResponseModel):
 class DeleteStorageVolumePayload(BaseResponseModel):
     """Payload for a storage volume soft delete."""
 
-    id: UUID = Field(description="ID of the withdrawn storage volume")
+    item: StorageVolumeNode = Field(description="The withdrawn storage volume.")
 
 
 class RestoreStorageVolumePayload(BaseResponseModel):
     """Payload for a storage volume restore."""
 
-    id: UUID = Field(description="ID of the restored storage volume")
+    item: StorageVolumeNode = Field(description="The restored storage volume.")
