@@ -849,7 +849,10 @@ class AgentRPCServer(aobject):
                     raise
                 except Exception:
                     log.exception("kernel creation failed")
-                    if ownership_data.kernel_id not in agent.kernel_registry:
+                    if (
+                        ownership_data.kernel_id not in agent.kernel_registry
+                        and ownership_data.kernel_id not in agent.reported_creation_failures
+                    ):
                         # No container exists to report the failure for it, so tell the manager
                         # the kernel is gone instead of leaving the session to its create timeout.
                         await agent.inject_container_lifecycle_event(
@@ -859,6 +862,8 @@ class AgentRPCServer(aobject):
                             KernelLifecycleEventReason.FAILED_TO_CREATE,
                         )
                     raise
+                finally:
+                    agent.reported_creation_failures.discard(ownership_data.kernel_id)
 
         # Failures raised by `_create_kernel` are logged in their kernel scope; this logs the rest.
         try:

@@ -873,6 +873,8 @@ class AbstractAgent[
     # Health monitoring tracking
     _active_pulls: dict[str, PullTaskInfo]  # key: image canonical name
     _active_creates: dict[KernelId, CreateTaskInfo]
+    # Kernels whose creation failure was already reported by `create_kernel` itself.
+    reported_creation_failures: set[KernelId]
 
     @contextmanager
     def track_pull(self, image: str) -> Generator[bool, None, None]:
@@ -958,6 +960,7 @@ class AbstractAgent[
         # Initialize health monitoring tracking maps
         self._active_pulls = {}
         self._active_creates = {}
+        self.reported_creation_failures = set()
         self._sync_container_lifecycle_observer = SyncContainerLifecycleObserver.instance()
         self._clean_kernel_registry_task = asyncio.create_task(self._clean_kernel_registry_loop())
 
@@ -3016,15 +3019,16 @@ class AbstractAgent[
                                     container_data["container_id"]
                                 )
                         await kernel_obj.init(self.event_producer)
-                    except Exception:
+                    except BaseException:
                         # The polling below reports its own failures; this covers the gap before it,
                         # so the manager does not wait for the create timeout.
+                        self.reported_creation_failures.add(kernel_id)
                         await self.inject_container_lifecycle_event(
                             kernel_id,
                             session_id,
                             LifecycleEvent.DESTROY,
                             KernelLifecycleEventReason.FAILED_TO_START,
-                            container_id=container_data.get("container_id"),
+                            container_id=ContainerId(container_data["container_id"]),
                         )
                         raise
                     log.debug(

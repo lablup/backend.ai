@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import uuid
 from collections.abc import Iterator
 from contextlib import contextmanager
@@ -14,14 +15,28 @@ from ai.backend.common.types import ContainerId, KernelId, SessionId
 
 
 class TestCreateKernelInitFailure:
-    async def test_init_failure_injects_failed_to_start_once(self) -> None:
+    @pytest.mark.parametrize(
+        ("failing_step", "error"),
+        [
+            ("init", RuntimeError("kernel init failed")),
+            ("registry_update", RuntimeError("registry update failed")),
+            ("init", asyncio.CancelledError()),
+        ],
+        ids=["init-error", "registry-update-error", "init-cancelled"],
+    )
+    async def test_failure_injects_failed_to_start_once(
+        self, failing_step: str, error: BaseException
+    ) -> None:
         kernel_id = KernelId(uuid.uuid4())
         session_id = SessionId(uuid.uuid4())
         container_id = ContainerId("c0ffee")
-        init_error = RuntimeError("kernel init failed")
 
         kernel_obj = MagicMock()
-        kernel_obj.init = AsyncMock(side_effect=init_error)
+        if failing_step == "init":
+            kernel_obj.init = AsyncMock(side_effect=error)
+        else:
+            kernel_obj.init = AsyncMock()
+            kernel_obj.data.update.side_effect = error
         kernel_config: dict[str, object] = {
             "environ": {},
             "image": {"labels": {}, "digest": "sha256:0", "registry": {}},
@@ -58,6 +73,7 @@ class TestCreateKernelInitFailure:
         ctx.start_container = AsyncMock(return_value={"container_id": container_id})
 
         agent = MagicMock()
+        agent.reported_creation_failures = set()
 
         @contextmanager
         def track_create(*_args: object, **_kwargs: object) -> Iterator[bool]:
@@ -83,7 +99,7 @@ class TestCreateKernelInitFailure:
         cluster_info = MagicMock()
 
         with patch("ai.backend.agent.agent.get_arch_name", return_value="x86_64"):
-            with pytest.raises(RuntimeError, match="kernel init failed") as exc_info:
+            with pytest.raises(type(error)) as exc_info:
                 await AbstractAgent.create_kernel(
                     agent,
                     ownership_data,
@@ -93,8 +109,12 @@ class TestCreateKernelInitFailure:
                     restarting=True,
                 )
 
-        assert exc_info.value is init_error
-        kernel_obj.init.assert_awaited_once()
+        assert exc_info.value is error
+        if failing_step == "init":
+            kernel_obj.init.assert_awaited_once()
+        else:
+            kernel_obj.init.assert_not_awaited()
+        assert agent.reported_creation_failures == {kernel_id}
         agent.inject_container_lifecycle_event.assert_awaited_once_with(
             kernel_id,
             session_id,

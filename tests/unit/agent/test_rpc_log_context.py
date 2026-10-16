@@ -339,6 +339,47 @@ class TestCreateKernels:
         else:
             agent.inject_container_lifecycle_event.assert_not_awaited()
 
+    @pytest.mark.parametrize(
+        ("reported", "injected"),
+        [(True, False), (False, True)],
+        ids=["already-reported", "not-reported"],
+    )
+    async def test_already_reported_failure_is_not_reported_twice(
+        self, reported: bool, injected: bool
+    ) -> None:
+        session_id = uuid.uuid4()
+        kernel_id = KernelId(uuid.uuid4())
+        agent = MagicMock()
+        agent.id = PRIMARY_AGENT_ID
+        agent.local_config.agent.kernel_creation_concurrency = 1
+        # The kernel is gone from the registry, as when the lifecycle task cleaned it up.
+        agent.kernel_registry = {}
+        agent.reported_creation_failures = {kernel_id} if reported else set()
+        agent.create_kernel = AsyncMock(side_effect=RuntimeError("rejected"))
+        agent.inject_container_lifecycle_event = AsyncMock()
+        image_ref = MagicMock()
+        image_ref.canonical = "cr.backend.ai/stable/python:latest"
+
+        with pytest.raises(RuntimeError):
+            await AgentRPCServer.create_kernels(
+                _server(agent),
+                _request(
+                    "create_kernels",
+                    (str(session_id), [str(kernel_id)], [{}], {}, {kernel_id: image_ref}),
+                ),
+            )
+
+        if injected:
+            agent.inject_container_lifecycle_event.assert_awaited_once_with(
+                kernel_id,
+                SessionId(session_id),
+                LifecycleEvent.DESTROY,
+                KernelLifecycleEventReason.FAILED_TO_CREATE,
+            )
+        else:
+            agent.inject_container_lifecycle_event.assert_not_awaited()
+        assert kernel_id not in agent.reported_creation_failures
+
     async def test_failure_outside_kernels_is_logged_once(
         self, capture: pytest.LogCaptureFixture
     ) -> None:
