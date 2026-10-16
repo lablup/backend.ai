@@ -15,7 +15,6 @@ import pytest
 from ai.backend.common.data.entity.resource_preset import ResourcePresetID
 from ai.backend.common.exception import InvalidAPIParameters, ResourcePresetConflict
 from ai.backend.common.types import (
-    AccessKey,
     BinarySize,
     ResourceSlot,
     SlotName,
@@ -379,11 +378,6 @@ class TestResourcePresetServiceCompatibility:
         """Test check presets when resources are sufficient."""
         action = CheckResourcePresetsAction(
             targets=[PublicResourcePresetTarget()],
-            access_key=AccessKey("test-key"),
-            resource_policy={
-                "total_resource_slots": {"cpu": "100", "mem": "100G", "gpu": "10"},
-                "default_for_unspecified": "UNLIMITED",
-            },
             domain_name="default",
             group="default",
             user_id=uuid.uuid4(),
@@ -679,11 +673,6 @@ class TestResourcePresetServiceCompatibility:
 
         action = CheckResourcePresetsAction(
             targets=[PublicResourcePresetTarget()],
-            access_key=AccessKey("test-key"),
-            resource_policy={
-                "total_resource_slots": {"cpu": "100", "mem": "100G"},
-                "default_for_unspecified": "UNLIMITED",
-            },
             domain_name="default",
             group="default",
             user_id=uuid.uuid4(),
