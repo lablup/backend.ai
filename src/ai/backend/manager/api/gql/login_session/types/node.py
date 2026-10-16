@@ -15,6 +15,7 @@ from strawberry.relay import Connection, Edge, NodeID
 from ai.backend.common.data.entity.login_session import LoginSessionID
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.dto.manager.v2.login_session.response import LoginSessionNode
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     gql_added_field,
@@ -57,7 +58,10 @@ class LoginSessionV2GQL(PydanticNodeMixin[LoginSessionNode]):
     )
 
     user_id: UUID = gql_field(description="UUID of the user who owns the session.")
-    access_key: str = gql_field(description="Access key associated with the session.")
+    access_key: str = gql_field(
+        description="Access key associated with the session.",
+        deprecation_reason=f"Deprecated since {NEXT_RELEASE_VERSION}. Use `userId`.",
+    )
     status: LoginSessionStatusGQL = gql_field(description="Current status of the login session.")
     created_at: datetime = gql_field(description="Timestamp when the session was created.")
     last_accessed_at: datetime | None = gql_field(

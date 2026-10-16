@@ -149,7 +149,9 @@ class SessionFilter(BaseRequestModel):
         default=None, description="Filter by the resource group the session runs in"
     )
     access_key: StringFilter | None = Field(
-        default=None, description="Filter by the access key the session was created with"
+        default=None,
+        deprecated=True,
+        description=f"Filter by the access key the session was created with. Deprecated since {NEXT_RELEASE_VERSION}. Use `user_uuid`",
     )
     tag: StringFilter | None = Field(default=None, description="Filter by the user-supplied tag")
     use_host_network: bool | None = Field(
