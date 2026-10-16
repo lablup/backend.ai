@@ -354,6 +354,38 @@ class TestCreateRelation:
         assert await _share_cap(database, target, scope) == Permission.UPDATE
         assert await _govern_cap(database, scope, target) is False
 
+    async def test_linking_again_registers_the_graph_reads_a_row_is_missing(
+        self,
+        database: ExtendedAsyncSAEngine,
+        provider: RelationOpsProvider,
+        pair: tuple[_ScopeID, _TargetID],
+    ) -> None:
+        """A pair already linked keeps its row and gets back the govern and the share."""
+        scope, target = pair
+        async with provider.write_ops() as ops:
+            await ops.create_relations(_Creator(), [(scope, target)])
+        async with database.begin_session() as sess:
+            await sess.execute(
+                sa.delete(ScopeBindingRow).where(
+                    ScopeBindingRow.virtual_entity_id == _node(target),
+                    ScopeBindingRow.scope_entity_id == _node(scope),
+                )
+            )
+            await sess.execute(
+                sa.delete(EntityMembershipRow).where(
+                    EntityMembershipRow.virtual_entity_id == _node(target),
+                    EntityMembershipRow.member_entity_id == _node(scope),
+                )
+            )
+
+        async with provider.write_ops() as ops:
+            written = await ops.create_relations(_Creator(), [(scope, target)])
+
+        assert written == [False]
+        assert await _row_count(database) == 1
+        assert await _govern_cap(database, scope, target) == Permission.READ
+        assert await _share_cap(database, target, scope) == Permission.READ
+
     async def test_a_precondition_the_spec_names_turns_the_link_away(
         self,
         database: ExtendedAsyncSAEngine,
