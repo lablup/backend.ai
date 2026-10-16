@@ -581,6 +581,19 @@ class ProxyWorkerConfig(BaseSchema):
             example=ConfigExample(local="", prod="worker.example.com:10201"),
         ),
     ]
+    internal_api_bind_addr: Annotated[
+        HostPortPair | None,
+        Field(default=None),
+        BackendAIConfigMeta(
+            description=(
+                "The address where the worker receives ingress pushes from the coordinator, "
+                "authenticated by the shared API secret. Keep it apart from the traffic and API "
+                "ports so users cannot reach it. Unset does not open the port."
+            ),
+            added_version=NEXT_RELEASE_VERSION,
+            example=ConfigExample(local="127.0.0.1:10202", prod="10.0.0.10:10202"),
+        ),
+    ]
 
     coordinator_endpoint: Annotated[
         AnyUrl,

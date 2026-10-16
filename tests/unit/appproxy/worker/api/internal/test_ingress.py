@@ -10,7 +10,7 @@ from aiohttp import web
 from aiohttp.test_utils import make_mocked_request
 
 from ai.backend.appproxy.common.errors.http import AuthorizationFailed
-from ai.backend.appproxy.worker.api.ingress import (
+from ai.backend.appproxy.worker.api.internal.ingress import (
     TOKEN_HEADER,
     IngressHandler,
     coordinator_auth_middleware,
@@ -103,12 +103,14 @@ def reader() -> AsyncMock:
 
 
 class TestIngressHandler:
-    async def test_upsert_applies_through_the_writer(
+    async def test_upsert_reports_the_applied_revisions(
         self, reader: AsyncMock, writer: AsyncMock
     ) -> None:
         handler = IngressHandler(IngressState(reader=reader, writer=writer))
         response = await handler.upsert(_request({"ingresses": [INGRESS_PAYLOAD]}))
-        assert response.status == HTTPStatus.NO_CONTENT
+        assert isinstance(response, web.Response)
+        assert response.status == HTTPStatus.OK
+        assert json.loads(response.text or "") == {"revisions": {"10205": 3}}
         writer.apply.assert_awaited_once()
 
     async def test_remove_removes_through_the_writer(
@@ -120,13 +122,15 @@ class TestIngressHandler:
         assert response.status == HTTPStatus.NO_CONTENT
         writer.remove.assert_awaited_once()
 
-    async def test_replace_replaces_through_the_writer(
+    async def test_replace_reports_the_applied_revisions(
         self, reader: AsyncMock, writer: AsyncMock
     ) -> None:
         handler = IngressHandler(IngressState(reader=reader, writer=writer))
-        response = await handler.replace(_request({"ingresses": []}))
-        assert response.status == HTTPStatus.NO_CONTENT
-        writer.replace_all.assert_awaited_once_with([])
+        response = await handler.replace(_request({"ingresses": [INGRESS_PAYLOAD]}))
+        assert isinstance(response, web.Response)
+        assert response.status == HTTPStatus.OK
+        assert json.loads(response.text or "") == {"revisions": {"10205": 3}}
+        writer.replace_all.assert_awaited_once()
 
     async def test_write_without_writer_is_not_supported(self, reader: AsyncMock) -> None:
         handler = IngressHandler(IngressState(reader=reader, writer=None))

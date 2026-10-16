@@ -1,13 +1,12 @@
 from __future__ import annotations
 
 import hmac
-from collections.abc import Iterable
 from http import HTTPStatus
 
 from aiohttp import web
 
 from ai.backend.appproxy.common.errors.http import AuthorizationFailed
-from ai.backend.appproxy.common.types import CORSOptions, WebMiddleware, WebRequestHandler
+from ai.backend.appproxy.common.types import WebRequestHandler
 from ai.backend.appproxy.worker.errors.ingress import (
     IngressStateUnavailableError,
     IngressWriteNotSupportedError,
@@ -46,7 +45,13 @@ class IngressHandler:
     @api_handler
     async def upsert(self, body: BodyParam[IngressUpsertRequest]) -> APIResponse:
         await self._writer().apply(body.parsed.ingresses)
-        return APIResponse.no_content(HTTPStatus.NO_CONTENT)
+        # The writer applies every ingress or raises, so each sent revision is the one held.
+        response = IngressRevisionsResponse(
+            revisions={
+                ingress.frontend.key(): ingress.revision for ingress in body.parsed.ingresses
+            }
+        )
+        return APIResponse.build(HTTPStatus.OK, response)
 
     @api_handler
     async def remove(self, body: BodyParam[IngressRemoveRequest]) -> APIResponse:
@@ -56,7 +61,12 @@ class IngressHandler:
     @api_handler
     async def replace(self, body: BodyParam[IngressReplaceRequest]) -> APIResponse:
         await self._writer().replace_all(body.parsed.ingresses)
-        return APIResponse.no_content(HTTPStatus.NO_CONTENT)
+        response = IngressRevisionsResponse(
+            revisions={
+                ingress.frontend.key(): ingress.revision for ingress in body.parsed.ingresses
+            }
+        )
+        return APIResponse.build(HTTPStatus.OK, response)
 
     @api_handler
     async def revisions(self) -> APIResponse:
@@ -78,15 +88,12 @@ class IngressHandler:
         return writer
 
 
-def create_app(
-    _default_cors_options: CORSOptions,
-) -> tuple[web.Application, Iterable[WebMiddleware]]:
+def create_app(root_ctx: RootContext) -> web.Application:
     app = web.Application(middlewares=[coordinator_auth_middleware])
-    app["prefix"] = "v2/ingress"
-    # The ingress state is not built at startup yet.
-    handler = IngressHandler(state=None)
+    app["_root.context"] = root_ctx
+    handler = IngressHandler(root_ctx.ingress_state)
     app.router.add_route("POST", "/upsert", handler.upsert)
     app.router.add_route("POST", "/remove", handler.remove)
     app.router.add_route("POST", "/replace", handler.replace)
     app.router.add_route("GET", "/revisions", handler.revisions)
-    return app, []
+    return app
