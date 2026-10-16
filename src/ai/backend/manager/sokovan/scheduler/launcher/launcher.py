@@ -432,10 +432,20 @@ class SessionLauncher:
             if create_tasks:
                 results = await asyncio.gather(*create_tasks, return_exceptions=True)
                 failed_agent_ids: list[AgentId] = []
+                first_failure: BaseException | None = None
                 for aid, result in zip(agent_ids_ordered, results, strict=True):
                     if isinstance(result, BaseException):
                         log.error("kernel creation failed on agent", agent_id=aid, exc_info=result)
                         failed_agent_ids.append(aid)
+                        first_failure = first_failure or result
+                if first_failure is not None:
+                    # Keep the agent's reason on the session; the agent terminates the kernels.
+                    await self._repository.update_session_error_info(
+                        session.session_id,
+                        convert_to_status_data(
+                            first_failure, self._config_provider.config.debug.enabled
+                        ),
+                    )
                 if failed_agent_ids:
                     try:
                         await self._valkey_schedule.record_session_failed_agents(

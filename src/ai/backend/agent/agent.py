@@ -1434,16 +1434,22 @@ class AbstractAgent[
                     if ev.container_id is None:
                         await self.reconstruct_resource_usage()
                         if not ev.suppress_events:
+                            # A creation that failed before its container existed keeps its reason.
+                            terminated_reason = (
+                                ev.reason
+                                if ev.reason == KernelLifecycleEventReason.FAILED_TO_CREATE
+                                else KernelLifecycleEventReason.ALREADY_TERMINATED
+                            )
                             await self.anycast_and_broadcast_event(
                                 KernelTerminatedAnycastEvent(
                                     kernel_id=ev.kernel_id,
                                     session_id=ev.session_id,
-                                    reason=KernelLifecycleEventReason.ALREADY_TERMINATED,
+                                    reason=terminated_reason,
                                 ),
                                 KernelTerminatedBroadcastEvent(
                                     kernel_id=ev.kernel_id,
                                     session_id=ev.session_id,
-                                    reason=KernelLifecycleEventReason.ALREADY_TERMINATED,
+                                    reason=terminated_reason,
                                 ),
                             )
                         ev.set_done_future_result(None)

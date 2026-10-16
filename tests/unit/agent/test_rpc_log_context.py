@@ -15,18 +15,21 @@ from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanE
 from opentelemetry.trace import SpanContext, SpanKind
 from pydantic import ValidationError
 
+from ai.backend.agent.errors import ResourceError
 from ai.backend.agent.errors.agent import ImagePullFailedError, ImagePullTimeoutError
 from ai.backend.agent.rpc.context import with_rpc_context, with_rpc_trace
 from ai.backend.agent.rpc.middlewares.tracing import build_tracing_middleware
 from ai.backend.agent.rpc.types import RPCMiddlewareContext
 from ai.backend.agent.server import AgentRPCServer, RPCFunctionRegistry
+from ai.backend.agent.types import LifecycleEvent
 from ai.backend.common.clients.agent.peer import PeerInvoker
 from ai.backend.common.contexts.request_id import current_request_id
 from ai.backend.common.contexts.user import current_user
 from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.user.types import UserData, UserRole
+from ai.backend.common.events.event_types.kernel.types import KernelLifecycleEventReason
 from ai.backend.common.message_queue.types import MessageMetadata
-from ai.backend.common.types import AgentId
+from ai.backend.common.types import AgentId, KernelId, SessionId
 from ai.backend.logging.structured import StructuredLogger
 
 SERVER_LOGGER = "ai.backend.agent.server"
@@ -273,6 +276,7 @@ class TestCreateKernels:
         agent.id = PRIMARY_AGENT_ID
         agent.local_config.agent.kernel_creation_concurrency = 1
         agent.create_kernel = AsyncMock(side_effect=RuntimeError("docker failure"))
+        agent.inject_container_lifecycle_event = AsyncMock()
         image_ref = MagicMock()
         image_ref.canonical = "cr.backend.ai/stable/python:latest"
 
@@ -291,6 +295,48 @@ class TestCreateKernels:
         assert errors[0].__dict__["log_tag_session_id"] == str(session_id)
         assert errors[0].__dict__["log_tag_kernel_id"] == str(kernel_id)
         assert errors[0].exc_info is not None
+
+    @pytest.mark.parametrize(
+        ("registered", "error", "injected"),
+        [
+            (False, RuntimeError("rejected"), True),
+            (True, RuntimeError("rejected"), False),
+            (False, ResourceError("Kernel creation already in progress"), False),
+            (False, TimeoutError(), False),
+        ],
+    )
+    async def test_failure_without_container_terminates_the_kernel(
+        self, registered: bool, error: Exception, injected: bool
+    ) -> None:
+        session_id = uuid.uuid4()
+        kernel_id = uuid.uuid4()
+        agent = MagicMock()
+        agent.id = PRIMARY_AGENT_ID
+        agent.local_config.agent.kernel_creation_concurrency = 1
+        agent.kernel_registry = {KernelId(kernel_id): MagicMock()} if registered else {}
+        agent.create_kernel = AsyncMock(side_effect=error)
+        agent.inject_container_lifecycle_event = AsyncMock()
+        image_ref = MagicMock()
+        image_ref.canonical = "cr.backend.ai/stable/python:latest"
+
+        with pytest.raises(type(error)):
+            await AgentRPCServer.create_kernels(
+                _server(agent),
+                _request(
+                    "create_kernels",
+                    (str(session_id), [str(kernel_id)], [{}], {}, {kernel_id: image_ref}),
+                ),
+            )
+
+        if injected:
+            agent.inject_container_lifecycle_event.assert_awaited_once_with(
+                KernelId(kernel_id),
+                SessionId(session_id),
+                LifecycleEvent.DESTROY,
+                KernelLifecycleEventReason.FAILED_TO_CREATE,
+            )
+        else:
+            agent.inject_container_lifecycle_event.assert_not_awaited()
 
     async def test_failure_outside_kernels_is_logged_once(
         self, capture: pytest.LogCaptureFixture
