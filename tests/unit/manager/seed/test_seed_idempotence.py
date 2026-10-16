@@ -63,6 +63,7 @@ _CASES: Final[list[IdempotenceCase]] = [
     IdempotenceCase(SeedKind.RESOURCE_PRESET, "resource_preset_seed_dir"),
     IdempotenceCase(SeedKind.ROLE, "role_kind_seed_dir"),
     IdempotenceCase(SeedKind.SESSION_TEMPLATE, "session_template_seed_dir"),
+    IdempotenceCase(SeedKind.PROJECT_MEMBER, "project_member_seed_dir"),
 ]
 
 

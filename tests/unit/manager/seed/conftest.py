@@ -625,6 +625,13 @@ _SCOPED_ROLES: dict[str, dict[str, Any]] = {
     },
 }
 
+# Project member items written for the tests: `admin` on `research`, `member` on
+# `model-store`.
+_PROJECT_MEMBERS: list[dict[str, str]] = [
+    {"project_id": _PROJECTS["research.yaml"]["id"], "user_id": _USERS["admin.yaml"]["id"]},
+    {"project_id": _PROJECTS["model-store.yaml"]["id"], "user_id": _USERS["member.yaml"]["id"]},
+]
+
 # The tables a seed kind writes, and the graph tables the creation path writes beside them.
 _SEED_TABLES: list[Table | type[HasTable]] = [
     AppConfigDefinitionRow,
@@ -1198,3 +1205,13 @@ def role_kind_seed_dir(project_seed_dir: Path) -> Path:
 @pytest.fixture
 def research_member_role_id() -> str:
     return str(_SCOPED_ROLES["research-member.yaml"]["id"])
+
+
+@pytest.fixture
+def project_member_seed_dir(role_kind_seed_dir: Path) -> Path:
+    """The role directory plus a project member file, so the projects, the users and the
+    auto_assign role the items name are written first."""
+    (role_kind_seed_dir / "project-members.yaml").write_text(
+        yaml.safe_dump({"kind": "project_member", "version": 1, "items": _PROJECT_MEMBERS})
+    )
+    return role_kind_seed_dir
