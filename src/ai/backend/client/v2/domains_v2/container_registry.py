@@ -2,17 +2,23 @@
 
 from __future__ import annotations
 
+from uuid import UUID
+
 from ai.backend.client.v2.base_domain import BaseDomainClient
+from ai.backend.common.dto.manager.v2.common import PartialBulkPayload
 from ai.backend.common.dto.manager.v2.container_registry.request import (
     AdminSearchContainerRegistriesInput,
     CreateContainerRegistryInput,
     DeleteContainerRegistryInput,
+    PartialBulkPurgeContainerRegistriesInput,
     UpdateContainerRegistryInput,
 )
 from ai.backend.common.dto.manager.v2.container_registry.response import (
     AdminSearchContainerRegistriesPayload,
+    ContainerRegistryNode,
     CreateContainerRegistryPayload,
     DeleteContainerRegistryPayload,
+    PurgeContainerRegistryPayload,
     UpdateContainerRegistryPayload,
 )
 
@@ -58,11 +64,30 @@ class V2ContainerRegistryClient(BaseDomainClient):
             response_model=UpdateContainerRegistryPayload,
         )
 
+    async def admin_purge(self, registry_id: UUID) -> PurgeContainerRegistryPayload:
+        """Purge a container registry (superadmin only)."""
+        return await self._client.typed_request(
+            "DELETE",
+            f"{_PATH}/{registry_id}",
+            response_model=PurgeContainerRegistryPayload,
+        )
+
+    async def admin_partial_bulk_purge(
+        self, request: PartialBulkPurgeContainerRegistriesInput
+    ) -> PartialBulkPayload[ContainerRegistryNode]:
+        """Purge several container registries (superadmin only), answering for each one."""
+        return await self._client.typed_request(
+            "POST",
+            f"{_PATH}/partial-bulk-purge",
+            request=request,
+            response_model=PartialBulkPayload[ContainerRegistryNode],
+        )
+
     async def admin_delete(
         self,
         request: DeleteContainerRegistryInput,
     ) -> DeleteContainerRegistryPayload:
-        """Delete a container registry (superadmin only). Hard delete."""
+        """Deprecated. Use :meth:`admin_purge`."""
         return await self._client.typed_request(
             "POST",
             f"{_PATH}/delete",

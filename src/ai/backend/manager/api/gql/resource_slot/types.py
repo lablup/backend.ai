@@ -18,6 +18,7 @@ from uuid import UUID
 from strawberry import Info
 from strawberry.relay import Connection, Edge, NodeID
 
+from ai.backend.common.dto.manager.v2.common import PartialBulkPayload
 from ai.backend.common.dto.manager.v2.resource_slot.request import (
     AgentResourceFilter as AgentResourceFilterDTO,
 )
@@ -26,6 +27,9 @@ from ai.backend.common.dto.manager.v2.resource_slot.request import (
 )
 from ai.backend.common.dto.manager.v2.resource_slot.request import (
     CreateResourceSlotTypeInput as CreateResourceSlotTypeInputDTO,
+)
+from ai.backend.common.dto.manager.v2.resource_slot.request import (
+    PartialBulkPurgeResourceSlotTypesInput as PartialBulkPurgeResourceSlotTypesInputDTO,
 )
 from ai.backend.common.dto.manager.v2.resource_slot.request import (
     PurgeResourceSlotTypeInput as PurgeResourceSlotTypeInputDTO,
@@ -76,6 +80,7 @@ from ai.backend.manager.api.gql.base import (
     StringFilter,
     UUIDFilter,
 )
+from ai.backend.manager.api.gql.common_types import PartialBulkFailureGQL
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     gql_added_field,
@@ -86,7 +91,11 @@ from ai.backend.manager.api.gql.decorators import (
     gql_pydantic_input,
     gql_pydantic_type,
 )
-from ai.backend.manager.api.gql.pydantic_compat import PydanticInputMixin, PydanticNodeMixin
+from ai.backend.manager.api.gql.pydantic_compat import (
+    PydanticInputMixin,
+    PydanticNodeMixin,
+    PydanticOutputMixin,
+)
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.api.gql.utils import dedent_strip
 
@@ -424,6 +433,43 @@ class PurgeResourceSlotTypeInputGQL(PydanticInputMixin[PurgeResourceSlotTypeInpu
 )
 class PurgeResourceSlotTypePayloadGQL:
     slot_name: str = gql_field(description="Slot name of the removed resource slot type.")
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Input for purging several resource slot types, each answered for separately.",
+    ),
+    name="PartialBulkPurgeResourceSlotTypesInput",
+)
+class PartialBulkPurgeResourceSlotTypesInputGQL(
+    PydanticInputMixin[PartialBulkPurgeResourceSlotTypesInputDTO]
+):
+    ids: list[UUID] = gql_field(description="IDs of the resource slot types to purge.")
+
+
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description=(
+            "Result of a partial bulk resource slot type operation: the slot types processed "
+            "and the ones that failed."
+        ),
+    ),
+    model=PartialBulkPayload[ResourceSlotTypeNodeDTO],
+    name="PartialBulkResourceSlotTypesPayload",
+)
+class PartialBulkResourceSlotTypesPayloadGQL(
+    PydanticOutputMixin[PartialBulkPayload[ResourceSlotTypeNodeDTO]]
+):
+    """Payload for partial bulk resource slot type mutations."""
+
+    successes: list[ResourceSlotTypeGQL] = gql_field(
+        description="The resource slot types processed, as they stood."
+    )
+    failed: list[PartialBulkFailureGQL] = gql_field(
+        description="The resource slot types not processed, each with the reason."
+    )
 
 
 # ========== AgentResourceSlotGQL (Node) ==========

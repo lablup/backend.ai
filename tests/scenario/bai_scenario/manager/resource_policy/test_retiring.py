@@ -64,7 +64,7 @@ class Purging(When[APolicyAndACaller[Any], ResourcePolicyAdapter, Purged]):
 
     @override
     def operation(self) -> str:
-        return self.family.calls.delete
+        return self.family.calls.purge
 
     @override
     def describe(self, laid: APolicyAndACaller[Any]) -> str:
@@ -74,7 +74,7 @@ class Purging(When[APolicyAndACaller[Any], ResourcePolicyAdapter, Purged]):
     async def call(self, adapter: ResourcePolicyAdapter, laid: APolicyAndACaller[Any]) -> Purged:
         wanted = self.named or laid.policy.name
         with ActingAs(laid.caller):
-            answered = await self.family.delete(adapter, wanted)
+            answered = await self.family.purge(adapter, wanted)
             found = await self.family.search(adapter, named=wanted)
         return Purged(name=answered, left=found.total_count)
 

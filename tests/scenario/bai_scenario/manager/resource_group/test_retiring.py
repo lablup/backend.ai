@@ -54,7 +54,9 @@ class Purging(When[AGroupAndACaller, ResourceGroupAdapter, ResourceGroupDetailNo
         self, adapter: ResourceGroupAdapter, laid: AGroupAndACaller
     ) -> ResourceGroupDetailNode:
         with ActingAs(laid.caller):
-            return await adapter.purge(UNKNOWN if self.unknown else laid.group.name)
+            return await adapter.purge(
+                await adapter.lookup_name(UNKNOWN if self.unknown else laid.group.name)
+            )
 
 
 @dataclass(frozen=True)

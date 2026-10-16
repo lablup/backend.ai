@@ -16,10 +16,13 @@ from ai.backend.manager.services.retention_policy.actions.bulk_get import (
 from ai.backend.manager.services.retention_policy.actions.create import (
     CreateRetentionPolicyAction,
 )
-from ai.backend.manager.services.retention_policy.actions.delete import (
-    DeleteRetentionPolicyAction,
-)
 from ai.backend.manager.services.retention_policy.actions.get import GetRetentionPolicyAction
+from ai.backend.manager.services.retention_policy.actions.partial_bulk_purge import (
+    PartialBulkPurgeRetentionPoliciesAction,
+)
+from ai.backend.manager.services.retention_policy.actions.partial_bulk_update import (
+    PartialBulkUpdateRetentionPoliciesAction,
+)
 from ai.backend.manager.services.retention_policy.actions.purge import (
     PurgeRetentionPolicyAction,
 )
@@ -44,13 +47,15 @@ class RetentionPolicyProcessors:
         UpdateRetentionPolicyAction,
         EntityOpsResult[RetentionPolicyData],
     ]
-    delete: SingleEntityActionProcessor[
-        DeleteRetentionPolicyAction,
-        EntityOpsResult[RetentionPolicyData],
-    ]
     purge: SingleEntityActionProcessor[
         PurgeRetentionPolicyAction,
         EntityOpsResult[RetentionPolicyData],
+    ]
+    partial_bulk_update: PartialBulkActionProcessor[
+        PartialBulkUpdateRetentionPoliciesAction, RetentionPolicyData
+    ]
+    partial_bulk_purge: PartialBulkActionProcessor[
+        PartialBulkPurgeRetentionPoliciesAction, RetentionPolicyData
     ]
     global_search: GlobalActionProcessor[
         SearchRetentionPoliciesAction,
@@ -62,6 +67,11 @@ class RetentionPolicyProcessors:
         self.bulk_get = group.partial_bulk_get_ops(BulkGetRetentionPoliciesAction)
         self.global_create = group.global_create_ops(CreateRetentionPolicyAction)
         self.update = group.single_update_ops(UpdateRetentionPolicyAction)
-        self.delete = group.entity_purge_ops(DeleteRetentionPolicyAction)
         self.purge = group.entity_purge_ops(PurgeRetentionPolicyAction)
+        self.partial_bulk_update = group.partial_bulk_update_ops(
+            PartialBulkUpdateRetentionPoliciesAction
+        )
+        self.partial_bulk_purge = group.entity_partial_bulk_purge_ops(
+            PartialBulkPurgeRetentionPoliciesAction
+        )
         self.global_search = group.global_searcher_ops(SearchRetentionPoliciesAction)

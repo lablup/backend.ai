@@ -5,9 +5,12 @@ from uuid import UUID
 
 from ai.backend.common.data.entity.deployment import DeploymentID
 from ai.backend.common.data.entity.runtime_variant import RuntimeVariantID
+from ai.backend.common.dto.manager.v2.common import PartialBulkFailure, PartialBulkPayload
 from ai.backend.common.dto.manager.v2.runtime_variant.request import (
     CreateRuntimeVariantInput,
     DeleteRuntimeVariantsInput,
+    PartialBulkPurgeRuntimeVariantsInput,
+    PartialBulkUpdateRuntimeVariantsInput,
     RuntimeVariantFilter,
     RuntimeVariantOrder,
     SearchRuntimeVariantsInput,
@@ -27,6 +30,7 @@ from ai.backend.common.dto.manager.v2.runtime_variant.types import (
     RuntimeVariantOrderField,
     RuntimeVariantUsage,
 )
+from ai.backend.manager.actions.v2.bulk.result import PartialBulkResult
 from ai.backend.manager.api.adapter_options.pagination.pagination import PaginationSpec
 from ai.backend.manager.api.adapters.base import BaseAdapter
 from ai.backend.manager.data.runtime_variant.types import RuntimeVariantData
@@ -56,6 +60,9 @@ from ai.backend.manager.services.runtime_variant.actions.create import CreateRun
 from ai.backend.manager.services.runtime_variant.actions.get import GetRuntimeVariantAction
 from ai.backend.manager.services.runtime_variant.actions.lookup import (
     LookupRuntimeVariantAction,
+)
+from ai.backend.manager.services.runtime_variant.actions.partial_bulk_update import (
+    PartialBulkUpdateRuntimeVariantsAction,
 )
 from ai.backend.manager.services.runtime_variant.actions.purge import PurgeRuntimeVariantAction
 from ai.backend.manager.services.runtime_variant.actions.scoped_search import (
@@ -159,24 +166,44 @@ class RuntimeVariantAdapter(BaseAdapter):
         self,
         input: UpdateRuntimeVariantInput,
     ) -> UpdateRuntimeVariantPayload:
-        updater = RuntimeVariantUpdater(
-            variant_id=RuntimeVariantID(input.id),
-            name=OptionalState.from_unset(input.name),
-            description=TriState.from_unset(input.description),
+        result = await self._runtime_variant.update.run(
+            UpdateRuntimeVariantAction(updater=self._to_updater(input))
         )
-        result = await self._runtime_variant.update.run(UpdateRuntimeVariantAction(updater=updater))
         return UpdateRuntimeVariantPayload(
             runtime_variant=self._data_to_node(result.data),
         )
 
-    async def delete(self, variant_id: UUID) -> DeleteRuntimeVariantPayload:
+    async def purge(self, variant_id: UUID) -> DeleteRuntimeVariantPayload:
+        """Purge a runtime variant with the presets in its catalog."""
         result = await self._runtime_variant.purge.run(
             PurgeRuntimeVariantAction(id=RuntimeVariantID(variant_id))
         )
         return DeleteRuntimeVariantPayload(id=result.data.id)
 
+    async def partial_bulk_update(
+        self, input: PartialBulkUpdateRuntimeVariantsInput
+    ) -> PartialBulkPayload[RuntimeVariantNode]:
+        """Update several runtime variants, answering for each one."""
+        result = await self._runtime_variant.partial_bulk_update.run(
+            PartialBulkUpdateRuntimeVariantsAction(
+                updaters=[self._to_updater(item) for item in input.items]
+            )
+        )
+        return self._to_partial_bulk_payload(result)
+
+    async def partial_bulk_purge(
+        self, input: PartialBulkPurgeRuntimeVariantsInput
+    ) -> PartialBulkPayload[RuntimeVariantNode]:
+        """Purge several runtime variants with their presets, answering for each one."""
+        result = await self._runtime_variant.bulk_purge.run(
+            BulkPurgeRuntimeVariantsAction(
+                ids=[RuntimeVariantID(variant_id) for variant_id in input.ids]
+            )
+        )
+        return self._to_partial_bulk_payload(result)
+
     async def bulk_delete(self, input: DeleteRuntimeVariantsInput) -> DeleteRuntimeVariantsPayload:
-        """Delete the named runtime variants, answering for each one."""
+        """Deprecated. Use :meth:`partial_bulk_purge`."""
         result = await self._runtime_variant.bulk_purge.run(
             BulkPurgeRuntimeVariantsAction(
                 ids=[RuntimeVariantID(variant_id) for variant_id in input.ids]
@@ -205,6 +232,27 @@ class RuntimeVariantAdapter(BaseAdapter):
         """
         result = await self._runtime_variant.lookup.run(LookupRuntimeVariantAction(name=name))
         return result.entity_id()
+
+    def _to_updater(self, input: UpdateRuntimeVariantInput) -> RuntimeVariantUpdater:
+        return RuntimeVariantUpdater(
+            variant_id=RuntimeVariantID(input.id),
+            name=OptionalState.from_unset(input.name),
+            description=TriState.from_unset(input.description),
+        )
+
+    def _to_partial_bulk_payload(
+        self, result: PartialBulkResult[RuntimeVariantData]
+    ) -> PartialBulkPayload[RuntimeVariantNode]:
+        return PartialBulkPayload[RuntimeVariantNode](
+            successes=[
+                self._data_to_node(item.value) for item in result.items if item.value is not None
+            ],
+            failed=[
+                PartialBulkFailure(id=item.entity_id, message=str(item.error))
+                for item in result.items
+                if item.error is not None
+            ],
+        )
 
     def _usage(self, usage: RuntimeVariantUsage | None) -> list[UsedBy]:
         """The uses the request named, each of which the caller must be able to read."""

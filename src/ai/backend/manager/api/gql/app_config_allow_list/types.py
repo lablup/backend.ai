@@ -23,6 +23,12 @@ from ai.backend.common.dto.manager.v2.app_config_allow_list.request import (
     CreateAppConfigAllowListInput as CreateAppConfigAllowListInputDTO,
 )
 from ai.backend.common.dto.manager.v2.app_config_allow_list.request import (
+    PartialBulkPurgeAppConfigAllowListsInput as PartialBulkPurgeAppConfigAllowListsInputDTO,
+)
+from ai.backend.common.dto.manager.v2.app_config_allow_list.request import (
+    PartialBulkUpdateAppConfigAllowListsInput as PartialBulkUpdateAppConfigAllowListsInputDTO,
+)
+from ai.backend.common.dto.manager.v2.app_config_allow_list.request import (
     PurgeAppConfigAllowListInput as PurgeAppConfigAllowListInputDTO,
 )
 from ai.backend.common.dto.manager.v2.app_config_allow_list.request import (
@@ -43,8 +49,10 @@ from ai.backend.common.dto.manager.v2.app_config_allow_list.response import (
 from ai.backend.common.dto.manager.v2.app_config_allow_list.types import (
     AppConfigScopeTypeFilter as AppConfigScopeTypeFilterDTO,
 )
+from ai.backend.common.dto.manager.v2.common import PartialBulkPayload
 from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import DateTimeFilter, OrderDirection, StringFilter, UUIDFilter
+from ai.backend.manager.api.gql.common_types import PartialBulkFailureGQL
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     PydanticInputMixin,
@@ -336,3 +344,55 @@ class PurgeAppConfigAllowListInputGQL(PydanticInputMixin[PurgeAppConfigAllowList
 )
 class PurgeAppConfigAllowListPayloadGQL(PydanticOutputMixin[PurgeAppConfigAllowListPayloadDTO]):
     pass
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Input for updating several allow-list entries, each answered for separately.",
+    ),
+    name="PartialBulkUpdateAppConfigAllowListsInput",
+)
+class PartialBulkUpdateAppConfigAllowListsInputGQL(
+    PydanticInputMixin[PartialBulkUpdateAppConfigAllowListsInputDTO]
+):
+    items: list[UpdateAppConfigAllowListInputGQL] = gql_field(
+        description="The allow-list entries to update, each with its id and fields."
+    )
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Input for purging several allow-list entries, each answered for separately.",
+    ),
+    name="PartialBulkPurgeAppConfigAllowListsInput",
+)
+class PartialBulkPurgeAppConfigAllowListsInputGQL(
+    PydanticInputMixin[PartialBulkPurgeAppConfigAllowListsInputDTO]
+):
+    ids: list[UUID] = gql_field(description="IDs of the allow-list entries to purge.")
+
+
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description=(
+            "Result of a partial bulk allow-list operation: the entries processed and the ones "
+            "that failed."
+        ),
+    ),
+    model=PartialBulkPayload[AppConfigAllowListNode],
+    name="PartialBulkAppConfigAllowListsPayload",
+)
+class PartialBulkAppConfigAllowListsPayloadGQL(
+    PydanticOutputMixin[PartialBulkPayload[AppConfigAllowListNode]]
+):
+    """Payload for partial bulk allow-list mutations."""
+
+    successes: list[AppConfigAllowListGQL] = gql_field(
+        description="The allow-list entries processed, as they stood when processed."
+    )
+    failed: list[PartialBulkFailureGQL] = gql_field(
+        description="The allow-list entries not processed, each with the reason."
+    )

@@ -40,8 +40,21 @@ def register_v2_model_card_routes(
     )
     registry.add("POST", "", handler.create, middlewares=[superadmin_required])
     registry.add("GET", "/{card_id}", handler.get, middlewares=[auth_required])
-    registry.add("PATCH", "/{card_id}", handler.update, middlewares=[superadmin_required])
-    registry.add("DELETE", "/{card_id}", handler.delete, middlewares=[superadmin_required])
+    registry.add("PATCH", "/{card_id}", handler.update, middlewares=[auth_required])
+    registry.add("DELETE", "/{card_id}", handler.purge, middlewares=[auth_required])
+    registry.add(
+        "POST",
+        "/partial-bulk-update",
+        handler.partial_bulk_update,
+        middlewares=[auth_required],
+    )
+    registry.add(
+        "POST",
+        "/partial-bulk-purge",
+        handler.partial_bulk_purge,
+        middlewares=[auth_required],
+    )
+    # Deprecated since NEXT_RELEASE_VERSION.
     registry.add(
         "POST",
         "/bulk-delete",

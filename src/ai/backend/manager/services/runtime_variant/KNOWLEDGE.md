@@ -1,7 +1,7 @@
 ---
 name: runtime-variant-service-shapes
 type: decision-table
-description: runtime_variant knowledge - why every read and the create and update run against ops, why the two purges keep a service, why the bulk purge is custom-backed and partial
+description: runtime_variant knowledge - why every read, the create and the single and partial bulk updates run against ops, why the two purges keep a service, why the bulk purge is custom-backed and partial
 scope: src/ai/backend/manager/services/runtime_variant
 keywords: [PurgeRuntimeVariantAction, BulkPurgeRuntimeVariantsAction, RuntimeVariantService, RuntimeVariantRepository, RuntimeVariantPresetsOfVariantPurger, partial_bulk, single_entity, RuntimeVariantEntityType]
 sources:

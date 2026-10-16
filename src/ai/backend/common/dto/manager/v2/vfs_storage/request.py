@@ -7,11 +7,14 @@ from uuid import UUID
 from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseRequestModel
+from ai.backend.common.dto.manager.v2.common import NonEmptyList
 
 __all__ = (
     "AdminSearchVFSStoragesInput",
     "CreateVFSStorageInput",
     "DeleteVFSStorageInput",
+    "PartialBulkPurgeVFSStoragesInput",
+    "PartialBulkUpdateVFSStoragesInput",
     "UpdateVFSStorageInput",
 )
 
@@ -37,6 +40,20 @@ class DeleteVFSStorageInput(BaseRequestModel):
     """Input for deleting a VFS storage."""
 
     id: UUID = Field(description="Storage ID to delete")
+
+
+class PartialBulkUpdateVFSStoragesInput(BaseRequestModel):
+    """Input for updating several VFS storages, each answered for separately."""
+
+    items: NonEmptyList[UpdateVFSStorageInput] = Field(
+        description="The VFS storages to update, each with its ID and fields."
+    )
+
+
+class PartialBulkPurgeVFSStoragesInput(BaseRequestModel):
+    """Input for permanently purging several VFS storages, each answered for separately."""
+
+    ids: NonEmptyList[UUID] = Field(description="IDs of the VFS storages to purge.")
 
 
 class AdminSearchVFSStoragesInput(BaseRequestModel):

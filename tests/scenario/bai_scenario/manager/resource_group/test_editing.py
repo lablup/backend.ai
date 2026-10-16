@@ -87,7 +87,8 @@ class Editing(When[AGroupAndACaller, ResourceGroupAdapter, ResourceGroupDetailNo
             fields["is_default"] = self.is_default
         with ActingAs(laid.caller):
             payload = await adapter.update(
-                UNKNOWN if self.unknown else laid.group.name, UpdateResourceGroupInput(**fields)
+                await adapter.lookup_name(UNKNOWN if self.unknown else laid.group.name),
+                UpdateResourceGroupInput(**fields),
             )
         return payload.resource_group
 

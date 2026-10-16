@@ -23,8 +23,10 @@ def register_v2_login_client_type_routes(
         POST   /            create (superadmin only)
         POST   /search      search with filter/order/pagination (authenticated users)
         GET    /{id}        get by id (authenticated users)
-        PATCH  /{id}        update (superadmin only)
-        DELETE /{id}        delete (superadmin only)
+        PATCH  /{id}        update
+        DELETE /{id}        purge
+        POST   /partial-bulk-update
+        POST   /partial-bulk-purge
     """
     registry = RouteRegistry.create("login-client-types", route_deps.cors_options)
 
@@ -49,14 +51,26 @@ def register_v2_login_client_type_routes(
     registry.add(
         "PATCH",
         "/{login_client_type_id}",
-        handler.admin_update,
-        middlewares=[superadmin_required],
+        handler.update,
+        middlewares=[auth_required],
     )
     registry.add(
         "DELETE",
         "/{login_client_type_id}",
-        handler.admin_delete,
-        middlewares=[superadmin_required],
+        handler.purge,
+        middlewares=[auth_required],
+    )
+    registry.add(
+        "POST",
+        "/partial-bulk-update",
+        handler.partial_bulk_update,
+        middlewares=[auth_required],
+    )
+    registry.add(
+        "POST",
+        "/partial-bulk-purge",
+        handler.partial_bulk_purge,
+        middlewares=[auth_required],
     )
 
     return registry
