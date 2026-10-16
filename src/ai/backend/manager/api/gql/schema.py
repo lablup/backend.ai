@@ -88,6 +88,8 @@ from ai.backend.manager.api.gql.client_ip_masking.resolver import (
 from ai.backend.manager.api.gql.container_registry.resolver.mutation import (
     admin_create_container_registry_v2,
     admin_delete_container_registry_v2,
+    admin_partial_bulk_purge_container_registries_v2,
+    admin_purge_container_registry_v2,
     admin_update_container_registry_v2,
 )
 from ai.backend.manager.api.gql.container_registry.resolver.query import (
@@ -97,10 +99,15 @@ from ai.backend.manager.api.gql.decorators import BackendAIGQLMeta, gql_root_fie
 from ai.backend.manager.api.gql.deployment.resolver.access_token import (
     create_access_token,
     delete_access_token,
+    partial_bulk_purge_access_tokens,
+    purge_access_token,
 )
 from ai.backend.manager.api.gql.deployment.resolver.auto_scaling import (
     create_auto_scaling_rule,
     delete_auto_scaling_rule,
+    partial_bulk_purge_auto_scaling_rules,
+    partial_bulk_update_auto_scaling_rules,
+    purge_auto_scaling_rule,
     update_auto_scaling_rule,
 )
 from ai.backend.manager.api.gql.deployment.resolver.deployment import (
@@ -136,6 +143,10 @@ from ai.backend.manager.api.gql.deployment.resolver.revision_preset import (
     admin_update_deployment_revision_preset,
     deployment_revision_preset,
     deployment_revision_presets,
+    partial_bulk_purge_deployment_revision_presets,
+    partial_bulk_update_deployment_revision_presets,
+    purge_deployment_revision_preset,
+    update_deployment_revision_preset,
 )
 from ai.backend.manager.api.gql.deployment.resolver.route import (
     route,
@@ -164,7 +175,9 @@ from ai.backend.manager.api.gql.domain_v2.resolver.query import (
 from ai.backend.manager.api.gql.entity.resolver.query import entity_types
 from ai.backend.manager.api.gql.entity_label.resolver.mutation import (
     partial_bulk_purge_entity_label,
+    partial_bulk_purge_entity_labels,
     partial_bulk_upsert_entity_label,
+    partial_bulk_upsert_entity_labels,
     purge_entity_label,
     upsert_entity_label,
 )
@@ -618,6 +631,7 @@ from ai.backend.manager.api.gql.session.resolver.session import (
     exclude_session_idle_checks,
     include_session_idle_checks,
     my_sessions_v2,
+    partial_bulk_terminate_sessions_v2,
     project_sessions_v2,
     scoped_sessions_v2,
     session_v2,
@@ -744,6 +758,8 @@ from .resource_slot.resolver import (
     admin_create_resource_slot_type,
     admin_purge_resource_slot_type,
     admin_update_resource_slot_type,
+    partial_bulk_purge_resource_slot_types,
+    purge_resource_slot_type,
     resource_slot_type,
     resource_slot_types,
 )
@@ -1050,6 +1066,8 @@ class Mutation:
     admin_create_resource_slot_type = admin_create_resource_slot_type
     admin_update_resource_slot_type = admin_update_resource_slot_type
     admin_purge_resource_slot_type = admin_purge_resource_slot_type
+    purge_resource_slot_type = purge_resource_slot_type
+    partial_bulk_purge_resource_slot_types = partial_bulk_purge_resource_slot_types
     admin_create_app_config_allow_list = admin_create_app_config_allow_list
     admin_purge_app_config_allow_list = admin_purge_app_config_allow_list
     admin_update_app_config_allow_list = admin_update_app_config_allow_list
@@ -1082,6 +1100,10 @@ class Mutation:
     admin_create_container_registry_v2 = admin_create_container_registry_v2
     admin_update_container_registry_v2 = admin_update_container_registry_v2
     admin_delete_container_registry_v2 = admin_delete_container_registry_v2
+    admin_purge_container_registry_v2 = admin_purge_container_registry_v2
+    admin_partial_bulk_purge_container_registries_v2 = (
+        admin_partial_bulk_purge_container_registries_v2
+    )
     create_model_deployment = create_model_deployment
     update_model_deployment = update_model_deployment
     delete_model_deployment = delete_model_deployment
@@ -1119,6 +1141,9 @@ class Mutation:
     create_auto_scaling_rule = create_auto_scaling_rule
     update_auto_scaling_rule = update_auto_scaling_rule
     delete_auto_scaling_rule = delete_auto_scaling_rule
+    purge_auto_scaling_rule = purge_auto_scaling_rule
+    partial_bulk_update_auto_scaling_rules = partial_bulk_update_auto_scaling_rules
+    partial_bulk_purge_auto_scaling_rules = partial_bulk_purge_auto_scaling_rules
     delete_object_storage = delete_object_storage
     purge_object_storage = purge_object_storage
     partial_bulk_update_object_storages = partial_bulk_update_object_storages
@@ -1149,6 +1174,8 @@ class Mutation:
     reject_artifact_revision = reject_artifact_revision
     create_access_token = create_access_token
     delete_access_token = delete_access_token
+    purge_access_token = purge_access_token
+    partial_bulk_purge_access_tokens = partial_bulk_purge_access_tokens
     activate_deployment_revision = activate_deployment_revision
     update_route_traffic_status = update_route_traffic_status
     # Fair Share
@@ -1412,6 +1439,12 @@ class Mutation:
     admin_create_deployment_revision_preset = admin_create_deployment_revision_preset
     admin_update_deployment_revision_preset = admin_update_deployment_revision_preset
     admin_delete_deployment_revision_preset = admin_delete_deployment_revision_preset
+    update_deployment_revision_preset = update_deployment_revision_preset
+    purge_deployment_revision_preset = purge_deployment_revision_preset
+    partial_bulk_update_deployment_revision_presets = (
+        partial_bulk_update_deployment_revision_presets
+    )
+    partial_bulk_purge_deployment_revision_presets = partial_bulk_purge_deployment_revision_presets
     # Model Card mutations
     admin_create_model_card_v2 = admin_create_model_card_v2
     admin_update_model_card_v2 = admin_update_model_card_v2
@@ -1448,12 +1481,15 @@ class Mutation:
     # Session V2 mutations
     enqueue_session = enqueue_session
     terminate_sessions_v2 = terminate_sessions_v2
+    partial_bulk_terminate_sessions_v2 = partial_bulk_terminate_sessions_v2
     exclude_session_idle_checks = exclude_session_idle_checks
     include_session_idle_checks = include_session_idle_checks
     # Entity Label mutations
     upsert_entity_label = upsert_entity_label
-    partial_bulk_upsert_entity_label = partial_bulk_upsert_entity_label
+    partial_bulk_upsert_entity_labels = partial_bulk_upsert_entity_labels
     purge_entity_label = purge_entity_label
+    partial_bulk_purge_entity_labels = partial_bulk_purge_entity_labels
+    partial_bulk_upsert_entity_label = partial_bulk_upsert_entity_label
     partial_bulk_purge_entity_label = partial_bulk_purge_entity_label
 
 
