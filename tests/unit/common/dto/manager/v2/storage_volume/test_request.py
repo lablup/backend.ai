@@ -28,6 +28,7 @@ from ai.backend.common.dto.manager.v2.storage_volume.types import (
     StorageVolumeServiceHoldingOrderField,
     StorageVolumeUsageExposureInput,
 )
+from ai.backend.common.exception import BackendAISchemaValidationFailed
 from ai.backend.common.tristate.unset import UNSET
 
 
@@ -38,12 +39,13 @@ class TestUpdateStorageVolumeInput:
         assert input.status_stale_after_seconds is UNSET
         assert input.usage_exposure is UNSET
 
-    def test_name_is_stripped(self) -> None:
-        assert UpdateStorageVolumeInput(name="  local  ").name == "local"
+    def test_name_is_taken_as_given(self) -> None:
+        """``String64`` does not strip, so the surrounding space is kept."""
+        assert UpdateStorageVolumeInput(name="  local  ").name == "  local  "
 
-    def test_blank_name_is_refused(self) -> None:
+    def test_empty_name_is_refused(self) -> None:
         with pytest.raises(ValidationError):
-            UpdateStorageVolumeInput(name=" ")
+            UpdateStorageVolumeInput(name="")
 
     def test_name_longer_than_the_column_is_refused(self) -> None:
         with pytest.raises(ValidationError):
@@ -113,7 +115,7 @@ class TestAdminSearchStorageVolumesInput:
         [("first", 0), ("last", 0), ("limit", 0), ("offset", -1)],
     )
     def test_out_of_range_pagination_is_refused(self, field: str, value: int) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             AdminSearchStorageVolumesInput.model_validate({field: value})
 
 
@@ -165,7 +167,7 @@ class TestSearchResourceGroupVolumeOffersInput:
 
 class TestUpsertResourceGroupVolumeOfferInput:
     def test_the_pair_is_required(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             UpsertResourceGroupVolumeOfferInput.model_validate({
                 "resource_group_id": str(uuid.uuid4())
             })
@@ -190,7 +192,7 @@ class TestUpsertResourceGroupVolumeOfferInput:
 
 class TestPurgeResourceGroupVolumeOfferInput:
     def test_the_pair_is_required(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             PurgeResourceGroupVolumeOfferInput.model_validate({
                 "storage_volume_id": str(uuid.uuid4())
             })

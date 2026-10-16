@@ -93,6 +93,7 @@ from ai.backend.manager.api.gql.types import StrawberryGQLContext
 
 __all__ = (
     "DeleteStorageVolumePayloadGQL",
+    "StorageVolumeEdgeGQL",
     "PurgeResourceGroupVolumeOfferInputGQL",
     "PurgeResourceGroupVolumeOfferPayloadGQL",
     "PurgeStorageVolumePayloadGQL",
@@ -400,7 +401,15 @@ class StorageVolumeGQL(PydanticNodeMixin[StorageVolumeNode]):
         raise NotImplementedError
 
 
-StorageVolumeEdgeGQL = Edge[StorageVolumeGQL]
+@gql_connection_type(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="One storage volume within a connection.",
+    ),
+    name="StorageVolumeV2Edge",
+)
+class StorageVolumeEdgeGQL(Edge[StorageVolumeGQL]):
+    pass
 
 
 @gql_connection_type(
@@ -411,6 +420,11 @@ StorageVolumeEdgeGQL = Edge[StorageVolumeGQL]
     name="StorageVolumeV2Connection",
 )
 class StorageVolumeConnectionGQL(Connection[StorageVolumeGQL]):
+    # Restated so the schema's edge type is the described one above rather than the
+    # one Strawberry would generate from the generic, which carries no version.
+    edges: list[StorageVolumeEdgeGQL] = gql_field(  # type: ignore[assignment]
+        description="Contains the nodes in this connection."
+    )
     count: int = gql_field(description="Total number of storage volumes matching the query.")
 
     def __init__(self, *args: Any, count: int, **kwargs: Any) -> None:
