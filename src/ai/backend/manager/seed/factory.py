@@ -13,6 +13,7 @@ from ai.backend.manager.seed.container_registry_project.seed import (
 from ai.backend.manager.seed.deployment_preset.seed import DeploymentPresetSeed
 from ai.backend.manager.seed.domain.seed import DomainSeed
 from ai.backend.manager.seed.idle_checker.seed import IdleCheckerSeed
+from ai.backend.manager.seed.idle_checker_assignment.seed import IdleCheckerAssignmentSeed
 from ai.backend.manager.seed.login_client_type.seed import LoginClientTypeSeed
 from ai.backend.manager.seed.notification_channel.seed import NotificationChannelSeed
 from ai.backend.manager.seed.notification_rule.seed import NotificationRuleSeed
@@ -89,4 +90,5 @@ def create_seed_kind_registry() -> SeedKindRegistry:
         SeedKind.RESOURCE_GROUP_FOR_PROJECT: (1, ResourceGroupForProjectSeed),
         SeedKind.RESOURCE_GROUP_FOR_KEYPAIR: (1, ResourceGroupForKeypairSeed),
         SeedKind.CONTAINER_REGISTRY_PROJECT: (1, ContainerRegistryProjectSeed),
+        SeedKind.IDLE_CHECKER_ASSIGNMENT: (1, IdleCheckerAssignmentSeed),
     })
