@@ -12,6 +12,7 @@ from __future__ import annotations
 from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseResponseModel
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 
 __all__ = (
     "BgtaskCancelledNode",
@@ -33,7 +34,15 @@ class SessionEventNode(BaseResponseModel):
 
     reason: str = Field(default="", description="Reason for the session event")
     session_name: str = Field(default="", description="Session name")
-    owner_access_key: str = Field(default="", description="Access key of the session owner")
+    owner_access_key: str = Field(
+        default="",
+        deprecated=True,
+        description=f"Access key of the session owner. Deprecated since {NEXT_RELEASE_VERSION}. Use `owner_user_id`.",
+    )
+    owner_user_id: str = Field(
+        default="",
+        description=f"UUID of the session owner. Added in {NEXT_RELEASE_VERSION}.",
+    )
     session_id: str = Field(default="", description="Session ID")
     exit_code: int | None = Field(default=None, description="Exit code of the session process")
 

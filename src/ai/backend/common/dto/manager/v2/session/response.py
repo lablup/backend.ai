@@ -17,6 +17,7 @@ from ai.backend.common.data.entity.idle_checker import IdleCheckerID
 from ai.backend.common.data.entity.session import SessionID
 from ai.backend.common.dto.manager.pagination import PaginationInfo
 from ai.backend.common.dto.manager.v2.session.types import SessionTerminationStatusEnum
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.common.types import SessionId
 
 __all__ = (
@@ -65,7 +66,9 @@ class SessionMetadataInfo(BaseResponseModel):
     name: str | None = Field(default=None, description="Human-readable name of the session.")
     session_type: str = Field(description="Type of the session (interactive, batch, inference).")
     access_key: str | None = Field(
-        default=None, description="Access key used to create this session."
+        default=None,
+        deprecated=True,
+        description=f"Access key used to create this session. Deprecated since {NEXT_RELEASE_VERSION}. Use `user_id`.",
     )
     cluster_mode: str = Field(
         description="Cluster mode for distributed sessions (single-node, multi-node)."
@@ -384,7 +387,9 @@ class SessionMetadataInfoGQLDTO(BaseResponseModel):
     name: str | None = Field(default=None, description="Human-readable name of the session.")
     session_type: str = Field(description="Type of the session (interactive, batch, inference).")
     access_key: str | None = Field(
-        default=None, description="Access key used to create this session."
+        default=None,
+        deprecated=True,
+        description=f"Access key used to create this session. Deprecated since {NEXT_RELEASE_VERSION}. Use `user_id`.",
     )
     cluster_mode: str = Field(
         description="Cluster mode for distributed sessions (single-node, multi-node)."

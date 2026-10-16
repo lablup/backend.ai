@@ -44,7 +44,11 @@ class LoginSessionFilter(BaseRequestModel):
 
     user_id: UUIDFilter | None = Field(default=None, description="User ID filter")
     status: LoginSessionStatusFilter | None = Field(default=None, description="Status filter")
-    access_key: StringFilter | None = Field(default=None, description="Access key filter")
+    access_key: StringFilter | None = Field(
+        default=None,
+        deprecated=True,
+        description=f"Access key filter. Deprecated since {NEXT_RELEASE_VERSION}. Use `user_id`",
+    )
     created_at: DateTimeFilter | None = Field(
         default=None, description="Filter sessions by created_at datetime"
     )

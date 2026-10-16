@@ -326,6 +326,7 @@ class SchedulingController:
                 spec.resource_spec.identity.session_id,
                 spec.resource_spec.identity.session_name,
                 spec.resource_spec.identity.access_key,
+                spec.resource_spec.identity.user_uuid,
             ),
             return_when=ALL_COMPLETED,
         )
@@ -359,6 +360,7 @@ class SchedulingController:
                 session_id,
                 spec.resource_spec.identity.session_name,
                 spec.resource_spec.identity.access_key,
+                spec.resource_spec.identity.user_uuid,
             ),
         )
 

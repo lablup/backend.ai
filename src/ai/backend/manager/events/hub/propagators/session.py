@@ -115,6 +115,7 @@ class SessionEventPropagator(EventPropagator):
             "reason": event_data.get("reason", ""),
             "sessionName": event_data.get("session_name", ""),
             "ownerAccessKey": event_data.get("access_key", ""),
+            "ownerUserId": str(event_data.get("user_uuid", "")),
             "sessionId": str(event_data.get("session_id", "")),
             "exitCode": event_data.get("exit_code"),
         }

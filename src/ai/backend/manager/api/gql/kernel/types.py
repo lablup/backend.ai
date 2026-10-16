@@ -215,7 +215,10 @@ class KernelV2ClusterInfoGQL:
 )
 class KernelV2UserInfoGQL:
     user_id: UUID | None = gql_field(description="The UUID of the user who owns this kernel.")
-    access_key: str | None = gql_field(description="The access key used to create this kernel.")
+    access_key: str | None = gql_field(
+        description="The access key used to create this kernel.",
+        deprecation_reason=f"Deprecated since {NEXT_RELEASE_VERSION}. Use `userId`.",
+    )
     domain_name: str | None = gql_field(description="The domain this kernel belongs to.")
     group_id: UUID | None = gql_field(description="The group (project) ID this kernel belongs to.")
 
