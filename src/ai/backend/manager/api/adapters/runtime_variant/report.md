@@ -2,18 +2,20 @@
 
 [무엇을 보장하는가](/src/ai/backend/manager/api/adapters/runtime_variant/KNOWLEDGE.md) · [어댑터](/src/ai/backend/manager/api/adapters/runtime_variant/adapter.py)
 
-시나리오: 미완 2 / 8
+시나리오: 미완 4 / 10
 
-- ops 로 구성 (6)
+- ops 로 구성 (7)
   - batch_load_by_ids — 대표 성공 ✓ · 대표 실패 ✓
   - create — 대표 성공 ✓ · 대표 실패 ✓
   - get — 대표 성공 ✓ · 대표 실패 ✓
+  - partial_bulk_update — 대표 성공 ✓ · 대표 실패 ✗ — SCENARIO-GAP
   - resolve_by_name — 대표 성공 ✓ · 대표 실패 ✓
   - search — 대표 성공 ✓ · 대표 실패 ✗ — SCENARIO-GAP
   - update — 대표 성공 ✓ · 대표 실패 ✓
-- 직접 구현 (2)
+- 직접 구현 (3)
   - bulk_delete — 성공 있음 3 · 실패 없음 (partial_bulk) — SCENARIO-GAP
-  - delete — 성공 있음 2 · 실패 있음 2 (single_entity)
+  - partial_bulk_purge — 성공 있음 2 · 실패 없음 (partial_bulk) — SCENARIO-GAP
+  - purge — 성공 있음 2 · 실패 있음 2 (single_entity)
 
 **batch_load_by_ids**
 
@@ -38,6 +40,13 @@
 |---|---|
 | [아무 권한도 없는 사용자가 id로 조회하면, 그 변형 전체가 반환된다. 이 조회는 인증만 확인한다](#reading-a-user-granted-nothing-reads-a-variant-by-id) | 성공 |
 | [존재하지 않는 id로 조회하면 거부된다. 권한을 물을 대상이 없으므로, 없는 것인지 닿지 못하는 것인지는 응답으로 드러나지 않는다](#reading-reading-a-variant-id-nothing-answers-to-is-refused) | 거부 |
+
+**partial_bulk_update**
+
+| 시나리오 | 판정 |
+|---|---|
+| [아무 권한도 없는 사용자가 변형 여럿을 한 번에 고치려 하면, 고쳐진 것 없이 모두 권한이 없다는 이유로 실패 목록에 온다](#partial_bulk_editing-a-user-granted-nothing-edits-none-of-several-variants) | 성공 |
+| [슈퍼관리자가 변형 여럿의 설명을 한 번에 바꾸면, 모두 새 설명으로 오고 실패한 것은 없다](#partial_bulk_editing-the-superadmin-edits-several-variants-at-once) | 성공 |
 
 **resolve_by_name**
 
@@ -75,7 +84,14 @@
 | [있는 id 뒤에 없는 id를 붙여 한 번에 삭제하면, 있는 것은 삭제된 목록에, 없는 id는 실패 목록에 반환된다](#retiring-an-unknown-id-in-a-bulk-delete-fails-alone-while-the-known-one-is-deleted) | 성공 |
 | [슈퍼관리자가 변형 둘을 한 번에 삭제하면, 둘 다 삭제된 목록에 반환되고 실패 목록은 비어 있다](#retiring-the-superadmin-deletes-many-variants-at-once) | 성공 |
 
-**delete**
+**partial_bulk_purge**
+
+| 시나리오 | 판정 |
+|---|---|
+| [아무 권한도 없는 사용자가 변형 여럿을 한 번에 purge 하려 하면, purge 된 것 없이 모두 권한이 없다는 이유로 실패 목록에 온다](#partial_bulk_purging-a-user-granted-nothing-purges-none-of-several-variants) | 성공 |
+| [슈퍼관리자가 변형 둘과 없는 id 하나를 한 번에 purge 하면, 둘은 purge 되기 전 모습으로 처리된 목록에 오고 없는 id 는 실패 목록에 온다](#partial_bulk_purging-purging-several-variants-answers-for-the-missing-one) | 성공 |
+
+**purge**
 
 | 시나리오 | 판정 |
 |---|---|
@@ -373,6 +389,90 @@ Then
 
 - 거부된다
   - 거부: NotEnoughPermission
+
+### partial_bulk_update
+
+<a id="partial_bulk_editing-a-user-granted-nothing-edits-none-of-several-variants"></a>
+
+#### [a-user-granted-nothing-edits-none-of-several-variants](/tests/scenario/bai_scenario/manager/runtime_variant/test_partial_bulk_editing.py) — pass
+
+아무 권한도 없는 사용자가 변형 여럿을 한 번에 고치려 하면, 고쳐진 것 없이 모두 권한이 없다는 이유로 실패 목록에 온다
+
+Given
+
+- 런타임 변형 2개와, 일반 사용자 한 명
+  - 런타임 변형 wanted-1: 기본 모델 정의가 비어 있고, 모델 폴더의 설정 파일을 읽지 않는다
+  - 런타임 변형 other-1: 기본 모델 정의가 비어 있고, 모델 폴더의 설정 파일을 읽지 않는다
+  - 도메인 home-1
+  - public 에서 runtime_variant 조회 권한을 받은 사용자 준비
+    - 도메인에 속한 사용자 한 명 준비
+      - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+      - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+    - 역할 public-reader-1: 이 역할이 앉은 스코프 안에서만 통한다
+    - 역할 public-reader-1: runtime_variant 전체에 READ 허용
+    - 일반 사용자 user-1: 역할 public-reader-1 보유
+
+When
+
+- RuntimeVariantAdapter.partial_bulk_update — user-1이 변형 2개의 설명을 한 번에 고침
+
+Then
+
+- 처리된 변형 없이 미리 만들어 둔 변형이 모두 실패 목록에 온다
+  - successes = []
+  - failed count = 2
+  - failed[0].id: 미리 만들어 둔 변형의 id와 같다
+  - failed[0].message: 'Insufficient permission'를 담은 이유
+  - failed[1].id: 미리 만들어 둔 변형의 id와 같다
+  - failed[1].message: 'Insufficient permission'를 담은 이유
+
+<a id="partial_bulk_editing-the-superadmin-edits-several-variants-at-once"></a>
+
+#### [the-superadmin-edits-several-variants-at-once](/tests/scenario/bai_scenario/manager/runtime_variant/test_partial_bulk_editing.py) — pass
+
+슈퍼관리자가 변형 여럿의 설명을 한 번에 바꾸면, 모두 새 설명으로 오고 실패한 것은 없다
+
+Given
+
+- 런타임 변형 2개와, 슈퍼관리자 한 명
+  - 런타임 변형 wanted-1: 기본 모델 정의가 비어 있고, 모델 폴더의 설정 파일을 읽지 않는다
+  - 런타임 변형 other-1: 기본 모델 정의가 비어 있고, 모델 폴더의 설정 파일을 읽지 않는다
+  - 도메인 home-1
+  - public 에서 runtime_variant 조회 권한을 받은 사용자 준비
+    - 도메인에 속한 사용자 한 명 준비
+      - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+      - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+    - 역할 public-reader-1: 이 역할이 앉은 스코프 안에서만 통한다
+    - 역할 public-reader-1: runtime_variant 전체에 READ 허용
+    - 슈퍼관리자 user-1: 역할 public-reader-1 보유
+
+When
+
+- RuntimeVariantAdapter.partial_bulk_update — user-1이 변형 2개의 설명을 한 번에 고침
+
+Then
+
+- 미리 만들어 둔 변형이 모두 처리된 목록에 오고, 실패한 것은 없다
+  - successes count = 2
+  - successes[0].id: 무시함 — 데이터베이스가 만든다
+  - successes[0].name = 'wanted-1'
+  - successes[0].description = '한 번에 고친 설명'
+  - successes[0].reads_vfolder_config_files = False
+  - successes[0].default_model_definition = RuntimeVariantModelDefinitionInfo(models=None)
+  - successes[0].created_at: 이 실행이 쓴 시각
+  - successes[0].updated_at: 이 실행이 쓴 시각
+  - successes[1].id: 무시함 — 데이터베이스가 만든다
+  - successes[1].name = 'other-1'
+  - successes[1].description = '한 번에 고친 설명'
+  - successes[1].reads_vfolder_config_files = False
+  - successes[1].default_model_definition = RuntimeVariantModelDefinitionInfo(models=None)
+  - successes[1].created_at: 이 실행이 쓴 시각
+  - successes[1].updated_at: 이 실행이 쓴 시각
+  - failed = []
 
 ### resolve_by_name
 
@@ -920,7 +1020,93 @@ Then
   - failed = []
   - deleted_count = 2
 
-### delete
+### partial_bulk_purge
+
+<a id="partial_bulk_purging-a-user-granted-nothing-purges-none-of-several-variants"></a>
+
+#### [a-user-granted-nothing-purges-none-of-several-variants](/tests/scenario/bai_scenario/manager/runtime_variant/test_partial_bulk_purging.py) — pass
+
+아무 권한도 없는 사용자가 변형 여럿을 한 번에 purge 하려 하면, purge 된 것 없이 모두 권한이 없다는 이유로 실패 목록에 온다
+
+Given
+
+- 런타임 변형 2개와, 일반 사용자 한 명
+  - 런타임 변형 wanted-1: 기본 모델 정의가 비어 있고, 모델 폴더의 설정 파일을 읽지 않는다
+  - 런타임 변형 other-1: 기본 모델 정의가 비어 있고, 모델 폴더의 설정 파일을 읽지 않는다
+  - 도메인 home-1
+  - public 에서 runtime_variant 조회 권한을 받은 사용자 준비
+    - 도메인에 속한 사용자 한 명 준비
+      - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+      - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+    - 역할 public-reader-1: 이 역할이 앉은 스코프 안에서만 통한다
+    - 역할 public-reader-1: runtime_variant 전체에 READ 허용
+    - 일반 사용자 user-1: 역할 public-reader-1 보유
+
+When
+
+- RuntimeVariantAdapter.partial_bulk_purge — user-1이 변형 2개를 한 번에 purge 함
+
+Then
+
+- 처리된 변형 없이 미리 만들어 둔 변형이 모두 실패 목록에 온다
+  - successes = []
+  - failed count = 2
+  - failed[0].id: 미리 만들어 둔 변형의 id와 같다
+  - failed[0].message: 'Insufficient permission'를 담은 이유
+  - failed[1].id: 미리 만들어 둔 변형의 id와 같다
+  - failed[1].message: 'Insufficient permission'를 담은 이유
+
+<a id="partial_bulk_purging-purging-several-variants-answers-for-the-missing-one"></a>
+
+#### [purging-several-variants-answers-for-the-missing-one](/tests/scenario/bai_scenario/manager/runtime_variant/test_partial_bulk_purging.py) — pass
+
+슈퍼관리자가 변형 둘과 없는 id 하나를 한 번에 purge 하면, 둘은 purge 되기 전 모습으로 처리된 목록에 오고 없는 id 는 실패 목록에 온다
+
+Given
+
+- 런타임 변형 2개와, 슈퍼관리자 한 명
+  - 런타임 변형 wanted-1: 기본 모델 정의가 비어 있고, 모델 폴더의 설정 파일을 읽지 않는다
+  - 런타임 변형 other-1: 기본 모델 정의가 비어 있고, 모델 폴더의 설정 파일을 읽지 않는다
+  - 도메인 home-1
+  - public 에서 runtime_variant 조회 권한을 받은 사용자 준비
+    - 도메인에 속한 사용자 한 명 준비
+      - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+      - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+    - 역할 public-reader-1: 이 역할이 앉은 스코프 안에서만 통한다
+    - 역할 public-reader-1: runtime_variant 전체에 READ 허용
+    - 슈퍼관리자 user-1: 역할 public-reader-1 보유
+
+When
+
+- RuntimeVariantAdapter.partial_bulk_purge — user-1이 변형 2개 와 없는 id 하나를 한 번에 purge 함
+
+Then
+
+- 미리 만들어 둔 변형이 모두 처리된 목록에 오고, 없는 id 는 실패 목록에 온다
+  - successes count = 2
+  - successes[0].id: 무시함 — 데이터베이스가 만든다
+  - successes[0].name = 'wanted-1'
+  - successes[0].description = '미리 만들어 둔 런타임 변형'
+  - successes[0].reads_vfolder_config_files = False
+  - successes[0].default_model_definition = RuntimeVariantModelDefinitionInfo(models=None)
+  - successes[0].created_at: 이 실행이 쓴 시각
+  - successes[0].updated_at: 이 실행이 쓴 시각
+  - successes[1].id: 무시함 — 데이터베이스가 만든다
+  - successes[1].name = 'other-1'
+  - successes[1].description = '미리 만들어 둔 런타임 변형'
+  - successes[1].reads_vfolder_config_files = False
+  - successes[1].default_model_definition = RuntimeVariantModelDefinitionInfo(models=None)
+  - successes[1].created_at: 이 실행이 쓴 시각
+  - successes[1].updated_at: 이 실행이 쓴 시각
+  - failed count = 1
+  - failed[0].id: 요청에 넣은 없는 id와 같다
+  - failed[0].message: 무시함 — 이유는 문자열로 오고, 문자열은 바뀌어도 되는 값이다
+
+### purge
 
 <a id="retiring-the-superadmin-deletes-a-variant"></a>
 
@@ -945,7 +1131,7 @@ Given
 
 When
 
-- RuntimeVariantAdapter.delete — user-1이 variant-1 삭제
+- RuntimeVariantAdapter.purge — user-1이 variant-1 삭제
 
 Then
 
@@ -975,7 +1161,7 @@ Given
 
 When
 
-- RuntimeVariantAdapter.delete — user-1이 variant-1 삭제
+- RuntimeVariantAdapter.purge — user-1이 variant-1 삭제
 
 Then
 
@@ -1005,7 +1191,7 @@ Given
 
 When
 
-- RuntimeVariantAdapter.delete — user-1이 variant-1 삭제
+- RuntimeVariantAdapter.purge — user-1이 variant-1 삭제
 
 Then
 
@@ -1035,7 +1221,7 @@ Given
 
 When
 
-- RuntimeVariantAdapter.delete — user-1이 존재하지 않는 id 삭제
+- RuntimeVariantAdapter.purge — user-1이 존재하지 않는 id 삭제
 
 Then
 

@@ -22,6 +22,9 @@ from ai.backend.common.dto.manager.v2.app_config_definition.request import (
     CreateAppConfigDefinitionInput as CreateAppConfigDefinitionInputDTO,
 )
 from ai.backend.common.dto.manager.v2.app_config_definition.request import (
+    PartialBulkPurgeAppConfigDefinitionsInput as PartialBulkPurgeAppConfigDefinitionsInputDTO,
+)
+from ai.backend.common.dto.manager.v2.app_config_definition.request import (
     PurgeAppConfigDefinitionInput as PurgeAppConfigDefinitionInputDTO,
 )
 from ai.backend.common.dto.manager.v2.app_config_definition.response import (
@@ -33,8 +36,10 @@ from ai.backend.common.dto.manager.v2.app_config_definition.response import (
 from ai.backend.common.dto.manager.v2.app_config_definition.response import (
     PurgeAppConfigDefinitionPayload as PurgeAppConfigDefinitionPayloadDTO,
 )
+from ai.backend.common.dto.manager.v2.common import PartialBulkPayload
 from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import DateTimeFilter, OrderDirection, StringFilter, UUIDFilter
+from ai.backend.manager.api.gql.common_types import PartialBulkFailureGQL
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     PydanticInputMixin,
@@ -240,3 +245,42 @@ class CreateAppConfigDefinitionPayloadGQL(PydanticOutputMixin[CreateAppConfigDef
 )
 class PurgeAppConfigDefinitionPayloadGQL(PydanticOutputMixin[PurgeAppConfigDefinitionPayloadDTO]):
     pass
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description=(
+            "Input for purging several app config definitions, each answered for separately."
+        ),
+    ),
+    name="PartialBulkPurgeAppConfigDefinitionsInput",
+)
+class PartialBulkPurgeAppConfigDefinitionsInputGQL(
+    PydanticInputMixin[PartialBulkPurgeAppConfigDefinitionsInputDTO]
+):
+    ids: list[UUID] = gql_field(description="IDs of the app config definitions to purge.")
+
+
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description=(
+            "Result of a partial bulk app config definition operation: the definitions "
+            "processed and the ones that failed."
+        ),
+    ),
+    model=PartialBulkPayload[AppConfigDefinitionNode],
+    name="PartialBulkAppConfigDefinitionsPayload",
+)
+class PartialBulkAppConfigDefinitionsPayloadGQL(
+    PydanticOutputMixin[PartialBulkPayload[AppConfigDefinitionNode]]
+):
+    """Payload for partial bulk app config definition mutations."""
+
+    successes: list[AppConfigDefinitionGQL] = gql_field(
+        description="The app config definitions processed, as they stood when processed."
+    )
+    failed: list[PartialBulkFailureGQL] = gql_field(
+        description="The app config definitions not processed, each with the reason."
+    )

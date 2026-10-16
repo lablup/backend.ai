@@ -3,12 +3,13 @@
 from __future__ import annotations
 
 from typing import Self
+from uuid import UUID
 
 from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseRequestModel
 from ai.backend.common.dto.manager.query import DateTimeFilter, StringFilter, UUIDFilter
-from ai.backend.common.dto.manager.v2.common import String64
+from ai.backend.common.dto.manager.v2.common import NonEmptyList, String64
 from ai.backend.common.dto.manager.v2.login_client_type.types import (
     LoginClientTypeOrderField,
     OrderDirection,
@@ -21,6 +22,9 @@ __all__ = (
     "CreateLoginClientTypeInput",
     "LoginClientTypeFilter",
     "LoginClientTypeOrder",
+    "PartialBulkPurgeLoginClientTypesInput",
+    "PartialBulkUpdateLoginClientTypeItemInput",
+    "PartialBulkUpdateLoginClientTypesInput",
     "UpdateLoginClientTypeInput",
 )
 
@@ -53,6 +57,29 @@ class UpdateLoginClientTypeInput(BaseRequestModel):
         default=UNSET,
         description="Updated description. Omit to leave unchanged; null clears.",
     )
+
+
+class PartialBulkUpdateLoginClientTypeItemInput(BaseRequestModel):
+    """One login client type of a partial bulk update and the fields to update on it."""
+
+    id: UUID = Field(description="ID of the login client type to update.")
+    input: UpdateLoginClientTypeInput = Field(
+        description="Fields to update on the login client type."
+    )
+
+
+class PartialBulkUpdateLoginClientTypesInput(BaseRequestModel):
+    """Input for updating several login client types, each answered for separately."""
+
+    items: NonEmptyList[PartialBulkUpdateLoginClientTypeItemInput] = Field(
+        description="The login client types to update, each with its fields."
+    )
+
+
+class PartialBulkPurgeLoginClientTypesInput(BaseRequestModel):
+    """Input for purging several login client types, each answered for separately."""
+
+    ids: NonEmptyList[UUID] = Field(description="IDs of the login client types to purge.")
 
 
 class LoginClientTypeFilter(BaseRequestModel):

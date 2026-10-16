@@ -8,6 +8,7 @@ import strawberry
 from strawberry import ID, UNSET, Info
 from strawberry.relay import Connection, Edge, NodeID
 
+from ai.backend.common.dto.manager.v2.common import PartialBulkPayload
 from ai.backend.common.dto.manager.v2.huggingface_registry.request import (
     AdminSearchHuggingFaceRegistriesInput,
 )
@@ -16,6 +17,18 @@ from ai.backend.common.dto.manager.v2.huggingface_registry.request import (
 )
 from ai.backend.common.dto.manager.v2.huggingface_registry.request import (
     DeleteHuggingFaceRegistryInput as DeleteHuggingFaceRegistryInputDTO,
+)
+from ai.backend.common.dto.manager.v2.huggingface_registry.request import (
+    PartialBulkPurgeHuggingFaceRegistriesInput as PartialBulkPurgeHuggingFaceRegistriesInputDTO,
+)
+from ai.backend.common.dto.manager.v2.huggingface_registry.request import (
+    PartialBulkUpdateHuggingFaceRegistriesInput as PartialBulkUpdateHuggingFaceRegistriesInputDTO,
+)
+from ai.backend.common.dto.manager.v2.huggingface_registry.request import (
+    PartialBulkUpdateHuggingFaceRegistryItemInput as PartialBulkUpdateHuggingFaceRegistryItemInputDTO,
+)
+from ai.backend.common.dto.manager.v2.huggingface_registry.request import (
+    UpdateHuggingFaceRegistryBody as UpdateHuggingFaceRegistryBodyDTO,
 )
 from ai.backend.common.dto.manager.v2.huggingface_registry.request import (
     UpdateHuggingFaceRegistryInput as UpdateHuggingFaceRegistryInputDTO,
@@ -30,9 +43,14 @@ from ai.backend.common.dto.manager.v2.huggingface_registry.response import (
     HuggingFaceRegistryNode,
 )
 from ai.backend.common.dto.manager.v2.huggingface_registry.response import (
+    PurgeHuggingFaceRegistryPayload as PurgeHuggingFaceRegistryPayloadDTO,
+)
+from ai.backend.common.dto.manager.v2.huggingface_registry.response import (
     UpdateHuggingFaceRegistryPayload as UpdateHuggingFaceRegistryPayloadDTO,
 )
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import encode_cursor, parse_uuid
+from ai.backend.manager.api.gql.common_types import PartialBulkFailureGQL
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     PydanticInputMixin,
@@ -230,10 +248,171 @@ async def update_huggingface_registry(
     )
 
 
-@gql_mutation(BackendAIGQLMeta(added_version="25.14.0", description="Delete huggingface registry."))
+@gql_mutation(
+    BackendAIGQLMeta(added_version="25.14.0", description="Delete huggingface registry."),
+    deprecation_reason=f"Deprecated since {NEXT_RELEASE_VERSION}. Use `purgeHuggingfaceRegistry`.",
+)
 async def delete_huggingface_registry(
     input: DeleteHuggingFaceRegistryInput, info: Info[StrawberryGQLContext]
 ) -> DeleteHuggingFaceRegistryPayload | None:
-    pydantic_input = input.to_pydantic()
-    result = await info.context.adapters.huggingface_registry.delete(pydantic_input)
+    result = await info.context.adapters.huggingface_registry.purge(input.to_pydantic().id)
     return DeleteHuggingFaceRegistryPayload(id=result.id)
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Fields to update on a HuggingFace registry.",
+    ),
+    name="UpdateHuggingFaceRegistryBodyInput",
+)
+class UpdateHuggingFaceRegistryBodyInputGQL(PydanticInputMixin[UpdateHuggingFaceRegistryBodyDTO]):
+    name: str | None = gql_field(default=UNSET, description="New registry name.")
+    url: str | None = gql_field(default=UNSET, description="New HuggingFace Hub URL.")
+    token: str | None = gql_field(default=UNSET, description="New access token.")
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="One HuggingFace registry of a partial bulk update and the fields to update on it.",
+    ),
+    name="PartialBulkUpdateHuggingFaceRegistryItemInput",
+)
+class PartialBulkUpdateHuggingFaceRegistryItemInputGQL(
+    PydanticInputMixin[PartialBulkUpdateHuggingFaceRegistryItemInputDTO]
+):
+    id: UUID = gql_field(description="ID of the registry to update.")
+    input: UpdateHuggingFaceRegistryBodyInputGQL = gql_field(
+        description="Fields to update on the registry."
+    )
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Input for updating several HuggingFace registries, each answered for separately.",
+    ),
+    name="PartialBulkUpdateHuggingFaceRegistriesInput",
+)
+class PartialBulkUpdateHuggingFaceRegistriesInputGQL(
+    PydanticInputMixin[PartialBulkUpdateHuggingFaceRegistriesInputDTO]
+):
+    items: list[PartialBulkUpdateHuggingFaceRegistryItemInputGQL] = gql_field(
+        description="The registries to update, each with its fields."
+    )
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Input for purging several HuggingFace registries, each answered for separately.",
+    ),
+    name="PartialBulkPurgeHuggingFaceRegistriesInput",
+)
+class PartialBulkPurgeHuggingFaceRegistriesInputGQL(
+    PydanticInputMixin[PartialBulkPurgeHuggingFaceRegistriesInputDTO]
+):
+    ids: list[UUID] = gql_field(description="IDs of the registries to purge.")
+
+
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Payload for purging a HuggingFace registry.",
+    ),
+    model=PurgeHuggingFaceRegistryPayloadDTO,
+    name="PurgeHuggingFaceRegistryPayload",
+)
+class PurgeHuggingFaceRegistryPayloadGQL(PydanticOutputMixin[PurgeHuggingFaceRegistryPayloadDTO]):
+    id: UUID = gql_field(description="ID of the purged HuggingFace registry.")
+
+
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description=(
+            "Result of a partial bulk HuggingFace registry update: the registries updated and "
+            "the ones that failed."
+        ),
+    ),
+    model=PartialBulkPayload[HuggingFaceRegistryNode],
+    name="PartialBulkUpdateHuggingFaceRegistriesPayload",
+)
+class PartialBulkUpdateHuggingFaceRegistriesPayloadGQL(
+    PydanticOutputMixin[PartialBulkPayload[HuggingFaceRegistryNode]]
+):
+    successes: list[HuggingFaceRegistry] = gql_field(
+        description="The registries updated, as they now stand."
+    )
+    failed: list[PartialBulkFailureGQL] = gql_field(
+        description="The registries not updated, each with the reason."
+    )
+
+
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description=(
+            "Result of a partial bulk HuggingFace registry purge: the registries purged and "
+            "the ones that failed."
+        ),
+    ),
+    model=PartialBulkPayload[PurgeHuggingFaceRegistryPayloadDTO],
+    name="PartialBulkPurgeHuggingFaceRegistriesPayload",
+)
+class PartialBulkPurgeHuggingFaceRegistriesPayloadGQL(
+    PydanticOutputMixin[PartialBulkPayload[PurgeHuggingFaceRegistryPayloadDTO]]
+):
+    successes: list[PurgeHuggingFaceRegistryPayloadGQL] = gql_field(
+        description="The registries purged."
+    )
+    failed: list[PartialBulkFailureGQL] = gql_field(
+        description="The registries not purged, each with the reason."
+    )
+
+
+@gql_mutation(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Permanently delete a HuggingFace registry.",
+    )
+)
+async def purge_huggingface_registry(
+    info: Info[StrawberryGQLContext],
+    id: UUID,
+) -> PurgeHuggingFaceRegistryPayloadGQL:
+    payload = await info.context.adapters.huggingface_registry.purge(id)
+    return PurgeHuggingFaceRegistryPayloadGQL.from_pydantic(payload)
+
+
+@gql_mutation(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Update several HuggingFace registries, answering for each one.",
+    )
+)
+async def partial_bulk_update_huggingface_registries(
+    info: Info[StrawberryGQLContext],
+    input: PartialBulkUpdateHuggingFaceRegistriesInputGQL,
+) -> PartialBulkUpdateHuggingFaceRegistriesPayloadGQL:
+    payload = await info.context.adapters.huggingface_registry.partial_bulk_update(
+        input.to_pydantic()
+    )
+    return PartialBulkUpdateHuggingFaceRegistriesPayloadGQL.from_pydantic(payload)
+
+
+@gql_mutation(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Permanently delete several HuggingFace registries, answering for each one.",
+    )
+)
+async def partial_bulk_purge_huggingface_registries(
+    info: Info[StrawberryGQLContext],
+    input: PartialBulkPurgeHuggingFaceRegistriesInputGQL,
+) -> PartialBulkPurgeHuggingFaceRegistriesPayloadGQL:
+    payload = await info.context.adapters.huggingface_registry.partial_bulk_purge(
+        input.to_pydantic()
+    )
+    return PartialBulkPurgeHuggingFaceRegistriesPayloadGQL.from_pydantic(payload)

@@ -137,8 +137,20 @@ from ai.backend.manager.services.artifact_registry.actions.common.get_multi impo
 from ai.backend.manager.services.artifact_registry.actions.huggingface.bulk_get import (
     BulkGetHuggingFaceRegistriesAction,
 )
+from ai.backend.manager.services.artifact_registry.actions.huggingface.partial_bulk_purge import (
+    PartialBulkPurgeHuggingFaceRegistriesAction,
+)
+from ai.backend.manager.services.artifact_registry.actions.huggingface.partial_bulk_update import (
+    PartialBulkUpdateHuggingFaceRegistriesAction,
+)
 from ai.backend.manager.services.artifact_registry.actions.reservoir.bulk_get import (
     BulkGetReservoirRegistriesAction,
+)
+from ai.backend.manager.services.artifact_registry.actions.reservoir.partial_bulk_purge import (
+    PartialBulkPurgeReservoirRegistriesAction,
+)
+from ai.backend.manager.services.artifact_registry.actions.reservoir.partial_bulk_update import (
+    PartialBulkUpdateReservoirRegistriesAction,
 )
 from ai.backend.manager.services.artifact_registry.processors import ArtifactRegistryProcessors
 from ai.backend.manager.services.audit_log.actions.bulk_get import BulkGetAuditLogsAction
@@ -575,8 +587,8 @@ def test_resource_domain_and_agent_reads_keep_their_judged_gates() -> None:
 
 
 def test_artifact_registry_metas_read_is_a_partial_bulk_permission_read() -> None:
-    """The named artifact, HuggingFace and Reservoir registries are read one permission check
-    per registry, not superadmin-only."""
+    """The named artifact, HuggingFace and Reservoir registries are read, updated and purged
+    one permission check per registry, not superadmin-only."""
     registry = _ops_registry()
     ArtifactRegistryProcessors(
         registry.group(GroupMeta(ArtifactRegistryEntityType())),
@@ -604,6 +616,17 @@ def test_artifact_registry_metas_read_is_a_partial_bulk_permission_read() -> Non
         ActionKind.BULK,
         ActionGate.PERMISSION,
     )
+    for action_cls in (
+        PartialBulkUpdateHuggingFaceRegistriesAction,
+        PartialBulkPurgeHuggingFaceRegistriesAction,
+        PartialBulkUpdateReservoirRegistriesAction,
+        PartialBulkPurgeReservoirRegistriesAction,
+    ):
+        assert recorded[action_cls] == (
+            ArtifactRegistryEntityType(),
+            ActionKind.BULK,
+            ActionGate.PERMISSION,
+        )
 
 
 def test_rg_domain_read_is_a_scoped_permission_read() -> None:

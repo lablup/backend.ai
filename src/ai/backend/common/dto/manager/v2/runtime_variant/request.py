@@ -6,7 +6,7 @@ from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseRequestModel
 from ai.backend.common.dto.manager.query import StringFilter, UUIDFilter
-from ai.backend.common.dto.manager.v2.common import OrderDirection, String128
+from ai.backend.common.dto.manager.v2.common import NonEmptyList, OrderDirection, String128
 from ai.backend.common.dto.manager.v2.runtime_variant.types import (
     RuntimeVariantOrderField,
     RuntimeVariantUsage,
@@ -31,6 +31,20 @@ class UpdateRuntimeVariantInput(BaseRequestModel):
     description: str | None | Unset = Field(
         default=UNSET, description="Updated description. Omit to leave unchanged; null clears."
     )
+
+
+class PartialBulkUpdateRuntimeVariantsInput(BaseRequestModel):
+    """Input for updating several runtime variants, each answered for separately."""
+
+    items: NonEmptyList[UpdateRuntimeVariantInput] = Field(
+        description="The runtime variants to update, each with its fields."
+    )
+
+
+class PartialBulkPurgeRuntimeVariantsInput(BaseRequestModel):
+    """Input for purging several runtime variants, each answered for separately."""
+
+    ids: NonEmptyList[UUID] = Field(description="IDs of the runtime variants to purge.")
 
 
 class DeleteRuntimeVariantsInput(BaseRequestModel):

@@ -1489,6 +1489,14 @@ type AtomicBulkAddRolePresetPermissionsPayload {
   items: [RolePermissionPreset!]!
 }
 
+"""
+Added in 26.10.0. Payload for an all-or-nothing upsert of many fragments at one scope.
+"""
+type AtomicBulkUpsertAppConfigFragmentsPayload {
+  """The upserted app config fragments."""
+  items: [AppConfigFragment!]!
+}
+
 """Added in 26.10.0. Shape of the action that wrote an audit log entry."""
 enum AuditLogActionKind {
   SINGLE_ENTITY
@@ -9626,6 +9634,11 @@ type Mutation {
   adminPurgeIdleChecker(input: PurgeIdleCheckerInput!): PurgeIdleCheckerPayload!
 
   """
+  Added in 26.10.0. Permanently removes several global idle checkers, answering for each one (super admin only).
+  """
+  adminPartialBulkPurgeIdleCheckers(input: PartialBulkPurgeIdleCheckersInput!): PartialBulkIdleCheckersPayload!
+
+  """
   Added in 26.8.0. Binds a global idle checker to a scope (super admin only).
   """
   adminCreateIdleCheckerAssignment(input: CreateIdleCheckerAssignmentInput!): CreateIdleCheckerAssignmentPayload!
@@ -9640,6 +9653,16 @@ type Mutation {
   """
   purgeIdleCheckerAssignment(input: PurgeIdleCheckerAssignmentInput!): PurgeIdleCheckerAssignmentPayload!
 
+  """
+  Added in 26.10.0. Updates several idle checker assignments' enabled state, answering for each one. Each item requires permission on its assignment's scope (subject to RBAC).
+  """
+  partialBulkUpdateIdleCheckerAssignments(input: PartialBulkUpdateIdleCheckerAssignmentsInput!): PartialBulkIdleCheckerAssignmentsPayload!
+
+  """
+  Added in 26.10.0. Permanently removes several idle checker assignments, answering for each one. Each item requires permission on its assignment's scope (subject to RBAC).
+  """
+  partialBulkPurgeIdleCheckerAssignments(input: PartialBulkPurgeIdleCheckerAssignmentsInput!): PartialBulkIdleCheckerAssignmentsPayload!
+
   """Added in 26.9.0. Register a new resource slot type (super admin only)."""
   adminCreateResourceSlotType(input: CreateResourceSlotTypeInput!): CreateResourceSlotTypePayload
 
@@ -9651,7 +9674,17 @@ type Mutation {
   """
   Added in 26.9.0. Remove a resource slot type by slot name (super admin only).
   """
-  adminPurgeResourceSlotType(input: PurgeResourceSlotTypeInput!): PurgeResourceSlotTypePayload
+  adminPurgeResourceSlotType(input: PurgeResourceSlotTypeInput!): PurgeResourceSlotTypePayload @deprecated(reason: "Deprecated since 26.10.0. Use `purgeResourceSlotType`.")
+
+  """
+  Added in 26.10.0. Remove a resource slot type, refusing while anything still references it.
+  """
+  purgeResourceSlotType(id: UUID!): PurgeResourceSlotTypePayload!
+
+  """
+  Added in 26.10.0. Remove several resource slot types, answering for each one.
+  """
+  partialBulkPurgeResourceSlotTypes(input: PartialBulkPurgeResourceSlotTypesInput!): PartialBulkResourceSlotTypesPayload!
 
   """
   Added in 26.7.0. Register a new app config allow-list entry (super admin only).
@@ -9661,22 +9694,58 @@ type Mutation {
   """
   Added in 26.7.0. Purge an app config allow-list entry by id (super admin only).
   """
-  adminPurgeAppConfigAllowList(input: PurgeAppConfigAllowListInput!): PurgeAppConfigAllowListPayload
+  adminPurgeAppConfigAllowList(input: PurgeAppConfigAllowListInput!): PurgeAppConfigAllowListPayload @deprecated(reason: "Deprecated since 26.10.0. Use `purgeAppConfigAllowList`.")
 
   """
   Added in 26.8.0. Update an app config allow-list entry's rank by id (super admin only).
   """
-  adminUpdateAppConfigAllowList(input: UpdateAppConfigAllowListInput!): UpdateAppConfigAllowListPayload
+  adminUpdateAppConfigAllowList(input: UpdateAppConfigAllowListInput!): UpdateAppConfigAllowListPayload @deprecated(reason: "Deprecated since 26.10.0. Use `updateAppConfigAllowList`.")
 
   """
   Added in 26.9.0. Upsert many app config fragments at one scope (insert, or replace config on conflict), with per-item partial success (not in effect yet: still all-or-nothing).
   """
-  scopedUpsertAppConfigFragments(input: ScopedUpsertAppConfigFragmentsInput!): UpsertAppConfigFragmentsPayload!
+  scopedUpsertAppConfigFragments(input: ScopedUpsertAppConfigFragmentsInput!): UpsertAppConfigFragmentsPayload! @deprecated(reason: "Deprecated since 26.10.0. Use `scopedAtomicBulkUpsertAppConfigFragments`.")
 
   """
   Added in 26.9.0. Upsert many app config fragments at the current user's own user scope, with per-item partial success (not in effect yet: still all-or-nothing).
   """
-  myUpsertAppConfigFragments(input: MyUpsertAppConfigFragmentsInput!): UpsertAppConfigFragmentsPayload!
+  myUpsertAppConfigFragments(input: MyUpsertAppConfigFragmentsInput!): UpsertAppConfigFragmentsPayload! @deprecated(reason: "Deprecated since 26.10.0. Use `myAtomicBulkUpsertAppConfigFragments`.")
+
+  """Added in 26.10.0. Update an app config allow-list entry's rank by id."""
+  updateAppConfigAllowList(input: UpdateAppConfigAllowListInput!): UpdateAppConfigAllowListPayload!
+
+  """
+  Added in 26.10.0. Purge an app config allow-list entry by id, with the fragments it admits.
+  """
+  purgeAppConfigAllowList(input: PurgeAppConfigAllowListInput!): PurgeAppConfigAllowListPayload!
+
+  """
+  Added in 26.10.0. Update several app config allow-list entries, answering for each one.
+  """
+  partialBulkUpdateAppConfigAllowLists(input: PartialBulkUpdateAppConfigAllowListsInput!): PartialBulkAppConfigAllowListsPayload!
+
+  """
+  Added in 26.10.0. Purge several app config allow-list entries, answering for each one.
+  """
+  partialBulkPurgeAppConfigAllowLists(input: PartialBulkPurgeAppConfigAllowListsInput!): PartialBulkAppConfigAllowListsPayload!
+
+  """
+  Added in 26.10.0. Upsert many app config fragments at one scope (insert, or replace config on conflict), all or none.
+  """
+  scopedAtomicBulkUpsertAppConfigFragments(input: ScopedUpsertAppConfigFragmentsInput!): AtomicBulkUpsertAppConfigFragmentsPayload!
+
+  """
+  Added in 26.10.0. Upsert many app config fragments at the current user's own user scope, all or none.
+  """
+  myAtomicBulkUpsertAppConfigFragments(input: MyUpsertAppConfigFragmentsInput!): AtomicBulkUpsertAppConfigFragmentsPayload!
+
+  """Added in 26.10.0. Purge an app config fragment by id."""
+  purgeAppConfigFragment(id: UUID!): PurgeAppConfigFragmentPayload!
+
+  """
+  Added in 26.10.0. Purge several app config fragments, answering for each one.
+  """
+  partialBulkPurgeAppConfigFragments(input: PartialBulkPurgeAppConfigFragmentsInput!): PartialBulkAppConfigFragmentsPayload!
 
   """
   Added in 25.14.0. Scan external registries to discover available artifacts. Searches HuggingFace or Reservoir registries for artifacts matching the specified criteria and registers them in the system with SCANNED status. The artifacts become available for import but are not downloaded until explicitly imported. This is the first step in the artifact workflow: Scan → Import → Use
@@ -9754,7 +9823,15 @@ type Mutation {
   adminUpdateContainerRegistryV2(input: UpdateContainerRegistryInput!): UpdateContainerRegistryPayload
 
   """Added in 26.4.2. Delete a container registry (admin only)."""
-  adminDeleteContainerRegistryV2(id: String!): DeleteContainerRegistryPayload
+  adminDeleteContainerRegistryV2(id: String!): DeleteContainerRegistryPayload @deprecated(reason: "Deprecated since 26.10.0. Use `adminPurgeContainerRegistryV2`.")
+
+  """Added in 26.10.0. Purge a container registry (admin only)."""
+  adminPurgeContainerRegistryV2(id: UUID!): PurgeContainerRegistryPayload!
+
+  """
+  Added in 26.10.0. Purge several container registries (admin only), answering for each one.
+  """
+  adminPartialBulkPurgeContainerRegistriesV2(input: PartialBulkPurgeContainerRegistriesInput!): PartialBulkContainerRegistriesPayload!
 
   """Added in 25.16.0. Create model deployment."""
   createModelDeployment(input: CreateDeploymentInput!): CreateDeploymentPayload
@@ -9870,7 +9947,20 @@ type Mutation {
   updateAutoScalingRule(input: UpdateAutoScalingRuleInput!): UpdateAutoScalingRulePayload
 
   """Added in 25.16.0. Delete auto scaling rule."""
-  deleteAutoScalingRule(input: DeleteAutoScalingRuleInput!): DeleteAutoScalingRulePayload
+  deleteAutoScalingRule(input: DeleteAutoScalingRuleInput!): DeleteAutoScalingRulePayload @deprecated(reason: "Deprecated since 26.10.0. Use `purgeAutoScalingRule`.")
+
+  """Added in 26.10.0. Permanently remove an auto-scaling rule."""
+  purgeAutoScalingRule(id: UUID!): DeleteAutoScalingRulePayload!
+
+  """
+  Added in 26.10.0. Update several auto-scaling rules, answering for each one.
+  """
+  partialBulkUpdateAutoScalingRules(input: PartialBulkUpdateAutoScalingRulesInput!): PartialBulkAutoScalingRulesPayload!
+
+  """
+  Added in 26.10.0. Permanently remove several auto-scaling rules, answering for each one.
+  """
+  partialBulkPurgeAutoScalingRules(input: PartialBulkPurgeAutoScalingRulesInput!): PartialBulkAutoScalingRulesPayload!
 
   """Added in 25.14.0. Delete an object storage."""
   deleteObjectStorage(input: DeleteObjectStorageInput!): DeleteObjectStoragePayload @deprecated(reason: "Deprecated since 26.10.0. Use `purgeObjectStorage`.")
@@ -9921,7 +10011,20 @@ type Mutation {
   updateHuggingfaceRegistry(input: UpdateHuggingFaceRegistryInput!): UpdateHuggingFaceRegistryPayload
 
   """Added in 25.14.0. Delete huggingface registry."""
-  deleteHuggingfaceRegistry(input: DeleteHuggingFaceRegistryInput!): DeleteHuggingFaceRegistryPayload
+  deleteHuggingfaceRegistry(input: DeleteHuggingFaceRegistryInput!): DeleteHuggingFaceRegistryPayload @deprecated(reason: "Deprecated since 26.10.0. Use `purgeHuggingfaceRegistry`.")
+
+  """Added in 26.10.0. Permanently delete a HuggingFace registry."""
+  purgeHuggingfaceRegistry(id: UUID!): PurgeHuggingFaceRegistryPayload!
+
+  """
+  Added in 26.10.0. Update several HuggingFace registries, answering for each one.
+  """
+  partialBulkUpdateHuggingfaceRegistries(input: PartialBulkUpdateHuggingFaceRegistriesInput!): PartialBulkUpdateHuggingFaceRegistriesPayload!
+
+  """
+  Added in 26.10.0. Permanently delete several HuggingFace registries, answering for each one.
+  """
+  partialBulkPurgeHuggingfaceRegistries(input: PartialBulkPurgeHuggingFaceRegistriesInput!): PartialBulkPurgeHuggingFaceRegistriesPayload!
 
   """Added in 25.14.0. Create reservoir registry."""
   createReservoirRegistry(input: CreateReservoirRegistryInput!): CreateReservoirRegistryPayload
@@ -9930,7 +10033,20 @@ type Mutation {
   updateReservoirRegistry(input: UpdateReservoirRegistryInput!): UpdateReservoirRegistryPayload
 
   """Added in 25.14.0. Delete reservoir registry."""
-  deleteReservoirRegistry(input: DeleteReservoirRegistryInput!): DeleteReservoirRegistryPayload
+  deleteReservoirRegistry(input: DeleteReservoirRegistryInput!): DeleteReservoirRegistryPayload @deprecated(reason: "Deprecated since 26.10.0. Use `purgeReservoirRegistry`.")
+
+  """Added in 26.10.0. Permanently delete a Reservoir registry."""
+  purgeReservoirRegistry(id: UUID!): PurgeReservoirRegistryPayload!
+
+  """
+  Added in 26.10.0. Update several Reservoir registries, answering for each one.
+  """
+  partialBulkUpdateReservoirRegistries(input: PartialBulkUpdateReservoirRegistriesInput!): PartialBulkUpdateReservoirRegistriesPayload!
+
+  """
+  Added in 26.10.0. Permanently delete several Reservoir registries, answering for each one.
+  """
+  partialBulkPurgeReservoirRegistries(input: PartialBulkPurgeReservoirRegistriesInput!): PartialBulkPurgeReservoirRegistriesPayload!
 
   """Added in 25.14.0. Get a presigned download URL."""
   getPresignedDownloadUrl(input: GetPresignedDownloadURLInput!): GetPresignedDownloadURLPayload
@@ -9952,7 +10068,15 @@ type Mutation {
   createAccessToken(input: CreateAccessTokenInput!): CreateAccessTokenPayload
 
   """Added in 26.4.4. Delete access token."""
-  deleteAccessToken(input: DeleteAccessTokenInput!): DeleteAccessTokenPayload
+  deleteAccessToken(input: DeleteAccessTokenInput!): DeleteAccessTokenPayload @deprecated(reason: "Deprecated since 26.10.0. Use `purgeAccessToken`.")
+
+  """Added in 26.10.0. Permanently remove an access token."""
+  purgeAccessToken(id: UUID!): DeleteAccessTokenPayload!
+
+  """
+  Added in 26.10.0. Permanently remove several access tokens, answering for each one.
+  """
+  partialBulkPurgeAccessTokens(input: PartialBulkPurgeAccessTokensInput!): PartialBulkAccessTokensPayload!
 
   """
   Added in 25.19.0. Activate a specific revision to be the current revision
@@ -9963,64 +10087,79 @@ type Mutation {
   updateRouteTrafficStatus(input: UpdateRouteTrafficStatusInput!): UpdateRouteTrafficStatusPayload
 
   """
+  Added in 26.1.0. Upsert domain fair share weight. Creates a new record if it doesn't exist, or updates the weight if it does
+  """
+  upsertDomainFairShareWeight(input: UpsertDomainFairShareWeightInput!): UpsertDomainFairShareWeightPayload
+
+  """
+  Added in 26.1.0. Upsert project fair share weight. Creates a new record if it doesn't exist, or updates the weight if it does
+  """
+  upsertProjectFairShareWeight(input: UpsertProjectFairShareWeightInput!): UpsertProjectFairShareWeightPayload
+
+  """
+  Added in 26.1.0. Upsert user fair share weight. Creates a new record if it doesn't exist, or updates the weight if it does
+  """
+  upsertUserFairShareWeight(input: UpsertUserFairShareWeightInput!): UpsertUserFairShareWeightPayload
+
+  """
+  Added in 26.10.0. Upsert several domain fair share weights in one transaction. Creates new records if they don't exist, or updates weights if they do
+  """
+  atomicBulkUpsertDomainFairShareWeights(input: BulkUpsertDomainFairShareWeightInput!): BulkUpsertDomainFairShareWeightPayload
+
+  """
+  Added in 26.10.0. Upsert several project fair share weights in one transaction. Creates new records if they don't exist, or updates weights if they do
+  """
+  atomicBulkUpsertProjectFairShareWeights(input: BulkUpsertProjectFairShareWeightInput!): BulkUpsertProjectFairShareWeightPayload
+
+  """
+  Added in 26.10.0. Upsert several user fair share weights in one transaction. Creates new records if they don't exist, or updates weights if they do
+  """
+  atomicBulkUpsertUserFairShareWeights(input: BulkUpsertUserFairShareWeightInput!): BulkUpsertUserFairShareWeightPayload
+
+  """
   Added in 26.2.0. Upsert domain fair share weight (admin only). Creates a new record if it doesn't exist, or updates the weight if it does
   """
-  adminUpsertDomainFairShareWeight(input: UpsertDomainFairShareWeightInput!): UpsertDomainFairShareWeightPayload
+  adminUpsertDomainFairShareWeight(input: UpsertDomainFairShareWeightInput!): UpsertDomainFairShareWeightPayload @deprecated(reason: "Deprecated since 26.10.0. Use `upsertDomainFairShareWeight`.")
 
   """
   Added in 26.2.0. Upsert project fair share weight (admin only). Creates a new record if it doesn't exist, or updates the weight if it does
   """
-  adminUpsertProjectFairShareWeight(input: UpsertProjectFairShareWeightInput!): UpsertProjectFairShareWeightPayload
+  adminUpsertProjectFairShareWeight(input: UpsertProjectFairShareWeightInput!): UpsertProjectFairShareWeightPayload @deprecated(reason: "Deprecated since 26.10.0. Use `upsertProjectFairShareWeight`.")
 
   """
   Added in 26.2.0. Upsert user fair share weight (admin only). Creates a new record if it doesn't exist, or updates the weight if it does
   """
-  adminUpsertUserFairShareWeight(input: UpsertUserFairShareWeightInput!): UpsertUserFairShareWeightPayload
+  adminUpsertUserFairShareWeight(input: UpsertUserFairShareWeightInput!): UpsertUserFairShareWeightPayload @deprecated(reason: "Deprecated since 26.10.0. Use `upsertUserFairShareWeight`.")
 
   """
   Added in 26.2.0. Bulk upsert domain fair share weights (admin only). Creates new records if they don't exist, or updates weights if they do
   """
-  adminBulkUpsertDomainFairShareWeight(input: BulkUpsertDomainFairShareWeightInput!): BulkUpsertDomainFairShareWeightPayload
+  adminBulkUpsertDomainFairShareWeight(input: BulkUpsertDomainFairShareWeightInput!): BulkUpsertDomainFairShareWeightPayload @deprecated(reason: "Deprecated since 26.10.0. Use `atomicBulkUpsertDomainFairShareWeights`.")
 
   """
   Added in 26.2.0. Bulk upsert project fair share weights (admin only). Creates new records if they don't exist, or updates weights if they do
   """
-  adminBulkUpsertProjectFairShareWeight(input: BulkUpsertProjectFairShareWeightInput!): BulkUpsertProjectFairShareWeightPayload
+  adminBulkUpsertProjectFairShareWeight(input: BulkUpsertProjectFairShareWeightInput!): BulkUpsertProjectFairShareWeightPayload @deprecated(reason: "Deprecated since 26.10.0. Use `atomicBulkUpsertProjectFairShareWeights`.")
 
   """
   Added in 26.2.0. Bulk upsert user fair share weights (admin only). Creates new records if they don't exist, or updates weights if they do
   """
-  adminBulkUpsertUserFairShareWeight(input: BulkUpsertUserFairShareWeightInput!): BulkUpsertUserFairShareWeightPayload
-
-  """
-  Added in 26.1.0. Upsert domain fair share weight (superadmin only). Creates a new record if it doesn't exist, or updates the weight if it does
-  """
-  upsertDomainFairShareWeight(input: UpsertDomainFairShareWeightInput!): UpsertDomainFairShareWeightPayload @deprecated(reason: "Use admin_upsert_domain_fair_share_weight instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.")
-
-  """
-  Added in 26.1.0. Upsert project fair share weight (superadmin only). Creates a new record if it doesn't exist, or updates the weight if it does
-  """
-  upsertProjectFairShareWeight(input: UpsertProjectFairShareWeightInput!): UpsertProjectFairShareWeightPayload @deprecated(reason: "Use admin_upsert_project_fair_share_weight instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.")
-
-  """
-  Added in 26.1.0. Upsert user fair share weight (superadmin only). Creates a new record if it doesn't exist, or updates the weight if it does
-  """
-  upsertUserFairShareWeight(input: UpsertUserFairShareWeightInput!): UpsertUserFairShareWeightPayload @deprecated(reason: "Use admin_upsert_user_fair_share_weight instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.")
+  adminBulkUpsertUserFairShareWeight(input: BulkUpsertUserFairShareWeightInput!): BulkUpsertUserFairShareWeightPayload @deprecated(reason: "Deprecated since 26.10.0. Use `atomicBulkUpsertUserFairShareWeights`.")
 
   """
   Added in 26.1.0. Bulk upsert domain fair share weights (superadmin only). Creates new records if they don't exist, or updates weights if they do
   """
-  bulkUpsertDomainFairShareWeight(input: BulkUpsertDomainFairShareWeightInput!): BulkUpsertDomainFairShareWeightPayload @deprecated(reason: "Use admin_bulk_upsert_domain_fair_share_weight instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.")
+  bulkUpsertDomainFairShareWeight(input: BulkUpsertDomainFairShareWeightInput!): BulkUpsertDomainFairShareWeightPayload @deprecated(reason: "Deprecated since 26.10.0. Use `atomicBulkUpsertDomainFairShareWeights`.")
 
   """
   Added in 26.1.0. Bulk upsert project fair share weights (superadmin only). Creates new records if they don't exist, or updates weights if they do
   """
-  bulkUpsertProjectFairShareWeight(input: BulkUpsertProjectFairShareWeightInput!): BulkUpsertProjectFairShareWeightPayload @deprecated(reason: "Use admin_bulk_upsert_project_fair_share_weight instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.")
+  bulkUpsertProjectFairShareWeight(input: BulkUpsertProjectFairShareWeightInput!): BulkUpsertProjectFairShareWeightPayload @deprecated(reason: "Deprecated since 26.10.0. Use `atomicBulkUpsertProjectFairShareWeights`.")
 
   """
   Added in 26.1.0. Bulk upsert user fair share weights (superadmin only). Creates new records if they don't exist, or updates weights if they do
   """
-  bulkUpsertUserFairShareWeight(input: BulkUpsertUserFairShareWeightInput!): BulkUpsertUserFairShareWeightPayload @deprecated(reason: "Use admin_bulk_upsert_user_fair_share_weight instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.")
+  bulkUpsertUserFairShareWeight(input: BulkUpsertUserFairShareWeightInput!): BulkUpsertUserFairShareWeightPayload @deprecated(reason: "Deprecated since 26.10.0. Use `atomicBulkUpsertUserFairShareWeights`.")
 
   """
   Added in 26.2.0. Update fair share configuration for a resource group (admin only). Only provided fields are updated; others retain their existing values. Resource weights are validated against capacity - only resource types available in the scaling group's capacity can be specified.
@@ -10665,10 +10804,28 @@ type Mutation {
   adminCreateLoginClientType(input: CreateLoginClientTypeInput!): CreateLoginClientTypePayload
 
   """Added in 26.4.2. Update a login client type (super admin only)."""
-  adminUpdateLoginClientType(id: UUID!, input: UpdateLoginClientTypeInput!): UpdateLoginClientTypePayload
+  adminUpdateLoginClientType(id: UUID!, input: UpdateLoginClientTypeInput!): UpdateLoginClientTypePayload @deprecated(reason: "Deprecated since 26.10.0. Use `updateLoginClientType`.")
 
   """Added in 26.4.2. Delete a login client type (super admin only)."""
-  adminDeleteLoginClientType(id: UUID!): DeleteLoginClientTypePayload
+  adminDeleteLoginClientType(id: UUID!): DeleteLoginClientTypePayload @deprecated(reason: "Deprecated since 26.10.0. Use `purgeLoginClientType`.")
+
+  """
+  Added in 26.10.0. Update a login client type. Only provided fields will be updated.
+  """
+  updateLoginClientType(id: UUID!, input: UpdateLoginClientTypeInput!): UpdateLoginClientTypePayload!
+
+  """Added in 26.10.0. Permanently remove a login client type."""
+  purgeLoginClientType(id: UUID!): PurgeLoginClientTypePayload!
+
+  """
+  Added in 26.10.0. Update several login client types, answering for each one.
+  """
+  partialBulkUpdateLoginClientTypes(input: PartialBulkUpdateLoginClientTypesInput!): PartialBulkLoginClientTypesPayload!
+
+  """
+  Added in 26.10.0. Permanently remove several login client types, answering for each one.
+  """
+  partialBulkPurgeLoginClientTypes(input: PartialBulkPurgeLoginClientTypesInput!): PartialBulkLoginClientTypesPayload!
 
   """
   Added in 26.7.0. Register a new app config definition (super admin only).
@@ -10678,29 +10835,72 @@ type Mutation {
   """
   Added in 26.7.0. Purge an app config definition by id (super admin only).
   """
-  adminPurgeAppConfigDefinition(input: PurgeAppConfigDefinitionInput!): PurgeAppConfigDefinitionPayload
+  adminPurgeAppConfigDefinition(input: PurgeAppConfigDefinitionInput!): PurgeAppConfigDefinitionPayload @deprecated(reason: "Deprecated since 26.10.0. Use `purgeAppConfigDefinition`.")
+
+  """
+  Added in 26.10.0. Purge an app config definition by id, with the allow-list entries and fragments under it.
+  """
+  purgeAppConfigDefinition(input: PurgeAppConfigDefinitionInput!): PurgeAppConfigDefinitionPayload!
+
+  """
+  Added in 26.10.0. Purge several app config definitions, answering for each one.
+  """
+  partialBulkPurgeAppConfigDefinitions(input: PartialBulkPurgeAppConfigDefinitionsInput!): PartialBulkAppConfigDefinitionsPayload!
 
   """Added in 26.4.2. Create a new runtime variant (superadmin only)."""
   adminCreateRuntimeVariant(input: CreateRuntimeVariantInput!): CreateRuntimeVariantPayload
 
   """Added in 26.4.2. Update a runtime variant (superadmin only)."""
-  adminUpdateRuntimeVariant(input: UpdateRuntimeVariantInput!): UpdateRuntimeVariantPayload
+  adminUpdateRuntimeVariant(input: UpdateRuntimeVariantInput!): UpdateRuntimeVariantPayload @deprecated(reason: "Deprecated since 26.10.0. Use `updateRuntimeVariant`.")
 
   """Added in 26.4.2. Delete a runtime variant (superadmin only)."""
-  adminDeleteRuntimeVariant(id: UUID!): DeleteRuntimeVariantPayload
+  adminDeleteRuntimeVariant(id: UUID!): DeleteRuntimeVariantPayload @deprecated(reason: "Deprecated since 26.10.0. Use `purgeRuntimeVariant`.")
 
   """Added in 26.4.2. Delete multiple runtime variants (superadmin only)."""
-  adminDeleteRuntimeVariants(input: DeleteRuntimeVariantsInput!): DeleteRuntimeVariantsPayload
+  adminDeleteRuntimeVariants(input: DeleteRuntimeVariantsInput!): DeleteRuntimeVariantsPayload @deprecated(reason: "Deprecated since 26.10.0. Use `partialBulkPurgeRuntimeVariants`.")
+
+  """
+  Added in 26.10.0. Update a runtime variant. Only provided fields will be updated.
+  """
+  updateRuntimeVariant(input: UpdateRuntimeVariantInput!): UpdateRuntimeVariantPayload!
+
+  """
+  Added in 26.10.0. Purge a runtime variant with the presets in its catalog.
+  """
+  purgeRuntimeVariant(id: UUID!): DeleteRuntimeVariantPayload!
+
+  """
+  Added in 26.10.0. Update several runtime variants, answering for each one.
+  """
+  partialBulkUpdateRuntimeVariants(input: PartialBulkUpdateRuntimeVariantsInput!): PartialBulkRuntimeVariantsPayload!
+
+  """
+  Added in 26.10.0. Purge several runtime variants with their presets, answering for each one.
+  """
+  partialBulkPurgeRuntimeVariants(input: PartialBulkPurgeRuntimeVariantsInput!): PartialBulkRuntimeVariantsPayload!
 
   """
   Added in 26.9.0. Set the client IP masking one target gets (superadmin only).
   """
-  adminUpsertClientIpMaskingPolicy(input: UpsertClientIPMaskingPolicyInput!): ClientIPMaskingPolicyPayload
+  adminUpsertClientIpMaskingPolicy(input: UpsertClientIPMaskingPolicyInput!): ClientIPMaskingPolicyPayload @deprecated(reason: "Deprecated since 26.10.0. Use `upsertClientIpMaskingPolicy`.")
 
   """
   Added in 26.9.0. Drop one target's client IP masking policy so it falls back to the default (superadmin only).
   """
-  adminPurgeClientIpMaskingPolicy(id: UUID!): ClientIPMaskingPolicyPayload
+  adminPurgeClientIpMaskingPolicy(id: UUID!): ClientIPMaskingPolicyPayload @deprecated(reason: "Deprecated since 26.10.0. Use `purgeClientIpMaskingPolicy`.")
+
+  """Added in 26.10.0. Set the client IP masking one target gets."""
+  upsertClientIpMaskingPolicy(input: UpsertClientIPMaskingPolicyInput!): ClientIPMaskingPolicyPayload!
+
+  """
+  Added in 26.10.0. Drop one target's client IP masking policy so it falls back to the default.
+  """
+  purgeClientIpMaskingPolicy(id: UUID!): ClientIPMaskingPolicyPayload!
+
+  """
+  Added in 26.10.0. Drop several client IP masking policies, answering for each one.
+  """
+  partialBulkPurgeClientIpMaskingPolicies(input: PartialBulkPurgeClientIPMaskingPoliciesInput!): PartialBulkClientIPMaskingPoliciesPayload!
 
   """Added in 26.8.0. Create a retention policy (superadmin only)."""
   adminCreateRetentionPolicy(input: CreateRetentionPolicyInput!): CreateRetentionPolicyPayload
@@ -10726,47 +10926,117 @@ type Mutation {
   leaveEntityShare(id: UUID!): EntitySharePayload
 
   """Added in 26.8.0. Update a retention policy (superadmin only)."""
-  adminUpdateRetentionPolicy(input: UpdateRetentionPolicyInput!): UpdateRetentionPolicyPayload
+  adminUpdateRetentionPolicy(input: UpdateRetentionPolicyInput!): UpdateRetentionPolicyPayload @deprecated(reason: "Deprecated since 26.10.0. Use `updateRetentionPolicy`.")
 
   """Added in 26.8.0. Delete a retention policy (superadmin only)."""
-  adminDeleteRetentionPolicy(id: UUID!): DeleteRetentionPolicyPayload
+  adminDeleteRetentionPolicy(id: UUID!): DeleteRetentionPolicyPayload @deprecated(reason: "Deprecated since 26.10.0. Use `purgeRetentionPolicy`.")
 
   """
   Added in 26.8.0. Purge (permanently remove) a retention policy (superadmin only).
   """
-  adminPurgeRetentionPolicy(id: UUID!): PurgeRetentionPolicyPayload
+  adminPurgeRetentionPolicy(id: UUID!): PurgeRetentionPolicyPayload @deprecated(reason: "Deprecated since 26.10.0. Use `purgeRetentionPolicy`.")
+
+  """
+  Added in 26.10.0. Update a retention policy. Only provided fields will be updated.
+  """
+  updateRetentionPolicy(input: UpdateRetentionPolicyInput!): UpdateRetentionPolicyPayload!
+
+  """Added in 26.10.0. Purge (permanently remove) a retention policy."""
+  purgeRetentionPolicy(id: UUID!): PurgeRetentionPolicyPayload!
+
+  """
+  Added in 26.10.0. Update several retention policies, answering for each one.
+  """
+  partialBulkUpdateRetentionPolicies(input: PartialBulkUpdateRetentionPoliciesInput!): PartialBulkRetentionPoliciesPayload!
+
+  """
+  Added in 26.10.0. Purge several retention policies, answering for each one.
+  """
+  partialBulkPurgeRetentionPolicies(input: PartialBulkPurgeRetentionPoliciesInput!): PartialBulkRetentionPoliciesPayload!
 
   """Added in 26.4.2. Create a runtime variant preset (superadmin only)."""
   adminCreateRuntimeVariantPreset(input: CreateRuntimeVariantPresetInput!): CreateRuntimeVariantPresetPayload
 
   """Added in 26.4.2. Update a runtime variant preset (superadmin only)."""
-  adminUpdateRuntimeVariantPreset(input: UpdateRuntimeVariantPresetInput!): UpdateRuntimeVariantPresetPayload
+  adminUpdateRuntimeVariantPreset(input: UpdateRuntimeVariantPresetInput!): UpdateRuntimeVariantPresetPayload @deprecated(reason: "Deprecated since 26.10.0. Use `updateRuntimeVariantPreset`.")
 
   """Added in 26.4.2. Delete a runtime variant preset (superadmin only)."""
-  adminDeleteRuntimeVariantPreset(id: UUID!): DeleteRuntimeVariantPresetPayload
+  adminDeleteRuntimeVariantPreset(id: UUID!): DeleteRuntimeVariantPresetPayload @deprecated(reason: "Deprecated since 26.10.0. Use `purgeRuntimeVariantPreset`.")
+
+  """
+  Added in 26.10.0. Update a runtime variant preset. Only provided fields will be updated.
+  """
+  updateRuntimeVariantPreset(input: UpdateRuntimeVariantPresetInput!): UpdateRuntimeVariantPresetPayload!
+
+  """Added in 26.10.0. Purge a runtime variant preset."""
+  purgeRuntimeVariantPreset(id: UUID!): DeleteRuntimeVariantPresetPayload!
+
+  """
+  Added in 26.10.0. Update several runtime variant presets, answering for each one.
+  """
+  partialBulkUpdateRuntimeVariantPresets(input: PartialBulkUpdateRuntimeVariantPresetsInput!): PartialBulkRuntimeVariantPresetsPayload!
+
+  """
+  Added in 26.10.0. Purge several runtime variant presets, answering for each one.
+  """
+  partialBulkPurgeRuntimeVariantPresets(input: PartialBulkPurgeRuntimeVariantPresetsInput!): PartialBulkRuntimeVariantPresetsPayload!
 
   """Added in 26.4.2. Create a deployment revision preset (admin only)."""
   adminCreateDeploymentRevisionPreset(input: CreateDeploymentRevisionPresetInput!): CreateDeploymentRevisionPresetPayload
 
   """Added in 26.4.2. Update a deployment revision preset (admin only)."""
-  adminUpdateDeploymentRevisionPreset(input: UpdateDeploymentRevisionPresetInput!): UpdateDeploymentRevisionPresetPayload
+  adminUpdateDeploymentRevisionPreset(input: UpdateDeploymentRevisionPresetInput!): UpdateDeploymentRevisionPresetPayload @deprecated(reason: "Deprecated since 26.10.0. Use `updateDeploymentRevisionPreset`.")
 
   """Added in 26.4.2. Delete a deployment revision preset (admin only)."""
-  adminDeleteDeploymentRevisionPreset(id: UUID!): DeleteDeploymentRevisionPresetPayload
+  adminDeleteDeploymentRevisionPreset(id: UUID!): DeleteDeploymentRevisionPresetPayload @deprecated(reason: "Deprecated since 26.10.0. Use `purgeDeploymentRevisionPreset`.")
+
+  """
+  Added in 26.10.0. Update a deployment revision preset. Only provided fields will be updated.
+  """
+  updateDeploymentRevisionPreset(input: UpdateDeploymentRevisionPresetInput!): UpdateDeploymentRevisionPresetPayload!
+
+  """Added in 26.10.0. Permanently remove a deployment revision preset."""
+  purgeDeploymentRevisionPreset(id: UUID!): DeleteDeploymentRevisionPresetPayload!
+
+  """
+  Added in 26.10.0. Update several deployment revision presets, answering for each one.
+  """
+  partialBulkUpdateDeploymentRevisionPresets(input: PartialBulkUpdateDeploymentRevisionPresetsInput!): PartialBulkDeploymentRevisionPresetsPayload!
+
+  """
+  Added in 26.10.0. Permanently remove several deployment revision presets, answering for each one.
+  """
+  partialBulkPurgeDeploymentRevisionPresets(input: PartialBulkPurgeDeploymentRevisionPresetsInput!): PartialBulkDeploymentRevisionPresetsPayload!
 
   """Added in 26.4.2. Create a model card (admin only)."""
   adminCreateModelCardV2(input: CreateModelCardV2Input!): CreateModelCardPayload
 
   """Added in 26.4.2. Update a model card (admin only)."""
-  adminUpdateModelCardV2(input: UpdateModelCardV2Input!): UpdateModelCardPayload
+  adminUpdateModelCardV2(input: UpdateModelCardV2Input!): UpdateModelCardPayload @deprecated(reason: "Deprecated since 26.10.0. Use `updateModelCardV2`.")
 
   """Added in 26.4.2. Delete a model card (admin only)."""
-  adminDeleteModelCardV2(id: UUID!, options: DeleteModelCardV2Options = null): DeleteModelCardPayload
+  adminDeleteModelCardV2(id: UUID!, options: DeleteModelCardV2Options = null): DeleteModelCardPayload @deprecated(reason: "Deprecated since 26.10.0. Use `purgeModelCardV2`.")
 
   """
   Added in 26.4.4. Bulk-delete model cards (admin only) with per-card partial-failure reporting.
   """
-  adminBulkDeleteModelCardsV2(input: BulkDeleteModelCardsV2Input!): BulkDeleteModelCardsV2Payload
+  adminBulkDeleteModelCardsV2(input: BulkDeleteModelCardsV2Input!): BulkDeleteModelCardsV2Payload @deprecated(reason: "Deprecated since 26.10.0. Use `partialBulkPurgeModelCardsV2`.")
+
+  """
+  Added in 26.10.0. Update a model card. Only provided fields will be updated.
+  """
+  updateModelCardV2(input: UpdateModelCardV2Input!): UpdateModelCardPayload!
+
+  """
+  Added in 26.10.0. Purge a model card. The options decide whether its vfolder is moved to the trash.
+  """
+  purgeModelCardV2(id: UUID!, options: DeleteModelCardV2Options = null): DeleteModelCardPayload!
+
+  """Added in 26.10.0. Update several model cards, answering for each one."""
+  partialBulkUpdateModelCardsV2(input: PartialBulkUpdateModelCardsInput!): PartialBulkModelCardsPayload!
+
+  """Added in 26.10.0. Purge several model cards, answering for each one."""
+  partialBulkPurgeModelCardsV2(input: PartialBulkPurgeModelCardsInput!): PartialBulkModelCardsPayload!
 
   """
   Added in 26.4.2. Scan a MODEL_STORE project and upsert model cards from vfolder model-definition.yaml files.
@@ -10863,7 +11133,10 @@ type Mutation {
   """
   Added in 26.4.4. Terminate one or more sessions by ID. Per-session RBAC permission is enforced by the bulk validator; any denial fails the whole request.
   """
-  terminateSessionsV2(sessionIds: [ID!]!, forced: Boolean! = false): TerminateSessionsPayload
+  terminateSessionsV2(sessionIds: [ID!]!, forced: Boolean! = false): TerminateSessionsPayload @deprecated(reason: "Deprecated since 26.10.0. Use `partialBulkTerminateSessionsV2`.")
+
+  """Added in 26.10.0. Terminate several sessions, answering for each one."""
+  partialBulkTerminateSessionsV2(input: PartialBulkTerminateSessionsInput!): PartialBulkTerminateSessionsPayload!
 
   """
   Added in 26.9.0. Exclude checker-session pairs from idle checks. Per-session RBAC permission is enforced by the bulk validator; any denial fails the whole request.
@@ -10883,7 +11156,7 @@ type Mutation {
   """
   Added in 26.10.0. Set keys on several entities in one call, answering per entity. An entity the caller may not write is one failed item; the rest are written.
   """
-  partialBulkUpsertEntityLabel(input: PartialBulkUpsertEntityLabelInput!): PartialBulkUpsertEntityLabelPayload
+  partialBulkUpsertEntityLabels(input: PartialBulkUpsertEntityLabelInput!): PartialBulkUpsertEntityLabelPayload
 
   """
   Added in 26.9.0. Take one label off, named by its own id. Which entity answers for it is read from the row before the delete runs.
@@ -10893,7 +11166,17 @@ type Mutation {
   """
   Added in 26.10.0. Take several labels off in one call, each named by its own id and answered for on its own. A label that is gone or on an entity the caller may not write is one failed item; the rest are taken off.
   """
-  partialBulkPurgeEntityLabel(input: PartialBulkPurgeEntityLabelInput!): PartialBulkPurgeEntityLabelPayload
+  partialBulkPurgeEntityLabels(input: PartialBulkPurgeEntityLabelInput!): PartialBulkPurgeEntityLabelPayload
+
+  """
+  Added in 26.10.0. Set keys on several entities in one call, answering per entity. An entity the caller may not write is one failed item; the rest are written.
+  """
+  partialBulkUpsertEntityLabel(input: PartialBulkUpsertEntityLabelInput!): PartialBulkUpsertEntityLabelPayload @deprecated(reason: "Deprecated since 26.10.0. Use `partialBulkUpsertEntityLabels`.")
+
+  """
+  Added in 26.10.0. Take several labels off in one call, each named by its own id and answered for on its own. A label that is gone or on an entity the caller may not write is one failed item; the rest are taken off.
+  """
+  partialBulkPurgeEntityLabel(input: PartialBulkPurgeEntityLabelInput!): PartialBulkPurgeEntityLabelPayload @deprecated(reason: "Deprecated since 26.10.0. Use `partialBulkPurgeEntityLabels`.")
 }
 
 """
@@ -11317,6 +11600,50 @@ type PageInfo @shareable {
 }
 
 """
+Added in 26.10.0. Result of a partial bulk access token operation: the tokens processed and the ones that failed.
+"""
+type PartialBulkAccessTokensPayload {
+  """The tokens processed, as they stood before removal."""
+  successes: [AccessToken!]!
+
+  """The tokens not processed, each with the reason."""
+  failed: [PartialBulkFailure!]!
+}
+
+"""
+Added in 26.10.0. Result of a partial bulk allow-list operation: the entries processed and the ones that failed.
+"""
+type PartialBulkAppConfigAllowListsPayload {
+  """The allow-list entries processed, as they stood when processed."""
+  successes: [AppConfigAllowList!]!
+
+  """The allow-list entries not processed, each with the reason."""
+  failed: [PartialBulkFailure!]!
+}
+
+"""
+Added in 26.10.0. Result of a partial bulk app config definition operation: the definitions processed and the ones that failed.
+"""
+type PartialBulkAppConfigDefinitionsPayload {
+  """The app config definitions processed, as they stood when processed."""
+  successes: [AppConfigDefinition!]!
+
+  """The app config definitions not processed, each with the reason."""
+  failed: [PartialBulkFailure!]!
+}
+
+"""
+Added in 26.10.0. Result of a partial bulk fragment operation: the fragments processed and the ones that failed.
+"""
+type PartialBulkAppConfigFragmentsPayload {
+  """The fragments processed, as they stood when processed."""
+  successes: [AppConfigFragment!]!
+
+  """The fragments not processed, each with the reason."""
+  failed: [PartialBulkFailure!]!
+}
+
+"""
 Added in 26.10.0. Result of a partial bulk artifact operation: the artifacts processed and the ones that failed.
 """
 type PartialBulkArtifactsPayload {
@@ -11324,6 +11651,39 @@ type PartialBulkArtifactsPayload {
   successes: [Artifact!]!
 
   """The artifacts not processed, each with the reason."""
+  failed: [PartialBulkFailure!]!
+}
+
+"""
+Added in 26.10.0. Result of a partial bulk auto-scaling rule operation: the rules processed and the ones that failed.
+"""
+type PartialBulkAutoScalingRulesPayload {
+  """The rules processed."""
+  successes: [AutoScalingRule!]!
+
+  """The rules not processed, each with the reason."""
+  failed: [PartialBulkFailure!]!
+}
+
+"""
+Added in 26.10.0. Result of a partial bulk client IP masking policy operation: the policies processed and the ones that failed.
+"""
+type PartialBulkClientIPMaskingPoliciesPayload {
+  """The policies processed, as they were left."""
+  successes: [ClientIPMaskingPolicy!]!
+
+  """The policies not processed, each with the reason."""
+  failed: [PartialBulkFailure!]!
+}
+
+"""
+Added in 26.10.0. Result of a partial bulk container registry operation: the registries processed and the ones that failed.
+"""
+type PartialBulkContainerRegistriesPayload {
+  """The container registries processed, as they stood."""
+  successes: [ContainerRegistryV2!]!
+
+  """The container registries not processed, each with the reason."""
   failed: [PartialBulkFailure!]!
 }
 
@@ -11384,6 +11744,17 @@ input PartialBulkDeleteVFoldersInput {
 }
 
 """
+Added in 26.10.0. Result of a partial bulk preset operation: the presets processed and the ones that failed.
+"""
+type PartialBulkDeploymentRevisionPresetsPayload {
+  """The presets processed."""
+  successes: [DeploymentRevisionPreset!]!
+
+  """The presets not processed, each with the reason."""
+  failed: [PartialBulkFailure!]!
+}
+
+"""
 Added in 26.10.0. Result of a partial bulk domain operation: the domains processed and the ones that failed.
 """
 type PartialBulkDomainsPayload {
@@ -11406,6 +11777,28 @@ type PartialBulkFailure {
 }
 
 """
+Added in 26.10.0. Result of a partial bulk idle checker assignment operation: the assignments processed and the ones that failed.
+"""
+type PartialBulkIdleCheckerAssignmentsPayload {
+  """The assignments processed, as they stood when processed."""
+  successes: [IdleCheckerAssignment!]!
+
+  """The assignments not processed, each with the reason."""
+  failed: [PartialBulkFailure!]!
+}
+
+"""
+Added in 26.10.0. Result of a partial bulk idle checker operation: the idle checkers processed and the ones that failed.
+"""
+type PartialBulkIdleCheckersPayload {
+  """The idle checkers processed, as they stood when processed."""
+  successes: [IdleChecker!]!
+
+  """The idle checkers not processed, each with the reason."""
+  failed: [PartialBulkFailure!]!
+}
+
+"""
 Added in 26.10.0. Result of a partial bulk image operation: the images processed and the ones that failed.
 """
 type PartialBulkImagesPayload {
@@ -11424,6 +11817,28 @@ type PartialBulkKeypairResourcePoliciesPayload {
   successes: [KeypairResourcePolicyV2!]!
 
   """The policies not processed, each with the reason."""
+  failed: [PartialBulkFailure!]!
+}
+
+"""
+Added in 26.10.0. Result of a partial bulk login client type operation: the login client types processed and the ones that failed.
+"""
+type PartialBulkLoginClientTypesPayload {
+  """The login client types processed, as they were left."""
+  successes: [LoginClientType!]!
+
+  """The login client types not processed, each with the reason."""
+  failed: [PartialBulkFailure!]!
+}
+
+"""
+Added in 26.10.0. Result of a partial bulk model card operation: the model cards processed and the ones that failed.
+"""
+type PartialBulkModelCardsPayload {
+  """The model cards processed, as they now stand."""
+  successes: [ModelCardV2!]!
+
+  """The model cards not processed, each with the reason."""
   failed: [PartialBulkFailure!]!
 }
 
@@ -11483,6 +11898,70 @@ type PartialBulkProjectsPayload {
 }
 
 """
+Added in 26.10.0. Input for permanently removing several access tokens, each answered for separately.
+"""
+input PartialBulkPurgeAccessTokensInput {
+  """IDs of the access tokens to purge."""
+  ids: [UUID!]!
+}
+
+"""
+Added in 26.10.0. Input for purging several allow-list entries, each answered for separately.
+"""
+input PartialBulkPurgeAppConfigAllowListsInput {
+  """IDs of the allow-list entries to purge."""
+  ids: [UUID!]!
+}
+
+"""
+Added in 26.10.0. Input for purging several app config definitions, each answered for separately.
+"""
+input PartialBulkPurgeAppConfigDefinitionsInput {
+  """IDs of the app config definitions to purge."""
+  ids: [UUID!]!
+}
+
+"""
+Added in 26.10.0. Input for purging several fragments, each answered for separately.
+"""
+input PartialBulkPurgeAppConfigFragmentsInput {
+  """IDs of the fragments to purge."""
+  ids: [UUID!]!
+}
+
+"""
+Added in 26.10.0. Input for permanently removing several auto-scaling rules, each answered for separately.
+"""
+input PartialBulkPurgeAutoScalingRulesInput {
+  """IDs of the auto-scaling rules to purge."""
+  ids: [UUID!]!
+}
+
+"""
+Added in 26.10.0. Input for dropping several client IP masking policies, each answered for separately.
+"""
+input PartialBulkPurgeClientIPMaskingPoliciesInput {
+  """IDs of the policies to drop."""
+  ids: [UUID!]!
+}
+
+"""
+Added in 26.10.0. Input for purging several container registries, each answered for separately.
+"""
+input PartialBulkPurgeContainerRegistriesInput {
+  """IDs of the container registries to purge."""
+  ids: [UUID!]!
+}
+
+"""
+Added in 26.10.0. Input for permanently removing several presets, each answered for separately.
+"""
+input PartialBulkPurgeDeploymentRevisionPresetsInput {
+  """IDs of the presets to purge."""
+  ids: [UUID!]!
+}
+
+"""
 Added in 26.10.0. Input for taking several labels off in one call, each named by its own id.
 """
 input PartialBulkPurgeEntityLabelInput {
@@ -11502,11 +11981,65 @@ type PartialBulkPurgeEntityLabelPayload {
 }
 
 """
+Added in 26.10.0. Input for purging several HuggingFace registries, each answered for separately.
+"""
+input PartialBulkPurgeHuggingFaceRegistriesInput {
+  """IDs of the registries to purge."""
+  ids: [UUID!]!
+}
+
+"""
+Added in 26.10.0. Result of a partial bulk HuggingFace registry purge: the registries purged and the ones that failed.
+"""
+type PartialBulkPurgeHuggingFaceRegistriesPayload {
+  """The registries purged."""
+  successes: [PurgeHuggingFaceRegistryPayload!]!
+
+  """The registries not purged, each with the reason."""
+  failed: [PartialBulkFailure!]!
+}
+
+"""
+Added in 26.10.0. Input for purging several idle checker assignments, each answered for separately.
+"""
+input PartialBulkPurgeIdleCheckerAssignmentsInput {
+  """IDs of the idle checker assignments to purge."""
+  ids: [UUID!]!
+}
+
+"""
+Added in 26.10.0. Input for purging several idle checkers, each answered for separately.
+"""
+input PartialBulkPurgeIdleCheckersInput {
+  """IDs of the idle checkers to purge."""
+  ids: [UUID!]!
+}
+
+"""
 Added in 26.10.0. Input for purging several keypair resource policies, each answered for separately.
 """
 input PartialBulkPurgeKeypairResourcePoliciesInput {
   """IDs of the keypair resource policies to purge."""
   ids: [UUID!]!
+}
+
+"""
+Added in 26.10.0. Input for purging several login client types, each answered for separately.
+"""
+input PartialBulkPurgeLoginClientTypesInput {
+  """IDs of the login client types to purge."""
+  ids: [UUID!]!
+}
+
+"""
+Added in 26.10.0. Input for purging several model cards, each answered for separately.
+"""
+input PartialBulkPurgeModelCardsInput {
+  """IDs of the model cards to purge."""
+  ids: [UUID!]!
+
+  """Options for the purge."""
+  options: DeleteModelCardV2Options = null
 }
 
 """
@@ -11558,6 +12091,25 @@ input PartialBulkPurgeQueryPresetCategoriesInput {
 }
 
 """
+Added in 26.10.0. Input for purging several Reservoir registries, each answered for separately.
+"""
+input PartialBulkPurgeReservoirRegistriesInput {
+  """IDs of the registries to purge."""
+  ids: [UUID!]!
+}
+
+"""
+Added in 26.10.0. Result of a partial bulk Reservoir registry purge: the registries purged and the ones that failed.
+"""
+type PartialBulkPurgeReservoirRegistriesPayload {
+  """The registries purged."""
+  successes: [PurgeReservoirRegistryPayload!]!
+
+  """The registries not purged, each with the reason."""
+  failed: [PartialBulkFailure!]!
+}
+
+"""
 Added in 26.10.0. Input for purging several resource groups, each answered for separately.
 """
 input PartialBulkPurgeResourceGroupsInput {
@@ -11574,6 +12126,22 @@ input PartialBulkPurgeResourcePresetsInput {
 }
 
 """
+Added in 26.10.0. Input for purging several resource slot types, each answered for separately.
+"""
+input PartialBulkPurgeResourceSlotTypesInput {
+  """IDs of the resource slot types to purge."""
+  ids: [UUID!]!
+}
+
+"""
+Added in 26.10.0. Input for purging several retention policies, each answered for separately.
+"""
+input PartialBulkPurgeRetentionPoliciesInput {
+  """IDs of the retention policies to purge."""
+  ids: [UUID!]!
+}
+
+"""
 Added in 26.10.0. Input for purging several role presets, each answered for separately.
 """
 input PartialBulkPurgeRolePresetsInput {
@@ -11586,6 +12154,22 @@ Added in 26.10.0. Input for permanently removing several roles, each answered fo
 """
 input PartialBulkPurgeRolesInput {
   """IDs of the roles to purge."""
+  ids: [UUID!]!
+}
+
+"""
+Added in 26.10.0. Input for purging several runtime variant presets, each answered for separately.
+"""
+input PartialBulkPurgeRuntimeVariantPresetsInput {
+  """IDs of the presets to purge."""
+  ids: [UUID!]!
+}
+
+"""
+Added in 26.10.0. Input for purging several runtime variants, each answered for separately.
+"""
+input PartialBulkPurgeRuntimeVariantsInput {
+  """IDs of the runtime variants to purge."""
   ids: [UUID!]!
 }
 
@@ -11658,6 +12242,17 @@ type PartialBulkResourcePresetsPayload {
 }
 
 """
+Added in 26.10.0. Result of a partial bulk resource slot type operation: the slot types processed and the ones that failed.
+"""
+type PartialBulkResourceSlotTypesPayload {
+  """The resource slot types processed, as they stood."""
+  successes: [ResourceSlotType!]!
+
+  """The resource slot types not processed, each with the reason."""
+  failed: [PartialBulkFailure!]!
+}
+
+"""
 Added in 26.10.0. Input for restoring several soft-deleted artifacts, each answered for separately.
 """
 input PartialBulkRestoreArtifactsInput {
@@ -11714,6 +12309,17 @@ input PartialBulkRestoreVFoldersInput {
 }
 
 """
+Added in 26.10.0. Result of a partial bulk retention policy operation: the policies processed and the ones that failed.
+"""
+type PartialBulkRetentionPoliciesPayload {
+  """The retention policies processed, as they now stand."""
+  successes: [RetentionPolicy!]!
+
+  """The retention policies not processed, each with the reason."""
+  failed: [PartialBulkFailure!]!
+}
+
+"""
 Added in 26.10.0. Result of a partial bulk role preset permission operation: the entries processed and the ones that failed.
 """
 type PartialBulkRolePresetPermissionsPayload {
@@ -11747,11 +12353,79 @@ type PartialBulkRolesPayload {
 }
 
 """
+Added in 26.10.0. Result of a partial bulk runtime variant preset operation: the presets processed and the ones that failed.
+"""
+type PartialBulkRuntimeVariantPresetsPayload {
+  """The presets processed, as they stood when processed."""
+  successes: [RuntimeVariantPreset!]!
+
+  """The presets not processed, each with the reason."""
+  failed: [PartialBulkFailure!]!
+}
+
+"""
+Added in 26.10.0. Result of a partial bulk runtime variant operation: the runtime variants processed and the ones that failed.
+"""
+type PartialBulkRuntimeVariantsPayload {
+  """The runtime variants processed, as they stood when processed."""
+  successes: [RuntimeVariant!]!
+
+  """The runtime variants not processed, each with the reason."""
+  failed: [PartialBulkFailure!]!
+}
+
+"""
+Added in 26.10.0. Input for terminating several sessions, each answered for separately.
+"""
+input PartialBulkTerminateSessionsInput {
+  """IDs of the sessions to terminate."""
+  ids: [UUID!]!
+
+  """Force-terminate without waiting for cleanup."""
+  forced: Boolean! = false
+}
+
+"""
+Added in 26.10.0. Result of a partial bulk session termination: the sessions processed, each with the state it ended in, and the ones that failed.
+"""
+type PartialBulkTerminateSessionsPayload {
+  """The sessions processed, each with the state it ended in."""
+  successes: [SessionTerminationInfo!]!
+
+  """The sessions not processed, each with the reason."""
+  failed: [PartialBulkFailure!]!
+}
+
+"""
+Added in 26.10.0. Input for updating several allow-list entries, each answered for separately.
+"""
+input PartialBulkUpdateAppConfigAllowListsInput {
+  """The allow-list entries to update, each with its id and fields."""
+  items: [UpdateAppConfigAllowListInput!]!
+}
+
+"""
 Added in 26.10.0. Input for updating several artifacts, each answered for separately.
 """
 input PartialBulkUpdateArtifactsInput {
   """The artifacts to update, each with its ID and fields."""
   items: [UpdateArtifactInput!]!
+}
+
+"""
+Added in 26.10.0. Input for updating several auto-scaling rules, each answered for separately.
+"""
+input PartialBulkUpdateAutoScalingRulesInput {
+  """The rules to update, each naming its rule by `id`."""
+  items: [UpdateAutoScalingRuleInput!]!
+}
+
+"""
+Added in 26.10.0. Input for updating several presets, each answered for separately.
+"""
+input PartialBulkUpdateDeploymentRevisionPresetsInput {
+  """The presets to update, each naming its preset by `id`."""
+  items: [UpdateDeploymentRevisionPresetInput!]!
 }
 
 """
@@ -11771,6 +12445,44 @@ Added in 26.10.0. Input for updating several domains, each answered for separate
 input PartialBulkUpdateDomainsInput {
   """The domains to update, each with its fields."""
   items: [PartialBulkUpdateDomainItemInput!]!
+}
+
+"""
+Added in 26.10.0. Input for updating several HuggingFace registries, each answered for separately.
+"""
+input PartialBulkUpdateHuggingFaceRegistriesInput {
+  """The registries to update, each with its fields."""
+  items: [PartialBulkUpdateHuggingFaceRegistryItemInput!]!
+}
+
+"""
+Added in 26.10.0. Result of a partial bulk HuggingFace registry update: the registries updated and the ones that failed.
+"""
+type PartialBulkUpdateHuggingFaceRegistriesPayload {
+  """The registries updated, as they now stand."""
+  successes: [HuggingFaceRegistry!]!
+
+  """The registries not updated, each with the reason."""
+  failed: [PartialBulkFailure!]!
+}
+
+"""
+Added in 26.10.0. One HuggingFace registry of a partial bulk update and the fields to update on it.
+"""
+input PartialBulkUpdateHuggingFaceRegistryItemInput {
+  """ID of the registry to update."""
+  id: UUID!
+
+  """Fields to update on the registry."""
+  input: UpdateHuggingFaceRegistryBodyInput!
+}
+
+"""
+Added in 26.10.0. Input for updating several idle checker assignments, each answered for separately.
+"""
+input PartialBulkUpdateIdleCheckerAssignmentsInput {
+  """The assignments to update, each with its new enabled state."""
+  items: [UpdateIdleCheckerAssignmentInput!]!
 }
 
 """
@@ -11809,6 +12521,33 @@ input PartialBulkUpdateKeypairResourcePolicyItemInput {
 
   """Fields to update on the policy."""
   input: UpdateKeypairResourcePolicyInput!
+}
+
+"""
+Added in 26.10.0. One login client type of a partial bulk update and the fields to update on it.
+"""
+input PartialBulkUpdateLoginClientTypeItemInput {
+  """ID of the login client type to update."""
+  id: UUID!
+
+  """Fields to update on the login client type."""
+  input: UpdateLoginClientTypeInput!
+}
+
+"""
+Added in 26.10.0. Input for updating several login client types, each answered for separately.
+"""
+input PartialBulkUpdateLoginClientTypesInput {
+  """The login client types to update, each with its fields."""
+  items: [PartialBulkUpdateLoginClientTypeItemInput!]!
+}
+
+"""
+Added in 26.10.0. Input for updating several model cards, each answered for separately.
+"""
+input PartialBulkUpdateModelCardsInput {
+  """The model cards to update, each with its ID and fields."""
+  items: [UpdateModelCardV2Input!]!
 }
 
 """
@@ -11933,6 +12672,36 @@ input PartialBulkUpdateQueryDefinitionsInput {
 }
 
 """
+Added in 26.10.0. Input for updating several Reservoir registries, each answered for separately.
+"""
+input PartialBulkUpdateReservoirRegistriesInput {
+  """The registries to update, each with its fields."""
+  items: [PartialBulkUpdateReservoirRegistryItemInput!]!
+}
+
+"""
+Added in 26.10.0. Result of a partial bulk Reservoir registry update: the registries updated and the ones that failed.
+"""
+type PartialBulkUpdateReservoirRegistriesPayload {
+  """The registries updated, as they now stand."""
+  successes: [ReservoirRegistry!]!
+
+  """The registries not updated, each with the reason."""
+  failed: [PartialBulkFailure!]!
+}
+
+"""
+Added in 26.10.0. One Reservoir registry of a partial bulk update and the fields to update on it.
+"""
+input PartialBulkUpdateReservoirRegistryItemInput {
+  """ID of the registry to update."""
+  id: UUID!
+
+  """Fields to update on the registry."""
+  input: UpdateReservoirRegistryBodyInput!
+}
+
+"""
 Added in 26.10.0. One resource group of a partial bulk update and the fields to update on it.
 """
 input PartialBulkUpdateResourceGroupItemInput {
@@ -11977,6 +12746,14 @@ input PartialBulkUpdateResourcePresetsInput {
 }
 
 """
+Added in 26.10.0. Input for updating several retention policies, each answered for separately.
+"""
+input PartialBulkUpdateRetentionPoliciesInput {
+  """The retention policies to update, each with its ID and fields."""
+  items: [UpdateRetentionPolicyInput!]!
+}
+
+"""
 Added in 26.10.0. One role of a partial bulk update and the fields to update on it.
 """
 input PartialBulkUpdateRoleItemInput {
@@ -12012,6 +12789,22 @@ Added in 26.10.0. Input for updating several roles, each answered for separately
 input PartialBulkUpdateRolesInput {
   """The roles to update, each with its fields."""
   items: [PartialBulkUpdateRoleItemInput!]!
+}
+
+"""
+Added in 26.10.0. Input for updating several runtime variant presets, each answered for separately.
+"""
+input PartialBulkUpdateRuntimeVariantPresetsInput {
+  """The presets to update, each with its fields."""
+  items: [UpdateRuntimeVariantPresetInput!]!
+}
+
+"""
+Added in 26.10.0. Input for updating several runtime variants, each answered for separately.
+"""
+input PartialBulkUpdateRuntimeVariantsInput {
+  """The runtime variants to update, each with its fields."""
+  items: [UpdateRuntimeVariantInput!]!
 }
 
 """
@@ -13429,6 +14222,18 @@ type PurgeAppConfigDefinitionPayload {
   id: UUID!
 }
 
+"""Added in 26.10.0. Payload for app config fragment purge."""
+type PurgeAppConfigFragmentPayload {
+  """Id of the purged app config fragment."""
+  id: UUID!
+}
+
+"""Added in 26.10.0. Payload for container registry purge."""
+type PurgeContainerRegistryPayload {
+  """ID of the purged registry."""
+  id: UUID!
+}
+
 """Added in 26.4.2. Payload for domain permanent deletion mutation."""
 type PurgeDomainPayload {
   """Whether the purge was successful."""
@@ -13448,6 +14253,12 @@ type PurgeEntityLabelError {
 type PurgeEntityLabelPayload {
   """The label taken off the entity."""
   label: EntityLabel!
+}
+
+"""Added in 26.10.0. Payload for purging a HuggingFace registry."""
+type PurgeHuggingFaceRegistryPayload {
+  """ID of the purged HuggingFace registry."""
+  id: UUID!
 }
 
 """Added in 26.8.0. Identifies the idle checker assignment to purge."""
@@ -13478,6 +14289,12 @@ type PurgeIdleCheckerPayload {
   id: UUID!
 }
 
+"""Added in 26.10.0. Payload for login client type purge."""
+type PurgeLoginClientTypePayload {
+  """UUID of the purged login client type."""
+  id: UUID!
+}
+
 """Added in 26.10.0. Payload for notification channel purge."""
 type PurgeNotificationChannelPayload {
   """ID of the purged notification channel."""
@@ -13500,6 +14317,12 @@ type PurgeObjectStoragePayload {
 type PurgeProjectPayload {
   """Whether the purge was successful."""
   purged: Boolean!
+}
+
+"""Added in 26.10.0. Payload for purging a Reservoir registry."""
+type PurgeReservoirRegistryPayload {
+  """ID of the purged Reservoir registry."""
+  id: UUID!
 }
 
 """Added in 26.9.0. Input for removing a resource slot type."""
@@ -18447,6 +19270,25 @@ input SessionSearchScope {
   user: [UUIDScope!] = null
 }
 
+"""Added in 26.10.0. What a termination request did to one session."""
+type SessionTerminationInfo {
+  """ID of the session."""
+  id: UUID!
+
+  """
+  State the session ended in: cancelled, terminating, force-terminated, or skipped.
+  """
+  status: SessionTerminationStatus!
+}
+
+"""Added in 26.10.0. What a termination request did to one session."""
+enum SessionTerminationStatus {
+  CANCELLED
+  TERMINATING
+  FORCE_TERMINATED
+  SKIPPED
+}
+
 enum SessionTypes {
   INTERACTIVE
   BATCH
@@ -19612,6 +20454,18 @@ input UpdateDomainInput {
   integrationName: String
 }
 
+"""Added in 26.10.0. Fields to update on a HuggingFace registry."""
+input UpdateHuggingFaceRegistryBodyInput {
+  """New registry name."""
+  name: String
+
+  """New HuggingFace Hub URL."""
+  url: String
+
+  """New access token."""
+  token: String
+}
+
 """Added in 25.14.0. """
 input UpdateHuggingFaceRegistryInput {
   id: ID!
@@ -20123,6 +20977,24 @@ input UpdateProjectResourcePolicyInput {
 type UpdateProjectResourcePolicyPayload {
   """The updated project resource policy."""
   projectResourcePolicy: ProjectResourcePolicyV2!
+}
+
+"""Added in 26.10.0. Fields to update on a Reservoir registry."""
+input UpdateReservoirRegistryBodyInput {
+  """New registry name."""
+  name: String
+
+  """New endpoint URL."""
+  endpoint: String
+
+  """New access key."""
+  accessKey: String
+
+  """New secret key."""
+  secretKey: String
+
+  """New API version."""
+  apiVersion: String
 }
 
 """Added in 25.14.0. """

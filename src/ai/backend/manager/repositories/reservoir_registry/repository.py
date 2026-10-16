@@ -1,7 +1,9 @@
 import uuid
+from collections.abc import Sequence
 
 from ai.backend.common.data.artifact.types import ArtifactRegistryType
 from ai.backend.common.data.entity.artifact_registry import ArtifactRegistryID
+from ai.backend.common.data.entity.types import EntityIdentifier
 from ai.backend.common.exception import BackendAIError
 from ai.backend.common.metrics.metric import DomainType, LayerType
 from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPolicy
@@ -22,6 +24,7 @@ from ai.backend.manager.models.reservoir_registry.creators import ReservoirRegis
 from ai.backend.manager.models.reservoir_registry.purgers import ReservoirRegistryPurger
 from ai.backend.manager.models.reservoir_registry.searchers import ReservoirRegistrySearcher
 from ai.backend.manager.models.reservoir_registry.updaters import ReservoirRegistryUpdater
+from ai.backend.manager.models.specs.types import BulkResultWithFailures
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.ops.v2.artifact_registry.provider import (
     ArtifactRegistryOpsProvider,
@@ -124,6 +127,57 @@ class ReservoirRegistryRepository:
                     f"Reservoir registry with ID {reservoir_id} not found"
                 )
             return deleted_id
+
+    @reservoir_registry_repository_resilience.apply()
+    async def partial_bulk_update(
+        self,
+        items: Sequence[tuple[ReservoirRegistryUpdater, ArtifactRegistryModifierMeta]],
+    ) -> BulkResultWithFailures[ReservoirRegistryData]:
+        """Edit each named Reservoir registry and its name in its own savepoint."""
+        successes: dict[EntityIdentifier, ReservoirRegistryData] = {}
+        errors: dict[EntityIdentifier, Exception] = {}
+        async with self._registry_ops.write_ops() as w:
+            for updater, meta in items:
+                try:
+                    async with w.savepoint() as sp:
+                        data = await sp.update_registry(
+                            updater,
+                            ArtifactRegistryMetaUpdater(
+                                registry_id=updater.registry_id, name=meta.name
+                            ),
+                        )
+                        if data is None:
+                            raise ArtifactRegistryNotFoundError(
+                                f"Reservoir registry with ID {updater.registry_id} not found"
+                            )
+                        successes[updater.registry_id] = data
+                except Exception as e:
+                    errors[updater.registry_id] = e
+        return BulkResultWithFailures(successes=successes, errors=errors)
+
+    @reservoir_registry_repository_resilience.apply()
+    async def partial_bulk_purge(
+        self, registry_ids: Sequence[ArtifactRegistryID]
+    ) -> BulkResultWithFailures[ArtifactRegistryID]:
+        """Remove each named Reservoir registry, the row naming it, and the node it was, in
+        its own savepoint."""
+        successes: dict[EntityIdentifier, ArtifactRegistryID] = {}
+        errors: dict[EntityIdentifier, Exception] = {}
+        async with self._registry_ops.write_ops() as w:
+            for registry_id in registry_ids:
+                try:
+                    async with w.savepoint() as sp:
+                        deleted_id = await sp.purge_registry(
+                            ReservoirRegistryPurger(registry_id=registry_id)
+                        )
+                        if deleted_id is None:
+                            raise ArtifactRegistryNotFoundError(
+                                f"Reservoir registry with ID {registry_id} not found"
+                            )
+                        successes[registry_id] = deleted_id
+                except Exception as e:
+                    errors[registry_id] = e
+        return BulkResultWithFailures(successes=successes, errors=errors)
 
     @reservoir_registry_repository_resilience.apply()
     async def list_reservoir_registries(self) -> list[ReservoirRegistryData]:

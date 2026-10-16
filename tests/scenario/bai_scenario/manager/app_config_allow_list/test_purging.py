@@ -56,7 +56,7 @@ class Purging(When[AnEntryAndACaller, AppConfigAllowListAdapter, Purged]):
 
     @override
     def operation(self) -> str:
-        return "admin_purge"
+        return "purge"
 
     @override
     def describe(self, laid: AnEntryAndACaller) -> str:
@@ -72,7 +72,7 @@ class Purging(When[AnEntryAndACaller, AppConfigAllowListAdapter, Purged]):
         else:
             raise LookupError("this row lays no entry to purge")
         with ActingAs(laid.caller):
-            return await adapter.admin_purge(PurgeAppConfigAllowListInput(id=wanted))
+            return await adapter.purge(PurgeAppConfigAllowListInput(id=wanted))
 
 
 @dataclass(frozen=True)

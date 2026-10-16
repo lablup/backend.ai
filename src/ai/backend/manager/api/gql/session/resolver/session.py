@@ -33,6 +33,8 @@ from ai.backend.manager.api.gql.session.types import (
     IncludeSessionIdleChecksFailureInfoGQL,
     IncludeSessionIdleChecksInputGQL,
     IncludeSessionIdleChecksPayloadGQL,
+    PartialBulkTerminateSessionsInputGQL,
+    PartialBulkTerminateSessionsPayloadGQL,
     ProjectSessionScopeGQL,
     SessionIdleCheckTargetInfoGQL,
     SessionScopeGQL,
@@ -322,11 +324,28 @@ async def enqueue_session(
 
 @gql_mutation(
     BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Terminate several sessions, answering for each one.",
+    )
+)
+async def partial_bulk_terminate_sessions_v2(
+    info: Info[StrawberryGQLContext],
+    input: PartialBulkTerminateSessionsInputGQL,
+) -> PartialBulkTerminateSessionsPayloadGQL:
+    payload = await info.context.adapters.session.partial_bulk_terminate(input.to_pydantic())
+    return PartialBulkTerminateSessionsPayloadGQL.from_pydantic(payload)
+
+
+@gql_mutation(
+    BackendAIGQLMeta(
         added_version="26.4.4",
         description=(
             "Terminate one or more sessions by ID. Per-session RBAC permission is enforced "
             "by the bulk validator; any denial fails the whole request."
         ),
+    ),
+    deprecation_reason=(
+        f"Deprecated since {NEXT_RELEASE_VERSION}. Use `partialBulkTerminateSessionsV2`."
     ),
 )
 async def terminate_sessions_v2(

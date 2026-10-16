@@ -11,6 +11,7 @@ from ai.backend.common.data.entity.app_config_allow_list import AppConfigAllowLi
 from ai.backend.common.dto.manager.v2.app_config_allow_list.request import (
     SearchAppConfigAllowListInput,
 )
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import encode_cursor
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
@@ -28,6 +29,9 @@ from .types import (
     AppConfigAllowListOrderByGQL,
     CreateAppConfigAllowListInputGQL,
     CreateAppConfigAllowListPayloadGQL,
+    PartialBulkAppConfigAllowListsPayloadGQL,
+    PartialBulkPurgeAppConfigAllowListsInputGQL,
+    PartialBulkUpdateAppConfigAllowListsInputGQL,
     PurgeAppConfigAllowListInputGQL,
     PurgeAppConfigAllowListPayloadGQL,
     UpdateAppConfigAllowListInputGQL,
@@ -121,16 +125,79 @@ async def admin_create_app_config_allow_list(
 
 @gql_mutation(
     BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Update an app config allow-list entry's rank by id.",
+    )
+)
+async def update_app_config_allow_list(
+    info: Info[StrawberryGQLContext],
+    input: UpdateAppConfigAllowListInputGQL,
+) -> UpdateAppConfigAllowListPayloadGQL:
+    payload = await info.context.adapters.app_config_allow_list.update(input.to_pydantic())
+    return UpdateAppConfigAllowListPayloadGQL.from_pydantic(payload)
+
+
+@gql_mutation(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Purge an app config allow-list entry by id, with the fragments it admits.",
+    )
+)
+async def purge_app_config_allow_list(
+    info: Info[StrawberryGQLContext],
+    input: PurgeAppConfigAllowListInputGQL,
+) -> PurgeAppConfigAllowListPayloadGQL:
+    payload = await info.context.adapters.app_config_allow_list.purge(input.to_pydantic())
+    return PurgeAppConfigAllowListPayloadGQL.from_pydantic(payload)
+
+
+@gql_mutation(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Update several app config allow-list entries, answering for each one.",
+    )
+)
+async def partial_bulk_update_app_config_allow_lists(
+    info: Info[StrawberryGQLContext],
+    input: PartialBulkUpdateAppConfigAllowListsInputGQL,
+) -> PartialBulkAppConfigAllowListsPayloadGQL:
+    payload = await info.context.adapters.app_config_allow_list.partial_bulk_update(
+        input.to_pydantic()
+    )
+    return PartialBulkAppConfigAllowListsPayloadGQL.from_pydantic(payload)
+
+
+@gql_mutation(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Purge several app config allow-list entries, answering for each one.",
+    )
+)
+async def partial_bulk_purge_app_config_allow_lists(
+    info: Info[StrawberryGQLContext],
+    input: PartialBulkPurgeAppConfigAllowListsInputGQL,
+) -> PartialBulkAppConfigAllowListsPayloadGQL:
+    payload = await info.context.adapters.app_config_allow_list.partial_bulk_purge(
+        input.to_pydantic()
+    )
+    return PartialBulkAppConfigAllowListsPayloadGQL.from_pydantic(payload)
+
+
+@gql_mutation(
+    BackendAIGQLMeta(
         added_version="26.8.0",
         description="Update an app config allow-list entry's rank by id (super admin only).",
-    )
+    ),
+    deprecation_reason=(
+        f"Deprecated since {NEXT_RELEASE_VERSION}. Use `updateAppConfigAllowList`."
+    ),
 )
 async def admin_update_app_config_allow_list(
     info: Info[StrawberryGQLContext],
     input: UpdateAppConfigAllowListInputGQL,
 ) -> UpdateAppConfigAllowListPayloadGQL | None:
     check_admin_only()
-    payload = await info.context.adapters.app_config_allow_list.admin_update(input.to_pydantic())
+    payload = await info.context.adapters.app_config_allow_list.update(input.to_pydantic())
     return UpdateAppConfigAllowListPayloadGQL.from_pydantic(payload)
 
 
@@ -138,12 +205,13 @@ async def admin_update_app_config_allow_list(
     BackendAIGQLMeta(
         added_version="26.7.0",
         description="Purge an app config allow-list entry by id (super admin only).",
-    )
+    ),
+    deprecation_reason=(f"Deprecated since {NEXT_RELEASE_VERSION}. Use `purgeAppConfigAllowList`."),
 )
 async def admin_purge_app_config_allow_list(
     info: Info[StrawberryGQLContext],
     input: PurgeAppConfigAllowListInputGQL,
 ) -> PurgeAppConfigAllowListPayloadGQL | None:
     check_admin_only()
-    payload = await info.context.adapters.app_config_allow_list.admin_purge(input.to_pydantic())
+    payload = await info.context.adapters.app_config_allow_list.purge(input.to_pydantic())
     return PurgeAppConfigAllowListPayloadGQL.from_pydantic(payload)

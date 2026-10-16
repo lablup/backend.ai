@@ -18,6 +18,7 @@ from ai.backend.common.data.entity.replica import ReplicaID
 from ai.backend.common.data.entity.session import SessionEntityType, SessionID
 from ai.backend.common.data.entity.types import RuntimeEntityID
 from ai.backend.common.data.entity.user import UserID
+from ai.backend.common.dto.manager.v2.common import PartialBulkPayload
 from ai.backend.common.dto.manager.v2.common import (
     ResourceSlotEntryInput as ResourceSlotEntryInputDTO,
 )
@@ -36,6 +37,9 @@ from ai.backend.common.dto.manager.v2.session.request import (
 )
 from ai.backend.common.dto.manager.v2.session.request import (
     MountItemInput as MountItemInputDTO,
+)
+from ai.backend.common.dto.manager.v2.session.request import (
+    PartialBulkTerminateSessionsInput as PartialBulkTerminateSessionsInputDTO,
 )
 from ai.backend.common.dto.manager.v2.session.request import (
     ResourceOptsInput as ResourceOptsInputDTO,
@@ -74,6 +78,9 @@ from ai.backend.common.dto.manager.v2.session.response import (
     SessionRuntimeInfoGQLDTO,
 )
 from ai.backend.common.dto.manager.v2.session.response import (
+    SessionTerminationInfo as SessionTerminationInfoDTO,
+)
+from ai.backend.common.dto.manager.v2.session.response import (
     TerminateSessionsPayload as TerminateSessionsPayloadDTO,
 )
 from ai.backend.common.dto.manager.v2.session.types import (
@@ -103,7 +110,7 @@ from ai.backend.manager.api.gql.common.types import (
     SessionV2ResultGQL,
     SessionV2TypeGQL,
 )
-from ai.backend.manager.api.gql.common_types import BinarySizeInputGQL
+from ai.backend.manager.api.gql.common_types import BinarySizeInputGQL, PartialBulkFailureGQL
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     PydanticInputMixin,
@@ -132,7 +139,7 @@ from ai.backend.manager.api.gql.kernel.types import (
     ResourceAllocationGQL,
 )
 from ai.backend.manager.api.gql.project_v2.types.node import ProjectV2GQL
-from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin
+from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin, PydanticOutputMixin
 from ai.backend.manager.api.gql.resource_group.types import ResourceGroupGQL
 from ai.backend.manager.api.gql.session_options.types import AgentSelectionPolicyGQL
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
@@ -1109,6 +1116,73 @@ class TerminateSessionsPayloadGQL:
     terminating: list[ID] = gql_field(description="Sessions marked TERMINATING.")
     force_terminated: list[ID] = gql_field(description="Sessions force-terminated.")
     skipped: list[ID] = gql_field(description="Sessions already terminated or not found.")
+
+
+@gql_enum(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="What a termination request did to one session.",
+    ),
+    name="SessionTerminationStatus",
+)
+class SessionTerminationStatusGQL(StrEnum):
+    CANCELLED = "cancelled"
+    TERMINATING = "terminating"
+    FORCE_TERMINATED = "force-terminated"
+    SKIPPED = "skipped"
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Input for terminating several sessions, each answered for separately.",
+    ),
+    name="PartialBulkTerminateSessionsInput",
+)
+class PartialBulkTerminateSessionsInputGQL(
+    PydanticInputMixin[PartialBulkTerminateSessionsInputDTO]
+):
+    ids: list[UUID] = gql_field(description="IDs of the sessions to terminate.")
+    forced: bool = gql_field(
+        default=False, description="Force-terminate without waiting for cleanup."
+    )
+
+
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="What a termination request did to one session.",
+    ),
+    model=SessionTerminationInfoDTO,
+    name="SessionTerminationInfo",
+)
+class SessionTerminationInfoGQL(PydanticOutputMixin[SessionTerminationInfoDTO]):
+    id: UUID = gql_field(description="ID of the session.")
+    status: SessionTerminationStatusGQL = gql_field(
+        description="State the session ended in: cancelled, terminating, force-terminated, or skipped."
+    )
+
+
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description=(
+            "Result of a partial bulk session termination: the sessions processed, each with "
+            "the state it ended in, and the ones that failed."
+        ),
+    ),
+    model=PartialBulkPayload[SessionTerminationInfoDTO],
+    name="PartialBulkTerminateSessionsPayload",
+)
+class PartialBulkTerminateSessionsPayloadGQL(
+    PydanticOutputMixin[PartialBulkPayload[SessionTerminationInfoDTO]]
+):
+    successes: list[SessionTerminationInfoGQL] = gql_field(
+        description="The sessions processed, each with the state it ended in."
+    )
+    failed: list[PartialBulkFailureGQL] = gql_field(
+        description="The sessions not processed, each with the reason."
+    )
 
 
 @gql_pydantic_input(

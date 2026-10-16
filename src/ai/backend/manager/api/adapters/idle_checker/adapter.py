@@ -16,12 +16,17 @@ from ai.backend.common.data.idle_checker.types import (
     UtilizationSpec,
     UtilizationThresholdEntry,
 )
-from ai.backend.common.dto.manager.v2.common import OrderDirection
+from ai.backend.common.dto.manager.v2.common import (
+    OrderDirection,
+    PartialBulkFailure,
+    PartialBulkPayload,
+)
 from ai.backend.common.dto.manager.v2.idle_checker.request import (
     CreateIdleCheckerInput,
     IdleCheckerFilter,
     IdleCheckerOrder,
     IdleCheckerSpecInputDTO,
+    PartialBulkPurgeIdleCheckersInput,
     PurgeIdleCheckerInput,
     SearchIdleCheckersInput,
     UpdateIdleCheckerInput,
@@ -189,6 +194,27 @@ class IdleCheckerAdapter(BaseAdapter):
         if error is not None:
             raise error
         return PurgeIdleCheckerPayload(id=input.id)
+
+    async def admin_partial_bulk_purge(
+        self,
+        input: PartialBulkPurgeIdleCheckersInput,
+    ) -> PartialBulkPayload[IdleCheckerNode]:
+        """Purge several idle checkers, answering for each one."""
+        action_result = await self._idle_checker.bulk_purge.run(
+            BulkPurgeIdleCheckersAction(ids=input.ids)
+        )
+        return PartialBulkPayload[IdleCheckerNode](
+            successes=[
+                self._data_to_node(item.value)
+                for item in action_result.items
+                if item.value is not None
+            ],
+            failed=[
+                PartialBulkFailure(id=item.entity_id, message=str(item.error))
+                for item in action_result.items
+                if item.error is not None
+            ],
+        )
 
     @staticmethod
     def _data_to_node(data: IdleCheckerData) -> IdleCheckerNode:
