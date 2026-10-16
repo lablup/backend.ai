@@ -507,6 +507,7 @@ from ai.backend.manager.api.gql.session_group.resolver import (
     admin_session_groups,
     scoped_session_groups,
     session_group,
+    update_session_group,
 )
 from ai.backend.manager.api.gql.user.resolver.mutation import (
     admin_bulk_create_users_v2,
@@ -1174,6 +1175,8 @@ class Mutation:
     terminate_sessions_v2 = terminate_sessions_v2
     exclude_session_idle_checks = exclude_session_idle_checks
     include_session_idle_checks = include_session_idle_checks
+    # Session Group mutations
+    update_session_group = update_session_group
     # Entity Label mutations
     upsert_entity_label = upsert_entity_label
     partial_bulk_upsert_entity_label = partial_bulk_upsert_entity_label
