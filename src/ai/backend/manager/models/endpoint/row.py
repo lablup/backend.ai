@@ -54,9 +54,7 @@ from ai.backend.manager.data.deployment.types import (
     DeploymentMetadata,
     DeploymentNetworkData,
     DeploymentOptions,
-    DeploymentPolicyData,
     DeploymentState,
-    ModelRevisionData,
     ReplicaData,
 )
 from ai.backend.manager.data.model_serving.types import (
@@ -73,9 +71,6 @@ from ai.backend.manager.models.base import (
     DecimalType,
     PydanticColumn,
     StrEnumType,
-)
-from ai.backend.manager.models.deployment_policy.searchable_fields import (
-    DeploymentPolicySearchableFields,
 )
 from ai.backend.manager.models.image.searchable_fields import ImageSearchableFields
 from ai.backend.manager.models.routing.searchable_fields import ReplicaSearchableFields
@@ -249,18 +244,18 @@ class EndpointRow(Base):
         default=DeploymentOptions,
     )
 
-    # Read by gql_legacy (api/gql_legacy/endpoint.py) and to_data. Delete once to_data
-    # stops reading relationships; the pair RoutingRow.endpoint_row stays (D-6).
+    # Read only by gql_legacy (endpoint.py, through to_data).
+    # Delete it together with the gql_legacy cleanup.
     routings: Mapped[list[RoutingRow]] = relationship("RoutingRow", back_populates="endpoint_row")
-    # Read only by gql_legacy (api/gql_legacy/endpoint.py) and to_data. Delete once
-    # to_data stops reading relationships.
+    # Read only by gql_legacy (endpoint.py, through to_data).
+    # Delete it together with the gql_legacy cleanup.
     created_user_row: Mapped[UserRow | None] = relationship(
         "UserRow",
         foreign_keys=[created_user],
         primaryjoin=_get_created_user_row_join_condition,
     )
-    # Read only by gql_legacy (api/gql_legacy/endpoint.py) and to_data; v2 readers join
-    # UserRow explicitly. Delete once to_data stops reading relationships.
+    # Read only by gql_legacy (endpoint.py, through to_data).
+    # Delete it together with the gql_legacy cleanup.
     session_owner_row: Mapped[UserRow | None] = relationship(
         "UserRow",
         foreign_keys=[session_owner],
@@ -270,14 +265,8 @@ class EndpointRow(Base):
     # The primary replica group's current revision. Filled only where the query passes
     # with_expression(current_revision_id_subquery()); None otherwise.
     current_revision_id: Mapped[DeploymentRevisionID | None] = query_expression()
-    # Sourced from the replica groups: the current revision is the primary
-    # group's ``current_revision_id`` and the deploying revision is the
-    # target group's ``target_revision_id`` (``None`` when no rollout is in
-    # progress). Joined through ``replica_groups`` so existing consumers
-    # (``to_deployment_info`` and the ``selectinload`` paths) are unchanged.
-    # current_revision_row and deploying_revision_row are read by DeploymentSearcher,
-    # DeploymentInfoSearcher, the deployment db_source, to_deployment_info and to_data.
-    # Deleted by the story that moves those to subqueries (B-3).
+    # current_revision_row and deploying_revision_row are read only by gql_legacy (endpoint.py,
+    # EndpointRow.get, list_endpoint, to_data). Delete them with the gql_legacy cleanup.
     current_revision_row: Mapped[DeploymentRevisionRow | None] = relationship(
         "DeploymentRevisionRow",
         secondary="replica_groups",
@@ -293,8 +282,8 @@ class EndpointRow(Base):
         uselist=False,
     )
 
-    # Read by DeploymentSearcher, DeploymentInfoSearcher, the deployment db_source and
-    # to_deployment_info. Deleted by the story that moves those to subqueries (B-3).
+    # Read only by DeploymentSearcher, whose to_data gets the row alone. Delete it once
+    # that Searcher loads the policy another way.
     deployment_policy: Mapped[DeploymentPolicyRow | None] = relationship(
         "DeploymentPolicyRow",
         primaryjoin=_get_deployment_policy_join_condition,
@@ -436,21 +425,10 @@ class EndpointRow(Base):
         """
         return self.current_revision_row or self.deploying_revision_row
 
+    # Read only by gql_legacy (endpoint.py); v2 builds EndpointData in ModelServingRepository.
+    # Delete it together with the gql_legacy cleanup.
     def to_data(self) -> EndpointData:
-        """Convert to EndpointData.
-
-        Requires ``current_revision_row`` / ``deploying_revision_row`` and
-        their ``image_row`` to be eagerly loaded via selectinload for
-        revision field population.
-        ``_find_active_revision`` prefers ``current_revision`` and falls
-        back to ``deploying_revision`` so the projection reflects the
-        spec currently being deployed during the initial DEPLOYING
-        phase. When neither pointer is set (PENDING endpoint without a
-        revision yet, or leftover orphan data), revision-derived fields
-        degrade to ``None`` / sentinel defaults and
-        ``runtime_variant_id`` stays ``None``; legacy response surfaces
-        render that as the historical blank state.
-        """
+        """Convert to EndpointData from the eagerly loaded relationships."""
         current_rev = self._find_active_revision()
         return EndpointData(
             id=self.id,
@@ -523,73 +501,11 @@ class EndpointRow(Base):
             else [],
         )
 
-    def to_deployment_info(self) -> DeploymentInfo:
-        """Full DeploymentInfo including the resolved current/deploying revision
-        rows. Requires the revision-row relationships to be eagerly loaded
-        (legacy REST v1 / engine read paths). The revision ids are derived from
-        those rows, so no separate replica-group load is needed.
-        """
-        from ai.backend.manager.models.deployment_revision.searchable_fields import (
-            ModelRevisionSearchableFields,
-        )
-
-        revisions = ModelRevisionSearchableFields.own
-        current_row = self.current_revision_row
-        deploying_row = self.deploying_revision_row
-        return self._build_deployment_info(
-            current_revision_id=DeploymentRevisionID(current_row.id) if current_row else None,
-            deploying_revision_id=DeploymentRevisionID(deploying_row.id) if deploying_row else None,
-            current_revision=revisions.to_data(current_row) if current_row else None,
-            deploying_revision=revisions.to_data(deploying_row) if deploying_row else None,
-            policy=(
-                DeploymentPolicySearchableFields.own.to_data(self.deployment_policy)
-                if self.deployment_policy is not None
-                else None
-            ),
-        )
-
-    def to_modern_deployment_info(self) -> DeploymentInfo:
-        """Lightweight DeploymentInfo carrying only the revision *ids* (sourced
-        from the replica groups), without loading the full revision rows. Used
-        by the modern (v2) read path, which only needs the ids. Requires
-        ``current_revision_id`` to be filled with ``with_expression``.
-        """
-        return self._build_deployment_info(
-            current_revision_id=self.current_revision_id,
-            deploying_revision_id=self.deploying_revision_id,
-            current_revision=None,
-            deploying_revision=None,
-            policy=(
-                DeploymentPolicySearchableFields.own.to_data(self.deployment_policy)
-                if self.deployment_policy is not None
-                else None
-            ),
-        )
-
     def to_bare_deployment_info(self) -> DeploymentInfo:
         """DeploymentInfo carrying this row's own columns only.
 
-        The revision and policy fields come back ``None``: a write path holds the
-        row it just wrote, with no relationship loaded to read them from.
-        """
-        return self._build_deployment_info(
-            current_revision_id=None,
-            deploying_revision_id=None,
-            current_revision=None,
-            deploying_revision=None,
-        )
-
-    def _build_deployment_info(
-        self,
-        current_revision_id: DeploymentRevisionID | None,
-        deploying_revision_id: DeploymentRevisionID | None,
-        current_revision: ModelRevisionData | None,
-        deploying_revision: ModelRevisionData | None,
-        policy: DeploymentPolicyData | None = None,
-    ) -> DeploymentInfo:
-        """Build DeploymentInfo. The revision *ids* and the full
-        ``current_revision`` / ``deploying_revision`` data are supplied by the
-        caller (the full data is ``None`` on the modern read path).
+        The revision ids, the revisions and the policy come back ``None``; a caller
+        that reads them fills them in with ``dataclasses.replace``.
         """
         return DeploymentInfo(
             id=self.id,
@@ -620,12 +536,7 @@ class EndpointRow(Base):
                 preferred_domain_name=None,
             ),
             options=self.options,
-            current_revision_id=current_revision_id,
-            deploying_revision_id=deploying_revision_id,
-            current_revision=current_revision,
-            deploying_revision=deploying_revision,
             sub_step=self.sub_step,
-            policy=policy,
             primary_replica_group_id=self.primary_replica_group_id,
             target_replica_group_id=self.target_replica_group_id,
         )
