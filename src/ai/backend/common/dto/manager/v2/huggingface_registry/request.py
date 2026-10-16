@@ -7,11 +7,16 @@ from uuid import UUID
 from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseRequestModel
+from ai.backend.common.dto.manager.v2.common import NonEmptyList
 
 __all__ = (
     "AdminSearchHuggingFaceRegistriesInput",
     "CreateHuggingFaceRegistryInput",
     "DeleteHuggingFaceRegistryInput",
+    "PartialBulkPurgeHuggingFaceRegistriesInput",
+    "PartialBulkUpdateHuggingFaceRegistriesInput",
+    "PartialBulkUpdateHuggingFaceRegistryItemInput",
+    "UpdateHuggingFaceRegistryBody",
     "UpdateHuggingFaceRegistryInput",
 )
 
@@ -24,19 +29,45 @@ class CreateHuggingFaceRegistryInput(BaseRequestModel):
     token: str | None = Field(default=None, description="Access token for the registry")
 
 
-class UpdateHuggingFaceRegistryInput(BaseRequestModel):
-    """Input for updating a HuggingFace registry."""
+class UpdateHuggingFaceRegistryBody(BaseRequestModel):
+    """Fields to update on a HuggingFace registry."""
 
-    id: UUID = Field(description="Registry ID to update")
     name: str | None = Field(default=None, description="Updated registry name")
     url: str | None = Field(default=None, description="Updated HuggingFace Hub URL")
     token: str | None = Field(default=None, description="Updated access token")
+
+
+class UpdateHuggingFaceRegistryInput(UpdateHuggingFaceRegistryBody):
+    """Input for updating a HuggingFace registry."""
+
+    id: UUID = Field(description="Registry ID to update")
 
 
 class DeleteHuggingFaceRegistryInput(BaseRequestModel):
     """Input for deleting a HuggingFace registry."""
 
     id: UUID = Field(description="Registry ID to delete")
+
+
+class PartialBulkUpdateHuggingFaceRegistryItemInput(BaseRequestModel):
+    """One HuggingFace registry of a partial bulk update and the fields to update on it."""
+
+    id: UUID = Field(description="ID of the registry to update.")
+    input: UpdateHuggingFaceRegistryBody = Field(description="Fields to update on the registry.")
+
+
+class PartialBulkUpdateHuggingFaceRegistriesInput(BaseRequestModel):
+    """Input for updating several HuggingFace registries, each answered for separately."""
+
+    items: NonEmptyList[PartialBulkUpdateHuggingFaceRegistryItemInput] = Field(
+        description="The registries to update, each with its fields."
+    )
+
+
+class PartialBulkPurgeHuggingFaceRegistriesInput(BaseRequestModel):
+    """Input for purging several HuggingFace registries, each answered for separately."""
+
+    ids: NonEmptyList[UUID] = Field(description="IDs of the registries to purge.")
 
 
 class AdminSearchHuggingFaceRegistriesInput(BaseRequestModel):

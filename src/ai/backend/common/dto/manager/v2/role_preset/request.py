@@ -2,13 +2,15 @@
 
 from __future__ import annotations
 
+from uuid import UUID
+
 from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseRequestModel
 from ai.backend.common.data.entity.role_preset import RolePresetID
 from ai.backend.common.data.entity.types import DeclaredEntityType
 from ai.backend.common.dto.manager.query import StringFilter, ToManyFilter, UUIDFilter
-from ai.backend.common.dto.manager.v2.common import OrderDirection
+from ai.backend.common.dto.manager.v2.common import NonEmptyList, OrderDirection
 from ai.backend.common.dto.manager.v2.role_permission_preset.request import (
     RolePermissionPresetFilter,
 )
@@ -23,6 +25,11 @@ __all__ = (
     "BulkPurgeRolePresetsInput",
     "BulkRestoreRolePresetsInput",
     "CreateRolePresetInput",
+    "PartialBulkDeleteRolePresetsInput",
+    "PartialBulkPurgeRolePresetsInput",
+    "PartialBulkRestoreRolePresetsInput",
+    "PartialBulkUpdateRolePresetItemInput",
+    "PartialBulkUpdateRolePresetsInput",
     "RolePresetFilter",
     "RolePresetOrder",
     "RolePresetPermissionNestedFilter",
@@ -102,6 +109,39 @@ class BulkPurgeRolePresetsInput(BaseRequestModel):
     role_preset_ids: list[RolePresetID] = Field(
         description="Role preset UUIDs to purge.",
     )
+
+
+class PartialBulkUpdateRolePresetItemInput(BaseRequestModel):
+    """One role preset of a partial bulk update and the fields to update on it."""
+
+    id: UUID = Field(description="ID of the role preset to update.")
+    input: UpdateRolePresetBody = Field(description="Fields to update on the role preset.")
+
+
+class PartialBulkUpdateRolePresetsInput(BaseRequestModel):
+    """Input for updating several role presets, each answered for separately."""
+
+    items: NonEmptyList[PartialBulkUpdateRolePresetItemInput] = Field(
+        description="The role presets to update, each with its fields."
+    )
+
+
+class PartialBulkDeleteRolePresetsInput(BaseRequestModel):
+    """Input for soft-deleting several role presets, each answered for separately."""
+
+    ids: NonEmptyList[UUID] = Field(description="IDs of the role presets to soft-delete.")
+
+
+class PartialBulkRestoreRolePresetsInput(BaseRequestModel):
+    """Input for restoring several soft-deleted role presets, each answered for separately."""
+
+    ids: NonEmptyList[UUID] = Field(description="IDs of the role presets to restore.")
+
+
+class PartialBulkPurgeRolePresetsInput(BaseRequestModel):
+    """Input for purging several role presets, each answered for separately."""
+
+    ids: NonEmptyList[UUID] = Field(description="IDs of the role presets to purge.")
 
 
 class RolePresetPermissionNestedFilter(ToManyFilter[RolePermissionPresetFilter]):

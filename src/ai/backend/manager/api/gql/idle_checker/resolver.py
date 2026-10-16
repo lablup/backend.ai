@@ -4,6 +4,7 @@ from strawberry import Info
 from strawberry.relay import PageInfo
 
 from ai.backend.common.dto.manager.v2.idle_checker.request import SearchIdleCheckersInput
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import encode_cursor
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
@@ -18,6 +19,8 @@ from ai.backend.manager.api.gql.idle_checker.types import (
     IdleCheckerFilterGQL,
     IdleCheckerGQL,
     IdleCheckerOrderByGQL,
+    PartialBulkIdleCheckersPayloadGQL,
+    PartialBulkPurgeIdleCheckersInputGQL,
     PurgeIdleCheckerInputGQL,
     PurgeIdleCheckerPayloadGQL,
     UpdateIdleCheckerInputGQL,
@@ -117,3 +120,21 @@ async def admin_purge_idle_checker(
     check_admin_only()
     payload = await info.context.adapters.idle_checker.admin_purge(input.to_pydantic())
     return PurgeIdleCheckerPayloadGQL.from_pydantic(payload)
+
+
+@gql_mutation(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description=(
+            "Permanently removes several global idle checkers, answering for each one "
+            "(super admin only)."
+        ),
+    )
+)
+async def admin_partial_bulk_purge_idle_checkers(
+    info: Info[StrawberryGQLContext],
+    input: PartialBulkPurgeIdleCheckersInputGQL,
+) -> PartialBulkIdleCheckersPayloadGQL:
+    check_admin_only()
+    payload = await info.context.adapters.idle_checker.admin_partial_bulk_purge(input.to_pydantic())
+    return PartialBulkIdleCheckersPayloadGQL.from_pydantic(payload)

@@ -12,8 +12,18 @@ from strawberry import Info
 from strawberry.relay import Connection, Edge, NodeID
 
 from ai.backend.common.data.entity.resource_preset import ResourcePresetID
+from ai.backend.common.dto.manager.v2.common import PartialBulkPayload
 from ai.backend.common.dto.manager.v2.resource_preset.request import (
     CreateResourcePresetInput as CreateResourcePresetInputDTO,
+)
+from ai.backend.common.dto.manager.v2.resource_preset.request import (
+    PartialBulkPurgeResourcePresetsInput as PartialBulkPurgeResourcePresetsInputDTO,
+)
+from ai.backend.common.dto.manager.v2.resource_preset.request import (
+    PartialBulkUpdateResourcePresetItemInput as PartialBulkUpdateResourcePresetItemInputDTO,
+)
+from ai.backend.common.dto.manager.v2.resource_preset.request import (
+    PartialBulkUpdateResourcePresetsInput as PartialBulkUpdateResourcePresetsInputDTO,
 )
 from ai.backend.common.dto.manager.v2.resource_preset.request import (
     ResourcePresetFilter as ResourcePresetFilterDTO,
@@ -41,6 +51,7 @@ from ai.backend.manager.api.gql.base import OrderDirection, StringFilter, UUIDFi
 from ai.backend.manager.api.gql.common_types import (
     BinarySizeInfoGQL,
     BinarySizeInputGQL,
+    PartialBulkFailureGQL,
     ResourceSlotEntryGQL,
     ResourceSlotEntryInputGQL,
 )
@@ -65,6 +76,10 @@ __all__ = (
     "CreateResourcePresetInputGQL",
     "CreateResourcePresetPayloadGQL",
     "DeleteResourcePresetPayloadGQL",
+    "PartialBulkPurgeResourcePresetsInputGQL",
+    "PartialBulkResourcePresetsPayloadGQL",
+    "PartialBulkUpdateResourcePresetItemInputGQL",
+    "PartialBulkUpdateResourcePresetsInputGQL",
     "ResourcePresetConnection",
     "ResourcePresetFilterGQL",
     "ResourcePresetGQL",
@@ -266,6 +281,81 @@ class UpdateResourcePresetPayloadGQL(PydanticOutputMixin[UpdateResourcePresetPay
 )
 class DeleteResourcePresetPayloadGQL(PydanticOutputMixin[DeleteResourcePresetPayloadDTO]):
     id: str = gql_field(description="UUID of the deleted resource preset.")
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="One resource preset of a partial bulk update and the fields to update on it.",
+    ),
+    name="PartialBulkUpdateResourcePresetItemInput",
+)
+class PartialBulkUpdateResourcePresetItemInputGQL(
+    PydanticInputMixin[PartialBulkUpdateResourcePresetItemInputDTO]
+):
+    id: UUID = gql_field(description="UUID of the resource preset to update.")
+    name: str | None = gql_field(default=strawberry.UNSET, description="Updated name.")
+    resource_slots: list[ResourceSlotEntryInputGQL] | None = gql_field(
+        default=strawberry.UNSET, description="Updated resource slot allocations."
+    )
+    shared_memory: BinarySizeInputGQL | None = gql_field(
+        default=strawberry.UNSET,
+        description="Updated shared memory. Use null to clear.",
+    )
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Input for updating several resource presets, each answered for separately.",
+    ),
+    name="PartialBulkUpdateResourcePresetsInput",
+)
+class PartialBulkUpdateResourcePresetsInputGQL(
+    PydanticInputMixin[PartialBulkUpdateResourcePresetsInputDTO]
+):
+    items: list[PartialBulkUpdateResourcePresetItemInputGQL] = gql_field(
+        description="The resource presets to update, each with its fields."
+    )
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description=(
+            "Input for permanently deleting several resource presets, each answered for separately."
+        ),
+    ),
+    name="PartialBulkPurgeResourcePresetsInput",
+)
+class PartialBulkPurgeResourcePresetsInputGQL(
+    PydanticInputMixin[PartialBulkPurgeResourcePresetsInputDTO]
+):
+    ids: list[UUID] = gql_field(description="UUIDs of the resource presets to purge.")
+
+
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description=(
+            "Result of a partial bulk resource preset operation: the resource presets "
+            "processed and the ones that failed."
+        ),
+    ),
+    model=PartialBulkPayload[ResourcePresetNode],
+    name="PartialBulkResourcePresetsPayload",
+)
+class PartialBulkResourcePresetsPayloadGQL(
+    PydanticOutputMixin[PartialBulkPayload[ResourcePresetNode]]
+):
+    """Payload for partial bulk resource preset mutations."""
+
+    successes: list[ResourcePresetGQL] = gql_field(
+        description="The resource presets processed, as they stood when processed."
+    )
+    failed: list[PartialBulkFailureGQL] = gql_field(
+        description="The resource presets not processed, each with the reason."
+    )
 
 
 # Connection type

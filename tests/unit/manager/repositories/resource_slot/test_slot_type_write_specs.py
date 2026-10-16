@@ -276,9 +276,7 @@ class TestResourceSlotTypePurger:
         db_with_referencing_tables: ExtendedAsyncSAEngine,
         existing_slot_type: ResourceSlotTypeData,
     ) -> None:
-        purger = ResourceSlotTypePurger(
-            slot_name=existing_slot_type.slot_name, slot_type_id=existing_slot_type.uuid
-        )
+        purger = ResourceSlotTypePurger(slot_type_id=existing_slot_type.uuid)
         async with V2DBOpsProvider(db_with_referencing_tables).write_ops() as w:
             data = await w.purge_entity(purger)
             assert data is not None
@@ -341,9 +339,7 @@ class TestResourceSlotTypePurger:
                 )
             )
 
-        purger = ResourceSlotTypePurger(
-            slot_name=existing_slot_type.slot_name, slot_type_id=existing_slot_type.uuid
-        )
+        purger = ResourceSlotTypePurger(slot_type_id=existing_slot_type.uuid)
         with pytest.raises(ResourceSlotTypeInUse):
             async with V2DBOpsProvider(db_with_referencing_tables).write_ops() as w:
                 await w.purge_entity(purger)

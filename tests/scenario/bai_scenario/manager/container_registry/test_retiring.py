@@ -8,12 +8,10 @@ from uuid import UUID
 
 import pytest
 
+from ai.backend.common.data.entity.container_registry import ContainerRegistryID
 from ai.backend.common.data.user.types import UserRole
-from ai.backend.common.dto.manager.v2.container_registry.request import (
-    DeleteContainerRegistryInput,
-)
 from ai.backend.common.dto.manager.v2.container_registry.response import (
-    DeleteContainerRegistryPayload,
+    PurgeContainerRegistryPayload,
 )
 from ai.backend.manager.api.adapters.container_registry.adapter import ContainerRegistryAdapter
 from ai.backend.manager.errors.auth import InsufficientPrivilege
@@ -46,17 +44,17 @@ type DeletionScenario = Scenario[
     TestSeedingSession,
     ARegistryAndACaller,
     ContainerRegistryAdapter,
-    DeleteContainerRegistryPayload,
+    PurgeContainerRegistryPayload,
 ]
 
 
 @dataclass(frozen=True)
-class Deleting(When[ARegistryAndACaller, ContainerRegistryAdapter, DeleteContainerRegistryPayload]):
+class Deleting(When[ARegistryAndACaller, ContainerRegistryAdapter, PurgeContainerRegistryPayload]):
     target: RegistryTarget = field(default_factory=TestSeededRegistry)
 
     @override
     def operation(self) -> str:
-        return "admin_delete"
+        return "admin_purge"
 
     @override
     def describe(self, laid: ARegistryAndACaller) -> str:
@@ -65,21 +63,21 @@ class Deleting(When[ARegistryAndACaller, ContainerRegistryAdapter, DeleteContain
     @override
     async def call(
         self, adapter: ContainerRegistryAdapter, laid: ARegistryAndACaller
-    ) -> DeleteContainerRegistryPayload:
+    ) -> PurgeContainerRegistryPayload:
         registry_id = self.target.id_of(laid)
         with ActingAs(laid.caller):
-            return await adapter.admin_delete(DeleteContainerRegistryInput(id=registry_id))
+            return await adapter.admin_purge(ContainerRegistryID(registry_id))
 
 
 @dataclass(frozen=True)
-class TheDeletedIdComesBack(Then[ARegistryAndACaller, DeleteContainerRegistryPayload]):
+class TheDeletedIdComesBack(Then[ARegistryAndACaller, PurgeContainerRegistryPayload]):
     @override
     def says(self) -> str:
         return "삭제한 id가 반환된다"
 
     @override
     def look(
-        self, laid: ARegistryAndACaller, answered: Answered[DeleteContainerRegistryPayload]
+        self, laid: ARegistryAndACaller, answered: Answered[PurgeContainerRegistryPayload]
     ) -> list[Verdict]:
         payload = answered.response
         if payload is None:
@@ -94,7 +92,7 @@ class DeletingAnswersWithTheRemovedId(
         TestSeedingSession,
         ARegistryAndACaller,
         ContainerRegistryAdapter,
-        DeleteContainerRegistryPayload,
+        PurgeContainerRegistryPayload,
     ]
 ):
     @override
@@ -112,11 +110,11 @@ class DeletingAnswersWithTheRemovedId(
     @override
     def when(
         self,
-    ) -> When[ARegistryAndACaller, ContainerRegistryAdapter, DeleteContainerRegistryPayload]:
+    ) -> When[ARegistryAndACaller, ContainerRegistryAdapter, PurgeContainerRegistryPayload]:
         return Deleting()
 
     @override
-    def then(self) -> Then[ARegistryAndACaller, DeleteContainerRegistryPayload]:
+    def then(self) -> Then[ARegistryAndACaller, PurgeContainerRegistryPayload]:
         return TheDeletedIdComesBack()
 
 
@@ -126,7 +124,7 @@ class DeletingTakesTheAllowedProjectWithIt(
         TestSeedingSession,
         ARegistryAndACaller,
         ContainerRegistryAdapter,
-        DeleteContainerRegistryPayload,
+        PurgeContainerRegistryPayload,
     ]
 ):
     @override
@@ -144,11 +142,11 @@ class DeletingTakesTheAllowedProjectWithIt(
     @override
     def when(
         self,
-    ) -> When[ARegistryAndACaller, ContainerRegistryAdapter, DeleteContainerRegistryPayload]:
+    ) -> When[ARegistryAndACaller, ContainerRegistryAdapter, PurgeContainerRegistryPayload]:
         return Deleting()
 
     @override
-    def then(self) -> Then[ARegistryAndACaller, DeleteContainerRegistryPayload]:
+    def then(self) -> Then[ARegistryAndACaller, PurgeContainerRegistryPayload]:
         return TheDeletedIdComesBack()
 
 
@@ -158,7 +156,7 @@ class MissingRegistryIsRefused(
         TestSeedingSession,
         ARegistryAndACaller,
         ContainerRegistryAdapter,
-        DeleteContainerRegistryPayload,
+        PurgeContainerRegistryPayload,
     ]
 ):
     @override
@@ -176,11 +174,11 @@ class MissingRegistryIsRefused(
     @override
     def when(
         self,
-    ) -> When[ARegistryAndACaller, ContainerRegistryAdapter, DeleteContainerRegistryPayload]:
+    ) -> When[ARegistryAndACaller, ContainerRegistryAdapter, PurgeContainerRegistryPayload]:
         return Deleting(target=MissingRegistry())
 
     @override
-    def then(self) -> Then[ARegistryAndACaller, DeleteContainerRegistryPayload]:
+    def then(self) -> Then[ARegistryAndACaller, PurgeContainerRegistryPayload]:
         return TheCallIsRefused(ContainerRegistryNotFound)
 
 
@@ -190,7 +188,7 @@ class APlainUserMayNotDelete(
         TestSeedingSession,
         ARegistryAndACaller,
         ContainerRegistryAdapter,
-        DeleteContainerRegistryPayload,
+        PurgeContainerRegistryPayload,
     ]
 ):
     @override
@@ -211,11 +209,11 @@ class APlainUserMayNotDelete(
     @override
     def when(
         self,
-    ) -> When[ARegistryAndACaller, ContainerRegistryAdapter, DeleteContainerRegistryPayload]:
+    ) -> When[ARegistryAndACaller, ContainerRegistryAdapter, PurgeContainerRegistryPayload]:
         return Deleting()
 
     @override
-    def then(self) -> Then[ARegistryAndACaller, DeleteContainerRegistryPayload]:
+    def then(self) -> Then[ARegistryAndACaller, PurgeContainerRegistryPayload]:
         return TheCallIsRefused(InsufficientPrivilege)
 
 

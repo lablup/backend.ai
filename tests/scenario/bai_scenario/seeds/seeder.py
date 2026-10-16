@@ -13,6 +13,7 @@ Which ops path writes a row follows from the spec's type, so no scenario names a
     EntityUpserter                  -> upsert_entity
     GlobalEntityUpserter            -> upsert_global_entity
     GuardedDataUpdater              -> update_data
+    TestSeedRegistryPair            -> create_registry
 
 A field row is written under an owner, so it has its own entry, ``adding``. A
 ``TestSeedFieldCreator`` runs ``create_field`` for its ``FieldCreator`` and a
@@ -37,8 +38,10 @@ from ai.backend.common.data.entity.user import UserID
 from ai.backend.manager.data.entity_share.types import EntityShareData
 from ai.backend.manager.data.project.types import ProjectData
 from ai.backend.manager.data.user.types import UserData
+from ai.backend.manager.models.artifact_registries.creators import ArtifactRegistryMetaCreator
 from ai.backend.manager.models.entity_share.updaters import EntityShareAcceptUpdater
 from ai.backend.manager.models.specs.creator import (
+    EntityCreator,
     FieldCreator,
     FieldToCreate,
     GlobalEntityCreator,
@@ -60,8 +63,21 @@ from ai.backend.manager.repositories.ops.v2.user.write import (
 )
 from bai_scenario.seeds.ops import TestSeedOps
 
+
+@dataclass(frozen=True)
+class TestSeedRegistryPair[D]:
+    """An artifact registry: its per-type row and the row naming it, written by the
+    registry ops in one go."""
+
+    __test__ = False
+
+    creator: EntityCreator[Any, D]
+    meta: ArtifactRegistryMetaCreator
+
+
 type WriteSpec[D] = (
-    GlobalEntityCreator[Any, D]
+    TestSeedRegistryPair[D]
+    | GlobalEntityCreator[Any, D]
     | GuardedEntityCreator[Any, D]
     | RoleManagedGlobalEntityCreator[Any, D]
     | RoleManagedEntityCreator[Any, D]
@@ -334,6 +350,8 @@ def _states(sentence: str, detail: str) -> str:
 
 async def _write(ops: TestSeedOps, spec: WriteSpec[Any]) -> Any:
     """Run one spec down the ops path its own type calls for."""
+    if isinstance(spec, TestSeedRegistryPair):
+        return await ops.create_registry(spec.creator, spec.meta)
     if isinstance(spec, RoleManagedGlobalEntityCreator):
         return await ops.create_role_managed_global_entity(spec)
     if isinstance(spec, RoleManagedEntityCreator):

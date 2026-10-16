@@ -16,6 +16,7 @@ from ai.backend.common.data.entity.prometheus_query_preset_category import (
     PrometheusQueryPresetCategoryEntityType,
 )
 from ai.backend.common.data.user.types import UserRole
+from ai.backend.common.dto.manager.v2.common import PartialBulkPayload
 from ai.backend.common.dto.manager.v2.prometheus_query_preset_category.response import (
     CategoryNode,
     DeleteCategoryPayload,
@@ -39,7 +40,7 @@ from ai.backend.testutils.scenario_steps import (
     Then,
     Verdict,
 )
-from bai_scenario.components.domain import WrittenByThisRun
+from bai_scenario.components.domain import Mentions, WrittenByThisRun
 from bai_scenario.components.system import lay_a_public_reader
 from bai_scenario.seeds.prometheus_query_preset_category.category import TestSeedCategory
 from bai_scenario.seeds.seeder import Laid
@@ -343,3 +344,34 @@ class TheRemovedOneIsNamed(Then[ACategoryAndACaller, DeleteCategoryPayload]):
         if payload is None:
             return [Refused(EntityNotFoundError, answered.raised)]
         return [Held("id", payload.id, SameAs[UUID](laid.category.id, "미리 만들어 둔 카테고리"))]
+
+
+@dataclass(frozen=True)
+class NothingIsProcessed(Then[ManyCategoriesAndACaller, PartialBulkPayload[CategoryNode]]):
+    """처리된 카테고리 없이, 미리 만들어 둔 카테고리가 모두 같은 이유로 실패 목록에 온다."""
+
+    reason: str
+
+    @override
+    def says(self) -> str:
+        return "처리된 카테고리 없이 대상이 모두 실패 목록에 온다"
+
+    @override
+    def look(
+        self,
+        laid: ManyCategoriesAndACaller,
+        answered: Answered[PartialBulkPayload[CategoryNode]],
+    ) -> list[Verdict]:
+        payload = answered.response
+        if payload is None:
+            return [Refused(NotEnoughPermission, answered.raised)]
+        verdicts: list[Verdict] = [
+            Same("successes", payload.successes, []),
+            Same("failed count", len(payload.failed), len(laid.laid)),
+        ]
+        for i, (failure, one) in enumerate(zip(payload.failed, laid.laid, strict=False)):
+            verdicts += [
+                Held[UUID](f"failed[{i}].id", failure.id, SameAs(one.id, "대상 카테고리의 id")),
+                Held(f"failed[{i}].message", failure.message, Mentions(self.reason)),
+            ]
+        return verdicts

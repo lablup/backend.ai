@@ -2,24 +2,27 @@
 
 [무엇을 보장하는가](/src/ai/backend/manager/api/adapters/image/KNOWLEDGE.md) · [어댑터](/src/ai/backend/manager/api/adapters/image/adapter.py)
 
-시나리오: 완성
+시나리오: 미완 3 / 17
 
-- ops 로 구성 (6)
+- ops 로 구성 (12)
   - admin_search — 대표 성공 ✓ · 대표 실패 ✓
   - admin_search_images_gql — 대표 성공 ✓ · 대표 실패 ✓
   - batch_load_aliases_by_ids — 대표 성공 ✓ · 대표 실패 ✓
   - batch_load_by_ids — 대표 성공 ✓ · 대표 실패 ✓
+  - delete — 대표 성공 ✓ · 대표 실패 ✓
+  - partial_bulk_delete — 대표 성공 ✓ · 대표 실패 ✗ — SCENARIO-GAP
+  - partial_bulk_restore — 대표 성공 ✓ · 대표 실패 ✗ — SCENARIO-GAP
+  - partial_bulk_update — 대표 성공 ✓ · 대표 실패 ✗ — SCENARIO-GAP
+  - restore — 대표 성공 ✓ · 대표 실패 ✓
   - scoped_search — 대표 성공 ✓ · 대표 실패 ✓
   - scoped_search_aliases — 대표 성공 ✓ · 대표 실패 ✓
-- 직접 구현 (8)
+  - update — 대표 성공 ✓ · 대표 실패 ✓
+- 직접 구현 (5)
   - admin_alias — 성공 있음 1 · 실패 있음 3 (global_scope)
   - admin_dealias — 성공 있음 1 · 실패 있음 2 (global_scope)
-  - admin_forget — 성공 있음 2 · 실패 있음 6 (single_entity)
   - admin_purge — 성공 있음 3 · 실패 있음 3 (single_entity)
-  - admin_restore — 성공 있음 2 · 실패 있음 2 (single_entity)
   - admin_scan_image — 성공 있음 2 · 실패 있음 3 (global_scope)
   - admin_search_image_aliases — 성공 있음 3 · 실패 있음 1 (global_scope)
-  - admin_update — 성공 있음 6 · 실패 있음 2 (global_scope)
 
 **admin_search**
 
@@ -62,6 +65,47 @@
 | [슈퍼관리자가 미리 만들어 둔 이미지 2개와 어느 이미지도 가리키지 않는 ID 1개를 한 번에 조회하면, 요청한 순서대로 반환되고 없는 ID 위치만 비어 있다](#reading-loading-many-image-ids-keeps-the-order-and-leaves-a-hole) | 성공 |
 | [아무 권한도 받지 않은 사용자가 ID 여러 개를 한 번에 조회하면, 요청 전체가 아니라 원소마다 권한 부족 거부가 입력 순서대로 반환된다](#reading-a-plain-user-loading-many-image-ids-is-refused-per-element) | 거부 |
 
+**delete**
+
+| 시나리오 | 판정 |
+|---|---|
+| [레지스트리에서 이미지 권한을 받은 사용자는 커스텀 이미지가 아닌 이미지도 소프트 삭제할 수 있고, 삭제됨 상태가 반환된다](#forgetting-a-granted-user-may-forget-an-image-they-did-not-customize) | 성공 |
+| [슈퍼관리자가 이미지를 소프트 삭제하면, 행은 남고 삭제됨 상태가 담긴 노드가 반환된다](#forgetting-forgetting-an-image-marks-it-deleted-and-keeps-the-row) | 성공 |
+| [자기가 커밋한 커스텀 이미지를 자기 개인 프로젝트의 권한으로 소프트 삭제하면, 이미지가 그 개인 프로젝트에 속하므로 이미지 권한 검사를 통과해 삭제됨 상태가 반환된다](#forgetting-the-maker-of-a-custom-image-may-forget-it) | 성공 |
+| [아무 권한도 받지 않은 사용자가 이미지를 소프트 삭제하려 하면 권한 부족으로 거부된다](#forgetting-a-user-granted-nothing-may-not-forget-an-image) | 거부 |
+| [다른 사용자가 커밋한 커스텀 이미지는 그 사람의 개인 프로젝트에 속하므로, 자기 개인 프로젝트에서 권한을 받은 사용자가 소프트 삭제하려 하면 권한 부족으로 거부된다](#forgetting-a-user-may-not-forget-a-custom-image-another-user-made) | 거부 |
+| [완전 삭제 중인 이미지를 소프트 삭제하려 하면 대상을 찾을 수 없어 거부된다. 살아 있는 이미지만 소프트 삭제할 수 있다](#forgetting-an-image-a-purge-is-working-through-cannot-be-reached) | 거부 |
+| [어느 이미지도 가리키지 않는 ID를 소프트 삭제하려 하면 대상을 찾을 수 없어 거부된다](#forgetting-forgetting-an-id-that-holds-no-image-is-refused) | 거부 |
+
+**partial_bulk_delete**
+
+| 시나리오 | 판정 |
+|---|---|
+| [아무 권한도 받지 않은 사용자가 이미지 여럿을 한 번에 소프트 삭제하려 하면, 삭제된 것 없이 모두 권한이 없다는 이유로 실패 목록에 온다](#partial_bulk_forgetting-a-user-granted-nothing-forgets-none-of-several-images) | 성공 |
+| [살아 있는 이미지 둘과 없는 id 하나를 한 번에 소프트 삭제하면, 둘은 삭제됨 상태로 오고 없는 id 는 대상이 없다는 이유로 실패 목록에 온다](#partial_bulk_forgetting-forgetting-several-answers-for-the-missing-one) | 성공 |
+
+**partial_bulk_restore**
+
+| 시나리오 | 판정 |
+|---|---|
+| [소프트 삭제한 이미지 여럿을 한 번에 복원하면, 모두 살아 있는 상태로 온다](#partial_bulk_forgetting-restoring-several-brings-them-back-alive) | 성공 |
+
+**partial_bulk_update**
+
+| 시나리오 | 판정 |
+|---|---|
+| [아무 권한도 받지 않은 사용자가 이미지 여럿을 한 번에 고치려 하면, 고쳐진 것 없이 모두 권한이 없다는 이유로 실패 목록에 온다](#partial_bulk_editing-a-user-granted-nothing-edits-none-of-several-images) | 성공 |
+| [슈퍼관리자가 이미지 여럿의 태그를 한 번에 바꾸면, 모두 새 태그로 오고 실패한 것은 없다](#partial_bulk_editing-the-superadmin-edits-several-images-at-once) | 성공 |
+
+**restore**
+
+| 시나리오 | 판정 |
+|---|---|
+| [슈퍼관리자가 삭제된 이미지를 복원하면 살아 있는 상태가 담긴 노드가 반환된다](#forgetting-restoring-a-forgotten-image-brings-it-back-alive) | 성공 |
+| [살아 있는 이미지를 복원해도 살아 있는 상태 그대로다](#forgetting-restoring-an-image-that-was-never-forgotten-leaves-it-alive) | 성공 |
+| [아무 권한도 받지 않은 사용자가 이미지를 복원하려 하면 권한 부족으로 거부된다](#forgetting-a-user-granted-nothing-may-not-restore-an-image) | 거부 |
+| [어느 이미지도 가리키지 않는 ID를 복원하려 하면 대상을 찾을 수 없어 거부된다](#forgetting-restoring-an-id-that-holds-no-image-is-refused) | 거부 |
+
 **scoped_search**
 
 | 시나리오 | 판정 |
@@ -75,6 +119,19 @@
 |---|---|
 | [그 이미지에 권한을 받은 사용자가 그 이미지의 별칭을 검색하면 등록해 둔 별칭이 반환된다](#searching-a-user-who-can-read-the-image-gets-its-aliases) | 성공 |
 | [아무 권한도 받지 않은 사용자가 그 이미지의 별칭을 검색하려 하면 권한 부족으로 거부된다](#searching-a-user-who-cannot-read-the-image-is-refused-its-aliases) | 거부 |
+
+**update**
+
+| 시나리오 | 판정 |
+|---|---|
+| [슈퍼관리자가 값을 하나도 지정하지 않고 수정하면 아무것도 바뀌지 않은 노드가 반환된다](#editing-an-edit-that-names-no-value-changes-nothing) | 성공 |
+| [슈퍼관리자가 레이블과 CPU 하한·상한을 수정하면 지정한 값이 반환된다](#editing-changing-labels-and-resource-limits-returns-the-new-values) | 성공 |
+| [슈퍼관리자가 태그만 수정하면 태그만 새 값이 되고 나머지 필드는 그대로다](#editing-changing-only-the-tag-leaves-every-other-field-alone) | 성공 |
+| [슈퍼관리자가 이름과 레지스트리 등의 기본 필드를 함께 수정하면 지정한 값이 반환된다](#editing-changing-the-remaining-scalar-fields-returns-the-new-values) | 성공 |
+| [슈퍼관리자가 가속기 목록을 비우는 수정을 하면 그 필드가 빈 채로 반환된다. 생략과 비우기를 구분할 수 있는 필드는 이것뿐이다](#editing-clearing-the-accelerator-list-empties-it) | 성공 |
+| [슈퍼관리자가 가속기 이름을 지정하면 그 이름이 담긴 노드가 반환된다](#editing-writing-an-accelerator-onto-an-image-that-had-none) | 성공 |
+| [아무 권한도 받지 않은 사용자가 이미지를 수정하려 하면 권한 부족으로 거부된다](#editing-a-user-granted-nothing-may-not-edit-an-image) | 거부 |
+| [어느 이미지도 가리키지 않는 ID를 수정하려 하면 대상을 찾을 수 없어 거부된다](#editing-editing-an-id-that-holds-no-image-is-refused) | 거부 |
 
 **admin_alias**
 
@@ -93,19 +150,6 @@
 | [슈퍼관리자가 아닌 사용자가 별칭을 해제하려 하면 슈퍼관리자 권한 부족으로 거부된다](#aliasing-a-user-who-is-not-the-superadmin-may-not-dealias) | 거부 |
 | [어느 이미지도 가리키지 않는 별칭을 해제하려 하면 대상을 찾을 수 없어 거부된다](#aliasing-dealiasing-a-name-no-image-holds-is-refused) | 거부 |
 
-**admin_forget**
-
-| 시나리오 | 판정 |
-|---|---|
-| [슈퍼관리자가 이미지를 소프트 삭제하면, 행은 남고 삭제됨 상태가 담긴 노드가 반환된다](#forgetting-forgetting-an-image-marks-it-deleted-and-keeps-the-row) | 성공 |
-| [자기가 커밋한 커스텀 이미지를 자기 개인 프로젝트의 권한으로 소프트 삭제하면, 이미지가 그 개인 프로젝트에 속하므로 이미지 권한과 커스텀 이미지 작성자 검사를 모두 통과해 삭제됨 상태가 반환된다](#forgetting-the-maker-of-a-custom-image-may-forget-it) | 성공 |
-| [커스텀 이미지가 아닌 이미지는 권한을 받은 사용자라도 소프트 삭제할 수 없다. 이미지 권한 검사를 통과한 뒤 커스텀 이미지 작성자 검사에서 거부된다](#forgetting-a-granted-user-may-not-forget-an-image-they-did-not-customize) | 거부 |
-| [아무 권한도 받지 않은 사용자가 이미지를 소프트 삭제하려 하면 권한 부족으로 거부된다](#forgetting-a-user-granted-nothing-may-not-forget-an-image) | 거부 |
-| [다른 사용자가 커밋한 커스텀 이미지는 그 사람의 개인 프로젝트에 속하므로, 자기 개인 프로젝트에서 권한을 받은 사용자가 소프트 삭제하려 하면 권한 부족으로 거부된다](#forgetting-a-user-may-not-forget-a-custom-image-another-user-made) | 거부 |
-| [완전 삭제 중인 이미지를 소프트 삭제하려 하면 대상을 찾을 수 없어 거부된다. 그 상태의 이미지는 ID로 조회하는 지점에서 보이지 않는다](#forgetting-an-image-a-purge-is-working-through-cannot-be-reached) | 거부 |
-| [어느 이미지도 가리키지 않는 ID를 소프트 삭제하려 하면 대상을 찾을 수 없어 거부된다](#forgetting-forgetting-an-id-that-holds-no-image-is-refused) | 거부 |
-| [RBAC 권한 검사를 비활성화해도 커스텀 이미지가 아닌 이미지는 소프트 삭제할 수 없다](#forgetting-turning-enforcement-off-does-not-skip-the-custom-image-creator-check) | 거부 |
-
 **admin_purge**
 
 | 시나리오 | 판정 |
@@ -116,15 +160,6 @@
 | [커스텀 이미지가 아닌 이미지는 권한을 받은 사용자라도 완전 삭제할 수 없다. 이미지 권한 검사를 통과한 뒤 커스텀 이미지 작성자 검사에서 거부된다](#retiring-a-granted-user-may-not-purge-an-image-they-did-not-customize) | 거부 |
 | [아무 권한도 받지 않은 사용자가 이미지를 완전 삭제하려 하면 권한 부족으로 거부된다](#retiring-a-user-granted-nothing-may-not-purge-an-image) | 거부 |
 | [어느 이미지도 가리키지 않는 ID를 완전 삭제하려 하면 대상을 찾을 수 없어 거부된다](#retiring-purging-an-id-that-holds-no-image-is-refused) | 거부 |
-
-**admin_restore**
-
-| 시나리오 | 판정 |
-|---|---|
-| [슈퍼관리자가 삭제된 이미지를 복원하면 살아 있는 상태가 담긴 노드가 반환된다](#forgetting-restoring-a-forgotten-image-brings-it-back-alive) | 성공 |
-| [살아 있는 이미지를 복원해도 살아 있는 상태 그대로다](#forgetting-restoring-an-image-that-was-never-forgotten-leaves-it-alive) | 성공 |
-| [아무 권한도 받지 않은 사용자가 이미지를 복원하려 하면 권한 부족으로 거부된다](#forgetting-a-user-granted-nothing-may-not-restore-an-image) | 거부 |
-| [어느 이미지도 가리키지 않는 ID를 복원하려 하면 대상을 찾을 수 없어 거부된다](#forgetting-restoring-an-id-that-holds-no-image-is-refused) | 거부 |
 
 **admin_scan_image**
 
@@ -144,19 +179,6 @@
 | [별칭이 등록되어 있을 때 슈퍼관리자가 별칭을 검색하면 그 별칭이 반환된다](#searching-searching-aliases-answers-with-the-one-that-was-attached) | 성공 |
 | [별칭을 하나도 등록하지 않은 상태에서 슈퍼관리자가 별칭을 검색하면 응답이 비어 있다](#searching-searching-aliases-when-none-were-attached-answers-empty) | 성공 |
 | [슈퍼관리자가 아닌 사용자가 별칭을 검색하려 하면 슈퍼관리자 권한 부족으로 거부된다](#searching-a-user-who-is-not-the-superadmin-may-not-search-aliases) | 거부 |
-
-**admin_update**
-
-| 시나리오 | 판정 |
-|---|---|
-| [슈퍼관리자가 값을 하나도 지정하지 않고 수정하면 아무것도 바뀌지 않은 노드가 반환된다](#editing-an-edit-that-names-no-value-changes-nothing) | 성공 |
-| [슈퍼관리자가 레이블과 CPU 하한·상한을 수정하면 지정한 값이 반환된다](#editing-changing-labels-and-resource-limits-returns-the-new-values) | 성공 |
-| [슈퍼관리자가 태그만 수정하면 태그만 새 값이 되고 나머지 필드는 그대로다](#editing-changing-only-the-tag-leaves-every-other-field-alone) | 성공 |
-| [슈퍼관리자가 이름과 레지스트리 등의 기본 필드를 함께 수정하면 지정한 값이 반환된다](#editing-changing-the-remaining-scalar-fields-returns-the-new-values) | 성공 |
-| [슈퍼관리자가 가속기 목록을 비우는 수정을 하면 그 필드가 빈 채로 반환된다. 생략과 비우기를 구분할 수 있는 필드는 이것뿐이다](#editing-clearing-the-accelerator-list-empties-it) | 성공 |
-| [슈퍼관리자가 가속기 이름을 지정하면 그 이름이 담긴 노드가 반환된다](#editing-writing-an-accelerator-onto-an-image-that-had-none) | 성공 |
-| [슈퍼관리자가 아닌 사용자가 이미지를 수정하려 하면 슈퍼관리자 권한 부족으로 거부된다](#editing-a-user-who-is-not-the-superadmin-may-not-edit-an-image) | 거부 |
-| [어느 이미지도 가리키지 않는 ID를 수정하려 하면 대상을 찾을 수 없어 거부된다](#editing-editing-an-id-that-holds-no-image-is-refused) | 거부 |
 
 ### admin_search
 
@@ -855,6 +877,847 @@ Then
   - 거부: NotEnoughPermission
   - 거부: NotEnoughPermission
 
+### delete
+
+<a id="forgetting-a-granted-user-may-forget-an-image-they-did-not-customize"></a>
+
+#### [a-granted-user-may-forget-an-image-they-did-not-customize](/tests/scenario/bai_scenario/manager/image/test_forgetting.py) — pass
+
+레지스트리에서 이미지 권한을 받은 사용자는 커스텀 이미지가 아닌 이미지도 소프트 삭제할 수 있고, 삭제됨 상태가 반환된다
+
+Given
+
+- 커스텀 이미지가 아닌 이미지 1개, 그 이미지에 권한 있음인 사용자 1명
+  - 도메인 home-1
+  - 컨테이너 레지스트리 host-1: 이미지를 가져오는 곳
+  - 이미지 image-1: x86_64 이미지
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+  - 이미지를 다룰 권한을 받은 사용자 준비
+    - 역할 image-keeper-1: 이 역할이 앉은 스코프 안에서만 통한다
+    - 역할 image-keeper-1: image 전체에 READ 허용
+    - 역할 image-keeper-1: image 전체에 SOFT_DELETE 허용
+    - 역할 image-keeper-1: image 전체에 HARD_DELETE 허용
+    - 일반 사용자 user-1: 역할 image-keeper-1 보유
+
+When
+
+- ImageAdapter.delete — user-1이 image-1 소프트 삭제
+
+Then
+
+- 이미지 노드의 모든 필드가 예상값과 일치한다
+  - id: 미리 만들어 둔 이미지의 ID와 같다
+  - name = 'image-1'
+  - image = 'image-1'
+  - registry = 'host-1'
+  - registry_id: 미리 만들어 둔 레지스트리의 ID와 같다
+  - project = None
+  - tag = 'latest'
+  - architecture = 'x86_64'
+  - size_bytes = 0
+  - type = <ImageType.COMPUTE: 'compute'>
+  - status = <ImageStatus.DELETED: 'DELETED'>
+  - labels = []
+  - tags = []
+  - resource_limits = [ImageResourceLimitInfo(key='cpu', min='1', max=None), ImageResourceLimitInfo(key='mem', min='1073741824', max=None)]
+  - accelerators = None
+  - config_digest = 'sha256:000000000000000000000000000000000000000000000000000000000image-1'
+  - is_local = False
+  - customized = False
+  - creator_id = None
+  - created_at: 이 실행이 쓴 시각
+  - last_used_at: 무시함 — 세션이 기록하는 값이라 이 실행에서는 알 수 없다
+  - identity.canonical_name = 'image-1'
+  - identity.namespace = 'image-1'
+  - identity.architecture = 'x86_64'
+  - metadata.digest = 'sha256:000000000000000000000000000000000000000000000000000000000image-1'
+  - metadata.size_bytes = 0
+  - metadata.created_at: 이 실행이 쓴 시각
+  - metadata.last_used_at: 노드의 last_used_at 필드와 같다
+  - metadata.tags = []
+  - metadata.labels = []
+  - metadata.status = <ImageStatus.DELETED: 'DELETED'>
+  - requirements.supported_accelerators = ['*']
+  - requirements.resource_limits = [ImageResourceLimitGQLInfo(key='cpu', min='1', max='Infinity'), ImageResourceLimitGQLInfo(key='mem', min='1073741824', max='Infinity')]
+
+<a id="forgetting-forgetting-an-image-marks-it-deleted-and-keeps-the-row"></a>
+
+#### [forgetting-an-image-marks-it-deleted-and-keeps-the-row](/tests/scenario/bai_scenario/manager/image/test_forgetting.py) — pass
+
+슈퍼관리자가 이미지를 소프트 삭제하면, 행은 남고 삭제됨 상태가 담긴 노드가 반환된다
+
+Given
+
+- 레지스트리 1개와 그 안의 이미지 1개, superadmin 1명
+  - 도메인 home-1
+  - 컨테이너 레지스트리 host-1: 이미지를 가져오는 곳
+  - 이미지 image-1: x86_64 이미지
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+
+When
+
+- ImageAdapter.delete — user-1이 image-1 소프트 삭제
+
+Then
+
+- 이미지 노드의 모든 필드가 예상값과 일치한다
+  - id: 미리 만들어 둔 이미지의 ID와 같다
+  - name = 'image-1'
+  - image = 'image-1'
+  - registry = 'host-1'
+  - registry_id: 미리 만들어 둔 레지스트리의 ID와 같다
+  - project = None
+  - tag = 'latest'
+  - architecture = 'x86_64'
+  - size_bytes = 0
+  - type = <ImageType.COMPUTE: 'compute'>
+  - status = <ImageStatus.DELETED: 'DELETED'>
+  - labels = []
+  - tags = []
+  - resource_limits = [ImageResourceLimitInfo(key='cpu', min='1', max=None), ImageResourceLimitInfo(key='mem', min='1073741824', max=None)]
+  - accelerators = None
+  - config_digest = 'sha256:000000000000000000000000000000000000000000000000000000000image-1'
+  - is_local = False
+  - customized = False
+  - creator_id = None
+  - created_at: 이 실행이 쓴 시각
+  - last_used_at: 무시함 — 세션이 기록하는 값이라 이 실행에서는 알 수 없다
+  - identity.canonical_name = 'image-1'
+  - identity.namespace = 'image-1'
+  - identity.architecture = 'x86_64'
+  - metadata.digest = 'sha256:000000000000000000000000000000000000000000000000000000000image-1'
+  - metadata.size_bytes = 0
+  - metadata.created_at: 이 실행이 쓴 시각
+  - metadata.last_used_at: 노드의 last_used_at 필드와 같다
+  - metadata.tags = []
+  - metadata.labels = []
+  - metadata.status = <ImageStatus.DELETED: 'DELETED'>
+  - requirements.supported_accelerators = ['*']
+  - requirements.resource_limits = [ImageResourceLimitGQLInfo(key='cpu', min='1', max='Infinity'), ImageResourceLimitGQLInfo(key='mem', min='1073741824', max='Infinity')]
+
+<a id="forgetting-the-maker-of-a-custom-image-may-forget-it"></a>
+
+#### [the-maker-of-a-custom-image-may-forget-it](/tests/scenario/bai_scenario/manager/image/test_forgetting.py) — pass
+
+자기가 커밋한 커스텀 이미지를 자기 개인 프로젝트의 권한으로 소프트 삭제하면, 이미지가 그 개인 프로젝트에 속하므로 이미지 권한 검사를 통과해 삭제됨 상태가 반환된다
+
+Given
+
+- 호출자가 커밋한 커스텀 이미지 1개, 호출자 개인 프로젝트에서 이미지 권한 있음
+  - 도메인 home-1
+  - 컨테이너 레지스트리 host-1: 이미지를 가져오는 곳
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+  - 커밋한 이미지 image-1: 커스터마이즈된 이미지라 소유자가 있다, 그 사람의 개인 프로젝트에 속한다
+  - 프로젝트의 이미지를 다룰 권한을 받은 사용자 준비
+    - 역할 image-keeper-1: 이 역할이 앉은 스코프 안에서만 통한다
+    - 역할 image-keeper-1: image 전체에 READ 허용
+    - 역할 image-keeper-1: image 전체에 SOFT_DELETE 허용
+    - 역할 image-keeper-1: image 전체에 HARD_DELETE 허용
+    - 일반 사용자 user-1: 역할 image-keeper-1 보유
+
+When
+
+- ImageAdapter.delete — user-1이 image-1 소프트 삭제
+
+Then
+
+- 이미지 노드의 모든 필드가 예상값과 일치한다
+  - id: 미리 만들어 둔 이미지의 ID와 같다
+  - name = 'image-1'
+  - image = 'image-1'
+  - registry = 'host-1'
+  - registry_id: 미리 만들어 둔 레지스트리의 ID와 같다
+  - project = None
+  - tag = 'latest'
+  - architecture = 'x86_64'
+  - size_bytes = 0
+  - type = <ImageType.COMPUTE: 'compute'>
+  - status = <ImageStatus.DELETED: 'DELETED'>
+  - labels = []
+  - tags = []
+  - resource_limits = [ImageResourceLimitInfo(key='cpu', min='1', max=None), ImageResourceLimitInfo(key='mem', min='1073741824', max=None)]
+  - accelerators = None
+  - config_digest = 'sha256:000000000000000000000000000000000000000000000000000000000image-1'
+  - is_local = False
+  - customized = True
+  - creator_id: 이미지를 커밋한 사용자의 ID와 같다
+  - created_at: 이 실행이 쓴 시각
+  - last_used_at: 무시함 — 세션이 기록하는 값이라 이 실행에서는 알 수 없다
+  - identity.canonical_name = 'image-1'
+  - identity.namespace = 'image-1'
+  - identity.architecture = 'x86_64'
+  - metadata.digest = 'sha256:000000000000000000000000000000000000000000000000000000000image-1'
+  - metadata.size_bytes = 0
+  - metadata.created_at: 이 실행이 쓴 시각
+  - metadata.last_used_at: 노드의 last_used_at 필드와 같다
+  - metadata.tags = []
+  - metadata.labels = []
+  - metadata.status = <ImageStatus.DELETED: 'DELETED'>
+  - requirements.supported_accelerators = ['*']
+  - requirements.resource_limits = [ImageResourceLimitGQLInfo(key='cpu', min='1', max='Infinity'), ImageResourceLimitGQLInfo(key='mem', min='1073741824', max='Infinity')]
+
+<a id="forgetting-a-user-granted-nothing-may-not-forget-an-image"></a>
+
+#### [a-user-granted-nothing-may-not-forget-an-image](/tests/scenario/bai_scenario/manager/image/test_forgetting.py) — pass
+
+아무 권한도 받지 않은 사용자가 이미지를 소프트 삭제하려 하면 권한 부족으로 거부된다
+
+Given
+
+- 커스텀 이미지가 아닌 이미지 1개, 아무 권한도 없음인 사용자 1명
+  - 도메인 home-1
+  - 컨테이너 레지스트리 host-1: 이미지를 가져오는 곳
+  - 이미지 image-1: x86_64 이미지
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+
+When
+
+- ImageAdapter.delete — user-1이 image-1 소프트 삭제
+
+Then
+
+- 거부된다
+  - 거부: NotEnoughPermission
+
+<a id="forgetting-a-user-may-not-forget-a-custom-image-another-user-made"></a>
+
+#### [a-user-may-not-forget-a-custom-image-another-user-made](/tests/scenario/bai_scenario/manager/image/test_forgetting.py) — pass
+
+다른 사용자가 커밋한 커스텀 이미지는 그 사람의 개인 프로젝트에 속하므로, 자기 개인 프로젝트에서 권한을 받은 사용자가 소프트 삭제하려 하면 권한 부족으로 거부된다
+
+Given
+
+- 다른 사용자가 커밋한 커스텀 이미지 1개, 호출자는 자기 개인 프로젝트에서만 이미지 권한 있음
+  - 도메인 home-1
+  - 컨테이너 레지스트리 host-1: 이미지를 가져오는 곳
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+    - 사용자 정책 user-policy-2: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
+    - 일반 사용자 user-2: 자기 키와 개인 프로젝트를 갖는다
+  - 커밋한 이미지 image-1: 커스터마이즈된 이미지라 소유자가 있다, 그 사람의 개인 프로젝트에 속한다
+  - 프로젝트의 이미지를 다룰 권한을 받은 사용자 준비
+    - 역할 image-keeper-1: 이 역할이 앉은 스코프 안에서만 통한다
+    - 역할 image-keeper-1: image 전체에 READ 허용
+    - 역할 image-keeper-1: image 전체에 SOFT_DELETE 허용
+    - 역할 image-keeper-1: image 전체에 HARD_DELETE 허용
+    - 일반 사용자 user-2: 역할 image-keeper-1 보유
+
+When
+
+- ImageAdapter.delete — user-2이 image-1 소프트 삭제
+
+Then
+
+- 거부된다
+  - 거부: NotEnoughPermission
+
+<a id="forgetting-an-image-a-purge-is-working-through-cannot-be-reached"></a>
+
+#### [an-image-a-purge-is-working-through-cannot-be-reached](/tests/scenario/bai_scenario/manager/image/test_forgetting.py) — pass
+
+완전 삭제 중인 이미지를 소프트 삭제하려 하면 대상을 찾을 수 없어 거부된다. 살아 있는 이미지만 소프트 삭제할 수 있다
+
+Given
+
+- 레지스트리 1개와 그 안의 이미지 1개, 상태는 PURGING, superadmin 1명
+  - 도메인 home-1
+  - 컨테이너 레지스트리 host-1: 이미지를 가져오는 곳
+  - 이미지 image-1: x86_64 이미지, 상태는 PURGING
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+
+When
+
+- ImageAdapter.delete — user-1이 image-1 소프트 삭제
+
+Then
+
+- 거부된다
+  - 거부: ImageNotFound
+
+<a id="forgetting-forgetting-an-id-that-holds-no-image-is-refused"></a>
+
+#### [forgetting-an-id-that-holds-no-image-is-refused](/tests/scenario/bai_scenario/manager/image/test_forgetting.py) — pass
+
+어느 이미지도 가리키지 않는 ID를 소프트 삭제하려 하면 대상을 찾을 수 없어 거부된다
+
+Given
+
+- 레지스트리 1개와 그 안의 이미지 1개, superadmin 1명
+  - 도메인 home-1
+  - 컨테이너 레지스트리 host-1: 이미지를 가져오는 곳
+  - 이미지 image-1: x86_64 이미지
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+
+When
+
+- ImageAdapter.delete — user-1이 어느 이미지도 가리키지 않는 ID 소프트 삭제
+
+Then
+
+- 거부된다
+  - 거부: EntityNotFoundError
+
+### partial_bulk_delete
+
+<a id="partial_bulk_forgetting-a-user-granted-nothing-forgets-none-of-several-images"></a>
+
+#### [a-user-granted-nothing-forgets-none-of-several-images](/tests/scenario/bai_scenario/manager/image/test_partial_bulk_forgetting.py) — pass
+
+아무 권한도 받지 않은 사용자가 이미지 여럿을 한 번에 소프트 삭제하려 하면, 삭제된 것 없이 모두 권한이 없다는 이유로 실패 목록에 온다
+
+Given
+
+- 레지스트리 1개와 그 안의 이미지 2개, user 1명
+  - 도메인 home-1
+  - 컨테이너 레지스트리 host-1: 이미지를 가져오는 곳
+  - 이미지 image-0-1: x86_64 이미지
+  - 이미지 image-1-1: x86_64 이미지
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+
+When
+
+- ImageAdapter.partial_bulk_delete — user-1이 이미지 2개를 한 번에 소프트 삭제
+
+Then
+
+- 처리된 이미지 없이 대상이 모두 실패 목록에 온다
+  - successes = []
+  - failed count = 2
+  - failed[0].id: 대상 이미지의 id와 같다
+  - failed[0].message: 'Insufficient permission'를 담은 이유
+  - failed[1].id: 대상 이미지의 id와 같다
+  - failed[1].message: 'Insufficient permission'를 담은 이유
+
+<a id="partial_bulk_forgetting-forgetting-several-answers-for-the-missing-one"></a>
+
+#### [forgetting-several-answers-for-the-missing-one](/tests/scenario/bai_scenario/manager/image/test_partial_bulk_forgetting.py) — pass
+
+살아 있는 이미지 둘과 없는 id 하나를 한 번에 소프트 삭제하면, 둘은 삭제됨 상태로 오고 없는 id 는 대상이 없다는 이유로 실패 목록에 온다
+
+Given
+
+- 레지스트리 1개와 그 안의 이미지 2개, superadmin 1명
+  - 도메인 home-1
+  - 컨테이너 레지스트리 host-1: 이미지를 가져오는 곳
+  - 이미지 image-0-1: x86_64 이미지
+  - 이미지 image-1-1: x86_64 이미지
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+
+When
+
+- ImageAdapter.partial_bulk_delete — user-1이 이미지 2개 와 없는 id 하나를 한 번에 소프트 삭제
+
+Then
+
+- 대상 이미지가 모두 DELETED 상태로 오고, 없는 id 는 대상이 없다는 이유로 실패 목록에 온다
+  - successes count = 2
+  - id: 미리 만들어 둔 이미지의 ID와 같다
+  - name = 'image-0-1'
+  - image = 'image-0-1'
+  - registry = 'host-1'
+  - registry_id: 미리 만들어 둔 레지스트리의 ID와 같다
+  - project = None
+  - tag = 'latest'
+  - architecture = 'x86_64'
+  - size_bytes = 0
+  - type = <ImageType.COMPUTE: 'compute'>
+  - status = <ImageStatus.DELETED: 'DELETED'>
+  - labels = []
+  - tags = []
+  - resource_limits = [ImageResourceLimitInfo(key='cpu', min='1', max=None), ImageResourceLimitInfo(key='mem', min='1073741824', max=None)]
+  - accelerators = None
+  - config_digest = 'sha256:0000000000000000000000000000000000000000000000000000000image-0-1'
+  - is_local = False
+  - customized = False
+  - creator_id = None
+  - created_at: 이 실행이 쓴 시각
+  - last_used_at: 무시함 — 세션이 기록하는 값이라 이 실행에서는 알 수 없다
+  - identity.canonical_name = 'image-0-1'
+  - identity.namespace = 'image-0-1'
+  - identity.architecture = 'x86_64'
+  - metadata.digest = 'sha256:0000000000000000000000000000000000000000000000000000000image-0-1'
+  - metadata.size_bytes = 0
+  - metadata.created_at: 이 실행이 쓴 시각
+  - metadata.last_used_at: 노드의 last_used_at 필드와 같다
+  - metadata.tags = []
+  - metadata.labels = []
+  - metadata.status = <ImageStatus.DELETED: 'DELETED'>
+  - requirements.supported_accelerators = ['*']
+  - requirements.resource_limits = [ImageResourceLimitGQLInfo(key='cpu', min='1', max='Infinity'), ImageResourceLimitGQLInfo(key='mem', min='1073741824', max='Infinity')]
+  - id: 미리 만들어 둔 이미지의 ID와 같다
+  - name = 'image-1-1'
+  - image = 'image-1-1'
+  - registry = 'host-1'
+  - registry_id: 미리 만들어 둔 레지스트리의 ID와 같다
+  - project = None
+  - tag = 'latest'
+  - architecture = 'x86_64'
+  - size_bytes = 0
+  - type = <ImageType.COMPUTE: 'compute'>
+  - status = <ImageStatus.DELETED: 'DELETED'>
+  - labels = []
+  - tags = []
+  - resource_limits = [ImageResourceLimitInfo(key='cpu', min='1', max=None), ImageResourceLimitInfo(key='mem', min='1073741824', max=None)]
+  - accelerators = None
+  - config_digest = 'sha256:0000000000000000000000000000000000000000000000000000000image-1-1'
+  - is_local = False
+  - customized = False
+  - creator_id = None
+  - created_at: 이 실행이 쓴 시각
+  - last_used_at: 무시함 — 세션이 기록하는 값이라 이 실행에서는 알 수 없다
+  - identity.canonical_name = 'image-1-1'
+  - identity.namespace = 'image-1-1'
+  - identity.architecture = 'x86_64'
+  - metadata.digest = 'sha256:0000000000000000000000000000000000000000000000000000000image-1-1'
+  - metadata.size_bytes = 0
+  - metadata.created_at: 이 실행이 쓴 시각
+  - metadata.last_used_at: 노드의 last_used_at 필드와 같다
+  - metadata.tags = []
+  - metadata.labels = []
+  - metadata.status = <ImageStatus.DELETED: 'DELETED'>
+  - requirements.supported_accelerators = ['*']
+  - requirements.resource_limits = [ImageResourceLimitGQLInfo(key='cpu', min='1', max='Infinity'), ImageResourceLimitGQLInfo(key='mem', min='1073741824', max='Infinity')]
+  - failed count = 1
+  - failed[0].id: 요청에 넣은 없는 id와 같다
+  - failed[0].message: 'not found'를 담은 이유
+
+### partial_bulk_restore
+
+<a id="partial_bulk_forgetting-restoring-several-brings-them-back-alive"></a>
+
+#### [restoring-several-brings-them-back-alive](/tests/scenario/bai_scenario/manager/image/test_partial_bulk_forgetting.py) — pass
+
+소프트 삭제한 이미지 여럿을 한 번에 복원하면, 모두 살아 있는 상태로 온다
+
+Given
+
+- 레지스트리 1개와 그 안의 이미지 2개, superadmin 1명
+  - 도메인 home-1
+  - 컨테이너 레지스트리 host-1: 이미지를 가져오는 곳
+  - 이미지 image-0-1: x86_64 이미지
+  - 이미지 image-1-1: x86_64 이미지
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+
+When
+
+- ImageAdapter.partial_bulk_restore — user-1이 이미지 2개를 한 번에 소프트 삭제했다가 한 번에 복원
+
+Then
+
+- 대상 이미지가 모두 ALIVE 상태로 오고, 실패한 것은 없다
+  - successes count = 2
+  - id: 미리 만들어 둔 이미지의 ID와 같다
+  - name = 'image-0-1'
+  - image = 'image-0-1'
+  - registry = 'host-1'
+  - registry_id: 미리 만들어 둔 레지스트리의 ID와 같다
+  - project = None
+  - tag = 'latest'
+  - architecture = 'x86_64'
+  - size_bytes = 0
+  - type = <ImageType.COMPUTE: 'compute'>
+  - status = <ImageStatus.ALIVE: 'ALIVE'>
+  - labels = []
+  - tags = []
+  - resource_limits = [ImageResourceLimitInfo(key='cpu', min='1', max=None), ImageResourceLimitInfo(key='mem', min='1073741824', max=None)]
+  - accelerators = None
+  - config_digest = 'sha256:0000000000000000000000000000000000000000000000000000000image-0-1'
+  - is_local = False
+  - customized = False
+  - creator_id = None
+  - created_at: 이 실행이 쓴 시각
+  - last_used_at: 무시함 — 세션이 기록하는 값이라 이 실행에서는 알 수 없다
+  - identity.canonical_name = 'image-0-1'
+  - identity.namespace = 'image-0-1'
+  - identity.architecture = 'x86_64'
+  - metadata.digest = 'sha256:0000000000000000000000000000000000000000000000000000000image-0-1'
+  - metadata.size_bytes = 0
+  - metadata.created_at: 이 실행이 쓴 시각
+  - metadata.last_used_at: 노드의 last_used_at 필드와 같다
+  - metadata.tags = []
+  - metadata.labels = []
+  - metadata.status = <ImageStatus.ALIVE: 'ALIVE'>
+  - requirements.supported_accelerators = ['*']
+  - requirements.resource_limits = [ImageResourceLimitGQLInfo(key='cpu', min='1', max='Infinity'), ImageResourceLimitGQLInfo(key='mem', min='1073741824', max='Infinity')]
+  - id: 미리 만들어 둔 이미지의 ID와 같다
+  - name = 'image-1-1'
+  - image = 'image-1-1'
+  - registry = 'host-1'
+  - registry_id: 미리 만들어 둔 레지스트리의 ID와 같다
+  - project = None
+  - tag = 'latest'
+  - architecture = 'x86_64'
+  - size_bytes = 0
+  - type = <ImageType.COMPUTE: 'compute'>
+  - status = <ImageStatus.ALIVE: 'ALIVE'>
+  - labels = []
+  - tags = []
+  - resource_limits = [ImageResourceLimitInfo(key='cpu', min='1', max=None), ImageResourceLimitInfo(key='mem', min='1073741824', max=None)]
+  - accelerators = None
+  - config_digest = 'sha256:0000000000000000000000000000000000000000000000000000000image-1-1'
+  - is_local = False
+  - customized = False
+  - creator_id = None
+  - created_at: 이 실행이 쓴 시각
+  - last_used_at: 무시함 — 세션이 기록하는 값이라 이 실행에서는 알 수 없다
+  - identity.canonical_name = 'image-1-1'
+  - identity.namespace = 'image-1-1'
+  - identity.architecture = 'x86_64'
+  - metadata.digest = 'sha256:0000000000000000000000000000000000000000000000000000000image-1-1'
+  - metadata.size_bytes = 0
+  - metadata.created_at: 이 실행이 쓴 시각
+  - metadata.last_used_at: 노드의 last_used_at 필드와 같다
+  - metadata.tags = []
+  - metadata.labels = []
+  - metadata.status = <ImageStatus.ALIVE: 'ALIVE'>
+  - requirements.supported_accelerators = ['*']
+  - requirements.resource_limits = [ImageResourceLimitGQLInfo(key='cpu', min='1', max='Infinity'), ImageResourceLimitGQLInfo(key='mem', min='1073741824', max='Infinity')]
+  - failed = []
+
+### partial_bulk_update
+
+<a id="partial_bulk_editing-a-user-granted-nothing-edits-none-of-several-images"></a>
+
+#### [a-user-granted-nothing-edits-none-of-several-images](/tests/scenario/bai_scenario/manager/image/test_partial_bulk_editing.py) — pass
+
+아무 권한도 받지 않은 사용자가 이미지 여럿을 한 번에 고치려 하면, 고쳐진 것 없이 모두 권한이 없다는 이유로 실패 목록에 온다
+
+Given
+
+- 레지스트리 1개와 그 안의 이미지 2개, user 1명
+  - 도메인 home-1
+  - 컨테이너 레지스트리 host-1: 이미지를 가져오는 곳
+  - 이미지 image-0-1: x86_64 이미지
+  - 이미지 image-1-1: x86_64 이미지
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+
+When
+
+- ImageAdapter.partial_bulk_update — user-1이 이미지 2개의 태그를 한 번에 고침
+
+Then
+
+- 처리된 이미지 없이 대상이 모두 실패 목록에 온다
+  - successes = []
+  - failed count = 2
+  - failed[0].id: 대상 이미지의 id와 같다
+  - failed[0].message: 'Insufficient permission'를 담은 이유
+  - failed[1].id: 대상 이미지의 id와 같다
+  - failed[1].message: 'Insufficient permission'를 담은 이유
+
+<a id="partial_bulk_editing-the-superadmin-edits-several-images-at-once"></a>
+
+#### [the-superadmin-edits-several-images-at-once](/tests/scenario/bai_scenario/manager/image/test_partial_bulk_editing.py) — pass
+
+슈퍼관리자가 이미지 여럿의 태그를 한 번에 바꾸면, 모두 새 태그로 오고 실패한 것은 없다
+
+Given
+
+- 레지스트리 1개와 그 안의 이미지 2개, superadmin 1명
+  - 도메인 home-1
+  - 컨테이너 레지스트리 host-1: 이미지를 가져오는 곳
+  - 이미지 image-0-1: x86_64 이미지
+  - 이미지 image-1-1: x86_64 이미지
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+
+When
+
+- ImageAdapter.partial_bulk_update — user-1이 이미지 2개의 태그를 한 번에 고침
+
+Then
+
+- 대상 이미지가 모두 ALIVE 상태로 오고, 실패한 것은 없다
+  - successes count = 2
+  - id: 미리 만들어 둔 이미지의 ID와 같다
+  - name = 'image-0-1'
+  - image = 'image-0-1'
+  - registry = 'host-1'
+  - registry_id: 미리 만들어 둔 레지스트리의 ID와 같다
+  - project = None
+  - tag = 'edited-together'
+  - architecture = 'x86_64'
+  - size_bytes = 0
+  - type = <ImageType.COMPUTE: 'compute'>
+  - status = <ImageStatus.ALIVE: 'ALIVE'>
+  - labels = []
+  - tags = []
+  - resource_limits = [ImageResourceLimitInfo(key='cpu', min='1', max=None), ImageResourceLimitInfo(key='mem', min='1073741824', max=None)]
+  - accelerators = None
+  - config_digest = 'sha256:0000000000000000000000000000000000000000000000000000000image-0-1'
+  - is_local = False
+  - customized = False
+  - creator_id = None
+  - created_at: 이 실행이 쓴 시각
+  - last_used_at: 무시함 — 세션이 기록하는 값이라 이 실행에서는 알 수 없다
+  - identity.canonical_name = 'image-0-1'
+  - identity.namespace = 'image-0-1'
+  - identity.architecture = 'x86_64'
+  - metadata.digest = 'sha256:0000000000000000000000000000000000000000000000000000000image-0-1'
+  - metadata.size_bytes = 0
+  - metadata.created_at: 이 실행이 쓴 시각
+  - metadata.last_used_at: 노드의 last_used_at 필드와 같다
+  - metadata.tags = []
+  - metadata.labels = []
+  - metadata.status = <ImageStatus.ALIVE: 'ALIVE'>
+  - requirements.supported_accelerators = ['*']
+  - requirements.resource_limits = [ImageResourceLimitGQLInfo(key='cpu', min='1', max='Infinity'), ImageResourceLimitGQLInfo(key='mem', min='1073741824', max='Infinity')]
+  - id: 미리 만들어 둔 이미지의 ID와 같다
+  - name = 'image-1-1'
+  - image = 'image-1-1'
+  - registry = 'host-1'
+  - registry_id: 미리 만들어 둔 레지스트리의 ID와 같다
+  - project = None
+  - tag = 'edited-together'
+  - architecture = 'x86_64'
+  - size_bytes = 0
+  - type = <ImageType.COMPUTE: 'compute'>
+  - status = <ImageStatus.ALIVE: 'ALIVE'>
+  - labels = []
+  - tags = []
+  - resource_limits = [ImageResourceLimitInfo(key='cpu', min='1', max=None), ImageResourceLimitInfo(key='mem', min='1073741824', max=None)]
+  - accelerators = None
+  - config_digest = 'sha256:0000000000000000000000000000000000000000000000000000000image-1-1'
+  - is_local = False
+  - customized = False
+  - creator_id = None
+  - created_at: 이 실행이 쓴 시각
+  - last_used_at: 무시함 — 세션이 기록하는 값이라 이 실행에서는 알 수 없다
+  - identity.canonical_name = 'image-1-1'
+  - identity.namespace = 'image-1-1'
+  - identity.architecture = 'x86_64'
+  - metadata.digest = 'sha256:0000000000000000000000000000000000000000000000000000000image-1-1'
+  - metadata.size_bytes = 0
+  - metadata.created_at: 이 실행이 쓴 시각
+  - metadata.last_used_at: 노드의 last_used_at 필드와 같다
+  - metadata.tags = []
+  - metadata.labels = []
+  - metadata.status = <ImageStatus.ALIVE: 'ALIVE'>
+  - requirements.supported_accelerators = ['*']
+  - requirements.resource_limits = [ImageResourceLimitGQLInfo(key='cpu', min='1', max='Infinity'), ImageResourceLimitGQLInfo(key='mem', min='1073741824', max='Infinity')]
+  - failed = []
+
+### restore
+
+<a id="forgetting-restoring-a-forgotten-image-brings-it-back-alive"></a>
+
+#### [restoring-a-forgotten-image-brings-it-back-alive](/tests/scenario/bai_scenario/manager/image/test_forgetting.py) — pass
+
+슈퍼관리자가 삭제된 이미지를 복원하면 살아 있는 상태가 담긴 노드가 반환된다
+
+Given
+
+- 레지스트리 1개와 그 안의 이미지 1개, 상태는 DELETED, superadmin 1명
+  - 도메인 home-1
+  - 컨테이너 레지스트리 host-1: 이미지를 가져오는 곳
+  - 이미지 image-1: x86_64 이미지, 상태는 DELETED
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+
+When
+
+- ImageAdapter.restore — user-1이 image-1 복원
+
+Then
+
+- 이미지 노드의 모든 필드가 예상값과 일치한다
+  - id: 미리 만들어 둔 이미지의 ID와 같다
+  - name = 'image-1'
+  - image = 'image-1'
+  - registry = 'host-1'
+  - registry_id: 미리 만들어 둔 레지스트리의 ID와 같다
+  - project = None
+  - tag = 'latest'
+  - architecture = 'x86_64'
+  - size_bytes = 0
+  - type = <ImageType.COMPUTE: 'compute'>
+  - status = <ImageStatus.ALIVE: 'ALIVE'>
+  - labels = []
+  - tags = []
+  - resource_limits = [ImageResourceLimitInfo(key='cpu', min='1', max=None), ImageResourceLimitInfo(key='mem', min='1073741824', max=None)]
+  - accelerators = None
+  - config_digest = 'sha256:000000000000000000000000000000000000000000000000000000000image-1'
+  - is_local = False
+  - customized = False
+  - creator_id = None
+  - created_at: 이 실행이 쓴 시각
+  - last_used_at: 무시함 — 세션이 기록하는 값이라 이 실행에서는 알 수 없다
+  - identity.canonical_name = 'image-1'
+  - identity.namespace = 'image-1'
+  - identity.architecture = 'x86_64'
+  - metadata.digest = 'sha256:000000000000000000000000000000000000000000000000000000000image-1'
+  - metadata.size_bytes = 0
+  - metadata.created_at: 이 실행이 쓴 시각
+  - metadata.last_used_at: 노드의 last_used_at 필드와 같다
+  - metadata.tags = []
+  - metadata.labels = []
+  - metadata.status = <ImageStatus.ALIVE: 'ALIVE'>
+  - requirements.supported_accelerators = ['*']
+  - requirements.resource_limits = [ImageResourceLimitGQLInfo(key='cpu', min='1', max='Infinity'), ImageResourceLimitGQLInfo(key='mem', min='1073741824', max='Infinity')]
+
+<a id="forgetting-restoring-an-image-that-was-never-forgotten-leaves-it-alive"></a>
+
+#### [restoring-an-image-that-was-never-forgotten-leaves-it-alive](/tests/scenario/bai_scenario/manager/image/test_forgetting.py) — pass
+
+살아 있는 이미지를 복원해도 살아 있는 상태 그대로다
+
+Given
+
+- 레지스트리 1개와 그 안의 이미지 1개, superadmin 1명
+  - 도메인 home-1
+  - 컨테이너 레지스트리 host-1: 이미지를 가져오는 곳
+  - 이미지 image-1: x86_64 이미지
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+
+When
+
+- ImageAdapter.restore — user-1이 image-1 복원
+
+Then
+
+- 이미지 노드의 모든 필드가 예상값과 일치한다
+  - id: 미리 만들어 둔 이미지의 ID와 같다
+  - name = 'image-1'
+  - image = 'image-1'
+  - registry = 'host-1'
+  - registry_id: 미리 만들어 둔 레지스트리의 ID와 같다
+  - project = None
+  - tag = 'latest'
+  - architecture = 'x86_64'
+  - size_bytes = 0
+  - type = <ImageType.COMPUTE: 'compute'>
+  - status = <ImageStatus.ALIVE: 'ALIVE'>
+  - labels = []
+  - tags = []
+  - resource_limits = [ImageResourceLimitInfo(key='cpu', min='1', max=None), ImageResourceLimitInfo(key='mem', min='1073741824', max=None)]
+  - accelerators = None
+  - config_digest = 'sha256:000000000000000000000000000000000000000000000000000000000image-1'
+  - is_local = False
+  - customized = False
+  - creator_id = None
+  - created_at: 이 실행이 쓴 시각
+  - last_used_at: 무시함 — 세션이 기록하는 값이라 이 실행에서는 알 수 없다
+  - identity.canonical_name = 'image-1'
+  - identity.namespace = 'image-1'
+  - identity.architecture = 'x86_64'
+  - metadata.digest = 'sha256:000000000000000000000000000000000000000000000000000000000image-1'
+  - metadata.size_bytes = 0
+  - metadata.created_at: 이 실행이 쓴 시각
+  - metadata.last_used_at: 노드의 last_used_at 필드와 같다
+  - metadata.tags = []
+  - metadata.labels = []
+  - metadata.status = <ImageStatus.ALIVE: 'ALIVE'>
+  - requirements.supported_accelerators = ['*']
+  - requirements.resource_limits = [ImageResourceLimitGQLInfo(key='cpu', min='1', max='Infinity'), ImageResourceLimitGQLInfo(key='mem', min='1073741824', max='Infinity')]
+
+<a id="forgetting-a-user-granted-nothing-may-not-restore-an-image"></a>
+
+#### [a-user-granted-nothing-may-not-restore-an-image](/tests/scenario/bai_scenario/manager/image/test_forgetting.py) — pass
+
+아무 권한도 받지 않은 사용자가 이미지를 복원하려 하면 권한 부족으로 거부된다
+
+Given
+
+- 커스텀 이미지가 아닌 이미지 1개, 아무 권한도 없음인 사용자 1명
+  - 도메인 home-1
+  - 컨테이너 레지스트리 host-1: 이미지를 가져오는 곳
+  - 이미지 image-1: x86_64 이미지
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+
+When
+
+- ImageAdapter.restore — user-1이 image-1 복원
+
+Then
+
+- 거부된다
+  - 거부: NotEnoughPermission
+
+<a id="forgetting-restoring-an-id-that-holds-no-image-is-refused"></a>
+
+#### [restoring-an-id-that-holds-no-image-is-refused](/tests/scenario/bai_scenario/manager/image/test_forgetting.py) — pass
+
+어느 이미지도 가리키지 않는 ID를 복원하려 하면 대상을 찾을 수 없어 거부된다
+
+Given
+
+- 레지스트리 1개와 그 안의 이미지 1개, superadmin 1명
+  - 도메인 home-1
+  - 컨테이너 레지스트리 host-1: 이미지를 가져오는 곳
+  - 이미지 image-1: x86_64 이미지
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+
+When
+
+- ImageAdapter.restore — user-1이 어느 이미지도 가리키지 않는 ID 복원
+
+Then
+
+- 거부된다
+  - 거부: EntityNotFoundError
+
 ### scoped_search
 
 <a id="searching-a-user-granted-on-a-registry-reads-the-images-it-holds"></a>
@@ -994,6 +1857,416 @@ Then
 
 - 거부된다
   - 거부: NotEnoughPermission
+
+### update
+
+<a id="editing-an-edit-that-names-no-value-changes-nothing"></a>
+
+#### [an-edit-that-names-no-value-changes-nothing](/tests/scenario/bai_scenario/manager/image/test_editing.py) — pass
+
+슈퍼관리자가 값을 하나도 지정하지 않고 수정하면 아무것도 바뀌지 않은 노드가 반환된다
+
+Given
+
+- 레지스트리 1개와 그 안의 이미지 1개, superadmin 1명
+  - 도메인 home-1
+  - 컨테이너 레지스트리 host-1: 이미지를 가져오는 곳
+  - 이미지 image-1: x86_64 이미지
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+
+When
+
+- ImageAdapter.update — user-1이 값을 하나도 지정하지 않고 수정
+
+Then
+
+- 이미지 노드의 모든 필드가 예상값과 일치한다
+  - id: 미리 만들어 둔 이미지의 ID와 같다
+  - name = 'image-1'
+  - image = 'image-1'
+  - registry = 'host-1'
+  - registry_id: 미리 만들어 둔 레지스트리의 ID와 같다
+  - project = None
+  - tag = 'latest'
+  - architecture = 'x86_64'
+  - size_bytes = 0
+  - type = <ImageType.COMPUTE: 'compute'>
+  - status = <ImageStatus.ALIVE: 'ALIVE'>
+  - labels = []
+  - tags = []
+  - resource_limits = [ImageResourceLimitInfo(key='cpu', min='1', max=None), ImageResourceLimitInfo(key='mem', min='1073741824', max=None)]
+  - accelerators = None
+  - config_digest = 'sha256:000000000000000000000000000000000000000000000000000000000image-1'
+  - is_local = False
+  - customized = False
+  - creator_id = None
+  - created_at: 이 실행이 쓴 시각
+  - last_used_at: 무시함 — 세션이 기록하는 값이라 이 실행에서는 알 수 없다
+  - identity.canonical_name = 'image-1'
+  - identity.namespace = 'image-1'
+  - identity.architecture = 'x86_64'
+  - metadata.digest = 'sha256:000000000000000000000000000000000000000000000000000000000image-1'
+  - metadata.size_bytes = 0
+  - metadata.created_at: 이 실행이 쓴 시각
+  - metadata.last_used_at: 노드의 last_used_at 필드와 같다
+  - metadata.tags = []
+  - metadata.labels = []
+  - metadata.status = <ImageStatus.ALIVE: 'ALIVE'>
+  - requirements.supported_accelerators = ['*']
+  - requirements.resource_limits = [ImageResourceLimitGQLInfo(key='cpu', min='1', max='Infinity'), ImageResourceLimitGQLInfo(key='mem', min='1073741824', max='Infinity')]
+
+<a id="editing-changing-labels-and-resource-limits-returns-the-new-values"></a>
+
+#### [changing-labels-and-resource-limits-returns-the-new-values](/tests/scenario/bai_scenario/manager/image/test_editing.py) — pass
+
+슈퍼관리자가 레이블과 CPU 하한·상한을 수정하면 지정한 값이 반환된다
+
+Given
+
+- 레지스트리 1개와 그 안의 이미지 1개, superadmin 1명
+  - 도메인 home-1
+  - 컨테이너 레지스트리 host-1: 이미지를 가져오는 곳
+  - 이미지 image-1: x86_64 이미지
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+
+When
+
+- ImageAdapter.update — user-1이 image-1의 여러 필드를 함께 수정
+
+Then
+
+- 이미지 노드의 모든 필드가 예상값과 일치한다
+  - id: 미리 만들어 둔 이미지의 ID와 같다
+  - name = 'image-1'
+  - image = 'image-1'
+  - registry = 'host-1'
+  - registry_id: 미리 만들어 둔 레지스트리의 ID와 같다
+  - project = None
+  - tag = 'latest'
+  - architecture = 'x86_64'
+  - size_bytes = 0
+  - type = <ImageType.COMPUTE: 'compute'>
+  - status = <ImageStatus.ALIVE: 'ALIVE'>
+  - labels = [ImageLabelInfo(key='purpose', value='scenario')]
+  - tags = []
+  - resource_limits = [ImageResourceLimitInfo(key='cpu', min='2', max='4'), ImageResourceLimitInfo(key='mem', min='1073741824', max=None)]
+  - accelerators = None
+  - config_digest = 'sha256:000000000000000000000000000000000000000000000000000000000image-1'
+  - is_local = False
+  - customized = False
+  - creator_id = None
+  - created_at: 이 실행이 쓴 시각
+  - last_used_at: 무시함 — 세션이 기록하는 값이라 이 실행에서는 알 수 없다
+  - identity.canonical_name = 'image-1'
+  - identity.namespace = 'image-1'
+  - identity.architecture = 'x86_64'
+  - metadata.digest = 'sha256:000000000000000000000000000000000000000000000000000000000image-1'
+  - metadata.size_bytes = 0
+  - metadata.created_at: 이 실행이 쓴 시각
+  - metadata.last_used_at: 노드의 last_used_at 필드와 같다
+  - metadata.tags = []
+  - metadata.labels = [ImageLabelInfo(key='purpose', value='scenario')]
+  - metadata.status = <ImageStatus.ALIVE: 'ALIVE'>
+  - requirements.supported_accelerators = ['*']
+  - requirements.resource_limits = [ImageResourceLimitGQLInfo(key='cpu', min='2', max='4'), ImageResourceLimitGQLInfo(key='mem', min='1073741824', max='Infinity')]
+
+<a id="editing-changing-only-the-tag-leaves-every-other-field-alone"></a>
+
+#### [changing-only-the-tag-leaves-every-other-field-alone](/tests/scenario/bai_scenario/manager/image/test_editing.py) — pass
+
+슈퍼관리자가 태그만 수정하면 태그만 새 값이 되고 나머지 필드는 그대로다
+
+Given
+
+- 레지스트리 1개와 그 안의 이미지 1개, superadmin 1명
+  - 도메인 home-1
+  - 컨테이너 레지스트리 host-1: 이미지를 가져오는 곳
+  - 이미지 image-1: x86_64 이미지
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+
+When
+
+- ImageAdapter.update — user-1이 image-1의 태그를 moved로 수정
+
+Then
+
+- 이미지 노드의 모든 필드가 예상값과 일치한다
+  - id: 미리 만들어 둔 이미지의 ID와 같다
+  - name = 'image-1'
+  - image = 'image-1'
+  - registry = 'host-1'
+  - registry_id: 미리 만들어 둔 레지스트리의 ID와 같다
+  - project = None
+  - tag = 'moved'
+  - architecture = 'x86_64'
+  - size_bytes = 0
+  - type = <ImageType.COMPUTE: 'compute'>
+  - status = <ImageStatus.ALIVE: 'ALIVE'>
+  - labels = []
+  - tags = []
+  - resource_limits = [ImageResourceLimitInfo(key='cpu', min='1', max=None), ImageResourceLimitInfo(key='mem', min='1073741824', max=None)]
+  - accelerators = None
+  - config_digest = 'sha256:000000000000000000000000000000000000000000000000000000000image-1'
+  - is_local = False
+  - customized = False
+  - creator_id = None
+  - created_at: 이 실행이 쓴 시각
+  - last_used_at: 무시함 — 세션이 기록하는 값이라 이 실행에서는 알 수 없다
+  - identity.canonical_name = 'image-1'
+  - identity.namespace = 'image-1'
+  - identity.architecture = 'x86_64'
+  - metadata.digest = 'sha256:000000000000000000000000000000000000000000000000000000000image-1'
+  - metadata.size_bytes = 0
+  - metadata.created_at: 이 실행이 쓴 시각
+  - metadata.last_used_at: 노드의 last_used_at 필드와 같다
+  - metadata.tags = []
+  - metadata.labels = []
+  - metadata.status = <ImageStatus.ALIVE: 'ALIVE'>
+  - requirements.supported_accelerators = ['*']
+  - requirements.resource_limits = [ImageResourceLimitGQLInfo(key='cpu', min='1', max='Infinity'), ImageResourceLimitGQLInfo(key='mem', min='1073741824', max='Infinity')]
+
+<a id="editing-changing-the-remaining-scalar-fields-returns-the-new-values"></a>
+
+#### [changing-the-remaining-scalar-fields-returns-the-new-values](/tests/scenario/bai_scenario/manager/image/test_editing.py) — pass
+
+슈퍼관리자가 이름과 레지스트리 등의 기본 필드를 함께 수정하면 지정한 값이 반환된다
+
+Given
+
+- 레지스트리 1개와 그 안의 이미지 1개, superadmin 1명
+  - 도메인 home-1
+  - 컨테이너 레지스트리 host-1: 이미지를 가져오는 곳
+  - 이미지 image-1: x86_64 이미지
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+
+When
+
+- ImageAdapter.update — user-1이 image-1의 여러 필드를 함께 수정
+
+Then
+
+- 이미지 노드의 모든 필드가 예상값과 일치한다
+  - id: 미리 만들어 둔 이미지의 ID와 같다
+  - name = 'updated-image'
+  - image = 'team/updated-image'
+  - registry = 'updated.example.com'
+  - registry_id: 미리 만들어 둔 레지스트리의 ID와 같다
+  - project = None
+  - tag = 'latest'
+  - architecture = 'aarch64'
+  - size_bytes = 2048
+  - type = <ImageType.SERVICE: 'service'>
+  - status = <ImageStatus.ALIVE: 'ALIVE'>
+  - labels = []
+  - tags = []
+  - resource_limits = [ImageResourceLimitInfo(key='cpu', min='1', max=None), ImageResourceLimitInfo(key='mem', min='1073741824', max=None)]
+  - accelerators = None
+  - config_digest = 'sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff'
+  - is_local = True
+  - customized = False
+  - creator_id = None
+  - created_at: 이 실행이 쓴 시각
+  - last_used_at: 무시함 — 세션이 기록하는 값이라 이 실행에서는 알 수 없다
+  - identity.canonical_name = 'updated-image'
+  - identity.namespace = 'team/updated-image'
+  - identity.architecture = 'aarch64'
+  - metadata.digest = 'sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff'
+  - metadata.size_bytes = 2048
+  - metadata.created_at: 이 실행이 쓴 시각
+  - metadata.last_used_at: 노드의 last_used_at 필드와 같다
+  - metadata.tags = []
+  - metadata.labels = []
+  - metadata.status = <ImageStatus.ALIVE: 'ALIVE'>
+  - requirements.supported_accelerators = ['*']
+  - requirements.resource_limits = [ImageResourceLimitGQLInfo(key='cpu', min='1', max='Infinity'), ImageResourceLimitGQLInfo(key='mem', min='1073741824', max='Infinity')]
+
+<a id="editing-clearing-the-accelerator-list-empties-it"></a>
+
+#### [clearing-the-accelerator-list-empties-it](/tests/scenario/bai_scenario/manager/image/test_editing.py) — pass
+
+슈퍼관리자가 가속기 목록을 비우는 수정을 하면 그 필드가 빈 채로 반환된다. 생략과 비우기를 구분할 수 있는 필드는 이것뿐이다
+
+Given
+
+- 레지스트리 1개와 그 안의 이미지 1개, superadmin 1명
+  - 도메인 home-1
+  - 컨테이너 레지스트리 host-1: 이미지를 가져오는 곳
+  - 이미지 image-1: x86_64 이미지, 가속기는 cuda
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+
+When
+
+- ImageAdapter.update — user-1이 image-1의 가속기 목록을 비움
+
+Then
+
+- 이미지 노드의 모든 필드가 예상값과 일치한다
+  - id: 미리 만들어 둔 이미지의 ID와 같다
+  - name = 'image-1'
+  - image = 'image-1'
+  - registry = 'host-1'
+  - registry_id: 미리 만들어 둔 레지스트리의 ID와 같다
+  - project = None
+  - tag = 'latest'
+  - architecture = 'x86_64'
+  - size_bytes = 0
+  - type = <ImageType.COMPUTE: 'compute'>
+  - status = <ImageStatus.ALIVE: 'ALIVE'>
+  - labels = []
+  - tags = []
+  - resource_limits = [ImageResourceLimitInfo(key='cpu', min='1', max=None), ImageResourceLimitInfo(key='mem', min='1073741824', max=None)]
+  - accelerators = None
+  - config_digest = 'sha256:000000000000000000000000000000000000000000000000000000000image-1'
+  - is_local = False
+  - customized = False
+  - creator_id = None
+  - created_at: 이 실행이 쓴 시각
+  - last_used_at: 무시함 — 세션이 기록하는 값이라 이 실행에서는 알 수 없다
+  - identity.canonical_name = 'image-1'
+  - identity.namespace = 'image-1'
+  - identity.architecture = 'x86_64'
+  - metadata.digest = 'sha256:000000000000000000000000000000000000000000000000000000000image-1'
+  - metadata.size_bytes = 0
+  - metadata.created_at: 이 실행이 쓴 시각
+  - metadata.last_used_at: 노드의 last_used_at 필드와 같다
+  - metadata.tags = []
+  - metadata.labels = []
+  - metadata.status = <ImageStatus.ALIVE: 'ALIVE'>
+  - requirements.supported_accelerators = ['*']
+  - requirements.resource_limits = [ImageResourceLimitGQLInfo(key='cpu', min='1', max='Infinity'), ImageResourceLimitGQLInfo(key='mem', min='1073741824', max='Infinity')]
+
+<a id="editing-writing-an-accelerator-onto-an-image-that-had-none"></a>
+
+#### [writing-an-accelerator-onto-an-image-that-had-none](/tests/scenario/bai_scenario/manager/image/test_editing.py) — pass
+
+슈퍼관리자가 가속기 이름을 지정하면 그 이름이 담긴 노드가 반환된다
+
+Given
+
+- 레지스트리 1개와 그 안의 이미지 1개, superadmin 1명
+  - 도메인 home-1
+  - 컨테이너 레지스트리 host-1: 이미지를 가져오는 곳
+  - 이미지 image-1: x86_64 이미지
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+
+When
+
+- ImageAdapter.update — user-1이 image-1의 가속기 목록을 cuda로 지정
+
+Then
+
+- 이미지 노드의 모든 필드가 예상값과 일치한다
+  - id: 미리 만들어 둔 이미지의 ID와 같다
+  - name = 'image-1'
+  - image = 'image-1'
+  - registry = 'host-1'
+  - registry_id: 미리 만들어 둔 레지스트리의 ID와 같다
+  - project = None
+  - tag = 'latest'
+  - architecture = 'x86_64'
+  - size_bytes = 0
+  - type = <ImageType.COMPUTE: 'compute'>
+  - status = <ImageStatus.ALIVE: 'ALIVE'>
+  - labels = []
+  - tags = []
+  - resource_limits = [ImageResourceLimitInfo(key='cpu', min='1', max=None), ImageResourceLimitInfo(key='mem', min='1073741824', max=None)]
+  - accelerators = 'cuda'
+  - config_digest = 'sha256:000000000000000000000000000000000000000000000000000000000image-1'
+  - is_local = False
+  - customized = False
+  - creator_id = None
+  - created_at: 이 실행이 쓴 시각
+  - last_used_at: 무시함 — 세션이 기록하는 값이라 이 실행에서는 알 수 없다
+  - identity.canonical_name = 'image-1'
+  - identity.namespace = 'image-1'
+  - identity.architecture = 'x86_64'
+  - metadata.digest = 'sha256:000000000000000000000000000000000000000000000000000000000image-1'
+  - metadata.size_bytes = 0
+  - metadata.created_at: 이 실행이 쓴 시각
+  - metadata.last_used_at: 노드의 last_used_at 필드와 같다
+  - metadata.tags = []
+  - metadata.labels = []
+  - metadata.status = <ImageStatus.ALIVE: 'ALIVE'>
+  - requirements.supported_accelerators = ['cuda']
+  - requirements.resource_limits = [ImageResourceLimitGQLInfo(key='cpu', min='1', max='Infinity'), ImageResourceLimitGQLInfo(key='mem', min='1073741824', max='Infinity')]
+
+<a id="editing-a-user-granted-nothing-may-not-edit-an-image"></a>
+
+#### [a-user-granted-nothing-may-not-edit-an-image](/tests/scenario/bai_scenario/manager/image/test_editing.py) — pass
+
+아무 권한도 받지 않은 사용자가 이미지를 수정하려 하면 권한 부족으로 거부된다
+
+Given
+
+- 레지스트리 1개와 그 안의 이미지 1개, user 1명
+  - 도메인 home-1
+  - 컨테이너 레지스트리 host-1: 이미지를 가져오는 곳
+  - 이미지 image-1: x86_64 이미지
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+
+When
+
+- ImageAdapter.update — user-1이 image-1의 태그를 moved로 수정
+
+Then
+
+- 거부된다
+  - 거부: NotEnoughPermission
+
+<a id="editing-editing-an-id-that-holds-no-image-is-refused"></a>
+
+#### [editing-an-id-that-holds-no-image-is-refused](/tests/scenario/bai_scenario/manager/image/test_editing.py) — pass
+
+어느 이미지도 가리키지 않는 ID를 수정하려 하면 대상을 찾을 수 없어 거부된다
+
+Given
+
+- 레지스트리 1개와 그 안의 이미지 1개, superadmin 1명
+  - 도메인 home-1
+  - 컨테이너 레지스트리 host-1: 이미지를 가져오는 곳
+  - 이미지 image-1: x86_64 이미지
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+
+When
+
+- ImageAdapter.update — user-1이 어느 이미지도 가리키지 않는 ID 수정
+
+Then
+
+- 거부된다
+  - 거부: EntityNotFoundError
 
 ### admin_alias
 
@@ -1201,309 +2474,6 @@ Then
 
 - 거부된다
   - 거부: ImageAliasNotFound
-
-### admin_forget
-
-<a id="forgetting-forgetting-an-image-marks-it-deleted-and-keeps-the-row"></a>
-
-#### [forgetting-an-image-marks-it-deleted-and-keeps-the-row](/tests/scenario/bai_scenario/manager/image/test_forgetting.py) — pass
-
-슈퍼관리자가 이미지를 소프트 삭제하면, 행은 남고 삭제됨 상태가 담긴 노드가 반환된다
-
-Given
-
-- 레지스트리 1개와 그 안의 이미지 1개, superadmin 1명
-  - 도메인 home-1
-  - 컨테이너 레지스트리 host-1: 이미지를 가져오는 곳
-  - 이미지 image-1: x86_64 이미지
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
-
-When
-
-- ImageAdapter.admin_forget — user-1이 image-1 소프트 삭제
-
-Then
-
-- 이미지 노드의 모든 필드가 예상값과 일치한다
-  - id: 미리 만들어 둔 이미지의 ID와 같다
-  - name = 'image-1'
-  - image = 'image-1'
-  - registry = 'host-1'
-  - registry_id: 미리 만들어 둔 레지스트리의 ID와 같다
-  - project = None
-  - tag = 'latest'
-  - architecture = 'x86_64'
-  - size_bytes = 0
-  - type = <ImageType.COMPUTE: 'compute'>
-  - status = <ImageStatus.DELETED: 'DELETED'>
-  - labels = []
-  - tags = []
-  - resource_limits = [ImageResourceLimitInfo(key='cpu', min='1', max=None), ImageResourceLimitInfo(key='mem', min='1073741824', max=None)]
-  - accelerators = None
-  - config_digest = 'sha256:000000000000000000000000000000000000000000000000000000000image-1'
-  - is_local = False
-  - customized = False
-  - creator_id = None
-  - created_at: 이 실행이 쓴 시각
-  - last_used_at: 무시함 — 세션이 기록하는 값이라 이 실행에서는 알 수 없다
-  - identity.canonical_name = 'image-1'
-  - identity.namespace = 'image-1'
-  - identity.architecture = 'x86_64'
-  - metadata.digest = 'sha256:000000000000000000000000000000000000000000000000000000000image-1'
-  - metadata.size_bytes = 0
-  - metadata.created_at: 이 실행이 쓴 시각
-  - metadata.last_used_at: 노드의 last_used_at 필드와 같다
-  - metadata.tags = []
-  - metadata.labels = []
-  - metadata.status = <ImageStatus.DELETED: 'DELETED'>
-  - requirements.supported_accelerators = ['*']
-  - requirements.resource_limits = [ImageResourceLimitGQLInfo(key='cpu', min='1', max='Infinity'), ImageResourceLimitGQLInfo(key='mem', min='1073741824', max='Infinity')]
-
-<a id="forgetting-the-maker-of-a-custom-image-may-forget-it"></a>
-
-#### [the-maker-of-a-custom-image-may-forget-it](/tests/scenario/bai_scenario/manager/image/test_forgetting.py) — pass
-
-자기가 커밋한 커스텀 이미지를 자기 개인 프로젝트의 권한으로 소프트 삭제하면, 이미지가 그 개인 프로젝트에 속하므로 이미지 권한과 커스텀 이미지 작성자 검사를 모두 통과해 삭제됨 상태가 반환된다
-
-Given
-
-- 호출자가 커밋한 커스텀 이미지 1개, 호출자 개인 프로젝트에서 이미지 권한 있음
-  - 도메인 home-1
-  - 컨테이너 레지스트리 host-1: 이미지를 가져오는 곳
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-  - 커밋한 이미지 image-1: 커스터마이즈된 이미지라 소유자가 있다, 그 사람의 개인 프로젝트에 속한다
-  - 프로젝트의 이미지를 다룰 권한을 받은 사용자 준비
-    - 역할 image-keeper-1: 이 역할이 앉은 스코프 안에서만 통한다
-    - 역할 image-keeper-1: image 전체에 READ 허용
-    - 역할 image-keeper-1: image 전체에 SOFT_DELETE 허용
-    - 역할 image-keeper-1: image 전체에 HARD_DELETE 허용
-    - 일반 사용자 user-1: 역할 image-keeper-1 보유
-
-When
-
-- ImageAdapter.admin_forget — user-1이 image-1 소프트 삭제
-
-Then
-
-- 이미지 노드의 모든 필드가 예상값과 일치한다
-  - id: 미리 만들어 둔 이미지의 ID와 같다
-  - name = 'image-1'
-  - image = 'image-1'
-  - registry = 'host-1'
-  - registry_id: 미리 만들어 둔 레지스트리의 ID와 같다
-  - project = None
-  - tag = 'latest'
-  - architecture = 'x86_64'
-  - size_bytes = 0
-  - type = <ImageType.COMPUTE: 'compute'>
-  - status = <ImageStatus.DELETED: 'DELETED'>
-  - labels = []
-  - tags = []
-  - resource_limits = [ImageResourceLimitInfo(key='cpu', min='1', max=None), ImageResourceLimitInfo(key='mem', min='1073741824', max=None)]
-  - accelerators = None
-  - config_digest = 'sha256:000000000000000000000000000000000000000000000000000000000image-1'
-  - is_local = False
-  - customized = True
-  - creator_id: 이미지를 커밋한 사용자의 ID와 같다
-  - created_at: 이 실행이 쓴 시각
-  - last_used_at: 무시함 — 세션이 기록하는 값이라 이 실행에서는 알 수 없다
-  - identity.canonical_name = 'image-1'
-  - identity.namespace = 'image-1'
-  - identity.architecture = 'x86_64'
-  - metadata.digest = 'sha256:000000000000000000000000000000000000000000000000000000000image-1'
-  - metadata.size_bytes = 0
-  - metadata.created_at: 이 실행이 쓴 시각
-  - metadata.last_used_at: 노드의 last_used_at 필드와 같다
-  - metadata.tags = []
-  - metadata.labels = []
-  - metadata.status = <ImageStatus.DELETED: 'DELETED'>
-  - requirements.supported_accelerators = ['*']
-  - requirements.resource_limits = [ImageResourceLimitGQLInfo(key='cpu', min='1', max='Infinity'), ImageResourceLimitGQLInfo(key='mem', min='1073741824', max='Infinity')]
-
-<a id="forgetting-a-granted-user-may-not-forget-an-image-they-did-not-customize"></a>
-
-#### [a-granted-user-may-not-forget-an-image-they-did-not-customize](/tests/scenario/bai_scenario/manager/image/test_forgetting.py) — pass
-
-커스텀 이미지가 아닌 이미지는 권한을 받은 사용자라도 소프트 삭제할 수 없다. 이미지 권한 검사를 통과한 뒤 커스텀 이미지 작성자 검사에서 거부된다
-
-Given
-
-- 커스텀 이미지가 아닌 이미지 1개, 그 이미지에 권한 있음인 사용자 1명
-  - 도메인 home-1
-  - 컨테이너 레지스트리 host-1: 이미지를 가져오는 곳
-  - 이미지 image-1: x86_64 이미지
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-  - 이미지를 다룰 권한을 받은 사용자 준비
-    - 역할 image-keeper-1: 이 역할이 앉은 스코프 안에서만 통한다
-    - 역할 image-keeper-1: image 전체에 READ 허용
-    - 역할 image-keeper-1: image 전체에 SOFT_DELETE 허용
-    - 역할 image-keeper-1: image 전체에 HARD_DELETE 허용
-    - 일반 사용자 user-1: 역할 image-keeper-1 보유
-
-When
-
-- ImageAdapter.admin_forget — user-1이 image-1 소프트 삭제
-
-Then
-
-- 거부된다
-  - 거부: ImageAccessForbiddenError
-
-<a id="forgetting-a-user-granted-nothing-may-not-forget-an-image"></a>
-
-#### [a-user-granted-nothing-may-not-forget-an-image](/tests/scenario/bai_scenario/manager/image/test_forgetting.py) — pass
-
-아무 권한도 받지 않은 사용자가 이미지를 소프트 삭제하려 하면 권한 부족으로 거부된다
-
-Given
-
-- 커스텀 이미지가 아닌 이미지 1개, 아무 권한도 없음인 사용자 1명
-  - 도메인 home-1
-  - 컨테이너 레지스트리 host-1: 이미지를 가져오는 곳
-  - 이미지 image-1: x86_64 이미지
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-
-When
-
-- ImageAdapter.admin_forget — user-1이 image-1 소프트 삭제
-
-Then
-
-- 거부된다
-  - 거부: NotEnoughPermission
-
-<a id="forgetting-a-user-may-not-forget-a-custom-image-another-user-made"></a>
-
-#### [a-user-may-not-forget-a-custom-image-another-user-made](/tests/scenario/bai_scenario/manager/image/test_forgetting.py) — pass
-
-다른 사용자가 커밋한 커스텀 이미지는 그 사람의 개인 프로젝트에 속하므로, 자기 개인 프로젝트에서 권한을 받은 사용자가 소프트 삭제하려 하면 권한 부족으로 거부된다
-
-Given
-
-- 다른 사용자가 커밋한 커스텀 이미지 1개, 호출자는 자기 개인 프로젝트에서만 이미지 권한 있음
-  - 도메인 home-1
-  - 컨테이너 레지스트리 host-1: 이미지를 가져오는 곳
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-    - 사용자 정책 user-policy-2: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
-    - 일반 사용자 user-2: 자기 키와 개인 프로젝트를 갖는다
-  - 커밋한 이미지 image-1: 커스터마이즈된 이미지라 소유자가 있다, 그 사람의 개인 프로젝트에 속한다
-  - 프로젝트의 이미지를 다룰 권한을 받은 사용자 준비
-    - 역할 image-keeper-1: 이 역할이 앉은 스코프 안에서만 통한다
-    - 역할 image-keeper-1: image 전체에 READ 허용
-    - 역할 image-keeper-1: image 전체에 SOFT_DELETE 허용
-    - 역할 image-keeper-1: image 전체에 HARD_DELETE 허용
-    - 일반 사용자 user-2: 역할 image-keeper-1 보유
-
-When
-
-- ImageAdapter.admin_forget — user-2이 image-1 소프트 삭제
-
-Then
-
-- 거부된다
-  - 거부: NotEnoughPermission
-
-<a id="forgetting-an-image-a-purge-is-working-through-cannot-be-reached"></a>
-
-#### [an-image-a-purge-is-working-through-cannot-be-reached](/tests/scenario/bai_scenario/manager/image/test_forgetting.py) — pass
-
-완전 삭제 중인 이미지를 소프트 삭제하려 하면 대상을 찾을 수 없어 거부된다. 그 상태의 이미지는 ID로 조회하는 지점에서 보이지 않는다
-
-Given
-
-- 레지스트리 1개와 그 안의 이미지 1개, 상태는 PURGING, superadmin 1명
-  - 도메인 home-1
-  - 컨테이너 레지스트리 host-1: 이미지를 가져오는 곳
-  - 이미지 image-1: x86_64 이미지, 상태는 PURGING
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
-
-When
-
-- ImageAdapter.admin_forget — user-1이 image-1 소프트 삭제
-
-Then
-
-- 거부된다
-  - 거부: ImageNotFound
-
-<a id="forgetting-forgetting-an-id-that-holds-no-image-is-refused"></a>
-
-#### [forgetting-an-id-that-holds-no-image-is-refused](/tests/scenario/bai_scenario/manager/image/test_forgetting.py) — pass
-
-어느 이미지도 가리키지 않는 ID를 소프트 삭제하려 하면 대상을 찾을 수 없어 거부된다
-
-Given
-
-- 레지스트리 1개와 그 안의 이미지 1개, superadmin 1명
-  - 도메인 home-1
-  - 컨테이너 레지스트리 host-1: 이미지를 가져오는 곳
-  - 이미지 image-1: x86_64 이미지
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
-
-When
-
-- ImageAdapter.admin_forget — user-1이 어느 이미지도 가리키지 않는 ID 소프트 삭제
-
-Then
-
-- 거부된다
-  - 거부: ImageNotFound
-
-<a id="forgetting-turning-enforcement-off-does-not-skip-the-custom-image-creator-check"></a>
-
-#### [turning-enforcement-off-does-not-skip-the-custom-image-creator-check](/tests/scenario/bai_scenario/manager/image/test_forgetting.py) — pass
-
-RBAC 권한 검사를 비활성화해도 커스텀 이미지가 아닌 이미지는 소프트 삭제할 수 없다
-
-Given
-
-- 커스텀 이미지가 아닌 이미지 1개, 아무 권한도 없음인 사용자 1명
-  - 도메인 home-1
-  - 컨테이너 레지스트리 host-1: 이미지를 가져오는 곳
-  - 이미지 image-1: x86_64 이미지
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-
-When
-
-- ImageAdapter.admin_forget — user-1이 image-1 소프트 삭제
-
-Then
-
-- 거부된다
-  - 거부: ImageAccessForbiddenError
 
 ### admin_purge
 
@@ -1772,180 +2742,6 @@ Given
 When
 
 - ImageAdapter.admin_purge — user-1이 어느 이미지도 가리키지 않는 ID 완전 삭제
-
-Then
-
-- 거부된다
-  - 거부: ImageNotFound
-
-### admin_restore
-
-<a id="forgetting-restoring-a-forgotten-image-brings-it-back-alive"></a>
-
-#### [restoring-a-forgotten-image-brings-it-back-alive](/tests/scenario/bai_scenario/manager/image/test_forgetting.py) — pass
-
-슈퍼관리자가 삭제된 이미지를 복원하면 살아 있는 상태가 담긴 노드가 반환된다
-
-Given
-
-- 레지스트리 1개와 그 안의 이미지 1개, 상태는 DELETED, superadmin 1명
-  - 도메인 home-1
-  - 컨테이너 레지스트리 host-1: 이미지를 가져오는 곳
-  - 이미지 image-1: x86_64 이미지, 상태는 DELETED
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
-
-When
-
-- ImageAdapter.admin_restore — user-1이 image-1 복원
-
-Then
-
-- 이미지 노드의 모든 필드가 예상값과 일치한다
-  - id: 미리 만들어 둔 이미지의 ID와 같다
-  - name = 'image-1'
-  - image = 'image-1'
-  - registry = 'host-1'
-  - registry_id: 미리 만들어 둔 레지스트리의 ID와 같다
-  - project = None
-  - tag = 'latest'
-  - architecture = 'x86_64'
-  - size_bytes = 0
-  - type = <ImageType.COMPUTE: 'compute'>
-  - status = <ImageStatus.ALIVE: 'ALIVE'>
-  - labels = []
-  - tags = []
-  - resource_limits = [ImageResourceLimitInfo(key='cpu', min='1', max=None), ImageResourceLimitInfo(key='mem', min='1073741824', max=None)]
-  - accelerators = None
-  - config_digest = 'sha256:000000000000000000000000000000000000000000000000000000000image-1'
-  - is_local = False
-  - customized = False
-  - creator_id = None
-  - created_at: 이 실행이 쓴 시각
-  - last_used_at: 무시함 — 세션이 기록하는 값이라 이 실행에서는 알 수 없다
-  - identity.canonical_name = 'image-1'
-  - identity.namespace = 'image-1'
-  - identity.architecture = 'x86_64'
-  - metadata.digest = 'sha256:000000000000000000000000000000000000000000000000000000000image-1'
-  - metadata.size_bytes = 0
-  - metadata.created_at: 이 실행이 쓴 시각
-  - metadata.last_used_at: 노드의 last_used_at 필드와 같다
-  - metadata.tags = []
-  - metadata.labels = []
-  - metadata.status = <ImageStatus.ALIVE: 'ALIVE'>
-  - requirements.supported_accelerators = ['*']
-  - requirements.resource_limits = [ImageResourceLimitGQLInfo(key='cpu', min='1', max='Infinity'), ImageResourceLimitGQLInfo(key='mem', min='1073741824', max='Infinity')]
-
-<a id="forgetting-restoring-an-image-that-was-never-forgotten-leaves-it-alive"></a>
-
-#### [restoring-an-image-that-was-never-forgotten-leaves-it-alive](/tests/scenario/bai_scenario/manager/image/test_forgetting.py) — pass
-
-살아 있는 이미지를 복원해도 살아 있는 상태 그대로다
-
-Given
-
-- 레지스트리 1개와 그 안의 이미지 1개, superadmin 1명
-  - 도메인 home-1
-  - 컨테이너 레지스트리 host-1: 이미지를 가져오는 곳
-  - 이미지 image-1: x86_64 이미지
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
-
-When
-
-- ImageAdapter.admin_restore — user-1이 image-1 복원
-
-Then
-
-- 이미지 노드의 모든 필드가 예상값과 일치한다
-  - id: 미리 만들어 둔 이미지의 ID와 같다
-  - name = 'image-1'
-  - image = 'image-1'
-  - registry = 'host-1'
-  - registry_id: 미리 만들어 둔 레지스트리의 ID와 같다
-  - project = None
-  - tag = 'latest'
-  - architecture = 'x86_64'
-  - size_bytes = 0
-  - type = <ImageType.COMPUTE: 'compute'>
-  - status = <ImageStatus.ALIVE: 'ALIVE'>
-  - labels = []
-  - tags = []
-  - resource_limits = [ImageResourceLimitInfo(key='cpu', min='1', max=None), ImageResourceLimitInfo(key='mem', min='1073741824', max=None)]
-  - accelerators = None
-  - config_digest = 'sha256:000000000000000000000000000000000000000000000000000000000image-1'
-  - is_local = False
-  - customized = False
-  - creator_id = None
-  - created_at: 이 실행이 쓴 시각
-  - last_used_at: 무시함 — 세션이 기록하는 값이라 이 실행에서는 알 수 없다
-  - identity.canonical_name = 'image-1'
-  - identity.namespace = 'image-1'
-  - identity.architecture = 'x86_64'
-  - metadata.digest = 'sha256:000000000000000000000000000000000000000000000000000000000image-1'
-  - metadata.size_bytes = 0
-  - metadata.created_at: 이 실행이 쓴 시각
-  - metadata.last_used_at: 노드의 last_used_at 필드와 같다
-  - metadata.tags = []
-  - metadata.labels = []
-  - metadata.status = <ImageStatus.ALIVE: 'ALIVE'>
-  - requirements.supported_accelerators = ['*']
-  - requirements.resource_limits = [ImageResourceLimitGQLInfo(key='cpu', min='1', max='Infinity'), ImageResourceLimitGQLInfo(key='mem', min='1073741824', max='Infinity')]
-
-<a id="forgetting-a-user-granted-nothing-may-not-restore-an-image"></a>
-
-#### [a-user-granted-nothing-may-not-restore-an-image](/tests/scenario/bai_scenario/manager/image/test_forgetting.py) — pass
-
-아무 권한도 받지 않은 사용자가 이미지를 복원하려 하면 권한 부족으로 거부된다
-
-Given
-
-- 커스텀 이미지가 아닌 이미지 1개, 아무 권한도 없음인 사용자 1명
-  - 도메인 home-1
-  - 컨테이너 레지스트리 host-1: 이미지를 가져오는 곳
-  - 이미지 image-1: x86_64 이미지
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-
-When
-
-- ImageAdapter.admin_restore — user-1이 image-1 복원
-
-Then
-
-- 거부된다
-  - 거부: NotEnoughPermission
-
-<a id="forgetting-restoring-an-id-that-holds-no-image-is-refused"></a>
-
-#### [restoring-an-id-that-holds-no-image-is-refused](/tests/scenario/bai_scenario/manager/image/test_forgetting.py) — pass
-
-어느 이미지도 가리키지 않는 ID를 복원하려 하면 대상을 찾을 수 없어 거부된다
-
-Given
-
-- 레지스트리 1개와 그 안의 이미지 1개, superadmin 1명
-  - 도메인 home-1
-  - 컨테이너 레지스트리 host-1: 이미지를 가져오는 곳
-  - 이미지 image-1: x86_64 이미지
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
-
-When
-
-- ImageAdapter.admin_restore — user-1이 어느 이미지도 가리키지 않는 ID 복원
 
 Then
 
@@ -2270,414 +3066,4 @@ Then
 
 - 거부된다
   - 거부: InsufficientPrivilege
-
-### admin_update
-
-<a id="editing-an-edit-that-names-no-value-changes-nothing"></a>
-
-#### [an-edit-that-names-no-value-changes-nothing](/tests/scenario/bai_scenario/manager/image/test_editing.py) — pass
-
-슈퍼관리자가 값을 하나도 지정하지 않고 수정하면 아무것도 바뀌지 않은 노드가 반환된다
-
-Given
-
-- 레지스트리 1개와 그 안의 이미지 1개, superadmin 1명
-  - 도메인 home-1
-  - 컨테이너 레지스트리 host-1: 이미지를 가져오는 곳
-  - 이미지 image-1: x86_64 이미지
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
-
-When
-
-- ImageAdapter.admin_update — user-1이 값을 하나도 지정하지 않고 수정
-
-Then
-
-- 이미지 노드의 모든 필드가 예상값과 일치한다
-  - id: 미리 만들어 둔 이미지의 ID와 같다
-  - name = 'image-1'
-  - image = 'image-1'
-  - registry = 'host-1'
-  - registry_id: 미리 만들어 둔 레지스트리의 ID와 같다
-  - project = None
-  - tag = 'latest'
-  - architecture = 'x86_64'
-  - size_bytes = 0
-  - type = <ImageType.COMPUTE: 'compute'>
-  - status = <ImageStatus.ALIVE: 'ALIVE'>
-  - labels = []
-  - tags = []
-  - resource_limits = [ImageResourceLimitInfo(key='cpu', min='1', max=None), ImageResourceLimitInfo(key='mem', min='1073741824', max=None)]
-  - accelerators = None
-  - config_digest = 'sha256:000000000000000000000000000000000000000000000000000000000image-1'
-  - is_local = False
-  - customized = False
-  - creator_id = None
-  - created_at: 이 실행이 쓴 시각
-  - last_used_at: 무시함 — 세션이 기록하는 값이라 이 실행에서는 알 수 없다
-  - identity.canonical_name = 'image-1'
-  - identity.namespace = 'image-1'
-  - identity.architecture = 'x86_64'
-  - metadata.digest = 'sha256:000000000000000000000000000000000000000000000000000000000image-1'
-  - metadata.size_bytes = 0
-  - metadata.created_at: 이 실행이 쓴 시각
-  - metadata.last_used_at: 노드의 last_used_at 필드와 같다
-  - metadata.tags = []
-  - metadata.labels = []
-  - metadata.status = <ImageStatus.ALIVE: 'ALIVE'>
-  - requirements.supported_accelerators = ['*']
-  - requirements.resource_limits = [ImageResourceLimitGQLInfo(key='cpu', min='1', max='Infinity'), ImageResourceLimitGQLInfo(key='mem', min='1073741824', max='Infinity')]
-
-<a id="editing-changing-labels-and-resource-limits-returns-the-new-values"></a>
-
-#### [changing-labels-and-resource-limits-returns-the-new-values](/tests/scenario/bai_scenario/manager/image/test_editing.py) — pass
-
-슈퍼관리자가 레이블과 CPU 하한·상한을 수정하면 지정한 값이 반환된다
-
-Given
-
-- 레지스트리 1개와 그 안의 이미지 1개, superadmin 1명
-  - 도메인 home-1
-  - 컨테이너 레지스트리 host-1: 이미지를 가져오는 곳
-  - 이미지 image-1: x86_64 이미지
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
-
-When
-
-- ImageAdapter.admin_update — user-1이 image-1의 여러 필드를 함께 수정
-
-Then
-
-- 이미지 노드의 모든 필드가 예상값과 일치한다
-  - id: 미리 만들어 둔 이미지의 ID와 같다
-  - name = 'image-1'
-  - image = 'image-1'
-  - registry = 'host-1'
-  - registry_id: 미리 만들어 둔 레지스트리의 ID와 같다
-  - project = None
-  - tag = 'latest'
-  - architecture = 'x86_64'
-  - size_bytes = 0
-  - type = <ImageType.COMPUTE: 'compute'>
-  - status = <ImageStatus.ALIVE: 'ALIVE'>
-  - labels = [ImageLabelInfo(key='purpose', value='scenario')]
-  - tags = []
-  - resource_limits = [ImageResourceLimitInfo(key='cpu', min='2', max='4'), ImageResourceLimitInfo(key='mem', min='1073741824', max=None)]
-  - accelerators = None
-  - config_digest = 'sha256:000000000000000000000000000000000000000000000000000000000image-1'
-  - is_local = False
-  - customized = False
-  - creator_id = None
-  - created_at: 이 실행이 쓴 시각
-  - last_used_at: 무시함 — 세션이 기록하는 값이라 이 실행에서는 알 수 없다
-  - identity.canonical_name = 'image-1'
-  - identity.namespace = 'image-1'
-  - identity.architecture = 'x86_64'
-  - metadata.digest = 'sha256:000000000000000000000000000000000000000000000000000000000image-1'
-  - metadata.size_bytes = 0
-  - metadata.created_at: 이 실행이 쓴 시각
-  - metadata.last_used_at: 노드의 last_used_at 필드와 같다
-  - metadata.tags = []
-  - metadata.labels = [ImageLabelInfo(key='purpose', value='scenario')]
-  - metadata.status = <ImageStatus.ALIVE: 'ALIVE'>
-  - requirements.supported_accelerators = ['*']
-  - requirements.resource_limits = [ImageResourceLimitGQLInfo(key='cpu', min='2', max='4'), ImageResourceLimitGQLInfo(key='mem', min='1073741824', max='Infinity')]
-
-<a id="editing-changing-only-the-tag-leaves-every-other-field-alone"></a>
-
-#### [changing-only-the-tag-leaves-every-other-field-alone](/tests/scenario/bai_scenario/manager/image/test_editing.py) — pass
-
-슈퍼관리자가 태그만 수정하면 태그만 새 값이 되고 나머지 필드는 그대로다
-
-Given
-
-- 레지스트리 1개와 그 안의 이미지 1개, superadmin 1명
-  - 도메인 home-1
-  - 컨테이너 레지스트리 host-1: 이미지를 가져오는 곳
-  - 이미지 image-1: x86_64 이미지
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
-
-When
-
-- ImageAdapter.admin_update — user-1이 image-1의 태그를 moved로 수정
-
-Then
-
-- 이미지 노드의 모든 필드가 예상값과 일치한다
-  - id: 미리 만들어 둔 이미지의 ID와 같다
-  - name = 'image-1'
-  - image = 'image-1'
-  - registry = 'host-1'
-  - registry_id: 미리 만들어 둔 레지스트리의 ID와 같다
-  - project = None
-  - tag = 'moved'
-  - architecture = 'x86_64'
-  - size_bytes = 0
-  - type = <ImageType.COMPUTE: 'compute'>
-  - status = <ImageStatus.ALIVE: 'ALIVE'>
-  - labels = []
-  - tags = []
-  - resource_limits = [ImageResourceLimitInfo(key='cpu', min='1', max=None), ImageResourceLimitInfo(key='mem', min='1073741824', max=None)]
-  - accelerators = None
-  - config_digest = 'sha256:000000000000000000000000000000000000000000000000000000000image-1'
-  - is_local = False
-  - customized = False
-  - creator_id = None
-  - created_at: 이 실행이 쓴 시각
-  - last_used_at: 무시함 — 세션이 기록하는 값이라 이 실행에서는 알 수 없다
-  - identity.canonical_name = 'image-1'
-  - identity.namespace = 'image-1'
-  - identity.architecture = 'x86_64'
-  - metadata.digest = 'sha256:000000000000000000000000000000000000000000000000000000000image-1'
-  - metadata.size_bytes = 0
-  - metadata.created_at: 이 실행이 쓴 시각
-  - metadata.last_used_at: 노드의 last_used_at 필드와 같다
-  - metadata.tags = []
-  - metadata.labels = []
-  - metadata.status = <ImageStatus.ALIVE: 'ALIVE'>
-  - requirements.supported_accelerators = ['*']
-  - requirements.resource_limits = [ImageResourceLimitGQLInfo(key='cpu', min='1', max='Infinity'), ImageResourceLimitGQLInfo(key='mem', min='1073741824', max='Infinity')]
-
-<a id="editing-changing-the-remaining-scalar-fields-returns-the-new-values"></a>
-
-#### [changing-the-remaining-scalar-fields-returns-the-new-values](/tests/scenario/bai_scenario/manager/image/test_editing.py) — pass
-
-슈퍼관리자가 이름과 레지스트리 등의 기본 필드를 함께 수정하면 지정한 값이 반환된다
-
-Given
-
-- 레지스트리 1개와 그 안의 이미지 1개, superadmin 1명
-  - 도메인 home-1
-  - 컨테이너 레지스트리 host-1: 이미지를 가져오는 곳
-  - 이미지 image-1: x86_64 이미지
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
-
-When
-
-- ImageAdapter.admin_update — user-1이 image-1의 여러 필드를 함께 수정
-
-Then
-
-- 이미지 노드의 모든 필드가 예상값과 일치한다
-  - id: 미리 만들어 둔 이미지의 ID와 같다
-  - name = 'updated-image'
-  - image = 'team/updated-image'
-  - registry = 'updated.example.com'
-  - registry_id: 미리 만들어 둔 레지스트리의 ID와 같다
-  - project = None
-  - tag = 'latest'
-  - architecture = 'aarch64'
-  - size_bytes = 2048
-  - type = <ImageType.SERVICE: 'service'>
-  - status = <ImageStatus.ALIVE: 'ALIVE'>
-  - labels = []
-  - tags = []
-  - resource_limits = [ImageResourceLimitInfo(key='cpu', min='1', max=None), ImageResourceLimitInfo(key='mem', min='1073741824', max=None)]
-  - accelerators = None
-  - config_digest = 'sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff'
-  - is_local = True
-  - customized = False
-  - creator_id = None
-  - created_at: 이 실행이 쓴 시각
-  - last_used_at: 무시함 — 세션이 기록하는 값이라 이 실행에서는 알 수 없다
-  - identity.canonical_name = 'updated-image'
-  - identity.namespace = 'team/updated-image'
-  - identity.architecture = 'aarch64'
-  - metadata.digest = 'sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff'
-  - metadata.size_bytes = 2048
-  - metadata.created_at: 이 실행이 쓴 시각
-  - metadata.last_used_at: 노드의 last_used_at 필드와 같다
-  - metadata.tags = []
-  - metadata.labels = []
-  - metadata.status = <ImageStatus.ALIVE: 'ALIVE'>
-  - requirements.supported_accelerators = ['*']
-  - requirements.resource_limits = [ImageResourceLimitGQLInfo(key='cpu', min='1', max='Infinity'), ImageResourceLimitGQLInfo(key='mem', min='1073741824', max='Infinity')]
-
-<a id="editing-clearing-the-accelerator-list-empties-it"></a>
-
-#### [clearing-the-accelerator-list-empties-it](/tests/scenario/bai_scenario/manager/image/test_editing.py) — pass
-
-슈퍼관리자가 가속기 목록을 비우는 수정을 하면 그 필드가 빈 채로 반환된다. 생략과 비우기를 구분할 수 있는 필드는 이것뿐이다
-
-Given
-
-- 레지스트리 1개와 그 안의 이미지 1개, superadmin 1명
-  - 도메인 home-1
-  - 컨테이너 레지스트리 host-1: 이미지를 가져오는 곳
-  - 이미지 image-1: x86_64 이미지, 가속기는 cuda
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
-
-When
-
-- ImageAdapter.admin_update — user-1이 image-1의 가속기 목록을 비움
-
-Then
-
-- 이미지 노드의 모든 필드가 예상값과 일치한다
-  - id: 미리 만들어 둔 이미지의 ID와 같다
-  - name = 'image-1'
-  - image = 'image-1'
-  - registry = 'host-1'
-  - registry_id: 미리 만들어 둔 레지스트리의 ID와 같다
-  - project = None
-  - tag = 'latest'
-  - architecture = 'x86_64'
-  - size_bytes = 0
-  - type = <ImageType.COMPUTE: 'compute'>
-  - status = <ImageStatus.ALIVE: 'ALIVE'>
-  - labels = []
-  - tags = []
-  - resource_limits = [ImageResourceLimitInfo(key='cpu', min='1', max=None), ImageResourceLimitInfo(key='mem', min='1073741824', max=None)]
-  - accelerators = None
-  - config_digest = 'sha256:000000000000000000000000000000000000000000000000000000000image-1'
-  - is_local = False
-  - customized = False
-  - creator_id = None
-  - created_at: 이 실행이 쓴 시각
-  - last_used_at: 무시함 — 세션이 기록하는 값이라 이 실행에서는 알 수 없다
-  - identity.canonical_name = 'image-1'
-  - identity.namespace = 'image-1'
-  - identity.architecture = 'x86_64'
-  - metadata.digest = 'sha256:000000000000000000000000000000000000000000000000000000000image-1'
-  - metadata.size_bytes = 0
-  - metadata.created_at: 이 실행이 쓴 시각
-  - metadata.last_used_at: 노드의 last_used_at 필드와 같다
-  - metadata.tags = []
-  - metadata.labels = []
-  - metadata.status = <ImageStatus.ALIVE: 'ALIVE'>
-  - requirements.supported_accelerators = ['*']
-  - requirements.resource_limits = [ImageResourceLimitGQLInfo(key='cpu', min='1', max='Infinity'), ImageResourceLimitGQLInfo(key='mem', min='1073741824', max='Infinity')]
-
-<a id="editing-writing-an-accelerator-onto-an-image-that-had-none"></a>
-
-#### [writing-an-accelerator-onto-an-image-that-had-none](/tests/scenario/bai_scenario/manager/image/test_editing.py) — pass
-
-슈퍼관리자가 가속기 이름을 지정하면 그 이름이 담긴 노드가 반환된다
-
-Given
-
-- 레지스트리 1개와 그 안의 이미지 1개, superadmin 1명
-  - 도메인 home-1
-  - 컨테이너 레지스트리 host-1: 이미지를 가져오는 곳
-  - 이미지 image-1: x86_64 이미지
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
-
-When
-
-- ImageAdapter.admin_update — user-1이 image-1의 가속기 목록을 cuda로 지정
-
-Then
-
-- 이미지 노드의 모든 필드가 예상값과 일치한다
-  - id: 미리 만들어 둔 이미지의 ID와 같다
-  - name = 'image-1'
-  - image = 'image-1'
-  - registry = 'host-1'
-  - registry_id: 미리 만들어 둔 레지스트리의 ID와 같다
-  - project = None
-  - tag = 'latest'
-  - architecture = 'x86_64'
-  - size_bytes = 0
-  - type = <ImageType.COMPUTE: 'compute'>
-  - status = <ImageStatus.ALIVE: 'ALIVE'>
-  - labels = []
-  - tags = []
-  - resource_limits = [ImageResourceLimitInfo(key='cpu', min='1', max=None), ImageResourceLimitInfo(key='mem', min='1073741824', max=None)]
-  - accelerators = 'cuda'
-  - config_digest = 'sha256:000000000000000000000000000000000000000000000000000000000image-1'
-  - is_local = False
-  - customized = False
-  - creator_id = None
-  - created_at: 이 실행이 쓴 시각
-  - last_used_at: 무시함 — 세션이 기록하는 값이라 이 실행에서는 알 수 없다
-  - identity.canonical_name = 'image-1'
-  - identity.namespace = 'image-1'
-  - identity.architecture = 'x86_64'
-  - metadata.digest = 'sha256:000000000000000000000000000000000000000000000000000000000image-1'
-  - metadata.size_bytes = 0
-  - metadata.created_at: 이 실행이 쓴 시각
-  - metadata.last_used_at: 노드의 last_used_at 필드와 같다
-  - metadata.tags = []
-  - metadata.labels = []
-  - metadata.status = <ImageStatus.ALIVE: 'ALIVE'>
-  - requirements.supported_accelerators = ['cuda']
-  - requirements.resource_limits = [ImageResourceLimitGQLInfo(key='cpu', min='1', max='Infinity'), ImageResourceLimitGQLInfo(key='mem', min='1073741824', max='Infinity')]
-
-<a id="editing-a-user-who-is-not-the-superadmin-may-not-edit-an-image"></a>
-
-#### [a-user-who-is-not-the-superadmin-may-not-edit-an-image](/tests/scenario/bai_scenario/manager/image/test_editing.py) — pass
-
-슈퍼관리자가 아닌 사용자가 이미지를 수정하려 하면 슈퍼관리자 권한 부족으로 거부된다
-
-Given
-
-- 레지스트리 1개와 그 안의 이미지 1개, user 1명
-  - 도메인 home-1
-  - 컨테이너 레지스트리 host-1: 이미지를 가져오는 곳
-  - 이미지 image-1: x86_64 이미지
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-
-When
-
-- ImageAdapter.admin_update — user-1이 image-1의 태그를 moved로 수정
-
-Then
-
-- 거부된다
-  - 거부: InsufficientPrivilege
-
-<a id="editing-editing-an-id-that-holds-no-image-is-refused"></a>
-
-#### [editing-an-id-that-holds-no-image-is-refused](/tests/scenario/bai_scenario/manager/image/test_editing.py) — pass
-
-어느 이미지도 가리키지 않는 ID를 수정하려 하면 대상을 찾을 수 없어 거부된다
-
-Given
-
-- 레지스트리 1개와 그 안의 이미지 1개, superadmin 1명
-  - 도메인 home-1
-  - 컨테이너 레지스트리 host-1: 이미지를 가져오는 곳
-  - 이미지 image-1: x86_64 이미지
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
-
-When
-
-- ImageAdapter.admin_update — user-1이 어느 이미지도 가리키지 않는 ID 수정
-
-Then
-
-- 거부된다
-  - 거부: ImageNotFound
 

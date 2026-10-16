@@ -8,8 +8,8 @@ generated:
   by: claude-code/opus-5
   at: 2026-09-10
 updated:
-  by: claude-code/fable-5.1
-  at: 2026-10-13
+  by: claude-code/opus-5.5
+  at: 2026-10-16
 status: draft
 ---
 # entity_label 어댑터 — 시나리오
@@ -24,6 +24,9 @@ status: draft
 호출은 여섯이다. 하나를 설정, 여럿을 설정, 하나를 삭제, 여럿을 삭제, 이름 지은 엔티티들의
 라벨 검색, 이미 손에 든 엔티티 하나의 라벨 검색. 단건 쓰기는 통째로 답하거나 통째로 거부되고,
 일괄 쓰기는 엔티티마다 또는 라벨마다 따로 답한다.
+
+여럿을 설정, 여럿을 삭제는 이름이 복수인 GQL mutation 과 `partial-bulk-` 로 시작하는 REST 경로로
+부른다. 단수 이름의 mutation 과 `bulk-` 경로는 deprecated 이고 같은 호출로 잇는다.
 
 엔티티 타입은 배선된 것만 이름 지을 수 있다. 배선되지 않은 타입을 든 요청은 어느 호출이든
 잘못된 요청으로 통째로 거부된다. 일괄 쓰기도 예외가 아니다. 그것은 엔티티 하나의 결과가 아니라
