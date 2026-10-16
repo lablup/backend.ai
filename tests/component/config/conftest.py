@@ -68,6 +68,7 @@ from ai.backend.manager.repositories.rbac.permission_check_repository import (
 from ai.backend.manager.repositories.user.repository import UserRepository
 from ai.backend.manager.secret.pool import KeyProviderPool
 from ai.backend.manager.secret.types import SecretValue
+from ai.backend.manager.services.auth.processors import AuthProcessors
 from ai.backend.manager.services.domain.processors import DomainProcessors
 from ai.backend.manager.services.domain.service import DomainService
 from ai.backend.manager.services.project.processors import ProjectProcessors
@@ -139,6 +140,7 @@ def server_module_registries(
     route_deps: RouteDeps,
     database_engine: ExtendedAsyncSAEngine,
     config_registry: ProcessorRegistry[Any],
+    auth_processors: AuthProcessors,
 ) -> list[RouteRegistry]:
     """Load only the modules required for config-domain tests."""
     v2_ops = V2DBOpsProvider(database_engine)
@@ -184,7 +186,7 @@ def server_module_registries(
     return [
         register_groupconfig_routes(GroupConfigHandler(project=project), route_deps),
         register_userconfig_routes(
-            UserConfigHandler(user=user, user_config=UserConfigAdapter(user)),
+            UserConfigHandler(auth=auth_processors, user=user, user_config=UserConfigAdapter(user)),
             route_deps,
         ),
         register_domainconfig_routes(DomainConfigHandler(domain=domain), route_deps),
@@ -355,6 +357,30 @@ async def non_default_user_access_key(
     yield access_key
     async with db_engine.begin() as conn:
         await conn.execute(sa.delete(KeyPairRow).where(KeyPairRow.access_key == access_key))
+
+
+@pytest.fixture
+async def regular_user_reads_admin(
+    database_engine: ExtendedAsyncSAEngine,
+    regular_user_fixture: UserFixture,
+    admin_user_fixture: UserFixture,
+) -> None:
+    async with database_engine.begin_session() as session:
+        await VirtualEntitySeeder().provision(
+            session, UserEntityType(), admin_user_fixture.user_uuid
+        )
+        role = RoleRow(
+            name=f"read-admin-{regular_user_fixture.user_uuid}",
+            status=RoleStatus.ACTIVE,
+            scope_type=UserEntityType(),
+            scope_id=admin_user_fixture.user_uuid,
+        )
+        session.add(role)
+        await session.flush()
+        session.add(
+            PermissionRow(role_id=role.id, entity_type=UserEntityType(), permission=Permission.READ)
+        )
+        session.add(UserRoleRow(user_id=regular_user_fixture.user_uuid, role_id=role.id))
 
 
 @pytest.fixture
