@@ -873,7 +873,7 @@ class AbstractAgent[
     # Health monitoring tracking
     _active_pulls: dict[str, PullTaskInfo]  # key: image canonical name
     _active_creates: dict[KernelId, CreateTaskInfo]
-    # Kernels whose creation failure was already reported by `create_kernel` itself.
+    # Kernels registered by an ongoing `create_kernel`, which reports their failures itself.
     reported_creation_failures: set[KernelId]
 
     @contextmanager
@@ -2974,6 +2974,8 @@ class AbstractAgent[
                     kernel_obj.session_type = kernel_config["session_type"]
                     async with self.registry_lock:
                         self.kernel_registry[kernel_id] = kernel_obj
+                    if not restarting:
+                        self.reported_creation_failures.add(kernel_id)
                     log.debug("kernel container starting")
                     try:
                         container_data = await ctx.start_container(
@@ -3011,18 +3013,17 @@ class AbstractAgent[
                     log.debug(
                         "kernel container started", container_id=container_data.get("container_id")
                     )
+                    async with self.registry_lock:
+                        self.kernel_registry[kernel_id].data.update(container_data)
+                        if "container_id" in container_data:
+                            self.kernel_registry[kernel_id].set_container_id(
+                                container_data["container_id"]
+                            )
                     try:
-                        async with self.registry_lock:
-                            self.kernel_registry[kernel_id].data.update(container_data)
-                            if "container_id" in container_data:
-                                self.kernel_registry[kernel_id].set_container_id(
-                                    container_data["container_id"]
-                                )
                         await kernel_obj.init(self.event_producer)
-                    except BaseException:
+                    except (Exception, asyncio.CancelledError):
                         # The polling below reports its own failures; this covers the gap before it,
                         # so the manager does not wait for the create timeout.
-                        self.reported_creation_failures.add(kernel_id)
                         await self.inject_container_lifecycle_event(
                             kernel_id,
                             session_id,

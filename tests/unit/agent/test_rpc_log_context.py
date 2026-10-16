@@ -380,6 +380,42 @@ class TestCreateKernels:
             agent.inject_container_lifecycle_event.assert_not_awaited()
         assert kernel_id not in agent.reported_creation_failures
 
+    @pytest.mark.parametrize(
+        ("error", "entry_kept"),
+        [
+            (KernelCreationInProgressError("Kernel creation already in progress"), True),
+            (RuntimeError("rejected"), False),
+        ],
+        ids=["duplicate-rpc", "other-failure"],
+    )
+    async def test_reported_entry_is_discarded_unless_creation_was_refused(
+        self, error: Exception, entry_kept: bool
+    ) -> None:
+        session_id = uuid.uuid4()
+        kernel_id = KernelId(uuid.uuid4())
+        agent = MagicMock()
+        agent.id = PRIMARY_AGENT_ID
+        agent.local_config.agent.kernel_creation_concurrency = 1
+        agent.kernel_registry = {}
+        # The ongoing creation registered the kernel and owns its failure reporting.
+        agent.reported_creation_failures = {kernel_id}
+        agent.create_kernel = AsyncMock(side_effect=error)
+        agent.inject_container_lifecycle_event = AsyncMock()
+        image_ref = MagicMock()
+        image_ref.canonical = "cr.backend.ai/stable/python:latest"
+
+        with pytest.raises(type(error)):
+            await AgentRPCServer.create_kernels(
+                _server(agent),
+                _request(
+                    "create_kernels",
+                    (str(session_id), [str(kernel_id)], [{}], {}, {kernel_id: image_ref}),
+                ),
+            )
+
+        agent.inject_container_lifecycle_event.assert_not_awaited()
+        assert (kernel_id in agent.reported_creation_failures) is entry_kept
+
     async def test_failure_outside_kernels_is_logged_once(
         self, capture: pytest.LogCaptureFixture
     ) -> None:

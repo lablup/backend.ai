@@ -834,6 +834,7 @@ class AgentRPCServer(aobject):
                 session_id=ownership_data.session_id, kernel_id=ownership_data.kernel_id
             ):
                 log.debug("kernel creating", image_name=kernel_image.canonical)
+                refused = False
                 try:
                     return await agent.create_kernel(
                         ownership_data,
@@ -842,7 +843,11 @@ class AgentRPCServer(aobject):
                         cluster_info,
                         throttle_sema=throttle_sema,
                     )
-                except (TimeoutError, asyncio.CancelledError, KernelCreationInProgressError):
+                except KernelCreationInProgressError:
+                    # The ongoing creation owns the entry.
+                    refused = True
+                    raise
+                except (TimeoutError, asyncio.CancelledError):
                     raise
                 except (ImagePullTimeoutError, ImagePullFailedError) as e:
                     log.trace("kernel image pull failed", error_repr=repr(e))
@@ -863,7 +868,8 @@ class AgentRPCServer(aobject):
                         )
                     raise
                 finally:
-                    agent.reported_creation_failures.discard(ownership_data.kernel_id)
+                    if not refused:
+                        agent.reported_creation_failures.discard(ownership_data.kernel_id)
 
         # Failures raised by `_create_kernel` are logged in their kernel scope; this logs the rest.
         try:
