@@ -911,6 +911,11 @@
 # management parameters.
 # Added in 25.8.0
 [session]
+  # Maximum time in seconds the manager waits for the kernel creation of a
+  # single session to complete after it leaves the PREPARED state. Increase for
+  # large images or slow agents; the default is 30 minutes.
+  # Added in 26.10.0
+  start-timeout = 1800.0
 
   # Configuration for detecting and handling hung sessions. Controls how the
   # system identifies sessions stuck in transitional states and what recovery
