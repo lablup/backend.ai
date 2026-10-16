@@ -131,8 +131,7 @@ class TestUserDotfileGet:
         assert isinstance(result, ListDotfilesResponse)
         # List response is a plain array (via BaseRootResponseModel)
         paths = [item.path for item in result.root]
-        assert f".list-a-{unique1}" in paths
-        assert f".list-b-{unique2}" in paths
+        assert paths.index(f".list-a-{unique1}") < paths.index(f".list-b-{unique2}")
 
     async def test_list_user_dotfiles_returns_plain_array_json(
         self,

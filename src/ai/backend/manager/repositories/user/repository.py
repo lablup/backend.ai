@@ -38,10 +38,12 @@ from ai.backend.manager.errors.storage import DotfileCreationFailed, DotfileNotF
 from ai.backend.manager.errors.user import KeyPairNotFound
 from ai.backend.manager.models.bootstrap_script.queriers import BootstrapScriptQuerier
 from ai.backend.manager.models.bootstrap_script.updaters import DefaultBootstrapScriptUpdater
+from ai.backend.manager.models.dotfile.conditions import DotfileConditions
 from ai.backend.manager.models.dotfile.creators import DotfileEntryCreator
 from ai.backend.manager.models.dotfile.purgers import DefaultDotfilePurger, DotfileEntryPurger
 from ai.backend.manager.models.dotfile.queriers import DotfileQuerier
-from ai.backend.manager.models.dotfile.searchers import DefaultDotfileSearcher
+from ai.backend.manager.models.dotfile.row import DotfileRow
+from ai.backend.manager.models.dotfile.searchers import DotfileSearcher
 from ai.backend.manager.models.dotfile.updaters import DefaultDotfileUpdater, DotfileEntryUpdater
 from ai.backend.manager.models.keypair.creators import KeypairCreator
 from ai.backend.manager.models.keypair.purgers import NonDefaultKeypairPurger
@@ -416,7 +418,15 @@ class UserRepository:
 
     async def _default_dotfiles(self, ops: V2ReadOps, user_id: UserID) -> DotfileEntries:
         result = await ops.search_in_global(
-            DefaultDotfileSearcher(entity=user_id, pagination=NoPagination())
+            DotfileSearcher(
+                pagination=NoPagination(),
+                conditions=[
+                    DotfileConditions.by_entity(user_id),
+                    DotfileConditions.by_is_default(True),
+                ],
+                # Migrated rows share created_at; id keeps their original order.
+                orders=[DotfileRow.created_at.asc(), DotfileRow.id.asc()],
+            )
         )
         return DotfileEntries(
             tuple(DotfileEntry(row.path, row.perm, row.data) for row in result.items)
