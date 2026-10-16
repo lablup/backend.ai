@@ -52,6 +52,7 @@ from zmq.auth.certs import load_certificate
 
 from ai.backend.agent.errors import (
     AgentInitializationError,
+    KernelCreationInProgressError,
     ResourceError,
 )
 from ai.backend.agent.errors.agent import (
@@ -841,7 +842,7 @@ class AgentRPCServer(aobject):
                         cluster_info,
                         throttle_sema=throttle_sema,
                     )
-                except (TimeoutError, asyncio.CancelledError, ResourceError):
+                except (TimeoutError, asyncio.CancelledError, KernelCreationInProgressError):
                     raise
                 except (ImagePullTimeoutError, ImagePullFailedError) as e:
                     log.trace("kernel image pull failed", error_repr=repr(e))

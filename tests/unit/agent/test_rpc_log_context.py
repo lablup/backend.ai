@@ -15,7 +15,7 @@ from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanE
 from opentelemetry.trace import SpanContext, SpanKind
 from pydantic import ValidationError
 
-from ai.backend.agent.errors import ResourceError
+from ai.backend.agent.errors import KernelCreationInProgressError, ResourceError
 from ai.backend.agent.errors.agent import ImagePullFailedError, ImagePullTimeoutError
 from ai.backend.agent.rpc.context import with_rpc_context, with_rpc_trace
 from ai.backend.agent.rpc.middlewares.tracing import build_tracing_middleware
@@ -301,7 +301,8 @@ class TestCreateKernels:
         [
             (False, RuntimeError("rejected"), True),
             (True, RuntimeError("rejected"), False),
-            (False, ResourceError("Kernel creation already in progress"), False),
+            (False, KernelCreationInProgressError("Kernel creation already in progress"), False),
+            (False, ResourceError("allocation failed"), True),
             (False, TimeoutError(), False),
         ],
     )

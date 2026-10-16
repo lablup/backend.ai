@@ -251,6 +251,7 @@ from .errors import (
     ContainerStartupTimeoutError,
     ImageArchitectureMismatchError,
     ImagePullTimeoutError,
+    KernelCreationInProgressError,
     ModelDefinitionEmptyError,
     ModelDefinitionNotFoundError,
     ModelFolderNotSpecifiedError,
@@ -2583,7 +2584,7 @@ class AbstractAgent[
         with self.track_create(kernel_id, session_id) as should_proceed:
             if not should_proceed:
                 log.debug("kernel creation already in progress")
-                raise ResourceError("Kernel creation already in progress")
+                raise KernelCreationInProgressError("Kernel creation already in progress")
 
             if throttle_sema is None:
                 # make a local semaphore

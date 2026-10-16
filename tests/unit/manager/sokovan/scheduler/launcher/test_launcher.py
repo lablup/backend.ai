@@ -327,6 +327,7 @@ class TestSessionLauncherKernelCreation:
         launcher: SessionLauncher,
         mock_agent_client_pool: MagicMock,
         mock_repository: AsyncMock,
+        mock_valkey_schedule: AsyncMock,
         session_for_start_single_kernel: SessionDataForStart,
         image_config_default: dict[UUID, ImageConfigData],
     ) -> None:
@@ -342,6 +343,7 @@ class TestSessionLauncherKernelCreation:
                 image_config_default,
             )
 
+        mock_valkey_schedule.record_session_failed_agents.assert_awaited_once()
         mock_repository.update_session_error_info.assert_awaited_once()
         session_id, error_info = mock_repository.update_session_error_info.await_args.args
         assert session_id == session_for_start_single_kernel.session_id

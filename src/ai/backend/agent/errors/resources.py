@@ -35,6 +35,13 @@ class ResourceError(BackendAIError, web.HTTPBadRequest):
         )
 
 
+class KernelCreationInProgressError(ResourceError):
+    """Raised when a kernel creation request arrives while the same kernel is being created."""
+
+    error_type = "https://api.backend.ai/probs/agent/kernel-creation-in-progress"
+    error_title = "Kernel creation already in progress."
+
+
 class UnsupportedResource(ResourceError):
     """Raised when a requested resource slot is not supported."""
 

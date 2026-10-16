@@ -438,14 +438,6 @@ class SessionLauncher:
                         log.error("kernel creation failed on agent", agent_id=aid, exc_info=result)
                         failed_agent_ids.append(aid)
                         first_failure = first_failure or result
-                if first_failure is not None:
-                    # Keep the agent's reason on the session; the agent terminates the kernels.
-                    await self._repository.update_session_error_info(
-                        session.session_id,
-                        convert_to_status_data(
-                            first_failure, self._config_provider.config.debug.enabled
-                        ),
-                    )
                 if failed_agent_ids:
                     try:
                         await self._valkey_schedule.record_session_failed_agents(
@@ -453,6 +445,17 @@ class SessionLauncher:
                         )
                     except Exception:
                         log.warning("failed agents not recorded in Valkey", exc_info=True)
+                if first_failure is not None:
+                    # Keep the agent's reason on the session for the client.
+                    try:
+                        await self._repository.update_session_error_info(
+                            session.session_id,
+                            convert_to_status_data(
+                                first_failure, self._config_provider.config.debug.enabled
+                            ),
+                        )
+                    except Exception:
+                        log.warning("agent failure not recorded on the session", exc_info=True)
 
             log.trace(
                 "session started",
