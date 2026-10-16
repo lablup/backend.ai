@@ -46076,12 +46076,15 @@
         "properties": {
           "path": {
             "description": "Dotfile path",
+            "maxLength": 512,
+            "pattern": "^[^\\x00]*$",
             "title": "Path",
             "type": "string"
           },
           "data": {
             "description": "Dotfile content",
             "maxLength": 65536,
+            "pattern": "^[^\\x00]*$",
             "title": "Data",
             "type": "string"
           },
@@ -46124,6 +46127,7 @@
           "data": {
             "description": "Updated dotfile content",
             "maxLength": 65536,
+            "pattern": "^[^\\x00]*$",
             "title": "Data",
             "type": "string"
           },
