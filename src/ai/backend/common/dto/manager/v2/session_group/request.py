@@ -24,7 +24,6 @@ from ai.backend.common.dto.manager.v2.session_group.types import (
     SessionGroupPlacementEnforcementEnum,
     SessionGroupScope,
 )
-from ai.backend.common.exception import InvalidAPIParameters
 from ai.backend.common.tristate.unset import UNSET, Unset
 
 __all__ = (
@@ -148,7 +147,7 @@ class UpdateSessionGroupInput(BaseRequestModel):
         if not isinstance(self.placement_direction, SessionGroupPlacementDirectionEnum) and not (
             isinstance(self.placement_enforcement, SessionGroupPlacementEnforcementEnum)
         ):
-            raise InvalidAPIParameters(
+            raise ValueError(
                 "UpdateSessionGroupInput requires 'placement_direction' or 'placement_enforcement'"
             )
         return self
