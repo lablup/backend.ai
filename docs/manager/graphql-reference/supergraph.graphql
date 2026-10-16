@@ -5934,6 +5934,9 @@ input DefaultSessionHandlerOptionsPolicyInput
 type DefaultSessionKernelExecutionSpecInfo
   @join__type(graph: STRAWBERRY)
 {
+  """Added in 26.10.0. The container image of this execution spec."""
+  imageV2: ImageV2
+
   """Container image identifier, or `null` if not resolved."""
   imageId: String
 
