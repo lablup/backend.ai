@@ -176,15 +176,11 @@ class SessionGroupAdapter(BaseAdapter):
         """Change a session group's placement direction and enforcement."""
         updater = SessionGroupUpdater(
             group_id=SessionGroupID(input.id),
-            placement_direction=(
-                OptionalState.update(SessionGroupPlacementDirection(input.placement_direction))
-                if isinstance(input.placement_direction, SessionGroupPlacementDirectionEnum)
-                else OptionalState[SessionGroupPlacementDirection].nop()
+            placement_direction=OptionalState.from_unset(input.placement_direction).map(
+                SessionGroupPlacementDirection
             ),
-            placement_enforcement=(
-                OptionalState.update(SessionGroupPlacementEnforcement(input.placement_enforcement))
-                if isinstance(input.placement_enforcement, SessionGroupPlacementEnforcementEnum)
-                else OptionalState[SessionGroupPlacementEnforcement].nop()
+            placement_enforcement=OptionalState.from_unset(input.placement_enforcement).map(
+                SessionGroupPlacementEnforcement
             ),
         )
         result = await self._session_group.update.run(UpdateSessionGroupAction(updater=updater))
