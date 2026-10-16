@@ -17,6 +17,9 @@ __all__ = (
     "BulkRestoreRolePresetsPayload",
     "BulkRolePresetFailureInfo",
     "CreateRolePresetPayload",
+    "DeleteRolePresetPayload",
+    "PurgeRolePresetPayload",
+    "RestoreRolePresetPayload",
     "RolePresetNode",
     "SearchRolePresetsPayload",
     "UpdateRolePresetPayload",
@@ -62,6 +65,24 @@ class UpdateRolePresetPayload(BaseResponseModel):
     """Payload for role preset update."""
 
     role_preset: RolePresetNode = Field(description="Updated role preset.")
+
+
+class DeleteRolePresetPayload(BaseResponseModel):
+    """Payload for role preset soft deletion."""
+
+    role_preset: RolePresetNode = Field(description="Soft-deleted role preset.")
+
+
+class RestoreRolePresetPayload(BaseResponseModel):
+    """Payload for role preset restoration."""
+
+    role_preset: RolePresetNode = Field(description="Restored role preset.")
+
+
+class PurgeRolePresetPayload(BaseResponseModel):
+    """Payload for role preset purge."""
+
+    role_preset: RolePresetNode = Field(description="Purged role preset, as it stood.")
 
 
 class BulkRolePresetFailureInfo(BaseResponseModel):

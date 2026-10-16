@@ -2,17 +2,21 @@
 
 [무엇을 보장하는가](/src/ai/backend/manager/api/adapters/notification/KNOWLEDGE.md) · [어댑터](/src/ai/backend/manager/api/adapters/notification/adapter.py)
 
-시나리오: 미완 2 / 14
+시나리오: 미완 6 / 18
 
-- ops 로 구성 (12)
+- ops 로 구성 (16)
   - batch_load_channels_by_ids — 대표 성공 ✓ · 대표 실패 ✗ — SCENARIO-GAP
   - batch_load_rules_by_ids — 대표 성공 ✓ · 대표 실패 ✗ — SCENARIO-GAP
   - create_channel — 대표 성공 ✓ · 대표 실패 ✓
   - create_rule — 대표 성공 ✓ · 대표 실패 ✓
-  - delete_channel — 대표 성공 ✓ · 대표 실패 ✓
-  - delete_rule — 대표 성공 ✓ · 대표 실패 ✓
   - get_channel — 대표 성공 ✓ · 대표 실패 ✓
   - get_rule — 대표 성공 ✓ · 대표 실패 ✓
+  - partial_bulk_purge_channels — 대표 성공 ✓ · 대표 실패 ✗ — SCENARIO-GAP
+  - partial_bulk_purge_rules — 대표 성공 ✓ · 대표 실패 ✗ — SCENARIO-GAP
+  - partial_bulk_update_channels — 대표 성공 ✓ · 대표 실패 ✗ — SCENARIO-GAP
+  - partial_bulk_update_rules — 대표 성공 ✓ · 대표 실패 ✗ — SCENARIO-GAP
+  - purge_channel — 대표 성공 ✓ · 대표 실패 ✓
+  - purge_rule — 대표 성공 ✓ · 대표 실패 ✓
   - search_channels — 대표 성공 ✓ · 대표 실패 ✓
   - search_rules — 대표 성공 ✓ · 대표 실패 ✓
   - update_channel — 대표 성공 ✓ · 대표 실패 ✓
@@ -59,23 +63,6 @@
 | [슈퍼관리자가 아닌 사용자가 규칙을 만들려 하면 역할 부족으로 거부된다](#creating_rules-a-user-who-is-not-the-superadmin-may-not-make-a-rule) | 거부 |
 | [모니터가 규칙을 만들려 하면 역할 부족으로 거부된다. 모니터는 읽기만 통과한다](#creating_rules-the-monitor-may-not-make-a-rule) | 거부 |
 
-**delete_channel**
-
-| 시나리오 | 판정 |
-|---|---|
-| [규칙이 가리키는 채널을 슈퍼관리자가 삭제하면 막히지 않고 삭제한 채널의 id가 반환된다. 두 테이블 사이에 외래 키가 없어 규칙은 남는다](#retiring_channels-a-channel-a-rule-points-at-is-deleted-all-the-same) | 성공 |
-| [채널 하나가 있고 슈퍼관리자가 삭제하면 삭제한 채널의 id가 반환된다](#retiring_channels-the-superadmin-deletes-a-channel) | 성공 |
-| [아무 권한도 없는 사용자가 삭제하려 하면 권한 부족으로 거부된다](#retiring_channels-a-user-granted-nothing-may-not-delete-a-channel) | 거부 |
-| [슈퍼관리자가 존재하지 않는 id를 삭제하면 대상을 찾을 수 없다는 이유로 거부된다](#retiring_channels-the-superadmin-deleting-a-channel-id-nothing-answers-to-is-not-found) | 거부 |
-
-**delete_rule**
-
-| 시나리오 | 판정 |
-|---|---|
-| [규칙 하나가 있고 슈퍼관리자가 삭제하면 삭제한 규칙의 id가 반환된다](#retiring_rules-the-superadmin-deletes-a-rule) | 성공 |
-| [아무 권한도 없는 사용자가 삭제하려 하면 권한 부족으로 거부된다](#retiring_rules-a-user-granted-nothing-may-not-delete-a-rule) | 거부 |
-| [슈퍼관리자가 존재하지 않는 id를 삭제하면 대상을 찾을 수 없다는 이유로 거부된다](#retiring_rules-the-superadmin-deleting-a-rule-id-nothing-answers-to-is-not-found) | 거부 |
-
 **get_channel**
 
 | 시나리오 | 판정 |
@@ -93,6 +80,51 @@
 | [규칙 하나가 있고 슈퍼관리자가 id로 조회하면, 그 규칙 전체가 반환된다](#reading_rules-the-superadmin-reads-a-rule-by-id) | 성공 |
 | [아무 권한도 없는 사용자가 id로 조회하면 권한 부족으로 거부된다](#reading_rules-a-user-granted-nothing-may-not-read-a-rule) | 거부 |
 | [슈퍼관리자가 존재하지 않는 id로 조회하면 대상을 찾을 수 없다는 이유로 거부된다](#reading_rules-the-superadmin-reading-a-rule-id-nothing-answers-to-is-not-found) | 거부 |
+
+**partial_bulk_purge_channels**
+
+| 시나리오 | 판정 |
+|---|---|
+| [아무 권한도 없는 사용자가 채널 여럿을 한 번에 purge 하려 하면, 지워진 것 없이 모두 권한이 없다는 이유로 실패 목록에 온다](#partial_bulk_purging_channels-a-user-granted-nothing-purges-none-of-several-channels) | 성공 |
+| [슈퍼관리자가 채널 둘과 없는 id 하나를 한 번에 purge 하면, 둘은 지우기 전 모습으로 오고 없는 id 는 대상이 없다는 이유로 실패 목록에 온다](#partial_bulk_purging_channels-purging-several-channels-answers-for-the-missing-one) | 성공 |
+
+**partial_bulk_purge_rules**
+
+| 시나리오 | 판정 |
+|---|---|
+| [아무 권한도 없는 사용자가 규칙 여럿을 한 번에 purge 하려 하면, 지워진 것 없이 모두 권한이 없다는 이유로 실패 목록에 온다](#partial_bulk_purging_rules-a-user-granted-nothing-purges-none-of-several-rules) | 성공 |
+| [슈퍼관리자가 규칙 둘과 없는 id 하나를 한 번에 purge 하면, 둘은 지우기 전 모습으로 오고 없는 id 는 대상이 없다는 이유로 실패 목록에 온다](#partial_bulk_purging_rules-purging-several-rules-answers-for-the-missing-one) | 성공 |
+
+**partial_bulk_update_channels**
+
+| 시나리오 | 판정 |
+|---|---|
+| [아무 권한도 없는 사용자가 채널 여럿을 한 번에 수정하려 하면, 수정된 것 없이 모두 권한이 없다는 이유로 실패 목록에 온다](#partial_bulk_editing_channels-a-user-granted-nothing-edits-none-of-several-channels) | 성공 |
+| [슈퍼관리자가 채널 둘의 설명을 한 번에 바꾸면, 둘 다 새 설명으로 오고 실패한 것은 없다](#partial_bulk_editing_channels-the-superadmin-describes-several-channels-at-once) | 성공 |
+
+**partial_bulk_update_rules**
+
+| 시나리오 | 판정 |
+|---|---|
+| [아무 권한도 없는 사용자가 규칙 여럿을 한 번에 수정하려 하면, 수정된 것 없이 모두 권한이 없다는 이유로 실패 목록에 온다](#partial_bulk_editing_rules-a-user-granted-nothing-edits-none-of-several-rules) | 성공 |
+| [슈퍼관리자가 규칙 둘의 설명을 한 번에 바꾸면, 둘 다 새 설명으로 오고 실패한 것은 없다](#partial_bulk_editing_rules-the-superadmin-describes-several-rules-at-once) | 성공 |
+
+**purge_channel**
+
+| 시나리오 | 판정 |
+|---|---|
+| [규칙이 가리키는 채널을 슈퍼관리자가 삭제하면 막히지 않고 삭제한 채널의 id가 반환된다. 두 테이블 사이에 외래 키가 없어 규칙은 남는다](#retiring_channels-a-channel-a-rule-points-at-is-deleted-all-the-same) | 성공 |
+| [채널 하나가 있고 슈퍼관리자가 삭제하면 삭제한 채널의 id가 반환된다](#retiring_channels-the-superadmin-deletes-a-channel) | 성공 |
+| [아무 권한도 없는 사용자가 삭제하려 하면 권한 부족으로 거부된다](#retiring_channels-a-user-granted-nothing-may-not-delete-a-channel) | 거부 |
+| [슈퍼관리자가 존재하지 않는 id를 삭제하면 대상을 찾을 수 없다는 이유로 거부된다](#retiring_channels-the-superadmin-deleting-a-channel-id-nothing-answers-to-is-not-found) | 거부 |
+
+**purge_rule**
+
+| 시나리오 | 판정 |
+|---|---|
+| [규칙 하나가 있고 슈퍼관리자가 삭제하면 삭제한 규칙의 id가 반환된다](#retiring_rules-the-superadmin-deletes-a-rule) | 성공 |
+| [아무 권한도 없는 사용자가 삭제하려 하면 권한 부족으로 거부된다](#retiring_rules-a-user-granted-nothing-may-not-delete-a-rule) | 거부 |
+| [슈퍼관리자가 존재하지 않는 id를 삭제하면 대상을 찾을 수 없다는 이유로 거부된다](#retiring_rules-the-superadmin-deleting-a-rule-id-nothing-answers-to-is-not-found) | 거부 |
 
 **search_channels**
 
@@ -745,196 +777,6 @@ Then
 - 거부된다
   - 거부: InsufficientPrivilege
 
-### delete_channel
-
-<a id="retiring_channels-a-channel-a-rule-points-at-is-deleted-all-the-same"></a>
-
-#### [a-channel-a-rule-points-at-is-deleted-all-the-same](/tests/scenario/bai_scenario/manager/notification/test_retiring_channels.py) — pass
-
-규칙이 가리키는 채널을 슈퍼관리자가 삭제하면 막히지 않고 삭제한 채널의 id가 반환된다. 두 테이블 사이에 외래 키가 없어 규칙은 남는다
-
-Given
-
-- 채널 하나와 그것을 가리키는 규칙 하나, 그리고 슈퍼관리자 한 명
-  - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
-  - webhook 채널 channel-1: https://hooks.example.test/notify로 보낸다
-  - 규칙 rule-1: session.started 이벤트를 알린다
-
-When
-
-- NotificationAdapter.delete_channel — user-1이 채널 channel-1 삭제
-
-Then
-
-- 삭제한 채널의 id가 반환된다
-  - id: 미리 만들어 둔 채널와 같다
-
-<a id="retiring_channels-the-superadmin-deletes-a-channel"></a>
-
-#### [the-superadmin-deletes-a-channel](/tests/scenario/bai_scenario/manager/notification/test_retiring_channels.py) — pass
-
-채널 하나가 있고 슈퍼관리자가 삭제하면 삭제한 채널의 id가 반환된다
-
-Given
-
-- webhook 채널 하나와, 슈퍼관리자 한 명
-  - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
-  - webhook 채널 channel-1: https://hooks.example.test/notify로 보낸다
-
-When
-
-- NotificationAdapter.delete_channel — user-1이 채널 channel-1 삭제
-
-Then
-
-- 삭제한 채널의 id가 반환된다
-  - id: 미리 만들어 둔 채널와 같다
-
-<a id="retiring_channels-a-user-granted-nothing-may-not-delete-a-channel"></a>
-
-#### [a-user-granted-nothing-may-not-delete-a-channel](/tests/scenario/bai_scenario/manager/notification/test_retiring_channels.py) — pass
-
-아무 권한도 없는 사용자가 삭제하려 하면 권한 부족으로 거부된다
-
-Given
-
-- webhook 채널 하나와, 일반 사용자 한 명
-  - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-  - webhook 채널 channel-1: https://hooks.example.test/notify로 보낸다
-
-When
-
-- NotificationAdapter.delete_channel — user-1이 채널 channel-1 삭제
-
-Then
-
-- 거부된다
-  - 거부: NotEnoughPermission
-
-<a id="retiring_channels-the-superadmin-deleting-a-channel-id-nothing-answers-to-is-not-found"></a>
-
-#### [the-superadmin-deleting-a-channel-id-nothing-answers-to-is-not-found](/tests/scenario/bai_scenario/manager/notification/test_retiring_channels.py) — pass
-
-슈퍼관리자가 존재하지 않는 id를 삭제하면 대상을 찾을 수 없다는 이유로 거부된다
-
-Given
-
-- webhook 채널 하나와, 슈퍼관리자 한 명
-  - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
-  - webhook 채널 channel-1: https://hooks.example.test/notify로 보낸다
-
-When
-
-- NotificationAdapter.delete_channel — user-1이 존재하지 않는 id 삭제
-
-Then
-
-- 거부된다
-  - 거부: EntityNotFoundError
-
-### delete_rule
-
-<a id="retiring_rules-the-superadmin-deletes-a-rule"></a>
-
-#### [the-superadmin-deletes-a-rule](/tests/scenario/bai_scenario/manager/notification/test_retiring_rules.py) — pass
-
-규칙 하나가 있고 슈퍼관리자가 삭제하면 삭제한 규칙의 id가 반환된다
-
-Given
-
-- 규칙 하나와 그것이 가리키는 webhook 채널, 그리고 슈퍼관리자 한 명
-  - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
-  - webhook 채널 channel-1: https://hooks.example.test/notify로 보낸다
-  - 규칙 rule-1: session.started 이벤트를 알린다
-
-When
-
-- NotificationAdapter.delete_rule — user-1이 규칙 rule-1 삭제
-
-Then
-
-- 삭제한 규칙의 id가 반환된다
-  - id: 미리 만들어 둔 규칙와 같다
-
-<a id="retiring_rules-a-user-granted-nothing-may-not-delete-a-rule"></a>
-
-#### [a-user-granted-nothing-may-not-delete-a-rule](/tests/scenario/bai_scenario/manager/notification/test_retiring_rules.py) — pass
-
-아무 권한도 없는 사용자가 삭제하려 하면 권한 부족으로 거부된다
-
-Given
-
-- 규칙 하나와 그것이 가리키는 webhook 채널, 그리고 일반 사용자 한 명
-  - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-  - webhook 채널 channel-1: https://hooks.example.test/notify로 보낸다
-  - 규칙 rule-1: session.started 이벤트를 알린다
-
-When
-
-- NotificationAdapter.delete_rule — user-1이 규칙 rule-1 삭제
-
-Then
-
-- 거부된다
-  - 거부: NotEnoughPermission
-
-<a id="retiring_rules-the-superadmin-deleting-a-rule-id-nothing-answers-to-is-not-found"></a>
-
-#### [the-superadmin-deleting-a-rule-id-nothing-answers-to-is-not-found](/tests/scenario/bai_scenario/manager/notification/test_retiring_rules.py) — pass
-
-슈퍼관리자가 존재하지 않는 id를 삭제하면 대상을 찾을 수 없다는 이유로 거부된다
-
-Given
-
-- 규칙 하나와 그것이 가리키는 webhook 채널, 그리고 슈퍼관리자 한 명
-  - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
-  - webhook 채널 channel-1: https://hooks.example.test/notify로 보낸다
-  - 규칙 rule-1: session.started 이벤트를 알린다
-
-When
-
-- NotificationAdapter.delete_rule — user-1이 존재하지 않는 id 삭제
-
-Then
-
-- 거부된다
-  - 거부: EntityNotFoundError
-
 ### get_channel
 
 <a id="reading_channels-the-superadmin-reads-a-channel-by-id"></a>
@@ -1162,6 +1004,532 @@ Given
 When
 
 - NotificationAdapter.get_rule — user-1이 존재하지 않는 id 조회
+
+Then
+
+- 거부된다
+  - 거부: EntityNotFoundError
+
+### partial_bulk_purge_channels
+
+<a id="partial_bulk_purging_channels-a-user-granted-nothing-purges-none-of-several-channels"></a>
+
+#### [a-user-granted-nothing-purges-none-of-several-channels](/tests/scenario/bai_scenario/manager/notification/test_partial_bulk_purging_channels.py) — pass
+
+아무 권한도 없는 사용자가 채널 여럿을 한 번에 purge 하려 하면, 지워진 것 없이 모두 권한이 없다는 이유로 실패 목록에 온다
+
+Given
+
+- webhook 채널 둘과, 일반 사용자 한 명
+  - 도메인 home-1
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+  - webhook 채널 wanted-1: https://hooks.example.test/notify로 보낸다
+  - webhook 채널 other-1: https://hooks.example.test/notify로 보낸다
+
+When
+
+- NotificationAdapter.partial_bulk_purge_channels — user-1이 채널 2개를 한 번에 purge 함
+
+Then
+
+- 처리된 것 없이 미리 만들어 둔 것이 모두 실패 목록에 온다
+  - successes = []
+  - failed count = 2
+  - failed[0].id: 미리 만들어 둔 것의 id와 같다
+  - failed[0].message: 'Insufficient permission'를 담은 이유
+  - failed[1].id: 미리 만들어 둔 것의 id와 같다
+  - failed[1].message: 'Insufficient permission'를 담은 이유
+
+<a id="partial_bulk_purging_channels-purging-several-channels-answers-for-the-missing-one"></a>
+
+#### [purging-several-channels-answers-for-the-missing-one](/tests/scenario/bai_scenario/manager/notification/test_partial_bulk_purging_channels.py) — pass
+
+슈퍼관리자가 채널 둘과 없는 id 하나를 한 번에 purge 하면, 둘은 지우기 전 모습으로 오고 없는 id 는 대상이 없다는 이유로 실패 목록에 온다
+
+Given
+
+- webhook 채널 둘과, 슈퍼관리자 한 명
+  - 도메인 home-1
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+  - webhook 채널 wanted-1: https://hooks.example.test/notify로 보낸다
+  - webhook 채널 other-1: https://hooks.example.test/notify로 보낸다
+
+When
+
+- NotificationAdapter.partial_bulk_purge_channels — user-1이 채널 2개 와 없는 id 하나를 한 번에 purge 함
+
+Then
+
+- 미리 만들어 둔 채널이 모두 처리된 목록에 오고, 없는 id 는 대상이 없다는 이유로 실패 목록에 온다
+  - successes count = 2
+  - successes[0].id: 무시함 — 데이터베이스가 만든다
+  - successes[0].name = 'wanted-1'
+  - successes[0].description = None
+  - successes[0].channel_type = 'webhook'
+  - successes[0].spec.channel_type = <NotificationChannelTypeDTO.WEBHOOK: 'webhook'>
+  - successes[0].spec.url = 'https://hooks.example.test/notify'
+  - successes[0].enabled = True
+  - successes[0].created_by: 만든 사람와 같다
+  - successes[0].created_at: 이 실행이 쓴 시각
+  - successes[0].updated_at: 이 실행이 쓴 시각
+  - successes[1].id: 무시함 — 데이터베이스가 만든다
+  - successes[1].name = 'other-1'
+  - successes[1].description = None
+  - successes[1].channel_type = 'webhook'
+  - successes[1].spec.channel_type = <NotificationChannelTypeDTO.WEBHOOK: 'webhook'>
+  - successes[1].spec.url = 'https://hooks.example.test/notify'
+  - successes[1].enabled = True
+  - successes[1].created_by: 만든 사람와 같다
+  - successes[1].created_at: 이 실행이 쓴 시각
+  - successes[1].updated_at: 이 실행이 쓴 시각
+  - failed count = 1
+  - failed[0].id: 요청에 넣은 없는 id와 같다
+  - failed[0].message: 'not found'를 담은 이유
+
+### partial_bulk_purge_rules
+
+<a id="partial_bulk_purging_rules-a-user-granted-nothing-purges-none-of-several-rules"></a>
+
+#### [a-user-granted-nothing-purges-none-of-several-rules](/tests/scenario/bai_scenario/manager/notification/test_partial_bulk_purging_rules.py) — pass
+
+아무 권한도 없는 사용자가 규칙 여럿을 한 번에 purge 하려 하면, 지워진 것 없이 모두 권한이 없다는 이유로 실패 목록에 온다
+
+Given
+
+- 같은 webhook 채널을 가리키는 규칙 둘과, 일반 사용자 한 명
+  - 도메인 home-1
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+  - webhook 채널 channel-1: https://hooks.example.test/notify로 보낸다
+  - 규칙 wanted-1: session.started 이벤트를 알린다
+  - 규칙 other-1: session.started 이벤트를 알린다
+
+When
+
+- NotificationAdapter.partial_bulk_purge_rules — user-1이 규칙 2개를 한 번에 purge 함
+
+Then
+
+- 처리된 것 없이 미리 만들어 둔 것이 모두 실패 목록에 온다
+  - successes = []
+  - failed count = 2
+  - failed[0].id: 미리 만들어 둔 것의 id와 같다
+  - failed[0].message: 'Insufficient permission'를 담은 이유
+  - failed[1].id: 미리 만들어 둔 것의 id와 같다
+  - failed[1].message: 'Insufficient permission'를 담은 이유
+
+<a id="partial_bulk_purging_rules-purging-several-rules-answers-for-the-missing-one"></a>
+
+#### [purging-several-rules-answers-for-the-missing-one](/tests/scenario/bai_scenario/manager/notification/test_partial_bulk_purging_rules.py) — pass
+
+슈퍼관리자가 규칙 둘과 없는 id 하나를 한 번에 purge 하면, 둘은 지우기 전 모습으로 오고 없는 id 는 대상이 없다는 이유로 실패 목록에 온다
+
+Given
+
+- 같은 webhook 채널을 가리키는 규칙 둘과, 슈퍼관리자 한 명
+  - 도메인 home-1
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+  - webhook 채널 channel-1: https://hooks.example.test/notify로 보낸다
+  - 규칙 wanted-1: session.started 이벤트를 알린다
+  - 규칙 other-1: session.started 이벤트를 알린다
+
+When
+
+- NotificationAdapter.partial_bulk_purge_rules — user-1이 규칙 2개 와 없는 id 하나를 한 번에 purge 함
+
+Then
+
+- 미리 만들어 둔 규칙이 모두 처리된 목록에 오고, 없는 id 는 대상이 없다는 이유로 실패 목록에 온다
+  - successes count = 2
+  - successes[0].id: 무시함 — 데이터베이스가 만든다
+  - successes[0].name = 'wanted-1'
+  - successes[0].description = None
+  - successes[0].rule_type = 'session.started'
+  - successes[0].channel_id: 가리키는 채널와 같다
+  - successes[0].message_template = 'Session {{ session_name }} is {{ status }}'
+  - successes[0].enabled = True
+  - successes[0].created_by: 만든 사람와 같다
+  - successes[0].created_at: 이 실행이 쓴 시각
+  - successes[0].updated_at: 이 실행이 쓴 시각
+  - successes[1].id: 무시함 — 데이터베이스가 만든다
+  - successes[1].name = 'other-1'
+  - successes[1].description = None
+  - successes[1].rule_type = 'session.started'
+  - successes[1].channel_id: 가리키는 채널와 같다
+  - successes[1].message_template = 'Session {{ session_name }} is {{ status }}'
+  - successes[1].enabled = True
+  - successes[1].created_by: 만든 사람와 같다
+  - successes[1].created_at: 이 실행이 쓴 시각
+  - successes[1].updated_at: 이 실행이 쓴 시각
+  - failed count = 1
+  - failed[0].id: 요청에 넣은 없는 id와 같다
+  - failed[0].message: 'not found'를 담은 이유
+
+### partial_bulk_update_channels
+
+<a id="partial_bulk_editing_channels-a-user-granted-nothing-edits-none-of-several-channels"></a>
+
+#### [a-user-granted-nothing-edits-none-of-several-channels](/tests/scenario/bai_scenario/manager/notification/test_partial_bulk_editing_channels.py) — pass
+
+아무 권한도 없는 사용자가 채널 여럿을 한 번에 수정하려 하면, 수정된 것 없이 모두 권한이 없다는 이유로 실패 목록에 온다
+
+Given
+
+- webhook 채널 둘과, 일반 사용자 한 명
+  - 도메인 home-1
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+  - webhook 채널 wanted-1: https://hooks.example.test/notify로 보낸다
+  - webhook 채널 other-1: https://hooks.example.test/notify로 보낸다
+
+When
+
+- NotificationAdapter.partial_bulk_update_channels — user-1이 채널 2개의 설명을 한 번에 수정
+
+Then
+
+- 처리된 것 없이 미리 만들어 둔 것이 모두 실패 목록에 온다
+  - successes = []
+  - failed count = 2
+  - failed[0].id: 미리 만들어 둔 것의 id와 같다
+  - failed[0].message: 'Insufficient permission'를 담은 이유
+  - failed[1].id: 미리 만들어 둔 것의 id와 같다
+  - failed[1].message: 'Insufficient permission'를 담은 이유
+
+<a id="partial_bulk_editing_channels-the-superadmin-describes-several-channels-at-once"></a>
+
+#### [the-superadmin-describes-several-channels-at-once](/tests/scenario/bai_scenario/manager/notification/test_partial_bulk_editing_channels.py) — pass
+
+슈퍼관리자가 채널 둘의 설명을 한 번에 바꾸면, 둘 다 새 설명으로 오고 실패한 것은 없다
+
+Given
+
+- webhook 채널 둘과, 슈퍼관리자 한 명
+  - 도메인 home-1
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+  - webhook 채널 wanted-1: https://hooks.example.test/notify로 보낸다
+  - webhook 채널 other-1: https://hooks.example.test/notify로 보낸다
+
+When
+
+- NotificationAdapter.partial_bulk_update_channels — user-1이 채널 2개의 설명을 한 번에 수정
+
+Then
+
+- 미리 만들어 둔 채널이 모두 처리된 목록에 오고, 실패한 것은 없다
+  - successes count = 2
+  - successes[0].id: 무시함 — 데이터베이스가 만든다
+  - successes[0].name = 'wanted-1'
+  - successes[0].description = '한 번에 바꾼 설명'
+  - successes[0].channel_type = 'webhook'
+  - successes[0].spec.channel_type = <NotificationChannelTypeDTO.WEBHOOK: 'webhook'>
+  - successes[0].spec.url = 'https://hooks.example.test/notify'
+  - successes[0].enabled = True
+  - successes[0].created_by: 만든 사람와 같다
+  - successes[0].created_at: 이 실행이 쓴 시각
+  - successes[0].updated_at: 이 실행이 쓴 시각
+  - successes[1].id: 무시함 — 데이터베이스가 만든다
+  - successes[1].name = 'other-1'
+  - successes[1].description = '한 번에 바꾼 설명'
+  - successes[1].channel_type = 'webhook'
+  - successes[1].spec.channel_type = <NotificationChannelTypeDTO.WEBHOOK: 'webhook'>
+  - successes[1].spec.url = 'https://hooks.example.test/notify'
+  - successes[1].enabled = True
+  - successes[1].created_by: 만든 사람와 같다
+  - successes[1].created_at: 이 실행이 쓴 시각
+  - successes[1].updated_at: 이 실행이 쓴 시각
+  - failed = []
+
+### partial_bulk_update_rules
+
+<a id="partial_bulk_editing_rules-a-user-granted-nothing-edits-none-of-several-rules"></a>
+
+#### [a-user-granted-nothing-edits-none-of-several-rules](/tests/scenario/bai_scenario/manager/notification/test_partial_bulk_editing_rules.py) — pass
+
+아무 권한도 없는 사용자가 규칙 여럿을 한 번에 수정하려 하면, 수정된 것 없이 모두 권한이 없다는 이유로 실패 목록에 온다
+
+Given
+
+- 같은 webhook 채널을 가리키는 규칙 둘과, 일반 사용자 한 명
+  - 도메인 home-1
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+  - webhook 채널 channel-1: https://hooks.example.test/notify로 보낸다
+  - 규칙 wanted-1: session.started 이벤트를 알린다
+  - 규칙 other-1: session.started 이벤트를 알린다
+
+When
+
+- NotificationAdapter.partial_bulk_update_rules — user-1이 규칙 2개의 설명을 한 번에 수정
+
+Then
+
+- 처리된 것 없이 미리 만들어 둔 것이 모두 실패 목록에 온다
+  - successes = []
+  - failed count = 2
+  - failed[0].id: 미리 만들어 둔 것의 id와 같다
+  - failed[0].message: 'Insufficient permission'를 담은 이유
+  - failed[1].id: 미리 만들어 둔 것의 id와 같다
+  - failed[1].message: 'Insufficient permission'를 담은 이유
+
+<a id="partial_bulk_editing_rules-the-superadmin-describes-several-rules-at-once"></a>
+
+#### [the-superadmin-describes-several-rules-at-once](/tests/scenario/bai_scenario/manager/notification/test_partial_bulk_editing_rules.py) — pass
+
+슈퍼관리자가 규칙 둘의 설명을 한 번에 바꾸면, 둘 다 새 설명으로 오고 실패한 것은 없다
+
+Given
+
+- 같은 webhook 채널을 가리키는 규칙 둘과, 슈퍼관리자 한 명
+  - 도메인 home-1
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+  - webhook 채널 channel-1: https://hooks.example.test/notify로 보낸다
+  - 규칙 wanted-1: session.started 이벤트를 알린다
+  - 규칙 other-1: session.started 이벤트를 알린다
+
+When
+
+- NotificationAdapter.partial_bulk_update_rules — user-1이 규칙 2개의 설명을 한 번에 수정
+
+Then
+
+- 미리 만들어 둔 규칙이 모두 처리된 목록에 오고, 실패한 것은 없다
+  - successes count = 2
+  - successes[0].id: 무시함 — 데이터베이스가 만든다
+  - successes[0].name = 'wanted-1'
+  - successes[0].description = '한 번에 바꾼 설명'
+  - successes[0].rule_type = 'session.started'
+  - successes[0].channel_id: 가리키는 채널와 같다
+  - successes[0].message_template = 'Session {{ session_name }} is {{ status }}'
+  - successes[0].enabled = True
+  - successes[0].created_by: 만든 사람와 같다
+  - successes[0].created_at: 이 실행이 쓴 시각
+  - successes[0].updated_at: 이 실행이 쓴 시각
+  - successes[1].id: 무시함 — 데이터베이스가 만든다
+  - successes[1].name = 'other-1'
+  - successes[1].description = '한 번에 바꾼 설명'
+  - successes[1].rule_type = 'session.started'
+  - successes[1].channel_id: 가리키는 채널와 같다
+  - successes[1].message_template = 'Session {{ session_name }} is {{ status }}'
+  - successes[1].enabled = True
+  - successes[1].created_by: 만든 사람와 같다
+  - successes[1].created_at: 이 실행이 쓴 시각
+  - successes[1].updated_at: 이 실행이 쓴 시각
+  - failed = []
+
+### purge_channel
+
+<a id="retiring_channels-a-channel-a-rule-points-at-is-deleted-all-the-same"></a>
+
+#### [a-channel-a-rule-points-at-is-deleted-all-the-same](/tests/scenario/bai_scenario/manager/notification/test_retiring_channels.py) — pass
+
+규칙이 가리키는 채널을 슈퍼관리자가 삭제하면 막히지 않고 삭제한 채널의 id가 반환된다. 두 테이블 사이에 외래 키가 없어 규칙은 남는다
+
+Given
+
+- 채널 하나와 그것을 가리키는 규칙 하나, 그리고 슈퍼관리자 한 명
+  - 도메인 home-1
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+  - webhook 채널 channel-1: https://hooks.example.test/notify로 보낸다
+  - 규칙 rule-1: session.started 이벤트를 알린다
+
+When
+
+- NotificationAdapter.purge_channel — user-1이 채널 channel-1 삭제
+
+Then
+
+- 삭제한 채널의 id가 반환된다
+  - id: 미리 만들어 둔 채널와 같다
+
+<a id="retiring_channels-the-superadmin-deletes-a-channel"></a>
+
+#### [the-superadmin-deletes-a-channel](/tests/scenario/bai_scenario/manager/notification/test_retiring_channels.py) — pass
+
+채널 하나가 있고 슈퍼관리자가 삭제하면 삭제한 채널의 id가 반환된다
+
+Given
+
+- webhook 채널 하나와, 슈퍼관리자 한 명
+  - 도메인 home-1
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+  - webhook 채널 channel-1: https://hooks.example.test/notify로 보낸다
+
+When
+
+- NotificationAdapter.purge_channel — user-1이 채널 channel-1 삭제
+
+Then
+
+- 삭제한 채널의 id가 반환된다
+  - id: 미리 만들어 둔 채널와 같다
+
+<a id="retiring_channels-a-user-granted-nothing-may-not-delete-a-channel"></a>
+
+#### [a-user-granted-nothing-may-not-delete-a-channel](/tests/scenario/bai_scenario/manager/notification/test_retiring_channels.py) — pass
+
+아무 권한도 없는 사용자가 삭제하려 하면 권한 부족으로 거부된다
+
+Given
+
+- webhook 채널 하나와, 일반 사용자 한 명
+  - 도메인 home-1
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+  - webhook 채널 channel-1: https://hooks.example.test/notify로 보낸다
+
+When
+
+- NotificationAdapter.purge_channel — user-1이 채널 channel-1 삭제
+
+Then
+
+- 거부된다
+  - 거부: NotEnoughPermission
+
+<a id="retiring_channels-the-superadmin-deleting-a-channel-id-nothing-answers-to-is-not-found"></a>
+
+#### [the-superadmin-deleting-a-channel-id-nothing-answers-to-is-not-found](/tests/scenario/bai_scenario/manager/notification/test_retiring_channels.py) — pass
+
+슈퍼관리자가 존재하지 않는 id를 삭제하면 대상을 찾을 수 없다는 이유로 거부된다
+
+Given
+
+- webhook 채널 하나와, 슈퍼관리자 한 명
+  - 도메인 home-1
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+  - webhook 채널 channel-1: https://hooks.example.test/notify로 보낸다
+
+When
+
+- NotificationAdapter.purge_channel — user-1이 존재하지 않는 id 삭제
+
+Then
+
+- 거부된다
+  - 거부: EntityNotFoundError
+
+### purge_rule
+
+<a id="retiring_rules-the-superadmin-deletes-a-rule"></a>
+
+#### [the-superadmin-deletes-a-rule](/tests/scenario/bai_scenario/manager/notification/test_retiring_rules.py) — pass
+
+규칙 하나가 있고 슈퍼관리자가 삭제하면 삭제한 규칙의 id가 반환된다
+
+Given
+
+- 규칙 하나와 그것이 가리키는 webhook 채널, 그리고 슈퍼관리자 한 명
+  - 도메인 home-1
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+  - webhook 채널 channel-1: https://hooks.example.test/notify로 보낸다
+  - 규칙 rule-1: session.started 이벤트를 알린다
+
+When
+
+- NotificationAdapter.purge_rule — user-1이 규칙 rule-1 삭제
+
+Then
+
+- 삭제한 규칙의 id가 반환된다
+  - id: 미리 만들어 둔 규칙와 같다
+
+<a id="retiring_rules-a-user-granted-nothing-may-not-delete-a-rule"></a>
+
+#### [a-user-granted-nothing-may-not-delete-a-rule](/tests/scenario/bai_scenario/manager/notification/test_retiring_rules.py) — pass
+
+아무 권한도 없는 사용자가 삭제하려 하면 권한 부족으로 거부된다
+
+Given
+
+- 규칙 하나와 그것이 가리키는 webhook 채널, 그리고 일반 사용자 한 명
+  - 도메인 home-1
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+  - webhook 채널 channel-1: https://hooks.example.test/notify로 보낸다
+  - 규칙 rule-1: session.started 이벤트를 알린다
+
+When
+
+- NotificationAdapter.purge_rule — user-1이 규칙 rule-1 삭제
+
+Then
+
+- 거부된다
+  - 거부: NotEnoughPermission
+
+<a id="retiring_rules-the-superadmin-deleting-a-rule-id-nothing-answers-to-is-not-found"></a>
+
+#### [the-superadmin-deleting-a-rule-id-nothing-answers-to-is-not-found](/tests/scenario/bai_scenario/manager/notification/test_retiring_rules.py) — pass
+
+슈퍼관리자가 존재하지 않는 id를 삭제하면 대상을 찾을 수 없다는 이유로 거부된다
+
+Given
+
+- 규칙 하나와 그것이 가리키는 webhook 채널, 그리고 슈퍼관리자 한 명
+  - 도메인 home-1
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+  - webhook 채널 channel-1: https://hooks.example.test/notify로 보낸다
+  - 규칙 rule-1: session.started 이벤트를 알린다
+
+When
+
+- NotificationAdapter.purge_rule — user-1이 존재하지 않는 id 삭제
 
 Then
 

@@ -35,5 +35,17 @@ def register_v2_idle_checker_assignment_routes(
         handler.purge,
         middlewares=[auth_required],
     )
+    registry.add(
+        "POST",
+        "/partial-bulk-update",
+        handler.partial_bulk_update,
+        middlewares=[auth_required],
+    )
+    registry.add(
+        "POST",
+        "/partial-bulk-purge",
+        handler.partial_bulk_purge,
+        middlewares=[auth_required],
+    )
 
     return registry

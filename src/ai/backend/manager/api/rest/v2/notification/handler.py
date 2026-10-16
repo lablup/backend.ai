@@ -12,12 +12,20 @@ from ai.backend.common.dto.manager.v2.notification.request import (
     CreateNotificationRuleInput,
     DeleteNotificationChannelInput,
     DeleteNotificationRuleInput,
+    PartialBulkPurgeNotificationChannelsInput,
+    PartialBulkPurgeNotificationRulesInput,
+    PartialBulkUpdateNotificationChannelsInput,
+    PartialBulkUpdateNotificationRulesInput,
     SearchNotificationChannelsInput,
     SearchNotificationRulesInput,
     UpdateNotificationChannelInput,
     UpdateNotificationRuleInput,
     ValidateNotificationChannelInput,
     ValidateNotificationRuleInput,
+)
+from ai.backend.common.dto.manager.v2.notification.response import (
+    DeleteNotificationChannelPayload,
+    DeleteNotificationRulePayload,
 )
 from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.api.rest.v2.path_params import ChannelIdPathParam, RuleIdPathParam
@@ -63,12 +71,37 @@ class V2NotificationHandler:
         result = await self._adapter.update_channel(path.parsed.channel_id, body.parsed)
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
 
+    async def purge_channel(
+        self,
+        path: PathParam[ChannelIdPathParam],
+    ) -> APIResponse:
+        """Permanently remove a notification channel."""
+        result = await self._adapter.purge_channel(path.parsed.channel_id)
+        return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
+
+    async def partial_bulk_update_channels(
+        self,
+        body: BodyParam[PartialBulkUpdateNotificationChannelsInput],
+    ) -> APIResponse:
+        """Update several notification channels, answering for each one."""
+        result = await self._adapter.partial_bulk_update_channels(body.parsed)
+        return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
+
+    async def partial_bulk_purge_channels(
+        self,
+        body: BodyParam[PartialBulkPurgeNotificationChannelsInput],
+    ) -> APIResponse:
+        """Permanently remove several notification channels, answering for each one."""
+        result = await self._adapter.partial_bulk_purge_channels(body.parsed)
+        return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
+
     async def delete_channel(
         self,
         body: BodyParam[DeleteNotificationChannelInput],
     ) -> APIResponse:
-        """Delete a notification channel."""
-        result = await self._adapter.delete_channel(body.parsed)
+        """Deprecated. Use `DELETE /v2/notifications/channels/{channel_id}`."""
+        purged = await self._adapter.purge_channel(body.parsed.id)
+        result = DeleteNotificationChannelPayload(id=purged.id)
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
 
     async def search_channels(
@@ -115,12 +148,37 @@ class V2NotificationHandler:
         result = await self._adapter.update_rule(path.parsed.rule_id, body.parsed)
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
 
+    async def purge_rule(
+        self,
+        path: PathParam[RuleIdPathParam],
+    ) -> APIResponse:
+        """Permanently remove a notification rule."""
+        result = await self._adapter.purge_rule(path.parsed.rule_id)
+        return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
+
+    async def partial_bulk_update_rules(
+        self,
+        body: BodyParam[PartialBulkUpdateNotificationRulesInput],
+    ) -> APIResponse:
+        """Update several notification rules, answering for each one."""
+        result = await self._adapter.partial_bulk_update_rules(body.parsed)
+        return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
+
+    async def partial_bulk_purge_rules(
+        self,
+        body: BodyParam[PartialBulkPurgeNotificationRulesInput],
+    ) -> APIResponse:
+        """Permanently remove several notification rules, answering for each one."""
+        result = await self._adapter.partial_bulk_purge_rules(body.parsed)
+        return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
+
     async def delete_rule(
         self,
         body: BodyParam[DeleteNotificationRuleInput],
     ) -> APIResponse:
-        """Delete a notification rule."""
-        result = await self._adapter.delete_rule(body.parsed)
+        """Deprecated. Use `DELETE /v2/notifications/rules/{rule_id}`."""
+        purged = await self._adapter.purge_rule(body.parsed.id)
+        result = DeleteNotificationRulePayload(id=purged.id)
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
 
     async def search_rules(

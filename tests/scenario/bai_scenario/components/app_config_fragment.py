@@ -20,8 +20,8 @@ from ai.backend.common.data.entity.types import EntityIdentifier
 from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.dto.manager.v2.app_config_fragment.response import (
     AppConfigFragmentNode,
+    AtomicBulkUpsertAppConfigFragmentsPayload,
     SearchAppConfigFragmentPayload,
-    UpsertAppConfigFragmentsPayload,
 )
 from ai.backend.manager.data.app_config.types import AppConfigFragmentData
 from ai.backend.manager.data.domain.types import DomainData
@@ -274,7 +274,9 @@ class SomewhereToTarget(Given[Any, ATargetAndACaller]):
 
 
 @dataclass(frozen=True)
-class TheWrittenFragments(Then[AWritingPlace | ATargetAndACaller, UpsertAppConfigFragmentsPayload]):
+class TheWrittenFragments(
+    Then[AWritingPlace | ATargetAndACaller, AtomicBulkUpsertAppConfigFragmentsPayload]
+):
     """쓴 설정 조각이 요청 순서대로 통째로 반환된다.
 
     값은 시나리오가 정한 것이고, 소유자와 종류는 미리 만들어 둔 스코프에서 읽는다.
@@ -293,7 +295,7 @@ class TheWrittenFragments(Then[AWritingPlace | ATargetAndACaller, UpsertAppConfi
     def look(
         self,
         laid: AWritingPlace | ATargetAndACaller,
-        answered: Answered[UpsertAppConfigFragmentsPayload],
+        answered: Answered[AtomicBulkUpsertAppConfigFragmentsPayload],
     ) -> list[Verdict]:
         payload = answered.response
         if payload is None:
@@ -301,7 +303,6 @@ class TheWrittenFragments(Then[AWritingPlace | ATargetAndACaller, UpsertAppConfi
         written = WrittenByThisRun(self.started)
         seen: list[Verdict] = [
             Same("items", len(payload.items), len(self.configs)),
-            Same("failed", list(payload.failed), []),
         ]
         for i, (node, config) in enumerate(zip(payload.items, self.configs, strict=False)):
             if self.replacing and i == 0 and laid.existing is not None:

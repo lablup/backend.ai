@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from uuid import UUID
 
+from ai.backend.common.dto.manager.v2.common import PartialBulkPayload
 from ai.backend.common.dto.manager.v2.role_preset.response import (
     BulkDeleteRolePresetsPayload as BulkDeleteRolePresetsPayloadDTO,
 )
@@ -20,8 +21,20 @@ from ai.backend.common.dto.manager.v2.role_preset.response import (
     CreateRolePresetPayload as CreateRolePresetPayloadDTO,
 )
 from ai.backend.common.dto.manager.v2.role_preset.response import (
+    DeleteRolePresetPayload as DeleteRolePresetPayloadDTO,
+)
+from ai.backend.common.dto.manager.v2.role_preset.response import (
+    PurgeRolePresetPayload as PurgeRolePresetPayloadDTO,
+)
+from ai.backend.common.dto.manager.v2.role_preset.response import (
+    RestoreRolePresetPayload as RestoreRolePresetPayloadDTO,
+)
+from ai.backend.common.dto.manager.v2.role_preset.response import RolePresetNode
+from ai.backend.common.dto.manager.v2.role_preset.response import (
     UpdateRolePresetPayload as UpdateRolePresetPayloadDTO,
 )
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
+from ai.backend.manager.api.gql.common_types import PartialBulkFailureGQL
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     gql_field,
@@ -111,4 +124,60 @@ class BulkPurgeRolePresetsPayloadGQL(PydanticOutputMixin[BulkPurgeRolePresetsPay
     items: list[RolePresetGQL] = gql_field(description="Role presets that were purged.")
     failed: list[BulkRolePresetFailureInfoGQL] = gql_field(
         description="Role preset IDs that failed to purge."
+    )
+
+
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Payload returned after soft-deleting a role preset.",
+    ),
+    model=DeleteRolePresetPayloadDTO,
+    name="DeleteRolePresetPayload",
+)
+class DeleteRolePresetPayloadGQL(PydanticOutputMixin[DeleteRolePresetPayloadDTO]):
+    role_preset: RolePresetGQL = gql_field(description="Soft-deleted role preset.")
+
+
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Payload returned after restoring a role preset.",
+    ),
+    model=RestoreRolePresetPayloadDTO,
+    name="RestoreRolePresetPayload",
+)
+class RestoreRolePresetPayloadGQL(PydanticOutputMixin[RestoreRolePresetPayloadDTO]):
+    role_preset: RolePresetGQL = gql_field(description="Restored role preset.")
+
+
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Payload returned after purging a role preset.",
+    ),
+    model=PurgeRolePresetPayloadDTO,
+    name="PurgeRolePresetPayload",
+)
+class PurgeRolePresetPayloadGQL(PydanticOutputMixin[PurgeRolePresetPayloadDTO]):
+    role_preset: RolePresetGQL = gql_field(description="Purged role preset, as it stood.")
+
+
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description=(
+            "Result of a partial bulk role preset operation: the role presets processed and the "
+            "ones that failed."
+        ),
+    ),
+    model=PartialBulkPayload[RolePresetNode],
+    name="PartialBulkRolePresetsPayload",
+)
+class PartialBulkRolePresetsPayloadGQL(PydanticOutputMixin[PartialBulkPayload[RolePresetNode]]):
+    successes: list[RolePresetGQL] = gql_field(
+        description="The role presets processed, as they now stand."
+    )
+    failed: list[PartialBulkFailureGQL] = gql_field(
+        description="The role presets not processed, each with the reason."
     )

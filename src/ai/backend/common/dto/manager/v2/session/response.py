@@ -16,6 +16,7 @@ from ai.backend.common.api_handlers import BaseResponseModel
 from ai.backend.common.data.entity.idle_checker import IdleCheckerID
 from ai.backend.common.data.entity.session import SessionID
 from ai.backend.common.dto.manager.pagination import PaginationInfo
+from ai.backend.common.dto.manager.v2.session.types import SessionTerminationStatusEnum
 from ai.backend.common.types import SessionId
 
 __all__ = (
@@ -41,6 +42,7 @@ __all__ = (
     "SessionResourceInfoGQLDTO",
     "SessionRuntimeInfo",
     "SessionRuntimeInfoGQLDTO",
+    "SessionTerminationInfo",
     "StartServicePayload",
     "StartSessionServicePayload",
     "TerminateSessionsPayload",
@@ -278,6 +280,15 @@ class TerminateSessionsPayload(BaseResponseModel):
     )
     skipped: list[SessionId] = Field(
         default_factory=list, description="Sessions already terminated or not found."
+    )
+
+
+class SessionTerminationInfo(BaseResponseModel):
+    """What a termination request did to one session."""
+
+    id: SessionID = Field(description="ID of the session.")
+    status: SessionTerminationStatusEnum = Field(
+        description="State the session ended in: cancelled, terminating, force-terminated, or skipped."
     )
 
 

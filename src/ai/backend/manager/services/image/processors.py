@@ -5,6 +5,7 @@ from ai.backend.manager.actions.v2.field.bulk_processor import PartialBulkFieldA
 from ai.backend.manager.actions.v2.global_scope.processor import GlobalActionProcessor
 from ai.backend.manager.actions.v2.ops.result import (
     BatchOpsResult,
+    EntityOpsResult,
     ScopedBatchOpsResult,
     ScopedFieldsOpsResult,
 )
@@ -29,6 +30,7 @@ from ai.backend.manager.services.image.actions.dealias_image import (
     DealiasImageAction,
     DealiasImageActionResult,
 )
+from ai.backend.manager.services.image.actions.delete_image_by_id import DeleteImageByIdAction
 from ai.backend.manager.services.image.actions.forget_image import (
     ForgetImageAction,
     ForgetImageActionResult,
@@ -38,6 +40,15 @@ from ai.backend.manager.services.image.actions.forget_image import (
 from ai.backend.manager.services.image.actions.get_image_installed_agents import (
     GetImageInstalledAgentsAction,
     GetImageInstalledAgentsActionResult,
+)
+from ai.backend.manager.services.image.actions.partial_bulk_delete_images import (
+    PartialBulkDeleteImagesAction,
+)
+from ai.backend.manager.services.image.actions.partial_bulk_restore_images import (
+    PartialBulkRestoreImagesAction,
+)
+from ai.backend.manager.services.image.actions.partial_bulk_update_images import (
+    PartialBulkUpdateImagesAction,
 )
 from ai.backend.manager.services.image.actions.preload_image import (
     PreloadImageAction,
@@ -51,10 +62,7 @@ from ai.backend.manager.services.image.actions.purge_images import (
     PurgeImagesAction,
     PurgeImagesActionResult,
 )
-from ai.backend.manager.services.image.actions.restore_image import (
-    RestoreImageByIdAction,
-    RestoreImageByIdActionResult,
-)
+from ai.backend.manager.services.image.actions.restore_image import RestoreImageByIdAction
 from ai.backend.manager.services.image.actions.scan_image import (
     GlobalScanImageAction,
     GlobalScanImageActionResult,
@@ -94,10 +102,7 @@ from ai.backend.manager.services.image.actions.update_image import (
     UpdateImageAction,
     UpdateImageActionResult,
 )
-from ai.backend.manager.services.image.actions.update_image_by_id import (
-    UpdateImageByIdAction,
-    UpdateImageByIdActionResult,
-)
+from ai.backend.manager.services.image.actions.update_image_by_id import UpdateImageByIdAction
 
 from .service import ImageService
 
@@ -108,15 +113,23 @@ class ImageProcessors:
     forget_image_by_id: SingleEntityActionProcessor[
         ForgetImageByIdAction, ForgetImageByIdActionResult
     ]
-    restore_image_by_id: SingleEntityActionProcessor[
-        RestoreImageByIdAction, RestoreImageByIdActionResult
+    delete_image_by_id: SingleEntityActionProcessor[
+        DeleteImageByIdAction, EntityOpsResult[ImageData]
     ]
+    restore_image_by_id: SingleEntityActionProcessor[
+        RestoreImageByIdAction, EntityOpsResult[ImageData]
+    ]
+    update_image_by_id: SingleEntityActionProcessor[
+        UpdateImageByIdAction, EntityOpsResult[ImageData]
+    ]
+    partial_bulk_update: PartialBulkActionProcessor[PartialBulkUpdateImagesAction, ImageData]
+    partial_bulk_delete: PartialBulkActionProcessor[PartialBulkDeleteImagesAction, ImageData]
+    partial_bulk_restore: PartialBulkActionProcessor[PartialBulkRestoreImagesAction, ImageData]
     purge_image_by_id: SingleEntityActionProcessor[PurgeImageByIdAction, PurgeImageByIdActionResult]
     alias_image: GlobalActionProcessor[AliasImageAction, AliasImageActionResult]
     alias_image_by_id: GlobalActionProcessor[AliasImageByIdAction, AliasImageByIdActionResult]
     dealias_image: GlobalActionProcessor[DealiasImageAction, DealiasImageActionResult]
     update_image: GlobalActionProcessor[UpdateImageAction, UpdateImageActionResult]
-    update_image_by_id: GlobalActionProcessor[UpdateImageByIdAction, UpdateImageByIdActionResult]
     preload_image: GlobalActionProcessor[PreloadImageAction, PreloadImageActionResult]
     unload_image: GlobalActionProcessor[UnloadImageAction, UnloadImageActionResult]
     untag_image_from_registry: SingleEntityActionProcessor[
@@ -177,9 +190,12 @@ class ImageProcessors:
         self.forget_image_by_id = group.single_entity(
             ForgetImageByIdAction, service.forget_image_by_id
         )
-        self.restore_image_by_id = group.single_entity(
-            RestoreImageByIdAction, service.restore_image_by_id
-        )
+        self.delete_image_by_id = group.single_delete_ops(DeleteImageByIdAction)
+        self.restore_image_by_id = group.single_restore_ops(RestoreImageByIdAction)
+        self.update_image_by_id = group.single_update_ops(UpdateImageByIdAction)
+        self.partial_bulk_update = group.partial_bulk_update_ops(PartialBulkUpdateImagesAction)
+        self.partial_bulk_delete = group.partial_bulk_delete_ops(PartialBulkDeleteImagesAction)
+        self.partial_bulk_restore = group.partial_bulk_restore_ops(PartialBulkRestoreImagesAction)
         self.purge_image_by_id = group.single_entity(
             PurgeImageByIdAction, service.purge_image_by_id
         )
@@ -189,9 +205,6 @@ class ImageProcessors:
         self.alias_image_by_id = group.global_scope(AliasImageByIdAction, service.alias_image_by_id)
         self.dealias_image = group.global_scope(DealiasImageAction, service.dealias_image)
         self.update_image = group.global_scope(UpdateImageAction, service.update_image)
-        self.update_image_by_id = group.global_scope(
-            UpdateImageByIdAction, service.update_image_by_id
-        )
         self.preload_image = group.global_scope(PreloadImageAction, service.preload_image)
         self.unload_image = group.global_scope(UnloadImageAction, service.unload_image)
         self.untag_image_from_registry = group.single_entity(

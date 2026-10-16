@@ -2,24 +2,18 @@
 
 [무엇을 보장하는가](/src/ai/backend/manager/api/adapters/resource_policy/KNOWLEDGE.md) · [어댑터](/src/ai/backend/manager/api/adapters/resource_policy/adapter.py)
 
-시나리오: 미완 7 / 24
+시나리오: 미완 16 / 33
 
-- ops 로 구성 (24)
+- ops 로 구성 (33)
   - admin_create_keypair_resource_policy — 대표 성공 ✓ · 대표 실패 ✓
   - admin_create_project_resource_policy — 대표 성공 ✓ · 대표 실패 ✓
   - admin_create_user_resource_policy — 대표 성공 ✓ · 대표 실패 ✓
-  - admin_delete_keypair_resource_policy — 대표 성공 ✓ · 대표 실패 ✓
-  - admin_delete_project_resource_policy — 대표 성공 ✓ · 대표 실패 ✓
-  - admin_delete_user_resource_policy — 대표 성공 ✓ · 대표 실패 ✓
   - admin_get_keypair_resource_policy — 대표 성공 ✓ · 대표 실패 ✓
   - admin_get_project_resource_policy — 대표 성공 ✓ · 대표 실패 ✓
   - admin_get_user_resource_policy — 대표 성공 ✓ · 대표 실패 ✓
   - admin_search_keypair_resource_policies — 대표 성공 ✓ · 대표 실패 ✓
   - admin_search_project_resource_policies — 대표 성공 ✓ · 대표 실패 ✓
   - admin_search_user_resource_policies — 대표 성공 ✓ · 대표 실패 ✓
-  - admin_update_keypair_resource_policy — 대표 성공 ✓ · 대표 실패 ✓
-  - admin_update_project_resource_policy — 대표 성공 ✓ · 대표 실패 ✓
-  - admin_update_user_resource_policy — 대표 성공 ✓ · 대표 실패 ✓
   - bulk_get_keypair_resource_policy_ids — 대표 성공 ✗ · 대표 실패 ✗ — SCENARIO-GAP
   - bulk_get_project_resource_policy_ids — 대표 성공 ✗ · 대표 실패 ✗ — SCENARIO-GAP
   - bulk_get_user_resource_policy_ids — 대표 성공 ✗ · 대표 실패 ✗ — SCENARIO-GAP
@@ -29,6 +23,21 @@
   - get_my_keypair_resource_policy — 대표 성공 ✓ · 대표 실패 ✓
   - get_my_user_resource_policy — 대표 성공 ✓ · 대표 실패 ✓
   - get_project_resource_policy — 대표 성공 ✗ · 대표 실패 ✗ — SCENARIO-GAP
+  - lookup_keypair_resource_policy — 대표 성공 ✗ · 대표 실패 ✗ — SCENARIO-GAP
+  - lookup_project_resource_policy — 대표 성공 ✗ · 대표 실패 ✗ — SCENARIO-GAP
+  - lookup_user_resource_policy — 대표 성공 ✗ · 대표 실패 ✗ — SCENARIO-GAP
+  - partial_bulk_purge_keypair_resource_policies — 대표 성공 ✓ · 대표 실패 ✗ — SCENARIO-GAP
+  - partial_bulk_purge_project_resource_policies — 대표 성공 ✓ · 대표 실패 ✗ — SCENARIO-GAP
+  - partial_bulk_purge_user_resource_policies — 대표 성공 ✓ · 대표 실패 ✗ — SCENARIO-GAP
+  - partial_bulk_update_keypair_resource_policies — 대표 성공 ✓ · 대표 실패 ✗ — SCENARIO-GAP
+  - partial_bulk_update_project_resource_policies — 대표 성공 ✓ · 대표 실패 ✗ — SCENARIO-GAP
+  - partial_bulk_update_user_resource_policies — 대표 성공 ✓ · 대표 실패 ✗ — SCENARIO-GAP
+  - purge_keypair_resource_policy — 대표 성공 ✓ · 대표 실패 ✓
+  - purge_project_resource_policy — 대표 성공 ✓ · 대표 실패 ✓
+  - purge_user_resource_policy — 대표 성공 ✓ · 대표 실패 ✓
+  - update_keypair_resource_policy — 대표 성공 ✓ · 대표 실패 ✓
+  - update_project_resource_policy — 대표 성공 ✓ · 대표 실패 ✓
+  - update_user_resource_policy — 대표 성공 ✓ · 대표 실패 ✓
 
 **admin_create_keypair_resource_policy**
 
@@ -63,33 +72,6 @@
 | [이미 다른 사용자 정책이 사용 중인 이름으로 생성하려 하면, 이름 중복으로 거부된다](#creating-a-name-another-user-policy-already-holds-is-refused) | 거부 |
 | [슈퍼관리자가 아닌 사용자가 사용자 정책을 생성하려 하면, 어떤 권한을 받았는지와 무관하게 역할 부족으로 거부된다](#creating-a-user-who-is-not-the-superadmin-may-not-create-a-user-policy) | 거부 |
 | [권한 검사를 꺼도 사용자 정책 생성은 여전히 거부된다](#creating-turning-enforcement-off-still-does-not-let-a-user-create-a-user-policy) | 거부 |
-
-**admin_delete_keypair_resource_policy**
-
-| 시나리오 | 판정 |
-|---|---|
-| [아무도 사용하지 않는 키페어 정책을 슈퍼관리자가 삭제하면, 삭제한 이름이 반환되고 이어서 검색하면 없다](#retiring-the-superadmin-purges-a-keypair-policy-nobody-holds) | 성공 |
-| [같은 키페어 정책이 있고 아무 권한도 없는 사용자가 삭제하려 하면, 삭제 로직에 이르기 전에 정책을 찾을 수 없다는 이유로 거부된다](#retiring-a-user-granted-nothing-may-not-purge-a-keypair-policy) | 거부 |
-| [슈퍼관리자가 어느 키페어 정책에도 없는 이름을 삭제하려 하면, 권한 문제가 아니라 대상이 없다는 것으로 거부된다](#retiring-purging-a-keypair-policy-name-nothing-answers-to-is-not-found) | 거부 |
-| [아직 누군가에게 할당된 키페어 정책을 슈퍼관리자가 삭제하려 하면, 아직 참조 중이라는 이유로 거부된다. 막는 것은 삭제 spec이 아니라 외래 키다](#retiring-purging-a-keypair-policy-still-held-is-refused) | 거부 |
-
-**admin_delete_project_resource_policy**
-
-| 시나리오 | 판정 |
-|---|---|
-| [아무도 사용하지 않는 프로젝트 정책을 슈퍼관리자가 삭제하면, 삭제한 이름이 반환되고 이어서 검색하면 없다](#retiring-the-superadmin-purges-a-project-policy-nobody-holds) | 성공 |
-| [같은 프로젝트 정책이 있고 아무 권한도 없는 사용자가 삭제하려 하면, 삭제 로직에 이르기 전에 정책을 찾을 수 없다는 이유로 거부된다](#retiring-a-user-granted-nothing-may-not-purge-a-project-policy) | 거부 |
-| [슈퍼관리자가 어느 프로젝트 정책에도 없는 이름을 삭제하려 하면, 권한 문제가 아니라 대상이 없다는 것으로 거부된다](#retiring-purging-a-project-policy-name-nothing-answers-to-is-not-found) | 거부 |
-| [아직 누군가에게 할당된 프로젝트 정책을 슈퍼관리자가 삭제하려 하면, 아직 참조 중이라는 이유로 거부된다. 막는 것은 삭제 spec이 아니라 외래 키다](#retiring-purging-a-project-policy-still-held-is-refused) | 거부 |
-
-**admin_delete_user_resource_policy**
-
-| 시나리오 | 판정 |
-|---|---|
-| [아무도 사용하지 않는 사용자 정책을 슈퍼관리자가 삭제하면, 삭제한 이름이 반환되고 이어서 검색하면 없다](#retiring-the-superadmin-purges-a-user-policy-nobody-holds) | 성공 |
-| [같은 사용자 정책이 있고 아무 권한도 없는 사용자가 삭제하려 하면, 삭제 로직에 이르기 전에 정책을 찾을 수 없다는 이유로 거부된다](#retiring-a-user-granted-nothing-may-not-purge-a-user-policy) | 거부 |
-| [슈퍼관리자가 어느 사용자 정책에도 없는 이름을 삭제하려 하면, 권한 문제가 아니라 대상이 없다는 것으로 거부된다](#retiring-purging-a-user-policy-name-nothing-answers-to-is-not-found) | 거부 |
-| [아직 누군가에게 할당된 사용자 정책을 슈퍼관리자가 삭제하려 하면, 아직 참조 중이라는 이유로 거부된다. 막는 것은 삭제 spec이 아니라 외래 키다](#retiring-purging-a-user-policy-still-held-is-refused) | 거부 |
 
 **admin_get_keypair_resource_policy**
 
@@ -146,39 +128,6 @@
 | [사용자 정책 여럿이 있고 슈퍼관리자가 필터 없이 전체를 검색하면, 미리 만들어 둔 정책이 모두, 그리고 그것만 반환된다](#searching-the-superadmin-finds-every-user-policy) | 성공 |
 | [슈퍼관리자가 아닌 사용자가 사용자 정책 전체를 검색하려 하면 역할 부족으로 거부된다](#searching-a-user-who-is-not-the-superadmin-may-not-search-user-policy) | 거부 |
 
-**admin_update_keypair_resource_policy**
-
-| 시나리오 | 판정 |
-|---|---|
-| [슈퍼관리자가 키페어 정책의 비울 수 없는 항목을 비우도록 수정하면, 그 요청은 무시되어 아무것도 바뀌지 않은 노드가 반환된다](#editing-clearing-a-non-nullable-value-of-a-keypair-policy-leaves-it-as-it-was) | 성공 |
-| [비울 수 있는 항목에 값이 설정된 키페어 정책을 슈퍼관리자가 그 항목을 비우도록 수정하면, 그 항목이 비어 있는 노드가 반환된다](#editing-clearing-a-nullable-value-of-a-keypair-policy-empties-it) | 성공 |
-| [슈퍼관리자가 키페어 정책을 지정만 하고 아무 값도 주지 않으면, 아무것도 바뀌지 않은 노드가 반환된다](#editing-giving-no-value-changes-nothing-of-a-keypair-policy) | 성공 |
-| [키페어 정책 하나가 있고 슈퍼관리자가 한도 하나만 수정하면, 그 한도만 새 값이 되고 나머지는 그대로 유지된다](#editing-the-superadmin-changes-one-limit-of-a-keypair-policy) | 성공 |
-| [같은 키페어 정책이 있고 아무 권한도 없는 사용자가 수정하려 하면, 수정 로직에 이르기 전에 정책을 찾을 수 없다는 이유로 거부된다](#editing-a-user-granted-nothing-may-not-edit-a-keypair-policy) | 거부 |
-| [슈퍼관리자가 어느 키페어 정책에도 없는 이름을 수정하려 하면, 권한 문제가 아니라 대상이 없다는 것으로 거부된다](#editing-editing-a-keypair-policy-name-nothing-answers-to-is-not-found) | 거부 |
-| [슈퍼관리자가 키페어 정책의 우선순위 상한을 세션 우선순위 범위 밖으로 수정하려 하면, 제약 위반으로 거부된다](#editing-moving-the-priority-cap-outside-the-session-range-is-refused) | 거부 |
-
-**admin_update_project_resource_policy**
-
-| 시나리오 | 판정 |
-|---|---|
-| [슈퍼관리자가 프로젝트 정책의 비울 수 없는 항목을 비우도록 수정하면, 그 요청은 무시되어 아무것도 바뀌지 않은 노드가 반환된다](#editing-clearing-a-non-nullable-value-of-a-project-policy-leaves-it-as-it-was) | 성공 |
-| [슈퍼관리자가 프로젝트 정책을 지정만 하고 아무 값도 주지 않으면, 아무것도 바뀌지 않은 노드가 반환된다](#editing-giving-no-value-changes-nothing-of-a-project-policy) | 성공 |
-| [프로젝트 정책 하나가 있고 슈퍼관리자가 한도 하나만 수정하면, 그 한도만 새 값이 되고 나머지는 그대로 유지된다](#editing-the-superadmin-changes-one-limit-of-a-project-policy) | 성공 |
-| [같은 프로젝트 정책이 있고 아무 권한도 없는 사용자가 수정하려 하면, 수정 로직에 이르기 전에 정책을 찾을 수 없다는 이유로 거부된다](#editing-a-user-granted-nothing-may-not-edit-a-project-policy) | 거부 |
-| [슈퍼관리자가 어느 프로젝트 정책에도 없는 이름을 수정하려 하면, 권한 문제가 아니라 대상이 없다는 것으로 거부된다](#editing-editing-a-project-policy-name-nothing-answers-to-is-not-found) | 거부 |
-
-**admin_update_user_resource_policy**
-
-| 시나리오 | 판정 |
-|---|---|
-| [슈퍼관리자가 사용자 정책의 비울 수 없는 항목을 비우도록 수정하면, 그 요청은 무시되어 아무것도 바뀌지 않은 노드가 반환된다](#editing-clearing-a-non-nullable-value-of-a-user-policy-leaves-it-as-it-was) | 성공 |
-| [비울 수 있는 항목에 값이 설정된 사용자 정책을 슈퍼관리자가 그 항목을 비우도록 수정하면, 그 항목이 비어 있는 노드가 반환된다](#editing-clearing-a-nullable-value-of-a-user-policy-empties-it) | 성공 |
-| [슈퍼관리자가 사용자 정책을 지정만 하고 아무 값도 주지 않으면, 아무것도 바뀌지 않은 노드가 반환된다](#editing-giving-no-value-changes-nothing-of-a-user-policy) | 성공 |
-| [사용자 정책 하나가 있고 슈퍼관리자가 한도 하나만 수정하면, 그 한도만 새 값이 되고 나머지는 그대로 유지된다](#editing-the-superadmin-changes-one-limit-of-a-user-policy) | 성공 |
-| [같은 사용자 정책이 있고 아무 권한도 없는 사용자가 수정하려 하면, 수정 로직에 이르기 전에 정책을 찾을 수 없다는 이유로 거부된다](#editing-a-user-granted-nothing-may-not-edit-a-user-policy) | 거부 |
-| [슈퍼관리자가 어느 사용자 정책에도 없는 이름을 수정하려 하면, 권한 문제가 아니라 대상이 없다는 것으로 거부된다](#editing-editing-a-user-policy-name-nothing-answers-to-is-not-found) | 거부 |
-
 **get_my_keypair_resource_policy**
 
 | 시나리오 | 판정 |
@@ -197,6 +146,111 @@
 | [자기 스코프에서 사용자 정책을 읽을 권한을 받은 사용자가 자기 정책을 조회하면, 그 사용자에게 할당된 정책 전체가 반환된다](#reading_own-a-user-granted-read-in-their-own-scope-reads-their-user-policy) | 성공 |
 | [권한 검사를 끄면 아무 권한도 없는 사용자도 자기 사용자 정책을 조회할 수 있다](#reading_own-turning-enforcement-off-lets-a-user-granted-nothing-read-their-own-user-policy) | 성공 |
 | [아무 권한도 없는 사용자가 자기 사용자 정책을 조회하면 권한 부족으로 거부된다. 자기 정책을 읽는 호출도 범위만 좁히는 것이 아니라 권한을 검사한다](#reading_own-a-user-granted-nothing-may-not-read-their-own-user-policy) | 거부 |
+
+**partial_bulk_purge_keypair_resource_policies**
+
+| 시나리오 | 판정 |
+|---|---|
+| [아무 권한도 받지 않은 사용자가 키페어 정책 여럿을 한 번에 삭제하려 하면, 삭제된 것 없이 모두 권한이 없다는 이유로 실패 목록에 온다](#partial_bulk_purging-a-user-granted-nothing-purges-none-of-several-keypair-policys) | 성공 |
+| [슈퍼관리자가 아무도 사용하지 않는 키페어 정책 둘과 없는 id 하나를 한 번에 삭제하면, 둘은 처리된 목록에 오고 없는 id 는 대상이 없다는 이유로 실패 목록에 온다](#partial_bulk_purging-purging-several-keypair-policys-answers-for-the-missing-one) | 성공 |
+| [슈퍼관리자가 아직 할당된 키페어 정책과 아무도 사용하지 않는 것을 한 번에 삭제하면, 사용하지 않는 것은 처리된 목록에 오고 할당된 것은 아직 참조 중이라는 이유로 실패 목록에 온다](#partial_bulk_purging-purging-several-keypair-policys-answers-for-the-one-still-held) | 성공 |
+
+**partial_bulk_purge_project_resource_policies**
+
+| 시나리오 | 판정 |
+|---|---|
+| [아무 권한도 받지 않은 사용자가 프로젝트 정책 여럿을 한 번에 삭제하려 하면, 삭제된 것 없이 모두 권한이 없다는 이유로 실패 목록에 온다](#partial_bulk_purging-a-user-granted-nothing-purges-none-of-several-project-policys) | 성공 |
+| [슈퍼관리자가 아무도 사용하지 않는 프로젝트 정책 둘과 없는 id 하나를 한 번에 삭제하면, 둘은 처리된 목록에 오고 없는 id 는 대상이 없다는 이유로 실패 목록에 온다](#partial_bulk_purging-purging-several-project-policys-answers-for-the-missing-one) | 성공 |
+| [슈퍼관리자가 아직 할당된 프로젝트 정책과 아무도 사용하지 않는 것을 한 번에 삭제하면, 사용하지 않는 것은 처리된 목록에 오고 할당된 것은 아직 참조 중이라는 이유로 실패 목록에 온다](#partial_bulk_purging-purging-several-project-policys-answers-for-the-one-still-held) | 성공 |
+
+**partial_bulk_purge_user_resource_policies**
+
+| 시나리오 | 판정 |
+|---|---|
+| [아무 권한도 받지 않은 사용자가 사용자 정책 여럿을 한 번에 삭제하려 하면, 삭제된 것 없이 모두 권한이 없다는 이유로 실패 목록에 온다](#partial_bulk_purging-a-user-granted-nothing-purges-none-of-several-user-policys) | 성공 |
+| [슈퍼관리자가 아무도 사용하지 않는 사용자 정책 둘과 없는 id 하나를 한 번에 삭제하면, 둘은 처리된 목록에 오고 없는 id 는 대상이 없다는 이유로 실패 목록에 온다](#partial_bulk_purging-purging-several-user-policys-answers-for-the-missing-one) | 성공 |
+| [슈퍼관리자가 아직 할당된 사용자 정책과 아무도 사용하지 않는 것을 한 번에 삭제하면, 사용하지 않는 것은 처리된 목록에 오고 할당된 것은 아직 참조 중이라는 이유로 실패 목록에 온다](#partial_bulk_purging-purging-several-user-policys-answers-for-the-one-still-held) | 성공 |
+
+**partial_bulk_update_keypair_resource_policies**
+
+| 시나리오 | 판정 |
+|---|---|
+| [아무 권한도 받지 않은 사용자가 키페어 정책 여럿을 한 번에 수정하려 하면, 수정된 것 없이 모두 권한이 없다는 이유로 실패 목록에 온다](#partial_bulk_editing-a-user-granted-nothing-edits-none-of-several-keypair-policys) | 성공 |
+| [슈퍼관리자가 키페어 정책 여럿의 한도 하나를 한 번에 바꾸면, 모두 그 한도만 새 값으로 오고 실패한 것은 없다](#partial_bulk_editing-the-superadmin-edits-several-keypair-policys-at-once) | 성공 |
+
+**partial_bulk_update_project_resource_policies**
+
+| 시나리오 | 판정 |
+|---|---|
+| [아무 권한도 받지 않은 사용자가 프로젝트 정책 여럿을 한 번에 수정하려 하면, 수정된 것 없이 모두 권한이 없다는 이유로 실패 목록에 온다](#partial_bulk_editing-a-user-granted-nothing-edits-none-of-several-project-policys) | 성공 |
+| [슈퍼관리자가 프로젝트 정책 여럿의 한도 하나를 한 번에 바꾸면, 모두 그 한도만 새 값으로 오고 실패한 것은 없다](#partial_bulk_editing-the-superadmin-edits-several-project-policys-at-once) | 성공 |
+
+**partial_bulk_update_user_resource_policies**
+
+| 시나리오 | 판정 |
+|---|---|
+| [아무 권한도 받지 않은 사용자가 사용자 정책 여럿을 한 번에 수정하려 하면, 수정된 것 없이 모두 권한이 없다는 이유로 실패 목록에 온다](#partial_bulk_editing-a-user-granted-nothing-edits-none-of-several-user-policys) | 성공 |
+| [슈퍼관리자가 사용자 정책 여럿의 한도 하나를 한 번에 바꾸면, 모두 그 한도만 새 값으로 오고 실패한 것은 없다](#partial_bulk_editing-the-superadmin-edits-several-user-policys-at-once) | 성공 |
+
+**purge_keypair_resource_policy**
+
+| 시나리오 | 판정 |
+|---|---|
+| [아무도 사용하지 않는 키페어 정책을 슈퍼관리자가 삭제하면, 삭제한 이름이 반환되고 이어서 검색하면 없다](#retiring-the-superadmin-purges-a-keypair-policy-nobody-holds) | 성공 |
+| [같은 키페어 정책이 있고 아무 권한도 없는 사용자가 삭제하려 하면, 삭제 로직에 이르기 전에 정책을 찾을 수 없다는 이유로 거부된다](#retiring-a-user-granted-nothing-may-not-purge-a-keypair-policy) | 거부 |
+| [슈퍼관리자가 어느 키페어 정책에도 없는 이름을 삭제하려 하면, 권한 문제가 아니라 대상이 없다는 것으로 거부된다](#retiring-purging-a-keypair-policy-name-nothing-answers-to-is-not-found) | 거부 |
+| [아직 누군가에게 할당된 키페어 정책을 슈퍼관리자가 삭제하려 하면, 아직 참조 중이라는 이유로 거부된다. 막는 것은 삭제 spec이 아니라 외래 키다](#retiring-purging-a-keypair-policy-still-held-is-refused) | 거부 |
+
+**purge_project_resource_policy**
+
+| 시나리오 | 판정 |
+|---|---|
+| [아무도 사용하지 않는 프로젝트 정책을 슈퍼관리자가 삭제하면, 삭제한 이름이 반환되고 이어서 검색하면 없다](#retiring-the-superadmin-purges-a-project-policy-nobody-holds) | 성공 |
+| [같은 프로젝트 정책이 있고 아무 권한도 없는 사용자가 삭제하려 하면, 삭제 로직에 이르기 전에 정책을 찾을 수 없다는 이유로 거부된다](#retiring-a-user-granted-nothing-may-not-purge-a-project-policy) | 거부 |
+| [슈퍼관리자가 어느 프로젝트 정책에도 없는 이름을 삭제하려 하면, 권한 문제가 아니라 대상이 없다는 것으로 거부된다](#retiring-purging-a-project-policy-name-nothing-answers-to-is-not-found) | 거부 |
+| [아직 누군가에게 할당된 프로젝트 정책을 슈퍼관리자가 삭제하려 하면, 아직 참조 중이라는 이유로 거부된다. 막는 것은 삭제 spec이 아니라 외래 키다](#retiring-purging-a-project-policy-still-held-is-refused) | 거부 |
+
+**purge_user_resource_policy**
+
+| 시나리오 | 판정 |
+|---|---|
+| [아무도 사용하지 않는 사용자 정책을 슈퍼관리자가 삭제하면, 삭제한 이름이 반환되고 이어서 검색하면 없다](#retiring-the-superadmin-purges-a-user-policy-nobody-holds) | 성공 |
+| [같은 사용자 정책이 있고 아무 권한도 없는 사용자가 삭제하려 하면, 삭제 로직에 이르기 전에 정책을 찾을 수 없다는 이유로 거부된다](#retiring-a-user-granted-nothing-may-not-purge-a-user-policy) | 거부 |
+| [슈퍼관리자가 어느 사용자 정책에도 없는 이름을 삭제하려 하면, 권한 문제가 아니라 대상이 없다는 것으로 거부된다](#retiring-purging-a-user-policy-name-nothing-answers-to-is-not-found) | 거부 |
+| [아직 누군가에게 할당된 사용자 정책을 슈퍼관리자가 삭제하려 하면, 아직 참조 중이라는 이유로 거부된다. 막는 것은 삭제 spec이 아니라 외래 키다](#retiring-purging-a-user-policy-still-held-is-refused) | 거부 |
+
+**update_keypair_resource_policy**
+
+| 시나리오 | 판정 |
+|---|---|
+| [슈퍼관리자가 키페어 정책의 비울 수 없는 항목을 비우도록 수정하면, 그 요청은 무시되어 아무것도 바뀌지 않은 노드가 반환된다](#editing-clearing-a-non-nullable-value-of-a-keypair-policy-leaves-it-as-it-was) | 성공 |
+| [비울 수 있는 항목에 값이 설정된 키페어 정책을 슈퍼관리자가 그 항목을 비우도록 수정하면, 그 항목이 비어 있는 노드가 반환된다](#editing-clearing-a-nullable-value-of-a-keypair-policy-empties-it) | 성공 |
+| [슈퍼관리자가 키페어 정책을 지정만 하고 아무 값도 주지 않으면, 아무것도 바뀌지 않은 노드가 반환된다](#editing-giving-no-value-changes-nothing-of-a-keypair-policy) | 성공 |
+| [키페어 정책 하나가 있고 슈퍼관리자가 한도 하나만 수정하면, 그 한도만 새 값이 되고 나머지는 그대로 유지된다](#editing-the-superadmin-changes-one-limit-of-a-keypair-policy) | 성공 |
+| [같은 키페어 정책이 있고 아무 권한도 없는 사용자가 수정하려 하면, 수정 로직에 이르기 전에 정책을 찾을 수 없다는 이유로 거부된다](#editing-a-user-granted-nothing-may-not-edit-a-keypair-policy) | 거부 |
+| [슈퍼관리자가 어느 키페어 정책에도 없는 이름을 수정하려 하면, 권한 문제가 아니라 대상이 없다는 것으로 거부된다](#editing-editing-a-keypair-policy-name-nothing-answers-to-is-not-found) | 거부 |
+| [슈퍼관리자가 키페어 정책의 우선순위 상한을 세션 우선순위 범위 밖으로 수정하려 하면, 제약 위반으로 거부된다](#editing-moving-the-priority-cap-outside-the-session-range-is-refused) | 거부 |
+
+**update_project_resource_policy**
+
+| 시나리오 | 판정 |
+|---|---|
+| [슈퍼관리자가 프로젝트 정책의 비울 수 없는 항목을 비우도록 수정하면, 그 요청은 무시되어 아무것도 바뀌지 않은 노드가 반환된다](#editing-clearing-a-non-nullable-value-of-a-project-policy-leaves-it-as-it-was) | 성공 |
+| [슈퍼관리자가 프로젝트 정책을 지정만 하고 아무 값도 주지 않으면, 아무것도 바뀌지 않은 노드가 반환된다](#editing-giving-no-value-changes-nothing-of-a-project-policy) | 성공 |
+| [프로젝트 정책 하나가 있고 슈퍼관리자가 한도 하나만 수정하면, 그 한도만 새 값이 되고 나머지는 그대로 유지된다](#editing-the-superadmin-changes-one-limit-of-a-project-policy) | 성공 |
+| [같은 프로젝트 정책이 있고 아무 권한도 없는 사용자가 수정하려 하면, 수정 로직에 이르기 전에 정책을 찾을 수 없다는 이유로 거부된다](#editing-a-user-granted-nothing-may-not-edit-a-project-policy) | 거부 |
+| [슈퍼관리자가 어느 프로젝트 정책에도 없는 이름을 수정하려 하면, 권한 문제가 아니라 대상이 없다는 것으로 거부된다](#editing-editing-a-project-policy-name-nothing-answers-to-is-not-found) | 거부 |
+
+**update_user_resource_policy**
+
+| 시나리오 | 판정 |
+|---|---|
+| [슈퍼관리자가 사용자 정책의 비울 수 없는 항목을 비우도록 수정하면, 그 요청은 무시되어 아무것도 바뀌지 않은 노드가 반환된다](#editing-clearing-a-non-nullable-value-of-a-user-policy-leaves-it-as-it-was) | 성공 |
+| [비울 수 있는 항목에 값이 설정된 사용자 정책을 슈퍼관리자가 그 항목을 비우도록 수정하면, 그 항목이 비어 있는 노드가 반환된다](#editing-clearing-a-nullable-value-of-a-user-policy-empties-it) | 성공 |
+| [슈퍼관리자가 사용자 정책을 지정만 하고 아무 값도 주지 않으면, 아무것도 바뀌지 않은 노드가 반환된다](#editing-giving-no-value-changes-nothing-of-a-user-policy) | 성공 |
+| [사용자 정책 하나가 있고 슈퍼관리자가 한도 하나만 수정하면, 그 한도만 새 값이 되고 나머지는 그대로 유지된다](#editing-the-superadmin-changes-one-limit-of-a-user-policy) | 성공 |
+| [같은 사용자 정책이 있고 아무 권한도 없는 사용자가 수정하려 하면, 수정 로직에 이르기 전에 정책을 찾을 수 없다는 이유로 거부된다](#editing-a-user-granted-nothing-may-not-edit-a-user-policy) | 거부 |
+| [슈퍼관리자가 어느 사용자 정책에도 없는 이름을 수정하려 하면, 권한 문제가 아니라 대상이 없다는 것으로 거부된다](#editing-editing-a-user-policy-name-nothing-answers-to-is-not-found) | 거부 |
 
 ### admin_create_keypair_resource_policy
 
@@ -755,324 +809,6 @@ Then
 
 - 거부된다
   - 거부: InsufficientPrivilege
-
-### admin_delete_keypair_resource_policy
-
-<a id="retiring-the-superadmin-purges-a-keypair-policy-nobody-holds"></a>
-
-#### [the-superadmin-purges-a-keypair-policy-nobody-holds](/tests/scenario/bai_scenario/manager/resource_policy/test_retiring.py) — pass
-
-아무도 사용하지 않는 키페어 정책을 슈퍼관리자가 삭제하면, 삭제한 이름이 반환되고 이어서 검색하면 없다
-
-Given
-
-- 아무도 사용하지 않는 키페어 정책 하나와, superadmin 한 명
-  - 도메인 home-1
-  - 정책이 할당된 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
-  - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
-
-When
-
-- ResourcePolicyAdapter.admin_delete_keypair_resource_policy — user-1이 keypair-policy-2 삭제 후 같은 이름으로 다시 검색
-
-Then
-
-- 삭제한 이름이 반환되고 다시 검색하면 없다
-  - name = 'keypair-policy-2'
-  - found afterwards = 0
-
-<a id="retiring-a-user-granted-nothing-may-not-purge-a-keypair-policy"></a>
-
-#### [a-user-granted-nothing-may-not-purge-a-keypair-policy](/tests/scenario/bai_scenario/manager/resource_policy/test_retiring.py) — pass
-
-같은 키페어 정책이 있고 아무 권한도 없는 사용자가 삭제하려 하면, 삭제 로직에 이르기 전에 정책을 찾을 수 없다는 이유로 거부된다
-
-Given
-
-- 아무도 사용하지 않는 키페어 정책 하나와, user 한 명
-  - 도메인 home-1
-  - 정책이 할당된 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-  - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
-
-When
-
-- ResourcePolicyAdapter.admin_delete_keypair_resource_policy — user-1이 keypair-policy-2 삭제 후 같은 이름으로 다시 검색
-
-Then
-
-- 거부된다
-  - 거부: GenericBadRequest
-
-<a id="retiring-purging-a-keypair-policy-name-nothing-answers-to-is-not-found"></a>
-
-#### [purging-a-keypair-policy-name-nothing-answers-to-is-not-found](/tests/scenario/bai_scenario/manager/resource_policy/test_retiring.py) — pass
-
-슈퍼관리자가 어느 키페어 정책에도 없는 이름을 삭제하려 하면, 권한 문제가 아니라 대상이 없다는 것으로 거부된다
-
-Given
-
-- 아무도 사용하지 않는 키페어 정책 하나와, superadmin 한 명
-  - 도메인 home-1
-  - 정책이 할당된 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
-  - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
-
-When
-
-- ResourcePolicyAdapter.admin_delete_keypair_resource_policy — user-1이 nobody 삭제 후 같은 이름으로 다시 검색
-
-Then
-
-- 거부된다
-  - 거부: EntityNotFoundError
-
-<a id="retiring-purging-a-keypair-policy-still-held-is-refused"></a>
-
-#### [purging-a-keypair-policy-still-held-is-refused](/tests/scenario/bai_scenario/manager/resource_policy/test_retiring.py) — pass
-
-아직 누군가에게 할당된 키페어 정책을 슈퍼관리자가 삭제하려 하면, 아직 참조 중이라는 이유로 거부된다. 막는 것은 삭제 spec이 아니라 외래 키다
-
-Given
-
-- superadmin 한 명과, 그 사용자에게 아직 할당된 키페어 정책
-  - 도메인 home-1
-  - 정책이 할당된 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
-
-When
-
-- ResourcePolicyAdapter.admin_delete_keypair_resource_policy — user-1이 keypair-policy-1 삭제 후 같은 이름으로 다시 검색
-
-Then
-
-- 거부된다
-  - 거부: ForeignKeyViolationError
-
-### admin_delete_project_resource_policy
-
-<a id="retiring-the-superadmin-purges-a-project-policy-nobody-holds"></a>
-
-#### [the-superadmin-purges-a-project-policy-nobody-holds](/tests/scenario/bai_scenario/manager/resource_policy/test_retiring.py) — pass
-
-아무도 사용하지 않는 프로젝트 정책을 슈퍼관리자가 삭제하면, 삭제한 이름이 반환되고 이어서 검색하면 없다
-
-Given
-
-- 아무도 사용하지 않는 프로젝트 정책 하나와, superadmin 한 명
-  - 도메인 home-1
-  - 정책이 할당된 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
-  - 프로젝트 정책 project-policy-1: 프로젝트 하나당 폴더 10개까지
-
-When
-
-- ResourcePolicyAdapter.admin_delete_project_resource_policy — user-1이 project-policy-1 삭제 후 같은 이름으로 다시 검색
-
-Then
-
-- 삭제한 이름이 반환되고 다시 검색하면 없다
-  - name = 'project-policy-1'
-  - found afterwards = 0
-
-<a id="retiring-a-user-granted-nothing-may-not-purge-a-project-policy"></a>
-
-#### [a-user-granted-nothing-may-not-purge-a-project-policy](/tests/scenario/bai_scenario/manager/resource_policy/test_retiring.py) — pass
-
-같은 프로젝트 정책이 있고 아무 권한도 없는 사용자가 삭제하려 하면, 삭제 로직에 이르기 전에 정책을 찾을 수 없다는 이유로 거부된다
-
-Given
-
-- 아무도 사용하지 않는 프로젝트 정책 하나와, user 한 명
-  - 도메인 home-1
-  - 정책이 할당된 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-  - 프로젝트 정책 project-policy-1: 프로젝트 하나당 폴더 10개까지
-
-When
-
-- ResourcePolicyAdapter.admin_delete_project_resource_policy — user-1이 project-policy-1 삭제 후 같은 이름으로 다시 검색
-
-Then
-
-- 거부된다
-  - 거부: GenericBadRequest
-
-<a id="retiring-purging-a-project-policy-name-nothing-answers-to-is-not-found"></a>
-
-#### [purging-a-project-policy-name-nothing-answers-to-is-not-found](/tests/scenario/bai_scenario/manager/resource_policy/test_retiring.py) — pass
-
-슈퍼관리자가 어느 프로젝트 정책에도 없는 이름을 삭제하려 하면, 권한 문제가 아니라 대상이 없다는 것으로 거부된다
-
-Given
-
-- 아무도 사용하지 않는 프로젝트 정책 하나와, superadmin 한 명
-  - 도메인 home-1
-  - 정책이 할당된 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
-  - 프로젝트 정책 project-policy-1: 프로젝트 하나당 폴더 10개까지
-
-When
-
-- ResourcePolicyAdapter.admin_delete_project_resource_policy — user-1이 nobody 삭제 후 같은 이름으로 다시 검색
-
-Then
-
-- 거부된다
-  - 거부: EntityNotFoundError
-
-<a id="retiring-purging-a-project-policy-still-held-is-refused"></a>
-
-#### [purging-a-project-policy-still-held-is-refused](/tests/scenario/bai_scenario/manager/resource_policy/test_retiring.py) — pass
-
-아직 누군가에게 할당된 프로젝트 정책을 슈퍼관리자가 삭제하려 하면, 아직 참조 중이라는 이유로 거부된다. 막는 것은 삭제 spec이 아니라 외래 키다
-
-Given
-
-- superadmin 한 명과, 그 사용자에게 아직 할당된 프로젝트 정책
-  - 도메인 home-1
-  - 정책이 할당된 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
-
-When
-
-- ResourcePolicyAdapter.admin_delete_project_resource_policy — user-1이 default 삭제 후 같은 이름으로 다시 검색
-
-Then
-
-- 거부된다
-  - 거부: ForeignKeyViolationError
-
-### admin_delete_user_resource_policy
-
-<a id="retiring-the-superadmin-purges-a-user-policy-nobody-holds"></a>
-
-#### [the-superadmin-purges-a-user-policy-nobody-holds](/tests/scenario/bai_scenario/manager/resource_policy/test_retiring.py) — pass
-
-아무도 사용하지 않는 사용자 정책을 슈퍼관리자가 삭제하면, 삭제한 이름이 반환되고 이어서 검색하면 없다
-
-Given
-
-- 아무도 사용하지 않는 사용자 정책 하나와, superadmin 한 명
-  - 도메인 home-1
-  - 정책이 할당된 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
-  - 사용자 정책 user-policy-2: 사용자 한 명당 폴더 10개까지
-
-When
-
-- ResourcePolicyAdapter.admin_delete_user_resource_policy — user-1이 user-policy-2 삭제 후 같은 이름으로 다시 검색
-
-Then
-
-- 삭제한 이름이 반환되고 다시 검색하면 없다
-  - name = 'user-policy-2'
-  - found afterwards = 0
-
-<a id="retiring-a-user-granted-nothing-may-not-purge-a-user-policy"></a>
-
-#### [a-user-granted-nothing-may-not-purge-a-user-policy](/tests/scenario/bai_scenario/manager/resource_policy/test_retiring.py) — pass
-
-같은 사용자 정책이 있고 아무 권한도 없는 사용자가 삭제하려 하면, 삭제 로직에 이르기 전에 정책을 찾을 수 없다는 이유로 거부된다
-
-Given
-
-- 아무도 사용하지 않는 사용자 정책 하나와, user 한 명
-  - 도메인 home-1
-  - 정책이 할당된 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-  - 사용자 정책 user-policy-2: 사용자 한 명당 폴더 10개까지
-
-When
-
-- ResourcePolicyAdapter.admin_delete_user_resource_policy — user-1이 user-policy-2 삭제 후 같은 이름으로 다시 검색
-
-Then
-
-- 거부된다
-  - 거부: GenericBadRequest
-
-<a id="retiring-purging-a-user-policy-name-nothing-answers-to-is-not-found"></a>
-
-#### [purging-a-user-policy-name-nothing-answers-to-is-not-found](/tests/scenario/bai_scenario/manager/resource_policy/test_retiring.py) — pass
-
-슈퍼관리자가 어느 사용자 정책에도 없는 이름을 삭제하려 하면, 권한 문제가 아니라 대상이 없다는 것으로 거부된다
-
-Given
-
-- 아무도 사용하지 않는 사용자 정책 하나와, superadmin 한 명
-  - 도메인 home-1
-  - 정책이 할당된 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
-  - 사용자 정책 user-policy-2: 사용자 한 명당 폴더 10개까지
-
-When
-
-- ResourcePolicyAdapter.admin_delete_user_resource_policy — user-1이 nobody 삭제 후 같은 이름으로 다시 검색
-
-Then
-
-- 거부된다
-  - 거부: EntityNotFoundError
-
-<a id="retiring-purging-a-user-policy-still-held-is-refused"></a>
-
-#### [purging-a-user-policy-still-held-is-refused](/tests/scenario/bai_scenario/manager/resource_policy/test_retiring.py) — pass
-
-아직 누군가에게 할당된 사용자 정책을 슈퍼관리자가 삭제하려 하면, 아직 참조 중이라는 이유로 거부된다. 막는 것은 삭제 spec이 아니라 외래 키다
-
-Given
-
-- superadmin 한 명과, 그 사용자에게 아직 할당된 사용자 정책
-  - 도메인 home-1
-  - 정책이 할당된 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
-
-When
-
-- ResourcePolicyAdapter.admin_delete_user_resource_policy — user-1이 user-policy-1 삭제 후 같은 이름으로 다시 검색
-
-Then
-
-- 거부된다
-  - 거부: ForeignKeyViolationError
 
 ### admin_get_keypair_resource_policy
 
@@ -1809,575 +1545,6 @@ Then
 - 거부된다
   - 거부: InsufficientPrivilege
 
-### admin_update_keypair_resource_policy
-
-<a id="editing-clearing-a-non-nullable-value-of-a-keypair-policy-leaves-it-as-it-was"></a>
-
-#### [clearing-a-non-nullable-value-of-a-keypair-policy-leaves-it-as-it-was](/tests/scenario/bai_scenario/manager/resource_policy/test_editing.py) — pass
-
-슈퍼관리자가 키페어 정책의 비울 수 없는 항목을 비우도록 수정하면, 그 요청은 무시되어 아무것도 바뀌지 않은 노드가 반환된다
-
-Given
-
-- 아무도 사용하지 않는 키페어 정책 하나와, superadmin 한 명
-  - 도메인 home-1
-  - 정책이 할당된 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
-  - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
-
-When
-
-- ResourcePolicyAdapter.admin_update_keypair_resource_policy — user-1이 keypair-policy-2 수정 (동시 세션 수 비우기)
-
-Then
-
-- 미리 만들어 둔 키페어 정책 전체가 반환된다
-  - id = 'keypair-policy-2'
-  - name = 'keypair-policy-2'
-  - created_at: 이 실행이 쓴 시각
-  - default_for_unspecified = <DefaultForUnspecified.UNLIMITED: 'UNLIMITED'>
-  - total_resource_slots = []
-  - max_session_lifetime = 0
-  - max_concurrent_sessions = 5
-  - max_pending_session_count = None
-  - max_priority = None
-  - max_pending_session_resource_slots = None
-  - max_concurrent_sftp_sessions = 1
-  - max_containers_per_session = 1
-  - idle_timeout = 3600
-  - allowed_vfolder_hosts = []
-
-<a id="editing-clearing-a-nullable-value-of-a-keypair-policy-empties-it"></a>
-
-#### [clearing-a-nullable-value-of-a-keypair-policy-empties-it](/tests/scenario/bai_scenario/manager/resource_policy/test_editing.py) — pass
-
-비울 수 있는 항목에 값이 설정된 키페어 정책을 슈퍼관리자가 그 항목을 비우도록 수정하면, 그 항목이 비어 있는 노드가 반환된다
-
-Given
-
-- 아무도 사용하지 않는 키페어 정책 하나와, superadmin 한 명
-  - 도메인 home-1
-  - 정책이 할당된 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
-  - 키페어 정책 keypair-policy-2: 동시 세션 5개까지, 그중 대기 2개까지
-
-When
-
-- ResourcePolicyAdapter.admin_update_keypair_resource_policy — user-1이 keypair-policy-2 수정 (대기 세션 수 비우기)
-
-Then
-
-- 미리 만들어 둔 키페어 정책 전체가 반환된다
-  - id = 'keypair-policy-2'
-  - name = 'keypair-policy-2'
-  - created_at: 이 실행이 쓴 시각
-  - default_for_unspecified = <DefaultForUnspecified.UNLIMITED: 'UNLIMITED'>
-  - total_resource_slots = []
-  - max_session_lifetime = 0
-  - max_concurrent_sessions = 5
-  - max_pending_session_count = None
-  - max_priority = None
-  - max_pending_session_resource_slots = None
-  - max_concurrent_sftp_sessions = 1
-  - max_containers_per_session = 1
-  - idle_timeout = 3600
-  - allowed_vfolder_hosts = []
-
-<a id="editing-giving-no-value-changes-nothing-of-a-keypair-policy"></a>
-
-#### [giving-no-value-changes-nothing-of-a-keypair-policy](/tests/scenario/bai_scenario/manager/resource_policy/test_editing.py) — pass
-
-슈퍼관리자가 키페어 정책을 지정만 하고 아무 값도 주지 않으면, 아무것도 바뀌지 않은 노드가 반환된다
-
-Given
-
-- 아무도 사용하지 않는 키페어 정책 하나와, superadmin 한 명
-  - 도메인 home-1
-  - 정책이 할당된 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
-  - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
-
-When
-
-- ResourcePolicyAdapter.admin_update_keypair_resource_policy — user-1이 keypair-policy-2 수정 (빈 요청)
-
-Then
-
-- 미리 만들어 둔 키페어 정책 전체가 반환된다
-  - id = 'keypair-policy-2'
-  - name = 'keypair-policy-2'
-  - created_at: 이 실행이 쓴 시각
-  - default_for_unspecified = <DefaultForUnspecified.UNLIMITED: 'UNLIMITED'>
-  - total_resource_slots = []
-  - max_session_lifetime = 0
-  - max_concurrent_sessions = 5
-  - max_pending_session_count = None
-  - max_priority = None
-  - max_pending_session_resource_slots = None
-  - max_concurrent_sftp_sessions = 1
-  - max_containers_per_session = 1
-  - idle_timeout = 3600
-  - allowed_vfolder_hosts = []
-
-<a id="editing-the-superadmin-changes-one-limit-of-a-keypair-policy"></a>
-
-#### [the-superadmin-changes-one-limit-of-a-keypair-policy](/tests/scenario/bai_scenario/manager/resource_policy/test_editing.py) — pass
-
-키페어 정책 하나가 있고 슈퍼관리자가 한도 하나만 수정하면, 그 한도만 새 값이 되고 나머지는 그대로 유지된다
-
-Given
-
-- 아무도 사용하지 않는 키페어 정책 하나와, superadmin 한 명
-  - 도메인 home-1
-  - 정책이 할당된 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
-  - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
-
-When
-
-- ResourcePolicyAdapter.admin_update_keypair_resource_policy — user-1이 keypair-policy-2 수정 (동시 세션 수 7로 변경)
-
-Then
-
-- 미리 만들어 둔 키페어 정책 전체가 반환된다
-  - id = 'keypair-policy-2'
-  - name = 'keypair-policy-2'
-  - created_at: 이 실행이 쓴 시각
-  - default_for_unspecified = <DefaultForUnspecified.UNLIMITED: 'UNLIMITED'>
-  - total_resource_slots = []
-  - max_session_lifetime = 0
-  - max_concurrent_sessions = 7
-  - max_pending_session_count = None
-  - max_priority = None
-  - max_pending_session_resource_slots = None
-  - max_concurrent_sftp_sessions = 1
-  - max_containers_per_session = 1
-  - idle_timeout = 3600
-  - allowed_vfolder_hosts = []
-
-<a id="editing-a-user-granted-nothing-may-not-edit-a-keypair-policy"></a>
-
-#### [a-user-granted-nothing-may-not-edit-a-keypair-policy](/tests/scenario/bai_scenario/manager/resource_policy/test_editing.py) — pass
-
-같은 키페어 정책이 있고 아무 권한도 없는 사용자가 수정하려 하면, 수정 로직에 이르기 전에 정책을 찾을 수 없다는 이유로 거부된다
-
-Given
-
-- 아무도 사용하지 않는 키페어 정책 하나와, user 한 명
-  - 도메인 home-1
-  - 정책이 할당된 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-  - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
-
-When
-
-- ResourcePolicyAdapter.admin_update_keypair_resource_policy — user-1이 keypair-policy-2 수정 (동시 세션 수 7로 변경)
-
-Then
-
-- 거부된다
-  - 거부: GenericBadRequest
-
-<a id="editing-editing-a-keypair-policy-name-nothing-answers-to-is-not-found"></a>
-
-#### [editing-a-keypair-policy-name-nothing-answers-to-is-not-found](/tests/scenario/bai_scenario/manager/resource_policy/test_editing.py) — pass
-
-슈퍼관리자가 어느 키페어 정책에도 없는 이름을 수정하려 하면, 권한 문제가 아니라 대상이 없다는 것으로 거부된다
-
-Given
-
-- 아무도 사용하지 않는 키페어 정책 하나와, superadmin 한 명
-  - 도메인 home-1
-  - 정책이 할당된 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
-  - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
-
-When
-
-- ResourcePolicyAdapter.admin_update_keypair_resource_policy — user-1이 nobody 수정 (동시 세션 수 7로 변경)
-
-Then
-
-- 거부된다
-  - 거부: EntityNotFoundError
-
-<a id="editing-moving-the-priority-cap-outside-the-session-range-is-refused"></a>
-
-#### [moving-the-priority-cap-outside-the-session-range-is-refused](/tests/scenario/bai_scenario/manager/resource_policy/test_editing.py) — pass
-
-슈퍼관리자가 키페어 정책의 우선순위 상한을 세션 우선순위 범위 밖으로 수정하려 하면, 제약 위반으로 거부된다
-
-Given
-
-- 아무도 사용하지 않는 키페어 정책 하나와, superadmin 한 명
-  - 도메인 home-1
-  - 정책이 할당된 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
-  - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
-
-When
-
-- ResourcePolicyAdapter.admin_update_keypair_resource_policy — user-1이 keypair-policy-2 수정 (우선순위 상한을 세션 우선순위 범위 밖으로 변경)
-
-Then
-
-- 거부된다
-  - 거부: CheckConstraintViolationError
-
-### admin_update_project_resource_policy
-
-<a id="editing-clearing-a-non-nullable-value-of-a-project-policy-leaves-it-as-it-was"></a>
-
-#### [clearing-a-non-nullable-value-of-a-project-policy-leaves-it-as-it-was](/tests/scenario/bai_scenario/manager/resource_policy/test_editing.py) — pass
-
-슈퍼관리자가 프로젝트 정책의 비울 수 없는 항목을 비우도록 수정하면, 그 요청은 무시되어 아무것도 바뀌지 않은 노드가 반환된다
-
-Given
-
-- 아무도 사용하지 않는 프로젝트 정책 하나와, superadmin 한 명
-  - 도메인 home-1
-  - 정책이 할당된 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
-  - 프로젝트 정책 project-policy-1: 프로젝트 하나당 폴더 10개까지
-
-When
-
-- ResourcePolicyAdapter.admin_update_project_resource_policy — user-1이 project-policy-1 수정 (폴더 수 비우기)
-
-Then
-
-- 미리 만들어 둔 프로젝트 정책 전체가 반환된다
-  - id = 'project-policy-1'
-  - name = 'project-policy-1'
-  - created_at: 이 실행이 쓴 시각
-  - max_vfolder_count = 10
-  - max_quota_scope_size = ('-1', '-1')
-  - max_network_count = 3
-
-<a id="editing-giving-no-value-changes-nothing-of-a-project-policy"></a>
-
-#### [giving-no-value-changes-nothing-of-a-project-policy](/tests/scenario/bai_scenario/manager/resource_policy/test_editing.py) — pass
-
-슈퍼관리자가 프로젝트 정책을 지정만 하고 아무 값도 주지 않으면, 아무것도 바뀌지 않은 노드가 반환된다
-
-Given
-
-- 아무도 사용하지 않는 프로젝트 정책 하나와, superadmin 한 명
-  - 도메인 home-1
-  - 정책이 할당된 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
-  - 프로젝트 정책 project-policy-1: 프로젝트 하나당 폴더 10개까지
-
-When
-
-- ResourcePolicyAdapter.admin_update_project_resource_policy — user-1이 project-policy-1 수정 (빈 요청)
-
-Then
-
-- 미리 만들어 둔 프로젝트 정책 전체가 반환된다
-  - id = 'project-policy-1'
-  - name = 'project-policy-1'
-  - created_at: 이 실행이 쓴 시각
-  - max_vfolder_count = 10
-  - max_quota_scope_size = ('-1', '-1')
-  - max_network_count = 3
-
-<a id="editing-the-superadmin-changes-one-limit-of-a-project-policy"></a>
-
-#### [the-superadmin-changes-one-limit-of-a-project-policy](/tests/scenario/bai_scenario/manager/resource_policy/test_editing.py) — pass
-
-프로젝트 정책 하나가 있고 슈퍼관리자가 한도 하나만 수정하면, 그 한도만 새 값이 되고 나머지는 그대로 유지된다
-
-Given
-
-- 아무도 사용하지 않는 프로젝트 정책 하나와, superadmin 한 명
-  - 도메인 home-1
-  - 정책이 할당된 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
-  - 프로젝트 정책 project-policy-1: 프로젝트 하나당 폴더 10개까지
-
-When
-
-- ResourcePolicyAdapter.admin_update_project_resource_policy — user-1이 project-policy-1 수정 (폴더 수 20으로 변경)
-
-Then
-
-- 미리 만들어 둔 프로젝트 정책 전체가 반환된다
-  - id = 'project-policy-1'
-  - name = 'project-policy-1'
-  - created_at: 이 실행이 쓴 시각
-  - max_vfolder_count = 20
-  - max_quota_scope_size = ('-1', '-1')
-  - max_network_count = 3
-
-<a id="editing-a-user-granted-nothing-may-not-edit-a-project-policy"></a>
-
-#### [a-user-granted-nothing-may-not-edit-a-project-policy](/tests/scenario/bai_scenario/manager/resource_policy/test_editing.py) — pass
-
-같은 프로젝트 정책이 있고 아무 권한도 없는 사용자가 수정하려 하면, 수정 로직에 이르기 전에 정책을 찾을 수 없다는 이유로 거부된다
-
-Given
-
-- 아무도 사용하지 않는 프로젝트 정책 하나와, user 한 명
-  - 도메인 home-1
-  - 정책이 할당된 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-  - 프로젝트 정책 project-policy-1: 프로젝트 하나당 폴더 10개까지
-
-When
-
-- ResourcePolicyAdapter.admin_update_project_resource_policy — user-1이 project-policy-1 수정 (폴더 수 20으로 변경)
-
-Then
-
-- 거부된다
-  - 거부: GenericBadRequest
-
-<a id="editing-editing-a-project-policy-name-nothing-answers-to-is-not-found"></a>
-
-#### [editing-a-project-policy-name-nothing-answers-to-is-not-found](/tests/scenario/bai_scenario/manager/resource_policy/test_editing.py) — pass
-
-슈퍼관리자가 어느 프로젝트 정책에도 없는 이름을 수정하려 하면, 권한 문제가 아니라 대상이 없다는 것으로 거부된다
-
-Given
-
-- 아무도 사용하지 않는 프로젝트 정책 하나와, superadmin 한 명
-  - 도메인 home-1
-  - 정책이 할당된 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
-  - 프로젝트 정책 project-policy-1: 프로젝트 하나당 폴더 10개까지
-
-When
-
-- ResourcePolicyAdapter.admin_update_project_resource_policy — user-1이 nobody 수정 (폴더 수 20으로 변경)
-
-Then
-
-- 거부된다
-  - 거부: EntityNotFoundError
-
-### admin_update_user_resource_policy
-
-<a id="editing-clearing-a-non-nullable-value-of-a-user-policy-leaves-it-as-it-was"></a>
-
-#### [clearing-a-non-nullable-value-of-a-user-policy-leaves-it-as-it-was](/tests/scenario/bai_scenario/manager/resource_policy/test_editing.py) — pass
-
-슈퍼관리자가 사용자 정책의 비울 수 없는 항목을 비우도록 수정하면, 그 요청은 무시되어 아무것도 바뀌지 않은 노드가 반환된다
-
-Given
-
-- 아무도 사용하지 않는 사용자 정책 하나와, superadmin 한 명
-  - 도메인 home-1
-  - 정책이 할당된 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
-  - 사용자 정책 user-policy-2: 사용자 한 명당 폴더 10개까지
-
-When
-
-- ResourcePolicyAdapter.admin_update_user_resource_policy — user-1이 user-policy-2 수정 (폴더 수 비우기)
-
-Then
-
-- 미리 만들어 둔 사용자 정책 전체가 반환된다
-  - id = 'user-policy-2'
-  - name = 'user-policy-2'
-  - created_at: 이 실행이 쓴 시각
-  - max_vfolder_count = 10
-  - max_concurrent_logins = None
-  - max_quota_scope_size = ('-1', '-1')
-  - max_session_count_per_model_session = 10
-  - max_customized_image_count = 3
-
-<a id="editing-clearing-a-nullable-value-of-a-user-policy-empties-it"></a>
-
-#### [clearing-a-nullable-value-of-a-user-policy-empties-it](/tests/scenario/bai_scenario/manager/resource_policy/test_editing.py) — pass
-
-비울 수 있는 항목에 값이 설정된 사용자 정책을 슈퍼관리자가 그 항목을 비우도록 수정하면, 그 항목이 비어 있는 노드가 반환된다
-
-Given
-
-- 아무도 사용하지 않는 사용자 정책 하나와, superadmin 한 명
-  - 도메인 home-1
-  - 정책이 할당된 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
-  - 사용자 정책 user-policy-2: 사용자 한 명당 폴더 10개까지, 동시 로그인 3개까지
-
-When
-
-- ResourcePolicyAdapter.admin_update_user_resource_policy — user-1이 user-policy-2 수정 (동시 로그인 수 비우기)
-
-Then
-
-- 미리 만들어 둔 사용자 정책 전체가 반환된다
-  - id = 'user-policy-2'
-  - name = 'user-policy-2'
-  - created_at: 이 실행이 쓴 시각
-  - max_vfolder_count = 10
-  - max_concurrent_logins = None
-  - max_quota_scope_size = ('-1', '-1')
-  - max_session_count_per_model_session = 10
-  - max_customized_image_count = 3
-
-<a id="editing-giving-no-value-changes-nothing-of-a-user-policy"></a>
-
-#### [giving-no-value-changes-nothing-of-a-user-policy](/tests/scenario/bai_scenario/manager/resource_policy/test_editing.py) — pass
-
-슈퍼관리자가 사용자 정책을 지정만 하고 아무 값도 주지 않으면, 아무것도 바뀌지 않은 노드가 반환된다
-
-Given
-
-- 아무도 사용하지 않는 사용자 정책 하나와, superadmin 한 명
-  - 도메인 home-1
-  - 정책이 할당된 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
-  - 사용자 정책 user-policy-2: 사용자 한 명당 폴더 10개까지
-
-When
-
-- ResourcePolicyAdapter.admin_update_user_resource_policy — user-1이 user-policy-2 수정 (빈 요청)
-
-Then
-
-- 미리 만들어 둔 사용자 정책 전체가 반환된다
-  - id = 'user-policy-2'
-  - name = 'user-policy-2'
-  - created_at: 이 실행이 쓴 시각
-  - max_vfolder_count = 10
-  - max_concurrent_logins = None
-  - max_quota_scope_size = ('-1', '-1')
-  - max_session_count_per_model_session = 10
-  - max_customized_image_count = 3
-
-<a id="editing-the-superadmin-changes-one-limit-of-a-user-policy"></a>
-
-#### [the-superadmin-changes-one-limit-of-a-user-policy](/tests/scenario/bai_scenario/manager/resource_policy/test_editing.py) — pass
-
-사용자 정책 하나가 있고 슈퍼관리자가 한도 하나만 수정하면, 그 한도만 새 값이 되고 나머지는 그대로 유지된다
-
-Given
-
-- 아무도 사용하지 않는 사용자 정책 하나와, superadmin 한 명
-  - 도메인 home-1
-  - 정책이 할당된 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
-  - 사용자 정책 user-policy-2: 사용자 한 명당 폴더 10개까지
-
-When
-
-- ResourcePolicyAdapter.admin_update_user_resource_policy — user-1이 user-policy-2 수정 (폴더 수 20으로 변경)
-
-Then
-
-- 미리 만들어 둔 사용자 정책 전체가 반환된다
-  - id = 'user-policy-2'
-  - name = 'user-policy-2'
-  - created_at: 이 실행이 쓴 시각
-  - max_vfolder_count = 20
-  - max_concurrent_logins = None
-  - max_quota_scope_size = ('-1', '-1')
-  - max_session_count_per_model_session = 10
-  - max_customized_image_count = 3
-
-<a id="editing-a-user-granted-nothing-may-not-edit-a-user-policy"></a>
-
-#### [a-user-granted-nothing-may-not-edit-a-user-policy](/tests/scenario/bai_scenario/manager/resource_policy/test_editing.py) — pass
-
-같은 사용자 정책이 있고 아무 권한도 없는 사용자가 수정하려 하면, 수정 로직에 이르기 전에 정책을 찾을 수 없다는 이유로 거부된다
-
-Given
-
-- 아무도 사용하지 않는 사용자 정책 하나와, user 한 명
-  - 도메인 home-1
-  - 정책이 할당된 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-  - 사용자 정책 user-policy-2: 사용자 한 명당 폴더 10개까지
-
-When
-
-- ResourcePolicyAdapter.admin_update_user_resource_policy — user-1이 user-policy-2 수정 (폴더 수 20으로 변경)
-
-Then
-
-- 거부된다
-  - 거부: GenericBadRequest
-
-<a id="editing-editing-a-user-policy-name-nothing-answers-to-is-not-found"></a>
-
-#### [editing-a-user-policy-name-nothing-answers-to-is-not-found](/tests/scenario/bai_scenario/manager/resource_policy/test_editing.py) — pass
-
-슈퍼관리자가 어느 사용자 정책에도 없는 이름을 수정하려 하면, 권한 문제가 아니라 대상이 없다는 것으로 거부된다
-
-Given
-
-- 아무도 사용하지 않는 사용자 정책 하나와, superadmin 한 명
-  - 도메인 home-1
-  - 정책이 할당된 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
-  - 사용자 정책 user-policy-2: 사용자 한 명당 폴더 10개까지
-
-When
-
-- ResourcePolicyAdapter.admin_update_user_resource_policy — user-1이 nobody 수정 (폴더 수 20으로 변경)
-
-Then
-
-- 거부된다
-  - 거부: EntityNotFoundError
-
 ### get_my_keypair_resource_policy
 
 <a id="reading_own-a-user-granted-read-in-their-own-scope-reads-their-keypair-policy"></a>
@@ -2696,4 +1863,1496 @@ Then
 
 - 거부된다
   - 거부: NotEnoughPermission
+
+### partial_bulk_purge_keypair_resource_policies
+
+<a id="partial_bulk_purging-a-user-granted-nothing-purges-none-of-several-keypair-policys"></a>
+
+#### [a-user-granted-nothing-purges-none-of-several-keypair-policys](/tests/scenario/bai_scenario/manager/resource_policy/test_partial_bulk_purging.py) — pass
+
+아무 권한도 받지 않은 사용자가 키페어 정책 여럿을 한 번에 삭제하려 하면, 삭제된 것 없이 모두 권한이 없다는 이유로 실패 목록에 온다
+
+Given
+
+- 아무도 사용하지 않는 키페어 정책 2개와, user 한 명
+  - 도메인 home-1
+  - 정책이 할당된 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+  - 키페어 정책 target-1: 동시 세션 5개까지
+  - 키페어 정책 target-2: 동시 세션 5개까지
+
+When
+
+- ResourcePolicyAdapter.partial_bulk_purge_keypair_resource_policies — user-1이 키페어 정책 2개를 한 번에 삭제
+
+Then
+
+- 처리된 키페어 정책 없이 대상이 모두 실패 목록에 온다
+  - successes = []
+  - failed count = 2
+  - failed[0].id: 대상 정책의 id와 같다
+  - failed[0].message: 'Insufficient permission'를 담은 이유
+  - failed[1].id: 대상 정책의 id와 같다
+  - failed[1].message: 'Insufficient permission'를 담은 이유
+
+<a id="partial_bulk_purging-purging-several-keypair-policys-answers-for-the-missing-one"></a>
+
+#### [purging-several-keypair-policys-answers-for-the-missing-one](/tests/scenario/bai_scenario/manager/resource_policy/test_partial_bulk_purging.py) — pass
+
+슈퍼관리자가 아무도 사용하지 않는 키페어 정책 둘과 없는 id 하나를 한 번에 삭제하면, 둘은 처리된 목록에 오고 없는 id 는 대상이 없다는 이유로 실패 목록에 온다
+
+Given
+
+- 아무도 사용하지 않는 키페어 정책 2개와, superadmin 한 명
+  - 도메인 home-1
+  - 정책이 할당된 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+  - 키페어 정책 target-1: 동시 세션 5개까지
+  - 키페어 정책 target-2: 동시 세션 5개까지
+
+When
+
+- ResourcePolicyAdapter.partial_bulk_purge_keypair_resource_policies — user-1이 키페어 정책 2개 와 없는 id 하나를 한 번에 삭제
+
+Then
+
+- 대상 키페어 정책이 모두 처리된 목록에 오고, 없는 id 는 대상이 없다는 이유로 실패 목록에 온다
+  - successes count = 2
+  - successes[0].id = 'target-1'
+  - successes[0].name = 'target-1'
+  - successes[0].created_at: 이 실행이 쓴 시각
+  - successes[0].default_for_unspecified = <DefaultForUnspecified.UNLIMITED: 'UNLIMITED'>
+  - successes[0].total_resource_slots = []
+  - successes[0].max_session_lifetime = 0
+  - successes[0].max_concurrent_sessions = 5
+  - successes[0].max_pending_session_count = None
+  - successes[0].max_priority = None
+  - successes[0].max_pending_session_resource_slots = None
+  - successes[0].max_concurrent_sftp_sessions = 1
+  - successes[0].max_containers_per_session = 1
+  - successes[0].idle_timeout = 3600
+  - successes[0].allowed_vfolder_hosts = []
+  - successes[1].id = 'target-2'
+  - successes[1].name = 'target-2'
+  - successes[1].created_at: 이 실행이 쓴 시각
+  - successes[1].default_for_unspecified = <DefaultForUnspecified.UNLIMITED: 'UNLIMITED'>
+  - successes[1].total_resource_slots = []
+  - successes[1].max_session_lifetime = 0
+  - successes[1].max_concurrent_sessions = 5
+  - successes[1].max_pending_session_count = None
+  - successes[1].max_priority = None
+  - successes[1].max_pending_session_resource_slots = None
+  - successes[1].max_concurrent_sftp_sessions = 1
+  - successes[1].max_containers_per_session = 1
+  - successes[1].idle_timeout = 3600
+  - successes[1].allowed_vfolder_hosts = []
+  - failed count = 1
+  - failed[0].id: 요청에 넣은 없는 id와 같다
+  - failed[0].message: 'not found'를 담은 이유
+
+<a id="partial_bulk_purging-purging-several-keypair-policys-answers-for-the-one-still-held"></a>
+
+#### [purging-several-keypair-policys-answers-for-the-one-still-held](/tests/scenario/bai_scenario/manager/resource_policy/test_partial_bulk_purging.py) — pass
+
+슈퍼관리자가 아직 할당된 키페어 정책과 아무도 사용하지 않는 것을 한 번에 삭제하면, 사용하지 않는 것은 처리된 목록에 오고 할당된 것은 아직 참조 중이라는 이유로 실패 목록에 온다
+
+Given
+
+- 아무도 사용하지 않는 키페어 정책 1개와, superadmin 한 명, 그 사용자에게 할당된 키페어 정책도 대상에 넣음
+  - 도메인 home-1
+  - 정책이 할당된 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+  - 키페어 정책 target-1: 동시 세션 5개까지
+
+When
+
+- ResourcePolicyAdapter.partial_bulk_purge_keypair_resource_policies — user-1이 키페어 정책 2개를 한 번에 삭제
+
+Then
+
+- 아무도 사용하지 않는 키페어 정책은 처리된 목록에 오고, 아직 할당된 것은 참조 중이라는 이유로 실패 목록에 온다
+  - successes count = 1
+  - successes[0].id = 'target-1'
+  - successes[0].name = 'target-1'
+  - successes[0].created_at: 이 실행이 쓴 시각
+  - successes[0].default_for_unspecified = <DefaultForUnspecified.UNLIMITED: 'UNLIMITED'>
+  - successes[0].total_resource_slots = []
+  - successes[0].max_session_lifetime = 0
+  - successes[0].max_concurrent_sessions = 5
+  - successes[0].max_pending_session_count = None
+  - successes[0].max_priority = None
+  - successes[0].max_pending_session_resource_slots = None
+  - successes[0].max_concurrent_sftp_sessions = 1
+  - successes[0].max_containers_per_session = 1
+  - successes[0].idle_timeout = 3600
+  - successes[0].allowed_vfolder_hosts = []
+  - failed count = 1
+  - failed[0].id: 호출자에게 할당된 정책의 id와 같다
+  - failed[0].message: 'Foreign key'를 담은 이유
+
+### partial_bulk_purge_project_resource_policies
+
+<a id="partial_bulk_purging-a-user-granted-nothing-purges-none-of-several-project-policys"></a>
+
+#### [a-user-granted-nothing-purges-none-of-several-project-policys](/tests/scenario/bai_scenario/manager/resource_policy/test_partial_bulk_purging.py) — pass
+
+아무 권한도 받지 않은 사용자가 프로젝트 정책 여럿을 한 번에 삭제하려 하면, 삭제된 것 없이 모두 권한이 없다는 이유로 실패 목록에 온다
+
+Given
+
+- 아무도 사용하지 않는 프로젝트 정책 2개와, user 한 명
+  - 도메인 home-1
+  - 정책이 할당된 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+  - 프로젝트 정책 target-1: 프로젝트 하나당 폴더 10개까지
+  - 프로젝트 정책 target-2: 프로젝트 하나당 폴더 10개까지
+
+When
+
+- ResourcePolicyAdapter.partial_bulk_purge_project_resource_policies — user-1이 프로젝트 정책 2개를 한 번에 삭제
+
+Then
+
+- 처리된 프로젝트 정책 없이 대상이 모두 실패 목록에 온다
+  - successes = []
+  - failed count = 2
+  - failed[0].id: 대상 정책의 id와 같다
+  - failed[0].message: 'Insufficient permission'를 담은 이유
+  - failed[1].id: 대상 정책의 id와 같다
+  - failed[1].message: 'Insufficient permission'를 담은 이유
+
+<a id="partial_bulk_purging-purging-several-project-policys-answers-for-the-missing-one"></a>
+
+#### [purging-several-project-policys-answers-for-the-missing-one](/tests/scenario/bai_scenario/manager/resource_policy/test_partial_bulk_purging.py) — pass
+
+슈퍼관리자가 아무도 사용하지 않는 프로젝트 정책 둘과 없는 id 하나를 한 번에 삭제하면, 둘은 처리된 목록에 오고 없는 id 는 대상이 없다는 이유로 실패 목록에 온다
+
+Given
+
+- 아무도 사용하지 않는 프로젝트 정책 2개와, superadmin 한 명
+  - 도메인 home-1
+  - 정책이 할당된 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+  - 프로젝트 정책 target-1: 프로젝트 하나당 폴더 10개까지
+  - 프로젝트 정책 target-2: 프로젝트 하나당 폴더 10개까지
+
+When
+
+- ResourcePolicyAdapter.partial_bulk_purge_project_resource_policies — user-1이 프로젝트 정책 2개 와 없는 id 하나를 한 번에 삭제
+
+Then
+
+- 대상 프로젝트 정책이 모두 처리된 목록에 오고, 없는 id 는 대상이 없다는 이유로 실패 목록에 온다
+  - successes count = 2
+  - successes[0].id = 'target-1'
+  - successes[0].name = 'target-1'
+  - successes[0].created_at: 이 실행이 쓴 시각
+  - successes[0].max_vfolder_count = 10
+  - successes[0].max_quota_scope_size = ('-1', '-1')
+  - successes[0].max_network_count = 3
+  - successes[1].id = 'target-2'
+  - successes[1].name = 'target-2'
+  - successes[1].created_at: 이 실행이 쓴 시각
+  - successes[1].max_vfolder_count = 10
+  - successes[1].max_quota_scope_size = ('-1', '-1')
+  - successes[1].max_network_count = 3
+  - failed count = 1
+  - failed[0].id: 요청에 넣은 없는 id와 같다
+  - failed[0].message: 'not found'를 담은 이유
+
+<a id="partial_bulk_purging-purging-several-project-policys-answers-for-the-one-still-held"></a>
+
+#### [purging-several-project-policys-answers-for-the-one-still-held](/tests/scenario/bai_scenario/manager/resource_policy/test_partial_bulk_purging.py) — pass
+
+슈퍼관리자가 아직 할당된 프로젝트 정책과 아무도 사용하지 않는 것을 한 번에 삭제하면, 사용하지 않는 것은 처리된 목록에 오고 할당된 것은 아직 참조 중이라는 이유로 실패 목록에 온다
+
+Given
+
+- 아무도 사용하지 않는 프로젝트 정책 1개와, superadmin 한 명, 그 사용자에게 할당된 프로젝트 정책도 대상에 넣음
+  - 도메인 home-1
+  - 정책이 할당된 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+  - 프로젝트 정책 target-1: 프로젝트 하나당 폴더 10개까지
+
+When
+
+- ResourcePolicyAdapter.partial_bulk_purge_project_resource_policies — user-1이 프로젝트 정책 2개를 한 번에 삭제
+
+Then
+
+- 아무도 사용하지 않는 프로젝트 정책은 처리된 목록에 오고, 아직 할당된 것은 참조 중이라는 이유로 실패 목록에 온다
+  - successes count = 1
+  - successes[0].id = 'target-1'
+  - successes[0].name = 'target-1'
+  - successes[0].created_at: 이 실행이 쓴 시각
+  - successes[0].max_vfolder_count = 10
+  - successes[0].max_quota_scope_size = ('-1', '-1')
+  - successes[0].max_network_count = 3
+  - failed count = 1
+  - failed[0].id: 호출자에게 할당된 정책의 id와 같다
+  - failed[0].message: 'Foreign key'를 담은 이유
+
+### partial_bulk_purge_user_resource_policies
+
+<a id="partial_bulk_purging-a-user-granted-nothing-purges-none-of-several-user-policys"></a>
+
+#### [a-user-granted-nothing-purges-none-of-several-user-policys](/tests/scenario/bai_scenario/manager/resource_policy/test_partial_bulk_purging.py) — pass
+
+아무 권한도 받지 않은 사용자가 사용자 정책 여럿을 한 번에 삭제하려 하면, 삭제된 것 없이 모두 권한이 없다는 이유로 실패 목록에 온다
+
+Given
+
+- 아무도 사용하지 않는 사용자 정책 2개와, user 한 명
+  - 도메인 home-1
+  - 정책이 할당된 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+  - 사용자 정책 target-1: 사용자 한 명당 폴더 10개까지
+  - 사용자 정책 target-2: 사용자 한 명당 폴더 10개까지
+
+When
+
+- ResourcePolicyAdapter.partial_bulk_purge_user_resource_policies — user-1이 사용자 정책 2개를 한 번에 삭제
+
+Then
+
+- 처리된 사용자 정책 없이 대상이 모두 실패 목록에 온다
+  - successes = []
+  - failed count = 2
+  - failed[0].id: 대상 정책의 id와 같다
+  - failed[0].message: 'Insufficient permission'를 담은 이유
+  - failed[1].id: 대상 정책의 id와 같다
+  - failed[1].message: 'Insufficient permission'를 담은 이유
+
+<a id="partial_bulk_purging-purging-several-user-policys-answers-for-the-missing-one"></a>
+
+#### [purging-several-user-policys-answers-for-the-missing-one](/tests/scenario/bai_scenario/manager/resource_policy/test_partial_bulk_purging.py) — pass
+
+슈퍼관리자가 아무도 사용하지 않는 사용자 정책 둘과 없는 id 하나를 한 번에 삭제하면, 둘은 처리된 목록에 오고 없는 id 는 대상이 없다는 이유로 실패 목록에 온다
+
+Given
+
+- 아무도 사용하지 않는 사용자 정책 2개와, superadmin 한 명
+  - 도메인 home-1
+  - 정책이 할당된 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+  - 사용자 정책 target-1: 사용자 한 명당 폴더 10개까지
+  - 사용자 정책 target-2: 사용자 한 명당 폴더 10개까지
+
+When
+
+- ResourcePolicyAdapter.partial_bulk_purge_user_resource_policies — user-1이 사용자 정책 2개 와 없는 id 하나를 한 번에 삭제
+
+Then
+
+- 대상 사용자 정책이 모두 처리된 목록에 오고, 없는 id 는 대상이 없다는 이유로 실패 목록에 온다
+  - successes count = 2
+  - successes[0].id = 'target-1'
+  - successes[0].name = 'target-1'
+  - successes[0].created_at: 이 실행이 쓴 시각
+  - successes[0].max_vfolder_count = 10
+  - successes[0].max_concurrent_logins = None
+  - successes[0].max_quota_scope_size = ('-1', '-1')
+  - successes[0].max_session_count_per_model_session = 10
+  - successes[0].max_customized_image_count = 3
+  - successes[1].id = 'target-2'
+  - successes[1].name = 'target-2'
+  - successes[1].created_at: 이 실행이 쓴 시각
+  - successes[1].max_vfolder_count = 10
+  - successes[1].max_concurrent_logins = None
+  - successes[1].max_quota_scope_size = ('-1', '-1')
+  - successes[1].max_session_count_per_model_session = 10
+  - successes[1].max_customized_image_count = 3
+  - failed count = 1
+  - failed[0].id: 요청에 넣은 없는 id와 같다
+  - failed[0].message: 'not found'를 담은 이유
+
+<a id="partial_bulk_purging-purging-several-user-policys-answers-for-the-one-still-held"></a>
+
+#### [purging-several-user-policys-answers-for-the-one-still-held](/tests/scenario/bai_scenario/manager/resource_policy/test_partial_bulk_purging.py) — pass
+
+슈퍼관리자가 아직 할당된 사용자 정책과 아무도 사용하지 않는 것을 한 번에 삭제하면, 사용하지 않는 것은 처리된 목록에 오고 할당된 것은 아직 참조 중이라는 이유로 실패 목록에 온다
+
+Given
+
+- 아무도 사용하지 않는 사용자 정책 1개와, superadmin 한 명, 그 사용자에게 할당된 사용자 정책도 대상에 넣음
+  - 도메인 home-1
+  - 정책이 할당된 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+  - 사용자 정책 target-1: 사용자 한 명당 폴더 10개까지
+
+When
+
+- ResourcePolicyAdapter.partial_bulk_purge_user_resource_policies — user-1이 사용자 정책 2개를 한 번에 삭제
+
+Then
+
+- 아무도 사용하지 않는 사용자 정책은 처리된 목록에 오고, 아직 할당된 것은 참조 중이라는 이유로 실패 목록에 온다
+  - successes count = 1
+  - successes[0].id = 'target-1'
+  - successes[0].name = 'target-1'
+  - successes[0].created_at: 이 실행이 쓴 시각
+  - successes[0].max_vfolder_count = 10
+  - successes[0].max_concurrent_logins = None
+  - successes[0].max_quota_scope_size = ('-1', '-1')
+  - successes[0].max_session_count_per_model_session = 10
+  - successes[0].max_customized_image_count = 3
+  - failed count = 1
+  - failed[0].id: 호출자에게 할당된 정책의 id와 같다
+  - failed[0].message: 'Foreign key'를 담은 이유
+
+### partial_bulk_update_keypair_resource_policies
+
+<a id="partial_bulk_editing-a-user-granted-nothing-edits-none-of-several-keypair-policys"></a>
+
+#### [a-user-granted-nothing-edits-none-of-several-keypair-policys](/tests/scenario/bai_scenario/manager/resource_policy/test_partial_bulk_editing.py) — pass
+
+아무 권한도 받지 않은 사용자가 키페어 정책 여럿을 한 번에 수정하려 하면, 수정된 것 없이 모두 권한이 없다는 이유로 실패 목록에 온다
+
+Given
+
+- 아무도 사용하지 않는 키페어 정책 2개와, user 한 명
+  - 도메인 home-1
+  - 정책이 할당된 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+  - 키페어 정책 target-1: 동시 세션 5개까지
+  - 키페어 정책 target-2: 동시 세션 5개까지
+
+When
+
+- ResourcePolicyAdapter.partial_bulk_update_keypair_resource_policies — user-1이 키페어 정책 2개를 한 번에 수정 (동시 세션 수 7로 변경)
+
+Then
+
+- 처리된 키페어 정책 없이 대상이 모두 실패 목록에 온다
+  - successes = []
+  - failed count = 2
+  - failed[0].id: 대상 정책의 id와 같다
+  - failed[0].message: 'Insufficient permission'를 담은 이유
+  - failed[1].id: 대상 정책의 id와 같다
+  - failed[1].message: 'Insufficient permission'를 담은 이유
+
+<a id="partial_bulk_editing-the-superadmin-edits-several-keypair-policys-at-once"></a>
+
+#### [the-superadmin-edits-several-keypair-policys-at-once](/tests/scenario/bai_scenario/manager/resource_policy/test_partial_bulk_editing.py) — pass
+
+슈퍼관리자가 키페어 정책 여럿의 한도 하나를 한 번에 바꾸면, 모두 그 한도만 새 값으로 오고 실패한 것은 없다
+
+Given
+
+- 아무도 사용하지 않는 키페어 정책 2개와, superadmin 한 명
+  - 도메인 home-1
+  - 정책이 할당된 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+  - 키페어 정책 target-1: 동시 세션 5개까지
+  - 키페어 정책 target-2: 동시 세션 5개까지
+
+When
+
+- ResourcePolicyAdapter.partial_bulk_update_keypair_resource_policies — user-1이 키페어 정책 2개를 한 번에 수정 (동시 세션 수 7로 변경)
+
+Then
+
+- 대상 키페어 정책이 모두 처리된 목록에 오고, 실패한 것은 없다
+  - successes count = 2
+  - successes[0].id = 'target-1'
+  - successes[0].name = 'target-1'
+  - successes[0].created_at: 이 실행이 쓴 시각
+  - successes[0].default_for_unspecified = <DefaultForUnspecified.UNLIMITED: 'UNLIMITED'>
+  - successes[0].total_resource_slots = []
+  - successes[0].max_session_lifetime = 0
+  - successes[0].max_concurrent_sessions = 7
+  - successes[0].max_pending_session_count = None
+  - successes[0].max_priority = None
+  - successes[0].max_pending_session_resource_slots = None
+  - successes[0].max_concurrent_sftp_sessions = 1
+  - successes[0].max_containers_per_session = 1
+  - successes[0].idle_timeout = 3600
+  - successes[0].allowed_vfolder_hosts = []
+  - successes[1].id = 'target-2'
+  - successes[1].name = 'target-2'
+  - successes[1].created_at: 이 실행이 쓴 시각
+  - successes[1].default_for_unspecified = <DefaultForUnspecified.UNLIMITED: 'UNLIMITED'>
+  - successes[1].total_resource_slots = []
+  - successes[1].max_session_lifetime = 0
+  - successes[1].max_concurrent_sessions = 7
+  - successes[1].max_pending_session_count = None
+  - successes[1].max_priority = None
+  - successes[1].max_pending_session_resource_slots = None
+  - successes[1].max_concurrent_sftp_sessions = 1
+  - successes[1].max_containers_per_session = 1
+  - successes[1].idle_timeout = 3600
+  - successes[1].allowed_vfolder_hosts = []
+  - failed = []
+
+### partial_bulk_update_project_resource_policies
+
+<a id="partial_bulk_editing-a-user-granted-nothing-edits-none-of-several-project-policys"></a>
+
+#### [a-user-granted-nothing-edits-none-of-several-project-policys](/tests/scenario/bai_scenario/manager/resource_policy/test_partial_bulk_editing.py) — pass
+
+아무 권한도 받지 않은 사용자가 프로젝트 정책 여럿을 한 번에 수정하려 하면, 수정된 것 없이 모두 권한이 없다는 이유로 실패 목록에 온다
+
+Given
+
+- 아무도 사용하지 않는 프로젝트 정책 2개와, user 한 명
+  - 도메인 home-1
+  - 정책이 할당된 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+  - 프로젝트 정책 target-1: 프로젝트 하나당 폴더 10개까지
+  - 프로젝트 정책 target-2: 프로젝트 하나당 폴더 10개까지
+
+When
+
+- ResourcePolicyAdapter.partial_bulk_update_project_resource_policies — user-1이 프로젝트 정책 2개를 한 번에 수정 (폴더 수 20으로 변경)
+
+Then
+
+- 처리된 프로젝트 정책 없이 대상이 모두 실패 목록에 온다
+  - successes = []
+  - failed count = 2
+  - failed[0].id: 대상 정책의 id와 같다
+  - failed[0].message: 'Insufficient permission'를 담은 이유
+  - failed[1].id: 대상 정책의 id와 같다
+  - failed[1].message: 'Insufficient permission'를 담은 이유
+
+<a id="partial_bulk_editing-the-superadmin-edits-several-project-policys-at-once"></a>
+
+#### [the-superadmin-edits-several-project-policys-at-once](/tests/scenario/bai_scenario/manager/resource_policy/test_partial_bulk_editing.py) — pass
+
+슈퍼관리자가 프로젝트 정책 여럿의 한도 하나를 한 번에 바꾸면, 모두 그 한도만 새 값으로 오고 실패한 것은 없다
+
+Given
+
+- 아무도 사용하지 않는 프로젝트 정책 2개와, superadmin 한 명
+  - 도메인 home-1
+  - 정책이 할당된 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+  - 프로젝트 정책 target-1: 프로젝트 하나당 폴더 10개까지
+  - 프로젝트 정책 target-2: 프로젝트 하나당 폴더 10개까지
+
+When
+
+- ResourcePolicyAdapter.partial_bulk_update_project_resource_policies — user-1이 프로젝트 정책 2개를 한 번에 수정 (폴더 수 20으로 변경)
+
+Then
+
+- 대상 프로젝트 정책이 모두 처리된 목록에 오고, 실패한 것은 없다
+  - successes count = 2
+  - successes[0].id = 'target-1'
+  - successes[0].name = 'target-1'
+  - successes[0].created_at: 이 실행이 쓴 시각
+  - successes[0].max_vfolder_count = 20
+  - successes[0].max_quota_scope_size = ('-1', '-1')
+  - successes[0].max_network_count = 3
+  - successes[1].id = 'target-2'
+  - successes[1].name = 'target-2'
+  - successes[1].created_at: 이 실행이 쓴 시각
+  - successes[1].max_vfolder_count = 20
+  - successes[1].max_quota_scope_size = ('-1', '-1')
+  - successes[1].max_network_count = 3
+  - failed = []
+
+### partial_bulk_update_user_resource_policies
+
+<a id="partial_bulk_editing-a-user-granted-nothing-edits-none-of-several-user-policys"></a>
+
+#### [a-user-granted-nothing-edits-none-of-several-user-policys](/tests/scenario/bai_scenario/manager/resource_policy/test_partial_bulk_editing.py) — pass
+
+아무 권한도 받지 않은 사용자가 사용자 정책 여럿을 한 번에 수정하려 하면, 수정된 것 없이 모두 권한이 없다는 이유로 실패 목록에 온다
+
+Given
+
+- 아무도 사용하지 않는 사용자 정책 2개와, user 한 명
+  - 도메인 home-1
+  - 정책이 할당된 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+  - 사용자 정책 target-1: 사용자 한 명당 폴더 10개까지
+  - 사용자 정책 target-2: 사용자 한 명당 폴더 10개까지
+
+When
+
+- ResourcePolicyAdapter.partial_bulk_update_user_resource_policies — user-1이 사용자 정책 2개를 한 번에 수정 (폴더 수 20으로 변경)
+
+Then
+
+- 처리된 사용자 정책 없이 대상이 모두 실패 목록에 온다
+  - successes = []
+  - failed count = 2
+  - failed[0].id: 대상 정책의 id와 같다
+  - failed[0].message: 'Insufficient permission'를 담은 이유
+  - failed[1].id: 대상 정책의 id와 같다
+  - failed[1].message: 'Insufficient permission'를 담은 이유
+
+<a id="partial_bulk_editing-the-superadmin-edits-several-user-policys-at-once"></a>
+
+#### [the-superadmin-edits-several-user-policys-at-once](/tests/scenario/bai_scenario/manager/resource_policy/test_partial_bulk_editing.py) — pass
+
+슈퍼관리자가 사용자 정책 여럿의 한도 하나를 한 번에 바꾸면, 모두 그 한도만 새 값으로 오고 실패한 것은 없다
+
+Given
+
+- 아무도 사용하지 않는 사용자 정책 2개와, superadmin 한 명
+  - 도메인 home-1
+  - 정책이 할당된 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+  - 사용자 정책 target-1: 사용자 한 명당 폴더 10개까지
+  - 사용자 정책 target-2: 사용자 한 명당 폴더 10개까지
+
+When
+
+- ResourcePolicyAdapter.partial_bulk_update_user_resource_policies — user-1이 사용자 정책 2개를 한 번에 수정 (폴더 수 20으로 변경)
+
+Then
+
+- 대상 사용자 정책이 모두 처리된 목록에 오고, 실패한 것은 없다
+  - successes count = 2
+  - successes[0].id = 'target-1'
+  - successes[0].name = 'target-1'
+  - successes[0].created_at: 이 실행이 쓴 시각
+  - successes[0].max_vfolder_count = 20
+  - successes[0].max_concurrent_logins = None
+  - successes[0].max_quota_scope_size = ('-1', '-1')
+  - successes[0].max_session_count_per_model_session = 10
+  - successes[0].max_customized_image_count = 3
+  - successes[1].id = 'target-2'
+  - successes[1].name = 'target-2'
+  - successes[1].created_at: 이 실행이 쓴 시각
+  - successes[1].max_vfolder_count = 20
+  - successes[1].max_concurrent_logins = None
+  - successes[1].max_quota_scope_size = ('-1', '-1')
+  - successes[1].max_session_count_per_model_session = 10
+  - successes[1].max_customized_image_count = 3
+  - failed = []
+
+### purge_keypair_resource_policy
+
+<a id="retiring-the-superadmin-purges-a-keypair-policy-nobody-holds"></a>
+
+#### [the-superadmin-purges-a-keypair-policy-nobody-holds](/tests/scenario/bai_scenario/manager/resource_policy/test_retiring.py) — pass
+
+아무도 사용하지 않는 키페어 정책을 슈퍼관리자가 삭제하면, 삭제한 이름이 반환되고 이어서 검색하면 없다
+
+Given
+
+- 아무도 사용하지 않는 키페어 정책 하나와, superadmin 한 명
+  - 도메인 home-1
+  - 정책이 할당된 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+  - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
+
+When
+
+- ResourcePolicyAdapter.purge_keypair_resource_policy — user-1이 keypair-policy-2 삭제 후 같은 이름으로 다시 검색
+
+Then
+
+- 삭제한 이름이 반환되고 다시 검색하면 없다
+  - name = 'keypair-policy-2'
+  - found afterwards = 0
+
+<a id="retiring-a-user-granted-nothing-may-not-purge-a-keypair-policy"></a>
+
+#### [a-user-granted-nothing-may-not-purge-a-keypair-policy](/tests/scenario/bai_scenario/manager/resource_policy/test_retiring.py) — pass
+
+같은 키페어 정책이 있고 아무 권한도 없는 사용자가 삭제하려 하면, 삭제 로직에 이르기 전에 정책을 찾을 수 없다는 이유로 거부된다
+
+Given
+
+- 아무도 사용하지 않는 키페어 정책 하나와, user 한 명
+  - 도메인 home-1
+  - 정책이 할당된 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+  - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
+
+When
+
+- ResourcePolicyAdapter.purge_keypair_resource_policy — user-1이 keypair-policy-2 삭제 후 같은 이름으로 다시 검색
+
+Then
+
+- 거부된다
+  - 거부: GenericBadRequest
+
+<a id="retiring-purging-a-keypair-policy-name-nothing-answers-to-is-not-found"></a>
+
+#### [purging-a-keypair-policy-name-nothing-answers-to-is-not-found](/tests/scenario/bai_scenario/manager/resource_policy/test_retiring.py) — pass
+
+슈퍼관리자가 어느 키페어 정책에도 없는 이름을 삭제하려 하면, 권한 문제가 아니라 대상이 없다는 것으로 거부된다
+
+Given
+
+- 아무도 사용하지 않는 키페어 정책 하나와, superadmin 한 명
+  - 도메인 home-1
+  - 정책이 할당된 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+  - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
+
+When
+
+- ResourcePolicyAdapter.purge_keypair_resource_policy — user-1이 nobody 삭제 후 같은 이름으로 다시 검색
+
+Then
+
+- 거부된다
+  - 거부: EntityNotFoundError
+
+<a id="retiring-purging-a-keypair-policy-still-held-is-refused"></a>
+
+#### [purging-a-keypair-policy-still-held-is-refused](/tests/scenario/bai_scenario/manager/resource_policy/test_retiring.py) — pass
+
+아직 누군가에게 할당된 키페어 정책을 슈퍼관리자가 삭제하려 하면, 아직 참조 중이라는 이유로 거부된다. 막는 것은 삭제 spec이 아니라 외래 키다
+
+Given
+
+- superadmin 한 명과, 그 사용자에게 아직 할당된 키페어 정책
+  - 도메인 home-1
+  - 정책이 할당된 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+
+When
+
+- ResourcePolicyAdapter.purge_keypair_resource_policy — user-1이 keypair-policy-1 삭제 후 같은 이름으로 다시 검색
+
+Then
+
+- 거부된다
+  - 거부: ForeignKeyViolationError
+
+### purge_project_resource_policy
+
+<a id="retiring-the-superadmin-purges-a-project-policy-nobody-holds"></a>
+
+#### [the-superadmin-purges-a-project-policy-nobody-holds](/tests/scenario/bai_scenario/manager/resource_policy/test_retiring.py) — pass
+
+아무도 사용하지 않는 프로젝트 정책을 슈퍼관리자가 삭제하면, 삭제한 이름이 반환되고 이어서 검색하면 없다
+
+Given
+
+- 아무도 사용하지 않는 프로젝트 정책 하나와, superadmin 한 명
+  - 도메인 home-1
+  - 정책이 할당된 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+  - 프로젝트 정책 project-policy-1: 프로젝트 하나당 폴더 10개까지
+
+When
+
+- ResourcePolicyAdapter.purge_project_resource_policy — user-1이 project-policy-1 삭제 후 같은 이름으로 다시 검색
+
+Then
+
+- 삭제한 이름이 반환되고 다시 검색하면 없다
+  - name = 'project-policy-1'
+  - found afterwards = 0
+
+<a id="retiring-a-user-granted-nothing-may-not-purge-a-project-policy"></a>
+
+#### [a-user-granted-nothing-may-not-purge-a-project-policy](/tests/scenario/bai_scenario/manager/resource_policy/test_retiring.py) — pass
+
+같은 프로젝트 정책이 있고 아무 권한도 없는 사용자가 삭제하려 하면, 삭제 로직에 이르기 전에 정책을 찾을 수 없다는 이유로 거부된다
+
+Given
+
+- 아무도 사용하지 않는 프로젝트 정책 하나와, user 한 명
+  - 도메인 home-1
+  - 정책이 할당된 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+  - 프로젝트 정책 project-policy-1: 프로젝트 하나당 폴더 10개까지
+
+When
+
+- ResourcePolicyAdapter.purge_project_resource_policy — user-1이 project-policy-1 삭제 후 같은 이름으로 다시 검색
+
+Then
+
+- 거부된다
+  - 거부: GenericBadRequest
+
+<a id="retiring-purging-a-project-policy-name-nothing-answers-to-is-not-found"></a>
+
+#### [purging-a-project-policy-name-nothing-answers-to-is-not-found](/tests/scenario/bai_scenario/manager/resource_policy/test_retiring.py) — pass
+
+슈퍼관리자가 어느 프로젝트 정책에도 없는 이름을 삭제하려 하면, 권한 문제가 아니라 대상이 없다는 것으로 거부된다
+
+Given
+
+- 아무도 사용하지 않는 프로젝트 정책 하나와, superadmin 한 명
+  - 도메인 home-1
+  - 정책이 할당된 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+  - 프로젝트 정책 project-policy-1: 프로젝트 하나당 폴더 10개까지
+
+When
+
+- ResourcePolicyAdapter.purge_project_resource_policy — user-1이 nobody 삭제 후 같은 이름으로 다시 검색
+
+Then
+
+- 거부된다
+  - 거부: EntityNotFoundError
+
+<a id="retiring-purging-a-project-policy-still-held-is-refused"></a>
+
+#### [purging-a-project-policy-still-held-is-refused](/tests/scenario/bai_scenario/manager/resource_policy/test_retiring.py) — pass
+
+아직 누군가에게 할당된 프로젝트 정책을 슈퍼관리자가 삭제하려 하면, 아직 참조 중이라는 이유로 거부된다. 막는 것은 삭제 spec이 아니라 외래 키다
+
+Given
+
+- superadmin 한 명과, 그 사용자에게 아직 할당된 프로젝트 정책
+  - 도메인 home-1
+  - 정책이 할당된 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+
+When
+
+- ResourcePolicyAdapter.purge_project_resource_policy — user-1이 default 삭제 후 같은 이름으로 다시 검색
+
+Then
+
+- 거부된다
+  - 거부: ForeignKeyViolationError
+
+### purge_user_resource_policy
+
+<a id="retiring-the-superadmin-purges-a-user-policy-nobody-holds"></a>
+
+#### [the-superadmin-purges-a-user-policy-nobody-holds](/tests/scenario/bai_scenario/manager/resource_policy/test_retiring.py) — pass
+
+아무도 사용하지 않는 사용자 정책을 슈퍼관리자가 삭제하면, 삭제한 이름이 반환되고 이어서 검색하면 없다
+
+Given
+
+- 아무도 사용하지 않는 사용자 정책 하나와, superadmin 한 명
+  - 도메인 home-1
+  - 정책이 할당된 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+  - 사용자 정책 user-policy-2: 사용자 한 명당 폴더 10개까지
+
+When
+
+- ResourcePolicyAdapter.purge_user_resource_policy — user-1이 user-policy-2 삭제 후 같은 이름으로 다시 검색
+
+Then
+
+- 삭제한 이름이 반환되고 다시 검색하면 없다
+  - name = 'user-policy-2'
+  - found afterwards = 0
+
+<a id="retiring-a-user-granted-nothing-may-not-purge-a-user-policy"></a>
+
+#### [a-user-granted-nothing-may-not-purge-a-user-policy](/tests/scenario/bai_scenario/manager/resource_policy/test_retiring.py) — pass
+
+같은 사용자 정책이 있고 아무 권한도 없는 사용자가 삭제하려 하면, 삭제 로직에 이르기 전에 정책을 찾을 수 없다는 이유로 거부된다
+
+Given
+
+- 아무도 사용하지 않는 사용자 정책 하나와, user 한 명
+  - 도메인 home-1
+  - 정책이 할당된 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+  - 사용자 정책 user-policy-2: 사용자 한 명당 폴더 10개까지
+
+When
+
+- ResourcePolicyAdapter.purge_user_resource_policy — user-1이 user-policy-2 삭제 후 같은 이름으로 다시 검색
+
+Then
+
+- 거부된다
+  - 거부: GenericBadRequest
+
+<a id="retiring-purging-a-user-policy-name-nothing-answers-to-is-not-found"></a>
+
+#### [purging-a-user-policy-name-nothing-answers-to-is-not-found](/tests/scenario/bai_scenario/manager/resource_policy/test_retiring.py) — pass
+
+슈퍼관리자가 어느 사용자 정책에도 없는 이름을 삭제하려 하면, 권한 문제가 아니라 대상이 없다는 것으로 거부된다
+
+Given
+
+- 아무도 사용하지 않는 사용자 정책 하나와, superadmin 한 명
+  - 도메인 home-1
+  - 정책이 할당된 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+  - 사용자 정책 user-policy-2: 사용자 한 명당 폴더 10개까지
+
+When
+
+- ResourcePolicyAdapter.purge_user_resource_policy — user-1이 nobody 삭제 후 같은 이름으로 다시 검색
+
+Then
+
+- 거부된다
+  - 거부: EntityNotFoundError
+
+<a id="retiring-purging-a-user-policy-still-held-is-refused"></a>
+
+#### [purging-a-user-policy-still-held-is-refused](/tests/scenario/bai_scenario/manager/resource_policy/test_retiring.py) — pass
+
+아직 누군가에게 할당된 사용자 정책을 슈퍼관리자가 삭제하려 하면, 아직 참조 중이라는 이유로 거부된다. 막는 것은 삭제 spec이 아니라 외래 키다
+
+Given
+
+- superadmin 한 명과, 그 사용자에게 아직 할당된 사용자 정책
+  - 도메인 home-1
+  - 정책이 할당된 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+
+When
+
+- ResourcePolicyAdapter.purge_user_resource_policy — user-1이 user-policy-1 삭제 후 같은 이름으로 다시 검색
+
+Then
+
+- 거부된다
+  - 거부: ForeignKeyViolationError
+
+### update_keypair_resource_policy
+
+<a id="editing-clearing-a-non-nullable-value-of-a-keypair-policy-leaves-it-as-it-was"></a>
+
+#### [clearing-a-non-nullable-value-of-a-keypair-policy-leaves-it-as-it-was](/tests/scenario/bai_scenario/manager/resource_policy/test_editing.py) — pass
+
+슈퍼관리자가 키페어 정책의 비울 수 없는 항목을 비우도록 수정하면, 그 요청은 무시되어 아무것도 바뀌지 않은 노드가 반환된다
+
+Given
+
+- 아무도 사용하지 않는 키페어 정책 하나와, superadmin 한 명
+  - 도메인 home-1
+  - 정책이 할당된 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+  - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
+
+When
+
+- ResourcePolicyAdapter.update_keypair_resource_policy — user-1이 keypair-policy-2 수정 (동시 세션 수 비우기)
+
+Then
+
+- 미리 만들어 둔 키페어 정책 전체가 반환된다
+  - id = 'keypair-policy-2'
+  - name = 'keypair-policy-2'
+  - created_at: 이 실행이 쓴 시각
+  - default_for_unspecified = <DefaultForUnspecified.UNLIMITED: 'UNLIMITED'>
+  - total_resource_slots = []
+  - max_session_lifetime = 0
+  - max_concurrent_sessions = 5
+  - max_pending_session_count = None
+  - max_priority = None
+  - max_pending_session_resource_slots = None
+  - max_concurrent_sftp_sessions = 1
+  - max_containers_per_session = 1
+  - idle_timeout = 3600
+  - allowed_vfolder_hosts = []
+
+<a id="editing-clearing-a-nullable-value-of-a-keypair-policy-empties-it"></a>
+
+#### [clearing-a-nullable-value-of-a-keypair-policy-empties-it](/tests/scenario/bai_scenario/manager/resource_policy/test_editing.py) — pass
+
+비울 수 있는 항목에 값이 설정된 키페어 정책을 슈퍼관리자가 그 항목을 비우도록 수정하면, 그 항목이 비어 있는 노드가 반환된다
+
+Given
+
+- 아무도 사용하지 않는 키페어 정책 하나와, superadmin 한 명
+  - 도메인 home-1
+  - 정책이 할당된 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+  - 키페어 정책 keypair-policy-2: 동시 세션 5개까지, 그중 대기 2개까지
+
+When
+
+- ResourcePolicyAdapter.update_keypair_resource_policy — user-1이 keypair-policy-2 수정 (대기 세션 수 비우기)
+
+Then
+
+- 미리 만들어 둔 키페어 정책 전체가 반환된다
+  - id = 'keypair-policy-2'
+  - name = 'keypair-policy-2'
+  - created_at: 이 실행이 쓴 시각
+  - default_for_unspecified = <DefaultForUnspecified.UNLIMITED: 'UNLIMITED'>
+  - total_resource_slots = []
+  - max_session_lifetime = 0
+  - max_concurrent_sessions = 5
+  - max_pending_session_count = None
+  - max_priority = None
+  - max_pending_session_resource_slots = None
+  - max_concurrent_sftp_sessions = 1
+  - max_containers_per_session = 1
+  - idle_timeout = 3600
+  - allowed_vfolder_hosts = []
+
+<a id="editing-giving-no-value-changes-nothing-of-a-keypair-policy"></a>
+
+#### [giving-no-value-changes-nothing-of-a-keypair-policy](/tests/scenario/bai_scenario/manager/resource_policy/test_editing.py) — pass
+
+슈퍼관리자가 키페어 정책을 지정만 하고 아무 값도 주지 않으면, 아무것도 바뀌지 않은 노드가 반환된다
+
+Given
+
+- 아무도 사용하지 않는 키페어 정책 하나와, superadmin 한 명
+  - 도메인 home-1
+  - 정책이 할당된 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+  - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
+
+When
+
+- ResourcePolicyAdapter.update_keypair_resource_policy — user-1이 keypair-policy-2 수정 (빈 요청)
+
+Then
+
+- 미리 만들어 둔 키페어 정책 전체가 반환된다
+  - id = 'keypair-policy-2'
+  - name = 'keypair-policy-2'
+  - created_at: 이 실행이 쓴 시각
+  - default_for_unspecified = <DefaultForUnspecified.UNLIMITED: 'UNLIMITED'>
+  - total_resource_slots = []
+  - max_session_lifetime = 0
+  - max_concurrent_sessions = 5
+  - max_pending_session_count = None
+  - max_priority = None
+  - max_pending_session_resource_slots = None
+  - max_concurrent_sftp_sessions = 1
+  - max_containers_per_session = 1
+  - idle_timeout = 3600
+  - allowed_vfolder_hosts = []
+
+<a id="editing-the-superadmin-changes-one-limit-of-a-keypair-policy"></a>
+
+#### [the-superadmin-changes-one-limit-of-a-keypair-policy](/tests/scenario/bai_scenario/manager/resource_policy/test_editing.py) — pass
+
+키페어 정책 하나가 있고 슈퍼관리자가 한도 하나만 수정하면, 그 한도만 새 값이 되고 나머지는 그대로 유지된다
+
+Given
+
+- 아무도 사용하지 않는 키페어 정책 하나와, superadmin 한 명
+  - 도메인 home-1
+  - 정책이 할당된 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+  - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
+
+When
+
+- ResourcePolicyAdapter.update_keypair_resource_policy — user-1이 keypair-policy-2 수정 (동시 세션 수 7로 변경)
+
+Then
+
+- 미리 만들어 둔 키페어 정책 전체가 반환된다
+  - id = 'keypair-policy-2'
+  - name = 'keypair-policy-2'
+  - created_at: 이 실행이 쓴 시각
+  - default_for_unspecified = <DefaultForUnspecified.UNLIMITED: 'UNLIMITED'>
+  - total_resource_slots = []
+  - max_session_lifetime = 0
+  - max_concurrent_sessions = 7
+  - max_pending_session_count = None
+  - max_priority = None
+  - max_pending_session_resource_slots = None
+  - max_concurrent_sftp_sessions = 1
+  - max_containers_per_session = 1
+  - idle_timeout = 3600
+  - allowed_vfolder_hosts = []
+
+<a id="editing-a-user-granted-nothing-may-not-edit-a-keypair-policy"></a>
+
+#### [a-user-granted-nothing-may-not-edit-a-keypair-policy](/tests/scenario/bai_scenario/manager/resource_policy/test_editing.py) — pass
+
+같은 키페어 정책이 있고 아무 권한도 없는 사용자가 수정하려 하면, 수정 로직에 이르기 전에 정책을 찾을 수 없다는 이유로 거부된다
+
+Given
+
+- 아무도 사용하지 않는 키페어 정책 하나와, user 한 명
+  - 도메인 home-1
+  - 정책이 할당된 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+  - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
+
+When
+
+- ResourcePolicyAdapter.update_keypair_resource_policy — user-1이 keypair-policy-2 수정 (동시 세션 수 7로 변경)
+
+Then
+
+- 거부된다
+  - 거부: GenericBadRequest
+
+<a id="editing-editing-a-keypair-policy-name-nothing-answers-to-is-not-found"></a>
+
+#### [editing-a-keypair-policy-name-nothing-answers-to-is-not-found](/tests/scenario/bai_scenario/manager/resource_policy/test_editing.py) — pass
+
+슈퍼관리자가 어느 키페어 정책에도 없는 이름을 수정하려 하면, 권한 문제가 아니라 대상이 없다는 것으로 거부된다
+
+Given
+
+- 아무도 사용하지 않는 키페어 정책 하나와, superadmin 한 명
+  - 도메인 home-1
+  - 정책이 할당된 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+  - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
+
+When
+
+- ResourcePolicyAdapter.update_keypair_resource_policy — user-1이 nobody 수정 (동시 세션 수 7로 변경)
+
+Then
+
+- 거부된다
+  - 거부: EntityNotFoundError
+
+<a id="editing-moving-the-priority-cap-outside-the-session-range-is-refused"></a>
+
+#### [moving-the-priority-cap-outside-the-session-range-is-refused](/tests/scenario/bai_scenario/manager/resource_policy/test_editing.py) — pass
+
+슈퍼관리자가 키페어 정책의 우선순위 상한을 세션 우선순위 범위 밖으로 수정하려 하면, 제약 위반으로 거부된다
+
+Given
+
+- 아무도 사용하지 않는 키페어 정책 하나와, superadmin 한 명
+  - 도메인 home-1
+  - 정책이 할당된 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+  - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
+
+When
+
+- ResourcePolicyAdapter.update_keypair_resource_policy — user-1이 keypair-policy-2 수정 (우선순위 상한을 세션 우선순위 범위 밖으로 변경)
+
+Then
+
+- 거부된다
+  - 거부: CheckConstraintViolationError
+
+### update_project_resource_policy
+
+<a id="editing-clearing-a-non-nullable-value-of-a-project-policy-leaves-it-as-it-was"></a>
+
+#### [clearing-a-non-nullable-value-of-a-project-policy-leaves-it-as-it-was](/tests/scenario/bai_scenario/manager/resource_policy/test_editing.py) — pass
+
+슈퍼관리자가 프로젝트 정책의 비울 수 없는 항목을 비우도록 수정하면, 그 요청은 무시되어 아무것도 바뀌지 않은 노드가 반환된다
+
+Given
+
+- 아무도 사용하지 않는 프로젝트 정책 하나와, superadmin 한 명
+  - 도메인 home-1
+  - 정책이 할당된 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+  - 프로젝트 정책 project-policy-1: 프로젝트 하나당 폴더 10개까지
+
+When
+
+- ResourcePolicyAdapter.update_project_resource_policy — user-1이 project-policy-1 수정 (폴더 수 비우기)
+
+Then
+
+- 미리 만들어 둔 프로젝트 정책 전체가 반환된다
+  - id = 'project-policy-1'
+  - name = 'project-policy-1'
+  - created_at: 이 실행이 쓴 시각
+  - max_vfolder_count = 10
+  - max_quota_scope_size = ('-1', '-1')
+  - max_network_count = 3
+
+<a id="editing-giving-no-value-changes-nothing-of-a-project-policy"></a>
+
+#### [giving-no-value-changes-nothing-of-a-project-policy](/tests/scenario/bai_scenario/manager/resource_policy/test_editing.py) — pass
+
+슈퍼관리자가 프로젝트 정책을 지정만 하고 아무 값도 주지 않으면, 아무것도 바뀌지 않은 노드가 반환된다
+
+Given
+
+- 아무도 사용하지 않는 프로젝트 정책 하나와, superadmin 한 명
+  - 도메인 home-1
+  - 정책이 할당된 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+  - 프로젝트 정책 project-policy-1: 프로젝트 하나당 폴더 10개까지
+
+When
+
+- ResourcePolicyAdapter.update_project_resource_policy — user-1이 project-policy-1 수정 (빈 요청)
+
+Then
+
+- 미리 만들어 둔 프로젝트 정책 전체가 반환된다
+  - id = 'project-policy-1'
+  - name = 'project-policy-1'
+  - created_at: 이 실행이 쓴 시각
+  - max_vfolder_count = 10
+  - max_quota_scope_size = ('-1', '-1')
+  - max_network_count = 3
+
+<a id="editing-the-superadmin-changes-one-limit-of-a-project-policy"></a>
+
+#### [the-superadmin-changes-one-limit-of-a-project-policy](/tests/scenario/bai_scenario/manager/resource_policy/test_editing.py) — pass
+
+프로젝트 정책 하나가 있고 슈퍼관리자가 한도 하나만 수정하면, 그 한도만 새 값이 되고 나머지는 그대로 유지된다
+
+Given
+
+- 아무도 사용하지 않는 프로젝트 정책 하나와, superadmin 한 명
+  - 도메인 home-1
+  - 정책이 할당된 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+  - 프로젝트 정책 project-policy-1: 프로젝트 하나당 폴더 10개까지
+
+When
+
+- ResourcePolicyAdapter.update_project_resource_policy — user-1이 project-policy-1 수정 (폴더 수 20으로 변경)
+
+Then
+
+- 미리 만들어 둔 프로젝트 정책 전체가 반환된다
+  - id = 'project-policy-1'
+  - name = 'project-policy-1'
+  - created_at: 이 실행이 쓴 시각
+  - max_vfolder_count = 20
+  - max_quota_scope_size = ('-1', '-1')
+  - max_network_count = 3
+
+<a id="editing-a-user-granted-nothing-may-not-edit-a-project-policy"></a>
+
+#### [a-user-granted-nothing-may-not-edit-a-project-policy](/tests/scenario/bai_scenario/manager/resource_policy/test_editing.py) — pass
+
+같은 프로젝트 정책이 있고 아무 권한도 없는 사용자가 수정하려 하면, 수정 로직에 이르기 전에 정책을 찾을 수 없다는 이유로 거부된다
+
+Given
+
+- 아무도 사용하지 않는 프로젝트 정책 하나와, user 한 명
+  - 도메인 home-1
+  - 정책이 할당된 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+  - 프로젝트 정책 project-policy-1: 프로젝트 하나당 폴더 10개까지
+
+When
+
+- ResourcePolicyAdapter.update_project_resource_policy — user-1이 project-policy-1 수정 (폴더 수 20으로 변경)
+
+Then
+
+- 거부된다
+  - 거부: GenericBadRequest
+
+<a id="editing-editing-a-project-policy-name-nothing-answers-to-is-not-found"></a>
+
+#### [editing-a-project-policy-name-nothing-answers-to-is-not-found](/tests/scenario/bai_scenario/manager/resource_policy/test_editing.py) — pass
+
+슈퍼관리자가 어느 프로젝트 정책에도 없는 이름을 수정하려 하면, 권한 문제가 아니라 대상이 없다는 것으로 거부된다
+
+Given
+
+- 아무도 사용하지 않는 프로젝트 정책 하나와, superadmin 한 명
+  - 도메인 home-1
+  - 정책이 할당된 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+  - 프로젝트 정책 project-policy-1: 프로젝트 하나당 폴더 10개까지
+
+When
+
+- ResourcePolicyAdapter.update_project_resource_policy — user-1이 nobody 수정 (폴더 수 20으로 변경)
+
+Then
+
+- 거부된다
+  - 거부: EntityNotFoundError
+
+### update_user_resource_policy
+
+<a id="editing-clearing-a-non-nullable-value-of-a-user-policy-leaves-it-as-it-was"></a>
+
+#### [clearing-a-non-nullable-value-of-a-user-policy-leaves-it-as-it-was](/tests/scenario/bai_scenario/manager/resource_policy/test_editing.py) — pass
+
+슈퍼관리자가 사용자 정책의 비울 수 없는 항목을 비우도록 수정하면, 그 요청은 무시되어 아무것도 바뀌지 않은 노드가 반환된다
+
+Given
+
+- 아무도 사용하지 않는 사용자 정책 하나와, superadmin 한 명
+  - 도메인 home-1
+  - 정책이 할당된 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+  - 사용자 정책 user-policy-2: 사용자 한 명당 폴더 10개까지
+
+When
+
+- ResourcePolicyAdapter.update_user_resource_policy — user-1이 user-policy-2 수정 (폴더 수 비우기)
+
+Then
+
+- 미리 만들어 둔 사용자 정책 전체가 반환된다
+  - id = 'user-policy-2'
+  - name = 'user-policy-2'
+  - created_at: 이 실행이 쓴 시각
+  - max_vfolder_count = 10
+  - max_concurrent_logins = None
+  - max_quota_scope_size = ('-1', '-1')
+  - max_session_count_per_model_session = 10
+  - max_customized_image_count = 3
+
+<a id="editing-clearing-a-nullable-value-of-a-user-policy-empties-it"></a>
+
+#### [clearing-a-nullable-value-of-a-user-policy-empties-it](/tests/scenario/bai_scenario/manager/resource_policy/test_editing.py) — pass
+
+비울 수 있는 항목에 값이 설정된 사용자 정책을 슈퍼관리자가 그 항목을 비우도록 수정하면, 그 항목이 비어 있는 노드가 반환된다
+
+Given
+
+- 아무도 사용하지 않는 사용자 정책 하나와, superadmin 한 명
+  - 도메인 home-1
+  - 정책이 할당된 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+  - 사용자 정책 user-policy-2: 사용자 한 명당 폴더 10개까지, 동시 로그인 3개까지
+
+When
+
+- ResourcePolicyAdapter.update_user_resource_policy — user-1이 user-policy-2 수정 (동시 로그인 수 비우기)
+
+Then
+
+- 미리 만들어 둔 사용자 정책 전체가 반환된다
+  - id = 'user-policy-2'
+  - name = 'user-policy-2'
+  - created_at: 이 실행이 쓴 시각
+  - max_vfolder_count = 10
+  - max_concurrent_logins = None
+  - max_quota_scope_size = ('-1', '-1')
+  - max_session_count_per_model_session = 10
+  - max_customized_image_count = 3
+
+<a id="editing-giving-no-value-changes-nothing-of-a-user-policy"></a>
+
+#### [giving-no-value-changes-nothing-of-a-user-policy](/tests/scenario/bai_scenario/manager/resource_policy/test_editing.py) — pass
+
+슈퍼관리자가 사용자 정책을 지정만 하고 아무 값도 주지 않으면, 아무것도 바뀌지 않은 노드가 반환된다
+
+Given
+
+- 아무도 사용하지 않는 사용자 정책 하나와, superadmin 한 명
+  - 도메인 home-1
+  - 정책이 할당된 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+  - 사용자 정책 user-policy-2: 사용자 한 명당 폴더 10개까지
+
+When
+
+- ResourcePolicyAdapter.update_user_resource_policy — user-1이 user-policy-2 수정 (빈 요청)
+
+Then
+
+- 미리 만들어 둔 사용자 정책 전체가 반환된다
+  - id = 'user-policy-2'
+  - name = 'user-policy-2'
+  - created_at: 이 실행이 쓴 시각
+  - max_vfolder_count = 10
+  - max_concurrent_logins = None
+  - max_quota_scope_size = ('-1', '-1')
+  - max_session_count_per_model_session = 10
+  - max_customized_image_count = 3
+
+<a id="editing-the-superadmin-changes-one-limit-of-a-user-policy"></a>
+
+#### [the-superadmin-changes-one-limit-of-a-user-policy](/tests/scenario/bai_scenario/manager/resource_policy/test_editing.py) — pass
+
+사용자 정책 하나가 있고 슈퍼관리자가 한도 하나만 수정하면, 그 한도만 새 값이 되고 나머지는 그대로 유지된다
+
+Given
+
+- 아무도 사용하지 않는 사용자 정책 하나와, superadmin 한 명
+  - 도메인 home-1
+  - 정책이 할당된 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+  - 사용자 정책 user-policy-2: 사용자 한 명당 폴더 10개까지
+
+When
+
+- ResourcePolicyAdapter.update_user_resource_policy — user-1이 user-policy-2 수정 (폴더 수 20으로 변경)
+
+Then
+
+- 미리 만들어 둔 사용자 정책 전체가 반환된다
+  - id = 'user-policy-2'
+  - name = 'user-policy-2'
+  - created_at: 이 실행이 쓴 시각
+  - max_vfolder_count = 20
+  - max_concurrent_logins = None
+  - max_quota_scope_size = ('-1', '-1')
+  - max_session_count_per_model_session = 10
+  - max_customized_image_count = 3
+
+<a id="editing-a-user-granted-nothing-may-not-edit-a-user-policy"></a>
+
+#### [a-user-granted-nothing-may-not-edit-a-user-policy](/tests/scenario/bai_scenario/manager/resource_policy/test_editing.py) — pass
+
+같은 사용자 정책이 있고 아무 권한도 없는 사용자가 수정하려 하면, 수정 로직에 이르기 전에 정책을 찾을 수 없다는 이유로 거부된다
+
+Given
+
+- 아무도 사용하지 않는 사용자 정책 하나와, user 한 명
+  - 도메인 home-1
+  - 정책이 할당된 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+  - 사용자 정책 user-policy-2: 사용자 한 명당 폴더 10개까지
+
+When
+
+- ResourcePolicyAdapter.update_user_resource_policy — user-1이 user-policy-2 수정 (폴더 수 20으로 변경)
+
+Then
+
+- 거부된다
+  - 거부: GenericBadRequest
+
+<a id="editing-editing-a-user-policy-name-nothing-answers-to-is-not-found"></a>
+
+#### [editing-a-user-policy-name-nothing-answers-to-is-not-found](/tests/scenario/bai_scenario/manager/resource_policy/test_editing.py) — pass
+
+슈퍼관리자가 어느 사용자 정책에도 없는 이름을 수정하려 하면, 권한 문제가 아니라 대상이 없다는 것으로 거부된다
+
+Given
+
+- 아무도 사용하지 않는 사용자 정책 하나와, superadmin 한 명
+  - 도메인 home-1
+  - 정책이 할당된 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+  - 사용자 정책 user-policy-2: 사용자 한 명당 폴더 10개까지
+
+When
+
+- ResourcePolicyAdapter.update_user_resource_policy — user-1이 nobody 수정 (폴더 수 20으로 변경)
+
+Then
+
+- 거부된다
+  - 거부: EntityNotFoundError
 

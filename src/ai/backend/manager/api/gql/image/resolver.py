@@ -7,6 +7,7 @@ This module provides GraphQL query fields for ImageV2.
 from __future__ import annotations
 
 from typing import Annotated
+from uuid import UUID
 
 import strawberry
 from strawberry import ID, Info
@@ -30,7 +31,18 @@ from ai.backend.manager.api.gql.decorators import (
     gql_mutation,
     gql_root_field,
 )
-from ai.backend.manager.api.gql.image.mutations import ScanImageInputGQL, ScanImagePayloadGQL
+from ai.backend.manager.api.gql.image.mutations import (
+    DeleteImagePayloadGQL,
+    PartialBulkDeleteImagesInputGQL,
+    PartialBulkImagesPayloadGQL,
+    PartialBulkRestoreImagesInputGQL,
+    PartialBulkUpdateImagesInputGQL,
+    RestoreImagePayloadGQL,
+    ScanImageInputGQL,
+    ScanImagePayloadGQL,
+    UpdateImageInputGQL,
+    UpdateImagePayloadGQL,
+)
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.api.gql.utils import check_admin_only
 
@@ -417,3 +429,84 @@ async def admin_scan_image(
     check_admin_only()
     payload = await info.context.adapters.image.admin_scan_image(input.to_pydantic())
     return ScanImagePayloadGQL.from_pydantic(payload)
+
+
+@gql_mutation(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Update an image. Only provided fields will be updated.",
+    )
+)
+async def update_image(
+    info: Info[StrawberryGQLContext],
+    id: UUID,
+    input: UpdateImageInputGQL,
+) -> UpdateImagePayloadGQL:
+    payload = await info.context.adapters.image.update(ImageID(id), input.to_pydantic())
+    return UpdateImagePayloadGQL.from_pydantic(payload)
+
+
+@gql_mutation(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION, description="Forget (soft-delete) an image."
+    )
+)
+async def delete_image(
+    info: Info[StrawberryGQLContext],
+    id: UUID,
+) -> DeleteImagePayloadGQL:
+    payload = await info.context.adapters.image.delete(ImageID(id))
+    return DeleteImagePayloadGQL.from_pydantic(payload)
+
+
+@gql_mutation(
+    BackendAIGQLMeta(added_version=NEXT_RELEASE_VERSION, description="Restore a forgotten image.")
+)
+async def restore_image(
+    info: Info[StrawberryGQLContext],
+    id: UUID,
+) -> RestoreImagePayloadGQL:
+    payload = await info.context.adapters.image.restore(ImageID(id))
+    return RestoreImagePayloadGQL.from_pydantic(payload)
+
+
+@gql_mutation(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Update several images, answering for each one.",
+    )
+)
+async def partial_bulk_update_images(
+    info: Info[StrawberryGQLContext],
+    input: PartialBulkUpdateImagesInputGQL,
+) -> PartialBulkImagesPayloadGQL:
+    payload = await info.context.adapters.image.partial_bulk_update(input.to_pydantic())
+    return PartialBulkImagesPayloadGQL.from_pydantic(payload)
+
+
+@gql_mutation(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Forget several images, answering for each one.",
+    )
+)
+async def partial_bulk_delete_images(
+    info: Info[StrawberryGQLContext],
+    input: PartialBulkDeleteImagesInputGQL,
+) -> PartialBulkImagesPayloadGQL:
+    payload = await info.context.adapters.image.partial_bulk_delete(input.to_pydantic())
+    return PartialBulkImagesPayloadGQL.from_pydantic(payload)
+
+
+@gql_mutation(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Restore several forgotten images, answering for each one.",
+    )
+)
+async def partial_bulk_restore_images(
+    info: Info[StrawberryGQLContext],
+    input: PartialBulkRestoreImagesInputGQL,
+) -> PartialBulkImagesPayloadGQL:
+    payload = await info.context.adapters.image.partial_bulk_restore(input.to_pydantic())
+    return PartialBulkImagesPayloadGQL.from_pydantic(payload)

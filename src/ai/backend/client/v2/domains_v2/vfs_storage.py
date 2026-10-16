@@ -6,16 +6,20 @@ from uuid import UUID
 
 from ai.backend.client.v2.base_domain import BaseDomainClient
 from ai.backend.common.api_handlers import BaseRootResponseModel
+from ai.backend.common.dto.manager.v2.common import PartialBulkPayload
 from ai.backend.common.dto.manager.v2.vfs_storage.request import (
     AdminSearchVFSStoragesInput,
     CreateVFSStorageInput,
     DeleteVFSStorageInput,
+    PartialBulkPurgeVFSStoragesInput,
+    PartialBulkUpdateVFSStoragesInput,
     UpdateVFSStorageInput,
 )
 from ai.backend.common.dto.manager.v2.vfs_storage.response import (
     AdminSearchVFSStoragesPayload,
     CreateVFSStoragePayload,
     DeleteVFSStoragePayload,
+    PurgeVFSStoragePayload,
     UpdateVFSStoragePayload,
     VFSStorageNode,
 )
@@ -79,10 +83,40 @@ class V2VFSStorageClient(BaseDomainClient):
         )
 
     async def delete(self, request: DeleteVFSStorageInput) -> DeleteVFSStoragePayload:
-        """Delete a VFS storage."""
+        """Deprecated. Use :meth:`purge`."""
         return await self._client.typed_request(
             "POST",
             f"{_PATH}/delete",
             request=request,
             response_model=DeleteVFSStoragePayload,
+        )
+
+    async def purge(self, storage_id: UUID) -> PurgeVFSStoragePayload:
+        """Permanently remove a VFS storage."""
+        return await self._client.typed_request(
+            "DELETE",
+            f"{_PATH}/{storage_id}",
+            response_model=PurgeVFSStoragePayload,
+        )
+
+    async def partial_bulk_update(
+        self, request: PartialBulkUpdateVFSStoragesInput
+    ) -> PartialBulkPayload[VFSStorageNode]:
+        """Update several VFS storages, answering for each one."""
+        return await self._client.typed_request(
+            "POST",
+            f"{_PATH}/partial-bulk-update",
+            request=request,
+            response_model=PartialBulkPayload[VFSStorageNode],
+        )
+
+    async def partial_bulk_purge(
+        self, request: PartialBulkPurgeVFSStoragesInput
+    ) -> PartialBulkPayload[VFSStorageNode]:
+        """Permanently remove several VFS storages, answering for each one."""
+        return await self._client.typed_request(
+            "POST",
+            f"{_PATH}/partial-bulk-purge",
+            request=request,
+            response_model=PartialBulkPayload[VFSStorageNode],
         )

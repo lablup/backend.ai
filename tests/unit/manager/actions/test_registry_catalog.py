@@ -137,8 +137,20 @@ from ai.backend.manager.services.artifact_registry.actions.common.get_multi impo
 from ai.backend.manager.services.artifact_registry.actions.huggingface.bulk_get import (
     BulkGetHuggingFaceRegistriesAction,
 )
+from ai.backend.manager.services.artifact_registry.actions.huggingface.partial_bulk_purge import (
+    PartialBulkPurgeHuggingFaceRegistriesAction,
+)
+from ai.backend.manager.services.artifact_registry.actions.huggingface.partial_bulk_update import (
+    PartialBulkUpdateHuggingFaceRegistriesAction,
+)
 from ai.backend.manager.services.artifact_registry.actions.reservoir.bulk_get import (
     BulkGetReservoirRegistriesAction,
+)
+from ai.backend.manager.services.artifact_registry.actions.reservoir.partial_bulk_purge import (
+    PartialBulkPurgeReservoirRegistriesAction,
+)
+from ai.backend.manager.services.artifact_registry.actions.reservoir.partial_bulk_update import (
+    PartialBulkUpdateReservoirRegistriesAction,
 )
 from ai.backend.manager.services.artifact_registry.processors import ArtifactRegistryProcessors
 from ai.backend.manager.services.audit_log.actions.bulk_get import BulkGetAuditLogsAction
@@ -267,13 +279,13 @@ from ai.backend.manager.services.resource_preset.actions.list_presets import (
     ListResourcePresetsAction,
 )
 from ai.backend.manager.services.resource_preset.processors import ResourcePresetProcessors
-from ai.backend.manager.services.role_preset.actions.bulk_add_permissions import (
-    BulkAddRolePermissionPresetsAction,
-)
-from ai.backend.manager.services.role_preset.actions.bulk_remove_permissions import (
-    BulkRemoveRolePermissionPresetsAction,
+from ai.backend.manager.services.role_preset.actions.atomic_bulk_add_permissions import (
+    AtomicBulkAddRolePresetPermissionsAction,
 )
 from ai.backend.manager.services.role_preset.actions.create import CreateRolePresetAction
+from ai.backend.manager.services.role_preset.actions.partial_bulk_remove_permissions import (
+    PartialBulkRemoveRolePresetPermissionsAction,
+)
 from ai.backend.manager.services.role_preset.actions.update import UpdateRolePresetAction
 from ai.backend.manager.services.runtime_variant.actions.purge import PurgeRuntimeVariantAction
 from ai.backend.manager.services.scheduling_history.actions.bulk_get_deployment_histories import (
@@ -575,8 +587,8 @@ def test_resource_domain_and_agent_reads_keep_their_judged_gates() -> None:
 
 
 def test_artifact_registry_metas_read_is_a_partial_bulk_permission_read() -> None:
-    """The named artifact, HuggingFace and Reservoir registries are read one permission check
-    per registry, not superadmin-only."""
+    """The named artifact, HuggingFace and Reservoir registries are read, updated and purged
+    one permission check per registry, not superadmin-only."""
     registry = _ops_registry()
     ArtifactRegistryProcessors(
         registry.group(GroupMeta(ArtifactRegistryEntityType())),
@@ -604,6 +616,17 @@ def test_artifact_registry_metas_read_is_a_partial_bulk_permission_read() -> Non
         ActionKind.BULK,
         ActionGate.PERMISSION,
     )
+    for action_cls in (
+        PartialBulkUpdateHuggingFaceRegistriesAction,
+        PartialBulkPurgeHuggingFaceRegistriesAction,
+        PartialBulkUpdateReservoirRegistriesAction,
+        PartialBulkPurgeReservoirRegistriesAction,
+    ):
+        assert recorded[action_cls] == (
+            ArtifactRegistryEntityType(),
+            ActionKind.BULK,
+            ActionGate.PERMISSION,
+        )
 
 
 def test_rg_domain_read_is_a_scoped_permission_read() -> None:
@@ -1083,8 +1106,8 @@ _OPS_ACTIONS_WIRED_TO_A_SERVICE: dict[type[Any], str] = {
     CreatePresetAction: "validates the query template before insert",
     CreateRolePresetAction: "validates that the role name template renders",
     UpdateRolePresetAction: "validates the template and re-syncs the derived roles",
-    BulkAddRolePermissionPresetsAction: "re-syncs the derived roles in the same transaction",
-    BulkRemoveRolePermissionPresetsAction: "re-syncs the derived roles in the same transaction",
+    AtomicBulkAddRolePresetPermissionsAction: "re-syncs the derived roles in the same transaction",
+    PartialBulkRemoveRolePresetPermissionsAction: "re-syncs the derived roles in the same transaction",
 }
 
 

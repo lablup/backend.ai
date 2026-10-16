@@ -13,10 +13,10 @@ from uuid import UUID, uuid4
 
 import pytest
 
-from ai.backend.common.data.user.types import UserRole
-from ai.backend.common.dto.manager.v2.prometheus_query_preset_category.request import (
-    DeleteCategoryInput,
+from ai.backend.common.data.entity.prometheus_query_preset_category import (
+    PrometheusQueryPresetCategoryID,
 )
+from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.dto.manager.v2.prometheus_query_preset_category.response import (
     DeleteCategoryPayload,
 )
@@ -58,7 +58,7 @@ class Removing(When[ACategoryAndACaller, Adapter, Removed]):
 
     @override
     def operation(self) -> str:
-        return "delete"
+        return "purge"
 
     @override
     def describe(self, laid: ACategoryAndACaller) -> str:
@@ -69,7 +69,7 @@ class Removing(When[ACategoryAndACaller, Adapter, Removed]):
     async def call(self, adapter: Adapter, laid: ACategoryAndACaller) -> Removed:
         wanted = self.other if self.other is not None else laid.category.id
         with ActingAs(laid.caller):
-            return await adapter.delete(DeleteCategoryInput(id=wanted))
+            return await adapter.purge(PrometheusQueryPresetCategoryID(wanted))
 
 
 @dataclass(frozen=True)

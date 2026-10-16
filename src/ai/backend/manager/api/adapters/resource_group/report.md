@@ -2,15 +2,17 @@
 
 [무엇을 보장하는가](/src/ai/backend/manager/api/adapters/resource_group/KNOWLEDGE.md) · [어댑터](/src/ai/backend/manager/api/adapters/resource_group/adapter.py)
 
-시나리오: 미완 2 / 23
+시나리오: 미완 4 / 25
 
-- ops 로 구성 (8)
+- ops 로 구성 (10)
   - batch_load_by_ids — 대표 성공 ✓ · 대표 실패 ✗ — SCENARIO-GAP
   - batch_load_by_names — 대표 성공 ✓ · 대표 실패 ✗ — SCENARIO-GAP
   - get — 대표 성공 ✓ · 대표 실패 ✓
   - get_allowed_resource_groups_for_domain — 대표 성공 ✓ · 대표 실패 ✓
   - get_allowed_resource_groups_for_project — 대표 성공 ✓ · 대표 실패 ✓
   - lookup_name — 대표 성공 ✓ · 대표 실패 ✓
+  - partial_bulk_purge — 대표 성공 ✓ · 대표 실패 ✗ — SCENARIO-GAP
+  - partial_bulk_update — 대표 성공 ✓ · 대표 실패 ✗ — SCENARIO-GAP
   - scoped_search — 대표 성공 ✓ · 대표 실패 ✓
   - search — 대표 성공 ✓ · 대표 실패 ✓
 - ops + 직접 구현 (1)
@@ -80,6 +82,20 @@
 | [아무 권한도 받지 않은 사용자도 리소스 그룹 이름으로 id를 찾을 수 있다. 이 호출은 인증만 보고, 권한은 그 id를 받는 호출이 본다](#looking_up-a-user-granted-nothing-still-looks-up-a-resource-group-by-name) | 성공 |
 | [슈퍼관리자가 리소스 그룹 이름으로 id를 찾으면, 그 리소스 그룹의 id가 온다](#looking_up-the-superadmin-looks-up-a-resource-group-by-name) | 성공 |
 | [아무 리소스 그룹도 갖지 않은 이름으로 id를 찾으면 대상이 없다는 것으로 거부된다](#looking_up-looking-up-a-resource-group-name-nothing-answers-to-is-not-found) | 거부 |
+
+**partial_bulk_purge**
+
+| 시나리오 | 판정 |
+|---|---|
+| [아무 권한도 받지 않은 사용자가 그룹 여럿을 한 번에 완전 삭제하려 하면, 지워진 것 없이 모두 권한이 없다는 이유로 실패 목록에 온다](#partial_bulk_purging-a-user-granted-nothing-purges-none-of-several-resource-groups) | 성공 |
+| [슈퍼관리자가 그룹 둘과 없는 id 하나를 한 번에 완전 삭제하면, 둘은 지운 그대로 오고 없는 id 는 대상이 없다는 이유로 실패 목록에 온다](#partial_bulk_purging-purging-several-resource-groups-answers-for-the-missing-one) | 성공 |
+
+**partial_bulk_update**
+
+| 시나리오 | 판정 |
+|---|---|
+| [아무 권한도 받지 않은 사용자가 그룹 여럿을 한 번에 고치려 하면, 고쳐진 것 없이 모두 권한이 없다는 이유로 실패 목록에 온다](#partial_bulk_editing-a-user-granted-nothing-edits-none-of-several-resource-groups) | 성공 |
+| [슈퍼관리자가 그룹 여럿의 설명을 한 번에 바꾸면, 모두 새 설명으로 오고 실패한 것은 없다](#partial_bulk_editing-the-superadmin-edits-several-resource-groups-at-once) | 성공 |
 
 **scoped_search**
 
@@ -901,6 +917,204 @@ Then
 
 - 거부된다
   - 거부: EntityNotFoundError
+
+### partial_bulk_purge
+
+<a id="partial_bulk_purging-a-user-granted-nothing-purges-none-of-several-resource-groups"></a>
+
+#### [a-user-granted-nothing-purges-none-of-several-resource-groups](/tests/scenario/bai_scenario/manager/resource_group/test_partial_bulk_purging.py) — pass
+
+아무 권한도 받지 않은 사용자가 그룹 여럿을 한 번에 완전 삭제하려 하면, 지워진 것 없이 모두 권한이 없다는 이유로 실패 목록에 온다
+
+Given
+
+- 리소스 그룹 둘과, 일반 사용자 한 명
+  - 도메인 home-1
+  - 리소스 그룹 wanted-1: fifo 스케줄러를 쓴다
+  - 리소스 그룹 other-1: fifo 스케줄러를 쓴다
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+
+When
+
+- ResourceGroupAdapter.partial_bulk_purge — user-1이 그룹 2개를 한 번에 완전 삭제함
+
+Then
+
+- 처리된 그룹 없이 그룹이 모두 실패 목록에 온다
+  - successes = []
+  - failed count = 2
+  - failed[0].id: 그룹의 id와 같다
+  - failed[0].message: 'Insufficient permission'를 담은 이유
+  - failed[1].id: 그룹의 id와 같다
+  - failed[1].message: 'Insufficient permission'를 담은 이유
+
+<a id="partial_bulk_purging-purging-several-resource-groups-answers-for-the-missing-one"></a>
+
+#### [purging-several-resource-groups-answers-for-the-missing-one](/tests/scenario/bai_scenario/manager/resource_group/test_partial_bulk_purging.py) — pass
+
+슈퍼관리자가 그룹 둘과 없는 id 하나를 한 번에 완전 삭제하면, 둘은 지운 그대로 오고 없는 id 는 대상이 없다는 이유로 실패 목록에 온다
+
+Given
+
+- 리소스 그룹 둘과, 슈퍼관리자 한 명
+  - 도메인 home-1
+  - 리소스 그룹 wanted-1: fifo 스케줄러를 쓴다
+  - 리소스 그룹 other-1: fifo 스케줄러를 쓴다
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+
+When
+
+- ResourceGroupAdapter.partial_bulk_purge — user-1이 그룹 2개 와 없는 id 하나를 한 번에 완전 삭제함
+
+Then
+
+- 그룹이 모두 처리된 목록에 오고, 없는 id 는 대상이 없다는 이유로 실패 목록에 온다
+  - successes count = 2
+  - successes[0].id: 무시함 — 데이터베이스가 만든다
+  - successes[0].name = 'wanted-1'
+  - successes[0].status.is_active = True
+  - successes[0].status.is_public = True
+  - successes[0].status.is_default = False
+  - successes[0].metadata.description = None
+  - successes[0].metadata.created_at: 이 실행이 쓴 시각
+  - successes[0].network.wsproxy_addr = None
+  - successes[0].network.use_host_network = False
+  - successes[0].scheduler.type = <SchedulerTypeDTO.FIFO: 'fifo'>
+  - successes[0].scheduler.preemption.enabled = False
+  - successes[0].scheduler.preemption.preemptible_priority = 5
+  - successes[0].scheduler.preemption.order = <PreemptionOrder.OLDEST: 'oldest'>
+  - successes[0].scheduler.preemption.mode = <PreemptionModeDTO.TERMINATE: 'terminate'>
+  - successes[0].scheduler.preemption.preemption_min_runtime = 0.0
+  - successes[0].scheduler.preemption.victim_scope = <PreemptionVictimScope.USER: 'user'>
+  - successes[0].default_deployment_options: 무시함 — 설치본이 정한 기본값이다
+  - successes[0].default_session_options: 무시함 — 설치본이 정한 기본값이다
+  - successes[1].id: 무시함 — 데이터베이스가 만든다
+  - successes[1].name = 'other-1'
+  - successes[1].status.is_active = True
+  - successes[1].status.is_public = True
+  - successes[1].status.is_default = False
+  - successes[1].metadata.description = None
+  - successes[1].metadata.created_at: 이 실행이 쓴 시각
+  - successes[1].network.wsproxy_addr = None
+  - successes[1].network.use_host_network = False
+  - successes[1].scheduler.type = <SchedulerTypeDTO.FIFO: 'fifo'>
+  - successes[1].scheduler.preemption.enabled = False
+  - successes[1].scheduler.preemption.preemptible_priority = 5
+  - successes[1].scheduler.preemption.order = <PreemptionOrder.OLDEST: 'oldest'>
+  - successes[1].scheduler.preemption.mode = <PreemptionModeDTO.TERMINATE: 'terminate'>
+  - successes[1].scheduler.preemption.preemption_min_runtime = 0.0
+  - successes[1].scheduler.preemption.victim_scope = <PreemptionVictimScope.USER: 'user'>
+  - successes[1].default_deployment_options: 무시함 — 설치본이 정한 기본값이다
+  - successes[1].default_session_options: 무시함 — 설치본이 정한 기본값이다
+  - failed count = 1
+  - failed[0].id: 요청에 넣은 없는 id와 같다
+  - failed[0].message: 'not found'를 담은 이유
+
+### partial_bulk_update
+
+<a id="partial_bulk_editing-a-user-granted-nothing-edits-none-of-several-resource-groups"></a>
+
+#### [a-user-granted-nothing-edits-none-of-several-resource-groups](/tests/scenario/bai_scenario/manager/resource_group/test_partial_bulk_editing.py) — pass
+
+아무 권한도 받지 않은 사용자가 그룹 여럿을 한 번에 고치려 하면, 고쳐진 것 없이 모두 권한이 없다는 이유로 실패 목록에 온다
+
+Given
+
+- 리소스 그룹 둘과, 일반 사용자 한 명
+  - 도메인 home-1
+  - 리소스 그룹 wanted-1: fifo 스케줄러를 쓴다
+  - 리소스 그룹 other-1: fifo 스케줄러를 쓴다
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+
+When
+
+- ResourceGroupAdapter.partial_bulk_update — user-1이 그룹 2개의 설명을 한 번에 고침
+
+Then
+
+- 처리된 그룹 없이 그룹이 모두 실패 목록에 온다
+  - successes = []
+  - failed count = 2
+  - failed[0].id: 그룹의 id와 같다
+  - failed[0].message: 'Insufficient permission'를 담은 이유
+  - failed[1].id: 그룹의 id와 같다
+  - failed[1].message: 'Insufficient permission'를 담은 이유
+
+<a id="partial_bulk_editing-the-superadmin-edits-several-resource-groups-at-once"></a>
+
+#### [the-superadmin-edits-several-resource-groups-at-once](/tests/scenario/bai_scenario/manager/resource_group/test_partial_bulk_editing.py) — pass
+
+슈퍼관리자가 그룹 여럿의 설명을 한 번에 바꾸면, 모두 새 설명으로 오고 실패한 것은 없다
+
+Given
+
+- 리소스 그룹 둘과, 슈퍼관리자 한 명
+  - 도메인 home-1
+  - 리소스 그룹 wanted-1: fifo 스케줄러를 쓴다
+  - 리소스 그룹 other-1: fifo 스케줄러를 쓴다
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+
+When
+
+- ResourceGroupAdapter.partial_bulk_update — user-1이 그룹 2개의 설명을 한 번에 고침
+
+Then
+
+- 그룹이 모두 처리된 목록에 오고, 실패한 것은 없다
+  - successes count = 2
+  - successes[0].id: 무시함 — 데이터베이스가 만든다
+  - successes[0].name = 'wanted-1'
+  - successes[0].status.is_active = True
+  - successes[0].status.is_public = True
+  - successes[0].status.is_default = False
+  - successes[0].metadata.description = '한 번에 고친 설명'
+  - successes[0].metadata.created_at: 이 실행이 쓴 시각
+  - successes[0].network.wsproxy_addr = None
+  - successes[0].network.use_host_network = False
+  - successes[0].scheduler.type = <SchedulerTypeDTO.FIFO: 'fifo'>
+  - successes[0].scheduler.preemption.enabled = False
+  - successes[0].scheduler.preemption.preemptible_priority = 5
+  - successes[0].scheduler.preemption.order = <PreemptionOrder.OLDEST: 'oldest'>
+  - successes[0].scheduler.preemption.mode = <PreemptionModeDTO.TERMINATE: 'terminate'>
+  - successes[0].scheduler.preemption.preemption_min_runtime = 0.0
+  - successes[0].scheduler.preemption.victim_scope = <PreemptionVictimScope.USER: 'user'>
+  - successes[0].default_deployment_options: 무시함 — 설치본이 정한 기본값이다
+  - successes[0].default_session_options: 무시함 — 설치본이 정한 기본값이다
+  - successes[1].id: 무시함 — 데이터베이스가 만든다
+  - successes[1].name = 'other-1'
+  - successes[1].status.is_active = True
+  - successes[1].status.is_public = True
+  - successes[1].status.is_default = False
+  - successes[1].metadata.description = '한 번에 고친 설명'
+  - successes[1].metadata.created_at: 이 실행이 쓴 시각
+  - successes[1].network.wsproxy_addr = None
+  - successes[1].network.use_host_network = False
+  - successes[1].scheduler.type = <SchedulerTypeDTO.FIFO: 'fifo'>
+  - successes[1].scheduler.preemption.enabled = False
+  - successes[1].scheduler.preemption.preemptible_priority = 5
+  - successes[1].scheduler.preemption.order = <PreemptionOrder.OLDEST: 'oldest'>
+  - successes[1].scheduler.preemption.mode = <PreemptionModeDTO.TERMINATE: 'terminate'>
+  - successes[1].scheduler.preemption.preemption_min_runtime = 0.0
+  - successes[1].scheduler.preemption.victim_scope = <PreemptionVictimScope.USER: 'user'>
+  - successes[1].default_deployment_options: 무시함 — 설치본이 정한 기본값이다
+  - successes[1].default_session_options: 무시함 — 설치본이 정한 기본값이다
+  - failed = []
 
 ### scoped_search
 

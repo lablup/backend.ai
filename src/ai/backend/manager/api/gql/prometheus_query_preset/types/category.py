@@ -7,6 +7,7 @@ from enum import StrEnum
 from typing import Self
 from uuid import UUID
 
+from ai.backend.common.dto.manager.v2.common import PartialBulkPayload
 from ai.backend.common.dto.manager.v2.prometheus_query_preset_category.request import (
     CategoryFilter as CategoryFilterDTO,
 )
@@ -15,6 +16,9 @@ from ai.backend.common.dto.manager.v2.prometheus_query_preset_category.request i
 )
 from ai.backend.common.dto.manager.v2.prometheus_query_preset_category.request import (
     CreateCategoryInput as CreateCategoryInputDTO,
+)
+from ai.backend.common.dto.manager.v2.prometheus_query_preset_category.request import (
+    PartialBulkPurgeQueryPresetCategoriesInput as PartialBulkPurgeQueryPresetCategoriesInputDTO,
 )
 from ai.backend.common.dto.manager.v2.prometheus_query_preset_category.response import (
     CategoryNode,
@@ -25,10 +29,12 @@ from ai.backend.common.dto.manager.v2.prometheus_query_preset_category.response 
 from ai.backend.common.dto.manager.v2.prometheus_query_preset_category.response import (
     DeleteCategoryPayload as DeleteCategoryPayloadDTO,
 )
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import (
     OrderDirection,
     StringFilter,
 )
+from ai.backend.manager.api.gql.common_types import PartialBulkFailureGQL
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     gql_added_field,
@@ -125,6 +131,19 @@ class CreateCategoryInputGQL(PydanticInputMixin[CreateCategoryInputDTO]):
     description: str | None = gql_field(description="Optional category description.", default=None)
 
 
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Input for purging several query preset categories, each answered for separately.",
+    ),
+    name="PartialBulkPurgeQueryPresetCategoriesInput",
+)
+class PartialBulkPurgeQueryPresetCategoriesInputGQL(
+    PydanticInputMixin[PartialBulkPurgeQueryPresetCategoriesInputDTO]
+):
+    ids: list[UUID] = gql_field(description="IDs of the categories to purge.")
+
+
 # --- Payload types ---
 
 
@@ -150,3 +169,27 @@ class CreateCategoryPayloadGQL(PydanticOutputMixin[CreateCategoryGQLPayloadDTO])
 )
 class DeleteCategoryPayloadGQL(PydanticOutputMixin[DeleteCategoryPayloadDTO]):
     id: UUID = gql_field(description="Deleted category ID.")
+
+
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description=(
+            "Result of a partial bulk query preset category operation: the categories "
+            "processed and the ones that failed."
+        ),
+    ),
+    model=PartialBulkPayload[CategoryNode],
+    name="PartialBulkQueryPresetCategoriesPayload",
+)
+class PartialBulkQueryPresetCategoriesPayloadGQL(
+    PydanticOutputMixin[PartialBulkPayload[CategoryNode]]
+):
+    """Payload for partial bulk query preset category mutations."""
+
+    successes: list[CategoryGQL] = gql_field(
+        description="The categories processed, as they now stand."
+    )
+    failed: list[PartialBulkFailureGQL] = gql_field(
+        description="The categories not processed, each with the reason."
+    )

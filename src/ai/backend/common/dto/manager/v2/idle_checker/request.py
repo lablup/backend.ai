@@ -114,6 +114,12 @@ class PurgeIdleCheckerInput(BaseRequestModel):
     id: IdleCheckerID = Field(description="Idle checker ID to purge.")
 
 
+class PartialBulkPurgeIdleCheckersInput(BaseRequestModel):
+    """Input for purging several idle checkers, each answered for separately."""
+
+    ids: NonEmptyList[IdleCheckerID] = Field(description="IDs of the idle checkers to purge.")
+
+
 class IdleCheckerFilter(BaseRequestModel):
     name: StringFilter | None = Field(default=None)
     checker_type: CheckerTypeFilter | None = Field(default=None)

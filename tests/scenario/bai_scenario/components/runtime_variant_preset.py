@@ -6,13 +6,14 @@ variant a preset would go under, and the preset or presets the call reads.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import datetime
 from typing import Any, override
 from uuid import UUID
 
 from ai.backend.common.data.entity.runtime_variant_preset import RuntimeVariantPresetEntityType
 from ai.backend.common.data.user.types import UserRole
+from ai.backend.common.dto.manager.v2.common import PartialBulkPayload
 from ai.backend.common.dto.manager.v2.runtime_variant_preset.response import (
     DeleteRuntimeVariantPresetPayload,
     PresetTargetSpec,
@@ -28,6 +29,7 @@ from ai.backend.manager.data.runtime_variant.types import RuntimeVariantData
 from ai.backend.manager.data.runtime_variant_preset.types import RuntimeVariantPresetData
 from ai.backend.manager.data.user.types import UserData
 from ai.backend.manager.errors.base.entity import EntityNotFoundError
+from ai.backend.manager.errors.permission import NotEnoughPermission
 from ai.backend.testutils.scenario_steps import (
     Answered,
     Given,
@@ -39,7 +41,7 @@ from ai.backend.testutils.scenario_steps import (
     Then,
     Verdict,
 )
-from bai_scenario.components.domain import WrittenByThisRun
+from bai_scenario.components.domain import Mentions, WrittenByThisRun
 from bai_scenario.components.runtime_variant import AVariantAndACaller
 from bai_scenario.components.system import (
     KEPT,
@@ -533,3 +535,86 @@ class TheDeletedPresetId(Then[APresetAndACaller, DeleteRuntimeVariantPresetPaylo
                 "id", payload.id, SameAs[UUID](laid.preset.id, "미리 만들어 둔 프리셋의 식별자")
             )
         ]
+
+
+@dataclass(frozen=True)
+class EveryLaidPresetComesBack(
+    Then[ManyPresetsAndACaller, PartialBulkPayload[RuntimeVariantPresetNode]]
+):
+    """미리 만들어 둔 프리셋이 모두 처리된 목록에 온다. `missing`이 있으면 그 id 만 실패 목록에 온다.
+
+    `described`가 있으면 그 설명으로, 없으면 시드가 쓴 그대로 온다.
+    """
+
+    started: datetime
+    described: str | Kept = KEPT
+    missing: UUID | None = None
+
+    @override
+    def says(self) -> str:
+        if self.missing is None:
+            return "미리 만들어 둔 프리셋이 모두 처리된 목록에 오고, 실패한 것은 없다"
+        return "미리 만들어 둔 프리셋이 모두 처리된 목록에 오고, 없는 id 는 실패 목록에 온다"
+
+    @override
+    def look(
+        self,
+        laid: ManyPresetsAndACaller,
+        answered: Answered[PartialBulkPayload[RuntimeVariantPresetNode]],
+    ) -> list[Verdict]:
+        payload = answered.response
+        if payload is None:
+            return [Refused(NotEnoughPermission, answered.raised)]
+        written = WrittenByThisRun(self.started)
+        verdicts: list[Verdict] = [Same("successes count", len(payload.successes), len(laid.laid))]
+        for i, (node, one) in enumerate(zip(payload.successes, laid.laid, strict=False)):
+            expected = (
+                one
+                if isinstance(self.described, Kept)
+                else replace(one, description=self.described)
+            )
+            verdicts += laid_preset_verdicts(f"successes[{i}].", node, expected, written)
+        if self.missing is None:
+            return [*verdicts, Same("failed", payload.failed, [])]
+        verdicts.append(Same("failed count", len(payload.failed), 1))
+        for failure in payload.failed:
+            verdicts += [
+                Held[UUID]("failed[0].id", failure.id, SameAs(self.missing, "요청에 넣은 없는 id")),
+                Skipped("failed[0].message", "이유는 문자열로 오고, 문자열은 바뀌어도 되는 값이다"),
+            ]
+        return verdicts
+
+
+@dataclass(frozen=True)
+class NoLaidPresetIsProcessed(
+    Then[ManyPresetsAndACaller, PartialBulkPayload[RuntimeVariantPresetNode]]
+):
+    """처리된 프리셋 없이, 미리 만들어 둔 프리셋이 모두 같은 이유로 실패 목록에 온다."""
+
+    reason: str
+
+    @override
+    def says(self) -> str:
+        return "처리된 프리셋 없이 미리 만들어 둔 프리셋이 모두 실패 목록에 온다"
+
+    @override
+    def look(
+        self,
+        laid: ManyPresetsAndACaller,
+        answered: Answered[PartialBulkPayload[RuntimeVariantPresetNode]],
+    ) -> list[Verdict]:
+        payload = answered.response
+        if payload is None:
+            return [Refused(NotEnoughPermission, answered.raised)]
+        verdicts: list[Verdict] = [
+            Same("successes", payload.successes, []),
+            Same("failed count", len(payload.failed), len(laid.laid)),
+        ]
+        for i, (failure, one) in enumerate(zip(payload.failed, laid.laid, strict=False)):
+            verdicts += [
+                Held[UUID](
+                    f"failed[{i}].id", failure.id, SameAs(one.id, "미리 만들어 둔 프리셋의 id")
+                ),
+                Held(f"failed[{i}].message", failure.message, Mentions(self.reason)),
+            ]
+        return verdicts
