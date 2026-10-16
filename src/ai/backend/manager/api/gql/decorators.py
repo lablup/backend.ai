@@ -277,7 +277,6 @@ def gql_field(
     name: str | None = None,
     default: Any = strawberry.UNSET,
     deprecation_reason: str | None = None,
-    graphql_type: Any | None = None,
 ) -> Any:
     """Field introduced with the parent type (shares the parent's version).
 
@@ -289,7 +288,6 @@ def gql_field(
         name=name,
         default=default,
         deprecation_reason=deprecation_reason,
-        graphql_type=graphql_type,
     )
 
 
