@@ -74,7 +74,7 @@ from ai.backend.appproxy.common.utils import (
     ensure_json_serializable,
     mime_match,
 )
-from ai.backend.appproxy.worker.api.ingress import create_app as create_ingress_app
+from ai.backend.appproxy.worker.api.internal.ingress import create_app as create_ingress_app
 from ai.backend.appproxy.worker.ingress.factory import IngressStateFactory
 from ai.backend.common.clients.http_client.client_pool import (
     ClientPool,
