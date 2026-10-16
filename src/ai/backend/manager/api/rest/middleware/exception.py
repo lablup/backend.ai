@@ -10,6 +10,7 @@ from aiohttp.typedefs import Middleware
 
 from ai.backend.common.exception import BackendAIError, ErrorCode
 from ai.backend.common.json import dump_json_str
+from ai.backend.common.middlewares.exception import client_closed_response, is_client_disconnect
 from ai.backend.common.plugin.monitor import INCREMENT
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.errors.api import InvalidAPIParameters
@@ -135,6 +136,11 @@ def build_exception_middleware(
             log.debug("Request cancelled ({0} {1})", request.method, request.rel_url)
             raise e
         except Exception as e:
+            if is_client_disconnect(request, e):
+                log.trace(
+                    "Client disconnected while writing the response ({} {})", method, endpoint
+                )
+                return client_closed_response()
             await error_monitor.capture_exception()
             log.exception(
                 "Uncaught exception in HTTP request handlers ({} {}): {}", method, endpoint, e
