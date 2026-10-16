@@ -21,6 +21,7 @@ def register_v2_session_group_routes(
     registry = RouteRegistry.create("session-groups", route_deps.cors_options)
 
     registry.add("GET", "/{session_group_id}", handler.get, middlewares=[auth_required])
+    registry.add("PATCH", "/{session_group_id}", handler.update, middlewares=[auth_required])
     registry.add("POST", "/search", handler.admin_search, middlewares=[superadmin_required])
     registry.add("POST", "/scoped/search", handler.scoped_search, middlewares=[auth_required])
 
