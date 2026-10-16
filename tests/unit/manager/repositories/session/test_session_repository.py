@@ -32,7 +32,7 @@ from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.data.session_template.types import TemplateType
-from ai.backend.manager.errors.kernel import SessionNotFound
+from ai.backend.manager.errors.kernel import SessionAlreadyExists, SessionNotFound
 from ai.backend.manager.models.agent.row import AgentRow
 from ai.backend.manager.models.container_registry.row import ContainerRegistryRow
 from ai.backend.manager.models.domain.row import DomainRow
@@ -393,6 +393,25 @@ class TestSessionRepository:
             await db_sess.commit()
         return session_id
 
+    async def _insert_other_keypair(
+        self, db: ExtendedAsyncSAEngine, base: SessionTestData
+    ) -> AccessKey:
+        other_key = AccessKey("OTHERKEY1234567")
+        async with db.begin_session() as db_sess:
+            db_sess.add(
+                KeyPairRow(
+                    user=base.user_id,
+                    access_key=other_key,
+                    secret_key=SecretValue("other-secret-key"),
+                    is_active=True,
+                    is_admin=False,
+                    resource_policy="default-keypair-policy",
+                    rate_limit=1000,
+                )
+            )
+            await db_sess.commit()
+        return other_key
+
     async def test_resolve_session_id_by_name_and_user(
         self,
         repository: SessionRepository,
@@ -420,20 +439,7 @@ class TestSessionRepository:
     ) -> None:
         """A terminal (TERMINATED) session sharing the name must not shadow the live one,
         even when created under a different access key of the same user."""
-        other_key = AccessKey("OTHERKEY1234567")
-        async with db_with_cleanup.begin_session() as db_sess:
-            db_sess.add(
-                KeyPairRow(
-                    user=session_with_kernel.user_id,
-                    access_key=other_key,
-                    secret_key=SecretValue("other-secret-key"),
-                    is_active=True,
-                    is_admin=False,
-                    resource_policy="default-keypair-policy",
-                    rate_limit=1000,
-                )
-            )
-            await db_sess.commit()
+        other_key = await self._insert_other_keypair(db_with_cleanup, session_with_kernel)
         await self._insert_session(
             db_with_cleanup,
             session_with_kernel,
@@ -456,6 +462,24 @@ class TestSessionRepository:
         some_id = uuid.uuid4()
         resolved = await repository.resolve_session_id(str(some_id), session_with_kernel.user_id)
         assert resolved == SessionId(some_id)
+
+    async def test_rename_rejects_name_of_same_user_session_under_other_keypair(
+        self,
+        repository: SessionRepository,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        session_with_kernel: SessionTestData,
+    ) -> None:
+        other_key = await self._insert_other_keypair(db_with_cleanup, session_with_kernel)
+        await self._insert_session(
+            db_with_cleanup,
+            session_with_kernel,
+            name="taken",
+            access_key=other_key,
+            status=SessionStatus.RUNNING,
+        )
+
+        with pytest.raises(SessionAlreadyExists):
+            await repository.update_session_name(session_with_kernel.session_id, "taken")
 
     # =========================================================================
     # Tests - get_session_with_routing_minimal
