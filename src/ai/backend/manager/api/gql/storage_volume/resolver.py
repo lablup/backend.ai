@@ -11,9 +11,11 @@ from ai.backend.manager.api.gql.decorators import (
     gql_root_field,
 )
 from ai.backend.manager.api.gql.storage_volume.types import (
+    DeleteStorageVolumePayloadGQL,
     PurgeResourceGroupVolumeOfferInputGQL,
     PurgeResourceGroupVolumeOfferPayloadGQL,
     PurgeStorageVolumePayloadGQL,
+    RestoreStorageVolumePayloadGQL,
     StorageVolumeConnectionGQL,
     StorageVolumeFilterGQL,
     StorageVolumeGQL,
@@ -26,8 +28,10 @@ from ai.backend.manager.api.gql.storage_volume.types import (
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 
 __all__ = (
+    "admin_delete_storage_volume",
     "admin_purge_resource_group_volume_offer",
     "admin_purge_storage_volume",
+    "admin_restore_storage_volume",
     "admin_upsert_resource_group_volume_offer",
     "admin_storage_volume",
     "admin_storage_volumes",
@@ -130,4 +134,33 @@ async def admin_purge_resource_group_volume_offer(
     info: Info[StrawberryGQLContext],
     input: PurgeResourceGroupVolumeOfferInputGQL,
 ) -> PurgeResourceGroupVolumeOfferPayloadGQL | None:
+    raise NotImplementedError
+
+
+@gql_mutation(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description=(
+            "Withhold one storage volume from new use. The folders already on it keep"
+            " working and the volume still answers get and search. Admin only."
+        ),
+    )
+)
+async def admin_delete_storage_volume(
+    info: Info[StrawberryGQLContext],
+    id: ID,
+) -> DeleteStorageVolumePayloadGQL | None:
+    raise NotImplementedError
+
+
+@gql_mutation(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Take one withdrawn storage volume back into use. Admin only.",
+    )
+)
+async def admin_restore_storage_volume(
+    info: Info[StrawberryGQLContext],
+    id: ID,
+) -> RestoreStorageVolumePayloadGQL | None:
     raise NotImplementedError

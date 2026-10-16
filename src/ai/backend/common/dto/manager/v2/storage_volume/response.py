@@ -14,6 +14,8 @@ from ai.backend.common.dto.manager.v2.storage_volume.types import StorageVolumeU
 
 __all__ = (
     "AdminSearchStorageVolumesPayload",
+    "DeleteStorageVolumePayload",
+    "RestoreStorageVolumePayload",
     "PurgeResourceGroupVolumeOfferPayload",
     "UpsertResourceGroupVolumeOfferPayload",
     "GetStorageVolumePayload",
@@ -126,3 +128,15 @@ class PurgeResourceGroupVolumeOfferPayload(BaseResponseModel):
 
     resource_group_id: UUID = Field(description="The resource group the volume was offered to.")
     storage_volume_id: UUID = Field(description="The volume withdrawn.")
+
+
+class DeleteStorageVolumePayload(BaseResponseModel):
+    """Payload for a storage volume soft delete."""
+
+    id: UUID = Field(description="ID of the withdrawn storage volume")
+
+
+class RestoreStorageVolumePayload(BaseResponseModel):
+    """Payload for a storage volume restore."""
+
+    id: UUID = Field(description="ID of the restored storage volume")

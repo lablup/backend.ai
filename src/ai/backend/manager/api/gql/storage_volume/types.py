@@ -39,6 +39,9 @@ from ai.backend.common.dto.manager.v2.storage_volume.request import (
     UpsertResourceGroupVolumeOfferInput as UpsertResourceGroupVolumeOfferInputDTO,
 )
 from ai.backend.common.dto.manager.v2.storage_volume.response import (
+    DeleteStorageVolumePayload as DeleteStorageVolumePayloadDTO,
+)
+from ai.backend.common.dto.manager.v2.storage_volume.response import (
     PurgeResourceGroupVolumeOfferPayload as PurgeResourceGroupVolumeOfferPayloadDTO,
 )
 from ai.backend.common.dto.manager.v2.storage_volume.response import (
@@ -48,6 +51,9 @@ from ai.backend.common.dto.manager.v2.storage_volume.response import (
     ResourceGroupVolumeOfferNode,
     StorageVolumeNode,
     StorageVolumeServiceHoldingNode,
+)
+from ai.backend.common.dto.manager.v2.storage_volume.response import (
+    RestoreStorageVolumePayload as RestoreStorageVolumePayloadDTO,
 )
 from ai.backend.common.dto.manager.v2.storage_volume.response import (
     SearchResourceGroupVolumeOffersPayload as SearchResourceGroupVolumeOffersPayloadDTO,
@@ -86,9 +92,11 @@ from ai.backend.manager.api.gql.pydantic_compat import (
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 
 __all__ = (
+    "DeleteStorageVolumePayloadGQL",
     "PurgeResourceGroupVolumeOfferInputGQL",
     "PurgeResourceGroupVolumeOfferPayloadGQL",
     "PurgeStorageVolumePayloadGQL",
+    "RestoreStorageVolumePayloadGQL",
     "UpsertResourceGroupVolumeOfferInputGQL",
     "UpsertResourceGroupVolumeOfferPayloadGQL",
     "UpdateStorageVolumePayloadGQL",
@@ -568,3 +576,27 @@ class PurgeResourceGroupVolumeOfferPayloadGQL(
 ):
     resource_group_id: UUID = gql_field(description="The resource group the volume was offered to.")
     storage_volume_id: UUID = gql_field(description="The volume withdrawn.")
+
+
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Payload returned after withdrawing a storage volume from new use.",
+    ),
+    model=DeleteStorageVolumePayloadDTO,
+    name="DeleteStorageVolumePayload",
+)
+class DeleteStorageVolumePayloadGQL(PydanticOutputMixin[DeleteStorageVolumePayloadDTO]):
+    id: UUID = gql_field(description="ID of the withdrawn storage volume.")
+
+
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Payload returned after restoring a withdrawn storage volume.",
+    ),
+    model=RestoreStorageVolumePayloadDTO,
+    name="RestoreStorageVolumePayload",
+)
+class RestoreStorageVolumePayloadGQL(PydanticOutputMixin[RestoreStorageVolumePayloadDTO]):
+    id: UUID = gql_field(description="ID of the restored storage volume.")

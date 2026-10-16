@@ -645,8 +645,10 @@ from ai.backend.manager.api.gql.session_group.resolver import (
     session_group,
 )
 from ai.backend.manager.api.gql.storage_volume.resolver import (
+    admin_delete_storage_volume,
     admin_purge_resource_group_volume_offer,
     admin_purge_storage_volume,
+    admin_restore_storage_volume,
     admin_storage_volume,
     admin_storage_volumes,
     admin_update_storage_volume,
@@ -1308,6 +1310,8 @@ class Mutation:
     partial_bulk_purge_prometheus_query_presets = partial_bulk_purge_prometheus_query_presets
     admin_update_storage_volume = admin_update_storage_volume
     admin_purge_storage_volume = admin_purge_storage_volume
+    admin_delete_storage_volume = admin_delete_storage_volume
+    admin_restore_storage_volume = admin_restore_storage_volume
     admin_upsert_resource_group_volume_offer = admin_upsert_resource_group_volume_offer
     admin_purge_resource_group_volume_offer = admin_purge_resource_group_volume_offer
     # Prometheus Query Preset Category - Admin APIs
