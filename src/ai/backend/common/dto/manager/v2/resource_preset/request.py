@@ -8,7 +8,11 @@ from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseRequestModel
 from ai.backend.common.dto.manager.query import StringFilter, UUIDFilter
-from ai.backend.common.dto.manager.v2.common import BinarySizeInput, ResourceSlotEntryInput
+from ai.backend.common.dto.manager.v2.common import (
+    BinarySizeInput,
+    NonEmptyList,
+    ResourceSlotEntryInput,
+)
 from ai.backend.common.dto.manager.v2.resource_preset.types import (
     ResourcePresetOrderDirection,
     ResourcePresetOrderField,
@@ -19,6 +23,9 @@ from ai.backend.common.tristate.unset import UNSET, Unset
 __all__ = (
     "AdminSearchResourcePresetsInput",
     "CreateResourcePresetInput",
+    "PartialBulkPurgeResourcePresetsInput",
+    "PartialBulkUpdateResourcePresetItemInput",
+    "PartialBulkUpdateResourcePresetsInput",
     "ResourcePresetFilter",
     "ResourcePresetOrder",
     "UpdateResourcePresetInput",
@@ -60,6 +67,36 @@ class UpdateResourcePresetInput(BaseRequestModel):
         default=UNSET,
         description="Updated resource group name. Omit to leave unchanged; null makes the preset global.",
     )
+
+
+class PartialBulkUpdateResourcePresetItemInput(BaseRequestModel):
+    """One resource preset of a partial bulk update and the fields to update on it."""
+
+    id: UUID = Field(description="UUID of the resource preset to update.")
+    name: str | None | Unset = Field(
+        default=UNSET, description="Updated name. Omit to leave unchanged."
+    )
+    resource_slots: list[ResourceSlotEntryInput] | None | Unset = Field(
+        default=UNSET, description="Updated resource slot allocations. Omit to leave unchanged."
+    )
+    shared_memory: BinarySizeInput | None | Unset = Field(
+        default=UNSET,
+        description="Updated shared memory. Omit to leave unchanged; null clears.",
+    )
+
+
+class PartialBulkUpdateResourcePresetsInput(BaseRequestModel):
+    """Input for updating several resource presets, each answered for separately."""
+
+    items: NonEmptyList[PartialBulkUpdateResourcePresetItemInput] = Field(
+        description="The resource presets to update, each with its fields."
+    )
+
+
+class PartialBulkPurgeResourcePresetsInput(BaseRequestModel):
+    """Input for permanently deleting several resource presets, each answered for separately."""
+
+    ids: NonEmptyList[UUID] = Field(description="UUIDs of the resource presets to purge.")
 
 
 class ResourcePresetFilter(BaseRequestModel):

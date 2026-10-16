@@ -26,6 +26,7 @@ from ai.backend.common.dto.manager.query import (
 from ai.backend.common.dto.manager.v2.common import (
     BinarySizeInput,
     MountItemInput,
+    NonEmptyList,
     ResourceSlotEntryInput,
 )
 from ai.backend.common.dto.manager.v2.entity_label.request import EntityLabelNestedFilter
@@ -58,6 +59,7 @@ __all__ = (
     "GetSessionLogsQuery",
     "ListFilesInput",
     "MountItemInput",
+    "PartialBulkTerminateSessionsInput",
     "RenameSessionInput",
     "ResourceOptsInput",
     "ResourceSlotEntryInput",
@@ -509,6 +511,13 @@ class TerminateSessionsInput(BaseRequestModel):
     """Input for terminating one or more sessions."""
 
     session_ids: list[UUID] = Field(description="Session UUIDs to terminate.")
+    forced: bool = Field(default=False, description="Force-terminate without waiting for cleanup.")
+
+
+class PartialBulkTerminateSessionsInput(BaseRequestModel):
+    """Input for terminating several sessions, each answered for separately."""
+
+    ids: NonEmptyList[UUID] = Field(description="IDs of the sessions to terminate.")
     forced: bool = Field(default=False, description="Force-terminate without waiting for cleanup.")
 
 

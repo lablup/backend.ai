@@ -12,13 +12,19 @@ from ai.backend.common.api_handlers import (
     BodyParam,
     PathParam,
 )
+from ai.backend.common.data.entity.vfs_storage import VFSStorageID
 from ai.backend.common.dto.manager.v2.vfs_storage.request import (
     AdminSearchVFSStoragesInput,
     CreateVFSStorageInput,
     DeleteVFSStorageInput,
+    PartialBulkPurgeVFSStoragesInput,
+    PartialBulkUpdateVFSStoragesInput,
     UpdateVFSStorageInput,
 )
-from ai.backend.common.dto.manager.v2.vfs_storage.response import VFSStorageNode
+from ai.backend.common.dto.manager.v2.vfs_storage.response import (
+    DeleteVFSStoragePayload,
+    VFSStorageNode,
+)
 from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.api.rest.v2.path_params import StorageIdPathParam
 
@@ -66,10 +72,35 @@ class V2VFSStorageHandler:
 
     async def update(
         self,
+        path: PathParam[StorageIdPathParam],
         body: BodyParam[UpdateVFSStorageInput],
     ) -> APIResponse:
-        """Update an existing VFS storage."""
-        result = await self._adapter.update(body.parsed)
+        """Update an existing VFS storage. The path ID wins over the ID in the body."""
+        result = await self._adapter.update(VFSStorageID(path.parsed.storage_id), body.parsed)
+        return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
+
+    async def purge(
+        self,
+        path: PathParam[StorageIdPathParam],
+    ) -> APIResponse:
+        """Permanently remove a VFS storage."""
+        result = await self._adapter.purge(VFSStorageID(path.parsed.storage_id))
+        return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
+
+    async def partial_bulk_update(
+        self,
+        body: BodyParam[PartialBulkUpdateVFSStoragesInput],
+    ) -> APIResponse:
+        """Update several VFS storages, answering for each one."""
+        result = await self._adapter.partial_bulk_update(body.parsed)
+        return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
+
+    async def partial_bulk_purge(
+        self,
+        body: BodyParam[PartialBulkPurgeVFSStoragesInput],
+    ) -> APIResponse:
+        """Permanently remove several VFS storages, answering for each one."""
+        result = await self._adapter.partial_bulk_purge(body.parsed)
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
 
     async def search(
@@ -84,6 +115,8 @@ class V2VFSStorageHandler:
         self,
         body: BodyParam[DeleteVFSStorageInput],
     ) -> APIResponse:
-        """Delete a VFS storage."""
-        result = await self._adapter.delete(body.parsed)
-        return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
+        """Deprecated. Use `DELETE /v2/vfs-storages/{storage_id}`."""
+        purged = await self._adapter.purge(VFSStorageID(body.parsed.id))
+        return APIResponse.build(
+            status_code=HTTPStatus.OK, response_model=DeleteVFSStoragePayload(id=purged.id)
+        )

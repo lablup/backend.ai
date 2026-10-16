@@ -2,13 +2,22 @@
 
 from __future__ import annotations
 
+from uuid import UUID
+
 from strawberry.scalars import JSON
 
+from ai.backend.common.dto.manager.v2.common import PartialBulkPayload
 from ai.backend.common.dto.manager.v2.container_registry.request import (
     CreateContainerRegistryInput as CreateContainerRegistryInputDTO,
 )
 from ai.backend.common.dto.manager.v2.container_registry.request import (
+    PartialBulkPurgeContainerRegistriesInput as PartialBulkPurgeContainerRegistriesInputDTO,
+)
+from ai.backend.common.dto.manager.v2.container_registry.request import (
     UpdateContainerRegistryInput as UpdateContainerRegistryInputDTO,
+)
+from ai.backend.common.dto.manager.v2.container_registry.response import (
+    ContainerRegistryNode,
 )
 from ai.backend.common.dto.manager.v2.container_registry.response import (
     CreateContainerRegistryPayload as CreateContainerRegistryPayloadDTO,
@@ -17,8 +26,13 @@ from ai.backend.common.dto.manager.v2.container_registry.response import (
     DeleteContainerRegistryPayload as DeleteContainerRegistryPayloadDTO,
 )
 from ai.backend.common.dto.manager.v2.container_registry.response import (
+    PurgeContainerRegistryPayload as PurgeContainerRegistryPayloadDTO,
+)
+from ai.backend.common.dto.manager.v2.container_registry.response import (
     UpdateContainerRegistryPayload as UpdateContainerRegistryPayloadDTO,
 )
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
+from ai.backend.manager.api.gql.common_types import PartialBulkFailureGQL
 from ai.backend.manager.api.gql.container_registry.types import (
     ContainerRegistryGQL,
     ContainerRegistryTypeGQL,
@@ -73,6 +87,19 @@ class UpdateContainerRegistryInputGQL(PydanticInputMixin[UpdateContainerRegistry
     extra: JSON | None = gql_field(default=None, description="Updated extra metadata.")
 
 
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Input for purging several container registries, each answered for separately.",
+    ),
+    name="PartialBulkPurgeContainerRegistriesInput",
+)
+class PartialBulkPurgeContainerRegistriesInputGQL(
+    PydanticInputMixin[PartialBulkPurgeContainerRegistriesInputDTO]
+):
+    ids: list[UUID] = gql_field(description="IDs of the container registries to purge.")
+
+
 # ── Payloads ──
 
 
@@ -110,3 +137,39 @@ class UpdateContainerRegistryPayloadGQL(PydanticOutputMixin[UpdateContainerRegis
 )
 class DeleteContainerRegistryPayloadGQL(PydanticOutputMixin[DeleteContainerRegistryPayloadDTO]):
     id: str = gql_field(description="ID of the deleted registry.")
+
+
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Payload for container registry purge.",
+    ),
+    model=PurgeContainerRegistryPayloadDTO,
+    name="PurgeContainerRegistryPayload",
+)
+class PurgeContainerRegistryPayloadGQL(PydanticOutputMixin[PurgeContainerRegistryPayloadDTO]):
+    id: UUID = gql_field(description="ID of the purged registry.")
+
+
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description=(
+            "Result of a partial bulk container registry operation: the registries processed "
+            "and the ones that failed."
+        ),
+    ),
+    model=PartialBulkPayload[ContainerRegistryNode],
+    name="PartialBulkContainerRegistriesPayload",
+)
+class PartialBulkContainerRegistriesPayloadGQL(
+    PydanticOutputMixin[PartialBulkPayload[ContainerRegistryNode]]
+):
+    """Payload for partial bulk container registry mutations."""
+
+    successes: list[ContainerRegistryGQL] = gql_field(
+        description="The container registries processed, as they stood."
+    )
+    failed: list[PartialBulkFailureGQL] = gql_field(
+        description="The container registries not processed, each with the reason."
+    )

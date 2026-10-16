@@ -27,6 +27,9 @@ from ai.backend.manager.services.runtime_variant.actions.get import GetRuntimeVa
 from ai.backend.manager.services.runtime_variant.actions.lookup import (
     LookupRuntimeVariantAction,
 )
+from ai.backend.manager.services.runtime_variant.actions.partial_bulk_update import (
+    PartialBulkUpdateRuntimeVariantsAction,
+)
 from ai.backend.manager.services.runtime_variant.actions.purge import (
     PurgeRuntimeVariantAction,
 )
@@ -50,6 +53,9 @@ class RuntimeVariantProcessors:
     update: SingleEntityActionProcessor[
         UpdateRuntimeVariantAction, EntityOpsResult[RuntimeVariantData]
     ]
+    partial_bulk_update: PartialBulkActionProcessor[
+        PartialBulkUpdateRuntimeVariantsAction, RuntimeVariantData
+    ]
     purge: SingleEntityActionProcessor[
         PurgeRuntimeVariantAction, EntityOpsResult[RuntimeVariantData]
     ]
@@ -66,6 +72,9 @@ class RuntimeVariantProcessors:
         self.bulk_get = group.partial_bulk_get_ops(BulkGetRuntimeVariantsAction)
         self.global_create = group.global_create_ops(CreateRuntimeVariantAction)
         self.update = group.single_update_ops(UpdateRuntimeVariantAction)
+        self.partial_bulk_update = group.partial_bulk_update_ops(
+            PartialBulkUpdateRuntimeVariantsAction
+        )
         self.purge = group.single_entity(PurgeRuntimeVariantAction, service.purge)
         self.bulk_purge = group.partial_bulk(BulkPurgeRuntimeVariantsAction, service.bulk_purge)
         self.scoped_search = group.scoped_search_ops(ScopedSearchRuntimeVariantsAction)

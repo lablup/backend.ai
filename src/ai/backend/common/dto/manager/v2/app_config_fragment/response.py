@@ -18,6 +18,7 @@ __all__ = (
     "AppConfigFragmentNode",
     "AppConfigFragmentUpsertErrorInfo",
     "AppConfigFragmentsByNamesPayload",
+    "AtomicBulkUpsertAppConfigFragmentsPayload",
     "BulkPurgeAppConfigFragmentPayload",
     "PurgeAppConfigFragmentPayload",
     "SearchAppConfigFragmentPayload",
@@ -67,6 +68,12 @@ class UpsertAppConfigFragmentsPayload(BaseResponseModel):
     failed: list[AppConfigFragmentUpsertErrorInfo] = Field(
         description="Per-item failures, each naming the config name it targeted."
     )
+
+
+class AtomicBulkUpsertAppConfigFragmentsPayload(BaseResponseModel):
+    """Payload for an all-or-nothing upsert of many fragments at one scope."""
+
+    items: list[AppConfigFragmentNode] = Field(description="The upserted app config fragments.")
 
 
 class PurgeAppConfigFragmentPayload(BaseResponseModel):

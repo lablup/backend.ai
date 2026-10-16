@@ -17,6 +17,7 @@ __all__ = (
     "ContainerRegistryNode",
     "CreateContainerRegistryPayload",
     "DeleteContainerRegistryPayload",
+    "PurgeContainerRegistryPayload",
     "AdminSearchContainerRegistriesPayload",
     "UpdateContainerRegistryPayload",
 )
@@ -65,6 +66,12 @@ class DeleteContainerRegistryPayload(BaseResponseModel):
     """Payload for container registry deletion mutation result."""
 
     id: UUID = Field(description="ID of the deleted container registry.")
+
+
+class PurgeContainerRegistryPayload(BaseResponseModel):
+    """Payload for container registry purge mutation result."""
+
+    id: UUID = Field(description="ID of the purged container registry.")
 
 
 class AdminSearchContainerRegistriesPayload(BaseResponseModel):

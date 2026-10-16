@@ -51,6 +51,9 @@ from ai.backend.manager.services.container_registry.actions.load_container_regis
 from ai.backend.manager.services.container_registry.actions.lookup import (
     LookupContainerRegistryAction,
 )
+from ai.backend.manager.services.container_registry.actions.partial_bulk_purge_container_registries import (
+    PartialBulkPurgeContainerRegistriesAction,
+)
 from ai.backend.manager.services.container_registry.actions.read_registry_quota import (
     ReadRegistryQuotaAction,
     ReadRegistryQuotaActionResult,
@@ -105,6 +108,9 @@ class ContainerRegistryProcessors:
     delete_container_registry: GlobalActionProcessor[
         DeleteContainerRegistryAction, DeleteContainerRegistryActionResult
     ]
+    partial_bulk_purge_container_registries: PartialBulkActionProcessor[
+        PartialBulkPurgeContainerRegistriesAction, ContainerRegistryData
+    ]
     search_container_registries: GlobalActionProcessor[
         SearchContainerRegistriesAction, BatchOpsResult[ContainerRegistryData]
     ]
@@ -152,6 +158,9 @@ class ContainerRegistryProcessors:
         )
         self.delete_container_registry = group.global_scope(
             DeleteContainerRegistryAction, service.delete_container_registry
+        )
+        self.partial_bulk_purge_container_registries = group.global_partial_bulk_purge_ops(
+            PartialBulkPurgeContainerRegistriesAction
         )
         self.search_container_registries = group.global_searcher_ops(
             SearchContainerRegistriesAction

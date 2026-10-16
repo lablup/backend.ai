@@ -9,10 +9,7 @@ from uuid import uuid4
 import pytest
 
 from ai.backend.common.data.user.types import UserRole
-from ai.backend.common.dto.manager.v2.notification.request import DeleteNotificationChannelInput
-from ai.backend.common.dto.manager.v2.notification.response import (
-    DeleteNotificationChannelPayload,
-)
+from ai.backend.common.dto.manager.v2.notification.response import PurgeNotificationChannelPayload
 from ai.backend.manager.api.adapters.notification.adapter import NotificationAdapter
 from ai.backend.manager.errors.base.entity import EntityNotFoundError
 from ai.backend.manager.errors.permission import NotEnoughPermission
@@ -29,7 +26,7 @@ from bai_scenario.runner.acting import ActingAs
 from bai_scenario.runner.planting import TestSeedingSession
 from bai_scenario.runner.steps import run_scenario
 
-type Deleted = DeleteNotificationChannelPayload
+type Deleted = PurgeNotificationChannelPayload
 type RetiringStep = Scenario[TestSeedingSession, AChannelAndACaller, NotificationAdapter, Any]
 
 
@@ -41,7 +38,7 @@ class Deleting(When[AChannelAndACaller, NotificationAdapter, Deleted]):
 
     @override
     def operation(self) -> str:
-        return "delete_channel"
+        return "purge_channel"
 
     @override
     def describe(self, laid: AChannelAndACaller) -> str:
@@ -51,9 +48,7 @@ class Deleting(When[AChannelAndACaller, NotificationAdapter, Deleted]):
     @override
     async def call(self, adapter: NotificationAdapter, laid: AChannelAndACaller) -> Deleted:
         with ActingAs(laid.caller):
-            return await adapter.delete_channel(
-                DeleteNotificationChannelInput(id=uuid4() if self.unknown else laid.channel.id)
-            )
+            return await adapter.purge_channel(uuid4() if self.unknown else laid.channel.id)
 
 
 @dataclass(frozen=True)
