@@ -10,7 +10,7 @@ from aiohttp import web
 from aiohttp.test_utils import make_mocked_request
 
 from ai.backend.appproxy.common.errors.http import AuthorizationFailed
-from ai.backend.appproxy.worker.api.ingress import (
+from ai.backend.appproxy.worker.api.internal.ingress import (
     TOKEN_HEADER,
     IngressHandler,
     coordinator_auth_middleware,
