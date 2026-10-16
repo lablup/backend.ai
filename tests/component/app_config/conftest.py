@@ -39,6 +39,7 @@ from ai.backend.manager.api.rest.v2.app_config_allow_list.handler import (
 )
 from ai.backend.manager.api.rest.v2.app_config_allow_list.registry import (
     register_v2_app_config_allow_list_routes,
+    register_v2_app_config_allow_lists_routes,
 )
 from ai.backend.manager.api.rest.v2.app_config_definition.handler import (
     V2AppConfigDefinitionHandler,
@@ -136,10 +137,12 @@ def server_module_registries(
             V2AppConfigDefinitionHandler(adapter=app_config_definition_adapter), route_deps
         )
     )
+    allow_list_handler = V2AppConfigAllowListHandler(adapter=app_config_allow_list_adapter)
     v2_registry.add_subregistry(
-        register_v2_app_config_allow_list_routes(
-            V2AppConfigAllowListHandler(adapter=app_config_allow_list_adapter), route_deps
-        )
+        register_v2_app_config_allow_list_routes(allow_list_handler, route_deps)
+    )
+    v2_registry.add_subregistry(
+        register_v2_app_config_allow_lists_routes(allow_list_handler, route_deps)
     )
     return [v2_registry]
 

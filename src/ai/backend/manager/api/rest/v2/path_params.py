@@ -66,6 +66,10 @@ class ResourceGroupNamePathParam(BaseRequestModel):
     name: str = Field(description="Resource group name")
 
 
+class ResourceGroupIdPathParam(BaseRequestModel):
+    resource_group_id: UUID = Field(description="Resource group ID")
+
+
 class ResourcePolicyNamePathParam(BaseRequestModel):
     name: str = Field(description="Resource policy name")
 
@@ -92,6 +96,10 @@ class RolePresetIdPathParam(BaseRequestModel):
 
 class LoginClientTypeIdPathParam(BaseRequestModel):
     login_client_type_id: UUID = Field(description="Login client type UUID")
+
+
+class ClientIPMaskingPolicyIdPathParam(BaseRequestModel):
+    policy_id: UUID = Field(description="Client IP masking policy UUID")
 
 
 class AppConfigAllowListIdPathParam(BaseRequestModel):
@@ -153,3 +161,7 @@ class SlotNamePathParam(BaseRequestModel):
 
 class ImageIdPathParam(BaseRequestModel):
     image_id: UUID = Field(description="Image ID")
+
+
+class SlotTypeIdPathParam(BaseRequestModel):
+    slot_type_id: UUID = Field(description="Resource slot type ID")

@@ -12,6 +12,10 @@ from .handler import V2ResourceGroupHandler
 if TYPE_CHECKING:
     from ai.backend.manager.api.rest.types import RouteDeps
 
+# Matches a UUID only, so `PATCH /{name}` and `DELETE /{name}` (deprecated) still take every
+# other name.
+_RESOURCE_GROUP_ID = "{resource_group_id:[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}}"
+
 
 def register_v2_resource_group_routes(
     handler: V2ResourceGroupHandler,
@@ -39,21 +43,47 @@ def register_v2_resource_group_routes(
         middlewares=[superadmin_required],
     )
     registry.add(
+        "POST",
+        "/partial-bulk-update",
+        handler.partial_bulk_update,
+        middlewares=[auth_required],
+    )
+    registry.add(
+        "POST",
+        "/partial-bulk-purge",
+        handler.partial_bulk_purge,
+        middlewares=[auth_required],
+    )
+    registry.add(
+        "PATCH",
+        f"/{_RESOURCE_GROUP_ID}",
+        handler.update,
+        middlewares=[auth_required],
+    )
+    registry.add(
+        "DELETE",
+        f"/{_RESOURCE_GROUP_ID}",
+        handler.purge,
+        middlewares=[auth_required],
+    )
+    registry.add(
         "GET",
         "/{name}",
         handler.get,
         middlewares=[superadmin_required],
     )
+    # Deprecated since NEXT_RELEASE_VERSION.
     registry.add(
         "PATCH",
         "/{name}",
-        handler.update,
+        handler.admin_update,
         middlewares=[superadmin_required],
     )
+    # Deprecated since NEXT_RELEASE_VERSION.
     registry.add(
         "DELETE",
         "/{name}",
-        handler.delete,
+        handler.admin_delete,
         middlewares=[superadmin_required],
     )
     registry.add(

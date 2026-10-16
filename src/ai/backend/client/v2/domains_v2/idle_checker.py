@@ -6,13 +6,16 @@ from typing import Final
 
 from ai.backend.client.v2.base_domain import BaseDomainClient
 from ai.backend.common.data.entity.idle_checker import IdleCheckerID
+from ai.backend.common.dto.manager.v2.common import PartialBulkPayload
 from ai.backend.common.dto.manager.v2.idle_checker.request import (
     CreateIdleCheckerInput,
+    PartialBulkPurgeIdleCheckersInput,
     SearchIdleCheckersInput,
     UpdateIdleCheckerInput,
 )
 from ai.backend.common.dto.manager.v2.idle_checker.response import (
     CreateIdleCheckerPayload,
+    IdleCheckerNode,
     PurgeIdleCheckerPayload,
     SearchIdleCheckerPayload,
     UpdateIdleCheckerPayload,
@@ -66,4 +69,16 @@ class V2IdleCheckerClient(BaseDomainClient):
             "DELETE",
             f"{_PATH}/{idle_checker_id}",
             response_model=PurgeIdleCheckerPayload,
+        )
+
+    async def admin_partial_bulk_purge(
+        self,
+        request: PartialBulkPurgeIdleCheckersInput,
+    ) -> PartialBulkPayload[IdleCheckerNode]:
+        """Purge several idle checkers, answering for each one."""
+        return await self._client.typed_request(
+            "POST",
+            f"{_PATH}/partial-bulk-purge",
+            request=request,
+            response_model=PartialBulkPayload[IdleCheckerNode],
         )

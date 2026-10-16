@@ -2,10 +2,11 @@
 
 from __future__ import annotations
 
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from typing import assert_never
 from uuid import UUID
 
+from ai.backend.common.api_handlers import BaseResponseModel
 from ai.backend.common.data.entity.notification import (
     NotificationChannelID,
     NotificationRuleID,
@@ -21,16 +22,19 @@ from ai.backend.common.data.notification.types import (
     SMTPAuth,
     SMTPConnection,
 )
+from ai.backend.common.dto.manager.v2.common import PartialBulkFailure, PartialBulkPayload
 from ai.backend.common.dto.manager.v2.notification.request import (
     CreateNotificationChannelInput,
     CreateNotificationRuleInput,
-    DeleteNotificationChannelInput,
-    DeleteNotificationRuleInput,
     NotificationChannelFilter,
     NotificationChannelOrder,
     NotificationChannelSpecInputDTO,
     NotificationRuleFilter,
     NotificationRuleOrder,
+    PartialBulkPurgeNotificationChannelsInput,
+    PartialBulkPurgeNotificationRulesInput,
+    PartialBulkUpdateNotificationChannelsInput,
+    PartialBulkUpdateNotificationRulesInput,
     SearchNotificationChannelsInput,
     SearchNotificationRulesInput,
     UpdateNotificationChannelInput,
@@ -41,12 +45,12 @@ from ai.backend.common.dto.manager.v2.notification.request import (
 from ai.backend.common.dto.manager.v2.notification.response import (
     CreateNotificationChannelPayload,
     CreateNotificationRulePayload,
-    DeleteNotificationChannelPayload,
-    DeleteNotificationRulePayload,
     GetNotificationChannelPayload,
     GetNotificationRulePayload,
     NotificationChannelNode,
     NotificationRuleNode,
+    PurgeNotificationChannelPayload,
+    PurgeNotificationRulePayload,
     SearchNotificationChannelsPayload,
     SearchNotificationRulesPayload,
     UpdateNotificationChannelPayload,
@@ -66,6 +70,7 @@ from ai.backend.common.dto.manager.v2.notification.types import (
     SMTPConnectionInfo,
     WebhookSpecInfo,
 )
+from ai.backend.manager.actions.v2.bulk.result import PartialBulkResult
 from ai.backend.manager.api.adapter_options.pagination.pagination import PaginationSpec
 from ai.backend.manager.api.adapters.base import BaseAdapter
 from ai.backend.manager.data.notification.types import NotificationChannelData, NotificationRuleData
@@ -104,6 +109,18 @@ from ai.backend.manager.services.notification.actions.get_channel import GetChan
 from ai.backend.manager.services.notification.actions.get_rule import GetRuleAction
 from ai.backend.manager.services.notification.actions.list_channels import SearchChannelsAction
 from ai.backend.manager.services.notification.actions.list_rules import SearchRulesAction
+from ai.backend.manager.services.notification.actions.partial_bulk_purge_channels import (
+    PartialBulkPurgeChannelsAction,
+)
+from ai.backend.manager.services.notification.actions.partial_bulk_purge_rules import (
+    PartialBulkPurgeRulesAction,
+)
+from ai.backend.manager.services.notification.actions.partial_bulk_update_channels import (
+    PartialBulkUpdateChannelsAction,
+)
+from ai.backend.manager.services.notification.actions.partial_bulk_update_rules import (
+    PartialBulkUpdateRulesAction,
+)
 from ai.backend.manager.services.notification.actions.purge_channel import PurgeChannelAction
 from ai.backend.manager.services.notification.actions.purge_rule import PurgeRuleAction
 from ai.backend.manager.services.notification.actions.update_channel import UpdateChannelAction
@@ -246,15 +263,38 @@ class NotificationAdapter(BaseAdapter):
             channel=self._channel_data_to_dto(action_result.data)
         )
 
-    async def delete_channel(
-        self, input: DeleteNotificationChannelInput
-    ) -> DeleteNotificationChannelPayload:
-        """Delete a notification channel."""
+    async def purge_channel(self, channel_id: UUID) -> PurgeNotificationChannelPayload:
+        """Permanently remove a notification channel."""
         await self._notification.purge_channel.run(
-            PurgeChannelAction(channel_id=NotificationChannelID(input.id))
+            PurgeChannelAction(channel_id=NotificationChannelID(channel_id))
         )
 
-        return DeleteNotificationChannelPayload(id=input.id)
+        return PurgeNotificationChannelPayload(id=channel_id)
+
+    async def partial_bulk_update_channels(
+        self, input: PartialBulkUpdateNotificationChannelsInput
+    ) -> PartialBulkPayload[NotificationChannelNode]:
+        """Update several notification channels, answering for each one."""
+        result = await self._notification.partial_bulk_update_channels.run(
+            PartialBulkUpdateChannelsAction(
+                updaters=[
+                    self._build_channel_updater(NotificationChannelID(item.id), item)
+                    for item in input.items
+                ]
+            )
+        )
+        return self._to_partial_bulk_payload(result, self._channel_data_to_dto)
+
+    async def partial_bulk_purge_channels(
+        self, input: PartialBulkPurgeNotificationChannelsInput
+    ) -> PartialBulkPayload[NotificationChannelNode]:
+        """Permanently remove several notification channels, answering for each one."""
+        result = await self._notification.partial_bulk_purge_channels.run(
+            PartialBulkPurgeChannelsAction(
+                ids=[NotificationChannelID(channel_id) for channel_id in input.ids]
+            )
+        )
+        return self._to_partial_bulk_payload(result, self._channel_data_to_dto)
 
     # ------------------------------------------------------------------ rules
 
@@ -298,15 +338,36 @@ class NotificationAdapter(BaseAdapter):
 
         return UpdateNotificationRulePayload(rule=self._rule_data_to_dto(action_result.data))
 
-    async def delete_rule(
-        self, input: DeleteNotificationRuleInput
-    ) -> DeleteNotificationRulePayload:
-        """Delete a notification rule."""
+    async def purge_rule(self, rule_id: UUID) -> PurgeNotificationRulePayload:
+        """Permanently remove a notification rule."""
         await self._notification.purge_rule.run(
-            PurgeRuleAction(rule_id=NotificationRuleID(input.id))
+            PurgeRuleAction(rule_id=NotificationRuleID(rule_id))
         )
 
-        return DeleteNotificationRulePayload(id=input.id)
+        return PurgeNotificationRulePayload(id=rule_id)
+
+    async def partial_bulk_update_rules(
+        self, input: PartialBulkUpdateNotificationRulesInput
+    ) -> PartialBulkPayload[NotificationRuleNode]:
+        """Update several notification rules, answering for each one."""
+        result = await self._notification.partial_bulk_update_rules.run(
+            PartialBulkUpdateRulesAction(
+                updaters=[
+                    self._build_rule_updater(NotificationRuleID(item.id), item)
+                    for item in input.items
+                ]
+            )
+        )
+        return self._to_partial_bulk_payload(result, self._rule_data_to_dto)
+
+    async def partial_bulk_purge_rules(
+        self, input: PartialBulkPurgeNotificationRulesInput
+    ) -> PartialBulkPayload[NotificationRuleNode]:
+        """Permanently remove several notification rules, answering for each one."""
+        result = await self._notification.partial_bulk_purge_rules.run(
+            PartialBulkPurgeRulesAction(ids=[NotificationRuleID(rule_id) for rule_id in input.ids])
+        )
+        return self._to_partial_bulk_payload(result, self._rule_data_to_dto)
 
     async def validate_channel(
         self, input: ValidateNotificationChannelInput
@@ -392,6 +453,18 @@ class NotificationAdapter(BaseAdapter):
         )
 
     # ------------------------------------------------------------------ helpers
+
+    def _to_partial_bulk_payload[TData, TNode: BaseResponseModel](
+        self, result: PartialBulkResult[TData], to_node: Callable[[TData], TNode]
+    ) -> PartialBulkPayload[TNode]:
+        return PartialBulkPayload[TNode](
+            successes=[to_node(item.value) for item in result.items if item.value is not None],
+            failed=[
+                PartialBulkFailure(id=item.entity_id, message=str(item.error))
+                for item in result.items
+                if item.error is not None
+            ],
+        )
 
     @staticmethod
     def _channel_data_to_dto(data: NotificationChannelData) -> NotificationChannelNode:

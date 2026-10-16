@@ -1,15 +1,15 @@
 ---
 name: runtime-variant-adapter-scenarios
 type: reference
-description: what the runtime variant adapter guarantees, as scenarios; the superadmin role on create, the entity gate nobody but a superadmin passes on update and delete, the reads answered in the public scope, the bulk delete that answers per id
+description: what the runtime variant adapter guarantees, as scenarios; the superadmin role on create, the entity gate nobody but a superadmin passes on update and purge, the reads answered in the public scope, the partial bulk update and purge that answer per id
 scope: src/ai/backend/manager/api/adapters/runtime_variant
-keywords: [runtime variant, scenario, adapter, superadmin, public read, lookup, bulk delete, partial bulk purge]
+keywords: [runtime variant, scenario, adapter, superadmin, public read, lookup, bulk delete, partial bulk update, partial bulk purge]
 generated:
   by: claude-code/opus-5
   at: 2026-09-11
 updated:
   by: claude-code/opus-5
-  at: 2026-09-21
+  at: 2026-10-16
 status: draft
 ---
 # runtime_variant 어댑터 — 시나리오
@@ -85,6 +85,13 @@ status: draft
 | 아무 권한도 없는 사용자가 없는 id를 수정한다 | 다른 `runtime_variant` 행만 있음, 아무 권한도 없음 | 이름 수정 | 권한 부족으로 거부 |
 | 권한 검사를 끄면 권한 없이도 수정된다 | 권한 검사 비활성화, 아무 권한도 없음 | 이름 수정 | 이름이 새 값인 노드 |
 
+## 여럿 수정하기
+
+| 시나리오 | 상황 | 요청 | 결과 |
+|---|---|---|---|
+| 슈퍼관리자가 여럿의 설명을 한 번에 바꾼다 | `runtime_variant` 둘, 슈퍼관리자 | 둘의 설명 수정 | 둘 다 새 설명으로 오고 실패한 것은 없음 |
+| 아무 권한도 없는 사용자가 여럿을 수정한다 | 같은 `runtime_variant` 둘, 아무 권한도 없음 | 둘의 설명 수정 | 수정된 것 없이 둘 다 권한 부족 이유로 실패 목록에 옴 |
+
 설명은 세 가지(생략·비우기·값 지정)를 받고 이름은 생략과 값 지정 둘뿐이다. 그래서 비우는
 시나리오는 설명에만 둔다.
 
@@ -95,7 +102,7 @@ status: draft
 이름 중복은 생성할 때와 수정할 때 서로 다른 오류로 거부된다. 생성은 이 엔티티의 오류로 거부하고,
 수정은 저장소의 제약 위반을 그대로 전파한다. 시나리오를 적기 전에 하나로 맞출 것인지 정한다.
 
-## 삭제
+## purge
 
 | 시나리오 | 상황 | 요청 | 결과 |
 |---|---|---|---|
@@ -106,6 +113,11 @@ status: draft
 | 여럿을 한 번에 삭제한다 | `runtime_variant` 둘, 슈퍼관리자 | 두 id를 한 번에 | 둘 다 삭제된 목록에 담기고 실패 목록은 비어 있다 |
 | 없는 id가 섞인 목록을 삭제한다 | `runtime_variant` 하나, 슈퍼관리자 | 있는 id 뒤에 없는 id를 붙여 한 번에 | 있는 것은 삭제된 목록에, 없는 id는 실패 목록에 담긴다 |
 | 아무 권한도 없는 사용자가 여럿을 삭제한다 | `runtime_variant` 둘, 아무 권한도 없음 | 두 id를 한 번에 | 둘 다 실패 목록에 담기고 아무것도 삭제되지 않는다 |
+| 여럿과 없는 id 하나를 한 번에 purge 한다 | `runtime_variant` 둘, 슈퍼관리자 | 세 id를 한 번에 | 둘은 purge 되기 전 노드로 처리된 목록에 오고, 없는 id 는 실패 목록에 옴 |
+| 아무 권한도 없는 사용자가 여럿을 purge 한다 | `runtime_variant` 둘, 아무 권한도 없음 | 두 id를 한 번에 | purge 된 것 없이 둘 다 권한 부족 이유로 실패 목록에 옴 |
+
+단건 purge 와 여럿 purge 는 `purge`, `partial_bulk_purge` 다. 옛 일괄 삭제(`bulk_delete`)는 같은
+processor 를 부르고 id 목록과 삭제 수로 답한다. 표의 여럿을 삭제하는 행 셋이 그 길이다.
 
 일괄 삭제는 id마다 따로 답하는 partial bulk purge다. 권한 검사도 id마다이고, 거부된 id와 없는
 id는 실패 목록에 들어가며 호출 자체는 거부되지 않는다. 삭제된 id는 요청한 순서대로 삭제된
@@ -122,7 +134,7 @@ preset과 함께 지워지므로, 하나가 실패해도 나머지는 삭제된 
 ## 아직 적지 않은 것
 
 없다. 어댑터가 제공하는 `create`, `get`, `resolve_by_name`, `batch_load_by_ids`, `search`,
-`update`, `delete`, `bulk_delete`가 모두 위에 있다.
+`update`, `partial_bulk_update`, `purge`, `partial_bulk_purge`, `bulk_delete`가 모두 위에 있다.
 
 `batch_load_fields`는 모든 어댑터가 물려받는 공용 헬퍼이지 이 엔티티의 호출이 아니다. 리포트에서는
 함께 세지만 시나리오로 적을 것은 없다.

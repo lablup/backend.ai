@@ -14,6 +14,7 @@ __all__ = (
     "CreateLoginClientTypePayload",
     "DeleteLoginClientTypePayload",
     "LoginClientTypeNode",
+    "PurgeLoginClientTypePayload",
     "UpdateLoginClientTypePayload",
 )
 
@@ -47,6 +48,12 @@ class DeleteLoginClientTypePayload(BaseResponseModel):
     """Payload for login client type deletion."""
 
     id: UUID = Field(description="UUID of the deleted login client type.")
+
+
+class PurgeLoginClientTypePayload(BaseResponseModel):
+    """Payload for login client type purge."""
+
+    id: UUID = Field(description="UUID of the purged login client type.")
 
 
 class SearchLoginClientTypesPayload(BaseResponseModel):

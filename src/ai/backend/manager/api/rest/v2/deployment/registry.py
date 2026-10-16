@@ -196,6 +196,19 @@ def register_v2_deployment_routes(
         middlewares=[auth_required],
     )
     registry.add(
+        "DELETE",
+        "/access-tokens/{token_id}",
+        handler.purge_access_token,
+        middlewares=[auth_required],
+    )
+    registry.add(
+        "POST",
+        "/access-tokens/partial-bulk-purge",
+        handler.partial_bulk_purge_access_tokens,
+        middlewares=[auth_required],
+    )
+    # Deprecated since NEXT_RELEASE_VERSION.
+    registry.add(
         "POST",
         "/access-tokens/delete",
         handler.delete_access_token,
@@ -229,6 +242,31 @@ def register_v2_deployment_routes(
         handler.get_auto_scaling_rule,
         middlewares=[auth_required],
     )
+    registry.add(
+        "PATCH",
+        "/auto-scaling-rules/{rule_id}",
+        handler.update_auto_scaling_rule,
+        middlewares=[auth_required],
+    )
+    registry.add(
+        "DELETE",
+        "/auto-scaling-rules/{rule_id}",
+        handler.purge_auto_scaling_rule,
+        middlewares=[auth_required],
+    )
+    registry.add(
+        "POST",
+        "/auto-scaling-rules/partial-bulk-update",
+        handler.partial_bulk_update_auto_scaling_rules,
+        middlewares=[auth_required],
+    )
+    registry.add(
+        "POST",
+        "/auto-scaling-rules/partial-bulk-purge",
+        handler.partial_bulk_purge_auto_scaling_rules,
+        middlewares=[auth_required],
+    )
+    # Deprecated since NEXT_RELEASE_VERSION.
     registry.add(
         "PUT",
         "/auto-scaling-rules/{rule_id}",

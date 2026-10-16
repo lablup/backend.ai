@@ -17,6 +17,7 @@ from ai.backend.common.data.entity.deployment import DeploymentID
 from ai.backend.common.data.entity.deployment_preset import DeploymentPresetID
 from ai.backend.common.data.entity.model_card import ModelCardID
 from ai.backend.common.data.model_deployment.types import DeploymentStrategy
+from ai.backend.common.dto.manager.v2.common import PartialBulkFailure, PartialBulkPayload
 from ai.backend.common.dto.manager.v2.deployment.request import DeploymentStrategyInput
 from ai.backend.common.dto.manager.v2.deployment.types import (
     ModelHealthCheckInfoDTO,
@@ -27,6 +28,8 @@ from ai.backend.common.dto.manager.v2.deployment_revision_preset.request import 
     CreateDeploymentRevisionPresetInput,
     DeploymentRevisionPresetFilter,
     DeploymentRevisionPresetOrder,
+    PartialBulkPurgeDeploymentRevisionPresetsInput,
+    PartialBulkUpdateDeploymentRevisionPresetsInput,
     SearchDeploymentRevisionPresetsInput,
     UpdateDeploymentRevisionPresetInput,
     UpdatePresetModelDefinitionInput,
@@ -65,8 +68,10 @@ from ai.backend.common.dto.manager.v2.resource_slot.types import (
     AllocatedResourceSlotOrderField,
     OrderDirection,
 )
+from ai.backend.common.exception import BackendAIError
 from ai.backend.common.model_service_start_command_compat import to_legacy_start_command
 from ai.backend.common.tristate.unset import Unset
+from ai.backend.manager.actions.v2.bulk.result import PartialBulkResult
 from ai.backend.manager.api.adapter_options.pagination.pagination import PaginationSpec
 from ai.backend.manager.api.adapters.base import BaseAdapter
 from ai.backend.manager.data.deployment_revision_preset.types import (
@@ -114,6 +119,12 @@ from ai.backend.manager.services.deployment_revision_preset.actions.create impor
 )
 from ai.backend.manager.services.deployment_revision_preset.actions.get import (
     GetDeploymentPresetAction,
+)
+from ai.backend.manager.services.deployment_revision_preset.actions.partial_bulk_purge import (
+    PartialBulkPurgeDeploymentPresetsAction,
+)
+from ai.backend.manager.services.deployment_revision_preset.actions.partial_bulk_update import (
+    PartialBulkUpdateDeploymentPresetsAction,
 )
 from ai.backend.manager.services.deployment_revision_preset.actions.purge import (
     PurgeDeploymentPresetAction,
@@ -351,6 +362,56 @@ class DeploymentRevisionPresetAdapter(BaseAdapter):
         self,
         input: UpdateDeploymentRevisionPresetInput,
     ) -> UpdateDeploymentRevisionPresetPayload:
+        result = await self._deployment_revision_preset.update.run(
+            await self._to_update_action(input)
+        )
+        return UpdateDeploymentRevisionPresetPayload(preset=self._data_to_node(result.data))
+
+    async def purge(self, preset_id: UUID) -> DeleteDeploymentRevisionPresetPayload:
+        result = await self._deployment_revision_preset.purge.run(
+            PurgeDeploymentPresetAction(preset_id=DeploymentPresetID(preset_id))
+        )
+        return DeleteDeploymentRevisionPresetPayload(id=result.data.id)
+
+    async def partial_bulk_update(
+        self, input: PartialBulkUpdateDeploymentRevisionPresetsInput
+    ) -> PartialBulkPayload[DeploymentRevisionPresetNode]:
+        """Update several presets, answering for each one.
+
+        A preset whose model definition patch cannot read the stored one fails alone.
+        """
+        updates: list[UpdateDeploymentPresetAction] = []
+        failed: list[PartialBulkFailure] = []
+        for item in input.items:
+            try:
+                updates.append(await self._to_update_action(item))
+            except BackendAIError as e:
+                failed.append(PartialBulkFailure(id=item.id, message=str(e)))
+        payload = self._to_partial_bulk_payload(
+            await self._deployment_revision_preset.partial_bulk_update.run(
+                PartialBulkUpdateDeploymentPresetsAction(updates=updates)
+            )
+            if updates
+            else PartialBulkResult(items=[])
+        )
+        return PartialBulkPayload[DeploymentRevisionPresetNode](
+            successes=payload.successes, failed=[*failed, *payload.failed]
+        )
+
+    async def partial_bulk_purge(
+        self, input: PartialBulkPurgeDeploymentRevisionPresetsInput
+    ) -> PartialBulkPayload[DeploymentRevisionPresetNode]:
+        """Purge several presets, answering for each one."""
+        result = await self._deployment_revision_preset.partial_bulk_purge.run(
+            PartialBulkPurgeDeploymentPresetsAction(
+                ids=[DeploymentPresetID(preset_id) for preset_id in input.ids]
+            )
+        )
+        return self._to_partial_bulk_payload(result)
+
+    async def _to_update_action(
+        self, input: UpdateDeploymentRevisionPresetInput
+    ) -> UpdateDeploymentPresetAction:
         # A model_definition patch merges onto the currently stored preset, so fetch it
         # upfront when it's being patched (unset/None need no current value).
         current: DeploymentRevisionPresetNode | None = None
@@ -395,16 +456,21 @@ class DeploymentRevisionPresetAdapter(BaseAdapter):
                 self._convert_strategy_spec
             ),
         )
-        result = await self._deployment_revision_preset.update.run(
-            UpdateDeploymentPresetAction(updater=updater, slot_creators=slot_creators)
-        )
-        return UpdateDeploymentRevisionPresetPayload(preset=self._data_to_node(result.data))
+        return UpdateDeploymentPresetAction(updater=updater, slot_creators=slot_creators)
 
-    async def delete(self, preset_id: UUID) -> DeleteDeploymentRevisionPresetPayload:
-        result = await self._deployment_revision_preset.purge.run(
-            PurgeDeploymentPresetAction(preset_id=DeploymentPresetID(preset_id))
+    def _to_partial_bulk_payload(
+        self, result: PartialBulkResult[DeploymentRevisionPresetData]
+    ) -> PartialBulkPayload[DeploymentRevisionPresetNode]:
+        return PartialBulkPayload[DeploymentRevisionPresetNode](
+            successes=[
+                self._data_to_node(item.value) for item in result.items if item.value is not None
+            ],
+            failed=[
+                PartialBulkFailure(id=item.entity_id, message=str(item.error))
+                for item in result.items
+                if item.error is not None
+            ],
         )
-        return DeleteDeploymentRevisionPresetPayload(id=result.data.id)
 
     async def search_resource_slots(
         self,

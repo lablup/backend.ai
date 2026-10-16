@@ -1,15 +1,15 @@
 ---
 name: runtime-variant-preset-adapter-scenarios
 type: reference
-description: what the runtime variant preset adapter guarantees, as scenarios; the rank the insert fills in, the value-type rule checked by the request on create and by the service on update, the batch read that is a search, the variant column with no foreign key in the ORM
+description: what the runtime variant preset adapter guarantees, as scenarios; the rank the insert fills in, the value-type rule checked by the request on create and by the service on update, the batch read that is a search, the partial bulk update and purge that answer per id, the variant column with no foreign key in the ORM
 scope: src/ai/backend/manager/api/adapters/runtime_variant_preset
-keywords: [runtime variant preset, scenario, adapter, superadmin, rank, value type, flag, public read]
+keywords: [runtime variant preset, scenario, adapter, superadmin, rank, value type, flag, public read, partial bulk update, partial bulk purge]
 generated:
   by: claude-code/opus-5
   at: 2026-09-11
 updated:
   by: claude-code/opus-5
-  at: 2026-09-21
+  at: 2026-10-16
 status: draft
 ---
 # runtime_variant_preset 어댑터 — 시나리오
@@ -108,7 +108,17 @@ status: draft
 `default_value` 값이 새 `value_type` 값과 어긋난 상태로 수정된다. 이를 거부할지 정한 뒤 시나리오를
 작성한다.
 
-## 삭제
+## 여럿 수정하기
+
+| 시나리오 | 상황 | 요청 | 결과 |
+|---|---|---|---|
+| 슈퍼관리자가 여럿의 설명을 한 번에 바꾼다 | 한 변형의 프리셋 둘, 슈퍼관리자 | 둘의 설명 수정 | 둘 다 새 설명으로 오고 실패한 것은 없음 |
+| 아무 권한도 없는 사용자가 여럿을 수정한다 | 같은 프리셋 둘, 아무 권한도 없음 | 둘의 설명 수정 | 수정된 것 없이 둘 다 권한 부족 이유로 실패 목록에 옴 |
+
+여럿 수정도 단건 수정과 같은 검사를 프리셋마다 한다. 검사에 걸린 프리셋은 그 이유로 실패 목록에
+오고 나머지는 수정된다.
+
+## purge
 
 | 시나리오 | 상황 | 요청 | 결과 |
 |---|---|---|---|
@@ -116,13 +126,18 @@ status: draft
 | 존재하지 않는 ID를 삭제한다 | 다른 프리셋만 있음, 슈퍼관리자 | 삭제 | 대상을 찾을 수 없어 거부 |
 | 아무 권한도 없는 사용자가 삭제한다 | 해당 프리셋에 아무 권한도 없음 | 삭제 | 권한 부족으로 거부 |
 | 권한 검사를 끄면 권한 없이도 삭제된다 | 권한 검사 비활성화, 아무 권한도 없음 | 삭제 | 삭제한 프리셋의 ID를 담은 응답 |
+| 여럿과 없는 ID 하나를 한 번에 purge 한다 | 한 변형의 프리셋 둘, 슈퍼관리자 | 세 ID를 한 번에 | 둘은 purge 되기 전 노드로 처리된 목록에 오고, 없는 ID는 실패 목록에 옴 |
+| 아무 권한도 없는 사용자가 여럿을 purge 한다 | 같은 프리셋 둘, 아무 권한도 없음 | 두 ID를 한 번에 | purge 된 것 없이 둘 다 권한 부족 이유로 실패 목록에 옴 |
+
+여럿 연산은 호출 전체를 거부하지 않는다. 처리한 프리셋은 처리된 목록에, 처리하지 못한 것은 ID와
+이유를 실패 목록에 싣는다.
 
 이 어댑터는 soft delete를 지원하지 않는다.
 
 ## 아직 적지 않은 것
 
-없다. 어댑터가 제공하는 `create`, `get`, `search`, `batch_load_by_ids`, `update`, `delete`가 모두 위에
-있다.
+없다. 어댑터가 제공하는 `create`, `get`, `search`, `batch_load_by_ids`, `update`,
+`partial_bulk_update`, `purge`, `partial_bulk_purge`가 모두 위에 있다.
 
 `batch_load_fields`는 모든 어댑터가 상속받는 공용 메서드이며 이 엔티티 고유의 호출이 아니다.
 보고서의 호출 목록에는 포함되지만 별도로 작성할 시나리오는 없다.
