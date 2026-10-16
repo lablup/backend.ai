@@ -10,6 +10,7 @@ from aiohttp.typedefs import Middleware
 
 from ai.backend.common.exception import BackendAIError, ErrorCode
 from ai.backend.common.json import dump_json_str
+from ai.backend.common.middlewares.exception import client_closed_response, is_client_disconnect
 from ai.backend.common.plugin.monitor import INCREMENT
 from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.errors.api import InvalidAPIParameters
@@ -146,6 +147,13 @@ def build_exception_middleware(
             log.trace("request cancelled", http_method=method, route_path=endpoint)
             raise e
         except Exception as e:
+            if is_client_disconnect(request, e):
+                log.trace(
+                    "client disconnected while writing the response",
+                    http_method=method,
+                    route_path=endpoint,
+                )
+                return client_closed_response()
             await error_monitor.capture_exception()
             log.exception(
                 "request handler raised an unexpected error",
