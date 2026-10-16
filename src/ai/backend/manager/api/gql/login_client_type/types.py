@@ -11,6 +11,7 @@ from strawberry import UNSET, Info
 from strawberry.relay import Connection, Edge, NodeID
 
 from ai.backend.common.data.entity.login_client_type import LoginClientTypeID
+from ai.backend.common.dto.manager.v2.common import PartialBulkPayload
 from ai.backend.common.dto.manager.v2.login_client_type.request import (
     CreateLoginClientTypeInput as CreateLoginClientTypeInputDTO,
 )
@@ -19,6 +20,15 @@ from ai.backend.common.dto.manager.v2.login_client_type.request import (
 )
 from ai.backend.common.dto.manager.v2.login_client_type.request import (
     LoginClientTypeOrder as LoginClientTypeOrderDTO,
+)
+from ai.backend.common.dto.manager.v2.login_client_type.request import (
+    PartialBulkPurgeLoginClientTypesInput as PartialBulkPurgeLoginClientTypesInputDTO,
+)
+from ai.backend.common.dto.manager.v2.login_client_type.request import (
+    PartialBulkUpdateLoginClientTypeItemInput as PartialBulkUpdateLoginClientTypeItemInputDTO,
+)
+from ai.backend.common.dto.manager.v2.login_client_type.request import (
+    PartialBulkUpdateLoginClientTypesInput as PartialBulkUpdateLoginClientTypesInputDTO,
 )
 from ai.backend.common.dto.manager.v2.login_client_type.request import (
     UpdateLoginClientTypeInput as UpdateLoginClientTypeInputDTO,
@@ -33,10 +43,14 @@ from ai.backend.common.dto.manager.v2.login_client_type.response import (
     LoginClientTypeNode,
 )
 from ai.backend.common.dto.manager.v2.login_client_type.response import (
+    PurgeLoginClientTypePayload as PurgeLoginClientTypePayloadDTO,
+)
+from ai.backend.common.dto.manager.v2.login_client_type.response import (
     UpdateLoginClientTypePayload as UpdateLoginClientTypePayloadDTO,
 )
 from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import DateTimeFilter, OrderDirection, StringFilter, UUIDFilter
+from ai.backend.manager.api.gql.common_types import PartialBulkFailureGQL
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     PydanticInputMixin,
@@ -61,6 +75,11 @@ __all__ = (
     "LoginClientTypeGQL",
     "LoginClientTypeOrderByGQL",
     "LoginClientTypeOrderFieldGQL",
+    "PartialBulkLoginClientTypesPayloadGQL",
+    "PartialBulkPurgeLoginClientTypesInputGQL",
+    "PartialBulkUpdateLoginClientTypeItemInputGQL",
+    "PartialBulkUpdateLoginClientTypesInputGQL",
+    "PurgeLoginClientTypePayloadGQL",
     "UpdateLoginClientTypeInputGQL",
     "UpdateLoginClientTypePayloadGQL",
 )
@@ -262,3 +281,83 @@ class UpdateLoginClientTypePayloadGQL(PydanticOutputMixin[UpdateLoginClientTypeP
 )
 class DeleteLoginClientTypePayloadGQL(PydanticOutputMixin[DeleteLoginClientTypePayloadDTO]):
     id: str = gql_field(description="UUID of the deleted login client type.")
+
+
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Payload for login client type purge.",
+    ),
+    model=PurgeLoginClientTypePayloadDTO,
+    name="PurgeLoginClientTypePayload",
+)
+class PurgeLoginClientTypePayloadGQL(PydanticOutputMixin[PurgeLoginClientTypePayloadDTO]):
+    id: UUID = gql_field(description="UUID of the purged login client type.")
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="One login client type of a partial bulk update and the fields to update on it.",
+    ),
+    name="PartialBulkUpdateLoginClientTypeItemInput",
+)
+class PartialBulkUpdateLoginClientTypeItemInputGQL(
+    PydanticInputMixin[PartialBulkUpdateLoginClientTypeItemInputDTO]
+):
+    id: UUID = gql_field(description="ID of the login client type to update.")
+    input: UpdateLoginClientTypeInputGQL = gql_field(
+        description="Fields to update on the login client type."
+    )
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Input for updating several login client types, each answered for separately.",
+    ),
+    name="PartialBulkUpdateLoginClientTypesInput",
+)
+class PartialBulkUpdateLoginClientTypesInputGQL(
+    PydanticInputMixin[PartialBulkUpdateLoginClientTypesInputDTO]
+):
+    items: list[PartialBulkUpdateLoginClientTypeItemInputGQL] = gql_field(
+        description="The login client types to update, each with its fields."
+    )
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Input for purging several login client types, each answered for separately.",
+    ),
+    name="PartialBulkPurgeLoginClientTypesInput",
+)
+class PartialBulkPurgeLoginClientTypesInputGQL(
+    PydanticInputMixin[PartialBulkPurgeLoginClientTypesInputDTO]
+):
+    ids: list[UUID] = gql_field(description="IDs of the login client types to purge.")
+
+
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description=(
+            "Result of a partial bulk login client type operation: the login client types "
+            "processed and the ones that failed."
+        ),
+    ),
+    model=PartialBulkPayload[LoginClientTypeNode],
+    name="PartialBulkLoginClientTypesPayload",
+)
+class PartialBulkLoginClientTypesPayloadGQL(
+    PydanticOutputMixin[PartialBulkPayload[LoginClientTypeNode]]
+):
+    """Payload for partial bulk login client type mutations."""
+
+    successes: list[LoginClientTypeGQL] = gql_field(
+        description="The login client types processed, as they were left."
+    )
+    failed: list[PartialBulkFailureGQL] = gql_field(
+        description="The login client types not processed, each with the reason."
+    )

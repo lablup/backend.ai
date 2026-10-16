@@ -45,7 +45,7 @@ class Deleting(When[APresetAndACaller, RuntimeVariantPresetAdapter, Deleted]):
 
     @override
     def operation(self) -> str:
-        return "delete"
+        return "purge"
 
     @override
     def describe(self, laid: APresetAndACaller) -> str:
@@ -55,7 +55,7 @@ class Deleting(When[APresetAndACaller, RuntimeVariantPresetAdapter, Deleted]):
     @override
     async def call(self, adapter: RuntimeVariantPresetAdapter, laid: APresetAndACaller) -> Deleted:
         with ActingAs(laid.caller):
-            return await adapter.delete(uuid4() if self.unknown else laid.preset.id)
+            return await adapter.purge(uuid4() if self.unknown else laid.preset.id)
 
 
 @dataclass(frozen=True)

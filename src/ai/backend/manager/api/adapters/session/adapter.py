@@ -23,6 +23,7 @@ from ai.backend.common.data.entity.session import SessionID
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.entity.vfolder import VFolderUUID
 from ai.backend.common.data.filter_specs import StringMatchSpec
+from ai.backend.common.dto.manager.v2.common import PartialBulkFailure, PartialBulkPayload
 from ai.backend.common.dto.manager.v2.deployment.types import (
     EnvironmentVariableEntryInfoDTO,
     EnvironmentVariablesInfoDTO,
@@ -63,6 +64,7 @@ from ai.backend.common.dto.manager.v2.session.request import (
     EnqueueSessionInput,
     ExcludeSessionIdleChecksInput,
     IncludeSessionIdleChecksInput,
+    PartialBulkTerminateSessionsInput,
     ScopedSearchSessionsInput,
     SessionFilter,
     SessionOrder,
@@ -86,6 +88,7 @@ from ai.backend.common.dto.manager.v2.session.response import (
     SessionNode,
     SessionResourceInfoGQLDTO,
     SessionRuntimeInfoGQLDTO,
+    SessionTerminationInfo,
     StartSessionServicePayload,
     TerminateSessionsPayload,
     UpdateSessionPayload,
@@ -95,6 +98,7 @@ from ai.backend.common.dto.manager.v2.session.types import (
     OrderDirection,
     SessionOrderField,
     SessionScope,
+    SessionTerminationStatusEnum,
     SessionUsage,
 )
 from ai.backend.common.types import (
@@ -1082,6 +1086,32 @@ class SessionAdapter(BaseAdapter):
     # -------------------------------------------------------------------------
     # Terminate
     # -------------------------------------------------------------------------
+
+    async def partial_bulk_terminate(
+        self, input: PartialBulkTerminateSessionsInput
+    ) -> PartialBulkPayload[SessionTerminationInfo]:
+        """Terminate several sessions, answering for each one."""
+        result = await self._session.terminate_sessions.run(
+            TerminateSessionsAction(
+                session_ids=[SessionId(session_id) for session_id in input.ids],
+                forced=input.forced,
+            )
+        )
+        return PartialBulkPayload[SessionTerminationInfo](
+            successes=[
+                SessionTerminationInfo(
+                    id=SessionID(item.entity_id),
+                    status=SessionTerminationStatusEnum(item.value.value),
+                )
+                for item in result.items
+                if item.value is not None
+            ],
+            failed=[
+                PartialBulkFailure(id=item.entity_id, message=str(item.error))
+                for item in result.items
+                if item.error is not None
+            ],
+        )
 
     async def terminate(self, input: TerminateSessionsInput) -> TerminateSessionsPayload:
         """Terminate one or more sessions.

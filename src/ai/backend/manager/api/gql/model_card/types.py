@@ -14,7 +14,7 @@ from ai.backend.common.data.entity.model_card import ModelCardID
 from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.entity.vfolder import VFolderUUID
-from ai.backend.common.dto.manager.v2.common import OrderDirection
+from ai.backend.common.dto.manager.v2.common import OrderDirection, PartialBulkPayload
 from ai.backend.common.dto.manager.v2.deployment_revision_preset.request import (
     DeploymentRevisionPresetFilter,
     DeploymentRevisionPresetOrder,
@@ -46,6 +46,12 @@ from ai.backend.common.dto.manager.v2.model_card.request import (
 )
 from ai.backend.common.dto.manager.v2.model_card.request import (
     ModelCardResourceRequirementNestedFilter as RequirementNestedFilterDTO,
+)
+from ai.backend.common.dto.manager.v2.model_card.request import (
+    PartialBulkPurgeModelCardsInput as PartialBulkPurgeInputDTO,
+)
+from ai.backend.common.dto.manager.v2.model_card.request import (
+    PartialBulkUpdateModelCardsInput as PartialBulkUpdateInputDTO,
 )
 from ai.backend.common.dto.manager.v2.model_card.request import (
     UpdateModelCardInput as UpdateInputDTO,
@@ -91,6 +97,7 @@ from ai.backend.common.dto.manager.v2.model_card.types import (
 from ai.backend.common.dto.manager.v2.model_card.types import (
     ProjectModelCardScope as ProjectModelCardScopeDTO,
 )
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import DateTimeFilter as DateTimeFilterGQL
 from ai.backend.manager.api.gql.base import DecimalFilter as DecimalFilterGQL
 from ai.backend.manager.api.gql.base import (
@@ -99,6 +106,7 @@ from ai.backend.manager.api.gql.base import (
 from ai.backend.manager.api.gql.base import StringFilter as StringFilterGQL
 from ai.backend.manager.api.gql.base import UUIDFilter as UUIDFilterGQL
 from ai.backend.manager.api.gql.base import UUIDScopeGQL
+from ai.backend.manager.api.gql.common_types import PartialBulkFailureGQL
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     PydanticInputMixin,
@@ -787,6 +795,56 @@ class BulkDeleteModelCardsV2PayloadGQL:
     )
     failed: list[BulkDeleteModelCardV2ErrorGQL] = gql_field(
         description="List of errors for model cards that failed to delete.",
+    )
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Input for updating several model cards, each answered for separately.",
+    ),
+    name="PartialBulkUpdateModelCardsInput",
+)
+class PartialBulkUpdateModelCardsInputGQL(PydanticInputMixin[PartialBulkUpdateInputDTO]):
+    items: list[UpdateModelCardInputGQL] = gql_field(
+        description="The model cards to update, each with its ID and fields."
+    )
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Input for purging several model cards, each answered for separately.",
+    ),
+    name="PartialBulkPurgeModelCardsInput",
+)
+class PartialBulkPurgeModelCardsInputGQL(PydanticInputMixin[PartialBulkPurgeInputDTO]):
+    ids: list[UUID] = gql_field(description="IDs of the model cards to purge.")
+    options: DeleteModelCardOptionsGQL | None = gql_field(
+        description="Options for the purge.",
+        default=None,
+    )
+
+
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description=(
+            "Result of a partial bulk model card operation: the model cards processed and "
+            "the ones that failed."
+        ),
+    ),
+    model=PartialBulkPayload[NodeDTO],
+    name="PartialBulkModelCardsPayload",
+)
+class PartialBulkModelCardsPayloadGQL(PydanticOutputMixin[PartialBulkPayload[NodeDTO]]):
+    """Payload for partial bulk model card mutations."""
+
+    successes: list[ModelCardGQL] = gql_field(
+        description="The model cards processed, as they now stand."
+    )
+    failed: list[PartialBulkFailureGQL] = gql_field(
+        description="The model cards not processed, each with the reason."
     )
 
 

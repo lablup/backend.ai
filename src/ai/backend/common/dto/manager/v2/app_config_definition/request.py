@@ -12,13 +12,14 @@ from ai.backend.common.dto.manager.query import DateTimeFilter, StringFilter, UU
 from ai.backend.common.dto.manager.v2.app_config_definition.types import (
     AppConfigDefinitionOrderField,
 )
-from ai.backend.common.dto.manager.v2.common import OrderDirection
+from ai.backend.common.dto.manager.v2.common import NonEmptyList, OrderDirection
 from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 
 __all__ = (
     "AppConfigDefinitionFilter",
     "AppConfigDefinitionOrder",
     "CreateAppConfigDefinitionInput",
+    "PartialBulkPurgeAppConfigDefinitionsInput",
     "PurgeAppConfigDefinitionInput",
     "SearchAppConfigDefinitionsInput",
 )
@@ -38,6 +39,12 @@ class PurgeAppConfigDefinitionInput(BaseRequestModel):
     """Input for purging an app config definition."""
 
     id: UUID = Field(description="App config definition id to purge.")
+
+
+class PartialBulkPurgeAppConfigDefinitionsInput(BaseRequestModel):
+    """Input for purging several app config definitions, each answered for separately."""
+
+    ids: NonEmptyList[UUID] = Field(description="IDs of the app config definitions to purge.")
 
 
 class AppConfigDefinitionFilter(BaseRequestModel):
