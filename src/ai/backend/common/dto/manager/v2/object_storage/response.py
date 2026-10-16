@@ -18,6 +18,7 @@ __all__ = (
     "ObjectStorageNode",
     "PresignedDownloadURLPayload",
     "PresignedUploadURLPayload",
+    "PurgeObjectStoragePayload",
     "UpdateObjectStoragePayload",
 )
 
@@ -53,6 +54,12 @@ class DeleteObjectStoragePayload(BaseResponseModel):
     """Payload for object storage deletion mutation result."""
 
     id: UUID = Field(description="ID of the deleted object storage")
+
+
+class PurgeObjectStoragePayload(BaseResponseModel):
+    """Payload for object storage permanent purge."""
+
+    id: UUID = Field(description="ID of the purged object storage")
 
 
 class PresignedUploadURLPayload(BaseResponseModel):

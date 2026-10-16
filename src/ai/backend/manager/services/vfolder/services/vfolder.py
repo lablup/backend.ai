@@ -20,7 +20,7 @@ from ai.backend.common.data.entity.vfolder import VFolderUUID
 from ai.backend.common.data.permission.types import Permission
 from ai.backend.common.defs import VFOLDER_GROUP_PERMISSION_MODE
 from ai.backend.common.etcd import AsyncEtcd
-from ai.backend.common.exception import UnreachableError
+from ai.backend.common.exception import BackendAIError, UnreachableError
 from ai.backend.common.types import (
     QuotaScopeID,
     QuotaScopeType,
@@ -76,6 +76,7 @@ from ai.backend.manager.models.vfolder.scopes import (
     ProjectVFolderTarget,
     UserVFolderTarget,
 )
+from ai.backend.manager.models.vfolder.updaters import VFolderAttributeUpdater
 from ai.backend.manager.repositories.user.repository import UserRepository
 from ai.backend.manager.repositories.vfolder.mount_policy import resolve_mount_policy
 from ai.backend.manager.repositories.vfolder.repository import VfolderRepository
@@ -130,6 +131,15 @@ from ai.backend.manager.services.vfolder.actions.get_v2 import (
 from ai.backend.manager.services.vfolder.actions.lookup import (
     LookupVFolderAction,
     LookupVFolderActionResult,
+)
+from ai.backend.manager.services.vfolder.actions.partial_bulk_delete_vfolders import (
+    PartialBulkDeleteVFoldersAction,
+)
+from ai.backend.manager.services.vfolder.actions.partial_bulk_restore_vfolders import (
+    PartialBulkRestoreVFoldersAction,
+)
+from ai.backend.manager.services.vfolder.actions.partial_bulk_update_vfolders import (
+    PartialBulkUpdateVFoldersAction,
 )
 from ai.backend.manager.services.vfolder.actions.search_storage_host_permissions import (
     SearchStorageHostPermissionsAction,
@@ -338,22 +348,40 @@ class VFolderService:
     async def update_attribute(
         self, action: UpdateVFolderAttributeAction
     ) -> UpdateVFolderAttributeActionResult:
+        vfolder = await self._update_attribute(action.updater)
+        return UpdateVFolderAttributeActionResult(vfolder_uuid=action.vfolder_uuid, vfolder=vfolder)
+
+    async def partial_bulk_update(
+        self, action: PartialBulkUpdateVFoldersAction
+    ) -> PartialBulkResult[VFolderData]:
+        items: list[PartialBulkEntityResult[VFolderData]] = []
+        for updater in action.updaters:
+            try:
+                vfolder = await self._update_attribute(updater)
+            except BackendAIError as e:
+                items.append(PartialBulkEntityResult[VFolderData].failed(updater.vfolder_id, e))
+                continue
+            items.append(
+                PartialBulkEntityResult[VFolderData].succeeded(
+                    updater.vfolder_id, vfolder, description="updated"
+                )
+            )
+        return PartialBulkResult(items=items)
+
+    async def _update_attribute(self, updater: VFolderAttributeUpdater) -> VFolderData:
         try:
-            new_name = action.updater.name.value()
+            new_name = updater.name.value()
         except ValueError:
             pass
         else:
-            vfolder_data = await self._vfolder_repository.get_by_id(action.vfolder_uuid)
+            vfolder_data = await self._vfolder_repository.get_by_id(updater.vfolder_id)
             if await self._vfolder_repository.check_vfolder_name_exists(
                 self._owning_scope(vfolder_data), new_name
             ):
                 raise VFolderInvalidParameter(
                     "One of your accessible vfolders already has the name you requested."
                 )
-
-        await self._vfolder_repository.update_vfolder_attribute(action.updater)
-
-        return UpdateVFolderAttributeActionResult(vfolder_uuid=action.vfolder_uuid)
+        return await self._vfolder_repository.update_vfolder_attribute(updater)
 
     async def get(self, action: GetVFolderAction) -> GetVFolderActionResult:
         vfolder_data = await self._vfolder_repository.get_by_id(action.vfolder_uuid)
@@ -387,11 +415,32 @@ class VFolderService:
     async def restore(
         self, action: RestoreVFolderFromTrashAction
     ) -> RestoreVFolderFromTrashActionResult:
-        # TODO: Implement proper permission checking and business logic
-        # For now, use admin repository for the operation
-        vfolder_data = await self._vfolder_repository.get_by_id(action.vfolder_uuid)
-        await self._vfolder_repository.restore_vfolders_from_trash([vfolder_data.id])
+        await self._restore_from_trash(action.vfolder_uuid)
         return RestoreVFolderFromTrashActionResult(vfolder_uuid=action.vfolder_uuid)
+
+    async def partial_bulk_restore(
+        self, action: PartialBulkRestoreVFoldersAction
+    ) -> PartialBulkResult[VFolderData]:
+        items: list[PartialBulkEntityResult[VFolderData]] = []
+        for vfolder_id in action.vfolder_ids:
+            try:
+                vfolder = await self._restore_from_trash(vfolder_id)
+            except BackendAIError as e:
+                items.append(PartialBulkEntityResult[VFolderData].failed(vfolder_id, e))
+                continue
+            items.append(
+                PartialBulkEntityResult[VFolderData].succeeded(
+                    vfolder_id, vfolder, description="restored"
+                )
+            )
+        return PartialBulkResult(items=items)
+
+    async def _restore_from_trash(self, vfolder_id: VFolderUUID) -> VFolderData:
+        vfolder_data = await self._vfolder_repository.get_by_id(vfolder_id)
+        restored = await self._vfolder_repository.restore_vfolders_from_trash([vfolder_data.id])
+        if not restored:
+            raise UnreachableError(f"VFolder disappeared while restoring: {vfolder_data.id}")
+        return restored[0]
 
     async def _remove_vfolder_from_storage(self, vfolder_data: VFolderData) -> None:
         proxy_name, volume_name = self._storage_manager.get_proxy_and_volume(
@@ -1259,10 +1308,30 @@ class VFolderService:
 
     async def delete_v2(self, action: DeleteVFolderV2Action) -> DeleteVFolderV2ActionResult:
         """Soft-delete a vfolder by ID. RBAC enforced at processor level."""
+        return DeleteVFolderV2ActionResult(vfolder=await self._move_to_trash(action.vfolder_uuid))
+
+    async def partial_bulk_delete(
+        self, action: PartialBulkDeleteVFoldersAction
+    ) -> PartialBulkResult[VFolderData]:
+        items: list[PartialBulkEntityResult[VFolderData]] = []
+        for vfolder_id in action.vfolder_ids:
+            try:
+                vfolder = await self._move_to_trash(vfolder_id)
+            except BackendAIError as e:
+                items.append(PartialBulkEntityResult[VFolderData].failed(vfolder_id, e))
+                continue
+            items.append(
+                PartialBulkEntityResult[VFolderData].succeeded(
+                    vfolder_id, vfolder, description="deleted"
+                )
+            )
+        return PartialBulkResult(items=items)
+
+    async def _move_to_trash(self, vfolder_id: VFolderUUID) -> VFolderData:
         me = current_user()
         if me is None:
             raise UnreachableError("User context is not available")
-        vfolder_data = await self._vfolder_repository.get_by_id(action.vfolder_uuid)
+        vfolder_data = await self._vfolder_repository.get_by_id(vfolder_id)
 
         # Host permission check — resolved from current user context
         await self._vfolder_repository.ensure_host_permission_allowed_by_user(
@@ -1274,7 +1343,7 @@ class VFolderService:
         trashed = await self._vfolder_repository.move_vfolders_to_trash([vfolder_data.id])
         if not trashed:
             raise UnreachableError(f"VFolder disappeared while trashing: {vfolder_data.id}")
-        return DeleteVFolderV2ActionResult(vfolder=trashed[0])
+        return trashed[0]
 
     async def purge_v2(self, action: PurgeVFolderV2Action) -> PurgeVFolderV2ActionResult:
         """Permanently purge a vfolder by ID. RBAC enforced at processor level.

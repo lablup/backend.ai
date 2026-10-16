@@ -9,8 +9,7 @@ from uuid import uuid4
 import pytest
 
 from ai.backend.common.data.user.types import UserRole
-from ai.backend.common.dto.manager.v2.notification.request import DeleteNotificationRuleInput
-from ai.backend.common.dto.manager.v2.notification.response import DeleteNotificationRulePayload
+from ai.backend.common.dto.manager.v2.notification.response import PurgeNotificationRulePayload
 from ai.backend.manager.api.adapters.notification.adapter import NotificationAdapter
 from ai.backend.manager.errors.base.entity import EntityNotFoundError
 from ai.backend.manager.errors.permission import NotEnoughPermission
@@ -26,7 +25,7 @@ from bai_scenario.runner.acting import ActingAs
 from bai_scenario.runner.planting import TestSeedingSession
 from bai_scenario.runner.steps import run_scenario
 
-type Deleted = DeleteNotificationRulePayload
+type Deleted = PurgeNotificationRulePayload
 type RetiringStep = Scenario[TestSeedingSession, ARuleAndACaller, NotificationAdapter, Any]
 
 
@@ -38,7 +37,7 @@ class Deleting(When[ARuleAndACaller, NotificationAdapter, Deleted]):
 
     @override
     def operation(self) -> str:
-        return "delete_rule"
+        return "purge_rule"
 
     @override
     def describe(self, laid: ARuleAndACaller) -> str:
@@ -48,9 +47,7 @@ class Deleting(When[ARuleAndACaller, NotificationAdapter, Deleted]):
     @override
     async def call(self, adapter: NotificationAdapter, laid: ARuleAndACaller) -> Deleted:
         with ActingAs(laid.caller):
-            return await adapter.delete_rule(
-                DeleteNotificationRuleInput(id=uuid4() if self.unknown else laid.rule.id)
-            )
+            return await adapter.purge_rule(uuid4() if self.unknown else laid.rule.id)
 
 
 @dataclass(frozen=True)

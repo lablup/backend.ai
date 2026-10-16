@@ -14,6 +14,7 @@ from ai.backend.common.data.entity.types import EntityType
 from ai.backend.common.dto.manager.v2.rbac.types import PermissionBitDTO
 
 __all__ = (
+    "AtomicBulkAddRolePresetPermissionsPayload",
     "BulkAddRolePermissionPresetFailureInfo",
     "BulkAddRolePermissionPresetsPayload",
     "BulkRemoveRolePermissionPresetsPayload",
@@ -72,6 +73,12 @@ class BulkAddRolePermissionPresetFailureInfo(BaseResponseModel):
         description="The operation bit of the permission entry that failed.",
     )
     message: str = Field(description="Error message describing the failure.")
+
+
+class AtomicBulkAddRolePresetPermissionsPayload(BaseResponseModel):
+    """Payload for adding permission entries to a role preset, all or none."""
+
+    items: list[RolePermissionPresetNode] = Field(description="Permission entries that were added.")
 
 
 class BulkAddRolePermissionPresetsPayload(BaseResponseModel):

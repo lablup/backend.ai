@@ -25,7 +25,7 @@ class TestSuperadminGate:
         user_v2_registry: V2ClientRegistry,
         registered_config_name: str,
     ) -> None:
-        """Each route carries the gate of its own, so a route registered without it is a hole.
+        """Each superadmin route carries the gate of its own, so a route registered without it is a hole.
 
         The ids are made up: the gate answers before anything is looked up.
         """
@@ -38,8 +38,6 @@ class TestSuperadminGate:
             await client.admin_search(SearchAppConfigDefinitionsInput(limit=1))
         with pytest.raises(PermissionDeniedError):
             await client.admin_get(uuid.uuid4())
-        with pytest.raises(PermissionDeniedError):
-            await client.admin_purge(uuid.uuid4())
 
 
 class TestDefinitionCRUD:
@@ -91,7 +89,7 @@ class TestDefinitionCRUD:
             CreateAppConfigDefinitionInput(config_name=registered_config_name)
         )
 
-        purged = await admin_v2_registry.app_config_definition.admin_purge(
+        purged = await admin_v2_registry.app_config_definition.purge(
             created.app_config_definition.id
         )
 

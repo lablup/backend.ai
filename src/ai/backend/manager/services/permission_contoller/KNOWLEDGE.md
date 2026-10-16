@@ -43,8 +43,11 @@ the entity type, shape, operation, gate and backing.
 
 ## Role edits are guarded single-entity operations
 
-- Update and soft delete are `single_guarded_*_ops`; purge is `entity_purge_ops`.
-- A SYSTEM role is refused by the spec's guard. It is edited through its preset.
+- Update, soft delete and restore are `single_*_ops`; purge is `entity_purge_ops`.
+- Each has a partial bulk counterpart (`partial_bulk_{update,delete,restore}_ops`,
+  `entity_partial_bulk_purge_ops`) that answers per role.
+- A SYSTEM role is refused by the spec's guard on update, soft delete and purge. It is
+  edited through its preset.
 
 ## A permission entry is a field row of its role
 

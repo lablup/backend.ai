@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from ai.backend.manager.api.rest.middleware.auth import superadmin_required
+from ai.backend.manager.api.rest.middleware.auth import auth_required, superadmin_required
 from ai.backend.manager.api.rest.routing import RouteRegistry
 
 from .handler import V2NotificationHandler
@@ -23,21 +23,47 @@ def register_v2_notification_routes(
     # Channel endpoints
     reg.add("POST", "/channels", handler.create_channel, middlewares=[superadmin_required])
     reg.add("GET", "/channels/{channel_id}", handler.get_channel, middlewares=[superadmin_required])
+    reg.add("PATCH", "/channels/{channel_id}", handler.update_channel, middlewares=[auth_required])
+    reg.add("DELETE", "/channels/{channel_id}", handler.purge_channel, middlewares=[auth_required])
     reg.add(
-        "PATCH", "/channels/{channel_id}", handler.update_channel, middlewares=[superadmin_required]
+        "POST",
+        "/channels/partial-bulk-update",
+        handler.partial_bulk_update_channels,
+        middlewares=[auth_required],
     )
-    reg.add("POST", "/channels/delete", handler.delete_channel, middlewares=[superadmin_required])
+    reg.add(
+        "POST",
+        "/channels/partial-bulk-purge",
+        handler.partial_bulk_purge_channels,
+        middlewares=[auth_required],
+    )
     reg.add("POST", "/channels/search", handler.search_channels, middlewares=[superadmin_required])
     reg.add(
         "POST", "/channels/validate", handler.validate_channel, middlewares=[superadmin_required]
     )
+    # Deprecated since NEXT_RELEASE_VERSION.
+    reg.add("POST", "/channels/delete", handler.delete_channel, middlewares=[superadmin_required])
 
     # Rule endpoints
     reg.add("POST", "/rules", handler.create_rule, middlewares=[superadmin_required])
     reg.add("GET", "/rules/{rule_id}", handler.get_rule, middlewares=[superadmin_required])
-    reg.add("PATCH", "/rules/{rule_id}", handler.update_rule, middlewares=[superadmin_required])
-    reg.add("POST", "/rules/delete", handler.delete_rule, middlewares=[superadmin_required])
+    reg.add("PATCH", "/rules/{rule_id}", handler.update_rule, middlewares=[auth_required])
+    reg.add("DELETE", "/rules/{rule_id}", handler.purge_rule, middlewares=[auth_required])
+    reg.add(
+        "POST",
+        "/rules/partial-bulk-update",
+        handler.partial_bulk_update_rules,
+        middlewares=[auth_required],
+    )
+    reg.add(
+        "POST",
+        "/rules/partial-bulk-purge",
+        handler.partial_bulk_purge_rules,
+        middlewares=[auth_required],
+    )
     reg.add("POST", "/rules/search", handler.search_rules, middlewares=[superadmin_required])
     reg.add("POST", "/rules/validate", handler.validate_rule, middlewares=[superadmin_required])
+    # Deprecated since NEXT_RELEASE_VERSION.
+    reg.add("POST", "/rules/delete", handler.delete_rule, middlewares=[superadmin_required])
 
     return reg

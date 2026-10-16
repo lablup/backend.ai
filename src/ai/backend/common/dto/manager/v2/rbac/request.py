@@ -20,6 +20,7 @@ from ai.backend.common.dto.manager.query import (
     ToManyFilter,
     UUIDFilter,
 )
+from ai.backend.common.dto.manager.v2.common import NonEmptyList
 from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.common.tristate.unset import UNSET, Unset
 
@@ -51,6 +52,11 @@ __all__ = (
     "EntityOrderBy",
     "MyAtomicBulkScopePermissionsInput",
     "MyScopePermissionsInput",
+    "PartialBulkDeleteRolesInput",
+    "PartialBulkPurgeRolesInput",
+    "PartialBulkRestoreRolesInput",
+    "PartialBulkUpdateRoleItemInput",
+    "PartialBulkUpdateRolesInput",
     "PermissionFilter",
     "PermissionNestedFilter",
     "PermissionOrderBy",
@@ -129,7 +135,12 @@ class UpdateRoleInput(BaseRequestModel):
         default=UNSET, description="Updated role description. Omit to leave unchanged; null clears."
     )
     status: RoleStatus | None | Unset = Field(
-        default=UNSET, description="Updated role status. Omit to leave unchanged."
+        default=UNSET,
+        description=(
+            f"Deprecated since {NEXT_RELEASE_VERSION}. Use the role delete and restore "
+            "operations. Accepted and ignored."
+        ),
+        deprecated=True,
     )
     auto_assign: bool | None | Unset = Field(
         default=UNSET,
@@ -161,6 +172,39 @@ class PurgeRoleInput(BaseRequestModel):
     """Input for purging a role."""
 
     id: UUID = Field(description="Role ID to purge")
+
+
+class PartialBulkUpdateRoleItemInput(BaseRequestModel):
+    """One role of a partial bulk update and the fields to update on it."""
+
+    id: UUID = Field(description="ID of the role to update.")
+    input: UpdateRoleInput = Field(description="Fields to update on the role.")
+
+
+class PartialBulkUpdateRolesInput(BaseRequestModel):
+    """Input for updating several roles, each answered for separately."""
+
+    items: NonEmptyList[PartialBulkUpdateRoleItemInput] = Field(
+        description="The roles to update, each with its fields."
+    )
+
+
+class PartialBulkDeleteRolesInput(BaseRequestModel):
+    """Input for soft-deleting several roles, each answered for separately."""
+
+    ids: NonEmptyList[UUID] = Field(description="IDs of the roles to soft-delete.")
+
+
+class PartialBulkRestoreRolesInput(BaseRequestModel):
+    """Input for restoring several soft-deleted roles, each answered for separately."""
+
+    ids: NonEmptyList[UUID] = Field(description="IDs of the roles to restore.")
+
+
+class PartialBulkPurgeRolesInput(BaseRequestModel):
+    """Input for permanently removing several roles, each answered for separately."""
+
+    ids: NonEmptyList[UUID] = Field(description="IDs of the roles to purge.")
 
 
 class CreatePermissionInput(BaseRequestModel):

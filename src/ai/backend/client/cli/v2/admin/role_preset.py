@@ -228,16 +228,15 @@ def update(
 @click.argument("role_preset_ids", type=click.UUID, nargs=-1, required=True)
 def delete(role_preset_ids: tuple[uuid.UUID, ...]) -> None:
     """Soft-delete one or more role presets (sets ``deleted = true``)."""
-    from ai.backend.common.data.entity.role_preset import RolePresetID
-    from ai.backend.common.dto.manager.v2.role_preset.request import BulkDeleteRolePresetsInput
-
-    ids = [RolePresetID(rid) for rid in role_preset_ids]
+    from ai.backend.common.dto.manager.v2.role_preset.request import (
+        PartialBulkDeleteRolePresetsInput,
+    )
 
     async def _run() -> None:
         registry = await create_v2_registry(load_v2_config())
         try:
-            result = await registry.role_preset.delete(
-                BulkDeleteRolePresetsInput(role_preset_ids=ids),
+            result = await registry.role_preset.partial_bulk_delete(
+                PartialBulkDeleteRolePresetsInput(ids=list(role_preset_ids)),
             )
             print_result(result)
         finally:
@@ -250,16 +249,15 @@ def delete(role_preset_ids: tuple[uuid.UUID, ...]) -> None:
 @click.argument("role_preset_ids", type=click.UUID, nargs=-1, required=True)
 def restore(role_preset_ids: tuple[uuid.UUID, ...]) -> None:
     """Restore one or more soft-deleted role presets (sets ``deleted = false``)."""
-    from ai.backend.common.data.entity.role_preset import RolePresetID
-    from ai.backend.common.dto.manager.v2.role_preset.request import BulkRestoreRolePresetsInput
-
-    ids = [RolePresetID(rid) for rid in role_preset_ids]
+    from ai.backend.common.dto.manager.v2.role_preset.request import (
+        PartialBulkRestoreRolePresetsInput,
+    )
 
     async def _run() -> None:
         registry = await create_v2_registry(load_v2_config())
         try:
-            result = await registry.role_preset.restore(
-                BulkRestoreRolePresetsInput(role_preset_ids=ids),
+            result = await registry.role_preset.partial_bulk_restore(
+                PartialBulkRestoreRolePresetsInput(ids=list(role_preset_ids)),
             )
             print_result(result)
         finally:
@@ -272,16 +270,15 @@ def restore(role_preset_ids: tuple[uuid.UUID, ...]) -> None:
 @click.argument("role_preset_ids", type=click.UUID, nargs=-1, required=True)
 def purge(role_preset_ids: tuple[uuid.UUID, ...]) -> None:
     """Hard-delete one or more role presets, cascading to their permission entries."""
-    from ai.backend.common.data.entity.role_preset import RolePresetID
-    from ai.backend.common.dto.manager.v2.role_preset.request import BulkPurgeRolePresetsInput
-
-    ids = [RolePresetID(rid) for rid in role_preset_ids]
+    from ai.backend.common.dto.manager.v2.role_preset.request import (
+        PartialBulkPurgeRolePresetsInput,
+    )
 
     async def _run() -> None:
         registry = await create_v2_registry(load_v2_config())
         try:
-            result = await registry.role_preset.purge(
-                BulkPurgeRolePresetsInput(role_preset_ids=ids),
+            result = await registry.role_preset.partial_bulk_purge(
+                PartialBulkPurgeRolePresetsInput(ids=list(role_preset_ids)),
             )
             print_result(result)
         finally:

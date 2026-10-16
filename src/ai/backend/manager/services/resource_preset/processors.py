@@ -37,6 +37,12 @@ from ai.backend.manager.services.resource_preset.actions.list_presets import (
 from ai.backend.manager.services.resource_preset.actions.lookup import (
     LookupResourcePresetAction,
 )
+from ai.backend.manager.services.resource_preset.actions.partial_bulk_purge_presets import (
+    PartialBulkPurgeResourcePresetsAction,
+)
+from ai.backend.manager.services.resource_preset.actions.partial_bulk_update_presets import (
+    PartialBulkUpdateResourcePresetsAction,
+)
 from ai.backend.manager.services.resource_preset.actions.search_presets import (
     SearchResourcePresetsV2Action,
 )
@@ -65,6 +71,12 @@ class ResourcePresetProcessors:
     delete_preset: SingleEntityActionProcessor[
         DeleteResourcePresetAction, DeleteResourcePresetActionResult
     ]
+    partial_bulk_update: PartialBulkActionProcessor[
+        PartialBulkUpdateResourcePresetsAction, ResourcePresetData
+    ]
+    partial_bulk_purge: PartialBulkActionProcessor[
+        PartialBulkPurgeResourcePresetsAction, ResourcePresetData
+    ]
     get_preset: SingleEntityActionProcessor[
         GetResourcePresetAction, EntityOpsResult[ResourcePresetData]
     ]
@@ -87,6 +99,12 @@ class ResourcePresetProcessors:
             SetResourcePresetResourceGroupAction, service.set_preset_resource_group
         )
         self.delete_preset = group.single_entity(DeleteResourcePresetAction, service.delete_preset)
+        self.partial_bulk_update = group.partial_bulk_update_ops(
+            PartialBulkUpdateResourcePresetsAction
+        )
+        self.partial_bulk_purge = group.entity_partial_bulk_purge_ops(
+            PartialBulkPurgeResourcePresetsAction
+        )
         self.get_preset = group.single_get_ops(GetResourcePresetAction)
         self.bulk_get = group.partial_bulk_get_ops(BulkGetResourcePresetsAction)
         self.list_presets = group.scope(ListResourcePresetsAction, service.list_presets)

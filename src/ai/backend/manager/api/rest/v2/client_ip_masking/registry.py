@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from ai.backend.manager.api.rest.middleware.auth import superadmin_required
+from ai.backend.manager.api.rest.middleware.auth import auth_required, superadmin_required
 from ai.backend.manager.api.rest.routing import RouteRegistry
 
 from .handler import V2ClientIPMaskingHandler
@@ -21,7 +21,12 @@ def register_v2_client_ip_masking_routes(
     registry = RouteRegistry.create("client-ip-masking-policies", route_deps.cors_options)
 
     registry.add("POST", "/search", handler.admin_search, middlewares=[superadmin_required])
-    registry.add("POST", "/upsert", handler.admin_upsert, middlewares=[superadmin_required])
+    registry.add("POST", "/upsert", handler.upsert, middlewares=[auth_required])
+    registry.add("DELETE", "/{policy_id}", handler.purge, middlewares=[auth_required])
+    registry.add(
+        "POST", "/partial-bulk-purge", handler.partial_bulk_purge, middlewares=[auth_required]
+    )
+    # Deprecated since NEXT_RELEASE_VERSION.
     registry.add("POST", "/purge", handler.admin_purge, middlewares=[superadmin_required])
 
     return registry

@@ -13,6 +13,7 @@ from uuid import UUID
 
 from ai.backend.common.data.retention.types import RetentionCategory
 from ai.backend.common.data.user.types import UserRole
+from ai.backend.common.dto.manager.v2.common import PartialBulkPayload
 from ai.backend.common.dto.manager.v2.retention_policy.response import (
     RetentionPolicyNode,
     SearchRetentionPoliciesPayload,
@@ -20,6 +21,7 @@ from ai.backend.common.dto.manager.v2.retention_policy.response import (
 from ai.backend.manager.data.retention.types import RetentionPolicyData
 from ai.backend.manager.data.user.types import UserData
 from ai.backend.manager.errors.base.entity import EntityNotFoundError
+from ai.backend.manager.errors.permission import NotEnoughPermission
 from ai.backend.testutils.scenario_steps import (
     Answered,
     Given,
@@ -31,7 +33,7 @@ from ai.backend.testutils.scenario_steps import (
     Then,
     Verdict,
 )
-from bai_scenario.components.domain import WrittenByThisRun
+from bai_scenario.components.domain import Mentions, WrittenByThisRun
 from bai_scenario.components.system import KEPT, Kept, lay_a_caller, role_named
 from bai_scenario.seeds.retention_policy.retention_policy import TestSeedRetentionPolicy
 
@@ -253,7 +255,7 @@ class OnlyTheNamedPolicyIsLeft(Then[ManyPoliciesAndACaller, SearchRetentionPolic
 
 @dataclass(frozen=True)
 class TheDeletedPolicyId(Then[APolicyAndACaller, Any]):
-    """삭제한 정책의 id를 담은 응답. 삭제와 완전 삭제가 같은 형태로 응답한다."""
+    """삭제한 정책의 id를 담은 응답."""
 
     @override
     def says(self) -> str:
@@ -265,3 +267,34 @@ class TheDeletedPolicyId(Then[APolicyAndACaller, Any]):
         if payload is None:
             return [Refused(EntityNotFoundError, answered.raised)]
         return [Held[UUID]("id", payload.id, SameAs[UUID](laid.policy.id, "미리 만들어 둔 정책"))]
+
+
+@dataclass(frozen=True)
+class NothingIsProcessed(Then[ManyPoliciesAndACaller, PartialBulkPayload[RetentionPolicyNode]]):
+    """처리된 정책 없이, 대상이 모두 같은 이유로 실패 목록에 온다."""
+
+    reason: str
+
+    @override
+    def says(self) -> str:
+        return "처리된 정책 없이 대상이 모두 실패 목록에 온다"
+
+    @override
+    def look(
+        self,
+        laid: ManyPoliciesAndACaller,
+        answered: Answered[PartialBulkPayload[RetentionPolicyNode]],
+    ) -> list[Verdict]:
+        payload = answered.response
+        if payload is None:
+            return [Refused(NotEnoughPermission, answered.raised)]
+        verdicts: list[Verdict] = [
+            Same("successes", payload.successes, []),
+            Same("failed count", len(payload.failed), len(laid.laid)),
+        ]
+        for i, (failure, policy) in enumerate(zip(payload.failed, laid.laid, strict=False)):
+            verdicts += [
+                Held[UUID](f"failed[{i}].id", failure.id, SameAs(policy.id, "대상 정책의 id")),
+                Held(f"failed[{i}].message", failure.message, Mentions(self.reason)),
+            ]
+        return verdicts

@@ -51,7 +51,7 @@ class Editing(When[ATypeAndACaller, LoginClientTypeAdapter, LoginClientTypeNode]
 
     @override
     def operation(self) -> str:
-        return "admin_update"
+        return "update"
 
     @override
     def describe(self, laid: ATypeAndACaller) -> str:
@@ -68,7 +68,7 @@ class Editing(When[ATypeAndACaller, LoginClientTypeAdapter, LoginClientTypeNode]
         self, adapter: LoginClientTypeAdapter, laid: ATypeAndACaller
     ) -> LoginClientTypeNode:
         with ActingAs(laid.caller):
-            payload = await adapter.admin_update(
+            payload = await adapter.update(
                 uuid4() if self.unknown else laid.client_type.id,
                 UpdateLoginClientTypeInput(name=self.named, description=self.described),
             )
@@ -83,7 +83,7 @@ class RenamingToAnothersName(
 
     @override
     def operation(self) -> str:
-        return "admin_update"
+        return "update"
 
     @override
     def describe(self, laid: ManyTypesAndACaller) -> str:
@@ -96,7 +96,7 @@ class RenamingToAnothersName(
     ) -> LoginClientTypeNode:
         other = next(one for one in laid.laid if one.id != laid.named.id)
         with ActingAs(laid.caller):
-            payload = await adapter.admin_update(
+            payload = await adapter.update(
                 laid.named.id, UpdateLoginClientTypeInput(name=other.name)
             )
         return payload.login_client_type

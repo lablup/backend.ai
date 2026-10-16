@@ -37,7 +37,9 @@ from ai.backend.manager.repositories.ops.repository import OpsRepository
 from ai.backend.manager.repositories.rbac.permission_check_repository import (
     RbacPermissionCheckRepository,
 )
-from ai.backend.manager.services.role_preset.actions.delete import BulkDeleteRolePresetsAction
+from ai.backend.manager.services.role_preset.actions.partial_bulk_delete import (
+    PartialBulkDeleteRolePresetsAction,
+)
 from ai.backend.testutils.db import with_tables
 from ai.backend.testutils.ops_contract import (
     ANONYMOUS_NOT_REFUSED,
@@ -123,7 +125,7 @@ async def _untouched(db: ExtendedAsyncSAEngine, preset_ids: list[RolePresetID]) 
 
 def _processor(harness: OpsHarness) -> Any:
     return harness.group(RolePresetEntityType()).partial_bulk_delete_ops(
-        BulkDeleteRolePresetsAction
+        PartialBulkDeleteRolePresetsAction
     )
 
 
@@ -143,7 +145,7 @@ async def _action_ids(db: ExtendedAsyncSAEngine) -> set[uuid.UUID]:
     async with db.begin_readonly_session() as sess:
         rows = await sess.scalars(
             sa.select(AuditLogRow.action_id).where(
-                AuditLogRow.action_name == BulkDeleteRolePresetsAction.action_name()
+                AuditLogRow.action_name == PartialBulkDeleteRolePresetsAction.action_name()
             )
         )
         return set(rows.all())
@@ -170,7 +172,7 @@ class TestActor:
         harness.enforce(enforced)
 
         with actors.acting_as(actor):
-            result = await _processor(harness).run(BulkDeleteRolePresetsAction(ids=presets))
+            result = await _processor(harness).run(PartialBulkDeleteRolePresetsAction(ids=presets))
 
         assert [item.value.id for item in result.items] == presets
         assert await _untouched(preset_db, presets) == set()
@@ -191,7 +193,7 @@ class TestActor:
         writes = _spy_writes(monkeypatch)
 
         with actors.acting_as(actor):
-            result = await _processor(harness).run(BulkDeleteRolePresetsAction(ids=presets))
+            result = await _processor(harness).run(PartialBulkDeleteRolePresetsAction(ids=presets))
 
         assert all(item.is_denied for item in result.items)
         assert all(isinstance(item.error, NotEnoughPermission) for item in result.items)
@@ -219,7 +221,7 @@ class TestActor:
 
         with actors.acting_as(Actor.ANONYMOUS):
             with pytest.raises(BackendAIError) as raised:
-                await _processor(harness).run(BulkDeleteRolePresetsAction(ids=presets))
+                await _processor(harness).run(PartialBulkDeleteRolePresetsAction(ids=presets))
 
         assert writes == []
         assert await _untouched(preset_db, presets) == set(presets)
@@ -239,7 +241,7 @@ class TestTarget:
 
         with actors.acting_as(Actor.SUPERADMIN):
             result = await _processor(harness).run(
-                BulkDeleteRolePresetsAction(ids=[presets[0], missing])
+                PartialBulkDeleteRolePresetsAction(ids=[presets[0], missing])
             )
 
         written, gone = result.items
@@ -254,7 +256,7 @@ class TestTarget:
         """target-2."""
         with actors.acting_as(Actor.GRANTED):
             result = await _processor(harness).run(
-                BulkDeleteRolePresetsAction(ids=[RolePresetID(uuid.uuid4())])
+                PartialBulkDeleteRolePresetsAction(ids=[RolePresetID(uuid.uuid4())])
             )
 
         (item,) = result.items
@@ -277,7 +279,7 @@ class TestMulti:
         writes = _spy_writes(monkeypatch)
 
         with actors.acting_as(Actor.UNGRANTED):
-            result = await _processor(harness).run(BulkDeleteRolePresetsAction(ids=presets))
+            result = await _processor(harness).run(PartialBulkDeleteRolePresetsAction(ids=presets))
 
         written, refused = result.items
         assert written.value.id == allowed
@@ -301,7 +303,7 @@ class TestMulti:
 
         with actors.acting_as(Actor.UNGRANTED):
             result = await _processor(harness).run(
-                BulkDeleteRolePresetsAction(ids=[allowed, denied, allowed, denied])
+                PartialBulkDeleteRolePresetsAction(ids=[allowed, denied, allowed, denied])
             )
 
         assert result.items[0] == result.items[2]
@@ -315,7 +317,7 @@ class TestMulti:
     ) -> None:
         """multi-3."""
         with actors.acting_as(Actor.GRANTED):
-            result = await _processor(harness).run(BulkDeleteRolePresetsAction(ids=[]))
+            result = await _processor(harness).run(PartialBulkDeleteRolePresetsAction(ids=[]))
 
         assert result.items == []
 
@@ -326,7 +328,7 @@ class TestMulti:
         ids = [presets[1], RolePresetID(uuid.uuid4()), presets[0]]
 
         with actors.acting_as(Actor.SUPERADMIN):
-            result = await _processor(harness).run(BulkDeleteRolePresetsAction(ids=ids))
+            result = await _processor(harness).run(PartialBulkDeleteRolePresetsAction(ids=ids))
 
         assert [item.entity_id for item in result.items] == ids
 
@@ -352,9 +354,11 @@ class TestRecord:
         target = presets[0] if exists else RolePresetID(uuid.uuid4())
 
         with actors.acting_as(actor):
-            await _processor(silent_reads_harness).run(BulkDeleteRolePresetsAction(ids=[target]))
+            await _processor(silent_reads_harness).run(
+                PartialBulkDeleteRolePresetsAction(ids=[target])
+            )
 
-        records = await silent_reads_harness.audit(BulkDeleteRolePresetsAction.action_name())
+        records = await silent_reads_harness.audit(PartialBulkDeleteRolePresetsAction.action_name())
         assert [((r.entity_type, r.entity_id), r.operation, r.status) for r in records] == [
             (entity_key(target), ActionOperationType.DELETE, status)
         ]
@@ -374,10 +378,10 @@ class TestRecord:
 
         with actors.acting_as(Actor.UNGRANTED):
             await _processor(harness).run(
-                BulkDeleteRolePresetsAction(ids=[allowed, denied, missing])
+                PartialBulkDeleteRolePresetsAction(ids=[allowed, denied, missing])
             )
 
-        records = await harness.audit(BulkDeleteRolePresetsAction.action_name())
+        records = await harness.audit(PartialBulkDeleteRolePresetsAction.action_name())
         assert {(r.entity_type, r.entity_id): r.status for r in records} == {
             entity_key(allowed): OperationStatus.SUCCESS,
             entity_key(denied): OperationStatus.DENIED,
@@ -406,9 +410,9 @@ class TestRecord:
 
         with actors.acting_as(Actor.UNGRANTED):
             with pytest.raises(RuntimeError):
-                await _processor(harness).run(BulkDeleteRolePresetsAction(ids=presets))
+                await _processor(harness).run(PartialBulkDeleteRolePresetsAction(ids=presets))
 
-        records = await harness.audit(BulkDeleteRolePresetsAction.action_name())
+        records = await harness.audit(PartialBulkDeleteRolePresetsAction.action_name())
         assert {(r.entity_type, r.entity_id): r.status for r in records} == {
             entity_key(allowed): OperationStatus.ERROR,
             entity_key(denied): OperationStatus.DENIED,
@@ -421,9 +425,9 @@ class TestRecord:
         """record-6."""
         with actors.acting_as(Actor.ANONYMOUS):
             with contextlib.suppress(BackendAIError):
-                await _processor(harness).run(BulkDeleteRolePresetsAction(ids=presets))
+                await _processor(harness).run(PartialBulkDeleteRolePresetsAction(ids=presets))
 
-        records = await harness.audit(BulkDeleteRolePresetsAction.action_name())
+        records = await harness.audit(PartialBulkDeleteRolePresetsAction.action_name())
         assert sorted(((r.entity_type, r.entity_id), r.status) for r in records) == sorted(
             (entity_key(preset_id), OperationStatus.DENIED) for preset_id in presets
         )
@@ -433,9 +437,9 @@ class TestRecord:
     ) -> None:
         """record-7."""
         with actors.acting_as(Actor.GRANTED):
-            await _processor(harness).run(BulkDeleteRolePresetsAction(ids=[]))
+            await _processor(harness).run(PartialBulkDeleteRolePresetsAction(ids=[]))
 
-        assert await harness.audit(BulkDeleteRolePresetsAction.action_name()) == []
+        assert await harness.audit(PartialBulkDeleteRolePresetsAction.action_name()) == []
 
     async def test_a_failing_permission_read_is_an_error_not_a_denial(
         self,
@@ -454,9 +458,9 @@ class TestRecord:
 
         with actors.acting_as(Actor.GRANTED):
             with pytest.raises(RuntimeError):
-                await _processor(harness).run(BulkDeleteRolePresetsAction(ids=[presets[0]]))
+                await _processor(harness).run(PartialBulkDeleteRolePresetsAction(ids=[presets[0]]))
 
-        records = await harness.audit(BulkDeleteRolePresetsAction.action_name())
+        records = await harness.audit(PartialBulkDeleteRolePresetsAction.action_name())
         assert [r.status for r in records] == [OperationStatus.ERROR]
         assert await _untouched(preset_db, presets) == set(presets)
 
@@ -467,7 +471,9 @@ class TestResult:
     ) -> None:
         """result-1."""
         with actors.acting_as(Actor.GRANTED):
-            result = await _processor(harness).run(BulkDeleteRolePresetsAction(ids=[presets[0]]))
+            result = await _processor(harness).run(
+                PartialBulkDeleteRolePresetsAction(ids=[presets[0]])
+            )
 
         (item,) = result.items
         assert item.value.id == presets[0]

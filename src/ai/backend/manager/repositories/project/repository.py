@@ -9,6 +9,7 @@ from uuid import UUID
 
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
 from ai.backend.common.data.entity.project import ProjectID
+from ai.backend.common.data.entity.types import EntityIdentifier
 from ai.backend.common.exception import BackendAIError
 from ai.backend.common.metrics.metric import DomainType, LayerType
 from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPolicy
@@ -25,6 +26,7 @@ from ai.backend.manager.errors.resource import (
 from ai.backend.manager.models.kernel.row import KernelRow
 from ai.backend.manager.models.project.creators import ProjectCreator
 from ai.backend.manager.models.project.updaters import ProjectDotfilesUpdater, ProjectUpdater
+from ai.backend.manager.models.specs.types import BulkResultWithFailures
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.repositories.ops.v2.resource_policy.provider import (
@@ -95,6 +97,27 @@ class ProjectRepository:
                 return None
             await w.restate_project_resource_policy_share(ProjectID(data.id))
             return data
+
+    @project_repository_resilience.apply()
+    async def partial_bulk_modify_validated(
+        self, updaters: Sequence[ProjectUpdater]
+    ) -> BulkResultWithFailures[ProjectData]:
+        """Modify each named project the way :meth:`modify_validated` does, in its own
+        savepoint."""
+        successes: dict[EntityIdentifier, ProjectData] = {}
+        errors: dict[EntityIdentifier, Exception] = {}
+        async with self._policy_ops.write_ops() as w:
+            for updater in updaters:
+                try:
+                    async with w.savepoint() as sp:
+                        data = await sp.update_data(updater)
+                        if data is None:
+                            raise ProjectNotFound(f"Project not found: {updater.project_id}")
+                        await sp.restate_project_resource_policy_share(updater.project_id)
+                        successes[updater.project_id] = data
+                except Exception as e:
+                    errors[updater.project_id] = e
+        return BulkResultWithFailures(successes=successes, errors=errors)
 
     @project_repository_resilience.apply()
     async def update_dotfiles(self, updater: ProjectDotfilesUpdater) -> ProjectData:

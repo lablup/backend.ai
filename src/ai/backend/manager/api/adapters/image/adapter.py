@@ -14,28 +14,30 @@ from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.session import SessionID
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.dto.manager.defs import DEFAULT_PAGE_LIMIT
+from ai.backend.common.dto.manager.v2.common import PartialBulkFailure, PartialBulkPayload
 from ai.backend.common.dto.manager.v2.image.request import (
     AdminSearchImageAliasesInput,
     AdminSearchImagesInput,
     AliasImageInput,
     DealiasImageInput,
-    ForgetImageInput,
     ImageAliasFilterInputDTO,
     ImageAliasOrderByInputDTO,
     ImageFilterInputDTO,
     ImageOrderByInputDTO,
+    PartialBulkDeleteImagesInput,
+    PartialBulkRestoreImagesInput,
+    PartialBulkUpdateImagesInput,
     PurgeImageInput,
-    RestoreImageInput,
     ScanImageInput,
     ScopedSearchImagesInput,
     SearchImageAliasesInput,
-    UpdateImageInput,
+    UpdateImageBody,
 )
 from ai.backend.common.dto.manager.v2.image.response import (
     AdminSearchImageAliasesPayload,
     AdminSearchImagesPayload,
     AliasImagePayload,
-    ForgetImagePayload,
+    DeleteImagePayload,
     ImageAliasNode,
     ImageIdentityInfoDTO,
     ImageMetadataInfoDTO,
@@ -62,6 +64,7 @@ from ai.backend.common.dto.manager.v2.image.types import (
     OrderDirection,
 )
 from ai.backend.common.types import ImageID
+from ai.backend.manager.actions.v2.bulk.result import PartialBulkResult
 from ai.backend.manager.api.adapter_options.pagination.pagination import (
     PaginationOptions,
     PaginationSpec,
@@ -88,14 +91,28 @@ from ai.backend.manager.models.image.searchable_fields import (
     ImageSearchableFields,
 )
 from ai.backend.manager.models.image.searchers import ImageAliasSearcher, ImageSearcher
-from ai.backend.manager.models.image.updaters import ImageUpdate
+from ai.backend.manager.models.image.updaters import (
+    ImageRestoreUpdater,
+    ImageSoftDeleteUpdater,
+    ImageUpdate,
+    ImageUpdater,
+)
 from ai.backend.manager.models.specs.search.usage import UsedBy
 from ai.backend.manager.models.specs.searcher import GlobalSearcher, ScopedSearcher
 from ai.backend.manager.services.image.actions.alias_image import AliasImageByIdAction
 from ai.backend.manager.services.image.actions.bulk_get import BulkGetImagesAction
 from ai.backend.manager.services.image.actions.bulk_get_aliases import BulkGetImageAliasesAction
 from ai.backend.manager.services.image.actions.dealias_image import DealiasImageAction
-from ai.backend.manager.services.image.actions.forget_image import ForgetImageByIdAction
+from ai.backend.manager.services.image.actions.delete_image_by_id import DeleteImageByIdAction
+from ai.backend.manager.services.image.actions.partial_bulk_delete_images import (
+    PartialBulkDeleteImagesAction,
+)
+from ai.backend.manager.services.image.actions.partial_bulk_restore_images import (
+    PartialBulkRestoreImagesAction,
+)
+from ai.backend.manager.services.image.actions.partial_bulk_update_images import (
+    PartialBulkUpdateImagesAction,
+)
 from ai.backend.manager.services.image.actions.purge_images import PurgeImageByIdAction
 from ai.backend.manager.services.image.actions.restore_image import RestoreImageByIdAction
 from ai.backend.manager.services.image.actions.scan_image import GlobalScanImageAction
@@ -350,19 +367,55 @@ class ImageAdapter(BaseAdapter):
         )
         return ScanImagePayload(item=self._data_to_dto(result.image))
 
-    async def admin_forget(self, input: ForgetImageInput) -> ForgetImagePayload:
-        """Forget (soft-delete) an image by ID."""
-        result = await self._image.forget_image_by_id.run(
-            ForgetImageByIdAction(image_id=ImageID(input.image_id))
+    async def update(self, image_id: ImageID, input: UpdateImageBody) -> UpdateImagePayload:
+        """Update an image. Only provided fields will be updated."""
+        result = await self._image.update_image_by_id.run(
+            UpdateImageByIdAction(updater=self._to_updater(image_id, input))
         )
-        return ForgetImagePayload(item=self._data_to_dto(result.image))
+        return UpdateImagePayload(item=self._data_to_dto(result.data))
 
-    async def admin_restore(self, input: RestoreImageInput) -> RestoreImagePayload:
-        """Restore a forgotten (soft-deleted) image by ID."""
-        result = await self._image.restore_image_by_id.run(
-            RestoreImageByIdAction(image_id=ImageID(input.image_id))
+    async def delete(self, image_id: ImageID) -> DeleteImagePayload:
+        """Forget (soft-delete) an image."""
+        result = await self._image.delete_image_by_id.run(
+            DeleteImageByIdAction(updater=ImageSoftDeleteUpdater(image_id=image_id))
         )
-        return RestoreImagePayload(item=self._data_to_dto(result.image))
+        return DeleteImagePayload(item=self._data_to_dto(result.data))
+
+    async def restore(self, image_id: ImageID) -> RestoreImagePayload:
+        """Restore a forgotten (soft-deleted) image."""
+        result = await self._image.restore_image_by_id.run(
+            RestoreImageByIdAction(updater=ImageRestoreUpdater(image_id=image_id))
+        )
+        return RestoreImagePayload(item=self._data_to_dto(result.data))
+
+    async def partial_bulk_update(
+        self, input: PartialBulkUpdateImagesInput
+    ) -> PartialBulkPayload[ImageNode]:
+        """Update several images, answering for each one."""
+        result = await self._image.partial_bulk_update.run(
+            PartialBulkUpdateImagesAction(
+                updaters=[self._to_updater(ImageID(item.id), item.input) for item in input.items]
+            )
+        )
+        return self._to_partial_bulk_payload(result)
+
+    async def partial_bulk_delete(
+        self, input: PartialBulkDeleteImagesInput
+    ) -> PartialBulkPayload[ImageNode]:
+        """Forget several images, answering for each one."""
+        result = await self._image.partial_bulk_delete.run(
+            PartialBulkDeleteImagesAction(ids=[ImageID(image_id) for image_id in input.ids])
+        )
+        return self._to_partial_bulk_payload(result)
+
+    async def partial_bulk_restore(
+        self, input: PartialBulkRestoreImagesInput
+    ) -> PartialBulkPayload[ImageNode]:
+        """Restore several forgotten images, answering for each one."""
+        result = await self._image.partial_bulk_restore.run(
+            PartialBulkRestoreImagesAction(ids=[ImageID(image_id) for image_id in input.ids])
+        )
+        return self._to_partial_bulk_payload(result)
 
     async def admin_purge(self, input: PurgeImageInput) -> PurgeImagePayload:
         """Purge (hard-delete) an image by ID."""
@@ -391,8 +444,7 @@ class ImageAdapter(BaseAdapter):
             image_id=result.image_id,
         )
 
-    async def admin_update(self, input: UpdateImageInput) -> UpdateImagePayload:
-        """Update an image by ID (superadmin only)."""
+    def _to_updater(self, image_id: ImageID, input: UpdateImageBody) -> ImageUpdater:
         update = ImageUpdate(
             name=OptionalState.from_unset(input.name),
             registry=OptionalState.from_unset(input.registry),
@@ -407,10 +459,21 @@ class ImageAdapter(BaseAdapter):
             accelerators=TriState.from_unset(input.supported_accelerators),
             resources=OptionalState.from_unset(input.resource_limits),
         )
-        result = await self._image.update_image_by_id.run(
-            UpdateImageByIdAction(image_id=ImageID(input.image_id), update=update)
+        return ImageUpdater(image_id=image_id, update=update)
+
+    def _to_partial_bulk_payload(
+        self, result: PartialBulkResult[ImageData]
+    ) -> PartialBulkPayload[ImageNode]:
+        return PartialBulkPayload[ImageNode](
+            successes=[
+                self._data_to_dto(item.value) for item in result.items if item.value is not None
+            ],
+            failed=[
+                PartialBulkFailure(id=item.entity_id, message=str(item.error))
+                for item in result.items
+                if item.error is not None
+            ],
         )
-        return UpdateImagePayload(item=self._data_to_dto(result.image))
 
     # ------------------------------------------------------------------ querier builders
 
