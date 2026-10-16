@@ -3,7 +3,6 @@ from __future__ import annotations
 import logging
 from collections.abc import Mapping
 from decimal import Decimal
-from typing import Any
 from uuid import UUID
 
 import trafaret as t
@@ -14,7 +13,7 @@ from ai.backend.common.metrics.metric import DomainType, LayerType
 from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPolicy
 from ai.backend.common.resilience.policies.retry import BackoffStrategy, RetryArgs, RetryPolicy
 from ai.backend.common.resilience.resilience import Resilience
-from ai.backend.common.types import AccessKey, SlotName, SlotQuantity, SlotTypes
+from ai.backend.common.types import SlotName, SlotQuantity, SlotTypes
 from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.resource_preset.types import (
@@ -148,11 +147,9 @@ class ResourcePresetRepository:
     @resource_preset_repository_resilience.apply()
     async def check_presets(
         self,
-        access_key: AccessKey,
         user_id: UUID,
         group_name: str,
         domain_name: str,
-        resource_policy: Mapping[str, Any],
         resource_group: str | None = None,
     ) -> CheckPresetsResult:
         """
@@ -166,11 +163,9 @@ class ResourcePresetRepository:
 
         # Get all data from DB source
         db_data = await self._db_source.check_presets_data(
-            access_key,
             user_id,
             group_name,
             domain_name,
-            resource_policy,
             known_slot_types,
             resource_group,
         )

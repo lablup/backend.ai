@@ -10,6 +10,7 @@ from uuid import UUID
 
 from ai.backend.common.types import (
     AccessKey,
+    SessionTypes,
     SlotName,
     SlotQuantity,
     SlotTypes,
@@ -84,6 +85,27 @@ class AccessKeyFilter(ResourceOccupancyFilter):
     @override
     def get_condition(self) -> Any:
         return KernelRow.access_key == self.access_key
+
+
+class UserIdFilter(ResourceOccupancyFilter):
+    """Filter for the kernel owner."""
+
+    user_id: UUID
+
+    def __init__(self, user_id: UUID) -> None:
+        self.user_id = user_id
+
+    @override
+    def get_condition(self) -> Any:
+        return KernelRow.user_uuid == self.user_id
+
+
+class NonPrivateSessionFilter(ResourceOccupancyFilter):
+    """Exclude private (SFTP) sessions, as the scheduler does."""
+
+    @override
+    def get_condition(self) -> Any:
+        return KernelRow.session_type.not_in(SessionTypes.private_types())
 
 
 class GroupIdFilter(ResourceOccupancyFilter):

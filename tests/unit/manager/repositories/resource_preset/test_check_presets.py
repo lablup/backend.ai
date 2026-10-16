@@ -8,10 +8,9 @@ Addresses BA-3054: Wrong parse of inference metrics.
 """
 
 import uuid
-from collections.abc import AsyncGenerator, Mapping
+from collections.abc import AsyncGenerator
 from datetime import datetime, timedelta
 from decimal import Decimal
-from typing import Any
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -543,25 +542,6 @@ class TestCheckPresetsOccupiedSlots:
         return agent_ids
 
     @pytest.fixture
-    async def test_resource_policy_dict(
-        self,
-        db_with_cleanup: ExtendedAsyncSAEngine,
-        test_resource_policy_name: str,
-    ) -> Mapping[str, Any]:
-        """Get resource policy dict for check_presets API"""
-        async with db_with_cleanup.begin_readonly_session() as db_sess:
-            kp_policy_result = await db_sess.execute(
-                sa.select(KeyPairResourcePolicyRow).where(
-                    KeyPairResourcePolicyRow.name == test_resource_policy_name
-                )
-            )
-            kp_policy = kp_policy_result.scalar_one()
-            return {
-                "total_resource_slots": kp_policy.total_resource_slots.to_json(),
-                "default_for_unspecified": str(kp_policy.default_for_unspecified),
-            }
-
-    @pytest.fixture
     def mock_config_provider(self) -> MagicMock:
         """Create mocked ManagerConfigProvider for repository"""
         mock = MagicMock()
@@ -695,25 +675,10 @@ class TestCheckPresetsOccupiedSlots:
             )
             group_name = group_result.scalar_one()
 
-        # Get resource policy data
-        async with db_with_cleanup.begin_readonly_session() as db_sess:
-            kp_policy_result = await db_sess.execute(
-                sa.select(KeyPairResourcePolicyRow).where(
-                    KeyPairResourcePolicyRow.name == test_resource_policy_name
-                )
-            )
-            kp_policy = kp_policy_result.scalar_one()
-            resource_policy_dict = {
-                "total_resource_slots": kp_policy.total_resource_slots.to_json(),
-                "default_for_unspecified": str(kp_policy.default_for_unspecified),
-            }
-
         result: CheckPresetsResult = await repository.check_presets(
-            access_key=test_keypair_access_key,
             user_id=test_user_uuid,
             group_name=group_name,
             domain_name=test_domain.domain_name,
-            resource_policy=resource_policy_dict,
             resource_group=test_scaling_group_name,
         )
 
@@ -823,25 +788,10 @@ class TestCheckPresetsOccupiedSlots:
             )
             group_name = group_result.scalar_one()
 
-        # Get resource policy data
-        async with db_with_cleanup.begin_readonly_session() as db_sess:
-            kp_policy_result = await db_sess.execute(
-                sa.select(KeyPairResourcePolicyRow).where(
-                    KeyPairResourcePolicyRow.name == test_resource_policy_name
-                )
-            )
-            kp_policy = kp_policy_result.scalar_one()
-            resource_policy_dict = {
-                "total_resource_slots": kp_policy.total_resource_slots.to_json(),
-                "default_for_unspecified": str(kp_policy.default_for_unspecified),
-            }
-
         result: CheckPresetsResult = await repository.check_presets(
-            access_key=test_keypair_access_key,
             user_id=test_user_uuid,
             group_name=group_name,
             domain_name=test_domain.domain_name,
-            resource_policy=resource_policy_dict,
             resource_group=test_scaling_group_name,
         )
 
@@ -943,25 +893,10 @@ class TestCheckPresetsOccupiedSlots:
             )
             group_name = group_result.scalar_one()
 
-        # Get resource policy data
-        async with db_with_cleanup.begin_readonly_session() as db_sess:
-            kp_policy_result = await db_sess.execute(
-                sa.select(KeyPairResourcePolicyRow).where(
-                    KeyPairResourcePolicyRow.name == test_resource_policy_name
-                )
-            )
-            kp_policy = kp_policy_result.scalar_one()
-            resource_policy_dict = {
-                "total_resource_slots": kp_policy.total_resource_slots.to_json(),
-                "default_for_unspecified": str(kp_policy.default_for_unspecified),
-            }
-
         result: CheckPresetsResult = await repository.check_presets(
-            access_key=test_keypair_access_key,
             user_id=test_user_uuid,
             group_name=group_name,
             domain_name=test_domain.domain_name,
-            resource_policy=resource_policy_dict,
             resource_group=test_scaling_group_name,
         )
 
@@ -1103,25 +1038,10 @@ class TestCheckPresetsOccupiedSlots:
             )
             group_name = group_result.scalar_one()
 
-        # Get resource policy data
-        async with db_with_cleanup.begin_readonly_session() as db_sess:
-            kp_policy_result = await db_sess.execute(
-                sa.select(KeyPairResourcePolicyRow).where(
-                    KeyPairResourcePolicyRow.name == test_resource_policy_name
-                )
-            )
-            kp_policy = kp_policy_result.scalar_one()
-            resource_policy_dict = {
-                "total_resource_slots": kp_policy.total_resource_slots.to_json(),
-                "default_for_unspecified": str(kp_policy.default_for_unspecified),
-            }
-
         result: CheckPresetsResult = await repository.check_presets(
-            access_key=test_keypair_access_key,
             user_id=test_user_uuid,
             group_name=group_name,
             domain_name=test_domain.domain_name,
-            resource_policy=resource_policy_dict,
             resource_group=test_scaling_group_name,
         )
 
@@ -1141,7 +1061,6 @@ class TestCheckPresetsOccupiedSlots:
         test_group_name: str,
         test_user_uuid: uuid.UUID,
         test_keypair_access_key: AccessKey,
-        test_resource_policy_dict: Mapping[str, Any],
         alive_and_non_alive_agents: list[AgentId],
     ) -> None:
         """
@@ -1149,11 +1068,9 @@ class TestCheckPresetsOccupiedSlots:
         from remaining resource calculation. Only ALIVE agents should contribute.
         """
         result: CheckPresetsResult = await repository.check_presets(
-            access_key=test_keypair_access_key,
             user_id=test_user_uuid,
             group_name=test_group_name,
             domain_name=test_domain.domain_name,
-            resource_policy=test_resource_policy_dict,
             resource_group=test_scaling_group_name,
         )
 
@@ -1162,6 +1079,244 @@ class TestCheckPresetsOccupiedSlots:
         sg_data = result.resource_groups[test_scaling_group_name]
         assert _qty(sg_data.remaining, "cpu") == Decimal("32")
         assert _qty(sg_data.remaining, "mem") == Decimal("65536")
+
+    async def _create_user(
+        self,
+        db: ExtendedAsyncSAEngine,
+        domain: DomainFixtureData,
+        resource_policy_name: str,
+    ) -> uuid.UUID:
+        user_uuid = uuid.uuid4()
+        async with db.begin_session() as db_sess:
+            db_sess.add(
+                UserRow(
+                    uuid=user_uuid,
+                    username=f"testuser-{user_uuid.hex[:8]}",
+                    email=f"test-{user_uuid.hex[:8]}@example.com",
+                    password=PasswordInfo(
+                        password="dummy",
+                        algorithm=PasswordHashAlgorithm.PBKDF2_SHA256,
+                        rounds=600_000,
+                        salt_size=32,
+                    ),
+                    domain_name=domain.domain_name,
+                    role=UserRole.USER,
+                    resource_policy=resource_policy_name,
+                    domain_id=domain.domain_id,
+                )
+            )
+        return user_uuid
+
+    async def _create_keypair(
+        self,
+        db: ExtendedAsyncSAEngine,
+        user_uuid: uuid.UUID,
+        resource_policy_name: str,
+        *,
+        is_default: bool,
+    ) -> AccessKey:
+        access_key = AccessKey(f"test-ak-{uuid.uuid4().hex[:8]}")
+        async with db.begin_session() as db_sess:
+            db_sess.add(
+                KeyPairRow(
+                    access_key=access_key,
+                    secret_key=SecretValue("test-secret"),
+                    user=user_uuid,
+                    is_active=True,
+                    is_default=is_default,
+                    resource_policy=resource_policy_name,
+                )
+            )
+        return access_key
+
+    async def _create_keypair_policy(self, db: ExtendedAsyncSAEngine, cpu: Decimal) -> str:
+        policy_name = f"test-kp-policy-{uuid.uuid4().hex[:8]}"
+        async with db.begin_session() as db_sess:
+            db_sess.add(
+                KeyPairResourcePolicyRow(
+                    name=policy_name,
+                    total_resource_slots=ResourceSlot({"cpu": cpu, "mem": Decimal("102400")}),
+                    max_concurrent_sessions=10,
+                    max_concurrent_sftp_sessions=2,
+                    max_pending_session_count=5,
+                    max_containers_per_session=10,
+                    idle_timeout=3600,
+                )
+            )
+        return policy_name
+
+    async def _create_running_kernel(
+        self,
+        db: ExtendedAsyncSAEngine,
+        *,
+        domain: DomainFixtureData,
+        resource_group_id: ResourceGroupID,
+        resource_group_name: str,
+        group_id: uuid.UUID,
+        agent_id: AgentId,
+        user_uuid: uuid.UUID,
+        access_key: AccessKey,
+        cpu: Decimal,
+        session_type: SessionTypes = SessionTypes.INTERACTIVE,
+    ) -> None:
+        async with db.begin_session() as db_sess:
+            session_id = SessionId(uuid.uuid4())
+            db_sess.add(
+                SessionRow(
+                    id=session_id,
+                    name=f"test-session-{session_id.hex[:8]}",
+                    session_type=session_type,
+                    cluster_mode=ClusterMode.SINGLE_NODE,
+                    cluster_size=1,
+                    status=SessionStatus.RUNNING,
+                    status_data={},
+                    created_at=datetime.now(tzutc()),
+                    domain_id=domain.domain_id,
+                    domain_name=domain.domain_name,
+                    group_id=group_id,
+                    user_uuid=user_uuid,
+                    access_key=access_key,
+                    resource_group_id=resource_group_id,
+                    scaling_group_name=resource_group_name,
+                    result=SessionResult.UNDEFINED,
+                    agent_ids=[],
+                    designated_agent_ids=[],
+                    target_sgroup_names=[],
+                    images=[],
+                    vfolder_mounts=[],
+                )
+            )
+            kernel_id = uuid.uuid4()
+            db_sess.add(
+                KernelRow(
+                    id=kernel_id,
+                    session_id=session_id,
+                    session_type=session_type,
+                    agent=agent_id,
+                    scaling_group=resource_group_name,
+                    resource_group_id=resource_group_id,
+                    domain_name=domain.domain_name,
+                    group_id=group_id,
+                    user_uuid=user_uuid,
+                    access_key=access_key,
+                    image="test-image:latest",
+                    status=KernelStatus.RUNNING,
+                    status_changed=datetime.now(tzutc()),
+                    status_data={},
+                    cluster_role="main",
+                    cluster_idx=1,
+                    cluster_hostname="main",
+                    vfolder_mounts=[],
+                    repl_in_port=0,
+                    repl_out_port=0,
+                    stdin_port=0,
+                    stdout_port=0,
+                )
+            )
+            await db_sess.flush()
+            db_sess.add(
+                ResourceAllocationRow(kernel_id=kernel_id, slot_name="cpu", requested=cpu, used=cpu)
+            )
+
+    async def test_keypair_usage_counts_the_users_kernels(
+        self,
+        repository: ResourcePresetRepository,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        test_domain: DomainFixtureData,
+        test_scaling_group_id: ResourceGroupID,
+        test_scaling_group_name: str,
+        test_resource_policy_name: str,
+        test_group_id: uuid.UUID,
+        test_group_name: str,
+        test_user_uuid: uuid.UUID,
+        test_agent_id: AgentId,
+    ) -> None:
+        """keypair_using sums every keypair of the user, and skips SYSTEM sessions and other users."""
+        default_ak = await self._create_keypair(
+            db_with_cleanup, test_user_uuid, test_resource_policy_name, is_default=True
+        )
+        other_ak = await self._create_keypair(
+            db_with_cleanup, test_user_uuid, test_resource_policy_name, is_default=False
+        )
+        other_user = await self._create_user(
+            db_with_cleanup, test_domain, test_resource_policy_name
+        )
+        other_user_ak = await self._create_keypair(
+            db_with_cleanup, other_user, test_resource_policy_name, is_default=True
+        )
+        for user_uuid, access_key, cpu, session_type in [
+            (test_user_uuid, default_ak, Decimal("4"), SessionTypes.INTERACTIVE),
+            (test_user_uuid, other_ak, Decimal("2"), SessionTypes.BATCH),
+            (test_user_uuid, other_ak, Decimal("1"), SessionTypes.SYSTEM),
+            (other_user, other_user_ak, Decimal("8"), SessionTypes.INTERACTIVE),
+        ]:
+            await self._create_running_kernel(
+                db_with_cleanup,
+                domain=test_domain,
+                resource_group_id=test_scaling_group_id,
+                resource_group_name=test_scaling_group_name,
+                group_id=test_group_id,
+                agent_id=test_agent_id,
+                user_uuid=user_uuid,
+                access_key=access_key,
+                cpu=cpu,
+                session_type=session_type,
+            )
+
+        result = await repository.check_presets(
+            user_id=test_user_uuid,
+            group_name=test_group_name,
+            domain_name=test_domain.domain_name,
+            resource_group=test_scaling_group_name,
+        )
+
+        # policy cpu 100 - (4 + 2)
+        assert _qty(result.keypair_using, "cpu") == Decimal("6")
+        assert _qty(result.keypair_remaining, "cpu") == Decimal("94")
+
+    async def test_keypair_limits_come_from_the_default_keypair_policy(
+        self,
+        repository: ResourcePresetRepository,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        test_domain: DomainFixtureData,
+        test_scaling_group_name: str,
+        test_resource_policy_name: str,
+        test_group_name: str,
+        test_user_uuid: uuid.UUID,
+    ) -> None:
+        small_policy = await self._create_keypair_policy(db_with_cleanup, Decimal("7"))
+        await self._create_keypair(
+            db_with_cleanup, test_user_uuid, test_resource_policy_name, is_default=True
+        )
+        await self._create_keypair(db_with_cleanup, test_user_uuid, small_policy, is_default=False)
+
+        result = await repository.check_presets(
+            user_id=test_user_uuid,
+            group_name=test_group_name,
+            domain_name=test_domain.domain_name,
+            resource_group=test_scaling_group_name,
+        )
+
+        assert _qty(result.keypair_limits, "cpu") == Decimal("100")
+
+    async def test_keypair_limits_are_unlimited_without_a_default_keypair(
+        self,
+        repository: ResourcePresetRepository,
+        test_domain: DomainFixtureData,
+        test_scaling_group_name: str,
+        test_group_name: str,
+        test_user_uuid: uuid.UUID,
+        test_keypair_access_key: AccessKey,
+    ) -> None:
+        """The scheduler applies no user quota when the user has no default keypair."""
+        result = await repository.check_presets(
+            user_id=test_user_uuid,
+            group_name=test_group_name,
+            domain_name=test_domain.domain_name,
+            resource_group=test_scaling_group_name,
+        )
+
+        assert _qty(result.keypair_limits, "cpu") == Decimal("Infinity")
 
 
 class TestCheckPresetsZeroValues:
@@ -1442,6 +1597,7 @@ class TestCheckPresetsZeroValues:
                 secret_key=SecretValue("test-secret"),
                 user=test_user_uuid,
                 is_active=True,
+                is_default=True,
                 resource_policy=test_resource_policy_name,
             )
             db_sess.add(keypair)
@@ -1565,25 +1721,10 @@ class TestCheckPresetsZeroValues:
             )
             group_name = group_result.scalar_one()
 
-        # Get resource policy data
-        async with db_with_cleanup.begin_readonly_session() as db_sess:
-            kp_policy_result = await db_sess.execute(
-                sa.select(KeyPairResourcePolicyRow).where(
-                    KeyPairResourcePolicyRow.name == test_resource_policy_name
-                )
-            )
-            kp_policy = kp_policy_result.scalar_one()
-            resource_policy_dict = {
-                "total_resource_slots": kp_policy.total_resource_slots.to_json(),
-                "default_for_unspecified": str(kp_policy.default_for_unspecified),
-            }
-
         result: CheckPresetsResult = await repository.check_presets(
-            access_key=test_keypair_access_key,
             user_id=test_user_uuid,
             group_name=group_name,
             domain_name=test_domain.domain_name,
-            resource_policy=resource_policy_dict,
             resource_group=test_scaling_group_name,
         )
 
