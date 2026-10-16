@@ -6,10 +6,13 @@ from uuid import UUID
 
 from ai.backend.client.v2.base_domain import BaseDomainClient
 from ai.backend.common.data.entity.resource_group import ResourceGroupName
+from ai.backend.common.dto.manager.v2.common import PartialBulkPayload
 from ai.backend.common.dto.manager.v2.deployment_options import DeploymentOptionsInfo
 from ai.backend.common.dto.manager.v2.resource_group.request import (
     AdminSearchResourceGroupsInput,
     CreateResourceGroupInput,
+    PartialBulkPurgeResourceGroupsInput,
+    PartialBulkUpdateResourceGroupsInput,
     ReplaceResourceGroupDefaultDeploymentOptionsInput,
     ReplaceResourceGroupDefaultSessionOptionsInput,
     UpdateAllowedDomainsForResourceGroupInput,
@@ -72,9 +75,50 @@ class V2ResourceGroupClient(BaseDomainClient):
         )
 
     async def update(
+        self, resource_group_id: UUID, request: UpdateResourceGroupInput
+    ) -> UpdateResourceGroupPayload:
+        """Update a resource group."""
+        return await self._client.typed_request(
+            "PATCH",
+            f"{_PATH}/{resource_group_id}",
+            request=request,
+            response_model=UpdateResourceGroupPayload,
+        )
+
+    async def purge(self, resource_group_id: UUID) -> ResourceGroupDetailNode:
+        """Purge a resource group."""
+        return await self._client.typed_request(
+            "DELETE",
+            f"{_PATH}/{resource_group_id}",
+            response_model=ResourceGroupDetailNode,
+        )
+
+    async def partial_bulk_update(
+        self, request: PartialBulkUpdateResourceGroupsInput
+    ) -> PartialBulkPayload[ResourceGroupDetailNode]:
+        """Update several resource groups, answering for each one."""
+        return await self._client.typed_request(
+            "POST",
+            f"{_PATH}/partial-bulk-update",
+            request=request,
+            response_model=PartialBulkPayload[ResourceGroupDetailNode],
+        )
+
+    async def partial_bulk_purge(
+        self, request: PartialBulkPurgeResourceGroupsInput
+    ) -> PartialBulkPayload[ResourceGroupDetailNode]:
+        """Purge several resource groups, answering for each one."""
+        return await self._client.typed_request(
+            "POST",
+            f"{_PATH}/partial-bulk-purge",
+            request=request,
+            response_model=PartialBulkPayload[ResourceGroupDetailNode],
+        )
+
+    async def admin_update(
         self, name: str, request: UpdateResourceGroupInput
     ) -> UpdateResourceGroupPayload:
-        """Update an existing resource group."""
+        """Deprecated. Use :meth:`update`."""
         return await self._client.typed_request(
             "PATCH",
             f"{_PATH}/{name}",
@@ -83,7 +127,7 @@ class V2ResourceGroupClient(BaseDomainClient):
         )
 
     async def delete(self, name: str) -> DeleteResourceGroupPayload:
-        """Purge a resource group by name."""
+        """Deprecated. Use :meth:`purge`."""
         return await self._client.typed_request(
             "DELETE",
             f"{_PATH}/{name}",

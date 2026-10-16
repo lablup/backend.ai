@@ -2,18 +2,26 @@
 
 [무엇을 보장하는가](/src/ai/backend/manager/api/adapters/container_registry/KNOWLEDGE.md) · [어댑터](/src/ai/backend/manager/api/adapters/container_registry/adapter.py)
 
-시나리오: 미완 1 / 8
+시나리오: 미완 2 / 9
 
-- ops 로 구성 (3)
+- ops 로 구성 (4)
+  - admin_partial_bulk_purge — 대표 성공 ✓ · 대표 실패 ✗ — SCENARIO-GAP
   - admin_search — 대표 성공 ✓ · 대표 실패 ✓
   - batch_load_by_ids — 대표 성공 ✓ · 대표 실패 ✓
   - lookup_by_name_and_registry_project — 대표 성공 ✓ · 대표 실패 ✓
 - 직접 구현 (5)
   - admin_create — 성공 있음 2 · 실패 있음 2 (global_scope, relation)
-  - admin_delete — 성공 있음 2 · 실패 있음 2 (global_scope)
+  - admin_purge — 성공 있음 2 · 실패 있음 2 (global_scope)
   - admin_update — 성공 있음 3 · 실패 있음 4 (global_scope, membership, relation)
   - apply_allowed_groups — 성공 있음 6 · 실패 있음 6 (relation)
   - apply_global — 성공 없음 · 실패 없음 (membership) — SCENARIO-GAP
+
+**admin_partial_bulk_purge**
+
+| 시나리오 | 판정 |
+|---|---|
+| [아무 권한도 받지 않은 사용자가 레지스트리 여럿을 한 번에 영구 삭제하려 하면, 지워진 것 없이 모두 권한이 없다는 이유로 실패 목록에 온다](#partial_bulk_purging-a-user-granted-nothing-purges-none-of-several-registries) | 성공 |
+| [슈퍼관리자가 레지스트리 둘과 없는 id 하나를 한 번에 영구 삭제하면, 둘은 지워지기 전 모습으로 오고 없는 id 는 대상이 없다는 이유로 실패 목록에 온다](#partial_bulk_purging-purging-several-registries-answers-for-the-missing-one) | 성공 |
 
 **admin_search**
 
@@ -49,7 +57,7 @@
 | [존재하지 않는 프로젝트를 허용 목록에 넣고 레지스트리를 생성하려 하면, 그 프로젝트를 찾을 수 없어 거부된다](#creating-a-project-that-does-not-exist-is-refused-while-creating) | 거부 |
 | [슈퍼관리자가 아닌 사용자가 레지스트리를 생성하려 하면 권한 부족으로 거부된다. 이 호출은 호출자가 슈퍼관리자인지만 검사하고, 부여된 권한은 보지 않는다](#creating-a-user-who-is-not-the-superadmin-may-not-create-a-registry) | 거부 |
 
-**admin_delete**
+**admin_purge**
 
 | 시나리오 | 판정 |
 |---|---|
@@ -86,6 +94,88 @@
 | [레지스트리에만 권한을 받고 프로젝트에는 받지 못한 사용자가 프로젝트를 허용하려 하면, 관계 연산은 지정한 스코프 모두의 권한을 검사하므로 권한 부족으로 거부된다](#allowing_projects-a-user-granted-on-the-registry-but-not-the-project-is-refused) | 거부 |
 | [양쪽 스코프에 생성 권한만 받은 사용자가 프로젝트를 제거하면 권한 부족으로 거부된다](#allowing_projects-create-permission-does-not-allow-removing-a-project) | 거부 |
 | [양쪽 스코프에 삭제 권한만 받은 사용자가 프로젝트를 추가하면 권한 부족으로 거부된다](#allowing_projects-soft-delete-permission-does-not-allow-adding-a-project) | 거부 |
+
+### admin_partial_bulk_purge
+
+<a id="partial_bulk_purging-a-user-granted-nothing-purges-none-of-several-registries"></a>
+
+#### [a-user-granted-nothing-purges-none-of-several-registries](/tests/scenario/bai_scenario/manager/container_registry/test_partial_bulk_purging.py) — pass
+
+아무 권한도 받지 않은 사용자가 레지스트리 여럿을 한 번에 영구 삭제하려 하면, 지워진 것 없이 모두 권한이 없다는 이유로 실패 목록에 온다
+
+Given
+
+- 레지스트리 2개, user 한 명
+  - 도메인 home-1
+  - 컨테이너 레지스트리 wanted-1: 이미지를 가져오는 곳
+  - 컨테이너 레지스트리 other-1: 이미지를 가져오는 곳
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+
+When
+
+- ContainerRegistryAdapter.admin_partial_bulk_purge — user-1이 레지스트리 2개를 한 번에 영구 삭제함
+
+Then
+
+- 처리된 레지스트리 없이 대상이 모두 실패 목록에 온다
+  - successes = []
+  - failed count = 2
+  - failed[0].id: 미리 만들어 둔 레지스트리의 id와 같다
+  - failed[0].message: 'Insufficient permission'를 담은 이유
+  - failed[1].id: 미리 만들어 둔 레지스트리의 id와 같다
+  - failed[1].message: 'Insufficient permission'를 담은 이유
+
+<a id="partial_bulk_purging-purging-several-registries-answers-for-the-missing-one"></a>
+
+#### [purging-several-registries-answers-for-the-missing-one](/tests/scenario/bai_scenario/manager/container_registry/test_partial_bulk_purging.py) — pass
+
+슈퍼관리자가 레지스트리 둘과 없는 id 하나를 한 번에 영구 삭제하면, 둘은 지워지기 전 모습으로 오고 없는 id 는 대상이 없다는 이유로 실패 목록에 온다
+
+Given
+
+- 레지스트리 2개, superadmin 한 명
+  - 도메인 home-1
+  - 컨테이너 레지스트리 wanted-1: 이미지를 가져오는 곳
+  - 컨테이너 레지스트리 other-1: 이미지를 가져오는 곳
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+
+When
+
+- ContainerRegistryAdapter.admin_partial_bulk_purge — user-1이 레지스트리 2개 와 없는 id 하나를 한 번에 영구 삭제함
+
+Then
+
+- 미리 만들어 둔 레지스트리가 모두 지워지기 전 모습으로 오고, 없는 id 는 대상이 없다는 이유로 실패 목록에 온다
+  - successes count = 2
+  - successes[0].id: 미리 만들어 둔 레지스트리의 id와 같다
+  - successes[0].url = 'https://wanted-1.scenario.local'
+  - successes[0].registry_name = 'wanted-1'
+  - successes[0].type = <ContainerRegistryType.DOCKER: 'docker'>
+  - successes[0].project = None
+  - successes[0].username = None
+  - successes[0].ssl_verify = True
+  - successes[0].is_global = True
+  - successes[0].extra = None
+  - successes[1].id: 미리 만들어 둔 레지스트리의 id와 같다
+  - successes[1].url = 'https://other-1.scenario.local'
+  - successes[1].registry_name = 'other-1'
+  - successes[1].type = <ContainerRegistryType.HARBOR2: 'harbor2'>
+  - successes[1].project = None
+  - successes[1].username = None
+  - successes[1].ssl_verify = True
+  - successes[1].is_global = False
+  - successes[1].extra = None
+  - failed count = 1
+  - failed[0].id: 요청에 넣은 없는 id와 같다
+  - failed[0].message: 'not found'를 담은 이유
 
 ### admin_search
 
@@ -508,7 +598,7 @@ Then
 - 거부된다
   - 거부: InsufficientPrivilege
 
-### admin_delete
+### admin_purge
 
 <a id="retiring-deleting-a-registry-answers-with-the-id-it-removed"></a>
 
@@ -529,7 +619,7 @@ Given
 
 When
 
-- ContainerRegistryAdapter.admin_delete — user-1이 미리 만들어 둔 레지스트리를 삭제
+- ContainerRegistryAdapter.admin_purge — user-1이 미리 만들어 둔 레지스트리를 삭제
 
 Then
 
@@ -557,7 +647,7 @@ Given
 
 When
 
-- ContainerRegistryAdapter.admin_delete — user-1이 미리 만들어 둔 레지스트리를 삭제
+- ContainerRegistryAdapter.admin_purge — user-1이 미리 만들어 둔 레지스트리를 삭제
 
 Then
 
@@ -583,7 +673,7 @@ Given
 
 When
 
-- ContainerRegistryAdapter.admin_delete — user-1이 미리 만들어 둔 레지스트리를 삭제
+- ContainerRegistryAdapter.admin_purge — user-1이 미리 만들어 둔 레지스트리를 삭제
 
 Then
 
@@ -609,7 +699,7 @@ Given
 
 When
 
-- ContainerRegistryAdapter.admin_delete — user-1이 존재하지 않는 id를 삭제
+- ContainerRegistryAdapter.admin_purge — user-1이 존재하지 않는 id를 삭제
 
 Then
 

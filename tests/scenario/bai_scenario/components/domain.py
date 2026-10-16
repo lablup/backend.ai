@@ -18,12 +18,14 @@ from ai.backend.common.data.entity.domain import DomainEntityType
 from ai.backend.common.data.entity.resource_group import ResourceGroupID
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.user.types import UserRole
+from ai.backend.common.dto.manager.v2.common import PartialBulkPayload
 from ai.backend.common.dto.manager.v2.domain.response import DomainNode
 from ai.backend.manager.data.domain.types import DomainData
 from ai.backend.manager.data.permission.types import Permission
 from ai.backend.manager.data.resource_group.types import ResourceGroupData
 from ai.backend.manager.data.user.types import UserData
 from ai.backend.manager.errors.base.entity import EntityNotFoundError
+from ai.backend.manager.errors.permission import NotEnoughPermission
 from ai.backend.testutils.scenario_steps import (
     Answered,
     Condition,
@@ -131,6 +133,10 @@ class ManyDomainsAndACaller:
     laid: tuple[DomainData, ...]
     named: DomainData
     caller: UserData
+
+    def elsewhere(self) -> tuple[DomainData, ...]:
+        """부르는 사람이 살지 않는 도메인들. 첫째가 부르는 사람의 집이다."""
+        return self.laid[1:]
 
 
 @dataclass(frozen=True)
@@ -256,6 +262,53 @@ class TheNewDomainNode(Then[Any, DomainNode]):
             Held("created_at", node.lifecycle.created_at, written),
             Held("modified_at", node.lifecycle.modified_at, written),
         ]
+
+
+@dataclass(frozen=True)
+class Mentions(Condition[str]):
+    """이유에 이 말이 들어 있다. 이유의 나머지는 id 를 싣고 있어 실행마다 다르다."""
+
+    phrase: str
+
+    @override
+    def says(self) -> str:
+        return f"'{self.phrase}'를 담은 이유"
+
+    @override
+    def holds(self, got: str) -> bool:
+        return self.phrase in got
+
+
+@dataclass(frozen=True)
+class NothingIsProcessed(Then[ManyDomainsAndACaller, PartialBulkPayload[DomainNode]]):
+    """처리된 도메인 없이, 대상이 모두 같은 이유로 실패 목록에 온다."""
+
+    reason: str
+
+    @override
+    def says(self) -> str:
+        return "처리된 도메인 없이 대상이 모두 실패 목록에 온다"
+
+    @override
+    def look(
+        self,
+        laid: ManyDomainsAndACaller,
+        answered: Answered[PartialBulkPayload[DomainNode]],
+    ) -> list[Verdict]:
+        payload = answered.response
+        if payload is None:
+            return [Refused(NotEnoughPermission, answered.raised)]
+        targets = laid.elsewhere()
+        verdicts: list[Verdict] = [
+            Same("successes", payload.successes, []),
+            Same("failed count", len(payload.failed), len(targets)),
+        ]
+        for i, (failure, domain) in enumerate(zip(payload.failed, targets, strict=False)):
+            verdicts += [
+                Held[UUID](f"failed[{i}].id", failure.id, SameAs(domain.id, "대상 도메인의 id")),
+                Held(f"failed[{i}].message", failure.message, Mentions(self.reason)),
+            ]
+        return verdicts
 
 
 @dataclass(frozen=True)

@@ -12,8 +12,15 @@ from strawberry.relay import Connection, Edge, NodeID
 
 from ai.backend.common.data.entity.runtime_variant import RuntimeVariantID
 from ai.backend.common.data.entity.runtime_variant_preset import RuntimeVariantPresetID
+from ai.backend.common.dto.manager.v2.common import PartialBulkPayload
 from ai.backend.common.dto.manager.v2.runtime_variant_preset.request import (
     CreateRuntimeVariantPresetInput as CreateInputDTO,
+)
+from ai.backend.common.dto.manager.v2.runtime_variant_preset.request import (
+    PartialBulkPurgeRuntimeVariantPresetsInput as PartialBulkPurgeInputDTO,
+)
+from ai.backend.common.dto.manager.v2.runtime_variant_preset.request import (
+    PartialBulkUpdateRuntimeVariantPresetsInput as PartialBulkUpdateInputDTO,
 )
 from ai.backend.common.dto.manager.v2.runtime_variant_preset.request import (
     RuntimeVariantPresetFilter as FilterDTO,
@@ -60,6 +67,7 @@ from ai.backend.common.dto.manager.v2.runtime_variant_preset.types import (
 from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import StringFilter as StringFilterGQL
 from ai.backend.manager.api.gql.base import UUIDFilter as UUIDFilterGQL
+from ai.backend.manager.api.gql.common_types import PartialBulkFailureGQL
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     PydanticInputMixin,
@@ -583,3 +591,53 @@ class UpdateRuntimeVariantPresetPayloadGQL(PydanticOutputMixin[UpdatePayloadDTO]
 )
 class DeleteRuntimeVariantPresetPayloadGQL(PydanticOutputMixin[DeletePayloadDTO]):
     id: UUID = gql_field(description="ID of the deleted preset.")
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description=(
+            "Input for updating several runtime variant presets, each answered for separately."
+        ),
+    ),
+    name="PartialBulkUpdateRuntimeVariantPresetsInput",
+)
+class PartialBulkUpdateRuntimeVariantPresetsInputGQL(PydanticInputMixin[PartialBulkUpdateInputDTO]):
+    items: list[UpdateRuntimeVariantPresetInputGQL] = gql_field(
+        description="The presets to update, each with its fields."
+    )
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description=(
+            "Input for purging several runtime variant presets, each answered for separately."
+        ),
+    ),
+    name="PartialBulkPurgeRuntimeVariantPresetsInput",
+)
+class PartialBulkPurgeRuntimeVariantPresetsInputGQL(PydanticInputMixin[PartialBulkPurgeInputDTO]):
+    ids: list[UUID] = gql_field(description="IDs of the presets to purge.")
+
+
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description=(
+            "Result of a partial bulk runtime variant preset operation: the presets processed "
+            "and the ones that failed."
+        ),
+    ),
+    model=PartialBulkPayload[NodeDTO],
+    name="PartialBulkRuntimeVariantPresetsPayload",
+)
+class PartialBulkRuntimeVariantPresetsPayloadGQL(PydanticOutputMixin[PartialBulkPayload[NodeDTO]]):
+    """Payload for partial bulk runtime variant preset mutations."""
+
+    successes: list[RuntimeVariantPresetGQL] = gql_field(
+        description="The presets processed, as they stood when processed."
+    )
+    failed: list[PartialBulkFailureGQL] = gql_field(
+        description="The presets not processed, each with the reason."
+    )

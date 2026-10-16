@@ -6,11 +6,9 @@ from uuid import UUID
 
 from strawberry import Info
 
-from ai.backend.common.dto.manager.v2.group.request import (
-    DeleteProjectInput,
-    PurgeProjectInput,
-    RestoreProjectInput,
-)
+from ai.backend.common.data.entity.project import ProjectID
+from ai.backend.common.dto.manager.v2.group.request import PurgeProjectInput
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     gql_mutation,
@@ -18,6 +16,10 @@ from ai.backend.manager.api.gql.decorators import (
 from ai.backend.manager.api.gql.project_v2.types.mutations import (
     CreateProjectInputGQL,
     DeleteProjectPayloadGQL,
+    PartialBulkDeleteProjectsInputGQL,
+    PartialBulkProjectsPayloadGQL,
+    PartialBulkRestoreProjectsInputGQL,
+    PartialBulkUpdateProjectsInputGQL,
     ProjectPayloadGQL,
     PurgeProjectPayloadGQL,
     RestoreProjectPayloadGQL,
@@ -48,9 +50,91 @@ async def admin_create_project_v2(
 
 @gql_mutation(
     BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Update a project. Only provided fields will be updated.",
+    )
+)
+async def update_project_v2(
+    info: Info[StrawberryGQLContext],
+    id: UUID,
+    input: UpdateProjectInputGQL,
+) -> ProjectPayloadGQL:
+    payload = await info.context.adapters.project.update(ProjectID(id), input.to_pydantic())
+    return ProjectPayloadGQL.from_pydantic(payload)
+
+
+@gql_mutation(
+    BackendAIGQLMeta(added_version=NEXT_RELEASE_VERSION, description="Soft-delete a project.")
+)
+async def delete_project_v2(
+    info: Info[StrawberryGQLContext],
+    id: UUID,
+) -> DeleteProjectPayloadGQL:
+    payload = await info.context.adapters.project.delete(ProjectID(id))
+    return DeleteProjectPayloadGQL.from_pydantic(payload)
+
+
+@gql_mutation(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION, description="Restore a soft-deleted project."
+    )
+)
+async def restore_project_v2(
+    info: Info[StrawberryGQLContext],
+    id: UUID,
+) -> RestoreProjectPayloadGQL:
+    payload = await info.context.adapters.project.restore(ProjectID(id))
+    return RestoreProjectPayloadGQL.from_pydantic(payload)
+
+
+@gql_mutation(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Update several projects, answering for each one.",
+    )
+)
+async def partial_bulk_update_projects_v2(
+    info: Info[StrawberryGQLContext],
+    input: PartialBulkUpdateProjectsInputGQL,
+) -> PartialBulkProjectsPayloadGQL:
+    payload = await info.context.adapters.project.partial_bulk_update(input.to_pydantic())
+    return PartialBulkProjectsPayloadGQL.from_pydantic(payload)
+
+
+@gql_mutation(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Soft-delete several projects, answering for each one.",
+    )
+)
+async def partial_bulk_delete_projects_v2(
+    info: Info[StrawberryGQLContext],
+    input: PartialBulkDeleteProjectsInputGQL,
+) -> PartialBulkProjectsPayloadGQL:
+    payload = await info.context.adapters.project.partial_bulk_delete(input.to_pydantic())
+    return PartialBulkProjectsPayloadGQL.from_pydantic(payload)
+
+
+@gql_mutation(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Restore several soft-deleted projects, answering for each one.",
+    )
+)
+async def partial_bulk_restore_projects_v2(
+    info: Info[StrawberryGQLContext],
+    input: PartialBulkRestoreProjectsInputGQL,
+) -> PartialBulkProjectsPayloadGQL:
+    payload = await info.context.adapters.project.partial_bulk_restore(input.to_pydantic())
+    return PartialBulkProjectsPayloadGQL.from_pydantic(payload)
+
+
+@gql_mutation(
+    BackendAIGQLMeta(
         added_version="26.4.2",
         description="Update a project (admin only). Requires superadmin privileges. Only provided fields will be updated.",
-    )
+    ),
+    deprecation_reason=f"Deprecated since {NEXT_RELEASE_VERSION}. Use `updateProjectV2`.",
 )
 async def admin_update_project_v2(
     info: Info[StrawberryGQLContext],
@@ -60,7 +144,7 @@ async def admin_update_project_v2(
     """Update a project."""
     check_admin_only()
     ctx = info.context
-    payload = await ctx.adapters.project.admin_update(project_id, input.to_pydantic())
+    payload = await ctx.adapters.project.update(ProjectID(project_id), input.to_pydantic())
     return ProjectPayloadGQL.from_pydantic(payload)
 
 
@@ -68,7 +152,8 @@ async def admin_update_project_v2(
     BackendAIGQLMeta(
         added_version="26.4.2",
         description="Soft-delete a project (admin only). Requires superadmin privileges.",
-    )
+    ),
+    deprecation_reason=f"Deprecated since {NEXT_RELEASE_VERSION}. Use `deleteProjectV2`.",
 )
 async def admin_delete_project_v2(
     info: Info[StrawberryGQLContext],
@@ -77,7 +162,7 @@ async def admin_delete_project_v2(
     """Soft-delete a project."""
     check_admin_only()
     ctx = info.context
-    payload = await ctx.adapters.project.admin_delete(DeleteProjectInput(group_id=project_id))
+    payload = await ctx.adapters.project.delete(ProjectID(project_id))
     return DeleteProjectPayloadGQL.from_pydantic(payload)
 
 
@@ -85,7 +170,8 @@ async def admin_delete_project_v2(
     BackendAIGQLMeta(
         added_version="26.9.0",
         description="Restore a soft-deleted project (admin only). Requires superadmin privileges.",
-    )
+    ),
+    deprecation_reason=f"Deprecated since {NEXT_RELEASE_VERSION}. Use `restoreProjectV2`.",
 )
 async def admin_restore_project_v2(
     info: Info[StrawberryGQLContext],
@@ -94,7 +180,7 @@ async def admin_restore_project_v2(
     """Restore a soft-deleted project."""
     check_admin_only()
     ctx = info.context
-    payload = await ctx.adapters.project.admin_restore(RestoreProjectInput(group_id=project_id))
+    payload = await ctx.adapters.project.restore(ProjectID(project_id))
     return RestoreProjectPayloadGQL.from_pydantic(payload)
 
 

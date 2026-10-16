@@ -13,6 +13,7 @@ from pydantic import Field, NonNegativeInt, field_validator
 from ai.backend.common.api_handlers import BaseRequestModel
 from ai.backend.common.dto.clients.prometheus.defs import PROMETHEUS_DURATION_PATTERN
 from ai.backend.common.dto.manager.query import StringFilter, UUIDFilter
+from ai.backend.common.dto.manager.v2.common import NonEmptyList
 from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.common.tristate.unset import UNSET, Unset
 
@@ -27,6 +28,9 @@ __all__ = (
     "CreateQueryDefinitionInput",
     "ModifyQueryDefinitionInput",
     "DeleteQueryDefinitionInput",
+    "PartialBulkUpdateQueryDefinitionItemInput",
+    "PartialBulkUpdateQueryDefinitionsInput",
+    "PartialBulkPurgeQueryDefinitionsInput",
     # Search
     "QueryDefinitionFilter",
     "QueryDefinitionOrder",
@@ -157,6 +161,29 @@ class DeleteQueryDefinitionInput(BaseRequestModel):
     """Input for deleting a prometheus query definition."""
 
     id: UUID = Field(description="Query definition ID to delete")
+
+
+class PartialBulkUpdateQueryDefinitionItemInput(BaseRequestModel):
+    """One query definition of a partial bulk update and the fields to update on it."""
+
+    id: UUID = Field(description="ID of the query definition to update.")
+    input: ModifyQueryDefinitionInput = Field(
+        description="Fields to update on the query definition."
+    )
+
+
+class PartialBulkUpdateQueryDefinitionsInput(BaseRequestModel):
+    """Input for updating several query definitions, each answered for separately."""
+
+    items: NonEmptyList[PartialBulkUpdateQueryDefinitionItemInput] = Field(
+        description="The query definitions to update, each with its fields."
+    )
+
+
+class PartialBulkPurgeQueryDefinitionsInput(BaseRequestModel):
+    """Input for purging several query definitions, each answered for separately."""
+
+    ids: NonEmptyList[UUID] = Field(description="IDs of the query definitions to purge.")
 
 
 class QueryDefinitionFilter(BaseRequestModel):

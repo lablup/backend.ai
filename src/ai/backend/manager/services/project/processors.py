@@ -25,6 +25,15 @@ from ai.backend.manager.services.project.actions.delete_project_dotfile import (
     DeleteProjectDotfileActionResult,
 )
 from ai.backend.manager.services.project.actions.lookup import LookupProjectAction
+from ai.backend.manager.services.project.actions.partial_bulk_delete_projects import (
+    PartialBulkDeleteProjectsAction,
+)
+from ai.backend.manager.services.project.actions.partial_bulk_restore_projects import (
+    PartialBulkRestoreProjectsAction,
+)
+from ai.backend.manager.services.project.actions.partial_bulk_update_projects import (
+    PartialBulkUpdateProjectsAction,
+)
 from ai.backend.manager.services.project.actions.purge_project import (
     PurgeProjectAction,
     PurgeProjectActionResult,
@@ -69,6 +78,9 @@ class ProjectProcessors:
     restore_project: SingleEntityActionProcessor[RestoreProjectAction, EntityOpsResult[ProjectData]]
     update_project: SingleEntityActionProcessor[UpdateProjectAction, UpdateProjectActionResult]
     purge_project: SingleEntityActionProcessor[PurgeProjectAction, PurgeProjectActionResult]
+    partial_bulk_update: PartialBulkActionProcessor[PartialBulkUpdateProjectsAction, ProjectData]
+    partial_bulk_delete: PartialBulkActionProcessor[PartialBulkDeleteProjectsAction, ProjectData]
+    partial_bulk_restore: PartialBulkActionProcessor[PartialBulkRestoreProjectsAction, ProjectData]
     usage_per_month: GlobalActionProcessor[UsagePerMonthAction, UsagePerMonthActionResult]
     usage_per_period: GlobalActionProcessor[UsagePerPeriodAction, UsagePerPeriodActionResult]
     create_dotfile: SingleEntityActionProcessor[
@@ -96,6 +108,11 @@ class ProjectProcessors:
         self.restore_project = group.single_restore_ops(RestoreProjectAction)
         self.update_project = group.single_entity(UpdateProjectAction, group_service.update_group)
         self.purge_project = group.single_entity(PurgeProjectAction, group_service.purge_group)
+        self.partial_bulk_update = group.partial_bulk(
+            PartialBulkUpdateProjectsAction, group_service.partial_bulk_update
+        )
+        self.partial_bulk_delete = group.partial_bulk_delete_ops(PartialBulkDeleteProjectsAction)
+        self.partial_bulk_restore = group.partial_bulk_restore_ops(PartialBulkRestoreProjectsAction)
         self.usage_per_month = group.global_scope(
             UsagePerMonthAction, group_service.usage_per_month
         )

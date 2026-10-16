@@ -18,6 +18,8 @@ from ai.backend.common.data.entity.resource_policy import (
 )
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.dto.manager.v2.common import (
+    PartialBulkFailure,
+    PartialBulkPayload,
     ResourceLimitEntryInfo,
     ResourceSlotEntryInfo,
     ResourceSlotEntryInput,
@@ -31,12 +33,15 @@ from ai.backend.common.dto.manager.v2.resource_policy.request import (
     CreateKeypairResourcePolicyInput,
     CreateProjectResourcePolicyInput,
     CreateUserResourcePolicyInput,
-    DeleteKeypairResourcePolicyInput,
-    DeleteProjectResourcePolicyInput,
-    DeleteUserResourcePolicyInput,
     KeypairResourcePolicyFilter,
     KeypairResourcePolicyKeypairNestedFilter,
     KeypairResourcePolicyOrder,
+    PartialBulkPurgeKeypairResourcePoliciesInput,
+    PartialBulkPurgeProjectResourcePoliciesInput,
+    PartialBulkPurgeUserResourcePoliciesInput,
+    PartialBulkUpdateKeypairResourcePoliciesInput,
+    PartialBulkUpdateProjectResourcePoliciesInput,
+    PartialBulkUpdateUserResourcePoliciesInput,
     ProjectResourcePolicyFilter,
     ProjectResourcePolicyOrder,
     UpdateKeypairResourcePolicyInput,
@@ -72,6 +77,7 @@ from ai.backend.common.exception import (
     UnreachableError,
 )
 from ai.backend.common.types import BinarySize, ResourceSlot, VFolderHostPermission
+from ai.backend.manager.actions.v2.bulk.result import PartialBulkResult
 from ai.backend.manager.api.adapter_options.pagination.pagination import PaginationSpec
 from ai.backend.manager.api.adapters.base import BaseAdapter
 from ai.backend.manager.data.resource.types import (
@@ -142,6 +148,12 @@ from ai.backend.manager.services.keypair_resource_policy.actions.global_search_k
 from ai.backend.manager.services.keypair_resource_policy.actions.lookup import (
     LookupKeypairResourcePolicyAction,
 )
+from ai.backend.manager.services.keypair_resource_policy.actions.partial_bulk_purge_keypair_resource_policies import (
+    PartialBulkPurgeKeypairResourcePoliciesAction,
+)
+from ai.backend.manager.services.keypair_resource_policy.actions.partial_bulk_update_keypair_resource_policies import (
+    PartialBulkUpdateKeypairResourcePoliciesAction,
+)
 from ai.backend.manager.services.keypair_resource_policy.actions.purge_keypair_resource_policy import (
     PurgeKeyPairResourcePolicyAction,
 )
@@ -172,6 +184,12 @@ from ai.backend.manager.services.project_resource_policy.actions.global_search_p
 from ai.backend.manager.services.project_resource_policy.actions.lookup import (
     LookupProjectResourcePolicyAction,
 )
+from ai.backend.manager.services.project_resource_policy.actions.partial_bulk_purge_project_resource_policies import (
+    PartialBulkPurgeProjectResourcePoliciesAction,
+)
+from ai.backend.manager.services.project_resource_policy.actions.partial_bulk_update_project_resource_policies import (
+    PartialBulkUpdateProjectResourcePoliciesAction,
+)
 from ai.backend.manager.services.project_resource_policy.actions.purge_project_resource_policy import (
     PurgeProjectResourcePolicyAction,
 )
@@ -199,6 +217,12 @@ from ai.backend.manager.services.user_resource_policy.actions.global_search_user
 )
 from ai.backend.manager.services.user_resource_policy.actions.lookup import (
     LookupUserResourcePolicyAction,
+)
+from ai.backend.manager.services.user_resource_policy.actions.partial_bulk_purge_user_resource_policies import (
+    PartialBulkPurgeUserResourcePoliciesAction,
+)
+from ai.backend.manager.services.user_resource_policy.actions.partial_bulk_update_user_resource_policies import (
+    PartialBulkUpdateUserResourcePoliciesAction,
 )
 from ai.backend.manager.services.user_resource_policy.actions.purge_user_resource_policy import (
     PurgeUserResourcePolicyAction,
@@ -340,51 +364,69 @@ class ResourcePolicyAdapter(BaseAdapter):
             keypair_resource_policy=self._keypair_policy_data_to_node(result.data)
         )
 
-    async def admin_update_keypair_resource_policy(
-        self, name: str, input: UpdateKeypairResourcePolicyInput
-    ) -> UpdateKeypairResourcePolicyPayload:
-        target = await self._keypair_resource_policy.lookup.run(
+    async def lookup_keypair_resource_policy(self, name: str) -> KeyPairResourcePolicyUUID:
+        """The id of the keypair resource policy the name names."""
+        result = await self._keypair_resource_policy.lookup.run(
             LookupKeypairResourcePolicyAction(name=name)
         )
-        updater = KeyPairResourcePolicyUpdater(
-            policy_id=target.entity_id(),
-            default_for_unspecified=OptionalState.from_unset(input.default_for_unspecified),
-            total_resource_slots=OptionalState.from_unset(input.total_resource_slots).map(
-                self._entries_to_resource_slot
-            ),
-            max_session_lifetime=OptionalState.from_unset(input.max_session_lifetime),
-            max_concurrent_sessions=OptionalState.from_unset(input.max_concurrent_sessions),
-            max_pending_session_count=TriState.from_unset(input.max_pending_session_count),
-            max_pending_session_resource_slots=TriState.from_unset(
-                input.max_pending_session_resource_slots
-            ).map(self._entries_to_resource_slot),
-            max_priority=TriState.from_unset(input.max_priority),
-            max_concurrent_sftp_sessions=OptionalState.from_unset(
-                input.max_concurrent_sftp_sessions
-            ),
-            max_containers_per_session=OptionalState.from_unset(input.max_containers_per_session),
-            idle_timeout=OptionalState.from_unset(input.idle_timeout),
-            allowed_vfolder_hosts=OptionalState.from_unset(input.allowed_vfolder_hosts).map(
-                self._entries_to_vfolder_hosts
-            ),
-        )
+        return result.entity_id()
+
+    async def update_keypair_resource_policy(
+        self, policy_id: KeyPairResourcePolicyUUID, input: UpdateKeypairResourcePolicyInput
+    ) -> UpdateKeypairResourcePolicyPayload:
         result = await self._keypair_resource_policy.update.run(
-            UpdateKeyPairResourcePolicyAction(updater=updater)
+            UpdateKeyPairResourcePolicyAction(updater=self._to_keypair_updater(policy_id, input))
         )
         return UpdateKeypairResourcePolicyPayload(
             keypair_resource_policy=self._keypair_policy_data_to_node(result.data)
         )
 
-    async def admin_delete_keypair_resource_policy(
-        self, input: DeleteKeypairResourcePolicyInput
+    async def partial_bulk_update_keypair_resource_policies(
+        self, input: PartialBulkUpdateKeypairResourcePoliciesInput
+    ) -> PartialBulkPayload[KeypairResourcePolicyNode]:
+        """Update several keypair resource policies, answering for each one."""
+        result = await self._keypair_resource_policy.partial_bulk_update.run(
+            PartialBulkUpdateKeypairResourcePoliciesAction(
+                updaters=[
+                    self._to_keypair_updater(KeyPairResourcePolicyUUID(item.id), item.input)
+                    for item in input.items
+                ]
+            )
+        )
+        return PartialBulkPayload[KeypairResourcePolicyNode](
+            successes=[
+                self._keypair_policy_data_to_node(item.value)
+                for item in result.items
+                if item.value is not None
+            ],
+            failed=self._partial_bulk_failures(result),
+        )
+
+    async def purge_keypair_resource_policy(
+        self, policy_id: KeyPairResourcePolicyUUID
     ) -> DeleteKeypairResourcePolicyPayload:
-        target = await self._keypair_resource_policy.lookup.run(
-            LookupKeypairResourcePolicyAction(name=input.name)
+        result = await self._keypair_resource_policy.purge.run(
+            PurgeKeyPairResourcePolicyAction(policy_id=policy_id)
         )
-        await self._keypair_resource_policy.purge.run(
-            PurgeKeyPairResourcePolicyAction(name=input.name, policy_id=target.entity_id())
+        return DeleteKeypairResourcePolicyPayload(name=result.data.name)
+
+    async def partial_bulk_purge_keypair_resource_policies(
+        self, input: PartialBulkPurgeKeypairResourcePoliciesInput
+    ) -> PartialBulkPayload[KeypairResourcePolicyNode]:
+        """Purge several keypair resource policies, answering for each one."""
+        result = await self._keypair_resource_policy.partial_bulk_purge.run(
+            PartialBulkPurgeKeypairResourcePoliciesAction(
+                ids=[KeyPairResourcePolicyUUID(policy_id) for policy_id in input.ids]
+            )
         )
-        return DeleteKeypairResourcePolicyPayload(name=input.name)
+        return PartialBulkPayload[KeypairResourcePolicyNode](
+            successes=[
+                self._keypair_policy_data_to_node(item.value)
+                for item in result.items
+                if item.value is not None
+            ],
+            failed=self._partial_bulk_failures(result),
+        )
 
     async def get_my_keypair_resource_policy(self) -> KeypairResourcePolicyNode:
         me = current_user()
@@ -488,41 +530,69 @@ class ResourcePolicyAdapter(BaseAdapter):
             user_resource_policy=self._user_policy_data_to_node(result.data)
         )
 
-    async def admin_update_user_resource_policy(
-        self, name: str, input: UpdateUserResourcePolicyInput
-    ) -> UpdateUserResourcePolicyPayload:
-        target = await self._user_resource_policy.lookup.run(
+    async def lookup_user_resource_policy(self, name: str) -> UserResourcePolicyUUID:
+        """The id of the user resource policy the name names."""
+        result = await self._user_resource_policy.lookup.run(
             LookupUserResourcePolicyAction(name=name)
         )
-        updater = UserResourcePolicyUpdater(
-            policy_id=target.entity_id(),
-            max_vfolder_count=OptionalState.from_unset(input.max_vfolder_count),
-            max_concurrent_logins=TriState.from_unset(input.max_concurrent_logins),
-            max_quota_scope_size=OptionalState.from_unset(input.max_quota_scope_size).map(
-                lambda x: x.bytes
-            ),
-            max_session_count_per_model_session=OptionalState.from_unset(
-                input.max_session_count_per_model_session
-            ),
-            max_customized_image_count=OptionalState.from_unset(input.max_customized_image_count),
-        )
+        return result.entity_id()
+
+    async def update_user_resource_policy(
+        self, policy_id: UserResourcePolicyUUID, input: UpdateUserResourcePolicyInput
+    ) -> UpdateUserResourcePolicyPayload:
         result = await self._user_resource_policy.update.run(
-            UpdateUserResourcePolicyAction(updater=updater)
+            UpdateUserResourcePolicyAction(updater=self._to_user_updater(policy_id, input))
         )
         return UpdateUserResourcePolicyPayload(
             user_resource_policy=self._user_policy_data_to_node(result.data)
         )
 
-    async def admin_delete_user_resource_policy(
-        self, input: DeleteUserResourcePolicyInput
+    async def partial_bulk_update_user_resource_policies(
+        self, input: PartialBulkUpdateUserResourcePoliciesInput
+    ) -> PartialBulkPayload[UserResourcePolicyNode]:
+        """Update several user resource policies, answering for each one."""
+        result = await self._user_resource_policy.partial_bulk_update.run(
+            PartialBulkUpdateUserResourcePoliciesAction(
+                updaters=[
+                    self._to_user_updater(UserResourcePolicyUUID(item.id), item.input)
+                    for item in input.items
+                ]
+            )
+        )
+        return PartialBulkPayload[UserResourcePolicyNode](
+            successes=[
+                self._user_policy_data_to_node(item.value)
+                for item in result.items
+                if item.value is not None
+            ],
+            failed=self._partial_bulk_failures(result),
+        )
+
+    async def purge_user_resource_policy(
+        self, policy_id: UserResourcePolicyUUID
     ) -> DeleteUserResourcePolicyPayload:
-        target = await self._user_resource_policy.lookup.run(
-            LookupUserResourcePolicyAction(name=input.name)
+        result = await self._user_resource_policy.purge.run(
+            PurgeUserResourcePolicyAction(policy_id=policy_id)
         )
-        await self._user_resource_policy.purge.run(
-            PurgeUserResourcePolicyAction(name=input.name, policy_id=target.entity_id())
+        return DeleteUserResourcePolicyPayload(name=result.data.name)
+
+    async def partial_bulk_purge_user_resource_policies(
+        self, input: PartialBulkPurgeUserResourcePoliciesInput
+    ) -> PartialBulkPayload[UserResourcePolicyNode]:
+        """Purge several user resource policies, answering for each one."""
+        result = await self._user_resource_policy.partial_bulk_purge.run(
+            PartialBulkPurgeUserResourcePoliciesAction(
+                ids=[UserResourcePolicyUUID(policy_id) for policy_id in input.ids]
+            )
         )
-        return DeleteUserResourcePolicyPayload(name=input.name)
+        return PartialBulkPayload[UserResourcePolicyNode](
+            successes=[
+                self._user_policy_data_to_node(item.value)
+                for item in result.items
+                if item.value is not None
+            ],
+            failed=self._partial_bulk_failures(result),
+        )
 
     async def get_my_user_resource_policy(self) -> UserResourcePolicyNode:
         me = current_user()
@@ -624,25 +694,42 @@ class ResourcePolicyAdapter(BaseAdapter):
             project_resource_policy=self._project_policy_data_to_node(result.data)
         )
 
-    async def admin_update_project_resource_policy(
-        self, name: str, input: UpdateProjectResourcePolicyInput
-    ) -> UpdateProjectResourcePolicyPayload:
-        target = await self._project_resource_policy.lookup.run(
+    async def lookup_project_resource_policy(self, name: str) -> ProjectResourcePolicyUUID:
+        """The id of the project resource policy the name names."""
+        result = await self._project_resource_policy.lookup.run(
             LookupProjectResourcePolicyAction(name=name)
         )
-        updater = ProjectResourcePolicyUpdater(
-            policy_id=target.entity_id(),
-            max_vfolder_count=OptionalState.from_unset(input.max_vfolder_count),
-            max_quota_scope_size=OptionalState.from_unset(input.max_quota_scope_size).map(
-                lambda x: x.bytes
-            ),
-            max_network_count=OptionalState.from_unset(input.max_network_count),
-        )
+        return result.entity_id()
+
+    async def update_project_resource_policy(
+        self, policy_id: ProjectResourcePolicyUUID, input: UpdateProjectResourcePolicyInput
+    ) -> UpdateProjectResourcePolicyPayload:
         result = await self._project_resource_policy.update.run(
-            UpdateProjectResourcePolicyAction(updater=updater)
+            UpdateProjectResourcePolicyAction(updater=self._to_project_updater(policy_id, input))
         )
         return UpdateProjectResourcePolicyPayload(
             project_resource_policy=self._project_policy_data_to_node(result.data)
+        )
+
+    async def partial_bulk_update_project_resource_policies(
+        self, input: PartialBulkUpdateProjectResourcePoliciesInput
+    ) -> PartialBulkPayload[ProjectResourcePolicyNode]:
+        """Update several project resource policies, answering for each one."""
+        result = await self._project_resource_policy.partial_bulk_update.run(
+            PartialBulkUpdateProjectResourcePoliciesAction(
+                updaters=[
+                    self._to_project_updater(ProjectResourcePolicyUUID(item.id), item.input)
+                    for item in input.items
+                ]
+            )
+        )
+        return PartialBulkPayload[ProjectResourcePolicyNode](
+            successes=[
+                self._project_policy_data_to_node(item.value)
+                for item in result.items
+                if item.value is not None
+            ],
+            failed=self._partial_bulk_failures(result),
         )
 
     async def get_project_resource_policy(self, project_id: ProjectID) -> ProjectResourcePolicyNode:
@@ -666,18 +753,94 @@ class ResourcePolicyAdapter(BaseAdapter):
             )
         return self._project_policy_data_to_node(result.items[0])
 
-    async def admin_delete_project_resource_policy(
-        self, input: DeleteProjectResourcePolicyInput
+    async def purge_project_resource_policy(
+        self, policy_id: ProjectResourcePolicyUUID
     ) -> DeleteProjectResourcePolicyPayload:
-        target = await self._project_resource_policy.lookup.run(
-            LookupProjectResourcePolicyAction(name=input.name)
+        result = await self._project_resource_policy.purge.run(
+            PurgeProjectResourcePolicyAction(policy_id=policy_id)
         )
-        await self._project_resource_policy.purge.run(
-            PurgeProjectResourcePolicyAction(name=input.name, policy_id=target.entity_id())
+        return DeleteProjectResourcePolicyPayload(name=result.data.name)
+
+    async def partial_bulk_purge_project_resource_policies(
+        self, input: PartialBulkPurgeProjectResourcePoliciesInput
+    ) -> PartialBulkPayload[ProjectResourcePolicyNode]:
+        """Purge several project resource policies, answering for each one."""
+        result = await self._project_resource_policy.partial_bulk_purge.run(
+            PartialBulkPurgeProjectResourcePoliciesAction(
+                ids=[ProjectResourcePolicyUUID(policy_id) for policy_id in input.ids]
+            )
         )
-        return DeleteProjectResourcePolicyPayload(name=input.name)
+        return PartialBulkPayload[ProjectResourcePolicyNode](
+            successes=[
+                self._project_policy_data_to_node(item.value)
+                for item in result.items
+                if item.value is not None
+            ],
+            failed=self._partial_bulk_failures(result),
+        )
 
     # ── Conversion helpers ──
+
+    def _to_keypair_updater(
+        self, policy_id: KeyPairResourcePolicyUUID, input: UpdateKeypairResourcePolicyInput
+    ) -> KeyPairResourcePolicyUpdater:
+        return KeyPairResourcePolicyUpdater(
+            policy_id=policy_id,
+            default_for_unspecified=OptionalState.from_unset(input.default_for_unspecified),
+            total_resource_slots=OptionalState.from_unset(input.total_resource_slots).map(
+                self._entries_to_resource_slot
+            ),
+            max_session_lifetime=OptionalState.from_unset(input.max_session_lifetime),
+            max_concurrent_sessions=OptionalState.from_unset(input.max_concurrent_sessions),
+            max_pending_session_count=TriState.from_unset(input.max_pending_session_count),
+            max_pending_session_resource_slots=TriState.from_unset(
+                input.max_pending_session_resource_slots
+            ).map(self._entries_to_resource_slot),
+            max_priority=TriState.from_unset(input.max_priority),
+            max_concurrent_sftp_sessions=OptionalState.from_unset(
+                input.max_concurrent_sftp_sessions
+            ),
+            max_containers_per_session=OptionalState.from_unset(input.max_containers_per_session),
+            idle_timeout=OptionalState.from_unset(input.idle_timeout),
+            allowed_vfolder_hosts=OptionalState.from_unset(input.allowed_vfolder_hosts).map(
+                self._entries_to_vfolder_hosts
+            ),
+        )
+
+    def _to_user_updater(
+        self, policy_id: UserResourcePolicyUUID, input: UpdateUserResourcePolicyInput
+    ) -> UserResourcePolicyUpdater:
+        return UserResourcePolicyUpdater(
+            policy_id=policy_id,
+            max_vfolder_count=OptionalState.from_unset(input.max_vfolder_count),
+            max_concurrent_logins=TriState.from_unset(input.max_concurrent_logins),
+            max_quota_scope_size=OptionalState.from_unset(input.max_quota_scope_size).map(
+                lambda x: x.bytes
+            ),
+            max_session_count_per_model_session=OptionalState.from_unset(
+                input.max_session_count_per_model_session
+            ),
+            max_customized_image_count=OptionalState.from_unset(input.max_customized_image_count),
+        )
+
+    def _to_project_updater(
+        self, policy_id: ProjectResourcePolicyUUID, input: UpdateProjectResourcePolicyInput
+    ) -> ProjectResourcePolicyUpdater:
+        return ProjectResourcePolicyUpdater(
+            policy_id=policy_id,
+            max_vfolder_count=OptionalState.from_unset(input.max_vfolder_count),
+            max_quota_scope_size=OptionalState.from_unset(input.max_quota_scope_size).map(
+                lambda x: x.bytes
+            ),
+            max_network_count=OptionalState.from_unset(input.max_network_count),
+        )
+
+    def _partial_bulk_failures(self, result: PartialBulkResult[Any]) -> list[PartialBulkFailure]:
+        return [
+            PartialBulkFailure(id=item.entity_id, message=str(item.error))
+            for item in result.items
+            if item.error is not None
+        ]
 
     @staticmethod
     def _entries_to_resource_slot(

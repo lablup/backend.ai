@@ -11,12 +11,14 @@ from pydantic import Field, field_validator
 
 from ai.backend.common.api_handlers import BaseRequestModel
 from ai.backend.common.dto.manager.query import StringFilter
+from ai.backend.common.dto.manager.v2.common import NonEmptyList
 
 from .types import CategoryOrderField, OrderDirection
 
 __all__ = (
     "CreateCategoryInput",
     "DeleteCategoryInput",
+    "PartialBulkPurgeQueryPresetCategoriesInput",
     "CategoryFilter",
     "CategoryOrder",
     "SearchCategoriesInput",
@@ -42,6 +44,12 @@ class DeleteCategoryInput(BaseRequestModel):
     """Input for deleting a prometheus query preset category."""
 
     id: UUID = Field(description="Category ID to delete")
+
+
+class PartialBulkPurgeQueryPresetCategoriesInput(BaseRequestModel):
+    """Input for purging several categories, each answered for separately."""
+
+    ids: NonEmptyList[UUID] = Field(description="IDs of the categories to purge.")
 
 
 class CategoryFilter(BaseRequestModel):

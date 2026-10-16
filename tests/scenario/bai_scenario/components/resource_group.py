@@ -17,6 +17,7 @@ from ai.backend.common.data.entity.resource_group import ResourceGroupEntityType
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.permission.types import Permission
 from ai.backend.common.data.user.types import UserRole
+from ai.backend.common.dto.manager.v2.common import PartialBulkPayload
 from ai.backend.common.dto.manager.v2.resource_group.response import (
     AllowedDomainsPayload,
     AllowedProjectsPayload,
@@ -48,7 +49,7 @@ from ai.backend.testutils.scenario_steps import (
     Then,
     Verdict,
 )
-from bai_scenario.components.domain import WAS_HERE, SomeoneOf, WrittenByThisRun
+from bai_scenario.components.domain import WAS_HERE, Mentions, SomeoneOf, WrittenByThisRun
 from bai_scenario.components.system import KEPT, Kept, role_named
 from bai_scenario.seeds.domain.domain import TestSeedDomain
 from bai_scenario.seeds.project.project import TestSeedProject
@@ -62,6 +63,7 @@ from bai_scenario.seeds.resource_policy.project import TestSeedProjectPolicy
 from bai_scenario.seeds.seeder import Laid, TestSeeder, TestSeedNest
 
 type Loaded = list[ResourceGroupDetailNode | Exception | None]
+type Processed = PartialBulkPayload[ResourceGroupDetailNode]
 
 SCHEDULER = "fifo"
 
@@ -629,6 +631,65 @@ class TheGroupsInTheOrderAsked(Then[ManyGroupsAndACaller, Loaded]):
             seen.extend(look.verdicts(f"items[{i}].", got, expected))
         last = items[asked - 1] if len(items) >= asked else "없음"
         seen.append(Same(f"items[{asked - 1}]", last, None))
+        return seen
+
+
+@dataclass(frozen=True)
+class EveryGroupIsProcessed(Then[ManyGroupsAndACaller, Processed]):
+    """그룹이 모두 처리된 목록에 온다. ``missing``이 있으면 그 id 만 실패 목록에 온다."""
+
+    look_for: GroupLook
+    missing: UUID | None = None
+
+    @override
+    def says(self) -> str:
+        if self.missing is None:
+            return "그룹이 모두 처리된 목록에 오고, 실패한 것은 없다"
+        return "그룹이 모두 처리된 목록에 오고, 없는 id 는 대상이 없다는 이유로 실패 목록에 온다"
+
+    @override
+    def look(self, laid: ManyGroupsAndACaller, answered: Answered[Processed]) -> list[Verdict]:
+        payload = answered.response
+        if payload is None:
+            return [Refused(NotEnoughPermission, answered.raised)]
+        seen: list[Verdict] = [Same("successes count", len(payload.successes), len(laid.laid))]
+        for i, (node, group) in enumerate(zip(payload.successes, laid.laid, strict=False)):
+            seen += self.look_for.verdicts(f"successes[{i}].", node, group)
+        if self.missing is None:
+            return [*seen, Same("failed", payload.failed, [])]
+        seen.append(Same("failed count", len(payload.failed), 1))
+        for failure in payload.failed:
+            seen += [
+                Held[UUID]("failed[0].id", failure.id, SameAs(self.missing, "요청에 넣은 없는 id")),
+                Held("failed[0].message", failure.message, Mentions("not found")),
+            ]
+        return seen
+
+
+@dataclass(frozen=True)
+class NoGroupIsProcessed(Then[ManyGroupsAndACaller, Processed]):
+    """처리된 그룹 없이, 그룹이 모두 같은 이유로 실패 목록에 온다."""
+
+    reason: str
+
+    @override
+    def says(self) -> str:
+        return "처리된 그룹 없이 그룹이 모두 실패 목록에 온다"
+
+    @override
+    def look(self, laid: ManyGroupsAndACaller, answered: Answered[Processed]) -> list[Verdict]:
+        payload = answered.response
+        if payload is None:
+            return [Refused(NotEnoughPermission, answered.raised)]
+        seen: list[Verdict] = [
+            Same("successes", payload.successes, []),
+            Same("failed count", len(payload.failed), len(laid.laid)),
+        ]
+        for i, (failure, group) in enumerate(zip(payload.failed, laid.laid, strict=False)):
+            seen += [
+                Held[UUID](f"failed[{i}].id", failure.id, SameAs(group.id, "그룹의 id")),
+                Held(f"failed[{i}].message", failure.message, Mentions(self.reason)),
+            ]
         return seen
 
 

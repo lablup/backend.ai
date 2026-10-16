@@ -2,15 +2,16 @@
 
 [무엇을 보장하는가](/src/ai/backend/manager/api/adapters/app_config_definition/KNOWLEDGE.md) · [어댑터](/src/ai/backend/manager/api/adapters/app_config_definition/adapter.py)
 
-시나리오: 완성
+시나리오: 미완 1 / 6
 
 - ops 로 구성 (4)
   - admin_create — 대표 성공 ✓ · 대표 실패 ✓
   - admin_get — 대표 성공 ✓ · 대표 실패 ✓
   - admin_search — 대표 성공 ✓ · 대표 실패 ✓
   - batch_load_by_ids — 대표 성공 ✓ · 대표 실패 ✓
-- 직접 구현 (1)
-  - admin_purge — 성공 있음 2 · 실패 있음 2 (single_entity)
+- 직접 구현 (2)
+  - partial_bulk_purge — 성공 있음 2 · 실패 없음 (partial_bulk) — SCENARIO-GAP
+  - purge — 성공 있음 2 · 실패 있음 2 (single_entity)
 
 **admin_create**
 
@@ -46,7 +47,14 @@
 | [슈퍼관리자가 설정 정의 둘과 없는 ID 하나를 한 번에 조회하면, 둘은 노드로 반환되고 없는 ID에 해당하는 항목은 비어 있다. 권한 검사를 통과하는 사용자만 빈 항목을 본다](#reading_many-the-superadmin-reads-both-and-a-missing-id-comes-back-empty) | 성공 |
 | [슈퍼관리자가 아닌 사용자가 설정 정의 둘과 없는 ID 하나를 한 번에 조회하면, 요청 전체가 막히는 것이 아니라 세 항목 모두 그 항목만 권한 부족으로 거부된다](#reading_many-a-user-who-is-not-the-superadmin-is-refused-per-id) | 거부 |
 
-**admin_purge**
+**partial_bulk_purge**
+
+| 시나리오 | 판정 |
+|---|---|
+| [권한이 없는 일반 사용자가 설정 정의 둘을 한 번에 영구 삭제하려 하면, 삭제된 것 없이 둘 다 권한이 없다는 이유로 실패 목록에 온다](#partial_bulk_purging-a-user-granted-nothing-purges-none-of-several-definitions) | 성공 |
+| [슈퍼관리자가 설정 정의 둘과 존재하지 않는 ID를 한 번에 영구 삭제하면, 둘은 처리된 목록에 오고 없는 ID는 대상이 없다는 이유로 실패 목록에 온다](#partial_bulk_purging-purging-several-answers-for-the-missing-one) | 성공 |
+
+**purge**
 
 | 시나리오 | 판정 |
 |---|---|
@@ -455,7 +463,71 @@ Then
   - 거부: NotEnoughPermission
   - 거부: NotEnoughPermission
 
-### admin_purge
+### partial_bulk_purge
+
+<a id="partial_bulk_purging-a-user-granted-nothing-purges-none-of-several-definitions"></a>
+
+#### [a-user-granted-nothing-purges-none-of-several-definitions](/tests/scenario/bai_scenario/manager/app_config_definition/test_partial_bulk_purging.py) — pass
+
+권한이 없는 일반 사용자가 설정 정의 둘을 한 번에 영구 삭제하려 하면, 삭제된 것 없이 둘 다 권한이 없다는 이유로 실패 목록에 온다
+
+Given
+
+- 설정 정의 둘과, 권한이 없는 일반 사용자 한 명
+  - 도메인 home-1
+  - 설정 정의 first-1: 이 이름의 설정이 등록돼 있다
+  - 설정 정의 second-1: 이 이름의 설정이 등록돼 있다
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+
+When
+
+- AppConfigDefinitionAdapter.partial_bulk_purge — user-1이 설정 정의 둘를 한 번에 영구 삭제
+
+Then
+
+- 처리된 설정 정의 없이 둘 다 권한이 없다는 이유로 실패 목록에 온다
+  - successes = []
+  - failed count = 2
+  - failed[0].id: 준비한 ID와 같다
+  - failed[0].message: 'Insufficient permission'를 담은 이유
+  - failed[1].id: 준비한 ID와 같다
+  - failed[1].message: 'Insufficient permission'를 담은 이유
+
+<a id="partial_bulk_purging-purging-several-answers-for-the-missing-one"></a>
+
+#### [purging-several-answers-for-the-missing-one](/tests/scenario/bai_scenario/manager/app_config_definition/test_partial_bulk_purging.py) — pass
+
+슈퍼관리자가 설정 정의 둘과 존재하지 않는 ID를 한 번에 영구 삭제하면, 둘은 처리된 목록에 오고 없는 ID는 대상이 없다는 이유로 실패 목록에 온다
+
+Given
+
+- 설정 정의 둘과, 슈퍼관리자 한 명
+  - 도메인 home-1
+  - 설정 정의 first-1: 이 이름의 설정이 등록돼 있다
+  - 설정 정의 second-1: 이 이름의 설정이 등록돼 있다
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+
+When
+
+- AppConfigDefinitionAdapter.partial_bulk_purge — user-1이 설정 정의 둘와 존재하지 않는 ID를 한 번에 영구 삭제
+
+Then
+
+- 설정 정의 둘은 처리된 목록에, 없는 ID는 대상이 없다는 이유로 실패 목록에 온다
+  - successes: 준비한 ID 둘와 같다
+  - failed count = 1
+  - failed[0].id: 요청에 넣은 없는 ID와 같다
+  - failed[0].message: 'not found'를 담은 이유
+
+### purge
 
 <a id="purging-a-definition-holding-an-entry-and-a-fragment-is-still-purged"></a>
 
@@ -478,7 +550,7 @@ Given
 
 When
 
-- AppConfigDefinitionAdapter.admin_purge — user-1이 config-1 영구 삭제
+- AppConfigDefinitionAdapter.purge — user-1이 config-1 영구 삭제
 
 Then
 
@@ -504,7 +576,7 @@ Given
 
 When
 
-- AppConfigDefinitionAdapter.admin_purge — user-1이 config-1 영구 삭제
+- AppConfigDefinitionAdapter.purge — user-1이 config-1 영구 삭제
 
 Then
 
@@ -530,7 +602,7 @@ Given
 
 When
 
-- AppConfigDefinitionAdapter.admin_purge — user-1이 config-1 영구 삭제
+- AppConfigDefinitionAdapter.purge — user-1이 config-1 영구 삭제
 
 Then
 
@@ -556,7 +628,7 @@ Given
 
 When
 
-- AppConfigDefinitionAdapter.admin_purge — user-1이 존재하지 않는 ID 영구 삭제
+- AppConfigDefinitionAdapter.purge — user-1이 존재하지 않는 ID 영구 삭제
 
 Then
 

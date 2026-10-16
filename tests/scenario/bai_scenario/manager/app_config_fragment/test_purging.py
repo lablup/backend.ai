@@ -16,12 +16,13 @@ import pytest
 from ai.backend.common.data.entity.app_config_fragment import AppConfigFragmentID
 from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.dto.manager.v2.app_config_fragment.request import (
-    BulkPurgeAppConfigFragmentInput,
+    PartialBulkPurgeAppConfigFragmentsInput,
 )
 from ai.backend.common.dto.manager.v2.app_config_fragment.response import (
-    BulkPurgeAppConfigFragmentPayload,
+    AppConfigFragmentNode,
     PurgeAppConfigFragmentPayload,
 )
+from ai.backend.common.dto.manager.v2.common import PartialBulkPayload
 from ai.backend.manager.api.adapters.app_config_fragment.adapter import AppConfigFragmentAdapter
 from ai.backend.manager.data.permission.types import Permission
 from ai.backend.manager.errors.base.entity import EntityNotFoundError
@@ -56,7 +57,7 @@ type Purged = PurgeAppConfigFragmentPayload
 type PurgingStep = Scenario[
     TestSeedingSession, AFragmentAndACaller, AppConfigFragmentAdapter, Purged
 ]
-type BulkPurged = BulkPurgeAppConfigFragmentPayload
+type BulkPurged = PartialBulkPayload[AppConfigFragmentNode]
 type BulkStep = Scenario[
     TestSeedingSession, SomeFragmentsAndACaller, AppConfigFragmentAdapter, BulkPurged
 ]
@@ -92,7 +93,7 @@ class PurgingMany(When[SomeFragmentsAndACaller, AppConfigFragmentAdapter, BulkPu
 
     @override
     def operation(self) -> str:
-        return "bulk_purge"
+        return "partial_bulk_purge"
 
     @override
     def describe(self, laid: SomeFragmentsAndACaller) -> str:
@@ -107,7 +108,9 @@ class PurgingMany(When[SomeFragmentsAndACaller, AppConfigFragmentAdapter, BulkPu
     ) -> BulkPurged:
         asked = [*(one.id for one in laid.mine), laid.theirs.id, AppConfigFragmentID(uuid4())]
         with ActingAs(laid.caller):
-            return await adapter.bulk_purge(BulkPurgeAppConfigFragmentInput(ids=asked))
+            return await adapter.partial_bulk_purge(
+                PartialBulkPurgeAppConfigFragmentsInput(ids=asked)
+            )
 
 
 @dataclass(frozen=True)
@@ -141,8 +144,8 @@ class MineArePurgedTheRestFail(Then[SomeFragmentsAndACaller, BulkPurged]):
             return [Refused(NotEnoughPermission, answered.raised)]
         return [
             Held[list[UUID]](
-                "items",
-                list(payload.items),
+                "successes",
+                [node.id for node in payload.successes],
                 SameAs[list[UUID]]([one.id for one in laid.mine], "미리 만들어 둔 자기 조각들"),
             ),
             Same("failed", len(payload.failed), 2),
@@ -170,8 +173,8 @@ class BothArePurgedTheMissingFails(Then[SomeFragmentsAndACaller, BulkPurged]):
             return [Refused(NotEnoughPermission, answered.raised)]
         return [
             Held[list[UUID]](
-                "items",
-                list(payload.items),
+                "successes",
+                [node.id for node in payload.successes],
                 SameAs[list[UUID]](
                     [*(one.id for one in laid.mine), laid.theirs.id], "미리 만들어 둔 조각들"
                 ),

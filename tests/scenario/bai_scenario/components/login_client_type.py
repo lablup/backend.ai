@@ -13,14 +13,16 @@ from uuid import UUID
 
 from ai.backend.common.data.entity.login_client_type import LoginClientTypeEntityType
 from ai.backend.common.data.user.types import UserRole
+from ai.backend.common.dto.manager.v2.common import PartialBulkPayload
 from ai.backend.common.dto.manager.v2.login_client_type.response import (
-    DeleteLoginClientTypePayload,
     LoginClientTypeNode,
+    PurgeLoginClientTypePayload,
     SearchLoginClientTypesPayload,
 )
 from ai.backend.manager.data.login_client_type.types import LoginClientTypeData
 from ai.backend.manager.data.user.types import UserData
 from ai.backend.manager.errors.base.entity import EntityNotFoundError
+from ai.backend.manager.errors.permission import NotEnoughPermission
 from ai.backend.testutils.scenario_steps import (
     Answered,
     Given,
@@ -32,7 +34,7 @@ from ai.backend.testutils.scenario_steps import (
     Then,
     Verdict,
 )
-from bai_scenario.components.domain import WrittenByThisRun
+from bai_scenario.components.domain import Mentions, WrittenByThisRun
 from bai_scenario.components.system import (
     KEPT,
     Kept,
@@ -201,7 +203,7 @@ class EveryLaidTypeIsCounted(Then[ManyTypesAndACaller, SearchLoginClientTypesPay
 
 
 @dataclass(frozen=True)
-class TheDeletedTypeId(Then[ATypeAndACaller, DeleteLoginClientTypePayload]):
+class TheDeletedTypeId(Then[ATypeAndACaller, PurgeLoginClientTypePayload]):
     """삭제한 종류의 id를 담은 응답."""
 
     @override
@@ -210,7 +212,7 @@ class TheDeletedTypeId(Then[ATypeAndACaller, DeleteLoginClientTypePayload]):
 
     @override
     def look(
-        self, laid: ATypeAndACaller, answered: Answered[DeleteLoginClientTypePayload]
+        self, laid: ATypeAndACaller, answered: Answered[PurgeLoginClientTypePayload]
     ) -> list[Verdict]:
         payload = answered.response
         if payload is None:
@@ -218,3 +220,36 @@ class TheDeletedTypeId(Then[ATypeAndACaller, DeleteLoginClientTypePayload]):
         return [
             Held[UUID]("id", payload.id, SameAs[UUID](laid.client_type.id, "미리 만들어 둔 종류"))
         ]
+
+
+@dataclass(frozen=True)
+class NoTypeIsProcessed(Then[ManyTypesAndACaller, PartialBulkPayload[LoginClientTypeNode]]):
+    """처리된 종류 없이, 미리 만들어 둔 종류가 모두 같은 이유로 실패 목록에 온다."""
+
+    reason: str
+
+    @override
+    def says(self) -> str:
+        return "처리된 종류 없이 대상이 모두 실패 목록에 온다"
+
+    @override
+    def look(
+        self,
+        laid: ManyTypesAndACaller,
+        answered: Answered[PartialBulkPayload[LoginClientTypeNode]],
+    ) -> list[Verdict]:
+        payload = answered.response
+        if payload is None:
+            return [Refused(NotEnoughPermission, answered.raised)]
+        verdicts: list[Verdict] = [
+            Same("successes", payload.successes, []),
+            Same("failed count", len(payload.failed), len(laid.laid)),
+        ]
+        for i, (failure, client_type) in enumerate(zip(payload.failed, laid.laid, strict=False)):
+            verdicts += [
+                Held[UUID](
+                    f"failed[{i}].id", failure.id, SameAs[UUID](client_type.id, "대상 종류의 id")
+                ),
+                Held(f"failed[{i}].message", failure.message, Mentions(self.reason)),
+            ]
+        return verdicts

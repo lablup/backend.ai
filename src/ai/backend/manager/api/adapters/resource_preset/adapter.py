@@ -11,10 +11,15 @@ from ai.backend.common.data.entity.resource_group import ResourceGroupID, Resour
 from ai.backend.common.data.entity.resource_preset import ResourcePresetID
 from ai.backend.common.dto.manager.v2.common import (
     BinarySizeInput,
+    PartialBulkFailure,
+    PartialBulkPayload,
     ResourceSlotEntryInfo,
 )
 from ai.backend.common.dto.manager.v2.resource_preset.request import (
     AdminSearchResourcePresetsInput,
+    PartialBulkPurgeResourcePresetsInput,
+    PartialBulkUpdateResourcePresetItemInput,
+    PartialBulkUpdateResourcePresetsInput,
     ResourcePresetFilter,
     ResourcePresetOrder,
     UpdateResourcePresetInput,
@@ -30,8 +35,10 @@ from ai.backend.common.dto.manager.v2.resource_preset.types import (
     ResourcePresetOrderDirection,
     ResourcePresetOrderField,
 )
+from ai.backend.common.exception import InvalidAPIParameters
 from ai.backend.common.tristate.unset import Unset
 from ai.backend.common.types import BinarySize, ResourceSlot
+from ai.backend.manager.actions.v2.bulk.result import PartialBulkResult
 from ai.backend.manager.api.adapter_options.pagination.pagination import PaginationSpec
 from ai.backend.manager.api.adapters.base import BaseAdapter
 from ai.backend.manager.data.resource_preset.types import ResourcePresetData
@@ -64,6 +71,12 @@ from ai.backend.manager.services.resource_preset.actions.delete_preset import (
 )
 from ai.backend.manager.services.resource_preset.actions.get_preset import (
     GetResourcePresetAction,
+)
+from ai.backend.manager.services.resource_preset.actions.partial_bulk_purge_presets import (
+    PartialBulkPurgeResourcePresetsAction,
+)
+from ai.backend.manager.services.resource_preset.actions.partial_bulk_update_presets import (
+    PartialBulkUpdateResourcePresetsAction,
 )
 from ai.backend.manager.services.resource_preset.actions.search_presets import (
     SearchResourcePresetsV2Action,
@@ -215,18 +228,8 @@ class ResourcePresetAdapter(BaseAdapter):
         input: UpdateResourcePresetInput,
     ) -> UpdateResourcePresetPayload:
         """Update an existing resource preset."""
-        updater = ResourcePresetUpdater(
-            preset_id=ResourcePresetID(input.id),
-            resource_slots=OptionalState.from_unset(input.resource_slots).map(
-                _resource_slot_entries_to_slot
-            ),
-            name=OptionalState.from_unset(input.name),
-            shared_memory=TriState.from_unset(input.shared_memory).map(
-                lambda v: BinarySize(v.bytes)
-            ),
-        )
         result = await self._resource_preset.update_preset.run(
-            UpdateResourcePresetAction(updater=updater)
+            UpdateResourcePresetAction(updater=self._to_updater(input))
         )
         preset = result.resource_preset
         if not isinstance(input.resource_group_name, Unset):
@@ -249,12 +252,67 @@ class ResourcePresetAdapter(BaseAdapter):
         )
         return result.resource_preset
 
-    async def delete(self, preset_id: UUID) -> DeleteResourcePresetPayload:
-        """Delete a resource preset by ID."""
+    async def purge(self, preset_id: UUID) -> DeleteResourcePresetPayload:
+        """Permanently delete a resource preset by ID."""
         result = await self._resource_preset.delete_preset.run(
             DeleteResourcePresetAction(preset_id=ResourcePresetID(preset_id))
         )
         return DeleteResourcePresetPayload(id=result.resource_preset.id)
+
+    async def partial_bulk_update(
+        self, input: PartialBulkUpdateResourcePresetsInput
+    ) -> PartialBulkPayload[ResourcePresetNode]:
+        """Update several resource presets, answering for each one."""
+        updaters = [self._to_updater(item) for item in input.items]
+        for updater in updaters:
+            if resource_slots := updater.resource_slots.optional_value():
+                if not resource_slots.has_intrinsic_slots():
+                    raise InvalidAPIParameters(
+                        "ResourceSlot must have all intrinsic resource slots."
+                    )
+        result = await self._resource_preset.partial_bulk_update.run(
+            PartialBulkUpdateResourcePresetsAction(updaters=updaters)
+        )
+        return self._to_partial_bulk_payload(result)
+
+    async def partial_bulk_purge(
+        self, input: PartialBulkPurgeResourcePresetsInput
+    ) -> PartialBulkPayload[ResourcePresetNode]:
+        """Permanently delete several resource presets, answering for each one."""
+        result = await self._resource_preset.partial_bulk_purge.run(
+            PartialBulkPurgeResourcePresetsAction(
+                ids=[ResourcePresetID(preset_id) for preset_id in input.ids]
+            )
+        )
+        return self._to_partial_bulk_payload(result)
+
+    def _to_updater(
+        self, input: UpdateResourcePresetInput | PartialBulkUpdateResourcePresetItemInput
+    ) -> ResourcePresetUpdater:
+        return ResourcePresetUpdater(
+            preset_id=ResourcePresetID(input.id),
+            resource_slots=OptionalState.from_unset(input.resource_slots).map(
+                _resource_slot_entries_to_slot
+            ),
+            name=OptionalState.from_unset(input.name),
+            shared_memory=TriState.from_unset(input.shared_memory).map(
+                lambda v: BinarySize(v.bytes)
+            ),
+        )
+
+    def _to_partial_bulk_payload(
+        self, result: PartialBulkResult[ResourcePresetData]
+    ) -> PartialBulkPayload[ResourcePresetNode]:
+        return PartialBulkPayload[ResourcePresetNode](
+            successes=[
+                self._data_to_node(item.value) for item in result.items if item.value is not None
+            ],
+            failed=[
+                PartialBulkFailure(id=item.entity_id, message=str(item.error))
+                for item in result.items
+                if item.error is not None
+            ],
+        )
 
     def _convert_filter(self, filter_: ResourcePresetFilter) -> list[QueryCondition]:
         """Convert ResourcePresetFilter DTO to QueryConditions."""

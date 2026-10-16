@@ -29,11 +29,32 @@ status: draft
 |---|---|---|---|
 | 사용자를 배정한다 | 프로젝트와 그 스코프의 역할이 있음 | 사용자 배정 | 그 사용자가 명부에 오름 |
 
+## 여럿 수정하기
+
+| 시나리오 | 상황 | 요청 | 결과 |
+|---|---|---|---|
+| 슈퍼관리자가 여럿의 설명을 한 번에 바꾼다 | 프로젝트 둘이 있음 | 둘의 설명 수정 | 둘 다 새 설명으로 오고 실패한 것은 없음 |
+| 아무 권한도 받지 않은 사용자가 여럿을 수정한다 | 같은 프로젝트 둘 | 둘의 설명 수정 | 수정된 것 없이 둘 다 권한 부족 이유로 실패 목록에 옴 |
+
+여럿 수정은 프로젝트마다 단건 수정과 같은 쓰기를 한다. 프로젝트 행을 고친 뒤 그 프로젝트가 따르는
+리소스 정책 공유를 다시 적는다.
+
+## 여럿 soft delete, restore
+
+| 시나리오 | 상황 | 요청 | 결과 |
+|---|---|---|---|
+| 슈퍼관리자가 둘과 없는 id 하나를 한 번에 soft delete 한다 | 활성 프로젝트 둘이 있음 | 셋 soft delete | 둘은 비활성으로 오고, 없는 id 는 대상 없음 이유로 실패 목록에 옴 |
+| 아무 권한도 받지 않은 사용자가 여럿을 soft delete 한다 | 같은 프로젝트 둘 | 둘 soft delete | soft delete 된 것 없이 둘 다 권한 부족 이유로 실패 목록에 옴 |
+| soft delete 된 여럿을 한 번에 restore 한다 | 프로젝트 둘이 있음 | 둘 soft delete 뒤 둘 restore | 둘 다 활성으로 옴 |
+
+여럿 연산은 호출 전체를 거부하지 않는다. 처리한 프로젝트는 처리된 목록에, 처리하지 못한 것은 id 와
+이유를 실패 목록에 싣는다. 여럿 purge 는 없다.
+
 ## 아직 적지 않은 것
 
-`admin_delete`, `admin_purge`, `admin_restore`, `admin_search`, `admin_update`,
-`batch_load_by_ids`, `batch_load_fields`, `get`, `scoped_search`,
-`search_by_domain_name`, `search_by_user`, `unassign_users`.
+`admin_purge`, `admin_search`, `batch_load_by_ids`, `batch_load_fields`, `delete`, `get`,
+`restore`, `scoped_search`, `search_by_domain_name`, `search_by_user`, `unassign_users`,
+`update`.
 
 ## image commit을 위한 Container Registry 조회
 

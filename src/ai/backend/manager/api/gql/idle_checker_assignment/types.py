@@ -10,6 +10,7 @@ import strawberry
 from strawberry import Info
 from strawberry.relay import Connection, Edge, NodeID
 
+from ai.backend.common.dto.manager.v2.common import PartialBulkPayload
 from ai.backend.common.dto.manager.v2.idle_checker_assignment.request import (
     CreateIdleCheckerAssignmentInput as CreateIdleCheckerAssignmentInputDTO,
 )
@@ -22,6 +23,12 @@ from ai.backend.common.dto.manager.v2.idle_checker_assignment.request import (
 from ai.backend.common.dto.manager.v2.idle_checker_assignment.request import (
     IdleCheckerAssignmentScopeDTO,
     IdleCheckerScopeRefDTO,
+)
+from ai.backend.common.dto.manager.v2.idle_checker_assignment.request import (
+    PartialBulkPurgeIdleCheckerAssignmentsInput as PartialBulkPurgeIdleCheckerAssignmentsInputDTO,
+)
+from ai.backend.common.dto.manager.v2.idle_checker_assignment.request import (
+    PartialBulkUpdateIdleCheckerAssignmentsInput as PartialBulkUpdateIdleCheckerAssignmentsInputDTO,
 )
 from ai.backend.common.dto.manager.v2.idle_checker_assignment.request import (
     PurgeIdleCheckerAssignmentInput as PurgeIdleCheckerAssignmentInputDTO,
@@ -44,11 +51,13 @@ from ai.backend.common.dto.manager.v2.idle_checker_assignment.response import (
 from ai.backend.common.dto.manager.v2.idle_checker_assignment.types import (
     ScopeTypeFilter as ScopeTypeFilterDTO,
 )
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import (
     DateTimeFilter,
     OrderDirection,
     UUIDFilter,
 )
+from ai.backend.manager.api.gql.common_types import PartialBulkFailureGQL
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     PydanticInputMixin,
@@ -317,6 +326,38 @@ class PurgeIdleCheckerAssignmentInputGQL(PydanticInputMixin[PurgeIdleCheckerAssi
     id: UUID = gql_field(description="Idle checker assignment ID to purge.")
 
 
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description=(
+            "Input for updating several idle checker assignments, each answered for separately."
+        ),
+    ),
+    name="PartialBulkUpdateIdleCheckerAssignmentsInput",
+)
+class PartialBulkUpdateIdleCheckerAssignmentsInputGQL(
+    PydanticInputMixin[PartialBulkUpdateIdleCheckerAssignmentsInputDTO]
+):
+    items: list[UpdateIdleCheckerAssignmentInputGQL] = gql_field(
+        description="The assignments to update, each with its new enabled state."
+    )
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description=(
+            "Input for purging several idle checker assignments, each answered for separately."
+        ),
+    ),
+    name="PartialBulkPurgeIdleCheckerAssignmentsInput",
+)
+class PartialBulkPurgeIdleCheckerAssignmentsInputGQL(
+    PydanticInputMixin[PartialBulkPurgeIdleCheckerAssignmentsInputDTO]
+):
+    ids: list[UUID] = gql_field(description="IDs of the idle checker assignments to purge.")
+
+
 @gql_pydantic_type(
     BackendAIGQLMeta(
         added_version="26.8.0",
@@ -370,3 +411,27 @@ class PurgeIdleCheckerAssignmentPayloadGQL(
     PydanticOutputMixin[PurgeIdleCheckerAssignmentPayloadDTO]
 ):
     id: UUID = gql_field(description="Purged idle checker assignment ID.")
+
+
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description=(
+            "Result of a partial bulk idle checker assignment operation: the assignments "
+            "processed and the ones that failed."
+        ),
+    ),
+    model=PartialBulkPayload[IdleCheckerAssignmentNode],
+    name="PartialBulkIdleCheckerAssignmentsPayload",
+)
+class PartialBulkIdleCheckerAssignmentsPayloadGQL(
+    PydanticOutputMixin[PartialBulkPayload[IdleCheckerAssignmentNode]]
+):
+    """Payload for partial bulk idle checker assignment mutations."""
+
+    successes: list[IdleCheckerAssignmentGQL] = gql_field(
+        description="The assignments processed, as they stood when processed."
+    )
+    failed: list[PartialBulkFailureGQL] = gql_field(
+        description="The assignments not processed, each with the reason."
+    )

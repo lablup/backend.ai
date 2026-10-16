@@ -17,6 +17,7 @@ from ai.backend.common.data.entity.vfolder import VFolderUUID
 from ai.backend.common.data.model_deployment.types import DeploymentStrategy
 from ai.backend.common.data.permission.types import Permission
 from ai.backend.common.data.user.types import UserData
+from ai.backend.common.dto.manager.v2.common import PartialBulkFailure, PartialBulkPayload
 from ai.backend.common.dto.manager.v2.deployment.request import DeploymentStrategyInput
 from ai.backend.common.dto.manager.v2.rbac.types import PermissionBitDTO
 from ai.backend.common.dto.manager.v2.vfolder.request import (
@@ -32,11 +33,15 @@ from ai.backend.common.dto.manager.v2.vfolder.request import (
     ListFilesInput,
     MkdirInput,
     MoveFileInput,
+    PartialBulkDeleteVFoldersInput,
+    PartialBulkRestoreVFoldersInput,
+    PartialBulkUpdateVFoldersInput,
     PurgeVFolderInput,
     ScopedSearchVFoldersInput,
     SearchVFoldersInput,
     SetVFolderMountPolicyInput,
     UnsetVFolderMountPolicyInput,
+    UpdateVFolderInput,
     VFolderFilter,
     VFolderOrder,
 )
@@ -61,6 +66,7 @@ from ai.backend.common.dto.manager.v2.vfolder.response import (
     SearchVFoldersPayload,
     SetVFolderMountPolicyPayload,
     UnsetVFolderMountPolicyPayload,
+    UpdateVFolderPayload,
     VFolderMountPoliciesPayload,
     VFolderMountPolicyNode,
     VFolderNode,
@@ -90,6 +96,7 @@ from ai.backend.common.types import (
     VFolderMountPolicy,
     VFolderUsageMode,
 )
+from ai.backend.manager.actions.v2.bulk.result import PartialBulkResult
 from ai.backend.manager.api.adapter_options.pagination.pagination import PaginationSpec
 from ai.backend.manager.api.adapters.base import BaseAdapter
 from ai.backend.manager.data.deployment.creator import (
@@ -130,6 +137,7 @@ from ai.backend.manager.models.vfolder.scopes import (
 )
 from ai.backend.manager.models.vfolder.searchable_fields import VFolderSearchableFields
 from ai.backend.manager.models.vfolder.searchers import VFolderSearcher
+from ai.backend.manager.models.vfolder.updaters import VFolderAttributeUpdater
 from ai.backend.manager.services.deployment.actions.create_deployment import CreateDeploymentAction
 from ai.backend.manager.services.deployment.processors import DeploymentProcessors
 from ai.backend.manager.services.vfolder.actions.admin_search_vfolders import (
@@ -137,6 +145,7 @@ from ai.backend.manager.services.vfolder.actions.admin_search_vfolders import (
 )
 from ai.backend.manager.services.vfolder.actions.base import (
     RestoreVFolderFromTrashAction,
+    UpdateVFolderAttributeAction,
 )
 from ai.backend.manager.services.vfolder.actions.bulk_get import BulkGetVFoldersAction
 from ai.backend.manager.services.vfolder.actions.bulk_load_permissions import (
@@ -160,6 +169,15 @@ from ai.backend.manager.services.vfolder.actions.mount_policy import (
     SetVFolderMountPolicyAction,
     UnsetVFolderMountPolicyAction,
 )
+from ai.backend.manager.services.vfolder.actions.partial_bulk_delete_vfolders import (
+    PartialBulkDeleteVFoldersAction,
+)
+from ai.backend.manager.services.vfolder.actions.partial_bulk_restore_vfolders import (
+    PartialBulkRestoreVFoldersAction,
+)
+from ai.backend.manager.services.vfolder.actions.partial_bulk_update_vfolders import (
+    PartialBulkUpdateVFoldersAction,
+)
 from ai.backend.manager.services.vfolder.actions.scoped_search import ScopedSearchVFoldersAction
 from ai.backend.manager.services.vfolder.actions.upload_session_v2 import (
     CreateUploadSessionV2Action,
@@ -172,6 +190,7 @@ from ai.backend.manager.services.vfolder.processors.file import VFolderFileProce
 from ai.backend.manager.services.vfolder.processors.mount_policy import VFolderMountPolicyProcessors
 from ai.backend.manager.services.vfolder.processors.vfolder import VFolderProcessors
 from ai.backend.manager.services.vfolder.processors.vfolder_admin import VFolderAdminProcessors
+from ai.backend.manager.types import OptionalState
 
 # The ``vfolders.max_files`` column default; no path ever wrote another value.
 _LEGACY_MAX_FILES = 1000
@@ -586,6 +605,82 @@ class VFolderAdapter(BaseAdapter):
             used_bytes=BinarySize.to_size_info(usage.used_bytes),
         )
 
+    async def update(self, vfolder_id: UUID, input: UpdateVFolderInput) -> UpdateVFolderPayload:
+        """Update a vfolder's name and options."""
+        me = current_user()
+        if me is None:
+            raise UnreachableError("User context is not available")
+        result = await self._vfolder.update_vfolder_attribute.run(
+            UpdateVFolderAttributeAction(
+                user_uuid=me.user_id,
+                vfolder_uuid=VFolderUUID(vfolder_id),
+                updater=self._to_updater(vfolder_id, input),
+            )
+        )
+        return UpdateVFolderPayload(vfolder=self._vfolder_data_to_node(result.vfolder))
+
+    async def partial_bulk_update(
+        self, input: PartialBulkUpdateVFoldersInput
+    ) -> PartialBulkPayload[VFolderNode]:
+        """Update several vfolders, answering for each one."""
+        result = await self._vfolder.partial_bulk_update.run(
+            PartialBulkUpdateVFoldersAction(
+                updaters=[self._to_updater(item.id, item.input) for item in input.items]
+            )
+        )
+        return self._to_partial_bulk_payload(result)
+
+    async def partial_bulk_delete(
+        self, input: PartialBulkDeleteVFoldersInput
+    ) -> PartialBulkPayload[VFolderNode]:
+        """Soft-delete several vfolders, answering for each one."""
+        result = await self._vfolder.partial_bulk_delete.run(
+            PartialBulkDeleteVFoldersAction(
+                vfolder_ids=[VFolderUUID(vfolder_id) for vfolder_id in input.ids]
+            )
+        )
+        return self._to_partial_bulk_payload(result)
+
+    async def partial_bulk_restore(
+        self, input: PartialBulkRestoreVFoldersInput
+    ) -> PartialBulkPayload[VFolderNode]:
+        """Restore several soft-deleted vfolders, answering for each one."""
+        result = await self._vfolder.partial_bulk_restore.run(
+            PartialBulkRestoreVFoldersAction(
+                vfolder_ids=[VFolderUUID(vfolder_id) for vfolder_id in input.ids]
+            )
+        )
+        return self._to_partial_bulk_payload(result)
+
+    def _to_updater(self, vfolder_id: UUID, input: UpdateVFolderInput) -> VFolderAttributeUpdater:
+        permission = input.permission
+        return VFolderAttributeUpdater(
+            vfolder_id=VFolderUUID(vfolder_id),
+            name=OptionalState.from_unset(input.name),
+            cloneable=OptionalState.from_unset(input.cloneable),
+            mount_permission=(
+                OptionalState[VFolderMountPolicy].update(VFolderMountPolicy(permission.value))
+                if isinstance(permission, VFolderPermissionField)
+                else OptionalState[VFolderMountPolicy].nop()
+            ),
+        )
+
+    def _to_partial_bulk_payload(
+        self, result: PartialBulkResult[VFolderData]
+    ) -> PartialBulkPayload[VFolderNode]:
+        return PartialBulkPayload[VFolderNode](
+            successes=[
+                self._vfolder_data_to_node(item.value)
+                for item in result.items
+                if item.value is not None
+            ],
+            failed=[
+                PartialBulkFailure(id=item.entity_id, message=str(item.error))
+                for item in result.items
+                if item.error is not None
+            ],
+        )
+
     async def delete(self, vfolder_id: UUID) -> DeleteVFolderPayload:
         """Soft-delete a vfolder (move to trash). RBAC enforced."""
         action = DeleteVFolderV2Action(vfolder_uuid=VFolderUUID(vfolder_id))
@@ -698,26 +793,17 @@ class VFolderAdapter(BaseAdapter):
         )
 
     async def bulk_delete(self, input: BulkDeleteVFoldersInput) -> BulkDeleteVFoldersPayload:
-        """Soft-delete multiple vfolders.
-
-        Each vfolder is processed independently; per-id failures are collected into
-        ``failed`` rather than aborting the batch and leaving the earlier ids deleted
-        while the caller is told the whole call failed.
-        """
-        deleted: list[VFolderNode] = []
-        failed: list[BulkDeleteVFolderV2Error] = []
-        for vfolder_id in input.ids:
-            action = DeleteVFolderV2Action(vfolder_uuid=VFolderUUID(vfolder_id))
-            try:
-                result = await self._vfolder.delete_v2.run(action)
-            except BackendAIError as e:
-                failed.append(BulkDeleteVFolderV2Error(vfolder_id=vfolder_id, message=str(e)))
-                continue
-            deleted.append(self._vfolder_data_to_node(result.vfolder))
+        """Deprecated. Use :meth:`partial_bulk_delete`."""
+        if not input.ids:
+            return BulkDeleteVFoldersPayload(items=[], deleted_count=0, failed=[])
+        payload = await self.partial_bulk_delete(PartialBulkDeleteVFoldersInput(ids=input.ids))
         return BulkDeleteVFoldersPayload(
-            items=deleted,
-            deleted_count=len(deleted),
-            failed=failed,
+            items=payload.successes,
+            deleted_count=len(payload.successes),
+            failed=[
+                BulkDeleteVFolderV2Error(vfolder_id=failure.id, message=failure.message)
+                for failure in payload.failed
+            ],
         )
 
     async def bulk_purge(self, input: BulkPurgeVFoldersInput) -> BulkPurgeVFoldersPayload:
