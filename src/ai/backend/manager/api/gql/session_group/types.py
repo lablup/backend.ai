@@ -139,7 +139,15 @@ class SessionGroupGQL(PydanticNodeMixin[SessionGroupNodeDTO]):
         return cast(list[Self], results)
 
 
-SessionGroupEdgeGQL = Edge[SessionGroupGQL]
+@gql_connection_type(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="One session group within a connection.",
+    ),
+    name="SessionGroupEdge",
+)
+class SessionGroupEdgeGQL(Edge[SessionGroupGQL]):
+    pass
 
 
 @gql_connection_type(
@@ -150,6 +158,10 @@ SessionGroupEdgeGQL = Edge[SessionGroupGQL]
     name="SessionGroupConnection",
 )
 class SessionGroupConnectionGQL(Connection[SessionGroupGQL]):
+    edges: list[Edge[SessionGroupGQL]] = gql_field(
+        description="Contains the nodes in this connection.",
+        graphql_type=list[SessionGroupEdgeGQL],
+    )
     count: int = gql_field(description="Total number of session groups matching the query.")
 
     def __init__(self, *args: Any, count: int, **kwargs: Any) -> None:
