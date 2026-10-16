@@ -8,9 +8,9 @@ from typing import Any, override
 
 from sqlalchemy.orm import InstrumentedAttribute
 
+from ai.backend.common.auth.password import PasswordInfo
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.manager.data.user.types import UserData
-from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.specs.types import IntegrityErrorCheck
 from ai.backend.manager.models.specs.updater import DataUpdater
 from ai.backend.manager.models.user.row import UserRole, UserRow, UserStatus

@@ -57,6 +57,7 @@ class TestAdminBulkAssignRole:
             assigned=[
                 RoleAssignmentNode(
                     id=uuid.uuid4(),
+                    field_id=uuid.uuid4(),
                     user_id=user_id_success,
                     role_id=role_id,
                     granted_by=None,
@@ -133,6 +134,7 @@ class TestAdminBulkRevokeRole:
             revoked=[
                 RoleAssignmentNode(
                     id=uuid.uuid4(),
+                    field_id=uuid.uuid4(),
                     user_id=user_id_success,
                     role_id=role_id,
                     granted_by=None,

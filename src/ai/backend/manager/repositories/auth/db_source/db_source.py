@@ -13,6 +13,7 @@ from uuid import UUID
 import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql as pgsql
 
+from ai.backend.common.auth.password import HashInfo, PasswordInfo
 from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.entity.project import ProjectEntityType, ProjectID
 from ai.backend.common.data.entity.types import EntityIdentifier
@@ -41,11 +42,10 @@ from ai.backend.manager.errors.auth import (
 from ai.backend.manager.errors.common import InternalServerError
 from ai.backend.manager.errors.user import KeyPairNotFound, UserCreationBadRequest
 from ai.backend.manager.models.domain.row import DomainRow
-from ai.backend.manager.models.hasher.types import HashInfo, PasswordInfo
+from ai.backend.manager.models.hasher.factory import compare_to_hashed_password
 from ai.backend.manager.models.keypair.queriers import DefaultKeypairQuerier
 from ai.backend.manager.models.keypair.row import (
     KEYPAIR_SECRET_KEY_CONTEXT,
-    generate_keypair_data,
     keypairs,
 )
 from ai.backend.manager.models.login_session.row import LoginHistoryRow, LoginSessionRow
@@ -56,12 +56,11 @@ from ai.backend.manager.models.user.row import (
     UserRole,
     UserRow,
     UserStatus,
-    check_credential,
-    compare_to_hashed_password,
     users,
 )
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.virtual_entity.queries import user_scope_membership_exists
+from ai.backend.manager.repositories.auth.keypair_secrets import generate_keypair_data
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.repositories.ops.v2.user.provider import UserOpsProvider
 from ai.backend.manager.repositories.ops.v2.user.write import FullUserCreator
@@ -389,7 +388,6 @@ class AuthDBSource:
 
     async def _check_password(
         self,
-        conn: sa.ext.asyncio.AsyncConnection,
         row: sa.Row[Any],
         target_password_info: PasswordInfo,
     ) -> None:
@@ -489,7 +487,7 @@ class AuthDBSource:
             if row is None:
                 raise AuthorizationFailed("User credential mismatch.")
 
-            await self._check_password(conn, row, target_password_info)
+            await self._check_password(row, target_password_info)
             await self._migrate_password_hash(conn, row, domain_name, email, target_password_info)
 
             # Fetch active sessions for the user within the same connection
@@ -601,15 +599,20 @@ class AuthDBSource:
         self,
         domain_name: str,
         email: str,
-        password: str,
+        target_password_info: PasswordInfo,
     ) -> sa.RowMapping:
         """Verify credentials without password migration (for signout, etc.)"""
-        return await check_credential(
-            db=self._db,
-            domain=domain_name,
-            email=email,
-            password=password,
-        )
+        async with self._db.begin_readonly() as conn:
+            result = await conn.execute(
+                sa.select(users)
+                .select_from(users)
+                .where((users.c.email == email) & (users.c.domain_name == domain_name)),
+            )
+            row = result.first()
+            if row is None:
+                raise AuthorizationFailed("User credential mismatch.")
+            await self._check_password(row, target_password_info)
+        return row._mapping
 
     @auth_db_source_resilience.apply()
     async def fetch_default_keypair(self, user_uuid: UUID) -> KeyPairData:

@@ -8,6 +8,7 @@ from typing import Any, override
 
 import sqlalchemy as sa
 
+from ai.backend.common.auth.password import PasswordInfo
 from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.entity.global_entity import GlobalEntityName
 from ai.backend.common.data.entity.types import EntityIdentifier
@@ -15,7 +16,6 @@ from ai.backend.common.data.entity.user import UserID
 from ai.backend.manager.data.permission.global_entity import global_entity_id
 from ai.backend.manager.data.user.types import UserData, UserStatus
 from ai.backend.manager.models.domain.row import DomainRow
-from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.specs.types import IntegrityErrorCheck
 from ai.backend.manager.models.specs.upserter import EntityUpserter
 from ai.backend.manager.models.user.row import UserRole, UserRow

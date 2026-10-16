@@ -6,6 +6,7 @@ from collections.abc import Mapping, Sequence
 from typing import TYPE_CHECKING, assert_never
 from uuid import UUID
 
+from ai.backend.common.auth.password import PasswordInfo
 from ai.backend.common.contexts.user import current_user
 from ai.backend.common.data.entity.domain import DomainID, DomainName
 from ai.backend.common.data.entity.keypair import KeyPairID
@@ -105,7 +106,6 @@ from ai.backend.manager.models.condition_utils import (
     negate_conditions,
 )
 from ai.backend.manager.models.domain.searchable_fields import DomainSearchableFields
-from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.keypair.row import KeyPairRow
 from ai.backend.manager.models.keypair.searchable_fields import KeyPairSearchableFields
 from ai.backend.manager.models.project.searchable_fields import ProjectSearchableFields

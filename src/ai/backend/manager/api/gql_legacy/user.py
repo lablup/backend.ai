@@ -18,6 +18,7 @@ from graphene.types.datetime import DateTime as GQLDateTime
 from graphql import Undefined
 from sqlalchemy.engine.row import Row
 
+from ai.backend.common.auth.password import PasswordInfo
 from ai.backend.common.data.entity.domain import DomainID, DomainName
 from ai.backend.common.data.entity.project import ProjectEntityType
 from ai.backend.common.data.entity.user import UserID
@@ -27,7 +28,6 @@ from ai.backend.manager.api.gql.base import resolve_entity_id
 from ai.backend.manager.data.user.types import (
     UserData,
 )
-from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.keypair.row import KeyPairRow
 from ai.backend.manager.models.minilang import (
     ExternalTableFilterSpec,

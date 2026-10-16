@@ -5,10 +5,10 @@ from uuid import UUID
 
 import pytest
 
+from ai.backend.common.auth.password import PasswordHashAlgorithm
 from ai.backend.common.plugin.hook import HookResult, HookResults
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.config.unified import AuthConfig, ManagerConfig
-from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.secret.types import KeyProviderType
 from ai.backend.manager.errors.auth import AuthorizationFailed
 from ai.backend.manager.errors.common import GenericBadRequest, RejectedByHook
