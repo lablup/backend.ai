@@ -255,11 +255,11 @@ class FairShareAdapter(BaseAdapter):
             domain_fair_share=self._domain_data_to_dto(result.data)
         )
 
-    async def bulk_upsert_domain(
+    async def atomic_bulk_upsert_domain(
         self,
         input: BulkUpsertDomainFairShareWeightInput,
     ) -> BulkUpsertDomainFairShareWeightPayload:
-        """Bulk upsert domain fair share weights."""
+        """Upsert several domain fair share weights in one transaction."""
         resource_group_id_result = await self._resource_group.lookup.run(
             LookupResourceGroupAction(name=ResourceGroupName(input.resource_group_name))
         )
@@ -380,11 +380,11 @@ class FairShareAdapter(BaseAdapter):
             project_fair_share=self._project_data_to_dto(result.data)
         )
 
-    async def bulk_upsert_project(
+    async def atomic_bulk_upsert_project(
         self,
         input: BulkUpsertProjectFairShareWeightInput,
     ) -> BulkUpsertProjectFairShareWeightPayload:
-        """Bulk upsert project fair share weights."""
+        """Upsert several project fair share weights in one transaction."""
         resource_group_id_result = await self._resource_group.lookup.run(
             LookupResourceGroupAction(name=ResourceGroupName(input.resource_group_name))
         )
@@ -509,11 +509,11 @@ class FairShareAdapter(BaseAdapter):
         )
         return UpsertUserFairShareWeightPayload(user_fair_share=self._user_data_to_dto(result.data))
 
-    async def bulk_upsert_user(
+    async def atomic_bulk_upsert_user(
         self,
         input: BulkUpsertUserFairShareWeightInput,
     ) -> BulkUpsertUserFairShareWeightPayload:
-        """Bulk upsert user fair share weights."""
+        """Upsert several user fair share weights in one transaction."""
         resource_group_id_result = await self._resource_group.lookup.run(
             LookupResourceGroupAction(name=ResourceGroupName(input.resource_group_name))
         )

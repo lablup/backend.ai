@@ -1,9 +1,9 @@
 ---
 name: retention-policy-adapter-scenarios
 type: reference
-description: what the retention policy adapter guarantees, as scenarios; the one policy a category holds, the read that needs the entity gate unlike the other catalogs, the delete and the purge that are the same hard delete, the monitor role passing the search
+description: what the retention policy adapter guarantees, as scenarios; the one policy a category holds, the read that needs the entity gate unlike the other catalogs, the purge that the deprecated delete also calls, the partial bulk update and purge, the monitor role passing the search
 scope: src/ai/backend/manager/api/adapters/retention_policy
-keywords: [retention policy, scenario, adapter, superadmin, monitor, category, purge]
+keywords: [retention policy, scenario, adapter, superadmin, monitor, category, purge, partial bulk]
 generated:
   by: claude-code/opus-5
   at: 2026-09-11
@@ -15,8 +15,8 @@ status: draft
 의심한다.
 
 `retention_policy` 정책은 카테고리마다 하나이고 어느 스코프에도 속하지 않게 만들어진다. 생성과
-검색은 호출한 사용자가 슈퍼관리자인지 검사하고, id를 지정하는 조회·수정·삭제는 그 정책에 부여된 권한을 검사하지만
-그 권한을 받을 방법이 없다. 생성·검색과 조회·수정·삭제 모두 슈퍼관리자만 통과하지만 거부
+검색은 호출한 사용자가 슈퍼관리자인지 검사하고, id를 지정하는 조회·수정·완전 삭제는 그 정책에 부여된 권한을 검사하지만
+그 권한을 받을 방법이 없다. 생성·검색과 조회·수정·완전 삭제 모두 슈퍼관리자만 통과하지만 거부
 이유가 서로 다르다.
 
 다른 전역 카탈로그와 달리 id로 하나를 조회하는 것도 권한 검사를 거친다. 인증만 확인하는
@@ -89,24 +89,38 @@ status: draft
 거부하고, 수정은 저장소의 제약 위반을 그대로 전파한다. 시나리오를 적기 전에 하나로 맞출 것인지
 정한다.
 
-## 삭제
+## 완전 삭제
 
 | 시나리오 | 상황 | 요청 | 결과 |
 |---|---|---|---|
-| 슈퍼관리자가 삭제한다 | 정책 하나, 슈퍼관리자 | 삭제 | 삭제한 id를 담은 응답 |
-| 완전 삭제한다 | 정책 하나, 슈퍼관리자 | 완전 삭제 | 삭제와 같은 응답. 남는 행이 없다 |
-| 존재하지 않는 id를 삭제한다 | 다른 정책만 있음, 슈퍼관리자 | 삭제 | 대상을 찾을 수 없어 거부 |
-| 아무 권한도 없는 사용자가 삭제한다 | 같은 정책, 아무 권한도 없음 | 삭제 | 권한 부족으로 거부 |
+| 슈퍼관리자가 완전 삭제한다 | 정책 하나, 슈퍼관리자 | 완전 삭제 | 삭제한 id를 담은 응답. 남는 행이 없다 |
+| 존재하지 않는 id를 완전 삭제한다 | 다른 정책만 있음, 슈퍼관리자 | 완전 삭제 | 대상을 찾을 수 없어 거부 |
 | 아무 권한도 없는 사용자가 완전 삭제한다 | 같은 정책, 아무 권한도 없음 | 완전 삭제 | 권한 부족으로 거부 |
-| 권한 검사를 끄면 권한 없이도 삭제된다 | 권한 검사 비활성화, 아무 권한도 없음 | 삭제 | 삭제한 id를 담은 응답 |
+| 권한 검사를 끄면 권한 없이도 완전 삭제된다 | 권한 검사 비활성화, 아무 권한도 없음 | 완전 삭제 | 삭제한 id를 담은 응답 |
 
-삭제와 완전 삭제는 같은 일을 한다. 둘 다 행을 지우고 soft delete는 없다. 둘 다 이미 API로
-공개되어 있어 합치면 API 변경이 되므로 이름을 둘 다 유지하고, 둘을 각각 시나리오로 두어 같다는
-것을 고정한다.
+soft delete 는 없다. deprecated 된 삭제 GQL mutation 과 SDK 메서드는 완전 삭제를 부른다.
+
+## 여럿 수정하기
+
+| 시나리오 | 상황 | 요청 | 결과 |
+|---|---|---|---|
+| 슈퍼관리자가 여럿의 보존 일수를 한 번에 바꾼다 | 카테고리가 다른 정책 둘, 슈퍼관리자 | 둘의 보존 일수 수정 | 둘 다 새 일수로 오고 실패한 것은 없음 |
+| 아무 권한도 없는 사용자가 여럿을 수정한다 | 같은 정책 둘, 아무 권한도 없음 | 둘의 보존 일수 수정 | 수정된 것 없이 둘 다 권한 부족 이유로 실패 목록에 옴 |
+
+## 여럿 완전 삭제
+
+| 시나리오 | 상황 | 요청 | 결과 |
+|---|---|---|---|
+| 슈퍼관리자가 둘과 없는 id 하나를 한 번에 완전 삭제한다 | 카테고리가 다른 정책 둘, 슈퍼관리자 | 셋 완전 삭제 | 둘은 처리된 목록에 오고, 없는 id 는 대상 없음 이유로 실패 목록에 옴 |
+| 아무 권한도 없는 사용자가 여럿을 완전 삭제한다 | 같은 정책 둘, 아무 권한도 없음 | 둘 완전 삭제 | 지워진 것 없이 둘 다 권한 부족 이유로 실패 목록에 옴 |
+
+여럿 연산은 호출 전체를 거부하지 않는다. 처리한 정책은 처리된 목록에, 처리하지 못한 것은 id 와
+이유를 실패 목록에 싣는다.
 
 ## 아직 적지 않은 것
 
-없다. 어댑터가 제공하는 `create`, `get`, `search`, `update`, `delete`, `purge`가 모두 위에 있다.
+없다. 어댑터가 제공하는 `create`, `get`, `search`, `update`, `purge`, `partial_bulk_update`,
+`partial_bulk_purge`가 모두 위에 있다.
 
 `batch_load_fields`는 모든 어댑터가 물려받는 공용 도우미이지 이 엔티티의 호출이 아니다. 레포트가
 이 호출도 함께 세지만 적을 시나리오는 없다.

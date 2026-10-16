@@ -2,23 +2,14 @@
 
 [무엇을 보장하는가](/src/ai/backend/manager/api/adapters/client_ip_masking/KNOWLEDGE.md) · [어댑터](/src/ai/backend/manager/api/adapters/client_ip_masking/adapter.py)
 
-시나리오: 미완 1 / 4
+시나리오: 미완 2 / 5
 
-- ops 로 구성 (4)
-  - admin_purge — 대표 성공 ✓ · 대표 실패 ✓
+- ops 로 구성 (5)
   - admin_search — 대표 성공 ✓ · 대표 실패 ✓
-  - admin_upsert — 대표 성공 ✓ · 대표 실패 ✓
   - batch_load_by_ids — 대표 성공 ✗ · 대표 실패 ✗ — SCENARIO-GAP
-
-**admin_purge**
-
-| 시나리오 | 판정 |
-|---|---|
-| [슈퍼관리자가 정책을 id로 삭제하면 삭제한 정책 전체를 담은 응답이 반환된다](#retiring-the-superadmin-purges-a-masking-policy) | 성공 |
-| [권한 검사를 끄면 아무 권한도 없는 사용자도 정책을 삭제할 수 있다](#retiring-turning-enforcement-off-lets-a-user-purge-a-masking-policy) | 성공 |
-| [아무 권한도 없는 사용자가 정책을 삭제하면 권한 부족으로 거부된다. 등록이 역할 부족으로 거부되는 것과는 다른 검사다](#retiring-a-user-granted-nothing-may-not-purge-a-masking-policy) | 거부 |
-| [아무 권한도 없는 사용자가 존재하지 않는 id를 삭제하면 대상 없음이 아니라 권한 부족으로 거부된다. 권한 검사가 먼저 실행되고 없는 행에는 부여된 권한도 없기 때문이다](#retiring-a-user-granted-nothing-purging-an-unknown-masking-policy-id-is-refused-for-permission) | 거부 |
-| [슈퍼관리자가 존재하지 않는 id를 삭제하면 대상을 찾을 수 없다는 이유로 거부된다](#retiring-purging-a-masking-policy-id-nothing-answers-to-is-not-found) | 거부 |
+  - partial_bulk_purge — 대표 성공 ✓ · 대표 실패 ✗ — SCENARIO-GAP
+  - purge — 대표 성공 ✓ · 대표 실패 ✓
+  - upsert — 대표 성공 ✓ · 대표 실패 ✓
 
 **admin_search**
 
@@ -28,7 +19,24 @@
 | [대상이 다른 정책 둘이 있을 때 슈퍼관리자가 필터 없이 조회하면 둘 다 집계된다](#searching-the-superadmin-counts-every-masking-policy-laid) | 성공 |
 | [슈퍼관리자가 아닌 사용자가 전체 조회를 요청하면 역할 부족으로 거부된다](#searching-a-user-who-is-not-the-superadmin-may-not-search-masking-policies) | 거부 |
 
-**admin_upsert**
+**partial_bulk_purge**
+
+| 시나리오 | 판정 |
+|---|---|
+| [아무 권한도 없는 사용자가 정책 여럿을 한 번에 purge 하려 하면, purge 된 것 없이 모두 권한이 없다는 이유로 실패 목록에 온다](#partial_bulk_purging-a-user-granted-nothing-purges-none-of-several-masking-policies) | 성공 |
+| [슈퍼관리자가 정책 둘과 없는 id 하나를 한 번에 purge 하면, 둘은 처리된 목록에 오고 없는 id 는 대상이 없다는 이유로 실패 목록에 온다](#partial_bulk_purging-purging-several-masking-policies-answers-for-the-missing-one) | 성공 |
+
+**purge**
+
+| 시나리오 | 판정 |
+|---|---|
+| [슈퍼관리자가 정책을 id로 삭제하면 삭제한 정책 전체를 담은 응답이 반환된다](#retiring-the-superadmin-purges-a-masking-policy) | 성공 |
+| [권한 검사를 끄면 아무 권한도 없는 사용자도 정책을 삭제할 수 있다](#retiring-turning-enforcement-off-lets-a-user-purge-a-masking-policy) | 성공 |
+| [아무 권한도 없는 사용자가 정책을 삭제하면 권한 부족으로 거부된다. 등록이 역할 부족으로 거부되는 것과는 다른 검사다](#retiring-a-user-granted-nothing-may-not-purge-a-masking-policy) | 거부 |
+| [아무 권한도 없는 사용자가 존재하지 않는 id를 삭제하면 대상 없음이 아니라 권한 부족으로 거부된다. 권한 검사가 먼저 실행되고 없는 행에는 부여된 권한도 없기 때문이다](#retiring-a-user-granted-nothing-purging-an-unknown-masking-policy-id-is-refused-for-permission) | 거부 |
+| [슈퍼관리자가 존재하지 않는 id를 삭제하면 대상을 찾을 수 없다는 이유로 거부된다](#retiring-purging-a-masking-policy-id-nothing-answers-to-is-not-found) | 거부 |
+
+**upsert**
 
 | 시나리오 | 판정 |
 |---|---|
@@ -39,150 +47,6 @@
 | [슈퍼관리자가 아닌 사용자가 정책을 등록하면 역할 부족으로 거부된다](#upserting-a-user-who-is-not-the-superadmin-may-not-put-a-masking-policy) | 거부 |
 | [모니터 역할이 정책을 등록하면 역할 부족으로 거부된다. 모니터는 슈퍼관리자 검사에서 읽기만 통과한다](#upserting-the-monitor-may-not-put-a-masking-policy) | 거부 |
 | [권한 검사를 꺼도 슈퍼관리자가 아니면 정책을 등록하지 못한다](#upserting-turning-enforcement-off-does-not-let-a-user-put-a-masking-policy) | 거부 |
-
-### admin_purge
-
-<a id="retiring-the-superadmin-purges-a-masking-policy"></a>
-
-#### [the-superadmin-purges-a-masking-policy](/tests/scenario/bai_scenario/manager/client_ip_masking/test_retiring.py) — pass
-
-슈퍼관리자가 정책을 id로 삭제하면 삭제한 정책 전체를 담은 응답이 반환된다
-
-Given
-
-- 클라이언트 IP 마스킹 정책 하나와, 슈퍼관리자 한 명
-  - 클라이언트 IP 마스킹 정책 default: truncate 모드, 접두 길이 v4 24, v6 48
-  - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
-
-When
-
-- ClientIPMaskingAdapter.admin_purge — user-1이 default 대상 정책 삭제
-
-Then
-
-- 삭제한 정책 전체가 반환된다
-  - id: 미리 만들어 둔 정책와 같다
-  - target_type = 'default'
-  - mode = 'truncate'
-  - ipv4_prefix = 24
-  - ipv6_prefix = 48
-  - created_at: 이 실행이 쓴 시각
-  - updated_at: 이 실행이 쓴 시각
-
-<a id="retiring-turning-enforcement-off-lets-a-user-purge-a-masking-policy"></a>
-
-#### [turning-enforcement-off-lets-a-user-purge-a-masking-policy](/tests/scenario/bai_scenario/manager/client_ip_masking/test_retiring.py) — pass
-
-권한 검사를 끄면 아무 권한도 없는 사용자도 정책을 삭제할 수 있다
-
-Given
-
-- 클라이언트 IP 마스킹 정책 하나와, 일반 사용자 한 명
-  - 클라이언트 IP 마스킹 정책 default: truncate 모드, 접두 길이 v4 24, v6 48
-  - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-
-When
-
-- ClientIPMaskingAdapter.admin_purge — user-1이 default 대상 정책 삭제
-
-Then
-
-- 삭제한 정책 전체가 반환된다
-  - id: 미리 만들어 둔 정책와 같다
-  - target_type = 'default'
-  - mode = 'truncate'
-  - ipv4_prefix = 24
-  - ipv6_prefix = 48
-  - created_at: 이 실행이 쓴 시각
-  - updated_at: 이 실행이 쓴 시각
-
-<a id="retiring-a-user-granted-nothing-may-not-purge-a-masking-policy"></a>
-
-#### [a-user-granted-nothing-may-not-purge-a-masking-policy](/tests/scenario/bai_scenario/manager/client_ip_masking/test_retiring.py) — pass
-
-아무 권한도 없는 사용자가 정책을 삭제하면 권한 부족으로 거부된다. 등록이 역할 부족으로 거부되는 것과는 다른 검사다
-
-Given
-
-- 클라이언트 IP 마스킹 정책 하나와, 일반 사용자 한 명
-  - 클라이언트 IP 마스킹 정책 default: truncate 모드, 접두 길이 v4 24, v6 48
-  - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-
-When
-
-- ClientIPMaskingAdapter.admin_purge — user-1이 default 대상 정책 삭제
-
-Then
-
-- 거부된다
-  - 거부: NotEnoughPermission
-
-<a id="retiring-a-user-granted-nothing-purging-an-unknown-masking-policy-id-is-refused-for-permission"></a>
-
-#### [a-user-granted-nothing-purging-an-unknown-masking-policy-id-is-refused-for-permission](/tests/scenario/bai_scenario/manager/client_ip_masking/test_retiring.py) — pass
-
-아무 권한도 없는 사용자가 존재하지 않는 id를 삭제하면 대상 없음이 아니라 권한 부족으로 거부된다. 권한 검사가 먼저 실행되고 없는 행에는 부여된 권한도 없기 때문이다
-
-Given
-
-- 클라이언트 IP 마스킹 정책 하나와, 일반 사용자 한 명
-  - 클라이언트 IP 마스킹 정책 default: truncate 모드, 접두 길이 v4 24, v6 48
-  - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-
-When
-
-- ClientIPMaskingAdapter.admin_purge — user-1이 존재하지 않는 id 삭제
-
-Then
-
-- 거부된다
-  - 거부: NotEnoughPermission
-
-<a id="retiring-purging-a-masking-policy-id-nothing-answers-to-is-not-found"></a>
-
-#### [purging-a-masking-policy-id-nothing-answers-to-is-not-found](/tests/scenario/bai_scenario/manager/client_ip_masking/test_retiring.py) — pass
-
-슈퍼관리자가 존재하지 않는 id를 삭제하면 대상을 찾을 수 없다는 이유로 거부된다
-
-Given
-
-- 클라이언트 IP 마스킹 정책 하나와, 슈퍼관리자 한 명
-  - 클라이언트 IP 마스킹 정책 default: truncate 모드, 접두 길이 v4 24, v6 48
-  - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
-
-When
-
-- ClientIPMaskingAdapter.admin_purge — user-1이 존재하지 않는 id 삭제
-
-Then
-
-- 거부된다
-  - 거부: EntityNotFoundError
 
 ### admin_search
 
@@ -273,7 +137,229 @@ Then
 - 거부된다
   - 거부: InsufficientPrivilege
 
-### admin_upsert
+### partial_bulk_purge
+
+<a id="partial_bulk_purging-a-user-granted-nothing-purges-none-of-several-masking-policies"></a>
+
+#### [a-user-granted-nothing-purges-none-of-several-masking-policies](/tests/scenario/bai_scenario/manager/client_ip_masking/test_partial_bulk_purging.py) — pass
+
+아무 권한도 없는 사용자가 정책 여럿을 한 번에 purge 하려 하면, purge 된 것 없이 모두 권한이 없다는 이유로 실패 목록에 온다
+
+Given
+
+- 대상이 다른 클라이언트 IP 마스킹 정책 둘과, 일반 사용자 한 명
+  - 클라이언트 IP 마스킹 정책 default: truncate 모드, 접두 길이 v4 24, v6 48
+  - 클라이언트 IP 마스킹 정책 login_history: truncate 모드, 접두 길이 v4 24, v6 48
+  - 도메인 home-1
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+
+When
+
+- ClientIPMaskingAdapter.partial_bulk_purge — user-1이 정책 2개를 한 번에 purge 함
+
+Then
+
+- 처리된 정책 없이 대상이 모두 실패 목록에 온다
+  - successes = []
+  - failed count = 2
+  - failed[0].id: 대상 정책의 id와 같다
+  - failed[0].message: 'Insufficient permission'를 담은 이유
+  - failed[1].id: 대상 정책의 id와 같다
+  - failed[1].message: 'Insufficient permission'를 담은 이유
+
+<a id="partial_bulk_purging-purging-several-masking-policies-answers-for-the-missing-one"></a>
+
+#### [purging-several-masking-policies-answers-for-the-missing-one](/tests/scenario/bai_scenario/manager/client_ip_masking/test_partial_bulk_purging.py) — pass
+
+슈퍼관리자가 정책 둘과 없는 id 하나를 한 번에 purge 하면, 둘은 처리된 목록에 오고 없는 id 는 대상이 없다는 이유로 실패 목록에 온다
+
+Given
+
+- 대상이 다른 클라이언트 IP 마스킹 정책 둘과, 슈퍼관리자 한 명
+  - 클라이언트 IP 마스킹 정책 default: truncate 모드, 접두 길이 v4 24, v6 48
+  - 클라이언트 IP 마스킹 정책 login_history: truncate 모드, 접두 길이 v4 24, v6 48
+  - 도메인 home-1
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+
+When
+
+- ClientIPMaskingAdapter.partial_bulk_purge — user-1이 정책 2개 와 없는 id 하나를 한 번에 purge 함
+
+Then
+
+- 정책이 모두 처리된 목록에 오고, 없는 id 는 대상이 없다는 이유로 실패 목록에 온다
+  - successes count = 2
+  - id: 미리 만들어 둔 정책와 같다
+  - target_type = 'default'
+  - mode = 'truncate'
+  - ipv4_prefix = 24
+  - ipv6_prefix = 48
+  - created_at: 이 실행이 쓴 시각
+  - updated_at: 이 실행이 쓴 시각
+  - id: 미리 만들어 둔 정책와 같다
+  - target_type = 'login_history'
+  - mode = 'truncate'
+  - ipv4_prefix = 24
+  - ipv6_prefix = 48
+  - created_at: 이 실행이 쓴 시각
+  - updated_at: 이 실행이 쓴 시각
+  - failed count = 1
+  - failed[0].id: 요청에 넣은 없는 id와 같다
+  - failed[0].message: 'not found'를 담은 이유
+
+### purge
+
+<a id="retiring-the-superadmin-purges-a-masking-policy"></a>
+
+#### [the-superadmin-purges-a-masking-policy](/tests/scenario/bai_scenario/manager/client_ip_masking/test_retiring.py) — pass
+
+슈퍼관리자가 정책을 id로 삭제하면 삭제한 정책 전체를 담은 응답이 반환된다
+
+Given
+
+- 클라이언트 IP 마스킹 정책 하나와, 슈퍼관리자 한 명
+  - 클라이언트 IP 마스킹 정책 default: truncate 모드, 접두 길이 v4 24, v6 48
+  - 도메인 home-1
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+
+When
+
+- ClientIPMaskingAdapter.purge — user-1이 default 대상 정책 삭제
+
+Then
+
+- 삭제한 정책 전체가 반환된다
+  - id: 미리 만들어 둔 정책와 같다
+  - target_type = 'default'
+  - mode = 'truncate'
+  - ipv4_prefix = 24
+  - ipv6_prefix = 48
+  - created_at: 이 실행이 쓴 시각
+  - updated_at: 이 실행이 쓴 시각
+
+<a id="retiring-turning-enforcement-off-lets-a-user-purge-a-masking-policy"></a>
+
+#### [turning-enforcement-off-lets-a-user-purge-a-masking-policy](/tests/scenario/bai_scenario/manager/client_ip_masking/test_retiring.py) — pass
+
+권한 검사를 끄면 아무 권한도 없는 사용자도 정책을 삭제할 수 있다
+
+Given
+
+- 클라이언트 IP 마스킹 정책 하나와, 일반 사용자 한 명
+  - 클라이언트 IP 마스킹 정책 default: truncate 모드, 접두 길이 v4 24, v6 48
+  - 도메인 home-1
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+
+When
+
+- ClientIPMaskingAdapter.purge — user-1이 default 대상 정책 삭제
+
+Then
+
+- 삭제한 정책 전체가 반환된다
+  - id: 미리 만들어 둔 정책와 같다
+  - target_type = 'default'
+  - mode = 'truncate'
+  - ipv4_prefix = 24
+  - ipv6_prefix = 48
+  - created_at: 이 실행이 쓴 시각
+  - updated_at: 이 실행이 쓴 시각
+
+<a id="retiring-a-user-granted-nothing-may-not-purge-a-masking-policy"></a>
+
+#### [a-user-granted-nothing-may-not-purge-a-masking-policy](/tests/scenario/bai_scenario/manager/client_ip_masking/test_retiring.py) — pass
+
+아무 권한도 없는 사용자가 정책을 삭제하면 권한 부족으로 거부된다. 등록이 역할 부족으로 거부되는 것과는 다른 검사다
+
+Given
+
+- 클라이언트 IP 마스킹 정책 하나와, 일반 사용자 한 명
+  - 클라이언트 IP 마스킹 정책 default: truncate 모드, 접두 길이 v4 24, v6 48
+  - 도메인 home-1
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+
+When
+
+- ClientIPMaskingAdapter.purge — user-1이 default 대상 정책 삭제
+
+Then
+
+- 거부된다
+  - 거부: NotEnoughPermission
+
+<a id="retiring-a-user-granted-nothing-purging-an-unknown-masking-policy-id-is-refused-for-permission"></a>
+
+#### [a-user-granted-nothing-purging-an-unknown-masking-policy-id-is-refused-for-permission](/tests/scenario/bai_scenario/manager/client_ip_masking/test_retiring.py) — pass
+
+아무 권한도 없는 사용자가 존재하지 않는 id를 삭제하면 대상 없음이 아니라 권한 부족으로 거부된다. 권한 검사가 먼저 실행되고 없는 행에는 부여된 권한도 없기 때문이다
+
+Given
+
+- 클라이언트 IP 마스킹 정책 하나와, 일반 사용자 한 명
+  - 클라이언트 IP 마스킹 정책 default: truncate 모드, 접두 길이 v4 24, v6 48
+  - 도메인 home-1
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+
+When
+
+- ClientIPMaskingAdapter.purge — user-1이 존재하지 않는 id 삭제
+
+Then
+
+- 거부된다
+  - 거부: NotEnoughPermission
+
+<a id="retiring-purging-a-masking-policy-id-nothing-answers-to-is-not-found"></a>
+
+#### [purging-a-masking-policy-id-nothing-answers-to-is-not-found](/tests/scenario/bai_scenario/manager/client_ip_masking/test_retiring.py) — pass
+
+슈퍼관리자가 존재하지 않는 id를 삭제하면 대상을 찾을 수 없다는 이유로 거부된다
+
+Given
+
+- 클라이언트 IP 마스킹 정책 하나와, 슈퍼관리자 한 명
+  - 클라이언트 IP 마스킹 정책 default: truncate 모드, 접두 길이 v4 24, v6 48
+  - 도메인 home-1
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+
+When
+
+- ClientIPMaskingAdapter.purge — user-1이 존재하지 않는 id 삭제
+
+Then
+
+- 거부된다
+  - 거부: EntityNotFoundError
+
+### upsert
 
 <a id="upserting-a-masking-policy-put-without-prefixes-carries-empty-prefixes"></a>
 
@@ -293,7 +379,7 @@ Given
 
 When
 
-- ClientIPMaskingAdapter.admin_upsert — user-1이 default 대상에 truncate 모드 정책을 등록
+- ClientIPMaskingAdapter.upsert — user-1이 default 대상에 truncate 모드 정책을 등록
 
 Then
 
@@ -325,7 +411,7 @@ Given
 
 When
 
-- ClientIPMaskingAdapter.admin_upsert — user-1이 default 대상에 truncate 모드 정책을 다시 등록
+- ClientIPMaskingAdapter.upsert — user-1이 default 대상에 truncate 모드 정책을 다시 등록
 
 Then
 
@@ -357,7 +443,7 @@ Given
 
 When
 
-- ClientIPMaskingAdapter.admin_upsert — user-1이 default 대상에 drop 모드 정책을 접두 길이와 함께 다시 등록
+- ClientIPMaskingAdapter.upsert — user-1이 default 대상에 drop 모드 정책을 접두 길이와 함께 다시 등록
 
 Then
 
@@ -388,7 +474,7 @@ Given
 
 When
 
-- ClientIPMaskingAdapter.admin_upsert — user-1이 default 대상에 truncate 모드 정책을 접두 길이와 함께 등록
+- ClientIPMaskingAdapter.upsert — user-1이 default 대상에 truncate 모드 정책을 접두 길이와 함께 등록
 
 Then
 
@@ -419,7 +505,7 @@ Given
 
 When
 
-- ClientIPMaskingAdapter.admin_upsert — user-1이 default 대상에 truncate 모드 정책을 접두 길이와 함께 등록
+- ClientIPMaskingAdapter.upsert — user-1이 default 대상에 truncate 모드 정책을 접두 길이와 함께 등록
 
 Then
 
@@ -444,7 +530,7 @@ Given
 
 When
 
-- ClientIPMaskingAdapter.admin_upsert — user-1이 default 대상에 truncate 모드 정책을 접두 길이와 함께 등록
+- ClientIPMaskingAdapter.upsert — user-1이 default 대상에 truncate 모드 정책을 접두 길이와 함께 등록
 
 Then
 
@@ -469,7 +555,7 @@ Given
 
 When
 
-- ClientIPMaskingAdapter.admin_upsert — user-1이 default 대상에 truncate 모드 정책을 접두 길이와 함께 등록
+- ClientIPMaskingAdapter.upsert — user-1이 default 대상에 truncate 모드 정책을 접두 길이와 함께 등록
 
 Then
 

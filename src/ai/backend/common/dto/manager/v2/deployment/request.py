@@ -41,7 +41,7 @@ from ai.backend.common.dto.manager.query import (
     ToManyFilter,
     UUIDFilter,
 )
-from ai.backend.common.dto.manager.v2.common import ResourceSlotEntryInput
+from ai.backend.common.dto.manager.v2.common import NonEmptyList, ResourceSlotEntryInput
 from ai.backend.common.dto.manager.v2.deployment.types import (
     AccessTokenOrderField,
     AutoScalingRuleOrderField,
@@ -102,6 +102,7 @@ __all__ = (
     "ModelMountConfigInput",
     "ModelRuntimeConfigInput",
     "ModelServiceConfigInput",
+    "PartialBulkPurgeAccessTokensInput",
     "PresetValueInput",
     "ReplicaFilter",
     "ReplicaHealthStatusFilter",
@@ -1003,6 +1004,12 @@ class BulkDeleteAccessTokensInput(BaseRequestModel):
     """Input for bulk deleting access tokens."""
 
     ids: list[UUID] = Field(description="List of access token UUIDs to delete.")
+
+
+class PartialBulkPurgeAccessTokensInput(BaseRequestModel):
+    """Input for permanently removing several access tokens, each answered for separately."""
+
+    ids: NonEmptyList[UUID] = Field(description="IDs of the access tokens to purge.")
 
 
 class CreateAutoScalingRuleInput(BaseRequestModel):

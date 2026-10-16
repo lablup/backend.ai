@@ -1,7 +1,7 @@
 ---
 name: login-client-type-adapter-scenarios
 type: reference
-description: what the login client type adapter guarantees, as scenarios; the reads open to every authenticated user, the superadmin role on create, the entity gate nobody but a superadmin passes on update and delete, the page size of fifty
+description: what the login client type adapter guarantees, as scenarios; the reads open to every authenticated user, the superadmin role on create, the entity gate nobody but a superadmin passes on update and purge, single and partial bulk, the page size of fifty
 scope: src/ai/backend/manager/api/adapters/login_client_type
 keywords: [login client type, scenario, adapter, superadmin, public read, page size]
 generated:
@@ -9,7 +9,7 @@ generated:
   at: 2026-09-11
 updated:
   by: claude-code/opus-5
-  at: 2026-09-21
+  at: 2026-10-16
 status: draft
 ---
 # login_client_type 어댑터 — 시나리오
@@ -18,8 +18,8 @@ status: draft
 의심한다.
 
 `login_client_type` 엔티티는 global 과 public 양쪽에 소속된다. 생성은 호출한 사용자가
-슈퍼관리자인지 검사하고, 하나를 지정해 수정·삭제하는 호출은 그 `login_client_type` 행에 부여된
-권한을 검사하는데 그 권한은 global 에서만 나온다. 생성과 수정·삭제 모두 슈퍼관리자만 성공하지만
+슈퍼관리자인지 검사하고, 지정해 수정·purge 하는 호출은 그 `login_client_type` 행에 부여된
+권한을 검사하는데 그 권한은 global 에서만 나온다. 생성과 수정·purge 모두 슈퍼관리자만 성공하지만
 거부 이유가 서로 다르다. 조회와 검색은 public 에서 READ 를 검사한다. 모든 계정이 public 소속
 역할을 자동으로 받으므로 로그인한 사용자는 모두 읽을 수 있다.
 
@@ -77,27 +77,44 @@ status: draft
 
 존재하지 않는 id는 슈퍼관리자와 그 밖의 사용자에게 서로 다른 이유로 거부된다. 권한 검사가 먼저
 실행되는데 존재하지 않는 행에는 부여된 권한도 없으므로, 그 검사를 통과하는 슈퍼관리자만 대상을
-찾을 수 없어 거부된다. 삭제 절의 같은 시나리오도 마찬가지다.
+찾을 수 없어 거부된다. purge 절의 같은 시나리오도 마찬가지다.
 
 이름 중복은 생성할 때와 수정할 때 서로 다른 오류로 거부된다. 생성은 이 엔티티 전용 오류로
 거부하고, 수정은 저장소의 제약 위반 오류를 그대로 전파한다. 시나리오를 적기 전에 하나로 맞출
 것인지 정한다.
 
-## 삭제
+## purge
 
 | 시나리오 | 상황 | 요청 | 결과 |
 |---|---|---|---|
-| 슈퍼관리자가 삭제한다 | `login_client_type` 하나, 슈퍼관리자 | 삭제 | 삭제한 id를 담은 응답 |
-| 존재하지 않는 id를 삭제한다 | 다른 `login_client_type` 행만 있음, 슈퍼관리자 | 삭제 | 대상을 찾을 수 없어 거부 |
-| 아무 권한도 없는 사용자가 삭제한다 | 같은 `login_client_type`, 아무 권한도 없음 | 삭제 | 권한 부족으로 거부 |
-| 권한 검사를 끄면 권한 없이도 삭제된다 | 권한 검사 비활성화, 아무 권한도 없음 | 삭제 | 삭제한 id를 담은 응답 |
+| 슈퍼관리자가 purge 한다 | `login_client_type` 하나, 슈퍼관리자 | purge | purge 한 id를 담은 응답 |
+| 존재하지 않는 id를 purge 한다 | 다른 `login_client_type` 행만 있음, 슈퍼관리자 | purge | 대상을 찾을 수 없어 거부 |
+| 아무 권한도 없는 사용자가 purge 한다 | 같은 `login_client_type`, 아무 권한도 없음 | purge | 권한 부족으로 거부 |
+| 권한 검사를 끄면 권한 없이도 purge 된다 | 권한 검사 비활성화, 아무 권한도 없음 | purge | purge 한 id를 담은 응답 |
 
 이 어댑터에는 soft delete가 없다.
 
+## 여럿 수정하기
+
+| 시나리오 | 상황 | 요청 | 결과 |
+|---|---|---|---|
+| 슈퍼관리자가 여럿의 설명을 한 번에 바꾼다 | `login_client_type` 둘, 슈퍼관리자 | 둘의 설명 수정 | 둘 다 새 설명으로 오고 실패한 것은 없음 |
+| 아무 권한도 없는 사용자가 여럿을 수정한다 | 같은 `login_client_type` 둘 | 둘의 설명 수정 | 수정된 것 없이 둘 다 권한 부족 이유로 실패 목록에 옴 |
+
+## 여럿 purge
+
+| 시나리오 | 상황 | 요청 | 결과 |
+|---|---|---|---|
+| 슈퍼관리자가 둘과 없는 id 하나를 한 번에 purge 한다 | `login_client_type` 둘, 슈퍼관리자 | 셋 purge | 둘은 지워지기 전 모습으로 처리된 목록에 오고, 없는 id 는 대상 없음 이유로 실패 목록에 옴 |
+| 아무 권한도 없는 사용자가 여럿을 purge 한다 | 같은 `login_client_type` 둘 | 둘 purge | purge 된 것 없이 둘 다 권한 부족 이유로 실패 목록에 옴 |
+
+여럿 연산은 호출 전체를 거부하지 않는다. 처리한 종류는 처리된 목록에, 처리하지 못한 것은 id 와
+이유를 실패 목록에 싣는다.
+
 ## 아직 적지 않은 것
 
-없다. 어댑터가 제공하는 `admin_create`, `get`, `search`, `admin_update`, `admin_delete`가 모두 위에
-있다.
+없다. 어댑터가 제공하는 `admin_create`, `get`, `search`, `update`, `purge`, `partial_bulk_update`,
+`partial_bulk_purge`가 모두 위에 있다.
 
 `batch_load_fields`는 모든 어댑터가 상속받는 공용 헬퍼이지 이 엔티티의 호출이 아니다. 리포트는
 이것도 함께 세지만 적을 것이 없다.

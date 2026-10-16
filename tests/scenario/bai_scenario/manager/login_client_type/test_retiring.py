@@ -11,7 +11,7 @@ import pytest
 
 from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.dto.manager.v2.login_client_type.response import (
-    DeleteLoginClientTypePayload,
+    PurgeLoginClientTypePayload,
 )
 from ai.backend.manager.api.adapters.login_client_type.adapter import LoginClientTypeAdapter
 from ai.backend.manager.errors.base.entity import EntityNotFoundError
@@ -29,7 +29,7 @@ from bai_scenario.runner.acting import ActingAs
 from bai_scenario.runner.planting import TestSeedingSession
 from bai_scenario.runner.steps import run_scenario
 
-type Deleted = DeleteLoginClientTypePayload
+type Deleted = PurgeLoginClientTypePayload
 type RetiringStep = Scenario[TestSeedingSession, ATypeAndACaller, LoginClientTypeAdapter, Deleted]
 
 
@@ -41,7 +41,7 @@ class Deleting(When[ATypeAndACaller, LoginClientTypeAdapter, Deleted]):
 
     @override
     def operation(self) -> str:
-        return "admin_delete"
+        return "purge"
 
     @override
     def describe(self, laid: ATypeAndACaller) -> str:
@@ -51,7 +51,7 @@ class Deleting(When[ATypeAndACaller, LoginClientTypeAdapter, Deleted]):
     @override
     async def call(self, adapter: LoginClientTypeAdapter, laid: ATypeAndACaller) -> Deleted:
         with ActingAs(laid.caller):
-            return await adapter.admin_delete(uuid4() if self.unknown else laid.client_type.id)
+            return await adapter.purge(uuid4() if self.unknown else laid.client_type.id)
 
 
 @dataclass(frozen=True)

@@ -14,6 +14,7 @@ from ai.backend.common.data.entity.prometheus_query_preset import PrometheusQuer
 from ai.backend.common.data.entity.prometheus_query_preset_category import (
     PrometheusQueryPresetCategoryID,
 )
+from ai.backend.common.dto.manager.v2.common import PartialBulkPayload
 from ai.backend.common.dto.manager.v2.prometheus_query_preset.response import (
     CreateQueryDefinitionGQLPayload as CreateQueryDefinitionGQLPayloadDTO,
 )
@@ -23,6 +24,8 @@ from ai.backend.common.dto.manager.v2.prometheus_query_preset.response import (
 from ai.backend.common.dto.manager.v2.prometheus_query_preset.response import (
     QueryDefinitionNode,
 )
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
+from ai.backend.manager.api.gql.common_types import PartialBulkFailureGQL
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     gql_added_field,
@@ -137,3 +140,27 @@ class ModifyQueryDefinitionPayload(PydanticOutputMixin[ModifyQueryDefinitionGQLP
     """Payload for query definition modification mutation."""
 
     preset: QueryDefinitionGQL = gql_field(description="Updated query definition.")
+
+
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description=(
+            "Result of a partial bulk query definition operation: the query definitions "
+            "processed and the ones that failed."
+        ),
+    ),
+    model=PartialBulkPayload[QueryDefinitionNode],
+    name="PartialBulkQueryDefinitionsPayload",
+)
+class PartialBulkQueryDefinitionsPayloadGQL(
+    PydanticOutputMixin[PartialBulkPayload[QueryDefinitionNode]]
+):
+    """Payload for partial bulk query definition mutations."""
+
+    successes: list[QueryDefinitionGQL] = gql_field(
+        description="The query definitions processed, as they now stand."
+    )
+    failed: list[PartialBulkFailureGQL] = gql_field(
+        description="The query definitions not processed, each with the reason."
+    )

@@ -1,26 +1,43 @@
 ---
 name: fair-share-adapter-scenarios
 type: reference
-description: TODO - what the fair share adapter guarantees, as scenarios; nobody has written these yet
+description: what the fair share adapter guarantees, as scenarios; the tests in tests/scenario/bai_scenario/manager/fair_share match these one for one
 scope: src/ai/backend/manager/api/adapters/fair_share
-keywords: [fair share, scenario, adapter, todo]
+keywords: [fair share, weight, upsert, atomic bulk, scenario, adapter, rbac]
 generated:
-  by: claude-code/opus-5
-  at: 2026-09-10
+  by: claude-code/opus-5.5
+  at: 2026-10-16
 status: draft
 ---
 # fair_share 어댑터 — 시나리오
 
-TODO. 아직 아무도 적지 않았다.
+규칙은 상위 디렉터리의 `AGENTS.md`에 있다. 여기 적힌 것과 실행 결과가 어긋나면 문장을 먼저
+의심한다.
 
-규칙은 상위 디렉터리의 `AGENTS.md`에 있다. 이 파일이 이 모양으로 남아 있는 동안, 이 엔티티는
-시나리오 테스트가 없다.
+fair share 기록은 리소스 그룹과 도메인, 프로젝트, 사용자 중 하나를 함께 키로 갖는다. 가중치를
+쓰는 문은 그 리소스 그룹을 지목하는 권한 검사지만, 검사하는 대상 타입이 리소스 그룹이 아니라
+전역이다. 전역 타입 권한은 역할로 줄 수 없으므로, 그 그룹에 앉힌 역할로 수정 권한을 받은 사용자도
+가중치를 쓰지 못한다. 지금 가중치를 쓸 수 있는 것은 슈퍼관리자뿐이다.
 
-## 적는 법
+## 가중치 하나 정하기
 
-1. `adapter.py`가 내놓는 호출을 전부 훑는다.
-2. 호출마다 무엇을 보장하는지 한 문장으로 적는다. 권한이 있는 경우와 없는 경우를 짝으로 둔다.
-3. 동작별로 표를 나눈다. 각 줄은 상황, 요청, 결과 셋을 갖는다.
-4. 어느 시나리오도 부르지 않는 호출은 "아직 적지 않은 것"에 남긴다.
+| 시나리오 | 상황 | 요청 | 결과 |
+|---|---|---|---|
+| 슈퍼관리자가 그룹 안 도메인의 가중치를 정한다 | 리소스 그룹 하나와 도메인 하나 | 가중치 정하기 | 그 가중치를 실은 기록. 나머지 설정은 그룹 기본값 |
+| 그 그룹의 수정 권한을 받은 사용자가 정하려 한다 | 같은 그룹과 도메인, 그룹에 앉힌 역할로 수정 권한 | 가중치 정하기 | 권한 부족으로 거부 |
+| 아무 권한도 받지 않은 사용자가 정하려 한다 | 같은 그룹과 도메인 | 가중치 정하기 | 권한 부족으로 거부 |
 
-먼저 적힌 것을 보려면 `../domain/KNOWLEDGE.md`를 참고한다.
+## 가중치 여럿 한 번에 정하기
+
+| 시나리오 | 상황 | 요청 | 결과 |
+|---|---|---|---|
+| 슈퍼관리자가 도메인 둘의 가중치를 한 번에 정한다 | 리소스 그룹 하나와 도메인 둘 | 둘의 가중치 정하기 | 정한 개수 둘 |
+| 그 그룹의 수정 권한을 받은 사용자가 한 번에 정하려 한다 | 같은 그룹과 도메인 둘, 그룹에 앉힌 역할로 수정 권한 | 둘의 가중치 정하기 | 권한 부족으로 거부 |
+| 아무 권한도 받지 않은 사용자가 한 번에 정하려 한다 | 같은 그룹과 도메인 둘 | 둘의 가중치 정하기 | 권한 부족으로 거부 |
+
+여럿 정하기는 한 트랜잭션이다. 항목마다 따로 답하지 않고, 실패하면 호출 전체가 거부된다.
+
+## 아직 적지 않은 것
+
+- 프로젝트와 사용자의 가중치 정하기, 여럿 정하기. 도메인과 같은 그룹 권한 검사를 지난다.
+- 기록 하나 읽기, 전체 검색, 리소스 그룹 범위 검색 (도메인, 프로젝트, 사용자 모두).

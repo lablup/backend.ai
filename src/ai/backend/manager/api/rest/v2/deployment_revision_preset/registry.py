@@ -22,8 +22,14 @@ def register_v2_deployment_revision_preset_routes(
     registry.add("POST", "/search", handler.search, middlewares=[auth_required])
     registry.add("POST", "", handler.create, middlewares=[superadmin_required])
     registry.add("GET", "/{preset_id}", handler.get, middlewares=[auth_required])
-    registry.add("PATCH", "/{preset_id}", handler.update, middlewares=[superadmin_required])
-    registry.add("DELETE", "/{preset_id}", handler.delete, middlewares=[superadmin_required])
+    registry.add("PATCH", "/{preset_id}", handler.update, middlewares=[auth_required])
+    registry.add("DELETE", "/{preset_id}", handler.purge, middlewares=[auth_required])
+    registry.add(
+        "POST", "/partial-bulk-update", handler.partial_bulk_update, middlewares=[auth_required]
+    )
+    registry.add(
+        "POST", "/partial-bulk-purge", handler.partial_bulk_purge, middlewares=[auth_required]
+    )
     registry.add(
         "POST",
         "/{preset_id}/resource-slots/search",

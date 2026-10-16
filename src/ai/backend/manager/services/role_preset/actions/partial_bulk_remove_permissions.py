@@ -1,0 +1,64 @@
+from __future__ import annotations
+
+from collections.abc import Mapping, Sequence
+from dataclasses import dataclass, replace
+from typing import Self, override
+
+from ai.backend.common.data.entity.role_permission_preset import RolePermissionPresetID
+from ai.backend.common.data.entity.role_preset import RolePresetID
+from ai.backend.manager.actions.v2.field.ops import (
+    PartialBulkPurgeFieldOpsAction,
+)
+from ai.backend.manager.data.role_preset.types import RolePermissionPresetData
+from ai.backend.manager.models.rbac_models.role_permission_preset.purgers import (
+    RolePermissionPresetPurger,
+)
+from ai.backend.manager.models.rbac_models.role_permission_preset.row import (
+    RolePermissionPresetRow,
+)
+from ai.backend.manager.services.role_preset.actions.lookup_permission_owner import (
+    LookupBulkRolePermissionPresetOwnerAction,
+)
+
+
+@dataclass
+class PartialBulkRemoveRolePresetPermissionsAction(
+    PartialBulkPurgeFieldOpsAction[
+        RolePermissionPresetID,
+        RolePresetID,
+        RolePermissionPresetRow,
+        RolePermissionPresetData,
+    ]
+):
+    """Drop the named permission entries, answering for each one.
+
+    The entries may belong to different presets; every one of those presets answers for
+    the removal of the entries it owns.
+    """
+
+    ids: Sequence[RolePermissionPresetID]
+
+    @override
+    @classmethod
+    def action_name(cls) -> str:
+        return "partial_bulk_remove_role_preset_permissions"
+
+    @override
+    def field_ids(self) -> Sequence[RolePermissionPresetID]:
+        return tuple(self.ids)
+
+    @override
+    def to_owner_lookup_action(self) -> LookupBulkRolePermissionPresetOwnerAction:
+        return LookupBulkRolePermissionPresetOwnerAction(permission_preset_ids=self.ids)
+
+    @override
+    def to_purgers(self) -> Mapping[RolePermissionPresetID, RolePermissionPresetPurger]:
+        return {
+            permission_id: RolePermissionPresetPurger(permission_preset_id=permission_id)
+            for permission_id in self.ids
+        }
+
+    @override
+    def narrowed_to(self, field_ids: Sequence[RolePermissionPresetID]) -> Self:
+        allowed = frozenset(field_ids)
+        return replace(self, ids=[field_id for field_id in self.ids if field_id in allowed])

@@ -11,6 +11,7 @@ from pydantic import Field, field_validator
 
 from ai.backend.common.api_handlers import BaseRequestModel
 from ai.backend.common.dto.manager.query import StringFilter, UUIDFilter
+from ai.backend.common.dto.manager.v2.common import NonEmptyList
 from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 
 from .types import (
@@ -26,6 +27,7 @@ __all__ = (
     "ContainerRegistryOrder",
     "CreateContainerRegistryInput",
     "DeleteContainerRegistryInput",
+    "PartialBulkPurgeContainerRegistriesInput",
     "AdminSearchContainerRegistriesInput",
     "UpdateContainerRegistryInput",
 )
@@ -145,6 +147,12 @@ class DeleteContainerRegistryInput(BaseRequestModel):
     """Input for deleting a container registry."""
 
     id: UUID = Field(description="Unique identifier of the registry to delete.")
+
+
+class PartialBulkPurgeContainerRegistriesInput(BaseRequestModel):
+    """Input for purging several container registries, each answered for separately."""
+
+    ids: NonEmptyList[UUID] = Field(description="IDs of the container registries to purge.")
 
 
 class ContainerRegistryFilter(BaseRequestModel):
