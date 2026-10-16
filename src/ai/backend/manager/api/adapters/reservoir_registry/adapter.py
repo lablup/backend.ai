@@ -3,22 +3,27 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
+from typing import Any
 from uuid import UUID
 
 from ai.backend.common.data.entity.artifact_registry import ArtifactRegistryID
+from ai.backend.common.dto.manager.v2.common import PartialBulkFailure, PartialBulkPayload
 from ai.backend.common.dto.manager.v2.reservoir_registry.request import (
     AdminSearchReservoirRegistriesInput,
     CreateReservoirRegistryInput,
-    DeleteReservoirRegistryInput,
+    PartialBulkPurgeReservoirRegistriesInput,
+    PartialBulkUpdateReservoirRegistriesInput,
+    UpdateReservoirRegistryBody,
     UpdateReservoirRegistryInput,
 )
 from ai.backend.common.dto.manager.v2.reservoir_registry.response import (
     AdminSearchReservoirRegistriesPayload,
     CreateReservoirRegistryPayload,
-    DeleteReservoirRegistryPayload,
+    PurgeReservoirRegistryPayload,
     ReservoirRegistryNode,
     UpdateReservoirRegistryPayload,
 )
+from ai.backend.manager.actions.v2.bulk.result import PartialBulkResult
 from ai.backend.manager.api.adapters.base import BaseAdapter
 from ai.backend.manager.data.artifact_registries.types import (
     ArtifactRegistryCreatorMeta,
@@ -50,6 +55,13 @@ from ai.backend.manager.services.artifact_registry.actions.reservoir.get import 
 )
 from ai.backend.manager.services.artifact_registry.actions.reservoir.get_multi import (
     GetReservoirRegistriesAction,
+)
+from ai.backend.manager.services.artifact_registry.actions.reservoir.partial_bulk_purge import (
+    PartialBulkPurgeReservoirRegistriesAction,
+)
+from ai.backend.manager.services.artifact_registry.actions.reservoir.partial_bulk_update import (
+    PartialBulkUpdateReservoirRegistriesAction,
+    PartialBulkUpdateReservoirRegistryItem,
 )
 from ai.backend.manager.services.artifact_registry.actions.reservoir.search import (
     SearchReservoirRegistriesAction,
@@ -118,43 +130,74 @@ class ReservoirRegistryAdapter(BaseAdapter):
 
     async def update(self, input: UpdateReservoirRegistryInput) -> UpdateReservoirRegistryPayload:
         """Update an existing Reservoir registry."""
-        updater = ReservoirRegistryUpdater(
-            registry_id=ArtifactRegistryID(input.id),
-            endpoint=(
-                OptionalState.update(input.endpoint)
-                if input.endpoint is not None
-                else OptionalState.nop()
-            ),
-            access_key=(
-                OptionalState.update(input.access_key)
-                if input.access_key is not None
-                else OptionalState.nop()
-            ),
-            secret_key=(
-                OptionalState.update(input.secret_key)
-                if input.secret_key is not None
-                else OptionalState.nop()
-            ),
-            api_version=(
-                OptionalState.update(input.api_version)
-                if input.api_version is not None
-                else OptionalState.nop()
-            ),
-        )
-        meta = ArtifactRegistryModifierMeta(
-            name=(
-                OptionalState.update(input.name) if input.name is not None else OptionalState.nop()
-            ),
-        )
+        registry_id = ArtifactRegistryID(input.id)
+        item = self._to_update_item(registry_id, input)
         action_result = await self._artifact_registry.update_reservoir_registry.run(
             UpdateReservoirRegistryAction(
-                registry_id=ArtifactRegistryID(input.id),
-                updater=updater,
-                meta=meta,
+                registry_id=registry_id,
+                updater=item.updater,
+                meta=item.meta,
             )
         )
         return UpdateReservoirRegistryPayload(
             reservoir=self._reservoir_registry_data_to_dto(action_result.result)
+        )
+
+    async def partial_bulk_update(
+        self, input: PartialBulkUpdateReservoirRegistriesInput
+    ) -> PartialBulkPayload[ReservoirRegistryNode]:
+        """Update several Reservoir registries, answering for each one."""
+        result = await self._artifact_registry.partial_bulk_update_reservoir_registries.run(
+            PartialBulkUpdateReservoirRegistriesAction(
+                items=[
+                    self._to_update_item(ArtifactRegistryID(item.id), item.input)
+                    for item in input.items
+                ]
+            )
+        )
+        return PartialBulkPayload[ReservoirRegistryNode](
+            successes=[
+                self._reservoir_registry_data_to_dto(item.value)
+                for item in result.items
+                if item.value is not None
+            ],
+            failed=self._to_failures(result),
+        )
+
+    def _to_update_item(
+        self, registry_id: ArtifactRegistryID, input: UpdateReservoirRegistryBody
+    ) -> PartialBulkUpdateReservoirRegistryItem:
+        return PartialBulkUpdateReservoirRegistryItem(
+            updater=ReservoirRegistryUpdater(
+                registry_id=registry_id,
+                endpoint=(
+                    OptionalState.update(input.endpoint)
+                    if input.endpoint is not None
+                    else OptionalState.nop()
+                ),
+                access_key=(
+                    OptionalState.update(input.access_key)
+                    if input.access_key is not None
+                    else OptionalState.nop()
+                ),
+                secret_key=(
+                    OptionalState.update(input.secret_key)
+                    if input.secret_key is not None
+                    else OptionalState.nop()
+                ),
+                api_version=(
+                    OptionalState.update(input.api_version)
+                    if input.api_version is not None
+                    else OptionalState.nop()
+                ),
+            ),
+            meta=ArtifactRegistryModifierMeta(
+                name=(
+                    OptionalState.update(input.name)
+                    if input.name is not None
+                    else OptionalState.nop()
+                ),
+            ),
         )
 
     async def get_many(self, registry_ids: list[UUID]) -> list[ReservoirRegistryNode]:
@@ -205,12 +248,37 @@ class ReservoirRegistryAdapter(BaseAdapter):
             api_version=connection.api_version,
         )
 
-    async def delete(self, input: DeleteReservoirRegistryInput) -> DeleteReservoirRegistryPayload:
-        """Delete a Reservoir registry."""
+    async def purge(self, registry_id: UUID) -> PurgeReservoirRegistryPayload:
+        """Permanently delete a Reservoir registry."""
         action_result = await self._artifact_registry.delete_reservoir_registry.run(
-            DeleteReservoirRegistryAction(registry_id=ArtifactRegistryID(input.id))
+            DeleteReservoirRegistryAction(registry_id=ArtifactRegistryID(registry_id))
         )
-        return DeleteReservoirRegistryPayload(id=action_result.deleted_reservoir_id)
+        return PurgeReservoirRegistryPayload(id=action_result.deleted_reservoir_id)
+
+    async def partial_bulk_purge(
+        self, input: PartialBulkPurgeReservoirRegistriesInput
+    ) -> PartialBulkPayload[PurgeReservoirRegistryPayload]:
+        """Permanently delete several Reservoir registries, answering for each one."""
+        result = await self._artifact_registry.partial_bulk_purge_reservoir_registries.run(
+            PartialBulkPurgeReservoirRegistriesAction(
+                ids=[ArtifactRegistryID(registry_id) for registry_id in input.ids]
+            )
+        )
+        return PartialBulkPayload[PurgeReservoirRegistryPayload](
+            successes=[
+                PurgeReservoirRegistryPayload(id=item.value)
+                for item in result.items
+                if item.value is not None
+            ],
+            failed=self._to_failures(result),
+        )
+
+    def _to_failures(self, result: PartialBulkResult[Any]) -> list[PartialBulkFailure]:
+        return [
+            PartialBulkFailure(id=item.entity_id, message=str(item.error))
+            for item in result.items
+            if item.error is not None
+        ]
 
     @staticmethod
     def _reservoir_registry_data_to_dto(data: ReservoirRegistryData) -> ReservoirRegistryNode:

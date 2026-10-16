@@ -12,19 +12,20 @@ from ai.backend.common.data.entity.container_registry import (
     ContainerRegistryProjectName,
 )
 from ai.backend.common.data.entity.project import ProjectID
+from ai.backend.common.dto.manager.v2.common import PartialBulkFailure, PartialBulkPayload
 from ai.backend.common.dto.manager.v2.container_registry.request import (
     AdminSearchContainerRegistriesInput,
     ContainerRegistryFilter,
     ContainerRegistryOrder,
     CreateContainerRegistryInput,
-    DeleteContainerRegistryInput,
+    PartialBulkPurgeContainerRegistriesInput,
     UpdateContainerRegistryInput,
 )
 from ai.backend.common.dto.manager.v2.container_registry.response import (
     AdminSearchContainerRegistriesPayload,
     ContainerRegistryNode,
     CreateContainerRegistryPayload,
-    DeleteContainerRegistryPayload,
+    PurgeContainerRegistryPayload,
     UpdateContainerRegistryPayload,
 )
 from ai.backend.common.dto.manager.v2.container_registry.types import (
@@ -32,6 +33,7 @@ from ai.backend.common.dto.manager.v2.container_registry.types import (
     ContainerRegistryTypeFilter,
     OrderDirection,
 )
+from ai.backend.manager.actions.v2.bulk.result import PartialBulkResult
 from ai.backend.manager.api.adapter_options.pagination.pagination import PaginationSpec
 from ai.backend.manager.api.adapters.base import BaseAdapter
 from ai.backend.manager.data.container_registry.types import ContainerRegistryData
@@ -69,6 +71,9 @@ from ai.backend.manager.services.container_registry.actions.delete_container_reg
 )
 from ai.backend.manager.services.container_registry.actions.lookup import (
     LookupContainerRegistryAction,
+)
+from ai.backend.manager.services.container_registry.actions.partial_bulk_purge_container_registries import (
+    PartialBulkPurgeContainerRegistriesAction,
 )
 from ai.backend.manager.services.container_registry.actions.search_container_registries import (
     SearchContainerRegistriesAction,
@@ -275,16 +280,37 @@ class ContainerRegistryAdapter(BaseAdapter):
                 f"group_ids: {allowed_groups.remove}"
             )
 
-    async def admin_delete(
-        self,
-        input: DeleteContainerRegistryInput,
-    ) -> DeleteContainerRegistryPayload:
-        """Delete a container registry (superadmin only). This is a hard delete."""
-        purger = ContainerRegistryPurger(registry_id=ContainerRegistryID(input.id))
+    async def admin_purge(self, registry_id: ContainerRegistryID) -> PurgeContainerRegistryPayload:
+        """Purge a container registry (superadmin only)."""
         await self._container_registry.delete_container_registry.run(
-            DeleteContainerRegistryAction(purger=purger)
+            DeleteContainerRegistryAction(purger=ContainerRegistryPurger(registry_id=registry_id))
         )
-        return DeleteContainerRegistryPayload(id=input.id)
+        return PurgeContainerRegistryPayload(id=registry_id)
+
+    async def admin_partial_bulk_purge(
+        self, input: PartialBulkPurgeContainerRegistriesInput
+    ) -> PartialBulkPayload[ContainerRegistryNode]:
+        """Purge several container registries (superadmin only), answering for each one."""
+        result = await self._container_registry.partial_bulk_purge_container_registries.run(
+            PartialBulkPurgeContainerRegistriesAction(
+                ids=[ContainerRegistryID(registry_id) for registry_id in input.ids]
+            )
+        )
+        return self._to_partial_bulk_payload(result)
+
+    def _to_partial_bulk_payload(
+        self, result: PartialBulkResult[ContainerRegistryData]
+    ) -> PartialBulkPayload[ContainerRegistryNode]:
+        return PartialBulkPayload[ContainerRegistryNode](
+            successes=[
+                self._data_to_dto(item.value) for item in result.items if item.value is not None
+            ],
+            failed=[
+                PartialBulkFailure(id=item.entity_id, message=str(item.error))
+                for item in result.items
+                if item.error is not None
+            ],
+        )
 
     def build_querier(self, input: AdminSearchContainerRegistriesInput) -> BatchQuerier:
         """Build a BatchQuerier from the search input DTO.

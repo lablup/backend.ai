@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from ai.backend.manager.api.rest.middleware.auth import superadmin_required
+from ai.backend.manager.api.rest.middleware.auth import auth_required, superadmin_required
 from ai.backend.manager.api.rest.routing import RouteRegistry
 
 from .handler import V2AppConfigAllowListHandler
@@ -23,8 +23,8 @@ def register_v2_app_config_allow_list_routes(
         POST   /                            register an allow-list entry
         POST   /search                      paginated search
         GET    /{app_config_allow_list_id}  get by id
-        PATCH  /{app_config_allow_list_id}  update (rank) by id
-        DELETE /{app_config_allow_list_id}  purge by id
+        PATCH  /{app_config_allow_list_id}  update (rank) by id (deprecated)
+        DELETE /{app_config_allow_list_id}  purge by id (deprecated)
     """
     registry = RouteRegistry.create("app-config-allow-list", route_deps.cors_options)
 
@@ -36,6 +36,7 @@ def register_v2_app_config_allow_list_routes(
         handler.admin_get,
         middlewares=[superadmin_required],
     )
+    # Deprecated since NEXT_RELEASE_VERSION.
     registry.add(
         "PATCH",
         "/{app_config_allow_list_id}",
@@ -47,6 +48,36 @@ def register_v2_app_config_allow_list_routes(
         "/{app_config_allow_list_id}",
         handler.admin_purge,
         middlewares=[superadmin_required],
+    )
+
+    return registry
+
+
+def register_v2_app_config_allow_lists_routes(
+    handler: V2AppConfigAllowListHandler,
+    route_deps: RouteDeps,
+) -> RouteRegistry:
+    """Register the REST v2 app config allow-list write routes.
+
+    Layout:
+        PATCH  /{app_config_allow_list_id}  update (rank) by id
+        DELETE /{app_config_allow_list_id}  purge by id
+        POST   /partial-bulk-update         update many by id
+        POST   /partial-bulk-purge          purge many by id
+    """
+    registry = RouteRegistry.create("app-config-allow-lists", route_deps.cors_options)
+
+    registry.add(
+        "PATCH", "/{app_config_allow_list_id}", handler.update, middlewares=[auth_required]
+    )
+    registry.add(
+        "DELETE", "/{app_config_allow_list_id}", handler.purge, middlewares=[auth_required]
+    )
+    registry.add(
+        "POST", "/partial-bulk-update", handler.partial_bulk_update, middlewares=[auth_required]
+    )
+    registry.add(
+        "POST", "/partial-bulk-purge", handler.partial_bulk_purge, middlewares=[auth_required]
     )
 
     return registry

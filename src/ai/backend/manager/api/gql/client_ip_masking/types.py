@@ -19,14 +19,19 @@ from ai.backend.common.dto.manager.v2.client_ip_masking.request import (
 from ai.backend.common.dto.manager.v2.client_ip_masking.request import (
     ClientIPMaskingPolicyOrder as OrderDTO,
 )
+from ai.backend.common.dto.manager.v2.client_ip_masking.request import (
+    PartialBulkPurgeClientIPMaskingPoliciesInput as PartialBulkPurgeInputDTO,
+)
 from ai.backend.common.dto.manager.v2.client_ip_masking.response import (
     ClientIPMaskingPolicyNode as NodeDTO,
 )
 from ai.backend.common.dto.manager.v2.client_ip_masking.response import (
     ClientIPMaskingPolicyPayload as PolicyPayloadDTO,
 )
+from ai.backend.common.dto.manager.v2.common import PartialBulkPayload
 from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import UUIDFilter
+from ai.backend.manager.api.gql.common_types import PartialBulkFailureGQL
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     PydanticInputMixin,
@@ -234,3 +239,38 @@ __all__ = (
     "ClientIPMaskingTargetGQL",
     "UpsertClientIPMaskingPolicyInputGQL",
 )
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Input for dropping several client IP masking policies, each answered for separately.",
+    ),
+    name="PartialBulkPurgeClientIPMaskingPoliciesInput",
+)
+class PartialBulkPurgeClientIPMaskingPoliciesInputGQL(PydanticInputMixin[PartialBulkPurgeInputDTO]):
+    ids: list[UUID] = gql_field(description="IDs of the policies to drop.")
+
+
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description=(
+            "Result of a partial bulk client IP masking policy operation: the policies "
+            "processed and the ones that failed."
+        ),
+    ),
+    model=PartialBulkPayload[NodeDTO],
+    name="PartialBulkClientIPMaskingPoliciesPayload",
+)
+class PartialBulkClientIPMaskingPoliciesPayloadGQL(
+    PydanticOutputMixin[PartialBulkPayload[NodeDTO]]
+):
+    """Payload for partial bulk client IP masking policy mutations."""
+
+    successes: list[ClientIPMaskingPolicyGQL] = gql_field(
+        description="The policies processed, as they were left."
+    )
+    failed: list[PartialBulkFailureGQL] = gql_field(
+        description="The policies not processed, each with the reason."
+    )

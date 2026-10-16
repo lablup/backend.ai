@@ -10,11 +10,18 @@ from strawberry import UNSET, Info
 from strawberry.relay import Connection, Edge, NodeID
 
 from ai.backend.common.data.entity.runtime_variant import RuntimeVariantID
+from ai.backend.common.dto.manager.v2.common import PartialBulkPayload
 from ai.backend.common.dto.manager.v2.runtime_variant.request import (
     CreateRuntimeVariantInput as CreateRuntimeVariantInputDTO,
 )
 from ai.backend.common.dto.manager.v2.runtime_variant.request import (
     DeleteRuntimeVariantsInput as DeleteRuntimeVariantsInputDTO,
+)
+from ai.backend.common.dto.manager.v2.runtime_variant.request import (
+    PartialBulkPurgeRuntimeVariantsInput as PartialBulkPurgeRuntimeVariantsInputDTO,
+)
+from ai.backend.common.dto.manager.v2.runtime_variant.request import (
+    PartialBulkUpdateRuntimeVariantsInput as PartialBulkUpdateRuntimeVariantsInputDTO,
 )
 from ai.backend.common.dto.manager.v2.runtime_variant.request import (
     RuntimeVariantFilter as RuntimeVariantFilterDTO,
@@ -62,6 +69,7 @@ from ai.backend.common.dto.manager.v2.runtime_variant.types import (
 from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import StringFilter as StringFilterGQL
 from ai.backend.manager.api.gql.base import UUIDFilter as UUIDFilterGQL
+from ai.backend.manager.api.gql.common_types import PartialBulkFailureGQL
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     PydanticInputMixin,
@@ -401,3 +409,55 @@ class DeleteRuntimeVariantsPayloadGQL(PydanticOutputMixin[DeleteRuntimeVariantsP
         ),
     )
     deleted_count: int = gql_field(description="Number of runtime variants successfully deleted.")
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Input for updating several runtime variants, each answered for separately.",
+    ),
+    name="PartialBulkUpdateRuntimeVariantsInput",
+)
+class PartialBulkUpdateRuntimeVariantsInputGQL(
+    PydanticInputMixin[PartialBulkUpdateRuntimeVariantsInputDTO]
+):
+    items: list[UpdateRuntimeVariantInputGQL] = gql_field(
+        description="The runtime variants to update, each with its fields."
+    )
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Input for purging several runtime variants, each answered for separately.",
+    ),
+    name="PartialBulkPurgeRuntimeVariantsInput",
+)
+class PartialBulkPurgeRuntimeVariantsInputGQL(
+    PydanticInputMixin[PartialBulkPurgeRuntimeVariantsInputDTO]
+):
+    ids: list[UUID] = gql_field(description="IDs of the runtime variants to purge.")
+
+
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description=(
+            "Result of a partial bulk runtime variant operation: the runtime variants processed "
+            "and the ones that failed."
+        ),
+    ),
+    model=PartialBulkPayload[RuntimeVariantNodeDTO],
+    name="PartialBulkRuntimeVariantsPayload",
+)
+class PartialBulkRuntimeVariantsPayloadGQL(
+    PydanticOutputMixin[PartialBulkPayload[RuntimeVariantNodeDTO]]
+):
+    """Payload for partial bulk runtime variant mutations."""
+
+    successes: list[RuntimeVariantGQL] = gql_field(
+        description="The runtime variants processed, as they stood when processed."
+    )
+    failed: list[PartialBulkFailureGQL] = gql_field(
+        description="The runtime variants not processed, each with the reason."
+    )

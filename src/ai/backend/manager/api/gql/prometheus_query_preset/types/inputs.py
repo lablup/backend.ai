@@ -26,11 +26,21 @@ from ai.backend.common.dto.manager.v2.prometheus_query_preset.request import (
     ModifyQueryDefinitionOptionsInput as ModifyQueryDefinitionOptionsInputDTO,
 )
 from ai.backend.common.dto.manager.v2.prometheus_query_preset.request import (
+    PartialBulkPurgeQueryDefinitionsInput as PartialBulkPurgeQueryDefinitionsInputDTO,
+)
+from ai.backend.common.dto.manager.v2.prometheus_query_preset.request import (
+    PartialBulkUpdateQueryDefinitionItemInput as PartialBulkUpdateQueryDefinitionItemInputDTO,
+)
+from ai.backend.common.dto.manager.v2.prometheus_query_preset.request import (
+    PartialBulkUpdateQueryDefinitionsInput as PartialBulkUpdateQueryDefinitionsInputDTO,
+)
+from ai.backend.common.dto.manager.v2.prometheus_query_preset.request import (
     PreviewQueryDefinitionInput as PreviewQueryDefinitionInputDTO,
 )
 from ai.backend.common.dto.manager.v2.prometheus_query_preset.request import (
     QueryTimeRangeInputDTO,
 )
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     gql_field,
@@ -103,6 +113,50 @@ class ModifyQueryDefinitionInput(PydanticInputMixin[ModifyQueryDefinitionInputDT
     options: ModifyQueryDefinitionOptionsInputGQL | None = gql_field(
         description="New query definition options.", default=UNSET
     )
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="One query definition of a partial bulk update and the fields to update on it.",
+    ),
+    name="PartialBulkUpdateQueryDefinitionItemInput",
+)
+class PartialBulkUpdateQueryDefinitionItemInputGQL(
+    PydanticInputMixin[PartialBulkUpdateQueryDefinitionItemInputDTO]
+):
+    id: UUID = gql_field(description="ID of the query definition to update.")
+    input: ModifyQueryDefinitionInput = gql_field(
+        description="Fields to update on the query definition."
+    )
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Input for updating several query definitions, each answered for separately.",
+    ),
+    name="PartialBulkUpdateQueryDefinitionsInput",
+)
+class PartialBulkUpdateQueryDefinitionsInputGQL(
+    PydanticInputMixin[PartialBulkUpdateQueryDefinitionsInputDTO]
+):
+    items: list[PartialBulkUpdateQueryDefinitionItemInputGQL] = gql_field(
+        description="The query definitions to update, each with its fields."
+    )
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Input for purging several query definitions, each answered for separately.",
+    ),
+    name="PartialBulkPurgeQueryDefinitionsInput",
+)
+class PartialBulkPurgeQueryDefinitionsInputGQL(
+    PydanticInputMixin[PartialBulkPurgeQueryDefinitionsInputDTO]
+):
+    ids: list[UUID] = gql_field(description="IDs of the query definitions to purge.")
 
 
 @gql_pydantic_input(

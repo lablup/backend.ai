@@ -104,7 +104,7 @@ class TestAllowListCRUD:
         )
         entry_id = created.app_config_allow_list.id
 
-        updated = await admin_v2_registry.app_config_allow_list.admin_update(
+        updated = await admin_v2_registry.app_config_allow_list.update(
             entry_id, UpdateAppConfigAllowListInput(id=entry_id, rank=350)
         )
 
@@ -126,7 +126,7 @@ class TestAllowListCRUD:
         )
         entry_id = created.app_config_allow_list.id
 
-        purged = await admin_v2_registry.app_config_allow_list.admin_purge(entry_id)
+        purged = await admin_v2_registry.app_config_allow_list.purge(entry_id)
 
         assert purged.id == entry_id
         with pytest.raises(NotFoundError):

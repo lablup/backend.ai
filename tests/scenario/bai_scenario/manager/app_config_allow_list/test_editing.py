@@ -52,7 +52,7 @@ class ChangingTheRank(When[AnEntryAndACaller, AppConfigAllowListAdapter, AppConf
 
     @override
     def operation(self) -> str:
-        return "admin_update"
+        return "update"
 
     @override
     def describe(self, laid: AnEntryAndACaller) -> str:
@@ -71,9 +71,7 @@ class ChangingTheRank(When[AnEntryAndACaller, AppConfigAllowListAdapter, AppConf
         else:
             raise LookupError("this row lays no entry to edit")
         with ActingAs(laid.caller):
-            payload = await adapter.admin_update(
-                UpdateAppConfigAllowListInput(id=wanted, rank=self.rank)
-            )
+            payload = await adapter.update(UpdateAppConfigAllowListInput(id=wanted, rank=self.rank))
         return payload.app_config_allow_list
 
 
