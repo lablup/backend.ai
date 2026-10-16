@@ -212,16 +212,6 @@ class ResourceGroupStatusGQL(PydanticOutputMixin[ResourceGroupStatusInfo]):
     is_public: bool = gql_field(
         description="Whether the resource group is publicly accessible to all users."
     )
-    is_default: bool = gql_added_field(
-        BackendAIGQLMeta(
-            added_version="26.8.0",
-            description=(
-                "Whether this is the default resource group. At most one resource group is the"
-                " default at a time; an agent registering for the first time without a resolvable"
-                " resource group name falls back to it."
-            ),
-        )
-    )
 
 
 @gql_pydantic_type(
