@@ -601,7 +601,7 @@ class PurgeResourceGroupVolumeOfferPayloadGQL(
     name="DeleteStorageVolumePayload",
 )
 class DeleteStorageVolumePayloadGQL(PydanticOutputMixin[DeleteStorageVolumePayloadDTO]):
-    id: UUID = gql_field(description="ID of the withdrawn storage volume.")
+    item: StorageVolumeGQL = gql_field(description="The withdrawn storage volume.")
 
 
 @gql_pydantic_type(
@@ -613,4 +613,4 @@ class DeleteStorageVolumePayloadGQL(PydanticOutputMixin[DeleteStorageVolumePaylo
     name="RestoreStorageVolumePayload",
 )
 class RestoreStorageVolumePayloadGQL(PydanticOutputMixin[RestoreStorageVolumePayloadDTO]):
-    id: UUID = gql_field(description="ID of the restored storage volume.")
+    item: StorageVolumeGQL = gql_field(description="The restored storage volume.")
