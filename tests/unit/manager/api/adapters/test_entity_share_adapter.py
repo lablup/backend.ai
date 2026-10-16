@@ -1,18 +1,31 @@
-"""Tests for EntityShareAdapter node conversion."""
+"""Tests for EntityShareAdapter node and filter conversion."""
 
 from __future__ import annotations
 
 from datetime import UTC, datetime, timedelta
+from typing import Any
 from unittest.mock import AsyncMock, MagicMock
-from uuid import uuid4
+from uuid import UUID, uuid4
+
+import pytest
+from sqlalchemy.dialects import postgresql
 
 from ai.backend.common.data.entity.entity_share import EntityShareID
 from ai.backend.common.data.entity.types import RuntimeEntityID
 from ai.backend.common.data.entity.user import UserEntityType, UserID
 from ai.backend.common.data.entity.vfolder import VFolderEntityType
 from ai.backend.common.data.permission.types import Permission
+from ai.backend.common.dto.manager.query import StringFilter, UUIDFilter
+from ai.backend.common.dto.manager.v2.entity_share.request import EntityShareFilter
 from ai.backend.manager.api.adapters.entity_share.adapter import EntityShareAdapter
 from ai.backend.manager.data.entity_share.types import EntityShareData, EntityShareStatus
+from ai.backend.manager.models.clauses import QueryCondition
+from ai.backend.manager.models.condition_utils import combine_conditions_and
+
+_TARGET_ID = UUID("11111111-1111-1111-1111-111111111111")
+_RECIPIENT_ID = UUID("22222222-2222-2222-2222-222222222222")
+_pg_dialect_cls: Any = postgresql.dialect
+_PG_DIALECT = _pg_dialect_cls()
 
 
 def _share_data(
@@ -89,3 +102,38 @@ class TestEntityShareNodeRecipient:
         assert payload.share.recipient_entity_type is None
         assert payload.share.recipient_entity_id is None
         assert payload.share.recipient_email == "invitee@example.com"
+
+
+def _to_sql(conditions: list[QueryCondition]) -> str:
+    return str(
+        combine_conditions_and(conditions)().compile(
+            dialect=_PG_DIALECT, compile_kwargs={"literal_binds": True}
+        )
+    )
+
+
+class TestEntityShareConvertFilter:
+    @pytest.mark.parametrize(
+        ("filter", "expected"),
+        [
+            (
+                EntityShareFilter(target_entity_id=UUIDFilter(equals=_TARGET_ID)),
+                f"entity_shares.target_entity_id = '{_TARGET_ID}'",
+            ),
+            (
+                EntityShareFilter(recipient_entity_id=UUIDFilter(in_=[_RECIPIENT_ID])),
+                f"entity_shares.recipient_entity_id IN ('{_RECIPIENT_ID}')",
+            ),
+            (
+                EntityShareFilter(recipient_email=StringFilter(equals="a@example.com")),
+                "entity_shares.recipient_email = 'a@example.com'",
+            ),
+            (
+                EntityShareFilter(recipient_email=StringFilter(i_equals="A@Example.com")),
+                "lower(entity_shares.recipient_email) = 'a@example.com'",
+            ),
+        ],
+    )
+    def test_each_field_narrows(self, filter: EntityShareFilter, expected: str) -> None:
+        adapter = EntityShareAdapter(MagicMock())
+        assert _to_sql(adapter._convert_filter(filter)) == expected
