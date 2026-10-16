@@ -11,7 +11,7 @@ from ai.backend.common.dto.manager.v2.session_group.types import (
     SessionGroupPlacementDirectionEnum,
     SessionGroupPlacementEnforcementEnum,
 )
-from ai.backend.common.exception import BackendAISchemaValidationFailed, InvalidAPIParameters
+from ai.backend.common.exception import BackendAISchemaValidationFailed
 from ai.backend.common.tristate.unset import UNSET
 
 
@@ -42,7 +42,7 @@ class TestUpdateSessionGroupInput:
         ids=["both-omitted", "both-null"],
     )
     def test_an_input_changing_nothing_is_rejected(self, body: dict[str, None]) -> None:
-        with pytest.raises(InvalidAPIParameters):
+        with pytest.raises(BackendAISchemaValidationFailed):
             UpdateSessionGroupInput.model_validate({"id": str(uuid4()), **body})
 
     def test_an_unknown_direction_is_rejected(self) -> None:
