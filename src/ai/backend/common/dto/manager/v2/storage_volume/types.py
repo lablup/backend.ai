@@ -14,9 +14,8 @@ from ai.backend.common.dto.manager.v2.common import OrderDirection
 
 __all__ = (
     "OrderDirection",
-    "ResourceGroupVolumeOfferOrderField",
     "StorageVolumeOrderField",
-    "StorageVolumeServiceHoldingOrderField",
+    "StorageVolumeServiceAttachmentOrderField",
     "StorageVolumeUsageExposureInfo",
     "StorageVolumeUsageExposureInput",
     "StorageVolumeUsageField",
@@ -31,21 +30,12 @@ class StorageVolumeOrderField(StrEnum):
     UPDATED_AT = "updated_at"
 
 
-class StorageVolumeServiceHoldingOrderField(StrEnum):
-    """Fields available for ordering the per-service holdings of a volume."""
+class StorageVolumeServiceAttachmentOrderField(StrEnum):
+    """Fields available for ordering the storage volume service attachments."""
 
     SERVICE_CATALOG_ID = "service_catalog_id"
     STORAGE_VOLUME_ID = "storage_volume_id"
     STATUS_CHECKED_AT = "status_checked_at"
-    UPDATED_AT = "updated_at"
-
-
-class ResourceGroupVolumeOfferOrderField(StrEnum):
-    """Fields available for ordering the offers of a volume to resource groups."""
-
-    RESOURCE_GROUP_ID = "resource_group_id"
-    STORAGE_VOLUME_ID = "storage_volume_id"
-    IS_DEFAULT = "is_default"
     UPDATED_AT = "updated_at"
 
 

@@ -13,18 +13,14 @@ from ai.backend.common.api_handlers import BaseResponseModel
 from ai.backend.common.dto.manager.v2.storage_volume.types import StorageVolumeUsageExposureInfo
 
 __all__ = (
-    "AdminSearchStorageVolumesPayload",
     "DeleteStorageVolumePayload",
-    "RestoreStorageVolumePayload",
-    "PurgeResourceGroupVolumeOfferPayload",
-    "UpsertResourceGroupVolumeOfferPayload",
     "GetStorageVolumePayload",
     "PurgeStorageVolumePayload",
-    "ResourceGroupVolumeOfferNode",
-    "SearchResourceGroupVolumeOffersPayload",
-    "SearchStorageVolumeServiceHoldingsPayload",
+    "RestoreStorageVolumePayload",
+    "SearchStorageVolumeServiceAttachmentsPayload",
+    "SearchStorageVolumesPayload",
     "StorageVolumeNode",
-    "StorageVolumeServiceHoldingNode",
+    "StorageVolumeServiceAttachmentNode",
     "UpdateStorageVolumePayload",
 )
 
@@ -32,7 +28,7 @@ __all__ = (
 class StorageVolumeNode(BaseResponseModel):
     """Node model representing a storage volume.
 
-    Carries no status: what each service sees is read through its holdings.
+    Carries no status: what each service sees is read through its attachments.
     """
 
     id: UUID = Field(description="Storage volume ID")
@@ -49,25 +45,15 @@ class StorageVolumeNode(BaseResponseModel):
     updated_at: datetime = Field(description="Last update timestamp")
 
 
-class StorageVolumeServiceHoldingNode(BaseResponseModel):
-    """Node model representing a storage volume as one service holds it."""
+class StorageVolumeServiceAttachmentNode(BaseResponseModel):
+    """Node model representing a storage volume as one service has it attached."""
 
-    service_catalog_id: UUID = Field(description="ID of the holding service")
-    storage_volume_id: UUID = Field(description="ID of the held volume")
+    id: UUID = Field(description="Storage volume service attachment ID")
+    service_catalog_id: UUID = Field(description="ID of the service the volume is attached to")
+    storage_volume_id: UUID = Field(description="ID of the attached volume")
     status_checked_at: datetime | None = Field(
-        description="When the holding service last checked the volume"
+        description="When the service last checked the volume"
     )
-    created_at: datetime = Field(description="Creation timestamp")
-    updated_at: datetime = Field(description="Last update timestamp")
-
-
-class ResourceGroupVolumeOfferNode(BaseResponseModel):
-    """Node model representing a storage volume offered to a resource group."""
-
-    resource_group_id: UUID = Field(description="ID of the resource group offered to")
-    storage_volume_id: UUID = Field(description="ID of the offered volume")
-    enabled: bool = Field(description="Whether the offer is enabled")
-    is_default: bool = Field(description="Whether the offer is the resource group's default")
     created_at: datetime = Field(description="Creation timestamp")
     updated_at: datetime = Field(description="Last update timestamp")
 
@@ -78,8 +64,8 @@ class GetStorageVolumePayload(BaseResponseModel):
     item: StorageVolumeNode = Field(description="The storage volume read.")
 
 
-class AdminSearchStorageVolumesPayload(BaseResponseModel):
-    """Payload for a storage volume search."""
+class SearchStorageVolumesPayload(BaseResponseModel):
+    """Payload for a storage volume search, whether an administrator's or a scoped one."""
 
     items: list[StorageVolumeNode] = Field(description="List of matching storage volumes.")
     total_count: int = Field(description="Total number of matching volumes.")
@@ -99,35 +85,17 @@ class PurgeStorageVolumePayload(BaseResponseModel):
     id: UUID = Field(description="ID of the purged storage volume")
 
 
-class SearchStorageVolumeServiceHoldingsPayload(BaseResponseModel):
-    """Payload for a search over the per-service holdings of the volumes."""
+class SearchStorageVolumeServiceAttachmentsPayload(BaseResponseModel):
+    """Payload for a search over the storage volume service attachments."""
 
-    items: list[StorageVolumeServiceHoldingNode] = Field(description="List of matching holdings.")
-    total_count: int = Field(description="Total number of matching holdings.")
+    items: list[StorageVolumeServiceAttachmentNode] = Field(
+        description="List of matching storage volume service attachments."
+    )
+    total_count: int = Field(
+        description="Total number of matching storage volume service attachments."
+    )
     has_next_page: bool = Field(description="Whether there are more items after this page.")
     has_previous_page: bool = Field(description="Whether there are more items before this page.")
-
-
-class SearchResourceGroupVolumeOffersPayload(BaseResponseModel):
-    """Payload for a search over the offers of the volumes to resource groups."""
-
-    items: list[ResourceGroupVolumeOfferNode] = Field(description="List of matching offers.")
-    total_count: int = Field(description="Total number of matching offers.")
-    has_next_page: bool = Field(description="Whether there are more items after this page.")
-    has_previous_page: bool = Field(description="Whether there are more items before this page.")
-
-
-class UpsertResourceGroupVolumeOfferPayload(BaseResponseModel):
-    """Payload for offering a volume to a resource group."""
-
-    item: ResourceGroupVolumeOfferNode = Field(description="The offer written.")
-
-
-class PurgeResourceGroupVolumeOfferPayload(BaseResponseModel):
-    """Payload for withdrawing a volume from a resource group."""
-
-    resource_group_id: UUID = Field(description="The resource group the volume was offered to.")
-    storage_volume_id: UUID = Field(description="The volume withdrawn.")
 
 
 class DeleteStorageVolumePayload(BaseResponseModel):

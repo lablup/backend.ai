@@ -9,27 +9,28 @@ from pydantic import ValidationError
 
 from ai.backend.common.data.storage.types import StorageVolumeUsageField
 from ai.backend.common.dto.manager.query import StringFilter, UUIDFilter
+from ai.backend.common.dto.manager.v2.rbac.types import UUIDScope
 from ai.backend.common.dto.manager.v2.storage_volume.request import (
     AdminSearchStorageVolumesInput,
-    PurgeResourceGroupVolumeOfferInput,
-    ResourceGroupVolumeOfferFilter,
-    SearchResourceGroupVolumeOffersInput,
-    SearchStorageVolumeServiceHoldingsInput,
+    ScopedSearchStorageVolumesInput,
     StorageVolumeFilter,
     StorageVolumeOrder,
-    StorageVolumeServiceHoldingFilter,
+    StorageVolumeScope,
+    StorageVolumeServiceAttachmentFilter,
     UpdateStorageVolumeInput,
-    UpsertResourceGroupVolumeOfferInput,
 )
 from ai.backend.common.dto.manager.v2.storage_volume.types import (
     OrderDirection,
-    ResourceGroupVolumeOfferOrderField,
     StorageVolumeOrderField,
-    StorageVolumeServiceHoldingOrderField,
+    StorageVolumeServiceAttachmentOrderField,
     StorageVolumeUsageExposureInput,
 )
 from ai.backend.common.exception import BackendAISchemaValidationFailed
 from ai.backend.common.tristate.unset import UNSET
+
+
+def _a_scope() -> StorageVolumeScope:
+    return StorageVolumeScope(domain=[UUIDScope(value=uuid.uuid4())])
 
 
 class TestUpdateStorageVolumeInput:
@@ -97,14 +98,35 @@ class TestStorageVolumeFilter:
         assert nested.entity_id.equals == volume_id
 
 
+class TestStorageVolumeScope:
+    def test_an_empty_scope_is_refused(self) -> None:
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
+            StorageVolumeScope()
+
+    @pytest.mark.parametrize("field", ["domain", "project", "user", "storage_backend"])
+    def test_one_dimension_is_enough(self, field: str) -> None:
+        scope = StorageVolumeScope.model_validate({field: [{"value": str(uuid.uuid4())}]})
+        assert getattr(scope, field) is not None
+
+    def test_the_other_dimensions_stay_none(self) -> None:
+        scope = _a_scope()
+        assert scope.project is None
+        assert scope.user is None
+        assert scope.storage_backend is None
+
+
 class TestAdminSearchStorageVolumesInput:
+    def test_it_takes_no_scope(self) -> None:
+        """The administrator's search reads the whole system, so it names no scope."""
+        assert "scope" not in AdminSearchStorageVolumesInput.model_fields
+
     def test_order_carries_the_field_and_the_direction(self) -> None:
         input = AdminSearchStorageVolumesInput(
             order=[
                 StorageVolumeOrder(
                     field=StorageVolumeOrderField.NAME, direction=OrderDirection.DESC
                 )
-            ]
+            ],
         )
         assert input.order is not None
         assert input.order[0].field is StorageVolumeOrderField.NAME
@@ -119,106 +141,53 @@ class TestAdminSearchStorageVolumesInput:
             AdminSearchStorageVolumesInput.model_validate({field: value})
 
 
-class TestSearchStorageVolumeServiceHoldingsInput:
+class TestScopedSearchStorageVolumesInput:
+    def test_the_scope_is_required(self) -> None:
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
+            ScopedSearchStorageVolumesInput.model_validate({})
+
+    def test_the_scope_is_carried(self) -> None:
+        backend_id = uuid.uuid4()
+        input = ScopedSearchStorageVolumesInput(
+            scope=StorageVolumeScope(storage_backend=[UUIDScope(value=backend_id)])
+        )
+        assert input.scope.storage_backend is not None
+        assert input.scope.storage_backend[0].value == backend_id
+
+
+class TestStorageVolumeServiceAttachmentFilter:
     def test_filter_names_either_side_of_the_pair(self) -> None:
         service_id = uuid.uuid4()
         volume_id = uuid.uuid4()
-        input = SearchStorageVolumeServiceHoldingsInput(
-            filter=StorageVolumeServiceHoldingFilter(
-                service_catalog_id=UUIDFilter(equals=service_id),
-                storage_volume_id=UUIDFilter(equals=volume_id),
-            )
+        filter = StorageVolumeServiceAttachmentFilter(
+            service_catalog_id=UUIDFilter(equals=service_id),
+            storage_volume_id=UUIDFilter(equals=volume_id),
         )
-        assert input.filter is not None
-        assert input.filter.service_catalog_id is not None
-        assert input.filter.service_catalog_id.equals == service_id
-        assert input.filter.storage_volume_id is not None
-        assert input.filter.storage_volume_id.equals == volume_id
-
-
-class TestSearchResourceGroupVolumeOffersInput:
-    def test_offer_flags_are_plain_booleans(self) -> None:
-        input = SearchResourceGroupVolumeOffersInput(
-            filter=ResourceGroupVolumeOfferFilter(enabled=True, is_default=False)
-        )
-        assert input.filter is not None
-        assert input.filter.enabled is True
-        assert input.filter.is_default is False
-
-    def test_offer_flags_default_to_none(self) -> None:
-        filter = ResourceGroupVolumeOfferFilter()
-        assert filter.enabled is None
-        assert filter.is_default is None
+        assert filter.service_catalog_id is not None
+        assert filter.service_catalog_id.equals == service_id
+        assert filter.storage_volume_id is not None
+        assert filter.storage_volume_id.equals == volume_id
 
     def test_nested_filters_hold_their_own_conditions(self) -> None:
-        resource_group_id = uuid.uuid4()
-        filter = ResourceGroupVolumeOfferFilter(
+        service_id = uuid.uuid4()
+        filter = StorageVolumeServiceAttachmentFilter(
             NOT=[
-                ResourceGroupVolumeOfferFilter(
-                    resource_group_id=UUIDFilter(equals=resource_group_id)
+                StorageVolumeServiceAttachmentFilter(
+                    service_catalog_id=UUIDFilter(equals=service_id)
                 )
             ]
         )
         assert filter.NOT is not None
         nested = filter.NOT[0]
-        assert nested.resource_group_id is not None
-        assert nested.resource_group_id.equals == resource_group_id
-
-
-class TestUpsertResourceGroupVolumeOfferInput:
-    def test_the_pair_is_required(self) -> None:
-        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
-            UpsertResourceGroupVolumeOfferInput.model_validate({
-                "resource_group_id": str(uuid.uuid4())
-            })
-
-    def test_flags_stay_unset_when_omitted(self) -> None:
-        input = UpsertResourceGroupVolumeOfferInput(
-            resource_group_id=uuid.uuid4(), storage_volume_id=uuid.uuid4()
-        )
-        assert input.enabled is UNSET
-        assert input.is_default is UNSET
-
-    def test_flags_are_carried(self) -> None:
-        input = UpsertResourceGroupVolumeOfferInput(
-            resource_group_id=uuid.uuid4(),
-            storage_volume_id=uuid.uuid4(),
-            enabled=False,
-            is_default=True,
-        )
-        assert input.enabled is False
-        assert input.is_default is True
-
-
-class TestPurgeResourceGroupVolumeOfferInput:
-    def test_the_pair_is_required(self) -> None:
-        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
-            PurgeResourceGroupVolumeOfferInput.model_validate({
-                "storage_volume_id": str(uuid.uuid4())
-            })
-
-    def test_the_pair_is_carried(self) -> None:
-        resource_group_id, storage_volume_id = uuid.uuid4(), uuid.uuid4()
-        input = PurgeResourceGroupVolumeOfferInput(
-            resource_group_id=resource_group_id, storage_volume_id=storage_volume_id
-        )
-        assert input.resource_group_id == resource_group_id
-        assert input.storage_volume_id == storage_volume_id
+        assert nested.service_catalog_id is not None
+        assert nested.service_catalog_id.equals == service_id
 
 
 class TestChildRowOrderFields:
-    def test_holdings_order_by_the_pair_the_check_time_or_the_update_time(self) -> None:
-        assert {f.value for f in StorageVolumeServiceHoldingOrderField} == {
+    def test_attachments_order_by_the_pair_the_check_time_or_the_update_time(self) -> None:
+        assert {f.value for f in StorageVolumeServiceAttachmentOrderField} == {
             "service_catalog_id",
             "storage_volume_id",
             "status_checked_at",
-            "updated_at",
-        }
-
-    def test_offers_order_by_the_pair_the_default_flag_or_the_update_time(self) -> None:
-        assert {f.value for f in ResourceGroupVolumeOfferOrderField} == {
-            "resource_group_id",
-            "storage_volume_id",
-            "is_default",
             "updated_at",
         }
