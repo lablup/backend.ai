@@ -5,7 +5,7 @@ import copy
 import logging
 import uuid
 from abc import ABCMeta, abstractmethod
-from collections.abc import AsyncIterator, Mapping, Sequence
+from collections.abc import AsyncIterator, Mapping, Sequence, Set
 from contextlib import asynccontextmanager as actxmgr
 from contextvars import ContextVar
 from dataclasses import dataclass
@@ -21,6 +21,7 @@ import aiotools
 import sqlalchemy as sa
 import trafaret as t
 import yarl
+from sqlalchemy.ext.asyncio import AsyncSession as SASession
 
 from ai.backend.common.bgtask.reporter import ProgressReporter
 from ai.backend.common.data.entity.container_registry import ContainerRegistryID
@@ -54,6 +55,7 @@ from ai.backend.manager.exceptions import ScanImageError, ScanTagError
 from ai.backend.manager.models.image.creators import ImageCreator
 from ai.backend.manager.models.image.row import ImageRow
 from ai.backend.manager.models.image.searchable_fields import ImageSearchableFields
+from ai.backend.manager.models.user.row import UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 
@@ -86,6 +88,23 @@ def _created_in_project(
     if user_id is None:
         return None
     return personal_projects.get(user_id)
+
+
+def _creator_id(labels: Mapping[str, Any], known_users: Set[UserID]) -> UserID | None:
+    """The user a scanned image was made for, or none where its owner label names a
+    user this installation does not have, such as one from another installation."""
+    user_id = _customized_owner_user_id(labels)
+    if user_id is None or user_id not in known_users:
+        return None
+    return user_id
+
+
+def _owner_user_ids(updates: Mapping[ImageIdentifier, Any]) -> set[UserID]:
+    return {
+        user_id
+        for update in updates.values()
+        if (user_id := _customized_owner_user_id(update["labels"])) is not None
+    }
 
 
 def _is_customized(labels: Mapping[str, Any]) -> bool:
@@ -246,6 +265,7 @@ class BaseContainerRegistry(metaclass=ABCMeta):
                     )
                 )
                 is_local = self.registry_name == "local"
+                known_users = await self._known_users(session, _all_updates)
 
                 for image_row in existing_images:
                     image_ref = image_row.image_ref
@@ -256,7 +276,7 @@ class BaseContainerRegistry(metaclass=ABCMeta):
                         image_row.accelerators = update.get("accels")
                         image_row.labels = update["labels"]
                         image_row.customized = _is_customized(update["labels"])
-                        image_row.creator_id = _customized_owner_user_id(update["labels"])
+                        image_row.creator_id = _creator_id(update["labels"], known_users)
                         image_row.is_local = is_local
                         scanned_images.append(ImageSearchableFields.own.to_data(image_row))
 
@@ -314,7 +334,7 @@ class BaseContainerRegistry(metaclass=ABCMeta):
                             labels=update["labels"],
                             status=ImageStatus.ALIVE,
                             customized=_is_customized(update["labels"]),
-                            creator_id=_customized_owner_user_id(update["labels"]),
+                            creator_id=_creator_id(update["labels"], known_users),
                             created_in_project_id=_created_in_project(
                                 update["labels"], scanned_projects
                             ),
@@ -332,15 +352,22 @@ class BaseContainerRegistry(metaclass=ABCMeta):
     ) -> dict[UserID, ProjectID]:
         """The personal project of every user a scanned customized-owner label names,
         which is the scope those images are created in."""
-        user_ids = {
-            user_id
-            for update in updates.values()
-            if (user_id := _customized_owner_user_id(update["labels"])) is not None
-        }
+        user_ids = _owner_user_ids(updates)
         if not user_ids:
             return {}
         async with self._ops_provider.read_ops() as r:
             return await r.personal_projects(list(user_ids))
+
+    async def _known_users(
+        self, session: SASession, updates: Mapping[ImageIdentifier, Any]
+    ) -> set[UserID]:
+        """The users the scanned owner labels name that exist here, which are the only
+        ones an image's creator column can point at."""
+        user_ids = _owner_user_ids(updates)
+        if not user_ids:
+            return set()
+        rows = await session.scalars(sa.select(UserRow.uuid).where(UserRow.uuid.in_(user_ids)))
+        return set(rows)
 
     async def _create_scanned_images(self, creators: list[ImageCreator]) -> list[ImageData]:
         """Insert the images the scan found, each joining the registry it came from,

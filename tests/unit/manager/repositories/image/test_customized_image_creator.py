@@ -649,6 +649,63 @@ class TestImageOwnershipGraph:
 
         assert await self._kind_and_creator(db_with_cleanup, image_id) == (True, None)
 
+    async def test_a_scanned_image_owned_by_an_unknown_user_has_no_creator(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        domain_id: DomainID,
+        registry_id: ContainerRegistryID,
+    ) -> None:
+        canonical = f"{REGISTRY_NAME}/{REGISTRY_PROJECT}/python:a"
+
+        scanned = await self._commit_rescan(
+            db_with_cleanup,
+            registry_id,
+            {ImageIdentifier(canonical, "x86_64"): self._scan_payload(UserID(uuid4()))},
+        )
+
+        assert [(image.customized, image.creator_id) for image in scanned] == [(True, None)]
+        assert await self._owning_projects(db_with_cleanup, scanned[0].id) == []
+
+    async def test_an_image_owned_by_an_unknown_user_does_not_fail_the_others(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        domain_id: DomainID,
+        registry_id: ContainerRegistryID,
+    ) -> None:
+        user_id = await self._create_user(db_with_cleanup, domain_id, "owner@test.io")
+        known = f"{REGISTRY_NAME}/{REGISTRY_PROJECT}/python:known"
+        unknown = f"{REGISTRY_NAME}/{REGISTRY_PROJECT}/python:unknown"
+
+        scanned = await self._commit_rescan(
+            db_with_cleanup,
+            registry_id,
+            {
+                ImageIdentifier(known, "x86_64"): self._scan_payload(user_id),
+                ImageIdentifier(unknown, "x86_64"): self._scan_payload(UserID(uuid4())),
+            },
+        )
+
+        assert sorted((image.name, image.creator_id) for image in scanned) == sorted([
+            (known, user_id),
+            (unknown, None),
+        ])
+
+    async def test_rescanning_an_image_owned_by_an_unknown_user_clears_the_creator(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        domain_id: DomainID,
+        registry_id: ContainerRegistryID,
+    ) -> None:
+        image_id, canonical = await self._create_image(db_with_cleanup, registry_id, "a")
+
+        await self._commit_rescan(
+            db_with_cleanup,
+            registry_id,
+            {ImageIdentifier(canonical, "x86_64"): self._scan_payload(UserID(uuid4()))},
+        )
+
+        assert await self._kind_and_creator(db_with_cleanup, image_id) == (True, None)
+
 
 class TestScanImage:
     @pytest.fixture
