@@ -23111,7 +23111,7 @@
               }
             ],
             "deprecated": true,
-            "description": "Deprecated since 26.10.0. Use the role delete and restore operations. Accepted and ignored.",
+            "description": "Deprecated since 26.10.0. Use the role delete and restore operations. DELETED is handled as delete, ACTIVE on a deleted role as restore; other values are ignored.",
             "title": "Status"
           },
           "auto_assign": {

@@ -138,7 +138,8 @@ class UpdateRoleInput(BaseRequestModel):
         default=UNSET,
         description=(
             f"Deprecated since {NEXT_RELEASE_VERSION}. Use the role delete and restore "
-            "operations. Accepted and ignored."
+            "operations. DELETED is handled as delete, ACTIVE on a deleted role as restore; "
+            "other values are ignored."
         ),
         deprecated=True,
     )

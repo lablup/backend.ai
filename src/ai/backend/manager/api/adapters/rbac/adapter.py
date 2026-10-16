@@ -144,7 +144,8 @@ from ai.backend.common.dto.manager.v2.rbac.types import (
     RoleStatusFilter as RoleStatusFilterDTO,
 )
 from ai.backend.common.exception import UnreachableError
-from ai.backend.manager.actions.v2.bulk.result import PartialBulkResult
+from ai.backend.common.tristate.unset import Unset
+from ai.backend.manager.actions.v2.bulk.result import PartialBulkEntityResult, PartialBulkResult
 from ai.backend.manager.api.adapter_options.pagination.pagination import PaginationSpec
 from ai.backend.manager.api.adapters.base import BaseAdapter
 from ai.backend.manager.data.common.types import SearchResult
@@ -857,12 +858,23 @@ class RBACAdapter(BaseAdapter):
     # ------------------------------------------------------------------ update
 
     async def update(self, role_id: UUID, input: UpdateRoleInput) -> UpdateRolePayload:
-        """Update an existing role."""
+        """Update an existing role; a deprecated ``status`` goes to delete or restore."""
         updater = self._build_updater(role_id, input)
         result = await self._permission_controller.update_role.run(
             UpdateRoleAction(updater=updater)
         )
-        return UpdateRolePayload(role=self._role_data_to_node(result.data))
+        data = result.data
+        if self._requests_soft_delete(input, data):
+            deleted = await self._permission_controller.delete_role.run(
+                DeleteRoleAction(updater=RoleSoftDeleteUpdater(role_id=data.id))
+            )
+            data = deleted.data
+        elif self._requests_restore(input, data):
+            restored = await self._permission_controller.restore_role.run(
+                RestoreRoleAction(updater=RoleRestoreUpdater(role_id=data.id))
+            )
+            data = restored.data
+        return UpdateRolePayload(role=self._role_data_to_node(data))
 
     # ------------------------------------------------------------------ delete
 
@@ -896,13 +908,39 @@ class RBACAdapter(BaseAdapter):
     async def partial_bulk_update(
         self, input: PartialBulkUpdateRolesInput
     ) -> PartialBulkPayload[RoleNode]:
-        """Update several roles, answering for each one."""
+        """Update several roles, answering for each one; a deprecated ``status`` goes to
+        delete or restore per role."""
         result = await self._permission_controller.partial_bulk_update_roles.run(
             PartialBulkUpdateRolesAction(
                 updaters=[self._build_updater(item.id, item.input) for item in input.items]
             )
         )
-        return self._to_partial_bulk_payload(result)
+        inputs = {RoleID(item.id): item.input for item in input.items}
+        to_delete: list[RoleID] = []
+        to_restore: list[RoleID] = []
+        for item in result.items:
+            if item.value is None:
+                continue
+            if self._requests_soft_delete(inputs[item.value.id], item.value):
+                to_delete.append(item.value.id)
+            elif self._requests_restore(inputs[item.value.id], item.value):
+                to_restore.append(item.value.id)
+        transitioned: dict[EntityIdentifier, PartialBulkEntityResult[RoleData]] = {}
+        if to_delete:
+            deleted = await self._permission_controller.partial_bulk_delete_roles.run(
+                PartialBulkDeleteRolesAction(ids=to_delete)
+            )
+            transitioned.update({item.entity_id: item for item in deleted.items})
+        if to_restore:
+            restored = await self._permission_controller.partial_bulk_restore_roles.run(
+                PartialBulkRestoreRolesAction(ids=to_restore)
+            )
+            transitioned.update({item.entity_id: item for item in restored.items})
+        return self._to_partial_bulk_payload(
+            PartialBulkResult(
+                items=[transitioned.get(item.entity_id, item) for item in result.items]
+            )
+        )
 
     async def partial_bulk_delete(
         self, input: PartialBulkDeleteRolesInput
@@ -1477,6 +1515,23 @@ class RBACAdapter(BaseAdapter):
             elif o.field == "granted_at":
                 result.append(fields.granted_at.order.apply(ascending))
         return result
+
+    def _requests_soft_delete(self, input: UpdateRoleInput, data: RoleData) -> bool:
+        return (
+            self._requested_status(input) == InternalRoleStatus.DELETED
+            and data.status != InternalRoleStatus.DELETED
+        )
+
+    def _requests_restore(self, input: UpdateRoleInput, data: RoleData) -> bool:
+        return (
+            self._requested_status(input) == InternalRoleStatus.ACTIVE
+            and data.status == InternalRoleStatus.DELETED
+        )
+
+    def _requested_status(self, input: UpdateRoleInput) -> InternalRoleStatus | None:
+        if input.status is None or isinstance(input.status, Unset):
+            return None
+        return InternalRoleStatus(input.status.value)
 
     def _build_updater(self, role_id: UUID, input: UpdateRoleInput) -> RoleUpdater:
         return RoleUpdater(
