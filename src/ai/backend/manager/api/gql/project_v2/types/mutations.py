@@ -99,7 +99,10 @@ class UpdateProjectInputGQL(PydanticInputMixin[UpdateProjectInputDTO]):
     description: str | None = gql_field(default=UNSET, description="New description.")
     is_active: bool | None = gql_field(
         default=UNSET,
-        description="Updated active status.",
+        description=(
+            "`false` runs `deleteProjectV2` and `true` runs `restoreProjectV2`; nothing happens "
+            "when the project is already in that state."
+        ),
         deprecation_reason=(
             f"Deprecated since {NEXT_RELEASE_VERSION}. Use `deleteProjectV2` or `restoreProjectV2`."
         ),

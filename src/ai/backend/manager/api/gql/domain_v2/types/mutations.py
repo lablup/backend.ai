@@ -89,7 +89,10 @@ class UpdateDomainInputGQL(PydanticInputMixin[UpdateDomainInputDTO]):
     description: str | None = gql_field(default=UNSET, description="New description.")
     is_active: bool | None = gql_field(
         default=UNSET,
-        description="Updated active status.",
+        description=(
+            "`false` runs `deleteDomainV2` and `true` runs `restoreDomainV2`; nothing happens "
+            "when the domain is already in that state."
+        ),
         deprecation_reason=(
             f"Deprecated since {NEXT_RELEASE_VERSION}. Use `deleteDomainV2` or `restoreDomainV2`."
         ),

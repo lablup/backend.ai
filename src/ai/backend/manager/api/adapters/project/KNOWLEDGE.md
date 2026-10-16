@@ -29,15 +29,30 @@ status: draft
 |---|---|---|---|
 | 사용자를 배정한다 | 프로젝트와 그 스코프의 역할이 있음 | 사용자 배정 | 그 사용자가 명부에 오름 |
 
+## 수정하기
+
+| 시나리오 | 상황 | 요청 | 결과 |
+|---|---|---|---|
+| 슈퍼관리자가 활성 플래그를 내린다 | 활성 프로젝트가 있음 | 활성 플래그를 내리는 수정 | soft delete 와 같이 비활성 상태를 실은 답 |
+| 슈퍼관리자가 soft delete 된 프로젝트의 활성 플래그를 올린다 | 그 프로젝트가 있음 | soft delete 뒤 활성 플래그를 올리는 수정 | restore 와 같이 활성 상태를 실은 답 |
+
+수정의 활성 플래그는 deprecated 다. 내리면 soft delete, 올리면 restore 를 부르고, 이미 그 상태면
+부르지 않는다. 나머지 필드는 수정으로 반영한다. 상태는 노드에 실리지 않아 시나리오는 활성 플래그로
+본다.
+
 ## 여럿 수정하기
 
 | 시나리오 | 상황 | 요청 | 결과 |
 |---|---|---|---|
 | 슈퍼관리자가 여럿의 설명을 한 번에 바꾼다 | 프로젝트 둘이 있음 | 둘의 설명 수정 | 둘 다 새 설명으로 오고 실패한 것은 없음 |
 | 아무 권한도 받지 않은 사용자가 여럿을 수정한다 | 같은 프로젝트 둘 | 둘의 설명 수정 | 수정된 것 없이 둘 다 권한 부족 이유로 실패 목록에 옴 |
+| 슈퍼관리자가 활성 플래그와 설명을 섞어 여럿을 한 번에 고친다 | 프로젝트 둘이 있음 | 둘째를 soft delete 한 뒤, 첫째는 플래그 내리기와 설명, 둘째는 플래그 올리기와 설명, 없는 id 하나는 플래그 내리기 | 둘 다 새 설명으로 오고 첫째는 비활성, 둘째는 활성, 없는 id 는 대상 없음 이유로 실패 목록에 옴 |
 
 여럿 수정은 프로젝트마다 단건 수정과 같은 쓰기를 한다. 프로젝트 행을 고친 뒤 그 프로젝트가 따르는
 리소스 정책 공유를 다시 적는다.
+
+활성 플래그는 항목마다 단건 수정과 같은 기준으로 soft delete 와 restore 를 부른다. 실패는 항목마다
+실패 목록에 싣는다.
 
 ## 여럿 soft delete, restore
 
@@ -53,8 +68,7 @@ status: draft
 ## 아직 적지 않은 것
 
 `admin_purge`, `admin_search`, `batch_load_by_ids`, `batch_load_fields`, `delete`, `get`,
-`restore`, `scoped_search`, `search_by_domain_name`, `search_by_user`, `unassign_users`,
-`update`.
+`restore`, `scoped_search`, `search_by_domain_name`, `search_by_user`, `unassign_users`.
 
 ## image commit을 위한 Container Registry 조회
 

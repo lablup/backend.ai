@@ -9,6 +9,7 @@ from uuid import UUID
 from ai.backend.common.data.entity.domain import DomainID, DomainName
 from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.role import RoleID
+from ai.backend.common.data.entity.types import EntityIdentifier
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.dto.manager.v2.common import PartialBulkFailure, PartialBulkPayload
 from ai.backend.common.dto.manager.v2.group.request import (
@@ -52,8 +53,9 @@ from ai.backend.common.dto.manager.v2.group.types import (
 )
 from ai.backend.common.dto.manager.v2.user.response import UserNode
 from ai.backend.common.exception import UnreachableError
+from ai.backend.common.tristate.unset import Unset
 from ai.backend.common.types import AccessKey
-from ai.backend.manager.actions.v2.bulk.result import PartialBulkResult
+from ai.backend.manager.actions.v2.bulk.result import PartialBulkEntityResult, PartialBulkResult
 from ai.backend.manager.api.adapter_options.pagination.pagination import PaginationSpec
 from ai.backend.manager.api.adapters.base import BaseAdapter
 from ai.backend.manager.api.adapters.user.adapter import UserAdapter
@@ -251,7 +253,8 @@ class ProjectAdapter(BaseAdapter):
         )
         if result.data is None:
             raise UnreachableError("modify_group must return data")
-        return ProjectPayload(project=self._group_data_to_node(result.data))
+        data = await self._apply_deprecated_is_active(result.data, input.is_active)
+        return ProjectPayload(project=self._group_data_to_node(data))
 
     async def delete(self, project_id: ProjectID) -> DeleteProjectPayload:
         """Soft-delete a project."""
@@ -276,7 +279,34 @@ class ProjectAdapter(BaseAdapter):
                 updaters=[self._to_updater(ProjectID(item.id), item.input) for item in input.items]
             )
         )
-        return self._to_partial_bulk_payload(result)
+        requested = {ProjectID(item.id): item.input.is_active for item in input.items}
+        to_delete: list[ProjectID] = []
+        to_restore: list[ProjectID] = []
+        for item in result.items:
+            if item.value is None:
+                continue
+            project_id = item.value.entity_id()
+            match requested.get(project_id):
+                case False if item.value.is_active is not False:
+                    to_delete.append(project_id)
+                case True if item.value.is_active is not True:
+                    to_restore.append(project_id)
+        transitioned: dict[EntityIdentifier, PartialBulkEntityResult[ProjectData]] = {}
+        if to_delete:
+            deleted = await self._project.partial_bulk_delete.run(
+                PartialBulkDeleteProjectsAction(ids=to_delete)
+            )
+            transitioned.update({item.entity_id: item for item in deleted.items})
+        if to_restore:
+            restored = await self._project.partial_bulk_restore.run(
+                PartialBulkRestoreProjectsAction(ids=to_restore)
+            )
+            transitioned.update({item.entity_id: item for item in restored.items})
+        return self._to_partial_bulk_payload(
+            PartialBulkResult(
+                items=[transitioned.get(item.entity_id, item) for item in result.items]
+            )
+        )
 
     async def partial_bulk_delete(
         self, input: PartialBulkDeleteProjectsInput
@@ -298,12 +328,28 @@ class ProjectAdapter(BaseAdapter):
         )
         return self._to_partial_bulk_payload(result)
 
+    async def _apply_deprecated_is_active(
+        self, data: ProjectData, is_active: bool | None | Unset
+    ) -> ProjectData:
+        """Soft-delete (``False``) or restore (``True``) the project; nothing when it is
+        already there."""
+        if not isinstance(is_active, bool) or data.is_active is is_active:
+            return data
+        if is_active:
+            restored = await self._project.restore_project.run(
+                RestoreProjectAction(updater=ProjectRestoreUpdater(project_id=data.entity_id()))
+            )
+            return restored.data
+        deleted = await self._project.delete_project.run(
+            DeleteProjectAction(updater=ProjectSoftDeleteUpdater(project_id=data.entity_id()))
+        )
+        return deleted.data
+
     def _to_updater(self, project_id: ProjectID, input: UpdateProjectInput) -> ProjectUpdater:
         return ProjectUpdater(
             project_id=project_id,
             name=OptionalState.from_unset(input.name),
             description=TriState.from_unset(input.description),
-            is_active=OptionalState.from_unset(input.is_active),
             integration_name=TriState.from_unset(input.integration_name),
             resource_policy=OptionalState.from_unset(input.resource_policy),
         )

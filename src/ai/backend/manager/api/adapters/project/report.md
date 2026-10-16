@@ -16,14 +16,14 @@
   - scoped_search — 대표 성공 ✗ · 대표 실패 ✗ — SCENARIO-GAP
   - search_by_domain_name — 대표 성공 ✗ · 대표 실패 ✗ — SCENARIO-GAP
   - search_by_user — 대표 성공 ✗ · 대표 실패 ✗ — SCENARIO-GAP
-- ops + 직접 구현 (2)
+- ops + 직접 구현 (4)
   - assign_users — 성공 있음 1 · 실패 없음 (atomic_bulk_get_ops, scope) — SCENARIO-GAP
+  - partial_bulk_update — 성공 있음 3 · 실패 없음 (partial_bulk, partial_bulk_delete_ops, partial_bulk_restore_ops) — SCENARIO-GAP
   - unassign_users — 성공 없음 · 실패 없음 (atomic_bulk_get_ops, scope) — SCENARIO-GAP
-- 직접 구현 (4)
+  - update — 성공 있음 2 · 실패 없음 (single_delete_ops, single_entity, single_restore_ops) — SCENARIO-GAP
+- 직접 구현 (2)
   - admin_create — 성공 있음 1 · 실패 있음 1 (scope)
   - admin_purge — 성공 없음 · 실패 없음 (single_entity) — SCENARIO-GAP
-  - partial_bulk_update — 성공 있음 2 · 실패 없음 (partial_bulk) — SCENARIO-GAP
-  - update — 성공 없음 · 실패 없음 (single_entity) — SCENARIO-GAP
 
 **batch_load_image_commit_registries**
 
@@ -52,19 +52,27 @@
 |---|---|
 | [프로젝트와 그 프로젝트 스코프의 역할이 있을 때 사용자를 배정하면, 그 사용자가 명부에 오른다](#project-assigning-a-user-to-a-project-puts-them-on-its-roster) | 성공 |
 
+**partial_bulk_update**
+
+| 시나리오 | 판정 |
+|---|---|
+| [아무 권한도 받지 않은 사용자가 프로젝트 여럿을 한 번에 고치려 하면, 고쳐진 것 없이 모두 권한이 없다는 이유로 실패 목록에 온다](#partial_bulk_editing-a-user-granted-nothing-edits-none-of-several-projects) | 성공 |
+| [활성 플래그와 설명을 섞어 프로젝트 여럿을 한 번에 고치면, 플래그를 내린 것은 soft delete 되고 올린 것은 restore 되며 둘 다 새 설명으로 오고, 없는 id 는 대상이 없다는 이유로 실패 목록에 온다](#partial_bulk_editing-the-active-flag-soft-deletes-or-restores-each-of-several-projects) | 성공 |
+| [슈퍼관리자가 프로젝트 여럿의 설명을 한 번에 바꾸면, 모두 새 설명으로 오고 실패한 것은 없다](#partial_bulk_editing-the-superadmin-edits-several-projects-at-once) | 성공 |
+
+**update**
+
+| 시나리오 | 판정 |
+|---|---|
+| [활성 플래그를 내리는 수정은 프로젝트를 soft delete 하고, 답이 비활성 상태를 실어 온다](#editing-clearing-the-active-flag-soft-deletes-a-project) | 성공 |
+| [soft delete 된 프로젝트의 활성 플래그를 올리는 수정은 그 프로젝트를 restore 하고, 답이 활성 상태를 실어 온다](#editing-raising-the-active-flag-restores-a-soft-deleted-project) | 성공 |
+
 **admin_create**
 
 | 시나리오 | 판정 |
 |---|---|
 | [도메인과 프로젝트 정책이 있을 때 슈퍼관리자가 프로젝트를 만들면, 그 이름의 프로젝트가 그 도메인 아래에 생긴다](#project-the-superadmin-makes-a-project-in-a-domain) | 성공 |
 | [프로젝트 생성은 역할이 아니라 도메인 스코프의 권한이 지키므로, 아무 권한도 받지 않은 사용자는 권한 부족으로 거부된다](#project-a-user-granted-nothing-may-not-make-a-project) | 거부 |
-
-**partial_bulk_update**
-
-| 시나리오 | 판정 |
-|---|---|
-| [아무 권한도 받지 않은 사용자가 프로젝트 여럿을 한 번에 고치려 하면, 고쳐진 것 없이 모두 권한이 없다는 이유로 실패 목록에 온다](#partial_bulk_editing-a-user-granted-nothing-edits-none-of-several-projects) | 성공 |
-| [슈퍼관리자가 프로젝트 여럿의 설명을 한 번에 바꾸면, 모두 새 설명으로 오고 실패한 것은 없다](#partial_bulk_editing-the-superadmin-edits-several-projects-at-once) | 성공 |
 
 ### batch_load_image_commit_registries
 
@@ -331,6 +339,227 @@ Then
 - 명부에 배정한 사람만 올라 있다
   - items: 배정한 사람 하나와 같다
 
+### partial_bulk_update
+
+<a id="partial_bulk_editing-a-user-granted-nothing-edits-none-of-several-projects"></a>
+
+#### [a-user-granted-nothing-edits-none-of-several-projects](/tests/scenario/bai_scenario/manager/project/test_partial_bulk_editing.py) — pass
+
+아무 권한도 받지 않은 사용자가 프로젝트 여럿을 한 번에 고치려 하면, 고쳐진 것 없이 모두 권한이 없다는 이유로 실패 목록에 온다
+
+Given
+
+- 한 도메인 아래의 프로젝트 2개와, 다른 도메인에 사는 user 한 명
+  - 도메인 home-1
+  - 도메인 target-1
+  - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+  - 프로젝트 team-1
+  - 프로젝트 team-2
+  - 도메인에 속한 사용자 한 명 준비
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+
+When
+
+- ProjectAdapter.partial_bulk_update — user-1이 프로젝트 2개의 설명을 한 번에 고침
+
+Then
+
+- 처리된 프로젝트 없이 대상이 모두 실패 목록에 온다
+  - successes = []
+  - failed count = 2
+  - failed[0].id: 대상 프로젝트의 id와 같다
+  - failed[0].message: 'Insufficient permission'를 담은 이유
+  - failed[1].id: 대상 프로젝트의 id와 같다
+  - failed[1].message: 'Insufficient permission'를 담은 이유
+
+<a id="partial_bulk_editing-the-active-flag-soft-deletes-or-restores-each-of-several-projects"></a>
+
+#### [the-active-flag-soft-deletes-or-restores-each-of-several-projects](/tests/scenario/bai_scenario/manager/project/test_partial_bulk_editing.py) — pass
+
+활성 플래그와 설명을 섞어 프로젝트 여럿을 한 번에 고치면, 플래그를 내린 것은 soft delete 되고 올린 것은 restore 되며 둘 다 새 설명으로 오고, 없는 id 는 대상이 없다는 이유로 실패 목록에 온다
+
+Given
+
+- 한 도메인 아래의 프로젝트 2개와, 다른 도메인에 사는 superadmin 한 명
+  - 도메인 home-1
+  - 도메인 target-1
+  - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+  - 프로젝트 team-1
+  - 프로젝트 team-2
+  - 도메인에 속한 사용자 한 명 준비
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+
+When
+
+- ProjectAdapter.partial_bulk_update — user-1이 둘째 프로젝트를 soft delete 한 뒤, 첫째는 활성 플래그를 내리고 둘째는 올리며 둘의 설명을 바꾸고, 없는 id 하나의 활성 플래그를 내림
+
+Then
+
+- 둘 다 새 설명으로 오고 첫째는 비활성, 둘째는 활성이며, 없는 id 는 대상이 없다는 이유로 실패 목록에 온다
+  - successes count = 2
+  - successes[0].name = 'team-1'
+  - successes[0].description = '한 번에 고친 설명'
+  - successes[0].integration_name = None
+  - successes[0].domain_name = 'target-1'
+  - successes[0].resource_policy = 'default'
+  - successes[0].allowed_vfolder_hosts = []
+  - successes[0].is_active = False
+  - successes[0].id: 무시함 — 데이터베이스가 만든다
+  - successes[0].type: 무시함 — 타입이 이미 값을 못박는다
+  - successes[0].entity_id: 미리 만든 프로젝트의 id와 같다
+  - successes[0].created_at: 이 실행이 쓴 시각
+  - successes[0].modified_at: 이 실행이 쓴 시각
+  - successes[1].name = 'team-2'
+  - successes[1].description = '한 번에 고친 설명'
+  - successes[1].integration_name = None
+  - successes[1].domain_name = 'target-1'
+  - successes[1].resource_policy = 'default'
+  - successes[1].allowed_vfolder_hosts = []
+  - successes[1].is_active = True
+  - successes[1].id: 무시함 — 데이터베이스가 만든다
+  - successes[1].type: 무시함 — 타입이 이미 값을 못박는다
+  - successes[1].entity_id: 미리 만든 프로젝트의 id와 같다
+  - successes[1].created_at: 이 실행이 쓴 시각
+  - successes[1].modified_at: 이 실행이 쓴 시각
+  - failed count = 1
+  - failed[0].id: 요청에 넣은 없는 id와 같다
+  - failed[0].message: 'not found'를 담은 이유
+
+<a id="partial_bulk_editing-the-superadmin-edits-several-projects-at-once"></a>
+
+#### [the-superadmin-edits-several-projects-at-once](/tests/scenario/bai_scenario/manager/project/test_partial_bulk_editing.py) — pass
+
+슈퍼관리자가 프로젝트 여럿의 설명을 한 번에 바꾸면, 모두 새 설명으로 오고 실패한 것은 없다
+
+Given
+
+- 한 도메인 아래의 프로젝트 2개와, 다른 도메인에 사는 superadmin 한 명
+  - 도메인 home-1
+  - 도메인 target-1
+  - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+  - 프로젝트 team-1
+  - 프로젝트 team-2
+  - 도메인에 속한 사용자 한 명 준비
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+
+When
+
+- ProjectAdapter.partial_bulk_update — user-1이 프로젝트 2개의 설명을 한 번에 고침
+
+Then
+
+- 대상 프로젝트가 모두 새 설명으로 오고, 실패한 것은 없다
+  - successes count = 2
+  - failed = []
+  - successes[0].name = 'team-1'
+  - successes[0].description = '한 번에 고친 설명'
+  - successes[0].integration_name = None
+  - successes[0].domain_name = 'target-1'
+  - successes[0].resource_policy = 'default'
+  - successes[0].allowed_vfolder_hosts = []
+  - successes[0].is_active = True
+  - successes[0].id: 무시함 — 데이터베이스가 만든다
+  - successes[0].type: 무시함 — 타입이 이미 값을 못박는다
+  - successes[0].entity_id: 미리 만든 프로젝트의 id와 같다
+  - successes[0].created_at: 이 실행이 쓴 시각
+  - successes[0].modified_at: 이 실행이 쓴 시각
+  - successes[1].name = 'team-2'
+  - successes[1].description = '한 번에 고친 설명'
+  - successes[1].integration_name = None
+  - successes[1].domain_name = 'target-1'
+  - successes[1].resource_policy = 'default'
+  - successes[1].allowed_vfolder_hosts = []
+  - successes[1].is_active = True
+  - successes[1].id: 무시함 — 데이터베이스가 만든다
+  - successes[1].type: 무시함 — 타입이 이미 값을 못박는다
+  - successes[1].entity_id: 미리 만든 프로젝트의 id와 같다
+  - successes[1].created_at: 이 실행이 쓴 시각
+  - successes[1].modified_at: 이 실행이 쓴 시각
+
+### update
+
+<a id="editing-clearing-the-active-flag-soft-deletes-a-project"></a>
+
+#### [clearing-the-active-flag-soft-deletes-a-project](/tests/scenario/bai_scenario/manager/project/test_editing.py) — pass
+
+활성 플래그를 내리는 수정은 프로젝트를 soft delete 하고, 답이 비활성 상태를 실어 온다
+
+Given
+
+- 한 도메인 아래의 프로젝트 1개와, 다른 도메인에 사는 superadmin 한 명
+  - 도메인 home-1
+  - 도메인 target-1
+  - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+  - 프로젝트 team-1
+  - 도메인에 속한 사용자 한 명 준비
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+
+When
+
+- ProjectAdapter.update — user-1이 team-1을 활성 플래그을 고침
+
+Then
+
+- 미리 만든 프로젝트 전체가 온다
+  - name = 'team-1'
+  - description = 'team-1 was already here'
+  - integration_name = None
+  - domain_name = 'target-1'
+  - resource_policy = 'default'
+  - allowed_vfolder_hosts = []
+  - is_active = False
+  - id: 무시함 — 데이터베이스가 만든다
+  - type: 무시함 — 타입이 이미 값을 못박는다
+  - entity_id: 미리 만든 프로젝트의 id와 같다
+  - created_at: 이 실행이 쓴 시각
+  - modified_at: 이 실행이 쓴 시각
+
+<a id="editing-raising-the-active-flag-restores-a-soft-deleted-project"></a>
+
+#### [raising-the-active-flag-restores-a-soft-deleted-project](/tests/scenario/bai_scenario/manager/project/test_editing.py) — pass
+
+soft delete 된 프로젝트의 활성 플래그를 올리는 수정은 그 프로젝트를 restore 하고, 답이 활성 상태를 실어 온다
+
+Given
+
+- 한 도메인 아래의 프로젝트 1개와, 다른 도메인에 사는 superadmin 한 명
+  - 도메인 home-1
+  - 도메인 target-1
+  - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+  - 프로젝트 team-1
+  - 도메인에 속한 사용자 한 명 준비
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+
+When
+
+- ProjectAdapter.update — user-1이 team-1을 soft delete 한 뒤 활성 플래그을 고침
+
+Then
+
+- 미리 만든 프로젝트 전체가 온다
+  - name = 'team-1'
+  - description = 'team-1 was already here'
+  - integration_name = None
+  - domain_name = 'target-1'
+  - resource_policy = 'default'
+  - allowed_vfolder_hosts = []
+  - is_active = True
+  - id: 무시함 — 데이터베이스가 만든다
+  - type: 무시함 — 타입이 이미 값을 못박는다
+  - entity_id: 미리 만든 프로젝트의 id와 같다
+  - created_at: 이 실행이 쓴 시각
+  - modified_at: 이 실행이 쓴 시각
+
 ### admin_create
 
 <a id="project-the-superadmin-makes-a-project-in-a-domain"></a>
@@ -392,92 +621,4 @@ Then
 
 - 거부된다
   - 거부: NotEnoughPermission
-
-### partial_bulk_update
-
-<a id="partial_bulk_editing-a-user-granted-nothing-edits-none-of-several-projects"></a>
-
-#### [a-user-granted-nothing-edits-none-of-several-projects](/tests/scenario/bai_scenario/manager/project/test_partial_bulk_editing.py) — pass
-
-아무 권한도 받지 않은 사용자가 프로젝트 여럿을 한 번에 고치려 하면, 고쳐진 것 없이 모두 권한이 없다는 이유로 실패 목록에 온다
-
-Given
-
-- 한 도메인 아래의 프로젝트 2개와, 다른 도메인에 사는 user 한 명
-  - 도메인 home-1
-  - 도메인 target-1
-  - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-  - 프로젝트 team-1
-  - 프로젝트 team-2
-  - 도메인에 속한 사용자 한 명 준비
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-
-When
-
-- ProjectAdapter.partial_bulk_update — user-1이 프로젝트 2개의 설명을 한 번에 고침
-
-Then
-
-- 처리된 프로젝트 없이 대상이 모두 실패 목록에 온다
-  - successes = []
-  - failed count = 2
-  - failed[0].id: 대상 프로젝트의 id와 같다
-  - failed[0].message: 'Insufficient permission'를 담은 이유
-  - failed[1].id: 대상 프로젝트의 id와 같다
-  - failed[1].message: 'Insufficient permission'를 담은 이유
-
-<a id="partial_bulk_editing-the-superadmin-edits-several-projects-at-once"></a>
-
-#### [the-superadmin-edits-several-projects-at-once](/tests/scenario/bai_scenario/manager/project/test_partial_bulk_editing.py) — pass
-
-슈퍼관리자가 프로젝트 여럿의 설명을 한 번에 바꾸면, 모두 새 설명으로 오고 실패한 것은 없다
-
-Given
-
-- 한 도메인 아래의 프로젝트 2개와, 다른 도메인에 사는 superadmin 한 명
-  - 도메인 home-1
-  - 도메인 target-1
-  - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-  - 프로젝트 team-1
-  - 프로젝트 team-2
-  - 도메인에 속한 사용자 한 명 준비
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
-
-When
-
-- ProjectAdapter.partial_bulk_update — user-1이 프로젝트 2개의 설명을 한 번에 고침
-
-Then
-
-- 대상 프로젝트가 모두 새 설명으로 오고, 실패한 것은 없다
-  - successes count = 2
-  - failed = []
-  - successes[0].name = 'team-1'
-  - successes[0].description = '한 번에 고친 설명'
-  - successes[0].integration_name = None
-  - successes[0].domain_name = 'target-1'
-  - successes[0].resource_policy = 'default'
-  - successes[0].allowed_vfolder_hosts = []
-  - successes[0].is_active = True
-  - successes[0].id: 무시함 — 데이터베이스가 만든다
-  - successes[0].type: 무시함 — 타입이 이미 값을 못박는다
-  - successes[0].entity_id: 미리 만든 프로젝트의 id와 같다
-  - successes[0].created_at: 이 실행이 쓴 시각
-  - successes[0].modified_at: 이 실행이 쓴 시각
-  - successes[1].name = 'team-2'
-  - successes[1].description = '한 번에 고친 설명'
-  - successes[1].integration_name = None
-  - successes[1].domain_name = 'target-1'
-  - successes[1].resource_policy = 'default'
-  - successes[1].allowed_vfolder_hosts = []
-  - successes[1].is_active = True
-  - successes[1].id: 무시함 — 데이터베이스가 만든다
-  - successes[1].type: 무시함 — 타입이 이미 값을 못박는다
-  - successes[1].entity_id: 미리 만든 프로젝트의 id와 같다
-  - successes[1].created_at: 이 실행이 쓴 시각
-  - successes[1].modified_at: 이 실행이 쓴 시각
 

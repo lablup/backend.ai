@@ -20444,7 +20444,9 @@ input UpdateDomainInput {
   """New description."""
   description: String
 
-  """Updated active status."""
+  """
+  `false` runs `deleteDomainV2` and `true` runs `restoreDomainV2`; nothing happens when the domain is already in that state.
+  """
   isActive: Boolean @deprecated(reason: "Deprecated since 26.10.0. Use `deleteDomainV2` or `restoreDomainV2`.")
 
   """New allowed Docker registry URLs."""
@@ -20949,7 +20951,9 @@ input UpdateProjectInput {
   """New description."""
   description: String
 
-  """Updated active status."""
+  """
+  `false` runs `deleteProjectV2` and `true` runs `restoreProjectV2`; nothing happens when the project is already in that state.
+  """
   isActive: Boolean @deprecated(reason: "Deprecated since 26.10.0. Use `deleteProjectV2` or `restoreProjectV2`.")
 
   """New external integration identifier."""

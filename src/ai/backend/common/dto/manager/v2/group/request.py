@@ -89,7 +89,9 @@ class UpdateProjectInput(BaseRequestModel):
         default=UNSET,
         description=(
             f"Deprecated since {NEXT_RELEASE_VERSION}. Use the project delete and restore "
-            "operations. Updated active status. Omit to leave unchanged."
+            "operations. false soft-deletes the project and true restores it, as those "
+            "operations do; nothing happens when it is already in that state. Omit to "
+            "leave unchanged."
         ),
         deprecated=True,
     )

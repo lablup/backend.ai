@@ -89,6 +89,7 @@
 | 시나리오 | 판정 |
 |---|---|
 | [아무 권한도 받지 않은 사용자가 도메인 여럿을 한 번에 고치려 하면, 고쳐진 것 없이 모두 권한이 없다는 이유로 실패 목록에 온다](#partial_bulk_editing-a-user-granted-nothing-edits-none-of-several-domains) | 성공 |
+| [활성 플래그와 설명을 섞어 도메인 여럿을 한 번에 고치면, 플래그를 내린 것은 soft delete 되고 올린 것은 restore 되며 둘 다 새 설명으로 오고, 없는 id 는 대상이 없다는 이유로 실패 목록에 온다](#partial_bulk_editing-the-active-flag-soft-deletes-or-restores-each-of-several-domains) | 성공 |
 | [슈퍼관리자가 도메인 여럿의 설명을 한 번에 바꾸면, 모두 새 설명으로 오고 실패한 것은 없다](#partial_bulk_editing-the-superadmin-edits-several-domains-at-once) | 성공 |
 
 **restore**
@@ -111,8 +112,10 @@
 
 | 시나리오 | 판정 |
 |---|---|
-| [활성 플래그를 내리는 수정은 도메인을 비활성으로 만들고, 답이 그 상태를 실어 온다](#editing-clearing-the-active-flag-deactivates-a-domain) | 성공 |
+| [활성 플래그를 내리는 수정은 도메인을 soft delete 하고, 답이 비활성 상태를 실어 온다](#editing-clearing-the-active-flag-soft-deletes-a-domain) | 성공 |
 | [슈퍼관리자가 도메인의 설명만 바꾸면, 설명은 새 값이 되고 이름은 그대로 남는다](#editing-editing-a-description-leaves-the-name-alone) | 성공 |
+| [soft delete 된 도메인의 활성 플래그를 내리며 설명을 바꾸면, 설명은 새 값이 되고 비활성 상태는 그대로다](#editing-lowering-the-active-flag-of-a-soft-deleted-domain-edits-only-the-rest) | 성공 |
+| [soft delete 된 도메인의 활성 플래그를 올리는 수정은 그 도메인을 restore 하고, 답이 활성 상태를 실어 온다](#editing-raising-the-active-flag-restores-a-soft-deleted-domain) | 성공 |
 | [아무 권한도 받지 않은 사용자가 도메인을 수정하려 하면 권한 부족으로 거부된다](#editing-a-user-granted-nothing-may-not-edit-a-domain) | 거부 |
 | [아무 도메인도 갖지 않은 이름을 수정하려 하면 대상이 없다는 것으로 거부된다](#editing-editing-a-name-nothing-answers-to-is-not-found) | 거부 |
 
@@ -880,6 +883,56 @@ Then
   - failed[1].id: 대상 도메인의 id와 같다
   - failed[1].message: 'Insufficient permission'를 담은 이유
 
+<a id="partial_bulk_editing-the-active-flag-soft-deletes-or-restores-each-of-several-domains"></a>
+
+#### [the-active-flag-soft-deletes-or-restores-each-of-several-domains](/tests/scenario/bai_scenario/manager/domain/test_partial_bulk_editing.py) — pass
+
+활성 플래그와 설명을 섞어 도메인 여럿을 한 번에 고치면, 플래그를 내린 것은 soft delete 되고 올린 것은 restore 되며 둘 다 새 설명으로 오고, 없는 id 는 대상이 없다는 이유로 실패 목록에 온다
+
+Given
+
+- 도메인 3개와, 그중 하나에 속한 superadmin 한 명
+  - 도메인 home-1
+  - 도메인 wanted-1
+  - 도메인 other-1
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+
+When
+
+- DomainAdapter.partial_bulk_update — user-1이 둘째 도메인을 soft delete 한 뒤, 첫째는 활성 플래그를 내리고 둘째는 올리며 둘의 설명을 바꾸고, 없는 id 하나의 활성 플래그를 내림
+
+Then
+
+- 둘 다 새 설명으로 오고 첫째는 비활성, 둘째는 활성이며, 없는 id 는 대상이 없다는 이유로 실패 목록에 온다
+  - successes count = 2
+  - successes[0].name = 'wanted-1'
+  - successes[0].description = '한 번에 고친 설명'
+  - successes[0].integration_name = None
+  - successes[0].allowed_docker_registries = []
+  - successes[0].is_active = False
+  - successes[0].is_default = False
+  - successes[0].id: 무시함 — 데이터베이스가 만든다
+  - successes[0].entity_id: 미리 만든 도메인의 id와 같다
+  - successes[0].created_at: 이 실행이 쓴 시각
+  - successes[0].modified_at: 이 실행이 쓴 시각
+  - successes[1].name = 'other-1'
+  - successes[1].description = '한 번에 고친 설명'
+  - successes[1].integration_name = None
+  - successes[1].allowed_docker_registries = []
+  - successes[1].is_active = True
+  - successes[1].is_default = False
+  - successes[1].id: 무시함 — 데이터베이스가 만든다
+  - successes[1].entity_id: 미리 만든 도메인의 id와 같다
+  - successes[1].created_at: 이 실행이 쓴 시각
+  - successes[1].modified_at: 이 실행이 쓴 시각
+  - failed count = 1
+  - failed[0].id: 요청에 넣은 없는 id와 같다
+  - failed[0].message: 'not found'를 담은 이유
+
 <a id="partial_bulk_editing-the-superadmin-edits-several-domains-at-once"></a>
 
 #### [the-superadmin-edits-several-domains-at-once](/tests/scenario/bai_scenario/manager/domain/test_partial_bulk_editing.py) — pass
@@ -1112,11 +1165,11 @@ Then
 
 ### update
 
-<a id="editing-clearing-the-active-flag-deactivates-a-domain"></a>
+<a id="editing-clearing-the-active-flag-soft-deletes-a-domain"></a>
 
-#### [clearing-the-active-flag-deactivates-a-domain](/tests/scenario/bai_scenario/manager/domain/test_editing.py) — pass
+#### [clearing-the-active-flag-soft-deletes-a-domain](/tests/scenario/bai_scenario/manager/domain/test_editing.py) — pass
 
-활성 플래그를 내리는 수정은 도메인을 비활성으로 만들고, 답이 그 상태를 실어 온다
+활성 플래그를 내리는 수정은 도메인을 soft delete 하고, 답이 비활성 상태를 실어 온다
 
 Given
 
@@ -1171,6 +1224,74 @@ Then
 - 미리 만든 도메인 전체가 온다
   - name = 'editable-1'
   - description = '고쳐 쓴 설명'
+  - integration_name = None
+  - allowed_docker_registries = []
+  - is_active = True
+  - is_default = False
+  - id: 무시함 — 데이터베이스가 만든다
+  - entity_id: 미리 만든 도메인의 id와 같다
+  - created_at: 이 실행이 쓴 시각
+  - modified_at: 이 실행이 쓴 시각
+
+<a id="editing-lowering-the-active-flag-of-a-soft-deleted-domain-edits-only-the-rest"></a>
+
+#### [lowering-the-active-flag-of-a-soft-deleted-domain-edits-only-the-rest](/tests/scenario/bai_scenario/manager/domain/test_editing.py) — pass
+
+soft delete 된 도메인의 활성 플래그를 내리며 설명을 바꾸면, 설명은 새 값이 되고 비활성 상태는 그대로다
+
+Given
+
+- 도메인 하나와, 그 도메인에 속한 superadmin 한 명
+  - 도메인 already-deleted-1
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+
+When
+
+- DomainAdapter.update — user-1이 already-deleted-1을 soft delete 한 뒤 활성 플래그와 설명을 고침
+
+Then
+
+- 미리 만든 도메인 전체가 온다
+  - name = 'already-deleted-1'
+  - description = '고쳐 쓴 설명'
+  - integration_name = None
+  - allowed_docker_registries = []
+  - is_active = False
+  - is_default = False
+  - id: 무시함 — 데이터베이스가 만든다
+  - entity_id: 미리 만든 도메인의 id와 같다
+  - created_at: 이 실행이 쓴 시각
+  - modified_at: 이 실행이 쓴 시각
+
+<a id="editing-raising-the-active-flag-restores-a-soft-deleted-domain"></a>
+
+#### [raising-the-active-flag-restores-a-soft-deleted-domain](/tests/scenario/bai_scenario/manager/domain/test_editing.py) — pass
+
+soft delete 된 도메인의 활성 플래그를 올리는 수정은 그 도메인을 restore 하고, 답이 활성 상태를 실어 온다
+
+Given
+
+- 도메인 하나와, 그 도메인에 속한 superadmin 한 명
+  - 도메인 to-restore-1
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+
+When
+
+- DomainAdapter.update — user-1이 to-restore-1을 soft delete 한 뒤 활성 플래그을 고침
+
+Then
+
+- 미리 만든 도메인 전체가 온다
+  - name = 'to-restore-1'
+  - description = '이미 있던 도메인'
   - integration_name = None
   - allowed_docker_registries = []
   - is_active = True
