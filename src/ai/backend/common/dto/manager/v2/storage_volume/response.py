@@ -48,7 +48,6 @@ class StorageVolumeNode(BaseResponseModel):
 class StorageVolumeServiceAttachmentNode(BaseResponseModel):
     """Node model representing a storage volume as one service has it attached."""
 
-    id: UUID = Field(description="Storage volume service attachment ID")
     service_catalog_id: UUID = Field(description="ID of the service the volume is attached to")
     storage_volume_id: UUID = Field(description="ID of the attached volume")
     status_checked_at: datetime | None = Field(
