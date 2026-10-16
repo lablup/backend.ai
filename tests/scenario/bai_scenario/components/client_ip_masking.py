@@ -16,10 +16,12 @@ from ai.backend.common.dto.manager.v2.client_ip_masking.response import (
     AdminSearchClientIPMaskingPoliciesPayload,
     ClientIPMaskingPolicyNode,
 )
+from ai.backend.common.dto.manager.v2.common import PartialBulkPayload
 from ai.backend.manager.data.client_ip.masking import ClientIPMaskingMode, ClientIPMaskingTarget
 from ai.backend.manager.data.client_ip.types import ClientIPMaskingPolicyData
 from ai.backend.manager.data.user.types import UserData
 from ai.backend.manager.errors.base.entity import EntityNotFoundError
+from ai.backend.manager.errors.permission import NotEnoughPermission
 from ai.backend.testutils.scenario_steps import (
     Answered,
     Given,
@@ -31,7 +33,7 @@ from ai.backend.testutils.scenario_steps import (
     Then,
     Verdict,
 )
-from bai_scenario.components.domain import WrittenByThisRun
+from bai_scenario.components.domain import Mentions, WrittenByThisRun
 from bai_scenario.components.system import KEPT, Kept, lay_a_caller, role_named
 from bai_scenario.seeds.client_ip_masking.policy import TestSeedClientIPMaskingPolicy
 
@@ -247,3 +249,38 @@ class TheDeletedMaskingPolicy(Then[AMaskingPolicyAndACaller, ClientIPMaskingPoli
             ipv6=seed.ipv6_prefix,
             written=WrittenByThisRun(self.started),
         )
+
+
+@dataclass(frozen=True)
+class NoMaskingPolicyIsProcessed(
+    Then[ManyMaskingPoliciesAndACaller, PartialBulkPayload[ClientIPMaskingPolicyNode]]
+):
+    """처리된 정책 없이, 미리 만들어 둔 정책이 모두 같은 이유로 실패 목록에 온다."""
+
+    reason: str
+
+    @override
+    def says(self) -> str:
+        return "처리된 정책 없이 대상이 모두 실패 목록에 온다"
+
+    @override
+    def look(
+        self,
+        laid: ManyMaskingPoliciesAndACaller,
+        answered: Answered[PartialBulkPayload[ClientIPMaskingPolicyNode]],
+    ) -> list[Verdict]:
+        payload = answered.response
+        if payload is None:
+            return [Refused(NotEnoughPermission, answered.raised)]
+        verdicts: list[Verdict] = [
+            Same("successes", payload.successes, []),
+            Same("failed count", len(payload.failed), len(laid.laid)),
+        ]
+        for i, (failure, policy) in enumerate(zip(payload.failed, laid.laid, strict=False)):
+            verdicts += [
+                Held[UUID](
+                    f"failed[{i}].id", failure.id, SameAs[UUID](policy.id, "대상 정책의 id")
+                ),
+                Held(f"failed[{i}].message", failure.message, Mentions(self.reason)),
+            ]
+        return verdicts

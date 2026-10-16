@@ -33,5 +33,11 @@ def register_v2_idle_checker_routes(
         handler.admin_purge,
         middlewares=[superadmin_required],
     )
+    registry.add(
+        "POST",
+        "/partial-bulk-purge",
+        handler.admin_partial_bulk_purge,
+        middlewares=[superadmin_required],
+    )
 
     return registry

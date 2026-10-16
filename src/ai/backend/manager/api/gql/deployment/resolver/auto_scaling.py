@@ -2,8 +2,11 @@
 
 from __future__ import annotations
 
+from uuid import UUID
+
 from strawberry import ID, Info
 
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     gql_mutation,
@@ -14,6 +17,9 @@ from ai.backend.manager.api.gql.deployment.types.auto_scaling import (
     CreateAutoScalingRulePayload,
     DeleteAutoScalingRuleInput,
     DeleteAutoScalingRulePayload,
+    PartialBulkAutoScalingRulesPayload,
+    PartialBulkPurgeAutoScalingRulesInput,
+    PartialBulkUpdateAutoScalingRulesInput,
     UpdateAutoScalingRuleInput,
     UpdateAutoScalingRulePayload,
 )
@@ -40,10 +46,51 @@ async def update_auto_scaling_rule(
     return UpdateAutoScalingRulePayload(rule=AutoScalingRule.from_pydantic(payload.rule))
 
 
-@gql_mutation(BackendAIGQLMeta(added_version="25.16.0", description="Delete auto scaling rule."))
+@gql_mutation(
+    BackendAIGQLMeta(added_version="25.16.0", description="Delete auto scaling rule."),
+    deprecation_reason=f"Deprecated since {NEXT_RELEASE_VERSION}. Use `purgeAutoScalingRule`.",
+)
 async def delete_auto_scaling_rule(
     input: DeleteAutoScalingRuleInput, info: Info[StrawberryGQLContext]
 ) -> DeleteAutoScalingRulePayload | None:
     """Delete an auto-scaling rule."""
-    payload = await info.context.adapters.deployment.delete_rule(input.to_pydantic())
+    payload = await info.context.adapters.deployment.purge_rule(input.to_pydantic().id)
     return DeleteAutoScalingRulePayload(id=ID(str(payload.id)))
+
+
+@gql_mutation(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION, description="Permanently remove an auto-scaling rule."
+    )
+)
+async def purge_auto_scaling_rule(
+    id: UUID, info: Info[StrawberryGQLContext]
+) -> DeleteAutoScalingRulePayload:
+    payload = await info.context.adapters.deployment.purge_rule(id)
+    return DeleteAutoScalingRulePayload(id=ID(str(payload.id)))
+
+
+@gql_mutation(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Update several auto-scaling rules, answering for each one.",
+    )
+)
+async def partial_bulk_update_auto_scaling_rules(
+    input: PartialBulkUpdateAutoScalingRulesInput, info: Info[StrawberryGQLContext]
+) -> PartialBulkAutoScalingRulesPayload:
+    payload = await info.context.adapters.deployment.partial_bulk_update_rules(input.to_pydantic())
+    return PartialBulkAutoScalingRulesPayload.from_pydantic(payload)
+
+
+@gql_mutation(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Permanently remove several auto-scaling rules, answering for each one.",
+    )
+)
+async def partial_bulk_purge_auto_scaling_rules(
+    input: PartialBulkPurgeAutoScalingRulesInput, info: Info[StrawberryGQLContext]
+) -> PartialBulkAutoScalingRulesPayload:
+    payload = await info.context.adapters.deployment.partial_bulk_purge_rules(input.to_pydantic())
+    return PartialBulkAutoScalingRulesPayload.from_pydantic(payload)

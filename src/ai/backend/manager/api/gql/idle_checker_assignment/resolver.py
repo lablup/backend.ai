@@ -7,6 +7,7 @@ from ai.backend.common.dto.manager.v2.idle_checker_assignment.request import (
     ScopedSearchIdleCheckerAssignmentsInput,
     SearchIdleCheckerAssignmentsInput,
 )
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import encode_cursor
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
@@ -22,6 +23,9 @@ from ai.backend.manager.api.gql.idle_checker_assignment.types import (
     IdleCheckerAssignmentGQL,
     IdleCheckerAssignmentOrderByGQL,
     IdleCheckerAssignmentScopeGQL,
+    PartialBulkIdleCheckerAssignmentsPayloadGQL,
+    PartialBulkPurgeIdleCheckerAssignmentsInputGQL,
+    PartialBulkUpdateIdleCheckerAssignmentsInputGQL,
     PurgeIdleCheckerAssignmentInputGQL,
     PurgeIdleCheckerAssignmentPayloadGQL,
     UpdateIdleCheckerAssignmentInputGQL,
@@ -178,3 +182,41 @@ async def purge_idle_checker_assignment(
 ) -> PurgeIdleCheckerAssignmentPayloadGQL:
     payload = await info.context.adapters.idle_checker_assignment.purge(input.to_pydantic())
     return PurgeIdleCheckerAssignmentPayloadGQL.from_pydantic(payload)
+
+
+@gql_mutation(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description=(
+            "Updates several idle checker assignments' enabled state, answering for each one. "
+            "Each item requires permission on its assignment's scope (subject to RBAC)."
+        ),
+    )
+)
+async def partial_bulk_update_idle_checker_assignments(
+    info: Info[StrawberryGQLContext],
+    input: PartialBulkUpdateIdleCheckerAssignmentsInputGQL,
+) -> PartialBulkIdleCheckerAssignmentsPayloadGQL:
+    payload = await info.context.adapters.idle_checker_assignment.partial_bulk_update(
+        input.to_pydantic()
+    )
+    return PartialBulkIdleCheckerAssignmentsPayloadGQL.from_pydantic(payload)
+
+
+@gql_mutation(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description=(
+            "Permanently removes several idle checker assignments, answering for each one. "
+            "Each item requires permission on its assignment's scope (subject to RBAC)."
+        ),
+    )
+)
+async def partial_bulk_purge_idle_checker_assignments(
+    info: Info[StrawberryGQLContext],
+    input: PartialBulkPurgeIdleCheckerAssignmentsInputGQL,
+) -> PartialBulkIdleCheckerAssignmentsPayloadGQL:
+    payload = await info.context.adapters.idle_checker_assignment.partial_bulk_purge(
+        input.to_pydantic()
+    )
+    return PartialBulkIdleCheckerAssignmentsPayloadGQL.from_pydantic(payload)
