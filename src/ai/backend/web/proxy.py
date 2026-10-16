@@ -18,15 +18,8 @@ from trafaret import DataError
 
 from ai.backend.client.exceptions import BackendAPIError, BackendClientError
 from ai.backend.client.request import Request, RequestContent, SessionMode
-<<<<<<< HEAD
 from ai.backend.common.exception import InvalidAPIParameters
-=======
-from ai.backend.common.endpoint_pool.exceptions import NoHealthyEndpointError
-from ai.backend.common.endpoint_pool.pool import HealthyEndpointPool
-from ai.backend.common.endpoint_pool.types import AcquiredEndpoint
-from ai.backend.common.exception import InvalidAPIParameters, MalformedRequestBody
 from ai.backend.common.middlewares.exception import is_client_disconnect
->>>>>>> 7ab98e958 (fix(BA-8553): log client disconnects while streaming a response at trace (#15746))
 from ai.backend.common.web.session import STORAGE_KEY, extra_config_headers, get_session
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.web.clients.endpoint_pool import AcquiredEndpoint, HealthyEndpointPool
@@ -323,7 +316,6 @@ async def _run_proxy_request(
             status=e.status,
             reason=e.reason,
         )
-<<<<<<< HEAD
     except BackendClientError:
         log.exception("{}: BackendClientError", log_prefix)
         return web.HTTPBadGateway(
@@ -333,26 +325,14 @@ async def _run_proxy_request(
             }),
             content_type="application/problem+json",
         )
-    except ClientConnectionError:
-        log.warning(
-            "{}: ClientConnectionError - Client disconnected during proxying: method: {}, path: {}",
-            log_prefix,
-            frontend_rqst.method,
-            path,
-        )
-=======
-    except BackendClientError as e:
-        log.warning("upstream connection failed", exc_info=True, handler_name=log_prefix)
-        raise ProxyTargetUnreachableError() from e
     except ClientConnectionError as e:
         if not is_client_disconnect(frontend_rqst, e):
             log.warning(
-                "connection closed during proxying",
-                handler_name=log_prefix,
-                request_method=frontend_rqst.method,
-                request_path=path,
+                "{}: ClientConnectionError - Client disconnected during proxying: method: {}, path: {}",
+                log_prefix,
+                frontend_rqst.method,
+                path,
             )
->>>>>>> 7ab98e958 (fix(BA-8553): log client disconnects while streaming a response at trace (#15746))
         raise
     except web.HTTPException:
         # BackendAIError instances that double-inherit aiohttp.web.HTTPException
@@ -558,24 +538,13 @@ async def web_handler_with_jwt(
             }),
             content_type="application/problem+json",
         )
-<<<<<<< HEAD
-    except ClientConnectionError:
-        log.warning(
-            "web_handler_with_jwt: ClientConnectionError - Client disconnected during proxying: method: {}, path: {}",
-            frontend_rqst.method,
-            path,
-        )
-=======
-        raise ProxyTargetUnreachableError() from e
     except ClientConnectionError as e:
         if not is_client_disconnect(frontend_rqst, e):
             log.warning(
-                "connection closed during proxying",
-                handler_name="web_handler_with_jwt",
-                request_method=frontend_rqst.method,
-                request_path=path,
+                "web_handler_with_jwt: ClientConnectionError - Client disconnected during proxying: method: {}, path: {}",
+                frontend_rqst.method,
+                path,
             )
->>>>>>> 7ab98e958 (fix(BA-8553): log client disconnects while streaming a response at trace (#15746))
         raise
     except web.HTTPException:
         # BackendAIError instances that double-inherit aiohttp.web.HTTPException

@@ -138,9 +138,7 @@ def build_exception_middleware(
         except Exception as e:
             if is_client_disconnect(request, e):
                 log.trace(
-                    "client disconnected while writing the response",
-                    http_method=method,
-                    route_path=endpoint,
+                    "Client disconnected while writing the response ({} {})", method, endpoint
                 )
                 return client_closed_response()
             await error_monitor.capture_exception()
