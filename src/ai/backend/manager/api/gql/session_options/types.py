@@ -39,6 +39,7 @@ from ai.backend.common.dto.manager.v2.session_options import (
     SessionHandlerOptionsInfo,
     SessionHandlerOptionsInput,
 )
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.common.types import ImageID
 from ai.backend.manager.api.gql.common_types import (
     BinarySizeInputGQL,
@@ -243,7 +244,7 @@ class DefaultSessionKernelExecutionSpecInfoGQL:
 
     @gql_added_field(
         BackendAIGQLMeta(
-            added_version="26.10.0",
+            added_version=NEXT_RELEASE_VERSION,
             description="The container image of this execution spec.",
         )
     )  # type: ignore[misc]
