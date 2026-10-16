@@ -3008,13 +3008,25 @@ class AbstractAgent[
                     log.debug(
                         "kernel container started", container_id=container_data.get("container_id")
                     )
-                    async with self.registry_lock:
-                        self.kernel_registry[kernel_id].data.update(container_data)
-                        if "container_id" in container_data:
-                            self.kernel_registry[kernel_id].set_container_id(
-                                container_data["container_id"]
-                            )
-                    await kernel_obj.init(self.event_producer)
+                    try:
+                        async with self.registry_lock:
+                            self.kernel_registry[kernel_id].data.update(container_data)
+                            if "container_id" in container_data:
+                                self.kernel_registry[kernel_id].set_container_id(
+                                    container_data["container_id"]
+                                )
+                        await kernel_obj.init(self.event_producer)
+                    except Exception:
+                        # The polling below reports its own failures; this covers the gap before it,
+                        # so the manager does not wait for the create timeout.
+                        await self.inject_container_lifecycle_event(
+                            kernel_id,
+                            session_id,
+                            LifecycleEvent.DESTROY,
+                            KernelLifecycleEventReason.FAILED_TO_START,
+                            container_id=container_data.get("container_id"),
+                        )
+                        raise
                     log.debug(
                         "kernel object initialized", container_id=container_data.get("container_id")
                     )
