@@ -12,7 +12,7 @@ from ai.backend.common.exception import (
     ErrorOperation,
 )
 
-__all__ = ("InvalidSeedDocument",)
+__all__ = ("InvalidSeedDocument", "SeedKindOutOfOrder")
 
 
 class InvalidSeedDocument(BackendAIError, web.HTTPBadRequest):
@@ -25,4 +25,17 @@ class InvalidSeedDocument(BackendAIError, web.HTTPBadRequest):
             domain=ErrorDomain.DATABASE,
             operation=ErrorOperation.READ,
             error_detail=ErrorDetail.INVALID_PARAMETERS,
+        )
+
+
+class SeedKindOutOfOrder(BackendAIError, web.HTTPInternalServerError):
+    error_type = "https://api.backend.ai/probs/seed-kind-out-of-order"
+    error_title = "A relation seed kind is declared before an entity seed kind."
+
+    @override
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.DATABASE,
+            operation=ErrorOperation.SETUP,
+            error_detail=ErrorDetail.INTERNAL_ERROR,
         )

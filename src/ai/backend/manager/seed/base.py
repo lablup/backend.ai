@@ -13,7 +13,7 @@ from ai.backend.common.serde.exceptions import InvalidFileContent, UnsupportedFi
 from ai.backend.common.serde.loader import FileLoader
 from ai.backend.common.types import BackendAISchema, SchemaValidationFailureInfo
 from ai.backend.manager.errors.seed import InvalidSeedDocument
-from ai.backend.manager.repositories.ops.v2.seed.types import SeedWrite
+from ai.backend.manager.repositories.ops.v2.seed.types import SeedItemWrite
 
 
 @dataclass(frozen=True)
@@ -48,7 +48,7 @@ class SeedItem(BackendAISchema, ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def write(self) -> SeedWrite:
+    def write(self) -> SeedItemWrite:
         raise NotImplementedError
 
     @abstractmethod
@@ -61,6 +61,11 @@ class SeedItem(BackendAISchema, ABC):
     def reject(cls, files: Sequence[SeedItems[Any]]) -> list[SeedRejection]:
         """The files that fail a check spanning the items of every file of this kind."""
         raise NotImplementedError
+
+
+class SeedRelationItem(SeedItem, ABC):
+    """One item linking two entities by their ids. Its kind is applied after every
+    entity kind."""
 
 
 class RootSeed[TItem](BackendAISchema):

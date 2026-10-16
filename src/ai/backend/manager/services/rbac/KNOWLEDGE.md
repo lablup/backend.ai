@@ -55,6 +55,9 @@ entity type, shape, operation, gate and backing.
   entity is asked once however many pairs name it, and the answer is per pair.
 - A pair already linked is skipped in ops and answered `False`. Naming one twice is not
   something a caller has to avoid, so no call site catches a duplicate.
+- A pair already linked still has its graph reads (govern and share) registered again.
+  The registration is idempotent, so a pair whose row survived without its graph rows is
+  filled in when it is created again.
 - The audit row records the direction — `create_relation`, `purge_relation`,
   `delete_relation`, `restore_relation` — and the scopes it named. The pair is what
   tells one relation from another, not the name.

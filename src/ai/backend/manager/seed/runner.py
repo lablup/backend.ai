@@ -11,6 +11,7 @@ from ai.backend.common.serde.types import FileFormat
 from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.errors.repository import (
     ForeignKeyViolationError,
+    RepositoryIntegrityError,
     UniqueConstraintViolationError,
 )
 from ai.backend.manager.errors.seed import InvalidSeedDocument
@@ -163,8 +164,9 @@ class SeedApplier:
     per item.
 
     The entity row and each field row are inserted unless a row holds their key, and
-    ``overwrite`` upserts them instead. An item colliding on another unique key is
-    skipped; an item referring to a missing row fails. Either leaves the rest written.
+    ``overwrite`` upserts them instead. A relation or roster item is added and never
+    removed. An item colliding on another unique key is skipped; an item referring to a
+    missing row, or refused by a rule, fails. Either leaves the rest written.
     """
 
     _repository: SeedRepository
@@ -222,7 +224,7 @@ class SeedApplier:
                 result.failed.append(
                     SeedItemFailure(key, f"refers to a missing row ({e.constraint_name})")
                 )
-            case e:
+            case RepositoryIntegrityError() as e:
                 log.warning(
                     "failed a seed item violating a constraint",
                     seed_kind_name=kind.name,
@@ -232,3 +234,11 @@ class SeedApplier:
                 result.failed.append(
                     SeedItemFailure(key, f"violates a constraint ({e.constraint_name})")
                 )
+            case e:
+                log.warning(
+                    "failed a seed item refused by a rule",
+                    seed_kind_name=kind.name,
+                    item_key=key,
+                    error_type=type(e).__name__,
+                )
+                result.failed.append(SeedItemFailure(key, f"refused: {e}"))

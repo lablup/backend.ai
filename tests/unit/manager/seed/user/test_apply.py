@@ -12,7 +12,9 @@ from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.entity.user import UserEntityType, UserID
 from ai.backend.common.types import AccessKey
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
+from ai.backend.manager.data.keypair.types import KeyPairSecrets
 from ai.backend.manager.models.hasher.types import PasswordInfo
+from ai.backend.manager.models.keypair.creators import DefaultKeypairCreator
 from ai.backend.manager.models.keypair.row import KeyPairRow
 from ai.backend.manager.models.project.row import ProjectRow
 from ai.backend.manager.models.rbac_models.role.row import RoleRow
@@ -72,6 +74,22 @@ async def runtime_user_id(db: ExtendedAsyncSAEngine, applied: None, admin: UserS
                 resource_policy="default",
             )
         )
+        await w.create_field(
+            UserID(data.id),
+            DefaultKeypairCreator(
+                secrets=KeyPairSecrets(
+                    access_key=AccessKey("AKRUNTIME"),
+                    secret_key=SecretValue("SKRUNTIME"),
+                    ssh_public_key="ssh-rsa runtime",
+                    ssh_private_key="runtime-private-key",
+                ),
+                is_active=True,
+                is_admin=False,
+                resource_policy="default",
+            ),
+        )
+        await w.restate_user_resource_policy_share(UserID(data.id))
+        await w.restate_keypair_resource_policy_share(UserID(data.id))
     return UserID(data.id)
 
 

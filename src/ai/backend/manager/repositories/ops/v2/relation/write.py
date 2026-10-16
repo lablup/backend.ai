@@ -45,9 +45,10 @@ class V2RelationWriteOps(V2WriteOps):
         and READ on the scope added to what the target holds of it. Answers per pair, in
         the order given, whether the link was written.
 
-        A pair already linked, switched off or not, is left as it stands and answered
-        ``False`` — naming one twice is not something a caller has to avoid. Every other
-        integrity failure is the spec's to map.
+        A pair already linked, switched off or not, keeps its row and is answered
+        ``False`` — naming one twice is not something a caller has to avoid. Its graph
+        reads are registered again, idempotently. Every other integrity failure is the
+        spec's to map.
 
         Both entities are already in the graph: a node is written when the entity is
         created, so one missing is a broken state and not something a relation repairs.
@@ -60,8 +61,7 @@ class V2RelationWriteOps(V2WriteOps):
             )
             for scope, target in pairs
         ]
-        linked = [pair for pair, is_new in zip(pairs, written, strict=True) if is_new]
-        for scope, target in linked:
+        for scope, target in pairs:
             await self._govern([scope], target, cap=Permission.READ)
             await self._widen_share(target, scope, {Permission.READ: None})
         return written
