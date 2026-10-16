@@ -197,9 +197,15 @@ def _parse_redis_url(redis_target: RedisTarget, db: int) -> yarl.URL:
         raise ValueError("Redis URL is not provided in the configuration.")
 
     schema = _get_redis_url_schema(redis_target)
-    return yarl.URL(f"{schema}://host").with_host(str(redis_url[0])).with_port(
-        redis_url[1]
-    ).with_password(redis_target.get("password")) / str(db)
+    url = (
+        yarl.URL(f"{schema}://host")
+        .with_host(str(redis_url[0]))
+        .with_port(redis_url[1])
+        .with_password(redis_target.get("password"))
+    )
+    if username := redis_target.get("username"):
+        url = url.with_user(username)
+    return url / str(db)
 
 
 def get_redis_object(
@@ -241,6 +247,7 @@ def get_redis_object(
             sentinel_addresses = _sentinel_addresses
 
         service_name = redis_target.get("service_name")
+        username = redis_target.get("username")
         password = redis_target.get("password")
         sentinel_password = redis_target.get("sentinel_password")
         sentinel_auth = sentinel_password if sentinel_password is not None else password
@@ -261,6 +268,7 @@ def get_redis_object(
         return RedisConnectionInfo(
             client=sentinel.master_for(
                 service_name=service_name,
+                username=username,
                 password=password,
                 **conn_opts,
             ),
@@ -329,6 +337,7 @@ def get_redis_object_for_lock(
             sentinel_addresses = _sentinel_addresses
 
         service_name = redis_target.get("service_name")
+        username = redis_target.get("username")
         password = redis_target.get("password")
         sentinel_password = redis_target.get("sentinel_password")
         sentinel_auth = sentinel_password if sentinel_password is not None else password
@@ -349,6 +358,7 @@ def get_redis_object_for_lock(
         return RedisConnectionInfo(
             client=sentinel.master_for(
                 service_name=service_name,
+                username=username,
                 password=password,
                 **conn_opts,
             ),
@@ -397,6 +407,7 @@ async def create_valkey_client(
     if valkey_target.password:
         credentials = ServerCredentials(
             password=valkey_target.password,
+            username=valkey_target.username,
         )
     pubsub_subscriptions: GlideClientConfiguration.PubSubSubscriptions | None = None
     if pubsub_channels is not None:
