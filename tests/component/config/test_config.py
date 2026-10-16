@@ -698,3 +698,14 @@ class TestUserDotfilesAcrossKeypairs:
                             data="x",
                         )
                     )
+
+    @pytest.mark.usefixtures("regular_user_reads_admin")
+    async def test_regular_user_who_reads_admin_cannot_target_admin_key(
+        self,
+        user_registry: BackendAIClientRegistry,
+        admin_access_key: str,
+    ) -> None:
+        with pytest.raises(PermissionDeniedError):
+            await user_registry.config.get_user_dotfile(
+                GetUserDotfileRequest(owner_access_key=admin_access_key, path=".private")
+            )
