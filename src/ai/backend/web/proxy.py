@@ -22,6 +22,7 @@ from ai.backend.common.endpoint_pool.exceptions import NoHealthyEndpointError
 from ai.backend.common.endpoint_pool.pool import HealthyEndpointPool
 from ai.backend.common.endpoint_pool.types import AcquiredEndpoint
 from ai.backend.common.exception import InvalidAPIParameters, MalformedRequestBody
+from ai.backend.common.middlewares.exception import is_client_disconnect
 from ai.backend.common.web.session import STORAGE_KEY, extra_config_headers, get_session
 from ai.backend.logging.structured import StructuredLogger
 from ai.backend.web.config.unified import WebServerUnifiedConfig
@@ -327,13 +328,14 @@ async def _run_proxy_request(
     except BackendClientError as e:
         log.warning("upstream connection failed", exc_info=True, handler_name=log_prefix)
         raise ProxyTargetUnreachableError() from e
-    except ClientConnectionError:
-        log.warning(
-            "connection closed during proxying",
-            handler_name=log_prefix,
-            request_method=frontend_rqst.method,
-            request_path=path,
-        )
+    except ClientConnectionError as e:
+        if not is_client_disconnect(frontend_rqst, e):
+            log.warning(
+                "connection closed during proxying",
+                handler_name=log_prefix,
+                request_method=frontend_rqst.method,
+                request_path=path,
+            )
         raise
     except NoHealthyEndpointError as e:
         raise ManagerConnectionUnavailable(extra_msg=e.extra_msg) from e
@@ -531,13 +533,14 @@ async def web_handler_with_jwt(
             "upstream connection failed", exc_info=True, handler_name="web_handler_with_jwt"
         )
         raise ProxyTargetUnreachableError() from e
-    except ClientConnectionError:
-        log.warning(
-            "connection closed during proxying",
-            handler_name="web_handler_with_jwt",
-            request_method=frontend_rqst.method,
-            request_path=path,
-        )
+    except ClientConnectionError as e:
+        if not is_client_disconnect(frontend_rqst, e):
+            log.warning(
+                "connection closed during proxying",
+                handler_name="web_handler_with_jwt",
+                request_method=frontend_rqst.method,
+                request_path=path,
+            )
         raise
     except NoHealthyEndpointError as e:
         raise ManagerConnectionUnavailable(extra_msg=e.extra_msg) from e
