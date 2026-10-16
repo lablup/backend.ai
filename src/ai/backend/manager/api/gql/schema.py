@@ -175,7 +175,9 @@ from ai.backend.manager.api.gql.domain_v2.resolver.query import (
 from ai.backend.manager.api.gql.entity.resolver.query import entity_types
 from ai.backend.manager.api.gql.entity_label.resolver.mutation import (
     partial_bulk_purge_entity_label,
+    partial_bulk_purge_entity_labels,
     partial_bulk_upsert_entity_label,
+    partial_bulk_upsert_entity_labels,
     purge_entity_label,
     upsert_entity_label,
 )
@@ -1484,8 +1486,10 @@ class Mutation:
     include_session_idle_checks = include_session_idle_checks
     # Entity Label mutations
     upsert_entity_label = upsert_entity_label
-    partial_bulk_upsert_entity_label = partial_bulk_upsert_entity_label
+    partial_bulk_upsert_entity_labels = partial_bulk_upsert_entity_labels
     purge_entity_label = purge_entity_label
+    partial_bulk_purge_entity_labels = partial_bulk_purge_entity_labels
+    partial_bulk_upsert_entity_label = partial_bulk_upsert_entity_label
     partial_bulk_purge_entity_label = partial_bulk_purge_entity_label
 
 

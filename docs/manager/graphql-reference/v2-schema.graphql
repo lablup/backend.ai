@@ -11156,7 +11156,7 @@ type Mutation {
   """
   Added in 26.10.0. Set keys on several entities in one call, answering per entity. An entity the caller may not write is one failed item; the rest are written.
   """
-  partialBulkUpsertEntityLabel(input: PartialBulkUpsertEntityLabelInput!): PartialBulkUpsertEntityLabelPayload
+  partialBulkUpsertEntityLabels(input: PartialBulkUpsertEntityLabelInput!): PartialBulkUpsertEntityLabelPayload
 
   """
   Added in 26.9.0. Take one label off, named by its own id. Which entity answers for it is read from the row before the delete runs.
@@ -11166,7 +11166,17 @@ type Mutation {
   """
   Added in 26.10.0. Take several labels off in one call, each named by its own id and answered for on its own. A label that is gone or on an entity the caller may not write is one failed item; the rest are taken off.
   """
-  partialBulkPurgeEntityLabel(input: PartialBulkPurgeEntityLabelInput!): PartialBulkPurgeEntityLabelPayload
+  partialBulkPurgeEntityLabels(input: PartialBulkPurgeEntityLabelInput!): PartialBulkPurgeEntityLabelPayload
+
+  """
+  Added in 26.10.0. Set keys on several entities in one call, answering per entity. An entity the caller may not write is one failed item; the rest are written.
+  """
+  partialBulkUpsertEntityLabel(input: PartialBulkUpsertEntityLabelInput!): PartialBulkUpsertEntityLabelPayload @deprecated(reason: "Deprecated since 26.10.0. Use `partialBulkUpsertEntityLabels`.")
+
+  """
+  Added in 26.10.0. Take several labels off in one call, each named by its own id and answered for on its own. A label that is gone or on an entity the caller may not write is one failed item; the rest are taken off.
+  """
+  partialBulkPurgeEntityLabel(input: PartialBulkPurgeEntityLabelInput!): PartialBulkPurgeEntityLabelPayload @deprecated(reason: "Deprecated since 26.10.0. Use `partialBulkPurgeEntityLabels`.")
 }
 
 """
