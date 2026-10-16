@@ -21,11 +21,18 @@ from ai.backend.common.events.event_types.session.broadcast import SchedulingBro
 from ai.backend.common.events.types import AbstractEvent
 from ai.backend.common.plugin.hook import HookPluginContext
 from ai.backend.common.types import (
+    AgentId,
+    KernelId,
     SessionId,
 )
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.session.types import SessionStatus
-from ai.backend.manager.errors.kernel import SessionNotFound
+from ai.backend.manager.errors.kernel import (
+    KernelExecutionFailed,
+    KernelLogsNotSupported,
+    SessionNotFound,
+)
+from ai.backend.manager.exceptions import AgentError
 from ai.backend.manager.plugin.network import NetworkPluginContext
 from ai.backend.manager.registry import AgentRegistry
 
@@ -381,3 +388,56 @@ class TestWaitForSessionRunning:
                 await mock_registry_obj._wait_for_session_running(
                     session_id, mock_propagator, max_wait=0
                 )
+
+
+class TestGetLogsFromAgent:
+    """Tests for get_logs_from_agent() when the agent refuses the verb."""
+
+    @pytest.fixture
+    def kernel_id(self) -> KernelId:
+        return KernelId(uuid.uuid4())
+
+    @pytest.fixture
+    def session(self, kernel_id: KernelId) -> MagicMock:
+        kernel = MagicMock()
+        kernel.id = kernel_id
+        kernel.agent = "agent-1"
+        session = MagicMock()
+        session.main_kernel = kernel
+        return session
+
+    def _make_registry(self, get_logs: AsyncMock) -> MagicMock:
+        client = MagicMock()
+        client.get_logs = get_logs
+        acquire_ctx = MagicMock()
+        acquire_ctx.__aenter__ = AsyncMock(return_value=client)
+        acquire_ctx.__aexit__ = AsyncMock(return_value=False)
+        registry = MagicMock(spec=AgentRegistry)
+        registry._agent_client_pool = MagicMock()
+        registry._agent_client_pool.acquire = MagicMock(return_value=acquire_ctx)
+        registry.get_logs_from_agent = AgentRegistry.get_logs_from_agent.__get__(
+            registry, AgentRegistry
+        )
+        return registry
+
+    async def test_returns_logs(self, session: MagicMock) -> None:
+        registry = self._make_registry(AsyncMock(return_value={"logs": "hello"}))
+        assert await registry.get_logs_from_agent(session) == "hello"
+
+    async def test_verb_not_supported_maps_to_501(
+        self, session: MagicMock, kernel_id: KernelId
+    ) -> None:
+        agent_error = AgentError(
+            AgentId("agent-1"), "KernelVerbNotSupported", "KernelVerbNotSupported('get_logs')", ()
+        )
+        registry = self._make_registry(AsyncMock(side_effect=agent_error))
+        with pytest.raises(KernelLogsNotSupported) as exc_info:
+            await registry.get_logs_from_agent(session)
+        assert exc_info.value.status_code == 501
+        assert str(kernel_id) in str(exc_info.value.extra_msg)
+
+    async def test_other_agent_error_stays_execution_failure(self, session: MagicMock) -> None:
+        agent_error = AgentError(AgentId("agent-1"), "RuntimeError", "RuntimeError('boom')", ())
+        registry = self._make_registry(AsyncMock(side_effect=agent_error))
+        with pytest.raises(KernelExecutionFailed):
+            await registry.get_logs_from_agent(session)

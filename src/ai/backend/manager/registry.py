@@ -167,6 +167,7 @@ from .errors.api import InvalidAPIParameters
 from .errors.image import ImageNotFound
 from .errors.kernel import (
     InvalidKernelConfig,
+    KernelLogsNotSupported,
     SessionAlreadyExists,
     SessionNotFound,
     TooManySessionsMatched,
@@ -176,6 +177,7 @@ from .errors.resource import (
     ResourceGroupNotFound,
     ResourceGroupSessionTypeNotAllowed,
 )
+from .exceptions import AgentError
 from .models.runtime_variant.row import RuntimeVariantRow
 from .models.utils import (
     ExtendedAsyncSAEngine,
@@ -191,6 +193,8 @@ log = StructuredLogger(logging.getLogger(__spec__.name))
 
 SESSION_NAME_LEN_LIMIT = 10
 DEFAULT_WAIT_TIMEOUT_SECONDS = 60
+# Class name of the error an agent raises for a verb it refuses (ADR 0035), e.g. get_logs of a TD.
+AGENT_VERB_NOT_SUPPORTED = "KernelVerbNotSupported"
 
 
 class AgentRegistry:
@@ -1670,7 +1674,18 @@ class AgentRegistry:
                     "Kernel has not been assigned to an agent.", extra_data={"kernel_id": kernel_id}
                 )
             async with self._agent_client_pool.acquire(AgentId(kernel.agent)) as client:
-                reply = await client.get_logs(kernel.id)
+                try:
+                    reply = await client.get_logs(kernel.id)
+                except AgentError as e:
+                    if e.exc_name == AGENT_VERB_NOT_SUPPORTED:
+                        raise KernelLogsNotSupported(
+                            extra_msg=(
+                                f"The agent does not serve the logs of kernel {kernel.id} "
+                                "(for example, a kernel running in a Trusted Domain)."
+                            ),
+                            extra_data={"kernel_id": str(kernel.id)},
+                        ) from None
+                    raise
             return reply["logs"]
 
     async def sync_agent_kernel_registry(self, agent_id: AgentId) -> None:
