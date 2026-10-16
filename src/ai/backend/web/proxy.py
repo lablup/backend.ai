@@ -19,6 +19,7 @@ from trafaret import DataError
 from ai.backend.client.exceptions import BackendAPIError, BackendClientError
 from ai.backend.client.request import Request, RequestContent, SessionMode
 from ai.backend.common.exception import InvalidAPIParameters
+from ai.backend.common.middlewares.exception import is_client_disconnect
 from ai.backend.common.web.session import STORAGE_KEY, extra_config_headers, get_session
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.web.clients.endpoint_pool import AcquiredEndpoint, HealthyEndpointPool
@@ -324,13 +325,14 @@ async def _run_proxy_request(
     except BackendClientError as e:
         log.exception("{}: BackendClientError", log_prefix)
         raise ProxyTargetUnreachableError() from e
-    except ClientConnectionError:
-        log.warning(
-            "{}: ClientConnectionError - Client disconnected during proxying: method: {}, path: {}",
-            log_prefix,
-            frontend_rqst.method,
-            path,
-        )
+    except ClientConnectionError as e:
+        if not is_client_disconnect(frontend_rqst, e):
+            log.warning(
+                "{}: ClientConnectionError - Client disconnected during proxying: method: {}, path: {}",
+                log_prefix,
+                frontend_rqst.method,
+                path,
+            )
         raise
     except web.HTTPException:
         # BackendAIError instances that double-inherit aiohttp.web.HTTPException
@@ -524,12 +526,14 @@ async def web_handler_with_jwt(
     except BackendClientError as e:
         log.exception("web_handler_with_jwt: BackendClientError")
         raise ProxyTargetUnreachableError() from e
-    except ClientConnectionError:
-        log.warning(
-            "web_handler_with_jwt: ClientConnectionError - Client disconnected during proxying: method: {}, path: {}",
-            frontend_rqst.method,
-            path,
-        )
+    except ClientConnectionError as e:
+        if not is_client_disconnect(frontend_rqst, e):
+            log.warning(
+                "web_handler_with_jwt: ClientConnectionError - Client disconnected during proxying:"
+                " method: {}, path: {}",
+                frontend_rqst.method,
+                path,
+            )
         raise
     except web.HTTPException:
         # BackendAIError instances that double-inherit aiohttp.web.HTTPException
