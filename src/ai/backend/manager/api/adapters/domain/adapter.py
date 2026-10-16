@@ -7,6 +7,7 @@ from typing import assert_never
 
 from ai.backend.common.data.entity.domain import DomainID, DomainName
 from ai.backend.common.data.entity.resource_group import ResourceGroupID
+from ai.backend.common.data.entity.types import EntityIdentifier
 from ai.backend.common.dto.manager.v2.common import PartialBulkFailure, PartialBulkPayload
 from ai.backend.common.dto.manager.v2.domain.request import (
     AdminSearchDomainsInput,
@@ -37,7 +38,8 @@ from ai.backend.common.dto.manager.v2.domain.types import (
     DomainUserFilter,
     OrderDirection,
 )
-from ai.backend.manager.actions.v2.bulk.result import PartialBulkResult
+from ai.backend.common.tristate.unset import Unset
+from ai.backend.manager.actions.v2.bulk.result import PartialBulkEntityResult, PartialBulkResult
 from ai.backend.manager.api.adapter_options.pagination.pagination import PaginationSpec
 from ai.backend.manager.api.adapters.base import BaseAdapter
 from ai.backend.manager.data.domain.types import DomainData
@@ -232,7 +234,8 @@ class DomainAdapter(BaseAdapter):
         result = await self._domain.update.run(
             UpdateDomainAction(updater=self._to_updater(domain_id, input))
         )
-        return DomainPayload(domain=self._domain_data_to_node(result.data))
+        data = await self._apply_deprecated_is_active(result.data, input.is_active)
+        return DomainPayload(domain=self._domain_data_to_node(data))
 
     async def delete(self, domain_id: DomainID) -> DeleteDomainPayload:
         """Soft-delete a domain."""
@@ -264,7 +267,33 @@ class DomainAdapter(BaseAdapter):
                 updaters=[self._to_updater(DomainID(item.id), item.input) for item in input.items]
             )
         )
-        return self._to_partial_bulk_payload(result)
+        requested = {DomainID(item.id): item.input.is_active for item in input.items}
+        to_delete: list[DomainID] = []
+        to_restore: list[DomainID] = []
+        for item in result.items:
+            if item.value is None:
+                continue
+            match requested.get(item.value.id):
+                case False if item.value.is_active:
+                    to_delete.append(item.value.id)
+                case True if not item.value.is_active:
+                    to_restore.append(item.value.id)
+        transitioned: dict[EntityIdentifier, PartialBulkEntityResult[DomainData]] = {}
+        if to_delete:
+            deleted = await self._domain.partial_bulk_delete.run(
+                PartialBulkDeleteDomainsAction(ids=to_delete)
+            )
+            transitioned.update({item.entity_id: item for item in deleted.items})
+        if to_restore:
+            restored = await self._domain.partial_bulk_restore.run(
+                PartialBulkRestoreDomainsAction(ids=to_restore)
+            )
+            transitioned.update({item.entity_id: item for item in restored.items})
+        return self._to_partial_bulk_payload(
+            PartialBulkResult(
+                items=[transitioned.get(item.entity_id, item) for item in result.items]
+            )
+        )
 
     async def partial_bulk_delete(
         self, input: PartialBulkDeleteDomainsInput
@@ -284,11 +313,27 @@ class DomainAdapter(BaseAdapter):
         )
         return self._to_partial_bulk_payload(result)
 
+    async def _apply_deprecated_is_active(
+        self, data: DomainData, is_active: bool | None | Unset
+    ) -> DomainData:
+        """Soft-delete (``False``) or restore (``True``) the domain; nothing when it is
+        already there."""
+        if not isinstance(is_active, bool) or data.is_active == is_active:
+            return data
+        if is_active:
+            restored = await self._domain.restore.run(
+                RestoreDomainAction(updater=DomainRestoreUpdater(domain_id=data.id))
+            )
+            return restored.data
+        deleted = await self._domain.delete.run(
+            DeleteDomainAction(updater=DomainSoftDeleteUpdater(domain_id=data.id))
+        )
+        return deleted.data
+
     def _to_updater(self, domain_id: DomainID, input: UpdateDomainInput) -> DomainUpdater:
         return DomainUpdater(
             domain_id=domain_id,
             description=TriState.from_unset(input.description),
-            is_active=OptionalState.from_unset(input.is_active),
             allowed_docker_registries=OptionalState.from_unset(input.allowed_docker_registries),
             integration_name=TriState.from_unset(input.integration_name),
         )

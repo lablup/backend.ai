@@ -387,7 +387,7 @@ class TestUserAdapterUpdater:
         )
 
         adapter = UserAdapter()
-        spec = adapter.build_updater(request, user_id=UserID(uuid4()))
+        spec = adapter.build_updater(request, user_id=UserID(uuid4()), status=UserStatus.ACTIVE)
 
         assert spec.username.value() == "newuser"
         assert spec.need_password_change.value() is True
@@ -413,7 +413,7 @@ class TestUserAdapterUpdater:
         )
 
         adapter = UserAdapter()
-        spec = adapter.build_updater(request, user_id=UserID(uuid4()))
+        spec = adapter.build_updater(request, user_id=UserID(uuid4()), status=UserStatus.INACTIVE)
 
         assert spec.username.value() == "updated-name"
         assert spec.status.value() == UserStatus.INACTIVE

@@ -42,7 +42,11 @@ from ai.backend.manager.models.project.row import (
     groups,
 )
 from ai.backend.manager.models.project.searchable_fields import ProjectSearchableFields
-from ai.backend.manager.models.project.updaters import ProjectSoftDeleteUpdater, ProjectUpdater
+from ai.backend.manager.models.project.updaters import (
+    ProjectRestoreUpdater,
+    ProjectSoftDeleteUpdater,
+    ProjectUpdater,
+)
 from ai.backend.manager.models.rbac import ProjectScope
 from ai.backend.manager.models.rbac.context import ClientContext
 from ai.backend.manager.models.user.row import UserRole
@@ -61,6 +65,7 @@ from ai.backend.manager.services.project.actions.delete_project import (
 from ai.backend.manager.services.project.actions.purge_project import (
     PurgeProjectAction,
 )
+from ai.backend.manager.services.project.actions.restore_project import RestoreProjectAction
 from ai.backend.manager.services.project.actions.update_project import UpdateProjectAction
 from ai.backend.manager.services.rbac.actions.roster.join_project import JoinProjectAction
 from ai.backend.manager.services.rbac.actions.roster.leave_project import LeaveProjectAction
@@ -642,9 +647,6 @@ class ModifyGroupInput(graphene.InputObjectType):  # type: ignore[misc]
             description=TriState[str].from_graphql(
                 self.description,
             ),
-            is_active=OptionalState[bool].from_graphql(
-                self.is_active,
-            ),
             total_resource_slots=OptionalState[ResourceSlot].from_graphql(
                 self.total_resource_slots
                 if (self.total_resource_slots is Undefined or self.total_resource_slots is None)
@@ -757,14 +759,35 @@ class ModifyGroup(graphene.Mutation):  # type: ignore[misc]
                     LeaveProjectAction(project_id=project_id, user_ids=user_ids)
                 )
         res = await graph_ctx.processors.project.update_project.run(props.to_action(gid))
+        data = (
+            await cls._apply_is_active(graph_ctx, res.data, props.is_active) if res.data else None
+        )
         graph_ctx.dataloader_manager.get_loader(graph_ctx, "Group.image_commit_registry").clear(
             ProjectID(gid)
         )
         return cls(
             ok=True,
             msg="success",
-            group=Group.from_dto(res.data) if res.data else None,
+            group=Group.from_dto(data) if data else None,
         )
+
+    @classmethod
+    async def _apply_is_active(
+        cls, graph_ctx: GraphQueryContext, data: ProjectData, is_active: Any
+    ) -> ProjectData:
+        """Soft-delete (``False``) or restore (``True``) the project; nothing when it is
+        already there."""
+        if not isinstance(is_active, bool) or data.is_active is is_active:
+            return data
+        if is_active:
+            restored = await graph_ctx.processors.project.restore_project.run(
+                RestoreProjectAction(updater=ProjectRestoreUpdater(project_id=data.entity_id()))
+            )
+            return restored.data
+        deleted = await graph_ctx.processors.project.delete_project.run(
+            DeleteProjectAction(updater=ProjectSoftDeleteUpdater(project_id=data.entity_id()))
+        )
+        return deleted.data
 
 
 class DeleteGroup(graphene.Mutation):  # type: ignore[misc]

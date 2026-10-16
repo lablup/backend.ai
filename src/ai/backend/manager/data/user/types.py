@@ -54,6 +54,18 @@ class UserStatus(enum.StrEnum):
         """Statuses a purge is working through. Writes are refused while in one."""
         return frozenset({cls.PURGING, cls.PURGE_ERROR})
 
+    def deletes_from(self, current: UserStatus) -> bool:
+        """Whether an update asking for this status soft-deletes a user in ``current``."""
+        return self is UserStatus.DELETED and current is not UserStatus.DELETED
+
+    def restores_from(self, current: UserStatus) -> bool:
+        """Whether an update asking for this status restores a user in ``current``."""
+        return self is UserStatus.ACTIVE and current is UserStatus.DELETED
+
+    def is_updater_value_from(self, current: UserStatus) -> bool:
+        """Whether an update asking for this status hands it to ``UserUpdater``."""
+        return self is not UserStatus.DELETED and not self.restores_from(current)
+
 
 @dataclass
 class UserInfoContext:

@@ -3,10 +3,10 @@ name: rbac-adapter-scenarios
 type: reference
 description: what the rbac adapter guarantees for role writes, as scenarios; the tests in tests/scenario/bai_scenario/manager/rbac match these one for one
 scope: src/ai/backend/manager/api/adapters/rbac
-keywords: [rbac, role, scenario, adapter, restore, partial_bulk]
+keywords: [rbac, role, scenario, adapter, restore, partial_bulk, status]
 generated:
   by: claude-code/opus-5
-  at: 2026-10-15
+  at: 2026-10-16
 status: draft
 ---
 # rbac 어댑터 — 시나리오
@@ -24,6 +24,10 @@ status: draft
 |---|---|---|---|
 | 슈퍼관리자가 역할의 설명을 바꾼다 | 커스텀 역할 하나 | 설명 수정 | 새 설명을 실은 역할 전체 |
 | 아무 권한도 받지 않은 사용자가 역할을 수정한다 | 같은 역할 | 설명 수정 | 권한 부족으로 거부 |
+| 슈퍼관리자가 역할의 status 를 DELETED 로 고친다 | 활성 역할 하나 | status DELETED | soft delete 되어 삭제 상태의 역할 |
+
+deprecated `status` 는 수정 뒤에 처리한다. DELETED 는 soft delete 로, 삭제된 역할에 ACTIVE 는
+restore 로 보낸다. 이미 그 상태면 아무것도 하지 않고, INACTIVE 는 반영하지 않는다.
 
 ## soft delete, restore, purge
 
@@ -42,6 +46,10 @@ status: draft
 |---|---|---|---|
 | 슈퍼관리자가 여럿의 설명을 한 번에 바꾼다 | 역할 둘 | 둘의 설명 수정 | 둘 다 새 설명으로 오고 실패한 것은 없음 |
 | 아무 권한도 받지 않은 사용자가 여럿을 수정한다 | 같은 역할 둘 | 둘의 설명 수정 | 수정된 것 없이 둘 다 권한 부족 이유로 실패 목록에 옴 |
+| soft delete 된 여럿의 status 를 한 번에 ACTIVE 로 고친다 | 역할 둘 | 둘 soft delete 뒤 둘 status ACTIVE | restore 되어 둘 다 활성으로 오고 실패한 것은 없음 |
+
+deprecated `status` 는 역할마다 단건과 같은 기준으로 처리한다. soft delete · restore 에서 실패한
+역할은 그 이유로 실패 목록에 온다.
 
 ## 여럿 soft delete, restore, purge
 

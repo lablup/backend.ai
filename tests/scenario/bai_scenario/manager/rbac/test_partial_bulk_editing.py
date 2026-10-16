@@ -8,14 +8,17 @@ from typing import override
 
 import pytest
 
+from ai.backend.common.data.permission.types import RoleStatus
 from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.dto.manager.v2.common import PartialBulkPayload
 from ai.backend.common.dto.manager.v2.rbac.request import (
+    PartialBulkDeleteRolesInput,
     PartialBulkUpdateRoleItemInput,
     PartialBulkUpdateRolesInput,
     UpdateRoleInput,
 )
 from ai.backend.common.dto.manager.v2.rbac.response import RoleNode
+from ai.backend.common.dto.manager.v2.rbac.types import RoleStatusDTO
 from ai.backend.manager.api.adapters.rbac.adapter import RBACAdapter
 from ai.backend.manager.errors.permission import NotEnoughPermission
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
@@ -70,6 +73,64 @@ class EditingEveryRole(When[RolesAndACaller, RBACAdapter, Edited]):
                     ]
                 )
             )
+
+
+@dataclass(frozen=True)
+class SoftDeletingThenEditingStatusToActive(When[RolesAndACaller, RBACAdapter, Edited]):
+    """역할들을 한 번에 soft delete 했다가 status 를 ACTIVE 로 한 번에 고친다."""
+
+    @override
+    def operation(self) -> str:
+        return "partial_bulk_update"
+
+    @override
+    def describe(self, laid: RolesAndACaller) -> str:
+        return (
+            f"{laid.caller.username}이 역할 {len(laid.roles)}개를 한 번에 soft delete 했다가 "
+            "status 를 ACTIVE 로 한 번에 고침"
+        )
+
+    @override
+    async def call(self, adapter: RBACAdapter, laid: RolesAndACaller) -> Edited:
+        with ActingAs(laid.caller):
+            await adapter.partial_bulk_delete(
+                PartialBulkDeleteRolesInput(ids=[role.id for role in laid.roles])
+            )
+            return await adapter.partial_bulk_update(
+                PartialBulkUpdateRolesInput(
+                    items=[
+                        PartialBulkUpdateRoleItemInput(
+                            id=role.id, input=UpdateRoleInput(status=RoleStatus.ACTIVE)
+                        )
+                        for role in laid.roles
+                    ]
+                )
+            )
+
+
+@dataclass(frozen=True)
+class EveryRoleIsRestored(Then[RolesAndACaller, Edited]):
+    """역할이 모두 활성으로 처리된 목록에 오고, 실패 목록은 비어 있다."""
+
+    started: datetime
+
+    @override
+    def says(self) -> str:
+        return "역할이 모두 활성으로 오고, 실패한 것은 없다"
+
+    @override
+    def look(self, laid: RolesAndACaller, answered: Answered[Edited]) -> list[Verdict]:
+        payload = answered.response
+        if payload is None:
+            return [Refused(NotEnoughPermission, answered.raised)]
+        look = RoleLook(self.started, status=RoleStatusDTO.ACTIVE)
+        verdicts: list[Verdict] = [
+            Same("successes count", len(payload.successes), len(laid.roles)),
+            Same("failed", payload.failed, []),
+        ]
+        for i, (node, role) in enumerate(zip(payload.successes, laid.roles, strict=False)):
+            verdicts += look.verdicts(f"successes[{i}].", node, role, laid.domain)
+        return verdicts
 
 
 @dataclass(frozen=True)
@@ -154,8 +215,39 @@ class AUserGrantedNothingEditsNone(
         return NothingIsProcessed(reason="Insufficient permission")
 
 
+@dataclass(frozen=True)
+class EditingStatusToActiveRestoresSeveral(
+    Scenario[TestSeedingSession, RolesAndACaller, RBACAdapter, Edited]
+):
+    started: datetime
+
+    @override
+    def summary(self) -> str:
+        return "editing-status-to-active-restores-several-roles"
+
+    @override
+    def describe(self) -> str:
+        return (
+            "soft delete 된 역할 여럿의 status 를 한 번에 ACTIVE 로 고치면, restore 되어 "
+            "모두 활성으로 온다"
+        )
+
+    @override
+    def given(self) -> Given[TestSeedingSession, RolesAndACaller]:
+        return RolesAndSomeone(role=UserRole.SUPERADMIN, count=2)
+
+    @override
+    def when(self) -> When[RolesAndACaller, RBACAdapter, Edited]:
+        return SoftDeletingThenEditingStatusToActive()
+
+    @override
+    def then(self) -> Then[RolesAndACaller, Edited]:
+        return EveryRoleIsRestored(started=self.started)
+
+
 SCENARIOS: list[RoleStep] = [
     TheSuperadminEditsSeveralRoles(started=datetime.now(UTC)),
+    EditingStatusToActiveRestoresSeveral(started=datetime.now(UTC)),
     AUserGrantedNothingEditsNone(),
 ]
 
