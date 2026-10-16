@@ -8,7 +8,7 @@ from ai.backend.common.data.entity.entity_share import EntityShareID
 from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.types import EntityIdentifier, RuntimeEntityID
 from ai.backend.common.data.entity.user import UserID
-from ai.backend.common.data.filter_specs import StringMatchSpec, UUIDInMatchSpec
+from ai.backend.common.data.filter_specs import UUIDInMatchSpec
 from ai.backend.common.data.permission.types import Permission
 from ai.backend.common.dto.manager.v2.common import OrderDirection
 from ai.backend.common.dto.manager.v2.entity_share.request import (
@@ -302,7 +302,10 @@ class EntityShareAdapter(BaseAdapter):
     def _convert_filter(self, filter: EntityShareFilter) -> list[QueryCondition]:
         fields = EntityShareSearchableFields.own
         conditions: list[QueryCondition] = [
-            *self.apply_uuid_filter(filter.entity_id, fields.id.filter)
+            *self.apply_uuid_filter(filter.entity_id, fields.id.filter),
+            *self.apply_uuid_filter(filter.target_entity_id, fields.target_entity_id.filter),
+            *self.apply_uuid_filter(filter.recipient_entity_id, fields.recipient_entity_id.filter),
+            *self.apply_string_filter(filter.recipient_email, fields.recipient_email.filter),
         ]
         if filter.status is not None:
             if filter.status.equals is not None:
@@ -315,14 +318,6 @@ class EntityShareAdapter(BaseAdapter):
                         EntityShareStatus(status) for status in filter.status.in_
                     ])
                 )
-        if filter.recipient_email is not None and filter.recipient_email.equals is not None:
-            conditions.append(
-                fields.recipient_email.filter.equals(
-                    StringMatchSpec(
-                        filter.recipient_email.equals, case_insensitive=False, negated=False
-                    )
-                )
-            )
         return conditions
 
     def _convert_orders(self, orders: Sequence[EntityShareOrderBy]) -> list[QueryOrder]:
