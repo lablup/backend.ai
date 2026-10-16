@@ -35,8 +35,9 @@ status: draft
 `fragment` 행을 바꿀 수도 있으므로 한쪽만으로는 통과하지 못한다.
 
 응답 필드는 id, `config_name`, `scope_type`, `scope_id`, `config`, 시각이다. 공개 `fragment`의 `scope_id`
-필드는 비어 있다. 쓰기의 응답에는 `failed` 필드가 있지만 언제나 비어 있다. 쓰기는 하나라도 실패하면
-전부 실패하므로 일부만 실패한 응답이 없다. 시나리오를 적기 전에 그 필드를 없앨 것인지 정한다.
+필드는 비어 있다. 쓰기는 하나라도 실패하면 전부 실패한다. 쓰기는 `scoped_atomic_bulk_upsert`,
+`my_atomic_bulk_upsert`이고 응답에는 쓴 노드만 있다. 옛 GQL mutation과 REST 경로는 deprecated이고
+같은 쓰기에 언제나 비어 있는 `failed` 필드를 붙여 반환한다.
 
 ## 자기 `fragment` 쓰기
 
@@ -190,8 +191,8 @@ status: draft
 
 | 시나리오 | 상황 | 요청 | 결과 |
 |---|---|---|---|
-| 있는 것, 없는 것, 삭제할 수 없는 것을 섞어 삭제한다 | 자기 `fragment` 둘, 다른 사용자의 `fragment` 하나, 자기 스코프에만 삭제 권한 있음 | 그 셋과 없는 id 하나를 한 번에 | 자기 둘은 `items` 목록에, 남의 것과 없는 id는 `failed` 목록에 이유와 함께 |
-| 슈퍼관리자가 섞어 삭제한다 | `fragment` 둘 | 그 둘과 없는 id 하나를 한 번에 | 둘은 `items` 목록에, 없는 id는 `failed` 목록에 |
+| 있는 것, 없는 것, 삭제할 수 없는 것을 섞어 삭제한다 | 자기 `fragment` 둘, 다른 사용자의 `fragment` 하나, 자기 스코프에만 삭제 권한 있음 | 그 셋과 없는 id 하나를 한 번에 | 자기 둘은 `successes` 목록에, 남의 것과 없는 id는 `failed` 목록에 이유와 함께 |
+| 슈퍼관리자가 섞어 삭제한다 | `fragment` 둘 | 그 둘과 없는 id 하나를 한 번에 | 둘은 `successes` 목록에, 없는 id는 `failed` 목록에 |
 
 권한이 없으면 요청 전체가 거부되지 않고 그 항목만 `failed` 목록에 들어가며, 남의 `fragment`는 남는다.
 없는 id와 삭제할 수 없는 id가 같은 `failed` 목록에 들어가므로 자기 `fragment`, 남의 `fragment`, 없는 id를
@@ -200,9 +201,12 @@ status: draft
 
 빈 목록은 시나리오로 두지 않는다. 요청 타입의 검증이 이미 거부하기 때문이다.
 
+여러 개 삭제는 `partial_bulk_purge`이고 삭제한 노드를 반환한다. 옛 REST `POST /bulk-delete`는
+deprecated이고 같은 삭제의 id만 반환한다.
+
 ## 아직 적지 않은 것
 
-어댑터가 제공하는 `scoped_upsert_app_config_fragments`, `my_upsert_app_config_fragments`, `get`,
-`purge`, `bulk_purge`, `batch_load_by_ids`, `scoped_app_config_fragments_by_names`,
+어댑터가 제공하는 `scoped_atomic_bulk_upsert`, `my_atomic_bulk_upsert`, `get`, `purge`,
+`partial_bulk_purge`, `batch_load_by_ids`, `scoped_app_config_fragments_by_names`,
 `my_app_config_fragments_by_names`, `admin_search`, `scoped_search`가 모두 위에 있다. 실행 결과에
 남는 `batch_load_fields`는 어댑터 공통 기반 클래스에서 상속한 필드 읽기이고, 이 엔티티는 필드를 갖지 않아 호출할 일이 없다.

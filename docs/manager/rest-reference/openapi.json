@@ -923,24 +923,26 @@
         "title": "PublicGetAppConfigsInput",
         "type": "object"
       },
-      "BulkPurgeAppConfigFragmentInput": {
-        "description": "Input for purging many fragments (per-item partial success).",
+      "NonEmptyList_AppConfigFragmentID_": {
+        "items": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "minItems": 1,
+        "type": "array"
+      },
+      "PartialBulkPurgeAppConfigFragmentsInput": {
+        "description": "Input for purging several fragments, each answered for separately.",
         "properties": {
           "ids": {
-            "description": "Fragment ids to purge.",
-            "items": {
-              "format": "uuid",
-              "type": "string"
-            },
-            "minItems": 1,
-            "title": "Ids",
-            "type": "array"
+            "$ref": "#/components/schemas/NonEmptyList_AppConfigFragmentID_",
+            "description": "IDs of the fragments to purge."
           }
         },
         "required": [
           "ids"
         ],
-        "title": "BulkPurgeAppConfigFragmentInput",
+        "title": "PartialBulkPurgeAppConfigFragmentsInput",
         "type": "object"
       },
       "AppConfigFragmentFilter": {
@@ -1478,6 +1480,26 @@
         "title": "MyUpsertAppConfigFragmentsInput",
         "type": "object"
       },
+      "BulkPurgeAppConfigFragmentInput": {
+        "description": "Input for purging many fragments (per-item partial success).",
+        "properties": {
+          "ids": {
+            "description": "Fragment ids to purge.",
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "minItems": 1,
+            "title": "Ids",
+            "type": "array"
+          }
+        },
+        "required": [
+          "ids"
+        ],
+        "title": "BulkPurgeAppConfigFragmentInput",
+        "type": "object"
+      },
       "CreateAppConfigAllowListInput": {
         "description": "Input for registering a new app config allow-list entry.",
         "properties": {
@@ -1804,6 +1826,49 @@
         "title": "UpdateAppConfigAllowListInput",
         "type": "object"
       },
+      "NonEmptyList_UpdateAppConfigAllowListInput_": {
+        "items": {
+          "$ref": "#/components/schemas/UpdateAppConfigAllowListInput"
+        },
+        "minItems": 1,
+        "type": "array"
+      },
+      "PartialBulkUpdateAppConfigAllowListsInput": {
+        "description": "Input for updating several allow-list entries, each answered for separately.",
+        "properties": {
+          "items": {
+            "$ref": "#/components/schemas/NonEmptyList_UpdateAppConfigAllowListInput_",
+            "description": "The allow-list entries to update, each with its id and fields."
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "title": "PartialBulkUpdateAppConfigAllowListsInput",
+        "type": "object"
+      },
+      "NonEmptyList_UUID_": {
+        "items": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "minItems": 1,
+        "type": "array"
+      },
+      "PartialBulkPurgeAppConfigAllowListsInput": {
+        "description": "Input for purging several allow-list entries, each answered for separately.",
+        "properties": {
+          "ids": {
+            "$ref": "#/components/schemas/NonEmptyList_UUID_",
+            "description": "IDs of the allow-list entries to purge."
+          }
+        },
+        "required": [
+          "ids"
+        ],
+        "title": "PartialBulkPurgeAppConfigAllowListsInput",
+        "type": "object"
+      },
       "CreateAppConfigDefinitionInput": {
         "description": "Input for registering a new app config definition.",
         "properties": {
@@ -2067,6 +2132,20 @@
           }
         },
         "title": "SearchAppConfigDefinitionsInput",
+        "type": "object"
+      },
+      "PartialBulkPurgeAppConfigDefinitionsInput": {
+        "description": "Input for purging several app config definitions, each answered for separately.",
+        "properties": {
+          "ids": {
+            "$ref": "#/components/schemas/NonEmptyList_UUID_",
+            "description": "IDs of the app config definitions to purge."
+          }
+        },
+        "required": [
+          "ids"
+        ],
+        "title": "PartialBulkPurgeAppConfigDefinitionsInput",
         "type": "object"
       },
       "ArtifactAvailability": {
@@ -2487,14 +2566,6 @@
         ],
         "title": "PartialBulkUpdateArtifactsInput",
         "type": "object"
-      },
-      "NonEmptyList_UUID_": {
-        "items": {
-          "format": "uuid",
-          "type": "string"
-        },
-        "minItems": 1,
-        "type": "array"
       },
       "PartialBulkDeleteArtifactsInput": {
         "description": "Input for soft-deleting several artifacts, each answered for separately.",
@@ -4119,6 +4190,20 @@
           "id"
         ],
         "title": "UpdateContainerRegistryInput",
+        "type": "object"
+      },
+      "PartialBulkPurgeContainerRegistriesInput": {
+        "description": "Input for purging several container registries, each answered for separately.",
+        "properties": {
+          "ids": {
+            "$ref": "#/components/schemas/NonEmptyList_UUID_",
+            "description": "IDs of the container registries to purge."
+          }
+        },
+        "required": [
+          "ids"
+        ],
+        "title": "PartialBulkPurgeContainerRegistriesInput",
         "type": "object"
       },
       "DeleteContainerRegistryInput": {
@@ -8003,6 +8088,20 @@
         "title": "SearchAccessTokensInput",
         "type": "object"
       },
+      "PartialBulkPurgeAccessTokensInput": {
+        "description": "Input for permanently removing several access tokens, each answered for separately.",
+        "properties": {
+          "ids": {
+            "$ref": "#/components/schemas/NonEmptyList_UUID_",
+            "description": "IDs of the access tokens to purge."
+          }
+        },
+        "required": [
+          "ids"
+        ],
+        "title": "PartialBulkPurgeAccessTokensInput",
+        "type": "object"
+      },
       "DeleteAccessTokenInput": {
         "description": "Input for deleting an access token.",
         "properties": {
@@ -8657,6 +8756,41 @@
           "id"
         ],
         "title": "UpdateAutoScalingRuleInput",
+        "type": "object"
+      },
+      "NonEmptyList_UpdateAutoScalingRuleInput_": {
+        "items": {
+          "$ref": "#/components/schemas/UpdateAutoScalingRuleInput"
+        },
+        "minItems": 1,
+        "type": "array"
+      },
+      "PartialBulkUpdateAutoScalingRulesInput": {
+        "description": "Input for updating several auto-scaling rules, each answered for separately.",
+        "properties": {
+          "items": {
+            "$ref": "#/components/schemas/NonEmptyList_UpdateAutoScalingRuleInput_",
+            "description": "The rules to update, each naming its rule by `id`."
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "title": "PartialBulkUpdateAutoScalingRulesInput",
+        "type": "object"
+      },
+      "PartialBulkPurgeAutoScalingRulesInput": {
+        "description": "Input for permanently removing several auto-scaling rules, each answered for separately.",
+        "properties": {
+          "ids": {
+            "$ref": "#/components/schemas/NonEmptyList_UUID_",
+            "description": "IDs of the auto-scaling rules to purge."
+          }
+        },
+        "required": [
+          "ids"
+        ],
+        "title": "PartialBulkPurgeAutoScalingRulesInput",
         "type": "object"
       },
       "DeleteAutoScalingRuleInput": {
@@ -10305,6 +10439,41 @@
           "id"
         ],
         "title": "UpdateDeploymentRevisionPresetInput",
+        "type": "object"
+      },
+      "NonEmptyList_UpdateDeploymentRevisionPresetInput_": {
+        "items": {
+          "$ref": "#/components/schemas/UpdateDeploymentRevisionPresetInput"
+        },
+        "minItems": 1,
+        "type": "array"
+      },
+      "PartialBulkUpdateDeploymentRevisionPresetsInput": {
+        "description": "Input for updating several presets, each answered for separately.",
+        "properties": {
+          "items": {
+            "$ref": "#/components/schemas/NonEmptyList_UpdateDeploymentRevisionPresetInput_",
+            "description": "The presets to update, each naming its preset by `id`."
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "title": "PartialBulkUpdateDeploymentRevisionPresetsInput",
+        "type": "object"
+      },
+      "PartialBulkPurgeDeploymentRevisionPresetsInput": {
+        "description": "Input for permanently removing several presets, each answered for separately.",
+        "properties": {
+          "ids": {
+            "$ref": "#/components/schemas/NonEmptyList_UUID_",
+            "description": "IDs of the presets to purge."
+          }
+        },
+        "required": [
+          "ids"
+        ],
+        "title": "PartialBulkPurgeDeploymentRevisionPresetsInput",
         "type": "object"
       },
       "DomainFilter": {
@@ -28508,6 +28677,20 @@
         "title": "UpdateResourceSlotTypeInput",
         "type": "object"
       },
+      "PartialBulkPurgeResourceSlotTypesInput": {
+        "description": "Input for purging several resource slot types, each answered for separately.",
+        "properties": {
+          "ids": {
+            "$ref": "#/components/schemas/NonEmptyList_UUID_",
+            "description": "IDs of the resource slot types to purge."
+          }
+        },
+        "required": [
+          "ids"
+        ],
+        "title": "PartialBulkPurgeResourceSlotTypesInput",
+        "type": "object"
+      },
       "AgentResourceFilter": {
         "description": "Filter conditions for agent resource search.",
         "properties": {
@@ -36239,17 +36422,12 @@
         "title": "ScopedSearchSessionsInput",
         "type": "object"
       },
-      "TerminateSessionsInput": {
-        "description": "Input for terminating one or more sessions.",
+      "PartialBulkTerminateSessionsInput": {
+        "description": "Input for terminating several sessions, each answered for separately.",
         "properties": {
-          "session_ids": {
-            "description": "Session UUIDs to terminate.",
-            "items": {
-              "format": "uuid",
-              "type": "string"
-            },
-            "title": "Session Ids",
-            "type": "array"
+          "ids": {
+            "$ref": "#/components/schemas/NonEmptyList_UUID_",
+            "description": "IDs of the sessions to terminate."
           },
           "forced": {
             "default": false,
@@ -36259,9 +36437,9 @@
           }
         },
         "required": [
-          "session_ids"
+          "ids"
         ],
-        "title": "TerminateSessionsInput",
+        "title": "PartialBulkTerminateSessionsInput",
         "type": "object"
       },
       "SessionIdleCheckTargetInput": {
@@ -36447,6 +36625,31 @@
           }
         },
         "title": "UpdateSessionInput",
+        "type": "object"
+      },
+      "TerminateSessionsInput": {
+        "description": "Input for terminating one or more sessions.",
+        "properties": {
+          "session_ids": {
+            "description": "Session UUIDs to terminate.",
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "title": "Session Ids",
+            "type": "array"
+          },
+          "forced": {
+            "default": false,
+            "description": "Force-terminate without waiting for cleanup.",
+            "title": "Forced",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "session_ids"
+        ],
+        "title": "TerminateSessionsInput",
         "type": "object"
       },
       "RegisterStorageNamespaceInput": {
@@ -49487,9 +49690,9 @@
         "description": "Get merged AppConfigs from public fragments only (anonymous)."
       }
     },
-    "/v2/app-config-fragments/bulk-delete": {
+    "/v2/app-config-fragments/partial-bulk-purge": {
       "post": {
-        "operationId": "v2/app-config-fragments.bulk_purge",
+        "operationId": "v2/app-config-fragments.partial_bulk_purge",
         "tags": [
           "v2/app-config-fragments"
         ],
@@ -49507,13 +49710,13 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/BulkPurgeAppConfigFragmentInput"
+                "$ref": "#/components/schemas/PartialBulkPurgeAppConfigFragmentsInput"
               }
             }
           }
         },
         "parameters": [],
-        "description": "Purge many fragments by id, with per-item partial success (auth, RBAC).\n\n**Preconditions:**\n* User privilege required.\n"
+        "description": "Purge several fragments, answering for each one (auth, RBAC-gated).\n\n**Preconditions:**\n* User privilege required.\n"
       }
     },
     "/v2/app-config-fragments/admin/search": {
@@ -49574,9 +49777,9 @@
         "description": "Read one scope's fragments for the given config names (auth, RBAC-authorized).\n\n**Preconditions:**\n* User privilege required.\n"
       }
     },
-    "/v2/app-config-fragments/scoped/bulk-upsert": {
+    "/v2/app-config-fragments/scoped/atomic-bulk-upsert": {
       "post": {
-        "operationId": "v2/app-config-fragments.scoped_bulk_upsert",
+        "operationId": "v2/app-config-fragments.scoped_atomic_bulk_upsert",
         "tags": [
           "v2/app-config-fragments"
         ],
@@ -49600,7 +49803,7 @@
           }
         },
         "parameters": [],
-        "description": "Upsert many fragments at one scope, with per-item partial success (auth, RBAC).\n\nNot in effect yet: still all-or-nothing.\n\n\n**Preconditions:**\n* User privilege required.\n"
+        "description": "Upsert many fragments at one scope, all or none (auth, RBAC).\n\n**Preconditions:**\n* User privilege required.\n"
       }
     },
     "/v2/app-config-fragments/my/by-names": {
@@ -49632,9 +49835,9 @@
         "description": "Read the caller's own user-scope fragments for the given config names (auth).\n\n**Preconditions:**\n* User privilege required.\n"
       }
     },
-    "/v2/app-config-fragments/my/bulk-upsert": {
+    "/v2/app-config-fragments/my/atomic-bulk-upsert": {
       "post": {
-        "operationId": "v2/app-config-fragments.my_bulk_upsert",
+        "operationId": "v2/app-config-fragments.my_atomic_bulk_upsert",
         "tags": [
           "v2/app-config-fragments"
         ],
@@ -49658,7 +49861,7 @@
           }
         },
         "parameters": [],
-        "description": "Upsert many fragments at the caller's own user scope, with per-item partial\nsuccess (auth).\n\nNot in effect yet: still all-or-nothing.\n\n\n**Preconditions:**\n* User privilege required.\n"
+        "description": "Upsert many fragments at the caller's own user scope, all or none (auth).\n\n**Preconditions:**\n* User privilege required.\n"
       }
     },
     "/v2/app-config-fragments/{fragment_id}": {
@@ -49715,6 +49918,93 @@
           }
         ],
         "description": "Purge a fragment by id (auth required, RBAC-gated).\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/v2/app-config-fragments/bulk-delete": {
+      "post": {
+        "operationId": "v2/app-config-fragments.bulk_purge",
+        "tags": [
+          "v2/app-config-fragments"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BulkPurgeAppConfigFragmentInput"
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "description": "Deprecated. Use `POST /v2/app-config-fragments/partial-bulk-purge`.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/v2/app-config-fragments/scoped/bulk-upsert": {
+      "post": {
+        "operationId": "v2/app-config-fragments.scoped_bulk_upsert",
+        "tags": [
+          "v2/app-config-fragments"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ScopedUpsertAppConfigFragmentsInput"
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "description": "Deprecated. Use `POST /v2/app-config-fragments/scoped/atomic-bulk-upsert`.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/v2/app-config-fragments/my/bulk-upsert": {
+      "post": {
+        "operationId": "v2/app-config-fragments.my_bulk_upsert",
+        "tags": [
+          "v2/app-config-fragments"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MyUpsertAppConfigFragmentsInput"
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "description": "Deprecated. Use `POST /v2/app-config-fragments/my/atomic-bulk-upsert`.\n\n**Preconditions:**\n* User privilege required.\n"
       }
     },
     "/v2/app-config-allow-list/": {
@@ -49837,7 +50127,7 @@
             }
           }
         ],
-        "description": "Update an app config allow-list entry's rank by id (superadmin only).\n\n**Preconditions:**\n* Superadmin privilege required.\n"
+        "description": "Deprecated. Use `PATCH /v2/app-config-allow-lists/{app_config_allow_list_id}`.\n\n**Preconditions:**\n* Superadmin privilege required.\n"
       },
       "delete": {
         "operationId": "v2/app-config-allow-list.admin_purge",
@@ -49864,7 +50154,130 @@
             }
           }
         ],
-        "description": "Purge an app config allow-list entry by id (superadmin only).\n\n**Preconditions:**\n* Superadmin privilege required.\n"
+        "description": "Deprecated. Use `DELETE /v2/app-config-allow-lists/{app_config_allow_list_id}`.\n\n**Preconditions:**\n* Superadmin privilege required.\n"
+      }
+    },
+    "/v2/app-config-allow-lists/{app_config_allow_list_id}": {
+      "patch": {
+        "operationId": "v2/app-config-allow-lists.update",
+        "tags": [
+          "v2/app-config-allow-lists"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateAppConfigAllowListInput"
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "app_config_allow_list_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "description": "Update an app config allow-list entry's rank by id.\n\n**Preconditions:**\n* User privilege required.\n"
+      },
+      "delete": {
+        "operationId": "v2/app-config-allow-lists.purge",
+        "tags": [
+          "v2/app-config-allow-lists"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "app_config_allow_list_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "description": "Purge an app config allow-list entry by id, with the fragments it admits.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/v2/app-config-allow-lists/partial-bulk-update": {
+      "post": {
+        "operationId": "v2/app-config-allow-lists.partial_bulk_update",
+        "tags": [
+          "v2/app-config-allow-lists"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PartialBulkUpdateAppConfigAllowListsInput"
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "description": "Update several app config allow-list entries, answering for each one.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/v2/app-config-allow-lists/partial-bulk-purge": {
+      "post": {
+        "operationId": "v2/app-config-allow-lists.partial_bulk_purge",
+        "tags": [
+          "v2/app-config-allow-lists"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PartialBulkPurgeAppConfigAllowListsInput"
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "description": "Purge several app config allow-list entries, answering for each one.\n\n**Preconditions:**\n* User privilege required.\n"
       }
     },
     "/v2/app-config-definitions/": {
@@ -49954,7 +50367,7 @@
         "description": "Get an app config definition by id (superadmin only).\n\n**Preconditions:**\n* Superadmin privilege required.\n"
       },
       "delete": {
-        "operationId": "v2/app-config-definitions.admin_purge",
+        "operationId": "v2/app-config-definitions.purge",
         "tags": [
           "v2/app-config-definitions"
         ],
@@ -49978,7 +50391,36 @@
             }
           }
         ],
-        "description": "Purge an app config definition by id (superadmin only).\n\n**Preconditions:**\n* Superadmin privilege required.\n"
+        "description": "Purge an app config definition by id, with the allow-list entries and fragments\nunder it.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/v2/app-config-definitions/partial-bulk-purge": {
+      "post": {
+        "operationId": "v2/app-config-definitions.partial_bulk_purge",
+        "tags": [
+          "v2/app-config-definitions"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PartialBulkPurgeAppConfigDefinitionsInput"
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "description": "Purge several app config definitions, answering for each one.\n\n**Preconditions:**\n* User privilege required.\n"
       }
     },
     "/v2/artifacts/search": {
@@ -50548,7 +50990,7 @@
         "description": "Set one key on an entity, replacing the value it carries.\n\n**Preconditions:**\n* User privilege required.\n"
       }
     },
-    "/v2/entity-labels/bulk-upsert": {
+    "/v2/entity-labels/partial-bulk-upsert": {
       "post": {
         "operationId": "v2/entity-labels.partial_bulk_upsert_labels",
         "tags": [
@@ -50606,7 +51048,7 @@
         "description": "Take one label off, named by its own id.\n\n**Preconditions:**\n* User privilege required.\n"
       }
     },
-    "/v2/entity-labels/bulk-purge": {
+    "/v2/entity-labels/partial-bulk-purge": {
       "post": {
         "operationId": "v2/entity-labels.partial_bulk_purge_labels",
         "tags": [
@@ -50662,6 +51104,64 @@
         },
         "parameters": [],
         "description": "Read the labels on the entities named.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/v2/entity-labels/bulk-upsert": {
+      "post": {
+        "operationId": "v2/entity-labels.bulk_upsert_labels",
+        "tags": [
+          "v2/entity-labels"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PartialBulkUpsertEntityLabelInput"
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "description": "Deprecated. Use `POST /v2/entity-labels/partial-bulk-upsert`.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/v2/entity-labels/bulk-purge": {
+      "post": {
+        "operationId": "v2/entity-labels.bulk_purge_labels",
+        "tags": [
+          "v2/entity-labels"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PartialBulkPurgeEntityLabelInput"
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "description": "Deprecated. Use `POST /v2/entity-labels/partial-bulk-purge`.\n\n**Preconditions:**\n* User privilege required.\n"
       }
     },
     "/v2/container-registries/search": {
@@ -50749,6 +51249,64 @@
         "description": "Update an existing container registry (superadmin only).\n\n**Preconditions:**\n* Superadmin privilege required.\n"
       }
     },
+    "/v2/container-registries/{registry_id}": {
+      "delete": {
+        "operationId": "v2/container-registries.admin_purge",
+        "tags": [
+          "v2/container-registries"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "registry_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "description": "Purge a container registry (superadmin only).\n\n**Preconditions:**\n* Superadmin privilege required.\n"
+      }
+    },
+    "/v2/container-registries/partial-bulk-purge": {
+      "post": {
+        "operationId": "v2/container-registries.admin_partial_bulk_purge",
+        "tags": [
+          "v2/container-registries"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PartialBulkPurgeContainerRegistriesInput"
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "description": "Purge several container registries (superadmin only), answering for each one.\n\n**Preconditions:**\n* Superadmin privilege required.\n"
+      }
+    },
     "/v2/container-registries/delete": {
       "post": {
         "operationId": "v2/container-registries.admin_delete",
@@ -50775,7 +51333,7 @@
           }
         },
         "parameters": [],
-        "description": "Delete a container registry (superadmin only). Hard delete via Purger.\n\n**Preconditions:**\n* Superadmin privilege required.\n"
+        "description": "Deprecated. Use `DELETE /v2/container-registries/{registry_id}`.\n\n**Preconditions:**\n* Superadmin privilege required.\n"
       }
     },
     "/v2/deployments/": {
@@ -51627,6 +52185,62 @@
           }
         ],
         "description": "Get an access token by ID.\n\n**Preconditions:**\n* User privilege required.\n"
+      },
+      "delete": {
+        "operationId": "v2/deployments.purge_access_token",
+        "tags": [
+          "v2/deployments"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "token_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "description": "Permanently remove an access token.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/v2/deployments/access-tokens/partial-bulk-purge": {
+      "post": {
+        "operationId": "v2/deployments.partial_bulk_purge_access_tokens",
+        "tags": [
+          "v2/deployments"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PartialBulkPurgeAccessTokensInput"
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "description": "Permanently remove several access tokens, answering for each one.\n\n**Preconditions:**\n* User privilege required.\n"
       }
     },
     "/v2/deployments/access-tokens/delete": {
@@ -51655,7 +52269,7 @@
           }
         },
         "parameters": [],
-        "description": "Delete an access token.\n\n**Preconditions:**\n* User privilege required.\n"
+        "description": "Deprecated. Use `DELETE /v2/deployments/access-tokens/{token_id}`.\n\n**Preconditions:**\n* User privilege required.\n"
       }
     },
     "/v2/deployments/access-tokens/bulk-delete": {
@@ -51684,7 +52298,7 @@
           }
         },
         "parameters": [],
-        "description": "Bulk delete access tokens.\n\n**Preconditions:**\n* User privilege required.\n"
+        "description": "Deprecated. Use `POST /v2/deployments/access-tokens/partial-bulk-purge`.\n\n**Preconditions:**\n* User privilege required.\n"
       }
     },
     "/v2/deployments/auto-scaling-rules": {
@@ -51782,7 +52396,7 @@
         ],
         "description": "Retrieve a single auto-scaling rule by ID.\n\n**Preconditions:**\n* User privilege required.\n"
       },
-      "put": {
+      "patch": {
         "operationId": "v2/deployments.update_auto_scaling_rule",
         "tags": [
           "v2/deployments"
@@ -51816,7 +52430,128 @@
             }
           }
         ],
-        "description": "Update an auto-scaling rule.\n\n**Preconditions:**\n* User privilege required.\n"
+        "description": "Update an auto-scaling rule. The path names the rule.\n\n**Preconditions:**\n* User privilege required.\n"
+      },
+      "delete": {
+        "operationId": "v2/deployments.purge_auto_scaling_rule",
+        "tags": [
+          "v2/deployments"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "rule_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "description": "Permanently remove an auto-scaling rule.\n\n**Preconditions:**\n* User privilege required.\n"
+      },
+      "put": {
+        "operationId": "v2/deployments.update_auto_scaling_rule.2",
+        "tags": [
+          "v2/deployments"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateAutoScalingRuleInput"
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "rule_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "description": "Update an auto-scaling rule. The path names the rule.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/v2/deployments/auto-scaling-rules/partial-bulk-update": {
+      "post": {
+        "operationId": "v2/deployments.partial_bulk_update_auto_scaling_rules",
+        "tags": [
+          "v2/deployments"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PartialBulkUpdateAutoScalingRulesInput"
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "description": "Update several auto-scaling rules, answering for each one.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/v2/deployments/auto-scaling-rules/partial-bulk-purge": {
+      "post": {
+        "operationId": "v2/deployments.partial_bulk_purge_auto_scaling_rules",
+        "tags": [
+          "v2/deployments"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PartialBulkPurgeAutoScalingRulesInput"
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "description": "Permanently remove several auto-scaling rules, answering for each one.\n\n**Preconditions:**\n* User privilege required.\n"
       }
     },
     "/v2/deployments/auto-scaling-rules/delete": {
@@ -51845,7 +52580,7 @@
           }
         },
         "parameters": [],
-        "description": "Delete an auto-scaling rule.\n\n**Preconditions:**\n* User privilege required.\n"
+        "description": "Deprecated. Use `DELETE /v2/deployments/auto-scaling-rules/{rule_id}`.\n\n**Preconditions:**\n* User privilege required.\n"
       }
     },
     "/v2/deployments/auto-scaling-rules/bulk-delete": {
@@ -51874,7 +52609,7 @@
           }
         },
         "parameters": [],
-        "description": "Bulk delete auto-scaling rules.\n\n**Preconditions:**\n* User privilege required.\n"
+        "description": "Deprecated. Use `POST /v2/deployments/auto-scaling-rules/partial-bulk-purge`.\n\n**Preconditions:**\n* User privilege required.\n"
       }
     },
     "/v2/deployments/policies/{deployment_id}": {
@@ -52084,10 +52819,10 @@
             }
           }
         ],
-        "description": "\n**Preconditions:**\n* Superadmin privilege required.\n"
+        "description": "\n**Preconditions:**\n* User privilege required.\n"
       },
       "delete": {
-        "operationId": "v2/deployments/revision-presets.delete",
+        "operationId": "v2/deployments/revision-presets.purge",
         "tags": [
           "v2/deployments/revision-presets"
         ],
@@ -52111,7 +52846,65 @@
             }
           }
         ],
-        "description": "\n**Preconditions:**\n* Superadmin privilege required.\n"
+        "description": "\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/v2/deployments/revision-presets/partial-bulk-update": {
+      "post": {
+        "operationId": "v2/deployments/revision-presets.partial_bulk_update",
+        "tags": [
+          "v2/deployments/revision-presets"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PartialBulkUpdateDeploymentRevisionPresetsInput"
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "description": "Update several presets, answering for each one.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/v2/deployments/revision-presets/partial-bulk-purge": {
+      "post": {
+        "operationId": "v2/deployments/revision-presets.partial_bulk_purge",
+        "tags": [
+          "v2/deployments/revision-presets"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PartialBulkPurgeDeploymentRevisionPresetsInput"
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "description": "Permanently remove several presets, answering for each one.\n\n**Preconditions:**\n* User privilege required.\n"
       }
     },
     "/v2/deployments/revision-presets/{preset_id}/resource-slots/search": {
@@ -52654,7 +53447,7 @@
     },
     "/v2/fair-share/domains/upsert": {
       "post": {
-        "operationId": "v2/fair-share.admin_upsert_domain",
+        "operationId": "v2/fair-share.upsert_domain",
         "tags": [
           "v2/fair-share"
         ],
@@ -52678,7 +53471,36 @@
           }
         },
         "parameters": [],
-        "description": "Upsert a domain fair share weight.\n\n**Preconditions:**\n* Superadmin privilege required.\n"
+        "description": "Upsert a domain fair share weight.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/v2/fair-share/domains/atomic-bulk-upsert": {
+      "post": {
+        "operationId": "v2/fair-share.atomic_bulk_upsert_domain",
+        "tags": [
+          "v2/fair-share"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BulkUpsertDomainFairShareWeightInput"
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "description": "Upsert several domain fair share weights in one transaction.\n\n**Preconditions:**\n* User privilege required.\n"
       }
     },
     "/v2/fair-share/domains/bulk-upsert": {
@@ -52707,7 +53529,7 @@
           }
         },
         "parameters": [],
-        "description": "Bulk upsert domain fair share weights.\n\n**Preconditions:**\n* Superadmin privilege required.\n"
+        "description": "Deprecated. Use `POST /v2/fair-share/domains/atomic-bulk-upsert`.\n\n**Preconditions:**\n* Superadmin privilege required.\n"
       }
     },
     "/v2/fair-share/projects/get": {
@@ -52770,7 +53592,7 @@
     },
     "/v2/fair-share/projects/upsert": {
       "post": {
-        "operationId": "v2/fair-share.admin_upsert_project",
+        "operationId": "v2/fair-share.upsert_project",
         "tags": [
           "v2/fair-share"
         ],
@@ -52794,7 +53616,36 @@
           }
         },
         "parameters": [],
-        "description": "Upsert a project fair share weight.\n\n**Preconditions:**\n* Superadmin privilege required.\n"
+        "description": "Upsert a project fair share weight.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/v2/fair-share/projects/atomic-bulk-upsert": {
+      "post": {
+        "operationId": "v2/fair-share.atomic_bulk_upsert_project",
+        "tags": [
+          "v2/fair-share"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BulkUpsertProjectFairShareWeightInput"
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "description": "Upsert several project fair share weights in one transaction.\n\n**Preconditions:**\n* User privilege required.\n"
       }
     },
     "/v2/fair-share/projects/bulk-upsert": {
@@ -52823,7 +53674,7 @@
           }
         },
         "parameters": [],
-        "description": "Bulk upsert project fair share weights.\n\n**Preconditions:**\n* Superadmin privilege required.\n"
+        "description": "Deprecated. Use `POST /v2/fair-share/projects/atomic-bulk-upsert`.\n\n**Preconditions:**\n* Superadmin privilege required.\n"
       }
     },
     "/v2/fair-share/users/get": {
@@ -52886,7 +53737,7 @@
     },
     "/v2/fair-share/users/upsert": {
       "post": {
-        "operationId": "v2/fair-share.admin_upsert_user",
+        "operationId": "v2/fair-share.upsert_user",
         "tags": [
           "v2/fair-share"
         ],
@@ -52910,7 +53761,36 @@
           }
         },
         "parameters": [],
-        "description": "Upsert a user fair share weight.\n\n**Preconditions:**\n* Superadmin privilege required.\n"
+        "description": "Upsert a user fair share weight.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/v2/fair-share/users/atomic-bulk-upsert": {
+      "post": {
+        "operationId": "v2/fair-share.atomic_bulk_upsert_user",
+        "tags": [
+          "v2/fair-share"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BulkUpsertUserFairShareWeightInput"
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "description": "Upsert several user fair share weights in one transaction.\n\n**Preconditions:**\n* User privilege required.\n"
       }
     },
     "/v2/fair-share/users/bulk-upsert": {
@@ -52939,7 +53819,7 @@
           }
         },
         "parameters": [],
-        "description": "Bulk upsert user fair share weights.\n\n**Preconditions:**\n* Superadmin privilege required.\n"
+        "description": "Deprecated. Use `POST /v2/fair-share/users/atomic-bulk-upsert`.\n\n**Preconditions:**\n* Superadmin privilege required.\n"
       }
     },
     "/v2/huggingface-registries": {
@@ -60715,7 +61595,65 @@
             }
           }
         ],
-        "description": "Remove a resource slot type by slot name (superadmin only).\n\n**Preconditions:**\n* Superadmin privilege required.\n"
+        "description": "Deprecated. Use `DELETE /v2/resource-slots/slot-types/{slot_type_id}`.\n\n**Preconditions:**\n* Superadmin privilege required.\n"
+      }
+    },
+    "/v2/resource-slots/slot-types/{slot_type_id}": {
+      "delete": {
+        "operationId": "v2/resource-slots.purge_slot_type",
+        "tags": [
+          "v2/resource-slots"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "slot_type_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "description": "Remove a resource slot type, refusing while anything still references it.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/v2/resource-slots/slot-types/partial-bulk-purge": {
+      "post": {
+        "operationId": "v2/resource-slots.partial_bulk_purge_slot_types",
+        "tags": [
+          "v2/resource-slots"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PartialBulkPurgeResourceSlotTypesInput"
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "description": "Remove several resource slot types, answering for each one.\n\n**Preconditions:**\n* User privilege required.\n"
       }
     },
     "/v2/resource-slots/agent-resources/scoped/search": {
@@ -62780,9 +63718,9 @@
         "description": "Search sessions within a project.\n\n**Preconditions:**\n* User privilege required.\n"
       }
     },
-    "/v2/sessions/terminate": {
+    "/v2/sessions/partial-bulk-terminate": {
       "post": {
-        "operationId": "v2/sessions.terminate",
+        "operationId": "v2/sessions.partial_bulk_terminate",
         "tags": [
           "v2/sessions"
         ],
@@ -62800,13 +63738,13 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/TerminateSessionsInput"
+                "$ref": "#/components/schemas/PartialBulkTerminateSessionsInput"
               }
             }
           }
         },
         "parameters": [],
-        "description": "Terminate one or more sessions.\n\n**Preconditions:**\n* User privilege required.\n"
+        "description": "Terminate several sessions, answering for each one.\n\n**Preconditions:**\n* User privilege required.\n"
       }
     },
     "/v2/sessions/exclude-idle-checks": {
@@ -62989,6 +63927,35 @@
           }
         ],
         "description": "Get container logs for a session.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/v2/sessions/terminate": {
+      "post": {
+        "operationId": "v2/sessions.terminate",
+        "tags": [
+          "v2/sessions"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TerminateSessionsInput"
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "description": "Deprecated. Use `POST /v2/sessions/partial-bulk-terminate`.\n\n**Preconditions:**\n* User privilege required.\n"
       }
     },
     "/v2/storage-hosts/my/permissions": {

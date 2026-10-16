@@ -1949,6 +1949,16 @@ type AtomicBulkAddRolePresetPermissionsPayload
   items: [RolePermissionPreset!]!
 }
 
+"""
+Added in 26.10.0. Payload for an all-or-nothing upsert of many fragments at one scope.
+"""
+type AtomicBulkUpsertAppConfigFragmentsPayload
+  @join__type(graph: STRAWBERRY)
+{
+  """The upserted app config fragments."""
+  items: [AppConfigFragment!]!
+}
+
 """Added in 26.10.0. Shape of the action that wrote an audit log entry."""
 enum AuditLogActionKind
   @join__type(graph: STRAWBERRY)
@@ -14089,7 +14099,17 @@ type Mutation
   """
   Added in 26.9.0. Remove a resource slot type by slot name (super admin only).
   """
-  adminPurgeResourceSlotType(input: PurgeResourceSlotTypeInput!): PurgeResourceSlotTypePayload @join__field(graph: STRAWBERRY)
+  adminPurgeResourceSlotType(input: PurgeResourceSlotTypeInput!): PurgeResourceSlotTypePayload @join__field(graph: STRAWBERRY) @deprecated(reason: "Deprecated since 26.10.0. Use `purgeResourceSlotType`.")
+
+  """
+  Added in 26.10.0. Remove a resource slot type, refusing while anything still references it.
+  """
+  purgeResourceSlotType(id: UUID!): PurgeResourceSlotTypePayload! @join__field(graph: STRAWBERRY)
+
+  """
+  Added in 26.10.0. Remove several resource slot types, answering for each one.
+  """
+  partialBulkPurgeResourceSlotTypes(input: PartialBulkPurgeResourceSlotTypesInput!): PartialBulkResourceSlotTypesPayload! @join__field(graph: STRAWBERRY)
 
   """
   Added in 26.7.0. Register a new app config allow-list entry (super admin only).
@@ -14099,22 +14119,58 @@ type Mutation
   """
   Added in 26.7.0. Purge an app config allow-list entry by id (super admin only).
   """
-  adminPurgeAppConfigAllowList(input: PurgeAppConfigAllowListInput!): PurgeAppConfigAllowListPayload @join__field(graph: STRAWBERRY)
+  adminPurgeAppConfigAllowList(input: PurgeAppConfigAllowListInput!): PurgeAppConfigAllowListPayload @join__field(graph: STRAWBERRY) @deprecated(reason: "Deprecated since 26.10.0. Use `purgeAppConfigAllowList`.")
 
   """
   Added in 26.8.0. Update an app config allow-list entry's rank by id (super admin only).
   """
-  adminUpdateAppConfigAllowList(input: UpdateAppConfigAllowListInput!): UpdateAppConfigAllowListPayload @join__field(graph: STRAWBERRY)
+  adminUpdateAppConfigAllowList(input: UpdateAppConfigAllowListInput!): UpdateAppConfigAllowListPayload @join__field(graph: STRAWBERRY) @deprecated(reason: "Deprecated since 26.10.0. Use `updateAppConfigAllowList`.")
 
   """
   Added in 26.9.0. Upsert many app config fragments at one scope (insert, or replace config on conflict), with per-item partial success (not in effect yet: still all-or-nothing).
   """
-  scopedUpsertAppConfigFragments(input: ScopedUpsertAppConfigFragmentsInput!): UpsertAppConfigFragmentsPayload! @join__field(graph: STRAWBERRY)
+  scopedUpsertAppConfigFragments(input: ScopedUpsertAppConfigFragmentsInput!): UpsertAppConfigFragmentsPayload! @join__field(graph: STRAWBERRY) @deprecated(reason: "Deprecated since 26.10.0. Use `scopedAtomicBulkUpsertAppConfigFragments`.")
 
   """
   Added in 26.9.0. Upsert many app config fragments at the current user's own user scope, with per-item partial success (not in effect yet: still all-or-nothing).
   """
-  myUpsertAppConfigFragments(input: MyUpsertAppConfigFragmentsInput!): UpsertAppConfigFragmentsPayload! @join__field(graph: STRAWBERRY)
+  myUpsertAppConfigFragments(input: MyUpsertAppConfigFragmentsInput!): UpsertAppConfigFragmentsPayload! @join__field(graph: STRAWBERRY) @deprecated(reason: "Deprecated since 26.10.0. Use `myAtomicBulkUpsertAppConfigFragments`.")
+
+  """Added in 26.10.0. Update an app config allow-list entry's rank by id."""
+  updateAppConfigAllowList(input: UpdateAppConfigAllowListInput!): UpdateAppConfigAllowListPayload! @join__field(graph: STRAWBERRY)
+
+  """
+  Added in 26.10.0. Purge an app config allow-list entry by id, with the fragments it admits.
+  """
+  purgeAppConfigAllowList(input: PurgeAppConfigAllowListInput!): PurgeAppConfigAllowListPayload! @join__field(graph: STRAWBERRY)
+
+  """
+  Added in 26.10.0. Update several app config allow-list entries, answering for each one.
+  """
+  partialBulkUpdateAppConfigAllowLists(input: PartialBulkUpdateAppConfigAllowListsInput!): PartialBulkAppConfigAllowListsPayload! @join__field(graph: STRAWBERRY)
+
+  """
+  Added in 26.10.0. Purge several app config allow-list entries, answering for each one.
+  """
+  partialBulkPurgeAppConfigAllowLists(input: PartialBulkPurgeAppConfigAllowListsInput!): PartialBulkAppConfigAllowListsPayload! @join__field(graph: STRAWBERRY)
+
+  """
+  Added in 26.10.0. Upsert many app config fragments at one scope (insert, or replace config on conflict), all or none.
+  """
+  scopedAtomicBulkUpsertAppConfigFragments(input: ScopedUpsertAppConfigFragmentsInput!): AtomicBulkUpsertAppConfigFragmentsPayload! @join__field(graph: STRAWBERRY)
+
+  """
+  Added in 26.10.0. Upsert many app config fragments at the current user's own user scope, all or none.
+  """
+  myAtomicBulkUpsertAppConfigFragments(input: MyUpsertAppConfigFragmentsInput!): AtomicBulkUpsertAppConfigFragmentsPayload! @join__field(graph: STRAWBERRY)
+
+  """Added in 26.10.0. Purge an app config fragment by id."""
+  purgeAppConfigFragment(id: UUID!): PurgeAppConfigFragmentPayload! @join__field(graph: STRAWBERRY)
+
+  """
+  Added in 26.10.0. Purge several app config fragments, answering for each one.
+  """
+  partialBulkPurgeAppConfigFragments(input: PartialBulkPurgeAppConfigFragmentsInput!): PartialBulkAppConfigFragmentsPayload! @join__field(graph: STRAWBERRY)
 
   """
   Added in 25.14.0. Scan external registries to discover available artifacts. Searches HuggingFace or Reservoir registries for artifacts matching the specified criteria and registers them in the system with SCANNED status. The artifacts become available for import but are not downloaded until explicitly imported. This is the first step in the artifact workflow: Scan → Import → Use
@@ -14192,7 +14248,15 @@ type Mutation
   adminUpdateContainerRegistryV2(input: UpdateContainerRegistryInput!): UpdateContainerRegistryPayload @join__field(graph: STRAWBERRY)
 
   """Added in 26.4.2. Delete a container registry (admin only)."""
-  adminDeleteContainerRegistryV2(id: String!): DeleteContainerRegistryPayload @join__field(graph: STRAWBERRY)
+  adminDeleteContainerRegistryV2(id: String!): DeleteContainerRegistryPayload @join__field(graph: STRAWBERRY) @deprecated(reason: "Deprecated since 26.10.0. Use `adminPurgeContainerRegistryV2`.")
+
+  """Added in 26.10.0. Purge a container registry (admin only)."""
+  adminPurgeContainerRegistryV2(id: UUID!): PurgeContainerRegistryPayload! @join__field(graph: STRAWBERRY)
+
+  """
+  Added in 26.10.0. Purge several container registries (admin only), answering for each one.
+  """
+  adminPartialBulkPurgeContainerRegistriesV2(input: PartialBulkPurgeContainerRegistriesInput!): PartialBulkContainerRegistriesPayload! @join__field(graph: STRAWBERRY)
 
   """Added in 25.16.0. Create model deployment."""
   createModelDeployment(input: CreateDeploymentInput!): CreateDeploymentPayload @join__field(graph: STRAWBERRY)
@@ -14308,7 +14372,20 @@ type Mutation
   updateAutoScalingRule(input: UpdateAutoScalingRuleInput!): UpdateAutoScalingRulePayload @join__field(graph: STRAWBERRY)
 
   """Added in 25.16.0. Delete auto scaling rule."""
-  deleteAutoScalingRule(input: DeleteAutoScalingRuleInput!): DeleteAutoScalingRulePayload @join__field(graph: STRAWBERRY)
+  deleteAutoScalingRule(input: DeleteAutoScalingRuleInput!): DeleteAutoScalingRulePayload @join__field(graph: STRAWBERRY) @deprecated(reason: "Deprecated since 26.10.0. Use `purgeAutoScalingRule`.")
+
+  """Added in 26.10.0. Permanently remove an auto-scaling rule."""
+  purgeAutoScalingRule(id: UUID!): DeleteAutoScalingRulePayload! @join__field(graph: STRAWBERRY)
+
+  """
+  Added in 26.10.0. Update several auto-scaling rules, answering for each one.
+  """
+  partialBulkUpdateAutoScalingRules(input: PartialBulkUpdateAutoScalingRulesInput!): PartialBulkAutoScalingRulesPayload! @join__field(graph: STRAWBERRY)
+
+  """
+  Added in 26.10.0. Permanently remove several auto-scaling rules, answering for each one.
+  """
+  partialBulkPurgeAutoScalingRules(input: PartialBulkPurgeAutoScalingRulesInput!): PartialBulkAutoScalingRulesPayload! @join__field(graph: STRAWBERRY)
 
   """Added in 25.14.0. Delete an object storage."""
   deleteObjectStorage(input: DeleteObjectStorageInput!): DeleteObjectStoragePayload @join__field(graph: STRAWBERRY) @deprecated(reason: "Deprecated since 26.10.0. Use `purgeObjectStorage`.")
@@ -14416,7 +14493,15 @@ type Mutation
   createAccessToken(input: CreateAccessTokenInput!): CreateAccessTokenPayload @join__field(graph: STRAWBERRY)
 
   """Added in 26.4.4. Delete access token."""
-  deleteAccessToken(input: DeleteAccessTokenInput!): DeleteAccessTokenPayload @join__field(graph: STRAWBERRY)
+  deleteAccessToken(input: DeleteAccessTokenInput!): DeleteAccessTokenPayload @join__field(graph: STRAWBERRY) @deprecated(reason: "Deprecated since 26.10.0. Use `purgeAccessToken`.")
+
+  """Added in 26.10.0. Permanently remove an access token."""
+  purgeAccessToken(id: UUID!): DeleteAccessTokenPayload! @join__field(graph: STRAWBERRY)
+
+  """
+  Added in 26.10.0. Permanently remove several access tokens, answering for each one.
+  """
+  partialBulkPurgeAccessTokens(input: PartialBulkPurgeAccessTokensInput!): PartialBulkAccessTokensPayload! @join__field(graph: STRAWBERRY)
 
   """
   Added in 25.19.0. Activate a specific revision to be the current revision
@@ -14427,64 +14512,79 @@ type Mutation
   updateRouteTrafficStatus(input: UpdateRouteTrafficStatusInput!): UpdateRouteTrafficStatusPayload @join__field(graph: STRAWBERRY)
 
   """
+  Added in 26.1.0. Upsert domain fair share weight. Creates a new record if it doesn't exist, or updates the weight if it does
+  """
+  upsertDomainFairShareWeight(input: UpsertDomainFairShareWeightInput!): UpsertDomainFairShareWeightPayload @join__field(graph: STRAWBERRY)
+
+  """
+  Added in 26.1.0. Upsert project fair share weight. Creates a new record if it doesn't exist, or updates the weight if it does
+  """
+  upsertProjectFairShareWeight(input: UpsertProjectFairShareWeightInput!): UpsertProjectFairShareWeightPayload @join__field(graph: STRAWBERRY)
+
+  """
+  Added in 26.1.0. Upsert user fair share weight. Creates a new record if it doesn't exist, or updates the weight if it does
+  """
+  upsertUserFairShareWeight(input: UpsertUserFairShareWeightInput!): UpsertUserFairShareWeightPayload @join__field(graph: STRAWBERRY)
+
+  """
+  Added in 26.10.0. Upsert several domain fair share weights in one transaction. Creates new records if they don't exist, or updates weights if they do
+  """
+  atomicBulkUpsertDomainFairShareWeights(input: BulkUpsertDomainFairShareWeightInput!): BulkUpsertDomainFairShareWeightPayload @join__field(graph: STRAWBERRY)
+
+  """
+  Added in 26.10.0. Upsert several project fair share weights in one transaction. Creates new records if they don't exist, or updates weights if they do
+  """
+  atomicBulkUpsertProjectFairShareWeights(input: BulkUpsertProjectFairShareWeightInput!): BulkUpsertProjectFairShareWeightPayload @join__field(graph: STRAWBERRY)
+
+  """
+  Added in 26.10.0. Upsert several user fair share weights in one transaction. Creates new records if they don't exist, or updates weights if they do
+  """
+  atomicBulkUpsertUserFairShareWeights(input: BulkUpsertUserFairShareWeightInput!): BulkUpsertUserFairShareWeightPayload @join__field(graph: STRAWBERRY)
+
+  """
   Added in 26.2.0. Upsert domain fair share weight (admin only). Creates a new record if it doesn't exist, or updates the weight if it does
   """
-  adminUpsertDomainFairShareWeight(input: UpsertDomainFairShareWeightInput!): UpsertDomainFairShareWeightPayload @join__field(graph: STRAWBERRY)
+  adminUpsertDomainFairShareWeight(input: UpsertDomainFairShareWeightInput!): UpsertDomainFairShareWeightPayload @join__field(graph: STRAWBERRY) @deprecated(reason: "Deprecated since 26.10.0. Use `upsertDomainFairShareWeight`.")
 
   """
   Added in 26.2.0. Upsert project fair share weight (admin only). Creates a new record if it doesn't exist, or updates the weight if it does
   """
-  adminUpsertProjectFairShareWeight(input: UpsertProjectFairShareWeightInput!): UpsertProjectFairShareWeightPayload @join__field(graph: STRAWBERRY)
+  adminUpsertProjectFairShareWeight(input: UpsertProjectFairShareWeightInput!): UpsertProjectFairShareWeightPayload @join__field(graph: STRAWBERRY) @deprecated(reason: "Deprecated since 26.10.0. Use `upsertProjectFairShareWeight`.")
 
   """
   Added in 26.2.0. Upsert user fair share weight (admin only). Creates a new record if it doesn't exist, or updates the weight if it does
   """
-  adminUpsertUserFairShareWeight(input: UpsertUserFairShareWeightInput!): UpsertUserFairShareWeightPayload @join__field(graph: STRAWBERRY)
+  adminUpsertUserFairShareWeight(input: UpsertUserFairShareWeightInput!): UpsertUserFairShareWeightPayload @join__field(graph: STRAWBERRY) @deprecated(reason: "Deprecated since 26.10.0. Use `upsertUserFairShareWeight`.")
 
   """
   Added in 26.2.0. Bulk upsert domain fair share weights (admin only). Creates new records if they don't exist, or updates weights if they do
   """
-  adminBulkUpsertDomainFairShareWeight(input: BulkUpsertDomainFairShareWeightInput!): BulkUpsertDomainFairShareWeightPayload @join__field(graph: STRAWBERRY)
+  adminBulkUpsertDomainFairShareWeight(input: BulkUpsertDomainFairShareWeightInput!): BulkUpsertDomainFairShareWeightPayload @join__field(graph: STRAWBERRY) @deprecated(reason: "Deprecated since 26.10.0. Use `atomicBulkUpsertDomainFairShareWeights`.")
 
   """
   Added in 26.2.0. Bulk upsert project fair share weights (admin only). Creates new records if they don't exist, or updates weights if they do
   """
-  adminBulkUpsertProjectFairShareWeight(input: BulkUpsertProjectFairShareWeightInput!): BulkUpsertProjectFairShareWeightPayload @join__field(graph: STRAWBERRY)
+  adminBulkUpsertProjectFairShareWeight(input: BulkUpsertProjectFairShareWeightInput!): BulkUpsertProjectFairShareWeightPayload @join__field(graph: STRAWBERRY) @deprecated(reason: "Deprecated since 26.10.0. Use `atomicBulkUpsertProjectFairShareWeights`.")
 
   """
   Added in 26.2.0. Bulk upsert user fair share weights (admin only). Creates new records if they don't exist, or updates weights if they do
   """
-  adminBulkUpsertUserFairShareWeight(input: BulkUpsertUserFairShareWeightInput!): BulkUpsertUserFairShareWeightPayload @join__field(graph: STRAWBERRY)
-
-  """
-  Added in 26.1.0. Upsert domain fair share weight (superadmin only). Creates a new record if it doesn't exist, or updates the weight if it does
-  """
-  upsertDomainFairShareWeight(input: UpsertDomainFairShareWeightInput!): UpsertDomainFairShareWeightPayload @join__field(graph: STRAWBERRY) @deprecated(reason: "Use admin_upsert_domain_fair_share_weight instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.")
-
-  """
-  Added in 26.1.0. Upsert project fair share weight (superadmin only). Creates a new record if it doesn't exist, or updates the weight if it does
-  """
-  upsertProjectFairShareWeight(input: UpsertProjectFairShareWeightInput!): UpsertProjectFairShareWeightPayload @join__field(graph: STRAWBERRY) @deprecated(reason: "Use admin_upsert_project_fair_share_weight instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.")
-
-  """
-  Added in 26.1.0. Upsert user fair share weight (superadmin only). Creates a new record if it doesn't exist, or updates the weight if it does
-  """
-  upsertUserFairShareWeight(input: UpsertUserFairShareWeightInput!): UpsertUserFairShareWeightPayload @join__field(graph: STRAWBERRY) @deprecated(reason: "Use admin_upsert_user_fair_share_weight instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.")
+  adminBulkUpsertUserFairShareWeight(input: BulkUpsertUserFairShareWeightInput!): BulkUpsertUserFairShareWeightPayload @join__field(graph: STRAWBERRY) @deprecated(reason: "Deprecated since 26.10.0. Use `atomicBulkUpsertUserFairShareWeights`.")
 
   """
   Added in 26.1.0. Bulk upsert domain fair share weights (superadmin only). Creates new records if they don't exist, or updates weights if they do
   """
-  bulkUpsertDomainFairShareWeight(input: BulkUpsertDomainFairShareWeightInput!): BulkUpsertDomainFairShareWeightPayload @join__field(graph: STRAWBERRY) @deprecated(reason: "Use admin_bulk_upsert_domain_fair_share_weight instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.")
+  bulkUpsertDomainFairShareWeight(input: BulkUpsertDomainFairShareWeightInput!): BulkUpsertDomainFairShareWeightPayload @join__field(graph: STRAWBERRY) @deprecated(reason: "Deprecated since 26.10.0. Use `atomicBulkUpsertDomainFairShareWeights`.")
 
   """
   Added in 26.1.0. Bulk upsert project fair share weights (superadmin only). Creates new records if they don't exist, or updates weights if they do
   """
-  bulkUpsertProjectFairShareWeight(input: BulkUpsertProjectFairShareWeightInput!): BulkUpsertProjectFairShareWeightPayload @join__field(graph: STRAWBERRY) @deprecated(reason: "Use admin_bulk_upsert_project_fair_share_weight instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.")
+  bulkUpsertProjectFairShareWeight(input: BulkUpsertProjectFairShareWeightInput!): BulkUpsertProjectFairShareWeightPayload @join__field(graph: STRAWBERRY) @deprecated(reason: "Deprecated since 26.10.0. Use `atomicBulkUpsertProjectFairShareWeights`.")
 
   """
   Added in 26.1.0. Bulk upsert user fair share weights (superadmin only). Creates new records if they don't exist, or updates weights if they do
   """
-  bulkUpsertUserFairShareWeight(input: BulkUpsertUserFairShareWeightInput!): BulkUpsertUserFairShareWeightPayload @join__field(graph: STRAWBERRY) @deprecated(reason: "Use admin_bulk_upsert_user_fair_share_weight instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.")
+  bulkUpsertUserFairShareWeight(input: BulkUpsertUserFairShareWeightInput!): BulkUpsertUserFairShareWeightPayload @join__field(graph: STRAWBERRY) @deprecated(reason: "Deprecated since 26.10.0. Use `atomicBulkUpsertUserFairShareWeights`.")
 
   """
   Added in 26.2.0. Update fair share configuration for a resource group (admin only). Only provided fields are updated; others retain their existing values. Resource weights are validated against capacity - only resource types available in the scaling group's capacity can be specified.
@@ -15160,7 +15260,17 @@ type Mutation
   """
   Added in 26.7.0. Purge an app config definition by id (super admin only).
   """
-  adminPurgeAppConfigDefinition(input: PurgeAppConfigDefinitionInput!): PurgeAppConfigDefinitionPayload @join__field(graph: STRAWBERRY)
+  adminPurgeAppConfigDefinition(input: PurgeAppConfigDefinitionInput!): PurgeAppConfigDefinitionPayload @join__field(graph: STRAWBERRY) @deprecated(reason: "Deprecated since 26.10.0. Use `purgeAppConfigDefinition`.")
+
+  """
+  Added in 26.10.0. Purge an app config definition by id, with the allow-list entries and fragments under it.
+  """
+  purgeAppConfigDefinition(input: PurgeAppConfigDefinitionInput!): PurgeAppConfigDefinitionPayload! @join__field(graph: STRAWBERRY)
+
+  """
+  Added in 26.10.0. Purge several app config definitions, answering for each one.
+  """
+  partialBulkPurgeAppConfigDefinitions(input: PartialBulkPurgeAppConfigDefinitionsInput!): PartialBulkAppConfigDefinitionsPayload! @join__field(graph: STRAWBERRY)
 
   """Added in 26.4.2. Create a new runtime variant (superadmin only)."""
   adminCreateRuntimeVariant(input: CreateRuntimeVariantInput!): CreateRuntimeVariantPayload @join__field(graph: STRAWBERRY)
@@ -15300,10 +15410,28 @@ type Mutation
   adminCreateDeploymentRevisionPreset(input: CreateDeploymentRevisionPresetInput!): CreateDeploymentRevisionPresetPayload @join__field(graph: STRAWBERRY)
 
   """Added in 26.4.2. Update a deployment revision preset (admin only)."""
-  adminUpdateDeploymentRevisionPreset(input: UpdateDeploymentRevisionPresetInput!): UpdateDeploymentRevisionPresetPayload @join__field(graph: STRAWBERRY)
+  adminUpdateDeploymentRevisionPreset(input: UpdateDeploymentRevisionPresetInput!): UpdateDeploymentRevisionPresetPayload @join__field(graph: STRAWBERRY) @deprecated(reason: "Deprecated since 26.10.0. Use `updateDeploymentRevisionPreset`.")
 
   """Added in 26.4.2. Delete a deployment revision preset (admin only)."""
-  adminDeleteDeploymentRevisionPreset(id: UUID!): DeleteDeploymentRevisionPresetPayload @join__field(graph: STRAWBERRY)
+  adminDeleteDeploymentRevisionPreset(id: UUID!): DeleteDeploymentRevisionPresetPayload @join__field(graph: STRAWBERRY) @deprecated(reason: "Deprecated since 26.10.0. Use `purgeDeploymentRevisionPreset`.")
+
+  """
+  Added in 26.10.0. Update a deployment revision preset. Only provided fields will be updated.
+  """
+  updateDeploymentRevisionPreset(input: UpdateDeploymentRevisionPresetInput!): UpdateDeploymentRevisionPresetPayload! @join__field(graph: STRAWBERRY)
+
+  """Added in 26.10.0. Permanently remove a deployment revision preset."""
+  purgeDeploymentRevisionPreset(id: UUID!): DeleteDeploymentRevisionPresetPayload! @join__field(graph: STRAWBERRY)
+
+  """
+  Added in 26.10.0. Update several deployment revision presets, answering for each one.
+  """
+  partialBulkUpdateDeploymentRevisionPresets(input: PartialBulkUpdateDeploymentRevisionPresetsInput!): PartialBulkDeploymentRevisionPresetsPayload! @join__field(graph: STRAWBERRY)
+
+  """
+  Added in 26.10.0. Permanently remove several deployment revision presets, answering for each one.
+  """
+  partialBulkPurgeDeploymentRevisionPresets(input: PartialBulkPurgeDeploymentRevisionPresetsInput!): PartialBulkDeploymentRevisionPresetsPayload! @join__field(graph: STRAWBERRY)
 
   """Added in 26.4.2. Create a model card (admin only)."""
   adminCreateModelCardV2(input: CreateModelCardV2Input!): CreateModelCardPayload @join__field(graph: STRAWBERRY)
@@ -15430,7 +15558,10 @@ type Mutation
   """
   Added in 26.4.4. Terminate one or more sessions by ID. Per-session RBAC permission is enforced by the bulk validator; any denial fails the whole request.
   """
-  terminateSessionsV2(sessionIds: [ID!]!, forced: Boolean! = false): TerminateSessionsPayload @join__field(graph: STRAWBERRY)
+  terminateSessionsV2(sessionIds: [ID!]!, forced: Boolean! = false): TerminateSessionsPayload @join__field(graph: STRAWBERRY) @deprecated(reason: "Deprecated since 26.10.0. Use `partialBulkTerminateSessionsV2`.")
+
+  """Added in 26.10.0. Terminate several sessions, answering for each one."""
+  partialBulkTerminateSessionsV2(input: PartialBulkTerminateSessionsInput!): PartialBulkTerminateSessionsPayload! @join__field(graph: STRAWBERRY)
 
   """
   Added in 26.9.0. Exclude checker-session pairs from idle checks. Per-session RBAC permission is enforced by the bulk validator; any denial fails the whole request.
@@ -15450,7 +15581,7 @@ type Mutation
   """
   Added in 26.10.0. Set keys on several entities in one call, answering per entity. An entity the caller may not write is one failed item; the rest are written.
   """
-  partialBulkUpsertEntityLabel(input: PartialBulkUpsertEntityLabelInput!): PartialBulkUpsertEntityLabelPayload @join__field(graph: STRAWBERRY)
+  partialBulkUpsertEntityLabels(input: PartialBulkUpsertEntityLabelInput!): PartialBulkUpsertEntityLabelPayload @join__field(graph: STRAWBERRY)
 
   """
   Added in 26.9.0. Take one label off, named by its own id. Which entity answers for it is read from the row before the delete runs.
@@ -15460,7 +15591,17 @@ type Mutation
   """
   Added in 26.10.0. Take several labels off in one call, each named by its own id and answered for on its own. A label that is gone or on an entity the caller may not write is one failed item; the rest are taken off.
   """
-  partialBulkPurgeEntityLabel(input: PartialBulkPurgeEntityLabelInput!): PartialBulkPurgeEntityLabelPayload @join__field(graph: STRAWBERRY)
+  partialBulkPurgeEntityLabels(input: PartialBulkPurgeEntityLabelInput!): PartialBulkPurgeEntityLabelPayload @join__field(graph: STRAWBERRY)
+
+  """
+  Added in 26.10.0. Set keys on several entities in one call, answering per entity. An entity the caller may not write is one failed item; the rest are written.
+  """
+  partialBulkUpsertEntityLabel(input: PartialBulkUpsertEntityLabelInput!): PartialBulkUpsertEntityLabelPayload @join__field(graph: STRAWBERRY) @deprecated(reason: "Deprecated since 26.10.0. Use `partialBulkUpsertEntityLabels`.")
+
+  """
+  Added in 26.10.0. Take several labels off in one call, each named by its own id and answered for on its own. A label that is gone or on an entity the caller may not write is one failed item; the rest are taken off.
+  """
+  partialBulkPurgeEntityLabel(input: PartialBulkPurgeEntityLabelInput!): PartialBulkPurgeEntityLabelPayload @join__field(graph: STRAWBERRY) @deprecated(reason: "Deprecated since 26.10.0. Use `partialBulkPurgeEntityLabels`.")
 }
 
 """
@@ -16021,6 +16162,58 @@ interface PaginatedList
 }
 
 """
+Added in 26.10.0. Result of a partial bulk access token operation: the tokens processed and the ones that failed.
+"""
+type PartialBulkAccessTokensPayload
+  @join__type(graph: STRAWBERRY)
+{
+  """The tokens processed, as they stood before removal."""
+  successes: [AccessToken!]!
+
+  """The tokens not processed, each with the reason."""
+  failed: [PartialBulkFailure!]!
+}
+
+"""
+Added in 26.10.0. Result of a partial bulk allow-list operation: the entries processed and the ones that failed.
+"""
+type PartialBulkAppConfigAllowListsPayload
+  @join__type(graph: STRAWBERRY)
+{
+  """The allow-list entries processed, as they stood when processed."""
+  successes: [AppConfigAllowList!]!
+
+  """The allow-list entries not processed, each with the reason."""
+  failed: [PartialBulkFailure!]!
+}
+
+"""
+Added in 26.10.0. Result of a partial bulk app config definition operation: the definitions processed and the ones that failed.
+"""
+type PartialBulkAppConfigDefinitionsPayload
+  @join__type(graph: STRAWBERRY)
+{
+  """The app config definitions processed, as they stood when processed."""
+  successes: [AppConfigDefinition!]!
+
+  """The app config definitions not processed, each with the reason."""
+  failed: [PartialBulkFailure!]!
+}
+
+"""
+Added in 26.10.0. Result of a partial bulk fragment operation: the fragments processed and the ones that failed.
+"""
+type PartialBulkAppConfigFragmentsPayload
+  @join__type(graph: STRAWBERRY)
+{
+  """The fragments processed, as they stood when processed."""
+  successes: [AppConfigFragment!]!
+
+  """The fragments not processed, each with the reason."""
+  failed: [PartialBulkFailure!]!
+}
+
+"""
 Added in 26.10.0. Result of a partial bulk artifact operation: the artifacts processed and the ones that failed.
 """
 type PartialBulkArtifactsPayload
@@ -16034,6 +16227,19 @@ type PartialBulkArtifactsPayload
 }
 
 """
+Added in 26.10.0. Result of a partial bulk auto-scaling rule operation: the rules processed and the ones that failed.
+"""
+type PartialBulkAutoScalingRulesPayload
+  @join__type(graph: STRAWBERRY)
+{
+  """The rules processed."""
+  successes: [AutoScalingRule!]!
+
+  """The rules not processed, each with the reason."""
+  failed: [PartialBulkFailure!]!
+}
+
+"""
 Added in 26.10.0. Result of a partial bulk client IP masking policy operation: the policies processed and the ones that failed.
 """
 type PartialBulkClientIPMaskingPoliciesPayload
@@ -16043,6 +16249,19 @@ type PartialBulkClientIPMaskingPoliciesPayload
   successes: [ClientIPMaskingPolicy!]!
 
   """The policies not processed, each with the reason."""
+  failed: [PartialBulkFailure!]!
+}
+
+"""
+Added in 26.10.0. Result of a partial bulk container registry operation: the registries processed and the ones that failed.
+"""
+type PartialBulkContainerRegistriesPayload
+  @join__type(graph: STRAWBERRY)
+{
+  """The container registries processed, as they stood."""
+  successes: [ContainerRegistryV2!]!
+
+  """The container registries not processed, each with the reason."""
   failed: [PartialBulkFailure!]!
 }
 
@@ -16114,6 +16333,19 @@ input PartialBulkDeleteVFoldersInput
 {
   """IDs of the vfolders to soft-delete."""
   ids: [UUID!]!
+}
+
+"""
+Added in 26.10.0. Result of a partial bulk preset operation: the presets processed and the ones that failed.
+"""
+type PartialBulkDeploymentRevisionPresetsPayload
+  @join__type(graph: STRAWBERRY)
+{
+  """The presets processed."""
+  successes: [DeploymentRevisionPreset!]!
+
+  """The presets not processed, each with the reason."""
+  failed: [PartialBulkFailure!]!
 }
 
 """
@@ -16286,12 +16518,82 @@ type PartialBulkProjectsPayload
 }
 
 """
+Added in 26.10.0. Input for permanently removing several access tokens, each answered for separately.
+"""
+input PartialBulkPurgeAccessTokensInput
+  @join__type(graph: STRAWBERRY)
+{
+  """IDs of the access tokens to purge."""
+  ids: [UUID!]!
+}
+
+"""
+Added in 26.10.0. Input for purging several allow-list entries, each answered for separately.
+"""
+input PartialBulkPurgeAppConfigAllowListsInput
+  @join__type(graph: STRAWBERRY)
+{
+  """IDs of the allow-list entries to purge."""
+  ids: [UUID!]!
+}
+
+"""
+Added in 26.10.0. Input for purging several app config definitions, each answered for separately.
+"""
+input PartialBulkPurgeAppConfigDefinitionsInput
+  @join__type(graph: STRAWBERRY)
+{
+  """IDs of the app config definitions to purge."""
+  ids: [UUID!]!
+}
+
+"""
+Added in 26.10.0. Input for purging several fragments, each answered for separately.
+"""
+input PartialBulkPurgeAppConfigFragmentsInput
+  @join__type(graph: STRAWBERRY)
+{
+  """IDs of the fragments to purge."""
+  ids: [UUID!]!
+}
+
+"""
+Added in 26.10.0. Input for permanently removing several auto-scaling rules, each answered for separately.
+"""
+input PartialBulkPurgeAutoScalingRulesInput
+  @join__type(graph: STRAWBERRY)
+{
+  """IDs of the auto-scaling rules to purge."""
+  ids: [UUID!]!
+}
+
+"""
 Added in 26.10.0. Input for dropping several client IP masking policies, each answered for separately.
 """
 input PartialBulkPurgeClientIPMaskingPoliciesInput
   @join__type(graph: STRAWBERRY)
 {
   """IDs of the policies to drop."""
+  ids: [UUID!]!
+}
+
+"""
+Added in 26.10.0. Input for purging several container registries, each answered for separately.
+"""
+input PartialBulkPurgeContainerRegistriesInput
+  @join__type(graph: STRAWBERRY)
+{
+  """IDs of the container registries to purge."""
+  ids: [UUID!]!
+}
+
+"""
+Added in 26.10.0. Input for permanently removing several presets, each answered for separately.
+"""
+input PartialBulkPurgeDeploymentRevisionPresetsInput
+  @join__type(graph: STRAWBERRY)
+{
+  """IDs of the presets to purge."""
   ids: [UUID!]!
 }
 
@@ -16498,6 +16800,16 @@ input PartialBulkPurgeResourcePresetsInput
 }
 
 """
+Added in 26.10.0. Input for purging several resource slot types, each answered for separately.
+"""
+input PartialBulkPurgeResourceSlotTypesInput
+  @join__type(graph: STRAWBERRY)
+{
+  """IDs of the resource slot types to purge."""
+  ids: [UUID!]!
+}
+
+"""
 Added in 26.10.0. Input for purging several retention policies, each answered for separately.
 """
 input PartialBulkPurgeRetentionPoliciesInput
@@ -16626,6 +16938,19 @@ type PartialBulkResourcePresetsPayload
   successes: [ResourcePresetV2!]!
 
   """The resource presets not processed, each with the reason."""
+  failed: [PartialBulkFailure!]!
+}
+
+"""
+Added in 26.10.0. Result of a partial bulk resource slot type operation: the slot types processed and the ones that failed.
+"""
+type PartialBulkResourceSlotTypesPayload
+  @join__type(graph: STRAWBERRY)
+{
+  """The resource slot types processed, as they stood."""
+  successes: [ResourceSlotType!]!
+
+  """The resource slot types not processed, each with the reason."""
   failed: [PartialBulkFailure!]!
 }
 
@@ -16778,6 +17103,42 @@ type PartialBulkRuntimeVariantsPayload
 }
 
 """
+Added in 26.10.0. Input for terminating several sessions, each answered for separately.
+"""
+input PartialBulkTerminateSessionsInput
+  @join__type(graph: STRAWBERRY)
+{
+  """IDs of the sessions to terminate."""
+  ids: [UUID!]!
+
+  """Force-terminate without waiting for cleanup."""
+  forced: Boolean! = false
+}
+
+"""
+Added in 26.10.0. Result of a partial bulk session termination: the sessions processed, each with the state it ended in, and the ones that failed.
+"""
+type PartialBulkTerminateSessionsPayload
+  @join__type(graph: STRAWBERRY)
+{
+  """The sessions processed, each with the state it ended in."""
+  successes: [SessionTerminationInfo!]!
+
+  """The sessions not processed, each with the reason."""
+  failed: [PartialBulkFailure!]!
+}
+
+"""
+Added in 26.10.0. Input for updating several allow-list entries, each answered for separately.
+"""
+input PartialBulkUpdateAppConfigAllowListsInput
+  @join__type(graph: STRAWBERRY)
+{
+  """The allow-list entries to update, each with its id and fields."""
+  items: [UpdateAppConfigAllowListInput!]!
+}
+
+"""
 Added in 26.10.0. Input for updating several artifacts, each answered for separately.
 """
 input PartialBulkUpdateArtifactsInput
@@ -16785,6 +17146,26 @@ input PartialBulkUpdateArtifactsInput
 {
   """The artifacts to update, each with its ID and fields."""
   items: [UpdateArtifactInput!]!
+}
+
+"""
+Added in 26.10.0. Input for updating several auto-scaling rules, each answered for separately.
+"""
+input PartialBulkUpdateAutoScalingRulesInput
+  @join__type(graph: STRAWBERRY)
+{
+  """The rules to update, each naming its rule by `id`."""
+  items: [UpdateAutoScalingRuleInput!]!
+}
+
+"""
+Added in 26.10.0. Input for updating several presets, each answered for separately.
+"""
+input PartialBulkUpdateDeploymentRevisionPresetsInput
+  @join__type(graph: STRAWBERRY)
+{
+  """The presets to update, each naming its preset by `id`."""
+  items: [UpdateDeploymentRevisionPresetInput!]!
 }
 
 """
@@ -18883,6 +19264,22 @@ type PurgeAppConfigDefinitionPayload
   @join__type(graph: STRAWBERRY)
 {
   """UUID of the purged app config definition."""
+  id: UUID!
+}
+
+"""Added in 26.10.0. Payload for app config fragment purge."""
+type PurgeAppConfigFragmentPayload
+  @join__type(graph: STRAWBERRY)
+{
+  """Id of the purged app config fragment."""
+  id: UUID!
+}
+
+"""Added in 26.10.0. Payload for container registry purge."""
+type PurgeContainerRegistryPayload
+  @join__type(graph: STRAWBERRY)
+{
+  """ID of the purged registry."""
   id: UUID!
 }
 
@@ -25263,6 +25660,29 @@ input SessionSearchScope
 
   """Users whose sessions are being read."""
   user: [UUIDScope!] = null
+}
+
+"""Added in 26.10.0. What a termination request did to one session."""
+type SessionTerminationInfo
+  @join__type(graph: STRAWBERRY)
+{
+  """ID of the session."""
+  id: UUID!
+
+  """
+  State the session ended in: cancelled, terminating, force-terminated, or skipped.
+  """
+  status: SessionTerminationStatus!
+}
+
+"""Added in 26.10.0. What a termination request did to one session."""
+enum SessionTerminationStatus
+  @join__type(graph: STRAWBERRY)
+{
+  CANCELLED @join__enumValue(graph: STRAWBERRY)
+  TERMINATING @join__enumValue(graph: STRAWBERRY)
+  FORCE_TERMINATED @join__enumValue(graph: STRAWBERRY)
+  SKIPPED @join__enumValue(graph: STRAWBERRY)
 }
 
 enum SessionTypes
