@@ -11,7 +11,9 @@ from ai.backend.manager.api.gql.decorators import (
     gql_root_field,
 )
 from ai.backend.manager.api.gql.storage_backend.types import (
+    DeleteStorageBackendPayloadGQL,
     PurgeStorageBackendPayloadGQL,
+    RestoreStorageBackendPayloadGQL,
     StorageBackendConnectionGQL,
     StorageBackendFilterGQL,
     StorageBackendGQL,
@@ -22,7 +24,9 @@ from ai.backend.manager.api.gql.storage_backend.types import (
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 
 __all__ = (
+    "admin_delete_storage_backend",
     "admin_purge_storage_backend",
+    "admin_restore_storage_backend",
     "admin_storage_backend",
     "admin_storage_backends",
     "admin_update_storage_backend",
@@ -89,4 +93,33 @@ async def admin_purge_storage_backend(
     info: Info[StrawberryGQLContext],
     id: ID,
 ) -> PurgeStorageBackendPayloadGQL | None:
+    raise NotImplementedError
+
+
+@gql_mutation(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description=(
+            "Withhold one storage backend from new use. The volumes already on it keep"
+            " working and the backend still answers get and search. Admin only."
+        ),
+    )
+)
+async def admin_delete_storage_backend(
+    info: Info[StrawberryGQLContext],
+    id: ID,
+) -> DeleteStorageBackendPayloadGQL | None:
+    raise NotImplementedError
+
+
+@gql_mutation(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Take one withdrawn storage backend back into use. Admin only.",
+    )
+)
+async def admin_restore_storage_backend(
+    info: Info[StrawberryGQLContext],
+    id: ID,
+) -> RestoreStorageBackendPayloadGQL | None:
     raise NotImplementedError

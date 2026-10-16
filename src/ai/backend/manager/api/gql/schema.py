@@ -638,7 +638,9 @@ from ai.backend.manager.api.gql.session.resolver.session import (
     terminate_sessions_v2,
 )
 from ai.backend.manager.api.gql.storage_backend.resolver import (
+    admin_delete_storage_backend,
     admin_purge_storage_backend,
+    admin_restore_storage_backend,
     admin_storage_backend,
     admin_storage_backends,
     admin_update_storage_backend,
@@ -1296,6 +1298,8 @@ class Mutation:
     partial_bulk_purge_prometheus_query_presets = partial_bulk_purge_prometheus_query_presets
     admin_update_storage_backend = admin_update_storage_backend
     admin_purge_storage_backend = admin_purge_storage_backend
+    admin_delete_storage_backend = admin_delete_storage_backend
+    admin_restore_storage_backend = admin_restore_storage_backend
     # Prometheus Query Preset Category - Admin APIs
     admin_create_prometheus_query_preset_category = admin_create_prometheus_query_preset_category
     admin_delete_prometheus_query_preset_category = admin_delete_prometheus_query_preset_category

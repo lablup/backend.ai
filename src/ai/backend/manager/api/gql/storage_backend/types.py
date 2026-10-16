@@ -27,7 +27,13 @@ from ai.backend.common.dto.manager.v2.storage_backend.request import (
     UpdateStorageBackendInput as UpdateStorageBackendInputDTO,
 )
 from ai.backend.common.dto.manager.v2.storage_backend.response import (
+    DeleteStorageBackendPayload as DeleteStorageBackendPayloadDTO,
+)
+from ai.backend.common.dto.manager.v2.storage_backend.response import (
     PurgeStorageBackendPayload as PurgeStorageBackendPayloadDTO,
+)
+from ai.backend.common.dto.manager.v2.storage_backend.response import (
+    RestoreStorageBackendPayload as RestoreStorageBackendPayloadDTO,
 )
 from ai.backend.common.dto.manager.v2.storage_backend.response import (
     SearchServiceStorageBackendStatusesPayload as SearchServiceStorageBackendStatusesPayloadDTO,
@@ -58,7 +64,9 @@ from ai.backend.manager.api.gql.pydantic_compat import (
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 
 __all__ = (
+    "DeleteStorageBackendPayloadGQL",
     "PurgeStorageBackendPayloadGQL",
+    "RestoreStorageBackendPayloadGQL",
     "UpdateStorageBackendPayloadGQL",
     "ServiceStorageBackendStatusGQL",
     "ServiceStorageBackendStatusListGQL",
@@ -306,3 +314,27 @@ class PurgeStorageBackendPayloadGQL(PydanticOutputMixin[PurgeStorageBackendPaylo
 )
 class UpdateStorageBackendPayloadGQL(PydanticOutputMixin[UpdateStorageBackendPayloadDTO]):
     item: StorageBackendGQL = gql_field(description="The updated storage backend.")
+
+
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Payload returned after withdrawing a storage backend from new use.",
+    ),
+    model=DeleteStorageBackendPayloadDTO,
+    name="DeleteStorageBackendPayload",
+)
+class DeleteStorageBackendPayloadGQL(PydanticOutputMixin[DeleteStorageBackendPayloadDTO]):
+    id: UUID = gql_field(description="ID of the withdrawn storage backend.")
+
+
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Payload returned after restoring a withdrawn storage backend.",
+    ),
+    model=RestoreStorageBackendPayloadDTO,
+    name="RestoreStorageBackendPayload",
+)
+class RestoreStorageBackendPayloadGQL(PydanticOutputMixin[RestoreStorageBackendPayloadDTO]):
+    id: UUID = gql_field(description="ID of the restored storage backend.")

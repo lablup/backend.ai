@@ -13,6 +13,8 @@ from ai.backend.common.api_handlers import BaseResponseModel
 
 __all__ = (
     "AdminSearchStorageBackendsPayload",
+    "DeleteStorageBackendPayload",
+    "RestoreStorageBackendPayload",
     "GetStorageBackendPayload",
     "PurgeStorageBackendPayload",
     "SearchServiceStorageBackendStatusesPayload",
@@ -87,3 +89,15 @@ class SearchServiceStorageBackendStatusesPayload(BaseResponseModel):
     total_count: int = Field(description="Total number of matching status rows.")
     has_next_page: bool = Field(description="Whether there are more items after this page.")
     has_previous_page: bool = Field(description="Whether there are more items before this page.")
+
+
+class DeleteStorageBackendPayload(BaseResponseModel):
+    """Payload for a storage backend soft delete."""
+
+    id: UUID = Field(description="ID of the withdrawn storage backend")
+
+
+class RestoreStorageBackendPayload(BaseResponseModel):
+    """Payload for a storage backend restore."""
+
+    id: UUID = Field(description="ID of the restored storage backend")
