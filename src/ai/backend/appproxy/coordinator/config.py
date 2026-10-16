@@ -2,9 +2,10 @@ import enum
 import os
 import socket
 import sys
+from collections.abc import Mapping
 from pathlib import Path
 from pprint import pformat
-from typing import Annotated, Self
+from typing import Annotated, Any, Self
 
 import click
 from pydantic import Field, FilePath, IPvAnyNetwork, ValidationError, model_validator
@@ -29,7 +30,11 @@ from ai.backend.common.configs import (
     PyroscopeConfig,
     ServiceDiscoveryConfig,
 )
-from ai.backend.common.meta import BackendAIConfigMeta, CompositeType, ConfigExample
+from ai.backend.common.meta import (
+    BackendAIConfigMeta,
+    CompositeType,
+    ConfigExample,
+)
 from ai.backend.common.types import ServiceDiscoveryType
 from ai.backend.logging import LogLevel
 from ai.backend.logging.config import LoggingConfig
@@ -87,16 +92,42 @@ class DBConfig(BaseSchema):
         ),
     ]
     addr: Annotated[
-        HostPortPair,
-        Field(),
+        HostPortPair | None,
+        Field(default=None),
         BackendAIConfigMeta(
             description=(
                 "The network address (host:port) of the PostgreSQL database server. "
-                "In local development, typically points to localhost. "
-                "In production, should point to your PostgreSQL server or cluster endpoint."
+                "Read as a one-member addrs list when addrs is not set."
             ),
             added_version="25.9.0",
+            deprecated_version="26.4.15",
+            deprecation_hint="Use addrs instead.",
+        ),
+    ]
+    addrs: Annotated[
+        list[HostPortPair],
+        Field(min_length=1),
+        BackendAIConfigMeta(
+            description=(
+                "Addresses of the PostgreSQL cluster members. "
+                "List every member of an HA cluster, or a single address of a standalone "
+                "server or a proxy in front of the cluster."
+            ),
+            added_version="26.4.15",
+            composite=CompositeType.LIST,
             example=ConfigExample(local="127.0.0.1:5432", prod="db-server:5432"),
+        ),
+    ]
+    connect_timeout: Annotated[
+        float,
+        Field(default=10.0, gt=0),
+        BackendAIConfigMeta(
+            description=(
+                "Timeout in seconds for connecting to one member of addrs. "
+                "When it expires, the next member is tried."
+            ),
+            added_version="26.4.15",
+            example=ConfigExample(local="10", prod="5"),
         ),
     ]
     name: Annotated[
@@ -164,6 +195,45 @@ class DBConfig(BaseSchema):
             example=ConfigExample(local="64", prod="128"),
         ),
     ]
+    pool_recycle: Annotated[
+        float,
+        Field(default=-1, ge=-1),
+        BackendAIConfigMeta(
+            description=(
+                "Maximum lifetime of a connection in seconds before it's recycled. "
+                "Set to -1 to disable connection recycling. "
+                "Useful for handling database connections closed by the server after inactivity "
+                "or by network equipment with idle timeouts."
+            ),
+            added_version="26.4.15",
+            example=ConfigExample(local="-1", prod="3600"),
+        ),
+    ]
+    pool_pre_ping: Annotated[
+        bool,
+        Field(default=True),
+        BackendAIConfigMeta(
+            description=(
+                "Whether to test connections with a lightweight ping before using them. "
+                "Detects connections closed by the server or the network at pool checkout "
+                "and replaces them. "
+                "Adds a small overhead per checkout but is recommended for production."
+            ),
+            added_version="26.4.15",
+            example=ConfigExample(local="true", prod="true"),
+        ),
+    ]
+
+    @model_validator(mode="before")
+    @classmethod
+    def _read_addr_as_addrs(cls, data: Any) -> Any:
+        if (
+            not isinstance(data, Mapping)
+            or data.get("addr") is None
+            or data.get("addrs") is not None
+        ):
+            return data
+        return {**data, "addrs": [data["addr"]]}
 
 
 class ClientIPStrategyConfig(BaseSchema):
