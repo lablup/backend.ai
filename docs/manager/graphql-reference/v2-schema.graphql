@@ -10473,6 +10473,11 @@ type Mutation {
   includeSessionIdleChecks(input: IncludeSessionIdleChecksInput!): IncludeSessionIdleChecksPayload
 
   """
+  Added in 26.10.0. Permanently remove a session group. Its member sessions remain with their group cleared. A group a deployment's replica group holds is not found.
+  """
+  purgeSessionGroup(input: PurgeSessionGroupInput!): PurgeSessionGroupPayload!
+
+  """
   Added in 26.9.0. Set one key on an entity, replacing the value it carries. Reachable by any caller RBAC authorizes to write the entity.
   """
   upsertEntityLabel(input: UpsertEntityLabelInput!): UpsertEntityLabelPayload
@@ -12352,6 +12357,20 @@ type PurgeRolePayload {
   id: UUID!
 }
 
+"""Added in 26.10.0. Identifies the session group to purge."""
+input PurgeSessionGroupInput {
+  """ID of the session group to purge."""
+  id: UUID!
+}
+
+"""
+Added in 26.10.0. Names the session group removed. Its member sessions remain.
+"""
+type PurgeSessionGroupPayload {
+  """ID of the purged session group."""
+  id: UUID!
+}
+
 """
 Added in 26.2.0. Input for permanently deleting a user and all associated data. This action is irreversible.
 """
@@ -12882,6 +12901,21 @@ type Query {
   Added in 26.4.3. Query a single session by ID. Returns an error if not found.
   """
   sessionV2(id: UUID!): SessionV2
+
+  """
+  Added in 26.10.0. Get a single session group by ID. A group a deployment's replica group holds is not found.
+  """
+  sessionGroup(id: UUID!): SessionGroup
+
+  """
+  Added in 26.10.0. Search every session group, deployment groups included (superadmin only). Groups marked deleted are left out unless the filter names `deletedAt`.
+  """
+  adminSessionGroups(filter: SessionGroupFilter = null, orderBy: [SessionGroupOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): SessionGroupConnection
+
+  """
+  Added in 26.10.0. Page through the session groups the named scopes reach, combined with OR. Every scope is authorized before the read runs, and groups a deployment's replica group holds are left out.
+  """
+  scopedSessionGroups(scope: SessionGroupScope!, filter: SessionGroupFilter = null, orderBy: [SessionGroupOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): SessionGroupConnection
 
   """Added in 25.19.0. List deployments within a specific project."""
   projectDeployments(
@@ -17062,6 +17096,183 @@ enum SessionFailurePolicy {
 }
 
 """
+Added in 26.10.0. A set of sessions sharing a placement policy. The group belongs to a project and is owned by one user.
+"""
+type SessionGroup implements Node {
+  """The Globally Unique ID of this object"""
+  id: ID!
+
+  """ID of the session group."""
+  entityId: UUID!
+
+  """ID of the domain the group belongs to."""
+  domainId: UUID!
+
+  """ID of the project the group belongs to."""
+  projectId: UUID!
+
+  """
+  ID of the user owning the group. Every member session belongs to this user.
+  """
+  ownerUserId: UUID!
+
+  """Whether member sessions are spread across agents or packed onto them."""
+  placementDirection: SessionGroupPlacementDirection!
+
+  """Whether the direction is a preference or a hard constraint."""
+  placementEnforcement: SessionGroupPlacementEnforcement!
+
+  """Creation timestamp."""
+  createdAt: DateTime!
+
+  """Deletion timestamp. Null while the group is in use."""
+  deletedAt: DateTime
+}
+
+"""Added in 26.10.0. Paginated connection for session groups."""
+type SessionGroupConnection {
+  """Pagination data for this connection"""
+  pageInfo: PageInfo!
+
+  """Contains the nodes in this connection"""
+  edges: [SessionGroupEdge!]!
+
+  """Total number of session groups matching the query."""
+  count: Int!
+}
+
+"""An edge in a connection."""
+type SessionGroupEdge {
+  """A cursor for use in pagination"""
+  cursor: String!
+
+  """The item at the end of the edge"""
+  node: SessionGroup!
+}
+
+"""
+Added in 26.10.0. Filter for session groups. Groups marked deleted are left out unless the top-level filter gives `deletedAt`; one inside AND, OR or NOT does not lift that.
+"""
+input SessionGroupFilter {
+  """Filter by session group ID."""
+  entityId: UUIDFilter = null
+
+  """Filter by domain ID."""
+  domainId: UUIDFilter = null
+
+  """Filter by project ID."""
+  projectId: UUIDFilter = null
+
+  """Filter by the ID of the owning user."""
+  ownerUserId: UUIDFilter = null
+
+  """Filter by placement direction."""
+  placementDirection: SessionGroupPlacementDirectionFilter = null
+
+  """Filter by placement enforcement."""
+  placementEnforcement: SessionGroupPlacementEnforcementFilter = null
+
+  """Filter by creation time."""
+  createdAt: DateTimeFilter = null
+
+  """
+  Filter by deletion time. Setting it on the top-level filter includes the groups marked deleted; inside AND, OR or NOT it does not.
+  """
+  deletedAt: NullableDateTimeFilter = null
+
+  """Match all nested filters."""
+  AND: [SessionGroupFilter!] = null
+
+  """Match any nested filter."""
+  OR: [SessionGroupFilter!] = null
+
+  """Negate nested filters."""
+  NOT: [SessionGroupFilter!] = null
+}
+
+"""Added in 26.10.0. One ordering rule for a session group search."""
+input SessionGroupOrderBy {
+  """Field to order by."""
+  field: SessionGroupOrderField!
+
+  """Order direction."""
+  direction: OrderDirection! = ASC
+}
+
+"""Added in 26.10.0. Fields available for ordering session groups."""
+enum SessionGroupOrderField {
+  PLACEMENT_DIRECTION
+  PLACEMENT_ENFORCEMENT
+  CREATED_AT
+  DELETED_AT
+}
+
+"""
+Added in 26.10.0. How the member sessions of a group sit relative to each other, per agent.
+"""
+enum SessionGroupPlacementDirection {
+  SPREAD
+  PACK
+  NONE
+}
+
+"""
+Added in 26.10.0. Filter for the placement direction with equality and membership operators.
+"""
+input SessionGroupPlacementDirectionFilter {
+  """Exact match."""
+  equals: SessionGroupPlacementDirection = null
+
+  """Match any of the provided values."""
+  in: [SessionGroupPlacementDirection!] = null
+
+  """Exclude an exact match."""
+  notEquals: SessionGroupPlacementDirection = null
+
+  """Exclude any of the provided values."""
+  notIn: [SessionGroupPlacementDirection!] = null
+}
+
+"""
+Added in 26.10.0. How hard the placement direction is enforced when it cannot be satisfied.
+"""
+enum SessionGroupPlacementEnforcement {
+  PREFERRED
+  STRICT
+}
+
+"""
+Added in 26.10.0. Filter for the placement enforcement with equality and membership operators.
+"""
+input SessionGroupPlacementEnforcementFilter {
+  """Exact match."""
+  equals: SessionGroupPlacementEnforcement = null
+
+  """Match any of the provided values."""
+  in: [SessionGroupPlacementEnforcement!] = null
+
+  """Exclude an exact match."""
+  notEquals: SessionGroupPlacementEnforcement = null
+
+  """Exclude any of the provided values."""
+  notIn: [SessionGroupPlacementEnforcement!] = null
+}
+
+"""
+Added in 26.10.0. Scope for the scoped session group query. Each list is OR'd internally and across lists, and every scope named is authorized before the read runs.
+"""
+input SessionGroupScope {
+  """Domains whose session groups are being read."""
+  domain: [UUIDScope!] = null
+
+  """Projects whose session groups are being read."""
+  project: [UUIDScope!] = null
+
+  """Users whose session groups are being read."""
+  user: [UUIDScope!] = null
+}
+
+"""
 Added in 26.9.0. One (checker, session) pair an idle-check exclusion or inclusion applied to.
 """
 type SessionIdleCheckTargetInfo {
@@ -17326,6 +17537,11 @@ type SessionV2 implements Node {
   Added in 26.4.4. The model deployment replica served by this session: a single replica instance of a model deployment that runs in this compute session and serves inference requests. Null for non-inference sessions.
   """
   replica: ModelReplica
+
+  """
+  Added in 26.10.0. The session group whose placement policy this session follows. Null when the session belongs to no group or to a group a deployment's replica group holds.
+  """
+  sessionGroup: SessionGroup
 
   """
   Added in 26.8.0. Resource allocation (requested / used / allocated) computed on-demand from the resource_allocations table. Unlike the deprecated eager `resource.allocation`, `allocated` here persists after the session is freed or terminated (for statistics and billing).
