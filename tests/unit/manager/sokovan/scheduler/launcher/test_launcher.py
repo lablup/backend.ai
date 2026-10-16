@@ -10,6 +10,7 @@ Test Scenarios:
 
 from __future__ import annotations
 
+import asyncio
 import logging
 from unittest.mock import AsyncMock, MagicMock
 from uuid import UUID
@@ -321,6 +322,43 @@ class TestSessionLauncherKernelCreation:
         assert record.exc_info is not None
         assert record.exc_info[1] is error
         mock_valkey_schedule.record_session_failed_agents.assert_awaited_once()
+
+    async def test_kernel_creation_honors_configured_start_timeout(
+        self,
+        launcher: SessionLauncher,
+        mock_config_provider: MagicMock,
+        mock_agent_client_pool: MagicMock,
+        session_for_start_single_kernel: SessionDataForStart,
+        image_config_default: dict[UUID, ImageConfigData],
+        caplog: pytest.LogCaptureFixture,
+    ) -> None:
+        """Kernel creation exceeding session.start_timeout is cancelled and logged.
+
+        Given: session.start_timeout configured shorter than the agent call
+        When: Start session
+        Then: The start is cancelled by the timeout and a warning is logged
+        """
+        mock_config_provider.config.session.start_timeout = 0.05
+
+        async def slow_create_kernels(*args: object, **kwargs: object) -> None:
+            await asyncio.sleep(5)
+
+        mock_agent_client_pool._mock_client.create_kernels.side_effect = slow_create_kernels
+
+        session_ids = [session_for_start_single_kernel.session_id]
+        with RecorderContext.scope("test", entity_ids=session_ids):
+            await launcher.start_sessions_for_handler(
+                [session_for_start_single_kernel],
+                image_config_default,
+            )
+
+        (record,) = [
+            r
+            for r in caplog.records
+            if "session start failed with unhandled exception" in r.message
+        ]
+        assert record.exc_info is not None
+        assert isinstance(record.exc_info[1], asyncio.TimeoutError)
 
 
 # =============================================================================

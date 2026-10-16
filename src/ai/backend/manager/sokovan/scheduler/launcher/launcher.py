@@ -33,7 +33,6 @@ from ai.backend.logging.structured import StructuredLogger, with_log_context
 from ai.backend.manager.clients.agent.pool import AgentClientPool
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.dotfile.types import normalize_newlines
-from ai.backend.manager.defs import START_SESSION_TIMEOUT_SEC
 from ai.backend.manager.exceptions import convert_to_status_data
 from ai.backend.manager.metrics.scheduler import (
     SchedulerPhaseMetricObserver,
@@ -208,7 +207,9 @@ class SessionLauncher:
 
         async def start_with_timeout(session: SessionDataForStart) -> None:
             with with_log_context(session_id=session.session_id):
-                async with async_timeout.timeout(delay=START_SESSION_TIMEOUT_SEC):
+                async with async_timeout.timeout(
+                    delay=self._config_provider.config.session.start_timeout
+                ):
                     await self._start_single_session(session, image_configs)
 
         results = await asyncio.gather(
