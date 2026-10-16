@@ -918,7 +918,10 @@ class UpdateRoleInput(PydanticInputMixin[UpdateRoleInputDTO]):
     name: str | None = UNSET
     description: str | None = UNSET
     status: RoleStatusGQL | None = gql_field(
-        description="Accepted and ignored.",
+        description=(
+            "DELETED is handled as `deleteRole`, ACTIVE on a deleted role as `restoreRole`; "
+            "other values are ignored."
+        ),
         default=UNSET,
         deprecation_reason=(
             f"Deprecated since {NEXT_RELEASE_VERSION}. Use `deleteRole` or `restoreRole`."
