@@ -38,6 +38,7 @@ from jupyter_client.manager import AsyncKernelManager
 from .compat import current_loop
 from .intrinsic import (
     init_sshd_service,
+    prepare_etty_service,
     prepare_sshd_service,
     prepare_ttyd_service,
 )
@@ -902,6 +903,8 @@ class BaseRunner(metaclass=ABCMeta):
                     cmdargs, env = None, {}
                     if service_info["name"] == "ttyd":
                         cmdargs, env = await prepare_ttyd_service(service_info)
+                    elif service_info["name"] == "etty":
+                        cmdargs, env = await prepare_etty_service(service_info)
                     elif service_info["name"] == "sshd":
                         cmdargs, env = await prepare_sshd_service(service_info)
                     elif self.service_parser is not None:
@@ -1177,7 +1180,7 @@ class BaseRunner(metaclass=ABCMeta):
         self._pid_set_history: list[dict[int, dict[str, Any]]] = []
         monitor_proc_task = asyncio.create_task(self._monitor_processes())
 
-        log.debug("starting intrinsic services: sshd, ttyd ...")
+        log.debug("starting intrinsic services: sshd, ttyd, etty ...")
         intrinsic_spawn_coros = []
         intrinsic_spawn_coros.append(
             self._start_service(
@@ -1194,6 +1197,16 @@ class BaseRunner(metaclass=ABCMeta):
                 {
                     "name": "ttyd",
                     "port": self.intrinsic_host_ports_mapping.get("ttyd", 7681),
+                    "protocol": "http",
+                },
+                launch_timeout=10.0,
+            )
+        )
+        intrinsic_spawn_coros.append(
+            self._start_service(
+                {
+                    "name": "etty",
+                    "port": self.intrinsic_host_ports_mapping.get("etty", 7682),
                     "protocol": "http",
                 },
                 launch_timeout=10.0,
