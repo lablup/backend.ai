@@ -94,7 +94,6 @@ from ai.backend.manager.models.domain.row import DomainRow, domains
 from ai.backend.manager.models.image.row import ImageRow
 from ai.backend.manager.models.kernel.creators import KernelCreator
 from ai.backend.manager.models.kernel.row import (
-    USER_RESOURCE_OCCUPYING_KERNEL_STATUSES,
     KernelRow,
 )
 from ai.backend.manager.models.kernel.searchable_fields import KernelSearchableFields
@@ -119,7 +118,6 @@ from ai.backend.manager.models.scheduling_history.creators import SessionSchedul
 from ai.backend.manager.models.scheduling_history.row import SessionSchedulingHistoryRow
 from ai.backend.manager.models.session.creators import SessionCreator, SessionDependencyCreator
 from ai.backend.manager.models.session.row import (
-    PRIVATE_SESSION_TYPES,
     SessionDependencyRow,
     SessionRow,
 )
@@ -207,7 +205,7 @@ from ai.backend.manager.views.sokovan.workload import (
     WorkloadOwner,
 )
 
-from .types import AgentResourcesByAgent, KeypairConcurrencyData
+from .types import AgentResourcesByAgent
 
 log = StructuredLogger(logging.getLogger(__spec__.name))
 
@@ -3865,37 +3863,19 @@ class ScheduleDBSource:
             )
             await db_sess.execute(kernel_stmt)
 
-    async def get_keypair_concurrencies_from_db(
-        self, access_key: AccessKey
-    ) -> KeypairConcurrencyData:
-        """
-        Calculate both regular and SFTP concurrency from database with two simple queries.
-
-        :param access_key: The access key to query
-        :return: KeypairConcurrencyData with both regular and sftp counts
-        """
+    async def count_user_active_sessions(self, user_id: UserID) -> int:
+        """The user's active non-private sessions, counted as the scheduler's concurrency check does."""
         async with self._db.begin_readonly_session_read_committed() as db_sess:
-            # Base query for active kernels
-            base_query = (
+            count = await db_sess.scalar(
                 sa.select(sa.func.count())
-                .select_from(KernelRow)
+                .select_from(SessionRow)
                 .where(
-                    (KernelRow.access_key == access_key)
-                    & (KernelRow.status.in_(USER_RESOURCE_OCCUPYING_KERNEL_STATUSES))
+                    SessionRow.user_uuid == user_id,
+                    SessionRow.status.in_(SessionStatus.resource_occupied_statuses()),
+                    SessionRow.session_type.not_in(SessionTypes.private_types()),
                 )
             )
-
-            # Query for regular sessions
-            regular_query = base_query.where(KernelRow.session_type.not_in(PRIVATE_SESSION_TYPES))
-            regular_result = await db_sess.execute(regular_query)
-            regular_count = regular_result.scalar() or 0
-
-            # Query for SFTP sessions
-            sftp_query = base_query.where(KernelRow.session_type.in_(PRIVATE_SESSION_TYPES))
-            sftp_result = await db_sess.execute(sftp_query)
-            sftp_count = sftp_result.scalar() or 0
-
-            return KeypairConcurrencyData(regular_count=regular_count, sftp_count=sftp_count)
+            return count or 0
 
     async def get_attached_network(self, network_id: NetworkID) -> NetworkData:
         """

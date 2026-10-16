@@ -228,14 +228,7 @@ class KeyPair(graphene.ObjectType):  # type: ignore[misc]
 
     async def resolve_concurrency_used(self, info: graphene.ResolveInfo) -> int:
         ctx: GraphQueryContext = info.context
-
-        # Get repository from context
-        repository = ctx.scheduler_repository
-
-        # Get concurrency through repository (cache-through pattern)
-        # Convert graphene.String to str, then to AccessKey type
-        access_key = AccessKey(str(self.access_key))
-        return await repository.get_keypair_concurrency(access_key, is_sftp=False)
+        return await ctx.scheduler_repository.get_user_concurrency(UserID(self.user))
 
     async def resolve_last_used(self, info: graphene.ResolveInfo) -> datetime | None:
         ctx: GraphQueryContext = info.context
