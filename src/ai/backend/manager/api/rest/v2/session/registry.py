@@ -88,8 +88,8 @@ def register_v2_session_routes(
     )
     registry.add(
         "POST",
-        "/terminate",
-        handler.terminate,
+        "/partial-bulk-terminate",
+        handler.partial_bulk_terminate,
         middlewares=[auth_required],
     )
     registry.add(
@@ -126,6 +126,13 @@ def register_v2_session_routes(
         "PATCH",
         "/{session_id}",
         handler.update,
+        middlewares=[auth_required],
+    )
+    # Deprecated since NEXT_RELEASE_VERSION.
+    registry.add(
+        "POST",
+        "/terminate",
+        handler.terminate,
         middlewares=[auth_required],
     )
 

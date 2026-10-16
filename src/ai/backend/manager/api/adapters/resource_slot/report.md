@@ -2,13 +2,15 @@
 
 [무엇을 보장하는가](/src/ai/backend/manager/api/adapters/resource_slot/KNOWLEDGE.md) · [어댑터](/src/ai/backend/manager/api/adapters/resource_slot/adapter.py)
 
-시나리오: 미완 1 / 12
+시나리오: 미완 2 / 14
 
-- ops 로 구성 (8)
+- ops 로 구성 (10)
   - admin_create_slot_type — 대표 성공 ✓ · 대표 실패 ✓
-  - admin_purge_slot_type — 대표 성공 ✓ · 대표 실패 ✓
   - admin_update_slot_type — 대표 성공 ✓ · 대표 실패 ✓
   - get_slot_type — 대표 성공 ✓ · 대표 실패 ✓
+  - lookup_slot_type — 대표 성공 ✓ · 대표 실패 ✓
+  - partial_bulk_purge_slot_types — 대표 성공 ✓ · 대표 실패 ✗ — SCENARIO-GAP
+  - purge_slot_type — 대표 성공 ✓ · 대표 실패 ✓
   - scoped_search_agent_resources — 대표 성공 ✓ · 대표 실패 ✓
   - search_agent_resources — 대표 성공 ✓ · 대표 실패 ✓
   - search_allocations — 대표 성공 ✓ · 대표 실패 ✓
@@ -33,17 +35,6 @@
 | [슈퍼관리자가 아닌 사용자가 슬롯 종류를 생성하면 역할 부족으로 거부된다](#creating-a-user-who-is-not-the-superadmin-may-not-create-a-slot-type) | 거부 |
 | [권한 검사를 꺼도 슈퍼관리자가 아니면 슬롯 종류를 생성하지 못한다](#creating-turning-enforcement-off-does-not-let-a-user-create-a-slot-type) | 거부 |
 
-**admin_purge_slot_type**
-
-| 시나리오 | 판정 |
-|---|---|
-| [아무것도 참조하지 않는 슬롯 종류를 슈퍼관리자가 이름으로 삭제하면 삭제한 이름을 담은 응답이 반환된다](#retiring-the-superadmin-purges-a-slot-type-nothing-refers-to) | 성공 |
-| [권한 검사를 끄면 아무 권한도 없는 사용자도 슬롯 종류를 삭제할 수 있다](#retiring-turning-enforcement-off-lets-a-user-purge-a-slot-type) | 성공 |
-| [배포 리비전이 아직 사용하는 슬롯 종류를 슈퍼관리자가 삭제하면 아직 사용 중이라는 이유로 거부된다](#retiring-a-slot-type-a-deployment-revision-still-uses-may-not-be-purged) | 거부 |
-| [커널이 아직 할당받은 슬롯 종류를 슈퍼관리자가 삭제하면 아직 사용 중이라는 이유로 거부된다](#retiring-a-slot-type-a-kernel-still-asks-for-may-not-be-purged) | 거부 |
-| [아무 권한도 없는 사용자가 슬롯 종류를 삭제하면 권한 부족으로 거부된다. 수정이 역할 부족으로 거부되는 것과는 다른 검사다](#retiring-a-user-granted-nothing-may-not-purge-a-slot-type) | 거부 |
-| [슈퍼관리자가 존재하지 않는 이름을 삭제하면 대상을 찾을 수 없다는 이유로 거부된다](#retiring-purging-a-slot-name-nothing-answers-to-is-not-found) | 거부 |
-
 **admin_update_slot_type**
 
 | 시나리오 | 판정 |
@@ -61,6 +52,32 @@
 |---|---|
 | [아무 권한도 없는 사용자가 이름으로 조회하면 그 슬롯 종류 전체가 반환된다. 이름을 풀어내는 단계도 그 뒤의 조회도 인증만 확인한다](#reading-a-user-granted-nothing-reads-a-slot-type-by-name) | 성공 |
 | [존재하지 않는 이름으로 조회하면 거부된다. 변환한 대상에 권한 검사가 뒤따르므로 존재하지 않는 이름과 닿지 못하는 이름이 같은 이름으로 거부된다](#reading-reading-a-slot-name-nothing-answers-to-is-refused) | 거부 |
+
+**lookup_slot_type**
+
+| 시나리오 | 판정 |
+|---|---|
+| [아무 권한도 없는 사용자가 이름으로 id를 찾으면 그 슬롯 종류의 id가 반환된다](#looking_up-a-user-granted-nothing-looks-up-a-slot-type-by-name) | 성공 |
+| [존재하지 않는 이름으로 id를 찾으면 잘못된 요청으로 거부된다](#looking_up-looking-up-a-slot-name-nothing-answers-to-is-refused) | 거부 |
+
+**partial_bulk_purge_slot_types**
+
+| 시나리오 | 판정 |
+|---|---|
+| [아무 권한도 없는 사용자가 슬롯 종류 여럿을 한 번에 삭제하려 하면, 지워진 것 없이 모두 권한이 없다는 이유로 실패 목록에 온다](#partial_bulk_purging-a-user-granted-nothing-purges-none-of-several-slot-types) | 성공 |
+| [아무것도 참조하지 않는 슬롯 종류 둘과 없는 id 하나를 슈퍼관리자가 한 번에 삭제하면, 둘은 지워지기 전 모습으로 오고 없는 id 는 대상이 없다는 이유로 실패 목록에 온다](#partial_bulk_purging-purging-several-slot-types-answers-for-the-missing-one) | 성공 |
+
+**purge_slot_type**
+
+| 시나리오 | 판정 |
+|---|---|
+| [아무것도 참조하지 않는 슬롯 종류를 슈퍼관리자가 id로 삭제하면 삭제한 이름을 담은 응답이 반환된다](#retiring-the-superadmin-purges-a-slot-type-nothing-refers-to) | 성공 |
+| [권한 검사를 끄면 아무 권한도 없는 사용자도 슬롯 종류를 삭제할 수 있다](#retiring-turning-enforcement-off-lets-a-user-purge-a-slot-type) | 성공 |
+| [배포 리비전이 아직 사용하는 슬롯 종류를 슈퍼관리자가 삭제하면 아직 사용 중이라는 이유로 거부된다](#retiring-a-slot-type-a-deployment-revision-still-uses-may-not-be-purged) | 거부 |
+| [커널이 아직 할당받은 슬롯 종류를 슈퍼관리자가 삭제하면 아직 사용 중이라는 이유로 거부된다](#retiring-a-slot-type-a-kernel-still-asks-for-may-not-be-purged) | 거부 |
+| [아무 권한도 없는 사용자가 슬롯 종류를 삭제하면 권한 부족으로 거부된다. 수정이 역할 부족으로 거부되는 것과는 다른 검사다](#retiring-a-user-granted-nothing-may-not-purge-a-slot-type) | 거부 |
+| [아무 권한도 없는 사용자가 존재하지 않는 id를 삭제하면 대상 없음이 아니라 권한 부족으로 거부된다. 호출한 사용자가 쓸 수 있는지를 대상을 찾기 전에 검사하기 때문이다](#retiring-a-user-granted-nothing-purging-an-unknown-slot-type-id-is-refused-by-permission) | 거부 |
+| [슈퍼관리자가 존재하지 않는 id를 삭제하면 대상을 찾을 수 없다는 이유로 거부된다](#retiring-purging-a-slot-type-id-nothing-answers-to-is-not-found) | 거부 |
 
 **scoped_search_agent_resources**
 
@@ -452,206 +469,6 @@ Then
 - 거부된다
   - 거부: InsufficientPrivilege
 
-### admin_purge_slot_type
-
-<a id="retiring-the-superadmin-purges-a-slot-type-nothing-refers-to"></a>
-
-#### [the-superadmin-purges-a-slot-type-nothing-refers-to](/tests/scenario/bai_scenario/manager/resource_slot/test_retiring.py) — pass
-
-아무것도 참조하지 않는 슬롯 종류를 슈퍼관리자가 이름으로 삭제하면 삭제한 이름을 담은 응답이 반환된다
-
-Given
-
-- 자원 슬롯 종류 하나와, 슈퍼관리자 한 명
-  - 자원 슬롯 종류 slot-1: count 종류
-  - 도메인 home-1
-  - public 에서 resource_slot_type 조회 권한을 받은 사용자 준비
-    - 도메인에 속한 사용자 한 명 준비
-      - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-      - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
-    - 역할 public-reader-1: 이 역할이 앉은 스코프 안에서만 통한다
-    - 역할 public-reader-1: resource_slot_type 전체에 READ 허용
-    - 슈퍼관리자 user-1: 역할 public-reader-1 보유
-
-When
-
-- ResourceSlotAdapter.admin_purge_slot_type — user-1이 slot-1 삭제
-
-Then
-
-- 삭제한 슬롯 종류의 이름이 반환된다
-  - slot_name = 'slot-1'
-
-<a id="retiring-turning-enforcement-off-lets-a-user-purge-a-slot-type"></a>
-
-#### [turning-enforcement-off-lets-a-user-purge-a-slot-type](/tests/scenario/bai_scenario/manager/resource_slot/test_retiring.py) — pass
-
-권한 검사를 끄면 아무 권한도 없는 사용자도 슬롯 종류를 삭제할 수 있다
-
-Given
-
-- 자원 슬롯 종류 하나와, 일반 사용자 한 명
-  - 자원 슬롯 종류 slot-1: count 종류
-  - 도메인 home-1
-  - public 에서 resource_slot_type 조회 권한을 받은 사용자 준비
-    - 도메인에 속한 사용자 한 명 준비
-      - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-      - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-    - 역할 public-reader-1: 이 역할이 앉은 스코프 안에서만 통한다
-    - 역할 public-reader-1: resource_slot_type 전체에 READ 허용
-    - 일반 사용자 user-1: 역할 public-reader-1 보유
-
-When
-
-- ResourceSlotAdapter.admin_purge_slot_type — user-1이 slot-1 삭제
-
-Then
-
-- 삭제한 슬롯 종류의 이름이 반환된다
-  - slot_name = 'slot-1'
-
-<a id="retiring-a-slot-type-a-deployment-revision-still-uses-may-not-be-purged"></a>
-
-#### [a-slot-type-a-deployment-revision-still-uses-may-not-be-purged](/tests/scenario/bai_scenario/manager/resource_slot/test_retiring.py) — pass
-
-배포 리비전이 아직 사용하는 슬롯 종류를 슈퍼관리자가 삭제하면 아직 사용 중이라는 이유로 거부된다
-
-Given
-
-- 배포 리비전 하나가 사용하는 자원 슬롯 종류 하나와, 슈퍼관리자 한 명
-  - 도메인 home-1
-  - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-  - 프로젝트 team-1
-  - 리소스 그룹 resource-group-1: fifo 스케줄러를 쓴다
-  - 배포 권한을 하나도 받지 않은 사용자 준비
-    - 도메인에 속한 사용자 한 명 준비
-      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-      - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
-  - 배포 deployment-1: 복제를 1개 두려 한다, 아직 리비전이 없다
-  - 리비전이 딛는 이미지, 모델 폴더, 런타임 변형, 자원 슬롯 타입 준비
-    - 컨테이너 레지스트리 registry-1: 이미지를 가져오는 곳
-    - 이미지 image-1: x86_64 이미지
-    - 개인 폴더 folder-1: 그 사람의 개인 프로젝트에 놓이고, 쓸 수 있는 상태다
-    - 폴더 읽기 권한 부여
-      - 역할 folder-reader-1: 이 역할이 앉은 스코프 안에서만 통한다
-      - 역할 folder-reader-1: vfolder 전체에 READ 허용
-      - 슈퍼관리자 user-1: 역할 folder-reader-1 보유
-    - 런타임 변형 runtime-1: 기본 모델 정의가 비어 있고, 모델 폴더의 설정 파일을 읽지 않는다
-    - 자원 슬롯 타입 cpu: 리비전이 채우지 않아도 된다
-    - 자원 슬롯 타입 mem: 리비전이 채우지 않아도 된다
-  - 배포 deployment-1: 리비전 하나를 갖는다
-
-When
-
-- ResourceSlotAdapter.admin_purge_slot_type — user-1이 cpu 삭제
-
-Then
-
-- 거부된다
-  - 거부: ResourceSlotTypeInUse
-
-<a id="retiring-a-slot-type-a-kernel-still-asks-for-may-not-be-purged"></a>
-
-#### [a-slot-type-a-kernel-still-asks-for-may-not-be-purged](/tests/scenario/bai_scenario/manager/resource_slot/test_retiring.py) — pass
-
-커널이 아직 할당받은 슬롯 종류를 슈퍼관리자가 삭제하면 아직 사용 중이라는 이유로 거부된다
-
-Given
-
-- 대기 중인 커널 하나가 요구하는 자원 슬롯 종류 하나와, 슈퍼관리자 한 명
-  - 도메인 home-1
-  - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-  - 프로젝트 team-1
-  - 리소스 그룹 resource-group-1: fifo 스케줄러를 쓴다
-  - 도메인에 속한 사용자 한 명 준비
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-    - 사용자 정책 user-policy-2: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-3: 동시 세션 5개까지
-    - 슈퍼관리자 user-2: 자기 키와 개인 프로젝트를 갖는다
-  - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
-  - 일반 사용자 user-1: 기본이 아닌 활성 키 하나를 더 갖는다
-  - 컨테이너 레지스트리 registry-1: 이미지를 가져오는 곳
-  - 이미지 image-1: x86_64 이미지
-  - 자원 슬롯 종류 slot-1: count 종류
-  - 세션 session-1: 스케줄링을 기다리고 있다
-  - 세션 session-1: 요구량이 slot-1 1인 커널 하나를 갖는다
-
-When
-
-- ResourceSlotAdapter.admin_purge_slot_type — user-2이 slot-1 삭제
-
-Then
-
-- 거부된다
-  - 거부: ResourceSlotTypeInUse
-
-<a id="retiring-a-user-granted-nothing-may-not-purge-a-slot-type"></a>
-
-#### [a-user-granted-nothing-may-not-purge-a-slot-type](/tests/scenario/bai_scenario/manager/resource_slot/test_retiring.py) — pass
-
-아무 권한도 없는 사용자가 슬롯 종류를 삭제하면 권한 부족으로 거부된다. 수정이 역할 부족으로 거부되는 것과는 다른 검사다
-
-Given
-
-- 자원 슬롯 종류 하나와, 일반 사용자 한 명
-  - 자원 슬롯 종류 slot-1: count 종류
-  - 도메인 home-1
-  - public 에서 resource_slot_type 조회 권한을 받은 사용자 준비
-    - 도메인에 속한 사용자 한 명 준비
-      - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-      - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-    - 역할 public-reader-1: 이 역할이 앉은 스코프 안에서만 통한다
-    - 역할 public-reader-1: resource_slot_type 전체에 READ 허용
-    - 일반 사용자 user-1: 역할 public-reader-1 보유
-
-When
-
-- ResourceSlotAdapter.admin_purge_slot_type — user-1이 slot-1 삭제
-
-Then
-
-- 거부된다
-  - 거부: NotEnoughPermission
-
-<a id="retiring-purging-a-slot-name-nothing-answers-to-is-not-found"></a>
-
-#### [purging-a-slot-name-nothing-answers-to-is-not-found](/tests/scenario/bai_scenario/manager/resource_slot/test_retiring.py) — pass
-
-슈퍼관리자가 존재하지 않는 이름을 삭제하면 대상을 찾을 수 없다는 이유로 거부된다
-
-Given
-
-- 자원 슬롯 종류 하나와, 슈퍼관리자 한 명
-  - 자원 슬롯 종류 slot-1: count 종류
-  - 도메인 home-1
-  - public 에서 resource_slot_type 조회 권한을 받은 사용자 준비
-    - 도메인에 속한 사용자 한 명 준비
-      - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-      - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
-    - 역할 public-reader-1: 이 역할이 앉은 스코프 안에서만 통한다
-    - 역할 public-reader-1: resource_slot_type 전체에 READ 허용
-    - 슈퍼관리자 user-1: 역할 public-reader-1 보유
-
-When
-
-- ResourceSlotAdapter.admin_purge_slot_type — user-1이 no-such-slot 삭제
-
-Then
-
-- 거부된다
-  - 거부: EntityNotFoundError
-
 ### admin_update_slot_type
 
 <a id="editing-a-slot-type-edit-giving-no-value-changes-nothing"></a>
@@ -939,6 +756,394 @@ Then
 
 - 거부된다
   - 거부: GenericBadRequest
+
+### lookup_slot_type
+
+<a id="looking_up-a-user-granted-nothing-looks-up-a-slot-type-by-name"></a>
+
+#### [a-user-granted-nothing-looks-up-a-slot-type-by-name](/tests/scenario/bai_scenario/manager/resource_slot/test_looking_up.py) — pass
+
+아무 권한도 없는 사용자가 이름으로 id를 찾으면 그 슬롯 종류의 id가 반환된다
+
+Given
+
+- 자원 슬롯 종류 하나와, 일반 사용자 한 명
+  - 자원 슬롯 종류 slot-1: count 종류
+  - 도메인 home-1
+  - public 에서 resource_slot_type 조회 권한을 받은 사용자 준비
+    - 도메인에 속한 사용자 한 명 준비
+      - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+      - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+    - 역할 public-reader-1: 이 역할이 앉은 스코프 안에서만 통한다
+    - 역할 public-reader-1: resource_slot_type 전체에 READ 허용
+    - 일반 사용자 user-1: 역할 public-reader-1 보유
+
+When
+
+- ResourceSlotAdapter.lookup_slot_type — user-1이 slot-1 이름으로 id 찾기
+
+Then
+
+- 미리 만들어 둔 슬롯 종류의 id가 반환된다
+  - id: 미리 만들어 둔 슬롯 종류의 id와 같다
+
+<a id="looking_up-looking-up-a-slot-name-nothing-answers-to-is-refused"></a>
+
+#### [looking-up-a-slot-name-nothing-answers-to-is-refused](/tests/scenario/bai_scenario/manager/resource_slot/test_looking_up.py) — pass
+
+존재하지 않는 이름으로 id를 찾으면 잘못된 요청으로 거부된다
+
+Given
+
+- 자원 슬롯 종류 하나와, 일반 사용자 한 명
+  - 자원 슬롯 종류 slot-1: count 종류
+  - 도메인 home-1
+  - public 에서 resource_slot_type 조회 권한을 받은 사용자 준비
+    - 도메인에 속한 사용자 한 명 준비
+      - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+      - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+    - 역할 public-reader-1: 이 역할이 앉은 스코프 안에서만 통한다
+    - 역할 public-reader-1: resource_slot_type 전체에 READ 허용
+    - 일반 사용자 user-1: 역할 public-reader-1 보유
+
+When
+
+- ResourceSlotAdapter.lookup_slot_type — user-1이 no-such-slot 이름으로 id 찾기
+
+Then
+
+- 거부된다
+  - 거부: GenericBadRequest
+
+### partial_bulk_purge_slot_types
+
+<a id="partial_bulk_purging-a-user-granted-nothing-purges-none-of-several-slot-types"></a>
+
+#### [a-user-granted-nothing-purges-none-of-several-slot-types](/tests/scenario/bai_scenario/manager/resource_slot/test_partial_bulk_purging.py) — pass
+
+아무 권한도 없는 사용자가 슬롯 종류 여럿을 한 번에 삭제하려 하면, 지워진 것 없이 모두 권한이 없다는 이유로 실패 목록에 온다
+
+Given
+
+- 자원 슬롯 종류 2개와, 일반 사용자 한 명
+  - 자원 슬롯 종류 wanted-1: count 종류
+  - 자원 슬롯 종류 other-1: count 종류
+  - 도메인 home-1
+  - public 에서 resource_slot_type 조회 권한을 받은 사용자 준비
+    - 도메인에 속한 사용자 한 명 준비
+      - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+      - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+    - 역할 public-reader-1: 이 역할이 앉은 스코프 안에서만 통한다
+    - 역할 public-reader-1: resource_slot_type 전체에 READ 허용
+    - 일반 사용자 user-1: 역할 public-reader-1 보유
+
+When
+
+- ResourceSlotAdapter.partial_bulk_purge_slot_types — user-1이 슬롯 종류 2개를 한 번에 삭제함
+
+Then
+
+- 처리된 슬롯 종류 없이 대상이 모두 실패 목록에 온다
+  - successes = []
+  - failed count = 2
+  - failed[0].id: 미리 만들어 둔 슬롯 종류의 id와 같다
+  - failed[0].message: 'Insufficient permission'를 담은 이유
+  - failed[1].id: 미리 만들어 둔 슬롯 종류의 id와 같다
+  - failed[1].message: 'Insufficient permission'를 담은 이유
+
+<a id="partial_bulk_purging-purging-several-slot-types-answers-for-the-missing-one"></a>
+
+#### [purging-several-slot-types-answers-for-the-missing-one](/tests/scenario/bai_scenario/manager/resource_slot/test_partial_bulk_purging.py) — pass
+
+아무것도 참조하지 않는 슬롯 종류 둘과 없는 id 하나를 슈퍼관리자가 한 번에 삭제하면, 둘은 지워지기 전 모습으로 오고 없는 id 는 대상이 없다는 이유로 실패 목록에 온다
+
+Given
+
+- 자원 슬롯 종류 2개와, 슈퍼관리자 한 명
+  - 자원 슬롯 종류 wanted-1: count 종류
+  - 자원 슬롯 종류 other-1: count 종류
+  - 도메인 home-1
+  - public 에서 resource_slot_type 조회 권한을 받은 사용자 준비
+    - 도메인에 속한 사용자 한 명 준비
+      - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+      - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+    - 역할 public-reader-1: 이 역할이 앉은 스코프 안에서만 통한다
+    - 역할 public-reader-1: resource_slot_type 전체에 READ 허용
+    - 슈퍼관리자 user-1: 역할 public-reader-1 보유
+
+When
+
+- ResourceSlotAdapter.partial_bulk_purge_slot_types — user-1이 슬롯 종류 2개 와 없는 id 하나를 한 번에 삭제함
+
+Then
+
+- 미리 만들어 둔 슬롯 종류가 모두 지워지기 전 모습으로 오고, 없는 id 는 대상이 없다는 이유로 실패 목록에 온다
+  - successes count = 2
+  - successes[0].id = 'wanted-1'
+  - successes[0].uuid: 무시함 — 데이터베이스가 만든다
+  - successes[0].slot_name = 'wanted-1'
+  - successes[0].slot_type = 'count'
+  - successes[0].required = False
+  - successes[0].enabled = True
+  - successes[0].display_name = '미리 만들어 둔 슬롯'
+  - successes[0].description = '미리 만들어 둔 슬롯 종류'
+  - successes[0].display_unit = ''
+  - successes[0].display_icon = ''
+  - successes[0].number_format = NumberFormatInfo(binary=False, round_length=0)
+  - successes[0].rank = 0
+  - successes[1].id = 'other-1'
+  - successes[1].uuid: 무시함 — 데이터베이스가 만든다
+  - successes[1].slot_name = 'other-1'
+  - successes[1].slot_type = 'count'
+  - successes[1].required = False
+  - successes[1].enabled = True
+  - successes[1].display_name = '미리 만들어 둔 슬롯'
+  - successes[1].description = '미리 만들어 둔 슬롯 종류'
+  - successes[1].display_unit = ''
+  - successes[1].display_icon = ''
+  - successes[1].number_format = NumberFormatInfo(binary=False, round_length=0)
+  - successes[1].rank = 0
+  - failed count = 1
+  - failed[0].id: 요청에 넣은 없는 id와 같다
+  - failed[0].message: 'not found'를 담은 이유
+
+### purge_slot_type
+
+<a id="retiring-the-superadmin-purges-a-slot-type-nothing-refers-to"></a>
+
+#### [the-superadmin-purges-a-slot-type-nothing-refers-to](/tests/scenario/bai_scenario/manager/resource_slot/test_retiring.py) — pass
+
+아무것도 참조하지 않는 슬롯 종류를 슈퍼관리자가 id로 삭제하면 삭제한 이름을 담은 응답이 반환된다
+
+Given
+
+- 자원 슬롯 종류 하나와, 슈퍼관리자 한 명
+  - 자원 슬롯 종류 slot-1: count 종류
+  - 도메인 home-1
+  - public 에서 resource_slot_type 조회 권한을 받은 사용자 준비
+    - 도메인에 속한 사용자 한 명 준비
+      - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+      - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+    - 역할 public-reader-1: 이 역할이 앉은 스코프 안에서만 통한다
+    - 역할 public-reader-1: resource_slot_type 전체에 READ 허용
+    - 슈퍼관리자 user-1: 역할 public-reader-1 보유
+
+When
+
+- ResourceSlotAdapter.purge_slot_type — user-1이 slot-1 삭제
+
+Then
+
+- 삭제한 슬롯 종류의 이름이 반환된다
+  - slot_name = 'slot-1'
+
+<a id="retiring-turning-enforcement-off-lets-a-user-purge-a-slot-type"></a>
+
+#### [turning-enforcement-off-lets-a-user-purge-a-slot-type](/tests/scenario/bai_scenario/manager/resource_slot/test_retiring.py) — pass
+
+권한 검사를 끄면 아무 권한도 없는 사용자도 슬롯 종류를 삭제할 수 있다
+
+Given
+
+- 자원 슬롯 종류 하나와, 일반 사용자 한 명
+  - 자원 슬롯 종류 slot-1: count 종류
+  - 도메인 home-1
+  - public 에서 resource_slot_type 조회 권한을 받은 사용자 준비
+    - 도메인에 속한 사용자 한 명 준비
+      - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+      - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+    - 역할 public-reader-1: 이 역할이 앉은 스코프 안에서만 통한다
+    - 역할 public-reader-1: resource_slot_type 전체에 READ 허용
+    - 일반 사용자 user-1: 역할 public-reader-1 보유
+
+When
+
+- ResourceSlotAdapter.purge_slot_type — user-1이 slot-1 삭제
+
+Then
+
+- 삭제한 슬롯 종류의 이름이 반환된다
+  - slot_name = 'slot-1'
+
+<a id="retiring-a-slot-type-a-deployment-revision-still-uses-may-not-be-purged"></a>
+
+#### [a-slot-type-a-deployment-revision-still-uses-may-not-be-purged](/tests/scenario/bai_scenario/manager/resource_slot/test_retiring.py) — pass
+
+배포 리비전이 아직 사용하는 슬롯 종류를 슈퍼관리자가 삭제하면 아직 사용 중이라는 이유로 거부된다
+
+Given
+
+- 배포 리비전 하나가 사용하는 자원 슬롯 종류 하나와, 슈퍼관리자 한 명
+  - 도메인 home-1
+  - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+  - 프로젝트 team-1
+  - 리소스 그룹 resource-group-1: fifo 스케줄러를 쓴다
+  - 배포 권한을 하나도 받지 않은 사용자 준비
+    - 도메인에 속한 사용자 한 명 준비
+      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+      - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+  - 배포 deployment-1: 복제를 1개 두려 한다, 아직 리비전이 없다
+  - 리비전이 딛는 이미지, 모델 폴더, 런타임 변형, 자원 슬롯 타입 준비
+    - 컨테이너 레지스트리 registry-1: 이미지를 가져오는 곳
+    - 이미지 image-1: x86_64 이미지
+    - 개인 폴더 folder-1: 그 사람의 개인 프로젝트에 놓이고, 쓸 수 있는 상태다
+    - 폴더 읽기 권한 부여
+      - 역할 folder-reader-1: 이 역할이 앉은 스코프 안에서만 통한다
+      - 역할 folder-reader-1: vfolder 전체에 READ 허용
+      - 슈퍼관리자 user-1: 역할 folder-reader-1 보유
+    - 런타임 변형 runtime-1: 기본 모델 정의가 비어 있고, 모델 폴더의 설정 파일을 읽지 않는다
+    - 자원 슬롯 타입 cpu: 리비전이 채우지 않아도 된다
+    - 자원 슬롯 타입 mem: 리비전이 채우지 않아도 된다
+  - 배포 deployment-1: 리비전 하나를 갖는다
+
+When
+
+- ResourceSlotAdapter.purge_slot_type — user-1이 cpu 삭제
+
+Then
+
+- 거부된다
+  - 거부: ResourceSlotTypeInUse
+
+<a id="retiring-a-slot-type-a-kernel-still-asks-for-may-not-be-purged"></a>
+
+#### [a-slot-type-a-kernel-still-asks-for-may-not-be-purged](/tests/scenario/bai_scenario/manager/resource_slot/test_retiring.py) — pass
+
+커널이 아직 할당받은 슬롯 종류를 슈퍼관리자가 삭제하면 아직 사용 중이라는 이유로 거부된다
+
+Given
+
+- 대기 중인 커널 하나가 요구하는 자원 슬롯 종류 하나와, 슈퍼관리자 한 명
+  - 도메인 home-1
+  - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+  - 프로젝트 team-1
+  - 리소스 그룹 resource-group-1: fifo 스케줄러를 쓴다
+  - 도메인에 속한 사용자 한 명 준비
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+    - 사용자 정책 user-policy-2: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-3: 동시 세션 5개까지
+    - 슈퍼관리자 user-2: 자기 키와 개인 프로젝트를 갖는다
+  - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
+  - 일반 사용자 user-1: 기본이 아닌 활성 키 하나를 더 갖는다
+  - 컨테이너 레지스트리 registry-1: 이미지를 가져오는 곳
+  - 이미지 image-1: x86_64 이미지
+  - 자원 슬롯 종류 slot-1: count 종류
+  - 세션 session-1: 스케줄링을 기다리고 있다
+  - 세션 session-1: 요구량이 slot-1 1인 커널 하나를 갖는다
+
+When
+
+- ResourceSlotAdapter.purge_slot_type — user-2이 slot-1 삭제
+
+Then
+
+- 거부된다
+  - 거부: ResourceSlotTypeInUse
+
+<a id="retiring-a-user-granted-nothing-may-not-purge-a-slot-type"></a>
+
+#### [a-user-granted-nothing-may-not-purge-a-slot-type](/tests/scenario/bai_scenario/manager/resource_slot/test_retiring.py) — pass
+
+아무 권한도 없는 사용자가 슬롯 종류를 삭제하면 권한 부족으로 거부된다. 수정이 역할 부족으로 거부되는 것과는 다른 검사다
+
+Given
+
+- 자원 슬롯 종류 하나와, 일반 사용자 한 명
+  - 자원 슬롯 종류 slot-1: count 종류
+  - 도메인 home-1
+  - public 에서 resource_slot_type 조회 권한을 받은 사용자 준비
+    - 도메인에 속한 사용자 한 명 준비
+      - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+      - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+    - 역할 public-reader-1: 이 역할이 앉은 스코프 안에서만 통한다
+    - 역할 public-reader-1: resource_slot_type 전체에 READ 허용
+    - 일반 사용자 user-1: 역할 public-reader-1 보유
+
+When
+
+- ResourceSlotAdapter.purge_slot_type — user-1이 slot-1 삭제
+
+Then
+
+- 거부된다
+  - 거부: NotEnoughPermission
+
+<a id="retiring-a-user-granted-nothing-purging-an-unknown-slot-type-id-is-refused-by-permission"></a>
+
+#### [a-user-granted-nothing-purging-an-unknown-slot-type-id-is-refused-by-permission](/tests/scenario/bai_scenario/manager/resource_slot/test_retiring.py) — pass
+
+아무 권한도 없는 사용자가 존재하지 않는 id를 삭제하면 대상 없음이 아니라 권한 부족으로 거부된다. 호출한 사용자가 쓸 수 있는지를 대상을 찾기 전에 검사하기 때문이다
+
+Given
+
+- 자원 슬롯 종류 하나와, 일반 사용자 한 명
+  - 자원 슬롯 종류 slot-1: count 종류
+  - 도메인 home-1
+  - public 에서 resource_slot_type 조회 권한을 받은 사용자 준비
+    - 도메인에 속한 사용자 한 명 준비
+      - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+      - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+    - 역할 public-reader-1: 이 역할이 앉은 스코프 안에서만 통한다
+    - 역할 public-reader-1: resource_slot_type 전체에 READ 허용
+    - 일반 사용자 user-1: 역할 public-reader-1 보유
+
+When
+
+- ResourceSlotAdapter.purge_slot_type — user-1이 존재하지 않는 id 삭제
+
+Then
+
+- 거부된다
+  - 거부: NotEnoughPermission
+
+<a id="retiring-purging-a-slot-type-id-nothing-answers-to-is-not-found"></a>
+
+#### [purging-a-slot-type-id-nothing-answers-to-is-not-found](/tests/scenario/bai_scenario/manager/resource_slot/test_retiring.py) — pass
+
+슈퍼관리자가 존재하지 않는 id를 삭제하면 대상을 찾을 수 없다는 이유로 거부된다
+
+Given
+
+- 자원 슬롯 종류 하나와, 슈퍼관리자 한 명
+  - 자원 슬롯 종류 slot-1: count 종류
+  - 도메인 home-1
+  - public 에서 resource_slot_type 조회 권한을 받은 사용자 준비
+    - 도메인에 속한 사용자 한 명 준비
+      - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+      - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+    - 역할 public-reader-1: 이 역할이 앉은 스코프 안에서만 통한다
+    - 역할 public-reader-1: resource_slot_type 전체에 READ 허용
+    - 슈퍼관리자 user-1: 역할 public-reader-1 보유
+
+When
+
+- ResourceSlotAdapter.purge_slot_type — user-1이 존재하지 않는 id 삭제
+
+Then
+
+- 거부된다
+  - 거부: EntityNotFoundError
 
 ### scoped_search_agent_resources
 

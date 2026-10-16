@@ -9674,7 +9674,17 @@ type Mutation {
   """
   Added in 26.9.0. Remove a resource slot type by slot name (super admin only).
   """
-  adminPurgeResourceSlotType(input: PurgeResourceSlotTypeInput!): PurgeResourceSlotTypePayload
+  adminPurgeResourceSlotType(input: PurgeResourceSlotTypeInput!): PurgeResourceSlotTypePayload @deprecated(reason: "Deprecated since 26.10.0. Use `purgeResourceSlotType`.")
+
+  """
+  Added in 26.10.0. Remove a resource slot type, refusing while anything still references it.
+  """
+  purgeResourceSlotType(id: UUID!): PurgeResourceSlotTypePayload!
+
+  """
+  Added in 26.10.0. Remove several resource slot types, answering for each one.
+  """
+  partialBulkPurgeResourceSlotTypes(input: PartialBulkPurgeResourceSlotTypesInput!): PartialBulkResourceSlotTypesPayload!
 
   """
   Added in 26.7.0. Register a new app config allow-list entry (super admin only).
@@ -9813,7 +9823,15 @@ type Mutation {
   adminUpdateContainerRegistryV2(input: UpdateContainerRegistryInput!): UpdateContainerRegistryPayload
 
   """Added in 26.4.2. Delete a container registry (admin only)."""
-  adminDeleteContainerRegistryV2(id: String!): DeleteContainerRegistryPayload
+  adminDeleteContainerRegistryV2(id: String!): DeleteContainerRegistryPayload @deprecated(reason: "Deprecated since 26.10.0. Use `adminPurgeContainerRegistryV2`.")
+
+  """Added in 26.10.0. Purge a container registry (admin only)."""
+  adminPurgeContainerRegistryV2(id: UUID!): PurgeContainerRegistryPayload!
+
+  """
+  Added in 26.10.0. Purge several container registries (admin only), answering for each one.
+  """
+  adminPartialBulkPurgeContainerRegistriesV2(input: PartialBulkPurgeContainerRegistriesInput!): PartialBulkContainerRegistriesPayload!
 
   """Added in 25.16.0. Create model deployment."""
   createModelDeployment(input: CreateDeploymentInput!): CreateDeploymentPayload
@@ -11115,7 +11133,10 @@ type Mutation {
   """
   Added in 26.4.4. Terminate one or more sessions by ID. Per-session RBAC permission is enforced by the bulk validator; any denial fails the whole request.
   """
-  terminateSessionsV2(sessionIds: [ID!]!, forced: Boolean! = false): TerminateSessionsPayload
+  terminateSessionsV2(sessionIds: [ID!]!, forced: Boolean! = false): TerminateSessionsPayload @deprecated(reason: "Deprecated since 26.10.0. Use `partialBulkTerminateSessionsV2`.")
+
+  """Added in 26.10.0. Terminate several sessions, answering for each one."""
+  partialBulkTerminateSessionsV2(input: PartialBulkTerminateSessionsInput!): PartialBulkTerminateSessionsPayload!
 
   """
   Added in 26.9.0. Exclude checker-session pairs from idle checks. Per-session RBAC permission is enforced by the bulk validator; any denial fails the whole request.
@@ -11135,7 +11156,7 @@ type Mutation {
   """
   Added in 26.10.0. Set keys on several entities in one call, answering per entity. An entity the caller may not write is one failed item; the rest are written.
   """
-  partialBulkUpsertEntityLabel(input: PartialBulkUpsertEntityLabelInput!): PartialBulkUpsertEntityLabelPayload
+  partialBulkUpsertEntityLabels(input: PartialBulkUpsertEntityLabelInput!): PartialBulkUpsertEntityLabelPayload
 
   """
   Added in 26.9.0. Take one label off, named by its own id. Which entity answers for it is read from the row before the delete runs.
@@ -11145,7 +11166,17 @@ type Mutation {
   """
   Added in 26.10.0. Take several labels off in one call, each named by its own id and answered for on its own. A label that is gone or on an entity the caller may not write is one failed item; the rest are taken off.
   """
-  partialBulkPurgeEntityLabel(input: PartialBulkPurgeEntityLabelInput!): PartialBulkPurgeEntityLabelPayload
+  partialBulkPurgeEntityLabels(input: PartialBulkPurgeEntityLabelInput!): PartialBulkPurgeEntityLabelPayload
+
+  """
+  Added in 26.10.0. Set keys on several entities in one call, answering per entity. An entity the caller may not write is one failed item; the rest are written.
+  """
+  partialBulkUpsertEntityLabel(input: PartialBulkUpsertEntityLabelInput!): PartialBulkUpsertEntityLabelPayload @deprecated(reason: "Deprecated since 26.10.0. Use `partialBulkUpsertEntityLabels`.")
+
+  """
+  Added in 26.10.0. Take several labels off in one call, each named by its own id and answered for on its own. A label that is gone or on an entity the caller may not write is one failed item; the rest are taken off.
+  """
+  partialBulkPurgeEntityLabel(input: PartialBulkPurgeEntityLabelInput!): PartialBulkPurgeEntityLabelPayload @deprecated(reason: "Deprecated since 26.10.0. Use `partialBulkPurgeEntityLabels`.")
 }
 
 """
@@ -11646,6 +11677,17 @@ type PartialBulkClientIPMaskingPoliciesPayload {
 }
 
 """
+Added in 26.10.0. Result of a partial bulk container registry operation: the registries processed and the ones that failed.
+"""
+type PartialBulkContainerRegistriesPayload {
+  """The container registries processed, as they stood."""
+  successes: [ContainerRegistryV2!]!
+
+  """The container registries not processed, each with the reason."""
+  failed: [PartialBulkFailure!]!
+}
+
+"""
 Added in 26.10.0. Input for soft-deleting several artifacts, each answered for separately.
 """
 input PartialBulkDeleteArtifactsInput {
@@ -11904,6 +11946,14 @@ input PartialBulkPurgeClientIPMaskingPoliciesInput {
 }
 
 """
+Added in 26.10.0. Input for purging several container registries, each answered for separately.
+"""
+input PartialBulkPurgeContainerRegistriesInput {
+  """IDs of the container registries to purge."""
+  ids: [UUID!]!
+}
+
+"""
 Added in 26.10.0. Input for permanently removing several presets, each answered for separately.
 """
 input PartialBulkPurgeDeploymentRevisionPresetsInput {
@@ -12076,6 +12126,14 @@ input PartialBulkPurgeResourcePresetsInput {
 }
 
 """
+Added in 26.10.0. Input for purging several resource slot types, each answered for separately.
+"""
+input PartialBulkPurgeResourceSlotTypesInput {
+  """IDs of the resource slot types to purge."""
+  ids: [UUID!]!
+}
+
+"""
 Added in 26.10.0. Input for purging several retention policies, each answered for separately.
 """
 input PartialBulkPurgeRetentionPoliciesInput {
@@ -12180,6 +12238,17 @@ type PartialBulkResourcePresetsPayload {
   successes: [ResourcePresetV2!]!
 
   """The resource presets not processed, each with the reason."""
+  failed: [PartialBulkFailure!]!
+}
+
+"""
+Added in 26.10.0. Result of a partial bulk resource slot type operation: the slot types processed and the ones that failed.
+"""
+type PartialBulkResourceSlotTypesPayload {
+  """The resource slot types processed, as they stood."""
+  successes: [ResourceSlotType!]!
+
+  """The resource slot types not processed, each with the reason."""
   failed: [PartialBulkFailure!]!
 }
 
@@ -12302,6 +12371,28 @@ type PartialBulkRuntimeVariantsPayload {
   successes: [RuntimeVariant!]!
 
   """The runtime variants not processed, each with the reason."""
+  failed: [PartialBulkFailure!]!
+}
+
+"""
+Added in 26.10.0. Input for terminating several sessions, each answered for separately.
+"""
+input PartialBulkTerminateSessionsInput {
+  """IDs of the sessions to terminate."""
+  ids: [UUID!]!
+
+  """Force-terminate without waiting for cleanup."""
+  forced: Boolean! = false
+}
+
+"""
+Added in 26.10.0. Result of a partial bulk session termination: the sessions processed, each with the state it ended in, and the ones that failed.
+"""
+type PartialBulkTerminateSessionsPayload {
+  """The sessions processed, each with the state it ended in."""
+  successes: [SessionTerminationInfo!]!
+
+  """The sessions not processed, each with the reason."""
   failed: [PartialBulkFailure!]!
 }
 
@@ -14134,6 +14225,12 @@ type PurgeAppConfigDefinitionPayload {
 """Added in 26.10.0. Payload for app config fragment purge."""
 type PurgeAppConfigFragmentPayload {
   """Id of the purged app config fragment."""
+  id: UUID!
+}
+
+"""Added in 26.10.0. Payload for container registry purge."""
+type PurgeContainerRegistryPayload {
+  """ID of the purged registry."""
   id: UUID!
 }
 
@@ -19171,6 +19268,25 @@ input SessionSearchScope {
 
   """Users whose sessions are being read."""
   user: [UUIDScope!] = null
+}
+
+"""Added in 26.10.0. What a termination request did to one session."""
+type SessionTerminationInfo {
+  """ID of the session."""
+  id: UUID!
+
+  """
+  State the session ended in: cancelled, terminating, force-terminated, or skipped.
+  """
+  status: SessionTerminationStatus!
+}
+
+"""Added in 26.10.0. What a termination request did to one session."""
+enum SessionTerminationStatus {
+  CANCELLED
+  TERMINATING
+  FORCE_TERMINATED
+  SKIPPED
 }
 
 enum SessionTypes {

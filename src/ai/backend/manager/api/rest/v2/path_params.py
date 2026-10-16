@@ -161,3 +161,7 @@ class SlotNamePathParam(BaseRequestModel):
 
 class ImageIdPathParam(BaseRequestModel):
     image_id: UUID = Field(description="Image ID")
+
+
+class SlotTypeIdPathParam(BaseRequestModel):
+    slot_type_id: UUID = Field(description="Resource slot type ID")
