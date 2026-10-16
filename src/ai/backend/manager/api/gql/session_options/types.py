@@ -15,6 +15,11 @@ without conflict.
 from __future__ import annotations
 
 from datetime import datetime
+from typing import TYPE_CHECKING, Annotated
+from uuid import UUID
+
+import strawberry
+from strawberry import Info
 
 from ai.backend.common.dto.manager.v2.session_options import (
     AgentSelectionPolicyEnum,
@@ -34,6 +39,7 @@ from ai.backend.common.dto.manager.v2.session_options import (
     SessionHandlerOptionsInfo,
     SessionHandlerOptionsInput,
 )
+from ai.backend.common.types import ImageID
 from ai.backend.manager.api.gql.common_types import (
     BinarySizeInputGQL,
     ResourceSlotEntryGQL,
@@ -42,10 +48,15 @@ from ai.backend.manager.api.gql.common_types import (
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     PydanticInputMixin,
+    gql_added_field,
     gql_enum,
     gql_pydantic_input,
     gql_pydantic_type,
 )
+from ai.backend.manager.api.gql.types import StrawberryGQLContext
+
+if TYPE_CHECKING:
+    from ai.backend.manager.api.gql.image.types import ImageV2GQL
 
 # ---------------------------------------------------------------------------
 # Enums
@@ -229,6 +240,25 @@ class DefaultSessionKernelExecutionSpecInfoGQL:
     bootstrap_script: str | None
     starts_at: datetime | None
     batch_timeout_sec: int | None
+
+    @gql_added_field(
+        BackendAIGQLMeta(
+            added_version="26.10.0",
+            description="The container image of this execution spec.",
+        )
+    )  # type: ignore[misc]
+    async def image_v2(
+        self, info: Info[StrawberryGQLContext]
+    ) -> (
+        Annotated[
+            ImageV2GQL,
+            strawberry.lazy("ai.backend.manager.api.gql.image.types"),
+        ]
+        | None
+    ):
+        if self.image_id is None:
+            return None
+        return await info.context.data_loaders.image_loader.load(ImageID(UUID(str(self.image_id))))
 
 
 # ---------------------------------------------------------------------------
