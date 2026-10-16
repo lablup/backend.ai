@@ -12,6 +12,7 @@ from strawberry.relay import Connection, Edge, NodeID
 
 from ai.backend.common.data.entity.idle_checker import IdleCheckerID
 from ai.backend.common.data.idle_checker.types import SESSION_ID_LABEL
+from ai.backend.common.dto.manager.v2.common import PartialBulkPayload
 from ai.backend.common.dto.manager.v2.idle_checker.request import (
     CreateIdleCheckerInput as CreateIdleCheckerInputDTO,
 )
@@ -27,6 +28,9 @@ from ai.backend.common.dto.manager.v2.idle_checker.request import (
     SessionLifetimeSpecInputDTO,
     UtilizationSpecInputDTO,
     UtilizationThresholdInputDTO,
+)
+from ai.backend.common.dto.manager.v2.idle_checker.request import (
+    PartialBulkPurgeIdleCheckersInput as PartialBulkPurgeIdleCheckersInputDTO,
 )
 from ai.backend.common.dto.manager.v2.idle_checker.request import (
     PurgeIdleCheckerInput as PurgeIdleCheckerInputDTO,
@@ -57,6 +61,7 @@ from ai.backend.common.dto.manager.v2.idle_checker.types import (
 from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.common.types import SessionTypes
 from ai.backend.manager.api.gql.base import DateTimeFilter, OrderDirection, StringFilter, UUIDFilter
+from ai.backend.manager.api.gql.common_types import PartialBulkFailureGQL
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     PydanticInputMixin,
@@ -518,6 +523,19 @@ class PurgeIdleCheckerInputGQL(PydanticInputMixin[PurgeIdleCheckerInputDTO]):
     id: UUID = gql_field(description="Idle checker ID to purge.")
 
 
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Input for purging several idle checkers, each answered for separately.",
+    ),
+    name="PartialBulkPurgeIdleCheckersInput",
+)
+class PartialBulkPurgeIdleCheckersInputGQL(
+    PydanticInputMixin[PartialBulkPurgeIdleCheckersInputDTO]
+):
+    ids: list[UUID] = gql_field(description="IDs of the idle checkers to purge.")
+
+
 @gql_pydantic_type(
     BackendAIGQLMeta(
         added_version="26.8.0",
@@ -561,3 +579,25 @@ class UpdateIdleCheckerPayloadGQL(PydanticOutputMixin[UpdateIdleCheckerPayloadDT
 )
 class PurgeIdleCheckerPayloadGQL(PydanticOutputMixin[PurgeIdleCheckerPayloadDTO]):
     id: UUID = gql_field(description="Purged idle checker ID.")
+
+
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description=(
+            "Result of a partial bulk idle checker operation: the idle checkers processed and "
+            "the ones that failed."
+        ),
+    ),
+    model=PartialBulkPayload[IdleCheckerNode],
+    name="PartialBulkIdleCheckersPayload",
+)
+class PartialBulkIdleCheckersPayloadGQL(PydanticOutputMixin[PartialBulkPayload[IdleCheckerNode]]):
+    """Payload for partial bulk idle checker mutations."""
+
+    successes: list[IdleCheckerGQL] = gql_field(
+        description="The idle checkers processed, as they stood when processed."
+    )
+    failed: list[PartialBulkFailureGQL] = gql_field(
+        description="The idle checkers not processed, each with the reason."
+    )

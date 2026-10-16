@@ -320,14 +320,11 @@ def update(
 @click.argument("role_id", type=str)
 def delete(role_id: str) -> None:
     """Soft-delete a role."""
-    from ai.backend.common.dto.manager.v2.rbac.request import DeleteRoleInput
 
     async def _run() -> None:
         registry = await create_v2_registry(load_v2_config())
         try:
-            result = await registry.rbac.delete_role(
-                DeleteRoleInput(id=UUID(role_id)),
-            )
+            result = await registry.rbac.delete_role(UUID(role_id))
             print_result(result)
         finally:
             await registry.close()

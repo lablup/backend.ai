@@ -19,16 +19,17 @@ def register_v2_prometheus_query_preset_category_routes(
 ) -> RouteRegistry:
     """Register all v2 prometheus query preset category routes.
 
-    Read endpoints (search, get) are available to any authenticated
-    user because categories are a shared catalog for organizing metric
-    query templates. Write endpoints (create, delete) remain restricted
-    to superadmins.
+    Create is restricted to superadmins; the rest check the caller's permission on
+    each category.
     """
     reg = RouteRegistry.create("prometheus-query-preset-categories", route_deps.cors_options)
 
     reg.add("POST", "", handler.create, middlewares=[superadmin_required])
     reg.add("POST", "/search", handler.search, middlewares=[auth_required])
     reg.add("GET", "/{category_id}", handler.get, middlewares=[auth_required])
+    reg.add("DELETE", "/{category_id}", handler.purge, middlewares=[auth_required])
+    reg.add("POST", "/partial-bulk-purge", handler.partial_bulk_purge, middlewares=[auth_required])
+    # Deprecated since NEXT_RELEASE_VERSION.
     reg.add("POST", "/delete", handler.delete, middlewares=[superadmin_required])
 
     return reg

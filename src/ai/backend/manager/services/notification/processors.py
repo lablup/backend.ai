@@ -25,6 +25,18 @@ from ai.backend.manager.services.notification.actions.get_channel import GetChan
 from ai.backend.manager.services.notification.actions.get_rule import GetRuleAction
 from ai.backend.manager.services.notification.actions.list_channels import SearchChannelsAction
 from ai.backend.manager.services.notification.actions.list_rules import SearchRulesAction
+from ai.backend.manager.services.notification.actions.partial_bulk_purge_channels import (
+    PartialBulkPurgeChannelsAction,
+)
+from ai.backend.manager.services.notification.actions.partial_bulk_purge_rules import (
+    PartialBulkPurgeRulesAction,
+)
+from ai.backend.manager.services.notification.actions.partial_bulk_update_channels import (
+    PartialBulkUpdateChannelsAction,
+)
+from ai.backend.manager.services.notification.actions.partial_bulk_update_rules import (
+    PartialBulkUpdateRulesAction,
+)
 from ai.backend.manager.services.notification.actions.process_notification import (
     ProcessNotificationAction,
     ProcessNotificationActionResult,
@@ -60,6 +72,12 @@ class NotificationProcessors:
     purge_channel: SingleEntityActionProcessor[
         PurgeChannelAction, EntityOpsResult[NotificationChannelData]
     ]
+    partial_bulk_update_channels: PartialBulkActionProcessor[
+        PartialBulkUpdateChannelsAction, NotificationChannelData
+    ]
+    partial_bulk_purge_channels: PartialBulkActionProcessor[
+        PartialBulkPurgeChannelsAction, NotificationChannelData
+    ]
     get_channel: SingleEntityActionProcessor[
         GetChannelAction, EntityOpsResult[NotificationChannelData]
     ]
@@ -73,6 +91,12 @@ class NotificationProcessors:
         UpdateRuleAction, EntityOpsResult[NotificationRuleData]
     ]
     purge_rule: SingleEntityActionProcessor[PurgeRuleAction, EntityOpsResult[NotificationRuleData]]
+    partial_bulk_update_rules: PartialBulkActionProcessor[
+        PartialBulkUpdateRulesAction, NotificationRuleData
+    ]
+    partial_bulk_purge_rules: PartialBulkActionProcessor[
+        PartialBulkPurgeRulesAction, NotificationRuleData
+    ]
     get_rule: SingleEntityActionProcessor[GetRuleAction, EntityOpsResult[NotificationRuleData]]
     search_rules: GlobalActionProcessor[SearchRulesAction, BatchOpsResult[NotificationRuleData]]
     validate_channel: SingleEntityActionProcessor[
@@ -94,11 +118,23 @@ class NotificationProcessors:
         self.create_channel = channel_group.global_create_ops(CreateChannelAction)
         self.update_channel = channel_group.single_update_ops(UpdateChannelAction)
         self.purge_channel = channel_group.entity_purge_ops(PurgeChannelAction)
+        self.partial_bulk_update_channels = channel_group.partial_bulk_update_ops(
+            PartialBulkUpdateChannelsAction
+        )
+        self.partial_bulk_purge_channels = channel_group.entity_partial_bulk_purge_ops(
+            PartialBulkPurgeChannelsAction
+        )
         self.get_channel = channel_group.single_get_ops(GetChannelAction)
         self.search_channels = channel_group.global_searcher_ops(SearchChannelsAction)
         self.create_rule = rule_group.global_create_ops(CreateRuleAction)
         self.update_rule = rule_group.single_update_ops(UpdateRuleAction)
         self.purge_rule = rule_group.entity_purge_ops(PurgeRuleAction)
+        self.partial_bulk_update_rules = rule_group.partial_bulk_update_ops(
+            PartialBulkUpdateRulesAction
+        )
+        self.partial_bulk_purge_rules = rule_group.entity_partial_bulk_purge_ops(
+            PartialBulkPurgeRulesAction
+        )
         self.get_rule = rule_group.single_get_ops(GetRuleAction)
         self.search_rules = rule_group.global_searcher_ops(SearchRulesAction)
         self.validate_channel = channel_group.single_entity(

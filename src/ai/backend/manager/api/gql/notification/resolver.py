@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from typing import Any, cast
+from uuid import UUID
 
 import strawberry
 from strawberry import ID, Info
@@ -14,6 +15,13 @@ from ai.backend.common.dto.manager.v2.notification.request import (
     SearchNotificationChannelsInput,
     SearchNotificationRulesInput,
 )
+from ai.backend.common.dto.manager.v2.notification.response import (
+    DeleteNotificationChannelPayload as DeleteNotificationChannelPayloadDTO,
+)
+from ai.backend.common.dto.manager.v2.notification.response import (
+    DeleteNotificationRulePayload as DeleteNotificationRulePayloadDTO,
+)
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import encode_cursor, parse_uuid
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
@@ -41,6 +49,14 @@ from .types import (
     NotificationRuleFilter,
     NotificationRuleOrderBy,
     NotificationRuleTypeGQL,
+    PartialBulkNotificationChannelsPayloadGQL,
+    PartialBulkNotificationRulesPayloadGQL,
+    PartialBulkPurgeNotificationChannelsInputGQL,
+    PartialBulkPurgeNotificationRulesInputGQL,
+    PartialBulkUpdateNotificationChannelsInputGQL,
+    PartialBulkUpdateNotificationRulesInputGQL,
+    PurgeNotificationChannelPayloadGQL,
+    PurgeNotificationRulePayloadGQL,
     UpdateNotificationChannelInput,
     UpdateNotificationChannelPayload,
     UpdateNotificationRuleInput,
@@ -382,7 +398,8 @@ async def create_notification_channel(
 @gql_mutation(
     BackendAIGQLMeta(
         added_version="26.4.2", description="Update a notification channel (admin only)"
-    )
+    ),
+    deprecation_reason=f"Deprecated since {NEXT_RELEASE_VERSION}. Use `updateNotificationChannel`.",
 )
 async def admin_update_notification_channel(
     input: UpdateNotificationChannelInput, info: Info[StrawberryGQLContext]
@@ -397,7 +414,6 @@ async def admin_update_notification_channel(
 
 @gql_mutation(
     BackendAIGQLMeta(added_version="26.4.2", description="Update a notification channel"),
-    deprecation_reason="Use admin_update_notification_channel instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.",
 )
 async def update_notification_channel(
     input: UpdateNotificationChannelInput, info: Info[StrawberryGQLContext]
@@ -411,26 +427,76 @@ async def update_notification_channel(
 
 @gql_mutation(
     BackendAIGQLMeta(
-        added_version="26.4.2", description="Delete a notification channel (admin only)"
+        added_version=NEXT_RELEASE_VERSION, description="Permanently remove a notification channel."
     )
+)
+async def purge_notification_channel(
+    info: Info[StrawberryGQLContext],
+    id: UUID,
+) -> PurgeNotificationChannelPayloadGQL:
+    payload = await info.context.adapters.notification.purge_channel(id)
+    return PurgeNotificationChannelPayloadGQL.from_pydantic(payload)
+
+
+@gql_mutation(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Update several notification channels, answering for each one.",
+    )
+)
+async def partial_bulk_update_notification_channels(
+    info: Info[StrawberryGQLContext],
+    input: PartialBulkUpdateNotificationChannelsInputGQL,
+) -> PartialBulkNotificationChannelsPayloadGQL:
+    payload = await info.context.adapters.notification.partial_bulk_update_channels(
+        input.to_pydantic()
+    )
+    return PartialBulkNotificationChannelsPayloadGQL.from_pydantic(payload)
+
+
+@gql_mutation(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Permanently remove several notification channels, answering for each one.",
+    )
+)
+async def partial_bulk_purge_notification_channels(
+    info: Info[StrawberryGQLContext],
+    input: PartialBulkPurgeNotificationChannelsInputGQL,
+) -> PartialBulkNotificationChannelsPayloadGQL:
+    payload = await info.context.adapters.notification.partial_bulk_purge_channels(
+        input.to_pydantic()
+    )
+    return PartialBulkNotificationChannelsPayloadGQL.from_pydantic(payload)
+
+
+@gql_mutation(
+    BackendAIGQLMeta(
+        added_version="26.4.2", description="Delete a notification channel (admin only)"
+    ),
+    deprecation_reason=f"Deprecated since {NEXT_RELEASE_VERSION}. Use `purgeNotificationChannel`.",
 )
 async def admin_delete_notification_channel(
     input: DeleteNotificationChannelInput, info: Info[StrawberryGQLContext]
 ) -> DeleteNotificationChannelPayload | None:
     check_admin_only()
-    result = await info.context.adapters.notification.delete_channel(input.to_pydantic())
-    return DeleteNotificationChannelPayload.from_pydantic(result)
+    payload = await info.context.adapters.notification.purge_channel(input.to_pydantic().id)
+    return DeleteNotificationChannelPayload.from_pydantic(
+        DeleteNotificationChannelPayloadDTO(id=payload.id)
+    )
 
 
 @gql_mutation(
     BackendAIGQLMeta(added_version="26.4.2", description="Delete a notification channel"),
-    deprecation_reason="Use admin_delete_notification_channel instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.",
+    deprecation_reason=f"Deprecated since {NEXT_RELEASE_VERSION}. Use `purgeNotificationChannel`.",
 )
 async def delete_notification_channel(
     input: DeleteNotificationChannelInput, info: Info[StrawberryGQLContext]
 ) -> DeleteNotificationChannelPayload | None:
-    result = await info.context.adapters.notification.delete_channel(input.to_pydantic())
-    return DeleteNotificationChannelPayload.from_pydantic(result)
+    payload = await info.context.adapters.notification.purge_channel(input.to_pydantic().id)
+    return DeleteNotificationChannelPayload.from_pydantic(
+        DeleteNotificationChannelPayloadDTO(id=payload.id)
+    )
 
 
 @gql_mutation(
@@ -465,7 +531,8 @@ async def create_notification_rule(
 
 
 @gql_mutation(
-    BackendAIGQLMeta(added_version="26.4.2", description="Update a notification rule (admin only)")
+    BackendAIGQLMeta(added_version="26.4.2", description="Update a notification rule (admin only)"),
+    deprecation_reason=f"Deprecated since {NEXT_RELEASE_VERSION}. Use `updateNotificationRule`.",
 )
 async def admin_update_notification_rule(
     input: UpdateNotificationRuleInput, info: Info[StrawberryGQLContext]
@@ -478,7 +545,6 @@ async def admin_update_notification_rule(
 
 @gql_mutation(
     BackendAIGQLMeta(added_version="26.4.2", description="Update a notification rule"),
-    deprecation_reason="Use admin_update_notification_rule instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.",
 )
 async def update_notification_rule(
     input: UpdateNotificationRuleInput, info: Info[StrawberryGQLContext]
@@ -489,25 +555,73 @@ async def update_notification_rule(
 
 
 @gql_mutation(
-    BackendAIGQLMeta(added_version="26.4.2", description="Delete a notification rule (admin only)")
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION, description="Permanently remove a notification rule."
+    )
+)
+async def purge_notification_rule(
+    info: Info[StrawberryGQLContext],
+    id: UUID,
+) -> PurgeNotificationRulePayloadGQL:
+    payload = await info.context.adapters.notification.purge_rule(id)
+    return PurgeNotificationRulePayloadGQL.from_pydantic(payload)
+
+
+@gql_mutation(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Update several notification rules, answering for each one.",
+    )
+)
+async def partial_bulk_update_notification_rules(
+    info: Info[StrawberryGQLContext],
+    input: PartialBulkUpdateNotificationRulesInputGQL,
+) -> PartialBulkNotificationRulesPayloadGQL:
+    payload = await info.context.adapters.notification.partial_bulk_update_rules(
+        input.to_pydantic()
+    )
+    return PartialBulkNotificationRulesPayloadGQL.from_pydantic(payload)
+
+
+@gql_mutation(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Permanently remove several notification rules, answering for each one.",
+    )
+)
+async def partial_bulk_purge_notification_rules(
+    info: Info[StrawberryGQLContext],
+    input: PartialBulkPurgeNotificationRulesInputGQL,
+) -> PartialBulkNotificationRulesPayloadGQL:
+    payload = await info.context.adapters.notification.partial_bulk_purge_rules(input.to_pydantic())
+    return PartialBulkNotificationRulesPayloadGQL.from_pydantic(payload)
+
+
+@gql_mutation(
+    BackendAIGQLMeta(added_version="26.4.2", description="Delete a notification rule (admin only)"),
+    deprecation_reason=f"Deprecated since {NEXT_RELEASE_VERSION}. Use `purgeNotificationRule`.",
 )
 async def admin_delete_notification_rule(
     input: DeleteNotificationRuleInput, info: Info[StrawberryGQLContext]
 ) -> DeleteNotificationRulePayload | None:
     check_admin_only()
-    result = await info.context.adapters.notification.delete_rule(input.to_pydantic())
-    return DeleteNotificationRulePayload.from_pydantic(result)
+    payload = await info.context.adapters.notification.purge_rule(input.to_pydantic().id)
+    return DeleteNotificationRulePayload.from_pydantic(
+        DeleteNotificationRulePayloadDTO(id=payload.id)
+    )
 
 
 @gql_mutation(
     BackendAIGQLMeta(added_version="26.4.2", description="Delete a notification rule"),
-    deprecation_reason="Use admin_delete_notification_rule instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.",
+    deprecation_reason=f"Deprecated since {NEXT_RELEASE_VERSION}. Use `purgeNotificationRule`.",
 )
 async def delete_notification_rule(
     input: DeleteNotificationRuleInput, info: Info[StrawberryGQLContext]
 ) -> DeleteNotificationRulePayload | None:
-    result = await info.context.adapters.notification.delete_rule(input.to_pydantic())
-    return DeleteNotificationRulePayload.from_pydantic(result)
+    payload = await info.context.adapters.notification.purge_rule(input.to_pydantic().id)
+    return DeleteNotificationRulePayload.from_pydantic(
+        DeleteNotificationRulePayloadDTO(id=payload.id)
+    )
 
 
 @gql_mutation(

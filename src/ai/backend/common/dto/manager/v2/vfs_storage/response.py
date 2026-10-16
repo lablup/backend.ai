@@ -12,6 +12,7 @@ __all__ = (
     "AdminSearchVFSStoragesPayload",
     "CreateVFSStoragePayload",
     "DeleteVFSStoragePayload",
+    "PurgeVFSStoragePayload",
     "UpdateVFSStoragePayload",
     "VFSStorageNode",
 )
@@ -45,6 +46,12 @@ class DeleteVFSStoragePayload(BaseResponseModel):
     """Payload for VFS storage deletion mutation result."""
 
     id: UUID = Field(description="ID of the deleted VFS storage")
+
+
+class PurgeVFSStoragePayload(BaseResponseModel):
+    """Payload for VFS storage permanent purge."""
+
+    id: UUID = Field(description="ID of the purged VFS storage")
 
 
 class AdminSearchVFSStoragesPayload(BaseResponseModel):

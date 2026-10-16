@@ -20,6 +20,12 @@ from ai.backend.manager.services.login_client_type.actions.create import (
 from ai.backend.manager.services.login_client_type.actions.get import (
     GetLoginClientTypeAction,
 )
+from ai.backend.manager.services.login_client_type.actions.partial_bulk_purge import (
+    PartialBulkPurgeLoginClientTypesAction,
+)
+from ai.backend.manager.services.login_client_type.actions.partial_bulk_update import (
+    PartialBulkUpdateLoginClientTypesAction,
+)
 from ai.backend.manager.services.login_client_type.actions.purge import (
     PurgeLoginClientTypeAction,
 )
@@ -52,6 +58,12 @@ class LoginClientTypeProcessors:
     purge: SingleEntityActionProcessor[
         PurgeLoginClientTypeAction, EntityOpsResult[LoginClientTypeData]
     ]
+    partial_bulk_update: PartialBulkActionProcessor[
+        PartialBulkUpdateLoginClientTypesAction, LoginClientTypeData
+    ]
+    partial_bulk_purge: PartialBulkActionProcessor[
+        PartialBulkPurgeLoginClientTypesAction, LoginClientTypeData
+    ]
 
     def __init__(self, group: ProcessorGroup[LoginClientTypeData]) -> None:
         self.get = group.single_get_ops(GetLoginClientTypeAction)
@@ -60,3 +72,9 @@ class LoginClientTypeProcessors:
         self.global_create = group.global_create_ops(CreateLoginClientTypeAction)
         self.update = group.single_update_ops(UpdateLoginClientTypeAction)
         self.purge = group.entity_purge_ops(PurgeLoginClientTypeAction)
+        self.partial_bulk_update = group.partial_bulk_update_ops(
+            PartialBulkUpdateLoginClientTypesAction
+        )
+        self.partial_bulk_purge = group.entity_partial_bulk_purge_ops(
+            PartialBulkPurgeLoginClientTypesAction
+        )

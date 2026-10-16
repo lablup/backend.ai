@@ -25,7 +25,7 @@ from ai.backend.common.dto.manager.v2.app_config_fragment.request import (
     ScopedUpsertAppConfigFragmentsInput,
 )
 from ai.backend.common.dto.manager.v2.app_config_fragment.response import (
-    UpsertAppConfigFragmentsPayload,
+    AtomicBulkUpsertAppConfigFragmentsPayload,
 )
 from ai.backend.manager.api.adapters.app_config_fragment.adapter import AppConfigFragmentAdapter
 from ai.backend.manager.data.permission.types import Permission
@@ -50,7 +50,7 @@ from bai_scenario.runner.planting import TestSeedingSession
 from bai_scenario.runner.steps import run_scenario
 from bai_scenario.seeds.app_config.allow_list import SCOPE_NAMES
 
-type Written = UpsertAppConfigFragmentsPayload
+type Written = AtomicBulkUpsertAppConfigFragmentsPayload
 type MineStep = Scenario[TestSeedingSession, AWritingPlace, AppConfigFragmentAdapter, Written]
 type ScopedStep = Scenario[TestSeedingSession, ATargetAndACaller, AppConfigFragmentAdapter, Written]
 
@@ -67,7 +67,7 @@ class WritingMine(When[AWritingPlace, AppConfigFragmentAdapter, Written]):
 
     @override
     def operation(self) -> str:
-        return "my_upsert_app_config_fragments"
+        return "my_atomic_bulk_upsert"
 
     @override
     def describe(self, laid: AWritingPlace) -> str:
@@ -80,9 +80,7 @@ class WritingMine(When[AWritingPlace, AppConfigFragmentAdapter, Written]):
             for name, config in zip(laid.names, self.configs, strict=True)
         ]
         with ActingAs(laid.caller):
-            return await adapter.my_upsert_app_config_fragments(
-                MyUpsertAppConfigFragmentsInput(items=items)
-            )
+            return await adapter.my_atomic_bulk_upsert(MyUpsertAppConfigFragmentsInput(items=items))
 
 
 @dataclass(frozen=True)
@@ -93,7 +91,7 @@ class WritingAt(When[ATargetAndACaller, AppConfigFragmentAdapter, Written]):
 
     @override
     def operation(self) -> str:
-        return "scoped_upsert_app_config_fragments"
+        return "scoped_atomic_bulk_upsert"
 
     @override
     def describe(self, laid: ATargetAndACaller) -> str:
@@ -106,7 +104,7 @@ class WritingAt(When[ATargetAndACaller, AppConfigFragmentAdapter, Written]):
             scope_id=AppConfigScopeID(laid.scope_id) if laid.scope_id is not None else None,
         )
         with ActingAs(laid.caller):
-            return await adapter.scoped_upsert_app_config_fragments(
+            return await adapter.scoped_atomic_bulk_upsert(
                 ScopedUpsertAppConfigFragmentsInput(
                     scope=scope,
                     items=[

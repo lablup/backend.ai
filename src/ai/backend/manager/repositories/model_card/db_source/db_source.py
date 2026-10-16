@@ -141,7 +141,8 @@ class ModelCardDBSource:
         options: DeleteModelCardOptions,
     ) -> UUID:
         async with self._v2_ops.write_ops() as w:
-            return await self._delete_card(w, purger, options)
+            deleted = await self._delete_card(w, purger, options)
+            return deleted.id
 
     async def bulk_delete(
         self,
@@ -154,7 +155,7 @@ class ModelCardDBSource:
         card, mounted VFolder, ...) does not abort the rest of the batch. The
         outer transaction commits the union of every successful savepoint.
         """
-        successes: list[UUID] = []
+        successes: list[ModelCardData] = []
         failures: list[BulkModelCardDeleteFailure] = []
         if not purgers:
             return BulkModelCardDeleteResultData(successes=successes, failures=failures)
@@ -162,8 +163,8 @@ class ModelCardDBSource:
             for purger in purgers:
                 try:
                     async with w.savepoint() as sp:
-                        deleted_id = await self._delete_card(sp, purger, options)
-                    successes.append(deleted_id)
+                        deleted = await self._delete_card(sp, purger, options)
+                    successes.append(deleted)
                 except Exception as exc:
                     failures.append(BulkModelCardDeleteFailure(card_id=purger.card_id, error=exc))
         return BulkModelCardDeleteResultData(successes=successes, failures=failures)
@@ -173,7 +174,7 @@ class ModelCardDBSource:
         w: V2WriteOps,
         purger: ModelCardPurger,
         options: DeleteModelCardOptions,
-    ) -> UUID:
+    ) -> ModelCardData:
         deleted = await w.purge_entity(purger)
         if deleted is None:
             raise ModelCardNotFound()
@@ -200,7 +201,7 @@ class ModelCardDBSource:
                     sibling_count=len(siblings),
                 )
             await w.update_data(VFolderSoftDeleteUpdater(vfolder_id=vfolder_id))
-        return deleted.id
+        return deleted
 
     async def _reject_if_vfolder_mounted(self, w: V2WriteOps, vfolder_id: VFolderUUID) -> None:
         """Raise :class:`VFolderDeletionNotAllowed` if the VFolder is mounted on a live session.

@@ -18,6 +18,10 @@ from ai.backend.common.dto.manager.v2.app_config_fragment.request import (
     MyAppConfigFragmentsByNamesInput,
     ScopedAppConfigFragmentsByNamesInput,
 )
+from ai.backend.common.dto.manager.v2.app_config_fragment.response import (
+    UpsertAppConfigFragmentsPayload,
+)
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import encode_cursor
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
@@ -34,7 +38,11 @@ from .types import (
     AppConfigFragmentGQL,
     AppConfigFragmentOrderByGQL,
     AppConfigScopeRefGQL,
+    AtomicBulkUpsertAppConfigFragmentsPayloadGQL,
     MyUpsertAppConfigFragmentsInputGQL,
+    PartialBulkAppConfigFragmentsPayloadGQL,
+    PartialBulkPurgeAppConfigFragmentsInputGQL,
+    PurgeAppConfigFragmentPayloadGQL,
     ScopedUpsertAppConfigFragmentsInputGQL,
     UpsertAppConfigFragmentsPayloadGQL,
 )
@@ -105,22 +113,94 @@ async def admin_app_config_fragments(
 
 @gql_mutation(
     BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description=(
+            "Upsert many app config fragments at one scope (insert, or replace config on "
+            "conflict), all or none."
+        ),
+    )
+)
+async def scoped_atomic_bulk_upsert_app_config_fragments(
+    info: Info[StrawberryGQLContext],
+    input: ScopedUpsertAppConfigFragmentsInputGQL,
+) -> AtomicBulkUpsertAppConfigFragmentsPayloadGQL:
+    payload = await info.context.adapters.app_config_fragment.scoped_atomic_bulk_upsert(
+        input.to_pydantic()
+    )
+    return AtomicBulkUpsertAppConfigFragmentsPayloadGQL.from_pydantic(payload)
+
+
+@gql_mutation(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description=(
+            "Upsert many app config fragments at the current user's own user scope, all or none."
+        ),
+    )
+)
+async def my_atomic_bulk_upsert_app_config_fragments(
+    info: Info[StrawberryGQLContext],
+    input: MyUpsertAppConfigFragmentsInputGQL,
+) -> AtomicBulkUpsertAppConfigFragmentsPayloadGQL:
+    payload = await info.context.adapters.app_config_fragment.my_atomic_bulk_upsert(
+        input.to_pydantic()
+    )
+    return AtomicBulkUpsertAppConfigFragmentsPayloadGQL.from_pydantic(payload)
+
+
+@gql_mutation(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Purge an app config fragment by id.",
+    )
+)
+async def purge_app_config_fragment(
+    info: Info[StrawberryGQLContext],
+    id: UUID,
+) -> PurgeAppConfigFragmentPayloadGQL:
+    payload = await info.context.adapters.app_config_fragment.purge(AppConfigFragmentID(id))
+    return PurgeAppConfigFragmentPayloadGQL.from_pydantic(payload)
+
+
+@gql_mutation(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Purge several app config fragments, answering for each one.",
+    )
+)
+async def partial_bulk_purge_app_config_fragments(
+    info: Info[StrawberryGQLContext],
+    input: PartialBulkPurgeAppConfigFragmentsInputGQL,
+) -> PartialBulkAppConfigFragmentsPayloadGQL:
+    payload = await info.context.adapters.app_config_fragment.partial_bulk_purge(
+        input.to_pydantic()
+    )
+    return PartialBulkAppConfigFragmentsPayloadGQL.from_pydantic(payload)
+
+
+@gql_mutation(
+    BackendAIGQLMeta(
         added_version="26.9.0",
         description=(
             "Upsert many app config fragments at one scope (insert, or replace config on "
             "conflict), with per-item partial success "
             "(not in effect yet: still all-or-nothing)."
         ),
-    )
+    ),
+    deprecation_reason=(
+        f"Deprecated since {NEXT_RELEASE_VERSION}. Use `scopedAtomicBulkUpsertAppConfigFragments`."
+    ),
 )
 async def scoped_upsert_app_config_fragments(
     info: Info[StrawberryGQLContext],
     input: ScopedUpsertAppConfigFragmentsInputGQL,
 ) -> UpsertAppConfigFragmentsPayloadGQL:
-    payload = await info.context.adapters.app_config_fragment.scoped_upsert_app_config_fragments(
+    payload = await info.context.adapters.app_config_fragment.scoped_atomic_bulk_upsert(
         input.to_pydantic()
     )
-    return UpsertAppConfigFragmentsPayloadGQL.from_pydantic(payload)
+    return UpsertAppConfigFragmentsPayloadGQL.from_pydantic(
+        UpsertAppConfigFragmentsPayload(items=payload.items, failed=[])
+    )
 
 
 @gql_mutation(
@@ -130,16 +210,21 @@ async def scoped_upsert_app_config_fragments(
             "Upsert many app config fragments at the current user's own user scope, with "
             "per-item partial success (not in effect yet: still all-or-nothing)."
         ),
-    )
+    ),
+    deprecation_reason=(
+        f"Deprecated since {NEXT_RELEASE_VERSION}. Use `myAtomicBulkUpsertAppConfigFragments`."
+    ),
 )
 async def my_upsert_app_config_fragments(
     info: Info[StrawberryGQLContext],
     input: MyUpsertAppConfigFragmentsInputGQL,
 ) -> UpsertAppConfigFragmentsPayloadGQL:
-    payload = await info.context.adapters.app_config_fragment.my_upsert_app_config_fragments(
+    payload = await info.context.adapters.app_config_fragment.my_atomic_bulk_upsert(
         input.to_pydantic()
     )
-    return UpsertAppConfigFragmentsPayloadGQL.from_pydantic(payload)
+    return UpsertAppConfigFragmentsPayloadGQL.from_pydantic(
+        UpsertAppConfigFragmentsPayload(items=payload.items, failed=[])
+    )
 
 
 @gql_root_field(

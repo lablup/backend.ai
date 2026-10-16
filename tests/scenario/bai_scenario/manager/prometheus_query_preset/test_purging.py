@@ -12,10 +12,8 @@ from uuid import UUID, uuid4
 
 import pytest
 
+from ai.backend.common.data.entity.prometheus_query_preset import PrometheusQueryPresetID
 from ai.backend.common.data.user.types import UserRole
-from ai.backend.common.dto.manager.v2.prometheus_query_preset.request import (
-    DeleteQueryDefinitionInput,
-)
 from ai.backend.common.dto.manager.v2.prometheus_query_preset.response import (
     DeleteQueryDefinitionPayload,
 )
@@ -58,7 +56,7 @@ class Removing(When[APresetAndACaller, PrometheusQueryPresetAdapter, Removed]):
 
     @override
     def operation(self) -> str:
-        return "delete"
+        return "purge"
 
     @override
     def describe(self, laid: APresetAndACaller) -> str:
@@ -69,7 +67,7 @@ class Removing(When[APresetAndACaller, PrometheusQueryPresetAdapter, Removed]):
     async def call(self, adapter: PrometheusQueryPresetAdapter, laid: APresetAndACaller) -> Removed:
         wanted = self.other if self.other is not None else laid.preset.id
         with ActingAs(laid.caller):
-            return await adapter.delete(DeleteQueryDefinitionInput(id=wanted))
+            return await adapter.purge(PrometheusQueryPresetID(wanted))
 
 
 @dataclass(frozen=True)

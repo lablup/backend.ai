@@ -18,11 +18,15 @@ from strawberry import Info
 from strawberry.relay import Connection, Edge, NodeID
 
 from ai.backend.common.data.entity.role_permission_preset import RolePermissionPresetID
+from ai.backend.common.dto.manager.v2.common import PartialBulkPayload
 from ai.backend.common.dto.manager.v2.role_permission_preset.request import (
     RolePermissionPresetFilter as RolePermissionPresetFilterDTO,
 )
 from ai.backend.common.dto.manager.v2.role_permission_preset.request import (
     RolePermissionPresetOrder as RolePermissionPresetOrderDTO,
+)
+from ai.backend.common.dto.manager.v2.role_permission_preset.response import (
+    AtomicBulkAddRolePresetPermissionsPayload as AtomicBulkAddRolePresetPermissionsPayloadDTO,
 )
 from ai.backend.common.dto.manager.v2.role_permission_preset.response import (
     BulkAddRolePermissionPresetFailureInfo as BulkAddRolePermissionPresetFailureInfoDTO,
@@ -46,6 +50,7 @@ from ai.backend.manager.api.gql.base import (
     StringFilter,
     UUIDFilter,
 )
+from ai.backend.manager.api.gql.common_types import PartialBulkFailureGQL
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     gql_added_field,
@@ -299,4 +304,42 @@ class BulkRemoveRolePermissionPresetsPayloadGQL(
     )
     failed: list[BulkRolePermissionPresetFailureInfoGQL] = gql_field(
         description="Permission entry IDs that failed to delete."
+    )
+
+
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Payload returned after adding permission entries to a role preset, all or none.",
+    ),
+    model=AtomicBulkAddRolePresetPermissionsPayloadDTO,
+    name="AtomicBulkAddRolePresetPermissionsPayload",
+)
+class AtomicBulkAddRolePresetPermissionsPayloadGQL(
+    PydanticOutputMixin[AtomicBulkAddRolePresetPermissionsPayloadDTO]
+):
+    items: list[RolePermissionPresetGQL] = gql_field(
+        description="Permission entries that were added."
+    )
+
+
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description=(
+            "Result of a partial bulk role preset permission operation: the entries processed "
+            "and the ones that failed."
+        ),
+    ),
+    model=PartialBulkPayload[RolePermissionPresetNode],
+    name="PartialBulkRolePresetPermissionsPayload",
+)
+class PartialBulkRolePresetPermissionsPayloadGQL(
+    PydanticOutputMixin[PartialBulkPayload[RolePermissionPresetNode]]
+):
+    successes: list[RolePermissionPresetGQL] = gql_field(
+        description="The permission entries processed, as they stood."
+    )
+    failed: list[PartialBulkFailureGQL] = gql_field(
+        description="The permission entries not processed, each with the reason."
     )

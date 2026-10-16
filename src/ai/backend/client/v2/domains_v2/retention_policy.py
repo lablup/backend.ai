@@ -1,12 +1,15 @@
-"""V2 SDK client for the retention policy domain (superadmin only)."""
+"""V2 SDK client for the retention policy domain."""
 
 from __future__ import annotations
 
 from uuid import UUID
 
 from ai.backend.client.v2.base_domain import BaseDomainClient
+from ai.backend.common.dto.manager.v2.common import PartialBulkPayload
 from ai.backend.common.dto.manager.v2.retention_policy.request import (
     CreateRetentionPolicyInput,
+    PartialBulkPurgeRetentionPoliciesInput,
+    PartialBulkUpdateRetentionPoliciesInput,
     SearchRetentionPoliciesInput,
     UpdateRetentionPolicyInput,
 )
@@ -58,16 +61,40 @@ class V2RetentionPolicyClient(BaseDomainClient):
             response_model=UpdateRetentionPolicyPayload,
         )
 
+    async def purge(self, policy_id: UUID) -> PurgeRetentionPolicyPayload:
+        """Purge (permanently remove) a retention policy."""
+        return await self._client.typed_request(
+            "DELETE",
+            f"{_PATH}/{policy_id}",
+            response_model=PurgeRetentionPolicyPayload,
+        )
+
+    async def partial_bulk_update(
+        self, request: PartialBulkUpdateRetentionPoliciesInput
+    ) -> PartialBulkPayload[RetentionPolicyNode]:
+        """Update several retention policies, answering for each one."""
+        return await self._client.typed_request(
+            "POST",
+            f"{_PATH}/partial-bulk-update",
+            request=request,
+            response_model=PartialBulkPayload[RetentionPolicyNode],
+        )
+
+    async def partial_bulk_purge(
+        self, request: PartialBulkPurgeRetentionPoliciesInput
+    ) -> PartialBulkPayload[RetentionPolicyNode]:
+        """Purge several retention policies, answering for each one."""
+        return await self._client.typed_request(
+            "POST",
+            f"{_PATH}/partial-bulk-purge",
+            request=request,
+            response_model=PartialBulkPayload[RetentionPolicyNode],
+        )
+
     async def delete(self, policy_id: UUID) -> DeleteRetentionPolicyPayload:
+        """Deprecated. Use :meth:`purge`."""
         return await self._client.typed_request(
             "DELETE",
             f"{_PATH}/{policy_id}",
             response_model=DeleteRetentionPolicyPayload,
-        )
-
-    async def purge(self, policy_id: UUID) -> PurgeRetentionPolicyPayload:
-        return await self._client.typed_request(
-            "POST",
-            f"{_PATH}/{policy_id}/purge",
-            response_model=PurgeRetentionPolicyPayload,
         )

@@ -18,6 +18,7 @@ from ai.backend.common.dto.manager.query import (
     StringFilter,
     UUIDFilter,
 )
+from ai.backend.common.dto.manager.v2.common import NonEmptyList
 from ai.backend.common.dto.manager.v2.entity_label.request import EntityLabelNestedFilter
 from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.common.tristate.unset import UNSET, Unset
@@ -51,11 +52,16 @@ __all__ = (
     "ImageStatusFilterInputDTO",
     "ImageTypeFilterInputDTO",
     "ImageUsage",
+    "PartialBulkDeleteImagesInput",
+    "PartialBulkRestoreImagesInput",
+    "PartialBulkUpdateImageItemInput",
+    "PartialBulkUpdateImagesInput",
     "PurgeImageInput",
     "ScanImageInput",
     "ScopedSearchImagesInput",
     "SearchImageAliasesInput",
     "SearchImagesInput",
+    "UpdateImageBody",
     "UpdateImageInput",
     "UUIDFilter",
 )
@@ -334,10 +340,9 @@ class SearchImageAliasesInput(BaseRequestModel):
     offset: int | None = Field(default=None, description="Offset pagination: number to skip.")
 
 
-class UpdateImageInput(BaseRequestModel):
-    """Input for updating an image by ID. All fields optional -- only provided fields will be updated."""
+class UpdateImageBody(BaseRequestModel):
+    """Fields to update on an image. All fields optional -- only provided fields will be updated."""
 
-    image_id: UUID = Field(description="ID of the image to update.")
     name: str | None | Unset = Field(
         default=UNSET, description="Updated canonical name. Omit to leave unchanged."
     )
@@ -377,3 +382,36 @@ class UpdateImageInput(BaseRequestModel):
     resource_limits: dict[str, Any] | None | Unset = Field(
         default=UNSET, description="Updated resource limits dict. Omit to leave unchanged."
     )
+
+
+class UpdateImageInput(UpdateImageBody):
+    """Input for updating an image by ID, carrying the image ID in the body."""
+
+    image_id: UUID = Field(description="ID of the image to update.")
+
+
+class PartialBulkUpdateImageItemInput(BaseRequestModel):
+    """One image of a partial bulk update and the fields to update on it."""
+
+    id: UUID = Field(description="ID of the image to update.")
+    input: UpdateImageBody = Field(description="Fields to update on the image.")
+
+
+class PartialBulkUpdateImagesInput(BaseRequestModel):
+    """Input for updating several images, each answered for separately."""
+
+    items: NonEmptyList[PartialBulkUpdateImageItemInput] = Field(
+        description="The images to update, each with its fields."
+    )
+
+
+class PartialBulkDeleteImagesInput(BaseRequestModel):
+    """Input for forgetting several images, each answered for separately."""
+
+    ids: NonEmptyList[UUID] = Field(description="IDs of the images to forget.")
+
+
+class PartialBulkRestoreImagesInput(BaseRequestModel):
+    """Input for restoring several forgotten images, each answered for separately."""
+
+    ids: NonEmptyList[UUID] = Field(description="IDs of the images to restore.")

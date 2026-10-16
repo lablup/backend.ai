@@ -37,6 +37,12 @@ from ai.backend.manager.services.keypair_resource_policy.actions.global_search_k
 from ai.backend.manager.services.keypair_resource_policy.actions.lookup import (
     LookupKeypairResourcePolicyAction,
 )
+from ai.backend.manager.services.keypair_resource_policy.actions.partial_bulk_purge_keypair_resource_policies import (
+    PartialBulkPurgeKeypairResourcePoliciesAction,
+)
+from ai.backend.manager.services.keypair_resource_policy.actions.partial_bulk_update_keypair_resource_policies import (
+    PartialBulkUpdateKeypairResourcePoliciesAction,
+)
 from ai.backend.manager.services.keypair_resource_policy.actions.purge_keypair_resource_policy import (
     PurgeKeyPairResourcePolicyAction,
 )
@@ -78,6 +84,12 @@ class KeypairResourcePolicyProcessors:
     purge: SingleEntityActionProcessor[
         PurgeKeyPairResourcePolicyAction, EntityOpsResult[KeyPairResourcePolicyData]
     ]
+    partial_bulk_update: PartialBulkActionProcessor[
+        PartialBulkUpdateKeypairResourcePoliciesAction, KeyPairResourcePolicyData
+    ]
+    partial_bulk_purge: PartialBulkActionProcessor[
+        PartialBulkPurgeKeypairResourcePoliciesAction, KeyPairResourcePolicyData
+    ]
 
     def __init__(self, group: ProcessorGroup[KeyPairResourcePolicyData]) -> None:
         self.get = group.single_get_ops(GetKeyPairResourcePolicyAction)
@@ -91,3 +103,9 @@ class KeypairResourcePolicyProcessors:
         self.global_create = group.global_create_ops(CreateKeyPairResourcePolicyAction)
         self.update = group.single_update_ops(UpdateKeyPairResourcePolicyAction)
         self.purge = group.entity_purge_ops(PurgeKeyPairResourcePolicyAction)
+        self.partial_bulk_update = group.partial_bulk_update_ops(
+            PartialBulkUpdateKeypairResourcePoliciesAction
+        )
+        self.partial_bulk_purge = group.entity_partial_bulk_purge_ops(
+            PartialBulkPurgeKeypairResourcePoliciesAction
+        )

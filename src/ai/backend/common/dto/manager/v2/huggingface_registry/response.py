@@ -13,6 +13,7 @@ __all__ = (
     "CreateHuggingFaceRegistryPayload",
     "DeleteHuggingFaceRegistryPayload",
     "HuggingFaceRegistryNode",
+    "PurgeHuggingFaceRegistryPayload",
     "UpdateHuggingFaceRegistryPayload",
 )
 
@@ -49,6 +50,12 @@ class DeleteHuggingFaceRegistryPayload(BaseResponseModel):
     """Payload for HuggingFace registry deletion mutation result."""
 
     id: UUID = Field(description="ID of the deleted HuggingFace registry")
+
+
+class PurgeHuggingFaceRegistryPayload(BaseResponseModel):
+    """Payload for HuggingFace registry purge result."""
+
+    id: UUID = Field(description="ID of the purged HuggingFace registry")
 
 
 class AdminSearchHuggingFaceRegistriesPayload(BaseResponseModel):
