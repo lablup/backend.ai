@@ -5,7 +5,10 @@ Shared between Client SDK and Manager API.
 
 from __future__ import annotations
 
-from pydantic import Field
+from typing import Self
+from uuid import UUID
+
+from pydantic import Field, model_validator
 
 from ai.backend.common.api_handlers import BaseRequestModel
 from ai.backend.common.dto.manager.query import (
@@ -21,6 +24,8 @@ from ai.backend.common.dto.manager.v2.session_group.types import (
     SessionGroupPlacementEnforcementEnum,
     SessionGroupScope,
 )
+from ai.backend.common.exception import InvalidAPIParameters
+from ai.backend.common.tristate.unset import UNSET, Unset
 
 __all__ = (
     "AdminSearchSessionGroupsInput",
@@ -29,6 +34,7 @@ __all__ = (
     "SessionGroupOrder",
     "SessionGroupPlacementDirectionFilter",
     "SessionGroupPlacementEnforcementFilter",
+    "UpdateSessionGroupInput",
 )
 
 
@@ -112,3 +118,30 @@ class AdminSearchSessionGroupsInput(BaseRequestModel):
     before: str | None = Field(default=None, description="Cursor pagination: before cursor.")
     limit: int | None = Field(default=None, description="Offset pagination: maximum items.")
     offset: int | None = Field(default=None, description="Offset pagination: number to skip.")
+
+
+class UpdateSessionGroupInput(BaseRequestModel):
+    """Input for changing a session group's placement policy.
+
+    At least one of the two fields must be given.
+    """
+
+    id: UUID = Field(description="ID of the session group to update.")
+    placement_direction: SessionGroupPlacementDirectionEnum | None | Unset = Field(
+        default=UNSET,
+        description="New placement direction. Omit to leave unchanged.",
+    )
+    placement_enforcement: SessionGroupPlacementEnforcementEnum | None | Unset = Field(
+        default=UNSET,
+        description="New placement enforcement. Omit to leave unchanged.",
+    )
+
+    @model_validator(mode="after")
+    def _require_a_change(self) -> Self:
+        if not isinstance(self.placement_direction, SessionGroupPlacementDirectionEnum) and not (
+            isinstance(self.placement_enforcement, SessionGroupPlacementEnforcementEnum)
+        ):
+            raise InvalidAPIParameters(
+                "UpdateSessionGroupInput requires 'placement_direction' or 'placement_enforcement'"
+            )
+        return self
