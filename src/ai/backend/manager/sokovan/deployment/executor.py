@@ -31,6 +31,7 @@ from ai.backend.common.exception import (
 )
 from ai.backend.common.types import (
     AutoScalingMetricSource,
+    EndpointProtocol,
 )
 from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.clients.appproxy.client import AppProxyClient
@@ -484,8 +485,11 @@ class DeploymentExecutor:
             )
 
         health_check_config = None
+        protocol = EndpointProtocol.HTTP
         if target_revision.model_definition:
             health_check_config = target_revision.model_definition.health_check_config()
+            # Provisional: ``service.protocol`` as the source is not decided by core.
+            protocol = target_revision.model_definition.service_protocol()
         if not health_check_config:
             log.trace("no health check configuration", deployment_id=deployment.id)
 
@@ -511,6 +515,7 @@ class DeploymentExecutor:
             ),
             open_to_public=deployment.network.open_to_public,
             health_check=health_check_config,
+            protocol=protocol,
         )
 
     async def _fetch_prometheus_metrics(

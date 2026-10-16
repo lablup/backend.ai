@@ -4,6 +4,7 @@ App Proxy Coordinator error classes.
 
 from .circuit import (
     CircuitCreationError,
+    EndpointProtocolMismatchError,
     InvalidCircuitConfigError,
     InvalidCircuitStateError,
 )
@@ -26,6 +27,7 @@ from .config import (
 __all__ = [
     # circuit
     "CircuitCreationError",
+    "EndpointProtocolMismatchError",
     "InvalidCircuitConfigError",
     "InvalidCircuitStateError",
     # config

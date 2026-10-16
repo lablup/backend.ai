@@ -5,7 +5,7 @@ import time
 import uuid
 from collections.abc import AsyncGenerator, AsyncIterator, Mapping
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, cast
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -21,6 +21,7 @@ from ai.backend.common.events.event_types.session.broadcast import SchedulingBro
 from ai.backend.common.events.types import AbstractEvent
 from ai.backend.common.plugin.hook import HookPluginContext
 from ai.backend.common.types import (
+    EndpointProtocol,
     SessionId,
 )
 from ai.backend.manager.config.provider import ManagerConfigProvider
@@ -210,6 +211,54 @@ class TestResolveHealthCheck:
             )
         )
         assert AgentRegistry._resolve_health_check(endpoint) is None  # type: ignore[arg-type]
+
+
+class TestCreateAppproxyEndpointProtocol:
+    """``create_appproxy_endpoint`` forwards ``service.protocol`` in the request body."""
+
+    @pytest.mark.parametrize(
+        ("service_kwargs", "expected"),
+        [({}, EndpointProtocol.HTTP), ({"protocol": "tcp"}, EndpointProtocol.TCP)],
+    )
+    async def test_protocol_reaches_request_body(
+        self, service_kwargs: dict[str, Any], expected: EndpointProtocol
+    ) -> None:
+        registry = AgentRegistry.__new__(AgentRegistry)
+        client = MagicMock()
+        client.create_endpoint = AsyncMock(return_value={"endpoint": "http://x"})
+        cast(Any, registry)._load_app_proxy_client = MagicMock(return_value=client)
+        db_sess = MagicMock()
+        db_sess.execute = AsyncMock(
+            side_effect=[
+                MagicMock(
+                    first=MagicMock(return_value=MagicMock(wsproxy_addr="a", wsproxy_api_token="t"))
+                ),
+                MagicMock(scalar_one=MagicMock(return_value="custom")),
+            ]
+        )
+        endpoint = MagicMock()
+        endpoint.url = None
+        endpoint.model = uuid.uuid4()
+        endpoint.session_owner_id = uuid.uuid4()
+        endpoint.project = uuid.uuid4()
+        endpoint.domain = "default"
+        endpoint.name = "svc"
+        endpoint.id = uuid.uuid4()
+        endpoint.open_to_public = False
+        endpoint.model_definition = ModelDefinition(
+            models=[
+                ModelConfig(
+                    name="m",
+                    model_path="/models/m",
+                    service=ModelServiceConfig(start_command="run", port=8000, **service_kwargs),
+                )
+            ]
+        )
+
+        await registry.create_appproxy_endpoint(db_sess, endpoint)
+
+        body = client.create_endpoint.await_args.args[1]
+        assert body.protocol is expected
 
 
 def _make_scheduling_event(
