@@ -235,8 +235,7 @@ class KernelExecutionFailed(BackendAgentError, web.HTTPInternalServerError):
 
 class KernelLogsNotSupported(BackendAIError, web.HTTPNotImplemented):
     """
-    Raised when the agent refuses to serve the logs of a kernel, e.g. a kernel
-    running in a Trusted Domain whose output is not readable from the host.
+    Raised when the agent does not support reading the logs of a kernel.
     """
 
     error_type = "https://api.backend.ai/probs/kernel-logs-not-supported"

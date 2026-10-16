@@ -9,6 +9,7 @@ from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
+from callosum.rpc import RPCUserError
 
 from ai.backend.common.auth import PublicKey, SecretKey
 from ai.backend.common.config import (
@@ -21,18 +22,15 @@ from ai.backend.common.events.event_types.session.broadcast import SchedulingBro
 from ai.backend.common.events.types import AbstractEvent
 from ai.backend.common.plugin.hook import HookPluginContext
 from ai.backend.common.types import (
-    AgentId,
     KernelId,
     SessionId,
 )
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.errors.kernel import (
-    KernelExecutionFailed,
     KernelLogsNotSupported,
     SessionNotFound,
 )
-from ai.backend.manager.exceptions import AgentError
 from ai.backend.manager.plugin.network import NetworkPluginContext
 from ai.backend.manager.registry import AgentRegistry
 
@@ -427,17 +425,18 @@ class TestGetLogsFromAgent:
     async def test_verb_not_supported_maps_to_501(
         self, session: MagicMock, kernel_id: KernelId
     ) -> None:
-        agent_error = AgentError(
-            AgentId("agent-1"), "KernelVerbNotSupported", "KernelVerbNotSupported('get_logs')", ()
+        rpc_error = RPCUserError(
+            "KernelVerbNotSupported", "KernelVerbNotSupported('get_logs')", "tb"
         )
-        registry = self._make_registry(AsyncMock(side_effect=agent_error))
+        registry = self._make_registry(AsyncMock(side_effect=rpc_error))
         with pytest.raises(KernelLogsNotSupported) as exc_info:
             await registry.get_logs_from_agent(session)
         assert exc_info.value.status_code == 501
         assert str(kernel_id) in str(exc_info.value.extra_msg)
 
-    async def test_other_agent_error_stays_execution_failure(self, session: MagicMock) -> None:
-        agent_error = AgentError(AgentId("agent-1"), "RuntimeError", "RuntimeError('boom')", ())
-        registry = self._make_registry(AsyncMock(side_effect=agent_error))
-        with pytest.raises(KernelExecutionFailed):
+    async def test_other_rpc_error_propagates_unchanged(self, session: MagicMock) -> None:
+        rpc_error = RPCUserError("RuntimeError", "RuntimeError('boom')", "tb")
+        registry = self._make_registry(AsyncMock(side_effect=rpc_error))
+        with pytest.raises(RPCUserError) as exc_info:
             await registry.get_logs_from_agent(session)
+        assert exc_info.value is rpc_error
