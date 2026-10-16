@@ -233,6 +233,23 @@ class KernelExecutionFailed(BackendAgentError, web.HTTPInternalServerError):
         )
 
 
+class KernelLogsNotSupported(BackendAIError, web.HTTPNotImplemented):
+    """
+    Raised when the agent does not support reading the logs of a kernel.
+    """
+
+    error_type = "https://api.backend.ai/probs/kernel-logs-not-supported"
+    error_title = "Logs of this kernel are not available."
+
+    @override
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.KERNEL,
+            operation=ErrorOperation.READ,
+            error_detail=ErrorDetail.NOT_IMPLEMENTED,
+        )
+
+
 class InvalidStreamMode(BackendAIError, web.HTTPBadRequest):
     error_type = "https://api.backend.ai/probs/invalid-stream-mode"
     error_title = "Invalid or missing stream mode parameter."
