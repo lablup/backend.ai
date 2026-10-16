@@ -149,6 +149,19 @@ async def _place(db: ExtendedAsyncSAEngine, project_id: ProjectID, user_id: User
         return {(str(row.permission), row.all_fields) for row in caps}, set(roles.all())
 
 
+async def _membership_ids(
+    db: ExtendedAsyncSAEngine, project_id: ProjectID, user_id: UserID
+) -> list[uuid.UUID]:
+    async with db.begin_readonly() as conn:
+        rows = await conn.scalars(
+            sa.select(EntityMembershipRow.id).where(
+                EntityMembershipRow.virtual_entity_id == _node(ProjectEntityType(), project_id),
+                EntityMembershipRow.member_entity_id == _node(UserEntityType(), user_id),
+            )
+        )
+        return list(rows.all())
+
+
 class TestApply:
     async def test_the_members_join_their_projects(
         self, db: ExtendedAsyncSAEngine, repository: SeedRepository, plan: SeedPlan
@@ -221,3 +234,44 @@ class TestApply:
         assert isinstance(results[0].error, error)
         assert results[1] == SeedWriteItemResult(written=True)
 
+
+class TestPersonalProjectOwner:
+    async def test_the_creator_joins_with_the_project(
+        self,
+        db: ExtendedAsyncSAEngine,
+        research_admin: ProjectMemberSeed,
+        member_id: UserID,
+        personal_project_id: ProjectID,
+    ) -> None:
+        caps, _ = await _place(db, personal_project_id, member_id)
+        seeded, _ = await _place(db, research_admin.project_id, research_admin.user_id)
+        assert caps == seeded
+
+    @pytest.mark.parametrize("overwrite", [False, True], ids=["insert", "overwrite"])
+    async def test_applying_the_project_again_leaves_the_owner_rows(
+        self,
+        db: ExtendedAsyncSAEngine,
+        repository: SeedRepository,
+        member_id: UserID,
+        personal_project: ProjectSeed,
+        overwrite: bool,
+    ) -> None:
+        rows = await _membership_ids(db, personal_project.id, member_id)
+
+        [result] = await repository.partial_write([personal_project.write()], overwrite=overwrite)
+
+        assert result.error is None
+        assert await _membership_ids(db, personal_project.id, member_id) == rows
+        assert len(rows) == 1
+
+    async def test_the_creator_stated_as_a_member_is_skipped(
+        self,
+        repository: SeedRepository,
+        member_id: UserID,
+        personal_project_id: ProjectID,
+    ) -> None:
+        owner = ProjectMemberSeed(project_id=personal_project_id, user_id=member_id)
+
+        results = await repository.partial_write([owner.write()], overwrite=False)
+
+        assert results == [SeedWriteItemResult(written=False)]

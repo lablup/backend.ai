@@ -336,7 +336,7 @@ class TestRoster:
     @pytest.mark.parametrize(
         ("project_id", "user_id", "error"),
         [
-            (_PERSONAL, _MEMBER, PersonalProjectMemberAdditionError),
+            (_PERSONAL, _OUTSIDER, PersonalProjectMemberAdditionError),
             (_PROJECT, _OUTSIDER, ProjectMemberNotJoinableError),
             (_PROJECT, UserID(uuid.uuid4()), ProjectMemberNotJoinableError),
         ],
