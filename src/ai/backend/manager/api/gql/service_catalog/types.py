@@ -42,6 +42,11 @@ from ai.backend.manager.api.gql.pydantic_compat import (
     PydanticNodeMixin,
     PydanticOutputMixin,
 )
+from ai.backend.manager.api.gql.storage_backend.types import (
+    ServiceStorageBackendStatusFilterGQL,
+    ServiceStorageBackendStatusListGQL,
+    ServiceStorageBackendStatusOrderByGQL,
+)
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 
 __all__ = (
@@ -114,6 +119,22 @@ class ServiceCatalogGQL(PydanticNodeMixin[ServiceCatalogNode]):
     endpoints: list[ServiceCatalogEndpointGQL] = gql_field(
         description="Endpoints exposed by this service instance."
     )
+
+    @gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="What this service reports about the storage backends it reaches.",
+        )
+    )  # type: ignore[misc]
+    async def storage_backend_statuses(
+        self,
+        info: Info[StrawberryGQLContext],
+        filter: ServiceStorageBackendStatusFilterGQL | None = None,
+        order_by: list[ServiceStorageBackendStatusOrderByGQL] | None = None,
+        limit: int | None = None,
+        offset: int | None = None,
+    ) -> ServiceStorageBackendStatusListGQL | None:
+        raise NotImplementedError
 
     @classmethod
     @override
