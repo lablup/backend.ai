@@ -3,8 +3,8 @@
 # Update ownership of executable to root and set SetUID (u+s) bit in order for stat collector to properly work.
 rbln_stat_path = ""
 # Restrict the accepted device names (as reported by rbln-smi). Empty: accept every `RBLN-CR*` name.
-# "RBLN-CR03" is an unconfirmed placeholder: the real Rebel100 name is known only after the node check.
-# device_names = ["RBLN-CR03"]
+# "RBLN-CR13" is the Rebel100 card name in the Rebellions version matrix; confirm the exact string with rbln-smi output on hardware.
+# device_names = ["RBLN-CR13"]
 # CDI device id passed to the container runtime. TODO: confirm on the Rebel100 node.
 # cdi_device_id = "rebellions.ai/npu=runtime"
 # Container env var carrying "local:global" device ids. TODO: confirm on the Rebel100 node.

@@ -27,7 +27,7 @@ SYNTHETIC_REBEL_SMI_JSON = {
         {
             "group_id": "0",
             "npu": 0,
-            "name": "RBLN-CR03",
+            "name": "RBLN-CR13",
             "sid": "sid-0",
             "uuid": "uuid-0",
             "device": "rbln0",
@@ -46,7 +46,7 @@ SYNTHETIC_REBEL_SMI_JSON = {
         {
             "group_id": "0",
             "npu": 1,
-            "name": "RBLN-CR03",
+            "name": "RBLN-CR13",
             "sid": "sid-1",
             "uuid": "uuid-1",
             "device": "rbln1",
@@ -147,7 +147,7 @@ class TestRebelDeviceEnumeration:
         assert all(isinstance(d, AbstractComputeDevice) for d in devices)
         assert devices[0].memory_size == 144 * 1024**3
         assert devices[1].numa_node == 1
-        assert devices[0].model_name == "RBLN-CR03"
+        assert devices[0].model_name == "RBLN-CR13"
 
     async def test_available_slots_counts_whole_cards(
         self, plugin: Rebel100Plugin, patched_stats: None
@@ -311,7 +311,7 @@ class TestConfigName:
     async def test_device_names_must_be_a_list(self) -> None:
         plugin = Rebel100Plugin.__new__(Rebel100Plugin)
         plugin.plugin_config = {}
-        raw_cfg = {"general": {"rbln_stat_path": None, "device_names": "RBLN-CR03"}}
+        raw_cfg = {"general": {"rbln_stat_path": None, "device_names": "RBLN-CR13"}}
         with (
             patch(
                 "ai.backend.accelerator.rebellions.common.plugin.config.read_from_file",
