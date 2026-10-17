@@ -1,7 +1,10 @@
 from __future__ import annotations
 
 import asyncio
+import inspect
+import json
 import logging
+import sys
 import time
 import uuid
 from dataclasses import dataclass
@@ -16,17 +19,13 @@ from ai.backend.common.storage.exceptions import (
     VolumeMarkerInvalidError,
     VolumeMountUnreadableError,
 )
+from ai.backend.common.storage.volume import vfs_mount_reader
+from ai.backend.common.storage.volume.vfs_mount_reader import MountSnapshot
 from ai.backend.logging.structured import StructuredLogger
 
 log = StructuredLogger(logging.getLogger(__spec__.name))
 
-_READ_DEVICE_ID_AND_MARKER: Final = 'stat -L -c %d -- "$1" && if [ -e "$2" ]; then cat -- "$2"; fi'
-
-
-@dataclass(frozen=True)
-class MountSnapshot:
-    device_id: int
-    marker_file_content: str | None
+_MOUNT_READER_SOURCE: Final = inspect.getsource(vfs_mount_reader)
 
 
 @dataclass
@@ -73,8 +72,6 @@ class VfsVolumeStatusCheck(AbstractStatusCheck[StorageVolumeID, VfsVolumeStatusR
         try:
             observed = await self._read_mount()
             device_id = observed.device_id
-            if observed.marker_file_content is not None:
-                marker_volume_id = self._parse_marker(observed.marker_file_content)
         except VolumeMountUnreadableError as e:
             log.exception(
                 "volume mount cannot be read",
@@ -82,13 +79,6 @@ class VfsVolumeStatusCheck(AbstractStatusCheck[StorageVolumeID, VfsVolumeStatusR
                 mount_path=str(self._mount_path),
             )
             error_msg = f"{self._mount_path} cannot be read: {e.extra_msg}"
-        except VolumeMarkerInvalidError as e:
-            log.warning(
-                "volume marker does not hold a volume id",
-                volume_id=str(self._volume_id),
-                marker_path=str(self._marker_path),
-            )
-            error_msg = f"{self._marker_path} does not hold a volume id: {e.extra_msg}"
         except Exception as e:
             log.exception(
                 "volume status check raised",
@@ -96,6 +86,16 @@ class VfsVolumeStatusCheck(AbstractStatusCheck[StorageVolumeID, VfsVolumeStatusR
                 mount_path=str(self._mount_path),
             )
             error_msg = str(e)
+        else:
+            try:
+                marker_volume_id = self._parse_marker(observed.marker_file_content)
+            except VolumeMarkerInvalidError as e:
+                log.warning(
+                    "volume marker does not hold a volume id",
+                    volume_id=str(self._volume_id),
+                    marker_path=str(self._marker_path),
+                )
+                error_msg = f"{self._marker_path} does not hold a volume id: {e.extra_msg}"
         self._latest = VfsVolumeStatusResult(
             check_started_at=started_at,
             duration=timedelta(seconds=time.perf_counter() - start_counter),
@@ -104,9 +104,15 @@ class VfsVolumeStatusCheck(AbstractStatusCheck[StorageVolumeID, VfsVolumeStatusR
             marker_volume_id=marker_volume_id,
         )
 
-    async def _run(self, *cmdargs: str) -> str:
+    async def _read_mount(self) -> MountSnapshot:
+        """Runs the mount read in a child process so a hung mount blocks only that process."""
         proc = await asyncio.create_subprocess_exec(
-            *cmdargs,
+            sys.executable,
+            "-I",
+            "-c",
+            _MOUNT_READER_SOURCE,
+            str(self._mount_path),
+            str(self._marker_path),
             stdin=asyncio.subprocess.DEVNULL,
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
@@ -119,30 +125,14 @@ class VfsVolumeStatusCheck(AbstractStatusCheck[StorageVolumeID, VfsVolumeStatusR
             raise
         if proc.returncode != 0:
             raise VolumeMountUnreadableError(stderr.decode().strip())
-        return stdout.decode()
+        return MountSnapshot(**json.loads(stdout))
 
-    async def _read_mount(self) -> MountSnapshot:
-        """Reads the mount in child processes so a hung mount blocks only them.
-
-        ``stat -f`` runs for its blocking: statfs reaches a network mount's server on every call.
-        """
-        await self._run("stat", "-f", "--", str(self._mount_path))
-        output = await self._run(
-            "sh",
-            "-c",
-            _READ_DEVICE_ID_AND_MARKER,
-            "sh",
-            str(self._mount_path),
-            str(self._marker_path),
-        )
-        device_id, _, marker_file_content = output.partition("\n")
-        return MountSnapshot(
-            device_id=int(device_id),
-            marker_file_content=marker_file_content.strip() or None,
-        )
-
-    def _parse_marker(self, marker_file_content: str) -> StorageVolumeID:
+    def _parse_marker(self, marker_file_content: str | None) -> StorageVolumeID:
+        if marker_file_content is None:
+            raise VolumeMarkerInvalidError("Marker file content is None")
         try:
             return StorageVolumeID(uuid.UUID(marker_file_content))
-        except (ValueError, TypeError):
-            raise VolumeMarkerInvalidError(repr(marker_file_content)) from None
+        except (ValueError, TypeError) as e:
+            raise VolumeMarkerInvalidError(
+                f"Marker file content is invalid, got: {marker_file_content}"
+            ) from e
