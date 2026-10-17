@@ -47,9 +47,9 @@ class TestContainerRegistryProjectSeed:
 
 class TestKindOrder:
     def test_the_kind_is_applied_after_every_entity_kind(self) -> None:
-        kinds = create_seed_kind_registry().ordered()
-        names = [kind.name for kind in kinds]
-        position = names.index(SeedKind.CONTAINER_REGISTRY_PROJECT)
-        assert all(not issubclass(kind.model, SeedRelationItem) for kind in kinds[:position])
-        assert names.index(SeedKind.CONTAINER_REGISTRY) < position
-        assert names.index(SeedKind.PROJECT) < position
+        ordered = create_seed_kind_registry().ordered()
+        names = [model.name for model in ordered]
+        entity_kinds = [
+            model.name for model in ordered if not issubclass(model.model, SeedRelationItem)
+        ]
+        assert names.index(SeedKind.CONTAINER_REGISTRY_PROJECT) > names.index(entity_kinds[-1])
