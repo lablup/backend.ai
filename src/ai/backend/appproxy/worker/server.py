@@ -338,13 +338,15 @@ async def http_client_pool_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
         sock_connect=10.0,
         sock_read=None,
     )
-    cleanup_interval = root_ctx.local_config.proxy_worker.client_pool_cleanup_interval
+    proxy_worker_config = root_ctx.local_config.proxy_worker
+    cleanup_interval = proxy_worker_config.client_pool_cleanup_interval
 
+    # This pool serves the coordinator only, so the setting applies pool-wide.
     root_ctx.http_client_pool = ClientPool(
         partial(
             tcp_client_session_factory,
             timeout=client_timeout,
-            ssl=True,  # SSL verification per endpoint via ClientKey
+            ssl=proxy_worker_config.verify_coordinator_ssl_certificate,
         ),
         cleanup_interval_seconds=cleanup_interval,
     )
