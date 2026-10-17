@@ -45,8 +45,9 @@ def _register_image_cli_orm_cluster() -> None:
     """Register ORM rows reachable only via string relationships so the CLI can configure mappers (kept minimal, not all models)."""
     from ai.backend.manager.models.agent.row import AgentRow
     from ai.backend.manager.models.resource_group.row import ResourceGroupForProjectRow
+    from ai.backend.manager.models.session.row import SessionRow
 
-    _ = (AgentRow, ResourceGroupForProjectRow)
+    _ = (AgentRow, ResourceGroupForProjectRow, SessionRow)
 
 
 def _canonical_searcher(canonical: str, architecture: str) -> ImageSearcher:
