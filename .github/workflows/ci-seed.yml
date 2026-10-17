@@ -38,7 +38,7 @@ jobs:
         cache-lmdb-store: 'false'
     - name: Pants export
       run: pants export --resolve=python-default
-    - name: Check the manager seeds
-      run: ./backend.ai mgr seed check seeds/manager
+    - name: Check the seeds
+      run: ./backend.ai mgr seed check seeds/
     - name: Check the role preset fixture is what the role seeds render
       run: ./backend.ai mgr permissions emit --check

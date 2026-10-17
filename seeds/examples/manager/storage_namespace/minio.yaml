@@ -1,0 +1,6 @@
+kind: storage_namespace
+version: 1
+items:
+- id: fe878f09-06cc-4b91-9242-4c71015cce08
+  storage_id: fe878f09-06cc-4b91-9242-4c71015cce07
+  namespace: backendai-storage

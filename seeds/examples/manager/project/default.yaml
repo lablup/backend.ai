@@ -1,0 +1,73 @@
+kind: project
+version: 1
+items:
+- id: 2de2b969-1d04-48a6-af16-0bc8adb3c831
+  domain_id: b9e676dc-e23e-54c6-b350-e83fba4127e9
+  name: default
+  description: The default user group
+  is_active: true
+  resource_policy: default
+  total_resource_slots: {}
+  allowed_vfolder_hosts: {}
+  type: general
+  creator_id: 4f13d193-f646-425a-a340-270c4d2b9860
+- id: 8e32dd28-d319-4e3b-8851-ea37837699a5
+  domain_id: b9e676dc-e23e-54c6-b350-e83fba4127e9
+  name: model-store
+  description: model store project
+  is_active: true
+  resource_policy: default
+  total_resource_slots: {}
+  allowed_vfolder_hosts: {}
+  type: model-store
+  creator_id: 4f13d193-f646-425a-a340-270c4d2b9860
+- id: d4e665c0-2199-4ecb-a2b7-3b86792e5a2a
+  domain_id: b9e676dc-e23e-54c6-b350-e83fba4127e9
+  name: admin
+  description: Personal Project
+  is_active: true
+  resource_policy: default
+  total_resource_slots: {}
+  allowed_vfolder_hosts: {}
+  type: personal
+  creator_id: f38dea23-50fa-42a0-b5ae-338f5f4693f4
+- id: 48831b30-333b-4158-8e98-8f34675a1326
+  domain_id: b9e676dc-e23e-54c6-b350-e83fba4127e9
+  name: domain-admin
+  description: Personal Project
+  is_active: true
+  resource_policy: default
+  total_resource_slots: {}
+  allowed_vfolder_hosts: {}
+  type: personal
+  creator_id: 4f13d193-f646-425a-a340-270c4d2b9860
+- id: e6fc5edc-7f0b-422e-8b4f-a03a17d0cca9
+  domain_id: b9e676dc-e23e-54c6-b350-e83fba4127e9
+  name: user
+  description: Personal Project
+  is_active: true
+  resource_policy: default
+  total_resource_slots: {}
+  allowed_vfolder_hosts: {}
+  type: personal
+  creator_id: dfa9da54-4b28-432f-be29-c0d680c7a412
+- id: cc943116-6d3f-4512-b174-707ef725a20e
+  domain_id: b9e676dc-e23e-54c6-b350-e83fba4127e9
+  name: user2
+  description: Personal Project
+  is_active: true
+  resource_policy: default
+  total_resource_slots: {}
+  allowed_vfolder_hosts: {}
+  type: personal
+  creator_id: 009fb1a4-487c-4f6e-9b1b-228b94b1d040
+- id: b64aa998-307b-4696-a888-5d1d740c5894
+  domain_id: b9e676dc-e23e-54c6-b350-e83fba4127e9
+  name: monitor
+  description: Personal Project
+  is_active: true
+  resource_policy: default
+  total_resource_slots: {}
+  allowed_vfolder_hosts: {}
+  type: personal
+  creator_id: 2e10157d-20ca-4bd0-9806-3f909cbcd0e6

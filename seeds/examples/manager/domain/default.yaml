@@ -1,0 +1,12 @@
+kind: domain
+version: 1
+items:
+- id: b9e676dc-e23e-54c6-b350-e83fba4127e9
+  name: default
+  description: The default domain
+  is_active: true
+  total_resource_slots: {}
+  allowed_vfolder_hosts: {}
+  allowed_docker_registries:
+  - cr.backend.ai
+  - index.docker.io
