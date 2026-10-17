@@ -2028,6 +2028,11 @@ input AuditLogFilter
 
   """Added in 26.10.0. Filter by audit log ID."""
   fieldId: UUIDFilter = null
+
+  """
+  Added in 26.10.0. Filter by the id of the action run that wrote the log.
+  """
+  actionId: UUIDFilter = null
   operation: StringFilter = null
   status: AuditLogStatusFilter = null
   createdAt: DateTimeFilter = null

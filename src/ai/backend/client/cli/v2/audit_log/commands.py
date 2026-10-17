@@ -54,6 +54,12 @@ def audit_log() -> None:
     help="Filter by acted-as (effective/acting user UUID, exact match).",
 )
 @click.option(
+    "--action-id",
+    type=click.UUID,
+    default=None,
+    help="Filter by the id of the action run that wrote the log (exact match).",
+)
+@click.option(
     "--action-name",
     type=str,
     default=None,
@@ -84,6 +90,7 @@ def search(
     status: str | None,
     triggered_by: str | None,
     acted_as: uuid.UUID | None,
+    action_id: uuid.UUID | None,
     action_name: str | None,
     action_kind: str | None,
     order_by: tuple[str, ...],
@@ -113,6 +120,7 @@ def search(
             status,
             triggered_by,
             acted_as,
+            action_id,
             action_name,
             action_kind,
         )
@@ -127,6 +135,7 @@ def search(
                 StringFilter(contains=triggered_by) if triggered_by is not None else None
             ),
             acted_as=(UUIDFilter(equals=acted_as) if acted_as is not None else None),
+            action_id=(UUIDFilter(equals=action_id) if action_id is not None else None),
             action_name=(StringFilter(contains=action_name) if action_name is not None else None),
             action_kind=(
                 AuditLogActionKindFilter(equals=AuditLogActionKind(action_kind))

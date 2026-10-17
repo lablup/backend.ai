@@ -15,6 +15,7 @@ import pytest
 
 from ai.backend.common.data.entity.project import ProjectEntityType
 from ai.backend.common.data.user.types import UserRole
+from ai.backend.common.dto.manager.query import UUIDFilter
 from ai.backend.common.dto.manager.v2.audit_log.request import (
     AuditLogFilter,
     AuditLogScope,
@@ -41,6 +42,7 @@ from bai_scenario.components.audit_log import (
     ARecordScopedToAProject,
     OneProjectManyRecords,
     OneProjectMixedStatus,
+    OneProjectOneRun,
     ProjectRecords,
     ScopedActors,
     ScopedEntities,
@@ -110,6 +112,34 @@ class ScopedSearchingEntitiesBySuccess(When[ScopedEntities, AuditLogAdapter, Sea
                     filter=AuditLogFilter(
                         status=AuditLogStatusFilter(equals=AuditLogStatus.SUCCESS)
                     ),
+                )
+            )
+
+
+@dataclass(frozen=True)
+class ScopedSearchingEntitiesByRun(When[ScopedEntities, AuditLogAdapter, Searched]):
+    """지정한 엔티티 안에서 한 실행의 기록을 필터로 검색한다."""
+
+    @override
+    def operation(self) -> str:
+        return "scoped_search"
+
+    @override
+    def describe(self, laid: ScopedEntities) -> str:
+        return f"{laid.caller.username}이 엔티티를 지정하고 실행 필터로 검색"
+
+    @override
+    async def call(self, adapter: AuditLogAdapter, laid: ScopedEntities) -> Searched:
+        with ActingAs(laid.caller):
+            return await adapter.scoped_search(
+                ScopedSearchAuditLogsInput(
+                    scope=AuditLogScope(
+                        entity=[
+                            EntityTypeScope(entity_type=ProjectEntityType(), entity_id=str(one))
+                            for one in laid.named
+                        ]
+                    ),
+                    filter=AuditLogFilter(action_id=UUIDFilter(equals=laid.filter_action)),
                 )
             )
 
@@ -240,6 +270,34 @@ class AStatusFilterNarrowsWithinScope(
     @override
     def when(self) -> When[ScopedEntities, AuditLogAdapter, Searched]:
         return ScopedSearchingEntitiesBySuccess()
+
+    @override
+    def then(self) -> Then[ScopedEntities, Searched]:
+        return TheRecordsAnswered()
+
+
+@dataclass(frozen=True)
+class ARunFilterNarrowsWithinScope(
+    Scenario[TestSeedingSession, ScopedEntities, AuditLogAdapter, Searched]
+):
+    @override
+    def summary(self) -> str:
+        return "a-run-filter-narrows-within-the-named-scope"
+
+    @override
+    def describe(self) -> str:
+        return (
+            "한 엔티티에 두 실행이 남긴 기록이 있을 때 그것을 지정하고 한 실행 필터로 검색하면, "
+            "그 실행이 남긴 기록만 모두 반환된다"
+        )
+
+    @override
+    def given(self) -> Given[TestSeedingSession, ScopedEntities]:
+        return OneProjectOneRun()
+
+    @override
+    def when(self) -> When[ScopedEntities, AuditLogAdapter, Searched]:
+        return ScopedSearchingEntitiesByRun()
 
     @override
     def then(self) -> Then[ScopedEntities, Searched]:
@@ -551,6 +609,7 @@ ENTITY_SCENARIOS: list[EntityStep] = [
     ARecordIsFoundByItsScopeTag(),
     NamingSeveralEntitiesMerges(),
     AStatusFilterNarrowsWithinScope(),
+    ARunFilterNarrowsWithinScope(),
     OmittingThePageSizeCapsThePage(),
     AnUnreadableEntityRefusesTheWhole(),
     AUserGrantedNothingMayNotScopeSearch(),

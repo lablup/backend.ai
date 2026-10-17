@@ -81,6 +81,13 @@ class AuditLogFilter(BaseRequestModel):
         default=None,
         description=f"Added in {NEXT_RELEASE_VERSION}. Filter by audit log ID.",
     )
+    action_id: UUIDFilter | None = Field(
+        default=None,
+        description=(
+            f"Added in {NEXT_RELEASE_VERSION}. Filter by the id of the action run that wrote "
+            "the log."
+        ),
+    )
     operation: StringFilter | None = Field(default=None, description="Operation filter")
     status: AuditLogStatusFilter | None = Field(default=None, description="Status filter")
     triggered_by: StringFilter | None = Field(default=None, description="Triggered-by filter")
