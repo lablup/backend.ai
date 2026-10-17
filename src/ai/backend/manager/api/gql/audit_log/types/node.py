@@ -127,7 +127,63 @@ class AuditLogV2GQL(PydanticNodeMixin[AuditLogNode]):
             # Older rows recorded a name rather than a uuid; those name no node.
             return None
         return await info.context.data_loaders.entity_node_loader.load(
+<<<<<<< HEAD
             RuntimeEntityID(EntityType(self.entity_type), entity_uuid)
+=======
+            RuntimeEntityID(EntityType.from_name(self.entity_type), self.target_entity_id)
+        )
+
+    @gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description=(
+                "The scopes the logged operation covered. Empty for an action kind that "
+                "records no scope."
+            ),
+        )
+    )  # type: ignore[misc]
+    async def scopes(
+        self,
+        info: Info[StrawberryGQLContext],
+        filter: AuditLogScopeEntryFilterGQL | None = None,
+        order_by: list[AuditLogScopeEntryOrderByGQL] | None = None,
+        before: str | None = None,
+        after: str | None = None,
+        first: int | None = None,
+        last: int | None = None,
+        limit: int | None = None,
+        offset: int | None = None,
+    ) -> AuditLogScopeEntryConnectionGQL:
+        payload = await info.context.adapters.audit_log.search_scopes(
+            AuditLogID(self.field_id),
+            SearchAuditLogScopesInput(
+                filter=filter.to_pydantic() if filter else None,
+                order=[o.to_pydantic() for o in order_by] if order_by else None,
+                first=first,
+                after=after,
+                last=last,
+                before=before,
+                limit=limit,
+                offset=offset,
+            ),
+        )
+        edges = [
+            AuditLogScopeEntryEdgeGQL(
+                node=AuditLogScopeEntryGQL.from_pydantic(item),
+                cursor=encode_cursor(str(item.id)),
+            )
+            for item in payload.items
+        ]
+        return AuditLogScopeEntryConnectionGQL(
+            edges=edges,
+            page_info=PageInfo(
+                has_next_page=payload.has_next_page,
+                has_previous_page=payload.has_previous_page,
+                start_cursor=edges[0].cursor if edges else None,
+                end_cursor=edges[-1].cursor if edges else None,
+            ),
+            count=payload.total_count,
+>>>>>>> d80a2e3a (fix(BA-8559): resolve the audit log entity by its declared kind (#15786))
         )
 
     @gql_field(
