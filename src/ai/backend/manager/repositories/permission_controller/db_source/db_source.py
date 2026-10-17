@@ -8,6 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession as SASession
 from ai.backend.common.data.entity.project import ProjectEntityType, ProjectID
 from ai.backend.common.data.entity.role import RoleID
 from ai.backend.common.data.entity.user import UserID
+from ai.backend.common.exception import BackendAIError
 from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.permission.permission import (
@@ -267,26 +268,27 @@ class PermissionDBSource:
         user_ids: Sequence[UserID],
         granted_by: UserID,
     ) -> BulkRoleAssignmentResultData:
-        """Grant the role to each user. A user already holding it is left as it stands
-        and reported as a failure."""
+        """Grant the role to each user, each in its own savepoint of one transaction. A
+        user the grant fails for, or one already holding the role, is reported as a
+        failure."""
         granted_user_ids: list[UserID] = []
         failures: list[BulkRoleAssignmentFailure] = []
         async with self._ops.write_ops() as w:
             for user_id in user_ids:
-                granted = await w.grant_roles(user_id, [role_id], granted_by)
-                if granted[0]:
-                    granted_user_ids.append(user_id)
-                    continue
-                failures.append(
-                    BulkRoleAssignmentFailure(
-                        user_id=user_id,
-                        message=str(
-                            RoleAlreadyAssigned(
-                                f"Role {role_id} is already assigned to user {user_id}."
-                            )
-                        ),
+                try:
+                    async with w.savepoint() as sp:
+                        [granted] = await sp.grant_roles(user_id, [role_id], granted_by)
+                    if not granted:
+                        raise RoleAlreadyAssigned(
+                            f"Role {role_id} is already assigned to user {user_id}."
+                        )
+                except BackendAIError as e:
+                    log.trace(
+                        "role assignment failed: {}", e, role_id=role_id, target_user_id=user_id
                     )
-                )
+                    failures.append(BulkRoleAssignmentFailure(user_id=user_id, message=str(e)))
+                    continue
+                granted_user_ids.append(user_id)
         async with self._db.begin_readonly_session_read_committed() as read_sess:
             rows = (
                 await read_sess.scalars(

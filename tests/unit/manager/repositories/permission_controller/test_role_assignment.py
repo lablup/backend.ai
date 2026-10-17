@@ -376,6 +376,24 @@ class TestRoleAssignment:
         )
         assert result.project_remaining_roles == []
 
+    # --- bulk_assign_role ---
+
+    async def test_bulk_assign_fails_only_the_user_the_grant_fails_for(
+        self,
+        perm_db_source: PermissionDBSource,
+        project_scoped_role: uuid.UUID,
+        user_1: uuid.UUID,
+    ) -> None:
+        """A user naming no user row fails alone; the others are still granted."""
+        missing_user = UserID(uuid.uuid4())
+
+        result = await perm_db_source.bulk_assign_role(
+            RoleID(project_scoped_role), [missing_user, UserID(user_1)], UserID(user_1)
+        )
+
+        assert [s.user_id for s in result.successes] == [user_1]
+        assert [f.user_id for f in result.failures] == [missing_user]
+
     # --- the project roster ---
 
     async def test_join_member_puts_the_user_on_the_project_list(
