@@ -16,6 +16,7 @@ from ai.backend.common.exception import BackendAIError
 from ai.backend.manager.errors.permission import VirtualEntityNotFound
 from ai.backend.manager.errors.repository import ForeignKeyViolationError, RepositoryIntegrityError
 from ai.backend.manager.errors.resource import ProjectMemberNotJoinableError
+from ai.backend.manager.models.project.row import ProjectRow, ProjectType
 from ai.backend.manager.models.virtual_entity.queries import user_scope_membership_exists
 from ai.backend.manager.models.virtual_entity.virtual_entity import VirtualEntityRow
 from ai.backend.manager.repositories.ops.v2.relation.write import V2RelationWriteOps
@@ -82,12 +83,12 @@ class V2SeedWriteOps(V2RelationWriteOps, V2RosterWriteOps, V2ResourcePolicyWrite
         return written
 
     async def _write_roster_item(self, write: SeedRosterWrite) -> bool:
-        """Whether the user joined. A user already on the roster is left as it stands;
-        one the roster cannot take fails."""
-        if await self.join_members(write.project_id, [write.user_id]):
-            return True
+        """Whether the user joined. A user already on the roster is left as it stands,
+        a personal project's owner included; one the roster cannot take fails."""
         if await self._on_roster(write.project_id, write.user_id):
             return False
+        if await self.join_members(write.project_id, [write.user_id]):
+            return True
         raise ProjectMemberNotJoinableError(
             f"User {write.user_id} cannot join project {write.project_id}"
         )
@@ -95,6 +96,24 @@ class V2SeedWriteOps(V2RelationWriteOps, V2RosterWriteOps, V2ResourcePolicyWrite
     async def _on_roster(self, project_id: ProjectID, user_id: UserID) -> bool:
         stmt = sa.select(user_scope_membership_exists(ProjectEntityType(), project_id, user_id))
         return bool(await self._sess.scalar(stmt))
+
+    async def _join_personal_project_owner(self, entity: EntityIdentifier) -> bool:
+        """Put a personal project's creator on its roster, as its creation does, unless
+        the creator is already there. Whether the creator joined."""
+        if not isinstance(entity, ProjectID):
+            return False
+        project = (
+            await self._sess.execute(
+                sa.select(ProjectRow.type, ProjectRow.creator_id).where(ProjectRow.id == entity)
+            )
+        ).one()
+        if project.type is not ProjectType.PERSONAL or project.creator_id is None:
+            return False
+        owner = UserID(project.creator_id)
+        if await self._on_roster(entity, owner):
+            return False
+        await self._join(entity, owner)
+        return True
 
     async def _restate_resource_policy_shares(self, entity: EntityIdentifier) -> None:
         """Lend a written user or project the resource policies it is subject to, as
@@ -133,6 +152,7 @@ class V2SeedWriteOps(V2RelationWriteOps, V2RosterWriteOps, V2ResourcePolicyWrite
         for user_id in write.granted_users:
             granted = await self.grant_roles(user_id, [RoleID(entity.entity_id)])
             written = written or any(granted)
+        written = await self._join_personal_project_owner(entity.entity_id) or written
         if written:
             await self._restate_resource_policy_shares(entity.entity_id)
         return written

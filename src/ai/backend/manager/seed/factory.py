@@ -15,6 +15,7 @@ from ai.backend.manager.seed.notification_channel.seed import NotificationChanne
 from ai.backend.manager.seed.notification_rule.seed import NotificationRuleSeed
 from ai.backend.manager.seed.object_storage.seed import ObjectStorageSeed
 from ai.backend.manager.seed.project.seed import ProjectSeed
+from ai.backend.manager.seed.project_member.seed import ProjectMemberSeed
 from ai.backend.manager.seed.prometheus_query_preset.seed import PrometheusQueryPresetSeed
 from ai.backend.manager.seed.prometheus_query_preset_category.seed import (
     PrometheusQueryPresetCategorySeed,
@@ -75,4 +76,5 @@ def create_seed_kind_registry() -> SeedKindRegistry:
         SeedKind.RESOURCE_PRESET: (1, ResourcePresetSeed),
         SeedKind.ROLE: (1, RoleSeed),
         SeedKind.SESSION_TEMPLATE: (1, SessionTemplateSeed),
+        SeedKind.PROJECT_MEMBER: (1, ProjectMemberSeed),
     })

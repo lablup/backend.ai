@@ -38,3 +38,4 @@ class SeedKind(StrEnum):
     ARTIFACT_REGISTRY = "artifact_registry"
     DEPLOYMENT_PRESET = "deployment_preset"
     SESSION_TEMPLATE = "session_template"
+    PROJECT_MEMBER = "project_member"
