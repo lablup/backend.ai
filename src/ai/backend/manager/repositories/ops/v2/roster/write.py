@@ -28,6 +28,7 @@ from ai.backend.manager.data.user.types import UserData
 from ai.backend.manager.errors.resource import (
     ModelStoreProjectLeaveError,
     PersonalProjectMemberAdditionError,
+    ProjectMemberNotJoinableError,
     ProjectNotFound,
 )
 from ai.backend.manager.models.project.row import ProjectRow, ProjectType
@@ -57,10 +58,13 @@ class V2RosterWriteOps(V2WriteOps, V2CapOps):
     _MEMBER_CAP: ClassVar[Permission] = Permission.READ
 
     async def join_member(self, project_id: ProjectID, user_id: UserID) -> None:
-        """Put one user on the project's roster. Idempotent; refuses a personal
-        project."""
+        """Put one user on the project's roster, leaving one already on it as it stands.
+        Refuses a personal project, and a user missing or outside the project's domain."""
         await self._refuse_personal_project(project_id)
-        await self._join(project_id, user_id)
+        if not await self._domain_users(project_id, [user_id], include_joined=True):
+            raise ProjectMemberNotJoinableError(f"User {user_id} cannot join project {project_id}")
+        if await self._domain_users(project_id, [user_id], include_joined=False):
+            await self._join(project_id, user_id)
 
     async def join_members(
         self,
@@ -80,7 +84,7 @@ class V2RosterWriteOps(V2WriteOps, V2CapOps):
         await self._refuse_personal_project(project_id)
         if role_id is not None and not await self._role_exists(role_id):
             raise InvalidAPIParameters(f"Role not found: {role_id}")
-        rows = await self._joinable_users(project_id, user_ids)
+        rows = await self._domain_users(project_id, user_ids, include_joined=False)
         if not rows:
             return []
         for row in rows:
@@ -138,27 +142,23 @@ class V2RosterWriteOps(V2WriteOps, V2CapOps):
         stmt = sa.select(sa.literal(1)).select_from(RoleRow).where(RoleRow.id == role_id)
         return (await self._sess.execute(stmt)).first() is not None
 
-    async def _joinable_users(
-        self, project_id: ProjectID, user_ids: Collection[UserID]
+    async def _domain_users(
+        self, project_id: ProjectID, user_ids: Collection[UserID], *, include_joined: bool
     ) -> list[UserRow]:
-        """The named users that belong to the project's domain and are not yet on its
-        roster."""
+        """The named users that belong to the project's domain; without ``include_joined``,
+        only those not yet on its roster."""
         project_domain = (
             sa.select(ProjectRow.domain_name).where(ProjectRow.id == project_id).scalar_subquery()
         )
-        return list(
-            (
-                await self._sess.scalars(
-                    sa.select(UserRow).where(
-                        UserRow.uuid.in_(user_ids),
-                        UserRow.domain_name == project_domain,
-                        ~user_scope_membership_exists(
-                            ProjectEntityType(), project_id, UserRow.uuid
-                        ),
-                    )
-                )
-            ).all()
+        stmt = sa.select(UserRow).where(
+            UserRow.uuid.in_(user_ids),
+            UserRow.domain_name == project_domain,
         )
+        if not include_joined:
+            stmt = stmt.where(
+                ~user_scope_membership_exists(ProjectEntityType(), project_id, UserRow.uuid)
+            )
+        return list((await self._sess.scalars(stmt)).all())
 
     async def _project_type(self, project_id: ProjectID) -> ProjectType:
         """The kind of project the id names; a roster write onto one that is not there
