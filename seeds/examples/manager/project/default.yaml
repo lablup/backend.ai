@@ -6,7 +6,7 @@ items:
   name: default
   description: The default user group
   is_active: true
-  resource_policy: default
+  resource_policy_id: 2f0e7303-bb2b-40a7-9fcf-c1acf34ec6f5
   total_resource_slots: {}
   allowed_vfolder_hosts: {}
   type: general
@@ -16,7 +16,7 @@ items:
   name: model-store
   description: model store project
   is_active: true
-  resource_policy: default
+  resource_policy_id: 2f0e7303-bb2b-40a7-9fcf-c1acf34ec6f5
   total_resource_slots: {}
   allowed_vfolder_hosts: {}
   type: model-store
@@ -26,7 +26,7 @@ items:
   name: admin
   description: Personal Project
   is_active: true
-  resource_policy: default
+  resource_policy_id: 2f0e7303-bb2b-40a7-9fcf-c1acf34ec6f5
   total_resource_slots: {}
   allowed_vfolder_hosts: {}
   type: personal
@@ -36,7 +36,7 @@ items:
   name: domain-admin
   description: Personal Project
   is_active: true
-  resource_policy: default
+  resource_policy_id: 2f0e7303-bb2b-40a7-9fcf-c1acf34ec6f5
   total_resource_slots: {}
   allowed_vfolder_hosts: {}
   type: personal
@@ -46,7 +46,7 @@ items:
   name: user
   description: Personal Project
   is_active: true
-  resource_policy: default
+  resource_policy_id: 2f0e7303-bb2b-40a7-9fcf-c1acf34ec6f5
   total_resource_slots: {}
   allowed_vfolder_hosts: {}
   type: personal
@@ -56,7 +56,7 @@ items:
   name: user2
   description: Personal Project
   is_active: true
-  resource_policy: default
+  resource_policy_id: 2f0e7303-bb2b-40a7-9fcf-c1acf34ec6f5
   total_resource_slots: {}
   allowed_vfolder_hosts: {}
   type: personal
@@ -66,7 +66,7 @@ items:
   name: monitor
   description: Personal Project
   is_active: true
-  resource_policy: default
+  resource_policy_id: 2f0e7303-bb2b-40a7-9fcf-c1acf34ec6f5
   total_resource_slots: {}
   allowed_vfolder_hosts: {}
   type: personal

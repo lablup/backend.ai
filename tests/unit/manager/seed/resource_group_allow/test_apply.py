@@ -75,13 +75,13 @@ def _user(user_id: UserID, access_key: AccessKey, name: str) -> UserSeed:
         "email": f"{name}@example.com",
         "username": name,
         "password": f"{name}-password",
-        "resource_policy": "default",
+        "resource_policy_id": "0198a5a0-0000-7000-8000-0000000b0001",
         "keypairs": [
             {
                 "access_key": access_key,
                 "secret_key": f"{name}-secret",
                 "is_default": True,
-                "resource_policy": "default",
+                "resource_policy_id": "0198a5a0-0000-7000-8000-0000000b0003",
             }
         ],
     })
@@ -123,7 +123,7 @@ def _entities() -> list[SeedItemWrite]:
                 "id": str(project_id),
                 "domain_id": str(_DOMAIN),
                 "name": name,
-                "resource_policy": "default",
+                "resource_policy_id": "0198a5a0-0000-7000-8000-0000000b0002",
             }).write()
             for project_id, name in ((_PROJECT, "research"), (_OTHER_PROJECT, "ops"))
         ],

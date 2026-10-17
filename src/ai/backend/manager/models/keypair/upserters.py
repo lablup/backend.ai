@@ -8,11 +8,13 @@ from typing import Any, override
 
 import sqlalchemy as sa
 
+from ai.backend.common.data.entity.resource_policy import KeyPairResourcePolicyUUID
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.types import AccessKey
 from ai.backend.manager.data.keypair.types import KeyPairData
 from ai.backend.manager.models.keypair.row import KeyPairRow
 from ai.backend.manager.models.keypair.searchable_fields import KeyPairSearchableFields
+from ai.backend.manager.models.resource_policy.row import KeyPairResourcePolicyRow
 from ai.backend.manager.models.specs.types import IntegrityErrorCheck
 from ai.backend.manager.models.specs.upserter import FieldUpserter
 from ai.backend.manager.secret.types import SecretValue
@@ -31,7 +33,7 @@ class KeypairUpserter(FieldUpserter[UserID, KeyPairRow, KeyPairData]):
     is_active: bool
     is_admin: bool
     is_default: bool
-    resource_policy: str
+    resource_policy_id: KeyPairResourcePolicyUUID
     rate_limit: int | None
     ssh_public_key: str | None
     ssh_private_key: str | None
@@ -64,11 +66,15 @@ class KeypairUpserter(FieldUpserter[UserID, KeyPairRow, KeyPairData]):
         return {**self._values(), "updated_at": sa.func.now()}
 
     def _values(self) -> dict[str, Any]:
+        """A resource policy id naming no row leaves ``resource_policy`` NULL, which the
+        column refuses."""
         values: dict[str, Any] = {
             "is_active": self.is_active,
             "is_admin": self.is_admin,
             "is_default": self.is_default,
-            "resource_policy": self.resource_policy,
+            "resource_policy": sa.select(KeyPairResourcePolicyRow.name)
+            .where(KeyPairResourcePolicyRow.uuid == self.resource_policy_id)
+            .scalar_subquery(),
             "ssh_public_key": self.ssh_public_key,
             "ssh_private_key": self.ssh_private_key,
         }

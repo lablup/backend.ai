@@ -11,13 +11,13 @@ items:
   status: active
   status_info: admin-requested
   domain_id: b9e676dc-e23e-54c6-b350-e83fba4127e9
-  resource_policy: default
+  resource_policy_id: 9bf9e534-3886-4585-a881-b26b170330be
   role: superadmin
   keypairs:
   - access_key: AKIAIOSFODNN7EXAMPLE
     secret_key: wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY
     is_active: true
-    resource_policy: default
+    resource_policy_id: 2d420c65-9ee0-4a1e-8856-79e762cc710e
     rate_limit: 30000
     is_admin: true
     is_default: true
@@ -31,13 +31,13 @@ items:
   status: active
   status_info: admin-requested
   domain_id: b9e676dc-e23e-54c6-b350-e83fba4127e9
-  resource_policy: default
+  resource_policy_id: 9bf9e534-3886-4585-a881-b26b170330be
   role: admin
   keypairs:
   - access_key: AKIAHUKCHDEZGEXAMPLE
     secret_key: cWbsM_vBB4CzTW7JdORRMx8SjGI3-wEXAMPLEKEY
     is_active: true
-    resource_policy: default
+    resource_policy_id: 2d420c65-9ee0-4a1e-8856-79e762cc710e
     rate_limit: 30000
     is_admin: true
     is_default: true
@@ -51,13 +51,13 @@ items:
   status: active
   status_info: admin-requested
   domain_id: b9e676dc-e23e-54c6-b350-e83fba4127e9
-  resource_policy: default
+  resource_policy_id: 9bf9e534-3886-4585-a881-b26b170330be
   role: user
   keypairs:
   - access_key: AKIANABBDUSEREXAMPLE
     secret_key: C8qnIo29EZvXkPK_MXcuAakYTy4NYrxwmCEyNPlf
     is_active: true
-    resource_policy: default
+    resource_policy_id: 2d420c65-9ee0-4a1e-8856-79e762cc710e
     rate_limit: 30000
     is_admin: false
     is_default: true
@@ -71,13 +71,13 @@ items:
   status: active
   status_info: admin-requested
   domain_id: b9e676dc-e23e-54c6-b350-e83fba4127e9
-  resource_policy: default
+  resource_policy_id: 9bf9e534-3886-4585-a881-b26b170330be
   role: user
   keypairs:
   - access_key: AKIANATWOUSEREXAMPLE
     secret_key: P7oxTDdzHbEpUSs5v7r7EWj9yKstp8VpZ7SEyA-g
     is_active: true
-    resource_policy: default
+    resource_policy_id: 2d420c65-9ee0-4a1e-8856-79e762cc710e
     rate_limit: 30000
     is_admin: false
     is_default: true
@@ -91,13 +91,13 @@ items:
   status: active
   status_info: admin-requested
   domain_id: b9e676dc-e23e-54c6-b350-e83fba4127e9
-  resource_policy: default
+  resource_policy_id: 9bf9e534-3886-4585-a881-b26b170330be
   role: monitor
   keypairs:
   - access_key: AKIANAMONITOREXAMPLE
     secret_key: 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
     is_active: true
-    resource_policy: default
+    resource_policy_id: 2d420c65-9ee0-4a1e-8856-79e762cc710e
     rate_limit: 30000
     is_admin: false
     is_default: true

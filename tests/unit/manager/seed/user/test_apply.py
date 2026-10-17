@@ -9,6 +9,10 @@ import pytest
 import sqlalchemy as sa
 
 from ai.backend.common.data.entity.domain import DomainID
+from ai.backend.common.data.entity.resource_policy import (
+    KeyPairResourcePolicyUUID,
+    UserResourcePolicyUUID,
+)
 from ai.backend.common.data.entity.user import UserEntityType, UserID
 from ai.backend.common.types import AccessKey
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
@@ -193,7 +197,7 @@ def _stated_keypairs(plan: SeedPlan) -> dict[str, _Keypair]:
             keypair.is_active,
             keypair.is_admin,
             keypair.is_default,
-            keypair.resource_policy,
+            "default",
             keypair.rate_limit if keypair.rate_limit is not None else 10000,
         )
         for seed in _seeds(plan)
@@ -397,6 +401,28 @@ class TestApply:
         assert result.error is not None
         assert str(orphan.id) not in await _users(db)
 
+    async def test_a_resource_policy_that_is_not_there_fails_the_item(
+        self,
+        db: ExtendedAsyncSAEngine,
+        repository: SeedRepository,
+        applied: None,
+        admin: UserSeed,
+    ) -> None:
+        orphan = admin.model_copy(
+            update={
+                "id": UserID(uuid.uuid4()),
+                "email": "no-policy@example.com",
+                "username": "no-policy",
+                "resource_policy_id": UserResourcePolicyUUID(uuid.uuid4()),
+                "keypairs": [],
+            }
+        )
+
+        [result] = await repository.partial_write([orphan.write()], overwrite=False)
+
+        assert result.error is not None
+        assert str(orphan.id) not in await _users(db)
+
     async def test_a_keypair_refused_by_a_constraint_fails_its_user(
         self,
         db: ExtendedAsyncSAEngine,
@@ -413,7 +439,7 @@ class TestApply:
                     UserKeypairSeed(
                         access_key=AccessKey("AKIAUNKNOWNPOLICY001"),
                         secret_key="secret",
-                        resource_policy="missing",
+                        resource_policy_id=KeyPairResourcePolicyUUID(uuid.uuid4()),
                     )
                 ],
             }
@@ -441,7 +467,7 @@ class TestApply:
                     UserKeypairSeed(
                         access_key=AccessKey(f"AKIATWODEFAULTS0000{index}"),
                         secret_key="secret",
-                        resource_policy="default",
+                        resource_policy_id=admin.keypairs[0].resource_policy_id,
                         is_default=True,
                     )
                     for index in range(2)

@@ -7,6 +7,10 @@ from typing import override
 from pydantic import ConfigDict, Field, field_validator
 
 from ai.backend.common.data.entity.domain import DomainID
+from ai.backend.common.data.entity.resource_policy import (
+    KeyPairResourcePolicyUUID,
+    UserResourcePolicyUUID,
+)
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.exception import InvalidIpAddressValue
 from ai.backend.common.types import AccessKey, BackendAISchema, ReadableCIDR
@@ -32,7 +36,7 @@ class UserKeypairSeed(BackendAISchema):
     is_active: bool = True
     is_admin: bool = False
     is_default: bool = False
-    resource_policy: str = Field(min_length=1, max_length=256)
+    resource_policy_id: KeyPairResourcePolicyUUID
     rate_limit: int | None = Field(default=None, ge=-(2**31), le=2**31 - 1)
     ssh_public_key: str | None = None
     ssh_private_key: str | None = None
@@ -54,7 +58,7 @@ class UserKeypairSeed(BackendAISchema):
             is_active=self.is_active,
             is_admin=self.is_admin,
             is_default=self.is_default,
-            resource_policy=self.resource_policy,
+            resource_policy_id=self.resource_policy_id,
             rate_limit=self.rate_limit,
             ssh_public_key=self.ssh_public_key,
             ssh_private_key=self.ssh_private_key,
@@ -76,7 +80,7 @@ class UserSeed(SeedItem):
     status: UserStatus = UserStatus.ACTIVE
     status_info: str | None = None
     role: UserRole = UserRole.USER
-    resource_policy: str = Field(min_length=1, max_length=256)
+    resource_policy_id: UserResourcePolicyUUID
     allowed_client_ip: list[str] | None = None
     sudo_session_enabled: bool = False
     container_uid: int | None = Field(default=None, ge=-(2**31), le=2**31 - 1)
@@ -122,7 +126,7 @@ class UserSeed(SeedItem):
                 status=self.status,
                 status_info=self.status_info,
                 role=self.role,
-                resource_policy=self.resource_policy,
+                resource_policy_id=self.resource_policy_id,
                 allowed_client_ip=self.allowed_client_ip,
                 sudo_session_enabled=self.sudo_session_enabled,
                 container_uid=self.container_uid,

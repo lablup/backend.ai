@@ -8,6 +8,7 @@ from pydantic import Field, field_validator
 
 from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.entity.project import ProjectID
+from ai.backend.common.data.entity.resource_policy import ProjectResourcePolicyUUID
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.types import ResourceSlot, VFolderHostPermission
 from ai.backend.manager.models.base import SlugType
@@ -24,7 +25,7 @@ class ProjectSeed(SeedItem):
     domain_id: DomainID
     name: str
     type: ProjectType = ProjectType.GENERAL
-    resource_policy: str = Field(min_length=1, max_length=256)
+    resource_policy_id: ProjectResourcePolicyUUID
     creator_id: UserID | None = None
     description: str | None = Field(default=None, max_length=512)
     is_active: bool = True
@@ -51,7 +52,7 @@ class ProjectSeed(SeedItem):
                 project_type=self.type,
                 creator_id=self.creator_id,
                 name=self.name,
-                resource_policy=self.resource_policy,
+                resource_policy_id=self.resource_policy_id,
                 description=self.description,
                 is_active=self.is_active,
                 total_resource_slots=ResourceSlot(self.total_resource_slots),

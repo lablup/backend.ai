@@ -58,7 +58,7 @@ def _project(project_id: ProjectID, name: str) -> ProjectSeed:
         "id": str(project_id),
         "domain_id": str(_DOMAIN),
         "name": name,
-        "resource_policy": "default",
+        "resource_policy_id": str(_PROJECT_POLICY),
     })
 
 

@@ -98,13 +98,13 @@ def _entities() -> list[SeedItemWrite]:
             "email": "member@example.com",
             "username": "member",
             "password": "member-password",
-            "resource_policy": "default",
+            "resource_policy_id": "0198a5a0-0000-7000-8000-0000000b0001",
             "keypairs": [
                 {
                     "access_key": "AKIAMEMBER0000000000",
                     "secret_key": "member-secret",
                     "is_default": True,
-                    "resource_policy": "default",
+                    "resource_policy_id": "0198a5a0-0000-7000-8000-0000000b0003",
                 }
             ],
         }).write(),
@@ -112,7 +112,7 @@ def _entities() -> list[SeedItemWrite]:
             "id": str(_PROJECT),
             "domain_id": str(_DOMAIN),
             "name": "research",
-            "resource_policy": "default",
+            "resource_policy_id": "0198a5a0-0000-7000-8000-0000000b0002",
         }).write(),
         ResourceGroupSeed.model_validate({
             "id": str(_RESOURCE_GROUP),

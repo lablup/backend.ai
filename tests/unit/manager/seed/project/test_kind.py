@@ -26,7 +26,7 @@ def _project(name: str = "lab", **values: Any) -> dict[str, Any]:
         "id": _PROJECT_ID,
         "domain_id": _DOMAIN_ID,
         "name": name,
-        "resource_policy": "default",
+        "resource_policy_id": "0198a5a0-0000-7000-8000-0000000b0002",
         **values,
     }
 
