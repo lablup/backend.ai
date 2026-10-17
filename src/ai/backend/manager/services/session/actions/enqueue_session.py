@@ -8,6 +8,7 @@ from typing import override
 
 from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.resource_group import ResourceGroupID
+from ai.backend.common.data.entity.session import SessionID
 from ai.backend.common.data.entity.types import EntityIdentifier
 from ai.backend.common.defs.session import JOB_PRIORITY_DEFAULT, SESSION_PRIORITY_DEFAULT
 from ai.backend.common.types import AccessKey, ClusterMode, MountInfoEntry, SessionTypes
@@ -128,3 +129,7 @@ class EnqueueSessionActionResult(SessionScopeActionResult):
     """Returns full session data for SessionNode conversion."""
 
     session_data: SessionData
+
+    @override
+    def entity_ids(self) -> Sequence[EntityIdentifier]:
+        return (SessionID(self.session_data.id),)
