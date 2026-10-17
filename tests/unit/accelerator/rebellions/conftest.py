@@ -1,0 +1,232 @@
+"""Real `rbln-smi` JSON from a 4x Rebel100 (RBLN-CR13) node, driver 3.5.1; sid and uuid replaced."""
+
+import copy
+from typing import Any
+
+import pytest
+
+# `rbln-smi -g -j`, idle.
+_IDLE_GROUP_JSON: dict[str, Any] = {
+    "KMD_version": "3.5.1",
+    "devices": [
+        {
+            "group_id": "0",
+            "npu": 0,
+            "name": "RBLN-CR13",
+            "sid": "0000000000000000",
+            "uuid": "00000000-0000-0000-0000-000000000000",
+            "device": "rbln0",
+            "status": "normal",
+            "fw_ver": "3.5.1",
+            "pci": {
+                "dev": "0x2130",
+                "bus_id": "0000:f3:00.0",
+                "numa_node": "0",
+                "link_speed": "32.0GT/s",
+                "link_width": "16",
+            },
+            "temperature": "34C",
+            "card_power": "100372000uW",
+            "pstate": "P10",
+            "memory": {"used": "0", "total": "150323855360"},
+            "util": "0.0",
+            "board_info": "00000009",
+            "location": 0,
+        },
+        {
+            "group_id": "0",
+            "npu": 1,
+            "name": "RBLN-CR13",
+            "sid": "0000000000000001",
+            "uuid": "00000000-0000-0000-0000-000000000001",
+            "device": "rbln1",
+            "status": "normal",
+            "fw_ver": "3.5.1",
+            "pci": {
+                "dev": "0x2130",
+                "bus_id": "0000:f4:00.0",
+                "numa_node": "0",
+                "link_speed": "32.0GT/s",
+                "link_width": "16",
+            },
+            "temperature": "35C",
+            "card_power": "102653000uW",
+            "pstate": "P10",
+            "memory": {"used": "0", "total": "150323855360"},
+            "util": "0.0",
+            "board_info": "00000009",
+            "location": 0,
+        },
+        {
+            "group_id": "0",
+            "npu": 2,
+            "name": "RBLN-CR13",
+            "sid": "0000000000000002",
+            "uuid": "00000000-0000-0000-0000-000000000002",
+            "device": "rbln2",
+            "status": "normal",
+            "fw_ver": "3.5.1",
+            "pci": {
+                "dev": "0x2130",
+                "bus_id": "0000:fd:00.0",
+                "numa_node": "0",
+                "link_speed": "32.0GT/s",
+                "link_width": "16",
+            },
+            "temperature": "36C",
+            "card_power": "97765000uW",
+            "pstate": "P10",
+            "memory": {"used": "0", "total": "150323855360"},
+            "util": "0.0",
+            "board_info": "00000009",
+            "location": 0,
+        },
+        {
+            "group_id": "0",
+            "npu": 3,
+            "name": "RBLN-CR13",
+            "sid": "0000000000000003",
+            "uuid": "00000000-0000-0000-0000-000000000003",
+            "device": "rbln3",
+            "status": "normal",
+            "fw_ver": "3.5.1",
+            "pci": {
+                "dev": "0x2130",
+                "bus_id": "0000:fe:00.0",
+                "numa_node": "0",
+                "link_speed": "32.0GT/s",
+                "link_width": "16",
+            },
+            "temperature": "36C",
+            "card_power": "100530000uW",
+            "pstate": "P10",
+            "memory": {"used": "0", "total": "150323855360"},
+            "util": "0.0",
+            "board_info": "00000009",
+            "location": 0,
+        },
+    ],
+    "contexts": [],
+}
+
+# `rbln-smi -j` while a process runs on rbln1 (`contexts` populated).
+_LOADED_JSON: dict[str, Any] = {
+    "KMD_version": "3.5.1",
+    "devices": [
+        {
+            "npu": 0,
+            "name": "RBLN-CR13",
+            "sid": "0000000000000000",
+            "uuid": "00000000-0000-0000-0000-000000000000",
+            "device": "rbln0",
+            "status": "normal",
+            "fw_ver": "3.5.1",
+            "pci": {
+                "dev": "0x2130",
+                "bus_id": "0000:f3:00.0",
+                "numa_node": "0",
+                "link_speed": "32.0GT/s",
+                "link_width": "16",
+            },
+            "temperature": "36C",
+            "card_power": "100801000uW",
+            "pstate": "P10",
+            "memory": {"used": "0", "total": "150323855360"},
+            "util": "0.0",
+            "board_info": "00000009",
+            "location": 0,
+        },
+        {
+            "npu": 1,
+            "name": "RBLN-CR13",
+            "sid": "0000000000000001",
+            "uuid": "00000000-0000-0000-0000-000000000001",
+            "device": "rbln1",
+            "status": "normal",
+            "fw_ver": "3.5.1",
+            "pci": {
+                "dev": "0x2130",
+                "bus_id": "0000:f4:00.0",
+                "numa_node": "0",
+                "link_speed": "32.0GT/s",
+                "link_width": "16",
+            },
+            "temperature": "36C",
+            "card_power": "103503000uW",
+            "pstate": "P10",
+            "memory": {"used": "79201042432", "total": "150323855360"},
+            "util": "0.0",
+            "board_info": "00000009",
+            "location": 0,
+        },
+        {
+            "npu": 2,
+            "name": "RBLN-CR13",
+            "sid": "0000000000000002",
+            "uuid": "00000000-0000-0000-0000-000000000002",
+            "device": "rbln2",
+            "status": "normal",
+            "fw_ver": "3.5.1",
+            "pci": {
+                "dev": "0x2130",
+                "bus_id": "0000:fd:00.0",
+                "numa_node": "0",
+                "link_speed": "32.0GT/s",
+                "link_width": "16",
+            },
+            "temperature": "35C",
+            "card_power": "101690000uW",
+            "pstate": "P10",
+            "memory": {"used": "0", "total": "150323855360"},
+            "util": "0.0",
+            "board_info": "00000009",
+            "location": 0,
+        },
+        {
+            "npu": 3,
+            "name": "RBLN-CR13",
+            "sid": "0000000000000003",
+            "uuid": "00000000-0000-0000-0000-000000000003",
+            "device": "rbln3",
+            "status": "normal",
+            "fw_ver": "3.5.1",
+            "pci": {
+                "dev": "0x2130",
+                "bus_id": "0000:fe:00.0",
+                "numa_node": "0",
+                "link_speed": "32.0GT/s",
+                "link_width": "16",
+            },
+            "temperature": "35C",
+            "card_power": "101231000uW",
+            "pstate": "P10",
+            "memory": {"used": "0", "total": "150323855360"},
+            "util": "0.0",
+            "board_info": "00000009",
+            "location": 0,
+        },
+    ],
+    "contexts": [
+        {
+            "ctx_id": "10001",
+            "npu": 1,
+            "process": "VLLM::Worker",
+            "pid": "472526",
+            "priority": "normal",
+            "ptid": "1",
+            "memalloc": "79201042432",
+            "status": "idle",
+            "util_info": "0.0",
+        }
+    ],
+}
+
+
+@pytest.fixture
+def idle_group_json() -> dict[str, Any]:
+    return copy.deepcopy(_IDLE_GROUP_JSON)
+
+
+@pytest.fixture
+def loaded_json() -> dict[str, Any]:
+    return copy.deepcopy(_LOADED_JSON)

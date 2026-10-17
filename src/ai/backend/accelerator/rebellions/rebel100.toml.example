@@ -1,0 +1,12 @@
+# Copy to rebel100.toml in the agent's config search path (searched in the working directory, ~/.config/backend.ai/, /etc/backend.ai/).
+# Also add the plugin to the agent config:
+#   [agent] allow-compute-plugins = ["ai.backend.accelerator.rebellions.rebel100"]
+#   [resource] allocation-order = ["cpu", "mem", "rebel100", ...]  (kernel creation fails with ValueError otherwise)
+[general]
+# Path to the rbln-smi (or rbln-stat) executable. Empty: search PATH for rbln-smi, then rbln-stat.
+rbln_stat_path = ""
+# enable_rsd is ignored (always off): CDI always injects /dev/rsd0 (group 0), so a card moved to another group is invisible to the SDK.
+# CDI device id passed to the container runtime; its prefix (before "=") selects the per-card ids.
+# cdi_device_id = "rebellions.ai/npu=runtime"
+# Container env var carrying "local:global" device ids.
+# device_ids_env_var = "ATOM_GLOBAL_DEVICE_IDS"
