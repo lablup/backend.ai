@@ -43,3 +43,7 @@ class CreateVFolderAction(VFolderScopeAction):
 @dataclass
 class CreateVFolderActionResult(VFolderScopeActionResult):
     vfolder: VFolderData
+
+    @override
+    def entity_ids(self) -> Sequence[EntityIdentifier]:
+        return (self.vfolder.id,)
