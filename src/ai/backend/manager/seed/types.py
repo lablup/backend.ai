@@ -43,3 +43,4 @@ class SeedKind(StrEnum):
     RESOURCE_GROUP_FOR_PROJECT = "resource_group_for_project"
     RESOURCE_GROUP_FOR_KEYPAIR = "resource_group_for_keypair"
     CONTAINER_REGISTRY_PROJECT = "container_registry_project"
+    IDLE_CHECKER_ASSIGNMENT = "idle_checker_assignment"

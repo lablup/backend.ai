@@ -68,6 +68,7 @@ _CASES: Final[list[IdempotenceCase]] = [
     IdempotenceCase(SeedKind.RESOURCE_GROUP_FOR_PROJECT, "resource_group_allow_seed_dir"),
     IdempotenceCase(SeedKind.RESOURCE_GROUP_FOR_KEYPAIR, "resource_group_allow_seed_dir"),
     IdempotenceCase(SeedKind.CONTAINER_REGISTRY_PROJECT, "container_registry_project_seed_dir"),
+    IdempotenceCase(SeedKind.IDLE_CHECKER_ASSIGNMENT, "idle_checker_assignment_seed_dir"),
 ]
 
 

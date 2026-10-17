@@ -22,7 +22,7 @@ from ai.backend.manager.models.container_registry.row import ContainerRegistryRo
 from ai.backend.manager.models.deployment_revision_preset.row import DeploymentRevisionPresetRow
 from ai.backend.manager.models.domain.row import DomainRow
 from ai.backend.manager.models.entity_label.row import EntityLabelRow
-from ai.backend.manager.models.idle_checker.row import IdleCheckerRow
+from ai.backend.manager.models.idle_checker.row import IdleCheckerBindingRow, IdleCheckerRow
 from ai.backend.manager.models.keypair.row import KeyPairRow
 from ai.backend.manager.models.login_client_type.row import LoginClientTypeRow
 from ai.backend.manager.models.notification.row import NotificationChannelRow, NotificationRuleRow
@@ -655,6 +655,7 @@ _SEED_TABLES: list[Table | type[HasTable]] = [
     NotificationChannelRow,
     NotificationRuleRow,
     IdleCheckerRow,
+    IdleCheckerBindingRow,
     ContainerRegistryRow,
     ObjectStorageRow,
     StorageNamespaceRow,
@@ -920,6 +921,25 @@ def idle_checker_seed_dir(tmp_path: Path) -> Path:
 @pytest.fixture
 def idle_checker_ids() -> list[str]:
     return [str(checker["id"]) for checker in _IDLE_CHECKERS]
+
+
+@pytest.fixture
+def idle_checker_assignment_seed_dir(
+    tmp_path: Path, idle_checker_seed_dir: Path, domain_seed_dir: Path
+) -> Path:
+    """The `idle_checker` and `domain` directories plus one `idle_checker_assignment` seed
+    file applying every checker to the default domain."""
+    directory = tmp_path / "idle_checker_assignment"
+    directory.mkdir()
+    domain_id = _DOMAINS["default.yaml"]["id"]
+    items = [
+        {"idle_checker_id": checker["id"], "scope_type": "domain", "scope_id": domain_id}
+        for checker in _IDLE_CHECKERS
+    ]
+    (directory / "assignments.yaml").write_text(
+        yaml.safe_dump({"kind": "idle_checker_assignment", "version": 1, "items": items})
+    )
+    return tmp_path
 
 
 @pytest.fixture
