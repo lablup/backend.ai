@@ -29,6 +29,9 @@ from ai.backend.common.dto.manager.v2.entity_share.request import (
     EntityShareScope as ScopeDTO,
 )
 from ai.backend.common.dto.manager.v2.entity_share.request import (
+    EntityShareStatusFilter as StatusFilterDTO,
+)
+from ai.backend.common.dto.manager.v2.entity_share.request import (
     EntityShareTargetScope as TargetScopeDTO,
 )
 from ai.backend.common.dto.manager.v2.entity_share.request import (
@@ -45,7 +48,7 @@ from ai.backend.common.dto.manager.v2.entity_share.types import (
     EntityShareStatusDTO,
 )
 from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
-from ai.backend.manager.api.gql.base import UUIDFilter, UUIDScopeGQL
+from ai.backend.manager.api.gql.base import StringFilter, UUIDFilter, UUIDScopeGQL
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     PydanticInputMixin,
@@ -239,15 +242,41 @@ class EntityShareConnection(Connection[EntityShareGQL]):
 
 
 @gql_pydantic_input(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Filter for entity share status with equality and membership operators.",
+    ),
+    name="EntityShareStatusFilter",
+)
+class EntityShareStatusFilterGQL(PydanticInputMixin[StatusFilterDTO]):
+    equals: EntityShareStatusGQL | None = gql_field(
+        default=None, description="Matches shares with this exact status."
+    )
+    in_: list[EntityShareStatusGQL] | None = gql_field(
+        default=None, description="Matches shares whose status is in this list.", name="in"
+    )
+
+
+@gql_pydantic_input(
     BackendAIGQLMeta(added_version="26.9.0", description="Filter for entity shares."),
     name="EntityShareFilter",
 )
 class EntityShareFilterGQL(PydanticInputMixin[FilterDTO]):
-    status: EntityShareStatusGQL | None = gql_field(default=None, description="Status filter.")
-    recipient_entity_id: UUID | None = gql_field(
-        default=None, description="Exact recipient scope match."
+    status: EntityShareStatusFilterGQL | None = gql_field(
+        default=None, description="Status filter."
     )
-    recipient_email: str | None = gql_field(default=None, description="Exact address match.")
+    recipient_entity_id: UUIDFilter | None = gql_field(
+        default=None, description="Recipient scope filter."
+    )
+    recipient_email: StringFilter | None = gql_field(
+        default=None, description="Recipient address filter."
+    )
+    target_entity_id: UUIDFilter | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION, description="Filter by the shared entity's ID."
+        ),
+        default=None,
+    )
     entity_id: UUIDFilter | None = gql_added_field(
         BackendAIGQLMeta(
             added_version=NEXT_RELEASE_VERSION, description="Filter by entity share ID."

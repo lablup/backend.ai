@@ -37,6 +37,18 @@ const ACCEPTED_REMOVALS = {
   "SessionUsedBy.resourceGroup": USAGE_RENAME,
 };
 
+// Type changes decided deliberately, keyed and dropped the same way as ACCEPTED_REMOVALS.
+const ENTITY_SHARE_FILTER_RETYPE =
+  "The old type failed DTO validation for every value, so no client could use the field.";
+
+const ACCEPTED_TYPE_CHANGES = {
+  "EntityShareFilter.status": ENTITY_SHARE_FILTER_RETYPE,
+  "EntityShareFilter.recipientEntityId": ENTITY_SHARE_FILTER_RETYPE,
+  "EntityShareFilter.recipientEmail": ENTITY_SHARE_FILTER_RETYPE,
+};
+
+const TYPE_CHANGES = ["INPUT_FIELD_TYPE_CHANGED", "FIELD_TYPE_CHANGED"];
+
 const REMOVAL_CHANGES = [
   "INPUT_FIELD_REMOVED",
   "FIELD_REMOVED",
@@ -66,6 +78,13 @@ module.exports = (props) => {
       change.criticality.level = "DANGEROUS";
       change.criticality.reason = acceptedRemovalReason;
       change.message = `${change.message} (accepted: ${acceptedRemovalReason})`;
+      return change;
+    }
+    const acceptedTypeChangeReason = ACCEPTED_TYPE_CHANGES[change.path];
+    if (TYPE_CHANGES.includes(change.type) && acceptedTypeChangeReason !== undefined) {
+      change.criticality.level = "DANGEROUS";
+      change.criticality.reason = acceptedTypeChangeReason;
+      change.message = `${change.message} (accepted: ${acceptedTypeChangeReason})`;
       return change;
     }
     if (

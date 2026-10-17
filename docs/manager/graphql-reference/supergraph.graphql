@@ -8639,13 +8639,16 @@ input EntityShareFilter
   @join__type(graph: STRAWBERRY)
 {
   """Status filter."""
-  status: EntityShareStatus = null
+  status: EntityShareStatusFilter = null
 
-  """Exact recipient scope match."""
-  recipientEntityId: UUID = null
+  """Recipient scope filter."""
+  recipientEntityId: UUIDFilter = null
 
-  """Exact address match."""
-  recipientEmail: String = null
+  """Recipient address filter."""
+  recipientEmail: StringFilter = null
+
+  """Added in 26.10.0. Filter by the shared entity's ID."""
+  targetEntityId: UUIDFilter = null
 
   """Added in 26.10.0. Filter by entity share ID."""
   entityId: UUIDFilter = null
@@ -8729,6 +8732,19 @@ enum EntityShareStatus
   REJECTED @join__enumValue(graph: STRAWBERRY)
   CANCELED @join__enumValue(graph: STRAWBERRY)
   REVOKED @join__enumValue(graph: STRAWBERRY)
+}
+
+"""
+Added in 26.10.0. Filter for entity share status with equality and membership operators.
+"""
+input EntityShareStatusFilter
+  @join__type(graph: STRAWBERRY)
+{
+  """Matches shares with this exact status."""
+  equals: EntityShareStatus = null
+
+  """Matches shares whose status is in this list."""
+  in: [EntityShareStatus!] = null
 }
 
 """Added in 26.9.0. One entity whose shares are being read."""
