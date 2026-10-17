@@ -13,13 +13,16 @@ from ai.backend.common.data.entity.user import UserEntityType
 from ai.backend.manager.models.app_config_allow_list.row import AppConfigAllowListRow
 from ai.backend.manager.models.app_config_definition.row import AppConfigDefinitionRow
 from ai.backend.manager.models.app_config_fragment.row import AppConfigFragmentRow
+from ai.backend.manager.models.association_container_registries_groups.row import (
+    AssociationContainerRegistriesGroupsRow,
+)
 from ai.backend.manager.models.base import ensure_all_tables_registered
 from ai.backend.manager.models.client_ip_masking.row import ClientIPMaskingPolicyRow
 from ai.backend.manager.models.container_registry.row import ContainerRegistryRow
 from ai.backend.manager.models.deployment_revision_preset.row import DeploymentRevisionPresetRow
 from ai.backend.manager.models.domain.row import DomainRow
 from ai.backend.manager.models.entity_label.row import EntityLabelRow
-from ai.backend.manager.models.idle_checker.row import IdleCheckerRow
+from ai.backend.manager.models.idle_checker.row import IdleCheckerBindingRow, IdleCheckerRow
 from ai.backend.manager.models.keypair.row import KeyPairRow
 from ai.backend.manager.models.login_client_type.row import LoginClientTypeRow
 from ai.backend.manager.models.notification.row import NotificationChannelRow, NotificationRuleRow
@@ -36,7 +39,12 @@ from ai.backend.manager.models.rbac_models.role_permission_preset.row import (
 )
 from ai.backend.manager.models.rbac_models.role_preset.row import RolePresetRow
 from ai.backend.manager.models.rbac_models.user_role.row import UserRoleRow
-from ai.backend.manager.models.resource_group.row import ResourceGroupRow
+from ai.backend.manager.models.resource_group.row import (
+    ResourceGroupForDomainRow,
+    ResourceGroupForKeypairsRow,
+    ResourceGroupForProjectRow,
+    ResourceGroupRow,
+)
 from ai.backend.manager.models.resource_policy.row import (
     KeyPairResourcePolicyRow,
     ProjectResourcePolicyRow,
@@ -647,6 +655,7 @@ _SEED_TABLES: list[Table | type[HasTable]] = [
     NotificationChannelRow,
     NotificationRuleRow,
     IdleCheckerRow,
+    IdleCheckerBindingRow,
     ContainerRegistryRow,
     ObjectStorageRow,
     StorageNamespaceRow,
@@ -664,8 +673,12 @@ _SEED_TABLES: list[Table | type[HasTable]] = [
     UserRow,
     KeyPairRow,
     ProjectRow,
+    AssociationContainerRegistriesGroupsRow,
     SessionTemplateRow,
     ResourceGroupRow,
+    ResourceGroupForDomainRow,
+    ResourceGroupForProjectRow,
+    ResourceGroupForKeypairsRow,
     RoleRow,
     UserRoleRow,
     VFSStorageRow,
@@ -911,6 +924,25 @@ def idle_checker_ids() -> list[str]:
 
 
 @pytest.fixture
+def idle_checker_assignment_seed_dir(
+    tmp_path: Path, idle_checker_seed_dir: Path, domain_seed_dir: Path
+) -> Path:
+    """The `idle_checker` and `domain` directories plus one `idle_checker_assignment` seed
+    file applying every checker to the default domain."""
+    directory = tmp_path / "idle_checker_assignment"
+    directory.mkdir()
+    domain_id = _DOMAINS["default.yaml"]["id"]
+    items = [
+        {"idle_checker_id": checker["id"], "scope_type": "domain", "scope_id": domain_id}
+        for checker in _IDLE_CHECKERS
+    ]
+    (directory / "assignments.yaml").write_text(
+        yaml.safe_dump({"kind": "idle_checker_assignment", "version": 1, "items": items})
+    )
+    return tmp_path
+
+
+@pytest.fixture
 def container_registry_seed_dir(tmp_path: Path) -> Path:
     """A directory with one `container_registry` seed file."""
     directory = tmp_path / "container_registry"
@@ -919,6 +951,24 @@ def container_registry_seed_dir(tmp_path: Path) -> Path:
         yaml.safe_dump({"kind": "container_registry", "version": 1, "items": _CONTAINER_REGISTRIES})
     )
     return directory
+
+
+@pytest.fixture
+def container_registry_project_seed_dir(project_seed_dir: Path) -> Path:
+    """The project directory plus the registries and the projects allowed on them, the
+    research project taking the first registry as its default."""
+    (project_seed_dir / "registries.yaml").write_text(
+        yaml.safe_dump({"kind": "container_registry", "version": 1, "items": _CONTAINER_REGISTRIES})
+    )
+    research = _PROJECTS["research.yaml"]["id"]
+    allowed = [
+        {"registry_id": _CONTAINER_REGISTRIES[0]["id"], "project_id": research, "is_default": True},
+        {"registry_id": _CONTAINER_REGISTRIES[1]["id"], "project_id": research},
+    ]
+    (project_seed_dir / "allowed-registries.yaml").write_text(
+        yaml.safe_dump({"kind": "container_registry_project", "version": 1, "items": allowed})
+    )
+    return project_seed_dir
 
 
 @pytest.fixture
@@ -1198,6 +1248,50 @@ def role_kind_seed_dir(project_seed_dir: Path) -> Path:
     for file_name, role in _SCOPED_ROLES.items():
         (project_seed_dir / f"role-{file_name}").write_text(
             yaml.safe_dump({"kind": "role", "version": 1, "items": [role]})
+        )
+    return project_seed_dir
+
+
+@pytest.fixture
+def resource_group_allow_seed_dir(project_seed_dir: Path) -> Path:
+    """The project directory plus the users, the resource groups and one file per resource
+    group allow kind, linking each to the `default` resource group."""
+    (project_seed_dir / "keypair_resource_policy.yaml").write_text(
+        yaml.safe_dump({
+            "kind": "keypair_resource_policy",
+            "version": 1,
+            "items": [_RESOURCE_POLICIES["keypair_resource_policy"]],
+        })
+    )
+    for file_name, user in _USERS.items():
+        (project_seed_dir / f"user-{file_name}").write_text(
+            yaml.safe_dump({"kind": "user", "version": 1, "items": [user]})
+        )
+    (project_seed_dir / "resource-groups.yaml").write_text(
+        yaml.safe_dump({"kind": "resource_group", "version": 1, "items": _RESOURCE_GROUPS})
+    )
+    resource_group_id = _RESOURCE_GROUPS[0]["id"]
+    admin = _USERS["admin.yaml"]
+    allows: dict[str, list[dict[str, Any]]] = {
+        "resource_group_for_domain": [
+            {"domain_id": domain["id"], "resource_group_id": resource_group_id}
+            for domain in _DOMAINS.values()
+        ],
+        "resource_group_for_project": [
+            {"project_id": _PROJECTS["research.yaml"]["id"], "resource_group_id": resource_group_id}
+        ],
+        "resource_group_for_keypair": [
+            {
+                "access_key": keypair["access_key"],
+                "user_id": admin["id"],
+                "resource_group_id": resource_group_id,
+            }
+            for keypair in admin["keypairs"]
+        ],
+    }
+    for kind, items in allows.items():
+        (project_seed_dir / f"{kind}.yaml").write_text(
+            yaml.safe_dump({"kind": kind, "version": 1, "items": items})
         )
     return project_seed_dir
 

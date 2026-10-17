@@ -64,6 +64,11 @@ _CASES: Final[list[IdempotenceCase]] = [
     IdempotenceCase(SeedKind.ROLE, "role_kind_seed_dir"),
     IdempotenceCase(SeedKind.SESSION_TEMPLATE, "session_template_seed_dir"),
     IdempotenceCase(SeedKind.PROJECT_MEMBER, "project_member_seed_dir"),
+    IdempotenceCase(SeedKind.RESOURCE_GROUP_FOR_DOMAIN, "resource_group_allow_seed_dir"),
+    IdempotenceCase(SeedKind.RESOURCE_GROUP_FOR_PROJECT, "resource_group_allow_seed_dir"),
+    IdempotenceCase(SeedKind.RESOURCE_GROUP_FOR_KEYPAIR, "resource_group_allow_seed_dir"),
+    IdempotenceCase(SeedKind.CONTAINER_REGISTRY_PROJECT, "container_registry_project_seed_dir"),
+    IdempotenceCase(SeedKind.IDLE_CHECKER_ASSIGNMENT, "idle_checker_assignment_seed_dir"),
 ]
 
 

@@ -7,9 +7,13 @@ from ai.backend.manager.seed.app_config_definition.seed import AppConfigDefiniti
 from ai.backend.manager.seed.app_config_fragment.seed import AppConfigFragmentSeed
 from ai.backend.manager.seed.client_ip_masking_policy.seed import ClientIPMaskingPolicySeed
 from ai.backend.manager.seed.container_registry.seed import ContainerRegistrySeed
+from ai.backend.manager.seed.container_registry_project.seed import (
+    ContainerRegistryProjectSeed,
+)
 from ai.backend.manager.seed.deployment_preset.seed import DeploymentPresetSeed
 from ai.backend.manager.seed.domain.seed import DomainSeed
 from ai.backend.manager.seed.idle_checker.seed import IdleCheckerSeed
+from ai.backend.manager.seed.idle_checker_assignment.seed import IdleCheckerAssignmentSeed
 from ai.backend.manager.seed.login_client_type.seed import LoginClientTypeSeed
 from ai.backend.manager.seed.notification_channel.seed import NotificationChannelSeed
 from ai.backend.manager.seed.notification_rule.seed import NotificationRuleSeed
@@ -22,6 +26,11 @@ from ai.backend.manager.seed.prometheus_query_preset_category.seed import (
 )
 from ai.backend.manager.seed.registry import SeedKindRegistry
 from ai.backend.manager.seed.resource_group.seed import ResourceGroupSeed
+from ai.backend.manager.seed.resource_group_allow.seed import (
+    ResourceGroupForDomainSeed,
+    ResourceGroupForKeypairSeed,
+    ResourceGroupForProjectSeed,
+)
 from ai.backend.manager.seed.resource_policy.seed import (
     KeyPairResourcePolicySeed,
     ProjectResourcePolicySeed,
@@ -77,4 +86,9 @@ def create_seed_kind_registry() -> SeedKindRegistry:
         SeedKind.ROLE: (1, RoleSeed),
         SeedKind.SESSION_TEMPLATE: (1, SessionTemplateSeed),
         SeedKind.PROJECT_MEMBER: (1, ProjectMemberSeed),
+        SeedKind.RESOURCE_GROUP_FOR_DOMAIN: (1, ResourceGroupForDomainSeed),
+        SeedKind.RESOURCE_GROUP_FOR_PROJECT: (1, ResourceGroupForProjectSeed),
+        SeedKind.RESOURCE_GROUP_FOR_KEYPAIR: (1, ResourceGroupForKeypairSeed),
+        SeedKind.CONTAINER_REGISTRY_PROJECT: (1, ContainerRegistryProjectSeed),
+        SeedKind.IDLE_CHECKER_ASSIGNMENT: (1, IdleCheckerAssignmentSeed),
     })
