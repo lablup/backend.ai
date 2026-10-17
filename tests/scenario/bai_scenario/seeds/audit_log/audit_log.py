@@ -32,7 +32,8 @@ class TestSeedAuditRecord[Owner](TestSeedFieldCreator[Owner, AuditLogData]):
     """One record of an operation on the entity ``owner_of`` reads off the laid row.
 
     The record's ``triggered_by`` is a user id, or none; the actor axis of a scoped read
-    matches on it while the entity axis matches on the owner.
+    matches on it while the entity axis matches on the owner. Records given the same
+    ``action_id`` are rows of one run; without one, each record is its own run.
     """
 
     owner_of: Callable[[Owner], EntityIdentifier]
@@ -40,6 +41,7 @@ class TestSeedAuditRecord[Owner](TestSeedFieldCreator[Owner, AuditLogData]):
     created_at: datetime
     status: OperationStatus = OperationStatus.SUCCESS
     triggered_by: UserID | None = None
+    action_id: UUID | None = None
 
     @override
     def kind(self) -> str:
@@ -48,6 +50,8 @@ class TestSeedAuditRecord[Owner](TestSeedFieldCreator[Owner, AuditLogData]):
             parts.append(f"{self.status.value} 상태")
         if self.triggered_by is not None:
             parts.append("실행한 사용자가 정해져 있음")
+        if self.action_id is not None:
+            parts.append("다른 기록과 같은 실행에서 남음")
         return ", ".join(parts)
 
     @override
@@ -57,7 +61,7 @@ class TestSeedAuditRecord[Owner](TestSeedFieldCreator[Owner, AuditLogData]):
     @override
     def seed(self) -> SingleEntityAuditLogCreator:
         return SingleEntityAuditLogCreator(
-            action_id=uuid4(),
+            action_id=self.action_id if self.action_id is not None else uuid4(),
             operation=self.operation,
             action_name=self.operation,
             created_at=self.created_at,

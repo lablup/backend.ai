@@ -52,6 +52,11 @@ class TestAuditLogAdapterConvertFilter:
         conditions = _make_adapter()._convert_filter(filter_dto)
         assert len(conditions) == 2
 
+    def test_action_id_filter_produces_one_condition(self) -> None:
+        filter_dto = AuditLogFilter(action_id=UUIDFilter(equals=uuid.uuid4()))
+        conditions = _make_adapter()._convert_filter(filter_dto)
+        assert len(conditions) == 1
+
     def test_action_fields_produce_one_condition_each(self) -> None:
         filter_dto = AuditLogFilter(
             action_name=StringFilter(equals="get_session"),

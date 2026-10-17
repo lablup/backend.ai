@@ -15,6 +15,7 @@
 
 | 시나리오 | 판정 |
 |---|---|
+| [한 실행이 여러 엔티티에 기록을 남겼을 때 그 실행 필터로 검색하면, 그 실행이 남긴 기록이 모두, 그리고 그것만 반환된다](#searching-a-run-filter-answers-every-record-the-run-left-and-only-those) | 성공 |
 | [성공 기록과 거부 기록이 섞여 있을 때 성공 상태 필터로 검색하면, 성공한 기록만 반환된다](#searching-a-status-filter-narrows-the-answer-to-the-status-it-names) | 성공 |
 | [두 사용자가 각각 기록을 남겼을 때 한 사용자 필터로 검색하면, 그 사용자가 실행한 기록만 반환된다](#searching-an-actor-filter-narrows-the-answer-to-the-user-who-triggered-it) | 성공 |
 | [페이지 크기를 지정하지 않고 검색하면, 10건까지 반환되고 다음 페이지가 있다고 응답한다](#searching-omitting-the-page-size-caps-the-page-and-says-more-follow) | 성공 |
@@ -42,6 +43,7 @@
 | 시나리오 | 판정 |
 |---|---|
 | [다른 엔티티에 대한 기록이 한 프로젝트를 스코프로 달고 있을 때 그 프로젝트를 지정해 검색하면, 대상 엔티티가 그 프로젝트가 아니어도 그 기록이 반환된다](#scoped_searching-a-record-tagged-with-a-scope-is-found-by-searching-that-scope) | 성공 |
+| [한 엔티티에 두 실행이 남긴 기록이 있을 때 그것을 지정하고 한 실행 필터로 검색하면, 그 실행이 남긴 기록만 모두 반환된다](#scoped_searching-a-run-filter-narrows-within-the-named-scope) | 성공 |
 | [한 엔티티에 성공 기록과 거부 기록이 있을 때 그것을 지정하고 성공 상태 필터로 검색하면, 성공한 기록만 반환된다](#scoped_searching-a-status-filter-narrows-within-the-named-scope) | 성공 |
 | [두 사용자가 각각 기록을 남겼고 한 사용자에 읽기 권한을 받은 사용자가 그 사용자를 실행한 사용자로 지정해 검색하면, 그 사용자가 실행한 기록만 반환된다](#scoped_searching-a-user-granted-read-on-an-actor-reads-only-what-that-actor-triggered) | 성공 |
 | [두 엔티티에 기록이 하나씩 있고 한쪽에만 읽기 권한을 받은 사용자가 그 엔티티를 지정해 검색하면, 그 엔티티의 기록만 반환된다](#scoped_searching-a-user-granted-read-on-an-entity-reads-only-that-entitys-records) | 성공 |
@@ -73,6 +75,71 @@
 | [아무 권한도 받지 않은 모니터 역할 사용자가 검색하면, 권한 부족으로 거부된다. 이 검색은 권한 그래프로 보호된다](#scope_searching-the-monitor-role-without-a-grant-is-refused) | 거부 |
 
 ### admin_search
+
+<a id="searching-a-run-filter-answers-every-record-the-run-left-and-only-those"></a>
+
+#### [a-run-filter-answers-every-record-the-run-left-and-only-those](/tests/scenario/bai_scenario/manager/audit_log/test_searching.py) — pass
+
+한 실행이 여러 엔티티에 기록을 남겼을 때 그 실행 필터로 검색하면, 그 실행이 남긴 기록이 모두, 그리고 그것만 반환된다
+
+Given
+
+- 한 실행이 두 사용자에 하나씩 남긴 기록, 다른 실행이 남긴 기록 하나와, 슈퍼관리자 한 명
+  - 도메인 home-1
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+    - 사용자 정책 user-policy-2: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
+    - 일반 사용자 user-2: 자기 키와 개인 프로젝트를 갖는다
+    - 사용자 정책 user-policy-3: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-3: 동시 세션 5개까지
+    - 슈퍼관리자 user-3: 자기 키와 개인 프로젝트를 갖는다
+  - 일반 사용자 user-1: 'edited' 기록, 다른 기록과 같은 실행에서 남음
+  - 일반 사용자 user-2: 'created' 기록, 다른 기록과 같은 실행에서 남음
+  - 일반 사용자 user-1: 'ran-separately' 기록
+
+When
+
+- AuditLogAdapter.admin_search — user-3이 실행 필터로 검색
+
+Then
+
+- 지정한 기록이 순서대로, 그리고 그것만 반환된다
+  - item_count = 2
+  - total_count = 2
+  - has_next_page = False
+  - has_previous_page = False
+  - id: 무시함 — 데이터베이스가 만든다
+  - action_id: 무시함 — 실행마다 새로 생성된다
+  - operation = 'edited'
+  - entity_type = 'user'
+  - entity_id: 기록의 대상 엔티티와 같다
+  - target_entity_id: 기록의 대상 엔티티와 같다
+  - status = <AuditLogStatus.SUCCESS: 'success'>
+  - description = 'edited was recorded'
+  - created_at = datetime.datetime(2026, 1, 2, 0, 0, tzinfo=datetime.timezone.utc)
+  - request_id = None
+  - acted_as = None
+  - duration = None
+  - client_ip = None
+  - triggered_by = None
+  - id: 무시함 — 데이터베이스가 만든다
+  - action_id: 무시함 — 실행마다 새로 생성된다
+  - operation = 'created'
+  - entity_type = 'user'
+  - entity_id: 기록의 대상 엔티티와 같다
+  - target_entity_id: 기록의 대상 엔티티와 같다
+  - status = <AuditLogStatus.SUCCESS: 'success'>
+  - description = 'created was recorded'
+  - created_at = datetime.datetime(2026, 1, 1, 0, 0, tzinfo=datetime.timezone.utc)
+  - request_id = None
+  - acted_as = None
+  - duration = None
+  - client_ip = None
+  - triggered_by = None
 
 <a id="searching-a-status-filter-narrows-the-answer-to-the-status-it-names"></a>
 
@@ -768,6 +835,69 @@ Then
   - status = <AuditLogStatus.SUCCESS: 'success'>
   - description = 'linked was recorded'
   - created_at = datetime.datetime(2026, 1, 2, 0, 0, tzinfo=datetime.timezone.utc)
+  - request_id = None
+  - acted_as = None
+  - duration = None
+  - client_ip = None
+  - triggered_by = None
+
+<a id="scoped_searching-a-run-filter-narrows-within-the-named-scope"></a>
+
+#### [a-run-filter-narrows-within-the-named-scope](/tests/scenario/bai_scenario/manager/audit_log/test_scoped_searching.py) — pass
+
+한 엔티티에 두 실행이 남긴 기록이 있을 때 그것을 지정하고 한 실행 필터로 검색하면, 그 실행이 남긴 기록만 모두 반환된다
+
+Given
+
+- 한 실행이 남긴 기록 둘과 다른 실행이 남긴 기록 하나를 가진 프로젝트 하나와, 읽기 권한을 받은 사용자 한 명
+  - 도메인 home-1
+  - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+  - 프로젝트 team-1
+  - 프로젝트 team-1: 'edited' 기록, 다른 기록과 같은 실행에서 남음
+  - 프로젝트 team-1: 'created' 기록, 다른 기록과 같은 실행에서 남음
+  - 프로젝트 team-1: 'ran-separately' 기록
+  - 도메인에 속한 사용자 한 명 준비
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+  - 역할 record-reader-1: 이 역할이 앉은 스코프 안에서만 통한다
+  - 역할 record-reader-1: project 전체에 READ 허용
+  - 일반 사용자 user-1: 역할 record-reader-1 보유
+
+When
+
+- AuditLogAdapter.scoped_search — user-1이 엔티티를 지정하고 실행 필터로 검색
+
+Then
+
+- 지정한 기록이 순서대로, 그리고 그것만 반환된다
+  - item_count = 2
+  - total_count = 2
+  - has_next_page = False
+  - has_previous_page = False
+  - id: 무시함 — 데이터베이스가 만든다
+  - action_id: 무시함 — 실행마다 새로 생성된다
+  - operation = 'edited'
+  - entity_type = 'project'
+  - entity_id: 기록의 대상 엔티티와 같다
+  - target_entity_id: 기록의 대상 엔티티와 같다
+  - status = <AuditLogStatus.SUCCESS: 'success'>
+  - description = 'edited was recorded'
+  - created_at = datetime.datetime(2026, 1, 2, 0, 0, tzinfo=datetime.timezone.utc)
+  - request_id = None
+  - acted_as = None
+  - duration = None
+  - client_ip = None
+  - triggered_by = None
+  - id: 무시함 — 데이터베이스가 만든다
+  - action_id: 무시함 — 실행마다 새로 생성된다
+  - operation = 'created'
+  - entity_type = 'project'
+  - entity_id: 기록의 대상 엔티티와 같다
+  - target_entity_id: 기록의 대상 엔티티와 같다
+  - status = <AuditLogStatus.SUCCESS: 'success'>
+  - description = 'created was recorded'
+  - created_at = datetime.datetime(2026, 1, 1, 0, 0, tzinfo=datetime.timezone.utc)
   - request_id = None
   - acted_as = None
   - duration = None

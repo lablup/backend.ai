@@ -13,7 +13,7 @@ from typing import Any, override
 import pytest
 
 from ai.backend.common.data.user.types import UserRole
-from ai.backend.common.dto.manager.query import StringFilter
+from ai.backend.common.dto.manager.query import StringFilter, UUIDFilter
 from ai.backend.common.dto.manager.v2.audit_log.request import (
     AdminSearchAuditLogsInput,
     AuditLogFilter,
@@ -36,6 +36,7 @@ from bai_scenario.components.answers import TheCallIsRefused
 from bai_scenario.components.audit_log import (
     ManyRecordsGlobally,
     MixedStatusGlobally,
+    OneRunGlobally,
     RecordsAndACaller,
     ThePageIsCapped,
     TheRecordsAnswered,
@@ -113,6 +114,28 @@ class SearchingByTriggeredUser(When[RecordsAndACaller, AuditLogAdapter, Searched
                     filter=AuditLogFilter(
                         triggered_by=StringFilter(equals=str(laid.filter_triggered))
                     )
+                )
+            )
+
+
+@dataclass(frozen=True)
+class SearchingByRun(When[RecordsAndACaller, AuditLogAdapter, Searched]):
+    """한 실행의 기록을 필터로 검색한다."""
+
+    @override
+    def operation(self) -> str:
+        return "admin_search"
+
+    @override
+    def describe(self, laid: RecordsAndACaller) -> str:
+        return f"{laid.caller.username}이 실행 필터로 검색"
+
+    @override
+    async def call(self, adapter: AuditLogAdapter, laid: RecordsAndACaller) -> Searched:
+        with ActingAs(laid.caller):
+            return await adapter.admin_search(
+                AdminSearchAuditLogsInput(
+                    filter=AuditLogFilter(action_id=UUIDFilter(equals=laid.filter_action))
                 )
             )
 
@@ -357,6 +380,31 @@ class AnActorFilterNarrowsToOneUser(
 
 
 @dataclass(frozen=True)
+class ARunFilterNarrowsToOneRun(
+    Scenario[TestSeedingSession, RecordsAndACaller, AuditLogAdapter, Searched]
+):
+    @override
+    def summary(self) -> str:
+        return "a-run-filter-answers-every-record-the-run-left-and-only-those"
+
+    @override
+    def describe(self) -> str:
+        return "한 실행이 여러 엔티티에 기록을 남겼을 때 그 실행 필터로 검색하면, 그 실행이 남긴 기록이 모두, 그리고 그것만 반환된다"
+
+    @override
+    def given(self) -> Given[TestSeedingSession, RecordsAndACaller]:
+        return OneRunGlobally()
+
+    @override
+    def when(self) -> When[RecordsAndACaller, AuditLogAdapter, Searched]:
+        return SearchingByRun()
+
+    @override
+    def then(self) -> Then[RecordsAndACaller, Searched]:
+        return TheRecordsAnswered()
+
+
+@dataclass(frozen=True)
 class TwoPaginationModesAreRefused(
     Scenario[TestSeedingSession, RecordsAndACaller, AuditLogAdapter, Searched]
 ):
@@ -414,6 +462,7 @@ SCENARIOS: list[SearchingStep] = [
     OmittingThePageSizeCapsThePage(),
     AStatusFilterNarrowsToSuccess(),
     AnActorFilterNarrowsToOneUser(),
+    ARunFilterNarrowsToOneRun(),
     TwoPaginationModesAreRefused(),
     ABrokenCursorIsRefused(),
 ]

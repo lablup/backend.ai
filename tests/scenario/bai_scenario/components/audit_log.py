@@ -64,6 +64,7 @@ OP_MINE = "acted-by-me"
 OP_THEIRS = "acted-by-another"
 OP_SCOPED = "linked"
 OP_TRIGGERED = "acted-on-a-project"
+OP_OTHER_RUN = "ran-separately"
 
 
 @dataclass(frozen=True)
@@ -124,11 +125,13 @@ def look_node(node: AuditLogNode, expected: ExpectedRecord, *, at: str = "") -> 
 @dataclass(frozen=True)
 class RecordsAndACaller:
     """Records that exist and the person asking. ``visible`` is the answer expected,
-    newest first; ``filter_triggered`` is the actor a filtering read narrows to."""
+    newest first; ``filter_triggered`` is the actor a filtering read narrows to, and
+    ``filter_action`` the run."""
 
     caller: UserData
     visible: tuple[ExpectedRecord, ...]
     filter_triggered: UUID | None = None
+    filter_action: UUID | None = None
 
 
 @dataclass(frozen=True)
@@ -143,11 +146,13 @@ class RecordsToLoad:
 
 @dataclass(frozen=True)
 class ScopedEntities:
-    """The entity ids a scoped read names, and the answer expected of it."""
+    """The entity ids a scoped read names, and the answer expected of it. ``filter_action``
+    is the run a filtering read narrows to."""
 
     caller: UserData
     named: tuple[UUID, ...]
     visible: tuple[ExpectedRecord, ...]
+    filter_action: UUID | None = None
 
 
 @dataclass(frozen=True)
@@ -387,6 +392,55 @@ class TwoActorsGlobally(Given[Any, RecordsAndACaller]):
 
 
 @dataclass(frozen=True)
+class OneRunGlobally(Given[Any, RecordsAndACaller]):
+    """One run that left a record on each of two users, another run's record on the first
+    user, and a superadmin caller narrowing to the first run."""
+
+    @override
+    def describe(self) -> str:
+        return (
+            "한 실행이 두 사용자에 하나씩 남긴 기록, 다른 실행이 남긴 기록 하나와, 슈퍼관리자 한 명"
+        )
+
+    @override
+    async def lay(self, seeding: TestSeedingSession) -> RecordsAndACaller:
+        domain = await seeding.creating(TestSeedDomain(name_hint="home", description=WAS_HERE))
+        first = await seeding.within(SomeoneOf(domain))
+        second = await seeding.within(SomeoneOf(domain))
+        run = uuid4()
+        await seeding.adding(
+            TestSeedAuditRecord(
+                owner_of=lambda u: UserID(u.id), operation=OP_LATE, created_at=LATE, action_id=run
+            ),
+            first,
+        )
+        await seeding.adding(
+            TestSeedAuditRecord(
+                owner_of=lambda u: UserID(u.id),
+                operation=OP_EARLY,
+                created_at=EARLY,
+                action_id=run,
+            ),
+            second,
+        )
+        await seeding.adding(
+            TestSeedAuditRecord(
+                owner_of=lambda u: UserID(u.id), operation=OP_OTHER_RUN, created_at=LATE
+            ),
+            first,
+        )
+        caller = await seeding.within(SomeoneOf(domain, role=UserRole.SUPERADMIN))
+        return RecordsAndACaller(
+            seeding.made(caller),
+            (
+                ExpectedRecord(OP_LATE, "user", seeding.made(first).id, LATE),
+                ExpectedRecord(OP_EARLY, "user", seeding.made(second).id, EARLY),
+            ),
+            filter_action=run,
+        )
+
+
+@dataclass(frozen=True)
 class ManyRecordsGlobally(Given[Any, RecordsAndACaller]):
     """More records than one default page holds, with a superadmin caller."""
 
@@ -549,6 +603,68 @@ class OneProjectMixedStatus(Given[Any, ScopedEntities]):
         pid = seeding.made(project).id
         return ScopedEntities(
             seeding.made(caller), (pid,), (ExpectedRecord(OP_OK, "project", pid, LATE),)
+        )
+
+
+@dataclass(frozen=True)
+class OneProjectOneRun(Given[Any, ScopedEntities]):
+    """A single project holding two records of one run and a record of another run, with
+    a caller granted READ on it."""
+
+    @override
+    def describe(self) -> str:
+        return (
+            "한 실행이 남긴 기록 둘과 다른 실행이 남긴 기록 하나를 가진 프로젝트 하나와, 읽기 "
+            "권한을 받은 사용자 한 명"
+        )
+
+    @override
+    async def lay(self, seeding: TestSeedingSession) -> ScopedEntities:
+        domain = await seeding.creating(TestSeedDomain(name_hint="home", description=WAS_HERE))
+        policy = await seeding.once(TestSeedProjectPolicy())
+        project = await seeding.creating_from_two(TestSeedProject(name_hint="team"), domain, policy)
+        run = uuid4()
+        await seeding.adding(
+            TestSeedAuditRecord(
+                owner_of=lambda p: ProjectID(p.id),
+                operation=OP_LATE,
+                created_at=LATE,
+                action_id=run,
+            ),
+            project,
+        )
+        await seeding.adding(
+            TestSeedAuditRecord(
+                owner_of=lambda p: ProjectID(p.id),
+                operation=OP_EARLY,
+                created_at=EARLY,
+                action_id=run,
+            ),
+            project,
+        )
+        await seeding.adding(
+            TestSeedAuditRecord(
+                owner_of=lambda p: ProjectID(p.id), operation=OP_OTHER_RUN, created_at=LATE
+            ),
+            project,
+        )
+        caller = await seeding.within(SomeoneOf(domain))
+        await grant_reading(
+            seeding,
+            project,
+            caller,
+            entity_type=ProjectEntityType(),
+            scope_of=lambda p: ProjectID(p.id),
+        )
+        pid = seeding.made(project).id
+        return ScopedEntities(
+            seeding.made(caller),
+            (pid,),
+            (
+                ExpectedRecord(OP_LATE, "project", pid, LATE),
+                ExpectedRecord(OP_EARLY, "project", pid, EARLY),
+            ),
+            filter_action=run,
         )
 
 
