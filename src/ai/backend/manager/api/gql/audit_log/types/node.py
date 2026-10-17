@@ -195,7 +195,7 @@ class AuditLogV2GQL(PydanticNodeMixin[AuditLogNode]):
         if self.entity_type is None or self.target_entity_id is None:
             return None
         return await info.context.data_loaders.entity_node_loader.load(
-            RuntimeEntityID(EntityType(self.entity_type), self.target_entity_id)
+            RuntimeEntityID(EntityType.from_name(self.entity_type), self.target_entity_id)
         )
 
     @gql_added_field(
