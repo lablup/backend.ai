@@ -6,6 +6,7 @@ import ipaddress
 import json
 import logging
 import uuid
+import warnings
 from collections.abc import (
     Callable,
     Mapping,
@@ -1151,6 +1152,18 @@ async def populate_fixture(
     engine: SAEngine,
     fixture_data: Mapping[str, str | Sequence[dict[str, Any]]],
 ) -> None:
+    """Deprecated: write seed files with `mgr seed apply` instead. Removed in the next LTS.
+
+    A fixture without the RBAC rows of the entities it writes may leave them unreachable through
+    permission checks."""
+    warnings.warn(
+        "populate_fixture() is deprecated and will be removed in the next LTS; use"
+        " `mgr seed apply`. A fixture without the RBAC rows (virtual_entities,"
+        " entity_memberships, scope_bindings) of the entities it writes may leave them"
+        " unreachable through permission checks.",
+        DeprecationWarning,
+        stacklevel=2,
+    )
     ensure_all_tables_registered()
     op_mode = FixtureOpModes(cast(str, fixture_data.get("__mode", "insert")))
     for table_name, rows in fixture_data.items():
