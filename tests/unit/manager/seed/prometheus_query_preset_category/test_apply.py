@@ -121,7 +121,7 @@ class TestApply:
         assert results[SeedKind.PROMETHEUS_QUERY_PRESET_CATEGORY].succeeded == [_CONTAINER, _VLLM]
         assert await _categories(db) == {
             _CONTAINER: ("container", "Container-level utilization metrics"),
-            _VLLM: ("vllm-inference", None),
+            _VLLM: ("vllm-inference", "added through the API"),
         }
 
     async def test_a_name_taken_by_another_row_skips_only_that_item(

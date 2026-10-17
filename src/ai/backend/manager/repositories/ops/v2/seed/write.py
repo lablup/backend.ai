@@ -4,7 +4,7 @@ savepoint per item. A relation or roster item goes through the primitive its API
 from __future__ import annotations
 
 from collections.abc import Sequence
-from typing import assert_never
+from typing import Any, assert_never
 
 import sqlalchemy as sa
 
@@ -17,6 +17,7 @@ from ai.backend.manager.errors.permission import VirtualEntityNotFound
 from ai.backend.manager.errors.repository import ForeignKeyViolationError, RepositoryIntegrityError
 from ai.backend.manager.errors.resource import ProjectMemberNotJoinableError
 from ai.backend.manager.models.project.row import ProjectRow, ProjectType
+from ai.backend.manager.models.specs.upserter import EntityUpserter, FieldUpserter
 from ai.backend.manager.models.virtual_entity.queries import user_scope_membership_exists
 from ai.backend.manager.models.virtual_entity.virtual_entity import VirtualEntityRow
 from ai.backend.manager.repositories.ops.v2.relation.write import V2RelationWriteOps
@@ -132,8 +133,7 @@ class V2SeedWriteOps(V2RelationWriteOps, V2RosterWriteOps, V2ResourcePolicyWrite
         entity = await self.insert_entity_if_absent(write.upserter)
         written = entity.inserted
         if overwrite and not entity.inserted:
-            await self.upsert_entity(write.upserter)
-            written = bool(write.upserter.build_update_values())
+            written = await self._overwrite_entity(write.upserter)
         if overwrite:
             for purger in write.field_purgers:
                 await self.batch_purge_field_entities(entity.entity_id, purger)
@@ -146,9 +146,9 @@ class V2SeedWriteOps(V2RelationWriteOps, V2RosterWriteOps, V2ResourcePolicyWrite
             for upserter, is_new in zip(write.field_upserters, inserted, strict=True)
             if not is_new
         ]
-        if overwrite and standing:
-            await self.atomic_upsert_field_entities(entity.entity_id, standing)
-            written = written or any(upserter.build_update_values() for upserter in standing)
+        if overwrite:
+            for upserter in standing:
+                written = await self._overwrite_field(entity.entity_id, upserter) or written
         for user_id in write.granted_users:
             granted = await self.grant_roles(user_id, [RoleID(entity.entity_id)])
             written = written or any(granted)
@@ -156,3 +156,30 @@ class V2SeedWriteOps(V2RelationWriteOps, V2RosterWriteOps, V2ResourcePolicyWrite
         if written:
             await self._restate_resource_policy_shares(entity.entity_id)
         return written
+
+    async def _overwrite_entity(self, upserter: EntityUpserter[Any, Any]) -> bool:
+        """Update the entity row with the values its spec states, leaving a column whose
+        value is None as it stands. Whether any value was left to write."""
+        values = {k: v for k, v in upserter.build_update_values().items() if v is not None}
+        await self._upsert_row_returning(
+            upserter.row_class(),
+            upserter.index_elements(),
+            upserter.build_insert_values(),
+            values,
+            upserter.integrity_error_checks(),
+        )
+        return bool(values)
+
+    async def _overwrite_field(
+        self, owner_id: EntityIdentifier, upserter: FieldUpserter[Any, Any, Any]
+    ) -> bool:
+        """:meth:`_overwrite_entity` for a field row of the owner."""
+        values = {k: v for k, v in upserter.build_update_values().items() if v is not None}
+        await self._upsert_row_returning(
+            upserter.row_class(),
+            upserter.index_elements(),
+            upserter.build_insert_values(owner_id),
+            values,
+            upserter.integrity_error_checks(),
+        )
+        return bool(values)

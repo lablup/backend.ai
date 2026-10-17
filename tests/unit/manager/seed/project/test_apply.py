@@ -10,6 +10,7 @@ import sqlalchemy as sa
 
 from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.entity.project import ProjectEntityType, ProjectID
+from ai.backend.common.data.entity.resource_policy import ProjectResourcePolicyUUID
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.project.types import ProjectType
@@ -289,6 +290,26 @@ class TestApply:
     ) -> None:
         orphan = research.model_copy(
             update={"id": ProjectID(uuid.uuid4()), "domain_id": DomainID(uuid.uuid4())}
+        )
+
+        [result] = await repository.partial_write([orphan.write()], overwrite=False)
+
+        assert result.error is not None
+        assert str(orphan.id) not in await _projects(db)
+
+    async def test_a_resource_policy_that_is_not_there_fails_the_item(
+        self,
+        db: ExtendedAsyncSAEngine,
+        repository: SeedRepository,
+        applied: None,
+        research: ProjectSeed,
+    ) -> None:
+        orphan = research.model_copy(
+            update={
+                "id": ProjectID(uuid.uuid4()),
+                "name": "no-policy",
+                "resource_policy_id": ProjectResourcePolicyUUID(uuid.uuid4()),
+            }
         )
 
         [result] = await repository.partial_write([orphan.write()], overwrite=False)

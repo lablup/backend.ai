@@ -10,12 +10,14 @@ import sqlalchemy as sa
 
 from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.entity.global_entity import GlobalEntityName
+from ai.backend.common.data.entity.resource_policy import UserResourcePolicyUUID
 from ai.backend.common.data.entity.types import EntityIdentifier
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.manager.data.permission.global_entity import global_entity_id
 from ai.backend.manager.data.user.types import UserData, UserStatus
 from ai.backend.manager.models.domain.row import DomainRow
 from ai.backend.manager.models.hasher.types import PasswordInfo
+from ai.backend.manager.models.resource_policy.row import UserResourcePolicyRow
 from ai.backend.manager.models.specs.types import IntegrityErrorCheck
 from ai.backend.manager.models.specs.upserter import EntityUpserter
 from ai.backend.manager.models.user.row import UserRole, UserRow
@@ -41,7 +43,7 @@ class UserUpserter(EntityUpserter[UserRow, UserData]):
     status: UserStatus
     status_info: str | None
     role: UserRole
-    resource_policy: str
+    resource_policy_id: UserResourcePolicyUUID
     allowed_client_ip: list[str] | None
     sudo_session_enabled: bool
     container_uid: int | None
@@ -71,8 +73,8 @@ class UserUpserter(EntityUpserter[UserRow, UserData]):
 
     @override
     def build_insert_values(self) -> dict[str, Any]:
-        """A domain id naming no row leaves ``domain_name`` NULL, which the column
-        refuses."""
+        """A domain or resource policy id naming no row leaves its name column NULL,
+        which the column refuses."""
         return {
             "uuid": self.id,
             "domain_id": self.domain_id,
@@ -99,7 +101,9 @@ class UserUpserter(EntityUpserter[UserRow, UserData]):
             "status": self.status,
             "status_info": self.status_info,
             "role": self.role,
-            "resource_policy": self.resource_policy,
+            "resource_policy": sa.select(UserResourcePolicyRow.name)
+            .where(UserResourcePolicyRow.uuid == self.resource_policy_id)
+            .scalar_subquery(),
             "allowed_client_ip": self.allowed_client_ip,
             "sudo_session_enabled": self.sudo_session_enabled,
             "container_uid": self.container_uid,

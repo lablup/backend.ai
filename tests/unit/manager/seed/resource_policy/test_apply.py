@@ -129,6 +129,8 @@ class TestApply:
 
         await SeedApplier(repository).apply(plan, overwrite=True)
 
+        [keypair_policy] = written[SeedKind.KEYPAIR_RESOURCE_POLICY].values()
+        keypair_policy["max_priority"] = 1
         for kind, row_class in _ROWS.items():
             assert await _rows(db, row_class) == written[kind]
 

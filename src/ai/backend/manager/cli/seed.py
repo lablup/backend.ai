@@ -47,15 +47,19 @@ def check(paths: tuple[Path, ...]) -> None:
 
 @cli.command(name="apply")
 @click.argument("paths", nargs=-1, required=True, type=click.Path(exists=True, path_type=Path))
-@click.option("--overwrite", is_flag=True, help="Rewrite existing rows with the seed values.")
+@click.option(
+    "--overwrite",
+    is_flag=True,
+    help="Rewrite existing rows with the seed values that are not null.",
+)
 @click.pass_obj
 def apply(cli_ctx: CLIContext, paths: tuple[Path, ...], overwrite: bool) -> None:
     """
     Write seed files into the database, kind by kind in the registered order.
 
     A file failing the checks of `check` is skipped and fails the command. A row that
-    exists is kept, or upserted with `--overwrite`; a relation is added and never
-    removed. An item colliding on another unique key is skipped, and one referring to a
+    exists is kept, or upserted with `--overwrite`, a null value leaving its column as it
+    stands; a relation is added and never removed. An item colliding on another unique key is skipped, and one referring to a
     missing row or refused by a rule fails the command. Both are listed, and the rest
     are written.
 

@@ -79,13 +79,13 @@ def _user(user_id: UserID, domain_id: DomainID, name: str) -> UserSeed:
         "email": f"{name}@example.com",
         "username": name,
         "password": f"{name}-password",
-        "resource_policy": "default",
+        "resource_policy_id": str(_USER_POLICY),
         "keypairs": [
             {
                 "access_key": f"AKIA{name.upper():0<16}"[:20],
                 "secret_key": f"{name}-secret",
                 "is_default": True,
-                "resource_policy": "default",
+                "resource_policy_id": str(_KEYPAIR_POLICY),
             }
         ],
     })
@@ -96,7 +96,7 @@ def _project(project_id: ProjectID, name: str, **values: Any) -> ProjectSeed:
         "id": str(project_id),
         "domain_id": str(_DOMAIN),
         "name": name,
-        "resource_policy": "default",
+        "resource_policy_id": str(_PROJECT_POLICY),
         **values,
     })
 

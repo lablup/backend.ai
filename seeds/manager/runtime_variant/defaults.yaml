@@ -1,0 +1,121 @@
+kind: runtime_variant
+version: 1
+items:
+- id: 9f6ef04f-2f8a-4ca8-a1b3-95911f407f92
+  name: vllm
+  description: vLLM
+  reads_vfolder_config_files: false
+  default_model_definition:
+    models:
+    - name: vllm-model
+      service:
+        start_command: vllm serve '{model_path}'
+        port: 8000
+        health_check:
+          enable: true
+          path: /health
+          interval: 10.0
+          max_retries: 10
+          initial_delay: 1800.0
+- id: 525e2627-d633-4e5d-9500-7bd6a10917b0
+  name: nim
+  description: NVIDIA NIM
+  reads_vfolder_config_files: false
+  default_model_definition:
+    models:
+    - name: nim-model
+      service:
+        port: 8000
+        health_check:
+          enable: true
+          path: /v1/health/ready
+          interval: 10.0
+          max_retries: 10
+          initial_delay: 1800.0
+- id: a2f2fe45-ab07-4eb2-929f-d41be1af2f3a
+  name: cmd
+  description: Predefined Image Command
+  reads_vfolder_config_files: false
+  default_model_definition:
+    models:
+    - name: image-model
+      service:
+        port: 8000
+- id: d27435f4-6978-40a0-8dd1-4e7e9f7da92c
+  name: huggingface-tgi
+  description: Huggingface TGI
+  reads_vfolder_config_files: false
+  default_model_definition:
+    models:
+    - name: tgi-model
+      service:
+        start_command: text-generation-launcher --model-id '{model_path}'
+        port: 3000
+        health_check:
+          enable: true
+          path: /info
+          interval: 10.0
+          max_retries: 10
+          initial_delay: 1800.0
+- id: 00aa51c5-4aac-4bc8-9b77-f95da44a6cbe
+  name: sglang
+  description: SGLang
+  reads_vfolder_config_files: false
+  default_model_definition:
+    models:
+    - name: sglang-model
+      service:
+        start_command: python -m sglang.launch_server --model-path '{model_path}'
+        port: 9001
+        health_check:
+          enable: true
+          path: /health
+          interval: 10.0
+          max_retries: 10
+          initial_delay: 1800.0
+- id: e23525a9-8772-4b7b-a11f-80ab01c0eca4
+  name: modular-max
+  description: Modular MAX
+  reads_vfolder_config_files: false
+  default_model_definition:
+    models:
+    - name: max-model
+      service:
+        start_command: max serve --model '{model_path}'
+        port: 8000
+        health_check:
+          enable: true
+          path: /health
+          interval: 10.0
+          max_retries: 10
+          initial_delay: 1800.0
+- id: 8f6babe5-b4c3-41f4-a3c0-36c042498415
+  name: llama-cpp
+  description: llama.cpp
+  reads_vfolder_config_files: false
+  default_model_definition:
+    models:
+    - name: llamacpp-model
+      service:
+        start_command: sh -c 'llama-server -m "$(ls /models/*.gguf | head -n1)" "$@"' llama-cpp
+        port: 8080
+        health_check:
+          path: /health
+          interval: 10.0
+          max_retries: 30
+          initial_delay: 60.0
+- id: 5eb571ea-6b3c-425a-a2b3-cc16921def00
+  name: custom
+  description: Custom (Default)
+  reads_vfolder_config_files: true
+  default_model_definition:
+    models:
+    - name: custom-model
+      service:
+        port: 8080
+        health_check:
+          enable: false
+          path: /health
+          interval: 10.0
+          max_retries: 10
+          initial_delay: 1800.0

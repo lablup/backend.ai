@@ -129,7 +129,7 @@ class TestApply:
         assert results[SeedKind.NOTIFICATION_RULE].succeeded == [_STARTED_ID, _DOWNLOADED_ID]
         assert (await _rules(db))[_STARTED_ID] == {
             "name": "session-started",
-            "description": None,
+            "description": "set through the API",
             "rule_type": "session.started",
             "channel_id": "0198a5a0-0000-7000-8000-00000000c001",
             "message_template": "Session {{ session_id }} started",

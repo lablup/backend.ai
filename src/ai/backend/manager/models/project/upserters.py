@@ -11,6 +11,7 @@ import sqlalchemy as sa
 from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.entity.global_entity import GlobalEntityName
 from ai.backend.common.data.entity.project import ProjectID
+from ai.backend.common.data.entity.resource_policy import ProjectResourcePolicyUUID
 from ai.backend.common.data.entity.types import EntityIdentifier
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.types import ResourceSlot, VFolderHostPermission
@@ -19,6 +20,7 @@ from ai.backend.manager.data.project.types import ProjectData
 from ai.backend.manager.models.domain.row import DomainRow
 from ai.backend.manager.models.project.row import ProjectRow, ProjectType
 from ai.backend.manager.models.project.searchable_fields import ProjectSearchableFields
+from ai.backend.manager.models.resource_policy.row import ProjectResourcePolicyRow
 from ai.backend.manager.models.specs.types import IntegrityErrorCheck
 from ai.backend.manager.models.specs.upserter import EntityUpserter
 
@@ -36,7 +38,7 @@ class ProjectUpserter(EntityUpserter[ProjectRow, ProjectData]):
     project_type: ProjectType
     creator_id: UserID | None
     name: str
-    resource_policy: str
+    resource_policy_id: ProjectResourcePolicyUUID
     description: str | None
     is_active: bool
     total_resource_slots: ResourceSlot
@@ -64,8 +66,8 @@ class ProjectUpserter(EntityUpserter[ProjectRow, ProjectData]):
 
     @override
     def build_insert_values(self) -> dict[str, Any]:
-        """A domain id naming no row leaves ``domain_name`` NULL, which the column
-        refuses."""
+        """A domain or resource policy id naming no row leaves its name column NULL,
+        which the column refuses."""
         return {
             "id": self.id,
             "domain_name": sa.select(DomainRow.name)
@@ -85,7 +87,9 @@ class ProjectUpserter(EntityUpserter[ProjectRow, ProjectData]):
     def _values(self) -> dict[str, Any]:
         return {
             "name": self.name,
-            "resource_policy": self.resource_policy,
+            "resource_policy": sa.select(ProjectResourcePolicyRow.name)
+            .where(ProjectResourcePolicyRow.uuid == self.resource_policy_id)
+            .scalar_subquery(),
             "description": self.description,
             "is_active": self.is_active,
             "total_resource_slots": self.total_resource_slots,

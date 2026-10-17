@@ -27,7 +27,7 @@ def _keypair(access_key: str = "AKIATEST000000000001", **values: Any) -> dict[st
     return {
         "access_key": access_key,
         "secret_key": "secret",
-        "resource_policy": "default",
+        "resource_policy_id": "0198a5a0-0000-7000-8000-0000000b0003",
         **values,
     }
 
@@ -39,7 +39,7 @@ def _user(user_id: str = _USER_ID, **values: Any) -> dict[str, Any]:
         "email": "user@example.com",
         "username": "user",
         "password": "password",
-        "resource_policy": "default",
+        "resource_policy_id": "0198a5a0-0000-7000-8000-0000000b0001",
         **values,
     }
 

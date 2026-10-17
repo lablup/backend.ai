@@ -1,0 +1,12 @@
+kind: container_registry
+version: 1
+items:
+- id: 8c5e2dc4-0c9a-4172-b0d6-456db669f59b
+  registry_name: ghcr.io
+  url: https://ghcr.io
+  type: github
+  username: <username>
+  password: <github_pat>
+  project: <username>
+  extra:
+    entity_type: users
