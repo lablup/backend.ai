@@ -77,18 +77,6 @@ class Rebel100Plugin(AbstractATOMPlugin[Rebel100Device]):
             )
         return devices
 
-    async def _group_npus(self, devices: Iterable[Rebel100Device]) -> int:
-        non_zero_groups: set[int] = {int(d.rbln_stat_info.group_id) for d in devices} - {0}
-        if len(non_zero_groups) > 0:
-            await ATOMAPI.destroy_groups(self._rbln_stat_path, list(non_zero_groups))
-
-        assigned_device_ids = {d.device_id for d in devices}
-        live_devices = await self._list_devices()
-        device_indexes = [
-            d.rbln_stat_info.npu for d in live_devices if d.device_id in assigned_device_ids
-        ]
-        return await ATOMAPI.create_group(self._rbln_stat_path, device_indexes, self.stat_args)
-
     async def generate_docker_args(
         self,
         docker: aiodocker.docker.Docker,
@@ -122,10 +110,12 @@ class Rebel100Plugin(AbstractATOMPlugin[Rebel100Device]):
 
     def _container_device_files(self, container_info: Mapping[str, Any]) -> list[str]:
         # The /dev/rbln* entries are not in HostConfig.Devices; the cards come from the CDI ids.
+        prefix = self.cdi_device_id.partition("=")[0] + "="
         return [
-            f"/dev/rbln{device_id.partition('=')[2]}"
+            f"/dev/rbln{device_id.removeprefix(prefix)}"
             for request in container_info["HostConfig"].get("DeviceRequests") or []
             for device_id in request.get("DeviceIDs") or []
+            if device_id.startswith(prefix)
         ]
 
     async def list_device_files(self, device: Rebel100Device) -> Iterable[str]:

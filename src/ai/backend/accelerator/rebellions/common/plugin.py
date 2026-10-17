@@ -464,7 +464,6 @@ class AbstractATOMPlugin[TATOMDevice: AbstractATOMDevice](AbstractComputePlugin,
         )
         return data
 
-    @abstractmethod
     async def _group_npus(self, devices: list[TATOMDevice]) -> int:
         raise NotImplementedError
 

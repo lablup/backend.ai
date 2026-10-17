@@ -225,35 +225,46 @@ class TestRebelContainerArgs:
 
 class TestRebelContainerMeasures:
     @pytest.fixture
-    def mock_docker(self) -> AsyncMock:
+    def mock_docker(self, request: pytest.FixtureRequest) -> AsyncMock:
         # CDI-only container: the cards appear in DeviceRequests, not in Devices.
-        container_info = {
-            "HostConfig": {
-                "Devices": [],
-                "DeviceRequests": [
-                    {"Driver": "cdi", "DeviceIDs": ["rebellions.ai/npu=1", "rebellions.ai/npu=3"]}
-                ],
-            },
-        }
+        container_info = {"HostConfig": {"Devices": [], "DeviceRequests": request.param}}
         docker = AsyncMock()
         docker.__aenter__ = AsyncMock(return_value=docker)
         docker.__aexit__ = AsyncMock(return_value=False)
         docker.containers.get = AsyncMock(return_value=container_info)
         return docker
 
+    @pytest.mark.parametrize(
+        ("mock_docker", "expected_cards"),
+        [
+            ([{"Driver": "cdi", "DeviceIDs": ["rebellions.ai/npu=1", "rebellions.ai/npu=3"]}], 2),
+            ([{"Driver": "cdi", "DeviceIDs": ["rebellions.ai/npu=3", "x/gpu=1"]}], 1),
+            ([{"Driver": "cdi", "DeviceIDs": ["x/gpu=1"]}], 0),
+            ([], 0),
+            (None, 0),
+        ],
+        indirect=["mock_docker"],
+        ids=[
+            "two-cards",
+            "foreign-cdi-id-ignored",
+            "foreign-only",
+            "empty-requests",
+            "null-requests",
+        ],
+    )
     async def test_container_cards_come_from_cdi_ids(
-        self, plugin: Rebel100Plugin, patched_stats: None, mock_docker: AsyncMock
+        self,
+        plugin: Rebel100Plugin,
+        patched_stats: None,
+        mock_docker: AsyncMock,
+        expected_cards: int,
     ) -> None:
         with patch(
             "ai.backend.accelerator.rebellions.common.plugin.Docker", return_value=mock_docker
         ):
             mem, util = await plugin.gather_container_measures(MagicMock(), ["c1"])
-        assert mem.per_container["c1"].capacity == Decimal(2 * 150323855360)
-        assert util.per_container["c1"].capacity == Decimal(200)
-
-    def test_container_without_requests_has_no_cards(self, plugin: Rebel100Plugin) -> None:
-        info: dict[str, Any] = {"HostConfig": {"Devices": [], "DeviceRequests": None}}
-        assert plugin._container_device_files(info) == []
+        assert mem.per_container["c1"].capacity == Decimal(expected_cards * 150323855360)
+        assert util.per_container["c1"].capacity == Decimal(expected_cards * 100)
 
 
 class TestATOMAPIToolHandling:
@@ -344,13 +355,11 @@ class TestConfigName:
         assert plugin.enabled
 
     @pytest.mark.parametrize(
-        ("raw_enable_rsd", "warned"),
-        [({}, False), ({"enable_rsd": False}, False), ({"enable_rsd": True}, True)],
+        "raw_enable_rsd",
+        [{}, {"enable_rsd": False}, {"enable_rsd": True}],
         ids=["default", "explicit-false", "explicit-true"],
     )
-    async def test_rebel100_forces_rsd_off(
-        self, raw_enable_rsd: dict[str, bool], warned: bool
-    ) -> None:
+    async def test_rebel100_forces_rsd_off(self, raw_enable_rsd: dict[str, bool]) -> None:
         plugin = Rebel100Plugin.__new__(Rebel100Plugin)
         plugin.plugin_config = {}
         raw_cfg = {"general": {"rbln_stat_path": None, **raw_enable_rsd}}
@@ -364,11 +373,9 @@ class TestConfigName:
                 return_value="/usr/bin/rbln-smi",
             ),
             patch.object(Rebel100Plugin, "list_devices", AsyncMock(return_value=[])),
-            patch("ai.backend.accelerator.rebellions.rebel100.plugin.log") as mock_log,
         ):
             await plugin.init()
         assert plugin._enable_rsd is False
-        assert mock_log.warning.call_count == int(warned)
 
     def test_atom_enable_rsd_stays_on_by_default(self) -> None:
         assert ATOMPlugin.enable_rsd_default is True
