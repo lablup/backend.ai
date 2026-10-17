@@ -7,6 +7,8 @@ from collections.abc import Collection, Sequence
 from dataclasses import dataclass
 from typing import Any, override
 
+import sqlalchemy as sa
+
 from ai.backend.common.container_registry import ContainerRegistryType
 from ai.backend.common.data.entity.container_registry import ContainerRegistryID
 from ai.backend.common.data.entity.global_entity import GlobalEntityName
@@ -14,6 +16,7 @@ from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.types import EntityIdentifier
 from ai.backend.manager.data.container_registry.types import ContainerRegistryData
 from ai.backend.manager.data.permission.global_entity import global_entity_id
+from ai.backend.manager.errors.image import ProjectDefaultContainerRegistryConflict
 from ai.backend.manager.errors.repository import ForeignKeyViolationError
 from ai.backend.manager.errors.resource import ProjectNotFound
 from ai.backend.manager.models.association_container_registries_groups.row import (
@@ -93,13 +96,29 @@ class ContainerRegistryCreator(EntityCreator[ContainerRegistryRow, ContainerRegi
 class ContainerRegistryProjectCreator(
     RelationCreator[ProjectID, ContainerRegistryID, AssociationContainerRegistriesGroupsRow]
 ):
-    """Links a project (the scope) to a registry (the target)."""
+    """Links a project (the scope) to a registry (the target), as the project's default
+    registry when ``is_default`` is set."""
+
+    is_default: bool = False
 
     @override
     def precondition_checks(
         self, scope: ProjectID, target: ContainerRegistryID
     ) -> Sequence[PreconditionCheck]:
-        return ()
+        """A project takes one default registry."""
+        if not self.is_default:
+            return ()
+        row = AssociationContainerRegistriesGroupsRow
+        return (
+            PreconditionCheck(
+                finder=sa.select(row.id).where(
+                    row.project_id == scope, row.is_default, row.registry_id != target
+                ),
+                error=ProjectDefaultContainerRegistryConflict(
+                    f"Project {scope} already has a default container registry"
+                ),
+            ),
+        )
 
     @override
     def row_class(self) -> type[AssociationContainerRegistriesGroupsRow]:
@@ -109,7 +128,9 @@ class ContainerRegistryProjectCreator(
     def build_row(
         self, scope: ProjectID, target: ContainerRegistryID
     ) -> AssociationContainerRegistriesGroupsRow:
-        return AssociationContainerRegistriesGroupsRow(registry_id=target, project_id=scope)
+        return AssociationContainerRegistriesGroupsRow(
+            registry_id=target, project_id=scope, is_default=self.is_default
+        )
 
     @override
     def integrity_error_checks(self) -> Sequence[IntegrityErrorCheck]:

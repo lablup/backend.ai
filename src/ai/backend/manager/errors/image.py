@@ -63,6 +63,19 @@ class ContainerRegistryGroupsAssociationNotFound(ObjectNotFound):
         )
 
 
+class ProjectDefaultContainerRegistryConflict(EntityError, web.HTTPConflict):
+    """Raised when a project would take a second default registry."""
+
+    error_type = "https://api.backend.ai/probs/project-default-container-registry-conflict"
+    error_title = "The project already has a default container registry."
+
+    @override
+    def entity_error_code(self) -> EntityErrorCode:
+        return EntityErrorCode(
+            ContainerRegistryEntityType(), ActionOperationType.CREATE, ErrorDetail.CONFLICT
+        )
+
+
 class ContainerRegistryWebhookAuthorizationFailed(BackendAIError, web.HTTPUnauthorized):
     error_type = "https://api.backend.ai/probs/webhook/auth-failed"
     error_title = "Container Registry Webhook authorization failed."
