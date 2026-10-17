@@ -9,10 +9,17 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 
 from ai.backend.common.data.entity.audit_log import AuditLogFieldType, AuditLogID
+from ai.backend.common.data.entity.session import SessionEntityType
+from ai.backend.common.data.entity.types import RuntimeEntityID
 from ai.backend.common.dto.manager.query import StringFilter
-from ai.backend.common.dto.manager.v2.audit_log.request import AuditLogFilter
+from ai.backend.common.dto.manager.v2.audit_log.request import (
+    AuditLogFilter,
+    AuditLogScope,
+    ScopedSearchAuditLogsInput,
+)
+from ai.backend.common.dto.manager.v2.rbac.types import EntityTypeScope
 from ai.backend.manager.actions.types import ActionKind, ActionOperationType, OperationStatus
-from ai.backend.manager.actions.v2.ops.result import BulkFieldOpsResult
+from ai.backend.manager.actions.v2.ops.result import BulkFieldOpsResult, ScopedFieldsOpsResult
 from ai.backend.manager.api.adapters.audit_log.adapter import AuditLogAdapter
 from ai.backend.manager.data.audit_log.types import AuditLogData
 from ai.backend.manager.errors.base.field import FieldNotFoundError
@@ -137,3 +144,48 @@ class TestAuditLogAdapterBatchLoad:
     ) -> None:
         assert await adapter.batch_load_by_ids([]) == []
         processors.bulk_get.run.assert_not_awaited()
+
+
+class TestAuditLogAdapterScopedSearch:
+    @pytest.fixture
+    def processors(self) -> MagicMock:
+        processors = MagicMock()
+        processors.scoped_search.run = AsyncMock(
+            return_value=ScopedFieldsOpsResult(
+                items=[], total_count=0, has_next_page=False, has_previous_page=False
+            )
+        )
+        return processors
+
+    async def _scoped_search(
+        self, processors: MagicMock, session_ids: list[uuid.UUID]
+    ) -> list[RuntimeEntityID]:
+        await AuditLogAdapter(processors).scoped_search(
+            ScopedSearchAuditLogsInput(
+                scope=AuditLogScope(
+                    entity=[
+                        EntityTypeScope(entity_type=SessionEntityType(), entity_id=str(one))
+                        for one in session_ids
+                    ]
+                )
+            )
+        )
+        action = processors.scoped_search.run.await_args.args[0]
+        return list(action.entity_ids())
+
+    async def test_one_entity_is_answered_for_once(self, processors: MagicMock) -> None:
+        session_id = uuid.uuid4()
+
+        entity_ids = await self._scoped_search(processors, [session_id])
+
+        assert entity_ids == [RuntimeEntityID(SessionEntityType(), session_id)]
+
+    async def test_two_entities_are_answered_for_once_each(self, processors: MagicMock) -> None:
+        first, second = uuid.uuid4(), uuid.uuid4()
+
+        entity_ids = await self._scoped_search(processors, [first, second])
+
+        assert entity_ids == [
+            RuntimeEntityID(SessionEntityType(), first),
+            RuntimeEntityID(SessionEntityType(), second),
+        ]
