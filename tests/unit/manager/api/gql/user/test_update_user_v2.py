@@ -7,7 +7,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from ai.backend.common.contexts.user import with_user_context
+from ai.backend.common.contexts.user import with_user
 from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.user.types import UserData
 from ai.backend.manager.api.gql.user.resolver.mutation import update_user_v2
@@ -85,7 +85,7 @@ class TestUpdateUserV2:
     async def test_non_superadmin_rejected_for_restricted_fields(
         self, mock_info: MagicMock, role: UserRole, fields: dict[str, Any]
     ) -> None:
-        with with_user_context(_user(role)), pytest.raises(InsufficientPrivilege):
+        with with_user(_user(role)), pytest.raises(InsufficientPrivilege):
             await cast(Any, update_user_v2).base_resolver(mock_info, UpdateUserV2InputGQL(**fields))
         mock_info.context.adapters.user.update_user_by_id.assert_not_awaited()
 
@@ -95,7 +95,7 @@ class TestUpdateUserV2:
         self, mock_info: MagicMock, fields: dict[str, Any]
     ) -> None:
         me = _user(UserRole.USER)
-        with with_user_context(me):
+        with with_user(me):
             await cast(Any, update_user_v2).base_resolver(mock_info, UpdateUserV2InputGQL(**fields))
         mock_info.context.adapters.user.update_user_by_id.assert_awaited_once()
         user_id, dto = mock_info.context.adapters.user.update_user_by_id.await_args.args
@@ -105,7 +105,7 @@ class TestUpdateUserV2:
     @pytest.mark.usefixtures("stub_payload")
     async def test_superadmin_updates_all_fields(self, mock_info: MagicMock) -> None:
         me = _user(UserRole.SUPERADMIN)
-        with with_user_context(me):
+        with with_user(me):
             await cast(Any, update_user_v2).base_resolver(
                 mock_info, UpdateUserV2InputGQL(**ALL_FIELDS_INPUT)
             )
