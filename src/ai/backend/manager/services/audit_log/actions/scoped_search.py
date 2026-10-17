@@ -34,7 +34,8 @@ class ScopedSearchAuditLogsAction(BulkScopedSearchOpsAction[AuditLogRow, AuditLo
     @final
     @override
     def entity_ids(self) -> Sequence[EntityIdentifier]:
-        return [target.scope_id() for target in self.targets]
+        # An entity is named by two targets, one per half of its history.
+        return tuple(dict.fromkeys(target.scope_id() for target in self.targets))
 
     @final
     @override
