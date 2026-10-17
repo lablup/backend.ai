@@ -2762,6 +2762,18 @@
             "default": null,
             "description": "Added in 26.10.0. Filter by audit log ID."
           },
+          "action_id": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/UUIDFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Added in 26.10.0. Filter by the id of the action run that wrote the log."
+          },
           "operation": {
             "anyOf": [
               {
