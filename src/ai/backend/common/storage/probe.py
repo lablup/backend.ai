@@ -1,7 +1,7 @@
 from __future__ import annotations
 
+import asyncio
 from collections.abc import Hashable, Sequence
-from concurrent.futures import Executor, Future
 from dataclasses import dataclass
 from functools import partial
 from typing import override
@@ -11,38 +11,32 @@ from ai.backend.common.storage.abc import AbstractProbeCheck
 
 
 @dataclass
-class ThreadPoolProbeArgs[TID: Hashable]:
+class ProbeTaskArgs[TID: Hashable]:
     name: str
     checks: Sequence[AbstractProbeCheck[TID]]
     interval: float
     initial_delay: float
-    executor: Executor
 
 
-class ThreadPoolProbeTask[TID: Hashable](PeriodicTask):
+class ProbeTask[TID: Hashable](PeriodicTask):
     """
-    Runs every status check it is given, each in a thread of its own.
+    Runs every status check it is given, each as an asyncio task of its own.
 
     It keeps no status: a check records what it found and whoever reports it reads that
-    off the check. A check still running is not submitted again, because the thread it
-    blocks in is not released by anything this task can do. ``_forget`` runs on whichever
-    thread finished the check, so it drops the entry only while it is still the one it
-    submitted.
+    off the check. A check still running is not started again.
     """
 
     _name: str
     _checks: Sequence[AbstractProbeCheck[TID]]
     _interval: float
     _initial_delay: float
-    _executor: Executor
-    _inflight: dict[TID, Future[None]]
+    _inflight: dict[TID, asyncio.Task[None]]
 
-    def __init__(self, args: ThreadPoolProbeArgs[TID]) -> None:
+    def __init__(self, args: ProbeTaskArgs[TID]) -> None:
         self._name = args.name
         self._checks = args.checks
         self._interval = args.interval
         self._initial_delay = args.initial_delay
-        self._executor = args.executor
         self._inflight = {}
 
     @property
@@ -71,9 +65,9 @@ class ThreadPoolProbeTask[TID: Hashable](PeriodicTask):
             check_id = check.id()
             if check_id in self._inflight:
                 continue
-            future = self._executor.submit(check.check_status)
-            self._inflight[check_id] = future
-            future.add_done_callback(partial(self._forget, check_id))
+            task = asyncio.create_task(check.check_status())
+            self._inflight[check_id] = task
+            task.add_done_callback(partial(self._forget, check_id))
 
-    def _forget(self, check_id: TID, future: Future[None]) -> None:
+    def _forget(self, check_id: TID, task: asyncio.Task[None]) -> None:
         self._inflight.pop(check_id, None)
