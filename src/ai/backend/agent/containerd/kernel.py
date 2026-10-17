@@ -72,7 +72,7 @@ class ContainerdKernel(AbstractKernel):
             environ=environ,
         )
         self.launch_plan = launch_plan
-        # Process-local handle for the readiness wait; not part of the pickled kernel state.
+        # Process-local handle; never pickled because the containerd agent does not persist its kernel registry.
         self._client = client
         self._readiness_deadline = None
 

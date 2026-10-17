@@ -457,9 +457,10 @@ class TestCheckStatusTlsTaskExit:
     ) -> None:
         fake.tasks[running] = TaskInfo(pid=1000, state=TaskState.STOPPED, exit_status=137)
 
-        with pytest.raises(KernelTaskExited, match="status 137"):
+        with pytest.raises(KernelTaskExited, match="status 137") as exc_info:
             await tls_kernel.check_status()
 
+        assert not isinstance(exc_info.value, TryAgain)
         assert refused.calls == 1
 
     async def test_task_exiting_between_calls_ends_the_wait(
