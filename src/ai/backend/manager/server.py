@@ -44,6 +44,7 @@ from ai.backend.common.metrics.metric import CommonMetricRegistry
 from ai.backend.common.metrics.multiprocess_setup import cleanup_prometheus_multiprocess_dir
 from ai.backend.common.msgpack import DEFAULT_PACK_OPTS, DEFAULT_UNPACK_OPTS
 from ai.backend.common.networking import force_threaded_dns_resolver
+from ai.backend.common.process.child_exit import ChildExitMonitor, ChildStatus
 from ai.backend.common.utils import env_info
 from ai.backend.logging import Logger, LogLevel
 from ai.backend.logging.otel import (
@@ -245,6 +246,7 @@ class ServerMainArgs:
     bootstrap_cfg_path: Path
     log_endpoint: str
     log_level: LogLevel
+    child_statuses: Sequence[ChildStatus]
 
 
 @asynccontextmanager
@@ -468,6 +470,7 @@ async def server_main(
         log.info("started the manager service")
     except Exception:
         log.exception("server initialization failed; triggering shutdown")
+        args.child_statuses[pidx].mark_init_failed()
         loop.call_later(0.2, os.kill, 0, signal.SIGINT)
 
     try:
@@ -490,7 +493,10 @@ async def server_main_logwrapper(
         bootstrap_cfg_path=tuple_args[1],
         log_endpoint=tuple_args[2],
         log_level=tuple_args[3],
+        child_statuses=tuple_args[4],
     )
+    child_status = args.child_statuses[pidx]
+    child_status.publish_pid()
     logger = Logger(
         args.bootstrap_cfg.logging,
         is_master=False,
@@ -504,6 +510,7 @@ async def server_main_logwrapper(
         with logger:
             async with server_main(loop, pidx, args):
                 yield
+            child_status.mark_clean_shutdown()
     except Exception:
         traceback.print_exc(file=sys.stderr)
 
@@ -577,11 +584,18 @@ def main(
                         log.info("using uvloop as the event loop backend")
                     case EventLoopType.ASYNCIO:
                         runner = asyncio.run
+                child_statuses = tuple(ChildStatus() for _ in range(bootstrap_cfg.manager.num_proc))
                 try:
                     aiotools.start_server(
                         server_main_logwrapper,
                         num_workers=bootstrap_cfg.manager.num_proc,
-                        args=(bootstrap_cfg, discovered_cfg_path, log_endpoint, log_level),
+                        args=(
+                            bootstrap_cfg,
+                            discovered_cfg_path,
+                            log_endpoint,
+                            log_level,
+                            child_statuses,
+                        ),
                         wait_timeout=(
                             bootstrap_cfg.manager.shutdown_grace_period + SHUTDOWN_CLEANUP_MARGIN
                         ),
@@ -590,6 +604,7 @@ def main(
                 finally:
                     cleanup_prometheus_multiprocess_dir()
                     log.info("terminated")
+                ChildExitMonitor(child_statuses).raise_system_exit()
         finally:
             if bootstrap_cfg.manager.pid_file.is_file():
                 # check is_file() to prevent deleting /dev/null!
