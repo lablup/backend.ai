@@ -4,12 +4,13 @@ import asyncio
 import logging
 from collections.abc import AsyncGenerator
 from typing import Any
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from etcd_client import CondVar, GRPCStatusCode, GRPCStatusError, WatchEventType
 
 from ai.backend.common.etcd import AsyncEtcd, ConfigScopes, Event
+from ai.backend.common.typed_validators import HostPortPair as HostPortPairModel
 from ai.backend.common.types import HostPortPair, QueueSentinel
 
 
@@ -501,6 +502,30 @@ class TestWatchExponentialBackoff:
         delays = [c.args[0] for c in mock_sleep.call_args_list]
         assert delays == pytest.approx([0.5, 1.0, 2.0, 4.0])
 
+    async def test_watch_resumes_after_the_stream_is_cut(self, etcd: AsyncEtcd) -> None:
+        """watch() watches again when the stream ends with UNKNOWN from a lost connection."""
+        call_count = 0
+        err = GRPCStatusError({
+            "code": GRPCStatusCode.Unknown,
+            "message": "h2 protocol error: error reading a body from connection",
+        })
+
+        async def mock_watch_impl(*args: Any, **kwargs: Any) -> AsyncGenerator[Event, None]:
+            nonlocal call_count
+            call_count += 1
+            if call_count == 1:
+                raise err
+            yield Event("test-key", WatchEventType.PUT, "v")
+
+        with (
+            patch.object(etcd, "_watch_impl", new=mock_watch_impl),
+            patch("asyncio.sleep", new_callable=AsyncMock),
+        ):
+            events = [ev async for ev in etcd.watch("test-key")]
+
+        assert call_count == 2
+        assert events == [Event("test-key", WatchEventType.PUT, "v")]
+
     async def test_watch_backoff_caps_at_max(self, etcd: AsyncEtcd) -> None:
         """watch() sleep delay never exceeds watch_reconnect_max_intvl (30 s)."""
         n_failures = 8
@@ -623,3 +648,126 @@ class TestWatchExponentialBackoff:
         ]
         assert len(warning_recs) == 1
         assert len(debug_recs) == n_failures - 1
+
+
+async def test_opened_etcd_sends_every_request_on_one_connection(etcd: AsyncEtcd) -> None:
+    unused_client = MagicMock()
+    unused_client.connect.side_effect = AssertionError("opened AsyncEtcd connected again")
+    with patch.object(etcd, "etcd", unused_client):
+        await etcd.put("shared", "1")
+        assert await etcd.get("shared") == "1"
+        assert await etcd.put_if_absent("shared", "2") is False
+        await etcd.delete("shared")
+        assert await etcd.get("shared") is None
+
+
+async def test_etcd_not_opened_connects_per_request(
+    etcd_container: tuple[str, HostPortPairModel],
+    test_ns: str,
+) -> None:
+    etcd = AsyncEtcd(
+        addrs=[etcd_container[1].to_legacy()],
+        namespace=test_ns,
+        scope_prefix_map={ConfigScopes.GLOBAL: "global"},
+    )
+    await etcd.put("not-opened", "1")
+    assert await etcd.get("not-opened") == "1"
+    await etcd.delete_prefix("")
+    await etcd.close()
+
+
+class TestRequestRetry:
+    @pytest.fixture
+    def communicator(self) -> AsyncMock:
+        return AsyncMock()
+
+    @pytest.fixture
+    def etcd(self, communicator: AsyncMock) -> AsyncEtcd:
+        etcd = AsyncEtcd(
+            addrs=HostPortPair("127.0.0.1", 2379),
+            namespace="test-retry",
+            scope_prefix_map={ConfigScopes.GLOBAL: ""},
+            request_retries=3,
+            request_retry_intvl=0.05,
+        )
+        etcd._communicator = communicator
+        return etcd
+
+    def _err(self, code: GRPCStatusCode, message: str) -> GRPCStatusError:
+        return GRPCStatusError({"code": code, "message": message})
+
+    def _txn_result(self, succeeded: bool) -> MagicMock:
+        result = MagicMock()
+        result.succeeded.return_value = succeeded
+        return result
+
+    async def test_unavailable_request_is_resent_with_growing_delay(
+        self, etcd: AsyncEtcd, communicator: AsyncMock
+    ) -> None:
+        unavailable = self._err(GRPCStatusCode.Unavailable, "tcp connect error")
+        communicator.get.side_effect = [unavailable, unavailable, b"v"]
+
+        with patch("asyncio.sleep", new_callable=AsyncMock) as mock_sleep:
+            assert await etcd.get("k", scope=ConfigScopes.GLOBAL) == "v"
+
+        assert communicator.get.call_count == 3
+        assert [c.args[0] for c in mock_sleep.call_args_list] == pytest.approx([0.05, 0.1])
+
+    async def test_unavailable_request_fails_after_the_retry_limit(
+        self, etcd: AsyncEtcd, communicator: AsyncMock
+    ) -> None:
+        communicator.put.side_effect = self._err(GRPCStatusCode.Unavailable, "tcp connect error")
+
+        with (
+            patch("asyncio.sleep", new_callable=AsyncMock),
+            pytest.raises(GRPCStatusError),
+        ):
+            await etcd.put("k", "v")
+
+        assert communicator.put.call_count == 4
+
+    async def test_timed_out_request_is_not_resent(
+        self, etcd: AsyncEtcd, communicator: AsyncMock
+    ) -> None:
+        communicator.get.side_effect = self._err(GRPCStatusCode.Cancelled, "Timeout expired")
+
+        with pytest.raises(GRPCStatusError):
+            await etcd.get("k", scope=ConfigScopes.GLOBAL)
+
+        assert communicator.get.call_count == 1
+
+    async def test_unconditional_write_is_resent_after_reaching_a_server(
+        self, etcd: AsyncEtcd, communicator: AsyncMock
+    ) -> None:
+        communicator.txn.side_effect = [
+            self._err(GRPCStatusCode.Unavailable, "transport error"),
+            self._txn_result(True),
+        ]
+
+        with patch("asyncio.sleep", new_callable=AsyncMock):
+            await etcd.put_prefix("k", {"a": "1"})
+
+        assert communicator.txn.call_count == 2
+
+    async def test_conditional_txn_is_resent_when_it_did_not_reach_a_server(
+        self, etcd: AsyncEtcd, communicator: AsyncMock
+    ) -> None:
+        communicator.txn.side_effect = [
+            self._err(GRPCStatusCode.Unavailable, "tcp connect error"),
+            self._txn_result(True),
+        ]
+
+        with patch("asyncio.sleep", new_callable=AsyncMock):
+            assert await etcd.put_if_absent("k", "v") is True
+
+        assert communicator.txn.call_count == 2
+
+    async def test_conditional_txn_is_not_resent_after_reaching_a_server(
+        self, etcd: AsyncEtcd, communicator: AsyncMock
+    ) -> None:
+        communicator.txn.side_effect = self._err(GRPCStatusCode.Unavailable, "transport error")
+
+        with pytest.raises(GRPCStatusError):
+            await etcd.compare_and_put("k", "v", expected=None, guards={})
+
+        assert communicator.txn.call_count == 1
