@@ -317,7 +317,7 @@ async def watcher_server(
             ConfigScopes.GLOBAL: "",
         }
         async with AsyncEtcd(
-            app["config"]["etcd"]["addr"],
+            app["config"]["etcd"]["addrs"],
             app["config"]["etcd"]["namespace"],
             scope_prefix_map=scope_prefix_map,
             credentials=etcd_credentials,

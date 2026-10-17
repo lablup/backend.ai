@@ -38,12 +38,12 @@ def base_agent_config() -> AgentUnifiedConfig:
         agent=AgentConfig(backend=AgentBackend.DOCKER),  # type: ignore[call-arg]
         container=ContainerConfig(scratch_type=ScratchType.HOSTDIR),  # type: ignore[call-arg]
         resource=ResourceConfig(),  # type: ignore[call-arg]
-        etcd=EtcdConfig(
-            namespace="test",
-            addr=HostPortPair(host="127.0.0.1", port=2379),
-            user=None,
-            password=None,
-        ),
+        etcd=EtcdConfig.model_validate({
+            "namespace": "test",
+            "addrs": [HostPortPair(host="127.0.0.1", port=2379)],
+            "user": None,
+            "password": None,
+        }),
     )
 
 

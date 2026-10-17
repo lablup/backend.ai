@@ -145,7 +145,7 @@ def get_async_etcd() -> AsyncEtcd:
         ConfigScopes.GLOBAL: "",
     }
     return AsyncEtcd(
-        local_config["etcd"]["addr"],
+        local_config["etcd"]["addrs"],
         local_config["etcd"]["namespace"],
         scope_prefix_map,
         credentials=etcd_credentials,

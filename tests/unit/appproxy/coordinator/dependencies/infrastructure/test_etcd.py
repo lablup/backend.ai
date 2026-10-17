@@ -37,12 +37,12 @@ class TestEtcdProvider:
         container_id, etcd_addr = etcd_container
 
         # Create etcd config
-        etcd_config = EtcdConfig(
-            addr=HostPortPair(host=etcd_addr.host, port=etcd_addr.port),
-            namespace=test_ns,
-            user=None,
-            password=None,
-        )
+        etcd_config = EtcdConfig.model_validate({
+            "addrs": [HostPortPair(host=etcd_addr.host, port=etcd_addr.port)],
+            "namespace": test_ns,
+            "user": None,
+            "password": None,
+        })
 
         # Create traefik config
         traefik_config = TraefikConfig(etcd=etcd_config, client_ip_strategy=None)
