@@ -20,13 +20,8 @@ class AbstractProbeCheck[TID: Hashable](metaclass=ABCMeta):
         raise NotImplementedError
 
     @abstractmethod
-    def check_status(self) -> None:
-        """
-        Observes the subject and records what it saw, judging none of it.
-
-        Called in a thread of its own, so it blocks rather than awaits, and it raises
-        nothing: an observation that failed is recorded in the result instead.
-        """
+    async def check_status(self) -> None:
+        """Observes the subject and records what it saw, judging none of it."""
         raise NotImplementedError
 
 
