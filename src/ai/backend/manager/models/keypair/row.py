@@ -10,11 +10,9 @@ import sqlalchemy as sa
 from cryptography.hazmat.backends import default_backend as crypto_default_backend
 from cryptography.hazmat.primitives import serialization as crypto_serialization
 from cryptography.hazmat.primitives.asymmetric import rsa
-from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.sql.expression import false
 
-from ai.backend.common import msgpack
 from ai.backend.common.data.entity.keypair import KeyPairID
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.types import AccessKey, SecretKey
@@ -39,9 +37,7 @@ __all__: Sequence[str] = (
     "Dotfile",
     "KeyPairRow",
     "keypairs",
-    "query_owned_dotfiles",
 )
-
 
 MAXIMUM_DOTFILE_SIZE = 64 * 1024  # 61 KiB
 
@@ -101,10 +97,6 @@ class KeyPairRow(LifecycleTimestampsMixin, Base):
         sa.String(length=256),
         sa.ForeignKey("keypair_resource_policies.name"),
         nullable=False,
-    )
-    # dotfiles column, \x90 means empty list in msgpack
-    dotfiles: Mapped[bytes] = mapped_column(
-        "dotfiles", sa.LargeBinary(length=MAXIMUM_DOTFILE_SIZE), nullable=False, default=b"\x90"
     )
 
     # Relationships
@@ -173,19 +165,3 @@ async def generate_keypair_data(key_provider_pool: KeyProviderPool) -> KeyPairSe
         ssh_public_key=pubkey,
         ssh_private_key=privkey,
     )
-
-
-async def query_owned_dotfiles(
-    conn: SAConnection,
-    access_key: AccessKey,
-) -> tuple[list[Dotfile], int]:
-    query = (
-        sa.select(KeyPairRow.dotfiles)
-        .select_from(KeyPairRow)
-        .where(KeyPairRow.access_key == access_key)
-    )
-    packed_dotfile = (await conn.execute(query)).scalar()
-    if packed_dotfile is None:
-        return [], MAXIMUM_DOTFILE_SIZE
-    rows = msgpack.unpackb(packed_dotfile)
-    return rows, MAXIMUM_DOTFILE_SIZE - len(packed_dotfile)

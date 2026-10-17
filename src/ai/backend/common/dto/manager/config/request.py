@@ -5,13 +5,21 @@ Shared between Client SDK and Manager API.
 
 from __future__ import annotations
 
+from typing import Self
 from uuid import UUID
 
-from pydantic import AliasChoices, Field
+from pydantic import AliasChoices, Field, field_validator, model_validator
 
+from ai.backend.common import msgpack
 from ai.backend.common.api_handlers import BaseRequestModel
-
-from .types import MAXIMUM_DOTFILE_SIZE, DotfilePermission
+from ai.backend.common.dto.manager.config.types import (
+    MAXIMUM_DOTFILE_PATH_LENGTH,
+    MAXIMUM_DOTFILE_SIZE,
+    NO_NUL_PATTERN,
+    RESERVED_DOTFILES,
+    DotfilePermission,
+)
+from ai.backend.common.exception import InvalidAPIParameters
 
 __all__ = (
     # User config
@@ -40,9 +48,14 @@ __all__ = (
 class CreateUserDotfileRequest(BaseRequestModel):
     """Request to create a user dotfile."""
 
-    path: str = Field(description="Dotfile path")
+    path: str = Field(
+        max_length=MAXIMUM_DOTFILE_PATH_LENGTH,
+        pattern=NO_NUL_PATTERN,
+        description="Dotfile path",
+    )
     data: str = Field(
         max_length=MAXIMUM_DOTFILE_SIZE,
+        pattern=NO_NUL_PATTERN,
         description="Dotfile content",
     )
     permission: DotfilePermission = Field(description="Unix file permission in octal (e.g., '755')")
@@ -50,6 +63,20 @@ class CreateUserDotfileRequest(BaseRequestModel):
         default=None,
         description="Access key of the target user (for superadmin delegation)",
     )
+
+    @field_validator("path")
+    @classmethod
+    def validate_path(cls, value: str) -> str:
+        if value in RESERVED_DOTFILES:
+            raise InvalidAPIParameters("dotfile path is reserved for internal operations.")
+        return value
+
+    @model_validator(mode="after")
+    def validate_serialized_size(self) -> Self:
+        packed = msgpack.packb([{"path": self.path, "perm": self.permission, "data": self.data}])
+        if len(packed) > MAXIMUM_DOTFILE_SIZE:
+            raise InvalidAPIParameters("No leftover space for dotfile storage")
+        return self
 
 
 class GetUserDotfileRequest(BaseRequestModel):
@@ -71,6 +98,7 @@ class UpdateUserDotfileRequest(BaseRequestModel):
     path: str = Field(description="Dotfile path")
     data: str = Field(
         max_length=MAXIMUM_DOTFILE_SIZE,
+        pattern=NO_NUL_PATTERN,
         description="Updated dotfile content",
     )
     permission: DotfilePermission = Field(description="Unix file permission in octal (e.g., '755')")
@@ -78,6 +106,13 @@ class UpdateUserDotfileRequest(BaseRequestModel):
         default=None,
         description="Access key of the target user (for superadmin delegation)",
     )
+
+    @model_validator(mode="after")
+    def validate_serialized_size(self) -> Self:
+        packed = msgpack.packb([{"path": self.path, "perm": self.permission, "data": self.data}])
+        if len(packed) > MAXIMUM_DOTFILE_SIZE:
+            raise InvalidAPIParameters("No leftover space for dotfile storage")
+        return self
 
 
 class DeleteUserDotfileRequest(BaseRequestModel):

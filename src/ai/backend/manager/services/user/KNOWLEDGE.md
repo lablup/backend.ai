@@ -7,7 +7,7 @@ keywords:
   - UserProcessors
   - keypair_group
   - LookupKeypairOwnerByAccessKeyAction
-  - KeypairDotfilesUpdater
+  - DotfileRow
   - bootstrap_script
 sources:
   - src/ai/backend/manager/services/user/processors.py
@@ -37,7 +37,14 @@ row is a change to that user.
 
 - `bootstrap_scripts` holds scripts per `(entity_type, entity_id)`; at most one per entity is `is_default`.
 - The API and session creation use the user's default script. Reading one that is missing answers an empty script; updating it answers not found.
-- Dotfiles stay on `keypairs.dotfiles`.
+- `dotfiles` stores one file per row with `entity_type`, `entity_id`, `path`, `perm`, `data`, and `is_default`. Each entity has at most one default row per path; user APIs and sessions use these rows.
+- Project and domain dotfiles remain in their existing columns.
+- Creation stores a non-default file. Its ActionResult retains `entries`: the existing default files followed by the new file. No runtime operation currently selects a default; migrated default files remain available.
+- User dotfile mutations lock the user row. Creation validates the single-file msgpack size in the request and enforces the DB content-byte limit; updates enforce the default files’ total msgpack-size limit.
+- The adapter creates `DotfileEntryCreator`, `DotfileEntryUpdater` or `DotfileEntryPurger`. Actions pass the spec to `UserRepository`, which checks the total msgpack size on update under the user-row lock before calling write ops in the same transaction.
+- Migration unpacks keypair bytes, deduplicates `(path, perm, data)` per user, and preserves whether any source was the default keypair. It reads rows in batches and writes up to 1,000 file rows per insert before dropping `keypairs.dotfiles`.
+- Downgrade packs each user’s default files into msgpack and restores them to all of that user’s keypairs.
+- An access key selects its owning user for the existing dotfile API. Purging a user deletes its dotfile rows.
 
 ## The operations that keep a service
 

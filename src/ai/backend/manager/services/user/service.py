@@ -5,26 +5,19 @@ from uuid import UUID
 
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
 from ai.backend.common.data.entity.bootstrap_script import BootstrapScript
-from ai.backend.common.data.entity.keypair import KeyPairID
 from ai.backend.common.events.event_types.kernel.types import KernelLifecycleEventReason
-from ai.backend.common.exception import BackendAIError, InvalidAPIParameters
-from ai.backend.common.types import AccessKey
+from ai.backend.common.exception import BackendAIError
 from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
-from ai.backend.manager.data.dotfile.types import (
-    DotfileEntries,
-    verify_dotfile_name,
-)
+from ai.backend.manager.data.dotfile.types import MAXIMUM_DOTFILE_COUNT
 from ai.backend.manager.data.user.types import (
     BulkPurgeError,
     BulkUserPurgeResultData,
     UserInfoContext,
 )
+from ai.backend.manager.errors.storage import DotfileCreationFailed
 from ai.backend.manager.errors.user import UserPurgeFailure
 from ai.backend.manager.models.bootstrap_script.updaters import DefaultBootstrapScriptUpdater
-from ai.backend.manager.models.keypair.updaters import (
-    KeypairDotfilesUpdater,
-)
 from ai.backend.manager.registry import AgentRegistry
 from ai.backend.manager.repositories.user.repository import UserRepository
 from ai.backend.manager.services.user.actions.admin_month_stats import (
@@ -47,13 +40,21 @@ from ai.backend.manager.services.user.actions.create_user import (
     CreateUserAction,
     CreateUserActionResult,
 )
-from ai.backend.manager.services.user.actions.delete_keypair_dotfile import (
-    DeleteKeypairDotfileAction,
-    DeleteKeypairDotfileActionResult,
+from ai.backend.manager.services.user.actions.delete_default_dotfile import (
+    DeleteDefaultDotfileAction,
+    DeleteDefaultDotfileActionResult,
 )
 from ai.backend.manager.services.user.actions.delete_user import (
     DeleteUserAction,
     DeleteUserActionResult,
+)
+from ai.backend.manager.services.user.actions.get_dotfile import (
+    GetDotfileAction,
+    GetDotfileActionResult,
+)
+from ai.backend.manager.services.user.actions.get_dotfiles import (
+    GetUserDotfilesAction,
+    GetUserDotfilesActionResult,
 )
 from ai.backend.manager.services.user.actions.get_user import (
     GetUserAction,
@@ -89,9 +90,9 @@ from ai.backend.manager.services.user.actions.restore_user import (
     RestoreUserAction,
     RestoreUserActionResult,
 )
-from ai.backend.manager.services.user.actions.update_keypair_dotfile import (
-    UpdateKeypairDotfileAction,
-    UpdateKeypairDotfileActionResult,
+from ai.backend.manager.services.user.actions.update_default_dotfile import (
+    UpdateDefaultDotfileAction,
+    UpdateDefaultDotfileActionResult,
 )
 from ai.backend.manager.services.user.actions.update_user import (
     BulkUpdateUserAction,
@@ -371,28 +372,26 @@ class UserService:
     async def create_dotfile(
         self, action: CreateKeypairDotfileAction
     ) -> CreateKeypairDotfileActionResult:
-        if not verify_dotfile_name(action.entry.path):
-            raise InvalidAPIParameters("dotfile path is reserved for internal operations.")
-        keypair_id, current = await self._read_dotfiles(action.access_key)
-        entries = current.added(action.entry)
-        await self._write_dotfiles(keypair_id, entries)
+        # Variants count too, so creation cannot grow a user's storage without bound.
+        count = await self._user_repository.count_dotfiles(action.user_id)
+        if count >= MAXIMUM_DOTFILE_COUNT:
+            raise DotfileCreationFailed("Dotfile creation limit reached")
+        entries = await self._user_repository.create_dotfile(action.user_id, action.creator)
         return CreateKeypairDotfileActionResult(entries=entries.entries)
 
-    async def update_dotfile(
-        self, action: UpdateKeypairDotfileAction
-    ) -> UpdateKeypairDotfileActionResult:
-        keypair_id, current = await self._read_dotfiles(action.access_key)
-        entries = current.replaced(action.entry)
-        await self._write_dotfiles(keypair_id, entries)
-        return UpdateKeypairDotfileActionResult(entries=entries.entries)
+    async def update_default_dotfile(
+        self, action: UpdateDefaultDotfileAction
+    ) -> UpdateDefaultDotfileActionResult:
+        entries = await self._user_repository.update_default_dotfile(
+            action.user_id, action.path, action.updater
+        )
+        return UpdateDefaultDotfileActionResult(entries=entries.entries)
 
-    async def delete_dotfile(
-        self, action: DeleteKeypairDotfileAction
-    ) -> DeleteKeypairDotfileActionResult:
-        keypair_id, current = await self._read_dotfiles(action.access_key)
-        entries = current.removed(action.path)
-        await self._write_dotfiles(keypair_id, entries)
-        return DeleteKeypairDotfileActionResult(entries=entries.entries)
+    async def delete_default_dotfile(
+        self, action: DeleteDefaultDotfileAction
+    ) -> DeleteDefaultDotfileActionResult:
+        entries = await self._user_repository.delete_default_dotfile(action.user_id, action.purger)
+        return DeleteDefaultDotfileActionResult(entries=entries.entries)
 
     async def get_default_bootstrap_script(
         self, action: GetDefaultBootstrapScriptAction
@@ -410,12 +409,14 @@ class UserService:
         )
         return UpdateDefaultBootstrapScriptActionResult()
 
-    async def _read_dotfiles(self, access_key: AccessKey) -> tuple[KeyPairID, DotfileEntries]:
-        """The keypair's id alongside its entries, so the write keys on the row it read."""
-        keypair = await self._user_repository.admin_get_keypair(access_key)
-        return keypair.id, DotfileEntries.unpack(keypair.dotfiles)
+    async def get_dotfile(self, action: GetDotfileAction) -> GetDotfileActionResult:
+        dotfile = await self._user_repository.dotfile(action.user_id, action.querier)
+        return GetDotfileActionResult(dotfile=dotfile)
 
-    async def _write_dotfiles(self, keypair_id: KeyPairID, entries: DotfileEntries) -> None:
-        await self._user_repository.update_keypair_column(
-            KeypairDotfilesUpdater(keypair_id=keypair_id, dotfiles=entries.pack())
+    async def get_default_dotfiles(
+        self, action: GetUserDotfilesAction
+    ) -> GetUserDotfilesActionResult:
+        dotfiles = await self._user_repository.search_user_scoped_dotfiles(
+            action.user_id, action.searcher
         )
+        return GetUserDotfilesActionResult(dotfiles=dotfiles)

@@ -118,7 +118,6 @@ class TestCreateUser:
             rate_limit=60000,
             ssh_public_key=None,
             ssh_private_key=None,
-            dotfiles=b"",
         )
 
     @pytest.fixture

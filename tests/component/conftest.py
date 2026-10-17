@@ -118,6 +118,7 @@ from ai.backend.manager.data.user.types import UserStatus
 from ai.backend.manager.dependencies.infrastructure.redis import ValkeyClients
 from ai.backend.manager.models.base import pgsql_connect_opts
 from ai.backend.manager.models.domain.row import domains
+from ai.backend.manager.models.dotfile.row import DotfileRow
 from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.image.row import ImageAliasRow, ImageRow
 from ai.backend.manager.models.kernel.row import kernels
@@ -171,6 +172,7 @@ from ai.backend.manager.repositories.ops.v2.resource_policy.provider import (
     ResourcePolicyOpsProvider,
 )
 from ai.backend.manager.repositories.ops.v2.share.provider import ShareOpsProvider
+from ai.backend.manager.repositories.ops.v2.user.provider import UserOpsProvider
 from ai.backend.manager.repositories.project.repository import ProjectRepository
 from ai.backend.manager.repositories.user.repository import UserRepository
 from ai.backend.manager.repositories.user_resource_policy.repository import (
@@ -1088,6 +1090,12 @@ async def admin_user_fixture(
     yield data
     async with db_engine.begin() as conn:
         # Clean side-effect tables that tests may populate via the running server
+        await conn.execute(
+            sa.delete(DotfileRow).where(
+                DotfileRow.entity_type == "user",
+                DotfileRow.entity_id == data.user_uuid,
+            )
+        )
         await conn.execute(vfolders.delete())
         await conn.execute(kernels.delete())
         await conn.execute(SessionRow.__table__.delete())
@@ -1182,6 +1190,12 @@ async def regular_user_fixture(
     yield data
     async with db_engine.begin() as conn:
         # Clean side-effect tables that tests may populate via the running server
+        await conn.execute(
+            sa.delete(DotfileRow).where(
+                DotfileRow.entity_type == "user",
+                DotfileRow.entity_id == data.user_uuid,
+            )
+        )
         await conn.execute(
             sa.delete(SessionTemplateRow).where(SessionTemplateRow.user_uuid == str(data.user_uuid))
         )
@@ -1539,6 +1553,7 @@ def auth_processors(
         ShareOpsProvider(database_engine),
         ResourcePolicyOpsProvider(database_engine),
         KeyProviderPool(providers=[], write_provider_type=KeyProviderType.PLAIN),
+        user_ops_provider=UserOpsProvider(database_engine),
     )
     group_repository = ProjectRepository(
         database_engine,

@@ -27,7 +27,10 @@ from ai.backend.manager.data.permission.global_entity import global_entity_id
 from ai.backend.manager.data.project.types import ProjectData
 from ai.backend.manager.data.user.types import UserData
 from ai.backend.manager.errors.resource import DomainNotFound
+from ai.backend.manager.errors.user import UserNotFound
 from ai.backend.manager.models.domain.row import DomainRow
+from ai.backend.manager.models.dotfile.conditions import DotfileConditions
+from ai.backend.manager.models.dotfile.row import DotfileRow
 from ai.backend.manager.models.keypair.creators import DefaultKeypairCreator
 from ai.backend.manager.models.project.creators import ProjectCreator
 from ai.backend.manager.models.project.row import ProjectRow, ProjectType
@@ -72,6 +75,23 @@ class V2UserWriteOps(V2RosterWriteOps, V2ResourcePolicyWriteOps):
     _SLUG_EDGE_CHARS: ClassVar[str] = "._-"
     _PROJECT_NAME_BASE_LIMIT: ClassVar[int] = 60
     _PROJECT_NAME_SUFFIX_LIMIT: ClassVar[int] = 1000
+
+    async def lock_user(self, user_id: UserID) -> None:
+        """Lock the user row until transaction end to serialize dependent writes and purge."""
+        owner = await self._sess.scalar(
+            sa.select(UserRow.uuid).where(UserRow.uuid == user_id).with_for_update()
+        )
+        if owner is None:
+            raise UserNotFound(str(user_id))
+
+    async def count_dotfiles(self, user_id: UserID) -> int:
+        """Every dotfile row the user owns, variants included."""
+        count = await self._sess.scalar(
+            sa.select(sa.func.count())
+            .select_from(DotfileRow)
+            .where(DotfileConditions.by_entity(user_id)())
+        )
+        return count or 0
 
     async def user_exists(self, email: str, username: str) -> bool:
         """Whether an account already holds either name."""

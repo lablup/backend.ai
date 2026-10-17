@@ -10,6 +10,7 @@ from typing import Any, cast
 from aiohttp import web
 from sqlalchemy import RowMapping
 
+from ai.backend.common import msgpack
 from ai.backend.common.clients.valkey_client.valkey_session.client import ValkeySessionClient
 from ai.backend.common.clients.valkey_client.valkey_session.types import (
     LoginSessionData,
@@ -216,10 +217,11 @@ class AuthService:
         return await self._key_provider_pool.decrypt(keypair.secret_key, KEYPAIR_SECRET_KEY_CONTEXT)
 
     async def _keypair_hook_payload(self, keypair: KeyPairData) -> dict[str, object]:
-        """The legacy keypair payload, with its user's bootstrap script."""
+        """The legacy keypair payload, with user-owned dotfiles and bootstrap script."""
         bootstrap_script = await self._user_repository.default_bootstrap_script(
             UserID(keypair.user_id)
         )
+        dotfiles = await self._user_repository.get_default_dotfiles(UserID(keypair.user_id))
         return {
             "access_key": keypair.access_key,
             "secret_key": await self._secret_key_of(keypair),
@@ -234,7 +236,10 @@ class AuthService:
             "ssh_private_key": keypair.ssh_private_key,
             "user": keypair.user_id,
             "resource_policy": keypair.resource_policy_name,
-            "dotfiles": keypair.dotfiles,
+            # Rows carry no aggregate size limit, so pack without DotfileEntries.pack()'s.
+            "dotfiles": msgpack.packb([
+                {"path": e.path, "perm": e.perm, "data": e.data} for e in dotfiles.entries
+            ]),
             "bootstrap_script": (
                 bootstrap_script.script if bootstrap_script is not None else BootstrapScript.empty()
             ),

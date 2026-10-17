@@ -9,11 +9,23 @@ from typing import Annotated
 from pydantic import Field
 
 __all__ = (
+    "MAXIMUM_DOTFILE_PATH_LENGTH",
     "MAXIMUM_DOTFILE_SIZE",
     "DotfilePermission",
 )
 
 MAXIMUM_DOTFILE_SIZE = 64 * 1024
+MAXIMUM_DOTFILE_PATH_LENGTH = 512
+NO_NUL_PATTERN = r"^[^\x00]*$"
+
+RESERVED_DOTFILES = frozenset({
+    ".terminfo",
+    ".jupyter",
+    ".ssh",
+    ".ssh/authorized_keys",
+    ".local",
+    ".config",
+})
 
 DotfilePermission = Annotated[
     str,

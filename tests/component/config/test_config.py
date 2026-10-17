@@ -56,7 +56,20 @@ class TestUserDotfileCreate:
         )
         assert isinstance(result, CreateDotfileResponse)
 
-    async def test_create_duplicate_user_dotfile_fails(
+    @pytest.mark.parametrize("path", [".config", ".ssh/authorized_keys"])
+    async def test_create_rejects_reserved_path(
+        self,
+        admin_registry: BackendAIClientRegistry,
+        path: str,
+    ) -> None:
+        with pytest.raises(InvalidRequestError, match="reserved for internal operations"):
+            await admin_registry.config.create_user_dotfile(
+                CreateUserDotfileRequest.model_construct(
+                    path=path, data="content", permission="600"
+                )
+            )
+
+    async def test_create_variant_preserves_existing_default(
         self,
         admin_registry: BackendAIClientRegistry,
         user_dotfile_factory: UserDotfileFactory,
@@ -64,10 +77,11 @@ class TestUserDotfileCreate:
         unique = secrets.token_hex(4)
         path = f".dup-{unique}"
         await user_dotfile_factory(path=path, data="first", permission="644")
-        with pytest.raises(InvalidRequestError):
-            await admin_registry.config.create_user_dotfile(
-                CreateUserDotfileRequest(path=path, data="second", permission="644")
-            )
+        await admin_registry.config.create_user_dotfile(
+            CreateUserDotfileRequest(path=path, data="second", permission="644")
+        )
+        result = await admin_registry.config.get_user_dotfile(GetUserDotfileRequest(path=path))
+        assert result.data == "first"
 
     async def test_regular_user_creates_own_dotfile(
         self,
@@ -79,8 +93,14 @@ class TestUserDotfileCreate:
             CreateUserDotfileRequest(path=path, data="user content", permission="644")
         )
         assert isinstance(result, CreateDotfileResponse)
-        # Cleanup
-        await user_registry.config.delete_user_dotfile(DeleteUserDotfileRequest(path=path))
+        with pytest.raises(NotFoundError):
+            await user_registry.config.get_user_dotfile(GetUserDotfileRequest(path=path))
+        with pytest.raises(NotFoundError):
+            await user_registry.config.update_user_dotfile(
+                UpdateUserDotfileRequest(path=path, permission="644", data="changed")
+            )
+        with pytest.raises(NotFoundError):
+            await user_registry.config.delete_user_dotfile(DeleteUserDotfileRequest(path=path))
 
 
 class TestUserDotfileGet:
@@ -111,8 +131,7 @@ class TestUserDotfileGet:
         assert isinstance(result, ListDotfilesResponse)
         # List response is a plain array (via BaseRootResponseModel)
         paths = [item.path for item in result.root]
-        assert f".list-a-{unique1}" in paths
-        assert f".list-b-{unique2}" in paths
+        assert paths.index(f".list-a-{unique1}") < paths.index(f".list-b-{unique2}")
 
     async def test_list_user_dotfiles_returns_plain_array_json(
         self,
@@ -605,4 +624,87 @@ class TestDomainDotfileDelete:
         with pytest.raises(NotFoundError):
             await admin_registry.config.get_domain_dotfile(
                 GetDomainDotfileRequest(domain=domain_fixture.domain_name, path=path)
+            )
+
+
+class TestUserDotfilesAcrossKeypairs:
+    async def test_non_default_key_updates_default_key_view(
+        self,
+        user_registry: BackendAIClientRegistry,
+        non_default_user_access_key: str,
+    ) -> None:
+        await user_registry.config.update_user_dotfile(
+            UpdateUserDotfileRequest(
+                owner_access_key=non_default_user_access_key,
+                path=".shared-user",
+                permission="644",
+                data="updated",
+            )
+        )
+        result = await user_registry.config.get_user_dotfile(
+            GetUserDotfileRequest(path=".shared-user")
+        )
+        assert (result.path, result.perm, result.data) == (".shared-user", "644", "updated")
+
+    async def test_non_default_key_creates_in_user_configuration(
+        self,
+        user_registry: BackendAIClientRegistry,
+        non_default_user_access_key: str,
+    ) -> None:
+        await user_registry.config.create_user_dotfile(
+            CreateUserDotfileRequest(
+                owner_access_key=non_default_user_access_key,
+                path=".new-user",
+                permission="600",
+                data="new",
+            )
+        )
+        with pytest.raises(NotFoundError):
+            await user_registry.config.get_user_dotfile(GetUserDotfileRequest(path=".new-user"))
+
+    async def test_non_default_key_deletes_from_user_configuration(
+        self,
+        user_registry: BackendAIClientRegistry,
+        non_default_user_access_key: str,
+    ) -> None:
+        await user_registry.config.delete_user_dotfile(
+            DeleteUserDotfileRequest(
+                owner_access_key=non_default_user_access_key, path=".shared-user"
+            )
+        )
+        result = await user_registry.config.list_user_dotfiles()
+        assert result.root == []
+
+    @pytest.mark.parametrize("operation", ["get", "update"])
+    async def test_regular_user_cannot_target_another_users_key(
+        self,
+        user_registry: BackendAIClientRegistry,
+        admin_access_key: str,
+        operation: str,
+    ) -> None:
+        with pytest.raises(InvalidRequestError, match="Cannot resolve the given user key"):
+            match operation:
+                case "get":
+                    await user_registry.config.get_user_dotfile(
+                        GetUserDotfileRequest(owner_access_key=admin_access_key, path=".private")
+                    )
+                case "update":
+                    await user_registry.config.update_user_dotfile(
+                        UpdateUserDotfileRequest(
+                            owner_access_key=admin_access_key,
+                            path=".private",
+                            permission="600",
+                            data="x",
+                        )
+                    )
+
+    @pytest.mark.usefixtures("regular_user_reads_admin")
+    async def test_regular_user_who_reads_admin_cannot_target_admin_key(
+        self,
+        user_registry: BackendAIClientRegistry,
+        admin_access_key: str,
+    ) -> None:
+        with pytest.raises(PermissionDeniedError):
+            await user_registry.config.get_user_dotfile(
+                GetUserDotfileRequest(owner_access_key=admin_access_key, path=".private")
             )
