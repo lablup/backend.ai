@@ -1,6 +1,9 @@
 import logging
-from collections.abc import Iterable, Sequence
+from collections.abc import Iterable, Mapping, Sequence
+from decimal import Decimal
 from typing import Any
+
+import aiodocker
 
 from ai.backend.accelerator.rebellions.common.atom_api import ATOMAPI
 from ai.backend.accelerator.rebellions.common.plugin import AbstractATOMPlugin
@@ -17,11 +20,6 @@ from .types import Rebel100Device
 
 log = StructuredLogger(logging.getLogger(__spec__.name))
 
-# TODO(rebel100): the exact Rebel100 `name` reported by rbln-smi is unknown until the node is
-# available (checklist step 5). Until then every `RBLN-CR*` name is accepted; set
-# `device_names` in rebel100.toml to restrict it to an exact list.
-DEFAULT_DEVICE_NAME_PREFIXES = ("RBLN-CR",)
-
 
 class Rebel100Plugin(AbstractATOMPlugin[Rebel100Device]):
     key = DeviceName("rebel100")
@@ -31,8 +29,10 @@ class Rebel100Plugin(AbstractATOMPlugin[Rebel100Device]):
     exclusive_slot_types: set[str] = {"rebel100.device"}
     config_name = "rebel100"
     executable_names: Sequence[str] = ("rbln-smi", "rbln-stat")
-    # TODO(rebel100): confirm the `rbln-smi` JSON flags on the node (checklist step 5).
-    stat_args: Sequence[str] = ("-j",)
+    stat_args: Sequence[str] = ("-g", "-j")
+    device_names: Sequence[str] = ("RBLN-CR13",)
+    # CDI always injects /dev/rsd0, and a card moved out of group 0 is invisible to the SDK there.
+    enable_rsd_default = False
 
     _all_devices: list[Rebel100Device] | None
     _unknown_device_names: set[str]
@@ -42,10 +42,7 @@ class Rebel100Plugin(AbstractATOMPlugin[Rebel100Device]):
         await super().init(context)
 
     def _is_valid_device_name(self, name: str) -> bool:
-        configured = self.atom_config["general"].get("device_names")
-        if configured:
-            return name in configured
-        return name.startswith(DEFAULT_DEVICE_NAME_PREFIXES)
+        return name in self.device_names
 
     async def _list_devices(self) -> list[Rebel100Device]:
         stats = await ATOMAPI.get_stats(self._rbln_stat_path, self.stat_args)
@@ -88,6 +85,29 @@ class Rebel100Plugin(AbstractATOMPlugin[Rebel100Device]):
             d.rbln_stat_info.npu for d in live_devices if d.device_id in assigned_device_ids
         ]
         return await ATOMAPI.create_group(self._rbln_stat_path, device_indexes, self.stat_args)
+
+    async def generate_docker_args(
+        self,
+        docker: aiodocker.docker.Docker,
+        device_alloc: Mapping[SlotName, Mapping[DeviceId, Decimal]],
+    ) -> Mapping[str, Any]:
+        args = await super().generate_docker_args(docker, device_alloc)
+        # Request only the assigned cards by host index (`rbln<N>`); `npu` is group-relative.
+        kind = self.cdi_device_id.partition("=")[0]
+        assigned = device_alloc.get(self.slot_types[0][0], {})
+        host_config = args["HostConfig"]
+        host_config["DeviceRequests"][0]["DeviceIDs"] = [
+            f"{kind}={d.device_id.removeprefix('rbln')}"
+            for d in await self._list_devices()
+            if d.device_id in assigned
+        ]
+        # CDI injects the host-numbered /dev/rbln<N> and /dev/rsd0; renumbered copies collide.
+        host_config["Devices"] = [
+            d
+            for d in host_config["Devices"]
+            if not d["PathInContainer"].startswith(("/dev/rbln", "/dev/rsd"))
+        ]
+        return args
 
     async def list_device_files(self, device: Rebel100Device) -> Iterable[str]:
         return [f"/dev/{device.rbln_stat_info.device}"]

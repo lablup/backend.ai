@@ -55,8 +55,7 @@ _atom_config_iv = t.Dict({
     "general": t.Dict({
         t.Key("rbln_stat_path"): t.Null | t.String,
         t.Key("enforce_singular_numa_affinity", default=False): t.Null | t.Bool,
-        t.Key("enable_rsd", default=True): t.Null | t.Bool,
-        t.Key("device_names", default=None): t.Null | t.List(t.String),
+        t.Key("enable_rsd", default=None): t.Null | t.Bool,
         t.Key("cdi_device_id", default=None): t.Null | t.String,
         t.Key("device_ids_env_var", default=None): t.Null | t.String,
     }).allow_extra("*"),
@@ -86,6 +85,8 @@ class AbstractATOMPlugin[TATOMDevice: AbstractATOMDevice](AbstractComputePlugin,
     cdi_device_id: str = "rebellions.ai/npu=runtime"
     # Container env var carrying "local:global" device ids; overridable in config.
     device_ids_env_var: str = "ATOM_GLOBAL_DEVICE_IDS"
+    # Used when `enable_rsd` is not set in the config.
+    enable_rsd_default: bool = True
 
     _rbln_stat_path: str
     _all_devices: list[TATOMDevice] | None
@@ -118,7 +119,8 @@ class AbstractATOMPlugin[TATOMDevice: AbstractATOMDevice](AbstractComputePlugin,
             self.enabled = False
             return
         self._rbln_stat_path = _rbln_stat_path
-        self._enable_rsd = self.atom_config["general"]["enable_rsd"]
+        enable_rsd = general_cfg["enable_rsd"]
+        self._enable_rsd = type(self).enable_rsd_default if enable_rsd is None else enable_rsd
         try:
             detected_devices = await self.list_devices()
             log.debug("detected devices:\n{}", pformat(detected_devices))
