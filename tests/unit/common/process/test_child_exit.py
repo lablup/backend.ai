@@ -48,6 +48,8 @@ class TestChildExitMonitorRaiseSystemExit:
         child = mp.get_context("spawn").Process(target=_fail_init, args=(status,))
         child.start()
         child.join(timeout=30)
+        assert child.exitcode == 0
+        assert status.init_failed.is_set()
 
         with pytest.raises(SystemExit) as exc_info:
             ChildExitMonitor((status,)).raise_system_exit()
