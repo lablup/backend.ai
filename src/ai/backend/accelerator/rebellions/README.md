@@ -13,3 +13,7 @@ Agent config:
 - `[agent] allow-compute-plugins` must include `"ai.backend.accelerator.rebellions.rebel100"`.
 - `[resource] allocation-order` must include `"rebel100"`, otherwise kernel creation fails with `ValueError: 'rebel100' is not in list`.
 Before starting the agent, register the `rebel100.device` slot type (no migration inserts it, and `agent_resources.slot_name` references `resource_slot_types`): create it with the v2 resource-slot slot-type create command as superadmin, or load `fixtures/manager/example-resource-slot-types.json` on a dev setup.
+
+## Known issue
+- Images that set `VIRTUAL_ENV` (such as `rbln/vllm-rbln`) make the in-container kernel runner abort with "Failed to import encodings module". The cause is in the Backend.AI core, not in this plugin.
+- Workaround: set the session or model-service environment variable `PYTHONHOME=/opt/backend.ai`.
