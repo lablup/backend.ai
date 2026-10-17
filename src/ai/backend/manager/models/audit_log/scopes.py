@@ -19,7 +19,6 @@ from ai.backend.manager.models.scopes import ExistenceCheck, ScopeTarget
 __all__ = (
     "AuditLogTarget",
     "EntityAuditLogTarget",
-    "ScopeAuditLogTarget",
     "TriggeredByAuditLogTarget",
 )
 
@@ -35,7 +34,8 @@ class AuditLogTarget(ScopeTarget, ABC):
 
 @dataclass(frozen=True)
 class EntityAuditLogTarget(AuditLogTarget):
-    """The records about one entity: the run named it as what it touched.
+    """The records of one entity's history: the runs that touched it, and the runs that
+    named it as a scope they ran in on ``audit_log_scopes``.
 
     ``existence_checks`` is empty -- RBAC validation already gates entity reachability.
     """
@@ -51,6 +51,7 @@ class EntityAuditLogTarget(AuditLogTarget):
         owner = self.owner
 
         def inner() -> sa.sql.expression.ColumnElement[bool]:
+<<<<<<< HEAD
             return sa.and_(
                 AuditLogRow.entity_type == owner.entity_type(),
                 AuditLogRow.entity_id == str(owner),
@@ -90,6 +91,20 @@ class ScopeAuditLogTarget(AuditLogTarget):
                     AuditLogScopeRow.scope_type == owner.entity_type(),
                     AuditLogScopeRow.scope_id == str(owner),
                 )
+=======
+            return sa.or_(
+                sa.and_(
+                    AuditLogRow.entity_type == owner.entity_type(),
+                    AuditLogRow.entity_id == owner,
+                ),
+                sa.exists().where(
+                    sa.and_(
+                        AuditLogScopeRow.audit_log_id == AuditLogRow.id,
+                        AuditLogScopeRow.scope_type == owner.entity_type(),
+                        AuditLogScopeRow.scope_id == owner,
+                    )
+                ),
+>>>>>>> 824275e3 (fix(BA-8562): record a refused scoped audit-log read once per entity (#15785))
             )
 
         return inner

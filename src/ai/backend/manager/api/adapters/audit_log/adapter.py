@@ -33,7 +33,6 @@ from ai.backend.manager.models.audit_log import AuditLogRow
 from ai.backend.manager.models.audit_log.scopes import (
     AuditLogTarget,
     EntityAuditLogTarget,
-    ScopeAuditLogTarget,
     TriggeredByAuditLogTarget,
 )
 from ai.backend.manager.models.audit_log.searchable_fields import AuditLogSearchableFields
@@ -149,10 +148,7 @@ class AuditLogAdapter(BaseAdapter):
                     f"Audit log scope id {entity_scope.entity_id!r} is not an entity id"
                 ) from e
             owner = RuntimeEntityID(EntityType(entity_scope.entity_type), entity_id)
-            # An entity's history is both halves: what was done to it, and what was done
-            # in it. The request names the entity once and the action ORs the two.
             targets.append(EntityAuditLogTarget(owner=owner))
-            targets.append(ScopeAuditLogTarget(owner=owner))
         for user_scope in input.scope.triggered_user or []:
             targets.append(TriggeredByAuditLogTarget(user_id=UserID(user_scope.value)))
         return targets
