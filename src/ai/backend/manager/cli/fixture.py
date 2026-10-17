@@ -30,6 +30,12 @@ def cli() -> None:
 @click.pass_obj
 def populate(cli_ctx: CLIContext, fixture_path: Path) -> None:
     async def _impl() -> None:
+        log.warning(
+            "fixture populate is deprecated and will be removed in the next LTS; use"
+            " `mgr seed apply`. A fixture without the RBAC rows (virtual_entities,"
+            " entity_memberships, scope_bindings) of the entities it writes may leave them"
+            " unreachable through permission checks"
+        )
         log.info("populating the fixture", fixture_path=fixture_path)
         try:
             fixture = load_json(fixture_path.read_text(encoding="utf8"))
@@ -48,7 +54,7 @@ def populate(cli_ctx: CLIContext, fixture_path: Path) -> None:
         finally:
             await engine.dispose()
 
-    """Populate fixtures."""
+    """Populate fixtures (deprecated: use `mgr seed apply`)."""
     asyncio.run(_impl())
 
 
