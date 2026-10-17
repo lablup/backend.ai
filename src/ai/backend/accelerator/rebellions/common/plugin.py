@@ -207,6 +207,10 @@ class AbstractATOMPlugin[TATOMDevice: AbstractATOMDevice](AbstractComputePlugin,
             ),
         ]
 
+    def _container_device_files(self, container_info: Mapping[str, Any]) -> list[str]:
+        """Host device files of the cards attached to a container."""
+        return [d["PathOnHost"] for d in container_info["HostConfig"]["Devices"]]
+
     async def gather_container_measures(
         self,
         ctx: StatContext,
@@ -240,9 +244,9 @@ class AbstractATOMPlugin[TATOMDevice: AbstractATOMDevice](AbstractComputePlugin,
                     util_stats[cid] = Decimal("0")
                     number_of_devices_per_container[cid] = 0
                     container_info = await docker.containers.get(cid)
-                    for device in container_info["HostConfig"]["Devices"]:
-                        if device["PathOnHost"] in device_stats_by_device_filename:
-                            device_stat = device_stats_by_device_filename[device["PathOnHost"]]
+                    for path in self._container_device_files(container_info):
+                        if path in device_stats_by_device_filename:
+                            device_stat = device_stats_by_device_filename[path]
                             mem_stats[cid] += int(device_stat.memory.used)
                             mem_sizes[cid] += int(device_stat.memory.total)
                             util_stats[cid] += Decimal(device_stat.util)

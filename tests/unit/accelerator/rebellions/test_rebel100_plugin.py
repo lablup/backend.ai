@@ -1,13 +1,12 @@
 from __future__ import annotations
 
-import copy
 import json
 import stat
 from collections.abc import Iterator
 from decimal import Decimal
 from pathlib import Path
 from typing import Any
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
@@ -20,8 +19,6 @@ from ai.backend.accelerator.rebellions.rebel100.plugin import Rebel100Plugin
 from ai.backend.agent.resources import AbstractComputeDevice
 from ai.backend.common.types import DeviceId, SlotName
 
-from .rebel100_samples import IDLE_GROUP_JSON, LOADED_JSON
-
 
 def _make_tool(tmp_path: Path, name: str, body: str) -> str:
     path = tmp_path / name
@@ -31,8 +28,8 @@ def _make_tool(tmp_path: Path, name: str, body: str) -> str:
 
 
 @pytest.fixture
-def smi_json_text() -> str:
-    return json.dumps(IDLE_GROUP_JSON)
+def smi_json_text(idle_group_json: dict[str, Any]) -> str:
+    return json.dumps(idle_group_json)
 
 
 @pytest.fixture
@@ -98,8 +95,10 @@ class TestRebelDeviceEnumeration:
     ) -> None:
         assert await plugin.available_slots() == {SlotName("rebel100.device"): Decimal(4)}
 
-    async def test_device_name_must_match_exactly(self, plugin: Rebel100Plugin) -> None:
-        data = copy.deepcopy(IDLE_GROUP_JSON)
+    async def test_device_name_must_match_exactly(
+        self, plugin: Rebel100Plugin, idle_group_json: dict[str, Any]
+    ) -> None:
+        data = idle_group_json
         data["devices"][1]["name"] = "RBLN-CR130"
         data["devices"][2]["name"] = "RBLN-CA22"
         stats = ATOMStat.from_dict(data)
@@ -116,11 +115,11 @@ class TestRebelDeviceEnumeration:
         device = (await plugin.list_devices())[1]
         assert list(await plugin.list_device_files(device)) == ["/dev/rbln1"]
 
-    def test_output_without_group_flag_lacks_group_id(self) -> None:
+    def test_output_without_group_flag_lacks_group_id(self, loaded_json: dict[str, Any]) -> None:
         # Why `stat_args` carries `-g`: plain `-j` (here under load) has no `group_id`.
-        assert LOADED_JSON["contexts"][0]["npu"] == 1
+        assert loaded_json["contexts"][0]["npu"] == 1
         with pytest.raises(KeyError, match="group_id"):
-            ATOMStat.from_dict(LOADED_JSON)
+            ATOMStat.from_dict(loaded_json)
 
 
 class TestRebelContainerArgs:
@@ -167,6 +166,46 @@ class TestRebelContainerArgs:
         )
         assert args["HostConfig"]["Devices"] == []
 
+    async def test_zero_allocation_requests_no_cards(
+        self, plugin: Rebel100Plugin, patched_stats: None
+    ) -> None:
+        args = await plugin.generate_docker_args(
+            AsyncMock(),
+            {SlotName("rebel100.device"): {DeviceId("rbln1"): Decimal(0)}},
+        )
+        assert args["HostConfig"]["DeviceRequests"] == []
+
+    async def test_zero_allocation_cards_are_skipped(
+        self, plugin: Rebel100Plugin, patched_stats: None
+    ) -> None:
+        args = await plugin.generate_docker_args(
+            AsyncMock(),
+            {
+                SlotName("rebel100.device"): {
+                    DeviceId("rbln0"): Decimal(0),
+                    DeviceId("rbln2"): Decimal(1),
+                }
+            },
+        )
+        assert args["HostConfig"]["DeviceRequests"][0]["DeviceIDs"] == ["rebellions.ai/npu=2"]
+
+    async def test_cdi_ids_come_from_allocation_sorted_numerically(
+        self, plugin: Rebel100Plugin, patched_stats: None
+    ) -> None:
+        args = await plugin.generate_docker_args(
+            AsyncMock(),
+            {
+                SlotName("rebel100.device"): {
+                    DeviceId("rbln10"): Decimal(1),
+                    DeviceId("rbln2"): Decimal(1),
+                }
+            },
+        )
+        assert args["HostConfig"]["DeviceRequests"][0]["DeviceIDs"] == [
+            "rebellions.ai/npu=2",
+            "rebellions.ai/npu=10",
+        ]
+
     async def test_default_env_var(self, plugin: Rebel100Plugin) -> None:
         data = await plugin.generate_resource_data({
             SlotName("rebel100.device"): {DeviceId("rbln3"): Decimal(1)},
@@ -182,6 +221,39 @@ class TestRebelContainerArgs:
             },
         })
         assert data == {"REBEL_GLOBAL_DEVICE_IDS": "0:rbln0,1:rbln1"}
+
+
+class TestRebelContainerMeasures:
+    @pytest.fixture
+    def mock_docker(self) -> AsyncMock:
+        # CDI-only container: the cards appear in DeviceRequests, not in Devices.
+        container_info = {
+            "HostConfig": {
+                "Devices": [],
+                "DeviceRequests": [
+                    {"Driver": "cdi", "DeviceIDs": ["rebellions.ai/npu=1", "rebellions.ai/npu=3"]}
+                ],
+            },
+        }
+        docker = AsyncMock()
+        docker.__aenter__ = AsyncMock(return_value=docker)
+        docker.__aexit__ = AsyncMock(return_value=False)
+        docker.containers.get = AsyncMock(return_value=container_info)
+        return docker
+
+    async def test_container_cards_come_from_cdi_ids(
+        self, plugin: Rebel100Plugin, patched_stats: None, mock_docker: AsyncMock
+    ) -> None:
+        with patch(
+            "ai.backend.accelerator.rebellions.common.plugin.Docker", return_value=mock_docker
+        ):
+            mem, util = await plugin.gather_container_measures(MagicMock(), ["c1"])
+        assert mem.per_container["c1"].capacity == Decimal(2 * 150323855360)
+        assert util.per_container["c1"].capacity == Decimal(200)
+
+    def test_container_without_requests_has_no_cards(self, plugin: Rebel100Plugin) -> None:
+        info: dict[str, Any] = {"HostConfig": {"Devices": [], "DeviceRequests": None}}
+        assert plugin._container_device_files(info) == []
 
 
 class TestATOMAPIToolHandling:
@@ -272,12 +344,12 @@ class TestConfigName:
         assert plugin.enabled
 
     @pytest.mark.parametrize(
-        ("raw_enable_rsd", "expected"),
-        [({}, False), ({"enable_rsd": True}, True), ({"enable_rsd": False}, False)],
-        ids=["default", "explicit-true", "explicit-false"],
+        ("raw_enable_rsd", "warned"),
+        [({}, False), ({"enable_rsd": False}, False), ({"enable_rsd": True}, True)],
+        ids=["default", "explicit-false", "explicit-true"],
     )
-    async def test_rebel100_enable_rsd_default(
-        self, raw_enable_rsd: dict[str, bool], expected: bool
+    async def test_rebel100_forces_rsd_off(
+        self, raw_enable_rsd: dict[str, bool], warned: bool
     ) -> None:
         plugin = Rebel100Plugin.__new__(Rebel100Plugin)
         plugin.plugin_config = {}
@@ -292,9 +364,11 @@ class TestConfigName:
                 return_value="/usr/bin/rbln-smi",
             ),
             patch.object(Rebel100Plugin, "list_devices", AsyncMock(return_value=[])),
+            patch("ai.backend.accelerator.rebellions.rebel100.plugin.log") as mock_log,
         ):
             await plugin.init()
-        assert plugin._enable_rsd is expected
+        assert plugin._enable_rsd is False
+        assert mock_log.warning.call_count == int(warned)
 
     def test_atom_enable_rsd_stays_on_by_default(self) -> None:
         assert ATOMPlugin.enable_rsd_default is True

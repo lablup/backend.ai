@@ -5,8 +5,7 @@
 [general]
 # Path to the rbln-smi (or rbln-stat) executable. Empty: search PATH for rbln-smi, then rbln-stat.
 rbln_stat_path = ""
-# Off by default: CDI always injects /dev/rsd0, and a card moved out of group 0 is invisible to the SDK in the container.
-# enable_rsd = false
+# enable_rsd is ignored (always off): CDI always injects /dev/rsd0 (group 0), so a card moved to another group is invisible to the SDK.
 # CDI device id passed to the container runtime; its prefix (before "=") selects the per-card ids.
 # cdi_device_id = "rebellions.ai/npu=runtime"
 # Container env var carrying "local:global" device ids.

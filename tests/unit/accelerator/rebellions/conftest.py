@@ -1,17 +1,20 @@
-"""Real `rbln-smi` JSON captured on a 4x Rebel100 (RBLN-CR13) node, driver 3.5.1."""
+"""Real `rbln-smi` JSON from a 4x Rebel100 (RBLN-CR13) node, driver 3.5.1; sid and uuid replaced."""
 
+import copy
 from typing import Any
 
+import pytest
+
 # `rbln-smi -g -j`, idle.
-IDLE_GROUP_JSON: dict[str, Any] = {
+_IDLE_GROUP_JSON: dict[str, Any] = {
     "KMD_version": "3.5.1",
     "devices": [
         {
             "group_id": "0",
             "npu": 0,
             "name": "RBLN-CR13",
-            "sid": "0000000052639097",
-            "uuid": "4ab3624a-2f13-8dfb-ba5c-c213cfae4f14",
+            "sid": "0000000000000000",
+            "uuid": "00000000-0000-0000-0000-000000000000",
             "device": "rbln0",
             "status": "normal",
             "fw_ver": "3.5.1",
@@ -34,8 +37,8 @@ IDLE_GROUP_JSON: dict[str, Any] = {
             "group_id": "0",
             "npu": 1,
             "name": "RBLN-CR13",
-            "sid": "0000000052639022",
-            "uuid": "ba933c81-51bd-8d1e-90eb-25ca1467c003",
+            "sid": "0000000000000001",
+            "uuid": "00000000-0000-0000-0000-000000000001",
             "device": "rbln1",
             "status": "normal",
             "fw_ver": "3.5.1",
@@ -58,8 +61,8 @@ IDLE_GROUP_JSON: dict[str, Any] = {
             "group_id": "0",
             "npu": 2,
             "name": "RBLN-CR13",
-            "sid": "0000000052639179",
-            "uuid": "1d8c518d-edd9-8633-8b0f-7149e8fbc96b",
+            "sid": "0000000000000002",
+            "uuid": "00000000-0000-0000-0000-000000000002",
             "device": "rbln2",
             "status": "normal",
             "fw_ver": "3.5.1",
@@ -82,8 +85,8 @@ IDLE_GROUP_JSON: dict[str, Any] = {
             "group_id": "0",
             "npu": 3,
             "name": "RBLN-CR13",
-            "sid": "0000000052639035",
-            "uuid": "2bcd1dad-80d7-8a41-9f05-5906bd39a5a1",
+            "sid": "0000000000000003",
+            "uuid": "00000000-0000-0000-0000-000000000003",
             "device": "rbln3",
             "status": "normal",
             "fw_ver": "3.5.1",
@@ -107,14 +110,14 @@ IDLE_GROUP_JSON: dict[str, Any] = {
 }
 
 # `rbln-smi -j` while a process runs on rbln1 (`contexts` populated).
-LOADED_JSON: dict[str, Any] = {
+_LOADED_JSON: dict[str, Any] = {
     "KMD_version": "3.5.1",
     "devices": [
         {
             "npu": 0,
             "name": "RBLN-CR13",
-            "sid": "0000000052639097",
-            "uuid": "4ab3624a-2f13-8dfb-ba5c-c213cfae4f14",
+            "sid": "0000000000000000",
+            "uuid": "00000000-0000-0000-0000-000000000000",
             "device": "rbln0",
             "status": "normal",
             "fw_ver": "3.5.1",
@@ -136,8 +139,8 @@ LOADED_JSON: dict[str, Any] = {
         {
             "npu": 1,
             "name": "RBLN-CR13",
-            "sid": "0000000052639022",
-            "uuid": "ba933c81-51bd-8d1e-90eb-25ca1467c003",
+            "sid": "0000000000000001",
+            "uuid": "00000000-0000-0000-0000-000000000001",
             "device": "rbln1",
             "status": "normal",
             "fw_ver": "3.5.1",
@@ -159,8 +162,8 @@ LOADED_JSON: dict[str, Any] = {
         {
             "npu": 2,
             "name": "RBLN-CR13",
-            "sid": "0000000052639179",
-            "uuid": "1d8c518d-edd9-8633-8b0f-7149e8fbc96b",
+            "sid": "0000000000000002",
+            "uuid": "00000000-0000-0000-0000-000000000002",
             "device": "rbln2",
             "status": "normal",
             "fw_ver": "3.5.1",
@@ -182,8 +185,8 @@ LOADED_JSON: dict[str, Any] = {
         {
             "npu": 3,
             "name": "RBLN-CR13",
-            "sid": "0000000052639035",
-            "uuid": "2bcd1dad-80d7-8a41-9f05-5906bd39a5a1",
+            "sid": "0000000000000003",
+            "uuid": "00000000-0000-0000-0000-000000000003",
             "device": "rbln3",
             "status": "normal",
             "fw_ver": "3.5.1",
@@ -217,3 +220,13 @@ LOADED_JSON: dict[str, Any] = {
         }
     ],
 }
+
+
+@pytest.fixture
+def idle_group_json() -> dict[str, Any]:
+    return copy.deepcopy(_IDLE_GROUP_JSON)
+
+
+@pytest.fixture
+def loaded_json() -> dict[str, Any]:
+    return copy.deepcopy(_LOADED_JSON)

@@ -138,7 +138,6 @@ class ATOMAPI:
         else:
             raise LibraryError("Failed to create group: Group ID pool empty")
 
-        # TODO(rebel100): confirm `rbln-smi group` syntax on the node (checklist step 8, 15).
         args = ["group", "-c", str(new_group_id), "-a", ",".join([str(x) for x in member_indexes])]
         await cls._run(exec_path, args, strict_stderr=True)
         return new_group_id

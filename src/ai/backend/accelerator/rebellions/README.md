@@ -6,7 +6,8 @@
 
 ## REBEL (Rebel100)
 The `rebel100` plugin (slot `rebel100.device`, whole cards only, device name `RBLN-CR13`) reads `rebel100.toml` instead of `atom.toml`, searched in the working directory, `~/.config/backend.ai/` and `/etc/backend.ai/` (see `rebel100.toml.example`).
-It looks for `rbln-smi`, then `rbln-stat`, in `PATH` unless `[general].rbln_stat_path` is set; with RSD off (the default) the plain executable works without root or setuid.
+It looks for `rbln-smi`, then `rbln-stat`, in `PATH` unless `[general].rbln_stat_path` is set.
+RSD groups are always off (`enable_rsd = true` is ignored with a warning): CDI always injects `/dev/rsd0` (group 0), so a card moved to another group is invisible to the SDK in the container.
 Only the assigned cards are requested through CDI (`rebellions.ai/npu=<N>`, `N` from the host `/dev/rbln<N>`).
 Agent config:
 - `[agent] allow-compute-plugins` must include `"ai.backend.accelerator.rebellions.rebel100"`.

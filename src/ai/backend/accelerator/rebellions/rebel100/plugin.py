@@ -40,6 +40,9 @@ class Rebel100Plugin(AbstractATOMPlugin[Rebel100Device]):
     async def init(self, context: Any = None) -> None:
         self._unknown_device_names = set()
         await super().init(context)
+        if self.enabled and self.atom_config["general"]["enable_rsd"]:
+            log.warning("ignoring enable_rsd: RSD groups are not supported", plugin_name=self.key)
+            self._enable_rsd = False
 
     def _is_valid_device_name(self, name: str) -> bool:
         return name in self.device_names
@@ -94,13 +97,21 @@ class Rebel100Plugin(AbstractATOMPlugin[Rebel100Device]):
         args = await super().generate_docker_args(docker, device_alloc)
         # Request only the assigned cards by host index (`rbln<N>`); `npu` is group-relative.
         kind = self.cdi_device_id.partition("=")[0]
-        assigned = device_alloc.get(self.slot_types[0][0], {})
+        assigned = sorted(
+            (k for k, v in device_alloc.get(self.slot_types[0][0], {}).items() if v > 0),
+            key=lambda k: int(k.removeprefix("rbln")),
+        )
         host_config = args["HostConfig"]
-        host_config["DeviceRequests"][0]["DeviceIDs"] = [
-            f"{kind}={d.device_id.removeprefix('rbln')}"
-            for d in await self._list_devices()
-            if d.device_id in assigned
-        ]
+        host_config["DeviceRequests"] = (
+            [
+                {
+                    **host_config["DeviceRequests"][0],
+                    "DeviceIDs": [f"{kind}={k.removeprefix('rbln')}" for k in assigned],
+                }
+            ]
+            if assigned
+            else []
+        )
         # CDI injects the host-numbered /dev/rbln<N> and /dev/rsd0; renumbered copies collide.
         host_config["Devices"] = [
             d
@@ -108,6 +119,14 @@ class Rebel100Plugin(AbstractATOMPlugin[Rebel100Device]):
             if not d["PathInContainer"].startswith(("/dev/rbln", "/dev/rsd"))
         ]
         return args
+
+    def _container_device_files(self, container_info: Mapping[str, Any]) -> list[str]:
+        # The /dev/rbln* entries are not in HostConfig.Devices; the cards come from the CDI ids.
+        return [
+            f"/dev/rbln{device_id.partition('=')[2]}"
+            for request in container_info["HostConfig"].get("DeviceRequests") or []
+            for device_id in request.get("DeviceIDs") or []
+        ]
 
     async def list_device_files(self, device: Rebel100Device) -> Iterable[str]:
         return [f"/dev/{device.rbln_stat_info.device}"]
