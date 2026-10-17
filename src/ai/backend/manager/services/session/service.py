@@ -58,6 +58,10 @@ from ai.backend.manager.actions.v2.bulk.result import (
 from ai.backend.manager.bgtask.tasks.commit_session import CommitSessionManifest
 from ai.backend.manager.bgtask.types import ManagerBgtaskName
 from ai.backend.manager.clients.appproxy.client import AppProxyClientPool
+from ai.backend.manager.clients.appproxy.types import (
+    CreateSessionAppTokenRequestBody,
+    SessionAppSessionInfo,
+)
 from ai.backend.manager.data.common.sentinel import undefined
 from ai.backend.manager.data.resource_slot.types import ResourceAllocationAggregate
 from ai.backend.manager.data.session.draft import (
@@ -1284,12 +1288,13 @@ class SessionService:
 
         if session_data.resource_group_name is None:
             raise ServiceUnavailable("Session has no scaling group assigned")
-        wsproxy_addr = await self._session_repository.get_resource_group_wsproxy_addr(
+        proxy_target = await self._session_repository.get_resource_group_proxy_target(
             session_data.resource_group_name
         )
-        if not wsproxy_addr:
+        if proxy_target is None:
             raise ServiceUnavailable("No coordinator configured for this resource group")
-        client = self._appproxy_client_pool.load_client(wsproxy_addr, "")
+        wsproxy_addr = proxy_target.addr
+        client = self._appproxy_client_pool.load_client(wsproxy_addr, proxy_target.api_token)
         wsproxy_status = await client.fetch_status()
         if wsproxy_status.advertise_address:
             wsproxy_advertise_addr = wsproxy_status.advertise_address
@@ -1300,6 +1305,8 @@ class SessionService:
             kernel_host = urlparse(info.agent_addr).hostname
         else:
             kernel_host = info.kernel_host
+        if not isinstance(kernel_host, str):
+            raise InternalServerError(f"Cannot determine the kernel host of session {session_id}")
         service_ports: list[dict[str, Any]] = info.service_ports
         sport: dict[str, Any] = {}
         host_port: int
@@ -1349,34 +1356,26 @@ class SessionService:
                 "Failed to launch the app service", extra_data=result["error"]
             )
 
-        body = {
-            "login_session_token": login_session_token,
-            "kernel_host": kernel_host,
-            "kernel_port": host_port,
-            "session": {
-                "id": str(session_data.id),
-                "user_uuid": str(session_data.user_uuid),
-                "group_id": str(session_data.group_id),
-                "access_key": session_data.access_key,
-                "domain_name": session_data.domain_name,
-            },
-        }
-
-        async with (
-            aiohttp.ClientSession() as req,
-            req.post(
-                f"{wsproxy_addr}/v2/conf",
-                json=body,
-            ) as resp,
-        ):
-            token_json = await resp.json()
-
-            return StartServiceActionResult(
-                result=None,
-                session_data=session_data,
-                token=token_json["token"],
-                wsproxy_addr=wsproxy_advertise_addr,
+        token = await client.create_session_app_token(
+            CreateSessionAppTokenRequestBody(
+                login_session_token=login_session_token,
+                kernel_host=kernel_host,
+                kernel_port=host_port,
+                session=SessionAppSessionInfo(
+                    id=session_data.id,
+                    user_uuid=session_data.user_uuid,
+                    group_id=session_data.group_id,
+                    access_key=session_data.access_key,
+                    domain_name=session_data.domain_name,
+                ),
             )
+        )
+        return StartServiceActionResult(
+            result=None,
+            session_data=session_data,
+            token=token,
+            wsproxy_addr=wsproxy_advertise_addr,
+        )
 
     async def upload_files(self, action: UploadFilesAction) -> UploadFilesActionResult:
         reader = action.reader
