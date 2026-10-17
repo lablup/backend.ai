@@ -698,6 +698,26 @@ class TestEnrollUsersInProject:
         with pytest.raises(ProjectMemberNotJoinableError):
             await roster_repository.join_member(test_project, UserID(uuid.uuid4()))
 
+    async def test_join_each_fails_only_the_user_who_cannot_join(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        roster_repository: RbacRosterRepository,
+        test_project: ProjectID,
+        same_domain_user_1: UserID,
+        cross_domain_user: UserID,
+    ) -> None:
+        """A refused user is reported alone; the users before and after it still join."""
+        result = await roster_repository.join_each(
+            test_project, [cross_domain_user, same_domain_user_1]
+        )
+
+        assert result.joined == [same_domain_user_1]
+        assert [f.user_id for f in result.failures] == [cross_domain_user]
+        membership_id, _, _ = await self._roster_place(
+            db_with_cleanup, test_project, same_domain_user_1
+        )
+        assert membership_id is not None
+
 
 class TestWithdrawUsersFromProject:
     """Tests for RbacRosterRepository.leave_members"""

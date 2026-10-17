@@ -9,6 +9,10 @@ from __future__ import annotations
 
 from typing import Any
 
+from ai.backend.manager.data.permission.role import (
+    BulkRoleAssignmentFailure,
+    BulkRoleAssignmentResultData,
+)
 from ai.backend.manager.repositories.permission_controller.repository import (
     PermissionControllerRepository,
 )
@@ -186,17 +190,24 @@ class RbacRoleService:
         return RevokeRoleActionResult(data=result.revoked)
 
     async def bulk_assign_role(self, action: BulkAssignRoleAction) -> BulkAssignRoleActionResult:
-        """Assigns a role to multiple users.
-
-        When project_id is provided, also binds each user to the project.
-        """
+        """Assigns a role to multiple users. When project_id is provided, also binds
+        each user to the project; a user who cannot join is reported as a failure and
+        not granted the role."""
+        user_ids = list(action.user_ids)
+        join_failures: list[BulkRoleAssignmentFailure] = []
         if action.project_id is not None:
-            for user_id in action.user_ids:
-                await self._roster_repository.join_member(action.project_id, user_id)
-        data = await self._repository.bulk_assign_role(
-            action.role_id, action.user_ids, action.granted_by
+            joined = await self._roster_repository.join_each(action.project_id, action.user_ids)
+            user_ids = joined.joined
+            join_failures = [
+                BulkRoleAssignmentFailure(user_id=f.user_id, message=f.message)
+                for f in joined.failures
+            ]
+        data = await self._repository.bulk_assign_role(action.role_id, user_ids, action.granted_by)
+        return BulkAssignRoleActionResult(
+            data=BulkRoleAssignmentResultData(
+                successes=data.successes, failures=join_failures + data.failures
+            )
         )
-        return BulkAssignRoleActionResult(data=data)
 
     async def bulk_revoke_role(self, action: BulkRevokeRoleAction) -> BulkRevokeRoleActionResult:
         """Revokes a role from multiple users with partial failure support."""

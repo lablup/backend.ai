@@ -40,7 +40,23 @@ from ai.backend.manager.models.virtual_entity.queries import user_scope_membersh
 from ai.backend.manager.repositories.ops.v2.cap import V2CapOps
 from ai.backend.manager.repositories.ops.v2.write import V2WriteOps
 
-__all__ = ("RosterLeaveResult", "V2RosterWriteOps")
+__all__ = ("RosterJoinFailure", "RosterJoinResult", "RosterLeaveResult", "V2RosterWriteOps")
+
+
+@dataclass(frozen=True)
+class RosterJoinFailure:
+    """A named user that could not join the roster, and why."""
+
+    user_id: UserID
+    message: str
+
+
+@dataclass
+class RosterJoinResult:
+    """Who joined the roster, and which named users could not."""
+
+    joined: list[UserID] = field(default_factory=list)
+    failures: list[RosterJoinFailure] = field(default_factory=list)
 
 
 @dataclass

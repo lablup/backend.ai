@@ -97,6 +97,8 @@ entity type, shape, operation, gate and backing.
 - Granting a project-scoped role puts the user on that project's list, and taking the
   last role there back takes them off it. The two writes are one operation, so they sit
   here beside the roster rather than with the role catalog.
+- A bulk role grant fails per user. A user who cannot join the roster and a user the
+  grant fails for are reported in failures; the other users go through.
 - What stays with the role catalog is the role itself and its permissions: creating a
   role, editing it, and reading it are not graph writes.
 - These four are still on the legacy action base. The role domain's move to the v2
