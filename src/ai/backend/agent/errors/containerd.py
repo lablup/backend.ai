@@ -180,6 +180,21 @@ class KernelAddressExhausted(BackendAIError, web.HTTPServiceUnavailable):
         )
 
 
+class KernelTaskExited(BackendAIError, web.HTTPInternalServerError):
+    """Raised when the task of a kernel exits before the kernel becomes ready."""
+
+    error_type = "https://api.backend.ai/probs/agent/kernel-task-exited"
+    error_title = "The kernel task exited before the kernel became ready."
+
+    @override
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.KERNEL,
+            operation=ErrorOperation.CREATE,
+            error_detail=ErrorDetail.INTERNAL_ERROR,
+        )
+
+
 class ReadinessTimeout(BackendAIError, web.HTTPGatewayTimeout):
     """Raised when a kernel is not ready within the readiness timeout of its launch plan."""
 

@@ -488,6 +488,7 @@ class ContainerdKernelCreationContext(AbstractKernelCreationContext[ContainerdKe
             environ=environ,
             data={},
             launch_plan=launch_plan,
+            client=self._client,
         )
 
     async def _add_spec_jws(self, signature: str) -> None:
