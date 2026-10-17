@@ -27,7 +27,7 @@ def _reexec_with_argv0(display_name: str) -> None:
             argv = [display_name, "-s", sys.argv[0]]
         # The re-executed interpreter has a display name as argv[0], so it cannot locate its own prefix.
         # Always pin it, even if the image sets VIRTUAL_ENV (removed again after the re-exec).
-        env["PYTHONHOME"] = sys.prefix
+        env["PYTHONHOME"] = sys.base_prefix
         # The process is re-executed in place, overriding argv and cmdline.
         os.execvpe(sys.executable, argv, env)
     else:
