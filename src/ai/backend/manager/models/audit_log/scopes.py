@@ -51,60 +51,18 @@ class EntityAuditLogTarget(AuditLogTarget):
         owner = self.owner
 
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-<<<<<<< HEAD
-            return sa.and_(
-                AuditLogRow.entity_type == owner.entity_type(),
-                AuditLogRow.entity_id == str(owner),
-            )
-
-        return inner
-
-    @property
-    @override
-    def existence_checks(self) -> Sequence[ExistenceCheck[Any]]:
-        return ()
-
-
-@dataclass(frozen=True)
-class ScopeAuditLogTarget(AuditLogTarget):
-    """The records of the runs that named one entity as the scope they ran in.
-
-    The other half of what an entity's history means, kept apart so a caller asks for
-    one or the other rather than always both: a scope action records the entities it
-    touched on the row and the scopes it ran in on ``audit_log_scopes``.
-    """
-
-    owner: EntityIdentifier
-
-    @override
-    def scope_id(self) -> EntityIdentifier:
-        return self.owner
-
-    @override
-    def to_condition(self) -> QueryCondition:
-        owner = self.owner
-
-        def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return sa.exists().where(
-                sa.and_(
-                    AuditLogScopeRow.audit_log_id == AuditLogRow.id,
-                    AuditLogScopeRow.scope_type == owner.entity_type(),
-                    AuditLogScopeRow.scope_id == str(owner),
-                )
-=======
             return sa.or_(
                 sa.and_(
                     AuditLogRow.entity_type == owner.entity_type(),
-                    AuditLogRow.entity_id == owner,
+                    AuditLogRow.entity_id == str(owner),
                 ),
                 sa.exists().where(
                     sa.and_(
                         AuditLogScopeRow.audit_log_id == AuditLogRow.id,
                         AuditLogScopeRow.scope_type == owner.entity_type(),
-                        AuditLogScopeRow.scope_id == owner,
+                        AuditLogScopeRow.scope_id == str(owner),
                     )
                 ),
->>>>>>> 824275e3 (fix(BA-8562): record a refused scoped audit-log read once per entity (#15785))
             )
 
         return inner

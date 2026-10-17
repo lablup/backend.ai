@@ -50,8 +50,8 @@ class TestEntityAuditLogTarget:
                 AuditLogRow(
                     id=row_id,
                     action_kind=ActionKind.SCOPE,
-                    entity_type=entity_type,
-                    entity_id=entity_id,
+                    entity_type=entity_type.name(),
+                    entity_id=str(entity_id),
                     operation="get",
                     action_name="test",
                     action_id=uuid.uuid4(),
@@ -61,7 +61,9 @@ class TestEntityAuditLogTarget:
             )
             await db_sess.flush()
             db_sess.add_all([
-                AuditLogScopeRow(audit_log_id=row_id, scope_type=scope_type, scope_id=scope_id)
+                AuditLogScopeRow(
+                    audit_log_id=row_id, scope_type=scope_type.name(), scope_id=str(scope_id)
+                )
                 for scope_type, scope_id in scopes or []
             ])
         return row_id
