@@ -1,12 +1,13 @@
 from __future__ import annotations
 
-from typing import Annotated
+from collections.abc import Mapping
+from typing import Annotated, Any
 
-from pydantic import Field
+from pydantic import Field, model_validator
 
 from ai.backend.common.config import BaseConfigSchema
 from ai.backend.common.data.config.types import EtcdConfigData
-from ai.backend.common.meta import BackendAIConfigMeta, ConfigExample
+from ai.backend.common.meta import BackendAIConfigMeta, CompositeType, ConfigExample
 from ai.backend.common.typed_validators import HostPortPair
 
 __all__ = ("EtcdConfig",)
@@ -33,16 +34,29 @@ class EtcdConfig(BaseConfigSchema):
         ),
     ]
     addr: Annotated[
-        HostPortPair | list[HostPortPair],
-        Field(default_factory=lambda: HostPortPair(host="127.0.0.1", port=2379)),
+        HostPortPair | list[HostPortPair] | None,
+        Field(default=None),
         BackendAIConfigMeta(
             description=(
-                "Network address of the etcd server. "
-                "Default is the standard etcd port on localhost. "
-                "In production, should point to one or more etcd instance endpoint(s)."
+                "Network address of the etcd server, or a list of them. "
+                "Read as addrs when addrs is not set."
             ),
             added_version="22.03.0",
-            example=ConfigExample(local="127.0.0.1:2379", prod="etcd-cluster:2379"),
+            deprecated_version="26.10.0",
+            deprecation_hint="Use addrs instead.",
+        ),
+    ]
+    addrs: Annotated[
+        list[HostPortPair],
+        Field(default_factory=lambda: [HostPortPair(host="127.0.0.1", port=2379)], min_length=1),
+        BackendAIConfigMeta(
+            description=(
+                "Addresses of the etcd cluster members. "
+                "List every member of an etcd cluster, or a single address of a standalone server."
+            ),
+            added_version="26.10.0",
+            composite=CompositeType.LIST,
+            example=ConfigExample(local="127.0.0.1:2379", prod="etcd1.example.com:2379"),
         ),
     ]
     user: Annotated[
@@ -73,11 +87,23 @@ class EtcdConfig(BaseConfigSchema):
         ),
     ]
 
+    @model_validator(mode="before")
+    @classmethod
+    def _read_addr_as_addrs(cls, data: Any) -> Any:
+        if (
+            not isinstance(data, Mapping)
+            or data.get("addr") is None
+            or data.get("addrs") is not None
+        ):
+            return data
+        addr = data["addr"]
+        return {**data, "addrs": addr if isinstance(addr, list) else [addr]}
+
     def to_dataclass(self) -> EtcdConfigData:
         """Convert to EtcdConfigData dataclass."""
         return EtcdConfigData(
             namespace=self.namespace,
-            addrs=self.addr if isinstance(self.addr, list) else [self.addr],
+            addrs=self.addrs,
             user=self.user,
             password=self.password,
         )

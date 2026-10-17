@@ -33,12 +33,12 @@ class TestRedisProvider:
 
         # Create mock config with only etcd settings
         config = MagicMock(spec=StorageProxyUnifiedConfig)
-        config.etcd = EtcdConfig(
-            addr=HostPortPair(host=etcd_addr.host, port=etcd_addr.port),
-            namespace=test_ns,
-            user=None,
-            password=None,
-        )
+        config.etcd = EtcdConfig.model_validate({
+            "addrs": [HostPortPair(host=etcd_addr.host, port=etcd_addr.port)],
+            "namespace": test_ns,
+            "user": None,
+            "password": None,
+        })
         return config
 
     @pytest.fixture

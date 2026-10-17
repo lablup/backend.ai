@@ -515,13 +515,7 @@ async def etcd_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
         if traefik_config.etcd.password:
             creds = {"password": traefik_config.etcd.password}
 
-        # Handle addr as either single HostPortPair or list
-        addr = traefik_config.etcd.addr
-        if isinstance(addr, list):
-            # Use first address from the list
-            host_port = addr[0]
-        else:
-            host_port = addr
+        host_port = traefik_config.etcd.addrs[0]
 
         root_ctx.traefik_etcd = TraefikEtcd(
             HostPortPair(host_port.host, host_port.port),

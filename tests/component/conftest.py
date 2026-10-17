@@ -1413,14 +1413,8 @@ async def background_task_manager(
 def _make_async_etcd(bootstrap_config: BootstrapConfig) -> AsyncEtcd:
     """Create an AsyncEtcd instance from bootstrap config."""
     etcd_config = bootstrap_config.etcd
-    etcd_addr = etcd_config.addr
-    addrs: HostPortPair | list[HostPortPair]
-    if isinstance(etcd_addr, list):
-        addrs = [HostPortPair(host=a.host, port=a.port) for a in etcd_addr]
-    else:
-        addrs = HostPortPair(host=etcd_addr.host, port=etcd_addr.port)
     return AsyncEtcd(
-        addrs=addrs,
+        addrs=[HostPortPair(host=a.host, port=a.port) for a in etcd_config.addrs],
         namespace=etcd_config.namespace,
         scope_prefix_map={
             ConfigScopes.GLOBAL: "global",
