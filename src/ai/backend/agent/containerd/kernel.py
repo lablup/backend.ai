@@ -72,6 +72,7 @@ class ContainerdKernel(AbstractKernel):
             environ=environ,
         )
         self.launch_plan = launch_plan
+        # Process-local handle for the readiness wait; not part of the pickled kernel state.
         self._client = client
         self._readiness_deadline = None
 

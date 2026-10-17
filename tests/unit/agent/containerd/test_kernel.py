@@ -31,7 +31,6 @@ from ai.backend.agent.errors.containerd import (
     ReadinessTimeout,
 )
 from ai.backend.agent.types import KernelOwnershipData
-from ai.backend.common.exception import BackendAIError
 from ai.backend.common.types import KernelId, ServicePortProtocols
 
 from .fakes import FakeContainerd
@@ -526,6 +525,19 @@ class TestCheckStatusTlsTaskExit:
 
         assert await tls_kernel.check_status() == {}
 
-    def test_task_exit_is_not_retried_by_the_create_loop(self) -> None:
-        assert not issubclass(KernelTaskExited, TryAgain)
-        assert issubclass(KernelTaskExited, BackendAIError)
+    @pytest.mark.parametrize("state", [TaskState.CREATED, TaskState.UNKNOWN])
+    async def test_not_yet_running_task_keeps_retrying(
+        self,
+        tls_kernel: ContainerdKernel,
+        fake: FakeContainerd,
+        running: str,
+        fast_probe: None,
+        refused: FakeConnect,
+        state: TaskState,
+    ) -> None:
+        fake.tasks[running] = TaskInfo(pid=0, state=state, exit_status=0)
+
+        with pytest.raises(TryAgain):
+            await tls_kernel.check_status()
+
+        assert refused.calls >= 2
