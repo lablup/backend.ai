@@ -67,3 +67,18 @@ class TestEtcdConfigIvAddrs:
         checked = config.etcd_config_iv.check({"etcd": {"namespace": "local", **etcd}})
 
         assert [(str(addr.host), addr.port) for addr in checked["etcd"]["addrs"]] == expected
+
+    @pytest.mark.parametrize(
+        "etcd",
+        [
+            {"addrs": ["etcd2:2379", "etcd3:2379"]},
+            {"addr": "etcd1:2379", "addrs": ["etcd2:2379", "etcd3:2379"]},
+        ],
+    )
+    def test_addr_follows_addrs(self, etcd: dict[str, Any]) -> None:
+        checked = config.etcd_config_iv.check({"etcd": {"namespace": "local", **etcd}})
+
+        assert [(str(addr.host), addr.port) for addr in checked["etcd"]["addr"]] == [
+            ("etcd2", 2379),
+            ("etcd3", 2379),
+        ]

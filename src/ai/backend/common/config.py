@@ -95,9 +95,9 @@ class BaseConfigModel(BackendAISchema):
     )
 
 
-def _read_etcd_addr_as_addrs(etcd: dict[str, Any]) -> dict[str, Any]:
+def _align_etcd_addr_and_addrs(etcd: dict[str, Any]) -> dict[str, Any]:
     if etcd.get("addrs") is not None:
-        return etcd
+        return {**etcd, "addr": etcd["addrs"]}
     addr = etcd["addr"]
     return {**etcd, "addrs": addr if isinstance(addr, list) else [addr]}
 
@@ -110,7 +110,7 @@ etcd_config_iv = t.Dict({
         t.Key("user", default=""): t.Null | t.String(allow_blank=True),
         t.Key("password", default=""): t.Null | t.String(allow_blank=True),
     }).allow_extra("*")
-    & _read_etcd_addr_as_addrs,
+    & _align_etcd_addr_and_addrs,
 }).allow_extra("*")
 
 redis_helper_default_config: RedisHelperConfig = {
