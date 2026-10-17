@@ -354,7 +354,7 @@ class TestCreateKernels:
         agent.local_config.agent.kernel_creation_concurrency = 1
         # The kernel is gone from the registry, as when the lifecycle task cleaned it up.
         agent.kernel_registry = {}
-        agent.reported_creation_failures = {kernel_id} if reported else set()
+        agent.failure_reporting_kernels = {kernel_id} if reported else set()
         agent.create_kernel = AsyncMock(side_effect=RuntimeError("rejected"))
         agent.inject_container_lifecycle_event = AsyncMock()
         image_ref = MagicMock()
@@ -378,7 +378,36 @@ class TestCreateKernels:
             )
         else:
             agent.inject_container_lifecycle_event.assert_not_awaited()
-        assert kernel_id not in agent.reported_creation_failures
+        assert kernel_id not in agent.failure_reporting_kernels
+
+    async def test_retried_creation_entry_survives_the_stale_report(self) -> None:
+        session_id = uuid.uuid4()
+        kernel_id = KernelId(uuid.uuid4())
+        agent = MagicMock()
+        agent.id = PRIMARY_AGENT_ID
+        agent.local_config.agent.kernel_creation_concurrency = 1
+        agent.kernel_registry = {}
+        agent.failure_reporting_kernels = set()
+        agent.create_kernel = AsyncMock(side_effect=RuntimeError("rejected"))
+
+        async def inject_while_retry_registers(*_args: object, **_kwargs: object) -> None:
+            # A retried RPC registers its kernel while the stale report is awaited.
+            agent.failure_reporting_kernels.add(kernel_id)
+
+        agent.inject_container_lifecycle_event = AsyncMock(side_effect=inject_while_retry_registers)
+        image_ref = MagicMock()
+        image_ref.canonical = "cr.backend.ai/stable/python:latest"
+
+        with pytest.raises(RuntimeError):
+            await AgentRPCServer.create_kernels(
+                _server(agent),
+                _request(
+                    "create_kernels",
+                    (str(session_id), [str(kernel_id)], [{}], {}, {kernel_id: image_ref}),
+                ),
+            )
+
+        assert kernel_id in agent.failure_reporting_kernels
 
     @pytest.mark.parametrize(
         ("error", "entry_kept"),
@@ -398,7 +427,7 @@ class TestCreateKernels:
         agent.local_config.agent.kernel_creation_concurrency = 1
         agent.kernel_registry = {}
         # The ongoing creation registered the kernel and owns its failure reporting.
-        agent.reported_creation_failures = {kernel_id}
+        agent.failure_reporting_kernels = {kernel_id}
         agent.create_kernel = AsyncMock(side_effect=error)
         agent.inject_container_lifecycle_event = AsyncMock()
         image_ref = MagicMock()
@@ -414,7 +443,7 @@ class TestCreateKernels:
             )
 
         agent.inject_container_lifecycle_event.assert_not_awaited()
-        assert (kernel_id in agent.reported_creation_failures) is entry_kept
+        assert (kernel_id in agent.failure_reporting_kernels) is entry_kept
 
     async def test_failure_outside_kernels_is_logged_once(
         self, capture: pytest.LogCaptureFixture

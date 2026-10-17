@@ -874,7 +874,7 @@ class AbstractAgent[
     _active_pulls: dict[str, PullTaskInfo]  # key: image canonical name
     _active_creates: dict[KernelId, CreateTaskInfo]
     # Kernels registered by an ongoing `create_kernel`, which reports their failures itself.
-    reported_creation_failures: set[KernelId]
+    failure_reporting_kernels: set[KernelId]
 
     @contextmanager
     def track_pull(self, image: str) -> Generator[bool, None, None]:
@@ -960,7 +960,7 @@ class AbstractAgent[
         # Initialize health monitoring tracking maps
         self._active_pulls = {}
         self._active_creates = {}
-        self.reported_creation_failures = set()
+        self.failure_reporting_kernels = set()
         self._sync_container_lifecycle_observer = SyncContainerLifecycleObserver.instance()
         self._clean_kernel_registry_task = asyncio.create_task(self._clean_kernel_registry_loop())
 
@@ -2975,7 +2975,7 @@ class AbstractAgent[
                     async with self.registry_lock:
                         self.kernel_registry[kernel_id] = kernel_obj
                     if not restarting:
-                        self.reported_creation_failures.add(kernel_id)
+                        self.failure_reporting_kernels.add(kernel_id)
                     log.debug("kernel container starting")
                     try:
                         container_data = await ctx.start_container(

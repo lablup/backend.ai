@@ -834,7 +834,7 @@ class AgentRPCServer(aobject):
                 session_id=ownership_data.session_id, kernel_id=ownership_data.kernel_id
             ):
                 log.debug("kernel creating", image_name=kernel_image.canonical)
-                refused = False
+                released = False
                 try:
                     return await agent.create_kernel(
                         ownership_data,
@@ -845,7 +845,7 @@ class AgentRPCServer(aobject):
                     )
                 except KernelCreationInProgressError:
                     # The ongoing creation owns the entry.
-                    refused = True
+                    released = True
                     raise
                 except (TimeoutError, asyncio.CancelledError):
                     raise
@@ -854,10 +854,14 @@ class AgentRPCServer(aobject):
                     raise
                 except Exception:
                     log.exception("kernel creation failed")
-                    if (
+                    unreported = (
                         ownership_data.kernel_id not in agent.kernel_registry
-                        and ownership_data.kernel_id not in agent.reported_creation_failures
-                    ):
+                        and ownership_data.kernel_id not in agent.failure_reporting_kernels
+                    )
+                    # Release before awaiting, so a retried RPC's entry is not discarded.
+                    agent.failure_reporting_kernels.discard(ownership_data.kernel_id)
+                    released = True
+                    if unreported:
                         # No container exists to report the failure for it, so tell the manager
                         # the kernel is gone instead of leaving the session to its create timeout.
                         await agent.inject_container_lifecycle_event(
@@ -868,8 +872,8 @@ class AgentRPCServer(aobject):
                         )
                     raise
                 finally:
-                    if not refused:
-                        agent.reported_creation_failures.discard(ownership_data.kernel_id)
+                    if not released:
+                        agent.failure_reporting_kernels.discard(ownership_data.kernel_id)
 
         # Failures raised by `_create_kernel` are logged in their kernel scope; this logs the rest.
         try:
