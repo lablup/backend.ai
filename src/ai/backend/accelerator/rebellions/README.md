@@ -15,5 +15,7 @@ Agent config:
 Before starting the agent, register the `rebel100.device` slot type (no migration inserts it, and `agent_resources.slot_name` references `resource_slot_types`): create it with the v2 resource-slot slot-type create command as superadmin, or load `fixtures/manager/example-resource-slot-types.json` on a dev setup.
 
 ## Known issue
-- Images that set `VIRTUAL_ENV` (such as `rbln/vllm-rbln`) make the in-container kernel runner abort with "Failed to import encodings module". The cause is in the Backend.AI core, not in this plugin.
-- Workaround: set the session or model-service environment variable `PYTHONHOME=/opt/backend.ai`.
+- Images that set `VIRTUAL_ENV` (such as `rbln/vllm-rbln`) make the in-container kernel runner abort with "Failed to import encodings module". The cause is in the Backend.AI core; the fix is in draft PR #15799.
+- `PYTHONHOME=/opt/backend.ai` starts the session, but services the runner launches inherit it and the image's Python fails the same way.
+- Recommended: use an image without `VIRTUAL_ENV`, e.g. flatten it with `docker export | docker import`, setting `PATH=/opt/rbln-venv/bin:...` and the Backend.AI labels instead.
+- The runner waits 30 s for a service port to open, while vLLM loads for minutes: use the model-service path, or a wrapper that opens the port early.
