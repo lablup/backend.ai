@@ -71,7 +71,7 @@ class AuditLogScopeEntryGQL(PydanticNodeMixin[AuditLogScopeEntryNode]):
         | None
     ):
         return await info.context.data_loaders.entity_node_loader.load(
-            RuntimeEntityID(EntityType(self.scope_type), self.scope_id)
+            RuntimeEntityID(EntityType.from_name(self.scope_type), self.scope_id)
         )
 
     @gql_field(description="The audit log the scope belongs to.")  # type: ignore[misc]
