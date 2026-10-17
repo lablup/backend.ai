@@ -105,8 +105,8 @@ class TestApply:
     async def test_an_overwrite_keeps_the_names_images_refer_to(
         self, db: ExtendedAsyncSAEngine, repository: SeedRepository, plan: SeedPlan
     ) -> None:
-        """``url`` and the credentials are rewritten; ``registry_name``, ``project`` and
-        ``is_global`` stay as the row had them."""
+        """``url`` and the stated credentials are rewritten; ``registry_name``, ``project``,
+        ``is_global`` and a credential the seed leaves null stay as the row had them."""
         async with db.begin_session() as sess:
             await sess.execute(
                 sa.insert(ContainerRegistryRow).values(
@@ -126,7 +126,7 @@ class TestApply:
         registry = (await _registries(db))[_HARBOR]
         assert registry["url"] == "https://cr.backend.ai"
         assert registry["type"] == ContainerRegistryType.HARBOR2
-        assert registry["username"] is None
+        assert registry["username"] == "someone"
         assert (registry["registry_name"], registry["project"], registry["is_global"]) == (
             "renamed",
             "community",

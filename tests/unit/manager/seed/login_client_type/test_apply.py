@@ -105,7 +105,7 @@ class TestApply:
         results = await SeedApplier(repository).apply(plan, overwrite=True)
 
         assert results[SeedKind.LOGIN_CLIENT_TYPE].succeeded == [_WEBUI, _CLI]
-        assert await _types(db) == {_WEBUI: ("webui", "Web UI"), _CLI: ("cli", None)}
+        assert await _types(db) == {_WEBUI: ("webui", "Web UI"), _CLI: ("cli", "edited")}
         assert await _public_members(db) == {_WEBUI, _CLI}
 
     @pytest.mark.parametrize("overwrite", [False, True], ids=["insert", "overwrite"])

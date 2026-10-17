@@ -156,7 +156,11 @@ class TestApply:
         results = await SeedApplier(repository).apply(plan, overwrite=True)
 
         assert results[SeedKind.PROMETHEUS_QUERY_PRESET].succeeded == [_SUM, _RATE]
-        assert await _presets(db) == _SEEDED
+        name, time_window, _, rank, category, options = _SEEDED[_RATE]
+        assert await _presets(db) == {
+            **_SEEDED,
+            _RATE: (name, time_window, "added through the API", rank, category, options),
+        }
 
     async def test_a_missing_category_fails_only_that_item(
         self,

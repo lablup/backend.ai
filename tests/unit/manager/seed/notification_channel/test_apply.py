@@ -130,7 +130,7 @@ class TestApply:
         assert results[SeedKind.NOTIFICATION_CHANNEL].succeeded == [_WEBHOOK_ID, _EMAIL_ID]
         assert (await _channels(db))[_WEBHOOK_ID] == {
             "name": "ops-webhook",
-            "description": None,
+            "description": "set through the API",
             "channel_type": "webhook",
             "config": {
                 "url": "https://hooks.example.com/ops",
