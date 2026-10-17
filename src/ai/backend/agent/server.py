@@ -1686,6 +1686,8 @@ async def server_main(
         log.info("agent service started")
     except Exception:
         log.exception("agent initialization failed, shutting down")
+        child_status: ChildStatus = _args[2][pidx]
+        child_status.mark_init_failed()
         loop.call_later(0.2, os.kill, 0, signal.SIGINT)
 
     # Run!

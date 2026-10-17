@@ -76,6 +76,7 @@ from ai.backend.common.middlewares.exception import general_exception_middleware
 from ai.backend.common.middlewares.request_id import request_id_middleware
 from ai.backend.common.msgpack import DEFAULT_PACK_OPTS, DEFAULT_UNPACK_OPTS
 from ai.backend.common.networking import force_threaded_dns_resolver
+from ai.backend.common.process.child_exit import ChildExitMonitor, ChildStatus
 from ai.backend.common.web.session import (
     Session,
     extra_config_headers,
@@ -801,6 +802,8 @@ async def server_main_logwrapper(
     setproctitle(f"backend.ai: webserver worker-{pidx}")
     config: WebServerUnifiedConfig = _args[0]
     log_endpoint = _args[1]
+    child_status: ChildStatus = _args[2][pidx]
+    child_status.publish_pid()
     logger = Logger(
         config.logging,
         is_master=False,
@@ -814,6 +817,7 @@ async def server_main_logwrapper(
         with logger:
             async with server_main(loop, pidx, _args):
                 yield
+            child_status.mark_clean_shutdown()
     except Exception:
         traceback.print_exc(file=sys.stderr)
 
@@ -1271,6 +1275,8 @@ async def server_main(
         log.info("started the web gateway service")
     except Exception:
         log.exception("server initialization failed; triggering shutdown")
+        child_status: ChildStatus = args[2][pidx]
+        child_status.mark_init_failed()
         loop.call_later(0.2, os.kill, 0, signal.SIGINT)
     try:
         yield
@@ -1362,15 +1368,17 @@ def main(
                         log.info("using uvloop as the event loop backend")
                     case EventLoopType.ASYNCIO:
                         runner = asyncio.run
+                child_statuses = tuple(ChildStatus() for _ in range(min(4, os.cpu_count() or 1)))
                 try:
                     aiotools.start_server(
                         server_main_logwrapper,
                         num_workers=min(4, os.cpu_count() or 1),
-                        args=(server_config, log_endpoint),
+                        args=(server_config, log_endpoint, child_statuses),
                         runner=runner,
                     )
                 finally:
                     log.info("terminated")
+                ChildExitMonitor(child_statuses).raise_system_exit()
         finally:
             if server_config.webserver.pid_file.is_file():
                 # check is_file() to prevent deleting /dev/null!

@@ -50,14 +50,15 @@ class ChildCheck:
 
 @dataclass(frozen=True)
 class ChildStatus:
-    """One child's process ID and whether it reached the end of its shutdown path.
-    Both live in shared memory because the child writes them and the supervisor reads
+    """One child's process ID, whether it reached the end of its shutdown path, and
+    whether its initialization failed. All live in shared memory because the child writes them and the supervisor reads
     them. Create one per child and hand it to that child through the worker arguments."""
 
     pid: Synchronized[int] = field(
         default_factory=lambda: mp.Value("i", _UNPUBLISHED_PID),
     )
     clean_shutdown: MPEvent = field(default_factory=mp.Event)
+    init_failed: MPEvent = field(default_factory=mp.Event)
 
     def publish_pid(self) -> None:
         """Call once the child process has started."""
@@ -66,6 +67,10 @@ class ChildStatus:
     def mark_clean_shutdown(self) -> None:
         """Call once the child has finished its shutdown routines."""
         self.clean_shutdown.set()
+
+    def mark_init_failed(self) -> None:
+        """Call when the child's initialization failed and it shuts itself down."""
+        self.init_failed.set()
 
 
 class ChildExitMonitor:
@@ -96,10 +101,13 @@ class ChildExitMonitor:
         self._thread.start()
 
     def raise_system_exit(self) -> None:
-        """Fail the process unless every child ran its shutdown routines. Call this once
-        the server has stopped: a zero exit code tells a service manager that the stop
-        was intended, so `Restart=on-failure` would not fire."""
-        if all(status.clean_shutdown.is_set() for status in self._statuses):
+        """Fail the process unless every child initialized and ran its shutdown routines.
+        Call this once the server has stopped: a zero exit code tells a service manager
+        that the stop was intended, so `Restart=on-failure` would not fire."""
+        if all(
+            status.clean_shutdown.is_set() and not status.init_failed.is_set()
+            for status in self._statuses
+        ):
             return
         raise SystemExit(1)
 

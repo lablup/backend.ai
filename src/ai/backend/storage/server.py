@@ -36,6 +36,7 @@ from ai.backend.common.metrics.profiler import Profiler, PyroscopeArgs
 from ai.backend.common.msgpack import DEFAULT_PACK_OPTS, DEFAULT_UNPACK_OPTS
 from ai.backend.common.networking import force_threaded_dns_resolver
 from ai.backend.common.plugin import AbstractPlugin, BasePluginContext
+from ai.backend.common.process.child_exit import ChildExitMonitor, ChildStatus
 from ai.backend.common.types import HostPortPair as CommonHostPortPair
 from ai.backend.common.utils import env_info
 from ai.backend.logging import Logger, LogLevel
@@ -85,6 +86,7 @@ class ServerMainArgs:
     config_path: Path | None
     log_endpoint: str
     log_level: LogLevel
+    child_statuses: Sequence[ChildStatus]
 
 
 @aiotools.server_context
@@ -99,7 +101,10 @@ async def server_main_logwrapper(
         config_path=tuple_args[1],
         log_endpoint=tuple_args[2],
         log_level=tuple_args[3],
+        child_statuses=tuple_args[4],
     )
+    child_status = args.child_statuses[pidx]
+    child_status.publish_pid()
     logger = Logger(
         args.local_config.logging,
         is_master=False,
@@ -113,6 +118,7 @@ async def server_main_logwrapper(
         with logger:
             async with server_main(loop, pidx, args):
                 yield
+            child_status.mark_clean_shutdown()
     except Exception:
         traceback.print_exc(file=sys.stderr)
 
@@ -410,6 +416,7 @@ async def server_main(
         log.info("storage-proxy started")
     except Exception:
         log.exception("server initialization failed, shutting down")
+        args.child_statuses[pidx].mark_init_failed()
         loop.call_later(0.2, os.kill, 0, signal.SIGINT)
     try:
         yield
@@ -535,17 +542,25 @@ def main(
                 else:
                     extra_procs = tuple()
 
+                child_statuses = tuple(ChildStatus() for _ in range(num_workers))
                 try:
                     aiotools.start_server(
                         server_main_logwrapper,
                         num_workers=num_workers,
                         extra_procs=extra_procs,
-                        args=(local_config, resolved_config_path, log_endpoint, log_level),
+                        args=(
+                            local_config,
+                            resolved_config_path,
+                            log_endpoint,
+                            log_level,
+                            child_statuses,
+                        ),
                         runner=runner,
                     )
                 finally:
                     cleanup_prometheus_multiprocess_dir()
                 log.info("storage-proxy exited")
+                ChildExitMonitor(child_statuses).raise_system_exit()
         finally:
             if local_config.storage_proxy.pid_file.is_file():
                 # check is_file() to prevent deleting /dev/null!
