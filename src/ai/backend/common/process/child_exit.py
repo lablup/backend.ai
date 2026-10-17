@@ -51,8 +51,9 @@ class ChildCheck:
 @dataclass(frozen=True)
 class ChildStatus:
     """One child's process ID, whether it reached the end of its shutdown path, and
-    whether its initialization failed. All live in shared memory because the child writes them and the supervisor reads
-    them. Create one per child and hand it to that child through the worker arguments."""
+    whether its initialization failed. All live in shared memory because the child
+    writes them and the supervisor reads them. Create one per child and hand it to that
+    child through the worker arguments."""
 
     pid: Synchronized[int] = field(
         default_factory=lambda: mp.Value("i", _UNPUBLISHED_PID),

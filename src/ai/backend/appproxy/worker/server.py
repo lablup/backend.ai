@@ -1068,11 +1068,12 @@ def main(ctx: click.Context, config_path: Path, debug: bool, log_level: LogLevel
                         log.info("using uvloop as the event loop backend")
                     case EventLoopType.ASYNCIO:
                         runner = asyncio.run
-                child_statuses = tuple(ChildStatus() for _ in range(1))
+                num_workers = 1
+                child_statuses = tuple(ChildStatus() for _ in range(num_workers))
                 try:
                     aiotools.start_server(
                         server_main_logwrapper,
-                        num_workers=1,
+                        num_workers=num_workers,
                         args=(server_config, log_endpoint, child_statuses),
                         wait_timeout=5.0,
                         runner=runner,

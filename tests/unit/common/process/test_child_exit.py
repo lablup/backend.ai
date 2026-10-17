@@ -1,8 +1,15 @@
 from __future__ import annotations
 
+import multiprocessing as mp
+
 import pytest
 
 from ai.backend.common.process.child_exit import ChildExitMonitor, ChildStatus
+
+
+def _fail_init(status: ChildStatus) -> None:
+    status.mark_init_failed()
+    status.mark_clean_shutdown()
 
 
 class TestChildExitMonitorRaiseSystemExit:
@@ -35,3 +42,14 @@ class TestChildExitMonitorRaiseSystemExit:
 
     def test_passes_without_children(self) -> None:
         ChildExitMonitor(()).raise_system_exit()
+
+    def test_fails_when_a_spawned_child_reports_an_init_failure(self) -> None:
+        status = ChildStatus()
+        child = mp.get_context("spawn").Process(target=_fail_init, args=(status,))
+        child.start()
+        child.join(timeout=30)
+
+        with pytest.raises(SystemExit) as exc_info:
+            ChildExitMonitor((status,)).raise_system_exit()
+
+        assert exc_info.value.code == 1

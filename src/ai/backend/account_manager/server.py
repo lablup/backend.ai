@@ -40,6 +40,7 @@ from ai.backend.common.metrics.multiprocess_setup import cleanup_prometheus_mult
 from ai.backend.common.metrics.profiler import Profiler, PyroscopeArgs
 from ai.backend.common.msgpack import DEFAULT_PACK_OPTS, DEFAULT_UNPACK_OPTS
 from ai.backend.common.networking import force_threaded_dns_resolver
+from ai.backend.common.process.child_exit import ChildExitMonitor, ChildStatus
 from ai.backend.common.types import HostPortPair
 from ai.backend.common.utils import env_info
 from ai.backend.logging import BraceStyleAdapter, Logger, LogLevel
@@ -384,6 +385,8 @@ async def server_main_logwrapper(
 ) -> AsyncGenerator[None, signal.Signals]:
     setproctitle(f"backend.ai: account-manager worker-{pidx}")
     log_endpoint = _args[1]
+    child_status: ChildStatus = _args[2][pidx]
+    child_status.publish_pid()
     logging_config = _args[0].logging
     logger = Logger(
         logging_config,
@@ -398,6 +401,7 @@ async def server_main_logwrapper(
         with logger:
             async with server_main(loop, pidx, _args):
                 yield
+            child_status.mark_clean_shutdown()
     except Exception:
         traceback.print_exc()
 
@@ -464,16 +468,20 @@ def main(
                 if account_manager_cfg.event_loop == EventLoopType.UVLOOP:
                     uvloop.install()
                     log.info("Using uvloop as the event loop backend")
+                child_statuses = tuple(
+                    ChildStatus() for _ in range(account_manager_cfg.num_workers)
+                )
                 try:
                     aiotools.start_server(
                         server_main_logwrapper,
                         num_workers=account_manager_cfg.num_workers,
-                        args=(server_config, log_endpoint),
+                        args=(server_config, log_endpoint, child_statuses),
                         wait_timeout=5.0,
                     )
                 finally:
                     cleanup_prometheus_multiprocess_dir()
                     log.info("terminated.")
+                ChildExitMonitor(child_statuses).raise_system_exit()
         finally:
             if account_manager_cfg.pid_file.is_file():
                 # check is_file() to prevent deleting /dev/null!
