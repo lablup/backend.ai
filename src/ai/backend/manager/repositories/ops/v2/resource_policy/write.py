@@ -104,7 +104,7 @@ class V2ResourcePolicyWriteOps(V2WriteOps, V2CapOps):
         restate that changes nothing rewrites nothing. What the scope owns stays."""
         dropped = sa.select(VirtualEntityRow.id).where(VirtualEntityRow.entity_type == entity_type)
         if keep is not None:
-            dropped = dropped.where(VirtualEntityRow.id != self._node_id_query(keep))
+            dropped = dropped.where(VirtualEntityRow.id.is_distinct_from(self._node_id_query(keep)))
         await self._sess.execute(
             sa.delete(EntityMembershipRow).where(
                 EntityMembershipRow.virtual_entity_id == self._node_id_query(scope),
