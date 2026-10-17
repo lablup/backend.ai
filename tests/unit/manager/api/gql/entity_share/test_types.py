@@ -13,7 +13,12 @@ from ai.backend.common.data.entity.vfolder import VFolderEntityType
 from ai.backend.common.dto.manager.v2.entity_share.response import EntityShareNode
 from ai.backend.common.dto.manager.v2.entity_share.types import EntityShareStatusDTO
 from ai.backend.common.dto.manager.v2.rbac.types import PermissionBitDTO
-from ai.backend.manager.api.gql.entity_share.types import EntityShareGQL
+from ai.backend.manager.api.gql.base import StringFilter, UUIDFilter
+from ai.backend.manager.api.gql.entity_share.types import (
+    EntityShareFilterGQL,
+    EntityShareGQL,
+    EntityShareStatusFilterGQL,
+)
 from ai.backend.manager.errors.common import GenericBadRequest
 from ai.backend.manager.errors.permission import NotEnoughPermission
 
@@ -141,3 +146,50 @@ class TestEntityShareTargetEntity:
         loaded_id = mock_info.context.data_loaders.entity_node_loader.load.call_args.args[0]
         assert isinstance(loaded_id.entity_type(), VFolderEntityType)
         assert loaded_id == target_id
+
+
+class TestEntityShareFilterToPydantic:
+    def test_status_equals(self) -> None:
+        filter_gql = EntityShareFilterGQL(
+            status=EntityShareStatusFilterGQL(equals=EntityShareStatusDTO.ACCEPTED)
+        )
+
+        dto = filter_gql.to_pydantic()
+
+        assert dto.status is not None
+        assert dto.status.equals == EntityShareStatusDTO.ACCEPTED
+
+    def test_status_in(self) -> None:
+        statuses = [EntityShareStatusDTO.PENDING, EntityShareStatusDTO.ACCEPTED]
+        filter_gql = EntityShareFilterGQL(status=EntityShareStatusFilterGQL(in_=statuses))
+
+        dto = filter_gql.to_pydantic()
+
+        assert dto.status is not None
+        assert dto.status.in_ == statuses
+
+    def test_recipient_entity_id(self) -> None:
+        recipient_id = uuid.uuid4()
+        filter_gql = EntityShareFilterGQL(recipient_entity_id=UUIDFilter(equals=recipient_id))
+
+        dto = filter_gql.to_pydantic()
+
+        assert dto.recipient_entity_id is not None
+        assert dto.recipient_entity_id.equals == recipient_id
+
+    def test_target_entity_id(self) -> None:
+        target_id = uuid.uuid4()
+        filter_gql = EntityShareFilterGQL(target_entity_id=UUIDFilter(equals=target_id))
+
+        dto = filter_gql.to_pydantic()
+
+        assert dto.target_entity_id is not None
+        assert dto.target_entity_id.equals == target_id
+
+    def test_recipient_email(self) -> None:
+        filter_gql = EntityShareFilterGQL(recipient_email=StringFilter(contains="example"))
+
+        dto = filter_gql.to_pydantic()
+
+        assert dto.recipient_email is not None
+        assert dto.recipient_email.contains == "example"
