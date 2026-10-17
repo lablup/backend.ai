@@ -91,6 +91,39 @@ class IdKeyedPermissionUpserter(RolePermissionPresetUpserter):
         return ["id"]
 
 
+@dataclass
+class TemplatedPresetUpserter(RolePresetUpserter):
+    """A preset that also states ``role_name_template``, None leaving it unstated."""
+
+    role_name_template: str | None = None
+
+    @override
+    def build_insert_values(self) -> dict[str, Any]:
+        return {**super().build_insert_values(), "role_name_template": self.role_name_template}
+
+    @override
+    def build_update_values(self) -> dict[str, Any]:
+        return {**super().build_update_values(), "role_name_template": self.role_name_template}
+
+
+@dataclass
+class NullOnlyPresetUpserter(RolePresetUpserter):
+    """A preset whose update values are all None."""
+
+    @override
+    def build_update_values(self) -> dict[str, Any]:
+        return {"name": None, "role_name_template": None}
+
+
+@dataclass
+class NullPermissionUpserter(RolePermissionPresetUpserter):
+    """A permission row whose update value is None, which its NOT NULL column refuses."""
+
+    @override
+    def build_update_values(self) -> dict[str, Any]:
+        return {"permission": None}
+
+
 @pytest.fixture
 async def db(
     global_entity_ids: ExtendedAsyncSAEngine,
@@ -133,6 +166,12 @@ async def _permission_count(db: ExtendedAsyncSAEngine) -> int:
     async with db.begin_readonly() as conn:
         count = await conn.scalar(sa.select(sa.func.count()).select_from(RolePermissionPresetRow))
         return int(count or 0)
+
+
+async def _templates(db: ExtendedAsyncSAEngine) -> dict[str, str | None]:
+    async with db.begin_readonly() as conn:
+        rows = await conn.execute(sa.select(RolePresetRow.name, RolePresetRow.role_name_template))
+        return {row.name: row.role_name_template for row in rows}
 
 
 async def _rename(db: ExtendedAsyncSAEngine, write: SeedWrite, name: str) -> None:
@@ -178,6 +217,55 @@ class TestWrite:
 
         assert results == [SeedWriteItemResult(written=True)]
         assert await _preset_names(db) == {"first"}
+
+    async def test_overwrite_leaves_a_column_whose_value_is_none(
+        self, db: ExtendedAsyncSAEngine, repository: SeedRepository
+    ) -> None:
+        preset_id = RolePresetID(uuid.uuid4())
+        stated = TemplatedPresetUpserter(
+            id=preset_id,
+            name="first",
+            scope_type=EntityType("domain"),
+            auto_assign=False,
+            role_name_template="filled-{scope}",
+        )
+        await repository.partial_write(
+            [SeedWrite(upserter=stated, field_upserters=(), field_purgers=())], overwrite=False
+        )
+        unstated = TemplatedPresetUpserter(
+            id=preset_id, name="renamed", scope_type=EntityType("domain"), auto_assign=False
+        )
+
+        results = await repository.partial_write(
+            [SeedWrite(upserter=unstated, field_upserters=(), field_purgers=())], overwrite=True
+        )
+
+        assert results == [SeedWriteItemResult(written=True)]
+        assert await _templates(db) == {"renamed": "filled-{scope}"}
+
+    async def test_overwrite_with_only_none_values_leaves_the_row(
+        self, db: ExtendedAsyncSAEngine, repository: SeedRepository
+    ) -> None:
+        write = _preset("first", _read())
+        await repository.partial_write([write], overwrite=False)
+        await _rename(db, write, "renamed")
+        preset = write.upserter
+        assert isinstance(preset, RolePresetUpserter)
+        nulls = NullOnlyPresetUpserter(
+            id=preset.id, name="first", scope_type=preset.scope_type, auto_assign=False
+        )
+        null_permission = NullPermissionUpserter(
+            entity_type=EntityType("agent"), permission=Permission.READ
+        )
+
+        results = await repository.partial_write(
+            [SeedWrite(upserter=nulls, field_upserters=[null_permission], field_purgers=())],
+            overwrite=True,
+        )
+
+        assert results == [SeedWriteItemResult(written=False)]
+        assert await _preset_names(db) == {"renamed"}
+        assert await _permission_count(db) == 1
 
 
 class TestRefusedItem:
