@@ -8,10 +8,13 @@ Tests cover:
 
 from __future__ import annotations
 
+import asyncio
 import json
+from collections.abc import AsyncIterator
 from datetime import UTC, datetime
 from unittest.mock import AsyncMock, MagicMock
 
+import aiohttp
 import pytest
 from aiohttp import web
 
@@ -328,6 +331,58 @@ class TestServerDrainNotifier:
             assert response.keep_alive is False
         else:
             assert "Connection" not in response.headers
+
+
+class TestDrainPeriod:
+    @pytest.fixture
+    async def drain_notifier(self) -> ServerDrainNotifier:
+        return ServerDrainNotifier()
+
+    @pytest.fixture
+    async def runner(self, drain_notifier: ServerDrainNotifier) -> AsyncIterator[web.AppRunner]:
+        async def ok(request: web.Request) -> web.Response:
+            return web.Response(text="ok")
+
+        app = web.Application()
+        app.router.add_get("/", ok)
+        app.on_response_prepare.append(drain_notifier.on_response_prepare)
+        runner = web.AppRunner(app, shutdown_timeout=1.0)
+        await runner.setup()
+        await web.TCPSite(runner, "127.0.0.1", 0).start()
+        try:
+            yield runner
+        finally:
+            await runner.cleanup()
+
+    @pytest.fixture
+    def url(self, runner: web.AppRunner) -> str:
+        host, port = runner.addresses[0][:2]
+        return f"http://{host}:{port}/"
+
+    async def test_accepts_new_connections_until_drain_period_ends(
+        self, drain_notifier: ServerDrainNotifier, runner: web.AppRunner, url: str
+    ) -> None:
+        drain = asyncio.create_task(drain_notifier.drain(0.5))
+        await asyncio.sleep(0)
+        assert drain_notifier.is_draining
+
+        async with aiohttp.ClientSession() as session:
+            async with session.get(url) as response:
+                assert response.status == 200
+                assert response.headers["Connection"] == "close"
+        assert not drain.done()
+
+        await drain
+        await runner.cleanup()
+        async with aiohttp.ClientSession() as session:
+            with pytest.raises(aiohttp.ClientConnectorError):
+                await session.get(url)
+
+    async def test_zero_drain_period_returns_immediately(
+        self, drain_notifier: ServerDrainNotifier
+    ) -> None:
+        await asyncio.wait_for(drain_notifier.drain(0), timeout=0.1)
+        assert drain_notifier.is_draining
 
 
 class TestDrainingErrorResponse:

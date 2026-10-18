@@ -126,7 +126,9 @@
 # the manager component itself.
 # Added in 25.8.0
 [manager]
-  # Seconds to wait for in-flight HTTP requests during shutdown.
+  # Seconds to keep accepting and serving requests after announcing the drain,
+  # before closing the listeners. Set it to about three times the health check
+  # interval of the clients' endpoint pool.
   # Added in 26.10.0
   shutdown-grace-period = 30.0
   # Base directory path for inter-process communication files. Used for Unix
