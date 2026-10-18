@@ -78,6 +78,7 @@ log = StructuredLogger(logging.getLogger(__spec__.name))
 
 EVENT_DISPATCHER_CONSUMER_GROUP: Final = "manager"
 SHUTDOWN_CLEANUP_MARGIN: Final = 10.0
+IN_FLIGHT_SHUTDOWN_TIMEOUT: Final = 5.0
 
 
 @asynccontextmanager
@@ -299,7 +300,7 @@ async def server_main(
         runner = web.AppRunner(
             root_app,
             keepalive_timeout=30.0,
-            shutdown_timeout=shutdown_config.shutdown_grace_period,
+            shutdown_timeout=IN_FLIGHT_SHUTDOWN_TIMEOUT,
         )
 
         internal_app = build_internal_app(dep_resources, drain_notifier)
@@ -307,7 +308,7 @@ async def server_main(
         internal_runner = web.AppRunner(
             internal_app,
             keepalive_timeout=30.0,
-            shutdown_timeout=shutdown_config.shutdown_grace_period,
+            shutdown_timeout=IN_FLIGHT_SHUTDOWN_TIMEOUT,
         )
 
         ssl_ctx = None
@@ -346,11 +347,11 @@ async def server_main(
         finally:
             try:
                 if started:
-                    drain_notifier.notify_draining()
                     log.info(
                         "draining API requests",
                         grace_period=shutdown_config.shutdown_grace_period,
                     )
+                    await drain_notifier.drain(shutdown_config.shutdown_grace_period)
             finally:
                 results = await asyncio.gather(
                     runner.cleanup(), internal_runner.cleanup(), return_exceptions=True

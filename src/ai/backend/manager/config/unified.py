@@ -717,7 +717,11 @@ class ManagerConfig(BaseConfigSchema):
             serialization_alias="shutdown-grace-period",
         ),
         BackendAIConfigMeta(
-            description="Seconds to wait for in-flight HTTP requests during shutdown.",
+            description=(
+                "Seconds to keep accepting and serving requests after announcing the drain, "
+                "before closing the listeners. "
+                "Set it to about three times the health check interval of the clients' endpoint pool."
+            ),
             added_version=NEXT_RELEASE_VERSION,
             example=ConfigExample(local="30.0", prod="30.0"),
         ),
