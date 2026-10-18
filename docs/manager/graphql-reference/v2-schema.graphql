@@ -9746,7 +9746,7 @@ type Mutation {
   adminUpdateUserV2(userId: UUID!, input: UpdateUserV2Input!): UpdateUserV2Payload
 
   """
-  Added in 26.2.0. Update the current user's information. Users can only update their own profile. Some fields may be restricted based on user role
+  Added in 26.2.0. Update the current user's information. Users can only update their own profile. Non-superadmins can set only fullName, password and allowedClientIp
   """
   updateUserV2(input: UpdateUserV2Input!): UpdateUserV2Payload
 
