@@ -125,7 +125,6 @@ from ai.backend.common.service_discovery.service_discovery import (
 )
 from ai.backend.common.types import (
     AgentId,
-    HostPortPair,
     RedisProfileTarget,
     ServiceDiscoveryType,
 )
@@ -515,17 +514,17 @@ async def etcd_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
         if traefik_config.etcd.password:
             creds = {"password": traefik_config.etcd.password}
 
-        host_port = traefik_config.etcd.addrs[0]
-
-        root_ctx.traefik_etcd = TraefikEtcd(
-            HostPortPair(host_port.host, host_port.port),
+        async with TraefikEtcd(
+            [addr.to_legacy() for addr in traefik_config.etcd.addrs],
             traefik_config.etcd.namespace,
             {ConfigScopes.GLOBAL: ""},
             credentials=creds,
-        )
+        ) as traefik_etcd:
+            root_ctx.traefik_etcd = traefik_etcd
+            yield
     else:
         root_ctx.traefik_etcd = None
-    yield
+        yield
 
 
 async def on_worker_lost_event(
