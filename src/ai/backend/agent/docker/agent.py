@@ -210,6 +210,9 @@ _CGROUP_PATH_CACHE_SIZE: Final[int] = 2048
 # Docker `HostConfig.NetworkMode` value for host networking.
 _HOST_NETWORK_MODE: Final[str] = "host"
 
+_SOCKET_RELAY_UID: Final[int] = 65534
+_SOCKET_RELAY_GID: Final[int] = 65534
+
 # Docker splits the configured total container-log size across this many files.
 _CONTAINER_LOG_FILE_COUNT: Final[int] = 5
 # Controllers the intrinsic plugins read, resolved together from a single inspect.
@@ -1711,10 +1714,8 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
         if sys.platform != "darwin":
             socket_dir = ipc_base_path / "container"
             relay_config = self.local_config.agent.socket_relay
-            relay_uid: int
-            relay_gid: int
             if os.geteuid() == 0:
-                relay_uid, relay_gid = relay_config.uid, relay_config.gid
+                relay_uid, relay_gid = _SOCKET_RELAY_UID, _SOCKET_RELAY_GID
                 os.chown(socket_dir, relay_uid, relay_gid)
             else:
                 relay_uid, relay_gid = os.geteuid(), os.getegid()

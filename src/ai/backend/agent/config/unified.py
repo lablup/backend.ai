@@ -137,33 +137,6 @@ class SyncContainerLifecyclesConfig(BaseConfigSchema):
 
 
 class SocketRelayConfig(BaseConfigSchema):
-    uid: Annotated[
-        UserID,
-        Field(default=UserID(65534)),
-        BackendAIConfigMeta(
-            description=(
-                "User ID that the socket relay container runs socat as. "
-                "The agent changes the owner of the socket directory to this user before "
-                "creating the relay. Applied only when the agent runs as root; "
-                "a non-root agent runs the relay as its own user."
-            ),
-            added_version="26.10.0",
-            example=ConfigExample(local="65534", prod="65534"),
-        ),
-    ]
-    gid: Annotated[
-        GroupID,
-        Field(default=GroupID(65534)),
-        BackendAIConfigMeta(
-            description=(
-                "Group ID that the socket relay container runs socat as. "
-                "Applied only when the agent runs as root; "
-                "a non-root agent runs the relay as its own group."
-            ),
-            added_version="26.10.0",
-            example=ConfigExample(local="65534", prod="65534"),
-        ),
-    ]
     pids_limit: Annotated[
         int,
         Field(
@@ -878,7 +851,7 @@ class CommonAgentConfig(BaseConfigSchema):
         ),
         BackendAIConfigMeta(
             description=(
-                "User, process, memory, and CPU limits of the socket relay container "
+                "Process, memory, and CPU limits of the socket relay container "
                 "that connects kernel containers to the agent socket."
             ),
             added_version="26.10.0",
