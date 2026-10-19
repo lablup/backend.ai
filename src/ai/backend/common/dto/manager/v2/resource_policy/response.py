@@ -102,6 +102,9 @@ class DeleteKeypairResourcePolicyPayload(BaseResponseModel):
     """Payload for keypair resource policy deletion mutation result."""
 
     name: str = Field(description="Name of the deleted keypair resource policy.")
+    entity_id: UUID = Field(
+        description="UUID of the deleted keypair resource policy. Added in 26.10.0.",
+    )
 
 
 class UserResourcePolicyNode(BaseResponseModel):
@@ -156,6 +159,9 @@ class DeleteUserResourcePolicyPayload(BaseResponseModel):
     """Payload for user resource policy deletion mutation result."""
 
     name: str = Field(description="Name of the deleted user resource policy.")
+    entity_id: UUID = Field(
+        description="UUID of the deleted user resource policy. Added in 26.10.0.",
+    )
 
 
 class ProjectResourcePolicyNode(BaseResponseModel):
@@ -199,6 +205,9 @@ class DeleteProjectResourcePolicyPayload(BaseResponseModel):
     """Payload for project resource policy deletion mutation result."""
 
     name: str = Field(description="Name of the deleted project resource policy.")
+    entity_id: UUID = Field(
+        description="UUID of the deleted project resource policy. Added in 26.10.0.",
+    )
 
 
 class SearchKeypairResourcePoliciesPayload(BaseResponseModel):
