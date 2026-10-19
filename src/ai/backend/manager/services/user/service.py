@@ -40,10 +40,6 @@ from ai.backend.manager.services.user.actions.create_user import (
     CreateUserAction,
     CreateUserActionResult,
 )
-from ai.backend.manager.services.user.actions.delete_default_dotfile import (
-    DeleteDefaultDotfileAction,
-    DeleteDefaultDotfileActionResult,
-)
 from ai.backend.manager.services.user.actions.delete_user import (
     DeleteUserAction,
     DeleteUserActionResult,
@@ -376,12 +372,6 @@ class UserService:
             action.user_id, action.path, action.updater
         )
         return UpdateDefaultDotfileActionResult(entries=entries.entries)
-
-    async def delete_default_dotfile(
-        self, action: DeleteDefaultDotfileAction
-    ) -> DeleteDefaultDotfileActionResult:
-        entries = await self._user_repository.delete_default_dotfile(action.user_id, action.purger)
-        return DeleteDefaultDotfileActionResult(entries=entries.entries)
 
     async def get_default_bootstrap_script(
         self, action: GetDefaultBootstrapScriptAction

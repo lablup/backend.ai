@@ -74,6 +74,10 @@ from ai.backend.manager.secret.types import SecretValue
 from ai.backend.manager.services.auth.processors import AuthProcessors
 from ai.backend.manager.services.domain.processors import DomainProcessors
 from ai.backend.manager.services.domain.service import DomainService
+from ai.backend.manager.services.dotfile.actions.lookup_owner import (
+    LookupBulkDotfileOwnerAction,
+    LookupDotfileOwnerAction,
+)
 from ai.backend.manager.services.dotfile.processors import DotfileProcessors
 from ai.backend.manager.services.project.processors import ProjectProcessors
 from ai.backend.manager.services.project.service import ProjectService
@@ -196,8 +200,11 @@ def server_module_registries(
                 user_config=UserConfigAdapter(
                     user,
                     DotfileProcessors(
-                        config_registry.dangling_field_group(
-                            FieldGroupMeta(DotfileFieldType()), DotfileData
+                        config_registry.dangling_lookup_field_group(
+                            FieldGroupMeta(DotfileFieldType()),
+                            DotfileData,
+                            LookupDotfileOwnerAction,
+                            LookupBulkDotfileOwnerAction,
                         )
                     ),
                 ),

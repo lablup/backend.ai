@@ -39,7 +39,6 @@ from ai.backend.manager.models.bootstrap_script.updaters import DefaultBootstrap
 from ai.backend.manager.models.dotfile.conditions import DotfileConditions
 from ai.backend.manager.models.dotfile.creators import DotfileEntryCreator
 from ai.backend.manager.models.dotfile.orders import DotfileOrders
-from ai.backend.manager.models.dotfile.purgers import DefaultDotfilePurger, DotfileEntryPurger
 from ai.backend.manager.models.dotfile.scopes import UserDotfileTarget
 from ai.backend.manager.models.dotfile.searchers import DotfileSearcher
 from ai.backend.manager.models.dotfile.updaters import DefaultDotfileUpdater, DotfileEntryUpdater
@@ -390,15 +389,6 @@ class UserRepository:
             await ops.batch_update_in_global(
                 DefaultDotfileUpdater(entity=user_id, path=path, updater=updater)
             )
-            return entries
-
-    @user_repository_resilience.apply()
-    async def delete_default_dotfile(
-        self, user_id: UserID, purger: DotfileEntryPurger
-    ) -> DotfileEntries:
-        async with self._user_ops.write_ops() as ops:
-            entries = purger.apply(await self._default_dotfiles(ops, user_id))
-            await ops.batch_purge_field_entities(user_id, DefaultDotfilePurger(path=purger.path))
             return entries
 
     async def _default_dotfiles(self, ops: V2ReadOps, user_id: UserID) -> DotfileEntries:

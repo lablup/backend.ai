@@ -18,17 +18,14 @@ from ai.backend.manager.errors.storage import DotfileNotFound
 from ai.backend.manager.models.dotfile.conditions import DotfileConditions
 from ai.backend.manager.models.dotfile.creators import DotfileEntryCreator
 from ai.backend.manager.models.dotfile.orders import DotfileOrders
-from ai.backend.manager.models.dotfile.purgers import DotfileEntryPurger
 from ai.backend.manager.models.dotfile.searchers import DotfileSearcher
 from ai.backend.manager.models.dotfile.updaters import DotfileEntryUpdater
 from ai.backend.manager.models.specs.pagination import NoPagination
+from ai.backend.manager.services.dotfile.actions.purge import PurgeDotfileAction
 from ai.backend.manager.services.dotfile.actions.search import SearchDotfilesAction
 from ai.backend.manager.services.dotfile.processors import DotfileProcessors
 from ai.backend.manager.services.user.actions.create_dotfile import (
     CreateDotfileAction,
-)
-from ai.backend.manager.services.user.actions.delete_default_dotfile import (
-    DeleteDefaultDotfileAction,
 )
 from ai.backend.manager.services.user.actions.update_default_dotfile import (
     UpdateDefaultDotfileAction,
@@ -62,6 +59,13 @@ class UserConfigAdapter:
         )
         return result.items
 
+    async def _default_dotfile(self, user_id: UserID, path: str) -> DotfileData:
+        """The legacy API names a file by path; this finds the default row it means."""
+        dotfiles = await self._search_default_dotfiles(user_id, path)
+        if not dotfiles:
+            raise DotfileNotFound
+        return dotfiles[0]
+
     async def create_dotfile(self, input: CreateDotfileInput) -> CreateDotfileResponse:
         await self._user.create_dotfile.run(
             CreateDotfileAction(
@@ -74,10 +78,7 @@ class UserConfigAdapter:
         return CreateDotfileResponse()
 
     async def get_default_dotfile(self, user_id: UserID, path: str) -> GetDotfileResponse:
-        dotfiles = await self._search_default_dotfiles(user_id, path)
-        if not dotfiles:
-            raise DotfileNotFound
-        dotfile = dotfiles[0]
+        dotfile = await self._default_dotfile(user_id, path)
         return GetDotfileResponse(path=dotfile.path, perm=dotfile.perm, data=dotfile.data)
 
     async def get_default_dotfiles(self, user_id: UserID) -> list[DotfileListItem]:
@@ -99,10 +100,6 @@ class UserConfigAdapter:
     async def delete_default_dotfile(
         self, input: DeleteDefaultDotfileInput
     ) -> DeleteDotfileResponse:
-        await self._user.delete_default_dotfile.run(
-            DeleteDefaultDotfileAction(
-                user_id=input.user_id,
-                purger=DotfileEntryPurger(path=input.path),
-            )
-        )
+        dotfile = await self._default_dotfile(input.user_id, input.path)
+        await self._dotfile.purge.run(PurgeDotfileAction(dotfile_id=dotfile.id))
         return DeleteDotfileResponse(success=True)

@@ -56,7 +56,7 @@ from ai.backend.manager.errors.user import (
 )
 from ai.backend.manager.models.bootstrap_script.purgers import BootstrapScriptPurger
 from ai.backend.manager.models.domain.row import DomainRow
-from ai.backend.manager.models.dotfile.purgers import DotfilePurger
+from ai.backend.manager.models.dotfile.purgers import UserDotfilePurger
 from ai.backend.manager.models.endpoint.purgers import UserEndpointPurger
 from ai.backend.manager.models.endpoint.row import EndpointRow, EndpointTokenRow
 from ai.backend.manager.models.entity_share.purgers import EntitySharePendingOfferBatchPurger
@@ -429,7 +429,7 @@ class UserDBSource:
             await w.batch_purge_field_entities(user_id, UserErrorLogPurger())
             await w.batch_purge_field_entities(user_id, UserKeyPairPurger())
             await w.batch_purge_field_entities(user_id, BootstrapScriptPurger())
-            await w.batch_purge_field_entities(user_id, DotfilePurger())
+            await w.batch_purge_field_entities(user_id, UserDotfilePurger())
             await w.batch_purge_field_entities(user_id, UserGroupAssociationPurger())
             # Placement groups the user still owns: their deployments were either
             # delegated (the groups moved with them) or deleted by now.

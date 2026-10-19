@@ -54,10 +54,6 @@ from ai.backend.manager.services.user.actions.create_user import (
     CreateUserAction,
     CreateUserActionResult,
 )
-from ai.backend.manager.services.user.actions.delete_default_dotfile import (
-    DeleteDefaultDotfileAction,
-    DeleteDefaultDotfileActionResult,
-)
 from ai.backend.manager.services.user.actions.delete_user import (
     DeleteUserAction,
     DeleteUserActionResult,
@@ -193,9 +189,6 @@ class UserProcessors:
     update_default_dotfile: SingleEntityActionProcessor[
         UpdateDefaultDotfileAction, UpdateDefaultDotfileActionResult
     ]
-    delete_default_dotfile: SingleEntityActionProcessor[
-        DeleteDefaultDotfileAction, DeleteDefaultDotfileActionResult
-    ]
     get_default_bootstrap_script: SingleEntityActionProcessor[
         GetDefaultBootstrapScriptAction, GetDefaultBootstrapScriptActionResult
     ]
@@ -256,9 +249,6 @@ class UserProcessors:
         self.create_dotfile = group.single_entity(CreateDotfileAction, user_service.create_dotfile)
         self.update_default_dotfile = group.single_entity(
             UpdateDefaultDotfileAction, user_service.update_default_dotfile
-        )
-        self.delete_default_dotfile = group.single_entity(
-            DeleteDefaultDotfileAction, user_service.delete_default_dotfile
         )
         self.get_default_bootstrap_script = group.single_entity(
             GetDefaultBootstrapScriptAction, user_service.get_default_bootstrap_script

@@ -228,6 +228,10 @@ from ai.backend.manager.services.domain.actions.create_domain import CreateDomai
 from ai.backend.manager.services.domain.actions.get import GetDomainAction
 from ai.backend.manager.services.domain.actions.scoped_search import ScopedSearchDomainsAction
 from ai.backend.manager.services.domain.processors import DomainProcessors
+from ai.backend.manager.services.dotfile.actions.lookup_owner import (
+    LookupBulkDotfileOwnerAction,
+    LookupDotfileOwnerAction,
+)
 from ai.backend.manager.services.dotfile.actions.search import SearchDotfilesAction
 from ai.backend.manager.services.dotfile.processors import DotfileProcessors
 from ai.backend.manager.services.entity_label.actions.lookup_owner import (
@@ -790,7 +794,12 @@ def test_entity_data_loader_reads_are_checked_per_entity() -> None:
     DomainProcessors(registry.group(GroupMeta(DomainEntityType())), MagicMock())
     UserProcessors(registry.group(GroupMeta(UserEntityType())), MagicMock())
     DotfileProcessors(
-        registry.dangling_field_group(FieldGroupMeta(DotfileFieldType()), DotfileData)
+        registry.dangling_lookup_field_group(
+            FieldGroupMeta(DotfileFieldType()),
+            DotfileData,
+            LookupDotfileOwnerAction,
+            LookupBulkDotfileOwnerAction,
+        )
     )
     ProjectProcessors(registry.group(GroupMeta(ProjectEntityType())), MagicMock())
     SessionGroupProcessors(registry.group(GroupMeta(SessionGroupEntityType())), MagicMock())
