@@ -6,6 +6,7 @@ from enum import StrEnum
 from typing import Any, override
 from uuid import UUID
 
+import strawberry
 from strawberry import Info
 from strawberry.relay import Connection, Edge, NodeID
 
@@ -27,6 +28,9 @@ from ai.backend.common.dto.manager.v2.client_ip_masking.response import (
 )
 from ai.backend.common.dto.manager.v2.client_ip_masking.response import (
     ClientIPMaskingPolicyPayload as PolicyPayloadDTO,
+)
+from ai.backend.common.dto.manager.v2.client_ip_masking.response import (
+    PurgeClientIPMaskingPolicyPayload as PurgePayloadDTO,
 )
 from ai.backend.common.dto.manager.v2.common import PartialBulkPayload
 from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
@@ -172,6 +176,21 @@ class UpsertClientIPMaskingPolicyInputGQL(PydanticInputMixin[UpsertInputDTO]):
 )
 class ClientIPMaskingPolicyPayloadGQL(PydanticOutputMixin[PolicyPayloadDTO]):
     policy: ClientIPMaskingPolicyGQL = gql_field(description="The policy the operation left.")
+
+
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Payload for client IP masking policy purge.",
+    ),
+    model=PurgePayloadDTO,
+    name="PurgeClientIPMaskingPolicyPayload",
+)
+class PurgeClientIPMaskingPolicyPayloadGQL(PydanticOutputMixin[PurgePayloadDTO]):
+    purged_id: strawberry.ID = gql_field(
+        description="Global ID of the purged client IP masking policy."
+    )
+    entity_id: UUID = gql_field(description="UUID of the purged client IP masking policy.")
 
 
 ClientIPMaskingPolicyEdgeGQL = Edge[ClientIPMaskingPolicyGQL]

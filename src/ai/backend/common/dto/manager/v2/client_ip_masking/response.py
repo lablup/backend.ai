@@ -15,6 +15,7 @@ __all__ = (
     "AdminSearchClientIPMaskingPoliciesPayload",
     "ClientIPMaskingPolicyNode",
     "ClientIPMaskingPolicyPayload",
+    "PurgeClientIPMaskingPolicyPayload",
 )
 
 
@@ -50,3 +51,11 @@ class ClientIPMaskingPolicyPayload(BaseResponseModel):
     """Payload carrying the settled policy row."""
 
     policy: ClientIPMaskingPolicyNode = Field(description="The policy the operation left")
+
+
+class PurgeClientIPMaskingPolicyPayload(BaseResponseModel):
+    """Payload for client IP masking policy purge."""
+
+    entity_id: UUID = Field(
+        description="UUID of the purged client IP masking policy. Added in 26.10.0.",
+    )
