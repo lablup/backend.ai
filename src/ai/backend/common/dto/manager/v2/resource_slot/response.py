@@ -97,6 +97,7 @@ class PurgeResourceSlotTypePayload(BaseResponseModel):
     """Payload for resource slot type removal."""
 
     slot_name: str = Field(description="Slot name of the removed resource slot type.")
+    entity_id: UUID = Field(description="UUID of the purged resource slot type. Added in 26.10.0.")
 
 
 class AgentResourceNode(BaseResponseModel):

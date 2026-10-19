@@ -12,7 +12,7 @@ from ai.backend.common.dto.manager.v2.resource_slot.request import (
     AdminSearchResourceSlotTypesInput,
 )
 from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
-from ai.backend.manager.api.gql.base import encode_cursor
+from ai.backend.manager.api.gql.base import encode_cursor, to_global_id
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     gql_mutation,
@@ -143,7 +143,11 @@ async def purge_resource_slot_type(
     id: UUID,
 ) -> PurgeResourceSlotTypePayloadGQL:
     payload = await info.context.adapters.resource_slot.purge_slot_type(ResourceSlotTypeUUID(id))
-    return PurgeResourceSlotTypePayloadGQL(slot_name=payload.slot_name)
+    return PurgeResourceSlotTypePayloadGQL(
+        slot_name=payload.slot_name,
+        purged_id=strawberry.ID(to_global_id(ResourceSlotTypeGQL, payload.slot_name)),
+        entity_id=payload.entity_id,
+    )
 
 
 @gql_mutation(
@@ -176,4 +180,8 @@ async def admin_purge_resource_slot_type(
     check_admin_only()
     adapter = info.context.adapters.resource_slot
     payload = await adapter.purge_slot_type(await adapter.lookup_slot_type(input.slot_name))
-    return PurgeResourceSlotTypePayloadGQL(slot_name=payload.slot_name)
+    return PurgeResourceSlotTypePayloadGQL(
+        slot_name=payload.slot_name,
+        purged_id=strawberry.ID(to_global_id(ResourceSlotTypeGQL, payload.slot_name)),
+        entity_id=payload.entity_id,
+    )
