@@ -13,5 +13,9 @@ for ARCH in x86_64 aarch64; do
     -f docker/socket-relay.dockerfile -t "$IMG" --output "type=docker,dest=-" docker \
     | gzip > "$OUT_DIR/backendai-socket-relay.img.$ARCH.tar.gz"
 done
-gzip -dc "$OUT_DIR/backendai-socket-relay.img.$ARCH.tar.gz" | docker load -q
-docker image inspect "$IMG" | jq -r '.[0].Config.Labels."ai.backend.version"' > "$OUT_DIR/backendai-socket-relay.version.txt"
+# Read the label from the archive instead of loading it, so the local daemon
+# keeps the image of its own architecture under the same tag.
+ARCHIVE="$OUT_DIR/backendai-socket-relay.img.x86_64.tar.gz"
+CONFIG_BLOB=$(tar -xzOf "$ARCHIVE" manifest.json | jq -r '.[0].Config')
+tar -xzOf "$ARCHIVE" "$CONFIG_BLOB" | jq -r '.config.Labels."ai.backend.version"' \
+  > "$OUT_DIR/backendai-socket-relay.version.txt"
