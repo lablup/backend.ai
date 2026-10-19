@@ -239,10 +239,10 @@ class DomainAdapter(BaseAdapter):
 
     async def delete(self, domain_id: DomainID) -> DeleteDomainPayload:
         """Soft-delete a domain."""
-        await self._domain.delete.run(
+        result = await self._domain.delete.run(
             DeleteDomainAction(updater=DomainSoftDeleteUpdater(domain_id=domain_id))
         )
-        return DeleteDomainPayload(deleted=True)
+        return DeleteDomainPayload(deleted=True, domain=self._domain_data_to_node(result.data))
 
     async def restore(self, domain_id: DomainID) -> RestoreDomainPayload:
         """Restore a soft-deleted domain."""

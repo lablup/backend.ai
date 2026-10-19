@@ -44,6 +44,7 @@ from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.common_types import PartialBulkFailureGQL
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
+    gql_added_field,
     gql_field,
     gql_pydantic_input,
     gql_pydantic_type,
@@ -182,7 +183,15 @@ class DomainPayloadGQL(PydanticOutputMixin[DomainPayloadDTO]):
 class DeleteDomainPayloadGQL(PydanticOutputMixin[DeleteDomainPayloadDTO]):
     """Payload for domain soft-delete."""
 
-    deleted: bool = gql_field(description="Whether the deletion was successful.")
+    deleted: bool = gql_field(
+        description="Whether the deletion was successful.",
+        deprecation_reason=f"Deprecated since {NEXT_RELEASE_VERSION}. Use `domain`.",
+    )
+    domain: DomainV2GQL = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION, description="The soft-deleted domain."
+        ),
+    )
 
 
 @gql_pydantic_type(
