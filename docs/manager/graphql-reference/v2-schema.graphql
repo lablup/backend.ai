@@ -11191,7 +11191,7 @@ type Mutation {
   includeSessionIdleChecks(input: IncludeSessionIdleChecksInput!): IncludeSessionIdleChecksPayload
 
   """
-  Added in 26.10.0. Permanently remove a session group. Its member sessions remain with their group cleared. A group a deployment's replica group holds is not found.
+  Added in 26.10.0. Permanently remove a session group. Its member sessions remain with their group cleared. A group a deployment's replica group references is refused as in use.
   """
   purgeSessionGroup(input: PurgeSessionGroupInput!): PurgeSessionGroupPayload!
 
