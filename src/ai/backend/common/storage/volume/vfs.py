@@ -5,16 +5,17 @@ import logging
 import os
 import time
 import uuid
-from concurrent.futures import Executor
+from concurrent.futures import Executor, ThreadPoolExecutor
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
-from typing import override
+from typing import Self, override
 
-from ai.backend.common.data.entity.storage_volume import StorageVolumeID, StorageVolumeName
-from ai.backend.common.data.storage.types import VfsVolumeStatusResult
+from ai.backend.common.configs.volume.vfs import VfsVolumeConfig
+from ai.backend.common.data.entity.storage_volume import StorageVolumeID
+from ai.backend.common.data.storage.types import StorageBackendType, VfsVolumeStatusResult
 from ai.backend.common.storage.exceptions import VolumeMarkerInvalidError
-from ai.backend.common.storage.probe.check import AbstractStatusCheck
+from ai.backend.common.storage.probe.volume import AbstractVolumeStatusCheck
 from ai.backend.logging.structured import StructuredLogger
 
 log = StructuredLogger(logging.getLogger(__spec__.name))
@@ -29,13 +30,14 @@ class _MountSnapshot:
 
 @dataclass
 class VfsVolumeStatusCheckArgs:
-    volume_name: StorageVolumeName
+    volume_id: StorageVolumeID
     mount_path: Path
     marker_filename: str
+    interval: float
     executor: Executor
 
 
-class VfsVolumeStatusCheck(AbstractStatusCheck[StorageVolumeName, VfsVolumeStatusResult]):
+class VfsVolumeStatusCheck(AbstractVolumeStatusCheck[VfsVolumeConfig, VfsVolumeStatusResult]):
     """Reads what identifies the mount a vfs volume is served from.
 
     It records the mount's device id and the volume id an operator wrote in the marker
@@ -44,22 +46,54 @@ class VfsVolumeStatusCheck(AbstractStatusCheck[StorageVolumeName, VfsVolumeStatu
     hung in the kernel blocks a thread there and not the event loop.
     """
 
-    _volume_name: StorageVolumeName
+    _volume_id: StorageVolumeID
     _mount_path: Path
     _marker_path: Path
+    _interval: float
     _executor: Executor
     _latest: VfsVolumeStatusResult | None
 
     def __init__(self, args: VfsVolumeStatusCheckArgs) -> None:
-        self._volume_name = args.volume_name
+        self._volume_id = args.volume_id
         self._mount_path = args.mount_path
         self._marker_path = args.mount_path / args.marker_filename
+        self._interval = args.interval
         self._executor = args.executor
         self._latest = None
 
+    @classmethod
     @override
-    def id(self) -> StorageVolumeName:
-        return self._volume_name
+    def volume_type(cls) -> StorageBackendType:
+        return StorageBackendType("vfs")
+
+    @classmethod
+    @override
+    def config_type(cls) -> type[VfsVolumeConfig]:
+        return VfsVolumeConfig
+
+    @classmethod
+    @override
+    def create(cls, volume_id: StorageVolumeID, config: VfsVolumeConfig) -> Self:
+        # One thread per volume: a mount hung in the kernel holds its own thread only.
+        return cls(
+            VfsVolumeStatusCheckArgs(
+                volume_id=volume_id,
+                mount_path=config.path,
+                marker_filename=config.marker_filename,
+                interval=config.check_interval,
+                executor=ThreadPoolExecutor(
+                    max_workers=1, thread_name_prefix=f"vfs-volume-status-{volume_id}"
+                ),
+            )
+        )
+
+    @override
+    def id(self) -> StorageVolumeID:
+        return self._volume_id
+
+    @override
+    def interval(self) -> float:
+        return self._interval
 
     @override
     def latest(self) -> VfsVolumeStatusResult | None:
@@ -79,14 +113,14 @@ class VfsVolumeStatusCheck(AbstractStatusCheck[StorageVolumeName, VfsVolumeStatu
         except OSError as e:
             log.exception(
                 "volume mount cannot be read",
-                volume_name=self._volume_name,
+                volume_id=str(self._volume_id),
                 mount_path=str(self._mount_path),
             )
             error_msg = f"{self._mount_path} cannot be read: {e}"
         except Exception as e:
             log.exception(
                 "volume status check raised",
-                volume_name=self._volume_name,
+                volume_id=str(self._volume_id),
                 mount_path=str(self._mount_path),
             )
             error_msg = str(e)
@@ -96,7 +130,7 @@ class VfsVolumeStatusCheck(AbstractStatusCheck[StorageVolumeName, VfsVolumeStatu
             except VolumeMarkerInvalidError as e:
                 log.warning(
                     "volume marker does not hold a volume id",
-                    volume_name=self._volume_name,
+                    volume_id=str(self._volume_id),
                     marker_path=str(self._marker_path),
                 )
                 error_msg = f"{self._marker_path} does not hold a volume id: {e.extra_msg}"
