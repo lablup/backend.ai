@@ -19,6 +19,7 @@ from ai.backend.storage.watcher import WatcherClient
 
 from .bgtask import BackgroundTaskManagerInput, BackgroundTaskManagerProvider
 from .manager_client_pool import ManagerClientPoolProvider
+from .status_probe import StatusProbeInput, StatusProbeProvider, StatusProbeResources
 from .storage_pool import StoragePoolInput, StoragePoolProvider
 from .volume_pool import VolumePoolInput, VolumePoolProvider
 from .volume_stats import VolumeStatsInput, VolumeStatsProvider, VolumeStatsResources
@@ -47,6 +48,7 @@ class StorageResources:
     background_task_manager: BackgroundTaskManager
     watcher: WatcherClient | None
     volume_stats: VolumeStatsResources
+    status_probe: StatusProbeResources
     manager_client_pool: ManagerHTTPClientPool
 
 
@@ -104,6 +106,14 @@ class StorageComposer(DependencyComposer[StorageComposerInput, StorageResources]
                 valkey_volume_stats=setup_input.valkey.volume_stats,
             ),
         )
+        status_probe = await stack.enter_dependency(
+            StatusProbeProvider(),
+            StatusProbeInput(
+                local_config=local_config,
+                pidx=setup_input.pidx,
+                volume_pool=volume_pool,
+            ),
+        )
         manager_client_pool = await stack.enter_dependency(
             ManagerClientPoolProvider(),
             local_config,
@@ -115,5 +125,6 @@ class StorageComposer(DependencyComposer[StorageComposerInput, StorageResources]
             background_task_manager=background_task_manager,
             watcher=watcher,
             volume_stats=volume_stats,
+            status_probe=status_probe,
             manager_client_pool=manager_client_pool,
         )
