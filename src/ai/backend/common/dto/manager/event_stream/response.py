@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from pydantic import ConfigDict, Field
 
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.common.types import BackendAISchema
 
@@ -38,7 +39,7 @@ class SessionEventPayload(BackendAISchema):
         deprecated=True,
         description=f"Deprecated since {NEXT_RELEASE_VERSION}. Use `owner_user_id`.",
     )
-    owner_user_id: str | None = Field(
+    owner_user_id: UserID | None = Field(
         alias="ownerUserId",
         description=f"UUID of the session owner, null once the owner is purged. Added in {NEXT_RELEASE_VERSION}.",
     )

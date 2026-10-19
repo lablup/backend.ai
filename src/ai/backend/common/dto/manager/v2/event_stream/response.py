@@ -12,6 +12,7 @@ from __future__ import annotations
 from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseResponseModel
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 
 __all__ = (
@@ -39,7 +40,7 @@ class SessionEventNode(BaseResponseModel):
         deprecated=True,
         description=f"Access key of the session owner. Deprecated since {NEXT_RELEASE_VERSION}. Use `owner_user_id`.",
     )
-    owner_user_id: str | None = Field(
+    owner_user_id: UserID | None = Field(
         description=f"UUID of the session owner, null once the owner is purged. Added in {NEXT_RELEASE_VERSION}.",
     )
     session_id: str = Field(default="", description="Session ID")

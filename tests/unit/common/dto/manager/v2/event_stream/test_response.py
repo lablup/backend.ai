@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 from uuid import uuid4
 
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.dto.manager.v2.event_stream.response import (
     BgtaskCancelledNode,
     BgtaskDoneNode,
@@ -15,7 +16,7 @@ from ai.backend.common.dto.manager.v2.event_stream.response import (
     SessionKernelEventNode,
 )
 
-_OWNER_USER_ID = str(uuid4())
+_OWNER_USER_ID = UserID(uuid4())
 
 
 class TestSessionEventNode:
