@@ -236,7 +236,6 @@ class SessionData(EntityData):
     replica_id: UUID | None = None
     requested_starts_at: datetime | None = field(default=None, compare=False)
     session_group_id: SessionGroupID | None = None
-    designated_agent_ids: list[str] | None = None
 
     @override
     def entity_id(self) -> SessionID:
