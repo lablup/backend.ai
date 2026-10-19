@@ -24,7 +24,7 @@
        packages/backend.ai-ui/.storybook/astryx.css;
        scripts/migration-gates/layer-order-gate.mjs fails on drift. -->
   <style nonce="{{nonce}}">
-    @layer reset, theme, base, astryx-base, astryx-theme, components, utilities;
+    @layer reset, theme, base, astryx-base, astryx-theme, ui-common, components, utilities;
   </style>
   <link rel="icon" href="manifest/favicon.ico">
   <link rel="apple-touch-icon" sizes="256x256" href="manifest/backend-ai.iconset/icon_256x256@2x.png">
@@ -97,16 +97,16 @@
     }
     globalThis.enableSW = true;
 
-    globalThis.packageVersion = "26.9.2";
-    globalThis.buildNumber = "9225";
+    globalThis.packageVersion = "26.10.0-alpha.0";
+    globalThis.buildNumber = "9328";
     globalThis.baiNonce = "{{nonce}}";
 
     // DO NOT CHANGE BELOW LINE
     
   </script>
   <!-- DO NOT CHANGE BELOW LINE -->
-  <script type="module" nonce="{{nonce}}" crossorigin src="/assets/index-B82PWaiZ.js"></script>
-  <link rel="stylesheet" crossorigin href="/assets/index-Bo67L5aK.css">
+  <script type="module" nonce="{{nonce}}" crossorigin src="/assets/index-4XAoWQdC.js"></script>
+  <link rel="stylesheet" crossorigin href="/assets/index-CJTJ4MIU.css">
 </head>
 
 <body>
@@ -306,6 +306,25 @@
 
         window.__dismissSplash = dismiss;
         window.__enterLoginBackdrop = enterLoginBackdrop;
+
+        // Dev-only (the NODE_ENV shim above is injected by react/vite.config.ts
+        // in dev): Backspace on the loading splash reloads straight to the login
+        // form. Lives here, not in a module, so it exists before Vite loads the
+        // app. Not Esc: browsers treat Esc during a page load as "stop loading".
+        if (globalThis.process && globalThis.process.env &&
+            globalThis.process.env.NODE_ENV === 'development') {
+          window.addEventListener('keydown', function (e) {
+            if (e.key !== 'Backspace' || state !== 'loading') return;
+            e.preventDefault();
+            e.stopImmediatePropagation();
+            // INTENTIONAL_LOGOUT_FLAG in react/src/hooks/useLogout.ts. Already
+            // set means this load is the reload heading to the form: let it finish.
+            var flag = 'backendai_intentional_logout';
+            if (sessionStorage.getItem(flag) === '1') return;
+            sessionStorage.setItem(flag, '1');
+            window.location.reload();
+          }, true);
+        }
 
         // Fallback for routes that signal neither (/verify-email,
         // /change-password): dismiss once the app occupies space. A

@@ -1,4 +1,4 @@
-.TH ALL-SMI 1 "October 11, 2026" "all-smi 0.27.1" "User Commands"
+.TH ALL-SMI 1 "October 17, 2026" "all-smi 0.28.0" "User Commands"
 .SH NAME
 all-smi \- Command-line utility for monitoring GPU hardware
 .SH SYNOPSIS
@@ -496,6 +496,9 @@ Native support for M1/M2/M3/M4 series with Metal API integration, ANE power moni
 .TP
 .B NVIDIA Jetson
 Tegra-specific metrics with DLA (Deep Learning Accelerator) support
+.TP
+.B NVIDIA RTX Spark N1X
+Windows on ARM64 SoC with a Blackwell GPU; the NPU is shown as a DLA gauge on the GPU row and exported as all_smi_dla_* metrics
 .TP
 .B Google Cloud TPUs
 Support for TPU v2-v7/Ironwood architectures, HBM memory tracking, and integration with libtpu/JAX workflows
