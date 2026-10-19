@@ -11,6 +11,7 @@ from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
 
 from ai.backend.client.v2.exceptions import ConflictError, NotFoundError
 from ai.backend.client.v2.registry import BackendAIClientRegistry
+from ai.backend.common.auth.password import PasswordHashAlgorithm, PasswordInfo
 from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.dto.manager.domain import (
     CreateDomainResponse,
@@ -22,11 +23,9 @@ from ai.backend.common.dto.manager.domain import (
 )
 from ai.backend.common.dto.manager.domain.types import DomainOrder, DomainOrderField, OrderDirection
 from ai.backend.common.dto.manager.query import StringFilter
-from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.data.user.types import UserStatus
 from ai.backend.manager.models.domain.row import DomainRow, domains
-from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.kernel.row import kernels
 from ai.backend.manager.models.project.row import groups
 from ai.backend.manager.models.resource_group.row import resource_groups

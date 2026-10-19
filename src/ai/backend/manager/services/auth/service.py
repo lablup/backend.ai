@@ -10,6 +10,8 @@ from typing import Any, cast
 from aiohttp import web
 from sqlalchemy import RowMapping
 
+from ai.backend.common.auth.password import PasswordInfo
+from ai.backend.common.auth.ssh import generate_ssh_keypair
 from ai.backend.common.clients.valkey_client.valkey_session.client import ValkeySessionClient
 from ai.backend.common.clients.valkey_client.valkey_session.types import (
     LoginSessionData,
@@ -50,18 +52,14 @@ from ai.backend.manager.errors.common import (
     RejectedByHook,
 )
 from ai.backend.manager.errors.user import KeyPairNotFound, UserResourcePolicyNotFound
-from ai.backend.manager.models.hasher.types import PasswordInfo
-from ai.backend.manager.models.keypair.row import (
-    KEYPAIR_SECRET_KEY_CONTEXT,
-    generate_ssh_keypair,
-)
+from ai.backend.manager.models.hasher.factory import compare_to_hashed_password
+from ai.backend.manager.models.keypair.row import KEYPAIR_SECRET_KEY_CONTEXT
 from ai.backend.manager.models.keypair.ssh_key_validator import SSHKeyValidator
 from ai.backend.manager.models.user.creators import UserCreator
 from ai.backend.manager.models.user.row import (
     INACTIVE_USER_STATUSES,
     UserRole,
     UserStatus,
-    compare_to_hashed_password,
 )
 from ai.backend.manager.repositories.auth.db_source.db_source import ActiveSessionInfo
 from ai.backend.manager.repositories.auth.repository import AuthRepository
@@ -636,10 +634,16 @@ class AuthService:
         if action.email != action.requester_email:
             raise GenericForbidden("Not the account owner")
         email = action.email
+        auth_config = self._config_provider.config.auth
         await self._auth_repository.check_credential_without_migration(
             action.domain_name,
             email,
-            action.password,
+            PasswordInfo(
+                password=action.password,
+                algorithm=auth_config.password_hash_algorithm,
+                rounds=auth_config.password_hash_rounds,
+                salt_size=auth_config.password_hash_salt_size,
+            ),
         )
         deleted_tokens = await self._auth_repository.delete_user_login_sessions(
             action.user_id,
@@ -672,11 +676,17 @@ class AuthService:
                 success=False,
                 message="new password mismatch",
             )
+        auth_config = self._config_provider.config.auth
         try:
             await self._auth_repository.check_credential_without_migration(
                 domain_name,
                 email,
-                action.old_password,
+                PasswordInfo(
+                    password=action.old_password,
+                    algorithm=auth_config.password_hash_algorithm,
+                    rounds=auth_config.password_hash_rounds,
+                    salt_size=auth_config.password_hash_salt_size,
+                ),
             )
         except AuthorizationFailed as e:
             raise AuthorizationFailed("Old password mismatch") from e
@@ -718,7 +728,12 @@ class AuthService:
         checked_user = await self._auth_repository.check_credential_without_migration(
             action.domain_name,
             action.email,
-            password=action.current_password,
+            PasswordInfo(
+                password=action.current_password,
+                algorithm=auth_config.password_hash_algorithm,
+                rounds=auth_config.password_hash_rounds,
+                salt_size=auth_config.password_hash_salt_size,
+            ),
         )
         new_password = action.new_password
         if compare_to_hashed_password(new_password, checked_user["password"]):

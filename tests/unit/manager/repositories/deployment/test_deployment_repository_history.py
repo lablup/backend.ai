@@ -10,6 +10,7 @@ from unittest.mock import MagicMock
 import pytest
 import sqlalchemy as sa
 
+from ai.backend.common.auth.password import PasswordHashAlgorithm, PasswordInfo
 from ai.backend.common.container_registry import ContainerRegistryType
 from ai.backend.common.data.endpoint.types import EndpointLifecycle
 from ai.backend.common.data.entity.container_registry import ContainerRegistryID
@@ -18,7 +19,6 @@ from ai.backend.common.data.entity.domain import DomainID, DomainName
 from ai.backend.common.data.entity.image import ImageID
 from ai.backend.common.data.entity.replica import ReplicaID
 from ai.backend.common.types import AccessKey, BinarySize, ResourceSlot
-from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.deployment.types import RouteHandlerCategory, RouteStatus
 from ai.backend.manager.data.image.types import ImageStatus, ImageType
 from ai.backend.manager.data.session.types import SchedulingResult
@@ -27,7 +27,6 @@ from ai.backend.manager.models.container_registry.row import ContainerRegistryRo
 from ai.backend.manager.models.domain.row import DomainRow
 from ai.backend.manager.models.endpoint.row import EndpointRow
 from ai.backend.manager.models.endpoint.updaters import EndpointLifecycleBatchUpdater
-from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.image.row import ImageRow
 from ai.backend.manager.models.keypair.row import KeyPairRow
 from ai.backend.manager.models.project.row import ProjectRow

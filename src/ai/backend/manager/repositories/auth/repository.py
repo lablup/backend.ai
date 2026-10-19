@@ -5,6 +5,7 @@ from uuid import UUID
 
 import sqlalchemy as sa
 
+from ai.backend.common.auth.password import PasswordInfo
 from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.types import EntityIdentifier
@@ -19,7 +20,6 @@ from ai.backend.manager.data.auth.types import (
     UserCreationData,
 )
 from ai.backend.manager.data.keypair.types import KeyPairData
-from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.specs.lookup import DataLookup
 from ai.backend.manager.models.specs.querier import DataQuerier
 from ai.backend.manager.models.user.creators import UserCreator
@@ -189,11 +189,11 @@ class AuthRepository:
         self,
         domain_name: str,
         email: str,
-        password: str,
+        target_password_info: PasswordInfo,
     ) -> sa.RowMapping:
         """Check credentials without password migration (for signout, etc.)"""
         return await self._db_source.verify_credential_without_migration(
-            domain_name, email, password
+            domain_name, email, target_password_info
         )
 
     @auth_repository_resilience.apply()

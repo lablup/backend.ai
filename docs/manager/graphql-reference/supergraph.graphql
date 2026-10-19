@@ -23250,6 +23250,9 @@ type RoleAssignment implements Node
   """The Globally Unique ID of this object"""
   id: ID!
 
+  """Added in 26.10.0. UUID of the role assignment row."""
+  fieldId: UUID!
+
   """The assigned user ID."""
   userId: UUID!
 

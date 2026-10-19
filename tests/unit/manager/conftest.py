@@ -12,6 +12,7 @@ from typing import Any
 import pytest
 import sqlalchemy as sa
 
+from ai.backend.common.auth.password import PasswordHashAlgorithm, PasswordInfo
 from ai.backend.common.data.entity.domain import (
     DomainEntityType,
     DomainID,
@@ -22,8 +23,6 @@ from ai.backend.common.types import ResourceSlot, VFolderHostPermissionMap
 from ai.backend.logging import LocalLogger, LogLevel
 from ai.backend.logging.config import ConsoleConfig, LogDriver, LoggingConfig
 from ai.backend.logging.types import LogFormat
-from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
-from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.testutils.fixtures import DomainFactory, DomainFixtureData
 

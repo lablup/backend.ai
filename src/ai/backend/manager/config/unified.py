@@ -198,6 +198,7 @@ from pydantic import (
     model_validator,
 )
 
+from ai.backend.common.auth.password import PasswordHashAlgorithm
 from ai.backend.common.config import BaseConfigSchema
 from ai.backend.common.configs.client import HttpTimeoutConfig
 from ai.backend.common.configs.etcd import EtcdConfig
@@ -228,7 +229,6 @@ from ai.backend.common.typed_validators import (
 from ai.backend.logging.config import LoggingConfig
 from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.actions.types import ActionOperationType
-from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.secret.types import (
     KeyProviderType,
     SecretKeyId,

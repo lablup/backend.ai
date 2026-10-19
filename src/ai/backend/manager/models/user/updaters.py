@@ -8,6 +8,7 @@ from typing import Any, override
 
 from sqlalchemy.orm import InstrumentedAttribute
 
+from ai.backend.common.auth.password import PasswordInfo
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.manager.data.user.types import UserData
 from ai.backend.manager.errors.user import (
@@ -15,7 +16,6 @@ from ai.backend.manager.errors.user import (
     UserModificationBadRequest,
     UserPurgeInProgress,
 )
-from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.specs.types import GuardCheck, IntegrityErrorCheck
 from ai.backend.manager.models.specs.updater import GuardedDataUpdater
 from ai.backend.manager.models.user.row import UserRole, UserRow, UserStatus

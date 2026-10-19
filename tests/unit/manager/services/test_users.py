@@ -13,13 +13,13 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
+from ai.backend.common.auth.password import PasswordHashAlgorithm, PasswordInfo
 from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.entity.keypair import KeyPairID
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.exception import InvalidAPIParameters
 from ai.backend.common.types import AccessKey
-from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.keypair.types import KeyPairData
 from ai.backend.manager.data.user.types import (
     UserCreateResultData,
@@ -28,7 +28,6 @@ from ai.backend.manager.data.user.types import (
     UserStatus,
 )
 from ai.backend.manager.errors.user import UserNotFound, UserPurgeFailure
-from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.user.creators import UserCreator
 from ai.backend.manager.models.user.updaters import UserUpdater
 from ai.backend.manager.repositories.user.repository import UserRepository
