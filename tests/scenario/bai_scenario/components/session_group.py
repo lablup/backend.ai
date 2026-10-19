@@ -86,7 +86,7 @@ class SessionGroupsAndACaller:
     users_group: SessionGroupData
     """세션 그룹들이 있는 프로젝트에 사용자가 만든 세션 그룹."""
     deployment_group: SessionGroupData
-    """같은 프로젝트의 replica group이 가진 세션 그룹."""
+    """같은 프로젝트에서 배포의 replica group이 가진 세션 그룹."""
     elsewhere_group: SessionGroupData
     """다른 프로젝트에 사용자가 만든 세션 그룹."""
     strangers_group: SessionGroupData
@@ -170,7 +170,7 @@ class SomeoneReadingTheirOwnSessionGroups(TestSeedNest[Laid[UserData]]):
 
 @dataclass(frozen=True)
 class SessionGroupsInTwoProjects(Given[Any, SessionGroupsAndACaller]):
-    """두 프로젝트의 사용자가 만든 세션 그룹과 replica group이 가진 세션 그룹, 그리고 정해진 곳에서 권한을 받은 사용자.
+    """두 프로젝트의 사용자가 만든 세션 그룹과 배포의 replica group이 가진 세션 그룹, 그리고 정해진 곳에서 권한을 받은 사용자.
 
     권한이 자기 스코프에 있으면 부르는 사람이 세션 그룹들을 만든 사람이다.
     """
@@ -181,7 +181,7 @@ class SessionGroupsInTwoProjects(Given[Any, SessionGroupsAndACaller]):
     @override
     def describe(self) -> str:
         laid = (
-            "한 프로젝트에 사용자가 만든 세션 그룹과 replica group이 가진 세션 그룹, 다른 프로젝트에 같은 사용자가 만든 "
+            "한 프로젝트에 사용자가 만든 세션 그룹과 배포의 replica group이 가진 세션 그룹, 다른 프로젝트에 같은 사용자가 만든 "
             "세션 그룹과 다른 사용자가 만든 세션 그룹"
         )
         if self.granted_in.is_the_owner():
@@ -269,14 +269,14 @@ class OwnerGrant(enum.Enum):
 
 @dataclass(frozen=True)
 class AGroupWithMembersAndItsOwner:
-    """멤버 세션이 있는 사용자가 만든 세션 그룹과 replica group이 가진 세션 그룹, 그리고 둘을 만든 사람."""
+    """멤버 세션이 있는 사용자가 만든 세션 그룹과 배포의 replica group이 가진 세션 그룹, 그리고 둘을 만든 사람."""
 
     project: ProjectData
     owner: UserData
     users_group: SessionGroupData
     """사용자가 만든 세션 그룹. 멤버 세션 둘을 갖는다."""
     deployment_group: SessionGroupData
-    """같은 프로젝트의 replica group이 가진 세션 그룹."""
+    """같은 프로젝트에서 배포의 replica group이 가진 세션 그룹."""
     members: tuple[SessionEntityData, ...]
 
 
@@ -307,13 +307,13 @@ class SomeoneGrantedOnTheirOwnSessionGroups(TestSeedNest[Laid[UserData]]):
 
 @dataclass(frozen=True)
 class AUsersGroupWithMembers(Given[Any, AGroupWithMembersAndItsOwner]):
-    """한 프로젝트에 멤버 세션 둘을 가진 사용자가 만든 세션 그룹과 replica group이 가진 세션 그룹, 둘을 만든 사람."""
+    """한 프로젝트에 멤버 세션 둘을 가진 사용자가 만든 세션 그룹과 배포의 replica group이 가진 세션 그룹, 둘을 만든 사람."""
 
     granted: OwnerGrant
 
     @override
     def describe(self) -> str:
-        laid = "한 프로젝트에 멤버 세션 둘을 가진 사용자가 만든 세션 그룹과 replica group이 가진 세션 그룹"
+        laid = "한 프로젝트에 멤버 세션 둘을 가진 사용자가 만든 세션 그룹과 배포의 replica group이 가진 세션 그룹"
         if self.granted is OwnerGrant.NOTHING:
             return f"{laid}, 그리고 아무 권한도 받지 않은 세션 그룹들을 만든 사용자"
         return (

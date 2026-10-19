@@ -237,7 +237,7 @@ class AGrantedUserFindsOnlyTheUsersGroup(
     def describe(self) -> str:
         return (
             "그 프로젝트에서만 세션 그룹 읽기 권한을 받은 사용자가 그 프로젝트 범위로 검색하면, "
-            "replica group이 가진 세션 그룹과 다른 프로젝트의 세션 그룹은 빠지고 그 프로젝트의 사용자가 만든 세션 그룹만 온다"
+            "배포의 replica group이 가진 세션 그룹과 다른 프로젝트의 세션 그룹은 빠지고 그 프로젝트의 사용자가 만든 세션 그룹만 온다"
         )
 
     @override
@@ -293,7 +293,7 @@ class AnOwnerFindsTheirOwnGroups(
     def describe(self) -> str:
         return (
             "자기 스코프에서 세션 그룹 읽기 권한을 받은 사용자가 자기 스코프로 검색하면, "
-            "두 프로젝트에 자기가 만든 세션 그룹이 오고 replica group이 가진 세션 그룹과 다른 사용자가 만든 세션 그룹은 빠진다"
+            "두 프로젝트에 자기가 만든 세션 그룹이 오고 배포의 replica group이 가진 세션 그룹과 다른 사용자가 만든 세션 그룹은 빠진다"
         )
 
     @override
@@ -350,7 +350,7 @@ class ScopesOfDifferentKindsAreJoined(
         return (
             "자기 스코프와 다른 프로젝트에서 세션 그룹 읽기 권한을 받은 사용자가 두 스코프를 "
             "함께 넘겨 검색하면, 자기가 만든 세션 그룹과 그 프로젝트에서 다른 사용자가 만든 세션 그룹이 "
-            "합쳐져 오고 replica group이 가진 세션 그룹은 빠진다"
+            "합쳐져 오고 배포의 replica group이 가진 세션 그룹은 빠진다"
         )
 
     @override

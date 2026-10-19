@@ -68,7 +68,7 @@ class PurgingTheUsersGroup(When[Laid, SessionGroupAdapter, PurgeSessionGroupPayl
 
 @dataclass(frozen=True)
 class PurgingTheDeploymentGroup(When[Laid, SessionGroupAdapter, PurgeSessionGroupPayload]):
-    """replica group이 가진 세션 그룹을 영구 삭제한다."""
+    """배포의 replica group이 가진 세션 그룹을 영구 삭제한다."""
 
     @override
     def operation(self) -> str:
@@ -76,7 +76,7 @@ class PurgingTheDeploymentGroup(When[Laid, SessionGroupAdapter, PurgeSessionGrou
 
     @override
     def describe(self, laid: Laid) -> str:
-        return f"{laid.owner.username}이 replica group이 가진 세션 그룹을 영구 삭제"
+        return f"{laid.owner.username}이 배포의 replica group이 가진 세션 그룹을 영구 삭제"
 
     @override
     async def call(self, adapter: SessionGroupAdapter, laid: Laid) -> PurgeSessionGroupPayload:
@@ -143,7 +143,7 @@ class ADeploymentsGroupIsNotFound(
     @override
     def describe(self) -> str:
         return (
-            "자기 스코프에서 세션 그룹 영구 삭제 권한을 받은 사용자가 replica group이 가진 세션 그룹을 지우면, "
+            "자기 스코프에서 세션 그룹 영구 삭제 권한을 받은 사용자가 배포의 replica group이 가진 세션 그룹을 지우면, "
             "권한이 아니라 대상이 없다는 것으로 거부되고 세션 그룹은 남는다"
         )
 

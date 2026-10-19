@@ -58,7 +58,7 @@ class ReadingTheUsersGroup(When[Laid, SessionGroupAdapter, SessionGroupNode]):
 
 @dataclass(frozen=True)
 class ReadingTheDeploymentGroup(When[Laid, SessionGroupAdapter, SessionGroupNode]):
-    """replica group이 가진 세션 그룹을 id로 읽는다."""
+    """배포의 replica group이 가진 세션 그룹을 id로 읽는다."""
 
     @override
     def operation(self) -> str:
@@ -66,7 +66,7 @@ class ReadingTheDeploymentGroup(When[Laid, SessionGroupAdapter, SessionGroupNode
 
     @override
     def describe(self, laid: Laid) -> str:
-        return f"{laid.caller.username}이 replica group이 가진 세션 그룹을 id로 조회"
+        return f"{laid.caller.username}이 배포의 replica group이 가진 세션 그룹을 id로 조회"
 
     @override
     async def call(self, adapter: SessionGroupAdapter, laid: Laid) -> SessionGroupNode:
@@ -161,7 +161,7 @@ class ADeploymentsGroupIsNotFound(
     @override
     def describe(self) -> str:
         return (
-            "그 프로젝트에서 세션 그룹 읽기 권한을 받은 사용자가 replica group이 가진 세션 그룹을 id로 조회하면, "
+            "그 프로젝트에서 세션 그룹 읽기 권한을 받은 사용자가 배포의 replica group이 가진 세션 그룹을 id로 조회하면, "
             "권한이 아니라 대상이 없다는 것으로 거부된다"
         )
 

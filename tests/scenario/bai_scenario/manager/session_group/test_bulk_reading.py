@@ -43,7 +43,7 @@ type BulkReadingStep = Scenario[TestSeedingSession, Laid, SessionGroupAdapter, A
 
 @dataclass(frozen=True)
 class ReadingBothGroupsOfTheProject(When[Laid, SessionGroupAdapter, Answers]):
-    """사용자가 만든 세션 그룹, replica group이 가진 세션 그룹 순으로 여럿 읽는다."""
+    """사용자가 만든 세션 그룹, 배포의 replica group이 가진 세션 그룹 순으로 여럿 읽는다."""
 
     @override
     def operation(self) -> str:
@@ -51,7 +51,7 @@ class ReadingBothGroupsOfTheProject(When[Laid, SessionGroupAdapter, Answers]):
 
     @override
     def describe(self, laid: Laid) -> str:
-        return f"{laid.caller.username}이 사용자가 만든 세션 그룹, replica group이 가진 세션 그룹 순으로 여럿 읽기"
+        return f"{laid.caller.username}이 사용자가 만든 세션 그룹, 배포의 replica group이 가진 세션 그룹 순으로 여럿 읽기"
 
     @override
     async def call(self, adapter: SessionGroupAdapter, laid: Laid) -> Answers:
@@ -100,13 +100,13 @@ class ReadingTheUsersGroupById(When[Laid, SessionGroupAdapter, Answers]):
 
 @dataclass(frozen=True)
 class OnlyTheUsersGroupComesBack(Then[Laid, Answers]):
-    """첫 자리에 사용자가 만든 세션 그룹이 오고, replica group이 가진 세션 그룹 자리는 비어 있다."""
+    """첫 자리에 사용자가 만든 세션 그룹이 오고, 배포의 replica group이 가진 세션 그룹 자리는 비어 있다."""
 
     started: datetime
 
     @override
     def says(self) -> str:
-        return "첫 자리에 사용자가 만든 세션 그룹 전체가 오고, replica group이 가진 세션 그룹 자리는 빈 값이다"
+        return "첫 자리에 사용자가 만든 세션 그룹 전체가 오고, 배포의 replica group이 가진 세션 그룹 자리는 빈 값이다"
 
     @override
     def look(self, laid: Laid, answered: Answered[Answers]) -> list[Verdict]:
@@ -178,7 +178,7 @@ class AGrantedUserReadsBothGroups(
     def describe(self) -> str:
         return (
             "그 프로젝트에서 세션 그룹 읽기 권한을 받은 사용자가 사용자가 만든 세션 그룹과 "
-            "replica group이 가진 세션 그룹을 함께 읽으면, 요청한 순서대로 그 세션 그룹과 빈 값이 온다"
+            "배포의 replica group이 가진 세션 그룹을 함께 읽으면, 요청한 순서대로 그 세션 그룹과 빈 값이 온다"
         )
 
     @override
