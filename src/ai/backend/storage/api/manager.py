@@ -60,6 +60,7 @@ from ai.backend.common.events.event_types.volume.broadcast import (
 )
 from ai.backend.common.json import dump_json_str
 from ai.backend.common.metrics.http import (
+    SystemMetricUpdater,
     build_api_metric_middleware,
     build_prometheus_metrics_handler,
 )
@@ -1434,6 +1435,7 @@ def init_internal_app(ctx: RootContext) -> web.Application:
     app.router.add_route("GET", "/livez", check_livez)
     app.router.add_route("GET", "/readyz", check_readyz)
     app.router.add_route("GET", "/metrics", build_prometheus_metrics_handler(metric_registry))
+    app.cleanup_ctx.append(SystemMetricUpdater(metric_registry.system).cleanup_ctx)
     return app
 
 

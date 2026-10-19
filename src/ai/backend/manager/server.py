@@ -39,7 +39,10 @@ from ai.backend.common.cli import LazyGroup
 from ai.backend.common.config import find_config_file
 from ai.backend.common.dependencies import DependencyBuilderStack
 from ai.backend.common.json import dump_json_str
-from ai.backend.common.metrics.http import build_prometheus_metrics_handler
+from ai.backend.common.metrics.http import (
+    SystemMetricUpdater,
+    build_prometheus_metrics_handler,
+)
 from ai.backend.common.metrics.metric import CommonMetricRegistry
 from ai.backend.common.metrics.multiprocess_setup import cleanup_prometheus_multiprocess_dir
 from ai.backend.common.msgpack import DEFAULT_PACK_OPTS, DEFAULT_UNPACK_OPTS
@@ -225,6 +228,7 @@ def build_internal_app(
 ) -> web.Application:
     app = web.Application()
     metric_registry = CommonMetricRegistry.instance()
+    app.cleanup_ctx.append(SystemMetricUpdater(metric_registry.system).cleanup_ctx)
     app.router.add_route("GET", r"/metrics", build_prometheus_metrics_handler(metric_registry))
     app.router.add_route(
         "GET",
