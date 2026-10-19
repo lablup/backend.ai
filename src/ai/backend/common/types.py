@@ -2008,6 +2008,10 @@ class KernelCreationConfig(TypedDict):
     scaling_group: str
     agent_addr: str
     endpoint_id: str | None
+    cluster_network_ip: NotRequired[str | None]
+    """The address the session's network plugin assigned this kernel, if it assigns them.
+
+    The agent passes it to the CNI plugin as the ``ips`` capability."""
 
 
 class SessionEnqueueingConfig(TypedDict):

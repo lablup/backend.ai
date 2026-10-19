@@ -461,6 +461,7 @@ class TestThePortsAStartTakes:
         ctx.ownership_data = MagicMock()
         ctx.internal_data = {}
         ctx.container_configs = []
+        ctx._cni_plugin = None
         ctx.computer_docker_args = {"HostConfig": {}}
         ctx.computers = {}
         ctx.resource_lock = asyncio.Lock()

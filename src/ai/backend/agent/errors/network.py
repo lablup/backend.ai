@@ -31,3 +31,18 @@ class ContainerSourceUnwired(BackendAIError, web.HTTPInternalServerError):
             operation=ErrorOperation.SETUP,
             error_detail=ErrorDetail.INTERNAL_ERROR,
         )
+
+
+class CniPluginNotInstalled(BackendAIError, web.HTTPInternalServerError):
+    """Raised when a session's network config names a CNI plugin this agent has not loaded."""
+
+    error_type = "https://api.backend.ai/probs/agent/cni-plugin-not-installed"
+    error_title = "The session's network plugin is not installed on this agent."
+
+    @override
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.AGENT,
+            operation=ErrorOperation.CREATE,
+            error_detail=ErrorDetail.NOT_FOUND,
+        )

@@ -8,6 +8,7 @@ import pytest
 
 from ai.backend.agent.kernel_registry.types import KernelRecoveryData
 from ai.backend.agent.resources import KernelResourceSpec
+from ai.backend.agent.scratch.types import KernelRecoveryScratchData
 from ai.backend.agent.types import KernelOwnershipData
 from ai.backend.common.docker import ImageRef
 from ai.backend.common.types import AgentId, KernelId, ResourceSlot, SessionId, SessionTypes
@@ -82,6 +83,31 @@ class TestKernelRecoveryDataFromDockerKernel:
         assert result.domain_socket_proxies == []
         assert result.repl_in_port == 2000
         assert result.repl_out_port == 2001
+
+    def test_repl_host_survives_the_scratch_record(
+        self, mock_docker_kernel: Any, mock_resource_spec: KernelResourceSpec
+    ) -> None:
+        """A kernel dialled at its container address is dialled there again after a restart."""
+        mock_docker_kernel.data = {**mock_docker_kernel.data, "repl_host": "10.240.0.5"}
+        written = KernelRecoveryScratchData.from_kernel_recovery_data(
+            KernelRecoveryData.from_docker_kernel(mock_docker_kernel)
+        )
+        read = KernelRecoveryScratchData.model_validate_json(written.model_dump_json())
+
+        restored = read.to_kernel_recovery_data(mock_resource_spec, {}).to_docker_kernel()
+
+        assert restored.data["repl_host"] == "10.240.0.5"
+
+    def test_repl_host_absent_from_an_older_record_reads_as_none(
+        self, mock_docker_kernel: Any
+    ) -> None:
+        """A record written before repl_host existed keeps dialling the published ports."""
+        written = KernelRecoveryScratchData.from_kernel_recovery_data(
+            KernelRecoveryData.from_docker_kernel(mock_docker_kernel)
+        ).model_dump(mode="json")
+        del written["repl_host"]
+
+        assert KernelRecoveryScratchData.model_validate(written).repl_host is None
 
     def test_from_docker_kernel_without_block_service_ports(self, mock_docker_kernel: Any) -> None:
         """Use default False when block_service_ports key is missing."""

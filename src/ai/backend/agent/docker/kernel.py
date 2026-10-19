@@ -102,7 +102,9 @@ class DockerKernel(AbstractKernel):
             self.kernel_id,
             self.session_id,
             event_producer,
-            kernel_host="127.0.0.1",  # repl ports are always bound to 127.0.0.1
+            # Loopback-published repl ports, except for a CNI-attached container: Docker publishes
+            # nothing and the agent dials the address the container's ADD returned.
+            kernel_host=self.data.get("repl_host") or "127.0.0.1",
             repl_in_port=self.data["repl_in_port"],
             repl_out_port=self.data["repl_out_port"],
             exec_timeout=0,
