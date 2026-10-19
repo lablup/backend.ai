@@ -57,13 +57,6 @@ class UserConfigAdapter:
         )
         return result.items
 
-    async def _default_dotfile(self, user_id: UserID, path: str) -> DotfileData:
-        """The legacy API names a file by path; this finds the default row it means."""
-        dotfiles = await self._search_default_dotfiles(user_id, path)
-        if not dotfiles:
-            raise DotfileNotFound
-        return dotfiles[0]
-
     async def create_dotfile(self, input: CreateDotfileInput) -> CreateDotfileResponse:
         await self._user.create_dotfile.run(
             CreateDotfileAction(
@@ -76,7 +69,10 @@ class UserConfigAdapter:
         return CreateDotfileResponse()
 
     async def get_default_dotfile(self, user_id: UserID, path: str) -> GetDotfileResponse:
-        dotfile = await self._default_dotfile(user_id, path)
+        dotfiles = await self._search_default_dotfiles(user_id, path)
+        if not dotfiles:
+            raise DotfileNotFound
+        dotfile = dotfiles[0]
         return GetDotfileResponse(path=dotfile.path, perm=dotfile.perm, data=dotfile.data)
 
     async def get_default_dotfiles(self, user_id: UserID) -> list[DotfileListItem]:
@@ -86,10 +82,12 @@ class UserConfigAdapter:
     async def update_default_dotfile(
         self, input: UpdateDefaultDotfileInput
     ) -> UpdateDotfileResponse:
-        dotfile = await self._default_dotfile(input.user_id, input.path)
+        dotfiles = await self._search_default_dotfiles(input.user_id, input.path)
+        if not dotfiles:
+            raise DotfileNotFound
         await self._dotfile.update.run(
             UpdateDotfileAction(
-                updater=DotfileUpdater(dotfile_id=dotfile.id, perm=input.perm, data=input.data)
+                updater=DotfileUpdater(dotfile_id=dotfiles[0].id, perm=input.perm, data=input.data)
             )
         )
         return UpdateDotfileResponse()
@@ -97,6 +95,8 @@ class UserConfigAdapter:
     async def delete_default_dotfile(
         self, input: DeleteDefaultDotfileInput
     ) -> DeleteDotfileResponse:
-        dotfile = await self._default_dotfile(input.user_id, input.path)
-        await self._dotfile.purge.run(PurgeDotfileAction(dotfile_id=dotfile.id))
+        dotfiles = await self._search_default_dotfiles(input.user_id, input.path)
+        if not dotfiles:
+            raise DotfileNotFound
+        await self._dotfile.purge.run(PurgeDotfileAction(dotfile_id=dotfiles[0].id))
         return DeleteDotfileResponse(success=True)
