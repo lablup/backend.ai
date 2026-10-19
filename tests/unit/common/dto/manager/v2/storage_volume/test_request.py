@@ -83,6 +83,7 @@ class TestStorageVolumeFilter:
         assert filter.entity_id is None
         assert filter.name is None
         assert filter.storage_backend_id is None
+        assert filter.enabled is None
 
     def test_nested_filters_hold_their_own_conditions(self) -> None:
         volume_id = uuid.uuid4()

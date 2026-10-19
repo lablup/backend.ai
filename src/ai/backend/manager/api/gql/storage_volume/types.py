@@ -168,6 +168,7 @@ class StorageVolumeGQL(PydanticNodeMixin[StorageVolumeNode]):
     usage_exposure: StorageVolumeUsageExposureGQL = gql_field(
         description="Which usage figures the volume shows a user."
     )
+    enabled: bool = gql_field(description="Whether the volume is enabled.")
     created_at: datetime = gql_field(description="Creation timestamp.")
     updated_at: datetime = gql_field(description="Last update timestamp.")
 
@@ -252,6 +253,7 @@ class StorageVolumeFilterGQL(PydanticInputMixin[StorageVolumeFilterDTO]):
     storage_backend_id: UUIDFilter | None = gql_field(
         description="Filter by the backend the volume sits on.", default=None
     )
+    enabled: bool | None = gql_field(description="Filter by the enabled flag.", default=None)
     AND: list[Self] | None = gql_field(
         description="Combine multiple filters with AND logic.", default=None
     )

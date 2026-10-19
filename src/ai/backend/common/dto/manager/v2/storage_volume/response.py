@@ -36,6 +36,7 @@ class StorageVolumeNode(BaseResponseModel):
     usage_exposure: StorageVolumeUsageExposureInfo = Field(
         description="Which usage figures the volume shows a user"
     )
+    enabled: bool = Field(description="Whether the volume is enabled")
     created_at: datetime = Field(description="Creation timestamp")
     updated_at: datetime = Field(description="Last update timestamp")
 

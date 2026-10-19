@@ -36,6 +36,7 @@ class StorageVolumeFilter(BaseRequestModel):
     storage_backend_id: UUIDFilter | None = Field(
         default=None, description="Filter by the backend the volume sits on."
     )
+    enabled: bool | None = Field(default=None, description="Filter by the enabled flag.")
     AND: list[StorageVolumeFilter] | None = Field(
         default=None, description="Logical AND of multiple filter conditions."
     )
