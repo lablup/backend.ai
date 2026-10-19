@@ -62,14 +62,6 @@ from ai.backend.manager.services.user.actions.delete_user import (
     DeleteUserAction,
     DeleteUserActionResult,
 )
-from ai.backend.manager.services.user.actions.get_dotfile import (
-    GetDotfileAction,
-    GetDotfileActionResult,
-)
-from ai.backend.manager.services.user.actions.get_dotfiles import (
-    GetUserDotfilesAction,
-    GetUserDotfilesActionResult,
-)
 from ai.backend.manager.services.user.actions.get_user import (
     GetUserAction,
     GetUserActionResult,
@@ -155,10 +147,6 @@ class UserProcessors:
     scoped_search: ScopeActionProcessor[ScopedSearchUsersAction, ScopedBatchOpsResult[UserData]]
     create_user: ScopeActionProcessor[CreateUserAction, CreateUserActionResult]
     get_user: SingleEntityActionProcessor[GetUserAction, GetUserActionResult]
-    get_dotfile: SingleEntityActionProcessor[GetDotfileAction, GetDotfileActionResult]
-    get_default_dotfiles: SingleEntityActionProcessor[
-        GetUserDotfilesAction, GetUserDotfilesActionResult
-    ]
     update_user: SingleEntityActionProcessor[UpdateUserAction, UpdateUserActionResult]
     delete_user: SingleEntityActionProcessor[DeleteUserAction, DeleteUserActionResult]
     restore_user: SingleEntityActionProcessor[RestoreUserAction, RestoreUserActionResult]
@@ -230,10 +218,6 @@ class UserProcessors:
         self.scoped_search = group.scoped_search_ops(ScopedSearchUsersAction)
         self.create_user = group.scope(CreateUserAction, user_service.create_user)
         self.get_user = group.single_entity(GetUserAction, user_service.get_user)
-        self.get_dotfile = group.single_entity(GetDotfileAction, user_service.get_dotfile)
-        self.get_default_dotfiles = group.single_entity(
-            GetUserDotfilesAction, user_service.get_default_dotfiles
-        )
         self.update_user = group.single_entity(UpdateUserAction, user_service.update_user)
         self.delete_user = group.single_entity(DeleteUserAction, user_service.delete_user)
         self.restore_user = group.single_entity(RestoreUserAction, user_service.restore_user)

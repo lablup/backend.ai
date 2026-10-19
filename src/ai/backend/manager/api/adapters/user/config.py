@@ -1,4 +1,4 @@
-"""Legacy user config DTO conversion and user processor calls."""
+"""Legacy user config DTO conversion and user and dotfile processor calls."""
 
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.dto.manager.config.response import (
@@ -8,28 +8,28 @@ from ai.backend.common.dto.manager.config.response import (
     GetDotfileResponse,
     UpdateDotfileResponse,
 )
-from ai.backend.manager.data.dotfile.types import DotfileEntry
+from ai.backend.manager.data.dotfile.types import DotfileData, DotfileEntry
 from ai.backend.manager.dto.user_config_input import (
     CreateDotfileInput,
     DeleteDefaultDotfileInput,
     UpdateDefaultDotfileInput,
 )
+from ai.backend.manager.errors.storage import DotfileNotFound
 from ai.backend.manager.models.dotfile.conditions import DotfileConditions
 from ai.backend.manager.models.dotfile.creators import DotfileEntryCreator
 from ai.backend.manager.models.dotfile.orders import DotfileOrders
 from ai.backend.manager.models.dotfile.purgers import DotfileEntryPurger
-from ai.backend.manager.models.dotfile.queriers import DotfileQuerier
 from ai.backend.manager.models.dotfile.searchers import DotfileSearcher
 from ai.backend.manager.models.dotfile.updaters import DotfileEntryUpdater
 from ai.backend.manager.models.specs.pagination import NoPagination
+from ai.backend.manager.services.dotfile.actions.search import SearchDotfilesAction
+from ai.backend.manager.services.dotfile.processors import DotfileProcessors
 from ai.backend.manager.services.user.actions.create_keypair_dotfile import (
     CreateKeypairDotfileAction,
 )
 from ai.backend.manager.services.user.actions.delete_default_dotfile import (
     DeleteDefaultDotfileAction,
 )
-from ai.backend.manager.services.user.actions.get_dotfile import GetDotfileAction
-from ai.backend.manager.services.user.actions.get_dotfiles import GetUserDotfilesAction
 from ai.backend.manager.services.user.actions.update_default_dotfile import (
     UpdateDefaultDotfileAction,
 )
@@ -38,9 +38,29 @@ from ai.backend.manager.services.user.processors import UserProcessors
 
 class UserConfigAdapter:
     _user: UserProcessors
+    _dotfile: DotfileProcessors
 
-    def __init__(self, user: UserProcessors) -> None:
+    def __init__(self, user: UserProcessors, dotfile: DotfileProcessors) -> None:
         self._user = user
+        self._dotfile = dotfile
+
+    async def _search_default_dotfiles(
+        self, user_id: UserID, path: str | None = None
+    ) -> list[DotfileData]:
+        conditions = [DotfileConditions.by_is_default(True)]
+        if path is not None:
+            conditions.append(DotfileConditions.by_path(path))
+        result = await self._dotfile.search.run(
+            SearchDotfilesAction(
+                user_id=user_id,
+                searcher=DotfileSearcher(
+                    pagination=NoPagination(),
+                    conditions=conditions,
+                    orders=[DotfileOrders.created_at(), DotfileOrders.id()],
+                ),
+            )
+        )
+        return result.items
 
     async def create_dotfile(self, input: CreateDotfileInput) -> CreateDotfileResponse:
         await self._user.create_dotfile.run(
@@ -54,35 +74,15 @@ class UserConfigAdapter:
         return CreateDotfileResponse()
 
     async def get_default_dotfile(self, user_id: UserID, path: str) -> GetDotfileResponse:
-        result = await self._user.get_dotfile.run(
-            GetDotfileAction(
-                user_id=user_id,
-                querier=DotfileQuerier(
-                    entity_type=user_id.entity_type(),
-                    conditions=[
-                        DotfileConditions.by_is_default(True),
-                        DotfileConditions.by_path(path),
-                    ],
-                ),
-            )
-        )
-        entry = result.dotfile
-        return GetDotfileResponse(path=entry.path, perm=entry.perm, data=entry.data)
+        dotfiles = await self._search_default_dotfiles(user_id, path)
+        if not dotfiles:
+            raise DotfileNotFound
+        dotfile = dotfiles[0]
+        return GetDotfileResponse(path=dotfile.path, perm=dotfile.perm, data=dotfile.data)
 
     async def get_default_dotfiles(self, user_id: UserID) -> list[DotfileListItem]:
-        result = await self._user.get_default_dotfiles.run(
-            GetUserDotfilesAction(
-                user_id=user_id,
-                searcher=DotfileSearcher(
-                    pagination=NoPagination(),
-                    conditions=[DotfileConditions.by_is_default(True)],
-                    orders=[DotfileOrders.created_at(), DotfileOrders.id()],
-                ),
-            )
-        )
-        return [
-            DotfileListItem(path=d.path, permission=d.perm, data=d.data) for d in result.dotfiles
-        ]
+        dotfiles = await self._search_default_dotfiles(user_id)
+        return [DotfileListItem(path=d.path, permission=d.perm, data=d.data) for d in dotfiles]
 
     async def update_default_dotfile(
         self, input: UpdateDefaultDotfileInput

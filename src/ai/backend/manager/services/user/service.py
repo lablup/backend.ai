@@ -48,14 +48,6 @@ from ai.backend.manager.services.user.actions.delete_user import (
     DeleteUserAction,
     DeleteUserActionResult,
 )
-from ai.backend.manager.services.user.actions.get_dotfile import (
-    GetDotfileAction,
-    GetDotfileActionResult,
-)
-from ai.backend.manager.services.user.actions.get_dotfiles import (
-    GetUserDotfilesAction,
-    GetUserDotfilesActionResult,
-)
 from ai.backend.manager.services.user.actions.get_user import (
     GetUserAction,
     GetUserActionResult,
@@ -408,15 +400,3 @@ class UserService:
             DefaultBootstrapScriptUpdater(entity=action.user_id, script=action.script)
         )
         return UpdateDefaultBootstrapScriptActionResult()
-
-    async def get_dotfile(self, action: GetDotfileAction) -> GetDotfileActionResult:
-        dotfile = await self._user_repository.dotfile(action.user_id, action.querier)
-        return GetDotfileActionResult(dotfile=dotfile)
-
-    async def get_default_dotfiles(
-        self, action: GetUserDotfilesAction
-    ) -> GetUserDotfilesActionResult:
-        dotfiles = await self._user_repository.search_user_scoped_dotfiles(
-            action.user_id, action.searcher
-        )
-        return GetUserDotfilesActionResult(dotfiles=dotfiles)

@@ -315,7 +315,7 @@ class Adapters:
             storage_host=StorageHostAdapter(processors.vfolder),
             storage_namespace=StorageNamespaceAdapter(processors.storage_namespace),
             user=UserAdapter(processors.user, processors.domain, auth_config, key_provider_pool),
-            user_config=UserConfigAdapter(processors.user),
+            user_config=UserConfigAdapter(processors.user, processors.dotfile),
             vfolder=VFolderAdapter(
                 processors.vfolder,
                 processors.vfolder_file,

@@ -14,6 +14,7 @@ from ai.backend.common.data.entity.container_registry import ContainerRegistryEn
 from ai.backend.common.data.entity.deployment import DeploymentEntityType
 from ai.backend.common.data.entity.deployment_preset import DeploymentPresetEntityType
 from ai.backend.common.data.entity.domain import DomainEntityType
+from ai.backend.common.data.entity.dotfile import DotfileFieldType
 from ai.backend.common.data.entity.entity_label import EntityLabelFieldType
 from ai.backend.common.data.entity.entity_share import EntityShareEntityType
 from ai.backend.common.data.entity.fair_share import (
@@ -80,6 +81,7 @@ from ai.backend.manager.actions.v2.bulk.validator.rbac import BulkOwnCheck
 from ai.backend.manager.clients.prometheus.preset import PromQLTemplateRenderer
 from ai.backend.manager.data.artifact.types import ArtifactRevisionData
 from ai.backend.manager.data.audit_log.types import AuditLogData, AuditLogScopeData
+from ai.backend.manager.data.dotfile.types import DotfileData
 from ai.backend.manager.data.entity_label.types import EntityLabelData
 from ai.backend.manager.data.fair_share.types import (
     DomainFairShareData,
@@ -136,6 +138,7 @@ from ai.backend.manager.services.deployment_revision_preset.service import (
 )
 from ai.backend.manager.services.domain.processors import DomainProcessors
 from ai.backend.manager.services.domain.service import DomainService
+from ai.backend.manager.services.dotfile.processors import DotfileProcessors
 from ai.backend.manager.services.entity_label.actions.lookup_owner import (
     LookupBulkEntityLabelOwnerAction,
     LookupEntityLabelOwnerAction,
@@ -857,6 +860,9 @@ def create_processors(
                 LookupEntityLabelOwnerAction,
                 LookupBulkEntityLabelOwnerAction,
             )
+        ),
+        dotfile=DotfileProcessors(
+            registry.dangling_field_group(FieldGroupMeta(DotfileFieldType()), DotfileData)
         ),
         idle_checker_assignment=IdleCheckerAssignmentProcessors(
             session_groups.group(GroupMeta(IdleCheckerEntityType())),

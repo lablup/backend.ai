@@ -12,6 +12,7 @@ from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
 
 from ai.backend.client.v2.registry import BackendAIClientRegistry
 from ai.backend.common.data.entity.domain import DomainEntityType
+from ai.backend.common.data.entity.dotfile import DotfileFieldType
 from ai.backend.common.data.entity.project import ProjectEntityType
 from ai.backend.common.data.entity.user import UserEntityType, UserID
 from ai.backend.common.data.permission.types import Permission
@@ -27,6 +28,7 @@ from ai.backend.common.dto.manager.config import (
 from ai.backend.manager.actions.monitors import ActionMonitors
 from ai.backend.manager.actions.registry.registry import ProcessorRegistry
 from ai.backend.manager.actions.registry.types import (
+    FieldGroupMeta,
     GroupMeta,
     ProcessorDependencies,
 )
@@ -41,6 +43,7 @@ from ai.backend.manager.api.rest.types import RouteDeps
 from ai.backend.manager.api.rest.userconfig.handler import UserConfigHandler
 from ai.backend.manager.api.rest.userconfig.registry import register_userconfig_routes
 from ai.backend.manager.config.provider import ManagerConfigProvider
+from ai.backend.manager.data.dotfile.types import DotfileData
 from ai.backend.manager.data.permission.status import RoleStatus
 from ai.backend.manager.data.secret.types import KeyProviderType
 from ai.backend.manager.models.bootstrap_script.row import BootstrapScriptRow
@@ -71,6 +74,7 @@ from ai.backend.manager.secret.types import SecretValue
 from ai.backend.manager.services.auth.processors import AuthProcessors
 from ai.backend.manager.services.domain.processors import DomainProcessors
 from ai.backend.manager.services.domain.service import DomainService
+from ai.backend.manager.services.dotfile.processors import DotfileProcessors
 from ai.backend.manager.services.project.processors import ProjectProcessors
 from ai.backend.manager.services.project.service import ProjectService
 from ai.backend.manager.services.user.processors import UserProcessors
@@ -186,7 +190,18 @@ def server_module_registries(
     return [
         register_groupconfig_routes(GroupConfigHandler(project=project), route_deps),
         register_userconfig_routes(
-            UserConfigHandler(auth=auth_processors, user=user, user_config=UserConfigAdapter(user)),
+            UserConfigHandler(
+                auth=auth_processors,
+                user=user,
+                user_config=UserConfigAdapter(
+                    user,
+                    DotfileProcessors(
+                        config_registry.dangling_field_group(
+                            FieldGroupMeta(DotfileFieldType()), DotfileData
+                        )
+                    ),
+                ),
+            ),
             route_deps,
         ),
         register_domainconfig_routes(DomainConfigHandler(domain=domain), route_deps),

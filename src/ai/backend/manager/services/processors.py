@@ -96,6 +96,7 @@ if TYPE_CHECKING:
         DomainProcessors,
     )
     from ai.backend.manager.services.domain.service import DomainService
+    from ai.backend.manager.services.dotfile.processors import DotfileProcessors
     from ai.backend.manager.services.entity_label.processors import (
         EntityLabelProcessors,
     )
@@ -480,6 +481,7 @@ class Processors:
     storage_namespace: StorageNamespaceProcessors
     audit_log: AuditLogProcessors
     entity_label: EntityLabelProcessors
+    dotfile: DotfileProcessors
     idle_checker_assignment: IdleCheckerAssignmentProcessors
     scheduling_history: SchedulingHistoryProcessors
     service_catalog: ServiceCatalogProcessors

@@ -45,6 +45,7 @@ row is a change to that user.
 - The adapter creates `DotfileEntryCreator`, `DotfileEntryUpdater` or `DotfileEntryPurger`. Actions pass the spec to `UserRepository`, which calls write ops in one transaction.
 - Migration unpacks keypair bytes, deduplicates `(path, perm, data)` per user, and preserves whether any source was the default keypair. It reads rows in batches and writes up to 1,000 file rows per insert before dropping `keypairs.dotfiles`.
 - Downgrade packs each user’s default files into msgpack and restores them to all of that user’s keypairs.
+- Reads are `SearchDotfilesAction` on `DotfileProcessors`, scope-shaped with the user as the scope, from a dangling field group because the owner's kind is a value on the row. The legacy single-file read is that search with a path condition.
 - An access key selects its owning user for the existing dotfile API. Purging a user deletes its dotfile rows.
 
 ## The operations that keep a service

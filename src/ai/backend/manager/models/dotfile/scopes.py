@@ -26,5 +26,5 @@ class UserDotfileTarget(ScopeTarget):
     @property
     @override
     def existence_checks(self) -> Sequence[ExistenceCheck[Any]]:
-        # The action's user check or the caller's user lock already answered for it.
+        # The action's scope gate already answered for the user.
         return ()
