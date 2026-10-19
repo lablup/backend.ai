@@ -929,6 +929,7 @@ class BaseRunner(metaclass=ABCMeta):
                             "status": "failed",
                             "error": error_reason,
                         }
+                    cmdargs = self._override_jupyter_cookie(service_info["name"], cmdargs)
                     service_env = {**self.child_env, **env}
                     # avoid conflicts with Python binary used by service apps.
                     if "LD_LIBRARY_PATH" in service_env:
@@ -1005,6 +1006,18 @@ class BaseRunner(metaclass=ABCMeta):
         finally:
             if error_reason:
                 log.warning("failed to start service {}: {}", service_info["name"], error_reason)
+
+    def _override_jupyter_cookie(
+        self, service_name: str, cmdargs: Sequence[str | os.PathLike[str]]
+    ) -> Sequence[str | os.PathLike[str]]:
+        # Jupyter's default login cookie lasts 30 days under a name that carries the host port,
+        # so every session left one behind. Applied here to cover images' service-defs too.
+        if service_name not in ("jupyter", "jupyterlab"):
+            return cmdargs
+        overrides = ['--IdentityProvider.cookie_options={"expires_days": None}']
+        if session_id := os.environ.get("BACKENDAI_SESSION_ID"):
+            overrides.append(f"--IdentityProvider.cookie_name=bai-jupyter-{session_id}")
+        return [*cmdargs, *overrides]
 
     async def _wait_service_proc(
         self,
