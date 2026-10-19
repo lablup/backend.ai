@@ -168,15 +168,12 @@ class SocketRelayConfig(BaseConfigSchema):
         int,
         Field(
             default=64,
-            ge=3,
+            ge=2,
             validation_alias=AliasChoices("pids-limit", "pids_limit"),
             serialization_alias="pids-limit",
         ),
         BackendAIConfigMeta(
-            description=(
-                "Maximum number of processes in the socket relay container, "
-                "including docker-init and the listening socat process."
-            ),
+            description="Maximum number of processes in the socket relay container.",
             added_version="26.10.0",
             example=ConfigExample(local="64", prod="64"),
         ),
@@ -192,8 +189,7 @@ class SocketRelayConfig(BaseConfigSchema):
         BackendAIConfigMeta(
             description=(
                 "Maximum number of connections that socat serves at once, each in its own "
-                "child process. Must be at most pids-limit minus 2, since docker-init and the "
-                "listening socat process also count toward pids-limit."
+                "child process. Must be smaller than pids-limit."
             ),
             added_version="26.10.0",
             example=ConfigExample(local="32", prod="32"),
@@ -224,10 +220,10 @@ class SocketRelayConfig(BaseConfigSchema):
 
     @model_validator(mode="after")
     def _validate_max_children(self) -> Self:
-        if self.max_children > self.pids_limit - 2:
+        if self.max_children >= self.pids_limit:
             raise ValueError(
-                f"max-children ({self.max_children}) must be at most pids-limit minus 2 "
-                f"({self.pids_limit - 2})."
+                f"max-children ({self.max_children}) must be smaller than "
+                f"pids-limit ({self.pids_limit})."
             )
         return self
 

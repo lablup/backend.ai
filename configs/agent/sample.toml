@@ -291,13 +291,11 @@
     # the agent runs as root; a non-root agent runs the relay as its own group.
     # Added in 26.10.0
     gid = "65534"
-    # Maximum number of processes in the socket relay container, including
-    # docker-init and the listening socat process.
+    # Maximum number of processes in the socket relay container.
     # Added in 26.10.0
     pids-limit = 64
     # Maximum number of connections that socat serves at once, each in its own
-    # child process. Must be at most pids-limit minus 2, since docker-init and
-    # the listening socat process also count toward pids-limit.
+    # child process. Must be smaller than pids-limit.
     # Added in 26.10.0
     max-children = 32
     # Memory limit of the socket relay container.
