@@ -6,6 +6,7 @@ from enum import StrEnum
 from typing import override
 from uuid import UUID
 
+import strawberry
 from strawberry import Info
 from strawberry.relay import Connection, Edge, NodeID
 
@@ -256,7 +257,21 @@ class DeleteRetentionPolicyPayloadGQL(PydanticOutputMixin[DeletePayloadDTO]):
     name="PurgeRetentionPolicyPayload",
 )
 class PurgeRetentionPolicyPayloadGQL(PydanticOutputMixin[PurgePayloadDTO]):
-    id: UUID = gql_field(description="ID of the purged retention policy.")
+    id: UUID = gql_field(
+        description="ID of the purged retention policy.",
+        deprecation_reason=f"Deprecated since {NEXT_RELEASE_VERSION}. Use `purgedId` or `entityId`.",
+    )
+    purged_id: strawberry.ID = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="Global ID of the purged retention policy.",
+        ),
+    )
+    entity_id: UUID = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION, description="UUID of the purged retention policy."
+        ),
+    )
 
 
 @gql_pydantic_type(

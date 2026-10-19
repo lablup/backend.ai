@@ -148,7 +148,7 @@ class RetentionPolicyAdapter(BaseAdapter):
     async def purge(self, policy_id: RetentionPolicyID) -> PurgeRetentionPolicyPayload:
         purger = RetentionPolicyPurger(policy_id=policy_id)
         result = await self._retention_policy.purge.run(PurgeRetentionPolicyAction(purger=purger))
-        return PurgeRetentionPolicyPayload(id=result.data.id)
+        return PurgeRetentionPolicyPayload(id=result.data.id, entity_id=result.data.id)
 
     async def partial_bulk_update(
         self, input: PartialBulkUpdateRetentionPoliciesInput
