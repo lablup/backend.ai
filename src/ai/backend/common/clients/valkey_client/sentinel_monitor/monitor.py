@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 from collections.abc import AsyncGenerator, Sequence
 from contextlib import aclosing
 from typing import Final, override
@@ -12,12 +13,16 @@ from ai.backend.common.clients.valkey_client.sentinel_monitor.types import (
 from ai.backend.common.types import HostPortPair
 
 _DEFAULT_POLL_INTERVAL: Final[float] = 60.0
+_DEFAULT_QUERY_MIN_INTERVAL: Final[float] = 1.0
 
 
 class SentinelMonitor(AbstractSentinelMonitor):
     """Tracks the master address of one service watched by a set of Sentinels."""
 
     _pool: SentinelPool
+    _query_min_interval: float
+    _query_lock: asyncio.Lock
+    _queried_at: float
 
     def __init__(
         self,
@@ -28,11 +33,15 @@ class SentinelMonitor(AbstractSentinelMonitor):
         use_tls: bool = False,
         tls_skip_verify: bool = False,
         poll_interval: float = _DEFAULT_POLL_INTERVAL,
+        query_min_interval: float = _DEFAULT_QUERY_MIN_INTERVAL,
     ) -> None:
         config = SentinelConnectionConfig(
             password=password, use_tls=use_tls, tls_skip_verify=tls_skip_verify
         )
         self._pool = SentinelPool(sentinel_addresses, service_name, config, poll_interval)
+        self._query_min_interval = query_min_interval
+        self._query_lock = asyncio.Lock()
+        self._queried_at = float("-inf")
 
     @override
     async def start(self) -> None:
@@ -67,5 +76,12 @@ class SentinelMonitor(AbstractSentinelMonitor):
         return await self._query()
 
     async def _query(self) -> HostPortPair:
-        master = await self._pool.query()
-        return master.address
+        """Callers within the minimum interval of the last query get its result."""
+        async with self._query_lock:
+            loop = asyncio.get_running_loop()
+            known = self._pool.master()
+            if known is not None and loop.time() - self._queried_at < self._query_min_interval:
+                return known.address
+            master = await self._pool.query()
+            self._queried_at = loop.time()
+            return master.address

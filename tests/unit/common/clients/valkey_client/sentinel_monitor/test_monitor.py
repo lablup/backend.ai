@@ -341,3 +341,17 @@ class TestSentinelMonitorCheckMaster:
 
         assert result == known
         assert [proxy.query_count for proxy in sentinel_proxies] == before
+
+    async def test_concurrent_checks_share_one_query(
+        self, sentinel_proxies: list[SentinelProxy], monitor_factory: MonitorFactory
+    ) -> None:
+        monitor = await monitor_factory()
+        known = await monitor.get_master()
+        # Past the minimum interval since the query above.
+        await asyncio.sleep(1.1)
+        before = [proxy.query_count for proxy in sentinel_proxies]
+
+        results = await asyncio.gather(*[monitor.check_master(known) for _ in range(10)])
+
+        assert results == [known] * 10
+        assert [proxy.query_count for proxy in sentinel_proxies] == [count + 1 for count in before]
