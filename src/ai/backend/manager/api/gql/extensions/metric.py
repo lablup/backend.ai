@@ -18,7 +18,7 @@ if TYPE_CHECKING:
 
 
 class GQLMetricExtension(SchemaExtension):
-    """Records per-field GraphQL metrics with OpenTelemetry tracing."""
+    """Records root-field GraphQL metrics and per-field OpenTelemetry spans."""
 
     @override
     def resolve(
@@ -41,6 +41,8 @@ class GQLMetricExtension(SchemaExtension):
         operation_name = (
             info.operation.name.value if info.operation.name is not None else "anonymous"
         )
+        # Metrics cover root fields only; nested fields stay in the trace.
+        is_root_field = info.path.prev is None
 
         tracer = trace.get_tracer(__name__)
         span = tracer.start_span(
@@ -62,6 +64,8 @@ class GQLMetricExtension(SchemaExtension):
                 span.end()
 
         def _observe(*, duration: float, error: BaseException | None = None) -> None:
+            if not is_root_field:
+                return
             match error:
                 case None:
                     error_code = None
@@ -73,7 +77,6 @@ class GQLMetricExtension(SchemaExtension):
                 operation_type=operation_type,
                 field_name=field_name,
                 parent_type=parent_type,
-                operation_name=operation_name,
                 error_code=error_code,
                 success=error is None,
                 duration=duration,
