@@ -83,6 +83,7 @@ class PersistentServiceContainer:
         if image_version == 0:
             log.info("PersistentServiceContainer({}): installing...", self.image)
             await self.install_latest()
+            image_version = await self.get_image_version()
         elif image_version < self.img_version:
             log.info(
                 "PersistentServiceContainer({}): upgrading (v{} -> v{})",
@@ -91,12 +92,17 @@ class PersistentServiceContainer:
                 self.img_version,
             )
             await self.install_latest()
+            image_version = await self.get_image_version()
         container_version, is_running = await self.get_container_version_and_status()
         if container_version == 0 or image_version != container_version or not is_running:
             log.info("PersistentServiceContainer({}): recreating...", self.image)
             await self.recreate()
+<<<<<<< HEAD
         if not is_running:
             log.info("PersistentServiceContainer({}): starting...", self.image)
+=======
+            log.info("persistent service container starting", image_name=self.image)
+>>>>>>> 28381b78 (fix(BA-8601): replace persistent containers on the first start after an upgrade (#15846))
             await self.start()
 
     async def install_latest(self) -> None:
