@@ -41,7 +41,6 @@ from ai.backend.manager.models.dotfile.creators import DotfileEntryCreator
 from ai.backend.manager.models.dotfile.orders import DotfileOrders
 from ai.backend.manager.models.dotfile.scopes import UserDotfileTarget
 from ai.backend.manager.models.dotfile.searchers import DotfileSearcher
-from ai.backend.manager.models.dotfile.updaters import DefaultDotfileUpdater, DotfileEntryUpdater
 from ai.backend.manager.models.keypair.creators import KeypairCreator
 from ai.backend.manager.models.keypair.purgers import NonDefaultKeypairPurger
 from ai.backend.manager.models.keypair.queriers import DefaultKeypairQuerier
@@ -379,17 +378,6 @@ class UserRepository:
             await ops.create_field(creator.owner, creator)
             current = await self._default_dotfiles(ops, creator.owner)
             return DotfileEntries((*current.entries, creator.entry))
-
-    @user_repository_resilience.apply()
-    async def update_default_dotfile(
-        self, user_id: UserID, path: str, updater: DotfileEntryUpdater
-    ) -> DotfileEntries:
-        async with self._user_ops.write_ops() as ops:
-            entries = updater.apply(await self._default_dotfiles(ops, user_id), path)
-            await ops.batch_update_in_global(
-                DefaultDotfileUpdater(entity=user_id, path=path, updater=updater)
-            )
-            return entries
 
     async def _default_dotfiles(self, ops: V2ReadOps, user_id: UserID) -> DotfileEntries:
         result = await ops.search_with_scopes(

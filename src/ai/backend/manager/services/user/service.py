@@ -78,10 +78,6 @@ from ai.backend.manager.services.user.actions.restore_user import (
     RestoreUserAction,
     RestoreUserActionResult,
 )
-from ai.backend.manager.services.user.actions.update_default_dotfile import (
-    UpdateDefaultDotfileAction,
-    UpdateDefaultDotfileActionResult,
-)
 from ai.backend.manager.services.user.actions.update_user import (
     BulkUpdateUserAction,
     BulkUpdateUserActionResult,
@@ -364,14 +360,6 @@ class UserService:
             raise DotfileCreationFailed("Dotfile creation limit reached")
         entries = await self._user_repository.create_dotfile(action.creator)
         return CreateDotfileActionResult(entries=entries.entries)
-
-    async def update_default_dotfile(
-        self, action: UpdateDefaultDotfileAction
-    ) -> UpdateDefaultDotfileActionResult:
-        entries = await self._user_repository.update_default_dotfile(
-            action.user_id, action.path, action.updater
-        )
-        return UpdateDefaultDotfileActionResult(entries=entries.entries)
 
     async def get_default_bootstrap_script(
         self, action: GetDefaultBootstrapScriptAction

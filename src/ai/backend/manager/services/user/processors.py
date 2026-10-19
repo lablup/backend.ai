@@ -108,10 +108,6 @@ from ai.backend.manager.services.user.actions.scoped_search import (
     ScopedSearchUsersAction,
 )
 from ai.backend.manager.services.user.actions.search_users import GlobalSearchUsersAction
-from ai.backend.manager.services.user.actions.update_default_dotfile import (
-    UpdateDefaultDotfileAction,
-    UpdateDefaultDotfileActionResult,
-)
 from ai.backend.manager.services.user.actions.update_user import (
     BulkUpdateUserAction,
     BulkUpdateUserActionResult,
@@ -186,9 +182,6 @@ class UserProcessors:
         AdminGetSSHKeypairAction, AdminGetSSHKeypairActionResult
     ]
     create_dotfile: SingleEntityActionProcessor[CreateDotfileAction, CreateDotfileActionResult]
-    update_default_dotfile: SingleEntityActionProcessor[
-        UpdateDefaultDotfileAction, UpdateDefaultDotfileActionResult
-    ]
     get_default_bootstrap_script: SingleEntityActionProcessor[
         GetDefaultBootstrapScriptAction, GetDefaultBootstrapScriptActionResult
     ]
@@ -247,9 +240,6 @@ class UserProcessors:
             AdminGetSSHKeypairAction, user_service.admin_get_ssh_keypair
         )
         self.create_dotfile = group.single_entity(CreateDotfileAction, user_service.create_dotfile)
-        self.update_default_dotfile = group.single_entity(
-            UpdateDefaultDotfileAction, user_service.update_default_dotfile
-        )
         self.get_default_bootstrap_script = group.single_entity(
             GetDefaultBootstrapScriptAction, user_service.get_default_bootstrap_script
         )

@@ -43,6 +43,7 @@ from ai.backend.manager.actions.v2.field.ops import (
     PurgeFieldOpsAction,
     RestoreFieldOpsAction,
     RuntimePurgeFieldOpsAction,
+    RuntimeUpdateFieldOpsAction,
     UpdateFieldOpsAction,
 )
 from ai.backend.manager.actions.v2.field.processor import (
@@ -470,6 +471,25 @@ class LookupFieldGroup[TFieldData: FieldData](FieldGroup[TFieldData]):
         )
         return SingleFieldActionProcessor(
             FieldPurgeService(self._deps.repository).execute,
+            self._owner_lookup,
+            monitors=(*self._deps.monitors.single_entity, *monitors),
+            validators=(*self._deps.validators.single_entity, *validators),
+        )
+
+    def runtime_update_ops[TAction: RuntimeUpdateFieldOpsAction[Any, Any, Any]](
+        self,
+        action_cls: type[TAction],
+        *,
+        validators: Sequence[SingleEntityActionValidator] = (),
+        monitors: Sequence[SingleEntityActionMonitor] = (),
+    ) -> SingleFieldActionProcessor[TAction, EntityOpsResult[TFieldData]]:
+        """A write to a field row whose owning entity is polymorphic; the update
+        counterpart of :meth:`runtime_purge_ops`."""
+        self._record(
+            action_cls, ActionKind.SINGLE_ENTITY, ActionGate.PERMISSION, ActionBacking.GENERIC
+        )
+        return SingleFieldActionProcessor(
+            UpdateService(self._deps.repository).execute,
             self._owner_lookup,
             monitors=(*self._deps.monitors.single_entity, *monitors),
             validators=(*self._deps.validators.single_entity, *validators),

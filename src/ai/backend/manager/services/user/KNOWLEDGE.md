@@ -42,10 +42,10 @@ row is a change to that user.
 - Project and domain dotfiles remain in their existing columns.
 - Creation stores a non-default file. Its ActionResult retains `entries`: the existing default files followed by the new file. No runtime operation currently selects a default; migrated default files remain available.
 - Requests limit each file's `data` to `MAXIMUM_DOTFILE_SIZE` bytes, the limit the row's CHECK enforces.
-- The adapter creates `DotfileEntryCreator` or `DotfileEntryUpdater`. Actions pass the spec to `UserRepository`, which calls write ops in one transaction. `DotfileEntryCreator` names the owner, and `CreateDotfileAction` takes its user from there.
+- The adapter creates `DotfileEntryCreator`. `CreateDotfileAction` passes it to `UserRepository`, which calls write ops in one transaction. `DotfileEntryCreator` names the owner, and `CreateDotfileAction` takes its user from there.
 - Migration unpacks keypair bytes, deduplicates `(path, perm, data)` per user, and preserves whether any source was the default keypair. It reads rows in batches and writes up to 1,000 file rows per insert before dropping `keypairs.dotfiles`.
 - Downgrade packs each user’s default files into msgpack and restores them to all of that user’s keypairs.
-- Reads are `SearchDotfilesAction` on `DotfileProcessors`, scope-shaped with the user as the scope, from a dangling field group because the owner's kind is a value on the row. The legacy single-file read is that search with a path condition. `PurgeDotfileAction` names one row by id and is answered for by the owner its lookup reads; the legacy delete finds the default row's id by path first.
+- Reads are `SearchDotfilesAction` on `DotfileProcessors`, scope-shaped with the user as the scope, from a dangling field group because the owner's kind is a value on the row. The legacy single-file read is that search with a path condition. `UpdateDotfileAction` and `PurgeDotfileAction` name one row by id and are answered for by the owner its lookup reads; the legacy update and delete find the default row's id by path first.
 - An access key selects its owning user for the existing dotfile API. Purging a user deletes its dotfile rows.
 
 ## The operations that keep a service

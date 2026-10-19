@@ -19,16 +19,14 @@ from ai.backend.manager.models.dotfile.conditions import DotfileConditions
 from ai.backend.manager.models.dotfile.creators import DotfileEntryCreator
 from ai.backend.manager.models.dotfile.orders import DotfileOrders
 from ai.backend.manager.models.dotfile.searchers import DotfileSearcher
-from ai.backend.manager.models.dotfile.updaters import DotfileEntryUpdater
+from ai.backend.manager.models.dotfile.updaters import DotfileUpdater
 from ai.backend.manager.models.specs.pagination import NoPagination
 from ai.backend.manager.services.dotfile.actions.purge import PurgeDotfileAction
 from ai.backend.manager.services.dotfile.actions.search import SearchDotfilesAction
+from ai.backend.manager.services.dotfile.actions.update import UpdateDotfileAction
 from ai.backend.manager.services.dotfile.processors import DotfileProcessors
 from ai.backend.manager.services.user.actions.create_dotfile import (
     CreateDotfileAction,
-)
-from ai.backend.manager.services.user.actions.update_default_dotfile import (
-    UpdateDefaultDotfileAction,
 )
 from ai.backend.manager.services.user.processors import UserProcessors
 
@@ -88,11 +86,10 @@ class UserConfigAdapter:
     async def update_default_dotfile(
         self, input: UpdateDefaultDotfileInput
     ) -> UpdateDotfileResponse:
-        await self._user.update_default_dotfile.run(
-            UpdateDefaultDotfileAction(
-                user_id=input.user_id,
-                path=input.path,
-                updater=DotfileEntryUpdater(perm=input.perm, data=input.data),
+        dotfile = await self._default_dotfile(input.user_id, input.path)
+        await self._dotfile.update.run(
+            UpdateDotfileAction(
+                updater=DotfileUpdater(dotfile_id=dotfile.id, perm=input.perm, data=input.data)
             )
         )
         return UpdateDotfileResponse()

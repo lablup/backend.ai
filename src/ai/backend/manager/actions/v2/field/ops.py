@@ -108,6 +108,17 @@ class PurgeFieldOpsAction[
         return ActionOperationType.UPDATE
 
 
+class RuntimeUpdateFieldOpsAction[TFieldID: FieldIdentifier, TRow: Base, TData: FieldData](
+    BaseRuntimeSingleFieldAction[TFieldID], UpdateOpsAction[TRow, TData], ABC
+):
+    """A write to one field row whose owning entity is polymorphic."""
+
+    @override
+    @classmethod
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.UPDATE
+
+
 class RuntimePurgeFieldOpsAction[TFieldID: FieldIdentifier, TRow: Base, TData: FieldData](
     BaseRuntimeSingleFieldAction[TFieldID], FieldPurgeOpsAction[TRow, TData], ABC
 ):
