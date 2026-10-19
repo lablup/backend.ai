@@ -321,7 +321,6 @@ class WorkerMetricRegistry:
         return cls._instance
 
     def to_prometheus(self) -> str:
-        self.system.observe()
         return generate_latest_multiprocess().decode("utf-8")
 
 
