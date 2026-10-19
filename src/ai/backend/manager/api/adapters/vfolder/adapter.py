@@ -684,8 +684,10 @@ class VFolderAdapter(BaseAdapter):
     async def delete(self, vfolder_id: UUID) -> DeleteVFolderPayload:
         """Soft-delete a vfolder (move to trash). RBAC enforced."""
         action = DeleteVFolderV2Action(vfolder_uuid=VFolderUUID(vfolder_id))
-        await self._vfolder.delete_v2.run(action)
-        return DeleteVFolderPayload(id=vfolder_id)
+        result = await self._vfolder.delete_v2.run(action)
+        return DeleteVFolderPayload(
+            id=vfolder_id, vfolder=self._vfolder_data_to_node(result.vfolder)
+        )
 
     async def restore(self, vfolder_id: UUID) -> RestoreVFolderPayload:
         """Restore a trashed vfolder. RBAC enforced."""
@@ -706,8 +708,10 @@ class VFolderAdapter(BaseAdapter):
             cascade_model_card=input.options.cascade_model_card,
             force=input.options.force,
         )
-        await self._vfolder.purge_v2.run(action)
-        return PurgeVFolderPayload(id=vfolder_id)
+        result = await self._vfolder.purge_v2.run(action)
+        return PurgeVFolderPayload(
+            id=vfolder_id, vfolder=self._vfolder_data_to_node(result.vfolder)
+        )
 
     async def deploy(
         self,
