@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from uuid import UUID
 
+import strawberry
+
 from ai.backend.common.dto.manager.v2.common import PartialBulkPayload
 from ai.backend.common.dto.manager.v2.role_preset.response import (
     BulkDeleteRolePresetsPayload as BulkDeleteRolePresetsPayloadDTO,
@@ -37,6 +39,7 @@ from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.common_types import PartialBulkFailureGQL
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
+    gql_added_field,
     gql_field,
     gql_pydantic_type,
 )
@@ -160,7 +163,21 @@ class RestoreRolePresetPayloadGQL(PydanticOutputMixin[RestoreRolePresetPayloadDT
     name="PurgeRolePresetPayload",
 )
 class PurgeRolePresetPayloadGQL(PydanticOutputMixin[PurgeRolePresetPayloadDTO]):
-    role_preset: RolePresetGQL = gql_field(description="Purged role preset, as it stood.")
+    role_preset: RolePresetGQL = gql_field(
+        description="Purged role preset, as it stood.",
+        deprecation_reason=f"Deprecated since {NEXT_RELEASE_VERSION}. Use `purgedId` or `entityId`.",
+    )
+    purged_id: strawberry.ID = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="Global ID of the purged role preset.",
+        ),
+    )
+    entity_id: UUID = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION, description="UUID of the purged role preset."
+        ),
+    )
 
 
 @gql_pydantic_type(
