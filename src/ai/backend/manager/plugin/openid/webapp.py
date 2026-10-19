@@ -32,6 +32,7 @@ from cryptography.hazmat.primitives import hashes
 from joserfc import jwt as jose_jwt
 from joserfc.jwk import KeySet
 
+from ai.backend.common.clients.valkey_client.sentinel_monitor.monitor_set import SentinelMonitorSet
 from ai.backend.common.cron import LocalCron, PeriodicTask
 from ai.backend.common.data.entity.domain import DomainName
 from ai.backend.common.data.entity.user import UserID
@@ -261,10 +262,13 @@ class OIDCWebAppPlugin(WebappPlugin):
 
         root_app = app["_root_app"]
         config_provider = root_app["_config_provider"]
+        sentinel_monitors: SentinelMonitorSet = root_app["_sentinel_monitors"]
         valkey_profile_target = config_provider.config.redis.to_valkey_profile_target()
+        valkey_target = valkey_profile_target.profile_target("openid")
         app["valkey_client"] = await ValkeyOpenIDClient.create(
-            valkey_profile_target.profile_target("openid"),
+            valkey_target,
             db_id=8,
+            sentinel_monitor=sentinel_monitors.monitor_for(valkey_target),
         )
 
     async def _webapp_shutdown(self, app: web.Application) -> None:

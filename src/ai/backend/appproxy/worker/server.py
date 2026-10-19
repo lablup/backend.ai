@@ -79,6 +79,7 @@ from ai.backend.common.clients.http_client.client_pool import (
     ClientPool,
     tcp_client_session_factory,
 )
+from ai.backend.common.clients.valkey_client.sentinel_monitor.monitor_set import SentinelMonitorSet
 from ai.backend.common.clients.valkey_client.valkey_live.client import ValkeyLiveClient
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
 from ai.backend.common.contexts.request_id import with_request_context
@@ -302,18 +303,33 @@ async def last_used_time_marker(root_ctx: RootContext) -> None:
 
 
 @asynccontextmanager
+async def sentinel_monitor_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
+    redis_profile_target = RedisProfileTarget.from_dict(root_ctx.local_config.redis.to_dict())
+    root_ctx.sentinel_monitors = SentinelMonitorSet(redis_profile_target.valkey_targets())
+    await root_ctx.sentinel_monitors.start()
+    try:
+        yield
+    finally:
+        await root_ctx.sentinel_monitors.close()
+
+
+@asynccontextmanager
 async def redis_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     redis_profile_target = RedisProfileTarget.from_dict(root_ctx.local_config.redis.to_dict())
+    live_target = redis_profile_target.profile_target(RedisRole.LIVE).to_valkey_target()
+    stat_target = redis_profile_target.profile_target(RedisRole.STATISTICS).to_valkey_target()
 
     root_ctx.valkey_live = await ValkeyLiveClient.create(
-        valkey_target=redis_profile_target.profile_target(RedisRole.LIVE).to_valkey_target(),
+        valkey_target=live_target,
         db_id=REDIS_LIVE_DB,
         human_readable_name="appproxy-worker",
+        sentinel_monitor=root_ctx.sentinel_monitors.monitor_for(live_target),
     )
     root_ctx.valkey_stat = await ValkeyStatClient.create(
-        valkey_target=redis_profile_target.profile_target(RedisRole.STATISTICS).to_valkey_target(),
+        valkey_target=stat_target,
         db_id=REDIS_STATISTICS_DB,
         human_readable_name="appproxy-worker",
+        sentinel_monitor=root_ctx.sentinel_monitors.monitor_for(stat_target),
     )
     root_ctx.last_used_time_marker_redis_queue = asyncio.Queue()
     root_ctx.request_counter_redis_queue = asyncio.Queue()
@@ -391,6 +407,7 @@ async def _make_message_queue(
     return await RedisQueue.create(
         stream_redis_target,
         args,
+        root_ctx.sentinel_monitors.monitor_for(stream_redis_target.to_valkey_target()),
     )
 
 
@@ -559,9 +576,14 @@ async def service_discovery_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
             redis_profile_target = RedisProfileTarget.from_dict(
                 root_ctx.local_config.redis.to_dict()
             )
-            live_redis_target = redis_profile_target.profile_target(RedisRole.LIVE)
+            live_valkey_target = redis_profile_target.profile_target(
+                RedisRole.LIVE
+            ).to_valkey_target()
             service_discovery = await RedisServiceDiscovery.create(
-                RedisServiceDiscoveryArgs(valkey_target=live_redis_target.to_valkey_target())
+                RedisServiceDiscoveryArgs(
+                    valkey_target=live_valkey_target,
+                    sentinel_monitor=root_ctx.sentinel_monitors.monitor_for(live_valkey_target),
+                )
             )
         case _:
             raise RuntimeError(f"Unsupported service discovery type: {sd_type}")
@@ -840,6 +862,7 @@ def build_root_app(
             # traefik won't require event dispatcher
             cleanup_contexts = [
                 proxy_frontend_ctx,
+                sentinel_monitor_ctx,
                 redis_ctx,
                 ingress_state_ctx,
                 http_client_pool_ctx,
@@ -850,6 +873,7 @@ def build_root_app(
         else:
             cleanup_contexts = [
                 proxy_frontend_ctx,
+                sentinel_monitor_ctx,
                 redis_ctx,
                 ingress_state_ctx,
                 http_client_pool_ctx,

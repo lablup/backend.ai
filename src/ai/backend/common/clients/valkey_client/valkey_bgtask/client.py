@@ -27,6 +27,7 @@ from ai.backend.common.clients.valkey_client.client import (
     AbstractValkeyClient,
     create_valkey_client,
 )
+from ai.backend.common.clients.valkey_client.sentinel_monitor.base import AbstractSentinelMonitor
 from ai.backend.common.data.bgtask.defs import (
     TASK_FINISHED_TTL,
     TASK_METADATA_TTL,
@@ -110,6 +111,7 @@ class ValkeyBgtaskClient:
         *,
         db_id: int = REDIS_BGTASK_DB,
         human_readable_name: str = "bgtask",
+        sentinel_monitor: AbstractSentinelMonitor | None = None,
     ) -> Self:
         """
         Create a ValkeyBgtaskClient instance.
@@ -118,6 +120,7 @@ class ValkeyBgtaskClient:
             valkey_target,
             db_id=db_id,
             human_readable_name=human_readable_name,
+            sentinel_monitor=sentinel_monitor,
         )
         await client.connect()
         return cls(client)

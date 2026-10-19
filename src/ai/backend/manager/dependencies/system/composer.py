@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from typing import override
 
 from ai.backend.common.bgtask.bgtask import BackgroundTaskManager
+from ai.backend.common.clients.valkey_client.sentinel_monitor.monitor_set import SentinelMonitorSet
 from ai.backend.common.dependencies import DependencyComposer, DependencyStack
 from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.events.dispatcher import EventProducer
@@ -46,6 +47,7 @@ class SystemInput:
     db: ExtendedAsyncSAEngine
     event_producer: EventProducer
     valkey_profile_target: ValkeyProfileTarget
+    sentinel_monitors: SentinelMonitorSet
     prometheus_client: PrometheusClient
 
 
@@ -100,6 +102,7 @@ class SystemComposer(DependencyComposer[SystemInput, SystemResources]):
                 config=setup_input.config,
                 etcd=setup_input.etcd,
                 valkey_profile_target=setup_input.valkey_profile_target,
+                sentinel_monitors=setup_input.sentinel_monitors,
             ),
         )
 

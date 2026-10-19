@@ -123,6 +123,7 @@ from ai.backend.common.cgroup import (
     get_cgroup_path_of_pid,
     get_container_main_pid,
 )
+from ai.backend.common.clients.valkey_client.sentinel_monitor.monitor_set import SentinelMonitorSet
 from ai.backend.common.data.image.types import InstalledImageInfo
 from ai.backend.common.docker import (
     MAX_KERNELSPEC,
@@ -1605,6 +1606,7 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
         computers: Mapping[DeviceName, ComputerContext],
         slots: Mapping[SlotName, Decimal],
         agent_class: AgentClass,
+        sentinel_monitors: SentinelMonitorSet,
     ) -> None:
         super().__init__(
             etcd,
@@ -1617,6 +1619,7 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
             computers=computers,
             slots=slots,
             agent_class=agent_class,
+            sentinel_monitors=sentinel_monitors,
         )
         self.checked_invalid_images = set()
         self._seccomp_profile_as_path = False

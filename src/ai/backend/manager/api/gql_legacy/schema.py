@@ -19,6 +19,7 @@ from opentelemetry import trace
 from opentelemetry.trace import StatusCode
 from sqlalchemy.orm import joinedload, selectinload
 
+from ai.backend.common.clients.valkey_client.sentinel_monitor.monitor_set import SentinelMonitorSet
 from ai.backend.common.clients.valkey_client.valkey_image.client import ValkeyImageClient
 from ai.backend.common.clients.valkey_client.valkey_live.client import ValkeyLiveClient
 from ai.backend.common.clients.valkey_client.valkey_schedule.client import ValkeyScheduleClient
@@ -339,6 +340,7 @@ class GraphQueryContext:
     valkey_live: ValkeyLiveClient
     valkey_image: ValkeyImageClient
     valkey_schedule: ValkeyScheduleClient  # TODO: Remove this client from here
+    sentinel_monitors: SentinelMonitorSet
     manager_status: ManagerStatus
     known_slot_types: Mapping[SlotName, SlotTypes]
     background_task_manager: BackgroundTaskManager

@@ -19,6 +19,7 @@ from ai.backend.common import config
 from ai.backend.common import config as common_config
 from ai.backend.common import validators as tx
 from ai.backend.common.arch import DEFAULT_IMAGE_ARCH
+from ai.backend.common.clients.valkey_client.sentinel_monitor.monitor_set import SentinelMonitorSet
 from ai.backend.common.configs.etcd import EtcdConfig
 from ai.backend.common.types import HostPortPair
 from ai.backend.logging import LocalLogger
@@ -348,6 +349,7 @@ async def agent_runtime(
         mock_stats_monitor,
         mock_error_monitor,
         None,
+        SentinelMonitorSet([]),
     )
 
     try:

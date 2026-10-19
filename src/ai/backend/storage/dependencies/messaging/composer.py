@@ -5,6 +5,7 @@ from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from typing import override
 
+from ai.backend.common.clients.valkey_client.sentinel_monitor.monitor_set import SentinelMonitorSet
 from ai.backend.common.configs.redis import RedisConfig
 from ai.backend.common.dependencies import DependencyComposer, DependencyStack
 from ai.backend.common.events.dispatcher import EventDispatcher, EventProducer
@@ -27,6 +28,7 @@ class MessagingComposerInput:
 
     local_config: StorageProxyUnifiedConfig
     redis_config: RedisConfig
+    sentinel_monitors: SentinelMonitorSet
     metric_registry: CommonMetricRegistry
 
 
@@ -62,6 +64,7 @@ class MessagingComposer(DependencyComposer[MessagingComposerInput, MessagingReso
             MessageQueueProvider(),
             MessageQueueInput(
                 redis_config=setup_input.redis_config,
+                sentinel_monitors=setup_input.sentinel_monitors,
                 node_id=local_config.storage_proxy.node_id,
             ),
         )

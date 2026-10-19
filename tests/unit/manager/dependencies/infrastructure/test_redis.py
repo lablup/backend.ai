@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import pytest
 
+from ai.backend.common.clients.valkey_client.sentinel_monitor.monitor_set import SentinelMonitorSet
 from ai.backend.common.config import redis_config_iv
 from ai.backend.common.typed_validators import HostPortPair as HostPortPairModel
 from ai.backend.common.types import HostPortPair
@@ -9,6 +10,7 @@ from ai.backend.manager.config.unified import ManagerUnifiedConfig
 from ai.backend.manager.dependencies.infrastructure.redis import (
     ValkeyClients,
     ValkeyDependency,
+    ValkeyInput,
 )
 
 
@@ -42,7 +44,9 @@ class TestValkeyDependency:
         """Dependency should create and cleanup all Valkey clients."""
         dependency = ValkeyDependency()
 
-        async with dependency.provide(manager_config) as clients:
+        async with dependency.provide(
+            ValkeyInput(config=manager_config, sentinel_monitors=SentinelMonitorSet([]))
+        ) as clients:
             assert isinstance(clients, ValkeyClients)
             # Verify clients are functional
             assert clients.live is not None
@@ -66,7 +70,9 @@ class TestValkeyDependency:
         dependency = ValkeyDependency()
 
         with pytest.raises(RuntimeError):
-            async with dependency.provide(manager_config) as clients:
+            async with dependency.provide(
+                ValkeyInput(config=manager_config, sentinel_monitors=SentinelMonitorSet([]))
+            ) as clients:
                 assert isinstance(clients, ValkeyClients)
                 raise RuntimeError("Test error")
 

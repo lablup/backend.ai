@@ -5,6 +5,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
+from ai.backend.common.clients.valkey_client.sentinel_monitor.monitor_set import SentinelMonitorSet
 from ai.backend.common.configs.etcd import EtcdConfig
 from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.typed_validators import HostPortPair
@@ -70,7 +71,9 @@ class TestRedisProvider:
     ) -> None:
         """Provider should create and cleanup all Valkey clients."""
         async with RedisConfigProvider().provide(etcd_client) as redis_config:
-            provider_input = RedisProviderInput(redis_config=redis_config, pidx=0)
+            provider_input = RedisProviderInput(
+                redis_config=redis_config, sentinel_monitors=SentinelMonitorSet([]), pidx=0
+            )
 
             async with RedisProvider().provide(provider_input) as clients:
                 assert isinstance(clients, StorageProxyValkeyClients)
@@ -87,7 +90,9 @@ class TestRedisProvider:
     ) -> None:
         """Provider should cleanup clients even on exception."""
         async with RedisConfigProvider().provide(etcd_client) as redis_config:
-            provider_input = RedisProviderInput(redis_config=redis_config, pidx=0)
+            provider_input = RedisProviderInput(
+                redis_config=redis_config, sentinel_monitors=SentinelMonitorSet([]), pidx=0
+            )
 
             with pytest.raises(RuntimeError):
                 async with RedisProvider().provide(provider_input) as clients:

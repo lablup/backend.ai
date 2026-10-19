@@ -7,6 +7,7 @@ from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from typing import override
 
+from ai.backend.common.clients.valkey_client.sentinel_monitor.monitor_set import SentinelMonitorSet
 from ai.backend.common.clients.valkey_client.valkey_leader.client import ValkeyLeaderClient
 from ai.backend.common.clients.valkey_client.valkey_live.client import ValkeyLiveClient
 from ai.backend.common.defs import REDIS_STREAM_LOCK, RedisRole
@@ -34,6 +35,7 @@ class LeaderElectionInput:
     """Input required for leader election setup."""
 
     valkey_profile_target: ValkeyProfileTarget
+    sentinel_monitors: SentinelMonitorSet
     pidx: int
     config_provider: ManagerConfigProvider
     event_producer: EventProducer
@@ -73,10 +75,12 @@ class LeaderElectionDependency(
             Started ValkeyLeaderElection instance
         """
         # Create ValkeyLeaderClient for leader election
+        leader_valkey_target = setup_input.valkey_profile_target.profile_target(RedisRole.STREAM)
         valkey_leader_client = await ValkeyLeaderClient.create(
-            valkey_target=setup_input.valkey_profile_target.profile_target(RedisRole.STREAM),
+            valkey_target=leader_valkey_target,
             db_id=REDIS_STREAM_LOCK,
             human_readable_name="leader",
+            sentinel_monitor=setup_input.sentinel_monitors.monitor_for(leader_valkey_target),
         )
 
         # Create leader election configuration

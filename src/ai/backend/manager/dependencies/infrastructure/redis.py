@@ -5,6 +5,9 @@ from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from typing import override
 
+from ai.backend.common.clients.valkey_client.sentinel_monitor.monitor_set import (
+    SentinelMonitorSet,
+)
 from ai.backend.common.clients.valkey_client.valkey_artifact.client import (
     ValkeyArtifactDownloadTrackingClient,
 )
@@ -29,6 +32,7 @@ from ai.backend.common.defs import (
     REDIS_STREAM_DB,
     RedisRole,
 )
+from ai.backend.common.dependencies import DependencyProvider
 from ai.backend.common.health_checker import (
     CID_REDIS_ARTIFACT,
     CID_REDIS_BGTASK,
@@ -43,7 +47,11 @@ from ai.backend.common.health_checker import (
 from ai.backend.common.health_checker.checkers.valkey import ValkeyHealthChecker
 from ai.backend.manager.config.unified import ManagerUnifiedConfig
 
-from .base import InfrastructureDependency
+
+@dataclass
+class ValkeyInput:
+    config: ManagerUnifiedConfig
+    sentinel_monitors: SentinelMonitorSet
 
 
 @dataclass
@@ -76,7 +84,7 @@ class ValkeyClients:
         await self.session.close()
 
 
-class ValkeyDependency(InfrastructureDependency[ValkeyClients]):
+class ValkeyDependency(DependencyProvider[ValkeyInput, ValkeyClients]):
     """Provides lifecycle management for 9 specialized Valkey clients."""
 
     @property
@@ -86,16 +94,17 @@ class ValkeyDependency(InfrastructureDependency[ValkeyClients]):
 
     @asynccontextmanager
     @override
-    async def provide(self, setup_input: ManagerUnifiedConfig) -> AsyncIterator[ValkeyClients]:
+    async def provide(self, setup_input: ValkeyInput) -> AsyncIterator[ValkeyClients]:
         """Initialize and provide all Valkey clients.
 
         Args:
-            setup_input: Configuration containing redis settings
+            setup_input: Configuration containing redis settings and the Sentinel monitors
 
         Yields:
             ValkeyClients instance containing all 9 specialized clients
         """
-        valkey_profile_target = setup_input.redis.to_valkey_profile_target()
+        valkey_profile_target = setup_input.config.redis.to_valkey_profile_target()
+        sentinel_monitors = setup_input.sentinel_monitors
 
         # Create all 9 specialized clients
         clients = ValkeyClients(
@@ -103,51 +112,81 @@ class ValkeyDependency(InfrastructureDependency[ValkeyClients]):
                 valkey_profile_target.profile_target(RedisRole.STATISTICS),
                 db_id=REDIS_STATISTICS_DB,
                 human_readable_name="artifact",
+                sentinel_monitor=sentinel_monitors.monitor_for(
+                    valkey_profile_target.profile_target(RedisRole.STATISTICS)
+                ),
             ),
             container_log=await ValkeyContainerLogClient.create(
                 valkey_profile_target.profile_target(RedisRole.CONTAINER_LOG),
                 db_id=REDIS_CONTAINER_LOG,
                 human_readable_name="container_log",
+                sentinel_monitor=sentinel_monitors.monitor_for(
+                    valkey_profile_target.profile_target(RedisRole.CONTAINER_LOG)
+                ),
             ),
             live=await ValkeyLiveClient.create(
                 valkey_profile_target.profile_target(RedisRole.LIVE),
                 db_id=REDIS_LIVE_DB,
                 human_readable_name="live",
+                sentinel_monitor=sentinel_monitors.monitor_for(
+                    valkey_profile_target.profile_target(RedisRole.LIVE)
+                ),
             ),
             stat=await ValkeyStatClient.create(
                 valkey_profile_target.profile_target(RedisRole.STATISTICS),
                 db_id=REDIS_STATISTICS_DB,
                 human_readable_name="stat",
+                sentinel_monitor=sentinel_monitors.monitor_for(
+                    valkey_profile_target.profile_target(RedisRole.STATISTICS)
+                ),
             ),
             image=await ValkeyImageClient.create(
                 valkey_profile_target.profile_target(RedisRole.IMAGE),
                 db_id=REDIS_IMAGE_DB,
                 human_readable_name="image",
+                sentinel_monitor=sentinel_monitors.monitor_for(
+                    valkey_profile_target.profile_target(RedisRole.IMAGE)
+                ),
             ),
             stream=await ValkeyStreamClient.create(
                 valkey_profile_target.profile_target(RedisRole.STREAM),
                 human_readable_name="stream",
                 db_id=REDIS_STREAM_DB,
+                sentinel_monitor=sentinel_monitors.monitor_for(
+                    valkey_profile_target.profile_target(RedisRole.STREAM)
+                ),
             ),
             schedule=await ValkeyScheduleClient.create(
                 valkey_profile_target.profile_target(RedisRole.STREAM),
                 db_id=REDIS_LIVE_DB,
                 human_readable_name="schedule",
+                sentinel_monitor=sentinel_monitors.monitor_for(
+                    valkey_profile_target.profile_target(RedisRole.STREAM)
+                ),
             ),
             bgtask=await ValkeyBgtaskClient.create(
                 valkey_profile_target.profile_target(RedisRole.BGTASK),
                 human_readable_name="bgtask",
                 db_id=REDIS_BGTASK_DB,
+                sentinel_monitor=sentinel_monitors.monitor_for(
+                    valkey_profile_target.profile_target(RedisRole.BGTASK)
+                ),
             ),
             rate_limit=await ValkeyRateLimitClient.create(
                 valkey_profile_target.profile_target(RedisRole.RATE_LIMIT),
                 db_id=REDIS_RATE_LIMIT_DB,
                 human_readable_name="ratelimit",
+                sentinel_monitor=sentinel_monitors.monitor_for(
+                    valkey_profile_target.profile_target(RedisRole.RATE_LIMIT)
+                ),
             ),
             session=await ValkeySessionClient.create(
                 valkey_profile_target.profile_target(RedisRole.STATISTICS),
                 db_id=REDIS_STATISTICS_DB,
                 human_readable_name="session",
+                sentinel_monitor=sentinel_monitors.monitor_for(
+                    valkey_profile_target.profile_target(RedisRole.STATISTICS)
+                ),
             ),
         )
 
