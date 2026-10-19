@@ -13,8 +13,8 @@ from ai.backend.manager.models.ssh_keypair.row import SSHKeypairRow
 @dataclass
 class SSHKeypairCreator(FieldCreator[UserID, SSHKeypairRow, SSHKeypairData]):
     public_key: str
-    private_key: str | None = None
-    is_default: bool = False
+    private_key: str | None
+    is_default: bool
 
     @override
     def field_id(self, row: SSHKeypairRow) -> SSHKeypairID:
