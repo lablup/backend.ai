@@ -38,9 +38,9 @@ class SessionEventPayload(BackendAISchema):
         deprecated=True,
         description=f"Deprecated since {NEXT_RELEASE_VERSION}. Use `owner_user_id`.",
     )
-    owner_user_id: str = Field(
+    owner_user_id: str | None = Field(
         alias="ownerUserId",
-        description=f"UUID of the session owner. Added in {NEXT_RELEASE_VERSION}.",
+        description=f"UUID of the session owner, null once the owner is purged. Added in {NEXT_RELEASE_VERSION}.",
     )
     session_id: str = Field(
         default="",

@@ -39,9 +39,8 @@ class SessionEventNode(BaseResponseModel):
         deprecated=True,
         description=f"Access key of the session owner. Deprecated since {NEXT_RELEASE_VERSION}. Use `owner_user_id`.",
     )
-    owner_user_id: str = Field(
-        default="",
-        description=f"UUID of the session owner. Added in {NEXT_RELEASE_VERSION}.",
+    owner_user_id: str | None = Field(
+        description=f"UUID of the session owner, null once the owner is purged. Added in {NEXT_RELEASE_VERSION}.",
     )
     session_id: str = Field(default="", description="Session ID")
     exit_code: int | None = Field(default=None, description="Exit code of the session process")
