@@ -75,9 +75,7 @@ class SessionEventPropagator(EventPropagator):
             - user_uuid: User UUID for ownership checks
             - domain_name: Domain name for domain filtering
             - group_id: Group ID for group filtering
-            - session_name: Session name filter
             - session_id: Session ID filter
-            - access_key: Access key for session ownership
             - scope: Event scope filter ("*", "session", "kernel")
         """
         self._id = uuid.uuid4()
@@ -252,9 +250,7 @@ class SessionEventPropagator(EventPropagator):
         user_uuid = self._filters.get("user_uuid")
         domain_name = self._filters.get("domain_name")
         group_id = self._filters.get("group_id")
-        session_name = self._filters.get("session_name")
         session_id = self._filters.get("session_id")
-        access_key = self._filters.get("access_key")
 
         # Domain filtering for USER and ADMIN roles
         if user_role in (UserRole.USER, UserRole.ADMIN):
@@ -270,18 +266,9 @@ class SessionEventPropagator(EventPropagator):
         if group_id != "*" and event_data.get("group_id") != group_id:
             return False
 
-        # Session ID filtering (takes precedence over name/access key)
         if session_id is not None and session_id != WILDCARD:
             if event_data.get("session_id") != session_id:
                 return False
-        else:
-            # Session name and access key filtering
-            if session_name != "*":
-                if not (
-                    event_data.get("session_name") == session_name
-                    and event_data.get("access_key") == access_key
-                ):
-                    return False
 
         return True
 

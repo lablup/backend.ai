@@ -2701,7 +2701,7 @@ class Query(graphene.ObjectType):  # type: ignore[misc]
         )
 
     @staticmethod
-    @scoped_query(autofill_user=False, user_key="access_key")
+    @scoped_query(autofill_user=False, user_key="user_id")
     async def resolve_compute_container_list(
         root: Any,
         info: graphene.ResolveInfo,
@@ -2715,6 +2715,7 @@ class Query(graphene.ObjectType):  # type: ignore[misc]
         domain_name: str | None = None,
         group_id: uuid.UUID | None = None,
         access_key: AccessKey | None = None,
+        user_id: uuid.UUID | None = None,
     ) -> ComputeContainerList:
         # TODO: adopt the generic queryfilter language
         total_count = await ComputeContainer.load_count(
@@ -2723,7 +2724,8 @@ class Query(graphene.ObjectType):  # type: ignore[misc]
             cluster_role=role,  # filter
             domain_name=domain_name,  # scope
             group_id=group_id,  # scope
-            access_key=access_key,  # scope
+            access_key=access_key,  # filter
+            user_id=user_id,  # scope
             filter=filter,
         )
         items = await ComputeContainer.load_slice(
@@ -2734,14 +2736,15 @@ class Query(graphene.ObjectType):  # type: ignore[misc]
             cluster_role=role,  # filter
             domain_name=domain_name,  # scope
             group_id=group_id,  # scope
-            access_key=access_key,  # scope
+            access_key=access_key,  # filter
+            user_id=user_id,  # scope
             filter=filter,
             order=order,
         )
         return ComputeContainerList(items, total_count)
 
     @staticmethod
-    @scoped_query(autofill_user=False, user_key="access_key")
+    @scoped_query(autofill_user=False, user_key="user_id")
     async def resolve_compute_container(
         root: Any,
         info: graphene.ResolveInfo,
@@ -2749,6 +2752,7 @@ class Query(graphene.ObjectType):  # type: ignore[misc]
         *,
         domain_name: str | None = None,
         access_key: AccessKey | None = None,
+        user_id: uuid.UUID | None = None,
     ) -> ComputeContainer:
         # We need to check the group membership of the designated kernel,
         # but practically a user cannot guess the IDs of kernels launched
@@ -2760,11 +2764,12 @@ class Query(graphene.ObjectType):  # type: ignore[misc]
             "ComputeContainer.detail",
             domain_name=domain_name,
             access_key=access_key,
+            user_id=user_id,
         )
         return cast(ComputeContainer, await loader.load(id))
 
     @staticmethod
-    @scoped_query(autofill_user=False, user_key="access_key")
+    @scoped_query(autofill_user=False, user_key="user_id")
     async def resolve_compute_session_list(
         root: Any,
         info: graphene.ResolveInfo,
@@ -2776,6 +2781,7 @@ class Query(graphene.ObjectType):  # type: ignore[misc]
         domain_name: str | None = None,
         group_id: uuid.UUID | None = None,
         access_key: AccessKey | None = None,
+        user_id: uuid.UUID | None = None,
         status: str | None = None,
     ) -> ComputeSessionList:
         total_count = await ComputeSession.load_count(
@@ -2783,7 +2789,8 @@ class Query(graphene.ObjectType):  # type: ignore[misc]
             status=status,  # filter
             domain_name=domain_name,  # scope
             group_id=group_id,  # scope
-            access_key=access_key,  # scope
+            access_key=access_key,  # filter
+            user_id=user_id,  # scope
             filter=filter,
         )
         items = await ComputeSession.load_slice(
@@ -2793,14 +2800,15 @@ class Query(graphene.ObjectType):  # type: ignore[misc]
             status=status,  # filter
             domain_name=domain_name,  # scope
             group_id=group_id,  # scope
-            access_key=access_key,  # scope
+            access_key=access_key,  # filter
+            user_id=user_id,  # scope
             filter=filter,
             order=order,
         )
         return ComputeSessionList(items, total_count)
 
     @staticmethod
-    @scoped_query(autofill_user=False, user_key="access_key")
+    @scoped_query(autofill_user=False, user_key="user_id")
     async def resolve_compute_session(
         root: Any,
         info: graphene.ResolveInfo,
@@ -2808,6 +2816,7 @@ class Query(graphene.ObjectType):  # type: ignore[misc]
         *,
         domain_name: str | None = None,
         access_key: AccessKey | None = None,
+        user_id: uuid.UUID | None = None,
     ) -> ComputeSession:
         # We need to check the group membership of the designated kernel,
         # but practically a user cannot guess the IDs of kernels launched
@@ -2819,11 +2828,12 @@ class Query(graphene.ObjectType):  # type: ignore[misc]
             "ComputeSession.detail",
             domain_name=domain_name,
             access_key=access_key,
+            user_id=user_id,
         )
         return cast(ComputeSession, await loader.load(id))
 
     @staticmethod
-    @scoped_query(autofill_user=False, user_key="access_key")
+    @scoped_query(autofill_user=False, user_key="user_id")
     async def resolve_legacy_compute_session_list(
         root: Any,
         info: graphene.ResolveInfo,
@@ -2833,6 +2843,7 @@ class Query(graphene.ObjectType):  # type: ignore[misc]
         domain_name: str | None = None,
         group_id: uuid.UUID | None = None,
         access_key: AccessKey | None = None,
+        user_id: uuid.UUID | None = None,
         status: str | None = None,
         order_key: str | None = None,
         order_asc: bool = True,
@@ -2842,6 +2853,7 @@ class Query(graphene.ObjectType):  # type: ignore[misc]
             domain_name=domain_name,
             group_id=group_id,
             access_key=access_key,
+            user_id=user_id,
             status=status,
         )
         items = await LegacyComputeSession.load_slice(
@@ -2851,6 +2863,7 @@ class Query(graphene.ObjectType):  # type: ignore[misc]
             domain_name=domain_name,
             group_id=group_id,
             access_key=access_key,
+            user_id=user_id,
             status=status,
             order_key=order_key,
             order_asc=order_asc,
@@ -2858,7 +2871,7 @@ class Query(graphene.ObjectType):  # type: ignore[misc]
         return LegacyComputeSessionList(items, total_count)
 
     @staticmethod
-    @scoped_query(autofill_user=False, user_key="access_key")
+    @scoped_query(autofill_user=False, user_key="user_id")
     async def resolve_legacy_compute_session(
         root: Any,
         info: graphene.ResolveInfo,
@@ -2866,6 +2879,7 @@ class Query(graphene.ObjectType):  # type: ignore[misc]
         *,
         domain_name: str | None = None,
         access_key: AccessKey | None = None,
+        user_id: uuid.UUID | None = None,
         status: str | None = None,
     ) -> LegacyComputeSession | None:
         # We need to check the group membership of the designated kernel,
@@ -2878,6 +2892,7 @@ class Query(graphene.ObjectType):  # type: ignore[misc]
             "LegacyComputeSession.detail",
             domain_name=domain_name,
             access_key=access_key,
+            user_id=user_id,
             status=status,
         )
 

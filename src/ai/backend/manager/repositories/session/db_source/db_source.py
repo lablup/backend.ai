@@ -264,19 +264,18 @@ class SessionDBSource:
             )
             if session_row.status != SessionStatus.RUNNING:
                 raise InvalidAPIParameters("Can't change name of not running session")
-            if session_row.access_key is not None:
-                # The name is unique among the live sessions of the target session's owner.
-                duplicate = await db_sess.scalar(
-                    sa.select(SessionRow.id)
-                    .where(
-                        (SessionRow.name == new_name)
-                        & (SessionRow.access_key == session_row.access_key)
-                        & (~SessionRow.status.in_(DEAD_SESSION_STATUSES))
-                    )
-                    .limit(1)
+            # The name is unique among the live sessions of the target session's owner.
+            duplicate = await db_sess.scalar(
+                sa.select(SessionRow.id)
+                .where(
+                    (SessionRow.name == new_name)
+                    & (SessionRow.user_uuid == session_row.user_uuid)
+                    & (~SessionRow.status.in_(TERMINAL_SESSION_STATUSES))
                 )
-                if duplicate is not None:
-                    raise SessionAlreadyExists(f"Session with name '{new_name}' already exists")
+                .limit(1)
+            )
+            if duplicate is not None:
+                raise SessionAlreadyExists(f"Session with name '{new_name}' already exists")
 
             session_row.name = new_name
             for kernel in session_row.kernels:
