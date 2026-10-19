@@ -10,12 +10,14 @@ from uuid import UUID
 
 import yarl
 
+from ai.backend.common.data.entity.agent import AgentUUID
 from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.replica import ReplicaID
 from ai.backend.common.data.entity.resource_group import ResourceGroupID
 from ai.backend.common.data.entity.session import SessionID
 from ai.backend.common.data.entity.session_dependency import SessionDependencyID
+from ai.backend.common.data.entity.session_designated_agent import SessionDesignatedAgentID
 from ai.backend.common.data.entity.session_group import SessionGroupID
 from ai.backend.common.data.entity.types import EntityData, FieldData
 from ai.backend.common.data.entity.user import UserID
@@ -378,6 +380,15 @@ class SessionDependencyData(FieldData):
     id: SessionDependencyID
     session_id: SessionID
     depends_on: SessionID
+
+
+@dataclass(frozen=True)
+class SessionDesignatedAgentData(FieldData):
+    """One agent a session designates for its placement."""
+
+    id: SessionDesignatedAgentID
+    session_id: SessionID
+    agent_uuid: AgentUUID
 
 
 @dataclass(frozen=True)
