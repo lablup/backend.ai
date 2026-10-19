@@ -18,6 +18,7 @@ from ai.backend.common.types import (
     KernelId,
     ResourceSlot,
     SessionId,
+    SessionResult,
 )
 from ai.backend.manager.data.image.types import ImageData, ImageStatus
 from ai.backend.manager.data.resource_slot.types import ResourceAllocationAggregate
@@ -63,7 +64,7 @@ from ai.backend.manager.models.session_template.row import SessionTemplateRow
 from ai.backend.manager.models.specs.pagination import NoPagination
 from ai.backend.manager.models.user.row import UserRole, UserRow
 from ai.backend.manager.models.user.searchable_fields import UserSearchableFields
-from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.models.utils import ExtendedAsyncSAEngine, execute_with_retry
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.repositories.ops.v2.write import V2WriteOps
 from ai.backend.manager.repositories.session.dependency_graph import find_dependency_sessions
@@ -213,12 +214,43 @@ class SessionDBSource:
         id_or_name_prefix: str,
         owner_access_key: AccessKey,
     ) -> list[SessionRow]:
+        """The session of ``owner_access_key`` whose id equals ``id_or_name_prefix``, or
+        else up to 10 of its sessions whose name equals it, newest first."""
         async with self._db.begin_readonly_session_read_committed() as db_sess:
-            return await SessionRow.match_sessions(
-                db_sess,
-                id_or_name_prefix,
-                owner_access_key,
+            try:
+                session_id = uuid.UUID(id_or_name_prefix)
+            except ValueError:
+                pass
+            else:
+                session_row = await db_sess.scalar(
+                    sa.select(SessionRow).where(
+                        (SessionRow.id == session_id) & (SessionRow.access_key == owner_access_key)
+                    )
+                )
+                if session_row is not None:
+                    return [session_row]
+            return list(
+                await db_sess.scalars(
+                    sa.select(SessionRow)
+                    .where(
+                        (SessionRow.name == id_or_name_prefix)
+                        & (SessionRow.access_key == owner_access_key)
+                    )
+                    .order_by(sa.desc(SessionRow.created_at))
+                    .limit(10)
+                )
             )
+
+    async def set_session_result(self, session_id: SessionId, success: bool) -> None:
+        async def _update() -> None:
+            async with self._db.begin_session() as db_sess:
+                await db_sess.execute(
+                    sa.update(SessionRow)
+                    .values(result=SessionResult.SUCCESS if success else SessionResult.FAILURE)
+                    .where(SessionRow.id == session_id)
+                )
+
+        await execute_with_retry(_update)
 
     async def get_template_by_id(
         self,
@@ -396,18 +428,38 @@ class SessionDBSource:
                 raise SessionNotFound(f"Session not found (id:{session_id})")
 
             if session_name and session_row.access_key is not None:
-                # Check the owner of the target session has any session with the same name
-                try:
-                    sess = await SessionRow.get_session(
-                        db_session,
-                        session_name,
-                        AccessKey(session_row.access_key),
+                # The live sessions of the owner that already carry the name.
+                namesakes = (
+                    await db_session.execute(
+                        sa.select(
+                            SessionRow.id, SessionRow.name, SessionRow.status, SessionRow.created_at
+                        )
+                        .where(
+                            (SessionRow.name == session_name)
+                            & (SessionRow.access_key == session_row.access_key)
+                            & ~SessionRow.status.in_(DEAD_SESSION_STATUSES)
+                        )
+                        .order_by(sa.desc(SessionRow.created_at))
+                        .limit(10)
                     )
-                except SessionNotFound:
-                    pass
-                else:
+                ).all()
+                if len(namesakes) > 1:
+                    raise TooManySessionsMatched(
+                        extra_data={
+                            "matches": [
+                                {
+                                    "session_id": namesake.id,
+                                    "session_name": namesake.name,
+                                    "status": namesake.status,
+                                    "created_at": namesake.created_at,
+                                }
+                                for namesake in namesakes
+                            ]
+                        }
+                    )
+                if namesakes:
                     raise SessionAlreadyExists(
-                        f"Duplicate session name. Session(id:{sess.id}) already has the name"
+                        f"Duplicate session name. Session(id:{namesakes[0].id}) already has the name"
                     )
 
             updated = await V2WriteOps(db_session).update_data(updater)
@@ -543,14 +595,12 @@ class SessionDBSource:
         kernel_loading_strategy: KernelLoadingStrategy = KernelLoadingStrategy.MAIN_KERNEL_ONLY,
         allow_stale: bool = False,
     ) -> SessionRow:
-        """Get session with group information eagerly loaded"""
         async with self._db.begin_readonly_session_read_committed() as db_sess:
             return await self._session_by_id(
                 db_sess,
                 session_id,
                 kernel_loading_strategy=kernel_loading_strategy,
                 allow_stale=allow_stale,
-                eager_loading_op=[selectinload(SessionRow.group)],
             )
 
     async def get_session_with_routing_minimal(
