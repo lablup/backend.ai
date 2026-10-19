@@ -216,7 +216,7 @@ class TheWholeSessionIsReturned(Then[ASessionAndACaller, AdminSearchSessionsPayl
                 },
                 "resource_group_name": session.resource_group_name,
                 "session_group_id": session.session_group_id,
-                "designated_agent_ids": session.designated_agent_ids,
+                "designated_agent_ids": None,
             },
             "lifecycle": {
                 "status": "PENDING",

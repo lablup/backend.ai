@@ -236,8 +236,8 @@ class ResourceOpts(_OptionsBaseModel):
 class SchedulingTarget(_OptionsBaseModel):
     """Where and how the session may be placed.
 
-    ``designated_agents`` maps to the ``SessionRow.designated_agent_ids``
-    column while ``agent_selection_policy`` lives inside
+    ``designated_agents`` maps to ``session_designated_agents`` rows
+    while ``agent_selection_policy`` lives inside
     ``SessionRow.options`` JSONB. The resource group itself is kept on
     ``SessionRow.scaling_group_name`` so existing queries do not need
     a JSONB path operator.
@@ -466,8 +466,8 @@ class SessionStoredOptions(_OptionsBaseModel):
 
     The fields that already have dedicated ``SessionRow`` columns
     (``priority``, ``is_preemptible``, ``cluster_mode``, ``cluster_size``,
-    ``scaling_group_name``, ``designated_agent_ids``) deliberately do
-    not live here — keeping them as columns preserves existing
+    ``scaling_group_name``) and the designated agents, kept as
+    ``session_designated_agents`` rows, deliberately do not live here — keeping them as columns preserves existing
     ``WHERE`` / ``ORDER BY`` queries and indexes without JSONB path
     operators. Everything else is stored in this blob.
 
@@ -511,7 +511,7 @@ class SessionOptions(_OptionsBaseModel):
       | ``is_preemptible``                             | ``SessionRow.is_preemptible`` column           |
       | ``cluster_mode``                               | ``SessionRow.cluster_mode`` column             |
       | ``cluster_size``                               | ``SessionRow.cluster_size`` column             |
-      | ``scheduling_target.designated_agents``        | ``SessionRow.designated_agent_ids`` column     |
+      | ``scheduling_target.designated_agents``        | ``session_designated_agents`` rows             |
       | ``scheduling_target.agent_selection_policy``   | ``SessionRow.options`` JSONB                   |
       | ``kernel_groups``                              | ``SessionRow.options`` JSONB                   |
       | ``handler_options``                            | ``SessionRow.options`` JSONB                   |

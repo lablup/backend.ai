@@ -71,6 +71,7 @@ from ai.backend.manager.models.resource_slot.row import (
 )
 from ai.backend.manager.models.scheduling_history.row import SessionSchedulingHistoryRow
 from ai.backend.manager.models.session.row import SessionDependencyRow, SessionRow
+from ai.backend.manager.models.session_designated_agent.row import SessionDesignatedAgentRow
 from ai.backend.manager.models.session_group.row import SessionGroupRow
 from ai.backend.manager.models.user.row import UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
@@ -105,6 +106,7 @@ _SCHEDULER_ROWS: list[type] = [
     ResourceAllocationRow,
     AgentResourceRow,
     SessionDependencyRow,
+    SessionDesignatedAgentRow,
     SessionSchedulingHistoryRow,
 ]
 

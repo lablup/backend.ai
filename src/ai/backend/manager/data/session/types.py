@@ -276,7 +276,6 @@ class SessionEntityData(EntityData):
     cluster_size: int
     options: SessionStoredOptions
     agent_ids: list[str] | None
-    designated_agent_ids: list[str] | None
     session_group_id: SessionGroupID | None
     resource_group_id: ResourceGroupID
     resource_group_name: str
@@ -342,7 +341,6 @@ class SessionEntityData(EntityData):
             name=self.name,
             access_key=self.access_key,
             agent_ids=self.agent_ids,
-            designated_agent_ids=self.designated_agent_ids,
             session_group_id=self.session_group_id,
             images=self.images,
             image_ids=self.image_ids,
