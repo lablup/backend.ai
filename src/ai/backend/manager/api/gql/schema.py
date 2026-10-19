@@ -3,12 +3,8 @@ from typing import override
 
 import strawberry
 from graphql import GraphQLError
-<<<<<<< HEAD
 from graphql.pyutils.undefined import Undefined as GraphQLUndefined
-from strawberry.extensions import MaxAliasesLimiter, QueryDepthLimiter
-=======
 from strawberry.extensions import QueryDepthLimiter
->>>>>>> 52e7e7f66 (fix(BA-8484): skip aliased __typename when counting GQL aliases (#15635))
 from strawberry.federation import Schema
 from strawberry.schema.config import StrawberryConfig
 from strawberry.types import ExecutionContext
@@ -20,6 +16,7 @@ from ai.backend.manager.api.gql.extensions import (
     GQLMetricExtension,
     GQLValidationExtension,
 )
+from ai.backend.manager.api.gql.extensions.max_aliases import GQLMaxAliasesExtension
 
 from .agent import (
     agent_stats,
@@ -106,37 +103,7 @@ from .domain_v2 import (
     domain_v2,
     rg_domains_v2,
 )
-<<<<<<< HEAD
 from .fair_share import (
-=======
-from ai.backend.manager.api.gql.entity.resolver.query import entity_types
-from ai.backend.manager.api.gql.entity_label.resolver.mutation import (
-    partial_bulk_purge_entity_label,
-    partial_bulk_purge_entity_labels,
-    partial_bulk_upsert_entity_label,
-    partial_bulk_upsert_entity_labels,
-    purge_entity_label,
-    upsert_entity_label,
-)
-from ai.backend.manager.api.gql.entity_label.resolver.query import entity_labels
-from ai.backend.manager.api.gql.entity_share.resolver import (
-    accept_entity_share,
-    cancel_entity_share,
-    create_entity_share,
-    entity_share,
-    entity_shares,
-    leave_entity_share,
-    my_entity_shares,
-    reject_entity_share,
-    revoke_entity_share,
-)
-from ai.backend.manager.api.gql.extensions.exception_handler import GQLExceptionHandlerExtension
-from ai.backend.manager.api.gql.extensions.logging_ext import GQLLoggingExtension
-from ai.backend.manager.api.gql.extensions.max_aliases import GQLMaxAliasesExtension
-from ai.backend.manager.api.gql.extensions.metric import GQLMetricExtension
-from ai.backend.manager.api.gql.extensions.validation import GQLValidationExtension
-from ai.backend.manager.api.gql.fair_share.resolver.domain import (
->>>>>>> 52e7e7f66 (fix(BA-8484): skip aliased __typename when counting GQL aliases (#15635))
     admin_bulk_upsert_domain_fair_share_weight,
     admin_bulk_upsert_project_fair_share_weight,
     admin_bulk_upsert_user_fair_share_weight,
@@ -1043,43 +1010,3 @@ schema = CustomizedSchema(
         GQLExceptionHandlerExtension,
     ],
 )
-<<<<<<< HEAD
-=======
-
-
-@gql_root_field(BackendAIGQLMeta(added_version="26.9.0", description="Returns 'pong'"))  # type: ignore[misc]
-async def ping() -> str:
-    return "pong"
-
-
-@strawberry.type(name="Query")
-class PublicQueries:
-    """Query root of the ``public`` subgraph, served without authentication at
-    ``POST /admin/gql/strawberry/public``.
-
-    Contains ONLY fields that are safe to expose without authentication; private fields are
-    physically absent, so they cannot be queried (no runtime gate needed). A public field belongs
-    here and nowhere else: declaring it on ``Query`` as well would let the router resolve it
-    against the authenticated subgraph, which answers 401 to an anonymous caller.
-    """
-
-    ping = ping
-    public_app_configs = public_app_configs
-
-
-# A subgraph of the same supergraph as `schema`, kept separate only so that its routing URL
-# carries no auth middleware: anonymous queries compose against this subgraph alone.
-public_schema = Schema(
-    query=PublicQueries,
-    config=StrawberryConfig(auto_camel_case=True),
-    federation_version="2.7",
-    extensions=[
-        GQLLoggingExtension,
-        GQLMetricExtension,
-        GQLValidationExtension,
-        lambda: QueryDepthLimiter(max_depth=MAX_QUERY_DEPTH),
-        lambda: GQLMaxAliasesExtension(max_alias_count=MAX_ALIAS_COUNT),
-        GQLExceptionHandlerExtension,
-    ],
-)
->>>>>>> 52e7e7f66 (fix(BA-8484): skip aliased __typename when counting GQL aliases (#15635))
