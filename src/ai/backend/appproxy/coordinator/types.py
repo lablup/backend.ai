@@ -32,6 +32,7 @@ from ai.backend.appproxy.common.events import (
 from ai.backend.appproxy.common.types import ProxyProtocol, RouteInfo, SerializableCircuit
 from ai.backend.common.clients.valkey_client.sentinel_monitor.monitor_set import SentinelMonitorSet
 from ai.backend.common.clients.valkey_client.valkey_live.client import ValkeyLiveClient
+from ai.backend.common.clients.valkey_client.valkey_lock.client import ValkeyLockClient
 from ai.backend.common.clients.valkey_client.valkey_schedule import ValkeyScheduleClient
 from ai.backend.common.events.dispatcher import EventDispatcher, EventProducer
 from ai.backend.common.health_checker.probe import HealthProbe
@@ -43,7 +44,7 @@ from ai.backend.common.metrics.metric import (
     SystemMetricObserver,
 )
 from ai.backend.common.metrics.multiprocess import generate_latest_multiprocess
-from ai.backend.common.types import AgentId, BackendAISchema, RedisConnectionInfo
+from ai.backend.common.types import AgentId, BackendAISchema
 from ai.backend.logging.structured import StructuredLogger
 
 from .config import ServerConfig
@@ -404,7 +405,7 @@ class RootContext:
 
     sentinel_monitors: SentinelMonitorSet
     valkey_live: ValkeyLiveClient
-    redis_lock: RedisConnectionInfo
+    valkey_lock: ValkeyLockClient
     core_valkey_live: ValkeyLiveClient
     valkey_schedule: ValkeyScheduleClient
     local_config: ServerConfig

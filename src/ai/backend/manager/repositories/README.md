@@ -874,9 +874,9 @@ class SessionDBSource:
 
 class SessionCacheSource:
     """Cache data access - only handles cache operations"""
-    _redis: RedisConnectionInfo
+    _redis: ValkeyLiveClient
 
-    def __init__(self, redis: RedisConnectionInfo) -> None:
+    def __init__(self, redis: ValkeyLiveClient) -> None:
         self._redis = redis
 
     async def get_session(self, session_id: SessionId) -> Optional[SessionInfo]:
@@ -896,7 +896,7 @@ class SessionRepository:
     def __init__(
         self,
         ops_provider: V2DBOpsProvider,
-        redis: RedisConnectionInfo,
+        redis: ValkeyLiveClient,
     ) -> None:
         self._db_source = SessionDBSource(ops_provider)
         self._cache_source = SessionCacheSource(redis)

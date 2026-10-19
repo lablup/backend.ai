@@ -76,7 +76,6 @@ PyYAML~=6.0
 pydantic[email]~=2.13.5
 packaging>=24.1
 huggingface-hub~=0.34.3
-redis[hiredis]~=7.1.0
 rich~=13.6
 ruamel.yaml~=0.18.10
 SQLAlchemy[postgresql_asyncpg]~=2.0.45
@@ -107,7 +106,7 @@ pytest>=8.4.0,<9.1
 pytest-aiohttp~=1.1.0
 pytest-dependency>=0.6.0
 pytest-mock>=3.14.0
-testcontainers[postgres,redis,minio]~=4.13.3
+testcontainers[postgres,minio]~=4.13.3
 
 # installed by pants [pytest] and [mypy] from this resolve
 mypy==1.18.2
@@ -130,7 +129,6 @@ types-Jinja2
 types-pexpect
 types-psutil
 types-PyYAML
-types-redis
 types-tabulate
 types-toml
 types-tqdm<4.70

@@ -5,7 +5,7 @@ import random
 import tempfile
 import threading
 import time
-from collections.abc import Callable, Iterable
+from collections.abc import AsyncIterator, Callable, Iterable
 from dataclasses import dataclass
 from decimal import Decimal
 from functools import partial
@@ -14,10 +14,10 @@ from typing import Any, override
 
 import aiotools
 import pytest
-from redis.asyncio import Redis
 
 from ai.backend.common import config
-from ai.backend.common.defs import REDIS_STREAM_DB
+from ai.backend.common.clients.valkey_client.valkey_lock.client import ValkeyLockClient
+from ai.backend.common.defs import REDIS_STREAM_DB, REDIS_STREAM_LOCK
 from ai.backend.common.distributed import GlobalTimer
 from ai.backend.common.events.dispatcher import (
     EventDispatcher,
@@ -34,7 +34,7 @@ from ai.backend.common.lock import (
     RedisLock,
 )
 from ai.backend.common.message_queue.redis_queue import RedisMQArgs, RedisQueue
-from ai.backend.common.types import AgentId, HostPortPair, RedisConnectionInfo, RedisTarget
+from ai.backend.common.types import AgentId, HostPortPair, RedisTarget, ValkeyTarget
 
 
 @dataclass
@@ -277,19 +277,29 @@ async def test_global_timer_filelock(
     assert target_count - 2 <= num_records <= target_count + 2
 
 
+@pytest.fixture
+async def valkey_lock(
+    redis_container: tuple[Any, HostPortPair],
+) -> AsyncIterator[ValkeyLockClient]:
+    redis_addr = redis_container[1]
+    client = await ValkeyLockClient.create(
+        ValkeyTarget(addr=f"{redis_addr.host}:{redis_addr.port}"),
+        db_id=REDIS_STREAM_LOCK,
+        human_readable_name="test.lock",
+    )
+    try:
+        yield client
+    finally:
+        await client.close()
+
+
 async def test_global_timer_redlock(
     test_case_ns: str,
     redis_container: tuple[Any, HostPortPair],
+    valkey_lock: ValkeyLockClient,
 ) -> None:
     redis_addr = redis_container[1]
-    r = RedisConnectionInfo(
-        Redis.from_url(f"redis://{redis_addr.host}:{redis_addr.port}"),
-        sentinel=None,
-        name="test",
-        service_name=None,
-        redis_helper_config=config.redis_helper_default_config,
-    )
-    lock_factory = lambda: RedisLock(f"{test_case_ns}lock", r, debug=True)
+    lock_factory = lambda: RedisLock(f"{test_case_ns}lock", valkey_lock, debug=True)
 
     event_records: list[float] = []
     num_threads = 7
