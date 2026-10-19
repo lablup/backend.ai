@@ -8,12 +8,13 @@ from ai.backend.manager.data.ssh_keypair.types import SSHKeypairData
 from ai.backend.manager.models.specs.creator import FieldCreator
 from ai.backend.manager.models.specs.types import IntegrityErrorCheck
 from ai.backend.manager.models.ssh_keypair.row import SSHKeypairRow
+from ai.backend.manager.secret.types import SecretValue
 
 
 @dataclass
 class SSHKeypairCreator(FieldCreator[UserID, SSHKeypairRow, SSHKeypairData]):
     public_key: str
-    private_key: str | None
+    private_key: SecretValue | None
     is_default: bool
 
     @override

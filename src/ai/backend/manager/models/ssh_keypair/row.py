@@ -1,10 +1,15 @@
+from typing import Final
+
 import sqlalchemy as sa
 from sqlalchemy.orm import Mapped, mapped_column
 
 from ai.backend.common.data.entity.ssh_keypair import SSHKeypairID
 from ai.backend.common.data.entity.user import UserID
-from ai.backend.manager.models.base import GUID, Base
+from ai.backend.manager.models.base import GUID, Base, SecretColumn
 from ai.backend.manager.models.mixins.timestamp import LifecycleTimestampsMixin
+from ai.backend.manager.secret.types import SecretValue
+
+SSH_KEYPAIR_PRIVATE_KEY_CONTEXT: Final[str] = "ssh_keypairs.private_key"
 
 
 class SSHKeypairRow(LifecycleTimestampsMixin, Base):
@@ -24,5 +29,7 @@ class SSHKeypairRow(LifecycleTimestampsMixin, Base):
         GUID(UserID), sa.ForeignKey("users.uuid", ondelete="CASCADE"), nullable=False, index=True
     )
     public_key: Mapped[str] = mapped_column(sa.Text, nullable=False)
-    private_key: Mapped[str | None] = mapped_column(sa.Text, nullable=True)
+    private_key: Mapped[SecretValue | None] = mapped_column(
+        SecretColumn(SSH_KEYPAIR_PRIVATE_KEY_CONTEXT), nullable=True
+    )
     is_default: Mapped[bool] = mapped_column(sa.Boolean, nullable=False, server_default=sa.false())
