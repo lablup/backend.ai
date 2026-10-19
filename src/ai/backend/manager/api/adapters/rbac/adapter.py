@@ -883,7 +883,7 @@ class RBACAdapter(BaseAdapter):
         result = await self._permission_controller.delete_role.run(
             DeleteRoleAction(updater=RoleSoftDeleteUpdater(role_id=RoleID(role_id)))
         )
-        return DeleteRolePayload(id=result.data.id)
+        return DeleteRolePayload(id=result.data.id, role=self._role_data_to_node(result.data))
 
     # ------------------------------------------------------------------ restore
 
@@ -901,7 +901,7 @@ class RBACAdapter(BaseAdapter):
         result = await self._permission_controller.purge_role.run(
             PurgeRoleAction(role_id=RoleID(role_id))
         )
-        return PurgeRolePayload(id=result.data.id)
+        return PurgeRolePayload(id=result.data.id, entity_id=result.data.id)
 
     # ------------------------------------------------------------------ partial bulk
 
@@ -992,7 +992,7 @@ class RBACAdapter(BaseAdapter):
         await self._permission_controller.delete_permission.run(
             DeletePermissionAction(permission_id=PermissionID(permission_id))
         )
-        return DeletePermissionPayloadDTO(id=permission_id)
+        return DeletePermissionPayloadDTO(id=permission_id, field_id=permission_id)
 
     # ------------------------------------------------------------------ create_permission / update_permission
 

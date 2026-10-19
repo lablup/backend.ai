@@ -9,7 +9,7 @@ from strawberry import Info
 
 from ai.backend.common.dto.manager.v2.rbac.request import AdminSearchPermissionsGQLInput
 from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
-from ai.backend.manager.api.gql.base import encode_cursor
+from ai.backend.manager.api.gql.base import encode_cursor, to_global_id
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     gql_mutation,
@@ -33,6 +33,7 @@ from ai.backend.manager.api.gql.rbac.types.permission import (
     PermissionFilter,
     PermissionGQL,
     PermissionOrderBy,
+    PurgePermissionPayload,
     ReplaceRolePermissionsInputGQL,
     ReplaceRolePermissionsPayloadGQL,
     ScopeEntityCombinationGQL,
@@ -247,9 +248,11 @@ async def update_permission(
 async def purge_permission(
     info: Info[StrawberryGQLContext],
     id: uuid.UUID,
-) -> DeletePermissionPayload:
+) -> PurgePermissionPayload:
     result = await info.context.adapters.rbac.purge_permission(id)
-    return DeletePermissionPayload.from_pydantic(result)
+    return PurgePermissionPayload.from_pydantic(
+        result, extra={"purged_id": to_global_id(PermissionGQL, result.field_id)}
+    )
 
 
 @gql_mutation(

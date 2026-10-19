@@ -104,6 +104,7 @@ class DeleteRolePayload(BaseResponseModel):
     """Payload for role soft-deletion mutation result."""
 
     id: UUID = Field(description="ID of the deleted role")
+    role: RoleNode = Field(description="The soft-deleted role. Added in 26.10.0.")
 
 
 class RestoreRolePayload(BaseResponseModel):
@@ -116,6 +117,7 @@ class PurgeRolePayload(BaseResponseModel):
     """Payload for role purge mutation result."""
 
     id: UUID = Field(description="ID of the purged role")
+    entity_id: UUID = Field(description="UUID of the purged role. Added in 26.10.0.")
 
 
 class CreateRoleInvitationPayload(BaseResponseModel):
@@ -128,6 +130,7 @@ class DeletePermissionPayload(BaseResponseModel):
     """Payload for permission deletion mutation result."""
 
     id: UUID = Field(description="ID of the deleted permission")
+    field_id: UUID = Field(description="UUID of the deleted permission row. Added in 26.10.0.")
 
 
 class RoleAssignmentNode(BaseResponseModel):

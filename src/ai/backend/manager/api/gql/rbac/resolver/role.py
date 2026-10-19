@@ -15,7 +15,7 @@ from ai.backend.common.dto.manager.v2.rbac.request import (
     SearchRolesInput,
 )
 from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
-from ai.backend.manager.api.gql.base import encode_cursor
+from ai.backend.manager.api.gql.base import encode_cursor, to_global_id
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     gql_mutation,
@@ -408,7 +408,9 @@ async def admin_purge_role(
 ) -> PurgeRolePayload | None:
     check_admin_only()
     result = await info.context.adapters.rbac.purge(input.id)
-    return PurgeRolePayload.from_pydantic(result)
+    return PurgeRolePayload.from_pydantic(
+        result, extra={"purged_id": to_global_id(RoleGQL, result.entity_id)}
+    )
 
 
 @gql_mutation(
@@ -512,7 +514,9 @@ async def purge_role(
     id: uuid.UUID,
 ) -> PurgeRolePayload:
     result = await info.context.adapters.rbac.purge(id)
-    return PurgeRolePayload.from_pydantic(result)
+    return PurgeRolePayload.from_pydantic(
+        result, extra={"purged_id": to_global_id(RoleGQL, result.entity_id)}
+    )
 
 
 @gql_mutation(
