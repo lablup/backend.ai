@@ -668,6 +668,7 @@ class SessionDBSource:
             sa.select(SessionDesignatedAgentRow.session_id, AgentRow.id)
             .join(AgentRow, AgentRow.uuid == SessionDesignatedAgentRow.agent_uuid)
             .where(SessionDesignatedAgentRow.session_id.in_(session_ids))
+            .order_by(AgentRow.id)
         )
         designated: dict[SessionId, list[AgentId]] = {}
         async with self._db.begin_readonly_session_read_committed() as db_sess:
