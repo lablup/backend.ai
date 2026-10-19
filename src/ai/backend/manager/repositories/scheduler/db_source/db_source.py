@@ -23,6 +23,7 @@ from sqlalchemy.ext.asyncio import AsyncSession as SASession
 from sqlalchemy.orm import load_only, selectinload
 
 from ai.backend.common import msgpack
+from ai.backend.common.data.entity.agent import AgentUUID
 from ai.backend.common.data.entity.domain import DomainID, DomainName
 from ai.backend.common.data.entity.image import ImageID
 from ai.backend.common.data.entity.kernel import KernelID
@@ -124,6 +125,9 @@ from ai.backend.manager.models.session.row import (
 )
 from ai.backend.manager.models.session.searchers import SessionInfoSearcher, SessionSearcher
 from ai.backend.manager.models.session.updaters import SessionStatusBatchUpdater
+from ai.backend.manager.models.session_designated_agent.creators import (
+    SessionDesignatedAgentCreator,
+)
 from ai.backend.manager.models.session_group.row import SessionGroupRow
 from ai.backend.manager.models.specs.creator import FieldToCreate, NestedFieldToCreate
 from ai.backend.manager.models.user.row import UserRow
@@ -1942,6 +1946,20 @@ class ScheduleDBSource:
                     )
                 matched_dependency_ids.append(SessionID(dependency_id))
 
+            # An agent id missing from ``agents`` designates nothing.
+            designated_agent_ids = list(
+                spec.resource_spec.options.scheduling_target.designated_agents
+            )
+            designated_agent_uuids: list[AgentUUID] = []
+            if designated_agent_ids:
+                designated_agent_uuids = list(
+                    (
+                        await read_sess.scalars(
+                            sa.select(AgentRow.uuid).where(AgentRow.id.in_(designated_agent_ids))
+                        )
+                    ).all()
+                )
+
         kernel_creators = [
             KernelCreator(
                 spec=spec,
@@ -1981,6 +1999,13 @@ class ScheduleDBSource:
                 [
                     SessionDependencyCreator(depends_on=dependency_id)
                     for dependency_id in matched_dependency_ids
+                ],
+            )
+            await w.atomic_create_field_entities(
+                session_id,
+                [
+                    SessionDesignatedAgentCreator(agent_uuid=agent_uuid)
+                    for agent_uuid in designated_agent_uuids
                 ],
             )
             await w.apply_batch_transition(
