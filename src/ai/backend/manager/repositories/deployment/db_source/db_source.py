@@ -19,6 +19,7 @@ from sqlalchemy.orm import aliased, contains_eager, selectinload, with_expressio
 
 from ai.backend.common.config import ModelHealthCheck
 from ai.backend.common.data.endpoint.types import EndpointLifecycle
+from ai.backend.common.data.entity.agent import AgentUUID
 from ai.backend.common.data.entity.deployment import DeploymentID
 from ai.backend.common.data.entity.deployment_preset import DeploymentPresetID
 from ai.backend.common.data.entity.deployment_revision import DeploymentRevisionID
@@ -122,6 +123,9 @@ from ai.backend.manager.errors.service import (
 )
 from ai.backend.manager.errors.storage import VFolderNotFound
 from ai.backend.manager.models.agent.row import AgentRow
+from ai.backend.manager.models.deployment_designated_agent.row import (
+    DeploymentDesignatedAgentRow,
+)
 from ai.backend.manager.models.deployment_policy.creators import DeploymentPolicyCreator
 from ai.backend.manager.models.deployment_policy.purgers import DeploymentPolicyPurger
 from ai.backend.manager.models.deployment_policy.row import DeploymentPolicyRow
@@ -2768,6 +2772,56 @@ class DeploymentDBSource:
                 raise EndpointNotFound(f"Endpoint {deployment_id} not found")
             stored: DeploymentOptions = row[0]
             return stored
+
+    async def replace_designated_agents(
+        self,
+        deployment_id: DeploymentID,
+        agent_uuids: set[AgentUUID],
+    ) -> None:
+        """Replace the agents a deployment designates with ``agent_uuids``.
+
+        Locks the deployment row so concurrent replaces run one after another.
+        """
+        async with self._begin_session_read_committed() as db_sess:
+            locked = await db_sess.scalar(
+                sa.select(EndpointRow.id).where(EndpointRow.id == deployment_id).with_for_update()
+            )
+            if locked is None:
+                raise EndpointNotFound(f"Endpoint {deployment_id} not found")
+            await db_sess.execute(
+                sa.delete(DeploymentDesignatedAgentRow).where(
+                    DeploymentDesignatedAgentRow.endpoint_id == deployment_id
+                )
+            )
+            if agent_uuids:
+                await db_sess.execute(
+                    sa.insert(DeploymentDesignatedAgentRow),
+                    [
+                        {"endpoint_id": deployment_id, "agent_uuid": agent_uuid}
+                        for agent_uuid in agent_uuids
+                    ],
+                )
+
+    async def fetch_designated_agents_by_deployment_ids(
+        self,
+        deployment_ids: set[DeploymentID],
+    ) -> Mapping[DeploymentID, list[AgentUUID]]:
+        """Fetch the designated agents of each deployment; one with none maps to ``[]``."""
+        if not deployment_ids:
+            return {}
+
+        async with self._begin_readonly_session_read_committed() as db_sess:
+            query = sa.select(
+                DeploymentDesignatedAgentRow.endpoint_id,
+                DeploymentDesignatedAgentRow.agent_uuid,
+            ).where(DeploymentDesignatedAgentRow.endpoint_id.in_(deployment_ids))
+            result = await db_sess.execute(query)
+            agents_by_deployment: dict[DeploymentID, list[AgentUUID]] = {
+                deployment_id: [] for deployment_id in deployment_ids
+            }
+            for endpoint_id, agent_uuid in result:
+                agents_by_deployment[endpoint_id].append(agent_uuid)
+            return agents_by_deployment
 
     async def activate_revision(
         self,
