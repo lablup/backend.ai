@@ -4,6 +4,7 @@ from typing import override
 
 from ai.backend.common.data.entity.dotfile import DotfileID
 from ai.backend.common.data.entity.types import EntityIdentifier
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.manager.data.dotfile.types import DotfileData, DotfileEntry
 from ai.backend.manager.errors.repository import ForeignKeyViolationError
 from ai.backend.manager.errors.user import UserNotFound
@@ -14,6 +15,7 @@ from ai.backend.manager.models.specs.types import IntegrityErrorCheck
 
 @dataclass(frozen=True)
 class DotfileEntryCreator(FieldCreator[EntityIdentifier, DotfileRow, DotfileData]):
+    owner: UserID
     entry: DotfileEntry
 
     @override

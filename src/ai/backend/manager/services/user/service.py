@@ -363,10 +363,10 @@ class UserService:
 
     async def create_dotfile(self, action: CreateDotfileAction) -> CreateDotfileActionResult:
         # Variants count too, so creation cannot grow a user's storage without bound.
-        count = await self._user_repository.count_dotfiles(action.user_id)
+        count = await self._user_repository.count_dotfiles(action.creator.owner)
         if count >= MAXIMUM_DOTFILE_COUNT:
             raise DotfileCreationFailed("Dotfile creation limit reached")
-        entries = await self._user_repository.create_dotfile(action.user_id, action.creator)
+        entries = await self._user_repository.create_dotfile(action.creator)
         return CreateDotfileActionResult(entries=entries.entries)
 
     async def update_default_dotfile(

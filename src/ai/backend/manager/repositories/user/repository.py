@@ -375,10 +375,10 @@ class UserRepository:
             return await self._default_dotfiles(ops, user_id)
 
     @user_repository_resilience.apply()
-    async def create_dotfile(self, user_id: UserID, creator: DotfileEntryCreator) -> DotfileEntries:
+    async def create_dotfile(self, creator: DotfileEntryCreator) -> DotfileEntries:
         async with self._user_ops.write_ops() as ops:
-            await ops.create_field(user_id, creator)
-            current = await self._default_dotfiles(ops, user_id)
+            await ops.create_field(creator.owner, creator)
+            current = await self._default_dotfiles(ops, creator.owner)
             return DotfileEntries((*current.entries, creator.entry))
 
     @user_repository_resilience.apply()

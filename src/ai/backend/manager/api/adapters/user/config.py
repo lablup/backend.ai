@@ -65,9 +65,9 @@ class UserConfigAdapter:
     async def create_dotfile(self, input: CreateDotfileInput) -> CreateDotfileResponse:
         await self._user.create_dotfile.run(
             CreateDotfileAction(
-                user_id=input.user_id,
                 creator=DotfileEntryCreator(
-                    DotfileEntry(path=input.path, perm=input.perm, data=input.data)
+                    owner=input.user_id,
+                    entry=DotfileEntry(path=input.path, perm=input.perm, data=input.data),
                 ),
             )
         )
