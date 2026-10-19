@@ -86,12 +86,16 @@ Background: `KNOWLEDGE.md`.
 | Operation | Target at response time | Payload |
 |---|---|---|
 | create · update · soft delete · restore | exists | the target Node field |
-| purge finishing within the request | gone | `deletedId: ID!` + `entityId` for an entity, `fieldId` for a field row, the end UUIDs for a relation |
-| purge of an entity with `purge_status` | exists (`purgeStatus: PURGING`) | the target Node field, no `deletedId` |
+| purge finishing within the request | gone | `purgedId: ID!` + `entityId` for an entity, `fieldId` for a field row, the end UUIDs for a relation |
+| purge of an entity with `purge_status` | exists (`purgeStatus: PURGING`) | the target Node field, no `purgedId` |
 | force purge | gone | same as a purge finishing within the request |
 
-- `deletedId` is the removed target's global ID; Relay's `@deleteEdge` and `@deleteRecord` take it. The GQL
+- `purgedId` is the removed target's global ID; Relay's `@deleteEdge` and `@deleteRecord` take it. The GQL
   layer builds it from the DTO's UUID.
+- A purge mutation returns a payload type of its own, `Purge<X>Payload`. Do NOT share a payload type with a
+  delete (soft delete) mutation.
+- Do NOT put `purgedId` on a payload named `Delete*`. Leave a published `delete*` mutation that removes the row
+  as it is, add a `purge*` mutation returning `Purge<X>Payload`, and deprecate the old mutation.
 - Do NOT put a global ID in the payload's own `id`.
 - Do NOT return the removed target as a Node.
 - A purge of an entity with `purge_status` is complete when `node(id:)` answers null. A failure is
