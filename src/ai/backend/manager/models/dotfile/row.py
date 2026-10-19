@@ -16,6 +16,12 @@ class DotfileRow(LifecycleTimestampsMixin, Base):
 
     __tablename__ = "dotfiles"
     __table_args__ = (
+        # Removing the owner's graph node removes its dotfiles.
+        sa.ForeignKeyConstraint(
+            ["entity_type", "entity_id"],
+            ["virtual_entities.entity_type", "virtual_entities.entity_id"],
+            ondelete="CASCADE",
+        ),
         sa.CheckConstraint("char_length(perm) <= 4", name="dotfile_perm_length"),
         sa.Index(
             "uq_dotfiles_is_default",

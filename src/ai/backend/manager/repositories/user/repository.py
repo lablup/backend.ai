@@ -396,7 +396,6 @@ class UserRepository:
     @user_repository_resilience.apply()
     async def create_dotfile(self, user_id: UserID, creator: DotfileEntryCreator) -> DotfileEntries:
         async with self._user_ops.write_ops() as ops:
-            await ops.lock_user(user_id)
             await ops.create_field(user_id, creator)
             current = await self._default_dotfiles(ops, user_id)
             return DotfileEntries((*current.entries, creator.entry))
@@ -406,7 +405,6 @@ class UserRepository:
         self, user_id: UserID, path: str, updater: DotfileEntryUpdater
     ) -> DotfileEntries:
         async with self._user_ops.write_ops() as ops:
-            await ops.lock_user(user_id)
             entries = updater.apply(await self._default_dotfiles(ops, user_id), path)
             await ops.batch_update_in_global(
                 DefaultDotfileUpdater(entity=user_id, path=path, updater=updater)
@@ -418,7 +416,6 @@ class UserRepository:
         self, user_id: UserID, purger: DotfileEntryPurger
     ) -> DotfileEntries:
         async with self._user_ops.write_ops() as ops:
-            await ops.lock_user(user_id)
             entries = purger.apply(await self._default_dotfiles(ops, user_id))
             await ops.batch_purge_field_entities(user_id, DefaultDotfilePurger(path=purger.path))
             return entries

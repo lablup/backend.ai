@@ -429,7 +429,6 @@ class UserDBSource:
             await w.batch_purge_field_entities(user_id, UserErrorLogPurger())
             await w.batch_purge_field_entities(user_id, UserKeyPairPurger())
             await w.batch_purge_field_entities(user_id, BootstrapScriptPurger())
-            await w.lock_user(user_id)
             await w.batch_purge_field_entities(user_id, DotfilePurger())
             await w.batch_purge_field_entities(user_id, UserGroupAssociationPurger())
             # Placement groups the user still owns: their deployments were either

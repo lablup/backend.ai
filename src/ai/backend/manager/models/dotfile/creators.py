@@ -5,6 +5,8 @@ from typing import override
 from ai.backend.common.data.entity.dotfile import DotfileID
 from ai.backend.common.data.entity.types import EntityIdentifier
 from ai.backend.manager.data.dotfile.types import DotfileData, DotfileEntry
+from ai.backend.manager.errors.repository import ForeignKeyViolationError
+from ai.backend.manager.errors.user import UserNotFound
 from ai.backend.manager.models.dotfile.row import DotfileRow
 from ai.backend.manager.models.specs.creator import FieldCreator
 from ai.backend.manager.models.specs.types import IntegrityErrorCheck
@@ -20,7 +22,7 @@ class DotfileEntryCreator(FieldCreator[EntityIdentifier, DotfileRow, DotfileData
 
     @override
     def integrity_error_checks(self) -> Sequence[IntegrityErrorCheck]:
-        return ()
+        return (IntegrityErrorCheck(violation_type=ForeignKeyViolationError, error=UserNotFound()),)
 
     @override
     def build_row(self, owner_id: EntityIdentifier) -> DotfileRow:

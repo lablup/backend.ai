@@ -23,6 +23,7 @@ from ai.backend.manager.models.dotfile.row import DotfileRow
 from ai.backend.manager.models.keypair.row import KeyPairRow
 from ai.backend.manager.models.project.row import ProjectRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.models.virtual_entity.virtual_entity import VirtualEntityRow
 from ai.backend.manager.repositories.ops.v2.reconciler.provider import ReconcileOpsProvider
 from ai.backend.manager.repositories.scheduler.db_source.db_source import ScheduleDBSource
 from ai.backend.manager.secret.types import SecretValue
@@ -44,6 +45,11 @@ async def dotfile_scope(
     test_access_key: AccessKey,
 ) -> UserScope:
     async with db_with_cleanup.begin_session() as session:
+        await session.execute(
+            sa.insert(VirtualEntityRow).values(
+                entity_type=UserEntityType(), entity_id=test_user_uuid
+            )
+        )
         await session.execute(
             sa.insert(DotfileRow).values(
                 entity_type=UserEntityType(),

@@ -80,6 +80,12 @@ def upgrade() -> None:
             "updated_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.func.now()
         ),
         sa.PrimaryKeyConstraint("id", name=op.f("pk_dotfiles")),
+        sa.ForeignKeyConstraint(
+            ["entity_type", "entity_id"],
+            ["virtual_entities.entity_type", "virtual_entities.entity_id"],
+            name=op.f("fk_dotfiles_entity_type_virtual_entities"),
+            ondelete="CASCADE",
+        ),
         sa.CheckConstraint("char_length(perm) <= 4", name=op.f("ck_dotfiles_dotfile_perm_length")),
         sa.CheckConstraint(
             "octet_length(data) <= 65536", name=op.f("ck_dotfiles_dotfile_data_length")

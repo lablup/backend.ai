@@ -75,6 +75,7 @@ from ai.backend.manager.models.session.row import SessionDependencyRow, SessionR
 from ai.backend.manager.models.session_group.row import SessionGroupRow
 from ai.backend.manager.models.user.row import UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.models.virtual_entity.virtual_entity import VirtualEntityRow
 from ai.backend.manager.secret.types import SecretValue
 from ai.backend.manager.views.sokovan.allocation import (
     KernelAllocation,
@@ -93,6 +94,7 @@ _SCHEDULER_ROWS: list[type] = [
     RoleRow,
     UserRoleRow,
     UserRow,
+    VirtualEntityRow,
     DotfileRow,
     KeyPairRow,
     ProjectRow,
