@@ -421,7 +421,11 @@ class DeploymentRepository:
         deployment_id: DeploymentID,
         agent_uuids: set[AgentUUID],
     ) -> None:
-        """Replace the agents a deployment designates with ``agent_uuids``."""
+        """Replace the agents a deployment designates with ``agent_uuids``.
+
+        Raises:
+            EndpointNotFound: If the deployment does not exist.
+        """
         await self._db_source.replace_designated_agents(deployment_id, agent_uuids)
 
     @deployment_repository_resilience.apply()

@@ -2778,8 +2778,16 @@ class DeploymentDBSource:
         deployment_id: DeploymentID,
         agent_uuids: set[AgentUUID],
     ) -> None:
-        """Replace the agents a deployment designates with ``agent_uuids``."""
+        """Replace the agents a deployment designates with ``agent_uuids``.
+
+        Locks the deployment row so concurrent replaces run one after another.
+        """
         async with self._begin_session_read_committed() as db_sess:
+            locked = await db_sess.scalar(
+                sa.select(EndpointRow.id).where(EndpointRow.id == deployment_id).with_for_update()
+            )
+            if locked is None:
+                raise EndpointNotFound(f"Endpoint {deployment_id} not found")
             await db_sess.execute(
                 sa.delete(DeploymentDesignatedAgentRow).where(
                     DeploymentDesignatedAgentRow.endpoint_id == deployment_id
