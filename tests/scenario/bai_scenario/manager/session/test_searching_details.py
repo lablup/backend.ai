@@ -15,7 +15,7 @@ from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.dto.manager.v2.session.request import AdminSearchSessionsInput
 from ai.backend.common.dto.manager.v2.session.response import AdminSearchSessionsPayload
-from ai.backend.common.types import AgentId, SessionTypes
+from ai.backend.common.types import SessionTypes
 from ai.backend.manager.api.adapters.session.adapter import SessionAdapter
 from ai.backend.manager.data.project.types import ProjectData
 from ai.backend.manager.data.resource_group.types import ResourceGroupData
@@ -45,7 +45,7 @@ from bai_scenario.runner.planting import TestSeedingSession
 from bai_scenario.runner.steps import run_scenario
 from bai_scenario.seeds.agent.agent import TestSeedAgent
 from bai_scenario.seeds.seeder import Naming, TestSeedRowFromTwo
-from bai_scenario.seeds.session.session import TestSeedSession
+from bai_scenario.seeds.session.session import TestSeedDesignatedAgentOf, TestSeedSession
 
 
 @dataclass(frozen=True)
@@ -74,11 +74,10 @@ class TestSeedSessionGroup(TestSeedRowFromTwo[ProjectData, UserData, SessionGrou
 class TestSeedSessionWithSchedulingConditions(TestSeedSession):
     image_id: ImageID
     session_group_id: SessionGroupID
-    designated_agents: tuple[AgentId, ...]
 
     @override
     def detail(self) -> str:
-        return "세션 그룹, designated_agent_ids 둘, requested_starts_at을 지정한 대기 세션"
+        return "세션 그룹, requested_starts_at을 지정한 대기 세션"
 
     @override
     def seed(
@@ -96,10 +95,6 @@ class TestSeedSessionWithSchedulingConditions(TestSeedSession):
                 starts_at=datetime(2030, 1, 2, 3, 4, tzinfo=UTC),
             ),
         )
-        scheduling_target = resource_spec.options.scheduling_target.model_copy(
-            update={"designated_agents": list(self.designated_agents)}
-        )
-        options = resource_spec.options.model_copy(update={"scheduling_target": scheduling_target})
         classification = resource_spec.classification.model_copy(
             update={"session_type": SessionTypes.BATCH}
         )
@@ -107,7 +102,6 @@ class TestSeedSessionWithSchedulingConditions(TestSeedSession):
             update={
                 "classification": classification,
                 "kernel_specs": (kernel,),
-                "options": options,
             }
         )
         scope = creator.spec.scope.model_copy(update={"session_group_id": self.session_group_id})
@@ -119,6 +113,7 @@ class TestSeedSessionWithSchedulingConditions(TestSeedSession):
 class ASessionAndACaller:
     session: SessionEntityData
     caller: UserData
+    designated_agent_ids: list[str] | None
 
 
 @dataclass(frozen=True)
@@ -134,25 +129,33 @@ class ASessionToRead(Given[TestSeedingSession, ASessionAndACaller]):
     async def lay(self, seeding: TestSeedingSession) -> ASessionAndACaller:
         place = await lay_a_place(seeding, slots=0)
         session_seed: TestSeedSession = TestSeedSession(access_key=place.access_key)
+        agents = []
         if self.configured:
             group = await seeding.creating_from_two(
                 TestSeedSessionGroup(), place.project, place.owner
             )
-            first_agent = await seeding.creating_from(TestSeedAgent(), place.group)
-            second_agent = await seeding.creating_from(TestSeedAgent(), place.group)
+            agents = [
+                await seeding.creating_from(TestSeedAgent(), place.group),
+                await seeding.creating_from(TestSeedAgent(), place.group),
+            ]
             session_seed = TestSeedSessionWithSchedulingConditions(
                 access_key=place.access_key,
                 image_id=ImageID(seeding.made(place.image).id),
                 session_group_id=seeding.made(group).id,
-                designated_agents=(AgentId(first_agent.name), AgentId(second_agent.name)),
             )
         session = await seeding.creating_from_three(
             session_seed, place.project, place.owner, place.group
         )
+        for agent in agents:
+            await seeding.adding(TestSeedDesignatedAgentOf(agent_uuid=seeding.made(agent)), session)
         caller = await lay_a_caller_of(
             seeding, place, role=UserRole.SUPERADMIN, granted=Granted.NOTHING
         )
-        return ASessionAndACaller(session=seeding.made(session), caller=seeding.made(caller))
+        return ASessionAndACaller(
+            session=seeding.made(session),
+            caller=seeding.made(caller),
+            designated_agent_ids=sorted(agent.name for agent in agents) or None,
+        )
 
 
 @dataclass(frozen=True)
@@ -215,7 +218,7 @@ class TheWholeSessionIsReturned(Then[ASessionAndACaller, AdminSearchSessionsPayl
                 },
                 "resource_group_name": session.resource_group_name,
                 "session_group_id": session.session_group_id,
-                "designated_agent_ids": None,
+                "designated_agent_ids": laid.designated_agent_ids,
             },
             "lifecycle": {
                 "status": "PENDING",
