@@ -219,6 +219,7 @@ class ManagerDependencyComposer(DependencyComposer[DependencyInput, DependencyRe
                 valkey_schedule=infrastructure.valkey.schedule,
                 valkey_image=infrastructure.valkey.image,
                 prometheus_client=prometheus_client,
+                sentinel_monitors=infrastructure.sentinel_monitors,
             ),
         )
 

@@ -12,6 +12,7 @@ from ai.backend.appproxy.coordinator.dependencies.infrastructure.redis import (
 )
 from ai.backend.common.clients.valkey_client.sentinel_monitor.monitor_set import SentinelMonitorSet
 from ai.backend.common.config import redis_config_iv
+from ai.backend.common.lock import RedisLock
 from ai.backend.common.typed_validators import HostPortPair as HostPortPairModel
 from ai.backend.common.types import HostPortPair
 
@@ -58,12 +59,15 @@ class TestRedisProvider:
             # Verify clients are functional
             assert clients.valkey_live is not None
             assert clients.core_valkey_live is not None
-            assert clients.redis_lock is not None
+            assert clients.valkey_lock is not None
             assert clients.valkey_schedule is not None
 
             # Test basic operation on live client
             server_time = await clients.valkey_live.get_server_time()
             assert server_time > 0
+
+            async with RedisLock("test-coordinator-lock", clients.valkey_lock, timeout=1.0):
+                pass
 
     async def test_cleanup_on_exception(
         self,

@@ -16,6 +16,9 @@ from .notification import NotificationCenterDependency
 from .repositories import RepositoriesDependency, RepositoriesInput
 
 if TYPE_CHECKING:
+    from ai.backend.common.clients.valkey_client.sentinel_monitor.monitor_set import (
+        SentinelMonitorSet,
+    )
     from ai.backend.common.clients.valkey_client.valkey_image.client import ValkeyImageClient
     from ai.backend.common.clients.valkey_client.valkey_live.client import ValkeyLiveClient
     from ai.backend.common.clients.valkey_client.valkey_schedule.client import (
@@ -47,6 +50,7 @@ class DomainInput:
     valkey_schedule: ValkeyScheduleClient
     valkey_image: ValkeyImageClient
     prometheus_client: PrometheusClient
+    sentinel_monitors: SentinelMonitorSet
 
 
 @dataclass
@@ -97,12 +101,13 @@ class DomainComposer(DependencyComposer[DomainInput, DomainResources]):
         # 2. Container registry (no dependencies)
         container_registry = await stack.enter_dependency(ContainerRegistryDependency(), None)
 
-        # 3. Distributed lock factory (depends on config, db, etcd)
+        # 3. Distributed lock factory (depends on config, db, etcd, sentinel monitors)
         distributed_lock_dep = DistributedLockFactoryDependency()
         distributed_lock_input = DistributedLockInput(
             config_provider=setup_input.config_provider,
             db=setup_input.db,
             etcd=setup_input.etcd,
+            sentinel_monitors=setup_input.sentinel_monitors,
         )
         distributed_lock_factory = await stack.enter_dependency(
             distributed_lock_dep, distributed_lock_input

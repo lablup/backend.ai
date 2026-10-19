@@ -80,13 +80,12 @@ from ai.backend.appproxy.common.utils import (
     BackendAIAccessLogger,
     ensure_json_serializable,
     mime_match,
-    ping_redis_connection,
 )
 from ai.backend.appproxy.coordinator.models.worker import WorkerStatus
-from ai.backend.common import redis_helper
 from ai.backend.common.clients.valkey_client.sentinel_monitor.monitor_set import SentinelMonitorSet
 from ai.backend.common.clients.valkey_client.valkey_leader.client import ValkeyLeaderClient
 from ai.backend.common.clients.valkey_client.valkey_live.client import ValkeyLiveClient
+from ai.backend.common.clients.valkey_client.valkey_lock.client import ValkeyLockClient
 from ai.backend.common.clients.valkey_client.valkey_schedule import ValkeyScheduleClient
 from ai.backend.common.contexts.request_id import with_request_context
 from ai.backend.common.defs import REDIS_LIVE_DB, REDIS_STREAM_DB, REDIS_STREAM_LOCK, RedisRole
@@ -351,13 +350,13 @@ async def redis_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
         sentinel_monitor=sentinel_monitors.monitor_for(core_live_target),
     )
 
-    # Keep redis_lock for distributed locking (not yet migrated)
-    root_ctx.redis_lock = redis_helper.get_redis_object_for_lock(
-        redis_profile_target.profile_target(RedisRole.STREAM),
-        name="lock",  # distributed locks
-        db=REDIS_STREAM_LOCK,
+    lock_target = redis_profile_target.profile_target(RedisRole.STREAM).to_valkey_target()
+    root_ctx.valkey_lock = await ValkeyLockClient.create(
+        valkey_target=lock_target,
+        db_id=REDIS_STREAM_LOCK,
+        human_readable_name="appproxy-coordinator-lock",
+        sentinel_monitor=sentinel_monitors.monitor_for(lock_target),
     )
-    await ping_redis_connection(root_ctx.redis_lock)
 
     # Initialize ValkeyScheduleClient for health status updates
     root_ctx.valkey_schedule = await ValkeyScheduleClient.create(
@@ -373,7 +372,7 @@ async def redis_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
         await root_ctx.valkey_live.close()
         await root_ctx.core_valkey_live.close()
         await root_ctx.valkey_schedule.close()
-        await root_ctx.redis_lock.close()
+        await root_ctx.valkey_lock.close()
 
 
 async def _make_message_queue(
@@ -1039,7 +1038,7 @@ def init_lock_factory(root_ctx: RootContext) -> DistributedLockFactory:
 
             return lambda lock_id, lifetime_hint: RedisLock(
                 str(lock_id),
-                root_ctx.redis_lock,
+                root_ctx.valkey_lock,
                 lifetime=min(lifetime_hint * 2, lifetime_hint + 30),
                 lock_retry_interval=redlock_config.lock_retry_interval,
             )
