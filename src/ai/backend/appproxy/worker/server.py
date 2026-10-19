@@ -74,6 +74,7 @@ from ai.backend.appproxy.common.utils import (
     ensure_json_serializable,
     mime_match,
 )
+from ai.backend.appproxy.worker.ingress.factory import IngressStateFactory
 from ai.backend.common.clients.http_client.client_pool import (
     ClientPool,
     tcp_client_session_factory,
@@ -88,6 +89,7 @@ from ai.backend.common.defs import (
     REDIS_STREAM_DB,
     RedisRole,
 )
+from ai.backend.common.dto.appproxy.v2.ingress.types import IngressAuthority
 from ai.backend.common.dto.internal.health import (
     ConnectivityCheckResponse,
     HealthResponse,
@@ -331,6 +333,16 @@ async def redis_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
 
 
 @asynccontextmanager
+async def ingress_state_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
+    root_ctx.ingress_state = IngressStateFactory(
+        root_ctx.local_config.proxy_worker.ingress,
+        IngressAuthority(root_ctx.local_config.proxy_worker.authority),
+        root_ctx.valkey_live,
+    ).create()
+    yield
+
+
+@asynccontextmanager
 async def http_client_pool_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     client_timeout = aiohttp.ClientTimeout(
         total=None,
@@ -499,6 +511,11 @@ async def worker_registration_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     circuits = await list_worker_circuits(root_ctx, str(uuid.uuid4()))
     for circuit in circuits:
         await root_ctx.proxy_frontend.register_circuit(circuit, circuit.route_info)
+    # Applied rather than replaced, so circuits from events handled meanwhile are kept.
+    ingress_writer = root_ctx.ingress_state.writer
+    if ingress_writer is not None:
+        ingress_authority = IngressAuthority(root_ctx.local_config.proxy_worker.authority)
+        await ingress_writer.apply([circuit.to_ingress(ingress_authority) for circuit in circuits])
 
     cron = LocalCron([WorkerHeartbeatTask(root_ctx)])
     await cron.start()
@@ -693,13 +710,20 @@ async def handle_proxy_route_event(
     if event.target_worker_authority != context.local_config.proxy_worker.authority:
         return
 
+    ingress_writer = context.ingress_state.writer
+    ingress_authority = IngressAuthority(context.local_config.proxy_worker.authority)
     match event:
         case AppProxyCircuitCreatedEvent():
             log.debug("circuits created: {}", [str(c.id) for c in event.circuits])
-            for circuit in event.circuits:
+            created_circuits = [Circuit.from_serialized_circuit(c) for c in event.circuits]
+            for created_circuit in created_circuits:
                 await context.proxy_frontend.register_circuit(
-                    Circuit.from_serialized_circuit(circuit), circuit.route_info
+                    created_circuit, created_circuit.route_info
                 )
+            if ingress_writer is not None:
+                await ingress_writer.apply([
+                    circuit.to_ingress(ingress_authority) for circuit in created_circuits
+                ])
             await context.event_producer.broadcast_event(
                 AppProxyWorkerCircuitAddedEvent(
                     target_worker_authority=context.local_config.proxy_worker.authority,
@@ -708,13 +732,23 @@ async def handle_proxy_route_event(
             )
         case AppProxyCircuitRouteUpdatedEvent():
             log.debug("circuit routes updated: {}", event.circuit.id)
-            await context.proxy_frontend.update_circuit_route_info(
-                Circuit.from_serialized_circuit(event.circuit), event.routes
+            updated_circuit = Circuit.from_serialized_circuit(event.circuit)
+            await context.proxy_frontend.update_circuit_route_info(updated_circuit, event.routes)
+            # The frontend stores the new routes on the circuit it holds and skips one it does not.
+            held_circuit = context.proxy_frontend.circuits.get(
+                context.proxy_frontend.get_circuit_key(updated_circuit)
             )
+            if ingress_writer is not None and held_circuit is not None:
+                await ingress_writer.apply([held_circuit.to_ingress(ingress_authority)])
         case AppProxyCircuitRemovedEvent():
             log.debug("circuits removed: {}", [str(c.id) for c in event.circuits])
-            for circuit in event.circuits:
-                await context.proxy_frontend.break_circuit(Circuit.from_serialized_circuit(circuit))
+            removed_circuits = [Circuit.from_serialized_circuit(c) for c in event.circuits]
+            for removed_circuit in removed_circuits:
+                await context.proxy_frontend.break_circuit(removed_circuit)
+            if ingress_writer is not None:
+                await ingress_writer.remove([
+                    circuit.to_ingress_key(ingress_authority) for circuit in removed_circuits
+                ])
 
 
 async def on_prepare(_request: web.Request, response: web.StreamResponse) -> None:
@@ -807,6 +841,7 @@ def build_root_app(
             cleanup_contexts = [
                 proxy_frontend_ctx,
                 redis_ctx,
+                ingress_state_ctx,
                 http_client_pool_ctx,
                 health_probe_ctx,
                 service_discovery_ctx,
@@ -816,6 +851,7 @@ def build_root_app(
             cleanup_contexts = [
                 proxy_frontend_ctx,
                 redis_ctx,
+                ingress_state_ctx,
                 http_client_pool_ctx,
                 event_dispatcher_ctx,
                 event_handler_ctx,
