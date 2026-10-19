@@ -1711,6 +1711,8 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
         if sys.platform != "darwin":
             socket_dir = ipc_base_path / "container"
             relay_config = self.local_config.agent.socket_relay
+            relay_uid: int
+            relay_gid: int
             if os.geteuid() == 0:
                 relay_uid, relay_gid = relay_config.uid, relay_config.gid
                 os.chown(socket_dir, relay_uid, relay_gid)
