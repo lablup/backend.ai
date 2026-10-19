@@ -4442,8 +4442,11 @@ input DeleteDeploymentInput {
 
 """Added in 25.19.0. Payload for deleting a model deployment."""
 type DeleteDeploymentPayload {
-  """ID of the deleted deployment"""
-  id: ID!
+  """ID of the deleted deployment."""
+  id: ID! @deprecated(reason: "Deprecated since 26.10.0. Use `deployment`.")
+
+  """Added in 26.10.0. The soft-deleted deployment."""
+  deployment: ModelDeployment!
 }
 
 """Added in 26.4.2. Delete deployment revision preset payload."""
@@ -4455,7 +4458,10 @@ type DeleteDeploymentRevisionPresetPayload {
 """Added in 26.4.2. Payload for domain deletion mutation."""
 type DeleteDomainPayload {
   """Whether the deletion was successful."""
-  deleted: Boolean!
+  deleted: Boolean! @deprecated(reason: "Deprecated since 26.10.0. Use `domain`.")
+
+  """Added in 26.10.0. The soft-deleted domain."""
+  domain: DomainV2!
 }
 
 """Added in 26.4.2. Input for deleting files inside a virtual folder."""
@@ -4565,7 +4571,10 @@ type DeletePermissionPayload {
 """Added in 26.4.2. Payload for project deletion mutation."""
 type DeleteProjectPayload {
   """Whether the deletion was successful."""
-  deleted: Boolean!
+  deleted: Boolean! @deprecated(reason: "Deprecated since 26.10.0. Use `project`.")
+
+  """Added in 26.10.0. The soft-deleted project."""
+  project: ProjectV2!
 }
 
 """Added in 26.4.2. Payload for project resource policy deletion."""
@@ -4619,7 +4628,10 @@ input DeleteRoleInput {
 """Added in 26.3.0. Payload for delete role mutation."""
 type DeleteRolePayload {
   """ID of the deleted role."""
-  id: UUID!
+  id: UUID! @deprecated(reason: "Deprecated since 26.10.0. Use `role`.")
+
+  """Added in 26.10.0. The soft-deleted role."""
+  role: Role!
 }
 
 """Added in 26.10.0. Payload returned after soft-deleting a role preset."""
@@ -4671,7 +4683,10 @@ type DeleteUserResourcePolicyPayload {
 """Added in 26.2.0. Payload for single user soft-delete mutation."""
 type DeleteUserV2Payload {
   """Whether the deletion was successful."""
-  success: Boolean!
+  success: Boolean! @deprecated(reason: "Deprecated since 26.10.0. Use `user`.")
+
+  """Added in 26.10.0. The soft-deleted user."""
+  user: UserV2!
 }
 
 """
@@ -4704,7 +4719,10 @@ Added in 26.4.2. Payload returned after soft-deleting a virtual folder.
 """
 type DeleteVFolderV2Payload {
   """ID of the deleted virtual folder."""
-  id: UUID!
+  id: UUID! @deprecated(reason: "Deprecated since 26.10.0. Use `vfolder`.")
+
+  """Added in 26.10.0. The soft-deleted virtual folder."""
+  vfolder: VFolder!
 }
 
 """Added in 26.4.2. Input for deploying a model card as a new deployment."""
@@ -9974,7 +9992,7 @@ type Mutation {
   deleteAutoScalingRule(input: DeleteAutoScalingRuleInput!): DeleteAutoScalingRulePayload @deprecated(reason: "Deprecated since 26.10.0. Use `purgeAutoScalingRule`.")
 
   """Added in 26.10.0. Permanently remove an auto-scaling rule."""
-  purgeAutoScalingRule(id: UUID!): DeleteAutoScalingRulePayload!
+  purgeAutoScalingRule(id: UUID!): PurgeAutoScalingRulePayload!
 
   """
   Added in 26.10.0. Update several auto-scaling rules, answering for each one.
@@ -10095,7 +10113,7 @@ type Mutation {
   deleteAccessToken(input: DeleteAccessTokenInput!): DeleteAccessTokenPayload @deprecated(reason: "Deprecated since 26.10.0. Use `purgeAccessToken`.")
 
   """Added in 26.10.0. Permanently remove an access token."""
-  purgeAccessToken(id: UUID!): DeleteAccessTokenPayload!
+  purgeAccessToken(id: UUID!): PurgeAccessTokenPayload!
 
   """
   Added in 26.10.0. Permanently remove several access tokens, answering for each one.
@@ -10207,7 +10225,7 @@ type Mutation {
   updateResourceGroup(id: UUID!, input: UpdateResourceGroupV2Input!): UpdateResourceGroupPayload!
 
   """Added in 26.10.0. Purge a resource group."""
-  purgeResourceGroupV2(id: UUID!): DeleteResourceGroupPayload!
+  purgeResourceGroupV2(id: UUID!): PurgeResourceGroupPayload!
 
   """
   Added in 26.10.0. Update several resource groups, answering for each one.
@@ -10487,7 +10505,7 @@ type Mutation {
   updatePrometheusQueryPreset(id: UUID!, input: ModifyQueryDefinitionInput!): ModifyQueryDefinitionPayload!
 
   """Added in 26.10.0. Permanently remove a query definition."""
-  purgePrometheusQueryPreset(id: UUID!): DeleteQueryDefinitionPayload!
+  purgePrometheusQueryPreset(id: UUID!): PurgeQueryDefinitionPayload!
 
   """
   Added in 26.10.0. Update several query definitions, answering for each one.
@@ -10662,7 +10680,7 @@ type Mutation {
   updatePermission(input: UpdatePermissionInput!): Permission!
 
   """Added in 26.10.0. Permanently remove a scoped permission."""
-  purgePermission(id: UUID!): DeletePermissionPayload!
+  purgePermission(id: UUID!): PurgePermissionPayload!
 
   """
   Added in 26.10.0. Insert scoped permission rows across one or more roles, answering for each one.
@@ -10749,7 +10767,7 @@ type Mutation {
   updateKeypairResourcePolicyV2(id: UUID!, input: UpdateKeypairResourcePolicyInput!): UpdateKeypairResourcePolicyPayload!
 
   """Added in 26.10.0. Permanently remove a keypair resource policy."""
-  purgeKeypairResourcePolicyV2(id: UUID!): DeleteKeypairResourcePolicyPayload!
+  purgeKeypairResourcePolicyV2(id: UUID!): PurgeKeypairResourcePolicyPayload!
 
   """
   Added in 26.10.0. Update several keypair resource policies, answering for each one.
@@ -10767,7 +10785,7 @@ type Mutation {
   updateUserResourcePolicyV2(id: UUID!, input: UpdateUserResourcePolicyInput!): UpdateUserResourcePolicyPayload!
 
   """Added in 26.10.0. Permanently remove a user resource policy."""
-  purgeUserResourcePolicyV2(id: UUID!): DeleteUserResourcePolicyPayload!
+  purgeUserResourcePolicyV2(id: UUID!): PurgeUserResourcePolicyPayload!
 
   """
   Added in 26.10.0. Update several user resource policies, answering for each one.
@@ -10785,7 +10803,7 @@ type Mutation {
   updateProjectResourcePolicyV2(id: UUID!, input: UpdateProjectResourcePolicyInput!): UpdateProjectResourcePolicyPayload!
 
   """Added in 26.10.0. Permanently remove a project resource policy."""
-  purgeProjectResourcePolicyV2(id: UUID!): DeleteProjectResourcePolicyPayload!
+  purgeProjectResourcePolicyV2(id: UUID!): PurgeProjectResourcePolicyPayload!
 
   """
   Added in 26.10.0. Update several project resource policies, answering for each one.
@@ -10812,7 +10830,7 @@ type Mutation {
   updateResourcePresetV2(input: UpdateResourcePresetV2Input!): UpdateResourcePresetPayload!
 
   """Added in 26.10.0. Permanently delete a resource preset."""
-  purgeResourcePresetV2(id: UUID!): DeleteResourcePresetPayload!
+  purgeResourcePresetV2(id: UUID!): PurgeResourcePresetPayload!
 
   """
   Added in 26.10.0. Update several resource presets, answering for each one.
@@ -10891,7 +10909,7 @@ type Mutation {
   """
   Added in 26.10.0. Purge a runtime variant with the presets in its catalog.
   """
-  purgeRuntimeVariant(id: UUID!): DeleteRuntimeVariantPayload!
+  purgeRuntimeVariant(id: UUID!): PurgeRuntimeVariantPayload!
 
   """
   Added in 26.10.0. Update several runtime variants, answering for each one.
@@ -10919,7 +10937,7 @@ type Mutation {
   """
   Added in 26.10.0. Drop one target's client IP masking policy so it falls back to the default.
   """
-  purgeClientIpMaskingPolicy(id: UUID!): ClientIPMaskingPolicyPayload!
+  purgeClientIpMaskingPolicy(id: UUID!): PurgeClientIPMaskingPolicyPayload!
 
   """
   Added in 26.10.0. Drop several client IP masking policies, answering for each one.
@@ -10993,7 +11011,7 @@ type Mutation {
   updateRuntimeVariantPreset(input: UpdateRuntimeVariantPresetInput!): UpdateRuntimeVariantPresetPayload!
 
   """Added in 26.10.0. Purge a runtime variant preset."""
-  purgeRuntimeVariantPreset(id: UUID!): DeleteRuntimeVariantPresetPayload!
+  purgeRuntimeVariantPreset(id: UUID!): PurgeRuntimeVariantPresetPayload!
 
   """
   Added in 26.10.0. Update several runtime variant presets, answering for each one.
@@ -11020,7 +11038,7 @@ type Mutation {
   updateDeploymentRevisionPreset(input: UpdateDeploymentRevisionPresetInput!): UpdateDeploymentRevisionPresetPayload!
 
   """Added in 26.10.0. Permanently remove a deployment revision preset."""
-  purgeDeploymentRevisionPreset(id: UUID!): DeleteDeploymentRevisionPresetPayload!
+  purgeDeploymentRevisionPreset(id: UUID!): PurgeDeploymentRevisionPresetPayload!
 
   """
   Added in 26.10.0. Update several deployment revision presets, answering for each one.
@@ -11054,7 +11072,7 @@ type Mutation {
   """
   Added in 26.10.0. Purge a model card. The options decide whether its vfolder is moved to the trash.
   """
-  purgeModelCardV2(id: UUID!, options: DeleteModelCardV2Options = null): DeleteModelCardPayload!
+  purgeModelCardV2(id: UUID!, options: DeleteModelCardV2Options = null): PurgeModelCardPayload!
 
   """Added in 26.10.0. Update several model cards, answering for each one."""
   partialBulkUpdateModelCardsV2(input: PartialBulkUpdateModelCardsInput!): PartialBulkModelCardsPayload!
@@ -14222,6 +14240,15 @@ input ProjectWeightInputItem {
   weight: Decimal = null
 }
 
+"""Added in 26.10.0. Payload for access token purge."""
+type PurgeAccessTokenPayload {
+  """Global ID of the purged access token."""
+  purgedId: ID!
+
+  """UUID of the purged access token."""
+  fieldId: UUID!
+}
+
 """Added in 26.7.0. Input for purging an app config allow-list entry."""
 input PurgeAppConfigAllowListInput {
   """App config allow-list entry id to purge."""
@@ -14230,8 +14257,14 @@ input PurgeAppConfigAllowListInput {
 
 """Added in 26.7.0. Payload for app config allow-list entry purge."""
 type PurgeAppConfigAllowListPayload {
+  """Added in 26.10.0. Global ID of the purged app config allow-list entry."""
+  purgedId: ID!
+
   """UUID of the purged app config allow-list entry."""
-  id: UUID!
+  id: UUID! @deprecated(reason: "Deprecated since 26.10.0. Use `purgedId` or `entityId`.")
+
+  """Added in 26.10.0. UUID of the purged app config allow-list entry."""
+  entityId: UUID!
 }
 
 """Added in 26.7.0. Input for purging an app config definition."""
@@ -14242,20 +14275,65 @@ input PurgeAppConfigDefinitionInput {
 
 """Added in 26.7.0. Payload for app config definition purge."""
 type PurgeAppConfigDefinitionPayload {
+  """Added in 26.10.0. Global ID of the purged app config definition."""
+  purgedId: ID!
+
   """UUID of the purged app config definition."""
-  id: UUID!
+  id: UUID! @deprecated(reason: "Deprecated since 26.10.0. Use `purgedId` or `entityId`.")
+
+  """Added in 26.10.0. UUID of the purged app config definition."""
+  entityId: UUID!
 }
 
 """Added in 26.10.0. Payload for app config fragment purge."""
 type PurgeAppConfigFragmentPayload {
+  """Added in 26.10.0. Global ID of the purged app config fragment."""
+  purgedId: ID!
+
   """Id of the purged app config fragment."""
-  id: UUID!
+  id: UUID! @deprecated(reason: "Deprecated since 26.10.0. Use `purgedId` or `entityId`.")
+
+  """Added in 26.10.0. UUID of the purged app config fragment."""
+  entityId: UUID!
+}
+
+"""Added in 26.10.0. Payload for auto-scaling rule purge."""
+type PurgeAutoScalingRulePayload {
+  """Global ID of the purged auto-scaling rule."""
+  purgedId: ID!
+
+  """UUID of the purged auto-scaling rule."""
+  fieldId: UUID!
+}
+
+"""Added in 26.10.0. Payload for client IP masking policy purge."""
+type PurgeClientIPMaskingPolicyPayload {
+  """Global ID of the purged client IP masking policy."""
+  purgedId: ID!
+
+  """UUID of the purged client IP masking policy."""
+  entityId: UUID!
 }
 
 """Added in 26.10.0. Payload for container registry purge."""
 type PurgeContainerRegistryPayload {
+  """Added in 26.10.0. Global ID of the purged container registry."""
+  purgedId: ID!
+
   """ID of the purged registry."""
-  id: UUID!
+  id: UUID! @deprecated(reason: "Deprecated since 26.10.0. Use `purgedId` or `entityId`.")
+
+  """Added in 26.10.0. UUID of the purged container registry."""
+  entityId: UUID!
+}
+
+"""Added in 26.10.0. Payload for deployment revision preset purge."""
+type PurgeDeploymentRevisionPresetPayload {
+  """Global ID of the purged deployment revision preset."""
+  purgedId: ID!
+
+  """UUID of the purged deployment revision preset."""
+  entityId: UUID!
 }
 
 """Added in 26.4.2. Payload for domain permanent deletion mutation."""
@@ -14275,14 +14353,26 @@ type PurgeEntityLabelError {
 
 """Added in 26.9.0. Payload returned after taking a label off an entity."""
 type PurgeEntityLabelPayload {
+  """Added in 26.10.0. Global ID of the purged entity label."""
+  purgedId: ID!
+
   """The label taken off the entity."""
-  label: EntityLabel!
+  label: EntityLabel! @deprecated(reason: "Deprecated since 26.10.0. Use `purgedId` or `fieldId`.")
+
+  """Added in 26.10.0. UUID of the purged entity label."""
+  fieldId: UUID!
 }
 
 """Added in 26.10.0. Payload for purging a HuggingFace registry."""
 type PurgeHuggingFaceRegistryPayload {
+  """Added in 26.10.0. Global ID of the purged HuggingFace registry."""
+  purgedId: ID!
+
   """ID of the purged HuggingFace registry."""
-  id: UUID!
+  id: UUID! @deprecated(reason: "Deprecated since 26.10.0. Use `purgedId` or `entityId`.")
+
+  """Added in 26.10.0. UUID of the purged HuggingFace registry."""
+  entityId: UUID!
 }
 
 """Added in 26.8.0. Identifies the idle checker assignment to purge."""
@@ -14309,32 +14399,89 @@ input PurgeIdleCheckerInput {
 Added in 26.8.0. Confirms that an idle checker was permanently removed. The returned identifier refers to the deleted checker.
 """
 type PurgeIdleCheckerPayload {
+  """Added in 26.10.0. Global ID of the purged idle checker."""
+  purgedId: ID!
+
   """Purged idle checker ID."""
-  id: UUID!
+  id: UUID! @deprecated(reason: "Deprecated since 26.10.0. Use `purgedId` or `entityId`.")
+
+  """Added in 26.10.0. UUID of the purged idle checker."""
+  entityId: UUID!
+}
+
+"""Added in 26.10.0. Payload for keypair resource policy purge."""
+type PurgeKeypairResourcePolicyPayload {
+  """Global ID of the purged keypair resource policy."""
+  purgedId: ID!
+
+  """UUID of the purged keypair resource policy."""
+  entityId: UUID!
 }
 
 """Added in 26.10.0. Payload for login client type purge."""
 type PurgeLoginClientTypePayload {
+  """Added in 26.10.0. Global ID of the purged login client type."""
+  purgedId: ID!
+
   """UUID of the purged login client type."""
-  id: UUID!
+  id: UUID! @deprecated(reason: "Deprecated since 26.10.0. Use `purgedId` or `entityId`.")
+
+  """Added in 26.10.0. UUID of the purged login client type."""
+  entityId: UUID!
+}
+
+"""Added in 26.10.0. Payload for model card purge."""
+type PurgeModelCardPayload {
+  """Global ID of the purged model card."""
+  purgedId: ID!
+
+  """UUID of the purged model card."""
+  entityId: UUID!
 }
 
 """Added in 26.10.0. Payload for notification channel purge."""
 type PurgeNotificationChannelPayload {
+  """Added in 26.10.0. Global ID of the purged notification channel."""
+  purgedId: ID!
+
   """ID of the purged notification channel."""
-  id: UUID!
+  id: UUID! @deprecated(reason: "Deprecated since 26.10.0. Use `purgedId` or `entityId`.")
+
+  """Added in 26.10.0. UUID of the purged notification channel."""
+  entityId: UUID!
 }
 
 """Added in 26.10.0. Payload for notification rule purge."""
 type PurgeNotificationRulePayload {
+  """Added in 26.10.0. Global ID of the purged notification rule."""
+  purgedId: ID!
+
   """ID of the purged notification rule."""
-  id: UUID!
+  id: UUID! @deprecated(reason: "Deprecated since 26.10.0. Use `purgedId` or `entityId`.")
+
+  """Added in 26.10.0. UUID of the purged notification rule."""
+  entityId: UUID!
 }
 
 """Added in 26.10.0. Payload for object storage permanent purge."""
 type PurgeObjectStoragePayload {
+  """Added in 26.10.0. Global ID of the purged object storage."""
+  purgedId: ID!
+
   """ID of the purged object storage."""
-  id: UUID!
+  id: UUID! @deprecated(reason: "Deprecated since 26.10.0. Use `purgedId` or `entityId`.")
+
+  """Added in 26.10.0. UUID of the purged object storage."""
+  entityId: UUID!
+}
+
+"""Added in 26.10.0. Payload for permission purge."""
+type PurgePermissionPayload {
+  """Global ID of the purged permission."""
+  purgedId: ID!
+
+  """UUID of the purged permission."""
+  fieldId: UUID!
 }
 
 """Added in 26.4.2. Payload for project permanent deletion mutation."""
@@ -14343,10 +14490,52 @@ type PurgeProjectPayload {
   purged: Boolean!
 }
 
+"""Added in 26.10.0. Payload for project resource policy purge."""
+type PurgeProjectResourcePolicyPayload {
+  """Global ID of the purged project resource policy."""
+  purgedId: ID!
+
+  """UUID of the purged project resource policy."""
+  entityId: UUID!
+}
+
+"""Added in 26.10.0. Payload for query definition purge."""
+type PurgeQueryDefinitionPayload {
+  """Global ID of the purged query definition."""
+  purgedId: ID!
+
+  """UUID of the purged query definition."""
+  entityId: UUID!
+}
+
 """Added in 26.10.0. Payload for purging a Reservoir registry."""
 type PurgeReservoirRegistryPayload {
+  """Added in 26.10.0. Global ID of the purged Reservoir registry."""
+  purgedId: ID!
+
   """ID of the purged Reservoir registry."""
-  id: UUID!
+  id: UUID! @deprecated(reason: "Deprecated since 26.10.0. Use `purgedId` or `entityId`.")
+
+  """Added in 26.10.0. UUID of the purged Reservoir registry."""
+  entityId: UUID!
+}
+
+"""Added in 26.10.0. Payload for resource group purge."""
+type PurgeResourceGroupPayload {
+  """Global ID of the purged resource group."""
+  purgedId: ID!
+
+  """UUID of the purged resource group."""
+  entityId: UUID!
+}
+
+"""Added in 26.10.0. Payload for resource preset purge."""
+type PurgeResourcePresetPayload {
+  """Global ID of the purged resource preset."""
+  purgedId: ID!
+
+  """UUID of the purged resource preset."""
+  entityId: UUID!
 }
 
 """Added in 26.9.0. Input for removing a resource slot type."""
@@ -14357,14 +14546,26 @@ input PurgeResourceSlotTypeInput {
 
 """Added in 26.9.0. Payload for resource slot type removal."""
 type PurgeResourceSlotTypePayload {
+  """Added in 26.10.0. Global ID of the purged resource slot type."""
+  purgedId: ID!
+
   """Slot name of the removed resource slot type."""
   slotName: String!
+
+  """Added in 26.10.0. UUID of the purged resource slot type."""
+  entityId: UUID!
 }
 
 """Added in 26.8.0. Purge retention policy payload."""
 type PurgeRetentionPolicyPayload {
+  """Added in 26.10.0. Global ID of the purged retention policy."""
+  purgedId: ID!
+
   """ID of the purged retention policy."""
-  id: UUID!
+  id: UUID! @deprecated(reason: "Deprecated since 26.10.0. Use `purgedId` or `entityId`.")
+
+  """Added in 26.10.0. UUID of the purged retention policy."""
+  entityId: UUID!
 }
 
 """Added in 26.3.0. Input for purging a role"""
@@ -14374,14 +14575,53 @@ input PurgeRoleInput {
 
 """Added in 26.3.0. Payload for purge role mutation."""
 type PurgeRolePayload {
+  """Added in 26.10.0. Global ID of the purged role."""
+  purgedId: ID!
+
   """ID of the purged role."""
-  id: UUID!
+  id: UUID! @deprecated(reason: "Deprecated since 26.10.0. Use `purgedId` or `entityId`.")
+
+  """Added in 26.10.0. UUID of the purged role."""
+  entityId: UUID!
 }
 
 """Added in 26.10.0. Payload returned after purging a role preset."""
 type PurgeRolePresetPayload {
+  """Added in 26.10.0. Global ID of the purged role preset."""
+  purgedId: ID!
+
   """Purged role preset, as it stood."""
-  rolePreset: RolePreset!
+  rolePreset: RolePreset! @deprecated(reason: "Deprecated since 26.10.0. Use `purgedId` or `entityId`.")
+
+  """Added in 26.10.0. UUID of the purged role preset."""
+  entityId: UUID!
+}
+
+"""Added in 26.10.0. Payload for runtime variant purge."""
+type PurgeRuntimeVariantPayload {
+  """Global ID of the purged runtime variant."""
+  purgedId: ID!
+
+  """UUID of the purged runtime variant."""
+  entityId: UUID!
+}
+
+"""Added in 26.10.0. Payload for runtime variant preset purge."""
+type PurgeRuntimeVariantPresetPayload {
+  """Global ID of the purged runtime variant preset."""
+  purgedId: ID!
+
+  """UUID of the purged runtime variant preset."""
+  entityId: UUID!
+}
+
+"""Added in 26.10.0. Payload for user resource policy purge."""
+type PurgeUserResourcePolicyPayload {
+  """Global ID of the purged user resource policy."""
+  purgedId: ID!
+
+  """UUID of the purged user resource policy."""
+  entityId: UUID!
 }
 
 """
@@ -14414,8 +14654,14 @@ type PurgeUserV2Payload {
 
 """Added in 26.10.0. Payload for VFS storage permanent purge."""
 type PurgeVFSStoragePayload {
+  """Added in 26.10.0. Global ID of the purged VFS storage."""
+  purgedId: ID!
+
   """ID of the purged VFS storage."""
-  id: UUID!
+  id: UUID! @deprecated(reason: "Deprecated since 26.10.0. Use `purgedId` or `entityId`.")
+
+  """Added in 26.10.0. UUID of the purged VFS storage."""
+  entityId: UUID!
 }
 
 """Added in 26.4.4. Optional behavior flags for vfolder purge operations."""
@@ -14436,7 +14682,10 @@ Added in 26.4.2. Payload returned after permanently purging a virtual folder.
 """
 type PurgeVFolderV2Payload {
   """ID of the purged virtual folder."""
-  id: UUID!
+  id: UUID! @deprecated(reason: "Deprecated since 26.10.0. Use `vfolder`.")
+
+  """Added in 26.10.0. The virtual folder being purged."""
+  vfolder: VFolder!
 }
 
 type Query {
