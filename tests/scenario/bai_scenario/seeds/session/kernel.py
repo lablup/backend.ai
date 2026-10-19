@@ -47,8 +47,12 @@ class TestSeedKernelOf(TestSeedFieldWithNestedRows[SessionEntityData, KernelInfo
 
     @override
     def field(self) -> KernelCreator:
-        if self.session.name is None or self.session.access_key is None:
-            raise LookupError("the session was laid without a name or an access key")
+        if (
+            self.session.name is None
+            or self.session.access_key is None
+            or self.session.user_uuid is None
+        ):
+            raise LookupError("the session was laid without a name, an access key or an owner")
         kernel_spec = KernelSpec(
             cluster_role="main",
             cluster_idx=1,
