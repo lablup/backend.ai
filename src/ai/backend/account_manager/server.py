@@ -32,6 +32,7 @@ from setproctitle import setproctitle
 
 from ai.backend.common.etcd import AsyncEtcd, ConfigScopes
 from ai.backend.common.metrics.http import (
+    SystemMetricUpdater,
     build_api_metric_middleware,
     build_prometheus_metrics_handler,
 )
@@ -274,6 +275,7 @@ def build_internal_app() -> web.Application:
     app = web.Application()
     metric_registry = CommonMetricRegistry.instance()
     app.router.add_route("GET", r"/metrics", build_prometheus_metrics_handler(metric_registry))
+    app.cleanup_ctx.append(SystemMetricUpdater(metric_registry.system).cleanup_ctx)
     return app
 
 
