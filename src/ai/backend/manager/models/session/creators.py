@@ -9,7 +9,6 @@ from typing import override
 from uuid import UUID
 
 from ai.backend.common.data.entity.image import ImageID
-from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.session import SessionID
 from ai.backend.common.data.entity.session_dependency import SessionDependencyID
 from ai.backend.common.data.entity.types import EntityIdentifier
@@ -52,7 +51,7 @@ class SessionCreator(EntityCreator[SessionRow, SessionEntityData]):
 
     @override
     def created_in(self, row: SessionRow) -> Collection[EntityIdentifier]:
-        return [UserID(row.user_uuid), ProjectID(row.group_id)]
+        return [UserID(self.spec.resource_spec.identity.user_uuid), self.spec.scope.project_id]
 
     @override
     def integrity_error_checks(self) -> Sequence[IntegrityErrorCheck]:

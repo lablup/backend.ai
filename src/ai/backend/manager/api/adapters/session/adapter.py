@@ -1316,7 +1316,7 @@ class SessionAdapter(BaseAdapter):
             entity_id=data.entity_id(),
             image_ids=data.image_ids,
             domain_name=data.domain_name,
-            user_id=UserID(data.user_uuid),
+            user_id=data.user_uuid,
             project_id=data.group_id,
             metadata=SessionMetadataInfoGQLDTO(
                 creation_id=data.creation_id or "",
@@ -1390,7 +1390,7 @@ class SessionAdapter(BaseAdapter):
                 session_type=info.session.session_type.value,
             ),
             user_info=KernelUserInfoGQLDTO(
-                user_id=UserID(info.user_permission.user_uuid),
+                user_id=info.user_permission.user_uuid,
                 access_key=info.user_permission.access_key,
                 domain_name=info.user_permission.domain_name,
                 group_id=info.user_permission.group_id,

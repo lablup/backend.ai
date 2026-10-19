@@ -685,7 +685,7 @@ class SessionV2GQL(PydanticNodeMixin[SessionNode]):
 
     # Fields used as keys for dynamic resolvers
     domain_name: str
-    user_id: ID
+    user_id: ID | None
     project_id: ID
     replica_id: ID | None = gql_added_field(
         BackendAIGQLMeta(
@@ -717,6 +717,8 @@ class SessionV2GQL(PydanticNodeMixin[SessionNode]):
         BackendAIGQLMeta(added_version="26.3.0", description="The user who owns this session.")
     )  # type: ignore[misc]
     async def user(self, info: Info[StrawberryGQLContext]) -> UserV2GQL | None:
+        if self.user_id is None:
+            return None
         user_data = await info.context.data_loaders.user_loader.load(
             UserID(UUID(str(self.user_id)))
         )

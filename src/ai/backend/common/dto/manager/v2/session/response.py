@@ -188,7 +188,9 @@ class SessionNode(BaseResponseModel):
         ),
     )
     domain_name: str = Field(description="Domain name the session belongs to.")
-    user_id: UUID = Field(description="UUID of the user who owns this session.")
+    user_id: UUID | None = Field(
+        description="UUID of the user who owns this session. Null once the owner is purged."
+    )
     project_id: UUID = Field(description="Group (project) ID the session belongs to.")
     metadata: SessionMetadataInfoGQLDTO = Field(
         description="Metadata including name, type, and cluster information."

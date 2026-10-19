@@ -220,7 +220,12 @@ class KernelRow(CreatedAtMixin, Base):
     group_id: Mapped[ProjectID] = mapped_column(
         "group_id", GUID(ProjectID), sa.ForeignKey("groups.id"), nullable=False
     )
-    user_uuid: Mapped[UserID] = mapped_column("user_uuid", GUID(UserID), nullable=False)
+    user_uuid: Mapped[UserID | None] = mapped_column(
+        "user_uuid",
+        GUID(UserID),
+        sa.ForeignKey("users.uuid", ondelete="SET NULL"),
+        nullable=True,
+    )
     access_key: Mapped[str | None] = mapped_column(
         "access_key", sa.String(length=20), nullable=True
     )
@@ -427,7 +432,7 @@ class KernelRow(CreatedAtMixin, Base):
     )
     agent_row: Mapped[AgentRow | None] = relationship("AgentRow")
     group_row: Mapped[ProjectRow] = relationship("ProjectRow")
-    user_row: Mapped[UserRow] = relationship(
+    user_row: Mapped[UserRow | None] = relationship(
         "UserRow",
         primaryjoin=_get_user_row_join_condition,
         foreign_keys="KernelRow.user_uuid",

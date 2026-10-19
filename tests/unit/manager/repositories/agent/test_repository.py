@@ -1273,6 +1273,39 @@ class TestAgentDBSourceKernelFiltering:
         yield (str(group_id), test_domain)
 
     @pytest.fixture
+    async def test_user(
+        self,
+        db_with_tables: ExtendedAsyncSAEngine,
+        test_domain: str,
+        test_domain_id: DomainID,
+    ) -> AsyncGenerator[UUID, None]:
+        """Create a user to own the seeded sessions and kernels"""
+        policy_name = str(uuid4())
+        user_uuid = uuid4()
+        async with db_with_tables.begin_session() as db_sess:
+            db_sess.add(
+                UserResourcePolicyRow(
+                    name=policy_name,
+                    max_vfolder_count=0,
+                    max_quota_scope_size=-1,
+                    max_session_count_per_model_session=10,
+                    max_customized_image_count=10,
+                )
+            )
+            await db_sess.flush()
+            db_sess.add(
+                UserRow(
+                    uuid=user_uuid,
+                    username=f"testuser-{user_uuid.hex[:8]}",
+                    email=f"{user_uuid.hex[:8]}@example.com",
+                    domain_name=test_domain,
+                    domain_id=test_domain_id,
+                    resource_policy=policy_name,
+                )
+            )
+        yield user_uuid
+
+    @pytest.fixture
     async def resource_group(
         self,
         db_with_tables: ExtendedAsyncSAEngine,
@@ -1374,6 +1407,7 @@ class TestAgentDBSourceKernelFiltering:
         domain_id: DomainID,
         domain_name: str,
         group_id: UUID,
+        user_uuid: UUID,
     ) -> SessionId:
         session_id = SessionId(uuid4())
         async with db.begin_session() as db_sess:
@@ -1385,7 +1419,7 @@ class TestAgentDBSourceKernelFiltering:
                     domain_id=domain_id,
                     domain_name=domain_name,
                     group_id=group_id,
-                    user_uuid=uuid4(),
+                    user_uuid=user_uuid,
                     resource_group_id=resource_group_id,
                     scaling_group_name=resource_group_name,
                     status=SessionStatus.RUNNING,
@@ -1417,7 +1451,7 @@ class TestAgentDBSourceKernelFiltering:
                     status=KernelStatus.RUNNING,
                     domain_name=domain_name,
                     group_id=group_id,
-                    user_uuid=uuid4(),
+                    user_uuid=user_uuid,
                     access_key="AKTEST" + uuid4().hex[:12],
                     environ={},
                     mounts=[],
@@ -1473,6 +1507,7 @@ class TestAgentDBSourceKernelFiltering:
         test_domain: str,
         test_domain_id: DomainID,
         test_group: tuple[str, str],
+        test_user: UUID,
     ) -> None:
         group_id_str, domain_name = test_group
         agent_id = AgentId(str(uuid4()))
@@ -1486,6 +1521,7 @@ class TestAgentDBSourceKernelFiltering:
             test_domain_id,
             domain_name,
             UUID(group_id_str),
+            test_user,
         )
 
         # force unset: rejected, agent group left unchanged

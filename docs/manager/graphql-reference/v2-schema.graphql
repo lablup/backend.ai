@@ -19552,7 +19552,7 @@ type SessionV2 implements Node {
   """
   imageIds: [ID!]
   domainName: String!
-  userId: ID!
+  userId: ID
   projectId: ID!
 
   """

@@ -523,6 +523,9 @@ class ScheduleDBSource:
                 # Matches the previous join semantics: a pending session
                 # without pending kernels is not schedulable.
                 continue
+            if row.user_uuid is None:
+                # The owner was purged; the purge marks the session for termination.
+                continue
             workloads.append(
                 SessionWorkload(
                     meta=WorkloadMeta(
@@ -530,7 +533,7 @@ class ScheduleDBSource:
                         resource_group_id=row.resource_group_id,
                         owner=WorkloadOwner(
                             access_key=AccessKey(row.access_key or ""),
-                            user_uuid=UserID(row.user_uuid),
+                            user_uuid=row.user_uuid,
                             project_id=ProjectID(row.group_id),
                             domain_id=DomainID(row.domain_id),
                         ),
@@ -4507,7 +4510,8 @@ class ScheduleDBSource:
                     "network_id": session.network_id,
                     "kernels": [],
                 }
-                user_uuids.add(session.user_uuid)
+                if session.user_uuid is not None:
+                    user_uuids.add(session.user_uuid)
 
             # 2. Query kernels for these sessions
             kernel_query = (

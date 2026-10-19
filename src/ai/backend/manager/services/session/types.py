@@ -45,7 +45,7 @@ class LegacySessionInfo:
     age_ms: int = field(compare=False)
     domain_name: str
     group_id: UUID
-    user_id: UUID
+    user_id: UUID | None
     lang: str
     image: str
     architecture: str

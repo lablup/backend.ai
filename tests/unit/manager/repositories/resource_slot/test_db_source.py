@@ -37,6 +37,8 @@ from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.resource_slot.db_source.db_source import ResourceSlotDBSource
 from ai.backend.testutils.db import with_tables
 
+_USER_ID = uuid4()
+
 
 class TestSlotTypes:
     """Tests for resource_slot_types read operations."""
@@ -138,6 +140,27 @@ class TestAggregation:
             )
         async with db.begin_session() as db_sess:
             db_sess.add(
+                UserResourcePolicyRow(
+                    name="default",
+                    max_vfolder_count=10,
+                    max_quota_scope_size=0,
+                    max_session_count_per_model_session=5,
+                    max_customized_image_count=3,
+                )
+            )
+            await db_sess.flush()
+            db_sess.add(
+                UserRow(
+                    uuid=_USER_ID,
+                    username="test-user",
+                    email="test-user@example.com",
+                    domain_name=domain_name,
+                    domain_id=domain_id,
+                    resource_policy="default",
+                )
+            )
+        async with db.begin_session() as db_sess:
+            db_sess.add(
                 AgentRow(
                     id=agent_id,
                     status=AgentStatus.ALIVE,
@@ -182,7 +205,7 @@ class TestAggregation:
                     group_id=project_id,
                     resource_group_id=resource_group_id,
                     scaling_group_name="test-sg",
-                    user_uuid=uuid4(),
+                    user_uuid=_USER_ID,
                 )
             )
             await db_sess.flush()
@@ -192,7 +215,7 @@ class TestAggregation:
                     session_id=session_id,
                     domain_name=domain_name,
                     group_id=project_id,
-                    user_uuid=uuid4(),
+                    user_uuid=_USER_ID,
                     status=status,
                     repl_in_port=0,
                     repl_out_port=0,
@@ -521,6 +544,27 @@ class TestComputeActualAgentResourceUsage:
             )
         async with db.begin_session() as db_sess:
             db_sess.add(
+                UserResourcePolicyRow(
+                    name="default",
+                    max_vfolder_count=10,
+                    max_quota_scope_size=0,
+                    max_session_count_per_model_session=5,
+                    max_customized_image_count=3,
+                )
+            )
+            await db_sess.flush()
+            db_sess.add(
+                UserRow(
+                    uuid=_USER_ID,
+                    username="test-user",
+                    email="test-user@example.com",
+                    domain_name=domain_name,
+                    domain_id=domain_id,
+                    resource_policy="default",
+                )
+            )
+        async with db.begin_session() as db_sess:
+            db_sess.add(
                 AgentRow(
                     id=agent_id,
                     status=AgentStatus.ALIVE,
@@ -560,7 +604,7 @@ class TestComputeActualAgentResourceUsage:
                     group_id=project_id,
                     resource_group_id=resource_group_id,
                     scaling_group_name="test-sg",
-                    user_uuid=uuid4(),
+                    user_uuid=_USER_ID,
                 )
             )
             await db_sess.flush()
@@ -570,7 +614,7 @@ class TestComputeActualAgentResourceUsage:
                     session_id=session_id,
                     domain_name=domain_name,
                     group_id=project_id,
-                    user_uuid=uuid4(),
+                    user_uuid=_USER_ID,
                     status=status,
                     repl_in_port=0,
                     repl_out_port=0,

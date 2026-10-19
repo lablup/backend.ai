@@ -195,7 +195,7 @@ class SessionData(EntityData):
     cluster_size: int
     domain_name: str
     group_id: UUID
-    user_uuid: UUID
+    user_uuid: UUID | None
     use_host_network: bool
     created_at: datetime = field(compare=False)
     status: SessionStatus
@@ -282,7 +282,7 @@ class SessionEntityData(EntityData):
     domain_name: str
     domain_id: DomainID
     group_id: ProjectID
-    user_uuid: UserID
+    user_uuid: UserID | None
     access_key: AccessKey | None
     images: list[str] | None
     image_ids: list[UUID] | None
@@ -410,7 +410,7 @@ class SessionMetadata:
     name: str
     domain_name: str
     group_id: UUID
-    user_uuid: UUID
+    user_uuid: UUID | None
     access_key: str
     session_type: SessionTypes
     priority: int

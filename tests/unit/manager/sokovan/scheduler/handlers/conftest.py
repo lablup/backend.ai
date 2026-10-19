@@ -685,7 +685,7 @@ def sessions_for_start_factory() -> Callable[..., SessionsForStartWithImages]:
                     )
                     for k in s.kernel_infos
                 ],
-                user_uuid=s.session_info.metadata.user_uuid,
+                user_uuid=s.session_info.metadata.user_uuid or uuid4(),
                 user_email="test@example.com",
                 user_name="test-user",
                 environ={},
