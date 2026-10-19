@@ -74,16 +74,12 @@ class StorageVolumeScope(BaseRequestModel):
     user: list[UUIDScope] | None = Field(
         default=None, description="Users whose storage volumes are being read"
     )
-    storage_backend: list[UUIDScope] | None = Field(
-        default=None, description="Storage backends whose volumes are being read"
-    )
 
     @model_validator(mode="after")
     def _require_non_empty(self) -> StorageVolumeScope:
-        if not self.domain and not self.project and not self.user and not self.storage_backend:
+        if not self.domain and not self.project and not self.user:
             raise ValueError(
-                "StorageVolumeScope requires a non-empty value for 'domain', 'project', "
-                "'user' or 'storage_backend'"
+                "StorageVolumeScope requires a non-empty value for 'domain', 'project' or 'user'"
             )
         return self
 

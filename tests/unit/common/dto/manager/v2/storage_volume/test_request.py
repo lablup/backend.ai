@@ -102,7 +102,7 @@ class TestStorageVolumeScope:
         with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             StorageVolumeScope()
 
-    @pytest.mark.parametrize("field", ["domain", "project", "user", "storage_backend"])
+    @pytest.mark.parametrize("field", ["domain", "project", "user"])
     def test_one_dimension_is_enough(self, field: str) -> None:
         scope = StorageVolumeScope.model_validate({field: [{"value": str(uuid.uuid4())}]})
         assert getattr(scope, field) is not None
@@ -111,7 +111,6 @@ class TestStorageVolumeScope:
         scope = _a_scope()
         assert scope.project is None
         assert scope.user is None
-        assert scope.storage_backend is None
 
 
 class TestAdminSearchStorageVolumesInput:
@@ -146,9 +145,9 @@ class TestScopedSearchStorageVolumesInput:
             ScopedSearchStorageVolumesInput.model_validate({})
 
     def test_the_scope_is_carried(self) -> None:
-        backend_id = uuid.uuid4()
+        project_id = uuid.uuid4()
         input = ScopedSearchStorageVolumesInput(
-            scope=StorageVolumeScope(storage_backend=[UUIDScope(value=backend_id)])
+            scope=StorageVolumeScope(project=[UUIDScope(value=project_id)])
         )
-        assert input.scope.storage_backend is not None
-        assert input.scope.storage_backend[0].value == backend_id
+        assert input.scope.project is not None
+        assert input.scope.project[0].value == project_id

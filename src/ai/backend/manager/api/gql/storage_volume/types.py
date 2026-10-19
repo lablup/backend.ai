@@ -143,9 +143,6 @@ class StorageVolumeScopeGQL(PydanticInputMixin[StorageVolumeScope]):
     user: list[UUIDScopeGQL] | None = gql_field(
         default=None, description="Users whose storage volumes are being read."
     )
-    storage_backend: list[UUIDScopeGQL] | None = gql_field(
-        default=None, description="Storage backends whose volumes are being read."
-    )
 
 
 @gql_node_type(
