@@ -1,7 +1,7 @@
 ---
 name: session-group-service-shapes
 type: decision-table
-description: session_group knowledge - why the reads by id keep a service while the two searches and the purge run against ops, how a deployment's group is left out of every user read and the purge, why the bulk read is partial
+description: session_group knowledge - why the reads by id keep a service while the two searches and the purge run against ops, how a deployment's group is left out of every user read and refused by the purge, why the bulk read is partial
 scope: src/ai/backend/manager/services/session_group
 keywords: [GetSessionGroupAction, BulkGetSessionGroupsAction, GlobalSearchSessionGroupsAction, ScopedSearchSessionGroupsAction, PurgeSessionGroupAction, SessionGroupPurger, SessionGroupService, OpsRepository, SessionGroupTarget, replica_groups, partial_bulk, single_entity]
 sources:
@@ -11,6 +11,9 @@ sources:
 generated:
   by: claude-code/opus-5.5
   at: 2026-10-15
+updated:
+  by: claude-code/opus-5.5
+  at: 2026-10-19
 status: draft
 ---
 
@@ -35,12 +38,14 @@ shape, operation, gate and backing.
 | `bulk_get_ids` | The same searcher for many ids; a held group answers empty |
 | `scoped_search` | Every `SessionGroupTarget` adds the same condition to its scope condition |
 | `global_search` | Not left out: the superadmin sees every group |
-| `purge` | The purger's guard rides on the DELETE; a held group answers not found |
+| `purge` | The purger's guard rides on the DELETE; a held group is refused as in use (409) |
 
 - The condition is `SessionGroupSearchableFields.linked.replica_groups.not_exists()`, one
   declaration every path reads.
-- A held group answers not found, not a denial: the caller may hold READ on it through
-  the project, so the permission is not what keeps it out.
+- A read answers a held group as not found, not a denial: the caller may hold READ on it
+  through the project, so the permission is not what keeps it out.
+- The purge refuses a held group as in use: only a caller holding PURGE on the group
+  reaches the guard, and the group cannot go while a replica group references it.
 
 ## The reads by id keep a service
 

@@ -132,7 +132,7 @@ async def scoped_session_groups(
         added_version=NEXT_RELEASE_VERSION,
         description=(
             "Permanently remove a session group. Its member sessions remain with their group "
-            "cleared. A group a deployment's replica group holds is not found."
+            "cleared. A group a deployment's replica group references is refused as in use."
         ),
     )
 )
